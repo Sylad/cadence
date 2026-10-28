@@ -4301,6 +4301,7 @@ lots:
     estimate: 0.5
     created: 2026-10-28
     started: 2026-10-28
+    review: { date: 2026-10-28, verdict: "conforme (revue Opus neuve après refonte par le lead ; regroupé en 24ddb581 sur main, diff identique, porte verte 4 258 tests) : sessions de vague et ref ne désactivent que les plugins, réglages et bac à sable intacts, 42 541 → 38 330 jetons au premier tour ; note : claudeConfigDir inutilisé dans src/", commit: 24ddb581595b90bdbe197fb632b781d1099769e9 }
   - id: L399
     title: "Tests rouges à la porte après une implémentation qui se disait verte : 30 passes sur 205 du 22 au 28-10 (cadence 17) ; diagnostiquer par lot (commande de la session ≠ orchestrate.test, test instable, dépendances du worktree) depuis les journaux, puis supprimer la cause mesurée ; doc, tests"
     status: done

@@ -58,6 +58,16 @@ lots:
     started: 2026-10-28
     review: { date: 2026-10-28, verdict: "compliant (1 minor : la garde ne voit que les lectures directes `read*(join(ROOT…, '.cadence', 'raf.yaml'))`) — orchestré (vague 2026-10-28-1620, 0 passe(s) de correction)", commit: d0c111b290976f11604411b0b39dd53b7c92e4a9, reporte: { de: beb6a2fbcfdeefaa4a622a7f6eb906bd6f6c6080, vers: d0c111b290976f11604411b0b39dd53b7c92e4a9, patchId: 26e0c3ac6a64b26cccef8d3ecc1eecfeb4b23946 } }
     finished: 2026-10-28
+  - id: L405
+    title: "Hook pre-push posé par cadence : refuser un push qui emporte un commit d'un lot non prêt d'une vague vivante du dépôt, en nommant le lot et la commande sûre (git push origin <sha>:main) ; vécu 15-10 et 28-10 (Q-PORTE1 poussé en revue après une note de plan commitée, vague arrêtée sur « push détecté »), test"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-28
+  - id: L406
+    title: "Passe fix sans commit : une session fix qui ne commite rien relance la revue sur les mêmes commits (L401 : 2 passes perdues le 28-10 ; 51 avertissements « fix sans nouveau commit » dans les états de vague) — exiger un commit ou une raison dans la sortie, sinon ne pas compter la passe ni relancer la revue à l'identique ; mesure avant/après, test"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-28
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

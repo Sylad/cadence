@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, realpathSync } from 'node:fs';
 import { cp, readdir, realpath, rm, symlink } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import type { Plan } from '../plan.js';
@@ -176,14 +176,14 @@ export async function copyDeps(repo: string, dir: string, names: readonly string
     await cp(from, to, { recursive: true, verbatimSymlinks: true });
     // Un dossier venu d'hors du dépôt (lien) garde ses liens internes relatifs ; ses liens vers le reste du monde sont refaits vers leur cible vivante.
     const inside = !relative(repoReal, from).startsWith('..');
-    await relinkOutside(inside ? repoReal : from, join(repo, name), from, to);
+    await relinkOutside(inside ? repoReal : from, from, to);
     copied.push(name);
   }
   return copied;
 }
 
-/** Dans la copie `to` de `live` (dont le vrai chemin est `real`), refait vers leur cible vivante les liens dont la cible sort de `boundary`. */
-async function relinkOutside(boundary: string, live: string, real: string, to: string): Promise<void> {
+/** Dans la copie `to` du dossier de vrai chemin `real`, refait vers leur cible vivante les liens dont la cible sort de `boundary`. */
+async function relinkOutside(boundary: string, real: string, to: string): Promise<void> {
   for (const e of await readdir(real, { withFileTypes: true })) {
     const realEntry = join(real, e.name);
     const copy = join(to, e.name);
@@ -199,7 +199,7 @@ async function relinkOutside(boundary: string, live: string, real: string, to: s
         await symlink(target, copy);
       }
     } else if (e.isDirectory()) {
-      await relinkOutside(boundary, join(live, e.name), realEntry, copy);
+      await relinkOutside(boundary, realEntry, copy);
     }
   }
 }

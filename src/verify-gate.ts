@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { lstatSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { OrchestrateConfig, VerifyConfig } from './config.js';
@@ -58,7 +58,7 @@ function sh(cmd: string, cwd: string, timeoutMs: number, group: { pgid?: number 
 }
 
 export interface GateCtx {
-  /** Racine du dépôt vivant : ses dépendances non suivies sont reliées dans le worktree. */
+  /** Racine du dépôt vivant : ses dépendances non suivies (node_modules, .venv) sont copiées dans le worktree (`copyDeps`). */
   repo: string;
   sha: string;
   config: OrchestrateConfig;
@@ -159,7 +159,7 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
     let copied: string[];
     let missing: string[] = [];
     if (config.worktreeDeps) {
-      const present = config.worktreeDeps.filter((n) => lstatSync(join(repo, n), { throwIfNoEntry: false }));
+      const present = config.worktreeDeps.filter((n) => existsSync(join(repo, n)));
       copied = await copyDeps(repo, dir, present);
       missing = config.worktreeDeps.filter((n) => !present.includes(n));
     } else {

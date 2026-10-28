@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
@@ -49,14 +49,14 @@ describe('orchestrate.worktreeDeps (L348)', () => {
 });
 
 describe('verifyGate : la porte rejouée au sha dans un worktree jetable (L348)', () => {
-  it('les dépendances non suivies sont liées depuis l\'arbre principal : vert', async () => {
+  it('les dépendances non suivies sont copiées depuis l\'arbre principal : vert', async () => {
     const { repo, sha } = project('orchestrate:\n  test: test -f node_modules/dep/index.js && test -d .venv\n');
     const r = await gate(repo, sha);
     expect(r.code).toBe(0);
     expect(r.text).toContain('vert');
   });
 
-  it('worktreeDeps déclarée : seules ces dépendances sont liées', async () => {
+  it('worktreeDeps déclarée : seules ces dépendances sont copiées', async () => {
     const { repo, sha } = project('orchestrate:\n  worktreeDeps: [node_modules]\n  test: test -f node_modules/dep/index.js && test ! -e .venv\n');
     expect((await gate(repo, sha)).code).toBe(0);
   });
@@ -520,7 +520,7 @@ describe('verifyGate : où la porte tourne (L389)', () => {
     expect(r.code).toBe(0);
   });
 
-  it('L392 R2 — la copie ne bloque pas la boucle d\'événements : Ctrl-C reçu pendant la copie est traité', async () => {
+  it('L392 R2 — la copie ne bloque pas la boucle d\'événements (condition pour que Ctrl-C soit traité pendant la copie)', async () => {
     const repo = gitRepo();
     writeFileSync(join(repo, '.gitignore'), 'node_modules/\n');
     const live = join(repo, 'node_modules');
@@ -588,6 +588,15 @@ describe('verifyGate : où la porte tourne (L389)', () => {
     expect(lines[0]).toMatch(/copie jetable/);
     expect(lines[0]).toMatch(/dépendances copiées : node_modules$/);
     expect(lines.findIndex((l) => l.includes('absentes'))).toBeGreaterThan(0);
+  });
+
+  it('L392 — worktreeDeps: [node_modules] alors que node_modules est un lien mort : rien n\'est copié, l\'avis « déclarées absentes » le dit', async () => {
+    const { repo, sha } = project('orchestrate:\n  worktreeDeps: [node_modules]\n  test: "true"\n');
+    execFileSync('rm', ['-rf', join(repo, 'node_modules')]);
+    symlinkSync(join(repo, 'nulle-part'), join(repo, 'node_modules'));
+    const r = await gate(repo, sha);
+    expect(r.text.split('\n')[0]).toMatch(/dépendances copiées : aucune$/);
+    expect(r.text).toMatch(/absentes de l'arbre principal, non copiées : node_modules/);
   });
 
   it('L389 R6 — l\'arbre principal bouge pendant la porte en place (HEAD avancé par une intégration) : le verdict est dit non probant, code 2', async () => {

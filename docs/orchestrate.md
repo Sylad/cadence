@@ -101,7 +101,7 @@ command warns `ne lit pas les demandes de contrôle` on the error output.
 plan too); then, each time the lots in play are finished, the wave **draws the next ready lots of the plan** — up to the
 session cap — and plays them in the same wave (same budget, same state folder, journal line `continue : tire …`). A lot
 is drawn when it is `todo`, its `after` is lifted, it is not recurring, neither its title nor a note says « à décider »
-(« à décider avec … », « (à décider) »: a lot waiting for a human decision), it is not already in the wave, and its own budget (derived from its estimate; a lot with `screen: page` is worth 1.3 M whatever its estimate (`component` and `journey` have their ordinary budget), or its ordinary budget plus the 450 k spec-stage allocation if that is more, and a lot with `spec: true` gets that allocation on top of its ordinary budget)
+(« à décider avec … », « (à décider) »: a lot waiting for a human decision), it is not already in the wave, the project's draw setting does not hold it back (L390, below), and its own budget (derived from its estimate; a lot with `screen: page` is worth 1.3 M whatever its estimate (`component` and `journey` have their ordinary budget), or its ordinary budget plus the 450 k spec-stage allocation if that is more, and a lot with `spec: true` gets that allocation on top of its ordinary budget)
 fits in the budget left — otherwise the next one that fits is taken (a lot that does not fit in what is left of the current
 round is not dropped: it is tried again at the next round, once the budget allows it). A round takes at most **one lot per
 repository** while other repositories have ready lots — the pool plays the lots of one repository one after the other, so a
@@ -117,6 +117,17 @@ lots finished cleanly), or no ready
 lot whose estimate fits the budget left. `--resume … --continue` draws again after the resumed lots. When the wave starts, `--continue` (and its `--dry-run`) prints the line `prêts, ressources libres : <project>:<lot> <title> (<resources>) · …` that `cadence lead tour` prints (L252): the ready lots, from every project of the folder, whose `uses:` resources (`raf uses`, `resources:` of the parent `cadence.yaml`) are held neither by a lot `doing` (of the folder's projects, and of every project that shares their resources: those under the folder whose `cadence.yaml` declares `resources:`, walked with its `depth:`, one level by default, so launched from a group or from inside one project it still sees the others) nor by an unfinished lot of a live wave nor by the lots of the first draw of the wave that starts (a lot of a wave is recognised by its repository and its id, not by the project name; those lots, and the ready lots that compete with them for a resource, are not listed); at most 3 lots per project, then `<project> +K`; nothing is held back by it, the draw below is unchanged. `--dry-run --continue` replays the
 draws round by round with the same function as the wave (one lot per repository per round, pre-check, budget counted on the estimates) and
 names the candidates skipped with their cause: `tour 1 : a:L2, b:L2 · tour 2 : a:L3, a:L4`. Drawing happens between rounds: a round of up to `--max-sessions` lots must finish before the next draw.
+
+**Keeping a lot out of the draw (L390, `orchestrate.continue`)**: `--continue` draws the first ready lot of the plan, even a big one with no spec and no sub-task (maritime B6 « Profils verticaux, coupes (10) », effort L, drawn on 27-10 then withdrawn by the lead). A project says what its draw may not take, in its own `cadence.yaml`:
+
+```yaml
+orchestrate:
+  continue:
+    maxEstimate: 1        # days: a lot whose estimate is above is not drawn (equal is drawn)
+    exclude: [L12, L40]   # lot ids never drawn
+```
+
+Both keys are optional; no `continue:` key keeps the old behaviour. A lot whose title or a note says « non tirable » (any case) is not drawn either, with no setting needed — the same convention as « à décider ». The setting belongs to the project: the other projects of the folder draw as before. It only governs the draw: a lot given on the command line (`cadence orchestrate maritime-atlas:B6`) is played whatever the setting says, and `--resume` replays the lots already in the wave. `--dry-run --continue` prints, after the `--continue : priorité …` line, `réglage de tirage — <project> : maxEstimate 1, exclude L12 L40` for each project that sets one, then `lot écarté — <project>:<lot> écarté du tirage : <cause>` for each ready lot held back (`estimate 3 > continue.maxEstimate 1`, `listé dans continue.exclude`, `marqué « non tirable »`); the wave itself says nothing about them, round after round. An unknown key, a `maxEstimate` that is not a positive number or an `exclude` that is not a list of ids refuses the configuration (`continue.<key> …`). The line `prêts, ressources libres` is a view of the ready lots by resource and does not apply this setting.
 
 **Chaining without the human (L148)**: the `lead` skill, once the human has chosen the first lots and the order, does not ask « next? »
 after a lot that comes back ready: it re-verifies it, records `raf done`, pushes, delivers, has the `qa-reviewer` check the

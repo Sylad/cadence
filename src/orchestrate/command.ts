@@ -25,7 +25,7 @@ import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { costlyHypotheses, specScreen, specText } from './spec.js';
 import { fichesDuDossier } from '../spec.js';
-import { candidates, parsePriority, parseUntil, readPriority, stopReason, type Candidate } from './continue.js';
+import { candidates, parsePriority, parseUntil, drawSettingsReport, readPriority, stopReason, type Candidate } from './continue.js';
 import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, leadReviewedHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, gitProcessRunning, indexLockRefusal, installPrePush, longDuration, removePrePush, snapshot } from './guard.js';
 import { buildArgs, buildLocalArgs, killSessions, MODEL_ALIASES, mcpServersFor, readAgents, realClaude, type AgentDef, type AnyModel, type ClaudeFn, type SessionKind, type StepModel } from './launch.js';
@@ -950,6 +950,7 @@ async function continueDryRun(args: Args, io: OrchestrateIo, deps: OrchestrateDe
   };
   skip(firstSkipped);
   const exclude = new Set(given.map((l) => lotKey(l.project, l.lot)));
+  for (const line of drawSettingsReport(launch, exclude)) io.out(`  ${line}`);
   let remaining = budget - given.reduce((sum, l) => sum + (l.budget ?? 0), 0);
   const cap = maxSessions(args, io);
   const rounds: string[] = [];

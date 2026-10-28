@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parse } from 'yaml';
 import { nextUp } from '../audit.js';
-import { planLoader } from '../config.js';
+import { planLoader, type OrchestrateConfig } from '../config.js';
 import { gitRoot } from '../git.js';
 import { findProjects, isProject } from '../lead.js';
 import { RafError, type Lot } from '../plan.js';
@@ -54,6 +54,19 @@ export function decisionPending(lot: Pick<Lot, 'title' | 'notes'>): boolean {
   return /à décider/i.test([lot.title, ...lot.notes.map((n) => n.text)].join('\n'));
 }
 
+/** Un lot marqué « non tirable » (titre ou note) n'est jamais tiré par `--continue` (L390) ; il reste lançable à la main. */
+export function nonDrawable(lot: Pick<Lot, 'title' | 'notes'>): boolean {
+  return /non tirable/i.test([lot.title, ...lot.notes.map((n) => n.text)].join('\n'));
+}
+
+/** Pourquoi le réglage `orchestrate.continue` du projet (et le marqueur « non tirable ») écarte ce lot du tirage, ou null quand il reste tirable (L390). */
+export function drawFilter(lot: Pick<Lot, 'id' | 'title' | 'notes' | 'estimate'>, setting: OrchestrateConfig['continue']): string | null {
+  if (setting?.exclude?.includes(lot.id)) return 'listé dans continue.exclude';
+  if (nonDrawable(lot)) return 'marqué « non tirable »';
+  if (setting?.maxEstimate !== undefined && lot.estimate !== undefined && lot.estimate > setting.maxEstimate) return `estimate ${lot.estimate} > continue.maxEstimate ${setting.maxEstimate}`;
+  return null;
+}
+
 export interface Candidate {
   project: string;
   dir: string;
@@ -66,10 +79,12 @@ export interface DrawOpts {
   exclude: Set<string>;
   /** Tokens comptés restant au budget : un lot dont le budget (estimate, plus l'étape spec d'un lot à écran) n'y tient pas n'est pas tiré. */
   remaining: number;
+  /** Reçoit une ligne par lot prêt écarté par le réglage de tirage du projet (L390), pour que le dry-run le dise. */
+  skipped?: string[];
 }
 
 /**
- * Les lots tirables sous `launch` : prêts (à faire, `after` levé, ni récurrents ni en cours), ni « à décider avec Sylvain » ni déjà
+ * Les lots tirables sous `launch` : prêts (à faire, `after` levé, ni récurrents ni en cours), ni « à décider avec Sylvain », ni écartés par le réglage `orchestrate.continue` du projet ou marqués « non tirable » (L390), ni déjà
  * dans la vague, dont le budget tient dans `remaining` ; projets dans l'ordre de priorité (puis alphabétique), lots dans l'ordre du plan
  * (gains rapides d'abord). `launch` est un projet : lui seul ; sinon ses sous-dossiers qui en sont. Un plan illisible est sauté.
  */
@@ -86,19 +101,48 @@ export function candidates(launch: string, o: DrawOpts): Candidate[] {
     }
     let specDir = 'docs/specs';
     let escalating = false;
+    let setting: OrchestrateConfig['continue'];
     try {
       const config = projectEnv(dir).config;
       specDir = config.spec.dir;
       escalating = !!config.escalation;
+      setting = config.continue;
     } catch {
       // configuration illisible : le dossier par défaut
     }
     for (const lot of ready) {
-      if (o.exclude.has(`${project}:${lot.id}`) || decisionPending(lot) || lotBudget(lot.estimate, specScreen(dir, specDir, lot) ? 'screen' : lot.spec ? 'spec' : undefined, escalating) > o.remaining) continue;
+      if (o.exclude.has(`${project}:${lot.id}`) || decisionPending(lot)) continue;
+      const why = drawFilter(lot, setting);
+      if (why) {
+        o.skipped?.push(`${project}:${lot.id} écarté du tirage : ${why}`);
+        continue;
+      }
+      if (lotBudget(lot.estimate, specScreen(dir, specDir, lot) ? 'screen' : lot.spec ? 'spec' : undefined, escalating) > o.remaining) continue;
       out.push({ project, dir, lot });
     }
   }
   return out;
+}
+
+/**
+ * Pour `--dry-run --continue` (L390) : une ligne par projet qui règle son tirage (`réglage de tirage — <projet> : maxEstimate 1, exclude L3`),
+ * puis une par lot prêt que ce réglage écarte (hors lots déjà dans `exclude`, donnés à la main : ceux-là se jouent).
+ */
+export function drawSettingsReport(launch: string, exclude: Set<string>): string[] {
+  const dirs = isProject(launch) ? [launch] : findProjects(launch);
+  const lines: string[] = [];
+  for (const dir of dirs) {
+    try {
+      const setting = projectEnv(dir).config.continue;
+      const parts = [setting?.maxEstimate !== undefined ? `maxEstimate ${setting.maxEstimate}` : '', setting?.exclude?.length ? `exclude ${setting.exclude.join(' ')}` : ''].filter(Boolean);
+      if (parts.length) lines.push(`réglage de tirage — ${basename(dir)} : ${parts.join(', ')}`);
+    } catch {
+      // configuration illisible : le projet est signalé par ailleurs
+    }
+  }
+  const skipped: string[] = [];
+  candidates(launch, { priority: [], exclude, remaining: Infinity, skipped });
+  return [...lines, ...skipped.map((s) => `lot écarté — ${s}`)];
 }
 
 export interface StopFacts {

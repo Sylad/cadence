@@ -1776,6 +1776,23 @@ describe('--continue (L147)', () => {
     expect(text).not.toMatch(/tour 1 : a:L2, a:L3/);
   });
 
+  it("L390 R9 — --dry-run --continue applique orchestrate.continue et affiche le réglage et les lots écartés ; la vague ne joue pas le lot écarté", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a1', estimate: 3 }, { title: 'a2' }, { title: 'a3' }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  continue:\n    maxEstimate: 1\n    exclude: [L3]\n');
+    git(dirs.a, 'add', 'cadence.yaml');
+    git(dirs.a, 'commit', '-m', 'chore: réglage');
+    const o = io(parent);
+    expect(await orchestrate(['--continue', '--dry-run', '--max-sessions', '2'], o.io, fakeDeps().deps)).toBe(0);
+    removeDryRunBriefs(o.out.join('\n'));
+    const text = o.out.join('\n');
+    expect(text).toMatch(/réglage de tirage — a : maxEstimate 1, exclude L3/);
+    expect(text).toMatch(/lot écarté — a:L1 écarté du tirage : estimate 3 > continue\.maxEstimate 1/);
+    expect(text).toMatch(/lot écarté — a:L3 écarté du tirage : listé dans continue\.exclude/);
+    expect(text).toMatch(/^a:L2 — a2$/m); // le premier tirage prend le seul lot tirable
+    expect(text).toMatch(/aucun autre lot prêt à tirer/);
+    expect(text).not.toMatch(/^a:L[13] — /m);
+  });
+
   it('un refus qui vaut pour tout le dépôt (arbre sale) saute le dépôt pour ce tirage seulement : une ligne, et ses lots sont tirés dès qu\'il est propre', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'a un' }, { title: 'a deux' }, { title: 'a trois' }], b: [{ title: 'b un' }, { title: 'b deux' }] });
     writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n# sale\n');

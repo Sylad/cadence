@@ -367,6 +367,11 @@ export interface OrchestrateConfig {
    * avec ce modèle avant de rendre le lot. `model` est passé tel quel à `claude --model` (pas de liste fermée : le compte n'a pas forcément tous les modèles). Absent : pas d'escalade.
    */
   escalation?: { model: string };
+  /**
+   * Réglage du tirage de `--continue` pour ce projet (L390) : `maxEstimate` (en jours) écarte les lots dont l'estimate le dépasse, `exclude` écarte les lots listés (leurs numéros).
+   * Ne touche que le tirage : un lot donné sur la ligne de commande se joue quoi qu'il en soit. Absent : tout lot prêt est tirable.
+   */
+  continue?: { maxEstimate?: number; exclude?: string[] };
   /** Niveau d'effort (`claude -p --effort`) de chaque passe (L137). `default` : pas de `--effort`, le niveau de la session. `review` vaut aussi pour `review-small`. */
   effort: Record<EffortStep, Effort>;
   permissionMode: string;
@@ -409,7 +414,7 @@ export function readVerifyConfig(file: string): VerifyConfig {
 
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'testReplay', 'build', 'worktreeDeps', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'testReplay', 'build', 'worktreeDeps', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'continue', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
@@ -527,6 +532,21 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     const m = o.escalation.model;
     if (typeof m !== 'string' || !m.trim()) throw bad('escalation.model : nom de modèle non vide attendu (passé tel quel à claude --model)');
     config.escalation = { model: m.trim() };
+  }
+  if (o.continue != null) {
+    if (!isObject(o.continue)) throw bad('continue doit être un objet { maxEstimate, exclude }');
+    for (const k of Object.keys(o.continue)) if (!['maxEstimate', 'exclude'].includes(k)) throw bad(`continue.${k} inconnu (attendu : maxEstimate, exclude)`);
+    const { maxEstimate, exclude } = o.continue;
+    const setting: NonNullable<OrchestrateConfig['continue']> = {};
+    if (maxEstimate != null) {
+      if (typeof maxEstimate !== 'number' || !(maxEstimate > 0)) throw bad('continue.maxEstimate : nombre de jours strictement positif attendu');
+      setting.maxEstimate = maxEstimate;
+    }
+    if (exclude != null) {
+      if (!Array.isArray(exclude) || exclude.some((x) => typeof x !== 'string' || !x.trim())) throw bad('continue.exclude : liste de numéros de lots non vides attendue (ex. [L12, L40])');
+      setting.exclude = exclude.map((x: string) => x.trim());
+    }
+    config.continue = setting;
   }
   if (o.effort != null) {
     if (!isObject(o.effort)) throw bad('effort doit être un objet { precheck, spec, maquette, fiche, accept, implement, fix, review, ux }');

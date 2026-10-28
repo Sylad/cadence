@@ -77,6 +77,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `orchestrate.continue` in a project's `cadence.yaml` (L390, `docs/orchestrate.md`): `maxEstimate` (days) and `exclude` (lot ids) keep `cadence orchestrate --continue` from drawing a big lot with no spec or sub-task (maritime B6 « Profils verticaux, coupes (10) », effort L, drawn on 27-10 then withdrawn by the lead); a lot whose title or note says « non tirable » is never drawn either. `--dry-run --continue` prints each project's setting and every ready lot it holds back, with the cause. A lot given on the command line is still played.
+
 ## [1.17.1] - 2026-10-27
 
 ### Fixed

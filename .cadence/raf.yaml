@@ -13,6 +13,7 @@ lots:
     estimate: 0.25
     created: 2026-10-28
     started: 2026-10-28
+    review: { date: 2026-10-28, verdict: "compliant (1 mineur : le commentaire placé au-dessus du premier lot ne voyage pas avec lui) — orchestré (vague 2026-10-28-1545, 0 passe(s) de correction)", commit: 2e821cbe9cd2c420c10268861360d562b4955b73, reporte: { de: b421519e58fbdf7d3987956ca77247aed5ca805c, vers: 2e821cbe9cd2c420c10268861360d562b4955b73, patchId: 990ff293934da20c1898ddb0d03b08bbcfa0cff4 } }
   - id: L401
     title: "Panneau des lots (mod cadence-hud, Pane) : arborescence projet → lots parents → sous-lots des projets du dossier, état (en cours, prêt, en vague, rendu, en question), liens after: ; lecture seule, rafraîchi sur changement de plan ou de vague ; repli lisible sur terminal"
     public: Un panneau à côté de la conversation qui montre les lots de chaque projet

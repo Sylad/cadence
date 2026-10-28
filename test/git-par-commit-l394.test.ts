@@ -71,6 +71,17 @@ describe('raf check et raf session start lisent les fichiers des commits en un s
     expect(calls.filter((c) => c === 'diff-tree')).toEqual([]);
   });
 
+  it('R4 — les commits qui ne citent aucun lot (plan, release) ne coûtent pas non plus un diff-tree chacun', async () => {
+    const dir = await repoWith(3);
+    for (let i = 0; i < 6; i++) {
+      git(dir, 'commit', '-q', '--allow-empty', '-m', `release: v0.${i}`, '--date', '2026-09-28T11:00:00');
+    }
+    for (const cmd of [['check'], ['session', 'start']]) {
+      const calls = await gitCalls(() => cad(dir, ...cmd));
+      expect(calls.filter((c) => c === 'diff-tree'), cmd.join(' ')).toEqual([]);
+    }
+  });
+
   it('R3 — le verdict ne change pas : l\'écart docs.sync de L1 est toujours signalé, sans compter les commits de L2', async () => {
     const dir = await repoWith(3);
     const out = (await cad(dir, 'check')).out;

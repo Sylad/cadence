@@ -159,7 +159,10 @@ export function isAcknowledged(plan: Plan, c: Commit): boolean {
 export function exemptPlanOnly(linked: Linked, plan: Plan, root: string): Linked {
   const { patterns } = plan.ignore;
   const acked = (c: Commit) => isAcknowledged(plan, c);
-  const orphans = linked.orphans.filter((c) => !patterns.some((re) => re.test(c.subject)) && !acked(c) && !isPlanOnly(c.sha, plan, root) && !isReleaseOnly(c.sha, root));
+  const candidates = linked.orphans.filter((c) => !patterns.some((re) => re.test(c.subject)) && !acked(c));
+  // Les fichiers des orphelins restants se lisent d'un seul git log, pas d'un diff-tree par commit (L394).
+  preloadChangedFiles(root, candidates.map((c) => c.sha));
+  const orphans = candidates.filter((c) => !isPlanOnly(c.sha, plan, root) && !isReleaseOnly(c.sha, root));
   return { ...linked, orphans, unknown: linked.unknown.filter((u) => !acked(u.commit)) };
 }
 

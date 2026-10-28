@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { buildPanel, flattenTree, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, readTime } from '../hooks/lots'
+import { buildPanel, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, planMove, projectDir, readTime, refusalReason } from '../hooks/lots'
 import type { LotsRow, TourLot } from '../types'
 
 const lot = (id: string, status: 'todo' | 'doing' = 'todo', extra: Partial<TourLot> = {}): TourLot => ({ id, title: `Titre ${id}`, status, after: [], ...extra })
@@ -533,4 +533,49 @@ test('L411 — la bascule d’un lot à sous-lots est collée à l’id à tous 
   const p = buildPanel({ rows, columns: 70, height: 40, waves: [], views: { [openKey('p', 'L1')]: true } })
   const leads = Object.fromEntries(p.lines.flatMap(l => (l.kind === 'lot' ? [[l.id, l.lead]] : [])))
   expect(leads).toEqual({ L1: ' ▾', L2: '  └▸', L3: '  ' })
+// ── L402 : réordonner ──────────────────────────────────────────────────────────────────────────────────────
+
+const PLAN = [lot('L1'), lot('L2'), task('L2', 1), task('L2', 2), lot('L3')]
+
+test('R20 — un lot se place avant ou après un lot du même projet : la demande à raf', () => {
+  expect(planMove(PLAN, { id: 'L3', target: 'L1', place: 'before' })).toEqual({ ok: true, argv: ['raf', 'move', 'L3', '--before', 'L1'] })
+  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'after' })).toEqual({ ok: true, argv: ['raf', 'move', 'L1', '--after', 'L3'] })
+})
+
+test('R20 — une sous-tâche se place parmi celles de son lot', () => {
+  expect(planMove(PLAN, { id: 'L2/2', target: 'L2/1', place: 'before' })).toEqual({ ok: true, argv: ['raf', 'move', 'L2/2', '--before', 'L2/1'] })
+})
+
+test('R21 — parents différents : refusé avec sa raison, raf n’est pas appelé', () => {
+  for (const [id, target] of [['L2/1', 'L1'], ['L1', 'L2/1']] as const) {
+    const plan = planMove(PLAN, { id, target, place: 'after' })
+    expect(plan?.ok).toBe(false)
+    expect(!plan?.ok && plan?.reason).toMatch(new RegExp(`${id.replace('/', '\\/')} et ${target.replace('/', '\\/')} n'ont pas le même parent`))
+  }
+  expect(groupOf(task('L2', 1))).toBe('L2')
+  expect(groupOf(lot('L1', 'todo', { parent: 'L0' }))).toBe('')
+})
+
+test('R21 — un lot lâché sur lui-même ne demande rien ; un id inconnu ou une place inconnue est refusé', () => {
+  expect(planMove(PLAN, { id: 'L1', target: 'L1', place: 'after' })).toBeUndefined()
+  expect(planMove(PLAN, { id: 'L9', target: 'L1', place: 'after' })).toEqual({ ok: false, reason: 'lot inconnu : L9' })
+  expect(planMove(PLAN, { id: 'L1', target: 'L9', place: 'after' })).toEqual({ ok: false, reason: 'lot inconnu : L9' })
+  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'beside' as never })?.ok).toBe(false)
+})
+
+test('R21 — la raison d’un refus de raf : sa première ligne sans le préfixe, le code à défaut', () => {
+  expect(refusalReason('raf: move : orchestration en cours (vague w1, pid 3) — attendre\nsuite', 2)).toBe('move : orchestration en cours (vague w1, pid 3) — attendre')
+  expect(refusalReason('\n  \n', 2)).toBe('raf move : code 2')
+})
+
+test('R20 — le dossier d’un projet du tour : le dossier lui-même pour un projet seul, sinon dossier/projet', () => {
+  const one = [{ project: 'cadence' }]
+  expect(projectDir('/w/cadence', 'cadence', one)).toBe('/w/cadence')
+  expect(projectDir('/w/cadence/', 'cadence', one)).toBe('/w/cadence/')
+  expect(projectDir('/w', 'apps/ol', [{ project: 'apps/ol' }, { project: 'cadence' }])).toBe('/w/apps/ol')
+})
+
+test('R20 — chaque ligne de lot du panneau porte son groupe de frères', () => {
+  const panel = buildPanel({ rows: [{ project: 'p', lots: PLAN }], columns: 80, height: 30, waves: [] })
+  expect(panel.lines.flatMap(l => (l.kind === 'lot' ? [`${l.id}:${l.group}`] : []))).toEqual(['L1:', 'L2:', 'L2/1:L2', 'L2/2:L2', 'L3:'])
 })

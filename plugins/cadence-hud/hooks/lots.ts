@@ -1,6 +1,6 @@
 import type { ThemeKey } from 'claude-code'
 
-import type { LotsBoard, LotsRow, TourLot } from '../types'
+import type { LotsBoard, LotsRow, MoveAsk, TourLot } from '../types'
 import { colorOfLot, lotStatusFr } from './format'
 
 // ── L401 : le panneau des lots (/hud lots) — lecture de `cadence lead tour --json`, arbre et mise en page ───────────
@@ -37,6 +37,30 @@ export const isTask = (l: TourLot): boolean => l.parent !== undefined && l.id.st
 
 /** Le nombre de lots non clos d'un projet : les sous-lots de Lot.parent comptent, les sous-tâches natives non. */
 export const openCount = (lots: readonly TourLot[]): number => lots.filter(l => !isTask(l)).length
+
+/** Le groupe de frères d'un lot : les lots du projet (''), ou les sous-tâches d'un même lot (le lot) ; `raf move` ne place un lot que par rapport à un frère. */
+export const groupOf = (l: TourLot): string => (isTask(l) ? l.parent! : '')
+
+/** Ce que le panneau demande à raf, ou pourquoi il ne le demande pas. */
+export type MovePlan = { ok: true; argv: string[] } | { ok: false; reason: string }
+
+/** Contrôle une demande de déplacement contre les lots lus du projet : les ids sont ceux du tableau (la demande vient du dessin, donc à vérifier) et les deux lots ont le même parent. Le reste (vague, plan en lecture seule, lot archivé) est dit par `raf move` lui-même. */
+/** `undefined` : rien à faire (un lot lâché sur lui-même). */
+export const planMove = (lots: readonly TourLot[], ask: MoveAsk): MovePlan | undefined => {
+  const lot = lots.find(l => l.id === ask.id)
+  const target = lots.find(l => l.id === ask.target)
+  if (!lot || !target || (ask.place !== 'before' && ask.place !== 'after')) return { ok: false, reason: `lot inconnu : ${!lot ? ask.id : ask.target}` }
+  if (lot === target) return undefined
+  if (groupOf(lot) !== groupOf(target)) return { ok: false, reason: `${lot.id} et ${target.id} n'ont pas le même parent : un lot se réordonne parmi les lots de son projet, une sous-tâche parmi celles de son lot` }
+  return { ok: true, argv: ['raf', 'move', lot.id, `--${ask.place}`, target.id] }
+}
+
+/** La raison d'un refus de `raf move` : la première ligne de son erreur, sans le préfixe « raf: » ; le code de sortie si elle est vide. */
+export const refusalReason = (stderr: string, exitCode: number): string => stderr.split('\n').map(l => l.trim()).find(l => l !== '')?.replace(/^raf\s*:\s*/, '') ?? `raf move : code ${exitCode}`
+
+/** Le dossier d'un projet du tour : le dossier interrogé lui-même quand le tour n'a qu'une ligne portant son nom (un projet sans sous-projet), sinon `<dossier>/<projet>` ; `raf` s'y lance. */
+export const projectDir = (folder: string, project: string, rows: readonly LotsRow[]): string =>
+  rows.length === 1 && folder.replace(/\/+$/, '').split('/').pop() === project ? folder : `${folder.replace(/\/+$/, '')}/${project}`
 
 export type LotNode = { lot: TourLot; children: LotNode[] }
 
@@ -164,6 +188,8 @@ export type PanelLine =
       state: LotState
       after: { id: string; struck: boolean }[]
       afterOwnLine: boolean
+      /** Le groupe de frères (groupOf) : on ne réordonne qu'à l'intérieur. */
+      group: string
       /** Largeurs communes à toutes les lignes, pour l'alignement. */
       idWidth: number
       stateWidth: number
@@ -236,7 +262,7 @@ export const buildPanel = (input: {
       const subs = f.children > 0 ? { key: openKey(b.project.project, f.lot.id), count: f.children, total: f.descendants, open: isOpen(b, f) } : undefined
       const room = columns - idWidth - 2 - stateWidth - 2 - (afterText && !narrow ? afterText.length + 2 : 0) - (subs ? subsText(subs.count).length + 2 : 0)
       lines.push({
-        kind: 'lot', id: f.lot.id, lead: leadOf(b, f), title: ellipsize(f.lot.title, Math.max(1, room)), state: stateOf(b, f), after, afterOwnLine, idWidth, stateWidth, ...(subs ? { subs } : {}), height: afterOwnLine ? 2 : 1,
+        kind: 'lot', id: f.lot.id, lead: leadOf(b, f), title: ellipsize(f.lot.title, Math.max(1, room)), state: stateOf(b, f), after, afterOwnLine, group: groupOf(f.lot), idWidth, stateWidth, ...(subs ? { subs } : {}), height: afterOwnLine ? 2 : 1,
       })
     }
     if (b.hidden > 0) lines.push({ kind: 'more', project: b.project.project, hidden: b.hidden, behind: b.behind, expanded: views[moreKey(b.project.project)] === true, height: 1 })

@@ -83,6 +83,12 @@ export type LotsRow = { project: string; error?: string; lots?: TourLot[] }
 /** Ce que le panneau a lu : les lignes du tour, et si cadence est trop ancien pour porter `lots`. */
 export type LotsBoard = { rows: LotsRow[]; outdated: boolean }
 
+/** Ce que le dessin demande : placer `id` juste avant ou après `target` (L402). */
+export type MoveAsk = { id: string; target: string; place: 'before' | 'after' }
+
+/** Le dernier mot du panneau sur un déplacement : fait (le plan est à commiter) ou refusé avec sa raison. */
+export type LotsNotice = { text: string; refused: boolean }
+
 declare module 'claude-code' {
   interface PluginState {
     'cadence-hud': {
@@ -112,6 +118,8 @@ declare module 'claude-code' {
       lotsFolds: Record<string, boolean>
       /** Les dépliages choisis dans le panneau des lots (vrai = déplié) : `more:<projet>` (le reste du projet au-delà de 5 lots), `open:<projet>#<lot>` (les sous-lots d'un lot) ; absent, replié. */
       lotsViews: Record<string, boolean>
+      /** Le résultat du dernier déplacement demandé dans le panneau ; null avant le premier. */
+      lotsNotice: LotsNotice | null
       /** Heure (ms) de la dernière lecture réussie du panneau des lots. */
       lotsAt: number
       error: string | null

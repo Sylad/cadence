@@ -21,14 +21,15 @@ cas:
       - Le lead tape /hud lots ; le mod ouvre le Pane (ancré à côté de la conversation, ou au-dessus du prompt).
       - Le mod lance cadence lead tour <dossier> --json.
       - Chaque ligne de projet porte la liste de ses lots non clos.
-      - Le panneau dessine, par projet, les lots parents puis leurs sous-lots, l'état de chacun et ses liens after:.
+      - Le panneau dessine, par projet, les lots parents puis leurs sous-lots (dans un plan natif, les sous-tâches lot.tasks), l'état de chacun et ses liens after:.
     alternatives:
       - { si: aucun projet n'a de lot non clos, alors: le panneau affiche le message d'état vide, regles: [R1] }
       - { si: la première lecture n'est pas revenue, alors: le panneau affiche « Lecture des plans… », regles: [R2] }
       - { si: cadence est absent ou ne répond pas et aucun tableau n'a été lu, alors: le panneau affiche l'erreur, regles: [R3] }
       - { si: un projet est illisible, alors: sa ligne dit l'erreur, les autres projets restent, regles: [R7] }
       - { si: les lignes du tour n'ont pas de champ lots (cadence plus ancien que le mod), alors: le panneau affiche l'erreur « cadence trop ancien », pas l'état vide, regles: [R14] }
-      - { si: l'argument de /hud n'est pas connu ou le terminal est trop étroit, alors: la commande répond par un texte et ne bascule rien, regles: [R16] }
+      - { si: l'argument de /hud n'est pas connu, alors: la commande répond par un texte et ne bascule rien, regles: [R16] }
+      - { si: le terminal est trop étroit, alors: la commande répond « terminal trop étroit… » et n'ouvre rien, regles: [R19] }
       - { si: l'arbre dépasse la hauteur du panneau, alors: il est tronqué avec le nombre de lots masqués, regles: [R17] }
     resultat: Un arbre de lots par projet, sans aucune action d'écriture.
   - id: C2
@@ -61,13 +62,14 @@ champs:
   - { id: message-cadence-ancien, libelle: Erreur cadence trop ancien, type: texte, source: statique, obligatoire: false }
   - { id: indicateur-suite, libelle: Lots non affichés faute de hauteur, type: texte, source: "tour → lots (reste)", obligatoire: false }
   - { id: message-vide, libelle: Message d'état vide, type: texte, source: statique, obligatoire: false }
+  - { id: message-terminal-etroit, libelle: Réponse de la commande dans un terminal trop étroit, type: texte, source: statique, obligatoire: false }
   - { id: message-erreur, libelle: Message d'erreur de lecture, type: texte, source: statique, obligatoire: false }
   - { id: liste-projets, libelle: Liste des projets, type: liste, source: "commande cadence lead tour → lignes", obligatoire: false }
   - { id: projet-nom, libelle: Nom du projet, type: texte, source: "tour → project", obligatoire: false }
-  - { id: projet-compte, libelle: Nombre de lots non clos du projet, type: texte, source: "tour → lots (longueur)", obligatoire: false }
+  - { id: projet-compte, libelle: Nombre de lots non clos du projet (sous-tâches natives exclues), type: texte, source: "tour → lots (lignes sans parent natif)", obligatoire: false }
   - { id: message-projet-erreur, libelle: Erreur d'un projet illisible, type: texte, source: "tour → error", obligatoire: false }
   - { id: arbre-lots, libelle: Arbre des lots d'un projet, type: liste, source: "tour → lots", obligatoire: false }
-  - { id: lot-id, libelle: Identifiant du lot, type: texte, source: "tour → lots[].id", obligatoire: false }
+  - { id: lot-id, libelle: Identifiant du lot ou de la sous-tâche (L80 ou L80/1), type: texte, source: "tour → lots[].id", obligatoire: false }
   - { id: lot-titre, libelle: Titre du lot, type: texte, source: "tour → lots[].title", obligatoire: false }
   - { id: lot-etat, libelle: État du lot, type: texte, source: "tour → lots[].state, ou état du lot dans la vague", obligatoire: false }
   - { id: lot-after, libelle: Liens after du lot, type: texte, source: "tour → lots[].after", obligatoire: false }
@@ -145,16 +147,16 @@ regles:
     tests: ["R9 — relecture en échec : le dernier tableau reste affiché"]
   - id: R10
     cas: [C1]
-    enonce: "cadence lead tour --json ajoute à chaque ligne un champ optionnel lots : les lots non clos (todo, doing) hors récurrents, avec id, title, status, after et parent ; les lots done, dropped et récurrents n'y figurent pas ; les champs existants de la ligne (TourRow, src/lead.ts:69) ne changent pas, et la bande (parseTour, format.ts:388) les lit comme avant."
+    enonce: "cadence lead tour --json ajoute à chaque ligne un champ optionnel lots : les lots non clos (todo, doing) hors récurrents, avec id, title, status, after et parent ; les lots done, dropped et récurrents n'y figurent pas. Dans un plan natif, les sous-tâches lot.tasks y entrent aussi, une entrée par sous-tâche non close (todo, doing), avec id <lot>/<n> (celui de Task.id), parent: <lot> et son statut ; sans after (une sous-tâche n'en porte pas) ; les sous-tâches closes (done, dropped) sont exclues comme les lots clos, et toutes celles d'un lot clos ou récurrent le sont avec lui. Dans un plan tenu par un autre outil, Lot.parent (src/plan.ts:55) reste la source du parent. Les champs existants de la ligne (TourRow, src/lead.ts:69) ne changent pas, et la bande (parseTour, format.ts:388) les lit comme avant."
     statut: sourcee
-    source: "réponse du lead (2026-10-28) : champ optionnel lots ({ id, title, status, after, parent? }[]) sur chaque ligne de cadence lead tour --json, nom et forme acceptés ; seulement les lots non clos (todo, doing) ; une seule source de vérité, qui lit déjà l'archive (L396) et les plans tenus par un autre outil ; ligne existante inchangée, testée"
-    tests: ["R10 — lots : seuls les lots non clos non récurrents", "R10 — les champs existants de la ligne sont inchangés", "R10 — la bande lit une ligne portant lots comme avant"]
+    source: "réponse du lead (2026-10-28) : champ optionnel lots ({ id, title, status, after, parent? }[]) sur chaque ligne de cadence lead tour --json, nom et forme acceptés ; seulement les lots non clos (todo, doing) ; ligne existante inchangée, testée. Décision du lead (28-10, objectif du lot) : dans un plan natif, les sous-tâches (lot.tasks, id <lot>/<n>) sont les sous-lots du panneau avec parent: <lot> et leur état, les closes exclues comme les lots clos ; dans un plan tenu par un autre outil, Lot.parent reste la source. Task = { id, title, status } (src/plan.ts:46-50). Seule l'exclusion des sous-tâches d'un lot clos est un choix de la fiche (R11)"
+    tests: ["R10 — lots : seuls les lots non clos non récurrents", "R10 — plan natif : une sous-tâche todo ou doing entre dans lots avec id <lot>/<n>, parent: <lot> et son statut, after vide", "R10 — sous-tâche done ou dropped : exclue de lots", "R10 — sous-tâche d'un lot clos ou récurrent : exclue", "R10 — plan d'un autre outil : parent vient de Lot.parent", "R10 — les champs existants de la ligne sont inchangés", "R10 — la bande lit une ligne portant lots comme avant"]
   - id: R11
     cas: [C1]
-    enonce: "Un lot dont parent: désigne un lot non clos du même projet est placé sous lui ; un parent clos ou inconnu laisse le lot au premier niveau ; la profondeur n'est pas limitée. Un lot dont la chaîne de parents revient à lui-même (parent: de lui-même, ou cycle A→B→A) est placé au premier niveau, son parent ignoré, et la construction se termine toujours ; pour un id présent deux fois, la première occurrence reçoit les sous-lots, les autres restent au premier niveau."
+    enonce: "Un lot ou une sous-tâche dont parent: désigne un lot non clos du même projet est placé sous lui, en retrait ; une sous-tâche native <lot>/<n> est donc toujours sous son lot, puisque seules celles d'un lot non clos sont émises (R10). Un parent clos ou inconnu (Lot.parent d'un plan tenu par un autre outil) laisse le lot au premier niveau ; la profondeur n'est pas limitée. Un lot dont la chaîne de parents revient à lui-même (parent: de lui-même, ou cycle A→B→A) est placé au premier niveau, son parent ignoré, et la construction se termine toujours ; pour un id présent deux fois, la première occurrence reçoit les sous-lots, les autres restent au premier niveau."
     statut: hypothese
-    si_faux: Si un sous-lot dont le parent est clos, un cycle ou un doublon devait disparaître, être signalé ou se rattacher autrement, seule la construction de l'arbre change (aucune donnée en jeu).
-    tests: ["R11 — parent ouvert : le sous-lot est rattaché", "R11 — parent clos ou inconnu : premier niveau", "R11 — parent de lui-même : premier niveau, pas de boucle", "R11 — cycle A→B→A : tous au premier niveau, pas de boucle", "R11 — id dupliqué : la première occurrence porte les sous-lots"]
+    si_faux: Si un sous-lot dont le parent est clos, un cycle ou un doublon devait disparaître, être signalé ou se rattacher autrement, ou si les sous-tâches ouvertes d'un lot clos devaient rester visibles au premier niveau, seule la construction de l'arbre (et le filtre de R10) change (aucune donnée en jeu).
+    tests: ["R11 — parent ouvert : le sous-lot est rattaché", "R11 — sous-tâche native <lot>/<n> : rendue sous son lot avec ├/└", "R11 — parent clos ou inconnu : premier niveau", "R11 — parent de lui-même : premier niveau, pas de boucle", "R11 — cycle A→B→A : tous au premier niveau, pas de boucle", "R11 — id dupliqué : la première occurrence porte les sous-lots"]
   - id: R12
     cas: [C2]
     enonce: Le tableau est relu à chaque transition de vague et au plus toutes les minutes ; il l'est aussi dès qu'un fichier de plan d'un projet a changé de date de modification depuis la dernière lecture. Les dates sont lues par le script collect du mod (os.stat, un stat par plan à chaque minuteur de 5 s), pas par le panneau.
@@ -177,7 +179,7 @@ regles:
     tests: ["R14 — lignes sans champ lots : message « cadence trop ancien », pas l'état vide"]
   - id: R15
     etat: charge
-    enonce: "Sous 60 colonnes de corps du panneau (bodyColumns), la liste after: passe sur une ligne à part et le titre est tronqué par « … », jamais l'id ni l'état ; le panneau ancré à côté de la conversation compte au plus 45 % des colonnes du terminal, 24 au moins (environ 70 colonnes dans un terminal de 1440 px, que la maquette dessine)."
+    enonce: "Sous 60 colonnes de corps du panneau (bodyColumns), la liste after: passe sur une ligne à part et le titre est tronqué par « … », jamais l'id ni l'état ; le panneau ancré à côté de la conversation compte au plus 45 % des colonnes du terminal, 24 au moins (environ 70 colonnes dans un terminal de 1440 px, que la maquette dessine à 1440 px ; à 390 px la maquette est un rendu réduit d'un terminal de 110 colonnes, panneau de 49 colonnes, donc replié). L'id d'une sous-tâche (L401/2, 6 colonnes et plus) n'est jamais tronqué."
     message: ~
     champs: [lot-titre]
     statut: hypothese
@@ -185,12 +187,12 @@ regles:
     tests: ["R15 — corps sous 60 colonnes : after: sur une ligne à part, titre tronqué, id et état conservés", "R15 — corps de 70 colonnes : une seule ligne par lot"]
   - id: R16
     etat: charge
-    enonce: "« /hud lots » ouvre le panneau, la même commande le ferme ; le panneau n'est jamais ouvert de lui-même (un Pane que le mod ouvre seul reste non dessiné sous 144 colonnes, 110 une fois demandé). Si le terminal est trop étroit, la commande répond « terminal trop étroit pour le panneau (110 colonnes au moins) ». La réponse aux arguments inconnus de /hud devient « argument inconnu : <arg> (attendu : cmd, projets, lots) ». Le pied du panneau rappelle « /hud lots pour fermer »."
+    enonce: "« /hud lots » ouvre le panneau, la même commande le ferme ; le panneau n'est jamais ouvert de lui-même (un Pane que le mod ouvre seul reste non dessiné sous 144 colonnes, 110 une fois demandé). La réponse aux arguments inconnus de /hud devient « argument inconnu : <arg> (attendu : cmd, projets, lots) ». Le pied du panneau rappelle « /hud lots pour fermer » dans tous les états (vide, chargement, erreur, chargé) et dans leurs variantes, pas seulement quand l'arbre est affiché."
     message: "/hud lots pour fermer"
     champs: [aide-fermeture]
     statut: hypothese
     si_faux: Si la commande devait s'appeler autrement ou le panneau s'ouvrir seul, seuls le nom et le déclencheur changent (le seuil de 110 colonnes vient de l'API Pane, à confirmer avec la skill plugin-authoring).
-    tests: ["R16 — /hud lots ouvre puis ferme le panneau", "R16 — terminal trop étroit : message, rien ne s'ouvre", "R16 — argument inconnu : la réponse cite lots"]
+    tests: ["R16 — /hud lots ouvre puis ferme le panneau", "R16 — argument inconnu : la réponse cite lots (test existant hud.test.tsx:988-993 et README.md:99 mis à jour)", "R16 — le pied rappelle la commande dans les états vide, chargement, erreur et chargé"]
   - id: R17
     etat: charge
     enonce: "Au-dessus du prompt, le panneau occupe au plus un tiers de la hauteur du terminal ; si l'arbre est plus long, les premières lignes restent et la dernière dit « … +N lots de plus » (N = lots non affichés) ; les titres trop longs sont tronqués par « … » sans passer à la ligne."
@@ -205,9 +207,33 @@ regles:
     statut: sourcee
     source: "réponse du lead (2026-10-28) : « Ne pas ralentir le tour (la bande a un délai de 20 s) : mesurer lead tour --json avant/après sur ce dossier et le dire »"
     tests: ["R18 — durée de lead tour --json avec lots : mesurée avant/après, sous le délai de 20 s de la bande", "R18 — after: vers un lot clos : id conservé tel quel dans lots[].after"]
+  - id: R19
+    etat: erreur
+    enonce: "Si le terminal est trop étroit (sous 110 colonnes), la commande /hud lots répond par ce texte et n'ouvre aucun panneau ; il n'y a donc aucun rendu du panneau dans un terminal de 46 colonnes (la maquette à 390 px montre un terminal de 110 colonnes réduit)."
+    message: "terminal trop étroit pour le panneau (110 colonnes au moins)"
+    champs: [message-terminal-etroit]
+    statut: hypothese
+    si_faux: Si le seuil est autre (144 colonnes sans demande explicite, à confirmer avec la skill plugin-authoring), seule la valeur change ; le texte aussi (aucune donnée en jeu).
+    tests: ["R19 — terminal trop étroit : message, rien ne s'ouvre"]
+  - id: R20
+    etat: charge
+    enonce: "Une sous-tâche native n'a que l'état de son statut dans le plan, jamais d'état de vague ni de after: : doing → « ▶ en cours » (claude) ; todo → « ○ à faire » (texte normal) ; elle n'est jamais « bloqué » ni « libre » (ces mots sont ceux des lots). Son id est affiché en entier (« L401/2 »)."
+    message: ~
+    champs: [lot-etat, lot-id]
+    statut: hypothese
+    si_faux: Si la sous-tâche devait reprendre « libre » ou l'état de vague de son lot, seul le mot et la couleur changent (aucune donnée en jeu) ; si l'id devait être court (« 2 »), seul l'affichage change.
+    tests: ["R20 — sous-tâche doing : « ▶ en cours »", "R20 — sous-tâche todo : « ○ à faire », sans after:", "R20 — l'id affiché est <lot>/<n>"]
+  - id: R21
+    etat: charge
+    enonce: "Le nombre de lots non clos d'un projet compte les lots, y compris les sous-lots de Lot.parent, mais pas les sous-tâches natives ; la troncature « +N lots de plus » (R17) compte des lignes affichables, sous-tâches comprises."
+    message: ~
+    champs: [projet-compte]
+    statut: hypothese
+    si_faux: Si le compte devait inclure les sous-tâches, seul le calcul du compte change (aucune donnée en jeu).
+    tests: ["R21 — compte du projet : lots seuls, sous-tâches natives non comptées", "R21 — sous-lot de Lot.parent compté"]
 actions:
-  - { id: A4, declencheur: ~, contrat: A3, regles: [R16] }
-  - { id: A5, declencheur: ~, contrat: A1, regles: [R1, R2, R3, R4, R5, R6, R7, R8, R10, R11, R13, R14, R15, R17, R18] }
+  - { id: A4, declencheur: ~, contrat: A3, regles: [R16, R19] }
+  - { id: A5, declencheur: ~, contrat: A1, regles: [R1, R2, R3, R4, R5, R6, R7, R8, R10, R11, R13, R14, R15, R17, R18, R20, R21] }
   - { id: A6, declencheur: ~, contrat: A2, regles: [R9, R12] }
 contrats:
   - id: A1
@@ -233,7 +259,7 @@ contrats:
     erreurs:
       - { code: log warn, message: "terminal trop étroit pour le panneau (110 colonnes au moins)" }
       - { code: log warn, message: "argument inconnu : <arg> (attendu : cmd, projets, lots)" }
-    regles: [R16]
+    regles: [R16, R19]
 donnees:
   - id: D1
     objet: "sortie de cadence lead tour --json (ligne de projet)"

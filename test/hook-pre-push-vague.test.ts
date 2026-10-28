@@ -51,7 +51,7 @@ async function vague(statuses: Record<string, LotState['status']>) {
 }
 
 /** La ligne que git écrit sur l'entrée standard d'un pre-push. */
-const line = (local: string, remote: string, ref = 'refs/heads/main') => `${ref} ${local} ${ref} ${remote}\n`;
+const line = (local: string, remote: string, ref = 'refs/heads/main', remoteRef = ref) => `${ref} ${local} ${remoteRef} ${remote}\n`;
 
 describe('hook pre-push posé par la vague : un push qui emporte un lot pas prêt (L405)', () => {
   let saved: string | undefined;
@@ -112,6 +112,24 @@ describe('hook pre-push posé par la vague : un push qui emporte un lot pas prê
     expect(r.err).toContain(`git push origin ${shas.A}:feature`);
   });
 
+  it('R11 — la commande sûre vise la branche DISTANTE (3e champ), pas la réf locale : « git push origin <sha>:main » donne « <sha> … refs/heads/main »', async () => {
+    const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L2': 'implementing' });
+    for (const localRef of [shas.C, 'HEAD', 'refs/heads/feature']) {
+      const r = await cli(dir, line(shas.C, shas.P, localRef, 'refs/heads/main'), 'hook', 'pre-push');
+      expect(r.code).toBe(3);
+      expect(r.err).toContain(`git push origin ${shas.A}:main`);
+      expect(r.err).not.toContain(`${shas.A}:${localRef}`);
+    }
+  });
+
+  it('R12 — la commande sûre nomme le remote reçu en premier argument du hook, « origin » à défaut', async () => {
+    const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L2': 'implementing' });
+    const r = await cli(dir, line(shas.C, shas.P), 'hook', 'pre-push', 'upstream', 'git@example.com:x/y.git');
+    expect(r.err).toContain(`git push upstream ${shas.A}:main`);
+    const d = await cli(dir, line(shas.C, shas.P), 'hook', 'pre-push');
+    expect(d.err).toContain(`git push origin ${shas.A}:main`);
+  });
+
   it('R8 — quand aucun commit de la plage n\'est livrable, le refus le dit au lieu de proposer une commande', async () => {
     const { dir, shas } = await avec({ 'ici:L1': 'implementing', 'ici:L2': 'implementing' });
     const r = await cli(dir, line(shas.C, shas.P), 'hook', 'pre-push');
@@ -132,7 +150,7 @@ describe('hook pre-push posé par la vague : un push qui emporte un lot pas prê
     expect(installPrePush(dir, 'w9').ok).toBe(true);
     const text = readFileSync(join(dir, '.git/hooks/pre-push'), 'utf8');
     removePrePush(dir, 'w9');
-    expect(text).toMatch(/raf hook pre-push/);
+    expect(text).toMatch(/raf hook pre-push "\$@"/);
     expect(text).toMatch(/\[ \$\? -ne 3 \] \|\| exit 1/);
     expect(text.indexOf('CADENCE_ORCHESTRATED')).toBeLessThan(text.indexOf('raf hook pre-push'));
   });

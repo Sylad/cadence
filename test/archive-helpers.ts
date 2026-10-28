@@ -1,7 +1,15 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parse } from 'yaml';
 import { run } from '../src/cli.js';
 import { Plan } from '../src/plan.js';
 import { gitRepo } from './helpers.js';
+
+/** Les identifiants écrits dans UN fichier (le plan ou un fichier d'année) : ce que l'archivage déplace, à distinguer de `plan.lots()` qui les présente tous. */
+export function fileIds(file: string): string[] {
+  if (!existsSync(file)) return [];
+  return ((parse(readFileSync(file, 'utf8')) as { lots?: { id: string }[] }).lots ?? []).map((l) => l.id);
+}
 
 /**
  * Un dépôt avec un plan : L1 done 2025, L2 dropped 2026-03, L3 done 2026-09, L4 doing, L5 todo.

@@ -134,7 +134,7 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     const root = gitRoot(dir) ?? dir;
     const plan = planLoader(root)();
     const lots = plan.lots();
-    const all = linkCommits(plan.everyLot(), planCommits(plan, root), plan.refs);
+    const all = linkCommits(lots, planCommits(plan, root), plan.refs);
     const { doing, ready, blocked } = nextUp(lots);
     const work = workByLot(plan, root, all, doing.map((l) => l.id));
 

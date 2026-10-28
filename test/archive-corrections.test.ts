@@ -7,6 +7,7 @@ import { Plan } from '../src/plan.js';
 import { needsPrecheck, precheckNothingToFind } from '../src/orchestrate/cycle.js';
 import { commitFile, harness } from './orchestrate-harness.js';
 import { gitRepo } from './helpers.js';
+import { fileIds } from './archive-helpers.js';
 
 const root = new URL('..', import.meta.url).pathname;
 
@@ -26,10 +27,11 @@ function suiteApresArchive() {
 describe('L396 — corrections de revue', () => {
   it('R14 — le précheck voit les lots archivés : une suite de L1 archivé garde la garde L292/L322', () => {
     const h = suiteApresArchive();
+    const file = join(h.repo, '.cadence/raf.yaml');
     expect(needsPrecheck({ precheck: true }, h.plan(), h.repo, 'L2')).toBe(true);
     expect(precheckNothingToFind(h.plan(), h.repo, 'L2')).toBeNull();
     h.plan().archive('2026-10-28');
-    expect(h.plan().lots().map((l) => l.id)).toEqual(['L2']);
+    expect(fileIds(file)).toEqual(['L2']);
     expect(needsPrecheck({ precheck: true }, h.plan(), h.repo, 'L2')).toBe(true);
     expect(precheckNothingToFind(h.plan(), h.repo, 'L2')).toBeNull();
   });

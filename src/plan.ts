@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node
 import { dirname, join, relative, resolve } from 'node:path';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
-import { appendToArchive, ARCHIVE_DIR, archiveFiles, archiveYear, readArchiveFile, selectArchivable, type Kept } from './archive.js';
+import { ARCHIVE_DIR, archiveFiles, archiveLots, archiveYear, newArchiveDoc, readArchiveDoc, selectArchivable, type Kept } from './archive.js';
 
 /** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
 const ON_WRITE_TIMEOUT_MS = 120_000;
@@ -280,8 +280,18 @@ export class Plan {
   save(): void {
     this.writable();
     const hook = this.settings.onWrite;
-    const kept = hook ? [this.path, ...hook.files.map((f) => resolve(hook.cwd, f))].map((p) => [p, existsSync(p) ? readFileSync(p) : null] as const) : [];
+    // L396 : chaque lot est réécrit dans le fichier d'où il vient — le plan, ou son fichier d'année si un lot archivé a été touché.
+    this.reopened();
+    const archives = (this.archives ?? []).filter((a) => a.dirty);
+    const hadDir = existsSync(this.archiveDir);
+    const written = [this.path, ...archives.map((a) => a.file)];
+    const kept = hook ? [...written, ...hook.files.map((f) => resolve(hook.cwd, f))].map((p) => [p, existsSync(p) ? readFileSync(p) : null] as const) : [];
     writeFileSync(this.path, this.doc.toString({ lineWidth: 0, indentSeq: this.indentSeq }));
+    if (archives.length > 0) mkdirSync(this.archiveDir, { recursive: true });
+    for (const a of archives) {
+      writeFileSync(a.file, a.doc.toString({ lineWidth: 0 }));
+      a.dirty = false;
+    }
     if (!hook) return;
     const limit = hook.timeoutMs ?? ON_WRITE_TIMEOUT_MS;
     const r = spawnSync('sh', ['-c', hook.command], { cwd: hook.cwd, encoding: 'utf8', timeout: limit, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -291,10 +301,13 @@ export class Plan {
       if (missing.length > 0) notice(`raf: plan.onWrite a réussi mais le fichier déclaré est absent : ${missing.join(', ')} — vérifier plan.onWrite.files dans cadence.yaml`);
       return;
     }
+    // « Plan inchangé » vaut pour l'archive aussi : ses fichiers reviennent tels qu'avant (un fichier d'année né de cette écriture disparaît, le dossier avec).
     for (const [p, content] of kept) {
       if (content === null) rmSync(p, { force: true });
       else writeFileSync(p, content);
     }
+    if (!hadDir) rmSync(this.archiveDir, { recursive: true, force: true });
+    for (const a of archives) a.dirty = true;
     const why = r.error ? (r.error as NodeJS.ErrnoException).code === 'ETIMEDOUT' ? `délai de ${limit / 1000} s dépassé` : r.error.message : `code ${r.status ?? r.signal}`;
     const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split('\n').slice(-5).join(' | ');
     throw new RafError(`plan.onWrite en échec (${hook.command}, ${why})${tail ? ` : ${tail}` : ''} — écriture refusée, plan inchangé`);
@@ -381,8 +394,7 @@ export class Plan {
 
   /** Tout ce qui est tenu avec le plan sans être du travail : plan.files et le fichier d'attendus QA. Source unique de l'audit et de l'orchestrateur. */
   get maintained(): string[] {
-    const root = this.settings.config ? dirname(this.settings.config) : null;
-    return [...new Set([...this.files, ...this.produced, this.qaExpectations, ...(root ? this.archiveFiles().map((f) => relative(root, f)) : [])])];
+    return [...new Set([...this.files, ...this.produced, this.qaExpectations, ...this.archiveFiles().map((f) => this.shown(f))])];
   }
 
   /**
@@ -481,8 +493,8 @@ export class Plan {
       const ack = readDocsOkFile(this.docsOkFile);
       return this.read().lots.map((l) => (l.docsOk || !ack[l.id] ? l : { ...l, docsOk: ack[l.id] }));
     }
-    const raw = (this.doc.get('lots') as YAMLSeq).toJSON() as Record<string, unknown>[];
-    return raw.map((r) => normalizeLot(r));
+    // L396 : l'archive est un détail de stockage — les lots archivés (années croissantes) puis ceux du fichier actif, comme un seul plan.
+    return [...this.loadArchives().flatMap((a) => archiveLots(a.doc).toJSON() as Record<string, unknown>[]), ...this.activeRaw()].map((r) => normalizeLot(r));
   }
 
   lot(id: string): Lot {
@@ -491,12 +503,17 @@ export class Plan {
     return found;
   }
 
+  /** Les lots du fichier du plan seul : ce que `raf archive` peut déplacer. */
+  private activeRaw(): Record<string, unknown>[] {
+    return (this.doc.get('lots') as YAMLSeq).toJSON() as Record<string, unknown>[];
+  }
+
   /** Dossier des lots archivés (L396), à côté du plan : `.cadence/archive/` pour `.cadence/raf.yaml`. */
   get archiveDir(): string {
     return join(dirname(this.path), ARCHIVE_DIR);
   }
 
-  /** Vrai quand `plan.onWrite` republie une copie du plan à chaque écriture (L346) : elle ne voit que le plan actif, jamais l'archive. */
+  /** Vrai quand `plan.onWrite` republie une copie du plan à chaque écriture (L346) : elle ne voit que le fichier actif, jamais l'archive. */
   get republishes(): boolean {
     return !!this.settings.onWrite;
   }
@@ -506,90 +523,122 @@ export class Plan {
     return this.readonly ? [] : archiveFiles(this.archiveDir);
   }
 
-  private archivedCache?: Lot[];
+  /** Un fichier d'année chargé ; `dirty` quand un de ses lots a été touché ou ajouté depuis la lecture : `save()` le réécrit. */
+  private archives?: { file: string; doc: Document; dirty: boolean }[];
+
+  /** Un chemin tel que l'utilisateur le voit : relatif à la racine du dépôt (le dossier du cadence.yaml, à défaut le parent du dossier du plan). */
+  private shown(file: string): string {
+    return relative(this.settings.config ? dirname(this.settings.config) : dirname(dirname(this.path)), file);
+  }
 
   /**
-   * Les lots archivés, que ne lisent que les commandes qui retrouvent un lot par son identifiant (show, commits, check, news, perf).
-   * Un identifiant redevenu actif l'emporte sur sa copie archivée.
+   * Les fichiers d'archive, lus une fois. Un même identifiant dans deux fichiers (plan et archive confondus) est une erreur nommée,
+   * jamais un choix silencieux : on ne saurait pas quelle copie lire ni dans laquelle écrire.
    */
-  archived(): Lot[] {
-    if (!this.archivedCache) {
-      const active = new Set(this.lots().map((l) => l.id));
-      const seen = new Set<string>();
-      this.archivedCache = this.archiveFiles()
-        .flatMap((f) => {
-          try {
-            return readArchiveFile(f);
-          } catch (e) {
-            throw new RafError((e as Error).message);
-          }
-        })
-        .map((r) => normalizeLot(r))
-        .filter((l) => !active.has(l.id) && !seen.has(l.id) && !!seen.add(l.id));
+  private loadArchives(): NonNullable<Plan['archives']> {
+    if (!this.archives) {
+      const archives = this.archiveFiles().map((file) => {
+        try {
+          return { file, doc: readArchiveDoc(file), dirty: false };
+        } catch (e) {
+          throw new RafError((e as Error).message);
+        }
+      });
+      const idsOf = (seq: YAMLSeq) => new Set(seq.items.filter(isMap).map((n) => String(n.get('id'))));
+      const files: { file: string; ids: Set<string> }[] = [...archives.map((a) => ({ file: a.file, ids: idsOf(archiveLots(a.doc)) })), { file: this.path, ids: idsOf(this.doc.get('lots') as YAMLSeq) }];
+      for (let i = 1; i < files.length; i++) {
+        for (const id of files[i].ids) {
+          const other = files.slice(0, i).find((f) => f.ids.has(id));
+          if (other) throw new RafError(`identifiant en double : ${id} est dans ${this.shown(other.file)} et dans ${this.shown(files[i].file)} — un lot ne vit que dans un fichier, en retirer une copie à la main`);
+        }
+      }
+      this.archives = archives;
     }
-    return this.archivedCache;
+    return this.archives;
   }
 
-  /** Le plan actif puis l'archive : de quoi reconnaître un identifiant cité par un commit, une Nouveauté ou une mesure. */
-  everyLot(): Lot[] {
-    return [...this.lots(), ...this.archived()];
-  }
-
-  /** Un lot du plan actif ou de l'archive ; `lot()` ne lit que le plan, seul à pouvoir être modifié. */
-  anyLot(id: string): Lot {
-    const found = this.everyLot().find((l) => l.id === id);
-    if (!found) throw new RafError(`lot inconnu : ${id}`);
+  /** Le fichier de l'année, créé en mémoire s'il n'existe pas encore (écrit par `save()`). */
+  private archiveFor(year: string): NonNullable<Plan['archives']>[number] {
+    const archives = this.loadArchives();
+    const file = join(this.archiveDir, `${year}.yaml`);
+    let found = archives.find((a) => a.file === file);
+    if (!found) {
+      found = { file, doc: newArchiveDoc(year), dirty: true };
+      archives.push(found);
+      archives.sort((a, b) => (a.file < b.file ? -1 : 1));
+    }
     return found;
   }
 
   /**
-   * `raf archive` : déplace les lots done et dropped (terminés avant `before` s'il est donné) vers l'archive de leur année de fin.
-   * Sans perte : l'archive est écrite avant le plan, et si l'écriture du plan échoue (`plan.onWrite`, L346) les fichiers d'archive
-   * reviennent tels qu'avant, comme le plan — « plan inchangé » vaut pour les deux. Un lot encore dans le plan ET dans l'archive
-   * (coupure entre les deux écritures, lot remis à la main) est recopié par-dessus sa copie archivée : le plan l'emporte.
+   * Un lot archivé qui n'est plus clos (`raf todo` sur un lot done archivé) revient à la fin du fichier du plan à l'écriture :
+   * l'archive ne porte que des lots done ou dropped, et le plan actif reste le seul fichier à porter du travail ouvert.
+   */
+  private reopened(): void {
+    const active = this.doc.get('lots') as YAMLSeq;
+    for (const a of this.archives ?? []) {
+      const seq = archiveLots(a.doc);
+      const back = seq.items.filter((n): n is YAMLMap => isMap(n) && !['done', 'dropped'].includes(String(n.get('status'))));
+      if (back.length === 0) continue;
+      seq.items = seq.items.filter((n) => !back.includes(n as YAMLMap));
+      for (const n of back) active.add(n);
+      a.dirty = true;
+    }
+  }
+
+  /**
+   * `raf archive` : déplace les lots done et dropped du fichier du plan (terminés avant `before` s'il est donné) vers le fichier de leur année
+   * de fin, puis écrit le tout par `save()` : si l'écriture échoue (`plan.onWrite`, L346), plan et archive reviennent tels qu'avant, sur le
+   * disque comme en mémoire. `blocked` : la raison pour laquelle un lot reste (un écart ouvert que `raf check` signale), null sinon.
    * `dryRun` : rend ce qui serait déplacé, sans rien écrire.
    */
-  archive(today: Day, opts: { before?: Day; dryRun?: boolean } = {}): { moved: { lot: Lot; file: string }[]; kept: Kept[] } {
+  archive(today: Day, opts: { before?: Day; dryRun?: boolean; blocked?: (lot: Lot) => string | null } = {}): { moved: { lot: Lot; file: string }[]; kept: Kept[] } {
     this.writable();
-    const { move, kept } = selectArchivable(this.lots(), opts.before);
+    const { move, kept } = selectArchivable(this.activeRaw().map((r) => normalizeLot(r)), opts.before, opts.blocked);
     const files = (lot: Lot) => join(this.archiveDir, `${archiveYear(lot, today)}.yaml`);
-    if (opts.dryRun || move.length === 0) return { moved: move.map((lot) => ({ lot, file: files(lot) })), kept };
+    const result = { moved: move.map((lot) => ({ lot, file: files(lot) })), kept };
+    if (opts.dryRun || move.length === 0) return result;
     const seq = this.doc.get('lots') as YAMLSeq;
     const ids = new Set(move.map((l) => l.id));
     const nodes = seq.items.filter((n): n is YAMLMap => isMap(n) && ids.has(String(n.get('id'))));
-    const byYear = new Map<string, YAMLMap[]>();
+    // De quoi revenir en arrière en mémoire : les items du plan, ceux de chaque archive déjà chargée, et le nombre d'archives (les nouvelles s'ajoutent à la fin).
+    const archives = this.loadArchives();
+    const snapshot = { items: [...seq.items], archives: archives.map((a) => ({ a, items: [...archiveLots(a.doc).items], dirty: a.dirty })) };
     for (const n of nodes) {
       const lot = move.find((l) => l.id === String(n.get('id')))!;
-      const year = archiveYear(lot, today);
-      byYear.set(year, [...(byYear.get(year) ?? []), n]);
+      const target = this.archiveFor(archiveYear(lot, today));
+      archiveLots(target.doc).add(n);
+      target.dirty = true;
     }
-    // Ce qu'il faudra remettre si le plan ne s'écrit pas : chaque fichier d'année touché (null : il n'existait pas), et le dossier.
-    const hadDir = existsSync(this.archiveDir);
-    const before = [...byYear.keys()].map((y) => join(this.archiveDir, `${y}.yaml`)).map((f) => [f, existsSync(f) ? readFileSync(f) : null] as const);
-    for (const [year, list] of byYear) appendToArchive(this.archiveDir, year, list);
-    const items = seq.items;
-    seq.items = items.filter((n) => !nodes.includes(n as YAMLMap));
-    this.archivedCache = undefined;
+    seq.items = seq.items.filter((n) => !nodes.includes(n as YAMLMap));
     try {
       this.save();
     } catch (e) {
-      for (const [f, content] of before) {
-        if (content === null) rmSync(f, { force: true });
-        else writeFileSync(f, content);
+      seq.items = snapshot.items;
+      for (const { a, items, dirty } of snapshot.archives) {
+        archiveLots(a.doc).items = items;
+        a.dirty = dirty;
       }
-      if (!hadDir) rmSync(this.archiveDir, { recursive: true, force: true });
-      seq.items = items;
-      this.archivedCache = undefined;
+      this.archives = snapshot.archives.map(({ a }) => a);
       throw e;
     }
-    return { moved: move.map((lot) => ({ lot, file: files(lot) })), kept };
+    return result;
   }
 
+  /** Le nœud d'un lot, dans le fichier du plan ou dans son fichier d'année ; une archive dont on prend un nœud sera réécrite (les appelants modifient). */
   private lotNode(id: string): YAMLMap {
-    const seq = this.doc.get('lots') as YAMLSeq;
-    const node = seq.items.find((n) => isMap(n) && String(n.get('id')) === id);
-    if (!node) throw new RafError(`lot inconnu : ${id}`);
-    return node as YAMLMap;
+    const find = (seq: YAMLSeq) => seq.items.find((n) => isMap(n) && String(n.get('id')) === id) as YAMLMap | undefined;
+    const archives = this.loadArchives(); // avant toute écriture : un identifiant en double est refusé ici aussi
+    const own = find(this.doc.get('lots') as YAMLSeq);
+    if (own) return own;
+    for (const a of archives) {
+      const node = find(archiveLots(a.doc));
+      if (node) {
+        a.dirty = true;
+        return node;
+      }
+    }
+    throw new RafError(`lot inconnu : ${id}`);
   }
 
   private taskNode(lotId: string, taskId: string): YAMLMap {
@@ -605,11 +654,11 @@ export class Plan {
       if (!SCREENS.includes(opts.screen)) throw new RafError(`screen inconnu : ${String(opts.screen)} (${SCREENS.join(', ')})`);
       if (!opts.visible) throw new RafError('--screen exige --visible : un écran est un changement visible');
     }
+    // Les lots archivés sont dans `lots()` : leur identifiant n'est jamais réutilisé.
     const known = new Set(this.lots().map((l) => l.id));
-    const used = new Set([...known, ...this.archived().map((l) => l.id)]);
     for (const dep of opts.after ?? []) if (!known.has(dep)) throw new RafError(`dépendance inconnue : ${dep}`);
     const re = new RegExp(`^${escapeRe(this.prefix)}(\\d+)$`);
-    const max = Math.max(0, ...[...used].map((id) => Number(re.exec(id)?.[1] ?? 0)));
+    const max = Math.max(0, ...[...known].map((id) => Number(re.exec(id)?.[1] ?? 0)));
     const id = `${this.prefix}${max + 1}`;
     const pub = opts.public === undefined ? undefined : cleanPublic(opts.public);
     if (opts.every !== undefined && !(Number.isInteger(opts.every) && opts.every > 0)) {

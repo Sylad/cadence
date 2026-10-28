@@ -2,11 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Plan } from '../src/plan.js';
-import { newsIssues } from '../src/news.js';
 import { readPlans } from '../src/perf.js';
 import { PLAN_READING } from '../src/orchestrate/briefs.js';
 import { commit, tempDir } from './helpers.js';
-import { repoWithPlan } from './archive-helpers.js';
+import { fileIds, repoWithPlan } from './archive-helpers.js';
 
 describe('raf archive (L396)', () => {
   it('R1 — les lots done et dropped passent dans archive/<année de fin>.yaml, les autres restent dans le plan', async () => {
@@ -17,15 +16,16 @@ describe('raf archive (L396)', () => {
     const y2026 = readFileSync(r.archive('2026'), 'utf8');
     expect(y2026).toContain('id: L2');
     expect(y2026).toContain('id: L3');
-    const active = Plan.load(r.plan).lots().map((l) => l.id);
-    expect(active).toEqual(['L4', 'L5']);
-    expect((await r.raf('list')).out).not.toContain('L1');
+    expect(fileIds(r.plan)).toEqual(['L4', 'L5']);
+    // L'archive est un détail de stockage : le plan chargé présente toujours les cinq lots, raf list aussi.
+    expect(Plan.load(r.plan).lots().map((l) => l.id)).toEqual(['L1', 'L2', 'L3', 'L4', 'L5']);
+    expect((await r.raf('list')).out).toContain('L1     done');
   });
 
   it('R2 — --before ne déplace que les lots terminés strictement avant la date', async () => {
     const r = repoWithPlan();
     await r.raf('archive', '--before', '2026-09-20');
-    expect(Plan.load(r.plan).lots().map((l) => l.id)).toEqual(['L3', 'L4', 'L5']);
+    expect(fileIds(r.plan)).toEqual(['L3', 'L4', 'L5']);
     expect(existsSync(r.archive('2025'))).toBe(true);
     expect(readFileSync(r.archive('2026'), 'utf8')).toContain('id: L2');
     expect(readFileSync(r.archive('2026'), 'utf8')).not.toContain('id: L3');
@@ -39,7 +39,7 @@ describe('raf archive (L396)', () => {
     const res = await r.raf('archive');
     expect(res.code).toBe(0);
     expect(res.out).toMatch(/L1 .*reste.*L6 \(after\)/);
-    expect(Plan.load(r.plan).lots().map((l) => l.id)).toEqual(['L1', 'L4', 'L5', 'L6']);
+    expect(fileIds(r.plan)).toEqual(['L1', 'L4', 'L5', 'L6']);
     expect(readFileSync(r.archive('2026'), 'utf8')).toContain('id: L3');
   });
 
@@ -48,7 +48,7 @@ describe('raf archive (L396)', () => {
     writeFileSync(r.plan, readFileSync(r.plan, 'utf8').replace(/(- id: L3\n)/, '$1    spec: true\n').replace(/(- id: L5\n)/, '$1    gate: { count: 1, spec: true }\n'));
     const res = await r.raf('archive');
     expect(res.out).toMatch(/L3 .*reste.*gate de L5/);
-    expect(Plan.load(r.plan).lots().map((l) => l.id)).toContain('L3');
+    expect(fileIds(r.plan)).toContain('L3');
   });
 
   it('R4 — rejouer ne déplace rien, un fichier d’année existant reçoit les nouveaux lots sans doublon', async () => {
@@ -60,7 +60,8 @@ describe('raf archive (L396)', () => {
     const text = readFileSync(r.archive('2026'), 'utf8');
     expect(text.match(/id: L2/g)).toHaveLength(1);
     expect(text).toContain('id: L3');
-    expect(Plan.load(r.plan).archived().map((l) => l.id).sort()).toEqual(['L1', 'L2', 'L3']);
+    expect([...fileIds(r.archive('2025')), ...fileIds(r.archive('2026'))]).toEqual(['L1', 'L2', 'L3']);
+    expect(fileIds(r.plan)).toEqual(['L4', 'L5']);
   });
 
   it('R5 — --dry-run annonce sans rien écrire ; --before invalide et plan en lecture seule sont refusés', async () => {
@@ -82,16 +83,17 @@ describe('raf archive (L396)', () => {
     const format = { lots: 'lots', fields: { id: ['id'], title: ['title'], status: ['status'] }, statuses: { done: 'done' as const }, estimates: {} };
     const plan = Plan.load(file, { format });
     expect(() => plan.archive('2026-10-28')).toThrow(/lecture seule/);
-    expect(plan.archived()).toEqual([]);
+    expect(plan.archiveFiles()).toEqual([]);
+    expect(plan.lots().map((l) => l.id)).toEqual(['A1']);
   });
 
   it("R2 — un lot sans date de fin reste quand --before est donné, et part sans --before", async () => {
     const r = repoWithPlan();
     writeFileSync(r.plan, readFileSync(r.plan, 'utf8').replace(/    finished: 2025-06-10\n/, ''));
     await r.raf('archive', '--before', '2030-01-01');
-    expect(Plan.load(r.plan).lots().map((l) => l.id)).toEqual(['L1', 'L4', 'L5']);
+    expect(fileIds(r.plan)).toEqual(['L1', 'L4', 'L5']);
     await r.raf('archive');
-    expect(Plan.load(r.plan).lots().map((l) => l.id)).toEqual(['L4', 'L5']);
+    expect(fileIds(r.plan)).toEqual(['L4', 'L5']);
   });
 
   it('R6 — show et commits lisent un lot archivé, commits compris', async () => {
@@ -128,19 +130,21 @@ describe('raf archive (L396)', () => {
     p.setStatus('L5', 'done', '2026-10-02', { force: true });
     p.save();
     await r.raf('archive');
-    expect(Plan.load(r.plan).lots().map((l) => l.id)).toEqual(['L4']);
+    expect(fileIds(r.plan)).toEqual(['L4']);
     const added = await r.raf('add', 'nouveau');
     expect(added.out).toContain('L6');
   });
 
-  it('R9 — les Nouveautés qui citent un lot archivé ne sont pas « absentes du plan », et le lot archivé ne réclame pas d’entrée', () => {
-    const dir = tempDir();
-    mkdirSync(join(dir, 'news'));
-    const entry = { file: 'a.md', slug: 'a', title: 'T', date: '2026-01-01', created: '2026-01-01T10:00:00', lots: ['L1'], captures: [], alts: [], body: '', problems: [], nocapture: 'x' } as never;
-    const archived = { id: 'L1', title: 'x', status: 'done', visible: true, tasks: [], notes: [], after: [], estimate: 1 } as never;
-    expect(newsIssues([], [entry], dir).map((i) => i.kind)).toContain('unknown-lot');
-    expect(newsIssues([], [entry], dir, new Map(), [archived]).map((i) => i.kind)).not.toContain('unknown-lot');
-    expect(newsIssues([], [{ ...(entry as object), lots: [] } as never], dir, new Map(), [archived]).map((i) => i.kind)).not.toContain('visible-without-entry');
+  it('R9 — cadence news check : une entrée qui cite un lot archivé rend le même verdict qu’avant l’archivage', async () => {
+    const r = repoWithPlan();
+    const dir = join(r.dir, 'docs/nouveautes');
+    expect((await r.raf('news', 'new', 'L1', '--title', 'Un titre', '--dir', dir)).code).toBe(0);
+    const avant = await r.raf('news', 'check', '--dir', dir);
+    expect(avant.out).not.toContain('absent du plan');
+    await r.raf('archive');
+    const apres = await r.raf('news', 'check', '--dir', dir);
+    expect(apres.out).toBe(avant.out);
+    expect(apres.code).toBe(avant.code);
   });
 
   it('R10 — cadence news new accepte un lot archivé', async () => {

@@ -57,7 +57,7 @@ const short = (c: Commit) => `${c.sha.slice(0, 7)} ${c.subject}`;
 /** Commits de la fenêtre reliés aux lots : ceux qui ne touchent que le plan ne comptent ni « sans lot » ni comme travail d'un lot (comme `raf commits`). */
 function period(ctx: SessionCtx, since: string): Linked {
   const commits = planCommits(ctx.plan, ctx.root, { since });
-  const exempt = exemptPlanOnly(linkCommits(ctx.plan.everyLot(), commits, ctx.plan.refs), ctx.plan, ctx.root);
+  const exempt = exemptPlanOnly(linkCommits(ctx.plan.lots(), commits, ctx.plan.refs), ctx.plan, ctx.root);
   const byLot = new Map([...workByLot(ctx.plan, ctx.root, exempt)].filter(([, cs]) => cs.length > 0));
   const linked = { ...exempt, byLot };
   // Comme raf check : un commit antérieur à l'adoption du plan n'avait pas à citer de lot.
@@ -126,7 +126,7 @@ function closeWindow(ctx: SessionCtx, since: string | undefined): { since: strin
 export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: number }): number {
   const { plan, out, today } = ctx;
   const lots = plan.lots();
-  const all = linkCommits(plan.everyLot(), planCommits(plan, ctx.root), plan.refs);
+  const all = linkCommits(lots, planCommits(plan, ctx.root), plan.refs);
   out(`${plan.project} — reprise du ${today}`);
 
   const next = readNext(ctx.state);

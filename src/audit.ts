@@ -192,11 +192,9 @@ export function missingPublicTitles(lots: Lot[], entries: Entry[]): AuditIssue[]
 /** Écarts entre le plan, l'historique et les Nouveautés — ce que `raf check` affiche. */
 export function audit(plan: Plan, root: string, newsDir: string, today: Day, opts: { since?: string; idle?: number } = {}): AuditIssue[] {
   const lots = plan.lots();
-  // Les lots archivés (L396) sont connus des commits qui les citent, mais ni audités ni comptés : ils l'ont été avant d'être déplacés.
-  const known = plan.everyLot();
-  const linked = exemptPlanOnly(linkCommits(known, planCommits(plan, root, { since: auditSince(plan, opts.since) }), plan.refs), plan, root);
+  const linked = exemptPlanOnly(linkCommits(lots, planCommits(plan, root, { since: auditSince(plan, opts.since) }), plan.refs), plan, root);
   // L'inactivité se mesure sur tout l'historique, pas seulement la fenêtre --since.
-  const all = linkCommits(known, planCommits(plan, root), plan.refs);
+  const all = linkCommits(lots, planCommits(plan, root), plan.refs);
   preloadChangedFiles(root, [...all.byLot.values()].flatMap((cs) => cs.map((c) => c.sha)));
   // Un commit acquitté (`raf ignore`) qui cite des lots connus ne compte pour aucun : ni commencé, ni actif, ni à relire.
   for (const [id, cs] of all.byLot) all.byLot.set(id, cs.filter((c) => !isAcknowledged(plan, c)));
@@ -220,7 +218,7 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
     const m = l.public ? publicTitleTooLong(l.public, max) : reused ? publicTitleTooLong(reused, max) : null;
     return m ? [{ message: `${l.id} : ${reused && !l.public ? m.replace('titre public', 'titre public repris de la Nouveauté') : m}` }] : [];
   });
-  const issues: AuditIssue[] = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7, { readonly: plan.readonly, hasVisibleField: plan.hasVisibleField }), ...newsIssues(lots, entries, newsDir, hypothesesOf(root, plan.configFile ?? join(root, 'cadence.yaml')), plan.archived()), ...titles, ...gates, ...docSyncIssues(plan, root, all.byLot), ...resourceIssues(lots, root), ...(plan.hasPublicField ? missingPublicTitles(lots, entries) : []),
+  const issues: AuditIssue[] = [...check(lots, { ...linked, byLot: all.byLot }, today, opts.idle ?? 7, { readonly: plan.readonly, hasVisibleField: plan.hasVisibleField }), ...newsIssues(lots, entries, newsDir, hypothesesOf(root, plan.configFile ?? join(root, 'cadence.yaml'))), ...titles, ...gates, ...docSyncIssues(plan, root, all.byLot), ...resourceIssues(lots, root), ...(plan.hasPublicField ? missingPublicTitles(lots, entries) : []),
     ...plan.ignore.invalid.map((src) => ({ message: `ignore : motif invalide « ${src} »` }))];
   // Un plan en lecture seule se corrige avec l'outil du projet : ne pas conseiller une commande raf qui refuserait.
   return plan.readonly ? issues.map((i) => ({ ...i, message: i.message.replace(/ — raf (start|public) .*$/, '') })) : issues;
@@ -262,7 +260,7 @@ function workCommits(plan: Plan, root: string, commits: Commit[]): Commit[] {
 
 /** Commits liés à un lot, du plus récent au plus ancien, avant tout tri : commits de plan et d'avant l'adoption compris. */
 export function lotCommits(plan: Plan, root: string, lotId: string): Commit[] {
-  return linkCommits(plan.everyLot(), planCommits(plan, root), plan.refs).byLot.get(lotId) ?? [];
+  return linkCommits(plan.lots(), planCommits(plan, root), plan.refs).byLot.get(lotId) ?? [];
 }
 
 /**

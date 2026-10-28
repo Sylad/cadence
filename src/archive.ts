@@ -1,13 +1,14 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Document, isMap, isSeq, parseDocument, type YAMLMap, type YAMLSeq } from 'yaml';
+import { Document, isMap, isSeq, parseDocument, type YAMLSeq } from 'yaml';
 import type { Day } from './dates.js';
 import type { Lot } from './plan.js';
 
 /**
- * Archive du plan (L396) : les lots done et dropped quittent `.cadence/raf.yaml` pour `.cadence/archive/<année>.yaml`
- * (l'année de leur fin). Le plan actif reste ce que lisent les sessions ; l'archive n'est lue que par les commandes
- * qui retrouvent un lot par son identifiant (show, commits, check, news, perf) — jamais par un brief.
+ * Archive du plan (L396) : un détail de STOCKAGE. Les lots done et dropped quittent le fichier `.cadence/raf.yaml` pour
+ * `.cadence/archive/<année>.yaml` (l'année de leur fin), mais le plan chargé (`Plan.load`) les présente tous : `plan.lots()`
+ * rend la même chose avant et après `raf archive`, et aucun lecteur n'a à connaître l'archive. Seul le fichier du plan
+ * actif devient petit, et les briefs disent aux sessions de ne jamais ouvrir `.cadence/archive/`.
  */
 export const ARCHIVE_DIR = 'archive';
 
@@ -18,11 +19,12 @@ export interface Kept {
 }
 
 /**
- * Les lots à déplacer et ceux qui restent. Un lot reste quand un lot du plan qui reste le cite (`after` : sa sortie
- * ferait un `bad-dependency`), ou quand il compte pour la condition de tirage (`gate`) d'un lot encore
- * ouvert : l'archiver baisserait le compte. `before` : seuls les lots terminés strictement avant ce jour (un lot sans date de fin reste).
+ * Les lots à déplacer et ceux qui restent, parmi `lots` (ceux du fichier actif). Un lot reste quand `blocked` le dit (un
+ * écart que `raf check` signale encore), quand un lot qui reste le cite (`after` : sa sortie ferait un `bad-dependency`),
+ * ou quand il compte pour la condition de tirage (`gate`) d'un lot encore ouvert : l'archiver baisserait le compte.
+ * `before` : seuls les lots terminés strictement avant ce jour (un lot sans date de fin reste).
  */
-export function selectArchivable(lots: Lot[], before?: Day): { move: Lot[]; kept: Kept[] } {
+export function selectArchivable(lots: Lot[], before?: Day, blocked: (lot: Lot) => string | null = () => null): { move: Lot[]; kept: Kept[] } {
   const closed = (l: Lot) => (l.status === 'done' || l.status === 'dropped') && (before === undefined || (!!l.finished && l.finished < before));
   const move = new Map(lots.filter(closed).map((l) => [l.id, l]));
   const kept: Kept[] = [];
@@ -30,6 +32,10 @@ export function selectArchivable(lots: Lot[], before?: Day): { move: Lot[]; kept
     move.delete(id);
     kept.push({ id, why });
   };
+  for (const l of [...move.values()]) {
+    const why = blocked(l);
+    if (why) keep(l.id, why);
+  }
   for (const l of lots) {
     if (!l.gate || l.gate.invalid || move.has(l.id) || l.status === 'done' || l.status === 'dropped') continue;
     for (const c of lots) {
@@ -63,38 +69,25 @@ export function archiveFiles(dir: string): string[] {
   return readdirSync(dir).filter((f) => /^\d{4}\.yaml$/.test(f)).sort().map((f) => join(dir, f));
 }
 
-/** Les lots bruts d'un fichier d'archive ; une archive illisible est une erreur nommée, pas un lot de moins. */
-export function readArchiveFile(file: string): Record<string, unknown>[] {
+/** La liste des lots d'un document d'archive (toujours présente : `readArchiveDoc` et `newArchiveDoc` la garantissent). */
+export function archiveLots(doc: Document): YAMLSeq {
+  return doc.get('lots') as YAMLSeq;
+}
+
+/** Un fichier d'archive lu tel quel ; une archive illisible est une erreur nommée, pas un lot de moins. */
+export function readArchiveDoc(file: string): Document {
   const doc = parseDocument(readFileSync(file, 'utf8'));
   if (doc.errors.length > 0) throw new Error(`${file} : ${doc.errors[0].message}`);
   const lots = isMap(doc.contents) ? doc.get('lots') : undefined;
   if (!isSeq(lots)) throw new Error(`${file} : la clé « lots » doit porter la liste des lots archivés`);
-  return lots.toJSON() as Record<string, unknown>[];
+  lots.flow = false;
+  return doc;
 }
 
-/**
- * Ajoute les nœuds au fichier de l'année (créé au besoin). Un identifiant déjà archivé est REMPLACÉ par la copie du plan, à sa
- * place : le plan est la seule copie qui a pu changer (note ajoutée après un échec d'écriture, lot remis à la main), l'archive
- * ne doit jamais garder une copie plus ancienne que lui. Jamais deux fois le même id.
- */
-export function appendToArchive(dir: string, year: string, nodes: YAMLMap[]): string {
-  const file = join(dir, `${year}.yaml`);
-  const doc = existsSync(file) ? parseDocument(readFileSync(file, 'utf8')) : new Document({ version: 1, lots: [] });
-  if (doc.errors.length > 0) throw new Error(`${file} : ${doc.errors[0].message}`);
-  let seq = doc.get('lots') as YAMLSeq | undefined;
-  if (!isSeq(seq)) {
-    seq = doc.createNode([]) as YAMLSeq;
-    doc.set('lots', seq);
-  }
-  seq.flow = false;
-  for (const n of nodes) {
-    const id = String(n.get('id'));
-    const at = seq.items.findIndex((o) => isMap(o) && String(o.get('id')) === id);
-    if (at === -1) seq.add(n);
-    else seq.items[at] = n;
-  }
-  mkdirSync(dir, { recursive: true });
-  if (!existsSync(file)) doc.commentBefore = ` Lots terminés ou abandonnés de ${year}, déplacés du plan par « raf archive ». Lecture seule pour les sessions : ne pas l'ouvrir.`;
-  writeFileSync(file, doc.toString({ lineWidth: 0 }));
-  return file;
+/** Le document d'un fichier d'année qui n'existe pas encore. */
+export function newArchiveDoc(year: string): Document {
+  const doc = new Document({ version: 1, lots: [] });
+  doc.commentBefore = ` Lots terminés ou abandonnés de ${year}, déplacés du fichier du plan par « raf archive ». Lecture seule pour les sessions : ne pas l'ouvrir, « raf show <id> » lit un lot archivé.`;
+  archiveLots(doc).flow = false;
+  return doc;
 }

@@ -886,7 +886,7 @@ export function readPlans(parent: string, warn: (line: string) => void): Plans {
   for (const dir of findProjects(parent, 2)) {
     const name = relative(parent, dir).split(sep).join('/');
     try {
-      plans.set(name, planLoader(dir)().everyLot());
+      plans.set(name, planLoader(dir)().lots());
     } catch {
       warn(`perf : plan illisible, projet ${name} sauté`);
     }

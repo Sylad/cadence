@@ -118,12 +118,13 @@ lots:
   - id: L411
     title: "Panneau des lots : au plus 5 lots par projet (les premiers dans l'ordre affiché, en cours d'abord après L410), bouton « + N lots » qui déplie le reste du projet et « moins » qui le replie ; un lot qui a des sous-lots se plie/déplie d'un clic (replié par défaut, compte des sous-lots visible) ; états gardés entre deux ouvertures — demande de Sylvain le 28-10"
     public: Cinq lots par projet, et le reste à la demande
-    status: todo
+    status: doing
     after: [ L410 ]
     estimate: 0.5
     visible: true
     screen: component
     created: 2026-10-28
+    started: 2026-10-28
   - id: L412
     title: "Panneau des lots : en tête, « ce qui attend une décision » — questions des sessions (texte court + commande --answer), lots rendus au lead (cause en une ligne), verdicts UX à poser, livraisons en échec ; lu dans les états de vague et le plan — idée validée par Sylvain le 28-10"
     public: Ce qui attend une décision, en tête du panneau

@@ -4273,13 +4273,14 @@ lots:
     finished: 2026-10-28
   - id: L395
     title: "Porte de tests visible et plafond commun : reprendre le commit 0ca657cf de la branche cadence/2026-10-28-0830c/cadence--L395 (git cherry-pick : étape « porte » dans l'état du lot, la bande et --status ; --status --wave <id> montre cette vague) ; PUIS plafond commun : toutes les vagues vivantes appliquent le même plafond de sessions (vague à 3 à côté d'une vague à 4 : « 4/3 en cours », L51 a attendu 16 min 28 s le 28-10) ; doc, tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-28
     started: 2026-10-28
     notes:
       - { date: 2026-10-28, text: "titre remplacé : « Porte de tests visible : étape « porte » dans l'état du lot (durée, next juste), la bande et --status l'affichent au lieu de « → implement » sans session (5 min muettes sur L392) ; --status --wave <id> montre le tableau de cette vague, pas celui de la dernière du dossier ; tests »" }
     review: { date: 2026-10-28, verdict: "compliant after 2 fixes (minors) : la porte visible et le plafond commun sont corrects et testés (60 tests ciblés verts) ; un gate périmé s'affiche encore dans `--status` après un SIGKILL ou un --resume, et la définition des créneaux libres dans docs/orchestrate.md:760 est restée à l'ancien plafond — orchestré (vague 2026-10-28-1015c, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant after 1 minor fix (une porte laissée par un processus tué réapparaît comme « porte tests » après --resume)", commit: 1eb8e5ec003fc3e2f4110416978fc413e50ac1bd }
+    finished: 2026-10-28
   - id: L396
     title: "raf archive [--before date] : lots done/dropped déplacés dans .cadence/archive/<année>.yaml, relus par raf (show, check, commits) et par perf, news et plan public quand l'id n'est pas dans le plan actif ; briefs : ne jamais lire l'archive (plan cadence 559 Ko ≈ 150 k tokens) ; doc, tests"
     status: doing

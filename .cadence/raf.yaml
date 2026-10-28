@@ -4265,11 +4265,12 @@ lots:
     created: 2026-10-27
   - id: L394
     title: "raf check et raf now : un seul git log --name-only pour les fichiers de tous les commits au lieu d'un git par commit (89 % du temps : raf check 20 s, raf now 15 s, session start 25 s à ~2 250 commits) → lead tour --json 35 s dépasse le délai de 20 s de la bande, liste des projets vide ; mesure avant/après, tests"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-28
     started: 2026-10-28
     review: { date: 2026-10-28, verdict: "conforme (2 notes mineures sur la documentation de la mesure) — orchestré (vague 2026-10-28-0830c, 0 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que le contexte de l'entrée L394 du CHANGELOG, désormais sous Fixed après L399 et L392 ; le code et les tests du lot sont intacts", commit: edaecededa54ec563291ac1766bfdace23147618 }
+    finished: 2026-10-28
   - id: L395
     title: "Porte de tests visible : étape « porte » dans l'état du lot (durée, next juste), la bande et --status l'affichent au lieu de « → implement » sans session (5 min muettes sur L392) ; --status --wave <id> montre le tableau de cette vague, pas celui de la dernière du dossier ; tests"
     status: doing
@@ -4294,11 +4295,12 @@ lots:
     created: 2026-10-28
   - id: L399
     title: "Tests rouges à la porte après une implémentation qui se disait verte : 30 passes sur 205 du 22 au 28-10 (cadence 17) ; diagnostiquer par lot (commande de la session ≠ orchestrate.test, test instable, dépendances du worktree) depuis les journaux, puis supprimer la cause mesurée ; doc, tests"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-28
     started: 2026-10-28
     review: { date: 2026-10-28, verdict: "compliant — 1 minor (mesure : « trois causes » pour quatre lignes) — orchestré (vague 2026-10-28-0830c, 0 passe(s) de correction)", commit: f5170cde5ce9333534e1badf5ee174a71b52fb25, reporte: { de: 966e47e7e4f27387c8d82d770803e97ec6542871, vers: f5170cde5ce9333534e1badf5ee174a71b52fb25, patchId: 77d7d54e0032684ba6814daef52cfbed64422d81 } }
+    finished: 2026-10-28
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

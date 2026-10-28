@@ -4276,6 +4276,16 @@ lots:
     status: todo
     estimate: 0.5
     created: 2026-10-28
+  - id: L397
+    title: "verify --gate réutilise la porte de la vague : même sha et arbre identique → lit le résultat enregistré par le programme au lieu de rejouer build et suite (≈ 5 min par lot prêt : L390 le 28-10) ; rejoue si le sha a changé (intégration) ou sans enregistrement ; sortie dit d'où vient le verdict ; skill lead à jour ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-28
+  - id: L398
+    title: "Sessions de vague sans contexte inutile : 29 à 60 k tokens au premier tour (liste de toutes les skills, hook superpowers, CLAUDE.md) pour des sessions qui n'utilisent que Bash ; lancer sans plugins ni skills utilisateur non voulus, mesurer contexte initial et tokens par étape avant/après sur 2 vagues ; doc, tests"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-28
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

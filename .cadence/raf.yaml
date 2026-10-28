@@ -16,12 +16,13 @@ lots:
   - id: L401
     title: "Panneau des lots (mod cadence-hud, Pane) : arborescence projet → lots parents → sous-lots des projets du dossier, état (en cours, prêt, en vague, rendu, en question), liens after: ; lecture seule, rafraîchi sur changement de plan ou de vague ; repli lisible sur terminal"
     public: Un panneau à côté de la conversation qui montre les lots de chaque projet
-    status: todo
+    status: doing
     estimate: 0.5
     visible: true
     screen: page
     goal: "Un panneau Pane du mod plugins/cadence-hud (charger la skill plugin-authoring, prendre la bande existante comme modèle) qui montre, pour chaque projet du dossier parent, l'arbre de ses lots non clos (parent → sous-lots) avec leur état et les liens after:, lu par cadence lead tour --json ou le même code ; lecture seule, rafraîchi quand un plan ou une vague change ; test du rendu (claude plugin test) et doc"
     created: 2026-10-28
+    started: 2026-10-28
   - id: L402
     title: "Panneau des lots : réordonner par glisser-déposer (app desktop, module de surface Client) et boutons ↑ ↓ ailleurs, via raf move ; grisé avec la raison pendant une vague du dépôt ou sur un plan en lecture seule"
     public: Réordonner les lots en les faisant glisser dans le panneau

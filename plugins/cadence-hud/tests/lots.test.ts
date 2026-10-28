@@ -448,3 +448,10 @@ test('L411 — la coupe compte les sous-lots d’un lot replié qu’elle retire
   expect(p.lines.filter(l => l.kind === 'lot')).toHaveLength(0)
   expect(p.more).toBe(4)
 })
+
+test('L411 — la bascule d’un lot à sous-lots est collée à l’id à tous les niveaux, sous la colonne du glyphe du projet', () => {
+  const rows = [{ project: 'p', lots: [lot('L1'), lot('L2', 'todo', { parent: 'L1' }), lot('L3'), lot('L4', 'todo', { parent: 'L2' })] }]
+  const p = buildPanel({ rows, columns: 70, height: 40, waves: [], views: { [openKey('p', 'L1')]: true } })
+  const leads = Object.fromEntries(p.lines.flatMap(l => (l.kind === 'lot' ? [[l.id, l.lead]] : [])))
+  expect(leads).toEqual({ L1: ' ▾', L2: '  └▸', L3: '  ' })
+})

@@ -201,12 +201,12 @@ export const buildPanel = (input: {
     })
   const baseLead = (f: FlatLot) => (f.depth === 0 ? '  ' : `  ${'  '.repeat(f.depth - 1)}${f.branch} `)
   const isOpen = (b: Block, f: FlatLot) => views[openKey(b.project.project, f.lot.id)] === true
-  // un lot à sous-lots porte sa bascule (▸ replié, ▾ déplié) dans la dernière cellule de son retrait, la première au premier niveau
+  // un lot à sous-lots porte sa bascule (▸ replié, ▾ déplié) dans la dernière cellule de son retrait, collée à l'id à tous les niveaux (au premier : « ␣▸L401 », sous la colonne du glyphe du projet)
   const leadOf = (b: Block, f: FlatLot) => {
     const lead = baseLead(f)
     if (f.children === 0) return lead
     const glyph = isOpen(b, f) ? '▾' : '▸'
-    return f.depth === 0 ? `${glyph} ` : `${lead.slice(0, -1)}${glyph}`
+    return `${lead.slice(0, -1)}${glyph}`
   }
   const shown = blocks.filter(b => !b.folded)
   const idWidth = Math.max(0, ...shown.flatMap(b => b.flat.map(f => leadOf(b, f).length + f.lot.id.length)))

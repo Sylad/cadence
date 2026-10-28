@@ -7,7 +7,8 @@ import { gitRoot, repoStatus } from './git.js';
 import { linkCommits } from './link.js';
 import { commitCount, lastActivity, lockStatus } from './session.js';
 import { parse } from 'yaml';
-import { RafError } from './plan.js';
+import { isOpen, RafError, type Lot } from './plan.js';
+import { isRecurring } from './recurring.js';
 import { priorityRank, readPriority } from './orchestrate/continue.js';
 import { readNext, sharedStateDir, stateDir } from './state.js';
 import { freeLine, readyFree, type FreeLot } from './ready-free.js';
@@ -66,6 +67,17 @@ export interface TourProgress {
   added7: number;
 }
 
+/** Un lot non clos du tableau (L401) ou, dans un plan natif, une sous-tâche non close (`<lot>/<n>`, `parent` = le lot, jamais d'`after`). */
+export interface TourLot {
+  id: string;
+  title: string;
+  status: 'todo' | 'doing';
+  /** Ids tels que le plan les écrit, clos ou inconnus compris : c'est au lecteur de dire s'ils sont satisfaits. */
+  after: string[];
+  /** Lot parent : `Lot.parent` d'un plan tenu par un autre outil, le lot lui-même pour une sous-tâche. */
+  parent?: string;
+}
+
 export interface TourRow {
   project: string;
   /** Renseigné quand le projet n'a pas pu être lu : les autres champs sont alors vides. */
@@ -81,6 +93,8 @@ export interface TourRow {
   /** Lots prêts dont aucune ressource (`uses:`) n'est prise par un lot en cours ni par une vague (L252) ; absent quand aucun n'est libre. */
   free?: FreeLot[];
   progress: TourProgress;
+  /** Lots non clos hors récurrents, sous-tâches ouvertes de ces lots comprises (L401) ; absent d'une ligne en erreur. */
+  lots?: TourLot[];
   /** « non commité », « non poussé », « livraison en cours » ; vide quand le dépôt est propre. */
   repo: string[];
   /** Worktrees de lot conservés par une vague (L279, R19) ; absent quand il n'y en a aucun. */
@@ -90,6 +104,16 @@ export interface TourRow {
 }
 
 const empty = (project: string): TourRow => ({ project, doing: [], drift: [], notes: [], next: null, progress: { done: 0, doing: 0, todo: 0, added7: 0 }, repo: [] });
+
+/** Les lots non clos du plan, hors récurrents, chacun suivi de ses sous-tâches non closes ; celles d'un lot clos ou récurrent sortent avec lui. */
+export function openLots(lots: Lot[]): TourLot[] {
+  return lots
+    .filter((l) => isOpen(l.status) && !isRecurring(l))
+    .flatMap((l): TourLot[] => [
+      { id: l.id, title: l.title, status: l.status as 'todo' | 'doing', after: l.after, ...(l.parent ? { parent: l.parent } : {}) },
+      ...l.tasks.filter((t) => isOpen(t.status)).map((t): TourLot => ({ id: `${l.id}/${t.id}`, title: t.title, status: t.status as 'todo' | 'doing', after: [], parent: l.id })),
+    ]);
+}
 
 export function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
@@ -156,6 +180,7 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
       todo: counted.filter((l) => l.status === 'todo').length,
       added7: counted.filter((l) => l.created !== undefined && diffDays(l.created, today) >= 0 && diffDays(l.created, today) < ADDED_DAYS).length,
     };
+    row.lots = openLots(lots);
     const waiting = gateWaiting(lots, blocked).map((g) => g.lot.id);
     if (waiting.length) row.waiting = waiting;
     row.next = ready[0] ? { id: ready[0].id, title: ready[0].title } : null;

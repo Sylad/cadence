@@ -212,8 +212,11 @@ async function commitPlan(c: LotCtx, message: string, root = c.lot.repo, before:
   const repo = root;
   const ownFile = planOwnFile(c, repo);
   // Les fichiers de plan.onWrite (L346) entrent même non suivis : le premier plan publié n'est pas encore au dépôt.
-  const produced = c.loadPlan().produced;
-  const dirty = [...new Set([...trackedPaths(await snapshot(repo, { remote: false })), ...dirtyPaths(repo, produced)])];
+  // Les fichiers d'année de l'archive (L396) aussi : un `raf archive` non commité pendant la vague les crée ou les réécrit, et le plan seul commité laisserait HEAD sans les lots archivés.
+  // Chemins relatifs au dépôt du projet (comme `plan.maintained`), même quand `root` est un worktree de lot ; vide pour un plan en lecture seule.
+  const plan = c.loadPlan();
+  const archives = plan.archiveFiles().map((f) => relative(c.lot.repo, f));
+  const dirty = [...new Set([...trackedPaths(await snapshot(repo, { remote: false })), ...dirtyPaths(repo, [...plan.produced, ...archives])])];
   if (dirty.length === 0) return null;
   const foreign = dirty.filter((f) => !ownFile(f));
   if (foreign.length) return `arbre sale (fichiers hors plan) : ${foreign.join(', ')}`;

@@ -7,6 +7,9 @@ import { Plan } from '../src/plan.js';
 import { repoWork } from '../src/repos.js';
 import { fileIds, repoWithPlan } from './archive-helpers.js';
 import { commit, tempDir } from './helpers.js';
+import { claudeOut, commitFile, git, harness, reviewReport, workReport, type Call } from './orchestrate-harness.js';
+import { until } from './orchestrate-worktree-harness.js';
+import { runLot } from '../src/orchestrate/cycle.js';
 
 /** `plan.onWrite` du dépôt : `command` lancé après chaque écriture du plan. */
 const onWrite = (dir: string, command: string) => writeFileSync(join(dir, 'cadence.yaml'), `plan:\n  path: .cadence/raf.yaml\n  onWrite:\n    command: '${command}'\n`);
@@ -170,5 +173,33 @@ describe('L396 — revue de code, constat 3 : les dépôts voisins (repos:) d’
     expect(show.out).toContain('dans la période');
     expect(show.out).not.toContain('hors période');
     expect(repoWork(Plan.load(r.plan), { rel: '../v', path: r.v }, 'L1').map((c) => c.subject)).toEqual(['feat(L1): dans la période']);
+  });
+});
+
+describe('L396 — revue de code, constat 4 : le commit du plan de la vague prend les fichiers d’année de l’archive', () => {
+  it("R29 — un raf archive non commité pendant la vague (entre deux sessions) : le commit du plan prend l'archive non suivie, HEAD porte les lots archivés", async () => {
+    const script = { implement: [(call: Call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a.txt')] }))], review: [() => claudeOut(reviewReport())] };
+    const h = harness({ lots: [{ title: 'un' }, { title: 'clos' }], script });
+    const p = h.plan();
+    p.setStatus('L2', 'done', '2025-06-10', { force: true });
+    p.save();
+    git(h.repo, 'commit', '-q', '-m', 'chore: L2 clos', '--', '.cadence/raf.yaml');
+    // La commande de tests de la vague est le rendez-vous : cadence l'attend entre la session de travail et la revue, le lead archive pendant ce temps, sans commiter.
+    const sync = tempDir();
+    const test = `touch ${sync}/running; while [ ! -f ${sync}/go ]; do sleep 0.05; done`;
+    const c = h.lot('L1', {}, { test });
+    const done = runLot(c);
+    await until(() => existsSync(join(sync, 'running')));
+    const live = h.plan();
+    expect(live.archive('2026-10-04').moved.map((m) => m.lot.id)).toEqual(['L2']);
+    live.save();
+    expect(git(h.repo, 'status', '--porcelain')).toContain('?? .cadence/archive/');
+    writeFileSync(join(sync, 'go'), '');
+    await done;
+    expect(c.lot.status, c.lot.outcome).not.toBe('failed');
+    expect(git(h.repo, 'ls-tree', '-r', '--name-only', 'HEAD')).toContain('.cadence/archive/2025.yaml');
+    expect(git(h.repo, 'show', 'HEAD:.cadence/archive/2025.yaml')).toContain('id: L2');
+    expect(git(h.repo, 'show', 'HEAD:.cadence/raf.yaml')).not.toContain('id: L2');
+    expect(git(h.repo, 'status', '--porcelain')).toBe('');
   });
 });

@@ -31,7 +31,10 @@ const KEPT_BEFORE = 3;
 export const defaultRoot = () => join(homedir(), '.local', 'share', 'cadence');
 export const defaultBinDir = () => join(homedir(), '.local', 'bin');
 
-/** Statut des lots du plan du dépôt, tel que HEAD le porte (plan: de cadence.yaml, sinon .cadence/raf.yaml, sinon docs/plan/raf.yaml hérité). */
+/**
+ * Statut des lots du plan du dépôt, tel que HEAD le porte (plan: de cadence.yaml, sinon .cadence/raf.yaml, sinon docs/plan/raf.yaml hérité),
+ * archive comprise : la même lecture fusionnée que `Plan.lots()` (L396) — les lots de `<dossier du plan>/archive/<année>.yaml` sont des lots du plan.
+ */
 function planStatuses(repo) {
   let planFile = '.cadence/raf.yaml';
   try {
@@ -42,9 +45,18 @@ function planStatuses(repo) {
   if (existsSync(join(repo, 'cadence.yaml'))) {
     const cfg = parse(readFileSync(join(repo, 'cadence.yaml'), 'utf8')) ?? {};
     if (typeof cfg.plan === 'string') planFile = cfg.plan;
+    else if (cfg.plan && typeof cfg.plan.path === 'string') planFile = cfg.plan.path;
   }
-  const plan = parse(git(repo, 'show', `HEAD:${planFile}`)) ?? {};
-  return new Map((plan.lots ?? []).map((l) => [String(l.id), String(l.status)]));
+  const lotsOf = (file) => parse(git(repo, 'show', `HEAD:${file}`))?.lots ?? [];
+  const archiveDir = `${dirname(planFile)}/archive`;
+  let years = [];
+  try {
+    years = git(repo, 'ls-tree', '--name-only', `HEAD:${archiveDir}`).split('\n').filter((f) => /^\d{4}\.yaml$/.test(f)).sort();
+  } catch {
+    years = []; // pas de dossier d'archive sous HEAD
+  }
+  const lots = [...years.flatMap((y) => lotsOf(`${archiveDir}/${y}`)), ...lotsOf(planFile)];
+  return new Map(lots.map((l) => [String(l.id), String(l.status)]));
 }
 
 /** Sha actuellement en service (nom du dossier de la version), ou undefined. */

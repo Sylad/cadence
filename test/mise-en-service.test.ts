@@ -171,6 +171,23 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(() => checkLotsDone(dir, 'HEAD', undefined)).toThrow(/L3 \(dropped\)/);
   });
 
+  it('L396 — checkLotsDone lit les lots archivés (.cadence/archive/<année>.yaml) comme ceux du plan : un lot done archivé passe, un dropped archivé non annulé bloque', () => {
+    const { dir } = workRepo({ L1: 'done', L2: 'dropped', L3: 'todo' });
+    mkdirSync(join(dir, '.cadence/archive'), { recursive: true });
+    git(dir, 'mv', 'docs/plan/raf.yaml', '.cadence/raf.yaml');
+    writeFileSync(join(dir, '.cadence/raf.yaml'), plan({ L3: 'todo' }));
+    writeFileSync(join(dir, '.cadence/archive/2025.yaml'), plan({ L1: 'done' }));
+    writeFileSync(join(dir, '.cadence/archive/2026.yaml'), plan({ L2: 'dropped' }));
+    commitAll(dir, 'plan: L1 2 lot(s) archivé(s)', '.cadence');
+    writeFileSync(join(dir, 'a.txt'), 'a');
+    commitAll(dir, 'fix(L1): suite du lot archivé', 'a.txt');
+    expect(() => checkLotsDone(dir, 'HEAD', undefined)).not.toThrow();
+    writeFileSync(join(dir, 'b.txt'), 'b');
+    commitAll(dir, 'feat(L2): jamais annulé', 'b.txt');
+    expect(() => checkLotsDone(dir, 'HEAD', undefined)).toThrow(/L2 \(dropped\)/);
+    expect(() => checkLotsDone(dir, 'HEAD', undefined)).not.toThrow(/absent du plan/);
+  });
+
   it("une installation qui échoue ne change rien : ni service/, ni liens, ni worktree restant", () => {
     const { dir, first } = workRepo();
     const { root, binDir } = places();

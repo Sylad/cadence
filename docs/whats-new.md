@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.19.1**: `cadence verify --gate` in the main tree reads `HEAD` and `git status` again after the steps, says what moved and prints no green or red verdict that is not the sha's.
 - **1.19.0**: `raf archive` moves closed lots out of the plan file (565 KB → 5 KB, same output everywhere); live waves share one session cap; wave sessions skip the user's plugins.
 - **1.18.0**: `cadence verify --gate` reuses the green gate of the wave instead of replaying it; `orchestrate.continue` keeps `--continue` from drawing a big lot; `raf check` and `raf now` run about 5 times faster.
 - **1.17.1**: `cadence deliver --sha` during a wave commits the plan it wrote, nothing else; `verify --gate` no longer turns red for reasons of its throwaway copy and says where it ran; the test suite no longer commits into the repository.
@@ -42,6 +43,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.19.1**: a verdict of `cadence verify --gate` run in the main tree is always the verdict of the sha it names (L393, `docs/deliver.md`): after the steps, `HEAD` and `git status` are read again; if the tree moved during the gate (a lot integrated, the plan of a wave committed), the output says what moved, the ✓/✗ lines are said not to be those of the sha, no « vert » / « rouge » line is written and the exit code is 2.
 
 **1.19.0**: a plan that only grows no longer weighs on every session. `raf archive [--before date] [--dry-run]` moves the `done` and `dropped` lots into `.cadence/archive/<year>.yaml` (L396, `docs/raf.md`): measured on the cadence plan, 565 KB → 5 KB, and `raf show|check|commits|now|gantt`, `cadence news`, `perf`, `session start`, `lead tour`, `deliver` and `orchestrate` print the same thing before and after (one transverse test); the archiving is lossless whatever fails, the command to commit plan and archive together is printed, a wave's plan commit takes the year files too, and the briefs tell the sessions never to read the archive. `raf todo <id>` reopens a closed lot, archived or not. All live waves now apply the same session cap, the lowest one declared, and the test gate is a visible step of a lot (L395, `docs/orchestrate.md`). Wave sessions start without the user's plugins (`--settings` with `enabledPlugins` false, L398): the first turn of an `implement` session went from 42,541 to 38,330 tokens.
 

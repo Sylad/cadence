@@ -78,6 +78,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.19.1] - 2026-10-28
+
 ### Fixed
 
 - `cadence verify --gate` run in the main tree reads `HEAD` and `git status` again after the steps and says what moved (L393, `docs/deliver.md`): `HEAD est passé de <sha> à <sha>` (a lot integrated, the plan of a wave committed) and/or `git status n'est plus vide`. The output then ends on `verdict non probant … ne sont pas ceux de <sha>` (exit 2, red or green) instead of a `vert` / `rouge` line that looked like the verdict of the sha.

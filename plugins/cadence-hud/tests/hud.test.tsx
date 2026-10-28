@@ -1092,6 +1092,22 @@ test('la sortie de lead tour est lue ; une sortie étrange vaut aucun projet, un
   expect(activeProjects(parseTour(JSON.stringify([{ project: 'x', doing: [] }])))).toEqual([])
 })
 
+test('R10 — la bande lit une ligne portant lots comme avant', () => {
+  const lots = [
+    { id: 'L149', title: 'Un lot en cours', status: 'doing', after: [] },
+    { id: 'L150', title: 'Un lot qui attend', status: 'todo', after: ['L149', 'L12'] },
+    { id: 'L149/1', title: 'Une sous-tâche', status: 'todo', after: [], parent: 'L149' },
+    { id: 'L151', title: 'Un lot d’un autre outil', status: 'todo', after: [], parent: 'L150' },
+  ]
+  const sans = TOUR.filter(r => !r.error)
+  const avec = sans.map(r => ({ ...r, lots }))
+  expect(parseTour(JSON.stringify(avec))).toEqual(parseTour(JSON.stringify(sans)))
+  const [ol, cadence] = activeProjects(parseTour(JSON.stringify(avec))) as [Project, Project]
+  expect(projectStats(ol)).toBe('▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine')
+  expect(projectFigures(cadence)).toBe('10/20 · 2 en cours : L149')
+  expect(Object.keys(cadence)).not.toContain('lots')
+})
+
 test('les chiffres d’un projet : barre, faits/total, en cours, ajoutés cette semaine (rien à zéro), sans le nom ni remplissage', () => {
   const [ol, cadence] = activeProjects(parseTour(JSON.stringify(TOUR))) as [Project, Project]
   expect(projectStats(ol)).toBe('▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine')

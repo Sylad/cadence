@@ -35,6 +35,7 @@ lots:
       - { date: 2026-10-28, text: "Revue de la fiche — mineur : docs/specs/panneau-lots/fiche.yaml:166 — R13 dit que « sans cadence sur le PATH, le panneau n'invente rien », en citant docs/cadence-hud.md. R3 dit qu'il affiche une erreur dans ce même cas. Les deux sont compatibles, mais R13 reprend la règle de la bande, qui ne dessine rien (register.tsx:~160, `catch` silencieux), alors que le panneau écrit un message. Préciser dans R13 que « n'invente rien » veut dire « aucun lot affiché », afin qu'un test ne vérifie pas l'absence de tout texte." }
       - { date: 2026-10-28, text: "Revue de la fiche — mineur : docs/specs/panneau-lots/fiche.yaml:150 — R10 : l'id d'une sous-tâche est dit « <lot>/<n> (celui de Task.id) ». Or Task.id est le seul <n> (src/plan.ts:46-50, parseur l.1164 `id: String(t.id)`, et `${l.id}/${t.id}` l.440 et l.832 pour composer l'id). Le composé est construit, pas lu. Un test écrit d'après « celui de Task.id » pourrait attendre « 1 » au lieu de « L401/1 ». Écrire « id composé `${lot.id}/${task.id}` »." }
       - { date: 2026-10-28, text: "Revue de la fiche — mineur : docs/specs/panneau-lots/fiche.yaml:150 — R10 : « plan natif » vs « plan tenu par un autre outil » n'a pas de critère. Dans un plan tenu par un autre outil, le parseur replie déjà en `tasks` les sous-lots dont l'id est `<parent>/…` et dont `parent:` est un lot de premier niveau (src/plan.ts:1073-1079) ; ils sortent alors de plan.lots() et n'arriveraient dans `lots` par aucune des deux voies si la règle se limite à Lot.parent pour ce plan. Dire que les tasks sont émises quel que soit le plan (le repli étant fait par le parseur), ou fixer le critère, avec un test sur ce cas." }
+      - { date: 2026-10-28, text: "28-10 (lead) : vu par Sylvain dans l'app desktop (/hud lots, cadence-hud 0.6.1) : « ok c'est un début » — l'arbre s'affiche ; maritime (159 lots) écrase les autres projets (+279 lots tronqués) → L409 repli par projet ; interaction → L402" }
     review: { date: 2026-10-28, verdict: "conforme : les deux derniers majeurs levés — test R10 présent (hud.test.tsx:1095, échoue si parseTour rejette lots, mutation vérifiée) ; mesure R18 avant/après rapportée dans docs/cadence-hud.md (7,0–8,4 s contre 7,3–9,1 s, sous les 20 s de la bande ; sortie 86 → 188 Ko) ; 153 tests du mod verts, typecheck propre ; revue courte du diff rebasé (patch-id différent) : compliant: rebase sans effet sur le changement du lot, 153 tests du mod verts", commit: 6a4f6365b5142725282781c58f9f93e2c36886d8 }
     ux: { date: 2026-10-28, verdict: "conforme sur pièces, contrôle à l'œil en attente : maquette validée par Sylvain (28-10), rendu vérifié par claude plugin test (153 tests verts dont arbre, états, liens after:, repli terminal), mesure du tour 7,0–8,4 s ; le panneau ne se voit que dans Claude (aucune capture possible) — Sylvain l'ouvre avec /hud lots après la mise en service ; un défaut vu à l'œil devient un lot" }
     finished: 2026-10-28
@@ -45,7 +46,8 @@ lots:
     estimate: 0.5
     visible: true
     screen: component
-    after: [ L400, L401 ]
+    after: [ L400, L401, L409 ]
+    goal: "Dans le panneau des lots (cadence-hud), on réordonne un lot parmi les lots de son projet (ou une sous-tâche parmi celles de son lot) : à la souris dans l'app desktop par glisser-déposer dans un module de surface Client (ClientPointerEvent down/move/up, bouton tenu ; repère de la position d'arrivée pendant le glisser), et au clavier partout (sélection puis Alt+↑ / Alt+↓, surface.onKey) ; le dépôt appelle raf move <id> --before|--after <id> (L400) dans le projet, puis le panneau se relit ; refus visible avec sa raison, sans rien déplacer : vague vivante du dépôt, plan tenu par un autre outil (maritime : sa commande), lot archivé, parents différents ; raf move ne commite pas : le panneau dit que le plan est à commiter (ou commite le seul fichier du plan avec un message plan: citant le lot, au choix motivé) ; tests du module (claude plugin test) et doc. Charger la skill plugin-authoring ; types de l'API dans le dossier des types du mod."
     created: 2026-10-28
   - id: L403
     title: "Porte de tests déportée (orchestrate.gate.host) : build et tests d'une vague ou de verify --gate joués en ssh sur une autre machine, au sha poussé dans un dépôt nu de cette machine, dépendances en cache par empreinte du lockfile ; repli local si l'hôte ne répond pas, dit dans la sortie ; générique (aucun nom de machine dans le code)"
@@ -90,6 +92,14 @@ lots:
     started: 2026-10-28
     review: { date: 2026-10-28, verdict: "conforme : pré-contrôle des 110 colonnes retiré (register.tsx), $.ui.open décide et « non placé : raison » sinon ; R19 remplacé par deux tests (60 colonnes ouvre, isPlaced false → message), doc/fiche/maquette/Nouveautés à jour ; relu par le lead (diff de 5 lignes de code) ; 154 tests du mod, 4345 tests, typecheck verts", commit: 9ae4bd5fa6ac4a3b9f70af5133919587c46ee9f6 }
     finished: 2026-10-28
+  - id: L409
+    title: "Panneau des lots : replier/déplier chaque projet (clic sur son nom, ou touche), état gardé entre deux ouvertures ; par défaut un projet de plus de 20 lots ouverts est replié (ligne : nom, nombre de lots, en cours) ; vu le 28-10 : maritime 159 lots écrasait les autres projets"
+    public: Replier les projets dans le panneau des lots
+    status: todo
+    estimate: 0.5
+    visible: true
+    screen: component
+    created: 2026-10-28
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

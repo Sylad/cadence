@@ -95,12 +95,15 @@ lots:
   - id: L409
     title: "Panneau des lots : replier/déplier chaque projet (clic sur son nom, ou touche), état gardé entre deux ouvertures ; par défaut un projet de plus de 20 lots ouverts est replié (ligne : nom, nombre de lots, en cours) ; vu le 28-10 : maritime 159 lots écrasait les autres projets"
     public: Replier les projets dans le panneau des lots
-    status: doing
+    status: done
     estimate: 0.5
     visible: true
     screen: component
     created: 2026-10-28
     started: 2026-10-28
+    review: { date: 2026-10-28, verdict: "conforme : 3 revues (2 corrections) + majeur doc levé par 28b432d6 (un projet replié retiré faute de place compte dans « … +N »), relu par le lead ; 4345 tests, 168 tests du mod verts ; mineurs en notes (« +N » ambigu → repris par L411, message « pas encore lus » quand cadence a échoué, aide d'erreur, fiche L401 R8)", commit: 28b432d631690f047c83315319eaf777f3871ff7 }
+    ux: { date: 2026-10-28, verdict: "conforme sur pièces (revue UX de la vague conforme, tests de rendu du mod) ; contrôle à l'œil par Sylvain dans l'app desktop avec /hud lots après la mise en service, comme L401" }
+    finished: 2026-10-28
   - id: L410
     title: "Panneau des lots : dans chaque projet, les lots en cours (doing, ou dans une vague : en implémentation, revue, question, rendu) en tête, puis les prêts, puis le reste (ordre du plan conservé dans chaque groupe) ; un sous-lot reste sous son parent, et un parent dont un sous-lot est en cours remonte avec lui — demande de Sylvain le 28-10 (on ne voyait que 2 projets)"
     public: Les lots en cours en tête de chaque projet dans le panneau

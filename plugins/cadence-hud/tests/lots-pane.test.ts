@@ -22,7 +22,7 @@ const WAVE: Wave = {
 type Cadence = { exitCode: number; stdout: string }
 
 /** Monte le mod comme une session, avec un moteur simulé : état en mémoire, panneaux ouverts, processus pilotés par le test. */
-const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; stamps?: () => string; refuse?: string } = {}) => {
+const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; stamps?: () => string; refuse?: string; kv?: [string, unknown][] } = {}) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const open = new Set<string>()
   const opened: unknown[] = []
@@ -36,6 +36,12 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     const version = (store.get(e.key)?.version ?? 0) + 1
     store.set(e.key, { value: e.value, version })
     return { value: { isSet: true, version } } as never
+  })
+  const kv = new Map<string, unknown>(setup.kv ?? [])
+  on('store.get', (_$, e) => ({ value: kv.get(e.key) }) as never)
+  on('store.set', (_$, e) => {
+    kv.set(e.key, e.value)
+    return { value: undefined } as never
   })
   on('command.register', () => ({ value: {} }) as never)
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
@@ -85,9 +91,22 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     const texts = (await ui.findAll({ type: 'Text' })).map(t => t.text ?? '')
     const buttons = await ui.findAll({ type: 'Button' })
     await ui.unmount()
-    return { texts, text: texts.join('\n'), buttons }
+    return { texts, text: [...buttons.map(b => b.text ?? ''), ...texts].join('\n'), buttons }
   }
-  return { store, open, opened, runs, tours, tour, stamps, waves, hud, advance, draw }
+  /** Appuie sur le Button du projet (clic, ou Entrée sous le focus : même appui). */
+  const press = async (project: string) => {
+    const ui = await $.ui.mount({
+      plugin: PLUGIN,
+      surface: 'terminal',
+      component: 'Pane',
+      requestId: 'lots',
+      props: { title: 'Lots', isFocused: false, bodyColumns: 70, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} },
+    } as never)
+    await ui.press({ key: `fold:${project}` })
+    await ui.unmount()
+    await settle()
+  }
+  return { kv, press, store, open, opened, runs, tours, tour, stamps, waves, hud, advance, draw }
 }
 
 const CLOSE_HELP = '/hud lots pour fermer'
@@ -203,8 +222,9 @@ test('R4 — le panneau dessine un bloc par projet, ses lots en arbre et les aft
   await s.hud('lots')
   await settle()
   const d = await s.draw()
-  expect(d.texts.some(t => /cadence.*2 lots non clos/.test(t))).toBe(true)
-  expect(d.texts.some(t => /ol.*1 lot non clos/.test(t))).toBe(true)
+  expect(d.buttons.map(b => b.text)).toEqual(['▾ cadence', '▾ ol'])
+  expect(d.texts.some(t => /^\s*2 lots non clos$/.test(t))).toBe(true)
+  expect(d.texts.some(t => /^\s*1 lot non clos$/.test(t))).toBe(true)
   expect(d.text).toContain('├')
   expect(d.text).toContain('└')
   expect(d.text).toContain('after: L400 L401')
@@ -220,12 +240,12 @@ test('R5 — l’état de la vague l’emporte sur celui du plan, dans le pannea
   expect((await s.draw()).text).toContain('⟳ relit')
 })
 
-test('R8 — le rendu ne contient aucun bouton ni lien d’action', async ($, on) => {
+test('R8 — lecture seule : pas d’action sur les lots, seuls les noms de projet se replient (L409)', async ($, on) => {
   const s = await session($, on)
   await s.hud('lots')
   await settle()
   const d = await s.draw()
-  expect(d.buttons).toEqual([])
+  expect(d.buttons.map(b => b.key)).toEqual(['fold:cadence', 'fold:ol'])
   expect(d.text).toContain('lecture seule')
 })
 
@@ -335,4 +355,62 @@ test('R12 — panneau fermé : aucune date de plan n’est lue', async ($, on) =
   const s = await session($, on)
   await s.advance(5_000)
   expect(s.runs.filter(a => a[3] === PLAN_STAMPS)).toEqual([])
+})
+
+// ── L409 : replier / déplier un projet ─────────────────────────────────────────────────────────────────────────────
+
+const big = row('maritime', Array.from({ length: 25 }, (_, i) => lot(`M${i + 1}`, i === 0 ? 'doing' : 'todo')))
+const BIG_TOUR = () => ({ exitCode: 0, stdout: JSON.stringify([big, ...TOUR]) })
+
+test('R1 — le panneau montre maritime (25 lots) replié, les autres projets déployés', async ($, on) => {
+  const s = await session($, on, { tour: BIG_TOUR })
+  await s.hud('lots')
+  const { text } = await s.draw()
+  expect(text).toMatch(/▸ maritime/)
+  expect(text).toMatch(/25 lots non clos · 1 en cours/)
+  expect(text).not.toMatch(/M2\b/)
+  expect(text).toMatch(/▾ ol/)
+  expect(text).toMatch(/L80/)
+})
+
+test('R5 — l’appui sur le nom du projet le déplie, un second le replie', async ($, on) => {
+  const s = await session($, on, { tour: BIG_TOUR })
+  await s.hud('lots')
+  expect((await s.draw()).buttons.map(b => b.key)).toContain('fold:maritime')
+  await s.press('maritime')
+  const open = await s.draw(70, 80)
+  expect(open.text).toMatch(/▾ maritime/)
+  expect(open.text).toMatch(/M25/)
+  await s.press('maritime')
+  expect((await s.draw()).text).not.toMatch(/M25/)
+})
+
+test('R6 — l’état est gardé : fermer puis rouvrir le panneau, et une nouvelle session, le retrouvent', async ($, on) => {
+  const s = await session($, on, { tour: BIG_TOUR })
+  await s.hud('lots')
+  await s.draw()
+  await s.press('maritime')
+  expect(s.kv.get('lotsFolds')).toEqual({ maritime: false })
+  await s.hud('lots')
+  await s.hud('lots')
+  expect((await s.draw(70, 80)).text).toMatch(/M25/)
+})
+
+test('R6 — une nouvelle session relit le choix gardé', async ($, on) => {
+  const s = await session($, on, { tour: BIG_TOUR, kv: [['lotsFolds', { maritime: false, ol: true }]] })
+  await s.hud('lots')
+  const { text } = await s.draw(70, 80)
+  expect(text).toMatch(/M25/)
+  expect(text).toMatch(/▸ ol/)
+  expect(text).not.toMatch(/L80/)
+})
+
+test('R7 — /hud lots <projet> bascule le projet au clavier ; un nom inconnu est dit', async ($, on) => {
+  const s = await session($, on, { tour: BIG_TOUR })
+  await s.hud('lots')
+  await s.draw()
+  expect((await s.hud('lots maritime')).text).toBe('maritime déplié.')
+  expect((await s.draw(70, 80)).text).toMatch(/M25/)
+  expect((await s.hud('lots maritime')).text).toBe('maritime replié.')
+  expect((await s.hud('lots nimporte')).text).toBe('projet inconnu : nimporte (projets : maritime, cadence, ol)')
 })

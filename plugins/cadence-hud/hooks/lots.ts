@@ -93,8 +93,14 @@ export const readTime = (at: number): string => {
 /** Tronque à `max` caractères avec « … » (une cellule, comme le Text du moteur) ; jamais plus long que `max`, vide à zéro. */
 export const ellipsize = (text: string, max: number): string => (max <= 0 ? '' : text.length <= max ? text : max === 1 ? '…' : `${text.slice(0, max - 1)}…`)
 
+/** Au-delà de ce nombre de lots ouverts, un projet est replié tant que la personne n'a pas choisi. */
+export const FOLD_ABOVE = 20
+
+/** Le projet est-il replié : le choix de la personne (`folds`, vrai = replié) l'emporte sur le défaut (plus de FOLD_ABOVE lots ouverts). */
+export const isFolded = (project: string, lots: readonly TourLot[], folds: Readonly<Record<string, boolean>>): boolean => folds[project] ?? openCount(lots) > FOLD_ABOVE
+
 export type PanelLine =
-  | { kind: 'project'; name: string; count: number; error?: string }
+  | { kind: 'project'; name: string; count: number; error?: string; /** lots en cours (hors sous-tâches) */ doing: number; /** absent d'un projet illisible, qui ne se replie pas */ folded?: boolean }
   | {
       kind: 'lot'
       id: string
@@ -123,26 +129,32 @@ export const buildPanel = (input: {
   columns: number
   height: number
   waves: readonly { project: string; lot: string; status: string }[]
+  /** Le choix de la personne par projet (vrai = replié) ; absent, le défaut de isFolded. */
+  folds?: Readonly<Record<string, boolean>>
 }): Panel => {
   const { rows, columns, waves } = input
+  const folds = input.folds ?? {}
   const narrow = columns < NARROW_BODY
-  type Block = { project: LotsRow; flat: FlatLot[]; open: Set<string> }
+  type Block = { project: LotsRow; flat: FlatLot[]; open: Set<string>; folded: boolean }
   const blocks: Block[] = rows
     .filter(r => r.error || (r.lots && r.lots.length > 0))
-    .map(r => ({ project: r, flat: flattenTree(lotTree(r.lots ?? [])), open: new Set((r.lots ?? []).map(l => l.id)) }))
+    .map(r => ({ project: r, flat: flattenTree(lotTree(r.lots ?? [])), open: new Set((r.lots ?? []).map(l => l.id)), folded: !r.error && isFolded(r.project, r.lots ?? [], folds) }))
   const leadOf = (f: FlatLot) => (f.depth === 0 ? '  ' : `  ${'  '.repeat(f.depth - 1)}${f.branch} `)
-  const all = blocks.flatMap(b => b.flat)
+  const shown = blocks.filter(b => !b.folded)
+  const all = shown.flatMap(b => b.flat)
   const idWidth = Math.max(0, ...all.map(f => leadOf(f).length + f.lot.id.length))
   const stateOf = (b: Block, f: FlatLot) => lotState(f.lot, b.open, waves.find(w => w.lot === f.lot.id && sameProject(b.project.project, w.project))?.status)
-  const stateWidth = Math.max(0, ...blocks.flatMap(b => b.flat.map(f => stateOf(b, f).text.length)))
+  const stateWidth = Math.max(0, ...shown.flatMap(b => b.flat.map(f => stateOf(b, f).text.length)))
 
   const lines: (PanelLine & { height: number })[] = []
   for (const b of blocks) {
     if (b.project.error) {
-      lines.push({ kind: 'project', name: b.project.project, count: 0, error: `illisible : ${b.project.error}`, height: 1 })
+      lines.push({ kind: 'project', name: b.project.project, count: 0, doing: 0, error: `illisible : ${b.project.error}`, height: 1 })
       continue
     }
-    lines.push({ kind: 'project', name: b.project.project, count: openCount(b.project.lots ?? []), height: 1 })
+    const top = (b.project.lots ?? []).filter(l => !isTask(l))
+    lines.push({ kind: 'project', name: b.project.project, count: top.length, doing: top.filter(l => l.status === 'doing').length, folded: b.folded, height: 1 })
+    if (b.folded) continue
     for (const f of b.flat) {
       const after = f.lot.after.map(id => ({ id, struck: !b.open.has(id) }))
       const afterText = after.length ? `after: ${after.map(a => a.id).join(' ')}` : ''
@@ -158,6 +170,6 @@ export const buildPanel = (input: {
   let used = 0
   let kept = 0
   while (kept < lines.length && used + lines[kept]!.height <= room - 1) used += lines[kept++]!.height
-  while (kept > 0 && lines[kept - 1]!.kind === 'project') kept-- // un nom de projet sans aucun de ses lots n'apprend rien
+  while (kept > 0 && lines[kept - 1]!.kind === 'project' && !(lines[kept - 1] as { folded?: boolean }).folded) kept-- // un nom de projet sans aucun de ses lots n'apprend rien
   return { lines: lines.slice(0, kept).map(({ height: _h, ...l }) => l as PanelLine), more: lines.slice(kept).filter(l => l.kind === 'lot').length }
 }

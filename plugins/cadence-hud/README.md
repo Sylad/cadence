@@ -96,11 +96,11 @@ tronqués en fin de ligne.
   statut), sinon **toutes les minutes** ; un `cadence` absent ou en échec garde le dernier tableau lu, sans message
   d'erreur dans la bande. **`/hud projets`** replie la liste sur une ligne grise (`▸ projets (2)`) et la rouvre.
 
-`/hud` masque ou réaffiche la bande ; `/hud cmd` liste les commandes d'arrière-plan comptées (voir `N cmd`) ; `/hud projets` replie ou rouvre la liste des projets ; `/hud lots` ouvre (ou ferme) le panneau des lots ; tout autre argument répond `argument inconnu : … (attendu : cmd, projets, lots)` sans masquer la bande.
+`/hud` masque ou réaffiche la bande ; `/hud cmd` liste les commandes d'arrière-plan comptées (voir `N cmd`) ; `/hud projets` replie ou rouvre la liste des projets ; `/hud lots` ouvre (ou ferme) le panneau des lots ; `/hud lots <projet>` replie ou déplie ce projet dans le panneau ; tout autre argument répond `argument inconnu : … (attendu : cmd, projets, lots)` sans masquer la bande.
 
 ### Panneau des lots (`/hud lots`, L401)
 
-Un `Pane` en lecture seule, ouvert **uniquement** par la commande (le moteur ne place pas un panneau que le mod ouvre seul sous 144 colonnes ; la commande, demandée par la personne, l'ouvre à toute largeur et Claude le place ; s'il ne le place pas, elle répond `panneau des lots non placé : <raison>` et n'ouvre rien). Par projet du dossier (ordre de `priority:`) : son nom, son nombre de lots non clos (sous-lots de `parent:` compris, sous-tâches natives non), puis l'arbre de ses lots non clos — un sous-lot sous son lot avec `├`/`└`, la profondeur libre ; un parent clos ou inconnu, un cycle ou un id en double laissent le lot au premier niveau.
+Un `Pane`, lecture seule pour les lots (seul le repli des projets s'y fait, L409), ouvert **uniquement** par la commande (le moteur ne place pas un panneau que le mod ouvre seul sous 144 colonnes ; la commande, demandée par la personne, l'ouvre à toute largeur et Claude le place ; s'il ne le place pas, elle répond `panneau des lots non placé : <raison>` et n'ouvre rien). Par projet du dossier (ordre de `priority:`) : son nom, son nombre de lots non clos (sous-lots de `parent:` compris, sous-tâches natives non), puis l'arbre de ses lots non clos — un sous-lot sous son lot avec `├`/`└`, la profondeur libre ; un parent clos ou inconnu, un cycle ou un id en double laissent le lot au premier niveau.
 
 | État | Mot | Couleur |
 |---|---|---|
@@ -109,6 +109,8 @@ Un `Pane` en lecture seule, ouvert **uniquement** par la commande (le moteur ne 
 | plan `todo`, un `after:` ouvert | `⊘ bloqué` | subtle |
 | vague (l'emporte sur le plan) | `… en attente`, `⟳ implémente`, `⟳ relit`, `⟳ corrige`, `? QUESTION`, `✔ prêt`, `↩ rendu`, `✖ échec`, `⏸ suspendu` (statut inconnu : `⟳ <statut>`) | ceux de la bande (`colorOfLot`) |
 | sous-tâche native `doing` / `todo` | `▶ en cours` / `○ à faire` (jamais un état de vague, jamais `after:`) | claude / texte |
+
+**Repli par projet (L409).** Le nom de chaque projet est un `Button` (`fold:<projet>`, `▾` déplié, `▸` replié) : un clic, ou Entrée sous le focus, le replie ou le déplie ; `/hud lots <projet>` fait de même au clavier (`<projet> replié.` / `<projet> déplié.`, `projet inconnu : <nom> (projets : …)` sinon). Un projet replié tient en une ligne, `▸ maritime  159 lots non clos · 3 en cours` (lots en cours : statut `doing` du plan, sous-tâches non comptées) ; il ne compte pas dans `… +N lots de plus`. Par défaut un projet de plus de 20 lots non clos (`FOLD_ABOVE`, sous-tâches natives non comptées) est replié ; le choix de la personne l'emporte dans les deux sens. Il est gardé dans le `$.store` du mod (clé `lotsFolds`, `{ projet: replié }`), donc entre deux ouvertures du panneau et d'une session à l'autre ; un magasin illisible laisse les défauts. Un projet illisible n'a pas de bouton.
 
 Les liens `after:` suivent le titre (`after: L400 L401`) ; un id clos ou inconnu est barré et ne bloque pas. Sous 60 colonnes de corps (le panneau latéral compte 45 % du terminal au plus, 24 au moins) la liste `after:` passe sur une ligne à part et le titre est tronqué par `…`, jamais l'id ni l'état. Au-dessus du prompt le panneau tient en un tiers de la hauteur : au-delà, `… +N lots de plus`.
 

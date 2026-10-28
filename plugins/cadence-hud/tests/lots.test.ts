@@ -201,3 +201,44 @@ test('R8 — l’heure de dernière lecture se lit HH:MM', () => {
   const at = new Date(2026, 9, 28, 15, 5).getTime()
   expect(readTime(at)).toBe('15:05')
 })
+
+// ── L409 : replier / déplier un projet ─────────────────────────────────────────────────────────────────────────────
+
+const many = (n: number, doing = 0): TourLot[] => Array.from({ length: n }, (_, i) => lot(`L${i + 1}`, i < doing ? 'doing' : 'todo'))
+const folding = (rows: LotsRow[], folds: Record<string, boolean> = {}) => buildPanel({ rows, columns: 70, height: 400, waves: [], folds })
+const heads = (p: ReturnType<typeof buildPanel>) => p.lines.filter(l => l.kind === 'project')
+
+test('R1 — un projet de plus de 20 lots ouverts est replié par défaut : sa ligne seule (nom, nombre de lots, en cours)', () => {
+  const p = folding([{ project: 'maritime', lots: many(21, 3) }, { project: 'ol', lots: [lot('L80')] }])
+  expect(heads(p)[0]).toMatchObject({ name: 'maritime', count: 21, doing: 3, folded: true })
+  expect(p.lines.filter(l => l.kind === 'lot').map(l => l.kind === 'lot' && l.id)).toEqual(['L80'])
+  expect(heads(p)[1]).toMatchObject({ name: 'ol', folded: false })
+})
+
+test('R1 — vingt lots ouverts : le projet reste ouvert ; les sous-tâches ne comptent pas dans le seuil', () => {
+  const twenty = folding([{ project: 'p', lots: many(20) }])
+  expect(heads(twenty)[0]).toMatchObject({ folded: false })
+  expect(twenty.lines.filter(l => l.kind === 'lot')).toHaveLength(20)
+  const tasks = Array.from({ length: 30 }, (_, i) => ({ ...lot(`L1/${i + 1}`), parent: 'L1' }))
+  expect(heads(folding([{ project: 'p', lots: [lot('L1'), ...tasks] }]))[0]).toMatchObject({ count: 1, folded: false })
+})
+
+test('R2 — le choix de la personne l’emporte sur le défaut, dans les deux sens', () => {
+  const rows = [{ project: 'maritime', lots: many(30) }, { project: 'ol', lots: [lot('L80')] }]
+  const p = folding(rows, { maritime: false, ol: true })
+  expect(heads(p).map(h => h.kind === 'project' && h.folded)).toEqual([false, true])
+  expect(p.lines.filter(l => l.kind === 'lot')).toHaveLength(30)
+})
+
+test('R3 — un projet replié ne compte pas dans « … +N lots de plus » et laisse sa place aux autres', () => {
+  const p = buildPanel({ rows: [{ project: 'maritime', lots: many(200) }, { project: 'ol', lots: many(5) }], columns: 70, height: 6, waves: [], folds: {} })
+  // sur 6 lignes, titre et pied en prennent 2 et « … +N » une : restent maritime (replié), ol et son premier lot
+  expect(p.lines.map(l => l.kind === 'project' ? l.name : l.id)).toEqual(['maritime', 'ol', 'L1'])
+  expect(p.more).toBe(4)
+})
+
+test('R4 — un projet illisible ne se replie pas', () => {
+  const p = folding([{ project: 'cassé', error: 'x' }], { cassé: true })
+  expect(heads(p)[0]).toMatchObject({ error: 'illisible : x' })
+  expect(heads(p)[0]).not.toHaveProperty('folded')
+})

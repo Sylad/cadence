@@ -108,6 +108,8 @@ declare module 'claude-code' {
       lotsBoard: LotsBoard | null
       /** La dernière lecture du panneau des lots a échoué (cadence absent, délai dépassé, sortie illisible). */
       lotsFailed: boolean
+      /** Le repli choisi par projet dans le panneau des lots (vrai = replié) ; un projet absent suit le défaut (replié au-delà de 20 lots ouverts). */
+      lotsFolds: Record<string, boolean>
       /** Heure (ms) de la dernière lecture réussie du panneau des lots. */
       lotsAt: number
       error: string | null

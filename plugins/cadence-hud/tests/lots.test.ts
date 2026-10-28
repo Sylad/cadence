@@ -306,3 +306,13 @@ test('L410 — aucun lot en cours : l’ordre du plan est inchangé', () => {
   const rows = [{ project: 'p', lots: [lot('L3'), lot('L1'), lot('L2')] }]
   expect(order(rows)).toEqual(['L3', 'L1', 'L2'])
 })
+
+test('L410 — un parent bloqué dont les sous-tâches sont seulement à faire ne remonte pas parmi les prêts', () => {
+  const rows = [{ project: 'p', lots: [lot('L3'), lot('L5', 'todo', { after: ['L3'] }), task('L5', 1), task('L5', 2), lot('L6')] }]
+  expect(order(rows)).toEqual(['L3', 'L6', 'L5', 'L5/1', 'L5/2'])
+})
+
+test('L410 — un parent bloqué dont un sous-lot est libre mais pas en cours reste dans le reste', () => {
+  const rows = [{ project: 'p', lots: [lot('L3'), lot('L5', 'todo', { after: ['L3'] }), lot('L7', 'todo', { parent: 'L5' }), lot('L6')] }]
+  expect(order(rows)).toEqual(['L3', 'L6', 'L5', 'L7'])
+})

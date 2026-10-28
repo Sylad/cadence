@@ -77,17 +77,17 @@ export const lotRank = (lot: TourLot, openIds: ReadonlySet<string>, waveStatus?:
 
 /**
  * L'arbre rangé par rang : en cours, prêts, reste ; l'ordre du plan est gardé dans un même rang. Un sous-lot reste sous son parent
- * (le tri se fait entre frères) et un parent prend le rang de son meilleur sous-lot, il remonte avec lui.
+ * (le tri se fait entre frères) et un parent dont un descendant est en cours (rang 0) passe au rang 0 et remonte avec lui ; un sous-lot seulement prêt ne change pas le rang de son parent.
  */
 export const sortTree = (nodes: readonly LotNode[], rankOf: (lot: TourLot) => number): LotNode[] => {
   const ranked = nodes.map(n => {
     const children = sortTree(n.children, rankOf)
-    return { node: { lot: n.lot, children }, rank: Math.min(rankOf(n.lot), ...children.map(c => bestRank(c, rankOf))) }
+    return { node: { lot: n.lot, children }, rank: children.some(c => hasInProgress(c, rankOf)) ? 0 : rankOf(n.lot) }
   })
   return ranked.map((r, i) => ({ ...r, i })).sort((a, b) => a.rank - b.rank || a.i - b.i).map(r => r.node)
 }
 
-const bestRank = (n: LotNode, rankOf: (lot: TourLot) => number): number => Math.min(rankOf(n.lot), ...n.children.map(c => bestRank(c, rankOf)))
+const hasInProgress = (n: LotNode, rankOf: (lot: TourLot) => number): boolean => rankOf(n.lot) === 0 || n.children.some(c => hasInProgress(c, rankOf))
 
 export type FlatLot = { lot: TourLot; depth: number; branch: '' | '├' | '└' }
 

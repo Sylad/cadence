@@ -74,6 +74,15 @@ export type Project = {
   progress: { done: number; doing: number; todo: number; added7: number }
 }
 
+/** Un lot non clos de `cadence lead tour --json` (L401) ou, dans un plan natif, une sous-tâche non close (`<lot>/<n>`, `parent` = le lot, jamais d'`after`). */
+export type TourLot = { id: string; title: string; status: 'todo' | 'doing'; after: string[]; parent?: string }
+
+/** Une ligne du tour pour le panneau des lots : le projet, l'erreur du tour s'il n'a pas pu être lu, ses lots non clos. */
+export type LotsRow = { project: string; error?: string; lots?: TourLot[] }
+
+/** Ce que le panneau a lu : les lignes du tour, et si cadence est trop ancien pour porter `lots`. */
+export type LotsBoard = { rows: LotsRow[]; outdated: boolean }
+
 declare module 'claude-code' {
   interface PluginState {
     'cadence-hud': {

@@ -459,8 +459,7 @@ correction pass: a `fix` session that adds no commit to a lot that already has w
 it (warning `fix sans nouveau commit : revue lancée sur les commits du lot, avec la raison de la session (choix)`), the
 pass counted — the cap of two correction passes stays the guard against a loop. Without it (L406), a review would reread
 the same commits and return the same findings, so the lot is handed back as `fix sans commit ni raison (choix vide) :
-la revue aurait relu les mêmes commits` and the pass is not counted (on 2026-10-28, L401 lost two passes this way and 51
-`fix sans nouveau commit` warnings sat in the wave states). With no commit on the lot at all it is handed back as
+la revue aurait relu les mêmes commits` and the pass is not counted (measured over the wave states of 2026-10-28 and before: 68 `fix` sessions without commit, 5 with an empty `choix` — about 7 %; the two L401 passes of 2026-10-28 gave a reason and stay counted, the test gate relaunched them, not a review). With no commit on the lot at all it is handed back as
 `fix sans commit`.
 
 **Compliant with minor findings**: the minors are not left for a follow-up lot. One **minors pass** runs

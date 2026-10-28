@@ -80,6 +80,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-10-28
+
 ### Added
 
 - `cadence-hud` 0.7.0: in the lots panel (`/hud lots`), each project folds to one line (name, number of open lots, number in progress) with a click on its name, Enter on the focused name or `/hud lots <project>`. A project with more than 20 open lots (native sub-tasks not counted) is folded until you choose; the choice, either way, is kept between two openings and between sessions (L409, `docs/cadence-hud.md`). seen on 2026-10-28: the 159 lots of a single project pushed the others out of the panel. When the panel is too short, a folded project placed after the cut keeps its line instead of vanishing.

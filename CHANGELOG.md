@@ -80,6 +80,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.22.1] - 2026-10-28
+
+### Fixed
+
+- `docs/whats-new.md`: the long form of 1.22.0 sat among the two-line entries, which stopped the 1.22.0 publication on its own README test; it is back in « Version by version ».
+
 ## [1.22.0] - 2026-10-28
 
 ### Added

@@ -5,9 +5,7 @@
 ## In two lines
 
 - **1.22.0**: the panel of lots folds a project with a click on its name; a project of more than 20 open lots starts folded.
-- **1.22.0**: the panel of lots no longer lets one big project hide the others (L409, cadence-hud 0.7.0, `docs/cadence-hud.md`): each project folds and unfolds with a click on its name (Enter under the focus, or `/hud lots <project>`), a project of more than 20 open lots starts folded on a single line (name, open lots, in progress), and the folded state is kept between two openings.
-
-**1.21.1**: `/hud lots` opens on the desktop app whatever the width; a correction session that makes no commit must say why, or the lot is handed back.
+- **1.21.1**: `/hud lots` opens on the desktop app whatever the width; a correction session that makes no commit must say why, or the lot is handed back.
 - **1.21.0**: `/hud lots` opens a panel beside the conversation with the open lots of every project; the pre-push hook of a wave refuses a push that carries a lot not ready.
 - **1.20.0**: `raf move <id> --before|--after <id>` reorders a lot or a sub-task in the plan, refused during a wave of the repository and on a plan kept by another tool.
 - **1.19.1**: `cadence verify --gate` in the main tree reads `HEAD` and `git status` again after the steps, says what moved and prints no green or red verdict that is not the sha's.
@@ -49,6 +47,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.22.0**: the panel of lots no longer lets one big project hide the others (L409, cadence-hud 0.7.0, `docs/cadence-hud.md`): each project folds and unfolds with a click on its name (Enter under the focus, or `/hud lots <project>`), a project of more than 20 open lots starts folded on a single line (name, open lots, in progress), and the folded state is kept between two openings.
 
 **1.21.1**: `/hud lots` opened nothing on the desktop app, even on a very wide screen (« terminal trop étroit », L408): the mod checked 110 columns itself, while a panel the person asks for is placed at any width; the engine now decides, and says « non placé » with its reason otherwise (cadence-hud 0.6.1). In a wave, a correction session that makes no commit must give its reason under `choix`; without one the lot is handed back instead of replaying the same review (L406, `docs/orchestrate.md`).
 

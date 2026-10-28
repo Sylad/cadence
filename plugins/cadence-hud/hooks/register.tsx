@@ -289,6 +289,7 @@ export const register: Register = on => {
     }
     if (arg.startsWith('lots ')) {
       const project = arg.slice(5).trim()
+      if (!(await read($, lotsBoard))) return { text: 'les plans ne sont pas encore lus : réessayez dans un instant.' }
       const folded = await toggleFold($, project)
       if (folded === undefined) {
         const names = ((await read($, lotsBoard))?.rows ?? []).filter(r => !r.error).map(r => r.project)

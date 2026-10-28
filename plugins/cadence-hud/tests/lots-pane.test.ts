@@ -414,3 +414,10 @@ test('R7 — /hud lots <projet> bascule le projet au clavier ; un nom inconnu es
   expect((await s.hud('lots maritime')).text).toBe('maritime replié.')
   expect((await s.hud('lots nimporte')).text).toBe('projet inconnu : nimporte (projets : maritime, cadence, ol)')
 })
+
+test('R7 — /hud lots <projet> avant la première lecture : « pas encore lu », pas « projet inconnu »', async ($, on) => {
+  const s = await session($, on, { tour: () => new Promise(() => undefined) })
+  const text = (await s.hud('lots maritime')).text
+  expect(text).toMatch(/pas encore lus/)
+  expect(text).not.toMatch(/inconnu/)
+})

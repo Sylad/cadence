@@ -16,6 +16,8 @@ if [ -n "$CADENCE_ORCHESTRATED" ]; then
   echo "cadence orchestrate : push refusé pendant la vague $CADENCE_ORCHESTRATED (le lead pousse)" >&2
   exit 1
 fi
+# Le push du lead ou d'une session à la main : refusé s'il emporte un commit d'un lot pas prêt de la vague (code 3 de raf seulement : un raf absent ou en panne le laisse passer).
+if command -v raf >/dev/null 2>&1; then raf hook pre-push; [ $? -ne 3 ] || exit 1; fi
 exit 0
 `;
 

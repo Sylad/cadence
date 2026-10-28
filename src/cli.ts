@@ -14,6 +14,7 @@ import { ganttData, renderGantt } from './gantt.js';
 import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
 import { dirtyPaths, gitRoot, tryGit, isTracked, readCommits, matchesHead, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
+import { pushRefusal } from './push-guard.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
 import { invalidResource, Plan, RafError, SCREENS, STATUSES, setPlanNotice, type Lot, type Screen, type Status } from './plan.js';
@@ -47,6 +48,8 @@ export interface Io {
   /** Avis qui ne sont pas des erreurs (plan hérité, L246) ; absent : `err`. `session --all` y met la vraie sortie d'erreur, pas sa sortie standard. */
   notice?: (line: string) => void;
   now: () => Date;
+  /** Entrée standard, lue en entier (hook pre-push, L405) ; absent : le descripteur 0. */
+  stdin?: () => string;
 }
 
 const HELP = `raf — plan « reste à faire » versionné dans le dépôt, relié aux commits
@@ -658,7 +661,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       }
       if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, today, io, readHookConfig(configPath).autostart);
       if (rest[0] === 'pre-commit') return preCommit(existsSync(planPath) ? loadPlan : null, readHookConfig(configPath).autostart, root, today, io);
-      throw new RafError('usage : raf hook install|pre-commit|post-commit');
+      if (rest[0] === 'pre-push') return prePush(root, io);
+      throw new RafError('usage : raf hook install|pre-commit|post-commit|pre-push');
     }
     case 'session': {
       // Le contexte de la session ne dépend d'aucun dépôt : le lead le lit depuis le dossier parent.
@@ -991,6 +995,33 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
   } catch (e) {
     return [`✗ ${(e as Error).message}`];
   }
+}
+
+/**
+ * `raf hook pre-push` (L405), appelé par le hook que la vague pose : refuse (code 3) un push qui emporte un commit d'un lot pas prêt de la vague vivante
+ * du dépôt. Sans vague qui tient le dépôt, ou avec un état de vague illisible (avertissement), un hook ne gêne jamais un push.
+ */
+function prePush(root: string, io: Io): number {
+  const holding = waveHolding(root);
+  if (!holding) return 0;
+  let input = '';
+  try {
+    input = io.stdin ? io.stdin() : readFileSync(0, 'utf8');
+  } catch {
+    return 0;
+  }
+  const lots = waveLotsIn(cadenceHome(), holding.pid, root);
+  if (lots === null) {
+    io.err(`raf: vague ${holding.wave} : état illisible, push non vérifié`);
+    return 0;
+  }
+  const { refusal, warning } = pushRefusal(root, holding.wave, lots, input);
+  if (warning) io.err(`raf: ${warning}`);
+  if (refusal) {
+    io.err(`raf: ${refusal}`);
+    return REFUSED;
+  }
+  return 0;
 }
 
 /** La vague qui tient le verrou du dépôt tant qu'un de ses lots y travaille encore (état illisible : on la tient pour active) ; null si le dépôt est libre. Partagé par `deliver` et `spec reseal`. */

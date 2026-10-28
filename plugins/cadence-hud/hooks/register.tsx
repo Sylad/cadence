@@ -1,11 +1,17 @@
 import { atom, read, update } from 'claude-code'
-import type { Register, RenderChildren, Timer } from 'claude-code'
+import type { EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
-import type { AgentsSummary, CommandInfo, LeadHold, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
-import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, LAUNCH_FOLDER, parseCollected } from './collect'
+import type { AgentsSummary, CommandInfo, LeadHold, LotsBoard, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
+import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
+import { buildPanel, ellipsize, parseLotsBoard, readTime, stampsSignature } from './lots'
+
 const PLUGIN = 'cadence-hud'
+/** Id du panneau des lots (`/hud lots`). */
+const LOTS_PANE = 'lots'
+/** Largeur de terminal sous laquelle le panneau n'est pas placé quand le lead le demande (API Pane : 110 colonnes une fois demandé). */
+const LOTS_MIN_COLUMNS = 110
 const REFRESH_MS = 5_000
 
 const usage = atom({ plugin: 'cadence-hud', key: 'usage' } as const, null)
@@ -19,6 +25,9 @@ const projects = atom({ plugin: 'cadence-hud', key: 'projects' } as const, [])
 const leadHolds = atom({ plugin: 'cadence-hud', key: 'leadHolds' } as const, [])
 const slotCap = atom({ plugin: 'cadence-hud', key: 'slotCap' } as const, DEFAULT_CAP)
 const projectsFolded = atom({ plugin: 'cadence-hud', key: 'projectsFolded' } as const, false)
+const lotsBoard = atom({ plugin: 'cadence-hud', key: 'lotsBoard' } as const, null)
+const lotsFailed = atom({ plugin: 'cadence-hud', key: 'lotsFailed' } as const, false)
+const lotsAt = atom({ plugin: 'cadence-hud', key: 'lotsAt' } as const, 0)
 const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
 const isHidden = atom({ plugin: 'cadence-hud', key: 'isHidden' } as const, false)
 const now = atom({ plugin: 'cadence-hud', key: 'now' } as const, 0)
@@ -38,6 +47,13 @@ const endCommand = async ($: Parameters<typeof read>[0], ended: string): Promise
   await update($, info, (cur: Record<string, CommandInfo>) => withoutIds(cur, removed))
 }
 
+/** Le panneau des lots est ouvert (ni ouvert seul, ni deviné : le moteur le dit) ; une liste illisible vaut fermé. */
+const isLotsOpen = ($: EngineInterface): Promise<boolean> =>
+  $.ui.panes().then(
+    list => list.some(p => p.id === LOTS_PANE),
+    () => false,
+  )
+
 export const register: Register = on => {
   let timer: Timer | undefined
   let isRefreshing = false
@@ -47,6 +63,7 @@ export const register: Register = on => {
   let sessionCwd: string | undefined
   // le cwd de session.start tel quel : c'est lui que `cadence session context` retrouve (le dossier de lancement ne sert qu'à l'avancement)
   let startCwd: string | undefined
+  let readTourNow: (() => Promise<void>) | undefined
 
   on('session.start', async ($, e, next) => {
     // Le dossier du tableau est celui de lancement, pas le dossier courant du shell : un cd du lead dans un sous-projet
@@ -64,7 +81,7 @@ export const register: Register = on => {
     await update($, info, () => ({}))
     await $.command.register({
       name: 'hud',
-      description: 'Affiche ou masque la bande cadence-hud ; « /hud cmd » liste les commandes d\'arrière-plan comptées, « /hud projets » replie la liste des projets',
+      description: 'Affiche ou masque la bande cadence-hud ; « /hud cmd » liste les commandes d\'arrière-plan comptées, « /hud projets » replie la liste des projets, « /hud lots » ouvre ou ferme le panneau des lots',
     })
 
     const refresh = async () => {
@@ -147,21 +164,37 @@ export const register: Register = on => {
 
     // L'avancement des plans vient de `cadence lead tour --json` : relu à chaque transition de vague, sinon toutes les minutes.
     // Hors de refresh() (un `cadence` lent ne retarde pas la bande) et sans effet sur `error` : cadence absent = pas de lignes de projets.
+    // La même lecture nourrit le panneau des lots (L401) ; tant qu'il est ouvert, la date de modification des plans fait aussi relire.
     const refreshProjects = async (found: Wave[], at: number) => {
-      const signature = waveSignature(found)
       const folder = tourFolder(found, sessionCwd)
-      if (isTouring || !folder || !tourDue(tourSignature, tourAt, signature, at)) return
+      if (isTouring || !folder) return
+      const stamps = (await isLotsOpen($)) ? await $.process.run(['python3', '-I', '-c', PLAN_STAMPS, folder], { timeoutMs: 4_000 }).then(r => (r.exitCode === 0 ? stampsSignature(r.stdout) : ''), () => '') : ''
+      const signature = stamps ? `${waveSignature(found)}#${stamps}` : waveSignature(found)
+      if (isTouring || !tourDue(tourSignature, tourAt, signature, at)) return
       isTouring = true
       tourSignature = signature
       tourAt = at
       try {
         const r = await $.process.run(['cadence', 'lead', 'tour', folder, '--json'], { timeoutMs: 20_000 })
-        if (r.exitCode === 0) await update($, projects, () => activeProjects(parseTour(r.stdout)))
+        if (r.exitCode !== 0) throw new Error(`cadence lead tour : code ${r.exitCode}`)
+        const board = parseLotsBoard(r.stdout)
+        const tour = parseTour(r.stdout)
+        await update($, projects, () => activeProjects(tour))
+        await update($, lotsBoard, () => board)
+        await update($, lotsFailed, () => false)
+        await update($, lotsAt, () => at)
       } catch {
-        // cadence absent, sortie illisible, délai dépassé : on garde le dernier tableau lu
+        // cadence absent, sortie illisible, délai dépassé : la bande et le panneau gardent le dernier tableau lu
+        await update($, lotsFailed, () => true)
       } finally {
         isTouring = false
       }
+    }
+    // Relit tout de suite, sans attendre le minuteur : à l'ouverture du panneau
+    readTourNow = async () => {
+      tourSignature = undefined
+      const [found, at] = await Promise.all([read($, waves), $.clock.now()])
+      await refreshProjects(found, at)
     }
 
     timer?.cancel()
@@ -237,8 +270,20 @@ export const register: Register = on => {
       await update($, projectsFolded, () => folded)
       return { text: folded ? 'liste des projets repliée (/hud projets pour la rouvrir).' : 'liste des projets affichée.' }
     }
+    if (arg === 'lots') {
+      if (await isLotsOpen($)) {
+        await $.ui.close({ id: LOTS_PANE })
+        return { text: 'panneau des lots fermé.' }
+      }
+      // le panneau est un panneau latéral : sous 110 colonnes le moteur ne le place pas
+      if (e.presentation !== undefined && e.presentation.columns < LOTS_MIN_COLUMNS) return { text: `terminal trop étroit pour le panneau (${LOTS_MIN_COLUMNS} colonnes au moins)` }
+      const opened = await $.ui.open({ id: LOTS_PANE, title: 'Lots' })
+      if (!opened.isPlaced) return { text: `panneau des lots non placé : ${opened.reason}` }
+      void readTourNow?.()
+      return { text: 'panneau des lots ouvert (/hud lots pour le fermer).' }
+    }
     // un argument inconnu ne bascule pas la bande : se tromper d'argument ne doit pas la faire disparaître sans un mot
-    if (arg !== '') return { text: `argument inconnu : ${fit(arg, 40)} (attendu : cmd, projets)` }
+    if (arg !== '') return { text: `argument inconnu : ${fit(arg, 40)} (attendu : cmd, projets, lots)` }
     const hidden = !(await read($, isHidden))
     await update($, isHidden, () => hidden)
 
@@ -573,6 +618,123 @@ export const register: Register = on => {
             cadence-hud : {fit(problem, width - 14)}
           </Text>
         )}
+      </Box>
+    )
+  })
+
+  // Le panneau des lots (L401) : lecture seule, l'arbre des lots non clos de chaque projet du dossier (lead tour --json).
+  on('ui.render', { component: 'Pane', requestId: LOTS_PANE }, async ($, e) => {
+    const [board, failed, readAt, allWaves, at] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, now)])
+    const { Box, Text } = $.ui.resolve(e)
+    const columns = Math.max(20, e.props.bodyColumns)
+    const header = (
+      <Text key="header" wrap="truncate-end">
+        <Text bold>Lots</Text>
+        <Text dimColor>
+          {'  '}lecture seule{board ? `  lu à ${readTime(readAt)}` : ''}
+        </Text>
+      </Text>
+    )
+    const footer = (
+      <Text key="footer" dimColor wrap="truncate-end">
+        /hud lots pour fermer
+      </Text>
+    )
+    const message = (text: string, color: 'error' | 'subtle') => (
+      <Text key="message" color={color} wrap="wrap">
+        {text}
+      </Text>
+    )
+
+    let body: RenderChildren
+    if (board?.outdated) {
+      body = message('Lots indisponibles : cadence est trop ancien, mettez-le à jour.', 'error')
+    } else if (board === null) {
+      body = failed ? message("Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute.", 'error') : message('Lecture des plans…', 'subtle')
+    } else {
+      const shown = allWaves.filter(w => isWaveShown(w, at))
+      const waveLots = [...shown.filter(w => w.live), ...shown.filter(w => !w.live)].flatMap(w => w.lots.map(l => ({ project: l.project, lot: l.lot, status: l.status })))
+      const panel = buildPanel({ rows: board.rows, columns, height: e.props.scroll.bodyRows, waves: waveLots })
+      if (panel.lines.length === 0) {
+        body = message('Aucun lot non clos dans les projets de ce dossier.', 'subtle')
+      } else {
+        const rows = panel.lines.map((line, i) => {
+          if (line.kind === 'project') {
+            return (
+              <Text key={`p${i}`} wrap="truncate-end">
+                <Text bold>{line.name}</Text>
+                {line.error ? (
+                  <Text color="error">
+                    {'  '}
+                    {ellipsize(line.error, columns - line.name.length - 2)}
+                  </Text>
+                ) : (
+                  <Text dimColor>
+                    {'  '}
+                    {line.count} lot{line.count > 1 ? 's' : ''} non clos
+                  </Text>
+                )}
+              </Text>
+            )
+          }
+          const after = line.after.length > 0 && (
+            <Text color="subtle">
+              after:{' '}
+              {line.after.map((a, j) => (
+                <Text key={a.id} strikethrough={a.struck}>
+                  {j > 0 ? ' ' : ''}
+                  {a.id}
+                </Text>
+              ))}
+            </Text>
+          )
+          return (
+            <Box key={`l${i}`} flexDirection="column">
+              <Box flexDirection="row">
+                <Box width={line.idWidth} flexShrink={0}>
+                  <Text wrap="truncate-end">
+                    <Text dimColor>{line.lead}</Text>
+                    {line.id}
+                  </Text>
+                </Box>
+                <Box paddingLeft={2} flexGrow={1} flexShrink={1}>
+                  <Text wrap="truncate-end">
+                    {line.title}
+                    {!line.afterOwnLine && after && '  '}
+                    {!line.afterOwnLine && after}
+                  </Text>
+                </Box>
+                <Box paddingLeft={2} width={line.stateWidth + 2} flexShrink={0}>
+                  <Text wrap="truncate-end" color={line.state.color}>
+                    {line.state.text}
+                  </Text>
+                </Box>
+              </Box>
+              {line.afterOwnLine && (
+                <Box paddingLeft={line.idWidth}>
+                  <Text wrap="truncate-end">{after}</Text>
+                </Box>
+              )}
+            </Box>
+          )
+        })
+        body = (
+          <Box key="tree" flexDirection="column">
+            {rows}
+            {panel.more > 0 && (
+              <Text dimColor>
+                … +{panel.more} lot{panel.more > 1 ? 's' : ''} de plus
+              </Text>
+            )}
+          </Box>
+        )
+      }
+    }
+    return (
+      <Box flexDirection="column">
+        {header}
+        {body}
+        {footer}
       </Box>
     )
   })

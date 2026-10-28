@@ -985,12 +985,12 @@ test('une fin qui tombe entre le propriétaire et la fiche d\'une commande qui n
   expect(hud.info()).toEqual({})
 })
 
-test('/hud avec un argument inconnu répond « argument inconnu » sans basculer la bande', async ($, on) => {
+test('R16 — argument inconnu : la réponse cite lots (/hud avec un argument inconnu répond « argument inconnu » sans basculer la bande)', async ($, on) => {
   wired(on)
   mock.clock(on)
   for (const args of ['cmds', 'list', 'CMD']) {
     const unknown = await $.command.run({ command: 'hud', args } as never)
-    expect(unknown.text).toBe(`argument inconnu : ${args} (attendu : cmd, projets)`)
+    expect(unknown.text).toBe(`argument inconnu : ${args} (attendu : cmd, projets, lots)`)
   }
   // rien n'a basculé : le premier « /hud » nu masque la bande, le second la réaffiche
   expect((await $.command.run({ command: 'hud', args: '' } as never)).text).toMatch(/masquée/)

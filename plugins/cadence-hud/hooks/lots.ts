@@ -22,6 +22,16 @@ export const parseLotsBoard = (stdout: string): LotsBoard => {
   return { rows, outdated: readable.length > 0 && readable.every(r => r.lots === undefined) }
 }
 
+/** La signature des dates de plans lues par PLAN_STAMPS : change dès qu'un plan est modifié, ajouté ou retiré ; vide quand la sortie est illisible (la surveillance est alors sans effet, la minute reste). */
+export const stampsSignature = (stdout: string): string => {
+  try {
+    const raw: unknown = JSON.parse(stdout)
+    return typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? Object.entries(raw).map(([path, mtime]) => `${path}=${String(mtime)}`).sort().join('|') : ''
+  } catch {
+    return ''
+  }
+}
+
 /** Une sous-tâche native : son id est `<lot>/<n>` et son parent est ce lot (le sous-lot d'un plan tenu par un autre outil a un id propre). */
 export const isTask = (l: TourLot): boolean => l.parent !== undefined && l.id.startsWith(`${l.parent}/`)
 

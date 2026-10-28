@@ -196,3 +196,27 @@ while True:
     d = up
 print(start)
 `
+
+/**
+ * Les dates de modification des plans d'un dossier de projets (python3 -I, argv[1] = le dossier) : un `stat` par fichier de plan
+ * (`.cadence/raf.yaml`, `docs/plan/raf.yaml`, `cadence.yaml`) du dossier lui-même et de chacun de ses sous-dossiers directs.
+ * Sortie : `{chemin: mtime en ns}`. Lancé à chaque minuteur de 5 s tant que le panneau des lots est ouvert (L401) : un plan modifié
+ * relance la lecture sans attendre la minute. Un plan tenu par un autre outil (chemin donné par cadence.yaml) n'est surveillé que par son cadence.yaml.
+ */
+export const PLAN_STAMPS = `
+import os, sys, json
+folder = sys.argv[1]
+stamps = {}
+try:
+    names = sorted(n for n in os.listdir(folder) if not n.startswith('.') and n not in ('node_modules', 'tmp'))
+except OSError:
+    names = []
+for d in [folder] + [os.path.join(folder, n) for n in names]:
+    for rel in ('.cadence/raf.yaml', 'docs/plan/raf.yaml', 'cadence.yaml'):
+        path = os.path.join(d, rel)
+        try:
+            stamps[path] = os.stat(path).st_mtime_ns
+        except OSError:
+            pass
+print(json.dumps(stamps))
+`

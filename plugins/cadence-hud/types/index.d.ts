@@ -104,6 +104,12 @@ declare module 'claude-code' {
       slotCap: number
       /** La liste des projets est repliée sur une ligne (`/hud projets`). */
       projectsFolded: boolean
+      /** Ce que le panneau des lots (`/hud lots`) a lu de `cadence lead tour --json` ; null avant la première lecture réussie. */
+      lotsBoard: LotsBoard | null
+      /** La dernière lecture du panneau des lots a échoué (cadence absent, délai dépassé, sortie illisible). */
+      lotsFailed: boolean
+      /** Heure (ms) de la dernière lecture réussie du panneau des lots. */
+      lotsAt: number
       error: string | null
       isHidden: boolean
       now: number

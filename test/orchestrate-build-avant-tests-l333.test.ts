@@ -19,12 +19,12 @@ describe('la porte joue le build avant les tests (L333)', () => {
 
   it('R2 — un build rouge rend le lot sans lancer les tests : un seul constat, « build »', async () => {
     const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
-    const c = h.lot('L1', {}, { test: 'echo TESTS_LANCES >&2; exit 3', build: 'test -f b.txt || { echo cassé >&2; exit 4; }' });
+    const c = h.lot('L1', {}, { test: 'echo TESTS_LANCES_$((1+1)) >&2; exit 3', build: 'test -f b.txt || { echo cassé >&2; exit 4; }' });
     await runLot(c);
     const brief = h.calls[1].brief;
     expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
     expect(brief).toContain('en échec (code 4)');
-    expect(brief).not.toContain('TESTS_LANCES');
+    expect(brief).not.toContain('TESTS_LANCES_2'); // sortie des tests : la commande elle-même est dans le brief (L399), pas son résultat
     expect(brief).not.toContain('code 3');
   });
 

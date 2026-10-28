@@ -83,6 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- The briefs of the writing sessions (implement, fix, minors pass, librarian pass) name the exact `orchestrate.test` and `orchestrate.build` commands of the gate (L399, `docs/orchestrate.md`, `docs/mesures/portes-rouges-2026-10-28.md`): a session that played a narrower `npm run build` announced a green lot that the gate (`npx tsc --noEmit`, tests included) sent back to a correction pass (L330, L353).
 - `cadence verify --gate` in its throwaway copy copies only the dependencies (`node_modules` of every level and `.venv`), never every ignored folder (L392, `docs/deliver.md`: on 28-10 jobmail's `data` weighed 14 GB, maritime's `docs/refdocs` 961 MB). The copy no longer freezes cadence: Ctrl-C received during it is handled. A `node_modules` that is itself a link is copied by its content (the line said « copied » while nothing was). The line telling where the gate ran is always the first of the output, before the notice of declared dependencies that are absent.
 
 ## [1.17.1] - 2026-10-27

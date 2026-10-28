@@ -20,7 +20,7 @@ import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
 import { replayRed, TEST_WORKERS_ENV, testWorkersText } from './workers.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
-import { capturesText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
+import { capturesText, gateText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type AnyModel, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, remoteAdvances, snapshot, type Snapshot } from './guard.js';
@@ -541,7 +541,7 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   const l = c.lot;
   const lot = plan.lot(l.lot);
   const tmpDir = c.wave.store.tmpDir(l.project, l.lot);
-  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', tmp: tmpText(tmpDir), workers: kind === 'implement' || kind === 'fix' ? workersText(c) : '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '' };
+  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', tmp: tmpText(tmpDir), workers: kind === 'implement' || kind === 'fix' ? workersText(c) : '', gate: kind === 'implement' || kind === 'fix' ? gateText(c.config) : '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '' };
   if (l.visible) {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = newsText(l.lot, pwDir);

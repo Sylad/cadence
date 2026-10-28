@@ -16,4 +16,5 @@ You are one short session of an orchestrated wave: do not launch subagents (the 
 Give your final report as the structured output (commits, tests, build, what you could not verify, choices).
 {{reponse}}
 {{workers}}
+{{gate}}
 {{tmp}}

@@ -46,6 +46,8 @@ export interface BriefVars {
   fiche?: string;
   /** Part de la machine de la session (L350) : `testWorkersText(n)` pour implement, fix, passe des mineurs et passe du bibliothécaire ; vide ailleurs et sans vague. */
   workers?: string;
+  /** Commandes exactes de la porte du programme (L399) : `gateText(config)` pour implement, fix, passe des mineurs et passe du bibliothécaire ; vide ailleurs et sans `orchestrate.test` ni `orchestrate.build`. */
+  gate?: string;
   /** Dossier temporaire de la session (L242) : `tmpText(dir)` ; vide sans vague (`--dry-run`, brief délégué à la main). */
   tmp?: string;
   /** Consigne de nommage des captures Playwright (L249) : `shotsText(dossier de la vague)` pour une étape qui charge le serveur ; vide ailleurs et sans vague (`--dry-run`). */
@@ -173,12 +175,23 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', elsewhere: vars.elsewhere ?? '', ack: vars.ack ?? '', spec: vars.spec ?? '', decisions: vars.decisions ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', workers: vars.workers ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '', lecture: vars.lecture ?? PLAN_READING } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', elsewhere: vars.elsewhere ?? '', ack: vars.ack ?? '', spec: vars.spec ?? '', decisions: vars.decisions ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', workers: vars.workers ?? '', gate: vars.gate ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '', lecture: vars.lecture ?? PLAN_READING } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });
   // Un marqueur vide ne laisse pas de trou : lignes vides en double ramenées à une.
   return `${out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()}\n`;
+}
+
+/**
+ * Consigne `{{gate}}` (L399) : le programme rejoue après chaque écriture `orchestrate.test` et `orchestrate.build`, pas la commande que la session juge équivalente.
+ * Du 22 au 28-10, des lots annoncés verts arrivaient rouges à la porte parce que la session avait joué `npm run build` (tsconfig.build.json : `src` seul)
+ * alors que la porte joue `npx tsc --noEmit` (test et scripts compris) : L330, L353. Vide sans commande déclarée.
+ */
+export function gateText(gate: { test?: string; build?: string }): string {
+  const lines = [gate.test ? `- tests: \`${gate.test}\`` : '', gate.build ? `- build: \`${gate.build}\`` : ''].filter(Boolean);
+  if (!lines.length) return '';
+  return `The program's gate, played after every writing session, is exactly:\n${lines.join('\n')}\nRun these commands as written before reporting, not a narrower one (\`npm run build\` or \`npm test\` may cover less than the gate). A red there sends the lot back to a correction pass even when your own run was green.`;
 }
 
 /**

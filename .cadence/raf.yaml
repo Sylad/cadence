@@ -123,6 +123,38 @@ lots:
     visible: true
     screen: component
     created: 2026-10-28
+  - id: L412
+    title: "Panneau des lots : en tête, « ce qui attend une décision » — questions des sessions (texte court + commande --answer), lots rendus au lead (cause en une ligne), verdicts UX à poser, livraisons en échec ; lu dans les états de vague et le plan — idée validée par Sylvain le 28-10"
+    public: Ce qui attend une décision, en tête du panneau
+    status: todo
+    estimate: 0.5
+    visible: true
+    screen: component
+    created: 2026-10-28
+  - id: L413
+    title: "Panneau des lots : frise du cycle de chaque lot en cours — étapes de la vague (fiche, maquette, accept, implement, revue, correction n/3, porte, UX, intégration, prêt) avec l'étape courante, sa durée et les passes, puis côté plan revue posée → clos → livré ; lu dans .cadence/runs/<vague> et le plan"
+    public: Le cycle complet de chaque lot en cours, en frise
+    status: todo
+    estimate: 0.5
+    visible: true
+    screen: component
+    created: 2026-10-28
+  - id: L414
+    title: "Panneau des lots : par lot en cours, tokens consommés sur le budget du lot et temps écoulé, comparés au temps habituel d'un lot de cette taille (cadence perf) — signal visible quand un lot dépasse (ex. L64 : 786 k, 53 min)"
+    public: Budget et durée des lots en cours
+    status: todo
+    estimate: 0.5
+    visible: true
+    screen: component
+    created: 2026-10-28
+  - id: L415
+    title: "Panneau des lots : par projet, dernière livraison (sha, âge, verte/rouge, depuis le journal de cadence deliver) et lots clos non livrés"
+    public: Dernière livraison de chaque projet
+    status: todo
+    estimate: 0.5
+    visible: true
+    screen: component
+    created: 2026-10-28
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

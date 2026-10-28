@@ -292,6 +292,16 @@ test('L410 — en vague : implémentation, revue, correction, question, rendu co
   expect(order([{ project: 'p', lots }], waves)).toEqual(['L2', 'L3', 'L4', 'L5', 'L6', 'L1', 'L7'])
 })
 
+test('L410 — une vague prête (ready) compte comme en cours', () => {
+  expect(order([{ project: 'p', lots: [lot('L1'), lot('L2')] }], [{ project: 'p', lot: 'L2', status: 'ready' }])).toEqual(['L2', 'L1'])
+})
+
+test('L410 — une vague en échec ou suspendue ne compte pas comme en cours : le lot suit le plan, avec les prêts s’il est libre', () => {
+  const lots = [lot('L1', 'todo', { after: ['L9'] }), lot('L2'), lot('L3'), lot('L4'), lot('L9')]
+  const waves = [{ project: 'p', lot: 'L3', status: 'failed' }, { project: 'p', lot: 'L4', status: 'suspended' }]
+  expect(order([{ project: 'p', lots }], waves)).toEqual(['L2', 'L3', 'L4', 'L9', 'L1'])
+})
+
 test('L410 — un sous-lot reste sous son parent, et le parent dont un sous-lot est en cours remonte avec lui', () => {
   const rows = [{ project: 'p', lots: [lot('L1'), lot('L2'), lot('L3', 'todo', { parent: 'L2' }), lot('L4', 'doing', { parent: 'L2' }), lot('L5')] }]
   expect(order(rows)).toEqual(['L2', 'L4', 'L3', 'L1', 'L5'])

@@ -9,9 +9,10 @@ reviewSince: 2026-10-03
 lots:
   - id: L400
     title: "raf move <id> --before|--after <id> : réordonner un lot dans le plan (même parent, refus pendant une vague du dépôt, plan en lecture seule refusé avec la commande du projet), doc, tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-28
+    started: 2026-10-28
   - id: L401
     title: "Panneau des lots (mod cadence-hud, Pane) : arborescence projet → lots parents → sous-lots des projets du dossier, état (en cours, prêt, en vague, rendu, en question), liens after: ; lecture seule, rafraîchi sur changement de plan ou de vague ; repli lisible sur terminal"
     public: Un panneau à côté de la conversation qui montre les lots de chaque projet

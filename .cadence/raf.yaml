@@ -95,11 +95,12 @@ lots:
   - id: L409
     title: "Panneau des lots : replier/déplier chaque projet (clic sur son nom, ou touche), état gardé entre deux ouvertures ; par défaut un projet de plus de 20 lots ouverts est replié (ligne : nom, nombre de lots, en cours) ; vu le 28-10 : maritime 159 lots écrasait les autres projets"
     public: Replier les projets dans le panneau des lots
-    status: todo
+    status: doing
     estimate: 0.5
     visible: true
     screen: component
     created: 2026-10-28
+    started: 2026-10-28
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

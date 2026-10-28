@@ -4249,9 +4249,10 @@ lots:
     finished: 2026-10-27
   - id: L392
     title: "verify --gate en copie jetable : ne copier que les dépendances (node_modules de tout niveau, .venv), jamais tous les dossiers ignorés (mesuré : jobmail copierait data 14 Go et .env, maritime docs/refdocs 961 Mo ; Ctrl-C sans effet pendant la copie synchrone) ; node_modules lui-même lien → rien copié alors que la sortie dit copié ; lien relatif sortant du dépôt (file:../voisin) pointe dans le vide ; ligne « où la porte a tourné » en premier ; tests"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-27
+    started: 2026-10-28
   - id: L393
     title: "verify --gate en place : relire HEAD et git status après les étapes ; si l'arbre principal a bougé pendant la porte (intégration, commit de plan d'une vague), le dire et ne pas présenter le verdict comme celui du sha ; test"
     status: todo

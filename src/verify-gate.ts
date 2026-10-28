@@ -89,11 +89,28 @@ function mainTreeObstacle(repo: string, sha: string): string | null {
 }
 
 /**
+ * Ce qui a changé dans l'arbre principal depuis le début d'une porte en place (L393) : HEAD n'est plus au sha et/ou `git status --porcelain` n'est plus vide ; null si rien n'a bougé.
+ * Relu à la fin de la porte, après toutes les étapes, y compris rouges.
+ */
+function mainTreeMoved(repo: string, sha: string): string | null {
+  try {
+    const head = git(repo, 'rev-parse', 'HEAD');
+    const status = git(repo, 'status', '--porcelain');
+    const changes: string[] = [];
+    if (head !== sha) changes.push(`HEAD est passé de ${sha.slice(0, 7)} à ${head.slice(0, 7)}`);
+    if (status) changes.push(`git status n'est plus vide (${status.split('\n').length} entrée(s))`);
+    return changes.length ? changes.join(' ; ') : null;
+  } catch (e) {
+    return `l'état de l'arbre principal est illisible (${gitFailure(e)})`;
+  }
+}
+
+/**
  * `cadence verify --gate` (L348) : la porte du projet (`orchestrate.build`, puis `orchestrate.test`, dans l'ordre de la vague : les tests lisent ce que le build produit)
  * rejouée au `sha` (L389) dans l'arbre principal quand il est propre et à ce sha (les outils qui refusent un `node_modules` venu d'un autre arbre y tournent chez eux) ;
  * sinon dans un worktree jetable, hors du dépôt, dont les dépendances non suivies sont copiées depuis le dépôt vivant (`orchestrate.worktreeDeps`,
  * sinon les `node_modules` de tout niveau et le `.venv` ; les autres dossiers ignorés sont reliés, comme dans les worktrees de vague ; la copie est asynchrone pour que Ctrl-C la coupe). `verify.inPlace` impose l'un (`true`, refus si l'arbre n'est pas propre au sha) ou l'autre (`false`).
- * La première ligne de la sortie dit où la porte a tourné ; en place, l'arbre est relu à la fin et, s'il a bougé, le verdict est dit non probant (code 2). Les deux commandes sont rejouées même si la première est rouge : le compte rendu est entier.
+ * La première ligne de la sortie dit où la porte a tourné ; en place, HEAD et `git status` sont relus après les étapes et, si l'arbre a bougé (HEAD avancé, status sale), la sortie dit ce qui a changé, que le verdict n'est pas celui du sha et sort en code 2, rouge ou vert ; la ligne « vert » / « rouge » n'est alors pas écrite. Les deux commandes sont rejouées même si la première est rouge : le compte rendu est entier.
  * Chaque commande reçoit `CADENCE_TEST_WORKERS` comme dans la porte d'une vague (L350, L387) : la valeur de l'environnement de l'appelant si c'est un entier positif, sinon cœurs ÷ plafond de sessions (`CADENCE_MAX_SESSIONS`, 2 par défaut) ;
  * sans elle le rejeu `--maxWorkers=$CADENCE_TEST_WORKERS` de `orchestrate.testReplay` sortirait en erreur et ne prouverait rien.
  * La porte déjà jouée par le programme au même sha n'est pas rejouée (L397) : si l'état d'une vague (`ctx.launchDirs`) porte des contrôles enregistrés AU sha, sur un arbre identique, verts et couvrant chaque commande actuelle,
@@ -145,11 +162,14 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
       if (group.pgid !== undefined) killGroup(group.pgid);
     });
     try {
-      const code = await runSteps(steps, repo, ctx, group, env, short);
-      // Une vague intègre ses lots par fast-forward dans cet arbre : s'il a bougé pendant la porte, les commandes ont lu un mélange de commits.
-      const moved = mainTreeObstacle(repo, sha);
-      if (moved === null) return code;
-      out(`verify --gate ${short} : verdict non probant — ${moved} à la fin de la porte (un lot a pu être intégré pendant qu'elle tournait, ou une commande a écrit hors des dossiers ignorés) ; la rejouer`);
+      const { code, summary } = await runSteps(steps, repo, ctx, group, env, short);
+      // Une vague intègre ses lots par fast-forward dans cet arbre et y commite son plan : s'il a bougé pendant la porte, les commandes ont lu un mélange de commits.
+      const moved = mainTreeMoved(repo, sha);
+      if (moved === null) {
+        out(summary);
+        return code;
+      }
+      out(`verify --gate ${short} : verdict non probant — ${moved} pendant la porte (un lot a pu être intégré ou le plan d'une vague commité pendant qu'elle tournait, ou une commande a écrit hors des dossiers ignorés) ; les ✓/✗ ci-dessus ne sont pas ceux de ${short} ; la rejouer`);
       return 2;
     } finally {
       forget();
@@ -194,15 +214,17 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
     out(`verify --gate ${short} : porte jouée dans une copie jetable ${dir} (${why}) ; dépendances copiées : ${copied.length ? copied.join(', ') : 'aucune'}`);
     out(replayReason);
     if (missing.length) out(`dépendances déclarées absentes de l'arbre principal, non copiées : ${missing.join(', ')}`);
-    return await runSteps(steps, dir, ctx, group, env, short);
+    const done = await runSteps(steps, dir, ctx, group, env, short);
+    out(done.summary);
+    return done.code;
   } finally {
     forget();
     cleanup();
   }
 }
 
-/** Les étapes de la porte jouées dans `cwd` ; le compte rendu et le code de sortie (0 vert, 1 rouge). */
-async function runSteps(steps: { name: string; cmd: string }[], cwd: string, ctx: GateCtx, group: { pgid?: number }, env: Record<string, string | undefined>, short: string): Promise<number> {
+/** Les étapes de la porte jouées dans `cwd` ; le code de sortie (0 vert, 1 rouge) et la ligne de verdict, écrite par l'appelant une fois sûr qu'elle vaut pour le sha. */
+async function runSteps(steps: { name: string; cmd: string }[], cwd: string, ctx: GateCtx, group: { pgid?: number }, env: Record<string, string | undefined>, short: string): Promise<{ code: number; summary: string }> {
   const { config, out } = ctx;
   let red = 0;
   for (const step of steps) {
@@ -245,6 +267,5 @@ async function runSteps(steps: { name: string; cmd: string }[], cwd: string, ctx
       if (r.output.trim()) for (const l of r.output.trimEnd().split('\n').slice(-TAIL_LINES)) out(`  | ${l}`);
     }
   }
-  out(red === 0 ? `verify --gate ${short} : vert` : `verify --gate ${short} : rouge (${red} étape${red > 1 ? 's' : ''} sur ${steps.length})`);
-  return red === 0 ? 0 : 1;
+  return { code: red === 0 ? 0 : 1, summary: red === 0 ? `verify --gate ${short} : vert` : `verify --gate ${short} : rouge (${red} étape${red > 1 ? 's' : ''} sur ${steps.length})` };
 }

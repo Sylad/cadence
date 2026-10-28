@@ -606,6 +606,34 @@ describe('verifyGate : où la porte tourne (L389)', () => {
     expect(r.text).toMatch(/non probant/);
   });
 
+  it('L393 R1 — HEAD avancé pendant la porte : la sortie dit que le verdict n\'est pas celui du sha et nomme le nouveau HEAD', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: git commit -q --allow-empty -m plan\n', true);
+    const r = await gate(repo, sha);
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+    expect(r.code).toBe(2);
+    expect(r.text).toContain(`verdict non probant`);
+    expect(r.text).toContain(`HEAD est passé de ${sha.slice(0, 7)} à ${head.slice(0, 7)}`);
+    expect(r.text).toMatch(/ne sont pas ceux de/);
+    expect(r.text).not.toMatch(/: vert\s*$/m);
+  });
+
+  it('L393 R2 — git status devenu sale pendant la porte (fichier non suivi écrit par une commande), HEAD inchangé : non probant, code 2, le dit', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: echo x > ecrit-par-la-porte.txt\n', true);
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(2);
+    expect(r.text).toMatch(/verdict non probant/);
+    expect(r.text).toMatch(/git status n'est plus vide/);
+    expect(r.text).not.toMatch(/HEAD est passé/);
+  });
+
+  it('L393 R3 — un rouge dont l\'arbre a bougé est aussi non probant (code 2, pas 1) : on ne présente pas un rouge d\'un mélange de commits comme celui du sha', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: git commit -q --allow-empty -m plan; exit 1\n', true);
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(2);
+    expect(r.text).toMatch(/verdict non probant/);
+    expect(r.text).not.toMatch(/: rouge \(/);
+  });
+
   it('L389 R6 — l\'arbre principal ne bouge pas pendant la porte en place : le verdict reste probant', async () => {
     const { repo, sha } = project('orchestrate:\n  test: "true"\n', true);
     const r = await gate(repo, sha);

@@ -14,6 +14,7 @@ lots:
     created: 2026-10-28
   - id: L401
     title: "Panneau des lots (mod cadence-hud, Pane) : arborescence projet → lots parents → sous-lots des projets du dossier, état (en cours, prêt, en vague, rendu, en question), liens after: ; lecture seule, rafraîchi sur changement de plan ou de vague ; repli lisible sur terminal"
+    public: Un panneau à côté de la conversation qui montre les lots de chaque projet
     status: todo
     estimate: 0.5
     visible: true
@@ -22,6 +23,7 @@ lots:
     created: 2026-10-28
   - id: L402
     title: "Panneau des lots : réordonner par glisser-déposer (app desktop, module de surface Client) et boutons ↑ ↓ ailleurs, via raf move ; grisé avec la raison pendant une vague du dépôt ou sur un plan en lecture seule"
+    public: Réordonner les lots en les faisant glisser dans le panneau
     status: todo
     estimate: 0.5
     visible: true

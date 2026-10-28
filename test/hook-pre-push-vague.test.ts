@@ -92,11 +92,14 @@ describe('hook pre-push posé par la vague : un push qui emporte un lot pas prê
     expect(r.code).toBe(0);
   });
 
-  it('R5 — le commit d\'un lot pas prêt déjà sur le distant n\'est pas emporté par le push : il ne bloque pas', async () => {
+  it('R5 — le commit d\'un lot pas prêt déjà sur le distant bloque encore : la garde est celle de la vague (toute l\'ascendance du sha poussé), qui s\'arrêterait sur « push détecté »', async () => {
     const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L2': 'implementing' });
-    // le distant est déjà en B (lot L2 pas prêt) : pousser C n'emporte que C, un commit de L1 prêt
+    // le distant est déjà en B (lot L2 pas prêt) : C a B dans son ascendance, `blockingLots` rend L2 comme pour `deliver --sha`
     const r = await cli(dir, line(shas.C, shas.B), 'hook', 'pre-push');
-    expect(r.code).toBe(0);
+    expect(r.code).toBe(3);
+    expect(r.err).toContain('ici:L2');
+    expect(r.err).toContain('aucun commit livrable');
+    expect(r.err).not.toContain('git push origin');
   });
 
   it('R6 — la suppression d\'une branche (sha local nul) n\'emporte aucun commit : acceptée', async () => {

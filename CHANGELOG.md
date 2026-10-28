@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- Lots panel (`/hud lots`): in each project the lots in progress come first (`doing`, or in a wave being implemented, reviewed, corrected, in question, ready or handed back), then the free ones, then the rest, plan order kept in each group; a sub-lot stays under its parent and a parent with a sub-lot in progress rises with it (L410).
+
 ## [1.22.1] - 2026-10-28
 
 ### Fixed

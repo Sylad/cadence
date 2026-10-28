@@ -66,6 +66,29 @@ export const lotTree = (lots: readonly TourLot[]): LotNode[] => {
   return top
 }
 
+/** Les états de vague où le lot est travaillé (ou attend la personne) : implémentation, revue, correction, question, prêt, rendu. */
+const WORKED_IN_WAVE = new Set(['implementing', 'reviewing', 'fixing', 'question', 'ready', 'handed-back'])
+
+/** Le rang d'un lot dans son projet (L410) : 0 en cours (doing, ou travaillé dans une vague), 1 prêt (à faire, aucun after: ouvert), 2 le reste. */
+export const lotRank = (lot: TourLot, openIds: ReadonlySet<string>, waveStatus?: string): 0 | 1 | 2 => {
+  if (lot.status === 'doing' || (waveStatus !== undefined && WORKED_IN_WAVE.has(waveStatus))) return 0
+  return isTask(lot) || !lot.after.some(id => openIds.has(id)) ? 1 : 2
+}
+
+/**
+ * L'arbre rangé par rang : en cours, prêts, reste ; l'ordre du plan est gardé dans un même rang. Un sous-lot reste sous son parent
+ * (le tri se fait entre frères) et un parent prend le rang de son meilleur sous-lot, il remonte avec lui.
+ */
+export const sortTree = (nodes: readonly LotNode[], rankOf: (lot: TourLot) => number): LotNode[] => {
+  const ranked = nodes.map(n => {
+    const children = sortTree(n.children, rankOf)
+    return { node: { lot: n.lot, children }, rank: Math.min(rankOf(n.lot), ...children.map(c => bestRank(c, rankOf))) }
+  })
+  return ranked.map((r, i) => ({ ...r, i })).sort((a, b) => a.rank - b.rank || a.i - b.i).map(r => r.node)
+}
+
+const bestRank = (n: LotNode, rankOf: (lot: TourLot) => number): number => Math.min(rankOf(n.lot), ...n.children.map(c => bestRank(c, rankOf)))
+
 export type FlatLot = { lot: TourLot; depth: number; branch: '' | '├' | '└' }
 
 /** L'arbre à plat, dans l'ordre d'affichage ; chaque sous-lot porte ├ (suivi d'un frère) ou └ (le dernier). */
@@ -138,7 +161,11 @@ export const buildPanel = (input: {
   type Block = { project: LotsRow; flat: FlatLot[]; open: Set<string>; folded: boolean }
   const blocks: Block[] = rows
     .filter(r => r.error || (r.lots && r.lots.length > 0))
-    .map(r => ({ project: r, flat: flattenTree(lotTree(r.lots ?? [])), open: new Set((r.lots ?? []).map(l => l.id)), folded: !r.error && isFolded(r.project, r.lots ?? [], folds) }))
+    .map(r => {
+      const open = new Set((r.lots ?? []).map(l => l.id))
+      const waveOf = (l: TourLot) => waves.find(w => w.lot === l.id && sameProject(r.project, w.project))?.status
+      return { project: r, flat: flattenTree(sortTree(lotTree(r.lots ?? []), l => lotRank(l, open, waveOf(l)))), open, folded: !r.error && isFolded(r.project, r.lots ?? [], folds) }
+    })
   const leadOf = (f: FlatLot) => (f.depth === 0 ? '  ' : `  ${'  '.repeat(f.depth - 1)}${f.branch} `)
   const shown = blocks.filter(b => !b.folded)
   const all = shown.flatMap(b => b.flat)

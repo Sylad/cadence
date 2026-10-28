@@ -268,3 +268,41 @@ test('R4 — un projet illisible ne se replie pas', () => {
   expect(heads(p)[0]).toMatchObject({ error: 'illisible : x' })
   expect(heads(p)[0]).not.toHaveProperty('folded')
 })
+
+// ── L410 : l'ordre d'un projet — en cours, puis prêts, puis le reste ───────────────────────────────────────────────
+
+const order = (rows: LotsRow[], waves: { project: string; lot: string; status: string }[] = []): string[] =>
+  panel({ rows, waves }).lines.flatMap(l => (l.kind === 'lot' ? [l.id] : []))
+
+test('L410 — en cours (doing) avant les prêts, puis le reste bloqué, l’ordre du plan gardé dans chaque groupe', () => {
+  const rows = [{ project: 'p', lots: [lot('L1', 'todo', { after: ['L9'] }), lot('L2'), lot('L3', 'doing'), lot('L4'), lot('L5', 'doing'), lot('L9', 'todo', { after: ['L1'] })] }]
+  expect(order(rows)).toEqual(['L3', 'L5', 'L2', 'L4', 'L1', 'L9'])
+})
+
+test('L410 — en vague : implémentation, revue, correction, question, rendu comptent comme en cours ; en attente non', () => {
+  const lots = [lot('L1'), lot('L2'), lot('L3'), lot('L4'), lot('L5'), lot('L6'), lot('L7')]
+  const waves = [
+    { project: 'p', lot: 'L2', status: 'implementing' },
+    { project: 'p', lot: 'L3', status: 'reviewing' },
+    { project: 'p', lot: 'L4', status: 'question' },
+    { project: 'p', lot: 'L5', status: 'handed-back' },
+    { project: 'p', lot: 'L6', status: 'fixing' },
+    { project: 'p', lot: 'L7', status: 'queued' },
+  ]
+  expect(order([{ project: 'p', lots }], waves)).toEqual(['L2', 'L3', 'L4', 'L5', 'L6', 'L1', 'L7'])
+})
+
+test('L410 — un sous-lot reste sous son parent, et le parent dont un sous-lot est en cours remonte avec lui', () => {
+  const rows = [{ project: 'p', lots: [lot('L1'), lot('L2'), lot('L3', 'todo', { parent: 'L2' }), lot('L4', 'doing', { parent: 'L2' }), lot('L5')] }]
+  expect(order(rows)).toEqual(['L2', 'L4', 'L3', 'L1', 'L5'])
+})
+
+test('L410 — sous-tâche native en cours : son lot remonte, elle passe avant ses sœurs', () => {
+  const rows = [{ project: 'p', lots: [lot('L1'), lot('L2'), task('L2', 1), task('L2', 2, 'doing')] }]
+  expect(order(rows)).toEqual(['L2', 'L2/2', 'L2/1', 'L1'])
+})
+
+test('L410 — aucun lot en cours : l’ordre du plan est inchangé', () => {
+  const rows = [{ project: 'p', lots: [lot('L3'), lot('L1'), lot('L2')] }]
+  expect(order(rows)).toEqual(['L3', 'L1', 'L2'])
+})

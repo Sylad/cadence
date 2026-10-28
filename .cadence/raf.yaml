@@ -4261,6 +4261,21 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-27
+  - id: L394
+    title: "raf check et raf now : un seul git log --name-only pour les fichiers de tous les commits au lieu d'un git par commit (89 % du temps : raf check 20 s, raf now 15 s, session start 25 s à ~2 250 commits) → lead tour --json 35 s dépasse le délai de 20 s de la bande, liste des projets vide ; mesure avant/après, tests"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-28
+  - id: L395
+    title: "Porte de tests visible : étape « porte » dans l'état du lot (durée, next juste), la bande et --status l'affichent au lieu de « → implement » sans session (5 min muettes sur L392) ; --status --wave <id> montre le tableau de cette vague, pas celui de la dernière du dossier ; tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-28
+  - id: L396
+    title: "raf archive [--before date] : lots done/dropped déplacés dans .cadence/archive/<année>.yaml, relus par raf (show, check, commits) et par perf, news et plan public quand l'id n'est pas dans le plan actif ; briefs : ne jamais lire l'archive (plan cadence 559 Ko ≈ 150 k tokens) ; doc, tests"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-28
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

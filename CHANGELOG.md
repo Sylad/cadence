@@ -82,6 +82,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - `raf move <id> --before|--after <id>` reorders a lot in the plan (a sub-task among those of its lot); refused among different parents, on an archived lot, on a read-only plan (with the project's own tool to use) and while a wave holds the repository (L400).
 
+### Fixed
+
+- The test that checks the back-sheet design against the plan (`etape-spec-back-fiche`) read `.cadence/raf.yaml` directly and went red once `raf archive` moved its lots out (L404): it now reads the plan through the loader (active and archived lots), and a guard test fails any test that reads the real plan file without it (`test/plan-reel.ts`).
+
 ## [1.19.1] - 2026-10-28
 
 ### Fixed

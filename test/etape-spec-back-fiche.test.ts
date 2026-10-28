@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { CODE_ERREUR } from '../src/spec.js';
 import { costlyHypotheses } from '../src/orchestrate/spec.js';
+import { lotsDuPlanReel } from './plan-reel.js';
 
 // Design de l'étape spec des lots sans écran (back) : la fiche donnée en exemple doit respecter les invariants que le design énonce,
 // et le design doit dire des chiffres et des lots ce que le plan et la mesure de référence disent.
@@ -12,7 +13,8 @@ const SPECS = join(ROOT, 'docs', 'superpowers', 'specs');
 const fiche = parse(readFileSync(join(SPECS, '2026-10-11-etape-spec-back-fiche-exemple.yaml'), 'utf8')) as any;
 const design = readFileSync(join(SPECS, '2026-10-11-etape-spec-back-design.md'), 'utf8');
 const mesure = readFileSync(join(ROOT, 'docs', 'mesures', 'corrections-2026-10-10.md'), 'utf8');
-const plan = parse(readFileSync(join(ROOT, '.cadence', 'raf.yaml'), 'utf8')) as { lots: any[] };
+// Le plan par le chargeur : actifs et archivés (les lots B1–B5 sont clos, donc archivés par `raf archive`).
+const plan = { lots: lotsDuPlanReel() };
 
 const ligne = (md: string, debut: string) => md.split('\n').find((l) => l.startsWith(debut)) ?? '';
 const ids = (liste: any[]) => liste.map((x) => x.id);
@@ -177,7 +179,7 @@ describe('design de l\'étape spec back', () => {
       const apres = cmd.match(/--after (L\d+)/)?.[1];
       if (i === 0) {
         expect(apres).toBeUndefined();
-        expect(lot?.after).toBeUndefined();
+        expect(lot?.after).toEqual([]); // le chargeur normalise l'absence de dépendance en liste vide
       } else {
         expect(apres).toBe(tableau[i - 1]!.match(/^\| (L\d+)/)![1]);
         expect(lot?.after).toEqual([apres]);

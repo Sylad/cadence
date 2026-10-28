@@ -18,7 +18,7 @@ lots:
   - id: L401
     title: "Panneau des lots (mod cadence-hud, Pane) : arborescence projet → lots parents → sous-lots des projets du dossier, état (en cours, prêt, en vague, rendu, en question), liens after: ; lecture seule, rafraîchi sur changement de plan ou de vague ; repli lisible sur terminal"
     public: Un panneau à côté de la conversation qui montre les lots de chaque projet
-    status: doing
+    status: done
     estimate: 0.5
     visible: true
     screen: page
@@ -36,6 +36,8 @@ lots:
       - { date: 2026-10-28, text: "Revue de la fiche — mineur : docs/specs/panneau-lots/fiche.yaml:150 — R10 : l'id d'une sous-tâche est dit « <lot>/<n> (celui de Task.id) ». Or Task.id est le seul <n> (src/plan.ts:46-50, parseur l.1164 `id: String(t.id)`, et `${l.id}/${t.id}` l.440 et l.832 pour composer l'id). Le composé est construit, pas lu. Un test écrit d'après « celui de Task.id » pourrait attendre « 1 » au lieu de « L401/1 ». Écrire « id composé `${lot.id}/${task.id}` »." }
       - { date: 2026-10-28, text: "Revue de la fiche — mineur : docs/specs/panneau-lots/fiche.yaml:150 — R10 : « plan natif » vs « plan tenu par un autre outil » n'a pas de critère. Dans un plan tenu par un autre outil, le parseur replie déjà en `tasks` les sous-lots dont l'id est `<parent>/…` et dont `parent:` est un lot de premier niveau (src/plan.ts:1073-1079) ; ils sortent alors de plan.lots() et n'arriveraient dans `lots` par aucune des deux voies si la règle se limite à Lot.parent pour ce plan. Dire que les tasks sont émises quel que soit le plan (le repli étant fait par le parseur), ou fixer le critère, avec un test sur ce cas." }
     review: { date: 2026-10-28, verdict: "conforme : les deux derniers majeurs levés — test R10 présent (hud.test.tsx:1095, échoue si parseTour rejette lots, mutation vérifiée) ; mesure R18 avant/après rapportée dans docs/cadence-hud.md (7,0–8,4 s contre 7,3–9,1 s, sous les 20 s de la bande ; sortie 86 → 188 Ko) ; 153 tests du mod verts, typecheck propre ; revue courte du diff rebasé (patch-id différent) : compliant: rebase sans effet sur le changement du lot, 153 tests du mod verts", commit: 6a4f6365b5142725282781c58f9f93e2c36886d8 }
+    ux: { date: 2026-10-28, verdict: "conforme sur pièces, contrôle à l'œil en attente : maquette validée par Sylvain (28-10), rendu vérifié par claude plugin test (153 tests verts dont arbre, états, liens after:, repli terminal), mesure du tour 7,0–8,4 s ; le panneau ne se voit que dans Claude (aucune capture possible) — Sylvain l'ouvre avec /hud lots après la mise en service ; un défaut vu à l'œil devient un lot" }
+    finished: 2026-10-28
   - id: L402
     title: "Panneau des lots : réordonner par glisser-déposer (app desktop, module de surface Client) et boutons ↑ ↓ ailleurs, via raf move ; grisé avec la raison pendant une vague du dépôt ou sur un plan en lecture seule"
     public: Réordonner les lots en les faisant glisser dans le panneau

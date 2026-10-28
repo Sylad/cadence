@@ -162,6 +162,31 @@ describe('hook pre-push posé par la vague : un push qui emporte un lot pas prê
     expect(r.err).not.toContain(`git push origin ${shas.A}:main`);
   });
 
+  it('R15 — un tag annoté posé au-dessus d\'un lot pas prêt est refusé sans commande sûre : « <sha>:refs/tags/<tag> » publierait un tag qui ne nomme pas son commit', async () => {
+    const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L2': 'implementing' });
+    execFileSync('git', ['tag', '-a', 'v1', '-m', 'release', shas.C], { cwd: dir });
+    const tagObject = sha(dir, 'refs/tags/v1');
+    expect(tagObject).not.toBe(shas.C);
+    const r = await cli(dir, line(tagObject, ZERO, 'refs/tags/v1'), 'hook', 'pre-push');
+    expect(r.code).toBe(3);
+    expect(r.err).toContain('ici:L2');
+    expect(r.err).toContain('refs/tags/v1 doit nommer son propre commit');
+    expect(r.err).not.toContain('git push origin');
+    expect(r.err).not.toContain(':refs/tags/');
+    // même pour un tag poussé sous un autre nom distant
+    const autre = await cli(dir, line(tagObject, ZERO, 'refs/tags/v1', 'refs/tags/v2'), 'hook', 'pre-push');
+    expect(autre.code).toBe(3);
+    expect(autre.err).not.toContain('git push origin');
+  });
+
+  it('R16 — une branche garde sa commande sûre (refs/heads/ : seul le tag en est privé)', async () => {
+    const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L2': 'implementing' });
+    const r = await cli(dir, line(shas.C, shas.P, 'refs/heads/release'), 'hook', 'pre-push');
+    expect(r.code).toBe(3);
+    expect(r.err).toContain(`git push origin ${shas.A}:release`);
+    expect(r.err).not.toContain('doit nommer son propre commit');
+  });
+
   it('R9 — l\'état de la vague illisible ne bloque pas un push : avertissement, code 0', async () => {
     const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L2': 'implementing' });
     process.env.CADENCE_HOME = tempDir();

@@ -100,7 +100,7 @@ tronqués en fin de ligne.
 
 ### Panneau des lots (`/hud lots`, L401)
 
-Un `Pane` en lecture seule, ouvert **uniquement** par la commande (le moteur ne place pas un panneau que le mod ouvre seul sous 144 colonnes ; la commande, demandée par le lead, le place dès 110 : en dessous elle répond `terminal trop étroit pour le panneau (110 colonnes au moins)` et n'ouvre rien). Par projet du dossier (ordre de `priority:`) : son nom, son nombre de lots non clos (sous-lots de `parent:` compris, sous-tâches natives non), puis l'arbre de ses lots non clos — un sous-lot sous son lot avec `├`/`└`, la profondeur libre ; un parent clos ou inconnu, un cycle ou un id en double laissent le lot au premier niveau.
+Un `Pane` en lecture seule, ouvert **uniquement** par la commande (le moteur ne place pas un panneau que le mod ouvre seul sous 144 colonnes ; la commande, demandée par la personne, l'ouvre à toute largeur et Claude le place ; s'il ne le place pas, elle répond `panneau des lots non placé : <raison>` et n'ouvre rien). Par projet du dossier (ordre de `priority:`) : son nom, son nombre de lots non clos (sous-lots de `parent:` compris, sous-tâches natives non), puis l'arbre de ses lots non clos — un sous-lot sous son lot avec `├`/`└`, la profondeur libre ; un parent clos ou inconnu, un cycle ou un id en double laissent le lot au premier niveau.
 
 | État | Mot | Couleur |
 |---|---|---|

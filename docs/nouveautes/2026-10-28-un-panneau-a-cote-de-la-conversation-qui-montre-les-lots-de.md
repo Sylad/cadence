@@ -12,7 +12,7 @@ Un panneau des lots, en lecture seule, s'ouvre à côté de la conversation avec
 - Chaque lot dit son état en mots, avec un glyphe et une couleur : `▶ en cours`, `○ libre`, `⊘ bloqué`, ou, quand le lot est dans une vague, l'état de la vague (`⟳ relit`, `? QUESTION`, `✔ prêt`…), les mêmes mots que la bande. Les liens `after:` suivent le titre ; un lien vers un lot déjà clos est barré et ne bloque rien.
 - Le panneau se met à jour quand une vague change d'étape, dès qu'un fichier de plan est modifié, et au plus toutes les minutes. Si une relecture échoue, le dernier tableau reste affiché.
 - Un projet que `cadence` n'a pas pu lire montre son erreur (`illisible : …`) sans cacher les autres. Avec un `cadence` trop ancien, le panneau le dit au lieu d'afficher une liste vide.
-- Le panneau ne s'ouvre jamais tout seul, et il faut un terminal d'au moins 110 colonnes : en dessous, la commande répond `terminal trop étroit pour le panneau (110 colonnes au moins)`. Un argument inconnu de `/hud` cite maintenant `lots` parmi ceux qui existent.
+- Le panneau ne s'ouvre jamais tout seul, et la commande l'ouvre quelle que soit la largeur de la fenêtre, Claude le plaçant ; s'il ne peut pas, elle répond `panneau des lots non placé : <raison>`. Un argument inconnu de `/hud` cite maintenant `lots` parmi ceux qui existent.
 
 ## Hypothèses
 
@@ -26,6 +26,6 @@ Un panneau des lots, en lecture seule, s'ouvre à côté de la conversation avec
 - R15 — sous 60 colonnes de corps, la liste `after:` passe sur sa propre ligne et le titre est tronqué ; seule la valeur 60 change si le seuil devait être autre.
 - R16 — la commande s'appelle `/hud lots` et le panneau ne s'ouvre jamais seul ; si elle devait s'appeler autrement ou s'ouvrir seule, seuls le nom et le déclencheur changent.
 - R17 — au-dessus du prompt, le panneau tient en un tiers de la hauteur et finit par « … +N lots de plus » ; s'il devait défiler ou plier des projets, seule la présentation change.
-- R19 — sous 110 colonnes, la commande répond « terminal trop étroit… » et n'ouvre rien ; seul le seuil change s'il devait être autre.
+- R19 — la commande ouvre le panneau à toute largeur, Claude le plaçant ; s'il ne le place pas, elle répond « panneau des lots non placé : <raison> » et n'ouvre rien.
 - R20 — une sous-tâche affiche « ▶ en cours » ou « ○ à faire », jamais « libre » ni l'état de vague de son lot ; seuls le mot et la couleur changent si c'est faux.
 - R21 — le nombre de lots d'un projet ne compte pas les sous-tâches de plan natif ; si elles devaient compter, seul le calcul du compte change.

@@ -29,7 +29,7 @@ cas:
       - { si: un projet est illisible, alors: sa ligne dit l'erreur, les autres projets restent, regles: [R7] }
       - { si: les lignes du tour n'ont pas de champ lots (cadence plus ancien que le mod), alors: le panneau affiche l'erreur « cadence trop ancien », pas l'état vide, regles: [R14] }
       - { si: l'argument de /hud n'est pas connu, alors: la commande répond par un texte et ne bascule rien, regles: [R16] }
-      - { si: le terminal est trop étroit, alors: la commande répond « terminal trop étroit… » et n'ouvre rien, regles: [R19] }
+      - { si: Claude ne place pas le panneau demandé, alors: la commande répond « panneau des lots non placé : <raison> » et n'ouvre rien, regles: [R19] }
       - { si: l'arbre dépasse la hauteur du panneau, alors: il est tronqué avec le nombre de lots masqués, regles: [R17] }
     resultat: Un arbre de lots par projet, sans aucune action d'écriture.
   - id: C2
@@ -62,7 +62,7 @@ champs:
   - { id: message-cadence-ancien, libelle: Erreur cadence trop ancien, type: texte, source: statique, obligatoire: false }
   - { id: indicateur-suite, libelle: Lots non affichés faute de hauteur, type: texte, source: "tour → lots (reste)", obligatoire: false }
   - { id: message-vide, libelle: Message d'état vide, type: texte, source: statique, obligatoire: false }
-  - { id: message-terminal-etroit, libelle: Réponse de la commande dans un terminal trop étroit, type: texte, source: statique, obligatoire: false }
+  - { id: message-non-place, libelle: Réponse de la commande quand Claude ne place pas le panneau, type: texte, source: statique, obligatoire: false }
   - { id: message-erreur, libelle: Message d'erreur de lecture, type: texte, source: statique, obligatoire: false }
   - { id: liste-projets, libelle: Liste des projets, type: liste, source: "commande cadence lead tour → lignes", obligatoire: false }
   - { id: projet-nom, libelle: Nom du projet, type: texte, source: "tour → project", obligatoire: false }
@@ -187,11 +187,11 @@ regles:
     tests: ["R15 — corps sous 60 colonnes : after: sur une ligne à part, titre tronqué, id et état conservés", "R15 — corps de 70 colonnes : une seule ligne par lot"]
   - id: R16
     etat: charge
-    enonce: "« /hud lots » ouvre le panneau, la même commande le ferme ; le panneau n'est jamais ouvert de lui-même (un Pane que le mod ouvre seul reste non dessiné sous 144 colonnes, 110 une fois demandé). La réponse aux arguments inconnus de /hud devient « argument inconnu : <arg> (attendu : cmd, projets, lots) ». Le pied du panneau rappelle « /hud lots pour fermer » dans tous les états (vide, chargement, erreur, chargé) et dans leurs variantes, pas seulement quand l'arbre est affiché."
+    enonce: "« /hud lots » ouvre le panneau, la même commande le ferme ; le panneau n'est jamais ouvert de lui-même (un Pane que le mod ouvre seul reste non dessiné sous 144 colonnes ; demandé par la commande, il est placé à toute largeur). La réponse aux arguments inconnus de /hud devient « argument inconnu : <arg> (attendu : cmd, projets, lots) ». Le pied du panneau rappelle « /hud lots pour fermer » dans tous les états (vide, chargement, erreur, chargé) et dans leurs variantes, pas seulement quand l'arbre est affiché."
     message: "/hud lots pour fermer"
     champs: [aide-fermeture]
     statut: hypothese
-    si_faux: Si la commande devait s'appeler autrement ou le panneau s'ouvrir seul, seuls le nom et le déclencheur changent (le seuil de 110 colonnes vient de l'API Pane, à confirmer avec la skill plugin-authoring).
+    si_faux: Si la commande devait s'appeler autrement ou le panneau s'ouvrir seul, seuls le nom et le déclencheur changent (le placement à toute largeur d'un panneau demandé vient de l'API Pane).
     tests: ["R16 — /hud lots ouvre puis ferme le panneau", "R16 — argument inconnu : la réponse cite lots (test existant hud.test.tsx:988-993 et README.md:99 mis à jour)", "R16 — le pied rappelle la commande dans les états vide, chargement, erreur et chargé"]
   - id: R17
     etat: charge
@@ -209,12 +209,12 @@ regles:
     tests: ["R18 — durée de lead tour --json avec lots : mesurée avant/après, sous le délai de 20 s de la bande", "R18 — after: vers un lot clos : id conservé tel quel dans lots[].after"]
   - id: R19
     etat: erreur
-    enonce: "Si le terminal est trop étroit (sous 110 colonnes), la commande /hud lots répond par ce texte et n'ouvre aucun panneau ; il n'y a donc aucun rendu du panneau dans un terminal de 46 colonnes (la maquette à 390 px montre un terminal de 110 colonnes réduit)."
-    message: "terminal trop étroit pour le panneau (110 colonnes au moins)"
-    champs: [message-terminal-etroit]
+    enonce: "La commande /hud lots ouvre le panneau quelle que soit la largeur de la fenêtre : c'est Claude qui le place. Quand il ne le place pas (isPlaced faux), la commande répond par ce texte, avec la raison donnée par Claude, et n'ouvre aucun panneau."
+    message: "panneau des lots non placé : <raison>"
+    champs: [message-non-place]
     statut: hypothese
-    si_faux: Si le seuil est autre (144 colonnes sans demande explicite, à confirmer avec la skill plugin-authoring), seule la valeur change ; le texte aussi (aucune donnée en jeu).
-    tests: ["R19 — terminal trop étroit : message, rien ne s'ouvre"]
+    si_faux: Si le texte devait être autre, seul le texte change (aucune donnée en jeu).
+    tests: ["R19 — à 60 colonnes la commande ouvre quand même le panneau : le moteur le place", "R19 — le moteur ne place pas le panneau : la commande donne sa raison, rien n'est ouvert"]
   - id: R20
     etat: charge
     enonce: "Une sous-tâche native n'a que l'état de son statut dans le plan, jamais d'état de vague ni de after: : doing → « ▶ en cours » (claude) ; todo → « ○ à faire » (texte normal) ; elle n'est jamais « bloqué » ni « libre » (ces mots sont ceux des lots). Son id est affiché en entier (« L401/2 »)."
@@ -257,7 +257,7 @@ contrats:
     entree: "lots (ouvre ou ferme le panneau) ; autre argument : cmd, projets"
     sortie: "panneau ouvert ou fermé ; texte de confirmation"
     erreurs:
-      - { code: log warn, message: "terminal trop étroit pour le panneau (110 colonnes au moins)" }
+      - { code: log warn, message: "panneau des lots non placé : <raison>" }
       - { code: log warn, message: "argument inconnu : <arg> (attendu : cmd, projets, lots)" }
     regles: [R16, R19]
 donnees:

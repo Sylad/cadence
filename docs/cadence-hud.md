@@ -59,7 +59,7 @@ answers `argument inconnu : … (attendu : cmd, projets, lots)` and leaves the b
 
 ### The lots panel (`/hud lots`, L401)
 
-`/hud lots` opens a read-only **panel** beside the conversation (inline above the prompt on the main screen); the same command closes it. It is never opened on its own, and a terminal under 110 columns answers `terminal trop étroit pour le panneau (110 colonnes au moins)` and opens nothing. For each project of the folder (the order of `priority:`) it draws the open lots as a tree, with their state and their `after:` links:
+`/hud lots` opens a read-only **panel** beside the conversation (inline above the prompt on the main screen); the same command closes it. It is never opened on its own, and the command opens it whatever the width of the window, Claude placing it; when Claude cannot place it, the command answers `panneau des lots non placé : <reason>` and nothing opens. For each project of the folder (the order of `priority:`) it draws the open lots as a tree, with their state and their `after:` links:
 
 ```
 Lots  lecture seule  lu à 15:52

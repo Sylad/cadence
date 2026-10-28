@@ -13,11 +13,12 @@ cas:
   - id: C1
     titre: Le lead ouvre le panneau et lit les lots non clos de ses projets
     acteur: le lead, dans une session Claude Code
-    declencheur: ouverture du panneau Pane de cadence-hud
+    declencheur: commande /hud lots (ouvre le panneau ; la même commande le ferme)
     preconditions:
       - la session a un dossier de projets (celui de la vague, sinon celui de la session)
       - cadence est sur le PATH
     nominal:
+      - Le lead tape /hud lots ; le mod ouvre le Pane (ancré à côté de la conversation, ou au-dessus du prompt).
       - Le mod lance cadence lead tour <dossier> --json.
       - Chaque ligne de projet porte la liste de ses lots non clos.
       - Le panneau dessine, par projet, les lots parents puis leurs sous-lots, l'état de chacun et ses liens after:.
@@ -26,6 +27,9 @@ cas:
       - { si: la première lecture n'est pas revenue, alors: le panneau affiche « Lecture des plans… », regles: [R2] }
       - { si: cadence est absent ou ne répond pas et aucun tableau n'a été lu, alors: le panneau affiche l'erreur, regles: [R3] }
       - { si: un projet est illisible, alors: sa ligne dit l'erreur, les autres projets restent, regles: [R7] }
+      - { si: les lignes du tour n'ont pas de champ lots (cadence plus ancien que le mod), alors: le panneau affiche l'erreur « cadence trop ancien », pas l'état vide, regles: [R14] }
+      - { si: l'argument de /hud n'est pas connu ou le terminal est trop étroit, alors: la commande répond par un texte et ne bascule rien, regles: [R16] }
+      - { si: l'arbre dépasse la hauteur du panneau, alors: il est tronqué avec le nombre de lots masqués, regles: [R17] }
     resultat: Un arbre de lots par projet, sans aucune action d'écriture.
   - id: C2
     titre: Le plan ou une vague change pendant que le panneau est ouvert
@@ -43,7 +47,7 @@ cas:
 ecran:
   id: panneau-lots
   titre: Panneau des lots
-  route: /lots
+  route: /hud lots
   lot: L401
   largeurs: [1440, 390]
   maquette: docs/specs/panneau-lots/maquette.html
@@ -53,6 +57,9 @@ champs:
   - { id: indicateur-lecture-seule, libelle: Mention « lecture seule », type: texte, source: statique, obligatoire: true }
   - { id: indicateur-rafraichi, libelle: Heure de la dernière lecture, type: texte, source: "heure de la dernière lecture réussie de A1", obligatoire: false }
   - { id: message-chargement, libelle: Message de première lecture, type: texte, source: statique, obligatoire: false }
+  - { id: aide-fermeture, libelle: Rappel de la commande de fermeture, type: texte, source: statique, obligatoire: true }
+  - { id: message-cadence-ancien, libelle: Erreur cadence trop ancien, type: texte, source: statique, obligatoire: false }
+  - { id: indicateur-suite, libelle: Lots non affichés faute de hauteur, type: texte, source: "tour → lots (reste)", obligatoire: false }
   - { id: message-vide, libelle: Message d'état vide, type: texte, source: statique, obligatoire: false }
   - { id: message-erreur, libelle: Message d'erreur de lecture, type: texte, source: statique, obligatoire: false }
   - { id: liste-projets, libelle: Liste des projets, type: liste, source: "commande cadence lead tour → lignes", obligatoire: false }
@@ -100,28 +107,28 @@ regles:
     tests: ["R4 — deux projets : un bloc par projet, dans l'ordre de priority:", "R4 — un sous-lot est rendu sous son parent avec ├/└"]
   - id: R5
     etat: charge
-    enonce: Chaque lot porte son état en mots et en glyphe (le mot suffit sans couleur) parmi « ▶ en cours », « ● prêt », « ⏸ bloqué », « ⟳ en vague », « ✔ rendu », « ? en question » ; en vague, l'état de la vague (ready, question…) l'emporte sur l'état du plan.
+    enonce: "Chaque lot porte son état en mots, glyphe et couleur (le mot suffit sans couleur), selon la table suivante ; en vague, l'état de la vague l'emporte sur celui du plan, et les mots de la vague sont ceux de la bande (STATUS_FR). Plan : doing → « ▶ en cours » (claude) ; todo sans after: ouvert → « ○ libre » (texte normal) ; todo dont un after: est ouvert → « ⊘ bloqué » (subtle). Vague : queued → « … en attente » (subtle) ; implementing → « ⟳ implémente » (claude) ; reviewing → « ⟳ relit » (claude) ; fixing → « ⟳ corrige » (claude) ; question → « ? QUESTION » (warning) ; ready → « ✔ prêt » (success) ; handed-back → « ↩ rendu » (error) ; failed → « ✖ échec » (error) ; suspended → « ⏸ suspendu » (warning) ; statut inconnu → « ⟳ <statut tel quel> » (claude), comme colorOfLot et lotStatusFr."
     message: ~
     champs: [lot-etat]
     statut: sourcee
-    source: "demande du lot (états : en cours, prêt, en vague, rendu, en question) ; statuts de vague et couleurs : plugins/cadence-hud/hooks/format.ts:48 (colorOfLot) ; en cours / prêt / bloqué : src/audit.ts:392 (nextUp)"
-    tests: ["R5 — un lot de chaque état : mot et glyphe", "R5 — lot dans une vague au statut ready : « rendu »", "R5 — lot todo dont un after: est ouvert : « bloqué »"]
+    source: "mots et couleurs de la vague : plugins/cadence-hud/hooks/format.ts:48 (colorOfLot) et :65 (STATUS_FR), pour rester cohérent avec la bande ; en cours / bloqué : src/audit.ts:392 (nextUp) ; « libre » remplace « prêt » du plan pour ne pas porter, à côté de la bande, le même mot que ready (choix de la fiche)"
+    tests: ["R5 — un lot de chaque statut de vague : mot, glyphe et couleur de la table", "R5 — lot doing : « ▶ en cours »", "R5 — lot todo sans after: ouvert : « ○ libre »", "R5 — lot todo dont un after: est ouvert : « ⊘ bloqué »", "R5 — statut de vague inconnu : affiché tel quel"]
   - id: R6
     etat: charge
-    enonce: "Un lot ayant des liens after: les liste après son titre (« after: L400 L401 ») ; un lot sans lien n'a rien. Aux 390 px, la liste passe sur une ligne à part et le titre est tronqué par « … », jamais l'id ni l'état."
+    enonce: "Un lot ayant des liens after: les liste après son titre (« after: L400 L401 ») ; un lot sans lien n'a rien. Un id d'after: qui n'est plus un lot non clos du projet (clos ou inconnu) est affiché tel quel mais barré, et ne bloque pas le lot."
     message: ~
     champs: [lot-after]
     statut: sourcee
-    source: "demande du lot : « les liens after: » ; src/plan.ts:74 (Lot.after) ; repli étroit : hypothèse de mise en page, seul le CSS change si faux"
-    tests: ["R6 — lot avec after: les ids sont listés", "R6 — lot sans after: aucune mention", "R6 — largeur étroite : titre tronqué, id et état conservés"]
+    source: "demande du lot : « les liens after: » ; src/plan.ts:74 (Lot.after) ; le barré des ids clos ou inconnus : choix d'affichage (CSS seul si faux)"
+    tests: ["R6 — lot avec after: les ids sont listés", "R6 — lot sans after: aucune mention", "R6 — after: vers un lot clos ou inconnu : id barré, lot non bloqué"]
   - id: R7
     etat: charge
-    enonce: Un projet que le tour n'a pas pu lire affiche son nom et l'erreur du tour ; les autres projets restent affichés.
+    enonce: "Un projet que le tour n'a pas pu lire affiche son nom et l'erreur du tour, préfixée par « illisible : » ; les autres projets restent affichés. La ligne synthétique « cadence.yaml » du tour (src/lead.ts, problems) est affichée de la même façon, sous le nom « cadence.yaml »."
     message: "illisible : raf.yaml ligne 12 : YAML invalide"
     champs: [message-projet-erreur]
-    statut: sourcee
-    source: "src/lead.ts:131-190 (tourRow : error par projet, les autres lignes sont lues) ; préfixe « illisible : » : hypothèse de libellé"
-    tests: ["R7 — un projet en erreur : son message, les autres projets présents"]
+    statut: hypothese
+    si_faux: "Le fond (une ligne d'erreur par projet illisible, lue dans le champ error du tour : src/lead.ts:131-190) est sourcé ; seul le préfixe « illisible : » et l'affichage de la ligne cadence.yaml sont de libellé, le texte change seul. Le lecteur du panneau est distinct de parseTour (format.ts:393 écarte les lignes en erreur) pour les conserver."
+    tests: ["R7 — un projet en erreur : son message, les autres projets présents", "R7 — la ligne cadence.yaml en erreur est affichée comme un projet illisible"]
   - id: R8
     etat: charge
     enonce: "Le panneau est en lecture seule : il porte la mention « lecture seule » et aucun bouton ni commande qui écrive sur un plan."
@@ -138,21 +145,21 @@ regles:
     tests: ["R9 — relecture en échec : le dernier tableau reste affiché"]
   - id: R10
     cas: [C1]
-    enonce: "cadence lead tour --json ajoute à chaque ligne un champ optionnel lots : les lots non clos (todo, doing) hors récurrents, avec id, title, status, after et parent ; les lots done, dropped et récurrents n'y figurent pas ; les champs existants de la ligne ne changent pas."
+    enonce: "cadence lead tour --json ajoute à chaque ligne un champ optionnel lots : les lots non clos (todo, doing) hors récurrents, avec id, title, status, after et parent ; les lots done, dropped et récurrents n'y figurent pas ; les champs existants de la ligne (TourRow, src/lead.ts:69) ne changent pas, et la bande (parseTour, format.ts:388) les lit comme avant."
     statut: hypothese
-    si_faux: Si le champ devait avoir un autre nom ou une autre forme, seuls le producteur (src/lead.ts) et le lecteur du mod changent ; les consommateurs actuels (la bande) ignorent le champ.
-    tests: ["R10 — lots : seuls les lots non clos non récurrents", "R10 — les champs existants de la ligne sont inchangés"]
+    si_faux: "Contrat partagé avec la bande : si le champ devait avoir un autre nom ou une autre forme (ou si le lecteur du panneau devait relire les plans lui-même), le producteur src/lead.ts, le test R10 et le lecteur du mod sont à refaire. Posé au lead dans les questions de la session ; la fiche reste valable tant que l'ajout est optionnel."
+    tests: ["R10 — lots : seuls les lots non clos non récurrents", "R10 — les champs existants de la ligne sont inchangés", "R10 — la bande lit une ligne portant lots comme avant"]
   - id: R11
     cas: [C1]
-    enonce: "Un lot dont parent: désigne un lot non clos du même projet est placé sous lui ; un parent clos ou inconnu laisse le lot au premier niveau ; la profondeur n'est pas limitée."
+    enonce: "Un lot dont parent: désigne un lot non clos du même projet est placé sous lui ; un parent clos ou inconnu laisse le lot au premier niveau ; la profondeur n'est pas limitée. Un lot dont la chaîne de parents revient à lui-même (parent: de lui-même, ou cycle A→B→A) est placé au premier niveau, son parent ignoré, et la construction se termine toujours ; pour un id présent deux fois, la première occurrence reçoit les sous-lots, les autres restent au premier niveau."
     statut: hypothese
-    si_faux: Si un sous-lot dont le parent est clos devait disparaître ou se rattacher autrement, seule la construction de l'arbre change.
-    tests: ["R11 — parent ouvert : le sous-lot est rattaché", "R11 — parent clos ou inconnu : premier niveau"]
+    si_faux: Si un sous-lot dont le parent est clos, un cycle ou un doublon devait disparaître, être signalé ou se rattacher autrement, seule la construction de l'arbre change (aucune donnée en jeu).
+    tests: ["R11 — parent ouvert : le sous-lot est rattaché", "R11 — parent clos ou inconnu : premier niveau", "R11 — parent de lui-même : premier niveau, pas de boucle", "R11 — cycle A→B→A : tous au premier niveau, pas de boucle", "R11 — id dupliqué : la première occurrence porte les sous-lots"]
   - id: R12
     cas: [C2]
-    enonce: Le tableau est relu à chaque transition de vague et au plus toutes les minutes ; il l'est aussi dès qu'un fichier de plan d'un projet a changé de date de modification depuis la dernière lecture.
+    enonce: Le tableau est relu à chaque transition de vague et au plus toutes les minutes ; il l'est aussi dès qu'un fichier de plan d'un projet a changé de date de modification depuis la dernière lecture. Les dates sont lues par le script collect du mod (os.stat, un stat par plan à chaque minuteur de 5 s), pas par le panneau.
     statut: hypothese
-    si_faux: Sans surveillance des plans, un changement de plan n'apparaît qu'à la relecture suivante (au plus une minute) ; seul le calcul de la signature change.
+    si_faux: "Si le coût d'un stat toutes les 5 s ou l'accès fichier du mod n'est pas acceptable, il n'y a pas de surveillance des plans : un changement de plan n'apparaît qu'à la relecture suivante (au plus une minute) ; seul le calcul de la signature change."
     tests: ["R12 — transition de vague : relecture", "R12 — plan modifié : relecture avant la minute", "R12 — rien de changé : pas de relecture"]
   - id: R13
     cas: [C1]
@@ -160,9 +167,42 @@ regles:
     statut: sourcee
     source: "plugins/cadence-hud/hooks/register.tsx:151-157 (tourFolder) et docs/cadence-hud.md (« sans cadence sur le PATH, les lignes ne sont pas dessinées »)"
     tests: ["R13 — dossier de la vague retenu avant celui de la session"]
+  - id: R14
+    etat: erreur
+    enonce: "Si les lignes du tour n'ont pas de champ lots (cadence plus ancien que le mod, comme parseTour traite « cadence trop ancien », format.ts:387), le panneau affiche cette erreur et non l'état vide ; le message est affiché même si un tableau plus ancien a été lu."
+    message: "Lots indisponibles : cadence est trop ancien, mettez-le à jour."
+    champs: [message-cadence-ancien]
+    statut: hypothese
+    si_faux: Seul le texte change ; si le panneau devait plutôt afficher l'état vide, le test R14 s'inverse (aucune donnée en jeu).
+    tests: ["R14 — lignes sans champ lots : message « cadence trop ancien », pas l'état vide"]
+  - id: R15
+    etat: charge
+    enonce: "Sous 60 colonnes de corps du panneau (bodyColumns), la liste after: passe sur une ligne à part et le titre est tronqué par « … », jamais l'id ni l'état ; le panneau ancré à côté de la conversation compte au plus 45 % des colonnes du terminal, 24 au moins (environ 70 colonnes dans un terminal de 1440 px, que la maquette dessine)."
+    message: ~
+    champs: [lot-titre]
+    statut: hypothese
+    si_faux: Si le seuil devait être autre, seule la valeur 60 change (mise en page) ; les bornes 45 % / 24 colonnes viennent des types du Pane (skill plugin-authoring, PaneOpenArgs.columns).
+    tests: ["R15 — corps sous 60 colonnes : after: sur une ligne à part, titre tronqué, id et état conservés", "R15 — corps de 70 colonnes : une seule ligne par lot"]
+  - id: R16
+    etat: charge
+    enonce: "« /hud lots » ouvre le panneau, la même commande le ferme ; le panneau n'est jamais ouvert de lui-même (un Pane que le mod ouvre seul reste non dessiné sous 144 colonnes, 110 une fois demandé). Si le terminal est trop étroit, la commande répond « terminal trop étroit pour le panneau (110 colonnes au moins) ». La réponse aux arguments inconnus de /hud devient « argument inconnu : <arg> (attendu : cmd, projets, lots) ». Le pied du panneau rappelle « /hud lots pour fermer »."
+    message: "/hud lots pour fermer"
+    champs: [aide-fermeture]
+    statut: hypothese
+    si_faux: Si la commande devait s'appeler autrement ou le panneau s'ouvrir seul, seuls le nom et le déclencheur changent (le seuil de 110 colonnes vient de l'API Pane, à confirmer avec la skill plugin-authoring).
+    tests: ["R16 — /hud lots ouvre puis ferme le panneau", "R16 — terminal trop étroit : message, rien ne s'ouvre", "R16 — argument inconnu : la réponse cite lots"]
+  - id: R17
+    etat: charge
+    enonce: "Au-dessus du prompt, le panneau occupe au plus un tiers de la hauteur du terminal ; si l'arbre est plus long, les premières lignes restent et la dernière dit « … +N lots de plus » (N = lots non affichés) ; les titres trop longs sont tronqués par « … » sans passer à la ligne."
+    message: "… +5 lots de plus"
+    champs: [indicateur-suite]
+    statut: hypothese
+    si_faux: Si le panneau devait défiler ou plier des projets, seule la présentation change (aucune donnée en jeu).
+    tests: ["R17 — arbre plus haut que le panneau : « … +N lots de plus »", "R17 — titre long : tronqué sur une ligne"]
 actions:
-  - { id: A3, declencheur: ~, contrat: A1, regles: [R1, R2, R3, R4, R5, R6, R7, R8, R10, R11, R13] }
-  - { id: A4, declencheur: ~, contrat: A2, regles: [R9, R12] }
+  - { id: A4, declencheur: ~, contrat: A3, regles: [R16] }
+  - { id: A5, declencheur: ~, contrat: A1, regles: [R1, R2, R3, R4, R5, R6, R7, R8, R10, R11, R13, R14, R15, R17] }
+  - { id: A6, declencheur: ~, contrat: A2, regles: [R9, R12] }
 contrats:
   - id: A1
     appel: commande lead-tour
@@ -170,7 +210,9 @@ contrats:
     sortie: "tableau de lignes de projet ; chaque ligne garde ses champs actuels et gagne lots?: { id, title, status, after, parent? }[]"
     erreurs:
       - { code: log warn, message: "cadence lead tour : sortie illisible" }
-    regles: [R3, R7, R10, R11, R13]
+      - { code: log warn, message: "Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute." }
+      - { code: log warn, message: "Lots indisponibles : cadence est trop ancien, mettez-le à jour." }
+    regles: [R3, R7, R10, R11, R13, R14]
   - id: A2
     appel: job rafraichissement-lots-hud
     entree: "minuteur de 5 s du mod ; relit A1 sur changement de signature ou après une minute"
@@ -178,10 +220,18 @@ contrats:
     erreurs: []
     sans_erreur: le job ne répond à aucun appelant ; l'échec de A1 est déjà couvert par R3 et R9
     regles: [R9, R12]
+  - id: A3
+    appel: commande hud
+    entree: "lots (ouvre ou ferme le panneau) ; autre argument : cmd, projets"
+    sortie: "panneau ouvert ou fermé ; texte de confirmation"
+    erreurs:
+      - { code: log warn, message: "terminal trop étroit pour le panneau (110 colonnes au moins)" }
+      - { code: log warn, message: "argument inconnu : <arg> (attendu : cmd, projets, lots)" }
+    regles: [R16]
 donnees:
   - id: D1
     objet: "sortie de cadence lead tour --json (ligne de projet)"
     existant: true
     modification: ajout
     note: "champ optionnel lots ajouté, aucun champ existant modifié (R10) ; rien n'est stocké"
-    decision: "hypothèse R10 : ajout optionnel, ancien consommateur inchangé (règle d'un lot sans écran du brief) ; à confirmer par le lead"
+    decision: "ajout optionnel prouvé sans effet sur l'ancienne ligne (R10) ; question posée au lead sur le nom et la forme du champ lots avant l'implémentation"

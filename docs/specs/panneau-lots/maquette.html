@@ -14,7 +14,13 @@
   * { box-sizing: border-box; }
   body { margin: 0; padding: 16px; background: #101013; color: var(--texte); font: 14px/1.5 var(--mono); }
   h2.etat-nom { font-size: 12px; color: var(--subtle); font-weight: normal; margin: 0 0 6px; }
-  section.etat { display: none; max-width: 112ch; margin: 0 auto 24px; }
+  section.etat { display: none; margin: 0 0 24px; }
+  /* Pane ancré à côté de la conversation : environ 70 colonnes (au plus 45 % d'un terminal de 1440 px) ; les largeurs se comptent en colonnes (ch). */
+  .terminal { display: flex; gap: 12px; align-items: flex-start; }
+  .conversation { flex: 1 1 0; color: var(--subtle); border: 1px dashed var(--bord); border-radius: 6px; padding: 10px 14px; min-height: 120px; }
+  .cadre { flex: 0 0 70ch; max-width: 100%; container-type: inline-size; }
+  .cadre.haut { max-height: 14.5em; overflow: hidden; }
+  .var { margin: 6px 0 4px; color: var(--subtle); font-size: 12px; }
   section.etat:target { display: block; }
   body:not(:has(:target)) section.etat { display: block; }
   .pane { background: var(--fond); border: 1px solid var(--bord); border-radius: 6px; padding: 10px 14px 12px; }
@@ -32,57 +38,76 @@
   .lot .titre { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lot .etat-lot { flex: 0 0 auto; min-width: 13ch; font-weight: bold; }
   .lot .after { flex: 0 0 auto; color: var(--subtle); margin-right: 1ch; }
-  .e-encours { color: var(--claude); } .e-pret { color: var(--success); } .e-vague { color: var(--claude); }
-  .e-rendu { color: var(--success); } .e-question { color: var(--warning); } .e-bloque { color: var(--subtle); }
+  .e-encours { color: var(--claude); } .e-libre { color: var(--texte); } .e-vague { color: var(--claude); }
+  .e-pret2 { color: var(--success); } .e-rendu { color: var(--error); } .e-susp { color: var(--warning); } .e-attente { color: var(--subtle); } .e-question { color: var(--warning); } .e-bloque { color: var(--subtle); }
   .erreur-projet { color: var(--error); }
   .msg { padding: 14px 0 6px; }
   .msg.err { color: var(--error); }
   .pied { margin-top: 6px; border-top: 1px solid var(--bord); padding-top: 6px; color: var(--subtle); font-size: 12px; }
-  @media (max-width: 600px) {
-    body { padding: 8px; font-size: 13px; }
+  .after s, .after .clos { text-decoration: line-through; }
+  .lot .etat-lot { min-width: 15ch; }
+  /* Repli sous 60 colonnes de corps (R15) */
+  @container (max-width: 60ch) {
     .lot .after { order: 5; flex-basis: 100%; padding-left: 5ch; }
     .lot .etat-lot { min-width: 0; }
   }
+  @media (max-width: 800px) { .conversation { display: none; } body { padding: 8px; font-size: 13px; } }
 </style>
 </head>
 <body>
 
 <section class="etat" id="etat-chargement">
   <h2 class="etat-nom">État : chargement</h2>
+  <div class="terminal"><div class="conversation">conversation</div><div class="cadre">
   <div class="pane" role="region" aria-label="Lots">
     <div class="entete"><h1 data-testid="titre-panneau">Lots</h1><span class="dim" data-testid="indicateur-lecture-seule">lecture seule</span></div>
     <p class="msg dim" data-testid="message-chargement">Lecture des plans…</p>
-  </div>
+  </div></div></div>
 </section>
 
 <section class="etat" id="etat-vide">
   <h2 class="etat-nom">État : vide</h2>
+  <div class="terminal"><div class="conversation">conversation</div><div class="cadre">
   <div class="pane" role="region" aria-label="Lots">
     <div class="entete"><h1 data-testid="titre-panneau">Lots</h1><span class="dim" data-testid="indicateur-lecture-seule">lecture seule</span><span class="dim" data-testid="indicateur-rafraichi">lu à 15:52</span></div>
     <p class="msg dim" data-testid="message-vide">Aucun lot non clos dans les projets de ce dossier.</p>
-  </div>
+  </div></div></div>
 </section>
 
 <section class="etat" id="etat-erreur">
   <h2 class="etat-nom">État : erreur</h2>
+  <div class="terminal"><div class="conversation">conversation</div><div class="cadre">
   <div class="pane" role="region" aria-label="Lots">
     <div class="entete"><h1 data-testid="titre-panneau">Lots</h1><span class="dim" data-testid="indicateur-lecture-seule">lecture seule</span></div>
     <p class="msg err" role="alert" data-testid="message-erreur">Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute.</p>
-  </div>
+  </div></div></div>
+
+  <p class="var">Variante : cadence plus ancien que le mod (R14).</p>
+  <div class="terminal"><div class="conversation">conversation</div><div class="cadre">
+    <div class="pane" role="region" aria-label="Lots">
+      <div class="entete"><h1>Lots</h1><span class="dim">lecture seule</span></div>
+      <p class="msg err" role="alert" data-testid="message-cadence-ancien">Lots indisponibles : cadence est trop ancien, mettez-le à jour.</p>
+    </div>
+  </div></div>
 </section>
 
 <section class="etat" id="etat-charge">
   <h2 class="etat-nom">État : chargé</h2>
+  <div class="terminal"><div class="conversation">conversation</div><div class="cadre">
   <div class="pane" role="region" aria-label="Lots">
     <div class="entete"><h1 data-testid="titre-panneau">Lots</h1><span class="dim" data-testid="indicateur-lecture-seule">lecture seule</span><span class="dim" data-testid="indicateur-rafraichi">lu à 15:52</span></div>
     <div data-testid="liste-projets">
 
       <div class="projet">
-        <div class="projet-tete"><span data-testid="projet-nom">cadence</span><span class="dim" data-testid="projet-compte">3 lots non clos</span></div>
+        <div class="projet-tete"><span data-testid="projet-nom">cadence</span><span class="dim" data-testid="projet-compte">7 lots non clos</span></div>
         <ul data-testid="arbre-lots">
           <li class="lot"><span class="id" data-testid="lot-id">L401</span><span class="titre" data-testid="lot-titre">Panneau des lots (mod cadence-hud, Pane)</span><span class="etat-lot e-encours" data-testid="lot-etat">▶ en cours</span></li>
-          <li class="lot"><span class="id" data-testid="lot-id">L402</span><span class="titre" data-testid="lot-titre">Panneau des lots : réordonner par glisser-déposer</span><span class="after" data-testid="lot-after">after: L400 L401</span><span class="etat-lot e-bloque" data-testid="lot-etat">⏸ bloqué</span></li>
-          <li class="lot"><span class="id" data-testid="lot-id">L403</span><span class="titre" data-testid="lot-titre">Porte de tests déportée (orchestrate.gate.host)</span><span class="etat-lot e-pret" data-testid="lot-etat">● prêt</span></li>
+          <li class="lot"><span class="id" data-testid="lot-id">L402</span><span class="titre" data-testid="lot-titre">Panneau des lots : réordonner par glisser-déposer</span><span class="after" data-testid="lot-after">after: <s>L400</s> L401</span><span class="etat-lot e-bloque" data-testid="lot-etat">⊘ bloqué</span></li>
+          <li class="lot"><span class="id" data-testid="lot-id">L403</span><span class="titre" data-testid="lot-titre">Porte de tests déportée (orchestrate.gate.host)</span><span class="etat-lot e-libre" data-testid="lot-etat">○ libre</span></li>
+          <li class="lot"><span class="id" data-testid="lot-id">L404</span><span class="titre" data-testid="lot-titre">Rétention des journaux de vague</span><span class="etat-lot e-rendu" data-testid="lot-etat">↩ rendu</span></li>
+          <li class="lot"><span class="id" data-testid="lot-id">L405</span><span class="titre" data-testid="lot-titre">Migration du format de run</span><span class="etat-lot e-rendu" data-testid="lot-etat">✖ échec</span></li>
+          <li class="lot"><span class="id" data-testid="lot-id">L406</span><span class="titre" data-testid="lot-titre">Journal des décisions du lead</span><span class="etat-lot e-susp" data-testid="lot-etat">⏸ suspendu</span></li>
+          <li class="lot"><span class="id" data-testid="lot-id">L407</span><span class="titre" data-testid="lot-titre">Export des rapports de vague</span><span class="etat-lot e-attente" data-testid="lot-etat">… en attente</span></li>
         </ul>
       </div>
 
@@ -90,13 +115,13 @@
         <div class="projet-tete"><span data-testid="projet-nom">ol</span><span class="dim" data-testid="projet-compte">4 lots non clos</span></div>
         <ul data-testid="arbre-lots">
           <li>
-            <div class="lot"><span class="id" data-testid="lot-id">L80</span><span class="titre" data-testid="lot-titre">Calendrier des matchs</span><span class="etat-lot e-vague" data-testid="lot-etat">⟳ en vague</span></div>
+            <div class="lot"><span class="id" data-testid="lot-id">L80</span><span class="titre" data-testid="lot-titre">Calendrier des matchs</span><span class="etat-lot e-vague" data-testid="lot-etat">⟳ relit</span></div>
             <ul>
-              <li class="lot"><span class="branche">├</span><span class="id" data-testid="lot-id">L81</span><span class="titre" data-testid="lot-titre">Filtre par compétition</span><span class="etat-lot e-rendu" data-testid="lot-etat">✔ rendu</span></li>
-              <li class="lot"><span class="branche">└</span><span class="id" data-testid="lot-id">L82</span><span class="titre" data-testid="lot-titre">Fuseau horaire des coups d'envoi</span><span class="after" data-testid="lot-after">after: L81</span><span class="etat-lot e-question" data-testid="lot-etat">? en question</span></li>
+              <li class="lot"><span class="branche">├</span><span class="id" data-testid="lot-id">L81</span><span class="titre" data-testid="lot-titre">Filtre par compétition</span><span class="etat-lot e-pret2" data-testid="lot-etat">✔ prêt</span></li>
+              <li class="lot"><span class="branche">└</span><span class="id" data-testid="lot-id">L82</span><span class="titre" data-testid="lot-titre">Fuseau horaire des coups d'envoi</span><span class="after" data-testid="lot-after">after: L81</span><span class="etat-lot e-question" data-testid="lot-etat">? QUESTION</span></li>
             </ul>
           </li>
-          <li class="lot"><span class="id" data-testid="lot-id">L90</span><span class="titre" data-testid="lot-titre">Mode sombre</span><span class="etat-lot e-pret" data-testid="lot-etat">● prêt</span></li>
+          <li class="lot"><span class="id" data-testid="lot-id">L90</span><span class="titre" data-testid="lot-titre">Mode sombre</span><span class="etat-lot e-libre" data-testid="lot-etat">○ libre</span></li>
         </ul>
       </div>
 
@@ -105,8 +130,18 @@
         <p class="erreur-projet" style="margin:0" data-testid="message-projet-erreur">illisible : raf.yaml ligne 12 : YAML invalide</p>
       </div>
     </div>
-    <div class="pied">▶ en cours · ● prêt · ⏸ bloqué · ⟳ en vague · ✔ rendu · ? en question</div>
-  </div>
+    <div class="pied"><span data-testid="aide-fermeture">/hud lots pour fermer</span> · ▶ en cours · ○ libre · ⊘ bloqué · ⟳ vague · ✔ prêt · ↩ rendu · ✖ échec</div>
+  </div></div></div>
+
+  <p class="var">Variante au-dessus du prompt : un tiers de la hauteur, arbre tronqué (R17).</p>
+  <div class="terminal"><div class="cadre haut" style="flex-basis:100ch">
+    <div class="pane" role="region" aria-label="Lots (hauteur contrainte)">
+      <div class="entete"><h1>Lots</h1><span class="dim">lecture seule</span></div>
+      <div class="projet"><div class="projet-tete"><span>cadence</span><span class="dim">7 lots non clos</span></div>
+        <ul><li class="lot"><span class="id">L401</span><span class="titre">Panneau des lots (mod cadence-hud, Pane) avec un titre vraiment très long qui dépasse la largeur du panneau</span><span class="etat-lot e-encours">▶ en cours</span></li></ul></div>
+      <div class="dim" data-testid="indicateur-suite">… +5 lots de plus</div>
+    </div>
+  </div></div>
 </section>
 
 </body>

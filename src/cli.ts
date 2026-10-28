@@ -887,15 +887,19 @@ function postCommit(load: (() => Plan) | null, newsDir: string, root: string, to
       }
       return 0;
     }
+    // Un lot archivé (L396) est connu : le commit du plan que propose `raf archive`, ou un fix qui le cite, n'est pas « n'existe pas dans le plan ».
     const lots = new Map(plan.lots().map((l) => [l.id, l]));
+    const archived = new Map(plan.archived().map((l) => [l.id, l]));
     const planning = isPlanOnly(head.sha, plan, root);
     for (const r of refs) {
-      const lot = lots.get(r.lot);
+      const lot = lots.get(r.lot) ?? archived.get(r.lot);
       if (!lot) io.err(`raf: ${r.lot} n'existe pas dans le plan`);
+      else if (archived.has(r.lot)) io.err(`raf: ${r.lot} (${lot.status}, archivé) ${lot.title}`);
       else if (isRecurring(lot)) io.err(`raf: ${r.lot} est récurrent (${dueLine(lot, today)})${plan.readonly ? '' : ` — raf did ${r.lot}`}`);
       else if (lot.status === 'todo' && !planning) io.err(`raf: ${r.lot} est encore todo${plan.readonly ? '' : ` — raf start ${r.lot}`}`);
       else io.err(`raf: ${r.lot} (${lot.status}) ${lot.title}`);
     }
+    // Seul un lot du plan actif réclame sa Nouveauté : un lot archivé a été clos, et audité, avant d'être déplacé (comme cadence news check).
     const entries = loadEntries(newsDir);
     for (const id of new Set(refs.map((r) => r.lot))) {
       if (lots.get(id)?.visible && !entries.some((e) => e.lots.includes(id))) io.err(`raf: ${id} est visible : cadence news new ${id}`);

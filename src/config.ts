@@ -309,7 +309,7 @@ export interface OrchestrateConfig {
   build?: string;
   /**
    * Dépendances non suivies à copier dans le worktree jetable de `cadence verify --gate` (L348, L389), chemins relatifs au dépôt (`node_modules`, `.venv`, `front/node_modules`…).
-   * Absente : les dossiers ignorés de tout niveau, comme pour les worktrees de vague.
+   * Absente : les `node_modules` de tout niveau et le `.venv` sont copiés ; les autres dossiers ignorés sont reliés, comme pour les worktrees de vague.
    */
   worktreeDeps?: string[];
   /**

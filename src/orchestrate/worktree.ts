@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, realpathSync } from 'node:fs';
+import { cp, readdir, realpath, rm, symlink } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import type { Plan } from '../plan.js';
 import { lotSlug } from './state.js';
@@ -149,42 +150,56 @@ export function ignoredDeps(repo: string): string[] {
   return git(repo, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory').split('\n').map((f) => f.replace(/\/$/, '')).filter((f) => f && !f.startsWith('.cadence') && !f.split('/').some((p) => OUTPUT_DIRS.has(p)));
 }
 
+/** Les dépendances que `verify --gate` copie quand `orchestrate.worktreeDeps` est absente (L392) : les `node_modules` de tout niveau et le `.venv`. Rien d'autre (données, `.env`) : trop gros, ou secret. */
+export const isCopiedDep = (name: string): boolean => ['node_modules', '.venv'].includes(basename(name));
+
 /**
  * Copie dans le worktree `dir` ces dépendances du dépôt vivant (L389), au lieu de les y relier : un outil qui refuse de charger un `node_modules` lié depuis
- * un autre arbre (Astro : « Could not load … ») les trouve chez lui. Les liens relatifs du dossier qui restent dans le dépôt (espaces de travail) sont
- * copiés tels quels : ils pointent dans la copie. Ceux qui en sortent (`file:../voisin`, `link:`) pointeraient dans le vide depuis `dir` : ils sont refaits
- * vers leur cible vivante. Rend les chemins copiés ; un chemin dont le parent n'existe pas dans le worktree est passé.
+ * un autre arbre (Astro : « Could not load … ») les trouve chez lui. Asynchrone (L392) : une copie synchrone de plusieurs centaines de Mo figerait la boucle
+ * d'événements, et le Ctrl-C reçu pendant ce temps n'aurait aucun effet. Un dossier qui est lui-même un lien est copié par son contenu (copier le lien ne
+ * copierait rien). Les liens relatifs du dossier qui restent dans le dépôt (espaces de travail) sont copiés tels quels : ils pointent dans la copie. Ceux qui en
+ * sortent (`file:../voisin`, `link:`) pointeraient dans le vide depuis `dir` : ils sont refaits vers leur cible vivante. Rend les chemins copiés ;
+ * un chemin dont le parent n'existe pas dans le worktree est passé.
  */
-export function copyDeps(repo: string, dir: string, names: readonly string[]): string[] {
+export async function copyDeps(repo: string, dir: string, names: readonly string[]): Promise<string[]> {
   const copied: string[] = [];
+  const repoReal = realpathSync(repo);
   for (const name of names) {
     const to = join(dir, name);
     if (existsSync(to) || !existsSync(dirname(to))) continue;
-    cpSync(join(repo, name), to, { recursive: true, verbatimSymlinks: true });
-    relinkOutside(realpathSync(repo), join(repo, name), to);
+    let from = join(repo, name);
+    try {
+      from = realpathSync(from);
+    } catch {
+      continue; // lien mort : rien à copier
+    }
+    await cp(from, to, { recursive: true, verbatimSymlinks: true });
+    // Un dossier venu d'hors du dépôt (lien) garde ses liens internes relatifs ; ses liens vers le reste du monde sont refaits vers leur cible vivante.
+    const inside = !relative(repoReal, from).startsWith('..');
+    await relinkOutside(inside ? repoReal : from, join(repo, name), from, to);
     copied.push(name);
   }
   return copied;
 }
 
-/** Dans la copie `to` de `live`, refait vers leur cible vivante les liens relatifs dont la cible sort du dépôt `repoReal`. */
-function relinkOutside(repoReal: string, live: string, to: string): void {
-  for (const e of readdirSync(live, { withFileTypes: true })) {
-    const liveEntry = join(live, e.name);
+/** Dans la copie `to` de `live` (dont le vrai chemin est `real`), refait vers leur cible vivante les liens dont la cible sort de `boundary`. */
+async function relinkOutside(boundary: string, live: string, real: string, to: string): Promise<void> {
+  for (const e of await readdir(real, { withFileTypes: true })) {
+    const realEntry = join(real, e.name);
     const copy = join(to, e.name);
     if (e.isSymbolicLink()) {
-      let real: string;
+      let target: string;
       try {
-        real = realpathSync(liveEntry);
+        target = await realpath(realEntry);
       } catch {
         continue; // lien mort : recopié tel quel
       }
-      if (relative(repoReal, real).startsWith('..')) {
-        rmSync(copy);
-        symlinkSync(real, copy);
+      if (relative(boundary, target).startsWith('..')) {
+        await rm(copy);
+        await symlink(target, copy);
       }
     } else if (e.isDirectory()) {
-      relinkOutside(repoReal, liveEntry, copy);
+      await relinkOutside(boundary, join(live, e.name), realEntry, copy);
     }
   }
 }

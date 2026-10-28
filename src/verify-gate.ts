@@ -1,13 +1,13 @@
 import { spawn } from 'node:child_process';
 import { lstatSync, mkdtempSync, rmSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import type { OrchestrateConfig, VerifyConfig } from './config.js';
 import { onTermination } from './proc.js';
 import { failedTests, hasUnnamedFailure, unloadedSuites } from './orchestrate/baseline.js';
 import { configuredCap } from './orchestrate/command.js';
 import { replayRed, TEST_WORKERS_ENV, testWorkersFrom } from './orchestrate/workers.js';
-import { copyDeps, git, gitFailure, ignoredDeps, linkIgnored } from './orchestrate/worktree.js';
+import { copyDeps, git, gitFailure, ignoredDeps, isCopiedDep, linkIgnored } from './orchestrate/worktree.js';
 
 /** Délai de chaque commande de la porte : celui du rejeu de la ligne de base de la vague. */
 const GATE_TIMEOUT_MS = 30 * 60_000;
@@ -89,7 +89,7 @@ function mainTreeObstacle(repo: string, sha: string): string | null {
  * `cadence verify --gate` (L348) : la porte du projet (`orchestrate.build`, puis `orchestrate.test`, dans l'ordre de la vague : les tests lisent ce que le build produit)
  * rejouée au `sha` (L389) dans l'arbre principal quand il est propre et à ce sha (les outils qui refusent un `node_modules` venu d'un autre arbre y tournent chez eux) ;
  * sinon dans un worktree jetable, hors du dépôt, dont les dépendances non suivies sont copiées depuis le dépôt vivant (`orchestrate.worktreeDeps`,
- * sinon les `node_modules` de tout niveau ; les autres dossiers ignorés sont reliés, comme dans les worktrees de vague). `verify.inPlace` impose l'un (`true`, refus si l'arbre n'est pas propre au sha) ou l'autre (`false`).
+ * sinon les `node_modules` de tout niveau et le `.venv` ; les autres dossiers ignorés sont reliés, comme dans les worktrees de vague ; la copie est asynchrone pour que Ctrl-C la coupe). `verify.inPlace` impose l'un (`true`, refus si l'arbre n'est pas propre au sha) ou l'autre (`false`).
  * La première ligne de la sortie dit où la porte a tourné ; en place, l'arbre est relu à la fin et, s'il a bougé, le verdict est dit non probant (code 2). Les deux commandes sont rejouées même si la première est rouge : le compte rendu est entier.
  * Chaque commande reçoit `CADENCE_TEST_WORKERS` comme dans la porte d'une vague (L350, L387) : la valeur de l'environnement de l'appelant si c'est un entier positif, sinon cœurs ÷ plafond de sessions (`CADENCE_MAX_SESSIONS`, 2 par défaut) ;
  * sans elle le rejeu `--maxWorkers=$CADENCE_TEST_WORKERS` de `orchestrate.testReplay` sortirait en erreur et ne prouverait rien.
@@ -157,19 +157,19 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
       return 2;
     }
     let copied: string[];
+    let missing: string[] = [];
     if (config.worktreeDeps) {
       const present = config.worktreeDeps.filter((n) => lstatSync(join(repo, n), { throwIfNoEntry: false }));
-      copied = copyDeps(repo, dir, present);
-      const missing = config.worktreeDeps.filter((n) => !present.includes(n));
-      if (missing.length) out(`dépendances déclarées absentes de l'arbre principal, non copiées : ${missing.join(', ')}`);
+      copied = await copyDeps(repo, dir, present);
+      missing = config.worktreeDeps.filter((n) => !present.includes(n));
     } else {
-      const deps = ignoredDeps(repo);
-      // Seuls les node_modules sont copiés : le reste (.venv, données, .env) reste relié, comme dans un worktree de vague, sans rien dupliquer dans /tmp.
-      copied = copyDeps(repo, dir, deps.filter((n) => basename(n) === 'node_modules'));
+      // Seules les dépendances sont copiées ; les autres dossiers ignorés (données, .env) restent reliés, comme dans un worktree de vague, sans rien dupliquer dans /tmp.
+      copied = await copyDeps(repo, dir, ignoredDeps(repo).filter(isCopiedDep));
       linkIgnored(repo, dir);
     }
     const why = mode === false ? 'verify.inPlace: false' : obstacle;
     out(`verify --gate ${short} : porte jouée dans une copie jetable ${dir} (${why}) ; dépendances copiées : ${copied.length ? copied.join(', ') : 'aucune'}`);
+    if (missing.length) out(`dépendances déclarées absentes de l'arbre principal, non copiées : ${missing.join(', ')}`);
     return await runSteps(steps, dir, ctx, group, env, short);
   } finally {
     forget();

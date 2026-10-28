@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - `orchestrate.continue` in a project's `cadence.yaml` (L390, `docs/orchestrate.md`): `maxEstimate` (days) and `exclude` (lot ids) keep `cadence orchestrate --continue` from drawing a big lot with no spec or sub-task (maritime B6 « Profils verticaux, coupes (10) », effort L, drawn on 27-10 then withdrawn by the lead); a lot whose title or note says « non tirable » is never drawn either. `--dry-run --continue` prints each project's setting and every ready lot it holds back, with the cause. A lot given on the command line is still played.
 
+### Fixed
+
+- `cadence verify --gate` in its throwaway copy copies only the dependencies (`node_modules` of every level and `.venv`), never every ignored folder (L392, `docs/deliver.md`: on 28-10 jobmail's `data` weighed 14 GB, maritime's `docs/refdocs` 961 MB). The copy no longer freezes cadence: Ctrl-C received during it is handled. A `node_modules` that is itself a link is copied by its content (the line said « copied » while nothing was). The line telling where the gate ran is always the first of the output, before the notice of declared dependencies that are absent.
+
 ## [1.17.1] - 2026-10-27
 
 ### Fixed

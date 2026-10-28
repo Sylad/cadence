@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { readOrchestrateConfig, readVerifyConfig } from '../src/config.js';
+import { copyDeps } from '../src/orchestrate/worktree.js';
 import { verifyGate } from '../src/verify-gate.js';
 import { cleanupTempDirs, gitRepo, tempDir } from './helpers.js';
 
@@ -503,18 +504,90 @@ describe('verifyGate : où la porte tourne (L389)', () => {
     expect(() => readVerifyConfig(join(repo, 'cadence.yaml'))).toThrow(/verify\.inPlace/);
   });
 
-  it('L389 R3 — sans worktreeDeps, seuls les node_modules sont copiés : les autres dossiers ignorés (.venv, données) restent des liens', async () => {
-    const { repo } = project('orchestrate:\n  test: test -L .venv && test -L donnees && test ! -L node_modules && test -f donnees/secret.txt\n', true);
-    writeFileSync(join(repo, '.gitignore'), 'node_modules/\n.venv/\ndonnees/\n');
+  it('L392 R1 — sans worktreeDeps, seuls node_modules et .venv sont copiés : les autres dossiers ignorés (données, .env) restent des liens, rien n\'est dupliqué', async () => {
+    const { repo } = project('orchestrate:\n  test: test ! -L .venv && test -f .venv/pyvenv.cfg && test -L donnees && test -L .env && test ! -L node_modules && test -f donnees/secret.txt\n', true);
+    writeFileSync(join(repo, '.gitignore'), 'node_modules/\n.venv/\ndonnees/\n.env\n');
     git(repo, 'add', '.gitignore');
     git(repo, 'commit', '-q', '-m', 'ignore donnees');
+    writeFileSync(join(repo, '.venv', 'pyvenv.cfg'), 'home = /usr/bin\n');
     mkdirSync(join(repo, 'donnees'));
     writeFileSync(join(repo, 'donnees', 'secret.txt'), 'x');
+    writeFileSync(join(repo, '.env'), 'SECRET=1\n');
     writeFileSync(join(repo, 'valeur.txt'), 'sale\n');
     const r = await gate(repo, git(repo, 'rev-parse', 'HEAD').trim());
     expect(here(r)).toMatch(/copie jetable/);
-    expect(here(r)).toMatch(/dépendances copiées : node_modules$/);
+    expect(here(r)).toMatch(/dépendances copiées : \.venv, node_modules$/);
     expect(r.code).toBe(0);
+  });
+
+  it('L392 R2 — la copie ne bloque pas la boucle d\'événements : Ctrl-C reçu pendant la copie est traité', async () => {
+    const repo = gitRepo();
+    writeFileSync(join(repo, '.gitignore'), 'node_modules/\n');
+    const live = join(repo, 'node_modules');
+    for (let d = 0; d < 20; d++) {
+      mkdirSync(join(live, `p${d}`), { recursive: true });
+      for (let f = 0; f < 100; f++) writeFileSync(join(live, `p${d}`, `f${f}.js`), 'x');
+    }
+    const dir = tempDir();
+    let ticks = 0;
+    const timer = setInterval(() => ticks++, 1);
+    try {
+      expect(await copyDeps(repo, dir, ['node_modules'])).toEqual(['node_modules']);
+    } finally {
+      clearInterval(timer);
+    }
+    expect(existsSync(join(dir, 'node_modules', 'p19', 'f99.js'))).toBe(true);
+    expect(ticks).toBeGreaterThan(0);
+  });
+
+  it('L392 R3 — node_modules lui-même un lien : son contenu est copié (un vrai dossier), la sortie ne dit « copié » que si c\'est vrai', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: test ! -L node_modules && test -f node_modules/dep/index.js\n');
+    const ailleurs = tempDir();
+    mkdirSync(join(ailleurs, 'dep'));
+    writeFileSync(join(ailleurs, 'dep', 'index.js'), 'x');
+    execFileSync('rm', ['-rf', join(repo, 'node_modules')]);
+    execFileSync('ln', ['-s', ailleurs, join(repo, 'node_modules')]);
+    // `node_modules/` (avec barre) n'ignore pas un lien : le motif sans barre est celui d'un projet réel.
+    writeFileSync(join(repo, '.gitignore'), 'node_modules\n.venv/\n');
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(0);
+    expect(here(r)).toMatch(/dépendances copiées : .*node_modules/);
+  });
+
+  it('L392 R4 — un lien relatif sortant du dépôt depuis un node_modules de sous-dossier (front/node_modules/x -> ../../../voisin) pointe le voisin vivant dans la copie', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: grep -q voisin front/node_modules/x/i.js\n');
+    writeFileSync(join(repo, '.gitignore'), 'node_modules/\n.venv/\n');
+    mkdirSync(join(repo, 'front'));
+    writeFileSync(join(repo, 'front', 'package.json'), '{}');
+    git(repo, 'add', '.');
+    git(repo, 'commit', '-q', '-m', 'front');
+    const au = git(repo, 'rev-parse', 'HEAD').trim();
+    const voisin = join(repo, '..', `voisin-front-${process.pid}`);
+    mkdirSync(voisin, { recursive: true });
+    writeFileSync(join(voisin, 'i.js'), 'voisin\n');
+    mkdirSync(join(repo, 'front', 'node_modules'));
+    execFileSync('ln', ['-s', `../../../voisin-front-${process.pid}`, join(repo, 'front', 'node_modules', 'x')]);
+    const avant = process.env.TMPDIR;
+    process.env.TMPDIR = tempDir();
+    try {
+      const r = await gate(repo, au);
+      expect(sha).not.toBe(au);
+      expect(here(r)).toMatch(/dépendances copiées : .*front\/node_modules/);
+      expect(r.code).toBe(0);
+    } finally {
+      if (avant === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = avant;
+      execFileSync('rm', ['-rf', voisin]);
+    }
+  });
+
+  it('L392 R5 — la ligne « où la porte a tourné » est la première, avant l\'avis des dépendances déclarées absentes', async () => {
+    const { repo, sha } = project('orchestrate:\n  worktreeDeps: [node_modules, vendor]\n  test: "true"\n');
+    const r = await gate(repo, sha);
+    const lines = r.text.split('\n');
+    expect(lines[0]).toMatch(/copie jetable/);
+    expect(lines[0]).toMatch(/dépendances copiées : node_modules$/);
+    expect(lines.findIndex((l) => l.includes('absentes'))).toBeGreaterThan(0);
   });
 
   it('L389 R6 — l\'arbre principal bouge pendant la porte en place (HEAD avancé par une intégration) : le verdict est dit non probant, code 2', async () => {

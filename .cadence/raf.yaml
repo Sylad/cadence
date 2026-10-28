@@ -4281,9 +4281,10 @@ lots:
       - { date: 2026-10-28, text: "titre remplacé : « Porte de tests visible : étape « porte » dans l'état du lot (durée, next juste), la bande et --status l'affichent au lieu de « → implement » sans session (5 min muettes sur L392) ; --status --wave <id> montre le tableau de cette vague, pas celui de la dernière du dossier ; tests »" }
   - id: L396
     title: "raf archive [--before date] : lots done/dropped déplacés dans .cadence/archive/<année>.yaml, relus par raf (show, check, commits) et par perf, news et plan public quand l'id n'est pas dans le plan actif ; briefs : ne jamais lire l'archive (plan cadence 559 Ko ≈ 150 k tokens) ; doc, tests"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-28
+    started: 2026-10-28
   - id: L397
     title: "verify --gate réutilise la porte de la vague : même sha et arbre identique → lit le résultat enregistré par le programme au lieu de rejouer build et suite (≈ 5 min par lot prêt : L390 le 28-10) ; rejoue si le sha a changé (intégration) ou sans enregistrement ; sortie dit d'où vient le verdict ; skill lead à jour ; tests"
     status: done

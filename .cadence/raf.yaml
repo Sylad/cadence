@@ -4252,11 +4252,12 @@ lots:
     finished: 2026-10-27
   - id: L392
     title: "verify --gate en copie jetable : ne copier que les dépendances (node_modules de tout niveau, .venv), jamais tous les dossiers ignorés (mesuré : jobmail copierait data 14 Go et .env, maritime docs/refdocs 961 Mo ; Ctrl-C sans effet pendant la copie synchrone) ; node_modules lui-même lien → rien copié alors que la sortie dit copié ; lien relatif sortant du dépôt (file:../voisin) pointe dans le vide ; ligne « où la porte a tourné » en premier ; tests"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-27
     started: 2026-10-28
     review: { date: 2026-10-28, verdict: "conforme : les mineurs traités par d88807b sont corrigés (titres et docstrings parlent de copie, le paramètre `live` inutilisé de relinkOutside est retiré, un lien mort déclaré dans worktreeDeps est maintenant annoncé comme absent, avec un test qui échouait avant le correctif, et le titre de R2 correspond à ce que le test vérifie) ; les correctifs ne cassent rien, aucun nouveau défaut. — orchestré (vague 2026-10-28-0750, 0 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que la place de l'entrée CHANGELOG (### Fixed sous [Unreleased], après ### Added de L390), le code du lot est identique", commit: c0af322bf21b92c374380f6a28d4b56cfe61d7aa }
+    finished: 2026-10-28
   - id: L393
     title: "verify --gate en place : relire HEAD et git status après les étapes ; si l'arbre principal a bougé pendant la porte (intégration, commit de plan d'une vague), le dire et ne pas présenter le verdict comme celui du sha ; test"
     status: todo

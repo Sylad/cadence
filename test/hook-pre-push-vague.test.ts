@@ -141,6 +141,27 @@ describe('hook pre-push posé par la vague : un push qui emporte un lot pas prê
     expect(r.err).not.toContain('git push origin');
   });
 
+  it('R13 — un lot pas prêt dont les commits ne se lisent pas (plan qui ne le connaît plus) refuse le push comme deliver --sha, et nomme le lot', async () => {
+    // L3 est dans la vague mais pas dans le plan : `gitCommitsIn` jette, la garde le rend « illisible » ; le push de C (L1 prêt + plan) ne bloque sinon rien
+    const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L3': 'implementing' });
+    const r = await cli(dir, line(shas.C, shas.P), 'hook', 'pre-push');
+    expect(r.code).toBe(3);
+    expect(r.err).toContain('commits illisibles');
+    expect(r.err).toContain('ici:L3');
+    expect(r.err).toContain('vague w9');
+    expect(r.err).not.toContain('git push origin');
+  });
+
+  it('R14 — un lot illisible et un lot pas prêt dans le même push : le refus nomme les deux, et aucune commande sûre n\'est proposée (aucun sha ne passe la garde)', async () => {
+    const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L2': 'implementing', 'ici:L3': 'implementing' });
+    const r = await cli(dir, line(shas.C, shas.P), 'hook', 'pre-push');
+    expect(r.code).toBe(3);
+    expect(r.err).toContain('ici:L2 (implémentation)');
+    expect(r.err).toContain('commits illisibles');
+    expect(r.err).toContain('ici:L3');
+    expect(r.err).not.toContain(`git push origin ${shas.A}:main`);
+  });
+
   it('R9 — l\'état de la vague illisible ne bloque pas un push : avertissement, code 0', async () => {
     const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L2': 'implementing' });
     process.env.CADENCE_HOME = tempDir();

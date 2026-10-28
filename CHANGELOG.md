@@ -81,7 +81,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- The temporary `pre-push` hook of a wave also refuses the push of the lead or of a session started by hand when it carries a commit of a lot of the live wave that is not ready (L405): the message names the lot and its state and gives the safe command, `git push <remote> <last deliverable sha>:<remote branch>` (or says that nothing in the range is deliverable). The guard is the one of the wave (`deliver --sha`): the whole history of the pushed sha counts, so a not-ready commit already on the remote still blocks; a branch deletion passes, an unreadable wave state warns without blocking, and `--no-verify` still overrides. New `raf hook pre-push` subcommand, called by that hook.
+- The temporary `pre-push` hook of a wave also refuses the push of the lead or of a session started by hand when it carries a commit of a lot of the live wave that is not ready (L405): the message names the lot and its state and gives the safe command, `git push <remote> <last deliverable sha>:<remote branch>` (or says that nothing in the range is deliverable). The guard is the one of the wave (`deliver --sha`): the whole history of the pushed sha counts, so a not-ready commit already on the remote still blocks; a branch deletion passes, a not-ready lot whose commits cannot be read refuses the push too (the wave would not tolerate it; the lot is named, no safe command), an unreadable wave state warns without blocking, and `--no-verify` still overrides. New `raf hook pre-push` subcommand, called by that hook.
 
 ## [1.20.0] - 2026-10-28
 

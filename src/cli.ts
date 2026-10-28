@@ -999,7 +999,8 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
 
 /**
  * `raf hook pre-push` (L405), appelé par le hook que la vague pose : refuse (code 3) un push qui emporte un commit d'un lot pas prêt de la vague vivante
- * du dépôt. Sans vague qui tient le dépôt, ou avec un état de vague illisible (avertissement), un hook ne gêne jamais un push.
+ * du dépôt, ou dont un lot pas prêt a des commits illisibles (la garde de `deliver --sha`). Sans vague qui tient le dépôt, ou avec un état de vague illisible
+ * (avertissement), un hook ne gêne jamais un push.
  */
 function prePush(root: string, io: Io, remoteName?: string): number {
   const holding = waveHolding(root);
@@ -1015,8 +1016,7 @@ function prePush(root: string, io: Io, remoteName?: string): number {
     io.err(`raf: vague ${holding.wave} : état illisible, push non vérifié`);
     return 0;
   }
-  const { refusal, warning } = pushRefusal(root, holding.wave, lots, input, remoteName || undefined);
-  if (warning) io.err(`raf: ${warning}`);
+  const refusal = pushRefusal(root, holding.wave, lots, input, remoteName || undefined);
   if (refusal) {
     io.err(`raf: ${refusal}`);
     return REFUSED;

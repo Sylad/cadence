@@ -4283,7 +4283,7 @@ lots:
     finished: 2026-10-28
   - id: L396
     title: "raf archive [--before date] : lots done/dropped déplacés dans .cadence/archive/<année>.yaml, relus par raf (show, check, commits) et par perf, news et plan public quand l'id n'est pas dans le plan actif ; briefs : ne jamais lire l'archive (plan cadence 559 Ko ≈ 150 k tokens) ; doc, tests"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-28
     started: 2026-10-28
@@ -4291,6 +4291,7 @@ lots:
       - { date: 2026-10-28, text: "28-10 (lead) : GELÉ après la 4e revue (règle d'arrêt). Travail complet dans le worktree gardé de la vague 2026-10-28-1015c (branche cadence/2026-10-28-1015c/cadence--L396, 13 commits, porte verte 4 274 tests ; mesuré sur le vrai plan : 565 → 5 Ko, sorties identiques). Reste 1 majeur : orchestrate/cycle.ts:216 commitPlan n'ajoute pas les fichiers d'année non suivis (dirtyPaths sur plan.archiveFiles()), un raf archive non commité pendant une vague laisse HEAD sans les lots archivés. Mineurs : raf todo d'un lot archivé le remet en fin de plan ; restore() remet l'archive avant le plan ; titre de R7. Reprise : correctif dans ce worktree + revue courte + --resume --integrate." }
       - { date: 2026-10-28, text: "28-10 : exception ACCORDÉE par Sylvain (pas encore faite). Correctif à faire dans le worktree de la vague 2026-10-28-1015c : src/orchestrate/cycle.ts commitPlan, ajouter les fichiers d'archive (plan.archiveFiles(), relatifs au dépôt, cohérents avec plan.maintained) à l'appel dirtyPaths, + test (raf archive non commité pendant une vague → commit du plan les prend). Puis revue courte Opus, puis depuis ~/projects/developpeur : cadence orchestrate --resume --wave 2026-10-28-1015c --integrate cadence:L396." }
     review: { date: 2026-10-28, verdict: "conforme : constat commitPlan corrigé (d66f7e51, fichiers d'archive non suivis pris dans le commit du plan, R29 échoue sans le correctif) ; bloquant typecheck de la revue courte corrigé (TS2769 test:199), tsc --noEmit vert ; mineurs connus laissés en notes (raf todo d'un lot archivé en fin de plan, ordre de restore(), titre de R7) ; revue courte du diff rebasé (patch-id différent) : conforme (rebase sans régression : code identique, conflit du CHANGELOG bien résolu)", commit: 6901dc6c0c9b3e6f9fdf92da4e6a356482f912e5 }
+    finished: 2026-10-28
   - id: L397
     title: "verify --gate réutilise la porte de la vague : même sha et arbre identique → lit le résultat enregistré par le programme au lieu de rejouer build et suite (≈ 5 min par lot prêt : L390 le 28-10) ; rejoue si le sha a changé (intégration) ou sans enregistrement ; sortie dit d'où vient le verdict ; skill lead à jour ; tests"
     status: done

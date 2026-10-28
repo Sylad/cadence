@@ -5,7 +5,7 @@ import { run } from '../src/cli.js';
 import { readAgents } from '../src/orchestrate/launch.js';
 import { checkInventaire } from '../src/ref/check.js';
 import { decodePng } from '../src/ref/png.js';
-import { tempDir } from './helpers.js';
+import { readJsonLines, tempDir } from './helpers.js';
 import { stubTools, writePdf, type FixturePage } from './ref-fixture.js';
 
 const root = join(import.meta.dirname, '..');
@@ -83,7 +83,7 @@ function setup(o: { a?: Obj[]; b?: Obj[]; decisions?: Obj[]; mode?: string; page
     FAKE_DECISIONS: JSON.stringify(o.decisions ?? []),
   } as NodeJS.ProcessEnv;
   const pdf = writePdf(base, 'norme.pdf', o.pages ?? NORME);
-  const appels = (): { agent: string; model: string; args: string[]; cwd: string; brief: string; propre: boolean | null; inventaire: boolean }[] => readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const appels = (): { agent: string; model: string; args: string[]; cwd: string; brief: string; propre: boolean | null; inventaire: boolean }[] => readJsonLines(log);
   return { base, refs, env, cwd, pdf, appels, dir: join(refs, 'norme') };
 }
 

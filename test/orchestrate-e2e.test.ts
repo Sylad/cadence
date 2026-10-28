@@ -10,7 +10,7 @@ import { projectLogDir } from '../src/orchestrate/launch.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { Plan } from '../src/plan.js';
 import { fakeApp } from './fake-app.js';
-import { gitRepo, removeDryRunBriefs, tempDir, testPackage } from './helpers.js';
+import { gitRepo, readJsonLines, removeDryRunBriefs, tempDir, testPackage } from './helpers.js';
 
 const FAKE = fileURLToPath(new URL('./fixtures/fake-claude.mjs', import.meta.url));
 const SAMPLE = fileURLToPath(new URL('./fixtures/claude-result.sample.json', import.meta.url));
@@ -44,7 +44,7 @@ function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string
   const log = join(tempDir(), 'calls.jsonl');
   writeFileSync(log, '');
   const env = { RAF_TODAY: '2026-10-04', CADENCE_CLAUDE_BIN: FAKE, FAKE_CLAUDE_SCENARIO: scen, FAKE_CLAUDE_LOG: log, FAKE_CLAUDE_SAMPLE: SAMPLE };
-  const calls = () => readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const calls = () => readJsonLines(log);
   const cli = async (...argv: string[]) => {
     const out: string[] = [];
     const err: string[] = [];

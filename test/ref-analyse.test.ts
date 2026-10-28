@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { readAgents } from '../src/orchestrate/launch.js';
 import { LECTURE_PAGES_MAX } from '../src/ref/analyse.js';
-import { tempDir } from './helpers.js';
+import { readJsonLines, tempDir } from './helpers.js';
 import { stubTools, writePdf, type FixturePage } from './ref-fixture.js';
 
 const root = join(import.meta.dirname, '..');
@@ -64,7 +64,7 @@ function setup(mode = 'ok', pages: FixturePage[] = NORME) {
   writeFileSync(join(cwd, 'cadence.yaml'), `references:\n  dir: ${refs}\n`);
   const env = { RAF_TODAY: '2026-10-24', PATH: `${stubs}:${process.env.PATH}`, XDG_DATA_HOME: join(base, 'xdg'), CADENCE_CLAUDE_BIN: bin, CLAUDE_CONFIG_DIR: join(base, 'claude-home'), FAKE_HOME: join(base, 'claude-home'), FAKE_LOG: log, FAKE_MODE: mode } as NodeJS.ProcessEnv;
   const pdf = writePdf(base, 'norme.pdf', pages);
-  const appels = (): { args: string[]; cwd: string; brief: string; lecturePresente: boolean }[] => readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const appels = (): { args: string[]; cwd: string; brief: string; lecturePresente: boolean }[] => readJsonLines(log);
   return { base, refs, env, cwd, pdf, appels };
 }
 

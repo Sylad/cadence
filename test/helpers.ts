@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -92,4 +92,14 @@ export function testPackage(): string {
   const pkg = process.env.CADENCE_TEST_PACKAGE;
   if (!pkg) throw new Error('CADENCE_TEST_PACKAGE absent : le global-setup de vitest construit le paquet jetable.');
   return pkg;
+}
+
+/**
+ * Journal JSONL d'un faux `claude` (une ligne `JSON + '\n'` par appel, ajoutée par appendFileSync). Le test le relit
+ * pendant qu'un fils y écrit encore : seules les lignes terminées comptent, la dernière, sans « \n », est en cours
+ * d'écriture et sera relue au tour suivant. Une ligne terminée mais illisible lève toujours.
+ */
+export function readJsonLines<T = any>(path: string): T[] {
+  const text = readFileSync(path, 'utf8');
+  return text.slice(0, text.lastIndexOf('\n') + 1).split('\n').filter(Boolean).map((l) => JSON.parse(l) as T);
 }

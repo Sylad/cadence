@@ -4272,11 +4272,13 @@ lots:
     review: { date: 2026-10-28, verdict: "conforme (2 notes mineures sur la documentation de la mesure) — orchestré (vague 2026-10-28-0830c, 0 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que le contexte de l'entrée L394 du CHANGELOG, désormais sous Fixed après L399 et L392 ; le code et les tests du lot sont intacts", commit: edaecededa54ec563291ac1766bfdace23147618 }
     finished: 2026-10-28
   - id: L395
-    title: "Porte de tests visible : étape « porte » dans l'état du lot (durée, next juste), la bande et --status l'affichent au lieu de « → implement » sans session (5 min muettes sur L392) ; --status --wave <id> montre le tableau de cette vague, pas celui de la dernière du dossier ; tests"
+    title: "Porte de tests visible et plafond commun : reprendre le commit 0ca657cf de la branche cadence/2026-10-28-0830c/cadence--L395 (git cherry-pick : étape « porte » dans l'état du lot, la bande et --status ; --status --wave <id> montre cette vague) ; PUIS plafond commun : toutes les vagues vivantes appliquent le même plafond de sessions (vague à 3 à côté d'une vague à 4 : « 4/3 en cours », L51 a attendu 16 min 28 s le 28-10) ; doc, tests"
     status: doing
     estimate: 0.25
     created: 2026-10-28
     started: 2026-10-28
+    notes:
+      - { date: 2026-10-28, text: "titre remplacé : « Porte de tests visible : étape « porte » dans l'état du lot (durée, next juste), la bande et --status l'affichent au lieu de « → implement » sans session (5 min muettes sur L392) ; --status --wave <id> montre le tableau de cette vague, pas celui de la dernière du dossier ; tests »" }
   - id: L396
     title: "raf archive [--before date] : lots done/dropped déplacés dans .cadence/archive/<année>.yaml, relus par raf (show, check, commits) et par perf, news et plan public quand l'id n'est pas dans le plan actif ; briefs : ne jamais lire l'archive (plan cadence 559 Ko ≈ 150 k tokens) ; doc, tests"
     status: todo

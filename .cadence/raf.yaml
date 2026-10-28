@@ -4281,9 +4281,10 @@ lots:
     created: 2026-10-28
   - id: L397
     title: "verify --gate réutilise la porte de la vague : même sha et arbre identique → lit le résultat enregistré par le programme au lieu de rejouer build et suite (≈ 5 min par lot prêt : L390 le 28-10) ; rejoue si le sha a changé (intégration) ou sans enregistrement ; sortie dit d'où vient le verdict ; skill lead à jour ; tests"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-28
+    started: 2026-10-28
   - id: L398
     title: "Sessions de vague sans contexte inutile : 29 à 60 k tokens au premier tour (liste de toutes les skills, hook superpowers, CLAUDE.md) pour des sessions qui n'utilisent que Bash ; lancer sans plugins ni skills utilisateur non voulus, mesurer contexte initial et tokens par étape avant/après sur 2 vagues ; doc, tests"
     status: todo

@@ -63,6 +63,13 @@ function ux(l: LotState): string {
 
 const commits = (l: LotState) => new Set(l.steps.flatMap((s: StepState) => s.commits ?? [])).size;
 const counted = (l: LotState) => l.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
+/** L'état d'un lot (L395) : « porte tests (3 min) » tant que la commande de la porte du programme tourne dans une vague vivante, sinon l'étiquette de son statut. Une porte restée dans l'état d'une vague arrêtée (processus tué) ne tourne plus. */
+const stateText = (l: LotState, wave: WaveState, now: number): string => {
+  if (!l.gate || wave.status !== 'running') return LABEL[l.status];
+  const since = Date.parse(l.gate.started);
+  return `porte ${l.gate.label}${Number.isFinite(since) ? ` (${Math.max(0, Math.floor((now - since) / 60_000))} min)` : ''}`;
+};
+
 const minutes = (l: LotState) => Math.round(l.steps.reduce((n, s) => n + (s.ended ? Date.parse(s.ended) - Date.parse(s.started) : 0), 0) / 60_000);
 
 /** Sha abrégés (7, comme `short` du cycle) des commits que git attribue au lot dans son dépôt, du plus ancien au plus récent (illisible ou sans plan : aucun). */
@@ -196,8 +203,8 @@ export function resumeAnswerHint(waveId: string, l: Pick<LotState, 'project' | '
 }
 
 /** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. */
-export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[] } = {}): string[] {
-  const rows = lots.map((l) => [`${l.project}:${l.lot}`, LABEL[l.status], String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`]);
+export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[]; now?: number } = {}): string[] {
+  const rows = lots.map((l) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`]);
   const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée'];
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
   const line = (r: string[]) => r.map((c, i) => c.padEnd(widths[i])).join('  ').trimEnd();

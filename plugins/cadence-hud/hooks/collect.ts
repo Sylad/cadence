@@ -79,7 +79,7 @@ def read_lots(d, live):
         lots.append({
             'project': l.get('project'), 'lot': l.get('lot'), 'title': l.get('title') or '', 'status': l.get('status'),
             'pass': l.get('pass') or 0, 'model': l.get('model'), 'next': l.get('next'),
-            'steps': len(steps), 'step': step,
+            'steps': len(steps), 'step': step, 'gate': l.get('gate') if live else None,
         })
     return lots
 

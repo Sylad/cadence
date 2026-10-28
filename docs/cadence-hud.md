@@ -13,7 +13,7 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
 Context of the session (green / orange / red at 50 and 75 %), the 5-hour and 7-day quota
 windows with the time to their reset, the cost of the session and its split per model, the
 subagents of this session, the background commands in progress (`2 cmd`: Bash run in the background and Monitor, subagents' included, as the app's "background commands" card counts them), and every live `cadence orchestrate` wave: budget, sessions, one
-aligned line per active lot (status, step, model, elapsed, start of the title), the lots still
+aligned line per active lot (status, step, model, elapsed, start of the title; `porte@tests 3 min` while the program's build or test gate runs with no session, L395), the lots still
 waiting. When no wave is running, the last finished one stays on a grey line for 30 minutes
 after it ended, then disappears. A background command counted for more than an hour, or with no
 record of when it started, is no longer shown as running: it moves to a grey `N cmd sans fin

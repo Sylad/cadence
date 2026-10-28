@@ -77,6 +77,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- The program's test gate is a visible step (L395, `docs/orchestrate.md`): while `orchestrate.build` / `orchestrate.test` runs with no session, `--status` prints `porte tests (3 min)` and the `cadence-hud` band `porte@tests 3 min`, instead of `implémentation` / `→ implement` (5 silent minutes on L392, 28-10). `cadence orchestrate --status --wave <wave>` shows that wave's table, not the last wave of the folder's (two different ids are refused).
+
 ## [1.18.0] - 2026-10-28
 
 ### Added

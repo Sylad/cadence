@@ -668,15 +668,22 @@ const DEFAULT_WATCH_INTERVAL = 10;
 
 /** Ce que `--status` montre à un instant : les vagues vivantes, puis le tableau (absent si seules les vagues vivantes comptent). */
 function statusView(args: Args, launch: string, cap: number, now: Date): { live: string[]; table?: string[]; running: boolean } {
-  const store = typeof args.status === 'string' ? RunStore.find(launch, args.status) : RunStore.last(launch);
+  const id = statusWave(args);
+  const store = id !== undefined ? RunStore.find(launch, id) : RunStore.last(launch);
   const live = [...liveLines(cap, now), ...expiredHoldLines(now)];
   const waveLive = liveWaves(cadenceHome()).length > 0;
-  if (!store && live.length && args.status === true) return { live, running: waveLive };
-  if (!store) throw new RafError(typeof args.status === 'string' ? `vague inconnue : ${args.status}` : 'aucune vague dans ce dossier');
+  if (!store && live.length && id === undefined) return { live, running: waveLive };
+  if (!store) throw new RafError(id !== undefined ? `vague inconnue : ${id}` : 'aucune vague dans ce dossier');
   // `running` : la vague suivie tourne — pour un <id> explicite, elle seule compte, pas les autres vagues de la machine
-  const running = typeof args.status === 'string' ? liveWaves(cadenceHome()).some((w) => w.wave === store.readWave()!.id) : waveLive;
+  const running = id !== undefined ? liveWaves(cadenceHome()).some((w) => w.wave === store.readWave()!.id) : waveLive;
   const lots = store.lots();
   return { live, table: [...renderTable(store.readWave()!, lots), ...keptLines(lots.map((l) => l.repo), now.getTime())], running };
+}
+
+/** La vague que `--status` suit (L395) : `--status <id>` ou `--status --wave <id>` ; aucune : la dernière du dossier. Deux ids différents : refus. */
+function statusWave(args: Args): string | undefined {
+  if (typeof args.status === 'string' && args.wave !== undefined && args.status !== args.wave) throw new RafError(`--status ${args.status} et --wave ${args.wave} désignent deux vagues : une seule`);
+  return typeof args.status === 'string' ? args.status : args.status === true ? args.wave : undefined;
 }
 
 /** Refus d'une `--wave` déjà existante, identique en simulation et au vrai lancement. */

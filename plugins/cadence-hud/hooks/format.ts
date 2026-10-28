@@ -85,6 +85,10 @@ export const lotCells = (lot: WaveLot, now: number): { lot: string; status: stri
     const dead = lot.step.alive ? '' : ' ✝'
     const sub = lot.step.sub > 0 ? ` +${lot.step.sub}` : ''
     detail.push(`${lot.step.kind}@${lot.step.model}${age}${sub}${dead}`)
+  } else if (lot.gate) {
+    // La porte du programme (build, tests) tourne sans session : « → implement » serait faux (L395)
+    const since = Date.parse(lot.gate.started)
+    detail.push(`porte@${lot.gate.label}${Number.isFinite(since) ? ` ${duration(now - since)}` : ''}`)
   } else if (lot.next && lot.status !== 'ready') {
     detail.push(`→ ${lot.next}`)
   }
@@ -427,7 +431,7 @@ export const projectStats = (p: Project): string => {
 
 /** Ce qui change à une transition de vague : l'état de chaque lot de chaque vague (pas le budget consommé, qui bouge sans cesse). */
 export const waveSignature = (waves: readonly Wave[]): string =>
-  waves.map(w => `${w.id}:${w.status ?? ''}:${w.lots.map(l => `${l.project}:${l.lot}=${l.status}/${l.step?.kind ?? ''}/${l.pass}`).join(',')}`).join('|')
+  waves.map(w => `${w.id}:${w.status ?? ''}:${w.lots.map(l => `${l.project}:${l.lot}=${l.status}/${l.step?.kind ?? ''}/${l.gate?.label ?? ''}/${l.pass}`).join(',')}`).join('|')
 
 /** Vrai quand le tableau doit être relu : jamais lu, vague passée à une autre étape, ou une minute écoulée. */
 export const tourDue = (lastSignature: string | undefined, lastAt: number, signature: string, now: number): boolean =>

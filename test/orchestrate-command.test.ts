@@ -2181,3 +2181,39 @@ describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans
     expect(table).not.toContain('Clé changée depuis');
   });
 });
+
+describe('L395 — --status --wave <id> montre le tableau de cette vague', () => {
+  const setup = async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    const f = fakeDeps();
+    expect(await orchestrate(['a:L1', '--wave', '2026-10-09-1253'], io(parent).io, f.deps)).toBe(0);
+    const old = new RunStore(parent, 'vieille-vague');
+    const recent = new RunStore(parent, '2026-10-09-1253');
+    old.writeWave({ ...recent.readWave()!, id: 'vieille-vague', created: '2026-10-07T09:00:00.000Z' });
+    old.writeLot(recent.lots()[0]);
+    recent.writeWave({ ...recent.readWave()!, created: '2026-10-09T12:53:00.000Z' });
+    return parent;
+  };
+  const status = async (parent: string, argv: string[]) => {
+    const r = io(parent);
+    const code = await orchestrate(argv, r.io, fakeDeps().deps);
+    return { code, text: r.out.join('\n') };
+  };
+
+  it('R5 — --status --wave <id> : le tableau de la vague nommée, pas celui de la dernière du dossier', async () => {
+    const parent = await setup();
+    const r = await status(parent, ['--status', '--wave', 'vieille-vague']);
+    expect(r.text).toContain('vague vieille-vague :');
+    expect(r.text).not.toContain('vague 2026-10-09-1253 :');
+  });
+
+  it('R6 — --status <id> et --wave <id> désignant deux vagues : refus, une seule vague', async () => {
+    const parent = await setup();
+    await expect(status(parent, ['--status', '2026-10-09-1253', '--wave', 'vieille-vague'])).rejects.toThrow(/deux vagues/);
+  });
+
+  it('R7 — --status --wave d\'une vague inconnue : « vague inconnue », pas la dernière', async () => {
+    const parent = await setup();
+    await expect(status(parent, ['--status', '--wave', 'nulle-part'])).rejects.toThrow(/vague inconnue : nulle-part/);
+  });
+});

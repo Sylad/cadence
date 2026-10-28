@@ -151,6 +151,8 @@ export interface LotState {
   minorFix?: boolean;
   /** Mineurs confiés à la passe des mineurs (lignes de proposition) : retirés des propositions si la revue courte qui la suit est conforme. */
   minorLines?: string[];
+  /** Porte du programme en cours (L395) : sa commande tourne, sans session claude. Posée au départ de chaque commande (build, puis tests), retirée à sa fin ; lue par `--status` et la bande pour ne pas dire « implémentation » d'un lot qui attend sa suite. */
+  gate?: { label: 'build' | 'tests'; started: string };
   /** Prochaine étape à jouer ; null = cycle terminé. Relue à la reprise. */
   next: StepKind | null;
   startedSha?: string;

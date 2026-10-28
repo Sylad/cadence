@@ -1979,9 +1979,21 @@ type CheckRun = NonNullable<LotState['checks']>['runs'][number];
  * (un test déjà rouge au sha de départ n'en est pas un, L213). S'arrête au premier rouge : un build rouge rend le lot sans lancer les tests. Après une écriture (work) et, au sommet rebasé, avant l'avance de la branche du dépôt (R7).
  */
 async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promise<void> {
+  try {
+    await runChecks(c, red, runs);
+  } finally {
+    // L395 : la porte se lit dans l'état du lot tant qu'une commande (ou le rejeu qui la suit) tourne, jamais après.
+    c.lot.gate = undefined;
+    save(c);
+  }
+}
+
+async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promise<void> {
   const l = c.lot;
   for (const [label, command] of [['build', c.config.build], ['tests', c.config.test]] as const) {
     if (!command) continue;
+    l.gate = { label, started: new Date().toISOString() };
+    save(c);
     const r = await sh(c, command);
     const run: CheckRun = { label, command, code: r.code };
     runs.push(run);

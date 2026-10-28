@@ -71,6 +71,15 @@ test('les nombres, barres et durées sont courts', () => {
   expect(duration(72 * 3_600_000)).toBe('3 j')
 })
 
+test('L395 R8 — la porte du programme se lit dans la bande au lieu de « → implement »', () => {
+  const at = Date.parse('2026-10-28T08:40:00.000Z')
+  const lot = { project: 'cadence', lot: 'L392', title: 't', status: 'implementing', pass: 0, model: 'sonnet', next: 'implement', steps: 1, step: null, gate: { label: 'tests', started: '2026-10-28T08:35:00.000Z' } }
+  expect(lotCells(lot, at)).toEqual({ lot: 'L392', status: 'implémente', detail: 'porte@tests 5 min' })
+  expect(lotText({ ...lot, gate: null }, at)).toBe('L392 implémente · → implement')
+  const running = { ...lot, step: { kind: 'fix', model: 'sonnet', started: '2026-10-28T08:39:00.000Z', pid: 2, alive: true, sub: 0 } }
+  expect(lotCells(running, at).detail).toBe('fix@sonnet 1 min')
+})
+
 test('un lot se lit en trois cellules ou en une ligne', () => {
   const at = Date.parse('2026-10-07T19:14:11.066Z')
   expect(lotCells(WAVE.lots[0]!, at)).toEqual({ lot: 'L75', status: 'corrige', detail: 'fix@sonnet 3 min' })

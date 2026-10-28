@@ -41,6 +41,8 @@ export type WaveLot = {
   next: string | null
   steps: number
   step: WaveStep | null
+  /** Porte du programme en cours (build ou tests), sans session claude ; absente hors d'une vague vivante. */
+  gate?: { label: string; started: string } | null
 }
 
 export type Wave = {

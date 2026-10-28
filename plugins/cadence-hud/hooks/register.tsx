@@ -5,13 +5,15 @@ import type { AgentsSummary, CommandInfo, LeadHold, ModelsSummary, Project, Usag
 import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
-import { buildPanel, ellipsize, isFolded, parseLotsBoard, readTime, stampsSignature } from './lots'
+import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, readTime, stampsSignature, subsText } from './lots'
 
 const PLUGIN = 'cadence-hud'
 /** Id du panneau des lots (`/hud lots`). */
 const LOTS_PANE = 'lots'
 /** Clé du `$.store` (gardé entre deux sessions) où le panneau des lots garde le repli choisi de chaque projet. */
 const FOLDS_KEY = 'lotsFolds'
+/** Clé du `$.store` où le panneau des lots garde les dépliages choisis (le reste d'un projet, les sous-lots d'un lot). */
+const VIEWS_KEY = 'lotsViews'
 const REFRESH_MS = 5_000
 
 const usage = atom({ plugin: 'cadence-hud', key: 'usage' } as const, null)
@@ -28,6 +30,7 @@ const projectsFolded = atom({ plugin: 'cadence-hud', key: 'projectsFolded' } as 
 const lotsBoard = atom({ plugin: 'cadence-hud', key: 'lotsBoard' } as const, null)
 const lotsFailed = atom({ plugin: 'cadence-hud', key: 'lotsFailed' } as const, false)
 const lotsFolds = atom({ plugin: 'cadence-hud', key: 'lotsFolds' } as const, {})
+const lotsViews = atom({ plugin: 'cadence-hud', key: 'lotsViews' } as const, {})
 const lotsAt = atom({ plugin: 'cadence-hud', key: 'lotsAt' } as const, 0)
 const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
 const isHidden = atom({ plugin: 'cadence-hud', key: 'isHidden' } as const, false)
@@ -66,6 +69,17 @@ const toggleFold = async ($: EngineInterface, project: string): Promise<boolean 
   return folded
 }
 
+/** Déplie ce qui est replié et inversement (clé de moreKey ou openKey) ; le choix est gardé. */
+const toggleView = async ($: EngineInterface, key: string): Promise<void> => {
+  const current = await read($, lotsViews)
+  const next = { ...current, [key]: !current[key] }
+  await update($, lotsViews, () => next)
+  await $.store.set(VIEWS_KEY, next).catch(() => undefined) // accessoire : sans magasin, le choix vaut pour la session
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+const onlyBooleans = (v: Record<string, unknown>): Record<string, boolean> => Object.fromEntries(Object.entries(v).filter((e): e is [string, boolean] => typeof e[1] === 'boolean'))
+
 export const register: Register = on => {
   let timer: Timer | undefined
   let isRefreshing = false
@@ -93,9 +107,9 @@ export const register: Register = on => {
     await update($, info, () => ({}))
     // Le repli choisi dans le panneau des lots survit à la session ; un magasin illisible laisse les défauts.
     const kept = await $.store.get(FOLDS_KEY).catch(() => undefined)
-    if (typeof kept === 'object' && kept !== null && !Array.isArray(kept)) {
-      await update($, lotsFolds, () => Object.fromEntries(Object.entries(kept).filter(([, v]) => typeof v === 'boolean')))
-    }
+    if (isRecord(kept)) await update($, lotsFolds, () => onlyBooleans(kept))
+    const keptViews = await $.store.get(VIEWS_KEY).catch(() => undefined)
+    if (isRecord(keptViews)) await update($, lotsViews, () => onlyBooleans(keptViews))
     await $.command.register({
       name: 'hud',
       description: 'Affiche ou masque la bande cadence-hud ; « /hud cmd » liste les commandes d\'arrière-plan comptées, « /hud projets » replie la liste des projets, « /hud lots » ouvre ou ferme le panneau des lots, « /hud lots <projet> » y replie ou déplie un projet',
@@ -650,7 +664,7 @@ export const register: Register = on => {
 
   // Le panneau des lots (L401) : lecture seule, l'arbre des lots non clos de chaque projet du dossier (lead tour --json).
   on('ui.render', { component: 'Pane', requestId: LOTS_PANE }, async ($, e) => {
-    const [board, failed, readAt, allWaves, at, folds] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, now), read($, lotsFolds)])
+    const [board, failed, readAt, allWaves, at, folds, views] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, now), read($, lotsFolds), read($, lotsViews)])
     const { Box, Text, Button } = $.ui.resolve(e)
     const columns = Math.max(20, e.props.bodyColumns)
     const header = (
@@ -680,7 +694,7 @@ export const register: Register = on => {
     } else {
       const shown = allWaves.filter(w => isWaveShown(w, at))
       const waveLots = [...shown.filter(w => w.live), ...shown.filter(w => !w.live)].flatMap(w => w.lots.map(l => ({ project: l.project, lot: l.lot, status: l.status })))
-      const panel = buildPanel({ rows: board.rows, columns, height: e.props.scroll.bodyRows, waves: waveLots, folds })
+      const panel = buildPanel({ rows: board.rows, columns, height: e.props.scroll.bodyRows, waves: waveLots, folds, views })
       if (panel.lines.length === 0) {
         body = message('Aucun lot non clos dans les projets de ce dossier.', 'subtle')
       } else {
@@ -711,6 +725,15 @@ export const register: Register = on => {
               </Box>
             )
           }
+          if (line.kind === 'more') {
+            return (
+              <Box key={`m${i}`} paddingLeft={2}>
+                <Button key={`more:${line.project}`} plain onPress={() => void toggleView($, moreKey(line.project))}>
+                  {moreText(line.hidden, line.expanded)}
+                </Button>
+              </Box>
+            )
+          }
           const after = line.after.length > 0 && (
             <Text color="subtle">
               after:{' '}
@@ -726,14 +749,21 @@ export const register: Register = on => {
             <Box key={`l${i}`} flexDirection="column">
               <Box flexDirection="row">
                 <Box width={line.idWidth} flexShrink={0}>
-                  <Text wrap="truncate-end">
-                    <Text dimColor>{line.lead}</Text>
-                    {line.id}
-                  </Text>
+                  {line.subs ? (
+                    <Button key={line.subs.key} plain onPress={() => void toggleView($, line.subs!.key)}>
+                      {`${line.lead}${line.id}`}
+                    </Button>
+                  ) : (
+                    <Text wrap="truncate-end">
+                      <Text dimColor>{line.lead}</Text>
+                      {line.id}
+                    </Text>
+                  )}
                 </Box>
                 <Box paddingLeft={2} flexGrow={1} flexShrink={1}>
                   <Text wrap="truncate-end">
                     {line.title}
+                    {line.subs && <Text dimColor>{`  ${subsText(line.subs.count)}`}</Text>}
                     {!line.afterOwnLine && after && '  '}
                     {!line.afterOwnLine && after}
                   </Text>

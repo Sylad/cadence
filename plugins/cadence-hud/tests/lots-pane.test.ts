@@ -93,6 +93,19 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await ui.unmount()
     return { texts, text: [...buttons.map(b => b.text ?? ''), ...texts].join('\n'), buttons }
   }
+  /** Appuie sur un Button du panneau par sa clé, puis laisse se poser le travail lancé. */
+  const pressKey = async (key: string) => {
+    const ui = await $.ui.mount({
+      plugin: PLUGIN,
+      surface: 'terminal',
+      component: 'Pane',
+      requestId: 'lots',
+      props: { title: 'Lots', isFocused: false, bodyColumns: 70, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} },
+    } as never)
+    await ui.press({ key })
+    await ui.unmount()
+    await settle()
+  }
   /** Appuie sur le Button du projet (clic, ou Entrée sous le focus : même appui). */
   const press = async (project: string) => {
     const ui = await $.ui.mount({
@@ -106,7 +119,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await ui.unmount()
     await settle()
   }
-  return { kv, press, store, open, opened, runs, tours, tour, stamps, waves, hud, advance, draw }
+  return { kv, press, pressKey, store, open, opened, runs, tours, tour, stamps, waves, hud, advance, draw }
 }
 
 const CLOSE_HELP = '/hud lots pour fermer'
@@ -218,11 +231,11 @@ test('R14 — lignes sans champ lots : message « cadence trop ancien », pas l�
 })
 
 test('R4 — le panneau dessine un bloc par projet, ses lots en arbre et les after:', async ($, on) => {
-  const s = await session($, on)
+  const s = await session($, on, { kv: [['lotsViews', { 'open:cadence#L401': true }]] })
   await s.hud('lots')
   await settle()
   const d = await s.draw()
-  expect(d.buttons.map(b => b.text)).toEqual(['▾ cadence', '▾ ol'])
+  expect(d.buttons.map(b => b.text)).toEqual(['▾ cadence', '▾ L401', '▾ ol'])
   expect(d.texts.some(t => /^\s*2 lots non clos$/.test(t))).toBe(true)
   expect(d.texts.some(t => /^\s*1 lot non clos$/.test(t))).toBe(true)
   expect(d.text).toContain('├')
@@ -240,12 +253,12 @@ test('R5 — l’état de la vague l’emporte sur celui du plan, dans le pannea
   expect((await s.draw()).text).toContain('⟳ relit')
 })
 
-test('R8 — lecture seule : pas d’action sur les lots, seuls les noms de projet se replient (L409)', async ($, on) => {
+test('R8 — lecture seule : pas d’action sur les lots, seuls les noms de projet et les lots à sous-lots se plient (L409, L411)', async ($, on) => {
   const s = await session($, on)
   await s.hud('lots')
   await settle()
   const d = await s.draw()
-  expect(d.buttons.map(b => b.key)).toEqual(['fold:cadence', 'fold:ol'])
+  expect(d.buttons.map(b => b.key)).toEqual(['fold:cadence', 'open:cadence#L401', 'fold:ol'])
   expect(d.text).toContain('lecture seule')
 })
 
@@ -296,7 +309,7 @@ for (const [state, tour] of FOOTER_STATES) {
 
 test('R17 — le panneau coupe l’arbre à la hauteur du corps : « … +N lots de plus »', async ($, on) => {
   const many = row('p', Array.from({ length: 12 }, (_, i) => lot(`L${i + 1}`)))
-  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify([many]) }) })
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify([many]) }), kv: [['lotsViews', { 'more:p': true }]] })
   await s.hud('lots')
   await settle()
   const d = await s.draw(70, 6)
@@ -360,6 +373,7 @@ test('R12 — panneau fermé : aucune date de plan n’est lue', async ($, on) =
 // ── L409 : replier / déplier un projet ─────────────────────────────────────────────────────────────────────────────
 
 const big = row('maritime', Array.from({ length: 25 }, (_, i) => lot(`M${i + 1}`, i === 0 ? 'doing' : 'todo')))
+const OPEN_BIG: [string, unknown][] = [['lotsViews', { 'more:maritime': true }]]
 const BIG_TOUR = () => ({ exitCode: 0, stdout: JSON.stringify([big, ...TOUR]) })
 
 test('R1 — le panneau montre maritime (25 lots) replié, les autres projets déployés', async ($, on) => {
@@ -374,7 +388,7 @@ test('R1 — le panneau montre maritime (25 lots) replié, les autres projets d�
 })
 
 test('R5 — l’appui sur le nom du projet le déplie, un second le replie', async ($, on) => {
-  const s = await session($, on, { tour: BIG_TOUR })
+  const s = await session($, on, { tour: BIG_TOUR, kv: OPEN_BIG })
   await s.hud('lots')
   expect((await s.draw()).buttons.map(b => b.key)).toContain('fold:maritime')
   await s.press('maritime')
@@ -386,7 +400,7 @@ test('R5 — l’appui sur le nom du projet le déplie, un second le replie', as
 })
 
 test('R6 — l’état est gardé : fermer puis rouvrir le panneau, et une nouvelle session, le retrouvent', async ($, on) => {
-  const s = await session($, on, { tour: BIG_TOUR })
+  const s = await session($, on, { tour: BIG_TOUR, kv: OPEN_BIG })
   await s.hud('lots')
   await s.draw()
   await s.press('maritime')
@@ -397,7 +411,7 @@ test('R6 — l’état est gardé : fermer puis rouvrir le panneau, et une nouve
 })
 
 test('R6 — une nouvelle session relit le choix gardé', async ($, on) => {
-  const s = await session($, on, { tour: BIG_TOUR, kv: [['lotsFolds', { maritime: false, ol: true }]] })
+  const s = await session($, on, { tour: BIG_TOUR, kv: [['lotsFolds', { maritime: false, ol: true }], ...OPEN_BIG] })
   await s.hud('lots')
   const { text } = await s.draw(70, 80)
   expect(text).toMatch(/M25/)
@@ -406,7 +420,7 @@ test('R6 — une nouvelle session relit le choix gardé', async ($, on) => {
 })
 
 test('R7 — /hud lots <projet> bascule le projet au clavier ; un nom inconnu est dit', async ($, on) => {
-  const s = await session($, on, { tour: BIG_TOUR })
+  const s = await session($, on, { tour: BIG_TOUR, kv: OPEN_BIG })
   await s.hud('lots')
   await s.draw()
   expect((await s.hud('lots maritime')).text).toBe('maritime déplié.')
@@ -420,4 +434,70 @@ test('R7 — /hud lots <projet> avant la première lecture : « pas encore lu »
   const text = (await s.hud('lots maritime')).text
   expect(text).toMatch(/pas encore lus/)
   expect(text).not.toMatch(/inconnu/)
+})
+
+// ── L411 : cinq lots par projet, sous-lots repliés, états gardés ───────────────────────────────────────────────────
+
+const ten = row('dix', Array.from({ length: 10 }, (_, i) => lot(`D${i + 1}`)))
+const TEN_TOUR = () => ({ exitCode: 0, stdout: JSON.stringify([ten, ...TOUR]) })
+
+test('R1 — le panneau montre cinq lots d’un projet de dix et le bouton « + 5 lots »', async ($, on) => {
+  const s = await session($, on, { tour: TEN_TOUR })
+  await s.hud('lots')
+  const { text, buttons } = await s.draw(70, 80)
+  expect(text).toMatch(/D5\b/)
+  expect(text).not.toMatch(/D6\b/)
+  expect(text).toMatch(/\+ 5 lots/)
+  expect(buttons.map(b => b.key)).toContain('more:dix')
+})
+
+test('R2 — l’appui sur « + 5 lots » montre le reste, « moins » le replie', async ($, on) => {
+  const s = await session($, on, { tour: TEN_TOUR })
+  await s.hud('lots')
+  await s.draw()
+  await s.pressKey('more:dix')
+  const open = await s.draw(70, 80)
+  expect(open.text).toMatch(/D10\b/)
+  expect(open.text).toMatch(/moins/)
+  expect(open.text).not.toMatch(/\+ 5 lots/)
+  await s.pressKey('more:dix')
+  expect((await s.draw(70, 80)).text).not.toMatch(/D10\b/)
+})
+
+test('R3 — un lot à sous-lots : replié avec son compte, un appui le déplie, un second le replie', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  const closed = await s.draw()
+  expect(closed.buttons.map(b => b.key)).toContain('open:cadence#L401')
+  expect(closed.text).toMatch(/▸ L401/)
+  expect(closed.text).toMatch(/2 sous-lots/)
+  expect(closed.text).not.toMatch(/L401\/2/)
+  await s.pressKey('open:cadence#L401')
+  const open = await s.draw()
+  expect(open.text).toMatch(/▾ L401/)
+  expect(open.text).toMatch(/L401\/2/)
+  await s.pressKey('open:cadence#L401')
+  expect((await s.draw()).text).not.toMatch(/L401\/2/)
+})
+
+test('R4 — les états sont gardés : dans le magasin, après fermeture/réouverture et dans une nouvelle session', async ($, on) => {
+  const s = await session($, on, { tour: TEN_TOUR })
+  await s.hud('lots')
+  await s.draw()
+  await s.pressKey('more:dix')
+  await s.pressKey('open:cadence#L401')
+  expect(s.kv.get('lotsViews')).toEqual({ 'more:dix': true, 'open:cadence#L401': true })
+  await s.hud('lots')
+  await s.hud('lots')
+  const text = (await s.draw(70, 80)).text
+  expect(text).toMatch(/D10\b/)
+  expect(text).toMatch(/L401\/2/)
+})
+
+test('R4 — une nouvelle session relit les états gardés ; un magasin illisible laisse les défauts', async ($, on) => {
+  const kept = await session($, on, { tour: TEN_TOUR, kv: [['lotsViews', { 'more:dix': true, 'open:cadence#L401': 'oui' }]] })
+  await kept.hud('lots')
+  const text = (await kept.draw(70, 80)).text
+  expect(text).toMatch(/D10\b/)
+  expect(text).not.toMatch(/L401\/2/)
 })

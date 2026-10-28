@@ -110,6 +110,8 @@ declare module 'claude-code' {
       lotsFailed: boolean
       /** Le repli choisi par projet dans le panneau des lots (vrai = replié) ; un projet absent suit le défaut (replié au-delà de 20 lots ouverts). */
       lotsFolds: Record<string, boolean>
+      /** Les dépliages choisis dans le panneau des lots (vrai = déplié) : `more:<projet>` (le reste du projet au-delà de 5 lots), `open:<projet>#<lot>` (les sous-lots d'un lot) ; absent, replié. */
+      lotsViews: Record<string, boolean>
       /** Heure (ms) de la dernière lecture réussie du panneau des lots. */
       lotsAt: number
       error: string | null

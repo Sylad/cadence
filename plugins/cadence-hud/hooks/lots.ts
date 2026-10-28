@@ -89,11 +89,14 @@ export const sortTree = (nodes: readonly LotNode[], rankOf: (lot: TourLot) => nu
 
 const hasInProgress = (n: LotNode, rankOf: (lot: TourLot) => number): boolean => rankOf(n.lot) === 0 || n.children.some(c => hasInProgress(c, rankOf))
 
-export type FlatLot = { lot: TourLot; depth: number; branch: '' | '├' | '└' }
+export type FlatLot = { lot: TourLot; depth: number; branch: '' | '├' | '└'; /** ses sous-lots, montrés ou non */ children: number }
 
-/** L'arbre à plat, dans l'ordre d'affichage ; chaque sous-lot porte ├ (suivi d'un frère) ou └ (le dernier). */
-export const flattenTree = (nodes: readonly LotNode[], depth = 0): FlatLot[] =>
-  nodes.flatMap((n, i) => [{ lot: n.lot, depth, branch: depth === 0 ? ('' as const) : i === nodes.length - 1 ? ('└' as const) : ('├' as const) }, ...flattenTree(n.children, depth + 1)])
+/** L'arbre à plat, dans l'ordre d'affichage ; chaque sous-lot porte ├ (suivi d'un frère) ou └ (le dernier). `isOpen` : les sous-lots d'un lot ne sont mis à plat que s'il dit oui (tous, par défaut). */
+export const flattenTree = (nodes: readonly LotNode[], isOpen: (lot: TourLot) => boolean = () => true, depth = 0): FlatLot[] =>
+  nodes.flatMap((n, i) => [
+    { lot: n.lot, depth, branch: depth === 0 ? ('' as const) : i === nodes.length - 1 ? ('└' as const) : ('├' as const), children: n.children.length },
+    ...(isOpen(n.lot) ? flattenTree(n.children, isOpen, depth + 1) : []),
+  ])
 
 const WAVE_GLYPH: Record<string, string> = { queued: '…', question: '?', ready: '✔', 'handed-back': '↩', failed: '✖', suspended: '⏸' }
 
@@ -122,6 +125,27 @@ export const FOLD_ABOVE = 20
 /** Le projet est-il replié : le choix de la personne (`folds`, vrai = replié) l'emporte sur le défaut (plus de FOLD_ABOVE lots ouverts). */
 export const isFolded = (project: string, lots: readonly TourLot[], folds: Readonly<Record<string, boolean>>): boolean => folds[project] ?? openCount(lots) > FOLD_ABOVE
 
+/** Le nombre de lots du premier niveau qu'un projet montre tant que la personne n'a pas demandé le reste (L411). */
+export const LOTS_PER_PROJECT = 5
+
+/** La clé du choix « le reste du projet est déplié » dans les états du panneau (vrai = déplié). */
+export const moreKey = (project: string): string => `more:${project}`
+
+/** La clé du choix « les sous-lots de ce lot sont dépliés » dans les états du panneau (vrai = déplié) ; par projet, un même id pouvant se trouver dans deux. */
+export const openKey = (project: string, id: string): string => `open:${project}#${id}`
+
+/** Les lignes visibles d'un projet : les LOTS_PER_PROJECT premiers lots du premier niveau (ou tous, si la personne a déplié le reste), et les sous-lots des seuls lots dépliés. `hidden` : les lots du premier niveau que le plafond cache. */
+const visibleLots = (project: string, tree: readonly LotNode[], views: Readonly<Record<string, boolean>>): { flat: FlatLot[]; hidden: number } => ({
+  flat: flattenTree(views[moreKey(project)] === true ? tree : tree.slice(0, LOTS_PER_PROJECT), lot => views[openKey(project, lot.id)] === true),
+  hidden: Math.max(0, tree.length - LOTS_PER_PROJECT),
+})
+
+/** Le compte des sous-lots d'un lot, tel qu'il s'affiche après son titre. */
+export const subsText = (count: number): string => `${count} sous-lot${count > 1 ? 's' : ''}`
+
+/** Le texte du bouton du reste d'un projet : « + N lots » replié, « moins » déplié. */
+export const moreText = (hidden: number, expanded: boolean): string => (expanded ? 'moins' : `+ ${hidden} lot${hidden > 1 ? 's' : ''}`)
+
 export type PanelLine =
   | { kind: 'project'; name: string; count: number; error?: string; /** lots en cours (hors sous-tâches) */ doing: number; /** absent d'un projet illisible, qui ne se replie pas */ folded?: boolean }
   | {
@@ -136,7 +160,11 @@ export type PanelLine =
       /** Largeurs communes à toutes les lignes, pour l'alignement. */
       idWidth: number
       stateWidth: number
+      /** Présent quand le lot a des sous-lots : sa bascule (clé de ses états), leur nombre et s'ils sont montrés. */
+      subs?: { key: string; count: number; open: boolean }
     }
+  /** Le bouton « + N lots » / « moins » du reste d'un projet de plus de LOTS_PER_PROJECT lots. */
+  | { kind: 'more'; project: string; hidden: number; expanded: boolean }
 
 export type Panel = { lines: PanelLine[]; /** lignes de lot non affichées faute de hauteur */ more: number }
 
@@ -154,22 +182,34 @@ export const buildPanel = (input: {
   waves: readonly { project: string; lot: string; status: string }[]
   /** Le choix de la personne par projet (vrai = replié) ; absent, le défaut de isFolded. */
   folds?: Readonly<Record<string, boolean>>
+  /** Les dépliages choisis (moreKey, openKey ; vrai = déplié) ; absent, tout est replié. */
+  views?: Readonly<Record<string, boolean>>
 }): Panel => {
   const { rows, columns, waves } = input
   const folds = input.folds ?? {}
+  const views = input.views ?? {}
   const narrow = columns < NARROW_BODY
-  type Block = { project: LotsRow; flat: FlatLot[]; open: Set<string>; folded: boolean }
+  type Block = { project: LotsRow; flat: FlatLot[]; hidden: number; open: Set<string>; folded: boolean }
   const blocks: Block[] = rows
     .filter(r => r.error || (r.lots && r.lots.length > 0))
     .map(r => {
       const open = new Set((r.lots ?? []).map(l => l.id))
       const waveOf = (l: TourLot) => waves.find(w => w.lot === l.id && sameProject(r.project, w.project))?.status
-      return { project: r, flat: flattenTree(sortTree(lotTree(r.lots ?? []), l => lotRank(l, open, waveOf(l)))), open, folded: !r.error && isFolded(r.project, r.lots ?? [], folds) }
+      const tree = sortTree(lotTree(r.lots ?? []), l => lotRank(l, open, waveOf(l)))
+      const { flat, hidden } = visibleLots(r.project, tree, views)
+      return { project: r, flat, hidden, open, folded: !r.error && isFolded(r.project, r.lots ?? [], folds) }
     })
-  const leadOf = (f: FlatLot) => (f.depth === 0 ? '  ' : `  ${'  '.repeat(f.depth - 1)}${f.branch} `)
+  const baseLead = (f: FlatLot) => (f.depth === 0 ? '  ' : `  ${'  '.repeat(f.depth - 1)}${f.branch} `)
+  const isOpen = (b: Block, f: FlatLot) => views[openKey(b.project.project, f.lot.id)] === true
+  // un lot à sous-lots porte sa bascule (▸ replié, ▾ déplié) dans la dernière cellule de son retrait, la première au premier niveau
+  const leadOf = (b: Block, f: FlatLot) => {
+    const lead = baseLead(f)
+    if (f.children === 0) return lead
+    const glyph = isOpen(b, f) ? '▾' : '▸'
+    return f.depth === 0 ? `${glyph} ` : `${lead.slice(0, -1)}${glyph}`
+  }
   const shown = blocks.filter(b => !b.folded)
-  const all = shown.flatMap(b => b.flat)
-  const idWidth = Math.max(0, ...all.map(f => leadOf(f).length + f.lot.id.length))
+  const idWidth = Math.max(0, ...shown.flatMap(b => b.flat.map(f => leadOf(b, f).length + f.lot.id.length)))
   const stateOf = (b: Block, f: FlatLot) => lotState(f.lot, b.open, waves.find(w => w.lot === f.lot.id && sameProject(b.project.project, w.project))?.status)
   const stateWidth = Math.max(0, ...shown.flatMap(b => b.flat.map(f => stateOf(b, f).text.length)))
 
@@ -186,9 +226,13 @@ export const buildPanel = (input: {
       const after = f.lot.after.map(id => ({ id, struck: !b.open.has(id) }))
       const afterText = after.length ? `after: ${after.map(a => a.id).join(' ')}` : ''
       const afterOwnLine = narrow && after.length > 0
-      const room = columns - idWidth - 2 - stateWidth - 2 - (afterText && !narrow ? afterText.length + 2 : 0)
-      lines.push({ kind: 'lot', id: f.lot.id, lead: leadOf(f), title: ellipsize(f.lot.title, Math.max(1, room)), state: stateOf(b, f), after, afterOwnLine, idWidth, stateWidth, height: afterOwnLine ? 2 : 1 })
+      const subs = f.children > 0 ? { key: openKey(b.project.project, f.lot.id), count: f.children, open: isOpen(b, f) } : undefined
+      const room = columns - idWidth - 2 - stateWidth - 2 - (afterText && !narrow ? afterText.length + 2 : 0) - (subs ? subsText(subs.count).length + 2 : 0)
+      lines.push({
+        kind: 'lot', id: f.lot.id, lead: leadOf(b, f), title: ellipsize(f.lot.title, Math.max(1, room)), state: stateOf(b, f), after, afterOwnLine, idWidth, stateWidth, ...(subs ? { subs } : {}), height: afterOwnLine ? 2 : 1,
+      })
     }
+    if (b.hidden > 0) lines.push({ kind: 'more', project: b.project.project, hidden: b.hidden, expanded: views[moreKey(b.project.project)] === true, height: 1 })
   }
 
   const room = Math.max(1, input.height - 2)

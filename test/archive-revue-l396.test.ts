@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { parseDocument, type YAMLSeq } from 'yaml';
 import { Plan } from '../src/plan.js';
 import { repoWork } from '../src/repos.js';
+import { tourRow } from '../src/lead.js';
 import { repoWithPlan } from './archive-helpers.js';
 import { commit, tempDir } from './helpers.js';
 
@@ -117,5 +118,68 @@ describe('L396 — revue de code, constat 3 : les dépôts voisins (repos:) d’
     expect(show.out).toContain('dans la période');
     expect(show.out).not.toContain('hors période');
     expect(repoWork(Plan.load(r.plan), { rel: '../v', path: r.v }, 'L1').map((c) => c.subject)).toEqual(['feat(L1): dans la période']);
+  });
+});
+
+/*
+ * Ces quatre chemins relient les commits avec plan.everyLot(). Seul « Fait depuis » de session start (period) en dépend de façon
+ * visible : remettre plan.lots() y ferait taire le commit du lot archivé (R22 le mesure). Dans sessionStart, lead tour, now et gantt,
+ * les commits reliés ne nourrissent que les lots actifs (en cours, prêts) : la lecture de l'archive y est neutre pour la sortie,
+ * et R23–R25 fixent ce que l'utilisateur voit — le projet se lit, le lot archivé n'apparaît nulle part, aucun écart « inconnu ».
+ */
+describe('L396 — revue de code, constat 4 : session start, lead tour, raf now et raf gantt avec un lot archivé', () => {
+  /** Plan commité, un commit de L1 (archivé ensuite) et un de L4 (en cours) ; L1 part à l'archive. */
+  async function archivedWithCommits() {
+    const r = repoWithPlan();
+    execFileSync('git', ['add', '--', '.cadence'], { cwd: r.dir, stdio: 'ignore' });
+    execFileSync('git', ['commit', '-q', '-m', 'chore: plan'], { cwd: r.dir, env: { ...process.env, GIT_AUTHOR_DATE: '2025-01-01T09:00:00', GIT_COMMITTER_DATE: '2025-01-01T09:00:00' }, stdio: 'ignore' });
+    commit(r.dir, 'feat(L1): travail ancien', '2025-06-01T10:00:00');
+    commit(r.dir, 'feat(L4): en cours', '2026-10-27T10:00:00');
+    expect((await r.raf('archive')).code).toBe(0);
+    expect(Plan.load(r.plan).lots().map((l) => l.id)).toEqual(['L4', 'L5']);
+    return r;
+  }
+
+  it('R22 — session start : « Fait depuis » rapporte le commit d’un lot archivé sous son id, ni « sans lot » ni écart, et ne propose pas le lot', async () => {
+    const r = await archivedWithCommits();
+    const res = await r.raf('session', 'start', '--since', '2025-01-01');
+    expect(res.code).toBe(0);
+    expect(res.out).toMatch(/Fait depuis 2025-01-01\n(.*\n)*? {2}L1 — 1 commit\(s\) : feat\(L1\): travail ancien/);
+    expect(res.out).toMatch(/ {2}L4 — 1 commit\(s\) : feat\(L4\): en cours/);
+    expect(res.out).not.toContain('sans lot');
+    expect(res.out).not.toContain('inconnu');
+    expect(res.out).toMatch(/En cours\n {2}L4 {2}quatrième {2}\(1 commit, dernière activité 2026-10-27/);
+    expect(res.out).not.toMatch(/Propositions(.*\n)*.*L1/);
+  });
+
+  it('R23 — lead tour : le projet se lit, L4 compte son commit, aucun écart « inconnu », la progression ne compte que le plan actif', async () => {
+    const r = await archivedWithCommits();
+    const row = tourRow(r.dir, '2026-10-28');
+    expect(row.error).toBeUndefined();
+    expect(row.doing).toEqual([{ id: 'L4', commits: 1 }]);
+    expect(row.drift.join('\n')).not.toContain('inconnu');
+    expect(row.drift.join('\n')).not.toContain('L1');
+    expect(row.progress).toMatchObject({ done: 0, doing: 1, todo: 1 });
+  });
+
+  it('R24 — raf now : L4 et son commit, aucun lot archivé dans « Terminés récemment », aucun écart', async () => {
+    const r = await archivedWithCommits();
+    const res = await r.raf('now');
+    expect(res.code).toBe(0);
+    expect(res.out).toMatch(/En cours\n {2}L4 {2}quatrième {2}\(1 j, 1 commit\(s\)\)/);
+    expect(res.out).not.toContain('Terminés récemment');
+    expect(res.out).not.toContain('L1');
+    expect(res.out).not.toContain('écart');
+  });
+
+  it('R25 — raf gantt : la page ne porte que les lots du plan actif, L4 avec son commit', async () => {
+    const r = await archivedWithCommits();
+    const res = await r.raf('gantt');
+    expect(res.code).toBe(0);
+    const html = readFileSync(res.out, 'utf8');
+    const data = JSON.parse(/<script type="application\/json" id="raf-data">(.*?)<\/script>/s.exec(html)![1]);
+    expect(data.bars.map((b: { id: string }) => b.id)).toEqual(['L4', 'L5']);
+    expect(data.bars[0]).toMatchObject({ id: 'L4', commits: 1 });
+    expect(html).not.toContain('travail ancien');
   });
 });

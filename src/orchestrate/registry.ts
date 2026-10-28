@@ -64,13 +64,24 @@ export function liveWaves(home: string): LiveWave[] {
 }
 
 /**
+ * Le plafond que TOUTES les vagues vivantes appliquent (L395) : le plus bas des plafonds connus, `fallback` si aucune n'en déclare.
+ * Les créneaux sont communs : deux plafonds différents ne peuvent pas être respectés tous les deux (une vague à 4 à côté d'une
+ * vague à 3 portait le total à « 4/3 » et la vague à 3 attendait), le plus bas fait loi pour toutes.
+ */
+export function commonCap(waves: LiveWave[], fallback: number): number {
+  const caps = waves.map((w) => w.cap).filter((c): c is number => c !== undefined && Number.isFinite(c) && c >= 1);
+  return caps.length ? Math.min(fallback, ...caps) : fallback;
+}
+
+/**
  * Les créneaux que le lead peut encore donner à des sous-agents : `total` moins, pour chaque vague vivante, le
- * plus petit de son plafond et du nombre de lots qu'elle joue à la fois — un par dépôt qu'elle tient encore, un par lot pour des lots en worktrees (ses pas prennent un créneau et le
+ * plus petit du plafond commun (`commonCap`) et du nombre de lots qu'elle joue à la fois — un par dépôt qu'elle tient encore, un par lot pour des lots en worktrees (ses pas prennent un créneau et le
  * rendent entre deux étapes : les sessions vivantes à l'instant ne disent pas ce que la vague va reprendre).
  * Une vague sans plafond connu compte pour `total`.
  */
 export function freeSlots(waves: LiveWave[], total: number, leadSessions = 0): number {
-  const held = waves.reduce((n, w) => n + Math.min(w.cap ?? total, w.lanes ?? w.repos.length), 0);
+  const common = commonCap(waves, total);
+  const held = waves.reduce((n, w) => n + Math.min(w.cap !== undefined ? common : total, w.lanes ?? w.repos.length), 0);
   return Math.max(0, total - held - leadSessions);
 }
 
@@ -221,9 +232,9 @@ export class SlotAbandoned extends Error {
 
 /**
  * Attend que le nombre de sessions vivantes, TOUTES vagues confondues et quel que soit l'index de leur créneau,
- * soit sous `cap` (le plafond de cette vague), puis prend le premier créneau libre (un pid mort est repris) et
- * rend sa libération. Chaque vague applique SON plafond au total commun : avec des plafonds différents, la
- * vague au plafond le plus haut peut porter le total au-dessus du plafond de l'autre, qui attend alors.
+ * soit sous le plafond commun — `cap` (le plafond de cette vague) ou, s'il est plus bas, celui d'une autre vague vivante
+ * (`commonCap`, relu à chaque tour, L395) —, puis prend le premier créneau libre (un pid mort est repris) et
+ * rend sa libération. Toutes les vagues appliquent le même plafond : jamais « 4/3 en cours ».
  * Deux vagues qui prennent en même temps se départagent au recomptage : si le total dépasse `cap` une fois
  * le créneau pris, il est rendu et l'attente reprend.
  *
@@ -237,7 +248,7 @@ export class SlotAbandoned extends Error {
 export async function acquireSlot(
   home: string,
   cap: number,
-  opts: { wave: string; slots?: (home: string) => OLock[]; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number) => void; onGot?: (waitedMs: number) => void; abandon?: () => string | null; now?: () => number },
+  opts: { wave: string; slots?: (home: string) => OLock[]; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number, limit: number) => void; onGot?: (waitedMs: number) => void; abandon?: () => string | null; now?: () => number },
 ): Promise<() => void> {
   mkdirSync(slotsDir(home), { recursive: true });
   const now = opts.now ?? Date.now; // injectable : les tests pilotent l'horloge
@@ -250,13 +261,14 @@ export async function acquireSlot(
     if (why) throw new SlotAbandoned(why);
   };
   for (;;) {
+    const limit = commonCap(liveWaves(home), cap); // relu à chaque tour : une vague au plafond bas qui s'arrête le relève
     if (reportedAt !== null) checkAbandon(); // pas à la première tentative : un créneau libre est pris même si une demande est posée
-    if (live(home).length < cap) {
+    if (live(home).length < limit) {
       for (let k = 0; k < MAX_SLOT_INDEX; k++) {
         const file = join(slotsDir(home), `slot-${k}.lock`);
         const got = takeLock(file, { pid: process.pid, wave: opts.wave, started: new Date().toISOString() });
         if (!got.ok) continue;
-        if (live(home).length <= cap) {
+        if (live(home).length <= limit) {
           if (reportedAt !== null) opts.onGot?.(now() - t0);
           return () => releaseLock(file, process.pid);
         }
@@ -267,7 +279,7 @@ export async function acquireSlot(
     if (reportedAt === null) checkAbandon(); // la première tentative a échoué : l'attente commence, la demande déjà posée l'interrompt sans attendre un tour
     if (reportedAt === null || now() - reportedAt >= (opts.reportMs ?? WAIT_REPORT_MS)) {
       reportedAt = now();
-      opts.onWait?.(live(home), reportedAt - t0);
+      opts.onWait?.(live(home), reportedAt - t0, limit);
     }
     await new Promise((r) => setTimeout(r, pollMs + Math.random() * pollMs * 0.25));
   }

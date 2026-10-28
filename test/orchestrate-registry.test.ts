@@ -136,8 +136,32 @@ describe('plafond réellement global (L71/t2)', () => {
     r();
   });
 
-  it("un plafond plus haut passe là où un plafond plus bas attend : chaque vague applique le sien", async () => {
+  it('un plafond commun : une vague à 4 à côté d\'une vague vivante à 3 attend à 3 sessions (jamais « 4/3 »)', async () => {
     const home = tempDir();
+    registerWave(home, wave({ cap: 3 })); // la vague voisine, vivante, au plafond 3
+    held(home, 0);
+    held(home, 1);
+    held(home, 2);
+    let got = false;
+    const waits: string[] = [];
+    const p = acquireSlot(home, 4, { wave: 'haut', pollMs: 10, onWait: (h, _ms, limit) => waits.push(`${h.length}/${limit}`) }).then((r) => {
+      got = true;
+      return r;
+    });
+    await new Promise((r) => setTimeout(r, 80));
+    expect(got).toBe(false); // 3 sessions tournent : le plafond de 4 de cette vague cède au plafond commun de 3
+    expect(waits[0]).toBe('3/3'); // le message dit le plafond appliqué, pas « 3/4 »
+    rmSync(join(home, 'slots/slot-2.lock'));
+    const r = await p;
+    expect(liveSlots(home)).toHaveLength(3);
+    r();
+  });
+
+  it("le plafond commun est le plus bas des vagues vivantes ; une vague sans plafond connu ou morte n'y compte pas", async () => {
+    const home = tempDir();
+    mkdirSync(join(home, 'waves'), { recursive: true });
+    writeFileSync(join(home, 'waves/999999999.json'), JSON.stringify(wave({ pid: 999999999, wave: 'morte', cap: 1 })));
+    registerWave(home, wave({ cap: undefined }));
     held(home, 0);
     held(home, 1);
     const r = await acquireSlot(home, 3, { wave: 'haut', pollMs: 10 });
@@ -237,5 +261,8 @@ describe('créneaux libres (L141)', () => {
     expect(freeSlots([w(2, ['/a']), w(2, ['/b'])], 2)).toBe(0);
     expect(freeSlots([w(2, ['/a', '/b']), w(2, ['/c', '/d'])], 2)).toBe(0);
     expect(freeSlots([w(undefined, ['/a', '/b'])], 2)).toBe(0);
+  });
+  it('plafond commun (L395) : une vague à 4 à côté d\'une vague à 3 ne retient pas plus que 3', () => {
+    expect(freeSlots([w(4, ['/a', '/b', '/c', '/d']), w(3, ['/e'])], 6)).toBe(2);
   });
 });

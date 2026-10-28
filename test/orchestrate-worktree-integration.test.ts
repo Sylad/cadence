@@ -250,6 +250,18 @@ describe('R9 / R17 — verdict reporté ou revue courte après un rebase', () =>
     }
     expect(r.out).toMatch(/a:L\d verdict reporté : [0-9a-f]{7} → [0-9a-f]{7} \(patch-id identique\)/);
   });
+  it('L397 R9 — rebase non vide : la porte enregistrée porte le sommet rebasé et son arbre, que verify --gate reprend', async () => {
+    const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], 'worktrees: true\nbuild: "true"');
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], fake({ implement: writes(meeting(2)) }));
+    expect(r.code).toBe(0);
+    const rebased = ['L1', 'L2'].map((id) => store(parent).readLot('a', id)!).filter((l) => planOf(repo).lot(l.lot).review!.reporte);
+    expect(rebased.length).toBeGreaterThan(0);
+    for (const l of rebased) {
+      expect(l.checks!.head).toBe(planOf(repo).lot(l.lot).review!.commit);
+      expect(git(repo, 'merge-base', '--is-ancestor', l.checks!.head, 'main')).toBe('');
+      expect(l.checks!.tree).toBe(git(repo, 'rev-parse', `${l.checks!.head}^{tree}`));
+    }
+  });
   it('R17 — patch-id identique : aucune revue jouée', async () => {
     const { parent } = setup();
     const f = fake({ implement: writes(meeting(2)) });

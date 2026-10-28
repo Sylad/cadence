@@ -296,10 +296,10 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
   return { from: found.branch, unintegrated: found.unintegrated };
 }
 
-/** Les fichiers du plan qu'une session ne doit pas toucher, relatifs au dépôt : le fichier de plan, la page Gantt et ce qui est généré avec (`plan.files`, les fichiers de `plan.onWrite`). */
+/** Les fichiers du plan qu'une session ne doit pas toucher, relatifs au dépôt : le fichier de plan, la page Gantt, ce qui est généré avec (`plan.files`, les fichiers de `plan.onWrite`) et les fichiers d'année de l'archive (L396). */
 export function planFileSet(plan: Plan, repo: string): Set<string> {
   const rel = relative(repo, plan.path);
-  return new Set([rel, join(dirname(rel), 'gantt.html'), ...plan.files, ...plan.produced]);
+  return new Set([rel, join(dirname(rel), 'gantt.html'), ...plan.files, ...plan.produced, ...plan.archiveFiles().map((f) => relative(repo, f))]);
 }
 
 /** Les commits de la branche du lot déjà dans la branche du dépôt ? */

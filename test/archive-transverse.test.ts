@@ -7,7 +7,8 @@ import { planLoader } from '../src/config.js';
 import { deliver, parseDeliverConfig, type DeliverDeps } from '../src/deliver.js';
 import { appendDelivery } from '../src/state.js';
 import { fileIds, repoWithPlan } from './archive-helpers.js';
-import { commit, tempDir } from './helpers.js';
+import { commit, gitRepo, tempDir } from './helpers.js';
+import { Plan } from '../src/plan.js';
 import { writeJournal, writeWave } from './perf-helpers.js';
 
 /*
@@ -80,14 +81,19 @@ async function livre(dir: string, first: string): Promise<string> {
 }
 
 /**
- * « Fait depuis » liste les lots dans l'ordre de leur commit le plus récent ; le commit du plan que propose `raf archive` cite les lots
- * archivés et passe donc L1 en tête après coup. C'est l'historique qui change, pas la lecture du plan : les lignes sont comparées triées.
+ * « Fait depuis » liste les lots dans l'ordre de leur commit le plus récent ; le commit du plan que propose `raf archive` cite le premier lot
+ * archivé (`plan: L1 3 lot(s) archivé(s)`) et passe donc sa ligne en tête après coup. C'est l'historique qui change, pas la lecture du plan :
+ * l'attendu d'après est l'avant avec la seule ligne de ce lot remontée en tête de la section, tout le reste à l'identique.
  */
-function faitDepuisTrie(text: string): string {
-  const lines = text.split('\n');
+function faitDepuisApresArchive(avant: string, lot: string): string {
+  const lines = avant.split('\n');
   const isLot = (l: string) => /^ {2}L\d+ — \d+ commit\(s\) : /.test(l);
-  const sorted = lines.filter(isLot).sort();
-  return lines.map((l) => (isLot(l) ? sorted.shift()! : l)).join('\n');
+  const first = lines.findIndex(isLot);
+  const moved = lines.findIndex((l) => l.startsWith(`  ${lot} — `));
+  if (first < 0 || moved < 0) throw new Error(`pas de ligne « Fait depuis » pour ${lot}`);
+  const [line] = lines.splice(moved, 1);
+  lines.splice(first, 0, line);
+  return lines.join('\n');
 }
 
 /** Les sorties à comparer, par commande. */
@@ -104,7 +110,7 @@ async function snapshot(r: { dir: string; parent: string; first: string }): Prom
     'raf list': await cadence(r.dir, 'list'),
     'raf list --status done': await cadence(r.dir, 'list', '--status', 'done'),
     'raf gantt': (await cadence(r.dir, 'gantt', '-o', gantt)).replace(gantt, '<gantt>'),
-    'session start': faitDepuisTrie(await cadence(r.dir, 'session', 'start', '--since', '2025-01-01')),
+    'session start': await cadence(r.dir, 'session', 'start', '--since', '2025-01-01'),
     'lead tour': await cadence(r.parent, 'lead', 'tour', r.parent),
     'ref coverage': await cadence(r.dir, 'ref', 'coverage', 'inventaire.json'),
     'news check': await cadence(r.dir, 'news', 'check', '--dir', join(r.dir, 'docs/nouveautes')),
@@ -150,8 +156,44 @@ describe('L396 — l’archive est invisible pour les lecteurs du plan', () => {
     git(r.dir, 'push', '-q');
 
     const apres = await snapshot(r);
-    for (const key of Object.keys(avant)) expect(apres[key], key).toBe(avant[key]);
+    for (const key of Object.keys(avant)) expect(apres[key], key).toBe(key === 'session start' ? faitDepuisApresArchive(avant[key], 'L1') : avant[key]);
     expect(existsSync(join(r.dir, '.cadence/archive/2025.yaml'))).toBe(true);
+  });
+
+  it('T3 — un plan entremêlé (todo, done, todo, dropped, doing, done) se lit dans le même ordre après raf archive : list, list --status, now, show, gantt et plan.lots()', async () => {
+    const dir = gitRepo();
+    const file = join(dir, '.cadence/raf.yaml');
+    const p = Plan.create(file, 'demo', 'L', '2025-01-01');
+    for (const t of ['un', 'deux', 'trois', 'quatre', 'cinq', 'six']) p.add(t, '2025-01-01');
+    p.setStatus('L2', 'done', '2025-03-01', { force: true });
+    p.setStatus('L4', 'dropped', '2026-02-01', { force: true });
+    p.setStatus('L5', 'doing', '2026-10-01');
+    p.setStatus('L6', 'done', '2026-10-20', { force: true });
+    p.save();
+    const gantt = join(tempDir(), 'gantt.html');
+    const snap = async () => {
+      const s: Record<string, string> = {
+        'plan.lots()': Plan.load(file).lots().map((l) => `${l.id} ${l.status}`).join(', '),
+        'raf list': await cadence(dir, 'list'),
+        'raf list --status done': await cadence(dir, 'list', '--status', 'done'),
+        'raf now': await cadence(dir, 'now'),
+        'raf show L4': await cadence(dir, 'show', 'L4'),
+        'raf gantt': (await cadence(dir, 'gantt', '-o', gantt)).replace(gantt, '<gantt>'),
+      };
+      s['gantt.html'] = readFileSync(gantt, 'utf8');
+      return s;
+    };
+    const avant = await snap();
+    expect(avant['plan.lots()']).toBe('L1 todo, L2 done, L3 todo, L4 dropped, L5 doing, L6 done');
+    expect(avant['raf list'].indexOf('L2 ')).toBeLessThan(avant['raf list'].indexOf('L3 '));
+    expect(avant['raf list'].indexOf('L3 ')).toBeLessThan(avant['raf list'].indexOf('L4 '));
+
+    const archive = await cadence(dir, 'archive');
+    expect(archive).toContain('archivé dans .cadence/archive/2025.yaml : L2');
+    expect(archive).toContain('archivé dans .cadence/archive/2026.yaml : L4, L6');
+    expect(fileIds(file)).toEqual(['L1', 'L3', 'L5']);
+    const apres = await snap();
+    for (const key of Object.keys(avant)) expect(apres[key], key).toBe(avant[key]);
   });
 
   it("T2 — le commit proposé par raf archive se rejoue sans doublon : un second tour qui n'archive rien ne propose rien", async () => {

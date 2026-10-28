@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node
 import { dirname, join, relative, resolve } from 'node:path';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
-import { ARCHIVE_DIR, archiveFiles, archiveLots, archiveYear, newArchiveDoc, readArchiveDoc, selectArchivable, type Kept } from './archive.js';
+import { ARCHIVE_DIR, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, selectArchivable, type Kept } from './archive.js';
 
 /** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
 const ON_WRITE_TIMEOUT_MS = 120_000;
@@ -274,8 +274,10 @@ export class Plan {
   }
 
   /**
-   * Écrit le plan, puis lance `plan.onWrite` s'il est déclaré. Chemin unique de toutes les écritures (raf, orchestrate, deliver, config set) :
-   * si la commande échoue, le plan et les fichiers qu'elle déclare reviennent tels qu'avant et l'erreur le dit (L346).
+   * Écrit le plan, puis lance `plan.onWrite` s'il est déclaré. Chemin unique de toutes les écritures (raf, orchestrate, deliver, config set).
+   * Sans perte, quelle que soit l'exception : les fichiers d'année (L396) sont écrits AVANT le plan — si le plan ne s'écrit pas ensuite, un lot
+   * déplacé est au pire en double, ce que le chargement refuse en le nommant, jamais perdu — et toute exception d'écriture (EACCES, disque plein,
+   * commande `plan.onWrite` en échec, L346) remet le plan, les fichiers d'année et les fichiers déclarés tels qu'avant ; l'erreur le dit.
    */
   save(): void {
     this.writable();
@@ -284,14 +286,34 @@ export class Plan {
     this.reopened();
     const archives = (this.archives ?? []).filter((a) => a.dirty);
     const hadDir = existsSync(this.archiveDir);
-    const written = [this.path, ...archives.map((a) => a.file)];
-    const kept = hook ? [...written, ...hook.files.map((f) => resolve(hook.cwd, f))].map((p) => [p, existsSync(p) ? readFileSync(p) : null] as const) : [];
-    writeFileSync(this.path, this.doc.toString({ lineWidth: 0, indentSeq: this.indentSeq }));
-    if (archives.length > 0) mkdirSync(this.archiveDir, { recursive: true });
-    for (const a of archives) {
-      writeFileSync(a.file, a.doc.toString({ lineWidth: 0 }));
-      a.dirty = false;
+    const written = [...archives.map((a) => a.file), this.path, ...(hook ? hook.files.map((f) => resolve(hook.cwd, f)) : [])];
+    const kept = written.map((p) => [p, existsSync(p) ? readFileSync(p) : null] as const);
+    // « Plan inchangé » vaut pour l'archive aussi : un fichier d'année né de cette écriture disparaît, le dossier avec. Un fichier qui n'a pas bougé
+    // (l'écriture a échoué avant lui, ou sur lui) n'est pas réécrit : le remettre échouerait de la même façon.
+    const restore = () => {
+      for (const [p, content] of kept) {
+        const now = existsSync(p) ? readFileSync(p) : null;
+        if (now === content || (now && content && now.equals(content))) continue;
+        try {
+          if (content === null) rmSync(p, { force: true });
+          else writeFileSync(p, content);
+        } catch {
+          /* le fichier d'origine est intact ou le même : rien de plus à faire */
+        }
+      }
+      if (!hadDir) rmSync(this.archiveDir, { recursive: true, force: true });
+      for (const a of archives) a.dirty = true;
+    };
+    try {
+      if (archives.length > 0) mkdirSync(this.archiveDir, { recursive: true });
+      for (const a of archives) writeFileSync(a.file, a.doc.toString({ lineWidth: 0 }));
+      writeFileSync(this.path, this.doc.toString({ lineWidth: 0, indentSeq: this.indentSeq }));
+    } catch (e) {
+      restore();
+      const code = (e as NodeJS.ErrnoException).code;
+      throw new RafError(`écriture du plan refusée (${code ? `${code}, ` : ''}${(e as Error).message}) — plan et archive inchangés`);
     }
+    for (const a of archives) a.dirty = false;
     if (!hook) return;
     const limit = hook.timeoutMs ?? ON_WRITE_TIMEOUT_MS;
     const r = spawnSync('sh', ['-c', hook.command], { cwd: hook.cwd, encoding: 'utf8', timeout: limit, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -301,13 +323,7 @@ export class Plan {
       if (missing.length > 0) notice(`raf: plan.onWrite a réussi mais le fichier déclaré est absent : ${missing.join(', ')} — vérifier plan.onWrite.files dans cadence.yaml`);
       return;
     }
-    // « Plan inchangé » vaut pour l'archive aussi : ses fichiers reviennent tels qu'avant (un fichier d'année né de cette écriture disparaît, le dossier avec).
-    for (const [p, content] of kept) {
-      if (content === null) rmSync(p, { force: true });
-      else writeFileSync(p, content);
-    }
-    if (!hadDir) rmSync(this.archiveDir, { recursive: true, force: true });
-    for (const a of archives) a.dirty = true;
+    restore();
     const why = r.error ? (r.error as NodeJS.ErrnoException).code === 'ETIMEDOUT' ? `délai de ${limit / 1000} s dépassé` : r.error.message : `code ${r.status ?? r.signal}`;
     const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split('\n').slice(-5).join(' | ');
     throw new RafError(`plan.onWrite en échec (${hook.command}, ${why})${tail ? ` : ${tail}` : ''} — écriture refusée, plan inchangé`);
@@ -493,8 +509,9 @@ export class Plan {
       const ack = readDocsOkFile(this.docsOkFile);
       return this.read().lots.map((l) => (l.docsOk || !ack[l.id] ? l : { ...l, docsOk: ack[l.id] }));
     }
-    // L396 : l'archive est un détail de stockage — les lots archivés (années croissantes) puis ceux du fichier actif, comme un seul plan.
-    return [...this.loadArchives().flatMap((a) => archiveLots(a.doc).toJSON() as Record<string, unknown>[]), ...this.activeRaw()].map((r) => normalizeLot(r));
+    // L396 : l'archive est un détail de stockage — les lots archivés reprennent leur place parmi ceux du fichier actif, comme un seul plan.
+    const archived = this.loadArchives().flatMap((a) => archiveLots(a.doc).toJSON() as Record<string, unknown>[]);
+    return mergeArchived(archived.map((r) => normalizeLot(r)), this.activeRaw().map((r) => normalizeLot(r)));
   }
 
   lot(id: string): Lot {
@@ -588,8 +605,8 @@ export class Plan {
 
   /**
    * `raf archive` : déplace les lots done et dropped du fichier du plan (terminés avant `before` s'il est donné) vers le fichier de leur année
-   * de fin, puis écrit le tout par `save()` : si l'écriture échoue (`plan.onWrite`, L346), plan et archive reviennent tels qu'avant, sur le
-   * disque comme en mémoire. `blocked` : la raison pour laquelle un lot reste (un écart ouvert que `raf check` signale), null sinon.
+   * de fin, puis écrit le tout par `save()` : si l'écriture échoue (toute exception — EACCES, `plan.onWrite` en échec, L346), plan et archive
+   * reviennent tels qu'avant, sur le disque (`save()`) comme en mémoire (ici). `blocked` : la raison pour laquelle un lot reste (un écart ouvert que `raf check` signale), null sinon.
    * `dryRun` : rend ce qui serait déplacé, sans rien écrire.
    */
   archive(today: Day, opts: { before?: Day; dryRun?: boolean; blocked?: (lot: Lot) => string | null } = {}): { moved: { lot: Lot; file: string }[]; kept: Kept[] } {
@@ -775,7 +792,7 @@ export class Plan {
     const node = this.lotNode(lotId);
     if (lot.status === status) throw new RafError(`${lotId} est déjà ${status}`);
     if (!isOpen(lot.status)) {
-      throw new RafError(`${lotId} est ${lot.status} ; le rouvrir à la main dans le YAML si c'est voulu`);
+      throw new RafError(`${lotId} est ${lot.status} ; le rouvrir si c'est voulu : raf todo ${lotId}`);
     }
     if (status === 'done') {
       const open = lot.tasks.filter((t) => isOpen(t.status)).map((t) => `${lotId}/${t.id}`);
@@ -802,13 +819,21 @@ export class Plan {
    * Remet en attente un lot démarré (doing → todo, `started` retiré, note datée) — `raf todo` (L220). Les refus passent dans
    * l'ordre : plan modifiable, lot et non sous-tâche, lot connu, lot doing ; `commits` n'est lu qu'ensuite (il lit git) et un lot
    * qui a du travail est refusé. Les sous-tâches et les autres clés du lot ne bougent pas.
+   * Rouvre aussi un lot clos (done ou dropped → todo, `finished` retiré, note datée « rouvert ») : c'est LA commande pour le faire,
+   * jamais le YAML — un lot archivé rouvert revient dans le fichier du plan à l'écriture (L396). Ses commits restent les siens : `started` est gardé.
    */
   putBack(ref: string, today: Day, reason: string, commits: () => number): void {
     this.writable();
     if (ref.includes('/')) throw new RafError(`raf todo se pose sur un lot, pas une sous-tâche : ${ref}`);
     const lot = this.lot(ref);
     if (lot.status === 'todo') throw new RafError(`${ref} est déjà todo`);
-    if (lot.status !== 'doing') throw new RafError(`${ref} est ${lot.status} ; le rouvrir à la main dans le YAML si c'est voulu`);
+    if (lot.status === 'done' || lot.status === 'dropped') {
+      const node = this.lotNode(ref);
+      node.set('status', 'todo');
+      node.delete('finished');
+      this.note(ref, reason.trim() ? `rouvert (était ${lot.status}) : ${reason.trim()}` : `rouvert (était ${lot.status})`, today);
+      return;
+    }
     const n = commits();
     if (n > 0) throw new RafError(`${ref} a ${n} commit(s) qui le citent : le remettre en attente perdrait leur lien — raf drop ou le laisser doing`);
     const node = this.lotNode(ref);

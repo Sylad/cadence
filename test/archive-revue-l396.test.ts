@@ -70,17 +70,24 @@ describe('L396 — l’écriture renvoie un lot archivé dans son fichier d’an
     expect(Plan.load(r.plan).lot('L1').review?.verdict).toBe('conforme');
   });
 
-  it('R27 — un lot archivé rouvert à la main dans son fichier d’année revient dans le fichier du plan à la première écriture : l’archive ne porte que des lots clos', async () => {
+  it('R27 — un lot archivé rouvert par raf todo revient dans le fichier du plan : l’archive ne porte que des lots clos', async () => {
     const r = repoWithPlan();
     await r.raf('archive');
-    // Rouvrir un lot clos se fait à la main dans le YAML (raf todo ne touche qu'un lot doing) : ici dans le fichier d'année.
-    writeFileSync(r.archive('2026'), readFileSync(r.archive('2026'), 'utf8').replace(/(id: L3\n\s+title: [^\n]+\n\s+status: )done/, '$1doing'));
-    expect(Plan.load(r.plan).lot('L3').status).toBe('doing');
-    expect((await r.raf('note', 'L3', 'reprise')).code).toBe(0);
+    // Rouvrir un lot clos passe par la commande (L396), jamais par le YAML : le lot quitte son fichier d'année à l'écriture.
+    const reopened = await r.raf('todo', 'L3', '--reason', 'à reprendre');
+    expect(reopened.code).toBe(0);
+    expect(reopened.out).toContain('L3 → todo');
+    expect(Plan.load(r.plan).lot('L3').status).toBe('todo');
     expect(fileIds(r.plan)).toEqual(['L4', 'L5', 'L3']);
     expect(fileIds(r.archive('2026'))).toEqual(['L2']);
-    expect((await r.raf('show', 'L3', '--notes')).out).toContain('reprise');
+    expect((await r.raf('show', 'L3', '--notes')).out).toContain('rouvert (était done) : à reprendre');
+    expect((await r.raf('start', 'L3')).code).toBe(0);
     expect((await r.raf('now')).out).toContain('L3');
+    // Un lot remis à la main en doing dans son fichier d'année revient aussi à la première écriture.
+    writeFileSync(r.archive('2026'), readFileSync(r.archive('2026'), 'utf8').replace(/(id: L2\n\s+title: [^\n]+\n\s+status: )dropped/, '$1doing'));
+    expect((await r.raf('note', 'L2', 'reprise')).code).toBe(0);
+    expect(fileIds(r.plan)).toEqual(['L4', 'L5', 'L3', 'L2']);
+    expect(fileIds(r.archive('2026'))).toEqual([]);
   });
 
   it('R28 — un fichier d’année illisible est une erreur nommée, pas un lot de moins', async () => {

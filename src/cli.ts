@@ -59,7 +59,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf spec <id> on|off   pose ou retire spec: d'un lot existant (le lot change un comportement : étape spec back d'orchestrate)
   raf uses <lot> [<ressource>…]   remplace les ressources partagées du lot (uses:, déclarées par resources: dans le cadence.yaml du dossier parent ; raf check refuse un nom non déclaré) ; sans nom, retire la clé
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
-  raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits
+  raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits ; rouvre un lot done ou dropped (→ todo, finished retiré, note « rouvert ») — la seule façon de rouvrir, archivé compris (il revient dans le fichier du plan)
   raf note <id> "texte"
   raf title <id> "nouveau titre"   remplace le titre d'un lot, de tout statut (done compris), et note l'ancien dans une note datée
   raf did <id> ["texte"]   un lot récurrent (--every) a été refait : le « dû depuis N j » repart de aujourd'hui
@@ -74,7 +74,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot, citant un id inconnu ou des lots sans y travailler, sans réécrire l'historique ; raf check --ignored les liste
   raf docs-ok <lot> --reason texte   acquitte l'écart docs.sync d'un lot (documentation en retard) avec la raison pour laquelle la documentation reste telle quelle (plan en lecture seule : .cadence/docs-ok.yaml, le plan n'est pas touché) ; lu par raf check et par orchestrate, qui ne rend jamais prêt un lot avec un écart ouvert
-  raf archive [--before date] [--dry-run]   déplace les lots done et dropped (terminés avant la date, s'il y en a une) du fichier du plan vers .cadence/archive/<année>.yaml ; le plan chargé présente toujours tous les lots (show, list, check, now, news, perf… inchangés), seules les sessions ne lisent jamais l'archive ; reste dans le plan un lot qui a un écart ouvert (raf check), cité par un lot resté (after) ou compté par un gate ouvert ; un id présent dans deux fichiers est une erreur nommée ; rejouable
+  raf archive [--before date] [--dry-run]   déplace les lots done et dropped (terminés avant la date, s'il y en a une) du fichier du plan vers .cadence/archive/<année>.yaml ; le plan chargé présente toujours tous les lots (show, list, check, now, news, perf… inchangés), seules les sessions ne lisent jamais l'archive ; reste dans le plan un lot qui a un écart ouvert (raf check) ; un id présent dans deux fichiers est une erreur nommée ; refusé tant que le plan est à docs/plan/raf.yaml (raf migrate d'abord) ; rejouable
   raf gantt [-o .cadence/gantt.html]
   cadence config set <clé> <valeur> --all [--dry-run] [--depth n]   pose la même clé dans le cadence.yaml de chaque projet du dossier (ceux de lead tour), commentaires et ordre gardés, un lot de config qui la cite (raf add + start) et un commit à chemin explicite par projet ; ne pousse pas ; liste ce qui est fait et sauté (dépôt sale, déjà posée, plan en lecture seule) ; s'arrête sur une config qui ne se relit pas
   raf migrate [--dry-run]   déplace docs/plan/raf.yaml vers .cadence/raf.yaml (git mv) et réécrit les lecteurs du chemin dans le dépôt ; --dry-run les liste sans rien toucher ; refus tant qu'un lecteur n'est pas traité (migrate.keep de cadence.yaml pour ceux qui ne lisent pas le plan) ; rejouable
@@ -424,6 +424,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'archive': {
       if (values.before !== undefined && !isDay(values.before)) throw new RafError(`--before invalide : ${values.before} (attendu AAAA-MM-JJ)`);
+      // L'archive vit à côté du plan : à l'ancien emplacement, elle irait sous docs/ (publié) et raf migrate ne la déplacerait pas — migrer d'abord.
+      if (planPath === resolve(root, PLAN_LEGACY)) throw new RafError(`raf archive refusé : le plan est à l'ancien emplacement ${PLAN_LEGACY}, l'archive irait sous docs/ — le déplacer d'abord : raf migrate`);
       const dry = !!values['dry-run'];
       const plan = loadPlan();
       // Un lot clos qui a encore un écart (revue, UX, docs.sync, Nouveauté… ce que `raf check` signale) reste dans le plan, avec l'écart pour raison.

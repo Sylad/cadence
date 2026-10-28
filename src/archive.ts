@@ -19,43 +19,40 @@ export interface Kept {
 }
 
 /**
- * Les lots à déplacer et ceux qui restent, parmi `lots` (ceux du fichier actif). Un lot reste quand `blocked` le dit (un
- * écart que `raf check` signale encore), quand un lot qui reste le cite (`after` : sa sortie ferait un `bad-dependency`),
- * ou quand il compte pour la condition de tirage (`gate`) d'un lot encore ouvert : l'archiver baisserait le compte.
- * `before` : seuls les lots terminés strictement avant ce jour (un lot sans date de fin reste).
+ * Les lots à déplacer et ceux qui restent, parmi `lots` (ceux du fichier actif). Un lot reste seulement quand `blocked` le dit (un
+ * écart que `raf check` signale encore) : les lecteurs voyant l'archive, un lot cité par `after` ou compté par un `gate` s'archive
+ * comme les autres sans rien changer à ce qu'ils lisent. `before` : seuls les lots terminés strictement avant ce jour (un lot sans
+ * date de fin reste).
  */
 export function selectArchivable(lots: Lot[], before?: Day, blocked: (lot: Lot) => string | null = () => null): { move: Lot[]; kept: Kept[] } {
   const closed = (l: Lot) => (l.status === 'done' || l.status === 'dropped') && (before === undefined || (!!l.finished && l.finished < before));
-  const move = new Map(lots.filter(closed).map((l) => [l.id, l]));
+  const move: Lot[] = [];
   const kept: Kept[] = [];
-  const keep = (id: string, why: string) => {
-    move.delete(id);
-    kept.push({ id, why });
-  };
-  for (const l of [...move.values()]) {
+  for (const l of lots.filter(closed)) {
     const why = blocked(l);
-    if (why) keep(l.id, why);
+    if (why) kept.push({ id: l.id, why });
+    else move.push(l);
   }
-  for (const l of lots) {
-    if (!l.gate || l.gate.invalid || move.has(l.id) || l.status === 'done' || l.status === 'dropped') continue;
-    for (const c of lots) {
-      if (move.has(c.id) && c.status === 'done' && (l.gate.criterion === 'spec' ? c.spec === true : c.screen === 'page')) keep(c.id, `compte pour le gate de ${l.id}`);
-    }
+  return { move, kept };
+}
+
+/** Le numéro d'un identifiant (`L12` → 12) ; NaN pour un identifiant sans numéro. */
+const num = (id: string) => Number(/\d+$/.exec(id)?.[0] ?? NaN);
+
+/**
+ * Les lots archivés remis à leur place parmi ceux du fichier actif : chacun juste avant le premier lot actif de numéro plus grand, à la fin
+ * sinon, les archivés entre eux par numéro. L'ordre du fichier actif ne bouge jamais ; un plan que `raf add` tient dans l'ordre des numéros
+ * (le cas ordinaire) se lit exactement comme avant l'archivage (L396).
+ */
+export function mergeArchived(archived: Lot[], active: Lot[]): Lot[] {
+  const queue = [...archived].sort((a, b) => num(a.id) - num(b.id) || 0);
+  const out: Lot[] = [];
+  for (const lot of active) {
+    const n = num(lot.id);
+    while (queue.length > 0 && !(num(queue[0].id) >= n)) out.push(queue.shift()!);
+    out.push(lot);
   }
-  // Un lot gardé peut en retenir d'autres : on boucle jusqu'à ce que plus rien ne bouge.
-  for (let moved = true; moved; ) {
-    moved = false;
-    for (const l of lots) {
-      if (move.has(l.id)) continue;
-      for (const ref of l.after) {
-        if (move.has(ref)) {
-          keep(ref, `cité par ${l.id} (after)`);
-          moved = true;
-        }
-      }
-    }
-  }
-  return { move: lots.filter((l) => move.has(l.id)), kept };
+  return [...out, ...queue];
 }
 
 /** Année de rangement d'un lot : celle de sa fin, à défaut de sa création, à défaut d'aujourd'hui. */

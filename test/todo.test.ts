@@ -87,21 +87,32 @@ describe('raf todo', () => {
     expect(r.err).toContain('L3 est déjà todo');
   });
 
-  it('R3 — lot done et lot dropped : refus, plan intact', () => {
+  it('R3 — lot done et lot dropped : rouverts (→ todo, finished retiré, note « rouvert »), started gardé (L396)', () => {
     const dir = setup();
     raf(dir, 'done', 'L1');
-    raf(dir, 'drop', 'L2');
-    const before = yaml(dir);
-    expect(raf(dir, 'todo', 'L1').err).toContain('L1 est done ; le rouvrir à la main dans le YAML si c\'est voulu');
-    expect(raf(dir, 'todo', 'L2').err).toContain('L2 est dropped ; le rouvrir à la main dans le YAML si c\'est voulu');
-    expect(yaml(dir)).toBe(before);
+    raf(dir, 'drop', 'L2', '--reason', 'plus utile');
+    expect(raf(dir, 'todo', 'L1', '--reason', 'à refaire').code).toBe(0);
+    expect(raf(dir, 'todo', 'L2').code).toBe(0);
+    const [l1, l2] = lots(dir);
+    expect(l1.status).toBe('todo');
+    expect(l1.finished).toBeUndefined();
+    expect(l1.started).toBe('2026-09-28');
+    expect(l1.notes.at(-1).text).toBe('rouvert (était done) : à refaire');
+    expect(l2.status).toBe('todo');
+    expect(l2.finished).toBeUndefined();
+    expect(l2.notes.at(-1).text).toBe('rouvert (était dropped)');
+    expect(raf(dir, 'todo', 'L1').err).toContain('L1 est déjà todo');
   });
 
-  it('R3 — un lot done qui a des commits reçoit le refus de statut, pas celui des commits', () => {
+  it('R3 — un lot done qui a des commits se rouvre aussi : ses commits restent les siens ; raf start sur un lot clos renvoie à raf todo', () => {
     const dir = setup();
     commit(dir, 'feat(L1): un');
     raf(dir, 'done', 'L1', '--force');
-    expect(raf(dir, 'todo', 'L1').err).toContain('le rouvrir à la main');
+    expect(raf(dir, 'start', 'L1').err).toContain('L1 est done ; le rouvrir si c\'est voulu : raf todo L1');
+    expect(raf(dir, 'todo', 'L1').code).toBe(0);
+    expect(lots(dir)[0].status).toBe('todo');
+    expect(raf(dir, 'show', 'L1').out).toContain('feat(L1): un');
+    expect(raf(dir, 'start', 'L1').code).toBe(0);
   });
 
   it('R4 — L1/t1 : refus avec le message', () => {

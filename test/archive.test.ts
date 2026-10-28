@@ -31,24 +31,33 @@ describe('raf archive (L396)', () => {
     expect(readFileSync(r.archive('2026'), 'utf8')).not.toContain('id: L3');
   });
 
-  it("R3 — un lot que cite un lot resté dans le plan (after) ou qui compte pour un gate reste, et la sortie dit pourquoi", async () => {
+  it("R3 — un lot cité par after s'archive comme les autres : les lecteurs voyant l'archive, la dépendance reste lue (raf check sans bad-dependency, raf show pareil)", async () => {
     const r = repoWithPlan();
     const p = Plan.load(r.plan);
     p.add('dépend de L1', '2026-10-01', { after: ['L1'] });
     p.save();
+    const avant = { check: await r.raf('check', '--since', '2025-01-01'), show: await r.raf('show', 'L6'), now: await r.raf('now') };
+    expect(avant.check.out).not.toContain('bad-dependency');
     const res = await r.raf('archive');
     expect(res.code).toBe(0);
-    expect(res.out).toMatch(/L1 .*reste.*L6 \(after\)/);
-    expect(fileIds(r.plan)).toEqual(['L1', 'L4', 'L5', 'L6']);
-    expect(readFileSync(r.archive('2026'), 'utf8')).toContain('id: L3');
+    expect(res.out).not.toContain('reste dans le plan');
+    expect(fileIds(r.plan)).toEqual(['L4', 'L5', 'L6']);
+    expect(fileIds(r.archive('2025'))).toEqual(['L1']);
+    expect((await r.raf('check', '--since', '2025-01-01')).out).toBe(avant.check.out);
+    expect((await r.raf('show', 'L6')).out).toBe(avant.show.out);
+    expect((await r.raf('now')).out).toBe(avant.now.out);
   });
 
-  it('R3 — un lot done qui compte pour la condition de tirage (gate) d’un lot ouvert reste', async () => {
+  it("R3 — un lot done compté par le gate d'un lot ouvert s'archive : le compte du gate (raf show, raf now) est le même après", async () => {
     const r = repoWithPlan();
     writeFileSync(r.plan, readFileSync(r.plan, 'utf8').replace(/(- id: L3\n)/, '$1    spec: true\n').replace(/(- id: L5\n)/, '$1    gate: { count: 1, spec: true }\n'));
+    const avant = { show: await r.raf('show', 'L5'), now: await r.raf('now') };
+    expect(avant.show.out).toMatch(/gate : 1 lots/);
     const res = await r.raf('archive');
-    expect(res.out).toMatch(/L3 .*reste.*gate de L5/);
-    expect(fileIds(r.plan)).toContain('L3');
+    expect(res.out).not.toContain('reste dans le plan');
+    expect(fileIds(r.plan)).toEqual(['L4', 'L5']);
+    expect((await r.raf('show', 'L5')).out).toBe(avant.show.out);
+    expect((await r.raf('now')).out).toBe(avant.now.out);
   });
 
   it('R4 — rejouer ne déplace rien, un fichier d’année existant reçoit les nouveaux lots sans doublon', async () => {

@@ -22,7 +22,7 @@ import { replayRed, TEST_WORKERS_ENV, testWorkersText } from './workers.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, gateText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
-import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, type AgentDef, type AnyModel, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
+import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, enabledPlugins, settingsFiles, type AgentDef, type AnyModel, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, remoteAdvances, snapshot, type Snapshot } from './guard.js';
 import { sumTokens, type Tokens } from './result.js';
 import { cutReport, EXTENSION_MS, MAX_EXTENSIONS, workTimeoutMs } from './timeouts.js';
@@ -803,6 +803,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
       tmpDir,
       mcpConfig,
       playwright,
+      disablePlugins: enabledPlugins(settingsFiles(w.claudeHome, wd(c))),
       timeoutMs: delay,
       extend,
     },

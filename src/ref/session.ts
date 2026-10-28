@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { readOrchestrateConfig } from '../config.js';
-import { journalTokens, runSession, type AgentDef, type ClaudeFn, type Model } from '../orchestrate/launch.js';
+import { enabledPlugins, journalTokens, runSession, settingsFiles, type AgentDef, type ClaudeFn, type Model } from '../orchestrate/launch.js';
 import { sumTokens } from '../orchestrate/result.js';
 import { RafError } from '../plan.js';
 
@@ -47,6 +47,7 @@ export async function sessionDeRef(o: SessionRef): Promise<ResultatSession> {
       permissionMode: config.permissionMode,
       addDirs: [o.docDir],
       timeoutMs: config.timeouts.work,
+      disablePlugins: enabledPlugins(settingsFiles(o.claudeHome, o.docDir)), // comme une étape de vague (L398)
     },
     { claude: o.claude, agents: o.agents, onRelaunch: o.onRelaunch },
   );

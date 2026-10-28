@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import type { Effort } from '../config.js';
@@ -55,6 +56,8 @@ export interface StepSpec {
   mcpConfig?: string;
   /** Le serveur Playwright est chargé pour cette étape : un agent aux outils restreints reçoit alors ses outils MCP. */
   playwright?: boolean;
+  /** Plugins (`enabledPlugins`) de l'utilisateur et du projet désactivés dans la session (L398) : leurs hooks et leurs skills ne chargent plus son contexte ; ses autres réglages restent. Absent ou vide : pas de `--settings`. */
+  disablePlugins?: readonly string[];
   /** Étape lancée par `claude-local` (modèle Ollama de Big-Blue, hors quota) : arguments de `buildLocalArgs`, jamais de relance `--resume` (L146). */
   local?: boolean;
   /** Dossier temporaire de la session (L242) : exporté en `TMPDIR`, hors du dépôt, pour que ses journaux et dumps n'y salissent pas l'arbre de travail. */
@@ -149,6 +152,40 @@ function effortArgs(spec: StepSpec): string[] {
 /** Retire `run_in_background` de Bash et des sous-agents : `claude -p` attend toute tâche de fond avant de sortir (jusqu'à 10 min d'inactivité), la session finie ne rendait pas la main (L285). */
 export const NO_BACKGROUND_ENV = { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' };
 
+/** Dossier de Claude Code de l'utilisateur : `CLAUDE_CONFIG_DIR`, sinon `~/.claude` (le `HOME` de l'environnement donné : les tests en simulent un). */
+export function claudeConfigDir(env: Record<string, string | undefined> = process.env): string {
+  return env.CLAUDE_CONFIG_DIR || join(env.HOME || homedir(), '.claude');
+}
+
+/** Les fichiers de réglages dont les plugins activés comptent pour une session lancée dans `cwd` : celui de l'utilisateur (`claudeHome`, s'il est connu), ceux du projet et du dossier. */
+export function settingsFiles(claudeHome: string | undefined, cwd: string): string[] {
+  return [...(claudeHome ? [join(claudeHome, 'settings.json')] : []), join(cwd, '.claude', 'settings.json'), join(cwd, '.claude', 'settings.local.json')];
+}
+
+/** Identifiants des plugins activés (`enabledPlugins: { "<id>": true }`) dans l'un des fichiers de réglages donnés ; un fichier absent ou illisible ne compte pas. */
+export function enabledPlugins(files: string[]): string[] {
+  const ids = new Set<string>();
+  for (const file of files) {
+    let settings: { enabledPlugins?: Record<string, unknown> };
+    try {
+      settings = JSON.parse(readFileSync(file, 'utf8')) as typeof settings;
+    } catch {
+      continue;
+    }
+    for (const [id, on] of Object.entries(settings?.enabledPlugins ?? {})) if (on === true) ids.add(id);
+  }
+  return [...ids];
+}
+
+/**
+ * `--settings` d'une session (L398) : un JSON qui ne porte que les plugins de l'utilisateur et du projet à `false`. Un plugin désactivé n'enregistre
+ * ni ses hooks (celui de démarrage de superpowers injectait 3,4 ko) ni ses skills : le contexte qu'une session, qui n'en appelle aucun, ne paie plus
+ * (mesure : `docs/mesures/contexte-session-2026-10-28.md`). Rien d'autre n'est touché ni relayé : les réglages de l'utilisateur et du projet
+ * s'appliquent avec leur précédence normale (`--settings` l'emporte sur un projet qui active le plugin, vérifié le 2026-10-28), ses hooks compris.
+ * En argument, pas dans un fichier : des identifiants seulement (`nom@marketplace`, aucun secret), 1 000 plugins pèsent 50 ko sous la limite d'un argument Linux (128 ko).
+ */
+const settingsArgs = (spec: StepSpec): string[] => (spec.disablePlugins?.length ? ['--settings', JSON.stringify({ enabledPlugins: Object.fromEntries(spec.disablePlugins.map((id) => [id, false])) })] : []);
+
 export function buildArgs(spec: StepSpec, agents: Record<string, AgentDef>): string[] {
   const args = ['-p', spec.brief, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model, ...effortArgs(spec)];
   if (spec.agent) {
@@ -157,7 +194,7 @@ export function buildArgs(spec: StepSpec, agents: Record<string, AgentDef>): str
   }
   args.push('--session-id', spec.sessionId, '--permission-mode', spec.permissionMode);
   for (const d of spec.addDirs) args.push('--add-dir', d);
-  args.push('--disallowedTools', ...DISALLOWED);
+  args.push(...settingsArgs(spec), '--disallowedTools', ...DISALLOWED);
   if (spec.mcpConfig) args.push('--strict-mcp-config', '--mcp-config', spec.mcpConfig);
   return args;
 }
@@ -228,7 +265,7 @@ export function buildRetryArgs(spec: StepSpec, sessionId: string, agents: Record
   }
   args.push('--resume', sessionId, '--permission-mode', spec.permissionMode);
   for (const d of spec.addDirs) args.push('--add-dir', d);
-  args.push('--disallowedTools', ...DISALLOWED);
+  args.push(...settingsArgs(spec), '--disallowedTools', ...DISALLOWED);
   if (spec.mcpConfig) args.push('--strict-mcp-config', '--mcp-config', spec.mcpConfig);
   return args;
 }

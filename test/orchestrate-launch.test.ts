@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chmodSync } from 'node:fs';
 import { parseSession, isQuotaMessage } from '../src/orchestrate/result.js';
-import { buildArgs, buildLocalArgs, buildRetryArgs, killSessions, realClaude, mcpServersFor, writeMcpConfig, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
+import { buildArgs, buildLocalArgs, buildRetryArgs, killSessions, realClaude, mcpServersFor, writeMcpConfig, claudeConfigDir, enabledPlugins, settingsFiles, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { tempDir } from './helpers.js';
 
@@ -106,6 +106,63 @@ describe('buildArgs', () => {
     expect(buildArgs(spec, { 'code-reviewer': { description: 'd', prompt: 'p' } })).not.toContain('--effort');
     const r = buildRetryArgs({ ...spec, effort: 'high' }, 'sid', { 'code-reviewer': { description: 'd', prompt: 'p' } });
     expect(r[r.indexOf('--effort') + 1]).toBe('high');
+  });
+
+  it('L398 — les plugins activés sont désactivés par --settings {"enabledPlugins": {<id>: false}} en argument, relance de mise en forme comprise ; rien d\'autre des réglages n\'est touché', () => {
+    const agents = { 'code-reviewer': { description: 'd', prompt: 'p' } };
+    const disablePlugins = ['superpowers@claude-plugins-official', 'cadence@cadence'];
+    for (const args of [buildArgs({ ...spec, disablePlugins }, agents), buildRetryArgs({ ...spec, disablePlugins }, 'sid', agents)]) {
+      expect(args.filter((a) => a === '--settings')).toHaveLength(1);
+      expect(JSON.parse(args[args.indexOf('--settings') + 1]!)).toEqual({ enabledPlugins: { 'superpowers@claude-plugins-official': false, 'cadence@cadence': false } });
+      expect(args).not.toContain('--setting-sources');
+    }
+  });
+
+  it('L398 — sans plugin activé, aucun drapeau : ni --settings ni --setting-sources, relance et claude-local compris', () => {
+    const agents = { 'code-reviewer': { description: 'd', prompt: 'p' } };
+    for (const args of [buildArgs(spec, agents), buildArgs({ ...spec, disablePlugins: [] }, agents), buildRetryArgs(spec, 'sid', agents), buildLocalArgs(spec, agents)]) {
+      expect(args).not.toContain('--settings');
+      expect(args).not.toContain('--setting-sources');
+    }
+  });
+
+  it('L398 — enabledPlugins lit les plugins à true de l\'utilisateur, du projet et du dossier ; un fichier absent ou illisible ne compte pas ; rien d\'autre du fichier n\'est lu', () => {
+    const d = tempDir();
+    const home = join(d, 'claude-home');
+    const cwd = join(d, 'proj');
+    mkdirSync(home);
+    mkdirSync(join(cwd, '.claude'), { recursive: true });
+    writeFileSync(join(home, 'settings.json'), JSON.stringify({ enabledPlugins: { 'a@m': true, 'b@m': false }, env: { SECRET_TOKEN: 'xyz' }, permissions: { allow: ['Bash(raf:*)'] }, hooks: { PreToolUse: [] } }));
+    writeFileSync(join(cwd, '.claude', 'settings.json'), JSON.stringify({ enabledPlugins: { 'c@m': true, 'a@m': true } }));
+    writeFileSync(join(cwd, '.claude', 'settings.local.json'), 'pas du json');
+    expect(settingsFiles(home, cwd)).toEqual([join(home, 'settings.json'), join(cwd, '.claude', 'settings.json'), join(cwd, '.claude', 'settings.local.json')]);
+    expect(enabledPlugins(settingsFiles(home, cwd))).toEqual(['a@m', 'c@m']);
+    expect(enabledPlugins(settingsFiles(undefined, cwd))).toEqual(['c@m', 'a@m']);
+    expect(enabledPlugins([join(d, 'absent.json')])).toEqual([]);
+    writeFileSync(join(home, 'settings.json'), JSON.stringify({ theme: 'dark' }));
+    expect(enabledPlugins([join(home, 'settings.json')])).toEqual([]);
+  });
+
+  it('L398 — claudeConfigDir respecte CLAUDE_CONFIG_DIR, sinon HOME/.claude', () => {
+    expect(claudeConfigDir({ CLAUDE_CONFIG_DIR: '/cfg', HOME: '/home/u' })).toBe('/cfg');
+    expect(claudeConfigDir({ HOME: '/home/u' })).toBe('/home/u/.claude');
+  });
+
+  it('L398 — 1 000 plugins désactivés tiennent en un argument (limite Linux 128 ko, E2BIG)', () => {
+    const disablePlugins = Array.from({ length: 1000 }, (_, i) => `plugin-${i}-${'x'.repeat(30)}@marketplace-${i}`);
+    const args = buildArgs({ ...spec, disablePlugins }, { 'code-reviewer': { description: 'd', prompt: 'p' } });
+    for (const a of args) expect(Buffer.byteLength(a)).toBeLessThan(131_072);
+  });
+
+  it('L398 — l\'étape ux garde son MCP Playwright et l\'agent code-reviewer ses outils malgré --settings', () => {
+    const agents = readAgents(AGENTS_DIR);
+    const disablePlugins = ['playwright@claude-plugins-official'];
+    const ux = buildArgs({ ...spec, kind: 'ux', agent: 'ux-reviewer', playwright: true, mcpConfig: '/lot/mcp-ux.json', disablePlugins }, agents);
+    expect(ux).toEqual(expect.arrayContaining(['--strict-mcp-config', '--mcp-config', '/lot/mcp-ux.json', '--settings']));
+    expect(JSON.parse(ux[ux.indexOf('--agents') + 1])['ux-reviewer'].tools).toContain('mcp__playwright');
+    const rev = buildArgs({ ...spec, disablePlugins }, agents);
+    expect(JSON.parse(rev[rev.indexOf('--agents') + 1])['code-reviewer'].tools).toEqual(['Read', 'Grep', 'Glob', 'Bash', 'StructuredOutput']);
+    expect(rev[rev.indexOf('--agent') + 1]).toBe('code-reviewer');
   });
 
   it('une implémentation n\'a ni --agent ni --agents', () => {

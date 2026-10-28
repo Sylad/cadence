@@ -43,7 +43,10 @@ function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string
   writeFileSync(scen, JSON.stringify(scenario));
   const log = join(tempDir(), 'calls.jsonl');
   writeFileSync(log, '');
-  const env = { RAF_TODAY: '2026-10-04', CADENCE_CLAUDE_BIN: FAKE, FAKE_CLAUDE_SCENARIO: scen, FAKE_CLAUDE_LOG: log, FAKE_CLAUDE_SAMPLE: SAMPLE };
+  // Hermétique (L398) : le dossier de Claude Code de l'utilisateur est simulé, les plugins de la machine ne passent pas dans les sessions.
+  const claudeHome = join(tempDir(), 'claude-home');
+  mkdirSync(claudeHome);
+  const env = { RAF_TODAY: '2026-10-04', CADENCE_CLAUDE_BIN: FAKE, FAKE_CLAUDE_SCENARIO: scen, FAKE_CLAUDE_LOG: log, FAKE_CLAUDE_SAMPLE: SAMPLE, CLAUDE_CONFIG_DIR: claudeHome };
   const calls = () => readJsonLines(log);
   const cli = async (...argv: string[]) => {
     const out: string[] = [];
@@ -54,7 +57,7 @@ function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string
     const code = await orchestrate(argv, { cwd: parent, env: e, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') }, deps);
     return { code, out: out.join('\n'), err: err.join('\n') };
   };
-  return { parent, dir, bare, calls, cli, env };
+  return { parent, dir, bare, calls, cli, env, claudeHome };
 }
 
 const impl = { commits: [{ file: 'a.txt', message: 'feat({lot}): travail' }] };
@@ -81,6 +84,41 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     // L61 : la vague a tourné depuis son instantané (copie du paquet dans le dossier de la vague)
     expect(existsSync(join(base, '../tool/bin/cadence.js'))).toBe(true);
     expect(existsSync(join(base, '../tool/dist/orchestrate/snapshot.js'))).toBe(true);
+  });
+
+  it('L398 — les plugins activés par l\'utilisateur ($CLAUDE_CONFIG_DIR/settings.json) et le projet sont désactivés dans chaque session par --settings, sans rien relayer de env ; MCP, agents et bac à sable gardés', async () => {
+    const s = setup({ implement: [impl], review: [{ noStructured: true }] }, { visible: true });
+    writeFileSync(join(s.claudeHome, 'settings.json'), JSON.stringify({ enabledPlugins: { 'superpowers@m': true, 'off@m': false }, env: { SECRET_TOKEN: 'xyz', KUBECONFIG: '/home/u/.kube/config' }, permissions: { allow: ['Bash(raf:*)'] }, hooks: { PreToolUse: [] } }));
+    mkdirSync(join(s.dir, '.claude'));
+    writeFileSync(join(s.dir, '.claude', 'settings.json'), JSON.stringify({ enabledPlugins: { 'projet@m': true } }));
+    git(s.dir, 'add', '.claude');
+    git(s.dir, 'commit', '-q', '-m', 'chore: réglages du projet');
+    const r = await s.cli('proj:L1');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    const calls = s.calls();
+    expect(calls.map((c) => [c.kind, c.resume])).toEqual([['implement', false], ['review', false], ['review', true]]);
+    for (const c of calls) {
+      const argv: string[] = c.argv;
+      expect(argv.filter((a) => a === '--settings'), c.kind).toHaveLength(1);
+      const settings = argv[argv.indexOf('--settings') + 1]!;
+      expect(JSON.parse(settings)).toEqual({ enabledPlugins: { 'superpowers@m': false, 'projet@m': false } });
+      expect(settings).not.toMatch(/SECRET|KUBECONFIG|permissions|hooks/);
+      expect(argv).not.toContain('--setting-sources');
+      expect(argv).toEqual(expect.arrayContaining(['--strict-mcp-config', '--mcp-config']));
+    }
+    expect(calls[0].argv.filter((a: string) => a === '--add-dir').length).toBeGreaterThan(0);
+    expect(calls[1].argv).toEqual(expect.arrayContaining(['--agents', '--agent', 'code-reviewer']));
+    expect(calls[0].kubeconfig).toBe('/dev/null');
+  });
+
+  it('L398 — sans plugin activé, aucune session ne reçoit --settings ni --setting-sources', async () => {
+    const s = setup({ implement: [impl], review: [{}] });
+    expect((await s.cli('proj:L1')).code).toBe(0);
+    for (const c of s.calls()) {
+      expect(c.argv).not.toContain('--settings');
+      expect(c.argv).not.toContain('--setting-sources');
+    }
   });
 
   it('(L61/t1) variables de relance héritées d\'une autre vague : ignorées, et aucune session ne les voit', async () => {

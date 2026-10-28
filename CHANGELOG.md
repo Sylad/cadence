@@ -82,6 +82,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - All live waves apply the same session cap, the lowest one declared (L395, `docs/orchestrate.md`): a wave at 3 next to a wave at 4 no longer waits behind a total of « 4/3 en cours » (L51 waited 16 min 28 s on 28-10). The cap is re-read at every turn, and the wait line and `créneaux libres` use it.
 - The program's test gate is a visible step (L395, `docs/orchestrate.md`): while `orchestrate.build` / `orchestrate.test` runs with no session, `--status` prints `porte tests (3 min)` and the `cadence-hud` band `porte@tests 3 min`, instead of `implémentation` / `→ implement` (5 silent minutes on L392, 28-10). `cadence orchestrate --status --wave <wave>` shows that wave's table, not the last wave of the folder's (two different ids are refused).
 
+### Changed
+
+- `cadence orchestrate`: sessions (and `cadence ref analyse` ones) start with `--settings '{"enabledPlugins":{"<id>":false,…}}'` naming the plugins enabled in the user's `$CLAUDE_CONFIG_DIR/settings.json` (fallback `~/.claude/settings.json`) and the project's `.claude/settings.json` / `settings.local.json`, so they no longer load those plugins' hooks and skills — checked in a real session: the plugin's `SessionStart` hook is not registered and its skills disappear; the first turn of an `implement` session measured **42 541 → 38 330 tokens** (−4.2 k, −9.9 %, same command line, `docs/mesures/contexte-session-2026-10-28.md`). Nothing else of the user's or the project's settings is touched or relayed (`permissions`, `autoMode`, `language`, `env`, hooks, provider and authentication keep their normal precedence); the JSON carries plugin ids only, inline; without an enabled plugin no flag is added; the `ux` step keeps its Playwright MCP, the reviewers their agents, the sandbox is unchanged (L398).
+
 ## [1.18.0] - 2026-10-28
 
 ### Added

@@ -21,7 +21,7 @@ const fs = require('node:fs');
 const args = process.argv.slice(2);
 const brief = args[args.indexOf('-p') + 1];
 const lectureFile = /(\\S+\\/lectures\\/a\\.json)/.exec(brief)[1];
-fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ args, cwd: process.cwd(), brief, lecturePresente: fs.existsSync(lectureFile) }) + '\\n');
+fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ args, cwd: process.cwd(), brief, lecturePresente: fs.existsSync(lectureFile), settings: args.includes('--settings') ? args[args.indexOf('--settings') + 1] : null }) + '\\n');
 const mode = process.env.FAKE_MODE || 'ok';
 const out = (o) => process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, session_id: 's-1', num_turns: 4, duration_ms: 10, result: '', usage: { input_tokens: 100, cache_creation_input_tokens: 400, cache_read_input_tokens: 9000, output_tokens: 500 }, ...o }));
 if (mode === 'quota') { out({ is_error: true, subtype: 'error', result: 'Claude usage limit reached | resets at 5pm' }); process.exit(0); }
@@ -64,7 +64,7 @@ function setup(mode = 'ok', pages: FixturePage[] = NORME) {
   writeFileSync(join(cwd, 'cadence.yaml'), `references:\n  dir: ${refs}\n`);
   const env = { RAF_TODAY: '2026-10-24', PATH: `${stubs}:${process.env.PATH}`, XDG_DATA_HOME: join(base, 'xdg'), CADENCE_CLAUDE_BIN: bin, CLAUDE_CONFIG_DIR: join(base, 'claude-home'), FAKE_HOME: join(base, 'claude-home'), FAKE_LOG: log, FAKE_MODE: mode } as NodeJS.ProcessEnv;
   const pdf = writePdf(base, 'norme.pdf', pages);
-  const appels = (): { args: string[]; cwd: string; brief: string; lecturePresente: boolean }[] => readJsonLines(log);
+  const appels = (): { args: string[]; cwd: string; brief: string; lecturePresente: boolean; settings: string | null }[] => readJsonLines(log);
   return { base, refs, env, cwd, pdf, appels };
 }
 
@@ -103,6 +103,25 @@ describe('agent reference-analyst (agents/reference-analyst.md, L265)', () => {
 });
 
 describe('cadence ref analyse (L265)', () => {
+  it('L398 — la session désactive les plugins activés dans $CLAUDE_CONFIG_DIR/settings.json par --settings, comme une étape de vague, sans rien relayer d\'autre', async () => {
+    const s = setup();
+    mkdirSync(s.env.CLAUDE_CONFIG_DIR!, { recursive: true });
+    writeFileSync(join(s.env.CLAUDE_CONFIG_DIR!, 'settings.json'), JSON.stringify({ enabledPlugins: { 'superpowers@m': true, 'x@m': false }, env: { SECRET_TOKEN: 'xyz' }, permissions: { allow: ['Bash(raf:*)'] }, hooks: { PreToolUse: [] } }));
+    expect((await analyse(s)).code).toBe(0);
+    const { args, settings } = s.appels()[0]!;
+    expect(args).not.toContain('--setting-sources');
+    expect(JSON.parse(settings!)).toEqual({ enabledPlugins: { 'superpowers@m': false } });
+    expect(settings).not.toMatch(/SECRET|permissions|hooks/);
+  });
+
+  it('L398 — sans plugin activé, la session n\'a ni --settings ni --setting-sources', async () => {
+    const s = setup();
+    expect((await analyse(s)).code).toBe(0);
+    const { args } = s.appels()[0]!;
+    expect(args).not.toContain('--settings');
+    expect(args).not.toContain('--setting-sources');
+  });
+
   it('R4 — add d\'abord, puis une seule session de l\'agent reference-analyst, en sonnet par défaut, dans le dossier du document', async () => {
     const s = setup();
     const r = await analyse(s);

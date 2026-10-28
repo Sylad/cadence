@@ -114,6 +114,7 @@ lots:
     screen: component
     created: 2026-10-28
     started: 2026-10-28
+    review: { date: 2026-10-28, verdict: "conforme : aucun constat — orchestré (vague 2026-10-28-2210, 2 passe(s) de correction)", commit: 98ce59f703f3548fddaa3d359d38875cd5c32ce6, reporte: { de: ab966ac69d2aca2e6cbddbc38e0e1d0cfc1fb4bc, vers: 98ce59f703f3548fddaa3d359d38875cd5c32ce6, patchId: c2b5fa5c6c818e57f9fa1c32d0f7da41d0154c4b } }
   - id: L411
     title: "Panneau des lots : au plus 5 lots par projet (les premiers dans l'ordre affiché, en cours d'abord après L410), bouton « + N lots » qui déplie le reste du projet et « moins » qui le replie ; un lot qui a des sous-lots se plie/déplie d'un clic (replié par défaut, compte des sous-lots visible) ; états gardés entre deux ouvertures — demande de Sylvain le 28-10"
     public: Cinq lots par projet, et le reste à la demande

@@ -4319,6 +4319,32 @@ lots:
     started: 2026-10-28
     review: { date: 2026-10-28, verdict: "compliant — 1 minor (mesure : « trois causes » pour quatre lignes) — orchestré (vague 2026-10-28-0830c, 0 passe(s) de correction)", commit: f5170cde5ce9333534e1badf5ee174a71b52fb25, reporte: { de: 966e47e7e4f27387c8d82d770803e97ec6542871, vers: f5170cde5ce9333534e1badf5ee174a71b52fb25, patchId: 77d7d54e0032684ba6814daef52cfbed64422d81 } }
     finished: 2026-10-28
+  - id: L400
+    title: "raf move <id> --before|--after <id> : réordonner un lot dans le plan (même parent, refus pendant une vague du dépôt, plan en lecture seule refusé avec la commande du projet), doc, tests"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-28
+  - id: L401
+    title: "Panneau des lots (mod cadence-hud, Pane) : arborescence projet → lots parents → sous-lots des projets du dossier, état (en cours, prêt, en vague, rendu, en question), liens after: ; lecture seule, rafraîchi sur changement de plan ou de vague ; repli lisible sur terminal"
+    status: todo
+    estimate: 0.5
+    visible: true
+    screen: page
+    created: 2026-10-28
+  - id: L402
+    title: "Panneau des lots : réordonner par glisser-déposer (app desktop, module de surface Client) et boutons ↑ ↓ ailleurs, via raf move ; grisé avec la raison pendant une vague du dépôt ou sur un plan en lecture seule"
+    status: todo
+    estimate: 0.5
+    visible: true
+    screen: component
+    after: [ L400, L401 ]
+    created: 2026-10-28
+  - id: L403
+    title: "Porte de tests déportée (orchestrate.gate.host) : build et tests d'une vague ou de verify --gate joués en ssh sur une autre machine, au sha poussé dans un dépôt nu de cette machine, dépendances en cache par empreinte du lockfile ; repli local si l'hôte ne répond pas, dit dans la sortie ; générique (aucun nom de machine dans le code)"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-10-28
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

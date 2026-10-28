@@ -653,7 +653,7 @@ test('R23 — parents différents : refusé avec sa raison, raf n’est pas appe
   expect(s.tours().length).toBe(before)
 })
 
-for (const reason of ['move : orchestration en cours (vague w1, pid 3) — attendre', 'plan en lecture seule : maritime — le modifier avec l’outil du projet', 'move : L402 est archivé']) {
+for (const reason of ['move : orchestration en cours (vague w1, pid 3) — attendre', 'plan en lecture seule : /repo/plan-maritime.json est tenu par un autre outil (cadence.yaml : plan) — le modifier avec l’outil du projet', 'move : L402 est archivé']) {
   test(`R23 — un refus de raf est montré avec sa raison, sans relecture : ${reason.split(' — ')[0]}`, async ($, on) => {
     const s = await session($, on, { raf: () => ({ exitCode: 2, stderr: `raf: ${reason}\n` }) })
     await s.hud('lots')

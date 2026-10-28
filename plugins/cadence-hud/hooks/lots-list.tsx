@@ -8,7 +8,8 @@ import type { PanelLot } from './lots'
 // Région Client : elle ne connaît que ses lignes ; le dépôt est posté au module de hooks, qui contrôle la demande et lance raf.
 
 type Props = { project: string; lines: PanelLot[] }
-type State = { selected?: string; drag?: { from: number; over: number } }
+/** Le glisser retient le lot saisi par son id, pas par sa ligne : les props changent pendant un geste (relecture du tableau), les indices bougent avec elles. */
+type State = { selected?: string; drag?: { id: string; over: number } }
 
 /** L'état le plus récent de chaque instance : `surface.state` ne change qu'à l'image suivante, or un geste rapide peut en enchaîner deux dans la même (la clé est l'objet `surface`, le même d'un appel à l'autre). */
 const live = new WeakMap<object, State>()
@@ -30,6 +31,8 @@ const List: ClientModule<Props, State> = (props, surface) => {
     }
     return lines.length - 1
   }
+  /** La ligne que le glisser tient dans les props d'à présent, `-1` si le lot saisi a disparu. */
+  const grabbed = (drag: NonNullable<State['drag']> | undefined) => (drag ? at(drag.id) : -1)
   const ask = (from: number, to: number, place: 'before' | 'after') => surface.post({ kind: 'move', project, id: lines[from]!.id, target: lines[to]!.id, place })
 
   surface.onPointer(e => {
@@ -37,14 +40,14 @@ const List: ClientModule<Props, State> = (props, surface) => {
     const { drag, selected } = current()
     if (e.type === 'down') {
       const i = rowAt(e.y)
-      keep({ selected: lines[i]!.id, drag: { from: i, over: i } })
+      keep({ selected: lines[i]!.id, drag: { id: lines[i]!.id, over: i } })
     } else if (e.type === 'move' && drag) {
-      keep({ selected, drag: { from: drag.from, over: rowAt(e.y) } })
+      keep({ selected, drag: { id: drag.id, over: rowAt(e.y) } })
     } else if (e.type === 'up' && drag) {
-      const { from } = drag
+      const from = grabbed(drag) // retrouvé à l'arrivée : le lot saisi a pu changer de ligne, ou disparaître (rien n'est alors demandé)
       const over = rowAt(e.y)
       keep({ selected })
-      if (over !== from) ask(from, over, over > from ? 'after' : 'before')
+      if (from >= 0 && over !== from) ask(from, over, over > from ? 'after' : 'before')
     }
   })
 
@@ -66,17 +69,19 @@ const List: ClientModule<Props, State> = (props, surface) => {
 
   const state = current()
   const { Box } = surface.elements
+  const held = grabbed(state.drag)
+  const hover = state.drag?.over ?? -1
+  const dragging = held >= 0 && hover !== held // un lot disparu pendant le geste ne laisse aucun repère
   const mark = (i: number): RowMark | undefined => {
-    const { drag } = state
-    if (drag && drag.over !== drag.from) {
-      if (i === drag.from) return { glyph: '●', color: 'claude' }
-      if (i === drag.over) return lines[i]!.group !== lines[drag.from]!.group ? { glyph: '⊘', color: 'error' } : { glyph: drag.over > drag.from ? '⇣' : '⇡', color: 'claude' }
+    if (dragging) {
+      if (i === held) return { glyph: '●', color: 'claude' }
+      if (i === hover) return lines[i]!.group !== lines[held]!.group ? { glyph: '⊘', color: 'error' } : { glyph: hover > held ? '⇣' : '⇡', color: 'claude' }
     }
     return lines[i]!.id === state.selected ? { glyph: '▸', color: 'claude' } : undefined
   }
   return (
     <Box flexDirection="column" width="100%">
-      {lines.map((line, i) => lotRow(surface.elements, line, `l${i}`, mark(i), state.drag && state.drag.over !== state.drag.from && i === state.drag.over ? 'target' : line.id === state.selected ? 'selected' : undefined))}
+      {lines.map((line, i) => lotRow(surface.elements, line, `l${i}`, mark(i), dragging && i === hover ? 'target' : line.id === state.selected ? 'selected' : undefined))}
     </Box>
   )
 }

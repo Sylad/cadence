@@ -78,6 +78,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `raf move <id> --before|--after <id>` reorders a lot in the plan (a sub-task among those of its lot); refused among different parents, on an archived lot, on a read-only plan (with the project's own tool to use) and while a wave holds the repository (L400).
+
 ## [1.19.1] - 2026-10-28
 
 ### Fixed

@@ -757,6 +757,40 @@ export class Plan {
     node.items.splice(created >= 0 ? created : after >= 0 ? after + 1 : keys.length, 0, this.doc.createPair('uses', list));
   }
 
+  /**
+   * Place un lot (ou une sous-tâche) juste avant ou juste après un autre du même parent (L400) : les lots entre eux, les sous-tâches d'un même lot entre elles.
+   * Seul l'ordre du fichier change — le nœud voyage avec ses clés et ses commentaires. Un lot archivé n'a pas de place dans le fichier du plan
+   * (l'archive se présente dans l'ordre d'avant l'archivage, jamais déplacée) : refusé. Déjà à sa place : rien à écrire.
+   */
+  move(ref: string, place: 'before' | 'after', target: string): void {
+    this.writable();
+    if (ref === target) throw new RafError(`move : ${ref} ne peut pas être placé par rapport à lui-même`);
+    const parent = (r: string) => (r.includes('/') ? r.slice(0, r.indexOf('/')) : null);
+    const siblings = (r: string): YAMLSeq => {
+      const owner = parent(r);
+      const top = this.doc.get('lots') as YAMLSeq;
+      const lotId = owner ?? r;
+      if (!top.items.some((n) => isMap(n) && String(n.get('id')) === lotId)) {
+        this.lotNode(lotId); // inconnu : « lot inconnu », même dans l'archive
+        throw new RafError(`move : ${lotId} est archivé — l'ordre du plan ne compte que les lots du fichier du plan`);
+      }
+      if (!owner) return top;
+      this.taskNode(owner, r.slice(owner.length + 1)); // sous-tâche inconnue
+      return this.lotNode(owner).get('tasks') as YAMLSeq;
+    };
+    const from = siblings(ref);
+    const to = siblings(target);
+    if (parent(ref) !== parent(target)) throw new RafError(`move : ${ref} et ${target} n'ont pas le même parent — un lot se place parmi les lots, une sous-tâche parmi celles de son lot`);
+    const idOf = (r: string) => (parent(r) ? r.slice(r.indexOf('/') + 1) : r);
+    const at = (seq: YAMLSeq, r: string) => seq.items.findIndex((n) => isMap(n) && String(n.get('id')) === idOf(r));
+    const node = from.items[at(from, ref)];
+    const without = from.items.filter((n) => n !== node);
+    const wanted = without.findIndex((n) => n === to.items[at(to, target)]) + (place === 'after' ? 1 : 0);
+    if (at(from, ref) === wanted) return;
+    without.splice(wanted, 0, node);
+    from.items = without;
+  }
+
   addTask(lotId: string, title: string): string {
     this.writable();
     const lot = this.lotNode(lotId);

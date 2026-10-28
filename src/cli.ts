@@ -57,6 +57,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (seule la valeur page adopte l'étape spec d'orchestrate)
   raf visible <id> on|off   pose ou retire visible: d'un lot existant (changement visible : entrée Nouveautés et étape UX d'orchestrate) ; off est refusé tant que le lot a un screen:
   raf spec <id> on|off   pose ou retire spec: d'un lot existant (le lot change un comportement : étape spec back d'orchestrate)
+  raf move <id> --before|--after <id>   réordonne un lot (ou une sous-tâche) dans le plan, parmi ceux du même parent ; refusé pendant une vague du dépôt, sur un lot archivé et sur un plan en lecture seule
   raf uses <lot> [<ressource>…]   remplace les ressources partagées du lot (uses:, déclarées par resources: dans le cadence.yaml du dossier parent ; raf check refuse un nom non déclaré) ; sans nom, retire la clé
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits ; rouvre un lot done ou dropped (→ todo, finished retiré, note « rouvert ») — la seule façon de rouvrir, archivé compris (il revient dans le fichier du plan)
@@ -480,6 +481,18 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       need(1, 'uses <lot> [<ressource>…]');
       const plan = loadPlan();
       plan.setUses(rest[0], rest.slice(1));
+      plan.save();
+      return 0;
+    }
+    case 'move': {
+      // Une seule position : --before ou --after, avec une cible (« after » est aussi le drapeau de « add », « before » celui de « archive »).
+      const place = values.before !== undefined && values.after === undefined ? 'before' : values.after !== undefined && values.before === undefined ? 'after' : null;
+      if (rest.length !== 1 || !place) throw new RafError('usage : raf move <id> --before <id> | raf move <id> --after <id>');
+      const plan = loadPlan();
+      plan.move(rest[0], place, values[place]!); // en mémoire : les refus de la commande (plan en lecture seule, parent, archive) passent avant celui de la vague
+      // Un lot de la vague s'appuie sur l'ordre du plan qu'il a lu : le réordonner sous ses pieds est refusé tant que la vague tient le dépôt.
+      const holding = waveHolding(root);
+      if (holding) throw new RafError(`move : orchestration en cours (vague ${holding.wave}, pid ${holding.pid}) — attendre que les lots de ce dépôt soient finis (le verrou tombe dès que tous sont prêts ou rendus), puis relancer`);
       plan.save();
       return 0;
     }

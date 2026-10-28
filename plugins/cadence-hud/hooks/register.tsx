@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
-import type { AgentsSummary, CommandInfo, LeadHold, LotsBoard, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
+import type { AgentsSummary, CommandInfo, LeadHold, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
 import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 

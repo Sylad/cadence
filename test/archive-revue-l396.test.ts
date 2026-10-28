@@ -196,7 +196,7 @@ describe('L396 — revue de code, constat 4 : le commit du plan de la vague pren
     expect(git(h.repo, 'status', '--porcelain')).toContain('?? .cadence/archive/');
     writeFileSync(join(sync, 'go'), '');
     await done;
-    expect(c.lot.status, c.lot.outcome).not.toBe('failed');
+    expect(c.lot.status, c.lot.outcome ?? undefined).not.toBe('failed');
     expect(git(h.repo, 'ls-tree', '-r', '--name-only', 'HEAD')).toContain('.cadence/archive/2025.yaml');
     expect(git(h.repo, 'show', 'HEAD:.cadence/archive/2025.yaml')).toContain('id: L2');
     expect(git(h.repo, 'show', 'HEAD:.cadence/raf.yaml')).not.toContain('id: L2');

@@ -619,3 +619,15 @@ describe('verifyGate : où la porte tourne (L389)', () => {
     expect(existsSync(join(repo, 'node_modules', 'dep', 'index.js'))).toBe(true);
   });
 });
+
+describe('aide de cadence verify --gate (L397)', () => {
+  it('L397 — l\'aide dit que la porte enregistrée par la vague est reprise (même sha, arbre identique), rejouée sinon', async () => {
+    const lines: string[] = [];
+    const io = { cwd: tempDir(), env: {}, out: (l: string) => lines.push(l), err: (l: string) => lines.push(l), now: () => new Date() };
+    expect(await run(['help'], io)).toBe(0);
+    const aide = lines.join('\n').split('\n').find((l) => /^\s*cadence verify --gate/.test(l));
+    expect(aide, 'ligne d\'aide de verify --gate').toMatch(/reprend|repris/);
+    expect(aide).toContain('arbre identique');
+    expect(aide).toContain('verdict rejoué');
+  });
+});

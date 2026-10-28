@@ -146,8 +146,8 @@ regles:
   - id: R10
     cas: [C1]
     enonce: "cadence lead tour --json ajoute à chaque ligne un champ optionnel lots : les lots non clos (todo, doing) hors récurrents, avec id, title, status, after et parent ; les lots done, dropped et récurrents n'y figurent pas ; les champs existants de la ligne (TourRow, src/lead.ts:69) ne changent pas, et la bande (parseTour, format.ts:388) les lit comme avant."
-    statut: hypothese
-    si_faux: "Contrat partagé avec la bande : si le champ devait avoir un autre nom ou une autre forme (ou si le lecteur du panneau devait relire les plans lui-même), le producteur src/lead.ts, le test R10 et le lecteur du mod sont à refaire. Posé au lead dans les questions de la session ; la fiche reste valable tant que l'ajout est optionnel."
+    statut: sourcee
+    source: "réponse du lead (2026-10-28) : champ optionnel lots ({ id, title, status, after, parent? }[]) sur chaque ligne de cadence lead tour --json, nom et forme acceptés ; seulement les lots non clos (todo, doing) ; une seule source de vérité, qui lit déjà l'archive (L396) et les plans tenus par un autre outil ; ligne existante inchangée, testée"
     tests: ["R10 — lots : seuls les lots non clos non récurrents", "R10 — les champs existants de la ligne sont inchangés", "R10 — la bande lit une ligne portant lots comme avant"]
   - id: R11
     cas: [C1]
@@ -199,9 +199,15 @@ regles:
     statut: hypothese
     si_faux: Si le panneau devait défiler ou plier des projets, seule la présentation change (aucune donnée en jeu).
     tests: ["R17 — arbre plus haut que le panneau : « … +N lots de plus »", "R17 — titre long : tronqué sur une ligne"]
+  - id: R18
+    cas: [C1]
+    enonce: "L'ajout de lots ne ralentit pas le tour : cadence lead tour --json sur ce dossier reste dans le même ordre de durée qu'avant (mesure de référence avant : 7,1 à 7,4 s, trois passes sur le dossier parent complet, sortie de 85 Ko) et très en deçà du délai de 20 s de la bande ; la mesure après est refaite à l'implémentation et rapportée. Un after: qui cite un lot clos garde son id tel quel (le panneau l'affiche comme satisfait, R6)."
+    statut: sourcee
+    source: "réponse du lead (2026-10-28) : « Ne pas ralentir le tour (la bande a un délai de 20 s) : mesurer lead tour --json avant/après sur ce dossier et le dire »"
+    tests: ["R18 — durée de lead tour --json avec lots : mesurée avant/après, sous le délai de 20 s de la bande", "R18 — after: vers un lot clos : id conservé tel quel dans lots[].after"]
 actions:
   - { id: A4, declencheur: ~, contrat: A3, regles: [R16] }
-  - { id: A5, declencheur: ~, contrat: A1, regles: [R1, R2, R3, R4, R5, R6, R7, R8, R10, R11, R13, R14, R15, R17] }
+  - { id: A5, declencheur: ~, contrat: A1, regles: [R1, R2, R3, R4, R5, R6, R7, R8, R10, R11, R13, R14, R15, R17, R18] }
   - { id: A6, declencheur: ~, contrat: A2, regles: [R9, R12] }
 contrats:
   - id: A1
@@ -212,7 +218,7 @@ contrats:
       - { code: log warn, message: "cadence lead tour : sortie illisible" }
       - { code: log warn, message: "Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute." }
       - { code: log warn, message: "Lots indisponibles : cadence est trop ancien, mettez-le à jour." }
-    regles: [R3, R7, R10, R11, R13, R14]
+    regles: [R3, R7, R10, R11, R13, R14, R18]
   - id: A2
     appel: job rafraichissement-lots-hud
     entree: "minuteur de 5 s du mod ; relit A1 sur changement de signature ou après une minute"
@@ -234,4 +240,4 @@ donnees:
     existant: true
     modification: ajout
     note: "champ optionnel lots ajouté, aucun champ existant modifié (R10) ; rien n'est stocké"
-    decision: "ajout optionnel prouvé sans effet sur l'ancienne ligne (R10) ; question posée au lead sur le nom et la forme du champ lots avant l'implémentation"
+    decision: "Oui : champ optionnel lots ({ id, title, status, after, parent? }[]) sur chaque ligne, nom et forme acceptés ; seulement les lots non clos (todo, doing) ; un after: qui cite un lot clos garde son id (réponse du lead, 2026-10-28) ; ligne existante inchangée, testée ; durée mesurée avant/après (R18)"

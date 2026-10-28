@@ -122,7 +122,7 @@ const sameProject = (row: string, wave: string): boolean => row === wave || row.
 
 /**
  * Les lignes du panneau pour `columns` colonnes de corps et `height` lignes de corps : le titre et le pied en prennent deux ;
- * si l'arbre est plus haut, les premières lignes restent et `more` compte les lots que la ligne « … +N lots de plus » (une ligne de plus) remplace.
+ * si l'arbre est plus haut, les premières lignes restent et `more` compte les lots que la ligne « … +N lots de plus » (une ligne de plus) remplace ; un projet replié placé après la coupure garde sa ligne.
  */
 export const buildPanel = (input: {
   rows: readonly LotsRow[]
@@ -167,9 +167,13 @@ export const buildPanel = (input: {
   const room = Math.max(1, input.height - 2)
   const total = lines.reduce((n, l) => n + l.height, 0)
   if (total <= room) return { lines: lines.map(({ height: _h, ...l }) => l as PanelLine), more: 0 }
-  let used = 0
+  const isFoldedLine = (l: PanelLine) => l.kind === 'project' && !!l.folded
+  const tail = (from: number) => lines.slice(from).filter(isFoldedLine) // les projets repliés après la coupure gardent leur ligne
   let kept = 0
+  let used = 0
   while (kept < lines.length && used + lines[kept]!.height <= room - 1) used += lines[kept++]!.height
-  while (kept > 0 && lines[kept - 1]!.kind === 'project' && !(lines[kept - 1] as { folded?: boolean }).folded) kept-- // un nom de projet sans aucun de ses lots n'apprend rien
-  return { lines: lines.slice(0, kept).map(({ height: _h, ...l }) => l as PanelLine), more: lines.slice(kept).filter(l => l.kind === 'lot').length }
+  const cost = (n: number) => lines.slice(0, n).reduce((s, l) => s + l.height, 0) + tail(n).length
+  while (kept > 0 && (cost(kept) > room - 1 || (lines[kept - 1]!.kind === 'project' && !isFoldedLine(lines[kept - 1]!)))) kept-- // un nom de projet sans aucun de ses lots n'apprend rien
+  const shownLines = [...lines.slice(0, kept), ...tail(kept)]
+  return { lines: shownLines.map(({ height: _h, ...l }) => l as PanelLine), more: lines.slice(kept).filter(l => l.kind === 'lot').length }
 }

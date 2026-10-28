@@ -237,6 +237,24 @@ test('R3 — un projet replié ne compte pas dans « … +N lots de plus » et l
   expect(p.more).toBe(4)
 })
 
+test('R3 — un projet replié placé après la coupure garde sa ligne : jamais de disparition silencieuse', () => {
+  const rows = [{ project: 'A', lots: many(8) }, { project: 'B', lots: many(25) }, { project: 'C', lots: many(25) }]
+  const p = buildPanel({ rows, columns: 70, height: 12, waves: [], folds: {} })
+  const names = p.lines.filter(l => l.kind === 'project').map(l => l.kind === 'project' && l.name)
+  expect(names).toEqual(['A', 'B', 'C'])
+  // les lots de A que la coupe retire sont comptés, ceux de B et C (repliés) non
+  expect(p.lines.filter(l => l.kind === 'lot').length + p.more).toBe(8)
+  expect(p.more).toBeGreaterThan(0)
+})
+
+test('R3 — un lot caché derrière un projet ouvert et un replié : le replié reste, le pied compte les lots ouverts cachés', () => {
+  const rows = [{ project: 'maritime', lots: many(159) }, { project: 'B', lots: many(25) }, { project: 'ol', lots: many(3) }]
+  const p = buildPanel({ rows, columns: 70, height: 22, waves: [], folds: { maritime: false } })
+  const names = p.lines.filter(l => l.kind === 'project').map(l => l.kind === 'project' && l.name)
+  expect(names).toContain('B')
+  expect(p.lines.filter(l => l.kind === 'lot').length + p.more).toBe(162)
+})
+
 test('R4 — un projet illisible ne se replie pas', () => {
   const p = folding([{ project: 'cassé', error: 'x' }], { cassé: true })
   expect(heads(p)[0]).toMatchObject({ error: 'illisible : x' })

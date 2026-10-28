@@ -1,6 +1,6 @@
 import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
-import type { TestBody } from 'claude-code/testing'
+import type { Mounted, TestBody } from 'claude-code/testing'
 
 import { PLAN_STAMPS } from '../hooks/collect'
 import type { LotsRow, TourLot, Wave } from '../types'
@@ -85,7 +85,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await settle()
   }
   /** Les textes du panneau monté, ceux que dessinent les régions Client (un projet chacune) comprises. */
-  const textsOf = async (ui: Awaited<ReturnType<typeof $.ui.mount>>) => {
+  const textsOf = async (ui: Pick<Mounted<'desktop' | 'terminal', 'Pane'>, 'drawn' | 'findAll'>) => {
     await ui.drawn() // le dessin suit les écritures d'état avant la lecture
     const own = (await ui.findAll({ type: 'Text' })).map(t => t.text ?? '')
     const regions = await Promise.all((await ui.findAll({ type: 'Client' })).map(async c => (await ui.findAll({ type: 'Text', in: c.key } as never)).map(t => t.text ?? '')))
@@ -132,16 +132,20 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
   }
   const rafs = () => runs.filter(a => a[0] === 'raf')
   /** Joue des gestes sur le panneau monté, comme la personne : chaque région Client reçoit sa taille, puis `act` ; rend le texte dessiné à la fin. */
-  const gestures = async (act: (ui: Awaited<ReturnType<typeof $.ui.mount>>) => Promise<void>, surface: 'terminal' | 'desktop' | 'mobile' | 'vscode' = 'desktop') => {
-    const ui = await $.ui.mount({
+  const gestures = async (act: (ui: Mounted<'desktop' | 'terminal', 'Pane'>) => Promise<void>, surface: 'terminal' | 'desktop' | 'mobile' | 'vscode' = 'desktop') => {
+    // sans Client (mobile, éditeur) le montage n'a ni pointeur, ni clavier, ni taille : `act` n'y est pas joué, seul le dessin est lu
+    const hasClient = surface === 'desktop' || surface === 'terminal'
+    const ui = await $.ui.mount<'desktop' | 'terminal', 'Pane'>({
       plugin: PLUGIN,
       surface,
       component: 'Pane',
       requestId: 'lots',
       props: { title: 'Lots', isFocused: true, bodyColumns: 70, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} },
     } as never)
-    if (surface === 'desktop' || surface === 'terminal') await ui.resize({ columns: 70, rows: 4, in: 'lots:cadence' } as never)
-    await act(ui)
+    if (hasClient) {
+      await ui.resize({ columns: 70, rows: 4, in: 'lots:cadence' })
+      await act(ui)
+    }
     await settle()
     // le montage ne suit pas les écritures d'état (comme `press`, qui remonte pour relire) : le résultat est lu sur un montage neuf, les régions Client sur celui des gestes
     const live = await textsOf(ui)
@@ -715,4 +719,46 @@ test('R23 — pendant le glisser, un repère dit qu’une arrivée chez un autre
   })
   expect(during).toMatch(/⊘/)
   expect(during).not.toMatch(/⇡/)
+})
+
+// ── L402 : les props arrivent pendant un glisser (relecture du tableau, minuteur de 5 s) ─────────────────────
+
+/** Le tableau de TOUR, un lot de plus en tête du projet « cadence » : L402, saisi à la ligne 3, passe à la ligne 4. */
+const TOUR_WITH_L400_FIRST = JSON.stringify([row('cadence', [lot('L400'), ...TOUR[0]!.lots]), TOUR[1]])
+/** Le tableau de TOUR sans L402 : le lot saisi à la ligne 3 a disparu. */
+const TOUR_WITHOUT_L402 = JSON.stringify([row('cadence', TOUR[0]!.lots.filter(l => l.id !== 'L402')), TOUR[1]])
+
+test('R22 — de nouvelles props pendant un glisser : c’est le lot saisi qui part, pas celui qui prend sa ligne', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  const before = s.tours().length
+  await s.gestures(async ui => {
+    await ui.pointer(down(3)) // L402
+    s.tour.current = () => ({ exitCode: 0, stdout: TOUR_WITH_L400_FIRST })
+    s.stamps.current = () => JSON.stringify({ '/x/cadence/.cadence/raf.yaml': 2 }) // le plan a changé : le prochain tour du minuteur relit le tableau
+    await s.advance(5_000) // L400 prend la tête, L402 passe à la ligne 4, la ligne 3 est maintenant L401/2
+    await ui.redraw() // le panneau monté reçoit les nouvelles lignes (comme le moteur, quand les props changent)
+    await ui.pointer(move(0))
+    await ui.pointer(up(0))
+  })
+  expect(s.tours().length).toBeGreaterThan(before) // le tableau a bien été relu pendant le glisser
+  expect(s.rafs()).toEqual([['raf', 'move', 'L402', '--before', 'L400']])
+})
+
+test('R22 — le lot saisi disparaît pendant le glisser : rien n’est demandé, ni refus ni relecture', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  const before = s.tours().length
+  const text = await s.gestures(async ui => {
+    await ui.pointer(down(3)) // L402, encore là
+    s.tour.current = () => ({ exitCode: 0, stdout: TOUR_WITHOUT_L402 })
+    s.stamps.current = () => JSON.stringify({ '/x/cadence/.cadence/raf.yaml': 2 })
+    await s.advance(5_000)
+    await ui.redraw()
+    await ui.pointer(move(0))
+    await ui.pointer(up(0))
+  })
+  expect(s.tours().length).toBeGreaterThan(before)
+  expect(s.rafs()).toEqual([])
+  expect(text).not.toMatch(/placé|n'ont pas le même parent|raf move/)
 })

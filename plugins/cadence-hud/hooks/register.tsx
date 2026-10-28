@@ -84,7 +84,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 const onlyBooleans = (v: Record<string, unknown>): Record<string, boolean> => Object.fromEntries(Object.entries(v).filter((e): e is [string, boolean] => typeof e[1] === 'boolean'))
 
 /** Garde le dernier mot du panneau sur un déplacement (fait, ou refusé avec sa raison) : il s'affiche sous le titre. */
-const say = ($: EngineInterface, text: string, refused: boolean): Promise<void> => update($, lotsNotice, () => ({ text, refused }) satisfies LotsNotice)
+const say = ($: EngineInterface, text: string, refused: boolean): Promise<void> => update($, lotsNotice, () => ({ text, refused }) satisfies LotsNotice).then(() => undefined)
 
 export const register: Register = on => {
   let timer: Timer | undefined

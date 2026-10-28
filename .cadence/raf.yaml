@@ -4260,9 +4260,10 @@ lots:
     finished: 2026-10-28
   - id: L393
     title: "verify --gate en place : relire HEAD et git status après les étapes ; si l'arbre principal a bougé pendant la porte (intégration, commit de plan d'une vague), le dire et ne pas présenter le verdict comme celui du sha ; test"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-27
+    started: 2026-10-28
   - id: L394
     title: "raf check et raf now : un seul git log --name-only pour les fichiers de tous les commits au lieu d'un git par commit (89 % du temps : raf check 20 s, raf now 15 s, session start 25 s à ~2 250 commits) → lead tour --json 35 s dépasse le délai de 20 s de la bande, liste des projets vide ; mesure avant/après, tests"
     status: done

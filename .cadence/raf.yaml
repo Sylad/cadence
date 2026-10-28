@@ -4297,11 +4297,12 @@ lots:
     finished: 2026-10-28
   - id: L398
     title: "Sessions de vague sans contexte inutile : 29 à 60 k tokens au premier tour (liste de toutes les skills, hook superpowers, CLAUDE.md) pour des sessions qui n'utilisent que Bash ; lancer sans plugins ni skills utilisateur non voulus, mesurer contexte initial et tokens par étape avant/après sur 2 vagues ; doc, tests"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-28
     started: 2026-10-28
     review: { date: 2026-10-28, verdict: "conforme (revue Opus neuve après refonte par le lead ; regroupé en 24ddb581 sur main, diff identique, porte verte 4 258 tests) : sessions de vague et ref ne désactivent que les plugins, réglages et bac à sable intacts, 42 541 → 38 330 jetons au premier tour ; note : claudeConfigDir inutilisé dans src/", commit: 24ddb581595b90bdbe197fb632b781d1099769e9 }
+    finished: 2026-10-28
   - id: L399
     title: "Tests rouges à la porte après une implémentation qui se disait verte : 30 passes sur 205 du 22 au 28-10 (cadence 17) ; diagnostiquer par lot (commande de la session ≠ orchestrate.test, test instable, dépendances du worktree) depuis les journaux, puis supprimer la cause mesurée ; doc, tests"
     status: done
@@ -4320,3 +4321,4 @@ acknowledged:
   - { sha: d00c4a10272b2608ba47e7af81b849c4f66dd7e2, subject: "config: précheck d'orchestrate sur le modèle local de cadence (décision du lead 24-10)", date: 2026-10-24, reason: "réglage d'outillage (précheck local de cadence), pas un lot du projet — lead 24-10" }
   - { subject: "feat(?): travail", date: 2026-10-27, reason: "commits laissés par un test non hermétique (orchestrate-e2e, faux claude qui commite a.txt dans le vrai dépôt) pendant la vague 1230 du 27-10 — cause et nettoyage : L391" }
   - { sha: cd910644d68458e5391636389d64c89294514d70, subject: "chore: orchestrate.testReplay déclaré pour cadence (L354) ; lots L369–L371 tirés des pertes du 26-10", date: 2026-10-27, reason: "commit de plan du lead (réglage testReplay cité entre parenthèses), pas un travail de L354" }
+  - { sha: d143343e5016176e3e6c431d6f09839825857e46, subject: "test: lecture du journal du faux claude tolérante à une ligne en cours d'écriture", date: 2026-10-28, reason: "correctif du test instable orchestrate-e2e (SIGTERM pendant la revue UX), fait dans une session séparée lancée par Sylvain le 28-10" }

@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.20.0**: `raf move <id> --before|--after <id>` reorders a lot or a sub-task in the plan, refused during a wave of the repository and on a plan kept by another tool.
 - **1.19.1**: `cadence verify --gate` in the main tree reads `HEAD` and `git status` again after the steps, says what moved and prints no green or red verdict that is not the sha's.
 - **1.19.0**: `raf archive` moves closed lots out of the plan file (565 KB → 5 KB, same output everywhere); live waves share one session cap; wave sessions skip the user's plugins.
 - **1.18.0**: `cadence verify --gate` reuses the green gate of the wave instead of replaying it; `orchestrate.continue` keeps `--continue` from drawing a big lot; `raf check` and `raf now` run about 5 times faster.
@@ -43,6 +44,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.20.0**: the order of the plan is no longer edited by hand. `raf move <id> --before|--after <id>` (L400, `docs/raf.md`) moves a lot among the lots, or a sub-task among the sub-tasks of its lot; it is refused across different parents, on an archived lot, during a live wave of the repository (the same detection as `cadence deliver`) and on a plan kept by another tool (with that tool's command); a lot already in place leaves the file untouched, and like every plan write it does not commit. A test that read the real plan file directly, red since `raf archive`, now goes through the plan loader, and a guard test refuses any test that reads the real plan without it (L404).
 
 **1.19.1**: a verdict of `cadence verify --gate` run in the main tree is always the verdict of the sha it names (L393, `docs/deliver.md`): after the steps, `HEAD` and `git status` are read again; if the tree moved during the gate (a lot integrated, the plan of a wave committed), the output says what moved, the ✓/✗ lines are said not to be those of the sha, no « vert » / « rouge » line is written and the exit code is 2.
 

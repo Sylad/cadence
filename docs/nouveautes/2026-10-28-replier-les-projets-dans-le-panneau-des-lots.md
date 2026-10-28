@@ -13,7 +13,7 @@ Dans le panneau des lots (`/hud lots`), chaque projet peut maintenant être repl
 - Au premier affichage, un projet de plus de 20 lots non clos est replié ; les autres sont dépliés. Votre choix l'emporte ensuite sur ce défaut, dans les deux sens.
 - Au clavier, `/hud lots <projet>` replie ou déplie le projet nommé ; un nom inconnu répond en listant les projets du dossier.
 - Le choix est gardé : le panneau fermé puis rouvert, et d'une session à l'autre, retrouve les mêmes projets repliés.
-- Un projet replié ne compte plus dans la ligne « … +N lots de plus » et laisse sa place aux suivants. Un projet illisible n'a pas de bouton.
+- Un projet replié affiché ne compte pas dans la ligne « … +N lots de plus » et laisse sa place aux suivants ; si la place manque même pour sa ligne, il est retiré et ses lots non clos passent dans ce « +N ». Un projet illisible n'a pas de bouton.
 
 ## Hypothèses
 

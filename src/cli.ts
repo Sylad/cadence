@@ -1315,7 +1315,7 @@ async function verifyGateCommand(values: { sha?: string; project?: string; retry
   const configPath = resolve(io.cwd, values.config ?? join(top, 'cadence.yaml'));
   const sha = resolveCommit(top, values.sha);
   if (!sha) throw new RafError(`verify --gate : --sha ${values.sha} : commit introuvable dans ${top}`);
-  return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), verify: readVerifyConfig(configPath), out: io.out });
+  return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), verify: readVerifyConfig(configPath), launchDirs: [io.cwd, top, dirname(top)], out: io.out });
 }
 
 /** `session start|close --all [--depth n]` : la commande jouée dans chaque projet sous le dossier courant, une section par projet. */

@@ -2259,7 +2259,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     }
   }
   l.constats = [];
-  l.checks = runs.length ? { head: git(wd(c), 'rev-parse', 'HEAD'), runs } : undefined;
+  l.checks = runs.length ? { head: git(wd(c), 'rev-parse', 'HEAD'), tree: git(wd(c), 'rev-parse', 'HEAD^{tree}'), runs } : undefined;
   l.next = firstReview(c);
   save(c);
 }
@@ -2712,7 +2712,7 @@ async function integrateLot(c: LotCtx): Promise<void> {
         if (tip !== reviewed) {
           // Le rebase a changé les commits : tests et build rejoués au sommet rebasé, avant que la branche du dépôt ne bouge (R7).
           const { red, runs } = await integratedChecks(c, key);
-          l.checks = runs.length ? { head: tip, runs } : undefined;
+          l.checks = runs.length ? { head: tip, tree: git(t.dir, 'rev-parse', 'HEAD^{tree}'), runs } : undefined;
           save(c);
           if (red.length) return refuse(`intégration refusée : tests rouges au sommet intégré (${red.map(redExcerpt).join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
           const before = patchId(t.dir, mergeBase(t.dir, reviewed, t.base), reviewed);

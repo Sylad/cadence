@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { OrchestrateConfig, VerifyConfig } from './config.js';
+import { recordedGate } from './gate-record.js';
 import { onTermination } from './proc.js';
 import { failedTests, hasUnnamedFailure, unloadedSuites } from './orchestrate/baseline.js';
 import { configuredCap } from './orchestrate/command.js';
@@ -65,6 +66,8 @@ export interface GateCtx {
   /** Clé `verify:` de cadence.yaml (L389) : où jouer la porte (défaut : `{}`, au mieux selon l'état de l'arbre principal). */
   verify?: VerifyConfig;
   out: (line: string) => void;
+  /** Dossiers où chercher l'état des vagues (`.cadence/runs`, L397) dont la porte peut être reprise au lieu d'être rejouée (défaut : aucun, la porte est toujours rejouée). */
+  launchDirs?: string[];
   /** Délai de chaque commande (défaut : 30 min). */
   timeoutMs?: number;
   /** Environnement des commandes et réglages lus pour la part de la machine (défaut : celui du processus). */
@@ -93,6 +96,8 @@ function mainTreeObstacle(repo: string, sha: string): string | null {
  * La première ligne de la sortie dit où la porte a tourné ; en place, l'arbre est relu à la fin et, s'il a bougé, le verdict est dit non probant (code 2). Les deux commandes sont rejouées même si la première est rouge : le compte rendu est entier.
  * Chaque commande reçoit `CADENCE_TEST_WORKERS` comme dans la porte d'une vague (L350, L387) : la valeur de l'environnement de l'appelant si c'est un entier positif, sinon cœurs ÷ plafond de sessions (`CADENCE_MAX_SESSIONS`, 2 par défaut) ;
  * sans elle le rejeu `--maxWorkers=$CADENCE_TEST_WORKERS` de `orchestrate.testReplay` sortirait en erreur et ne prouverait rien.
+ * La porte déjà jouée par le programme au même sha n'est pas rejouée (L397) : si l'état d'une vague (`ctx.launchDirs`) porte des contrôles enregistrés AU sha, sur un arbre identique, verts et couvrant chaque commande actuelle,
+ * leur verdict est repris et la première ligne le dit (vague, lot) ; sinon la porte est rejouée et la ligne qui suit celle du lieu en donne la raison.
  * Le worktree est retiré dans tous les cas. 0 vert, 1 rouge (avec les tests en échec), 2 rien à rejouer ou worktree impossible.
  */
 export async function verifyGate(ctx: GateCtx): Promise<number> {
@@ -108,6 +113,23 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
     out('verify --gate : ni orchestrate.test ni orchestrate.build déclarés dans cadence.yaml — rien à rejouer');
     return 2;
   }
+  let recorded: ReturnType<typeof recordedGate> = { reason: 'aucune porte de vague enregistrée pour ce sha' };
+  try {
+    recorded = recordedGate(ctx.launchDirs ?? [], repo, sha, steps);
+  } catch (e) {
+    recorded = { reason: `état des vagues illisible (${gitFailure(e)})` };
+  }
+  if ('found' in recorded) {
+    const f = recorded.found;
+    out(`verify --gate ${short} : verdict repris de la porte de la vague ${f.wave} (lot ${f.lot} : contrôles du programme au même sha, arbre ${f.tree.slice(0, 7)} identique) — rien rejoué`);
+    for (const step of steps) {
+      const run = f.runs.find((r) => r.label === (step.name === 'build' ? 'build' : 'tests') && r.command === step.cmd)!;
+      out(`✓ ${step.name} (${step.cmd}) — enregistré par la vague${run.instables?.length ? `, ${run.instables.length} test(s) instable(s) sous charge, verts rejoués seuls` : ''}`);
+    }
+    out(`verify --gate ${short} : vert`);
+    return 0;
+  }
+  const replayReason = `verdict rejoué : ${recorded.reason}`;
   const obstacle = mainTreeObstacle(repo, sha);
   const mode = ctx.verify?.inPlace;
   if (mode === true && obstacle) {
@@ -117,6 +139,7 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
   const inPlace = mode === true || (mode === undefined && obstacle === null);
   if (inPlace) {
     out(`verify --gate ${short} : porte jouée dans l'arbre principal ${repo} (propre, au sha)`);
+    out(replayReason);
     const group: { pgid?: number } = {};
     const forget = onTermination(() => {
       if (group.pgid !== undefined) killGroup(group.pgid);
@@ -169,6 +192,7 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
     }
     const why = mode === false ? 'verify.inPlace: false' : obstacle;
     out(`verify --gate ${short} : porte jouée dans une copie jetable ${dir} (${why}) ; dépendances copiées : ${copied.length ? copied.join(', ') : 'aucune'}`);
+    out(replayReason);
     if (missing.length) out(`dépendances déclarées absentes de l'arbre principal, non copiées : ${missing.join(', ')}`);
     return await runSteps(steps, dir, ctx, group, env, short);
   } finally {

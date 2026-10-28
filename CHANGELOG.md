@@ -79,6 +79,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- `cadence verify --gate` reuses the gate of the wave instead of replaying it (L397, `docs/deliver.md`, skill `lead`): when the state of a wave (`.cadence/runs/<wave>`, looked for in the current folder, the repository root and its parent) holds checks the program ran AT the requested sha, on an identical git tree, green and covering every current `orchestrate.build` / `orchestrate.test` command, the verdict is read from it, nothing runs (exit 0) and the first line says so (`verdict repris de la porte de la vague <vague> (lot …)`). A changed sha (integration, rebase), a tree that differs, a record without tree, a red or missing step, a changed command or no wave at all replays the gate as before, and the line after the one telling where it ran says why (`verdict rejoué : …`). The wave now records the tree of the checked commit next to its sha. A re-verification of a ready lot no longer costs the ~5 minutes of its build and suite (L390, 28-10).
+
 - `orchestrate.continue` in a project's `cadence.yaml` (L390, `docs/orchestrate.md`): `maxEstimate` (days) and `exclude` (lot ids) keep `cadence orchestrate --continue` from drawing a big lot with no spec or sub-task (maritime B6 « Profils verticaux, coupes (10) », effort L, drawn on 27-10 then withdrawn by the lead); a lot whose title or note says « non tirable » is never drawn either. `--dry-run --continue` prints each project's setting and every ready lot it holds back, with the cause. A lot given on the command line is still played.
 
 ### Fixed

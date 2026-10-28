@@ -75,6 +75,7 @@ lots:
     estimate: 0.5
     created: 2026-10-28
     started: 2026-10-28
+    review: { date: 2026-10-28, verdict: "conforme : les mineurs traités sont levés (mesure exacte, 68/5 recomptés ; réponse du lead comptée comme raison ; R1 vérifie que la revue lit la raison), 2 mineurs nouveaux en notes (doc et avertissement muets sur la réponse du lead) — orchestré (vague 2026-10-28-2000, 1 passe(s) de correction + passe des mineurs)", commit: 9dc80732ef6375b059250da59ffb099b303cdf2c }
   - id: L407
     title: "Réponse sur une vague vivante : --answer est refusé tant qu'un autre lot de la vague tourne (L401 bloqué ~15 min le 28-10) — l'accepter et la faire prendre par la vague vivante (file de réponses lue entre deux étapes), test"
     status: todo

@@ -4234,11 +4234,12 @@ lots:
     finished: 2026-10-27
   - id: L390
     title: orchestrate --continue tire le premier lot prêt du plan, même un gros lot sans spécification ni sous-tâche (maritime B6 « Profils verticaux, coupes (10) », effort L, tiré le 27-10 puis retiré par le lead) — réglage de tirage par projet (continue.maxEstimate, continue.exclude ou lots marqués non tirables) appliqué au tirage et affiché par le dry-run ; doc, tests
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-27
     started: 2026-10-28
     review: { date: 2026-10-28, verdict: "compliant — 0 blocking, 0 major, 1 minor (note) — orchestré (vague 2026-10-28-0750, 0 passe(s) de correction)", commit: 71811e1aced8e985fbe460fc8e2d57ebf67e088d }
+    finished: 2026-10-28
   - id: L391
     title: "⚡ un test non hermétique a commité 14 fois « feat(?): travail » (a.txt à la racine) dans le vrai dépôt cadence pendant la vague 2026-10-27-1230 (13:19, entre L379 et L378), intégré puis poussé avec 1.16.x — trouver le test (test/orchestrate-e2e.test.ts : impl { file: 'a.txt', message: 'feat({lot}): travail' }, {lot} non résolu → cwd réel), le rendre hermétique (dossier temporaire imposé, garde qui refuse un cwd dans le dépôt), retirer a.txt ; test de garde"
     status: done

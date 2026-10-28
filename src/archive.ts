@@ -72,7 +72,11 @@ export function readArchiveFile(file: string): Record<string, unknown>[] {
   return lots.toJSON() as Record<string, unknown>[];
 }
 
-/** Ajoute les nœuds au fichier de l'année (créé au besoin) ; un identifiant déjà archivé n'est pas ajouté deux fois (rejeu après un échec d'écriture du plan). */
+/**
+ * Ajoute les nœuds au fichier de l'année (créé au besoin). Un identifiant déjà archivé est REMPLACÉ par la copie du plan, à sa
+ * place : le plan est la seule copie qui a pu changer (note ajoutée après un échec d'écriture, lot remis à la main), l'archive
+ * ne doit jamais garder une copie plus ancienne que lui. Jamais deux fois le même id.
+ */
 export function appendToArchive(dir: string, year: string, nodes: YAMLMap[]): string {
   const file = join(dir, `${year}.yaml`);
   const doc = existsSync(file) ? parseDocument(readFileSync(file, 'utf8')) : new Document({ version: 1, lots: [] });
@@ -83,8 +87,12 @@ export function appendToArchive(dir: string, year: string, nodes: YAMLMap[]): st
     doc.set('lots', seq);
   }
   seq.flow = false;
-  const have = new Set(seq.items.filter(isMap).map((n) => String(n.get('id'))));
-  for (const n of nodes) if (!have.has(String(n.get('id')))) seq.add(n);
+  for (const n of nodes) {
+    const id = String(n.get('id'));
+    const at = seq.items.findIndex((o) => isMap(o) && String(o.get('id')) === id);
+    if (at === -1) seq.add(n);
+    else seq.items[at] = n;
+  }
   mkdirSync(dir, { recursive: true });
   if (!existsSync(file)) doc.commentBefore = ` Lots terminés ou abandonnés de ${year}, déplacés du plan par « raf archive ». Lecture seule pour les sessions : ne pas l'ouvrir.`;
   writeFileSync(file, doc.toString({ lineWidth: 0 }));

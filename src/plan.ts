@@ -544,7 +544,9 @@ export class Plan {
 
   /**
    * `raf archive` : déplace les lots done et dropped (terminés avant `before` s'il est donné) vers l'archive de leur année de fin.
-   * L'archive est écrite avant le plan : un échec entre les deux laisse des doublons que le rejeu ne recopie pas.
+   * Sans perte : l'archive est écrite avant le plan, et si l'écriture du plan échoue (`plan.onWrite`, L346) les fichiers d'archive
+   * reviennent tels qu'avant, comme le plan — « plan inchangé » vaut pour les deux. Un lot encore dans le plan ET dans l'archive
+   * (coupure entre les deux écritures, lot remis à la main) est recopié par-dessus sa copie archivée : le plan l'emporte.
    * `dryRun` : rend ce qui serait déplacé, sans rien écrire.
    */
   archive(today: Day, opts: { before?: Day; dryRun?: boolean } = {}): { moved: { lot: Lot; file: string }[]; kept: Kept[] } {
@@ -561,10 +563,25 @@ export class Plan {
       const year = archiveYear(lot, today);
       byYear.set(year, [...(byYear.get(year) ?? []), n]);
     }
+    // Ce qu'il faudra remettre si le plan ne s'écrit pas : chaque fichier d'année touché (null : il n'existait pas), et le dossier.
+    const hadDir = existsSync(this.archiveDir);
+    const before = [...byYear.keys()].map((y) => join(this.archiveDir, `${y}.yaml`)).map((f) => [f, existsSync(f) ? readFileSync(f) : null] as const);
     for (const [year, list] of byYear) appendToArchive(this.archiveDir, year, list);
-    seq.items = seq.items.filter((n) => !nodes.includes(n as YAMLMap));
+    const items = seq.items;
+    seq.items = items.filter((n) => !nodes.includes(n as YAMLMap));
     this.archivedCache = undefined;
-    this.save();
+    try {
+      this.save();
+    } catch (e) {
+      for (const [f, content] of before) {
+        if (content === null) rmSync(f, { force: true });
+        else writeFileSync(f, content);
+      }
+      if (!hadDir) rmSync(this.archiveDir, { recursive: true, force: true });
+      seq.items = items;
+      this.archivedCache = undefined;
+      throw e;
+    }
     return { moved: move.map((lot) => ({ lot, file: files(lot) })), kept };
   }
 

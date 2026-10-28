@@ -3,9 +3,12 @@ import { run } from '../src/cli.js';
 import { Plan } from '../src/plan.js';
 import { gitRepo } from './helpers.js';
 
-/** Un dépôt avec un plan : L1 done 2025, L2 dropped 2026-03, L3 done 2026-09, L4 doing, L5 todo. */
-export function repoWithPlan(today = '2026-10-28') {
-  const dir = gitRepo();
+/**
+ * Un dépôt avec un plan : L1 done 2025, L2 dropped 2026-03, L3 done 2026-09, L4 doing, L5 todo.
+ * `parent` : le dépôt est `<parent>/depot`, pour poser un dépôt voisin à côté (clé de lot `repos:`).
+ */
+export function repoWithPlan(today = '2026-10-28', parent?: string) {
+  const dir = gitRepo(parent);
   const lines: string[] = [];
   const errs: string[] = [];
   const io = () => ({ cwd: dir, env: { RAF_TODAY: today }, out: (l: string) => lines.push(l), err: (l: string) => errs.push(l), now: () => new Date(`${today}T10:00:00`) });

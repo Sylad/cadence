@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { parseDocument, type YAMLSeq } from 'yaml';
 import { Plan } from '../src/plan.js';
+import { repoWork } from '../src/repos.js';
 import { repoWithPlan } from './archive-helpers.js';
-import { commit } from './helpers.js';
+import { commit, tempDir } from './helpers.js';
 
 /** `plan.onWrite` du dépôt : `command` lancé après chaque écriture du plan. */
 const onWrite = (dir: string, command: string) => writeFileSync(join(dir, 'cadence.yaml'), `plan:\n  path: .cadence/raf.yaml\n  onWrite:\n    command: '${command}'\n`);
@@ -81,5 +82,40 @@ describe('L396 — revue de code, constat 2 : le hook post-commit connaît un lo
     commit(r.dir, 'fix(L1): suite', '2026-10-28T11:00:00');
     const hook = await r.raf('hook', 'post-commit');
     expect(hook.err).not.toContain('est visible');
+  });
+});
+
+describe('L396 — revue de code, constat 3 : les dépôts voisins (repos:) d’un lot archivé gardent la période du lot', () => {
+  /** L1 (démarré le 2025-06-01, fini le 2025-06-10) travaille aussi dans ../v, où un commit du lot est dans la période et un autre hors. */
+  function withNeighbour() {
+    const parent = tempDir();
+    const r = repoWithPlan('2026-10-28', parent);
+    const v = join(parent, 'v');
+    mkdirSync(v);
+    for (const args of [['init', '-q', '-b', 'main'], ['config', 'user.email', 'test@example.com'], ['config', 'user.name', 'Test'], ['config', 'commit.gpgsign', 'false']]) execFileSync('git', args, { cwd: v, stdio: 'ignore' });
+    commit(v, 'feat(L1): dans la période', '2025-06-05T10:00:00');
+    commit(v, 'feat(L1): hors période', '2026-02-01T10:00:00');
+    const p = Plan.load(r.plan);
+    p.setRepos('L1', [{ path: '../v' }]);
+    p.save();
+    writeFileSync(r.plan, readFileSync(r.plan, 'utf8').replace('started: 2025-06-10', 'started: 2025-06-01'));
+    return { ...r, v };
+  }
+
+  it('R21 — raf commits et raf show d’un lot archivé ne listent que les commits voisins de sa période, comme avant l’archivage', async () => {
+    const r = withNeighbour();
+    const avant = await r.raf('commits', 'L1');
+    expect(avant.out).toContain('dans la période');
+    expect(avant.out).not.toContain('hors période');
+    expect((await r.raf('archive')).code).toBe(0);
+    const apres = await r.raf('commits', 'L1');
+    expect(apres.code).toBe(0);
+    expect(apres.out).toContain('dépôt ../v');
+    expect(apres.out).toContain('dans la période');
+    expect(apres.out).not.toContain('hors période');
+    const show = await r.raf('show', 'L1');
+    expect(show.out).toContain('dans la période');
+    expect(show.out).not.toContain('hors période');
+    expect(repoWork(Plan.load(r.plan), { rel: '../v', path: r.v }, 'L1').map((c) => c.subject)).toEqual(['feat(L1): dans la période']);
   });
 });

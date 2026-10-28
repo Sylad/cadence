@@ -45,7 +45,8 @@ export function resolveLotRepos(base: string, lot: Pick<Lot, 'repos'>): { repos:
  * compte de la casse, dans le sujet et le corps). Sans `cite`, les commits d'une autre application qui citent le même id comptent.
  */
 export function repoWork(plan: Plan, repo: LotRepo, lotId: string): Commit[] {
-  const lot = plan.lots().find((l) => l.id === lotId);
+  // Un lot archivé (L396) garde sa période : sans elle, `raf commits` listerait les commits voisins d'avant et d'après le lot.
+  const lot = plan.everyLot().find((l) => l.id === lotId);
   const inPeriod = lotWork(plan, repo.path, lotId).filter((c) => (!lot?.started || c.day >= lot.started) && (!lot?.finished || c.day <= lot.finished));
   if (!repo.cite) return inPeriod;
   const needle = repo.cite.toLowerCase();

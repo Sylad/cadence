@@ -192,6 +192,7 @@ export function audit(plan: Plan, root: string, newsDir: string, today: Day, opt
   const linked = exemptPlanOnly(linkCommits(lots, planCommits(plan, root, { since: auditSince(plan, opts.since) }), plan.refs), plan, root);
   // L'inactivité se mesure sur tout l'historique, pas seulement la fenêtre --since.
   const all = linkCommits(lots, planCommits(plan, root), plan.refs);
+  preloadChangedFiles(root, [...all.byLot.values()].flatMap((cs) => cs.map((c) => c.sha)));
   // Un commit acquitté (`raf ignore`) qui cite des lots connus ne compte pour aucun : ni commencé, ni actif, ni à relire.
   for (const [id, cs] of all.byLot) all.byLot.set(id, cs.filter((c) => !isAcknowledged(plan, c)));
   // Planifier un lot (commit qui ne touche que le plan) n'est pas y travailler : un lot « todo »
@@ -249,6 +250,8 @@ export function docSyncIssues(plan: Plan, root: string, byLot: Map<string, Commi
 /** Commits qui portent du travail sur un lot : ni antérieurs à l'adoption du plan, ni acquittés (`raf ignore`), ni réduits au plan, ni une simple version. */
 function workCommits(plan: Plan, root: string, commits: Commit[]): Commit[] {
   const adopted = plan.since;
+  // Les fichiers de tous ces commits d'un seul `git log` : le filtre ci-dessous les lit un à un (L394, un `git diff-tree` par commit coûtait 89 % de `raf check`).
+  preloadChangedFiles(root, commits.map((c) => c.sha));
   return commits.filter((c) => (!adopted || c.day >= adopted) && !isAcknowledged(plan, c) && !isPlanOnly(c.sha, plan, root) && !isReleaseOnly(c.sha, root));
 }
 

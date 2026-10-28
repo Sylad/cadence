@@ -27,7 +27,7 @@
   `raf now` prints no commit and the tour `L1 (0 commit)`, L379; the commit column and the tooltip of `raf gantt` read the same count, L381), and
   `cadence deliver` does not announce the lots it cites as delivered. The files
   decide, never the subject: a `chore(plan): …` commit that touches a source
-  file is a commit like any other.
+  file is a commit like any other. `raf check`, `raf now` and `cadence session start` read the files of all the commits in one `git log` call, not one `git diff-tree` per commit (L394: 16.5 s down to 3.4 s for `raf check` on 2,764 commits, `docs/mesures/fichiers-des-commits-2026-10-28.md`).
 - `raf gantt` writes a single self-contained HTML page (no server, no CDN).
 
 ```sh

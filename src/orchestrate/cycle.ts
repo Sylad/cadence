@@ -2188,10 +2188,17 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     return;
   }
   // La session peut n'avoir plus rien à commiter (réponse du lead, lot commité avant la vague) : le travail du lot est déjà dans git.
-  // Même règle côté fix (L56) : la passe n'avait rien à ajouter, le lot a déjà ses commits de travail → revue neuve ; la passe reste consommée, MAX_PASSES borne la boucle.
+  // Même règle côté fix (L56) : la passe n'avait rien à ajouter, le lot a déjà ses commits de travail → revue neuve, à condition que la session donne sa raison (L406, plus bas) ; la passe reste consommée, MAX_PASSES borne la boucle.
   const alreadyDone = hasWork(plan, wd(c), l);
   if (made === 0 && !alreadyDone && !headMoved) {
     stop(c, 'handed-back', `${kind} sans commit`);
+    return;
+  }
+  // L406 : une correction qui ne commite rien doit dire pourquoi (« choix », lu par la revue). Sans raison, la revue relirait les mêmes commits et rendrait les mêmes constats : la passe ne compte pas (toFix l'avait comptée), le lot est rendu.
+  const reason = (rep.choix ?? []).some((x) => x.trim());
+  if (kind === 'fix' && made === 0 && !headMoved && !docsPass && !reason) {
+    l.pass = Math.max(0, l.pass - 1);
+    stop(c, 'handed-back', 'fix sans commit ni raison (choix vide) : la revue aurait relu les mêmes commits');
     return;
   }
   // L317 : la passe du bibliothécaire qui laisse l'écart ouvert (rien commité, ou autre chose que la documentation) ne passe pas à la revue : le lot ne finirait pas prêt, `raf check` resterait rouge.
@@ -2203,7 +2210,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     }
   }
   if (headMoved) l.warnings.push(`${minorsPass ? 'passe des mineurs' : 'correction'} reprise sans nouveau commit : un commit d'une session précédente est relu par la revue`);
-  else if (made === 0) l.warnings.push(kind === 'fix' ? 'fix sans nouveau commit : revue lancée sur les commits du lot' : `${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
+  else if (made === 0) l.warnings.push(kind === 'fix' ? 'fix sans nouveau commit : revue lancée sur les commits du lot, avec la raison de la session (choix)' : `${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
 
   const red: Constat[] = [];
   // Tests annoncés rouges (L213) : avec orchestrate.test, le programme rejoue et compare à la ligne de base, la session n'est crue que si les tests y sont rouges autrement que par des échecs de départ ; sans, la liste des échecs de base de la session, non vérifiée.

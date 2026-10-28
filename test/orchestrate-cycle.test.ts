@@ -783,18 +783,39 @@ describe('contrôles autour des sessions', () => {
     expect(c.lot.outcome).toBe('implement sans commit');
   });
 
-  it('une correction sans nouveau commit sur un lot déjà commité enchaîne sur une revue neuve, avec avertissement (L56)', async () => {
-    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [() => claudeOut(workReport())] } });
+  it('L406 R1 — une correction sans commit mais avec sa raison (choix) enchaîne sur une revue neuve, passe comptée, raison relue par la revue', async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [() => claudeOut(workReport({ choix: ['le constat est faux : le cas est couvert par a.txt'] }))] } });
     const c = h.lot('L1');
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
     expect(c.lot.status).toBe('ready');
     expect(c.lot.pass).toBe(1);
-    expect(c.lot.warnings).toContain('fix sans nouveau commit : revue lancée sur les commits du lot');
+    expect(c.lot.warnings).toContain('fix sans nouveau commit : revue lancée sur les commits du lot, avec la raison de la session (choix)');
+    expect(c.lot.choix).toContain('le constat est faux : le cas est couvert par a.txt');
   });
 
-  it('deux corrections sans commit de suite : le plafond de passes est atteint, rendu au lead (L56)', async () => {
-    const h = harness({ script: { implement: [impl()], review: [major, major, major], fix: [() => claudeOut(workReport()), () => claudeOut(workReport())] } });
+  it('L406 R2 — une correction sans commit ni raison est rendue au lead : pas de revue à l\'identique, passe non comptée', async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [() => claudeOut(workReport())] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.pass).toBe(0);
+    expect(c.lot.outcome).toBe('fix sans commit ni raison (choix vide) : la revue aurait relu les mêmes commits');
+  });
+
+  it('L406 R3 — un choix blanc n\'est pas une raison', async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [() => claudeOut(workReport({ choix: ['  '] }))] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.pass).toBe(0);
+  });
+
+  it('deux corrections sans commit, chacune avec sa raison : le plafond de passes est atteint, rendu au lead (L56)', async () => {
+    const why = () => claudeOut(workReport({ choix: ['constat contesté'] }));
+    const h = harness({ script: { implement: [impl()], review: [major, major, major], fix: [why, why] } });
     const c = h.lot('L1');
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review']);
@@ -2041,7 +2062,7 @@ describe('correction ordinaire interrompue puis reprise (L40)', () => {
   });
 
   it('deux passes sans coupure : la seconde sans commit relance une revue (lot commité), jamais prise pour une reprise (L56)', async () => {
-    const nothing: Handler = () => claudeOut(workReport());
+    const nothing: Handler = () => claudeOut(workReport({ choix: ['rien à ajouter : le constat restant est faux'] }));
     // La 1re correction commite mais annonce ses tests rouges : le lot repart en correction, la 2e passe n'a rien à ajouter.
     const redFix: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'b.txt', 'fix(L1): b')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }));
     const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [redFix, nothing] } });
@@ -2050,7 +2071,7 @@ describe('correction ordinaire interrompue puis reprise (L40)', () => {
     expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'fix', 'review']);
     expect(c.lot.status).toBe('ready');
     expect(c.lot.warnings.join('\n')).not.toContain('reprise sans nouveau commit');
-    expect(c.lot.warnings).toContain('fix sans nouveau commit : revue lancée sur les commits du lot');
+    expect(c.lot.warnings).toContain('fix sans nouveau commit : revue lancée sur les commits du lot, avec la raison de la session (choix)');
   });
 });
 

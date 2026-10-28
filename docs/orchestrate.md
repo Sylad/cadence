@@ -454,9 +454,14 @@ review) still starts with the implementation session: its brief tells it to read
 sub-tasks, which carry the findings of any earlier review. If that session ends without a new commit on a lot that
 already has commits, the wave goes on to the review (warning `implement sans nouveau commit`) instead of handing the
 lot back; with no commit on the lot at all it is handed back as `implement sans commit`. The same goes for a
-correction pass: a `fix` session that adds no commit to a lot that already has work commits goes on to a fresh review
-(warning `fix sans nouveau commit : revue lancée sur les commits du lot`), the pass still counted — the cap of two
-correction passes stays the guard against a loop; with no commit on the lot it is handed back as `fix sans commit`.
+correction pass: a `fix` session that adds no commit to a lot that already has work commits must give its reason under
+`choix` (the brief says so; a blank entry is no reason). With the reason, the wave goes on to a fresh review, which reads
+it (warning `fix sans nouveau commit : revue lancée sur les commits du lot, avec la raison de la session (choix)`), the
+pass counted — the cap of two correction passes stays the guard against a loop. Without it (L406), a review would reread
+the same commits and return the same findings, so the lot is handed back as `fix sans commit ni raison (choix vide) :
+la revue aurait relu les mêmes commits` and the pass is not counted (on 2026-10-28, L401 lost two passes this way and 51
+`fix sans nouveau commit` warnings sat in the wave states). With no commit on the lot at all it is handed back as
+`fix sans commit`.
 
 **Compliant with minor findings**: the minors are not left for a follow-up lot. One **minors pass** runs
 before concluding: a new Sonnet session with its own brief (`fix-minors.md`) fixes the minors that are right

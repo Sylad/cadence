@@ -113,6 +113,7 @@ lots:
     title: "Panneau des lots : au plus 5 lots par projet (les premiers dans l'ordre affiché, en cours d'abord après L410), bouton « + N lots » qui déplie le reste du projet et « moins » qui le replie ; un lot qui a des sous-lots se plie/déplie d'un clic (replié par défaut, compte des sous-lots visible) ; états gardés entre deux ouvertures — demande de Sylvain le 28-10"
     public: Cinq lots par projet, et le reste à la demande
     status: todo
+    after: [ L410 ]
     estimate: 0.5
     visible: true
     screen: component

@@ -185,13 +185,15 @@ lots:
   - id: L413
     title: "Panneau des lots : frise du cycle de chaque lot en cours — étapes de la vague (fiche, maquette, accept, implement, revue, correction n/3, porte, UX, intégration, prêt) avec l'étape courante, sa durée et les passes, puis côté plan revue posée → clos → livré ; lu dans .cadence/runs/<vague> et le plan"
     public: Le cycle complet de chaque lot en cours, en frise
-    status: doing
+    status: done
     estimate: 0.5
     visible: true
     screen: component
     created: 2026-10-28
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "conforme : 7 commits relus, 296 tests du mod verts (claude plugin test, non couverts par vitest) et tsc du mod vert, frise conforme au but et à la doc ; 2 mineurs au bord (lot rendu sans pas connu sans ✖ : 43/318 lots réels ; ✔ UX/intégration jamais jouées) proposés en sous-tâches — orchestré (vague 2026-10-29-c413, 3 passe(s) de correction)", commit: 4af8a768a9c7c5ea99d68ecd1e98293686c0bae4, reporte: { de: 3cc98eb15608a0a46b32b29e2a5958db891cdf0f, vers: 4af8a768a9c7c5ea99d68ecd1e98293686c0bae4, patchId: e40fbf7b84880a9317c05d4262e2ec087c14d84d } }
+    ux: { date: 2026-10-29, verdict: "conforme : revue Fable neuve conforme après 3 corrections ; frise du cycle tenue par les tests du panneau monté (repli en « ✔ n » quand trop large, ✖ sur l'intégration pour un lot rendu à l'intégration) ; rendu réel à regarder par Sylvain après /reload-plugins ; mineurs non passés (budget) rendus en propositions" }
+    finished: 2026-10-29
   - id: L414
     title: "Panneau des lots : par lot en cours, tokens consommés sur le budget du lot et temps écoulé, comparés au temps habituel d'un lot de cette taille (cadence perf) — signal visible quand un lot dépasse (ex. L64 : 786 k, 53 min)"
     public: Budget et durée des lots en cours

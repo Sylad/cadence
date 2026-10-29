@@ -289,6 +289,7 @@ lots:
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
+    review: { date: 2026-10-29, verdict: "conforme : 0 bloquant, 0 majeur, 1 mineur (notion de « plan » plus étroite que isPlanOnly, échec côté sûr) — orchestré (vague 2026-10-29-1650, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 91bd9b533426c6334e3d3f11f6c88127b2fff183 }
   - id: L433
     title: "Registre des créneaux : une vague en mode worktree garde tout le plafond (« sessions en cours : 0 · créneaux libres : 0 sur 3 ») alors que 2 de ses 3 lots sont prêts et qu'elle n'a plus rien en file (29-10, vague cad1) — compter les sessions vivantes et les lots encore à jouer, pas le plafond"
     status: doing

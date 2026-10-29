@@ -93,6 +93,13 @@ describe('docs/lead.md', () => {
     expect(row).toMatch(/committed.*cit/)
   })
 
+  it("R12 — la ligne lots du tour --json (L401) décrit le champ reviewed posé quand le plan porte la revue de code (L413)", () => {
+    const row = read('docs/lead.md').split('\n').find((l) => l.includes('also carries `lots`')) ?? ''
+    expect(row).toContain('reviewed?')
+    expect(row).toMatch(/`reviewed: true`.*(code review|review)/)
+    expect(row).toContain('cycle')
+  })
+
   it('décrit les règles permanentes et les codes de sortie', () => {
     const md = read('docs/lead.md')
     expect(md).toMatch(/^## .*[Rr]ules/m)

@@ -355,9 +355,10 @@ lots:
     created: 2026-10-29
   - id: L440
     title: "Comptes rendus courts des agents qa-reviewer et code-reviewer appelés par le lead : 5 lignes (verdict, bloquants, suites) au lead, rapport complet écrit dans un fichier lu à la demande — une vingtaine de rapports de 3 à 5k ont gonflé le lead le 29-10 (demande de Sylvain)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-29
+    started: 2026-10-29
   - id: L441
     title: "cadence orchestrate --status compact : une ligne par lot (état, passes, revue, UX, tokens, durée) ; choix faits, propositions et captures dans un fichier de la vague, affichés par --status --detail <lot> (le tableau complet a coûté 5 à 10k par lecture au lead le 29-10) (demande de Sylvain)"
     status: todo

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { renderBrief } from '../src/orchestrate/briefs.js';
 
 const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: 'c1', reponse: '', constats: 'un constat', ux: '', choix: '', checks: '', news: '', captures: '', fiche: '', repos: '' };
@@ -54,5 +56,25 @@ describe('cas limites et fiche (L428, correction)', () => {
     expect(b).toContain('except a case the fiche does not cover');
     expect(b).toContain('you do not code a rule it does not state');
     expect(b).toContain('neither coded nor tested');
+  });
+});
+
+describe('documentation du point « cas limites » (L428, correction)', () => {
+  const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8');
+  it('R6 — docs/orchestrate.md, la page de mesure et le CHANGELOG disent qu\'avec une fiche un cas limite qu\'elle ne couvre pas n\'est ni codé ni testé', () => {
+    const orch = read('../docs/orchestrate.md');
+    const l428 = orch.split('\n').find((l) => l.includes('Limits and rules before the walkthrough (L428)'));
+    expect(l428, 'puce L428 de docs/orchestrate.md').toBeDefined();
+    expect(l428).toContain('neither coded nor tested');
+    expect(l428).toMatch(/except .*the fiche does not cover/);
+    const regle = orch.split('\n').find((l) => l.includes('a case the sheet does not cover is written in the report'));
+    expect(regle, 'règle « does not invent a rule » de docs/orchestrate.md').toBeDefined();
+    expect(regle).toContain('not coded nor tested');
+    const mesure = read('../docs/mesures/bug-code-2026-10-29.md');
+    expect(mesure).toContain('ni codé ni testé');
+    expect(mesure).toMatch(/sauf un cas que la fiche ne couvre pas/);
+    const changelog = read('../CHANGELOG.md').split('\n').find((l) => l.includes('Limits and rules, before the walkthrough') && l.includes('L428'));
+    expect(changelog, 'entrée L428 du CHANGELOG').toBeDefined();
+    expect(changelog).toContain('neither coded nor tested');
   });
 });

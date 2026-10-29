@@ -533,6 +533,8 @@ test('L411 — la bascule d’un lot à sous-lots est collée à l’id à tous 
   const p = buildPanel({ rows, columns: 70, height: 40, waves: [], views: { [openKey('p', 'L1')]: true } })
   const leads = Object.fromEntries(p.lines.flatMap(l => (l.kind === 'lot' ? [[l.id, l.lead]] : [])))
   expect(leads).toEqual({ L1: ' ▾', L2: '  └▸', L3: '  ' })
+})
+
 // ── L402 : réordonner ──────────────────────────────────────────────────────────────────────────────────────
 
 const PLAN = [lot('L1'), lot('L2'), task('L2', 1), task('L2', 2), lot('L3')]
@@ -608,7 +610,7 @@ test('R20 — le dossier d’un projet du tour : le dossier lui-même pour un pr
 })
 
 test('R20 — chaque ligne de lot du panneau porte son groupe de frères', () => {
-  const panel = buildPanel({ rows: [{ project: 'p', lots: PLAN }], columns: 80, height: 30, waves: [] })
+  const panel = buildPanel({ rows: [{ project: 'p', lots: PLAN }], columns: 80, height: 30, waves: [], views: { [openKey('p', 'L2')]: true } }) // L2 déplié (L411) : ses sous-tâches sont des lignes
   expect(panel.lines.flatMap(l => (l.kind === 'lot' ? [`${l.id}:${l.group}`] : []))).toEqual(['L1:', 'L2:', 'L2/1:L2', 'L2/2:L2', 'L3:'])
 })
 

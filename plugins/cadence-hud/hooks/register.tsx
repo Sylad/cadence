@@ -6,7 +6,7 @@ import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, LAUNCH_FOLDER, PLAN_STAMPS, par
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
-import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, planMove, projectDir, rankerOf, readTime, refusalReason, stampsSignature, subsText, waveLotsOf } from './lots'
+import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseToggleAsk, planMove, projectDir, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
@@ -696,8 +696,14 @@ export const register: Register = on => {
   // (un `raf move` a réussi, la relecture commencée après lui n'est pas finie — `cadence lead tour` prend plusieurs secondes), on ne juge pas : raf tranche.
   on('ui.message', async ($, e, next) => {
     if (e.requestId !== LOTS_PANE) return next(e)
-    const ask = parseMoveAsk(e.data)
     const [board, allWaves, at] = await Promise.all([read($, lotsBoard), read($, waves), read($, now)])
+    // la bascule des sous-lots d'un lot (L411), postée par la région parce que c'est elle qui reçoit le pointeur et le clavier de ses lignes
+    const toggle = parseToggleAsk(e.data, board?.rows ?? [])
+    if (toggle) {
+      await toggleView($, toggle.key)
+      return {}
+    }
+    const ask = parseMoveAsk(e.data)
     const project = board?.rows.find(r => r.project === ask?.project && !r.error)
     if (!ask || !board || !project || isMoving) return {}
     const plan = planMove(project.lots ?? [], ask, rankerOf(project, waveLotsOf(allWaves, at)), boardGen !== moveGen)
@@ -780,7 +786,7 @@ export const register: Register = on => {
               <Client key={`lots:${runProject}`} module="./lots-list.tsx" props={{ project: runProject, lines: run }} width="100%" />
             ) : (
               <Box key={`r${rows.length}`} flexDirection="column">
-                {run.map((l, j) => lotRow(table, l, `l${j}`))}
+                {run.map((l, j) => lotRow(table, l, `l${j}`, l.subs ? { onToggle: () => void toggleView($, l.subs!.key) } : {}))}
               </Box>
             ),
           )

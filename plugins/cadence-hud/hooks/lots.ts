@@ -341,6 +341,15 @@ export const buildPanel = (input: {
 /** Une ligne de lot du panneau, telle que le dessin la porte ; le projet la date. */
 export type PanelLot = Extract<PanelLine, { kind: 'lot' }>
 
+/** Lit une bascule de sous-lots postée par la région Client (L411 dans la région L402) : `key` doit être la clé openKey d'un lot du projet lu, sinon rien (la donnée vient du dessin, elle n'est pas crue). */
+export const parseToggleAsk = (data: unknown, rows: readonly LotsRow[]): { project: string; key: string } | undefined => {
+  if (typeof data !== 'object' || data === null) return undefined
+  const d = data as Record<string, unknown>
+  if (d.kind !== 'toggle' || typeof d.project !== 'string' || typeof d.key !== 'string') return undefined
+  const row = rows.find(r => r.project === d.project && !r.error)
+  return row && (row.lots ?? []).some(l => openKey(d.project as string, l.id) === d.key) ? { project: d.project, key: d.key } : undefined
+}
+
 /** Lit ce que la région Client a posté : un déplacement d'un projet, ou rien (la donnée vient du dessin, elle n'est pas crue). Les ids sont vérifiés plus loin, contre le tableau lu. */
 export const parseMoveAsk = (data: unknown): (MoveAsk & { project: string }) | undefined => {
   if (typeof data !== 'object' || data === null) return undefined

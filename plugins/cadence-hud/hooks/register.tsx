@@ -691,9 +691,9 @@ export const register: Register = on => {
   })
 
   // Le dépôt d'un lot (ou d'une sous-tâche) posté par la région Client du panneau (L402) : contrôlé contre le tableau lu, puis `raf move` dans le projet.
-  // L'écran est trié par état (L410), pas dans l'ordre du plan : le panneau dit vrai sans interdire le geste — un dépôt qui laisse le plan tel quel n'appelle pas raf
-  // et le dit, un dépôt qui change le plan sans rien changer à l'écran le dit aussi. Ces deux jugements se font sur le tableau lu : tant qu'il est périmé
-  // (un `raf move` a réussi, la relecture commencée après lui n'est pas finie — `cadence lead tour` prend plusieurs secondes), on ne juge pas : raf tranche.
+  // L'écran est trié par état (L410), pas dans l'ordre du plan : un lot ne se réordonne qu'à l'intérieur de son groupe d'affichage (en cours, libres, le reste) — un dépôt sur un lot
+  // d'un autre groupe est refusé sans appeler raf (planMove), un dépôt qui laisse l'ordre du groupe tel qu'il est n'appelle pas raf et le dit (« déjà »). Ces jugements se font sur le
+  // tableau lu : tant qu'il est périmé (un `raf move` a réussi, la relecture commencée après lui n'est pas finie — `cadence lead tour` prend plusieurs secondes), on ne juge pas « déjà » : raf tranche.
   on('ui.message', async ($, e, next) => {
     if (e.requestId !== LOTS_PANE) return next(e)
     const [board, allWaves, at] = await Promise.all([read($, lotsBoard), read($, waves), read($, now)])

@@ -1156,7 +1156,8 @@ test('L412 R15 — une livraison en échec se lit sur le journal des livraisons,
 })
 
 test('L412 R16 — le bloc ne prend jamais plus de la moitié du corps : l’arbre garde sa place', async ($, on) => {
-  const lots = Array.from({ length: 8 }, (_, i) => ({ ...WAVE.lots[0]!, lot: `Q${i}`, status: 'question', questions: ['q'] }))
+  // un projet hors du tableau du tour : le plan n'écarte pas ses questions (L412 R18), le plafond seul joue
+  const lots = Array.from({ length: 8 }, (_, i) => ({ ...WAVE.lots[0]!, project: 'maritime', lot: `Q${i}`, status: 'question', questions: ['q'] }))
   const s = await session($, on, { waves: [{ ...WAVE, lots }] })
   await s.advance(5_000)
   await s.hud('lots')
@@ -1175,4 +1176,19 @@ test('L412 R17 — une question d’une vague finie attend dans le panneau penda
   expect(text).toMatch(/Ce qui attend une décision \(1\)/)
   expect(text).toMatch(/\? ol:L80 .*Encore \?/)
   expect(text).toMatch(/--wave fini --answer ol:L80/)
+})
+
+test('L412 R18 — panneau monté : un verdict UX dont le lot est clos au plan (raf ux puis raf done) disparaît du bloc ; un lot encore ouvert y reste', async ($, on) => {
+  const lots = [
+    { ...WAVE.lots[0]!, lot: 'L80', status: 'ready', visible: true, uxVerdict: 'conforme' }, // ouvert dans TOUR (ol: L80)
+    { ...WAVE.lots[0]!, lot: 'L79', status: 'ready', visible: true, uxVerdict: 'conforme' }, // clos : absent de TOUR
+    { ...WAVE.lots[0]!, project: 'cadence', lot: 'L399', status: 'handed-back', outcome: 'budget atteint' }, // clos : absent de TOUR
+  ]
+  const s = await session($, on, { waves: [{ ...WAVE, lots }] })
+  await s.advance(5_000)
+  await s.hud('lots')
+  const { text } = await s.draw()
+  expect(text).toMatch(/Ce qui attend une décision \(1\)/)
+  expect(text).toMatch(/◐ ol:L80 +verdict UX : conforme/)
+  expect(text).not.toMatch(/ol:L79|cadence:L399/)
 })

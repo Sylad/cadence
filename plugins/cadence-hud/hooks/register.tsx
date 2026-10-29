@@ -779,8 +779,9 @@ export const register: Register = on => {
       </Text>
     )
 
-    // « ce qui attend une décision » (L412) : au plus la moitié du corps, l'arbre garde le reste ; la vague finie vient d'`endedWave` (la bande et l'arbre ne lisent que `waves`)
-    const decisions = buildDecisions(decisionsOf(allWaves, deliveries, ended), columns, Math.max(3, Math.floor(e.props.scroll.bodyRows / 2)))
+    // « ce qui attend une décision » (L412) : au plus la moitié du corps, l'arbre garde le reste ; la vague finie vient d'`endedWave` (la bande et l'arbre ne lisent que `waves`),
+    // le tableau lu écarte les décisions dont le lot est clos au plan
+    const decisions = buildDecisions(decisionsOf(allWaves, deliveries, ended, board), columns, Math.max(3, Math.floor(e.props.scroll.bodyRows / 2)))
     const decisionBlock = decisions.lines.length > 0 && (
       <Box key="decisions" flexDirection="column">
         {decisions.lines.map((l, i) => (

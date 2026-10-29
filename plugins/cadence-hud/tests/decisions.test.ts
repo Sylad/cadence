@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { buildDecisions, decisionsOf, parseDeliveries } from '../hooks/decisions'
-import type { FailedDelivery, Wave, WaveLot } from '../types'
+import type { FailedDelivery, LotsBoard, TourLot, Wave, WaveLot } from '../types'
 
 const wlot = (lot: string, status: string, extra: Partial<WaveLot> = {}): WaveLot => ({ project: 'ol', lot, title: `T ${lot}`, status, pass: 0, model: 'sonnet', next: null, steps: 1, step: null, ...extra })
 const wave = (lots: WaveLot[], extra: Partial<Wave> = {}): Wave => ({ id: 'w1', pid: 1, cwd: '/p', started: '2026-10-29T16:00:00Z', live: true, lots, ...extra })
@@ -70,4 +70,25 @@ test('L412 R10 — journal des livraisons : lu de la sortie du script, une sorti
   expect(parseDeliveries('[{"project":"a","day":"2026-10-29","sha":"s","reason":"r"},{"project":3},"x"]')).toEqual([{ project: 'a', day: '2026-10-29', sha: 's', reason: 'r' }])
   expect(parseDeliveries('{"waves":[]}')).toEqual([])
   expect(parseDeliveries('pas du json')).toEqual([])
+})
+
+const tlot = (id: string): TourLot => ({ id, title: `T ${id}`, status: 'todo', after: [] })
+
+test('L412 R21 — le plan tranche : une décision dont le lot n’est plus ouvert dans un projet lu du tableau disparaît ; un projet absent du tableau, en erreur ou sans lots garde les siennes', () => {
+  const w = wave([
+    wlot('L1', 'ready', { visible: true, uxVerdict: 'conforme' }), // clos au plan (raf ux puis raf done) : plus rien à poser
+    wlot('L2', 'handed-back', { outcome: 'cause' }), // encore ouvert : attend
+    wlot('L3', 'question', { questions: ['q'] }), // clos au plan : la question n'a plus d'objet
+    wlot('L4', 'question', { questions: ['q'], project: 'maritime' }), // projet absent du tableau : on ne sait pas, elle reste
+    wlot('L5', 'handed-back', { project: 'erreur' }), // projet illisible par le tour : reste
+    wlot('L6', 'handed-back', { project: 'ancien' }), // ligne sans lots (cadence trop ancien) : reste
+  ])
+  const board: LotsBoard = { outdated: false, rows: [{ project: 'ol', lots: [tlot('L2'), tlot('L9/1')] }, { project: 'erreur', error: 'plan illisible' }, { project: 'ancien' }] }
+  const lots = (d: ReturnType<typeof decisionsOf>) => d.map(x => (x.kind === 'livraison' ? '' : x.lot))
+  expect(lots(decisionsOf([w], [], null, board))).toEqual(['L2', 'L4', 'L5', 'L6'])
+  expect(lots(decisionsOf([w], [], null, null))).toEqual(['L1', 'L2', 'L3', 'L4', 'L5', 'L6']) // sans tableau lu, rien n'est écarté
+  // une sous-tâche ouverte se reconnaît par son id complet ; une livraison en échec ne dépend pas du plan
+  const sub = wave([wlot('L9/1', 'question', { questions: ['q'] }), wlot('L9/2', 'question', { questions: ['q'] })])
+  const failed: FailedDelivery[] = [{ project: 'ol', day: '2026-10-29', sha: 'abc1234', reason: 'CI en échec' }]
+  expect(decisionsOf([sub], failed, null, board).map(x => (x.kind === 'livraison' ? x.kind : x.lot))).toEqual(['L9/1', 'livraison'])
 })

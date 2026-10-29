@@ -1,4 +1,4 @@
-import type { FailedDelivery, Wave } from '../types'
+import type { FailedDelivery, LotsBoard, Wave } from '../types'
 import { ellipsize } from './lots'
 import { lotStatusFr } from './format'
 
@@ -19,8 +19,15 @@ const firstLine = (text: string): string => text.split('\n').map(l => l.trim()).
  * vague du dossier ne la remplace pas) et dans les livraisons en échec : une question de session (`question`), un lot rendu au lead (`handed-back`, `failed` : la cause est la
  * première ligne de son issue, à défaut son statut), un verdict UX à poser (lot prêt, visible, dont la revue a rendu un verdict) et une livraison en échec par projet.
  * Les vagues vivantes passent d'abord, puis les finies (une vague n'est lue qu'une fois) ; un lot n'est compté que dans la première vague qui le porte ; un lot suspendu n'attend rien de la personne.
+ * Le plan tranche (`board`, le tableau du panneau lu de `cadence lead tour --json`) : une décision dont le lot n'est plus ouvert dans un projet que le tour a lu (ligne sans erreur,
+ * avec ses lots) n'est plus affichée — un verdict UX posé puis `raf done`, un lot rendu puis repris et clos, une question dont le lot est clos. Un projet absent du tableau, en erreur
+ * ou sans lots (cadence trop ancien) garde ses décisions : on ne sait pas. Une livraison en échec ne dépend pas du plan.
  */
-export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedDelivery[], ended: Wave | null = null): Decision[] => {
+export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedDelivery[], ended: Wave | null = null, board: LotsBoard | null = null): Decision[] => {
+  const open = (project: string, lot: string): boolean => {
+    const row = board?.rows.find(r => r.project === project && !r.error && Array.isArray(r.lots))
+    return !row || row.lots!.some(t => t.id === lot)
+  }
   const finished = [...(ended ? [ended] : []), ...waves.filter(w => !w.live)]
   const ids = new Set<string>()
   const ordered = [...waves.filter(w => w.live), ...finished].filter(w => !ids.has(w.id) && ids.add(w.id))
@@ -31,6 +38,7 @@ export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedD
       const key = `${l.project}:${l.lot}`
       if (seen.has(key)) continue
       seen.add(key)
+      if (!open(l.project, l.lot)) continue
       if (l.status === 'question') {
         const text = (l.questions ?? []).map(firstLine).filter(q => q !== '').join(' / ')
         out.push({ kind: 'question', project: l.project, lot: l.lot, text: text || 'question sans texte', command: `cadence orchestrate --resume --wave ${w.id} --answer ${key} "…"` })

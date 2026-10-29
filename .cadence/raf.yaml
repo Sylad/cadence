@@ -204,7 +204,7 @@ lots:
     screen: component
     created: 2026-10-28
     started: 2026-10-29
-    review: { date: 2026-10-29, verdict: "conforme : 0 bloquant, 0 majeur ; 2 mineurs en note (README du mod cite R1–R4 au lieu de R1–R5 de perf-duree-lot-l414 ; le panneau teste > là où l'orchestrateur teste >= quand les tokens égalent le budget)", commit: 7663dde7496c78ae7a1747e52d55b516ce1fc301 }
+    review: { date: 2026-10-29, verdict: "conforme : 0 bloquant, 0 majeur (revue Opus du 30-10, reposée après rebase sur 31f8875 : conflits de juxtaposition avec L413 seulement, diffs des fix identiques, vitest/tsc/build/plugin verts) ; 2 mineurs en note (README R1–R4 au lieu de R1–R5 ; > au lieu de >= quand les tokens égalent le budget)", commit: 223e50dbaa4cc1555b8086205d89854f2181d2c6 }
   - id: L415
     title: "Panneau des lots : par projet, dernière livraison (sha, âge, verte/rouge, depuis le journal de cadence deliver) et lots clos non livrés"
     public: Dernière livraison de chaque projet

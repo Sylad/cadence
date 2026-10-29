@@ -144,6 +144,109 @@ describe('hook pre-push : un push dont le sha de tête n\'a pas de verdict vert 
   });
 });
 
+describe('un commit qui ne touche que le plan reprend le verdict de son parent (L432)', () => {
+  const PLAN = '.cadence/raf.yaml';
+  /** Un commit qui ne change que `files` (chemin → contenu). */
+  const commitFiles = (repo: string, files: Record<string, string>, msg: string) => {
+    for (const [f, c] of Object.entries(files)) {
+      mkdirSync(join(repo, f, '..'), { recursive: true });
+      writeFileSync(join(repo, f), c);
+    }
+    git(repo, 'add', ...Object.keys(files));
+    git(repo, 'commit', '-q', '-m', msg);
+    return git(repo, 'rev-parse', 'HEAD');
+  };
+  const planOnly = (repo: string, n: string) => commitFiles(repo, { [PLAN]: `${n}\n` }, `plan: ${n}`);
+
+  it('R1 — un commit qui ne change que le plan au-dessus d\'un sha à porte verte passe sans rejouer la porte', async () => {
+    const { repo, first, head } = project('true');
+    await cli(repo, '', {}, 'verify', '--gate', '--sha', head);
+    const top = planOnly(repo, 'a');
+    expect((await cli(repo, push(top, first), {}, 'hook', 'pre-push')).code).toBe(0);
+    expect(verdicts(repo)[top]).toBeUndefined();
+  });
+
+  it('R2 — plusieurs commits de plan empilés reprennent le verdict du premier parent qui n\'est pas un commit de plan', async () => {
+    const { repo, first, head } = project('true');
+    await cli(repo, '', {}, 'verify', '--gate', '--sha', head);
+    planOnly(repo, 'a');
+    const top = planOnly(repo, 'b');
+    expect((await cli(repo, push(top, first), {}, 'hook', 'pre-push')).code).toBe(0);
+  });
+
+  it('R3 — un commit qui touche le plan ET un autre fichier n\'hérite de rien : refus', async () => {
+    const { repo, first, head } = project('true');
+    await cli(repo, '', {}, 'verify', '--gate', '--sha', head);
+    const top = commitFiles(repo, { [PLAN]: 'x\n', 'a.txt': '3\n' }, 'plan et code');
+    expect((await cli(repo, push(top, first), {}, 'hook', 'pre-push')).code).toBe(3);
+  });
+
+  it('R4 — un commit de plan au-dessus d\'un sha à porte rouge est refusé, et dit « rouge »', async () => {
+    const { repo, first, head } = project('false');
+    await cli(repo, '', {}, 'verify', '--gate', '--sha', head);
+    const top = planOnly(repo, 'a');
+    const r = await cli(repo, push(top, first), {}, 'hook', 'pre-push');
+    expect(r.code).toBe(3);
+    expect(r.err).toContain('rouge');
+    expect(r.err).toContain(top.slice(0, 7));
+  });
+
+  it('R5 — un commit de plan au-dessus d\'un sha sans verdict reste refusé (« aucun verdict »)', async () => {
+    const { repo, first, head } = project('true');
+    const top = planOnly(repo, 'a');
+    const r = await cli(repo, push(top, first), {}, 'hook', 'pre-push');
+    expect(r.code).toBe(3);
+    expect(r.err).toContain('aucun verdict');
+    expect(head).not.toBe(top);
+  });
+
+  it('R6 — un autre fichier sous .cadence/ ou un plan d\'un autre nom n\'est pas « le plan » : refus', async () => {
+    const { repo, first, head } = project('true');
+    await cli(repo, '', {}, 'verify', '--gate', '--sha', head);
+    const other = commitFiles(repo, { '.cadence/autre.yaml': 'x\n' }, 'autre');
+    expect((await cli(repo, push(other, first), {}, 'hook', 'pre-push')).code).toBe(3);
+  });
+
+  it('R7 — le plan est celui que cadence.yaml désigne (plan: path), pas toujours .cadence/raf.yaml', async () => {
+    const { repo, first, head } = project('true');
+    writeFileSync(join(repo, 'cadence.yaml'), 'plan:\n  path: docs/mon-plan.yaml\norchestrate:\n  test: "true"\nverify:\n  inPlace: false\n');
+    await cli(repo, '', {}, 'verify', '--gate', '--sha', head);
+    const top = commitFiles(repo, { 'docs/mon-plan.yaml': 'a\n' }, 'plan');
+    expect((await cli(repo, push(top, first), {}, 'hook', 'pre-push')).code).toBe(0);
+    const defaut = planOnly(repo, 'b'); // .cadence/raf.yaml n'est plus le plan de ce projet
+    expect((await cli(repo, push(defaut, first), {}, 'hook', 'pre-push')).code).toBe(3);
+  });
+
+  it('R8 — un commit de fusion (deux parents) ne reprend rien, même si ses fichiers se limitent au plan', async () => {
+    const { repo, first, head } = project('true');
+    await cli(repo, '', {}, 'verify', '--gate', '--sha', head);
+    git(repo, 'checkout', '-q', '-b', 'autre', first);
+    commitFiles(repo, { [PLAN]: 'branche\n' }, 'plan sur la branche');
+    git(repo, 'checkout', '-q', '-');
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'fusion', 'autre');
+    const merge = git(repo, 'rev-parse', 'HEAD');
+    expect(git(repo, 'rev-list', '--parents', '-n1', merge).split(' ')).toHaveLength(3);
+    expect((await cli(repo, push(merge, first), {}, 'hook', 'pre-push')).code).toBe(3);
+  });
+
+  it('R9 — un commit racine qui ne contient que le plan n\'a pas de parent : aucun verdict à reprendre, refus', async () => {
+    const repo = gitRepo();
+    writeFileSync(join(repo, 'cadence.yaml'), 'orchestrate:\n  test: "true"\n');
+    mkdirSync(join(repo, '.cadence'));
+    writeFileSync(join(repo, PLAN), 'a\n');
+    git(repo, 'add', PLAN);
+    git(repo, 'commit', '-q', '-m', 'racine');
+    expect((await cli(repo, push(git(repo, 'rev-parse', 'HEAD')), {}, 'hook', 'pre-push')).code).toBe(3);
+  });
+
+  it('R10 — docs/deliver.md et docs/raf.md décrivent la reprise du verdict d\'un commit de plan', () => {
+    for (const f of ['deliver.md', 'raf.md']) {
+      const doc = readFileSync(join(__dirname, '..', 'docs', f), 'utf8');
+      expect(doc).toContain('L432');
+    }
+  });
+});
+
 describe('la garde de la porte survit au hook de la vague (L426)', () => {
   const bare = (repo: string) => {
     const origin = tempDir();

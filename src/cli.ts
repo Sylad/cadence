@@ -665,7 +665,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       }
       if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, today, io, readHookConfig(configPath).autostart);
       if (rest[0] === 'pre-commit') return preCommit(existsSync(planPath) ? loadPlan : null, readHookConfig(configPath).autostart, root, today, io);
-      if (rest[0] === 'pre-push') return prePush(root, io, rest[1], configPath);
+      if (rest[0] === 'pre-push') return prePush(root, io, rest[1], configPath, planFileIn(root, planPath));
       throw new RafError('usage : raf hook install|pre-commit|post-commit|pre-push');
     }
     case 'session': {
@@ -1001,13 +1001,18 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
   }
 }
 
+/** Le plan, relatif à la racine du dépôt git (comme les fichiers d'un commit), séparateurs `/`. */
+function planFileIn(root: string, planPath: string): string {
+  return relative(gitRoot(root) ?? root, planPath).split('\\').join('/');
+}
+
 /**
  * `raf hook pre-push` (L405), appelé par le hook que la vague pose : refuse (code 3) un push qui emporte un commit d'un lot pas prêt de la vague vivante
  * du dépôt, ou dont un lot pas prêt a des commits illisibles (la garde de `deliver --sha`). Puis (L426), quand le projet déclare une porte, refuse un push dont
- * le sha de tête n'a pas de verdict vert de `cadence verify --gate` (`CADENCE_PUSH_UNGATED=1` passe outre, et le dit). Sans vague qui tient le dépôt, ou avec un état de vague illisible
+ * le sha de tête n'a pas de verdict vert de `cadence verify --gate` (`CADENCE_PUSH_UNGATED=1` passe outre, et le dit) ; un commit qui ne change que le plan reprend le verdict de son parent (L432). Sans vague qui tient le dépôt, ou avec un état de vague illisible
  * (avertissement), la première garde ne gêne jamais un push ; une config illisible laisse passer la seconde.
  */
-function prePush(root: string, io: Io, remoteName: string | undefined, configPath: string): number {
+function prePush(root: string, io: Io, remoteName: string | undefined, configPath: string, planFile: string): number {
   let input = '';
   try {
     input = io.stdin ? io.stdin() : readFileSync(0, 'utf8');
@@ -1035,7 +1040,7 @@ function prePush(root: string, io: Io, remoteName: string | undefined, configPat
   } catch {
     return 0;
   }
-  const refusal = gateRefusal(root, gate, input);
+  const refusal = gateRefusal(root, gate, input, planFile);
   if (!refusal) return 0;
   if (io.env[UNGATED_ENV] === '1') {
     io.err(`raf: ${refusal.replace(/^push refusé/, 'push passé outre')} — ${UNGATED_ENV}=1 est posée`);

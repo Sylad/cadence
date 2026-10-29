@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- The `pre-push` hook's gate check (L426) lets through a commit that changes only the plan (`.cadence/raf.yaml`, or the file `plan:` names) when the commit below it, or the one below a stack of such commits (up to 50), has a verdict: it takes that verdict, green or red, instead of demanding a full suite replayed for the `raf done` commit (29-10, cadence and avatar) (L432, `docs/deliver.md`). A commit that also touches another file, a merge, a root commit and a stack with no verdict below are refused as before. The `lead` and `deliver` skills, `docs/lead.md`, `docs/orchestrate.md` and `docs/raf.md` say so.
+
 ### Fixed
 
 - Free slots no longer stay at zero while a wave in worktree mode has nothing left to play (L433, `docs/orchestrate.md`): the wave registers the lots it still has to play, not the lots it started with, and updates it each time a lot is settled (ready, handed back, failed or suspended). On 2026-10-29 `créneaux libres : 0 sur 3` stayed on while two of the three lots were ready and nothing was queued.

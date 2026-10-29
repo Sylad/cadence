@@ -220,9 +220,11 @@ One project at a time, by the lead: push, then the `deliver` skill (`cadence del
 refuses with exit 3 a push of a branch whose local sha has no green verdict of `cadence verify --gate`, naming the sha and
 the command to run. The verdict of the re-check (section 3, point 2) belongs to the lot's sha, and the head of `main` is
 almost never that sha: `raf done` does not commit, so the plan commit that follows it (« plan: Lx terminé »), a release
-commit or the plan commit of the next lot sits above. Such a plan commit has no verdict, and `verify --gate --sha <head>`
-cannot reuse the wave's record (made at the lot's sha, `checks.head`): it replays the whole gate, ~5 minutes. Count that
-replay in: after the plan commit, `cadence verify --gate --sha HEAD`, then push `main`. Delivering while the wave runs
+commit or the plan commit of the next lot sits above. A commit that changes only the plan file (L432) takes the verdict of
+its parent, stacked ones included: the hook lets it through, no replay. A commit that also touches another file (a release
+commit, a plan commit with code) has no verdict, and `verify --gate --sha <head>` cannot reuse the wave's record (made at the
+lot's sha, `checks.head`): it replays the whole gate, ~5 minutes. Count that replay in: after such a commit,
+`cadence verify --gate --sha HEAD`, then push `main`. Delivering while the wave runs
 (section 2b) pushes the lot's sha alone (`git push origin <sha>:main`): its verdict is the one the re-check recorded, and the
 plan commit is pushed later, after its own replay. `CADENCE_PUSH_UNGATED=1 git push …` lets a push through with no verdict
 and says so on stderr: it is for the push the human explicitly asks ungated (a plan-only or docs-only commit above a verified

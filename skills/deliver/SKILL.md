@@ -62,7 +62,7 @@ The push targets the branch being delivered (`main` here). Two cases where it do
 **The sha pushed needs a green verdict of the gate (L426).** Where the project declares a gate (`orchestrate.test` or
 `orchestrate.build`), the `pre-push` hook a wave installs, and the gate-only hook it leaves behind, refuse with exit 3 a push
 of a branch whose local sha has no green verdict of `cadence verify --gate`; the message names the sha and the command. The
-lot's sha the lead re-checked has one; a plan or release commit above it has none, and the wave's record does not cover it:
+lot's sha the lead re-checked has one, and a commit above it that changes only the plan takes it (L432); a release commit or a plan commit that also touches another file has none, and the wave's record does not cover it:
 run `cadence verify --gate --sha <sha>` on the very sha you push (a full replay for such a commit, ~5 minutes) before the
 push, HEAD included when you push `main`. `CADENCE_PUSH_UNGATED=1 git push …` lets a push through with no verdict and says so
 on stderr: only when the human asks for it, never the routine.

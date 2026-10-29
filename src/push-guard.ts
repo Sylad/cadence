@@ -1,5 +1,5 @@
-import { verdictFor } from './gate-verdict.js';
-import { tryGit } from './git.js';
+import { verdictFor, type GateVerdict } from './gate-verdict.js';
+import { changedFiles, tryGit } from './git.js';
 import { blockingLots, LABEL } from './orchestrate/table.js';
 import type { LotState } from './orchestrate/state.js';
 
@@ -46,19 +46,41 @@ export function pushRefusal(root: string, wave: string, lots: LotState[], input:
 /** La variable qui passe outre le verdict de la porte au push (L426) ; la garde des lots de la vague (`pushRefusal`) n'en dépend pas. */
 export const UNGATED_ENV = 'CADENCE_PUSH_UNGATED';
 
+/** Combien de commits de plan empilés on remonte au plus ; au-delà, le sha n'a pas de verdict (la porte se rejoue). */
+const PLAN_HOPS = 50;
+
+/**
+ * Le verdict de la porte pour `sha`, ou, quand `sha` ne change que le plan (`planFile`) et n'a qu'un parent, celui de son parent, de proche en proche
+ * (L432 : un commit de `raf done` au-dessus d'un sha à porte verte ne réclame pas une suite complète rejouée). Son propre verdict, s'il en a un, prime.
+ * Une fusion (deux parents), un commit racine, un commit qui touche autre chose que le plan ou un commit sans fichier n'héritent de rien.
+ */
+function planVerdict(root: string, sha: string, planFile: string): GateVerdict | null {
+  let at = sha;
+  for (let hop = 0; hop <= PLAN_HOPS; hop++) {
+    const verdict = verdictFor(root, at);
+    if (verdict) return verdict;
+    const parents = (tryGit(root, ['rev-list', '--parents', '-n1', at]) ?? '').trim().split(/\s+/).slice(1);
+    const files = parents.length === 1 ? changedFiles(root, at) : [];
+    if (files.length !== 1 || files[0] !== planFile) return null;
+    at = parents[0]!;
+  }
+  return null;
+}
+
 /**
  * Le refus d'un push dont le sha de tête n'a pas de verdict vert de `cadence verify --gate` (L426) : pour chaque ligne de l'entrée standard du hook pre-push,
  * le sha local d'une branche (`refs/heads/`) doit avoir son dernier verdict à 0 dans l'état partagé du dépôt. Absent ou rouge, le refus nomme le sha, dit lequel des deux
  * et donne la commande qui rend le verdict (`cadence verify --gate --sha <sha>`) ; il rappelle la variable qui passe outre. Une suppression de branche, un sha illisible
  * et une réf hors `refs/heads/` (un tag : son sha est celui de l'objet tag, pas d'un commit à vérifier) passent. Sans porte déclarée (`gate` faux) rien n'est exigé.
+ * Un commit qui ne change que le plan (`planFile`, relatif à la racine du dépôt) reprend le verdict de son parent (L432, `planVerdict`).
  */
-export function gateRefusal(root: string, gate: boolean, input: string): string | null {
+export function gateRefusal(root: string, gate: boolean, input: string, planFile: string): string | null {
   if (!gate) return null;
   for (const entry of input.split('\n')) {
     const [ref, local, remoteRef] = entry.trim().split(/\s+/);
     if (!ref || !local || ZERO.test(local) || !/^[0-9a-f]{7,64}$/.test(local)) continue;
     if (!(remoteRef || ref).startsWith('refs/heads/')) continue;
-    const verdict = verdictFor(root, local);
+    const verdict = planVerdict(root, local, planFile);
     if (verdict?.code === 0) continue;
     const short = local.slice(0, 7);
     const state = verdict ? `sa porte est rouge (verdict du ${verdict.at.slice(0, 10)})` : 'aucun verdict de la porte pour ce sha';

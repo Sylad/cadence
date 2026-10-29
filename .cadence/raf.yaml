@@ -127,6 +127,7 @@ lots:
     screen: component
     created: 2026-10-28
     started: 2026-10-28
+    review: { date: 2026-10-29, verdict: "conforme : « … +N lots de plus » compte les lots à toute profondeur (descendants, behind, hides), test de propriété rouge sous 4 mutations ; bouton « + N lots » au premier niveau comme documenté ; 202 tests du mod, tsc, vitest verts ; interaction L410 vérifiée", commit: cdae71a279abfa860be544df99b64f8f3e3daac4 }
   - id: L416
     title: "Créneaux toujours visibles : cadence lead tour affiche « créneaux libres : N sur M » même sans vague ni session du lead, et cadence lead release affiche après la libération les créneaux libres et la ligne « prêts, ressources libres », avec un ⚠ quand un créneau reste libre (29-10 : plafond 3 pris pour 2, un créneau vide plus d'une heure)"
     status: todo

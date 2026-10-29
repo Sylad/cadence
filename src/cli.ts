@@ -1429,7 +1429,15 @@ async function verifyGateCommand(values: { sha?: string; project?: string; retry
   const configPath = resolve(io.cwd, values.config ?? join(top, 'cadence.yaml'));
   const sha = resolveCommit(top, values.sha);
   if (!sha) throw new RafError(`verify --gate : --sha ${values.sha} : commit introuvable dans ${top}`);
-  return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), verify: readVerifyConfig(configPath), launchDirs: [io.cwd, top, dirname(top)], now: io.now, out: io.out });
+  // Le plan du projet (L444) : les commits qui ne changent que lui au-dessus du sha reprennent la porte du sha dessous. Illisible, il n'est pas cherché : la porte se rejoue.
+  let planFile: string | undefined;
+  try {
+    const configured = readPlanConfig(configPath, top)?.path;
+    planFile = planFileIn(top, configured !== undefined ? resolve(top, configured) : defaultPlan(top).path);
+  } catch {
+    planFile = undefined;
+  }
+  return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), verify: readVerifyConfig(configPath), launchDirs: [io.cwd, top, dirname(top)], planFile, now: io.now, out: io.out });
 }
 
 /** `session start|close --all [--depth n]` : la commande jouée dans chaque projet sous le dossier courant, une section par projet. */

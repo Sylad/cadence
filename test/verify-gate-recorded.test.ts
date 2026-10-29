@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { readOrchestrateConfig, readVerifyConfig } from '../src/config.js';
 import { newLot, RunStore, type LotState } from '../src/orchestrate/state.js';
+import { verdictFor } from '../src/gate-verdict.js';
 import { verifyGate } from '../src/verify-gate.js';
 import { cleanupTempDirs, gitRepo, tempDir } from './helpers.js';
 
@@ -135,6 +136,81 @@ describe('L397 — verify --gate reprend la porte enregistrée par la vague', ()
     wave(repo, repo, { head: sha, tree: treeOf(repo, sha), runs: green() });
     const lines: string[] = [];
     const code = await run(['verify', '--gate', '--sha', sha], { cwd: repo, env: {}, out: (l: string) => lines.push(l), err: (l: string) => lines.push(l), now: () => new Date('2026-10-28T12:00:00') });
+    expect(code).toBe(0);
+    expect(lines.join('\n')).toContain('verdict repris');
+  });
+});
+
+describe('L444 — le commit de plan au-dessus du sha contrôlé reprend la porte de ce sha', () => {
+  const PLAN = '.cadence/raf.yaml';
+  const planCommit = (repo: string, msg: string): string => {
+    mkdirSync(join(repo, '.cadence'), { recursive: true });
+    appendFileSync(join(repo, PLAN), `${msg}\n`);
+    git(repo, 'add', PLAN);
+    git(repo, 'commit', '-qm', msg);
+    return git(repo, 'rev-parse', 'HEAD');
+  };
+  const gateWithPlan = async (repo: string, sha: string, launch: string, planFile: string | undefined) => {
+    const lines: string[] = [];
+    const cfg = join(repo, 'cadence.yaml');
+    const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(cfg), verify: readVerifyConfig(cfg), launchDirs: [launch], planFile, out: (l) => lines.push(l) });
+    return { code, text: lines.join('\n'), lines };
+  };
+
+  it('R1 — un ou deux commits qui ne changent que le plan au-dessus du sha contrôlé : verdict repris, rien rejoué, la sortie nomme le sha contrôlé', async () => {
+    const { repo, sha } = project();
+    const launch = tempDir();
+    wave(launch, repo, { head: sha, tree: treeOf(repo, sha), runs: green() });
+    planCommit(repo, 'revue enregistrée');
+    const top = planCommit(repo, 'raf done');
+    const r = await gateWithPlan(repo, top, launch, PLAN);
+    expect(r.code).toBe(0);
+    expect(r.lines[0]).toContain('verdict repris');
+    expect(r.lines[0]).toContain(sha.slice(0, 7));
+    expect(ran()).toBe(false);
+    expect(verdictFor(repo, top)?.code).toBe(0);
+  });
+
+  it('R2 — un commit qui touche aussi un autre fichier, ou sans le plan connu : la porte est rejouée', async () => {
+    const { repo, sha } = project();
+    const launch = tempDir();
+    wave(launch, repo, { head: sha, tree: treeOf(repo, sha), runs: green() });
+    const onlyPlan = planCommit(repo, 'raf done');
+    expect((await gateWithPlan(repo, onlyPlan, launch, undefined)).text).toContain('aucune porte de vague enregistrée');
+    expect(ran()).toBe(true);
+    rmSync(mark);
+    appendFileSync(join(repo, PLAN), 'plus\n');
+    writeFileSync(join(repo, 'valeur.txt'), 'v2\n');
+    git(repo, 'add', PLAN, 'valeur.txt');
+    git(repo, 'commit', '-qm', 'mixte');
+    const mixed = git(repo, 'rev-parse', 'HEAD');
+    const r = await gateWithPlan(repo, mixed, launch, PLAN);
+    expect(r.text).toContain('aucune porte de vague enregistrée');
+    expect(r.text).not.toContain('verdict repris');
+    expect(ran()).toBe(true);
+  });
+
+  it('R3 — le sha contrôlé a un arbre différent de l\'enregistrement : le commit de plan au-dessus ne le sauve pas', async () => {
+    const { repo, sha } = project();
+    const launch = tempDir();
+    wave(launch, repo, { head: sha, tree: '0'.repeat(40), runs: green() });
+    const top = planCommit(repo, 'raf done');
+    const r = await gateWithPlan(repo, top, launch, PLAN);
+    expect(r.text).toContain('arbre différent');
+    expect(r.text).not.toContain('verdict repris');
+  });
+
+  it('R4 — la commande cadence verify --gate --sha HEAD lit le plan du projet et reprend la porte sous le commit de plan', async () => {
+    const { repo } = project();
+    mkdirSync(join(repo, '.cadence'), { recursive: true });
+    writeFileSync(join(repo, PLAN), 'project: p\nlots: []\n');
+    git(repo, 'add', PLAN);
+    git(repo, 'commit', '-qm', 'plan initial');
+    const checked = git(repo, 'rev-parse', 'HEAD');
+    wave(repo, repo, { head: checked, tree: treeOf(repo, checked), runs: green() });
+    planCommit(repo, 'raf done');
+    const lines: string[] = [];
+    const code = await run(['verify', '--gate', '--sha', 'HEAD'], { cwd: repo, env: {}, out: (l: string) => lines.push(l), err: (l: string) => lines.push(l), now: () => new Date('2026-10-28T12:00:00') });
     expect(code).toBe(0);
     expect(lines.join('\n')).toContain('verdict repris');
   });

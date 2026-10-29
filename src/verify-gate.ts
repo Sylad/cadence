@@ -71,6 +71,8 @@ export interface GateCtx {
   out: (line: string) => void;
   /** Dossiers où chercher l'état des vagues (`.cadence/runs`, L397) dont la porte peut être reprise au lieu d'être rejouée (défaut : aucun, la porte est toujours rejouée). */
   launchDirs?: string[];
+  /** Le plan du projet, relatif à la racine du dépôt (L444) : les commits qui ne changent que lui au-dessus du sha ne sont pas un autre contenu, la porte du sha dessous vaut. */
+  planFile?: string;
   /** Délai de chaque commande (défaut : 30 min). */
   timeoutMs?: number;
   /** Environnement des commandes et réglages lus pour la part de la machine (défaut : celui du processus). */
@@ -152,13 +154,14 @@ async function playGate(ctx: GateCtx): Promise<number> {
   }
   let recorded: ReturnType<typeof recordedGate> = { reason: 'aucune porte de vague enregistrée pour ce sha' };
   try {
-    recorded = recordedGate(ctx.launchDirs ?? [], repo, sha, steps);
+    recorded = recordedGate(ctx.launchDirs ?? [], repo, sha, steps, ctx.planFile);
   } catch (e) {
     recorded = { reason: `état des vagues illisible (${gitFailure(e)})` };
   }
   if ('found' in recorded) {
     const f = recorded.found;
-    out(`verify --gate ${short} : verdict repris de la porte de la vague ${f.wave} (lot ${f.lot} : contrôles du programme au même sha, arbre ${f.tree.slice(0, 7)} identique) — rien rejoué`);
+    const where = f.checked === sha ? 'au même sha' : `au sha ${f.checked.slice(0, 7)}, sous les seuls commits de plan de ${short}`;
+    out(`verify --gate ${short} : verdict repris de la porte de la vague ${f.wave} (lot ${f.lot} : contrôles du programme ${where}, arbre ${f.tree.slice(0, 7)} identique) — rien rejoué`);
     for (const step of steps) {
       const run = f.runs.find((r) => r.label === (step.name === 'build' ? 'build' : 'tests') && r.command === step.cmd)!;
       out(`✓ ${step.name} (${step.cmd}) — enregistré par la vague${run.instables?.length ? `, ${run.instables.length} test(s) instable(s) sous charge, verts rejoués seuls` : ''}`);

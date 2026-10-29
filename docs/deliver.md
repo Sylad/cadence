@@ -295,7 +295,7 @@ cadence verify --gate --sha 6b0d9aa --project app    # from the parent folder, t
 
 **A gate the wave already played is read, not replayed (L397).** A lot that turns ready has just been through the program's gate (`orchestrate.build`, then `orchestrate.test`, at the commit it integrates), and the wave keeps the result in its state (`.cadence/runs/<wave>/<lot>.json`, key `checks`: the commit, its git tree, each command and its code). Replaying the same build and suite on the same commit costs ~5 minutes and says nothing new (L390, 28-10). `cadence verify --gate` therefore looks in the current folder, the repository root and its parent for a wave state of this repository (most recent first) and **reads the verdict** when all of this holds:
 
-- the recorded checks ran **at the requested sha** (the same commit, not a descendant);
+- the recorded checks ran **at the requested sha** (the same commit, not a descendant) — or at the commit under it when the commits between them change **only the plan file** (the review record and `raf done` that the wave and the lead commit above an integrated lot, L444; the walk stops at a commit that touches another file, a merge or a root commit; the first line then says « au sha <checked>, sous les seuls commits de plan »);
 - the git tree of the sha is **identical** to the recorded tree;
 - every current step (`orchestrate.build`, `orchestrate.test`) has a recorded run with **the same command and code 0** (an unstable test the wave replayed alone is still green and is said).
 
@@ -306,7 +306,7 @@ verify --gate 6b0d9aa : verdict repris de la porte de la vague 2026-10-28-0830c 
 verify --gate 6b0d9aa : vert
 ```
 
-Nothing runs: no worktree, no copy of the dependencies, exit 0. Otherwise the gate is **replayed** exactly as described above, and the line right after the one telling where it ran gives the reason: `verdict rejoué : aucune porte de vague enregistrée pour ce sha` (no wave state, another sha such as the head after an integration that rebased or a plan commit, another repository), `arbre différent de celui contrôlé`, `arbre non enregistré` (state written before L397), or `l'enregistrement (vague …, lot …) ne couvre pas en vert test (…)` (a red, missing or changed step). A recorded red is never repeated as a verdict: it is replayed. The verdict read is the one of the wave's gate (with `orchestrate.testReplay` applied), not a new run: to force a replay, ask for a sha the wave did not check.
+Nothing runs: no worktree, no copy of the dependencies, exit 0. Otherwise the gate is **replayed** exactly as described above, and the line right after the one telling where it ran gives the reason: `verdict rejoué : aucune porte de vague enregistrée pour ce sha` (no wave state, another sha such as the head after an integration that rebased, a commit that also touches another file (a plan-only commit is crossed, L444), another repository), `arbre différent de celui contrôlé`, `arbre non enregistré` (state written before L397), or `l'enregistrement (vague …, lot …) ne couvre pas en vert test (…)` (a red, missing or changed step). A recorded red is never repeated as a verdict: it is replayed. The verdict read is the one of the wave's gate (with `orchestrate.testReplay` applied), not a new run: to force a replay, ask for a sha the wave did not check.
 
 ```yaml
 # cadence.yaml

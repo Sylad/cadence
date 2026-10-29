@@ -77,4 +77,10 @@ describe('documentation du point « cas limites » (L428, correction)', () => {
     expect(changelog, 'entrée L428 du CHANGELOG').toBeDefined();
     expect(changelog).toContain('neither coded nor tested');
   });
+
+  it('R7 — l\'exemple « --follow --reverse » cite L322 (pas L329), qui n\'a pas ce constat', () => {
+    const mesure = read('../docs/mesures/bug-code-2026-10-29.md');
+    expect(mesure).toMatch(/--reverse`, ce que git ne fait pas \(L322\)/);
+    expect(mesure).not.toContain('L329');
+  });
 });

@@ -180,6 +180,8 @@ export interface PerfResult {
   /** Tests rouges dans la suite de la porte, verts rejoués seuls (L354) : ni comptés ni corrigés. Une hausse dit que la machine est trop chargée pour la suite (`CADENCE_TEST_WORKERS`). */
   instables: { current: InstableCounts; previous: InstableCounts };
   tokens: TokensBlock;
+  /** Médiane de la durée de mur d'un lot rendu, en minutes (début de sa première étape → fin de sa dernière), par classe d'estimate comme `tokens.byEstimate` (L414) : le temps habituel que le panneau des lots compare à celui d'un lot en cours. */
+  lotMinutes: Record<string, Indicator>;
   delays: DelaysBlock;
   /** Médiane de la durée de mur en minutes, par sorte d'étape ; `lots` = étapes. */
   durations: Record<string, Indicator>;
@@ -482,6 +484,25 @@ export function computePerf(input: PerfInput): PerfResult {
     const vals = both(windows, (w) => median((w === windows.current ? lotsOfClass.current : lotsOfClass.previous).map((l) => l.total)));
     byEstimate[key] = { ...mk(vals, { current: lotsOfClass.current.length, previous: lotsOfClass.previous.length }, 'up', twinFirstTime), carrier: carrierOf(lotsOfClass.current.map((l) => l.kinds), lotsOfClass.previous.map((l) => l.kinds)) };
   }
+  // Durée de mur d'un lot rendu par classe d'estimate (L414) : la même clé que les tokens ; un journal sans début ni fin lisibles, ou à fin avant début, n'est pas compté
+  const minutesByClass = (w: Window): Map<string, number[]> => {
+    const classes = new Map<string, number[]>();
+    for (const d of rendered(w)) {
+      const p = planLot(plans, d.j.project, d.j.lot);
+      const starts = d.j.steps.map((x) => Date.parse(x.started ?? '')).filter((t) => !Number.isNaN(t));
+      const ends = d.j.steps.map((x) => Date.parse(x.ended ?? '')).filter((t) => !Number.isNaN(t));
+      if (!p || starts.length === 0 || ends.length === 0 || Math.max(...ends) < Math.min(...starts)) continue;
+      const key = `${p.estimate}${d.j.steps.some((x) => SPEC_CHAIN.has(x.kind)) ? '+spec' : ''}`;
+      classes.set(key, [...(classes.get(key) ?? []), (Math.max(...ends) - Math.min(...starts)) / 60_000]);
+    }
+    return classes;
+  };
+  const minutesClasses = both(windows, minutesByClass);
+  const lotMinutes: Record<string, Indicator> = {};
+  for (const key of classKeys) {
+    const v = both(windows, (w) => (w === windows.current ? minutesClasses.current : minutesClasses.previous).get(key) ?? []);
+    lotMinutes[key] = mk({ current: median(v.current), previous: median(v.previous) }, { current: v.current.length, previous: v.previous.length }, 'up', twinFirstTime);
+  }
   const reviewShare = both(windows, (w) => {
     let review = 0;
     let all = 0;
@@ -609,7 +630,7 @@ export function computePerf(input: PerfInput): PerfResult {
     redDeliveries: mk(reds, deliveriesOf, 'up', 'throughput.delivered'),
     qaBlocking: mk(both(windows, blockingOf), both(windows, deliveredCount), 'up', twinEscaped, escapedNote),
   };
-  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, precheck, escalations: both(windows, (w) => escalationCounts(rendered(w))), instables: both(windows, (w) => instableCounts(rendered(w))), tokens, delays, durations, cost, quality, orphans, warnings: [] };
+  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, precheck, escalations: both(windows, (w) => escalationCounts(rendered(w))), instables: both(windows, (w) => instableCounts(rendered(w))), tokens, lotMinutes, delays, durations, cost, quality, orphans, warnings: [] };
   const bottleneck = bottleneckOf(causes.current);
   for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind)} → ${decisionOf(key, ind, result)}`);
   if (bottleneck) result.warnings.push(bottleneck);

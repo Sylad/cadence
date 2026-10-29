@@ -41,7 +41,7 @@ current window, with at least 10 classified passes) is flagged by a `⚠` even w
 - **Tests unstable under load** (L354). Under the section « Porte de tests sous charge », for the current window: `tests instables sous charge : n tests dans k lots (rouges dans la suite, verts rejoués seuls ; précédente m)` — the tests of the rendered lots that were red in the gate's whole suite and green when the gate replayed them alone (`instables` of the lot journal, only for a project that declares `orchestrate.testReplay`, `docs/orchestrate.md`): they were neither counted nor corrected. Nothing is printed without one. In `--json`: `instables` (`{ current, previous }`, each `{ lots, tests }`). A rise says the machine is too loaded for the suite: lower the session cap or the `CADENCE_TEST_WORKERS` share before reading it as flaky tests.
 - **`--since date`** is an ISO date that ignores everything before that day in both windows (a wave created before that day is not read, even if its lots end after it); a window starting before it is *truncated* (its per-day rates divide by the days covered, no `⚠`).
   It is **not** the instant of `cadence corrections --since` (waves created strictly after).
-- **`--json`** prints one object `{ since, today, windows: { current, previous }, throughput, corrections, interventions, precheck, escalations, instables, tokens, delays, durations, cost, quality, orphans, warnings }`; every indicator carries
+- **`--json`** prints one object `{ since, today, windows: { current, previous }, throughput, corrections, interventions, precheck, escalations, instables, tokens, lotMinutes, delays, durations, cost, quality, orphans, warnings }`; every indicator carries
   `{ current, previous, change, warn, twin, lots, note }` (`twin`: the path of its quality twin, e.g. `throughput.escaped`). Same values as the text.
 
 ## Tokens, delays, wall time and cost (L226)
@@ -75,6 +75,8 @@ Without `perf.prices` (absent or empty) the cost is `n/d` and a warning says whe
 cache writes are billed at the input price (the grid has no write price, so the cost is slightly underestimated if they are billed more); a step that only carries `counted` (an old journal) is split 90 % input, 10 % output, no cache read;
 a step without any readable token costs 0 € (the lot stays in the population); a `local` step costs 0 € whatever its counters (outside quota and budget) and needs no price.
 A lot with a step of a model that has no price in the grid (or no readable `model`, named `inconnu`) is left out of the cost and a warning on the error output names the model and the number of lots; delivered lots without any journal are counted aside (`N lot(s) livré(s) sans journal`). No `⚠` on a cost that is `n/d`.
+
+**Usual wall time of a lot** (L414). `--json` only: `lotMinutes` is the median wall time of a rendered lot, in minutes (start of its first step to end of its last, journals without a readable start or end left out), per size class under the same keys as `tokens.byEstimate` (`0.5`, `1`, `0.5+spec`…), in the Indicator format. It is printed in no line and raises no `⚠`: the lots panel of the HUD (`/hud lots`, `docs/cadence-hud.md`) reads it as « the usual time of a lot of this size » and compares it with the elapsed time of each lot in progress.
 
 No indicator of produced volume (lines of code, commits, total tokens or euros of a window) is printed or exposed: only per-lot medians, median durations and shares come out. Tokens and euros compare lots of the same size; they never set a spending target.
 

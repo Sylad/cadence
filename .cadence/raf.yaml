@@ -338,6 +338,7 @@ lots:
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
+    review: { date: 2026-10-29, verdict: "compliant (0 blocking, 0 major, 3 minor notes) — orchestré (vague 2026-10-30-p443, 0 passe(s) de correction)", commit: 6d54da7b9f7bd4a34f1af26a3a85bbef0bb744af }
   - id: L437
     title: "Seuil de contexte du lead en tokens, pas en % : 60 % valait 120k sur une fenêtre de 200k et vaut 600k sur 1M (lead à 460k le 29-10, relu à chaque transition) — lead.contextThreshold en tokens (150k par défaut) lu par cadence session context et le skill lead (décision de Sylvain le 29-10)"
     status: todo

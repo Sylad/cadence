@@ -41,7 +41,7 @@ it('L412 R11 — le script DELIVERIES lit la dernière livraison en échec, effa
   }
 })
 
-it('L412 R12 — le collecteur rend la dernière vague finie du dossier dans `ended`, à part des vagues de la bande (`waves` ne la porte que sans vague vivante)', () => {
+it('L412 R12 — le collecteur rend la dernière vague finie du dossier dans `ended` même sous une vague vivante dont le wave.json est plus récent ; `waves` ne porte la finie que sans vivante', () => {
   const root = mkdtempSync(join(tmpdir(), 'collect-'))
   try {
     const home = join(root, 'home')
@@ -50,8 +50,15 @@ it('L412 R12 — le collecteur rend la dernière vague finie du dossier dans `en
     const runs = (id: string) => join(cwd, '.cadence', 'runs', id)
     mkdirSync(runs('fini'), { recursive: true })
     mkdirSync(runs('vivant'), { recursive: true })
-    writeFileSync(join(runs('fini'), 'wave.json'), JSON.stringify({ id: 'fini', status: 'done' }))
+    writeFileSync(join(runs('fini'), 'wave.json'), JSON.stringify({ id: 'fini', status: 'done', consumed: 3 }))
     writeFileSync(join(runs('fini'), 'ol--L5.json'), JSON.stringify({ project: 'ol', lot: 'L5', status: 'question', questions: ['q ?'] }))
+    // la vague vivante a aussi son wave.json, et c'est TOUJOURS le plus récent du dossier : orchestrate y réécrit `consumed` en continu
+    writeFileSync(join(runs('vivant'), 'wave.json'), JSON.stringify({ id: 'vivant', status: 'implementing', consumed: 1 }))
+    writeFileSync(join(runs('vivant'), 'ol--L6.json'), JSON.stringify({ project: 'ol', lot: 'L6', status: 'implementing' }))
+    const older = new Date('2026-10-29T10:00:00Z')
+    const newer = new Date('2026-10-29T11:00:00Z')
+    utimesSync(join(runs('fini'), 'wave.json'), older, older)
+    utimesSync(join(runs('vivant'), 'wave.json'), newer, newer)
     writeFileSync(join(home, 'waves', `${process.pid}.json`), JSON.stringify({ wave: 'vivant', pid: process.pid, cwd }))
     type Out = { waves: { id: string; live: boolean }[]; ended: { id: string; live: boolean; lots: { lot: string }[] } | null }
     const collect = (): Out => {
@@ -59,16 +66,22 @@ it('L412 R12 — le collecteur rend la dernière vague finie du dossier dans `en
       expect(run.status).toBe(0)
       return JSON.parse(run.stdout) as Out
     }
-    // une vague vit : la bande ne reçoit qu'elle, la vague finie attend dans `ended` avec ses lots
+    // une vague vit : la bande ne reçoit qu'elle ; la vague finie, plus ancienne, attend dans `ended` avec ses lots — la vivante n'est pas la « dernière finie »
     const withLive = collect()
     expect(withLive.waves.map(w => [w.id, w.live])).toEqual([['vivant', true]])
     expect(withLive.ended).toMatchObject({ id: 'fini', live: false })
     expect(withLive.ended!.lots.map(l => l.lot)).toEqual(['L5'])
-    // plus de vague vivante : la bande reçoit la vague finie, comme avant le lot, et `ended` la porte aussi
+    // plus de vague vivante : la bande reçoit la dernière vague du dossier (la plus récente, comme avant le lot), et `ended` la porte aussi
     rmSync(join(home, 'waves', `${process.pid}.json`))
     const alone = collect()
-    expect(alone.waves.map(w => [w.id, w.live])).toEqual([['fini', false]])
-    expect(alone.ended).toMatchObject({ id: 'fini', live: false })
+    expect(alone.waves.map(w => [w.id, w.live])).toEqual([['vivant', false]])
+    expect(alone.ended).toMatchObject({ id: 'vivant', live: false })
+    expect(alone.ended!.lots.map(l => l.lot)).toEqual(['L6'])
+    // sans la vague « vivant » : la finie seule, dans `waves` comme dans `ended`
+    rmSync(runs('vivant'), { recursive: true, force: true })
+    const only = collect()
+    expect(only.waves.map(w => [w.id, w.live])).toEqual([['fini', false]])
+    expect(only.ended).toMatchObject({ id: 'fini', live: false })
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

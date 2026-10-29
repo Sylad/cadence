@@ -7,7 +7,8 @@ import type { LeadHold, Wave } from '../types'
  * en cours il compte les processus `claude` descendants de la session (sessions filles, équipes).
  * Sans vague vivante, il rend la dernière vague terminée du dossier courant (`live: false`, `ended` = date
  * de son wave.json) pour que la bande garde son statut sous les yeux ; elle la masque 30 min après sa fin (WAVE_LINGER_MS).
- * Cette même vague terminée est rendue à part dans `ended` (`null` sans vague finie, ou si elle vit encore), qu'une vague vive ou non :
+ * Cette même vague terminée est rendue à part dans `ended` (`null` sans vague finie), qu'une vague vive ou non : la dernière vague du dossier
+ * dont l'id n'est pas vivant (le wave.json d'une vague vivante est toujours le plus récent, orchestrate y réécrit `consumed` ; il ne compte pas) ;
  * les décisions en attente du panneau des lots (L412 : questions, lots rendus, verdicts UX) la lisent par là, sans toucher à ce que la bande dessine.
  * Il rend aussi, avec les vagues, les sessions du lead inscrites par `cadence lead hold` (`<home>/holds/*.json`, sans
  * filtrer l'échéance : la bande le fait à chaque dessin) et le plafond de sessions (CADENCE_MAX_SESSIONS, 2 par défaut).
@@ -106,6 +107,10 @@ cwd = os.getcwd()
 live_ids = set(w['id'] for w in out)
 last, last_mtime = None, 0
 for wf in glob.glob(os.path.join(cwd, '.cadence', 'runs', '*', 'wave.json')):
+    # le wave.json d'une vague vivante est toujours le plus récent du dossier (orchestrate y réécrit consumed en continu) :
+    # on cherche la dernière vague FINIE, les vivantes sont sautées
+    if os.path.basename(os.path.dirname(wf)) in live_ids:
+        continue
     try:
         m = os.stat(wf).st_mtime
     except Exception:

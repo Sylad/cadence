@@ -202,6 +202,8 @@ lots:
     status: todo
     estimate: 0.5
     created: 2026-10-29
+    notes:
+      - { date: 2026-10-29, text: "29-10 : même mur pour --resume --integrate d'une vague finie (2026-10-28-2210, L402) pendant qu'une autre vague du dépôt tourne (2026-10-29-cad) : « une orchestration y est déjà en cours » — l'intégration d'un lot revu devrait pouvoir passer, ou être mise en file par la vague vivante" }
   - id: L422
     title: "Table finale d'orchestrate : une sous-tâche proposée dont le fichier cité a été modifié par un commit du lot postérieur à la revue qui l'a émise est marquée « peut-être déjà traitée (<sha>) » (28-10 : L230 ouvert sur des propositions déjà corrigées, 5 passes perdues)"
     status: todo

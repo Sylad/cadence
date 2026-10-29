@@ -169,11 +169,12 @@ lots:
   - id: L412
     title: "Panneau des lots : en tête, « ce qui attend une décision » — questions des sessions (texte court + commande --answer), lots rendus au lead (cause en une ligne), verdicts UX à poser, livraisons en échec ; lu dans les états de vague et le plan — idée validée par Sylvain le 28-10"
     public: Ce qui attend une décision, en tête du panneau
-    status: todo
+    status: doing
     estimate: 0.5
     visible: true
     screen: component
     created: 2026-10-28
+    started: 2026-10-29
   - id: L413
     title: "Panneau des lots : frise du cycle de chaque lot en cours — étapes de la vague (fiche, maquette, accept, implement, revue, correction n/3, porte, UX, intégration, prêt) avec l'étape courante, sa durée et les passes, puis côté plan revue posée → clos → livré ; lu dans .cadence/runs/<vague> et le plan"
     public: Le cycle complet de chaque lot en cours, en frise

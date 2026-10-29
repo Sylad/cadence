@@ -44,3 +44,15 @@ describe('goulot « bug de code » : relecture contre la fiche et les règles, c
     expect(renderBrief('review', vars)).not.toContain(TITRE);
   });
 });
+
+describe('cas limites et fiche (L428, correction)', () => {
+  it('R3 — avec une fiche, un cas limite que la fiche ne couvre pas est noté (nonVerifie ou choix), pas codé', () => {
+    const fiche = 'a case the sheet does not cover is noted in your report (under "nonVerifie" or "choix"), not coded.';
+    const out = renderBrief('implement', { ...vars, fiche });
+    expect(out).toContain(fiche);
+    const b = bloc();
+    expect(b).toContain('except a case the fiche does not cover');
+    expect(b).toContain('you do not code a rule it does not state');
+    expect(b).toContain('neither coded nor tested');
+  });
+});

@@ -550,7 +550,7 @@ test('R21 — parents différents : refusé avec sa raison, raf n’est pas appe
   for (const [id, target] of [['L2/1', 'L1'], ['L1', 'L2/1']] as const) {
     const plan = planMove(PLAN, { id, target, place: 'after' })
     expect(plan?.ok).toBe(false)
-    expect(!plan?.ok && plan?.reason).toMatch(new RegExp(`${id.replace('/', '\\/')} et ${target.replace('/', '\\/')} n'ont pas le même parent`))
+    expect(plan?.ok === false && plan.reason).toMatch(new RegExp(`${id.replace('/', '\\/')} et ${target.replace('/', '\\/')} n'ont pas le même parent`))
   }
   expect(groupOf(task('L2', 1))).toBe('L2')
   expect(groupOf(lot('L1', 'todo', { parent: 'L0' }))).toBe('')

@@ -85,6 +85,15 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await settle()
   }
   /** Les textes du panneau monté, ceux que dessinent les régions Client (un projet chacune) comprises. */
+  /** Monte le panneau des lots : le seul endroit qui appelle `$.ui.mount`. */
+  const mountPane = (surface: 'terminal' | 'desktop' | 'mobile' | 'vscode', isFocused: boolean, bodyColumns: number, bodyRows: number): Promise<Mounted<'desktop' | 'terminal', 'Pane'>> =>
+    $.ui.mount({
+      plugin: PLUGIN,
+      surface,
+      component: 'Pane',
+      requestId: 'lots',
+      props: { title: 'Lots', isFocused, bodyColumns, placement: 'dock', scroll: { offset: 0, bodyRows }, view: {} },
+    } as never) as never
   const textsOf = async (ui: Pick<Mounted<'desktop' | 'terminal', 'Pane'>, 'drawn' | 'findAll'>) => {
     await ui.drawn() // le dessin suit les écritures d'état avant la lecture
     const own = (await ui.findAll({ type: 'Text' })).map(t => t.text ?? '')
@@ -92,13 +101,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     return [...own, ...regions.flat()]
   }
   const draw = async (bodyColumns = 70, bodyRows = 30) => {
-    const ui = await $.ui.mount({
-      plugin: PLUGIN,
-      surface: 'terminal',
-      component: 'Pane',
-      requestId: 'lots',
-      props: { title: 'Lots', isFocused: false, bodyColumns, placement: 'dock', scroll: { offset: 0, bodyRows }, view: {} },
-    } as never)
+    const ui = await mountPane('terminal', false, bodyColumns, bodyRows)
     const texts = await textsOf(ui)
     const buttons = await ui.findAll({ type: 'Button' })
     await ui.unmount()
@@ -119,13 +122,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
   }
   /** Appuie sur le Button du projet (clic, ou Entrée sous le focus : même appui). */
   const press = async (project: string) => {
-    const ui = await $.ui.mount({
-      plugin: PLUGIN,
-      surface: 'terminal',
-      component: 'Pane',
-      requestId: 'lots',
-      props: { title: 'Lots', isFocused: false, bodyColumns: 70, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} },
-    } as never)
+    const ui = await mountPane('terminal', false, 70, 60)
     await ui.press({ key: `fold:${project}` })
     await ui.unmount()
     await settle()
@@ -135,13 +132,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
   const gestures = async (act: (ui: Mounted<'desktop' | 'terminal', 'Pane'>) => Promise<void>, surface: 'terminal' | 'desktop' | 'mobile' | 'vscode' = 'desktop') => {
     // sans Client (mobile, éditeur) le montage n'a ni pointeur, ni clavier, ni taille : `act` n'y est pas joué, seul le dessin est lu
     const hasClient = surface === 'desktop' || surface === 'terminal'
-    const ui = await $.ui.mount<'desktop' | 'terminal', 'Pane'>({
-      plugin: PLUGIN,
-      surface,
-      component: 'Pane',
-      requestId: 'lots',
-      props: { title: 'Lots', isFocused: true, bodyColumns: 70, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} },
-    } as never)
+    const ui = await mountPane(surface, true, 70, 60)
     if (hasClient) {
       await ui.resize({ columns: 70, rows: 4, in: 'lots:cadence' })
       await act(ui)
@@ -150,13 +141,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     // le montage ne suit pas les écritures d'état (comme `press`, qui remonte pour relire) : le résultat est lu sur un montage neuf, les régions Client sur celui des gestes
     const live = await textsOf(ui)
     await ui.unmount()
-    const fresh = await $.ui.mount({
-      plugin: PLUGIN,
-      surface,
-      component: 'Pane',
-      requestId: 'lots',
-      props: { title: 'Lots', isFocused: true, bodyColumns: 70, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} },
-    } as never)
+    const fresh = await mountPane(surface, true, 70, 60)
     const text = [...live, ...(await textsOf(fresh))].join('\n')
     await fresh.unmount()
     return text
@@ -723,8 +708,8 @@ test('R23 — pendant le glisser, un repère dit qu’une arrivée chez un autre
 
 // ── L402 : les props arrivent pendant un glisser (relecture du tableau, minuteur de 5 s) ─────────────────────
 
-/** Le tableau de TOUR, un lot de plus en tête du projet « cadence » : L402, saisi à la ligne 3, passe à la ligne 4. */
-const TOUR_WITH_L400_FIRST = JSON.stringify([row('cadence', [lot('L400'), ...TOUR[0]!.lots]), TOUR[1]])
+/** Le tableau de TOUR, un lot EN COURS de plus en tête du projet « cadence » : l'ordre d'affichage (L410) met les lots en cours d'abord, dans l'ordre du plan ; L400 prend donc la ligne 0 à l'écran, et L402, saisi à la ligne 3, passe à la ligne 4. (Un lot seulement « à faire » se rangerait après L401, en cours, et la ligne 0 resterait L401.) */
+const TOUR_WITH_L400_FIRST = JSON.stringify([row('cadence', [lot('L400', 'doing'), ...TOUR[0]!.lots]), TOUR[1]])
 /** Le tableau de TOUR sans L402 : le lot saisi à la ligne 3 a disparu. */
 const TOUR_WITHOUT_L402 = JSON.stringify([row('cadence', TOUR[0]!.lots.filter(l => l.id !== 'L402')), TOUR[1]])
 
@@ -761,4 +746,58 @@ test('R22 — le lot saisi disparaît pendant le glisser : rien n’est demandé
   expect(s.tours().length).toBeGreaterThan(before)
   expect(s.rafs()).toEqual([])
   expect(text).not.toMatch(/placé|n'ont pas le même parent|raf move/)
+})
+
+// ── L402 × L410 : le lot visé est celui de l'ÉCRAN, pas le voisin du plan ───────────────────────────────────
+
+// Le plan : L10 (libre), L11 (en cours, une sous-tâche), L12 (bloqué par L10). À l'écran (L410) : L11 (y 0), L11/1 (1), L10 (2), L12 (3).
+// L10, premier du plan, est donc affiché sous L11, qui le suit dans le plan.
+const L410_TOUR = JSON.stringify([row('cadence', [lot('L10'), lot('L11', 'doing'), lot('L11/1', 'todo', { parent: 'L11' }), lot('L12', 'todo', { after: ['L10'] })])])
+const l410 = ($: Parameters<TestBody>[0], on: On) => session($, on, { tour: () => ({ exitCode: 0, stdout: L410_TOUR }) })
+
+test('R22 — L410 : glisser un lot libre sur la ligne en tête de l’écran le place avant le lot que la personne voit là', async ($, on) => {
+  const s = await l410($, on)
+  await s.hud('lots')
+  await s.gestures(async ui => {
+    await ui.pointer(down(2)) // L10 (premier du plan, troisième à l'écran)
+    await ui.pointer(up(0)) // L11, en tête à l'écran
+  })
+  expect(s.rafs()).toEqual([['raf', 'move', 'L10', '--before', 'L11']])
+})
+
+test('R22 — L410 : glisser vers le bas place après le lot affiché dessous, pas après son suivant du plan', async ($, on) => {
+  const s = await l410($, on)
+  await s.hud('lots')
+  await s.gestures(async ui => {
+    await ui.pointer(down(0)) // L11
+    await ui.pointer(up(3)) // L12
+  })
+  expect(s.rafs()).toEqual([['raf', 'move', 'L11', '--after', 'L12']])
+})
+
+test('R22 — L410 : Alt+↑ / Alt+↓ vont vers le voisin affiché (les sous-tâches du lot voisin ne comptent pas)', async ($, on) => {
+  const s = await l410($, on)
+  await s.hud('lots')
+  await s.gestures(async ui => {
+    await ui.pointer(down(2)) // L10 : à l'écran, son voisin du dessus est L11 (sous-tâche L11/1 sautée), alors que dans le plan L10 est le premier
+    await ui.pointer(up(2))
+    await ui.key(altKey('up'))
+  })
+  await s.gestures(async ui => {
+    await ui.pointer(down(0)) // L11 : à l'écran, son voisin du dessous est L10 (sous-tâche sautée), alors que dans le plan c'est L12
+    await ui.pointer(up(0))
+    await ui.key(altKey('down'))
+  })
+  expect(s.rafs()).toEqual([['raf', 'move', 'L10', '--before', 'L11'], ['raf', 'move', 'L11', '--after', 'L10']])
+})
+
+test('R23 — L410 : le contrôle « même parent » porte sur la ligne visée à l’écran', async ($, on) => {
+  const s = await l410($, on)
+  await s.hud('lots')
+  const text = await s.gestures(async ui => {
+    await ui.pointer(down(2)) // L10
+    await ui.pointer(up(1)) // L11/1, sous-tâche de L11 : voisine à l'écran, pas dans le plan
+  })
+  expect(s.rafs()).toEqual([])
+  expect(text).toMatch(/L10 et L11\/1 n'ont pas le même parent/)
 })

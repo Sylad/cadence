@@ -678,7 +678,7 @@ export const register: Register = on => {
     if (!ask || !board || !project || isMoving) return {}
     const plan = planMove(project.lots ?? [], ask)
     if (!plan) return {}
-    if (!plan.ok) {
+    if (plan.ok === false) {
       await say($, plan.reason, true)
       return {}
     }

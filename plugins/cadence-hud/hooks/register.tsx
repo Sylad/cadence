@@ -99,6 +99,12 @@ export const register: Register = on => {
   let startCwd: string | undefined
   let readTourNow: (() => Promise<void>) | undefined
   let isMoving = false
+  // Le tableau lu est PÉRIMÉ depuis un `raf move` réussi jusqu'à la fin d'une relecture commencée après lui : `moveGen` compte les déplacements réussis,
+  // `boardGen` celui qu'avait vu la relecture qui a écrit le tableau (une relecture déjà en vol au moment du move a lu l'ancien plan : elle ne rattrape pas).
+  let moveGen = 0
+  let boardGen = 0
+  // Une relecture demandée pendant qu'une autre est en vol : à relancer à la fin de celle-ci
+  let tourAgain = false
 
   on('session.start', async ($, e, next) => {
     // Le dossier du tableau est celui de lancement, pas le dossier courant du shell : un cd du lead dans un sous-projet
@@ -214,6 +220,7 @@ export const register: Register = on => {
       isTouring = true
       tourSignature = signature
       tourAt = at
+      const gen = moveGen // les déplacements réussis avant que ce tour lise le plan
       try {
         const r = await $.process.run(['cadence', 'lead', 'tour', folder, '--json'], { timeoutMs: 20_000 })
         if (r.exitCode !== 0) throw new Error(`cadence lead tour : code ${r.exitCode}`)
@@ -223,6 +230,7 @@ export const register: Register = on => {
         await update($, lotsBoard, () => board)
         await update($, lotsFailed, () => false)
         await update($, lotsAt, () => at)
+        boardGen = gen
       } catch {
         // cadence absent, sortie illisible, délai dépassé : la bande et le panneau gardent le dernier tableau lu.
         // Le délai (20 s) peut tomber après le déchargement du module (rechargement du mod, fin de session) : l'état n'est plus à lui,
@@ -230,11 +238,20 @@ export const register: Register = on => {
         await update($, lotsFailed, () => true).catch(() => undefined)
       } finally {
         isTouring = false
+        if (tourAgain) {
+          tourAgain = false
+          void readTourNow?.()
+        }
       }
     }
-    // Relit tout de suite, sans attendre le minuteur : à l'ouverture du panneau
+    // Relit tout de suite, sans attendre le minuteur : à l'ouverture du panneau, après un déplacement réussi.
+    // Un tour déjà en vol a lu le plan avant la demande : un autre suit à sa fin, on ne se contente pas de lui.
     readTourNow = async () => {
       tourSignature = undefined
+      if (isTouring) {
+        tourAgain = true
+        return
+      }
       const [found, at] = await Promise.all([read($, waves), $.clock.now()])
       await refreshProjects(found, at)
     }
@@ -675,14 +692,15 @@ export const register: Register = on => {
 
   // Le dépôt d'un lot (ou d'une sous-tâche) posté par la région Client du panneau (L402) : contrôlé contre le tableau lu, puis `raf move` dans le projet.
   // L'écran est trié par état (L410), pas dans l'ordre du plan : le panneau dit vrai sans interdire le geste — un dépôt qui laisse le plan tel quel n'appelle pas raf
-  // et le dit, un dépôt qui change le plan sans rien changer à l'écran le dit aussi.
+  // et le dit, un dépôt qui change le plan sans rien changer à l'écran le dit aussi. Ces deux jugements se font sur le tableau lu : tant qu'il est périmé
+  // (un `raf move` a réussi, la relecture commencée après lui n'est pas finie — `cadence lead tour` prend plusieurs secondes), on ne juge pas : raf tranche.
   on('ui.message', async ($, e, next) => {
     if (e.requestId !== LOTS_PANE) return next(e)
     const ask = parseMoveAsk(e.data)
     const [board, allWaves, at] = await Promise.all([read($, lotsBoard), read($, waves), read($, now)])
     const project = board?.rows.find(r => r.project === ask?.project && !r.error)
     if (!ask || !board || !project || isMoving) return {}
-    const plan = planMove(project.lots ?? [], ask, rankerOf(project, waveLotsOf(allWaves, at)))
+    const plan = planMove(project.lots ?? [], ask, rankerOf(project, waveLotsOf(allWaves, at)), boardGen !== moveGen)
     if (!plan) return {}
     if (plan.kind === 'refused') {
       await say($, plan.reason, 'refused')
@@ -705,6 +723,7 @@ export const register: Register = on => {
       else {
         const done = `${ask.id} placé ${ask.place === 'before' ? 'avant' : 'après'} ${ask.target} — le plan est modifié, à commiter (raf move ne commite pas)`
         await say($, plan.planOnly ? `${done} ; à l'écran rien ne bouge : le panneau trie par état (en cours, libres, le reste)` : done, 'done')
+        moveGen += 1 // le tableau est périmé jusqu'à la fin d'une relecture commencée maintenant
         void readTourNow?.()
       }
     } finally {

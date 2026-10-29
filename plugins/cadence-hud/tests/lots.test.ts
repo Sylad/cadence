@@ -586,6 +586,15 @@ test('R22 — L410 : un déplacement entre deux groupes d’affichage change le 
   expect(planMove(PLAN, { id: 'L2', target: 'L1', place: 'before' }, l1First)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L2', '--before', 'L1'], planOnly: true })
 })
 
+test('R22 — tableau périmé (stale) : ni « déjà » ni « plan seul » sur un ordre qui n’est plus celui du plan, raf tranche ; les refus restent', () => {
+  const l1First = (l: TourLot) => (l.id === 'L1' ? 0 : 1)
+  expect(planMove(PLAN, { id: 'L1', target: 'L2', place: 'before' }, flat, true)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L1', '--before', 'L2'], planOnly: false })
+  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'after' }, l1First, true)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L1', '--after', 'L3'], planOnly: false })
+  expect(planMove(PLAN, { id: 'L2/1', target: 'L1', place: 'after' }, flat, true)?.kind).toBe('refused')
+  expect(planMove(PLAN, { id: 'L9', target: 'L1', place: 'after' }, flat, true)).toEqual({ kind: 'refused', reason: 'lot inconnu : L9' })
+  expect(planMove(PLAN, { id: 'L1', target: 'L1', place: 'after' }, flat, true)).toBeUndefined()
+})
+
 test('R21 — la raison d’un refus de raf : sa première ligne sans le préfixe, le code à défaut', () => {
   expect(refusalReason('raf: move : orchestration en cours (vague w1, pid 3) — attendre\nsuite', 2)).toBe('move : orchestration en cours (vague w1, pid 3) — attendre')
   expect(refusalReason('\n  \n', 2)).toBe('raf move : code 2')

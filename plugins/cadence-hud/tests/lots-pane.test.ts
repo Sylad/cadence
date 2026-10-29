@@ -128,6 +128,8 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await settle()
   }
   const rafs = () => runs.filter(a => a[0] === 'raf')
+  /** Le dernier mot du panneau sur un déplacement, lu sur un montage neuf (le texte de `gestures` porte aussi celui d'avant, sur le montage des gestes). */
+  const notice = async () => (await draw()).texts.find(t => /^[✔•✖] /.test(t))
   /** Joue des gestes sur le panneau monté, comme la personne : chaque région Client reçoit sa taille (`rows` : les lignes du projet « cadence »), puis `act` ; rend le texte dessiné à la fin. */
   const gestures = async (act: (ui: Mounted<'desktop' | 'terminal', 'Pane'>) => Promise<void>, surface: 'terminal' | 'desktop' | 'mobile' | 'vscode' = 'desktop', rows = 4) => {
     // sans Client (mobile, éditeur) le montage n'a ni pointeur, ni clavier, ni taille : `act` n'y est pas joué, seul le dessin est lu
@@ -146,7 +148,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await fresh.unmount()
     return text
   }
-  return { rafs, gestures, kv, press, pressKey, store, open, opened, runs, tours, tour, stamps, waves, hud, advance, draw }
+  return { rafs, gestures, notice, kv, press, pressKey, store, open, opened, runs, tours, tour, stamps, waves, hud, advance, draw }
 }
 
 const CLOSE_HELP = '/hud lots pour fermer'
@@ -851,6 +853,111 @@ test('R22 — L410 : entre sous-tâches aussi — déjà à sa place, plan seul,
   expect(planOnly).toMatch(/✔ L11\/2 placé après L11\/3 — le plan est modifié, à commiter/)
   expect(planOnly).toMatch(PLAN_ONLY)
   expect(s.rafs()).toEqual([['raf', 'move', 'L11/3', '--before', 'L11/1'], ['raf', 'move', 'L11/2', '--after', 'L11/3']])
+})
+
+// ── L402 : le tableau lu est périmé entre un raf move réussi et la fin de la relecture commencée après lui ──────────
+
+// Le plan : L10 (libre), L11 (en cours), L12 (libre) ; à l'écran (L410) : L11 (y 0), L10 (1), L12 (2).
+const STALE_TOUR = JSON.stringify([row('cadence', [lot('L10'), lot('L11', 'doing'), lot('L12')])])
+/** Un tour que le test relâche à la main, appel par appel : `release()` répond au plus ancien en attente (vrai s'il y en avait un). */
+const gatedTour = () => {
+  const waiting: ((c: Cadence) => void)[] = []
+  const tour = () => new Promise<Cadence>(resolve => waiting.push(resolve))
+  const release = (stdout = STALE_TOUR) => {
+    const r = waiting.shift()
+    r?.({ exitCode: 0, stdout })
+    return r !== undefined
+  }
+  return { tour, release, waiting }
+}
+const STALE_ROWS = 3
+const DONE_L10_BEFORE_L11 = '✔ L10 placé avant L11 — le plan est modifié, à commiter (raf move ne commite pas)'
+const ALREADY_L10_BEFORE_L11 = '• L10 est déjà avant L11 dans le plan : rien à déplacer'
+
+test('R22 — deux gestes avant la relecture : après un raf move réussi, pas de « déjà » ni de « plan seul » sur l’ancien tableau, raf tranche ; la relecture finie, le court-circuit reprend', async ($, on) => {
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: STALE_TOUR }) })
+  await s.hud('lots')
+  const g = gatedTour()
+  s.tour.current = g.tour // les relectures qui suivent attendent le test
+  const before = s.tours().length
+  await s.gestures(async ui => {
+    await ui.pointer(down(1)) // L10
+    await ui.pointer(up(1))
+    await ui.key(altKey('down')) // voisin du dessous à l'écran : L12 → raf move L10 --after L12 (plan L11, L12, L10)
+  }, 'desktop', STALE_ROWS)
+  expect(await s.notice()).toBe('✔ L10 placé après L12 — le plan est modifié, à commiter (raf move ne commite pas)')
+  expect(s.tours().length).toBe(before + 1) // la relecture est partie et attend : le tableau est périmé
+  await s.gestures(async ui => {
+    await ui.pointer(down(1)) // L10, toujours à la ligne 1 : le tableau n'a pas été relu
+    await ui.pointer(up(1))
+    await ui.key(altKey('up')) // → L10 avant L11 : l'ancien tableau dirait « déjà », le plan réel (L11, L12, L10) non — raf est appelé, le retour en arrière se fait
+  }, 'desktop', STALE_ROWS)
+  expect(s.rafs()).toEqual([['raf', 'move', 'L10', '--after', 'L12'], ['raf', 'move', 'L10', '--before', 'L11']])
+  expect(await s.notice()).toBe(DONE_L10_BEFORE_L11) // succès simple : ni « déjà », ni « à l'écran rien ne bouge »
+  // la relecture en vol avait lu le plan avant le second move : elle ne rattrape pas, une autre part à sa fin
+  expect(g.release()).toBe(true) // (les deux moves se sont annulés : le plan relu est le plan de départ)
+  await settle()
+  expect(s.tours().length).toBe(before + 2)
+  await s.gestures(async ui => {
+    await ui.pointer(down(0)) // L11 (en cours)
+    await ui.pointer(up(2)) // sur L12 : à jour, le tableau dirait « plan seul » (L11 reste en tête) ; périmé, raf tranche et le succès reste simple
+  }, 'desktop', STALE_ROWS)
+  expect(s.rafs().length).toBe(3)
+  expect(await s.notice()).toBe('✔ L11 placé après L12 — le plan est modifié, à commiter (raf move ne commite pas)')
+  expect(g.release()).toBe(true) // la relecture lancée par le 2e move finit, mais le 3e move l'a précédée : encore une
+  await settle()
+  expect(s.tours().length).toBe(before + 3)
+  expect(g.release()).toBe(true) // celle commencée après le dernier move finit : le tableau est à jour
+  await settle()
+  await s.gestures(async ui => {
+    await ui.pointer(down(1))
+    await ui.pointer(up(1))
+    await ui.key(altKey('up')) // L10 avant L11 : le plan relu le dit déjà, le court-circuit reprend
+  }, 'desktop', STALE_ROWS)
+  expect(s.rafs().length).toBe(3)
+  expect(await s.notice()).toBe(ALREADY_L10_BEFORE_L11)
+  expect(g.waiting.length).toBe(0) // aucune relecture de plus que nécessaire
+})
+
+test('R22 — un tour déjà en vol au moment du move ne rattrape pas : un autre suit à sa fin, le tableau reste périmé jusque-là', async ($, on) => {
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: STALE_TOUR }) })
+  await s.hud('lots')
+  const g = gatedTour()
+  s.tour.current = g.tour
+  s.stamps.current = () => JSON.stringify({ '/x/cadence/.cadence/raf.yaml': 2 }) // le plan a changé : le minuteur relit, et ce tour attend
+  await s.advance(5_000)
+  const before = s.tours().length
+  expect(g.waiting.length).toBe(1)
+  await s.gestures(async ui => {
+    await ui.pointer(down(1)) // L10
+    await ui.pointer(up(1))
+    await ui.key(altKey('down')) // raf move L10 --after L12, réussi pendant que le tour est en vol
+  }, 'desktop', STALE_ROWS)
+  expect(s.rafs()).toEqual([['raf', 'move', 'L10', '--after', 'L12']])
+  expect(s.tours().length).toBe(before) // pas de second tour tant que le premier vole
+  expect(g.release()).toBe(true) // le tour en vol revient : il avait lu le plan avant le move
+  await settle()
+  expect(s.tours().length).toBe(before + 1) // un autre est parti à sa fin
+  await s.gestures(async ui => {
+    await ui.pointer(down(1))
+    await ui.pointer(up(1))
+    await ui.key(altKey('up')) // toujours périmé : raf est appelé
+  }, 'desktop', STALE_ROWS)
+  expect(s.rafs().length).toBe(2)
+  expect(await s.notice()).toBe(DONE_L10_BEFORE_L11)
+  expect(g.release()).toBe(true) // ce tour avait lu le plan avant le 2e move : encore un
+  await settle()
+  expect(s.tours().length).toBe(before + 2)
+  expect(g.release()).toBe(true)
+  await settle()
+  await s.gestures(async ui => {
+    await ui.pointer(down(1))
+    await ui.pointer(up(1))
+    await ui.key(altKey('up')) // relu : « déjà » reprend
+  }, 'desktop', STALE_ROWS)
+  expect(s.rafs().length).toBe(2)
+  expect(await s.notice()).toBe(ALREADY_L10_BEFORE_L11)
+  expect(g.waiting.length).toBe(0)
 })
 
 test('R23 — L410 : le contrôle « même parent » porte sur la ligne visée à l’écran', async ($, on) => {

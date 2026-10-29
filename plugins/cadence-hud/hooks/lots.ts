@@ -64,18 +64,22 @@ export const displayOrder = (lots: readonly TourLot[], rankOf: (lot: TourLot) =>
  * du dessin, donc à vérifier) et les deux lots ont le même parent. Le reste (vague, plan en lecture seule, lot archivé) est dit par `raf move` lui-même.
  * Le panneau dit vrai sans interdire le geste (L410 trie l'écran par état, l'ordre affiché n'est pas celui du plan) : une demande qui laisse le plan tel qu'il est n'appelle pas raf (`unchanged`),
  * une demande qui change le plan sans changer l'écran le signale (`planOnly`). `rankOf` : le rang d'affichage de chaque lot, celui de buildPanel ([rankerOf]).
+ * `stale` : le tableau lu est périmé (un `raf move` a réussi depuis sa lecture et la relecture n'est pas finie) — on ne juge alors plus ni « déjà » ni « plan seul »
+ * sur un ordre qui n'est plus celui du plan : raf est appelé et tranche, le succès reste simple.
  * `undefined` : rien à faire (un lot lâché sur lui-même).
  */
-export const planMove = (lots: readonly TourLot[], ask: MoveAsk, rankOf: (lot: TourLot) => number): MovePlan | undefined => {
+export const planMove = (lots: readonly TourLot[], ask: MoveAsk, rankOf: (lot: TourLot) => number, stale = false): MovePlan | undefined => {
   const lot = lots.find(l => l.id === ask.id)
   const target = lots.find(l => l.id === ask.target)
   if (!lot || !target || (ask.place !== 'before' && ask.place !== 'after')) return { kind: 'refused', reason: `lot inconnu : ${!lot ? ask.id : ask.target}` }
   if (lot === target) return undefined
   if (groupOf(lot) !== groupOf(target)) return { kind: 'refused', reason: `${lot.id} et ${target.id} n'ont pas le même parent : un lot se réordonne parmi les lots de son projet, une sous-tâche parmi celles de son lot` }
+  const argv = ['raf', 'move', lot.id, `--${ask.place}`, target.id]
+  if (stale) return { kind: 'move', argv, planOnly: false }
   const moved = movedLots(lots, lot, target, ask.place)
   const siblings = (all: readonly TourLot[]) => all.filter(l => groupOf(l) === groupOf(lot)).map(l => l.id)
   if (sameOrder(siblings(lots), siblings(moved))) return { kind: 'unchanged', text: `${lot.id} est déjà ${ask.place === 'before' ? 'avant' : 'après'} ${target.id} dans le plan : rien à déplacer` }
-  return { kind: 'move', argv: ['raf', 'move', lot.id, `--${ask.place}`, target.id], planOnly: sameOrder(displayOrder(lots, rankOf), displayOrder(moved, rankOf)) }
+  return { kind: 'move', argv, planOnly: sameOrder(displayOrder(lots, rankOf), displayOrder(moved, rankOf)) }
 }
 
 /** La raison d'un refus de `raf move` : la première ligne de son erreur, sans le préfixe « raf: » ; le code de sortie si elle est vide. */

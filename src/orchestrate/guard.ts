@@ -2,9 +2,22 @@ import { chmodSync, existsSync, lstatSync, readdirSync, statSync, readFileSync, 
 import { execFile, execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
+import { readOrchestrateConfig } from '../config.js';
 import { gitCommonDir, gitRoot, hooksDir, indexLockPath } from '../git.js';
 
 const MARK = '# cadence orchestrate — hook pre-push temporaire (retiré à la fin de la vague)';
+
+/** Le hook que la vague laisse derrière elle quand le projet déclare une porte (L426) : il ne garde que le verdict de la porte au push. */
+const GATE_MARK = '# cadence — hook pre-push de la porte (L426) : refuse un push sans verdict vert de `cadence verify --gate`';
+
+const gateHook = `#!/bin/sh
+${GATE_MARK}
+if command -v raf >/dev/null 2>&1; then raf hook pre-push "$@"; [ $? -ne 3 ] || exit 1; fi
+exit 0
+`;
+
+/** Un hook de cadence (de la vague ou de la porte) : le remplacer ne touche à aucune règle du projet. */
+const ours = (text: string) => text.includes(MARK) || text.includes(GATE_MARK);
 
 const waveLine = (wave: string) => `# wave: ${wave}`;
 
@@ -200,7 +213,7 @@ export function cleanPlaywrightOutput(repo: string): void {
  */
 export function installPrePush(repo: string, wave = '?'): { ok: true } | { ok: false; reason: string } {
   const file = hookPath(repo);
-  if (existsSync(file) && !readFileSync(file, 'utf8').includes(MARK)) {
+  if (existsSync(file) && !ours(readFileSync(file, 'utf8'))) {
     return { ok: false, reason: `un hook pre-push existe déjà (${file}) : l'orchestrateur ne le remplace pas` };
   }
   mkdirSync(dirname(file), { recursive: true });
@@ -231,10 +244,30 @@ export function removePrePush(repo: string, wave?: string): void {
   restoreExclude(repo);
 }
 
+/**
+ * Fin de la garde de la vague sur un dépôt (L426) : quand le projet déclare une porte (`orchestrate.test` ou `orchestrate.build`), le hook de la vague
+ * est remplacé par un hook qui ne garde que la porte, sinon le push de livraison, qui vient après la fin des lots du dépôt, ne serait plus contrôlé.
+ * Rien n'est laissé quand aucune porte n'est déclarée (ou la config illisible), quand un autre hook pre-push est en place (celui du projet, ou celui d'une autre
+ * vague vivante : il reste), ni quand le dossier des hooks est dans l'arbre suivi (le fichier y serait un fichier non suivi du dépôt).
+ */
+export function keepGateGuard(repo: string): void {
+  try {
+    const config = readOrchestrateConfig(join(gitRoot(repo) ?? repo, 'cadence.yaml'));
+    if (!config.test && !config.build) return;
+  } catch {
+    return;
+  }
+  const file = hookPath(repo);
+  if (existsSync(file) || excludeLine(repo) !== null) return;
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, gateHook);
+  chmodSync(file, 0o755);
+}
+
 /** Pourrait-on poser le hook ? (préconditions, sans écrire) */
 export function canInstallPrePush(repo: string): string | null {
   const file = hookPath(repo);
-  return existsSync(file) && !readFileSync(file, 'utf8').includes(MARK) ? `un hook pre-push existe déjà (${file}) : l'orchestrateur ne le remplace pas` : null;
+  return existsSync(file) && !ours(readFileSync(file, 'utf8')) ? `un hook pre-push existe déjà (${file}) : l'orchestrateur ne le remplace pas` : null;
 }
 
 /** git sans bloquer la boucle d'événements (un `ls-remote` peut durer 20 s) ; null en cas d'échec ou de délai. */

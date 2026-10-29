@@ -82,7 +82,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- `cadence verify --gate` keeps its verdict per sha (`.git/cadence/gate-verdicts.json`) and the `pre-push` hook refuses (exit 3) a push of a branch whose sha has no green verdict, when the project declares a gate (L426, `docs/deliver.md`, `docs/orchestrate.md`): the message names the sha, says « aucun verdict » or « rouge » and gives `cadence verify --gate --sha <sha>`; `CADENCE_PUSH_UNGATED=1` overrides it and says so. Brought by a push made with a red gate whose exit code had been hidden by `| tail -1` (29-10, the same loss as 28-10).
+- `cadence verify --gate` keeps its verdict per sha (`.git/cadence/gate-verdicts.json`) and the `pre-push` hook refuses (exit 3) a push of a branch whose sha has no green verdict, when the project declares a gate (L426, `docs/deliver.md`, `docs/orchestrate.md`): the message names the sha, says « aucun verdict » or « rouge » and gives `cadence verify --gate --sha <sha>`; `CADENCE_PUSH_UNGATED=1` overrides it and says so. Brought by a push made with a red gate whose exit code had been hidden by `| tail -1` (29-10, the same loss as 28-10). The guard outlives the wave's hook: when the wave frees a repository whose project declares a gate, a gate-only `pre-push` hook is left behind (not over another `pre-push` hook, nor with `core.hooksPath` inside the tracked tree), so the delivery push that follows the last lot is still checked.
 
 ### Fixed
 

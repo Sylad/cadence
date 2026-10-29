@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { sharedStateDir } from '../src/state.js';
-import { cleanupTempDirs, gitRepo } from './helpers.js';
+import { installPrePush, keepGateGuard, removePrePush } from '../src/orchestrate/guard.js';
+import { cleanupTempDirs, gitRepo, tempDir } from './helpers.js';
 
 afterEach(cleanupTempDirs);
 
@@ -140,5 +141,51 @@ describe('hook pre-push : un push dont le sha de tête n\'a pas de verdict vert 
     expect(line).toContain('verdict');
     expect(line).toContain('CADENCE_PUSH_UNGATED=1');
     expect(line).not.toContain('exits 0 with no live wave');
+  });
+});
+
+describe('la garde de la porte survit au hook de la vague (L426)', () => {
+  const bare = (repo: string) => {
+    const origin = tempDir();
+    git(origin, 'init', '-q', '--bare', '-b', 'main');
+    git(repo, 'remote', 'add', 'origin', origin);
+  };
+  const hookFile = (repo: string) => join(repo, '.git/hooks/pre-push');
+
+  it('R14 — quand la vague retire son hook et que le projet déclare une porte, il reste un hook qui refuse un push sans verdict vert', () => {
+    const { repo } = project('true');
+    bare(repo);
+    expect(installPrePush(repo, 'w1')).toEqual({ ok: true });
+    removePrePush(repo, 'w1');
+    keepGateGuard(repo);
+    expect(existsSync(hookFile(repo))).toBe(true);
+    expect(readFileSync(hookFile(repo), 'utf8')).not.toContain('CADENCE_ORCHESTRATED');
+    // le hook appelle `raf` du PATH (pas de dist dans les tests) : un faux `raf` qui refuse (code 3) montre que le hook le consulte et en suit le refus
+    const bin = tempDir();
+    writeFileSync(join(bin, 'raf'), '#!/bin/sh\necho "raf: push refusé — faux" >&2\nexit 3\n', { mode: 0o755 });
+    const refused = spawnSync('git', ['push', 'origin', 'HEAD:refs/heads/main'], { cwd: repo, encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } });
+    expect(refused.status).not.toBe(0);
+    expect(refused.stderr).toContain('push refusé — faux');
+    const ok = tempDir();
+    writeFileSync(join(ok, 'raf'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    expect(spawnSync('git', ['push', 'origin', 'HEAD:refs/heads/main'], { cwd: repo, encoding: 'utf8', env: { ...process.env, PATH: `${ok}:${process.env.PATH}` } }).status).toBe(0);
+  });
+
+  it('R15 — sans porte déclarée, ou devant un hook du projet, la vague ne laisse rien ; une vague suivante remplace le hook laissé', () => {
+    const { repo } = project(null);
+    expect(installPrePush(repo, 'w1')).toEqual({ ok: true });
+    removePrePush(repo, 'w1');
+    expect(existsSync(hookFile(repo))).toBe(false);
+    const gated = project('true').repo;
+    writeFileSync(hookFile(gated), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    keepGateGuard(gated);
+    expect(readFileSync(hookFile(gated), 'utf8')).toBe('#!/bin/sh\nexit 0\n');
+    const again = project('true').repo;
+    keepGateGuard(again);
+    expect(installPrePush(again, 'w2')).toEqual({ ok: true });
+    expect(readFileSync(hookFile(again), 'utf8')).toContain('# wave: w2');
+    removePrePush(again, 'w2');
+    keepGateGuard(again);
+    expect(readFileSync(hookFile(again), 'utf8')).not.toContain('# wave: w2');
   });
 });

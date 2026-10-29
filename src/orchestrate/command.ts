@@ -27,7 +27,7 @@ import { costlyHypotheses, specScreen, specText } from './spec.js';
 import { fichesDuDossier } from '../spec.js';
 import { candidates, parsePriority, parseUntil, drawSettingsReport, readPriority, stopReason, type Candidate } from './continue.js';
 import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, leadReviewedHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
-import { canInstallPrePush, gitProcessRunning, indexLockRefusal, installPrePush, longDuration, removePrePush, snapshot } from './guard.js';
+import { canInstallPrePush, gitProcessRunning, indexLockRefusal, installPrePush, keepGateGuard, longDuration, removePrePush, snapshot } from './guard.js';
 import { buildArgs, buildLocalArgs, killSessions, MODEL_ALIASES, mcpServersFor, readAgents, realClaude, enabledPlugins, settingsFiles, type AgentDef, type AnyModel, type ClaudeFn, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { groupLots, runPool } from './pool.js';
@@ -1090,6 +1090,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     releaseLock(file, process.pid);
     held.splice(0, held.length, ...held.filter((f) => f !== file));
     removePrePush(r, wave.id);
+    keepGateGuard(r);
     try {
       updateWaveRepos(home, process.pid, repos.filter((x) => !freed.has(x)), lanes());
     } catch {
@@ -1099,7 +1100,11 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   const release = () => {
     for (const f of held) releaseLock(f, process.pid);
     held.length = 0;
-    for (const r of repos) if (!freed.has(r)) removePrePush(r, wave.id);
+    for (const r of repos) {
+      if (freed.has(r)) continue;
+      removePrePush(r, wave.id);
+      keepGateGuard(r);
+    }
     try {
       unregisterWave(home, process.pid);
     } catch {

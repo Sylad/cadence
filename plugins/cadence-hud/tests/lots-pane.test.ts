@@ -1192,3 +1192,15 @@ test('L412 R18 — panneau monté : un verdict UX dont le lot est clos au plan (
   expect(text).toMatch(/◐ ol:L80 +verdict UX : conforme/)
   expect(text).not.toMatch(/ol:L79|cadence:L399/)
 })
+
+test('L412 R23 — à 70 colonnes, la commande --answer d’un id long se lit entière sur deux lignes du panneau, sans « … »', async ($, on) => {
+  const lots = [{ ...WAVE.lots[0]!, project: 'maritime-atlas', lot: 'Q4/accueil-4-ux12', status: 'question', questions: ['Quel titre ?'] }]
+  const s = await session($, on, { waves: [{ ...WAVE, id: '2026-10-29-1650', lots }] })
+  await s.advance(5_000)
+  await s.hud('lots')
+  const { texts } = await s.draw(70, 30)
+  const first = texts.findIndex(t => t === '   cadence orchestrate --resume --wave 2026-10-29-1650 --answer')
+  expect(first).toBeGreaterThan(-1)
+  expect(texts[first + 1]).toBe('   maritime-atlas:Q4/accueil-4-ux12 "…"')
+  expect(texts.some(t => /--answer caden…|--answer mari…/.test(t))).toBe(false)
+})

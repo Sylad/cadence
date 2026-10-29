@@ -69,19 +69,52 @@ export type DecisionLine = { text: string; tone: 'title' | 'error' | 'text' | 's
 
 const GLYPH: Record<Decision['kind'], string> = { question: '?', rendu: '↩', ux: '◐', livraison: '✖' }
 
-/** Les lignes d'une décision : son résumé, puis la commande à copier pour une question ou un verdict UX. */
+/** Le retrait de la commande à copier sous sa décision. */
+const INDENT = '   '
+
+/**
+ * La commande à copier, repliée sur des lignes de `columns` colonnes au plus (retrait compris), jamais coupée par « … » : une commande tronquée ne se copie pas.
+ * Le repli se fait aux espaces ; un mot plus long qu'une ligne est coupé à la largeur. Les lignes, jointes par un espace et sans leur retrait, redonnent la commande.
+ */
+export const wrapCommand = (command: string, columns: number): string[] => {
+  const width = Math.max(1, columns - INDENT.length)
+  const lines: string[] = []
+  let line = ''
+  const flush = () => {
+    if (line !== '') lines.push(line)
+    line = ''
+  }
+  for (let word of command.split(' ')) {
+    while (word.length > width) {
+      flush()
+      lines.push(word.slice(0, width))
+      word = word.slice(width)
+    }
+    if (line === '') line = word
+    else if (line.length + 1 + word.length <= width) line += ` ${word}`
+    else {
+      flush()
+      line = word
+    }
+  }
+  flush()
+  return lines.map(l => ellipsize(`${INDENT}${l}`, columns))
+}
+
+/** Les lignes d'une décision : son résumé (coupé à la largeur), puis la commande à copier, repliée, pour une question ou un verdict UX. */
 const linesOf = (d: Decision, columns: number): DecisionLine[] => {
   const where = d.kind === 'livraison' ? d.project : `${d.project}:${d.lot}`
   const label = d.kind === 'livraison' ? 'livraison' : d.kind === 'ux' ? 'verdict UX' : ''
   const head = ellipsize(`${GLYPH[d.kind]} ${where}  ${label ? `${label} : ` : ''}${d.text}`, columns)
   const lines: DecisionLine[] = [{ text: head, tone: d.kind === 'livraison' || d.kind === 'rendu' ? 'error' : 'text' }]
-  if (d.kind === 'question' || d.kind === 'ux') lines.push({ text: ellipsize(`   ${d.command}`, columns), tone: 'subtle' })
+  if (d.kind === 'question' || d.kind === 'ux') lines.push(...wrapCommand(d.command, columns).map((text): DecisionLine => ({ text, tone: 'subtle' })))
   return lines
 }
 
 /**
  * Le bloc de tête du panneau pour `columns` colonnes et `height` lignes : un titre, puis les décisions dans l'ordre (questions, lots rendus, verdicts UX, livraisons ; l'ordre de `decisionsOf`
- * est gardé), chacune sur une ligne et la commande sous les questions et les verdicts. Trop haut : les premières décisions qui tiennent avec la ligne « … +N décisions de plus » (`more` = N).
+ * est gardé), chacune sur une ligne et la commande, repliée, sous les questions et les verdicts (les lignes repliées comptent dans la hauteur). Trop haut : les premières décisions
+ * qui tiennent avec la ligne « … +N décisions de plus » (`more` = N).
  * Aucune décision : aucune ligne, le bloc n'occupe rien.
  */
 export const buildDecisions = (decisions: readonly Decision[], columns: number, height: number): { lines: DecisionLine[]; more: number } => {

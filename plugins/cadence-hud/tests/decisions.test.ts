@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { buildDecisions, decisionsOf, parseDeliveries } from '../hooks/decisions'
+import { buildDecisions, decisionsOf, parseDeliveries, wrapCommand } from '../hooks/decisions'
 import type { FailedDelivery, LotsBoard, TourLot, Wave, WaveLot } from '../types'
 
 const wlot = (lot: string, status: string, extra: Partial<WaveLot> = {}): WaveLot => ({ project: 'ol', lot, title: `T ${lot}`, status, pass: 0, model: 'sonnet', next: null, steps: 1, step: null, ...extra })
@@ -91,4 +91,25 @@ test('L412 R21 — le plan tranche : une décision dont le lot n’est plus ouve
   const sub = wave([wlot('L9/1', 'question', { questions: ['q'] }), wlot('L9/2', 'question', { questions: ['q'] })])
   const failed: FailedDelivery[] = [{ project: 'ol', day: '2026-10-29', sha: 'abc1234', reason: 'CI en échec' }]
   expect(decisionsOf([sub], failed, null, board).map(x => (x.kind === 'livraison' ? x.kind : x.lot))).toEqual(['L9/1', 'livraison'])
+})
+
+test('L412 R22 — la commande à copier se replie sur plusieurs lignes à la largeur, aux espaces, jamais coupée par « … » ; le plafond du bloc compte les lignes repliées', () => {
+  const q = wave([wlot('Q4/accueil-4-ux12', 'question', { questions: ['Quel titre ?'], project: 'maritime-atlas' })], { id: '2026-10-29-1650' })
+  const command = 'cadence orchestrate --resume --wave 2026-10-29-1650 --answer maritime-atlas:Q4/accueil-4-ux12 "…"'
+  const { lines } = buildDecisions(decisionsOf([q], []), 70, 20)
+  const cmd = lines.slice(2)
+  expect(cmd.length).toBeGreaterThan(1)
+  expect(cmd.every(l => l.text.length <= 70 && l.tone === 'subtle' && l.text.startsWith('   '))).toBe(true)
+  expect(cmd.map(l => l.text.trim()).join(' ')).toBe(command) // recopiable : rien de perdu
+  expect(cmd.map(l => l.text)).toEqual(['   cadence orchestrate --resume --wave 2026-10-29-1650 --answer', '   maritime-atlas:Q4/accueil-4-ux12 "…"'])
+  // le plafond compte le titre, la ligne de la question et ses 2 lignes de commande : 4 lignes
+  expect(buildDecisions(decisionsOf([q], []), 70, 4)).toMatchObject({ more: 0 })
+  expect(buildDecisions(decisionsOf([q], []), 70, 4).lines).toHaveLength(4)
+  const short = buildDecisions(decisionsOf([q], []), 70, 3)
+  expect(short.more).toBe(1)
+  expect(short.lines.map(l => l.text)).toEqual(['Ce qui attend une décision (1)', '… +1 décision de plus'])
+  // large : une seule ligne ; un mot plus long que la ligne est coupé sans « … » ; une largeur nulle ne donne rien de plus long qu'elle
+  expect(wrapCommand(command, 120)).toEqual([`   ${command}`])
+  expect(wrapCommand('a bbbbbbbbbb c', 9)).toEqual(['   a', '   bbbbbb', '   bbbb c'])
+  expect(wrapCommand('raf ux L1 "verdict"', 1).every(l => l.length <= 1)).toBe(true)
 })

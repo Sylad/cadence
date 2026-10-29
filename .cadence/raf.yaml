@@ -134,6 +134,7 @@ lots:
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
+    review: { date: 2026-10-29, verdict: "conforme : 1 mineur (aucune ligne des créneaux quand le dossier du tour n'a aucun projet) — orchestré (vague 2026-10-29-cad, 0 passe(s) de correction)", commit: c7244a36e5f9880d517cb9fd2dd8a95131c16fe9, reporte: { de: 475e95151bbeda03563fbbaceb4f90d1a93efb72, vers: c7244a36e5f9880d517cb9fd2dd8a95131c16fe9, patchId: 96a711042d14a59ddbbb3eccd1110c8bf7bd3e56 } }
   - id: L417
     title: "Porte de tests de cadence : la vague joue aussi claude plugin test plugins/cadence-hud et tsc -p plugins/cadence-hud avec les types générés (vitest exclut plugins/**) — 43 erreurs de typage (L402, 28-10) et un faux rouge du mod sous charge (29-10) passés sans que la porte les voie"
     status: doing

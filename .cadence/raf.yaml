@@ -185,11 +185,12 @@ lots:
   - id: L413
     title: "Panneau des lots : frise du cycle de chaque lot en cours — étapes de la vague (fiche, maquette, accept, implement, revue, correction n/3, porte, UX, intégration, prêt) avec l'étape courante, sa durée et les passes, puis côté plan revue posée → clos → livré ; lu dans .cadence/runs/<vague> et le plan"
     public: Le cycle complet de chaque lot en cours, en frise
-    status: todo
+    status: doing
     estimate: 0.5
     visible: true
     screen: component
     created: 2026-10-28
+    started: 2026-10-29
   - id: L414
     title: "Panneau des lots : par lot en cours, tokens consommés sur le budget du lot et temps écoulé, comparés au temps habituel d'un lot de cette taille (cadence perf) — signal visible quand un lot dépasse (ex. L64 : 786 k, 53 min)"
     public: Budget et durée des lots en cours

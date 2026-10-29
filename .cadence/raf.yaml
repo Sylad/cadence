@@ -127,6 +127,27 @@ lots:
     screen: component
     created: 2026-10-28
     started: 2026-10-28
+  - id: L416
+    title: "Créneaux toujours visibles : cadence lead tour affiche « créneaux libres : N sur M » même sans vague ni session du lead, et cadence lead release affiche après la libération les créneaux libres et la ligne « prêts, ressources libres », avec un ⚠ quand un créneau reste libre (29-10 : plafond 3 pris pour 2, un créneau vide plus d'une heure)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L417
+    title: "Porte de tests de cadence : la vague joue aussi claude plugin test plugins/cadence-hud et tsc -p plugins/cadence-hud avec les types générés (vitest exclut plugins/**) — 43 erreurs de typage (L402, 28-10) et un faux rouge du mod sous charge (29-10) passés sans que la porte les voie"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L419
+    title: npm run service met aussi à jour la copie locale du mod cadence-hud (~/.claude/mods/cadence-hud, chargée par CLAUDE_CODE_PLUGIN_DIRS ; rsync sans .claude-plugin/types) — aujourd'hui à la main à chaque release, un oubli laisse l'ancien mod
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L423
+    title: "orchestrate --resume --integrate sort en 0 quand l'intégration est refusée et le lot rendu (29-10, L402 : revue courte du diff rebasé non conforme) — code 1 comme toute vague dont un lot est rendu"
+    status: todo
+    estimate: 0.1
+    quickwin: true
+    created: 2026-10-29
   - id: L412
     title: "Panneau des lots : en tête, « ce qui attend une décision » — questions des sessions (texte court + commande --answer), lots rendus au lead (cause en une ligne), verdicts UX à poser, livraisons en échec ; lu dans les états de vague et le plan — idée validée par Sylvain le 28-10"
     public: Ce qui attend une décision, en tête du panneau
@@ -159,6 +180,26 @@ lots:
     visible: true
     screen: component
     created: 2026-10-28
+  - id: L418
+    title: "Release : le script de publication lit le vrai code de sortie de la suite (pipefail, aucun | grep final qui masque un rouge) et joue le test whats-new « deux lignes » avant le tag — 28-10 : test rouge commité, publication npm de 1.22.0 échouée"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L420
+    title: "cadence deliver commite lui-même la note « article à rafraîchir » qu'il écrit dans le plan (28-10 : laissée non commitée, un commit à la main à chaque livraison)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L421
+    title: Ajouter un lot à une vague vivante (--add <projet:lot>) au lieu d'en lancer une seconde, refusée dans le même dépôt ; le message du refus nomme cette commande (28-10)
+    status: todo
+    estimate: 0.5
+    created: 2026-10-29
+  - id: L422
+    title: "Table finale d'orchestrate : une sous-tâche proposée dont le fichier cité a été modifié par un commit du lot postérieur à la revue qui l'a émise est marquée « peut-être déjà traitée (<sha>) » (28-10 : L230 ouvert sur des propositions déjà corrigées, 5 passes perdues)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

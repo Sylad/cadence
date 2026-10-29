@@ -72,22 +72,31 @@ const GLYPH: Record<Decision['kind'], string> = { question: '?', rendu: '↩', u
 /** Le retrait de la commande à copier sous sa décision. */
 const INDENT = '   '
 
+/** La continuation de ligne du shell, en fin de chaque ligne repliée sauf la dernière : collées, les lignes ne font qu'une commande. */
+const CONTINUATION = ' \\'
+
 /**
- * La commande à copier, repliée sur des lignes de `columns` colonnes au plus (retrait compris), jamais coupée par « … » : une commande tronquée ne se copie pas.
- * Le repli se fait aux espaces ; un mot plus long qu'une ligne est coupé à la largeur. Les lignes, jointes par un espace et sans leur retrait, redonnent la commande.
+ * La commande à copier, repliée sur des lignes de `columns` colonnes au plus (retrait et continuation compris), jamais coupée par « … » : une commande tronquée ne se copie pas.
+ * Le repli se fait aux espaces ; un mot plus long qu'une ligne est coupé à la largeur. Chaque ligne sauf la dernière finit par la continuation ` \` (`\` collé au morceau
+ * quand un mot est coupé) : collées telles quelles dans un shell, les lignes ne lancent qu'UNE commande, la commande d'origine — sans elle, une ligne 1
+ * `cadence orchestrate --resume --wave <vague>` s'exécutait seule, sans son `--answer`. Les lignes, sans leur retrait, jointes en effaçant chaque `\` de fin de ligne
+ * et le saut qui le suit (ce que fait le shell), redonnent la commande ; jointes par un espace, elles ne la redonnent pas quand un mot est coupé.
+ * Un mot n'est coupé que quand la largeur passe sous le plus long argument (`projet:lot`, retrait et continuation compris) ; une coupe entre guillemets simples ne se recollerait pas, la commande n'en a pas.
+ * Sous 6 colonnes (retrait + 1 + continuation), les lignes sont coupées par « … » : rien n'y est lisible de toute façon.
  */
 export const wrapCommand = (command: string, columns: number): string[] => {
-  const width = Math.max(1, columns - INDENT.length)
-  const lines: string[] = []
+  const width = Math.max(1, columns - INDENT.length - CONTINUATION.length)
+  const lines: { text: string; cut: boolean }[] = []
   let line = ''
-  const flush = () => {
-    if (line !== '') lines.push(line)
+  const flush = (cut = false) => {
+    if (line !== '') lines.push({ text: line, cut })
     line = ''
   }
   for (let word of command.split(' ')) {
     while (word.length > width) {
       flush()
-      lines.push(word.slice(0, width))
+      line = word.slice(0, width)
+      flush(true)
       word = word.slice(width)
     }
     if (line === '') line = word
@@ -98,7 +107,8 @@ export const wrapCommand = (command: string, columns: number): string[] => {
     }
   }
   flush()
-  return lines.map(l => ellipsize(`${INDENT}${l}`, columns))
+  const last = lines.length - 1
+  return lines.map((l, i) => ellipsize(`${INDENT}${l.text}${i < last ? (l.cut ? CONTINUATION.trimStart() : CONTINUATION) : ''}`, columns))
 }
 
 /** Les lignes d'une décision : son résumé (coupé à la largeur), puis la commande à copier, repliée, pour une question ou un verdict UX. */

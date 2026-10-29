@@ -82,7 +82,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- The lots panel (`/hud lots`) opens with « ce qui attend une décision »: the questions of the sessions with the `--answer` command, the lots handed back to the lead with their cause in one line, the UX verdicts to record and the failed deliveries, read from the wave states (the last finished wave of the folder, read with no time limit through the collector's `ended`, apart from what the band shows, and kept while a newer wave runs in the same folder: only a newer finished wave replaces it), the plan (a decision whose lot is closed in a project the tour read is dropped) and the delivery log; the command to copy is wrapped at the panel's width, never cut (L412, `docs/cadence-hud.md`).
+- The lots panel (`/hud lots`) opens with « ce qui attend une décision »: the questions of the sessions with the `--answer` command, the lots handed back to the lead with their cause in one line, the UX verdicts to record and the failed deliveries, read from the wave states (the last finished wave of the folder, read with no time limit through the collector's `ended`, apart from what the band shows, and kept while a newer wave runs in the same folder: only a newer finished wave replaces it), the plan (a decision whose lot is closed in a project the tour read is dropped) and the delivery log; the command to copy is wrapped at the panel's width, never cut, each line but the last ending with a ` \` continuation so the pasted lines run as one command (L412, `docs/cadence-hud.md`).
 
 ### Changed
 

@@ -7,8 +7,10 @@ import { expect, it } from 'vitest';
 
 // Le mod est hors du typecheck de cadence (tsconfig.json) : son module est chargé à l'exécution, par une URL que tsc ne suit pas.
 const { DELIVERIES, COLLECTOR } = (await import(new URL('../plugins/cadence-hud/hooks/collect.ts', import.meta.url).href)) as { DELIVERIES: string; COLLECTOR: string };
+const { wrapCommand } = (await import(new URL('../plugins/cadence-hud/hooks/decisions.ts', import.meta.url).href)) as { wrapCommand: (command: string, columns: number) => string[] };
 
-// L412 : le script Python du mod (livraisons en échec du panneau des lots) joué pour de vrai ; les tests du mod n'ont pas accès au système de fichiers.
+// L412 : les scripts Python du mod (livraisons en échec, collecteur des vagues) joués pour de vrai, et la commande repliée collée dans un vrai shell ;
+// les tests du mod n'ont pas accès au système de fichiers ni aux processus.
 
 it('L412 R11 — le script DELIVERIES lit la dernière livraison en échec, effacée par une livraison verte écrite après', () => {
   const root = mkdtempSync(join(tmpdir(), 'deliveries-'))
@@ -84,5 +86,19 @@ it('L412 R12 — le collecteur rend la dernière vague finie du dossier dans `en
     expect(only.ended).toMatchObject({ id: 'fini', live: false })
   } finally {
     rmSync(root, { recursive: true, force: true })
+  }
+})
+
+it('L412 R25 — les lignes de la commande repliée, collées telles quelles dans bash, lancent UNE commande avec tous ses arguments, à toute largeur', () => {
+  // la commande affiche chaque argument entre crochets : ce que bash a reçu se lit sur la sortie
+  const command = 'printf "[%s]" orchestrate --resume --wave 2026-10-29-1650 --answer maritime-atlas:Q4/accueil-4-ux12 "…"'
+  const expected = '[orchestrate][--resume][--wave][2026-10-29-1650][--answer][maritime-atlas:Q4/accueil-4-ux12][…]'
+  for (const columns of [54, 60, 62, 70, 120, 30, 9]) {
+    const lines = wrapCommand(command, columns)
+    if (columns <= 70) expect(lines.length, `${columns} colonnes : repliée`).toBeGreaterThan(1)
+    const run = spawnSync('bash', [], { input: `${lines.map(l => l.replace(/^ {3}/, '')).join('\n')}\n`, encoding: 'utf8' })
+    expect(run.status, `${columns} colonnes`).toBe(0)
+    expect(run.stderr, `${columns} colonnes`).toBe('')
+    expect(run.stdout, `${columns} colonnes`).toBe(expected)
   }
 })

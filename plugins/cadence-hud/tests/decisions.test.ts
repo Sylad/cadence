@@ -93,6 +93,9 @@ test('L412 R21 — le plan tranche : une décision dont le lot n’est plus ouve
   expect(decisionsOf([sub], failed, null, board).map(x => (x.kind === 'livraison' ? x.kind : x.lot))).toEqual(['L9/1', 'livraison'])
 })
 
+/** Ce que le shell lit des lignes collées : le retrait ôté, `\` en fin de ligne efface le saut de ligne (le shell joint, l'espace qui précède `\` reste). */
+const pasted = (lines: readonly string[]): string => lines.map(l => l.replace(/^ {3}/, '')).join('\n').replace(/\\\n/g, '')
+
 test('L412 R22 — la commande à copier se replie sur plusieurs lignes à la largeur, aux espaces, jamais coupée par « … » ; le plafond du bloc compte les lignes repliées', () => {
   const q = wave([wlot('Q4/accueil-4-ux12', 'question', { questions: ['Quel titre ?'], project: 'maritime-atlas' })], { id: '2026-10-29-1650' })
   const command = 'cadence orchestrate --resume --wave 2026-10-29-1650 --answer maritime-atlas:Q4/accueil-4-ux12 "…"'
@@ -100,16 +103,37 @@ test('L412 R22 — la commande à copier se replie sur plusieurs lignes à la la
   const cmd = lines.slice(2)
   expect(cmd.length).toBeGreaterThan(1)
   expect(cmd.every(l => l.text.length <= 70 && l.tone === 'subtle' && l.text.startsWith('   '))).toBe(true)
-  expect(cmd.map(l => l.text.trim()).join(' ')).toBe(command) // recopiable : rien de perdu
-  expect(cmd.map(l => l.text)).toEqual(['   cadence orchestrate --resume --wave 2026-10-29-1650 --answer', '   maritime-atlas:Q4/accueil-4-ux12 "…"'])
+  expect(pasted(cmd.map(l => l.text))).toBe(command) // recopiable : rien de perdu
+  expect(cmd.map(l => l.text)).toEqual(['   cadence orchestrate --resume --wave 2026-10-29-1650 --answer \\', '   maritime-atlas:Q4/accueil-4-ux12 "…"'])
   // le plafond compte le titre, la ligne de la question et ses 2 lignes de commande : 4 lignes
   expect(buildDecisions(decisionsOf([q], []), 70, 4)).toMatchObject({ more: 0 })
   expect(buildDecisions(decisionsOf([q], []), 70, 4).lines).toHaveLength(4)
   const short = buildDecisions(decisionsOf([q], []), 70, 3)
   expect(short.more).toBe(1)
   expect(short.lines.map(l => l.text)).toEqual(['Ce qui attend une décision (1)', '… +1 décision de plus'])
-  // large : une seule ligne ; un mot plus long que la ligne est coupé sans « … » ; une largeur nulle ne donne rien de plus long qu'elle
+  // large : une seule ligne, sans continuation ; un mot plus long que la ligne est coupé sans « … » ; une largeur nulle ne donne rien de plus long qu'elle
   expect(wrapCommand(command, 120)).toEqual([`   ${command}`])
-  expect(wrapCommand('a bbbbbbbbbb c', 9)).toEqual(['   a', '   bbbbbb', '   bbbb c'])
+  expect(wrapCommand('a bbbbbbbbbb c', 9)).toEqual(['   a \\', '   bbbb\\', '   bbbb\\', '   bb c'])
   expect(wrapCommand('raf ux L1 "verdict"', 1).every(l => l.length <= 1)).toBe(true)
+})
+
+test('L412 R24 — aucune ligne repliée n’est une commande exécutable seule : chaque ligne sauf la dernière finit par la continuation ` \\` (`\\` collé quand un mot est coupé), et les lignes collées dans un shell redonnent la commande', () => {
+  const command = 'cadence orchestrate --resume --wave 2026-10-29-1650 --answer maritime-atlas:Q4/accueil-4-ux12 "…"'
+  // le cas de la revue : entre 54 et 62 colonnes, la ligne 1 tenait `--resume --wave <vague>` seule et s’exécutait sans `--answer`
+  expect(wrapCommand(command, 62)).toEqual(['   cadence orchestrate --resume --wave 2026-10-29-1650 \\', '   --answer maritime-atlas:Q4/accueil-4-ux12 "…"'])
+  expect(wrapCommand(command, 60)).toEqual(['   cadence orchestrate --resume --wave 2026-10-29-1650 \\', '   --answer maritime-atlas:Q4/accueil-4-ux12 "…"'])
+  expect(wrapCommand(command, 54)).toEqual(['   cadence orchestrate --resume --wave \\', '   2026-10-29-1650 --answer \\', '   maritime-atlas:Q4/accueil-4-ux12 "…"'])
+  expect(wrapCommand(command, 70)).toEqual(['   cadence orchestrate --resume --wave 2026-10-29-1650 --answer \\', '   maritime-atlas:Q4/accueil-4-ux12 "…"'])
+  for (const columns of [54, 60, 62, 70, 9, 37]) {
+    const lines = wrapCommand(command, columns)
+    expect(lines.every(l => l.length <= columns), `${columns} colonnes`).toBe(true)
+    expect(lines.slice(0, -1).every(l => l.endsWith('\\')), `${columns} colonnes : continuation`).toBe(true)
+    expect(lines.at(-1)?.endsWith('\\'), `${columns} colonnes : dernière ligne`).toBe(false)
+    expect(pasted(lines), `${columns} colonnes : collage`).toBe(command)
+  }
+  // un mot coupé (largeur sous le mot le plus long) : `\` collé au morceau, le shell recolle le mot ; joindre les lignes par un espace ne redonnerait PAS la commande
+  const cut = wrapCommand(command, 30)
+  expect(cut.some(l => l.endsWith('\\') && !l.endsWith(' \\'))).toBe(true)
+  expect(pasted(cut)).toBe(command)
+  expect(cut.map(l => l.trim()).join(' ')).not.toBe(command)
 })

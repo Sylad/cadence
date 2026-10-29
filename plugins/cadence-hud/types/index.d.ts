@@ -86,8 +86,8 @@ export type LotsBoard = { rows: LotsRow[]; outdated: boolean }
 /** Ce que le dessin demande : placer `id` juste avant ou après `target` (L402). */
 export type MoveAsk = { id: string; target: string; place: 'before' | 'after' }
 
-/** Le dernier mot du panneau sur un déplacement : fait (le plan est à commiter) ou refusé avec sa raison. */
-export type LotsNotice = { text: string; refused: boolean }
+/** Le dernier mot du panneau sur un déplacement : fait (`done`, le plan est à commiter), sans effet (`unchanged`, le lot était déjà à cette place dans le plan) ou refusé avec sa raison (`refused`). */
+export type LotsNotice = { text: string; kind: 'done' | 'unchanged' | 'refused' }
 
 declare module 'claude-code' {
   interface PluginState {

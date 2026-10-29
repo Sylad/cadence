@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { buildPanel, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, planMove, projectDir, readTime, refusalReason } from '../hooks/lots'
+import { buildPanel, displayOrder, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, planMove, projectDir, readTime, refusalReason } from '../hooks/lots'
 import type { LotsRow, TourLot } from '../types'
 
 const lot = (id: string, status: 'todo' | 'doing' = 'todo', extra: Partial<TourLot> = {}): TourLot => ({ id, title: `Titre ${id}`, status, after: [], ...extra })
@@ -536,31 +536,54 @@ test('L411 — la bascule d’un lot à sous-lots est collée à l’id à tous 
 // ── L402 : réordonner ──────────────────────────────────────────────────────────────────────────────────────
 
 const PLAN = [lot('L1'), lot('L2'), task('L2', 1), task('L2', 2), lot('L3')]
+/** Tous les lots au même rang d'affichage : l'écran suit l'ordre du plan. */
+const flat = () => 1
 
 test('R20 — un lot se place avant ou après un lot du même projet : la demande à raf', () => {
-  expect(planMove(PLAN, { id: 'L3', target: 'L1', place: 'before' })).toEqual({ ok: true, argv: ['raf', 'move', 'L3', '--before', 'L1'] })
-  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'after' })).toEqual({ ok: true, argv: ['raf', 'move', 'L1', '--after', 'L3'] })
+  expect(planMove(PLAN, { id: 'L3', target: 'L1', place: 'before' }, flat)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L3', '--before', 'L1'], planOnly: false })
+  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'after' }, flat)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L1', '--after', 'L3'], planOnly: false })
 })
 
 test('R20 — une sous-tâche se place parmi celles de son lot', () => {
-  expect(planMove(PLAN, { id: 'L2/2', target: 'L2/1', place: 'before' })).toEqual({ ok: true, argv: ['raf', 'move', 'L2/2', '--before', 'L2/1'] })
+  expect(planMove(PLAN, { id: 'L2/2', target: 'L2/1', place: 'before' }, flat)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L2/2', '--before', 'L2/1'], planOnly: false })
 })
 
 test('R21 — parents différents : refusé avec sa raison, raf n’est pas appelé', () => {
   for (const [id, target] of [['L2/1', 'L1'], ['L1', 'L2/1']] as const) {
-    const plan = planMove(PLAN, { id, target, place: 'after' })
-    expect(plan?.ok).toBe(false)
-    expect(plan?.ok === false && plan.reason).toMatch(new RegExp(`${id.replace('/', '\\/')} et ${target.replace('/', '\\/')} n'ont pas le même parent`))
+    const plan = planMove(PLAN, { id, target, place: 'after' }, flat)
+    expect(plan?.kind).toBe('refused')
+    expect(plan?.kind === 'refused' && plan.reason).toMatch(new RegExp(`${id.replace('/', '\\/')} et ${target.replace('/', '\\/')} n'ont pas le même parent`))
   }
   expect(groupOf(task('L2', 1))).toBe('L2')
   expect(groupOf(lot('L1', 'todo', { parent: 'L0' }))).toBe('')
 })
 
 test('R21 — un lot lâché sur lui-même ne demande rien ; un id inconnu ou une place inconnue est refusé', () => {
-  expect(planMove(PLAN, { id: 'L1', target: 'L1', place: 'after' })).toBeUndefined()
-  expect(planMove(PLAN, { id: 'L9', target: 'L1', place: 'after' })).toEqual({ ok: false, reason: 'lot inconnu : L9' })
-  expect(planMove(PLAN, { id: 'L1', target: 'L9', place: 'after' })).toEqual({ ok: false, reason: 'lot inconnu : L9' })
-  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'beside' as never })?.ok).toBe(false)
+  expect(planMove(PLAN, { id: 'L1', target: 'L1', place: 'after' }, flat)).toBeUndefined()
+  expect(planMove(PLAN, { id: 'L9', target: 'L1', place: 'after' }, flat)).toEqual({ kind: 'refused', reason: 'lot inconnu : L9' })
+  expect(planMove(PLAN, { id: 'L1', target: 'L9', place: 'after' }, flat)).toEqual({ kind: 'refused', reason: 'lot inconnu : L9' })
+  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'beside' as never }, flat)?.kind).toBe('refused')
+})
+
+test('R22 — un lot déjà à sa place dans le plan : raf n’est pas demandé, le panneau le dit (lots et sous-tâches)', () => {
+  expect(planMove(PLAN, { id: 'L1', target: 'L2', place: 'before' }, flat)).toEqual({ kind: 'unchanged', text: 'L1 est déjà avant L2 dans le plan : rien à déplacer' })
+  expect(planMove(PLAN, { id: 'L2', target: 'L1', place: 'after' }, flat)).toEqual({ kind: 'unchanged', text: 'L2 est déjà après L1 dans le plan : rien à déplacer' })
+  expect(planMove(PLAN, { id: 'L2/1', target: 'L2/2', place: 'before' }, flat)).toEqual({ kind: 'unchanged', text: 'L2/1 est déjà avant L2/2 dans le plan : rien à déplacer' })
+  // les sous-tâches entre L2 et L3 ne comptent pas : L3 est bien déjà juste après L2 parmi les lots
+  expect(planMove(PLAN, { id: 'L3', target: 'L2', place: 'after' }, flat)).toEqual({ kind: 'unchanged', text: 'L3 est déjà après L2 dans le plan : rien à déplacer' })
+  // mais L1 avant L3 déplace bien L1 (L2 est entre les deux)
+  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'before' }, flat)?.kind).toBe('move')
+})
+
+test('R22 — L410 : un déplacement entre deux groupes d’affichage change le plan sans changer l’écran : planOnly', () => {
+  const l1First = (l: TourLot) => (l.id === 'L1' ? 0 : 1) // L1 en cours : affiché en tête quelle que soit sa place dans le plan
+  expect(displayOrder(PLAN, l1First)).toEqual(['L1', 'L2', 'L2/1', 'L2/2', 'L3'])
+  // L1 après L3 : le plan devient L2, L3, L1 ; l'écran reste L1, L2, L3
+  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'after' }, l1First)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L1', '--after', 'L3'], planOnly: true })
+  // L3 avant L1 : le plan devient L3, L1, L2 ; l'écran L1, L3, L2 — visible
+  expect(planMove(PLAN, { id: 'L3', target: 'L1', place: 'before' }, l1First)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L3', '--before', 'L1'], planOnly: false })
+  // et L2 avant L1, qui est déjà le cas à l'écran mais pas dans le plan : le plan change, l'écran non
+  expect(planMove(PLAN, { id: 'L2', target: 'L1', place: 'before' }, l1First)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L2', '--before', 'L1'], planOnly: true })
 })
 
 test('R21 — la raison d’un refus de raf : sa première ligne sans le préfixe, le code à défaut', () => {

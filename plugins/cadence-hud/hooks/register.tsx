@@ -6,7 +6,7 @@ import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, LAUNCH_FOLDER, PLAN_STAMPS, par
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
-import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, planMove, projectDir, readTime, refusalReason, stampsSignature, subsText } from './lots'
+import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, planMove, projectDir, rankerOf, readTime, refusalReason, stampsSignature, subsText, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
@@ -17,6 +17,8 @@ const FOLDS_KEY = 'lotsFolds'
 /** Clé du `$.store` où le panneau des lots garde les dépliages choisis (le reste d'un projet, les sous-lots d'un lot). */
 const VIEWS_KEY = 'lotsViews'
 const REFRESH_MS = 5_000
+/** Le dernier mot du panneau sur un déplacement, sous le titre : fait (vert), sans effet (le lot était déjà là, en couleur du texte), refusé (rouge). */
+const NOTICE_LOOK: Record<LotsNotice['kind'], { glyph: string; color: 'success' | 'text' | 'error' }> = { done: { glyph: '✔ ', color: 'success' }, unchanged: { glyph: '• ', color: 'text' }, refused: { glyph: '✖ ', color: 'error' } }
 
 const usage = atom({ plugin: 'cadence-hud', key: 'usage' } as const, null)
 const agents = atom({ plugin: 'cadence-hud', key: 'agents' } as const, { running: 0, names: [] })
@@ -83,8 +85,8 @@ const toggleView = async ($: EngineInterface, key: string): Promise<void> => {
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const onlyBooleans = (v: Record<string, unknown>): Record<string, boolean> => Object.fromEntries(Object.entries(v).filter((e): e is [string, boolean] => typeof e[1] === 'boolean'))
 
-/** Garde le dernier mot du panneau sur un déplacement (fait, ou refusé avec sa raison) : il s'affiche sous le titre. */
-const say = ($: EngineInterface, text: string, refused: boolean): Promise<void> => update($, lotsNotice, () => ({ text, refused }) satisfies LotsNotice).then(() => undefined)
+/** Garde le dernier mot du panneau sur un déplacement (fait, sans effet, ou refusé avec sa raison) : il s'affiche sous le titre. */
+const say = ($: EngineInterface, text: string, kind: LotsNotice['kind']): Promise<void> => update($, lotsNotice, () => ({ text, kind }) satisfies LotsNotice).then(() => undefined)
 
 export const register: Register = on => {
   let timer: Timer | undefined
@@ -672,30 +674,37 @@ export const register: Register = on => {
   })
 
   // Le dépôt d'un lot (ou d'une sous-tâche) posté par la région Client du panneau (L402) : contrôlé contre le tableau lu, puis `raf move` dans le projet.
+  // L'écran est trié par état (L410), pas dans l'ordre du plan : le panneau dit vrai sans interdire le geste — un dépôt qui laisse le plan tel quel n'appelle pas raf
+  // et le dit, un dépôt qui change le plan sans rien changer à l'écran le dit aussi.
   on('ui.message', async ($, e, next) => {
     if (e.requestId !== LOTS_PANE) return next(e)
     const ask = parseMoveAsk(e.data)
-    const board = await read($, lotsBoard)
+    const [board, allWaves, at] = await Promise.all([read($, lotsBoard), read($, waves), read($, now)])
     const project = board?.rows.find(r => r.project === ask?.project && !r.error)
     if (!ask || !board || !project || isMoving) return {}
-    const plan = planMove(project.lots ?? [], ask)
+    const plan = planMove(project.lots ?? [], ask, rankerOf(project, waveLotsOf(allWaves, at)))
     if (!plan) return {}
-    if (plan.ok === false) {
-      await say($, plan.reason, true)
+    if (plan.kind === 'refused') {
+      await say($, plan.reason, 'refused')
       return {}
     }
-    const folder = tourFolder(await read($, waves), sessionCwd)
+    if (plan.kind === 'unchanged') {
+      await say($, plan.text, 'unchanged')
+      return {}
+    }
+    const folder = tourFolder(allWaves, sessionCwd)
     if (!folder) {
-      await say($, 'dossier des plans inconnu : rien n\'a été déplacé', true)
+      await say($, 'dossier des plans inconnu : rien n\'a été déplacé', 'refused')
       return {}
     }
     isMoving = true
     try {
       const r = await $.process.run(plan.argv, { cwd: projectDir(folder, ask.project, board.rows), timeoutMs: 10_000 }).catch(() => undefined)
-      if (!r) await say($, `raf move n’a pas pu être lancé (raf absent du PATH ou sans réponse) : rien n’a été déplacé`, true)
-      else if (r.exitCode !== 0) await say($, refusalReason(r.stderr, r.exitCode), true)
+      if (!r) await say($, `raf move n’a pas pu être lancé (raf absent du PATH ou sans réponse) : rien n’a été déplacé`, 'refused')
+      else if (r.exitCode !== 0) await say($, refusalReason(r.stderr, r.exitCode), 'refused')
       else {
-        await say($, `${ask.id} placé ${ask.place === 'before' ? 'avant' : 'après'} ${ask.target} — le plan est modifié, à commiter (raf move ne commite pas)`, false)
+        const done = `${ask.id} placé ${ask.place === 'before' ? 'avant' : 'après'} ${ask.target} — le plan est modifié, à commiter (raf move ne commite pas)`
+        await say($, plan.planOnly ? `${done} ; à l'écran rien ne bouge : le panneau trie par état (en cours, libres, le reste)` : done, 'done')
         void readTourNow?.()
       }
     } finally {
@@ -737,9 +746,7 @@ export const register: Register = on => {
     } else if (board === null) {
       body = failed ? message("Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute.", 'error') : message('Lecture des plans…', 'subtle')
     } else {
-      const shown = allWaves.filter(w => isWaveShown(w, at))
-      const waveLots = [...shown.filter(w => w.live), ...shown.filter(w => !w.live)].flatMap(w => w.lots.map(l => ({ project: l.project, lot: l.lot, status: l.status })))
-      const panel = buildPanel({ rows: board.rows, columns, height: e.props.scroll.bodyRows, waves: waveLots, folds, views })
+      const panel = buildPanel({ rows: board.rows, columns, height: e.props.scroll.bodyRows, waves: waveLotsOf(allWaves, at), folds, views })
       if (panel.lines.length === 0) {
         body = message('Aucun lot non clos dans les projets de ce dossier.', 'subtle')
       } else {
@@ -817,8 +824,8 @@ export const register: Register = on => {
       }
     }
     const result = notice && (
-      <Text key="notice" color={notice.refused ? 'error' : 'success'} wrap="wrap">
-        {notice.refused ? '✖ ' : '✔ '}
+      <Text key="notice" color={NOTICE_LOOK[notice.kind].color} wrap="wrap">
+        {NOTICE_LOOK[notice.kind].glyph}
         {notice.text}
       </Text>
     )

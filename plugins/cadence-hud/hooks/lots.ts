@@ -1,7 +1,7 @@
 import type { ThemeKey } from 'claude-code'
 
-import type { LotsBoard, LotsRow, MoveAsk, TourLot } from '../types'
-import { colorOfLot, lotStatusFr } from './format'
+import type { LotsBoard, LotsRow, MoveAsk, TourLot, Wave } from '../types'
+import { colorOfLot, isWaveShown, lotStatusFr } from './format'
 
 // ── L401 : le panneau des lots (/hud lots) — lecture de `cadence lead tour --json`, arbre et mise en page ───────────
 
@@ -42,17 +42,40 @@ export const openCount = (lots: readonly TourLot[]): number => lots.filter(l => 
 export const groupOf = (l: TourLot): string => (isTask(l) ? l.parent! : '')
 
 /** Ce que le panneau demande à raf, ou pourquoi il ne le demande pas. */
-export type MovePlan = { ok: true; argv: string[] } | { ok: false; reason: string }
+export type MovePlan =
+  | { kind: 'move'; argv: string[]; /** Le plan change mais pas l'écran : les deux lots sont dans des groupes d'affichage différents (L410, tri par état), l'ordre affiché reste le même. */ planOnly: boolean }
+  | { kind: 'unchanged'; /** Le lot est déjà à cette place dans le plan : `raf move` ne changerait rien, on ne le lance pas et on le dit. */ text: string }
+  | { kind: 'refused'; reason: string }
 
-/** Contrôle une demande de déplacement contre les lots lus du projet : les ids sont ceux du tableau (la demande vient du dessin, donc à vérifier) et les deux lots ont le même parent. Le reste (vague, plan en lecture seule, lot archivé) est dit par `raf move` lui-même. */
-/** `undefined` : rien à faire (un lot lâché sur lui-même). */
-export const planMove = (lots: readonly TourLot[], ask: MoveAsk): MovePlan | undefined => {
+/** Les lots tels que le plan les porterait après le déplacement : `lot` retiré, puis remis juste avant ou après `target` (les autres gardent leur ordre, comme `raf move`). */
+const movedLots = (lots: readonly TourLot[], lot: TourLot, target: TourLot, place: 'before' | 'after'): TourLot[] => {
+  const without = lots.filter(l => l !== lot)
+  const at = without.indexOf(target) + (place === 'after' ? 1 : 0)
+  return [...without.slice(0, at), lot, ...without.slice(at)]
+}
+
+const sameOrder = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((id, i) => id === b[i])
+
+/** L'ordre d'affichage des lots d'un projet (L410) : l'arbre rangé par rang, à plat — ce que buildPanel dessine. */
+export const displayOrder = (lots: readonly TourLot[], rankOf: (lot: TourLot) => number): string[] => flattenTree(sortTree(lotTree(lots), rankOf)).map(f => f.lot.id)
+
+/**
+ * Contrôle une demande de déplacement contre les lots lus du projet (dans l'ordre du plan, celui que `cadence lead tour` émet) : les ids sont ceux du tableau (la demande vient
+ * du dessin, donc à vérifier) et les deux lots ont le même parent. Le reste (vague, plan en lecture seule, lot archivé) est dit par `raf move` lui-même.
+ * Le panneau dit vrai sans interdire le geste (L410 trie l'écran par état, l'ordre affiché n'est pas celui du plan) : une demande qui laisse le plan tel qu'il est n'appelle pas raf (`unchanged`),
+ * une demande qui change le plan sans changer l'écran le signale (`planOnly`). `rankOf` : le rang d'affichage de chaque lot, celui de buildPanel ([rankerOf]).
+ * `undefined` : rien à faire (un lot lâché sur lui-même).
+ */
+export const planMove = (lots: readonly TourLot[], ask: MoveAsk, rankOf: (lot: TourLot) => number): MovePlan | undefined => {
   const lot = lots.find(l => l.id === ask.id)
   const target = lots.find(l => l.id === ask.target)
-  if (!lot || !target || (ask.place !== 'before' && ask.place !== 'after')) return { ok: false, reason: `lot inconnu : ${!lot ? ask.id : ask.target}` }
+  if (!lot || !target || (ask.place !== 'before' && ask.place !== 'after')) return { kind: 'refused', reason: `lot inconnu : ${!lot ? ask.id : ask.target}` }
   if (lot === target) return undefined
-  if (groupOf(lot) !== groupOf(target)) return { ok: false, reason: `${lot.id} et ${target.id} n'ont pas le même parent : un lot se réordonne parmi les lots de son projet, une sous-tâche parmi celles de son lot` }
-  return { ok: true, argv: ['raf', 'move', lot.id, `--${ask.place}`, target.id] }
+  if (groupOf(lot) !== groupOf(target)) return { kind: 'refused', reason: `${lot.id} et ${target.id} n'ont pas le même parent : un lot se réordonne parmi les lots de son projet, une sous-tâche parmi celles de son lot` }
+  const moved = movedLots(lots, lot, target, ask.place)
+  const siblings = (all: readonly TourLot[]) => all.filter(l => groupOf(l) === groupOf(lot)).map(l => l.id)
+  if (sameOrder(siblings(lots), siblings(moved))) return { kind: 'unchanged', text: `${lot.id} est déjà ${ask.place === 'before' ? 'avant' : 'après'} ${target.id} dans le plan : rien à déplacer` }
+  return { kind: 'move', argv: ['raf', 'move', lot.id, `--${ask.place}`, target.id], planOnly: sameOrder(displayOrder(lots, rankOf), displayOrder(moved, rankOf)) }
 }
 
 /** La raison d'un refus de `raf move` : la première ligne de son erreur, sans le préfixe « raf: » ; le code de sortie si elle est vide. */
@@ -204,6 +227,21 @@ export type Panel = { lines: PanelLine[]; /** lignes de lot non affichées faute
 /** La vague d'un lot : le projet de la vague est le nom du dossier du projet du tour (« apps/ol » ↔ « ol »). */
 const sameProject = (row: string, wave: string): boolean => row === wave || row.split('/').pop() === wave
 
+/** Un lot d'une vague, tel que le panneau en a besoin : son projet, son id, l'état de la vague. */
+export type PanelWaveLot = { project: string; lot: string; status: string }
+
+/** Les lots des vagues affichées à `at` (isWaveShown), les vagues vivantes d'abord : l'état que le panneau prête à un lot est celui de la première vague qui le porte. */
+export const waveLotsOf = (waves: readonly Wave[], at: number): PanelWaveLot[] => {
+  const shown = waves.filter(w => isWaveShown(w, at))
+  return [...shown.filter(w => w.live), ...shown.filter(w => !w.live)].flatMap(w => w.lots.map(l => ({ project: l.project, lot: l.lot, status: l.status })))
+}
+
+/** Le rang d'affichage (L410) des lots d'un projet lu, celui que buildPanel applique : en cours, prêts, le reste, d'après le plan et l'état des vagues. */
+export const rankerOf = (row: LotsRow, waves: readonly PanelWaveLot[]): ((lot: TourLot) => 0 | 1 | 2) => {
+  const open = new Set((row.lots ?? []).map(l => l.id))
+  return lot => lotRank(lot, open, waves.find(w => w.lot === lot.id && sameProject(row.project, w.project))?.status)
+}
+
 /**
  * Les lignes du panneau pour `columns` colonnes de corps et `height` lignes de corps : le titre et le pied en prennent deux ;
  * si l'arbre est plus haut, les premières lignes restent et `more` compte les lots que la ligne « … +N lots de plus » (une ligne de plus) remplace ; un projet replié placé après la coupure garde sa ligne, de même que le bouton « + N lots » / « moins » du projet que la coupure traverse.
@@ -212,7 +250,7 @@ export const buildPanel = (input: {
   rows: readonly LotsRow[]
   columns: number
   height: number
-  waves: readonly { project: string; lot: string; status: string }[]
+  waves: readonly PanelWaveLot[]
   /** Le choix de la personne par projet (vrai = replié) ; absent, le défaut de isFolded. */
   folds?: Readonly<Record<string, boolean>>
   /** Les dépliages choisis (moreKey, openKey ; vrai = déplié) ; absent, tout est replié. */
@@ -226,11 +264,9 @@ export const buildPanel = (input: {
   const blocks: Block[] = rows
     .filter(r => r.error || (r.lots && r.lots.length > 0))
     .map(r => {
-      const open = new Set((r.lots ?? []).map(l => l.id))
-      const waveOf = (l: TourLot) => waves.find(w => w.lot === l.id && sameProject(r.project, w.project))?.status
-      const tree = sortTree(lotTree(r.lots ?? []), l => lotRank(l, open, waveOf(l)))
+      const tree = sortTree(lotTree(r.lots ?? []), rankerOf(r, waves))
       const { flat, hidden, behind } = visibleLots(r.project, tree, views)
-      return { project: r, flat, hidden, behind, open, folded: !r.error && isFolded(r.project, r.lots ?? [], folds) }
+      return { project: r, flat, hidden, behind, open: new Set((r.lots ?? []).map(l => l.id)), folded: !r.error && isFolded(r.project, r.lots ?? [], folds) }
     })
   const baseLead = (f: FlatLot) => (f.depth === 0 ? '  ' : `  ${'  '.repeat(f.depth - 1)}${f.branch} `)
   const isOpen = (b: Block, f: FlatLot) => views[openKey(b.project.project, f.lot.id)] === true

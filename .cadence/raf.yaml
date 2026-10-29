@@ -257,11 +257,12 @@ lots:
     finished: 2026-10-29
   - id: L428
     title: "Goulot « bug de code » (cadence perf du 29-10 : 100 passes de correction sur 143 classées) : classer ces passes par cause (cadence corrections --classify), retenir les 2 ou 3 causes dominantes et changer le maillon qui les produit (brief implement : relecture de son diff contre la fiche et les règles, cas limites testés avant de rendre) ; mesurer l'effet sur 2 fenêtres de cadence perf — décision de Sylvain du 29-10"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-29
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "conforme (1 note mineure : l'exemple L322 de la page de mesure est un bug de code, pas une affirmation fausse) — orchestré (vague 2026-10-29-cad1, 3 passe(s) de correction + passe des mineurs)", commit: 3baff9052ca7139501f1b3e39c4b4ad0b93039ec, reporte: { de: 1d4b2e1793525651a05dcae6e80db45e65e38f99, vers: 3baff9052ca7139501f1b3e39c4b4ad0b93039ec, patchId: 19a5000ac46782ab20173e47ed71484a15b24468 } }
+    finished: 2026-10-29
   - id: L429
     title: "raf public (et tout raf dont plan.onWrite échoue) : l'erreur montre la fin de la pile Node au lieu du motif (« titre public … non conforme (93 caractères > 80) ») — afficher la première ligne d'erreur du script, pas la pile (29-10, ol L232)"
     status: done
@@ -271,6 +272,26 @@ lots:
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "compliant — orchestré (vague 2026-10-29-cad1, 0 passe(s) de correction)", commit: 24670b5a48beeaa56102c54932ccffbeae2a1161, reporte: { de: 46b03597bc7ff88753f8d71e551f9c25eb0942f7, vers: 24670b5a48beeaa56102c54932ccffbeae2a1161, patchId: feb135c5ded25b9f8c786126a77f5789c62affb4 } }
     finished: 2026-10-29
+  - id: L430
+    title: "Mesure de L428 : relire cadence perf sur 2 fenêtres après le 29-10 (part « bug de code » des passes classées, part conforme du premier coup, lots à ≥ 2 passes) contre l'avant de docs/mesures/bug-code-2026-10-29.md ; garder, ajuster ou retirer le bloc « Limits and rules » du brief implement"
+    status: todo
+    estimate: 0.1
+    created: 2026-10-29
+  - id: L431
+    title: "verify --gate --sha joue la porte dans l'arbre principal (« propre, au sha ») pendant une vague vivante du dépôt : une intégration déplace HEAD au milieu, verdict non probant, 5 min perdues (29-10, L427) — pendant une vague vivante du dépôt, toujours une copie jetable"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L432
+    title: "Pre-push (L426) : un commit qui ne touche que le plan (.cadence/raf.yaml) au-dessus d'un sha à porte verte est refusé, d'où une suite complète rejouée pour raf done (29-10, cadence et avatar) — reprendre le verdict du parent quand le diff ne touche que le plan"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L433
+    title: "Registre des créneaux : une vague en mode worktree garde tout le plafond (« sessions en cours : 0 · créneaux libres : 0 sur 3 ») alors que 2 de ses 3 lots sont prêts et qu'elle n'a plus rien en file (29-10, vague cad1) — compter les sessions vivantes et les lots encore à jouer, pas le plafond"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

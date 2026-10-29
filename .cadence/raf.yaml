@@ -226,6 +226,7 @@ lots:
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
+    review: { date: 2026-10-29, verdict: "conforme, 1 mineur (formulation « It is a display » restée dans docs/lead.md:119) — orchestré (vague 2026-10-29-cad3, 2 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (L425) n'introduit aucun constat dans le changement du lot", commit: f8b8e6e57452960a33e6a8fc8a7f204a77e14ce8 }
   - id: L425
     title: "Intégration en mode worktree : un lot prêt attend le verrou d'intégration tenu par SA PROPRE vague (un autre lot en train d'intégrer : rebase rejoué + porte ≈ 10 min) et est rendu au bout de 10 min (29-10, L417 derrière L416) — mettre les lots d'une même vague en file sur le verrou au lieu de les rendre"
     status: doing

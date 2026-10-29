@@ -1,3 +1,4 @@
+import { verdictFor } from './gate-verdict.js';
 import { tryGit } from './git.js';
 import { blockingLots, LABEL } from './orchestrate/table.js';
 import type { LotState } from './orchestrate/state.js';
@@ -38,6 +39,30 @@ export function pushRefusal(root: string, wave: string, lots: LotState[], input:
     ].filter(Boolean).join(' ; ');
     const how = notBranch ? `${target} doit nommer son propre commit : attendre que ces lots soient prêts, ou poser la réf sur un commit livrable` : safe ? `pousser seulement le livrable : git push ${remoteName} ${safe}:${branch}` : unreadable.length > 0 ? `rétablir le plan ou attendre la fin de ces lots` : `aucun commit livrable dans cette plage : attendre la fin de ces lots`;
     return `push refusé — vague ${wave} vivante : ${local.slice(0, 7)} ${why} ; ${how} (--no-verify pour passer outre)`;
+  }
+  return null;
+}
+
+/** La variable qui passe outre le verdict de la porte au push (L426) ; la garde des lots de la vague (`pushRefusal`) n'en dépend pas. */
+export const UNGATED_ENV = 'CADENCE_PUSH_UNGATED';
+
+/**
+ * Le refus d'un push dont le sha de tête n'a pas de verdict vert de `cadence verify --gate` (L426) : pour chaque ligne de l'entrée standard du hook pre-push,
+ * le sha local d'une branche (`refs/heads/`) doit avoir son dernier verdict à 0 dans l'état partagé du dépôt. Absent ou rouge, le refus nomme le sha, dit lequel des deux
+ * et donne la commande qui rend le verdict (`cadence verify --gate --sha <sha>`) ; il rappelle la variable qui passe outre. Une suppression de branche, un sha illisible
+ * et une réf hors `refs/heads/` (un tag : son sha est celui de l'objet tag, pas d'un commit à vérifier) passent. Sans porte déclarée (`gate` faux) rien n'est exigé.
+ */
+export function gateRefusal(root: string, gate: boolean, input: string): string | null {
+  if (!gate) return null;
+  for (const entry of input.split('\n')) {
+    const [ref, local, remoteRef] = entry.trim().split(/\s+/);
+    if (!ref || !local || ZERO.test(local) || !/^[0-9a-f]{7,64}$/.test(local)) continue;
+    if (!(remoteRef || ref).startsWith('refs/heads/')) continue;
+    const verdict = verdictFor(root, local);
+    if (verdict?.code === 0) continue;
+    const short = local.slice(0, 7);
+    const state = verdict ? `sa porte est rouge (verdict du ${verdict.at.slice(0, 10)})` : 'aucun verdict de la porte pour ce sha';
+    return `push refusé — ${short} : ${state} ; la rejouer : cadence verify --gate --sha ${short} (vert, le push passe) ; ${UNGATED_ENV}=1 git push … pour passer outre`;
   }
   return null;
 }

@@ -4,6 +4,7 @@ import { availableParallelism, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { OrchestrateConfig, VerifyConfig } from './config.js';
 import { recordedGate } from './gate-record.js';
+import { recordVerdict } from './gate-verdict.js';
 import { onTermination } from './proc.js';
 import { failedTests, hasUnnamedFailure, unloadedSuites } from './orchestrate/baseline.js';
 import { configuredCap } from './orchestrate/command.js';
@@ -72,6 +73,8 @@ export interface GateCtx {
   timeoutMs?: number;
   /** Environnement des commandes et réglages lus pour la part de la machine (défaut : celui du processus). */
   env?: Record<string, string | undefined>;
+  /** L'horloge qui date le verdict noté (défaut : l'heure du système). */
+  now?: () => Date;
   /** Cœurs de la machine (défaut : ceux du système) ; sert au calcul de CADENCE_TEST_WORKERS. */
   cores?: number;
 }
@@ -115,9 +118,17 @@ function mainTreeMoved(repo: string, sha: string): string | null {
  * sans elle le rejeu `--maxWorkers=$CADENCE_TEST_WORKERS` de `orchestrate.testReplay` sortirait en erreur et ne prouverait rien.
  * La porte déjà jouée par le programme au même sha n'est pas rejouée (L397) : si l'état d'une vague (`ctx.launchDirs`) porte des contrôles enregistrés AU sha, sur un arbre identique, verts et couvrant chaque commande actuelle,
  * leur verdict est repris et la première ligne le dit (vague, lot) ; sinon la porte est rejouée et la ligne qui suit celle du lieu en donne la raison.
+ * Le verdict (0 ou 1, pas 2) est noté par sha dans l'état partagé du dépôt (`gate-verdict.ts`, L426) : le hook pre-push refuse un push dont le sha n'a pas de verdict vert.
  * Le worktree est retiré dans tous les cas. 0 vert, 1 rouge (avec les tests en échec), 2 rien à rejouer ou worktree impossible.
  */
 export async function verifyGate(ctx: GateCtx): Promise<number> {
+  const code = await playGate(ctx);
+  // Seuls 0 (vert) et 1 (rouge) sont des verdicts du sha ; 2 (rien à rejouer, verdict non probant) n'en est pas un. Le hook pre-push les lit (L426).
+  if (code === 0 || code === 1) recordVerdict(ctx.repo, ctx.sha, code, (ctx.now ?? (() => new Date()))());
+  return code;
+}
+
+async function playGate(ctx: GateCtx): Promise<number> {
   const { repo, sha, config, out } = ctx;
   const steps = [
     ...(config.build ? [{ name: 'build', cmd: config.build }] : []),

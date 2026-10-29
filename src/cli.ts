@@ -14,7 +14,7 @@ import { ganttData, renderGantt } from './gantt.js';
 import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
 import { dirtyPaths, gitRoot, tryGit, isTracked, readCommits, matchesHead, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
-import { pushRefusal } from './push-guard.js';
+import { gateRefusal, pushRefusal, UNGATED_ENV } from './push-guard.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
 import { invalidResource, Plan, RafError, SCREENS, STATUSES, setPlanNotice, type Lot, type Screen, type Status } from './plan.js';
@@ -100,7 +100,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   cadence ref corpus <dossier> [--sans-rendu]   écrit le corpus synthétique à vérité connue (7 pièges : texte ambigu levé par une figure, figure qui contredit, table en image, gabarit BUFR, contrôle translucide, page Proposal, scan bruité) : par cas document.html et attendu.json, puis document.pdf et page-<n>.png (1700×2200) rendus par Playwright (CADENCE_PLAYWRIGHT = dossier du paquet) ; dossier existant ou Playwright introuvable : code 2
   cadence release patch|minor|major [--dry-run]   prépare le commit de version (package.json, package-lock.json, plugin.json, marketplace.json, CHANGELOG.md) sans commiter ni publier ; imprime les étapes du lead et vérifie docs/whats-new.md : refus sur un arbre sale, un [Unreleased] vide ou une version déjà taguée
   cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
-  cadence verify --gate --sha rév [--project dossier]   porte du projet (orchestrate.build puis orchestrate.test) : reprend le verdict enregistré par la vague quand son sha est le même et son arbre identique, sans rien rejouer (la sortie dit « verdict repris de la porte de la vague ») ; sinon la rejoue (« verdict rejoué : raison ») au sha dans l'arbre principal s'il est propre au sha, sinon dans un worktree jetable aux dépendances copiées (orchestrate.worktreeDeps), puis le retire : 0 vert, 1 rouge avec les tests en échec, 2 rien à rejouer
+  cadence verify --gate --sha rév [--project dossier]   porte du projet (orchestrate.build puis orchestrate.test) : reprend le verdict enregistré par la vague quand son sha est le même et son arbre identique, sans rien rejouer (la sortie dit « verdict repris de la porte de la vague ») ; sinon la rejoue (« verdict rejoué : raison ») au sha dans l'arbre principal s'il est propre au sha, sinon dans un worktree jetable aux dépendances copiées (orchestrate.worktreeDeps), puis le retire : 0 vert, 1 rouge avec les tests en échec, 2 rien à rejouer ; le verdict (0 ou 1) est noté par sha et le hook pre-push refuse un push dont le sha n'a pas de verdict vert (CADENCE_PUSH_UNGATED=1 passe outre)
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
 Un commit appartient à un lot quand son message cite l'identifiant : « feat(L3): … », « L3/t1 ».
@@ -665,7 +665,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       }
       if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, today, io, readHookConfig(configPath).autostart);
       if (rest[0] === 'pre-commit') return preCommit(existsSync(planPath) ? loadPlan : null, readHookConfig(configPath).autostart, root, today, io);
-      if (rest[0] === 'pre-push') return prePush(root, io, rest[1]);
+      if (rest[0] === 'pre-push') return prePush(root, io, rest[1], configPath);
       throw new RafError('usage : raf hook install|pre-commit|post-commit|pre-push');
     }
     case 'session': {
@@ -1003,29 +1003,46 @@ function morningEffects(configPath: string, root: string): Promise<string[]> | s
 
 /**
  * `raf hook pre-push` (L405), appelé par le hook que la vague pose : refuse (code 3) un push qui emporte un commit d'un lot pas prêt de la vague vivante
- * du dépôt, ou dont un lot pas prêt a des commits illisibles (la garde de `deliver --sha`). Sans vague qui tient le dépôt, ou avec un état de vague illisible
- * (avertissement), un hook ne gêne jamais un push.
+ * du dépôt, ou dont un lot pas prêt a des commits illisibles (la garde de `deliver --sha`). Puis (L426), quand le projet déclare une porte, refuse un push dont
+ * le sha de tête n'a pas de verdict vert de `cadence verify --gate` (`CADENCE_PUSH_UNGATED=1` passe outre, et le dit). Sans vague qui tient le dépôt, ou avec un état de vague illisible
+ * (avertissement), la première garde ne gêne jamais un push ; une config illisible laisse passer la seconde.
  */
-function prePush(root: string, io: Io, remoteName?: string): number {
-  const holding = waveHolding(root);
-  if (!holding) return 0;
+function prePush(root: string, io: Io, remoteName: string | undefined, configPath: string): number {
   let input = '';
   try {
     input = io.stdin ? io.stdin() : readFileSync(0, 'utf8');
   } catch {
     return 0;
   }
-  const lots = waveLotsIn(cadenceHome(), holding.pid, root);
-  if (lots === null) {
-    io.err(`raf: vague ${holding.wave} : état illisible, push non vérifié`);
+  const holding = waveHolding(root);
+  if (holding) {
+    const lots = waveLotsIn(cadenceHome(), holding.pid, root);
+    if (lots === null) {
+      io.err(`raf: vague ${holding.wave} : état illisible, push non vérifié`);
+    } else {
+      const refusal = pushRefusal(root, holding.wave, lots, input, remoteName || undefined);
+      if (refusal) {
+        io.err(`raf: ${refusal}`);
+        return REFUSED;
+      }
+    }
+  }
+  // La porte du projet (L426) : une config illisible ne gêne pas un push, comme un état de vague illisible.
+  let gate = false;
+  try {
+    const config = readOrchestrateConfig(configPath);
+    gate = Boolean(config.test || config.build);
+  } catch {
     return 0;
   }
-  const refusal = pushRefusal(root, holding.wave, lots, input, remoteName || undefined);
-  if (refusal) {
-    io.err(`raf: ${refusal}`);
-    return REFUSED;
+  const refusal = gateRefusal(root, gate, input);
+  if (!refusal) return 0;
+  if (io.env[UNGATED_ENV] === '1') {
+    io.err(`raf: ${refusal.replace(/^push refusé/, 'push passé outre')} — ${UNGATED_ENV}=1 est posée`);
+    return 0;
   }
-  return 0;
+  io.err(`raf: ${refusal}`);
+  return REFUSED;
 }
 
 /**
@@ -1407,7 +1424,7 @@ async function verifyGateCommand(values: { sha?: string; project?: string; retry
   const configPath = resolve(io.cwd, values.config ?? join(top, 'cadence.yaml'));
   const sha = resolveCommit(top, values.sha);
   if (!sha) throw new RafError(`verify --gate : --sha ${values.sha} : commit introuvable dans ${top}`);
-  return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), verify: readVerifyConfig(configPath), launchDirs: [io.cwd, top, dirname(top)], out: io.out });
+  return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), verify: readVerifyConfig(configPath), launchDirs: [io.cwd, top, dirname(top)], now: io.now, out: io.out });
 }
 
 /** `session start|close --all [--depth n]` : la commande jouée dans chaque projet sous le dossier courant, une section par projet. */

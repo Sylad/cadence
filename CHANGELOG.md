@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `cadence verify --gate` keeps its verdict per sha (`.git/cadence/gate-verdicts.json`) and the `pre-push` hook refuses (exit 3) a push of a branch whose sha has no green verdict, when the project declares a gate (L426, `docs/deliver.md`, `docs/orchestrate.md`): the message names the sha, says « aucun verdict » or « rouge » and gives `cadence verify --gate --sha <sha>`; `CADENCE_PUSH_UNGATED=1` overrides it and says so. Brought by a push made with a red gate whose exit code had been hidden by `| tail -1` (29-10, the same loss as 28-10).
+
 ### Fixed
 
 - `cadence orchestrate` in worktree mode: a ready lot queues behind the other lots of its own wave on the integration lock instead of being handed back after 10 minutes (L425, `docs/orchestrate.md`; 2026-10-29, L417 behind L416: a replayed rebase plus the gate lasts about 10 minutes). The 10-minute bound now applies only to the lock held by another process.

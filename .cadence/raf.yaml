@@ -341,8 +341,25 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-29
+    notes:
+      - { date: 2026-10-29, text: "Sylvain (29-10) : un seuil de 150k ne doit pas forcer des /clear fréquents — à combiner avec /compact (et le réglage de compaction automatique de Claude Code, à vérifier dans sa doc) et avec les lots de réduction du contexte (livreur délégué, comptes rendus courts, status compact)" }
   - id: L438
     title: "Alerte de joignabilité des machines : une sonde depuis Big-Blue (ping + API k3s) écrit sur Discord (webhook discord-idle) quand dark-blue ne répond plus — le 29-10 il s'est éteint à 20:05 et on ne l'a su qu'à la livraison de 20:43 (config locale, rien de propre à notre dossier dans le code de cadence)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L439
+    title: "Livreur délégué : pour un lot prêt, une sous-session fait la chaîne lead (verify --gate au sha, verdict UX sur captures selon lead.ux, raf done, commit du plan et des fichiers de plan.onWrite, push du sha, deliver, qa-reviewer) et rend UNE ligne au lead (« L84 livré 3d6edf4, QA 2/2 ») ou une question ; livraisons toujours une à une — le contexte du lead a atteint 460k le 29-10 surtout par ces chaînes (~10 appels par lot) (demande de Sylvain)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-29
+  - id: L440
+    title: "Comptes rendus courts des agents qa-reviewer et code-reviewer appelés par le lead : 5 lignes (verdict, bloquants, suites) au lead, rapport complet écrit dans un fichier lu à la demande — une vingtaine de rapports de 3 à 5k ont gonflé le lead le 29-10 (demande de Sylvain)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L441
+    title: "cadence orchestrate --status compact : une ligne par lot (état, passes, revue, UX, tokens, durée) ; choix faits, propositions et captures dans un fichier de la vague, affichés par --status --detail <lot> (le tableau complet a coûté 5 à 10k par lecture au lead le 29-10) (demande de Sylvain)"
     status: todo
     estimate: 0.25
     created: 2026-10-29

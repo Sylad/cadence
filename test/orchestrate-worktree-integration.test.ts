@@ -479,6 +479,25 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
       sleeper.kill();
     }
   });
+  it('L443 — le verrou du dépôt tenu par un processus vivant de la MÊME vague (la première reprise entre son verrou et son inscription par execute) : la seconde reprise est refusée tout de suite, n\'attend pas, n\'écrit rien', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const sleeper = spawn('sleep', ['30'], { stdio: 'ignore' });
+    writeFileSync(join(sharedStateDir(repo), REPO_LOCK), JSON.stringify({ pid: sleeper.pid, wave: '2026-10-04-1412', started: '2026-10-04T00:00:00Z' }));
+    const before = JSON.stringify(store(parent).readLot('a', lot));
+    const t0 = Date.now();
+    try {
+      const second = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }), { repoWait: { waitMs: 5000, pollMs: 50 } });
+      expect(second.code).toBe(2);
+      expect(second.err).toBe(`orchestrate : la vague 2026-10-04-1412 tourne encore (pid ${sleeper.pid}, verrou de a)`);
+      expect(second.out).not.toContain('attente de sa fin');
+      expect(Date.now() - t0).toBeLessThan(2000);
+      expect(JSON.stringify(store(parent).readLot('a', lot))).toBe(before); // rien d'écrit : ni suspended, ni session relancée
+      expect(activeLock(join(sharedStateDir(repo), REPO_LOCK))?.pid).toBe(sleeper.pid); // le verrou de la première reprise n'est pas touché
+    } finally {
+      sleeper.kill();
+    }
+  });
   it('L443 — --stop-after-current demandé pendant l\'attente n\'est pas effacé à la fin de l\'attente : l\'intégration ne part pas', async () => {
     const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
     git(repo, 'checkout', '-q', 'main');

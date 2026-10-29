@@ -1499,6 +1499,12 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
           busy = t.held;
         }
         if (!busy || busy.pid === process.pid) break;
+        // Le verrou porte l'id de la vague : tenu par un processus vivant de CETTE vague, c'est une autre reprise de la même vague,
+        // entre son verrou et son inscription par `execute` (le garde « tourne encore » ci-dessus ne la voit pas encore) : refus, pas d'attente.
+        if (busy.wave === wave.id) {
+          refusals.push(`la vague ${wave.id} tourne encore (pid ${busy.pid}, verrou de ${basename(repo)})`);
+          break;
+        }
         if (!waitFor || Date.now() >= deadline) {
           refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
           break;

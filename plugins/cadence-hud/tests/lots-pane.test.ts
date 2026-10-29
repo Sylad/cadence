@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Mounted, TestBody } from 'claude-code/testing'
 
-import { PLAN_STAMPS } from '../hooks/collect'
+import { DELIVERIES, PLAN_STAMPS } from '../hooks/collect'
 import type { LotsRow, TourLot, Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module) : laisse se poser un travail lancé sans être attendu. */
@@ -22,7 +22,7 @@ const WAVE: Wave = {
 type Cadence = { exitCode: number; stdout: string }
 
 /** Monte le mod comme une session, avec un moteur simulé : état en mémoire, panneaux ouverts, processus pilotés par le test. */
-const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; stamps?: () => string; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
+const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; stamps?: () => string; deliveries?: () => string; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const open = new Set<string>()
   const opened: unknown[] = []
@@ -68,6 +68,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
       const r = await tour.current()
       return { value: { ...r, stderr: '' } } as never
     }
+    if (argv[3] === DELIVERIES) return { value: { exitCode: 0, stdout: (setup.deliveries ?? (() => '[]'))(), stderr: '' } } as never
     if (argv[3] === PLAN_STAMPS) return { value: { exitCode: 0, stdout: stamps.current(), stderr: '' } } as never
     return { value: { exitCode: 0, stdout: JSON.stringify({ waves: waves.current, holds: [], cap: 2 }), stderr: '' } } as never
   })
@@ -1119,4 +1120,47 @@ test('R23 — L410 : le contrôle « même parent » porte sur la ligne visée �
   }, 'desktop', L410_ROWS)
   expect(s.rafs()).toEqual([])
   expect(text).toMatch(/✖ L10 et L11\/1 n'ont pas le même parent/)
+})
+
+// ── L412 : « ce qui attend une décision », en tête du panneau ───────────────────────────────────────────────────────
+
+const ASKING: Wave = { ...WAVE, lots: [{ ...WAVE.lots[0]!, lot: 'L80', status: 'question', questions: ['Quel format ?'] }] }
+
+test('R12 — une question de session s’affiche en tête du panneau, avant l’arbre, avec la commande --answer', async ($, on) => {
+  const s = await session($, on, { waves: [ASKING] })
+  await s.advance(5_000)
+  await s.hud('lots')
+  const { texts } = await s.draw()
+  const at = (re: RegExp) => texts.findIndex(t => re.test(t))
+  expect(at(/Ce qui attend une décision \(1\)/)).toBeGreaterThan(-1)
+  expect(at(/\? ol:L80 .*Quel format \?/)).toBeGreaterThan(at(/Ce qui attend/))
+  expect(at(/cadence orchestrate --resume --wave w1 --answer ol:L80 "…"/)).toBeGreaterThan(-1)
+  expect(at(/L401/)).toBeGreaterThan(at(/--answer/)) // l'arbre vient après le bloc
+})
+
+test('R13 — rien à décider : le bloc n’apparaît pas', async ($, on) => {
+  const s = await session($, on, { waves: [WAVE] })
+  await s.advance(5_000)
+  await s.hud('lots')
+  expect((await s.draw()).text).not.toMatch(/Ce qui attend/)
+})
+
+test('R14 — une livraison en échec se lit sur le journal des livraisons, panneau ouvert seulement', async ($, on) => {
+  const failed = JSON.stringify([{ project: 'maritime', day: '2026-10-29', sha: 'abc1234', reason: 'CI en échec' }])
+  const s = await session($, on, { deliveries: () => failed })
+  await s.advance(5_000)
+  expect(s.runs.filter(a => a[3] === DELIVERIES)).toEqual([])
+  await s.hud('lots')
+  await s.advance(5_000)
+  expect((await s.draw()).text).toMatch(/✖ maritime +livraison : abc1234 · CI en échec \(2026-10-29\)/)
+})
+
+test('R15 — le bloc ne prend jamais plus de la moitié du corps : l’arbre garde sa place', async ($, on) => {
+  const lots = Array.from({ length: 8 }, (_, i) => ({ ...WAVE.lots[0]!, lot: `Q${i}`, status: 'question', questions: ['q'] }))
+  const s = await session($, on, { waves: [{ ...WAVE, lots }] })
+  await s.advance(5_000)
+  await s.hud('lots')
+  const { text } = await s.draw(70, 12)
+  expect(text).toMatch(/… \+\d+ décisions? de plus/)
+  expect(text).toMatch(/▾ cadence/)
 })

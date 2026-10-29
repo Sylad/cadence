@@ -361,9 +361,10 @@ lots:
     started: 2026-10-29
   - id: L441
     title: "cadence orchestrate --status compact : une ligne par lot (état, passes, revue, UX, tokens, durée) ; choix faits, propositions et captures dans un fichier de la vague, affichés par --status --detail <lot> (le tableau complet a coûté 5 à 10k par lecture au lead le 29-10) (demande de Sylvain)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-29
+    started: 2026-10-29
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.23.0**: the panel of lots shows five lots per project, in progress first, and reorders a lot by dragging it inside its group; `cadence lead tour` always shows the free slots.
 - **1.22.0**: the panel of lots folds a project with a click on its name; a project of more than 20 open lots starts folded.
 - **1.21.1**: `/hud lots` opens on the desktop app whatever the width; a correction session that makes no commit must say why, or the lot is handed back.
 - **1.21.0**: `/hud lots` opens a panel beside the conversation with the open lots of every project; the pre-push hook of a wave refuses a push that carries a lot not ready.
@@ -47,6 +48,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.23.0**: the panel of lots (`/hud lots`, `docs/cadence-hud.md`) becomes a place to steer from. In each project the lots in progress come first, then the free ones, then the blocked ones, plan order kept in each group (L410); at most five lots per project are shown, with a `+ N lots` / `moins` button for the rest, and a lot that has sub-lots folds and unfolds with a click (L411); `… +N lots de plus` counts every lot the height cuts, sub-lots included. A lot is reordered by dragging it onto another lot of its group, or with Alt+↑ / Alt+↓, through `raf move` (L402): dropping it on a lot of another group (a free lot on a lot in progress) is refused with its reason, a drop that changes nothing says so, and the panel never commits the plan. For the lead, `cadence lead tour` prints `créneaux libres : N sur M` even when nothing runs, and `cadence lead release` prints the free slots and the ready lots, with a ⚠ when a slot stays free (L416, `docs/lead.md`); cadence's own test gate also plays the tests and the type-check of the `cadence-hud` mod (L417); and `npm run service` also updates the local copy of the mod (L419).
 
 **1.22.0**: the panel of lots no longer lets one big project hide the others (L409, cadence-hud 0.7.0, `docs/cadence-hud.md`): each project folds and unfolds with a click on its name (Enter under the focus, or `/hud lots <project>`), a project of more than 20 open lots starts folded on a single line (name, open lots, in progress), and the folded state is kept between two openings.
 

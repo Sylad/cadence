@@ -6,9 +6,22 @@ import type { FailedDelivery, LotsBoard, TourLot, Wave, WaveLot } from '../types
 const wlot = (lot: string, status: string, extra: Partial<WaveLot> = {}): WaveLot => ({ project: 'ol', repo: `/p/${extra.project ?? 'ol'}`, lot, title: `T ${lot}`, status, pass: 0, model: 'sonnet', next: null, steps: 1, step: null, ...extra })
 const wave = (lots: WaveLot[], extra: Partial<Wave> = {}): Wave => ({ id: 'w1', pid: 1, cwd: '/p', started: '2026-10-29T16:00:00Z', live: true, lots, ...extra })
 
-test('L412 R1 — une question de session : le texte court et la commande --answer de la vague, qui commence par `cd <dossier de lancement de la vague> &&`', () => {
-  const d = decisionsOf([wave([wlot('L5', 'question', { questions: ['Quel format ?', 'Quelle date ?'] })])], [])
+test('L412 R1 — une question de session d’une vague finie : le texte court et la commande --answer de la vague, qui commence par `cd <dossier de lancement de la vague> &&`', () => {
+  const d = decisionsOf([wave([wlot('L5', 'question', { questions: ['Quel format ?', 'Quelle date ?'] })], { live: false })], [])
   expect(d).toEqual([{ kind: 'question', project: 'ol', lot: 'L5', text: 'Quel format ? / Quelle date ?', command: 'cd /p && cadence orchestrate --resume --wave w1 --answer ol:L5 "…"' }])
+})
+
+test('L412 R28 — une question d’une vague VIVANTE ne propose pas `--resume --answer` (orchestrate la refuse : « la vague tourne encore ») : la question s’affiche avec « réponse possible à la fin de la vague »', () => {
+  const d = decisionsOf([wave([wlot('L5', 'question', { questions: ['Quel format ?'] })])], [])
+  expect(d).toEqual([{ kind: 'question', project: 'ol', lot: 'L5', text: 'Quel format ?', command: null }])
+  const { lines } = buildDecisions(d, 80, 10)
+  expect(lines.map(l => [l.text, l.tone])).toEqual([
+    ['Ce qui attend une décision (1)', 'title'],
+    ['? ol:L5  Quel format ?', 'text'],
+    ['   réponse possible à la fin de la vague', 'subtle'],
+  ])
+  // la même vague finie : la commande revient
+  expect(decisionsOf([wave([wlot('L5', 'question', { questions: ['Quel format ?'] })], { live: false })], [])[0]).toMatchObject({ command: 'cd /p && cadence orchestrate --resume --wave w1 --answer ol:L5 "…"' })
 })
 
 test('L412 R2 — un lot rendu au lead : la cause en une ligne (première ligne de l’issue), à défaut le statut', () => {
@@ -22,7 +35,7 @@ test('L412 R3 — un verdict UX à poser : lot prêt, visible, verdict de la rev
 })
 
 test('L412 R27 — les commandes à copier nomment leur dossier : `cd` du dépôt du lot (`repo` de son état) pour raf ux, du dossier de lancement de la vague (`cwd`) pour --answer ; un chemin avec espace ou apostrophe est quoté ; un état de lot sans `repo` (jamais écrit par orchestrate) garde raf ux nu', () => {
-  const w = wave([wlot('L1', 'ready', { visible: true, uxVerdict: 'ok', repo: "/home/s l/projets/l'ol" }), wlot('L2', 'ready', { visible: true, uxVerdict: 'ok', repo: undefined }), wlot('L3', 'question', { questions: ['q'] })], { cwd: '/home/s l/projets' })
+  const w = wave([wlot('L1', 'ready', { visible: true, uxVerdict: 'ok', repo: "/home/s l/projets/l'ol" }), wlot('L2', 'ready', { visible: true, uxVerdict: 'ok', repo: undefined }), wlot('L3', 'question', { questions: ['q'] })], { cwd: '/home/s l/projets', live: false })
   const cmd = (d: ReturnType<typeof decisionsOf>[number]) => (d.kind === 'question' || d.kind === 'ux' ? d.command : '')
   expect(decisionsOf([w], []).map(cmd)).toEqual([
     `cd '/home/s l/projets/l'\\''ol' && raf ux L1 "verdict"`,
@@ -30,7 +43,7 @@ test('L412 R27 — les commandes à copier nomment leur dossier : `cd` du dépô
     `cd '/home/s l/projets' && cadence orchestrate --resume --wave w1 --answer ol:L3 "…"`,
   ])
   // le chemin réel du dossier des vagues : tel quel, sans guillemets
-  const real = wave([wlot('L412', 'question', { project: 'cadence', questions: ['q'] })], { id: '2026-10-29-1650', cwd: '/home/sylvain_ladoire/projects/developpeur' })
+  const real = wave([wlot('L412', 'question', { project: 'cadence', questions: ['q'] })], { id: '2026-10-29-1650', cwd: '/home/sylvain_ladoire/projects/developpeur', live: false })
   expect(cmd(decisionsOf([real], [])[0]!)).toBe('cd /home/sylvain_ladoire/projects/developpeur && cadence orchestrate --resume --wave 2026-10-29-1650 --answer cadence:L412 "…"')
 })
 
@@ -88,8 +101,8 @@ test('L412 R8 — le panneau coupe les textes à la largeur et compte les décis
   expect(built.lines[3]!.text).toMatch(/\+4 décisions/)
 })
 
-test('L412 R9 — les lignes : un titre, puis une ligne par décision, la commande à copier sous une question ou un verdict', () => {
-  const d = decisionsOf([wave([wlot('L5', 'question', { questions: ['Quel format ?'] })])], [])
+test('L412 R9 — les lignes : un titre, puis une ligne par décision, la commande à copier sous une question (de vague finie) ou un verdict', () => {
+  const d = decisionsOf([wave([wlot('L5', 'question', { questions: ['Quel format ?'] })], { live: false })], [])
   const { lines } = buildDecisions(d, 120, 10)
   expect(lines[0]!.text).toMatch(/Ce qui attend une décision/)
   expect(lines[1]!.text).toMatch(/ol:L5.*Quel format \?/)
@@ -127,7 +140,7 @@ test('L412 R21 — le plan tranche : une décision dont le lot n’est plus ouve
 const pasted = (lines: readonly string[]): string => lines.map(l => l.replace(/^ {3}/, '')).join('\n').replace(/\\\n/g, '')
 
 test('L412 R22 — la commande à copier se replie sur plusieurs lignes à la largeur, aux espaces, jamais coupée par « … » ; le plafond du bloc compte les lignes repliées', () => {
-  const q = wave([wlot('Q4/accueil-4-ux12', 'question', { questions: ['Quel titre ?'], project: 'maritime-atlas' })], { id: '2026-10-29-1650', cwd: '/p' })
+  const q = wave([wlot('Q4/accueil-4-ux12', 'question', { questions: ['Quel titre ?'], project: 'maritime-atlas' })], { id: '2026-10-29-1650', cwd: '/p', live: false })
   const command = 'cd /p && cadence orchestrate --resume --wave 2026-10-29-1650 --answer maritime-atlas:Q4/accueil-4-ux12 "…"'
   const { lines } = buildDecisions(decisionsOf([q], []), 70, 20)
   const cmd = lines.slice(2)

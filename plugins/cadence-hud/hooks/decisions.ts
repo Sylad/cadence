@@ -5,7 +5,7 @@ import { lotStatusFr } from './format'
 // ── L412 : « ce qui attend une décision », en tête du panneau des lots ───────────────────────────────────────────
 
 export type Decision =
-  | { kind: 'question'; project: string; lot: string; text: string; /** la commande qui répond (celle du tableau de fin de vague) */ command: string }
+  | { kind: 'question'; project: string; lot: string; text: string; /** la commande qui répond (celle du tableau de fin de vague) ; null tant que la vague vit : orchestrate refuse `--resume` d'une vague qui tourne encore */ command: string | null }
   | { kind: 'rendu'; project: string; lot: string; text: string }
   | { kind: 'ux'; project: string; lot: string; text: string; command: string }
   | { kind: 'livraison'; project: string; text: string }
@@ -33,6 +33,8 @@ const from = (folder: string | null | undefined, command: string): string => (fo
  * Les commandes à copier commencent par `cd` : `--answer` depuis le dossier de lancement de la vague (`cwd`, le seul d'où orchestrate retrouve `<cwd>/.cadence/runs/<vague>`),
  * `raf ux` depuis le dépôt du lot (`repo` de son état) — depuis le dossier parent des projets, raf répondait « pas de plan », et depuis un autre projet il posait le verdict
  * sur le lot de même id de ce projet. Un état de lot sans `repo` (orchestrate l'écrit toujours) garde la commande nue.
+ * Une question d'une vague VIVANTE n'a pas de commande (`command: null`) : `cadence orchestrate --resume --wave <vivante> --answer …` est refusée par orchestrate
+ * (src/orchestrate/command.ts, « la vague X tourne encore ») ; le bloc dit « réponse possible à la fin de la vague ».
  */
 export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedDelivery[], ended: readonly Wave[] = [], board: LotsBoard | null = null): Decision[] => {
   const open = (project: string, lot: string): boolean => {
@@ -52,7 +54,7 @@ export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedD
       if (!open(l.project, l.lot)) continue
       if (l.status === 'question') {
         const text = (l.questions ?? []).map(firstLine).filter(q => q !== '').join(' / ')
-        out.push({ kind: 'question', project: l.project, lot: l.lot, text: text || 'question sans texte', command: from(w.cwd, `cadence orchestrate --resume --wave ${w.id} --answer ${key} "…"`) })
+        out.push({ kind: 'question', project: l.project, lot: l.lot, text: text || 'question sans texte', command: w.live ? null : from(w.cwd, `cadence orchestrate --resume --wave ${w.id} --answer ${key} "…"`) })
       } else if (l.status === 'handed-back' || l.status === 'failed') {
         out.push({ kind: 'rendu', project: l.project, lot: l.lot, text: firstLine(l.outcome ?? '') || lotStatusFr(l.status) })
       } else if (l.status === 'ready' && l.visible === true && typeof l.uxVerdict === 'string' && l.uxVerdict !== '') {
@@ -124,13 +126,18 @@ export const wrapCommand = (command: string, columns: number): string[] => {
   return lines.map((l, i) => ellipsize(`${INDENT}${l.text}${i < last ? (l.cut ? CONTINUATION.trimStart() : CONTINUATION) : ''}`, columns))
 }
 
-/** Les lignes d'une décision : son résumé (coupé à la largeur), puis la commande à copier, repliée, pour une question ou un verdict UX. */
+/** Sous une question dont la vague vit encore, à la place de la commande : orchestrate ne reprend la vague qu'une fois finie. */
+const LIVE_NOTE = 'réponse possible à la fin de la vague'
+
+/** Les lignes d'une décision : son résumé (coupé à la largeur), puis la commande à copier, repliée, pour une question ou un verdict UX ; sans commande (vague vivante), la note. */
 const linesOf = (d: Decision, columns: number): DecisionLine[] => {
   const where = d.kind === 'livraison' ? d.project : `${d.project}:${d.lot}`
   const label = d.kind === 'livraison' ? 'livraison' : d.kind === 'ux' ? 'verdict UX' : ''
   const head = ellipsize(`${GLYPH[d.kind]} ${where}  ${label ? `${label} : ` : ''}${d.text}`, columns)
   const lines: DecisionLine[] = [{ text: head, tone: d.kind === 'livraison' || d.kind === 'rendu' ? 'error' : 'text' }]
-  if (d.kind === 'question' || d.kind === 'ux') lines.push(...wrapCommand(d.command, columns).map((text): DecisionLine => ({ text, tone: 'subtle' })))
+  const command = d.kind === 'question' || d.kind === 'ux' ? d.command : undefined
+  if (command === null) lines.push({ text: ellipsize(`${INDENT}${LIVE_NOTE}`, columns), tone: 'subtle' })
+  else if (command !== undefined) lines.push(...wrapCommand(command, columns).map((text): DecisionLine => ({ text, tone: 'subtle' })))
   return lines
 }
 

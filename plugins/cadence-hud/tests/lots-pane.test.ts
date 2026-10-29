@@ -1126,7 +1126,7 @@ test('R23 — L410 : le contrôle « même parent » porte sur la ligne visée �
 
 const ASKING: Wave = { ...WAVE, lots: [{ ...WAVE.lots[0]!, lot: 'L80', status: 'question', questions: ['Quel format ?'] }] }
 
-test('L412 R13 — une question de session s’affiche en tête du panneau, avant l’arbre, avec la commande --answer', async ($, on) => {
+test('L412 R13 — une question de session s’affiche en tête du panneau, avant l’arbre ; sa vague vit : « réponse possible à la fin de la vague » plutôt qu’une commande --answer qu’orchestrate refuserait', async ($, on) => {
   const s = await session($, on, { waves: [ASKING] })
   await s.advance(5_000)
   await s.hud('lots')
@@ -1134,8 +1134,9 @@ test('L412 R13 — une question de session s’affiche en tête du panneau, avan
   const at = (re: RegExp) => texts.findIndex(t => re.test(t))
   expect(at(/Ce qui attend une décision \(1\)/)).toBeGreaterThan(-1)
   expect(at(/\? ol:L80 .*Quel format \?/)).toBeGreaterThan(at(/Ce qui attend/))
-  expect(at(/cd \/p && cadence orchestrate --resume --wave w1 --answer ol:L80/)).toBeGreaterThan(-1) // à 70 colonnes, `"…"` passe à la ligne suivante
-  expect(at(/L401/)).toBeGreaterThan(at(/--answer/)) // l'arbre vient après le bloc
+  expect(texts[at(/\? ol:L80/) + 1]).toBe('   réponse possible à la fin de la vague')
+  expect(at(/--answer/)).toBe(-1)
+  expect(at(/L401/)).toBeGreaterThan(at(/réponse possible/)) // l'arbre vient après le bloc
 })
 
 test('L412 R14 — rien à décider : le bloc n’apparaît pas', async ($, on) => {
@@ -1193,9 +1194,9 @@ test('L412 R18 — panneau monté : un verdict UX dont le lot est clos au plan (
   expect(text).not.toMatch(/ol:L79|cadence:L399/)
 })
 
-test('L412 R23 — à 70 colonnes, la commande --answer d’un id long, `cd` du dossier des vagues compris, se lit entière sur trois lignes du panneau, sans « … », chacune sauf la dernière finie par la continuation', async ($, on) => {
+test('L412 R23 — à 70 colonnes, la commande --answer d’un id long (vague finie), `cd` du dossier des vagues compris, se lit entière sur trois lignes du panneau, sans « … », chacune sauf la dernière finie par la continuation', async ($, on) => {
   const lots = [{ ...WAVE.lots[0]!, project: 'maritime-atlas', lot: 'Q4/accueil-4-ux12', status: 'question', questions: ['Quel titre ?'] }]
-  const s = await session($, on, { waves: [{ ...WAVE, id: '2026-10-29-1650', cwd: '/home/sylvain_ladoire/projects/developpeur', lots }] })
+  const s = await session($, on, { waves: [{ ...WAVE, id: '2026-10-29-1650', cwd: '/home/sylvain_ladoire/projects/developpeur', live: false, lots }] })
   await s.advance(5_000)
   await s.hud('lots')
   const { texts } = await s.draw(70, 30)

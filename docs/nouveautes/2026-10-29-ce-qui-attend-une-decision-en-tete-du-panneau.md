@@ -8,7 +8,7 @@ nocapture: le panneau ne se dessine que dans Claude Code (app desktop ou termina
 ---
 En tête du panneau des lots (`/hud lots`), un bloc « Ce qui attend une décision » réunit ce qu'il vous reste à trancher, sans parcourir les vagues une à une :
 
-- les **questions** des sessions, avec la commande `cd <dossier> && cadence orchestrate --resume --wave … --answer projet:lot "…"` à copier pour répondre ;
+- les **questions** des sessions, avec la commande `cd <dossier> && cadence orchestrate --resume --wave … --answer projet:lot "…"` à copier pour répondre (tant que la vague tourne, « réponse possible à la fin de la vague ») ;
 - les **lots rendus** au lead, avec leur cause en une ligne ;
 - les **verdicts UX** à poser, avec la commande `cd <dépôt> && raf ux …` ;
 - les **livraisons en échec** de chaque projet, avec le sha et la raison.

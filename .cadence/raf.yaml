@@ -146,6 +146,7 @@ lots:
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
+    review: { date: 2026-10-29, verdict: "compliant — orchestré (vague 2026-10-29-cad, 0 passe(s) de correction)", commit: c8fb47518005eccc210f433054fe36661888be51, reporte: { de: 2c2779d923ae8a1d9c37675022c9c2ca1d71313c, vers: c8fb47518005eccc210f433054fe36661888be51, patchId: d872777a6afee464bb99b3fbc1eb4a61e6152555 } }
   - id: L423
     title: "orchestrate --resume --integrate sort en 0 quand l'intégration est refusée et le lot rendu (29-10, L402 : revue courte du diff rebasé non conforme) — code 1 comme toute vague dont un lot est rendu"
     status: dropped

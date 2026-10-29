@@ -222,9 +222,10 @@ lots:
     created: 2026-10-29
   - id: L424
     title: "Plafond de sessions : la vague compte les sessions du lead (cadence lead hold) avant de prendre un créneau — 29-10, vague 2026-10-29-cad : 2 sessions lancées pour 3/3 alors qu'un hold du lead était actif (4 agents pour un plafond de 3) ; le journal dit « 3/3 en cours » sans le hold"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-29
+    started: 2026-10-29
   - id: L425
     title: "Intégration en mode worktree : un lot prêt attend le verrou d'intégration tenu par SA PROPRE vague (un autre lot en train d'intégrer : rebase rejoué + porte ≈ 10 min) et est rendu au bout de 10 min (29-10, L417 derrière L416) — mettre les lots d'une même vague en file sur le verrou au lieu de les rendre"
     status: todo

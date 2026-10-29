@@ -260,10 +260,11 @@ lots:
     created: 2026-10-29
   - id: L429
     title: "raf public (et tout raf dont plan.onWrite échoue) : l'erreur montre la fin de la pile Node au lieu du motif (« titre public … non conforme (93 caractères > 80) ») — afficher la première ligne d'erreur du script, pas la pile (29-10, ol L232)"
-    status: todo
+    status: doing
     estimate: 0.1
     quickwin: true
     created: 2026-10-29
+    started: 2026-10-29
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

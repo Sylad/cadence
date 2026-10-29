@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { changelogSectionOf } from './changelog-section.js';
 
 // L426 : les consignes de l'agent qui pousse disent que le sha poussé doit avoir un verdict vert de `cadence verify --gate`,
 // que la tête de main est le plus souvent un commit de plan sans verdict (porte rejouée en entier), et ce que vaut CADENCE_PUSH_UNGATED=1.
@@ -39,7 +40,7 @@ describe('skills lead et deliver — le push demande un verdict vert de la porte
   });
 
   it('R19 — le CHANGELOG cite la mise à jour des skills lead et deliver', () => {
-    const unreleased = read('CHANGELOG.md').split('## [Unreleased]')[1]!.split('\n## [')[0]!;
-    expect(unreleased).toMatch(/`lead` and `deliver` skills/);
+    const section = changelogSectionOf(read('CHANGELOG.md'), '(L426,');
+    expect(section).toMatch(/`lead` and `deliver` skills/);
   });
 });

@@ -30,6 +30,12 @@ describe('lecture du CHANGELOG par les tests (L380)', () => {
     expect(readsUnreleasedOnly("const log = '## [Unreleased]\\n- x'; read(dir, 'CHANGELOG.md')")).toBe(false);
   });
 
+  it('R6 — le détecteur refuse aussi la lecture par split(\'## [Unreleased]\') (L427 : R19 de L426 passait entre les mailles)', () => {
+    const mauvais = "const unreleased = read('CHANGELOG.md').split('## [Unreleased]')[1]!.split('\\n## [')[0]!;";
+    expect(readsUnreleasedOnly(mauvais)).toBe(true);
+    expect(readsUnreleasedOnly("changelogSectionOf(read('CHANGELOG.md'), 'L426')")).toBe(false);
+  });
+
   it('R4 — aucun test du dépôt ne cherche l\'entrée d\'un lot dans [Unreleased] seul hors de l\'utilitaire partagé', () => {
     const fautifs = readdirSync(dir)
       .filter((f) => f.endsWith('.test.ts') && f !== 'changelog-garde.test.ts')

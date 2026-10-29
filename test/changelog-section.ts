@@ -8,9 +8,9 @@ export function changelogSectionOf(changelog: string, marker: string | RegExp): 
   return changelog.split(/\n(?=## \[)/).find((s) => s.startsWith('## [') && carries(s)) ?? '';
 }
 
-/** Vrai quand le source d'un test lit le CHANGELOG.md du dépôt et y choisit la section `## [Unreleased]` (les lignes de commentaire ne comptent pas). */
+/** Vrai quand le source d'un test lit le CHANGELOG.md du dépôt et y choisit la section `## [Unreleased]` (startsWith, indexOf, includes ou split) (les lignes de commentaire ne comptent pas). */
 export function readsUnreleasedOnly(source: string): boolean {
   const code = source.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
   const readsRepoLog = /\bread\w*\(\s*(?:join\((?:root|__dirname|import\.meta\.dirname)\b[^)]*,\s*)?['"](?:\.\.\/)?CHANGELOG\.md['"]\s*\)/.test(code);
-  return readsRepoLog && /(?:startsWith|indexOf|includes)\(\s*['"]## \[Unreleased\]/.test(code);
+  return readsRepoLog && /(?:startsWith|indexOf|includes|split)\(\s*['"]## \[Unreleased\]/.test(code);
 }

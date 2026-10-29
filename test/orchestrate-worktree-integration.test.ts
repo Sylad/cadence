@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sharedStateDir } from '../src/state.js';
+import { REPO_LOCK } from '../src/orchestrate/lock.js';
 import { INTEGRATION_LOCK } from '../src/orchestrate/integrate.js';
 import { cadenceHome, liveSlots } from '../src/orchestrate/registry.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
@@ -423,6 +424,40 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
     expect(verdict.split('revue courte du diff rebasé')).toHaveLength(2);
     expect(verdict).toContain('seconde lecture');
     expect(verdict).not.toContain('rebase sans dégât');
+  });
+  /** Une autre vague vivante (un `sleep`) tient le dépôt ; `after` ms plus tard elle finit (le processus meurt) — jamais si `after` est null. */
+  async function otherWaveHolds(repo: string, after: number | null) {
+    const sleeper = spawn('sleep', ['30'], { stdio: 'ignore' });
+    writeFileSync(join(sharedStateDir(repo), REPO_LOCK), JSON.stringify({ pid: sleeper.pid, wave: 'autre-vague', started: '2026-10-04T00:00:00Z' }));
+    if (after !== null) setTimeout(() => sleeper.kill(), after);
+    return sleeper;
+  }
+  it('L443 — --resume --integrate dont le dépôt est tenu par une autre vague attend sa fin, le dit, puis intègre au lieu de sortir en 2', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const sleeper = await otherWaveHolds(repo, 400);
+    try {
+      const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }), { repoWait: { waitMs: 20_000, pollMs: 50 } });
+      expect(again.err).toMatch(/^orchestrate : verrou de dépôt périmé retiré \(a, pid \d+ mort\)$/); // le verrou de l'autre vague, tombé avec son processus, est repris
+      expect(again.code).toBe(0);
+      expect(again.out.match(/a : tenu par la vague autre-vague \(pid \d+\) : attente de sa fin/g)).toHaveLength(1);
+      expect(store(parent).readLot('a', lot)!.status).toBe('ready');
+    } finally {
+      sleeper.kill();
+    }
+  });
+  it('L443 — l\'autre vague tient le dépôt au-delà de l\'attente : refus en 2 avec le texte habituel, le lot reste rendu', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const sleeper = await otherWaveHolds(repo, null);
+    try {
+      const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
+      expect(again.code).toBe(2);
+      expect(again.err).toMatch(new RegExp(`orchestrate : a : une orchestration y est déjà en cours \\(autre-vague, pid ${sleeper.pid}\\)`));
+      expect(store(parent).readLot('a', lot)!.status).toBe('handed-back');
+    } finally {
+      sleeper.kill();
+    }
   });
 });
 

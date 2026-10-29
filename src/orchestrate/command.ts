@@ -76,7 +76,12 @@ export interface OrchestrateDeps {
   cores?: () => number;
   /** Attente du verrou d'intégration du dépôt (L279, R25) : défauts 10 minutes et 1 s ; réglable pour les tests. */
   integrate?: { waitMs?: number; pollMs?: number };
+  /** Attente, par `--resume --integrate`/`--replay`, du verrou de dépôt tenu par une autre vague vivante (L443) : défauts 3 heures et 5 s ; réglable pour les tests. */
+  repoWait?: { waitMs?: number; pollMs?: number };
 }
+
+const REPO_WAIT_MS = 3 * 60 * 60_000;
+const REPO_WAIT_POLL_MS = 5_000;
 
 export const DEFAULT_BUDGET = 2_000_000;
 
@@ -1468,8 +1473,19 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     (drops.includes(lotKey(l.project, l.lot)) ? removed : live).push(l);
   }
   // Comme au départ : un dépôt tenu par une autre orchestration vivante est refusé avant toute écriture.
+  // L443 : une reprise d'intégration (--integrate, --replay) attend la fin de l'autre vague au lieu de sortir en 2 ; toute autre reprise refuse comme avant.
+  const waitFor = integ.length ? { waitMs: deps.repoWait?.waitMs ?? REPO_WAIT_MS, pollMs: deps.repoWait?.pollMs ?? REPO_WAIT_POLL_MS } : null;
+  const deadline = Date.now() + (waitFor?.waitMs ?? 0);
   for (const repo of new Set(live.flatMap(lotRepoPaths))) {
-    const busy = activeLock(join(sharedStateDir(repo), REPO_LOCK));
+    const file = join(sharedStateDir(repo), REPO_LOCK);
+    let busy = activeLock(file);
+    let announced: string | null = null;
+    while (waitFor && busy && busy.pid !== process.pid && Date.now() < deadline) {
+      if (announced !== busy.wave) io.out(`orchestrate : ${basename(repo)} : tenu par la vague ${busy.wave} (pid ${busy.pid}) : attente de sa fin avant de reprendre l'intégration`);
+      announced = busy.wave;
+      await new Promise<void>((res) => setTimeout(res, Math.min(waitFor.pollMs, Math.max(1, deadline - Date.now()))));
+      busy = activeLock(file);
+    }
     if (busy && busy.pid !== process.pid) refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
   }
   // Comme au départ : le .nvmrc est relu à chaque reprise (version désinstallée, .nvmrc changé, vague d'avant L80),

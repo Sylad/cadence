@@ -1206,3 +1206,37 @@ test('L412 R23 — à 70 colonnes, la commande --answer d’un id long (vague fi
   expect(texts[first + 2]).toBe('   maritime-atlas:Q4/accueil-4-ux12 "…"')
   expect(texts.some(t => /--answer caden…|--answer mari…/.test(t))).toBe(false)
 })
+
+// ── L413 : la frise du cycle sous le lot ──────────────────────────────────────────────────────────────────────────
+
+const CYCLE_TOUR = JSON.stringify([row('cadence', [lot('L401', 'doing'), lot('L402', 'doing')])])
+const cycleLot = (id: string): Wave['lots'][number] => ({
+  project: 'cadence', repo: '/p/cadence', lot: id, title: 't', status: 'reviewing', pass: 1, model: 'sonnet', next: null, steps: 3, step: null,
+  trail: [
+    { kind: 'implement', status: 'ok', started: '2026-10-07T19:00:00.000Z', ended: '2026-10-07T19:10:00.000Z' },
+    { kind: 'review', status: 'running', started: '2026-10-07T19:10:00.000Z' },
+  ],
+})
+const CYCLE_WAVE: Wave = { ...WAVE, lots: [cycleLot('L401'), cycleLot('L402')] }
+
+test('L413 R16 — le panneau monté dessine sous le lot de la vague sa frise : étapes faites avec leur durée, étape courante, étapes à venir, puis celles du plan', async ($, on) => {
+  const s = await session($, on, { waves: [CYCLE_WAVE], tour: () => ({ exitCode: 0, stdout: CYCLE_TOUR }) })
+  await s.hud('lots')
+  await settle()
+  const text = (await s.draw(120)).text
+  expect(text).toContain('✔ implement 10 min')
+  expect(text).toMatch(/▶ revue /)
+  expect(text).toContain('○ correction 1/3')
+  expect(text).toContain('○ revue posée')
+  expect(text).toContain('○ livré')
+})
+
+test('L413 R17 — la frise prend une rangée dans la région : un appui sur la frise d’un lot saisit ce lot, le lot du dessous commence deux rangées plus bas', async ($, on) => {
+  const s = await session($, on, { waves: [CYCLE_WAVE], tour: () => ({ exitCode: 0, stdout: CYCLE_TOUR }) })
+  await s.hud('lots')
+  await s.gestures(async ui => {
+    await ui.pointer(down(3)) // la frise de L402 (L401 : rangées 0–1, L402 : rangées 2–3)
+    await ui.pointer(up(0))
+  }, 'desktop', 4)
+  expect(s.rafs()).toEqual([['raf', 'move', 'L402', '--before', 'L401']])
+})

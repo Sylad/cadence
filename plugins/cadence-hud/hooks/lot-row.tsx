@@ -15,7 +15,7 @@ export type RowOptions = {
   onToggle?: () => void
 }
 
-/** Une ligne de lot du panneau : retrait, id, titre avec son compte de sous-lots et ses `after:`, état. */
+/** Une ligne de lot du panneau : retrait, id, titre avec son compte de sous-lots et ses `after:`, état ; dessous, la frise de son cycle (L413) quand il en a une. */
 export const lotRow = ({ Box, Text, Button }: Pick<ClientElements, 'Box' | 'Text' | 'Button'>, line: PanelLot, key: string, options: RowOptions = {}) => {
   const { mark, emphasis, onToggle } = options
   const after = line.after.length > 0 && (
@@ -71,6 +71,18 @@ export const lotRow = ({ Box, Text, Button }: Pick<ClientElements, 'Box' | 'Text
       {line.afterOwnLine && (
         <Box paddingLeft={line.idWidth}>
           <Text wrap="truncate-end">{after}</Text>
+        </Box>
+      )}
+      {line.cycle && (
+        <Box paddingLeft={line.idWidth + 2}>
+          <Text wrap="truncate-end">
+            {line.cycle.map((seg, j) => (
+              <Text key={`c${j}`} color={seg.color} bold={seg.bold}>
+                {j > 0 ? ' → ' : ''}
+                {seg.text}
+              </Text>
+            ))}
+          </Text>
         </Box>
       )}
     </Box>

@@ -2,6 +2,7 @@ import type { ClientModule } from 'claude-code'
 
 import { lotRow } from './lot-row'
 import type { RowMark } from './lot-row'
+import { rowsOf } from './lots'
 import type { PanelLot } from './lots'
 
 // ── L402 : les lots d'un projet dans le panneau, réordonnables à la souris (glisser-déposer) et au clavier (Alt+↑ / Alt+↓) ──
@@ -22,11 +23,11 @@ const List: ClientModule<Props, State> = (props, surface) => {
     surface.setState(next)
   }
   const at = (id: string | undefined) => lines.findIndex(l => l.id === id)
-  /** La ligne qui couvre la rangée `y` de la région (une ligne d'`after:` à part en prend deux) ; hors région, la plus proche. */
+  /** La ligne qui couvre la rangée `y` de la région (une ligne d'`after:` à part, une frise de cycle en prennent chacune une de plus) ; hors région, la plus proche. */
   const rowAt = (y: number) => {
     let top = 0
     for (let i = 0; i < lines.length; i++) {
-      top += lines[i]!.afterOwnLine ? 2 : 1
+      top += rowsOf(lines[i]!)
       if (y < top) return i
     }
     return lines.length - 1

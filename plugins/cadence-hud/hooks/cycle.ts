@@ -25,9 +25,10 @@ export type TrailStep = { kind: string; status: string; started: string; ended?:
 /** Ce que la frise lit d'un lot de vague. */
 export type CycleInput = {
   status: string
-  pass: number
+  /** Passes de correction faites ; absent, aucune. */
+  pass?: number
   /** La prochaine étape à jouer (`next` de l'état du lot). */
-  next: string | null
+  next?: string | null
   gate?: { label: string; started: string } | null
   trail?: readonly TrailStep[]
 }
@@ -84,7 +85,7 @@ const waveStages = (lot: CycleInput, now: number): Stage[] => {
         stage.duration = sums.reduce((n, d) => n + Math.max(0, d), 0)
       }
     }
-    if (label === 'correction') stage.note = `${lot.pass > 0 ? lot.pass : played.length > 0 ? played.length : 0}/${MAX_FIX}`
+    if (label === 'correction') stage.note = `${lot.pass ?? 0}/${MAX_FIX}`
     else if (label === 'revue' && played.length > 1) stage.note = `×${played.length}`
     else if (label === 'porte' && gating) stage.note = lot.gate!.label
     out.push(stage)
@@ -101,11 +102,11 @@ const planStages = (plan: PlanInput, active: boolean): Stage[] => {
 }
 
 /**
- * La frise d'un lot : ses étapes de vague s'il en a une (`lot`), puis celles du plan (revue posée → clos → livré). Sans vague, un lot que le plan tient en cours n'a que celles du plan ;
- * un lot à faire sans vague, ou sans lecture du plan, n'a rien (`[]`). Les durées sont calculées à `now` (ms).
+ * La frise d'un lot : ses étapes de vague s'il en a une (`lot`), puis celles du plan (revue posée → clos → livré). Sans vague, un lot que le plan tient en cours n'a que celles du plan, et seulement
+ * une fois sa revue posée (avant, rien ne s'est passé qu'une frise puisse montrer) ; un lot à faire sans vague, ou sans lecture du plan, n'a rien (`[]`). Les durées sont calculées à `now` (ms).
  */
 export const cycleOf = (lot: CycleInput | undefined, plan: PlanInput | undefined, now: number): Stage[] => {
-  if (!lot) return plan?.doing ? planStages(plan, true) : []
+  if (!lot) return plan?.doing && plan.reviewed ? planStages(plan, true) : []
   const wave = waveStages(lot, now)
   return [...wave, ...planStages(plan ?? { reviewed: false }, !wave.some(s => s.state === 'current') && !wave.some(s => s.state === 'failed') && lot.status === 'ready')]
 }

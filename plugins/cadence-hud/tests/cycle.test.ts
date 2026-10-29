@@ -2,6 +2,9 @@ import { expect, test } from 'claude-code/testing'
 
 import { cycleOf, cycleSegments, cycleText, MAX_FIX } from '../hooks/cycle'
 import type { CycleInput } from '../hooks/cycle'
+import { buildPanel, waveLotsOf } from '../hooks/lots'
+import type { PanelLot, PanelWaveLot } from '../hooks/lots'
+import type { LotsRow, TourLot, Wave, WaveLot } from '../types'
 
 const T0 = Date.parse('2026-10-29T10:00:00Z')
 const at = (min: number) => new Date(T0 + min * 60_000).toISOString()
@@ -81,9 +84,10 @@ test('L413 R7 — côté plan, après la vague : revue posée → clos → livr�
   expect(working.filter(s => s.state === 'current')).toHaveLength(1)
 })
 
-test('L413 R8 — un lot en cours au plan sans vague n’a que la frise du plan ; un lot à faire sans vague n’en a pas', () => {
-  expect(names(cycleOf(undefined, { reviewed: false, doing: true }, NOW))).toEqual(['current:revue posée', 'todo:clos', 'todo:livré'])
+test('L413 R8 — un lot en cours au plan sans vague n’a la frise du plan que quand sa revue est posée (sans revue, rien ne s’est passé à montrer) ; un lot à faire sans vague n’en a pas', () => {
+  expect(cycleOf(undefined, { reviewed: false, doing: true }, NOW)).toEqual([])
   expect(names(cycleOf(undefined, { reviewed: true, doing: true }, NOW))).toEqual(['done:revue posée', 'current:clos', 'todo:livré'])
+  expect(cycleOf(undefined, { reviewed: true, doing: false }, NOW)).toEqual([])
   expect(cycleOf(undefined, { reviewed: false, doing: false }, NOW)).toEqual([])
   expect(cycleOf(undefined, undefined, NOW)).toEqual([])
 })
@@ -123,4 +127,50 @@ test('L413 R11 — trop étroite, la frise replie les étapes faites en « ✔ n
   // rien de fait : rien à replier, la frise est coupée à la largeur
   const fresh = cycleOf(wave({ trail: [step('implement', 0, undefined)] }), undefined, NOW)
   expect(cycleText(fresh, 30).length).toBeLessThanOrEqual(30)
+})
+
+// ── dans le panneau ────────────────────────────────────────────────────────────────────────────────────────
+
+const lot = (id: string, status: 'todo' | 'doing', extra: Partial<TourLot> = {}): TourLot => ({ id, title: `Titre ${id}`, status, after: [], ...extra })
+const rows = (lots: TourLot[]): LotsRow[] => [{ project: 'ol', lots }]
+const inWave = (id: string, over: Partial<PanelWaveLot> = {}): PanelWaveLot => ({ project: 'ol', lot: id, status: 'reviewing', pass: 0, next: null, gate: null, trail: [step('implement', 0, 10)], ...over })
+const lotLines = (panel: ReturnType<typeof buildPanel>) => panel.lines.filter((l): l is PanelLot => l.kind === 'lot')
+
+test('L413 R12 — dans le panneau, un lot de vague ou tenu en cours par le plan porte sa frise ; un lot à faire sans vague, une sous-tâche et un lot d’un autre projet n’en portent pas', () => {
+  const tour = rows([lot('L1', 'doing', { reviewed: true }), lot('L2', 'todo'), lot('L3', 'todo'), lot('L1/1', 'doing', { parent: 'L1' }), lot('L9', 'doing')])
+  const panel = buildPanel({ rows: tour, columns: 120, height: 40, waves: [inWave('L2'), { ...inWave('L3'), project: 'autre' }], now: NOW, views: { 'open:ol#L1': true } })
+  const by = (id: string) => lotLines(panel).find(l => l.id === id)!
+  expect(by('L1').cycle?.map(s => s.text).join(' → ')).toBe('✔ revue posée → ▶ clos → ○ livré')
+  expect(by('L2').cycle?.map(s => s.text).join(' → ')).toContain('✔ implement 10 min')
+  expect(by('L3').cycle).toBeUndefined()
+  expect(by('L1/1').cycle).toBeUndefined()
+  // en cours au plan, sans vague ni revue posée : rien à montrer
+  expect(by('L9').cycle).toBeUndefined()
+})
+
+test('L413 R13 — la ligne de frise prend une ligne de plus dans la hauteur du panneau : la coupe « … +N lots » la compte', () => {
+  const tour = rows([lot('L1', 'doing', { reviewed: true }), lot('L2', 'doing', { reviewed: true }), lot('L3', 'doing', { reviewed: true })])
+  const tall = (waves: PanelWaveLot[]) => buildPanel({ rows: tour, columns: 120, height: 9, waves, now: NOW })
+  // sans vague, chaque lot en cours dont la revue est posée porte la frise du plan : 1 projet + 3 × 2 lignes + le pied et le titre = 9
+  expect(lotLines(tall([])).length).toBe(3)
+  expect(tall([]).more).toBe(0)
+  const cut = buildPanel({ rows: tour, columns: 120, height: 8, waves: [], now: NOW })
+  expect(cut.more).toBeGreaterThan(0)
+  // la même hauteur sans frise (lots à faire) montre les trois lots
+  expect(lotLines(buildPanel({ rows: rows([lot('L1', 'todo'), lot('L2', 'todo'), lot('L3', 'todo')]), columns: 120, height: 8, waves: [], now: NOW })).length).toBe(3)
+})
+
+test('L413 R14 — la frise tient dans la largeur du corps moins le retrait du titre', () => {
+  const tour = rows([lot('L1', 'doing')])
+  for (const columns of [120, 70, 40, 30]) {
+    const line = lotLines(buildPanel({ rows: tour, columns, height: 40, waves: [inWave('L1', { trail: [step('implement', 0, 10), step('review', 10, 14), step('fix', 14, undefined)], pass: 1, status: 'fixing' })], now: NOW }))[0]!
+    const width = line.cycle!.reduce((n, s, i) => n + s.text.length + (i > 0 ? 3 : 0), 0)
+    expect(width, `${columns} colonnes`).toBeLessThanOrEqual(columns - line.idWidth - 2)
+  }
+})
+
+test('L413 R15 — waveLotsOf donne au panneau les pas, la porte, la passe et la prochaine étape du lot ; un lot sans trail (collecteur plus ancien) a une liste vide', () => {
+  const w = (trail?: WaveLot['trail']): Wave => ({ id: 'w', pid: 1, cwd: '/p', started: at(0), live: true, lots: [{ project: 'ol', lot: 'L1', title: 't', status: 'fixing', pass: 2, model: 'sonnet', next: 'review', steps: 1, step: null, gate: { label: 'build', started: at(1) }, ...(trail ? { trail } : {}) }] })
+  expect(waveLotsOf([w([step('fix', 0, 1)])], NOW)).toEqual([{ project: 'ol', lot: 'L1', status: 'fixing', pass: 2, next: 'review', gate: { label: 'build', started: at(1) }, trail: [step('fix', 0, 1)] }])
+  expect(waveLotsOf([w()], NOW)[0]!.trail).toEqual([])
 })

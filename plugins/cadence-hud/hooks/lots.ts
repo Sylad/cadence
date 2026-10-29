@@ -1,6 +1,8 @@
 import type { ThemeKey } from 'claude-code'
 
 import type { LotsBoard, LotsRow, MoveAsk, TourLot, Wave } from '../types'
+import { cycleOf, cycleSegments } from './cycle'
+import type { CycleInput, CycleSeg } from './cycle'
 import { colorOfLot, isWaveShown, lotStatusFr } from './format'
 
 // ── L401 : le panneau des lots (/hud lots) — lecture de `cadence lead tour --json`, arbre et mise en page ───────────
@@ -245,6 +247,8 @@ export type PanelLine =
       stateWidth: number
       /** Présent quand le lot a des sous-lots : sa bascule (clé de ses états), leur nombre (`count`, les directs, affiché), tous ses descendants (`total`, ce que cache le lot replié) et s'ils sont montrés. */
       subs?: { key: string; count: number; total: number; open: boolean }
+      /** La frise du cycle du lot (L413), sur une ligne sous lui : présente pour un lot de vague ou tenu en cours par le plan, absente sinon. */
+      cycle?: CycleSeg[]
     }
   /** Le bouton « + N lots » / « moins » du reste d'un projet de plus de LOTS_PER_PROJECT lots : `hidden`, les lots du premier niveau du reste (le N affiché) ; `behind`, tous les lots du reste, sous-lots compris (ce que le bouton cache tant qu'il est replié). */
   | { kind: 'more'; project: string; hidden: number; behind: number; expanded: boolean }
@@ -254,13 +258,13 @@ export type Panel = { lines: PanelLine[]; /** lignes de lot non affichées faute
 /** La vague d'un lot : le projet de la vague est le nom du dossier du projet du tour (« apps/ol » ↔ « ol »). */
 const sameProject = (row: string, wave: string): boolean => row === wave || row.split('/').pop() === wave
 
-/** Un lot d'une vague, tel que le panneau en a besoin : son projet, son id, l'état de la vague. */
-export type PanelWaveLot = { project: string; lot: string; status: string }
+/** Un lot d'une vague, tel que le panneau en a besoin : son projet, son id, l'état de la vague et ce dont la frise de son cycle a besoin (L413). */
+export type PanelWaveLot = { project: string; lot: string } & CycleInput
 
 /** Les lots des vagues affichées à `at` (isWaveShown), les vagues vivantes d'abord : l'état que le panneau prête à un lot est celui de la première vague qui le porte. */
 export const waveLotsOf = (waves: readonly Wave[], at: number): PanelWaveLot[] => {
   const shown = waves.filter(w => isWaveShown(w, at))
-  return [...shown.filter(w => w.live), ...shown.filter(w => !w.live)].flatMap(w => w.lots.map(l => ({ project: l.project, lot: l.lot, status: l.status })))
+  return [...shown.filter(w => w.live), ...shown.filter(w => !w.live)].flatMap(w => w.lots.map(l => ({ project: l.project, lot: l.lot, status: l.status, pass: l.pass, next: l.next, gate: l.gate ?? null, trail: l.trail ?? [] })))
 }
 
 /** Le rang d'affichage (L410) des lots d'un projet lu, celui que buildPanel applique : en cours, prêts, le reste, d'après le plan et l'état des vagues. */
@@ -282,8 +286,11 @@ export const buildPanel = (input: {
   folds?: Readonly<Record<string, boolean>>
   /** Les dépliages choisis (moreKey, openKey ; vrai = déplié) ; absent, tout est replié. */
   views?: Readonly<Record<string, boolean>>
+  /** L'heure (ms) à laquelle les durées de la frise sont calculées ; absent, maintenant. */
+  now?: number
 }): Panel => {
   const { rows, columns, waves } = input
+  const now = input.now ?? Date.now()
   const folds = input.folds ?? {}
   const views = input.views ?? {}
   const narrow = columns < NARROW_BODY
@@ -325,8 +332,11 @@ export const buildPanel = (input: {
       const afterOwnLine = narrow && after.length > 0
       const subs = f.children > 0 ? { key: openKey(b.project.project, f.lot.id), count: f.children, total: f.descendants, open: isOpen(b, f) } : undefined
       const room = columns - idWidth - 2 - stateWidth - 2 - (afterText && !narrow ? afterText.length + 2 : 0) - (subs ? subsText(subs.count).length + 2 : 0)
+      // la frise (L413) : les lots de vague, ceux que le plan tient en cours ; jamais une sous-tâche. Elle tient sous le titre : le corps moins le retrait de l'id
+      const wave = waves.find(w => w.lot === f.lot.id && sameProject(b.project.project, w.project))
+      const cycle = isTask(f.lot) ? [] : cycleSegments(cycleOf(wave, { reviewed: f.lot.reviewed === true, doing: f.lot.status === 'doing' }, now), columns - idWidth - 2)
       lines.push({
-        kind: 'lot', id: f.lot.id, lead: leadOf(b, f), title: ellipsize(f.lot.title, Math.max(1, room)), state: stateOf(b, f), after, afterOwnLine, group: groupOf(f.lot), rank: b.ranks.get(f.lot)!, idWidth, stateWidth, ...(subs ? { subs } : {}), height: afterOwnLine ? 2 : 1,
+        kind: 'lot', id: f.lot.id, lead: leadOf(b, f), title: ellipsize(f.lot.title, Math.max(1, room)), state: stateOf(b, f), after, afterOwnLine, group: groupOf(f.lot), rank: b.ranks.get(f.lot)!, idWidth, stateWidth, ...(subs ? { subs } : {}), ...(cycle.length > 0 ? { cycle } : {}), height: (afterOwnLine ? 2 : 1) + (cycle.length > 0 ? 1 : 0),
       })
     }
     if (b.hidden > 0) lines.push({ kind: 'more', project: b.project.project, hidden: b.hidden, behind: b.behind, expanded: views[moreKey(b.project.project)] === true, height: 1 })
@@ -364,6 +374,9 @@ export const buildPanel = (input: {
 
 /** Une ligne de lot du panneau, telle que le dessin la porte ; le projet la date. */
 export type PanelLot = Extract<PanelLine, { kind: 'lot' }>
+
+/** Les rangées qu'une ligne de lot prend à l'écran : le lot, sa liste after: si elle passe à part, sa frise (L413). */
+export const rowsOf = (l: Pick<PanelLot, 'afterOwnLine' | 'cycle'>): number => 1 + (l.afterOwnLine ? 1 : 0) + (l.cycle ? 1 : 0)
 
 /** Lit une bascule de sous-lots postée par la région Client (L411 dans la région L402) : `key` doit être la clé openKey d'un lot du projet lu, sinon rien (la donnée vient du dessin, elle n'est pas crue). */
 export const parseToggleAsk = (data: unknown, rows: readonly LotsRow[]): { project: string; key: string } | undefined => {

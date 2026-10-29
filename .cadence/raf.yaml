@@ -42,7 +42,7 @@ lots:
   - id: L402
     title: "Panneau des lots : réordonner par glisser-déposer (app desktop, module de surface Client) et boutons ↑ ↓ ailleurs, via raf move ; grisé avec la raison pendant une vague du dépôt ou sur un plan en lecture seule"
     public: Réordonner les lots en les faisant glisser dans le panneau
-    status: doing
+    status: done
     estimate: 0.5
     visible: true
     screen: component
@@ -51,6 +51,8 @@ lots:
     created: 2026-10-28
     started: 2026-10-28
     review: { date: 2026-10-29, verdict: "conforme — orchestré (vague 2026-10-29-cad2, 0 passe(s) de correction + passe des mineurs)", commit: 6e8dc3cd74b94de11529816037dfa5a53be48d15 }
+    ux: { date: 2026-10-29, verdict: "conforme : essayé par Sylvain dans l'app desktop (29-10) — glisser dans un groupe déplace le lot, glisser sur un autre groupe est refusé avec sa raison ; « + N lots » / « moins » fonctionnent" }
+    finished: 2026-10-29
   - id: L403
     title: "Porte de tests déportée (orchestrate.gate.host) : build et tests d'une vague ou de verify --gate joués en ssh sur une autre machine, au sha poussé dans un dépôt nu de cette machine, dépendances en cache par empreinte du lockfile ; repli local si l'hôte ne répond pas, dit dans la sortie ; générique (aucun nom de machine dans le code)"
     status: todo

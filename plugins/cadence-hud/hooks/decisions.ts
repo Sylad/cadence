@@ -60,7 +60,8 @@ export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedD
       }
     }
   }
-  for (const d of deliveries) out.push({ kind: 'livraison', project: d.project, text: `${d.sha} · ${d.reason} (${d.day})` })
+  // deliver écrit le sha entier (40 caractères) : court (7), sinon il ne restait que 6 caractères de raison à 80 colonnes
+  for (const d of deliveries) out.push({ kind: 'livraison', project: d.project, text: `${d.sha.slice(0, 7)} · ${d.reason} (${d.day})` })
   return out
 }
 

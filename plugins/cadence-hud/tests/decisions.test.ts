@@ -34,9 +34,16 @@ test('L412 R27 — les commandes à copier nomment leur dossier : `cd` du dépô
   expect(cmd(decisionsOf([real], [])[0]!)).toBe('cd /home/sylvain_ladoire/projects/developpeur && cadence orchestrate --resume --wave 2026-10-29-1650 --answer cadence:L412 "…"')
 })
 
-test('L412 R4 — une livraison en échec par projet : la dernière raison et le sha', () => {
-  const failed: FailedDelivery[] = [{ project: 'maritime', day: '2026-10-29', sha: 'abc1234', reason: 'CI en échec' }]
-  expect(decisionsOf([], failed)).toEqual([{ kind: 'livraison', project: 'maritime', text: 'abc1234 · CI en échec (2026-10-29)' }])
+test('L412 R4 — une livraison en échec par projet : la dernière raison et le sha court (7 caractères : deliver écrit le sha entier, 40 caractères qui ne laissaient que 6 caractères de raison à 80 colonnes)', () => {
+  const failed: FailedDelivery[] = [{ project: 'maritime', day: '2026-10-29', sha: 'abc1234', reason: 'CI en échec' }, { project: 'cadence', day: '2026-10-29', sha: 'b4d4507a82121e94d3d2427dea25759c9d2fafbf', reason: 'vérification en échec : GET /healthz → 502' }]
+  expect(decisionsOf([], failed)).toEqual([
+    { kind: 'livraison', project: 'maritime', text: 'abc1234 · CI en échec (2026-10-29)' },
+    { kind: 'livraison', project: 'cadence', text: 'b4d4507 · vérification en échec : GET /healthz → 502 (2026-10-29)' },
+  ])
+  // à 80 colonnes, la raison se lit (avec le sha entier il n'en restait que 6 caractères) ; à 100, la ligne entière
+  const { lines } = buildDecisions(decisionsOf([], failed.slice(1)), 80, 10)
+  expect(lines[1]!.text).toMatch(/^✖ cadence  livraison : b4d4507 · vérification en échec : GET \/healthz → 502 \(20…$/)
+  expect(buildDecisions(decisionsOf([], failed.slice(1)), 100, 10).lines[1]!.text).toBe('✖ cadence  livraison : b4d4507 · vérification en échec : GET /healthz → 502 (2026-10-29)')
 })
 
 test('L412 R5 — les vagues finies se lisent dans `ended` (toutes, de la plus récente à la plus ancienne, sans délai de 30 min, à part de la bande), après les vivantes ; un lot n’est compté qu’une fois ; sans vivante, celle que porte `waves` se lit aussi', () => {

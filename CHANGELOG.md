@@ -82,7 +82,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- The lots panel (`/hud lots`) opens with « ce qui attend une décision »: the questions of the sessions with the `--answer` command, the lots handed back to the lead with their cause in one line, the UX verdicts to record and the failed deliveries, read from the wave states and the delivery log (L412, `docs/cadence-hud.md`).
+- The lots panel (`/hud lots`) opens with « ce qui attend une décision »: the questions of the sessions with the `--answer` command, the lots handed back to the lead with their cause in one line, the UX verdicts to record and the failed deliveries, read from the wave states (the last finished wave of the folder is read with no time limit, the plan is not) and the delivery log (L412, `docs/cadence-hud.md`).
 
 ### Changed
 

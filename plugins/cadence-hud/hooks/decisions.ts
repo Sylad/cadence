@@ -1,6 +1,6 @@
 import type { FailedDelivery, Wave } from '../types'
 import { ellipsize } from './lots'
-import { isWaveShown, lotStatusFr } from './format'
+import { lotStatusFr } from './format'
 
 // ── L412 : « ce qui attend une décision », en tête du panneau des lots ───────────────────────────────────────────
 
@@ -14,14 +14,13 @@ export type Decision =
 const firstLine = (text: string): string => text.split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
 
 /**
- * Ce qui attend une décision de la personne, lu dans les vagues affichées (isWaveShown : vivantes, et la dernière finie depuis moins de 30 min) et dans les livraisons en échec :
+ * Ce qui attend une décision de la personne, lu dans les vagues rendues par le collecteur (vivantes, et la dernière finie du dossier, sans délai : une question ou un lot rendu attend tant qu'une autre vague ne la remplace pas) et dans les livraisons en échec :
  * une question de session (`question`), un lot rendu au lead (`handed-back`, `failed` : la cause est la première ligne de son issue, à défaut son statut), un verdict UX à poser (lot
  * prêt, visible, dont la revue a rendu un verdict) et une livraison en échec par projet. Un lot n'est compté que dans la première vague qui le porte, les vagues vivantes d'abord ;
  * un lot suspendu n'attend rien de la personne.
  */
-export const decisionsOf = (waves: readonly Wave[], at: number, deliveries: readonly FailedDelivery[]): Decision[] => {
-  const shown = waves.filter(w => isWaveShown(w, at))
-  const ordered = [...shown.filter(w => w.live), ...shown.filter(w => !w.live)]
+export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedDelivery[]): Decision[] => {
+  const ordered = [...waves.filter(w => w.live), ...waves.filter(w => !w.live)]
   const seen = new Set<string>()
   const out: Decision[] = []
   for (const w of ordered) {

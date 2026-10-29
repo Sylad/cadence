@@ -5,8 +5,9 @@ import type { LeadHold, Wave } from '../types'
  * `~/.cadence/orchestrate/waves/<pid>.json`, garde celles dont le processus vit, puis l'état de la vague
  * (`<cwd>/.cadence/runs/<vague>/wave.json`) et de ses lots (`<projet>--<lot>.json`). Pour chaque étape
  * en cours il compte les processus `claude` descendants de la session (sessions filles, équipes).
- * Sans vague vivante, il rend la dernière vague terminée du dossier courant (`live: false`, `ended` = date
- * de son wave.json) pour que la bande garde son statut sous les yeux ; elle la masque 30 min après sa fin (WAVE_LINGER_MS).
+ * Il rend aussi, après les vagues vivantes, la dernière vague terminée du dossier courant (`live: false`, `ended` = date
+ * de son wave.json) : la bande garde son statut sous les yeux et la masque 30 min après sa fin (WAVE_LINGER_MS), tandis que
+ * les décisions en attente du panneau des lots (questions, lots rendus) la lisent tant qu'une autre vague du dossier ne l'a pas remplacée.
  * Il rend aussi, avec les vagues, les sessions du lead inscrites par `cadence lead hold` (`<home>/holds/*.json`, sans
  * filtrer l'échéance : la bande le fait à chaque dessin) et le plafond de sessions (CADENCE_MAX_SESSIONS, 2 par défaut).
  * Sortie : `{waves, holds, cap}`.
@@ -100,25 +101,25 @@ for f in sorted(glob.glob(os.path.join(home, 'waves', '*.json'))):
         'live': True, 'repos': len(r.get('repos') or []), 'lots': read_lots(d, True),
     })
 
-if not out:
-    cwd = os.getcwd()
-    last, last_mtime = None, 0
-    for wf in glob.glob(os.path.join(cwd, '.cadence', 'runs', '*', 'wave.json')):
-        try:
-            m = os.stat(wf).st_mtime
-        except Exception:
-            continue
-        if m > last_mtime:
-            last, last_mtime = wf, m
-    if last:
-        w = load(last) or {}
-        d = os.path.dirname(last)
-        ended = datetime.datetime.fromtimestamp(last_mtime, datetime.timezone.utc).isoformat()
-        out.append({
-            'id': w.get('id') or os.path.basename(d), 'pid': int(w.get('pid') or 0), 'cwd': cwd, 'cap': None,
-            'started': w.get('created'), 'status': w.get('status'), 'budget': w.get('budget'),
-            'consumed': w.get('consumed'), 'live': False, 'ended': ended, 'lots': read_lots(d, False),
-        })
+cwd = os.getcwd()
+live_ids = set(w['id'] for w in out)
+last, last_mtime = None, 0
+for wf in glob.glob(os.path.join(cwd, '.cadence', 'runs', '*', 'wave.json')):
+    try:
+        m = os.stat(wf).st_mtime
+    except Exception:
+        continue
+    if m > last_mtime:
+        last, last_mtime = wf, m
+w = (load(last) or {}) if last else {}
+d = os.path.dirname(last) if last else ''
+if last and (w.get('id') or os.path.basename(d)) not in live_ids:
+    ended = datetime.datetime.fromtimestamp(last_mtime, datetime.timezone.utc).isoformat()
+    out.append({
+        'id': w.get('id') or os.path.basename(d), 'pid': int(w.get('pid') or 0), 'cwd': cwd, 'cap': None,
+        'started': w.get('created'), 'status': w.get('status'), 'budget': w.get('budget'),
+        'consumed': w.get('consumed'), 'live': False, 'ended': ended, 'lots': read_lots(d, False),
+    })
 holds = []
 for hf in sorted(glob.glob(os.path.join(home, 'holds', '*.json'))):
     h = load(hf)

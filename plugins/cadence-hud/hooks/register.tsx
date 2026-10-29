@@ -777,7 +777,7 @@ export const register: Register = on => {
     )
 
     // « ce qui attend une décision » (L412) : au plus la moitié du corps, l'arbre garde le reste
-    const decisions = buildDecisions(decisionsOf(allWaves, at, deliveries), columns, Math.max(3, Math.floor(e.props.scroll.bodyRows / 2)))
+    const decisions = buildDecisions(decisionsOf(allWaves, deliveries), columns, Math.max(3, Math.floor(e.props.scroll.bodyRows / 2)))
     const decisionBlock = decisions.lines.length > 0 && (
       <Box key="decisions" flexDirection="column">
         {decisions.lines.map((l, i) => (

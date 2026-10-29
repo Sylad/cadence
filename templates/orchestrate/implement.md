@@ -19,8 +19,8 @@ Self-check before handing back (the recurring findings of the reviews). Go throu
 - no false comment: a comment, a docstring or a message never describes a behaviour the code no longer has or does not have.
 A point you cannot hold is written under "choix" or "nonVerifie" of your report, not left unsaid.
 
-Limits and rules, before the walkthrough (a code bug found by the review is the first cause of correction passes: 100 of the 143 classified passes of the 23–29-10 window). Re-read your diff against the sheet and the lot, then:
-- rules: for each rule of the sheet (`Rn`), or of the lot when it has no sheet, name the test that fails if the code breaks it and the line of code that holds it; a rule with no such pair is not done;
+Limits and rules, before the walkthrough (a code bug found by the review is the first cause of correction passes: 100 of the 143 classified passes of the 23–29-10 window). Re-read your diff against the fiche (if there is one) and the lot, then:
+- rules: for each rule of the fiche (`Rn`), or of the lot when it has no fiche, name the test that fails if the code breaks it and the line of code that holds it; a rule with no such pair is not done;
 - edge cases: for every function, parser, pattern, threshold or command you add or change, list the inputs at its edge — empty, absent, twice, wrong order, wrong type, refused, the real shape of the data (not the one of your fixture), the other callers of what you changed — and give each one a test that fails without your code, before handing back; a case you listed and did not test goes under "nonVerifie";
 - claims: each figure, « all », « never » or « always » that your README, docs, comments or tests state is checked against the code or by running it, not from memory.
 

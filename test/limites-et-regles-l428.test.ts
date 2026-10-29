@@ -20,7 +20,7 @@ describe('goulot « bug de code » : relecture contre la fiche et les règles, c
 
   it('R2 — chaque règle de la fiche ou du lot a un test qui échoue si le code la casse, et la ligne qui la tient', () => {
     const b = bloc();
-    expect(b).toContain('each rule of the sheet');
+    expect(b).toContain('each rule of the fiche');
     expect(b).toContain('fails if the code breaks it');
     expect(b).toContain('a rule with no such pair is not done');
   });

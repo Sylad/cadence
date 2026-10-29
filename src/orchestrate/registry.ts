@@ -232,7 +232,7 @@ export class SlotAbandoned extends Error {
 
 /**
  * Attend que le nombre de sessions vivantes, TOUTES vagues confondues et quel que soit l'index de leur créneau,
- * soit sous le plafond commun — `cap` (le plafond de cette vague) ou, s'il est plus bas, celui d'une autre vague vivante
+ * — plus les sessions du lead inscrites par `lead hold` (L424), qu'aucune vague ne porte — soit sous le plafond commun — `cap` (le plafond de cette vague) ou, s'il est plus bas, celui d'une autre vague vivante
  * (`commonCap`, relu à chaque tour, L395) —, puis prend le premier créneau libre (un pid mort est repris) et
  * rend sa libération. Toutes les vagues appliquent le même plafond : jamais « 4/3 en cours ».
  * Deux vagues qui prennent en même temps se départagent au recomptage : si le total dépasse `cap` une fois
@@ -248,7 +248,7 @@ export class SlotAbandoned extends Error {
 export async function acquireSlot(
   home: string,
   cap: number,
-  opts: { wave: string; slots?: (home: string) => OLock[]; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number, limit: number) => void; onGot?: (waitedMs: number) => void; abandon?: () => string | null; now?: () => number },
+  opts: { wave: string; slots?: (home: string) => OLock[]; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number, limit: number, leadHolds: LeadHold[]) => void; onGot?: (waitedMs: number) => void; abandon?: () => string | null; now?: () => number },
 ): Promise<() => void> {
   mkdirSync(slotsDir(home), { recursive: true });
   const now = opts.now ?? Date.now; // injectable : les tests pilotent l'horloge
@@ -263,12 +263,14 @@ export async function acquireSlot(
   for (;;) {
     const limit = commonCap(liveWaves(home), cap); // relu à chaque tour : une vague au plafond bas qui s'arrête le relève
     if (reportedAt !== null) checkAbandon(); // pas à la première tentative : un créneau libre est pris même si une demande est posée
-    if (live(home).length < limit) {
+    // Les sessions du lead (`lead hold`) tournent hors de toute vague mais prennent un créneau : relues à chaque comptage (L424).
+    const taken = () => live(home).length + liveHolds(home, new Date()).length;
+    if (taken() < limit) {
       for (let k = 0; k < MAX_SLOT_INDEX; k++) {
         const file = join(slotsDir(home), `slot-${k}.lock`);
         const got = takeLock(file, { pid: process.pid, wave: opts.wave, started: new Date().toISOString() });
         if (!got.ok) continue;
-        if (live(home).length <= limit) {
+        if (taken() <= limit) {
           if (reportedAt !== null) opts.onGot?.(now() - t0);
           return () => releaseLock(file, process.pid);
         }
@@ -279,7 +281,7 @@ export async function acquireSlot(
     if (reportedAt === null) checkAbandon(); // la première tentative a échoué : l'attente commence, la demande déjà posée l'interrompt sans attendre un tour
     if (reportedAt === null || now() - reportedAt >= (opts.reportMs ?? WAIT_REPORT_MS)) {
       reportedAt = now();
-      opts.onWait?.(live(home), reportedAt - t0, limit);
+      opts.onWait?.(live(home), reportedAt - t0, limit, liveHolds(home, new Date()));
     }
     await new Promise((r) => setTimeout(r, pollMs + Math.random() * pollMs * 0.25));
   }

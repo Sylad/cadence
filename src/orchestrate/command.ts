@@ -1143,7 +1143,10 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
         if (o.lot && ctl.drops.includes(o.lot)) return DROPPED;
         return ctl.stopAfterCurrent ? STOP_REQUESTED : null;
       },
-      onWait: (h, ms, limit) => wctx.log(`${o.lot ? `${o.lot} · ` : ''}en attente d'un créneau de session depuis ${duration(ms)} (${h.length}/${limit} en cours : ${[...new Set(h.map((x) => x.wave))].join(', ')})`),
+      onWait: (h, ms, limit, lead) => {
+        const who = [...new Set(h.map((x) => x.wave)), ...lead.map((x) => `session du lead ${x.label}`)];
+        wctx.log(`${o.lot ? `${o.lot} · ` : ''}en attente d'un créneau de session depuis ${duration(ms)} (${h.length + lead.length}/${limit} en cours : ${who.join(', ')})`);
+      },
       onGot: (ms) => wctx.log(`${o.lot ? `${o.lot} · ` : ''}créneau de session obtenu après ${duration(ms)} d'attente`),
     });
     try {

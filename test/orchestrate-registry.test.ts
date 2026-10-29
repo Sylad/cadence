@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { SlotAbandoned, acquireSlot, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
+import { SlotAbandoned, acquireSlot, addHold, cadenceHome, freeSlots, liveSlots, liveWaves, registerWave, releaseHold, unregisterWave } from '../src/orchestrate/registry.js';
 import { tempDir } from './helpers.js';
 
 const wave = (over = {}) => ({ pid: process.pid, wave: 'w1', started: 'x', cwd: '/p', repos: ['/p/a'], ...over });
@@ -264,5 +264,46 @@ describe('créneaux libres (L141)', () => {
   });
   it('plafond commun (L395) : une vague à 4 à côté d\'une vague à 3 ne retient pas plus que 3', () => {
     expect(freeSlots([w(4, ['/a', '/b', '/c', '/d']), w(3, ['/e'])], 6)).toBe(2);
+  });
+});
+
+describe('plafond de sessions et sessions du lead (L424)', () => {
+  it('R1 — une session du lead inscrite (lead hold) prend un créneau : la vague attend au lieu de partir', async () => {
+    const home = tempDir();
+    addHold(home, 'correctif-L12', 60, new Date());
+    const waits: string[] = [];
+    let got = false;
+    const p = acquireSlot(home, 1, { wave: 'a', pollMs: 10, onWait: (h, _ms, limit, held) => waits.push(`${h.length}+${held.map((x) => x.label)}/${limit}`) }).then((r) => {
+      got = true;
+      return r;
+    });
+    await new Promise((r) => setTimeout(r, 80));
+    expect(got).toBe(false);
+    expect(waits[0]).toBe('0+correctif-L12/1');
+    releaseHold(home, 'correctif-L12');
+    (await p)();
+  });
+
+  it('R2 — avec un plafond de 3, un hold et une session de vague laissent exactement un créneau', async () => {
+    const home = tempDir();
+    addHold(home, 'revue', 60, new Date());
+    const a = await acquireSlot(home, 3, { wave: 'a' });
+    const b = await acquireSlot(home, 3, { wave: 'a' });
+    let got = false;
+    const p = acquireSlot(home, 3, { wave: 'a', pollMs: 10 }).then((r) => {
+      got = true;
+      return r;
+    });
+    await new Promise((r) => setTimeout(r, 80));
+    expect(got).toBe(false); // 2 sessions + 1 hold = 3/3
+    a();
+    (await p)();
+    b();
+  });
+
+  it("R3 — un hold dont le TTL est échu ne retient plus de créneau", async () => {
+    const home = tempDir();
+    addHold(home, 'vieille', 10, new Date(Date.now() - 3600_000));
+    (await acquireSlot(home, 1, { wave: 'a', pollMs: 10 }))();
   });
 });

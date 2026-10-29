@@ -124,7 +124,14 @@ function mainTreeMoved(repo: string, sha: string): string | null {
 export async function verifyGate(ctx: GateCtx): Promise<number> {
   const code = await playGate(ctx);
   // Seuls 0 (vert) et 1 (rouge) sont des verdicts du sha ; 2 (rien à rejouer, verdict non probant) n'en est pas un. Le hook pre-push les lit (L426).
-  if (code === 0 || code === 1) recordVerdict(ctx.repo, ctx.sha, code, (ctx.now ?? (() => new Date()))());
+  if (code === 0 || code === 1) {
+    try {
+      recordVerdict(ctx.repo, ctx.sha, code, (ctx.now ?? (() => new Date()))());
+    } catch (e) {
+      // Un verdict qu'on ne peut pas noter ne change jamais le code de la porte : le push sera refusé faute de verdict, et la sortie dit pourquoi.
+      ctx.out(`verify --gate ${ctx.sha.slice(0, 7)} : verdict non noté (${(e as Error).message}) — le hook pre-push refusera ce sha tant qu'il n'a pas de verdict`);
+    }
+  }
   return code;
 }
 

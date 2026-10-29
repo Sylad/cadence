@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { sharedStateDir } from '../src/state.js';
@@ -56,6 +56,16 @@ describe('verify --gate enregistre son verdict par sha (L426)', () => {
     const { repo, head } = project(null);
     expect((await cli(repo, '', {}, 'verify', '--gate', '--sha', head)).code).toBe(2);
     expect(existsSync(join(sharedStateDir(repo), 'gate-verdicts.json'))).toBe(false);
+  });
+});
+
+describe('verdict non inscriptible (L426)', () => {
+  it('R13 — un verdict qu\'on ne peut pas noter n\'altère pas le code de sortie de la porte : il est dit sur la sortie', async () => {
+    const { repo, head } = project('false');
+    mkdirSync(join(sharedStateDir(repo), 'gate-verdicts.json')); // un dossier à la place du fichier : le renommage échoue
+    const r = await cli(repo, '', {}, 'verify', '--gate', '--sha', head);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('verdict non noté');
   });
 });
 

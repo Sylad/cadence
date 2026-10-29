@@ -17,7 +17,7 @@ export type SpendRow = {
   consumed: number
   /** Budget des passes ordinaires : `budget` de l'état moins la part réservée à l'escalade tant qu'elle n'est pas engagée ; nul sans budget. */
   budget: number | null
-  /** Minutes écoulées depuis le début de la première étape (jusqu'à sa dernière fin si aucune ne tourne) ; nul sans début lisible. */
+  /** Minutes écoulées depuis le début de la première étape, portes du programme comprises ; nul sans début lisible. */
   minutes: number | null
   /** Temps habituel (minutes) d'un lot de cette taille, `cadence perf` ; nul sans mesure pour sa classe. */
   usual: number | null
@@ -41,8 +41,8 @@ export const spendOf = (waves: readonly Wave[], typical: Readonly<Record<string,
       if (!SPENDING.has(l.status) || seen.has(key)) return []
       seen.add(key)
       const since = Date.parse(l.since ?? '')
-      const until = l.until === null || l.until === undefined ? at : Date.parse(l.until)
-      const minutes = Number.isFinite(since) && Number.isFinite(until) ? Math.max(0, until - since) / 60_000 : null
+      // jusqu'à `at`, jamais jusqu'à la fin de la dernière étape : une porte du programme (build, tests) tourne sans session alors que le lot reste en cours, et `lotMinutes` compte ces portes
+      const minutes = Number.isFinite(since) ? Math.max(0, at - since) / 60_000 : null
       const budget = typeof l.budget === 'number' ? l.budget - (l.escalated ? 0 : (l.escalationReserve ?? 0)) : null
       const cls = classOf(l.estimate, l.spec)
       const usual = cls !== null && cls in typical ? typical[cls]! : null

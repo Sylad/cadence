@@ -17,7 +17,7 @@ import type { LeadHold, Wave } from '../types'
  * Il rend aussi, avec les vagues, les sessions du lead inscrites par `cadence lead hold` (`<home>/holds/*.json`, sans
  * filtrer l'échéance : la bande le fait à chaque dessin) et le plafond de sessions (CADENCE_MAX_SESSIONS, 2 par défaut).
  * Chaque lot porte `trail`, la liste de ses pas (genre, statut, début, fin ; L413) d'où la frise du panneau des lots tire ses étapes.
- * Chaque lot porte aussi ce que le panneau lit de sa dépense (L414) : `budget`, `escalationReserve`, `estimate`, `escalated`, `spec`, les tokens comptés par ses étapes (`consumed`), le début de sa première étape (`since`) et la fin de sa dernière (`until`, nul tant qu'une étape tourne).
+ * Chaque lot porte aussi ce que le panneau lit de sa dépense (L414) : `budget`, `escalationReserve`, `estimate`, `escalated`, `spec`, les tokens comptés par ses étapes (`consumed`), le début de sa première étape (`since`) ; la durée écoulée court jusqu'à maintenant (le panneau n'en lit pas la fin).
  * Sortie : `{waves, holds, cap, ended}`.
  */
 export const COLLECTOR = `
@@ -101,12 +101,10 @@ def read_lots(d, live):
             for s in steps if isinstance(s, dict) and isinstance(s.get('kind'), str) and isinstance(s.get('started'), str)
         ]
         starts = [x['started'] for x in steps if isinstance(x.get('started'), str)]
-        ends = [x['ended'] for x in steps if isinstance(x.get('ended'), str)]
         lots.append({
             'budget': number(l.get('budget')), 'escalationReserve': number(l.get('escalationReserve')), 'estimate': number(l.get('estimate')),
             'escalated': bool(l.get('escalation')), 'spec': any(x.get('kind') in SPEC_CHAIN for x in steps),
             'consumed': sum(counted_of(x) for x in steps), 'since': min(starts) if starts else None,
-            'until': max(ends) if ends and not running else None,
             'project': l.get('project'), 'repo': l.get('repo'), 'lot': l.get('lot'), 'title': l.get('title') or '', 'status': l.get('status'),
             'pass': l.get('pass') or 0, 'model': l.get('model'), 'next': l.get('next'),
             'steps': len(steps), 'trail': trail, 'step': step, 'gate': l.get('gate') if live else None,

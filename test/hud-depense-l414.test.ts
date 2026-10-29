@@ -35,15 +35,16 @@ it('L414 R1 — le collecteur rend, par lot, le budget, la part réservée à l�
     budget: 775_000, escalationReserve: 175_000, estimate: 0.5,
     steps: [step('precheck', '2026-10-29T19:10:00.000Z', '2026-10-29T19:11:00.000Z', 10_000), step('implement', '2026-10-29T19:11:00.000Z', '2026-10-29T19:40:00.000Z', 200_000), step('review', '2026-10-29T19:40:00.000Z', '2026-10-29T19:50:00.000Z', 50_000)],
   });
-  expect(lot).toMatchObject({ budget: 775_000, escalationReserve: 175_000, estimate: 0.5, consumed: 260_000, since: '2026-10-29T19:10:00.000Z', until: '2026-10-29T19:50:00.000Z', spec: false, escalated: false });
+  expect(lot).toMatchObject({ budget: 775_000, escalationReserve: 175_000, estimate: 0.5, consumed: 260_000, since: '2026-10-29T19:10:00.000Z', spec: false, escalated: false });
 });
 
-it('L414 R2 — une étape en cours (sans fin) : `until` est nul, la durée court jusqu’à maintenant ; une étape sans tokens ne compte rien', () => {
+it('L414 R2 — une étape en cours (sans fin) ne compte aucun token ; le collecteur ne rend pas de fin de lot (la durée court jusqu’à maintenant)', () => {
   const lot = collect({ steps: [step('implement', '2026-10-29T19:11:00.000Z', '2026-10-29T19:40:00.000Z', 5), step('fix', '2026-10-29T19:41:00.000Z', undefined, undefined, 'running')] });
-  expect(lot).toMatchObject({ consumed: 5, since: '2026-10-29T19:11:00.000Z', until: null });
+  expect(lot).toMatchObject({ consumed: 5, since: '2026-10-29T19:11:00.000Z' });
+  expect(lot).not.toHaveProperty('until');
 });
 
 it('L414 R3 — un état sans budget, sans estimate ni étape : champs absents ou nuls, jamais d’erreur du collecteur ; `spec` vrai dès une étape de la chaîne spec, `escalated` dès une escalade posée', () => {
-  expect(collect({ steps: [] })).toMatchObject({ consumed: 0, since: null, until: null, budget: null, estimate: null, spec: false });
+  expect(collect({ steps: [] })).toMatchObject({ consumed: 0, since: null, budget: null, estimate: null, spec: false });
   expect(collect({ steps: [step('spec', '2026-10-29T19:11:00.000Z', '2026-10-29T19:12:00.000Z', 1)], escalation: { model: 'fable', stage: 'fix' } })).toMatchObject({ spec: true, escalated: true });
 });

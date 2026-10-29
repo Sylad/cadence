@@ -69,8 +69,6 @@ export type WaveLot = {
   consumed?: number
   /** Début de la première étape (ISO), nul sans étape. */
   since?: string | null
-  /** Fin de la dernière étape (ISO), nulle tant qu'une étape tourne ou sans étape. */
-  until?: string | null
 }
 
 export type Wave = {

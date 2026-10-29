@@ -5,7 +5,7 @@ import type { Wave, WaveLot } from '../types'
 
 const NOW = Date.parse('2026-10-29T20:00:00.000Z')
 const minutesAgo = (m: number) => new Date(NOW - m * 60_000).toISOString()
-const wlot = (lot: string, extra: Partial<WaveLot> = {}): WaveLot => ({ project: 'cadence', repo: '/p/cadence', lot, title: `T ${lot}`, status: 'implementing', pass: 0, model: 'sonnet', next: null, steps: 1, step: null, budget: 750_000, consumed: 100_000, estimate: 0.5, since: minutesAgo(10), until: null, ...extra })
+const wlot = (lot: string, extra: Partial<WaveLot> = {}): WaveLot => ({ project: 'cadence', repo: '/p/cadence', lot, title: `T ${lot}`, status: 'implementing', pass: 0, model: 'sonnet', next: null, steps: 1, step: null, budget: 750_000, consumed: 100_000, estimate: 0.5, since: minutesAgo(10), ...extra })
 const wave = (lots: WaveLot[], extra: Partial<Wave> = {}): Wave => ({ id: 'w1', pid: 1, cwd: '/p', started: '2026-10-29T16:00:00Z', live: true, lots, ...extra })
 const TYPICAL = { '0.5': 30, '1': 60, '0.5+spec': 90 }
 
@@ -50,11 +50,11 @@ test('L414 R6 — un lot sans budget dans son état : les tokens consommés seul
   expect(buildSpend(rows, 100, 10).lines[1]!.text).toBe('▶ cadence:L1  900k tokens · 10 min (habituel 30 min)')
 })
 
-test('L414 R7 — seuls les lots travaillés d’une vague VIVANTE comptent : ni lot prêt, rendu, en attente ou suspendu, ni vague finie ; la durée d’un lot dont la dernière étape est finie s’arrête à sa fin', () => {
-  const lots = [wlot('L1'), wlot('L2', { status: 'reviewing' }), wlot('L3', { status: 'fixing' }), wlot('L4', { status: 'ready' }), wlot('L5', { status: 'handed-back' }), wlot('L6', { status: 'queued' }), wlot('L7', { status: 'suspended' }), wlot('L8', { status: 'question', since: minutesAgo(20), until: minutesAgo(15) })]
+test('L414 R7 — seuls les lots travaillés d’une vague VIVANTE comptent : ni lot prêt, rendu, en attente ou suspendu, ni vague finie ; la durée d’un lot court jusqu’à maintenant, même entre deux étapes (une porte du programme tourne sans session)', () => {
+  const lots = [wlot('L1'), wlot('L2', { status: 'reviewing' }), wlot('L3', { status: 'fixing' }), wlot('L4', { status: 'ready' }), wlot('L5', { status: 'handed-back' }), wlot('L6', { status: 'queued' }), wlot('L7', { status: 'suspended' }), wlot('L8', { status: 'question', since: minutesAgo(20) })]
   const rows = spendOf([wave(lots), wave([wlot('L9')], { id: 'w0', live: false })], TYPICAL, NOW)
   expect(rows.map(r => r.lot)).toEqual(['L1', 'L2', 'L3', 'L8'])
-  expect(rows.find(r => r.lot === 'L8')!.minutes).toBe(5)
+  expect(rows.find(r => r.lot === 'L8')!.minutes).toBe(20)
 })
 
 test('L414 R8 — un lot sans début lisible ou sans tokens lus : ligne sans durée ou à zéro token, jamais NaN', () => {

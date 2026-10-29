@@ -23,7 +23,7 @@ import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { configSet } from './config-set.js';
 import { findProjects, readDepth, leadTour, readLeadUx, tourFreeLine, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
-import { configuredCap, expiredHoldLines, liveLines, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
+import { configuredCap, expiredHoldLines, slotsLine, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { cadenceHome, liveWaves, openLotsIn, openWavesIn, waveLotsIn, type OpenWave } from './orchestrate/registry.js';
@@ -240,7 +240,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const root = gitRoot(io.cwd) ?? io.cwd;
   // Le tour parcourt les sous-dossiers (ou, sans sous-projet, prend le dossier lui-même s'il est un projet) : il ne lit pas le plan du dossier courant.
   if (command === 'lead') {
-    if (rest[0] === 'hold' || rest[0] === 'release') return leadHold(rest, values.ttl, io);
+    if (rest[0] === 'hold' || rest[0] === 'release') return leadHold(rest, values.ttl, io, today);
     if (values.ttl !== undefined) throw new RafError('--ttl ne va qu\'avec lead hold');
     if (rest[0] !== 'tour' || rest.length > 2) throw new RafError('usage : cadence lead tour [dossier] [--idle 3] [--depth n] [--json] | lead hold <étiquette> [--ttl minutes] | lead release <étiquette>');
     const idle = values.idle === undefined ? undefined : Number(values.idle);
@@ -265,10 +265,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       // un projet sans orchestrate.test : la vague ne lancera pas la suite (L327)
       for (const l of tourNoTestLines(rows)) io.out(l);
       // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
-      const [slots] = liveLines(configuredCap(io.env), io.now());
-      if (slots) io.out(slots);
-      // en face des créneaux libres, les lots prêts dont aucune ressource n'est prise (L252) ; sans vague en cours ni session tenue par le lead (L255), pas de créneau à remplir : seul --json les donne
-      const free = slots ? tourFreeLine(rows) : null;
+      // toujours imprimés, même sans vague ni session du lead (L416) : un créneau vide se lit, il ne se déduit pas d'une ligne absente
+      io.out(slotsLine(configuredCap(io.env), io.now()).line);
+      // en face des créneaux libres, les lots prêts dont aucune ressource n'est prise (L252)
+      const free = tourFreeLine(rows);
       if (free) io.out(free);
       // une session du lead dont le TTL est échu (L278) : rien ne l'arrête, le tour la signale (hors --json, comme les créneaux)
       for (const l of expiredHoldLines(io.now())) io.out(l);
@@ -1254,13 +1254,19 @@ const HOLD_TTL_MINUTES = 60;
 const HOLD_LABEL_MAX = 200;
 
 /** `cadence lead hold <étiquette> [--ttl minutes]` / `lead release <étiquette>` (L255) : inscrit, ou rend, une session lancée à la main par le lead, qui compte dans les créneaux libres. */
-function leadHold(rest: string[], ttl: string | undefined, io: Io): number {
+function leadHold(rest: string[], ttl: string | undefined, io: Io, today: Day): number {
   const [verb, label] = rest;
   const usage = verb === 'hold' ? 'usage : cadence lead hold <étiquette> [--ttl minutes]' : 'usage : cadence lead release <étiquette>';
   if (rest.length !== 2 || !label!.trim()) throw new RafError(usage);
   if (verb === 'release') {
     if (ttl !== undefined) throw new RafError(`--ttl ne va qu'avec lead hold (${usage})`);
     io.out(releaseHold(cadenceHome(), label!) ? `session « ${label} » rendue` : `aucune session « ${label} » inscrite`);
+    // ce que la libération laisse (L416) : les créneaux, les lots prêts qui peuvent les prendre, et un ⚠ tant qu'un créneau reste vide
+    const { line, free } = slotsLine(configuredCap(io.env), io.now());
+    io.out(line);
+    const ready = tourFreeLine(leadTour(resolve(io.cwd), today));
+    if (ready) io.out(ready);
+    if (free > 0) io.out(`⚠ ${free} ${free === 1 ? 'créneau libre' : 'créneaux libres'} sur ${configuredCap(io.env)} : lancer un lot prêt ou une session, un créneau vide ne sert à rien`);
     return 0;
   }
   // le nom de fichier encode l'étiquette (6 octets par lettre accentuée) : au-delà, le système de fichiers refuse (ENAMETOOLONG)

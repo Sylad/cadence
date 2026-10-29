@@ -153,20 +153,20 @@ describe('cadence lead hold / release (L255)', () => {
     unregisterWave(cadenceHome(), process.ppid);
   });
 
-  it('R11 — sans vague, une session du lead suffit à afficher la ligne ; sans rien, aucune ligne', async () => {
+  it('R11 — sans vague, une session du lead est soustraite de la ligne ; sans rien, la ligne (L416 R1) reste à plein', async () => {
     const root = await project();
-    expect((await cad(root, {}, T0, 'lead', 'tour')).out).not.toContain('créneaux libres');
+    expect((await cad(root, {}, T0, 'lead', 'tour')).out).toContain('vagues en cours : 0 · sessions en cours : 0 · créneaux libres : 2 sur 2');
     await cad(root, {}, T0, 'lead', 'hold', 'qa');
     expect((await cad(root, {}, minutes(1), 'lead', 'tour')).out).toContain('vagues en cours : 0 · sessions en cours : 0 · sessions du lead : 1 (qa) · créneaux libres : 1 sur 2');
   });
 
-  it('R17 — sans vague, une session du lead fait aussi imprimer la ligne « prêts, ressources libres » ; sans session, elle reste muette', async () => {
+  it('R17 — sans vague ni session du lead, la ligne « prêts, ressources libres » s\'imprime aussi (L416 R2) ; une session du lead la laisse', async () => {
     const root = await project();
     execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root, stdio: 'ignore' }); // le tour lit le dépôt de chaque projet
     const plan = Plan.load(join(root, '.cadence/raf.yaml'));
     plan.add('Premier lot', '2026-10-23', { estimate: 1 });
     plan.save();
-    expect((await cad(root, {}, T0, 'lead', 'tour')).out).not.toContain('prêts, ressources libres');
+    expect((await cad(root, {}, T0, 'lead', 'tour')).out).toMatch(/prêts, ressources libres : .*L\d+ Premier lot/);
     await cad(root, {}, T0, 'lead', 'hold', 'qa');
     const tour = (await cad(root, {}, minutes(1), 'lead', 'tour')).out;
     expect(tour).toContain('créneaux libres : 1 sur 2');
@@ -200,7 +200,7 @@ describe('session du lead échue (L278)', () => {
     expect(after).toContain('⚠ session du lead échue : correctif-B28 (inscrite depuis 5 h 10 min, échue depuis 2 h 10 min)');
     expect(after).toContain('cadence lead hold correctif-B28 --ttl <minutes>');
     expect(after).toContain('cadence lead release correctif-B28');
-    expect(after).not.toContain('créneaux libres'); // échue : plus de créneau pris, la ligne des créneaux se tait comme sans session
+    expect(after).toContain('sessions en cours : 0 · créneaux libres : 2 sur 2'); // échue : plus de créneau pris, la ligne est celle d'une absence de session
   });
 
   it('R2 — l\'avertissement suit la ligne des créneaux quand une session vivante l\'affiche, et cesse au release', async () => {

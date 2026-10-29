@@ -632,15 +632,21 @@ function duration(ms: number): string {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
 }
 
+/** La ligne des créneaux (L141, L255) et leur nombre libre : toujours, même sans vague ni session du lead (L416 : « libres : 3 sur 3 » se lit, il ne se déduit pas d'une absence de ligne). */
+export function slotsLine(cap = DEFAULT_MAX_SESSIONS, now = new Date()): { line: string; free: number } {
+  const home = cadenceHome();
+  const holds = liveHolds(home, now);
+  const free = freeSlots(liveWaves(home), cap, holds.length);
+  const lead = holds.length ? ` · sessions du lead : ${holds.length} (${holds.map((h) => h.label).join(', ')})` : '';
+  return { line: `vagues en cours : ${liveWaves(home).length} · sessions en cours : ${liveSlots(home).length}${lead} · créneaux libres : ${free} sur ${cap}`, free };
+}
+
 /** Vagues vivantes (toutes, quel que soit leur dossier de départ), sessions du lead (L255), créneaux libres et dépôts qu'elles tiennent. Rien sans vague ni session du lead. */
 export function liveLines(cap = DEFAULT_MAX_SESSIONS, now = new Date()): string[] {
   const home = cadenceHome();
   const waves = liveWaves(home);
-  const holds = liveHolds(home, now);
-  if (waves.length === 0 && holds.length === 0) return [];
-  const slots = liveSlots(home).length;
-  const lead = holds.length ? ` · sessions du lead : ${holds.length} (${holds.map((h) => h.label).join(', ')})` : '';
-  const lines = [`vagues en cours : ${waves.length} · sessions en cours : ${slots}${lead} · créneaux libres : ${freeSlots(waves, cap, holds.length)} sur ${cap}`];
+  if (waves.length === 0 && liveHolds(home, now).length === 0) return [];
+  const lines = [slotsLine(cap, now).line];
   for (const w of waves) lines.push(`  ${w.wave} (pid ${w.pid}, depuis ${w.started}) lancée depuis ${w.cwd} · plafond ${w.cap ?? '?'} · dépôts : ${w.repos.join(', ')}`);
   return lines;
 }

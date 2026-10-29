@@ -53,6 +53,9 @@ async function parent() {
   return { root, alpha, beta };
 }
 
+/** Les lignes de projet du tour : sans la ligne des créneaux ni celle des lots prêts, qui s'impriment toujours (L416). */
+const projectLines = (out: string): string[] => out.split('\n').filter((l) => !l.startsWith('vagues en cours') && !l.startsWith('prêts, ressources libres'));
+
 describe('cadence lead tour', () => {
   it('imprime une ligne par projet, plan raf et plan en lecture seule, sans toucher au plan', async () => {
     const { root, alpha, beta } = await parent();
@@ -62,7 +65,7 @@ describe('cadence lead tour', () => {
     const { code, out, err } = await cad(root, 'lead', 'tour');
     expect(code).toBe(0);
     expect(err).toBe('');
-    const lines = out.split('\n');
+    const lines = projectLines(out);
     expect(lines).toHaveLength(2);
     expect(lines[0]).toMatch(/^alpha · en cours L1 \(1 commit, silencieux 4 ?j\) · dérive /);
     expect(lines[0]).toContain('notes : finir L1 puis livrer');
@@ -78,7 +81,7 @@ describe('cadence lead tour', () => {
     const explicit = await cad(alpha, 'lead', 'tour', root);
     const implicit = await cad(root, 'lead', 'tour');
     expect(explicit.out).toBe(implicit.out);
-    expect(explicit.out.split('\n')).toHaveLength(2);
+    expect(projectLines(explicit.out)).toHaveLength(2);
   });
 
   it('dit « livraison en cours » et « non poussé »', async () => {
@@ -93,9 +96,9 @@ describe('cadence lead tour', () => {
     expect(out.split('\n')[0]).toMatch(/dépôt non poussé, livraison en cours$/);
   });
 
-  it('ajoute une ligne « créneaux libres » quand une vague tourne, rien sinon (L141)', async () => {
+  it('ajoute une ligne « créneaux libres » quand une vague tourne (L141) ; sans vague elle reste, à plein (L416 R1)', async () => {
     const { root } = await parent();
-    expect((await cad(root, 'lead', 'tour')).out).not.toContain('créneaux libres');
+    expect((await cad(root, 'lead', 'tour')).out).toContain('vagues en cours : 0 · sessions en cours : 0 · créneaux libres : 2 sur 2');
     registerWave(cadenceHome(), { pid: process.ppid, wave: '2026-10-09-1253', started: '2026-10-09T12:53:00Z', cwd: root, repos: ['/x/a'], cap: 2 });
     const { out } = await cad(root, 'lead', 'tour');
     expect(out.split('\n')[2]).toBe('vagues en cours : 1 · sessions en cours : 0 · créneaux libres : 1 sur 2');
@@ -245,7 +248,7 @@ describe('cadence lead tour', () => {
     writeFileSync(join(root, 'cadence.yaml'), yaml);
     const text = await cad(root, 'lead', 'tour');
     expect(text.code).toBe(0);
-    const lines = text.out.split('\n');
+    const lines = projectLines(text.out);
     expect(lines[0]).toMatch(/^cadence\.yaml · ✗ erreur : /);
     expect(lines[0]).toMatch(cause);
     expect(lines.slice(1).map((l) => l.split(' · ')[0])).toEqual(['alpha', 'beta']);
@@ -258,14 +261,14 @@ describe('cadence lead tour', () => {
   it('un cadence.yaml sans priority: ne produit aucune ligne d\'erreur', async () => {
     const { root } = await parent();
     writeFileSync(join(root, 'cadence.yaml'), 'qa:\n  expectations: docs/qa.md\n');
-    expect((await cad(root, 'lead', 'tour')).out.split('\n').map((l) => l.split(' · ')[0])).toEqual(['alpha', 'beta']);
+    expect(projectLines((await cad(root, 'lead', 'tour')).out).map((l) => l.split(' · ')[0])).toEqual(['alpha', 'beta']);
   });
 
   it("depuis un projet sans sous-projet, la ligne de ce projet seul ; --json la donne avec son avancement (L149)", async () => {
     const { alpha, beta } = await parent();
     const { code, out } = await cad(alpha, 'lead', 'tour');
     expect(code).toBe(0);
-    expect(out.split('\n')).toHaveLength(1);
+    expect(projectLines(out)).toHaveLength(1);
     expect(out).toMatch(/^alpha · en cours L1 /);
     const rows = JSON.parse((await cad(beta, 'lead', 'tour', '--json')).out) as Array<{ project: string; progress: unknown }>;
     expect(rows.map((r) => r.project)).toEqual(['beta']);

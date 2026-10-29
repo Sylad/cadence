@@ -173,9 +173,9 @@ describe('L252 — lead tour : les lots prêts dont les ressources sont libres',
     expect(rows[0].free).toEqual([{ id: 'L1', title: 'A', uses: ['banc', 'passerelle'] }]);
   });
 
-  it('R6 — sans vague en cours : pas de ligne (comme « créneaux libres »), le --json donne quand même les lots libres', async () => {
+  it('R6 — sans vague en cours : la ligne s\'imprime quand même (L416 R2), et le --json donne les mêmes lots libres', async () => {
     const { parent } = parentWith({ alpha: [{ title: 'Un' }] });
-    expect((await tour(parent)).out).not.toContain(FREE);
+    expect((await tour(parent)).out).toContain(`${FREE}alpha:L1 Un`);
     expect(JSON.parse((await tour(parent, '--json')).out)[0].free).toEqual([{ id: 'L1', title: 'Un' }]);
   });
 

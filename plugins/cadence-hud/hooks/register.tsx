@@ -4,7 +4,7 @@ import type { ClientProps, ElementConstructor, EngineInterface, Register, Render
 import type { AgentsSummary, CommandInfo, LeadHold, LotsNotice, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
 import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
 import { buildDecisions, decisionsOf, parseDeliveries } from './decisions'
-import { buildSpend, parseTypical, spendOf } from './spend'
+import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
@@ -800,8 +800,10 @@ export const register: Register = on => {
       </Box>
     )
 
-    // « lots en cours : budget et durée » (L414), sous les décisions : au plus le quart du corps, et décisions et dépenses ensemble au plus la moitié : l'arbre garde le reste
-    const spend = buildSpend(spendOf(allWaves, typical, at), columns, Math.min(Math.floor(e.props.scroll.bodyRows / 4), Math.floor(e.props.scroll.bodyRows / 2) - decisions.lines.length))
+    // « lots en cours : budget et durée » (L414), sous les décisions : au plus le quart du corps, et décisions et dépenses ensemble au plus la moitié, l'arbre garde le reste —
+    // sauf qu'un lot en dépassement garde toujours ses deux lignes (titre et ⚠), prises sur l'arbre : le signal ne disparaît jamais faute de place (spendHeight)
+    const spendRows = spendOf(allWaves, typical, at)
+    const spend = buildSpend(spendRows, columns, spendHeight(spendRows, e.props.scroll.bodyRows, decisions.lines.length))
     const spendBlock = spend.lines.length > 0 && (
       <Box key="spend" flexDirection="column">
         {spend.lines.map((l, i) => (

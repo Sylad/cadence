@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { buildSpend, parseTypical, spendOf } from '../hooks/spend'
+import { buildSpend, parseTypical, spendHeight, spendOf } from '../hooks/spend'
 import type { Wave, WaveLot } from '../types'
 
 const NOW = Date.parse('2026-10-29T20:00:00.000Z')
@@ -84,4 +84,17 @@ test('L414 R11 — à deux lignes de hauteur, le titre et un lot tiennent : le l
   const rows = spendOf([wave([wlot('L1'), wlot('L2', { consumed: 800_000 })])], TYPICAL, NOW)
   const { lines } = buildSpend(rows, 100, 2)
   expect(lines.map(l => l.text)).toEqual(['Lots en cours : budget et durée (2)', '⚠ cadence:L2  800k/750k tokens dépassé · 10 min (habituel 30 min)'])
+})
+
+test('L414 R12 — la hauteur du bloc : le quart du corps, décisions et dépenses ensemble au plus la moitié ; jamais sous deux lignes dès qu’un lot dépasse, le signal se prend sur l’arbre', () => {
+  const calm = spendOf([wave([wlot('L1')])], TYPICAL, NOW)
+  const over = spendOf([wave([wlot('L1'), wlot('L2', { consumed: 800_000 })])], TYPICAL, NOW)
+  expect(spendHeight(calm, 30, 0)).toBe(7)
+  expect(spendHeight(calm, 30, 12)).toBe(3)
+  expect(spendHeight(calm, 30, 15)).toBe(0)
+  expect(spendHeight(calm, 6, 0)).toBe(1)
+  expect(spendHeight(over, 30, 15)).toBe(2)
+  expect(spendHeight(over, 6, 0)).toBe(2)
+  expect(spendHeight(over, 30, 0)).toBe(7)
+  expect(spendHeight([], 30, 15)).toBe(0)
 })

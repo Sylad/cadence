@@ -1280,3 +1280,36 @@ test('L414 R13 — sans vague vivante : ni bloc, ni lecture de `cadence perf`', 
   expect((await s.draw()).text).not.toMatch(/Lots en cours/)
   expect(s.perfs()).toEqual([])
 })
+
+test('L414 R14 — à 30 lignes, des décisions qui prennent toute leur moitié du corps : le lot en dépassement reste visible, titre et ligne ⚠, pris sur l’arbre', async ($, on) => {
+  // 15 lots rendus d'un projet hors du tableau du tour (le plan ne les écarte pas) : le bloc des décisions dépasse son plafond, la moitié du corps, et le remplit
+  const handed = Array.from({ length: 15 }, (_, i) => ({ ...WAVE.lots[0]!, project: 'maritime', lot: `H${i}`, status: 'handed-back', outcome: 'budget atteint' }))
+  const s = await session($, on, { waves: [{ ...spending({}), lots: [...spending({}).lots, ...handed] }], perf: () => ({ exitCode: 0, stdout: PERF }) })
+  await s.advance(5_000)
+  await s.hud('lots')
+  const { texts } = await s.draw(70, 30)
+  const at = (re: RegExp) => texts.findIndex(t => re.test(t))
+  expect(at(/… \+\d+ décisions? de plus/)).toBeGreaterThan(-1)
+  expect(at(/Lots en cours : budget et durée \(1\)/)).toBeGreaterThan(-1)
+  expect(texts[at(/ol:L80/)]).toMatch(/^⚠ ol:L80 {2}786k\/750k tokens dépassé · \d+ min \(habituel 30 min, dépassé\)$/)
+  expect(at(/L401/)).toBeGreaterThan(at(/ol:L80/))
+})
+
+test('L414 R15 — un corps de 6 lignes (le quart ne fait pas deux lignes) : le lot en dépassement reste visible, titre et ligne ⚠ ; hors dépassement, le bloc cède la place à l’arbre', async ($, on) => {
+  const over = await session($, on, { waves: [spending({})], perf: () => ({ exitCode: 0, stdout: PERF }) })
+  await over.advance(5_000)
+  await over.hud('lots')
+  const { texts } = await over.draw(70, 6)
+  expect(texts.findIndex(t => /Lots en cours : budget et durée \(1\)/.test(t))).toBeGreaterThan(-1)
+  expect(texts.find(t => /ol:L80/.test(t))).toMatch(/^⚠ ol:L80 {2}786k\/750k tokens dépassé/)
+})
+
+test('L414 R16 — hors dépassement, un bloc qui n’a pas deux lignes de place n’apparaît pas : l’arbre garde le corps', async ($, on) => {
+  // sous le budget et sous le temps habituel (5 min pour 30 habituelles)
+  const s = await session($, on, { waves: [spending({ consumed: 100_000, since: new Date(-5 * 60_000).toISOString() })], perf: () => ({ exitCode: 0, stdout: PERF }) })
+  await s.advance(5_000)
+  await s.hud('lots')
+  const { text } = await s.draw(70, 6)
+  expect(text).not.toMatch(/Lots en cours|ol:L80/)
+  expect(text).toMatch(/L401/)
+})

@@ -74,6 +74,16 @@ export const parseTypical = (stdout: string): Record<string, number> => {
   }
 }
 
+const isOver = (r: SpendRow): boolean => r.tokensOver || r.timeOver
+
+/**
+ * La hauteur du bloc dans un corps de `bodyRows` lignes dont les décisions prennent déjà `decisionLines` : au plus le quart du corps, décisions et dépenses ensemble au plus la moitié
+ * (l'arbre garde le reste) — mais jamais sous deux lignes, le titre et le premier lot en dépassement, dès qu'un lot dépasse : le signal se prend alors sur l'arbre, il ne disparaît
+ * jamais faute de place (un corps de 7 lignes ou moins, ou des décisions qui remplissent leur moitié, l'effaçaient). Sans dépassement, un bloc qui n'a pas deux lignes cède la place.
+ */
+export const spendHeight = (rows: readonly SpendRow[], bodyRows: number, decisionLines: number): number =>
+  Math.max(rows.some(isOver) ? 2 : 0, Math.min(Math.floor(bodyRows / 4), Math.floor(bodyRows / 2) - decisionLines))
+
 export type SpendLine = { text: string; tone: 'title' | 'warning' | 'text' }
 
 /**
@@ -82,15 +92,14 @@ export type SpendLine = { text: string; tone: 'title' | 'warning' | 'text' }
  */
 export const buildSpend = (rows: readonly SpendRow[], columns: number, height: number): { lines: SpendLine[] } => {
   if (rows.length === 0 || height < 2) return { lines: [] }
-  const over = (r: SpendRow) => r.tokensOver || r.timeOver
-  const ordered = [...rows.filter(over), ...rows.filter(r => !over(r))]
+  const ordered = [...rows.filter(isOver), ...rows.filter(r => !isOver(r))]
   // Deux lignes : le titre et un lot, sans « +N » (il ne tiendrait pas) ; le lot en dépassement passe en tête, il ne doit jamais être caché
   const shown = ordered.length <= height - 1 ? ordered.length : Math.max(1, height - 2)
   const lines: SpendLine[] = [{ text: ellipsize(`Lots en cours : budget et durée (${rows.length})`, columns), tone: 'title' }]
   for (const r of ordered.slice(0, shown)) {
     const tokens = `${r.budget === null ? k(r.consumed) : `${k(r.consumed)}/${k(r.budget)}`} tokens${r.tokensOver ? ' dépassé' : ''}`
     const time = r.minutes === null ? '' : ` · ${duration(r.minutes * 60_000)}${r.usual === null ? '' : ` (habituel ${duration(r.usual * 60_000)}${r.timeOver ? ', dépassé' : ''})`}`
-    lines.push({ text: ellipsize(`${over(r) ? '⚠' : '▶'} ${r.project}:${r.lot}  ${tokens}${time}`, columns), tone: over(r) ? 'warning' : 'text' })
+    lines.push({ text: ellipsize(`${isOver(r) ? '⚠' : '▶'} ${r.project}:${r.lot}  ${tokens}${time}`, columns), tone: isOver(r) ? 'warning' : 'text' })
   }
   const hidden = ordered.length - shown
   if (hidden > 0 && lines.length < height) lines.push({ text: ellipsize(`… +${hidden} lot${hidden > 1 ? 's' : ''} en cours`, columns), tone: 'text' })

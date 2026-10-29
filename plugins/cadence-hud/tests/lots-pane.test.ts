@@ -457,10 +457,15 @@ test('R7 — /hud lots <projet> bascule le projet au clavier ; un nom inconnu es
 })
 
 test('R7 — /hud lots <projet> avant la première lecture : « pas encore lu », pas « projet inconnu »', async ($, on) => {
-  const s = await session($, on, { tour: () => new Promise(() => undefined) })
+  // le tour est retenu, pas abandonné : un tour qui ne répond jamais reviendrait au délai du mod (20 s), après le déchargement du module, et le fichier de tests finirait sur un rejet sans preneur dès qu'il dure plus de 20 s (sous charge)
+  let release: () => void = () => {}
+  const gate = new Promise<void>(resolve => (release = resolve))
+  const s = await session($, on, { tour: async () => (await gate, { exitCode: 0, stdout: JSON.stringify(TOUR) }) })
   const text = (await s.hud('lots maritime')).text
   expect(text).toMatch(/pas encore lus/)
   expect(text).not.toMatch(/inconnu/)
+  release()
+  await settle()
 })
 
 // ── L411 : cinq lots par projet, sous-lots repliés, états gardés ───────────────────────────────────────────────────

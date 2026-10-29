@@ -222,8 +222,10 @@ export const register: Register = on => {
         await update($, lotsFailed, () => false)
         await update($, lotsAt, () => at)
       } catch {
-        // cadence absent, sortie illisible, délai dépassé : la bande et le panneau gardent le dernier tableau lu
-        await update($, lotsFailed, () => true)
+        // cadence absent, sortie illisible, délai dépassé : la bande et le panneau gardent le dernier tableau lu.
+        // Le délai (20 s) peut tomber après le déchargement du module (rechargement du mod, fin de session) : l'état n'est plus à lui,
+        // l'écriture est refusée et il n'y a plus rien à dire — un rejet laissé ici n'aurait aucun preneur (refreshProjects n'est pas attendu).
+        await update($, lotsFailed, () => true).catch(() => undefined)
       } finally {
         isTouring = false
       }

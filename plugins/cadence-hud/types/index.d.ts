@@ -55,6 +55,22 @@ export type WaveLot = {
   uxVerdict?: string | null
   /** Le lot est visible : son verdict UX se pose au plan (L412). */
   visible?: boolean
+  /** Plafond des tokens du lot, part réservée à l'escalade comprise (`budget` de son état, L414) ; absent d'un état sans budget. */
+  budget?: number | null
+  /** Part de `budget` réservée à l'escalade de modèle ; absente sans escalade déclarée. */
+  escalationReserve?: number | null
+  /** L'escalade de modèle est engagée : la part réservée est libérée. */
+  escalated?: boolean
+  /** Estimate du plan, en jours : la taille du lot, clé du temps habituel de `cadence perf`. */
+  estimate?: number | null
+  /** Le lot est passé par une étape de la chaîne spec (classe « +spec » de `cadence perf`). */
+  spec?: boolean
+  /** Tokens comptés par les étapes du lot, comme le journal de `cadence perf`. */
+  consumed?: number
+  /** Début de la première étape (ISO), nul sans étape. */
+  since?: string | null
+  /** Fin de la dernière étape (ISO), nulle tant qu'une étape tourne ou sans étape. */
+  until?: string | null
 }
 
 export type Wave = {
@@ -139,6 +155,8 @@ declare module 'claude-code' {
       lotsNotice: LotsNotice | null
       /** Les livraisons en échec lues pour le panneau des lots (L412), une par projet au plus. */
       lotsDeliveries: FailedDelivery[]
+      /** Le temps habituel d'un lot (minutes) par classe de taille, lu de `cadence perf --json` (L414) ; vide tant qu'il n'a pas répondu. */
+      lotsTypical: Record<string, number>
       /** Heure (ms) de la dernière lecture réussie du panneau des lots. */
       lotsAt: number
       error: string | null

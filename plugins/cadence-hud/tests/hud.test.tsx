@@ -1306,7 +1306,7 @@ test('le tableau est demandé à cadence lead tour --json dans le dossier de la 
   })
   await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
   await settle()
-  const tours = () => runs.filter(a => a[0] === 'cadence')
+  const tours = () => runs.filter(a => a[0] === 'cadence' && a[1] === 'lead')
   expect(tours()).toEqual([['cadence', 'lead', 'tour', '/p', '--json']])
   expect((hud.state('projects') as Project[]).map(p => p.project)).toEqual(['ol', 'cadence'])
   // 5 s plus tard, rien n'a changé : pas de nouvelle lecture

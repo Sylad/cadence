@@ -22,7 +22,7 @@ const WAVE: Wave = {
 type Cadence = { exitCode: number; stdout: string }
 
 /** Monte le mod comme une session, avec un moteur simulé : état en mémoire, panneaux ouverts, processus pilotés par le test. */
-const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave[]; stamps?: () => string; deliveries?: () => string; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
+const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave[]; stamps?: () => string; deliveries?: () => string; perf?: () => Cadence; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const open = new Set<string>()
   const opened: unknown[] = []
@@ -64,6 +64,10 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
       const r = (setup.raf ?? (() => ({ exitCode: 0, stderr: '' })))(argv, (e as unknown as { init?: { cwd?: string } }).init?.cwd)
       return { value: { exitCode: r.exitCode, stdout: '', stderr: r.stderr } } as never
     }
+    if (argv[0] === 'cadence' && argv[1] === 'perf') {
+      const r = (setup.perf ?? (() => ({ exitCode: 1, stdout: '' })))()
+      return { value: { ...r, stderr: '' } } as never
+    }
     if (argv[0] === 'cadence') {
       const r = await tour.current()
       return { value: { ...r, stderr: '' } } as never
@@ -74,7 +78,8 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
   })
   await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
   await settle()
-  const tours = () => runs.filter(a => a[0] === 'cadence')
+  const tours = () => runs.filter(a => a[0] === 'cadence' && a[1] === 'lead')
+  const perfs = () => runs.filter(a => a[0] === 'cadence' && a[1] === 'perf')
   // laisse finir la lecture que l'ouverture lance sans l'attendre : un test qui s'arrête avant la verrait aboutir après le déchargement du mod
   const hud = async (args: string, columns = 140) => {
     const answer = await $.command.run({ command: 'hud', args, presentation: { columns, isFullscreen: true } } as never)
@@ -143,7 +148,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await fresh.unmount()
     return text
   }
-  return { rafs, gestures, notice, kv, press, pressKey, store, open, opened, runs, tours, tour, stamps, waves, hud, advance, draw }
+  return { rafs, gestures, notice, kv, press, pressKey, store, open, opened, runs, tours, perfs, tour, stamps, waves, hud, advance, draw }
 }
 
 const CLOSE_HELP = '/hud lots pour fermer'
@@ -1239,4 +1244,39 @@ test('L413 R17 — la frise prend une rangée dans la région : un appui sur la 
     await ui.pointer(up(0))
   }, 'desktop', 4)
   expect(s.rafs()).toEqual([['raf', 'move', 'L402', '--before', 'L401']])
+})
+
+// ── L414 : « lots en cours : budget et durée », en tête du panneau ──────────────────────────────────────────────────
+
+const PERF = JSON.stringify({ lotMinutes: { '0.5': { current: 30, previous: null } } })
+/** `since` : 53 minutes avant l'instant 0 de l'horloge simulée, que le panneau lit comme « maintenant » (à quelques secondes près). */
+const spending = (extra: Record<string, unknown>): Wave => ({ ...WAVE, lots: [{ ...WAVE.lots[0]!, lot: 'L80', status: 'implementing', budget: 750_000, consumed: 786_000, estimate: 0.5, since: new Date(-53 * 60_000).toISOString(), until: null, ...extra } as Wave['lots'][number]] })
+
+test('L414 R11 — le panneau montre, en tête et avant l’arbre, le lot en cours : tokens sur budget, temps écoulé, temps habituel de `cadence perf` et le signal du dépassement', async ($, on) => {
+  const s = await session($, on, { waves: [spending({})], perf: () => ({ exitCode: 0, stdout: PERF }) })
+  await s.advance(5_000)
+  await s.hud('lots')
+  const { texts } = await s.draw()
+  const at = (re: RegExp) => texts.findIndex(t => re.test(t))
+  expect(at(/Lots en cours : budget et durée \(1\)/)).toBeGreaterThan(-1)
+  expect(texts[at(/ol:L80/)]).toMatch(/^⚠ ol:L80 {2}786k\/750k tokens dépassé · \d+ min \(habituel 30 min, dépassé\)$/)
+  expect(at(/ol:L80/)).toBeGreaterThan(at(/Lots en cours/))
+  expect(at(/L401/)).toBeGreaterThan(at(/ol:L80/))
+  expect(s.perfs()[0]).toEqual(['cadence', 'perf', '/p', '--json'])
+})
+
+test('L414 R12 — `cadence perf` absent ou en échec : le bloc reste, sans temps habituel (ni signal de temps)', async ($, on) => {
+  const s = await session($, on, { waves: [spending({ consumed: 100_000 })] })
+  await s.advance(5_000)
+  await s.hud('lots')
+  const { texts } = await s.draw()
+  expect(texts.find(t => /ol:L80/.test(t))).toMatch(/^▶ ol:L80 {2}100k\/750k tokens · \d+ min$/)
+})
+
+test('L414 R13 — sans vague vivante : ni bloc, ni lecture de `cadence perf`', async ($, on) => {
+  const s = await session($, on, { waves: [], perf: () => ({ exitCode: 0, stdout: PERF }) })
+  await s.advance(5_000)
+  await s.hud('lots')
+  expect((await s.draw()).text).not.toMatch(/Lots en cours/)
+  expect(s.perfs()).toEqual([])
 })

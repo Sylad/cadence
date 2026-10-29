@@ -145,10 +145,13 @@ lots:
     created: 2026-10-29
   - id: L423
     title: "orchestrate --resume --integrate sort en 0 quand l'intégration est refusée et le lot rendu (29-10, L402 : revue courte du diff rebasé non conforme) — code 1 comme toute vague dont un lot est rendu"
-    status: todo
+    status: dropped
     estimate: 0.1
     quickwin: true
     created: 2026-10-29
+    finished: 2026-10-29
+    notes:
+      - { date: 2026-10-29, text: "abandonné : fausse prémisse : le code 0 lu le 29-10 était celui du | tail du pipeline, orchestrate --integrate sortait bien en 1 (vérifié avec PIPESTATUS à l'intégration de L411)" }
   - id: L412
     title: "Panneau des lots : en tête, « ce qui attend une décision » — questions des sessions (texte court + commande --answer), lots rendus au lead (cause en une ligne), verdicts UX à poser, livraisons en échec ; lu dans les états de vague et le plan — idée validée par Sylvain le 28-10"
     public: Ce qui attend une décision, en tête du panneau

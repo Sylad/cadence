@@ -80,11 +80,6 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
-### Changed
-
-- `code-reviewer` and `qa-reviewer` answer the lead in 5 lines at most (`Verdict:`, `Blocking:`, `Follow-ups:`, `Report:`) and write the full report to a file when the brief carries a `Report file: <path>` line; the `lead` skill gives that line and reads the file only on demand (L440, `docs/skills.md`, `docs/lead.md`). Without the line (waves, hand use) the report is complete, as before.
-- `cadence verify --gate` plays in a throwaway copy, not in the main tree, while an orchestration wave is live on the repository: an integration moving HEAD mid-gate no longer yields a « non probant » verdict (L431). `verify.inPlace: true` is still obeyed.
-
 ### Added
 
 - The lots panel (`/hud lots`) draws, under each lot that a wave carries (or whose code review the plan holds while it is in progress), the **cycle of the lot as a strip**: the wave's stages — `fiche`, `maquette`, `accept` (only those the lot played), `implement`, `revue`, `correction n/3`, `porte`, `UX`, `intégration`, `prêt` — with the current one in bold, its duration and the passes (`correction 1/3`, `revue ×2`, the gate `build` or `tests`), then the plan's: `revue posée → clos → livré`. A strip too long for the panel folds its finished stages into `✔ n`, then tightens its arrows, before cutting its end. `cadence lead tour --json` gives a lot `reviewed: true` when the plan holds its code review, and the collector gives each lot of a wave the list of its steps (`trail`) (L413, `docs/cadence-hud.md`).
@@ -92,7 +87,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
+- `code-reviewer` and `qa-reviewer` answer the lead in 5 lines at most (`Verdict:`, `Blocking:`, `Follow-ups:`, `Report:`) and write the full report to a file when the brief carries a `Report file: <path>` line; the `lead` skill gives that line and reads the file only on demand (L440, `docs/skills.md`, `docs/lead.md`). Without the line (waves, hand use) the report is complete, as before.
+- `cadence verify --gate` plays in a throwaway copy, not in the main tree, while an orchestration wave is live on the repository: an integration moving HEAD mid-gate no longer yields a « non probant » verdict (L431). `verify.inPlace: true` is still obeyed.
 - The `pre-push` hook's gate check (L426) lets through a commit that changes only the plan (`.cadence/raf.yaml`, or the file `plan:` names) when the commit below it, or the one below a stack of such commits (up to 50), has a verdict: it takes that verdict, green or red, instead of demanding a full suite replayed for the `raf done` commit (29-10, cadence and avatar) (L432, `docs/deliver.md`). A commit that also touches another file, a merge, a root commit and a stack with no verdict below are refused as before. The `lead` and `deliver` skills, `docs/lead.md`, `docs/orchestrate.md` and `docs/raf.md` say so.
+- `cadence orchestrate --status` (and `--status --watch`) prints a **compact table**: one line per lot (state, passes, review, UX, commits, tokens, duration), the wave total, the questions, the lots handed back and the escalation and warning lines; the per-lot detail (given goal, UX note and captures, tests already red at the start, choices made, hypotheses of the sheet, proposals, UX verdict) leaves it — the full table cost the lead 5 to 10 k tokens per read on 29-10. A single line names the lots that have a detail, and `cadence orchestrate --status [<wave>] --detail <project:lot>` (or the bare lot id when it is unique in the wave) prints it, read from the wave's state. The table at the end of a wave is unchanged (L441).
 
 ### Fixed
 

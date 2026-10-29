@@ -37,7 +37,7 @@ import { schemaFor } from './schemas.js';
 import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
-import { quotaText, renderTable, resumeCommand } from './table.js';
+import { quotaText, renderDetail, renderTable, resumeCommand } from './table.js';
 import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, repairSnapshotModules, snapshotExists, waveReadsControl, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
 
 export interface OrchestrateIo {
@@ -143,6 +143,8 @@ export interface Args {
   waits: boolean;
   since?: string;
   watch: boolean;
+  /** `--status --detail projet:lot` (L441) : le détail d'un lot (choix, propositions, captures…) que le tableau compact de `--status` n'imprime pas. */
+  detail?: string;
   /** Secondes entre deux rendus de `--status --watch`. */
   interval?: number;
   resume?: string | true;
@@ -232,7 +234,8 @@ export function parseOrchestrateArgs(argv: string[]): Args {
     else if (t === '--since') {
       a.since = value(t);
       if (!isDay(a.since)) throw new RafError(`--since invalide : ${a.since} (AAAA-MM-JJ)`);
-    } else if (t === '--watch') a.watch = true;
+    } else if (t === '--detail') a.detail = value(t);
+    else if (t === '--watch') a.watch = true;
     else if (t === '--interval') a.interval = parseMaxSessions(value(t), '--interval');
     else if (t === '--budget') {
       const v = value(t);
@@ -683,7 +686,14 @@ function statusView(args: Args, launch: string, cap: number, now: Date): { live:
   // `running` : la vague suivie tourne — pour un <id> explicite, elle seule compte, pas les autres vagues de la machine
   const running = id !== undefined ? liveWaves(cadenceHome()).some((w) => w.wave === store.readWave()!.id) : waveLive;
   const lots = store.lots();
-  return { live, table: [...renderTable(store.readWave()!, lots), ...keptLines(lots.map((l) => l.repo), now.getTime())], running };
+  if (args.detail !== undefined) {
+    try {
+      return { live: [], table: renderDetail(lots, args.detail), running };
+    } catch (e) {
+      throw new RafError((e as Error).message);
+    }
+  }
+  return { live, table: [...renderTable(store.readWave()!, lots, { compact: true }), ...keptLines(lots.map((l) => l.repo), now.getTime())], running };
 }
 
 /** La vague que `--status` suit (L395) : `--status <id>` ou `--status --wave <id>` ; aucune : la dernière du dossier. Deux ids différents : refus. */
@@ -751,6 +761,8 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.until !== undefined) args.untilAt = parseUntil(args.until, io.now()); // heure invalide ou passée : refus avant d'agir
   if (args.continue) priorityOf(args, launch); // une clé priority: illisible du cadence.yaml : refus avant d'agir, lots donnés ou non
   if (args.watch && args.status === undefined) throw new RafError('--watch s\'utilise avec --status');
+  if (args.detail !== undefined && args.status === undefined) throw new RafError('--detail s\'utilise avec --status');
+  if (args.detail !== undefined && args.watch) throw new RafError('--detail ne se combine pas avec --watch (il donne le détail d\'un lot, pas le tableau)');
   if (args.interval !== undefined && !args.watch) throw new RafError('--interval s\'utilise avec --status --watch');
   // --drop / --stop-after-current (L79) pilotent une vague VIVANTE : ni avec --status (rien à piloter), ni --stop-after-current avec --resume (il le contredit). --resume --drop retire le lot avant de rejouer la vague arrêtée.
   if (args.status !== undefined && (args.drop.length || args.stopAfterCurrent)) throw new RafError('--status ne se combine pas avec --drop / --stop-after-current');
@@ -807,7 +819,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.resume !== undefined) return resume(args, argv, io, deps, launch, today);
   if (args.drop.length || args.stopAfterCurrent) return control(args, io);
 
-  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
+  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);

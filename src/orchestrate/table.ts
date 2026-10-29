@@ -202,8 +202,50 @@ export function resumeAnswerHint(waveId: string, l: Pick<LotState, 'project' | '
   return resumeCommand(waveId, '--answer', `${l.project}:${l.lot}`, '"…"');
 }
 
-/** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. */
-export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[]; now?: number } = {}): string[] {
+/** Les lignes d'un lot qui restent dans le tableau compact : une escalade et les avertissements sont des signaux, pas du détail. */
+function signalLines(l: LotState): string[] {
+  const out: string[] = [];
+  if (l.escalation) out.push(`${l.project}:${l.lot} — escalade ${l.escalation.model} : ${escalationText(l)}`);
+  for (const w of l.warnings) out.push(`${l.project}:${l.lot} — ⚠ ${w}`);
+  return out;
+}
+
+/** Le détail d'un lot (L441) : ce que le tableau compact de `--status` n'imprime pas et que `--status --detail <lot>` donne. */
+function detailLines(l: LotState): string[] {
+  const out: string[] = [];
+  if (l.goal) out.push(`${l.project}:${l.lot} — objectif donné : ${l.goal}`);
+  if (l.uxNote) out.push(`${l.project}:${l.lot} — ${l.uxNote}`);
+  if (l.uxCaptures) out.push(`${l.project}:${l.lot} — captures Playwright : ${l.uxCaptures}`);
+  // Ligne de base des tests (L213) : les échecs déjà présents au sha de départ, à part de ceux du lot.
+  const base = l.baseline;
+  if (base?.failures.length) {
+    const where = `${base.sha ? ` (${base.sha.slice(0, 7)}${base.verified ? '' : ', annoncé par la session, non vérifié'})` : ''}`;
+    for (const t of base.failures.slice(0, BASELINE_LISTED)) out.push(`${l.project}:${l.lot} — déjà rouge au départ${where} : ${t}`);
+    if (base.failures.length > BASELINE_LISTED) out.push(`${l.project}:${l.lot} — déjà rouge au départ${where} : … et ${base.failures.length - BASELINE_LISTED} autre(s)`);
+  }
+  for (const x of l.choix ?? []) out.push(`${l.project}:${l.lot} — choix fait : ${x}`);
+  for (const h of l.hypotheses ?? []) out.push(`${l.project}:${l.lot} — hypothèse de la fiche : ${h}`);
+  for (const p of l.proposals) out.push(`${l.project}:${l.lot} — proposé : ${p}`);
+  if (l.uxVerdict && l.visible) out.push(`${l.project}:${l.lot} — verdict UX pour « raf ux » : ${l.uxVerdict}`);
+  return out;
+}
+
+/**
+ * `--status --detail <lot>` (L441) : les lignes de détail d'un lot de la vague, lues dans l'état de la vague (le fichier de chaque lot).
+ * `sel` : `projet:lot` ou le seul `lot` s'il est unique dans la vague. Lot inconnu ou ambigu : lève.
+ */
+export function renderDetail(lots: LotState[], sel: string): string[] {
+  const hit = lots.filter((l) => `${l.project}:${l.lot}` === sel);
+  const found = hit.length ? hit : sel.includes(':') ? [] : lots.filter((l) => l.lot === sel);
+  if (found.length === 0) throw new Error(`lot inconnu dans cette vague : ${sel} (lots : ${lots.map((l) => `${l.project}:${l.lot}`).join(', ')})`);
+  if (found.length > 1) throw new Error(`lot ambigu : ${sel} (${found.map((l) => `${l.project}:${l.lot}`).join(', ')}) : donner projet:lot`);
+  const l = found[0]!;
+  const lines = detailLines(l);
+  return lines.length ? lines : [`${l.project}:${l.lot} — aucun détail (ni objectif, capture, choix, proposition, ni verdict UX)`];
+}
+
+/** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. `compact` (L441, `--status`) : sans le détail des lots, une seule ligne renvoie à `--status --detail`. */
+export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[]; now?: number; compact?: boolean } = {}): string[] {
   const rows = lots.map((l) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`]);
   const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée'];
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
@@ -223,23 +265,12 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
     out.push(`${d.ready.project}:${d.ready.lot} — livrable jusqu'à ${d.sha} (dernier commit de ${d.ready.lot}, sous ${d.under.lot} ${d.under.status === 'handed-back' || d.under.status === 'failed' ? 'rendu' : LABEL[d.under.status]}) : git push origin ${d.sha}:main && cadence deliver --sha ${d.sha}`);
   }
   for (const l of lots) {
-    if (l.goal) out.push(`${l.project}:${l.lot} — objectif donné : ${l.goal}`);
-    if (l.escalation) out.push(`${l.project}:${l.lot} — escalade ${l.escalation.model} : ${escalationText(l)}`);
-    if (l.uxNote) out.push(`${l.project}:${l.lot} — ${l.uxNote}`);
-    if (l.uxCaptures) out.push(`${l.project}:${l.lot} — captures Playwright : ${l.uxCaptures}`);
-    for (const w of l.warnings) out.push(`${l.project}:${l.lot} — ⚠ ${w}`);
-    // Ligne de base des tests (L213) : les échecs déjà présents au sha de départ, à part de ceux du lot.
-    const base = l.baseline;
-    if (base?.failures.length) {
-      const where = `${base.sha ? ` (${base.sha.slice(0, 7)}${base.verified ? '' : ', annoncé par la session, non vérifié'})` : ''}`;
-      for (const t of base.failures.slice(0, BASELINE_LISTED)) out.push(`${l.project}:${l.lot} — déjà rouge au départ${where} : ${t}`);
-      if (base.failures.length > BASELINE_LISTED) out.push(`${l.project}:${l.lot} — déjà rouge au départ${where} : … et ${base.failures.length - BASELINE_LISTED} autre(s)`);
-    }
-    for (const x of l.choix ?? []) out.push(`${l.project}:${l.lot} — choix fait : ${x}`);
-    for (const h of l.hypotheses ?? []) out.push(`${l.project}:${l.lot} — hypothèse de la fiche : ${h}`);
-    for (const p of l.proposals) out.push(`${l.project}:${l.lot} — proposé : ${p}`);
-    if (l.uxVerdict && l.visible) out.push(`${l.project}:${l.lot} — verdict UX pour « raf ux » : ${l.uxVerdict}`);
+    out.push(...signalLines(l));
+    if (deps.compact) continue;
+    out.push(...detailLines(l));
   }
+  const withDetail = lots.filter((l) => detailLines(l).length > 0).map((l) => `${l.project}:${l.lot}`);
+  if (deps.compact && withDetail.length) out.push(`détail (objectif, captures, base de tests, choix, propositions, verdict UX) : cadence orchestrate --status --detail <projet:lot> — ${withDetail.join(', ')}`);
   return out;
 }
 

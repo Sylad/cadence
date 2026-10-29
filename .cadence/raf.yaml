@@ -248,12 +248,13 @@ lots:
     finished: 2026-10-29
   - id: L427
     title: "Test R19 de test/lead-skill-push-porte-l426.test.ts : il cherche l'entrée de L426 dans [Unreleased] du CHANGELOG, que le commit de version vide — la porte de la release 1.24.0 est rouge (29-10) ; lire la section qui porte l'entrée (changelogSectionOf, test/changelog-section.ts), et voir pourquoi test/changelog-garde.test.ts ne l'a pas refusé"
-    status: doing
+    status: done
     estimate: 0.1
     quickwin: true
     created: 2026-10-29
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "compliant — orchestré (vague 2026-10-29-cad1, 0 passe(s) de correction)", commit: 01ed6e55a865aa71424342d5cbcc9200d7747933, reporte: { de: 59aaf9741f9201f65ae0e099d73d53a0e5cd0a0d, vers: 01ed6e55a865aa71424342d5cbcc9200d7747933, patchId: 39ab831d3ccf1e7821cc885c817cf6c1b771f2f1 } }
+    finished: 2026-10-29
   - id: L428
     title: "Goulot « bug de code » (cadence perf du 29-10 : 100 passes de correction sur 143 classées) : classer ces passes par cause (cadence corrections --classify), retenir les 2 ou 3 causes dominantes et changer le maillon qui les produit (brief implement : relecture de son diff contre la fiche et les règles, cas limites testés avant de rendre) ; mesurer l'effet sur 2 fenêtres de cadence perf — décision de Sylvain du 29-10"
     status: doing
@@ -262,12 +263,13 @@ lots:
     started: 2026-10-29
   - id: L429
     title: "raf public (et tout raf dont plan.onWrite échoue) : l'erreur montre la fin de la pile Node au lieu du motif (« titre public … non conforme (93 caractères > 80) ») — afficher la première ligne d'erreur du script, pas la pile (29-10, ol L232)"
-    status: doing
+    status: done
     estimate: 0.1
     quickwin: true
     created: 2026-10-29
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "compliant — orchestré (vague 2026-10-29-cad1, 0 passe(s) de correction)", commit: 24670b5a48beeaa56102c54932ccffbeae2a1161, reporte: { de: 46b03597bc7ff88753f8d71e551f9c25eb0942f7, vers: 24670b5a48beeaa56102c54932ccffbeae2a1161, patchId: feb135c5ded25b9f8c786126a77f5789c62affb4 } }
+    finished: 2026-10-29
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -287,10 +287,14 @@ lots:
     created: 2026-10-29
   - id: L431
     title: "verify --gate --sha joue la porte dans l'arbre principal (« propre, au sha ») pendant une vague vivante du dépôt : une intégration déplace HEAD au milieu, verdict non probant, 5 min perdues (29-10, L427) — pendant une vague vivante du dépôt, toujours une copie jetable"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
+    review: { date: 2026-10-29, verdict: "conforme : 0 bloquant, 0 majeur, 1 mineur (aide CLI, commentaire de config et docs/orchestrate.md pas alignés sur le cas « vague vivante ») — revue Sonnet de la vague c431, confirmée par le lead (l'incident « commit pendant la revue » était le commit de plan du lead, 8d1620c)", commit: e23b9e4c2ce825bed70ef3f857b6cea928ea3781 }
+    notes:
+      - { date: 2026-10-29, text: "Mineur de la revue (note) : aide CLI, commentaire de config et docs/orchestrate.md à aligner sur le cas « vague vivante »" }
+    finished: 2026-10-29
   - id: L432
     title: "Pre-push (L426) : un commit qui ne touche que le plan (.cadence/raf.yaml) au-dessus d'un sha à porte verte est refusé, d'où une suite complète rejouée pour raf done (29-10, cadence et avatar) — reprendre le verdict du parent quand le diff ne touche que le plan"
     status: done

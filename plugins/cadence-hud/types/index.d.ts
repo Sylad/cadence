@@ -42,6 +42,8 @@ export type WaveLot = {
   model: string
   next: string | null
   steps: number
+  /** Les pas du lot (genre, statut, début, fin), dans l'ordre : la frise du cycle du panneau des lots (L413) en tire ses étapes. Absent d'un collecteur plus ancien. */
+  trail?: { kind: string; status: string; started: string; ended?: string }[]
   step: WaveStep | null
   /** Porte du programme en cours (build ou tests), sans session claude ; absente hors d'une vague vivante. */
   gate?: { label: string; started: string } | null
@@ -85,7 +87,7 @@ export type Project = {
 }
 
 /** Un lot non clos de `cadence lead tour --json` (L401) ou, dans un plan natif, une sous-tâche non close (`<lot>/<n>`, `parent` = le lot, jamais d'`after`). */
-export type TourLot = { id: string; title: string; status: 'todo' | 'doing'; after: string[]; parent?: string }
+export type TourLot = { id: string; title: string; status: 'todo' | 'doing'; after: string[]; parent?: string; /** La revue de code du lot est posée au plan (L413) ; absent sans revue ou d'un cadence plus ancien. */ reviewed?: true }
 
 /** Une ligne du tour pour le panneau des lots : le projet, l'erreur du tour s'il n'a pas pu être lu, ses lots non clos. */
 export type LotsRow = { project: string; error?: string; lots?: TourLot[] }

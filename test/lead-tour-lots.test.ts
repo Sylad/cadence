@@ -83,3 +83,15 @@ describe('champ lots de cadence lead tour --json (L401)', () => {
     expect(leadTour(dir, '2026-10-28')[0]!.lots).toBeUndefined();
   });
 });
+
+describe('revue posée dans lots de cadence lead tour --json (L413)', () => {
+  it('R12 — un lot non clos dont le plan porte une revue de code a reviewed: true ; sans revue, le champ est absent ; une sous-tâche ne le porte jamais', () => {
+    const review = '    review: { date: 2026-10-29, verdict: "conforme" }\n';
+    const dir = nativeProject(lot('L1', 'doing', review + `    tasks:\n${task(1, 'doing')}`) + lot('L2', 'doing'));
+    expect(tourRow(dir, '2026-10-29').lots).toEqual([
+      { id: 'L1', title: 'Titre L1', status: 'doing', after: [], reviewed: true },
+      { id: 'L1/1', title: 'Tâche 1', status: 'doing', after: [], parent: 'L1' },
+      { id: 'L2', title: 'Titre L2', status: 'doing', after: [] },
+    ]);
+  });
+});

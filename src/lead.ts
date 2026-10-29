@@ -76,6 +76,8 @@ export interface TourLot {
   after: string[];
   /** Lot parent : `Lot.parent` d'un plan tenu par un autre outil, le lot lui-même pour une sous-tâche. */
   parent?: string;
+  /** La revue de code du lot est posée au plan (`raf review`, L413) : l'étape « revue posée » de la frise du panneau ; absent sans revue et d'une sous-tâche. */
+  reviewed?: true;
 }
 
 export interface TourRow {
@@ -110,7 +112,7 @@ export function openLots(lots: Lot[]): TourLot[] {
   return lots
     .filter((l) => isOpen(l.status) && !isRecurring(l))
     .flatMap((l): TourLot[] => [
-      { id: l.id, title: l.title, status: l.status as 'todo' | 'doing', after: l.after, ...(l.parent ? { parent: l.parent } : {}) },
+      { id: l.id, title: l.title, status: l.status as 'todo' | 'doing', after: l.after, ...(l.parent ? { parent: l.parent } : {}), ...(l.review ? { reviewed: true as const } : {}) },
       ...l.tasks.filter((t) => isOpen(t.status)).map((t): TourLot => ({ id: `${l.id}/${t.id}`, title: t.title, status: t.status as 'todo' | 'doing', after: [], parent: l.id })),
     ]);
 }

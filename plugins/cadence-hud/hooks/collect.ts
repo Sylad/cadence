@@ -16,6 +16,7 @@ import type { LeadHold, Wave } from '../types'
  * chaque vague `cwd` (son dossier de lancement) : les commandes à copier du panneau commencent par `cd` là.
  * Il rend aussi, avec les vagues, les sessions du lead inscrites par `cadence lead hold` (`<home>/holds/*.json`, sans
  * filtrer l'échéance : la bande le fait à chaque dessin) et le plafond de sessions (CADENCE_MAX_SESSIONS, 2 par défaut).
+ * Chaque lot porte `trail`, la liste de ses pas (genre, statut, début, fin ; L413) d'où la frise du panneau des lots tire ses étapes.
  * Sortie : `{waves, holds, cap, ended}`.
  */
 export const COLLECTOR = `
@@ -83,10 +84,15 @@ def read_lots(d, live):
                 'pid': spid, 'alive': bool(spid) and alive(spid),
                 'sub': claude_descendants(tree, spid) if spid else 0,
             }
+        # les pas du lot (L413) : la frise du panneau des lots en tire ses étapes, leurs durées et leurs passes
+        trail = [
+            dict((k, s[k]) for k in ('kind', 'status', 'started', 'ended') if isinstance(s.get(k), str))
+            for s in steps if isinstance(s, dict) and isinstance(s.get('kind'), str) and isinstance(s.get('started'), str)
+        ]
         lots.append({
             'project': l.get('project'), 'repo': l.get('repo'), 'lot': l.get('lot'), 'title': l.get('title') or '', 'status': l.get('status'),
             'pass': l.get('pass') or 0, 'model': l.get('model'), 'next': l.get('next'),
-            'steps': len(steps), 'step': step, 'gate': l.get('gate') if live else None,
+            'steps': len(steps), 'trail': trail, 'step': step, 'gate': l.get('gate') if live else None,
             'questions': l.get('questions') or [], 'outcome': l.get('outcome'), 'uxVerdict': l.get('uxVerdict'), 'visible': bool(l.get('visible')),
         })
     return lots

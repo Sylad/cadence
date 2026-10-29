@@ -130,9 +130,10 @@ lots:
     review: { date: 2026-10-29, verdict: "conforme : « … +N lots de plus » compte les lots à toute profondeur (descendants, behind, hides), test de propriété rouge sous 4 mutations ; bouton « + N lots » au premier niveau comme documenté ; 202 tests du mod, tsc, vitest verts ; interaction L410 vérifiée ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main n'a changé que le plan (L410 terminé, L416–L423), les cinq commits de code de L411 sont identiques (range-diff =)", commit: 510969e521ad839cd6745b6c95ce514fce13c0b7 }
   - id: L416
     title: "Créneaux toujours visibles : cadence lead tour affiche « créneaux libres : N sur M » même sans vague ni session du lead, et cadence lead release affiche après la libération les créneaux libres et la ligne « prêts, ressources libres », avec un ⚠ quand un créneau reste libre (29-10 : plafond 3 pris pour 2, un créneau vide plus d'une heure)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-29
+    started: 2026-10-29
   - id: L417
     title: "Porte de tests de cadence : la vague joue aussi claude plugin test plugins/cadence-hud et tsc -p plugins/cadence-hud avec les types générés (vitest exclut plugins/**) — 43 erreurs de typage (L402, 28-10) et un faux rouge du mod sous charge (29-10) passés sans que la porte les voie"
     status: todo

@@ -142,8 +142,8 @@ const linesOf = (d: Decision, columns: number): DecisionLine[] => {
 }
 
 /**
- * Le bloc de tête du panneau pour `columns` colonnes et `height` lignes : un titre, puis les décisions dans l'ordre (questions, lots rendus, verdicts UX, livraisons ; l'ordre de `decisionsOf`
- * est gardé), chacune sur une ligne et la commande, repliée, sous les questions et les verdicts (les lignes repliées comptent dans la hauteur). Trop haut : les premières décisions
+ * Le bloc de tête du panneau pour `columns` colonnes et `height` lignes : un titre, puis les décisions dans l'ordre de `decisionsOf` (celui des vagues, vivantes d'abord puis les finies de la plus récente à la plus ancienne,
+ * les sortes — questions, lots rendus, verdicts UX — s'entremêlant selon la vague qui porte le lot, puis les livraisons ; cet ordre est gardé), chacune sur une ligne et la commande, repliée, sous les questions et les verdicts (les lignes repliées comptent dans la hauteur). Trop haut : les premières décisions
  * qui tiennent avec la ligne « … +N décisions de plus » (`more` = N).
  * Aucune décision : aucune ligne, le bloc n'occupe rien.
  */

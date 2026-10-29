@@ -9,7 +9,7 @@ import type { LeadHold, Wave } from '../types'
  * de son wave.json) pour que la bande garde son statut sous les yeux ; elle la masque 30 min après sa fin (WAVE_LINGER_MS).
  * Les vagues terminées du dossier sont rendues à part dans `ended` (liste, vide sans vague finie), qu'une vague vive ou non : toutes celles dont l'id
  * n'est pas vivant (le wave.json d'une vague vivante est toujours le plus récent, orchestrate y réécrit `consumed` ; il ne compte pas), de la plus
- * récente à la plus ancienne par la date de leur wave.json, bornées aux ENDED_DAYS derniers jours et aux ENDED_MAX plus récentes (le coût du collecteur :
+ * récente à la plus ancienne par la date de leur wave.json, bornées aux ENDED_DAYS derniers jours (un garde-fou de ENDED_GUARD vagues protège le coût du collecteur, très au-dessus du rythme mesuré, sans être une règle ; le coût :
  * un wave.json et ses états de lots par vague, toutes les 5 s) ; les décisions en attente du panneau des lots (L412 : questions, lots rendus, verdicts UX)
  * les lisent par là, sans toucher à ce que la bande dessine — avant, seule la dernière finie était lue, et toute vague qui finissait dans le dossier
  * effaçait les questions et les lots rendus non tranchés des vagues d'avant. Chaque état de lot porte `repo` (le chemin absolu du dépôt du lot) et
@@ -109,7 +109,8 @@ for f in sorted(glob.glob(os.path.join(home, 'waves', '*.json'))):
 
 cwd = os.getcwd()
 live_ids = set(w['id'] for w in out)
-ENDED_DAYS, ENDED_MAX = 7, 30
+# la règle est la seule borne de 7 jours ; ENDED_GUARD n'est qu'un garde-fou de coût, très au-dessus du rythme mesuré (162 vagues en 7 jours)
+ENDED_DAYS, ENDED_GUARD = 7, 500
 finished = []
 for wf in glob.glob(os.path.join(cwd, '.cadence', 'runs', '*', 'wave.json')):
     # le wave.json d'une vague vivante est toujours le plus récent du dossier (orchestrate y réécrit consumed en continu) :
@@ -123,7 +124,7 @@ for wf in glob.glob(os.path.join(cwd, '.cadence', 'runs', '*', 'wave.json')):
     finished.append((m, wf))
 finished.sort(reverse=True)
 ended = []
-for m, wf in finished[:ENDED_MAX]:
+for m, wf in finished[:ENDED_GUARD]:
     if m < time.time() - ENDED_DAYS * 86400:
         break
     w = load(wf) or {}

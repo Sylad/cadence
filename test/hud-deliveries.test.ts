@@ -103,7 +103,7 @@ it('L412 R25 — les lignes de la commande repliée, collées telles quelles dan
   }
 })
 
-it('L412 R26 — le collecteur rend TOUTES les vagues finies du dossier (7 derniers jours, 30 au plus), de la plus récente à la plus ancienne : un lot rendu d’une vague ancienne survit à trois vagues finies depuis', () => {
+it('L412 R26 — le collecteur rend TOUTES les vagues finies du dossier des 7 derniers jours (sans plafond par nombre), de la plus récente à la plus ancienne : un lot rendu d’une vague ancienne survit à trois vagues finies depuis', () => {
   const root = mkdtempSync(join(tmpdir(), 'collect-'))
   try {
     const home = join(root, 'home')
@@ -138,12 +138,13 @@ it('L412 R26 — le collecteur rend TOUTES les vagues finies du dossier (7 derni
     expect(out.ended[3]!.lots).toMatchObject([{ lot: 'L412', status: 'handed-back', repo: join(cwd, 'cadence') }]) // le dépôt du lot, pour `cd` devant raf ux
     // la bande, elle, ne reçoit que la plus récente
     expect(out.waves.map(w => w.id)).toEqual(['2026-10-29-wo1'])
-    // 30 au plus : 31 vagues plus récentes poussent la vague 1650 hors de la liste
-    for (let i = 0; i < 31; i++) wave(`2026-10-29-n${i}`, (31 - i) * 60_000, null)
-    const capped = collect()
-    expect(capped.ended).toHaveLength(30)
-    expect(capped.ended.map(w => w.id)).not.toContain('2026-10-29-1650')
-    expect(capped.ended[0]!.id).toBe('2026-10-29-n30')
+    // pas de plafond par nombre : 40 vagues finies plus récentes ne poussent pas la vague rendue hors de la liste (162 vagues en 7 jours sur le dossier réel)
+    for (let i = 0; i < 40; i++) wave(`2026-10-29-n${i}`, (40 - i) * 60_000, null)
+    const many = collect()
+    expect(many.ended).toHaveLength(4 + 40)
+    expect(many.ended.map(w => w.id)).toContain('2026-10-29-1650')
+    expect(many.ended[0]!.id).toBe('2026-10-29-n39')
+    expect(many.ended.map(w => w.id)).not.toContain('2026-10-20-old') // la borne des 7 jours reste
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

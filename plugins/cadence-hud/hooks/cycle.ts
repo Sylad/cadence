@@ -57,12 +57,12 @@ const waveStages = (lot: CycleInput, now: number): Stage[] => {
   const running = [...known].reverse().find(t => t.status === 'running')
   const gating = !running && !!lot.gate
   const ready = lot.status === 'ready'
-  // l'étape courante : la session qui tourne, la porte, sinon (entre deux sessions) la prochaine du lot ; un lot rendu ou en échec garde sa dernière étape, en erreur
+  // l'étape courante : la session qui tourne, la porte, sinon (entre deux sessions) la prochaine du lot ; un lot rendu ou en échec marque en erreur l'étape de `next` (l'intégration d'un lot rendu à l'intégration), sinon sa dernière étape jouée
   let current: string | undefined
   let failed: string | undefined
   if (running) current = STAGE_OF[running.kind]
   else if (gating) current = 'porte'
-  else if (lot.status === 'failed' || lot.status === 'handed-back') failed = lastPlayed
+  else if (lot.status === 'failed' || lot.status === 'handed-back') failed = (lot.next && STAGE_OF[lot.next]) || lastPlayed
   else if (lot.status === 'question') current = lastPlayed
   else if (!ready && lot.next) current = STAGE_OF[lot.next]
   // l'étape la plus avancée jouée ; la porte n'en fait pas partie (elle passe entre l'écriture et la revue sans pas à elle)

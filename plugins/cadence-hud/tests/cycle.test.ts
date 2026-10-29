@@ -72,6 +72,19 @@ test('L413 R6 — un lot rendu ou en échec marque en erreur la dernière étape
   expect(cycleOf(wave({ status: 'question', trail: [step('implement', 0, 10)] }), undefined, NOW).find(s => s.label === 'implement')).toMatchObject({ state: 'current' })
 })
 
+test('L413 R6 — un lot rendu à l’intégration (`next: integrate`) marque en erreur l’intégration, pas la dernière étape jouée', () => {
+  const trail = [step('implement', 0, 10), step('review', 10, 12), step('ux', 12, 15)]
+  for (const status of ['handed-back', 'failed']) {
+    const c = cycleOf(wave({ status, next: 'integrate', trail }), undefined, NOW)
+    expect(c.find(s => s.label === 'intégration')).toMatchObject({ state: 'failed' })
+    expect(c.find(s => s.label === 'UX')).toMatchObject({ state: 'done' })
+    expect(c.filter(s => s.state === 'failed')).toHaveLength(1)
+  }
+  const noUx = cycleOf(wave({ status: 'handed-back', next: 'integrate', trail: trail.slice(0, 2) }), undefined, NOW)
+  expect(noUx.find(s => s.label === 'revue')).toMatchObject({ state: 'done' })
+  expect(noUx.find(s => s.label === 'intégration')).toMatchObject({ state: 'failed' })
+})
+
 test('L413 R7 — côté plan, après la vague : revue posée → clos → livré ; la revue posée est faite quand le plan la porte, la première étape du plan non faite est la courante quand la vague est prête', () => {
   const ready = wave({ status: 'ready', trail: [step('implement', 0, 10)] })
   const unreviewed = cycleOf(ready, { reviewed: false }, NOW)

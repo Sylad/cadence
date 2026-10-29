@@ -261,6 +261,7 @@ lots:
     estimate: 0.5
     created: 2026-10-29
     started: 2026-10-29
+    review: { date: 2026-10-29, verdict: "conforme (1 note mineure : l'exemple L322 de la page de mesure est un bug de code, pas une affirmation fausse) — orchestré (vague 2026-10-29-cad1, 3 passe(s) de correction + passe des mineurs)", commit: 3baff9052ca7139501f1b3e39c4b4ad0b93039ec, reporte: { de: 1d4b2e1793525651a05dcae6e80db45e65e38f99, vers: 3baff9052ca7139501f1b3e39c4b4ad0b93039ec, patchId: 19a5000ac46782ab20173e47ed71484a15b24468 } }
   - id: L429
     title: "raf public (et tout raf dont plan.onWrite échoue) : l'erreur montre la fin de la pile Node au lieu du motif (« titre public … non conforme (93 caractères > 80) ») — afficher la première ligne d'erreur du script, pas la pile (29-10, ol L232)"
     status: done

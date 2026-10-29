@@ -234,6 +234,7 @@ lots:
     notes:
       - { date: 2026-10-29, text: "29-10 : même famille — un raf add du lead dans l'arbre principal pendant l'intégration de L416 l'a fait refuser (arbre modifié) ; raf move refuse déjà pendant une vague, raf add/note/done devraient au moins avertir quand une intégration du dépôt est en cours" }
     started: 2026-10-29
+    review: { date: 2026-10-29, verdict: "compliant (2 commits : fae3931, 5b210e9) — 0 bloquant, 0 majeur, 1 mineur noté — orchestré (vague 2026-10-29-cad3, 0 passe(s) de correction)", commit: 9521cdff4823503bbb0bf24b07a5ce618806958b, reporte: { de: fae3931fbc10649c9da611ad7e673dd18fa7f9b6, vers: 9521cdff4823503bbb0bf24b07a5ce618806958b, patchId: 1cd3018e77b629697ce762d029d686ed74de3190 } }
   - id: L426
     title: "Push gardé par la porte : cadence verify --gate enregistre son verdict par sha, et le hook pre-push (L405) refuse un push dont le sha de tête n'a pas de verdict vert (contournable par une variable explicite) — 29-10 : evatosorus poussé avec une porte rouge, son code de sortie masqué par « | tail -1 » (récidive de la perte n° 1 du 28-10)"
     status: doing

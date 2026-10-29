@@ -8,10 +8,10 @@ nocapture: le panneau s'affiche dans le terminal et l'app de Claude Code, dans u
 ---
 Dans le panneau des lots (`/hud lots`), on peut maintenant changer l'ordre des lots sans quitter la conversation.
 
-- À la souris (terminal avec la souris active, app de bureau) : appuyez sur un lot, faites-le glisser sur un autre lot du même projet, relâchez. Pendant le glisser, un repère montre où il va tomber : `⇡` (avant la ligne survolée) ou `⇣` (après). Une sous-tâche se déplace de la même façon parmi celles de son lot.
+- À la souris (terminal avec la souris active, app de bureau) : appuyez sur un lot, faites-le glisser sur un autre lot du même projet et du même groupe (en cours, libres, bloqués), relâchez. Pendant le glisser, un repère montre où il va tomber : `⇡` (avant la ligne survolée) ou `⇣` (après). Une sous-tâche se déplace de la même façon parmi celles de son lot.
 - Au clavier : sélectionnez une ligne (un clic, puis ↑ / ↓), puis Alt+↑ ou Alt+↓ pour la placer avant le lot précédent ou après le suivant.
 - Le dépôt lance `raf move` dans le projet, puis le panneau relit les plans. Il écrit ensuite que le plan est modifié et reste à commiter : le panneau ne commite rien.
-- Le panneau range les lots par état (en cours, libres, le reste), pas dans l'ordre du plan : il dit donc ce que le geste fait vraiment. Un lot déposé là où le plan le place déjà ne lance rien et le panneau écrit « L10 est déjà avant L11 dans le plan : rien à déplacer » ; un déplacement qui change le plan sans rien changer à l'écran (les deux lots ne sont pas dans le même groupe d'état) est fait, et le panneau ajoute qu'à l'écran rien ne bouge parce qu'il trie par état.
+- Un lot ne se réordonne qu'à l'intérieur de son groupe, celui où le panneau l'affiche : en cours, libres, bloqués. Lâcher un lot libre sur un lot en cours est refusé : le panneau n'y touche pas, le `⊘` rouge le signale pendant le glisser et il écrit « L411 est en cours : un lot libre se range parmi les libres ». Alt+↑ ou Alt+↓ vers un voisin d'un autre groupe donne le même refus. Un lot ne disparaît donc plus sous « + N lots » après un déplacement.
 - Quand le déplacement est impossible, le panneau le dit sous son titre avec la raison, et rien ne bouge : une vague tient le dépôt, le plan est tenu par un autre outil (le panneau ne nomme pas cet outil : à chercher dans le projet), le lot est archivé, ou les deux lignes n'ont pas le même parent. Un `⊘` rouge prévient pendant le glisser quand l'arrivée sera refusée.
 - Sur mobile et dans l'éditeur, le panneau reste en lecture seule.
 

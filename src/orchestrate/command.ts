@@ -1474,10 +1474,12 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   }
   // Comme au départ : un dépôt tenu par une autre orchestration vivante est refusé avant toute écriture.
   // L443 : une reprise d'intégration (--integrate, --replay) attend la fin de l'autre vague au lieu de sortir en 2 ; toute autre reprise refuse comme avant.
-  const waitFor = integ.length ? { waitMs: deps.repoWait?.waitMs ?? REPO_WAIT_MS, pollMs: deps.repoWait?.pollMs ?? REPO_WAIT_POLL_MS } : null;
+  // Un refus déjà connu (vague qui tourne encore, claude introuvable, session en vie…) sort en 2 tout de suite : attendre 3 h ne le lèverait pas.
+  const waitFor = integ.length && !refusals.length ? { waitMs: deps.repoWait?.waitMs ?? REPO_WAIT_MS, pollMs: deps.repoWait?.pollMs ?? REPO_WAIT_POLL_MS } : null;
   const deadline = Date.now() + (waitFor?.waitMs ?? 0);
   // Pendant l'attente (jusqu'à 3 h) la reprise est inscrite parmi les vagues vivantes : le garde « la vague tourne encore » d'une seconde reprise la voit, et ne vient pas attendre à son tour.
   let waiting = false;
+  const stopBefore = store.control().stopAfterCurrent;
   try {
     for (const repo of new Set(live.flatMap(lotRepoPaths))) {
       const file = join(sharedStateDir(repo), REPO_LOCK);
@@ -1573,7 +1575,8 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     store.writeLot(l);
   }
   if (args.budget !== undefined) wave.budget = wave.consumed + args.budget;
-  store.clearStopRequest(); // un arrêt demandé à la vague d'avant ne doit pas arrêter celle-ci
+  // Un arrêt demandé à la vague d'avant ne doit pas arrêter celle-ci ; celui demandé pendant l'attente (la reprise est alors visible de --stop-after-current) est gardé.
+  if (!(waiting && !stopBefore && store.control().stopAfterCurrent)) store.clearStopRequest();
   for (const l of removed) {
     const k = lotKey(l.project, l.lot);
     store.requestDrop(k);

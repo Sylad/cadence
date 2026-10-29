@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { sharedStateDir } from '../src/state.js';
 import { REPO_LOCK } from '../src/orchestrate/lock.js';
 import { INTEGRATION_LOCK } from '../src/orchestrate/integrate.js';
-import { cadenceHome, liveSlots, liveWaves } from '../src/orchestrate/registry.js';
+import { cadenceHome, liveSlots, liveWaves, registerWave } from '../src/orchestrate/registry.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
 import { branches, conflictWave, fake, inWorktree, lotOf, meeting, planOf, run, setup, sharedFile, store, subjects, writes } from './orchestrate-worktree-harness.js';
 import { parseOrchestrateArgs } from '../src/orchestrate/command.js';
@@ -459,6 +459,38 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
       expect(liveWaves(cadenceHome())).toHaveLength(0);
     } finally {
       clearInterval(probe);
+      sleeper.kill();
+    }
+  });
+  it('L443 — une seconde reprise, déjà refusée parce que la première attend, sort en 2 sans attendre à son tour', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const sleeper = await otherWaveHolds(repo, null);
+    registerWave(cadenceHome(), { pid: sleeper.pid!, wave: '2026-10-04-1412', started: '2026-10-04T00:00:00Z', cwd: parent, repos: [] }); // la première reprise, en attente dans un autre processus
+    const t0 = Date.now();
+    const second = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 5000, pollMs: 50 } });
+    try {
+      expect(second.code).toBe(2);
+      expect(second.err).toContain('la vague 2026-10-04-1412 tourne encore');
+      expect(second.out).not.toContain('attente de sa fin');
+      expect(Date.now() - t0).toBeLessThan(2000);
+    } finally {
+      sleeper.kill();
+    }
+  });
+  it('L443 — --stop-after-current demandé pendant l\'attente n\'est pas effacé à la fin de l\'attente : l\'intégration ne part pas', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const sleeper = await otherWaveHolds(repo, 600);
+    try {
+      const pending = run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }), { repoWait: { waitMs: 20_000, pollMs: 50 } });
+      while (!liveWaves(cadenceHome()).some((w) => w.wave === '2026-10-04-1412')) await new Promise((res) => setTimeout(res, 20));
+      const stop = await run(parent, ['--stop-after-current'], fake());
+      expect(stop.code).toBe(0);
+      await pending;
+      expect(store(parent).readLot('a', lot)!.status).not.toBe('ready');
+      expect(subjects(repo).some((s) => s.startsWith(`feat(${lot})`))).toBe(false);
+    } finally {
       sleeper.kill();
     }
   });

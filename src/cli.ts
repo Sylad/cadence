@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { basename, dirname, join, posix, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -26,6 +26,7 @@ import { findProjects, readDepth, leadTour, readLeadUx, tourFreeLine, tourLine, 
 import { configuredCap, expiredHoldLines, slotsLine, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
+import { INTEGRATION_LOCK } from './orchestrate/integrate.js';
 import { cadenceHome, liveWaves, openLotsIn, openWavesIn, waveLotsIn, type OpenWave } from './orchestrate/registry.js';
 import { blockingLots, LABEL, resumeCommand } from './orchestrate/table.js';
 import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
@@ -379,6 +380,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       }
       plan.save();
       io.out(id);
+      warnIntegrating(root, io.err);
       return 0;
     }
     case 'start':
@@ -416,6 +418,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (command === 'drop' && values.reason) plan.note(rest[0], `abandonné : ${values.reason}`, today);
       plan.save();
       io.out(`${rest[0]} → ${status}`);
+      if (status === 'done') warnIntegrating(root, io.err);
       if (status === 'done' && !rest[0].includes('/')) {
         const lot = plan.lot(rest[0]);
         if (lot.visible && !loadEntries(newsDir).some((e) => e.lots.includes(lot.id))) {
@@ -463,6 +466,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       plan.note(rest[0], rest.slice(1).join(' '), today);
       plan.save();
+      warnIntegrating(root, io.err);
       return 0;
     }
     case 'did': {
@@ -1022,6 +1026,18 @@ function prePush(root: string, io: Io, remoteName?: string): number {
     return REFUSED;
   }
   return 0;
+}
+
+/**
+ * Avertit (stderr, sans refuser) quand une intégration du dépôt est en cours (L425) : le plan écrit dans l'arbre principal est un fichier suivi modifié, et
+ * l'intégration en cours le voit et refuse son lot (« arbre du dépôt modifié »). Seul l'arbre principal est concerné : dans le worktree d'un lot, l'écriture
+ * ne change pas l'arbre que l'intégration contrôle.
+ */
+function warnIntegrating(root: string, err: (line: string) => void): void {
+  const top = gitRoot(root);
+  if (!top || !statSync(join(top, '.git')).isDirectory()) return;
+  const holder = activeLock(join(sharedStateDir(root), INTEGRATION_LOCK));
+  if (holder) err(`avertissement : intégration en cours (vague ${holder.wave}, pid ${holder.pid}) — ce plan est un fichier suivi modifié de l'arbre principal, l'intégration en cours peut refuser son lot (arbre du dépôt modifié) : committer le plan sans attendre`);
 }
 
 /** La vague qui tient le verrou du dépôt tant qu'un de ses lots y travaille encore (état illisible : on la tient pour active) ; null si le dépôt est libre. Partagé par `deliver` et `spec reseal`. */

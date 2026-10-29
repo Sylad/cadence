@@ -80,6 +80,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cadence orchestrate` in worktree mode: a ready lot queues behind the other lots of its own wave on the integration lock instead of being handed back after 10 minutes (L425, `docs/orchestrate.md`; 2026-10-29, L417 behind L416: a replayed rebase plus the gate lasts about 10 minutes). The 10-minute bound now applies only to the lock held by another process.
+- `raf add`, `raf note` and `raf done` warn on stderr while an integration of the repository is in progress (L425, `docs/raf.md`): a plan written in the main tree during an integration made it refuse its lot (`arbre du dépôt modifié`, `raf add` of the lead during L416). Nothing changes in the result of the commands.
+
 ## [1.23.0] - 2026-10-29
 
 ### Added

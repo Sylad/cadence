@@ -6,7 +6,7 @@ import { ESCALATION_RESERVE } from '../src/orchestrate/cycle.js';
 import { lotBudget, lotBudgetBasis, orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { projectLogDir, type ClaudeFn, type LaunchOutcome } from '../src/orchestrate/launch.js';
 import { installPrePush } from '../src/orchestrate/guard.js';
-import { acquireSlot, addHold, cadenceHome, liveSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
+import { acquireSlot, addHold, cadenceHome, liveSlots, liveWaves, registerWave, releaseHold, unregisterWave } from '../src/orchestrate/registry.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { resumeAnswerHint } from '../src/orchestrate/table.js';
 import { AGENTS_DIR } from '../src/skills.js';
@@ -651,6 +651,26 @@ describe('plafond de sessions simultanées et --status (L71)', () => {
     } finally {
       x(); // idempotents : rendre un créneau déjà rendu ne fait rien
       y();
+      await done.catch(() => undefined);
+    }
+  });
+
+  it("L424 — le journal d'attente compte la session du lead et la nomme", async () => {
+    const { parent } = parentWith({ a: [{ title: 'un' }] });
+    const home = cadenceHome();
+    const x = await acquireSlot(home, 2, { wave: 'x' });
+    addHold(home, 'correctif-L12', 30, new Date());
+    const f = fakeDeps();
+    f.deps.slotPollMs = 10;
+    const r = io(parent);
+    const done = orchestrate(['a:L1', '--max-sessions', '2'], r.io, f.deps);
+    try {
+      await until(() => /en attente d'un créneau de session/.test(r.out.join('\n')), "le message d'attente de créneau");
+      expect(f.calls).toEqual([]);
+      expect(r.out.join('\n')).toMatch(/a:L1 · en attente d'un créneau de session depuis \d+ s \(2\/2 en cours : x, session du lead correctif-L12\)/);
+    } finally {
+      x();
+      releaseHold(home, 'correctif-L12');
       await done.catch(() => undefined);
     }
   });

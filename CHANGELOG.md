@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- `cadence verify --gate` plays in a throwaway copy, not in the main tree, while an orchestration wave is live on the repository: an integration moving HEAD mid-gate no longer yields a « non probant » verdict (L431). `verify.inPlace: true` is still obeyed.
+
 ### Added
 
 - The lots panel (`/hud lots`) opens with « ce qui attend une décision »: the questions of the sessions with the `--answer` command, the lots handed back to the lead with their cause in one line, the UX verdicts to record and the failed deliveries, read from the wave states (all the finished waves of the folder of the last 7 days, newest first, with no cap on their number, read through the collector's `ended` (a decision whose wave is older than 7 days leaves the block even if its lot is still open in the plan), apart from what the band shows: a newer wave running or finishing in the same folder does not erase a question or a handed-back lot that is still open in the plan), the plan (a decision whose lot is closed in a project the tour read is dropped) and the delivery log; the commands to copy start with `cd <folder> &&` (the wave's launch folder for `--answer`, the lot's repository for `raf ux`) so they run as they are from any folder, a question of a live wave shows « réponse possible à la fin de la vague » instead of a `--resume` orchestrate would refuse, and are wrapped at the panel's width, never cut, each line but the last ending with a ` \` continuation so the pasted lines run as one command (L412, `docs/cadence-hud.md`).

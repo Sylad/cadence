@@ -7,6 +7,8 @@ import { run } from '../src/cli.js';
 import { readOrchestrateConfig, readVerifyConfig } from '../src/config.js';
 import { copyDeps } from '../src/orchestrate/worktree.js';
 import { verifyGate } from '../src/verify-gate.js';
+import { REPO_LOCK } from '../src/orchestrate/lock.js';
+import { sharedStateDir } from '../src/state.js';
 import { cleanupTempDirs, gitRepo, tempDir } from './helpers.js';
 
 afterEach(cleanupTempDirs);
@@ -477,6 +479,31 @@ describe('verifyGate : où la porte tourne (L389)', () => {
     const { repo, sha } = project('orchestrate:\n  test: "true"\n', true);
     writeFileSync(join(repo, 'nouveau.txt'), 'x');
     expect(here(await gate(repo, sha))).toMatch(/copie jetable/);
+  });
+
+  const holdWave = (repo: string, pid: number) =>
+    writeFileSync(join(sharedStateDir(repo), REPO_LOCK), JSON.stringify({ pid, wave: '2026-10-29-x', started: '2026-10-29T10:00:00Z' }));
+
+  it('L431 R1 — une vague vivante tient le dépôt : copie jetable même si l\'arbre principal est propre au sha, et la sortie dit pourquoi', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: "true"\n', true);
+    holdWave(repo, process.pid);
+    const r = await gate(repo, sha);
+    expect(r.code).toBe(0);
+    expect(here(r)).toMatch(/copie jetable/);
+    expect(here(r)).toContain('vague 2026-10-29-x');
+    expect(r.text).not.toMatch(/arbre principal/);
+  });
+
+  it('L431 R2 — le verrou d\'une vague morte (pid disparu) ne compte pas : la porte reste jouée en place', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: "true"\n', true);
+    holdWave(repo, 2 ** 22 + 12345);
+    expect(here(await gate(repo, sha))).toMatch(/arbre principal/);
+  });
+
+  it('L431 R3 — verify.inPlace: true reste obéi pendant une vague vivante (choix explicite du projet)', async () => {
+    const { repo, sha } = project('orchestrate:\n  test: "true"\nverify:\n  inPlace: true\n', true);
+    holdWave(repo, process.pid);
+    expect(here(await gate(repo, sha))).toMatch(/arbre principal/);
   });
 
   it('L389 R4 — verify.inPlace: false : copie jetable même si l\'arbre est propre au sha', async () => {

@@ -315,7 +315,7 @@ verify:
   # inPlace: true  # the main tree or nothing: not clean at the sha → exit 2, nothing is run
 ```
 
-Absent, `verify.inPlace` chooses as above. Which dependencies are copied into the throwaway worktree:
+Absent, `verify.inPlace` chooses as above, with one more case for the copy (L431): **a live wave on the repository** (the `orchestrate.lock` of the repository is held by a running process). A wave integrates its lots by fast-forward into the main tree and commits its plan there, so HEAD can move during the gate and the verdict would be « non probant » (5 minutes lost, 29-10); while a wave is live the gate therefore always runs in the throwaway copy, and the first line says why (`la vague … est vivante sur ce dépôt`). A stale lock (dead process) does not count. `verify.inPlace: true` is still obeyed, as the project's explicit choice. Which dependencies are copied into the throwaway worktree:
 
 - `orchestrate.worktreeDeps: [node_modules, .venv, front/node_modules]` in `cadence.yaml`: those paths, relative to the repository
   (no absolute path, no `..`); one that does not exist in the main tree is reported and skipped;

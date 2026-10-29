@@ -350,9 +350,10 @@ lots:
     created: 2026-10-29
   - id: L439
     title: "Livreur délégué : pour un lot prêt, une sous-session fait la chaîne lead (verify --gate au sha, verdict UX sur captures selon lead.ux, raf done, commit du plan et des fichiers de plan.onWrite, push du sha, deliver, qa-reviewer) et rend UNE ligne au lead (« L84 livré 3d6edf4, QA 2/2 ») ou une question ; livraisons toujours une à une — le contexte du lead a atteint 460k le 29-10 surtout par ces chaînes (~10 appels par lot) (demande de Sylvain)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-29
+    started: 2026-10-29
   - id: L440
     title: "Comptes rendus courts des agents qa-reviewer et code-reviewer appelés par le lead : 5 lignes (verdict, bloquants, suites) au lead, rapport complet écrit dans un fichier lu à la demande — une vingtaine de rapports de 3 à 5k ont gonflé le lead le 29-10 (demande de Sylvain)"
     status: doing

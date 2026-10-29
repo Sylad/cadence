@@ -359,14 +359,14 @@ test('R1 — le plafond compte les lots du premier niveau : un lot et ses sous-l
 
 test('R2 — plus de 5 lots : un bouton « + N lots » compte le reste, replié par défaut', () => {
   const p = view([{ project: 'p', lots: Array.from({ length: 12 }, (_, i) => lot(`L${i + 1}`)) }])
-  expect(moreLine(p)).toEqual({ kind: 'more', project: 'p', hidden: 7, expanded: false })
+  expect(moreLine(p)).toEqual({ kind: 'more', project: 'p', hidden: 7, behind: 7, expanded: false })
   expect(p.lines.at(-1)).toMatchObject({ kind: 'more' })
 })
 
 test('R2 — le bouton déplié montre tout le reste du projet et devient « moins »', () => {
   const p = view([{ project: 'p', lots: Array.from({ length: 12 }, (_, i) => lot(`L${i + 1}`)) }], { [moreKey('p')]: true })
   expect(lotIds(p)).toHaveLength(12)
-  expect(moreLine(p)).toEqual({ kind: 'more', project: 'p', hidden: 7, expanded: true })
+  expect(moreLine(p)).toEqual({ kind: 'more', project: 'p', hidden: 7, behind: 7, expanded: true })
 })
 
 test('R2 — le choix est par projet : déplier l’un ne déplie pas l’autre', () => {
@@ -423,13 +423,13 @@ const buttons = (p: ReturnType<typeof buildPanel>) => p.lines.filter(l => l.kind
 test('R4 — le bouton « + N lots » reste affiché quand la hauteur coupe les lots : les lots coupés passent dans « … +N », jamais le bouton', () => {
   const p = buildPanel({ rows: [twelve('p')], columns: 70, height: 6, waves: [], views: {} })
   expect(p.lines.filter(l => l.kind === 'lot').map(l => l.kind === 'lot' && l.id)).toEqual(['L1'])
-  expect(buttons(p)).toEqual([{ kind: 'more', project: 'p', hidden: 7, expanded: false }])
+  expect(buttons(p)).toEqual([{ kind: 'more', project: 'p', hidden: 7, behind: 7, expanded: false }])
   expect(p.more).toBe(4) // L2 à L5 coupés ; les 7 autres sont derrière le bouton, qui les annonce
 })
 
 test('R4 — « moins » reste affiché quand la hauteur coupe le reste déplié : le projet se replie toujours', () => {
   const p = buildPanel({ rows: [twelve('p')], columns: 70, height: 10, waves: [], views: { [moreKey('p')]: true } })
-  expect(buttons(p)).toEqual([{ kind: 'more', project: 'p', hidden: 7, expanded: true }])
+  expect(buttons(p)).toEqual([{ kind: 'more', project: 'p', hidden: 7, behind: 7, expanded: true }])
   expect(p.lines.filter(l => l.kind === 'lot')).toHaveLength(5)
   expect(p.more).toBe(7)
 })
@@ -438,15 +438,94 @@ test('R4 — un bouton coupé avec son projet compte les lots qu’il cachait da
   const p = buildPanel({ rows: [twelve('a'), twelve('b')], columns: 70, height: 12, waves: [], views: {} })
   const visible = p.lines.filter(l => l.kind === 'lot').length
   // 24 lots en tout : ce que le panneau montre + ce que « … +N » annonce + ce que les boutons affichés annoncent
-  const behindButtons = buttons(p).reduce((n, l) => n + (l.kind === 'more' ? l.hidden : 0), 0)
+  const behindButtons = buttons(p).reduce((n, l) => n + (l.kind === 'more' ? l.behind : 0), 0)
   expect(visible + p.more + behindButtons).toBe(24)
 })
 
-test('L411 — la coupe compte les sous-lots d’un lot replié qu’elle retire : aucun lot ne disparaît sans être compté', () => {
-  const rows = [{ project: 's', lots: [lot('S1'), lot('S2'), lot('S3', 'todo', { parent: 'S1' }), lot('S4', 'todo', { parent: 'S1' })] }]
+/** Ce que le panneau rend compte de : les lots affichés, ceux qu'un lot replié affiché cache (tous ses descendants), ceux qu'un bouton replié affiché cache (sous-lots compris), et « … +N ». */
+const accounted = (p: ReturnType<typeof buildPanel>) =>
+  p.lines.reduce((n, l) => n + (l.kind === 'lot' ? 1 + (l.subs && !l.subs.open ? l.subs.total : 0) : l.kind === 'more' && !l.expanded ? l.behind : 0), 0) + p.more
+
+test('L411 — la coupe compte tous les descendants d’un lot replié qu’elle retire, petits-enfants compris (sonde 1)', () => {
+  // S1 > S3 > S5, plus S2 ; hauteur 4 : aucune ligne de lot ne tient, le pied doit compter les 4 lots (S5 est un petit-enfant)
+  const rows = [{ project: 's', lots: [lot('S1'), lot('S2'), lot('S3', 'todo', { parent: 'S1' }), lot('S5', 'todo', { parent: 'S3' })] }]
   const p = buildPanel({ rows, columns: 70, height: 4, waves: [] })
   expect(p.lines.filter(l => l.kind === 'lot')).toHaveLength(0)
   expect(p.more).toBe(4)
+  // le lot replié affiché porte le total de ses descendants, pas seulement ses sous-lots directs
+  const whole = buildPanel({ rows, columns: 70, height: 40, waves: [] })
+  expect(whole.lines.find(l => l.kind === 'lot' && l.id === 'S1')).toMatchObject({ subs: { count: 1, total: 2, open: false } })
+})
+
+test('L411 — un bouton coupé avec son projet compte les sous-lots cachés derrière lui (sonde 2)', () => {
+  // deux projets de 9 lots : 7 au premier niveau, 2 sous-lots sous L7 (derrière le bouton) ; hauteur 9
+  const nine = (name: string) => ({ project: name, lots: [...Array.from({ length: 7 }, (_, i) => lot(`L${i + 1}`)), lot('L8', 'todo', { parent: 'L7' }), lot('L9', 'todo', { parent: 'L7' })] })
+  const p = buildPanel({ rows: [nine('a'), nine('b')], columns: 70, height: 9, waves: [], views: {} })
+  expect(p.lines.filter(l => l.kind === 'lot')).toHaveLength(4)
+  // le bouton gardé (projet a) annonce 2 lots du premier niveau, en cache 4
+  expect(buttons(p)).toEqual([{ kind: 'more', project: 'a', hidden: 2, behind: 4, expanded: false }])
+  // L5 de a, L1 à L5 de b, et les 4 lots derrière le bouton coupé de b (L6, L7, L8, L9)
+  expect(p.more).toBe(10)
+  expect(accounted(p)).toBe(18)
+})
+
+test('L411 — trois niveaux derrière un bouton coupé : la chaîne entière est comptée dans « … +N »', () => {
+  // b : L1 à L7 au premier niveau, L7 > L8 > L9 ; le bouton de b (2 lots du premier niveau, 4 en tout) est coupé avec son projet
+  const b = { project: 'b', lots: [...Array.from({ length: 7 }, (_, i) => lot(`L${i + 1}`)), lot('L8', 'todo', { parent: 'L7' }), lot('L9', 'todo', { parent: 'L8' })] }
+  const p = buildPanel({ rows: [twelve('a'), b], columns: 70, height: 12, waves: [], views: {} })
+  expect(p.lines.filter(l => l.kind === 'lot').map(l => l.kind === 'lot' && l.id)).toEqual(['L1', 'L2', 'L3', 'L4', 'L5'])
+  expect(buttons(p)).toEqual([{ kind: 'more', project: 'a', hidden: 7, behind: 7, expanded: false }])
+  // les 9 lots de b : 5 lignes coupées + 4 derrière son bouton coupé (dont L8 et L9, à deux et trois niveaux)
+  expect(p.more).toBe(9)
+  expect(accounted(p)).toBe(21)
+})
+
+/** Un générateur déterministe (mulberry32) : le test rejoue toujours les mêmes arbres. */
+const prng = (seed: number) => () => {
+  seed = (seed + 0x6d2b79f5) | 0
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+}
+
+/** Un projet au hasard : des lots du premier niveau, des sous-lots `parent:` à toute profondeur, des sous-tâches natives `<lot>/<n>`, quelques after: et lots en cours. */
+const randomProject = (name: string, rnd: () => number): LotsRow => {
+  const lots: TourLot[] = []
+  const count = 1 + Math.floor(rnd() * 14)
+  for (let i = 0; i < count; i++) {
+    const status = rnd() < 0.15 ? 'doing' : 'todo'
+    const after = lots.length > 0 && rnd() < 0.2 ? [lots[Math.floor(rnd() * lots.length)]!.id] : []
+    const draw = rnd()
+    const parent = lots.length > 0 && draw < 0.55 ? lots[Math.floor(rnd() * lots.length)]! : undefined
+    if (parent && draw < 0.2) lots.push(task(parent.id, i, status))
+    else if (parent) lots.push(lot(`L${i + 1}`, status, { parent: parent.id, after }))
+    else lots.push(lot(`L${i + 1}`, status, { after }))
+  }
+  return { project: name, lots }
+}
+
+test('L411 — propriété : pour tout arbre et toute hauteur, lots affichés + descendants cachés + lots derrière les boutons gardés + « … +N » = total du tableau', () => {
+  const rnd = prng(2026_10_28)
+  let cases = 0
+  for (let round = 0; round < 120; round++) {
+    const rows = Array.from({ length: 1 + Math.floor(rnd() * 3) }, (_, i) => randomProject(`p${i}`, rnd))
+    const total = rows.reduce((n, r) => n + (r.lots?.length ?? 0), 0)
+    const views: Record<string, boolean> = {}
+    for (const r of rows) {
+      if (rnd() < 0.5) views[moreKey(r.project)] = true
+      for (const l of r.lots ?? []) if (rnd() < 0.5) views[openKey(r.project, l.id)] = true
+    }
+    const columns = rnd() < 0.5 ? 30 : 70
+    const folds = Object.fromEntries(rows.map(r => [r.project, false]))
+    const whole = buildPanel({ rows, columns, height: 1000, waves: [], views, folds })
+    expect(whole.more).toBe(0)
+    for (let height = 1; height <= whole.lines.length + 4; height++) {
+      const p = buildPanel({ rows, columns, height, waves: [], views, folds })
+      if (accounted(p) !== total) throw new Error(`hauteur ${height}, colonnes ${columns} : ${accounted(p)} lots rendus pour ${total}\n${JSON.stringify({ rows, views })}`)
+      cases++
+    }
+  }
+  expect(cases).toBeGreaterThan(1000)
 })
 
 test('L411 — la bascule d’un lot à sous-lots est collée à l’id à tous les niveaux, sous la colonne du glyphe du projet', () => {

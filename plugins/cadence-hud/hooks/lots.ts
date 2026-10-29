@@ -89,12 +89,15 @@ export const sortTree = (nodes: readonly LotNode[], rankOf: (lot: TourLot) => nu
 
 const hasInProgress = (n: LotNode, rankOf: (lot: TourLot) => number): boolean => rankOf(n.lot) === 0 || n.children.some(c => hasInProgress(c, rankOf))
 
-export type FlatLot = { lot: TourLot; depth: number; branch: '' | '├' | '└'; /** ses sous-lots, montrés ou non */ children: number }
+export type FlatLot = { lot: TourLot; depth: number; branch: '' | '├' | '└'; /** ses sous-lots directs, montrés ou non */ children: number; /** tous ses descendants, à toute profondeur : ce que cache le lot replié */ descendants: number }
+
+/** Le nombre de lots sous un nœud, à toute profondeur (sous-lots `parent:` et sous-tâches natives) ; 0 pour une feuille. */
+export const descendantCount = (n: LotNode): number => n.children.reduce((s, c) => s + 1 + descendantCount(c), 0)
 
 /** L'arbre à plat, dans l'ordre d'affichage ; chaque sous-lot porte ├ (suivi d'un frère) ou └ (le dernier). `isOpen` : les sous-lots d'un lot ne sont mis à plat que s'il dit oui (tous, par défaut). */
 export const flattenTree = (nodes: readonly LotNode[], isOpen: (lot: TourLot) => boolean = () => true, depth = 0): FlatLot[] =>
   nodes.flatMap((n, i) => [
-    { lot: n.lot, depth, branch: depth === 0 ? ('' as const) : i === nodes.length - 1 ? ('└' as const) : ('├' as const), children: n.children.length },
+    { lot: n.lot, depth, branch: depth === 0 ? ('' as const) : i === nodes.length - 1 ? ('└' as const) : ('├' as const), children: n.children.length, descendants: descendantCount(n) },
     ...(isOpen(n.lot) ? flattenTree(n.children, isOpen, depth + 1) : []),
   ])
 
@@ -134,10 +137,14 @@ export const moreKey = (project: string): string => `more:${project}`
 /** La clé du choix « les sous-lots de ce lot sont dépliés » dans les états du panneau (vrai = déplié) ; par projet, un même id pouvant se trouver dans deux. */
 export const openKey = (project: string, id: string): string => `open:${project}#${id}`
 
-/** Les lignes visibles d'un projet : les LOTS_PER_PROJECT premiers lots du premier niveau (ou tous, si la personne a déplié le reste), et les sous-lots des seuls lots dépliés. `hidden` : les lots du premier niveau que le plafond cache. */
-const visibleLots = (project: string, tree: readonly LotNode[], views: Readonly<Record<string, boolean>>): { flat: FlatLot[]; hidden: number } => ({
+/**
+ * Les lignes visibles d'un projet : les LOTS_PER_PROJECT premiers lots du premier niveau (ou tous, si la personne a déplié le reste), et les sous-lots des seuls lots dépliés.
+ * `hidden` : les lots du premier niveau que le plafond cache (le N du bouton) ; `behind` : tous les lots du reste, leurs sous-lots à toute profondeur compris (ce qu'un bouton replié cache vraiment).
+ */
+const visibleLots = (project: string, tree: readonly LotNode[], views: Readonly<Record<string, boolean>>): { flat: FlatLot[]; hidden: number; behind: number } => ({
   flat: flattenTree(views[moreKey(project)] === true ? tree : tree.slice(0, LOTS_PER_PROJECT), lot => views[openKey(project, lot.id)] === true),
   hidden: Math.max(0, tree.length - LOTS_PER_PROJECT),
+  behind: tree.slice(LOTS_PER_PROJECT).reduce((n, node) => n + 1 + descendantCount(node), 0),
 })
 
 /** Le compte des sous-lots d'un lot, tel qu'il s'affiche après son titre. */
@@ -160,11 +167,11 @@ export type PanelLine =
       /** Largeurs communes à toutes les lignes, pour l'alignement. */
       idWidth: number
       stateWidth: number
-      /** Présent quand le lot a des sous-lots : sa bascule (clé de ses états), leur nombre et s'ils sont montrés. */
-      subs?: { key: string; count: number; open: boolean }
+      /** Présent quand le lot a des sous-lots : sa bascule (clé de ses états), leur nombre (`count`, les directs, affiché), tous ses descendants (`total`, ce que cache le lot replié) et s'ils sont montrés. */
+      subs?: { key: string; count: number; total: number; open: boolean }
     }
-  /** Le bouton « + N lots » / « moins » du reste d'un projet de plus de LOTS_PER_PROJECT lots. */
-  | { kind: 'more'; project: string; hidden: number; expanded: boolean }
+  /** Le bouton « + N lots » / « moins » du reste d'un projet de plus de LOTS_PER_PROJECT lots : `hidden`, les lots du premier niveau du reste (le N affiché) ; `behind`, tous les lots du reste, sous-lots compris (ce que le bouton cache tant qu'il est replié). */
+  | { kind: 'more'; project: string; hidden: number; behind: number; expanded: boolean }
 
 export type Panel = { lines: PanelLine[]; /** lignes de lot non affichées faute de hauteur */ more: number }
 
@@ -189,15 +196,15 @@ export const buildPanel = (input: {
   const folds = input.folds ?? {}
   const views = input.views ?? {}
   const narrow = columns < NARROW_BODY
-  type Block = { project: LotsRow; flat: FlatLot[]; hidden: number; open: Set<string>; folded: boolean }
+  type Block = { project: LotsRow; flat: FlatLot[]; hidden: number; behind: number; open: Set<string>; folded: boolean }
   const blocks: Block[] = rows
     .filter(r => r.error || (r.lots && r.lots.length > 0))
     .map(r => {
       const open = new Set((r.lots ?? []).map(l => l.id))
       const waveOf = (l: TourLot) => waves.find(w => w.lot === l.id && sameProject(r.project, w.project))?.status
       const tree = sortTree(lotTree(r.lots ?? []), l => lotRank(l, open, waveOf(l)))
-      const { flat, hidden } = visibleLots(r.project, tree, views)
-      return { project: r, flat, hidden, open, folded: !r.error && isFolded(r.project, r.lots ?? [], folds) }
+      const { flat, hidden, behind } = visibleLots(r.project, tree, views)
+      return { project: r, flat, hidden, behind, open, folded: !r.error && isFolded(r.project, r.lots ?? [], folds) }
     })
   const baseLead = (f: FlatLot) => (f.depth === 0 ? '  ' : `  ${'  '.repeat(f.depth - 1)}${f.branch} `)
   const isOpen = (b: Block, f: FlatLot) => views[openKey(b.project.project, f.lot.id)] === true
@@ -226,14 +233,16 @@ export const buildPanel = (input: {
       const after = f.lot.after.map(id => ({ id, struck: !b.open.has(id) }))
       const afterText = after.length ? `after: ${after.map(a => a.id).join(' ')}` : ''
       const afterOwnLine = narrow && after.length > 0
-      const subs = f.children > 0 ? { key: openKey(b.project.project, f.lot.id), count: f.children, open: isOpen(b, f) } : undefined
+      const subs = f.children > 0 ? { key: openKey(b.project.project, f.lot.id), count: f.children, total: f.descendants, open: isOpen(b, f) } : undefined
       const room = columns - idWidth - 2 - stateWidth - 2 - (afterText && !narrow ? afterText.length + 2 : 0) - (subs ? subsText(subs.count).length + 2 : 0)
       lines.push({
         kind: 'lot', id: f.lot.id, lead: leadOf(b, f), title: ellipsize(f.lot.title, Math.max(1, room)), state: stateOf(b, f), after, afterOwnLine, idWidth, stateWidth, ...(subs ? { subs } : {}), height: afterOwnLine ? 2 : 1,
       })
     }
-    if (b.hidden > 0) lines.push({ kind: 'more', project: b.project.project, hidden: b.hidden, expanded: views[moreKey(b.project.project)] === true, height: 1 })
+    if (b.hidden > 0) lines.push({ kind: 'more', project: b.project.project, hidden: b.hidden, behind: b.behind, expanded: views[moreKey(b.project.project)] === true, height: 1 })
   }
+  // les lots qu'une ligne cache et qu'aucune autre ligne ne porte : les descendants d'un lot replié (à toute profondeur), le reste d'un projet derrière un bouton replié
+  const hides = (l: PanelLine): number => (l.kind === 'lot' ? (l.subs && !l.subs.open ? l.subs.total : 0) : l.kind === 'more' && !l.expanded ? l.behind : 0)
 
   const room = Math.max(1, input.height - 2)
   const total = lines.reduce((n, l) => n + l.height, 0)
@@ -256,9 +265,9 @@ export const buildPanel = (input: {
   const fits = shownLines.slice(0, Math.max(0, room - 1))
   const dropped = shownLines.slice(fits.length)
   const droppedLots = dropped.reduce((n, l) => n + (l.kind === 'project' ? l.count : 0), 0)
-  // un bouton replié coupé avec son projet cachait des lots qu'aucune ligne ne compte : ils passent dans « … +N » comme les autres
-  const cutButtons = lines.slice(kept).filter(l => l.kind === 'more' && l !== button && !l.expanded).reduce((n, l) => n + (l.kind === 'more' ? l.hidden : 0), 0)
-  // un lot replié que la coupure retire emporte ses sous-lots, qui ne sont plus des lignes : ils passent dans « … +N » avec lui
-  const cutLots = lines.slice(kept).reduce((n, l) => n + (l.kind === 'lot' ? 1 + (l.subs && !l.subs.open ? l.subs.count : 0) : 0), 0)
+  // un bouton replié coupé avec son projet cachait des lots qu'aucune ligne ne compte, sous-lots compris : ils passent dans « … +N » comme les autres
+  const cutButtons = lines.slice(kept).filter(l => l.kind === 'more' && l !== button).reduce((n, l) => n + hides(l), 0)
+  // un lot replié que la coupure retire emporte ses descendants à toute profondeur, qui ne sont plus des lignes : ils passent dans « … +N » avec lui
+  const cutLots = lines.slice(kept).reduce((n, l) => n + (l.kind === 'lot' ? 1 + hides(l) : 0), 0)
   return { lines: fits.map(({ height: _h, ...l }) => l as PanelLine), more: cutLots + droppedLots + cutButtons }
 }

@@ -80,6 +80,7 @@ def read_lots(d, live):
             'project': l.get('project'), 'lot': l.get('lot'), 'title': l.get('title') or '', 'status': l.get('status'),
             'pass': l.get('pass') or 0, 'model': l.get('model'), 'next': l.get('next'),
             'steps': len(steps), 'step': step, 'gate': l.get('gate') if live else None,
+            'questions': l.get('questions') or [], 'outcome': l.get('outcome'), 'uxVerdict': l.get('uxVerdict'), 'visible': bool(l.get('visible')),
         })
     return lots
 
@@ -137,7 +138,7 @@ export type Collected = { waves: Wave[]; holds: LeadHold[]; cap: number }
 /**
  * Lit la sortie du collecteur : `{waves, holds, cap}`, ou l'ancienne liste de vagues seule. Une sortie illisible
  * (JSON invalide) lève ; une forme étrange vaut aucune vague, aucune session du lead et le plafond par défaut.
- * Sans champ \`live\`, la vague est vivante.
+ * Sans champ `live`, la vague est vivante.
  */
 export const parseCollected = (stdout: string): Collected => {
   const raw: unknown = JSON.parse(stdout)
@@ -219,4 +220,41 @@ for d in [folder] + [os.path.join(folder, n) for n in names]:
         except OSError:
             pass
 print(json.dumps(stamps))
+`
+
+/**
+ * Les livraisons en échec d'un dossier de projets (python3 -I, argv[1] = le dossier, L412) : pour le dossier lui-même et chacun de ses sous-dossiers directs
+ * qui est un dépôt git (`.git` dossier ; un worktree ou un sous-module, dont `.git` est un fichier, est ignoré), la dernière ligne de
+ * `.git/cadence/deliveries-failed.log` quand ce journal a été écrit après `deliveries.log` (ou que celui-ci n'existe pas) : une livraison verte
+ * qui suit l'échec l'efface. Le jour ne suffit pas à ordonner deux écritures du même jour, la date de modification des fichiers le fait.
+ * Sortie : `[{project, day, sha, reason}]`, la raison sans sa classe `[ci]` ni la sortie de la commande en échec qui suit la raison. Lecture seule.
+ */
+export const DELIVERIES = `
+import os, sys, json, re
+folder = os.path.abspath(sys.argv[1])
+try:
+    names = sorted(n for n in os.listdir(folder) if not n.startswith('.') and n not in ('node_modules', 'tmp'))
+except OSError:
+    names = []
+out = []
+for d in [folder] + [os.path.join(folder, n) for n in names]:
+    log = os.path.join(d, '.git', 'cadence')
+    failed, green = os.path.join(log, 'deliveries-failed.log'), os.path.join(log, 'deliveries.log')
+    try:
+        mtime = os.stat(failed).st_mtime_ns
+        with open(failed, encoding='utf-8') as fh:
+            lines = [l for l in fh.read().split('\\n') if l.strip()]
+    except OSError:
+        continue
+    try:
+        if os.stat(green).st_mtime_ns >= mtime:
+            continue
+    except OSError:
+        pass
+    if not lines:
+        continue
+    m = re.match(r'^(\\S+) (\\S+) (?:\\[\\w+\\] ?)?(.*)$', lines[-1].split(' \u23ce ')[0])
+    if m:
+        out.append({'project': os.path.basename(d), 'day': m.group(1), 'sha': m.group(2), 'reason': m.group(3)})
+print(json.dumps(out))
 `

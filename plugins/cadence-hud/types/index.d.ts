@@ -43,6 +43,14 @@ export type WaveLot = {
   step: WaveStep | null
   /** Porte du programme en cours (build ou tests), sans session claude ; absente hors d'une vague vivante. */
   gate?: { label: string; started: string } | null
+  /** Questions posées par la session (L412), vides hors de l'état `question`. */
+  questions?: string[]
+  /** Issue du lot (état `handed-back` ou `failed` : la cause du rendu), `null` ou absente sinon (L412). */
+  outcome?: string | null
+  /** Verdict de la revue UX de la session (L412), posé au plan par `raf ux`. */
+  uxVerdict?: string | null
+  /** Le lot est visible : son verdict UX se pose au plan (L412). */
+  visible?: boolean
 }
 
 export type Wave = {
@@ -83,6 +91,9 @@ export type LotsRow = { project: string; error?: string; lots?: TourLot[] }
 /** Ce que le panneau a lu : les lignes du tour, et si cadence est trop ancien pour porter `lots`. */
 export type LotsBoard = { rows: LotsRow[]; outdated: boolean }
 
+/** Une livraison en échec d'un projet (L412) : la dernière ligne de `deliveries-failed.log`, quand aucune livraison verte ne l'a suivie. */
+export type FailedDelivery = { project: string; day: string; sha: string; reason: string }
+
 /** Ce que le dessin demande : placer `id` juste avant ou après `target` (L402). */
 export type MoveAsk = { id: string; target: string; place: 'before' | 'after' }
 
@@ -120,6 +131,8 @@ declare module 'claude-code' {
       lotsViews: Record<string, boolean>
       /** Le résultat du dernier déplacement demandé dans le panneau ; null avant le premier. */
       lotsNotice: LotsNotice | null
+      /** Les livraisons en échec lues pour le panneau des lots (L412), une par projet au plus. */
+      lotsDeliveries: FailedDelivery[]
       /** Heure (ms) de la dernière lecture réussie du panneau des lots. */
       lotsAt: number
       error: string | null

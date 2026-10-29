@@ -52,7 +52,10 @@ export const spendOf = (waves: readonly Wave[], typical: Readonly<Record<string,
   )
 }
 
-/** Le temps habituel d'un lot par classe, lu de `cadence perf --json` (`lotMinutes`) : la médiane de la fenêtre courante, à défaut de la précédente ; une sortie illisible ou étrangère n'en donne aucun. */
+/** Sous ce nombre de lots dans une fenêtre, sa médiane n'est pas un temps habituel : la même borne que `MIN_SAMPLE` de `cadence perf` (src/perf.ts), qui refuse alors toute tendance. */
+export const MIN_SAMPLE = 5
+
+/** Le temps habituel d'un lot par classe, lu de `cadence perf --json` (`lotMinutes`) : la médiane de la fenêtre courante, à défaut de la précédente, d'au moins MIN_SAMPLE lots ; une sortie illisible ou étrangère n'en donne aucun. */
 export const parseTypical = (stdout: string): Record<string, number> => {
   try {
     const raw: unknown = JSON.parse(stdout)
@@ -60,8 +63,9 @@ export const parseTypical = (stdout: string): Record<string, number> => {
     if (typeof by !== 'object' || by === null || Array.isArray(by)) return {}
     const out: Record<string, number> = {}
     for (const [cls, ind] of Object.entries(by)) {
-      const { current, previous } = (typeof ind === 'object' && ind !== null ? ind : {}) as { current?: unknown; previous?: unknown }
-      const minutes = [current, previous].find((v): v is number => typeof v === 'number' && Number.isFinite(v))
+      const { current, previous, lots } = (typeof ind === 'object' && ind !== null ? ind : {}) as { current?: unknown; previous?: unknown; lots?: { current?: unknown; previous?: unknown } | null }
+      const sample = (n: unknown) => typeof n === 'number' && n >= MIN_SAMPLE
+      const minutes = [sample(lots?.current) ? current : undefined, sample(lots?.previous) ? previous : undefined].find((v): v is number => typeof v === 'number' && Number.isFinite(v))
       if (minutes !== undefined) out[cls] = minutes
     }
     return out

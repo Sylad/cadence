@@ -1248,7 +1248,7 @@ test('L413 R17 — la frise prend une rangée dans la région : un appui sur la 
 
 // ── L414 : « lots en cours : budget et durée », en tête du panneau ──────────────────────────────────────────────────
 
-const PERF = JSON.stringify({ lotMinutes: { '0.5': { current: 30, previous: null } } })
+const PERF = JSON.stringify({ lotMinutes: { '0.5': { current: 30, previous: null, lots: { current: 5, previous: 0 } } } })
 /** `since` : 53 minutes avant l'instant 0 de l'horloge simulée, que le panneau lit comme « maintenant » (à quelques secondes près). */
 const spending = (extra: Record<string, unknown>): Wave => ({ ...WAVE, lots: [{ ...WAVE.lots[0]!, lot: 'L80', status: 'implementing', budget: 750_000, consumed: 786_000, estimate: 0.5, since: new Date(-53 * 60_000).toISOString(), until: null, ...extra } as Wave['lots'][number]] })
 

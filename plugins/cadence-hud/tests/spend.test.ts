@@ -71,9 +71,10 @@ test('L414 R9 — rien en cours : aucune ligne, pas même le titre ; la liste es
   expect(buildSpend(rows, 100, 0).lines).toEqual([])
 })
 
-test('L414 R10 — le temps habituel vient de `cadence perf --json` : la médiane de la fenêtre courante, à défaut de la précédente ; une sortie illisible ou étrangère n’en donne aucun', () => {
-  const out = JSON.stringify({ lotMinutes: { '0.5': { current: 42.4, previous: 30 }, '1': { current: null, previous: 80 }, '2': { current: null, previous: null }, '3': { current: 'x' } } })
-  expect(parseTypical(out)).toEqual({ '0.5': 42.4, '1': 80 })
+test('L414 R10 — le temps habituel vient de `cadence perf --json` : la médiane de la fenêtre courante, à défaut de la précédente, d’au moins 5 lots ; une sortie illisible ou étrangère n’en donne aucun', () => {
+  const ind = (current: unknown, previous: unknown, lots = { current: 6, previous: 6 }) => ({ current, previous, lots })
+  const out = JSON.stringify({ lotMinutes: { '0.5': ind(42.4, 30), '1': ind(null, 80), '2': ind(null, null), '3': { current: 'x' }, '4': ind(7.6, 24.1, { current: 3, previous: 8 }), '5': ind(11.3, null, { current: 1, previous: 0 }), '6': ind(9, 20, { current: 4, previous: 4 }), '7': ind(12, 15, { current: 5, previous: 2 }) } })
+  expect(parseTypical(out)).toEqual({ '0.5': 42.4, '1': 80, '4': 24.1, '7': 12 })
   expect(parseTypical('pas du json')).toEqual({})
   expect(parseTypical(JSON.stringify([1]))).toEqual({})
   expect(parseTypical(JSON.stringify({ lotMinutes: 3 }))).toEqual({})

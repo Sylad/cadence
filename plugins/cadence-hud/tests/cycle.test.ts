@@ -124,6 +124,15 @@ test('L413 R11 — trop étroite, la frise replie les étapes faites en « ✔ n
   expect(narrow).toMatch(/^✔ 2 → ▶ correction 1\/3 46 min/)
   for (const w of [60, 40, 20, 5, 1]) expect(cycleText(c, w).length, `${w} colonnes`).toBeLessThanOrEqual(w)
   expect(cycleText(c, 0)).toBe('')
+  // encore trop étroite : les flèches deviennent des espaces, toutes les étapes restent
+  const folded = cycleText(c, wide.length - 1)
+  const tight = cycleText(c, folded.length - 1)
+  expect(tight).not.toContain('→')
+  expect(tight).toContain('○ livré')
+  expect(tight.length).toBeLessThan(folded.length)
+  // une seule étape faite se replie aussi quand c'est elle qui fait tenir la frise
+  const one = cycleOf(wave({ status: 'reviewing', trail: [step('implement', 0, 10), step('review', 10, undefined)] }), { reviewed: false }, NOW)
+  expect(cycleText(one, cycleText(one, 400).length - 1)).toMatch(/^✔ 1 → ▶ revue /)
   // rien de fait : rien à replier, la frise est coupée à la largeur
   const fresh = cycleOf(wave({ trail: [step('implement', 0, undefined)] }), undefined, NOW)
   expect(cycleText(fresh, 30).length).toBeLessThanOrEqual(30)
@@ -138,7 +147,7 @@ const lotLines = (panel: ReturnType<typeof buildPanel>) => panel.lines.filter((l
 
 test('L413 R12 — dans le panneau, un lot de vague ou tenu en cours par le plan porte sa frise ; un lot à faire sans vague, une sous-tâche et un lot d’un autre projet n’en portent pas', () => {
   const tour = rows([lot('L1', 'doing', { reviewed: true }), lot('L2', 'todo'), lot('L3', 'todo'), lot('L1/1', 'doing', { parent: 'L1' }), lot('L9', 'doing')])
-  const panel = buildPanel({ rows: tour, columns: 120, height: 40, waves: [inWave('L2'), { ...inWave('L3'), project: 'autre' }], now: NOW, views: { 'open:ol#L1': true } })
+  const panel = buildPanel({ rows: tour, columns: 160, height: 40, waves: [inWave('L2'), { ...inWave('L3'), project: 'autre' }], now: NOW, views: { 'open:ol#L1': true } })
   const by = (id: string) => lotLines(panel).find(l => l.id === id)!
   expect(by('L1').cycle?.map(s => s.text).join(' → ')).toBe('✔ revue posée → ▶ clos → ○ livré')
   expect(by('L2').cycle?.map(s => s.text).join(' → ')).toContain('✔ implement 10 min')
@@ -164,7 +173,7 @@ test('L413 R14 — la frise tient dans la largeur du corps moins le retrait du t
   const tour = rows([lot('L1', 'doing')])
   for (const columns of [120, 70, 40, 30]) {
     const line = lotLines(buildPanel({ rows: tour, columns, height: 40, waves: [inWave('L1', { trail: [step('implement', 0, 10), step('review', 10, 14), step('fix', 14, undefined)], pass: 1, status: 'fixing' })], now: NOW }))[0]!
-    const width = line.cycle!.reduce((n, s, i) => n + s.text.length + (i > 0 ? 3 : 0), 0)
+    const width = line.cycle!.reduce((n, s) => n + s.sep.length + s.text.length, 0)
     expect(width, `${columns} colonnes`).toBeLessThanOrEqual(columns - line.idWidth - 2)
   }
 })

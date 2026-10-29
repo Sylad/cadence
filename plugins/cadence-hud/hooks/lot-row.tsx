@@ -78,7 +78,7 @@ export const lotRow = ({ Box, Text, Button }: Pick<ClientElements, 'Box' | 'Text
           <Text wrap="truncate-end">
             {line.cycle.map((seg, j) => (
               <Text key={`c${j}`} color={seg.color} bold={seg.bold}>
-                {j > 0 ? ' → ' : ''}
+                {seg.sep}
                 {seg.text}
               </Text>
             ))}

@@ -117,39 +117,46 @@ const COLOR: Record<Stage['state'], ThemeKey> = { done: 'success', current: 'cla
 /** Une étape en texte : « ▶ correction 1/3 46 min ». */
 const stageText = (s: Stage): string => [GLYPH[s.state], s.label, s.note, s.duration === undefined ? undefined : duration(s.duration)].filter(Boolean).join(' ')
 
-export type CycleSeg = { text: string; color: ThemeKey; bold?: boolean }
+/** Un segment de la frise : `sep`, ce qui le sépare du précédent (vide au premier). */
+export type CycleSeg = { text: string; color: ThemeKey; bold?: boolean; sep: string }
 
 const SEP = ' → '
+/** Le séparateur de la frise serrée, quand même repliée elle ne tient pas. */
+const TIGHT = ' '
 
 /** Coupe à `max` caractères avec « … » (jamais plus long). */
 const cut = (text: string, max: number): string => (max <= 0 ? '' : text.length <= max ? text : max === 1 ? '…' : `${text.slice(0, max - 1)}…`)
 
 /**
- * La frise en segments colorés pour `width` colonnes : toutes les étapes ; trop longue, les étapes faites du début se replient en « ✔ n » (l'étape courante, la rendue et les à venir restent entières) ;
- * trop longue encore, la fin est coupée par « … ». Jamais plus large que `width`.
+ * La frise en segments colorés pour `width` colonnes. Trop longue, par degrés : les étapes faites du début se replient en « ✔ n » (l'étape courante, la rendue et les à venir restent entières),
+ * puis les flèches deviennent de simples espaces ; trop longue encore, la fin est coupée par « … ». Jamais plus large que `width`.
  */
 export const cycleSegments = (stages: readonly Stage[], width: number): CycleSeg[] => {
   if (width <= 0 || stages.length === 0) return []
-  const seg = (s: Stage): CycleSeg => ({ text: stageText(s), color: COLOR[s.state], ...(s.state === 'current' ? { bold: true } : {}) })
-  const total = (segs: readonly CycleSeg[]) => segs.reduce((n, s) => n + s.text.length, 0) + SEP.length * Math.max(0, segs.length - 1)
-  let segs = stages.map(seg)
-  if (total(segs) > width) {
-    const lead = stages.findIndex(s => s.state !== 'done')
-    const folded = lead < 0 ? stages.length : lead
-    if (folded > 1) segs = [{ text: `✔ ${folded}`, color: COLOR.done }, ...segs.slice(folded)]
-  }
+  const seg = (s: Stage): Omit<CycleSeg, 'sep'> => ({ text: stageText(s), color: COLOR[s.state], ...(s.state === 'current' ? { bold: true } : {}) })
+  const full = stages.map(seg)
+  const lead = stages.findIndex(s => s.state !== 'done')
+  const folded = lead < 0 ? stages.length : lead
+  const fold = folded >= 1 ? [{ text: `✔ ${folded}`, color: COLOR.done }, ...full.slice(folded)] : full
+  const size = (segs: readonly { text: string }[], gap: string) => segs.reduce((n, s) => n + s.text.length, 0) + gap.length * Math.max(0, segs.length - 1)
+  let segs = full
+  let sep = SEP
+  if (size(segs, sep) > width) segs = fold
+  if (size(segs, sep) > width) sep = TIGHT
   // coupe : les segments entiers qui tiennent, puis le suivant tronqué
   const out: CycleSeg[] = []
   let used = 0
   for (const s of segs) {
-    const room = width - used - (out.length > 0 ? SEP.length : 0)
+    const gap = out.length > 0 ? sep : ''
+    const room = width - used - gap.length
     if (room <= 0) break
-    out.push({ ...s, text: cut(s.text, room) })
-    used += (out.length > 1 ? SEP.length : 0) + out[out.length - 1]!.text.length
-    if (s.text.length > room) break
+    const text = cut(s.text, room)
+    out.push({ ...s, text, sep: gap })
+    used += gap.length + text.length
+    if (text.length < s.text.length) break
   }
   return out
 }
 
-/** La frise en une chaîne : les segments joints par « → ». */
-export const cycleText = (stages: readonly Stage[], width: number): string => cycleSegments(stages, width).map(s => s.text).join(SEP)
+/** La frise en une chaîne, ses segments avec leurs séparateurs. */
+export const cycleText = (stages: readonly Stage[], width: number): string => cycleSegments(stages, width).map(s => s.sep + s.text).join('')

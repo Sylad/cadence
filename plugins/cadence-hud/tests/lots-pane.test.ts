@@ -1223,7 +1223,7 @@ test('L413 R16 — le panneau monté dessine sous le lot de la vague sa frise : 
   const s = await session($, on, { waves: [CYCLE_WAVE], tour: () => ({ exitCode: 0, stdout: CYCLE_TOUR }) })
   await s.hud('lots')
   await settle()
-  const text = (await s.draw(120)).text
+  const text = (await s.draw(160)).text
   expect(text).toContain('✔ implement 10 min')
   expect(text).toMatch(/▶ revue /)
   expect(text).toContain('○ correction 1/3')

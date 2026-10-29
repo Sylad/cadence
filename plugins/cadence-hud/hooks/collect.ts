@@ -7,15 +7,19 @@ import type { LeadHold, Wave } from '../types'
  * en cours il compte les processus `claude` descendants de la session (sessions filles, équipes).
  * Sans vague vivante, il rend la dernière vague terminée du dossier courant (`live: false`, `ended` = date
  * de son wave.json) pour que la bande garde son statut sous les yeux ; elle la masque 30 min après sa fin (WAVE_LINGER_MS).
- * Cette même vague terminée est rendue à part dans `ended` (`null` sans vague finie), qu'une vague vive ou non : la dernière vague du dossier
- * dont l'id n'est pas vivant (le wave.json d'une vague vivante est toujours le plus récent, orchestrate y réécrit `consumed` ; il ne compte pas) ;
- * les décisions en attente du panneau des lots (L412 : questions, lots rendus, verdicts UX) la lisent par là, sans toucher à ce que la bande dessine.
+ * Les vagues terminées du dossier sont rendues à part dans `ended` (liste, vide sans vague finie), qu'une vague vive ou non : toutes celles dont l'id
+ * n'est pas vivant (le wave.json d'une vague vivante est toujours le plus récent, orchestrate y réécrit `consumed` ; il ne compte pas), de la plus
+ * récente à la plus ancienne par la date de leur wave.json, bornées aux ENDED_DAYS derniers jours et aux ENDED_MAX plus récentes (le coût du collecteur :
+ * un wave.json et ses états de lots par vague, toutes les 5 s) ; les décisions en attente du panneau des lots (L412 : questions, lots rendus, verdicts UX)
+ * les lisent par là, sans toucher à ce que la bande dessine — avant, seule la dernière finie était lue, et toute vague qui finissait dans le dossier
+ * effaçait les questions et les lots rendus non tranchés des vagues d'avant. Chaque état de lot porte `repo` (le chemin absolu du dépôt du lot) et
+ * chaque vague `cwd` (son dossier de lancement) : les commandes à copier du panneau commencent par `cd` là.
  * Il rend aussi, avec les vagues, les sessions du lead inscrites par `cadence lead hold` (`<home>/holds/*.json`, sans
  * filtrer l'échéance : la bande le fait à chaque dessin) et le plafond de sessions (CADENCE_MAX_SESSIONS, 2 par défaut).
  * Sortie : `{waves, holds, cap, ended}`.
  */
 export const COLLECTOR = `
-import json, os, glob, datetime
+import json, os, glob, datetime, time
 
 home = os.environ.get('CADENCE_HOME') or os.path.join(os.path.expanduser('~'), '.cadence', 'orchestrate')
 
@@ -105,29 +109,35 @@ for f in sorted(glob.glob(os.path.join(home, 'waves', '*.json'))):
 
 cwd = os.getcwd()
 live_ids = set(w['id'] for w in out)
-last, last_mtime = None, 0
+ENDED_DAYS, ENDED_MAX = 7, 30
+finished = []
 for wf in glob.glob(os.path.join(cwd, '.cadence', 'runs', '*', 'wave.json')):
     # le wave.json d'une vague vivante est toujours le plus récent du dossier (orchestrate y réécrit consumed en continu) :
-    # on cherche la dernière vague FINIE, les vivantes sont sautées
+    # on cherche les vagues FINIES, les vivantes sont sautées
     if os.path.basename(os.path.dirname(wf)) in live_ids:
         continue
     try:
         m = os.stat(wf).st_mtime
     except Exception:
         continue
-    if m > last_mtime:
-        last, last_mtime = wf, m
-ended = None
-w = (load(last) or {}) if last else {}
-d = os.path.dirname(last) if last else ''
-if last and (w.get('id') or os.path.basename(d)) not in live_ids:
-    ended = {
-        'id': w.get('id') or os.path.basename(d), 'pid': int(w.get('pid') or 0), 'cwd': cwd, 'cap': None,
+    finished.append((m, wf))
+finished.sort(reverse=True)
+ended = []
+for m, wf in finished[:ENDED_MAX]:
+    if m < time.time() - ENDED_DAYS * 86400:
+        break
+    w = load(wf) or {}
+    d = os.path.dirname(wf)
+    wid = w.get('id') or os.path.basename(d)
+    if wid in live_ids:
+        continue
+    ended.append({
+        'id': wid, 'pid': int(w.get('pid') or 0), 'cwd': w.get('cwd') or cwd, 'cap': None,
         'started': w.get('created'), 'status': w.get('status'), 'budget': w.get('budget'), 'consumed': w.get('consumed'),
-        'live': False, 'ended': datetime.datetime.fromtimestamp(last_mtime, datetime.timezone.utc).isoformat(), 'lots': read_lots(d, False),
-    }
+        'live': False, 'ended': datetime.datetime.fromtimestamp(m, datetime.timezone.utc).isoformat(), 'lots': read_lots(d, False),
+    })
 if not out and ended:
-    out.append(ended)
+    out.append(ended[0])
 holds = []
 for hf in sorted(glob.glob(os.path.join(home, 'holds', '*.json'))):
     h = load(hf)
@@ -142,21 +152,22 @@ print(json.dumps({'waves': out, 'holds': holds, 'cap': cap, 'ended': ended}))
 /** Plafond de sessions quand le collecteur n'en donne pas de valide (le défaut de cadence). */
 export const DEFAULT_CAP = 2
 
-export type Collected = { waves: Wave[]; holds: LeadHold[]; cap: number; /** la dernière vague finie du dossier, qu'une vague vive ou non (L412) ; null sans */ ended: Wave | null }
+export type Collected = { waves: Wave[]; holds: LeadHold[]; cap: number; /** les vagues finies du dossier, la plus récente d'abord, qu'une vague vive ou non (L412) ; vide sans */ ended: Wave[] }
 
 const isWave = (w: unknown): w is Wave => typeof w === 'object' && w !== null && typeof (w as Wave).id === 'string'
 
 /**
  * Lit la sortie du collecteur : `{waves, holds, cap, ended}`, ou l'ancienne liste de vagues seule. Une sortie illisible
  * (JSON invalide) lève ; une forme étrange vaut aucune vague, aucune session du lead, le plafond par défaut et aucune vague finie.
- * Sans champ `live`, la vague est vivante ; `ended` est toujours finie (`live: false`).
+ * Sans champ `live`, la vague est vivante ; les vagues d'`ended` sont toujours finies (`live: false`), dans l'ordre du collecteur (la plus récente
+ * d'abord) ; une vague seule (le collecteur d'avant la liste) en vaut une, une entrée étrange est sautée.
  */
 export const parseCollected = (stdout: string): Collected => {
   const raw: unknown = JSON.parse(stdout)
   const obj = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
   const list: unknown = Array.isArray(raw) ? raw : obj.waves
   const waves = (Array.isArray(list) ? list : []).filter(isWave).map(w => ({ ...w, live: w.live !== false }))
-  const ended = isWave(obj.ended) ? { ...obj.ended, live: false } : null
+  const ended = (Array.isArray(obj.ended) ? obj.ended : [obj.ended]).filter(isWave).map(w => ({ ...w, live: false }))
   const holds = (Array.isArray(obj.holds) ? obj.holds : []).filter(
     (h): h is LeadHold => typeof h === 'object' && h !== null && typeof (h as LeadHold).label === 'string' && typeof (h as LeadHold).expires === 'string',
   )

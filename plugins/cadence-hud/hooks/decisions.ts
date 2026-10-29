@@ -14,21 +14,23 @@ export type Decision =
 const firstLine = (text: string): string => text.split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
 
 /**
- * Ce qui attend une décision de la personne, lu dans les vagues de la bande (`waves` : les vivantes, et sans vivante la dernière finie du dossier), dans `ended` (la dernière vague
- * finie du dossier que le collecteur rend à part, qu'une vague vive ou non, L412 : lue sans le délai de 30 min de la bande, une question ou un lot rendu attend tant qu'une autre
- * vague du dossier ne la remplace pas) et dans les livraisons en échec : une question de session (`question`), un lot rendu au lead (`handed-back`, `failed` : la cause est la
- * première ligne de son issue, à défaut son statut), un verdict UX à poser (lot prêt, visible, dont la revue a rendu un verdict) et une livraison en échec par projet.
- * Les vagues vivantes passent d'abord, puis les finies (une vague n'est lue qu'une fois) ; un lot n'est compté que dans la première vague qui le porte ; un lot suspendu n'attend rien de la personne.
+ * Ce qui attend une décision de la personne, lu dans les vagues de la bande (`waves` : les vivantes, et sans vivante la dernière finie du dossier), dans `ended` (les vagues
+ * finies du dossier que le collecteur rend à part, la plus récente d'abord, qu'une vague vive ou non, L412 : lues sans le délai de 30 min de la bande, une question ou un lot rendu
+ * attend tant que le plan le tient ouvert — une vague plus récente qui finit sans porter le lot ne l'efface pas) et dans les livraisons en échec : une question de session
+ * (`question`), un lot rendu au lead (`handed-back`, `failed` : la cause est la première ligne de son issue, à défaut son statut), un verdict UX à poser (lot prêt, visible, dont
+ * la revue a rendu un verdict) et une livraison en échec par projet.
+ * Les vagues vivantes passent d'abord, puis les finies de la plus récente à la plus ancienne (une vague n'est lue qu'une fois) ; un lot n'est compté que dans la première vague qui
+ * le porte (repris dans une vague plus récente, c'est elle qui tranche) ; un lot suspendu n'attend rien de la personne.
  * Le plan tranche (`board`, le tableau du panneau lu de `cadence lead tour --json`) : une décision dont le lot n'est plus ouvert dans un projet que le tour a lu (ligne sans erreur,
  * avec ses lots) n'est plus affichée — un verdict UX posé puis `raf done`, un lot rendu puis repris et clos, une question dont le lot est clos. Un projet absent du tableau, en erreur
  * ou sans lots (cadence trop ancien) garde ses décisions : on ne sait pas. Une livraison en échec ne dépend pas du plan.
  */
-export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedDelivery[], ended: Wave | null = null, board: LotsBoard | null = null): Decision[] => {
+export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedDelivery[], ended: readonly Wave[] = [], board: LotsBoard | null = null): Decision[] => {
   const open = (project: string, lot: string): boolean => {
     const row = board?.rows.find(r => r.project === project && !r.error && Array.isArray(r.lots))
     return !row || row.lots!.some(t => t.id === lot)
   }
-  const finished = [...(ended ? [ended] : []), ...waves.filter(w => !w.live)]
+  const finished = [...waves.filter(w => !w.live), ...ended]
   const ids = new Set<string>()
   const ordered = [...waves.filter(w => w.live), ...finished].filter(w => !ids.has(w.id) && ids.add(w.id))
   const seen = new Set<string>()

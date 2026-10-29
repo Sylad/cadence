@@ -22,7 +22,7 @@ const WAVE: Wave = {
 type Cadence = { exitCode: number; stdout: string }
 
 /** Monte le mod comme une session, avec un moteur simulé : état en mémoire, panneaux ouverts, processus pilotés par le test. */
-const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave; stamps?: () => string; deliveries?: () => string; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
+const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave[]; stamps?: () => string; deliveries?: () => string; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const open = new Set<string>()
   const opened: unknown[] = []
@@ -70,7 +70,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     }
     if (argv[3] === DELIVERIES) return { value: { exitCode: 0, stdout: (setup.deliveries ?? (() => '[]'))(), stderr: '' } } as never
     if (argv[3] === PLAN_STAMPS) return { value: { exitCode: 0, stdout: stamps.current(), stderr: '' } } as never
-    return { value: { exitCode: 0, stdout: JSON.stringify({ waves: waves.current, ended: setup.ended ?? null, holds: [], cap: 2 }), stderr: '' } } as never
+    return { value: { exitCode: 0, stdout: JSON.stringify({ waves: waves.current, ended: setup.ended ?? [], holds: [], cap: 2 }), stderr: '' } } as never
   })
   await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
   await settle()
@@ -1169,7 +1169,7 @@ test('L412 R16 — le bloc ne prend jamais plus de la moitié du corps : l’arb
 test('L412 R17 — une question d’une vague finie attend dans le panneau pendant qu’une autre vague vit : lue dans `ended` du collecteur, hors de la bande', async ($, on) => {
   const live: Wave = { ...WAVE, lots: [{ ...WAVE.lots[0]!, project: 'cadence', lot: 'L401', status: 'reviewing' }] }
   const ended: Wave = { ...WAVE, id: 'fini', live: false, ended: '2026-10-07T18:00:00.000Z', lots: [{ ...WAVE.lots[0]!, lot: 'L80', status: 'question', questions: ['Encore ?'] }] }
-  const s = await session($, on, { waves: [live], ended })
+  const s = await session($, on, { waves: [live], ended: [ended] })
   await s.advance(5_000)
   await s.hud('lots')
   const { text } = await s.draw()

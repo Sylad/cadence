@@ -99,12 +99,13 @@ test('le collecteur se lit, et une sortie étrange vaut aucune vague', () => {
   expect(() => parseCollected('pas du json')).toThrow()
 })
 
-test('L412 R19 — la dernière vague finie du dossier se lit dans `ended` du collecteur, toujours finie ; absente, étrange ou sans id : aucune', () => {
-  expect(parseCollected(JSON.stringify({ waves: [WAVE], ended: { ...WAVE, id: 'fini', live: true } })).ended).toMatchObject({ id: 'fini', live: false })
-  expect(parseCollected(JSON.stringify({ waves: [WAVE] })).ended).toBeNull()
-  expect(parseCollected(JSON.stringify({ waves: [WAVE], ended: null })).ended).toBeNull()
-  expect(parseCollected(JSON.stringify({ waves: [WAVE], ended: { pid: 3 } })).ended).toBeNull()
-  expect(parseCollected(JSON.stringify([WAVE])).ended).toBeNull()
+test('L412 R19 — les vagues finies du dossier se lisent dans `ended` du collecteur, toutes finies, dans son ordre (la plus récente d’abord) ; absentes, étranges ou sans id : aucune ; une vague seule (ancien collecteur) en vaut une', () => {
+  expect(parseCollected(JSON.stringify({ waves: [WAVE], ended: [{ ...WAVE, id: 'fini', live: true }, { ...WAVE, id: 'avant' }] })).ended).toMatchObject([{ id: 'fini', live: false }, { id: 'avant', live: false }])
+  expect(parseCollected(JSON.stringify({ waves: [WAVE], ended: { ...WAVE, id: 'fini', live: true } })).ended).toMatchObject([{ id: 'fini', live: false }])
+  expect(parseCollected(JSON.stringify({ waves: [WAVE] })).ended).toEqual([])
+  expect(parseCollected(JSON.stringify({ waves: [WAVE], ended: null })).ended).toEqual([])
+  expect(parseCollected(JSON.stringify({ waves: [WAVE], ended: [{ pid: 3 }, 'x', { ...WAVE, id: 'ok' }] })).ended).toMatchObject([{ id: 'ok' }])
+  expect(parseCollected(JSON.stringify([WAVE])).ended).toEqual([])
 })
 
 /** Répond aux lectures d'état du mod depuis la mémoire du test (le kit n'a pas d'écriture d'état). */
@@ -216,7 +217,7 @@ test('la dernière vague terminée reste en gris, sur une ligne, sans ses lots',
   await ui.unmount()
 })
 
-test('L412 R20 — la bande : une vague finie ne se dessine que sans vague vivante ; avec une vivante, le collecteur la met dans `ended` et le mod la garde hors de `waves`, dans `endedWave`', async ($, on) => {
+test('L412 R20 — la bande : une vague finie ne se dessine que sans vague vivante ; avec une vivante, le collecteur la met dans `ended` et le mod la garde hors de `waves`, dans `endedWaves`', async ($, on) => {
   const hud = wired(on)
   const clock = mock.clock(on)
   mock.env(on, {})
@@ -225,7 +226,7 @@ test('L412 R20 — la bande : une vague finie ne se dessine que sans vague vivan
   on('agent.list', () => ({ value: [] }) as never)
   on('process.run', async (_$, e) => {
     const argv = (e as unknown as { argv: string[] }).argv
-    if (argv[3] === COLLECTOR) return { value: { exitCode: 0, stdout: JSON.stringify({ waves: [WAVE], ended: ENDED, holds: [], cap: 2 }), stderr: '' } } as never
+    if (argv[3] === COLLECTOR) return { value: { exitCode: 0, stdout: JSON.stringify({ waves: [WAVE], ended: [ENDED], holds: [], cap: 2 }), stderr: '' } } as never
     return { value: { exitCode: 1, stdout: '', stderr: 'absent' } } as never
   })
   await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
@@ -233,7 +234,7 @@ test('L412 R20 — la bande : une vague finie ne se dessine que sans vague vivan
   await clock.advance(5_000)
   await settle()
   expect((hud.state('waves') as Wave[]).map(w => w.id)).toEqual([WAVE.id])
-  expect(hud.state('endedWave')).toMatchObject({ id: ENDED.id, live: false })
+  expect(hud.state('endedWaves')).toMatchObject([{ id: ENDED.id, live: false }])
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
     expect(await ui.find({ type: 'Text', text: /cadence · 2026-10-07-2103 en cours/ })).toBeDefined()
@@ -1389,7 +1390,7 @@ test('R5 — le collecteur rend aussi les sessions du lead et le plafond, un anc
   expect(out.cap).toBe(3)
   expect(parseCollected(JSON.stringify([WAVE]))).toMatchObject({ holds: [], cap: 2 })
   expect(parseCollected(JSON.stringify({ waves: [], holds: [], cap: 0 })).cap).toBe(2)
-  expect(parseCollected('{}')).toEqual({ waves: [], holds: [], cap: 2, ended: null })
+  expect(parseCollected('{}')).toEqual({ waves: [], holds: [], cap: 2, ended: [] })
 })
 
 test('R6 — la bande affiche les sessions du lead et les créneaux sans aucune vague', async ($, on) => {

@@ -26,17 +26,27 @@ test('L412 R4 — une livraison en échec par projet : la dernière raison et le
   expect(decisionsOf([], failed)).toEqual([{ kind: 'livraison', project: 'maritime', text: 'abc1234 · CI en échec (2026-10-29)' }])
 })
 
-test('L412 R5 — la vague finie se lit dans `ended` (sans délai de 30 min, à part de la bande), après les vivantes ; un lot n’est compté qu’une fois ; sans vivante, celle que porte `waves` se lit aussi', () => {
+test('L412 R5 — les vagues finies se lisent dans `ended` (toutes, de la plus récente à la plus ancienne, sans délai de 30 min, à part de la bande), après les vivantes ; un lot n’est compté qu’une fois ; sans vivante, celle que porte `waves` se lit aussi', () => {
   const old = wave([wlot('L9', 'question', { questions: ['q'] }), wlot('L8', 'handed-back', { outcome: 'cause' })], { id: 'old', live: false, ended: '2026-10-29T10:00:00Z' })
   const lots = (d: ReturnType<typeof decisionsOf>) => d.map(x => (x.kind === 'livraison' ? '' : x.lot))
-  expect(lots(decisionsOf([], [], old))).toEqual(['L9', 'L8'])
+  expect(lots(decisionsOf([], [], [old]))).toEqual(['L9', 'L8'])
   expect(lots(decisionsOf([old], []))).toEqual(['L9', 'L8']) // sans vague vivante, la bande porte la vague finie
-  expect(lots(decisionsOf([old], [], old))).toEqual(['L9', 'L8']) // la même vague des deux côtés : une fois
+  expect(lots(decisionsOf([old], [], [old]))).toEqual(['L9', 'L8']) // la même vague des deux côtés : une fois
   const recent = wave([wlot('L5', 'question', { questions: ['ancienne'] })], { id: 'rec', live: false, ended: '2026-10-29T16:50:00Z' })
   const live = wave([wlot('L5', 'question', { questions: ['vivante'] })], { id: 'liv' })
-  const d = decisionsOf([live], [], recent)
+  const d = decisionsOf([live], [], [recent])
   expect(d).toHaveLength(1)
   expect(d[0]).toMatchObject({ text: 'vivante' })
+  // le cas de la revue : un lot rendu dans une vague ancienne, trois vagues finies depuis sans rien à décider — il attend toujours
+  const quiet = (id: string, ended: string) => wave([wlot('L1', 'ready', { project: 'evatosorus' })], { id, live: false, ended })
+  const handed = wave([wlot('L412', 'handed-back', { project: 'cadence', outcome: 'correction non jouée (budget)' })], { id: '1650', live: false, ended: '2026-10-29T16:30:00Z' })
+  const finished = [quiet('wo1', '2026-10-29T17:30:00Z'), quiet('ev43', '2026-10-29T17:10:00Z'), quiet('ew1', '2026-10-29T16:50:00Z'), handed]
+  expect(decisionsOf([], [], finished)).toEqual([{ kind: 'rendu', project: 'cadence', lot: 'L412', text: 'correction non jouée (budget)' }])
+  // la bande porte la plus récente (`waves`), `ended` toutes : la plus récente n'est lue qu'une fois, l'ancienne est lue
+  expect(lots(decisionsOf([finished[0]!], [], finished))).toEqual(['L412'])
+  // le même lot dans deux vagues finies : la plus récente tranche (repris et rendu à nouveau), l'ancienne est sautée
+  const again = wave([wlot('L412', 'handed-back', { project: 'cadence', outcome: 'rendu à nouveau' })], { id: 'later', live: false, ended: '2026-10-29T18:00:00Z' })
+  expect(decisionsOf([], [], [again, ...finished]).map(x => (x.kind === 'rendu' ? x.text : ''))).toEqual(['rendu à nouveau'])
 })
 
 test('L412 R6 — rien à décider : aucune décision, aucune ligne', () => {
@@ -85,12 +95,12 @@ test('L412 R21 — le plan tranche : une décision dont le lot n’est plus ouve
   ])
   const board: LotsBoard = { outdated: false, rows: [{ project: 'ol', lots: [tlot('L2'), tlot('L9/1')] }, { project: 'erreur', error: 'plan illisible' }, { project: 'ancien' }] }
   const lots = (d: ReturnType<typeof decisionsOf>) => d.map(x => (x.kind === 'livraison' ? '' : x.lot))
-  expect(lots(decisionsOf([w], [], null, board))).toEqual(['L2', 'L4', 'L5', 'L6'])
-  expect(lots(decisionsOf([w], [], null, null))).toEqual(['L1', 'L2', 'L3', 'L4', 'L5', 'L6']) // sans tableau lu, rien n'est écarté
+  expect(lots(decisionsOf([w], [], [], board))).toEqual(['L2', 'L4', 'L5', 'L6'])
+  expect(lots(decisionsOf([w], [], [], null))).toEqual(['L1', 'L2', 'L3', 'L4', 'L5', 'L6']) // sans tableau lu, rien n'est écarté
   // une sous-tâche ouverte se reconnaît par son id complet ; une livraison en échec ne dépend pas du plan
   const sub = wave([wlot('L9/1', 'question', { questions: ['q'] }), wlot('L9/2', 'question', { questions: ['q'] })])
   const failed: FailedDelivery[] = [{ project: 'ol', day: '2026-10-29', sha: 'abc1234', reason: 'CI en échec' }]
-  expect(decisionsOf([sub], failed, null, board).map(x => (x.kind === 'livraison' ? x.kind : x.lot))).toEqual(['L9/1', 'livraison'])
+  expect(decisionsOf([sub], failed, [], board).map(x => (x.kind === 'livraison' ? x.kind : x.lot))).toEqual(['L9/1', 'livraison'])
 })
 
 /** Ce que le shell lit des lignes collées : le retrait ôté, `\` en fin de ligne efface le saut de ligne (le shell joint, l'espace qui précède `\` reste). */

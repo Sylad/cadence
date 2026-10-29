@@ -246,6 +246,12 @@ lots:
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "conforme : 0 bloquant, 0 majeur, 2 mineurs (notes : hook laissé dans un core.hooksPath partagé hors de l'arbre ; « temporary hook » périmé dans docs/raf.md:79) — orchestré (vague 2026-10-29-cad3, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (L424, L425) ne change que du contexte, conflit de src/cli.ts bien résolu (warnIntegrating conservé), aucun constat", commit: 515e83df590b58899b7a86eeac0b6967622ced51 }
     finished: 2026-10-29
+  - id: L427
+    title: "Test R19 de test/lead-skill-push-porte-l426.test.ts : il cherche l'entrée de L426 dans [Unreleased] du CHANGELOG, que le commit de version vide — la porte de la release 1.24.0 est rouge (29-10) ; lire la section qui porte l'entrée (changelogSectionOf, test/changelog-section.ts), et voir pourquoi test/changelog-garde.test.ts ne l'a pas refusé"
+    status: todo
+    estimate: 0.1
+    quickwin: true
+    created: 2026-10-29
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

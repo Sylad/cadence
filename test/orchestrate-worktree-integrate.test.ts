@@ -77,6 +77,18 @@ describe('R10 / R25 — verrou d\'intégration du dépôt', () => {
     expect(order).toEqual(['x entre', 'x sort', 'y entre', 'y sort']);
     expect(existsSync(join(sharedStateDir(repo), INTEGRATION_LOCK))).toBe(false);
   });
+  it('L425 — un lot attend derrière un autre lot de la même vague plus longtemps que la borne : il passe à son tour, il n\'est pas rendu', async () => {
+    const repo = repoWith({ a: 'a\n' });
+    const first = await takeRepoWrite(repo, { wave: 'w1' }, { waitMs: 100, pollMs: 10 });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const second = takeRepoWrite(repo, { wave: 'w1' }, { waitMs: 100, pollMs: 10 });
+    await new Promise((r) => setTimeout(r, 350)); // 3,5 fois la borne : le porteur est un lot de ce processus, il libérera
+    first.release();
+    const g = await second;
+    expect(g.ok).toBe(true);
+    if (g.ok) g.release();
+  });
   it('R10 — verrou d\'intégration d\'un pid mort : retiré, l\'intégration passe', async () => {
     const repo = repoWith({ a: 'a\n' });
     writeFileSync(join(sharedStateDir(repo), INTEGRATION_LOCK), JSON.stringify({ pid: 2 ** 22 + 12345, wave: 'morte', started: '2026-10-01T00:00:00Z' }));

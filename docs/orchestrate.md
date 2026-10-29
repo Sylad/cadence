@@ -581,7 +581,7 @@ nothing below applies and the wave behaves as before; any other value is refused
 - **Integration, before `ready`.** At the end of its cycle (compliant review, UX included) the lot is integrated into the repository's branch, and only
   then does it become `ready`; the repository's branch gets the lots one by one, on a linear history. Under the repository's **integration lock**
   (a file next to the wave lock, same format, pid and start time, stale when the holder is dead, plus an in-memory queue because the lots of a wave share
-  a pid; the wait is bounded to 10 minutes and holds no session slot):
+  a pid; a lot queues behind the other lots of its wave without limit (L425), the wait for another process's lock is bounded to 10 minutes, and no wait holds a session slot):
   1. the repository must still be on its start branch (`le dépôt est sur <branch> et non sur <start branch>`) and have no modified tracked file
      (`arbre du dépôt modifié (<files>)`): the program never changes the lead's branch or tree. The check is made again right before the
      fast-forward (the replayed checks and the short review can last) and right before the plan is written: a lead moved to another branch, or whose
@@ -635,7 +635,7 @@ nothing below applies and the wave behaves as before; any other value is refused
   6. the worktree and the branch, clean and merged, are removed; the lot is `ready`.
   A stop between the advance and the plan write is resumed at the `integrate` step: the branch being already contained in the repository's, the rebase
   and the advance are skipped and the verdict is written once.
-- **A lot handed back at the integration step** (lock held for more than 10 minutes, repository's branch changed, tracked file modified, rebase conflict,
+- **A lot handed back at the integration step** (lock held by another process for more than 10 minutes, repository's branch changed, tracked file modified, rebase conflict,
   red tests, blocking finding of the short review, plan write refused) keeps `next: integrate`, its worktree and its branch. **Only
   `--resume --wave <wave> --integrate <project:lot>` replays it** (repeatable): a plain `--resume`, `--drop`, `--answer` or `--budget` never does. The lot
   restarts at `suspended`, step `integrate` (`<project>:<lot> → suspended — intégration reprise (--resume --integrate)`), and the rebase and the checks run

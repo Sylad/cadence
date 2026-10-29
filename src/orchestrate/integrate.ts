@@ -24,20 +24,17 @@ export type Grant = { ok: true; release: () => void } | { ok: false; holder: { w
 
 /**
  * Prend la main sur le dépôt pour une intégration ou une écriture de plan du programme (R10, R21, R26) : d'abord la file en mémoire du dépôt (les lots d'une
- * vague partagent un pid, `takeLock` rendrait chacun déjà porteur), puis le verrou fichier, qui ne départage que les autres processus. L'attente est bornée
- * par `waitMs` (R25) ; au-delà, le porteur est rendu et rien n'est pris. Une attente ne retient aucun créneau de session : ce verrou n'a rien à voir avec eux.
+ * vague partagent un pid, `takeLock` rendrait chacun déjà porteur), puis le verrou fichier, qui ne départage que les autres processus. La file en mémoire
+ * s'attend sans borne (L425) : son porteur est un lot de ce processus, qui libère toujours, et une intégration (rebase rejoué + porte) dure plus que la borne.
+ * L'attente du verrou fichier d'un autre processus est bornée par `waitMs` (R25), comptée à partir du tour ; au-delà, le porteur est rendu et rien n'est pris.
+ * Une attente ne retient aucun créneau de session : ce verrou n'a rien à voir avec eux.
  */
 export async function takeRepoWrite(repo: string, who: { wave: string }, o: { waitMs?: number; pollMs?: number } = {}): Promise<Grant> {
   const waitMs = o.waitMs ?? INTEGRATE_WAIT_MS;
   const pollMs = o.pollMs ?? INTEGRATE_POLL_MS;
   const file = join(sharedStateDir(repo), INTEGRATION_LOCK);
+  const turn = (await mutexFor(`integrate:${gitCommonDir(repo)}`).acquire())!;
   const deadline = Date.now() + waitMs;
-  const turn = await mutexFor(`integrate:${gitCommonDir(repo)}`).acquire(waitMs);
-  if (!turn) {
-    // Un autre lot de ce processus tient la main : c'est lui le porteur (il a posé le verrou fichier).
-    const holder = activeLock(file);
-    return { ok: false, holder: { wave: holder?.wave ?? who.wave, pid: holder?.pid ?? process.pid } };
-  }
   for (;;) {
     const lock: OLock = { pid: process.pid, wave: who.wave, started: new Date().toISOString() };
     const got = takeLock(file, lock);

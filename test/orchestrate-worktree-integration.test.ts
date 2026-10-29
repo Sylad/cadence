@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sharedStateDir } from '../src/state.js';
-import { REPO_LOCK } from '../src/orchestrate/lock.js';
+import { activeLock, REPO_LOCK } from '../src/orchestrate/lock.js';
+import { linkNodeBin } from '../src/orchestrate/node-env.js';
 import { INTEGRATION_LOCK } from '../src/orchestrate/integrate.js';
 import { cadenceHome, liveSlots, liveWaves, registerWave } from '../src/orchestrate/registry.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
@@ -490,6 +491,44 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
       await pending;
       expect(store(parent).readLot('a', lot)!.status).not.toBe('ready');
       expect(subjects(repo).some((s) => s.startsWith(`feat(${lot})`))).toBe(false);
+    } finally {
+      sleeper.kill();
+    }
+  });
+  /** Un faux ~/.nvm avec un Node 22 et un `.nvmrc` « 22 » dans le dépôt : la reprise passe par `linkNode`, entre la fin de l'attente et `execute`. */
+  function withNvm(repo: string): string {
+    const nvm = tempDir();
+    mkdirSync(join(nvm, 'versions/node/v22.1.0/bin'), { recursive: true });
+    writeFileSync(join(nvm, 'versions/node/v22.1.0/bin/node'), '#!/bin/sh\n', { mode: 0o755 });
+    writeFileSync(join(repo, '.nvmrc'), '22\n');
+    return nvm;
+  }
+  it('L443 — la fin de l\'attente prend le verrou du dépôt tout de suite : une autre reprise qui attendait le même dépôt ne le voit plus libre pendant le .nvmrc et l\'arbre', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const nvm = withNvm(repo);
+    const sleeper = await otherWaveHolds(repo, 300);
+    const holders: (number | undefined)[] = [];
+    try {
+      const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }), { repoWait: { waitMs: 20_000, pollMs: 50 }, linkNode: (dir, version, bin) => {
+        holders.push(activeLock(join(sharedStateDir(repo), REPO_LOCK))?.pid);
+        return linkNodeBin(dir, version, bin);
+      } }, { NVM_DIR: nvm });
+      expect(again.code).toBe(0);
+      expect(holders).toEqual([process.pid]);
+    } finally {
+      sleeper.kill();
+    }
+  });
+  it('L443 — une reprise qui a pris le verrou du dépôt à la fin de l\'attente le rend si elle échoue avant de jouer', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const nvm = withNvm(repo);
+    const sleeper = await otherWaveHolds(repo, 200);
+    try {
+      await expect(run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 20_000, pollMs: 50 }, linkNode: () => { throw new Error('EACCES: symlink'); } }, { NVM_DIR: nvm })).rejects.toThrow(/EACCES/);
+      expect(activeLock(join(sharedStateDir(repo), REPO_LOCK))).toBeNull();
+      expect(store(parent).readLot('a', lot)!.status).toBe('handed-back');
     } finally {
       sleeper.kill();
     }

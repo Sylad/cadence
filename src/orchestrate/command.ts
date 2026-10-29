@@ -1134,13 +1134,14 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   for (const r of repos) {
     const file = join(sharedStateDir(r), REPO_LOCK);
     const l = takeLock(file, { pid: process.pid, wave: wave.id, started: new Date().toISOString() });
-    if (!l.ok) {
+    // Le verrou déjà à ce pid : pris par la reprise qui a attendu l'autre vague (L443).
+    if (!l.ok && l.held.pid !== process.pid) {
       io.err(`orchestrate : ${basename(r)} : une orchestration y est déjà en cours (${l.held.wave}, pid ${l.held.pid})`);
       release();
       return 2;
     }
     held.push(file);
-    if (l.stale) io.err(`orchestrate : verrou de dépôt périmé retiré (${basename(r)}, pid ${l.stale.pid} mort)`);
+    if (l.ok && l.stale) io.err(`orchestrate : verrou de dépôt périmé retiré (${basename(r)}, pid ${l.stale.pid} mort)`);
     const hook = installPrePush(r, wave.id);
     if (!hook.ok) {
       io.err(`orchestrate : ${basename(r)} : ${hook.reason}`);
@@ -1479,13 +1480,29 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   const deadline = Date.now() + (waitFor?.waitMs ?? 0);
   // Pendant l'attente (jusqu'à 3 h) la reprise est inscrite parmi les vagues vivantes : le garde « la vague tourne encore » d'une seconde reprise la voit, et ne vient pas attendre à son tour.
   let waiting = false;
+  // Verrous pris à la fin de l'attente : tenus jusqu'à `execute` (qui les retrouve à son pid), pour qu'une autre reprise qui attendait le même dépôt ne le voie pas libre pendant le .nvmrc, l'arbre et l'écriture des lots.
+  const taken: string[] = [];
   const stopBefore = store.control().stopAfterCurrent;
   try {
     for (const repo of new Set(live.flatMap(lotRepoPaths))) {
       const file = join(sharedStateDir(repo), REPO_LOCK);
-      let busy = activeLock(file);
       let announced: string | null = null;
-      while (waitFor && busy && busy.pid !== process.pid && Date.now() < deadline) {
+      for (;;) {
+        let busy = activeLock(file);
+        if (waitFor && (!busy || busy.pid === process.pid)) {
+          const t = takeLock(file, { pid: process.pid, wave: wave.id, started: new Date().toISOString() });
+          if (t.ok) {
+            taken.push(file);
+            if (t.stale) io.err(`orchestrate : verrou de dépôt périmé retiré (${basename(repo)}, pid ${t.stale.pid} mort)`);
+            break;
+          }
+          busy = t.held;
+        }
+        if (!busy || busy.pid === process.pid) break;
+        if (!waitFor || Date.now() >= deadline) {
+          refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
+          break;
+        }
         if (!waiting) {
           registerWave(cadenceHome(), { pid: process.pid, wave: wave.id, started: new Date().toISOString(), cwd: launch, repos: [] });
           waiting = true;
@@ -1493,118 +1510,123 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
         if (announced !== busy.wave) io.out(`orchestrate : ${basename(repo)} : tenu par la vague ${busy.wave} (pid ${busy.pid}) : attente de sa fin avant de reprendre l'intégration`);
         announced = busy.wave;
         await new Promise<void>((res) => setTimeout(res, Math.min(waitFor.pollMs, Math.max(1, deadline - Date.now()))));
-        busy = activeLock(file);
       }
-      if (busy && busy.pid !== process.pid) refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
     }
   } finally {
     if (waiting) unregisterWave(cadenceHome(), process.pid);
   }
-  // Comme au départ : le .nvmrc est relu à chaque reprise (version désinstallée, .nvmrc changé, vague d'avant L80),
-  // et un Node introuvable refuse le lot — jamais de repli silencieux sur le Node par défaut.
-  const nodes = new Map<LotState, NodeChoice>();
-  for (const l of live) {
-    const node = resolveNode(l.repo, nvmVersionsDir(io.env));
-    if (node.kind === 'missing') refusals.push(`${lotKey(l.project, l.lot)} : ${node.message}`);
-    else nodes.set(l, node);
-  }
-  // Tous les refus avant la moindre écriture (l'arbre sale compris) : une reprise refusée ne change pas l'état de la vague.
-  const dirty = new Set<string>();
-  for (const repo of live.flatMap(lotRepoPaths)) if (!dirty.has(repo)) {
-    dirty.add(repo);
-    const d = await trackedDirty(repo);
-    if (d.length) refusals.push(`${basename(repo)} : arbre sale, ${d.length} fichier(s) suivi(s) modifié(s) : ${d.join(', ')}`);
-  }
-  // Les worktrees des lots repris suivent les mêmes gardes qu'un dépôt (R11) : un fichier suivi modifié refuse la reprise.
-  for (const l of live) {
-    const dir = lotTreeDir(store.dir, l.project, l.lot, l.repo);
-    if (!existsSync(join(dir, '.git'))) continue;
-    const d = await trackedDirty(dir);
-    if (d.length) refusals.push(`${basename(dir)} : arbre sale, ${d.length} fichier(s) suivi(s) modifié(s) : ${d.join(', ')}`);
-  }
-  if (refusals.length) {
-    for (const r of refusals) io.err(`orchestrate : ${r}`);
-    return 2;
-  }
-  for (const [l, node] of nodes) {
-    if (node.kind === 'ok') l.node = { version: node.version, wanted: node.wanted, bin: node.bin, link: (deps.linkNode ?? linkNodeBin)(store.dir, node.version, node.bin) };
-    else delete l.node;
-  }
-  // Une étape interrompue (signal, crash) dont les tokens n'ont pas été comptés : relue dans le journal de sa session.
-  const recovered = new Budget(0);
-  // La session d'un lot en worktree a travaillé dans son worktree : c'est là que son journal se range.
-  const workdirOf = (l: LotState): string => {
-    const dir = lotTreeDir(store.dir, l.project, l.lot, l.repo);
-    return existsSync(join(dir, '.git')) ? dir : l.repo;
-  };
-  for (const l of [...live, ...removed]) for (const s of l.steps) if (s.status === 'interrupted') countInterrupted(deps.claudeHome, workdirOf(l), s, recovered);
-  wave.consumed += recovered.consumed;
-  wave.cacheRead += recovered.cacheRead;
-  if (recovered.consumed || recovered.cacheRead) store.writeWave(wave);
-  for (const [l, r] of raised) {
-    const k = lotKey(l.project, l.lot);
-    const text = `budget relevé de ${r.from} à ${r.to} (--resume --budget)`;
-    l.budget = r.to;
-    l.status = 'suspended';
-    l.next = r.step;
-    l.outcome = null;
-    l.warnings.push(text);
-    store.journal(`${k} → suspended — ${text}`);
-    io.out(`${k} → suspended — ${text}`);
-  }
-  for (const l of integ) {
-    const k = lotKey(l.project, l.lot);
-    const lead = leadReviewed.get(l);
-    if (lead) {
-      // La revue du lead tient lieu de revue du lot : le rebase reporte son verdict (même patch-id) ou joue la revue courte du diff rebasé.
-      l.next = 'integrate';
-      l.code = { conforme: true, bloquants: 0, majeurs: 0, mineurs: 0, verdict: lead.verdict, sousTaches: [], nonVerifie: [], head: lead.head };
-      l.verdict = lead.verdict;
-      l.constats = [];
+  // Avant `execute`, tout refus ou échec rend les verrous pris ; `execute` les garde ensuite et les rend à sa fin.
+  let played = false;
+  try {
+    // Comme au départ : le .nvmrc est relu à chaque reprise (version désinstallée, .nvmrc changé, vague d'avant L80),
+    // et un Node introuvable refuse le lot — jamais de repli silencieux sur le Node par défaut.
+    const nodes = new Map<LotState, NodeChoice>();
+    for (const l of live) {
+      const node = resolveNode(l.repo, nvmVersionsDir(io.env));
+      if (node.kind === 'missing') refusals.push(`${lotKey(l.project, l.lot)} : ${node.message}`);
+      else nodes.set(l, node);
     }
-    const planNote = l.next !== 'integrate'; // rendu sur une écriture de plan refusée (--replay) : le lot repart de l'étape gardée
-    if (planNote && l.outcome?.startsWith(HYPOTHESES_HANDBACK)) l.hypotheses = undefined; // les notes d'hypothèses se posent de nouveau (sans doublon) à l'entrée de l'étape
-    l.status = 'suspended';
-    l.outcome = null;
-    const text = lead ? `intégration reprise (--resume --integrate) : revue conforme du lead hors vague, ${lead.head.slice(0, 7)}` : planNote ? `écriture du plan reprise à l'étape ${l.next} (--resume --replay)` : 'intégration reprise (--resume --integrate)';
-    store.journal(`${k} → suspended — ${text}`);
-    io.out(`${k} → suspended — ${text}`);
-  }
-  for (const l of live) {
-    if (l.status === 'implementing' || l.status === 'reviewing' || l.status === 'fixing') l.status = 'suspended';
-    store.writeLot(l);
-  }
-  if (args.budget !== undefined) wave.budget = wave.consumed + args.budget;
-  // Un arrêt demandé à la vague d'avant ne doit pas arrêter celle-ci ; celui demandé pendant l'attente (la reprise est alors visible de --stop-after-current) est gardé.
-  if (!(waiting && !stopBefore && store.control().stopAfterCurrent)) store.clearStopRequest();
-  for (const l of removed) {
-    const k = lotKey(l.project, l.lot);
-    store.requestDrop(k);
-    store.journal(`demande : retirer ${k} de la vague (--resume --drop)`);
-    io.out(`${k} : retrait demandé — le lot est rendu au lead sans être rejoué`);
-    l.next = null;
-    l.status = 'handed-back';
-    l.outcome = DROPPED;
-    store.writeLot(l);
-    store.journal(`${k} → handed-back — ${DROPPED}`);
-    // Un lot retiré garde son worktree et sa branche (R12) : le journal en donne le chemin.
-    const branch = lotBranch(wave.id, l.project, l.lot);
-    if (baseBranchOf(l.repo, branch)) {
-      const line = `orchestrate : ${k} : worktree conservé : ${lotTreeDir(store.dir, l.project, l.lot, l.repo)} (branche ${branch})`;
-      io.out(line);
-      store.journal(line);
+    // Tous les refus avant la moindre écriture (l'arbre sale compris) : une reprise refusée ne change pas l'état de la vague.
+    const dirty = new Set<string>();
+    for (const repo of live.flatMap(lotRepoPaths)) if (!dirty.has(repo)) {
+      dirty.add(repo);
+      const d = await trackedDirty(repo);
+      if (d.length) refusals.push(`${basename(repo)} : arbre sale, ${d.length} fichier(s) suivi(s) modifié(s) : ${d.join(', ')}`);
     }
-  }
-  if (live.length === 0) {
-    if (lots.every(lotFinished)) {
-      wave.status = 'done';
-      store.writeWave(wave);
+    // Les worktrees des lots repris suivent les mêmes gardes qu'un dépôt (R11) : un fichier suivi modifié refuse la reprise.
+    for (const l of live) {
+      const dir = lotTreeDir(store.dir, l.project, l.lot, l.repo);
+      if (!existsSync(join(dir, '.git'))) continue;
+      const d = await trackedDirty(dir);
+      if (d.length) refusals.push(`${basename(dir)} : arbre sale, ${d.length} fichier(s) suivi(s) modifié(s) : ${d.join(', ')}`);
     }
-    for (const line of renderTable(wave, lots)) io.out(line);
-    for (const line of keptLines(lots.map((l) => l.repo))) io.out(line);
-    return removed.length && !lots.every((l) => l.status === 'ready') ? 1 : 0;
+    if (refusals.length) {
+      for (const r of refusals) io.err(`orchestrate : ${r}`);
+      return 2;
+    }
+    for (const [l, node] of nodes) {
+      if (node.kind === 'ok') l.node = { version: node.version, wanted: node.wanted, bin: node.bin, link: (deps.linkNode ?? linkNodeBin)(store.dir, node.version, node.bin) };
+      else delete l.node;
+    }
+    // Une étape interrompue (signal, crash) dont les tokens n'ont pas été comptés : relue dans le journal de sa session.
+    const recovered = new Budget(0);
+    // La session d'un lot en worktree a travaillé dans son worktree : c'est là que son journal se range.
+    const workdirOf = (l: LotState): string => {
+      const dir = lotTreeDir(store.dir, l.project, l.lot, l.repo);
+      return existsSync(join(dir, '.git')) ? dir : l.repo;
+    };
+    for (const l of [...live, ...removed]) for (const s of l.steps) if (s.status === 'interrupted') countInterrupted(deps.claudeHome, workdirOf(l), s, recovered);
+    wave.consumed += recovered.consumed;
+    wave.cacheRead += recovered.cacheRead;
+    if (recovered.consumed || recovered.cacheRead) store.writeWave(wave);
+    for (const [l, r] of raised) {
+      const k = lotKey(l.project, l.lot);
+      const text = `budget relevé de ${r.from} à ${r.to} (--resume --budget)`;
+      l.budget = r.to;
+      l.status = 'suspended';
+      l.next = r.step;
+      l.outcome = null;
+      l.warnings.push(text);
+      store.journal(`${k} → suspended — ${text}`);
+      io.out(`${k} → suspended — ${text}`);
+    }
+    for (const l of integ) {
+      const k = lotKey(l.project, l.lot);
+      const lead = leadReviewed.get(l);
+      if (lead) {
+        // La revue du lead tient lieu de revue du lot : le rebase reporte son verdict (même patch-id) ou joue la revue courte du diff rebasé.
+        l.next = 'integrate';
+        l.code = { conforme: true, bloquants: 0, majeurs: 0, mineurs: 0, verdict: lead.verdict, sousTaches: [], nonVerifie: [], head: lead.head };
+        l.verdict = lead.verdict;
+        l.constats = [];
+      }
+      const planNote = l.next !== 'integrate'; // rendu sur une écriture de plan refusée (--replay) : le lot repart de l'étape gardée
+      if (planNote && l.outcome?.startsWith(HYPOTHESES_HANDBACK)) l.hypotheses = undefined; // les notes d'hypothèses se posent de nouveau (sans doublon) à l'entrée de l'étape
+      l.status = 'suspended';
+      l.outcome = null;
+      const text = lead ? `intégration reprise (--resume --integrate) : revue conforme du lead hors vague, ${lead.head.slice(0, 7)}` : planNote ? `écriture du plan reprise à l'étape ${l.next} (--resume --replay)` : 'intégration reprise (--resume --integrate)';
+      store.journal(`${k} → suspended — ${text}`);
+      io.out(`${k} → suspended — ${text}`);
+    }
+    for (const l of live) {
+      if (l.status === 'implementing' || l.status === 'reviewing' || l.status === 'fixing') l.status = 'suspended';
+      store.writeLot(l);
+    }
+    if (args.budget !== undefined) wave.budget = wave.consumed + args.budget;
+    // Un arrêt demandé à la vague d'avant ne doit pas arrêter celle-ci ; celui demandé pendant l'attente (la reprise est alors visible de --stop-after-current) est gardé.
+    if (!(waiting && !stopBefore && store.control().stopAfterCurrent)) store.clearStopRequest();
+    for (const l of removed) {
+      const k = lotKey(l.project, l.lot);
+      store.requestDrop(k);
+      store.journal(`demande : retirer ${k} de la vague (--resume --drop)`);
+      io.out(`${k} : retrait demandé — le lot est rendu au lead sans être rejoué`);
+      l.next = null;
+      l.status = 'handed-back';
+      l.outcome = DROPPED;
+      store.writeLot(l);
+      store.journal(`${k} → handed-back — ${DROPPED}`);
+      // Un lot retiré garde son worktree et sa branche (R12) : le journal en donne le chemin.
+      const branch = lotBranch(wave.id, l.project, l.lot);
+      if (baseBranchOf(l.repo, branch)) {
+        const line = `orchestrate : ${k} : worktree conservé : ${lotTreeDir(store.dir, l.project, l.lot, l.repo)} (branche ${branch})`;
+        io.out(line);
+        store.journal(line);
+      }
+    }
+    if (live.length === 0) {
+      if (lots.every(lotFinished)) {
+        wave.status = 'done';
+        store.writeWave(wave);
+      }
+      for (const line of renderTable(wave, lots)) io.out(line);
+      for (const line of keptLines(lots.map((l) => l.repo))) io.out(line);
+      return removed.length && !lots.every((l) => l.status === 'ready') ? 1 : 0;
+    }
+    played = true;
+    return continueRounds(await execute(wave, live, store, io, deps, today, maxSessions(args, io), lots), wave, lots, store, io, deps, today, args, launch);
+  } finally {
+    if (!played) for (const f of taken) releaseLock(f, process.pid);
   }
-  return continueRounds(await execute(wave, live, store, io, deps, today, maxSessions(args, io), lots), wave, lots, store, io, deps, today, args, launch);
 }
 
 /** `loggedIn` de la sortie JSON de `claude auth status` ; null si elle n'est pas lisible (versions sans cette commande : pas de refus). */

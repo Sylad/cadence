@@ -121,7 +121,7 @@ lots:
   - id: L411
     title: "Panneau des lots : au plus 5 lots par projet (les premiers dans l'ordre affiché, en cours d'abord après L410), bouton « + N lots » qui déplie le reste du projet et « moins » qui le replie ; un lot qui a des sous-lots se plie/déplie d'un clic (replié par défaut, compte des sous-lots visible) ; états gardés entre deux ouvertures — demande de Sylvain le 28-10"
     public: Cinq lots par projet, et le reste à la demande
-    status: doing
+    status: done
     after: [ L410 ]
     estimate: 0.5
     visible: true
@@ -129,20 +129,24 @@ lots:
     created: 2026-10-28
     started: 2026-10-28
     review: { date: 2026-10-29, verdict: "conforme : « … +N lots de plus » compte les lots à toute profondeur (descendants, behind, hides), test de propriété rouge sous 4 mutations ; bouton « + N lots » au premier niveau comme documenté ; 202 tests du mod, tsc, vitest verts ; interaction L410 vérifiée ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main n'a changé que le plan (L410 terminé, L416–L423), les cinq commits de code de L411 sont identiques (range-diff =)", commit: 510969e521ad839cd6745b6c95ce514fce13c0b7 }
+    ux: { date: 2026-10-29, verdict: "conforme : vu par le lead sur la capture de Sylvain (app desktop, 29-10 10:50) — 5 lots par projet en cours d'abord, « + 11 lots » / « + 17 lots », projets repliés avec leur compte, états de vague justes ; « … +N lots de plus » compte tous les lots coupés (rendu du lead à 14 lignes : +35 = lots coupés)" }
+    finished: 2026-10-29
   - id: L416
     title: "Créneaux toujours visibles : cadence lead tour affiche « créneaux libres : N sur M » même sans vague ni session du lead, et cadence lead release affiche après la libération les créneaux libres et la ligne « prêts, ressources libres », avec un ⚠ quand un créneau reste libre (29-10 : plafond 3 pris pour 2, un créneau vide plus d'une heure)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "conforme : 1 mineur (aucune ligne des créneaux quand le dossier du tour n'a aucun projet) — orchestré (vague 2026-10-29-cad, 0 passe(s) de correction)", commit: c7244a36e5f9880d517cb9fd2dd8a95131c16fe9, reporte: { de: 475e95151bbeda03563fbbaceb4f90d1a93efb72, vers: c7244a36e5f9880d517cb9fd2dd8a95131c16fe9, patchId: 96a711042d14a59ddbbb3eccd1110c8bf7bd3e56 } }
+    finished: 2026-10-29
   - id: L417
     title: "Porte de tests de cadence : la vague joue aussi claude plugin test plugins/cadence-hud et tsc -p plugins/cadence-hud avec les types générés (vitest exclut plugins/**) — 43 erreurs de typage (L402, 28-10) et un faux rouge du mod sous charge (29-10) passés sans que la porte les voie"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "compliant — orchestré (vague 2026-10-29-cad, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: c92e4b0960d23d66cafdf893acaa136b61b512f5 }
+    finished: 2026-10-29
   - id: L419
     title: npm run service met aussi à jour la copie locale du mod cadence-hud (~/.claude/mods/cadence-hud, chargée par CLAUDE_CODE_PLUGIN_DIRS ; rsync sans .claude-plugin/types) — aujourd'hui à la main à chaque release, un oubli laisse l'ancien mod
     status: done

@@ -334,9 +334,10 @@ lots:
     created: 2026-10-29
   - id: L436
     title: "raf done avec plan.onWrite : la commande de commit proposée ne cite que .cadence/raf.yaml alors que le script a régénéré d'autres fichiers (frontend/public/plan-data/plan.json) — deliver refuse ensuite « 1 fichier modifié » ; citer les fichiers écrits par plan.onWrite (finance, ol, warhammer le 29-10)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-29
+    started: 2026-10-29
   - id: L437
     title: "Seuil de contexte du lead en tokens, pas en % : 60 % valait 120k sur une fenêtre de 200k et vaut 600k sur 1M (lead à 460k le 29-10, relu à chaque transition) — lead.contextThreshold en tokens (150k par défaut) lu par cadence session context et le skill lead (décision de Sylvain le 29-10)"
     status: todo

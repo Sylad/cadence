@@ -215,6 +215,20 @@ is always recorded by the lead's own `raf ux`, never by a subagent.
 One project at a time, by the lead: push, then the `deliver` skill (`cadence deliver --dry-run`, then
 `cadence deliver`). Follow the human's standing instructions about confirmation before production.
 
+**The sha pushed needs a green verdict of the gate (L426).** Where the project declares a gate (`orchestrate.test` or
+`orchestrate.build`), the `pre-push` hook (the wave's, or the gate-only hook it leaves behind once the repository is freed)
+refuses with exit 3 a push of a branch whose local sha has no green verdict of `cadence verify --gate`, naming the sha and
+the command to run. The verdict of the re-check (section 3, point 2) belongs to the lot's sha, and the head of `main` is
+almost never that sha: `raf done` does not commit, so the plan commit that follows it (« plan: Lx terminé »), a release
+commit or the plan commit of the next lot sits above. Such a plan commit has no verdict, and `verify --gate --sha <head>`
+cannot reuse the wave's record (made at the lot's sha, `checks.head`): it replays the whole gate, ~5 minutes. Count that
+replay in: after the plan commit, `cadence verify --gate --sha HEAD`, then push `main`. Delivering while the wave runs
+(section 2b) pushes the lot's sha alone (`git push origin <sha>:main`): its verdict is the one the re-check recorded, and the
+plan commit is pushed later, after its own replay. `CADENCE_PUSH_UNGATED=1 git push …` lets a push through with no verdict
+and says so on stderr: it is for the push the human explicitly asks ungated (a plan-only or docs-only commit above a verified
+sha, when the human says so), never the routine: the incident the hook answers (29-10, a project pushed with a red gate whose
+exit code a `| tail -1` had hidden) was exactly a push nobody had checked.
+
 When the wave's final table gives a line « livrable jusqu'à <sha> » for the repository (a ready lot stacked under a
 handed-back or failed one), HEAD holds the code of the lot above, which was not reviewed: never push or deliver HEAD.
 Push that sha alone first (`git push origin <sha>:main`), then deliver it (`cadence deliver --dry-run --sha <sha>`, then

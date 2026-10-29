@@ -71,6 +71,10 @@ picture, not its source.
    `CADENCE_PUSH_UNGATED=1` is the human's explicit override, never the routine. A lot that turns ready is delivered while the wave runs (`cadence deliver --sha <sha>`, accepted when no commit of the sha belongs to a lot that is not ready), not at the end of the wave. After a green delivery that changes what a page shows or what it is served, the
    `qa-reviewer` agent walks the delivered pages in a real browser, reads only, and brings its blocking
    findings to the human. It is not a gate: a finding becomes a new lot.
+   The lead asks both reviewers (`code-reviewer`, `qa-reviewer`) for a short reply with a `Report file: <path>` line in
+   the brief (L440): the full report goes to that file, outside the repository, and the agent answers in 5 lines at most
+   (`Verdict:`, `Blocking:`, `Follow-ups:`, `Report:`). The lead reads the file only when it needs the detail; twenty
+   reports of 3 to 5k each had swollen its context on 29-10.
 7. **Threshold and chaining.** Before every new wave the lead reads `cadence session context`. Under
    **60 %** it chains: `cadence orchestrate --continue` draws the next ready lot of the plan, in the
    declared priority, without asking the human « next? ». From 60 % upward, or when the figure cannot

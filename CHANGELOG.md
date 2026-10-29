@@ -82,6 +82,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
+- `code-reviewer` and `qa-reviewer` answer the lead in 5 lines at most (`Verdict:`, `Blocking:`, `Follow-ups:`, `Report:`) and write the full report to a file when the brief carries a `Report file: <path>` line; the `lead` skill gives that line and reads the file only on demand (L440, `docs/skills.md`, `docs/lead.md`). Without the line (waves, hand use) the report is complete, as before.
 - `cadence verify --gate` plays in a throwaway copy, not in the main tree, while an orchestration wave is live on the repository: an integration moving HEAD mid-gate no longer yields a « non probant » verdict (L431). `verify.inPlace: true` is still obeyed.
 
 ### Added

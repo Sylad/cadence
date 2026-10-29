@@ -59,6 +59,9 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   verdict for `raf review`. It takes the lot's commits from `raf commits`, never
   runs a build whose output is used live, and never edits code. A README or usage
   documentation that does not follow the lot's change is a *major* finding.
+  **Short reply (L440):** both reviewers answer in 5 lines at most (`Verdict:`, `Blocking:`, `Follow-ups:`, `Report:`) when the brief
+  carries a `Report file: <absolute path>` line, and write the full report to that file (outside the repository, verdict last);
+  the lead reads it on demand. With no such line (waves, hand use) the report is complete, as before.
 - **doc-keeper** (agent, L306): any stack; given a repository and a lot id, it reads the diff of the lot and the
   project's map of documents (`docs.sync` of `cadence.yaml`, README, `docs/`, CHANGELOG, news entries), says which
   documents must change and where, then updates them in a writing session (explicit paths, `docs(<lot>): …`) or
@@ -95,3 +98,6 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   the route, what was expected, what was measured and the evidence; pages checked
   N/N, follow-ups as `raf add` lines, what it could not verify, a one-line
   verdict. Read-only: GET only, no login, nothing submitted; it stops at a PIN.
+  **Short reply (L440):** both reviewers answer in 5 lines at most (`Verdict:`, `Blocking:`, `Follow-ups:`, `Report:`) when the brief
+  carries a `Report file: <absolute path>` line, and write the full report to that file (outside the repository, verdict last);
+  the lead reads it on demand. With no such line (waves, hand use) the report is complete, as before.

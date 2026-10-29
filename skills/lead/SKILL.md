@@ -190,6 +190,11 @@ is always recorded by the lead's own `raf ux`, never by a subagent.
    the absolute path of the project and the lot id, **not** the author's report: it reads the diff
    itself from the commits that cite the lot, runs the checks, and returns real defects only,
    ranked, with what it could not verify and a one-line verdict.
+   Add a line `Report file: <absolute path>` in a temporary folder outside the repository (one file per
+   lot and pass): the agent writes its full report there and answers you in 5 lines (verdict, blocking
+   findings, follow-ups, the path). Read the file only when you need it: to act on a blocking finding,
+   to hand a finding to a fix, or to bring the verdict line up to date for `raf review`. A short reply with `Blocking: 0`
+   needs no read.
 2. **The lead re-verifies itself**: `git log` shows the commits, the test suite and build pass when
    run by the lead, `raf check` is clean. During a wave, or in any tree that is not the lead's own, replay the gate at the lot's last sha with
    `cadence verify --gate --sha <sha> [--project <dir>]` (exit 0 green, 1 red with the failing tests, 2 nothing to replay): a bare
@@ -249,6 +254,10 @@ is a defect even when the delivery checks are green — with its proposed follow
 without an expectations file gets a draft back: show it to the human, who corrects it and decides
 whether it is committed. It is not a gate: `raf done` does not wait for it, and a finding becomes a
 new lot, not a reopened one.
+
+Give the `qa-reviewer` the same line `Report file: <absolute path>` (outside the repository): it answers in 5 lines
+(verdict, blocking findings, follow-ups, the path) and keeps the full report, with its measurements, in that file; read the
+file only to show the human a blocking finding or to commit the draft of an expectations file.
 
 ## 5. Close
 

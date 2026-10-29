@@ -169,6 +169,23 @@ Give screenshots and snapshots the absolute path of the capture directory your b
 the caller names; remove them, or list their paths in the report — except the QA browser profile, which is kept for the next pass. The working tree is left as you
 found it.
 
+## Short reply
+
+Only when the brief carries a line `Report file: <absolute path>` (the lead, which keeps its context
+small by reading a report only when it needs to). That line is the only trigger; an orchestrated
+review session and a review started by hand have none.
+
+- The full report, as the Output section above describes it, is written to that file with Bash. Use the
+  path the brief gives and no other: it is outside the repository, so the working tree stays as you
+  found it. The verdict is the last line of the file. Write the file before you reply.
+- Reply to the caller with 5 lines at most, and nothing before or after them:
+  `Verdict: <the one-line verdict>`, `Blocking: <n> — <one short phrase per blocking finding>` (`Blocking: 0` when there is none),
+  `Follow-ups: <n> — <the lines to add to the plan, by their first words>` (`Follow-ups: 0` when there is none),
+  `Report: <the path>`. Add a fifth line, `Not walked: <n> pages`, only when pages were not reached.
+- If you cannot write the file, say so on the first line of the reply and give the whole report in the reply, as if
+  the brief had no report file: a verdict whose evidence nobody can read is lost.
+- With no `Report file:` line in the brief, give the complete report in your reply.
+
 ## Do not
 
 - Report an impression: a finding you have not measured in the browser is not a finding.

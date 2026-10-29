@@ -83,4 +83,11 @@ describe('documentation du point « cas limites » (L428, correction)', () => {
     expect(mesure).toMatch(/--reverse`, ce que git ne fait pas \(L322\)/);
     expect(mesure).not.toContain('L329');
   });
+  it('R8 — l\'auto-vérification renvoie à la liste des cas limites du bloc L428 au lieu d\'en redonner une seconde', () => {
+    const b = read('../templates/orchestrate/implement.md');
+    const ligne = b.split('\n').find((l) => l.includes('edge cases (') && l.includes('one test per changed behaviour'));
+    expect(ligne, 'ligne de la grille').toBeDefined();
+    expect(ligne).toContain('the list of the edge-cases point above');
+    expect(ligne).not.toContain('empty, absent, twice, wrong order, refused');
+  });
 });

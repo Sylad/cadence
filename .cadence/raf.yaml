@@ -177,6 +177,7 @@ lots:
     started: 2026-10-29
     tasks:
       - { id: t1, title: "Panneau, commande repliée : un mot coupé ne se recolle pas avec le retrait de 3 espaces des lignes suivantes (30–36 colonnes : maritime-atlas:Q4/accueil + -4-ux12 ; id de vague coupé à 18 colonnes) ; R25 colle sans le retrait, contrairement à son titre — mineur de la 3e revue de L412 (29-10)", status: todo }
+      - { id: t2, title: "Panneau, ce qui attend une décision : un lot retiré d'une vague par le lead (--drop) n'est pas une décision en attente — maritime-atlas:B6 et DI1 (retirés le 27-10, pas mûrs) remontent depuis la lecture des vagues finies de 7 jours (vu par Sylvain le 29-10)", status: todo }
     review: { date: 2026-10-29, verdict: "conforme : 4e revue Opus — les 4 constats précédents tenus (un test échoue sans chaque correction : toutes les vagues finies lues, cd <dossier> &&, sha court, pas de --answer sur vague vivante), aucune régression (bande, arbre, parseCollected) ; dernier majeur (plafond de 30 vagues) levé en f373f2ec (borne de 7 jours seule, R26 rouge avant / vert après), relu par le lead ; 278 tests du mod, 4413 racine verts ; mineur ouvert en L412/t1 ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main n'a changé que le contexte du CHANGELOG (L412 sous Added, avant Changed/Fixed) et le plan ; code, tests et doc du panneau identiques à la pointe relue (6c769415) ; aucun constat ; mineur ouvert en L412/t1", commit: 07614fa8bd104fd3c0e98b7270021ebd1d80728c }
     ux: { date: 2026-10-29, verdict: "conforme : les 3 réserves UX (bande changée, décisions déjà prises affichées, --answer tronquée) levées et tenues par le panneau monté à 70 colonnes (R13, R17, R18, R23) ; commandes à copier préfixées de cd <dossier> &&, repliées avec continuation \\ ; rendu réel dans Claude Code à regarder par Sylvain après /reload-plugins ; mot coupé par le repli → L412/t1" }
     finished: 2026-10-29
@@ -325,6 +326,26 @@ lots:
     finished: 2026-10-29
     notes:
       - { date: 2026-10-29, text: "abandonné : prémisse fausse : le refus sort bien en 2 (vérifié) ; le 0 lu venait du | tail -40 de la commande de lancement du lead, récidive de L423" }
+  - id: L435
+    title: "cadence verify --sha vert après une livraison rouge du même sha : l'inscrire au journal des livraisons (ou le panneau l'affiche « vérifié depuis »), pour que la ligne rouge disparaisse sans relivrer — ol 3d6edf4 rouge pendant la panne de dark-blue, vert à la vérification (29-10)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L436
+    title: "raf done avec plan.onWrite : la commande de commit proposée ne cite que .cadence/raf.yaml alors que le script a régénéré d'autres fichiers (frontend/public/plan-data/plan.json) — deliver refuse ensuite « 1 fichier modifié » ; citer les fichiers écrits par plan.onWrite (finance, ol, warhammer le 29-10)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L437
+    title: "Seuil de contexte du lead en tokens, pas en % : 60 % valait 120k sur une fenêtre de 200k et vaut 600k sur 1M (lead à 460k le 29-10, relu à chaque transition) — lead.contextThreshold en tokens (150k par défaut) lu par cadence session context et le skill lead (décision de Sylvain le 29-10)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
+  - id: L438
+    title: "Alerte de joignabilité des machines : une sonde depuis Big-Blue (ping + API k3s) écrit sur Discord (webhook discord-idle) quand dark-blue ne répond plus — le 29-10 il s'est éteint à 20:05 et on ne l'a su qu'à la livraison de 20:43 (config locale, rien de propre à notre dossier dans le code de cadence)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-29
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

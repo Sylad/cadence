@@ -142,9 +142,10 @@ lots:
     started: 2026-10-29
   - id: L419
     title: npm run service met aussi à jour la copie locale du mod cadence-hud (~/.claude/mods/cadence-hud, chargée par CLAUDE_CODE_PLUGIN_DIRS ; rsync sans .claude-plugin/types) — aujourd'hui à la main à chaque release, un oubli laisse l'ancien mod
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-29
+    started: 2026-10-29
   - id: L423
     title: "orchestrate --resume --integrate sort en 0 quand l'intégration est refusée et le lot rendu (29-10, L402 : revue courte du diff rebasé non conforme) — code 1 comme toute vague dont un lot est rendu"
     status: dropped

@@ -228,11 +228,12 @@ lots:
     started: 2026-10-29
   - id: L425
     title: "Intégration en mode worktree : un lot prêt attend le verrou d'intégration tenu par SA PROPRE vague (un autre lot en train d'intégrer : rebase rejoué + porte ≈ 10 min) et est rendu au bout de 10 min (29-10, L417 derrière L416) — mettre les lots d'une même vague en file sur le verrou au lieu de les rendre"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-29
     notes:
       - { date: 2026-10-29, text: "29-10 : même famille — un raf add du lead dans l'arbre principal pendant l'intégration de L416 l'a fait refuser (arbre modifié) ; raf move refuse déjà pendant une vague, raf add/note/done devraient au moins avertir quand une intégration du dépôt est en cours" }
+    started: 2026-10-29
   - id: L426
     title: "Push gardé par la porte : cadence verify --gate enregistre son verdict par sha, et le hook pre-push (L405) refuse un push dont le sha de tête n'a pas de verdict vert (contournable par une variable explicite) — 29-10 : evatosorus poussé avec une porte rouge, son code de sortie masqué par « | tail -1 » (récidive de la perte n° 1 du 28-10)"
     status: todo

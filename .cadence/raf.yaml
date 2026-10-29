@@ -175,6 +175,8 @@ lots:
     screen: component
     created: 2026-10-28
     started: 2026-10-29
+    tasks:
+      - { id: t1, title: "Panneau, commande repliée : un mot coupé ne se recolle pas avec le retrait de 3 espaces des lignes suivantes (30–36 colonnes : maritime-atlas:Q4/accueil + -4-ux12 ; id de vague coupé à 18 colonnes) ; R25 colle sans le retrait, contrairement à son titre — mineur de la 3e revue de L412 (29-10)", status: todo }
   - id: L413
     title: "Panneau des lots : frise du cycle de chaque lot en cours — étapes de la vague (fiche, maquette, accept, implement, revue, correction n/3, porte, UX, intégration, prêt) avec l'étape courante, sa durée et les passes, puis côté plan revue posée → clos → livré ; lu dans .cadence/runs/<vague> et le plan"
     public: Le cycle complet de chaque lot en cours, en frise

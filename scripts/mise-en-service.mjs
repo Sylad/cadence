@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Mise en service (L195) : le `raf` et le `cadence` du PATH vivent dans une copie séparée du dépôt de travail
 // (un worktree git détaché, construit là), mise à jour par le lead après revue, jamais par une session de vague.
-//   node scripts/mise-en-service.mjs <sha> [--root dossier] [--bin-dir dossier] [--repo dépôt]
+//   node scripts/mise-en-service.mjs <sha> [--root dossier] [--bin-dir dossier] [--repo dépôt] [--mod-dir dossier]
 // <root>/releases/<sha12> : un worktree détaché par version mise en service ; <root>/service : lien vers la version en cours ;
 // <bin-dir>/raf et <bin-dir>/cadence : liens vers <root>/service/bin/*.js.
+// <mod-dir> (défaut ~/.claude/mods/cadence-hud) : copie locale du mod cadence-hud, recopiée depuis plugins/cadence-hud de la version (L419).
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
@@ -30,6 +31,29 @@ const KEPT_BEFORE = 3;
 
 export const defaultRoot = () => join(homedir(), '.local', 'share', 'cadence');
 export const defaultBinDir = () => join(homedir(), '.local', 'bin');
+/** Copie locale du mod cadence-hud, celle que CLAUDE_CODE_PLUGIN_DIRS fait charger à Claude Code. */
+export const defaultModDir = () => join(homedir(), '.claude', 'mods', 'cadence-hud');
+
+/** Recopie le mod de la version mise en service ; `.claude-plugin/types` (généré par Claude Code dans la copie) n'est ni copié ni effacé. */
+function rsyncMod(source, modDir) {
+  execFileSync('rsync', ['-a', '--delete', '--exclude=/.claude-plugin/types', `${source}/`, `${modDir}/`], { stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+/**
+ * Met à jour la copie locale du mod depuis `<dir>/plugins/cadence-hud`. Une copie absente n'est pas créée (une machine sans le mod
+ * n'en reçoit pas) ; un échec est rendu dans `error`, jamais levé : la version est déjà en service.
+ */
+function mettreAJourMod({ dir, modDir, syncMod }) {
+  const source = join(dir, 'plugins', 'cadence-hud');
+  if (!existsSync(source)) return { updated: false, dir: modDir, reason: 'sans source' };
+  if (!existsSync(modDir)) return { updated: false, dir: modDir, reason: 'absente' };
+  try {
+    syncMod(source, modDir);
+    return { updated: true, dir: modDir };
+  } catch (e) {
+    return { updated: false, dir: modDir, error: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 /**
  * Statut des lots du plan du dépôt, tel que HEAD le porte (plan: de cadence.yaml, sinon .cadence/raf.yaml, sinon docs/plan/raf.yaml hérité),
@@ -127,10 +151,10 @@ function replaceLink(target, link) {
 
 /**
  * Construit <sha> dans <root>/releases/<sha12> puis bascule <root>/service et les liens du bin-dir.
- * `install(dir)` (défaut : npm ci sans scripts puis tsc) est injectable pour les tests, comme `inUse(releases)` (copies à ne pas
+ * Met aussi à jour la copie locale du mod cadence-hud (`modDir`, L419). `install(dir)` (défaut : npm ci sans scripts puis tsc) est injectable pour les tests, comme `syncMod(source, modDir)`, `inUse(releases)` (copies à ne pas
  * retirer) et `launchDirs` (dossiers de lancement dont on lit les vagues non terminées, voir `copiesDesVaguesNonFinies`).
  */
-export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defaultBinDir(), install = installAndBuild, inUse = copiesUtilisees, launchDirs = lanceursConnus(repo) }) {
+export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defaultBinDir(), install = installAndBuild, inUse = copiesUtilisees, launchDirs = lanceursConnus(repo), modDir = defaultModDir(), syncMod = rsyncMod }) {
   const sha = checkAccepted(repo, rev);
   const served = servedSha(root);
   const servedFull = served && existsSync(join(root, 'releases', served)) ? git(join(root, 'releases', served), 'rev-parse', 'HEAD') : undefined;
@@ -167,7 +191,7 @@ export function mettreEnService({ repo, rev, root = defaultRoot(), binDir = defa
   } catch (e) {
     purge = { removed: 0, kept: 0, freedBytes: 0, error: e instanceof Error ? e.message : String(e) };
   }
-  return { sha, dir, fingerprint: fingerprint(dir), purge };
+  return { sha, dir, fingerprint: fingerprint(dir), purge, mod: mettreAJourMod({ dir, modDir, syncMod }) };
 }
 
 const real = (path) => {
@@ -360,6 +384,14 @@ export function direPurge({ removed, kept, freedBytes, error }) {
   return `purge : ${removed} ${removed > 1 ? 'copies retirées' : 'copie retirée'}, ${size} libérés${tail}`;
 }
 
+/** La phrase de la sortie : ce qu'il est advenu de la copie locale du mod cadence-hud. */
+export function direMod({ updated, dir, reason, error }) {
+  if (error) return `avertissement : mod cadence-hud non mis à jour (${error}) ; la version est en service, la copie locale (${dir}) garde l'ancien mod`;
+  if (updated) return `mod cadence-hud : copie locale mise à jour (${dir})`;
+  if (reason === 'absente') return `mod cadence-hud : copie locale absente (${dir}), non mise à jour`;
+  return 'mod cadence-hud : absent de cette version, copie locale inchangée';
+}
+
 function installAndBuild(dir) {
   const run = (cmd, args) => execFileSync(cmd, args, { cwd: dir, stdio: 'inherit' });
   run('npm', ['ci', '--ignore-scripts']);
@@ -389,15 +421,17 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   };
   const root = opt('--root');
   const binDir = opt('--bin-dir');
+  const modDir = opt('--mod-dir');
   const repo = opt('--repo') ?? process.cwd();
   const [rev] = args;
   if (!rev) {
-    console.error('usage : node scripts/mise-en-service.mjs <sha> [--root dossier] [--bin-dir dossier] [--repo dépôt]');
+    console.error('usage : node scripts/mise-en-service.mjs <sha> [--root dossier] [--bin-dir dossier] [--repo dépôt] [--mod-dir dossier]');
     process.exit(2);
   }
   try {
-    const r = mettreEnService({ repo, rev, ...(root && { root: resolve(root) }), ...(binDir && { binDir: resolve(binDir) }) });
+    const r = mettreEnService({ repo, rev, ...(root && { root: resolve(root) }), ...(binDir && { binDir: resolve(binDir) }), ...(modDir && { modDir: resolve(modDir) }) });
     console.log(`en service : ${r.sha.slice(0, 7)} dans ${r.dir}\nempreinte : ${r.fingerprint}`);
+    (r.mod.error ? console.error : console.log)(direMod(r.mod));
     (r.purge.error ? console.error : console.log)(direPurge(r.purge)); // une purge ratée : avertissement sur stderr, code de sortie 0 (la version est en service)
   } catch (e) {
     console.error(e instanceof Error ? e.message : String(e));

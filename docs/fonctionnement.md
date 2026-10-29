@@ -73,7 +73,7 @@ working repository's `dist/`: they read a separate worktree under `~/.local/shar
 only by `npm run service -- <sha>`. The command refuses a sha that is not an ancestor of `HEAD` and a
 sha whose cited lots are not `done`, so a wave cannot put unreviewed code in service. In the
 working repository, `npm run build` is a typecheck only. A `dropped` lot whose every commit is undone
-by a `git revert` under the sha no longer blocks. The command keeps the copy in service and the 3 put in service before it (rollback), removes the older ones unless a live process still uses one, and says what it purged (number of copies, space freed).
+by a `git revert` under the sha no longer blocks. The command keeps the copy in service and the 3 put in service before it (rollback), removes the older ones unless a live process still uses one, and says what it purged (number of copies, space freed). It also synchronises `plugins/cadence-hud` of the new copy into the local `cadence-hud` mod (`~/.claude/mods/cadence-hud`, `.claude-plugin/types` left alone), so the mod Claude Code loads is never an older release.
 
 ## Budget of a lot
 

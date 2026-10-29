@@ -90,3 +90,5 @@ The source lives in [`plugins/cadence-hud`](../plugins/cadence-hud/README.md)
 `claude plugin validate plugins/cadence-hud`, `claude plugin test plugins/cadence-hud`, and
 `tsc -p plugins/cadence-hud` once Claude Code has loaded the plugin at least once (it generates
 the `.claude-plugin/types` the tsconfig extends).
+
+To load the mod from a local copy instead of the marketplace, put it in `CLAUDE_CODE_PLUGIN_DIRS` (for example `~/.claude/mods/cadence-hud`). On the cadence repository, `npm run service -- <sha>` keeps that copy up to date (L419): it synchronises `plugins/cadence-hud` of the version put in service into `~/.claude/mods/cadence-hud` (`--mod-dir` for another folder), leaving `.claude-plugin/types` alone. The folder must already exist; it is never created.

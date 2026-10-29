@@ -3,7 +3,7 @@ import { appendFileSync, chmodSync, cpSync, existsSync, lstatSync, mkdirSync, re
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { checkAccepted, checkLotsDone, copiesDesVaguesNonFinies, direPurge, fingerprint, lanceursConnus, mettreEnService } from '../scripts/mise-en-service.mjs';
+import { checkAccepted, checkLotsDone, copiesDesVaguesNonFinies, direMod, direPurge, fingerprint, lanceursConnus, mettreEnService } from '../scripts/mise-en-service.mjs';
 import { takeSnapshot } from '../src/orchestrate/snapshot.js';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
@@ -479,4 +479,97 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(existsSync(join(root, 'service', 'node_modules'))).toBe(true);
     expect(execFileSync(join(binDir, 'cadence'), ['--version'], { encoding: 'utf8' }).trim()).toMatch(/^\d+/);
   });
+});
+
+/** Dépôt de travail qui porte le mod : plugins/cadence-hud avec un fichier de hooks et un .claude-plugin/plugin.json. */
+function repoAvecMod(hook: string) {
+  const w = workRepo();
+  mkdirSync(join(w.dir, 'plugins/cadence-hud/hooks'), { recursive: true });
+  mkdirSync(join(w.dir, 'plugins/cadence-hud/.claude-plugin'), { recursive: true });
+  writeFileSync(join(w.dir, 'plugins/cadence-hud/hooks/lots.ts'), hook);
+  writeFileSync(join(w.dir, 'plugins/cadence-hud/.claude-plugin/plugin.json'), '{"name":"cadence-hud"}\n');
+  const sha = commitAll(w.dir, 'feat(L1): mod', 'plugins');
+  return { ...w, sha };
+}
+
+describe('L419 — la mise en service met aussi à jour la copie locale du mod cadence-hud', () => {
+  it('R1 — la copie du mod reçoit les fichiers de la version mise en service, un fichier retiré du dépôt disparaît', () => {
+    const { dir, sha } = repoAvecMod('// v2\n');
+    const { root, binDir } = places();
+    const modDir = join(tempDir(), 'cadence-hud');
+    mkdirSync(join(modDir, 'hooks'), { recursive: true });
+    writeFileSync(join(modDir, 'hooks/lots.ts'), '// v1 ancien\n');
+    writeFileSync(join(modDir, 'hooks/retire.ts'), '// n existe plus\n');
+    const r = mettreEnService({ repo: dir, rev: sha, root, binDir, install, modDir });
+    expect(readFileSync(join(modDir, 'hooks/lots.ts'), 'utf8')).toBe('// v2\n');
+    expect(readFileSync(join(modDir, '.claude-plugin/plugin.json'), 'utf8')).toContain('cadence-hud');
+    expect(existsSync(join(modDir, 'hooks/retire.ts'))).toBe(false);
+    expect(r.mod).toEqual({ updated: true, dir: modDir });
+  }, 120_000);
+
+  it('R2 — .claude-plugin/types, généré par Claude Code dans la copie, est laissé en place', () => {
+    const { dir, sha } = repoAvecMod('// v2\n');
+    const { root, binDir } = places();
+    const modDir = join(tempDir(), 'cadence-hud');
+    mkdirSync(join(modDir, '.claude-plugin/types'), { recursive: true });
+    writeFileSync(join(modDir, '.claude-plugin/types/index.d.ts'), 'généré');
+    mettreEnService({ repo: dir, rev: sha, root, binDir, install, modDir });
+    expect(readFileSync(join(modDir, '.claude-plugin/types/index.d.ts'), 'utf8')).toBe('généré');
+  }, 120_000);
+
+  it("R3 — la source est la version mise en service, pas le dépôt de travail", () => {
+    const { dir, sha } = repoAvecMod('// accepté\n');
+    const { root, binDir } = places();
+    const modDir = join(tempDir(), 'cadence-hud');
+    mkdirSync(modDir, { recursive: true });
+    writeFileSync(join(dir, 'plugins/cadence-hud/hooks/lots.ts'), '// non revu\n'); // modifié, pas commité
+    mettreEnService({ repo: dir, rev: sha, root, binDir, install, modDir });
+    expect(readFileSync(join(modDir, 'hooks/lots.ts'), 'utf8')).toBe('// accepté\n');
+  }, 120_000);
+
+  it("R4 — sans copie locale du mod (dossier absent), rien n'est créé et la mise en service réussit en le disant", () => {
+    const { dir, sha } = repoAvecMod('// v2\n');
+    const { root, binDir } = places();
+    const modDir = join(tempDir(), 'absent', 'cadence-hud');
+    const r = mettreEnService({ repo: dir, rev: sha, root, binDir, install, modDir });
+    expect(existsSync(modDir)).toBe(false);
+    expect(r.mod).toEqual({ updated: false, dir: modDir, reason: 'absente' });
+    expect(direMod(r.mod)).toBe(`mod cadence-hud : copie locale absente (${modDir}), non mise à jour`);
+  }, 120_000);
+
+  it("R5 — un échec de la synchronisation est un avertissement : la version reste en service", () => {
+    const { dir, sha } = repoAvecMod('// v2\n');
+    const { root, binDir } = places();
+    const modDir = join(tempDir(), 'cadence-hud');
+    mkdirSync(modDir, { recursive: true });
+    const r = mettreEnService({ repo: dir, rev: sha, root, binDir, install, modDir, syncMod: () => { throw new Error('rsync: boom'); } });
+    expect(r.mod).toMatchObject({ updated: false, error: expect.stringContaining('boom') });
+    expect(direMod(r.mod)).toMatch(/^avertissement : mod cadence-hud non mis à jour \(.*boom.*\)/);
+    expect(readlinkSync(join(root, 'service'))).toBe(r.dir);
+  }, 120_000);
+
+  it("R6 — une version sans plugins/cadence-hud ne touche pas à la copie du mod", () => {
+    const { dir, first } = workRepo();
+    const { root, binDir } = places();
+    const modDir = join(tempDir(), 'cadence-hud');
+    mkdirSync(modDir, { recursive: true });
+    writeFileSync(join(modDir, 'garde.txt'), 'g');
+    const r = mettreEnService({ repo: dir, rev: first, root, binDir, install, modDir });
+    expect(existsSync(join(modDir, 'garde.txt'))).toBe(true);
+    expect(r.mod).toMatchObject({ updated: false, reason: 'sans source' });
+  }, 120_000);
+
+  it("R7 — la ligne de commande dit la mise à jour du mod et accepte --mod-dir", () => {
+    const { dir, sha } = repoAvecMod('// v2\n');
+    const { root, binDir } = places();
+    const modDir = join(tempDir(), 'cadence-hud');
+    mkdirSync(modDir, { recursive: true });
+    const shim = tempDir();
+    writeFileSync(join(shim, 'npm'), `#!/bin/sh\nln -s '${join(REPO, 'node_modules')}' node_modules\n`, { mode: 0o755 });
+    writeFileSync(join(shim, 'npx'), `#!/bin/sh\nshift\nexec '${join(REPO, 'node_modules/.bin/tsc')}' "$@"\n`, { mode: 0o755 });
+    const r = spawnSync('node', [join(REPO, 'scripts/mise-en-service.mjs'), sha, '--root', root, '--bin-dir', binDir, '--repo', dir, '--mod-dir', modDir], { encoding: 'utf8', env: { ...process.env, PATH: `${shim}:${process.env.PATH}`, CADENCE_HOME: join(tempDir(), 'home') } });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain(`mod cadence-hud : copie locale mise à jour (${modDir})`);
+    expect(readFileSync(join(modDir, 'hooks/lots.ts'), 'utf8')).toBe('// v2\n');
+  }, 120_000);
 });

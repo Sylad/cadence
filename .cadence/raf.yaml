@@ -360,6 +360,7 @@ lots:
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
+    review: { date: 2026-10-29, verdict: "compliant (0 bloquant, 0 majeur, 1 mineur : consigne du lead qui demande de lire le fichier pour le verdict déjà présent dans la réponse courte) — orchestré (vague 2026-10-30-n440, 0 passe(s) de correction)", commit: 4c9ff1facf0c026144399056de25d1c9368a8bad, reporte: { de: b2cea1645b33f2490b633346a209d0941e23a163, vers: 4c9ff1facf0c026144399056de25d1c9368a8bad, patchId: 5cbc8fc768247c74584f5a2e2ca72eb3f86bbfcc } }
   - id: L441
     title: "cadence orchestrate --status compact : une ligne par lot (état, passes, revue, UX, tokens, durée) ; choix faits, propositions et captures dans un fichier de la vague, affichés par --status --detail <lot> (le tableau complet a coûté 5 à 10k par lecture au lead le 29-10) (demande de Sylvain)"
     status: doing

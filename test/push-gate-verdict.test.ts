@@ -133,4 +133,12 @@ describe('hook pre-push : un push dont le sha de tête n\'a pas de verdict vert 
     await cli(repo, '', {}, 'verify', '--gate', '--sha', head);
     expect(verdicts(repo)[head]!.code).toBe(0);
   });
+
+  it('R13 — docs/raf.md décrit le refus de la porte de `raf hook pre-push` et son contournement', () => {
+    const doc = readFileSync(join(__dirname, '..', 'docs', 'raf.md'), 'utf8');
+    const line = doc.split('\n').find((l) => l.startsWith('| `raf hook pre-push`'))!;
+    expect(line).toContain('verdict');
+    expect(line).toContain('CADENCE_PUSH_UNGATED=1');
+    expect(line).not.toContain('exits 0 with no live wave');
+  });
 });

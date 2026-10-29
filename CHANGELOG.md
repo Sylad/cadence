@@ -80,6 +80,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-10-29
+
 ### Added
 
 - The `implement` brief carries a block « Limits and rules, before the walkthrough » against the first cause of correction passes, the code bug found by the review (L428, `docs/orchestrate.md`, `docs/mesures/bug-code-2026-10-29.md`): per rule the test that fails and the line that holds it, per changed code the edge inputs each tested (except, with a fiche, a case the fiche does not cover: written under `nonVerifie` or `choix`, neither coded nor tested), per figure or « all / never / always » written a check against the code. The effect is to be measured on two `cadence perf` windows (protocol in the measure page).

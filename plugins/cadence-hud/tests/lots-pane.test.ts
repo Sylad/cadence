@@ -84,7 +84,6 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await clock.advance(ms)
     await settle()
   }
-  /** Les textes du panneau monté, ceux que dessinent les régions Client (un projet chacune) comprises. */
   /** Monte le panneau des lots : le seul endroit qui appelle `$.ui.mount`. */
   const mountPane = (surface: 'terminal' | 'desktop' | 'mobile' | 'vscode', isFocused: boolean, bodyColumns: number, bodyRows: number): Promise<Mounted<'desktop' | 'terminal', 'Pane'>> =>
     $.ui.mount({
@@ -94,6 +93,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
       requestId: 'lots',
       props: { title: 'Lots', isFocused, bodyColumns, placement: 'dock', scroll: { offset: 0, bodyRows }, view: {} },
     } as never) as never
+  /** Les textes du panneau monté, ceux que dessinent les régions Client (un projet chacune) comprises. */
   const textsOf = async (ui: Pick<Mounted<'desktop' | 'terminal', 'Pane'>, 'drawn' | 'findAll'>) => {
     await ui.drawn() // le dessin suit les écritures d'état avant la lecture
     const own = (await ui.findAll({ type: 'Text' })).map(t => t.text ?? '')

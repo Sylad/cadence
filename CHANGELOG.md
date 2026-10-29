@@ -95,6 +95,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `raf done` (and every command that prints the plan commit) now cites the files `plan.onWrite` really wrote, even when `plan.onWrite.files` does not list them (L436): the proposed `git add` / `git commit` no longer leaves a regenerated file out, which made `cadence deliver` refuse with « 1 fichier modifié ». Stderr says `plan.onWrite a écrit <fichier>, absent de plan.onWrite.files` so the declaration can be completed.
 - Free slots no longer stay at zero while a wave in worktree mode has nothing left to play (L433, `docs/orchestrate.md`): the wave registers the lots it still has to play, not the lots it started with, and updates it each time a lot is settled (ready, handed back, failed or suspended). On 2026-10-29 `créneaux libres : 0 sur 3` stayed on while two of the three lots were ready and nothing was queued.
 
 ## [1.24.0] - 2026-10-29

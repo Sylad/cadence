@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 export interface Commit {
@@ -272,6 +272,34 @@ export function dirtyPaths(root: string, paths: string[]): string[] {
   if (paths.length === 0) return [];
   const out = git(root, ['-c', 'core.quotepath=off', 'status', '--porcelain', '-z', '--', ...paths]);
   return out.split('\0').filter(Boolean).map((l) => l.slice(3));
+}
+
+/**
+ * L'état des fichiers que git voit modifiés, stagés ou non suivis dans tout le dépôt : chemin (relatif à la racine) → contenu.
+ * Deux états se comparent pour savoir ce qu'une commande a écrit entre les deux. Vide hors d'un dépôt git.
+ */
+export function dirtyContents(root: string): Map<string, string> {
+  const state = new Map<string, string>();
+  let out: string;
+  try {
+    out = git(root, ['-c', 'core.quotepath=off', 'status', '--porcelain', '-z', '-uall']);
+  } catch {
+    return state;
+  }
+  const top = tryGit(root, ['rev-parse', '--show-toplevel'])?.trim() ?? root;
+  const entries = out.split('\0').filter(Boolean);
+  for (let i = 0; i < entries.length; i++) {
+    const file = entries[i].slice(3);
+    if (entries[i][0] === 'R' || entries[i][0] === 'C') i++; // un renommage porte l'ancien chemin dans l'entrée suivante
+    let content = '';
+    try {
+      content = readFileSync(resolve(top, file)).toString('base64');
+    } catch {
+      content = '(absent)';
+    }
+    state.set(file, content);
+  }
+  return state;
 }
 
 /** Commit de `paths` seuls (à chemin explicite : le reste de l'index n'y entre pas). Rend le sha court. Lève l'erreur de git (hook refusé compris). */

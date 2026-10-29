@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { dirtyContents } from './git.js';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
 import { ARCHIVE_DIR, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, selectArchivable, type Kept } from './archive.js';
@@ -291,6 +292,9 @@ export class Plan {
    * déplacé est au pire en double, ce que le chargement refuse en le nommant, jamais perdu — et toute exception d'écriture (EACCES, disque plein,
    * commande `plan.onWrite` en échec, L346) remet le plan, les fichiers d'année et les fichiers déclarés tels qu'avant ; l'erreur le dit.
    */
+  /** Fichiers que `plan.onWrite` a écrits sans les déclarer, relevés à chaque `save()` de ce processus (L436). */
+  private readonly writtenByHook = new Set<string>();
+
   save(): void {
     this.writable();
     const hook = this.settings.onWrite;
@@ -328,8 +332,15 @@ export class Plan {
     for (const a of archives) a.dirty = false;
     if (!hook) return;
     const limit = hook.timeoutMs ?? ON_WRITE_TIMEOUT_MS;
+    const before = dirtyContents(hook.cwd);
     const r = spawnSync('sh', ['-c', hook.command], { cwd: hook.cwd, encoding: 'utf8', timeout: limit, stdio: ['ignore', 'pipe', 'pipe'] });
     if (r.status === 0) {
+      // Ce que la commande a réellement écrit (L436) : un fichier hors de `files` (déclaration incomplète) doit quand même être commité avec le plan,
+      // sans quoi la livraison refuse « 1 fichier modifié ». Le plan, les archives et les fichiers déclarés ont leur propre chemin.
+      const known = new Set([...written.map((p) => relative(hook.cwd, p)), ...hook.files]);
+      const undeclared = [...dirtyContents(hook.cwd)].filter(([f, content]) => before.get(f) !== content && !known.has(f)).map(([f]) => f);
+      for (const f of undeclared) this.writtenByHook.add(f);
+      if (undeclared.length > 0) notice(`raf: plan.onWrite a écrit ${undeclared.join(', ')}, absent de plan.onWrite.files — l'ajouter dans cadence.yaml (il est cité dans le commit proposé cette fois)`);
       // Un chemin mal déclaré laisse le vrai fichier produit hors du commit du plan (le constat d'origine du lot) : le dire.
       const missing = hook.files.filter((f) => !existsSync(resolve(hook.cwd, f)));
       if (missing.length > 0) notice(`raf: plan.onWrite a réussi mais le fichier déclaré est absent : ${missing.join(', ')} — vérifier plan.onWrite.files dans cadence.yaml`);
@@ -412,7 +423,7 @@ export class Plan {
 
   /** Fichiers que produit `plan.onWrite` (L346), relatifs à la racine du dépôt : à commiter avec le plan, même s'ils n'étaient pas encore suivis. */
   get produced(): string[] {
-    return this.settings.onWrite?.files ?? [];
+    return [...(this.settings.onWrite?.files ?? []), ...this.writtenByHook];
   }
 
   /** Fichier d'attendus QA du `qa-reviewer`, relatif à la racine du dépôt. */

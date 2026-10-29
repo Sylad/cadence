@@ -501,7 +501,7 @@ export function computePerf(input: PerfInput): PerfResult {
   const lotMinutes: Record<string, Indicator> = {};
   for (const key of classKeys) {
     const v = both(windows, (w) => (w === windows.current ? minutesClasses.current : minutesClasses.previous).get(key) ?? []);
-    lotMinutes[key] = mk({ current: median(v.current), previous: median(v.previous) }, { current: v.current.length, previous: v.previous.length }, 'up', twinFirstTime);
+    lotMinutes[key] = mk({ current: median(v.current), previous: median(v.previous) }, { current: v.current.length, previous: v.previous.length }, null, null);
   }
   const reviewShare = both(windows, (w) => {
     let review = 0;

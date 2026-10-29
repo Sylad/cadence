@@ -70,4 +70,17 @@ describe('cadence perf — durée de mur d’un lot par taille (L414)', () => {
     const { data } = await perf(dir);
     expect(data.lotMinutes['0.5'].lots.current).toBe(1);
   });
+
+  it('R5 — une durée n’a ni ⚠ ni jumeau qualité : `warn` faux et `twin` nul pour chaque classe, même quand la médiane monte de plus de 25 % sur 5 lots dans chaque fenêtre', async () => {
+    const ids = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9', 'L10'];
+    const { dir, runs } = root(ids.map((id) => ({ id, estimate: 0.5 })));
+    ids.forEach((id, i) => {
+      const old = i < 5;
+      const day = old ? '2026-10-08' : DAY;
+      writeJournal(runs, 'w1', 'alpha', id, { status: 'ready', steps: [{ kind: 'implement', started: at('08:00:00', day), ended: at(old ? '08:30:00' : '10:00:00', day), counted: 1000 }] });
+    });
+    const { data } = await perf(dir);
+    expect(data.lotMinutes['0.5']).toMatchObject({ current: 120, previous: 30, lots: { current: 5, previous: 5 }, warn: false, twin: null });
+    expect(data.tokens.byEstimate['0.5'].twin).toBe('corrections.firstTime');
+  });
 });

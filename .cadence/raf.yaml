@@ -285,18 +285,26 @@ lots:
     created: 2026-10-29
   - id: L432
     title: "Pre-push (L426) : un commit qui ne touche que le plan (.cadence/raf.yaml) au-dessus d'un sha à porte verte est refusé, d'où une suite complète rejouée pour raf done (29-10, cadence et avatar) — reprendre le verdict du parent quand le diff ne touche que le plan"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "conforme : 0 bloquant, 0 majeur, 1 mineur (notion de « plan » plus étroite que isPlanOnly, échec côté sûr) — orchestré (vague 2026-10-29-1650, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 91bd9b533426c6334e3d3f11f6c88127b2fff183 }
+    finished: 2026-10-29
   - id: L433
     title: "Registre des créneaux : une vague en mode worktree garde tout le plafond (« sessions en cours : 0 · créneaux libres : 0 sur 3 ») alors que 2 de ses 3 lots sont prêts et qu'elle n'a plus rien en file (29-10, vague cad1) — compter les sessions vivantes et les lots encore à jouer, pas le plafond"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "compliant — orchestré (vague 2026-10-29-1650, 0 passe(s) de correction)", commit: 2f4cb167b58730379102364cb8f3426df7ee8068, reporte: { de: 8fa67df480c2c8381d1b87c864ea8453830d9e93, vers: 2f4cb167b58730379102364cb8f3426df7ee8068, patchId: b9300557023c2583cdddf88f82f3a2cf46ff90bd } }
+    finished: 2026-10-29
+  - id: L434
+    title: "cadence orchestrate --wave <id> sur une vague qui existe déjà : refus « cette vague existe déjà » mais code de sortie 0 (29-10, vague cad2 de ce matin) — le lead a cru la vague lancée et suivi l'ancien journal ; un refus avant d'agir sort en 2, comme documenté"
+    status: todo
+    estimate: 0.1
+    quickwin: true
+    created: 2026-10-29
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

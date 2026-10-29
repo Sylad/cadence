@@ -37,6 +37,9 @@ const MIN_CLASSIFIED = 10;
 /** Les étapes de la chaîne spec : un lot qui en a une est mesuré à part pour ses tokens (L240). */
 const SPEC_CHAIN = new Set(['spec', 'fiche', 'maquette', 'accept']);
 
+/** La classe de taille d'un lot : son estimate, « +spec » s'il est passé par la chaîne spec. Les tokens et la durée de mur (`lotMinutes`) la partagent ; le collecteur du mod (plugins/cadence-hud/hooks/collect.ts) en recopie la chaîne, `test/hud-classe-l414.test.ts` les relie. */
+const sizeClass = (estimate: number, steps: { kind: string }[]): string => `${estimate}${steps.some((x) => SPEC_CHAIN.has(x.kind)) ? '+spec' : ''}`;
+
 /**
  * Les deux fenêtres de 7 jours calendaires locaux : la courante finit à `today` inclus, la précédente la précède.
  * `since` (jour ISO ou instant) ignore tout ce qui le précède : la fenêtre qui commence avant lui est tronquée à lui.
@@ -469,7 +472,7 @@ export function computePerf(input: PerfInput): PerfResult {
       const counted = d.j.steps.filter((x) => x.counted !== undefined);
       if (!p || counted.length === 0) continue;
       // Un lot passé par la chaîne spec (écran ou back) coûte plus que le lot ordinaire de même estimate (mesuré le 12–18-10 : +150 k à l'estimate 0,5, +30 k à 1 ; 450 k est l'écart de budget, pas l'écart mesuré) : classe à part, sinon l'arrivée de ces lots dans une fenêtre passe pour un lot ordinaire plus lourd (L240).
-      const key = `${p.estimate}${d.j.steps.some((x) => SPEC_CHAIN.has(x.kind)) ? '+spec' : ''}`;
+      const key = sizeClass(p.estimate, d.j.steps);
       const kinds = new Map<string, number>();
       for (const x of counted) kinds.set(carrierKind(x.kind), (kinds.get(carrierKind(x.kind)) ?? 0) + x.counted!);
       classes.set(key, [...(classes.get(key) ?? []), { total: counted.reduce((sum, x) => sum + x.counted!, 0), kinds }]);
@@ -492,7 +495,7 @@ export function computePerf(input: PerfInput): PerfResult {
       const starts = d.j.steps.map((x) => Date.parse(x.started ?? '')).filter((t) => !Number.isNaN(t));
       const ends = d.j.steps.map((x) => Date.parse(x.ended ?? '')).filter((t) => !Number.isNaN(t));
       if (!p || starts.length === 0 || ends.length === 0 || Math.max(...ends) < Math.min(...starts)) continue;
-      const key = `${p.estimate}${d.j.steps.some((x) => SPEC_CHAIN.has(x.kind)) ? '+spec' : ''}`;
+      const key = sizeClass(p.estimate, d.j.steps);
       classes.set(key, [...(classes.get(key) ?? []), (Math.max(...ends) - Math.min(...starts)) / 60_000]);
     }
     return classes;

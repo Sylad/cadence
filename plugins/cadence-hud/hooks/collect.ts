@@ -65,6 +65,7 @@ def load(path):
 
 tree = None
 
+# copie de SPEC_CHAIN de src/perf.ts (la classe « +spec » de cadence perf) ; test/hud-classe-l414.test.ts les relie
 SPEC_CHAIN = ('spec', 'fiche', 'maquette', 'accept')
 
 def counted_of(step):

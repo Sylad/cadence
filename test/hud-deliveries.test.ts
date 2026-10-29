@@ -120,13 +120,13 @@ it('L412 R26 — le collecteur rend TOUTES les vagues finies du dossier (7 derni
       utimesSync(join(runs(id), 'wave.json'), d, d)
     }
     // le cas de la revue : L412 rendu dans la vague 1650, puis ew1, ev43 et wo1 finies sans rien à décider
-    wave('2026-10-29-1650', 4 * HOUR, { project: 'cadence', lot: 'L412', status: 'handed-back', outcome: 'correction non jouée (budget)' })
+    wave('2026-10-29-1650', 4 * HOUR, { project: 'cadence', repo: join(cwd, 'cadence'), lot: 'L412', status: 'handed-back', outcome: 'correction non jouée (budget)' })
     wave('2026-10-29-ew1', 3 * HOUR, { project: 'evatosorus', lot: 'L42', status: 'ready' })
     wave('2026-10-29-ev43', 2 * HOUR, { project: 'evatosorus', lot: 'L43', status: 'ready' })
     wave('2026-10-29-wo1', 1 * HOUR, null)
     wave('2026-10-20-old', 8 * 24 * HOUR, { project: 'ol', lot: 'L1', status: 'question', questions: ['trop vieille'] }) // plus de 7 jours : hors du bloc
     writeFileSync(join(cwd, '.cadence', 'runs', 'etranger.txt'), '') // un fichier étranger dans runs/ ne gêne pas
-    type Out = { waves: { id: string; live: boolean }[]; ended: { id: string; live: boolean; cwd: string; lots: { lot: string; status: string }[] }[] }
+    type Out = { waves: { id: string; live: boolean }[]; ended: { id: string; live: boolean; cwd: string; lots: { lot: string; status: string; repo?: string }[] }[] }
     const collect = (): Out => {
       const run = spawnSync('python3', ['-I', '-c', COLLECTOR], { encoding: 'utf8', cwd, env: { ...process.env, CADENCE_HOME: home } })
       expect(run.status, run.stderr).toBe(0)
@@ -135,7 +135,7 @@ it('L412 R26 — le collecteur rend TOUTES les vagues finies du dossier (7 derni
     const out = collect()
     expect(out.ended.map(w => w.id)).toEqual(['2026-10-29-wo1', '2026-10-29-ev43', '2026-10-29-ew1', '2026-10-29-1650'])
     expect(out.ended.every(w => !w.live && w.cwd === cwd)).toBe(true)
-    expect(out.ended[3]!.lots).toMatchObject([{ lot: 'L412', status: 'handed-back' }])
+    expect(out.ended[3]!.lots).toMatchObject([{ lot: 'L412', status: 'handed-back', repo: join(cwd, 'cadence') }]) // le dépôt du lot, pour `cd` devant raf ux
     // la bande, elle, ne reçoit que la plus récente
     expect(out.waves.map(w => w.id)).toEqual(['2026-10-29-wo1'])
     // 30 au plus : 31 vagues plus récentes poussent la vague 1650 hors de la liste

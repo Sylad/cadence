@@ -16,7 +16,7 @@ const TOUR = [row('cadence', [lot('L401', 'doing'), lot('L401/1', 'doing', { par
 
 const WAVE: Wave = {
   id: 'w1', pid: 1, cwd: '/p', cap: 2, started: '2026-10-07T19:03:10.939Z', status: 'running', live: true, budget: 1_000_000, consumed: 1,
-  lots: [{ project: 'ol', lot: 'L80', title: 't', status: 'reviewing', pass: 0, model: 'sonnet', next: null, steps: 1, step: null }],
+  lots: [{ project: 'ol', repo: '/p/ol', lot: 'L80', title: 't', status: 'reviewing', pass: 0, model: 'sonnet', next: null, steps: 1, step: null }],
 }
 
 type Cadence = { exitCode: number; stdout: string }
@@ -1134,7 +1134,7 @@ test('L412 R13 — une question de session s’affiche en tête du panneau, avan
   const at = (re: RegExp) => texts.findIndex(t => re.test(t))
   expect(at(/Ce qui attend une décision \(1\)/)).toBeGreaterThan(-1)
   expect(at(/\? ol:L80 .*Quel format \?/)).toBeGreaterThan(at(/Ce qui attend/))
-  expect(at(/cadence orchestrate --resume --wave w1 --answer ol:L80 "…"/)).toBeGreaterThan(-1)
+  expect(at(/cd \/p && cadence orchestrate --resume --wave w1 --answer ol:L80/)).toBeGreaterThan(-1) // à 70 colonnes, `"…"` passe à la ligne suivante
   expect(at(/L401/)).toBeGreaterThan(at(/--answer/)) // l'arbre vient après le bloc
 })
 
@@ -1175,7 +1175,7 @@ test('L412 R17 — une question d’une vague finie attend dans le panneau penda
   const { text } = await s.draw()
   expect(text).toMatch(/Ce qui attend une décision \(1\)/)
   expect(text).toMatch(/\? ol:L80 .*Encore \?/)
-  expect(text).toMatch(/--wave fini --answer ol:L80/)
+  expect(text).toMatch(/cd \/p && cadence orchestrate --resume --wave fini --answer ol:L80/)
 })
 
 test('L412 R18 — panneau monté : un verdict UX dont le lot est clos au plan (raf ux puis raf done) disparaît du bloc ; un lot encore ouvert y reste', async ($, on) => {
@@ -1193,14 +1193,15 @@ test('L412 R18 — panneau monté : un verdict UX dont le lot est clos au plan (
   expect(text).not.toMatch(/ol:L79|cadence:L399/)
 })
 
-test('L412 R23 — à 70 colonnes, la commande --answer d’un id long se lit entière sur deux lignes du panneau, sans « … », la première finie par la continuation', async ($, on) => {
+test('L412 R23 — à 70 colonnes, la commande --answer d’un id long, `cd` du dossier des vagues compris, se lit entière sur trois lignes du panneau, sans « … », chacune sauf la dernière finie par la continuation', async ($, on) => {
   const lots = [{ ...WAVE.lots[0]!, project: 'maritime-atlas', lot: 'Q4/accueil-4-ux12', status: 'question', questions: ['Quel titre ?'] }]
-  const s = await session($, on, { waves: [{ ...WAVE, id: '2026-10-29-1650', lots }] })
+  const s = await session($, on, { waves: [{ ...WAVE, id: '2026-10-29-1650', cwd: '/home/sylvain_ladoire/projects/developpeur', lots }] })
   await s.advance(5_000)
   await s.hud('lots')
   const { texts } = await s.draw(70, 30)
-  const first = texts.findIndex(t => t === '   cadence orchestrate --resume --wave 2026-10-29-1650 --answer \\')
+  const first = texts.findIndex(t => t === '   cd /home/sylvain_ladoire/projects/developpeur && cadence \\')
   expect(first).toBeGreaterThan(-1)
-  expect(texts[first + 1]).toBe('   maritime-atlas:Q4/accueil-4-ux12 "…"')
+  expect(texts[first + 1]).toBe('   orchestrate --resume --wave 2026-10-29-1650 --answer \\')
+  expect(texts[first + 2]).toBe('   maritime-atlas:Q4/accueil-4-ux12 "…"')
   expect(texts.some(t => /--answer caden…|--answer mari…/.test(t))).toBe(false)
 })

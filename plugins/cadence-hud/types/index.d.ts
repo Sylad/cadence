@@ -33,6 +33,8 @@ export type WaveStep = {
 
 export type WaveLot = {
   project: string
+  /** Chemin absolu du dépôt du lot (`repo` de son état, écrit par orchestrate) : la commande `raf ux` à copier commence par `cd` là (L412). */
+  repo?: string | null
   lot: string
   title: string
   status: string

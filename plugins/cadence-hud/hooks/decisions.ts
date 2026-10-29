@@ -13,6 +13,12 @@ export type Decision =
 /** La première ligne non vide d'un texte. */
 const firstLine = (text: string): string => text.split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
 
+/** Un argument rendu tel quel par sh, quels que soient ses espaces, guillemets ou jokers (la règle de src/deliver.ts) : un chemin ordinaire reste nu. */
+const shellQuote = (arg: string): string => (/^[A-Za-z0-9_@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", `'\\''`)}'`)
+
+/** La commande à copier, précédée de `cd <dossier> && ` : elle s'exécute telle quelle depuis n'importe quel dossier (le précédent de src/cli.ts, legacyPlanLine). Sans dossier, la commande nue. */
+const from = (folder: string | null | undefined, command: string): string => (folder ? `cd ${shellQuote(folder)} && ${command}` : command)
+
 /**
  * Ce qui attend une décision de la personne, lu dans les vagues de la bande (`waves` : les vivantes, et sans vivante la dernière finie du dossier), dans `ended` (les vagues
  * finies du dossier que le collecteur rend à part, la plus récente d'abord, qu'une vague vive ou non, L412 : lues sans le délai de 30 min de la bande, une question ou un lot rendu
@@ -24,6 +30,9 @@ const firstLine = (text: string): string => text.split('\n').map(l => l.trim()).
  * Le plan tranche (`board`, le tableau du panneau lu de `cadence lead tour --json`) : une décision dont le lot n'est plus ouvert dans un projet que le tour a lu (ligne sans erreur,
  * avec ses lots) n'est plus affichée — un verdict UX posé puis `raf done`, un lot rendu puis repris et clos, une question dont le lot est clos. Un projet absent du tableau, en erreur
  * ou sans lots (cadence trop ancien) garde ses décisions : on ne sait pas. Une livraison en échec ne dépend pas du plan.
+ * Les commandes à copier commencent par `cd` : `--answer` depuis le dossier de lancement de la vague (`cwd`, le seul d'où orchestrate retrouve `<cwd>/.cadence/runs/<vague>`),
+ * `raf ux` depuis le dépôt du lot (`repo` de son état) — depuis le dossier parent des projets, raf répondait « pas de plan », et depuis un autre projet il posait le verdict
+ * sur le lot de même id de ce projet. Un état de lot sans `repo` (orchestrate l'écrit toujours) garde la commande nue.
  */
 export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedDelivery[], ended: readonly Wave[] = [], board: LotsBoard | null = null): Decision[] => {
   const open = (project: string, lot: string): boolean => {
@@ -43,11 +52,11 @@ export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedD
       if (!open(l.project, l.lot)) continue
       if (l.status === 'question') {
         const text = (l.questions ?? []).map(firstLine).filter(q => q !== '').join(' / ')
-        out.push({ kind: 'question', project: l.project, lot: l.lot, text: text || 'question sans texte', command: `cadence orchestrate --resume --wave ${w.id} --answer ${key} "…"` })
+        out.push({ kind: 'question', project: l.project, lot: l.lot, text: text || 'question sans texte', command: from(w.cwd, `cadence orchestrate --resume --wave ${w.id} --answer ${key} "…"`) })
       } else if (l.status === 'handed-back' || l.status === 'failed') {
         out.push({ kind: 'rendu', project: l.project, lot: l.lot, text: firstLine(l.outcome ?? '') || lotStatusFr(l.status) })
       } else if (l.status === 'ready' && l.visible === true && typeof l.uxVerdict === 'string' && l.uxVerdict !== '') {
-        out.push({ kind: 'ux', project: l.project, lot: l.lot, text: firstLine(l.uxVerdict), command: `raf ux ${l.lot} "verdict"` })
+        out.push({ kind: 'ux', project: l.project, lot: l.lot, text: firstLine(l.uxVerdict), command: from(l.repo, `raf ux ${l.lot} "verdict"`) })
       }
     }
   }
@@ -83,7 +92,8 @@ const CONTINUATION = ' \\'
  * quand un mot est coupé) : collées telles quelles dans un shell, les lignes ne lancent qu'UNE commande, la commande d'origine — sans elle, une ligne 1
  * `cadence orchestrate --resume --wave <vague>` s'exécutait seule, sans son `--answer`. Les lignes, sans leur retrait, jointes en effaçant chaque `\` de fin de ligne
  * et le saut qui le suit (ce que fait le shell), redonnent la commande ; jointes par un espace, elles ne la redonnent pas quand un mot est coupé.
- * Un mot n'est coupé que quand la largeur passe sous le plus long argument (`projet:lot`, retrait et continuation compris) ; une coupe entre guillemets simples ne se recollerait pas, la commande n'en a pas.
+ * Un mot n'est coupé que quand la largeur passe sous le plus long argument (le chemin du `cd`, `projet:lot`, retrait et continuation compris) ; une coupe entre guillemets simples
+ * ne se recollerait pas : seul un chemin avec espace ou apostrophe en porte, et il se coupe alors dès que la largeur passe sous sa longueur.
  * Sous 6 colonnes (retrait + 1 + continuation), les lignes sont coupées par « … » : rien n'y est lisible de toute façon.
  */
 export const wrapCommand = (command: string, columns: number): string[] => {

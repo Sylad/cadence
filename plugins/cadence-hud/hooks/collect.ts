@@ -84,7 +84,7 @@ def read_lots(d, live):
                 'sub': claude_descendants(tree, spid) if spid else 0,
             }
         lots.append({
-            'project': l.get('project'), 'lot': l.get('lot'), 'title': l.get('title') or '', 'status': l.get('status'),
+            'project': l.get('project'), 'repo': l.get('repo'), 'lot': l.get('lot'), 'title': l.get('title') or '', 'status': l.get('status'),
             'pass': l.get('pass') or 0, 'model': l.get('model'), 'next': l.get('next'),
             'steps': len(steps), 'step': step, 'gate': l.get('gate') if live else None,
             'questions': l.get('questions') or [], 'outcome': l.get('outcome'), 'uxVerdict': l.get('uxVerdict'), 'visible': bool(l.get('visible')),

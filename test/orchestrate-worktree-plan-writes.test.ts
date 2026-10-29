@@ -83,6 +83,26 @@ describe('R3 — les créneaux libres comptent les lots en parallèle', () => {
   });
 });
 
+describe('L433 — un lot fini ne garde plus de créneau', () => {
+  it('L433 — trois lots en worktree joués un par un : le registre annonce les lots encore à jouer (3, 2, 1), pas le plafond, et 0 une fois tous finis', async () => {
+    const { parent } = setup([{ title: 'un' }, { title: 'deux' }, { title: 'trois' }]);
+    const seen: (number | undefined)[] = [];
+    const f = fake({
+      implement: writes(async () => {
+        seen.push(liveWaves(cadenceHome())[0]?.lanes);
+      }),
+    });
+    const r = await run(parent, ['a:L1', 'a:L2', 'a:L3', '--max-sessions', '1'], f);
+    expect(r.code).toBe(0);
+    expect(seen).toEqual([3, 2, 1]);
+  });
+  it('L433 — freeSlots : une vague à 0 lot à jouer ne retient aucun créneau (3 sur 3 libres), à 1 lot elle en retient un', () => {
+    const w = (lanes: number) => ({ pid: 1, wave: 'w', started: 's', cwd: '.', repos: ['a'], cap: 3, lanes });
+    expect(freeSlots([w(0)], 3)).toBe(3);
+    expect(freeSlots([w(1)], 3)).toBe(2);
+  });
+});
+
 describe('R3 — mode par défaut inchangé : le registre ne reçoit pas de files', () => {
   it('R3 — vague sans worktrees avec un lot à dépôt voisin : aucune file écrite, créneaux = min(plafond, dépôts tenus) comme avant L279', async () => {
     const { parent } = setup([{ title: 'un', repos: ['../voisin'] }], '');

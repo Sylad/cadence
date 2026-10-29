@@ -115,6 +115,27 @@ describe('R3 — une commande en échec refuse l\'écriture et le dit', () => {
     expect(readFileSync(join(dir, PLAN), 'utf8')).toBe(planBefore);
     expect(readFileSync(join(dir, OUT), 'utf8')).toBe('ancien\n');
   });
+  it('R3 — un script Node qui jette : l\'erreur montre le motif (la première ligne « Error: … »), pas la fin de la pile (L429)', () => {
+    const script = join(tempDir(), 'publier.mjs');
+    writeFileSync(script, "throw new Error('titre public « Un titre trop long » non conforme (93 caractères > 80)');\n");
+    const dir = project(config(`node ${script}`));
+    const planBefore = readFileSync(join(dir, PLAN), 'utf8');
+    const r = cadence(dir, 'add', 'refusé');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('non conforme (93 caractères > 80)');
+    expect(r.err).not.toMatch(/\bat .*(node:internal|publier\.mjs)/);
+    expect(r.err).not.toContain('Node.js v');
+    expect(r.err).toContain('écriture refusée, plan inchangé');
+    expect(readFileSync(join(dir, PLAN), 'utf8')).toBe(planBefore);
+  });
+  it('R3 — un script qui écrit son motif sur la sortie standard sans pile : la première ligne est gardée', () => {
+    const script = join(tempDir(), 'publier.sh');
+    writeFileSync(script, 'echo motif-clair\necho detail-secondaire\nexit 1\n');
+    const dir = project(config(`sh ${script}`));
+    const r = cadence(dir, 'add', 'refusé');
+    expect(r.err).toContain('motif-clair');
+    expect(r.err).not.toContain('detail-secondaire');
+  });
   it('R3 — un fichier produit qui n\'existait pas avant est retiré', () => {
     const dir = project(config(`${GENERATE} && exit 1`));
     expect(existsSync(join(dir, OUT))).toBe(false);

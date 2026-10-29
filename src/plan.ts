@@ -8,6 +8,18 @@ import { ARCHIVE_DIR, archiveFiles, archiveLots, archiveYear, mergeArchived, new
 /** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
 const ON_WRITE_TIMEOUT_MS = 120_000;
 
+/**
+ * La raison d'un échec de `plan.onWrite` en une ligne (L429) : la première ligne « Error: … » de la sortie d'erreur (un script Node qui jette
+ * imprime d'abord le fichier, le code fautif et un caret, puis le motif, puis la pile : garder la fin de la pile cachait le motif) ; sans
+ * ligne de ce genre, la première ligne non vide de la sortie d'erreur, puis de la sortie standard. Les lignes de pile (« at … ») et la
+ * bannière « Node.js v… » ne sont jamais la raison.
+ */
+function failureReason(stderr: string | null, stdout: string | null): string {
+  const lines = (text: string | null) => (text ?? '').split('\n').map((l) => l.trim()).filter((l) => l && !/^at\s/.test(l) && !/^Node\.js v\d/.test(l));
+  const err = lines(stderr);
+  return err.find((l) => /^(?:\w+)?Error\b/.test(l)) ?? err[0] ?? lines(stdout)[0] ?? '';
+}
+
 /** Où va un avertissement de `save()` (la commande a réussi mais quelque chose cloche) : stderr, ou le `err` du CLI qui a lancé l'écriture. */
 let notice: (line: string) => void = (line) => void process.stderr.write(`${line}\n`);
 export function setPlanNotice(fn: (line: string) => void): void {
@@ -325,7 +337,7 @@ export class Plan {
     }
     restore();
     const why = r.error ? (r.error as NodeJS.ErrnoException).code === 'ETIMEDOUT' ? `délai de ${limit / 1000} s dépassé` : r.error.message : `code ${r.status ?? r.signal}`;
-    const tail = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim().split('\n').slice(-5).join(' | ');
+    const tail = failureReason(r.stderr, r.stdout);
     throw new RafError(`plan.onWrite en échec (${hook.command}, ${why})${tail ? ` : ${tail}` : ''} — écriture refusée, plan inchangé`);
   }
 

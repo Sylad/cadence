@@ -86,6 +86,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `plan.onWrite en échec` shows the reason of the failure, not the tail of the Node stack (L429, `docs/raf.md`): the first `Error: …` line of the script's error output (`titre public … non conforme (93 caractères > 80)` for `raf public`), else the first line of its output, instead of the last five lines, which were stack frames and hid the reason (29-10, ol L232).
+
 - `cadence orchestrate` in worktree mode: a ready lot queues behind the other lots of its own wave on the integration lock instead of being handed back after 10 minutes (L425, `docs/orchestrate.md`; 2026-10-29, L417 behind L416: a replayed rebase plus the gate lasts about 10 minutes). The 10-minute bound now applies only to the lock held by another process.
 - `raf add`, `raf note` and `raf done` warn on stderr while an integration of the repository is in progress (L425, `docs/raf.md`): a plan written in the main tree during an integration made it refuse its lot (`arbre du dépôt modifié`, `raf add` of the lead during L416). Nothing changes in the result of the commands.
 - A wave counts the sessions the lead declared with `cadence lead hold` before taking a session slot (L424): with a cap of 3, one held session and two wave sessions are 3/3, the next session waits (on 2026-10-29 two sessions started for « 3/3 » while a hold was active: 4 agents under a cap of 3). The `en attente d'un créneau` journal line includes the held sessions (`3/3 en cours : …, session du lead <label>`).

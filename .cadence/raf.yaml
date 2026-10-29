@@ -194,11 +194,12 @@ lots:
   - id: L414
     title: "Panneau des lots : par lot en cours, tokens consommés sur le budget du lot et temps écoulé, comparés au temps habituel d'un lot de cette taille (cadence perf) — signal visible quand un lot dépasse (ex. L64 : 786 k, 53 min)"
     public: Budget et durée des lots en cours
-    status: todo
+    status: doing
     estimate: 0.5
     visible: true
     screen: component
     created: 2026-10-28
+    started: 2026-10-29
   - id: L415
     title: "Panneau des lots : par projet, dernière livraison (sha, âge, verte/rouge, depuis le journal de cadence deliver) et lots clos non livrés"
     public: Dernière livraison de chaque projet

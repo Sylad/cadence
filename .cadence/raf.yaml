@@ -255,9 +255,10 @@ lots:
     started: 2026-10-29
   - id: L428
     title: "Goulot « bug de code » (cadence perf du 29-10 : 100 passes de correction sur 143 classées) : classer ces passes par cause (cadence corrections --classify), retenir les 2 ou 3 causes dominantes et changer le maillon qui les produit (brief implement : relecture de son diff contre la fiche et les règles, cas limites testés avant de rendre) ; mesurer l'effet sur 2 fenêtres de cadence perf — décision de Sylvain du 29-10"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-29
+    started: 2026-10-29
   - id: L429
     title: "raf public (et tout raf dont plan.onWrite échoue) : l'erreur montre la fin de la pile Node au lieu du motif (« titre public … non conforme (93 caractères > 80) ») — afficher la première ligne d'erreur du script, pas la pile (29-10, ol L232)"
     status: doing

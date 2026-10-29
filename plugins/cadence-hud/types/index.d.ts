@@ -113,6 +113,8 @@ declare module 'claude-code' {
       commandInfo: Record<string, BackgroundCommandInfo>
       models: ModelsSummary
       waves: Wave[]
+      /** La dernière vague finie du dossier, qu'une vague vive ou non (L412) : lue par « ce qui attend une décision » du panneau des lots, jamais par la bande (qui ne la voit, dans `waves`, que sans vague vivante). */
+      endedWave: Wave | null
       /** Projets actifs (au moins un lot ouvert), dans l'ordre de priorité de `cadence lead tour`. */
       projects: Project[]
       /** Sessions du lead inscrites par `cadence lead hold` (celles dont l'échéance est passée sont écartées au dessin). */

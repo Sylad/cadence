@@ -28,6 +28,7 @@ const owners = atom({ plugin: 'cadence-hud', key: 'commandOwners' } as const, {}
 const info = atom({ plugin: 'cadence-hud', key: 'commandInfo' } as const, {})
 const models = atom({ plugin: 'cadence-hud', key: 'models' } as const, { byModel: {}, usdSeen: 0 })
 const waves = atom({ plugin: 'cadence-hud', key: 'waves' } as const, [])
+const endedWave = atom({ plugin: 'cadence-hud', key: 'endedWave' } as const, null)
 const projects = atom({ plugin: 'cadence-hud', key: 'projects' } as const, [])
 const leadHolds = atom({ plugin: 'cadence-hud', key: 'leadHolds' } as const, [])
 const slotCap = atom({ plugin: 'cadence-hud', key: 'slotCap' } as const, DEFAULT_CAP)
@@ -176,10 +177,11 @@ export const register: Register = on => {
         let found: Wave[] = []
         let foundHolds: LeadHold[] = []
         let foundCap = DEFAULT_CAP
+        let foundEnded: Wave | null = null
         let problem: string | null = null
         if (collected.exitCode === 0) {
           try {
-            ;({ waves: found, holds: foundHolds, cap: foundCap } = parseCollected(collected.stdout))
+            ;({ waves: found, holds: foundHolds, cap: foundCap, ended: foundEnded } = parseCollected(collected.stdout))
           } catch (err) {
             problem = `collecteur illisible : ${String(err).slice(0, 60)}`
           }
@@ -200,6 +202,7 @@ export const register: Register = on => {
         await update($, usage, () => nextUsage)
         await update($, agents, () => summary)
         await update($, waves, () => found)
+        await update($, endedWave, () => foundEnded)
         await update($, leadHolds, () => foundHolds)
         await update($, slotCap, () => foundCap)
         await update($, error, () => problem)
@@ -751,7 +754,7 @@ export const register: Register = on => {
 
   // Le panneau des lots (L401) : lecture seule, l'arbre des lots non clos de chaque projet du dossier (lead tour --json).
   on('ui.render', { component: 'Pane', requestId: LOTS_PANE }, async ($, e) => {
-    const [board, failed, readAt, allWaves, at, folds, views, notice, deliveries] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries)])
+    const [board, failed, readAt, allWaves, ended, at, folds, views, notice, deliveries] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, endedWave), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries)])
     const table = $.ui.resolve(e)
     const { Box, Text, Button } = table
     // les surfaces sans région Client (mobile, éditeur) dessinent les lots sans les réordonner
@@ -776,8 +779,8 @@ export const register: Register = on => {
       </Text>
     )
 
-    // « ce qui attend une décision » (L412) : au plus la moitié du corps, l'arbre garde le reste
-    const decisions = buildDecisions(decisionsOf(allWaves, deliveries), columns, Math.max(3, Math.floor(e.props.scroll.bodyRows / 2)))
+    // « ce qui attend une décision » (L412) : au plus la moitié du corps, l'arbre garde le reste ; la vague finie vient d'`endedWave` (la bande et l'arbre ne lisent que `waves`)
+    const decisions = buildDecisions(decisionsOf(allWaves, deliveries, ended), columns, Math.max(3, Math.floor(e.props.scroll.bodyRows / 2)))
     const decisionBlock = decisions.lines.length > 0 && (
       <Box key="decisions" flexDirection="column">
         {decisions.lines.map((l, i) => (

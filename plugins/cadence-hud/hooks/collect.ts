@@ -5,12 +5,13 @@ import type { LeadHold, Wave } from '../types'
  * `~/.cadence/orchestrate/waves/<pid>.json`, garde celles dont le processus vit, puis l'état de la vague
  * (`<cwd>/.cadence/runs/<vague>/wave.json`) et de ses lots (`<projet>--<lot>.json`). Pour chaque étape
  * en cours il compte les processus `claude` descendants de la session (sessions filles, équipes).
- * Il rend aussi, après les vagues vivantes, la dernière vague terminée du dossier courant (`live: false`, `ended` = date
- * de son wave.json) : la bande garde son statut sous les yeux et la masque 30 min après sa fin (WAVE_LINGER_MS), tandis que
- * les décisions en attente du panneau des lots (questions, lots rendus) la lisent tant qu'une autre vague du dossier ne l'a pas remplacée.
+ * Sans vague vivante, il rend la dernière vague terminée du dossier courant (`live: false`, `ended` = date
+ * de son wave.json) pour que la bande garde son statut sous les yeux ; elle la masque 30 min après sa fin (WAVE_LINGER_MS).
+ * Cette même vague terminée est rendue à part dans `ended` (`null` sans vague finie, ou si elle vit encore), qu'une vague vive ou non :
+ * les décisions en attente du panneau des lots (L412 : questions, lots rendus, verdicts UX) la lisent par là, sans toucher à ce que la bande dessine.
  * Il rend aussi, avec les vagues, les sessions du lead inscrites par `cadence lead hold` (`<home>/holds/*.json`, sans
  * filtrer l'échéance : la bande le fait à chaque dessin) et le plafond de sessions (CADENCE_MAX_SESSIONS, 2 par défaut).
- * Sortie : `{waves, holds, cap}`.
+ * Sortie : `{waves, holds, cap, ended}`.
  */
 export const COLLECTOR = `
 import json, os, glob, datetime
@@ -111,15 +112,17 @@ for wf in glob.glob(os.path.join(cwd, '.cadence', 'runs', '*', 'wave.json')):
         continue
     if m > last_mtime:
         last, last_mtime = wf, m
+ended = None
 w = (load(last) or {}) if last else {}
 d = os.path.dirname(last) if last else ''
 if last and (w.get('id') or os.path.basename(d)) not in live_ids:
-    ended = datetime.datetime.fromtimestamp(last_mtime, datetime.timezone.utc).isoformat()
-    out.append({
+    ended = {
         'id': w.get('id') or os.path.basename(d), 'pid': int(w.get('pid') or 0), 'cwd': cwd, 'cap': None,
-        'started': w.get('created'), 'status': w.get('status'), 'budget': w.get('budget'),
-        'consumed': w.get('consumed'), 'live': False, 'ended': ended, 'lots': read_lots(d, False),
-    })
+        'started': w.get('created'), 'status': w.get('status'), 'budget': w.get('budget'), 'consumed': w.get('consumed'),
+        'live': False, 'ended': datetime.datetime.fromtimestamp(last_mtime, datetime.timezone.utc).isoformat(), 'lots': read_lots(d, False),
+    }
+if not out and ended:
+    out.append(ended)
 holds = []
 for hf in sorted(glob.glob(os.path.join(home, 'holds', '*.json'))):
     h = load(hf)
@@ -128,31 +131,32 @@ for hf in sorted(glob.glob(os.path.join(home, 'holds', '*.json'))):
 
 raw_cap = (os.environ.get('CADENCE_MAX_SESSIONS') or '').strip()
 cap = int(raw_cap) if raw_cap.isdigit() and int(raw_cap) >= 1 else 2
-print(json.dumps({'waves': out, 'holds': holds, 'cap': cap}))
+print(json.dumps({'waves': out, 'holds': holds, 'cap': cap, 'ended': ended}))
 `
 
 /** Plafond de sessions quand le collecteur n'en donne pas de valide (le défaut de cadence). */
 export const DEFAULT_CAP = 2
 
-export type Collected = { waves: Wave[]; holds: LeadHold[]; cap: number }
+export type Collected = { waves: Wave[]; holds: LeadHold[]; cap: number; /** la dernière vague finie du dossier, qu'une vague vive ou non (L412) ; null sans */ ended: Wave | null }
+
+const isWave = (w: unknown): w is Wave => typeof w === 'object' && w !== null && typeof (w as Wave).id === 'string'
 
 /**
- * Lit la sortie du collecteur : `{waves, holds, cap}`, ou l'ancienne liste de vagues seule. Une sortie illisible
- * (JSON invalide) lève ; une forme étrange vaut aucune vague, aucune session du lead et le plafond par défaut.
- * Sans champ `live`, la vague est vivante.
+ * Lit la sortie du collecteur : `{waves, holds, cap, ended}`, ou l'ancienne liste de vagues seule. Une sortie illisible
+ * (JSON invalide) lève ; une forme étrange vaut aucune vague, aucune session du lead, le plafond par défaut et aucune vague finie.
+ * Sans champ `live`, la vague est vivante ; `ended` est toujours finie (`live: false`).
  */
 export const parseCollected = (stdout: string): Collected => {
   const raw: unknown = JSON.parse(stdout)
   const obj = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
   const list: unknown = Array.isArray(raw) ? raw : obj.waves
-  const waves = (Array.isArray(list) ? list : [])
-    .filter((w): w is Wave => typeof w === 'object' && w !== null && typeof (w as Wave).id === 'string')
-    .map(w => ({ ...w, live: w.live !== false }))
+  const waves = (Array.isArray(list) ? list : []).filter(isWave).map(w => ({ ...w, live: w.live !== false }))
+  const ended = isWave(obj.ended) ? { ...obj.ended, live: false } : null
   const holds = (Array.isArray(obj.holds) ? obj.holds : []).filter(
     (h): h is LeadHold => typeof h === 'object' && h !== null && typeof (h as LeadHold).label === 'string' && typeof (h as LeadHold).expires === 'string',
   )
   const cap = typeof obj.cap === 'number' && Number.isInteger(obj.cap) && obj.cap >= 1 ? obj.cap : DEFAULT_CAP
-  return { waves, holds, cap }
+  return { waves, holds, cap, ended }
 }
 
 /**

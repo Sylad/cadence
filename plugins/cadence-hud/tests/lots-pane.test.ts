@@ -22,7 +22,7 @@ const WAVE: Wave = {
 type Cadence = { exitCode: number; stdout: string }
 
 /** Monte le mod comme une session, avec un moteur simulé : état en mémoire, panneaux ouverts, processus pilotés par le test. */
-const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; stamps?: () => string; deliveries?: () => string; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
+const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave; stamps?: () => string; deliveries?: () => string; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const open = new Set<string>()
   const opened: unknown[] = []
@@ -70,7 +70,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     }
     if (argv[3] === DELIVERIES) return { value: { exitCode: 0, stdout: (setup.deliveries ?? (() => '[]'))(), stderr: '' } } as never
     if (argv[3] === PLAN_STAMPS) return { value: { exitCode: 0, stdout: stamps.current(), stderr: '' } } as never
-    return { value: { exitCode: 0, stdout: JSON.stringify({ waves: waves.current, holds: [], cap: 2 }), stderr: '' } } as never
+    return { value: { exitCode: 0, stdout: JSON.stringify({ waves: waves.current, ended: setup.ended ?? null, holds: [], cap: 2 }), stderr: '' } } as never
   })
   await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
   await settle()
@@ -1126,7 +1126,7 @@ test('R23 — L410 : le contrôle « même parent » porte sur la ligne visée �
 
 const ASKING: Wave = { ...WAVE, lots: [{ ...WAVE.lots[0]!, lot: 'L80', status: 'question', questions: ['Quel format ?'] }] }
 
-test('R12 — une question de session s’affiche en tête du panneau, avant l’arbre, avec la commande --answer', async ($, on) => {
+test('L412 R13 — une question de session s’affiche en tête du panneau, avant l’arbre, avec la commande --answer', async ($, on) => {
   const s = await session($, on, { waves: [ASKING] })
   await s.advance(5_000)
   await s.hud('lots')
@@ -1138,14 +1138,14 @@ test('R12 — une question de session s’affiche en tête du panneau, avant l�
   expect(at(/L401/)).toBeGreaterThan(at(/--answer/)) // l'arbre vient après le bloc
 })
 
-test('R13 — rien à décider : le bloc n’apparaît pas', async ($, on) => {
+test('L412 R14 — rien à décider : le bloc n’apparaît pas', async ($, on) => {
   const s = await session($, on, { waves: [WAVE] })
   await s.advance(5_000)
   await s.hud('lots')
   expect((await s.draw()).text).not.toMatch(/Ce qui attend/)
 })
 
-test('R14 — une livraison en échec se lit sur le journal des livraisons, panneau ouvert seulement', async ($, on) => {
+test('L412 R15 — une livraison en échec se lit sur le journal des livraisons, panneau ouvert seulement', async ($, on) => {
   const failed = JSON.stringify([{ project: 'maritime', day: '2026-10-29', sha: 'abc1234', reason: 'CI en échec' }])
   const s = await session($, on, { deliveries: () => failed })
   await s.advance(5_000)
@@ -1155,7 +1155,7 @@ test('R14 — une livraison en échec se lit sur le journal des livraisons, pann
   expect((await s.draw()).text).toMatch(/✖ maritime +livraison : abc1234 · CI en échec \(2026-10-29\)/)
 })
 
-test('R15 — le bloc ne prend jamais plus de la moitié du corps : l’arbre garde sa place', async ($, on) => {
+test('L412 R16 — le bloc ne prend jamais plus de la moitié du corps : l’arbre garde sa place', async ($, on) => {
   const lots = Array.from({ length: 8 }, (_, i) => ({ ...WAVE.lots[0]!, lot: `Q${i}`, status: 'question', questions: ['q'] }))
   const s = await session($, on, { waves: [{ ...WAVE, lots }] })
   await s.advance(5_000)
@@ -1163,4 +1163,16 @@ test('R15 — le bloc ne prend jamais plus de la moitié du corps : l’arbre ga
   const { text } = await s.draw(70, 12)
   expect(text).toMatch(/… \+\d+ décisions? de plus/)
   expect(text).toMatch(/▾ cadence/)
+})
+
+test('L412 R17 — une question d’une vague finie attend dans le panneau pendant qu’une autre vague vit : lue dans `ended` du collecteur, hors de la bande', async ($, on) => {
+  const live: Wave = { ...WAVE, lots: [{ ...WAVE.lots[0]!, project: 'cadence', lot: 'L401', status: 'reviewing' }] }
+  const ended: Wave = { ...WAVE, id: 'fini', live: false, ended: '2026-10-07T18:00:00.000Z', lots: [{ ...WAVE.lots[0]!, lot: 'L80', status: 'question', questions: ['Encore ?'] }] }
+  const s = await session($, on, { waves: [live], ended })
+  await s.advance(5_000)
+  await s.hud('lots')
+  const { text } = await s.draw()
+  expect(text).toMatch(/Ce qui attend une décision \(1\)/)
+  expect(text).toMatch(/\? ol:L80 .*Encore \?/)
+  expect(text).toMatch(/--wave fini --answer ol:L80/)
 })

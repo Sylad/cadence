@@ -14,13 +14,16 @@ export type Decision =
 const firstLine = (text: string): string => text.split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
 
 /**
- * Ce qui attend une décision de la personne, lu dans les vagues rendues par le collecteur (vivantes, et la dernière finie du dossier, sans délai : une question ou un lot rendu attend tant qu'une autre vague ne la remplace pas) et dans les livraisons en échec :
- * une question de session (`question`), un lot rendu au lead (`handed-back`, `failed` : la cause est la première ligne de son issue, à défaut son statut), un verdict UX à poser (lot
- * prêt, visible, dont la revue a rendu un verdict) et une livraison en échec par projet. Un lot n'est compté que dans la première vague qui le porte, les vagues vivantes d'abord ;
- * un lot suspendu n'attend rien de la personne.
+ * Ce qui attend une décision de la personne, lu dans les vagues de la bande (`waves` : les vivantes, et sans vivante la dernière finie du dossier), dans `ended` (la dernière vague
+ * finie du dossier que le collecteur rend à part, qu'une vague vive ou non, L412 : lue sans le délai de 30 min de la bande, une question ou un lot rendu attend tant qu'une autre
+ * vague du dossier ne la remplace pas) et dans les livraisons en échec : une question de session (`question`), un lot rendu au lead (`handed-back`, `failed` : la cause est la
+ * première ligne de son issue, à défaut son statut), un verdict UX à poser (lot prêt, visible, dont la revue a rendu un verdict) et une livraison en échec par projet.
+ * Les vagues vivantes passent d'abord, puis les finies (une vague n'est lue qu'une fois) ; un lot n'est compté que dans la première vague qui le porte ; un lot suspendu n'attend rien de la personne.
  */
-export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedDelivery[]): Decision[] => {
-  const ordered = [...waves.filter(w => w.live), ...waves.filter(w => !w.live)]
+export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedDelivery[], ended: Wave | null = null): Decision[] => {
+  const finished = [...(ended ? [ended] : []), ...waves.filter(w => !w.live)]
+  const ids = new Set<string>()
+  const ordered = [...waves.filter(w => w.live), ...finished].filter(w => !ids.has(w.id) && ids.add(w.id))
   const seen = new Set<string>()
   const out: Decision[] = []
   for (const w of ordered) {

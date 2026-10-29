@@ -10,7 +10,7 @@ const { DELIVERIES, COLLECTOR } = (await import(new URL('../plugins/cadence-hud/
 
 // L412 : le script Python du mod (livraisons en échec du panneau des lots) joué pour de vrai ; les tests du mod n'ont pas accès au système de fichiers.
 
-it('R11 — le script DELIVERIES lit la dernière livraison en échec, effacée par une livraison verte écrite après', () => {
+it('L412 R11 — le script DELIVERIES lit la dernière livraison en échec, effacée par une livraison verte écrite après', () => {
   const root = mkdtempSync(join(tmpdir(), 'deliveries-'))
   try {
     const repo = (name: string, failed: string | null, green: string | null, greenIsNewer = true) => {
@@ -41,7 +41,7 @@ it('R11 — le script DELIVERIES lit la dernière livraison en échec, effacée 
   }
 })
 
-it('R12 — le collecteur rend la dernière vague finie du dossier même quand une autre vague vit (ses décisions attendent encore)', () => {
+it('L412 R12 — le collecteur rend la dernière vague finie du dossier dans `ended`, à part des vagues de la bande (`waves` ne la porte que sans vague vivante)', () => {
   const root = mkdtempSync(join(tmpdir(), 'collect-'))
   try {
     const home = join(root, 'home')
@@ -53,11 +53,22 @@ it('R12 — le collecteur rend la dernière vague finie du dossier même quand u
     writeFileSync(join(runs('fini'), 'wave.json'), JSON.stringify({ id: 'fini', status: 'done' }))
     writeFileSync(join(runs('fini'), 'ol--L5.json'), JSON.stringify({ project: 'ol', lot: 'L5', status: 'question', questions: ['q ?'] }))
     writeFileSync(join(home, 'waves', `${process.pid}.json`), JSON.stringify({ wave: 'vivant', pid: process.pid, cwd }))
-    const run = spawnSync('python3', ['-I', '-c', COLLECTOR], { encoding: 'utf8', cwd, env: { ...process.env, CADENCE_HOME: home } })
-    expect(run.status).toBe(0)
-    const waves = JSON.parse(run.stdout).waves as { id: string; live: boolean; lots: { lot: string }[] }[]
-    expect(waves.map(w => [w.id, w.live])).toEqual([['vivant', true], ['fini', false]])
-    expect(waves[1]!.lots.map(l => l.lot)).toEqual(['L5'])
+    type Out = { waves: { id: string; live: boolean }[]; ended: { id: string; live: boolean; lots: { lot: string }[] } | null }
+    const collect = (): Out => {
+      const run = spawnSync('python3', ['-I', '-c', COLLECTOR], { encoding: 'utf8', cwd, env: { ...process.env, CADENCE_HOME: home } })
+      expect(run.status).toBe(0)
+      return JSON.parse(run.stdout) as Out
+    }
+    // une vague vit : la bande ne reçoit qu'elle, la vague finie attend dans `ended` avec ses lots
+    const withLive = collect()
+    expect(withLive.waves.map(w => [w.id, w.live])).toEqual([['vivant', true]])
+    expect(withLive.ended).toMatchObject({ id: 'fini', live: false })
+    expect(withLive.ended!.lots.map(l => l.lot)).toEqual(['L5'])
+    // plus de vague vivante : la bande reçoit la vague finie, comme avant le lot, et `ended` la porte aussi
+    rmSync(join(home, 'waves', `${process.pid}.json`))
+    const alone = collect()
+    expect(alone.waves.map(w => [w.id, w.live])).toEqual([['fini', false]])
+    expect(alone.ended).toMatchObject({ id: 'fini', live: false })
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

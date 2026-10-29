@@ -142,6 +142,7 @@ lots:
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
+    review: { date: 2026-10-29, verdict: "compliant — orchestré (vague 2026-10-29-cad, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: c92e4b0960d23d66cafdf893acaa136b61b512f5 }
   - id: L419
     title: npm run service met aussi à jour la copie locale du mod cadence-hud (~/.claude/mods/cadence-hud, chargée par CLAUDE_CODE_PLUGIN_DIRS ; rsync sans .claude-plugin/types) — aujourd'hui à la main à chaque release, un oubli laisse l'ancien mod
     status: done

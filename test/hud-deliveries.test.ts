@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
 
-import { DELIVERIES } from '../plugins/cadence-hud/hooks/collect.ts';
+
+// Le mod est hors du typecheck de cadence (tsconfig.json) : son module est chargé à l'exécution, par une URL que tsc ne suit pas.
+const { DELIVERIES } = (await import(new URL('../plugins/cadence-hud/hooks/collect.ts', import.meta.url).href)) as { DELIVERIES: string };
 
 // L412 : le script Python du mod (livraisons en échec du panneau des lots) joué pour de vrai ; les tests du mod n'ont pas accès au système de fichiers.
 

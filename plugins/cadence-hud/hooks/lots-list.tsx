@@ -80,7 +80,8 @@ const List: ClientModule<Props, State> = (props, surface) => {
       return
     }
     if (cur < 0) return
-    // le frère voisin AFFICHÉ : les lignes d'un autre groupe (les sous-tâches du lot voisin) ne comptent pas, et un lot caché (sous-lots repliés,
+    // le frère voisin AFFICHÉ : les lignes d'un autre parent (les sous-tâches du lot voisin) ne comptent pas ; s'il est d'un autre groupe d'affichage (en cours, libres, bloqués),
+    // la demande part quand même et le module de hooks la refuse en le disant. Un lot caché (sous-lots repliés,
     // reste du projet derrière « + N lots », L411) n'est pas une ligne : au bord des lignes affichées, rien ne part
     let to = cur + step
     while (to >= 0 && to < lines.length && lines[to]!.group !== lines[cur]!.group) to += step
@@ -95,7 +96,7 @@ const List: ClientModule<Props, State> = (props, surface) => {
   const mark = (i: number): RowMark | undefined => {
     if (dragging) {
       if (i === held) return { glyph: '●', color: 'claude' }
-      if (i === hover) return lines[i]!.group !== lines[held]!.group ? { glyph: '⊘', color: 'error' } : { glyph: hover > held ? '⇣' : '⇡', color: 'claude' }
+      if (i === hover) return lines[i]!.group !== lines[held]!.group || lines[i]!.rank !== lines[held]!.rank ? { glyph: '⊘', color: 'error' } : { glyph: hover > held ? '⇣' : '⇡', color: 'claude' }
     }
     return lines[i]!.id === state.selected ? { glyph: '▸', color: 'claude' } : undefined
   }

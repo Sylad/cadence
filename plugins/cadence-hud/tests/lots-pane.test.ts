@@ -595,11 +595,12 @@ const down = (y: number) => ({ type: 'down', x: 4, y, button: 'left', in: 'lots:
 const move = (y: number) => ({ type: 'move', x: 4, y, button: 'left', in: 'lots:cadence' }) as never
 const up = (y: number) => ({ type: 'up', x: 4, y, button: 'left', in: 'lots:cadence' }) as never
 const altKey = (key: 'up' | 'down') => ({ key, meta: true, in: 'lots:cadence' }) as never
-/** Ce que le panneau ajoute quand le plan change sans que l'écran bouge (deux groupes d'affichage, L410). */
-const PLAN_ONLY = /à l'écran rien ne bouge : le panneau trie par état \(en cours, libres, le reste\)/
+/** Le tableau des gestes qui doivent partir : les lots et sous-tâches de TOUR tous EN COURS, donc d'un même groupe d'affichage (L410) ; mêmes lignes que TOUR (L401 y 0, L401/1 y 1, L401/2 y 2, L402 y 3). */
+const MOVE_TOUR = JSON.stringify([row('cadence', [lot('L401', 'doing'), lot('L401/1', 'doing', { parent: 'L401' }), lot('L401/2', 'doing', { parent: 'L401' }), lot('L402', 'doing')]), TOUR[1]])
+const moves = ($: Parameters<TestBody>[0], on: On, setup: Parameters<typeof session>[2] = {}) => session($, on, { kv: SUBS_OPEN, tour: () => ({ exitCode: 0, stdout: MOVE_TOUR }), ...setup })
 
 test('R22 — glisser un lot sur un autre : raf move dans le projet, puis le panneau se relit et dit que le plan est à commiter', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   const before = s.tours().length
   const text = await s.gestures(async ui => {
@@ -609,13 +610,13 @@ test('R22 — glisser un lot sur un autre : raf move dans le projet, puis le pan
   })
   expect(s.rafs()).toEqual([['raf', 'move', 'L402', '--before', 'L401']])
   expect(s.tours().length).toBe(before + 1)
-  // L401 est en cours et L402 bloqué : le plan change, l'écran (trié par état, L410) non, et le panneau le dit
-  expect(text).toMatch(/✔ L402 placé avant L401 — le plan est modifié, à commiter \(raf move ne commite pas\) ; à l'écran rien ne bouge : le panneau trie par état \(en cours, libres, le reste\)/)
+  expect(text).toMatch(/✔ L402 placé avant L401 — le plan est modifié, à commiter \(raf move ne commite pas\)$/m)
+  expect(text).not.toMatch(/rien ne bouge/) // le message « à l'écran rien ne bouge » n'existe plus : un geste ne part que dans un groupe, où l'écran suit le plan
 })
 
 test('R22 — le dossier de raf est celui du projet', async ($, on) => {
   const cwds: (string | undefined)[] = []
-  const s = await session($, on, { kv: SUBS_OPEN, raf: (_argv, cwd) => (cwds.push(cwd), { exitCode: 0, stderr: '' }) })
+  const s = await moves($, on, { raf: (_argv, cwd) => (cwds.push(cwd), { exitCode: 0, stderr: '' }) })
   await s.hud('lots')
   await s.gestures(async ui => {
     await ui.pointer(down(3))
@@ -625,7 +626,7 @@ test('R22 — le dossier de raf est celui du projet', async ($, on) => {
 })
 
 test('R22 — glisser vers le bas place après la cible', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   await s.gestures(async ui => {
     await ui.pointer(down(0))
@@ -635,7 +636,7 @@ test('R22 — glisser vers le bas place après la cible', async ($, on) => {
 })
 
 test('R22 — pendant le glisser, un repère marque la position d’arrivée ; relâché au même endroit, rien ne bouge', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   const during = await s.gestures(async ui => {
     await ui.pointer(down(3))
@@ -653,7 +654,7 @@ test('R22 — pendant le glisser, un repère marque la position d’arrivée ; r
 })
 
 test('R22 — au clavier : sélection, puis Alt+↑ / Alt+↓ place le lot avant le précédent / après le suivant (les sous-tâches du lot voisin ne comptent pas)', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   await s.gestures(async ui => {
     await ui.pointer(down(3))
@@ -669,7 +670,7 @@ test('R22 — au clavier : sélection, puis Alt+↑ / Alt+↓ place le lot avant
 })
 
 test('R22 — au clavier, ↑ / ↓ seuls changent la sélection ; rien sans sélection ; aux bords rien ne part', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   await s.gestures(async ui => {
     await ui.key(altKey('up'))
@@ -683,19 +684,18 @@ test('R22 — au clavier, ↑ / ↓ seuls changent la sélection ; rien sans sé
 })
 
 test('R22 — une sous-tâche se réordonne par glisser parmi celles de son lot', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   const text = await s.gestures(async ui => {
     await ui.pointer(down(2))
     await ui.pointer(up(1))
   })
   expect(s.rafs()).toEqual([['raf', 'move', 'L401/2', '--before', 'L401/1']])
-  expect(text).toMatch(/L401\/2 placé avant L401\/1 — le plan est modifié, à commiter/) // L401/1 en cours reste affichée la première : plan seul
-  expect(text).toMatch(PLAN_ONLY)
+  expect(text).toMatch(/L401\/2 placé avant L401\/1 — le plan est modifié, à commiter/)
 })
 
 test('R23 — parents différents : refusé avec sa raison, raf n’est pas appelé et le tableau n’est pas relu', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   const before = s.tours().length
   const text = await s.gestures(async ui => {
@@ -709,7 +709,7 @@ test('R23 — parents différents : refusé avec sa raison, raf n’est pas appe
 
 for (const reason of ['move : orchestration en cours (vague w1, pid 3) — attendre', 'plan en lecture seule : /repo/plan-maritime.json est tenu par un autre outil (cadence.yaml : plan) — le modifier avec l’outil du projet', 'move : L402 est archivé']) {
   test(`R23 — un refus de raf est montré avec sa raison, sans relecture : ${reason.split(' — ')[0]}`, async ($, on) => {
-    const s = await session($, on, { kv: SUBS_OPEN, raf: () => ({ exitCode: 2, stderr: `raf: ${reason}\n` }) })
+    const s = await moves($, on, { raf: () => ({ exitCode: 2, stderr: `raf: ${reason}\n` }) })
     await s.hud('lots')
     const before = s.tours().length
     const text = await s.gestures(async ui => {
@@ -723,7 +723,7 @@ for (const reason of ['move : orchestration en cours (vague w1, pid 3) — atten
 }
 
 test('R23 — raf introuvable : le panneau le dit', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN, raf: () => { throw new Error('ENOENT') } })
+  const s = await moves($, on, { raf: () => { throw new Error('ENOENT') } })
   await s.hud('lots')
   const text = await s.gestures(async ui => {
     await ui.pointer(down(3))
@@ -733,7 +733,7 @@ test('R23 — raf introuvable : le panneau le dit', async ($, on) => {
 })
 
 test('R22 — une demande forgée (projet ou lot inconnu) est ignorée', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   await s.gestures(async ui => {
     await ui.post({ kind: 'move', project: 'zzz', id: 'L402', target: 'L401', place: 'before' }, { in: 'lots:cadence' } as never)
@@ -744,13 +744,13 @@ test('R22 — une demande forgée (projet ou lot inconnu) est ignorée', async (
 })
 
 test('R22 — sur une surface sans Client (mobile, éditeur) le panneau se dessine, sans glisser', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   for (const surface of ['mobile', 'vscode'] as const) expect(await s.gestures(async () => undefined, surface)).toContain('L402')
 })
 
 test('R22 — le clavier fonctionne aussi dans le terminal', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   await s.gestures(async ui => {
     await ui.pointer(down(3))
@@ -761,7 +761,7 @@ test('R22 — le clavier fonctionne aussi dans le terminal', async ($, on) => {
 })
 
 test('R23 — pendant le glisser, un repère dit qu’une arrivée chez un autre parent sera refusée', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   const during = await s.gestures(async ui => {
     await ui.pointer(down(3))
@@ -774,12 +774,12 @@ test('R23 — pendant le glisser, un repère dit qu’une arrivée chez un autre
 // ── L402 : les props arrivent pendant un glisser (relecture du tableau, minuteur de 5 s) ─────────────────────
 
 /** Le tableau de TOUR, un lot EN COURS de plus en tête du projet « cadence » : l'ordre d'affichage (L410) met les lots en cours d'abord, dans l'ordre du plan ; L400 prend donc la ligne 0 à l'écran, et L402, saisi à la ligne 3, passe à la ligne 4. (Un lot seulement « à faire » se rangerait après L401, en cours, et la ligne 0 resterait L401.) */
-const TOUR_WITH_L400_FIRST = JSON.stringify([row('cadence', [lot('L400', 'doing'), ...TOUR[0]!.lots]), TOUR[1]])
+const TOUR_WITH_L400_FIRST = JSON.stringify([row('cadence', [lot('L400', 'doing'), ...JSON.parse(MOVE_TOUR)[0].lots]), TOUR[1]])
 /** Le tableau de TOUR sans L402 : le lot saisi à la ligne 3 a disparu. */
-const TOUR_WITHOUT_L402 = JSON.stringify([row('cadence', TOUR[0]!.lots.filter(l => l.id !== 'L402')), TOUR[1]])
+const TOUR_WITHOUT_L402 = JSON.stringify([row('cadence', JSON.parse(MOVE_TOUR)[0].lots.filter((l: { id: string }) => l.id !== 'L402')), TOUR[1]])
 
 test('R22 — de nouvelles props pendant un glisser : c’est le lot saisi qui part, pas celui qui prend sa ligne', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   const before = s.tours().length
   await s.gestures(async ui => {
@@ -796,7 +796,7 @@ test('R22 — de nouvelles props pendant un glisser : c’est le lot saisi qui p
 })
 
 test('R22 — le lot saisi disparaît pendant le glisser : rien n’est demandé, ni refus ni relecture', async ($, on) => {
-  const s = await session($, on, { kv: SUBS_OPEN })
+  const s = await moves($, on)
   await s.hud('lots')
   const before = s.tours().length
   const text = await s.gestures(async ui => {
@@ -813,6 +813,74 @@ test('R22 — le lot saisi disparaît pendant le glisser : rien n’est demandé
   expect(text).not.toMatch(/placé|n'ont pas le même parent|raf move/)
 })
 
+// ── L402 : un lot ne se réordonne qu'à l'intérieur de son groupe d'affichage (L410 : en cours, libres, bloqués) ──────────────────
+
+// TOUR : L401 est en cours (y 0), L402 bloqué par L400/L401 (y 3) ; leurs sous-tâches entre les deux.
+test('R24 — lâcher un lot sur un lot d’un autre groupe est refusé sans appeler raf, avec la raison par groupe', async ($, on) => {
+  const s = await session($, on, { kv: SUBS_OPEN })
+  await s.hud('lots')
+  const before = s.tours().length
+  const text = await s.gestures(async ui => {
+    await ui.pointer(down(3)) // L402 (bloqué)
+    await ui.pointer(up(0)) // L401 (en cours)
+  })
+  expect(s.rafs()).toEqual([])
+  expect(text).toMatch(/✖ L401 est en cours : un lot bloqué se range parmi les bloqués/)
+  expect(s.tours().length).toBe(before)
+})
+
+test('R24 — pendant le glisser, le repère ⊘ rouge marque la cible d’un autre groupe, comme celle d’un autre parent', async ($, on) => {
+  const s = await session($, on, { kv: SUBS_OPEN })
+  await s.hud('lots')
+  const during = await s.gestures(async ui => {
+    await ui.pointer(down(3))
+    await ui.pointer(move(0))
+  })
+  expect(during).toMatch(/⊘/)
+  expect(during).not.toMatch(/⇡/)
+})
+
+test('R24 — Alt+↑ vers le voisin affiché d’un autre groupe : même refus, sans appeler raf', async ($, on) => {
+  const s = await session($, on, { kv: SUBS_OPEN })
+  await s.hud('lots')
+  const text = await s.gestures(async ui => {
+    await ui.pointer(down(3)) // L402 (bloqué) ; son voisin du dessus affiché, L401 (en cours), saute ses sous-tâches
+    await ui.pointer(up(3))
+    await ui.key(altKey('up'))
+  })
+  expect(s.rafs()).toEqual([])
+  expect(text).toMatch(/✖ L401 est en cours : un lot bloqué se range parmi les bloqués/)
+})
+
+// Le cas vécu (29-10) : le plan L402 L403 L407 L411 (+ trois autres libres), L402 et L411 en cours. À l'écran : L402 (y 0), L411 (1), L403 (2), L407 (3), L420 (4), puis « + 2 lots ».
+const LIVED_TOUR = JSON.stringify([row('cadence', [lot('L402', 'doing'), lot('L403'), lot('L407'), lot('L411', 'doing'), lot('L420'), lot('L421'), lot('L422')])])
+test('R24 — cas vécu : L403 (libre) lâché sur L411 (en cours) est refusé ; il ne descend pas sous L407 et ne se cache pas derrière « + N lots »', async ($, on) => {
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: LIVED_TOUR }) })
+  await s.hud('lots')
+  const before = s.tours().length
+  const text = await s.gestures(async ui => {
+    await ui.pointer(down(2)) // L403
+    await ui.pointer(up(1)) // L411
+  }, 'desktop', 6)
+  expect(s.rafs()).toEqual([])
+  expect(text).toMatch(/✖ L411 est en cours : un lot libre se range parmi les libres/)
+  const last = (id: string) => text.lastIndexOf(id) // le dernier dessin : L403 est toujours avant L407, lui-même avant L420 (rien ne descend derrière « + N lots »)
+  expect(last('L403')).toBeGreaterThan(text.lastIndexOf('Lots  glisser'))
+  expect(last('L403')).toBeLessThan(last('L407'))
+  expect(last('L407')).toBeLessThan(last('L420'))
+  expect(s.tours().length).toBe(before)
+})
+
+test('R24 — une demande forgée entre deux groupes est refusée aussi : le contrôle est celui du module, pas du dessin', async ($, on) => {
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: LIVED_TOUR }) })
+  await s.hud('lots')
+  const text = await s.gestures(async ui => {
+    await ui.post({ kind: 'move', project: 'cadence', id: 'L403', target: 'L411', place: 'after' }, { in: 'lots:cadence' } as never)
+  }, 'desktop', 6)
+  expect(s.rafs()).toEqual([])
+  expect(text).toMatch(/✖ L411 est en cours : un lot libre se range parmi les libres/)
+})
+
 // ── L402 × L410 : le lot visé est celui de l'ÉCRAN, pas le voisin du plan ; le panneau dit ce que le geste fait au plan et à l'écran ──
 
 // Le plan : L10 (libre), L11 (en cours ; sous-tâches L11/1 à faire, L11/2 en cours, L11/3 à faire), L12 (bloqué par L10), L13 (libre).
@@ -822,16 +890,16 @@ const L410_TOUR = JSON.stringify([row('cadence', [lot('L10'), lot('L11', 'doing'
 const L410_ROWS = 7
 const l410 = ($: Parameters<TestBody>[0], on: On) => session($, on, { kv: SUBS_OPEN, tour: () => ({ exitCode: 0, stdout: L410_TOUR }) })
 
-test('R22 — L410 : glisser un lot sur le lot affiché au-dessus, que le plan place déjà après lui : rien n’est demandé, le panneau dit « déjà »', async ($, on) => {
+test('R22 — L410 : « déjà » — un lot que le plan place déjà ainsi parmi les lots de son groupe n’appelle pas raf (L11, en cours, sépare L10 et L12 dans le plan)', async ($, on) => {
   const s = await l410($, on)
   await s.hud('lots')
   const before = s.tours().length
+  // aucun geste ne mène là (dans un groupe, l'écran suit le plan) : la demande vient d'un dessin forgé
   const text = await s.gestures(async ui => {
-    await ui.pointer(down(4)) // L10 (premier du plan, affiché sous L11)
-    await ui.pointer(up(0)) // L11, en tête à l'écran : « L10 avant L11 », ce que le plan dit déjà
+    await ui.post({ kind: 'move', project: 'cadence', id: 'L10', target: 'L13', place: 'before' }, { in: 'lots:cadence' } as never)
   }, 'desktop', L410_ROWS)
   expect(s.rafs()).toEqual([])
-  expect(text).toMatch(/• L10 est déjà avant L11 dans le plan : rien à déplacer/)
+  expect(text).toMatch(/• L10 est déjà avant L13 dans le plan : rien à déplacer/)
   expect(text).not.toMatch(/à commiter/)
   expect(s.tours().length).toBe(before)
 })
@@ -845,21 +913,25 @@ test('R22 — L410 : glisser un lot sur un lot du même groupe d’affichage : r
   }, 'desktop', L410_ROWS)
   expect(s.rafs()).toEqual([['raf', 'move', 'L13', '--before', 'L10']])
   expect(text).toMatch(/✔ L13 placé avant L10 — le plan est modifié, à commiter \(raf move ne commite pas\)/)
-  expect(text).not.toMatch(PLAN_ONLY)
 })
 
-test('R22 — L410 : glisser vers le bas sur le lot affiché dessous, d’un autre groupe : le plan change, pas l’écran, et le panneau le dit', async ($, on) => {
+test('R24 — L410 : glisser un lot en cours sur un lot bloqué, ou un lot libre sur un lot en cours : refusé, le plan ne bouge pas', async ($, on) => {
   const s = await l410($, on)
   await s.hud('lots')
-  const text = await s.gestures(async ui => {
+  const down6 = await s.gestures(async ui => {
     await ui.pointer(down(0)) // L11 (en cours)
-    await ui.pointer(up(6)) // L12 (bloqué), pas son suivant du plan : le plan devient L10, L12, L13, L11 ; L11 reste en tête à l'écran
+    await ui.pointer(up(6)) // L12 (bloqué)
   }, 'desktop', L410_ROWS)
-  expect(s.rafs()).toEqual([['raf', 'move', 'L11', '--after', 'L12']])
-  expect(text).toMatch(/✔ L11 placé après L12 — le plan est modifié, à commiter \(raf move ne commite pas\) ; à l'écran rien ne bouge : le panneau trie par état \(en cours, libres, le reste\)/)
+  expect(down6).toMatch(/✖ L12 est bloqué : un lot en cours se range parmi les lots en cours/)
+  const up0 = await s.gestures(async ui => {
+    await ui.pointer(down(4)) // L10 (libre)
+    await ui.pointer(up(0)) // L11 (en cours)
+  }, 'desktop', L410_ROWS)
+  expect(up0).toMatch(/✖ L11 est en cours : un lot libre se range parmi les libres/)
+  expect(s.rafs()).toEqual([])
 })
 
-test('R22 — L410 : Alt+↑ / Alt+↓ vont vers le voisin affiché (les sous-tâches du lot voisin ne comptent pas) ; un voisin que le plan place déjà ainsi est dit « déjà »', async ($, on) => {
+test('R24 — L410 : Alt+↑ / Alt+↓ vont vers le voisin affiché (les sous-tâches du lot voisin ne comptent pas) ; d’un autre groupe, c’est refusé', async ($, on) => {
   const s = await l410($, on)
   await s.hud('lots')
   const moved = await s.gestures(async ui => {
@@ -869,43 +941,40 @@ test('R22 — L410 : Alt+↑ / Alt+↓ vont vers le voisin affiché (les sous-t�
   }, 'desktop', L410_ROWS)
   expect(moved).toMatch(/✔ L13 placé avant L10/)
   const above = await s.gestures(async ui => {
-    await ui.pointer(down(4)) // L10 : à l'écran, son voisin du dessus est L11 (sous-tâches sautées), alors que dans le plan L10 est le premier
+    await ui.pointer(down(4)) // L10 : à l'écran, son voisin du dessus est L11 (sous-tâches sautées), en cours
     await ui.pointer(up(4))
     await ui.key(altKey('up'))
   }, 'desktop', L410_ROWS)
-  expect(above).toMatch(/• L10 est déjà avant L11 dans le plan : rien à déplacer/)
+  expect(above).toMatch(/✖ L11 est en cours : un lot libre se range parmi les libres/)
   const below = await s.gestures(async ui => {
-    await ui.pointer(down(0)) // L11 : à l'écran, son voisin du dessous est L10 (sous-tâches sautées), alors que dans le plan c'est L12
+    await ui.pointer(down(0)) // L11 : à l'écran, son voisin du dessous est L10 (sous-tâches sautées), libre
     await ui.pointer(up(0))
     await ui.key(altKey('down'))
   }, 'desktop', L410_ROWS)
-  expect(below).toMatch(/• L11 est déjà après L10 dans le plan : rien à déplacer/)
+  expect(below).toMatch(/✖ L10 est libre : un lot en cours se range parmi les lots en cours/)
   expect(s.rafs()).toEqual([['raf', 'move', 'L13', '--before', 'L10']])
 })
 
-test('R22 — L410 : entre sous-tâches aussi — déjà à sa place, plan seul, ou visible', async ($, on) => {
+test('R24 — L410 : entre sous-tâches aussi — dans le groupe, ça part ; d’un groupe à l’autre, refusé avec « sous-tâche »', async ($, on) => {
   const s = await l410($, on)
   await s.hud('lots')
-  const already = await s.gestures(async ui => {
+  const crossed = await s.gestures(async ui => {
     await ui.pointer(down(2)) // L11/1 (à faire, affichée sous L11/2 en cours)
-    await ui.pointer(up(1)) // L11/2 : « L11/1 avant L11/2 », ce que le plan dit déjà
+    await ui.pointer(up(1)) // L11/2 (en cours)
   }, 'desktop', L410_ROWS)
-  expect(already).toMatch(/• L11\/1 est déjà avant L11\/2 dans le plan : rien à déplacer/)
+  expect(crossed).toMatch(/✖ L11\/2 est en cours : une sous-tâche libre se range parmi les libres/)
+  const crossedDown = await s.gestures(async ui => {
+    await ui.pointer(down(1)) // L11/2 (en cours)
+    await ui.pointer(up(3)) // L11/3 (à faire)
+  }, 'desktop', L410_ROWS)
+  expect(crossedDown).toMatch(/✖ L11\/3 est libre : une sous-tâche en cours se range parmi les sous-tâches en cours/)
   expect(s.rafs()).toEqual([])
-  // (le texte rendu par `gestures` porte aussi le dernier mot du geste précédent, sur le montage des gestes : le cas « visible » est joué avant le cas « plan seul » pour que son texte n'en porte pas la mention)
   const visible = await s.gestures(async ui => {
     await ui.pointer(down(3)) // L11/3 (à faire)
-    await ui.pointer(up(2)) // L11/1 (à faire) : même groupe d'affichage, l'écran suivra
+    await ui.pointer(up(2)) // L11/1 (à faire) : même groupe, l'écran suivra
   }, 'desktop', L410_ROWS)
   expect(visible).toMatch(/✔ L11\/3 placé avant L11\/1 — le plan est modifié, à commiter/)
-  expect(visible).not.toMatch(PLAN_ONLY)
-  const planOnly = await s.gestures(async ui => {
-    await ui.pointer(down(1)) // L11/2 (en cours)
-    await ui.pointer(up(3)) // L11/3 : le plan devient L11/1, L11/3, L11/2 ; L11/2 reste la première de ses sœurs à l'écran
-  }, 'desktop', L410_ROWS)
-  expect(planOnly).toMatch(/✔ L11\/2 placé après L11\/3 — le plan est modifié, à commiter/)
-  expect(planOnly).toMatch(PLAN_ONLY)
-  expect(s.rafs()).toEqual([['raf', 'move', 'L11/3', '--before', 'L11/1'], ['raf', 'move', 'L11/2', '--after', 'L11/3']])
+  expect(s.rafs()).toEqual([['raf', 'move', 'L11/3', '--before', 'L11/1']])
 })
 
 // ── L402 : le tableau lu est périmé entre un raf move réussi et la fin de la relecture commencée après lui ──────────
@@ -924,10 +993,12 @@ const gatedTour = () => {
   return { tour, release, waiting }
 }
 const STALE_ROWS = 3
-const DONE_L10_BEFORE_L11 = '✔ L10 placé avant L11 — le plan est modifié, à commiter (raf move ne commite pas)'
-const ALREADY_L10_BEFORE_L11 = '• L10 est déjà avant L11 dans le plan : rien à déplacer'
+const DONE_L10_BEFORE_L12 = '✔ L10 placé avant L12 — le plan est modifié, à commiter (raf move ne commite pas)'
+const ALREADY_L10_BEFORE_L12 = '• L10 est déjà avant L12 dans le plan : rien à déplacer'
+/** « L10 avant L12 » : l'ancien tableau (L10, L11, L12) le dit déjà vrai parmi les libres ; aucun geste n'y mène (l'écran suit le plan dans un groupe), la demande est forgée. */
+const forgeL10BeforeL12 = (ui: Parameters<Parameters<Awaited<ReturnType<typeof session>>['gestures']>[0]>[0]) => ui.post({ kind: 'move', project: 'cadence', id: 'L10', target: 'L12', place: 'before' }, { in: 'lots:cadence' } as never)
 
-test('R22 — deux gestes avant la relecture : après un raf move réussi, pas de « déjà » ni de « plan seul » sur l’ancien tableau, raf tranche ; la relecture finie, le court-circuit reprend', async ($, on) => {
+test('R22 — deux gestes avant la relecture : après un raf move réussi, pas de « déjà » sur l’ancien tableau, raf tranche ; la relecture finie, le court-circuit reprend', async ($, on) => {
   const s = await session($, on, { kv: SUBS_OPEN, tour: () => ({ exitCode: 0, stdout: STALE_TOUR }) })
   await s.hud('lots')
   const g = gatedTour()
@@ -940,35 +1011,24 @@ test('R22 — deux gestes avant la relecture : après un raf move réussi, pas d
   }, 'desktop', STALE_ROWS)
   expect(await s.notice()).toBe('✔ L10 placé après L12 — le plan est modifié, à commiter (raf move ne commite pas)')
   expect(s.tours().length).toBe(before + 1) // la relecture est partie et attend : le tableau est périmé
-  await s.gestures(async ui => {
-    await ui.pointer(down(1)) // L10, toujours à la ligne 1 : le tableau n'a pas été relu
-    await ui.pointer(up(1))
-    await ui.key(altKey('up')) // → L10 avant L11 : l'ancien tableau dirait « déjà », le plan réel (L11, L12, L10) non — raf est appelé, le retour en arrière se fait
-  }, 'desktop', STALE_ROWS)
-  expect(s.rafs()).toEqual([['raf', 'move', 'L10', '--after', 'L12'], ['raf', 'move', 'L10', '--before', 'L11']])
-  expect(await s.notice()).toBe(DONE_L10_BEFORE_L11) // succès simple : ni « déjà », ni « à l'écran rien ne bouge »
+  await s.gestures(forgeL10BeforeL12, 'desktop', STALE_ROWS) // l'ancien tableau dirait « déjà », le plan réel (L11, L12, L10) non — raf est appelé
+  expect(s.rafs()).toEqual([['raf', 'move', 'L10', '--after', 'L12'], ['raf', 'move', 'L10', '--before', 'L12']])
+  expect(await s.notice()).toBe(DONE_L10_BEFORE_L12) // succès simple : pas de « déjà »
   // la relecture en vol avait lu le plan avant le second move : elle ne rattrape pas, une autre part à sa fin
-  expect(g.release()).toBe(true) // (les deux moves se sont annulés : le plan relu est le plan de départ)
+  expect(g.release()).toBe(true) // (le tour simulé répond toujours le plan de départ)
   await settle()
   expect(s.tours().length).toBe(before + 2)
-  await s.gestures(async ui => {
-    await ui.pointer(down(0)) // L11 (en cours)
-    await ui.pointer(up(2)) // sur L12 : à jour, le tableau dirait « plan seul » (L11 reste en tête) ; périmé, raf tranche et le succès reste simple
-  }, 'desktop', STALE_ROWS)
+  await s.gestures(forgeL10BeforeL12, 'desktop', STALE_ROWS) // la relecture lancée par le 1er move est finie mais pas celle d'après le 2e : encore périmé, raf tranche
   expect(s.rafs().length).toBe(3)
-  expect(await s.notice()).toBe('✔ L11 placé après L12 — le plan est modifié, à commiter (raf move ne commite pas)')
+  expect(await s.notice()).toBe(DONE_L10_BEFORE_L12)
   expect(g.release()).toBe(true) // la relecture lancée par le 2e move finit, mais le 3e move l'a précédée : encore une
   await settle()
   expect(s.tours().length).toBe(before + 3)
   expect(g.release()).toBe(true) // celle commencée après le dernier move finit : le tableau est à jour
   await settle()
-  await s.gestures(async ui => {
-    await ui.pointer(down(1))
-    await ui.pointer(up(1))
-    await ui.key(altKey('up')) // L10 avant L11 : le plan relu le dit déjà, le court-circuit reprend
-  }, 'desktop', STALE_ROWS)
+  await s.gestures(forgeL10BeforeL12, 'desktop', STALE_ROWS) // le plan relu le dit déjà : le court-circuit reprend
   expect(s.rafs().length).toBe(3)
-  expect(await s.notice()).toBe(ALREADY_L10_BEFORE_L11)
+  expect(await s.notice()).toBe(ALREADY_L10_BEFORE_L12)
   expect(g.waiting.length).toBe(0) // aucune relecture de plus que nécessaire
 })
 
@@ -991,25 +1051,17 @@ test('R22 — un tour déjà en vol au moment du move ne rattrape pas : un autre
   expect(g.release()).toBe(true) // le tour en vol revient : il avait lu le plan avant le move
   await settle()
   expect(s.tours().length).toBe(before + 1) // un autre est parti à sa fin
-  await s.gestures(async ui => {
-    await ui.pointer(down(1))
-    await ui.pointer(up(1))
-    await ui.key(altKey('up')) // toujours périmé : raf est appelé
-  }, 'desktop', STALE_ROWS)
+  await s.gestures(forgeL10BeforeL12, 'desktop', STALE_ROWS) // toujours périmé : raf est appelé
   expect(s.rafs().length).toBe(2)
-  expect(await s.notice()).toBe(DONE_L10_BEFORE_L11)
+  expect(await s.notice()).toBe(DONE_L10_BEFORE_L12)
   expect(g.release()).toBe(true) // ce tour avait lu le plan avant le 2e move : encore un
   await settle()
   expect(s.tours().length).toBe(before + 2)
   expect(g.release()).toBe(true)
   await settle()
-  await s.gestures(async ui => {
-    await ui.pointer(down(1))
-    await ui.pointer(up(1))
-    await ui.key(altKey('up')) // relu : « déjà » reprend
-  }, 'desktop', STALE_ROWS)
+  await s.gestures(forgeL10BeforeL12, 'desktop', STALE_ROWS) // relu : « déjà » reprend
   expect(s.rafs().length).toBe(2)
-  expect(await s.notice()).toBe(ALREADY_L10_BEFORE_L11)
+  expect(await s.notice()).toBe(ALREADY_L10_BEFORE_L12)
   expect(g.waiting.length).toBe(0)
 })
 

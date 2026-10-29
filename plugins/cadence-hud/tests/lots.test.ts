@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { buildPanel, displayOrder, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, planMove, projectDir, readTime, refusalReason } from '../hooks/lots'
+import { buildPanel, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, planMove, projectDir, readTime, refusalReason } from '../hooks/lots'
 import type { LotsRow, TourLot } from '../types'
 
 const lot = (id: string, status: 'todo' | 'doing' = 'todo', extra: Partial<TourLot> = {}): TourLot => ({ id, title: `Titre ${id}`, status, after: [], ...extra })
@@ -542,12 +542,12 @@ const PLAN = [lot('L1'), lot('L2'), task('L2', 1), task('L2', 2), lot('L3')]
 const flat = () => 1
 
 test('R20 — un lot se place avant ou après un lot du même projet : la demande à raf', () => {
-  expect(planMove(PLAN, { id: 'L3', target: 'L1', place: 'before' }, flat)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L3', '--before', 'L1'], planOnly: false })
-  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'after' }, flat)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L1', '--after', 'L3'], planOnly: false })
+  expect(planMove(PLAN, { id: 'L3', target: 'L1', place: 'before' }, flat)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L3', '--before', 'L1'] })
+  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'after' }, flat)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L1', '--after', 'L3'] })
 })
 
 test('R20 — une sous-tâche se place parmi celles de son lot', () => {
-  expect(planMove(PLAN, { id: 'L2/2', target: 'L2/1', place: 'before' }, flat)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L2/2', '--before', 'L2/1'], planOnly: false })
+  expect(planMove(PLAN, { id: 'L2/2', target: 'L2/1', place: 'before' }, flat)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L2/2', '--before', 'L2/1'] })
 })
 
 test('R21 — parents différents : refusé avec sa raison, raf n’est pas appelé', () => {
@@ -577,24 +577,60 @@ test('R22 — un lot déjà à sa place dans le plan : raf n’est pas demandé,
   expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'before' }, flat)?.kind).toBe('move')
 })
 
-test('R22 — L410 : un déplacement entre deux groupes d’affichage change le plan sans changer l’écran : planOnly', () => {
-  const l1First = (l: TourLot) => (l.id === 'L1' ? 0 : 1) // L1 en cours : affiché en tête quelle que soit sa place dans le plan
-  expect(displayOrder(PLAN, l1First)).toEqual(['L1', 'L2', 'L2/1', 'L2/2', 'L3'])
-  // L1 après L3 : le plan devient L2, L3, L1 ; l'écran reste L1, L2, L3
-  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'after' }, l1First)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L1', '--after', 'L3'], planOnly: true })
-  // L3 avant L1 : le plan devient L3, L1, L2 ; l'écran L1, L3, L2 — visible
-  expect(planMove(PLAN, { id: 'L3', target: 'L1', place: 'before' }, l1First)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L3', '--before', 'L1'], planOnly: false })
-  // et L2 avant L1, qui est déjà le cas à l'écran mais pas dans le plan : le plan change, l'écran non
-  expect(planMove(PLAN, { id: 'L2', target: 'L1', place: 'before' }, l1First)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L2', '--before', 'L1'], planOnly: true })
+// Le plan du cas vécu (29-10) : L402 en cours, L403 libre, L407 libre, L411 en cours, L412 bloqué par L403.
+const LIVED = [lot('L402', 'doing'), lot('L403'), lot('L407'), lot('L411', 'doing'), lot('L412', 'todo', { after: ['L403'] })]
+const byState = (l: TourLot) => (l.status === 'doing' ? 0 : l.after.length ? 2 : 1)
+
+test('R24 — cas vécu : un lot libre lâché sur un lot en cours est refusé sans appeler raf, avec la raison', () => {
+  expect(planMove(LIVED, { id: 'L403', target: 'L411', place: 'after' }, byState)).toEqual({
+    kind: 'refused',
+    reason: 'L411 est en cours : un lot libre se range parmi les libres',
+  })
 })
 
-test('R22 — tableau périmé (stale) : ni « déjà » ni « plan seul » sur un ordre qui n’est plus celui du plan, raf tranche ; les refus restent', () => {
-  const l1First = (l: TourLot) => (l.id === 'L1' ? 0 : 1)
-  expect(planMove(PLAN, { id: 'L1', target: 'L2', place: 'before' }, flat, true)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L1', '--before', 'L2'], planOnly: false })
-  expect(planMove(PLAN, { id: 'L1', target: 'L3', place: 'after' }, l1First, true)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L1', '--after', 'L3'], planOnly: false })
+test('R24 — la raison suit le groupe du lot et celui de la cible : en cours, libres, bloqués', () => {
+  const reason = (id: string, target: string) => {
+    const plan = planMove(LIVED, { id, target, place: 'before' }, byState)
+    return plan?.kind === 'refused' ? plan.reason : plan
+  }
+  expect(reason('L411', 'L403')).toBe('L403 est libre : un lot en cours se range parmi les lots en cours')
+  expect(reason('L403', 'L412')).toBe('L412 est bloqué : un lot libre se range parmi les libres')
+  expect(reason('L412', 'L402')).toBe('L402 est en cours : un lot bloqué se range parmi les bloqués')
+})
+
+test('R24 — entre sous-tâches aussi : la raison dit « sous-tâche »', () => {
+  const tasks = [lot('L5', 'doing'), task('L5', 1), { ...task('L5', 2), status: 'doing' } as TourLot]
+  const plan = planMove(tasks, { id: 'L5/1', target: 'L5/2', place: 'after' }, l => (l.status === 'doing' ? 0 : 1))
+  expect(plan).toEqual({ kind: 'refused', reason: 'L5/2 est en cours : une sous-tâche libre se range parmi les libres' })
+})
+
+test('R24 — un parent dont un descendant est en cours est du groupe « en cours » (c’est ainsi qu’il est affiché)', () => {
+  const plan = [lot('A'), lot('B'), lot('B1', 'doing', { parent: 'B' })]
+  expect(planMove(plan, { id: 'A', target: 'B', place: 'after' }, byState)).toEqual({ kind: 'refused', reason: 'B est en cours : un lot libre se range parmi les libres' })
+})
+
+test('R24 — dans un groupe : le lot part (les lots d’un autre groupe entre les deux ne comptent pas)', () => {
+  // L403 et L407 sont libres, L411 (en cours) vient après dans le plan
+  expect(planMove(LIVED, { id: 'L407', target: 'L403', place: 'before' }, byState)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L407', '--before', 'L403'] })
+})
+
+test('R22 — un lot déjà à sa place parmi les lots de son groupe : raf n’est pas demandé, même si un lot d’un autre groupe les sépare dans le plan', () => {
+  const plan = [lot('L10'), lot('L11', 'doing'), lot('L12')]
+  expect(planMove(plan, { id: 'L10', target: 'L12', place: 'before' }, byState)).toEqual({ kind: 'unchanged', text: 'L10 est déjà avant L12 dans le plan : rien à déplacer' })
+})
+
+test('R22 — tableau périmé (stale) : pas de « déjà » sur un ordre qui n’est plus celui du plan, raf tranche ; les refus restent', () => {
+  expect(planMove(PLAN, { id: 'L1', target: 'L2', place: 'before' }, flat, true)).toEqual({ kind: 'move', argv: ['raf', 'move', 'L1', '--before', 'L2'] })
   expect(planMove(PLAN, { id: 'L2/1', target: 'L1', place: 'after' }, flat, true)?.kind).toBe('refused')
+  expect(planMove(LIVED, { id: 'L403', target: 'L411', place: 'after' }, byState, true)?.kind).toBe('refused')
   expect(planMove(PLAN, { id: 'L9', target: 'L1', place: 'after' }, flat, true)).toEqual({ kind: 'refused', reason: 'lot inconnu : L9' })
   expect(planMove(PLAN, { id: 'L1', target: 'L1', place: 'after' }, flat, true)).toBeUndefined()
+})
+
+test('R24 — chaque ligne de lot du panneau porte son groupe d’affichage (un parent d’un lot en cours compris)', () => {
+  const rows = [{ project: 'p', lots: [lot('A'), lot('B'), lot('B1', 'doing', { parent: 'B' }), lot('C', 'todo', { after: ['A'] }), lot('D', 'doing')] }]
+  const p = buildPanel({ rows, columns: 70, height: 40, waves: [], views: { [openKey('p', 'B')]: true } })
+  expect(Object.fromEntries(p.lines.flatMap(l => (l.kind === 'lot' ? [[l.id, l.rank]] : [])))).toEqual({ B: 0, B1: 0, D: 0, A: 1, C: 2 })
 })
 
 test('R21 — la raison d’un refus de raf : sa première ligne sans le préfixe, le code à défaut', () => {

@@ -728,7 +728,7 @@ export const register: Register = on => {
       else if (r.exitCode !== 0) await say($, refusalReason(r.stderr, r.exitCode), 'refused')
       else {
         const done = `${ask.id} placé ${ask.place === 'before' ? 'avant' : 'après'} ${ask.target} — le plan est modifié, à commiter (raf move ne commite pas)`
-        await say($, plan.planOnly ? `${done} ; à l'écran rien ne bouge : le panneau trie par état (en cours, libres, le reste)` : done, 'done')
+        await say($, done, 'done')
         moveGen += 1 // le tableau est périmé jusqu'à la fin d'une relecture commencée maintenant
         void readTourNow?.()
       }

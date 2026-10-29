@@ -301,10 +301,13 @@ lots:
     finished: 2026-10-29
   - id: L434
     title: "cadence orchestrate --wave <id> sur une vague qui existe déjà : refus « cette vague existe déjà » mais code de sortie 0 (29-10, vague cad2 de ce matin) — le lead a cru la vague lancée et suivi l'ancien journal ; un refus avant d'agir sort en 2, comme documenté"
-    status: todo
+    status: dropped
     estimate: 0.1
     quickwin: true
     created: 2026-10-29
+    finished: 2026-10-29
+    notes:
+      - { date: 2026-10-29, text: "abandonné : prémisse fausse : le refus sort bien en 2 (vérifié) ; le 0 lu venait du | tail -40 de la commande de lancement du lead, récidive de L423" }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

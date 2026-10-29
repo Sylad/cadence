@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { sharedStateDir } from '../src/state.js';
 import { REPO_LOCK } from '../src/orchestrate/lock.js';
 import { INTEGRATION_LOCK } from '../src/orchestrate/integrate.js';
-import { cadenceHome, liveSlots } from '../src/orchestrate/registry.js';
+import { cadenceHome, liveSlots, liveWaves } from '../src/orchestrate/registry.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
 import { branches, conflictWave, fake, inWorktree, lotOf, meeting, planOf, run, setup, sharedFile, store, subjects, writes } from './orchestrate-worktree-harness.js';
 import { parseOrchestrateArgs } from '../src/orchestrate/command.js';
@@ -443,6 +443,22 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
       expect(again.out.match(/a : tenu par la vague autre-vague \(pid \d+\) : attente de sa fin/g)).toHaveLength(1);
       expect(store(parent).readLot('a', lot)!.status).toBe('ready');
     } finally {
+      sleeper.kill();
+    }
+  });
+  it('L443 — pendant l\'attente, la reprise est inscrite parmi les vagues vivantes (le garde d\'une seconde reprise la voit), et l\'inscription tombe quand l\'attente finit', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const sleeper = await otherWaveHolds(repo, null);
+    const during: string[][] = [];
+    const probe = setInterval(() => during.push(liveWaves(cadenceHome()).map((w) => w.wave)), 40);
+    try {
+      const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 400, pollMs: 50 } });
+      expect(again.code).toBe(2);
+      expect(during.some((w) => w.includes('2026-10-04-1412'))).toBe(true);
+      expect(liveWaves(cadenceHome())).toHaveLength(0);
+    } finally {
+      clearInterval(probe);
       sleeper.kill();
     }
   });

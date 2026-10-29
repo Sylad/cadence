@@ -1476,17 +1476,27 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
   // L443 : une reprise d'intégration (--integrate, --replay) attend la fin de l'autre vague au lieu de sortir en 2 ; toute autre reprise refuse comme avant.
   const waitFor = integ.length ? { waitMs: deps.repoWait?.waitMs ?? REPO_WAIT_MS, pollMs: deps.repoWait?.pollMs ?? REPO_WAIT_POLL_MS } : null;
   const deadline = Date.now() + (waitFor?.waitMs ?? 0);
-  for (const repo of new Set(live.flatMap(lotRepoPaths))) {
-    const file = join(sharedStateDir(repo), REPO_LOCK);
-    let busy = activeLock(file);
-    let announced: string | null = null;
-    while (waitFor && busy && busy.pid !== process.pid && Date.now() < deadline) {
-      if (announced !== busy.wave) io.out(`orchestrate : ${basename(repo)} : tenu par la vague ${busy.wave} (pid ${busy.pid}) : attente de sa fin avant de reprendre l'intégration`);
-      announced = busy.wave;
-      await new Promise<void>((res) => setTimeout(res, Math.min(waitFor.pollMs, Math.max(1, deadline - Date.now()))));
-      busy = activeLock(file);
+  // Pendant l'attente (jusqu'à 3 h) la reprise est inscrite parmi les vagues vivantes : le garde « la vague tourne encore » d'une seconde reprise la voit, et ne vient pas attendre à son tour.
+  let waiting = false;
+  try {
+    for (const repo of new Set(live.flatMap(lotRepoPaths))) {
+      const file = join(sharedStateDir(repo), REPO_LOCK);
+      let busy = activeLock(file);
+      let announced: string | null = null;
+      while (waitFor && busy && busy.pid !== process.pid && Date.now() < deadline) {
+        if (!waiting) {
+          registerWave(cadenceHome(), { pid: process.pid, wave: wave.id, started: new Date().toISOString(), cwd: launch, repos: [] });
+          waiting = true;
+        }
+        if (announced !== busy.wave) io.out(`orchestrate : ${basename(repo)} : tenu par la vague ${busy.wave} (pid ${busy.pid}) : attente de sa fin avant de reprendre l'intégration`);
+        announced = busy.wave;
+        await new Promise<void>((res) => setTimeout(res, Math.min(waitFor.pollMs, Math.max(1, deadline - Date.now()))));
+        busy = activeLock(file);
+      }
+      if (busy && busy.pid !== process.pid) refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
     }
-    if (busy && busy.pid !== process.pid) refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
+  } finally {
+    if (waiting) unregisterWave(cadenceHome(), process.pid);
   }
   // Comme au départ : le .nvmrc est relu à chaque reprise (version désinstallée, .nvmrc changé, vague d'avant L80),
   // et un Node introuvable refuse le lot — jamais de repli silencieux sur le Node par défaut.

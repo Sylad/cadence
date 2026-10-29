@@ -1505,7 +1505,8 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
           refusals.push(`la vague ${wave.id} tourne encore (pid ${busy.pid}, verrou de ${basename(repo)})`);
           break;
         }
-        if (!waitFor || Date.now() >= deadline) {
+        // Un refus déjà posé sur un dépôt précédent (même vague, attente échue) : les suivants ne font plus attendre, la reprise sort en 2.
+        if (!waitFor || refusals.length || Date.now() >= deadline) {
           refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
           break;
         }

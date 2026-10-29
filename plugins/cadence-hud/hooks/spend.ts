@@ -74,13 +74,14 @@ export type SpendLine = { text: string; tone: 'title' | 'warning' | 'text' }
 
 /**
  * Les lignes du bloc, pour `columns` colonnes et au plus `height` lignes : le titre avec le compte, un lot par ligne (les lots en dépassement d'abord, l'ordre des vagues ensuite),
- * « … +N lots en cours » quand la hauteur n'en montre pas tous. Aucune ligne sans lot en cours ni sous deux lignes de hauteur.
+ * « … +N lots en cours » quand la hauteur n'en montre pas tous et qu'une ligne reste pour le dire. Aucune ligne sans lot en cours ni sous deux lignes de hauteur ; à deux lignes, le titre et le premier lot.
  */
 export const buildSpend = (rows: readonly SpendRow[], columns: number, height: number): { lines: SpendLine[] } => {
   if (rows.length === 0 || height < 2) return { lines: [] }
   const over = (r: SpendRow) => r.tokensOver || r.timeOver
   const ordered = [...rows.filter(over), ...rows.filter(r => !over(r))]
-  const shown = ordered.length <= height - 1 ? ordered.length : height - 2
+  // Deux lignes : le titre et un lot, sans « +N » (il ne tiendrait pas) ; le lot en dépassement passe en tête, il ne doit jamais être caché
+  const shown = ordered.length <= height - 1 ? ordered.length : Math.max(1, height - 2)
   const lines: SpendLine[] = [{ text: ellipsize(`Lots en cours : budget et durée (${rows.length})`, columns), tone: 'title' }]
   for (const r of ordered.slice(0, shown)) {
     const tokens = `${r.budget === null ? k(r.consumed) : `${k(r.consumed)}/${k(r.budget)}`} tokens${r.tokensOver ? ' dépassé' : ''}`
@@ -88,6 +89,6 @@ export const buildSpend = (rows: readonly SpendRow[], columns: number, height: n
     lines.push({ text: ellipsize(`${over(r) ? '⚠' : '▶'} ${r.project}:${r.lot}  ${tokens}${time}`, columns), tone: over(r) ? 'warning' : 'text' })
   }
   const hidden = ordered.length - shown
-  if (hidden > 0) lines.push({ text: ellipsize(`… +${hidden} lot${hidden > 1 ? 's' : ''} en cours`, columns), tone: 'text' })
+  if (hidden > 0 && lines.length < height) lines.push({ text: ellipsize(`… +${hidden} lot${hidden > 1 ? 's' : ''} en cours`, columns), tone: 'text' })
   return { lines }
 }

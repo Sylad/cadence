@@ -78,3 +78,9 @@ test('L414 R10 — le temps habituel vient de `cadence perf --json` : la médian
   expect(parseTypical(JSON.stringify([1]))).toEqual({})
   expect(parseTypical(JSON.stringify({ lotMinutes: 3 }))).toEqual({})
 })
+
+test('L414 R11 — à deux lignes de hauteur, le titre et un lot tiennent : le lot en dépassement reste visible, sans ligne « +N » qui ne tiendrait pas', () => {
+  const rows = spendOf([wave([wlot('L1'), wlot('L2', { consumed: 800_000 })])], TYPICAL, NOW)
+  const { lines } = buildSpend(rows, 100, 2)
+  expect(lines.map(l => l.text)).toEqual(['Lots en cours : budget et durée (2)', '⚠ cadence:L2  800k/750k tokens dépassé · 10 min (habituel 30 min)'])
+})

@@ -50,6 +50,8 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   edits code. Read-only for real: its `tools:` list is `Read, Grep, Glob, Bash` and the
   Playwright tools (`mcp__playwright`, and `mcp__plugin_playwright_playwright` when the
   browser comes from the Playwright plugin) — no `Edit`, no `Write`. In a wave it gives its captures the absolute path of the capture directory its brief names (a bare name would land in the repository); outside a wave, a path under `.playwright-mcp/` (e.g. `.playwright-mcp/page-home.png`; the Playwright MCP resolves a bare file name against the repository, where it would land at the root); `qa-reviewer` follows it too.
+  **Short reply (L452):** with a `Report file: <absolute path>` line in the brief it answers in 15 lines at most (`Verdict:`, `Findings:` with
+  the rule or measure of each, `Not verified:`, `Sub-tasks:`, `Report:`, `Captures:`) and writes the full report to that file (outside the repository, verdict last).
 - **code-reviewer** (agent): any stack; given a repository and a lot id, it reads
   the diff itself from the commits that cite the lot — not the author's summary —
   and the project's CLAUDE.md, when there is one, for its conventions; findings grounded in a
@@ -69,6 +71,8 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   document behind the lot; the lead calls it by hand. A document outside the repository only when the project's
   `cadence.yaml` names it (`docs.articles`): the agent then proposes a lot for that repository's plan and never writes it
   ([news](news.md#the-librarian-doc-keeper)).
+  **Short reply (L452):** with a `Report file: <absolute path>` line in the brief it answers in 15 lines at most (`Verdict:`, `Findings:` with
+  the rule or measure of each, `Not verified:`, `Sub-tasks:`, `Report:`) and writes the full report to that file (outside the repository, verdict last).
 - **reference-analyst** (agent, L265): given the folder of a document registered by `cadence ref add` and the file to
   write, it looks at every rendered page whole, then every zone at full resolution, measures with `cadence ref measure`
   (never by eye), copies every text verbatim, links each figure to the passages that cite it and writes one reading in

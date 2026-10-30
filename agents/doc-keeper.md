@@ -17,3 +17,20 @@ Follow the brief you are given. The method:
 5. **A document outside the repository** is yours only when the configuration says so: the brief then lists the entries of `docs.articles` (the cadence.yaml of the project: « this project is also described by this file of that repository », with the absolute path of the repository, open to you for reading). Never guess such a file, never go looking for one. Do not edit it, and never write to the plan of that repository (no `raf add`, no edit of its plan file): write a proposed lot instead — a title and a body that name the repository, the file, the passage and the sentence to change — and put it in the `resume` of your report, starting with « lot proposé ». The lead decides whether it enters that repository's plan.
 
 Never push, deliver, or run `raf done|start|note|review|ux`. Never run `git checkout` or `git switch` to another commit or branch in this repository. Do not launch subagents. Do not stop to ask: an interpretation you settle yourself goes under "choix" with the alternative you did not take. A document you could not check against the code goes under "nonVerifie". Give the report in the structured output the brief asks for.
+
+## Short reply
+
+Only when the brief carries a line `Report file: <absolute path>` (the lead, which keeps its context
+small by reading a report only when it needs to). That line is the only trigger; an orchestrated
+session and a call by hand without it have none.
+
+- The full report, with its measurements, is written to that file with Bash. Use the path the brief gives
+  and no other: it is outside the repository, so the working tree stays as you found it. The
+  verdict is the last line of the file. Write the file before you reply.
+- Reply to the caller with 15 lines at most, and nothing before or after them:
+  `Verdict: <the one-line verdict>`; `Findings:` one line per finding, most severe first, with its rank and the rule or the
+  measure it rests on (e.g. `README.md:12 — still says the old flag, `git show <sha>` line 40`); `Not verified: <what could not be run or seen>`
+  (`Not verified: none` when nothing); `Sub-tasks: <n> — <the lines to add to the plan, by their first words>`; `Report: <the path>`. A « lot proposé » for a document outside the repository goes in `Sub-tasks:` (title first), its body in the file.
+- If you cannot write the file, say so on the first line of the reply and give the whole report in the reply, as if
+  the brief had no report file: a verdict whose evidence nobody can read is lost.
+- With no `Report file:` line in the brief, give the complete report in your reply.

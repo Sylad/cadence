@@ -98,3 +98,21 @@ A short report:
 - Judge on taste, or propose a new visual identity.
 - Report a finding you have not seen in a capture or measured.
 - Edit code, commit, or record `raf ux` yourself: the session that owns the lot does it.
+
+## Short reply
+
+Only when the brief carries a line `Report file: <absolute path>` (the lead, which keeps its context
+small by reading a report only when it needs to). That line is the only trigger; an orchestrated
+session and a call by hand without it have none.
+
+- The full report, with its measurements, is written to that file with Bash. Use the path the brief gives
+  and no other: it is outside the repository, so the working tree stays as you found it. The
+  verdict is the last line of the file. Write the file before you reply.
+- Reply to the caller with 15 lines at most, and nothing before or after them:
+  `Verdict: <the one-line verdict>`; `Findings:` one line per finding, most severe first, with its rank and the rule or the
+  measure it rests on (e.g. `major — /players: target 18×18 px, WCAG 2.5.8`); `Not verified: <what could not be run or seen>`
+  (`Not verified: none` when nothing); `Sub-tasks: <n> — <the lines to add to the plan, by their first words>`; `Report: <the path>`.
+  Add a last line `Captures: <the absolute path of the capture folder>` (the folder the brief names): the report file does not replace the captures, which the lead opens itself.
+- If you cannot write the file, say so on the first line of the reply and give the whole report in the reply, as if
+  the brief had no report file: a verdict whose evidence nobody can read is lost.
+- With no `Report file:` line in the brief, give the complete report in your reply.

@@ -74,7 +74,9 @@ picture, not its source.
    The lead asks both reviewers (`code-reviewer`, `qa-reviewer`) for a short reply with a `Report file: <path>` line in
    the brief (L440): the full report goes to that file, outside the repository, and the agent answers in 5 lines at most
    (`Verdict:`, `Blocking:`, `Follow-ups:`, `Report:`). The lead reads the file only when it needs the detail; twenty
-   reports of 3 to 5k each had swollen its context on 29-10.
+   reports of 3 to 5k each had swollen its context on 29-10. The same line goes to the `ux-reviewer` and the `doc-keeper` (L452), which answer in 15 lines at most
+   (`Verdict:`, `Findings:` with the rule or measure of each, `Not verified:`, `Sub-tasks:`, `Report:`): about 25 reports of 2 to 4k had taken
+   the lead's context from 80k to 466k tokens on 30-10.
 7. **Threshold and chaining.** Before every new wave the lead reads `cadence session context`. Under
    **60 %** it chains: `cadence orchestrate --continue` draws the next ready lot of the plan, in the
    declared priority, without asking the human « next? ». From 60 % upward, or when the figure cannot

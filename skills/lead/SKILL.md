@@ -80,7 +80,7 @@ like (the human's words) and keeps the rest verbatim. **A stale title is no reas
 
 A lot that adds or changes a screen is `visible`: after the implementation, have the
 `ux-reviewer` agent review it (give it the URL or the way to run the app) and bring its verdict and
-proposed sub-tasks back to the human — or, where the folder's `cadence.yaml` says `lead.ux: lead`, form the UX verdict yourself (see « The UX verdict » in section 2c).
+proposed sub-tasks back to the human (add a line `Report file: <absolute path>` outside the repository, and the folder of the captures: it answers in 15 lines at most — verdict, findings with their rule or measure, not verified, sub-tasks, the paths — and keeps the measurements in that file, L452) — or, where the folder's `cadence.yaml` says `lead.ux: lead`, form the UX verdict yourself (see « The UX verdict » in section 2c).
 
 ### 2b. A wave through `cadence orchestrate`
 
@@ -193,7 +193,7 @@ is recorded by the lead's own `raf ux` or, for a lot it hands over, by the `livr
 
 0. After an orchestrated wave the review is already done, by a fresh session: read the table, then go to
    point 2. For a lot delegated by hand:
-0b. For a lot delegated by hand, `raf check` or the `dérive` column reporting `documentation en retard` is handled **before** the review: hand the lot to the `doc-keeper` agent (a fresh subagent; the absolute path of the project and the lot id; it updates the documents, or only lists them if you say read-only). Read the `docs.articles` key of the project's `cadence.yaml` yourself and put its entries (`repo`, `file`, and the absolute path of that repository, `repo` being relative to the project) in the brief, with read access to that repository for the subagent: the agent examines a document outside the repository only if the brief names it, and with no entry (the key is absent by default) you name none. A proposed lot it returns for a document outside the repository (`docs.articles`) is yours to decide: it never writes to that plan.
+0b. For a lot delegated by hand, `raf check` or the `dérive` column reporting `documentation en retard` is handled **before** the review: hand the lot to the `doc-keeper` agent (a fresh subagent; the absolute path of the project and the lot id; it updates the documents, or only lists them if you say read-only). Read the `docs.articles` key of the project's `cadence.yaml` yourself and put its entries (`repo`, `file`, and the absolute path of that repository, `repo` being relative to the project) in the brief, with read access to that repository for the subagent: the agent examines a document outside the repository only if the brief names it, and with no entry (the key is absent by default) you name none. A proposed lot it returns for a document outside the repository (`docs.articles`) is yours to decide: it never writes to that plan. Add a line `Report file: <absolute path>` (outside the repository) to the brief: it answers in 15 lines at most and writes its full report there (L452); read the file only to apply a document it only listed.
 1. The `code-reviewer` agent, as a fresh subagent (most capable model), reviews the lot. Give it
    the absolute path of the project and the lot id, **not** the author's report: it reads the diff
    itself from the commits that cite the lot, runs the checks, and returns real defects only,

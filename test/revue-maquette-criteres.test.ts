@@ -51,7 +51,7 @@ describe('R1/R2/R3 — les critères repris dans la section Mockup mode', () => 
     expect(empreinte(entre(ux, '## Inputs', '## Mockup mode'))).toBe('1b95a900c30a9113');
     expect(empreinte(entre(ux, '## Conformity mode', '## Method'))).toBe('0e678bf38c96081f');
     expect(empreinte(entre(ux, '## Method', '## Output'))).toBe('f6d00d8463947ffa');
-    expect(empreinte(entre(ux, '## Output'))).toBe('3f3791ca62eb6631');
+    expect(empreinte(entre(ux, '## Output', '\n## Short reply'))).toBe('3f3791ca62eb6631');
     expect(ux.indexOf('## Mockup mode')).toBeLessThan(ux.indexOf('## Conformity mode'));
   });
   it('R2 — ux-reviewer.md ne contient ni « WCAG 2.1 » ni « 2.5.5 » ni « What works well »', () => {

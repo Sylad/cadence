@@ -87,6 +87,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Changed
 
 - `raf` no longer repeats the full title of a lot in the lead's context (L453, [docs/raf.md](docs/raf.md)): the post-commit hook line `raf: L12 (doing) …` cuts the title at 60 characters (id and state kept), and `--verbose` — on the hook and on `raf done`, `ux`, `review`, `note`, `move`, `public` — gives the line `id  state  full title` of the touched lot. The `plan non commité` reminder keeps its command.
+- `ux-reviewer` and `doc-keeper` answer the lead in 15 lines at most (verdict, findings with their rule or measure, not verified, sub-tasks, paths) and write the full report to the file named by a `Report file: <path>` line of the brief; the lead's skill gives that line to both (L452).
 
 ## [1.27.0] - 2026-10-30
 

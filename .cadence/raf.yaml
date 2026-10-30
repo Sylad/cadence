@@ -499,9 +499,10 @@ lots:
     started: 2026-10-30
   - id: L452
     title: "Comptes rendus courts des agents appelés par le lead (qa-reviewer, ux-reviewer, code-reviewer, doc-keeper) : au plus ~15 lignes rendues (verdict, constats classés avec leur règle ou mesure, non vérifié, sous-tâches proposées), le détail mesuré écrit dans un fichier dont le chemin est rendu ; motif : ~25 comptes rendus de 2 à 4k tokens lus par le lead le 30-10 (contexte 80k → 466k) ; demande de Sylvain (gestion des tokens sans /clear)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-30
+    started: 2026-10-30
   - id: L453
     title: "raf discret : raf done/ux/review/note/move/public n'impriment plus le titre complet des lots touchés (id, état et 60 caractères au plus ; --verbose pour le titre entier) ; le rappel « plan non commité » garde sa commande ; motif : chaque raf répétait des titres de ~300 caractères dans le contexte du lead (30-10)"
     status: todo

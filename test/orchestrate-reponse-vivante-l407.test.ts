@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
 
-function parentWith(names: string[]) {
+function parentWith(names: string[], lotsOf: Record<string, number> = {}) {
   const parent = tempDir();
   for (const name of names) {
     const dir = join(parent, name);
@@ -24,7 +24,7 @@ function parentWith(names: string[]) {
     git(dir, 'config', 'user.name', 'T');
     git(dir, 'config', 'commit.gpgsign', 'false');
     const plan = Plan.create(join(dir, '.cadence/raf.yaml'), name, 'L', '2026-09-01');
-    plan.add('lot', '2026-10-01', { estimate: 1 });
+    for (let i = 0; i < (lotsOf[name] ?? 1); i++) plan.add('lot', '2026-10-01', { estimate: 1 });
     plan.save();
     writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
     git(dir, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
@@ -208,5 +208,39 @@ describe('L407 — réponse sur une vague vivante', () => {
     for (const extra of [['--drop', 'a:L1'], ['--stop-after-current'], ['--budget', '1M'], ['a:L1']]) {
       await expect(orchestrate(['--answer', 'a:L1', 'x', ...extra], io(parent).io, d)).rejects.toThrow(/ne se combine/);
     }
+  });
+
+  it("R9 — deux réponses prises au même tour pour deux lots du même dépôt ne partent pas ensemble : jamais deux sessions dans un même dépôt", async () => {
+    const parent = parentWith(['a', 'b'], { a: 2 });
+    let inA = 0;
+    let maxA = 0;
+    const asked = new Set<string>();
+    const claude: ClaudeFn = async (args, o) => {
+      const kind = kindOf(args);
+      const project = o.cwd.split('/').pop()!;
+      if (kind !== 'implement' && kind !== 'fix') return claudeOut(reviewReport());
+      const lot = /on lot `([^`]+)`/.exec(args[1])![1];
+      const store = RunStore.last(parent)!;
+      if (project === 'a' && !asked.has(lot)) {
+        asked.add(lot);
+        return claudeOut(workReport({ questions: ['Quelle base ?'] }));
+      }
+      if (project === 'b') {
+        await wait(() => store.readLot('a', 'L1')?.status === 'question' && store.readLot('a', 'L2')?.status === 'question');
+        expect(await orchestrate(['--answer', 'a:L1', 'x', '--answer', 'a:L2', 'y'], io(parent).io, d)).toBe(0);
+        await wait(() => store.readLot('a', 'L1')?.status === 'ready' && store.readLot('a', 'L2')?.status === 'ready');
+      } else {
+        maxA = Math.max(maxA, ++inA);
+        await new Promise((r) => setTimeout(r, 60));
+        inA--;
+      }
+      return claudeOut(workReport({ commits: [commitFile(o.cwd, `f-${Math.random()}.txt`, `feat(${lot}): travail`)] }));
+    };
+    const d: OrchestrateDeps = { claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR, slotPollMs: 20 };
+    await orchestrate(['a:L1', 'a:L2', 'b:L1', '--max-sessions', '3'], io(parent).io, d);
+    expect(maxA).toBe(1);
+    const store = RunStore.last(parent)!;
+    expect(store.readLot('a', 'L1')!.status).toBe('ready');
+    expect(store.readLot('a', 'L2')!.status).toBe('ready');
   });
 });

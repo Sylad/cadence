@@ -100,9 +100,17 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
     const p = runQueue(queue).finally(() => running.delete(p));
     running.set(p, queue);
   };
-  // Sans worktree, un lot repris ne joue pas pendant qu'un lot du même dépôt joue (jamais deux sessions dans un dépôt).
-  const canRun = (c: LotCtx) => !!c.tree || ![...running.values()].some((q) => q.some((o) => lotRepoPaths(o.lot).some((r) => lotRepoPaths(c.lot).includes(r))));
+  // Sans worktree, un lot repris ne joue pas pendant qu'un autre lot du même dépôt joue, attend un créneau ou vient d'être accepté dans ce même tour (jamais deux sessions dans un dépôt).
+  const admitted: LotCtx[] = [];
+  const sameRepo = (a: LotCtx, b: LotCtx) => lotRepoPaths(a.lot).some((r) => lotRepoPaths(b.lot).includes(r));
+  const canRun = (c: LotCtx) => {
+    if (c.tree) return true;
+    if ([...running.values(), ...pending].some((q) => q.some((o) => sameRepo(c, o))) || admitted.some((o) => sameRepo(c, o))) return false;
+    admitted.push(c);
+    return true;
+  };
   for (;;) {
+    admitted.length = 0;
     for (const c of answers?.take(canRun) ?? []) {
       live.add(c);
       pending.push([c]);

@@ -80,6 +80,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-10-30
+
 ### Added
 
 - The lots panel (`/hud lots`) draws, under each lot that a wave carries (or whose code review the plan holds while it is in progress), the **cycle of the lot as a strip**: the wave's stages — `fiche`, `maquette`, `accept` (only those the lot played), `implement`, `revue`, `correction n/3`, `porte`, `UX`, `intégration`, `prêt` — with the current one in bold, its duration and the passes (`correction 1/3`, `revue ×2`, the gate `build` or `tests`), then the plan's: `revue posée → clos → livré`. A strip too long for the panel folds its finished stages into `✔ n`, then tightens its arrows, before cutting its end. `cadence lead tour --json` gives a lot `reviewed: true` when the plan holds its code review, and the collector gives each lot of a wave the list of its steps (`trail`) (L413, `docs/cadence-hud.md`).

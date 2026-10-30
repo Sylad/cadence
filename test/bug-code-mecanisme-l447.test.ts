@@ -57,6 +57,22 @@ describe('R8 — un seul mécanisme, au maillon désigné', () => {
     expect(part).toBe(Math.round((100 * bug) / classees));
   });
 
+  it('R8 — la ligne « Avant » porte la part conforme du premier coup relevée le 30-10', () => {
+    const avant = /^\| Avant : .*$/m.exec(mesure)![0];
+    expect(avant).toMatch(/\| 56 % \|/);
+    expect(avant).not.toContain('à relever');
+  });
+
+  it('R11 — la fenêtre suivante part de la mise en service de la liste, pas de l\'heure du commit', () => {
+    expect(mesure).toContain('mise en service');
+    expect(mesure).not.toContain('heure du commit');
+  });
+
+  it('R8 — le document ne promet pas un accord du modèle que aucune commande ne calcule', () => {
+    expect(mesure).not.toContain('(`--sample`) le donnerait');
+    expect(mesure).toContain('n\'est pas calculé');
+  });
+
   it('R8 — aucun maillon dominant : aucun marqueur [L447] dans les quatre emplacements', () => {
     // Le document dit « aucun » si, et seulement si, aucun emplacement ne porte le marqueur.
     const posés = Object.values(EMPLACEMENTS).reduce((n, t) => n + count(t), 0);

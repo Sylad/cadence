@@ -321,7 +321,7 @@ Absent, `verify.inPlace` chooses as above, with one more case for the copy (L431
 
 - `orchestrate.worktreeDeps: [node_modules, .venv, front/node_modules]` in `cadence.yaml`: those paths, relative to the repository
   (no absolute path, no `..`); one that does not exist in the main tree is reported and skipped;
-- absent: the `node_modules` of every level and the `.venv` are copied; the other ignored folders (data, `.env`…, build outputs such as `dist` excluded) are linked, as in the worktrees of a wave. A bare worktree has no `node_modules` or `.venv`: on 26-10 the re-verification of a lot in one gave nine red suites that were only missing dependencies.
+- absent: the `node_modules` of every level and the `.venv` are copied; the other ignored folders (data, `.env`…, build outputs such as `dist`) are neither copied nor linked. A bare worktree has no `node_modules` or `.venv`: on 26-10 the re-verification of a lot in one gave nine red suites that were only missing dependencies.
 
 ```
 verify --gate 6b0d9aa : porte jouée dans l'arbre principal /path/app (propre, au sha)

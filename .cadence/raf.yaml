@@ -509,6 +509,7 @@ lots:
     estimate: 0.25
     created: 2026-10-30
     started: 2026-10-30
+    review: { date: 2026-10-30, verdict: "compliant (2 minor notes, no sub-task) — orchestré (vague 2026-10-30-1715, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant (3 minor notes, no rebase breakage: the rebased diff of 7 files is coherent, targeted tests pass 52/52)", commit: 6f87c86b914dd5ace32801386093a97db07a1188 }
   - id: L453
     title: "raf discret : raf done/ux/review/note/move/public n'impriment plus le titre complet des lots touchés (id, état et 60 caractères au plus ; --verbose pour le titre entier) ; le rappel « plan non commité » garde sa commande ; motif : chaque raf répétait des titres de ~300 caractères dans le contexte du lead (30-10)"
     status: done

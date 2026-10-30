@@ -538,9 +538,10 @@ lots:
     finished: 2026-10-30
   - id: L455
     title: "verify --gate : la copie jetable relie les dossiers non suivis de l'arbre principal (data-local/, data/) — un test qui compare des chemins par realpath y rougit à tort (finance L60 « refuse un UX_DEMO_DIR = REPO » rouge en copie, vert dans l'arbre principal au même sha, 30-10, livreur de L58 arrêté) ; ne relier que les dépendances (node_modules, .venv…) ou des dossiers déclarés, et test du cas"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-30
+    started: 2026-10-30
   - id: L456
     title: "Une session de vague ne commite jamais sur la branche principale d'un AUTRE dépôt que celui de son lot (cluster-sante L1 a commité 3 commits sur developpeur-gitops main le 30-10, à un deploy.sh près de la prod) : le brief l'interdit, l'orchestrateur détecte en fin de session un commit sur la branche principale d'un dépôt frère cité par le lot (ou de tout dépôt du dossier parent) et rend le lot avec le constat ; la voie prévue est une branche wip/<projet>-<lot> ; doc et test"
     status: todo

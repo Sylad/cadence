@@ -90,11 +90,25 @@ describe('agent livreur (L439)', () => {
   it('R6 — agents/livreur.md rend une question sans raf ux quand le brief n\'a pas les captures', () => {
     const ux = section('The UX verdict')
     expect(ux).toMatch(/slightest doubt/)
-    for (const d of ['reservation you cannot settle', 'capture you cannot read', 'matter of taste', 'state the captures do not show', 'report or captures missing from the brief']) {
+    for (const d of ['reservation you cannot settle', 'capture you cannot read', 'matter of taste', 'state the captures do not show', 'Report or captures missing from the brief']) {
       expect(ux, d).toContain(d)
     }
     expect(ux).toContain('Question : doute sur le verdict UX de <lot> : <réserve> (captures : <chemin>)')
     expect(ux).toMatch(/records no `raf ux`, closes nothing/)
+  })
+
+  it('R6 — rapport ou captures absents : un seul message, celui du doute UX après raf show, jamais « brief incomplet » au contrôle 1', () => {
+    const ux = section('The UX verdict')
+    // la phrase que l'agent rend vraiment dans ce cas
+    expect(ux).toContain('Question : doute sur le verdict UX de <lot> : rapport ou captures absents du brief (captures : <chemin reçu, ou aucun>)')
+    expect(ux).toMatch(/known once `raf show` prints `visible : oui`/)
+    expect(ux).toMatch(/Never « brief incomplet » for them/)
+    // le contrôle 1 ne les demande plus : la branche « brief incomplet » pour le rapport et les captures n'existe plus
+    const c = section('Before any command')
+    const check1 = c.slice(c.indexOf('1. Complete brief'), c.indexOf('2. The lot'))
+    expect(check1).not.toMatch(/Complete brief:[^.]*report or captures/)
+    expect(check1).toMatch(/their absence is a doubt on the UX verdict/)
+    expect(body.match(/Question : brief incomplet : <champ> absent/g)).toHaveLength(1)
   })
 
   it('R7 — agents/livreur.md interdit raf ux quand lead.ux n\'est pas lead', () => {
@@ -226,10 +240,8 @@ describe('agent livreur (L439)', () => {
   it('R14 — agents/livreur.md rend une question sans rien lancer quand le sha, le lot, le dossier ou lead.ux manque au brief', () => {
     const c = section('Before any command')
     expect(c).toMatch(/launch neither verify, nor `raf done`, nor a push, nor deliver/)
-    for (const f of ['project folder', 'lot id', 'sha', '`lead.ux` value', 'base URL', 'report or captures']) {
-      expect(c, f).toContain(f)
-    }
-    expect(c).toContain('Question : brief incomplet : <champ> absent')
+    // la phrase exacte de la liste des champs : « sha » seul revient dix fois dans la section et ne peut pas faire échouer le test
+    expect(c).toContain('1. Complete brief: project folder, lot id, sha, `lead.ux` value. Otherwise `Question : brief incomplet : <champ> absent`.')
   })
 
   it('R14 — l\'URL de base est exigée au contrôle 4 (après git fetch origin main, quand le diff touche une page ou une API), pas au contrôle 1, par « Question : brief incomplet : URL de base absente »', () => {
@@ -288,6 +300,15 @@ describe('agent livreur (L439)', () => {
     expect(c.slice(lot, c.indexOf('3. Run')).includes('Question : <lot> déjà clos')).toBe(false)
     expect(c.slice(preuves)).toMatch(/Lot done and neither proof/)
     expect(c.slice(preuves)).toMatch(/lot being done does not change the choice of the message/)
+  })
+
+  it('R14 — lot done et aucune des deux preuves : la question dit ce qui est mesuré (ni dans origin/main ni au journal, push et livraison à faire), jamais « déjà livré »', () => {
+    const c = section('Before any command')
+    const preuves = c.slice(c.indexOf('7. The sha is not already delivered'))
+    expect(preuves).toMatch(/Lot done and neither proof: say what is measured, never « déjà livré »: `Question : <lot> clos mais sha <sha> ni dans origin\/main ni au journal : push et livraison restent à faire`/)
+    // « déjà clos ou sha déjà livré » n'est rendu que pour les deux preuves ensemble
+    expect(preuves.match(/Question : <lot> déjà clos ou sha <sha> déjà livré \(origin\/main et journal\)/g)).toHaveLength(1)
+    expect(preuves).toMatch(/Both proofs: `Question : <lot> déjà clos ou sha <sha> déjà livré \(origin\/main et journal\)`/)
   })
 
   it('R14 — agents/livreur.md refuse un sha déjà dans origin/main sans le journal sans relancer raf done ni deliver', () => {

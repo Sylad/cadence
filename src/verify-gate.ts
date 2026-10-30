@@ -71,7 +71,7 @@ export interface GateCtx {
   out: (line: string) => void;
   /** Dossiers où chercher l'état des vagues (`.cadence/runs`, L397) dont la porte peut être reprise au lieu d'être rejouée (défaut : aucun, la porte est toujours rejouée). */
   launchDirs?: string[];
-  /** Le plan du projet, relatif à la racine du dépôt (L444) : les commits qui ne changent que lui au-dessus du sha ne sont pas un autre contenu, la porte du sha dessous vaut. */
+  /** Le plan du projet, relatif à la racine du dépôt (L444) : les commits qui ne changent que lui au-dessus du sha ne sont pas un autre contenu, la porte du sha dessous vaut, sauf si `orchestrate.gate.readsPlan` déclare qu'un test le lit (L450). */
   planFile?: string;
   /** Délai de chaque commande (défaut : 30 min). */
   timeoutMs?: number;
@@ -154,7 +154,8 @@ async function playGate(ctx: GateCtx): Promise<number> {
   }
   let recorded: ReturnType<typeof recordedGate> = { reason: 'aucune porte de vague enregistrée pour ce sha' };
   try {
-    recorded = recordedGate(ctx.launchDirs ?? [], repo, sha, steps, ctx.planFile);
+    // Un test qui lit le plan (orchestrate.gate.readsPlan, L450) voit un autre contenu après un `raf done` : les commits de plan seuls ne sont pas traversés.
+    recorded = recordedGate(ctx.launchDirs ?? [], repo, sha, steps, config.gate ? undefined : ctx.planFile);
   } catch (e) {
     recorded = { reason: `état des vagues illisible (${gitFailure(e)})` };
   }
@@ -169,7 +170,7 @@ async function playGate(ctx: GateCtx): Promise<number> {
     out(`verify --gate ${short} : vert`);
     return 0;
   }
-  const replayReason = `verdict rejoué : ${recorded.reason}`;
+  const replayReason = `verdict rejoué : ${recorded.reason}${config.gate && ctx.planFile ? ' (orchestrate.gate.readsPlan : un test lit le plan, les commits de plan seuls ne reprennent pas le verdict d\'un sha dessous)' : ''}`;
   const obstacle = mainTreeObstacle(repo, sha);
   const mode = ctx.verify?.inPlace;
   if (mode === true && obstacle) {

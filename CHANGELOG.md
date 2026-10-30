@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `orchestrate.gate.readsPlan` (L450, [docs/deliver.md](docs/deliver.md)): a project whose tests read the plan declares it (`true`, or the list of those tests), and `cadence verify --gate` no longer takes over a wave's verdict under commits that change only the plan (L444) — it replays the gate. avatar-pandora's `plan-page.e2e` had gone red after a `raf done` without the head gate seeing it.
+
 ### Changed
 
 - `raf` no longer repeats the full title of a lot in the lead's context (L453, [docs/raf.md](docs/raf.md)): the post-commit hook line `raf: L12 (doing) …` cuts the title at 60 characters (id and state kept), and `--verbose` — on the hook and on `raf done`, `ux`, `review`, `note`, `move`, `public` — gives the line `id  state  full title` of the touched lot. The `plan non commité` reminder keeps its command.

@@ -313,6 +313,11 @@ export interface OrchestrateConfig {
    */
   worktreeDeps?: string[];
   /**
+   * `gate.readsPlan` (L450) : un test de la porte lit le plan du projet (`true`, ou la liste des chemins des tests qui le lisent, pour la trace). `cadence verify --gate` ne reprend alors plus le verdict
+   * d'une vague sous des commits qui ne changent que le plan (L444) : un `raf done` change ce que ce test lit, la porte est rejouée. Absente : ces commits sont traversés.
+   */
+  gate?: { readsPlan: true | string[] };
+  /**
    * Commande dédiée de l'étape accept (L173, spec etape-spec S5) : ne lance QUE les tests d'acceptation du lot (config du lanceur
    * `*.acceptation.config.*` qui lit `CADENCE_ACCEPTATION`, chemin de l'acceptation-<lot>.json du lot, aussi substitué à `{acceptation}`).
    * Une LISTE de commandes (L189, spec etape-spec-back B4) pour un projet à plusieurs lanceurs (front Vitest, back Jest) : chacune ne prend que les
@@ -414,7 +419,7 @@ export function readVerifyConfig(file: string): VerifyConfig {
 
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'testReplay', 'build', 'worktreeDeps', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'continue', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'testReplay', 'build', 'worktreeDeps', 'gate', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'continue', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
@@ -454,6 +459,15 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     const deps = o.worktreeDeps;
     if (!Array.isArray(deps) || !deps.length || deps.some((x) => typeof x !== 'string' || !x.trim() || isAbsolute(x) || x.split(/[\\/]/).includes('..'))) throw bad('worktreeDeps : liste de chemins relatifs au dépôt, sans « .. » (node_modules, .venv…)');
     config.worktreeDeps = deps.map((x: string) => x.trim().replace(/\/$/, ''));
+  }
+  if (o.gate != null) {
+    if (!isObject(o.gate)) throw bad('gate : objet attendu (gate: { readsPlan: true })');
+    for (const k of Object.keys(o.gate)) if (k !== 'readsPlan') throw bad(`gate.${k} inconnu (attendu : readsPlan)`);
+    const r = o.gate.readsPlan;
+    const msg = 'gate.readsPlan : true, false ou liste de chemins de tests relatifs au dépôt, sans « .. »';
+    if (r === true) config.gate = { readsPlan: true };
+    else if (Array.isArray(r) && r.length && r.every((x) => typeof x === 'string' && x.trim() && !isAbsolute(x) && !x.split(/[\\/]/).includes('..'))) config.gate = { readsPlan: r.map((x: string) => x.trim()) };
+    else if (r !== false) throw bad(msg);
   }
   if (o.maquette != null) {
     if (typeof o.maquette !== 'boolean') throw bad('maquette : true ou false attendu');

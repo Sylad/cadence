@@ -1283,7 +1283,16 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
             store.writeLot(c.lot);
             store.markAnswerTaken(e.id);
             wctx.log(`${e.lot} : réponse du lead prise, le lot repart`);
+            // Le lot avait fini de jouer à sa question (`settled`) : il rejoue, il tient de nouveau un créneau — sans cela `lanes()` le sous-compte et le registre annonce un créneau libre de trop (L433).
+            settled.delete(c);
             taken.push(c);
+          }
+        }
+        if (taken.length) {
+          try {
+            updateWaveRepos(home, process.pid, repos.filter((x) => !freed.has(x)), lanes());
+          } catch {
+            // registre illisible : le décompte reste celui du dernier écrit
           }
         }
         return taken;

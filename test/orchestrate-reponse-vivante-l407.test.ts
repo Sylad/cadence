@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { orchestrate, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { waveReadsAnswerQueue } from '../src/orchestrate/snapshot.js';
-import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
+import { cadenceHome, freeSlots, liveWaves, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import type { ClaudeFn } from '../src/orchestrate/launch.js';
 import { briefOf, claudeOut, commitFile, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
+import { fake as treeFake, inWorktree, lotOf, run as treeRun, setup as treeSetup, store as treeStore, until } from './orchestrate-worktree-harness.js';
 import { tempDir } from './helpers.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -242,5 +243,41 @@ describe('L407 — réponse sur une vague vivante', () => {
     const store = RunStore.last(parent)!;
     expect(store.readLot('a', 'L1')!.status).toBe('ready');
     expect(store.readLot('a', 'L2')!.status).toBe('ready');
+  });
+
+  it('R10 — en worktrees : le lot répondu rejoue dans son worktree PENDANT que l\'autre lot du même dépôt tourne, et le registre compte de nouveau son créneau (2 files, 0 libre sur 2)', async () => {
+    const { parent } = treeSetup([{ title: 'un' }, { title: 'deux' }]);
+    let asked = false;
+    let l2Done = false;
+    let seen: { lanes: number | undefined; free: number; tree: boolean; l2Running: boolean } | undefined;
+    const f = treeFake({
+      implement: async (cwd, brief) => {
+        const lot = lotOf(brief);
+        if (lot === 'L1' && !asked) {
+          asked = true;
+          return claudeOut(workReport({ questions: ['Quelle base ?'] }));
+        }
+        if (lot === 'L1') {
+          // Le rejeu de L1 : L2 joue encore, la vague tient deux créneaux et doit le dire au registre.
+          const w = liveWaves(cadenceHome()).find((x) => x.pid === process.pid)!;
+          seen = { lanes: w.lanes, free: freeSlots([w], 2), tree: inWorktree(cwd), l2Running: !l2Done };
+        } else {
+          const s = treeStore(parent);
+          await until(() => s.readLot('a', 'L1')?.status === 'question');
+          expect((await treeRun(parent, ['--answer', 'a:L1', 'main'], f, { slotPollMs: 20 })).code).toBe(0);
+          await until(() => !!seen);
+          l2Done = true;
+        }
+        return claudeOut(workReport({ commits: [commitFile(cwd, `${lot}.txt`, `feat(${lot}): travail`)] }));
+      },
+    });
+    const r = await treeRun(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f, { slotPollMs: 20 });
+    expect(r.code).toBe(0);
+    expect(seen).toEqual({ lanes: 2, free: 0, tree: true, l2Running: true });
+    expect(f.calls.filter((c) => c.lot === 'L1' && c.kind === 'implement').map((c) => inWorktree(c.cwd))).toEqual([true, true]); // la reprise retrouve le worktree (ensureTree)
+    const s = treeStore(parent);
+    expect(s.readLot('a', 'L1')!.status).toBe('ready');
+    expect(s.readLot('a', 'L2')!.status).toBe('ready');
+    expect(s.readWave()!.status).toBe('done');
   });
 });

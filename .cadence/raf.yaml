@@ -210,11 +210,12 @@ lots:
   - id: L415
     title: "Panneau des lots : par projet, dernière livraison (sha, âge, verte/rouge, depuis le journal de cadence deliver) et lots clos non livrés"
     public: Dernière livraison de chaque projet
-    status: todo
+    status: doing
     estimate: 0.5
     visible: true
     screen: component
     created: 2026-10-28
+    started: 2026-10-30
   - id: L418
     title: "Release : le script de publication lit le vrai code de sortie de la suite (pipefail, aucun | grep final qui masque un rouge) et joue le test whats-new « deux lignes » avant le tag — 28-10 : test rouge commité, publication npm de 1.22.0 échouée"
     status: todo

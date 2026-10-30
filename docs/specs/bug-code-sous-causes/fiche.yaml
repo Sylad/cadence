@@ -10,7 +10,7 @@ sujet:
     endpoints: []
     jobs: []
     hors_perimetre:
-      - "les sept causes de CAUSES, leur cache .cadence/corrections.json (format et lecture inchangés) et le ⚠ goulot de perf (L225 R19, src/perf.ts:702)"
+      - "les sept causes de CAUSES, leur cache .cadence/corrections.json (format et lecture inchangés) et le ⚠ goulot de perf (L225 R19, src/perf.ts:705)"
       - "les 37 passes sans revue (tests rouges) : elles restent comptées à part (sans-constat), jamais envoyées au modèle ; leur analyse est un autre lot"
       - "la mesure sur la fenêtre suivante : le protocole est écrit dans docs/mesures, les lignes « après » sont remplies par un lot de mesure ultérieur"
       - "le brief fix, la revue, et tout second mécanisme : un seul maillon reçoit un mécanisme"
@@ -50,7 +50,7 @@ cas:
       - { si: "le cache des sous-causes est illisible", alors: "un avertissement, la ligne est omise, le reste du tableau est inchangé", regles: [R7] }
       - { si: "aucune passe bug-code dans la fenêtre", alors: "pas de ligne, la sortie est celle d'avant", regles: [R9] }
       - { si: "--json", alors: "corrections.causes.current gagne bugCode, les clés existantes sont inchangées", regles: [R9] }
-    resultat: Le maillon à corriger est désigné par une règle, sur la fenêtre de perf.
+    resultat: "Le maillon à corriger est désigné par une règle, sur la fenêtre de perf (7 jours, src/perf.ts:53) : sous 10 passes bug-code sous-classées, « aucun » est le résultat courant, pas une erreur."
   - id: C3
     titre: Un seul mécanisme est posé au maillon dominant
     acteur: la session du lot L447 (implémentation)
@@ -60,9 +60,10 @@ cas:
     nominal:
       - La session lit le maillon dominant et la table des sous-causes.
       - Elle écrit docs/mesures/bug-code-2026-10-30.md avec le tableau mesuré, le maillon dominant et le protocole de mesure sur la fenêtre suivante (part conforme du premier coup, causes).
-      - Elle pose un mécanisme, et un seul, dans le fichier du maillon désigné (brief implement, auto-vérification avant rendu, porte locale ou fiche).
+      - "Elle pose un mécanisme, et un seul, à l'emplacement du maillon désigné (table de R2 : fichier et section), marqué « [L447] »."
     alternatives:
       - { si: "aucun maillon dominant (R2)", alors: "aucun mécanisme n'est posé, le document dit pourquoi et ce qu'il faut mesurer ensuite", regles: [R2, R8] }
+      - { si: "le maillon désigné est le brief implement, où le bloc « Limits and rules » de L428 est déjà posé et non mesuré", alors: "le mécanisme est une reformulation de ce bloc (une puce remplacée, pas de second bloc), marquée « [L447] », et le document fixe la date de départ de la fenêtre de mesure", regles: [R11] }
       - { si: "Ollama indisponible pour classer la fenêtre", alors: "le document le dit, le mécanisme n'est pas posé sur une lecture à la main", regles: [R8] }
     resultat: Un mécanisme posé sur une mesure, avec le protocole pour juger de son effet.
 
@@ -75,7 +76,7 @@ regles:
     tests: ["R1 — une passe bug-code est envoyée au modèle de sous-cause, une passe spec-floue ne l'est pas", "R1 — une passe sans constat n'est jamais envoyée", "R1 — une réponse hors de la liste des sept sous-causes est refusée"]
   - id: R2
     cas: [C2, C3]
-    enonce: "Chaque sous-cause relève d'un maillon : cas-limite et test-vide → brief implement ; affirmation-fausse et appelant-oublie → auto-vérification avant rendu ; test-casse → porte locale ; contrat-mal-lu → fiche ; autre → aucun. Le maillon dominant est celui dont les sous-causes pèsent le plus de passes ; il n'est désigné que si au moins 10 passes bug-code de la fenêtre sont sous-classées et que ses passes pèsent au moins 40 % d'elles. Sinon, ou à égalité de deux maillons en tête, il n'y en a aucun, et la ligne dit la raison."
+    enonce: "Chaque sous-cause relève d'un maillon : cas-limite et test-vide → brief implement ; affirmation-fausse et appelant-oublie → auto-vérification avant rendu ; test-casse → porte locale ; contrat-mal-lu → fiche ; autre → aucun. Chaque maillon a un emplacement unique (table de R8). Le maillon dominant est celui dont les sous-causes pèsent le plus de passes ; il n'est désigné que si au moins 10 passes bug-code de la fenêtre sont sous-classées et que ses passes pèsent au moins 40 % d'elles. Sinon, ou à égalité de deux maillons en tête, il n'y en a aucun, et la ligne dit la raison."
     statut: hypothese
     si_faux: "Seuls la table sous-cause → maillon et les seuils 10 et 40 % changent (constantes dans src/corrections.ts) ; aucune donnée stockée ne porte le maillon, il est recalculé à chaque lecture."
     tests: ["R2 — 6 cas-limite et 4 test-vide sur 10 : le maillon dominant est le brief implement", "R2 — 9 passes sous-classées seulement : aucun maillon dominant, raison donnée", "R2 — deux maillons à égalité en tête : aucun maillon dominant", "R2 — un maillon à 39 % : aucun maillon dominant, à 40 % : désigné", "R2 — la sous-cause autre ne désigne aucun maillon"]
@@ -83,13 +84,13 @@ regles:
     cas: [C1]
     enonce: "Une sous-cause n'entre au cache que sur une réponse valide du modèle. Une panne, un statut non 2xx ou une réponse hors liste laisse la passe hors cache ; elle est comptée « sans sous-cause » dans le rapport et reprise par la relance. Le classement des causes (corrections.json) n'est pas affecté."
     statut: sourcee
-    source: "comportement codé de classifyAll et ollamaClassifier : un échec n'entre pas au cache (src/corrections.ts:300 et suivants, « un échec n'entre pas au cache (une relance le reprend) »)"
+    source: "comportement codé de classifyAll et ollamaClassifier : un échec n'entre pas au cache (src/corrections.ts:346, « un échec n'entre pas au cache (une relance le reprend) »)"
     tests: ["R3 — Ollama répond 500 : la passe n'est pas au cache des sous-causes et est comptée sans sous-cause", "R3 — une relance classe la passe restée hors cache", "R3 — une panne de sous-cause laisse corrections.json inchangé"]
   - id: R4
     cas: [C1]
     enonce: "Un champ manual posé à la main dans le cache des sous-causes (une des sept valeurs) prime sur la réponse du modèle dans tous les tableaux, comme pour les causes."
     statut: sourcee
-    source: "règle codée pour les causes : Classification.manual prime, src/corrections.ts:30-35 et measure (c.manual ?? c.cause), docs/corrections.md"
+    source: "règle codée pour les causes : Classification.manual prime, src/corrections.ts:52 (champ manual) et :284 (measure c.manual ?? c.cause), docs/corrections.md"
     tests: ["R4 — manual contredit le modèle : le tableau compte la relecture", "R4 — manual hors liste : la commande refuse le fichier"]
   - id: R5
     cas: [C1]
@@ -111,10 +112,10 @@ regles:
     tests: ["R7 — cache absent : la ligne n/d et le code 0", "R7 — cache illisible : avertissement, ligne omise, reste du tableau identique, code 0", "R7 — perf n'écrit aucun fichier"]
   - id: R8
     cas: [C3]
-    enonce: "Le lot pose un seul mécanisme, au maillon désigné par la règle R2 sur la fenêtre 24→30-10, et le documente dans docs/mesures/bug-code-2026-10-30.md : tableau des sous-causes issu de la commande, maillon, texte du mécanisme, protocole sur deux fenêtres (part conforme du premier coup, causes). Aucun maillon dominant ou classement impossible : aucun mécanisme n'est posé et le document dit pourquoi. Les fichiers des autres maillons ne changent pas."
+    enonce: "Le lot pose un seul mécanisme, au maillon désigné par la règle R2 sur la fenêtre 24→30-10, à l'emplacement que la table suivante lui donne, et le documente dans docs/mesures/bug-code-2026-10-30.md : tableau des sous-causes issu de la commande, maillon, texte du mécanisme, protocole sur deux fenêtres (part conforme du premier coup, causes). Table maillon → emplacement : brief implement → templates/orchestrate/implement.md, section « Limits and rules, before the walkthrough » (bloc de L428) ; auto-vérification avant rendu → templates/orchestrate/implement.md, section « Self-check before handing back » (liste à puces) ; porte locale → src/testgate.ts (porte testGate, avant la revue) ; fiche → templates/orchestrate/spec-back.md. Le mécanisme porte le marqueur « [L447] » ; ce marqueur figure une seule fois dans l'ensemble des quatre emplacements, dans celui du maillon désigné, et nulle part ailleurs (y compris l'autre section de implement.md). Aucun maillon dominant ou classement impossible : aucun marqueur n'est posé et le document dit pourquoi."
     statut: sourcee
-    source: "titre du lot L447 : « désigner le maillon dominant, et y poser UN mécanisme … ; mesure : part conforme du premier coup et causes sur la fenêtre suivante »"
-    tests: ["R8 — le document cite le maillon et le fichier qui porte le mécanisme, et ce fichier contient le texte du mécanisme", "R8 — le document contient le tableau des sous-causes et le protocole de mesure", "R8 — les gabarits des autres maillons n'ont pas le texte du mécanisme"]
+    source: "titre du lot L447 : « désigner le maillon dominant, et y poser UN mécanisme … ; mesure : part conforme du premier coup et causes sur la fenêtre suivante » ; emplacements lus dans templates/orchestrate/implement.md:14 (Self-check) et :22 (Limits and rules, L428), src/testgate.ts (porte testGate, L287)"
+    tests: ["R8 — le document cite le maillon et l'emplacement (fichier et section) du mécanisme", "R8 — le marqueur [L447] est dans la section du maillon désigné, une seule fois", "R8 — le marqueur [L447] est absent des trois autres emplacements, dont l'autre section de implement.md", "R8 — le document contient le tableau des sous-causes et le protocole de mesure", "R8 — aucun maillon dominant : aucun marqueur [L447] dans les quatre emplacements"]
   - id: R9
     cas: [C1, C2]
     enonce: "Sans passe bug-code dans la fenêtre, la sortie texte de cadence corrections et de cadence perf est celle d'avant octet pour octet. Avec elles, seules s'ajoutent la section ou la ligne de sous-causes et, en --json, la clé bugCode (perf : corrections.causes.current.bugCode) ; aucune clé existante ne change de type ni de sens, et corrections.json garde son format."
@@ -128,6 +129,19 @@ regles:
     source: "ollamaClassifier existant : température 0, format JSON contraint, constats tronqués à 1500 caractères (src/corrections.ts, SYSTEM et ollamaClassifier)"
     tests: ["R10 — la requête a temperature 0 et un enum de sept sous-causes", "R10 — les constats sont tronqués à 1500 caractères"]
 
+  - id: R11
+    cas: [C3]
+    enonce: "Si le maillon désigné est le brief implement, le mécanisme remplace ou précise une puce du bloc « Limits and rules » posé par L428 (docs/mesures/bug-code-2026-10-29.md §3) au lieu d'y ajouter un second bloc ; le document de mesure note que les lignes « après » de L428 (§4) sont vides, et que la fenêtre suivante mesure L428 et L447 ensemble, depuis la date du commit du mécanisme. Le texte du bloc reste un seul bloc."
+    statut: hypothese
+    si_faux: "Si le lead préfère ne rien poser tant que L428 n'est pas mesuré, seul le contenu de implement.md change (un texte de gabarit, aucune donnée) ; R8 vaudrait alors « aucun marqueur »."
+    tests: ["R11 — maillon brief implement : la section Limits and rules garde un seul bloc et porte [L447] une fois", "R11 — le document de mesure date le départ de la fenêtre et dit que L428 et L447 sont mesurés ensemble"]
+  - id: R12
+    cas: [C1, C2]
+    enonce: "Une entrée du cache des sous-causes dont la clé n'est pas une passe bug-code de la fenêtre (cause changée à la main, re-classée, ou clé absente de la fenêtre) est ignorée : ni comptée, ni effacée, ni refusée."
+    statut: hypothese
+    si_faux: "Si ces entrées devaient être comptées ou purgées, seul le comptage change ; la purge serait une action sur le fichier et demanderait une décision."
+    tests: ["R12 — une entrée dont la passe est re-classée spec-floue n'est pas comptée", "R12 — une clé absente de la fenêtre est ignorée et le fichier reste intact"]
+
 contrats:
   - id: A1
     appel: commande cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--cache-sous-causes fichier] [--since date] [--until date] [--json]
@@ -136,14 +150,14 @@ contrats:
     erreurs:
       - { code: log error, message: "<fichier> : JSON illisible (un objet clé → classement est attendu), corrigez ou supprimez le fichier" }
       - { code: log error, message: "<fichier> : sous-cause inconnue pour <clé> : <valeur>" }
-    regles: [R1, R3, R4, R5, R9, R10]
+    regles: [R1, R3, R4, R5, R9, R10, R12]
   - id: A2
     appel: commande cadence perf [dossier] [--since date] [--json]
     entree: "options existantes, aucune nouvelle"
     sortie: "tableau existant, plus la ligne « bug de code (N passes sous-classées sur M) … maillon dominant » ; --json : corrections.causes.current.bugCode"
     erreurs:
       - { code: log warn, message: "perf : <fichier> illisible, sous-causes n/d" }
-    regles: [R2, R6, R7, R9]
+    regles: [R2, R6, R7, R9, R12]
   - id: A3
     appel: commande cadence corrections (cache des sous-causes illisible)
     entree: "un fichier corrections-sous-causes.json qui n'est pas un objet JSON, ou porte une sous-cause inconnue"

@@ -59,7 +59,7 @@ describe('R8 — un seul mécanisme, au maillon désigné', () => {
 
   it('R8 — la ligne « Avant » porte la part conforme du premier coup relevée le 30-10', () => {
     const avant = /^\| Avant : .*$/m.exec(mesure)![0];
-    expect(avant).toMatch(/\| 56 % \|/);
+    expect(avant).toMatch(/\| 56 % \(/);
     expect(avant).not.toContain('à relever');
   });
 

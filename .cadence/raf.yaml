@@ -405,6 +405,7 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-30
+    goal: "Les tests test/hud-cycle, test/hud-deliveries et test/hud-depense-l414 (et toute la suite npm test / prepublishOnly) passent dans un git clone neuf où plugins/cadence-hud/.claude-plugin/types n'existe pas (cas de la CI publish.yml) : soit ces tests ne dépendent plus de ce fichier généré, soit le prepublishOnly / la CI le génère avant les tests — au choix motivé ; preuve : la suite rejouée dans un git clone propre (sans fichiers non suivis) est verte. La relance de la publication, le tag et la release GitHub ne sont PAS de ce lot (le lead les fait après) ; aucune session ne pousse."
   - id: L446
     title: "Passage en clone propre avant le tag : cadence release (ou tests.yml sur push de main) rejoue la porte dans un git clone neuf, sans fichiers non suivis — la 1.25.0 a cassé à la publication sur 3 tests hud-* qui dépendaient de plugins/cadence-hud/.claude-plugin/types, présent dans tous nos arbres locaux et copies de porte, absent de la CI ; tests.yml ne tourne plus sur main depuis le 24-10"
     status: todo

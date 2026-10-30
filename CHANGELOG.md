@@ -83,7 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Fixed
 
 - `cadence session context` read `lead.contextThreshold` in the `cadence.yaml` of the current folder only: run from a sub-project it took the default 150000 and said « atteint » wrongly (39 % read « atteint » from `avatar-pandora`, « sous le seuil » from the parent folder). It now goes up to the lead's folder (the first parent whose `cadence.yaml` carries `lead:` or `priority:`) and, when it read a parent, names the file in the verdict line (L457, `docs/session.md`).
-- `cadence orchestrate --answer` is accepted while another lot of the wave is still running (L407, `docs/orchestrate.md`): the answer goes into the wave's queue and the live wave replays the lot between two steps, instead of waiting for the end of the wave (a lot stayed blocked about 15 minutes on 28-10). `--resume --wave <wave> --answer …` on a running wave does the same instead of being refused.
+- `cadence orchestrate --answer` is accepted while another lot of the wave is still running (L407, `docs/orchestrate.md`): the answer goes into the wave's queue and the live wave replays the lot between two steps, instead of waiting for the end of the wave (a lot stayed blocked about 15 minutes on 28-10). `--resume --wave <wave> --answer …` on a running wave does the same instead of being refused. The lots panel (`/hud lots`) shows the same `--answer` command under a question of a live wave, no longer « réponse possible à la fin de la vague » (L407).
 
 ## [1.29.0] - 2026-10-30
 

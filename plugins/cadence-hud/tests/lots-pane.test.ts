@@ -1137,7 +1137,7 @@ test('R23 — L410 : le contrôle « même parent » porte sur la ligne visée �
 
 const ASKING: Wave = { ...WAVE, lots: [{ ...WAVE.lots[0]!, lot: 'L80', status: 'question', questions: ['Quel format ?'] }] }
 
-test('L412 R13 — une question de session s’affiche en tête du panneau, avant l’arbre ; sa vague vit : « réponse possible à la fin de la vague » plutôt qu’une commande --answer qu’orchestrate refuserait', async ($, on) => {
+test('L412 R13 — une question de session s’affiche en tête du panneau, avant l’arbre ; sa vague vit : la commande --answer (orchestrate la dépose dans la file de la vague, L407) y est, pas d’attente de la fin de la vague', async ($, on) => {
   const s = await session($, on, { waves: [ASKING] })
   await s.advance(5_000)
   await s.hud('lots')
@@ -1145,9 +1145,9 @@ test('L412 R13 — une question de session s’affiche en tête du panneau, avan
   const at = (re: RegExp) => texts.findIndex(t => re.test(t))
   expect(at(/Ce qui attend une décision \(1\)/)).toBeGreaterThan(-1)
   expect(at(/\? ol:L80 .*Quel format \?/)).toBeGreaterThan(at(/Ce qui attend/))
-  expect(texts[at(/\? ol:L80/) + 1]).toBe('   réponse possible à la fin de la vague')
-  expect(at(/--answer/)).toBe(-1)
-  expect(at(/L401/)).toBeGreaterThan(at(/réponse possible/)) // l'arbre vient après le bloc
+  expect(texts.join('\n')).not.toMatch(/fin de la vague/)
+  expect(texts[at(/\? ol:L80/) + 1]).toMatch(/--resume --wave .* --answer ol:L80/)
+  expect(at(/L401/)).toBeGreaterThan(at(/--answer ol:L80/)) // l'arbre vient après le bloc
 })
 
 test('L412 R14 — rien à décider : le bloc n’apparaît pas', async ($, on) => {

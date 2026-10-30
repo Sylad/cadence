@@ -11,17 +11,19 @@ test('L412 R1 — une question de session d’une vague finie : le texte court e
   expect(d).toEqual([{ kind: 'question', project: 'ol', lot: 'L5', text: 'Quel format ? / Quelle date ?', command: 'cd /p && cadence orchestrate --resume --wave w1 --answer ol:L5 "…"' }])
 })
 
-test('L412 R28 — une question d’une vague VIVANTE ne propose pas `--resume --answer` (orchestrate la refuse : « la vague tourne encore ») : la question s’affiche avec « réponse possible à la fin de la vague »', () => {
+test('L412 R28 — une question d’une vague VIVANTE porte la même commande `--resume --wave --answer` que celle d’une vague finie (orchestrate la dépose dans la file de la vague vivante, L407) : pas de note d’attente', () => {
+  const cmd = 'cd /p && cadence orchestrate --resume --wave w1 --answer ol:L5 "…"'
   const d = decisionsOf([wave([wlot('L5', 'question', { questions: ['Quel format ?'] })])], [])
-  expect(d).toEqual([{ kind: 'question', project: 'ol', lot: 'L5', text: 'Quel format ?', command: null }])
-  const { lines } = buildDecisions(d, 80, 10)
+  expect(d).toEqual([{ kind: 'question', project: 'ol', lot: 'L5', text: 'Quel format ?', command: cmd }])
+  const { lines } = buildDecisions(d, 120, 10)
   expect(lines.map(l => [l.text, l.tone])).toEqual([
     ['Ce qui attend une décision (1)', 'title'],
     ['? ol:L5  Quel format ?', 'text'],
-    ['   réponse possible à la fin de la vague', 'subtle'],
+    [`   ${cmd}`, 'subtle'],
   ])
-  // la même vague finie : la commande revient
-  expect(decisionsOf([wave([wlot('L5', 'question', { questions: ['Quel format ?'] })], { live: false })], [])[0]).toMatchObject({ command: 'cd /p && cadence orchestrate --resume --wave w1 --answer ol:L5 "…"' })
+  expect(lines.map(l => l.text).join('\n')).not.toMatch(/fin de la vague/)
+  // la même vague finie : la même commande
+  expect(decisionsOf([wave([wlot('L5', 'question', { questions: ['Quel format ?'] })], { live: false })], [])[0]).toMatchObject({ command: cmd })
 })
 
 test('L412 R2 — un lot rendu au lead : la cause en une ligne (première ligne de l’issue), à défaut le statut', () => {

@@ -360,7 +360,7 @@ lots:
     created: 2026-10-29
   - id: L439
     title: "Livreur délégué : pour un lot prêt, une sous-session fait la chaîne lead (verify --gate au sha, verdict UX sur captures selon lead.ux, raf done, commit du plan et des fichiers de plan.onWrite, push du sha, deliver, qa-reviewer) et rend UNE ligne au lead (« L84 livré 3d6edf4, QA 2/2 ») ou une question ; livraisons toujours une à une — le contexte du lead a atteint 460k le 29-10 surtout par ces chaînes (~10 appels par lot) (demande de Sylvain)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-29
     started: 2026-10-29
@@ -382,6 +382,7 @@ lots:
       - { date: 2026-10-30, text: "Hypothèses (fiche livreur-delegue) — R8 : Le livreur rend une seule ligne « <lot> livré <sha court>, QA à lancer <url> » où <url> est l'URL de base de l'app livrée que le brief porte (le lead la lit da… ; si faux : Si le lead veut toujours l'URL, la ligne change de fin ; si le critère doit être décidé par le lead, le brief porterait un drapeau « QA oui/non » au lieu du di…" }
       - { date: 2026-10-30, text: "Hypothèses (fiche livreur-delegue) — R13 : Une question rendue commence par « Question : », tient en quelques lignes (étape, sha, cause, commande à relancer) et laisse le dépôt dans l'état de l'étape at… ; si faux : Si le lead veut un rapport structuré, le format de la sortie change ; le lead lit la même information, aucune donnée n'est en jeu" }
     review: { date: 2026-10-30, verdict: "conforme : revue Opus neuve du 30-10 (5 points des revues précédentes corrigés : R7 par raf show visible/ux, décision QA avant le push, test R14 serré, message unique, « déjà livré » selon la mesure) ; son majeur (entrée CHANGELOG sous [1.25.1] après la release) corrigé par rebase sur main + 5de99a1, titre R7 aligné (23cb6e7), relus par le lead ; suite complète 4549/4549 ; mineur gardé : deux interdits de agents/livreur.md:69 (raf note, git checkout) absents de la fiche R12", commit: 23cb6e726967d7244cbfb7912e1f41fc3dc80ace }
+    finished: 2026-10-30
   - id: L440
     title: "Comptes rendus courts des agents qa-reviewer et code-reviewer appelés par le lead : 5 lignes (verdict, bloquants, suites) au lead, rapport complet écrit dans un fichier lu à la demande — une vingtaine de rapports de 3 à 5k ont gonflé le lead le 29-10 (demande de Sylvain)"
     status: done

@@ -146,6 +146,19 @@ regles:
     statut: hypothese
     si_faux: "Si le dépôt d'un autre lot de la vague était surveillé, le constat serait faux dès qu'un lot légitime avance sa branche (docs/orchestrate.md:563, worktrees) ; en contrepartie, un commit fautif d'une session sur la branche principale du dépôt d'un autre projet de la même vague n'est pas vu, à couvrir par un lot à part."
     tests: ["R14 — deux lots de projets frères dans la même vague, l'un avance sa branche principale : aucun constat sur l'autre", "R14 — dépôt absent de la vague : surveillé"]
+    amendement: "L456, décision du lead 2026-10-30 : R14 ne couvre que la même vague ; les lots d'une autre vague vivante sont l'objet de R17, les commits du lead celui de R18."
+  - id: R17
+    cas: [C1]
+    enonce: "Les dépôts des lots d'une AUTRE vague vivante lancée du même dossier (vague `running` dont le processus vit) ne sont pas surveillés : leur branche principale bouge par leur propre vague."
+    statut: sourcee
+    source: "décision du lead, 2026-10-30, vague 2026-10-30-1755-cad (amende R14)"
+    tests: ["R17 — une autre vague en cours du même dossier : ses lots ne sont pas surveillés", "R17 — une autre vague terminée : ses lots sont surveillés"]
+  - id: R18
+    cas: [C1]
+    enonce: "Les commits du lead sont tolérés sur la branche principale d'un dépôt tiers : un commit dont le sujet commence par « plan: » et qui ne change que le fichier du plan (même chemin relatif que celui du lot). Tout autre commit sur cette branche reste un constat, y compris un commit « plan: » qui touche aussi un autre fichier."
+    statut: sourcee
+    source: "décision du lead, 2026-10-30, vague 2026-10-30-1755-cad (amende R14)"
+    tests: ["R18 — commit « plan: » ne changeant que le fichier du plan : pas d'incident", "R18 — commit « plan: » qui touche aussi un autre fichier : constat", "R18 — le commit du lead à côté de celui de la session : le constat ne nomme que le second"]
   - id: R15
     cas: [C1]
     enonce: "Sont ignorés : un enfant dont .git est un fichier (worktree lié), un lien symbolique qui mène à un dépôt déjà compté, et le dossier parent lui-même s'il est un dépôt git ; chaque dépôt n'est compté qu'une fois (chemin réel)."
@@ -167,7 +180,7 @@ contrats:
       - { code: log error, message: "incident : commit sur la branche principale d'un autre dépôt (<dépôt>, <branche>) pendant <projet>:<lot> (<étape>) : <sha court> <sujet> ; la voie est la branche wip/<projet>-<lot>" }
       - { code: log warn, message: "dépôt tiers <dépôt> ignoré : lecture impossible (<cause git>)" }
       - { code: log warn, message: "<étape> : la session a laissé le dépôt tiers <dépôt> sur la branche <wip/<projet>-<lot>> ; elle n'est pas remise" }
-    regles: [R2, R3, R4, R5, R6, R7, R8, R9, R11, R13, R14, R15, R16]
+    regles: [R2, R3, R4, R5, R6, R7, R8, R9, R11, R13, R14, R15, R16, R17, R18]
   - id: A2
     appel: commande cadence orchestrate
     entree: "brief d'une session d'écriture"

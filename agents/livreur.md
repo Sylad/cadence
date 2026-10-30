@@ -17,7 +17,7 @@ You launch no agent and ask the human nothing: when something is ambiguous, you 
 Check the brief and the sha first. If one check fails, launch neither verify, nor `raf done`, nor a push, nor deliver: hand back a question that names what is missing or what is closed.
 
 1. Complete brief: project folder, lot id, sha, `lead.ux` value, base URL for a delivery that needs a QA pass, report or captures for a visible lot with `lead.ux: lead`. Otherwise `Question : brief incomplet : <champ> absent`.
-2. The lot (`raf show <lot>`): a lot unknown to the plan gives `Question : <lot> inconnu du plan`. A lot already done is not answered yet: `raf done` comes before the push and the deliver, so a done lot may be a delivery that stopped after it; check 6 weighs both proofs first.
+2. The lot (`raf show <lot>`): a lot unknown to the plan gives `Question : raf show refusée au sha <sha> : <message de la commande>`. A lot already done is not answered yet: `raf done` comes before the push and the deliver, so a done lot may be a delivery that stopped after it; check 6 weighs both proofs first.
 3. Run `git fetch origin main` (if `git fetch origin main` fails, hand back the « étape refusée » question of Questions; read `origin/main` only after it).
 4. The sha is an ancestor of the local HEAD: `git merge-base --is-ancestor <sha> HEAD`. Otherwise `Question : sha <sha> non livrable : pas un ancêtre de HEAD`.
 5. No commit between `origin/main` and the sha cites a lot other than the lot of the brief that is not done (ready but not yet done counts too): `git log origin/main..<sha>` and `raf show` of each lot cited. A commit that cites no lot, or the plan alone, passes. Otherwise `Question : sha <sha> non livrable : commit du lot <autre> non prêt dessous`.

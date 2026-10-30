@@ -198,7 +198,8 @@ describe('agent livreur (L439)', () => {
 
   it('R14 — agents/livreur.md rend une question quand le lot est inconnu ou déjà done', () => {
     const c = section('Before any command')
-    expect(c).toMatch(/lot unknown to the plan/)
+    expect(c).toContain('a lot unknown to the plan gives `Question : raf show refusée au sha <sha> : <message de la commande>`')
+    expect(c).not.toContain('inconnu du plan')
     expect(c).toContain('Question : <lot> déjà clos ou sha <sha> déjà livré (origin/main et journal)')
   })
 

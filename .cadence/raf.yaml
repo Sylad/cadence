@@ -551,6 +551,9 @@ lots:
     spec: true
     created: 2026-10-30
     started: 2026-10-30
+    notes:
+      - { date: 2026-10-30, text: "Revue de la fiche — mineur : docs/specs/session-sans-commit-sur-depot-tiers/fiche.yaml:72 — R3 et R8 : « sourcee » avec des choix (« enfant direct », « ignoré sans bruit ») que la source ne donne pas. La fiche l'avoue dans la source. R8 est déjà une hypothèse (si_faux fourni, non coûteux à défaire). R3 devrait se limiter à ce que la demande dit et laisser le choix à R8. Le test « ignoré, vague continue » de R3 appartient à R8." }
+      - { date: 2026-10-30, text: "Revue de la fiche — mineur : docs/specs/session-sans-commit-sur-depot-tiers/fiche.yaml:97 — A2 liste les règles [R1, R5, R10], mais R5 est un contrôle d'après-session (A1), pas un contenu de brief. Le contrat A1 omet R5 et R1. Le test R7 (« sha inchangé après le constat ») est vague : il peut passer sans défaire le commit tout simplement parce que le code ne l'a pas fait, donc il n'échoue sur aucune régression plausible tant qu'aucun reset n'existe." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

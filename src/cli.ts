@@ -72,7 +72,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf ux <id> "verdict" enregistre la revue d'ergonomie du lot (agent ux-reviewer)
   raf review enable     revue de code obligatoire avant « done » pour les lots qui ont des commits
   raf review <id> "verdict" enregistre la revue de code du lot (agent code-reviewer)
-  raf show <id> [--notes]   le lot : statut, dates, after, titre public, notes datées, commits comptés ; --notes : les notes seules
+  raf show <id> [--notes]   le lot : statut, dates, after, titre public, visible et verdict ux (lot visible), notes datées, commits comptés ; --notes : les notes seules
   raf commits <id>      les commits du lot que compte la porte de revue de code, du plus ancien au plus récent
   raf now               ce qui est en cours, la suite, les derniers terminés
   raf list [--status todo|doing|done|dropped]
@@ -568,7 +568,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (dates.length) io.out(dates.map(([k, d]) => `${k} : ${d}`).join('  '));
       if (lot.after.length) io.out(`after : ${lot.after.join(', ')}`);
       if (lot.public) io.out(`public : ${lot.public}`);
+      // L439 : le livreur lit ici si le lot est visible et s'il porte un verdict UX ; deux lignes stables, absentes d'un lot non visible.
+      if (lot.visible) io.out('visible : oui');
       if (lot.screen) io.out(`screen : ${lot.screen}`);
+      if (lot.visible) io.out(lot.ux ? `ux : ${lot.ux.verdict}` : 'ux : absent');
       if (lot.spec) io.out('spec : true');
       if (lot.uses) io.out(`uses : ${lot.uses.join(', ')}`);
       if (lot.docsOk) io.out(`docs-ok : ${lot.docsOk.date} — ${lot.docsOk.reason}`);

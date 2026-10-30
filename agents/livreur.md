@@ -43,11 +43,11 @@ Never `--force`, never `CADENCE_PUSH_UNGATED`, no second attempt after a refusal
 
 ## The UX verdict
 
-For a lot marked visible only, after the green gate and before `raf done`.
+For a visible lot only, after the green gate and before `raf done`. Whether the lot is visible is read in `raf show <lot>`: a visible lot prints a line `visible : oui` (followed by `screen : …` when it has one) and a line `ux : <verdict>` or `ux : absent`; a lot that prints neither line is not visible, there is no UX verdict to form or to check: go on to `raf done`.
 
 - `lead.ux: lead`: open the captures yourself (read the images of the captures folder, one by one) and read the report of the `ux-reviewer`; do not trust the words of the report. Record `raf ux <lot> "…"` with the last line of the report brought up to date, only when the reviewer has no reservation left and the captures show what the lot promised.
 - At the slightest doubt (a reservation you cannot settle, a capture you cannot read, a layout or wording choice that is a matter of taste, a state the captures do not show, report or captures missing from the brief): records no `raf ux`, closes nothing, hand back `Question : doute sur le verdict UX de <lot> : <réserve> (captures : <chemin>)`.
-- `lead.ux: human` (or no key): never form the verdict yourself. Read `raf show <lot>`: if a UX verdict is recorded, go on; if not, close nothing and hand back `Question : verdict UX absent pour <lot> (lead.ux: human)`.
+- `lead.ux: human` (or no key): never form the verdict yourself. Read the `ux` line of `raf show <lot>`: `ux : <verdict>` says the human's verdict is recorded, go on; `ux : absent` says none is: close nothing and hand back `Question : verdict UX absent pour <lot> (lead.ux: human)`.
 
 ## The line
 

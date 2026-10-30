@@ -405,6 +405,27 @@ describe('raf show', () => {
     expect(r.out).not.toContain('terminé');
   });
 
+  it('L439 — un lot visible affiche « visible : oui » (screen dessous) et « ux : absent », puis « ux : <verdict> » après raf ux ; un lot non visible n\'affiche ni l\'un ni l\'autre', () => {
+    const dir = gitRepo();
+    raf(dir, 'init', '--project', 'demo');
+    raf(dir, 'add', 'Caché');
+    raf(dir, 'add', 'Écran', '--visible', '--screen', 'page');
+    const cache = raf(dir, 'show', 'L1').out;
+    expect(cache).not.toContain('visible :');
+    expect(cache).not.toContain('ux :');
+    const avant = raf(dir, 'show', 'L2');
+    expect(avant.code).toBe(0);
+    const lignes = avant.out.split('\n');
+    expect(lignes.indexOf('visible : oui')).toBeGreaterThan(0);
+    expect(lignes.indexOf('screen : page')).toBe(lignes.indexOf('visible : oui') + 1);
+    expect(lignes).toContain('ux : absent');
+    expect(raf(dir, 'ux', 'L2', 'conforme à la maquette, sans réserve').code).toBe(0);
+    const apres = raf(dir, 'show', 'L2').out.split('\n');
+    expect(apres).toContain('ux : conforme à la maquette, sans réserve');
+    expect(apres).not.toContain('ux : absent');
+    expect(apres).toContain('visible : oui');
+  });
+
   it('refuse un lot inconnu et une sous-tâche', () => {
     const dir = planAvecLot();
     expect(raf(dir, 'show', 'L9').err).toContain('lot inconnu');

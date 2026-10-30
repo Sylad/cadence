@@ -3,7 +3,7 @@ sujet:
   titre: "Livreur délégué : un agent fait la chaîne de livraison d'un lot prêt et rend une ligne au lead"
   lot: L439
   perimetre:
-    modules: [agents/livreur.md, skills/lead/SKILL.md, docs/lead.md, docs/skills.md, README.md, CHANGELOG.md]
+    modules: [agents/livreur.md, skills/lead/SKILL.md, "src/cli.ts (raf show : lignes visible et ux)", docs/raf.md, docs/lead.md, docs/skills.md, README.md, CHANGELOG.md]
     endpoints: []
     jobs: []
     hors_perimetre:
@@ -58,10 +58,10 @@ cas:
     preconditions:
       - "le lead a transmis le verdict UX de l'humain ou ne l'a pas encore"
     nominal:
-      - "Après la porte verte, le livreur lit le lot (raf show) pour savoir si un verdict UX est déjà enregistré."
-      - "Le verdict est déjà là : il poursuit comme en C1."
+      - "Après la porte verte, le livreur lit raf show <lot> : la ligne « visible : oui » (suivie de « screen : … » s'il y en a un) dit que le lot est visible, la ligne « ux : <verdict> » ou « ux : absent » dit si un verdict UX est enregistré ; un lot qui n'imprime aucune de ces lignes n'est pas visible et n'a pas de verdict à attendre."
+      - "La ligne est « ux : <verdict> » : il poursuit comme en C1."
     alternatives:
-      - { si: "aucun verdict UX n'est enregistré", alors: "il ne le forme jamais lui-même, ne clôt rien et rend une question", regles: [R7] }
+      - { si: "la ligne est « ux : absent »", alors: "il ne forme jamais le verdict lui-même, ne clôt rien et rend une question", regles: [R7] }
     resultat: "Aucune livraison d'un lot visible sans le verdict de l'humain."
   - id: C4
     titre: "Le lead enchaîne les livreurs et lance le qa-reviewer"
@@ -118,10 +118,10 @@ regles:
     tests: ["R6 — agents/livreur.md rend une question sans raf ux quand le brief n'a pas les captures"]
   - id: R7
     cas: [C3]
-    enonce: "Avec lead.ux: human (ou sans clé), le livreur ne forme jamais le verdict UX : si le lot visible n'a pas de verdict enregistré, il rend une question et ne clôt rien ; s'il en a un, il poursuit."
-    statut: hypothese
-    si_faux: "Si le lead préfère passer le verdict de l'humain dans le brief au lieu de l'écrire avant, seule la façon de le détecter change (brief au lieu de raf show) ; aucune donnée n'est en jeu."
-    tests: ["R7 — agents/livreur.md interdit raf ux quand lead.ux n'est pas lead", "R7 — agents/livreur.md lit raf show pour savoir si un verdict UX existe"]
+    enonce: "Avec lead.ux: human (ou sans clé), le livreur ne forme jamais le verdict UX : il lit la ligne ux de raf show <lot>, imprimée pour un lot visible (celui qui imprime « visible : oui ») ; « ux : absent » : il rend une question et ne clôt rien ; « ux : <verdict> » : il poursuit. raf show imprime ces deux lignes pour un lot visible et aucune pour un autre (src/cli.ts, case show)."
+    statut: sourcee
+    source: "arbitrage du lead du 30-10 (reprise de L439 : raf show n'imprimait ni visible ni ux, le livreur ne pouvait pas les lire ; décision : deux lignes stables « visible : oui » et « ux : <verdict> | absent ») ; src/cli.ts case 'show' ; docs/raf.md (raf show)"
+    tests: ["R7 — agents/livreur.md interdit raf ux quand lead.ux n'est pas lead", "R7 — agents/livreur.md lit les lignes « visible : oui » et « ux : <verdict> | absent » de raf show pour savoir si le lot est visible et si un verdict UX existe", "R7 — les lignes que l'agent lit sont celles que raf show imprime (src/cli.ts)", "test/cli.test.ts — L439 : raf show imprime « visible : oui », « screen », « ux : absent » puis « ux : <verdict> » après raf ux, et rien de tel pour un lot non visible"]
   - id: R8
     cas: [C1]
     enonce: "Le livreur rend une seule ligne « <lot> livré <sha court>, QA à lancer <url> » où <url> est l'URL de base de l'app livrée que le brief porte (le lead la lit dans la config deliver de cadence.yaml, docs/deliver.md) : le livreur ne la déduit ni ne l'invente, et un brief sans URL pour une livraison qui change une page ou une API est une question (R14). Il juge « la livraison ne change ni page ni API » sur l'ensemble des commits que la livraison pousse et déploie (git diff --name-only origin/main..<sha>, et non le seul dernier commit : un commit antérieur du lot peut changer une page ou une API) : seuls des docs, le plan ou des tests sur tout l'intervalle, comme skills/lead/SKILL.md:244-248 ; dès qu'un fichier de l'intervalle touche une page ou une API, la ligne porte l'URL ; alors la ligne finit par « pas de QA à lancer » au lieu de l'URL."
@@ -185,3 +185,4 @@ donnees:
   - { id: D1, objet: "plan du projet (.cadence/raf.yaml) : status done et finished posés par raf done, clé ux posée par raf ux", existant: true, modification: aucune, note: "écrit par les commandes existantes comme avant, aucun format ne change" }
   - { id: D2, objet: "journal de livraison deliveries.log (<git common dir>/cadence/, lignes « jour sha »)", existant: true, modification: aucune, note: "lu par le livreur pour décider « déjà livré » (R14), écrit par cadence deliver comme avant" }
   - { id: D3, objet: "agents/livreur.md (nouvel agent installé comme les autres par cadence install)", existant: false, modification: ajout, note: "fichier de consignes, aucune donnée de projet" }
+  - { id: D4, objet: "sortie de raf show <lot> : lignes « visible : oui », « screen : … » et « ux : <verdict> | absent »", existant: true, modification: ajout, note: "deux lignes ajoutées pour un lot visible (src/cli.ts, case show), rien pour un lot non visible ; aucun champ du plan ne change, R7 les lit" }

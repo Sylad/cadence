@@ -6,7 +6,7 @@ import { basename, delimiter, dirname, isAbsolute, join, posix, relative, resolv
 import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
-import { readDocsConfig, readPlanConfig, type OrchestrateConfig } from '../config.js';
+import { planLoader, readDocsConfig, readPlanConfig, type OrchestrateConfig } from '../config.js';
 import { PLAN_ACTIONS, leadAnswerMessage, planCommitMessage } from '../plan-commit.js';
 import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
@@ -2294,14 +2294,39 @@ const noCommitNote = (l: LotState): string => (l.warnings.some((w) => w.startsWi
 /** Revue de code qui clôt le cycle : complète, ou courte une fois la passe des mineurs jouée. */
 const codeReview = (l: LotState): SessionKind => (l.minorPass ? 'review-small' : 'review');
 
+/** Note d'un lot que sa session a rendu `visible` après le lancement de la vague (L454) : son verdict UX n'existe pas encore, le lead le sait. */
+const VISIBLE_ADDED = 'visible ajouté en cours de vague, étape UX à jouer';
+
+/**
+ * Relit `visible` dans le plan du worktree après une session d'écriture (L454) : un lot que sa session a rendu visible (warhammer L37 et L43,
+ * 30-10) est lancé non visible, et sortait « prêt » sans étape UX. Il le devient dans l'état du lot, donc l'UX est jouée (`uxAfterReview`, ou la
+ * revue courte d'un petit lot) ; sans application déclarée, il est rendu avec la note. Un plan illisible, ou un lot qui n'est plus visible
+ * dans le plan, laisse l'état tel quel (retirer `visible` en cours de vague n'est pas traité).
+ */
+function addedVisible(c: LotCtx): void {
+  const l = c.lot;
+  if (l.visible) return;
+  let now: boolean;
+  try {
+    now = (wd(c) === l.repo ? c.loadPlan() : planLoader(wd(c))()).lot(l.lot).visible;
+  } catch {
+    return;
+  }
+  if (!now) return;
+  l.visible = true;
+  if (!c.config.ux) l.uxNote = `${VISIBLE_ADDED} (aucune application déclarée : cadence.yaml orchestrate.ux)`;
+  c.wave.log(`${lotKey(l.project, l.lot)} · ${VISIBLE_ADDED}`);
+}
+
 /**
  * Première étape après un travail d'écriture (L221) : la revue de code, jamais l'UX. La revue UX d'un lot visible est jouée une seule fois,
  * après la dernière revue de code conforme (`uxAfterReview`), sur le code qui sera livré.
  */
 function firstReview(c: LotCtx): SessionKind {
   const l = c.lot;
+  addedVisible(c);
   if (l.small) return l.visible || l.minorPass ? 'review-small' : 'review'; // passe unique code + ergonomie ; sans écran, une revue de code
-  if (l.visible && !c.config.ux) l.uxNote = 'UX à faire par le lead (aucune application déclarée : cadence.yaml orchestrate.ux)';
+  if (l.visible && !c.config.ux && !l.uxNote?.startsWith(VISIBLE_ADDED)) l.uxNote = 'UX à faire par le lead (aucune application déclarée : cadence.yaml orchestrate.ux)';
   return codeReview(l);
 }
 

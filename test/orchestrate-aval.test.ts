@@ -139,7 +139,7 @@ describe('cycle : un lot avec fiche', () => {
   });
 
   it('un petit lot sans écran (ni fiche) : la revue garde ses consignes d\'avant, sans règle → test → vert ni conformité UX', async () => {
-    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    const h = harness({ lots: [{ title: 'Un petit lot sans écran' }], script: { implement: [impl], review: [ok] } }); // non visible dans le plan aussi (L454 : le plan est relu après la session)
     ecrit(h.repo);
     await runLot(h.lot('L1', { visible: false, small: true }, {}));
     expect(brief(h, 'review')).not.toContain('rule → test → green');

@@ -83,6 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Added
 
 - `orchestrate.gate.readsPlan` (L450, [docs/deliver.md](docs/deliver.md)): a project whose tests read the plan declares it (`true`, or the list of those tests), and `cadence verify --gate` no longer takes over a wave's verdict under commits that change only the plan (L444) — it replays the gate. avatar-pandora's `plan-page.e2e` had gone red after a `raf done` without the head gate seeing it.
+- A lot made `visible` by its own session during the wave no longer comes out « ready » with no UX step (L454, [docs/orchestrate.md](docs/orchestrate.md)): after each writing session the orchestrator re-reads `visible` in the plan of the lot's worktree (warhammer L37 and L43, 30-10) and plays the UX step like for any visible lot; without `orchestrate.ux` it hands the lot back with the note « visible ajouté en cours de vague, étape UX à jouer ».
 
 ### Changed
 

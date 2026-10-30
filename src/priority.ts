@@ -52,6 +52,11 @@ export function movePriority(parent: string, project: string, place: 'before' | 
   if (isSeq(value.contents)) {
     value.contents.items = list.map((n) => kept.get(n) ?? value.createNode(n));
     value.contents.flow = isSeq(old) && old.flow === true; // la liste en ligne reste en ligne
+    // la séquence porte le commentaire de la ligne de la clé et celui écrit avant son premier nom : la nouvelle les reprend
+    if (isSeq(old)) {
+      value.contents.commentBefore = old.commentBefore;
+      value.contents.comment = old.comment;
+    }
   }
   const next = setKey(text, 'priority', value);
   if (next !== null) writeFileSync(file, next);

@@ -55,6 +55,15 @@ describe('cadence lead priority — réordonner les projets (L449)', () => {
     expect(yamlOf(flow)).toMatch(/^# ordre\npriority: \[ ?beta, alpha ?\]/);
   });
 
+  it('R2 — le commentaire de la ligne de la clé priority: (qui passe sur la ligne suivante) et celui écrit avant le premier nom sont gardés', () => {
+    const onKey = folder(['a', 'b', 'c'], 'priority: # l’ordre du tour\n  - a\n  - b\n  - c\n');
+    cadence(onKey, 'lead', 'priority', 'c', '--before', 'a');
+    expect(yamlOf(onKey)).toMatch(/^priority:\n {2}# l’ordre du tour\n {2}- c\n {2}- a\n {2}- b\n$/);
+    const before = folder(['a', 'b', 'c'], 'priority:\n  # en tête : le projet pro\n  - a\n  - b\n  - c\n');
+    cadence(before, 'lead', 'priority', 'b', '--after', 'c');
+    expect(yamlOf(before)).toMatch(/^priority:\n {2}# en tête : le projet pro\n {2}- a\n {2}- c\n {2}- b\n$/);
+  });
+
   it('R3 — sans cadence.yaml le fichier est créé ; sans clé priority: elle est ajoutée au bout, le reste intact ; tous les projets sont nommés', () => {
     const none = folder(['alpha', 'beta', 'gamma']);
     expect(cadence(none, 'lead', 'priority', 'gamma', '--before', 'alpha').code).toBe(0);

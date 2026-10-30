@@ -1,0 +1,187 @@
+sujet:
+  id: livreur-delegue
+  titre: "Livreur délégué : un agent fait la chaîne de livraison d'un lot prêt et rend une ligne au lead"
+  lot: L439
+  perimetre:
+    modules: [agents/livreur.md, skills/lead/SKILL.md, docs/lead.md, docs/skills.md, README.md, CHANGELOG.md]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le qa-reviewer : il reste lancé par le lead après la ligne du livreur (R9), son agent est inchangé"
+      - "les commandes cadence verify, raf done, raf ux, cadence deliver et le hook pre-push : aucune ne change, le livreur ne fait que les appeler"
+      - "le verdict de revue (raf review) et la décision de lancer une vague : toujours au lead (R12)"
+      - "la livraison pendant la vague par le lead lui-même : le lead peut encore la faire, le livreur est un moyen en plus"
+
+cas:
+  - id: C1
+    titre: "Le livreur livre un lot prêt sans écran à vérifier"
+    acteur: le livreur (sous-agent du lead)
+    declencheur: commande livreur (le lead le lance avec un brief pour UN lot prêt)
+    preconditions:
+      - "le brief donne le dossier du projet, l'id du lot, le sha à livrer et, si le lot est visible, le rapport et les captures du ux-reviewer"
+      - "le lead a déjà enregistré le verdict de la revue (raf review) quand la porte l'exige"
+      - "aucun autre livreur ni sous-agent, ni aucune autre livraison, ne tourne dans ce dépôt (les sessions d'une vague ne comptent pas, R11)"
+      - "aucune intégration de vague n'est en cours dans ce dépôt (le lead l'a vérifié avec lead tour avant de lancer le livreur, R11)"
+      - "le brief est complet, le lot n'est pas encore done et son sha est livrable : ancêtre de HEAD de la branche locale, sans commit d'un lot non prêt dessous, pas encore dans origin/main (R14)"
+    nominal:
+      - "Le livreur contrôle le sha (R14), puis lance cadence verify --gate --sha <sha> et lit le code de sortie."
+      - "Vert : il lance raf done <lot> et prend la commande git add / git commit que raf done imprime."
+      - "Il exécute ce commit, avec exactement les chemins imprimés."
+      - "Il pousse le sha seul : git push origin <sha>:main."
+      - "Il lance cadence deliver --dry-run --sha <sha> puis cadence deliver --sha <sha>."
+      - "Le commit du plan reste au-dessus de origin/main, non poussé : le lead le pousse avec son propre replay (R10)."
+      - "Il rend au lead une seule ligne : « L84 livré 3d6edf4, QA à lancer <url> »."
+    alternatives:
+      - { si: "le brief est incomplet (sha, lot, dossier, valeur de lead.ux ou URL de base absents), le lot est inconnu ou déjà done, ou le sha n'est pas livrable (pas un ancêtre de HEAD, commit d'un lot non prêt dessous, déjà dans origin/main, ou « déjà livré » douteux)", alors: "il ne lance rien et rend une question", regles: [R14] }
+      - { si: "la porte rend 1 (rouge) ou 2 (rien à rejouer)", alors: "il s'arrête avant raf done et rend une question", regles: [R4] }
+      - { si: "raf done, le commit du plan, le push (hook pre-push, code 3) ou deliver refuse ou échoue", alors: "il s'arrête là, ne force rien et rend une question", regles: [R10] }
+      - { si: "la livraison ne change ni page ni API (docs, plan ou tests seuls)", alors: "la ligne dit qu'il n'y a pas de QA à lancer", regles: [R8] }
+    resultat: "Le lot est clos, son sha est poussé et livré, et le lead a lu une ligne au lieu de dix appels."
+  - id: C2
+    titre: "Le livreur livre un lot visible quand lead.ux vaut lead"
+    acteur: le livreur
+    declencheur: "commande livreur (lot visible, cadence.yaml avec lead.ux: lead)"
+    preconditions:
+      - "le brief porte le rapport du ux-reviewer et le chemin de ses captures"
+    nominal:
+      - "Après la porte verte, le livreur lit le rapport et ouvre lui-même les captures."
+      - "Le rapport n'a plus de réserve et les captures montrent ce que le lot promettait."
+      - "Il enregistre raf ux <lot> \"…\" avec la dernière ligne du rapport mise à jour."
+      - "Il poursuit comme en C1 : raf done, commit, push du sha, deliver, ligne."
+    alternatives:
+      - { si: "une réserve non tranchée, une capture illisible, un choix de goût ou un état non montré", alors: "il n'enregistre rien, ne ferme rien, rend la question avec les captures", regles: [R6] }
+    resultat: "Le verdict UX est enregistré par le livreur sur le même critère que celui du lead, ou une question sort."
+  - id: C3
+    titre: "Le livreur reçoit un lot visible quand lead.ux vaut human (défaut)"
+    acteur: le livreur
+    declencheur: "commande livreur (lot visible, lead.ux absent ou human)"
+    preconditions:
+      - "le lead a transmis le verdict UX de l'humain ou ne l'a pas encore"
+    nominal:
+      - "Après la porte verte, le livreur lit le lot (raf show) pour savoir si un verdict UX est déjà enregistré."
+      - "Le verdict est déjà là : il poursuit comme en C1."
+    alternatives:
+      - { si: "aucun verdict UX n'est enregistré", alors: "il ne le forme jamais lui-même, ne clôt rien et rend une question", regles: [R7] }
+    resultat: "Aucune livraison d'un lot visible sans le verdict de l'humain."
+  - id: C4
+    titre: "Le lead enchaîne les livreurs et lance le qa-reviewer"
+    acteur: le lead
+    declencheur: lot prêt dans le journal de la vague ou rendu prêt par une session
+    preconditions:
+      - "le lead a le sha livrable du lot (« livrable jusqu'à »)"
+      - "un créneau est libre"
+    nominal:
+      - "Le lead lance un livreur pour ce lot."
+      - "Il lit la ligne rendue."
+      - "Il lance lui-même le qa-reviewer avec l'URL de la ligne, puis lance le livreur du lot prêt suivant."
+    alternatives:
+      - { si: "la ligne est une question", alors: "le lead tranche ou la relaie à l'humain et ne lance pas le livreur du lot suivant du même dépôt avant la fin", regles: [R11] }
+      - { si: "un livreur tourne déjà dans ce dépôt", alors: "le lead attend, jamais deux livraisons en parallèle", regles: [R11] }
+    resultat: "Les livraisons passent une à une, le contexte du lead ne garde qu'une ligne par lot."
+
+regles:
+  - id: R1
+    cas: [C1, C2, C3]
+    enonce: "Le livreur traite UN seul lot par lancement : celui du brief, au sha du brief ; il ne calcule pas lui-même le « livrable jusqu'à »."
+    statut: sourcee
+    source: "demande du lot L439 : « fait pour UN lot prêt la chaîne … verify --gate au sha » ; skills/lead/SKILL.md:112 (le sha vient du lead)"
+    tests: ["R1 — agents/livreur.md demande un seul lot et un sha dans le brief, et interdit d'en traiter un second"]
+  - id: R2
+    cas: [C1, C2, C3]
+    enonce: "Le livreur ne lance aucun agent et ne pose aucune question à l'humain : devant une ambiguïté il s'arrête et la rend au lead comme question."
+    statut: sourcee
+    source: "demande du lot L439 : « qui ne peut lancer aucun agent ni poser de question à l'humain » ; skills/lead/SKILL.md:40"
+    tests: ["R2 — agents/livreur.md n'a pas l'outil Agent et dit de rendre une question au lead au lieu de demander"]
+  - id: R3
+    cas: [C1, C2, C3]
+    enonce: "La chaîne est dans cet ordre : cadence verify --gate --sha, verdict UX selon lead.ux (lot visible), raf done, commit du plan, push du sha, cadence deliver --dry-run --sha puis cadence deliver --sha ; aucune étape n'est sautée ni inversée."
+    statut: sourcee
+    source: "demande du lot L439 : « verify --gate au sha, verdict UX …, raf done …, push du sha, deliver » ; skills/lead/SKILL.md:200, :205, :241"
+    tests: ["R3 — agents/livreur.md liste les étapes dans l'ordre verify, UX, raf done, push, deliver"]
+  - id: R4
+    cas: [C1]
+    enonce: "Si cadence verify --gate rend 1 (rouge, tests en échec) ou 2 (rien à rejouer), le livreur ne lance ni raf done, ni push, ni deliver, et rend une question : avec le code 1 elle nomme le sha et les tests en échec, avec le code 2 elle nomme le sha et dit « rien à rejouer »."
+    statut: sourcee
+    source: "skills/lead/SKILL.md:200 (« exit 0 green, 1 red with the failing tests, 2 nothing to replay »)"
+    tests: ["R4 — agents/livreur.md interdit raf done, push et deliver après un verify rouge ou 2", "R4 — agents/livreur.md distingue le contenu de la question du code 1 (tests en échec) et du code 2 (rien à rejouer)", "R4 — le code de sortie du verify est lu sans pipe (pas de | tail)"]
+  - id: R5
+    cas: [C2]
+    enonce: "Avec lead.ux: lead, le livreur forme le verdict UX sur le rapport du ux-reviewer et sur les captures qu'il ouvre lui-même, sans se fier aux mots du rapport, et enregistre raf ux seulement quand il ne reste aucune réserve et que les captures montrent ce que le lot promettait."
+    statut: sourcee
+    source: "demande du lot L439 : « verdict UX selon lead.ux (sur le rapport et les captures du ux-reviewer que le lead lui passe) » ; critère repris de skills/lead/SKILL.md:176-179"
+    tests: ["R5 — agents/livreur.md demande d'ouvrir les captures et d'enregistrer raf ux seulement sans réserve"]
+  - id: R6
+    cas: [C2]
+    enonce: "Au moindre doute (réserve non tranchée, capture illisible, choix de goût, état non montré, rapport ou captures absents du brief), le livreur n'enregistre aucun raf ux, ne clôt rien et rend la question avec les chemins des captures."
+    statut: sourcee
+    source: "skills/lead/SKILL.md:179-181 (« At the slightest doubt … it records nothing, brings the captures and the question »)"
+    tests: ["R6 — agents/livreur.md rend une question sans raf ux quand le brief n'a pas les captures"]
+  - id: R7
+    cas: [C3]
+    enonce: "Avec lead.ux: human (ou sans clé), le livreur ne forme jamais le verdict UX : si le lot visible n'a pas de verdict enregistré, il rend une question et ne clôt rien ; s'il en a un, il poursuit."
+    statut: hypothese
+    si_faux: "Si le lead préfère passer le verdict de l'humain dans le brief au lieu de l'écrire avant, seule la façon de le détecter change (brief au lieu de raf show) ; aucune donnée n'est en jeu."
+    tests: ["R7 — agents/livreur.md interdit raf ux quand lead.ux n'est pas lead", "R7 — agents/livreur.md lit raf show pour savoir si un verdict UX existe"]
+  - id: R8
+    cas: [C1]
+    enonce: "Le livreur rend une seule ligne « <lot> livré <sha court>, QA à lancer <url> » où <url> est l'URL de base de l'app livrée que le brief porte (le lead la lit dans la config deliver de cadence.yaml, docs/deliver.md) : le livreur ne la déduit ni ne l'invente, et un brief sans URL pour une livraison qui change une page ou une API est une question (R14). Il juge « la livraison ne change ni page ni API » sur les fichiers du sha livré (git diff --name-only du sha contre son parent) : seuls des docs, le plan ou des tests, comme skills/lead/SKILL.md:244-248 ; alors la ligne finit par « pas de QA à lancer » au lieu de l'URL."
+    statut: hypothese
+    si_faux: "Si le lead veut toujours l'URL, la ligne change de fin ; si le critère doit être décidé par le lead, le brief porterait un drapeau « QA oui/non » au lieu du diff ; le lead lit la même ligne, aucune donnée n'est en jeu."
+    tests: ["R8 — agents/livreur.md prend l'URL dans le brief et interdit de l'inventer", "R8 — agents/livreur.md juge l'absence de QA sur les fichiers du sha (docs, plan, tests seuls)", "R8 — agents/livreur.md donne le format exact de la ligne avec l'URL", "R8 — agents/livreur.md donne la variante sans QA pour une livraison docs, plan ou tests seuls"]
+  - id: R9
+    cas: [C1, C4]
+    enonce: "Le livreur ne lance jamais le qa-reviewer : c'est le lead qui le lance après la ligne, avec l'URL qu'elle porte."
+    statut: sourcee
+    source: "demande du lot L439 : « c'est le lead qui lance ensuite le qa-reviewer »"
+    tests: ["R9 — agents/livreur.md interdit de lancer le qa-reviewer", "R9 — skills/lead/SKILL.md fait lancer le qa-reviewer par le lead après la ligne du livreur"]
+  - id: R10
+    cas: [C1]
+    enonce: "Le commit du plan reprend exactement la commande que raf done imprime (chemins et sujet) ; le push ne porte que le sha (git push origin <sha>:main, jamais HEAD) ; le livreur n'emploie ni --force, ni CADENCE_PUSH_UNGATED, ni nouvelle tentative d'un refus (raf done, hook pre-push code 3, deliver) : il s'arrête et rend une question. Le livreur ne pousse pas le commit du plan : il reste au-dessus de main pour le lead, qui le pousse après son propre replay (hook pre-push)."
+    statut: sourcee
+    source: "demande du lot L439 : « raf done avec le commit que raf done imprime, push du sha » ; docs/raf.md:64 ; skills/lead/SKILL.md:112, :223-237, :241 (le commit du plan est poussé plus tard par le lead)"
+    tests: ["R10 — agents/livreur.md reprend le commit imprimé par raf done", "R10 — agents/livreur.md pousse <sha>:main et jamais HEAD", "R10 — agents/livreur.md interdit --force et CADENCE_PUSH_UNGATED"]
+  - id: R11
+    cas: [C4]
+    enonce: "Le lead lance les livreurs un à un : jamais deux livraisons en parallèle, jamais un livreur dans un dépôt où un autre livreur ou un autre sous-agent travaille, et chaque livreur compte dans le plafond de sous-agents. Seuls les livreurs et les sous-agents comptent comme « un autre » : les sessions d'une vague en cours ne bloquent pas le livreur (c'est le cas d'usage de skills/lead/SKILL.md:112). En revanche le lead ne lance pas de livreur pendant l'intégration d'un lot de la vague (lead tour la montre) : raf done y écrit le plan de l'arbre principal, et une intégration qui le voit modifié refuse son lot (« arbre du dépôt modifié »). Si raf done imprime tout de même l'avertissement « intégration en cours », le livreur commite le plan aussitôt, sans autre écriture dans l'arbre."
+    statut: sourcee
+    source: "demande du lot L439 : « livraisons une à une » ; skills/lead/SKILL.md:33-39, :112 ; docs/raf.md:64 (avertissement raf done pendant intégration)"
+    tests: ["R11 — skills/lead/SKILL.md dit une livraison à la fois et compte le livreur dans le plafond", "R11 — skills/lead/SKILL.md dit que seuls livreurs et sous-agents bloquent un nouveau livreur, pas les sessions de vague", "R11 — skills/lead/SKILL.md interdit de lancer un livreur pendant une intégration de la vague", "R11 — agents/livreur.md commite le plan aussitôt si raf done avertit d'une intégration en cours"]
+  - id: R12
+    cas: [C1, C2, C3]
+    enonce: "Le livreur ne modifie aucun code, ne lance ni raf review ni raf start, et n'enregistre raf ux que dans le cas de R5 ; skills/lead/SKILL.md est amendé pour dire que la livraison et, avec lead.ux: lead, raf ux peuvent être faits par le livreur, et que raf review reste au lead."
+    statut: sourcee
+    source: "demande du lot L439 (le livreur fait la chaîne) ; skills/lead/SKILL.md:38-39 et :182 disaient « jamais par un sous-agent » et sont amendés par le lot ; skills/lead/SKILL.md:205 (raf review avant raf done)"
+    tests: ["R12 — agents/livreur.md interdit raf review et toute modification de code", "R12 — skills/lead/SKILL.md ne dit plus que la livraison est jamais faite par un sous-agent"]
+  - id: R13
+    cas: [C1, C2, C3]
+    enonce: "Une question rendue commence par « Question : », tient en quelques lignes (étape, sha, cause, commande à relancer) et laisse le dépôt dans l'état de l'étape atteinte, que la question dit. Elle contient : le préfixe « Question : », l'étape atteinte, le sha, la cause et la commande à relancer."
+    statut: hypothese
+    si_faux: "Si le lead veut un rapport structuré, le format de la sortie change ; le lead lit la même information, aucune donnée n'est en jeu."
+    tests: ["R13 — agents/livreur.md impose le préfixe « Question : »", "R13 — agents/livreur.md impose de nommer l'étape atteinte et le sha", "R13 — agents/livreur.md impose de donner la commande à relancer"]
+  - id: R14
+    cas: [C1]
+    enonce: "Avant toute commande, le livreur contrôle le brief et le sha, et ne lance ni verify, ni raf done, ni push, ni deliver s'il échoue : il rend une question qui nomme ce qui manque ou ce qui est clos. (a) Brief incomplet : dossier, lot, sha, valeur de lead.ux absents, URL de base absente pour une livraison à QA, rapport ou captures absents pour un lot visible avec lead.ux: lead. (b) Lot inconnu ou déjà done. (c) Le sha doit être un ancêtre de HEAD de la branche locale (git merge-base --is-ancestor <sha> HEAD) ; sinon question. (d) Aucun commit situé entre origin/main et le sha ne cite un lot autre que celui du brief qui ne soit pas done (un commit qui ne cite aucun lot, ou le plan seul, passe) ; sinon question qui nomme le lot non prêt. (e) Le sha ne doit pas être déjà dans origin/main (le livreur le pousse lui-même) : « sha déjà livré » veut dire exactement sha ancêtre de origin/main ET présent au journal de livraison de cadence deliver (deliveries.log, une ligne « jour sha » dans <git common dir>/cadence/ ; comparaison sur le sha complet ou son préfixe) ; ces deux preuves ensemble donnent la question « déjà livré, rien à refaire » ; une seule des deux donne une question qui dit laquelle manque (poussé mais jamais livré, ou au journal mais absent de origin/main), sans rien relancer. Une relance après une livraison réussie ne refait donc jamais raf done. Le livreur lit origin/main après git fetch origin main."
+    statut: sourcee
+    source: "arbitrage du lead du 30-10 (majeur R14 de la 2e revue), note du lot L439 et son énoncé : « ancêtre de HEAD … merge-base --is-ancestor … sans commit d'un lot non prêt dessous, pas encore dans origin/main … sha ancêtre de origin/main ET présent au journal de livraison de cadence deliver — l'un sans l'autre donne une question » ; journal : src/state.ts:178-180 (appendDelivery écrit « jour sha » dans deliveries.log), src/state.ts:243-249 (lastDelivery), docs/perf.md:57 (emplacement <git common dir>/cadence/) ; « livrable jusqu'à » : skills/lead/SKILL.md:112"
+    tests: ["R14 — agents/livreur.md rend une question sans rien lancer quand le sha, le lot, le dossier ou lead.ux manque au brief", "R14 — agents/livreur.md rend une question quand le lot est inconnu ou déjà done", "R14 — agents/livreur.md exige git merge-base --is-ancestor <sha> HEAD et rend une question sinon", "R14 — agents/livreur.md rend une question qui nomme le lot non prêt quand un commit d'un autre lot non done est sous le sha", "R14 — agents/livreur.md définit « sha déjà livré » comme ancêtre de origin/main ET présent au journal deliveries.log", "R14 — agents/livreur.md rend une question qui dit quelle preuve manque quand une seule des deux est vraie", "R14 — agents/livreur.md refuse un sha déjà dans origin/main sans le journal sans relancer raf done ni deliver"]
+
+contrats:
+  - id: A1
+    appel: commande livreur
+    entree: "brief du lead : dossier absolu du projet, id du lot, sha à livrer, valeur de lead.ux, pour un lot visible le rapport du ux-reviewer et le dossier absolu des captures"
+    sortie: "une ligne « L84 livré 3d6edf4, QA à lancer <url> » (ou « …, pas de QA à lancer »), ou une ligne « Question : … »"
+    erreurs:
+      - { code: log error, message: "Question : verify --gate rouge au sha <sha> : <tests en échec>" }
+      - { code: log error, message: "Question : verify --gate au sha <sha> : rien à rejouer (code 2)" }
+      - { code: log error, message: "Question : brief incomplet : <champ> absent" }
+      - { code: log error, message: "Question : <lot> déjà clos ou sha <sha> déjà livré (origin/main et journal)" }
+      - { code: log error, message: "Question : sha <sha> non livrable : <pas un ancêtre de HEAD | commit du lot <autre> non prêt dessous | dans origin/main sans le journal | au journal sans être dans origin/main>" }
+      - { code: log error, message: "Question : verdict UX absent pour <lot> (lead.ux: human)" }
+      - { code: log error, message: "Question : doute sur le verdict UX de <lot> : <réserve> (captures : <chemin>)" }
+      - { code: log error, message: "Question : <étape> refusée au sha <sha> : <message de la commande>" }
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14]
+
+donnees:
+  - { id: D1, objet: "plan du projet (.cadence/raf.yaml) : status done et finished posés par raf done, clé ux posée par raf ux", existant: true, modification: aucune, note: "écrit par les commandes existantes comme avant, aucun format ne change" }
+  - { id: D2, objet: "journal de livraison deliveries.log (<git common dir>/cadence/, lignes « jour sha »)", existant: true, modification: aucune, note: "lu par le livreur pour décider « déjà livré » (R14), écrit par cadence deliver comme avant" }
+  - { id: D3, objet: "agents/livreur.md (nouvel agent installé comme les autres par cadence install)", existant: false, modification: ajout, note: "fichier de consignes, aucune donnée de projet" }

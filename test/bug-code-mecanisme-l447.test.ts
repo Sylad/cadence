@@ -48,6 +48,15 @@ describe('R8 — un seul mécanisme, au maillon désigné', () => {
     expect(mesure).toContain('| F2 (après) |');
   });
 
+  it('R8 — la ligne « Avant » du protocole compte les passes classées, pas toutes les passes (sans revue exclues)', () => {
+    const total = Number(/(\d+) passes de correction/.exec(mesure)?.[1]);
+    const avant = /^\| Avant : [^|]*\| (\d+) \| (\d+) \((\d+) %\)/m.exec(mesure);
+    expect(avant, 'ligne Avant').not.toBeNull();
+    const [classees, bug, part] = [Number(avant![1]), Number(avant![2]), Number(avant![3])];
+    expect(classees).toBeLessThan(total);
+    expect(part).toBe(Math.round((100 * bug) / classees));
+  });
+
   it('R8 — aucun maillon dominant : aucun marqueur [L447] dans les quatre emplacements', () => {
     // Le document dit « aucun » si, et seulement si, aucun emplacement ne porte le marqueur.
     const posés = Object.values(EMPLACEMENTS).reduce((n, t) => n + count(t), 0);

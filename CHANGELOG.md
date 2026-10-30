@@ -80,6 +80,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-10-30
+
 ### Added
 
 - `cadence orchestrate`: a writing session no longer commits on the main branch of another repository than its lot's (L456, `docs/orchestrate.md`). The brief forbids it and gives the way, the branch `wip/<project>-<lot>`; at the end of the session the program compares, with no network, the main branches (`origin/HEAD`, `main`, `master`) of the repositories next to the lot's, and hands the lot back with the commits found when one moved (a first lot of a cluster project had put 3 commits on `developpeur-gitops` `main`, 30 October). The commit is not undone. Neighbours declared by `repos:` and the repositories of the other lots of the wave (or of another wave running at the same time) are not concerned, nor are the lead's own commits (a `plan: ` subject that changes only the plan file; a `plan: ` commit touching another file is still found). The check also runs when the session ends in failure, at the time limit or at the quota.

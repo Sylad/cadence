@@ -405,7 +405,7 @@ describe('raf show', () => {
     expect(r.out).not.toContain('terminé');
   });
 
-  it('L439 — un lot visible affiche « visible : oui » (screen dessous) et « ux : absent », puis « ux : <verdict> » après raf ux ; un lot non visible n\'affiche ni l\'un ni l\'autre', () => {
+  it('R7 — test/cli.test.ts (L439) : raf show imprime « visible : oui », « screen », « ux : absent » puis « ux : <verdict> » après raf ux, et rien de tel pour un lot non visible', () => {
     const dir = gitRepo();
     raf(dir, 'init', '--project', 'demo');
     raf(dir, 'add', 'Caché');

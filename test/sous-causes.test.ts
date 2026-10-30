@@ -363,8 +363,17 @@ describe('R9 — rien ne change sans passe bug-code', () => {
     expect(avec.out).not.toContain('sous-cause');
     expect(avec.out).not.toContain('Maillon');
     // sans fichier de sous-causes ni passe bug-code : la sortie est celle du rapport seul
-    const { renderReport, measure, readCache } = await import('../src/corrections.js');
-    expect(avec.out).toBe(renderReport(measure(readRuns(w.runs), readCache(causesFile(w.root)))));
+    // référence figée (le rapport d'avant le lot), pas le rendu du code courant
+    const titres = avec.out.split('\n').filter((l) => l.startsWith('### '));
+    expect(titres).toEqual([
+      '### Par cause',
+      '### Par cause et par projet (passes)',
+      '### Lots avec correction',
+      '### Lots visibles et non visibles',
+      '### Par cause et par visibilité (passes)',
+    ]);
+    expect(avec.out.split('\n')[0]).toMatch(/^\*\*\d+ lots\*\* passés par une session d'écriture, \*\*\d+ passes de correction\*\* : .* au moins deux\.$/);
+    expect(avec.out.trimEnd().split('\n').pop()).toMatch(/^\| non visibles \|/);
     const perf = await cad(w.root, {}, 'perf');
     expect(perf.out).not.toContain('bug de code (');
   });

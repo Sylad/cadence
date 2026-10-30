@@ -216,6 +216,7 @@ lots:
     screen: component
     created: 2026-10-28
     started: 2026-10-30
+    review: { date: 2026-10-30, verdict: "conforme (2 remarques mineures, sans sous-tâche) — orchestré (vague 2026-10-30-0845, 0 passe(s) de correction + passe des mineurs)", commit: 4cc2497ae90a89457b1a93f6f04891ee2c3d18da, reporte: { de: 29a57564fb921cc71b0a1fe71a4b75ec03d794e4, vers: 4cc2497ae90a89457b1a93f6f04891ee2c3d18da, patchId: c786b7121e0600876fe7eb51ad3084027ef599c1 } }
   - id: L418
     title: "Release : le script de publication lit le vrai code de sortie de la suite (pipefail, aucun | grep final qui masque un rouge) et joue le test whats-new « deux lignes » avant le tag — 28-10 : test rouge commité, publication npm de 1.22.0 échouée"
     status: todo

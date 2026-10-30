@@ -198,13 +198,15 @@ lots:
   - id: L414
     title: "Panneau des lots : par lot en cours, tokens consommés sur le budget du lot et temps écoulé, comparés au temps habituel d'un lot de cette taille (cadence perf) — signal visible quand un lot dépasse (ex. L64 : 786 k, 53 min)"
     public: Budget et durée des lots en cours
-    status: doing
+    status: done
     estimate: 0.5
     visible: true
     screen: component
     created: 2026-10-28
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "conforme : 0 bloquant, 0 majeur (revue Opus du 30-10, reposée après rebase sur 31f8875 : conflits de juxtaposition avec L413 seulement, diffs des fix identiques, vitest/tsc/build/plugin verts) ; 2 mineurs en note (README R1–R4 au lieu de R1–R5 ; > au lieu de >= quand les tokens égalent le budget)", commit: 223e50dbaa4cc1555b8086205d89854f2181d2c6 }
+    ux: { date: 2026-10-30, verdict: "conforme : rendu vérifié par les tests du mod (lots-pane R11–R16 : budget, durée, temps habituel, ⚠ gardé sur 2 lignes quand la place manque), sans capture du panneau réel — Sylvain regarde /hud lots après mise en service (accord du 30-10)" }
+    finished: 2026-10-30
   - id: L415
     title: "Panneau des lots : par projet, dernière livraison (sha, âge, verte/rouge, depuis le journal de cadence deliver) et lots clos non livrés"
     public: Dernière livraison de chaque projet
@@ -334,11 +336,12 @@ lots:
     created: 2026-10-29
   - id: L436
     title: "raf done avec plan.onWrite : la commande de commit proposée ne cite que .cadence/raf.yaml alors que le script a régénéré d'autres fichiers (frontend/public/plan-data/plan.json) — deliver refuse ensuite « 1 fichier modifié » ; citer les fichiers écrits par plan.onWrite (finance, ol, warhammer le 29-10)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "compliant (0 blocking, 0 major, 3 minor notes) — orchestré (vague 2026-10-30-p443, 0 passe(s) de correction)", commit: 6d54da7b9f7bd4a34f1af26a3a85bbef0bb744af }
+    finished: 2026-10-30
   - id: L437
     title: "Seuil de contexte du lead en tokens, pas en % : 60 % valait 120k sur une fenêtre de 200k et vaut 600k sur 1M (lead à 460k le 29-10, relu à chaque transition) — lead.contextThreshold en tokens (150k par défaut) lu par cadence session context et le skill lead (décision de Sylvain le 29-10)"
     status: todo
@@ -383,18 +386,20 @@ lots:
     created: 2026-10-29
   - id: L443
     title: "orchestrate --resume --integrate refusé parce qu'une autre vague tient le dépôt : attendre la fin de cette vague (ou intégrer à côté, les worktrees isolant déjà les lots) au lieu de sortir en 2 — L414 a attendu 80 min le 30-10"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "conforme après 1 correctif (arrêt demandé pendant l'attente perdu si un arrêt périmé traîne) ; 2 notes mineures — orchestré (vague 2026-10-30-p443, 4 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que le contexte du CHANGELOG (entrée L443 bien placée dans Fixed) ; le code, les tests et la doc du lot sont identiques à la version relue", commit: 75d91196f45afbbc07b3bba2b8f8d10a6c0840b8 }
+    finished: 2026-10-30
   - id: L444
     title: "verify --gate --sha <sha intégré> rejoue toute la porte (« aucune porte de vague enregistrée pour ce sha ») alors que l'intégration vient de jouer la porte sur ce même sha : enregistrer ce verdict pour que le lead le reprenne (~5 min par lot prêt, L440 et L441 le 30-10)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
     review: { date: 2026-10-29, verdict: "compliant (commit bfaa103 : la porte du sha contrôlé est reprise sous les seuls commits de plan, 0 bloquant, 0 majeur, 1 mineur : marche des commits de plan dupliquée avec push-guard.ts) — orchestré (vague 2026-10-30-p443, 0 passe(s) de correction)", commit: fa11949f34010742ead8d634f5d87eb3eb00b157, reporte: { de: bfaa1036d74179685a440b3a2af695a77db977af, vers: fa11949f34010742ead8d634f5d87eb3eb00b157, patchId: 720c3d1b3ad7b36968eafab619b81082029c4896 } }
+    finished: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

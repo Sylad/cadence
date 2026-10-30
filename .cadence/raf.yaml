@@ -441,10 +441,11 @@ lots:
     finished: 2026-10-30
   - id: L447
     title: "Goulot perf « bug de code » (74 des 107 passes de correction classées, 69 %, fenêtre 24→30-10 ; 45 % de passes non classées, 37 sans revue sur tests rouges) : sous-classer les constats « bug de code » des revues (cas limite non testé, test existant cassé, contrat ou fiche mal lu, oubli d'un appelant, …) dans cadence corrections/perf, désigner le maillon dominant, et y poser UN mécanisme (brief implement, auto-vérification avant rendu, porte locale…) ; mesure : part conforme du premier coup et causes sur la fenêtre suivante"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-10-30
+    started: 2026-10-30
   - id: L448
     title: "Revue de maquette renforcée par les critères de la skill design-critique du plugin Design d'Anthropic (anthropics/knowledge-work-plugins, dossier design ; aussi ux-copy et accessibility-review) : les lire, les comparer à l'agent ux-reviewer en mode maquette et au spec-writer, reprendre dans NOS agents les seuls critères absents, chacun fondé sur une règle nommée ou une mesure (aucune dépendance au plugin : cadence reste générique, compte pro) ; motif : sessions ux par lot visible 1,6 contre 1,2 (cadence perf du 30-10, « renforcer la maquette ») ; mesure : ce chiffre sur la fenêtre suivante ; décision de Sylvain le 30-10"
     status: todo

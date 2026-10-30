@@ -121,3 +121,54 @@ describe('cadence lead priority — réordonner les projets (L449)', () => {
     expect(shown(parent)).toEqual(['beta', 'alpha']);
   });
 });
+
+describe('cadence lead priority — noms en préfixe et profondeur (L449)', () => {
+  it('R4 — un projet dont le nom commence un autre (shop, shop-web) ne peut pas en être séparé : refus qui dit pourquoi, fichier intact, rien de faux annoncé', () => {
+    const yaml = 'priority: [shop, shop-web, x]\n';
+    const parent = folder(['shop', 'shop-web', 'x'], yaml);
+    const r = cadence(parent, 'lead', 'priority', 'shop-web', '--after', 'x');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/shop-web ne peut pas être placé après x.*shop/);
+    expect(r.out).not.toMatch(/placé/);
+    expect(yamlOf(parent)).toBe(yaml);
+    expect(shown(parent)).toEqual(['shop', 'shop-web', 'x']);
+  });
+
+  it('R4 — le même cas sans préfixe en jeu reste possible : x peut passer devant shop-web', () => {
+    const parent = folder(['shop', 'shop-web', 'x'], 'priority: [shop, shop-web, x]\n');
+    expect(cadence(parent, 'lead', 'priority', 'x', '--before', 'shop').code).toBe(0);
+    expect(shown(parent)).toEqual(['x', 'shop', 'shop-web']);
+  });
+
+  it('R8 — deux projets de même nom de dossier (--depth 2) : refus, fichier intact', () => {
+    const parent = tempDir();
+    for (const d of ['g/p', 'h/p', 'z']) {
+      mkdirSync(join(parent, d, '.cadence'), { recursive: true });
+      writeFileSync(join(parent, d, '.cadence', 'raf.yaml'), 'project: x\nlots: []\n');
+    }
+    const r = cadence(parent, 'lead', 'priority', 'z', '--before', 'g/p', '--depth', '2');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/deux projets s'appellent p/);
+  });
+
+  it('R8 — projets imbriqués (--depth 2) : nommés groupe/projet, écrits par leur dossier dans priority:', () => {
+    const parent = tempDir();
+    for (const d of ['g/x', 'h/y', 'z']) {
+      mkdirSync(join(parent, d, '.cadence'), { recursive: true });
+      writeFileSync(join(parent, d, '.cadence', 'raf.yaml'), 'project: x\nlots: []\n');
+    }
+    writeFileSync(join(parent, 'cadence.yaml'), 'priority: [x, y, z]\n');
+    const r = cadence(parent, 'lead', 'priority', 'h/y', '--before', 'g/x', '--depth', '2');
+    expect(r.code).toBe(0);
+    expect(yamlOf(parent)).toMatch(/priority: \[\s*y, x, z\s*\]/);
+  });
+
+  it('R8 — --depth invalide (0, abc) est refusé', () => {
+    const parent = folder(['alpha', 'beta']);
+    for (const d of ['0', 'abc']) {
+      const r = cadence(parent, 'lead', 'priority', 'alpha', '--before', 'beta', '--depth', d);
+      expect(r.code).not.toBe(0);
+      expect(r.err).toMatch(/--depth invalide/);
+    }
+  });
+});

@@ -37,6 +37,12 @@ export function movePriority(parent: string, project: string, place: 'before' | 
   if (order.every((n, i) => n === ranked[i]!.name)) return { order, changed: false };
   const unmatched = declared.filter((n) => !keys.some((k) => k === n || k.startsWith(`${n}-`)));
   const list = [...moved.map((p) => p.key), ...unmatched];
+  // la liste écrite doit restituer l'ordre voulu : un nom qui en préfixe un autre (`shop` et `shop-web`) les rangerait ensemble
+  const back = [...projects].sort((a, b) => priorityRank(a.key, list) - priorityRank(b.key, list) || a.key.localeCompare(b.key) || a.name.localeCompare(b.name)).map((p) => p.name);
+  if (back.some((n, i) => n !== order[i])) {
+    const clash = keys.find((k) => keys.some((o) => o !== k && o.startsWith(`${k}-`)));
+    throw new RafError(`${project} ne peut pas être placé ${place === 'before' ? 'avant' : 'après'} ${target} : la liste priority: nomme un projet par son dossier, et ${clash ?? 'un nom'} est le début du nom d'un autre projet (« ${clash ?? 'x'}- »), qui le suit toujours — rien n'est écrit`);
+  }
   const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
   const old = parseDocument(text).get('priority', true);
   // les noms déjà dans la liste gardent leur nœud, donc le commentaire de leur ligne ; les autres sont des nœuds neufs
@@ -49,5 +55,5 @@ export function movePriority(parent: string, project: string, place: 'before' | 
   }
   const next = setKey(text, 'priority', value);
   if (next !== null) writeFileSync(file, next);
-  return { order, changed: true };
+  return { order, changed: next !== null };
 }

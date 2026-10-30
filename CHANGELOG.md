@@ -80,6 +80,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-10-30
+
 ### Added
 
 - `cadence lead priority <project> --before|--after <project>` and the lots panel (L449, [docs/lead.md](docs/lead.md#lead-priority), [docs/cadence-hud.md](docs/cadence-hud.md)): the projects of the folder are reordered by drag and drop (mouse, desktop app and terminal) or with Alt+↑ / Alt+↓, and the drop rewrites the `priority:` list of the parent folder's `cadence.yaml` — the order of the tour, of `cadence orchestrate --continue` and of the panel — with the comments of the file kept (the comment of a prefix name such as `maritime` follows the first project it covered once the name is written in full); an unreadable `cadence.yaml` is refused with its reason, shown under the title of the panel; a move that the list cannot express because a project's name begins another's (`shop`, `shop-web`) is refused with that reason instead of being announced.

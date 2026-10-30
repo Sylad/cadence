@@ -505,9 +505,10 @@ lots:
     started: 2026-10-30
   - id: L453
     title: "raf discret : raf done/ux/review/note/move/public n'impriment plus le titre complet des lots touchés (id, état et 60 caractères au plus ; --verbose pour le titre entier) ; le rappel « plan non commité » garde sa commande ; motif : chaque raf répétait des titres de ~300 caractères dans le contexte du lead (30-10)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-30
+    started: 2026-10-30
   - id: L454
     title: "Un lot rendu visible PAR SA SESSION pendant la vague (warhammer L37 34f0c2d et L43 5f4dce5, le 30-10) sort « prêt » sans étape UX (colonne UX « — ») : l'orchestrateur relit visible/screen après chaque session et joue l'étape UX si le lot l'est devenu, ou le rend au lead avec « visible ajouté en cours de vague, étape UX à jouer » ; test"
     status: todo

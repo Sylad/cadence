@@ -566,6 +566,11 @@ lots:
       - { date: 2026-10-30, text: "Hypothèses (fiche session-sans-commit-sur-depot-tiers) — R16 : Le relevé des dépôts tiers se fait sans réseau, en une lecture locale de références par dépôt, avant et après chaque session d'écriture ; il ne lance ni ls-rem… ; si faux : Si le relevé devait aussi interroger le distant, chaque session paierait un ls-remote par dépôt tiers (guard.ts:313, jusqu'à 20 s) ; la détection ne dépend pas…" }
     review: { date: 2026-10-30, verdict: "conforme : les deux constats mineurs traités sont corrigés et couverts par un test (la branche créée sur l'historique de master, et w.quota posé avant checkTiers ; le test du quota échouait avant le correctif) ; il reste 1 mineur, un constat qui nomme des commits anciens quand main est créée dans un dépôt qui n'avait aucune branche principale — orchestré (vague 2026-10-30-1755-cad, 1 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 5ec0bf8e556cef62100d844b81a2d31d8dd92c10 }
     finished: 2026-10-30
+  - id: L457
+    title: "cadence session context lit lead.contextThreshold dans le cadence.yaml du dossier COURANT : lancé depuis un sous-projet, il prend le défaut 150000 et dit « seuil atteint » à tort (30-10 : 39 % lu « atteint » depuis avatar-pandora, « sous le seuil » depuis le dossier parent). Remonter jusqu'au dossier du lead (premier parent qui porte lead: ou priority:), ou nommer le fichier lu dans la sortie ; test"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

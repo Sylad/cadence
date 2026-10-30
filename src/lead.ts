@@ -97,6 +97,8 @@ export interface TourRow {
   progress: TourProgress;
   /** Lots non clos hors récurrents, sous-tâches ouvertes de ces lots comprises (L401) ; absent d'une ligne en erreur. */
   lots?: TourLot[];
+  /** Lots clos (`done`, hors lots à échéance `every`) avec leur jour de clôture (L415) : le panneau des lots en tire les lots clos non livrés ; absent sans lot clos daté. */
+  closed?: { id: string; finished: Day }[];
   /** « non commité », « non poussé », « livraison en cours » ; vide quand le dépôt est propre. */
   repo: string[];
   /** Worktrees de lot conservés par une vague (L279, R19) ; absent quand il n'y en a aucun. */
@@ -183,6 +185,8 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
       added7: counted.filter((l) => l.created !== undefined && diffDays(l.created, today) >= 0 && diffDays(l.created, today) < ADDED_DAYS).length,
     };
     row.lots = openLots(lots);
+    const closed = lots.filter((l) => l.status === 'done' && l.every === undefined && l.finished !== undefined).map((l) => ({ id: l.id, finished: l.finished! }));
+    if (closed.length) row.closed = closed;
     const waiting = gateWaiting(lots, blocked).map((g) => g.lot.id);
     if (waiting.length) row.waiting = waiting;
     row.next = ready[0] ? { id: ready[0].id, title: ready[0].title } : null;

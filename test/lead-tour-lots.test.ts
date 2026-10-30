@@ -95,3 +95,25 @@ describe('revue posée dans lots de cadence lead tour --json (L413)', () => {
     ]);
   });
 });
+
+describe('champ closed de cadence lead tour --json (L415)', () => {
+  const done = (id: string, finished: string, extra = '') => lot(id, 'done', `    finished: ${finished}\n${extra}`);
+
+  it('R1 — closed : les lots clos (done) non récurrents avec leur jour de clôture, dans l’ordre du plan', () => {
+    const dir = nativeProject(done('L1', '2026-10-20') + lot('L2', 'todo') + done('L3', '2026-10-28'));
+    expect(tourRow(dir, '2026-10-30').closed).toEqual([
+      { id: 'L1', finished: '2026-10-20' },
+      { id: 'L3', finished: '2026-10-28' },
+    ]);
+  });
+
+  it('R1 — un lot abandonné, un lot récurrent et un lot clos sans jour de clôture ne sont pas des lots livrables', () => {
+    const dir = nativeProject(lot('L1', 'dropped', '    finished: 2026-10-20\n') + done('L2', '2026-10-21', '    every: 7\n') + lot('L3', 'done') + done('L4', '2026-10-22'));
+    expect(tourRow(dir, '2026-10-30').closed).toEqual([{ id: 'L4', finished: '2026-10-22' }]);
+  });
+
+  it('R1 — un plan sans lot clos n’écrit pas de champ closed, une ligne en erreur non plus', () => {
+    expect(tourRow(nativeProject(lot('L1', 'todo')), '2026-10-30')).not.toHaveProperty('closed');
+    expect(tourRow('/nonexistent-l415', '2026-10-30')).not.toHaveProperty('closed');
+  });
+});

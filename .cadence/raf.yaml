@@ -488,9 +488,10 @@ lots:
     created: 2026-10-30
   - id: L450
     title: "verify --gate reprend le verdict de la vague sous des commits « de plan seuls », alors qu'un test peut lire le plan : avatar-pandora plan-page.e2e est passé au rouge après le raf done de L8 (9e lot livré, 30-10) sans que la porte de tête le voie — ne reprendre le verdict que si aucun test déclaré ne lit le plan (clé orchestrate.gate.readsPlan ou liste de chemins), sinon rejouer ; test sur un dépôt dont un test lit .cadence/raf.yaml"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-30
+    started: 2026-10-30
   - id: L451
     title: "Mécanisme du goulot (suite de L447) : cadence corrections --classify du 30-10 — 563 passes bug-code sous-classées, cas limite 404 (72 %), maillon dominant brief implement (425/563, 75 %) ; poser LE mécanisme prévu par la fiche L447 (R8/R11 : reformuler une puce du bloc L428 de templates/orchestrate/implement.md, section Limits and rules : énumérer les cas limites du contrat avant de coder et en tester chacun), sans second bloc ; mesure : part conforme du premier coup et part « cas limite » sur la fenêtre suivante, depuis la date du commit"
     status: doing

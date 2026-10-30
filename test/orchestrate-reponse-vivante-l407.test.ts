@@ -245,6 +245,49 @@ describe('L407 — réponse sur une vague vivante', () => {
     expect(store.readLot('a', 'L2')!.status).toBe('ready');
   });
 
+  it("R9bis — deux réponses déposées SÉPARÉMENT alors que les créneaux sont pleins : la seconde attend la file de la première, jamais deux sessions dans un même dépôt", async () => {
+    const parent = parentWith(['a', 'b', 'c'], { a: 2 });
+    let inA = 0;
+    let maxA = 0;
+    let cStarted = false;
+    let released = false;
+    const asked = new Set<string>();
+    const claude: ClaudeFn = async (args, o) => {
+      const kind = kindOf(args);
+      const project = o.cwd.split('/').pop()!;
+      if (kind !== 'implement' && kind !== 'fix') return claudeOut(reviewReport());
+      const lot = /on lot `([^`]+)`/.exec(args[1])![1];
+      const store = RunStore.last(parent)!;
+      if (project === 'a' && !asked.has(lot)) {
+        asked.add(lot);
+        return claudeOut(workReport({ questions: ['Quelle base ?'] }));
+      }
+      if (project === 'b') {
+        // b et c tiennent les deux créneaux ; les deux lots de a sont en question.
+        await wait(() => cStarted && store.readLot('a', 'L1')?.status === 'question' && store.readLot('a', 'L2')?.status === 'question');
+        expect(await orchestrate(['--answer', 'a:L1', 'x'], io(parent).io, d)).toBe(0);
+        await new Promise((r) => setTimeout(r, 150));
+        expect(await orchestrate(['--answer', 'a:L2', 'y'], io(parent).io, d)).toBe(0);
+        await new Promise((r) => setTimeout(r, 150));
+        released = true;
+      } else if (project === 'c') {
+        cStarted = true;
+        await wait(() => released);
+      } else {
+        maxA = Math.max(maxA, ++inA);
+        await new Promise((r) => setTimeout(r, 60));
+        inA--;
+      }
+      return claudeOut(workReport({ commits: [commitFile(o.cwd, `f-${Math.random()}.txt`, `feat(${lot}): travail`)] }));
+    };
+    const d: OrchestrateDeps = { claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR, slotPollMs: 20 };
+    await orchestrate(['a:L1', 'a:L2', 'b:L1', 'c:L1', '--max-sessions', '2'], io(parent).io, d);
+    expect(maxA).toBe(1);
+    const store = RunStore.last(parent)!;
+    expect(store.readLot('a', 'L1')!.status).toBe('ready');
+    expect(store.readLot('a', 'L2')!.status).toBe('ready');
+  });
+
   it('R10 — en worktrees : le lot répondu rejoue dans son worktree PENDANT que l\'autre lot du même dépôt tourne, et le registre compte de nouveau son créneau (2 files, 0 libre sur 2)', async () => {
     const { parent } = treeSetup([{ title: 'un' }, { title: 'deux' }]);
     let asked = false;

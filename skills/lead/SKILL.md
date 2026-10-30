@@ -35,8 +35,16 @@ commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.
   the human (a trial at 3 was decided on 2026-10-12); if the slots are the bottleneck, say so and let them decide.
 - **Never two subagents in the same repository at the same time**, and the lead does not commit in a
   repository where a subagent is working.
-- **Deliveries and `raf ux` / `raf review` verdicts are done by the lead, one project at a time** —
-  never by a subagent, never two deliveries in parallel.
+- **Deliveries and `raf ux` / `raf review` verdicts are done by the lead, one project at a time, or by the `livreur` agent it
+  launches** (L439): the delivery and, with `lead.ux: lead`, `raf ux` may be done by the `livreur`; `raf review` stays with the
+  lead. Launch one `livreur` at a time: never two deliveries in parallel, and each `livreur` counts in the cap of subagents. Only another
+  `livreur` or another subagent blocks a new one; the sessions of a running wave do not (a ready lot is delivered while the wave runs,
+  section 2b). Never launch a `livreur` while the wave integrates a lot (`cadence lead tour` shows it): `raf done` would write the plan
+  of the main tree, which that integration refuses as modified. Brief: the absolute project folder, the lot, the sha to deliver
+  (« livrable jusqu'à »), the value of `lead.ux`, the base URL of the delivered app (the `deliver` configuration of `cadence.yaml`),
+  and for a visible lot with `lead.ux: lead` the `ux-reviewer`'s report and the folder of its captures. It hands back one line
+  (`L84 livré 3d6edf4, QA à lancer <url>`) or one `Question : …`; the lead itself launches the `qa-reviewer` with the URL of the line
+  (section 4), then the `livreur` of the next ready lot.
 - A subagent cannot ask the human anything. When it hits an ambiguity it stops and reports; the lead
   brings the question to the human.
 
@@ -179,7 +187,7 @@ reviewer's last line brought up to date. It does so only when the reviewer has n
 what the lot promised. At the **slightest doubt** — a reservation of the reviewer it cannot settle, a capture it cannot read,
 a layout or wording choice that is a matter of taste, a state the captures do not show — it records nothing, brings the
 captures and the question to the human, and the chain goes on with the other lots as for any UX reservation. The verdict
-is always recorded by the lead's own `raf ux`, never by a subagent.
+is recorded by the lead's own `raf ux` or, for a lot it hands over, by the `livreur` on the same criterion (it opens the captures itself and records nothing at the slightest doubt).
 
 ## 3. Check
 
@@ -217,7 +225,7 @@ is always recorded by the lead's own `raf ux`, never by a subagent.
 
 ## 4. Delivery
 
-One project at a time, by the lead: push, then the `deliver` skill (`cadence deliver --dry-run`, then
+One project at a time, by the lead or, for a ready lot it hands over, by the `livreur` agent (« Limits that always apply »): push, then the `deliver` skill (`cadence deliver --dry-run`, then
 `cadence deliver`). Follow the human's standing instructions about confirmation before production.
 
 **The sha pushed needs a green verdict of the gate (L426).** Where the project declares a gate (`orchestrate.test` or

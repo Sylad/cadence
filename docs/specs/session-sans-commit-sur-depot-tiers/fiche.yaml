@@ -9,7 +9,7 @@ sujet:
     hors_perimetre:
       - "le push et le déploiement : déjà refusés par le hook pre-push de la vague et la détection de push (cycle.ts:983-998), inchangés"
       - "le dépôt du lot lui-même : ses commits sur sa branche (ou celle de son worktree) sont le travail normal, l'intégration reste celle de L279"
-      - "les voisins déclarés par la clé repos: du lot : leur comportement codé (commits sur leur branche courante, briefs.ts:68, docs/orchestrate.md « A lot whose work is in a neighbouring repository », test/orchestrate-cycle-repos.test.ts:30-37 et :115) reste tel quel, sous réserve de la question posée au lead (R12)"
+      - "les voisins déclarés par la clé repos: du lot : leur comportement codé (commits sur leur branche courante, briefs.ts:68, docs/orchestrate.md « A lot whose work is in a neighbouring repository », test/orchestrate-cycle-repos.test.ts:30-37 et :115) reste tel quel (décision du lead, R12)"
       - "défaire le commit fautif (reset, revert, déplacement de branche) : le programme constate et rend, le lead tranche"
       - "les sessions en lecture seule : tout changement de dépôt reste un incident par handBack (cycle.ts:1048-1051), inchangé"
 cas:
@@ -47,7 +47,7 @@ cas:
       - "Le contrôle « HEAD déplacé » existant s'applique au voisin comme aujourd'hui ; raf commits, la revue, repoShas (cycle.ts:2541) et le test « already has work » lisent le voisin comme aujourd'hui."
     alternatives:
       - { si: "la session a basculé le voisin sur une autre branche (par exemple wip/<projet>-<lot>)", alors: "contrôle existant inchangé : branche d'origine remise avec avertissement, ou lot rendu si la remise est impossible", regles: [R12] }
-    resultat: "Un lot à voisin déclaré reste livrable comme aujourd'hui ; L456 n'y change rien tant que le lead n'a pas tranché la question sur wip."
+    resultat: "Un lot à voisin déclaré reste livrable comme aujourd'hui ; L456 n'y change rien (décision du lead) : la cible est un dépôt non déclaré par le lot."
   - id: C3
     titre: "La session d'écriture reçoit l'interdiction et la voie prévue dans son brief"
     acteur: le programme (construction du brief d'une session d'écriture)
@@ -131,8 +131,8 @@ regles:
   - id: R12
     cas: [C2]
     enonce: "Les voisins déclarés par repos: ne sont pas soumis à R2 : la session y commite sur leur branche courante comme aujourd'hui, le contrôle « HEAD déplacé » (remise ou rendu), raf commits, la revue, repoShas (cycle.ts:2541) et « already has work » les lisent sur cette branche, sans changement."
-    statut: hypothese
-    si_faux: "Si le lead décide qu'un lot à voisin déclaré doit commiter seulement sur wip/<projet>-<lot>, R12 tombe : R2 couvre alors les voisins, la consigne de reposText (briefs.ts:68), la section « A lot whose work is in a neighbouring repository » de docs/orchestrate.md, test/orchestrate-cycle-repos.test.ts:30-37 et :115 sont à changer, et raf commits, la revue, repoShas et « already has work » doivent lire la branche wip du voisin. Question posée au lead avant l'acceptation."
+    statut: sourcee
+    source: "réponse du lead, 2026-10-30, vague 2026-10-30-1755-cad : le comportement des voisins déclarés (repos:) ne change pas dans ce lot ; briefs.ts:68, docs/orchestrate.md et test/orchestrate-cycle-repos.test.ts:30-37 et :115 restent tels quels ; si un voisin déclaré doit être protégé, ce sera un autre lot ouvert sur un cas réel"
     tests: ["R12 — lot à voisin déclaré : commit sur la branche courante du voisin, lot livrable (test/orchestrate-cycle-repos.test.ts existant, inchangé)", "R12 — voisin déclaré basculé sur une autre branche : remise avec avertissement, comme avant"]
   - id: R13
     cas: [C1]

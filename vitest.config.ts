@@ -7,8 +7,8 @@ const share = Number.isInteger(workers) && workers >= 1 ? workers : undefined;
 export default defineConfig({
   // L445 : plugins/cadence-hud/tsconfig.json étend .claude-plugin/types/tsconfig.json, écrit par Claude Code et non versionné
   // (absent d'un git clone neuf, donc de la CI publish.yml). Vite lit le tsconfig le plus proche de chaque .ts qu'il transforme et
-  // plante sur cet extends ; tsconfigRaw lui évite cette lecture. La suite n'a besoin d'aucune option de tsconfig (esbuild a ses défauts).
-  esbuild: { tsconfigRaw: {} },
+  // plante sur cet extends ; tsconfigRaw en chaîne lui évite cette lecture (un objet serait fusionné avec le tsconfig lu). La suite n'a besoin d'aucune option de tsconfig (esbuild a ses défauts).
+  esbuild: { tsconfigRaw: '{}' },
   test: {
     // minForks/minThreads à 1 : le minimum par défaut de tinypool (cœurs) dépasse la borne et vitest refuse de démarrer.
     poolOptions: share ? { forks: { minForks: 1, maxForks: share }, threads: { minThreads: 1, maxThreads: share } } : {},

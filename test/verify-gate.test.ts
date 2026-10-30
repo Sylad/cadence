@@ -58,6 +58,12 @@ describe('verifyGate : la porte rejouée au sha dans un worktree jetable (L348)'
     expect(r.text).toContain('vert');
   });
 
+  it('L455 — la référence de config (docs/orchestrate.md) ne dit plus que les autres dossiers ignorés sont reliés', () => {
+    const ligne = readFileSync(join(__dirname, '..', 'docs', 'orchestrate.md'), 'utf8').split('\n').find((l) => l.includes('worktreeDeps: ['));
+    expect(ligne).toContain('neither copied nor linked');
+    expect(ligne).not.toContain('are linked');
+  });
+
   it('L455 — les dossiers ignorés qui ne sont pas des dépendances (data-local/, data/, .env) ne sont pas reliés dans la copie : un test qui compare des chemins par realpath n\'y voit pas l\'arbre principal', async () => {
     const { repo } = project('orchestrate:\n  test: test -f node_modules/dep/index.js && test ! -e data-local && test ! -e data && test ! -e .env\n');
     writeFileSync(join(repo, '.gitignore'), 'node_modules/\n.venv/\ndata-local/\ndata/\n.env\n');

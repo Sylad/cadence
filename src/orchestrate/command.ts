@@ -38,7 +38,7 @@ import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderDetail, renderTable, resumeCommand } from './table.js';
-import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, repairSnapshotModules, snapshotExists, waveReadsControl, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
+import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, repairSnapshotModules, snapshotExists, waveReadsAnswerQueue, waveReadsControl, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
 
 export interface OrchestrateIo {
   cwd: string;
@@ -679,6 +679,8 @@ function freeLines(launch: string, drawn: LotState[]): string[] {
 /** Efface l'écran et replace le curseur en haut : l'entrée d'un rendu de `--status --watch`. */
 const CLEAR_SCREEN = '\x1b[H\x1b[2J';
 const DEFAULT_WATCH_INTERVAL = 10;
+/** Attente (ms) entre deux lectures de la file de réponses d'une vague vivante (L407) quand aucune file de lots ne finit. */
+const ANSWER_POLL_MS = 2000;
 
 /** Ce que `--status` montre à un instant : les vagues vivantes, puis le tableau (absent si seules les vagues vivantes comptent). */
 function statusView(args: Args, launch: string, cap: number, now: Date): { live: string[]; table?: string[]; running: boolean } {
@@ -823,6 +825,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.removeWorktree) return removeWorktree(args, io);
   if (args.resume !== undefined) return resume(args, argv, io, deps, launch, today);
   if (args.drop.length || args.stopAfterCurrent) return control(args, io);
+  if (args.answers.length) return answerOnly(args, io);
 
   if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
   const refusals: string[] = [];
@@ -1262,7 +1265,30 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
       for (const r of lotRepoPaths(c.lot)) {
         if (held.includes(join(sharedStateDir(r), REPO_LOCK)) && all.filter((l) => lotRepoPaths(l).includes(r)).every(finished)) freeRepo(r);
       }
-    }, (lots) => lots.every((c) => c.tree));
+    }, (lots) => lots.every((c) => c.tree), {
+      pollMs: deps.slotPollMs ?? ANSWER_POLL_MS,
+      // L407 : les réponses déposées par `--answer` pendant la vague sont prises entre deux étapes ; un lot qui n'est plus en question ne rejoue rien.
+      take: (canRun) => {
+        const taken: LotCtx[] = [];
+        for (const e of store.answerQueue()) {
+          const c = ctxs.find((x) => lotKey(x.lot.project, x.lot.lot) === e.lot);
+          const why = !c ? 'lot inconnu' : c.lot.status !== 'question' ? `le lot n'attend plus de réponse (${c.lot.status})` : c.lot.pendingAnswer ? 'une réponse est déjà en cours de jeu' : null;
+          if (why) {
+            wctx.log(`${e.lot} : réponse écartée (${why})`);
+            store.markAnswerTaken(e.id);
+          } else if (c && canRun(c)) {
+            c.lot.pendingAnswer = e.text;
+            c.lot.answers.push(e.text);
+            c.lot.questions = [];
+            store.writeLot(c.lot);
+            store.markAnswerTaken(e.id);
+            wctx.log(`${e.lot} : réponse du lead prise, le lot repart`);
+            taken.push(c);
+          }
+        }
+        return taken;
+      },
+    });
     handBackDroppedQuestions(ctxs); // un lot en question retiré pendant la vague : rendu avant de fixer le statut de la vague
   } finally {
     forget();
@@ -1279,10 +1305,53 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   return all.every((l) => l.status === 'ready') ? 0 : 1;
 }
 
-/** `--drop` / `--stop-after-current` (L79) : une demande écrite dans le dossier d'état de la vague vivante ; c'est elle qui la lit avant sa prochaine session. */
-function control(args: Args, io: OrchestrateIo): number {
-  const flags = '--drop / --stop-after-current';
-  if (args.lots.length || args.continue || args.dryRun || args.budget !== undefined || args.answers.length) throw new RafError(`${flags} ne se combinent pas avec des lots à lancer, --continue, --dry-run, --budget ou --answer`);
+/**
+ * `--answer` sur une vague VIVANTE (L407) : la réponse est déposée dans la file de la vague (`answers.log`), qui la prend entre deux étapes et rejoue le lot dès qu'un créneau est libre.
+ * Sans cela le lead attendait la fin de la vague (15 min d'un lot bloqué le 28-10). Les lots visés sont contrôlés comme à la reprise : connus, en question.
+ */
+function answerLive(args: Args, io: OrchestrateIo, store: RunStore): number {
+  const lots = store.lots();
+  const refusals: string[] = [];
+  const keys: { key: string; text: string }[] = [];
+  for (const a of args.answers) {
+    const matches = lots.filter((l) => l.lot === a.lot && (a.project ? l.project === a.project : true));
+    const where = `${a.project ? `${a.project}:` : ''}${a.lot}`;
+    if (matches.length !== 1) refusals.push(matches.length ? `--answer ${where} : plusieurs projets portent ce lot, précisez projet:lot` : `--answer ${where} : lot inconnu dans la vague ${store.id}`);
+    else if (matches[0].status !== 'question') refusals.push(`--answer ${lotKey(matches[0].project, matches[0].lot)} : le lot n'attend pas de réponse (${matches[0].status})`);
+    else keys.push({ key: lotKey(matches[0].project, matches[0].lot), text: a.text });
+  }
+  if (!waveReadsAnswerQueue(store.dir)) refusals.push(`la vague ${store.id} ne lit pas la file de réponses (lancée avec une version de cadence d'avant L407) : attendre sa fin, puis ${resumeCommand(store.id, '--answer', '<projet>:<lot>', '"…"')}`);
+  if (refusals.length) {
+    for (const r of refusals) io.err(`orchestrate : ${r}`);
+    return 2;
+  }
+  for (const { key, text } of keys) {
+    const id = store.requestAnswer(key, text);
+    // La vague a pu finir entre le contrôle et le dépôt : sa file ne sera plus lue, la réponse est retirée et le lead reprend à la main.
+    if (!liveWaves(cadenceHome()).some((w) => w.wave === store.id)) {
+      store.markAnswerTaken(id);
+      io.err(`orchestrate : ${key} : la vague ${store.id} vient de finir, réponse non prise : ${resumeCommand(store.id, '--answer', key, '"…"')}`);
+      return 2;
+    }
+    store.journal(`demande : réponse du lead pour ${key}`);
+    io.out(`${key} : réponse déposée — la vague ${store.id} la prend entre deux étapes et rejoue le lot dès qu'un créneau est libre`);
+  }
+  return 0;
+}
+
+/** La vague vivante, pour `--answer` seul (sans --resume) : la même recherche que `--drop`. */
+function answerOnly(args: Args, io: OrchestrateIo): number {
+  if (args.drop.length || args.stopAfterCurrent || args.budget !== undefined || args.dryRun || args.continue || args.lots.length) throw new RafError("--answer ne se combine pas avec --drop, --stop-after-current, --budget, --dry-run, --continue ni des lots à lancer (sur une vague arrêtée : --resume --answer)");
+  const store = liveStore('--answer', args, io);
+  if (typeof store === 'number') {
+    io.err(`orchestrate : --answer : une vague arrêtée se reprend avec ${resumeCommand('<vague>', '--answer', '<projet>:<lot>', '"…"')}`);
+    return store;
+  }
+  return answerLive(args, io, store);
+}
+
+/** La vague vivante lancée depuis ce dossier que vise `--wave` (ou la seule) ; sinon le refus (code 2) déjà écrit. */
+function liveStore(flags: string, args: Args, io: OrchestrateIo): RunStore | number {
   const live = liveWaves(cadenceHome()).filter((w) => w.cwd === io.cwd && (args.wave === undefined || w.wave === args.wave));
   if (live.length === 0) {
     io.err(`orchestrate : ${flags} : aucune vague en cours${args.wave ? ` (${args.wave})` : ''} lancée depuis ce dossier`);
@@ -1297,6 +1366,15 @@ function control(args: Args, io: OrchestrateIo): number {
     io.err(`orchestrate : ${flags} : dossier d'état de la vague ${live[0].wave} introuvable`);
     return 2;
   }
+  return store;
+}
+
+/** `--drop` / `--stop-after-current` (L79) : une demande écrite dans le dossier d'état de la vague vivante ; c'est elle qui la lit avant sa prochaine session. */
+function control(args: Args, io: OrchestrateIo): number {
+  const flags = '--drop / --stop-after-current';
+  if (args.lots.length || args.continue || args.dryRun || args.budget !== undefined || args.answers.length) throw new RafError(`${flags} ne se combinent pas avec des lots à lancer, --continue, --dry-run, --budget ou --answer`);
+  const store = liveStore(flags, args, io);
+  if (typeof store === 'number') return store;
   const lots = store.lots();
   const refusals: string[] = [];
   const keys: string[] = [];
@@ -1383,6 +1461,8 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
       io.err(`orchestrate : vague ${store.id} sans instantané (antérieure à L61) : reprise avec le dist/ et les gabarits courants`);
     }
   }
+  // L407 : la forme documentée sur une vague qui tourne encore dépose la réponse dans sa file au lieu de refuser ; avec une autre option de reprise, le refus ci-dessous reste.
+  if (args.answers.length && !args.lotBudgets.length && !args.drop.length && !args.integrate.length && args.budget === undefined && !args.continue && liveWaves(cadenceHome()).some((w) => w.wave === store.id && w.cwd === launch && w.pid !== process.pid)) return answerLive(args, io, store);
   const wave = store.readWave()!;
   const refusals: string[] = [];
   const info = deps.claudeInfo();

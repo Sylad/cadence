@@ -136,6 +136,18 @@ export function waveReadsControl(waveDir: string): boolean {
 }
 
 /**
+ * La vague lit-elle la file de réponses `answers.log` (L407) ? Une vague lancée avant L407 ne la lirait jamais : la réponse y dormirait. Sans instantané : on suppose que oui.
+ */
+export function waveReadsAnswerQueue(waveDir: string): boolean {
+  if (!snapshotExists(waveDir)) return true;
+  try {
+    return readFileSync(join(toolDirOf(waveDir), 'dist', 'orchestrate', 'state.js'), 'utf8').includes('answers.log');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * L'instantané de la vague connaît-il `--budget projet:lot=+N` (L223) ? Un instantané plus ancien relit l'argument avec son `parseBudget` et le refuse
  * comme budget invalide. Sans instantané : rien à relire, on suppose que oui.
  */

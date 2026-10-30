@@ -394,6 +394,41 @@ export class RunStore {
     writeFileSync(f, kept.map((l) => `${l}\n`).join(''));
   }
 
+  /**
+   * File des réponses du lead à une vague vivante (L407) : `answers.log`, en ajout seul, une ligne JSON par réponse déposée (`{id, lot, text}`) ou par réponse prise (`{taken: id}`).
+   * La vague la relit entre deux étapes ; une réponse prise ou écartée n'y figure plus. Une ligne illisible est ignorée. Pas de `.json` : `lots()` le prendrait pour un lot.
+   */
+  answerQueue(): { id: number; lot: string; text: string }[] {
+    const f = join(this.dir, 'answers.log');
+    if (!existsSync(f)) return [];
+    const entries: { id: number; lot: string; text: string }[] = [];
+    const taken = new Set<number>();
+    for (const line of readFileSync(f, 'utf8').split('\n')) {
+      try {
+        const o = JSON.parse(line) as { id?: unknown; lot?: unknown; text?: unknown; taken?: unknown };
+        if (typeof o.taken === 'number') taken.add(o.taken);
+        else if (typeof o.id === 'number' && typeof o.lot === 'string' && typeof o.text === 'string') entries.push({ id: o.id, lot: o.lot, text: o.text });
+      } catch {
+        // ligne vide ou illisible : ignorée
+      }
+    }
+    return entries.filter((e) => !taken.has(e.id));
+  }
+
+  /** Dépose une réponse dans la file ; rend son numéro. */
+  requestAnswer(lot: string, text: string): number {
+    const f = join(this.dir, 'answers.log');
+    const last = existsSync(f) ? [...readFileSync(f, 'utf8').matchAll(/^\{"id":(\d+),/gm)].map((m) => Number(m[1])) : [];
+    const id = Math.max(0, ...last) + 1;
+    appendFileSync(join(this.dir, 'answers.log'), `${JSON.stringify({ id, lot, text })}\n`);
+    return id;
+  }
+
+  /** La réponse `id` est prise (jouée, écartée ou retirée par son auteur) : elle ne sera plus relue. */
+  markAnswerTaken(id: number): void {
+    appendFileSync(join(this.dir, 'answers.log'), `${JSON.stringify({ taken: id })}\n`);
+  }
+
   journal(line: string): void {
     appendFileSync(join(this.dir, 'journal.log'), `${new Date().toISOString()} ${line}\n`);
   }

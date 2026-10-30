@@ -55,7 +55,9 @@ picture, not its source.
    question from a session comes back to the human at once; the answer goes in with
    `cadence orchestrate --resume --wave <wave> --answer <project>:<lot> "…"` (the wave is named: the
    command is printed under each question of the table, ready to run; without a wave, `--resume` is refused as
-   soon as the folder keeps several unfinished waves). The lead never answers in the
+   soon as the folder keeps several unfinished waves). While the wave is still running the same command (or
+   `cadence orchestrate --answer <project>:<lot> "…"`) queues the answer and the live wave replays the lot at
+   once, whatever the other lots do (L407). The lead never answers in the
    human's place. `--drop` and `--stop-after-current` steer a wave that is running.
 4. **Review.** The final table of the wave lists the lots ready, handed back, and the line
    « livrable jusqu'à <sha> » for a ready lot stacked under a handed-back one. Minor findings come back in

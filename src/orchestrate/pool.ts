@@ -32,9 +32,18 @@ export function groupLots(ctxs: LotCtx[]): LotCtx[][] {
  * sont dans la même file : jamais deux sessions dans un même dépôt (le plafond global des sessions de toutes les vagues est tenu par command.ts).
  * `parallel(groupe)` (L279) : les lots de ce groupe sont chacun leur propre file — ils jouent ensemble, chacun dans son worktree, dans la limite de `slots` ;
  * un lot qui dépend d'un lot du groupe attend qu'il soit fini (ready après son intégration) avant de partir, et le lot en attente d'une place n'est pas commencé
- * (son worktree n'existe pas encore, R3). `onSettled` est appelé quand un lot a fini de jouer (L132 : command.ts libère alors les dépôts que plus aucun lot ne tient). Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
+ * (son worktree n'existe pas encore, R3). `answers` (L407) : à chaque tour, et au plus tard après `pollMs`, les lots en question dont le lead a déposé la réponse repartent comme une file de plus (un créneau libre ; sans worktree, jamais en même temps qu'un autre lot du même dépôt). `onSettled` est appelé quand un lot a fini de jouer (L132 : command.ts libère alors les dépôts que plus aucun lot ne tient). Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
  */
-export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] = [], onSettled: (c: LotCtx) => void = () => {}, parallel: (lots: LotCtx[]) => boolean = () => false): Promise<void> {
+/**
+ * La file des réponses du lead à une vague vivante (L407) : `take(canRun)` applique les réponses déposées aux lots en question que `canRun` accepte et rend ces lots,
+ * prêts à être rejoués ; `pollMs` est l'attente entre deux lectures quand aucune file ne finit.
+ */
+export interface AnswerFeed {
+  take: (canRun: (c: LotCtx) => boolean) => LotCtx[];
+  pollMs: number;
+}
+
+export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] = [], onSettled: (c: LotCtx) => void = () => {}, parallel: (lots: LotCtx[]) => boolean = () => false, answers?: AnswerFeed): Promise<void> {
   const pending = groupLots(ctxs).flatMap((g) => (parallel(g) ? g.map((c) => [c]) : [g]));
   // Les lots pas encore finis de jouer (en file ou en cours) : un lot ne part pas tant que l'un d'eux est sa dépendance.
   const live = new Set(ctxs);
@@ -86,12 +95,18 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
       return !!dep && live.has(dep) && dep.lot.status !== 'ready';
     });
 
-  const running = new Set<Promise<void>>();
+  const running = new Map<Promise<void>, LotCtx[]>();
   const start = (queue: LotCtx[]) => {
     const p = runQueue(queue).finally(() => running.delete(p));
-    running.add(p);
+    running.set(p, queue);
   };
+  // Sans worktree, un lot repris ne joue pas pendant qu'un lot du même dépôt joue (jamais deux sessions dans un dépôt).
+  const canRun = (c: LotCtx) => !!c.tree || ![...running.values()].some((q) => q.some((o) => lotRepoPaths(o.lot).some((r) => lotRepoPaths(c.lot).includes(r))));
   for (;;) {
+    for (const c of answers?.take(canRun) ?? []) {
+      live.add(c);
+      pending.push([c]);
+    }
     while (running.size < slots) {
       const next = pending.findIndex((q) => !blocked(q));
       if (next < 0) break;
@@ -103,6 +118,11 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
       start(pending.shift()!);
       continue;
     }
-    await Promise.race(running);
+    if (!answers) await Promise.race(running.keys());
+    else {
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([...running.keys(), new Promise<void>((res) => (timer = setTimeout(res, answers.pollMs)))]);
+      clearTimeout(timer);
+    }
   }
 }

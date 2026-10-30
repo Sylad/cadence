@@ -94,8 +94,8 @@ regles:
   - id: R5
     cas: [C1]
     enonce: "Le cache des sous-causes est un fichier à part, <dossier>/.cadence/corrections-sous-causes.json (--cache-sous-causes pour un autre), objet clé de passe → { sous, by, manual? }. Illisible, ou sous-cause inconnue : cadence corrections refuse (code 1) sans réécrire le fichier, comme pour corrections.json. Absent : lu comme vide."
-    statut: hypothese
-    si_faux: "Si le lead préfère un champ optionnel dans corrections.json, le format de ce fichier existant change : coût de migration ; le fichier à part garde corrections.json intact (R9)."
+    statut: sourcee
+    source: réponse du lead, 2026-10-30, vague 2026-10-30-1305
     tests: ["R5 — fichier illisible : code 1 et fichier intact", "R5 — sous-cause inconnue : code 1 avec la clé citée", "R5 — fichier absent : lu comme vide"]
   - id: R6
     cas: [C2]

@@ -569,11 +569,12 @@ lots:
     finished: 2026-10-30
   - id: L457
     title: "cadence session context lit lead.contextThreshold dans le cadence.yaml du dossier COURANT : lancé depuis un sous-projet, il prend le défaut 150000 et dit « seuil atteint » à tort (30-10 : 39 % lu « atteint » depuis avatar-pandora, « sous le seuil » depuis le dossier parent). Remonter jusqu'au dossier du lead (premier parent qui porte lead: ou priority:), ou nommer le fichier lu dans la sortie ; test"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-30
     started: 2026-10-30
     review: { date: 2026-10-30, verdict: "compliant — orchestré (vague 2026-10-30-2105-cad, 0 passe(s) de correction)", commit: e8b6ebbcd861f0ed581129c881999f3767312b80 }
+    finished: 2026-10-30
   - id: L458
     title: "Faux positif de L456 : la tolérance des lots d'une AUTRE vague vivante du même dossier ne voit pas une vague lancée APRÈS celle qui contrôle (30-10 21:25 : 2026-10-30-2110-cx a rendu codex:L50 pour e61c61f a33fed9 9f53e75 de warhammer40k:L62, vague 2026-10-30-2120-wh lancée 10 min plus tard) — relire le registre des vagues au moment du contrôle (et celles finies pendant la session) ; test avec une vague lancée après"
     status: todo

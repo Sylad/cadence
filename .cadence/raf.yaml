@@ -592,6 +592,11 @@ lots:
     created: 2026-10-30
     notes:
       - { date: 2026-10-30, text: "Partir de l'existant : docs/fonctionnement.md, docs/overview.md et leurs schémas (fonctionnement-lot, -wave, -lead, -service, cycle-vague, en clair et sombre). D'abord mesurer ce qui manque ou est périmé par rapport aux notions de la liste : worktree, intégration, livrable jusqu'à, livreur, holds, escalade, readsPlan, tolérances de L456… Ensuite compléter ou restructurer ces pages, sans créer de doublon. docs/concepts.md n'est créé que si fonctionnement.md ne peut pas jouer ce rôle. Un lecteur qui ne connaît pas cadence doit comprendre le parcours d'un lot en 5 minutes." }
+  - id: L461
+    title: "Audit de simplification du code (lecture seule, relecteur neuf en Fable) : code mort (exports jamais appelés, options ou branches sans effet, ce qui a été remplacé sans être retiré), doublons (blocs copiés, fonctions jumelles), fichiers trop gros et leurs découpages naturels (orchestrate/cycle.ts 3047 lignes, orchestrate/command.ts 1679, cli.ts 1597 au 30-10), tests redondants ou vides ; liste classée par gain et par risque, chaque point avec les tests qui le protègent déjà (ou « non protégé ») et sa mesure ; aucun changement. Chaque point retenu devient un lot de nettoyage ≤ 0,5 j, sans changement de comportement observable (suite verte sans toucher aux tests sauf ceux de code mort), mesuré avant/après — demande de Sylvain le 30-10"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

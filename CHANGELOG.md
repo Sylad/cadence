@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- The test suite (`npm test`, so `prepublishOnly` and the `publish` workflow) passes in a fresh `git clone`: vitest no longer reads `plugins/cadence-hud/tsconfig.json`, which extends `.claude-plugin/types/tsconfig.json`, a file Claude Code writes when it loads the mod and git does not track. The 1.25.0 publication failed on it in `test/hud-cycle`, `test/hud-deliveries` and `test/hud-depense-l414` (L445). The mod's own typecheck still extends that file.
+
 ## [1.25.0] - 2026-10-30
 
 ### Added

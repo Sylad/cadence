@@ -1729,7 +1729,7 @@ describe('cadence perf — goulot de la fenêtre 12–18-10 (L240)', () => {
   it('Causes — tout est classé : pas de rappel de la commande', async () => {
     const c = ctx();
     const r = journal(c, CUR, { passes: 1 });
-    writeFileSync(join(c.root, '.cadence', 'corrections.json'), JSON.stringify({ [`${r.wave}/${r.project}--${r.lot}/3`]: { cause: 'bug-code', by: 'm' } }));
+    writeFileSync(join(c.root, '.cadence', 'corrections.json'), JSON.stringify({ [`${r.wave}/${r.project}--${r.lot}/3`]: { cause: 'spec-floue', by: 'm' } }));
     expect((await cad(c.root)).text).not.toContain('cadence corrections --classify');
   });
 });

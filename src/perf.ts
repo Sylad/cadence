@@ -1,6 +1,6 @@
 import { join, relative, sep } from 'node:path';
 import { planLoader, type ModelPrice, type PriceGrid } from './config.js';
-import { CAUSES, isReview as isReviewKind, type Cause, type Classification, type Journal, type JournalPass, type JournalStep } from './corrections.js';
+import { bugCodeOf, CAUSES, isReview as isReviewKind, sousCausesRanked, type BugCode, type Cause, type Classification, type Journal, type JournalPass, type JournalStep, type SousClassification } from './corrections.js';
 import { addDays, diffDays, isDay, toDay, type Day } from './dates.js';
 import { gitCommonDir } from './git.js';
 import { findProjects } from './lead.js';
@@ -86,6 +86,8 @@ export interface CauseWindow {
   unclassifiedShare: number | null;
   /** Passes à constats de la fenêtre par sorte de revue qui les a levées (`review`, `review-small`, `ux`) : lu dans les journaux, sans modèle ni cache. */
   byReview: Record<string, number>;
+  /** Passes bug-code de la fenêtre par sous-cause et maillon dominant (L447) ; absent de la fenêtre précédente, sans passe bug-code ou sans cache des sous-causes lisible. */
+  bugCode?: BugCode;
 }
 
 /** L'étape qui porte la hausse des tokens d'une classe d'estimate (L312) : la sorte d'étape dont la somme des jetons par lot, en moyenne sur les lots de la classe, monte le plus d'une fenêtre à l'autre. */
@@ -201,6 +203,8 @@ export interface PerfInput {
   /** Les plans lisibles ; vide : les indicateurs qui lisent le plan sont n/d (R16). */
   plans: Plans;
   cache: Map<string, Classification>;
+  /** Le cache des sous-causes (L447), vide quand le fichier est absent ; absent quand il est illisible : la fenêtre courante ne porte alors pas `bugCode`. */
+  sousCache?: Map<string, SousClassification>;
   /** Jours de deliveries.log par projet ; un projet absent (pas un dépôt git, pas de journal de livraison) donne un délai de livraison n/d (R5). */
   deliveries?: Map<string, Day[]>;
   /** Jours de deliveries-failed.log par projet (L227) ; un projet absent compte 0 livraison rouge. */
@@ -327,8 +331,9 @@ const byEstimateKey = (a: string, b: string): number => parseFloat(a) - parseFlo
 /** Les deux valeurs d'un indicateur, calculées fenêtre par fenêtre. */
 const both = <T>(windows: Windows, f: (w: Window) => T): { current: T; previous: T } => ({ current: f(windows.current), previous: f(windows.previous) });
 
-function causeWindow(passes: { pass: JournalPass; day: Day }[], w: Window, cache: Map<string, Classification>): CauseWindow {
+function causeWindow(passes: { pass: JournalPass; day: Day }[], w: Window, cache: Map<string, Classification>, sousCache?: Map<string, SousClassification>): CauseWindow {
   const counts = new Map<Cause, number>();
+  const bugCodePasses: JournalPass[] = [];
   let unclassified = 0;
   let withoutFindings = 0;
   const byReview: Record<string, number> = {};
@@ -346,14 +351,16 @@ function causeWindow(passes: { pass: JournalPass; day: Day }[], w: Window, cache
     }
     const cause = c.manual ?? c.cause;
     counts.set(cause, (counts.get(cause) ?? 0) + 1);
+    if (cause === 'bug-code') bugCodePasses.push(pass);
   }
+  const bugCode = sousCache ? bugCodeOf(bugCodePasses, sousCache) : null;
   const classified = [...counts.values()].reduce((a, b) => a + b, 0);
   const top = CAUSES.filter((c) => counts.has(c))
     .map((cause) => ({ cause, passes: counts.get(cause)!, share: counts.get(cause)! / classified }))
     .sort((a, b) => b.passes - a.passes)
     .slice(0, 3);
   const withFindings = classified + unclassified;
-  return { top, classified, unclassified, withoutFindings, unclassifiedShare: withFindings === 0 ? null : unclassified / withFindings, byReview };
+  return { top, classified, unclassified, withoutFindings, unclassifiedShare: withFindings === 0 ? null : unclassified / withFindings, byReview, ...(bugCode ? { bugCode } : {}) };
 }
 
 /** La sorte d'étape sous laquelle la hausse se compte : `review` et `review-small` ne font qu'une (la taille du lot choisit l'une ou l'autre, `orchestrate.review.threshold` : le passage de l'une à l'autre n'est pas une hausse). */
@@ -420,7 +427,7 @@ export function computePerf(input: PerfInput): PerfResult {
   };
   const lotCounts = both(windows, (w) => lotsIn(w).length);
   const passDays = withPasses.flatMap((d) => d.j.passes.map((pass) => ({ pass, day: pass.fixEnded && !Number.isNaN(Date.parse(pass.fixEnded)) ? toDay(new Date(pass.fixEnded)) : d.day })));
-  const causes = { current: causeWindow(passDays, windows.current, cache), previous: causeWindow(passDays, windows.previous, cache) };
+  const causes = { current: causeWindow(passDays, windows.current, cache, input.sousCache), previous: causeWindow(passDays, windows.previous, cache) };
 
   // Interventions du lead (R10, R15)
   const lastOf = new Map<string, Dated>();
@@ -831,6 +838,15 @@ function redBreakdownLines(b: RedBreakdown): string[] {
   ];
 }
 
+
+/** La ligne des sous-causes bug-code sous « causes dominantes » (L447, R6/R7) : sans sous-cause classée, elle dit comment les classer. */
+function bugCodeLine(b: BugCode): string {
+  if (b.classees === 0) return `  bug de code (${b.sansSousCause} passes) : sous-causes n/d · à classer : cadence corrections --classify`;
+  const ranked = sousCausesRanked(b).map((r, i) => `${i + 1}. ${r.label} ${r.passes}`).join(' · ');
+  const maillon = b.maillon.nom ?? `aucun (${b.maillon.raison})`;
+  return `  bug de code (${b.classees} passes sous-classées sur ${b.classees + b.sansSousCause}) : ${ranked}${b.sansSousCause > 0 ? ` · sans sous-cause : ${b.sansSousCause}` : ''} · maillon dominant : ${maillon}`;
+}
+
 /** Le tableau en texte : chaque indicateur de vitesse sur la même ligne que son jumeau de qualité (R8). */
 export function renderPerf(r: PerfResult): string[] {
   const lines = indicatorLines(r);
@@ -864,6 +880,7 @@ export function renderPerf(r: PerfResult): string[] {
   const c = r.corrections.causes.current;
   const top = c.top.map((t, i) => `${i + 1}. ${LABELS[t.cause]} ${t.passes} (${pct(t.share)})`).join(' · ');
   out.push(`  causes dominantes (${c.classified} passes classées) : ${top || 'aucune'} · non classé : ${c.unclassifiedShare === null ? 'n/d' : pct(c.unclassifiedShare)} · sans revue (tests rouges) : ${c.withoutFindings}${c.unclassified > 0 ? ' · à classer : cadence corrections --classify' : ''}`);
+  if (c.bugCode) out.push(bugCodeLine(c.bugCode));
   const origins = Object.entries(c.byReview).sort(([a, x], [b, y]) => y - x || a.localeCompare(b));
   if (origins.length > 0) out.push(`  origine des passes à constats : ${origins.map(([k, n]) => `${k} ${n}`).join(' · ')}`);
   section('Interventions du lead', ['lots terminés hors vague', 'sessions ux par lot visible', 'part des lots visibles revus par une étape ux']);

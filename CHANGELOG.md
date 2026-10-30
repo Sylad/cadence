@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `cadence corrections` sub-classifies the « bug de code » passes (L447, [docs/corrections.md](docs/corrections.md)): one of seven sub-causes (edge case, broken test, misread contract, forgotten caller, false statement, empty test, other) per pass, asked of the local model with `--classify` and cached in `.cadence/corrections-sous-causes.json` (`--cache-sous-causes`); the report gains the section « Bug de code par sous-cause » and the dominant link of the chain (at least 10 passes sub-classified and 40 % of them), `--json` the key `bugCode`. `cadence perf` prints the same count under « causes dominantes », read-only. Nothing changes for a window with no `bug-code` pass.
+
 ## [1.26.0] - 2026-10-30
 
 ### Added

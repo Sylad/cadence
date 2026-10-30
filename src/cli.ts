@@ -29,7 +29,7 @@ import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { INTEGRATION_LOCK } from './orchestrate/integrate.js';
 import { cadenceHome, liveWaves, openLotsIn, openWavesIn, waveLotsIn, type OpenWave } from './orchestrate/registry.js';
 import { blockingLots, LABEL, resumeCommand } from './orchestrate/table.js';
-import { classifyAll, measure, ollamaClassifier, readCache, readJournals, readRuns, renderReport, sampleKeys, serializeCache } from './corrections.js';
+import { bugCodeOf, bugCodePasses, classifyAll, classifySous, measure, ollamaClassifier, ollamaSousClassifier, readCache, readJournals, readRuns, readSousCache, renderReport, sampleKeys, serializeCache, serializeSousCache } from './corrections.js';
 import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedEntries, renderPerf, type PerfResult } from './perf.js';
 import { findAcceptation, parseAcceptation, redAcceptations, resealAcceptation, resealForGreen, runAcceptation, setVert } from './orchestrate/accept.js';
 import { refCommand } from './ref/command.js';
@@ -88,7 +88,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
                         mode worktree par lot (orchestrate.worktrees: true)  (activé par défaut dans cadence, désactivé ailleurs tant que la clé est absente) ; ses options : --resume --wave <vague> --integrate projet:lot (rejoue un lot rendu à l'intégration) · --resume --wave <vague> --replay projet:lot (idem, et après une écriture de plan refusée) · --remove-worktree projet:lot [--abandon-commits] (retire le worktree et la branche conservés) ; la liste des worktrees conservés : orchestrate --status et lead tour
   cadence lead tour [dossier] [--idle 3] [--depth n] [--json]   le tableau du lead, sans modèle : une ligne par sous-dossier qui a un plan, ou la ligne du dossier seul s'il est lui-même un projet (en cours, dérive, notes de clôture, prochain lot prêt, dépôt), précédées de l'en-tête perf : une ligne par ⚠ de cadence perf, rien si tout est stable
   cadence lead hold <étiquette> [--ttl minutes] | lead release <étiquette>   déclare (60 min par défaut), puis rend, une session lancée à la main par le lead : elle est soustraite des créneaux libres de orchestrate --status et de lead tour ; au TTL échu, les deux la signalent en ⚠ jusqu'au release
-  cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--since date] [--json]   mesure des passes de correction des journaux dossier/.cadence/runs : lots à ≥1 et ≥2 corrections, par projet, visibles ou non, passes par cause (classées par Ollama avec --classify, hors quota)
+  cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--cache-sous-causes fichier] [--sample n] [--until date] [--since date] [--json]   mesure des passes de correction des journaux dossier/.cadence/runs : lots à ≥1 et ≥2 corrections, par projet, visibles ou non, passes par cause (classées par Ollama avec --classify, hors quota)
   cadence perf [dossier] [--since date] [--json]   tableau de bord du workflow, sans modèle : deux fenêtres (7 derniers jours contre les 7 précédents) lues dans dossier/.cadence/runs et les plans, chaque vitesse à côté de sa qualité, ⚠ au-delà de 25 % de dégradation ; tokens par lot selon l'estimate, part de la revue, délais création → done → livraison, durée de mur par étape, coût en euros par lot livré (grille cadence.yaml perf.prices) ; --since est un jour qui tronque les fenêtres
   cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]   enregistre un document de référence hors du dépôt (references.dir de cadence.yaml, sinon $XDG_DATA_HOME/cadence/references) : pages rendues à 200 dpi, texte positionné, images incluses, index des figures et des passages qui les citent ; exige poppler, ImageMagick et tesseract (outil absent nommé avec sa commande, code 2)
   cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug nom] [--model sonnet|opus|haiku] [--model-b sonnet|opus|haiku] [--seuil 30] [--double]   la chaîne : add, puis UNE lecture (une session de l'agent reference-analyst, lectures/a.json, le programme relit le fichier : ref check, document et genre) ; --double : deux lectures indépendantes (A sur --model, B sur --model-b, lectures/a.json et b.json), ref diff, le troisième regard (agent reference-verifier : confirme ou écarte ce qu'une seule lecture porte, d'après une découpe) et l'inventaire réconcilié (inventaire.json, usage.tokens = les trois sessions) — option dont la mesure n'a pas montré de gain (docs/mesures/ref-double-lecture-2026-10-25.md) ; --model-b et --seuil n'ont de sens qu'avec --double ; plafond déclaré : 20 pages par lecture ; code 1 lecture refusée ou (--double) trop d'éléments non appariés (--seuil, 30 %), 2 refus (plafond, modèle, session en échec), 3 quota
@@ -216,6 +216,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       classify: { type: 'boolean' },
       model: { type: 'string' },
       cache: { type: 'string' },
+      'cache-sous-causes': { type: 'string' },
       sample: { type: 'string' },
       sections: { type: 'string' },
       slug: { type: 'string' },
@@ -1342,8 +1343,8 @@ function spec(rest: string[], io: Io): number {
 }
 
 /** `cadence corrections` (L165) : la mesure de référence des passes de correction d'une vague, lue dans <dossier>/.cadence/runs. */
-async function corrections(rest: string[], values: { classify?: boolean; model?: string; cache?: string; sample?: string; until?: string; since?: string; json?: boolean }, io: Io): Promise<number> {
-  if (rest.length > 1) throw new RafError('usage : cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--sample n] [--until date] [--since date] [--json]');
+async function corrections(rest: string[], values: { classify?: boolean; model?: string; cache?: string; 'cache-sous-causes'?: string; sample?: string; until?: string; since?: string; json?: boolean }, io: Io): Promise<number> {
+  if (rest.length > 1) throw new RafError('usage : cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--cache-sous-causes fichier] [--sample n] [--until date] [--since date] [--json]');
   const parent = resolve(io.cwd, rest[0] ?? '.');
   const runsDir = join(parent, '.cadence', 'runs');
   if (!existsSync(runsDir)) throw new RafError(`corrections : aucun journal de vague dans ${runsDir}`);
@@ -1354,13 +1355,28 @@ async function corrections(rest: string[], values: { classify?: boolean; model?:
   const model = values.model ?? 'mistral-small3.2:24b';
   const cacheFile = resolve(io.cwd, values.cache ?? join(parent, '.cadence', 'corrections.json'));
   const data = readRuns(runsDir, values.until, values.since);
+  const sousFile = resolve(io.cwd, values['cache-sous-causes'] ?? join(parent, '.cadence', 'corrections-sous-causes.json'));
   const cache = readCache(cacheFile);
+  // R5 (L447) : le cache des sous-causes illisible sort avec le code 1 de la fiche (corrections.json illisible sort avec 2, par `failure`).
+  let sousCache: ReturnType<typeof readSousCache>;
+  try {
+    sousCache = readSousCache(sousFile);
+  } catch (e) {
+    if (!(e instanceof RafError)) throw e;
+    io.err(`raf: ${e.message}`);
+    return 1;
+  }
   if (values.classify) {
-    const classify = ollamaClassifier({ url: io.env.OLLAMA_HOST ?? 'http://localhost:11434', model });
-    await classifyAll(data.passes, cache, classify, model, (done, total) => {
+    const url = io.env.OLLAMA_HOST ?? 'http://localhost:11434';
+    await classifyAll(data.passes, cache, ollamaClassifier({ url, model }), model, (done, total) => {
       if (done % 25 === 0 || done === total) io.err(`classement : ${done}/${total}`);
     }, { every: 10, save: () => writeFileSync(cacheFile, serializeCache(cache)) });
     writeFileSync(cacheFile, serializeCache(cache));
+    const saveSous = () => writeFileSync(sousFile, serializeSousCache(sousCache));
+    const added = await classifySous(data.passes, cache, sousCache, ollamaSousClassifier({ url, model }), model, (done, total) => {
+      if (done % 25 === 0 || done === total) io.err(`sous-causes : ${done}/${total}`);
+    }, { every: 10, save: saveSous });
+    if (added > 0) saveSous();
   }
   if (sample !== undefined) {
     const byKey = new Map(data.passes.map((p) => [p.key, p]));
@@ -1375,7 +1391,8 @@ async function corrections(rest: string[], values: { classify?: boolean; model?:
     return 0;
   }
   const m = measure(data, cache);
-  io.out(values.json ? JSON.stringify(m, null, 2) : renderReport(m));
+  const bugCode = bugCodeOf(bugCodePasses(data.passes, cache), sousCache);
+  io.out(values.json ? JSON.stringify(bugCode ? { ...m, bugCode } : m, null, 2) : renderReport(m, bugCode));
   return 0;
 }
 
@@ -1392,14 +1409,25 @@ function readPerf(parent: string, today: Day, since: string | undefined, warn: (
   const cache = readCache(join(parent, '.cadence', 'corrections.json'));
   const journals = readJournals(runsDir);
   const warnings: string[] = [];
+  // Les sous-causes (L447) n'arrêtent pas perf : un cache illisible avertit et la ligne est omise.
+  const sousFile = join(parent, '.cadence', 'corrections-sous-causes.json');
+  let sousCache: ReturnType<typeof readSousCache> | undefined;
+  let sousWarning: string | undefined;
+  try {
+    sousCache = readSousCache(sousFile);
+  } catch (e) {
+    if (!(e instanceof RafError)) throw e;
+    sousWarning = `perf : ${sousFile} illisible, sous-causes n/d`;
+  }
   const plans = readPlans(parent, (l) => warnings.push(l));
   if (plans.size === 0 && warnings.length === 0) warnings.push(`perf : aucun plan sous ${parent}, indicateurs du plan n/d`);
   const deliveries = readProjectDeliveries(parent, [...plans.keys()]);
   const failures = readProjectFailedEntries(parent, [...plans.keys()]);
   const failedDeliveries = new Map([...failures].map(([name, entries]) => [name, entries.map((e) => e.day)]));
-  const result = computePerf({ journals, plans, cache, deliveries, failedDeliveries, failures, prices, windows: perfWindows(today, since), today, since });
+  const result = computePerf({ journals, plans, cache, ...(sousCache ? { sousCache } : {}), deliveries, failedDeliveries, failures, prices, windows: perfWindows(today, since), today, since });
   if (!prices) warnings.push('perf : aucune grille de prix (cadence.yaml perf.prices), coût en euros n/d');
   for (const [model, lots] of Object.entries(result.cost.withoutPrice)) warnings.push(`perf : modèle sans prix dans perf.prices : ${model}, coût n/d pour ${lots} lot(s)`);
+  if (sousWarning) warnings.push(sousWarning);
   warnings.forEach(warn);
   return result;
 }

@@ -14,7 +14,7 @@ one (the 7 days before). Every speed indicator is printed on the same line as it
 |---|---|---|---|
 | Throughput | lots ready, lots handed back per day, lots delivered (plan `done` with `finished` in the window), share of handed-back lots within their token budget | escaped defects | is the flow dropping? look for the bottleneck before adding lots; are the budgets right? |
 | Corrections | median of `fix` passes per lot, share of lots with 2 passes or more | share of lots right the first time (no `fix` pass) | is the first write good enough? harden the sheet or the brief |
-| Corrections | dominant causes (top 3 of the classified passes, the unclassified share apart) | — | which link to fix |
+| Corrections | dominant causes (top 3 of the classified passes, the unclassified share apart); under it, the sub-causes of the `bug-code` passes and the dominant link (L447, [corrections](corrections.md)) | — | which link to fix |
 | Lead interventions | lots handed back by a wave then finished outside it, sessions that see the application per visible lot (`ux` steps, plus the `review-small` of a small visible lot), share of visible lots reviewed by a dedicated `ux` step | escaped defects (sessions per lot only) | does the wave stop too early? does the ergonomics review cost more than one round? |
 
 A line starts with `⚠` and ends with the decision it informs when its value is **worse than the previous window by more than 25 %**

@@ -387,12 +387,206 @@ export function serializeCache(cache: Map<string, Classification>): string {
   return JSON.stringify(Object.fromEntries([...cache].sort(([a], [b]) => a.localeCompare(b))), null, 2) + '\n';
 }
 
+/** Les sous-causes d'une passe « bug de code » (L447, R1), dans l'ordre où le rapport les liste. */
+export const SOUS_CAUSES = ['cas-limite', 'test-casse', 'contrat-mal-lu', 'appelant-oublie', 'affirmation-fausse', 'test-vide', 'autre'] as const;
+export type SousCause = (typeof SOUS_CAUSES)[number];
+
+const SOUS_LABELS: Record<SousCause, string> = {
+  'cas-limite': 'cas limite',
+  'test-casse': 'test cassé',
+  'contrat-mal-lu': 'contrat mal lu',
+  'appelant-oublie': 'appelant oublié',
+  'affirmation-fausse': 'affirmation fausse',
+  'test-vide': 'test vide',
+  autre: 'autre',
+};
+
+/** Ce que chaque valeur veut dire, une ligne chacune : le prompt du modèle de sous-cause (R10). */
+const SOUS_DEFINITIONS: Record<SousCause, string> = {
+  'cas-limite': 'un cas limite (entrée vide, absente, en double, d\'un autre type, refusée, forme réelle des données) que le code ne tient pas ou qu\'aucun test ne couvre',
+  'test-casse': 'un test existant que le changement casse',
+  'contrat-mal-lu': 'un contrat, une fiche ou un énoncé de lot mal lu : le code fait autre chose que ce qui est écrit',
+  'appelant-oublie': 'un appelant, un consommateur ou un autre site à changer a été oublié',
+  'affirmation-fausse': 'une documentation, un commentaire, un message ou un rapport affirme une chose fausse (chiffre, « jamais », « toujours », ancien comportement)',
+  'test-vide': 'un test qui ne peut pas échouer, ou un comportement ajouté sans test',
+  autre: 'tout bug de code qui n\'entre dans aucune des valeurs précédentes',
+};
+
+/** Les maillons de la chaîne où un mécanisme peut être posé (R2). */
+export const MAILLONS = ['brief implement', 'auto-vérification avant rendu', 'porte locale', 'fiche'] as const;
+export type Maillon = (typeof MAILLONS)[number];
+
+/** Le maillon dont relève chaque sous-cause (R2, hypothèse) ; `autre` n'en désigne aucun. */
+export const MAILLON_DE: Record<SousCause, Maillon | null> = {
+  'cas-limite': 'brief implement',
+  'test-vide': 'brief implement',
+  'affirmation-fausse': 'auto-vérification avant rendu',
+  'appelant-oublie': 'auto-vérification avant rendu',
+  'test-casse': 'porte locale',
+  'contrat-mal-lu': 'fiche',
+  autre: null,
+};
+
+/** Seuils de désignation du maillon dominant (R2, hypothèse) : passes sous-classées au moins, et part minimale du maillon en tête, en %. */
+export const MAILLON_MIN_PASSES = 10;
+export const MAILLON_MIN_PART = 40;
+
+export interface SousClassification {
+  sous: SousCause;
+  /** `ollama:<modèle>` */
+  by: string;
+  /** Sous-cause posée à la main : elle prime sur le modèle. */
+  manual?: SousCause;
+}
+
+export type SousClassifier = (pass: FixPass) => Promise<SousCause | null>;
+
+/** Extrait une sous-cause connue d'une réponse (JSON `{sous}`) ; null sinon. */
+export function parseSousCause(text: string): SousCause | null {
+  try {
+    const s = JSON.parse(text)?.sous;
+    return typeof s === 'string' && (SOUS_CAUSES as readonly string[]).includes(s) ? (s as SousCause) : null;
+  } catch {
+    return null;
+  }
+}
+
+const SOUS_SYSTEM = `Tu sous-classes une passe de correction déjà classée « bug de code » : une session a écrit du code, une revue a formulé des constats, une session de correction les a traités. Réponds par UNE sous-cause, celle du constat le plus grave. Les valeurs :
+${SOUS_CAUSES.map((s) => `- ${s} : ${SOUS_DEFINITIONS[s]} ;`).join('\n')}`;
+
+/** Sous-classeur sur un modèle local servi par Ollama (comme `ollamaClassifier` : /api/chat, température 0, sortie contrainte par un schéma à sept valeurs). */
+export function ollamaSousClassifier(opts: { url: string; model: string; fetch?: typeof fetch }): SousClassifier {
+  const doFetch = opts.fetch ?? fetch;
+  return async (pass) => {
+    const findings = pass.findings.map((f, i) => `${i + 1}. ${f.slice(0, 1500)}`).join('\n');
+    const user = `Lot ${pass.project} ${pass.lot}.\nConstats de la revue :\n${findings}\n\nCommits de la correction :\n${pass.commits.join('\n') || '(aucun)'}`;
+    try {
+      const res = await doFetch(`${opts.url.replace(/\/$/, '')}/api/chat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: opts.model,
+          stream: false,
+          options: { temperature: 0 },
+          format: { type: 'object', properties: { sous: { type: 'string', enum: [...SOUS_CAUSES] }, raison: { type: 'string' } }, required: ['sous', 'raison'] },
+          messages: [{ role: 'system', content: SOUS_SYSTEM }, { role: 'user', content: user }],
+        }),
+      });
+      if (!res.ok) return null;
+      const body = (await res.json()) as { message?: { content?: string } };
+      return parseSousCause(body.message?.content ?? '');
+    } catch {
+      return null;
+    }
+  };
+}
+
+/** La cause retenue d'une passe à constats : la relecture à la main, sinon le modèle ; absente sans classement. */
+const retainedCause = (cache: Map<string, Classification>, p: FixPass): Cause | undefined => {
+  const c = cache.get(p.key);
+  return c ? (c.manual ?? c.cause) : undefined;
+};
+
+/** Les passes à sous-classer : à constats, de cause retenue bug-code (R1). */
+export const bugCodePasses = (passes: FixPass[], cache: Map<string, Classification>): FixPass[] => passes.filter((p) => p.findings.length > 0 && retainedCause(cache, p) === 'bug-code');
+
+/** Sous-classe les passes bug-code absentes du cache des sous-causes ; un échec n'y entre pas (R3). Rend le nombre d'entrées ajoutées. */
+export async function classifySous(passes: FixPass[], cache: Map<string, Classification>, sousCache: Map<string, SousClassification>, classify: SousClassifier, model: string, progress?: (done: number, total: number) => void, checkpoint?: { every: number; save: () => void }): Promise<number> {
+  const todo = bugCodePasses(passes, cache).filter((p) => !sousCache.has(p.key));
+  let done = 0;
+  let added = 0;
+  for (const p of todo) {
+    const sous = await classify(p);
+    if (sous) {
+      sousCache.set(p.key, { sous, by: `ollama:${model}` });
+      added++;
+    }
+    done++;
+    progress?.(done, todo.length);
+    if (checkpoint && added > 0 && done % checkpoint.every === 0) checkpoint.save();
+  }
+  return added;
+}
+
+export function readSousCache(file: string): Map<string, SousClassification> {
+  let raw: unknown = null;
+  if (existsSync(file)) {
+    raw = readJson(file);
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw new RafError(`${file} : JSON illisible (un objet clé → classement est attendu), corrigez ou supprimez le fichier`);
+  }
+  const known = (s: unknown) => typeof s === 'string' && (SOUS_CAUSES as readonly string[]).includes(s);
+  const entries = Object.entries((raw ?? {}) as Record<string, SousClassification>);
+  for (const [key, c] of entries) {
+    if (!known(c?.sous)) throw new RafError(`${file} : sous-cause inconnue pour ${key} : ${String(c?.sous)}`);
+    if (c.manual !== undefined && !known(c.manual)) throw new RafError(`${file} : sous-cause inconnue pour ${key} : ${String(c.manual)}`);
+  }
+  return new Map(entries);
+}
+
+export function serializeSousCache(cache: Map<string, SousClassification>): string {
+  return JSON.stringify(Object.fromEntries([...cache].sort(([a], [b]) => a.localeCompare(b))), null, 2) + '\n';
+}
+
+/** Le maillon dominant et pourquoi (R2) : `nom` null dit « aucun », `raison` dit pourquoi ou sur quoi. */
+export interface MaillonDominant {
+  nom: Maillon | null;
+  raison: string;
+}
+
+/** Les passes bug-code d'une fenêtre par sous-cause, avec le maillon dominant (A1 : clé `bugCode`). */
+export interface BugCode {
+  /** Passes bug-code qui ont une sous-cause. */
+  classees: number;
+  /** Passes bug-code sans sous-cause (hors cache), comptées à part. */
+  sansSousCause: number;
+  parSousCause: Record<SousCause, number>;
+  maillon: MaillonDominant;
+}
+
+/** Désigne le maillon dominant : le plus lourd en passes, si au moins MAILLON_MIN_PASSES sont sous-classées et qu'il pèse MAILLON_MIN_PART % d'elles ; ni égalité en tête ni `autre` ne désignent (R2). */
+export function dominantMaillon(parSousCause: Record<SousCause, number>): MaillonDominant {
+  const total = SOUS_CAUSES.reduce((n, s) => n + parSousCause[s], 0);
+  if (total < MAILLON_MIN_PASSES) return { nom: null, raison: `${total} passes sous-classées, il en faut au moins ${MAILLON_MIN_PASSES}` };
+  const poids = MAILLONS.map((m) => ({ m, passes: SOUS_CAUSES.filter((s) => MAILLON_DE[s] === m).reduce((n, s) => n + parSousCause[s], 0) })).sort((a, b) => b.passes - a.passes);
+  const [first, second] = poids as [(typeof poids)[number], (typeof poids)[number]];
+  if (first.passes > 0 && first.passes === second.passes) return { nom: null, raison: `égalité en tête entre ${first.m} et ${second.m} (${first.passes} passes chacun)` };
+  if (first.passes * 100 < MAILLON_MIN_PART * total) return { nom: null, raison: `aucun maillon à ${MAILLON_MIN_PART} % des passes sous-classées (le premier : ${first.passes} sur ${total})` };
+  return { nom: first.m, raison: `${first.passes} passes sur ${total} sous-classées (${Math.round((100 * first.passes) / total)} %)` };
+}
+
+/** Compte les sous-causes des passes bug-code données (R4 : manual prime ; R12 : une entrée du cache hors de ces passes n'est pas lue). Rend null sans passe bug-code (R9). */
+export function bugCodeOf(passes: FixPass[], sousCache: Map<string, SousClassification>): BugCode | null {
+  if (passes.length === 0) return null;
+  const parSousCause = Object.fromEntries(SOUS_CAUSES.map((s) => [s, 0])) as Record<SousCause, number>;
+  let classees = 0;
+  for (const p of passes) {
+    const c = sousCache.get(p.key);
+    if (!c) continue;
+    parSousCause[c.manual ?? c.sous]++;
+    classees++;
+  }
+  return { classees, sansSousCause: passes.length - classees, parSousCause, maillon: dominantMaillon(parSousCause) };
+}
+
+/** Les sous-causes dans l'ordre décroissant des passes (à égalité, l'ordre de SOUS_CAUSES), celles sans passe écartées. */
+export function sousCausesRanked(b: BugCode): { sous: SousCause; label: string; passes: number }[] {
+  return SOUS_CAUSES.map((sous, i) => ({ sous, label: SOUS_LABELS[sous], passes: b.parSousCause[sous], i })).filter((x) => x.passes > 0).sort((a, b2) => b2.passes - a.passes || a.i - b2.i);
+}
+
+/** La section « Bug de code par sous-cause » de `cadence corrections` (A1) : sous-cause, passes, part des passes sous-classées, maillon. */
+export function renderSousCauses(b: BugCode): string[] {
+  const out = ['### Bug de code par sous-cause', '', `${b.classees} passes sous-classées sur ${b.classees + b.sansSousCause}${b.sansSousCause > 0 ? ` · sans sous-cause : ${b.sansSousCause} (à classer : cadence corrections --classify)` : ''}.`, ''];
+  if (b.classees > 0) out.push('| Sous-cause | Passes | Part | Maillon |', '|---|---|---|---|', ...sousCausesRanked(b).map((r) => `| ${r.label} | ${r.passes} | ${pct(r.passes, b.classees)} | ${MAILLON_DE[r.sous] ?? 'aucun'} |`), '');
+  out.push(`Maillon dominant : ${b.maillon.nom ?? `aucun (${b.maillon.raison})`}${b.maillon.nom ? ` — ${b.maillon.raison}` : ''}.`, '');
+  return out;
+}
+
 const pct = (a: number, b: number) => (b === 0 ? '—' : `${Math.round((100 * a) / b)} %`);
 /** Les causes qu'une meilleure spécification évite (critère de réussite de l'étape spec). */
 const SPEC_CAUSES: Cause[] = ['spec-floue', 'regle-inventee', 'test-manquant'];
 const row = (name: string, t: Tally) => `| ${name} | ${t.lots} | ${t.atLeast1} (${pct(t.atLeast1, t.lots)}) | ${t.atLeast2} (${pct(t.atLeast2, t.lots)}) | ${t.passes} |`;
 
-export function renderReport(m: Measure): string {
+export function renderReport(m: Measure, bugCode?: BugCode | null): string {
   const all = [...CAUSES, 'sans-constat', 'non-classe'] as CauseOrNone[];
   const used = all.filter((c) => (c !== 'non-classe' && c !== 'sans-constat') || m.byCause[c] > 0);
   const projects = Object.keys(m.byProject).sort();
@@ -411,5 +605,6 @@ export function renderReport(m: Measure): string {
   }
   out.push('');
   if (m.agreement.reviewed > 0) out.push(`Échantillon relu à la main : ${m.agreement.reviewed} passes, le modèle local est d'accord avec la relecture sur ${m.agreement.agree} (${pct(m.agreement.agree, m.agreement.reviewed)}) ; la cause relue prime dans les tableaux.`, '');
+  if (bugCode) out.push(...renderSousCauses(bugCode));
   return out.join('\n');
 }

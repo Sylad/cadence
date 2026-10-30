@@ -585,6 +585,11 @@ lots:
     estimate: 0.5
     spec: true
     created: 2026-10-30
+  - id: L460
+    title: "Guide des notions de cadence pour un humain (docs/concepts.md, lié en tête du README) : une page qui explique, chacune en quelques phrases et dans l'ordre où on les rencontre, plan et lot, verdicts (revue, UX), session et vague, étapes d'un lot (spec, code, revue, correction, UX, prêt) et QUI fait chacune, porte de tests (reprise, copie jetable), worktree par lot et intégration, livrable jusqu'à <sha>, lead, livreur, créneaux et holds, escalade, mise en service et release ; 3 à 4 schémas SVG simples (parcours d'un lot, vague et créneaux, worktrees → main, livraison au sha), un glossaire ; le détail technique reste dans les docs existantes, liées — demande de Sylvain le 30-10 (« cadence est devenu complexe, je veux que ce soit bien expliqué »)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

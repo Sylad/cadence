@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, sep } from 'node:path';
-import { Document, isSeq, parseDocument } from 'yaml';
+import { Document, isScalar, isSeq, parseDocument, type Node } from 'yaml';
 import { findProjects, readDepth } from './lead.js';
 import { priorityRank, readPriority } from './orchestrate/continue.js';
 import { RafError } from './plan.js';
@@ -39,9 +39,14 @@ export function movePriority(parent: string, project: string, place: 'before' | 
   const list = [...moved.map((p) => p.key), ...unmatched];
   const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
   const old = parseDocument(text).get('priority', true);
-  const flow = isSeq(old) && old.flow === true; // la liste en ligne reste en ligne
+  // les noms déjà dans la liste gardent leur nœud, donc le commentaire de leur ligne ; les autres sont des nœuds neufs
+  const kept = new Map<string, Node>();
+  if (isSeq(old)) for (const item of old.items) if (isScalar(item) && typeof item.value === 'string') kept.set(item.value.trim(), item);
   const value = new Document(list);
-  if (flow && isSeq(value.contents)) value.contents.flow = true;
+  if (isSeq(value.contents)) {
+    value.contents.items = list.map((n) => kept.get(n) ?? value.createNode(n));
+    value.contents.flow = isSeq(old) && old.flow === true; // la liste en ligne reste en ligne
+  }
   const next = setKey(text, 'priority', value);
   if (next !== null) writeFileSync(file, next);
   return { order, changed: true };

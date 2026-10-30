@@ -48,6 +48,8 @@ describe('cadence lead priority — réordonner les projets (L449)', () => {
     expect(text).toContain('# en-tête\ndepth: 1 # un niveau\n\n# l’ordre du tour\npriority:');
     expect(text).toContain('orchestrate:\n  test: npx vitest run # la suite\n');
     expect(text).toMatch(/priority:\n {2}- beta\n {2}- alpha/);
+    // le commentaire de la ligne d'un nom suit ce nom quand il change de place
+    expect(text).toMatch(/- beta\n {2}- alpha # le premier/);
     const flow = folder(['alpha', 'beta'], '# ordre\npriority: [alpha, beta] # inline\n');
     cadence(flow, 'lead', 'priority', 'beta', '--before', 'alpha');
     expect(yamlOf(flow)).toMatch(/^# ordre\npriority: \[ ?beta, alpha ?\]/);

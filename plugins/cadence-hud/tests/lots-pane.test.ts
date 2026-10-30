@@ -1473,7 +1473,7 @@ test('L449 — une demande forgée (projet inconnu, même projet, place inconnue
       { kind: 'project-move', id: 'ol', target: 'zzz', place: 'before' },
       { kind: 'project-move', id: 'ol', target: 'ol', place: 'before' },
       { kind: 'project-move', id: 'ol', target: 'cadence', place: 'dessus' },
-      { kind: 'project-move', id: 'ol', place: 'before' },
+      { kind: 'project-move', id: 'ol', target: 3, place: 'before' },
     ]) await ui.post(data, { in: 'projects' } as never)
   })
   expect(s.priorities()).toEqual([])

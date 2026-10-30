@@ -23,7 +23,7 @@ import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { configSet } from './config-set.js';
 import { movePriority } from './priority.js';
-import { findProjects, readDepth, leadTour, TITLE_MAX, truncate, readLeadUx, tourFreeLine, readLeadContextThreshold, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
+import { findProjects, readDepth, leadTour, TITLE_MAX, truncate, readLeadUx, tourFreeLine, readLeadContextThreshold, findLeadDir, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
 import { configuredCap, expiredHoldLines, slotsLine, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
@@ -1551,8 +1551,10 @@ function sessionContext(io: Io, session?: string): number {
   const r = readHudContext(io.env, io.now().getTime(), { cwd: io.cwd, session });
   if (!r.ok) throw new RafError(`session context : contexte illisible — ${r.reason} ; à traiter comme au seuil`);
   io.out(`ctx ${Math.round(r.ctx.percent)} % (${r.ctx.tokens}/${r.ctx.window})`);
-  const threshold = readLeadContextThreshold(io.cwd);
-  io.out(`seuil ${threshold} tokens : ${r.ctx.tokens >= threshold ? 'atteint' : 'sous le seuil'}`);
+  // Lancée d'un sous-projet, la commande lit le cadence.yaml du dossier du lead (L457) et nomme le dossier lu.
+  const leadDir = findLeadDir(io.cwd);
+  const threshold = readLeadContextThreshold(leadDir);
+  io.out(`seuil ${threshold} tokens : ${r.ctx.tokens >= threshold ? 'atteint' : 'sous le seuil'}${leadDir === io.cwd ? '' : ` (lu dans ${join(leadDir, 'cadence.yaml')})`}`);
   return 0;
 }
 

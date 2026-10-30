@@ -24,7 +24,10 @@ cadence session context            # `ctx 42 % (84000/200000)`: the context of Y
                                    # `seuil 150000 tokens : sous le seuil` or `… : atteint` (tokens ≥ threshold)
 ```
 
-`lead.contextThreshold` is read in the `cadence.yaml` of the folder where `session context` runs (the lead's folder): an integer ≥ 1,
+`lead.contextThreshold` is read in the `cadence.yaml` of the lead's folder: the folder where `session context` runs, or else the first
+parent whose `cadence.yaml` carries a `lead:` or `priority:` key (run from a sub-project it no longer falls back on the default). When it
+is read in a parent, the verdict line names the file: `seuil 500000 tokens : sous le seuil (lu dans /…/cadence.yaml)`. With no such
+parent, the current folder and the default apply. The value is an integer ≥ 1,
 in tokens, because a percentage moves with the window (60 % is 120k on 200k, 600k on 1M). A zero, a negative, a decimal or
 a non-number is refused with the key's name (exit 2, read as at the threshold). It is not scaled to the window: on a window
 smaller than the threshold the verdict never reads `atteint`, so set a lower one there.

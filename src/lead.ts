@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { basename, join, relative, sep } from 'node:path';
+import { basename, dirname, join, relative, sep } from 'node:path';
 import { audit, gateWaiting, nextUp, planCommits, workByLot } from './audit.js';
 import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readPlanConfig } from './config.js';
 import { diffDays, type Day } from './dates.js';
@@ -40,6 +40,22 @@ export function readLeadUx(parent: string): 'lead' | 'human' {
   if (ux == null) return 'human';
   if (ux !== 'lead' && ux !== 'human') throw new RafError(`${found!.file} : lead.ux doit être « lead » ou « human »`);
   return ux;
+}
+
+/** Le dossier du lead pour `start` (L457) : `start` ou le premier parent dont le cadence.yaml porte la clé `lead:` ou `priority:` ; aucun ne la porte (ou un yaml illisible en chemin) = `start` lui-même. */
+export function findLeadDir(start: string): string {
+  for (let dir = start; ; dir = dirname(dir)) {
+    const file = join(dir, 'cadence.yaml');
+    if (existsSync(file)) {
+      try {
+        const raw = parse(readFileSync(file, 'utf8')) as Record<string, unknown> | null;
+        if (raw && typeof raw === 'object' && ('lead' in raw || 'priority' in raw)) return dir;
+      } catch {
+        // un yaml illisible n'est pas celui d'un lead qu'on puisse lire : on continue de remonter
+      }
+    }
+    if (dirname(dir) === dir) return start;
+  }
 }
 
 /** Seuil de contexte du lead quand `lead.contextThreshold` n'est pas posé (L437). */

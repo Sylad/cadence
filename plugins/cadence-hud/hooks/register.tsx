@@ -9,7 +9,7 @@ import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
-import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseToggleAsk, planMove, projectDir, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
+import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
@@ -733,6 +733,30 @@ export const register: Register = on => {
       await toggleView($, toggle.key)
       return {}
     }
+    // l'ordre des projets (L449) : posté par la région des projets, réécrit dans la liste priority: du cadence.yaml du dossier par `cadence lead priority`
+    const projectAsk = parseProjectMoveAsk(e.data, board?.rows ?? [])
+    if (projectAsk) {
+      if (isMoving) return {}
+      const folder = tourFolder(allWaves, sessionCwd)
+      if (!folder) {
+        await say($, 'dossier des plans inconnu : rien n\'a été déplacé', 'refused')
+        return {}
+      }
+      isMoving = true
+      try {
+        const r = await $.process.run(priorityArgv(folder, projectAsk), { cwd: folder, timeoutMs: 10_000 }).catch(() => undefined)
+        if (!r) await say($, 'cadence n’a pas pu être lancé (absent du PATH ou sans réponse) : l’ordre des projets n’a pas changé', 'refused')
+        else if (r.exitCode !== 0) await say($, refusalReason(r.stderr, r.exitCode, 'cadence lead priority'), 'refused')
+        else if (/rien à changer/.test(r.stdout)) await say($, `${projectAsk.id} est déjà ${projectAsk.place === 'before' ? 'avant' : 'après'} ${projectAsk.target}`, 'unchanged')
+        else {
+          await say($, `${projectAsk.id} placé ${projectAsk.place === 'before' ? 'avant' : 'après'} ${projectAsk.target} — priority: du cadence.yaml est modifiée, à commiter`, 'done')
+          void readTourNow?.()
+        }
+      } finally {
+        isMoving = false
+      }
+      return {}
+    }
     const ask = parseMoveAsk(e.data)
     const project = board?.rows.find(r => r.project === ask?.project && !r.error)
     if (!ask || !board || !project || isMoving) return {}
@@ -841,7 +865,16 @@ export const register: Register = on => {
     } else if (board === null) {
       body = failed ? message("Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute.", 'error') : message('Lecture des plans…', 'subtle')
     } else {
-      const panel = buildPanel({ rows: board.rows, columns, height: e.props.scroll.bodyRows - decisions.lines.length - spend.lines.length - shipped.lines.length, waves: waveLotsOf(allWaves, at), folds, views, now: at })
+      // l'ordre des projets (L449) : une région de plus, une ligne par projet (et son titre), quand il y a un ordre à ranger (deux projets au moins) ;
+      // elle prend ses lignes sur l'arbre et ne vient que s'il lui reste de quoi montrer le nom de chaque projet et un lot (2 lignes par projet)
+      const ranked = projectsOf(board.rows)
+      const room = e.props.scroll.bodyRows - decisions.lines.length - spend.lines.length - shipped.lines.length
+      const showOrder = Client !== undefined && ranked.length >= 2 && room - (ranked.length + 1) >= 2 * ranked.length + 1
+      const order = showOrder && (
+        <Client key="projects" module="./projects-list.tsx" props={{ projects: ranked.map(r => ({ name: r.project, detail: projectDetail(r) })) }} width="100%" />
+      )
+      const orderRows = order ? ranked.length + 1 : 0
+      const panel = buildPanel({ rows: board.rows, columns, height: room - orderRows, waves: waveLotsOf(allWaves, at), folds, views, now: at })
       if (panel.lines.length === 0) {
         body = message('Aucun lot non clos dans les projets de ce dossier.', 'subtle')
       } else {
@@ -908,6 +941,12 @@ export const register: Register = on => {
         flush()
         body = (
           <Box key="tree" flexDirection="column">
+            {order && (
+              <Text key="order" dimColor wrap="truncate-end">
+                ordre des projets (priority:) — glisser, ou Alt+↑ / Alt+↓
+              </Text>
+            )}
+            {order}
             {rows}
             {panel.more > 0 && (
               <Text dimColor>

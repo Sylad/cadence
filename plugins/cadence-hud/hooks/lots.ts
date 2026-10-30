@@ -106,8 +106,8 @@ export const planMove = (lots: readonly TourLot[], ask: MoveAsk, rankOf: (lot: T
   return { kind: 'move', argv }
 }
 
-/** La raison d'un refus de `raf move` : la première ligne de son erreur, sans le préfixe « raf: » ; le code de sortie si elle est vide. */
-export const refusalReason = (stderr: string, exitCode: number): string => stderr.split('\n').map(l => l.trim()).find(l => l !== '')?.replace(/^raf\s*:\s*/, '') ?? `raf move : code ${exitCode}`
+/** La raison d'un refus d'une commande : la première ligne de son erreur, sans le préfixe « raf: » ; le code de sortie, avec `command`, si elle est vide. */
+export const refusalReason = (stderr: string, exitCode: number, command = 'raf move'): string => stderr.split('\n').map(l => l.trim()).find(l => l !== '')?.replace(/^raf\s*:\s*/, '') ?? `${command} : code ${exitCode}`
 
 /** Le dossier d'un projet du tour : le dossier interrogé lui-même quand le tour n'a qu'une ligne portant son nom (un projet sans sous-projet), sinon `<dossier>/<projet>` ; `raf` s'y lance. */
 export const projectDir = (folder: string, project: string, rows: readonly LotsRow[]): string =>
@@ -395,3 +395,31 @@ export const parseMoveAsk = (data: unknown): (MoveAsk & { project: string }) | u
   if (d.kind !== 'move' || typeof d.project !== 'string' || typeof d.id !== 'string' || typeof d.target !== 'string') return undefined
   return d.place === 'before' || d.place === 'after' ? { project: d.project, id: d.id, target: d.target, place: d.place } : undefined
 }
+
+// ── L449 : l'ordre des projets, réécrit dans la liste priority: du cadence.yaml du dossier (cadence lead priority) ──
+
+/** La ligne que `lead tour` ajoute quand le cadence.yaml du dossier est illisible : elle n'est pas un projet, on ne la range pas. */
+const FOLDER_PROBLEM = 'cadence.yaml'
+
+/** Les projets que le panneau range, dans l'ordre où le tour les donne (celui de `priority:`) : toute ligne du tour sauf l'erreur du cadence.yaml du dossier. */
+export const projectsOf = (rows: readonly LotsRow[]): LotsRow[] => rows.filter(r => !(r.error !== undefined && r.project === FOLDER_PROBLEM))
+
+/** Une ligne de la région des projets : le nom et ce que le projet tient (son nombre de lots non clos, ou l'erreur de sa lecture). */
+export const projectDetail = (r: LotsRow): string => {
+  if (r.error !== undefined) return 'illisible'
+  const n = openCount(r.lots ?? [])
+  return `${n} lot${n > 1 ? 's' : ''} non clos`
+}
+
+/** Lit ce que la région des projets a posté : placer `id` avant ou après `target`, deux projets différents du tableau lu, sinon rien (la donnée vient du dessin, elle n'est pas crue). */
+export const parseProjectMoveAsk = (data: unknown, rows: readonly LotsRow[]): MoveAsk | undefined => {
+  if (typeof data !== 'object' || data === null) return undefined
+  const d = data as Record<string, unknown>
+  if (d.kind !== 'project-move' || typeof d.id !== 'string' || typeof d.target !== 'string' || d.id === d.target) return undefined
+  if (d.place !== 'before' && d.place !== 'after') return undefined
+  const names = projectsOf(rows).map(r => r.project)
+  return names.includes(d.id) && names.includes(d.target) ? { id: d.id, target: d.target, place: d.place } : undefined
+}
+
+/** La commande qui range un projet : `cadence lead priority` sur le dossier du tour. */
+export const priorityArgv = (folder: string, ask: MoveAsk): string[] => ['cadence', 'lead', 'priority', ask.id, `--${ask.place}`, ask.target, folder]

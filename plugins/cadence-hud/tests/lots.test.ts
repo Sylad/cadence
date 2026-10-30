@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { buildPanel, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, planMove, projectDir, readTime, refusalReason } from '../hooks/lots'
+import { buildPanel, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, planMove, priorityArgv, projectDetail, projectDir, projectsOf, readTime, refusalReason } from '../hooks/lots'
 import type { LotsRow, TourLot } from '../types'
 
 const lot = (id: string, status: 'todo' | 'doing' = 'todo', extra: Partial<TourLot> = {}): TourLot => ({ id, title: `Titre ${id}`, status, after: [], ...extra })
@@ -655,4 +655,43 @@ test('R22 — ce que la région Client poste est vérifié : seule une demande c
   for (const bad of [null, 'move', 7, {}, { kind: 'move', project: 'p', id: 'L1', target: 'L2', place: 'beside' }, { kind: 'move', project: 'p', id: 1, target: 'L2', place: 'after' }, { kind: 'other', project: 'p', id: 'L1', target: 'L2', place: 'after' }]) {
     expect(parseMoveAsk(bad)).toBeUndefined()
   }
+})
+
+// ── L449 : l'ordre des projets ────────────────────────────────────────────────────────────────────────────────
+
+const PROJECT_ROWS = [
+  { project: 'cadence.yaml', error: 'cadence.yaml illisible : x' },
+  { project: 'alpha', lots: [lot('A'), lot('A/1', 'todo', { parent: 'A' }), lot('B')] },
+  { project: 'beta', error: 'plan illisible' },
+  { project: 'gamma', lots: [lot('G')] },
+] as never[]
+
+test('L449 — les projets rangés sont ceux du tour, sauf la ligne d’erreur du cadence.yaml du dossier ; un projet nommé cadence.yaml sans erreur en est un', () => {
+  expect(projectsOf(PROJECT_ROWS).map(r => r.project)).toEqual(['alpha', 'beta', 'gamma'])
+  expect(projectsOf([{ project: 'cadence.yaml', lots: [] }] as never[])).toHaveLength(1)
+})
+
+test('L449 — le détail d’un projet : ses lots non clos (sous-tâches natives exclues, pluriel), « illisible » en erreur', () => {
+  const [, alpha, beta, gamma] = PROJECT_ROWS as Parameters<typeof projectDetail>[0][]
+  expect(projectDetail(alpha!)).toBe('2 lots non clos')
+  expect(projectDetail(gamma!)).toBe('1 lot non clos')
+  expect(projectDetail(beta!)).toBe('illisible')
+})
+
+test('L449 — la demande de la région des projets : deux projets différents du tableau, place before/after, sinon rien', () => {
+  const ok = { kind: 'project-move', id: 'gamma', target: 'alpha', place: 'before' }
+  expect(parseProjectMoveAsk(ok, PROJECT_ROWS)).toEqual({ id: 'gamma', target: 'alpha', place: 'before' })
+  expect(parseProjectMoveAsk({ ...ok, id: 'cadence.yaml' }, PROJECT_ROWS)).toBeUndefined()
+  expect(parseProjectMoveAsk({ ...ok, id: 'zzz' }, PROJECT_ROWS)).toBeUndefined()
+  expect(parseProjectMoveAsk({ ...ok, target: 'gamma' }, PROJECT_ROWS)).toBeUndefined()
+  expect(parseProjectMoveAsk({ ...ok, place: 'dessus' }, PROJECT_ROWS)).toBeUndefined()
+  expect(parseProjectMoveAsk({ ...ok, kind: 'move' }, PROJECT_ROWS)).toBeUndefined()
+  expect(parseProjectMoveAsk({ ...ok, target: 3 }, PROJECT_ROWS)).toBeUndefined()
+  expect(parseProjectMoveAsk(null, PROJECT_ROWS)).toBeUndefined()
+})
+
+test('L449 — la commande est cadence lead priority sur le dossier du tour ; sans message d’erreur la raison nomme la commande et le code', () => {
+  expect(priorityArgv('/p', { id: 'gamma', target: 'alpha', place: 'after' })).toEqual(['cadence', 'lead', 'priority', 'gamma', '--after', 'alpha', '/p'])
+  expect(refusalReason('', 3, 'cadence lead priority')).toBe('cadence lead priority : code 3')
+  expect(refusalReason('raf: /p/cadence.yaml illisible : x\n', 2, 'cadence lead priority')).toBe('/p/cadence.yaml illisible : x')
 })

@@ -22,7 +22,7 @@ const WAVE: Wave = {
 type Cadence = { exitCode: number; stdout: string }
 
 /** Monte le mod comme une session, avec un moteur simulé : état en mémoire, panneaux ouverts, processus pilotés par le test. */
-const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave[]; stamps?: () => string; deliveries?: () => string; last?: () => string; perf?: () => Cadence; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
+const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave[]; stamps?: () => string; deliveries?: () => string; last?: () => string; perf?: () => Cadence; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string }; priority?: (argv: string[], cwd: string | undefined) => { exitCode: number; stdout: string; stderr: string } } = {}) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const open = new Set<string>()
   const opened: unknown[] = []
@@ -64,6 +64,10 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
       const r = (setup.raf ?? (() => ({ exitCode: 0, stderr: '' })))(argv, (e as unknown as { init?: { cwd?: string } }).init?.cwd)
       return { value: { exitCode: r.exitCode, stdout: '', stderr: r.stderr } } as never
     }
+    if (argv[0] === 'cadence' && argv[1] === 'lead' && argv[2] === 'priority') {
+      const r = (setup.priority ?? (() => ({ exitCode: 0, stdout: 'placé', stderr: '' })))(argv, (e as unknown as { init?: { cwd?: string } }).init?.cwd)
+      return { value: r } as never
+    }
     if (argv[0] === 'cadence' && argv[1] === 'perf') {
       const r = (setup.perf ?? (() => ({ exitCode: 1, stdout: '' })))()
       return { value: { ...r, stderr: '' } } as never
@@ -79,7 +83,8 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
   })
   await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
   await settle()
-  const tours = () => runs.filter(a => a[0] === 'cadence' && a[1] === 'lead')
+  const tours = () => runs.filter(a => a[0] === 'cadence' && a[1] === 'lead' && a[2] === 'tour')
+  const priorities = () => runs.filter(a => a[0] === 'cadence' && a[1] === 'lead' && a[2] === 'priority')
   const perfs = () => runs.filter(a => a[0] === 'cadence' && a[1] === 'perf')
   // laisse finir la lecture que l'ouverture lance sans l'attendre : un test qui s'arrête avant la verrait aboutir après le déchargement du mod
   const hud = async (args: string, columns = 140) => {
@@ -149,7 +154,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await fresh.unmount()
     return text
   }
-  return { rafs, gestures, notice, kv, press, pressKey, store, open, opened, runs, tours, perfs, tour, stamps, waves, hud, advance, draw }
+  return { rafs, priorities, gestures, notice, kv, press, pressKey, store, open, opened, runs, tours, perfs, tour, stamps, waves, hud, advance, draw }
 }
 
 const CLOSE_HELP = '/hud lots pour fermer'
@@ -1355,4 +1360,153 @@ test('L415 R14 — un corps de 12 lignes : le bloc se coupe à ce que la moitié
   expect(texts.filter(t => /^✔ p\d/.test(t))).toHaveLength(4)
   expect(texts).toContain('… +2 projets')
   expect(texts.some(t => /L401/.test(t))).toBe(true)
+})
+
+// ── L449 : réordonner les projets dans le panneau ─────────────────────────────────────────────────────────────
+
+// la région des projets : « cadence » (y 0), « ol » (y 1) ; TOUR a deux projets
+const pdown = (y: number) => ({ type: 'down', x: 4, y, button: 'left', in: 'projects' }) as never
+const pmove = (y: number) => ({ type: 'move', x: 4, y, button: 'left', in: 'projects' }) as never
+const pup = (y: number) => ({ type: 'up', x: 4, y, button: 'left', in: 'projects' }) as never
+const pkey = (key: 'up' | 'down', meta = true) => ({ key, ...(meta ? { meta } : {}), in: 'projects' }) as never
+const projectGestures = (s: Awaited<ReturnType<typeof session>>, act: Parameters<Awaited<ReturnType<typeof session>>['gestures']>[0], surface: 'desktop' | 'terminal' = 'desktop') => s.gestures(act, surface, 2, 'projects')
+
+test('L449 — glisser un projet sur un autre : cadence lead priority dans le dossier du tour, puis le panneau se relit et dit que le cadence.yaml est à commiter', async ($, on) => {
+  const cwds: (string | undefined)[] = []
+  const s = await session($, on, { priority: (_a, cwd) => (cwds.push(cwd), { exitCode: 0, stdout: 'ol placé avant cadence', stderr: '' }) })
+  await s.hud('lots')
+  const before = s.tours().length
+  const text = await projectGestures(s, async ui => {
+    await ui.pointer(pdown(1))
+    await ui.pointer(pmove(0))
+    await ui.pointer(pup(0))
+  })
+  expect(s.priorities()).toEqual([['cadence', 'lead', 'priority', 'ol', '--before', 'cadence', '/x']])
+  expect(cwds).toEqual(['/x'])
+  expect(s.tours().length).toBe(before + 1)
+  expect(text).toMatch(/✔ ol placé avant cadence — priority: du cadence.yaml est modifiée, à commiter$/m)
+})
+
+test('L449 — glisser vers le bas place après la cible ; lâcher sur la ligne saisie ne demande rien', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  await projectGestures(s, async ui => {
+    await ui.pointer(pdown(0))
+    await ui.pointer(pup(1))
+    await ui.pointer(pdown(1))
+    await ui.pointer(pup(1))
+  })
+  expect(s.priorities()).toEqual([['cadence', 'lead', 'priority', 'cadence', '--after', 'ol', '/x']])
+})
+
+test('L449 — Alt+↓ / Alt+↑ sur le projet sélectionné le range d’un cran ; au bord, ou sans sélection, rien ne part ; sans Alt, la flèche sélectionne seulement', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  await projectGestures(s, async ui => {
+    await ui.key(pkey('down', true)) // rien de sélectionné : rien
+    await ui.key(pkey('down', false)) // sélectionne cadence
+    await ui.key(pkey('up', true)) // au bord haut : rien
+    await ui.key(pkey('down', true)) // cadence après ol
+  })
+  expect(s.priorities()).toEqual([['cadence', 'lead', 'priority', 'cadence', '--after', 'ol', '/x']])
+  await projectGestures(s, async ui => {
+    await ui.key(pkey('down', false))
+    await ui.key(pkey('down', false)) // ol
+    await ui.key(pkey('down', true)) // au bord bas : rien
+    await ui.key(pkey('up', true)) // ol avant cadence
+  })
+  expect(s.priorities()[1]).toEqual(['cadence', 'lead', 'priority', 'ol', '--before', 'cadence', '/x'])
+  expect(s.priorities()).toHaveLength(2)
+})
+
+test('L449 — un refus de cadence (cadence.yaml illisible) est montré avec sa raison, sans relecture ni message de réussite', async ($, on) => {
+  const reason = '/x/cadence.yaml illisible : Flow sequence in block collection must be sufficiently indented'
+  const s = await session($, on, { priority: () => ({ exitCode: 2, stdout: '', stderr: `raf: ${reason}\n` }) })
+  await s.hud('lots')
+  const before = s.tours().length
+  const text = await projectGestures(s, async ui => {
+    await ui.pointer(pdown(1))
+    await ui.pointer(pup(0))
+  })
+  expect(text).toMatch(new RegExp(`✖ ${reason.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
+  expect(text).not.toMatch(/à commiter/)
+  expect(s.tours().length).toBe(before)
+})
+
+test('L449 — un refus de cadence sans message donne la commande et le code', async ($, on) => {
+  const s = await session($, on, { priority: () => ({ exitCode: 3, stdout: '', stderr: '' }) })
+  await s.hud('lots')
+  expect(await projectGestures(s, async ui => {
+    await ui.pointer(pdown(1))
+    await ui.pointer(pup(0))
+  })).toMatch(/✖ cadence lead priority : code 3/)
+})
+
+test('L449 — cadence introuvable : le panneau le dit et l’ordre n’a pas changé', async ($, on) => {
+  const s = await session($, on, { priority: () => { throw new Error('ENOENT') } })
+  await s.hud('lots')
+  expect(await projectGestures(s, async ui => {
+    await ui.pointer(pdown(1))
+    await ui.pointer(pup(0))
+  })).toMatch(/cadence n’a pas pu être lancé.*l’ordre des projets n’a pas changé/)
+})
+
+test('L449 — le projet déjà à cette place : la commande le dit, le panneau l’affiche sans « à commiter » et sans relecture', async ($, on) => {
+  const s = await session($, on, { priority: () => ({ exitCode: 0, stdout: 'ol est déjà avant cadence : rien à changer', stderr: '' }) })
+  await s.hud('lots')
+  const before = s.tours().length
+  const text = await projectGestures(s, async ui => {
+    await ui.pointer(pdown(1))
+    await ui.pointer(pup(0))
+  })
+  expect(text).toMatch(/• ol est déjà avant cadence/)
+  expect(text).not.toMatch(/à commiter/)
+  expect(s.tours().length).toBe(before)
+})
+
+test('L449 — une demande forgée (projet inconnu, même projet, place inconnue, dossier) est ignorée', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  await projectGestures(s, async ui => {
+    for (const data of [
+      { kind: 'project-move', id: 'zzz', target: 'ol', place: 'before' },
+      { kind: 'project-move', id: 'ol', target: 'zzz', place: 'before' },
+      { kind: 'project-move', id: 'ol', target: 'ol', place: 'before' },
+      { kind: 'project-move', id: 'ol', target: 'cadence', place: 'dessus' },
+      { kind: 'project-move', id: 'ol', place: 'before' },
+    ]) await ui.post(data, { in: 'projects' } as never)
+  })
+  expect(s.priorities()).toEqual([])
+})
+
+test('L449 — sans région Client (mobile), pas de liste ni de libellé de l’ordre des projets ; avec elle (terminal), le libellé', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  expect((await s.draw(70, 30, 'mobile')).text).not.toMatch(/ordre des projets/)
+  expect((await s.draw(70, 30, 'terminal')).text).toMatch(/ordre des projets \(priority:\)/)
+})
+
+test('L449 — un seul projet : rien à ranger, ni liste ni libellé', async ($, on) => {
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify([TOUR[1]]) }) })
+  await s.hud('lots')
+  expect((await s.draw(70, 30, 'terminal')).text).not.toMatch(/ordre des projets/)
+})
+
+test('L449 — la ligne « cadence.yaml » du tour (fichier illisible) n’est pas un projet : ni rangée, ni cible', async ($, on) => {
+  const broken = { project: 'cadence.yaml', error: 'cadence.yaml illisible : x', doing: [], drift: [], notes: [], next: null, repo: [], progress: { done: 0, doing: 0, todo: 0, added7: 0 } }
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify([broken, ...TOUR]) }) })
+  await s.hud('lots')
+  await projectGestures(s, async ui => {
+    await ui.post({ kind: 'project-move', id: 'cadence.yaml', target: 'ol', place: 'before' }, { in: 'projects' } as never)
+    await ui.post({ kind: 'project-move', id: 'ol', target: 'cadence.yaml', place: 'after' }, { in: 'projects' } as never)
+  })
+  expect(s.priorities()).toEqual([])
+})
+
+test('L449 — trop peu de place : la région des projets cède sa place à l’arbre des lots', async ($, on) => {
+  const s = await session($, on)
+  await s.hud('lots')
+  const small = await s.draw(70, 6, 'terminal')
+  expect(small.text).not.toMatch(/ordre des projets/)
+  expect(small.text).toMatch(/L401/)
 })

@@ -22,7 +22,7 @@ import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { configSet } from './config-set.js';
-import { findProjects, readDepth, leadTour, TITLE_MAX, truncate, readLeadUx, tourFreeLine, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
+import { findProjects, readDepth, leadTour, TITLE_MAX, truncate, readLeadUx, tourFreeLine, readLeadContextThreshold, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
 import { configuredCap, expiredHoldLines, slotsLine, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
@@ -1528,11 +1528,13 @@ async function sessionAll(rest: string[], values: { all?: boolean; depth?: strin
   return worst;
 }
 
-/** Le contexte de la session de `--session <id>`, sinon de `CLAUDE_CODE_SESSION_ID`, sinon (variable absente) de la seule session du dossier courant, tel que la bande cadence-hud le publie ; illisible = code 2, à lire comme « au seuil ». */
+/** Le contexte (et sa position par rapport à `lead.contextThreshold`, en tokens) de la session de `--session <id>`, sinon de `CLAUDE_CODE_SESSION_ID`, sinon (variable absente) de la seule session du dossier courant, tel que la bande cadence-hud le publie ; illisible = code 2, à lire comme « au seuil ». */
 function sessionContext(io: Io, session?: string): number {
   const r = readHudContext(io.env, io.now().getTime(), { cwd: io.cwd, session });
   if (!r.ok) throw new RafError(`session context : contexte illisible — ${r.reason} ; à traiter comme au seuil`);
   io.out(`ctx ${Math.round(r.ctx.percent)} % (${r.ctx.tokens}/${r.ctx.window})`);
+  const threshold = readLeadContextThreshold(io.cwd);
+  io.out(`seuil ${threshold} tokens : ${r.ctx.tokens >= threshold ? 'atteint' : 'sous le seuil'}`);
   return 0;
 }
 

@@ -130,7 +130,7 @@
 <text x="1140" y="703.5" text-anchor="middle">findings → the human</text>
 </g>
 <g id="ctx"><rect x="1241" y="337" width="158" height="66" rx="8" fill="#0c2d6b" stroke="#58a6ff" stroke-width="1.5"/>
-<text x="1320" y="358.5" text-anchor="middle" font-weight="600">Context under 60 %?</text>
+<text x="1320" y="358.5" text-anchor="middle" font-weight="600">Context under limit?</text>
 <text x="1320" y="374.5" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="11.5">session context</text>
 <text x="1320" y="390.5" text-anchor="middle">error = at threshold</text>
 </g>
@@ -175,7 +175,7 @@
 <polyline points="1320,403 1320,650" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <text x="1326" y="440" text-anchor="start" font-size="11" fill="#8b949e" class="lbl">yes: chain</text>
 <polyline points="1399,370 1421,370" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
-<text x="1410" y="329" text-anchor="middle" font-size="11" fill="#8b949e" class="lbl">≥ 60 %: close</text>
+<text x="1410" y="329" text-anchor="middle" font-size="11" fill="#8b949e" class="lbl">limit reached: close</text>
 <polyline points="1500,337 1500,203" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <polyline points="1320,716 1320,746 420,746 420,716" fill="none" stroke="#8b949e" stroke-width="1.6" marker-end="url(#arr)"/>
 <text x="870" y="740" text-anchor="middle" font-size="11" fill="#8b949e" class="lbl">next wave: back to step 2, the limits still apply</text>

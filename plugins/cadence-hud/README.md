@@ -140,7 +140,7 @@ appelle `cadence lead tour --json` (CLI `@sylad/cadence` sur le PATH, facultativ
 un `python3` écrit le contexte de la session dans `~/.cadence/orchestrate/hud-context/<id de session>.json`
 (`session`, `cwd` = le dossier de la session, `percent`, `tokens`, `window`, `at` ; écriture atomique, un fichier PAR
 session). C'est ce que lit `cadence session context` : la session lead ne voit pas la bande, qui n'est qu'un rendu, et le
-skill `lead` en tire son seuil de 60 % pour enchaîner sans le humain. La commande lit par défaut le fichier de SA session, celui
+skill `lead` compare ce contexte à son seuil en tokens (`lead.contextThreshold`) pour enchaîner sans le humain. La commande lit par défaut le fichier de SA session, celui
 que nomme la variable `CLAUDE_CODE_SESSION_ID` (posée par Claude Code dans l'environnement de ses commandes Bash, valeur
 identique au nom du fichier) ; `--session <id>` l'emporte. Le dossier courant ne sert que si la variable est absente ET qu'une
 seule session publie pour ce dossier ; avec deux sessions dans le même dossier (elles alternent, « la plus récente » serait

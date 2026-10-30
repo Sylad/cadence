@@ -17,10 +17,10 @@ import { staleNotes, staleText } from './stale-notes.js';
 import { noTestGate, noTestText, type NoTestGate } from './orchestrate/no-test.js';
 import { KEPT_TITLE, keptLine, keptTrees, type KeptTree } from './orchestrate/worktree.js';
 
-/** Clé `lead.ux` du cadence.yaml du dossier parent (L197) : qui pose le verdict UX (`raf ux`) d'un lot visible. `human` (défaut) : l'humain ; `lead` : le lead, l'humain n'étant consulté qu'en cas de doute. */
-export function readLeadUx(parent: string): 'lead' | 'human' {
+/** Le bloc `lead:` du cadence.yaml du dossier parent (absent = `undefined`) ; un `lead` qui n'est pas une table est refusé en nommant `key`. */
+function readLeadBlock(parent: string, key: string, expected: string): { file: string; block: Record<string, unknown> } | undefined {
   const file = join(parent, 'cadence.yaml');
-  if (!existsSync(file)) return 'human';
+  if (!existsSync(file)) return undefined;
   let raw: unknown;
   try {
     raw = parse(readFileSync(file, 'utf8'));
@@ -28,12 +28,30 @@ export function readLeadUx(parent: string): 'lead' | 'human' {
     throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
   }
   const l = (raw as { lead?: unknown } | null)?.lead;
-  if (l == null) return 'human';
-  const ux = (l as { ux?: unknown }).ux;
-  if (typeof l !== 'object' || Array.isArray(l)) throw new RafError(`${file} : lead.ux doit être « lead » ou « human »`);
+  if (l == null) return undefined;
+  if (typeof l !== 'object' || Array.isArray(l)) throw new RafError(`${file} : ${key} doit être ${expected}`);
+  return { file, block: l as Record<string, unknown> };
+}
+
+/** Clé `lead.ux` du cadence.yaml du dossier parent (L197) : qui pose le verdict UX (`raf ux`) d'un lot visible. `human` (défaut) : l'humain ; `lead` : le lead, l'humain n'étant consulté qu'en cas de doute. */
+export function readLeadUx(parent: string): 'lead' | 'human' {
+  const found = readLeadBlock(parent, 'lead.ux', '« lead » ou « human »');
+  const ux = found?.block.ux;
   if (ux == null) return 'human';
-  if (ux !== 'lead' && ux !== 'human') throw new RafError(`${file} : lead.ux doit être « lead » ou « human »`);
+  if (ux !== 'lead' && ux !== 'human') throw new RafError(`${found!.file} : lead.ux doit être « lead » ou « human »`);
   return ux;
+}
+
+/** Seuil de contexte du lead quand `lead.contextThreshold` n'est pas posé (L437). */
+export const CONTEXT_THRESHOLD_DEFAULT = 150_000;
+
+/** Clé `lead.contextThreshold` du cadence.yaml du dossier (L437) : le nombre de tokens de contexte à partir duquel le lead ne lance plus de vague. En tokens et non en % : 60 % d'une fenêtre de 1M valait 600k. Un entier ≥ 1, sinon refus. */
+export function readLeadContextThreshold(parent: string): number {
+  const found = readLeadBlock(parent, 'lead.contextThreshold', 'un entier ≥ 1 (tokens)');
+  const t = found?.block.contextThreshold;
+  if (t == null) return CONTEXT_THRESHOLD_DEFAULT;
+  if (typeof t !== 'number' || !Number.isInteger(t) || t < 1) throw new RafError(`${found!.file} : lead.contextThreshold doit être un entier ≥ 1 (tokens), pas ${JSON.stringify(t)}`);
+  return t;
 }
 
 /** Clé `depth:` du cadence.yaml du dossier parent (L201, issue #8), à côté de `priority:` : combien de niveaux `lead tour` parcourt (1 : sous-dossiers directs, le défaut). */

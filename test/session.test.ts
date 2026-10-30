@@ -573,7 +573,7 @@ describe('session context (L148)', () => {
     publish(home, 'lead', { cwd: dir, percent: 42.4, tokens: 84000, window: 200000, at: at - 5_000 });
     const r = await ctxRun(dir, home);
     expect(r.code).toBe(0);
-    expect(r.out).toBe('ctx 42 % (84000/200000)');
+    expect(r.out.split('\n')[0]).toBe('ctx 42 % (84000/200000)');
   });
 
   it('deux sessions écrivent : celle du dossier courant est choisie, jamais une autre', async () => {
@@ -582,8 +582,8 @@ describe('session context (L148)', () => {
     const other = tempDir();
     publish(home, 'lead', { cwd: lead, percent: 70, tokens: 140000, window: 200000, at: at - 20_000 });
     publish(home, 'autre', { cwd: other, percent: 15, tokens: 30000, window: 200000, at: at - 1_000 });
-    expect((await ctxRun(lead, home)).out).toBe('ctx 70 % (140000/200000)');
-    expect((await ctxRun(other, home)).out).toBe('ctx 15 % (30000/200000)');
+    expect((await ctxRun(lead, home)).out.split('\n')[0]).toBe('ctx 70 % (140000/200000)');
+    expect((await ctxRun(other, home)).out.split('\n')[0]).toBe('ctx 15 % (30000/200000)');
   });
 
   it('CLAUDE_CODE_SESSION_ID posée : sa session, même quand une autre du même dossier est plus récente', async () => {
@@ -591,10 +591,10 @@ describe('session context (L148)', () => {
     const dir = tempDir();
     publish(home, 'a', { cwd: dir, percent: 10, tokens: 1, window: 2, at: at - 40_000 });
     publish(home, 'b', { cwd: dir, percent: 55, tokens: 3, window: 4, at: at - 3_000 });
-    expect((await ctxRun(dir, home, [], { CLAUDE_CODE_SESSION_ID: 'a' })).out).toBe('ctx 10 % (1/2)');
-    expect((await ctxRun(dir, home, [], { CLAUDE_CODE_SESSION_ID: 'b' })).out).toBe('ctx 55 % (3/4)');
+    expect((await ctxRun(dir, home, [], { CLAUDE_CODE_SESSION_ID: 'a' })).out.split('\n')[0]).toBe('ctx 10 % (1/2)');
+    expect((await ctxRun(dir, home, [], { CLAUDE_CODE_SESSION_ID: 'b' })).out.split('\n')[0]).toBe('ctx 55 % (3/4)');
     // --session l'emporte sur la variable
-    expect((await ctxRun(dir, home, ['--session', 'b'], { CLAUDE_CODE_SESSION_ID: 'a' })).out).toBe('ctx 55 % (3/4)');
+    expect((await ctxRun(dir, home, ['--session', 'b'], { CLAUDE_CODE_SESSION_ID: 'a' })).out.split('\n')[0]).toBe('ctx 55 % (3/4)');
     // la variable désigne une session sans fichier : refus, pas de repli sur le dossier
     const lost = await ctxRun(dir, home, [], { CLAUDE_CODE_SESSION_ID: 'muette' });
     expect(lost.code).toBe(2);
@@ -612,7 +612,7 @@ describe('session context (L148)', () => {
     expect(r.err).toContain('--session');
     // une session périmée du même dossier (close) n'est pas une rivale
     publish(home, 'b', { cwd: dir, percent: 55, tokens: 3, window: 4, at: at - 3_000_000 });
-    expect((await ctxRun(dir, home)).out).toBe('ctx 10 % (1/2)');
+    expect((await ctxRun(dir, home)).out.split('\n')[0]).toBe('ctx 10 % (1/2)');
   });
 
   it('--session force la session, même si son dossier n\'est pas le dossier courant', async () => {
@@ -620,7 +620,7 @@ describe('session context (L148)', () => {
     publish(home, 'lead', { cwd: '/ailleurs', percent: 61, tokens: 5, window: 6, at: at - 2_000 });
     const r = await ctxRun(tempDir(), home, ['--session', 'lead']);
     expect(r.code).toBe(0);
-    expect(r.out).toBe('ctx 61 % (5/6)');
+    expect(r.out.split('\n')[0]).toBe('ctx 61 % (5/6)');
     const none = await ctxRun(tempDir(), home, ['--session', 'inconnue']);
     expect(none.code).toBe(2);
     expect(none.err).toContain('inconnue');
@@ -649,7 +649,7 @@ describe('session context (L148)', () => {
     publish(home, 'vieille', { cwd: dir, percent: 99, tokens: 1, window: 2, at: at - 25 * 3600_000 });
     publish(home, 'lead', { cwd: dir, percent: 20, tokens: 1, window: 2, at: at - 1_000 });
     const r = await ctxRun(dir, home);
-    expect(r.out).toBe('ctx 20 % (1/2)');
+    expect(r.out.split('\n')[0]).toBe('ctx 20 % (1/2)');
     expect(existsSync(join(home, 'hud-context', 'vieille.json'))).toBe(false);
     expect(existsSync(join(home, 'hud-context', 'lead.json'))).toBe(true);
   });
@@ -685,7 +685,7 @@ describe('session context (L148)', () => {
     const body = JSON.stringify({ session: 'a/b c', cwd: dir, percent: 33, tokens: 7, window: 9, at: at - 1_000 });
     execFileSync('python3', ['-I', '-c', writer!, body], { env: { ...process.env, CADENCE_HOME: home } });
     expect(existsSync(join(home, 'hud-context', 'a_b_c.json'))).toBe(true);
-    expect((await ctxRun(dir, home)).out).toBe('ctx 33 % (7/9)');
-    expect((await ctxRun(tempDir(), home, ['--session', 'a/b c'])).out).toBe('ctx 33 % (7/9)');
+    expect((await ctxRun(dir, home)).out.split('\n')[0]).toBe('ctx 33 % (7/9)');
+    expect((await ctxRun(tempDir(), home, ['--session', 'a/b c'])).out.split('\n')[0]).toBe('ctx 33 % (7/9)');
   });
 });

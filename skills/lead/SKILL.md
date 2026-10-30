@@ -157,12 +157,15 @@ one named by `$CLAUDE_CODE_SESSION_ID` (Claude Code sets it in the environment o
 whatever the folder; `--session <id>` overrides it). Without the variable it falls back to the folder only if a single
 session publishes for it; two sessions in one folder make it exit 2 ("pass --session"), never guess the latest. It prints
 `ctx 42 % (84000/200000)`, the figure the `ctx` segment of the band shows, which the band publishes to
-a file because it is only a rendering the model cannot see. If the command fails (exit code 2: the band is not loaded in
+a file because it is only a rendering the model cannot see, then a second line, `seuil 150000 tokens : sous le seuil` or
+`… : atteint`: the threshold is in **tokens**, not in %, because a percentage moves with the window (60 % is 120k on 200k and
+600k on 1M). It is `lead.contextThreshold` in the `cadence.yaml` of the folder where the lead runs (150000 by default); read the
+second line, do not recompute it. If the command fails (exit code 2: the band is not loaded in
 this session, several sessions share the folder without the variable, or the figure is older than two minutes), treat it as
 **at the threshold**: you cannot prove you are under it, and without the band loaded the lead does not chain.
-From **60 %** upward, start nothing: at the threshold the lead runs `session-close` in each project touched, writes its
+When the second line says `atteint` (the context has reached the threshold), start nothing: at the threshold the lead runs `session-close` in each project touched, writes its
 memory (filtered, as `session-close` says), and records three lines for next time with `cadence session next` — the wave
-that was about to start comes first among them. Under it, chain. The lead says in one sentence which side of the threshold
+that was about to start comes first among them. While it says `sous le seuil`, chain. The lead says in one sentence which side of the threshold
 it is on each time it chains or stops; it never waits for the figure to move (never a polling loop).
 
 **What stays with the human**: the first choice and the order; the questions a session raised (the lead brings them

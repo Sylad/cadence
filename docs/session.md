@@ -20,7 +20,14 @@ cadence session context            # `ctx 42 % (84000/200000)`: the context of Y
                                    # overrides it; with no variable, the folder decides only if a single session publishes for it
                                    # (two sessions in one folder = exit 2, "pass --session"); exit 2 too when no fresh figure
                                    # (band not loaded) = treat as at the threshold
+                                   # a second line gives the verdict against `lead.contextThreshold` (tokens, 150000 by default):
+                                   # `seuil 150000 tokens : sous le seuil` or `… : atteint` (tokens ≥ threshold)
 ```
+
+`lead.contextThreshold` is read in the `cadence.yaml` of the folder where `session context` runs (the lead's folder): an integer ≥ 1,
+in tokens, because a percentage moves with the window (60 % is 120k on 200k, 600k on 1M). A zero, a negative, a decimal or
+a non-number is refused with the key's name (exit 2, read as at the threshold). It is not scaled to the window: on a window
+smaller than the threshold the verdict never reads `atteint`, so set a lower one there.
 
 `session start` records its time in the worktree's state (`session.json`, under the git dir); the next
 `session close` takes it as its window and names it in the section title: `Commits de la période (depuis

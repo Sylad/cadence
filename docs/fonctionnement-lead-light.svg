@@ -50,11 +50,11 @@
 <text x="920" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Delivers</text>
 <text x="920" y="186.5" text-anchor="middle" font-size="11.5" fill="#57606a">push + deliver</text>
 <rect x="1000" y="146" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
-<text x="1064" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">&lt; 60 % ?</text>
+<text x="1064" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">&lt; limit ?</text>
 <text x="1064" y="186.5" text-anchor="middle" font-size="11.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#57606a">session context</text>
 <rect x="1144" y="146" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
 <text x="1208" y="171.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Close</text>
-<text x="1208" y="186.5" text-anchor="middle" font-size="11.5" fill="#57606a">if ≥ 60 %</text>
+<text x="1208" y="186.5" text-anchor="middle" font-size="11.5" fill="#57606a">if limit reached</text>
 <rect x="280" y="246" width="128" height="58" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
 <text x="344" y="271.5" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Lots</text>
 <text x="344" y="286.5" text-anchor="middle" font-size="11.5" fill="#57606a">figure 2, per lot</text>

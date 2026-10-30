@@ -104,7 +104,7 @@ describe('docs/lead.md', () => {
     const md = read('docs/lead.md')
     expect(md).toMatch(/^## .*[Rr]ules/m)
     expect(md).toMatch(/^## .*[Ee]xit codes/m)
-    expect(md).toContain('60 %')
+    expect(md).toContain('lead.contextThreshold')
     expect(md).toContain('as many subagents as the session cap') // le plafond est réglé par l'humain, plus 2 en dur (L208)
     for (const code of ['0', '1', '2', '3']) expect(md).toMatch(new RegExp(`\\| \`${code}\` \\|`))
   })
@@ -150,7 +150,7 @@ describe.each(Object.entries(svgs))('schéma %s', (variant, file) => {
 
   it('a trois couloirs et les étapes du workflow', () => {
     for (const s of ['Human', 'Lead session', 'orchestrate', 'cadence lead tour', '--wave', 'journal.log',
-      '--resume --answer', 'raf ux', 'raf done', 'qa-reviewer', '60 %', 'session-close', 'session next', 'cadence deliver']) {
+      '--resume --answer', 'raf ux', 'raf done', 'qa-reviewer', 'limit', 'session-close', 'session next', 'cadence deliver']) {
       expect(svg, `${variant}: ${s}`).toContain(s)
     }
   })

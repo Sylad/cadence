@@ -77,9 +77,11 @@ picture, not its source.
    reports of 3 to 5k each had swollen its context on 29-10. The same line goes to the `ux-reviewer` and the `doc-keeper` (L452), which answer in 15 lines at most
    (`Verdict:`, `Findings:` with the rule or measure of each, `Not verified:`, `Sub-tasks:`, `Report:`): about 25 reports of 2 to 4k had taken
    the lead's context from 80k to 466k tokens on 30-10.
-7. **Threshold and chaining.** Before every new wave the lead reads `cadence session context`. Under
-   **60 %** it chains: `cadence orchestrate --continue` draws the next ready lot of the plan, in the
-   declared priority, without asking the human « next? ». From 60 % upward, or when the figure cannot
+7. **Threshold and chaining.** Before every new wave the lead reads `cadence session context`. While the context is under
+   the threshold it chains: `cadence orchestrate --continue` draws the next ready lot of the plan, in the
+   declared priority, without asking the human « next? ». The threshold is in tokens, not in %: `lead.contextThreshold` in the `cadence.yaml` of the folder where the lead runs
+   (an integer ≥ 1, `150000` by default, because 60 % of a 1M window is 600k), and `session context` prints its verdict on a
+   second line (`seuil 150000 tokens : sous le seuil` or `atteint`). When it is reached, or when the figure cannot
    be read (exit code 2: the band is not loaded, or its figure is stale), it starts nothing. A lot
    that was not handed back ready is reported, not chained over; a question or a UX reservation
    pending on a lot never stops the chain on the other lots.

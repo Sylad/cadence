@@ -7,7 +7,7 @@ import { defaultPlan, readDocsConfig, readHookConfig, readMigrateConfig, readNew
 import type { Day } from './dates.js';
 import { parseDeliverConfig } from './deliver.js';
 import { commitPaths, dirtyPaths, gitRoot, restorePaths } from './git.js';
-import { findProjects, isProject, readDepth, readLeadUx } from './lead.js';
+import { findProjects, isProject, readDepth, readLeadContextThreshold, readLeadUx } from './lead.js';
 import { readPriority } from './orchestrate/continue.js';
 import { Plan, RafError, type PlanSettings } from './plan.js';
 
@@ -37,6 +37,7 @@ export function validateConfig(file: string, root: string): void {
   readReferencesConfig(file);
   readMigrateConfig(file);
   readLeadUx(dirname(file));
+  readLeadContextThreshold(dirname(file));
   readDepth(dirname(file));
   readPriority(dirname(file));
   const text = readFileSync(file, 'utf8');

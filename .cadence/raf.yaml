@@ -483,10 +483,11 @@ lots:
   - id: L449
     title: "Panneau des lots : réordonner les PROJETS par glisser-déposer (souris dans l'app desktop, Alt+↑/↓ au clavier, comme le réordonnancement des lots) ; le dépôt réécrit la liste priority: du cadence.yaml du dossier parent (ordre du tour, de --continue et du panneau), commentaires du fichier conservés ; refus visible si le fichier est illisible ; tests du module et doc (demande de Sylvain le 30-10)"
     public: "Panneau des lots : on range les projets par priorité en les glissant"
-    status: todo
+    status: doing
     estimate: 0.5
     visible: true
     created: 2026-10-30
+    started: 2026-10-30
   - id: L450
     title: "verify --gate reprend le verdict de la vague sous des commits « de plan seuls », alors qu'un test peut lire le plan : avatar-pandora plan-page.e2e est passé au rouge après le raf done de L8 (9e lot livré, 30-10) sans que la porte de tête le voie — ne reprendre le verdict que si aucun test déclaré ne lit le plan (clé orchestrate.gate.readsPlan ou liste de chemins), sinon rejouer ; test sur un dépôt dont un test lit .cadence/raf.yaml"
     status: done

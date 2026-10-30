@@ -1002,10 +1002,13 @@ main branch of any other repository**, whether the lot's text cites it or not: o
 `wip/<project>-<lot>` in that repository, commit on it, never push, and say it under « choix ».
 
 **What the program checks.** Before and after each writing session it reads, with no network (one `git for-each-ref` per repository, no `ls-remote`, no `fetch`),
-the sha of the main branches of the other repositories. The main branches of a repository are, among its local branches, the one `origin/HEAD` names, `main` and
+the sha of the main branches of the other repositories (the commits it reports are filtered, see below). The main branches of a repository are, among its local branches, the one `origin/HEAD` names, `main` and
 `master`; one that moves is enough. When one moved, the lot is handed back to the lead (`handed-back`, the step `failed`) before the checks and the next lot, with
 a finding: `incident : commit sur la branche principale d'un autre dépôt (<repository>, <branch>) pendant <project>:<lot> (<step>) : <short sha> <subject> ; la voie
-est la branche wip/<project>-<lot>`. The repository is marked dirty for the wave. A branch created or deleted during the session counts as a moved sha. The comparison
+est la branche wip/<project>-<lot>`. **Only a commit whose subject cites a lot of the wave is reported** (`feat(L1): chart cluster-sante`; the whole identifier counts, `L10` and `L1.2` do not cite `L1`; the
+body of the message is not read). Every other commit on that main branch passes: a delivery (the tag bump of a `deploy.sh` in a GitOps repository), a commit of the lead
+(`plan: …`), a commit of another wave, whenever it was launched, a commit that cites no lot. The rule needs no registry of the waves, so it holds
+for a wave started after the session began. The repository is marked dirty for the wave. A branch created or deleted during the session counts as a moved sha. The comparison
 is on the branch, not on `HEAD`: a commit made then left with `HEAD` elsewhere is found too. The program **does not undo the commit** (no reset, no revert, no move of
 the branch): it states and hands back, the lead decides. The check also runs when the session ends in failure, at the time limit or at the quota, not only on a
 successful one: otherwise the next attempt would take the moved sha as its reference and the commit would never be named.
@@ -1017,10 +1020,12 @@ That makes every sibling repository, cited by the lot or not.
 
 - the lot's own repository, and the neighbours declared by `repos:`: they keep their behaviour (the session commits on their current branch, a moved `HEAD` is put back
   with a warning, `raf commits` and the review read them as before);
-- the repositories of the **other lots of the same wave**, and their neighbours, and those of the lots of another wave **running at the same time** from the same launch folder
-  (its state says `running` and its process lives): their main branch moves legitimately through their own sessions and their integration;
-- the commits of the **lead** on a main branch: a commit whose subject starts with `plan: ` and that changes only the plan file (same relative path as the lot's) is left
-  out of the finding; any other commit is found, including a `plan: ` commit that touches another file (a GitOps delivery that changes a `values.yaml` is found);
+- the repositories of the **other lots of the same wave**, and their neighbours: their main branch moves legitimately through their own sessions and their integration, and
+  those commits cite the lots of the wave; likewise those of the lots of a wave **running at the same time** that the registry shows when the session starts (two projects
+  can both have a `L1`: the citation alone would take the other wave's commits for the lot's own). A wave launched later is not in that list: its commits pass because
+  they cite no lot of this wave;
+- the commits that **cite no lot of the wave** (see above): deliveries, the lead's `plan: ` commits, another wave's commits. A branch deleted, created or moved with no new
+  commit is still reported;
 - a repository two levels below the folder (`folder/group/repository`), a child that is not a git repository, and a **linked worktree** (a child whose `.git` is a file);
 - a symbolic link to a repository already counted (each repository is counted once, under its real path), and the folder itself when it is a git repository;
 - a repository whose references cannot be read, or that has no main branch before and after the session: it is skipped with a line of the wave's log

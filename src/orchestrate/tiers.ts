@@ -91,21 +91,17 @@ export function takeTiers(repos: string[], log: (line: string) => void): Map<str
 /** Plus de commits que cela dans le constat : le reste est compté. */
 const SHOWN = 5;
 
-/** Un commit du lead (R18) : le sujet commence par « plan: ». Il n'est toléré que s'il ne change que le fichier du plan. */
-const LEAD_SUBJECT = /^\S+ plan: /;
-
-/** Une ligne « sha sujet » est-elle un commit du lead : sujet « plan: » et le seul fichier changé est celui du plan ? */
-function isLeadCommit(repo: string, line: string, planFile: string): boolean {
-  if (!LEAD_SUBJECT.test(line)) return false;
-  const files = (tryGit(repo, 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', line.split(' ')[0]) ?? '').split('\n').filter(Boolean);
-  return files.length > 0 && files.every((f) => f === planFile);
+/** Le sujet d'un commit cite-t-il l'un de ces lots ? Identifiant entier : « L1 » n'est ni dans « L10 » ni dans « L1.2 », mais l'est dans « feat(L1): » ou « demo:L1 ». */
+export function citesLot(subject: string, lots: string[]): boolean {
+  return lots.some((id) => new RegExp(`(?<![\\w.-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`).test(subject));
 }
 
 /**
  * Première branche principale dont le sha a bougé entre deux relevés, avec ce qu'il faut en dire : les commits ajoutés (sha court et sujet), ou la branche créée,
- * supprimée ou déplacée sans commit nouveau ; les commits du lead (R18 : « plan: » et rien d'autre que `planFile`) ne comptent pas. Une branche absente d'un seul côté a bougé (créée ou supprimée pendant la session). Null : rien n'a bougé.
+ * supprimée ou déplacée sans commit nouveau. Seuls comptent les commits dont le sujet cite un lot de la vague (`lots`, L458) : une livraison (bump de tag de deploy.sh), un commit du lead
+ * ou d'une autre vague ne citent aucun d'eux et passent. Une branche absente d'un seul côté a bougé (créée ou supprimée pendant la session). Null : rien n'a bougé.
  */
-export function tierMoved(repo: string, before: TierRead, after: TierRead, planFile: string): { branch: string; detail: string } | null {
+export function tierMoved(repo: string, before: TierRead, after: TierRead, lots: string[]): { branch: string; detail: string } | null {
   for (const branch of [...new Set([...Object.keys(before.mains), ...Object.keys(after.mains)])].sort()) {
     const b = before.mains[branch];
     const a = after.mains[branch];
@@ -114,8 +110,8 @@ export function tierMoved(repo: string, before: TierRead, after: TierRead, planF
     // branche créée : seuls comptent les commits que aucune branche principale d'avant ne portait déjà
     const range = b ? [`${b}..${a}`] : [a, '--not', ...Object.values(before.mains)];
     const all = (tryGit(repo, 'log', '--abbrev=7', '--format=%h %s', ...range) ?? '').split('\n').filter(Boolean);
-    const lines = all.filter((l) => !isLeadCommit(repo, l, planFile));
-    if (all.length && !lines.length) continue; // que des commits du lead
+    const lines = all.filter((l) => citesLot(l.slice(l.indexOf(' ') + 1), lots));
+    if (all.length && !lines.length) continue; // aucun commit ne cite un lot de la vague
     if (!lines.length && !b) return { branch, detail: `branche créée (${a.slice(0, 7)})` };
     if (!lines.length) return { branch, detail: `branche déplacée de ${b.slice(0, 7)} à ${a.slice(0, 7)}` };
     const more = lines.length > SHOWN ? ` | … (${lines.length - SHOWN} de plus)` : '';

@@ -372,29 +372,76 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     expect(c.lot.status).toBe('ready');
   });
 
-  it('R17 — une autre vague en cours du même dossier : ses lots ne sont pas surveillés', async () => {
+  it('L458 — vague lancée APRÈS le début de la session, commit qui cite son lot : passe (registre non relu)', async () => {
     const parent = tempDir();
-    const sibRepo = sibling(parent, 'frere');
-    const h = harness({ parent, script: { implement: [impl(sibRepo, commitOnMain)], review: [ok] } });
-    const autre = new RunStore(h.launch, 'w2');
-    writeFileSync(join(autre.dir, 'wave.json'), JSON.stringify({ id: 'w2', created: '2026-10-04', cwd: h.launch, budget: 1, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: ['frere:L9'] }));
-    autre.writeLot(newLot({ project: 'frere', repo: sibRepo, lot: 'L9', title: 'autre', visible: false, small: false, model: 'sonnet', readOnlyPlan: false }));
+    const gitops = sibling(parent, 'gitops');
+    const h = harness({ parent, script: { implement: [impl(gitops, (t) => {
+      const autre = new RunStore(h.launch, 'w2');
+      writeFileSync(join(autre.dir, 'wave.json'), JSON.stringify({ id: 'w2', created: '2026-10-30', cwd: h.launch, budget: 1, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: ['wh:L62'] }));
+      autre.writeLot(newLot({ project: 'wh', repo: gitops, lot: 'L62', title: 'autre', visible: false, small: false, model: 'sonnet', readOnlyPlan: false }));
+      commitFile(t, 'wh.yaml', 'feat(L62): chart');
+    })], review: [ok] } });
     const c = h.lot('L1');
     await runLot(c);
     expect(c.lot.status).toBe('ready');
-    writeFileSync(join(autre.dir, 'wave.json'), JSON.stringify({ id: 'w2', created: '2026-10-04', cwd: h.launch, budget: 1, consumed: 0, cacheRead: 0, status: 'done', pid: process.pid, lots: ['frere:L9'] }));
   });
 
-  it('R17 — une autre vague terminée : ses lots sont surveillés', async () => {
+  it('L458 — deux vagues vivantes avec chacune un L1 : ses commits ne sont pas pris pour les nôtres', async () => {
     const parent = tempDir();
     const sibRepo = sibling(parent, 'frere');
     const h = harness({ parent, script: { implement: [impl(sibRepo, commitOnMain)], review: [ok] } });
     const autre = new RunStore(h.launch, 'w2');
-    writeFileSync(join(autre.dir, 'wave.json'), JSON.stringify({ id: 'w2', created: '2026-10-04', cwd: h.launch, budget: 1, consumed: 0, cacheRead: 0, status: 'done', pid: process.pid, lots: ['frere:L9'] }));
-    autre.writeLot(newLot({ project: 'frere', repo: sibRepo, lot: 'L9', title: 'autre', visible: false, small: false, model: 'sonnet', readOnlyPlan: false }));
+    writeFileSync(join(autre.dir, 'wave.json'), JSON.stringify({ id: 'w2', created: '2026-10-30', cwd: h.launch, budget: 1, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: ['frere:L1'] }));
+    autre.writeLot(newLot({ project: 'frere', repo: sibRepo, lot: 'L1', title: 'autre', visible: false, small: false, model: 'sonnet', readOnlyPlan: false }));
     const c = h.lot('L1');
     await runLot(c);
+    expect(c.lot.status).toBe('ready');
+    writeFileSync(join(autre.dir, 'wave.json'), JSON.stringify({ id: 'w2', created: '2026-10-30', cwd: h.launch, budget: 1, consumed: 0, cacheRead: 0, status: 'done', pid: process.pid, lots: ['frere:L1'] }));
+  });
+
+  it('L458 — livraison (bump de tag de deploy.sh) : aucun lot cité, pas de constat', async () => {
+    const { c } = world((t) => commitFile(t, 'values.yaml', 'warhammer40k: frontend→sha-6c555fe'));
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('L458 — commits du lead « plan: L462… » qui ne touchent que le plan, ou aussi un autre fichier : pas de constat', async () => {
+    const { c } = world((t) => {
+      mkdirSync(join(t, '.cadence'), { recursive: true });
+      commitFile(t, '.cadence/raf.yaml', 'plan: L462 démarré');
+      commitFile(t, 'values.yaml', 'plan: L463 note');
+    });
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('L458 — commit qui cite un lot de la vague (cluster-sante L1) : constat, mais le commit sans lot à côté n\'est pas nommé', async () => {
+    const { c } = world((t) => {
+      commitFile(t, 'values.yaml', 'warhammer40k: frontend→sha-6c555fe');
+      commitFile(t, 'chart.yaml', 'feat(L1): chart cluster-sante');
+    });
+    await runLot(c);
     expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('feat(L1): chart cluster-sante');
+    expect(c.lot.outcome).not.toContain('sha-6c555fe');
+  });
+
+  it('L458 — « L10 » ne cite pas L1, « L1.2 » non plus ; un lot d\'un autre projet de la vague compte', async () => {
+    const { c } = world((t) => {
+      commitFile(t, 'a.yaml', 'feat(L10): autre lot');
+      commitFile(t, 'b.yaml', 'fix(L1.2): sous-numéro');
+    });
+    await runLot(c);
+    expect(c.lot.status).toBe('ready');
+
+    const parent = tempDir();
+    const gitops = sibling(parent, 'gitops');
+    const h = harness({ parent, script: { implement: [impl(gitops, (t) => commitFile(t, 'wh.yaml', 'feat(L9): chart'))], review: [ok] } });
+    h.store.writeLot(newLot({ project: 'autre', repo: join(tempDir(), 'x'), lot: 'L9', title: 'frère', visible: false, small: false, model: 'sonnet', readOnlyPlan: false }));
+    const c2 = h.lot('L1');
+    await runLot(c2);
+    expect(c2.lot.status).toBe('handed-back');
+    expect(c2.lot.outcome).toContain('feat(L9): chart');
   });
 
   it('R14 — dépôt absent de la vague : surveillé', async () => {
@@ -507,41 +554,6 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
       await runLot(c);
       expect(c.lot.status).toBe('failed');
       expect(c.lot.outcome).toMatch(/implement sans résultat/);
-    });
-  });
-
-  describe('R18 — commits du lead', () => {
-    const PLAN = '.cadence/raf.yaml';
-    const leadPlan = (t: string) => {
-      mkdirSync(join(t, '.cadence'), { recursive: true });
-      commitFile(t, PLAN, 'plan: add L126');
-    };
-
-    it('R18 — commit « plan: » ne changeant que le fichier du plan : pas d\'incident', async () => {
-      const { c } = world(leadPlan);
-      await runLot(c);
-      expect(c.lot.status).toBe('ready');
-    });
-
-    it('R18 — commit « plan: » qui touche aussi un autre fichier : constat', async () => {
-      const { c } = world((t) => {
-        writeFileSync(join(t, 'values.yaml'), 'tag: sha-1\n');
-        mkdirSync(join(t, '.cadence'), { recursive: true });
-        writeFileSync(join(t, PLAN), 'plan\n');
-        git(t, 'add', '--', 'values.yaml', PLAN);
-        git(t, 'commit', '-q', '-m', 'plan: add L126');
-      });
-      await runLot(c);
-      expect(c.lot.status).toBe('handed-back');
-      expect(c.lot.outcome).toContain('plan: add L126');
-    });
-
-    it('R18 — le commit du lead à côté de celui de la session : le constat ne nomme que le second', async () => {
-      const { c } = world((t) => { leadPlan(t); commitOnMain(t); });
-      await runLot(c);
-      expect(c.lot.status).toBe('handed-back');
-      expect(c.lot.outcome).toContain('feat(L1): deploy.sh');
-      expect(c.lot.outcome).not.toContain('plan: add L126');
     });
   });
 });

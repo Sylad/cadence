@@ -1068,7 +1068,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   return { step, report: res.structured, before, after, others };
 }
 
-/** Les dépôts tiers d'un lot (L456) : frères du dépôt du lot, hors voisins déclarés et dépôts des autres lots de la vague, ou d'une autre vague en cours du même dossier (leur branche principale bouge légitimement, R14). */
+/** Les dépôts tiers d'un lot (L456) : frères du dépôt du lot, hors voisins déclarés et dépôts des autres lots de la vague (leur branche principale bouge légitimement, R14). Une vague lancée après ce relevé, comme le lead ou une livraison, n'est pas dans la liste : seuls les commits qui citent un lot de cette vague sont constatés (L458) ; exclure les vagues vivantes déjà connues évite qu'un identifiant de lot commun (deux projets, chacun son L1) fasse passer leurs commits pour les nôtres. */
 function thirdRepos(c: LotCtx): string[] {
   const mine = lotKey(c.lot.project, c.lot.lot);
   const others = [...c.wave.store.lots().filter((x) => lotKey(x.project, x.lot) !== mine), ...c.wave.store.liveWaveLots()].flatMap(lotRepoPaths);
@@ -1097,7 +1097,7 @@ function checkTiers(c: LotCtx, kind: SessionKind, step: StepState, before: Map<s
     if (!Object.keys(b.mains).length && !Object.keys(a.mains).length) {
       w.log(`${key} · dépôt tiers ${name} ignoré : aucune branche principale`);
     } else {
-      const moved = tierMoved(repo, b, a, relative(l.repo, c.loadPlan().path));
+      const moved = tierMoved(repo, b, a, w.store.lots().map((x) => x.lot));
       if (moved) {
         step.status = 'failed';
         step.cause = `commit sur la branche principale d'un autre dépôt (${name}, ${moved.branch})`;

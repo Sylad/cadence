@@ -146,19 +146,14 @@ regles:
     statut: hypothese
     si_faux: "Si le dépôt d'un autre lot de la vague était surveillé, le constat serait faux dès qu'un lot légitime avance sa branche (docs/orchestrate.md:563, worktrees) ; en contrepartie, un commit fautif d'une session sur la branche principale du dépôt d'un autre projet de la même vague n'est pas vu, à couvrir par un lot à part."
     tests: ["R14 — deux lots de projets frères dans la même vague, l'un avance sa branche principale : aucun constat sur l'autre", "R14 — dépôt absent de la vague : surveillé"]
-    amendement: "L456, décision du lead 2026-10-30 : R14 ne couvre que la même vague ; les lots d'une autre vague vivante sont l'objet de R17, les commits du lead celui de R18."
+    amendement: "L456, décision du lead 2026-10-30 : R14 ne couvre que la même vague ; les autres vagues et les commits du lead sont couverts par R17 (L458)."
   - id: R17
     cas: [C1]
-    enonce: "Les dépôts des lots d'une AUTRE vague vivante lancée du même dossier (vague `running` dont le processus vit) ne sont pas surveillés : leur branche principale bouge par leur propre vague."
+    enonce: "Remplacée par L458 : seuls les commits d'un dépôt tiers dont le sujet cite un lot de la vague sont constatés ; une livraison, un commit du lead, une autre vague (lancée avant ou après) ou un commit sans lot passent, sans dépendre du registre des vagues (les vagues vivantes connues au départ restent exclues, pour un identifiant de lot commun à deux projets)."
     statut: sourcee
-    source: "décision du lead, 2026-10-30, vague 2026-10-30-1755-cad (amende R14)"
-    tests: ["R17 — une autre vague en cours du même dossier : ses lots ne sont pas surveillés", "R17 — une autre vague terminée : ses lots sont surveillés"]
-  - id: R18
-    cas: [C1]
-    enonce: "Les commits du lead sont tolérés sur la branche principale d'un dépôt tiers : un commit dont le sujet commence par « plan: » et qui ne change que le fichier du plan (même chemin relatif que celui du lot). Tout autre commit sur cette branche reste un constat, y compris un commit « plan: » qui touche aussi un autre fichier."
-    statut: sourcee
-    source: "décision du lead, 2026-10-30, vague 2026-10-30-1755-cad (amende R14)"
-    tests: ["R18 — commit « plan: » ne changeant que le fichier du plan : pas d'incident", "R18 — commit « plan: » qui touche aussi un autre fichier : constat", "R18 — le commit du lead à côté de celui de la session : le constat ne nomme que le second"]
+    source: "L458, notes du 30-10 (trois faux positifs de la tolérance « autre vague vivante » et de la tolérance « plan: » de L456)"
+    amendement: "Remplace les anciennes R17 (autre vague vivante) et R18 (commits « plan: » du lead) : elles ne voyaient ni une vague lancée après le contrôle, ni une livraison, ni un commit du lead qui touche un autre fichier."
+    tests: ["L458 — vague lancée APRÈS le début de la session, commit qui cite son lot : passe (registre non relu)", "L458 — livraison (bump de tag de deploy.sh) : aucun lot cité, pas de constat", "L458 — commits du lead « plan: L462… » qui ne touchent que le plan, ou aussi un autre fichier : pas de constat", "L458 — commit qui cite un lot de la vague (cluster-sante L1) : constat, mais le commit sans lot à côté n'est pas nommé", "L458 — deux vagues vivantes avec chacune un L1 : ses commits ne sont pas pris pour les nôtres", "L458 — « L10 » ne cite pas L1, « L1.2 » non plus ; un lot d'un autre projet de la vague compte"]
   - id: R15
     cas: [C1]
     enonce: "Sont ignorés : un enfant dont .git est un fichier (worktree lié), un lien symbolique qui mène à un dépôt déjà compté, et le dossier parent lui-même s'il est un dépôt git ; chaque dépôt n'est compté qu'une fois (chemin réel)."
@@ -180,7 +175,7 @@ contrats:
       - { code: log error, message: "incident : commit sur la branche principale d'un autre dépôt (<dépôt>, <branche>) pendant <projet>:<lot> (<étape>) : <sha court> <sujet> ; la voie est la branche wip/<projet>-<lot>" }
       - { code: log warn, message: "dépôt tiers <dépôt> ignoré : lecture impossible (<cause git>)" }
       - { code: log warn, message: "<étape> : la session a laissé le dépôt tiers <dépôt> sur la branche <wip/<projet>-<lot>> ; elle n'est pas remise" }
-    regles: [R2, R3, R4, R5, R6, R7, R8, R9, R11, R13, R14, R15, R16, R17, R18]
+    regles: [R2, R3, R4, R5, R6, R7, R8, R9, R11, R13, R14, R15, R16, R17]
   - id: A2
     appel: commande cadence orchestrate
     entree: "brief d'une session d'écriture"

@@ -80,6 +80,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-10-30
+
 ### Added
 
 - The mockup review checks four more families of design criteria, each tied to a named rule or a count (L448, [docs/orchestrate.md](docs/orchestrate.md)): visual hierarchy (one primary element per state), consistency with the product tokens (values that do not come from the product's CSS variables), quality of the texts (error, empty and loading states, action labels, destructive confirmations, one word per notion) and complementary accessibility (focus order, name, role and label, error as text, text at 200 %). Mockup mode only: no new review or session, the severity scale and the report are unchanged. The spec writer and its brief apply the drawing-time ones before the review. Measure: « sessions ux par lot visible » of `cadence perf` (1.6 on the window of 30-10, target 1.2).

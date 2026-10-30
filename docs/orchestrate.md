@@ -1016,8 +1016,8 @@ That makes every sibling repository, cited by the lot or not.
   with a warning, `raf commits` and the review read them as before);
 - the repositories of the **other lots of the same wave**, and their neighbours, and those of the lots of another wave **running at the same time** from the same launch folder
   (its state says `running` and its process lives): their main branch moves legitimately through their own sessions and their integration;
-- the commits of the **lead** on a main branch: a delivery (`<repository>: backend→sha-… — plan: L126 terminé`) or a plan commit carries `plan: ` in its subject and is left
-  out of the finding; a session commit with another subject is still found;
+- the commits of the **lead** on a main branch: a commit whose subject starts with `plan: ` and that changes only the plan file (same relative path as the lot's) is left
+  out of the finding; any other commit is found, including a `plan: ` commit that touches another file (a GitOps delivery that changes a `values.yaml` is found);
 - a repository two levels below the folder (`folder/group/repository`), a child that is not a git repository, and a **linked worktree** (a child whose `.git` is a file);
 - a symbolic link to a repository already counted (each repository is counted once, under its real path), and the folder itself when it is a git repository;
 - a repository whose references cannot be read, or that has no main branch before and after the session: it is skipped with a line of the wave's log

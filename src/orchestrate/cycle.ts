@@ -1097,7 +1097,7 @@ function checkTiers(c: LotCtx, kind: SessionKind, step: StepState, before: Map<s
     if (!Object.keys(b.mains).length && !Object.keys(a.mains).length) {
       w.log(`${key} · dépôt tiers ${name} ignoré : aucune branche principale`);
     } else {
-      const moved = tierMoved(repo, b, a);
+      const moved = tierMoved(repo, b, a, relative(l.repo, c.loadPlan().path));
       if (moved) {
         step.status = 'failed';
         step.cause = `commit sur la branche principale d'un autre dépôt (${name}, ${moved.branch})`;

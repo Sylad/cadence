@@ -347,7 +347,7 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     expect(c.lot.status).toBe('ready');
   });
 
-  it('hors fiche (extension de R14) — une autre vague en cours du même dossier : ses lots ne sont pas surveillés non plus', async () => {
+  it('R17 — une autre vague en cours du même dossier : ses lots ne sont pas surveillés', async () => {
     const parent = tempDir();
     const sibRepo = sibling(parent, 'frere');
     const h = harness({ parent, script: { implement: [impl(sibRepo, commitOnMain)], review: [ok] } });
@@ -358,6 +358,18 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     await runLot(c);
     expect(c.lot.status).toBe('ready');
     writeFileSync(join(autre.dir, 'wave.json'), JSON.stringify({ id: 'w2', created: '2026-10-04', cwd: h.launch, budget: 1, consumed: 0, cacheRead: 0, status: 'done', pid: process.pid, lots: ['frere:L9'] }));
+  });
+
+  it('R17 — une autre vague terminée : ses lots sont surveillés', async () => {
+    const parent = tempDir();
+    const sibRepo = sibling(parent, 'frere');
+    const h = harness({ parent, script: { implement: [impl(sibRepo, commitOnMain)], review: [ok] } });
+    const autre = new RunStore(h.launch, 'w2');
+    writeFileSync(join(autre.dir, 'wave.json'), JSON.stringify({ id: 'w2', created: '2026-10-04', cwd: h.launch, budget: 1, consumed: 0, cacheRead: 0, status: 'done', pid: process.pid, lots: ['frere:L9'] }));
+    autre.writeLot(newLot({ project: 'frere', repo: sibRepo, lot: 'L9', title: 'autre', visible: false, small: false, model: 'sonnet', readOnlyPlan: false }));
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
   });
 
   it('R14 — dépôt absent de la vague : surveillé', async () => {
@@ -464,21 +476,38 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     });
   });
 
-  describe('commits du lead', () => {
-    const lead = (t: string) => commitFile(t, 'values.yaml', 'ol-companion: backend→sha-3c6bd61 — plan: L126 et L125 terminés');
+  describe('R18 — commits du lead', () => {
+    const PLAN = '.cadence/raf.yaml';
+    const leadPlan = (t: string) => {
+      mkdirSync(join(t, '.cadence'), { recursive: true });
+      commitFile(t, PLAN, 'plan: add L126');
+    };
 
-    it('hors fiche (livraison du lead) — un commit de livraison ou de plan sur main d\'un dépôt tiers n\'est pas un incident', async () => {
-      const { c } = world(lead);
+    it('R18 — commit « plan: » ne changeant que le fichier du plan : pas d\'incident', async () => {
+      const { c } = world(leadPlan);
       await runLot(c);
       expect(c.lot.status).toBe('ready');
     });
 
-    it('hors fiche (livraison du lead) — le commit du lead à côté de celui de la session : le constat ne nomme que le second', async () => {
-      const { c } = world((t) => { lead(t); commitOnMain(t); });
+    it('R18 — commit « plan: » qui touche aussi un autre fichier : constat', async () => {
+      const { c } = world((t) => {
+        writeFileSync(join(t, 'values.yaml'), 'tag: sha-1\n');
+        mkdirSync(join(t, '.cadence'), { recursive: true });
+        writeFileSync(join(t, PLAN), 'plan\n');
+        git(t, 'add', '--', 'values.yaml', PLAN);
+        git(t, 'commit', '-q', '-m', 'plan: add L126');
+      });
+      await runLot(c);
+      expect(c.lot.status).toBe('handed-back');
+      expect(c.lot.outcome).toContain('plan: add L126');
+    });
+
+    it('R18 — le commit du lead à côté de celui de la session : le constat ne nomme que le second', async () => {
+      const { c } = world((t) => { leadPlan(t); commitOnMain(t); });
       await runLot(c);
       expect(c.lot.status).toBe('handed-back');
       expect(c.lot.outcome).toContain('feat(L1): deploy.sh');
-      expect(c.lot.outcome).not.toContain('plan: L126');
+      expect(c.lot.outcome).not.toContain('plan: add L126');
     });
   });
 });

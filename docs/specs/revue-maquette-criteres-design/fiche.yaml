@@ -1,0 +1,188 @@
+sujet:
+  id: revue-maquette-criteres-design
+  titre: "Revue de maquette renforcée : les critères de design-critique, ux-copy et accessibility-review absents de nos agents"
+  lot: L448
+  perimetre:
+    modules:
+      - agents/ux-reviewer.md
+      - agents/spec-writer.md
+      - templates/orchestrate/maquette.md
+      - templates/orchestrate/spec.md
+      - docs/orchestrate.md
+      - CHANGELOG.md
+    endpoints: []
+    jobs:
+      - "étape maquette d'orchestrate (revue de la maquette par ux-reviewer, mode maquette)"
+      - "étape spec d'orchestrate (session spec-writer d'un lot à écran)"
+    hors_perimetre:
+      - "le mode conformité de ux-reviewer et l'étape ux (raf ux) : inchangés, ils ne sont pas la revue de maquette"
+      - "le nombre de revues (orchestrate.maquetteReviews, 3 par défaut), le plafond de sessions spec et le schéma du rapport de revue (L230)"
+      - "le calcul de l'indicateur « sessions ux par lot visible » de cadence perf (src/perf.ts) : le lot ne fait que le lire sur la fenêtre suivante"
+      - "l'étape spec back (templates/orchestrate/spec-back.md) : pas d'écran, donc pas de critère d'écran"
+      - "toute dépendance au plugin Design d'Anthropic : aucun appel, aucun nom de skill dans les agents ni les gabarits"
+
+cas:
+  - id: C1
+    titre: "La première revue de maquette applique les critères repris des trois skills"
+    acteur: l'agent ux-reviewer (mode maquette)
+    declencheur: job maquette (revue d'une maquette et de sa fiche)
+    preconditions:
+      - "une fiche et une maquette valides ont été écrites par l'étape spec"
+      - "le brief maquette.md est rendu avec la liste à cocher du balayage (L230)"
+    nominal:
+      - "La session lit son agent et le brief : au balayage existant s'ajoutent quatre familles de critères absentes jusque-là — hiérarchie visuelle (un élément principal par état), cohérence avec les jetons du produit (valeurs mesurées hors variables CSS), qualité des textes (messages d'erreur, états vides, libellés d'actions, confirmations, vocabulaire) et accessibilité complémentaire (ordre de focus, nom-rôle-valeur et libellés des champs, identification de l'erreur, titres et repères, zoom à 200 %)."
+      - "Chaque critère est vérifié sur la capture ou mesuré dans la maquette, état par état, et porté en ligne dans la liste à cocher du rapport."
+      - "Tous les constats bloquants et majeurs sont dans ce premier rapport."
+    alternatives:
+      - { si: "un critère ne peut pas être vérifié sur une maquette statique (lecteur d'écran réel)", alors: "il est écrit dans nonVerifie, pas coché", regles: [R5] }
+      - { si: "l'écart à un critère ne gêne pas la tâche (formulation correcte mais perfectible, hiérarchie discutable sans erreur d'action)", alors: "il est classé mineur et devient une note du lot, sans renvoi à la spec", regles: [R6] }
+      - { si: "le mode est la conformité après le code ou une revue d'écran existant (raf ux)", alors: "les nouveaux critères ne s'appliquent pas, l'agent travaille comme avant", regles: [R7] }
+      - { si: "le projet a installé l'agent à la main (copie modifiée)", alors: "l'installation ne l'écrase pas : le texte renforcé n'arrive que par réinstallation", regles: [R14] }
+    resultat: "Un premier rapport qui couvre les critères repris, avec leur règle ou leur mesure, sans revue supplémentaire."
+  - id: C2
+    titre: "Le spec-writer tient les critères applicables au dessin avant la revue"
+    acteur: l'agent spec-writer
+    declencheur: job spec (session spec d'un lot à écran)
+    preconditions:
+      - "le lot a un écran (screen:) ; le brief spec.md est rendu"
+    nominal:
+      - "La session lit son agent et le brief : les messages d'erreur et d'état vide, les libellés d'action et les confirmations sont écrits selon la structure demandée, un seul élément principal par état, un libellé visible par champ, un même mot pour une même chose."
+      - "La maquette emploie les variables CSS du produit pour couleurs, tailles et espacements."
+      - "La fiche expose chaque message mot pour mot dans l'état que nomme son etat."
+    alternatives:
+      - { si: "un lot sans écran passe par l'étape spec back", alors: "aucun critère d'écran ne s'applique", regles: [R10] }
+      - { si: "un message de la fiche existait déjà dans le produit (source)", alors: "le mot du produit est gardé, la structure ne le réécrit pas", regles: [R9] }
+    resultat: "Une maquette et une fiche qui arrivent à la revue déjà conformes aux critères."
+  - id: C3
+    titre: "Le lead lit l'effet du renforcement sur la fenêtre suivante"
+    acteur: le lead
+    declencheur: commande cadence perf
+    preconditions:
+      - "au moins un lot visible rendu dans chacune des deux fenêtres de 7 jours"
+    nominal:
+      - "cadence perf calcule « sessions ux par lot visible » comme avant (étape ux, et review-small d'un petit lot visible)."
+      - "Le lead compare le chiffre de la fenêtre suivante à 1,6 (cadence perf du 30-10) ; la cible est 1,2."
+    alternatives:
+      - { si: "aucun lot visible n'est rendu dans une fenêtre", alors: "l'indicateur n'a pas de valeur pour cette fenêtre, comme avant", regles: [R13] }
+    resultat: "Une mesure comparable avant et après, sur la même définition."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "agents/ux-reviewer.md, dans sa section « Mockup mode », liste les critères repris, regroupés en quatre familles : hiérarchie visuelle, cohérence avec les jetons du produit, qualité des textes, accessibilité complémentaire."
+    statut: sourcee
+    source: "demande du lot : « reprendre dans NOS agents les seuls critères absents » des skills design-critique, ux-copy et accessibility-review (texte des trois SKILL.md lus le 30-10 sur anthropics/knowledge-work-plugins, dossier design)"
+    tests: ["R1 — la section Mockup mode de ux-reviewer.md contient les quatre familles de critères", "R1 — le contenu hors de la section Mockup mode n'est pas déplacé (Method et Conformity mode inchangés)"]
+  - id: R2
+    cas: [C1]
+    enonce: "Seuls les critères absents sont repris : contraste, taille des cibles, clavier, focus visible, alternatives textuelles, information par la couleur seule, reflow à 320 px, lisibilité des données et états vides à expliquer restent écrits une seule fois, et l'agent ne reprend ni le référentiel WCAG 2.1 ni le critère 2.5.5 (cibles de 44 px, déjà couvert par « 44 px recommended ») ni le « What works well », sans règle ni mesure."
+    statut: sourcee
+    source: "demande du lot : « les seuls critères absents » ; comparaison de agents/ux-reviewer.md:« Method » étape 3 (Nielsen, WCAG 2.2 AA, cibles ≥ 24×24 px, reflow à 320 px) avec les trois skills"
+    tests: ["R2 — ux-reviewer.md ne contient ni « WCAG 2.1 » ni « 2.5.5 » ni « What works well »", "R2 — chaque critère de contraste, cible, reflow n'apparaît pas deux fois dans la section Mockup mode"]
+  - id: R3
+    cas: [C1]
+    enonce: "Chaque critère repris porte, sur sa ligne, sa règle nommée (heuristique de Nielsen numérotée, critère WCAG 2.2 numéroté) ou sa mesure (un décompte ou une valeur à relever) : hiérarchie = un seul élément principal par état (Nielsen 8) ; jetons = nombre de valeurs de couleur, de taille et d'espacement qui ne viennent pas des variables CSS du produit (Nielsen 4) ; messages d'erreur = quoi, pourquoi, comment corriger (Nielsen 9) ; états vides et de chargement = ce que c'est, pourquoi c'est vide, comment commencer (Nielsen 1) ; libellé d'action = verbe qui nomme le résultat, jamais « OK » ni « Valider » seul (Nielsen 2 et 4) ; confirmation d'une action destructive = nomme l'objet et la conséquence, boutons nommés par l'action (Nielsen 5) ; un même mot par notion = nombre de libellés distincts pour une notion (Nielsen 4) ; ordre de focus (WCAG 2.4.3) ; nom, rôle, valeur et libellé de champ (4.1.2, 3.3.2, 1.3.1) ; erreur identifiée par du texte (3.3.1) ; texte agrandi à 200 % sans perte (1.4.4)."
+    statut: sourcee
+    source: "demande du lot : « chacun fondé sur une règle nommée ou une mesure » ; structures « quoi + pourquoi + comment » de la skill ux-copy, critères 2.4.3, 3.3.1, 3.3.2, 4.1.2 de la skill accessibility-review, volets hiérarchie et cohérence de design-critique"
+    tests: ["R3 — chaque puce du bloc des critères repris contient « Nielsen » suivi d'un numéro, ou un numéro de critère WCAG, ou le mot « count »", "R3 — les onze règles ou mesures de l'énoncé sont chacune présentes dans l'agent"]
+  - id: R4
+    cas: [C1]
+    enonce: "Les critères repris entrent dans la liste à cocher du premier rapport (une ligne par famille, par état à 1440 et 390 px) et le brief maquette.md les nomme dans sa liste de balayage ; les sept points du balayage de L230 restent présents, mot pour mot, et la consigne « ALL the blocking and major findings in this first report » aussi."
+    statut: sourcee
+    source: "docs/specs/revue-maquette-exhaustive/fiche.yaml R3 et R4, test/orchestrate-maquette-exhaustive.test.ts:53-68 (sept points, consigne « tous les majeurs »)"
+    tests: ["R4 — le brief maquette rendu contient les quatre familles et les sept points de L230", "R4 — le brief garde « ALL the blocking and major findings in this first report »", "R4 — agents/ux-reviewer.md garde les dix points testés par L230 (checklist, nonVerifie, every state…)"]
+  - id: R5
+    cas: [C1]
+    enonce: "Un critère qu'une maquette statique ne permet pas de vérifier (annonce par un lecteur d'écran réel) est écrit dans nonVerifie et n'est pas coché ; l'agent ne le remplace pas par un constat."
+    statut: sourcee
+    source: "agents/ux-reviewer.md « Mockup mode » : « What you cannot verify (a state you cannot capture, an ambiguous rule) goes in nonVerifie, not ticked » ; skill accessibility-review : « Test with real assistive technology »"
+    tests: ["R5 — ux-reviewer.md range le lecteur d'écran réel dans nonVerifie", "R5 — le brief maquette garde « what you cannot verify goes in `nonVerifie`, not ticked »"]
+  - id: R6
+    cas: [C1]
+    enonce: "La gravité suit l'échelle existante : un écart d'accessibilité (WCAG) est bloquant ou majeur comme avant ; un défaut de texte, de hiérarchie ou de jeton est majeur seulement s'il trompe ou ralentit la tâche (message sans la correction à faire, deux actions principales, valeur hors jetons qui change l'identité), sinon mineur."
+    statut: hypothese
+    si_faux: "Si ces défauts devaient toujours être majeurs, plus de maquettes seraient renvoyées à la spec et consommeraient les trois revues ; s'ils devaient toujours être mineurs, ils n'arriveraient plus avant le code. Seul le texte de la consigne de gravité change, aucune donnée."
+    tests: ["R6 — ux-reviewer.md classe un texte d'erreur sans correction en majeur seulement s'il trompe la tâche", "R6 — l'échelle bloquant / majeur / minor de l'agent reste inchangée"]
+  - id: R7
+    cas: [C1]
+    enonce: "Les critères repris ne valent que dans le mode maquette : le mode conformité (« this is not the full audit »), la section Method et la revue d'un écran existant (raf ux) gardent leur texte."
+    statut: sourcee
+    source: "demande du lot : « Revue de maquette renforcée » ; agents/ux-reviewer.md « Conformity mode » (« do not redo the audit of the whole screen »)"
+    tests: ["R7 — les sections Conformity mode et Method de ux-reviewer.md sont identiques à celles d'avant le lot", "R7 — templates/orchestrate/ux.md n'est pas modifié"]
+  - id: R8
+    cas: [C1, C2]
+    enonce: "Aucune dépendance au plugin : ni agents/*.md ni templates/orchestrate/*.md ne nomment le plugin, ses skills (design-critique, ux-copy, accessibility-review) ni son dépôt, n'invoquent une skill ou un outil de plus, et la ligne tools de ux-reviewer et de spec-writer est inchangée."
+    statut: sourcee
+    source: "demande du lot : « aucune dépendance au plugin : cadence reste générique, compte pro »"
+    tests: ["R8 — aucun fichier de agents/ ni de templates/orchestrate/ ne contient « knowledge-work-plugins », « design-critique », « ux-copy », « accessibility-review » ni « Anthropic »", "R8 — le front matter tools de ux-reviewer et de spec-writer est identique à celui d'avant"]
+  - id: R9
+    cas: [C2]
+    enonce: "agents/spec-writer.md et le brief spec.md demandent d'écrire, avant la revue : messages d'erreur selon quoi, pourquoi, comment corriger ; états vides selon ce que c'est, pourquoi c'est vide, comment commencer ; libellés d'action en verbe qui nomme le résultat ; confirmation d'une action destructive qui nomme l'objet et la conséquence ; un même mot par notion dans la fiche et la maquette. Un mot ou un message déjà présent dans le produit (source) est gardé tel quel."
+    statut: sourcee
+    source: "demande du lot : comparer au spec-writer et reprendre dans NOS agents les critères absents ; structures de la skill ux-copy ; agents/spec-writer.md étape 1 (« reuse what exists, invent nothing when an equivalent exists »)"
+    tests: ["R9 — spec-writer.md contient les structures d'erreur, d'état vide, de libellé et de confirmation", "R9 — le brief spec.md rendu contient la même consigne", "R9 — spec-writer.md garde « reuse what exists »"]
+  - id: R10
+    cas: [C2]
+    enonce: "Le spec-writer ne reçoit que les critères applicables en dessinant (textes, un élément principal par état, un libellé visible par champ, variables CSS du produit) ; les mesures de revue (contraste mesuré, zoom à 200 %, ordre de focus) restent à ux-reviewer. L'étape spec back n'est pas modifiée."
+    statut: hypothese
+    si_faux: "Si le spec-writer devait aussi tenir ces mesures, seul le texte de son agent s'allonge ; aucune donnée ni contrat ne change."
+    tests: ["R10 — spec-writer.md ne contient ni « 200 % » ni « 2.4.3 »", "R10 — templates/orchestrate/spec-back.md n'est pas modifié"]
+  - id: R11
+    cas: [C2]
+    enonce: "Le format de la fiche ne change pas : aucune clé ajoutée, cadence spec check accepte les mêmes fiches qu'avant, et la fiche expose toujours chaque message mot pour mot dans l'état que nomme son etat."
+    statut: sourcee
+    source: "templates/orchestrate/spec.md:15 (« Expose the messages exactly as the screen shows them ») ; format de templates/fiche.yaml vérifié par cadence spec check"
+    tests: ["R11 — une fiche valide avant le lot passe cadence spec check après le lot", "R11 — templates/fiche.yaml et le schéma de la fiche ne sont pas modifiés"]
+  - id: R12
+    cas: [C1, C2]
+    enonce: "Plus de critères n'ajoutent ni revue ni session : maquetteReviews reste à 3 par défaut, le plafond de sessions spec et le schéma du rapport de revue (gravités, inchange, nonVerifie) sont inchangés."
+    statut: sourcee
+    source: "docs/specs/revue-maquette-exhaustive/fiche.yaml R1, R4, R5 ; src/orchestrate/cycle.ts:1796 (« non conforme après N revue(s) »)"
+    tests: ["R12 — maquetteReviews absent : plafond 3", "R12 — REVIEW_SCHEMA accepte et refuse les mêmes rapports qu'avant", "R12 — trois revues non conformes : lot rendu « maquette non conforme après 3 revues : »"]
+  - id: R13
+    cas: [C3]
+    enonce: "La définition de « sessions ux par lot visible » est inchangée (étape ux et review-small d'un petit lot visible, rapportées aux lots visibles rendus de la fenêtre) ; le lot ne touche pas src/perf.ts, et la valeur de départ à comparer est 1,6 (fenêtre du 30-10), la cible 1,2."
+    statut: sourcee
+    source: "src/perf.ts:452-460 (calcul de l'indicateur ux) et src/perf.ts:753 (libellé) ; demande du lot : « mesure : ce chiffre sur la fenêtre suivante »"
+    tests: ["R13 — cadence perf imprime toujours la ligne « sessions ux par lot visible »", "R13 — deux fenêtres sans lot visible : indicateur sans valeur, comme avant"]
+  - id: R14
+    cas: [C1]
+    enonce: "L'installation des agents n'écrase pas un agent modifié à la main : un projet qui a modifié sa copie de ux-reviewer garde son texte jusqu'à réinstallation."
+    statut: sourcee
+    source: "test/skills.test.ts:82-85 (la copie « à la main » de cadence-ux-reviewer.md est conservée à la réinstallation)"
+    tests: ["R14 — agent installé puis modifié à la main : réinstallation sans écrasement", "R14 — agent installé non modifié : reçoit le texte renforcé"]
+  - id: R15
+    cas: [C1, C2]
+    enonce: "Le CHANGELOG (section Unreleased) et docs/orchestrate.md (description de l'étape maquette) nomment les familles de critères reprises, sans nommer le plugin."
+    statut: hypothese
+    si_faux: "Si la documentation devait citer l'origine des critères, seul un texte de doc change ; la règle R8 ne vaut alors que pour agents/ et templates/."
+    tests: ["R15 — CHANGELOG.md, section Unreleased, contient les quatre familles", "R15 — docs/orchestrate.md décrit les critères de l'étape maquette"]
+
+contrats:
+  - id: A1
+    appel: "job maquette"
+    entree: "le brief templates/orchestrate/maquette.md rendu (lot, titre, chemin de la spec, objectif) et l'agent ux-reviewer ; la maquette maquette.html, la fiche fiche.yaml et les captures de la spec"
+    sortie: "le rapport structuré de la revue (comptes bloquants/majeurs/mineurs, constats avec gravité, fichier, ligne et texte, nonVerifie, verdict d'une ligne) ; la liste à cocher, avec les familles de critères reprises, est dans le texte du rapport"
+    erreurs: []
+    sans_erreur: "le lot ne change aucun échec du job : un rapport non conforme à la 3ᵉ revue rend le lot « maquette non conforme après 3 revues : » (src/orchestrate/cycle.ts:1796), déjà couvert par L230 et R12"
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R12, R14, R15]
+  - id: A2
+    appel: "job spec"
+    entree: "le brief templates/orchestrate/spec.md rendu et l'agent spec-writer ; le charter du projet et le lot à écran"
+    sortie: "maquette.html, fiche.yaml (même format) et captures dans docs/specs/<écran>/, puis le rapport de la session"
+    erreurs: []
+    sans_erreur: "le lot ne change aucun échec du job : une fiche non conforme est renvoyée comme avant (« spec non conforme après N passes : », src/orchestrate/cycle.ts:1624)"
+    regles: [R8, R9, R10, R11, R12, R15]
+  - id: A3
+    appel: "commande cadence perf"
+    entree: "aucune (lit les journaux des deux fenêtres de 7 jours)"
+    sortie: "la ligne « sessions ux par lot visible » pour la fenêtre courante et la précédente, définition inchangée"
+    erreurs: []
+    sans_erreur: "le lot ne modifie ni la commande ni ses échecs : elle reste en lecture seule"
+    regles: [R13]
+
+donnees:
+  - { id: D1, objet: "agents/ux-reviewer.md (texte de l'agent, copié par l'installation en .claude/agents/cadence-ux-reviewer.md)", existant: true, modification: aucune, note: "texte de consigne seulement, aucun format de donnée ; le front matter (name, description, tools) est inchangé (R8)" }
+  - { id: D2, objet: "agents/spec-writer.md (texte de l'agent)", existant: true, modification: aucune, note: "texte de consigne seulement, front matter inchangé (R8)" }
+  - { id: D3, objet: "templates/orchestrate/maquette.md et spec.md (briefs rendus par le programme)", existant: true, modification: aucune, note: "texte seulement ; les variables {{lot}}, {{titre}}, {{chemin}}, {{objectif}}, {{shots}} sont inchangées" }
+  - { id: D4, objet: "journaux de vague lus par cadence perf (étapes ux et review-small)", existant: true, modification: aucune, note: "lus seulement, jamais écrits par ce lot (R13)" }

@@ -387,6 +387,7 @@ lots:
     estimate: 0.25
     created: 2026-10-29
     started: 2026-10-29
+    review: { date: 2026-10-29, verdict: "conforme après 1 correctif (arrêt demandé pendant l'attente perdu si un arrêt périmé traîne) ; 2 notes mineures — orchestré (vague 2026-10-30-p443, 4 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que le contexte du CHANGELOG (entrée L443 bien placée dans Fixed) ; le code, les tests et la doc du lot sont identiques à la version relue", commit: 75d91196f45afbbc07b3bba2b8f8d10a6c0840b8 }
   - id: L444
     title: "verify --gate --sha <sha intégré> rejoue toute la porte (« aucune porte de vague enregistrée pour ce sha ») alors que l'intégration vient de jouer la porte sur ce même sha : enregistrer ce verdict pour que le lead le reprenne (~5 min par lot prêt, L440 et L441 le 30-10)"
     status: doing

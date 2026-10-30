@@ -513,6 +513,7 @@ lots:
     estimate: 0.25
     created: 2026-10-30
     started: 2026-10-30
+    review: { date: 2026-10-30, verdict: "compliant (1 minor note: `--verbose` prints the lot line on `raf start` and `raf drop` too, undocumented and untested) — orchestré (vague 2026-10-30-1715, 0 passe(s) de correction)", commit: 3eab7c64c321ec2819267c7cf34a402c7cbf9197, reporte: { de: f288121f57b70e35294ffdd797055335b86857bc, vers: 3eab7c64c321ec2819267c7cf34a402c7cbf9197, patchId: e829c404de05e34c4b7501af5e3d74030c5ea507 } }
   - id: L454
     title: "Un lot rendu visible PAR SA SESSION pendant la vague (warhammer L37 34f0c2d et L43 5f4dce5, le 30-10) sort « prêt » sans étape UX (colonne UX « — ») : l'orchestrateur relit visible/screen après chaque session et joue l'étape UX si le lot l'est devenu, ou le rend au lead avec « visible ajouté en cours de vague, étape UX à jouer » ; test"
     status: todo

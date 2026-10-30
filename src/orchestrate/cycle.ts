@@ -927,6 +927,8 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
     writeFileSync(join(dir, `${base}.json`), outcome.stdout);
     writeFileSync(join(dir, `${base}.err`), outcome.stderr);
     step.report = `${base}.json`;
+    // Un commit sur la branche principale d'un dépôt tiers se dit aussi quand la session est en échec ou coupée au délai : sinon la relance le prendrait pour référence.
+    if (tiersBefore && checkTiers(c, kind, step, tiersBefore)) return null;
     step.status = 'failed';
     step.cause = outcome.cause;
     if (write && outcome.cause === 'délai dépassé') {
@@ -954,6 +956,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   }
   if (outcome.kind === 'quota') {
     if (outcome.firstStdout !== undefined) writeFileSync(join(dir, `${base}.first.json`), outcome.firstStdout);
+    if (tiersBefore && checkTiers(c, kind, step, tiersBefore)) return null;
     step.status = 'interrupted';
     step.cause = outcome.message;
     w.quota = { hit: true, message: outcome.message };

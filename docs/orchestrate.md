@@ -1004,7 +1004,8 @@ the sha of the main branches of the other repositories. The main branches of a r
 a finding: `incident : commit sur la branche principale d'un autre dépôt (<repository>, <branch>) pendant <project>:<lot> (<step>) : <short sha> <subject> ; la voie
 est la branche wip/<project>-<lot>`. The repository is marked dirty for the wave. A branch created or deleted during the session counts as a moved sha. The comparison
 is on the branch, not on `HEAD`: a commit made then left with `HEAD` elsewhere is found too. The program **does not undo the commit** (no reset, no revert, no move of
-the branch): it states and hands back, the lead decides.
+the branch): it states and hands back, the lead decides. The check also runs when the session ends in failure, at the time limit or at the quota, not only on a
+successful one: otherwise the next attempt would take the moved sha as its reference and the commit would never be named.
 
 **What is watched.** The repositories that are a **direct child** of the folder that holds the lot's repository (the parent of the repository's path, not of a worktree).
 That makes every sibling repository, cited by the lot or not.
@@ -1015,6 +1016,8 @@ That makes every sibling repository, cited by the lot or not.
   with a warning, `raf commits` and the review read them as before);
 - the repositories of the **other lots of the same wave**, and their neighbours, and those of the lots of another wave **running at the same time** from the same launch folder
   (its state says `running` and its process lives): their main branch moves legitimately through their own sessions and their integration;
+- the commits of the **lead** on a main branch: a delivery (`<repository>: backend→sha-… — plan: L126 terminé`) or a plan commit carries `plan: ` in its subject and is left
+  out of the finding; a session commit with another subject is still found;
 - a repository two levels below the folder (`folder/group/repository`), a child that is not a git repository, and a **linked worktree** (a child whose `.git` is a file);
 - a symbolic link to a repository already counted (each repository is counted once, under its real path), and the folder itself when it is a git repository;
 - a repository whose references cannot be read, or that has no main branch before and after the session: it is skipped with a line of the wave's log

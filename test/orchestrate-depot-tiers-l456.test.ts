@@ -347,7 +347,7 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     expect(c.lot.status).toBe('ready');
   });
 
-  it('R14 — une autre vague en cours du même dossier : ses lots ne sont pas surveillés non plus', async () => {
+  it('hors fiche (extension de R14) — une autre vague en cours du même dossier : ses lots ne sont pas surveillés non plus', async () => {
     const parent = tempDir();
     const sibRepo = sibling(parent, 'frere');
     const h = harness({ parent, script: { implement: [impl(sibRepo, commitOnMain)], review: [ok] } });
@@ -430,5 +430,55 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     const lines = readFileSync(trace, 'utf8').split('\n').filter((l) => /built-in: git |run_command: git /.test(l));
     expect(lines).toHaveLength(20);
     expect(lines.every((l) => l.includes('for-each-ref'))).toBe(true);
+  });
+
+  describe('fin de session sans sortie « ok »', () => {
+    const quota = { code: 1, stdout: JSON.stringify({ is_error: true, subtype: 'success', result: 'Claude AI usage limit reached|1759600000', session_id: 's', num_turns: 1, duration_ms: 1, usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 } }), stderr: '', timedOut: false };
+    const endings: [string, { code: number; stdout: string; stderr: string; timedOut: boolean }][] = [
+      ['en échec (code 1)', { code: 1, stdout: '', stderr: 'boom', timedOut: false }],
+      ['coupée au délai', { code: 0, stdout: '', stderr: '', timedOut: true }],
+      ['au quota', quota],
+    ];
+    for (const [label, ending] of endings) {
+      it(`R2 — session ${label} après un commit sur main d'un dépôt tiers : lot rendu avec le constat`, async () => {
+        const parent = tempDir();
+        const tier = sibling(parent, 'gitops');
+        const h = harness({ parent, script: { implement: [() => { commitOnMain(tier); return ending; }] } });
+        const c = h.lot('L1');
+        await runLot(c);
+        expect(c.lot.status).toBe('handed-back');
+        expect(c.lot.outcome).toContain('incident : commit sur la branche principale d\'un autre dépôt (gitops, main) pendant demo:L1 (implement)');
+        expect(c.lot.outcome).toContain('feat(L1): deploy.sh');
+        expect(c.wave.dirtyRepos?.get(tier)).toBe('demo:L1');
+      });
+    }
+
+    it('R2 — session en échec sans commit sur un dépôt tiers : l\'échec reste un échec', async () => {
+      const parent = tempDir();
+      sibling(parent, 'gitops');
+      const h = harness({ parent, script: { implement: [() => ({ code: 1, stdout: '', stderr: 'boom', timedOut: false })] } });
+      const c = h.lot('L1');
+      await runLot(c);
+      expect(c.lot.status).toBe('failed');
+      expect(c.lot.outcome).toMatch(/implement sans résultat/);
+    });
+  });
+
+  describe('commits du lead', () => {
+    const lead = (t: string) => commitFile(t, 'values.yaml', 'ol-companion: backend→sha-3c6bd61 — plan: L126 et L125 terminés');
+
+    it('hors fiche (livraison du lead) — un commit de livraison ou de plan sur main d\'un dépôt tiers n\'est pas un incident', async () => {
+      const { c } = world(lead);
+      await runLot(c);
+      expect(c.lot.status).toBe('ready');
+    });
+
+    it('hors fiche (livraison du lead) — le commit du lead à côté de celui de la session : le constat ne nomme que le second', async () => {
+      const { c } = world((t) => { lead(t); commitOnMain(t); });
+      await runLot(c);
+      expect(c.lot.status).toBe('handed-back');
+      expect(c.lot.outcome).toContain('feat(L1): deploy.sh');
+      expect(c.lot.outcome).not.toContain('plan: L126');
+    });
   });
 });

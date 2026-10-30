@@ -92,8 +92,14 @@ export function takeTiers(repos: string[], log: (line: string) => void): Map<str
 const SHOWN = 5;
 
 /**
+ * Un commit du lead : la livraison d'un lot prêt dans un dépôt GitOps et les commits de plan portent « plan: » dans leur sujet (gabarit `plan.commit` par défaut,
+ * `<dépôt>: backend→sha-… — plan: L126 terminé`). Ils sont posés par le lead pendant la vague, pas par la session : ils ne sont pas un incident.
+ */
+const LEAD_COMMIT = /^\S+ (?:.*— )?plan: /;
+
+/**
  * Première branche principale dont le sha a bougé entre deux relevés, avec ce qu'il faut en dire : les commits ajoutés (sha court et sujet), ou la branche créée,
- * supprimée ou déplacée sans commit nouveau. Une branche absente d'un seul côté a bougé (créée ou supprimée pendant la session). Null : rien n'a bougé.
+ * supprimée ou déplacée sans commit nouveau ; les commits du lead (`LEAD_COMMIT`) ne comptent pas. Une branche absente d'un seul côté a bougé (créée ou supprimée pendant la session). Null : rien n'a bougé.
  */
 export function tierMoved(repo: string, before: TierRead, after: TierRead): { branch: string; detail: string } | null {
   for (const branch of [...new Set([...Object.keys(before.mains), ...Object.keys(after.mains)])].sort()) {
@@ -102,7 +108,9 @@ export function tierMoved(repo: string, before: TierRead, after: TierRead): { br
     if (a === b) continue;
     if (!a) return { branch, detail: `branche supprimée (${b.slice(0, 7)})` };
     const range = b ? `${b}..${a}` : a;
-    const lines = (tryGit(repo, 'log', '--abbrev=7', '--format=%h %s', range) ?? '').split('\n').filter(Boolean);
+    const all = (tryGit(repo, 'log', '--abbrev=7', '--format=%h %s', range) ?? '').split('\n').filter(Boolean);
+    const lines = all.filter((l) => !LEAD_COMMIT.test(l));
+    if (all.length && !lines.length) continue; // que des commits du lead
     if (!lines.length) return { branch, detail: `branche déplacée de ${b.slice(0, 7)} à ${a.slice(0, 7)}` };
     const more = lines.length > SHOWN ? ` | … (${lines.length - SHOWN} de plus)` : '';
     return { branch, detail: lines.slice(0, SHOWN).join(' | ') + more };

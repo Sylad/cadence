@@ -22,6 +22,7 @@ import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { configSet } from './config-set.js';
+import { movePriority } from './priority.js';
 import { findProjects, readDepth, leadTour, TITLE_MAX, truncate, readLeadUx, tourFreeLine, readLeadContextThreshold, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
 import { configuredCap, expiredHoldLines, slotsLine, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
@@ -245,8 +246,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   // Le tour parcourt les sous-dossiers (ou, sans sous-projet, prend le dossier lui-même s'il est un projet) : il ne lit pas le plan du dossier courant.
   if (command === 'lead') {
     if (rest[0] === 'hold' || rest[0] === 'release') return leadHold(rest, values.ttl, io, today);
+    if (rest[0] === 'priority') return leadPriority(rest, values.before, values.after, values.depth, io);
     if (values.ttl !== undefined) throw new RafError('--ttl ne va qu\'avec lead hold');
-    if (rest[0] !== 'tour' || rest.length > 2) throw new RafError('usage : cadence lead tour [dossier] [--idle 3] [--depth n] [--json] | lead hold <étiquette> [--ttl minutes] | lead release <étiquette>');
+    if (rest[0] !== 'tour' || rest.length > 2) throw new RafError('usage : cadence lead tour [dossier] [--idle 3] [--depth n] [--json] | lead priority <projet> --before|--after <projet> [dossier] | lead hold <étiquette> [--ttl minutes] | lead release <étiquette>');
     const idle = values.idle === undefined ? undefined : Number(values.idle);
     if (idle !== undefined && !(Number.isInteger(idle) && idle >= 0)) throw new RafError(`--idle invalide : ${values.idle}`);
     const depth = values.depth === undefined ? undefined : Number(values.depth);
@@ -1312,6 +1314,21 @@ const HOLD_TTL_MINUTES = 60;
 
 /** Longueur maximale de l'étiquette encodée : un nom de fichier tient en 255 octets, `.json.tmp` en prend 9. */
 const HOLD_LABEL_MAX = 200;
+
+/** `cadence lead priority <projet> --before|--after <projet> [dossier]` (L449) : range un projet dans la liste `priority:` du cadence.yaml du dossier (celui du tour), sans modèle ni commit. */
+function leadPriority(rest: string[], before: string | undefined, after: string | undefined, depth: string | undefined, io: Io): number {
+  const usage = 'usage : cadence lead priority <projet> --before|--after <projet> [dossier] [--depth n]';
+  if (rest.length < 2 || rest.length > 3 || (before === undefined) === (after === undefined)) throw new RafError(usage);
+  const place = before !== undefined ? 'before' : 'after';
+  const levels = depth === undefined ? undefined : Number(depth);
+  if (levels !== undefined && !(Number.isInteger(levels) && levels >= 1)) throw new RafError(`--depth invalide : ${depth} (un entier ≥ 1)`);
+  const parent = resolve(io.cwd, rest[2] ?? '.');
+  if (!existsSync(parent)) throw new RafError(`lead priority : dossier introuvable : ${parent}`);
+  const target = (before ?? after)!;
+  const moved = movePriority(parent, rest[1]!, place, target, levels);
+  io.out(moved.changed ? `${rest[1]} placé ${place === 'before' ? 'avant' : 'après'} ${target} dans priority: de ${join(parent, 'cadence.yaml')} (ordre : ${moved.order.join(' > ')}) — le fichier est modifié, à commiter` : `${rest[1]} est déjà ${place === 'before' ? 'avant' : 'après'} ${target} : rien à changer`);
+  return 0;
+}
 
 /** `cadence lead hold <étiquette> [--ttl minutes]` / `lead release <étiquette>` (L255) : inscrit, ou rend, une session lancée à la main par le lead, qui compte dans les créneaux libres. */
 function leadHold(rest: string[], ttl: string | undefined, io: Io, today: Day): number {

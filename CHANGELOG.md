@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cadence verify --gate` no longer links the other ignored folders of the main tree (`data/`, `data-local/`, `.env`) into the throwaway copy: a test comparing paths by `realpath` went red there and green in the main tree at the same sha. Only the dependencies are copied (`node_modules`, `.venv`, or `orchestrate.worktreeDeps`) (L455).
+
 ## [1.28.0] - 2026-10-30
 
 ### Added

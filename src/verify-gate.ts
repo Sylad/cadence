@@ -11,7 +11,7 @@ import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { failedTests, hasUnnamedFailure, unloadedSuites } from './orchestrate/baseline.js';
 import { configuredCap } from './orchestrate/command.js';
 import { replayRed, TEST_WORKERS_ENV, testWorkersFrom } from './orchestrate/workers.js';
-import { copyDeps, git, gitFailure, ignoredDeps, isCopiedDep, linkIgnored } from './orchestrate/worktree.js';
+import { copyDeps, git, gitFailure, ignoredDeps, isCopiedDep } from './orchestrate/worktree.js';
 
 /** Délai de chaque commande de la porte : celui du rejeu de la ligne de base de la vague. */
 const GATE_TIMEOUT_MS = 30 * 60_000;
@@ -116,7 +116,7 @@ function mainTreeMoved(repo: string, sha: string): string | null {
  * `cadence verify --gate` (L348) : la porte du projet (`orchestrate.build`, puis `orchestrate.test`, dans l'ordre de la vague : les tests lisent ce que le build produit)
  * rejouée au `sha` (L389) dans l'arbre principal quand il est propre et à ce sha (les outils qui refusent un `node_modules` venu d'un autre arbre y tournent chez eux) ;
  * sinon (arbre non propre ou à un autre commit, ou vague d'orchestration vivante sur le dépôt, L431) dans un worktree jetable, hors du dépôt, dont les dépendances non suivies sont copiées depuis le dépôt vivant (`orchestrate.worktreeDeps`,
- * sinon les `node_modules` de tout niveau et le `.venv` ; les autres dossiers ignorés sont reliés, comme dans les worktrees de vague ; la copie est asynchrone pour que Ctrl-C la coupe). `verify.inPlace` impose l'un (`true`, refus si l'arbre n'est pas propre au sha) ou l'autre (`false`).
+ * sinon les `node_modules` de tout niveau et le `.venv` ; les autres dossiers ignorés (données, `.env`) sont absents de la copie, L455 ; la copie est asynchrone pour que Ctrl-C la coupe). `verify.inPlace` impose l'un (`true`, refus si l'arbre n'est pas propre au sha) ou l'autre (`false`).
  * La première ligne de la sortie dit où la porte a tourné ; en place, HEAD et `git status` sont relus après les étapes et, si l'arbre a bougé (HEAD avancé, status sale), la sortie dit ce qui a changé, que le verdict n'est pas celui du sha et sort en code 2, rouge ou vert ; la ligne « vert » / « rouge » n'est alors pas écrite. Les deux commandes sont rejouées même si la première est rouge : le compte rendu est entier.
  * Chaque commande reçoit `CADENCE_TEST_WORKERS` comme dans la porte d'une vague (L350, L387) : la valeur de l'environnement de l'appelant si c'est un entier positif, sinon cœurs ÷ plafond de sessions (`CADENCE_MAX_SESSIONS`, 2 par défaut) ;
  * sans elle le rejeu `--maxWorkers=$CADENCE_TEST_WORKERS` de `orchestrate.testReplay` sortirait en erreur et ne prouverait rien.
@@ -237,9 +237,8 @@ async function playGate(ctx: GateCtx): Promise<number> {
       copied = await copyDeps(repo, dir, present);
       missing = config.worktreeDeps.filter((n) => !present.includes(n));
     } else {
-      // Seules les dépendances sont copiées ; les autres dossiers ignorés (données, .env) restent reliés, comme dans un worktree de vague, sans rien dupliquer dans /tmp.
+      // Seules les dépendances sont copiées ; les autres dossiers ignorés (données, .env) ne sont ni copiés ni reliés (L455) : un lien rendrait à un test qui compare des chemins par realpath l'arbre principal.
       copied = await copyDeps(repo, dir, ignoredDeps(repo).filter(isCopiedDep));
-      linkIgnored(repo, dir);
     }
     const why = mode === false ? 'verify.inPlace: false' : (obstacle ?? `la vague ${liveWave} est vivante sur ce dépôt : HEAD et le plan y bougent`);
     out(`verify --gate ${short} : porte jouée dans une copie jetable ${dir} (${why}) ; dépendances copiées : ${copied.length ? copied.join(', ') : 'aucune'}`);

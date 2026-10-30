@@ -58,6 +58,20 @@ describe('verifyGate : la porte rejouée au sha dans un worktree jetable (L348)'
     expect(r.text).toContain('vert');
   });
 
+  it('L455 — les dossiers ignorés qui ne sont pas des dépendances (data-local/, data/, .env) ne sont pas reliés dans la copie : un test qui compare des chemins par realpath n\'y voit pas l\'arbre principal', async () => {
+    const { repo } = project('orchestrate:\n  test: test -f node_modules/dep/index.js && test ! -e data-local && test ! -e data && test ! -e .env\n');
+    writeFileSync(join(repo, '.gitignore'), 'node_modules/\n.venv/\ndata-local/\ndata/\n.env\n');
+    git(repo, 'commit', '-q', '-am', 'ignore data');
+    const head = git(repo, 'rev-parse', 'HEAD').trim();
+    mkdirSync(join(repo, 'data-local'));
+    mkdirSync(join(repo, 'data'));
+    writeFileSync(join(repo, 'data', 'x'), 'x');
+    writeFileSync(join(repo, '.env'), 'K=1');
+    const r = await gate(repo, head);
+    expect(r.text).toContain('dépendances copiées : .venv, node_modules');
+    expect(r.code).toBe(0);
+  });
+
   it('worktreeDeps déclarée : seules ces dépendances sont copiées', async () => {
     const { repo, sha } = project('orchestrate:\n  worktreeDeps: [node_modules]\n  test: test -f node_modules/dep/index.js && test ! -e .venv\n');
     expect((await gate(repo, sha)).code).toBe(0);
@@ -531,8 +545,8 @@ describe('verifyGate : où la porte tourne (L389)', () => {
     expect(() => readVerifyConfig(join(repo, 'cadence.yaml'))).toThrow(/verify\.inPlace/);
   });
 
-  it('L392 R1 — sans worktreeDeps, seuls node_modules et .venv sont copiés : les autres dossiers ignorés (données, .env) restent des liens, rien n\'est dupliqué', async () => {
-    const { repo } = project('orchestrate:\n  test: test ! -L .venv && test -f .venv/pyvenv.cfg && test -L donnees && test -L .env && test ! -L node_modules && test -f donnees/secret.txt\n', true);
+  it('L392 R1 — sans worktreeDeps, seuls node_modules et .venv sont copiés : les autres dossiers ignorés (données, .env) ne sont ni copiés ni reliés (L455)', async () => {
+    const { repo } = project('orchestrate:\n  test: test ! -L .venv && test -f .venv/pyvenv.cfg && test ! -e donnees && test ! -e .env && test ! -L node_modules\n', true);
     writeFileSync(join(repo, '.gitignore'), 'node_modules/\n.venv/\ndonnees/\n.env\n');
     git(repo, 'add', '.gitignore');
     git(repo, 'commit', '-q', '-m', 'ignore donnees');

@@ -32,7 +32,7 @@ On top of the usability and accessibility checks, check the **consistency mockup
 
 **Family: consistency with the product tokens**
 
-- colour, size and spacing values of `maquette.html` that do not come from the product’s CSS variables: count them, each is a finding (Nielsen 4);
+- colour, size and spacing values of `maquette.html` that do not come from the product’s CSS variables: report the count as one finding, not one per value (Nielsen 4); a product with no CSS variables gets no finding, write it in `nonVerifie`;
 
 **Family: quality of the texts**
 

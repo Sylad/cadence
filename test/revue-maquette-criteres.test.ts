@@ -164,6 +164,16 @@ describe('R9/R10/R11 — le spec-writer', () => {
   });
   it('R11 — templates/fiche.yaml et le schéma de la fiche ne sont pas modifiés', () => {
     expect(empreinte(read('templates/fiche.yaml'))).toBe('325496e3942ce749');
+    // le schéma : la validation de `cadence spec check` (src/spec.ts, src/orchestrate/spec.ts)
+    expect(empreinte(read('src/spec.ts'))).toBe('bad3c070476b92bc');
+    expect(empreinte(read('src/orchestrate/spec.ts'))).toBe('5f5d582e1fd9364e');
+  });
+  it('R3 — un produit sans variables CSS : un seul constat chiffré, pas un par valeur, repli noté dans nonVerifie', () => {
+    const jetons = puces.find((l) => l.includes('CSS variables')) ?? '';
+    expect(jetons).toContain('one finding');
+    expect(jetons).toContain('no CSS variables');
+    expect(jetons).toContain('nonVerifie');
+    expect(writer).toContain('no CSS variables');
   });
 });
 

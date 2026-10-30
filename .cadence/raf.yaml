@@ -490,6 +490,7 @@ lots:
     visible: true
     created: 2026-10-30
     started: 2026-10-30
+    review: { date: 2026-10-30, verdict: "compliant — orchestré (vague 2026-10-30-1715, revue Fable conforme + UX conforme, 2 mineurs notés) ; rebasé sur main par le lead, seul conflit = ligne d'import de src/cli.ts (movePriority + readLeadContextThreshold réunis), tsc 0 erreur", commit: 0e0697952a823ec069dd36a19d28cbe59fe31f4d }
   - id: L450
     title: "verify --gate reprend le verdict de la vague sous des commits « de plan seuls », alors qu'un test peut lire le plan : avatar-pandora plan-page.e2e est passé au rouge après le raf done de L8 (9e lot livré, 30-10) sans que la porte de tête le voie — ne reprendre le verdict que si aucun test déclaré ne lit le plan (clé orchestrate.gate.readsPlan ou liste de chemins), sinon rejouer ; test sur un dépôt dont un test lit .cadence/raf.yaml"
     status: done

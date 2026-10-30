@@ -613,6 +613,61 @@ lots:
     created: 2026-10-30
     notes:
       - { date: 2026-10-30, text: "Portée élargie par Sylvain (30-10) : valable pour TOUS les projets et TOUTES les technos. L462 pose les garde-fous de cadence ET écrit la recette de référence réutilisable (docs/, générique, sans rien de propre à un projet), par techno : TS (ESLint, typescript-eslint, sonarjs, knip, jscpd), Python (ruff C901, radon, vulture), Java (Checkstyle, PMD/CPD, SpotBugs dans Maven), shell (shellcheck). Elle décrit aussi la ligne de base en cliquet et son branchement dans orchestrate.build et la CI. Les autres projets l'appliqueront ensuite, chacun dans un lot." }
+  - id: L463
+    title: "Plans riches — statuts détaillés du projet, écrits et gardés (plan.statuses écrivable, transitions, raf status) (manque M1 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-30
+  - id: L464
+    title: "Plans riches — champs d'extension déclarés, validés et conservés (plan.extras, raf add --set) (manque M2 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-30
+  - id: L465
+    title: "Plans riches — identifiants libres et sous-lots à plat (plan.idPattern, parent: hors préfixe) (manque M3 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-30
+  - id: L466
+    title: "Plans riches — fenêtre prévue et planification (planned: from..to, raf plan, --propose) (manque M4 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-30
+  - id: L467
+    title: "Plans riches — gains rapides groupés (raf quickwins par champ d'extension) (manque M5 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
+  - id: L468
+    title: "Plans riches — écriture du plan sûre entre sessions (verrou inter-processus) (manque M6 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-30
+  - id: L469
+    title: "Plans riches — livré ≠ terminé (deliver écrit delivered: et l'état livré, blocs par chemins) (manque M7 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-30
+  - id: L470
+    title: "Plans riches — export JSON stable du plan et flux d'événements (raf export, raf events) (manque M8 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-30
+  - id: L471
+    title: "Plans riches — plan.onWrite tolérant (onFailure: refuse|warn) (manque M9 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
+  - id: L472
+    title: "Plans riches — import d'un plan d'un autre format vers le natif, réversible (raf import --from-config --verify) (manque M10 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-30
+  - id: L473
+    title: "Plans riches — signal « lot dont toutes les sous-tâches sont fermées » (raf now, session start) (manque M11 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -353,6 +353,7 @@ lots:
     created: 2026-10-29
     notes:
       - { date: 2026-10-29, text: "Sylvain (29-10) : un seuil de 150k ne doit pas forcer des /clear fréquents — à combiner avec /compact (et le réglage de compaction automatique de Claude Code, à vérifier dans sa doc) et avec les lots de réduction du contexte (livreur délégué, comptes rendus courts, status compact)" }
+      - { date: 2026-10-30, text: "30-10 : Sylvain abandonne le /clear tous les 150k (session démarrée à 80k, 466k à 15 h) mais garde l'objectif de sobriété : ce lot reste à faire (seuil configurable en tokens, utile au compte pro à fenêtre plus petite)." }
   - id: L438
     title: "Alerte de joignabilité des machines : une sonde depuis Big-Blue (ping + API k3s) écrit sur Discord (webhook discord-idle) quand dark-blue ne répond plus — le 29-10 il s'est éteint à 20:05 et on ne l'a su qu'à la livraison de 20:43 (config locale, rien de propre à notre dossier dans le code de cadence)"
     status: todo
@@ -492,6 +493,21 @@ lots:
     created: 2026-10-30
   - id: L451
     title: "Mécanisme du goulot (suite de L447) : cadence corrections --classify du 30-10 — 563 passes bug-code sous-classées, cas limite 404 (72 %), maillon dominant brief implement (425/563, 75 %) ; poser LE mécanisme prévu par la fiche L447 (R8/R11 : reformuler une puce du bloc L428 de templates/orchestrate/implement.md, section Limits and rules : énumérer les cas limites du contrat avant de coder et en tester chacun), sans second bloc ; mesure : part conforme du premier coup et part « cas limite » sur la fenêtre suivante, depuis la date du commit"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
+  - id: L452
+    title: "Comptes rendus courts des agents appelés par le lead (qa-reviewer, ux-reviewer, code-reviewer, doc-keeper) : au plus ~15 lignes rendues (verdict, constats classés avec leur règle ou mesure, non vérifié, sous-tâches proposées), le détail mesuré écrit dans un fichier dont le chemin est rendu ; motif : ~25 comptes rendus de 2 à 4k tokens lus par le lead le 30-10 (contexte 80k → 466k) ; demande de Sylvain (gestion des tokens sans /clear)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
+  - id: L453
+    title: "raf discret : raf done/ux/review/note/move/public n'impriment plus le titre complet des lots touchés (id, état et 60 caractères au plus ; --verbose pour le titre entier) ; le rappel « plan non commité » garde sa commande ; motif : chaque raf répétait des titres de ~300 caractères dans le contexte du lead (30-10)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
+  - id: L454
+    title: "Un lot rendu visible PAR SA SESSION pendant la vague (warhammer L37 34f0c2d et L43 5f4dce5, le 30-10) sort « prêt » sans étape UX (colonne UX « — ») : l'orchestrateur relit visible/screen après chaque session et joue l'étape UX si le lot l'est devenu, ou le rend au lead avec « visible ajouté en cours de vague, étape UX à jouer » ; test"
     status: todo
     estimate: 0.25
     created: 2026-10-30

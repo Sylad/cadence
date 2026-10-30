@@ -494,10 +494,13 @@ lots:
     started: 2026-10-30
   - id: L451
     title: "Mécanisme du goulot (suite de L447) : cadence corrections --classify du 30-10 — 563 passes bug-code sous-classées, cas limite 404 (72 %), maillon dominant brief implement (425/563, 75 %) ; poser LE mécanisme prévu par la fiche L447 (R8/R11 : reformuler une puce du bloc L428 de templates/orchestrate/implement.md, section Limits and rules : énumérer les cas limites du contrat avant de coder et en tester chacun), sans second bloc ; mesure : part conforme du premier coup et part « cas limite » sur la fenêtre suivante, depuis la date du commit"
-    status: doing
+    status: dropped
     estimate: 0.25
     created: 2026-10-30
     started: 2026-10-30
+    finished: 2026-10-30
+    notes:
+      - { date: 2026-10-30, text: "abandonné : déjà posé par L447 (bbcd460 : puce « edge cases » du brief implement, liste avant de coder et chaque cas joué avant de rendre) ; le classement du 30-10 (cas limite 72 %, maillon brief implement 75 %) confirme ce maillon — mesure sur la fenêtre suivante" }
   - id: L452
     title: "Comptes rendus courts des agents appelés par le lead (qa-reviewer, ux-reviewer, code-reviewer, doc-keeper) : au plus ~15 lignes rendues (verdict, constats classés avec leur règle ou mesure, non vérifié, sous-tâches proposées), le détail mesuré écrit dans un fichier dont le chemin est rendu ; motif : ~25 comptes rendus de 2 à 4k tokens lus par le lead le 30-10 (contexte 80k → 466k) ; demande de Sylvain (gestion des tokens sans /clear)"
     status: doing

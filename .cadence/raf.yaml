@@ -85,11 +85,12 @@ lots:
     finished: 2026-10-28
   - id: L407
     title: "Réponse sur une vague vivante : --answer est refusé tant qu'un autre lot de la vague tourne (L401 bloqué ~15 min le 28-10) — l'accepter et la faire prendre par la vague vivante (file de réponses lue entre deux étapes), test"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-28
     started: 2026-10-30
     review: { date: 2026-10-30, verdict: "compliant — revue Opus passe 3 (2 majeurs précédents corrigés : canRun pending/take, settled/lanes ; tsc 0, 1968 tests orchestrate) + test R9bis de la garde pending ajouté par f341889d, rouge sans la garde, 13/13 avec ; 3 mineurs laissés en note (2e réponse en file acceptée, branche « vient de finir » sans test, JSDoc d'AnswerFeed) ; revue courte du diff rebasé (patch-id différent) : compliant — rebase sans effet sur le code du lot (range-diff : seule l'entrée CHANGELOG change, conflit résolu sous le « ### Fixed » de [Unreleased]), aucun constat", commit: d91f557840dd69c8d349a1eee17b651e11447ecd }
+    finished: 2026-10-30
   - id: L408
     title: "/hud lots refusé « terminal trop étroit » dans l'app desktop même sur un écran très large : le mod pré-contrôlait 110 colonnes (presentation.columns) alors qu'un Pane demandé est placé à toute largeur — retirer le pré-contrôle, $.ui.open décide (non placé : raison)"
     status: done

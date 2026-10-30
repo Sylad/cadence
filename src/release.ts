@@ -81,6 +81,8 @@ interface Planned {
   packageName: string;
   isPrivate: boolean;
   hasEvalScript: boolean;
+  /** Les scripts npm que le clone neuf rejoue, dans l'ordre : typecheck puis test, ceux que le paquet déclare. */
+  cloneScripts: string[];
 }
 
 /** Un échec de git (hors dépôt, dépôt sans commit) est un refus, pas une trace de pile. */
@@ -179,6 +181,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
     packageName: String(pkg.name ?? ''),
     isPrivate: pkg.private === true,
     hasEvalScript: typeof pkg.scripts?.['eval:plugin'] === 'string',
+    cloneScripts: ['typecheck', 'test'].filter((n) => typeof pkg.scripts?.[n] === 'string'),
   };
 }
 
@@ -209,12 +212,23 @@ export function whatsNewIssues(text: string, version: string): string[] {
   return issues;
 }
 
+/**
+ * Le passage en clone neuf (L446) : la porte voit l'arbre du lead, avec ses fichiers non suivis (la 1.25.0 a cassé à la publication sur des
+ * types que Claude Code génère dans plugins/cadence-hud et que seul un clone ne porte pas). `git clone` du dépôt courant ne prend que ce qui est commité,
+ * `--no-hardlinks` pour ne rien partager avec lui ; le clone est retiré, vert ou rouge.
+ */
+function cloneStep(scripts: string[]): string {
+  const run = scripts.map((n) => (n === 'test' ? 'npm test' : `npm run ${n}`)).join(' && ');
+  return `d=$(mktemp -d) && git clone -q --no-hardlinks . "$d/c" && (cd "$d/c" && npm ci && ${run}); r=$?; rm -rf "$d"; test $r -eq 0    (la suite dans un git clone neuf, comme publish.yml ; rouge = pas de tag)`;
+}
+
 /** Les étapes que le lead joue, dans l'ordre : la commande n'en fait aucune. */
 function steps(p: Planned, files: string[], branch: string): string[] {
   const tag = `v${p.version}`;
   const out = [
     `git add ${files.join(' ')} && git commit -m "release: ${p.version}"`,
     'cadence verify --gate --sha HEAD    (la suite et le build rejoués sur le commit de version, où le CHANGELOG n\'a plus de [Unreleased] plein ; rouge = pas d\'éval ni de tag)',
+    ...(p.cloneScripts.length ? [cloneStep(p.cloneScripts)] : []),
     ...(p.hasEvalScript ? ['npm run eval:plugin -- --trust-plugin    (facturé ; un cas sous le seuil arrête la release)'] : []),
     `git tag ${tag}`,
     `git push origin ${branch} ${tag}    (le tag lance le workflow de publication)`,

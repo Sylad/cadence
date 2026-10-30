@@ -22,7 +22,13 @@ A version exists in three places and is published in two; a release does all of 
    billed evaluation and before the tag. Red: fix it in a commit of its own and redo the version commit. A test that looks
    for the entry of a lot in the CHANGELOG reads the section that carries it (`[Unreleased]` or the published version) through
    `changelogSectionOf` (`test/changelog-section.ts`); `test/changelog-garde.test.ts` refuses a test that selects `## [Unreleased]`
-   of the repository's CHANGELOG itself.
+   of the repository's CHANGELOG itself. The gate runs in the lead's tree or in a copy of it, both full of files git does not track
+   (the `plugins/cadence-hud/.claude-plugin/types` that Claude Code generates, `node_modules`): the 1.25.0 publish run broke on three
+   `hud-*` tests that read those types, present in every local tree and absent from the CI checkout (L446). So the same commit is
+   also replayed **in a fresh `git clone`** — the next step the command prints: `git clone --no-hardlinks` of the repository
+   (only what is committed), `npm ci`, then `npm run typecheck` and `npm test` (those the package declares; a package with neither gets no
+   such step), the clone removed whatever the result. Red: no evaluation and no tag. `.github/workflows/tests.yml` does the same on every
+   push to `main`, from a fresh checkout.
 3. Run the plugin evaluation, `npm run eval:plugin` (billed, see [Evaluating the plugin](#evaluating-the-plugin-before-a-release)),
    on that version commit; a case below the threshold stops the release until you have read it in the report.
 4. `git tag v<version> && git push origin main v<version>` — the tag starts `.github/workflows/publish.yml`,
@@ -37,7 +43,7 @@ A version exists in three places and is published in two; a release does all of 
    while an existing one is left alone. If the package is on npm but the release is still missing, re-run the job;
    the by-hand fallback is `gh release create v<version> --title v<version> --notes-file <the section of CHANGELOG.md> --verify-tag`.
 
-`.github/workflows/tests.yml` runs the type-check and the test suite on the same runner image and `npm ci` as the publish job, in a matrix of Node 22 and 24 (the minimum `engines.node` allows, and the Node the publish job uses), and never publishes: start it with `gh workflow run tests.yml --ref <branch>` or by pushing a `diag/**` branch, to see on the runner what a red publish run saw.
+`.github/workflows/tests.yml` runs the type-check and the test suite on the same runner image and `npm ci` as the publish job, in a matrix of Node 22 and 24 (the minimum `engines.node` allows, and the Node the publish job uses), and never publishes: it starts on every push to `main` (L446: each run is a fresh checkout, which no local tree is), with `gh workflow run tests.yml --ref <branch>` or by pushing a `diag/**` branch, to see on the runner what a red publish run saw.
 
 The suite runs the same way on your machine as on that runner, **without `raf` or `cadence` installed** (L384): `test/global-setup.ts` replaces, in the `PATH` of the tests, every folder outside the repository that carries a `raf` or a `cadence` (`~/.local/bin`, the global npm folder, the plugin's `bin/`) by a mirror of that folder without those two names — the other tools stay, `node` included. A test that relies on the installed tool turns red on the lead's machine and in the gate, not only in the publish run: the 1.16.0 publication failed because the post-commit hook of `test/raf-init-commit.test.ts` (R2) found `raf` in the developer's `PATH` and not on the runner. A test that needs `raf` (a hook, a script) builds its own from the sources (`CADENCE_TEST_PACKAGE`).
 
@@ -79,7 +85,7 @@ introduction (the newest version first, as the file is read). Exit code 1 when a
 version files are written, the commit is not ready. `--dry-run` reads the forms the same way (nothing is written) and exits 1 on the same findings, so the forms can be checked before the real run.
 
 It prints the lead's steps, in order, and runs none: the `git add` of exactly the files of the version commit and the commit,
-`cadence verify --gate --sha HEAD` (always printed, before the evaluation and the tag),
+`cadence verify --gate --sha HEAD` (always printed, before the evaluation and the tag), the replay in a fresh clone (L446: `git clone --no-hardlinks`, `npm ci`, `npm run typecheck` and `npm test` for the scripts `package.json` declares, none printed when it declares neither),
 `npm run eval:plugin -- --trust-plugin` (only when `package.json` has that script), `git tag v<x.y.z>`, `git push origin <branch> v<x.y.z>`,
 `gh run watch`, `npm view <package> version` (not for a private package) and, only with a `.claude-plugin/plugin.json`,
 the plugin update: `claude plugin marketplace update <marketplace>` first (without it the installed plugin stays at the old

@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `cadence release` prints, right after the gate replay, a step that replays the version commit **in a fresh `git clone`** (`git clone --no-hardlinks`, `npm ci`, `npm run typecheck`, `npm test`, the clone removed afterwards; only the scripts `package.json` declares), and `.github/workflows/tests.yml` now also runs on every push to `main` (L446, `docs/releasing.md`). The gate runs in trees full of untracked files, which is how the 1.25.0 publication broke on tests that no local tree could see failing.
+
 ### Fixed
 
 - The test suite (`npm test`, so `prepublishOnly` and the `publish` workflow) passes in a fresh `git clone`: vitest no longer reads `plugins/cadence-hud/tsconfig.json`, which extends `.claude-plugin/types/tsconfig.json`, a file Claude Code writes when it loads the mod and git does not track. The 1.25.0 publication failed on it in `test/hud-cycle`, `test/hud-deliveries` and `test/hud-depense-l414` (L445). The mod's own typecheck still extends that file.

@@ -1,11 +1,12 @@
 # Diagnostic de la suite sur le runner GitHub, sans rien publier : même image, Node 22 (le minimal, engines.node) et Node 24 (celui de publish.yml), même identité git
-# et même npm ci que le job de publish.yml. Lancement à la main (workflow_dispatch) ou par un push sur une branche diag/**.
+# et même npm ci que le job de publish.yml. Lancement à la main (workflow_dispatch), par un push sur une branche diag/** ou sur main (L446) :
+# chaque run part d'un checkout neuf, sans fichier non suivi, ce que les arbres locaux et les copies de la porte ne sont jamais.
 name: tests
 
 on:
   workflow_dispatch:
   push:
-    branches: ['diag/**']
+    branches: [main, 'diag/**']
 
 permissions:
   contents: read

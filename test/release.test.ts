@@ -11,7 +11,7 @@ const LOCK_ROOT = { name: NAME, version: '1.2.3', dependencies: { yaml: '^2.5.0'
 const PACKAGE = `{
   "name": "${NAME}",
   "version": "1.2.3",
-  "scripts": { "eval:plugin": "claude plugin eval ." },
+  "scripts": { "eval:plugin": "claude plugin eval .", "typecheck": "tsc --noEmit", "test": "vitest run" },
   "dependencies": { "yaml": "^2.5.0" },
   "devDependencies": { "vitest": "^2.0.0" }
 }
@@ -295,6 +295,7 @@ describe('cadence release — rien n’est publié', () => {
       'git add package.json package-lock.json .claude-plugin/plugin.json .claude-plugin/marketplace.json CHANGELOG.md docs/whats-new.md',
       'git commit',
       'cadence verify --gate --sha HEAD',
+      'git clone',
       'npm run eval:plugin -- --trust-plugin',
       'git tag v1.2.4',
       'git push origin main v1.2.4',
@@ -563,5 +564,40 @@ describe('cadence release — le plugin du marketplace', () => {
     const r = release(dir, 'patch');
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/à la version 1\.2\.3/);
+  });
+});
+
+describe('cadence release — passage en clone neuf (L446)', () => {
+  it('L446 — la porte est aussi rejouée dans un git clone du commit de version, sans fichier non suivi : clone, npm ci, typecheck, test, puis le clone est retiré', () => {
+    const r = release(project({ whatsNew: WHATS_NEW_DONE }), 'patch');
+    const line = r.out.split('\n').find((l) => l.includes('git clone')) ?? '';
+    expect(line).toMatch(/git clone .*--no-hardlinks/);
+    const at = (s: string) => line.indexOf(s);
+    expect(at('npm ci'), line).toBeGreaterThan(at('git clone'));
+    expect(at('npm run typecheck'), line).toBeGreaterThan(at('npm ci'));
+    expect(at('npm test'), line).toBeGreaterThan(at('npm run typecheck'));
+    expect(at('rm -rf'), line).toBeGreaterThan(at('npm test'));
+    expect(r.out.indexOf('git clone'), 'après la porte, avant le tag').toBeGreaterThan(r.out.indexOf('cadence verify --gate --sha HEAD'));
+    expect(r.out.indexOf('git clone')).toBeLessThan(r.out.indexOf('git tag v1.2.4'));
+  });
+
+  it('L446 — le clone ne rejoue que les scripts que le paquet déclare : sans script typecheck, pas de typecheck ; sans test ni typecheck, pas de clone', () => {
+    const only = (scripts: Record<string, string>) => {
+      const dir = project({ whatsNew: WHATS_NEW_DONE });
+      const pkg = JSON.parse(read(dir, 'package.json'));
+      pkg.scripts = scripts;
+      writeFileSync(join(dir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
+      git(dir, 'commit', '-qam', 'chore: scripts');
+      return release(dir, 'patch').out;
+    };
+    const testOnly = only({ test: 'vitest run' });
+    expect(testOnly).toContain('git clone');
+    expect(testOnly).not.toContain('npm run typecheck');
+    expect(only({ 'eval:plugin': 'x' })).not.toContain('git clone');
+  });
+
+  it('L446 — tests.yml tourne sur chaque push de main (un clone neuf par run), en plus des branches diag/**', () => {
+    const wf = readFileSync(join(process.cwd(), '.github/workflows/tests.yml'), 'utf8');
+    expect(wf).toMatch(/push:\s*\n\s*branches:\s*\[[^\]]*\bmain\b[^\]]*'diag\/\*\*'[^\]]*\]/);
   });
 });

@@ -445,6 +445,13 @@ lots:
     estimate: 0.5
     spec: true
     created: 2026-10-30
+  - id: L448
+    title: "Revue de maquette renforcée par les critères de la skill design-critique du plugin Design d'Anthropic (anthropics/knowledge-work-plugins, dossier design ; aussi ux-copy et accessibility-review) : les lire, les comparer à l'agent ux-reviewer en mode maquette et au spec-writer, reprendre dans NOS agents les seuls critères absents, chacun fondé sur une règle nommée ou une mesure (aucune dépendance au plugin : cadence reste générique, compte pro) ; motif : sessions ux par lot visible 1,6 contre 1,2 (cadence perf du 30-10, « renforcer la maquette ») ; mesure : ce chiffre sur la fenêtre suivante ; décision de Sylvain le 30-10"
+    status: todo
+    estimate: 0.5
+    spec: true
+    after: [ L447 ]
+    created: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

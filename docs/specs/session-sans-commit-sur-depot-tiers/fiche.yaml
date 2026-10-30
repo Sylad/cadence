@@ -9,40 +9,45 @@ sujet:
     hors_perimetre:
       - "le push et le déploiement : déjà refusés par le hook pre-push de la vague et la détection de push (cycle.ts:983-998), inchangés"
       - "le dépôt du lot lui-même : ses commits sur sa branche (ou celle de son worktree) sont le travail normal, l'intégration reste celle de L279"
+      - "les voisins déclarés par la clé repos: du lot : leur comportement codé (commits sur leur branche courante, briefs.ts:68, docs/orchestrate.md « A lot whose work is in a neighbouring repository », test/orchestrate-cycle-repos.test.ts:30-37 et :115) reste tel quel, sous réserve de la question posée au lead (R12)"
       - "défaire le commit fautif (reset, revert, déplacement de branche) : le programme constate et rend, le lead tranche"
       - "les sessions en lecture seule : tout changement de dépôt reste un incident par handBack (cycle.ts:1048-1051), inchangé"
 cas:
   - id: C1
-    titre: "Une session d'écriture commite sur la branche principale d'un dépôt voisin cité par le lot (repos:)"
+    titre: "Une session d'écriture commite sur la branche principale d'un dépôt tiers (ni celui du lot, ni un voisin déclaré)"
     acteur: le programme (fin d'une session d'écriture d'orchestrate)
-    declencheur: "fin d'une session spec, accept, implement ou fix dans cycle.ts (comparaison des snapshots avant/après)"
+    declencheur: "fin d'une session spec, accept, implement ou fix dans cycle.ts (comparaison des relevés avant/après)"
     preconditions:
-      - "le lot déclare un dépôt voisin (clé repos:) dont la branche principale est main ou master"
-      - "la session a ajouté au moins un commit à cette branche pendant sa durée"
+      - "un dépôt git, enfant direct du dossier parent du projet (cité par le lot dans son texte ou non, ex. developpeur-gitops), n'est ni le dépôt du lot, ni un de ses voisins déclarés (repos:), ni le dépôt d'un autre lot de la vague"
+      - "la session a ajouté au moins un commit à sa branche principale pendant sa durée"
     nominal:
-      - "Le programme relève, avant la session, le sha de la branche principale de chaque dépôt voisin du lot."
-      - "À la fin de la session d'écriture, il relève de nouveau ce sha."
-      - "Le sha a bougé : le lot est rendu au lead (handed-back) avec un constat qui nomme le dépôt, la branche, les commits ajoutés et la voie wip/<projet>-<lot>."
-      - "Le commit n'est pas défait ; le dépôt est marqué sale pour la vague (comme un HEAD déplacé), la reprise exige le lead."
+      - "Avant la session, le programme relève, sans réseau, le sha de la branche principale de chaque dépôt tiers (origin/HEAD, sinon main, sinon master)."
+      - "À la fin de la session d'écriture, il relève de nouveau ces sha."
+      - "Un sha a bougé : le lot est rendu au lead (handed-back) avec un constat qui nomme le dépôt, la branche, les commits ajoutés et la voie wip/<projet>-<lot>."
+      - "Le commit n'est pas défait ; le dépôt est marqué sale pour la vague, la reprise exige le lead."
     alternatives:
-      - { si: "la session a commité sur la branche wip/<projet>-<lot> du voisin", alors: "aucun incident : voie prévue, avertissement de trace seulement", regles: [R5] }
-      - { si: "le commit a été fait puis la session a remis HEAD ailleurs, la branche principale gardant le commit", alors: "même constat : le sha de la branche est comparé, pas HEAD", regles: [R2] }
+      - { si: "la session a commité sur la branche wip/<projet>-<lot> du dépôt tiers, la branche principale n'ayant pas bougé", alors: "aucun incident : voie prévue ; si HEAD du tiers est resté sur la branche wip, un avertissement le dit et rien n'est remis", regles: [R5, R11] }
+      - { si: "le commit a été fait sur la branche principale puis la session a remis HEAD ailleurs", alors: "même constat : le sha de la branche est comparé, pas HEAD", regles: [R2] }
       - { si: "la branche principale n'a pas bougé", alors: "rien à constater, la vague continue", regles: [R2] }
-    resultat: "Le lot est rendu avec le constat avant tout contrôle ou lot suivant ; rien n'est poussé, rien n'est défait."
-  - id: C2
-    titre: "Une session d'écriture commite sur la branche principale d'un dépôt du dossier parent que le lot ne cite pas"
-    acteur: le programme (fin d'une session d'écriture d'orchestrate)
-    declencheur: "fin d'une session d'écriture dans cycle.ts"
-    preconditions:
-      - "un dépôt git, enfant direct du dossier parent du projet, n'est ni le dépôt du lot ni un de ses voisins déclarés"
-    nominal:
-      - "Avant la session, le programme relève le sha de la branche principale de chaque dépôt git enfant direct du dossier parent."
-      - "Après la session, il les relève de nouveau."
-      - "Un sha a bougé : le lot est rendu avec le constat (même texte que C1, avec la mention « non cité par le lot »)."
-    alternatives:
-      - { si: "un enfant du dossier parent n'est pas un dépôt git, ou est illisible", alors: "il est ignoré sans bruit, la vague continue", regles: [R3] }
-      - { si: "la session a commité sur wip/<projet>-<lot> dans ce dépôt", alors: "aucun incident", regles: [R5] }
+      - { si: "un enfant du dossier parent n'est pas un dépôt git, ou sa lecture échoue avant ou après la session", alors: "il est ignoré, une ligne du journal le dit, la vague continue", regles: [R3, R13] }
+      - { si: "le dépôt n'a aucun commit, ou aucune branche principale lisible, avant et après", alors: "ignoré, comme un enfant illisible", regles: [R13] }
+      - { si: "la branche principale est créée ou supprimée pendant la session (sha absent d'un seul côté)", alors: "même constat qu'un sha qui a bougé", regles: [R13] }
+      - { si: "main et master existent tous les deux", alors: "les deux sont surveillées, un sha qui bouge sur l'une suffit", regles: [R4] }
+      - { si: "l'enfant est un worktree lié, un lien symbolique vers un dépôt déjà compté, ou le dossier parent est lui-même un dépôt git", alors: "ignoré : seuls les dépôts à part entière enfants directs sont surveillés, chacun une fois", regles: [R15, R8] }
+      - { si: "le dépôt tiers est le dépôt d'un autre lot de la même vague (worktrees, intégration de L279)", alors: "non surveillé pendant cette vague : sa branche principale bouge légitimement", regles: [R14] }
     resultat: "Le cas cluster-sante L1 (3 commits sur developpeur-gitops main) rend le lot au lieu de passer inaperçu."
+  - id: C2
+    titre: "Une session d'écriture travaille dans un voisin déclaré (repos:) du lot"
+    acteur: le programme (fin d'une session d'écriture d'orchestrate)
+    declencheur: "fin d'une session d'écriture d'un lot à repos: dans cycle.ts"
+    preconditions:
+      - "le lot déclare un voisin par la clé repos:"
+    nominal:
+      - "La session commite dans le voisin, sur sa branche courante, avec le lot cité dans les commits (comportement codé)."
+      - "Le contrôle « HEAD déplacé » existant s'applique au voisin comme aujourd'hui ; raf commits, la revue, repoShas (cycle.ts:2541) et le test « already has work » lisent le voisin comme aujourd'hui."
+    alternatives:
+      - { si: "la session a basculé le voisin sur une autre branche (par exemple wip/<projet>-<lot>)", alors: "contrôle existant inchangé : branche d'origine remise avec avertissement, ou lot rendu si la remise est impossible", regles: [R12] }
+    resultat: "Un lot à voisin déclaré reste livrable comme aujourd'hui ; L456 n'y change rien tant que le lead n'a pas tranché la question sur wip."
   - id: C3
     titre: "La session d'écriture reçoit l'interdiction et la voie prévue dans son brief"
     acteur: le programme (construction du brief d'une session d'écriture)
@@ -50,88 +55,126 @@ cas:
     preconditions:
       - "la session est une session d'écriture"
     nominal:
-      - "Le brief dit : ne jamais commiter sur la branche principale d'un autre dépôt que celui du lot, voisin cité ou non."
+      - "Le brief dit : ne jamais commiter sur la branche principale d'un dépôt autre que celui du lot et que ses voisins déclarés, cité dans le texte du lot ou non."
       - "Le brief donne la voie : créer la branche wip/<projet>-<lot> dans ce dépôt et y commiter."
-      - "Le brief du lot à voisins (reposText) garde sa consigne de travail dans le voisin mais la limite à cette branche."
+      - "Le brief des voisins déclarés (reposText) garde sa consigne de travail inchangée."
     alternatives: []
     sans_alternative: "le brief est un texte construit à l'identique pour toute session d'écriture ; son seul cas est le nominal (R1)"
     resultat: "La session sait avant d'agir ce qui est interdit et où commiter à la place."
 regles:
   - id: R1
     cas: [C3]
-    enonce: "Le brief de toute session d'écriture interdit de commiter sur la branche principale d'un autre dépôt que celui du lot et nomme la voie wip/<projet>-<lot>."
+    enonce: "Le brief de toute session d'écriture interdit de commiter sur la branche principale d'un dépôt qui n'est ni celui du lot ni un voisin déclaré, et nomme la voie wip/<projet>-<lot>."
     statut: sourcee
     source: "demande du lot L456 : « le brief l'interdit … la voie prévue est une branche wip/<projet>-<lot> »"
-    tests: ["R1 — brief d'écriture : l'interdiction et wip/<projet>-<lot> sont présents", "R1 — brief d'écriture avec voisin : la consigne de commit dans le voisin est limitée à la branche wip"]
+    tests: ["R1 — brief d'écriture : l'interdiction et wip/<projet>-<lot> sont présents", "R1 — brief d'écriture avec voisin déclaré : reposText inchangé"]
   - id: R2
     cas: [C1]
-    enonce: "Si, à la fin d'une session d'écriture, le sha de la branche principale d'un dépôt voisin déclaré a changé, le lot est rendu (handed-back) avec le constat ; la comparaison porte sur la branche, pas sur HEAD."
+    enonce: "Si, à la fin d'une session d'écriture, le sha de la branche principale d'un dépôt tiers a changé, le lot est rendu (handed-back) avec le constat ; la comparaison porte sur la branche, pas sur HEAD."
     statut: sourcee
-    source: "demande du lot L456 : « l'orchestrateur détecte en fin de session un commit sur la branche principale d'un dépôt frère cité par le lot … et rend le lot avec le constat » ; mécanisme voisin : cycle.ts:1001-1031 (HEAD déplacé, rendu handed-back)"
-    tests: ["R2 — commit sur main d'un voisin cité : lot rendu avec le constat", "R2 — commit fait puis HEAD remis ailleurs : constat quand même", "R2 — branche principale inchangée : aucun incident"]
+    source: "demande du lot L456 : « l'orchestrateur détecte en fin de session un commit sur la branche principale d'un dépôt … et rend le lot avec le constat » ; mécanisme voisin : cycle.ts:1001-1031 (HEAD déplacé, rendu handed-back)"
+    tests: ["R2 — commit sur main d'un dépôt tiers : lot rendu avec le constat", "R2 — commit fait puis HEAD remis ailleurs : constat quand même", "R2 — branche principale inchangée : aucun incident"]
   - id: R3
-    cas: [C2]
-    enonce: "La surveillance couvre aussi tout dépôt git enfant direct du dossier parent du projet ; un enfant qui n'est pas un dépôt lisible est ignoré."
+    cas: [C1]
+    enonce: "La surveillance couvre tout dépôt git du dossier parent du projet, pas seulement ceux que le lot cite ; un enfant qui n'est pas un dépôt lisible est ignoré."
     statut: sourcee
-    source: "demande du lot L456 : « (ou de tout dépôt du dossier parent) » ; « enfant direct » et « ignoré sans bruit » sont des choix (R8)"
+    source: "demande du lot L456 : « (ou de tout dépôt du dossier parent) » ; la profondeur et l'ignorance sont précisées par R8 et R13"
     tests: ["R3 — commit sur main d'un dépôt non cité du dossier parent : lot rendu", "R3 — enfant du dossier parent qui n'est pas un dépôt git : ignoré, vague continue"]
   - id: R4
-    cas: [C1, C2]
-    enonce: "La branche principale d'un dépôt tiers est la branche locale main, sinon master, quand l'une existe ; les autres branches ne déclenchent rien."
+    cas: [C1]
+    enonce: "Les branches principales surveillées d'un dépôt tiers sont, parmi les branches locales existantes : celle que désigne origin/HEAD (refs/remotes/origin/HEAD, lu sans réseau comme git.ts:206-221), main et master ; si plusieurs existent, toutes sont surveillées et un sha qui bouge sur l'une suffit. Les autres branches ne déclenchent rien."
     statut: hypothese
-    si_faux: "Si le dépôt a une autre branche par défaut (develop, trunk), un commit dessus passe inaperçu : il suffirait de lire origin/HEAD comme git.ts:206-221 avant le repli main puis master."
-    tests: ["R4 — dépôt tiers avec branche par défaut master : commit détecté", "R4 — commit sur une branche autre que main et master : aucun incident"]
+    si_faux: "Un dépôt dont la branche par défaut est develop ou trunk, sans origin/HEAD posé, laisserait passer un commit sur elle : il faudrait ajouter ce nom ; la détection ne perd rien sur le cas nominal puisque main et master restent surveillées."
+    tests: ["R4 — origin/HEAD pointe develop : commit sur develop détecté", "R4 — dépôt tiers avec branche par défaut master : commit détecté", "R4 — main et master présentes : un commit sur master est détecté", "R4 — commit sur une branche autre que principale : aucun incident"]
   - id: R5
-    cas: [C1, C2]
-    enonce: "Un commit sur la branche wip/<projet>-<lot> d'un dépôt tiers n'est pas un incident ; le programme le note en avertissement du lot."
+    cas: [C1]
+    enonce: "Un commit sur la branche wip/<projet>-<lot> d'un dépôt tiers n'est pas un incident quand la branche principale n'a pas bougé."
     statut: sourcee
     source: "demande du lot L456 : « la voie prévue est une branche wip/<projet>-<lot> »"
-    tests: ["R5 — commit sur wip/<projet>-<lot> d'un voisin : pas d'incident, avertissement noté"]
+    tests: ["R5 — commit sur wip/<projet>-<lot> d'un dépôt tiers : pas d'incident"]
   - id: R6
-    cas: [C1, C2]
+    cas: [C1]
     enonce: "Le constat nomme le dépôt, la branche, les commits ajoutés (sha court et sujet) et la voie wip/<projet>-<lot> ; il est rendu avant les contrôles et le lot suivant, comme les autres incidents de dépôt."
     statut: hypothese
     si_faux: "Si le texte doit changer, seul le message change (aucune donnée en jeu) ; si le constat devait venir après les contrôles, l'ordre des étapes de cycle.ts changerait."
     tests: ["R6 — constat : dépôt, branche, sha court, sujet et wip/<projet>-<lot> présents", "R6 — constat rendu avant le lancement des tests du lot"]
   - id: R7
-    cas: [C1, C2]
+    cas: [C1]
     enonce: "Le programme ne défait jamais le commit fautif : il n'y a ni reset, ni revert, ni déplacement de la branche principale d'un autre dépôt."
     statut: sourcee
     source: réponse du lead, 2026-10-30, vague 2026-10-30-1755-cad
-    tests: ["R7 — après le constat, le sha de la branche principale du voisin est celui laissé par la session"]
+    tests: ["R7 — le test crée un commit sur main du tiers, laisse le programme constater, puis vérifie que le sha de main est celui du commit fautif et que git reflog n'a aucune entrée reset ou checkout ajoutée par le programme"]
   - id: R8
-    cas: [C2]
-    enonce: "Seuls les dépôts à un niveau sous le dossier parent sont surveillés, le dépôt du lot et ses voisins déclarés étant comptés une fois."
+    cas: [C1]
+    enonce: "Seuls les dépôts enfants directs du dossier parent sont surveillés, chacun une fois, le dépôt du lot et ses voisins déclarés étant exclus."
     statut: hypothese
     si_faux: "Un dépôt plus profond (parent/groupe/depot) ne serait pas vu : la profondeur de recherche serait à élargir, au prix d'un parcours plus long à chaque session."
-    tests: ["R8 — dépôt voisin déclaré aussi enfant du dossier parent : un seul constat", "R8 — dépôt du lot lui-même : jamais compté comme tiers"]
+    tests: ["R8 — voisin déclaré aussi enfant du dossier parent : jamais compté comme tiers", "R8 — dépôt du lot lui-même : jamais compté comme tiers", "R8 — dépôt à deux niveaux sous le dossier parent : non surveillé"]
   - id: R9
-    cas: [C1, C2]
-    enonce: "Le lot est rendu seulement pour une session d'écriture ; le contrôle d'une session en lecture seule est inchangé."
+    cas: [C1]
+    enonce: "Le constat de R2 ne s'applique qu'aux sessions d'écriture ; le contrôle d'une session en lecture seule est inchangé."
     statut: sourcee
-    source: "src/orchestrate/cycle.ts:1048-1051 (une étape en lecture seule qui change un dépôt est déjà rendue par handBack)"
+    source: "src/orchestrate/cycle.ts:1048-1051 (une étape en lecture seule qui change un dépôt surveillé est déjà rendue par handBack)"
     tests: ["R9 — session de revue sans commit tiers : comportement inchangé"]
   - id: R10
-    cas: [C1, C2, C3]
-    enonce: "La règle et la voie wip/<projet>-<lot> sont écrites dans la documentation d'orchestrate."
+    cas: [C1, C3]
+    enonce: "La règle et la voie wip/<projet>-<lot> sont écrites dans la documentation d'orchestrate (docs/orchestrate.md), avec ce qui n'est pas surveillé (R8, R14, R15)."
     statut: sourcee
     source: "demande du lot L456 : « doc et test »"
-    tests: ["R10 — la doc d'orchestrate cite l'interdiction et wip/<projet>-<lot>"]
+    tests: ["R10 — la doc d'orchestrate cite l'interdiction, wip/<projet>-<lot> et les dépôts non surveillés"]
+  - id: R11
+    cas: [C1]
+    enonce: "Quand HEAD d'un dépôt tiers est resté sur la branche wip/<projet>-<lot> à la fin de la session, le programme ne le remet pas (le contrôle « HEAD déplacé » ne surveille que le dépôt du lot et ses voisins déclarés) et note un avertissement du lot qui nomme le dépôt et la branche."
+    statut: hypothese
+    si_faux: "Si le lead veut que le tiers retrouve sa branche d'origine, il faudrait relever la branche courante de chaque tiers avant la session et la remettre comme cycle.ts:1001-1020 le fait pour un voisin ; rien n'est détruit dans les deux cas."
+    tests: ["R11 — HEAD resté sur wip dans un tiers : avertissement, branche non remise, aucun incident", "R11 — tiers resté sur sa branche : aucun avertissement"]
+  - id: R12
+    cas: [C2]
+    enonce: "Les voisins déclarés par repos: ne sont pas soumis à R2 : la session y commite sur leur branche courante comme aujourd'hui, le contrôle « HEAD déplacé » (remise ou rendu), raf commits, la revue, repoShas (cycle.ts:2541) et « already has work » les lisent sur cette branche, sans changement."
+    statut: hypothese
+    si_faux: "Si le lead décide qu'un lot à voisin déclaré doit commiter seulement sur wip/<projet>-<lot>, R12 tombe : R2 couvre alors les voisins, la consigne de reposText (briefs.ts:68), la section « A lot whose work is in a neighbouring repository » de docs/orchestrate.md, test/orchestrate-cycle-repos.test.ts:30-37 et :115 sont à changer, et raf commits, la revue, repoShas et « already has work » doivent lire la branche wip du voisin. Question posée au lead avant l'acceptation."
+    tests: ["R12 — lot à voisin déclaré : commit sur la branche courante du voisin, lot livrable (test/orchestrate-cycle-repos.test.ts existant, inchangé)", "R12 — voisin déclaré basculé sur une autre branche : remise avec avertissement, comme avant"]
+  - id: R13
+    cas: [C1]
+    enonce: "Un dépôt tiers dont la lecture du sha échoue avant ou après la session, ou qui n'a aucune branche principale ni commit des deux côtés, est ignoré avec une ligne du journal et n'est jamais un incident ; une branche principale absente d'un seul côté (créée ou supprimée pendant la session) compte comme un sha qui a bougé."
+    statut: hypothese
+    si_faux: "Si un échec de lecture devait rendre le lot, une panne de disque ou un index.lock d'un dépôt sans rapport arrêterait des lots sains ; le coût du contraire est un commit non vu quand la lecture échoue précisément ce jour-là."
+    tests: ["R13 — sha illisible après la session : ignoré, ligne du journal, vague continue", "R13 — dépôt sans commit : ignoré", "R13 — branche main créée avec un commit pendant la session : constat", "R13 — branche master supprimée pendant la session : constat"]
+  - id: R14
+    cas: [C1]
+    enonce: "Les dépôts des autres lots de la même vague (et leurs voisins déclarés) ne sont pas surveillés pendant cette vague : leur branche principale bouge légitimement par les sessions et l'intégration d'un autre lot."
+    statut: hypothese
+    si_faux: "Si le dépôt d'un autre lot de la vague était surveillé, le constat serait faux dès qu'un lot légitime avance sa branche (docs/orchestrate.md:563, worktrees) ; en contrepartie, un commit fautif d'une session sur la branche principale du dépôt d'un autre projet de la même vague n'est pas vu, à couvrir par un lot à part."
+    tests: ["R14 — deux lots de projets frères dans la même vague, l'un avance sa branche principale : aucun constat sur l'autre", "R14 — dépôt absent de la vague : surveillé"]
+  - id: R15
+    cas: [C1]
+    enonce: "Sont ignorés : un enfant dont .git est un fichier (worktree lié), un lien symbolique qui mène à un dépôt déjà compté, et le dossier parent lui-même s'il est un dépôt git ; chaque dépôt n'est compté qu'une fois (chemin réel)."
+    statut: hypothese
+    si_faux: "Un worktree lié serait compté comme un second dépôt et son avance légitime donnerait un faux constat ; le dépôt principal de ce worktree reste surveillé par ailleurs. Si le dossier parent doit être surveillé, il suffit de l'ajouter à la liste."
+    tests: ["R15 — enfant worktree lié : ignoré", "R15 — lien symbolique vers un dépôt déjà enfant : compté une fois", "R15 — dossier parent dépôt git : non surveillé"]
+  - id: R16
+    cas: [C1]
+    enonce: "Le relevé des dépôts tiers se fait sans réseau, en une lecture locale de références par dépôt, avant et après chaque session d'écriture ; il ne lance ni ls-remote ni fetch."
+    statut: hypothese
+    si_faux: "Si le relevé devait aussi interroger le distant, chaque session paierait un ls-remote par dépôt tiers (guard.ts:313, jusqu'à 20 s) ; la détection ne dépend pas du distant."
+    tests: ["R16 — relevé des tiers : aucun appel à ls-remote ni fetch", "R16 — vingt enfants du dossier parent : le relevé n'échoue pas et tient dans un délai borné"]
 contrats:
   - id: A1
     appel: commande cadence orchestrate
-    entree: "<projet>:<lot> …, session d'écriture (spec, accept, implement, fix) ; dépôts surveillés : voisins déclarés et enfants git du dossier parent"
-    sortie: "lot en handed-back avec le constat, étape en failed, dépôt marqué sale pour la vague ; sinon la vague continue"
+    entree: "<projet>:<lot> …, session d'écriture (spec, accept, implement, fix) ; dépôts tiers surveillés : enfants git directs du dossier parent, hors dépôt du lot, voisins déclarés et dépôts des autres lots de la vague"
+    sortie: "lot en handed-back avec le constat, étape en failed, dépôt marqué sale pour la vague ; sinon la vague continue (avertissement du lot si HEAD d'un tiers est resté sur wip)"
     erreurs:
       - { code: log error, message: "incident : commit sur la branche principale d'un autre dépôt (<dépôt>, <branche>) pendant <projet>:<lot> (<étape>) : <sha court> <sujet> ; la voie est la branche wip/<projet>-<lot>" }
-    regles: [R2, R3, R4, R6, R7, R8, R9]
+      - { code: log warn, message: "dépôt tiers <dépôt> ignoré : lecture impossible (<cause git>)" }
+      - { code: log warn, message: "<étape> : la session a laissé le dépôt tiers <dépôt> sur la branche <wip/<projet>-<lot>> ; elle n'est pas remise" }
+    regles: [R2, R3, R4, R5, R6, R7, R8, R9, R11, R13, R14, R15, R16]
   - id: A2
     appel: commande cadence orchestrate
     entree: "brief d'une session d'écriture"
-    sortie: "le brief porte l'interdiction et la voie wip/<projet>-<lot>"
+    sortie: "le brief porte l'interdiction et la voie wip/<projet>-<lot> ; la consigne des voisins déclarés est inchangée"
     erreurs: []
     sans_erreur: "la construction du brief est un texte, sans entrée qui puisse échouer"
-    regles: [R1, R5, R10]
+    regles: [R1, R10, R12]
 donnees:
-  - { id: D1, objet: "état de vague (step.cause, dirtyRepos de la vague en mémoire)", existant: true, modification: aucune, note: "le constat réutilise step.cause et le marquage sale existants (cycle.ts:1027-1028) ; aucun champ ajouté" }
-  - { id: D2, objet: "snapshot de garde (guard.ts:288)", existant: true, modification: aucune, note: "le sha de la branche principale se lit avec git rev-parse à côté du snapshot ; le type Snapshot n'est pas changé" }
+  - { id: D1, objet: "état de vague (step.cause, dirtyRepos, movedRepos de la vague en mémoire)", existant: true, modification: aucune, note: "le constat réutilise step.cause et le marquage sale existants (cycle.ts:1027-1028) ; aucun champ ajouté" }
+  - { id: D2, objet: "snapshot de garde (guard.ts:288)", existant: true, modification: aucune, note: "le sha des branches principales se lit à côté du snapshot, sans réseau ; le type Snapshot n'est pas changé" }

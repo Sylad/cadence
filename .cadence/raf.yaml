@@ -492,6 +492,7 @@ lots:
     estimate: 0.25
     created: 2026-10-30
     started: 2026-10-30
+    review: { date: 2026-10-30, verdict: "compliant (2 minor notes, no sub-task) — orchestré (vague 2026-10-30-1715, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 2f57005ed49a95f7453c86a8f51710744e5dc9b9 }
   - id: L451
     title: "Mécanisme du goulot (suite de L447) : cadence corrections --classify du 30-10 — 563 passes bug-code sous-classées, cas limite 404 (72 %), maillon dominant brief implement (425/563, 75 %) ; poser LE mécanisme prévu par la fiche L447 (R8/R11 : reformuler une puce du bloc L428 de templates/orchestrate/implement.md, section Limits and rules : énumérer les cas limites du contrat avant de coder et en tester chacun), sans second bloc ; mesure : part conforme du premier coup et part « cas limite » sur la fenêtre suivante, depuis la date du commit"
     status: dropped

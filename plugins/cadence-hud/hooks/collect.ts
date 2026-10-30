@@ -302,3 +302,49 @@ for d in [folder] + [os.path.join(folder, n) for n in names]:
         out.append({'project': os.path.basename(d), 'day': m.group(1), 'sha': m.group(2), 'reason': m.group(3)})
 print(json.dumps(out))
 `
+
+/**
+ * La dernière livraison de chaque projet d'un dossier (python3 -I, argv[1] = le dossier, L415) : pour le dossier lui-même et chacun de ses sous-dossiers directs dont `.git` est
+ * un dossier, la dernière ligne lisible de `.git/cadence/deliveries.log` (« jour sha », la dernière verte) et celle de `deliveries-failed.log` ; la dernière livraison est la rouge
+ * quand `deliveries-failed.log` a été modifié après `deliveries.log` (ou que celui-ci n'existe pas), la verte sinon — la règle de DELIVERIES : la date de modification des fichiers tranche,
+ * le jour de la ligne ne suffisant pas pour deux écritures le même jour. Un dépôt sans aucune ligne lisible est absent.
+ * Sortie : `[{project, day, sha, status: 'verte' | 'rouge', green}]` : `green` est le jour de la dernière verte (nul sans). La raison d'une rouge n'y est pas : DELIVERIES la porte déjà. Lecture seule.
+ */
+export const LAST_DELIVERIES = `
+import os, sys, json, re
+folder = os.path.abspath(sys.argv[1])
+try:
+    names = sorted(n for n in os.listdir(folder) if not n.startswith('.') and n not in ('node_modules', 'tmp'))
+except OSError:
+    names = []
+
+def read(path):
+    try:
+        with open(path, encoding='utf-8') as fh:
+            return os.stat(path).st_mtime_ns, [l for l in fh.read().split('\\n') if l.strip()]
+    except OSError:
+        return None, []
+
+out = []
+for d in [folder] + [os.path.join(folder, n) for n in names]:
+    log = os.path.join(d, '.git', 'cadence')
+    green_at, green_lines = read(os.path.join(log, 'deliveries.log'))
+    failed_at, failed_lines = read(os.path.join(log, 'deliveries-failed.log'))
+    green = None
+    for l in reversed(green_lines):
+        m = re.match(r'^(\\d{4}-\\d\\d-\\d\\d) (\\S+)\\s*$', l)
+        if m:
+            green = (m.group(1), m.group(2))
+            break
+    red = None
+    for l in reversed(failed_lines):
+        m = re.match(r'^(\\d{4}-\\d\\d-\\d\\d) (\\S+)(?: |$)', l.split(' ⏎ ')[0])
+        if m:
+            red = (m.group(1), m.group(2))
+            break
+    if red and (not green or failed_at > green_at):
+        out.append({'project': os.path.basename(d), 'day': red[0], 'sha': red[1], 'status': 'rouge', 'green': green[0] if green else None})
+    elif green:
+        out.append({'project': os.path.basename(d), 'day': green[0], 'sha': green[1], 'status': 'verte', 'green': green[0]})
+print(json.dumps(out))
+`

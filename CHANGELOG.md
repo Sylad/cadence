@@ -80,6 +80,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-10-30
+
 ### Fixed
 
 - `cadence session context` read `lead.contextThreshold` in the `cadence.yaml` of the current folder only: run from a sub-project it took the default 150000 and said « atteint » wrongly (39 % read « atteint » from `avatar-pandora`, « sous le seuil » from the parent folder). It now goes up to the lead's folder (the first parent whose `cadence.yaml` carries `lead:` or `priority:`) and, when it read a parent, names the file in the verdict line (L457, `docs/session.md`).

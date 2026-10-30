@@ -22,7 +22,7 @@ import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { configSet } from './config-set.js';
-import { findProjects, readDepth, leadTour, readLeadUx, tourFreeLine, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
+import { findProjects, readDepth, leadTour, TITLE_MAX, truncate, readLeadUx, tourFreeLine, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
 import { configuredCap, expiredHoldLines, slotsLine, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
@@ -66,6 +66,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits ; rouvre un lot done ou dropped (→ todo, finished retiré, note « rouvert ») — la seule façon de rouvrir, archivé compris (il revient dans le fichier du plan)
   raf note <id> "texte"
+  --verbose             avec done, ux, review, note, move ou public : imprime la ligne « id  état  titre entier » du lot touché ; avec hook post-commit : le titre entier (sinon 60 caractères au plus)
   raf title <id> "nouveau titre"   remplace le titre d'un lot, de tout statut (done compris), et note l'ancien dans une note datée
   raf did <id> ["texte"]   un lot récurrent (--every) a été refait : le « dû depuis N j » repart de aujourd'hui
   raf ux enable         revue UX obligatoire avant « done » pour les lots --visible
@@ -213,6 +214,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       ignored: { type: 'boolean' },
       notes: { type: 'boolean' },
       json: { type: 'boolean' },
+      verbose: { type: 'boolean' },
       classify: { type: 'boolean' },
       model: { type: 'string' },
       cache: { type: 'string' },
@@ -420,6 +422,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       plan.save();
       io.out(`${rest[0]} → ${status}`);
       if (status === 'done') warnIntegrating(root, io.err);
+      touchedLot(plan, rest[0], values.verbose, io);
       if (status === 'done' && !rest[0].includes('/')) {
         const lot = plan.lot(rest[0]);
         if (lot.visible && !loadEntries(newsDir).some((e) => e.lots.includes(lot.id))) {
@@ -468,6 +471,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       plan.note(rest[0], rest.slice(1).join(' '), today);
       plan.save();
       warnIntegrating(root, io.err);
+      touchedLot(plan, rest[0], values.verbose, io);
       return 0;
     }
     case 'did': {
@@ -502,6 +506,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const holding = waveHolding(root);
       if (holding) throw new RafError(`move : orchestration en cours (vague ${holding.wave}, pid ${holding.pid}) — attendre que les lots de ce dépôt soient finis (le verrou tombe dès que tous sont prêts ou rendus), puis relancer`);
       plan.save();
+      touchedLot(plan, rest[0], values.verbose, io);
       return 0;
     }
     case 'public': {
@@ -511,6 +516,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (!values.clear) refuseLongTitle(rest.slice(1).join(' '));
       plan.setPublic(rest[0], values.clear ? null : rest.slice(1).join(' '));
       plan.save();
+      touchedLot(plan, rest[0], values.verbose, io);
       return 0;
     }
     case 'screen': {
@@ -543,7 +549,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'ux':
     case 'review':
-      return gate(command, rest, loadPlan, root, today, io);
+      return gate(command, rest, loadPlan, root, today, io, !!values.verbose);
     case 'commits': {
       need(1, 'commits <lot>');
       const plan = loadPlan();
@@ -667,7 +673,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         io.out(changed ? `hook installé : ${path}` : `hook déjà présent : ${path}`);
         return 0;
       }
-      if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, today, io, readHookConfig(configPath).autostart);
+      if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, today, io, readHookConfig(configPath).autostart, !!values.verbose);
       if (rest[0] === 'pre-commit') return preCommit(existsSync(planPath) ? loadPlan : null, readHookConfig(configPath).autostart, root, today, io);
       if (rest[0] === 'pre-push') return prePush(root, io, rest[1], configPath, planFileIn(root, planPath));
       throw new RafError('usage : raf hook install|pre-commit|post-commit|pre-push');
@@ -755,7 +761,7 @@ const GATES = {
 };
 
 /** « raf ux … » et « raf review … » ont la même forme : activer la porte, ou noter le verdict d'un lot. */
-function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io): number {
+function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io, verbose: boolean): number {
   if (rest.length < 1) throw new RafError(`usage : raf ${kind} enable | ${kind} <lot> "verdict"`);
   const plan = loadPlan();
   if (rest[0] === 'enable') {
@@ -776,7 +782,19 @@ function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, ro
     plan.recordReview(rest[0], verdict, today, plan.readonly ? null : (lotWork(plan, root, rest[0])[0]?.sha ?? null), neighbours?.repos.length ? repoShas(plan, neighbours.repos, rest[0]) : undefined);
   }
   plan.save();
+  touchedLot(plan, rest[0], verbose, io);
   return 0;
+}
+
+/** Un titre de lot n'est jamais rendu en entier par défaut (L453) : ~300 caractères répétés à chaque commande, chaque commit de plan. */
+function shortTitle(title: string, verbose: boolean | undefined): string {
+  return verbose ? title : truncate(title, TITLE_MAX);
+}
+
+/** `--verbose` (L453) : la ligne `id  état  titre entier` du lot touché par `done`, `ux`, `review`, `note`, `move`, `public` ; sans lui, rien de plus (une sous-tâche n'a pas de ligne). */
+function touchedLot(plan: Plan, id: string, verbose: boolean | undefined, io: Io): void {
+  const lot = verbose ? plan.lots().find((l) => l.id === id) : undefined;
+  if (lot) io.out(`${lot.id}  ${lot.status}  ${lot.title}`);
 }
 
 function knownLot(plan: Plan, id: string, subtask: string): Lot {
@@ -902,7 +920,7 @@ function preCommit(load: (() => Plan) | null, mode: 'warn' | 'refuse' | 'start' 
   return 0;
 }
 
-function postCommit(load: (() => Plan) | null, newsDir: string, root: string, today: Day, io: Io, mode?: 'warn' | 'refuse' | 'start'): number {
+function postCommit(load: (() => Plan) | null, newsDir: string, root: string, today: Day, io: Io, mode?: 'warn' | 'refuse' | 'start', verbose?: boolean): number {
   if (!load) return 0;
   try {
     const plan = load();
@@ -924,7 +942,7 @@ function postCommit(load: (() => Plan) | null, newsDir: string, root: string, to
       if (!lot) io.err(`raf: ${r.lot} n'existe pas dans le plan`);
       else if (isRecurring(lot)) io.err(`raf: ${r.lot} est récurrent (${dueLine(lot, today)})${plan.readonly ? '' : ` — raf did ${r.lot}`}`);
       else if (lot.status === 'todo' && !planning) io.err(`raf: ${r.lot} est encore todo${plan.readonly ? '' : ` — raf start ${r.lot}`}`);
-      else io.err(`raf: ${r.lot} (${lot.status}) ${lot.title}`);
+      else io.err(`raf: ${r.lot} (${lot.status}) ${shortTitle(lot.title, verbose)}`);
     }
     const entries = loadEntries(newsDir);
     for (const id of new Set(refs.map((r) => r.lot))) {

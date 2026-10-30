@@ -670,6 +670,16 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-30
+  - id: L474
+    title: "cadence deliver --sha refuse aussi HORS vague un intervalle origin..sha qui contient des commits d'un lot ni done ni ready (aujourd'hui seulement pendant une vague du dépôt) ; --dry-run liste les lots de l'intervalle avec leur état — cas du 30-10 : codex 09217b0 « L49 seul » a livré L50 et L51 non relus, dont les commits étaient SOUS L49"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
+  - id: L475
+    title: "raf add/note/done avertit (ou refuse sans --force) quand une session de vague tient l'arbre principal du dépôt (vague sans worktree, ou lot en implement/review/fix dans l'arbre principal) : un commit de plan du lead pendant une revue rend le lot (cas du 30-10 : cadence L458 rendu par ad7ad3f2)"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

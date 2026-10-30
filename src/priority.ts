@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, sep } from 'node:path';
-import { Document, isScalar, isSeq, parseDocument, type Node } from 'yaml';
+import { Document, isScalar, isSeq, parseDocument, type Node, type Scalar } from 'yaml';
 import { findProjects, readDepth } from './lead.js';
 import { priorityRank, readPriority } from './orchestrate/continue.js';
 import { RafError } from './plan.js';
@@ -16,8 +16,8 @@ export interface PriorityMove {
 /**
  * `cadence lead priority <projet> --before|--after <projet>` (L449) : place `project` juste avant ou après `target` dans l'ordre des projets du dossier,
  * en réécrivant la liste `priority:` de son cadence.yaml (créé s'il manque). Les projets sont nommés comme `lead tour` les nomme.
- * La liste écrite nomme tous les projets du dossier, dans l'ordre affiché : un nom qui en couvrait plusieurs par préfixe (`maritime` pour `maritime-atlas`) devient explicite,
- * et un nom qui ne couvre aucun projet reste en fin de liste. Le reste du fichier, commentaires compris, est gardé (setKey). Un fichier illisible, ou une clé qui n'est pas une liste, est refusé sans rien écrire.
+ * La liste écrite nomme tous les projets du dossier, dans l'ordre affiché : un nom qui en couvrait plusieurs par préfixe (`maritime` pour `maritime-atlas`) devient explicite
+ * (le commentaire de sa ligne passe sur le premier projet qu'il couvrait), et un nom qui ne couvre aucun projet reste en fin de liste. Le reste du fichier, commentaires compris, est gardé (setKey). Un fichier illisible, ou une clé qui n'est pas une liste, est refusé sans rien écrire.
  */
 export function movePriority(parent: string, project: string, place: 'before' | 'after', target: string, depth?: number): PriorityMove {
   const file = join(parent, 'cadence.yaml');
@@ -45,9 +45,20 @@ export function movePriority(parent: string, project: string, place: 'before' | 
   }
   const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
   const old = parseDocument(text).get('priority', true);
-  // les noms déjà dans la liste gardent leur nœud, donc le commentaire de leur ligne ; les autres sont des nœuds neufs
+  // les noms déjà dans la liste gardent leur nœud, donc le commentaire de leur ligne ; un nom qui couvrait des projets par préfixe (`maritime`)
+  // donne le sien au premier projet qu'il couvre, dans l'ordre écrit, sous le nom explicite ; les autres sont des nœuds neufs
   const kept = new Map<string, Node>();
-  if (isSeq(old)) for (const item of old.items) if (isScalar(item) && typeof item.value === 'string') kept.set(item.value.trim(), item);
+  const scalars = isSeq(old) ? old.items.filter((item): item is Scalar<string> => isScalar(item) && typeof item.value === 'string') : [];
+  for (const item of scalars) if (!kept.has(item.value.trim())) kept.set(item.value.trim(), item); // deux fois le même nom : le premier nœud compte, comme pour le rang
+  for (const item of scalars) {
+    const n = item.value.trim();
+    if (kept.get(n) !== item || keys.includes(n)) continue; // un nom qui est déjà un projet garde son nœud et n'en donne pas une copie à `nom-…`
+    const covered = list.find((k) => !kept.has(k) && k.startsWith(`${n}-`));
+    if (covered === undefined) continue;
+    const explicit = item.clone() as Scalar<string>;
+    explicit.value = covered;
+    kept.set(covered, explicit);
+  }
   const value = new Document(list);
   if (isSeq(value.contents)) {
     value.contents.items = list.map((n) => kept.get(n) ?? value.createNode(n));

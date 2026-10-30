@@ -80,6 +80,18 @@ describe('cadence lead priority — réordonner les projets (L449)', () => {
     expect(yamlOf(parent)).toMatch(/zeta[\s\S]*maritime-atlas[\s\S]*ol[\s\S]*absent/);
   });
 
+  it('R2 — le commentaire d’un nom-préfixe (maritime, pour maritime-atlas) suit le premier projet qu’il couvre quand le nom devient explicite', () => {
+    const parent = folder(['maritime-atlas', 'maritime-sat', 'ol', 'ol-web', 'zeta'], 'priority:\n  # le pro d’abord\n  - maritime # le projet pro, toujours devant\n  - ol # loisir\n');
+    expect(cadence(parent, 'lead', 'priority', 'zeta', '--before', 'ol').code).toBe(0);
+    expect(shown(parent)).toEqual(['maritime-atlas', 'maritime-sat', 'zeta', 'ol', 'ol-web']);
+    const text = yamlOf(parent);
+    // le commentaire de la ligne et celui écrit au-dessus passent sur le premier projet couvert, pas sur le second ;
+    // un nom qui est déjà un projet (ol) garde le sien sans le recopier sur ol-web
+    expect(text).toMatch(/priority:\n {2}# le pro d’abord\n {2}- maritime-atlas # le projet pro, toujours devant\n {2}- maritime-sat\n {2}- zeta\n {2}- ol # loisir\n {2}- ol-web\n/);
+    expect(text.match(/toujours devant/g)).toHaveLength(1);
+    expect(text.match(/loisir/g)).toHaveLength(1);
+  });
+
   it('R5 — déjà à cette place : rien n’est écrit, la réponse le dit', () => {
     const text = 'priority: [alpha,   beta]   # tel quel\n';
     const parent = folder(['alpha', 'beta'], text);

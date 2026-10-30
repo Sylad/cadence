@@ -348,12 +348,13 @@ lots:
     finished: 2026-10-30
   - id: L437
     title: "Seuil de contexte du lead en tokens, pas en % : 60 % valait 120k sur une fenêtre de 200k et vaut 600k sur 1M (lead à 460k le 29-10, relu à chaque transition) — lead.contextThreshold en tokens (150k par défaut) lu par cadence session context et le skill lead (décision de Sylvain le 29-10)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-29
     notes:
       - { date: 2026-10-29, text: "Sylvain (29-10) : un seuil de 150k ne doit pas forcer des /clear fréquents — à combiner avec /compact (et le réglage de compaction automatique de Claude Code, à vérifier dans sa doc) et avec les lots de réduction du contexte (livreur délégué, comptes rendus courts, status compact)" }
       - { date: 2026-10-30, text: "30-10 : Sylvain abandonne le /clear tous les 150k (session démarrée à 80k, 466k à 15 h) mais garde l'objectif de sobriété : ce lot reste à faire (seuil configurable en tokens, utile au compte pro à fenêtre plus petite)." }
+    started: 2026-10-30
   - id: L438
     title: "Alerte de joignabilité des machines : une sonde depuis Big-Blue (ping + API k3s) écrit sur Discord (webhook discord-idle) quand dark-blue ne répond plus — le 29-10 il s'est éteint à 20:05 et on ne l'a su qu'à la livraison de 20:43 (config locale, rien de propre à notre dossier dans le code de cadence)"
     status: todo

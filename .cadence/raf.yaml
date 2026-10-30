@@ -463,7 +463,7 @@ lots:
     finished: 2026-10-30
   - id: L448
     title: "Revue de maquette renforcée par les critères de la skill design-critique du plugin Design d'Anthropic (anthropics/knowledge-work-plugins, dossier design ; aussi ux-copy et accessibility-review) : les lire, les comparer à l'agent ux-reviewer en mode maquette et au spec-writer, reprendre dans NOS agents les seuls critères absents, chacun fondé sur une règle nommée ou une mesure (aucune dépendance au plugin : cadence reste générique, compte pro) ; motif : sessions ux par lot visible 1,6 contre 1,2 (cadence perf du 30-10, « renforcer la maquette ») ; mesure : ce chiffre sur la fenêtre suivante ; décision de Sylvain le 30-10"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     after: [ L447 ]
@@ -477,6 +477,24 @@ lots:
       - { date: 2026-10-30, text: "Hypothèses (fiche revue-maquette-criteres-design) — R10 : Le spec-writer ne reçoit que les critères applicables en dessinant (textes, un élément principal par état, un libellé visible par champ, variables CSS du produ… ; si faux : Si le spec-writer devait aussi tenir ces mesures, seul le texte de son agent s'allonge ; aucune donnée ni contrat ne change" }
       - { date: 2026-10-30, text: "Hypothèses (fiche revue-maquette-criteres-design) — R15 : Le CHANGELOG (section Unreleased) et docs/orchestrate.md (description de l'étape maquette) nomment les familles de critères reprises, sans nommer le plugin ; si faux : Si la documentation devait citer l'origine des critères, seul un texte de doc change ; la règle R8 ne vaut alors que pour agents/ et templates/" }
     review: { date: 2026-10-30, verdict: "compliant (1 note mineure : l'empreinte R11 gèle src/spec.ts et src/orchestrate/spec.ts entiers) — orchestré (vague 2026-10-30-1305, 0 passe(s) de correction + passe des mineurs)", commit: fcb8fdace0a9db68d49feb829a78c33dd0ad1d51, reporte: { de: 6bba1796024a4c1c9059fd3120de1da51684a818, vers: fcb8fdace0a9db68d49feb829a78c33dd0ad1d51, patchId: b49f9e213377b3781ca9d1bfe39eac1924c7d757 } }
+    finished: 2026-10-30
+  - id: L449
+    title: "Panneau des lots : réordonner les PROJETS par glisser-déposer (souris dans l'app desktop, Alt+↑/↓ au clavier, comme le réordonnancement des lots) ; le dépôt réécrit la liste priority: du cadence.yaml du dossier parent (ordre du tour, de --continue et du panneau), commentaires du fichier conservés ; refus visible si le fichier est illisible ; tests du module et doc (demande de Sylvain le 30-10)"
+    public: "Panneau des lots : on range les projets par priorité en les glissant"
+    status: todo
+    estimate: 0.5
+    visible: true
+    created: 2026-10-30
+  - id: L450
+    title: "verify --gate reprend le verdict de la vague sous des commits « de plan seuls », alors qu'un test peut lire le plan : avatar-pandora plan-page.e2e est passé au rouge après le raf done de L8 (9e lot livré, 30-10) sans que la porte de tête le voie — ne reprendre le verdict que si aucun test déclaré ne lit le plan (clé orchestrate.gate.readsPlan ou liste de chemins), sinon rejouer ; test sur un dépôt dont un test lit .cadence/raf.yaml"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
+  - id: L451
+    title: "Mécanisme du goulot (suite de L447) : cadence corrections --classify du 30-10 — 563 passes bug-code sous-classées, cas limite 404 (72 %), maillon dominant brief implement (425/563, 75 %) ; poser LE mécanisme prévu par la fiche L447 (R8/R11 : reformuler une puce du bloc L428 de templates/orchestrate/implement.md, section Limits and rules : énumérer les cas limites du contrat avant de coder et en tester chacun), sans second bloc ; mesure : part conforme du premier coup et part « cas limite » sur la fenêtre suivante, depuis la date du commit"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

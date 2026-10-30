@@ -35,7 +35,7 @@ cas:
       - { si: "le brief est incomplet (sha, lot, dossier, valeur de lead.ux ou URL de base absents), le lot est inconnu ou déjà done, ou le sha n'est pas livrable (pas un ancêtre de HEAD, commit d'un lot non prêt dessous, déjà dans origin/main, ou « déjà livré » douteux)", alors: "il ne lance rien et rend une question", regles: [R14] }
       - { si: "la porte rend 1 (rouge) ou 2 (rien à rejouer)", alors: "il s'arrête avant raf done et rend une question", regles: [R4] }
       - { si: "raf done, le commit du plan, le push (hook pre-push, code 3) ou deliver refuse ou échoue", alors: "il s'arrête là, ne force rien et rend une question", regles: [R10] }
-      - { si: "la livraison ne change ni page ni API (docs, plan ou tests seuls)", alors: "la ligne dit qu'il n'y a pas de QA à lancer", regles: [R8] }
+      - { si: "la livraison ne change ni page ni API (docs, plan ou tests seuls sur tous les commits origin/main..sha)", alors: "la ligne dit qu'il n'y a pas de QA à lancer", regles: [R8] }
     resultat: "Le lot est clos, son sha est poussé et livré, et le lead a lu une ligne au lieu de dix appels."
   - id: C2
     titre: "Le livreur livre un lot visible quand lead.ux vaut lead"
@@ -124,10 +124,10 @@ regles:
     tests: ["R7 — agents/livreur.md interdit raf ux quand lead.ux n'est pas lead", "R7 — agents/livreur.md lit raf show pour savoir si un verdict UX existe"]
   - id: R8
     cas: [C1]
-    enonce: "Le livreur rend une seule ligne « <lot> livré <sha court>, QA à lancer <url> » où <url> est l'URL de base de l'app livrée que le brief porte (le lead la lit dans la config deliver de cadence.yaml, docs/deliver.md) : le livreur ne la déduit ni ne l'invente, et un brief sans URL pour une livraison qui change une page ou une API est une question (R14). Il juge « la livraison ne change ni page ni API » sur les fichiers du sha livré (git diff --name-only du sha contre son parent) : seuls des docs, le plan ou des tests, comme skills/lead/SKILL.md:244-248 ; alors la ligne finit par « pas de QA à lancer » au lieu de l'URL."
+    enonce: "Le livreur rend une seule ligne « <lot> livré <sha court>, QA à lancer <url> » où <url> est l'URL de base de l'app livrée que le brief porte (le lead la lit dans la config deliver de cadence.yaml, docs/deliver.md) : le livreur ne la déduit ni ne l'invente, et un brief sans URL pour une livraison qui change une page ou une API est une question (R14). Il juge « la livraison ne change ni page ni API » sur l'ensemble des commits que la livraison pousse et déploie (git diff --name-only origin/main..<sha>, et non le seul dernier commit : un commit antérieur du lot peut changer une page ou une API) : seuls des docs, le plan ou des tests sur tout l'intervalle, comme skills/lead/SKILL.md:244-248 ; dès qu'un fichier de l'intervalle touche une page ou une API, la ligne porte l'URL ; alors la ligne finit par « pas de QA à lancer » au lieu de l'URL."
     statut: hypothese
     si_faux: "Si le lead veut toujours l'URL, la ligne change de fin ; si le critère doit être décidé par le lead, le brief porterait un drapeau « QA oui/non » au lieu du diff ; le lead lit la même ligne, aucune donnée n'est en jeu."
-    tests: ["R8 — agents/livreur.md prend l'URL dans le brief et interdit de l'inventer", "R8 — agents/livreur.md juge l'absence de QA sur les fichiers du sha (docs, plan, tests seuls)", "R8 — agents/livreur.md donne le format exact de la ligne avec l'URL", "R8 — agents/livreur.md donne la variante sans QA pour une livraison docs, plan ou tests seuls"]
+    tests: ["R8 — agents/livreur.md prend l'URL dans le brief et interdit de l'inventer", "R8 — agents/livreur.md juge l'absence de QA sur git diff --name-only origin/main..<sha> (docs, plan, tests seuls)", "R8 — agents/livreur.md garde l'URL quand un commit antérieur de l'intervalle change une page ou une API et que le dernier ne touche que des tests ou des docs", "R8 — agents/livreur.md donne le format exact de la ligne avec l'URL", "R8 — agents/livreur.md donne la variante sans QA pour une livraison docs, plan ou tests seuls"]
   - id: R9
     cas: [C1, C4]
     enonce: "Le livreur ne lance jamais le qa-reviewer : c'est le lead qui le lance après la ligne, avec l'URL qu'elle porte."

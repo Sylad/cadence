@@ -84,6 +84,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- The `livreur` agent (L439, installed by `cadence skills install` like the others): for one ready lot and one sha given by the lead, it runs `cadence verify --gate --sha`, the UX verdict according to `lead.ux`, `raf done` and the plan commit it prints, `git push origin <sha>:main` and `cadence deliver`, then hands back one line (`L84 livré 3d6edf4, QA à lancer <url>`) or one `Question : …`. It checks first that the sha is an ancestor of HEAD, has no lot that is not done below it and is not already in `origin/main` and in the delivery log. It launches no agent, never the `qa-reviewer` (the lead does, after the line), and the lead launches one `livreur` at a time. [docs/lead.md](docs/lead.md).
+
 - `cadence release` prints, right after the gate replay, a step that replays the version commit **in a fresh `git clone`** (`git clone --no-hardlinks`, `npm ci`, `npm run typecheck`, `npm test`, the clone removed afterwards; only the scripts `package.json` declares), and `.github/workflows/tests.yml` now also runs on every push to `main` (L446, `docs/releasing.md`). The gate runs in trees full of untracked files, which is how the 1.25.0 publication broke on tests that no local tree could see failing.
 - The lots panel (`/hud lots`) shows, under the lots in progress, the **last delivery of each project**: its short sha, its age in days, green or red (read from the journal `cadence deliver` writes), and the lots closed since the last green delivery that were not delivered; `cadence lead tour --json` gains `closed`, the closed lots of a project with their closing day (L415, `docs/cadence-hud.md`)
 

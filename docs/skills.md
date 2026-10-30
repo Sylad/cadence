@@ -10,7 +10,7 @@ As a plugin:
 ```
 
 gives `/cadence:session-start`, `/cadence:session-close`, `/cadence:deliver`,
-`/cadence:lead`, `/cadence:orchestrate` and the `ux-reviewer`, `code-reviewer` and `qa-reviewer` agents. Or copy them into the
+`/cadence:lead`, `/cadence:orchestrate`, the `ux-reviewer`, `code-reviewer` and `qa-reviewer` agents and the `livreur` delivery agent. Or copy them into the
 repository with `cadence skills install` (to `.claude/skills/cadence-*` and
 `.claude/agents/cadence-*.md`; `--dir` for another `.claude` folder,
 `--force` to overwrite local edits).
@@ -82,6 +82,7 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   other did not, each with the rendered page and a crop of its zone, and answers `confirme` or `ecarte` with a reason, measuring with
   `cadence ref measure` rather than by eye and never guessing (what it cannot tell is `ecarte`). Its tools are `Read` and `Bash`: it writes nothing and never sees the readings
   ([ref](ref.md#cadence-ref-analyse-documentpdf---sections-3-59---slug-name---model-sonnetopushaiku---model-b-sonnetopushaiku---seuil-30---double)).
+- **livreur** (agent, L439): the lead's delivery agent. Given one ready lot, its sha and the base URL of the app, it checks the sha (ancestor of HEAD, no lot that is not done below it, not already in `origin/main`), then runs `cadence verify --gate --sha`, the UX verdict according to `lead.ux`, `raf done` with the plan commit it prints, `git push origin <sha>:main` and `cadence deliver`, and hands back one line (`L84 livré 3d6edf4, QA à lancer <url>`) or one `Question : …`. Its tools are `Read`, `Grep`, `Glob` and `Bash`: no `Agent`, no `Edit`, no `Write`; it never launches the `qa-reviewer`, `raf review` or a force push ([lead](lead.md)).
 - **qa-reviewer** (agent): any web app (read-only like `ux-reviewer`: same tool list, no `Edit`, no `Write`); given a repository and a base URL (and
   optionally a lot id, to walk only the pages it touched — those that call the
   changed endpoints, those of the screens it changed, the pages that consume the services the lot changed,

@@ -1330,9 +1330,9 @@ test('L415 R12 — le panneau montre, sous les lots en cours, la dernière livra
   const at = (re: RegExp) => texts.findIndex(t => re.test(t))
   expect(texts[at(/Dernière livraison par projet/)]).toBe('Dernière livraison par projet (2)')
   expect(texts.find(t => /^✖ cadence/.test(t))).toBe('✖ cadence  1234567 · aujourd’hui · rouge · 2 lots clos non livrés : L390, L395')
-  expect(texts.find(t => /^▶ ol/.test(t))).toBe('▶ ol  abcdef0 · aujourd’hui · verte · rien à livrer')
-  expect(at(/^✖ cadence/)).toBeLessThan(at(/^▶ ol/))
-  expect(at(/L401/)).toBeGreaterThan(at(/^▶ ol/))
+  expect(texts.find(t => /^✔ ol/.test(t))).toBe('✔ ol  abcdef0 · aujourd’hui · verte · rien à livrer')
+  expect(at(/^✖ cadence/)).toBeLessThan(at(/^✔ ol/))
+  expect(at(/L401/)).toBeGreaterThan(at(/^✔ ol/))
 })
 
 test('L415 R13 — aucune livraison lue (aucun journal) : pas de bloc ; panneau fermé : le script n’est pas lancé', async ($, on) => {
@@ -1352,7 +1352,7 @@ test('L415 R14 — un corps de 12 lignes : le bloc se coupe à ce que la moitié
   await s.hud('lots')
   await s.advance(5_000)
   const { texts } = await s.draw(100, 12)
-  expect(texts.filter(t => /^▶ p\d/.test(t))).toHaveLength(4)
+  expect(texts.filter(t => /^✔ p\d/.test(t))).toHaveLength(4)
   expect(texts).toContain('… +2 projets')
   expect(texts.some(t => /L401/.test(t))).toBe(true)
 })

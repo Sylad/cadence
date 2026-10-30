@@ -60,7 +60,7 @@ const order = (a: DeliveryRow, b: DeliveryRow): number =>
 
 const textOf = (r: DeliveryRow): string => {
   const rest = r.undelivered === null ? '' : r.undelivered.length === 0 ? ' · rien à livrer' : ` · ${r.undelivered.length} lot${r.undelivered.length > 1 ? 's' : ''} clos non livré${r.undelivered.length > 1 ? 's' : ''} : ${r.undelivered.join(', ')}`
-  return `${r.status === 'rouge' ? '✖' : '▶'} ${r.project}  ${r.sha} · ${ageLabel(r.age)} · ${r.status}${rest}`
+  return `${r.status === 'rouge' ? '✖' : '✔'} ${r.project}  ${r.sha} · ${ageLabel(r.age)} · ${r.status}${rest}`
 }
 
 export type DeliveryLine = { text: string; tone: 'title' | 'error' | 'text' }

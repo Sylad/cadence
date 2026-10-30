@@ -58,17 +58,17 @@ test('L415 R8 — le bloc : un titre avec le compte, une ligne par projet (sha, 
   expect(lines.map(l => [l.text, l.tone])).toEqual([
     ['Dernière livraison par projet (3)', 'title'],
     ['✖ wh  3f9a1c2 · hier · rouge', 'error'],
-    ['▶ finance  3f9a1c2 · il y a 2 j · verte · 2 lots clos non livrés : L3, L4', 'text'],
-    ['▶ ol  abcdef0 · aujourd’hui · verte · rien à livrer', 'text'],
+    ['✔ finance  3f9a1c2 · il y a 2 j · verte · 2 lots clos non livrés : L3, L4', 'text'],
+    ['✔ ol  abcdef0 · aujourd’hui · verte · rien à livrer', 'text'],
   ])
-  expect(buildDeliveries(deliveriesOf([last('ol')], null, NOW), 100, 10).lines[1]!.text).toBe('▶ ol  3f9a1c2 · il y a 2 j · verte')
-  expect(buildDeliveries(deliveriesOf([last('ol')], board({ ol: [['L1', '2026-10-29']] }), NOW), 100, 10).lines[1]!.text).toBe('▶ ol  3f9a1c2 · il y a 2 j · verte · 1 lot clos non livré : L1')
+  expect(buildDeliveries(deliveriesOf([last('ol')], null, NOW), 100, 10).lines[1]!.text).toBe('✔ ol  3f9a1c2 · il y a 2 j · verte')
+  expect(buildDeliveries(deliveriesOf([last('ol')], board({ ol: [['L1', '2026-10-29']] }), NOW), 100, 10).lines[1]!.text).toBe('✔ ol  3f9a1c2 · il y a 2 j · verte · 1 lot clos non livré : L1')
 })
 
 test('L415 R9 — l’ordre : les rouges d’abord, puis le plus de lots clos non livrés, puis le nom ; coupé à la largeur (…)', () => {
   const b = board({ b: [['L1', '2026-10-29']], c: [['L1', '2026-10-29'], ['L2', '2026-10-29']], a: [] })
   const rows = deliveriesOf([last('a'), last('b'), last('c'), last('z', { status: 'rouge' })], b, NOW)
-  expect(buildDeliveries(rows, 100, 10).lines.slice(1).map(l => l.text.split('  ')[0])).toEqual(['✖ z', '▶ c', '▶ b', '▶ a'])
+  expect(buildDeliveries(rows, 100, 10).lines.slice(1).map(l => l.text.split('  ')[0])).toEqual(['✖ z', '✔ c', '✔ b', '✔ a'])
   const narrow = buildDeliveries(rows, 30, 10).lines
   expect(narrow.every(l => l.text.length <= 30)).toBe(true)
   expect(narrow[2]!.text.endsWith('…')).toBe(true)
@@ -78,8 +78,8 @@ test('L415 R10 — rien à montrer : aucune ligne, pas même le titre ; hauteur 
   expect(buildDeliveries([], 100, 10).lines).toEqual([])
   const rows = deliveriesOf([last('a'), last('b'), last('c'), last('d')], null, NOW)
   expect(buildDeliveries(rows, 100, 1).lines).toEqual([])
-  expect(buildDeliveries(rows, 100, 2).lines.map(l => l.text)).toEqual(['Dernière livraison par projet (4)', '▶ a  3f9a1c2 · il y a 2 j · verte'])
-  expect(buildDeliveries(rows, 100, 4).lines.map(l => l.text)).toEqual(['Dernière livraison par projet (4)', '▶ a  3f9a1c2 · il y a 2 j · verte', '▶ b  3f9a1c2 · il y a 2 j · verte', '… +2 projets'])
+  expect(buildDeliveries(rows, 100, 2).lines.map(l => l.text)).toEqual(['Dernière livraison par projet (4)', '✔ a  3f9a1c2 · il y a 2 j · verte'])
+  expect(buildDeliveries(rows, 100, 4).lines.map(l => l.text)).toEqual(['Dernière livraison par projet (4)', '✔ a  3f9a1c2 · il y a 2 j · verte', '✔ b  3f9a1c2 · il y a 2 j · verte', '… +2 projets'])
 })
 
 test('L415 R11 — la hauteur : un projet par ligne et le titre, dans ce que décisions et dépenses laissent de la moitié du corps ; moins de deux lignes → rien', () => {

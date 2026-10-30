@@ -990,3 +990,36 @@ it is cut. A cut write step is no longer a bare « failure »: the table gives t
 (with those that are tests, and the lines added) and says the work stays in the repository. A cut that left commits or files
 hands the lot back to the lead; a cut that left nothing is a failure. For a lot with neighbouring repositories (`repos:`, L303),
 the report counts the commits and the uncommitted files of each neighbour too, prefixed with its name (`../gitops: chart.yaml`).
+
+## A session never commits on another repository (L456)
+
+A writing session (`spec`, `accept`, `implement`, `fix`) works in its lot's repository and in the neighbours the lot declares with `repos:`. It **never commits on the
+main branch of any other repository**, whether the lot's text cites it or not: on 2026-10-30 the first lot of a cluster project put 3 commits on
+`developpeur-gitops` `main`, one `deploy.sh` away from production. The brief of every writing session says so and gives the way: create the branch
+`wip/<project>-<lot>` in that repository, commit on it, never push, and say it under « choix ».
+
+**What the program checks.** Before and after each writing session it reads, with no network (one `git for-each-ref` per repository, no `ls-remote`, no `fetch`),
+the sha of the main branches of the other repositories. The main branches of a repository are, among its local branches, the one `origin/HEAD` names, `main` and
+`master`; one that moves is enough. When one moved, the lot is handed back to the lead (`handed-back`, the step `failed`) before the checks and the next lot, with
+a finding: `incident : commit sur la branche principale d'un autre dépôt (<repository>, <branch>) pendant <project>:<lot> (<step>) : <short sha> <subject> ; la voie
+est la branche wip/<project>-<lot>`. The repository is marked dirty for the wave. A branch created or deleted during the session counts as a moved sha. The comparison
+is on the branch, not on `HEAD`: a commit made then left with `HEAD` elsewhere is found too. The program **does not undo the commit** (no reset, no revert, no move of
+the branch): it states and hands back, the lead decides.
+
+**What is watched.** The repositories that are a **direct child** of the folder that holds the lot's repository (the parent of the repository's path, not of a worktree).
+That makes every sibling repository, cited by the lot or not.
+
+**What is not watched.**
+
+- the lot's own repository, and the neighbours declared by `repos:`: they keep their behaviour (the session commits on their current branch, a moved `HEAD` is put back
+  with a warning, `raf commits` and the review read them as before);
+- the repositories of the **other lots of the same wave**, and their neighbours, and those of the lots of another wave **running at the same time** from the same launch folder
+  (its state says `running` and its process lives): their main branch moves legitimately through their own sessions and their integration;
+- a repository two levels below the folder (`folder/group/repository`), a child that is not a git repository, and a **linked worktree** (a child whose `.git` is a file);
+- a symbolic link to a repository already counted (each repository is counted once, under its real path), and the folder itself when it is a git repository;
+- a repository whose references cannot be read, or that has no main branch before and after the session: it is skipped with a line of the wave's log
+  (`dépôt tiers <repository> ignoré : lecture impossible (<git cause>)`), never an incident.
+
+A commit on the `wip/<project>-<lot>` branch of another repository, with its main branch unmoved, is not an incident. If the session leaves that repository's `HEAD` on
+that branch, the lot gets a warning (`<step> : la session a laissé le dépôt tiers <repository> sur la branche wip/<project>-<lot> ; elle n'est pas remise`) and the
+branch is not put back. A read-only session (review, UX) is not concerned: any change to a watched repository stays an incident of the step, as before.

@@ -3017,7 +3017,7 @@ describe('session d\'écriture qui finit hors de sa branche (L214)', () => {
       const c = commitFile(call.opts.cwd, 'x.txt', 'feat(L1): x.txt');
       return claudeOut(workReport({ commits: [c] }));
     };
-    const other = gitRepo();
+    const other = gitRepo(tempDir()); // sous un dossier à lui : les dépôts frères du lot sont relevés (L456)
     commitFile(other, 'init.txt', 'chore: init');
     const h = harness({ lots: [{ title: 'Un' }, { title: 'Deux' }, { title: 'Trois' }], script: { implement: [wander, impl('c.txt')], review: [ok] } });
     const c1 = h.lot('L1');

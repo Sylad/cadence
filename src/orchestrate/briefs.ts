@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RafError, type Lot } from '../plan.js';
 import type { SessionKind } from './launch.js';
+import { wipBranch } from './tiers.js';
 
 /** Gabarits livrés avec le paquet (à la racine, à côté de dist/ et src/). */
 export const TEMPLATES_DIR = fileURLToPath(new URL('../../templates/orchestrate', import.meta.url));
@@ -74,6 +75,15 @@ export function reposText(role: 'write' | 'read', lot: string, repos: { rel: str
     ...cited.map((r) => `In \`${r.rel}\` only the commits that also contain \`${r.cite}\` count: the repository is shared with other projects.`),
     `\`raf commits ${lot}\` lists them all; read the diff of the neighbouring ones with \`git -C <path> log\` / \`git -C <path> show\` (${repos.map((r) => `git -C ${r.path} log`).join(' ; ')}), and review them like the rest. You are read-only there too.`,
   ].join('\n');
+}
+
+/**
+ * Consigne des dépôts tiers (L456) d'une session d'écriture : jamais de commit sur la branche principale d'un autre dépôt que celui du lot et que ses voisins déclarés,
+ * cité par le lot ou non (cluster-sante L1 : 3 commits sur developpeur-gitops main le 30-10) ; la voie est `wip/<projet>-<lot>`. Le programme le contrôle en fin de session.
+ */
+export function tiersText(project: string, lot: string): string {
+  const wip = wipBranch(project, lot);
+  return `Never commit on the main branch (\`origin/HEAD\`, \`main\` or \`master\`) of any repository other than this lot's own and the ones it declares with \`repos:\`, whether the lot's text cites that repository or not: a sibling repository of the projects folder is not yours to move (a GitOps repository can be one script away from production). If the lot's work needs a change there, create the branch \`${wip}\` in that repository and commit on it, never push, and say it under "choix". At the end of the session the program checks those repositories: a moved main branch hands the lot back to the lead, and the commit is not undone.`;
 }
 
 /** Revue courte du diff rebasé (L279, R17) : la branche du lot vient d'être rebasée sur celle du dépôt et son diff n'est plus celui que la revue a lu. */

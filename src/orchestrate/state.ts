@@ -3,6 +3,7 @@ import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdir
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { gitCommonDir, gitRoot } from '../git.js';
+import { pidAlive } from '../state.js';
 import type { AnyModel, SessionKind, StepKind, StepModel } from './launch.js';
 import type { Screen } from '../plan.js';
 import type { Tokens } from './result.js';
@@ -347,6 +348,13 @@ export class RunStore {
   readLot(project: string, lot: string): LotState | null {
     const f = join(this.dir, lotFile(project, lot));
     return existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as LotState) : null;
+  }
+
+  /** Les lots des AUTRES vagues en cours du même dossier de lancement (L456) : vague `running` dont le processus vit. Leurs dépôts avancent sans que cette vague y soit pour rien. */
+  liveWaveLots(): LotState[] {
+    return RunStore.all(this.launchDir)
+      .filter(({ store, wave }) => store.id !== this.id && wave?.status === 'running' && pidAlive(wave.pid))
+      .flatMap(({ store }) => store.lots());
   }
 
   /** Les lots de la vague, dans l'ordre donné au lancement (`wave.lots`) : une reprise rejoue les dépendances avant les dépendants. */

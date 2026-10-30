@@ -48,7 +48,7 @@ Details: [docs/skills.md](docs/skills.md) and [docs/cadence-hud.md](docs/cadence
 ## Where to read more
 
 - [docs/raf.md](docs/raf.md): the plan, its commands and its file.
-- [docs/orchestrate.md](docs/orchestrate.md): waves of sessions and their budgets.
+- [docs/orchestrate.md](docs/orchestrate.md): waves of sessions and their budgets, and which repositories a session may commit in.
 - [docs/deliver.md](docs/deliver.md): wait for the CI, deploy, verify the effect.
 - [docs/spec.md](docs/spec.md): screen and back-end sheets.
 - [docs/ref.md](docs/ref.md): reference documents (specs, norms, mock-ups) and the coverage of their elements by the lots.

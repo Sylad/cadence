@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `cadence orchestrate`: a writing session no longer commits on the main branch of another repository than its lot's (L456, `docs/orchestrate.md`). The brief forbids it and gives the way, the branch `wip/<project>-<lot>`; at the end of the session the program compares, with no network, the main branches (`origin/HEAD`, `main`, `master`) of the repositories next to the lot's, and hands the lot back with the commits found when one moved (a first lot of a cluster project had put 3 commits on `developpeur-gitops` `main`, 30 October). The commit is not undone. Neighbours declared by `repos:` and the repositories of the other lots of the wave (or of another wave running at the same time) are not concerned.
+
 ### Fixed
 
 - `cadence verify --gate` no longer links the other ignored folders of the main tree (`data/`, `data-local/`, `.env`) into the throwaway copy: a test comparing paths by `realpath` went red there and green in the main tree at the same sha. Only the dependencies are copied (`node_modules`, `.venv`, or `orchestrate.worktreeDeps`) (L455).

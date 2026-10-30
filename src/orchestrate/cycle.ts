@@ -20,7 +20,7 @@ import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
 import { replayRed, TEST_WORKERS_ENV, testWorkersText } from './workers.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
-import { capturesText, gateText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
+import { capturesText, gateText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, enabledPlugins, settingsFiles, type AgentDef, type AnyModel, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, remoteAdvances, snapshot, type Snapshot } from './guard.js';
@@ -38,6 +38,7 @@ import { decisionsText, humanDecisions } from './decisions.js';
 import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 import { advance, baseMoved, INTEGRATE_WAIT_MS, MAX_REPLAYS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
 import { mutexFor } from './mutex.js';
+import { readTier, takeTiers, tierMoved, tierRepos, wipBranch, type TierRead } from './tiers.js';
 import { branchExists, git, gitFailure, integrated, linkIgnored, lotBranch, planFileSet, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */
@@ -614,7 +615,9 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     if (kind === 'implement' && l.precheck) vars.commits = [vars.commits, l.precheck].filter(Boolean).join('\n');
     if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
-  return renderBrief(briefName(l, kind, !!c.integration), vars, c.wave.templates);
+  const brief = renderBrief(briefName(l, kind, !!c.integration), vars, c.wave.templates);
+  // Les dépôts tiers (L456) : la consigne s'ajoute à tout brief d'écriture, sans passer par un gabarit (un gabarit modifié change l'empreinte que d'autres tests gardent).
+  return kind === 'implement' || kind === 'fix' || kind === 'spec' || kind === 'accept' ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief;
 }
 
 /** Les dépôts voisins du lot, vus avant et après une session. */
@@ -741,6 +744,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   const before = await snapshot(wd(c));
   const neighbours = l.repos ?? [];
   const beforeOthers = await Promise.all(neighbours.map((r) => snapshot(r.path)));
+  const tiersBefore = write ? takeTiers(thirdRepos(c), (line) => w.log(`${lotKey(l.project, l.lot)} · ${line}`)) : null;
   const n = l.steps.length + 1;
   const sessionId = randomUUID();
   const step: StepState = { n, kind, model, ...(effort !== 'default' ? { effort } : {}), status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
@@ -998,6 +1002,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
       return stop(c, 'failed', `incident : ${w.incident}`);
     }
   }
+  if (tiersBefore && checkTiers(c, kind, step, tiersBefore)) return null;
   for (const { where, path, before: b, after: a } of watched) {
     // Session d'écriture finie sur une autre branche ou en HEAD détaché (L214) : pas un push, mais les contrôles et le lot suivant partiraient d'un HEAD qui n'est plus la branche du lot.
     if (write && b.branch !== a.branch) {
@@ -1058,6 +1063,53 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   step.status = 'ok';
   save(c);
   return { step, report: res.structured, before, after, others };
+}
+
+/** Les dépôts tiers d'un lot (L456) : frères du dépôt du lot, hors voisins déclarés et dépôts des autres lots de la vague, ou d'une autre vague en cours du même dossier (leur branche principale bouge légitimement, R14). */
+function thirdRepos(c: LotCtx): string[] {
+  const mine = lotKey(c.lot.project, c.lot.lot);
+  const others = [...c.wave.store.lots().filter((x) => lotKey(x.project, x.lot) !== mine), ...c.wave.store.liveWaveLots()].flatMap(lotRepoPaths);
+  return tierRepos(c.lot.repo, [...neighbourDirs(c.lot), ...others]);
+}
+
+/**
+ * Fin d'une session d'écriture (L456) : la branche principale d'un dépôt tiers a-t-elle bougé ? Alors le lot est rendu avec le constat, le commit n'est pas défait,
+ * le dépôt est marqué sale pour la vague. Un tiers resté sur la branche wip du lot est dit en avertissement, sans être remis. Un dépôt illisible ou sans branche
+ * principale des deux côtés est ignoré, au journal. Vrai quand le lot est rendu : la session s'arrête là.
+ */
+function checkTiers(c: LotCtx, kind: SessionKind, step: StepState, before: Map<string, TierRead>): boolean {
+  const l = c.lot;
+  const w = c.wave;
+  const key = lotKey(l.project, l.lot);
+  const wip = wipBranch(l.project, l.lot);
+  for (const [repo, b] of before) {
+    const name = basename(repo);
+    let a: TierRead;
+    try {
+      a = readTier(repo);
+    } catch (e) {
+      w.log(`${key} · dépôt tiers ${name} ignoré : lecture impossible (${gitFailure(e)})`);
+      continue;
+    }
+    if (!Object.keys(b.mains).length && !Object.keys(a.mains).length) {
+      w.log(`${key} · dépôt tiers ${name} ignoré : aucune branche principale`);
+    } else {
+      const moved = tierMoved(repo, b, a);
+      if (moved) {
+        step.status = 'failed';
+        step.cause = `commit sur la branche principale d'un autre dépôt (${name}, ${moved.branch})`;
+        (w.dirtyRepos ??= new Map()).set(repo, key);
+        stop(c, 'handed-back', `incident : commit sur la branche principale d'un autre dépôt (${name}, ${moved.branch}) pendant ${key} (${kind}) : ${moved.detail} ; la voie est la branche ${wip}`);
+        return true;
+      }
+    }
+    if (a.branch === wip && b.branch !== wip) {
+      const text = `${kind} : la session a laissé le dépôt tiers ${name} sur la branche ${wip} ; elle n'est pas remise`;
+      l.warnings.push(text);
+      w.log(`${key} · ${text}`);
+    }
+  }
+  return false;
 }
 
 /**

@@ -106,7 +106,8 @@ export interface Harness {
  * réponses de chaque type d'étape. Rien ne lance le vrai claude.
  */
 export function harness(opts: { lots?: { title: string; visible?: boolean; screen?: 'page' | 'component' | 'journey'; spec?: boolean; estimate?: number; quickwin?: boolean; status?: 'todo' | 'doing' }[]; script?: Partial<Record<Call['kind'], Handler[]>>; budget?: number; templatesDir?: string; planRel?: string; parent?: string } = {}): Harness {
-  const repo = gitRepo(opts.parent);
+  // Le dépôt est toujours sous un dossier parent à lui (L456) : la vague relève les dépôts frères du lot, ceux d'un dossier partagé comme /tmp bougent avec les autres tests.
+  const repo = gitRepo(opts.parent ?? tempDir());
   const planRel = opts.planRel ?? '.cadence/raf.yaml';
   const planFile = join(repo, planRel);
   const plan = Plan.create(planFile, 'demo', 'L', '2026-09-01');

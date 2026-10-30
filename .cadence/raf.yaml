@@ -544,10 +544,11 @@ lots:
     started: 2026-10-30
   - id: L456
     title: "Une session de vague ne commite jamais sur la branche principale d'un AUTRE dépôt que celui de son lot (cluster-sante L1 a commité 3 commits sur developpeur-gitops main le 30-10, à un deploy.sh près de la prod) : le brief l'interdit, l'orchestrateur détecte en fin de session un commit sur la branche principale d'un dépôt frère cité par le lot (ou de tout dépôt du dossier parent) et rend le lot avec le constat ; la voie prévue est une branche wip/<projet>-<lot> ; doc et test"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-10-30
+    started: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

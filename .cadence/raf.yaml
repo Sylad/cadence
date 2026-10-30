@@ -579,7 +579,7 @@ lots:
     finished: 2026-10-30
   - id: L458
     title: "Faux positif de L456 : la tolérance des lots d'une AUTRE vague vivante du même dossier ne voit pas une vague lancée APRÈS celle qui contrôle (30-10 21:25 : 2026-10-30-2110-cx a rendu codex:L50 pour e61c61f a33fed9 9f53e75 de warhammer40k:L62, vague 2026-10-30-2120-wh lancée 10 min plus tard) — relire le registre des vagues au moment du contrôle (et celles finies pendant la session) ; test avec une vague lancée après"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-30
     notes:
@@ -587,6 +587,7 @@ lots:
       - { date: 2026-10-30, text: "Troisième faux positif (30-10 22:00) : maritime:Q-MIG1 rendu pour cb25601 et 6522f48 du lead dans cadence (« plan: L462… », .cadence/raf.yaml SEUL). La tolérance (b) n'a donc pas joué non plus : à reproduire en test. La règle « seuls les commits qui citent un lot de la vague » les laisse passer." }
     started: 2026-10-30
     review: { date: 2026-10-30, verdict: "compliant (0 bloquant, 0 majeur, 2 mineurs : doc de la collision d'identifiant avec une vague lancée après ; test du plan à un autre chemin) — revue de la vague 2026-10-30-2215-cad, rendue par un incident dû au lead (commit de plan ad7ad3f2 sur main pendant la revue), verdict confirmé par le lead", commit: 70e50614e657a9f24c9e55e7e133670a9edea7f6 }
+    finished: 2026-10-30
   - id: L459
     title: "Étape maquette pour les lots visibles sans screen: page (screen: component, retouches, revues UX d'écran) : maquette légère (capture de l'écran actuel + version visée, états touchés) validée par l'ux-reviewer en mode maquette AVANT le code, puis conformité après ; mesure : « sessions ux par lot visible » de cadence perf (1,6 le 30-10, cible 1,2) sur deux fenêtres — demande de Sylvain le 30-10 (« coder à partir de specs déjà validées graphiquement »)"
     status: todo

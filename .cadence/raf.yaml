@@ -85,9 +85,10 @@ lots:
     finished: 2026-10-28
   - id: L407
     title: "Réponse sur une vague vivante : --answer est refusé tant qu'un autre lot de la vague tourne (L401 bloqué ~15 min le 28-10) — l'accepter et la faire prendre par la vague vivante (file de réponses lue entre deux étapes), test"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-28
+    started: 2026-10-30
   - id: L408
     title: "/hud lots refusé « terminal trop étroit » dans l'app desktop même sur un écran très large : le mod pré-contrôlait 110 colonnes (presentation.columns) alors qu'un Pane demandé est placé à toute largeur — retirer le pré-contrôle, $.ui.open décide (non placé : raison)"
     status: done

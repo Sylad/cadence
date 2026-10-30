@@ -361,7 +361,7 @@ lots:
     created: 2026-10-29
     started: 2026-10-29
     spec: true
-    goal: "Livreur délégué : un agent livreur (sous-agent du lead, qui ne peut lancer aucun agent ni poser de question à l'humain) fait pour UN lot prêt la chaîne verify --gate au sha, verdict UX selon lead.ux (sur le rapport et les captures du ux-reviewer que le lead lui passe), raf done avec le commit que raf done imprime, push du sha, deliver ; il rend une ligne au lead (« L84 livré 3d6edf4, QA à lancer <url> ») ou une question ; c'est le lead qui lance ensuite le qa-reviewer ; livraisons une à une"
+    goal: "Livreur délégué : un agent livreur (sous-agent du lead, qui ne peut lancer aucun agent ni poser de question à l'humain) fait pour UN lot prêt la chaîne verify --gate au sha, verdict UX selon lead.ux (sur le rapport et les captures du ux-reviewer que le lead lui passe), raf done avec le commit que raf done imprime, push du sha, deliver ; il rend une ligne au lead (« L84 livré 3d6edf4, QA à lancer <url> ») ou une question ; c'est le lead qui lance ensuite le qa-reviewer ; livraisons une à une. Arbitrage du lead (30-10, majeur R14 de la 2e revue de fiche) : le sha à livrer doit être un ancêtre de HEAD de la branche locale (git merge-base --is-ancestor <sha> HEAD) sans commit d'un lot non prêt dessous, et pas encore dans origin/main (le livreur le pousse lui-même) ; « sha déjà livré » = sha ancêtre de origin/main ET présent au journal de livraison de cadence deliver — l'un sans l'autre donne une question."
     notes:
       - { date: 2026-10-30, text: "Revue de la fiche — mineur : docs/specs/livreur-delegue/fiche.yaml:9 — Périmètre incomplet : docs/skills.md liste chaque agent (l.13 « the `ux-reviewer`, `code-reviewer` and `qa-reviewer` agents », l.65 doc-keeper, l.85 qa-reviewer) et test/skills.test.ts:~516 vérifie les manifestes (« three reviewer agents ») ; un nouvel agent installé par cadence install (src/skills.ts lit tout agents/) devrait y figurer. Seuls README.md, docs/lead.md, CHANGELOG.md sont prévus. Ajouter docs/skills.md au périmètre." }
       - { date: 2026-10-30, text: "Revue de la fiche — mineur : docs/specs/livreur-delegue/fiche.yaml:27 — C1 : le commit du plan est exécuté mais son push n'est dit nulle part. SKILL.md:241 dit qu'il est poussé plus tard après son propre replay (hook pre-push). La fiche devrait dire que le livreur ne le pousse pas (il reste au-dessus de main pour le lead) pour que la question « état du dépôt » de R13 soit exacte." }
@@ -408,20 +408,28 @@ lots:
     finished: 2026-10-30
   - id: L445
     title: "CI publish rouge en 1.25.0 (run 40980073428) : test/hud-cycle, hud-deliveries et hud-depense-l414 échouent au prepublishOnly car plugins/cadence-hud/tsconfig.json étend ./.claude-plugin/types/tsconfig.json, généré en local et non versionné — rendre ces tests indépendants de ce fichier (ou le générer en CI), puis relancer la publication de v1.25.0 (tag déjà poussé) et la release GitHub"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-30
     goal: "Les tests test/hud-cycle, test/hud-deliveries et test/hud-depense-l414 (et toute la suite npm test / prepublishOnly) passent dans un git clone neuf où plugins/cadence-hud/.claude-plugin/types n'existe pas (cas de la CI publish.yml) : soit ces tests ne dépendent plus de ce fichier généré, soit le prepublishOnly / la CI le génère avant les tests — au choix motivé ; preuve : la suite rejouée dans un git clone propre (sans fichiers non suivis) est verte. La relance de la publication, le tag et la release GitHub ne sont PAS de ce lot (le lead les fait après) ; aucune session ne pousse."
     started: 2026-10-30
     review: { date: 2026-10-30, verdict: "compliant — orchestré (vague 2026-10-30-0805, 0 passe(s) de correction)", commit: 3dac55274bc6a0cc7ceab398a2dbccd05570a017, reporte: { de: bcfd8555a35fa815c1ba8f64ce099214f7a06ddc, vers: 3dac55274bc6a0cc7ceab398a2dbccd05570a017, patchId: 0de2701508543d06bdf3bee6bd2a5f361f6ab8e1 } }
+    finished: 2026-10-30
   - id: L446
     title: "Passage en clone propre avant le tag : cadence release (ou tests.yml sur push de main) rejoue la porte dans un git clone neuf, sans fichiers non suivis — la 1.25.0 a cassé à la publication sur 3 tests hud-* qui dépendaient de plugins/cadence-hud/.claude-plugin/types, présent dans tous nos arbres locaux et copies de porte, absent de la CI ; tests.yml ne tourne plus sur main depuis le 24-10"
-    status: doing
+    status: done
     estimate: 0.25
     after: [ L445 ]
     created: 2026-10-30
     started: 2026-10-30
     review: { date: 2026-10-30, verdict: "compliant — orchestré (vague 2026-10-30-0805, 0 passe(s) de correction)", commit: e67aceed8e40812ae6cf99c5b39f3e036e293cfc }
+    finished: 2026-10-30
+  - id: L447
+    title: "Goulot perf « bug de code » (74 des 107 passes de correction classées, 69 %, fenêtre 24→30-10 ; 45 % de passes non classées, 37 sans revue sur tests rouges) : sous-classer les constats « bug de code » des revues (cas limite non testé, test existant cassé, contrat ou fiche mal lu, oubli d'un appelant, …) dans cadence corrections/perf, désigner le maillon dominant, et y poser UN mécanisme (brief implement, auto-vérification avant rendu, porte locale…) ; mesure : part conforme du premier coup et causes sur la fenêtre suivante"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

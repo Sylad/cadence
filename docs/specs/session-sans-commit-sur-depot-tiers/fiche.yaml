@@ -96,8 +96,8 @@ regles:
   - id: R7
     cas: [C1, C2]
     enonce: "Le programme ne défait jamais le commit fautif : il n'y a ni reset, ni revert, ni déplacement de la branche principale d'un autre dépôt."
-    statut: hypothese
-    si_faux: "Si un retour automatique était voulu, ce serait une action destructive sur un dépôt hors du lot : question au lead, pas un réglage."
+    statut: sourcee
+    source: réponse du lead, 2026-10-30, vague 2026-10-30-1755-cad
     tests: ["R7 — après le constat, le sha de la branche principale du voisin est celui laissé par la session"]
   - id: R8
     cas: [C2]

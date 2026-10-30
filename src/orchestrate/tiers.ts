@@ -111,10 +111,12 @@ export function tierMoved(repo: string, before: TierRead, after: TierRead, planF
     const a = after.mains[branch];
     if (a === b) continue;
     if (!a) return { branch, detail: `branche supprimée (${b.slice(0, 7)})` };
-    const range = b ? `${b}..${a}` : a;
-    const all = (tryGit(repo, 'log', '--abbrev=7', '--format=%h %s', range) ?? '').split('\n').filter(Boolean);
+    // branche créée : seuls comptent les commits que aucune branche principale d'avant ne portait déjà
+    const range = b ? [`${b}..${a}`] : [a, '--not', ...Object.values(before.mains)];
+    const all = (tryGit(repo, 'log', '--abbrev=7', '--format=%h %s', ...range) ?? '').split('\n').filter(Boolean);
     const lines = all.filter((l) => !isLeadCommit(repo, l, planFile));
     if (all.length && !lines.length) continue; // que des commits du lead
+    if (!lines.length && !b) return { branch, detail: `branche créée (${a.slice(0, 7)})` };
     if (!lines.length) return { branch, detail: `branche déplacée de ${b.slice(0, 7)} à ${a.slice(0, 7)}` };
     const more = lines.length > SHOWN ? ` | … (${lines.length - SHOWN} de plus)` : '';
     return { branch, detail: lines.slice(0, SHOWN).join(' | ') + more };

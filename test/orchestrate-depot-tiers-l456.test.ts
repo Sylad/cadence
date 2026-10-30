@@ -322,6 +322,31 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     expect(c.lot.outcome).toContain('(gitops, main)');
   });
 
+  it('R13 — branche main créée sur l\'historique de master : constat sans les commits anciens', async () => {
+    const { c } = world(
+      (t) => {
+        git(t, 'checkout', '-q', '-b', 'main');
+        commitOnMain(t);
+      },
+      {},
+      { branch: 'master' },
+    );
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('(gitops, main)');
+    expect(c.lot.outcome).toContain('feat(L1): deploy.sh');
+    expect(c.lot.outcome).not.toMatch(/[0-9a-f]{7} init/);
+  });
+
+  it('R13 — branche main créée sans commit neuf : « branche créée », pas les commits anciens', async () => {
+    const { c } = world((t) => git(t, 'branch', 'main'), {}, { branch: 'master' });
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('(gitops, main)');
+    expect(c.lot.outcome).toContain('branche créée');
+    expect(c.lot.outcome).not.toMatch(/[0-9a-f]{7} init/);
+  });
+
   it('R13 — branche master supprimée pendant la session : constat', async () => {
     const { c } = world(
       (t) => {
@@ -464,6 +489,15 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
         expect(c.wave.dirtyRepos?.get(tier)).toBe('demo:L1');
       });
     }
+
+    it('R2 — session au quota après un commit sur main d\'un dépôt tiers : la vague le sait', async () => {
+      const parent = tempDir();
+      const tier = sibling(parent, 'gitops');
+      const h = harness({ parent, script: { implement: [() => { commitOnMain(tier); return quota; }] } });
+      const c = h.lot('L1');
+      await runLot(c);
+      expect(c.wave.quota?.hit).toBe(true);
+    });
 
     it('R2 — session en échec sans commit sur un dépôt tiers : l\'échec reste un échec', async () => {
       const parent = tempDir();

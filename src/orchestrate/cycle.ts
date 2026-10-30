@@ -956,10 +956,10 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   }
   if (outcome.kind === 'quota') {
     if (outcome.firstStdout !== undefined) writeFileSync(join(dir, `${base}.first.json`), outcome.firstStdout);
+    w.quota = { hit: true, message: outcome.message };
     if (tiersBefore && checkTiers(c, kind, step, tiersBefore)) return null;
     step.status = 'interrupted';
     step.cause = outcome.message;
-    w.quota = { hit: true, message: outcome.message };
     w.saveWave();
     c.lot.next = kind;
     transition(c, 'suspended', 'quota atteint');

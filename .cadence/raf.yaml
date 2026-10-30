@@ -546,7 +546,7 @@ lots:
     finished: 2026-10-30
   - id: L456
     title: "Une session de vague ne commite jamais sur la branche principale d'un AUTRE dépôt que celui de son lot (cluster-sante L1 a commité 3 commits sur developpeur-gitops main le 30-10, à un deploy.sh près de la prod) : le brief l'interdit, l'orchestrateur détecte en fin de session un commit sur la branche principale d'un dépôt frère cité par le lot (ou de tout dépôt du dossier parent) et rend le lot avec le constat ; la voie prévue est une branche wip/<projet>-<lot> ; doc et test"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-30
@@ -565,6 +565,7 @@ lots:
       - { date: 2026-10-30, text: "Hypothèses (fiche session-sans-commit-sur-depot-tiers) — R15 : Sont ignorés : un enfant dont .git est un fichier (worktree lié), un lien symbolique qui mène à un dépôt déjà compté, et le dossier parent lui-même s'il est un… ; si faux : Un worktree lié serait compté comme un second dépôt et son avance légitime donnerait un faux constat ; le dépôt principal de ce worktree reste surveillé par ai…" }
       - { date: 2026-10-30, text: "Hypothèses (fiche session-sans-commit-sur-depot-tiers) — R16 : Le relevé des dépôts tiers se fait sans réseau, en une lecture locale de références par dépôt, avant et après chaque session d'écriture ; il ne lance ni ls-rem… ; si faux : Si le relevé devait aussi interroger le distant, chaque session paierait un ls-remote par dépôt tiers (guard.ts:313, jusqu'à 20 s) ; la détection ne dépend pas…" }
     review: { date: 2026-10-30, verdict: "conforme : les deux constats mineurs traités sont corrigés et couverts par un test (la branche créée sur l'historique de master, et w.quota posé avant checkTiers ; le test du quota échouait avant le correctif) ; il reste 1 mineur, un constat qui nomme des commits anciens quand main est créée dans un dépôt qui n'avait aucune branche principale — orchestré (vague 2026-10-30-1755-cad, 1 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 5ec0bf8e556cef62100d844b81a2d31d8dd92c10 }
+    finished: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

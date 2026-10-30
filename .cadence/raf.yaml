@@ -569,9 +569,10 @@ lots:
     finished: 2026-10-30
   - id: L457
     title: "cadence session context lit lead.contextThreshold dans le cadence.yaml du dossier COURANT : lancé depuis un sous-projet, il prend le défaut 150000 et dit « seuil atteint » à tort (30-10 : 39 % lu « atteint » depuis avatar-pandora, « sous le seuil » depuis le dossier parent). Remonter jusqu'au dossier du lead (premier parent qui porte lead: ou priority:), ou nommer le fichier lu dans la sortie ; test"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-30
+    started: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -129,17 +129,38 @@ describe('agent livreur (L439)', () => {
   })
 
   it('R8 — agents/livreur.md juge l\'absence de QA sur git diff --name-only origin/main..<sha> (docs, plan, tests seuls)', () => {
+    const c = section('Before any command')
+    expect(c).toMatch(/4\. The QA decision: `git diff --name-only origin\/main\.\.<sha>`/)
+    expect(c).toMatch(/docs, the plan or tests only, over the whole interval: no QA is due/)
     const line = section('The line')
     expect(line).toContain('git diff --name-only origin/main..<sha>')
-    expect(line).toMatch(/docs, the plan or tests only/)
-    expect(line).toMatch(/whole interval/)
+    expect(line).toMatch(/The decision is the one of check 4/)
+    expect(line).toMatch(/docs, the plan or tests only over the whole interval, no QA/)
+  })
+
+  it('R8 — agents/livreur.md lit git diff --name-only origin/main..<sha> à une étape de la chaîne, juste après git fetch origin main et avant verify, raf done et le push (après le push l\'intervalle est vide)', () => {
+    const c = section('Before any command')
+    // l'étape est numérotée : contrôle 3 = fetch, contrôle 4 = décision QA, contrôle 5 = ancêtre de HEAD
+    before(c, '3. Run `git fetch origin main`', '4. The QA decision')
+    before(c, '4. The QA decision', '5. The sha is an ancestor of the local HEAD')
+    before(c, 'git fetch origin main', 'git diff --name-only origin/main..<sha>')
+    before(c, 'git diff --name-only origin/main..<sha>', 'git merge-base --is-ancestor <sha> HEAD')
+    expect(c).toMatch(/right after the fetch and before the gate, `raf done` and the push/)
+    expect(c).toMatch(/after `git push origin <sha>:main`, `origin\/main` is the sha and the interval is empty/)
+    // la lecture précède la chaîne elle-même : verify, raf done, push
+    before(body, 'git diff --name-only origin/main..<sha>', 'cadence verify --gate --sha <sha>')
+    before(body, 'git diff --name-only origin/main..<sha>', 'raf done <lot>')
+    before(body, 'git diff --name-only origin/main..<sha>', 'git push origin <sha>:main')
+    // « The line » ne demande plus de lire le diff « avant le push » comme si c'était une étape à part : il renvoie au contrôle 4
+    expect(section('The line')).not.toMatch(/read before the push/)
   })
 
   it('R8 — agents/livreur.md garde l\'URL quand un commit antérieur de l\'intervalle change une page ou une API et que le dernier ne touche que des tests ou des docs', () => {
-    const line = section('The line')
-    expect(line).toMatch(/not the last commit alone/)
-    expect(line).toMatch(/an earlier commit of the lot may change a page or an API/)
-    expect(line).toMatch(/one file of the interval touches a page or an API: the line carries the URL/)
+    const c = section('Before any command')
+    expect(c).toMatch(/not the last commit alone/)
+    expect(c).toMatch(/an earlier commit of the lot may change a page or an API/)
+    expect(c).toMatch(/one file of the interval touches a page or an API: a QA pass is due and the line carries the base URL of the brief/)
+    expect(section('The line')).toMatch(/one file of the interval touches a page or an API: the line carries the URL/)
   })
 
   it('R8 — agents/livreur.md donne le format exact de la ligne avec l\'URL', () => {
@@ -211,6 +232,17 @@ describe('agent livreur (L439)', () => {
     expect(c).toContain('Question : brief incomplet : <champ> absent')
   })
 
+  it('R14 — l\'URL de base est exigée au contrôle 4 (après git fetch origin main, quand le diff touche une page ou une API), pas au contrôle 1, par « Question : brief incomplet : URL de base absente »', () => {
+    const c = section('Before any command')
+    const check1 = c.slice(c.indexOf('1. Complete brief'), c.indexOf('2. The lot'))
+    expect(check1).toMatch(/The base URL is not judged here/)
+    expect(check1).not.toContain('URL de base absente')
+    const check4 = c.slice(c.indexOf('4. The QA decision'), c.indexOf('5. The sha is an ancestor'))
+    expect(check4).toContain('Question : brief incomplet : URL de base absente')
+    before(check4, 'touches a page or an API', 'Question : brief incomplet : URL de base absente')
+    expect(check4).toMatch(/URL de base absente`, before any action/)
+  })
+
   it('R14 — agents/livreur.md rend une question quand le lot est inconnu ou déjà done', () => {
     const c = section('Before any command')
     expect(c).toContain('a lot unknown to the plan gives `Question : raf show refusée au sha <sha> : <message de la commande>`')
@@ -250,7 +282,7 @@ describe('agent livreur (L439)', () => {
   it('R14 — agents/livreur.md pèse les deux preuves avant de répondre « déjà clos » pour un lot done (relance après un deliver refusé)', () => {
     const c = section('Before any command')
     const lot = c.indexOf('2. The lot')
-    const preuves = c.indexOf('6. The sha is not already delivered')
+    const preuves = c.indexOf('7. The sha is not already delivered')
     expect(lot).toBeGreaterThan(-1)
     // le contrôle du lot ne rend plus « déjà clos » : seul le contrôle des deux preuves le fait
     expect(c.slice(lot, c.indexOf('3. Run')).includes('Question : <lot> déjà clos')).toBe(false)

@@ -485,12 +485,16 @@ lots:
   - id: L449
     title: "Panneau des lots : réordonner les PROJETS par glisser-déposer (souris dans l'app desktop, Alt+↑/↓ au clavier, comme le réordonnancement des lots) ; le dépôt réécrit la liste priority: du cadence.yaml du dossier parent (ordre du tour, de --continue et du panneau), commentaires du fichier conservés ; refus visible si le fichier est illisible ; tests du module et doc (demande de Sylvain le 30-10)"
     public: "Panneau des lots : on range les projets par priorité en les glissant"
-    status: doing
+    status: done
     estimate: 0.5
     visible: true
     created: 2026-10-30
     started: 2026-10-30
     review: { date: 2026-10-30, verdict: "compliant — orchestré (vague 2026-10-30-1715, revue Fable conforme + UX conforme, 2 mineurs notés) ; rebasé sur main par le lead, seul conflit = ligne d'import de src/cli.ts (movePriority + readLeadContextThreshold réunis), tsc 0 erreur", commit: 0e0697952a823ec069dd36a19d28cbe59fe31f4d }
+    ux: { date: 2026-10-30, verdict: "conforme — revue UX de la vague (0 réserve, 2 mineurs en notes) ; rendu du panneau vu par le lead (région « ordre des projets (priority:) » et ses lignes présentes en terminal et desktop, absente sur mobile) ; plugin test 344/344, tsc 0" }
+    finished: 2026-10-30
+    notes:
+      - { date: 2026-10-30, text: "Mineurs gardés en note : la région des projets disparaît sans indice sous 3n+2 lignes (32 avec les 10 projets du dossier de Sylvain) — geste de repli : cadence lead priority ; coût permanent en hauteur (région repliable possible, cf. L411) ; deux Alt+↑ rapprochés lus sur l'ordre périmé (pas de moveGen) ; commentaire d'un nom en double perdu ; déplacement du commentaire de la ligne priority: non dit dans docs/lead.md" }
   - id: L450
     title: "verify --gate reprend le verdict de la vague sous des commits « de plan seuls », alors qu'un test peut lire le plan : avatar-pandora plan-page.e2e est passé au rouge après le raf done de L8 (9e lot livré, 30-10) sans que la porte de tête le voie — ne reprendre le verdict que si aucun test déclaré ne lit le plan (clé orchestrate.gate.readsPlan ou liste de chemins), sinon rejouer ; test sur un dépôt dont un test lit .cadence/raf.yaml"
     status: done

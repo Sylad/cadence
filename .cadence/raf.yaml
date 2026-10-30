@@ -355,6 +355,7 @@ lots:
       - { date: 2026-10-29, text: "Sylvain (29-10) : un seuil de 150k ne doit pas forcer des /clear fréquents — à combiner avec /compact (et le réglage de compaction automatique de Claude Code, à vérifier dans sa doc) et avec les lots de réduction du contexte (livreur délégué, comptes rendus courts, status compact)" }
       - { date: 2026-10-30, text: "30-10 : Sylvain abandonne le /clear tous les 150k (session démarrée à 80k, 466k à 15 h) mais garde l'objectif de sobriété : ce lot reste à faire (seuil configurable en tokens, utile au compte pro à fenêtre plus petite)." }
     started: 2026-10-30
+    review: { date: 2026-10-30, verdict: "compliant (0 blocking, 0 major ; 3 minor notes of stale documentation) — orchestré (vague 2026-10-30-1715, 0 passe(s) de correction)", commit: c3756c35557b01692b05ffe2d6e02a10d4209300, reporte: { de: 3fd594a512bcad18415c241f9cd70db9f7ec3bd0, vers: c3756c35557b01692b05ffe2d6e02a10d4209300, patchId: 902c3f3da2db0a1bcb8dc5afa59f7bd19680cf17 } }
   - id: L438
     title: "Alerte de joignabilité des machines : une sonde depuis Big-Blue (ping + API k3s) écrit sur Discord (webhook discord-idle) quand dark-blue ne répond plus — le 29-10 il s'est éteint à 20:05 et on ne l'a su qu'à la livraison de 20:43 (config locale, rien de propre à notre dossier dans le code de cadence)"
     status: todo

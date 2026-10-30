@@ -2,8 +2,9 @@ import { atom, read, update } from 'claude-code'
 import type { ClientProps, ElementConstructor, EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, CommandInfo, LeadHold, LotsNotice, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
-import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
+import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, DELIVERIES, LAST_DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
 import { buildDecisions, decisionsOf, parseDeliveries } from './decisions'
+import { buildDeliveries, deliveriesHeight, deliveriesOf, parseLastDeliveries } from './deliveries'
 import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
@@ -40,6 +41,8 @@ const lotsFolds = atom({ plugin: 'cadence-hud', key: 'lotsFolds' } as const, {})
 const lotsViews = atom({ plugin: 'cadence-hud', key: 'lotsViews' } as const, {})
 const lotsNotice = atom({ plugin: 'cadence-hud', key: 'lotsNotice' } as const, null)
 const lotsDeliveries = atom({ plugin: 'cadence-hud', key: 'lotsDeliveries' } as const, [])
+/** La dernière livraison de chaque projet (L415), lue du journal de `cadence deliver` avec les livraisons en échec. */
+const lotsLast = atom({ plugin: 'cadence-hud', key: 'lotsLast' } as const, [])
 /** Le temps habituel d'un lot par classe de taille (minutes), lu de `cadence perf --json` (L414) ; vide tant qu'il n'a pas répondu. */
 const lotsTypical = atom({ plugin: 'cadence-hud', key: 'lotsTypical' } as const, {})
 const lotsAt = atom({ plugin: 'cadence-hud', key: 'lotsAt' } as const, 0)
@@ -217,13 +220,18 @@ export const register: Register = on => {
       }
     }
 
-    // Les livraisons en échec (L412) : lues tant que le panneau des lots est ouvert, à chaque rafraîchissement (deux `stat` par projet) ; un journal illisible n'en montre aucune.
+    // Les livraisons (L412, L415) : lues tant que le panneau des lots est ouvert, à chaque rafraîchissement (quelques `stat` par projet) : les échecs pour « ce qui attend une décision »,
+    // la dernière de chaque projet pour son bloc ; un journal illisible n'en montre aucune.
     const refreshDeliveries = async (found: Wave[]) => {
       const folder = tourFolder(found, sessionCwd)
       if (!folder || !(await isLotsOpen($))) return
-      const failed = await $.process.run(['python3', '-I', '-c', DELIVERIES, folder], { timeoutMs: 4_000 }).then(r => (r.exitCode === 0 ? parseDeliveries(r.stdout) : []), () => [])
+      const [failed, latest] = await Promise.all([
+        $.process.run(['python3', '-I', '-c', DELIVERIES, folder], { timeoutMs: 4_000 }).then(r => (r.exitCode === 0 ? parseDeliveries(r.stdout) : []), () => []),
+        $.process.run(['python3', '-I', '-c', LAST_DELIVERIES, folder], { timeoutMs: 4_000 }).then(r => (r.exitCode === 0 ? parseLastDeliveries(r.stdout) : []), () => []),
+      ])
       // le délai peut tomber après le déchargement du module : l'écriture est alors refusée et il n'y a plus rien à dire
       await update($, lotsDeliveries, () => failed).catch(() => undefined)
+      await update($, lotsLast, () => latest).catch(() => undefined)
     }
     // L'avancement des plans vient de `cadence lead tour --json` : relu à chaque transition de vague, sinon toutes les minutes.
     // Hors de refresh() (un `cadence` lent ne retarde pas la bande) et sans effet sur `error` : cadence absent = pas de lignes de projets.
@@ -762,7 +770,7 @@ export const register: Register = on => {
 
   // Le panneau des lots (L401) : lecture seule, l'arbre des lots non clos de chaque projet du dossier (lead tour --json).
   on('ui.render', { component: 'Pane', requestId: LOTS_PANE }, async ($, e) => {
-    const [board, failed, readAt, allWaves, ended, at, folds, views, notice, deliveries, typical] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, endedWaves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries), read($, lotsTypical)])
+    const [board, failed, readAt, allWaves, ended, at, folds, views, notice, deliveries, typical, latest] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, endedWaves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries), read($, lotsTypical), read($, lotsLast)])
     const table = $.ui.resolve(e)
     const { Box, Text, Button } = table
     // les surfaces sans région Client (mobile, éditeur) dessinent les lots sans les réordonner
@@ -814,13 +822,26 @@ export const register: Register = on => {
       </Box>
     )
 
+    // « dernière livraison par projet » (L415), sous les dépenses : ce que décisions et dépenses laissent de la moitié du corps, l'arbre garde le reste
+    const deliveryRows = deliveriesOf(latest, board, at)
+    const shipped = buildDeliveries(deliveryRows, columns, deliveriesHeight(deliveryRows.length, e.props.scroll.bodyRows, decisions.lines.length + spend.lines.length))
+    const deliveriesBlock = shipped.lines.length > 0 && (
+      <Box key="deliveries" flexDirection="column">
+        {shipped.lines.map((l, i) => (
+          <Text key={`v${i}`} bold={l.tone === 'title'} color={l.tone === 'error' ? 'error' : undefined} wrap="truncate-end">
+            {l.text}
+          </Text>
+        ))}
+      </Box>
+    )
+
     let body: RenderChildren
     if (board?.outdated) {
       body = message('Lots indisponibles : cadence est trop ancien, mettez-le à jour.', 'error')
     } else if (board === null) {
       body = failed ? message("Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute.", 'error') : message('Lecture des plans…', 'subtle')
     } else {
-      const panel = buildPanel({ rows: board.rows, columns, height: e.props.scroll.bodyRows - decisions.lines.length - spend.lines.length, waves: waveLotsOf(allWaves, at), folds, views, now: at })
+      const panel = buildPanel({ rows: board.rows, columns, height: e.props.scroll.bodyRows - decisions.lines.length - spend.lines.length - shipped.lines.length, waves: waveLotsOf(allWaves, at), folds, views, now: at })
       if (panel.lines.length === 0) {
         body = message('Aucun lot non clos dans les projets de ce dossier.', 'subtle')
       } else {
@@ -909,6 +930,7 @@ export const register: Register = on => {
         {result}
         {decisionBlock}
         {spendBlock}
+        {deliveriesBlock}
         {body}
         {footer}
       </Box>

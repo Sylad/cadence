@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Mounted, TestBody } from 'claude-code/testing'
 
-import { DELIVERIES, PLAN_STAMPS } from '../hooks/collect'
+import { DELIVERIES, LAST_DELIVERIES, PLAN_STAMPS } from '../hooks/collect'
 import type { LotsRow, TourLot, Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module) : laisse se poser un travail lancé sans être attendu. */
@@ -22,7 +22,7 @@ const WAVE: Wave = {
 type Cadence = { exitCode: number; stdout: string }
 
 /** Monte le mod comme une session, avec un moteur simulé : état en mémoire, panneaux ouverts, processus pilotés par le test. */
-const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave[]; stamps?: () => string; deliveries?: () => string; perf?: () => Cadence; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
+const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave[]; stamps?: () => string; deliveries?: () => string; last?: () => string; perf?: () => Cadence; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string } } = {}) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const open = new Set<string>()
   const opened: unknown[] = []
@@ -72,6 +72,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
       const r = await tour.current()
       return { value: { ...r, stderr: '' } } as never
     }
+    if (argv[3] === LAST_DELIVERIES) return { value: { exitCode: 0, stdout: (setup.last ?? (() => '[]'))(), stderr: '' } } as never
     if (argv[3] === DELIVERIES) return { value: { exitCode: 0, stdout: (setup.deliveries ?? (() => '[]'))(), stderr: '' } } as never
     if (argv[3] === PLAN_STAMPS) return { value: { exitCode: 0, stdout: stamps.current(), stderr: '' } } as never
     return { value: { exitCode: 0, stdout: JSON.stringify({ waves: waves.current, ended: setup.ended ?? [], holds: [], cap: 2 }), stderr: '' } } as never
@@ -1312,4 +1313,46 @@ test('L414 R16 — hors dépassement, un bloc qui n’a pas deux lignes de place
   const { text } = await s.draw(70, 6)
   expect(text).not.toMatch(/Lots en cours|ol:L80/)
   expect(text).toMatch(/L401/)
+})
+
+const LAST = JSON.stringify([
+  { project: 'ol', day: '1970-01-01', sha: 'abcdef0123456789', status: 'verte', green: '1970-01-01' },
+  { project: 'cadence', day: '1970-01-01', sha: '1234567fedcba', status: 'rouge', green: '1969-12-30' },
+])
+const closedTour = JSON.stringify([{ ...TOUR[0], closed: [{ id: 'L390', finished: '1969-12-31' }, { id: 'L395', finished: '1970-01-01' }] }, { ...TOUR[1], closed: [{ id: 'L70', finished: '1969-12-01' }] }])
+
+test('L415 R12 — le panneau montre, sous les lots en cours, la dernière livraison de chaque projet : sha, âge, verte ou rouge, lots clos non livrés (rouge d’abord)', async ($, on) => {
+  const s = await session($, on, { waves: [], last: () => LAST, tour: () => ({ exitCode: 0, stdout: closedTour }) })
+  await s.advance(5_000)
+  await s.hud('lots')
+  await s.advance(5_000)
+  const { texts } = await s.draw(100, 30)
+  const at = (re: RegExp) => texts.findIndex(t => re.test(t))
+  expect(texts[at(/Dernière livraison par projet/)]).toBe('Dernière livraison par projet (2)')
+  expect(texts.find(t => /^✖ cadence/.test(t))).toBe('✖ cadence  1234567 · aujourd’hui · rouge · 2 lots clos non livrés : L390, L395')
+  expect(texts.find(t => /^▶ ol/.test(t))).toBe('▶ ol  abcdef0 · aujourd’hui · verte · rien à livrer')
+  expect(at(/^✖ cadence/)).toBeLessThan(at(/^▶ ol/))
+  expect(at(/L401/)).toBeGreaterThan(at(/^▶ ol/))
+})
+
+test('L415 R13 — aucune livraison lue (aucun journal) : pas de bloc ; panneau fermé : le script n’est pas lancé', async ($, on) => {
+  const s = await session($, on, { waves: [] })
+  await s.advance(5_000)
+  expect(s.runs.filter(a => a[3] === LAST_DELIVERIES)).toEqual([])
+  await s.hud('lots')
+  await s.advance(5_000)
+  expect((await s.draw()).text).not.toMatch(/Dernière livraison/)
+  expect(s.runs.filter(a => a[3] === LAST_DELIVERIES).length).toBeGreaterThan(0)
+})
+
+test('L415 R14 — un corps de 12 lignes : le bloc se coupe à ce que la moitié du corps laisse, l’arbre garde le reste', async ($, on) => {
+  const many = JSON.stringify(Array.from({ length: 6 }, (_, i) => ({ project: `p${i}`, day: '1970-01-01', sha: 'abcdef0', status: 'verte', green: '1970-01-01' })))
+  const s = await session($, on, { waves: [], last: () => many })
+  await s.advance(5_000)
+  await s.hud('lots')
+  await s.advance(5_000)
+  const { texts } = await s.draw(100, 12)
+  expect(texts.filter(t => /^▶ p\d/.test(t))).toHaveLength(4)
+  expect(texts).toContain('… +2 projets')
+  expect(texts.some(t => /L401/.test(t))).toBe(true)
 })

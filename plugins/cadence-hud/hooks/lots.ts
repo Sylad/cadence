@@ -18,6 +18,7 @@ export const parseLotsBoard = (stdout: string): LotsBoard => {
     .map(r => ({
       project: r.project as string,
       ...(typeof r.error === 'string' && r.error ? { error: r.error } : {}),
+      ...(Array.isArray(r.closed) ? { closed: r.closed.filter((c): c is { id: string; finished: string } => typeof c?.id === 'string' && typeof c?.finished === 'string').map(c => ({ id: c.id, finished: c.finished })) } : {}),
       ...(Array.isArray(r.lots) ? { lots: r.lots.filter((l): l is TourLot => typeof l?.id === 'string').map(l => ({ ...l, after: Array.isArray(l.after) ? l.after : [] })) } : {}),
     }))
   const readable = rows.filter(r => !r.error)

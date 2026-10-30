@@ -104,13 +104,16 @@ export type Project = {
 export type TourLot = { id: string; title: string; status: 'todo' | 'doing'; after: string[]; parent?: string; /** La revue de code du lot est posée au plan (L413) ; absent sans revue ou d'un cadence plus ancien. */ reviewed?: true }
 
 /** Une ligne du tour pour le panneau des lots : le projet, l'erreur du tour s'il n'a pas pu être lu, ses lots non clos. */
-export type LotsRow = { project: string; error?: string; lots?: TourLot[] }
+export type LotsRow = { project: string; error?: string; lots?: TourLot[]; /** Lots clos et leur jour de clôture (L415) ; absent d'un cadence plus ancien ou sans lot clos daté. */ closed?: { id: string; finished: string }[] }
 
 /** Ce que le panneau a lu : les lignes du tour, et si cadence est trop ancien pour porter `lots`. */
 export type LotsBoard = { rows: LotsRow[]; outdated: boolean }
 
 /** Une livraison en échec d'un projet (L412) : la dernière ligne de `deliveries-failed.log`, quand aucune livraison verte ne l'a suivie. */
 export type FailedDelivery = { project: string; day: string; sha: string; reason: string }
+
+/** La dernière livraison d'un projet (L415), lue par le script LAST_DELIVERIES : son jour et son sha, verte ou rouge, et le jour de la dernière livraison verte (nul sans). */
+export type LastDelivery = { project: string; day: string; sha: string; status: 'verte' | 'rouge'; green: string | null }
 
 /** Ce que le dessin demande : placer `id` juste avant ou après `target` (L402). */
 export type MoveAsk = { id: string; target: string; place: 'before' | 'after' }
@@ -153,6 +156,8 @@ declare module 'claude-code' {
       lotsNotice: LotsNotice | null
       /** Les livraisons en échec lues pour le panneau des lots (L412), une par projet au plus. */
       lotsDeliveries: FailedDelivery[]
+      /** La dernière livraison de chaque projet lue pour le panneau des lots (L415). */
+      lotsLast: LastDelivery[]
       /** Le temps habituel d'un lot (minutes) par classe de taille, lu de `cadence perf --json` (L414) ; vide tant qu'il n'a pas répondu. */
       lotsTypical: Record<string, number>
       /** Heure (ms) de la dernière lecture réussie du panneau des lots. */

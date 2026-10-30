@@ -24,7 +24,36 @@ On top of the usability and accessibility checks, check the **consistency mockup
 - every state of `etats` has its section `#etat-<état>`; the `masque` of an empty-state rule really hides the fields it names;
 - the units, formats and wording the sheet declares are those shown.
 
-**Sweep everything in the first review**, and render it as a checklist in the text of your report (one line per item, ticked or not): every state of the sheet at 1440 px and at 390 px; every rule of the sheet; contrast (WCAG 2.2 AA, measured); the real envelope of the app (usable width, side bar, header — measured in the neighbouring pages, not assumed); gutters; empty or stretched panels; holes in the layout. What you cannot verify (a state you cannot capture, an ambiguous rule) goes in `nonVerifie`, not ticked. Report ALL the blocking and major findings in the first report: the mockup is reviewed up to `orchestrate.maquetteReviews` times (3 by default), but a later review that finds a major on a point nobody changed counts as a review defect in the wave journal. From the second review on, check the points of the previous one first, run the sweep again, and set `inchange: true` on each blocking or major finding about a point the spec writer did not change and the previous review had not raised (leave the field out otherwise).
+**Criteria added in mockup mode** — in this mode only (conformity mode and the review of an existing screen keep their text). Each one carries its named rule or the value to count; the checks of the method below (contrast, targets, keyboard, focus, alternatives, colour, reflow, data display) are already written there and are not repeated here.
+
+**Family: visual hierarchy**
+
+- one primary element per state: count the primary actions of each state, more than one is a finding (Nielsen 8);
+
+**Family: consistency with the product tokens**
+
+- colour, size and spacing values of `maquette.html` that do not come from the product’s CSS variables: count them, each is a finding (Nielsen 4);
+
+**Family: quality of the texts**
+
+- an error message says what, why, how to fix (Nielsen 9);
+- an empty or loading state says what it is, why it is empty, how to start (Nielsen 1);
+- an action label is a verb that names the result, never “OK” or “Validate” alone (Nielsen 2 and 4);
+- the confirmation of a destructive action names the object and the consequence, and its buttons are named by the action (Nielsen 5);
+- one word per notion: count of distinct labels used for one notion across the states and the sheet (Nielsen 4);
+
+**Family: complementary accessibility**
+
+- focus order follows the reading order (WCAG 2.4.3);
+- name, role, value and a visible label for every field (WCAG 4.1.2, 3.3.2, 1.3.1);
+- an error is identified by text, not by colour or an icon alone (WCAG 3.3.1);
+- text enlarged to 200 % loses no content or function (WCAG 1.4.4);
+
+What a static mockup cannot show, such as what a real screen reader announces, goes in `nonVerifie`, not ticked, and is never replaced by a finding.
+
+Severity keeps the scale below: an accessibility (WCAG) gap is blocking or major as before; a text, hierarchy or token defect is major only if it misleads or slows the task (an error message without the fix, two primary actions, an off-token value that changes the identity), otherwise minor.
+
+**Sweep everything in the first review**, and render it as a checklist in the text of your report (one line per item, ticked or not): every state of the sheet at 1440 px and at 390 px; one line per family of the added criteria, per state at 1440 px and 390 px; every rule of the sheet; contrast (WCAG 2.2 AA, measured); the real envelope of the app (usable width, side bar, header — measured in the neighbouring pages, not assumed); gutters; empty or stretched panels; holes in the layout. What you cannot verify (a state you cannot capture, an ambiguous rule) goes in `nonVerifie`, not ticked. Report ALL the blocking and major findings in the first report: the mockup is reviewed up to `orchestrate.maquetteReviews` times (3 by default), but a later review that finds a major on a point nobody changed counts as a review defect in the wave journal. From the second review on, check the points of the previous one first, run the sweep again, and set `inchange: true` on each blocking or major finding about a point the spec writer did not change and the previous review had not raised (leave the field out otherwise).
 
 Check the **sample data** too: recompute the weekday of every date shown (a command such as `date -d`), do not trust the one written. A wrong sample datum (weekday, date, figure that does not add up) is **minor**, never major: it changes no field, rule or state of the sheet, so it does not send the mockup back to the spec writer.
 

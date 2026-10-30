@@ -9,6 +9,8 @@ What you produce, in `<dir>/<écran>/`:
 2. The captures described above, one per state and per width, copied from the Playwright output directory of this wave into the folder (give a capture the absolute path of that directory, as the Playwright paragraph says, then copy it).
 3. `fiche.yaml`, in the format of the template below. Check it with `cadence spec check <fiche>` until it is valid, and derive the QA expectations with `cadence spec qa <fiche>` only if the lot asks for it.
 
+Write the texts before the review, with the structure the UX reviewer will check: an error message says what, why, how to fix; an empty or loading state says what it is, why it is empty, how to start; an action label is a verb that names the result, never "OK" or "Validate" alone; the confirmation of a destructive action names the object and the consequence; one word per notion, in the sheet and in the mockup. A word or a message already in the product is kept as it is.
+
 Sheet rules:
 - Every rule is `sourcee` (it says where it comes from: a line of the lot, a note, `expectations.md`, a rule already coded, an API contract) or `hypothese` (you chose it for lack of a source; `si_faux` says what would change if it were wrong). Never present a guess as sourced.
 - Check every date in the sample data of the mockup before keeping it: compute its weekday (a command such as `date -d 2026-09-03 +%A`, or a script), never write it from memory — a « Wed 03/09 » that is a Thursday sends the mockup back for nothing. The same goes for any figure that must add up (a score and its result, a total and its parts).

@@ -17,13 +17,15 @@ You launch no agent and ask the human nothing: when something is ambiguous, you 
 Check the brief and the sha first. If one check fails, launch neither verify, nor `raf done`, nor a push, nor deliver: hand back a question that names what is missing or what is closed.
 
 1. Complete brief: project folder, lot id, sha, `lead.ux` value, base URL for a delivery that needs a QA pass, report or captures for a visible lot with `lead.ux: lead`. Otherwise `Question : brief incomplet : <champ> absent`.
-2. The lot (`raf show <lot>`): a lot unknown to the plan or already done gives `Question : <lot> déjà clos ou sha <sha> déjà livré (origin/main et journal)`.
+2. The lot (`raf show <lot>`): a lot unknown to the plan gives `Question : <lot> inconnu du plan`. A lot already done is not answered yet: `raf done` comes before the push and the deliver, so a done lot may be a delivery that stopped after it; check 6 weighs both proofs first.
 3. Run `git fetch origin main` (if `git fetch origin main` fails, hand back the « étape refusée » question of Questions; read `origin/main` only after it).
 4. The sha is an ancestor of the local HEAD: `git merge-base --is-ancestor <sha> HEAD`. Otherwise `Question : sha <sha> non livrable : pas un ancêtre de HEAD`.
 5. No commit between `origin/main` and the sha cites a lot other than the lot of the brief that is not done (ready but not yet done counts too): `git log origin/main..<sha>` and `raf show` of each lot cited. A commit that cites no lot, or the plan alone, passes. Otherwise `Question : sha <sha> non livrable : commit du lot <autre> non prêt dessous`.
 6. The sha is not already delivered. « Already delivered » means exactly: the sha is an ancestor of `origin/main` AND present in the delivery log of `cadence deliver` (`deliveries.log`, one line « day sha » in `<git rev-parse --git-common-dir>/cadence/`; compare the full sha or its prefix).
    - Both proofs: `Question : <lot> déjà clos ou sha <sha> déjà livré (origin/main et journal)`: nothing left to do.
+   - Lot done and neither proof: same question `Question : <lot> déjà clos ou sha <sha> déjà livré (origin/main et journal)` saying that the sha is neither in `origin/main` nor in the log; rerun nothing, `raf done` is already done.
    - Only one of the two: say which proof is missing and rerun nothing: neither `raf done` nor `cadence deliver`. `Question : sha <sha> non livrable : dans origin/main sans le journal` (pushed, never delivered) or `Question : sha <sha> non livrable : au journal sans être dans origin/main`. The log keeps the sha declared by the delivery script (`CADENCE_DEPLOYED_FILE`) when it declares one, so a successful delivery that declared another commit shows as « pushed, never delivered »: that too is a question, nothing rerun.
+   - The lot being done does not change the choice of the message: it is picked from the two proofs, evaluated for a done lot too.
    - A rerun after a successful delivery never does `raf done` again.
 
 ## The chain

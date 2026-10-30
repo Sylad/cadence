@@ -198,7 +198,7 @@ describe('agent livreur (L439)', () => {
 
   it('R14 — agents/livreur.md rend une question quand le lot est inconnu ou déjà done', () => {
     const c = section('Before any command')
-    expect(c).toMatch(/lot unknown to the plan or already done/)
+    expect(c).toMatch(/lot unknown to the plan/)
     expect(c).toContain('Question : <lot> déjà clos ou sha <sha> déjà livré (origin/main et journal)')
   })
 
@@ -229,6 +229,17 @@ describe('agent livreur (L439)', () => {
     expect(c).toContain('Question : sha <sha> non livrable : dans origin/main sans le journal')
     expect(c).toContain('Question : sha <sha> non livrable : au journal sans être dans origin/main')
     expect(c).toMatch(/sha declared by the delivery script/)
+  })
+
+  it('R14 — agents/livreur.md pèse les deux preuves avant de répondre « déjà clos » pour un lot done (relance après un deliver refusé)', () => {
+    const c = section('Before any command')
+    const lot = c.indexOf('2. The lot')
+    const preuves = c.indexOf('6. The sha is not already delivered')
+    expect(lot).toBeGreaterThan(-1)
+    // le contrôle du lot ne rend plus « déjà clos » : seul le contrôle des deux preuves le fait
+    expect(c.slice(lot, c.indexOf('3. Run')).includes('Question : <lot> déjà clos')).toBe(false)
+    expect(c.slice(preuves)).toMatch(/Lot done and neither proof/)
+    expect(c.slice(preuves)).toMatch(/lot being done does not change the choice of the message/)
   })
 
   it('R14 — agents/livreur.md refuse un sha déjà dans origin/main sans le journal sans relancer raf done ni deliver', () => {

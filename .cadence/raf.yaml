@@ -574,6 +574,17 @@ lots:
     created: 2026-10-30
     started: 2026-10-30
     review: { date: 2026-10-30, verdict: "compliant — orchestré (vague 2026-10-30-2105-cad, 0 passe(s) de correction)", commit: e8b6ebbcd861f0ed581129c881999f3767312b80 }
+  - id: L458
+    title: "Faux positif de L456 : la tolérance des lots d'une AUTRE vague vivante du même dossier ne voit pas une vague lancée APRÈS celle qui contrôle (30-10 21:25 : 2026-10-30-2110-cx a rendu codex:L50 pour e61c61f a33fed9 9f53e75 de warhammer40k:L62, vague 2026-10-30-2120-wh lancée 10 min plus tard) — relire le registre des vagues au moment du contrôle (et celles finies pendant la session) ; test avec une vague lancée après"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-30
+  - id: L459
+    title: "Étape maquette pour les lots visibles sans screen: page (screen: component, retouches, revues UX d'écran) : maquette légère (capture de l'écran actuel + version visée, états touchés) validée par l'ux-reviewer en mode maquette AVANT le code, puis conformité après ; mesure : « sessions ux par lot visible » de cadence perf (1,6 le 30-10, cible 1,2) sur deux fenêtres — demande de Sylvain le 30-10 (« coder à partir de specs déjà validées graphiquement »)"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-10-30
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

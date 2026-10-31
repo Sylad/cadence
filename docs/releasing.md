@@ -33,8 +33,8 @@ A version exists in three places and is published in two; a release does all of 
    on that version commit; a case below the threshold stops the release until you have read it in the report.
 4. `git tag v<version> && git push origin main v<version>` — the tag starts `.github/workflows/publish.yml`,
    which publishes to npm through Trusted Publishing (OIDC, no token stored anywhere): it checks the tag
-   matches `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` and that `CHANGELOG.md` has a `## [x.y.z]` section for it (no section, no publication), then `npm publish --provenance`, where `prepublishOnly` runs the type-check and the
-   tests and `prepare` builds `dist/`; a red suite stops the publication; then it creates the GitHub release with that CHANGELOG section as its text. The trusted publisher is declared
+   matches `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` and that `CHANGELOG.md` has a `## [x.y.z]` section for it (no section, no publication), then `npm publish --provenance`, where `prepublishOnly` runs the type-check, the quality ratchet (`npm run qualite`, [qualite.md](qualite.md): exit 1 when a measure got worse, 2 when a tool crashed or the baseline is missing) and the
+   tests and `prepare` builds `dist/`; a red suite or a measure that got worse stops the publication (fix the code, then `npm run qualite:cliquet` locks the gain); then it creates the GitHub release with that CHANGELOG section as its text. The trusted publisher is declared
    once on npmjs.com (package settings → Trusted Publisher → GitHub Actions, `Sylad/cadence`, `publish.yml`).
 5. Watch the run: `gh run watch` (or `gh run list --workflow publish.yml`).
 6. Check the effect: `npm view @sylad/cadence version` answers the new version.

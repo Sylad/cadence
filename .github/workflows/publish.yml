@@ -83,8 +83,8 @@ jobs:
             echo "$out"; exit 1
           fi
 
-      # prepublishOnly relance typecheck + tests, prepare construit dist/ : une suite rouge arrête tout.
-      # Quand la version est déjà publiée, cette étape est sautée : ni typecheck ni tests ne tournent dans ce run
+      # prepublishOnly relance typecheck + qualité (cliquet) + tests, prepare construit dist/ : une suite rouge arrête tout.
+      # Quand la version est déjà publiée, cette étape est sautée : ni typecheck, ni cliquet, ni tests ne tournent dans ce run
       # (le run qui a publié les a passés), et la release ci-dessous peut être créée sans suite exécutée.
       # Le registre peut encore répondre E404 juste après une publication (cache) : un conflit de publication
       # (EPUBLISHCONFLICT / « previously published », sur une ligne d'erreur de npm : la sortie de la suite de

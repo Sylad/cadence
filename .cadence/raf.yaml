@@ -822,10 +822,11 @@ lots:
       - { date: 2026-10-31, text: "31-10, rendu vu par Sylvain après /reload-plugins : les barres NE sont PAS alignées. L494 n'a changé aucun code (le padEnd existait depuis L481, le lot n'a ajouté qu'un test et la doc) ; le panneau de l'app de bureau rend une police proportionnelle, où des espaces de bourrage n'alignent rien. Repris par L495." }
   - id: L495
     title: "Panneau des lots : aligner VRAIMENT les barres d'« ordre des projets » — le panneau de l'app de bureau a une police proportionnelle, le padEnd de L481/L494 (espaces) n'aligne rien (capture de Sylvain 31-10 : claude-code-codex démarre ~25 px plus à droite que cadence). Mettre le nom dans une boîte de largeur fixe (Box width / minWidth, ou une grille), en suivant l'API des éléments de surface du mod (skill plugin-authoring) ; le test doit vérifier la structure (boîte de largeur fixe), pas des espaces"
-    status: todo
+    status: doing
     estimate: 0.25
     visible: true
     created: 2026-10-31
+    started: 2026-10-31
   - id: L496
     title: "docs.sync : un lot de nettoyage sans effet documenté (retrait d'export, découpage de fichier, doublon factorisé) ne doit plus être rendu au lead avant la revue — accepter l'acquittement à l'avance (raf docs-ok posé avant la vague, valable pour les commits qui suivent) ou une clé docs: none sur le lot ; cas du 31-10 : L483 et L484 rendus deux fois pour 30 fichiers dont aucun document ne change, et L485–L493 sont du même type"
     status: todo

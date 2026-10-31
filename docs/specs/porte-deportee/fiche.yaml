@@ -49,7 +49,8 @@ cas:
     alternatives:
       - { si: "le worktree du lot a des modifications non validées", alors: "porte locale, dite dans la sortie", regles: [R7] }
       - { si: "l'hôte ne répond pas", alors: "porte locale pour ce lot, dite dans la sortie, sans arrêter la vague", regles: [R4, R5] }
-      - { si: "la commande est rouge sur l'hôte", alors: "le rouge est compté comme un rouge local (correction), sans repli", regles: [R8] }
+      - { si: "la connexion ssh tombe (code 255) pendant une commande de la porte du lot, de la ligne de base ou du rejeu seul", alors: "cette commande est rejouée en local, dit dans la sortie et dans le journal de la vague, jamais compté comme un rouge du lot", regles: [R6] }
+      - { si: "la commande sort avec un code distant autre que 255 (rouge sur l'hôte)", alors: "le rouge est compté comme un rouge local (correction), sans repli", regles: [R8] }
     resultat: "La charge de build et de tests quitte la machine des sessions, sans changer ce que la vague conclut."
   - id: C3
     titre: "Le lead déclare l'hôte dans cadence.yaml"
@@ -98,11 +99,11 @@ regles:
     si_faux: "Si ces échecs doivent bloquer la porte (code 2) au lieu de se replier, seul le code de sortie change dans ces cas ; aucune donnée."
     tests: ["R5 — push refusé : repli local dit, code de la porte locale", "R5 — installation du cache en échec : repli local, aucun cache à moitié rempli réutilisé"]
   - id: R6
-    cas: [C1]
-    enonce: "Si ssh sort en 255 (connexion perdue) pendant une commande de la porte, la porte est rejouée en local et la sortie le dit ; tout autre code non nul est le verdict de la commande."
-    statut: hypothese
-    si_faux: "Si une suite peut elle-même sortir en 255, un rouge réel serait rejoué en local (porte plus lente, même verdict) ; si l'on préfère un rouge sec, seul le coût change."
-    tests: ["R6 — code 255 : la porte est rejouée en local et la sortie le dit", "R6 — code 1 d'un test : verdict rouge, pas de repli"]
+    cas: [C1, C2]
+    enonce: "Si ssh sort en 255 (connexion perdue) PENDANT une commande de la porte, cette commande est rejouée en local, de la même façon pour verify --gate (C1) et pour la vague (C2 : porte d'un lot, ligne de base, rejeu seul). Le repli est dit dans la sortie ET dans le journal de la vague (C2), et le 255 n'est jamais compté comme un rouge du lot (ni correction, ni constat). Tout autre code non nul reste le verdict de la commande (R8)."
+    statut: sourcee
+    source: "décision du lead du 31-10 (lot L403) : « une connexion ssh perdue (code 255) PENDANT une commande de la porte est traitée de la même façon dans une vague (C2) que pour verify --gate (C1) — rejeu local, dit dans la sortie et dans le journal de la vague, jamais compté comme un rouge du lot ; R6 couvre C1 et C2 » ; contre-exemple évité : src/orchestrate/cycle.ts:2056-2057 (runChecks : code non nul de sh → againstBaseline / red.push)"
+    tests: ["R6 — verify --gate, code 255 : la porte est rejouée en local et la sortie le dit", "R6 — vague, 255 sur la commande de porte du lot : rejeu local, dit dans la sortie et le journal de la vague, aucun rouge compté", "R6 — vague, 255 pendant la ligne de base : rejeu local de la ligne de base, aucun rouge compté", "R6 — vague, 255 pendant le rejeu seul : rejeu local du rejeu, aucun test compté rouge ni instable", "R6 — code 1 d'un test (vague comme verify --gate) : verdict rouge, pas de repli (R8)"]
   - id: R7
     cas: [C2]
     enonce: "Le worktree d'un lot qui a des modifications non validées (ou un HEAD qui n'est pas celui demandé) ne se déporte pas, car l'hôte ne verrait pas ce qui est testé : la porte est locale et la sortie dit pourquoi."
@@ -197,11 +198,12 @@ contrats:
   - id: A2
     appel: commande cadence orchestrate
     entree: "cadence.yaml avec orchestrate.gate.host ; worktree d'un lot"
-    sortie: "contrôles build/tests du lot joués sur l'hôte ; lieu écrit dans la sortie et l'état du lot"
+    sortie: "contrôles build/tests du lot joués sur l'hôte ; lieu écrit dans la sortie et l'état du lot ; un repli après connexion perdue est écrit dans la sortie et le journal de la vague"
     erreurs:
       - { code: "log warn", message: "porte du lot <lot> : worktree non validé, jouée en local (l'hôte ne verrait pas les modifications)" }
       - { code: "log warn", message: "porte du lot <lot> : porte déportée indisponible sur <hôte> (<cause>) — jouée en local" }
-    regles: [R1, R3, R4, R5, R7, R8, R10, R12, R13, R14, R15, R16, R17, R18, R19]
+      - { code: "log warn", message: "porte du lot <lot> : connexion perdue avec <hôte> pendant la porte — rejouée en local" }
+    regles: [R1, R3, R4, R5, R6, R7, R8, R10, R12, R13, R14, R15, R16, R17, R18, R19]
   - id: A3
     appel: commande cadence orchestrate (lecture de cadence.yaml)
     entree: "orchestrate.gate: { host, install, readsPlan }"

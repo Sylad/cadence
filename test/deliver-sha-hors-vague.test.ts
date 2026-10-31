@@ -196,4 +196,44 @@ describe('deliver --sha hors vague : lots ni done ni prêts (L474)', () => {
     push(dir);
     expect((await run(dir, planFile)).code).toBe(0);
   });
+
+  it('R10 — la couverture de la revue se juge jusqu\'au sha livré : un fix(L1) au-dessus d\'un lot relu à X ne bloque pas `--sha X`', async () => {
+    const { dir, planFile } = repo();
+    work(dir, 'feat(L1): un', 'a.txt');
+    const x = headSha(dir)!;
+    const plan = Plan.load(planFile);
+    plan.setStatus('L1', 'doing', '2026-09-28');
+    plan.recordReview('L1', 'conforme', '2026-09-28', x);
+    plan.save();
+    work(dir, 'fix(L1): après la revue', 'c.txt');
+    push(dir);
+    const r = await run(dir, planFile, { sha: x });
+    expect(r.err.join('\n')).toBe('');
+    expect(r.code).toBe(0);
+    // Le sha de tête, lui, porte le commit non relu : refus.
+    expect((await run(dir, planFile)).code).toBe(2);
+  });
+
+  it('R11 — un commit du lot non relu SOUS le sha bloque toujours, même si la revue est plus haut', async () => {
+    const { dir, planFile } = repo();
+    work(dir, 'feat(L1): un', 'a.txt');
+    work(dir, 'feat(L1): deux', 'b.txt');
+    const mid = headSha(dir)!;
+    work(dir, 'feat(L1): trois', 'c.txt');
+    const plan = Plan.load(planFile);
+    plan.setStatus('L1', 'doing', '2026-09-28');
+    plan.recordReview('L1', 'conforme', '2026-09-28', headSha(dir)!);
+    plan.save();
+    push(dir);
+    // Revue au sommet : les commits sous mid sont couverts.
+    expect((await run(dir, planFile, { sha: mid, dryRun: true })).code).toBe(0);
+    // Revue au premier commit : le deuxième (sous mid) n'est pas couvert.
+    const first = execFileSync('git', ['rev-parse', 'HEAD~2'], { cwd: dir }).toString().trim();
+    const p2 = Plan.load(planFile);
+    p2.recordReview('L1', 'conforme', '2026-09-28', first);
+    p2.save();
+    const r = await run(dir, planFile, { sha: mid });
+    expect(r.code).toBe(2);
+    expect(r.err.join('\n')).toMatch(/L1.*relu avant 1 commit/);
+  });
 });

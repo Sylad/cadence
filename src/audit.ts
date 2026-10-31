@@ -3,7 +3,7 @@ import { dirname, join, relative } from 'node:path';
 import { check } from './check.js';
 import type { Day } from './dates.js';
 import { parse } from 'yaml';
-import { changedFiles, fileAt, preloadChangedFiles, readCommits, type Commit } from './git.js';
+import { changedFiles, fileAt, isAncestor, preloadChangedFiles, readCommits, type Commit } from './git.js';
 import { citedRefs, linkCommits, scopeOf, type Linked } from './link.js';
 import { PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readNewsConfig, readOrchestrateConfig } from './config.js';
 import { ficheHypotheses } from './spec.js';
@@ -343,7 +343,8 @@ export function deliveryLots(plan: Plan, root: string, sha: string, base: string
     if (l.status === 'done') entry(false, 'terminé');
     else if (l.status === 'dropped') entry(false, 'abandonné');
     else {
-      const late = l.review ? unreviewedWork(plan, root, l.id) : 0;
+      // Couverture jugée sur les commits du lot jusqu'à `sha` seulement : un `fix` posé au-dessus du sha livré n'est pas livré.
+      const late = l.review ? unreviewed(plan, root, l.review, lotCommits(plan, root, l.id)).filter((c) => isAncestor(root, c.sha, sha)).length : 0;
       if (l.review && late === 0) entry(false, 'prêt');
       else entry(true, `${l.status === 'todo' ? 'à faire' : 'en cours'}, ${l.review ? `relu avant ${late} commit(s)` : 'non relu'}`);
     }

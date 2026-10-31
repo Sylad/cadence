@@ -319,6 +319,38 @@ function unreviewed(plan: Plan, root: string, review: Verdict | undefined, linke
   return workCommits(plan, root, at < 0 ? linked : linked.slice(0, at));
 }
 
+/** Un lot dont l'intervalle à livrer porte des commits de travail, avec ce qui décide s'il se livre (L474). */
+export interface DeliveryLot {
+  id: string;
+  title: string;
+  /** done, prêt (revue de code couvrant ses commits) ou abandonné : se livre. Sinon : bloque. */
+  blocking: boolean;
+  state: string;
+}
+
+/**
+ * Les lots dont les commits de travail sont dans l'histoire de `sha` après `base` (toute l'histoire sans `base`), avec leur état de livraison (L474, hors vague) :
+ * `done` et abandonné ne bloquent pas ; un lot « prêt » (son verdict de revue couvre tous ses commits) non plus ; un lot à faire ou en cours, non relu
+ * ou relu avant des commits postérieurs, bloque. Un commit qui cite un lot que le plan ne connaît pas (clos et archivé, ou inconnu) n'en fait pas un lot.
+ */
+export function deliveryLots(plan: Plan, root: string, sha: string, base: string | null): DeliveryLot[] {
+  const inRange = planCommits(plan, root, { range: base ? `${base}..${sha}` : sha });
+  const { byLot } = linkCommits(plan.lots(), inRange, plan.refs);
+  const lots: DeliveryLot[] = [];
+  for (const l of plan.lots()) {
+    if (!workCommits(plan, root, byLot.get(l.id) ?? []).length) continue;
+    const entry = (blocking: boolean, state: string) => lots.push({ id: l.id, title: l.title, blocking, state });
+    if (l.status === 'done') entry(false, 'terminé');
+    else if (l.status === 'dropped') entry(false, 'abandonné');
+    else {
+      const late = l.review ? unreviewedWork(plan, root, l.id) : 0;
+      if (l.review && late === 0) entry(false, 'prêt');
+      else entry(true, `${l.status === 'todo' ? 'à faire' : 'en cours'}, ${l.review ? `relu avant ${late} commit(s)` : 'non relu'}`);
+    }
+  }
+  return lots;
+}
+
 /** Nombre de commits d'un lot que sa revue de code ne couvre pas — ce que `raf done` refuse quand la porte est active. */
 export function unreviewedWork(plan: Plan, root: string, lotId: string): number {
   const lot = plan.lots().find((l) => l.id === lotId);

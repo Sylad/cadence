@@ -5,7 +5,7 @@ import { join, relative } from 'node:path';
 import { parse } from 'yaml';
 import { onTermination, readProcs, SIGNAL_GRACE_MS, SIGNAL_PENDING_MS, TreeTracker } from './proc.js';
 import type { Day } from './dates.js';
-import { isPlanOnly } from './audit.js';
+import { deliveryLots, isPlanOnly } from './audit.js';
 import { commitPaths, dirtyPaths, headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
 import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
 import { citedRefs } from './link.js';
@@ -334,6 +334,9 @@ export function describeCheck(c: VerifyCheck, sha: string): string {
   return `GET ${substitute(c.url!, sha)} → ${c.status ?? 200}${c.contains === undefined ? '' : `, contient « ${substitute(c.contains, sha)} »`}`;
 }
 
+const guardMessage = (sha: string, lots: { id: string; state: string }[]) =>
+  `${sha.slice(0, 7)} contient des commits de lots ni terminés ni prêts : ${lots.map((l) => `${l.id} (${l.state})`).join(', ')} ; livrer un sha antérieur, ou relire ces lots (raf review) avant`;
+
 /** Livre HEAD. 0 livré, 1 étape en échec, 2 refus avant d'agir. */
 export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<number> {
   const { config, out, err } = ctx;
@@ -355,6 +358,20 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
   if (dirty && !config.allowDirty) return refuse(`${dirty} fichier(s) suivi(s) modifié(s) : commiter et pousser d'abord`);
   if (dirty) err(`deliver : ${dirty} fichier(s) suivi(s) modifié(s) : non livré(s), seul ${sha.slice(0, 7)} l'est (allowDirty)`);
   if (!onRemote(ctx.root, sha)) return refuse(`${sha.slice(0, 7)} non poussé : la CI n'a rien construit (git push)`);
+  // Hors vague, un sha choisi emporte les commits de TOUS les lots sous lui (« L49 seul » a livré L50 et L51 non relus, 30-10) : on les nomme, avec leur état.
+  // Pendant une vague, la garde de la vague (cli, `blockingLots`) en tient lieu.
+  let undelivered: { id: string; state: string }[] = [];
+  if (ctx.sha !== undefined && !ctx.duringWave && ctx.plan) {
+    const last = lastDelivery(ctx.state);
+    const lots = deliveryLots(ctx.plan, ctx.root, sha, last && isAncestor(ctx.root, last, sha) ? last : null);
+    if (ctx.dryRun) {
+      out(`Lots de l'intervalle ${last && isAncestor(ctx.root, last, sha) ? `${last.slice(0, 7)}..` : 'jusqu\'à '}${sha.slice(0, 7)} :`);
+      if (lots.length === 0) out('  (aucun)');
+      for (const l of lots) out(`  ${l.id} « ${l.title} » — ${l.state}`);
+    }
+    undelivered = lots.filter((l) => l.blocking);
+    if (undelivered.length && !ctx.dryRun) return refuse(guardMessage(sha, undelivered));
+  }
   const lock = readLock(ctx.state);
   if (lock && lockAlive(lock)) {
     return refuse(
@@ -386,6 +403,7 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     if (config.verify.length) out(`  Vérifications (réessayées pendant ${config.verifyTimeout} s) :`);
     config.verify.forEach((c, i) => out(`    ${i + 1}. ${describeCheck(c, sha)}`));
     out(`  Variables : ${Object.entries(env).map(([k, v]) => `${k}=${v}`).join(' ')}`);
+    if (undelivered.length) return refuse(guardMessage(sha, undelivered));
     return 0;
   }
 

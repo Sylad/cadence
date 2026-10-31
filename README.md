@@ -55,7 +55,7 @@ Details: [docs/skills.md](docs/skills.md) and [docs/cadence-hud.md](docs/cadence
 - [docs/lead.md](docs/lead.md): the lead workflow, and the `livreur` agent that delivers a ready lot for it.
 - [docs/overview.md](docs/overview.md): the longer introduction and the map of every page.
 - [docs/fonctionnement.md](docs/fonctionnement.md): how it all works, in four figures.
-- [docs/stabilite.md](docs/stabilite.md): what is guaranteed from 1.0.0.
+- [docs/stabilite.md](docs/stabilite.md): what is guaranteed from 1.0.0; [docs/qualite.md](docs/qualite.md): the code-quality ratchet.
 - [docs/whats-new.md](docs/whats-new.md) and [CHANGELOG.md](CHANGELOG.md): what changed.
 
 ## License

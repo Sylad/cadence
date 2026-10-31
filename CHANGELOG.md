@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- Code-quality guard rails for cadence itself and a reference recipe for any project (L462, `docs/qualite.md`): ESLint with typescript-eslint and sonarjs (file length, function length, depth, parameters, cyclomatic and cognitive complexity), knip (dead code, unused exports and dependencies) and jscpd (duplicates), compared to a versioned baseline by a ratchet — `npm run qualite` fails when a measure gets worse, `npm run qualite:cliquet` locks a gain. It runs in the wave's gate (`orchestrate.build`) and in the CI. The page also gives the equivalent tools for Python, Java and shell.
+
 ### Fixed
 
 - `raf done` refuses, without `--force`, a lot whose recorded code-review verdict is non-compliant (`non conforme`, `not compliant`), even when the review covers all its commits (L476, `docs/raf.md`): until now only the coverage of the commits was judged, so a lot reviewed « non conforme : 1 bloquant » at its last commit could be closed. Same predicate as `cadence deliver` (L474).

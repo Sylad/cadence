@@ -37,6 +37,11 @@ describe('L403 — orchestrate.gate.host et gate.install (C3)', () => {
     for (const v of ['""', '"  "', '3']) expect(cfg(`    host: m\n    install: ${v}\n`), v).toThrow('cadence.yaml : orchestrate.gate.install : commande non vide attendue');
   });
 
+  it('R11 — gate: {} ou gate sans clé connue reste refusé comme avant', () => {
+    expect(cfg('    {}\n')).toThrow(/gate\.readsPlan : true, false ou liste/);
+    expect(cfg('    install: npm ci\n')().gate).toEqual({ install: 'npm ci' });
+  });
+
   it('R11 — gate: {host} seul : config.gate est posé sans readsPlan ; gate: {readsPlan: false} ne pose toujours pas config.gate', () => {
     expect(cfg('    host: m\n')().gate).toEqual({ host: 'm' });
     expect(cfg('    readsPlan: false\n')().gate).toBeUndefined();

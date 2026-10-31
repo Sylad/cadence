@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { availableParallelism, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { OrchestrateConfig, VerifyConfig } from './config.js';
-import { recordedGate } from './gate-record.js';
+import { recordedGate, type RecordedGate } from './gate-record.js';
 import { recordVerdict } from './gate-verdict.js';
 import { onTermination } from './proc.js';
 import { sharedStateDir } from './state.js';
@@ -12,16 +12,11 @@ import { failedTests, hasUnnamedFailure, unloadedSuites } from './orchestrate/ba
 import { configuredCap } from './orchestrate/command.js';
 import { replayRed, TEST_WORKERS_ENV, testWorkersFrom } from './orchestrate/workers.js';
 import { copyDeps, git, gitFailure, ignoredDeps, isCopiedDep } from './orchestrate/worktree.js';
-import { isSha, openRemoteGate, type Ran } from './remote-gate.js';
-
-/** Délai de chaque commande de la porte : celui du rejeu de la ligne de base de la vague. */
-const GATE_TIMEOUT_MS = 30 * 60_000;
+import { tryRemote } from './verify-gate-remote.js';
+import { GATE_TIMEOUT_MS, type Ran } from './remote-gate.js';
 
 /** Lignes de la fin de la sortie montrées quand aucun test n'est identifiable dans une sortie rouge. */
 const TAIL_LINES = 10;
-
-/** ssh a perdu la connexion pendant une commande de la porte déportée (code 255, R6) : la porte est rejouée en local. */
-class ConnectionLost extends Error {}
 
 function killGroup(pgid: number): void {
   try {
@@ -60,7 +55,7 @@ function sh(cmd: string, cwd: string, timeoutMs: number, group: { pgid?: number 
   });
 }
 
-interface GateCtx {
+export interface GateCtx {
   /** Racine du dépôt vivant : ses dépendances non suivies (node_modules, .venv) sont copiées dans le worktree (`copyDeps`). */
   repo: string;
   sha: string;
@@ -138,6 +133,19 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
   return code;
 }
 
+/** La porte déjà jouée par une vague au même arbre (L397) : son verdict est repris, rien n'est rejoué. */
+function reuseRecorded(f: RecordedGate, steps: { name: string; cmd: string }[], sha: string, out: (line: string) => void): number {
+  const short = sha.slice(0, 7);
+  const where = f.checked === sha ? 'au même sha' : `au sha ${f.checked.slice(0, 7)}, sous les seuls commits de plan de ${short}`;
+  out(`verify --gate ${short} : verdict repris de la porte de la vague ${f.wave} (lot ${f.lot} : contrôles du programme ${where}, arbre ${f.tree.slice(0, 7)} identique) — rien rejoué`);
+  for (const step of steps) {
+    const run = f.runs.find((r) => r.label === (step.name === 'build' ? 'build' : 'tests') && r.command === step.cmd)!;
+    out(`✓ ${step.name} (${step.cmd}) — enregistré par la vague${run.instables?.length ? `, ${run.instables.length} test(s) instable(s) sous charge, verts rejoués seuls` : ''}`);
+  }
+  out(`verify --gate ${short} : vert`);
+  return 0;
+}
+
 async function playGate(ctx: GateCtx): Promise<number> {
   const { repo, sha, config, out } = ctx;
   const steps = [
@@ -158,26 +166,12 @@ async function playGate(ctx: GateCtx): Promise<number> {
   } catch (e) {
     recorded = { reason: `état des vagues illisible (${gitFailure(e)})` };
   }
-  if ('found' in recorded) {
-    const f = recorded.found;
-    const where = f.checked === sha ? 'au même sha' : `au sha ${f.checked.slice(0, 7)}, sous les seuls commits de plan de ${short}`;
-    out(`verify --gate ${short} : verdict repris de la porte de la vague ${f.wave} (lot ${f.lot} : contrôles du programme ${where}, arbre ${f.tree.slice(0, 7)} identique) — rien rejoué`);
-    for (const step of steps) {
-      const run = f.runs.find((r) => r.label === (step.name === 'build' ? 'build' : 'tests') && r.command === step.cmd)!;
-      out(`✓ ${step.name} (${step.cmd}) — enregistré par la vague${run.instables?.length ? `, ${run.instables.length} test(s) instable(s) sous charge, verts rejoués seuls` : ''}`);
-    }
-    out(`verify --gate ${short} : vert`);
-    return 0;
-  }
+  if ('found' in recorded) return reuseRecorded(recorded.found, steps, sha, out);
   const replayReason = `verdict rejoué : ${recorded.reason}${config.gate?.readsPlan && ctx.planFile ? ' (orchestrate.gate.readsPlan : un test lit le plan, les commits de plan seuls ne reprennent pas le verdict d\'un sha dessous)' : ''}`;
   const obstacle = mainTreeObstacle(repo, sha);
   const mode = ctx.verify?.inPlace;
-  const host = config.gate?.host;
-  if (host && mode === true) out(`verify --gate : verify.inPlace demande l'arbre principal, l'hôte ${host} est ignoré`);
-  else if (host) {
-    const remote = await playRemote(ctx, host, steps, short, replayReason);
-    if (remote !== null) return remote;
-  }
+  const remote = await tryRemote(ctx, short, replayReason, (exec, emit) => runSteps(steps, exec, emit, config, short));
+  if (remote !== null) return remote;
   if (mode === true && obstacle) {
     out(`verify --gate : verify.inPlace demande l'arbre principal, mais ${obstacle} — rien n'est joué`);
     return 2;
@@ -198,7 +192,7 @@ async function playGate(ctx: GateCtx): Promise<number> {
       if (group.pgid !== undefined) killGroup(group.pgid);
     });
     try {
-      const { code, summary } = await runSteps(steps, (cmd) => sh(cmd, repo, ctx.timeoutMs ?? GATE_TIMEOUT_MS, group, env), ctx.out, ctx, short);
+      const { code, summary } = await runSteps(steps, (cmd) => sh(cmd, repo, ctx.timeoutMs ?? GATE_TIMEOUT_MS, group, env), ctx.out, config, short);
       // Une vague intègre ses lots par fast-forward dans cet arbre et y commite son plan : s'il a bougé pendant la porte, les commandes ont lu un mélange de commits.
       const moved = mainTreeMoved(repo, sha);
       if (moved === null) {
@@ -249,7 +243,7 @@ async function playGate(ctx: GateCtx): Promise<number> {
     out(`verify --gate ${short} : porte jouée dans une copie jetable ${dir} (${why}) ; dépendances copiées : ${copied.length ? copied.join(', ') : 'aucune'}`);
     out(replayReason);
     if (missing.length) out(`dépendances déclarées absentes de l'arbre principal, non copiées : ${missing.join(', ')}`);
-    const done = await runSteps(steps, (cmd) => sh(cmd, dir, ctx.timeoutMs ?? GATE_TIMEOUT_MS, group, env), out, ctx, short);
+    const done = await runSteps(steps, (cmd) => sh(cmd, dir, ctx.timeoutMs ?? GATE_TIMEOUT_MS, group, env), out, config, short);
     out(done.summary);
     return done.code;
   } finally {
@@ -262,16 +256,10 @@ async function playGate(ctx: GateCtx): Promise<number> {
  * Les étapes de la porte jouées par `exec` (une commande locale dans un dossier, ou sur l'hôte) ; le code de sortie (0 vert, 1 rouge) et la ligne de verdict, écrite par l'appelant une fois sûr qu'elle vaut pour le sha.
  * Les lignes passent par `out` ; `exec` qui rend `lost` (connexion perdue, R6) interrompt la porte par `ConnectionLost`.
  */
-async function runSteps(steps: { name: string; cmd: string }[], exec: (cmd: string) => Promise<Ran>, out: (line: string) => void, ctx: GateCtx, short: string): Promise<{ code: number; summary: string }> {
-  const { config } = ctx;
-  const play = async (cmd: string): Promise<Ran> => {
-    const r = await exec(cmd);
-    if (r.lost) throw new ConnectionLost();
-    return r;
-  };
+async function runSteps(steps: { name: string; cmd: string }[], exec: (cmd: string) => Promise<Ran>, out: (line: string) => void, config: OrchestrateConfig, short: string): Promise<{ code: number; summary: string }> {
   let red = 0;
   for (const step of steps) {
-    const r = await play(step.cmd);
+    const r = await exec(step.cmd);
     if (r.code === 0) {
       out(`✓ ${step.name} (${step.cmd})`);
       continue;
@@ -285,7 +273,7 @@ async function runSteps(steps: { name: string; cmd: string }[], exec: (cmd: stri
     const replays: number[] = [];
     const { red: still, unstable } = replayable
       ? await replayRed(async (c) => {
-          const p = await play(c);
+          const p = await exec(c);
           replays.push(p.code);
           return p;
         }, config.testReplay!, names, r.output)
@@ -311,44 +299,4 @@ async function runSteps(steps: { name: string; cmd: string }[], exec: (cmd: stri
     }
   }
   return { code: red === 0 ? 0 : 1, summary: red === 0 ? `verify --gate ${short} : vert` : `verify --gate ${short} : rouge (${red} étape${red > 1 ? 's' : ''} sur ${steps.length})` };
-}
-
-/**
- * La porte jouée sur l'hôte `gate.host` (L403) : sha poussé, cache de dépendances, worktree jetable distant ; les mêmes étapes que la porte locale (`runSteps`), le même verdict.
- * Rend le code de la porte, ou null quand elle doit être jouée en local : hôte injoignable, push ou cache impossible (R4, R5, jamais un rouge), ou connexion perdue pendant une commande (R6, la porte entière est rejouée en local).
- * Un autre code non nul d'une commande reste son verdict (R8). Le worktree distant est retiré dans tous les cas, au signal compris (R10, R19).
- */
-async function playRemote(ctx: GateCtx, host: string, steps: { name: string; cmd: string }[], short: string, replayReason: string): Promise<number | null> {
-  const { repo, sha, config, out } = ctx;
-  if (!isSha(sha)) {
-    out('verify --gate : sha invalide pour la porte déportée (hexadécimal attendu)');
-    return 2;
-  }
-  const base = ctx.env ?? process.env;
-  const timeout = ctx.timeoutMs ?? GATE_TIMEOUT_MS;
-  const opened = await openRemoteGate({ host, install: config.gate?.install, repo, sha, depsFrom: repo, worktreeDeps: config.worktreeDeps, env: base, timeoutMs: timeout, workers: (cores) => testWorkersFrom(base, cores, configuredCap(base)) });
-  if (!opened.ok) {
-    out(opened.stage === 'host' ? `verify --gate : porte déportée indisponible sur ${host} (${opened.cause}) — repli sur la porte locale` : `verify --gate : cache de dépendances impossible sur ${host} (${opened.cause}) — repli sur la porte locale`);
-    return null;
-  }
-  const gate = opened.gate;
-  const forget = onTermination(() => {
-    gate.close();
-  });
-  out(`verify --gate ${short} : porte jouée sur l'hôte ${host} (sha ${short}, ${gate.cache})`);
-  // Les lignes des étapes sont tenues jusqu'au bout : une connexion perdue en cours de porte la fait rejouer en local, les ✓ de l'hôte ne seraient pas ceux du verdict.
-  const lines: string[] = [replayReason];
-  try {
-    const { code, summary } = await runSteps(steps, (cmd) => gate.run(cmd, timeout), (l) => lines.push(l), ctx, short);
-    for (const l of [...lines, summary]) out(l);
-    return code;
-  } catch (e) {
-    if (!(e instanceof ConnectionLost)) throw e;
-    out(`verify --gate : connexion perdue avec ${host} pendant la porte — rejouée en local`);
-    return null;
-  } finally {
-    forget();
-    const orphan = gate.close();
-    if (orphan) out(`verify --gate : nettoyage de l'hôte ${host} en échec (${orphan}) — le worktree orphelin y sera retiré au prochain appel`);
-  }
 }

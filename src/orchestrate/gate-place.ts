@@ -2,18 +2,16 @@
 // Les décisions de verdict (rouge, ligne de base, rejeu seul) restent celles du cycle : ce module ne change que le lieu et ne rend jamais un 255 comme un résultat.
 
 import type { OrchestrateConfig } from '../config.js';
-import { isSha, openRemoteGate, type Ran, type RemoteGate } from '../remote-gate.js';
+import { GATE_TIMEOUT_MS, isSha, openRemoteGate, type Ran, type RemoteGate } from '../remote-gate.js';
 import { configuredCap } from './command.js';
 import { testWorkersFrom } from './workers.js';
 import { trackedDirty, untrackedFiles } from './worktree.js';
 
-const GATE_TIMEOUT_MS = 30 * 60_000;
-
 /** Un lieu d'exécution : `run` joue une commande (la même signature que la commande locale du cycle), `close` retire le worktree de l'hôte. */
 export interface Place {
   run(command: string): Promise<Ran>;
-  /** Lieu pour l'état du lot (hôte, sha court, cache) ; absent pour une porte locale, donc rien de plus dans l'état qu'avant. */
-  where(): string | undefined;
+  /** Le lieu à inscrire avec le résultat d'un contrôle (hôte, sha court, cache) ; vide pour une porte locale, donc rien de plus dans l'état qu'avant. */
+  stamp(): { lieu?: string };
   close(): void;
 }
 
@@ -21,8 +19,8 @@ export interface PlaceOpts {
   config: OrchestrateConfig;
   /** Dépôt du projet : porte le sha, et les dépendances non suivies à copier. */
   repo: string;
-  /** Le sha à jouer sur l'hôte. */
-  sha: string;
+  /** Le sha à jouer sur l'hôte ; null (HEAD illisible) : la porte est locale. */
+  sha: string | null;
   /** Dossier local de ce sha. Avec `needClean`, il doit être propre : l'hôte ne verrait pas ses modifications non validées (R7). */
   dir: string;
   needClean: boolean;
@@ -37,15 +35,17 @@ export interface PlaceOpts {
   env?: Record<string, string | undefined>;
 }
 
-const localPlace = (local: PlaceOpts['local']): Place => ({ run: local, where: () => undefined, close: () => {} });
+const localPlace = (local: PlaceOpts['local']): Place => ({ run: local, stamp: () => ({}), close: () => {} });
+
 
 /**
  * Ouvre le lieu de la porte. Sans `gate.host`, ou quand l'hôte ne peut pas porter la porte (arbre non validé R7, hôte injoignable, push ou cache impossible R4/R5), la porte est locale et la ligne dit pourquoi.
  * Sur l'hôte, un code 255 de ssh (connexion perdue) n'est jamais un résultat : la commande est rejouée en local, la ligne le dit, et le lieu reste local pour les commandes suivantes (R6).
  */
-export async function openPlace(o: PlaceOpts): Promise<Place> {
+async function openPlace(o: PlaceOpts): Promise<Place> {
   const host = o.config.gate?.host;
-  if (!host) return localPlace(o.local);
+  // Aucune commande de porte déclarée : rien à jouer, ni sonde ni worktree sur l'hôte.
+  if (!host || !o.sha || !(o.config.build || o.config.test)) return localPlace(o.local);
   if (o.needClean) {
     const dirty = [...trackedDirty(o.dir), ...untrackedFiles(o.dir)];
     if (dirty.length) {
@@ -76,10 +76,20 @@ export async function openPlace(o: PlaceOpts): Promise<Place> {
       o.say(`${o.label} : connexion perdue avec ${host} pendant la porte — rejouée en local${o.detail ? ` ${o.detail}` : ''}`);
       return o.local(command);
     },
-    where: () => (lost ? `local (connexion perdue avec ${host})` : where),
+    stamp: () => ({ lieu: lost ? `local (connexion perdue avec ${host})` : where }),
     close: () => {
       const orphan = gate.close();
       if (orphan) o.say(`${o.label} : nettoyage de l'hôte ${host} en échec (${orphan}) — le worktree orphelin y sera retiré au prochain appel`);
     },
   };
+}
+
+/** Joue `fn` dans le lieu de la porte et retire le worktree de l'hôte quoi qu'il arrive (R10). */
+export async function withPlace<T>(o: PlaceOpts, fn: (place: Place) => Promise<T>): Promise<T> {
+  const place = await openPlace(o);
+  try {
+    return await fn(place);
+  } finally {
+    place.close();
+  }
 }

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runLot } from '../src/orchestrate/cycle.js';
-import { openPlace } from '../src/orchestrate/gate-place.js';
+import { withPlace } from '../src/orchestrate/gate-place.js';
 import type { OrchestrateConfig } from '../src/config.js';
 import { fakeRemote, type FakeRemote } from './fake-ssh.js';
 import { cleanupTempDirs, tempDir } from './helpers.js';
@@ -68,11 +68,12 @@ describe('L403 — la porte d\'un lot sur l\'hôte (C2)', () => {
     writeFileSync(join(h.repo, 'brouillon.txt'), 'pas validé\n');
     const said: string[] = [];
     const ran: string[] = [];
-    const place = await openPlace({ config: { gate: gateHost } as OrchestrateConfig, repo: h.repo, sha: git(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: true, label: 'porte du lot L1', local: async (c) => (ran.push(c), { code: 0, output: '' }), say: (l) => said.push(l) });
-    await place.run('npm test');
+    await withPlace({ config: { gate: gateHost, test: 'npm test' } as OrchestrateConfig, repo: h.repo, sha: git(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: true, label: 'porte du lot L1', local: async (c: string) => (ran.push(c), { code: 0, output: '' }), say: (l: string) => said.push(l) }, async (place) => {
+      await place.run('npm test');
+      expect(place.stamp()).toEqual({});
+    });
     expect(said).toEqual(['porte du lot L1 : worktree non validé, jouée en local (l\'hôte ne verrait pas les modifications)']);
     expect(ran).toEqual(['npm test']);
-    expect(place.where()).toBeUndefined();
     expect(remote.commands()).toEqual([]);
   });
 

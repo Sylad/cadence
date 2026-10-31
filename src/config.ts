@@ -4,6 +4,7 @@ import { parse } from 'yaml';
 import { isDay, type Day } from './dates.js';
 import type { ArticleRule } from './articles.js';
 import type { DocSyncRule } from './docsync.js';
+import { readGate } from './gate-config.js';
 import { DEFAULT_TEST_PATTERNS, type TestGateConfig } from './testgate.js';
 import { gitRoot } from './git.js';
 import { planCommitProblem } from './plan-commit.js';
@@ -472,27 +473,7 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     if (!Array.isArray(deps) || !deps.length || deps.some((x) => typeof x !== 'string' || !x.trim() || isAbsolute(x) || x.split(/[\\/]/).includes('..'))) throw bad('worktreeDeps : liste de chemins relatifs au dépôt, sans « .. » (node_modules, .venv…)');
     config.worktreeDeps = deps.map((x: string) => x.trim().replace(/\/$/, ''));
   }
-  if (o.gate != null) {
-    if (!isObject(o.gate)) throw bad('gate : objet attendu (gate: { readsPlan: true })');
-    for (const k of Object.keys(o.gate)) if (!['readsPlan', 'host', 'install'].includes(k)) throw bad(`gate.${k} inconnu (attendu : readsPlan, host, install)`);
-    const r = o.gate.readsPlan;
-    const msg = 'gate.readsPlan : true, false ou liste de chemins de tests relatifs au dépôt, sans « .. »';
-    const gate: NonNullable<OrchestrateConfig['gate']> = {};
-    if (r === true) gate.readsPlan = true;
-    else if (Array.isArray(r) && r.length && r.every((x) => typeof x === 'string' && x.trim() && !isAbsolute(x) && !x.split(/[\\/]/).includes('..'))) gate.readsPlan = r.map((x: string) => x.trim());
-    else if (r !== false && (r != null || (o.gate.host == null && o.gate.install == null))) throw bad(msg);
-    if (o.gate.host != null) {
-      const h = o.gate.host;
-      // Une destination qui commencerait par « - » serait lue par ssh comme une option (-oProxyCommand=…).
-      if (typeof h !== 'string' || !h.trim() || /\s/.test(h.trim()) || h.trim().startsWith('-')) throw bad('gate.host : destination ssh attendue (une chaîne sans espace, ne commençant pas par « - »)');
-      gate.host = h.trim();
-    }
-    if (o.gate.install != null) {
-      if (typeof o.gate.install !== 'string' || !o.gate.install.trim()) throw bad('gate.install : commande non vide attendue');
-      gate.install = o.gate.install.trim();
-    }
-    if (Object.keys(gate).length) config.gate = gate;
-  }
+  if (o.gate != null) config.gate = readGate(o.gate, bad);
   if (o.maquette != null) {
     if (typeof o.maquette !== 'boolean') throw bad('maquette : true ou false attendu');
     config.maquette = o.maquette;

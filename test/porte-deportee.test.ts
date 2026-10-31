@@ -233,6 +233,12 @@ describe('L403 — repli sur la porte locale (R4, R5)', () => {
     expect(trees(p)).toEqual([]);
   });
 
+  it('R5 — sha absent du dépôt local : repli local dit, la porte ne plante pas', async () => {
+    const p = project(withInstall());
+    const r = await gate(p, 'deadbeef');
+    expect(r.text).toMatch(/porte déportée indisponible sur machine \(.*\) — repli sur la porte locale/);
+  });
+
   it('R5 — installation du cache en échec : repli local, aucun cache à moitié rempli réutilisé', async () => {
     const p = project(`  test: echo "tests $(pwd)" >> {MARK}\n  gate:\n    host: machine\n    install: mkdir -p node_modules/p && echo half > node_modules/p/i.js && echo "$(pwd)" >> ${'{MARK}'}.tries && test ! -f ${'{MARK}'}.fail\n`);
     writeFileSync(`${p.mark}.fail`, '');
@@ -390,6 +396,27 @@ describe('L403 — empreinte et quoting (R18)', () => {
     const r = await gate(p, sha);
     expect(r.lines[0]).toContain(`empreinte ${prints.fp.slice(0, 8)}`);
     expect(caches(p)[0]).toMatch(new RegExp(`^${prints.fp}`));
+  });
+
+  it('R18 — lockfile d\'un sous-dossier compté, celui d\'un node_modules ignoré', () => {
+    const p = project(withInstall());
+    const before = lockfileFingerprint(p.repo, p.sha)!;
+    mkdirSync(join(p.repo, 'front'));
+    writeFileSync(join(p.repo, 'front', 'package-lock.json'), '{"front":1}\n');
+    mkdirSync(join(p.repo, 'vendor', 'node_modules', 'x'), { recursive: true });
+    writeFileSync(join(p.repo, 'vendor', 'node_modules', 'x', 'package-lock.json'), '{}\n');
+    git(p.repo, 'add', '-f', '.');
+    git(p.repo, 'commit', '-qm', 'front');
+    const after = lockfileFingerprint(p.repo, git(p.repo, 'rev-parse', 'HEAD'))!;
+    expect(after.files).toEqual(['front/package-lock.json', 'package-lock.json']);
+    expect(after.fp).not.toBe(before.fp);
+  });
+
+  it('R18 — sha abrégé hexadécimal accepté', async () => {
+    const p = project(withInstall());
+    const r = await gate(p, p.sha.slice(0, 7));
+    expect(r.code).toBe(0);
+    expect(r.lines[0]).toContain('porte jouée sur l\'hôte machine');
   });
 
   it('R18 — aucun lockfile : pas de cache, la porte joue', async () => {

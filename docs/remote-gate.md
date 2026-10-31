@@ -16,7 +16,7 @@ orchestrate:
 
 `host` is a non-empty string without space, not starting with `-` (ssh would read it as an option);
 anything else refuses `cadence.yaml` with `orchestrate.gate.host : destination ssh attendue …`. `install` is a non-empty command.
-Any other key of `gate` is refused as unknown (`readsPlan`, `host`, `install` are the three). Declaring `host` alone is **not** `readsPlan`:
+`install` without `host` does nothing (the gate stays local). Any other key of `gate` is refused as unknown (`readsPlan`, `host`, `install` are the three). Declaring `host` alone is **not** `readsPlan`:
 the plan-only commits are still crossed (L444) and the `readsPlan` message does not appear.
 Nothing in cadence names a machine: the host comes from this key, and the work folder on it is derived.
 

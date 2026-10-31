@@ -36,10 +36,22 @@ function workRepo(statuses: Record<string, string> = { L1: 'done' }) {
   return { dir, first };
 }
 
-/** Installation de test : les dépendances viennent du dépôt réel (pas de réseau), la compilation est la vraie. */
+/**
+ * Installation de test : les dépendances viennent du dépôt réel (pas de réseau), la compilation est la vraie — faite UNE fois par fichier
+ * puis copiée (L480). Les sources mises en service sont toujours celles du paquet (workRepo les copie, les commits suivants n'ajoutent que
+ * des .txt), donc le dist est le même pour toutes. Un tsc par mise en service bloquait le worker en synchrone plusieurs secondes, cinq de
+ * suite dans un test plus de 60 s sous charge : vitest n'attend que 60 s la réponse de son processus principal à onTaskUpdate (birpc),
+ * et l'échec remontait en « Unhandled Rejection : [vitest-worker]: Timeout calling "onTaskUpdate" », le fichier perdant son rapport.
+ */
+let distCompile: string | undefined;
 const install = (dir: string) => {
   symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'), 'dir');
-  execFileSync(join(REPO, 'node_modules/.bin/tsc'), ['-p', 'tsconfig.build.json'], { cwd: dir, stdio: 'pipe' });
+  if (!distCompile) {
+    const out = join(tempDir(), 'dist');
+    execFileSync(join(REPO, 'node_modules/.bin/tsc'), ['-p', join(dir, 'tsconfig.build.json'), '--outDir', out], { cwd: dir, stdio: 'pipe' });
+    distCompile = out;
+  }
+  cpSync(distCompile, join(dir, 'dist'), { recursive: true });
 };
 
 /** Met en service un commit par nom (un fichier ajouté), dans l'ordre ; rend leurs shas. */

@@ -723,6 +723,8 @@ lots:
     estimate: 0.25
     created: 2026-10-31
     started: 2026-10-31
+    notes:
+      - { date: 2026-10-31, text: "Reprise du lead 31-10 (worktree .cadence/runs/2026-10-31-1250-cad/worktrees/cadence--L480, shas c07195bb + bde00cc7, non intégrés) : attentes observables (/proc, registre) au lieu de délais, plafond 120 s sur le test d'installation interrompue. NON VÉRIFIÉ : machine saturée (load 15–17), test/mise-en-service.test.ts ne termine pas sous charge (« Timeout calling onTaskUpdate », mettreEnService synchrones avec vrai tsc) ; régression de c07195bb ni prouvée ni écartée. À rejouer seul, machine calme, avant toute revue ; puis revue Opus et --integrate." }
   - id: L481
     title: "Panneau des lots (/hud lots) : la section « ordre des projets » montre pour chaque projet la barre d'avancement colorée du bandeau (lots clos / total, couleur selon la part, en cours, +N cette semaine), pour lire l'avancement sans faire défiler le bandeau du bas (demande de Sylvain 31-10, captures du bandeau et du panneau) ; le glisser et Alt+↑/↓ restent"
     status: done

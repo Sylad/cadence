@@ -80,6 +80,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-10-31
+
 ### Added
 
 - Code-quality guard rails for cadence itself and a reference recipe for any project (L462, `docs/qualite.md`): ESLint with typescript-eslint and sonarjs (file length, function length, depth, parameters, cyclomatic and cognitive complexity), knip (dead code, unused exports and dependencies) and jscpd (duplicates), compared to a versioned baseline by a ratchet — `npm run qualite` fails when a measure gets worse, `npm run qualite:cliquet` locks a gain. It runs in the wave's gate (`orchestrate.build`) and in the CI. The page also gives the equivalent tools for Python, Java and shell. The ratchet sums the figures per file and rule (`|total`, and `|lignes` for jscpd) so that a function cannot grow unseen, the gate and the CI compare the baseline to the one at the start of the lot (`--contre`) so that it cannot be raised, and `--migrer` is the one way to move or split files, an `eslint-disable`, a `jscpd:ignore` or a knip tag cannot lower the measure (`noInlineConfig`, directives counted per file), `--contre` refuses a changed `eslint.config.mjs`, `knip.json` or `.jscpd.json`, and `--init --contre` re-measures the baseline when the start of the lot has none (the lot introducing the ratchet, rebased on a moved `main`).

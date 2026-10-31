@@ -55,6 +55,7 @@ lots:
     finished: 2026-10-29
   - id: L403
     title: "Porte de tests déportée (orchestrate.gate.host) : build et tests d'une vague ou de verify --gate joués en ssh sur une autre machine, au sha poussé dans un dépôt nu de cette machine, dépendances en cache par empreinte du lockfile ; repli local si l'hôte ne répond pas, dit dans la sortie ; générique (aucun nom de machine dans le code)"
+    goal: "Porte de tests déportée (orchestrate.gate.host) selon la fiche docs/specs/porte-deportee/fiche.yaml déjà écrite, avec la décision du lead du 31-10 sur le majeur restant : une connexion ssh perdue (code 255) PENDANT une commande de la porte est traitée de la même façon dans une vague (C2 : porte d'un lot, ligne de base, rejeu seul) que pour verify --gate (C1) — rejeu local de cette commande, dit dans la sortie et dans le journal de la vague, jamais compté comme un rouge du lot ; R6 couvre C1 et C2. Un code de sortie distant autre que 255 reste un rouge (R8)."
     status: doing
     estimate: 0.5
     spec: true

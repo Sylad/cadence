@@ -13,6 +13,9 @@ import { lotSlug } from '../src/orchestrate/state.js';
 import { writeJournal, writeWave } from './perf-helpers.js';
 import { docText } from './docs-text.js';
 import { run } from '../src/cli.js';
+import { sealAcceptation } from '../src/orchestrate/accept.js';
+import { ecritAcceptation } from './accept-helpers.js';
+import { ecrit } from './spec-helpers.js';
 
 const root = join(import.meta.dirname, '..');
 const GATE = { code: ['*.ts'], tests: ['*.spec.ts'], except: [] as string[], threshold: 1 };
@@ -549,6 +552,53 @@ describe('sonde de cas limites (L497)', () => {
     expect(kinds(h)).toEqual(['implement', 'probe']);
     expect(c.lot.status).toBe('handed-back');
     expect(c.lot.outcome).toContain('dépôt sale après probe');
+  });
+
+  /** Un dépôt avec une acceptation scellée et commitée (aides de orchestrate-accept-step) ; la sonde en réécrit le test scellé. */
+  const sealedRepo = (probeHandler: (test: string) => Handler) => {
+    const tests: { file: string } = { file: '' };
+    const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { implement: [green], probe: [(call) => probeHandler(tests.file)(call)], review: [ok] } });
+    ecrit(h.repo);
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    tests.file = a.test;
+    sealAcceptation(h.repo, a.json);
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation scellée', '--', a.json);
+    return h;
+  };
+  const green: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'done.flag', 'feat(L1): a')] }));
+  const rewrite = (call: Parameters<Handler>[0], test: string): void => {
+    writeFileSync(join(call.opts.cwd, test), "it('R1', () => {});\n");
+    git(call.opts.cwd, 'add', '--', test);
+    git(call.opts.cwd, 'commit', '-q', '-m', 'probe(L1): réécrit le test scellé', '--', test);
+  };
+  const SCREEN = { visible: true, screen: 'page' as const };
+  const CFG = { probe: true, accept: 'test -f done.flag', test: 'true' };
+
+  it("R9 — une sonde qui répond et commite la réécriture d'un test scellé rend le lot « verrou des tests d'acceptation »", async () => {
+    const h = sealedRepo((test) => (call) => {
+      rewrite(call, test);
+      return claudeOut(probeReport({ commits: [{ sha: git(call.opts.cwd, 'rev-parse', 'HEAD'), sujet: 'probe(L1): réécrit le test scellé' }] }));
+    });
+    const c = h.lot('L1', SCREEN, CFG);
+    await runLot(c);
+    expect(kinds(h)).toContain('probe');
+    expect(kinds(h)).not.toContain('review');
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/verrou des tests d'acceptation/);
+  });
+
+  it("R9 — une sonde coupée au délai après avoir commité la réécriture d'un test scellé rend le lot « verrou des tests d'acceptation »", async () => {
+    const h = sealedRepo((test) => (call) => {
+      rewrite(call, test);
+      return { code: 143, stdout: '', stderr: '', timedOut: true };
+    });
+    const c = h.lot('L1', SCREEN, CFG);
+    await runLot(c);
+    expect(kinds(h)).toContain('probe');
+    expect(kinds(h)).not.toContain('review');
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toMatch(/verrou des tests d'acceptation/);
   });
 
   it('R10 — docs/orchestrate.md et README.md citent orchestrate.probe', () => {

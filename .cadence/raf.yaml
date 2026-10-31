@@ -610,11 +610,12 @@ lots:
       - { date: 2026-10-30, text: "Après L462 : s'appuyer sur ses mesures (ESLint, sonarjs, knip, jscpd) et sur sa ligne de base. Chaque nettoyage doit faire baisser la ligne de base. Découper les gros fichiers en modules cohérents, organisation pro (Sylvain, 30-10)." }
   - id: L462
     title: "Garde-fous de qualité du code, comme Checkstyle/PMD/Sonar en Java : ESLint + typescript-eslint (max-lines par fichier, max-lines-per-function, max-depth, max-params, complexity), eslint-plugin-sonarjs (complexité cognitive), knip (code mort, exports et dépendances inutilisés), jscpd (doublons) ; seuils de départ 400 lignes/fichier, 80/fonction, complexité cognitive 15 ; ligne de base « cliquet » versionnée (l'existant passe, rien ne peut empirer, un fichier touché ne peut que baisser) ; dans la porte (orchestrate.build) et la CI ; doc du rôle de chaque outil et du cliquet — demande de Sylvain le 30-10 (« bonnes pratiques pour être pris au sérieux »)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-30
     notes:
       - { date: 2026-10-30, text: "Portée élargie par Sylvain (30-10) : valable pour TOUS les projets et TOUTES les technos. L462 pose les garde-fous de cadence ET écrit la recette de référence réutilisable (docs/, générique, sans rien de propre à un projet), par techno : TS (ESLint, typescript-eslint, sonarjs, knip, jscpd), Python (ruff C901, radon, vulture), Java (Checkstyle, PMD/CPD, SpotBugs dans Maven), shell (shellcheck). Elle décrit aussi la ligne de base en cliquet et son branchement dans orchestrate.build et la CI. Les autres projets l'appliqueront ensuite, chacun dans un lot." }
+    started: 2026-10-31
   - id: L463
     title: "Plans riches — statuts détaillés du projet, écrits et gardés (plan.statuses écrivable, transitions, raf status) (manque M1 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo

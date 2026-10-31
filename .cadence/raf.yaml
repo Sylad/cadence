@@ -60,6 +60,10 @@ lots:
     spec: true
     created: 2026-10-28
     started: 2026-10-31
+    notes:
+      - { date: 2026-10-31, text: "Revue de la fiche — mineur : src/verify-gate.ts:173 — R11 couvre la ligne 158 mais pas la ligne 173 : `config.gate && ctx.planFile` ajoute le message « orchestrate.gate.readsPlan : un test lit le plan… » ; avec gate: {host} seul, config.gate sera truthy et ce message serait faux. Ajouter un test sur la sortie (et noter que gate: {readsPlan:false} ne pose pas config.gate aujourd'hui, config.ts:470)." }
+      - { date: 2026-10-31, text: "Revue de la fiche — mineur : docs/specs/porte-deportee/fiche.yaml — Limites non traitées : lockfiles pris en compte non listés (package-lock, pnpm, yarn, poetry…), sha/chemins insérés dans une commande ssh sans règle de quoting, croissance illimitée des caches (disque de l'hôte plein / nettoyage) : à noter ou motiver en sans_erreur." }
+      - { date: 2026-10-31, text: "Revue de la fiche — mineur : docs/specs/porte-deportee/fiche.yaml — R10 est `sourcee` sur verify-gate.ts:118 et 197-216, qui décrivent le nettoyage local ; le comportement distant (arrêt de la commande côté hôte après timeout/Ctrl-C, qu'un simple kill du ssh local ne garantit pas sans tty) est nouveau et gagnerait un statut hypothèse ou une précision." }
   - id: L404
     title: "test/etape-spec-back-fiche.test.ts:15 lit .cadence/raf.yaml en direct : rouge depuis raf archive (B1–B5 archivés) — lire le plan par le chargeur (lots actifs + archivés), garde contre tout test qui relit le plan réel sans le chargeur"
     status: done

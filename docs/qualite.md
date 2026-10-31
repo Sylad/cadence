@@ -40,6 +40,15 @@ threshold until it means nothing, or sprinkle `eslint-disable`. The ratchet keep
    A missing baseline also exits 2, and says how to create it.
 
 Counts, not line numbers, are compared: moving code inside a file does not move anything.
+
+**Moving or splitting a file** (a 3000-line file cut into three modules, a function moved to its own file) is the one
+legitimate way to get new paths in the baseline, and it has its own command: `node scripts/qualite.mjs --migrer --contre
+main`. It measures, and rewrites the baseline only if (a) no key of a file that **existed at the start of the lot** went
+up, and (b) the total of every measure over all files (sum of the `…|total`, `…|lignes` and knip counts per tool and
+rule) did not go up. A new path starts free — its own `max-lines` finding is fine when the file it was cut from lost
+more — but a defect cannot be moved into an existing file, nor added. The same rule is what `--contre` applies to the
+baseline of the lot, so a migrated baseline passes the gate and the CI, and a hand-edited one does not. It needs
+`--contre` (the files that « existed » are those of the start of the lot) and exits 2 without it.
 The way out of a finding is to fix it and lock the gain; a `// eslint-disable` comment is a decision to be justified in
 review (ESLint reports a disable directive that disables nothing, and the ratchet counts it under `analyse`).
 

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { appliquer, BASELINE, comparer, lireEslint, lireJscpd, lireKnip, lireRef } from '../scripts/qualite.mjs';
+import { appliquer, BASELINE, comparer, comparerMigration, lireEslint, lireJscpd, lireKnip, lireRef } from '../scripts/qualite.mjs';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -204,6 +204,87 @@ describe('L462 — la base ne peut pas remonter par rapport au point de départ 
     const triche = qualite('--contre', 'main');
     expect(triche.status).toBe(1);
     expect(triche.stderr).toContain('remonte');
+  });
+});
+
+describe('L462 — déplacer ou découper un fichier de la base', () => {
+  const gros = { 'eslint|src/gros.ts|max-lines': 1, 'eslint|src/gros.ts|max-lines|total': 3047, 'eslint|src/cli.ts|max-lines': 1, 'eslint|src/cli.ts|max-lines|total': 450 };
+  const existait = (c: string) => c === 'src/gros.ts' || c === 'src/cli.ts';
+  const trois = { 'eslint|src/cli.ts|max-lines': 1, 'eslint|src/cli.ts|max-lines|total': 450, ...Object.fromEntries(['a', 'b', 'c'].flatMap((n) => [[`eslint|src/${n}.ts|max-lines`, 1], [`eslint|src/${n}.ts|max-lines|total`, 1000]])) };
+  const lire = (dir: string) => JSON.parse(readFileSync(join(dir, BASELINE), 'utf8'));
+
+  it('R10 — découper un fichier de 3047 lignes en trois de 1000 : les chemins neufs partent libres tant que le total par mesure ne monte pas', () => {
+    expect(comparer(gros, trois).pires.length).toBeGreaterThan(0);
+    expect(comparerMigration(gros, trois, existait)).toEqual([]);
+  });
+
+  it('R10 — une migration ne cache pas une hausse : le total qui monte, ou une clé d\'un fichier qui existait qui monte, est refusé', () => {
+    const plus = { ...trois, 'eslint|src/d.ts|max-lines': 1, 'eslint|src/d.ts|max-lines|total': 1000 };
+    expect(comparerMigration(gros, plus, existait).map((p) => p.cle)).toEqual(['eslint|max-lines|total (total, tous fichiers)']);
+    const deplace = { ...gros, 'eslint|src/gros.ts|max-lines|total': 2500, 'eslint|src/cli.ts|max-lines|total': 900 };
+    expect(comparerMigration(gros, deplace, existait).map((p) => p.cle)).toEqual(['eslint|src/cli.ts|max-lines|total']);
+    expect(comparerMigration(gros, { ...gros, 'knip|src/x.ts|files': 1 }, existait).map((p) => p.cle)).toEqual(['knip|files (total, tous fichiers)']);
+  });
+
+  it('R10 — --migrer réécrit la base pour la mesure d\'un découpage, refuse une hausse (base intacte) et refuse sans --contre', () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, BASELINE), JSON.stringify(gros));
+    const ref = { nom: 'main (abc1234)', base: gros, existe: existait };
+    expect(appliquer(dir, 'migrer', trois, null).code).toBe(2);
+    expect(appliquer(dir, 'migrer', { ...trois, 'eslint|src/d.ts|max-lines|total': 5000 }, ref).code).toBe(1);
+    expect(lire(dir)).toEqual(gros);
+    expect(appliquer(dir, 'migrer', trois, ref).code).toBe(0);
+    expect(lire(dir)).toEqual(trois);
+  });
+
+  it('R10 — la base migrée passe la comparaison au point de départ ; la même base avec un total en hausse non', () => {
+    const dir = tempDir();
+    const ref = { nom: 'main (abc1234)', base: gros, existe: existait };
+    writeFileSync(join(dir, BASELINE), JSON.stringify(trois));
+    expect(appliquer(dir, 'verifier', trois, ref).code).toBe(0);
+    const truque = { ...trois, 'eslint|src/a.ts|max-lines|total': 1200 };
+    writeFileSync(join(dir, BASELINE), JSON.stringify(truque));
+    expect(appliquer(dir, 'verifier', truque, ref).code).toBe(1);
+  });
+
+  it('R10 — le CLI : un fichier découpé en dépôt réel passe par --migrer --contre, puis la porte est verte', () => {
+    const dir = tempDir();
+    const git = (...a: string[]) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, encoding: 'utf8' });
+    const qualite = (...args: string[]) => spawnSync(process.execPath, [join(REPO, 'scripts/qualite.mjs'), ...args], { cwd: dir, encoding: 'utf8' });
+    const corps = (n: number, depart = 0) => Array.from({ length: n }, (_, i) => `  x += ${depart + i};`).join('\n');
+    const fichier = (nom: string, n: number, depart = 0) => `export function ${nom}(): number {\n  let x = 0;\n${corps(n, depart)}\n  return x;\n}\n`;
+    // jscpd n'écrit pas de rapport sans doublon : b.ts en porte un, copié dans cli.ts
+    const copie = Array.from({ length: 30 }, (_, i) => `console.log(${i});`).join('\n');
+    git('init', '-q', '-b', 'main');
+    mkdirSync(join(dir, 'src'));
+    for (const f of ['eslint.config.mjs', 'knip.json']) cpSync(join(REPO, f), join(dir, f));
+    writeFileSync(join(dir, '.jscpd.json'), readFileSync(join(REPO, '.jscpd.json'), 'utf8').replace(/"path": \[[^\]]*\]/, '"path": ["src"]'));
+    symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'));
+    writeFileSync(join(dir, 'package.json'), '{"name":"p","type":"module"}\n');
+    writeFileSync(join(dir, 'src/cli.ts'), `import { a } from './gros.js';\nimport { b } from './b.js';\nconsole.log(a(), b());\n${copie}\n`);
+    writeFileSync(join(dir, 'src/gros.ts'), fichier('a', 1000));
+    writeFileSync(join(dir, 'src/b.ts'), `export const b = (): number => 1;\n${copie}\n`);
+    const init = qualite('--init');
+    expect(init.stderr).toBe('');
+    git('add', 'src', '.jscpd.json', 'eslint.config.mjs', 'knip.json', 'package.json', BASELINE);
+    git('commit', '-q', '-m', 'départ');
+    git('switch', '-q', '-c', 'lot');
+    // découpage : gros.ts (1000 lignes) devient gros.ts (450) et a2.ts (450, neuf, lui aussi au-dessus du seuil)
+    writeFileSync(join(dir, 'src/gros.ts'), fichier('a', 450));
+    writeFileSync(join(dir, 'src/a2.ts'), fichier('a2', 450, 5000));
+    writeFileSync(join(dir, 'src/cli.ts'), "import { a } from './gros.js';\nimport { a2 } from './a2.js';\nimport { b } from './b.js';\nconsole.log(a(), a2(), b());\n");
+    const avant = qualite('--contre', 'main');
+    expect(avant.status).toBe(1);
+    expect(avant.stderr).toContain('eslint|src/a2.ts|max-lines');
+    expect(qualite('--migrer', '--contre', 'main').status).toBe(0);
+    expect(qualite('--contre', 'main').status).toBe(0);
+    // le total remonte (le fichier neuf grossit) : la mesure dépasse la base migrée, et une nouvelle migration refuse
+    writeFileSync(join(dir, 'src/a2.ts'), fichier('a2', 1200, 5000));
+    expect(qualite('--contre', 'main').status).toBe(1);
+    const refus = qualite('--migrer', '--contre', 'main');
+    expect(refus.status).toBe(1);
+    expect(refus.stderr).toContain('max-lines');
+    expect(qualite('--migrer').status).toBe(2);
   });
 });
 

@@ -84,6 +84,35 @@ export function comparer(base, courant) {
   return { pires, mieux };
 }
 
+const cheminDeCle = (cle) => cle.split('|')[1];
+// les clés `eslint|fichier|règle` et `jscpd|fichier` comptent des occurrences ; les autres portent le chiffre à additionner
+const estCompteur = (cle) => { const p = cle.split('|'); return (p[0] === 'eslint' && p.length === 3) || (p[0] === 'jscpd' && p.length === 2); };
+
+/** Le total de chaque mesure (outil, règle) sur tous les fichiers : ce que la ligne de base pèse en tout. */
+function totaux(mesure) {
+  const t = {};
+  for (const [cle, n] of Object.entries(mesure)) {
+    if (estCompteur(cle)) continue;
+    const p = cle.split('|');
+    ajouter(t, [p[0], ...p.slice(2)].join('|'), n);
+  }
+  return t;
+}
+
+/**
+ * Le passage de `avant` à `apres` quand des fichiers ont été déplacés ou découpés : une clé d'un fichier qui existait
+ * (`existe(chemin)`) ne peut pas monter, un chemin neuf part libre, mais le total de chaque mesure sur tous les fichiers
+ * ne peut pas monter. Rend ce qui empire. Découper un fichier de 3000 lignes en trois de 1000 passe ; en déplacer
+ * le défaut dans un fichier qui existait, ou en ajouter, non.
+ */
+export function comparerMigration(avant, apres, existe) {
+  const pires = comparer(avant, Object.fromEntries(Object.entries(apres).filter(([cle]) => existe(cheminDeCle(cle))))).pires;
+  const ta = totaux(avant);
+  const tb = totaux(apres);
+  for (const cle of Object.keys(tb)) if (tb[cle] > (ta[cle] ?? 0)) pires.push({ cle: `${cle} (total, tous fichiers)`, avant: ta[cle] ?? 0, apres: tb[cle] });
+  return pires;
+}
+
 const trier = (mesure) => Object.fromEntries(Object.entries(mesure).sort(([a], [b]) => (a < b ? -1 : 1)));
 
 export const lireBase = (racine) => JSON.parse(readFileSync(join(racine, BASELINE), 'utf8'));
@@ -110,20 +139,40 @@ export function mesurer(racine) {
   }
 }
 
-/** Le point de départ du lot : la ligne de base au merge-base de HEAD et de `ref`. `base` vaut null quand elle n'y existait pas encore. */
+/** Le point de départ du lot : au merge-base de HEAD et de `ref`, la ligne de base (null si elle n'y existait pas encore) et `existe(chemin)`, vrai pour un fichier qui y était. */
 export function lireRef(racine, ref) {
   const git = (...args) => spawnSync('git', args, { cwd: racine, encoding: 'utf8' });
   const mb = git('merge-base', 'HEAD', ref);
   if (mb.status !== 0) throw new Error(`référence « ${ref} » introuvable (git merge-base HEAD ${ref}) : ${mb.stderr.trim() || 'pas de dépôt git ?'}`);
   const sha = mb.stdout.trim();
   const show = git('show', `${sha}:${BASELINE}`);
-  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null };
+  const existe = (chemin) => git('cat-file', '-e', `${sha}:${chemin}`).status === 0;
+  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe };
 }
 
 const ligne = ({ cle, avant, apres }) => `  ${cle} : ${avant} → ${apres}`;
 
+const existeAuDepart = (ref) => ref.existe ?? (() => true);
+
+/** La base du lot contre celle du départ : refus (code 1) si elle monte, null sinon. */
+function baseRemonte(base, ref) {
+  const remonte = ref?.base ? comparerMigration(ref.base, base, existeAuDepart(ref)) : [];
+  if (!remonte.length) return null;
+  return { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${remonte.map(ligne).join('\n')}` };
+}
+
+/** `--migrer` : réécrit la base pour une mesure où des fichiers ont été déplacés ou découpés. */
+function migrer(racine, base, mesure, ref) {
+  if (!ref) return { code: 2, texte: '--migrer exige --contre <ref> : les fichiers « qui existaient » sont ceux du point de départ du lot.' };
+  const empire = comparerMigration(base, mesure, existeAuDepart(ref));
+  if (empire.length) return { code: 1, texte: `Qualité : la migration empire ${empire.length} mesure(s) (ni un fichier qui existait ni le total ne peuvent monter) :\n${empire.map(ligne).join('\n')}` };
+  ecrireBase(racine, mesure);
+  return { code: 0, texte: `${BASELINE} migrée : ${Object.keys(mesure).length} mesures, aucun total en hausse.` };
+}
+
 /**
- * Compare la mesure à la base. mode : 'verifier' (défaut), 'init' (crée la base) ou 'ecrire' (la baisse). Rend { code, texte }.
+ * Compare la mesure à la base. mode : 'verifier' (défaut), 'init' (crée la base), 'ecrire' (la baisse) ou 'migrer'
+ * (réécrit la base après un déplacement ou un découpage de fichiers, voir comparerMigration ; exige `ref`). Rend { code, texte }.
  * `ref` (voir lireRef) : la base du point de départ du lot ; la base du lot ne peut pas la dépasser, sinon une session
  * « réparerait » la base au lieu du code et la porte comme la CI resteraient vertes.
  */
@@ -137,10 +186,9 @@ export function appliquer(racine, mode, mesure = mesurer(racine), ref = null) {
   }
   if (!existe) return { code: 2, texte: `${BASELINE} absente : lancer « node scripts/qualite.mjs --init » une fois, puis la versionner.` };
   const base = lireBase(racine);
-  const remonte = ref?.base ? comparer(ref.base, base).pires : [];
-  if (remonte.length) {
-    return { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${remonte.map(ligne).join('\n')}` };
-  }
+  const refus = baseRemonte(base, ref);
+  if (refus) return refus;
+  if (mode === 'migrer') return migrer(racine, base, mesure, ref);
   const { pires, mieux } = comparer(base, mesure);
   if (pires.length) {
     return { code: 1, texte: `Qualité : ${pires.length} mesure(s) empirent (rien ne peut empirer, un fichier touché ne peut que baisser) :\n${pires.map(ligne).join('\n')}` };
@@ -158,8 +206,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const i = args.indexOf('--contre');
   const ref = i >= 0 ? args.splice(i, 2)[1] : null;
   const arg = args[0];
-  const mode = { '--init': 'init', '--ecrire': 'ecrire' }[arg ?? ''];
-  if ((arg && !mode) || args.length > 1 || (i >= 0 && !ref)) { console.error('usage : node scripts/qualite.mjs [--init | --ecrire] [--contre <ref>]'); process.exit(2); }
+  const mode = { '--init': 'init', '--ecrire': 'ecrire', '--migrer': 'migrer' }[arg ?? ''];
+  if ((arg && !mode) || args.length > 1 || (i >= 0 && !ref)) { console.error('usage : node scripts/qualite.mjs [--init | --ecrire | --migrer] [--contre <ref>]'); process.exit(2); }
   try {
     const { code, texte } = appliquer(process.cwd(), mode ?? 'verifier', undefined, ref ? lireRef(process.cwd(), ref) : null);
     (code ? console.error : console.log)(texte);

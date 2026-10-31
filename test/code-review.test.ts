@@ -227,6 +227,40 @@ describe('revue de code liée au commit relu', () => {
     expect((await raf(forced, 'done', 'L1', '--force')).code).toBe(0);
   });
 
+  it('un verdict non conforme, même au dernier commit, ferme la porte ; --force, une nouvelle revue conforme ou une porte inactive la rouvrent', async () => {
+    const dir = await lotWithCommit();
+    await raf(dir, 'review', 'L1', 'non', 'conforme', ':', '1', 'bloquant');
+    const refused = await raf(dir, 'done', 'L1');
+    expect(refused.code).toBe(2);
+    expect(refused.err).toBe('raf: L1 : la revue de code enregistrée est non conforme (« non conforme : 1 bloquant ») — corriger puis refaire la revue : raf review L1 "verdict" (--force pour passer outre)');
+    expect(planOf(dir)).not.toContain('status: done');
+
+    // « conforme après 1 correction » n'est pas non conforme.
+    await raf(dir, 'review', 'L1', 'conforme', 'après', '1', 'correction');
+    expect((await raf(dir, 'done', 'L1')).code).toBe(0);
+
+    const forced = await lotWithCommit();
+    await raf(forced, 'review', 'L1', 'Non-conforme');
+    expect((await raf(forced, 'done', 'L1')).code).toBe(2);
+    expect((await raf(forced, 'done', 'L1', '--force')).code).toBe(0);
+
+    // Porte de revue inactive : le verdict n'est pas jugé.
+    const off = gitRepo();
+    await raf(off, 'init', '--no-hook');
+    await raf(off, 'add', 'Cache');
+    await raf(off, 'start', 'L1');
+    commit(off, 'feat(L1): cache', '2026-09-28T10:00:00');
+    await raf(off, 'review', 'L1', 'non conforme');
+    expect((await raf(off, 'done', 'L1')).code).toBe(0);
+  });
+
+  it('un verdict non conforme et un commit postérieur : le refus de couverture passe en premier', async () => {
+    const dir = await lotWithCommit();
+    await raf(dir, 'review', 'L1', 'non conforme');
+    commit(dir, 'fix(L1): oubli', '2026-09-28T11:00:00');
+    expect((await raf(dir, 'done', 'L1')).err).toBe(STALE);
+  });
+
   it('check signale un lot terminé qui a reçu un commit après sa revue', async () => {
     const dir = await lotWithCommit();
     await raf(dir, 'review', 'L1', 'conforme');

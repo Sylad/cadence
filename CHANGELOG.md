@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `raf done` refuses, without `--force`, a lot whose recorded code-review verdict is non-compliant (`non conforme`, `not compliant`), even when the review covers all its commits (L476, `docs/raf.md`): until now only the coverage of the commits was judged, so a lot reviewed « non conforme : 1 bloquant » at its last commit could be closed. Same predicate as `cadence deliver` (L474).
+
 ## [1.31.0] - 2026-10-31
 
 ### Added

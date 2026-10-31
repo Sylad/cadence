@@ -834,9 +834,10 @@ export class Plan {
   /**
    * `ref` is `L3` or `L3/t1`. `unreviewed` : nombre de commits du lot que sa revue de code ne couvre
    * pas (le plan ne lit pas git) — tous sans verdict, ceux postérieurs au commit relu sinon ; sans lui,
-   * la revue de code n'est pas exigée.
+   * la revue de code n'est pas exigée. `nonConforming` : le verdict enregistré dit « non conforme » (le texte du
+   * verdict se juge dans `audit.ts`, `isNonConformingVerdict`) — refusé même si la revue couvre tous les commits.
    */
-  setStatus(ref: string, status: Status, today: Day, opts: { force?: boolean; unreviewed?: number } = {}): void {
+  setStatus(ref: string, status: Status, today: Day, opts: { force?: boolean; unreviewed?: number; nonConforming?: boolean } = {}): void {
     this.writable();
     const [lotId, taskId] = ref.split('/');
     if (taskId) {
@@ -864,6 +865,11 @@ export class Plan {
           lot.review
             ? `${lotId} : la revue de code précède ${opts.unreviewed} commit(s) du lot, elle est à refaire — raf review ${lotId} "verdict" (--force pour passer outre)`
             : `${lotId} a ${opts.unreviewed} commit(s) : revue de code attendue avant done — raf review ${lotId} "verdict" (--force pour passer outre)`,
+        );
+      }
+      if (this.reviewSince && opts.nonConforming && lot.review && !opts.force) {
+        throw new RafError(
+          `${lotId} : la revue de code enregistrée est non conforme (« ${lot.review.verdict} ») — corriger puis refaire la revue : raf review ${lotId} "verdict" (--force pour passer outre)`,
         );
       }
     }

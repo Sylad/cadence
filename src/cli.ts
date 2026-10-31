@@ -4,7 +4,7 @@ import { basename, dirname, join, posix, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { defaultPlan, PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readSessionConfig, readVerifyConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
-import { audit, exemptPlanOnly, gateProgress, gateText, gateWaiting, hypothesesOf, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork, workByLot } from './audit.js';
+import { audit, exemptPlanOnly, gateProgress, gateText, gateWaiting, hypothesesOf, isNonConformingVerdict, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork, workByLot } from './audit.js';
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps, shellQuote } from './deliver.js';
@@ -422,7 +422,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         }
       }
       const unreviewed = status === 'done' && plan.reviewSince && !plan.readonly && !values.force ? unreviewedWork(plan, root, rest[0]) : 0;
-      plan.setStatus(rest[0], status, today, { force: values.force, unreviewed });
+      const verdict = status === 'done' && !rest[0].includes('/') ? plan.lots().find((l) => l.id === rest[0])?.review?.verdict : undefined;
+      const nonConforming = verdict !== undefined && isNonConformingVerdict(verdict);
+      plan.setStatus(rest[0], status, today, { force: values.force, unreviewed, nonConforming });
       if (command === 'drop' && values.reason) plan.note(rest[0], `abandonné : ${values.reason}`, today);
       plan.save();
       io.out(`${rest[0]} → ${status}`);

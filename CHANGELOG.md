@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `raf add`, `raf note` and `raf done` warn on stderr when a session of a live wave is writing in the main tree of the repository (L475, `docs/raf.md`): a lot in implementation, review or fix that does not play in a worktree. A plan commit of the lead at that moment hands the lot back (2026-10-30: cadence L458 handed back by a plan commit during its review). The commands still write, exit code 0.
+
 ## [1.30.0] - 2026-10-30
 
 ### Fixed

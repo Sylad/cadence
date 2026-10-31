@@ -104,7 +104,7 @@ export type Project = {
 export type TourLot = { id: string; title: string; status: 'todo' | 'doing'; after: string[]; parent?: string; /** La revue de code du lot est posée au plan (L413) ; absent sans revue ou d'un cadence plus ancien. */ reviewed?: true }
 
 /** Une ligne du tour pour le panneau des lots : le projet, l'erreur du tour s'il n'a pas pu être lu, ses lots non clos. */
-export type LotsRow = { project: string; error?: string; lots?: TourLot[]; /** Lots clos et leur jour de clôture (L415) ; absent d'un cadence plus ancien ou sans lot clos daté. */ closed?: { id: string; finished: string }[] }
+export type LotsRow = { project: string; error?: string; lots?: TourLot[]; /** Lots clos et leur jour de clôture (L415) ; absent d'un cadence plus ancien ou sans lot clos daté. */ closed?: { id: string; finished: string }[]; /** L'avancement du projet, tel que la bande l'écrit (L481) ; absent d'un cadence plus ancien. */ progress?: Project['progress']; /** Ids des lots en cours (L481), pour les chiffres de l'avancement. */ doing?: { id: string }[] }
 
 /** Ce que le panneau a lu : les lignes du tour, et si cadence est trop ancien pour porter `lots`. */
 export type LotsBoard = { rows: LotsRow[]; outdated: boolean }

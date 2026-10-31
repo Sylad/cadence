@@ -3,7 +3,8 @@ import type { ClientModule } from 'claude-code'
 // ── L449 : l'ordre des projets dans le panneau, réordonnable à la souris (glisser-déposer) et au clavier (Alt+↑ / Alt+↓) ──
 // Région Client : elle ne connaît que ses lignes (un nom, un détail) ; le dépôt est posté au module de hooks, qui contrôle la demande et lance cadence.
 
-type Props = { projects: { name: string; detail: string }[] }
+/** `bar`, `color` et `figures` (L481) : l'avancement tel que la bande l'écrit, calculé par le module de hooks ; absents, la ligne garde `detail`. */
+type Props = { projects: { name: string; detail: string; bar?: string; color?: 'error' | 'warning' | 'success' | 'subtle'; figures?: string }[] }
 /** Le glisser retient le projet saisi par son nom, pas par sa ligne : les props changent pendant un geste (relecture du tableau). */
 type State = { selected?: string; drag?: { name: string; over: number } }
 
@@ -60,15 +61,19 @@ const List: ClientModule<Props, State> = (props, surface) => {
     if (dragging && i === hover) return { glyph: hover > held ? '⇣' : '⇡', color: 'claude' }
     return projects[i]!.name === state.selected ? { glyph: '▸', color: 'claude' } : undefined
   }
+  const nameWidth = Math.max(0, ...projects.map(p => p.name.length))
   return (
     <Box flexDirection="column" width="100%">
       {projects.map((p, i) => {
         const m = mark(i)
+        const filled = p.bar?.replace(/▯/g, '') ?? ''
         return (
           <Text key={`p${i}`} wrap="truncate-end" bold={p.name === state.selected} underline={dragging && i === hover}>
             {m ? <Text color={m.color}>{m.glyph}</Text> : <Text> </Text>}
-            {` ${p.name}`}
-            <Text dimColor>{`  ${p.detail}`}</Text>
+            {p.bar === undefined ? ` ${p.name}` : ` ${p.name.padEnd(nameWidth)} `}
+            {p.bar === undefined && <Text dimColor>{`  ${p.detail}`}</Text>}
+            {filled && <Text color={p.color}>{filled}</Text>}
+            {p.bar !== undefined && <Text dimColor>{`${p.bar.slice(filled.length)} ${p.figures ?? ''}`}</Text>}
           </Text>
         )
       })}

@@ -1510,3 +1510,25 @@ test('L449 — trop peu de place : la région des projets cède sa place à l’
   expect(small.text).not.toMatch(/ordre des projets/)
   expect(small.text).toMatch(/L401/)
 })
+
+test('L481 — la région des projets montre la barre colorée et les chiffres de la bande à côté de chaque projet, noms alignés', async ($, on) => {
+  const withProgress = [
+    { ...row('cadence', TOUR[0]!.lots), doing: [{ id: 'L401' }], progress: { done: 3, doing: 1, todo: 6, added7: 2 } },
+    { ...row('ol', TOUR[1]!.lots), progress: { done: 9, doing: 0, todo: 1, added7: 0 } },
+  ]
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify(withProgress) }) })
+  await s.hud('lots')
+  const text = (await s.draw(70, 30, 'terminal')).text
+  expect(text).toMatch(/cadence ▮▮▮▯▯▯▯▯▯▯ 3\/10 · 1 en cours : L401 · \+2 cette semaine/)
+  expect(text).toMatch(/ol {6}▮{9}▯ 9\/10 · 0 en cours/)
+  expect(text).not.toMatch(/cadence {2}\d+ lots? non clos/)
+})
+
+test('L481 — un cadence qui ne donne pas progress : la ligne du projet garde le nombre de lots non clos, sans barre', async ($, on) => {
+  const old = TOUR.map(r => ({ ...r, progress: undefined }))
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify(old) }) })
+  await s.hud('lots')
+  const text = (await s.draw(70, 30, 'terminal')).text
+  expect(text).toMatch(/cadence {2}2 lots non clos/)
+  expect(text).toMatch(/ol {2}1 lot non clos/)
+})

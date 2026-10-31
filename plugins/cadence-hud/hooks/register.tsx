@@ -9,7 +9,7 @@ import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
-import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
+import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
@@ -871,7 +871,7 @@ export const register: Register = on => {
       const room = e.props.scroll.bodyRows - decisions.lines.length - spend.lines.length - shipped.lines.length
       const showOrder = Client !== undefined && ranked.length >= 2 && room - (ranked.length + 1) >= 2 * ranked.length + 1
       const order = showOrder && (
-        <Client key="projects" module="./projects-list.tsx" props={{ projects: ranked.map(r => ({ name: r.project, detail: projectDetail(r) })) }} width="100%" />
+        <Client key="projects" module="./projects-list.tsx" props={{ projects: ranked.map(r => ({ name: r.project, detail: projectDetail(r), ...projectProgress(r) })) }} width="100%" />
       )
       const orderRows = order ? ranked.length + 1 : 0
       const panel = buildPanel({ rows: board.rows, columns, height: room - orderRows, waves: waveLotsOf(allWaves, at), folds, views, now: at })

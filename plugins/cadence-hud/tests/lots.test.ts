@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { buildPanel, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, planMove, priorityArgv, projectDetail, projectDir, projectsOf, readTime, refusalReason } from '../hooks/lots'
+import { buildPanel, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, planMove, priorityArgv, projectDetail, projectDir, projectProgress, projectsOf, readTime, refusalReason } from '../hooks/lots'
 import type { LotsRow, TourLot } from '../types'
 
 const lot = (id: string, status: 'todo' | 'doing' = 'todo', extra: Partial<TourLot> = {}): TourLot => ({ id, title: `Titre ${id}`, status, after: [], ...extra })
@@ -694,4 +694,27 @@ test('L449 — la commande est cadence lead priority sur le dossier du tour ; sa
   expect(priorityArgv('/p', { id: 'gamma', target: 'alpha', place: 'after' })).toEqual(['cadence', 'lead', 'priority', 'gamma', '--after', 'alpha', '/p'])
   expect(refusalReason('', 3, 'cadence lead priority')).toBe('cadence lead priority : code 3')
   expect(refusalReason('raf: /p/cadence.yaml illisible : x\n', 2, 'cadence lead priority')).toBe('/p/cadence.yaml illisible : x')
+})
+
+// ── L481 : l'avancement de chaque projet dans la région des projets ──────────────────────────────────────────────
+
+const progressRow = (progress: unknown, extra: object = {}) => parseLotsBoard(JSON.stringify([{ project: 'alpha', lots: [], progress, ...extra }])).rows[0]!
+
+test('L481 — l’avancement d’un projet : barre, couleur selon la part de lots clos et chiffres de la bande (en cours nommés, +N cette semaine)', () => {
+  const r = progressRow({ done: 3, doing: 1, todo: 6, added7: 2 }, { doing: [{ id: 'L9' }] })
+  expect(projectProgress(r)).toEqual({ bar: '▮▮▮▯▯▯▯▯▯▯', color: 'error', figures: '3/10 · 1 en cours : L9 · +2 cette semaine' })
+  expect(projectProgress(progressRow({ done: 5, doing: 0, todo: 5, added7: 0 }))!.color).toBe('warning')
+  expect(projectProgress(progressRow({ done: 9, doing: 0, todo: 1, added7: 0 }))!.color).toBe('success')
+})
+
+test('L481 — sans lot : barre vide grise ; projet illisible ou cadence sans progress : pas d’avancement', () => {
+  expect(projectProgress(progressRow({ done: 0, doing: 0, todo: 0, added7: 0 }))).toEqual({ bar: '▯▯▯▯▯▯▯▯▯▯', color: 'subtle', figures: '0/0 · 0 en cours' })
+  expect(projectProgress(progressRow(undefined))).toBeUndefined()
+  expect(projectProgress({ project: 'beta', error: 'plan illisible', progress: { done: 1, doing: 0, todo: 0, added7: 0 } })).toBeUndefined()
+})
+
+test('L481 — un progress mal formé (champ manquant ou texte) est écarté à la lecture, les ids en cours sans id aussi', () => {
+  expect(progressRow({ done: 1, doing: 'x', todo: 0, added7: 0 }).progress).toBeUndefined()
+  expect(progressRow({ done: 1 }).progress).toBeUndefined()
+  expect(progressRow({ done: 0, doing: 1, todo: 0, added7: 0 }, { doing: [{ id: 'L1' }, { x: 1 }, null] }).doing).toEqual([{ id: 'L1' }])
 })

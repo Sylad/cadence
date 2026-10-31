@@ -3,12 +3,15 @@ import type { ThemeKey } from 'claude-code'
 import type { LotsBoard, LotsRow, MoveAsk, TourLot, Wave } from '../types'
 import { cycleOf, cycleSegments } from './cycle'
 import type { CycleInput, CycleSeg } from './cycle'
-import { colorOfLot, isWaveShown, lotStatusFr } from './format'
+import { colorOfDone, colorOfLot, isWaveShown, lotStatusFr, progressBar, projectFigures } from './format'
 
 // ── L401 : le panneau des lots (/hud lots) — lecture de `cadence lead tour --json`, arbre et mise en page ───────────
 
 /** Sous cette largeur de corps, la liste after: passe sur une ligne à part. */
 export const NARROW_BODY = 60
+
+const isProgress = (p: unknown): p is NonNullable<LotsRow['progress']> =>
+  typeof p === 'object' && p !== null && ['done', 'doing', 'todo', 'added7'].every(k => Number.isFinite((p as Record<string, unknown>)[k]))
 
 /** Lit la sortie de `cadence lead tour --json` pour le panneau : toutes les lignes, celles en erreur comprises (parseTour les écarte). `outdated` : aucune ligne lisible ne porte `lots` (cadence plus ancien que le mod) ; une ligne en erreur n'en a jamais et ne le dit donc pas. */
 export const parseLotsBoard = (stdout: string): LotsBoard => {
@@ -18,6 +21,8 @@ export const parseLotsBoard = (stdout: string): LotsBoard => {
     .map(r => ({
       project: r.project as string,
       ...(typeof r.error === 'string' && r.error ? { error: r.error } : {}),
+      ...(isProgress(r.progress) ? { progress: r.progress } : {}),
+      ...(Array.isArray(r.doing) ? { doing: r.doing.filter((d): d is { id: string } => typeof d?.id === 'string').map(d => ({ id: d.id })) } : {}),
       ...(Array.isArray(r.closed) ? { closed: r.closed.filter((c): c is { id: string; finished: string } => typeof c?.id === 'string' && typeof c?.finished === 'string').map(c => ({ id: c.id, finished: c.finished })) } : {}),
       ...(Array.isArray(r.lots) ? { lots: r.lots.filter((l): l is TourLot => typeof l?.id === 'string').map(l => ({ ...l, after: Array.isArray(l.after) ? l.after : [] })) } : {}),
     }))
@@ -409,6 +414,13 @@ export const projectDetail = (r: LotsRow): string => {
   if (r.error !== undefined) return 'illisible'
   const n = openCount(r.lots ?? [])
   return `${n} lot${n > 1 ? 's' : ''} non clos`
+}
+
+/** L'avancement d'un projet comme la bande l'écrit (L481) : la barre, sa couleur selon la part de lots clos, les chiffres. Rien pour un projet illisible ou d'un cadence qui ne donne pas `progress`. */
+export const projectProgress = (r: LotsRow): { bar: string; color: ThemeKey; figures: string } | undefined => {
+  if (r.error !== undefined || !r.progress) return undefined
+  const { done, doing, todo } = r.progress
+  return { bar: progressBar(done, done + doing + todo), color: colorOfDone(done, done + doing + todo), figures: projectFigures({ project: r.project, doing: r.doing, progress: r.progress }) }
 }
 
 /** Lit ce que la région des projets a posté : placer `id` avant ou après `target`, deux projets différents du tableau lu, sinon rien (la donnée vient du dessin, elle n'est pas crue). */

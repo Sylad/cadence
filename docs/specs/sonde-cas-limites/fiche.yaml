@@ -35,6 +35,7 @@ cas:
       - { si: "une passe de correction est déjà faite (l.pass ≥ MAX_PASSES − 1) ou le budget ne paie pas la sonde, la correction et la revue", alors: "la sonde n'est pas jouée, un warning dit pourquoi, la revue part", regles: [R6] }
       - { si: "la sonde a modifié un fichier qui n'est pas un test", alors: "un warning le nomme ; les constats sont transmis quand même", regles: [R8] }
       - { si: "la session échoue, est coupée ou dépasse son délai", alors: "un warning, la sonde est comptée jouée, la revue part sans elle", regles: [R9] }
+      - { si: "la sonde a répondu mais laisse le dépôt sale, ou viole le verrou des tests d'acceptation", alors: "le lot est rendu (handed-back, « dépôt sale après probe : … » ou « verrou des tests d'acceptation : … »), comme après toute session d'écriture", regles: [R9] }
       - { si: "le quota est atteint pendant la sonde", alors: "la vague se suspend comme pour toute session, la reprise rejoue la sonde", regles: [R9] }
     resultat: "Un lot qui arrive à la revue avec ses cas limites déjà exercés, ou la trace qu'ils n'ont pas pu l'être."
   - id: C2
@@ -101,10 +102,11 @@ regles:
     tests: ["R8 — le brief probe cite les sept bornes et la fiche", "R8 — le brief probe interdit de modifier le code applicatif et les tests scellés", "R8 — un commit de la sonde sur un fichier hors tests écrit un warning nommé", "R8 — le brief probe se rend sans accolade restante", "R8 — le brief probe renvoie au diff par commande et ne le colle pas"]
   - id: R9
     cas: [C1]
-    enonce: "La sonde ne bloque jamais le lot : un échec, une coupure, un délai ou un rapport illisible écrivent un warning « sonde de cas limites non jouée : <cause> » et la revue part ; un quota suspend la vague comme pour toute session et la reprise rejoue la sonde. Les questions du rapport sont notées en warning, sans interroger le lead."
+    enonce: "Les constats de la sonde ne bloquent jamais le lot : tests rouges (ils repartent en correction, R4), questions, échec, coupure, délai ou rapport illisible écrivent un warning « sonde de cas limites non jouée : <cause> » (ou la question) et la revue part ; un quota suspend la vague comme pour toute session et la reprise rejoue la sonde. Les questions du rapport sont notées en warning, sans interroger le lead. En revanche les contrôles communs à toute session d'écriture s'appliquent à la sonde comme aux autres étapes : un dépôt laissé sale par une sonde qui a répondu, ou une violation du verrou des tests d'acceptation, rendent le lot (handed-back) avec le message existant « dépôt sale après probe : … » ou « verrou des tests d'acceptation : … »."
     statut: hypothese
-    si_faux: "Si un échec de la sonde devait rendre le lot au lead, l'issue passerait de warning à handed-back ; la sonde étant un essai à mesurer, l'échec silencieux fausserait la mesure moins qu'un lot bloqué."
-    tests: ["R9 — une session probe en échec laisse partir la revue avec le warning exact", "R9 — un quota pendant la sonde suspend la vague et la reprise la rejoue", "R9 — une question du rapport probe devient un warning, aucune attente"]
+    si_faux: "Si un échec de la sonde devait rendre le lot au lead, l'issue passerait de warning à handed-back ; la sonde étant un essai à mesurer, l'échec silencieux fausserait la mesure moins qu'un lot bloqué. Si la sonde devait être dispensée des contrôles d'après-session, un dépôt sale ou un test scellé réécrit passerait sans trace."
+    tests: ["R9 — une session probe en échec laisse partir la revue avec le warning exact", "R9 — un quota pendant la sonde suspend la vague et la reprise la rejoue", "R9 — une question du rapport probe devient un warning, aucune attente", "R9 — une sonde qui répond mais laisse le dépôt sale rend le lot « dépôt sale après probe »"]
+
   - id: R10
     cas: [C1, C2]
     enonce: "La documentation d'usage décrit la clé : README.md et docs/orchestrate.md (étape, condition, coût, mesure L430), et CHANGELOG.md."

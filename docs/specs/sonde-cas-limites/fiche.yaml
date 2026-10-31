@@ -1,0 +1,144 @@
+sujet:
+  id: sonde-cas-limites
+  titre: "Sonde de cas limites entre implement et review (orchestrate.probe)"
+  lot: L497
+  perimetre:
+    modules: [src/config.ts, src/orchestrate/cycle.ts, src/orchestrate/launch.ts, src/orchestrate/briefs.ts, src/orchestrate/schemas.ts, src/perf.ts, templates/orchestrate/probe.md, cadence.yaml, README.md, docs/orchestrate.md, CHANGELOG.md]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "la mesure elle-même et la décision de garder ou retirer la sonde : le lead les prend avec cadence corrections (L430), sur des figures ; aucun seuil automatique n'est codé"
+      - "la sonde sur les autres projets : la clé n'est posée que dans le cadence.yaml de cadence pour l'essai"
+      - "les briefs implement, fix, review* : inchangés (la sonde n'ajoute pas de consigne à la revue Opus)"
+      - "le classement des passes de correction de cadence corrections : inchangé, la passe issue de la sonde se reconnaît à son texte (R7)"
+
+cas:
+  - id: C1
+    titre: "Une sonde Sonnet neuve cherche à casser le lot avant la revue, un test rouge repart en correction"
+    acteur: le programme (orchestrate)
+    declencheur: commande cadence orchestrate (fin d'une session d'écriture du lot, avant la première revue)
+    preconditions:
+      - "orchestrate.probe: true dans cadence.yaml du projet"
+      - "le lot a au moins un commit, la porte « code sans test » (L287) est passée ou absente, la passe des mineurs n'est pas en cours"
+      - "la sonde n'a pas encore joué pour ce lot"
+    nominal:
+      - "Le programme lance une session probe (Sonnet, neuve, sans contexte de l'implémentation) avec le brief probe.md : le diff du lot, la fiche s'il y en a une, la liste des bornes (vide, absent, double, mauvais type, refusé, forme réelle des données, autres appelants)."
+      - "La session écrit des tests aux bornes dans de nouveaux fichiers de test, les joue et les commite avec les commits du lot (probe(L<n>): …), sans toucher au code applicatif."
+      - "Les tests qui passent restent dans le lot."
+      - "Le programme joue sa porte de tests (orchestrate.test) après la session comme après toute écriture ; un test rouge nouveau devient un constat « sonde de cas limites : … » et le lot repart en correction (session fix) avant la revue."
+      - "La session fix corrige le code jusqu'à ce que ces tests passent, puis la revue Opus arrive sur un code déjà éprouvé."
+    alternatives:
+      - { si: "la clé orchestrate.probe est absente ou false", alors: "rien ne change : aucune session probe, aucun champ nouveau dans le journal", regles: [R1] }
+      - { si: "aucun test de la sonde n'est rouge", alors: "pas de correction, la revue part directement ; la sonde est comptée jouée", regles: [R4] }
+      - { si: "la porte de tests n'est pas déclarée (orchestrate.test absent)", alors: "les tests rouges sont ceux que la sonde annonce dans son rapport, non vérifiés par le programme (un warning le dit)", regles: [R5] }
+      - { si: "le lot n'a aucun commit, ou la passe des mineurs est en cours", alors: "la sonde n'est pas jouée", regles: [R3] }
+      - { si: "une passe de correction est déjà faite (l.pass ≥ MAX_PASSES − 1) ou le budget ne paie pas la sonde, la correction et la revue", alors: "la sonde n'est pas jouée, un warning dit pourquoi, la revue part", regles: [R6] }
+      - { si: "la sonde a modifié un fichier qui n'est pas un test", alors: "un warning le nomme ; les constats sont transmis quand même", regles: [R8] }
+      - { si: "la session échoue, est coupée ou dépasse son délai", alors: "un warning, la sonde est comptée jouée, la revue part sans elle", regles: [R9] }
+      - { si: "le quota est atteint pendant la sonde", alors: "la vague se suspend comme pour toute session, la reprise rejoue la sonde", regles: [R9] }
+    resultat: "Un lot qui arrive à la revue avec ses cas limites déjà exercés, ou la trace qu'ils n'ont pas pu l'être."
+  - id: C2
+    titre: "Le lead pose la clé sur cadence et mesure l'essai"
+    acteur: le lead
+    declencheur: commande cadence corrections <dossier> --since <borne> (puis cadence perf)
+    preconditions:
+      - "orchestrate.probe: true posé dans le cadence.yaml de cadence ; des vagues créées après la borne"
+    nominal:
+      - "Les sessions probe figurent dans le journal du lot (étape probe, tokens) et dans la table de cadence perf, à part des autres étapes."
+      - "Le lead compare, avant/après, la part bug-code et cas limite des passes de correction, les lots à au moins 2 passes et les tokens par lot (L430), puis garde ou retire la clé."
+    alternatives: []
+    sans_alternative: "lecture seule des journaux ; ses échecs sont ceux des commandes existantes (date invalide, dossier sans journaux)"
+    resultat: "Les chiffres pour décider de garder ou de retirer la sonde."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Sans clé orchestrate.probe, ou avec probe: false, le cycle est identique à celui d'avant : aucune session probe, aucun champ ajouté à l'état ni au journal du lot, aucune ligne de la sortie."
+    statut: sourcee
+    source: "demande du lot L497 : « clé orchestrate.probe (absente = rien ne change) »"
+    tests: ["R1 — sans orchestrate.probe, le lot passe de implement à review sans session probe", "R1 — probe: false se lit comme la clé absente"]
+  - id: R2
+    cas: [C1]
+    enonce: "orchestrate.probe n'accepte que true ou false ; la clé est posée à true dans le cadence.yaml de cadence seul. Elle s'ajoute à ORCH_KEYS et probe s'ajoute aux étapes de effort (défaut medium)."
+    statut: hypothese
+    si_faux: "Si la sonde doit avoir son modèle ou un plafond (forme { model }), la forme booléenne s'étend en objet sans casser true ; seul le validateur de src/config.ts change."
+    tests: ["R2 — probe: true est lu, une autre valeur est refusée avec le message exact", "R2 — le cadence.yaml de cadence pose orchestrate.probe: true", "R2 — effort.probe vaut medium par défaut et se règle comme les autres étapes"]
+  - id: R3
+    cas: [C1]
+    enonce: "La sonde se joue une seule fois par lot, après une session d'écriture dont le programme a vérifié les portes (tests, build, acceptation) et après la porte « code sans test », avant le bibliothécaire et la revue ; elle ne joue pas quand le lot n'a aucun commit ni pendant la passe des mineurs. Son état (probe joué) est enregistré : une reprise ne la rejoue pas."
+    statut: hypothese
+    si_faux: "Si la sonde devait jouer aussi après une correction, le drapeau ne serait plus par lot mais par passe et le coût monterait d'une session Sonnet par passe ; c'est un réglage de condition, aucune donnée en jeu."
+    tests: ["R3 — la sonde joue après la porte « code sans test » et avant la revue", "R3 — un lot sans commit ou en passe des mineurs ne joue pas la sonde", "R3 — une reprise après la sonde ne la rejoue pas"]
+  - id: R4
+    cas: [C1]
+    enonce: "Un test rouge de la sonde (nouveau par rapport à la ligne de base, jamais un échec déjà présent au départ) renvoie le lot en correction avant la revue, avec un constat de gravité majeur dont le texte commence par « sonde de cas limites : » et nomme le test, la borne et l'attendu ; tous les tests verts de la sonde restent commités. Sans rouge, la revue part directement."
+    statut: sourcee
+    source: "demande du lot L497 : « tout test qui échoue revient à implement comme constat avant la revue Opus » ; ligne de base des échecs déjà rouges : src/orchestrate/cycle.ts:2300 (againstBaseline) et docs/orchestrate.md (L213)"
+    tests: ["R4 — un test rouge de la sonde produit une passe fix avec un constat « sonde de cas limites : »", "R4 — tous les tests de la sonde verts : la revue part sans passe fix", "R4 — un échec déjà rouge à la ligne de base n'est pas un constat de la sonde"]
+  - id: R5
+    cas: [C1]
+    enonce: "Les rouges se lisent par la porte du programme (orchestrate.test) ; sans cette porte déclarée, ce sont les échecs que la sonde annonce (champ echecs de son rapport), repris tels quels, avec un warning « non vérifié par le programme »."
+    statut: hypothese
+    si_faux: "Si la sonde ne devait jamais se jouer sans porte, la condition de R3 gagnerait « orchestrate.test déclaré » et la ligne de warning disparaîtrait."
+    tests: ["R5 — avec orchestrate.test, les rouges viennent de la porte et non du rapport", "R5 — sans orchestrate.test, les échecs annoncés partent en correction avec le warning exact"]
+  - id: R6
+    cas: [C1]
+    enonce: "La passe de correction que la sonde déclenche est l'une des passes ordinaires (l.pass, MAX_PASSES). La sonde ne joue pas quand une passe est déjà faite ou quand le budget du lot ne paie pas la sonde, la correction et la revue qui la suit ; elle écrit alors un warning et la revue part. Sa session compte dans les tokens et le budget du lot."
+    statut: hypothese
+    si_faux: "Si la sonde devait avoir sa passe à part, MAX_PASSES et le calcul de budget changeraient (une passe de plus, un plancher de budget relevé) : un réglage de plafond, pas une donnée."
+    tests: ["R6 — la sonde déclenche une passe comptée dans l.pass", "R6 — avec une passe déjà faite, la sonde n'est pas jouée et un warning le dit", "R6 — un budget trop court pour la sonde, la correction et la revue : pas de sonde, un warning", "R6 — les tokens de la session probe entrent dans la dépense du lot"]
+  - id: R7
+    cas: [C1, C2]
+    enonce: "L'étape est un nouveau genre de session `probe` : Sonnet quel que soit le modèle du lot, brief templates/orchestrate/probe.md, rapport {commits, echecs, nonVerifie, questions, choix, resume} ; elle est journalisée comme une étape (modèle, tokens, commits) pour que cadence perf la compte à part et que le texte « sonde de cas limites : » des constats distingue la passe de correction qu'elle déclenche."
+    statut: sourcee
+    source: "demande du lot L497 : « session Sonnet neuve », « mesure par L430 (… tokens par lot) » ; src/perf.ts:248 (KIND_ORDER des étapes du tableau) ; src/orchestrate/schemas.ts (rapports par étape)"
+    tests: ["R7 — la session probe tourne sur Sonnet même pour un lot Opus", "R7 — le rapport probe sans champ echecs est refusé par le schéma", "R7 — cadence perf compte l'étape probe à part", "R7 — le journal du lot garde l'étape probe avec ses tokens"]
+  - id: R8
+    cas: [C1]
+    enonce: "Le brief probe.md donne le diff du lot, la fiche quand il y en a une, et les bornes à essayer (vide, absent, double, mauvais type, refusé, forme réelle des données, autres appelants) ; il interdit de modifier le code applicatif et les tests scellés (acceptation-<lot>.json). Si un commit de la sonde touche un fichier qui n'est pas un test (testGate.tests quand il est déclaré), le programme écrit un warning qui le nomme et ne retire rien."
+    statut: hypothese
+    si_faux: "Si le programme devait refuser ou annuler un commit de code de la sonde, il faudrait la même logique que le verrou des tests d'acceptation (rendre le lot) ; ici seul un warning change."
+    tests: ["R8 — le brief probe cite les sept bornes et la fiche", "R8 — le brief probe interdit de modifier le code applicatif et les tests scellés", "R8 — un commit de la sonde sur un fichier hors tests écrit un warning nommé", "R8 — le brief probe se rend sans accolade restante"]
+  - id: R9
+    cas: [C1]
+    enonce: "La sonde ne bloque jamais le lot : un échec, une coupure, un délai ou un rapport illisible écrivent un warning « sonde de cas limites non jouée : <cause> » et la revue part ; un quota suspend la vague comme pour toute session et la reprise rejoue la sonde. Les questions du rapport sont notées en warning, sans interroger le lead."
+    statut: hypothese
+    si_faux: "Si un échec de la sonde devait rendre le lot au lead, l'issue passerait de warning à handed-back ; la sonde étant un essai à mesurer, l'échec silencieux fausserait la mesure moins qu'un lot bloqué."
+    tests: ["R9 — une session probe en échec laisse partir la revue avec le warning exact", "R9 — un quota pendant la sonde suspend la vague et la reprise la rejoue", "R9 — une question du rapport probe devient un warning, aucune attente"]
+  - id: R10
+    cas: [C1, C2]
+    enonce: "La documentation d'usage décrit la clé : README.md et docs/orchestrate.md (étape, condition, coût, mesure L430), et CHANGELOG.md."
+    statut: sourcee
+    source: "cadence.yaml docs.sync (src/**, templates/** → README.md, docs/*.md) ; consigne d'auto-contrôle des briefs (docs à jour dans les mêmes commits)"
+    tests: ["R10 — docs/orchestrate.md et README.md citent orchestrate.probe"]
+
+contrats:
+  - id: A1
+    appel: "commande cadence orchestrate (clé orchestrate.probe de cadence.yaml)"
+    entree: "orchestrate.probe: true | false | absente"
+    sortie: "true : la sonde joue (R3) ; false ou absente : comportement d'avant (R1)"
+    erreurs:
+      - { code: "log error", message: "cadence.yaml : orchestrate.probe : true ou false attendu" }
+    regles: [R1, R2]
+  - id: A2
+    appel: "commande cadence orchestrate (session probe, brief probe.md)"
+    entree: "BriefVars existantes (chemin, lot, titre, objectif, fiche, commits, tmp…) ; rapport attendu {commits, echecs, nonVerifie, questions, choix, resume}"
+    sortie: "tests commités dans le lot ; des constats « sonde de cas limites : … » qui partent en fix, ou rien"
+    erreurs:
+      - { code: "log warn", message: "sonde de cas limites non jouée : <cause>" }
+      - { code: "log warn", message: "sonde de cas limites : la session a modifié du code hors tests (<fichiers>)" }
+      - { code: "log warn", message: "sonde de cas limites : échecs annoncés par la session, non vérifié par le programme (orchestrate.test absent)" }
+      - { code: "log warn", message: "sonde de cas limites non jouée : <n> passe(s) de correction déjà faite(s) ou budget du lot (<compte>) insuffisant" }
+    regles: [R3, R4, R5, R6, R7, R8, R9]
+  - id: A3
+    appel: "commande cadence perf / cadence corrections --since <borne>"
+    entree: "journaux .cadence/runs contenant des étapes probe"
+    sortie: "tables existantes, avec l'étape probe comptée à part (tokens par étape) ; passes de correction inchangées dans leur format"
+    erreurs:
+      - { code: "log error", message: "--since invalide : <valeur> (une date ISO, ex. 2026-10-10T18:31Z)" }
+    regles: [R7, R10]
+
+donnees:
+  - { id: D1, objet: ".cadence/runs/<vague>/<projet>--<lot>.json (état et journal du lot)", existant: true, modification: ajout, note: "champ optionnel probe sur l'état du lot et steps[].kind = probe ; absent quand la clé est absente (R1), les journaux d'avant restent lisibles", decision: "à confirmer par le lead : champ optionnel d'un journal par vague, éphémère ; écrit en hypothèse R1/R3, la lecture des anciens journaux est inchangée (aucune question : le journal n'est ni migré ni publié)" }
+  - { id: D2, objet: "templates/orchestrate/probe.md (texte du brief)", existant: false, modification: aucune, note: "nouveau gabarit, texte fixe relu à chaque rendu" }
+  - { id: D3, objet: "cadence.yaml (clé orchestrate.probe)", existant: true, modification: ajout, note: "clé optionnelle ajoutée au schéma de configuration ; absente = rien ne change (R1)", decision: "clé nouvelle et optionnelle, pas un contrat publié existant : demande explicite du lot L497 (« clé orchestrate.probe »)" }

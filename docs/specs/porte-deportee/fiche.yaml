@@ -1,0 +1,179 @@
+sujet:
+  id: porte-deportee
+  titre: "Porte de tests déportée : build et tests joués en ssh sur une autre machine, au sha poussé, avec repli local"
+  lot: L403
+  perimetre:
+    modules: [src/verify-gate.ts, src/orchestrate/cycle.ts, src/config.ts, docs/orchestrate.md, README.md]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "la reprise du verdict d'une vague (L397) et le verdict noté par sha pour le hook pre-push (L426) : inchangés, la porte déportée ne fait que changer le lieu où les commandes tournent"
+      - "l'installation de la machine distante (ssh, git, clé d'accès, outils du projet) : à la charge du lead, cadence ne la configure pas"
+      - "les autres commandes de la vague (session claude, acceptation, démarrage, verdict) : elles restent locales"
+
+cas:
+  - id: C1
+    titre: "Le lead rejoue la porte d'un sha sur l'autre machine"
+    acteur: le lead (ou le livreur)
+    declencheur: commande cadence verify --gate --sha <sha>
+    preconditions:
+      - "cadence.yaml déclare orchestrate.gate.host (une destination ssh) et au moins orchestrate.test ou orchestrate.build"
+      - "aucune porte de vague enregistrée ne reprend le verdict de ce sha (sinon rien n'est rejoué, L397)"
+      - "verify.inPlace n'est pas true"
+    nominal:
+      - "La commande sonde l'hôte par ssh (non interactif, délai court)."
+      - "Elle pousse le sha dans le dépôt nu de l'hôte (créé au premier usage)."
+      - "Elle calcule l'empreinte des lockfiles du sha et cherche le cache de dépendances de cette empreinte sur l'hôte ; absent, elle le remplit."
+      - "Elle crée sur l'hôte un worktree jetable au sha, y place les dépendances du cache, joue le build puis les tests (avec le rejeu seul des rouges) en ssh."
+      - "Elle écrit en première ligne que la porte a tourné sur l'hôte, au sha, avec l'état du cache (utilisé ou rempli)."
+      - "Elle retire le worktree distant, note le verdict du sha comme aujourd'hui et sort en 0 (vert) ou 1 (rouge, avec les tests en échec)."
+    alternatives:
+      - { si: "l'hôte ne répond pas, le push ou la préparation du cache échoue", alors: "repli sur la porte locale, dit dans la sortie avec la cause", regles: [R4, R5] }
+      - { si: "la connexion tombe pendant une commande de la porte (code ssh 255)", alors: "la porte est rejouée en local, dit dans la sortie", regles: [R6] }
+      - { si: "les dépendances du lockfile sont déjà en cache sur l'hôte", alors: "elles sont réutilisées sans réinstallation", regles: [R3] }
+      - { si: "verify.inPlace vaut true", alors: "l'hôte est ignoré, la sortie le dit", regles: [R9] }
+      - { si: "une commande dépasse le délai", alors: "la commande distante est arrêtée et le worktree distant retiré", regles: [R10] }
+    resultat: "Le verdict du sha vient de l'autre machine, la sortie dit où et comment, le cache évite la réinstallation."
+  - id: C2
+    titre: "La vague joue la porte d'un lot sur l'autre machine"
+    acteur: la vague d'orchestration
+    declencheur: commande cadence orchestrate (porte après une écriture, ligne de base, rejeu seul)
+    preconditions:
+      - "orchestrate.gate.host est déclaré"
+      - "le worktree du lot est à un commit, sans modification non validée"
+    nominal:
+      - "Après l'écriture d'une session, la vague pousse le HEAD du worktree du lot dans le dépôt nu de l'hôte."
+      - "Elle joue build puis tests, le rejeu seul des rouges et la ligne de base, sur l'hôte, au sha concerné (même préparation que C1)."
+      - "Elle enregistre les contrôles comme aujourd'hui (commande, code, instables), la commande enregistrée restant celle de cadence.yaml."
+      - "Elle écrit dans l'état du lot et dans la sortie le lieu de la porte."
+    alternatives:
+      - { si: "le worktree du lot a des modifications non validées", alors: "porte locale, dite dans la sortie", regles: [R7] }
+      - { si: "l'hôte ne répond pas", alors: "porte locale pour ce lot, dite dans la sortie, sans arrêter la vague", regles: [R4, R5] }
+      - { si: "la commande est rouge sur l'hôte", alors: "le rouge est compté comme un rouge local (correction), sans repli", regles: [R8] }
+    resultat: "La charge de build et de tests quitte la machine des sessions, sans changer ce que la vague conclut."
+  - id: C3
+    titre: "Le lead déclare l'hôte dans cadence.yaml"
+    acteur: le lead
+    declencheur: lecture de cadence.yaml (cadence orchestrate, cadence verify --gate)
+    preconditions:
+      - "cadence.yaml contient orchestrate.gate"
+    nominal:
+      - "La config lit gate.host (et gate.install s'il est déclaré) à côté de gate.readsPlan."
+      - "Aucune autre commande ne dépend d'un nom de machine : le nom ne vient que de cette clé."
+    alternatives:
+      - { si: "host n'est pas une chaîne sans espace, ou commence par « - »", alors: "la config est refusée avec le message exact", regles: [R2] }
+      - { si: "gate ne porte que host", alors: "readsPlan reste non déclaré : les commits de plan seuls sont encore traversés", regles: [R11] }
+      - { si: "gate.host est absent", alors: "la porte est celle d'aujourd'hui, inchangée", regles: [R1] }
+    resultat: "Une clé facultative qui, absente, ne change rien."
+
+regles:
+  - id: R1
+    cas: [C1, C2, C3]
+    enonce: "Sans orchestrate.gate.host, la porte (verify --gate et vague) se comporte exactement comme avant : aucun appel ssh, mêmes lignes de sortie."
+    statut: sourcee
+    source: "src/verify-gate.ts:155-205 (lieux actuels : arbre principal ou copie jetable) ; l'option est « orchestrate.gate.host » du lot"
+    tests: ["R1 — gate.host absent : aucune commande ssh lancée et la première ligne de sortie est celle d'avant"]
+  - id: R2
+    cas: [C3]
+    enonce: "gate.host est une destination ssh non vide, sans espace, ne commençant pas par « - » (qui serait lue comme une option) ; sinon la config est refusée."
+    statut: hypothese
+    si_faux: "Si une destination avec options doit être permise, le contrôle s'assouplit ; le refus est un message de config, sans donnée."
+    tests: ["R2 — host « -oProxyCommand=x » refusé", "R2 — host vide ou avec espace refusé", "R2 — host « machine » ou « user@machine » accepté"]
+  - id: R3
+    cas: [C1, C2]
+    enonce: "Les dépendances sont gardées sur l'hôte dans un cache dont la clé est l'empreinte (sha256) du contenu des lockfiles du sha ; empreinte déjà en cache : réutilisée sans réinstallation, sinon remplie une fois. Le worktree distant reçoit une copie du cache, jamais un lien (comme L455)."
+    statut: sourcee
+    source: "demande du lot : « dépendances en cache par empreinte du lockfile » ; copie plutôt que lien : src/verify-gate.ts:219-220 (commentaire L455)"
+    tests: ["R3 — même lockfile à deux shas : le second appel n'installe pas", "R3 — lockfile modifié : nouveau cache rempli", "R3 — le worktree distant a une copie des dépendances, pas un lien"]
+  - id: R4
+    cas: [C1, C2]
+    enonce: "Avant toute chose la porte sonde l'hôte (ssh non interactif, délai de connexion court) ; s'il ne répond pas, elle se replie sur la porte locale et la sortie dit « porte déportée indisponible », l'hôte et la cause."
+    statut: sourcee
+    source: "demande du lot : « repli local si l'hôte ne répond pas, dit dans la sortie »"
+    tests: ["R4 — hôte injoignable : la porte tourne en local et la sortie nomme l'hôte et la cause", "R4 — la sonde n'attend jamais un mot de passe (BatchMode)"]
+  - id: R5
+    cas: [C1, C2]
+    enonce: "Un échec du push du sha ou de la préparation du cache (avant la première commande de la porte) replie aussi sur la porte locale, avec la cause dans la sortie ; ce n'est jamais un rouge."
+    statut: hypothese
+    si_faux: "Si ces échecs doivent bloquer la porte (code 2) au lieu de se replier, seul le code de sortie change dans ces cas ; aucune donnée."
+    tests: ["R5 — push refusé : repli local dit, code de la porte locale", "R5 — installation du cache en échec : repli local, aucun cache à moitié rempli réutilisé"]
+  - id: R6
+    cas: [C1]
+    enonce: "Si ssh sort en 255 (connexion perdue) pendant une commande de la porte, la porte est rejouée en local et la sortie le dit ; tout autre code non nul est le verdict de la commande."
+    statut: hypothese
+    si_faux: "Si une suite peut elle-même sortir en 255, un rouge réel serait rejoué en local (porte plus lente, même verdict) ; si l'on préfère un rouge sec, seul le coût change."
+    tests: ["R6 — code 255 : la porte est rejouée en local et la sortie le dit", "R6 — code 1 d'un test : verdict rouge, pas de repli"]
+  - id: R7
+    cas: [C2]
+    enonce: "Le worktree d'un lot qui a des modifications non validées (ou un HEAD qui n'est pas celui demandé) ne se déporte pas, car l'hôte ne verrait pas ce qui est testé : la porte est locale et la sortie dit pourquoi."
+    statut: hypothese
+    si_faux: "Si la porte de vague doit aussi déporter l'arbre sale, il faudrait transférer un diff ; sans cela une porte verte à distance ne vaudrait pas pour le lot."
+    tests: ["R7 — worktree sale : porte locale et raison dite", "R7 — worktree propre : porte sur l'hôte au HEAD du lot"]
+  - id: R8
+    cas: [C1, C2]
+    enonce: "Le verdict d'une porte jouée sur l'hôte est traité comme celui d'une porte locale : 0 vert, 1 rouge avec les tests nommés, rejeu seul (orchestrate.testReplay), ligne de base et enregistrement des contrôles inchangés, commandes de cadence.yaml telles quelles. Le verdict du sha est noté dans l'état partagé du dépôt local."
+    statut: sourcee
+    source: "src/verify-gate.ts:128-145 (verdict noté par sha, L426) et src/orchestrate/cycle.ts:2047-2096 (contrôles du programme, rejeu L354)"
+    tests: ["R8 — rouge distant : même sortie ✗ et mêmes tests nommés qu'en local", "R8 — vert distant : verdict noté pour le sha dans l'état local", "R8 — rejeu seul des rouges joué sur l'hôte"]
+  - id: R9
+    cas: [C1]
+    enonce: "verify.inPlace: true impose l'arbre principal : l'hôte est alors ignoré et la sortie le dit ; verify.inPlace: false ou absent laisse l'hôte passer avant l'arbre principal et la copie jetable."
+    statut: hypothese
+    si_faux: "Si l'hôte doit l'emporter sur inPlace: true, la porte irait à distance malgré la demande du lead ; seule la précédence change."
+    tests: ["R9 — inPlace true et host : porte dans l'arbre principal, hôte ignoré, dit", "R9 — inPlace absent et host : porte sur l'hôte"]
+  - id: R10
+    cas: [C1, C2]
+    enonce: "La première ligne de la porte déportée dit le lieu (hôte, sha court, cache utilisé ou rempli, empreinte courte) ; le worktree distant est retiré dans tous les cas (vert, rouge, délai, signal) et, au délai ou à Ctrl-C, les commandes distantes sont arrêtées."
+    statut: sourcee
+    source: "src/verify-gate.ts:118 (« Le worktree est retiré dans tous les cas », première ligne = lieu) et 197-216 (nettoyage sur signal)"
+    tests: ["R10 — première ligne : hôte, sha et état du cache", "R10 — rouge : le worktree distant est retiré", "R10 — délai : la commande distante est arrêtée et le worktree retiré"]
+  - id: R11
+    cas: [C3]
+    enonce: "Déclarer gate.host seul ne vaut pas gate.readsPlan : config.gate (truthy) coupe aujourd'hui la traversée des commits de plan, la présence de l'hôte ne doit donc pas la couper."
+    statut: sourcee
+    source: "src/verify-gate.ts:163 (config.gate ? undefined : ctx.planFile) et src/config.ts:463-470"
+    tests: ["R11 — gate: {host} seul : les commits de plan seuls reprennent encore le verdict", "R11 — gate: {host, readsPlan: true} : la reprise est coupée"]
+  - id: R12
+    cas: [C1, C2, C3]
+    enonce: "Le code ne contient aucun nom de machine : l'hôte, le dossier de travail distant et l'installation viennent de cadence.yaml ; sans gate.install, le dossier du cache est rempli par copie des dépendances locales (worktreeDeps), avec gate.install par cette commande jouée sur l'hôte."
+    statut: sourcee
+    source: "demande du lot : « générique (aucun nom de machine dans le code) »"
+    tests: ["R12 — aucun nom de machine ni de dépôt ne figure dans src/", "R12 — gate.install déclaré : joué sur l'hôte, une fois par empreinte"]
+  - id: R13
+    cas: [C1, C2]
+    enonce: "CADENCE_TEST_WORKERS d'une porte déportée est calculé avec les cœurs de l'hôte (nproc) et le plafond de sessions, sauf valeur entière positive déjà dans l'environnement de l'appelant."
+    statut: hypothese
+    si_faux: "Si les cœurs locaux conviennent mieux, la valeur serait trop basse ou trop haute sur l'hôte : plus lent ou plus instable, sans donnée."
+    tests: ["R13 — nproc de l'hôte 16, plafond 2 : 8 workers", "R13 — valeur entière de l'environnement conservée"]
+
+contrats:
+  - id: A1
+    appel: commande cadence verify --gate
+    entree: "--sha <sha> [--project <dossier>] ; cadence.yaml avec orchestrate.gate.host"
+    sortie: "0 vert, 1 rouge, 2 rien à rejouer ou non probant ; première ligne : où la porte a tourné ; avec host, hôte, sha et cache dits"
+    erreurs:
+      - { code: "log warn", message: "verify --gate : porte déportée indisponible sur <hôte> (<cause>) — repli sur la porte locale" }
+      - { code: "log warn", message: "verify --gate : connexion perdue avec <hôte> pendant la porte — rejouée en local" }
+      - { code: "log warn", message: "verify --gate : verify.inPlace demande l'arbre principal, l'hôte <hôte> est ignoré" }
+    regles: [R1, R3, R4, R5, R6, R8, R9, R10, R13]
+  - id: A2
+    appel: commande cadence orchestrate
+    entree: "cadence.yaml avec orchestrate.gate.host ; worktree d'un lot"
+    sortie: "contrôles build/tests du lot joués sur l'hôte ; lieu écrit dans la sortie et l'état du lot"
+    erreurs:
+      - { code: "log warn", message: "porte du lot <lot> : worktree non validé, jouée en local (l'hôte ne verrait pas les modifications)" }
+      - { code: "log warn", message: "porte du lot <lot> : porte déportée indisponible sur <hôte> (<cause>) — jouée en local" }
+    regles: [R1, R3, R4, R5, R7, R8, R10, R12, R13]
+  - id: A3
+    appel: commande cadence orchestrate (lecture de cadence.yaml)
+    entree: "orchestrate.gate: { host, install, readsPlan }"
+    sortie: "config lue ; host et install facultatifs"
+    erreurs:
+      - { code: "log error", message: "cadence.yaml : orchestrate.gate.host : destination ssh attendue (une chaîne sans espace, ne commençant pas par « - »)" }
+      - { code: "log error", message: "cadence.yaml : orchestrate.gate.install : commande non vide attendue" }
+    regles: [R2, R11, R12]
+
+donnees:
+  - { id: D1, objet: "cadence.yaml : clés orchestrate.gate.host et orchestrate.gate.install (facultatives)", existant: true, modification: ajout, decision: "ajout facultatif à la clé gate de la config : l'absence laisse la porte inchangée (R1) ; la clé host est nommée par le lot ; install est une hypothèse de ce lot (R12), pas une décision du lead", note: "clés facultatives, lues par src/config.ts" }
+  - { id: D2, objet: "dépôt nu et caches de dépendances sur l'hôte (dossier de travail distant, un cache par empreinte de lockfile)", existant: false, modification: aucune, note: "nouveau, hors du dépôt et jetable : le supprimer ne fait que forcer un push et une réinstallation" }
+  - { id: D3, objet: "verdict par sha de l'état partagé du dépôt local (gate-verdict)", existant: true, modification: aucune, note: "écrit comme avant, vert ou rouge, par la porte déportée (R8)" }

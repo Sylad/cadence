@@ -1,0 +1,9 @@
+{
+  "path": ["src", "scripts", "bin"],
+  "format": ["typescript", "javascript"],
+  "minLines": 8,
+  "minTokens": 70,
+  "ignore": ["**/*.test.ts", "**/*.d.mts"],
+  "reporters": ["json"],
+  "silent": true
+}

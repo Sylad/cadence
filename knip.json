@@ -1,0 +1,8 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["src/cli.ts", "src/orchestrate/*.ts", "scripts/*.mjs", "bin/*.js", "test/**/*.test.ts"],
+  "project": ["src/**/*.ts", "scripts/*.mjs", "bin/*.js", "test/**/*.ts"],
+  "ignore": ["plugins/**", "scripts/*.d.mts"],
+  "ignoreBinaries": ["claude"],
+  "ignoreDependencies": ["jscpd"]
+}

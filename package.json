@@ -31,6 +31,7 @@
     "docs/skills.md",
     "docs/cadence-hud.md",
     "docs/releasing.md",
+    "docs/qualite.md",
     "docs/overview.md",
     "docs/whats-new.md",
     "docs/fonctionnement.md",
@@ -62,16 +63,23 @@
     "service": "node scripts/mise-en-service.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "qualite": "node scripts/qualite.mjs",
+    "qualite:cliquet": "node scripts/qualite.mjs --ecrire",
     "eval:plugin": "claude plugin eval . --max-cost-usd 5 --no-publish",
     "prepare": "tsc -p tsconfig.build.json",
-    "prepublishOnly": "npm run typecheck && npm test"
+    "prepublishOnly": "npm run typecheck && npm run qualite && npm test"
   },
   "dependencies": {
     "yaml": "^2.5.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-sonarjs": "^3.0.7",
+    "jscpd": "^4.3.0",
+    "knip": "^5.88.1",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.72.1",
     "vitest": "^2.0.0"
   },
   "repository": {

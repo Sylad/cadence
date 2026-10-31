@@ -19,15 +19,16 @@ const MESURE = {
   'sonarjs/cognitive-complexity': /from (\d+) to the/,
 };
 
+// une règle sans chiffre dans son message (erreur d'analyse, directive inutile) pèse 1 par occurrence
 const chiffre = (regle, message) => {
   const m = MESURE[regle]?.exec(message);
-  return m ? Number(m[1]) : 0;
+  return m ? Number(m[1]) : 1;
 };
 
 const ajouter = (mesure, cle, n) => { mesure[cle] = (mesure[cle] ?? 0) + n; };
 const chemin = (racine, fichier) => relative(racine, fichier).split('\\').join('/');
 
-/** Sortie JSON d'ESLint → par fichier et par règle : le nombre de dépassements et le pire chiffre mesuré. */
+/** Sortie JSON d'ESLint → par fichier et par règle : le nombre de dépassements et la somme des chiffres mesurés (`|total`). */
 export function lireEslint(json, racine) {
   const mesure = {};
   for (const f of json) {
@@ -36,7 +37,8 @@ export function lireEslint(json, racine) {
       const regle = m.ruleId ?? 'analyse';
       const base = `eslint|${chemin(racine, f.filePath)}|${regle}`;
       ajouter(mesure, base, 1);
-      mesure[`${base}|pire`] = Math.max(mesure[`${base}|pire`] ?? 0, chiffre(regle, m.message));
+      // la somme, pas le pire : une fonction qui grossit sans dépasser la pire du fichier fait monter le total
+      ajouter(mesure, `${base}|total`, chiffre(regle, m.message));
     }
   }
   return mesure;
@@ -57,12 +59,14 @@ export function lireKnip(json, racine) {
   return mesure;
 }
 
-/** Rapport JSON de jscpd → par fichier, le nombre de blocs dupliqués qui le touchent. */
+/** Rapport JSON de jscpd → par fichier, le nombre de blocs dupliqués qui le touchent et leur total de lignes (`|lignes`). */
 export function lireJscpd(rapport) {
   const mesure = {};
   for (const d of rapport.duplicates ?? []) {
-    ajouter(mesure, `jscpd|${d.firstFile.name}`, 1);
-    ajouter(mesure, `jscpd|${d.secondFile.name}`, 1);
+    for (const nom of [d.firstFile.name, d.secondFile.name]) {
+      ajouter(mesure, `jscpd|${nom}`, 1);
+      ajouter(mesure, `jscpd|${nom}|lignes`, d.lines ?? 0);
+    }
   }
   return mesure;
 }

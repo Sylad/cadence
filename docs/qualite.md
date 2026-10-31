@@ -25,8 +25,11 @@ threshold until it means nothing, or sprinkle `eslint-disable`. The ratchet keep
 
 1. `node scripts/qualite.mjs --init` measures once and writes `qualite-baseline.json`, a flat map sorted by key,
    versioned with the code. A key is `tool|file|rule` (`eslint|src/cli.ts|max-lines`, `knip|src/audit.ts|exports`,
-   `jscpd|src/config.ts`) and its value a count. For ESLint every key also has a `…|pire` twin: the worst figure
-   measured (a file of 1397 lines records 1397), so a file that is already too big cannot grow **inside** its one finding.
+   `jscpd|src/config.ts`) and its value a count. Two metrics have a `…|total` or `…|lignes` twin that sums the figures:
+   for ESLint, every key has a `…|total` (the sum of the figures measured, a file of 1397 lines records 1397, three
+   functions of cognitive complexity 463, 20 and 18 record 501), and for jscpd every file has a `…|lignes` (the lines
+   of the duplicated blocks that touch it). A function that grows without passing the worst of its file, or a new
+   function that replaces a small one, makes the sum go up: the count alone would not see it.
 2. `npm run qualite` measures again and compares key by key. A key that is **higher** than in the baseline, or absent from
    it (a new file, a rule never broken before), makes the command fail (exit 1) and names it with its old and new value.
    The existing code passes; nothing can get worse; a touched file can only go down.

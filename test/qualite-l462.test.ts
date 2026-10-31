@@ -17,13 +17,22 @@ describe('L462 — lecture des trois outils', () => {
       { filePath: '/r/src/a.ts', messages: [msg('max-lines', 'File has too many lines (450). Maximum allowed is 400.'), msg('complexity', "Function 'f' has a complexity of 20. Maximum allowed is 15."), msg('complexity', "Function 'g' has a complexity of 31. Maximum allowed is 15.")] },
       { filePath: '/r/src/b.ts', messages: [msg('max-depth', 'Blocks are nested too deeply (6). Maximum allowed is 4.'), msg('max-params', "Function 'h' has too many parameters (7). Maximum allowed is 5."), msg('sonarjs/cognitive-complexity', 'Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed.'), msg('max-lines-per-function', "Function 'dispatch' has too many lines (540). Maximum allowed is 80.")] },
     ], '/r');
-    expect(m['eslint|src/a.ts|max-lines|pire']).toBe(450);
+    expect(m['eslint|src/a.ts|max-lines|total']).toBe(450);
     expect(m['eslint|src/a.ts|complexity']).toBe(2);
-    expect(m['eslint|src/a.ts|complexity|pire']).toBe(31);
-    expect(m['eslint|src/b.ts|max-depth|pire']).toBe(6);
-    expect(m['eslint|src/b.ts|max-params|pire']).toBe(7);
-    expect(m['eslint|src/b.ts|sonarjs/cognitive-complexity|pire']).toBe(22);
-    expect(m['eslint|src/b.ts|max-lines-per-function|pire']).toBe(540);
+    expect(m['eslint|src/a.ts|complexity|total']).toBe(51);
+    expect(m['eslint|src/b.ts|max-depth|total']).toBe(6);
+    expect(m['eslint|src/b.ts|max-params|total']).toBe(7);
+    expect(m['eslint|src/b.ts|sonarjs/cognitive-complexity|total']).toBe(22);
+    expect(m['eslint|src/b.ts|max-lines-per-function|total']).toBe(540);
+  });
+
+  it('R1 — ESLint : une fonction qui grossit sans dépasser la pire du fichier, ou une neuve qui remplace une petite, fait monter le total', () => {
+    const cog = (n: number) => msg('sonarjs/cognitive-complexity', `Refactor this function to reduce its Cognitive Complexity from ${n} to the 15 allowed.`);
+    const mesure = (...n: number[]) => lireEslint([{ filePath: '/r/src/cli.ts', messages: n.map(cog) }], '/r');
+    const avant = mesure(463, 20, 18);
+    expect(comparer(avant, mesure(463, 20, 400)).pires.map((p) => p.cle)).toEqual(['eslint|src/cli.ts|sonarjs/cognitive-complexity|total']);
+    expect(comparer(avant, mesure(463, 18, 300)).pires).toHaveLength(1);
+    expect(comparer(avant, mesure(463, 20, 18)).pires).toEqual([]);
   });
 
   it('R1 — ESLint : une erreur d\'analyse (ruleId nul) est comptée, jamais ignorée ; aucune sortie = aucune mesure', () => {
@@ -40,23 +49,29 @@ describe('L462 — lecture des trois outils', () => {
     expect(lireKnip({}, '/r')).toEqual({});
   });
 
+  it('R3 — jscpd : un bloc dupliqué qui passe de 10 à 200 lignes fait monter le total de lignes, même si le nombre de blocs ne change pas', () => {
+    const rapport = (lines: number) => ({ duplicates: [{ lines, firstFile: { name: 'src/a.ts' }, secondFile: { name: 'src/b.ts' } }] });
+    expect(lireJscpd(rapport(200))['jscpd|src/a.ts|lignes']).toBe(200);
+    expect(comparer(lireJscpd(rapport(10)), lireJscpd(rapport(200))).pires.map((p) => p.cle)).toEqual(['jscpd|src/a.ts|lignes', 'jscpd|src/b.ts|lignes']);
+  });
+
   it('R3 — jscpd : chaque bloc dupliqué compte pour les deux fichiers, y compris un bloc copié dans le même fichier', () => {
     const m = lireJscpd({ duplicates: [{ firstFile: { name: 'src/a.ts' }, secondFile: { name: 'src/b.ts' } }, { firstFile: { name: 'src/a.ts' }, secondFile: { name: 'src/a.ts' } }] });
-    expect(m).toEqual({ 'jscpd|src/a.ts': 3, 'jscpd|src/b.ts': 1 });
+    expect(m).toEqual({ 'jscpd|src/a.ts': 3, 'jscpd|src/a.ts|lignes': 0, 'jscpd|src/b.ts': 1, 'jscpd|src/b.ts|lignes': 0 });
     expect(lireJscpd({})).toEqual({});
   });
 });
 
 describe('L462 — le cliquet (comparer)', () => {
-  const base = { 'eslint|src/a.ts|max-lines': 1, 'eslint|src/a.ts|max-lines|pire': 500 };
+  const base = { 'eslint|src/a.ts|max-lines': 1, 'eslint|src/a.ts|max-lines|total': 500 };
 
   it('R4 — l\'existant passe : une mesure égale à la base n\'empire rien', () => {
     expect(comparer(base, { ...base })).toEqual({ pires: [], mieux: [] });
   });
 
   it('R5 — un fichier touché ne peut que baisser : le pire chiffre qui monte, avec le même nombre de dépassements, empire', () => {
-    const { pires } = comparer(base, { ...base, 'eslint|src/a.ts|max-lines|pire': 501 });
-    expect(pires).toEqual([{ cle: 'eslint|src/a.ts|max-lines|pire', avant: 500, apres: 501 }]);
+    const { pires } = comparer(base, { ...base, 'eslint|src/a.ts|max-lines|total': 501 });
+    expect(pires).toEqual([{ cle: 'eslint|src/a.ts|max-lines|total', avant: 500, apres: 501 }]);
   });
 
   it('R5 — une règle jamais violée qui l\'est (fichier neuf, règle neuve) empire à partir de zéro', () => {
@@ -65,9 +80,9 @@ describe('L462 — le cliquet (comparer)', () => {
   });
 
   it('R6 — ce qui baisse ou disparaît est rendu en « mieux », sans compter comme pire', () => {
-    const { pires, mieux } = comparer(base, { 'eslint|src/a.ts|max-lines|pire': 450 });
+    const { pires, mieux } = comparer(base, { 'eslint|src/a.ts|max-lines|total': 450 });
     expect(pires).toEqual([]);
-    expect(mieux).toEqual([{ cle: 'eslint|src/a.ts|max-lines', avant: 1, apres: 0 }, { cle: 'eslint|src/a.ts|max-lines|pire', avant: 500, apres: 450 }]);
+    expect(mieux).toEqual([{ cle: 'eslint|src/a.ts|max-lines', avant: 1, apres: 0 }, { cle: 'eslint|src/a.ts|max-lines|total', avant: 500, apres: 450 }]);
   });
 });
 
@@ -140,18 +155,18 @@ describe('L462 — parcours réel dans un dépôt jetable (vrais ESLint, knip, j
     expect(init.status).toBe(0);
     const base = JSON.parse(readFileSync(join(dir, BASELINE), 'utf8'));
     expect(base['eslint|src/gros.ts|max-lines']).toBe(1);
-    expect(base['eslint|src/gros.ts|max-lines|pire']).toBeGreaterThan(400);
+    expect(base['eslint|src/gros.ts|max-lines|total']).toBeGreaterThan(400);
     expect(qualite(dir).status).toBe(0);
 
     writeFileSync(join(dir, 'src/gros.ts'), gros(500));
     const pire = qualite(dir);
     expect(pire.status).toBe(1);
-    expect(pire.stderr).toContain('src/gros.ts|max-lines|pire');
+    expect(pire.stderr).toContain('src/gros.ts|max-lines|total');
 
     writeFileSync(join(dir, 'src/gros.ts'), gros(410));
     expect(qualite(dir).status).toBe(0);
     expect(qualite(dir, '--ecrire').status).toBe(0);
-    expect(JSON.parse(readFileSync(join(dir, BASELINE), 'utf8'))['eslint|src/gros.ts|max-lines|pire']).toBeLessThan(base['eslint|src/gros.ts|max-lines|pire']);
+    expect(JSON.parse(readFileSync(join(dir, BASELINE), 'utf8'))['eslint|src/gros.ts|max-lines|total']).toBeLessThan(base['eslint|src/gros.ts|max-lines|total']);
   });
 
   it('R8 — un export jamais importé (code mort pour knip) est détecté puis refusé, et un outil qui plante ne passe pas pour « zéro défaut »', () => {

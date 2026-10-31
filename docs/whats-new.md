@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.31.0**: `deliver --sha` refuses, outside a wave too, a sha that carries commits of a lot neither done nor ready (a `non conforme` verdict is not ready); `raf add/note/done` warn when a wave session writes in the main tree.
 - **1.30.0**: a question can be answered while its wave still runs; the sibling-repository check of 1.29.0 only flags commits that cite a lot of the wave; `session context` reads the lead's threshold from the lead's folder.
 - **1.29.0**: a wave session can no longer commit on the main branch of another repository than its lot's (the lot is handed back with the finding); `verify --gate` no longer links data folders into its throwaway copy.
 - **1.28.0**: projects are reordered from the lots panel or `cadence lead priority`; the lead's context threshold is in tokens; reviewers answer the lead in a few lines; the gate replays under plan commits when tests read the plan.
@@ -56,6 +57,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.31.0**: `cadence deliver --sha <sha>` refuses, outside a wave too, a sha whose history since the last delivery carries work commits of a lot that is neither done nor ready — ready meaning a compliant code review that covers the lot's commits up to that sha, so a fix stacked above a reviewed sha does not block it and a `non conforme` verdict does — and `--dry-run` lists the lots of the interval with their state (L474, `docs/deliver.md`). Before, the check only ran during a wave of the repository: on 30-10 a sha delivered as « L49 alone » took two unreviewed lots whose commits sat beneath it. `raf add`, `raf note` and `raf done` warn on stderr when a session of a live wave writes in the main tree of the repository (L475, `docs/raf.md`): a plan commit of the lead at that moment hands the lot back, as it did on 30-10.
 
 **1.30.0**: `cadence orchestrate --answer <project>:<lot> "…"` (or `--resume --wave <wave> --answer`) is accepted while the wave is still running (L407, `docs/orchestrate.md`): the answer goes into a queue the live wave reads, the lot takes a slot again under the wave's cap, plays in its own worktree when the mode is on, and never runs beside another session of the same repository; the registry counts it at once, so « créneaux libres » stays right. Before, the lead had to wait for the end of the wave. The check of 1.29.0 against commits on the main branch of a sibling repository (L456) now flags only the commits that cite a lot of the wave (L458): a delivery's tag bump in a GitOps repository, the lead's plan commits and the lots of another live wave launched later no longer hand a lot back — three false positives on 30-10. `cadence session context` reads `lead.contextThreshold` from the lead's folder, the first parent holding `lead:` or `priority:`, instead of the current folder (L457).
 

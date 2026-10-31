@@ -319,6 +319,11 @@ function unreviewed(plan: Plan, root: string, review: Verdict | undefined, linke
   return workCommits(plan, root, at < 0 ? linked : linked.slice(0, at));
 }
 
+/** Un texte de verdict de revue dit « non conforme » / « not compliant » (le mot « conforme » dedans ne compte pas) ; « conforme après 1 correction » reste conforme. */
+export function isNonConformingVerdict(text: string): boolean {
+  return /\bnon[\s-]*conforme|\bnot\s+compliant|\bnon[\s-]*compliant/i.test(text);
+}
+
 /** Un lot dont l'intervalle à livrer porte des commits de travail, avec ce qui décide s'il se livre (L474). */
 export interface DeliveryLot {
   id: string;
@@ -330,7 +335,7 @@ export interface DeliveryLot {
 
 /**
  * Les lots dont les commits de travail sont dans l'histoire de `sha` après `base` (toute l'histoire sans `base`), avec leur état de livraison (L474, hors vague) :
- * `done` et abandonné ne bloquent pas ; un lot « prêt » (son verdict de revue couvre tous ses commits) non plus ; un lot à faire ou en cours, non relu
+ * `done` et abandonné ne bloquent pas ; un lot « prêt » (son verdict de revue, conforme, couvre tous ses commits) non plus ; un lot à faire ou en cours, non relu
  * ou relu avant des commits postérieurs, bloque. Un commit qui cite un lot que le plan ne connaît pas (clos et archivé, ou inconnu) n'en fait pas un lot.
  */
 export function deliveryLots(plan: Plan, root: string, sha: string, base: string | null): DeliveryLot[] {
@@ -345,8 +350,11 @@ export function deliveryLots(plan: Plan, root: string, sha: string, base: string
     else {
       // Couverture jugée sur les commits du lot jusqu'à `sha` seulement : un `fix` posé au-dessus du sha livré n'est pas livré.
       const late = l.review ? unreviewed(plan, root, l.review, lotCommits(plan, root, l.id)).filter((c) => isAncestor(root, c.sha, sha)).length : 0;
-      if (l.review && late === 0) entry(false, 'prêt');
-      else entry(true, `${l.status === 'todo' ? 'à faire' : 'en cours'}, ${l.review ? `relu avant ${late} commit(s)` : 'non relu'}`);
+      const state = l.status === 'todo' ? 'à faire' : 'en cours';
+      // Prêt = revue CONFORME couvrant les commits (côté vague, un lot n'est ready qu'après une revue conforme).
+      if (l.review && late === 0 && !isNonConformingVerdict(l.review.verdict)) entry(false, 'prêt');
+      else if (l.review && late === 0) entry(true, `${state}, relu non conforme`);
+      else entry(true, `${state}, ${l.review ? `relu avant ${late} commit(s)` : 'non relu'}`);
     }
   }
   return lots;

@@ -6,6 +6,7 @@ import { deliver, parseDeliverConfig, type DeliverDeps } from '../src/deliver.js
 import { headSha } from '../src/git.js';
 import { Plan } from '../src/plan.js';
 import { appendDelivery, sharedStateDir } from '../src/state.js';
+import { isNonConformingVerdict } from '../src/audit.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -113,6 +114,29 @@ describe('deliver --sha hors vague : lots ni done ni prêts (L474)', () => {
     expect(free.code).toBe(0);
     expect(free.out.join('\n')).toMatch(/L2 « Second » — prêt/);
     expect(free.out.join('\n')).toMatch(/simulation/);
+  });
+
+  it('R12 — un lot relu NON conforme à son dernier commit n\'est pas prêt : deliver --sha refuse, --dry-run le dit', async () => {
+    const { dir, planFile } = repo();
+    work(dir, 'feat(L1): un', 'a.txt');
+    push(dir);
+    const plan = Plan.load(planFile);
+    plan.setStatus('L1', 'doing', '2026-09-28');
+    plan.recordReview('L1', 'non conforme : 1 bloquant', '2026-09-28', headSha(dir)!);
+    plan.save();
+    const r = await run(dir, planFile);
+    expect(r.code).toBe(2);
+    expect(r.err.join('\n')).toMatch(/L1.*relu non conforme/);
+    expect(r.execs).toEqual([]);
+    const d = await run(dir, planFile, { dryRun: true });
+    expect(d.code).toBe(2);
+    expect(d.out.join('\n')).toMatch(/L1 « Premier » — en cours, relu non conforme/);
+    expect(d.out.join('\n')).not.toMatch(/prêt/);
+  });
+
+  it('R13 — isNonConformingVerdict : FR et EN, « conforme » dans « non conforme » ne compte pas', () => {
+    for (const t of ['non conforme : 1 bloquant', 'Non conforme', 'non-conforme', 'not compliant', 'Non-compliant (2 majeurs)']) expect(isNonConformingVerdict(t), t).toBe(true);
+    for (const t of ['conforme', 'conforme après 1 correction', 'Conforme — 0 bloquant', 'compliant', 'compliant after 1 fix']) expect(isNonConformingVerdict(t), t).toBe(false);
   });
 
   it('R4 — l\'intervalle part de la dernière livraison : un lot en cours dont les commits sont avant elle ne bloque plus', async () => {

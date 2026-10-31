@@ -736,6 +736,61 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-10-31
+  - id: L483
+    title: "Nettoyage A1 : retirer « export » des symboles jamais importés dans src/ hors ref/ (knip) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § A ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-31
+  - id: L484
+    title: "Nettoyage A2 : retirer « export » des symboles jamais importés dans src/ref/ et test/, supprimer le type mort Exclusion (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § A ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-31
+  - id: L485
+    title: "Nettoyage B : retirer staleFiles et readFailedDeliveries (seuls les tests les appellent) et aligner les deux recopies de claudeConfigDir (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § B ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-31
+  - id: L486
+    title: "Nettoyage D1–D4 : doublons Ollama, buildArgs/buildRetryArgs, lecture de verrou, choix d'agent d'une étape (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § D ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-31
+  - id: L487
+    title: "Nettoyage D5–D6 : lecture d'une clé et du fichier cadence.yaml factorisées (config.ts, continue.ts, lead.ts, resources.ts) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § D ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-31
+  - id: L488
+    title: "Découpage C3 : cli.ts en modules par famille de commandes, dispatch réduit à une table (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C3 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-31
+  - id: L489
+    title: "Découpage C2 : orchestrate/command.ts en modules (arguments, budget, preflight, dry-run, status, resume) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C2 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-31
+  - id: L490
+    title: "Découpage C1a : orchestrate/cycle.ts — ctx puis budget, brief, plan-writes (façade de ré-export) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C1 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-31
+  - id: L491
+    title: "Découpage C1b : orchestrate/cycle.ts — session (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C1 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-31
+  - id: L492
+    title: "Découpage C1c : orchestrate/cycle.ts — les étapes (precheck, spec, accept, checks, work, review, integrate) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C1 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-31
+  - id: L493
+    title: "Nettoyage E : déclarer vite en devDependency, assertion manquante du R3 de orchestrate-registry.test.ts (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § E ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
+    status: todo
+    estimate: 0.5
+    created: 2026-10-31
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

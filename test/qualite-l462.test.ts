@@ -12,7 +12,7 @@ afterAll(cleanupTempDirs);
 const msg = (ruleId: string | null, message: string) => ({ ruleId, message });
 
 describe('L462 — lecture des trois outils', () => {
-  it('R1 — ESLint : un dépassement est compté par fichier et par règle, avec le pire chiffre mesuré (pas le seuil)', () => {
+  it('R1 — ESLint : un dépassement est compté par fichier et par règle, avec la somme des chiffres mesurés (|total, pas le seuil)', () => {
     const m = lireEslint([
       { filePath: '/r/src/a.ts', messages: [msg('max-lines', 'File has too many lines (450). Maximum allowed is 400.'), msg('complexity', "Function 'f' has a complexity of 20. Maximum allowed is 15."), msg('complexity', "Function 'g' has a complexity of 31. Maximum allowed is 15.")] },
       { filePath: '/r/src/b.ts', messages: [msg('max-depth', 'Blocks are nested too deeply (6). Maximum allowed is 4.'), msg('max-params', "Function 'h' has too many parameters (7). Maximum allowed is 5."), msg('sonarjs/cognitive-complexity', 'Refactor this function to reduce its Cognitive Complexity from 22 to the 15 allowed.'), msg('max-lines-per-function', "Function 'dispatch' has too many lines (540). Maximum allowed is 80.")] },
@@ -69,7 +69,7 @@ describe('L462 — le cliquet (comparer)', () => {
     expect(comparer(base, { ...base })).toEqual({ pires: [], mieux: [] });
   });
 
-  it('R5 — un fichier touché ne peut que baisser : le pire chiffre qui monte, avec le même nombre de dépassements, empire', () => {
+  it('R5 — un fichier touché ne peut que baisser : la somme des chiffres (|total) qui monte, avec le même nombre de dépassements, empire', () => {
     const { pires } = comparer(base, { ...base, 'eslint|src/a.ts|max-lines|total': 501 });
     expect(pires).toEqual([{ cle: 'eslint|src/a.ts|max-lines|total', avant: 500, apres: 501 }]);
   });
@@ -104,12 +104,18 @@ describe('L462 — la ligne de base (appliquer)', () => {
     expect(lire(dir)).toEqual({ a: 1, b: 2 });
   });
 
-  it('R5 — la vérification échoue (code 1) en nommant la mesure qui empire', () => {
+  it('R5 — la vérification échoue (code 1) en nommant la mesure qui empire ; sans base au point de départ, elle propose la voie d\'amorçage (--init --contre)', () => {
     const dir = tempDir();
     appliquer(dir, 'init', { a: 1 });
     const r = appliquer(dir, 'verifier', { a: 2 });
     expect(r.code).toBe(1);
     expect(r.texte).toContain('a : 1 → 2');
+    expect(r.texte).not.toContain('--init');
+    const sansBase = appliquer(dir, 'verifier', { a: 2 }, { nom: 'main (abc1234)', base: null });
+    expect(sansBase.code).toBe(1);
+    expect(sansBase.texte).toContain('--init --contre main');
+    // avec une base au départ, la voie n'est pas proposée : la base ne peut que baisser
+    expect(appliquer(dir, 'verifier', { a: 2 }, { nom: 'main (abc1234)', base: { a: 1 } }).texte).not.toContain('--init');
   });
 
   it('R6 — la vérification passe quand ça baisse, et dit comment figer le gain sans toucher la base', () => {
@@ -357,19 +363,114 @@ describe('L462 — le cliquet ne se contourne ni par une directive ni par un seu
     expect(r.texte).toContain('main (abc1234)');
     writeFileSync(join(dir, 'eslint.config.mjs'), 'max: 400');
     expect(appliquer(dir, 'verifier', {}, ref).code).toBe(0);
-    // un fichier de config absent au départ (lot qui l'introduit) n'a rien à comparer
-    expect(appliquer(dir, 'verifier', {}, { nom: 'main', base: {}, config: () => null }).code).toBe(0);
+    // le lot qui adopte les outils (pas de base au départ) introduit ses configs librement : rien n'est encore jugé par elles
+    expect(appliquer(dir, 'verifier', {}, { nom: 'main', base: null, config: () => null }).code).toBe(0);
   });
 
-  it('R11 — les directives qui désactivent un contrôle (eslint-disable, jscpd:ignore, tag knip) sont comptées par fichier : en ajouter fait empirer', () => {
+  it('R11 — tout fichier de config que les outils lisent est comparé au départ : eslint.config.js (lu AVANT .mjs), .knip.json, knip.config.ts, package.json#jscpd / #knip, .gitignore', () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, BASELINE), '{}');
+    writeFileSync(join(dir, 'eslint.config.mjs'), 'max: 400');
+    const depart: Record<string, string> = { 'eslint.config.mjs': 'max: 400', 'package.json': '{"name":"p","knip":{"ignore":["a"]}}', '.gitignore': 'dist\n' };
+    const ref = { nom: 'main (abc1234)', base: {}, config: (f: string) => depart[f] ?? null };
+    writeFileSync(join(dir, 'package.json'), depart['package.json']);
+    writeFileSync(join(dir, '.gitignore'), depart['.gitignore']);
+    expect(appliquer(dir, 'verifier', {}, ref).code).toBe(0);
+    // une config qui apparaît alors qu'elle n'était pas au départ change ce que l'outil lit : refusée, nommée comme neuve
+    for (const f of ['eslint.config.js', 'eslint.config.ts', '.knip.json', 'knip.jsonc', 'knip.config.ts', 'knip.ts']) {
+      writeFileSync(join(dir, f), 'x');
+      const r = appliquer(dir, 'verifier', {}, ref);
+      expect(r.code, f).toBe(1);
+      expect(r.texte).toContain(`${f} (nouveau)`);
+      rmSync(join(dir, f));
+    }
+    expect(appliquer(dir, 'verifier', {}, ref).code).toBe(0);
+    // package.json : seules les clés `jscpd` et `knip` comptent, le reste du fichier bouge librement
+    writeFileSync(join(dir, 'package.json'), '{"name":"p","version":"2","knip":{"ignore":["a"]}}');
+    expect(appliquer(dir, 'verifier', {}, ref).code).toBe(0);
+    writeFileSync(join(dir, 'package.json'), '{"name":"p","knip":{"ignore":["a"]},"jscpd":{"ignore":["src/**"]}}');
+    let r = appliquer(dir, 'verifier', {}, ref);
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain('package.json#jscpd');
+    writeFileSync(join(dir, 'package.json'), '{"name":"p","knip":{"ignore":["a","b"]}}');
+    r = appliquer(dir, 'verifier', {}, ref);
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain('package.json#knip');
+    writeFileSync(join(dir, 'package.json'), depart['package.json']);
+    // .gitignore : jscpd et knip le respectent, y cacher un dossier ferait baisser la mesure
+    writeFileSync(join(dir, '.gitignore'), 'dist\nsrc/gros.ts\n');
+    r = appliquer(dir, 'verifier', {}, ref);
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain('.gitignore (modifié)');
+    // une config supprimée est refusée aussi
+    writeFileSync(join(dir, '.gitignore'), depart['.gitignore']);
+    rmSync(join(dir, 'eslint.config.mjs'));
+    r = appliquer(dir, 'verifier', {}, ref);
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain('eslint.config.mjs (supprimé)');
+  });
+
+  it('R11 — parcours réel : un eslint.config.js aux seuils relevés, ajouté à côté du .mjs, ne fait pas sortir la porte à 0 sur un code qui grossit', () => {
+    const dir = tempDir();
+    const git = (...a: string[]) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, encoding: 'utf8' });
+    const qualite = (...args: string[]) => spawnSync(process.execPath, [join(REPO, 'scripts/qualite.mjs'), ...args], { cwd: dir, encoding: 'utf8' });
+    const gros = (n: number) => `export function f(): number {\n  let x = 0;\n${Array.from({ length: n }, (_, i) => `  x += ${i};`).join('\n')}\n  return x;\n}\n`;
+    git('init', '-q', '-b', 'main');
+    mkdirSync(join(dir, 'src'));
+    for (const f of ['eslint.config.mjs', 'knip.json']) cpSync(join(REPO, f), join(dir, f));
+    writeFileSync(join(dir, '.jscpd.json'), readFileSync(join(REPO, '.jscpd.json'), 'utf8').replace(/"path": \[[^\]]*\]/, '"path": ["src"]'));
+    symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'));
+    writeFileSync(join(dir, 'package.json'), '{"name":"p","type":"module"}\n');
+    writeFileSync(join(dir, 'src/cli.ts'), "import { f } from './gros.js';\nconsole.log(f());\n");
+    writeFileSync(join(dir, 'src/gros.ts'), gros(450));
+    expect(qualite('--init').status).toBe(0);
+    git('add', 'src', '.jscpd.json', 'eslint.config.mjs', 'knip.json', 'package.json', BASELINE);
+    git('commit', '-q', '-m', 'départ');
+    git('switch', '-q', '-c', 'lot');
+    writeFileSync(join(dir, 'src/gros.ts'), gros(900));
+    expect(qualite('--contre', 'main').status).toBe(1);
+    // la triche : ESLint 9 charge eslint.config.js avant eslint.config.mjs ; sans le refus, la mesure retombe à zéro
+    writeFileSync(join(dir, 'eslint.config.js'), "export default [{ files: ['src/**/*.ts'], rules: {} }];\n");
+    const r = qualite('--contre', 'main');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('eslint.config.js (nouveau)');
+  });
+
+  it('R11 — les directives qui désactivent un contrôle (eslint-disable, jscpd:ignore, tag knip) sont comptées par fichier, dans les seuls fichiers que l\'outil concerné analyse : en ajouter fait empirer', () => {
     const dir = tempDir();
     mkdirSync(join(dir, 'src'));
+    mkdirSync(join(dir, 'test'));
     writeFileSync(join(dir, 'src/a.ts'), '/* eslint-disable */\n// eslint-disable-next-line max-depth\n// jscpd:ignore-start\n/** @public */\nexport const a = 1;\n// jscpd:ignore-end\n');
     writeFileSync(join(dir, 'src/b.ts'), 'export const b = 1;\n');
-    const m = lireDirectives(dir);
-    expect(m).toEqual({ 'directive|src/a.ts|eslint-disable': 2, 'directive|src/a.ts|jscpd-ignore': 2, 'directive|src/a.ts|knip-tag': 1 });
+    // un fichier hors du périmètre d'ESLint et de jscpd (test/) : ses directives n'éteignent rien chez eux, knip seul le lit
+    writeFileSync(join(dir, 'test/a.test.ts'), '/* eslint-disable */\n// jscpd:ignore-start\n/** @internal */\nexport const t = 1;\n');
+    // le texte « eslint-disable » hors d'un commentaire (une chaîne, une regex, une phrase de commentaire) n'est pas une directive
+    writeFileSync(join(dir, 'src/c.ts'), "const re = /eslint-disable/; // ESLint ignore un eslint-disable\nexport const c = String(re);\n");
+    const perimetres = { 'eslint-disable': ['src/a.ts', 'src/b.ts', 'src/c.ts'], 'jscpd-ignore': ['src/a.ts', 'src/b.ts', 'src/c.ts'], 'knip-tag': ['src/a.ts', 'src/b.ts', 'src/c.ts', 'test/a.test.ts'] };
+    const m = lireDirectives(dir, perimetres);
+    expect(m).toEqual({ 'directive|src/a.ts|eslint-disable': 2, 'directive|src/a.ts|jscpd-ignore': 2, 'directive|src/a.ts|knip-tag': 1, 'directive|test/a.test.ts|knip-tag': 1 });
     writeFileSync(join(dir, 'src/b.ts'), '// eslint-disable-line\nexport const b = 1;\n');
-    expect(comparer(m, lireDirectives(dir)).pires.map((p) => p.cle)).toEqual(['directive|src/b.ts|eslint-disable']);
+    expect(comparer(m, lireDirectives(dir, perimetres)).pires.map((p) => p.cle)).toEqual(['directive|src/b.ts|eslint-disable']);
+  });
+
+  it('R11 — en dépôt réel, les périmètres sont ceux des outils : une directive dans test/ ou dans un fichier que .jscpd.json ignore n\'est pas comptée pour ESLint ni jscpd', () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, 'src'));
+    mkdirSync(join(dir, 'test'));
+    for (const f of ['eslint.config.mjs', 'knip.json']) cpSync(join(REPO, f), join(dir, f));
+    writeFileSync(join(dir, '.jscpd.json'), readFileSync(join(REPO, '.jscpd.json'), 'utf8').replace(/"path": \[[^\]]*\]/, '"path": ["src"]'));
+    symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'));
+    writeFileSync(join(dir, 'package.json'), '{"name":"p","type":"module"}\n');
+    // jscpd n'écrit son rapport que s'il a lu assez de code
+    const corps = Array.from({ length: 30 }, (_, i) => `console.log(${i});`).join('\n');
+    writeFileSync(join(dir, 'src/cli.ts'), `import { f } from './gros.js';\n// jscpd:ignore-start\nconsole.log(f());\n// jscpd:ignore-end\n${corps}\n`);
+    writeFileSync(join(dir, 'src/gros.ts'), '/** @public */\nexport const f = (): number => 1;\n');
+    writeFileSync(join(dir, 'test/x.test.ts'), '/* eslint-disable */\n// jscpd:ignore-start\n/** @internal */\nexport const t = 1;\n');
+    const qualite = (...args: string[]) => spawnSync(process.execPath, [join(REPO, 'scripts/qualite.mjs'), ...args], { cwd: dir, encoding: 'utf8' });
+    expect(qualite('--init').status).toBe(0);
+    const base = JSON.parse(readFileSync(join(dir, BASELINE), 'utf8'));
+    const directives = Object.keys(base).filter((k) => k.startsWith('directive|'));
+    expect(directives).toEqual(['directive|src/cli.ts|jscpd-ignore', 'directive|src/gros.ts|knip-tag', 'directive|test/x.test.ts|knip-tag']);
   });
 
   it('R11 — --init amorce la base même si elle existe, quand le point de départ n\'en a pas (main sans base : le lot rebasé la re-mesure) ; jamais quand il en a une', () => {

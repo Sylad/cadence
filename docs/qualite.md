@@ -54,17 +54,26 @@ anything, and the ratchet closes them:
 
 - **A directive**: `eslint.config.mjs` sets `linterOptions.noInlineConfig`, so an `eslint-disable` comment disables
   nothing (ESLint reports it, and the ratchet counts that report under `analyse`). The directives that the tools cannot
-  refuse (`jscpd:ignore-start`/`-end`, knip's `@public`/`@internal` tags) and any `eslint-disable` text are counted per
-  file under `directive|file|name`, so adding one makes the measure go up like a new finding.
-- **A threshold or an exclusion**: under `--contre`, `eslint.config.mjs`, `knip.json` and `.jscpd.json` must be
-  byte-identical to the start of the lot (exit 1 otherwise). Changing a threshold is a decision of the plan, delivered
-  alone; a lot judged by those thresholds cannot move them.
+  refuse (`jscpd:ignore-start`/`-end`, knip's `@public`/`@internal` tags) and any `eslint-disable` comment are counted per
+  file under `directive|file|name`, so adding one makes the measure go up like a new finding. Only the files the tool
+  concerned analyses are read (the files ESLint linted, the sources jscpd scanned, knip's `project` globs minus `ignore`):
+  a directive in a file the tool does not read disables nothing and is not counted.
+- **A threshold or an exclusion**: under `--contre`, every file the tools read must be byte-identical to the start of
+  the lot — present, absent or changed the same way (exit 1 otherwise, naming each one as `nouveau`, `supprimé` or
+  `modifié`). That is not only the three files this repository uses: ESLint 9 loads `eslint.config.js` **before**
+  `eslint.config.mjs` (then `.cjs`, `.ts`, `.mts`, `.cts`), knip reads `knip.json`, `knip.jsonc`, `.knip.json`,
+  `.knip.jsonc`, `knip.ts`, `knip.js`, `knip.config.ts`, `knip.config.js` and `package.json#knip`, jscpd reads
+  `.jscpd.json` and `package.json#jscpd`, and knip as jscpd respect `.gitignore`. Of `package.json`, only the `knip` and
+  `jscpd` keys are compared. Changing a threshold is a decision of the plan, delivered alone; a lot judged by those
+  thresholds cannot move them. The lot that adopts the tools (no baseline at its start) introduces its configs freely.
 
 **When the start of the lot has no baseline yet** (the lot that introduces the ratchet, while `main` moves under it):
 the baseline measured at the start no longer matches the code once `main` is merged or the lot rebased, since `main`'s
 own commits changed the figures, and the gate would hand back code the lot did not write. There is nothing to not
 exceed in that case, so `node scripts/qualite.mjs --init --contre main` re-measures at the rebased tip and rewrites the
 baseline (`--init` refuses as soon as `main` has a baseline: from then on `--ecrire` and `--migrer` are the only ways).
+The refusal itself says so: when the start of the lot has no baseline, the list of measures that got worse ends with
+that command.
 
 The baseline is also the project's list of cleanups: each cleanup lot is measured by what it removes from it.
 

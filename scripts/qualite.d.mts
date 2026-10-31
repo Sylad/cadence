@@ -2,7 +2,8 @@ export const BASELINE: string;
 export type Mesure = Record<string, number>;
 export function lireEslint(json: { filePath: string; messages: { ruleId: string | null; message: string }[] }[], racine: string): Mesure;
 export function lireKnip(json: { files?: string[]; issues?: Record<string, unknown>[] }, racine: string): Mesure;
-export function lireDirectives(racine: string): Mesure;
+/** `perimetres[nom]` : les fichiers (relatifs à `racine`) que l'outil de la directive `nom` analyse. */
+export function lireDirectives(racine: string, perimetres: Record<string, Iterable<string>>): Mesure;
 export function lireJscpd(rapport: { duplicates?: { firstFile: { name: string }; secondFile: { name: string }; lines?: number }[] }): Mesure;
 export function comparer(base: Mesure, courant: Mesure): { pires: { cle: string; avant: number; apres: number }[]; mieux: { cle: string; avant: number; apres: number }[] };
 export function lireBase(racine: string): Mesure;

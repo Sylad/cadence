@@ -28,8 +28,8 @@ export const shq = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`;
 
 /** Empreinte des lockfiles du sha (R3, R18) ; null quand le sha n'en porte aucun (pas de cache). `files` : leurs chemins dans le dépôt, triés. */
 export function lockfileFingerprint(repo: string, sha: string): { fp: string; files: string[] } | null {
-  const files = git(repo, 'ls-tree', '-r', '--name-only', sha)
-    .split('\n')
+  const files = git(repo, 'ls-tree', '-r', '--name-only', '-z', sha)
+    .split('\0')
     .filter((f) => f && LOCKFILES.includes(basename(f)) && !f.split('/').includes('node_modules'))
     .sort();
   if (!files.length) return null;
@@ -180,7 +180,8 @@ interface Work {
 async function probeHost(o: OpenOpts): Promise<{ platform: string; cores: number } | string> {
   const probe = await ssh({ host: o.host, env: o.env, connectS: PROBE_CONNECT_S, timeoutMs: 30_000, script: 'uname -s; uname -m; nproc 2>/dev/null || getconf _NPROCESSORS_ONLN' });
   if (probe.code !== 0) return causeOf(probe);
-  const [os = '', arch = '', cores = ''] = probe.output.trim().split('\n').map((l) => l.trim());
+  // Une bannière de connexion (motd, .bashrc bavard) précède la sortie : les trois dernières lignes sont celles de la sonde.
+  const [os = '', arch = '', cores = ''] = probe.output.trim().split('\n').map((l) => l.trim()).slice(-3);
   const nproc = Number.parseInt(cores, 10);
   return { platform: `${os.toLowerCase()}-${archOf(arch)}`, cores: Number.isFinite(nproc) && nproc >= 1 ? nproc : 1 };
 }

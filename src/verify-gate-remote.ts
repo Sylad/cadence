@@ -1,6 +1,5 @@
 import { configuredCap } from './orchestrate/command.js';
 import { testWorkersFrom } from './orchestrate/workers.js';
-import { onTermination } from './proc.js';
 import { ConnectionLost, GATE_TIMEOUT_MS, isSha, openRemoteGate, type Ran } from './remote-gate.js';
 import type { GateCtx } from './verify-gate.js';
 
@@ -29,9 +28,6 @@ export async function tryRemote(ctx: GateCtx, short: string, replayReason: strin
     return null;
   }
   const gate = opened.gate;
-  const forget = onTermination(() => {
-    gate.close();
-  });
   out(`verify --gate ${short} : porte jouée sur l'hôte ${host} (sha ${short}, ${gate.cache})`);
   // Les lignes des étapes sont tenues jusqu'au bout : une connexion perdue en cours de porte la fait rejouer en local, les ✓ de l'hôte ne seraient pas ceux du verdict.
   const lines: string[] = [replayReason];
@@ -48,7 +44,6 @@ export async function tryRemote(ctx: GateCtx, short: string, replayReason: strin
     out(`verify --gate : connexion perdue avec ${host} pendant la porte — rejouée en local`);
     return null;
   } finally {
-    forget();
     const orphan = gate.close();
     if (orphan) out(`verify --gate : nettoyage de l'hôte ${host} en échec (${orphan}) — le worktree orphelin y sera retiré au prochain appel`);
   }

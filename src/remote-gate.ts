@@ -5,6 +5,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { onTermination } from './proc.js';
 import { git, gitFailure, ignoredDeps, isCopiedDep } from './orchestrate/worktree.js';
 
 /** Les lockfiles que l'empreinte couvre, à tout niveau du dépôt (R18). */
@@ -159,9 +160,25 @@ type Opened = { ok: true; gate: RemoteGate } | { ok: false; stage: 'host' | 'cac
  */
 export async function openRemoteGate(o: OpenOpts): Promise<Opened> {
   if (!isSha(o.sha)) throw new Error(`sha invalide pour la porte déportée : ${o.sha}`);
+  // Dès la préparation (gate.install dure jusqu'à 30 min) et jusqu'à `close`, Ctrl-C ou un signal arrête ce qui tourne sur l'hôte et en retire le worktree (R10, R19).
+  let forget = (): void => {};
   try {
-    return await prepare(o);
+    const opened = await prepare(o, (w) => {
+      forget = onTermination(() => {
+        cleanupHost(o, w);
+      });
+    });
+    if (!opened.ok) forget();
+    else {
+      const close = opened.gate.close;
+      opened.gate.close = () => {
+        forget();
+        return close();
+      };
+    }
+    return opened;
   } catch (e) {
+    forget();
     // Une erreur locale (sha absent du dépôt, git illisible) n'est pas un rouge : la porte se replie en local, avec la cause (R5).
     return { ok: false, stage: 'host', cause: e instanceof Error ? e.message.split('\n')[0] : String(e) };
   }
@@ -247,13 +264,14 @@ async function prepareCache(o: OpenOpts, w: Work, hostPlatform: string): Promise
   return `cache rempli ${o.install ? 'par gate.install' : 'par copie des dépendances locales'} (empreinte ${short})`;
 }
 
-async function prepare(o: OpenOpts): Promise<Opened> {
+async function prepare(o: OpenOpts, onWork: (w: Work) => void): Promise<Opened> {
   const { host, env } = o;
   const probe = await probeHost(o);
   if (typeof probe === 'string') return { ok: false, stage: 'host', cause: probe };
   const id = `${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
   const root = `.cadence-gate/${basename(resolve(o.repo))}`;
   const w: Work = { id, root, head: `R="$PWD"/${shq(root)}; `, bare: '"$R/repo.git"', wt: `"$R/wt/${id}"` };
+  onWork(w);
   const pushed = await pushSha(o, w);
   if (pushed) return { ok: false, stage: 'host', cause: pushed };
   const fail = (cause: string, stage: 'host' | 'cache'): Opened => {

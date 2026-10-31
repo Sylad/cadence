@@ -123,28 +123,65 @@ regles:
     tests: ["R9 — inPlace true et host : porte dans l'arbre principal, hôte ignoré, dit", "R9 — inPlace absent et host : porte sur l'hôte"]
   - id: R10
     cas: [C1, C2]
-    enonce: "La première ligne de la porte déportée dit le lieu (hôte, sha court, cache utilisé ou rempli, empreinte courte) ; le worktree distant est retiré dans tous les cas (vert, rouge, délai, signal) et, au délai ou à Ctrl-C, les commandes distantes sont arrêtées."
+    enonce: "La première ligne de la porte déportée dit le lieu (hôte, sha court, cache utilisé ou rempli, empreinte courte) ; le worktree distant est retiré dans tous les cas (vert, rouge, délai, signal)."
     statut: sourcee
-    source: "src/verify-gate.ts:118 (« Le worktree est retiré dans tous les cas », première ligne = lieu) et 197-216 (nettoyage sur signal)"
-    tests: ["R10 — première ligne : hôte, sha et état du cache", "R10 — rouge : le worktree distant est retiré", "R10 — délai : la commande distante est arrêtée et le worktree retiré"]
+    source: "src/verify-gate.ts:118 (« Le worktree est retiré dans tous les cas », première ligne = lieu) et 197-216 (nettoyage sur signal), pour la version locale reprise à l'identique"
+    tests: ["R10 — première ligne : hôte, sha et état du cache", "R10 — rouge : le worktree distant est retiré", "R10 — délai : le worktree distant est retiré"]
   - id: R11
     cas: [C3]
-    enonce: "Déclarer gate.host seul ne vaut pas gate.readsPlan : config.gate (truthy) coupe aujourd'hui la traversée des commits de plan, la présence de l'hôte ne doit donc pas la couper."
+    enonce: "Déclarer gate.host (ou gate.install, gate.dir) seul ne vaut pas gate.readsPlan : config.gate (truthy) coupe aujourd'hui la traversée des commits de plan (ligne 163) et ajoute le message « orchestrate.gate.readsPlan : un test lit le plan… » (ligne 173) ; avec l'hôte seul, ni la coupure ni ce message ne doivent apparaître. gate: {readsPlan: false} ne pose pas config.gate aujourd'hui (src/config.ts:470) et reste inchangé."
     statut: sourcee
-    source: "src/verify-gate.ts:163 (config.gate ? undefined : ctx.planFile) et src/config.ts:463-470"
-    tests: ["R11 — gate: {host} seul : les commits de plan seuls reprennent encore le verdict", "R11 — gate: {host, readsPlan: true} : la reprise est coupée"]
+    source: "src/verify-gate.ts:163 (config.gate ? undefined : ctx.planFile), src/verify-gate.ts:173 (message readsPlan) et src/config.ts:463-470"
+    tests: ["R11 — gate: {host} seul : les commits de plan seuls reprennent encore le verdict", "R11 — gate: {host} seul : la sortie ne contient pas le message readsPlan", "R11 — gate: {host, readsPlan: true} : la reprise est coupée et le message est présent", "R11 — gate: {readsPlan: false} : config.gate non posé, comportement d'avant"]
   - id: R12
     cas: [C1, C2, C3]
-    enonce: "Le code ne contient aucun nom de machine : l'hôte, le dossier de travail distant et l'installation viennent de cadence.yaml ; sans gate.install, le dossier du cache est rempli par copie des dépendances locales (worktreeDeps), avec gate.install par cette commande jouée sur l'hôte."
+    enonce: "Le code ne contient aucun nom de machine ni de dépôt : l'hôte vient de gate.host de cadence.yaml, le dossier de travail distant est dérivé (R14)."
     statut: sourcee
     source: "demande du lot : « générique (aucun nom de machine dans le code) »"
-    tests: ["R12 — aucun nom de machine ni de dépôt ne figure dans src/", "R12 — gate.install déclaré : joué sur l'hôte, une fois par empreinte"]
+    tests: ["R12 — aucun nom de machine ni de dépôt ne figure dans src/"]
   - id: R13
     cas: [C1, C2]
     enonce: "CADENCE_TEST_WORKERS d'une porte déportée est calculé avec les cœurs de l'hôte (nproc) et le plafond de sessions, sauf valeur entière positive déjà dans l'environnement de l'appelant."
     statut: hypothese
     si_faux: "Si les cœurs locaux conviennent mieux, la valeur serait trop basse ou trop haute sur l'hôte : plus lent ou plus instable, sans donnée."
     tests: ["R13 — nproc de l'hôte 16, plafond 2 : 8 workers", "R13 — valeur entière de l'environnement conservée"]
+
+  - id: R14
+    cas: [C1, C2]
+    enonce: "Aucune clé de config ne désigne le dossier de travail distant : il est dérivé, relatif au répertoire de connexion de l'hôte : « .cadence-gate/<nom du dossier du projet local> » (dépôt nu « repo.git », caches « deps/<empreinte> », worktrees « wt/<id unique> »). Les clés acceptées de orchestrate.gate sont readsPlan, host et install ; toute autre reste refusée comme aujourd'hui."
+    statut: hypothese
+    si_faux: "Si le lead veut choisir le dossier, il faudra une clé gate.dir (ajout facultatif à la config, contrat partagé, à valider) ; sans elle seul le chemin change, rien de stocké hors de l'hôte."
+    tests: ["R14 — le dossier distant est .cadence-gate/<nom du projet> et aucune autre clé n'est lue", "R14 — gate: {dir: x} refusé comme clé inconnue"]
+  - id: R15
+    cas: [C1, C2, C3]
+    enonce: "gate.install (facultatif, commande non vide) est la commande qui installe les dépendances ; elle est toujours jouée sur l'hôte, dans un worktree au sha, pour remplir le cache de son empreinte. Sans gate.install, aucune installation distante n'est faite : le cache n'est rempli que par la copie des dépendances locales si R16 la permet ; sinon la porte se replie en local (R5) avec la cause."
+    statut: hypothese
+    si_faux: "Si le lead préfère une autre convention (commande déduite du lockfile, ou aucune clé install), seule la façon de remplir un cache change ; le cache et le verdict restent ceux de R3 et R8. La clé est un ajout facultatif à la config (D1)."
+    tests: ["R15 — gate.install déclaré : joué sur l'hôte, dans un worktree au sha, une fois par empreinte", "R15 — gate.install vide refusé", "R15 — sans gate.install et copie locale refusée par R16 : repli local dit"]
+  - id: R16
+    cas: [C1, C2]
+    enonce: "Un cache n'est jamais rempli par copie des dépendances locales sous une empreinte qu'elles ne méritent pas : la copie n'a lieu que si l'empreinte des lockfiles de l'arbre local qui les porte est égale à celle du sha ET si la plateforme locale (système et architecture) est égale à celle de l'hôte (relevée par la sonde) ; sinon pas de copie, repli selon R15. Un cache rempli par gate.install porte la plateforme de l'hôte dans sa clé de dossier."
+    statut: hypothese
+    si_faux: "Si la comparaison est trop stricte, la porte se replie plus souvent en local (plus lent, même verdict) ; si elle était omise, un cache faux serait réutilisé pour tous les shas de même lockfile (verdicts faux) : c'est pourquoi elle est prudente."
+    tests: ["R16 — lockfile local différent de celui du sha : aucune copie, repli local dit", "R16 — plateforme locale différente de l'hôte : aucune copie, repli local dit", "R16 — empreinte et plateforme égales : copie faite et cache utilisé au second appel"]
+  - id: R17
+    cas: [C1, C2]
+    enonce: "Le remplissage d'un cache est atomique et sûr en concurrence : il s'écrit dans un dossier temporaire unique, puis est publié par un renommage vers « deps/<empreinte> » ; si ce dossier existe déjà (autre appel de même empreinte, vague en parallèle ou verify --gate), le temporaire est jeté et le cache existant est utilisé. Un lecteur ne voit donc jamais un cache à moitié écrit ; un échec d'installation laisse un temporaire, jamais un cache publié (nettoyé au prochain appel)."
+    statut: hypothese
+    si_faux: "Si le renommage atomique n'est pas disponible sur le disque de l'hôte, il faudrait un verrou ; sans cette règle, deux porte simultanées corrompraient le cache et donneraient des verdicts faux."
+    tests: ["R17 — deux remplissages simultanés de même empreinte : un seul cache publié, les deux portes lisent un cache complet", "R17 — installation en échec : aucun dossier deps/<empreinte> publié", "R17 — temporaire orphelin d'un appel précédent nettoyé"]
+  - id: R18
+    cas: [C1, C2]
+    enonce: "L'empreinte couvre les lockfiles présents au sha parmi : package-lock.json, npm-shrinkwrap.json, pnpm-lock.yaml, yarn.lock, poetry.lock, uv.lock, Pipfile.lock, Cargo.lock, go.sum ; aucun lockfile au sha : pas de cache, la porte joue sans dépendances préparées. Le sha, l'hôte et les chemins sont insérés dans les commandes ssh entre quotes simples échappées ; un sha qui n'est pas hexadécimal (4 à 64 caractères) est refusé avant toute commande. Les caches ne sont jamais purgés par cadence (voir note de D2) : le nettoyage de l'espace disque de l'hôte est à la charge du lead."
+    statut: hypothese
+    si_faux: "Si la liste de lockfiles est incomplète, un projet de ce type n'aurait pas de cache (porte plus lente, verdict juste) ; sans quoting, un sha ou un chemin hostile exécuterait une commande sur l'hôte ; sans purge, le disque de l'hôte peut se remplir (effet sur l'hôte, pas sur le dépôt)."
+    tests: ["R18 — lockfile yarn.lock seul : empreinte calculée", "R18 — aucun lockfile : pas de cache, la porte joue", "R18 — sha « abc; rm -rf x » refusé avant toute commande ssh", "R18 — chemin avec apostrophe correctement quoté"]
+  - id: R19
+    cas: [C1, C2]
+    enonce: "Au délai, à Ctrl-C ou à un signal, les commandes distantes sont arrêtées côté hôte : elles sont lancées avec un tty alloué (ssh -tt) dans un groupe de processus propre, et le nettoyage envoie ensuite à l'hôte une commande séparée qui tue ce groupe et retire le worktree ; si cette commande échoue, la sortie le dit et le worktree orphelin est retiré au prochain appel."
+    statut: hypothese
+    si_faux: "Si le tty ou le groupe de processus ne suffisent pas, des commandes pourraient continuer sur l'hôte après le délai (charge inutile, sans effet sur le verdict) ; le kill du seul ssh local ne l'évite pas."
+    tests: ["R19 — délai : la commande distante est arrêtée côté hôte (plus de processus du groupe)", "R19 — nettoyage en échec : dit dans la sortie, worktree orphelin retiré au prochain appel"]
 
 contrats:
   - id: A1
@@ -154,8 +191,9 @@ contrats:
     erreurs:
       - { code: "log warn", message: "verify --gate : porte déportée indisponible sur <hôte> (<cause>) — repli sur la porte locale" }
       - { code: "log warn", message: "verify --gate : connexion perdue avec <hôte> pendant la porte — rejouée en local" }
+      - { code: "log warn", message: "verify --gate : cache de dépendances impossible sur <hôte> (<cause>) — repli sur la porte locale" }
       - { code: "log warn", message: "verify --gate : verify.inPlace demande l'arbre principal, l'hôte <hôte> est ignoré" }
-    regles: [R1, R3, R4, R5, R6, R8, R9, R10, R13]
+    regles: [R1, R3, R4, R5, R6, R8, R9, R10, R13, R14, R15, R16, R17, R18, R19]
   - id: A2
     appel: commande cadence orchestrate
     entree: "cadence.yaml avec orchestrate.gate.host ; worktree d'un lot"
@@ -163,17 +201,18 @@ contrats:
     erreurs:
       - { code: "log warn", message: "porte du lot <lot> : worktree non validé, jouée en local (l'hôte ne verrait pas les modifications)" }
       - { code: "log warn", message: "porte du lot <lot> : porte déportée indisponible sur <hôte> (<cause>) — jouée en local" }
-    regles: [R1, R3, R4, R5, R7, R8, R10, R12, R13]
+    regles: [R1, R3, R4, R5, R7, R8, R10, R12, R13, R14, R15, R16, R17, R18, R19]
   - id: A3
     appel: commande cadence orchestrate (lecture de cadence.yaml)
     entree: "orchestrate.gate: { host, install, readsPlan }"
     sortie: "config lue ; host et install facultatifs"
     erreurs:
       - { code: "log error", message: "cadence.yaml : orchestrate.gate.host : destination ssh attendue (une chaîne sans espace, ne commençant pas par « - »)" }
+      - { code: "log error", message: "verify --gate : sha invalide pour la porte déportée (hexadécimal attendu)" }
       - { code: "log error", message: "cadence.yaml : orchestrate.gate.install : commande non vide attendue" }
-    regles: [R2, R11, R12]
+    regles: [R2, R11, R12, R14, R15]
 
 donnees:
-  - { id: D1, objet: "cadence.yaml : clés orchestrate.gate.host et orchestrate.gate.install (facultatives)", existant: true, modification: ajout, decision: "ajout facultatif à la clé gate de la config : l'absence laisse la porte inchangée (R1) ; la clé host est nommée par le lot ; install est une hypothèse de ce lot (R12), pas une décision du lead", note: "clés facultatives, lues par src/config.ts" }
-  - { id: D2, objet: "dépôt nu et caches de dépendances sur l'hôte (dossier de travail distant, un cache par empreinte de lockfile)", existant: false, modification: aucune, note: "nouveau, hors du dépôt et jetable : le supprimer ne fait que forcer un push et une réinstallation" }
+  - { id: D1, objet: "cadence.yaml : clés orchestrate.gate.host et orchestrate.gate.install (facultatives)", existant: true, modification: ajout, decision: "ajout facultatif à la clé gate de la config : l'absence laisse la porte inchangée (R1) ; la clé host est nommée par le lot ; install est une hypothèse de ce lot (R15, avec si_faux), pas une décision du lead ; aucune clé de dossier (R14)", note: "clés facultatives, lues par src/config.ts" }
+  - { id: D2, objet: "dépôt nu et caches de dépendances sur l'hôte (dossier de travail distant, un cache par empreinte de lockfile)", existant: false, modification: aucune, note: "nouveau, hors du dépôt et jetable mais sans purge par cadence (R18) : le supprimer ne fait que forcer un push et une réinstallation" }
   - { id: D3, objet: "verdict par sha de l'état partagé du dépôt local (gate-verdict)", existant: true, modification: aucune, note: "écrit comme avant, vert ou rouge, par la porte déportée (R8)" }

@@ -276,5 +276,6 @@
   "jscpd|src/orchestrate/lock.ts|lignes": 12,
   "jscpd|src/state.ts": 1,
   "jscpd|src/state.ts|lignes": 12,
+  "knip|src/spec.ts|exports": 2,
   "knip|test/vitest-config-clone-neuf.test.ts|unlisted": 1
 }

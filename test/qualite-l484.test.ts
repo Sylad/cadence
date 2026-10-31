@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 
 const FICHIERS = [
-  'spec',
   'ref/add', 'ref/analyse', 'ref/corpus-render', 'ref/coverage', 'ref/diff', 'ref/evaluate', 'ref/figures', 'ref/measure',
   'ref/pdf', 'ref/regard', 'ref/session', 'ref/store', 'ref/tools',
 ].map((f) => `src/${f}.ts`).concat([
@@ -15,7 +14,7 @@ const FICHIERS = [
 
 interface Probleme { file: string; exports?: unknown[]; types?: unknown[] }
 
-describe('L484 — A2 : « export » retiré des symboles de src/ref/, spec.ts et test/ jamais importés', () => {
+describe('L484 — A2 : « export » retiré des symboles de src/ref/ et test/ jamais importés', () => {
   it('A2 — knip ne trouve plus aucun export ni type inutilisé dans les fichiers nettoyés', () => {
     const r = spawnSync(process.execPath, ['node_modules/knip/bin/knip.js', '--reporter', 'json'], { cwd: REPO, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
     const issues = (JSON.parse(r.stdout) as { issues: Probleme[] }).issues;

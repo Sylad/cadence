@@ -309,6 +309,8 @@ lots:
     status: todo
     estimate: 0.1
     created: 2026-10-29
+    notes:
+      - { date: 2026-10-31, text: "31-10 : mesure intermédiaire (cadence corrections --classify --since 2026-10-30, 86 passes) : bug de code 44 (51 % des classées, 53 % avant), cas limite 64 % des bug-code (69 % avant), lots ≥ 2 passes 26 % (27 % avant) — consignes L428/L447 sans effet net ; mécanisme suivant L497 (sonde avant revue), à mesurer aussi" }
   - id: L431
     title: "verify --gate --sha joue la porte dans l'arbre principal (« propre, au sha ») pendant une vague vivante du dépôt : une intégration déplace HEAD au milieu, verdict non probant, 5 min perdues (29-10, L427) — pendant une vague vivante du dépôt, toujours une copie jetable"
     status: done
@@ -842,6 +844,12 @@ lots:
     title: "docs.sync : un lot de nettoyage sans effet documenté (retrait d'export, découpage de fichier, doublon factorisé) ne doit plus être rendu au lead avant la revue — accepter l'acquittement à l'avance (raf docs-ok posé avant la vague, valable pour les commits qui suivent) ou une clé docs: none sur le lot ; cas du 31-10 : L483 et L484 rendus deux fois pour 30 fichiers dont aucun document ne change, et L485–L493 sont du même type"
     status: todo
     estimate: 0.25
+    created: 2026-10-31
+  - id: L497
+    title: "Sonde de cas limites avant la revue (goulot « bug de code » : cas limite 64 % des passes bug-code depuis la consigne L447, 69 % avant — la consigne écrite n'a rien changé) : étape d'orchestrate entre implement et review, session Sonnet neuve qui lit le diff du lot (et la fiche s'il y en a une) et cherche à le casser par des tests aux bornes (vide, absent, double, mauvais type, refusé, forme réelle des données, autres appelants) ; tout test qui échoue revient à implement comme constat avant la revue Opus ; clé orchestrate.probe (absente = rien ne change), posée sur cadence seul pour l'essai ; mesure par L430 (part bug-code et cas limite, lots à ≥ 2 passes, tokens par lot) pour garder ou retirer"
+    status: todo
+    estimate: 0.5
+    spec: true
     created: 2026-10-31
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

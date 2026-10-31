@@ -128,3 +128,5 @@ Shell has no complexity rule: keep a script small, and move logic into a languag
 Start from the table above, measure, and fix the baseline **where the code is**: a threshold chosen to fit the existing
 code is not a guard rail. Lower a threshold only when the baseline for it is empty or near, and never raise one: a
 threshold that goes up is a decision, written in the plan.
+
+The simplification audit of L461 (dead code, copies, how to split the three largest files, each point with the tests that protect it and its measure) is in [docs/mesures/audit-simplification-l461.md](mesures/audit-simplification-l461.md).

@@ -80,6 +80,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- Simplification audit of the code (L461, `docs/mesures/audit-simplification-l461.md`): dead code, copies and split plans for `orchestrate/cycle.ts`, `orchestrate/command.ts` and `cli.ts`, each point ranked by gain and risk with the tests that protect it and its measure. Read-only: no code changed.
+
 ## [1.32.0] - 2026-10-31
 
 ### Added

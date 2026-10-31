@@ -7,6 +7,8 @@ export default tseslint.config(
   { ignores: ['dist/**', 'node_modules/**', 'plugins/**', 'evals/**', 'tmp/**', '.cadence/**'] },
   {
     files: ['src/**/*.ts', 'bin/**/*.js', 'scripts/**/*.mjs'],
+    // un eslint-disable ne fait pas disparaître un dépassement : le cliquet le compte quand même (qualite.mjs)
+    linterOptions: { noInlineConfig: true },
     languageOptions: { parser: tseslint.parser },
     plugins: { sonarjs },
     rules: {

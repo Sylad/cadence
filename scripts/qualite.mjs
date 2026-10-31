@@ -2,7 +2,7 @@
 // Le cliquet compare la mesure à qualite-baseline.json : l'existant passe, rien ne peut empirer, ce qui baisse se fige.
 // Lancé par `npm run qualite` (porte orchestrate.build et CI) ; la recette est dans docs/qualite.md.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -71,6 +71,39 @@ export function lireJscpd(rapport) {
   return mesure;
 }
 
+// Les directives qui éteignent un contrôle au lieu de corriger le code : un fichier qui en gagne une empire, comme pour une règle.
+// (ESLint les ignore déjà : eslint.config.mjs pose noInlineConfig ; on les compte aussi, pour que la tentative se voie.)
+const DIRECTIVES = {
+  'eslint-disable': /eslint-disable/g,
+  'jscpd-ignore': /jscpd:ignore-(?:start|end)/g,
+  'knip-tag': /@(?:public|internal|beta|alpha|lintignore|knipignore)\b/g,
+};
+const DOSSIERS_LUS = ['src', 'bin', 'scripts', 'test'];
+
+function* fichiersSource(dossier) {
+  for (const e of readdirSync(dossier, { withFileTypes: true })) {
+    const chemin = join(dossier, e.name);
+    if (e.isDirectory()) yield* fichiersSource(chemin);
+    else if (/\.(?:ts|mjs|js)$/.test(e.name)) yield chemin;
+  }
+}
+
+/** Par fichier et par sorte de directive (`directive|fichier|nom`), le nombre d'occurrences dans le code source. */
+export function lireDirectives(racine) {
+  const mesure = {};
+  for (const d of DOSSIERS_LUS) {
+    if (!existsSync(join(racine, d))) continue;
+    for (const f of fichiersSource(join(racine, d))) {
+      const texte = readFileSync(f, 'utf8');
+      for (const [nom, re] of Object.entries(DIRECTIVES)) {
+        const n = texte.match(re)?.length ?? 0;
+        if (n) ajouter(mesure, `directive|${chemin(racine, f)}|${nom}`, n);
+      }
+    }
+  }
+  return mesure;
+}
+
 /** Ce qui empire (une clé neuve ou plus haute que la base), ce qui baisse (plus bas ou disparu). */
 export function comparer(base, courant) {
   const pires = [];
@@ -133,13 +166,13 @@ export function mesurer(racine) {
   try {
     lancer(racine, 'jscpd/bin/jscpd', ['-c', '.jscpd.json', '--output', sortie], [0]);
     const jscpd = JSON.parse(readFileSync(join(sortie, 'jscpd-report.json'), 'utf8'));
-    return trier({ ...lireEslint(eslint, racine), ...lireKnip(knip, racine), ...lireJscpd(jscpd) });
+    return trier({ ...lireEslint(eslint, racine), ...lireKnip(knip, racine), ...lireJscpd(jscpd), ...lireDirectives(racine) });
   } finally {
     rmSync(sortie, { recursive: true, force: true });
   }
 }
 
-/** Le point de départ du lot : au merge-base de HEAD et de `ref`, la ligne de base (null si elle n'y existait pas encore) et `existe(chemin)`, vrai pour un fichier qui y était. */
+/** Le point de départ du lot : au merge-base de HEAD et de `ref`, la ligne de base (null si elle n'y existait pas encore), `existe(chemin)` (vrai pour un fichier qui y était) et `config(chemin)` (son contenu, null s'il n'y était pas). */
 export function lireRef(racine, ref) {
   const git = (...args) => spawnSync('git', args, { cwd: racine, encoding: 'utf8' });
   const mb = git('merge-base', 'HEAD', ref);
@@ -147,7 +180,22 @@ export function lireRef(racine, ref) {
   const sha = mb.stdout.trim();
   const show = git('show', `${sha}:${BASELINE}`);
   const existe = (chemin) => git('cat-file', '-e', `${sha}:${chemin}`).status === 0;
-  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe };
+  const config = (chemin) => { const r = git('show', `${sha}:${chemin}`); return r.status === 0 ? r.stdout : null; };
+  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, config };
+}
+
+// Les seuils et les exclusions des trois outils : les relever ferait baisser la mesure sans corriger le code.
+const CONFIGS = ['eslint.config.mjs', 'knip.json', '.jscpd.json'];
+
+/** Refus (code 1) si une config diffère de celle du point de départ du lot, null sinon. */
+function configChangee(racine, ref) {
+  if (!ref?.config) return null;
+  const changees = CONFIGS.filter((f) => {
+    const depart = ref.config(f);
+    return depart !== null && (!existsSync(join(racine, f)) || readFileSync(join(racine, f), 'utf8') !== depart);
+  });
+  if (!changees.length) return null;
+  return { code: 1, texte: `${changees.join(', ')} diffère(nt) de ${ref.nom} : un seuil ou une exclusion ne se change pas dans un lot qui est jugé par eux (corriger le code ; changer une config est une décision du plan, livrée seule).` };
 }
 
 const ligne = ({ cle, avant, apres }) => `  ${cle} : ${avant} → ${apres}`;
@@ -178,9 +226,12 @@ function migrer(racine, base, mesure, ref) {
  */
 export function appliquer(racine, mode, mesure = mesurer(racine), ref = null) {
   const existe = existsSync(join(racine, BASELINE));
+  const config = configChangee(racine, ref);
+  if (config) return config;
   if (mode === 'init') {
     if (ref?.base) return { code: 2, texte: `${BASELINE} existe déjà dans ${ref.nom} : --init ne la recrée pas (elle ne peut que baisser, utiliser --ecrire).` };
-    if (existe) return { code: 2, texte: `${BASELINE} existe déjà : --init ne la recrée pas (elle ne peut que baisser, utiliser --ecrire).` };
+    // sans base au départ (main n'en a pas encore), il n'y a rien à ne pas dépasser : on l'amorce, y compris pour re-mesurer après un rebase
+    if (existe && !ref) return { code: 2, texte: `${BASELINE} existe déjà : --init ne la recrée pas (elle ne peut que baisser, utiliser --ecrire).` };
     ecrireBase(racine, mesure);
     return { code: 0, texte: `${BASELINE} créée : ${Object.keys(mesure).length} mesures figées.` };
   }

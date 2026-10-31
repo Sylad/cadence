@@ -49,8 +49,22 @@ rule) did not go up. A new path starts free — its own `max-lines` finding is f
 more — but a defect cannot be moved into an existing file, nor added. The same rule is what `--contre` applies to the
 baseline of the lot, so a migrated baseline passes the gate and the CI, and a hand-edited one does not. It needs
 `--contre` (the files that « existed » are those of the start of the lot) and exits 2 without it.
-The way out of a finding is to fix it and lock the gain; a `// eslint-disable` comment is a decision to be justified in
-review (ESLint reports a disable directive that disables nothing, and the ratchet counts it under `analyse`).
+The way out of a finding is to fix it and lock the gain. Two other ways would also lower the measure without fixing
+anything, and the ratchet closes them:
+
+- **A directive**: `eslint.config.mjs` sets `linterOptions.noInlineConfig`, so an `eslint-disable` comment disables
+  nothing (ESLint reports it, and the ratchet counts that report under `analyse`). The directives that the tools cannot
+  refuse (`jscpd:ignore-start`/`-end`, knip's `@public`/`@internal` tags) and any `eslint-disable` text are counted per
+  file under `directive|file|name`, so adding one makes the measure go up like a new finding.
+- **A threshold or an exclusion**: under `--contre`, `eslint.config.mjs`, `knip.json` and `.jscpd.json` must be
+  byte-identical to the start of the lot (exit 1 otherwise). Changing a threshold is a decision of the plan, delivered
+  alone; a lot judged by those thresholds cannot move them.
+
+**When the start of the lot has no baseline yet** (the lot that introduces the ratchet, while `main` moves under it):
+the baseline measured at the start no longer matches the code once `main` is merged or the lot rebased, since `main`'s
+own commits changed the figures, and the gate would hand back code the lot did not write. There is nothing to not
+exceed in that case, so `node scripts/qualite.mjs --init --contre main` re-measures at the rebased tip and rewrites the
+baseline (`--init` refuses as soon as `main` has a baseline: from then on `--ecrire` and `--migrer` are the only ways).
 
 The baseline is also the project's list of cleanups: each cleanup lot is measured by what it removes from it.
 

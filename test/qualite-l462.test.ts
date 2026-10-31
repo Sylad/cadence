@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { appliquer, BASELINE, comparer, comparerMigration, lireEslint, lireJscpd, lireKnip, lireRef } from '../scripts/qualite.mjs';
+import { appliquer, BASELINE, comparer, comparerMigration, lireDirectives, lireEslint, lireJscpd, lireKnip, lireRef } from '../scripts/qualite.mjs';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -340,5 +340,64 @@ describe('L462 — parcours réel dans un dépôt jetable (vrais ESLint, knip, j
     expect(casse.status).toBe(2);
     expect(casse.stderr).toContain('eslint');
     expect(existsSync(join(dir, 'src'))).toBe(true);
+  });
+});
+
+describe('L462 — le cliquet ne se contourne ni par une directive ni par un seuil relevé', () => {
+  const lire = (dir: string) => JSON.parse(readFileSync(join(dir, BASELINE), 'utf8'));
+
+  it('R11 — une config (eslint.config.mjs, knip.json, .jscpd.json) changée par rapport au départ est refusée sous --contre, intacte elle passe', () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, BASELINE), '{}');
+    writeFileSync(join(dir, 'eslint.config.mjs'), 'max: 4000');
+    const ref = { nom: 'main (abc1234)', base: {}, config: (f: string) => (f === 'eslint.config.mjs' ? 'max: 400' : null) };
+    const r = appliquer(dir, 'verifier', {}, ref);
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain('eslint.config.mjs');
+    expect(r.texte).toContain('main (abc1234)');
+    writeFileSync(join(dir, 'eslint.config.mjs'), 'max: 400');
+    expect(appliquer(dir, 'verifier', {}, ref).code).toBe(0);
+    // un fichier de config absent au départ (lot qui l'introduit) n'a rien à comparer
+    expect(appliquer(dir, 'verifier', {}, { nom: 'main', base: {}, config: () => null }).code).toBe(0);
+  });
+
+  it('R11 — les directives qui désactivent un contrôle (eslint-disable, jscpd:ignore, tag knip) sont comptées par fichier : en ajouter fait empirer', () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, 'src'));
+    writeFileSync(join(dir, 'src/a.ts'), '/* eslint-disable */\n// eslint-disable-next-line max-depth\n// jscpd:ignore-start\n/** @public */\nexport const a = 1;\n// jscpd:ignore-end\n');
+    writeFileSync(join(dir, 'src/b.ts'), 'export const b = 1;\n');
+    const m = lireDirectives(dir);
+    expect(m).toEqual({ 'directive|src/a.ts|eslint-disable': 2, 'directive|src/a.ts|jscpd-ignore': 2, 'directive|src/a.ts|knip-tag': 1 });
+    writeFileSync(join(dir, 'src/b.ts'), '// eslint-disable-line\nexport const b = 1;\n');
+    expect(comparer(m, lireDirectives(dir)).pires.map((p) => p.cle)).toEqual(['directive|src/b.ts|eslint-disable']);
+  });
+
+  it('R11 — --init amorce la base même si elle existe, quand le point de départ n\'en a pas (main sans base : le lot rebasé la re-mesure) ; jamais quand il en a une', () => {
+    const dir = tempDir();
+    appliquer(dir, 'init', { a: 1 });
+    expect(appliquer(dir, 'init', { a: 9 }, { nom: 'main', base: { a: 1 } }).code).toBe(2);
+    expect(lire(dir)).toEqual({ a: 1 });
+    const r = appliquer(dir, 'init', { a: 9 }, { nom: 'main (abc1234)', base: null });
+    expect(r.code).toBe(0);
+    expect(lire(dir)).toEqual({ a: 9 });
+  });
+
+  it('R11 — parcours réel : un /* eslint-disable */ ajouté en tête d\'un fichier trop gros ne fait plus baisser la mesure', () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, 'src'));
+    for (const f of ['eslint.config.mjs', 'knip.json']) cpSync(join(REPO, f), join(dir, f));
+    writeFileSync(join(dir, '.jscpd.json'), readFileSync(join(REPO, '.jscpd.json'), 'utf8').replace(/"path": \[[^\]]*\]/, '"path": ["src"]'));
+    symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'));
+    writeFileSync(join(dir, 'package.json'), '{"name":"p","type":"module"}\n');
+    const corps = Array.from({ length: 450 }, (_, i) => `  x += ${i};`).join('\n');
+    const gros = (tete: string) => `${tete}export function f(): number {\n  let x = 0;\n${corps}\n  return x;\n}\n`;
+    writeFileSync(join(dir, 'src/cli.ts'), "import { f } from './gros.js';\nconsole.log(f());\n");
+    writeFileSync(join(dir, 'src/gros.ts'), gros(''));
+    const qualite = (...args: string[]) => spawnSync(process.execPath, [join(REPO, 'scripts/qualite.mjs'), ...args], { cwd: dir, encoding: 'utf8' });
+    expect(qualite('--init').status).toBe(0);
+    writeFileSync(join(dir, 'src/gros.ts'), gros('/* eslint-disable */\n'));
+    const r = qualite();
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/directive\|src\/gros\.ts\|eslint-disable|eslint\|src\/gros\.ts\|analyse/);
   });
 });

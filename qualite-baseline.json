@@ -1,4 +1,10 @@
 {
+  "directive|scripts/qualite.mjs|eslint-disable": 3,
+  "directive|src/orchestrate/baseline.ts|eslint-disable": 1,
+  "directive|src/state.ts|eslint-disable": 2,
+  "directive|test/qualite-l462.test.ts|eslint-disable": 9,
+  "directive|test/qualite-l462.test.ts|jscpd-ignore": 2,
+  "directive|test/qualite-l462.test.ts|knip-tag": 1,
   "eslint|scripts/check-links.mjs|sonarjs/cognitive-complexity": 1,
   "eslint|scripts/check-links.mjs|sonarjs/cognitive-complexity|total": 21,
   "eslint|scripts/mise-en-service.mjs|complexity": 2,

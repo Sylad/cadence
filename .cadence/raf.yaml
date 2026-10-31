@@ -603,13 +603,14 @@ lots:
       - { date: 2026-10-30, text: "Partir de l'existant : docs/fonctionnement.md, docs/overview.md et leurs schémas (fonctionnement-lot, -wave, -lead, -service, cycle-vague, en clair et sombre). D'abord mesurer ce qui manque ou est périmé par rapport aux notions de la liste : worktree, intégration, livrable jusqu'à, livreur, holds, escalade, readsPlan, tolérances de L456… Ensuite compléter ou restructurer ces pages, sans créer de doublon. docs/concepts.md n'est créé que si fonctionnement.md ne peut pas jouer ce rôle. Un lecteur qui ne connaît pas cadence doit comprendre le parcours d'un lot en 5 minutes." }
   - id: L461
     title: "Audit de simplification du code (lecture seule, relecteur neuf en Fable) : code mort (exports jamais appelés, options ou branches sans effet, ce qui a été remplacé sans être retiré), doublons (blocs copiés, fonctions jumelles), fichiers trop gros et leurs découpages naturels (orchestrate/cycle.ts 3047 lignes, orchestrate/command.ts 1679, cli.ts 1597 au 30-10), tests redondants ou vides ; liste classée par gain et par risque, chaque point avec les tests qui le protègent déjà (ou « non protégé ») et sa mesure ; aucun changement. Chaque point retenu devient un lot de nettoyage ≤ 0,5 j, sans changement de comportement observable (suite verte sans toucher aux tests sauf ceux de code mort), mesuré avant/après — demande de Sylvain le 30-10"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-30
     notes:
       - { date: 2026-10-30, text: "Après L462 : s'appuyer sur ses mesures (ESLint, sonarjs, knip, jscpd) et sur sa ligne de base. Chaque nettoyage doit faire baisser la ligne de base. Découper les gros fichiers en modules cohérents, organisation pro (Sylvain, 30-10)." }
     started: 2026-10-31
     review: { date: 2026-10-31, verdict: "conforme : 0 bloquant, 0 majeur, 3 mineurs (précisions à porter dans D1, D4, D5/D6 du rapport) — orchestré (vague 2026-10-31-1250-cad, 3 passe(s) de correction)", commit: c0985b218051bea5262872120774c55f1e8de835, reporte: { de: d8a4ac0f8154176150059d17b210b3f79014c883, vers: c0985b218051bea5262872120774c55f1e8de835, patchId: 7c4f272dc08fef0e976397aa8db43a85e1eebce8 } }
+    finished: 2026-10-31
   - id: L462
     title: "Garde-fous de qualité du code, comme Checkstyle/PMD/Sonar en Java : ESLint + typescript-eslint (max-lines par fichier, max-lines-per-function, max-depth, max-params, complexity), eslint-plugin-sonarjs (complexité cognitive), knip (code mort, exports et dépendances inutilisés), jscpd (doublons) ; seuils de départ 400 lignes/fichier, 80/fonction, complexité cognitive 15 ; ligne de base « cliquet » versionnée (l'existant passe, rien ne peut empirer, un fichier touché ne peut que baisser) ; dans la porte (orchestrate.build) et la CI ; doc du rôle de chaque outil et du cliquet — demande de Sylvain le 30-10 (« bonnes pratiques pour être pris au sérieux »)"
     status: done

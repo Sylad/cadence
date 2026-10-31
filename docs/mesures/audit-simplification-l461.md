@@ -6,6 +6,23 @@ mort), à créer par le lead. Les mesures viennent des outils de L462 (`node scr
 et se rejouent avec les commandes de la dernière section ; chaque lot doit **faire baisser la ligne de base**
 (`npm run qualite:cliquet`), le découpage d'un fichier passant par `--migrer --contre main` (voir `docs/qualite.md`).
 
+> **Modèle ayant produit l'audit (écart accepté par le lead le 31-10).** Le but du lot demandait un relecteur neuf en
+> Fable. Les sections ont été produites ainsi :
+>
+> | Section | Produite par | Relue par un Fable neuf |
+> |---|---|---|
+> | Mesures de départ | Claude Sonnet 5.5 (`6191474b`) | non |
+> | A. Retirer `export` | Sonnet 5.5, corrigée par Fable 5.1 (`6719f020` : `ÉcritBack`, « piège » de A) | oui |
+> | B. Code appelé par les tests seuls | Sonnet 5.5, corrigée par Fable 5.1 (`6719f020` : `claudeConfigDir`) | oui |
+> | C. Découper les trois gros fichiers | Sonnet 5.5 (`6191474b`) | **non** |
+> | D. Doublons | Sonnet 5.5 (`6191474b`) | **non** |
+> | E. Divers | Sonnet 5.5 (`6191474b`, `78cb7448`, `2b044a43`) | **non** |
+> | Non retenu | Sonnet 5.5 (`6191474b`, `78cb7448`) | **non** |
+> | Ordre proposé, Rejouer les mesures | Sonnet 5.5 (`6191474b`) | non |
+>
+> Décision du lead : l'audit n'est pas rejoué en Fable. La revue neuve Fable qui suit vérifie sur échantillon que les
+> sections non relues tiennent ; la liste reste une proposition que le lead présente à Sylvain, qui tranche chaque point.
+
 ## Mesures de départ (sha `e6c018ee`)
 
 | Mesure | Valeur |

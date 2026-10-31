@@ -852,6 +852,32 @@ lots:
     spec: true
     created: 2026-10-31
     started: 2026-10-31
+  - id: L498
+    title: "File de lots pré-approuvés tirée à chaque créneau libre (inventaire des pertes du 31-10 (17→31-10) : 2 569 min de mur sans aucune session, 1,58 créneau occupé sur 3 en moyenne) : le lead approuve une liste ordonnée de lots (projet:lot) une fois, chaque vague vivante ou une vague neuve en tire le suivant dès qu'un créneau se libère, sans attendre le lead ; un lot non mûr (question, after non clos, uses tenu) est sauté et dit ; avec L421 (ajout à une vague vivante)"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-10-31
+  - id: L499
+    title: "Parité porte ↔ CI (inventaire des pertes du 31-10 (17→31-10) : 37 livraisons rouges, ~12 h estimées, dont des tests joués en CI seulement, ex. e2e warhammer) : cadence lit les commandes de test des workflows CI du dépôt et signale (lead tour, orchestrate --dry-run, verify --gate) celles que orchestrate.test/build ne jouent pas ; avec L482"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-31
+  - id: L500
+    title: "Précheck : tests d'acceptation scellés et fichiers partagés (inventaire des pertes du 31-10 (17→31-10) : 19 questions sur 43 portent sur un test scellé d'un autre lot, médiane 56 min de blocage ; 28 intégrations refusées dont 16 conflits) : avant implement, le précheck liste les tests scellés que le lot risque de toucher et les fichiers que touche aussi un autre lot de la vague ou un worktree conservé, dans le brief et dans le tableau"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-31
+  - id: L501
+    title: "Budget de lot calé sur la mesure (inventaire des pertes du 31-10 (17→31-10) : 34 lots rendus pour budget, ~800 min et 11 M tokens, médiane 106 min avant reprise) : le budget par défaut d'un lot vient du p90 des tokens par estimate que cadence perf calcule déjà (fenêtre glissante), borné, et le --dry-run dit d'où vient le chiffre"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-31
+  - id: L502
+    title: "Hook du plugin contre le pipe qui masque le code de sortie (inventaire des pertes du 31-10 (17→31-10) : 4 récidives du lead malgré la règle, L423 L434 ouverts à tort) : PreToolUse Bash qui refuse une commande de porte, de test, de push ou de livraison (cadence, raf, git push, npm test, vitest…) suivie de | tail/head/grep sans set -o pipefail ni PIPESTATUS, avec le message qui dit quoi écrire"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-31
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

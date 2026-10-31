@@ -118,7 +118,9 @@ deux niveaux différents (unitaire `prepareTree` contre vague complète) ; ils n
 
 - `test/vitest-config-clone-neuf.test.ts:3` importe `vite`, absent des `devDependencies` (knip : « unlisted ») : le déclarer
   (`npm i -D vite@<version>`) ou l'importer via `vitest/node`. Base knip −1.
-- `knip.json` : `scripts/*.d.mts` dans `ignore` est inutile (indication de knip, « Remove from ignore »).
+- `knip.json` : `scripts/*.d.mts` dans `ignore` est inutile (indication de knip, « Remove from ignore »). **Décision du plan, livrée seule** :
+  `scripts/qualite.mjs` refuse tout lot dont `knip.json` diffère de `main` (`docs/qualite.md` : « a lot judged by those thresholds cannot move them »).
+  Ce point ne peut donc pas être rangé dans un lot de nettoyage.
 - `test/orchestrate-registry.test.ts:304` (`R3 — un hold dont le TTL est échu…`) n'a aucun `expect` : il ne peut échouer que
   par dépassement de délai. Ajouter l'assertion sur le créneau rendu (test faible, pas vide).
 - Directives : 2 `eslint-disable` (`state.ts`, `orchestrate/baseline.ts`) et 4 étiquettes knip dans `qualite-l462.test.ts`
@@ -140,7 +142,8 @@ deux niveaux différents (unitaire `prepareTree` contre vague complète) ; ils n
 1. **A** (2 lots) puis **B** : base knip 153 → ≈ 3, sans risque.
 2. **D1–D4** (un lot) ; **D5–D6** (un lot).
 3. **C3** (cli.ts, le plus testé), puis **C2**, puis **C1** (3 lots, le plus gros gain : `max-lines` total −2 000).
-4. **E** au passage du premier lot qui touche le fichier concerné.
+4. **E**, sauf `knip.json` : au passage du premier lot qui touche le fichier concerné. Le retrait de `scripts/*.d.mts` de `knip.json` est une
+   décision du plan, dans un lot à part qui ne change que ce fichier.
 
 ## Rejouer les mesures
 

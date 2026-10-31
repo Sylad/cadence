@@ -317,7 +317,16 @@ export interface OrchestrateConfig {
    * `gate.readsPlan` (L450) : un test de la porte lit le plan du projet (`true`, ou la liste des chemins des tests qui le lisent, pour la trace). `cadence verify --gate` ne reprend alors plus le verdict
    * d'une vague sous des commits qui ne changent que le plan (L444) : un `raf done` change ce que ce test lit, la porte est rejouée. Absente : ces commits sont traversés.
    */
-  gate?: { readsPlan: true | string[] };
+  gate?: {
+    readsPlan?: true | string[];
+    /**
+     * `gate.host` (L403) : destination ssh où jouer la porte (`machine`, `user@machine`), au sha poussé, avec repli local. Absente, la porte est locale, inchangée.
+     * Le déclarer seul ne vaut pas `readsPlan`.
+     */
+    host?: string;
+    /** `gate.install` (L403) : commande qui installe les dépendances, jouée sur l'hôte dans un worktree au sha pour remplir le cache de l'empreinte des lockfiles. */
+    install?: string;
+  };
   /**
    * Commande dédiée de l'étape accept (L173, spec etape-spec S5) : ne lance QUE les tests d'acceptation du lot (config du lanceur
    * `*.acceptation.config.*` qui lit `CADENCE_ACCEPTATION`, chemin de l'acceptation-<lot>.json du lot, aussi substitué à `{acceptation}`).
@@ -465,12 +474,24 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   }
   if (o.gate != null) {
     if (!isObject(o.gate)) throw bad('gate : objet attendu (gate: { readsPlan: true })');
-    for (const k of Object.keys(o.gate)) if (k !== 'readsPlan') throw bad(`gate.${k} inconnu (attendu : readsPlan)`);
+    for (const k of Object.keys(o.gate)) if (!['readsPlan', 'host', 'install'].includes(k)) throw bad(`gate.${k} inconnu (attendu : readsPlan, host, install)`);
     const r = o.gate.readsPlan;
     const msg = 'gate.readsPlan : true, false ou liste de chemins de tests relatifs au dépôt, sans « .. »';
-    if (r === true) config.gate = { readsPlan: true };
-    else if (Array.isArray(r) && r.length && r.every((x) => typeof x === 'string' && x.trim() && !isAbsolute(x) && !x.split(/[\\/]/).includes('..'))) config.gate = { readsPlan: r.map((x: string) => x.trim()) };
-    else if (r !== false) throw bad(msg);
+    const gate: NonNullable<OrchestrateConfig['gate']> = {};
+    if (r === true) gate.readsPlan = true;
+    else if (Array.isArray(r) && r.length && r.every((x) => typeof x === 'string' && x.trim() && !isAbsolute(x) && !x.split(/[\\/]/).includes('..'))) gate.readsPlan = r.map((x: string) => x.trim());
+    else if (r !== false && (r != null || (o.gate.host == null && o.gate.install == null))) throw bad(msg);
+    if (o.gate.host != null) {
+      const h = o.gate.host;
+      // Une destination qui commencerait par « - » serait lue par ssh comme une option (-oProxyCommand=…).
+      if (typeof h !== 'string' || !h.trim() || /\s/.test(h.trim()) || h.trim().startsWith('-')) throw bad('gate.host : destination ssh attendue (une chaîne sans espace, ne commençant pas par « - »)');
+      gate.host = h.trim();
+    }
+    if (o.gate.install != null) {
+      if (typeof o.gate.install !== 'string' || !o.gate.install.trim()) throw bad('gate.install : commande non vide attendue');
+      gate.install = o.gate.install.trim();
+    }
+    if (Object.keys(gate).length) config.gate = gate;
   }
   if (o.maquette != null) {
     if (typeof o.maquette !== 'boolean') throw bad('maquette : true ou false attendu');

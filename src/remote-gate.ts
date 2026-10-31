@@ -1,0 +1,285 @@
+// Porte déportée (L403) : build et tests joués par ssh sur l'hôte `orchestrate.gate.host`, au sha poussé dans un dépôt nu, avec un cache de dépendances par empreinte des lockfiles.
+// Ce module ne connaît ni nom de machine ni nom de dépôt : l'hôte vient de la config, le dossier de travail distant est dérivé du dossier du projet (`.cadence-gate/<projet>`).
+
+import { spawn, spawnSync } from 'node:child_process';
+import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
+import { git, gitFailure, ignoredDeps, isCopiedDep } from './orchestrate/worktree.js';
+
+/** Les lockfiles que l'empreinte couvre, à tout niveau du dépôt (R18). */
+export const LOCKFILES = ['package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock', 'poetry.lock', 'uv.lock', 'Pipfile.lock', 'Cargo.lock', 'go.sum'];
+
+/** Au-delà de cet âge, un worktree ou un cache temporaire laissé sur l'hôte est un orphelin (aucune commande de la porte ne dure autant) : le prochain appel le retire (R17, R19). */
+const ORPHAN_MIN = 360;
+
+/** Délai de connexion de la sonde (R4) puis des autres appels ssh. */
+const PROBE_CONNECT_S = 5;
+const CONNECT_S = 10;
+
+/** Un nom de commit sûr à insérer dans une commande : hexadécimal de 4 à 64 caractères (R18). */
+export const isSha = (s: string): boolean => /^[0-9a-f]{4,64}$/i.test(s);
+
+/** Une valeur entre apostrophes pour `sh`, apostrophes internes échappées (R18) : le sha, l'hôte et les chemins insérés dans une commande ssh passent par là. */
+export const shq = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`;
+
+/** Empreinte des lockfiles du sha (R3, R18) ; null quand le sha n'en porte aucun (pas de cache). `files` : leurs chemins dans le dépôt, triés. */
+export function lockfileFingerprint(repo: string, sha: string): { fp: string; files: string[] } | null {
+  const files = git(repo, 'ls-tree', '-r', '--name-only', sha)
+    .split('\n')
+    .filter((f) => f && LOCKFILES.includes(basename(f)) && !f.split('/').includes('node_modules'))
+    .sort();
+  if (!files.length) return null;
+  const h = createHash('sha256');
+  for (const f of files) {
+    h.update(`${f}\0`);
+    h.update(spawnSync('git', ['show', `${sha}:${f}`], { cwd: repo, maxBuffer: 1 << 28 }).stdout);
+    h.update('\0');
+  }
+  return { fp: h.digest('hex'), files };
+}
+
+/** Empreinte des mêmes lockfiles dans le dossier `dir` du disque (R16) ; null si l'un manque. */
+function diskFingerprint(dir: string, files: string[]): string | null {
+  const h = createHash('sha256');
+  for (const f of files) {
+    if (!existsSync(join(dir, f))) return null;
+    h.update(`${f}\0`);
+    h.update(readFileSync(join(dir, f)));
+    h.update('\0');
+  }
+  return h.digest('hex');
+}
+
+const archOf = (m: string): string => ({ x86_64: 'x64', amd64: 'x64', aarch64: 'arm64', arm64: 'arm64' })[m] ?? m;
+
+/** Système et architecture de cette machine, écrits comme ceux de l'hôte (relevés par la sonde) : `linux-x64`, `darwin-arm64` (R16). */
+export const localPlatform = (): string => `${process.platform}-${process.arch}`;
+
+export interface Ran {
+  code: number;
+  output: string;
+  /** ssh a perdu la connexion (code 255) : la commande n'a pas rendu de verdict (R6). */
+  lost?: boolean;
+}
+
+type Env = Record<string, string | undefined>;
+
+interface SshCall {
+  host: string;
+  script: string;
+  env: Env;
+  connectS?: number;
+  /** Terminal alloué (`-tt`) : l'arrêt de la connexion ferme le tty de la commande distante (R19). */
+  tty?: boolean;
+  timeoutMs?: number;
+  /** Flux envoyé sur l'entrée de ssh (tar des dépendances). */
+  stdin?: NodeJS.ReadableStream;
+}
+
+const sshArgs = (c: SshCall): string[] => ['-o', 'BatchMode=yes', '-o', `ConnectTimeout=${c.connectS ?? CONNECT_S}`, ...(c.tty ? ['-tt'] : []), '--', c.host, c.script];
+
+function killGroup(pgid: number): void {
+  try {
+    process.kill(-pgid, 'SIGKILL');
+  } catch {
+    // groupe déjà vide
+  }
+}
+
+/** Un appel ssh non interactif (jamais de mot de passe : BatchMode). Le délai tue le ssh local et son groupe ; 255 est une connexion perdue (`lost`), 124 un délai. */
+function ssh(c: SshCall): Promise<Ran> {
+  return new Promise((resolveRan) => {
+    const child = spawn('ssh', sshArgs(c), { env: c.env, stdio: [c.stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'], detached: true });
+    child.once('error', (e) => resolveRan({ code: 127, output: e.message }));
+    const pgid = child.pid;
+    if (pgid === undefined) return;
+    c.stdin?.pipe(child.stdin!).on('error', () => {});
+    let output = '';
+    for (const s of [child.stdout!, child.stderr!]) s.on('data', (d: Buffer) => (output += d.toString()));
+    // Un terminal écrit « \r\n » : la sortie de la porte est celle d'une commande locale.
+    const text = () => output.replace(/\r\n/g, '\n');
+    // Au délai le ssh local est tué et la porte n'attend pas la fermeture de ses tubes : ce qui tourne encore sur l'hôte est arrêté par le nettoyage (R19).
+    const timer = c.timeoutMs
+      ? setTimeout(() => {
+          killGroup(pgid);
+          resolveRan({ code: 124, output: `${text()}\ndélai dépassé (${Math.round((c.timeoutMs ?? 0) / 60_000)} min)` });
+        }, c.timeoutMs)
+      : undefined;
+    child.once('close', (code) => {
+      clearTimeout(timer);
+      killGroup(pgid);
+      resolveRan({ code: code ?? 1, output: text(), lost: code === 255 });
+    });
+  });
+}
+
+/** La dernière ligne utile d'une sortie d'échec : la cause dite à l'humain. */
+const causeOf = (r: Ran): string => r.output.trim().split('\n').filter(Boolean).slice(-1)[0] ?? `code ${r.code}`;
+
+export interface OpenOpts {
+  host: string;
+  /** `orchestrate.gate.install` : remplit un cache absent, sur l'hôte (R15). */
+  install?: string;
+  /** Dépôt local qui porte le sha. */
+  repo: string;
+  sha: string;
+  /** Dossier du disque qui porte les dépendances non suivies (le dépôt vivant) : source de la copie d'un cache (R16). */
+  depsFrom: string;
+  /** `orchestrate.worktreeDeps` : les dossiers de dépendances ; absent, les `node_modules` de tout niveau et le `.venv`. */
+  worktreeDeps?: string[];
+  env: Env;
+  /** Délai de l'installation d'un cache. */
+  timeoutMs: number;
+  /** CADENCE_TEST_WORKERS d'une commande de la porte, d'après les cœurs de l'hôte (R13). */
+  workers: (hostCores: number) => number;
+}
+
+export interface RemoteGate {
+  host: string;
+  /** Comment le cache a servi, pour la première ligne de la porte (R10) : « cache utilisé (empreinte 1a2b3c4d) », « cache rempli … », « sans cache (aucun lockfile) ». */
+  cache: string;
+  /** Une commande de la porte, dans le worktree de l'hôte au sha. */
+  run(command: string, timeoutMs: number): Promise<Ran>;
+  /** Arrête ce qui tourne encore sur l'hôte et y retire le worktree (R10, R19) ; rend la cause si l'hôte n'a pas pu être nettoyé. Synchrone : appelable depuis un signal. */
+  close(): string | null;
+}
+
+export type Opened = { ok: true; gate: RemoteGate } | { ok: false; stage: 'host' | 'cache'; cause: string };
+
+/**
+ * Sonde l'hôte, y pousse le sha, prépare le cache de dépendances et le worktree (R3-R5, R15-R18). Un échec avant la première commande de la porte rend `ok: false`
+ * avec son étape : l'appelant se replie sur la porte locale, jamais un rouge (R4, R5). Le sha doit être hexadécimal (R18) : refusé avant toute commande ssh.
+ */
+export async function openRemoteGate(o: OpenOpts): Promise<Opened> {
+  if (!isSha(o.sha)) throw new Error(`sha invalide pour la porte déportée : ${o.sha}`);
+  const { host, env } = o;
+  const probe = await ssh({ host, env, connectS: PROBE_CONNECT_S, timeoutMs: 30_000, script: 'uname -s; uname -m; nproc 2>/dev/null || getconf _NPROCESSORS_ONLN' });
+  if (probe.code !== 0) return { ok: false, stage: 'host', cause: causeOf(probe) };
+  const [os = '', arch = '', cores = ''] = probe.output.trim().split('\n').map((l) => l.trim());
+  const hostPlatform = `${os.toLowerCase()}-${archOf(arch)}`;
+  const nproc = Number.parseInt(cores, 10);
+
+  const id = `${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
+  const root = `.cadence-gate/${basename(resolve(o.repo))}`;
+  // Absolu : `git -C` change de dossier, un chemin relatif au répertoire de connexion y deviendrait relatif au dépôt nu.
+  const head = `R="$PWD"/${shq(root)}; `;
+  const bare = '"$R/repo.git"';
+  const init = await ssh({
+    host,
+    env,
+    script: `${head}set -e; mkdir -p "$R/deps" "$R/wt"; [ -d ${bare} ] || git init --bare -q ${bare}; ` +
+      `find "$R/wt" -mindepth 1 -maxdepth 1 -mmin +${ORPHAN_MIN} -exec rm -rf {} + 2>/dev/null || true; ` +
+      `find "$R/deps" -mindepth 1 -maxdepth 1 -name '.tmp-*' -mmin +${ORPHAN_MIN} -exec rm -rf {} + 2>/dev/null || true; git -C ${bare} worktree prune 2>/dev/null || true`,
+  });
+  if (init.code !== 0) return { ok: false, stage: 'host', cause: `dépôt de travail impossible : ${causeOf(init)}` };
+
+  const push = await new Promise<Ran>((res) => {
+    const child = spawn('git', ['push', '-q', '--no-verify', `${host}:${root}/repo.git`, `${o.sha}:refs/cadence-gate/${o.sha}`], { cwd: o.repo, env: { ...env, GIT_SSH_COMMAND: `ssh -o BatchMode=yes -o ConnectTimeout=${CONNECT_S}`, GIT_TERMINAL_PROMPT: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    for (const s of [child.stdout, child.stderr]) s.on('data', (d: Buffer) => (output += d.toString()));
+    child.once('error', (e) => res({ code: 127, output: e.message }));
+    child.once('close', (code) => res({ code: code ?? 1, output }));
+  });
+  if (push.code !== 0) {
+    // Deux pushes simultanés du même sha (vague en parallèle, verify --gate) se disputent la même référence : le perdant échoue alors que le sha est arrivé.
+    const there = await ssh({ host, env, script: `${head}git -C ${bare} cat-file -e ${shq(`${o.sha}^{commit}`)}` });
+    if (there.code !== 0) return { ok: false, stage: 'host', cause: `push du sha impossible : ${causeOf(push)}` };
+  }
+
+  const wt = `"$R/wt/${id}"`;
+  const pidFile = (n: string) => `"$R/wt/${n}.pid"`;
+  const cleanup = (): string | null => {
+    const ids = [id, `${id}-i`];
+    const script = `${head}for i in ${ids.join(' ')}; do if [ -f "$R/wt/$i.pid" ]; then p=$(cat "$R/wt/$i.pid"); kill -s KILL -- "-$p" 2>/dev/null || true; fi; ` +
+      `git -C ${bare} worktree remove --force "$R/wt/$i" 2>/dev/null || rm -rf "$R/wt/$i"; rm -f "$R/wt/$i.pid"; done; rm -rf "$R/deps/.tmp-${id}"; git -C ${bare} worktree prune 2>/dev/null || true`;
+    const r = spawnSync('ssh', sshArgs({ host, env, script }), { env, encoding: 'utf8', timeout: 30_000 });
+    return r.status === 0 ? null : `${(r.stderr || r.stdout || `code ${r.status}`).trim().split('\n').slice(-1)[0]}`;
+  };
+  const fail = (cause: string, stage: 'host' | 'cache'): Opened => {
+    cleanup();
+    return { ok: false, stage, cause };
+  };
+
+  const prints = lockfileFingerprint(o.repo, o.sha);
+  let cache = 'sans cache (aucun lockfile au sha)';
+  const add = await ssh({ host, env, script: `${head}set -e; git -C ${bare} worktree add -q --detach ${wt} ${shq(o.sha)}` });
+  if (add.code !== 0) return fail(`worktree impossible : ${causeOf(add)}`, 'host');
+
+  if (prints) {
+    const short = prints.fp.slice(0, 8);
+    const keyInstall = `${prints.fp}-${hostPlatform}`;
+    const copyDeps = (): Promise<Ran> =>
+      ssh({
+        host,
+        env,
+        script: `${head}set -e; for k in ${shq(keyInstall)} ${shq(prints.fp)}; do if [ -d "$R/deps/$k" ]; then ` +
+          `while IFS= read -r p; do mkdir -p ${wt}/"$(dirname "$p")"; cp -R "$R/deps/$k/$p" ${wt}/"$p"; done < "$R/deps/$k/.paths"; echo "HIT $k"; exit 0; fi; done; echo MISS`,
+      });
+    let r = await copyDeps();
+    if (r.code !== 0) return fail(`lecture du cache impossible : ${causeOf(r)}`, 'cache');
+    if (r.output.includes('MISS')) {
+      const filled = o.install ? await fillByInstall(o, keyInstall, id, head, bare) : await fillByCopy(o, prints, hostPlatform, id, head);
+      if (typeof filled === 'string') return fail(filled, 'cache');
+      r = await copyDeps();
+      if (r.code !== 0 || !r.output.includes('HIT')) return fail(`cache introuvable après remplissage : ${causeOf(r)}`, 'cache');
+      cache = `cache rempli ${o.install ? 'par gate.install' : 'par copie des dépendances locales'} (empreinte ${short})`;
+    } else {
+      cache = `cache utilisé (empreinte ${short})`;
+    }
+  }
+
+  const workers = o.workers(Number.isFinite(nproc) && nproc >= 1 ? nproc : 1);
+  const gate: RemoteGate = {
+    host,
+    cache,
+    run: (command, timeoutMs) =>
+      ssh({ host, env, tty: true, timeoutMs, script: `${head}echo $$ > ${pidFile(id)}; cd ${wt} && export CADENCE_TEST_WORKERS=${workers} && exec sh -c ${shq(command)}` }),
+    close: cleanup,
+  };
+  return { ok: true, gate };
+}
+
+/** Remplit le cache `key` en jouant `gate.install` sur l'hôte, dans un worktree au sha (R15) ; rend la cause d'un échec. */
+async function fillByInstall(o: OpenOpts, key: string, id: string, head: string, bare: string): Promise<null | string> {
+  const iw = `"$R/wt/${id}-i"`;
+  const tmp = `"$R/deps/.tmp-${id}"`;
+  const dirs = o.worktreeDeps
+    ? `for p in ${o.worktreeDeps.map(shq).join(' ')}; do [ -e "$p" ] && echo "$p"; done`
+    : `find . -name .git -prune -o \\( -name node_modules -o -name .venv \\) -type d -print -prune`;
+  const script =
+    `${head}echo $$ > "$R/wt/${id}-i.pid"; set -e; git -C ${bare} worktree add -q --detach ${iw} ${shq(o.sha)}; cd ${iw}; sh -c ${shq(o.install!)}; ` +
+    `mkdir -p ${tmp}; : > ${tmp}/.paths; (${dirs}) | while IFS= read -r p; do p="\${p#./}"; mkdir -p ${tmp}/"$(dirname "$p")"; cp -R "$p" ${tmp}/"$p"; echo "$p" >> ${tmp}/.paths; done; ` +
+    `cd "$R"; git -C ${bare} worktree remove --force ${iw} || true; mv ${tmp} "$R/deps/${key}" 2>/dev/null || true; rm -rf "$R/deps/${key}/.tmp-${id}" ${tmp}; [ -d "$R/deps/${key}" ]`;
+  const r = await ssh({ host: o.host, env: o.env, tty: true, timeoutMs: o.timeoutMs, script });
+  return r.code === 0 ? null : `gate.install en échec sur ${o.host} (code ${r.code}) : ${causeOf(r)}`;
+}
+
+/** Remplit le cache par copie des dépendances locales, seulement si elles méritent l'empreinte du sha et viennent de la même plateforme que l'hôte (R16) ; rend la cause d'un refus ou d'un échec. */
+async function fillByCopy(o: OpenOpts, prints: { fp: string; files: string[] }, hostPlatform: string, id: string, head: string): Promise<null | string> {
+  if (localPlatform() !== hostPlatform) return `gate.install absent et plateforme locale ${localPlatform()} différente de celle de l'hôte ${hostPlatform} : dépendances locales non copiées`;
+  if (diskFingerprint(o.depsFrom, prints.files) !== prints.fp) return 'gate.install absent et lockfile local différent de celui du sha : dépendances locales non copiées';
+  let paths: string[];
+  try {
+    paths = o.worktreeDeps ? o.worktreeDeps.filter((n) => existsSync(join(o.depsFrom, n))) : ignoredDeps(o.depsFrom).filter(isCopiedDep);
+  } catch (e) {
+    return `dépendances locales illisibles (${gitFailure(e)})`;
+  }
+  if (!paths.length) return 'gate.install absent et aucune dépendance locale à copier';
+  const tmp = `"$R/deps/.tmp-${id}"`;
+  const tar = spawn('tar', ['-cf', '-', '-C', o.depsFrom, ...paths], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const tarDone = new Promise<number>((res) => {
+    tar.once('error', () => res(127));
+    tar.once('close', (c) => res(c ?? 1));
+  });
+  const up = await ssh({ host: o.host, env: o.env, timeoutMs: o.timeoutMs, stdin: tar.stdout!, script: `${head}set -e; mkdir -p ${tmp}; tar -xf - -C ${tmp}` });
+  const tarCode = await tarDone;
+  if (up.code !== 0 || tarCode !== 0) return `copie des dépendances locales impossible : ${tarCode !== 0 ? `tar code ${tarCode}` : causeOf(up)}`;
+  const key = prints.fp;
+  const publish = await ssh({
+    host: o.host,
+    env: o.env,
+    script: `${head}set -e; printf '%s\\n' ${paths.map(shq).join(' ')} > ${tmp}/.paths; mv ${tmp} "$R/deps/${key}" 2>/dev/null || true; rm -rf "$R/deps/${key}/.tmp-${id}" ${tmp}; [ -d "$R/deps/${key}" ]`,
+  });
+  return publish.code === 0 ? null : `publication du cache impossible : ${causeOf(publish)}`;
+}

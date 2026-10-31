@@ -273,7 +273,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     const cwdUser = spawn('sleep', ['60'], { cwd: join(root, 'releases', first.slice(0, 12)), stdio: 'ignore' });
     const scriptUser = spawn('node', ['-e', 'setTimeout(() => {}, 60000)', join(root, 'releases', second.slice(0, 12), 'bin', 'raf.js')], { stdio: 'ignore' });
     try {
-      await new Promise((r) => setTimeout(r, 100));
+      await observable(() => cwdDe(cwdUser.pid) === join(root, 'releases', first.slice(0, 12)) && cmdlineDe(scriptUser.pid).includes(join('releases', second.slice(0, 12), 'bin', 'raf.js')));
       const rest = enService(dir, root, binDir, ['c', 'd', 'e', 'f']);
       expect(existsSync(join(root, 'releases', first.slice(0, 12)))).toBe(true);
       expect(existsSync(join(root, 'releases', second.slice(0, 12)))).toBe(true);
@@ -303,7 +303,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     symlinkSync(join(copieA, 'node_modules'), join(tool, 'node_modules'));
     const wave = spawn('node', [join(tool, 'bin', 'cadence.js')], { stdio: 'ignore' });
     try {
-      await new Promise((r) => setTimeout(r, 100));
+      await observable(() => cmdlineDe(wave.pid).includes(join(tool, 'bin', 'cadence.js')));
       enService(dir, root, binDir, ['b', 'c', 'd', 'e']);
       expect(existsSync(copieA)).toBe(true);
       wave.kill();
@@ -325,7 +325,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     mettreEnService({ repo: dir, rev: first, root: lien, binDir, install });
     const user = spawn('sleep', ['60'], { cwd: join(reel, 'releases', first.slice(0, 12)), stdio: 'ignore' });
     try {
-      await new Promise((r) => setTimeout(r, 100));
+      await observable(() => cwdDe(user.pid) === join(realpathSync(reel), 'releases', first.slice(0, 12)));
       enService(dir, lien, binDir, ['b', 'c', 'd', 'e']);
       expect(existsSync(join(reel, 'releases', first.slice(0, 12)))).toBe(true);
       user.kill();
@@ -336,6 +336,26 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
       user.kill();
     }
   }, 120_000);
+
+  /** Attend que le processus lancé soit observable par la purge (/proc) : sous charge, 100 ms ne suffisent pas à ce que le fils ait fait son chdir/exec. */
+  const observable = async (ok: () => boolean) => {
+    for (let i = 0; i < 400 && !ok(); i++) await new Promise((r) => setTimeout(r, 25));
+    expect(ok()).toBe(true);
+  };
+  const cwdDe = (pid: number | undefined) => {
+    try {
+      return readlinkSync(`/proc/${pid}/cwd`);
+    } catch {
+      return '';
+    }
+  };
+  const cmdlineDe = (pid: number | undefined) => {
+    try {
+      return readFileSync(`/proc/${pid}/cmdline`, 'utf8');
+    } catch {
+      return '';
+    }
+  };
 
   /** Une vague de `launch` : `<launch>/.cadence/runs/<id>/` avec son wave.json et, si `modules`, l'instantané dont tool/node_modules y renvoie. */
   const faussVague = (launch: string, id: string, status: string, modules?: string) => {

@@ -71,12 +71,20 @@ describe('R3 — les créneaux libres comptent les lots en parallèle', () => {
   it('R3 — la vague annonce au registre autant de files que de lots en worktree : les créneaux libres ne sont pas surestimés', async () => {
     const { parent } = setup([{ title: 'un' }, { title: 'deux' }]);
     const seen: (number | undefined)[] = [];
+    // Barrière : un lot fini cesse de compter (L433), donc chaque lot ne rend la main qu'une fois les deux files lues — sinon, sous charge, L1 finit avant que L2 lise et le registre annonce 1. Le délai borne l'attente si les lots ne jouaient pas ensemble : le test échoue au lieu de pendre.
+    let reads = 0;
+    let release!: () => void;
+    const bothRead = new Promise<void>((r) => (release = r));
+    const timer = setTimeout(release, 10_000);
     const f = fake({
       implement: writes(async () => {
         seen.push(liveWaves(cadenceHome())[0]?.lanes);
+        if (++reads === 2) release();
+        await bothRead;
       }),
     });
     await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
+    clearTimeout(timer);
     expect(seen).toEqual([2, 2]);
     expect(freeSlots([{ pid: 1, wave: 'w', started: 's', cwd: '.', repos: ['a'], cap: 2, lanes: 2 }], 2)).toBe(0);
     expect(freeSlots([{ pid: 1, wave: 'w', started: 's', cwd: '.', repos: ['a'], cap: 2 }], 2)).toBe(1); // une vague sans worktree tient un dépôt, une session

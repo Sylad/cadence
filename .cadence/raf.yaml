@@ -616,6 +616,7 @@ lots:
     notes:
       - { date: 2026-10-30, text: "Portée élargie par Sylvain (30-10) : valable pour TOUS les projets et TOUTES les technos. L462 pose les garde-fous de cadence ET écrit la recette de référence réutilisable (docs/, générique, sans rien de propre à un projet), par techno : TS (ESLint, typescript-eslint, sonarjs, knip, jscpd), Python (ruff C901, radon, vulture), Java (Checkstyle, PMD/CPD, SpotBugs dans Maven), shell (shellcheck). Elle décrit aussi la ligne de base en cliquet et son branchement dans orchestrate.build et la CI. Les autres projets l'appliqueront ensuite, chacun dans un lot." }
     started: 2026-10-31
+    review: { date: 2026-10-31, verdict: "conforme sur arbitrage du lead (31-10) : la reprise Fable corrige le majeur (configs eslint/knip/jscpd surveillées, 8718e0e7) sans régression (revue Opus : tsc 0, cliquet --contre main 0, qualite-l462 33/33) ; la nouvelle revue trouve encore des fichiers lus par les outils hors liste (.gitignore imbriqué, vitest.config.*, package.json scripts/main) — l'énumération ne converge pas, le contournement reste visible en revue de code : repris dans le lot de suite des trous du cliquet", commit: 8718e0e7147212290fab58d1c5823b5bc7897d3a }
   - id: L463
     title: "Plans riches — statuts détaillés du projet, écrits et gardés (plan.statuses écrivable, transitions, raf status) (manque M1 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo

@@ -672,13 +672,14 @@ lots:
     created: 2026-10-30
   - id: L474
     title: "cadence deliver --sha refuse aussi HORS vague un intervalle origin..sha qui contient des commits d'un lot ni done ni ready (aujourd'hui seulement pendant une vague du dépôt) ; --dry-run liste les lots de l'intervalle avec leur état — cas du 30-10 : codex 09217b0 « L49 seul » a livré L50 et L51 non relus, dont les commits étaient SOUS L49"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-30
     started: 2026-10-31
     review: { date: 2026-10-31, verdict: "conforme (revue Opus neuve après 2 corrections du lead : couverture jugée jusqu'au sha livré, verdict non conforme refusé) — 0 bloquant, 0 majeur, 2 mineurs en notes : garde sautée pendant une vague pour un lot hors vague ; skill deliver muet sur le refus hors vague", commit: 696e421c254fa504bf4e5ded98cb92af04afece0 }
     notes:
       - { date: 2026-10-31, text: "mineurs de la revue Opus 2 (31-10) : pendant une vague, un lot ouvert hors vague sous le sha n'est pas contrôlé (table.ts:171) ; skills/deliver/SKILL.md ne cite pas le refus hors vague ; dry-run lent (7 s, 425 lots) sans livraison dans l'histoire du sha" }
+    finished: 2026-10-31
   - id: L475
     title: "raf add/note/done avertit (ou refuse sans --force) quand une session de vague tient l'arbre principal du dépôt (vague sans worktree, ou lot en implement/review/fix dans l'arbre principal) : un commit de plan du lead pendant une revue rend le lot (cas du 30-10 : cadence L458 rendu par ad7ad3f2)"
     status: done

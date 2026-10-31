@@ -7,7 +7,7 @@ import { RafError } from './plan.js';
 export const CAUSES = ['spec-floue', 'regle-inventee', 'derive-architecture', 'donnees-sql', 'bug-code', 'test-manquant', 'faux-constat'] as const;
 export type Cause = (typeof CAUSES)[number];
 /** `sans-constat` : passe sans constat de revue à lire (tests rouges juste après l'écriture) : comptée à part, jamais envoyée au modèle. */
-export type CauseOrNone = Cause | 'sans-constat' | 'non-classe';
+type CauseOrNone = Cause | 'sans-constat' | 'non-classe';
 
 const LABELS: Record<CauseOrNone, string> = {
   'spec-floue': 'spec floue ou critère absent',
@@ -32,14 +32,14 @@ export interface FixPass {
   commits: string[];
 }
 
-export interface LotRecord {
+interface LotRecord {
   project: string;
   lot: string;
   visible: boolean;
   fixes: number;
 }
 
-export interface Runs {
+interface Runs {
   lots: LotRecord[];
   passes: FixPass[];
 }
@@ -247,14 +247,14 @@ export function readRuns(runsDir: string, until?: string, since?: string): Runs 
   return { lots, passes };
 }
 
-export interface Tally {
+interface Tally {
   lots: number;
   atLeast1: number;
   atLeast2: number;
   passes: number;
 }
 
-export interface Measure {
+interface Measure {
   total: Tally;
   byProject: Record<string, Tally>;
   byVisibility: { visible: Tally; hidden: Tally };
@@ -304,7 +304,7 @@ export function parseCause(text: string): Cause | null {
   }
 }
 
-export type Classifier = (pass: FixPass) => Promise<Cause | null>;
+type Classifier = (pass: FixPass) => Promise<Cause | null>;
 
 const SYSTEM = `Tu classes la CAUSE d'une passe de correction dans un projet logiciel mené par vagues d'agents : une session a écrit du code, une revue a formulé des constats, une session de correction les a traités. Réponds par UNE cause, celle du constat le plus grave, en cherchant la racine de ce qui a obligé à corriger.
 Règle de départ : si le code livré ne fait pas ce que le lot ou le commit annonce, ou fait faux (logique, cas limite, condition trop large, rendu qui ne s'applique pas, accessibilité, état périmé, travail annoncé mais non fait), c'est bug-code.
@@ -413,11 +413,11 @@ const SOUS_DEFINITIONS: Record<SousCause, string> = {
 };
 
 /** Les maillons de la chaîne où un mécanisme peut être posé (R2). */
-export const MAILLONS = ['brief implement', 'auto-vérification avant rendu', 'porte locale', 'fiche'] as const;
-export type Maillon = (typeof MAILLONS)[number];
+const MAILLONS = ['brief implement', 'auto-vérification avant rendu', 'porte locale', 'fiche'] as const;
+type Maillon = (typeof MAILLONS)[number];
 
 /** Le maillon dont relève chaque sous-cause (R2, hypothèse) ; `autre` n'en désigne aucun. */
-export const MAILLON_DE: Record<SousCause, Maillon | null> = {
+const MAILLON_DE: Record<SousCause, Maillon | null> = {
   'cas-limite': 'brief implement',
   'test-vide': 'brief implement',
   'affirmation-fausse': 'auto-vérification avant rendu',
@@ -428,8 +428,8 @@ export const MAILLON_DE: Record<SousCause, Maillon | null> = {
 };
 
 /** Seuils de désignation du maillon dominant (R2, hypothèse) : passes sous-classées au moins, et part minimale du maillon en tête, en %. */
-export const MAILLON_MIN_PASSES = 10;
-export const MAILLON_MIN_PART = 40;
+const MAILLON_MIN_PASSES = 10;
+const MAILLON_MIN_PART = 40;
 
 export interface SousClassification {
   sous: SousCause;
@@ -439,7 +439,7 @@ export interface SousClassification {
   manual?: SousCause;
 }
 
-export type SousClassifier = (pass: FixPass) => Promise<SousCause | null>;
+type SousClassifier = (pass: FixPass) => Promise<SousCause | null>;
 
 /** Extrait une sous-cause connue d'une réponse (JSON `{sous}`) ; null sinon. */
 export function parseSousCause(text: string): SousCause | null {
@@ -574,7 +574,7 @@ export function sousCausesRanked(b: BugCode): { sous: SousCause; label: string; 
 }
 
 /** La section « Bug de code par sous-cause » de `cadence corrections` (A1) : sous-cause, passes, part des passes sous-classées, maillon. */
-export function renderSousCauses(b: BugCode): string[] {
+function renderSousCauses(b: BugCode): string[] {
   const out = ['### Bug de code par sous-cause', '', `${b.classees} passes sous-classées sur ${b.classees + b.sansSousCause}${b.sansSousCause > 0 ? ` · sans sous-cause : ${b.sansSousCause} (à classer : cadence corrections --classify)` : ''}.`, ''];
   if (b.classees > 0) out.push('| Sous-cause | Passes | Part | Maillon |', '|---|---|---|---|', ...sousCausesRanked(b).map((r) => `| ${r.label} | ${r.passes} | ${pct(r.passes, b.classees)} | ${MAILLON_DE[r.sous] ?? 'aucun'} |`), '');
   out.push(`Maillon dominant : ${b.maillon.nom ?? `aucun (${b.maillon.raison})`}${b.maillon.nom ? ` — ${b.maillon.raison}` : ''}.`, '');

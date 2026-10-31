@@ -61,7 +61,7 @@ function sh(cmd: string, cwd: string, timeoutMs: number, group: { pgid?: number 
   });
 }
 
-export interface GateCtx {
+interface GateCtx {
   /** Racine du dépôt vivant : ses dépendances non suivies (node_modules, .venv) sont copiées dans le worktree (`copyDeps`). */
   repo: string;
   sha: string;

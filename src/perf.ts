@@ -8,11 +8,11 @@ import type { Lot } from './plan.js';
 import { FAIL_CLASSES, readDeliveries, readFailedEntries, type FailClass, type FailedDelivery } from './state.js';
 
 /** Le lot d'un plan tel que `cadence perf` le lit. */
-export type PlanLot = Pick<Lot, 'id' | 'status' | 'created' | 'finished' | 'estimate' | 'notes'>;
+type PlanLot = Pick<Lot, 'id' | 'status' | 'created' | 'finished' | 'estimate' | 'notes'>;
 /** Les plans lisibles du dossier : nom du projet (chemin relatif au dossier, séparateurs « / ») → ses lots. */
-export type Plans = Map<string, PlanLot[]>;
+type Plans = Map<string, PlanLot[]>;
 
-export interface Window {
+interface Window {
   from: Day;
   to: Day;
   /** Jours couverts (moins de 7 quand `--since` tronque la fenêtre, 0 quand elle est entière avant `--since`). */
@@ -67,7 +67,7 @@ export interface Indicator {
   note: string | null;
 }
 
-export interface CauseShare {
+interface CauseShare {
   cause: Cause;
   passes: number;
   /** Part des passes classées de la fenêtre. */
@@ -91,7 +91,7 @@ export interface CauseWindow {
 }
 
 /** L'étape qui porte la hausse des tokens d'une classe d'estimate (L312) : la sorte d'étape dont la somme des jetons par lot, en moyenne sur les lots de la classe, monte le plus d'une fenêtre à l'autre. */
-export interface Carrier {
+interface Carrier {
   kind: string;
   /** Hausse en jetons par lot ; toujours positive. */
   delta: number;
@@ -118,7 +118,7 @@ export interface CostBlock {
 }
 
 /** Les livraisons rouges d'une fenêtre ventilées (L282) ; `inconnue` : une ligne sans classe écrite dont le libellé n'est pas reconnu (L331). */
-export type RedClass = FailClass | 'inconnue';
+type RedClass = FailClass | 'inconnue';
 export interface RedBreakdown {
   count: number;
   byClass: Record<RedClass, number>;
@@ -198,7 +198,7 @@ export interface PerfResult {
   warnings: string[];
 }
 
-export interface PerfInput {
+interface PerfInput {
   journals: Journal[];
   /** Les plans lisibles ; vide : les indicateurs qui lisent le plan sont n/d (R16). */
   plans: Plans;
@@ -307,7 +307,7 @@ const DECISIONS = {
   qaBlocking: 'la revue laisse passer des défauts graves : durcir la revue avant de livrer davantage',
   duration: 'cette étape est lente : revoir ses timeouts, son effort ou son modèle',
 } as const;
-export type DecisionKey = keyof typeof DECISIONS;
+type DecisionKey = keyof typeof DECISIONS;
 
 function indicator(current: number | null, previous: number | null, lots: { current: number; previous: number }, windows: Windows, dir: Direction | null, twin: string | null, nullNote: string | null = null, minSample = MIN_SAMPLE): Indicator {
   const change = current !== null && previous !== null && previous !== 0 ? (current - previous) / previous : null;

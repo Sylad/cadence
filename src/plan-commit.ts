@@ -5,14 +5,14 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { tryGit } from './git.js';
 
 /** Gabarit par défaut du message d'un commit de plan écrit dans une vague (L343 : inchangé depuis toujours). */
-export const PLAN_COMMIT_WAVE = 'plan: {lot} {action} (orchestrate {vague})';
+const PLAN_COMMIT_WAVE = 'plan: {lot} {action} (orchestrate {vague})';
 /** Gabarit par défaut hors vague (`spec reseal`) : pas de vague à citer. */
-export const PLAN_COMMIT_PLAIN = 'plan: {lot} {action}';
+const PLAN_COMMIT_PLAIN = 'plan: {lot} {action}';
 /** Gabarit par défaut du commit de la fiche sourcée par la réponse du lead : type `docs`, déjà conventionnel (L343). */
-export const LEAD_ANSWER_COMMIT = 'docs({lot}): {action} (orchestrate {vague})';
+const LEAD_ANSWER_COMMIT = 'docs({lot}): {action} (orchestrate {vague})';
 
 /** Les mots que le gabarit `plan.commit` de cadence.yaml peut employer. */
-export const PLAN_COMMIT_FIELDS = ['lot', 'action', 'vague'] as const;
+const PLAN_COMMIT_FIELDS = ['lot', 'action', 'vague'] as const;
 
 /** Ce que cadence écrit dans un commit de plan, par action : une seule source pour la vague et pour le dry-run. */
 export const PLAN_ACTIONS = {

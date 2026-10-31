@@ -6,7 +6,7 @@ import { priorityRank, readPriority } from './orchestrate/continue.js';
 import { RafError } from './plan.js';
 import { setKey } from './config-set.js';
 
-export interface PriorityMove {
+interface PriorityMove {
   /** Les projets dans l'ordre où `lead tour`, `orchestrate --continue` et le panneau les rangent après le déplacement. */
   order: string[];
   /** Faux quand le projet était déjà à cette place : le fichier n'est pas touché. */

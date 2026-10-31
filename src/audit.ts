@@ -147,7 +147,7 @@ export function isReleaseOnly(sha: string, root: string): boolean {
 }
 
 /** Le commit a été acquitté par « raf ignore » : par son sha, ou par son sujet exact. */
-export function isAcknowledged(plan: Plan, c: Commit): boolean {
+function isAcknowledged(plan: Plan, c: Commit): boolean {
   return plan.acknowledged.some((a) => (a.sha !== undefined && a.sha === c.sha) || (a.sha === undefined && a.subject === c.subject));
 }
 
@@ -167,14 +167,14 @@ export function exemptPlanOnly(linked: Linked, plan: Plan, root: string): Linked
 }
 
 /** Fenêtre de l'audit : --since, sinon la date d'adoption du plan, sinon 30 jours. */
-export function auditSince(plan: Plan, explicit?: string): string {
+function auditSince(plan: Plan, explicit?: string): string {
   if (explicit) return explicit;
   // Une date seule vaudrait « ce jour-là à l'heure actuelle » pour git : minuit explicite.
   return plan.since ? `${plan.since} 00:00` : '30 days ago';
 }
 
 /** Un écart de `raf check` ; `warning` : signalé sans faire échouer la commande. */
-export interface AuditIssue {
+interface AuditIssue {
   message: string;
   warning?: true;
 }
@@ -183,7 +183,7 @@ export interface AuditIssue {
  * Avertissements : un lot visible (hors abandonné) sans titre public — le site retombe sur le titre technique du plan,
  * sauf pour un lot terminé qu'une Nouveauté cite : le site en reprend le titre (cf. reusedNewsTitle).
  */
-export function missingPublicTitles(lots: Lot[], entries: Entry[]): AuditIssue[] {
+function missingPublicTitles(lots: Lot[], entries: Entry[]): AuditIssue[] {
   return lots
     .filter((l) => l.visible && l.status !== 'dropped' && !l.public && reusedNewsTitle(l, entries) === null)
     .map((l) => ({ message: `${l.id} : lot visible sans titre public — raf public ${l.id} "…"`, warning: true as const }));
@@ -240,7 +240,7 @@ export function hypothesesOf(root: string, configFile: string): Map<string, stri
  * travail touchent des chemins sans toucher le document que la règle désigne. Les commits de plan ne comptent pas.
  * Un lot dont l'écart est acquitté et motivé (`raf docs-ok`, L317) n'est pas compté.
  */
-export function docSyncIssues(plan: Plan, root: string, byLot: Map<string, Commit[]>): AuditIssue[] {
+function docSyncIssues(plan: Plan, root: string, byLot: Map<string, Commit[]>): AuditIssue[] {
   const { sync, since } = readDocsConfig(plan.configFile ?? join(root, 'cadence.yaml'));
   if (!sync.length) return [];
   return plan
@@ -325,7 +325,7 @@ export function isNonConformingVerdict(text: string): boolean {
 }
 
 /** Un lot dont l'intervalle à livrer porte des commits de travail, avec ce qui décide s'il se livre (L474). */
-export interface DeliveryLot {
+interface DeliveryLot {
   id: string;
   title: string;
   /** done, prêt (revue de code couvrant ses commits) ou abandonné : se livre. Sinon : bloque. */
@@ -371,7 +371,7 @@ export function unreviewedWork(plan: Plan, root: string, lotId: string): number 
  * à la journée près, on ne distingue pas un lot fermé avant l'activation d'un lot fermé après
  * (et `raf done` refuse de toute façon dès l'activation).
  */
-export function uxIssues(plan: Plan): { message: string }[] {
+function uxIssues(plan: Plan): { message: string }[] {
   const since = plan.uxSince;
   if (!since) return [];
   return plan
@@ -385,7 +385,7 @@ export function uxIssues(plan: Plan): { message: string }[] {
  * pas : aucun verdict, ou un verdict antérieur à ces commits. Même règle de date que `uxIssues` ; un
  * lot sans commit n'a rien à faire relire.
  */
-export function reviewIssues(plan: Plan, root: string, byLot: Map<string, Commit[]>): { message: string }[] {
+function reviewIssues(plan: Plan, root: string, byLot: Map<string, Commit[]>): { message: string }[] {
   const since = plan.reviewSince;
   if (!since) return [];
   return plan
@@ -401,7 +401,7 @@ export function reviewIssues(plan: Plan, root: string, byLot: Map<string, Commit
 }
 
 /** Avancement de la condition de tirage d'un lot (L219) ; `undefined` sans champ `gate`. Le compte porte sur tous les lots du plan, récurrents compris. */
-export interface GateProgress {
+interface GateProgress {
   count: number;
   n: number;
   label: string;

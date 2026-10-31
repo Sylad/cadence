@@ -4,8 +4,8 @@ import { currentBranch, hasTrackedChanges, tagExists } from './git.js';
 import { RafError } from './plan.js';
 import type { Day } from './dates.js';
 
-export const BUMPS = ['patch', 'minor', 'major'] as const;
-export type Bump = (typeof BUMPS)[number];
+const BUMPS = ['patch', 'minor', 'major'] as const;
+type Bump = (typeof BUMPS)[number];
 
 const PACKAGE = 'package.json';
 const LOCK = 'package-lock.json';
@@ -14,11 +14,11 @@ const MARKETPLACE = '.claude-plugin/marketplace.json';
 const CHANGELOG = 'CHANGELOG.md';
 const WHATS_NEW = 'docs/whats-new.md';
 /** Longueur maximale (en caractères) de la ligne d'une version dans la liste courte de docs/whats-new.md. */
-export const SHORT_LINE_MAX = 240;
+const SHORT_LINE_MAX = 240;
 
 type Json = Record<string, any>;
 
-export function nextVersion(current: string, bump: Bump): string {
+function nextVersion(current: string, bump: Bump): string {
   const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(current);
   if (!m) throw new RafError(`release : la version de ${PACKAGE} (${current}) n'est pas de la forme x.y.z, elle ne se calcule pas`);
   const [major, minor, patch] = [Number(m[1]), Number(m[2]), Number(m[3])];
@@ -190,7 +190,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
  * une ligne de la liste « In two lines » (≤ 240 caractères, en tête) et un paragraphe long (en tête de « Version by version »).
  * Rend les écarts, une ligne chacun ; vide quand les deux sont là, à leur place.
  */
-export function whatsNewIssues(text: string, version: string): string[] {
+function whatsNewIssues(text: string, version: string): string[] {
   const lines = text.split('\n');
   const issues: string[] = [];
   // « Version by version » coupe le fichier : la liste courte est avant, les paragraphes longs sont après (sauf l'introduction, premier paragraphe de la section).

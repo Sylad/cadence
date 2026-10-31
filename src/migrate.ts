@@ -42,20 +42,20 @@ function citesPath(path: string): boolean {
   }
 }
 
-export interface Reader {
+interface Reader {
   file: string;
   /** Nombre de références réécrites. */
   count: number;
 }
 
-export interface Unhandled {
+interface Unhandled {
   file: string;
   /** Numéro de ligne (1-based) ; absent pour un fichier qu'on ne sait pas lire. */
   line?: number;
   text: string;
 }
 
-export interface Migration {
+interface Migration {
   /** `git mv`, `mv`, ou null quand le plan n'est pas à l'ancien emplacement. */
   move: 'git mv' | 'mv' | null;
   readers: Reader[];

@@ -54,7 +54,7 @@ function signal(pid: number, sig: NodeJS.Signals | 0): boolean {
 }
 
 /** Ce qu'on sait d'un processus : son parent, son heure de démarrage (son identité, un pid se réutilise), zombie ou non. */
-export interface ProcInfo {
+interface ProcInfo {
   ppid: number;
   start: string;
   zombie: boolean;
@@ -127,7 +127,7 @@ export function processStart(pid: number): string | null {
 export const MAX_SNAPSHOT_AGE_MS = 1_000;
 
 /** Intervalle du relevé des descendants d'une commande de deliver pendant qu'elle tourne. */
-export const TRACK_INTERVAL_MS = 200;
+const TRACK_INTERVAL_MS = 200;
 
 /**
  * Suivi continu de l'arbre d'une commande : toutes les TRACK_INTERVAL_MS, ses descendants sont relevés et
@@ -296,7 +296,7 @@ export class TreeTracker {
 export const SESSION_MARK_VAR = 'CADENCE_SESSION';
 
 /** Entrées de `findMarked` injectables, comme le `read` du TreeTracker : tests sans /proc, ou avec un faux `ps`. */
-export interface FindMarkedIo {
+interface FindMarkedIo {
   /** Dossier des processus (défaut `/proc`) : un dossier absent simule une machine sans /proc. */
   procRoot?: string;
   /** Exécuteur de `ps` (défaut `execFileSync`). */

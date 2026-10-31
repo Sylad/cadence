@@ -17,7 +17,7 @@ export function sharedStateDir(cwd: string): string {
   return dir;
 }
 
-export interface Next {
+interface Next {
   date: Day;
   lines: string[];
 }
@@ -43,7 +43,7 @@ export function clearNext(dir: string): Next | null {
   return previous;
 }
 
-export interface SessionMark {
+interface SessionMark {
   kind: 'start' | 'close';
   /** Instant ISO (UTC) de l'ouverture ou de la clôture. */
   at: string;
@@ -64,7 +64,7 @@ export function writeSessionMark(dir: string, mark: SessionMark): void {
   writeFileSync(join(dir, 'session.json'), `${JSON.stringify(mark)}\n`);
 }
 
-export interface Lock {
+interface Lock {
   pid: number;
   sha: string;
   started: string;

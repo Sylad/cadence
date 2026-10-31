@@ -19,7 +19,7 @@ const shellQuote = (s: string) => `'${s.replaceAll("'", "'\\''")}'`;
 /** Estimation du lot de config : une ligne de configuration, pas une journée. */
 const ESTIMATE = 0.05;
 
-export interface ConfigSetResult {
+interface ConfigSetResult {
   lines: string[];
   /** 0 : tous les projets sont passés ou sautés ; 1 : arrêt sur un projet. */
   code: number;

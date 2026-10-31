@@ -59,7 +59,7 @@ export function findLeadDir(start: string): string {
 }
 
 /** Seuil de contexte du lead quand `lead.contextThreshold` n'est pas posé (L437). */
-export const CONTEXT_THRESHOLD_DEFAULT = 150_000;
+const CONTEXT_THRESHOLD_DEFAULT = 150_000;
 
 /** Clé `lead.contextThreshold` du cadence.yaml du dossier (L437) : le nombre de tokens de contexte à partir duquel le lead ne lance plus de vague. En tokens et non en % : 60 % d'une fenêtre de 1M valait 600k. Un entier ≥ 1, sinon refus. */
 export function readLeadContextThreshold(parent: string): number {
@@ -86,12 +86,12 @@ export function readDepth(parent: string): number {
   return d;
 }
 
-export const NOTES_MAX = 120;
+const NOTES_MAX = 120;
 export const TITLE_MAX = 60;
 /** Au-delà de ce nombre de jours sans activité, un lot en cours est dit silencieux. */
-export const TOUR_IDLE = 3;
+const TOUR_IDLE = 3;
 /** Un lot créé depuis moins de ce nombre de jours (aujourd'hui compris : 0 à 6 jours d'écart) compte parmi les « ajoutés cette semaine ». */
-export const ADDED_DAYS = 7;
+const ADDED_DAYS = 7;
 
 /** Avancement du plan (L149) : lots faits / en cours / à faire, abandonnés et récurrents exclus ; `added7` = créés sur les 7 derniers jours. */
 export interface TourProgress {
@@ -144,7 +144,7 @@ export interface TourRow {
 const empty = (project: string): TourRow => ({ project, doing: [], drift: [], notes: [], next: null, progress: { done: 0, doing: 0, todo: 0, added7: 0 }, repo: [] });
 
 /** Les lots non clos du plan, hors récurrents, chacun suivi de ses sous-tâches non closes ; celles d'un lot clos ou récurrent sortent avec lui. */
-export function openLots(lots: Lot[]): TourLot[] {
+function openLots(lots: Lot[]): TourLot[] {
   return lots
     .filter((l) => isOpen(l.status) && !isRecurring(l))
     .flatMap((l): TourLot[] => [

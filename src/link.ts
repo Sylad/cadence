@@ -10,7 +10,7 @@ export interface Linked {
   unknown: { commit: Commit; ref: string }[];
 }
 
-export function isMerge(c: Commit): boolean {
+function isMerge(c: Commit): boolean {
   return /^Merge\b/.test(c.subject);
 }
 

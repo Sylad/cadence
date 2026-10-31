@@ -13,13 +13,13 @@ export interface ArticleRule {
   name?: string;
 }
 
-export interface Heading {
+interface Heading {
   level: number;
   text: string;
 }
 
 /** Titre du lot ouvert à la livraison. */
-export const articleTitle = (name: string): string => `Article ${name} à rafraîchir`;
+const articleTitle = (name: string): string => `Article ${name} à rafraîchir`;
 
 const SECTIONS_SHOWN = 12;
 
@@ -57,7 +57,7 @@ export function articleSections(text: string, titles: string[]): string[] {
   return picked.slice(0, SECTIONS_SHOWN);
 }
 
-export interface ArticleOpening {
+interface ArticleOpening {
   plan: Plan;
   root: string;
   rules: ArticleRule[];
@@ -69,7 +69,7 @@ export interface ArticleOpening {
   today: Day;
 }
 
-export interface ArticleResult {
+interface ArticleResult {
   /** Lots créés. */
   opened: string[];
   /** Lots déjà ouverts qui ont reçu une note au lieu d'un doublon. */

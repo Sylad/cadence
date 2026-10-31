@@ -8,7 +8,7 @@ export const SKILLS_DIR = fileURLToPath(new URL('../skills', import.meta.url));
 /** Agents livrés avec le paquet. */
 export const AGENTS_DIR = fileURLToPath(new URL('../agents', import.meta.url));
 
-export interface Installed {
+interface Installed {
   name: string;
   status: 'installed' | 'updated' | 'unchanged';
 }

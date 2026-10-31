@@ -106,7 +106,7 @@ export interface DeliverCtx {
 const POLL_CI = 15_000;
 const CI_APPEAR = 300_000;
 /** Intervalle de réessai d'une vérification : celui de deliver ET de `cadence verify --retry`. */
-export const POLL_VERIFY = 10_000;
+const POLL_VERIFY = 10_000;
 const CI_OK = new Set(['success', 'skipped', 'neutral']);
 const GH_TIMEOUT = 60_000;
 export const TIMED_OUT = 124;
@@ -547,7 +547,7 @@ async function waitCi(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: Reco
 }
 
 /** Un essai d'une vérification : cause de l'échec, ou null. Partagé par deliver et `cadence verify`. */
-export async function tryCheck(c: VerifyCheck, deps: CheckDeps, sha: string, env: Record<string, string>, budgetMs: number): Promise<string | null> {
+async function tryCheck(c: VerifyCheck, deps: CheckDeps, sha: string, env: Record<string, string>, budgetMs: number): Promise<string | null> {
   if (c.command !== undefined) {
     const code = await deps.exec(c.command, env, budgetMs);
     return code === 0 ? null : codeText(code);

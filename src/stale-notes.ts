@@ -2,7 +2,7 @@ import type { Day } from './dates.js';
 import type { Lot } from './plan.js';
 
 /** Une note de clôture et les lots qu'elle cite alors qu'ils sont déjà finis : « L217 done le 24-10 ». */
-export interface NoteCheck {
+interface NoteCheck {
   line: string;
   stale: string[];
 }

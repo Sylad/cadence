@@ -118,7 +118,7 @@ export interface LotRepoDecl {
 /** Condition de tirage d'un lot : `count` lots done portant `spec: true` ou `screen: page`. Mal formée (`invalid`), elle n'est jamais remplie. */
 export type Gate = { count: number; criterion: 'spec' | 'screen'; invalid?: undefined } | { invalid: true };
 
-export const GATE_INVALID = 'gate invalide : count: entier ≥ 1 et un critère spec: true ou screen: page attendus';
+const GATE_INVALID = 'gate invalide : count: entier ≥ 1 et un critère spec: true ou screen: page attendus';
 
 export class RafError extends Error {}
 
@@ -129,7 +129,7 @@ export const RESOURCES_BAD_LIST = 'doit être une liste de noms de ressources';
 export const invalidResource = (name: string) => `ressource invalide : ${name === '' ? '(vide)' : name} (lettres minuscules, chiffres, - et _)`;
 
 /** Les noms de ressources de `--uses` ou de `raf uses` : chacun valide (`RafError` sinon), sans doublon, dans l'ordre donné. */
-export function cleanUses(names: string[]): string[] {
+function cleanUses(names: string[]): string[] {
   for (const n of names) if (!RESOURCE_NAME.test(n)) throw new RafError(invalidResource(n));
   return [...new Set(names)];
 }
@@ -193,7 +193,7 @@ export function escapeRe(s: string): string {
 const DOTTED = '\\.\\w';
 
 /** Matches `L3` or `L3/t1` as whole words. Group 1 = lot id, group 2 = task id. */
-export function refPattern(prefix: string): RegExp {
+function refPattern(prefix: string): RegExp {
   return new RegExp(`(?<![\\w/])(${escapeRe(prefix)}\\d+)(?:/(t\\d+))?(?!\\w|${DOTTED})`, 'g');
 }
 
@@ -214,7 +214,7 @@ lots: []
 }
 
 /** Exemption d'un commit : `sha` complet ou `subject` exact (au moins l'un), datée et motivée. */
-export interface Acknowledged {
+interface Acknowledged {
   sha?: string;
   subject?: string;
   date: Day;

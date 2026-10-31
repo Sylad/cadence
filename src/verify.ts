@@ -54,7 +54,7 @@ export function realCheckDeps(root: string, opts: { quiet?: boolean } = {}): Che
   return { fetch, sleep, now, exec: (cmd, env, timeoutMs) => execGroup(root, cmd, env, timeoutMs, !!opts.quiet) };
 }
 
-export interface VerifyResult {
+interface VerifyResult {
   label: string;
   /** Cause de l'échec ; null quand l'effet est celui attendu. */
   reason: string | null;
@@ -91,7 +91,7 @@ export function summaryLine(results: VerifyResult[]): string {
 }
 
 /** Variables passées aux commandes de vérification, comme à celles de deliver. */
-export function verifyEnv(sha: string): Record<string, string> {
+function verifyEnv(sha: string): Record<string, string> {
   return { CADENCE_SHA: sha, CADENCE_SHORT: sha.slice(0, 7), CADENCE_BRANCH: '' };
 }
 
@@ -117,7 +117,7 @@ export function expectedTarget(root: string, config: DeliverConfig, last: string
 /** Sha attendu de la reprise et de `cadence verify` sans --sha. */
 export const defaultTarget = (root: string, config: DeliverConfig) => expectedTarget(root, config, lastDelivery(sharedStateDir(root)));
 
-export interface VerifyCtx {
+interface VerifyCtx {
   config: DeliverConfig;
   /** Sha qui remplace ${SHA} / ${SHORT} (voir expectedTarget). */
   sha: string;
@@ -129,7 +129,7 @@ export interface VerifyCtx {
 }
 
 /** Délai de chaque essai d'une vérification de `cadence verify`. */
-export const VERIFY_ATTEMPT_MS = 120_000;
+const VERIFY_ATTEMPT_MS = 120_000;
 
 /** `cadence verify` : 0 tout vert, 1 un effet rouge, 2 rien à vérifier. */
 export async function verifyCommand(ctx: VerifyCtx, deps: CheckDeps): Promise<number> {

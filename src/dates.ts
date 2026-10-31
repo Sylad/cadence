@@ -37,7 +37,7 @@ export function addDays(day: Day, n: number): Day {
   return format(d);
 }
 
-export function isWeekend(day: Day): boolean {
+function isWeekend(day: Day): boolean {
   const w = parse(day).getUTCDay();
   return w === 0 || w === 6;
 }

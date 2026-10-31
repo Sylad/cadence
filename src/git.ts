@@ -167,7 +167,7 @@ export function resolveCommit(cwd: string, rev: string): string | null {
   return tryGit(cwd, ['rev-parse', '--verify', '-q', `${rev}^{commit}`]);
 }
 
-export interface RepoStatus {
+interface RepoStatus {
   /** null en HEAD détachée. */
   branch: string | null;
   /** Fichiers suivis modifiés (index ou arbre de travail). */

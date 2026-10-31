@@ -4,7 +4,7 @@ import type { Linked } from './link.js';
 import { isOpen, type Lot } from './plan.js';
 import { isRecurring } from './recurring.js';
 
-export interface Issue {
+interface Issue {
   kind: 'orphan-commit' | 'unknown-ref' | 'todo-with-commits' | 'idle' | 'done-open-tasks' | 'bad-dependency' | 'cycle' | 'bad-field' | 'ux-review-not-visible';
   message: string;
 }
@@ -16,7 +16,7 @@ export const short = (c: Commit) => `${c.sha.slice(0, 7)} ${c.subject}`;
 const UX_REVIEW_TITLE = /^revue ux\s+—/i;
 
 /** Ce que `check` doit savoir du plan pour ne pas conseiller une commande impossible (L321). */
-export interface PlanKind {
+interface PlanKind {
   /** Plan tenu par un autre outil : aucune commande raf ne peut le corriger. */
   readonly?: boolean;
   /** Le plan porte le champ `visible` (toujours vrai pour un plan raf). */

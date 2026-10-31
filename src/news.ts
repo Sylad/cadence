@@ -23,7 +23,7 @@ export interface Entry {
   problems: string[];
 }
 
-export interface NewsIssue {
+interface NewsIssue {
   kind: 'bad-entry' | 'unknown-lot' | 'missing-capture' | 'no-capture' | 'no-time' | 'visible-without-entry' | 'missing-hypotheses';
   message: string;
 }
@@ -212,7 +212,7 @@ export function newsIssues(lots: Lot[], entries: Entry[], dir: string, hypothese
   return issues;
 }
 
-export function slugify(title: string): string {
+function slugify(title: string): string {
   return (
     title
       .normalize('NFD')
@@ -325,7 +325,7 @@ export function renderMarkdown(md: string): string {
     .join('\n');
 }
 
-export interface NewsData {
+interface NewsData {
   project: string;
   generated: string;
   /** `alts` : texte alternatif de chaque capture, même ordre, « '' » sans texte — absent quand l'entrée n'en donne aucun. */

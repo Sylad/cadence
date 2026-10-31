@@ -5,7 +5,7 @@ import { git } from './orchestrate/worktree.js';
 import { RunStore } from './orchestrate/state.js';
 
 /** Contrôles du programme que la porte d'une vague a enregistrés pour un lot (`LotState.checks`, L397). */
-export interface RecordedGate {
+interface RecordedGate {
   wave: string;
   lot: string;
   tree: string;

@@ -1,7 +1,7 @@
 import type { Day } from './dates.js';
 import type { Bar } from './schedule.js';
 
-export interface GanttData {
+interface GanttData {
   project: string;
   today: Day;
   generated: string;

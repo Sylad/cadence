@@ -13,13 +13,13 @@ import { diffDays, toDay, type Day } from './dates.js';
  * jamais lever : l'élément n'est pas proposé et son chemin est rendu dans `unreadable`.
  */
 
-export interface Stale {
+interface Stale {
   path: string;
   /** Jours depuis le dernier changement (mtime ou ctime) de l'élément (de son contenu, pour un dossier). */
   age: number;
 }
 
-export interface CleanScan {
+interface CleanScan {
   /** Éléments à proposer, du plus vieux au plus récent. */
   stale: Stale[];
   /** Chemins qu'on n'a pas pu lire entièrement (lecture refusée, disparu, git sans réponse) : jamais proposés. */

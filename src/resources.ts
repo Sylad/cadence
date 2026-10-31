@@ -4,7 +4,7 @@ import { parse } from 'yaml';
 import { isOpen, RafError, RESOURCE_NAME, RESOURCES_BAD_LIST, type Lot } from './plan.js';
 
 /** Les ressources déclarées (clé `resources:`, L251) et le cadence.yaml qui les déclare, ou celui du dossier parent quand aucun n'en porte. */
-export interface Resources {
+interface Resources {
   file: string;
   names: string[];
 }

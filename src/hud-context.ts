@@ -3,11 +3,11 @@ import { basename, join, resolve } from 'node:path';
 import { cadenceHome } from './orchestrate/registry.js';
 
 /** Au-delà, le chiffre écrit par la bande est trop vieux pour guider un arrêt (la bande le rafraîchit toutes les 5 s). */
-export const HUD_CONTEXT_MAX_AGE_MS = 120_000;
+const HUD_CONTEXT_MAX_AGE_MS = 120_000;
 /** Un fichier de session plus vieux que cela est ignoré et supprimé à la lecture (une session fermée ne le rafraîchit plus). */
-export const HUD_CONTEXT_PURGE_MS = 24 * 3600_000;
+const HUD_CONTEXT_PURGE_MS = 24 * 3600_000;
 
-export interface HudContext {
+interface HudContext {
   cwd: string;
   percent: number;
   tokens: number;
@@ -16,12 +16,12 @@ export interface HudContext {
 }
 
 /** Dossier où la bande cadence-hud publie le contexte de chaque session : un fichier `<id de session>.json` par session. */
-export function hudContextDir(env: NodeJS.ProcessEnv = process.env): string {
+function hudContextDir(env: NodeJS.ProcessEnv = process.env): string {
   return join(cadenceHome(env), 'hud-context');
 }
 
 /** Le nom de fichier d'une session : le même nettoyage que le script d'écriture de la bande (lettres, chiffres, `-`, `_`). */
-export function hudContextFile(session: string): string {
+function hudContextFile(session: string): string {
   return `${session.replace(/[^A-Za-z0-9_-]/g, '_')}.json`;
 }
 
@@ -66,7 +66,7 @@ function livingFiles(dir: string, nowMs: number): string[] {
 }
 
 /** La variable que Claude Code pose dans l'environnement de ses commandes Bash : l'id de la session, nom du fichier que la bande écrit. */
-export const SESSION_ID_ENV = 'CLAUDE_CODE_SESSION_ID';
+const SESSION_ID_ENV = 'CLAUDE_CODE_SESSION_ID';
 
 /**
  * Le contexte publié par la bande pour la session de l'appelant, dans l'ordre : `session` quand on la désigne, sinon la session de la

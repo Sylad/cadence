@@ -10,7 +10,7 @@ import { planCommitProblem } from './plan-commit.js';
 import { isComposedGate } from './orchestrate/workers.js';
 import { FIELDS, Plan, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
-export interface PlanConfig {
+interface PlanConfig {
   /** Chemin du plan, relatif à la racine du dépôt. */
   path?: string;
   /** Commande qui crée un lot dans un plan en lecture seule (`plan.add`) : `{title}` y est remplacé par le titre, entre guillemets. */
@@ -158,7 +158,7 @@ function parseFormat(p: Record<string, unknown>, bad: (what: string) => RafError
   return format;
 }
 
-export interface NewsConfig {
+interface NewsConfig {
   /** Longueur maximale (caractères) d'un titre public, celle que la page Plan du site applique au build. Absente : aucune limite déclarée. */
   publicTitleMax?: number;
 }
@@ -182,7 +182,7 @@ export function readNewsConfig(file: string): NewsConfig {
   return { publicTitleMax: max };
 }
 
-export interface HookConfig {
+interface HookConfig {
   /** Que faire d'un commit qui cite un lot encore todo : l'avertir (défaut), le refuser, ou démarrer le lot dans le commit. */
   autostart?: 'warn' | 'refuse' | 'start';
 }
@@ -251,7 +251,7 @@ export function readPerfConfig(file: string): PriceGrid | null {
   return Object.keys(grid).length === 0 ? null : grid;
 }
 
-export interface SessionConfig {
+interface SessionConfig {
   /** Commande sh, à la racine du dépôt, dont la sortie complète « cadence session start ». */
   start?: string;
   /** Idem pour « cadence session close ». */
@@ -387,7 +387,7 @@ export interface OrchestrateConfig {
 
 const EFFORTS = ['default', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type Effort = (typeof EFFORTS)[number];
-export const EFFORT_STEPS = ['precheck', 'spec', 'maquette', 'fiche', 'accept', 'implement', 'fix', 'review', 'ux'] as const;
+const EFFORT_STEPS = ['precheck', 'spec', 'maquette', 'fiche', 'accept', 'implement', 'fix', 'review', 'ux'] as const;
 export type EffortStep = (typeof EFFORT_STEPS)[number];
 
 /** Clé `verify:` de cadence.yaml (L389). */
@@ -605,7 +605,7 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
   return config;
 }
 
-export interface DocsConfig {
+interface DocsConfig {
   /** Paires « chemins modifiés → documents à toucher » (L143). */
   sync: DocSyncRule[];
   /** Articles d'un dépôt voisin rafraîchis à la livraison (L144) ; absent : aucun. */
@@ -668,7 +668,7 @@ export function readDocsConfig(file: string): DocsConfig {
   return config;
 }
 
-export interface ReferencesConfig {
+interface ReferencesConfig {
   /** Dossier des documents de référence (cadence ref), relatif au dossier du cadence.yaml. */
   dir?: string;
 }
@@ -691,7 +691,7 @@ export function readReferencesConfig(file: string): ReferencesConfig {
   return { dir: r.dir.trim() };
 }
 
-export interface MigrateConfig {
+interface MigrateConfig {
   /** Motifs de chemins (comme docs.sync) des fichiers que `raf migrate` laisse tels quels : ils citent docs/plan/raf.yaml sans le lire. */
   keep: string[];
 }

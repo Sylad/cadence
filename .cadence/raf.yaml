@@ -753,7 +753,7 @@ lots:
     finished: 2026-10-31
   - id: L484
     title: "Nettoyage A2 : retirer « export » des symboles jamais importés dans src/ref/ et test/, supprimer le type mort Exclusion (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § A ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-31
     notes:
@@ -761,6 +761,7 @@ lots:
     started: 2026-10-31
     docs_ok: { date: 2026-10-31, reason: "refactor interne : mot export retiré de symboles jamais importés, type mort Exclusion supprimé, cliquet abaissé ; aucune commande, option ni comportement documenté ne change" }
     review: { date: 2026-10-31, verdict: "conforme (revue neuve : seuls des export retirés, type Exclusion supprimé, 29 lignes de base en moins, src/spec.ts identique à main ; tsc, cliquet --contre main et qualite-l484 verts) ; revue courte du diff rebasé (patch-id différent) : Conforme : le rebase sur main (7901a1e → b47ec63) n'a changé ni fa17f3d ni 77bae89. `git range-diff` donne deux patchs identiques, les commits de main ne touchent aucun fichier du lot, et le constat docs.sync est sans objet : retirer des mots-clés « export » ne change rien de ce que décrivent README.md et docs/*.md, qui ne citent aucun de ces symboles.", commit: 77bae897bf1ff403d4868a7601405ca3b3ac34f2 }
+    finished: 2026-10-31
   - id: L485
     title: "Nettoyage B : retirer staleFiles et readFailedDeliveries (seuls les tests les appellent) et aligner les deux recopies de claudeConfigDir (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § B ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: todo

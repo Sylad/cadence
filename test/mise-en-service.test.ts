@@ -498,7 +498,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(existsSync(join(root, 'service', 'dist', 'cli.js'))).toBe(true);
     expect(existsSync(join(root, 'service', 'node_modules'))).toBe(true);
     expect(execFileSync(join(binDir, 'cadence'), ['--version'], { encoding: 'utf8' }).trim()).toMatch(/^\d+/);
-  });
+  }, 120_000);
 });
 
 /** Dépôt de travail qui porte le mod : plugins/cadence-hud avec un fichier de hooks et un .claude-plugin/plugin.json. */

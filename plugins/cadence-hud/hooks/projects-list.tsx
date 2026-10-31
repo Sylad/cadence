@@ -67,14 +67,33 @@ const List: ClientModule<Props, State> = (props, surface) => {
       {projects.map((p, i) => {
         const m = mark(i)
         const filled = p.bar?.replace(/▯/g, '') ?? ''
+        const style = { bold: p.name === state.selected, underline: dragging && i === hover }
+        if (p.bar === undefined)
+          return (
+            <Text key={`p${i}`} wrap="truncate-end" {...style}>
+              {m ? <Text color={m.color}>{m.glyph}</Text> : <Text> </Text>}
+              {` ${p.name}`}
+              <Text dimColor>{`  ${p.detail}`}</Text>
+            </Text>
+          )
+        // la police du panneau est proportionnelle : des espaces de bourrage n'alignent rien, la largeur du nom est donc celle d'une boîte (L495)
         return (
-          <Text key={`p${i}`} wrap="truncate-end" bold={p.name === state.selected} underline={dragging && i === hover}>
-            {m ? <Text color={m.color}>{m.glyph}</Text> : <Text> </Text>}
-            {p.bar === undefined ? ` ${p.name}` : ` ${p.name.padEnd(nameWidth)} `}
-            {p.bar === undefined && <Text dimColor>{`  ${p.detail}`}</Text>}
-            {filled && <Text color={p.color}>{filled}</Text>}
-            {p.bar !== undefined && <Text dimColor>{`${p.bar.slice(filled.length)} ${p.figures ?? ''}`}</Text>}
-          </Text>
+          <Box key={`p${i}`} flexDirection="row">
+            <Box width={2} flexShrink={0}>
+              <Text {...style}>{m ? <Text color={m.color}>{m.glyph}</Text> : ' '}</Text>
+            </Box>
+            <Box key={`name:${p.name}`} width={nameWidth} flexShrink={0}>
+              <Text wrap="truncate-end" {...style}>
+                {p.name}
+              </Text>
+            </Box>
+            <Box paddingLeft={1} flexShrink={1}>
+              <Text wrap="truncate-end">
+                {filled && <Text color={p.color}>{filled}</Text>}
+                <Text dimColor>{`${p.bar.slice(filled.length)} ${p.figures ?? ''}`}</Text>
+              </Text>
+            </Box>
+          </Box>
         )
       })}
     </Box>

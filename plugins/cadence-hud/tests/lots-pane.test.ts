@@ -133,6 +133,15 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await ui.unmount()
     await settle()
   }
+  /** Les boîtes du nom de chaque projet dans la région des projets : celles de clé `name:<projet>`. */
+  const projectBoxes = async (bodyColumns: number, bodyRows: number, surface: 'terminal' | 'desktop') => {
+    const ui = await mountPane(surface, false, bodyColumns, bodyRows)
+    await ui.drawn()
+    const region = (await ui.findAll({ type: 'Client' })).find(c => c.key === 'projects')
+    const boxes = (await ui.findAll({ type: 'Box', in: region?.key } as never)) as unknown as { key?: string; props?: { width?: unknown; flexShrink?: unknown }; text?: string }[]
+    await ui.unmount()
+    return boxes.filter(b => b.key?.startsWith('name:')).map(b => ({ text: b.text ?? '', width: b.props!.width, flexShrink: b.props!.flexShrink }))
+  }
   const rafs = () => runs.filter(a => a[0] === 'raf')
   /** Le dernier mot du panneau sur un déplacement, lu sur un montage neuf (le texte de `gestures` porte aussi celui d'avant, sur le montage des gestes). */
   const notice = async () => (await draw()).texts.find(t => /^[✔•✖] /.test(t))
@@ -154,7 +163,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
     await fresh.unmount()
     return text
   }
-  return { rafs, priorities, gestures, notice, kv, press, pressKey, store, open, opened, runs, tours, perfs, tour, stamps, waves, hud, advance, draw }
+  return { rafs, priorities, gestures, notice, kv, press, pressKey, store, open, opened, runs, tours, perfs, tour, stamps, waves, hud, advance, draw, projectBoxes }
 }
 
 const CLOSE_HELP = '/hud lots pour fermer'
@@ -1519,8 +1528,8 @@ test('L481 — la région des projets montre la barre colorée et les chiffres d
   const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify(withProgress) }) })
   await s.hud('lots')
   const text = (await s.draw(70, 30, 'terminal')).text
-  expect(text).toMatch(/cadence ▮▮▮▯▯▯▯▯▯▯ 3\/10 · 1 en cours : L401 · \+2 cette semaine/)
-  expect(text).toMatch(/ol {6}▮{9}▯ 9\/10 · 0 en cours/)
+  expect(text).toMatch(/^▮▮▮▯▯▯▯▯▯▯ 3\/10 · 1 en cours : L401 · \+2 cette semaine$/m)
+  expect(text).toMatch(/^▮{9}▯ 9\/10 · 0 en cours$/m)
   expect(text).not.toMatch(/cadence {2}\d+ lots? non clos/)
 })
 
@@ -1533,7 +1542,7 @@ test('L481 — un cadence qui ne donne pas progress : la ligne du projet garde l
   expect(text).toMatch(/ol {2}1 lot non clos/)
 })
 
-test('L494 — les barres d’avancement des projets partent de la même colonne, la largeur des noms étant celle du plus long', async ($, on) => {
+test('L495 — le nom de chaque projet est dans une boîte de largeur fixe, celle du plus long nom : l’alignement ne dépend pas des espaces (police proportionnelle)', async ($, on) => {
   const withProgress = [
     { ...row('cadence', TOUR[0]!.lots), progress: { done: 3, doing: 0, todo: 7, added7: 0 } },
     { ...row('jobmail-assistant', TOUR[1]!.lots), progress: { done: 5, doing: 0, todo: 5, added7: 0 } },
@@ -1541,12 +1550,8 @@ test('L494 — les barres d’avancement des projets partent de la même colonne
   ]
   const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify(withProgress) }) })
   await s.hud('lots')
-  const lines = (await s.draw(80, 30, 'terminal')).text.split('\n')
-  const columns = ['cadence', 'jobmail-assistant', 'ol'].map(name => {
-    const line = lines.find(l => new RegExp(`${name} +[▮▯]`).test(l))
-    expect(line, name).toBeDefined()
-    return line!.search(/[▮▯]/)
-  })
-  expect(new Set(columns).size).toBe(1)
-  expect(lines.find(l => /jobmail-assistant [▮▯]/.test(l))).toBeDefined() // le plus long garde une seule espace avant sa barre
+  const found = await s.projectBoxes(70, 30, 'desktop')
+  expect(found.map(b => b.text)).toEqual(['cadence', 'jobmail-assistant', 'ol']) // le nom seul, aucune espace de bourrage
+  expect(found.map(b => b.width)).toEqual(['jobmail-assistant'.length, 'jobmail-assistant'.length, 'jobmail-assistant'.length])
+  expect(found.every(b => b.flexShrink === 0)).toBe(true)
 })

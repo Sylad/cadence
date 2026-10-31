@@ -732,6 +732,7 @@ lots:
     notes:
       - { date: 2026-10-31, text: "Capture de Sylvain 31-10 (tmp/L481-bandeau-coupe.png du dossier parent) : avec deux vagues en cours, le bandeau empile ctx/budget, les lignes de lots des vagues et les créneaux ; il ne reste la place que pour 2 projets sur 11 dans les barres d'avancement (cadence, maritime-atlas), le reste est coupé sous la zone de saisie — c'est le cas à couvrir" }
     started: 2026-10-31
+    review: { date: 2026-10-31, verdict: "compliant — 0 blocking, 0 major, 1 minor note (lot L481, commit 27df385) — orchestré (vague 2026-10-31-1445-cad, 0 passe(s) de correction)", commit: 84d0471a6ea3bf1d73768b5ccdb999995f3d3a4c, reporte: { de: 27df38522b325b279bc532d8dcda51b237102b5d, vers: 84d0471a6ea3bf1d73768b5ccdb999995f3d3a4c, patchId: e7394a57ae7a5eaa763e30f1f5a7cf47bb479d7c } }
   - id: L482
     title: "verify --gate n'hérite pas le verdict du parent sous un commit de plan seul quand le code du projet lit le fichier de plan (détecter le chemin du plan cité dans les sources/tests, ou avertir à orchestrate --dry-run / lead tour : « le code lit le plan, gate.readsPlan absent ») — 31-10 : codex sans readsPlan, deux builds Cloudflare rouges (titres publics L50, L58) derrière une porte « verte » héritée"
     status: todo

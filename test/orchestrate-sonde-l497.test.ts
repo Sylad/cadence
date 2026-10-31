@@ -537,6 +537,20 @@ describe('sonde de cas limites (L497)', () => {
     expect(c.lot.warnings.some((w) => w.startsWith('sonde de cas limites : question sans réponse') && w.includes('Faut-il refuser le vide ?'))).toBe(true);
   });
 
+  it('R9 — une sonde qui répond mais laisse le dépôt sale rend le lot « dépôt sale après probe »', async () => {
+    const dirty: Handler = (call) => {
+      const out = probe('q.spec.ts')(call);
+      writeFileSync(join(call.opts.cwd, 'a.ts'), '// modifié par la sonde, non commité\n');
+      return out;
+    };
+    const h = harness({ script: { implement: [impl('a.ts')], probe: [dirty], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('dépôt sale après probe');
+  });
+
   it('R10 — docs/orchestrate.md et README.md citent orchestrate.probe', () => {
     expect(readFileSync(join(root, 'docs/orchestrate.md'), 'utf8')).toContain('orchestrate.probe');
     // le README est une page d'accueil sans clé de configuration (test L232) : il renvoie à la section de la page docs/ qui la décrit

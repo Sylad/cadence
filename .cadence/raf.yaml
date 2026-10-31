@@ -688,6 +688,11 @@ lots:
     started: 2026-10-31
     review: { date: 2026-10-31, verdict: "compliant — 0 bloquant, 0 majeur, 1 mineur (R9 n'exerce pas le catch de main-tree.ts) — orchestré (vague 2026-10-31-0801-cad, 0 passe(s) de correction)", commit: 56e9b5c90d66161f553024216945dc7858c1ffb5 }
     finished: 2026-10-31
+  - id: L476
+    title: "raf done refuse (sans --force) un lot dont le verdict de revue enregistré est non conforme (prédicat isNonConformingVerdict de L474) : aujourd'hui unreviewedWork ne juge que la couverture des commits, un lot relu « non conforme : 1 bloquant » à son dernier commit se ferme ; test + doc"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-31
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

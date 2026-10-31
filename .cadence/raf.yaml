@@ -725,12 +725,13 @@ lots:
     started: 2026-10-31
   - id: L481
     title: "Panneau des lots (/hud lots) : la section « ordre des projets » montre pour chaque projet la barre d'avancement colorée du bandeau (lots clos / total, couleur selon la part, en cours, +N cette semaine), pour lire l'avancement sans faire défiler le bandeau du bas (demande de Sylvain 31-10, captures du bandeau et du panneau) ; le glisser et Alt+↑/↓ restent"
-    status: todo
+    status: doing
     estimate: 0.25
     visible: true
     created: 2026-10-31
     notes:
       - { date: 2026-10-31, text: "Capture de Sylvain 31-10 (tmp/L481-bandeau-coupe.png du dossier parent) : avec deux vagues en cours, le bandeau empile ctx/budget, les lignes de lots des vagues et les créneaux ; il ne reste la place que pour 2 projets sur 11 dans les barres d'avancement (cadence, maritime-atlas), le reste est coupé sous la zone de saisie — c'est le cas à couvrir" }
+    started: 2026-10-31
   - id: L482
     title: "verify --gate n'hérite pas le verdict du parent sous un commit de plan seul quand le code du projet lit le fichier de plan (détecter le chemin du plan cité dans les sources/tests, ou avertir à orchestrate --dry-run / lead tour : « le code lit le plan, gate.readsPlan absent ») — 31-10 : codex sans readsPlan, deux builds Cloudflare rouges (titres publics L50, L58) derrière une porte « verte » héritée"
     status: todo

@@ -55,10 +55,11 @@ lots:
     finished: 2026-10-29
   - id: L403
     title: "Porte de tests déportée (orchestrate.gate.host) : build et tests d'une vague ou de verify --gate joués en ssh sur une autre machine, au sha poussé dans un dépôt nu de cette machine, dépendances en cache par empreinte du lockfile ; repli local si l'hôte ne répond pas, dit dans la sortie ; générique (aucun nom de machine dans le code)"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-10-28
+    started: 2026-10-31
   - id: L404
     title: "test/etape-spec-back-fiche.test.ts:15 lit .cadence/raf.yaml en direct : rouge depuis raf archive (B1–B5 archivés) — lire le plan par le chargeur (lots actifs + archivés), garde contre tout test qui relit le plan réel sans le chargeur"
     status: done

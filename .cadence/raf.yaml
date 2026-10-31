@@ -746,6 +746,7 @@ lots:
     estimate: 0.5
     created: 2026-10-31
     started: 2026-10-31
+    docs_ok: { date: 2026-10-31, reason: "le lot ne retire que le mot export de symboles jamais importés : aucun comportement, aucune option ni commande ne change, les documents restent vrais" }
   - id: L484
     title: "Nettoyage A2 : retirer « export » des symboles jamais importés dans src/ref/ et test/, supprimer le type mort Exclusion (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § A ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: todo

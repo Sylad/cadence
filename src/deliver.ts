@@ -363,9 +363,10 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
   let undelivered: { id: string; state: string }[] = [];
   if (ctx.sha !== undefined && !ctx.duringWave && ctx.plan) {
     const last = lastDelivery(ctx.state);
-    const lots = deliveryLots(ctx.plan, ctx.root, sha, last && isAncestor(ctx.root, last, sha) ? last : null);
+    const from = last && isAncestor(ctx.root, last, sha) ? last : null;
+    const lots = deliveryLots(ctx.plan, ctx.root, sha, from);
     if (ctx.dryRun) {
-      out(`Lots de l'intervalle ${last && isAncestor(ctx.root, last, sha) ? `${last.slice(0, 7)}..` : 'jusqu\'à '}${sha.slice(0, 7)} :`);
+      out(`Lots de l'intervalle ${from ? `${from.slice(0, 7)}..` : 'jusqu\'à '}${sha.slice(0, 7)} :`);
       if (lots.length === 0) out('  (aucun)');
       for (const l of lots) out(`  ${l.id} « ${l.title} » — ${l.state}`);
     }

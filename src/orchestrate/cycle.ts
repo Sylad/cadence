@@ -1530,7 +1530,7 @@ function dirtAfter(done: Done): string[] {
 const dirtBetween = (before: Snapshot, after: Snapshot): string[] => [...trackedPaths(after), ...after.untracked.filter((f) => !before.untracked.includes(f))];
 
 /** Suite commune des étapes spec et accept : commits de la session (avertis s'ils ne citent pas le lot), choix reportés, vraies questions (les non-questions deviennent un avertissement). */
-function takeReport(c: LotCtx, done: Done, rep: { choix?: string[]; questions: string[] }): string[] {
+function takeReport(c: LotCtx, done: Pick<Done, 'step'>, rep: { choix?: string[]; questions: string[] }): string[] {
   const l = c.lot;
   const commits: Commit[] = readCommits(wd(c), { range: done.step.headBefore ? `${done.step.headBefore}..HEAD` : undefined });
   done.step.commits = commits.map(short).reverse();
@@ -2305,8 +2305,8 @@ async function toReview(c: LotCtx, runs: CheckRun[], minorsPass: boolean): Promi
 
 /** Ce que la sonde (probe.ts) emprunte au cycle. */
 const probeIo = (c: LotCtx): ProbeIo<Done> => ({
-  lot: c.lot, config: c.config, cwd: wd(c), play: () => session(c, 'probe'), take: (done, rep) => takeReport(c, done, rep), sealed: (head) => sealedViolations(c, head), dirt: dirtAfter, gate: (red, runs) => programChecks(c, red, runs),
-  fix: (constats) => toFix(c, constats, 'sonde de cas limites'), review: (runs) => toReview(c, runs, false), handBack: (why) => void stop(c, 'handed-back', why), pays: () => fixAffordable(c.lot), count: () => budgetCount(c.lot), head: () => git(wd(c), 'rev-parse', 'HEAD').trim(),
+  lot: c.lot, config: c.config, cwd: wd(c), play: () => session(c, 'probe'), take: (step, rep) => takeReport(c, { step }, rep), sealed: (head) => sealedViolations(c, head), dirt: dirtAfter, gate: (red, runs) => programChecks(c, red, runs),
+  fix: (constats) => toFix(c, constats, 'sonde de cas limites'), review: (runs) => toReview(c, runs, false), handBack: (why) => void stop(c, 'handed-back', why), pays: () => fixAffordable(c.lot), head: () => git(wd(c), 'rev-parse', 'HEAD').trim(),
 });
 
 /** Mention « sans commit » du verdict quand la passe des mineurs n'a rien commité (l'UX finale conclut alors à la place de la passe). */

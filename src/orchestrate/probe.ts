@@ -68,7 +68,7 @@ export interface ProbeIo<D extends ProbeDone> {
   /** La session : `null` quand le lot est suspendu ou rendu, `PROBE_FAILED` quand elle n'a rien donné. */
   play(): Promise<D | null | typeof PROBE_FAILED>;
   /** Commits de la session au journal, choix repris, questions : rend les vraies questions. */
-  take(done: D, rep: { choix?: string[]; questions: string[] }): string[];
+  take(step: StepState, rep: { choix?: string[]; questions: string[] }): string[];
   /** Violations du verrou des tests d'acceptation depuis `head`. */
   sealed(head: string | undefined): string[];
   /** Fichiers laissés sales par la session. */
@@ -82,7 +82,6 @@ export interface ProbeIo<D extends ProbeDone> {
   handBack(why: string): void;
   /** Le budget paie-t-il la correction et la revue qui la suit ? */
   pays(): boolean;
-  count(): string;
   head(): string;
 }
 
@@ -107,10 +106,9 @@ function warnOutsideTests(io: ProbeIo<ProbeDone>, headBefore: string | undefined
   if (outside.length) io.lot.warnings.push(`sonde de cas limites : la session a modifié du code hors tests (${outside.join(', ')})`);
 }
 
-/** Les contrôles faits après une session qui a rendu un rapport : verrou, dépôt propre, fichiers hors tests. Vrai quand le lot est rendu. */
-function handedBack<D extends ProbeDone>(io: ProbeIo<D>, done: D, headBefore: string | undefined): boolean {
+/** Les contrôles faits après une session qui a commité, avec ou sans rapport : verrou, dépôt propre (`dirt`), fichiers hors tests. Vrai quand le lot est rendu. */
+function handedBack<D extends ProbeDone>(io: ProbeIo<D>, dirt: string[], headBefore: string | undefined): boolean {
   const locked = io.sealed(headBefore);
-  const dirt = io.dirt(done);
   const why = locked.length ? `verrou des tests d'acceptation : ${locked.join(' ; ')}` : dirt.length ? `dépôt sale après probe : ${dirt.join(', ')}` : '';
   if (why) io.handBack(why);
   else warnOutsideTests(io, headBefore);
@@ -138,7 +136,7 @@ export async function probeStep<D extends ProbeDone>(io: ProbeIo<D>): Promise<vo
   const done = await io.play();
   if (!done) return;
   const step = l.steps[l.steps.length - 1]!;
-  const rep = done === PROBE_FAILED ? unplayedReport(l, step) : readSession(io, done, step);
+  const rep = done === PROBE_FAILED ? cutSession(io, step) : readSession(io, done, step);
   if (rep === 'rendu') return;
   // La porte du programme après la sonde comme après toute écriture, mais seulement si elle a commité : sans nouveau commit il n'y a rien de neuf à rejouer.
   const red: Constat[] = [];
@@ -146,10 +144,9 @@ export async function probeStep<D extends ProbeDone>(io: ProbeIo<D>): Promise<vo
   const moved = !!step.headBefore && io.head() !== step.headBefore;
   if (moved) await io.gate(red, runs);
   const found = moved ? findings(l, red, (rep?.echecs ?? []).map((e) => e.trim()).filter(Boolean), !!io.config.test) : [];
-  if (found.length && !io.pays()) {
-    l.warnings.push(`sonde de cas limites : correction non jouée (budget du lot ${io.count()}), la revue part avec ses tests rouges : ${found.map((k) => k.texte).join(' ; ')}`);
-  } else if (found.length) {
-    l.warnings.push(`${PROBE_FINDING}${found.length} constat(s), passe de correction avant la revue`);
+  if (found.length) {
+    // Une correction que le budget ne paie plus n'est pas sautée : l'étape fix refuse et le lot revient au lead sans revue, tests rouges (L145, cycle.ts overBudget).
+    if (io.pays()) l.warnings.push(`${PROBE_FINDING}${found.length} constat(s), passe de correction avant la revue`);
     step.constats = found.map((k) => k.texte);
     io.fix(found);
     return;
@@ -158,15 +155,17 @@ export async function probeStep<D extends ProbeDone>(io: ProbeIo<D>): Promise<vo
   await io.review(moved ? runs : [...(l.checks?.runs ?? [])]);
 }
 
-/** La session n'a rien donné : un warning, pas de rapport. */
-function unplayedReport(l: LotState, step: StepState): undefined {
-  unplayed(l, step.cause ?? 'échec');
-  return undefined;
+/** La session n'a rien donné (échec, coupure, délai) : un warning, pas de rapport. Ce qu'elle a commité avant d'être coupée passe les mêmes contrôles qu'après un rapport (commits au journal, verrou, fichiers hors tests) ; le dépôt a déjà été remis propre. */
+function cutSession<D extends ProbeDone>(io: ProbeIo<D>, step: StepState): undefined | 'rendu' {
+  unplayed(io.lot, step.cause ?? 'échec');
+  if (!step.headBefore || io.head() === step.headBefore) return undefined;
+  io.take(step, { questions: [] });
+  return handedBack(io, [], step.headBefore) ? 'rendu' : undefined;
 }
 
 /** Le rapport d'une session qui a répondu : questions notées, verrou et dépôt contrôlés. `'rendu'` quand le lot est rendu. */
 function readSession<D extends ProbeDone>(io: ProbeIo<D>, done: D, step: StepState): ProbeReport | undefined | 'rendu' {
   const rep = readReport(io.lot, done.report);
-  for (const q of io.take(done, rep ?? { questions: [] })) io.lot.warnings.push(`sonde de cas limites : question sans réponse (la sonde ne bloque pas le lot) : « ${q.trim()} »`);
-  return handedBack(io, done, step.headBefore) ? 'rendu' : rep;
+  for (const q of io.take(step, rep ?? { questions: [] })) io.lot.warnings.push(`sonde de cas limites : question sans réponse (la sonde ne bloque pas le lot) : « ${q.trim()} »`);
+  return handedBack(io, io.dirt(done), step.headBefore) ? 'rendu' : rep;
 }

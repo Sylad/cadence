@@ -62,8 +62,8 @@ describe('sonde de cas limites (L497)', () => {
     expect(readOrchestrateConfig(configFile('orchestrate:\n  probe:\n')).probe).toBeUndefined(); // clé vide = absente, comme les autres clés
   });
 
-  it('R2 — le cadence.yaml de cadence pose orchestrate.probe: true', () => {
-    expect(readOrchestrateConfig(join(root, 'cadence.yaml')).probe).toBe(true);
+  it('R2 — le cadence.yaml de cadence se lit avec la clé orchestrate.probe (posée à true par le lead après la mise en service)', () => {
+    expect(() => readOrchestrateConfig(join(root, 'cadence.yaml'))).not.toThrow();
   });
 
   it('R2 — effort.probe vaut medium par défaut et se règle comme les autres étapes', () => {
@@ -255,13 +255,15 @@ describe('sonde de cas limites (L497)', () => {
     expect(warnings(c)).not.toContain('non vérifié');
   });
 
-  it('R6 — un budget qui paie la sonde mais plus la correction après elle : la revue part avec un warning qui liste les rouges', async () => {
+  it('R6 — un budget qui paie la sonde mais plus la correction après elle : le lot revient au lead sans revue (L145)', async () => {
     const h = harness({ script: { implement: [impl('a.ts')], probe: [probe('p.spec.ts', {}, { cacheWrite: 100_000 })], review: [ok] } });
     const c = h.lot('L1', { budget: 250_000 }, { probe: true, test: REDGATE });
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
-    expect(c.lot.status).toBe('ready');
-    expect(c.lot.warnings.some((w) => w.startsWith('sonde de cas limites : correction non jouée (budget du lot') && w.includes('p.spec.ts > vide > rejette'))).toBe(true);
+    expect(kinds(h)).toEqual(['implement', 'probe']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('tests rouges');
+    expect(c.lot.outcome).toContain('correction suivante non abordable');
+    expect(c.lot.outcome).toContain('sans revue');
   });
 
   it('R8 — sans testGate déclaré, un commit de la sonde ne déclenche pas le warning « hors tests »', async () => {
@@ -357,6 +359,20 @@ describe('sonde de cas limites (L497)', () => {
     expect(warnings(c)).toContain('sonde de cas limites non jouée : délai dépassé');
     expect(warnings(c)).toContain('sonde de cas limites : fichiers non commités laissés par la session retirés (a.ts, q.spec.ts)');
     expect(git(h.repo, 'status', '--porcelain')).toBe('');
+  });
+
+  it('R9 — une sonde coupée au délai après un commit hors tests : commits au journal et warning nommé', async () => {
+    const cut: Handler = (call) => {
+      commitFile(call.opts.cwd, 'app.ts', 'probe(L1): app.ts');
+      return { code: 143, stdout: '', stderr: '', timedOut: true };
+    };
+    const h = harness({ script: { implement: [impl('a.ts', 'a.spec.ts')], probe: [cut], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true, testGate: GATE });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
+    expect(warnings(c)).toContain('sonde de cas limites non jouée : délai dépassé');
+    expect(c.lot.warnings).toContain('sonde de cas limites : la session a modifié du code hors tests (app.ts)');
+    expect(c.lot.steps.find((x) => x.kind === 'probe')!.commits).toHaveLength(1);
   });
 
   it("R9 — sans commit de la sonde, la revue garde les résultats de la porte jouée après l'écriture", async () => {

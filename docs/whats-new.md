@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.34.0**: an optional edge-case probe (`orchestrate.probe: true`) tries to break a lot's diff with tests at the edges before the code review; flaky tests of `mise-en-service` made deterministic.
 - **1.33.0**: the lots panel shows each project's progress bar in its « ordre des projets » section, aligned in the desktop app; a simplification audit of the code, and dead exports removed.
 - **1.32.0**: code-quality guard rails in a ratchet (ESLint, sonarjs, knip, jscpd vs a versioned baseline), a recipe for TS, Python, Java, shell; `raf done` refuses a lot whose recorded review is `non conforme`.
 - **1.31.0**: `deliver --sha` refuses, outside a wave too, a sha that carries commits of a lot neither done nor ready (a `non conforme` verdict is not ready); `raf add/note/done` warn when a wave session writes in the main tree.
@@ -59,6 +60,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.34.0**: `cadence orchestrate` can play an edge-case probe between the implementation and the code review (L497, `orchestrate.probe: true`, `docs/orchestrate.md`): a fresh Sonnet session reads the lot's diff, and the sheet when there is one, and writes tests at the edges — empty, absent, twice, wrong type, refused, the real shape of the data, the other callers; a red test sends the lot back to the implementation as a finding before the Opus review, which costs more. The probe's findings never block the lot (a failed or timed-out probe is a warning and the review goes on), while the checks common to every writing session — a dirty repository, the acceptance-test lock — apply to it too. Absent, nothing changes. It answers the « bug de code » bottleneck: edge cases were 64 % of the code-bug correction passes after two written instructions in the implementation brief. The test suite also stops blocking a Vitest worker for more than 60 s: `mise-en-service` compiles once per test file instead of five synchronous `tsc` runs (L480).
 
 **1.33.0**: the lots panel (`/hud lots`) shows, on each row of its « ordre des projets » section, the progress bar of the band — closed lots over total, coloured by the share done, the lots in progress and `+N cette semaine` (L481, `docs/cadence-hud.md`); the bars all start at the same column, the project name sitting in a box as wide as the longest name, which a proportional font aligns where spaces did not (L494, L495). Dragging and Alt+↑ / Alt+↓ are unchanged. A read-only simplification audit of the code (L461, `docs/mesures/audit-simplification-l461.md`) ranks dead code, copies and split plans by gain and risk; its first cleanups remove exports nothing imports and a dead type (L483, L484), with no change of behaviour.
 

@@ -6,4 +6,6 @@ export function lireJscpd(rapport: { duplicates?: { firstFile: { name: string };
 export function comparer(base: Mesure, courant: Mesure): { pires: { cle: string; avant: number; apres: number }[]; mieux: { cle: string; avant: number; apres: number }[] };
 export function lireBase(racine: string): Mesure;
 export function mesurer(racine: string): Mesure;
-export function appliquer(racine: string, mode: 'verifier' | 'init' | 'ecrire', mesure?: Mesure): { code: number; texte: string };
+export type Ref = { nom: string; base: Mesure | null };
+export function lireRef(racine: string, ref: string): Ref;
+export function appliquer(racine: string, mode: 'verifier' | 'init' | 'ecrire', mesure?: Mesure, ref?: Ref | null): { code: number; texte: string };

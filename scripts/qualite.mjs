@@ -110,18 +110,38 @@ export function mesurer(racine) {
   }
 }
 
+/** Le point de départ du lot : la ligne de base au merge-base de HEAD et de `ref`. `base` vaut null quand elle n'y existait pas encore. */
+export function lireRef(racine, ref) {
+  const git = (...args) => spawnSync('git', args, { cwd: racine, encoding: 'utf8' });
+  const mb = git('merge-base', 'HEAD', ref);
+  if (mb.status !== 0) throw new Error(`référence « ${ref} » introuvable (git merge-base HEAD ${ref}) : ${mb.stderr.trim() || 'pas de dépôt git ?'}`);
+  const sha = mb.stdout.trim();
+  const show = git('show', `${sha}:${BASELINE}`);
+  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null };
+}
+
 const ligne = ({ cle, avant, apres }) => `  ${cle} : ${avant} → ${apres}`;
 
-/** Compare la mesure à la base. mode : 'verifier' (défaut), 'init' (crée la base) ou 'ecrire' (la baisse). Rend { code, texte }. */
-export function appliquer(racine, mode, mesure = mesurer(racine)) {
+/**
+ * Compare la mesure à la base. mode : 'verifier' (défaut), 'init' (crée la base) ou 'ecrire' (la baisse). Rend { code, texte }.
+ * `ref` (voir lireRef) : la base du point de départ du lot ; la base du lot ne peut pas la dépasser, sinon une session
+ * « réparerait » la base au lieu du code et la porte comme la CI resteraient vertes.
+ */
+export function appliquer(racine, mode, mesure = mesurer(racine), ref = null) {
   const existe = existsSync(join(racine, BASELINE));
   if (mode === 'init') {
+    if (ref?.base) return { code: 2, texte: `${BASELINE} existe déjà dans ${ref.nom} : --init ne la recrée pas (elle ne peut que baisser, utiliser --ecrire).` };
     if (existe) return { code: 2, texte: `${BASELINE} existe déjà : --init ne la recrée pas (elle ne peut que baisser, utiliser --ecrire).` };
     ecrireBase(racine, mesure);
     return { code: 0, texte: `${BASELINE} créée : ${Object.keys(mesure).length} mesures figées.` };
   }
   if (!existe) return { code: 2, texte: `${BASELINE} absente : lancer « node scripts/qualite.mjs --init » une fois, puis la versionner.` };
-  const { pires, mieux } = comparer(lireBase(racine), mesure);
+  const base = lireBase(racine);
+  const remonte = ref?.base ? comparer(ref.base, base).pires : [];
+  if (remonte.length) {
+    return { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${remonte.map(ligne).join('\n')}` };
+  }
+  const { pires, mieux } = comparer(base, mesure);
   if (pires.length) {
     return { code: 1, texte: `Qualité : ${pires.length} mesure(s) empirent (rien ne peut empirer, un fichier touché ne peut que baisser) :\n${pires.map(ligne).join('\n')}` };
   }
@@ -134,11 +154,14 @@ export function appliquer(racine, mode, mesure = mesurer(racine)) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const arg = process.argv[2];
+  const args = process.argv.slice(2);
+  const i = args.indexOf('--contre');
+  const ref = i >= 0 ? args.splice(i, 2)[1] : null;
+  const arg = args[0];
   const mode = { '--init': 'init', '--ecrire': 'ecrire' }[arg ?? ''];
-  if (arg && !mode) { console.error('usage : node scripts/qualite.mjs [--init | --ecrire]'); process.exit(2); }
+  if ((arg && !mode) || args.length > 1 || (i >= 0 && !ref)) { console.error('usage : node scripts/qualite.mjs [--init | --ecrire] [--contre <ref>]'); process.exit(2); }
   try {
-    const { code, texte } = appliquer(process.cwd(), mode ?? 'verifier');
+    const { code, texte } = appliquer(process.cwd(), mode ?? 'verifier', undefined, ref ? lireRef(process.cwd(), ref) : null);
     (code ? console.error : console.log)(texte);
     process.exit(code);
   } catch (e) {

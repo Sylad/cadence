@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync, cpSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, cpSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { appliquer, BASELINE, comparer, lireEslint, lireJscpd, lireKnip } from '../scripts/qualite.mjs';
+import { appliquer, BASELINE, comparer, lireEslint, lireJscpd, lireKnip, lireRef } from '../scripts/qualite.mjs';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -128,6 +128,82 @@ describe('L462 — la ligne de base (appliquer)', () => {
     expect(lire(dir)).toEqual({ a: 3, b: 1 });
     expect(appliquer(dir, 'ecrire', { a: 2 }).code).toBe(0);
     expect(lire(dir)).toEqual({ a: 2 });
+  });
+});
+
+describe('L462 — la base ne peut pas remonter par rapport au point de départ du lot', () => {
+  const ref = { nom: 'main (abc1234)', base: { a: 3, b: 1 } };
+  const lire = (dir: string) => JSON.parse(readFileSync(join(dir, BASELINE), 'utf8'));
+
+  it('R9 — une base du lot plus haute que celle du départ (valeur montée à la main, clé neuve) est refusée même si la mesure la respecte', () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, BASELINE), JSON.stringify({ a: 5, b: 1 }));
+    const r = appliquer(dir, 'verifier', { a: 5, b: 1 }, ref);
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain('a : 3 → 5');
+    expect(r.texte).toContain('main (abc1234)');
+    writeFileSync(join(dir, BASELINE), JSON.stringify({ a: 3, b: 1, c: 1 }));
+    expect(appliquer(dir, 'ecrire', { a: 3, b: 1, c: 1 }, ref).code).toBe(1);
+    expect(lire(dir)).toEqual({ a: 3, b: 1, c: 1 });
+  });
+
+  it('R9 — une base égale ou plus basse que celle du départ passe ; --init ne recrée pas une base qui existait au départ', () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, BASELINE), JSON.stringify({ a: 2 }));
+    expect(appliquer(dir, 'verifier', { a: 2 }, ref).code).toBe(0);
+    const sans = tempDir();
+    const r = appliquer(sans, 'init', { a: 99 }, ref);
+    expect(r.code).toBe(2);
+    expect(existsSync(join(sans, BASELINE))).toBe(false);
+    expect(appliquer(sans, 'init', { a: 99 }, { nom: 'main', base: null }).code).toBe(0);
+  });
+
+  it('R9 — lireRef lit la base au merge-base, la dit absente quand elle n\'y existait pas, et échoue sur une référence inconnue', () => {
+    const dir = tempDir();
+    const git = (...a: string[]) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, encoding: 'utf8' });
+    git('init', '-q', '-b', 'main');
+    writeFileSync(join(dir, 'x'), '1');
+    git('add', 'x');
+    git('commit', '-q', '-m', 'un');
+    expect(lireRef(dir, 'main').base).toBeNull();
+    writeFileSync(join(dir, BASELINE), '{"a":3}');
+    git('add', BASELINE);
+    git('commit', '-q', '-m', 'base');
+    git('switch', '-q', '-c', 'lot');
+    writeFileSync(join(dir, BASELINE), '{"a":9}');
+    git('commit', '-q', '-am', 'monte');
+    expect(lireRef(dir, 'main').base).toEqual({ a: 3 });
+    expect(() => lireRef(dir, 'inconnue')).toThrow(/introuvable/);
+  });
+
+  it('R9 — le CLI avec --contre échoue (code 1) quand la base du lot dépasse celle du départ', () => {
+    const dir = tempDir();
+    const git = (...a: string[]) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, encoding: 'utf8' });
+    git('init', '-q', '-b', 'main');
+    mkdirSync(join(dir, 'src'));
+    for (const f of ['eslint.config.mjs', 'knip.json']) cpSync(join(REPO, f), join(dir, f));
+    writeFileSync(join(dir, '.jscpd.json'), readFileSync(join(REPO, '.jscpd.json'), 'utf8').replace(/"path": \[[^\]]*\]/, '"path": ["src"]'));
+    symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'));
+    writeFileSync(join(dir, 'package.json'), '{"name":"p","type":"module"}\n');
+    // jscpd n'écrit son rapport que s'il a lu assez de code
+    const corps = Array.from({ length: 30 }, (_, i) => `console.log(${i});`).join('\n');
+    writeFileSync(join(dir, 'src/cli.ts'), `${corps}\n`);
+    writeFileSync(join(dir, BASELINE), '{}\n');
+    git('add', '.');
+    git('commit', '-q', '-m', 'départ');
+    git('switch', '-q', '-c', 'lot');
+    // src/cli.ts est une entrée de knip : c'est un fichier que personne n'importe qui est du code mort
+    writeFileSync(join(dir, 'src/mort.ts'), `${corps}\nexport const mort = 1;\n`);
+    const qualite = (...args: string[]) => spawnSync(process.execPath, [join(REPO, 'scripts/qualite.mjs'), ...args], { cwd: dir, encoding: 'utf8' });
+    const d = qualite('--contre', 'main');
+    expect(d.stderr).toContain('knip|src/mort.ts|files');
+    expect(d.status).toBe(1);
+    // la « réparation » : réécrire la base à la mesure du lot
+    rmSync(join(dir, BASELINE));
+    expect(qualite('--init').status).toBe(0);
+    const triche = qualite('--contre', 'main');
+    expect(triche.status).toBe(1);
+    expect(triche.stderr).toContain('remonte');
   });
 });
 

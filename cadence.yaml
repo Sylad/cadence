@@ -15,8 +15,8 @@ orchestrate:
   test: npx vitest run
   # Rejeu seul d'un rouge avant qu'il compte (L354) : mise-en-service.test.ts rouge puis vert à la relance sous charge le 26-10 (intégration de L364).
   testReplay: npx vitest run --minWorkers=1 --maxWorkers=$CADENCE_TEST_WORKERS {files}
-  # Garde-fous de qualité (L462) : le cliquet (ESLint, sonarjs, knip, jscpd contre qualite-baseline.json) fait partie de la porte, après le typecheck ; un code mort ou un fichier qui grossit repart en correction.
-  build: npx tsc --noEmit && node scripts/qualite.mjs
+  # Garde-fous de qualité (L462) : le cliquet (ESLint, sonarjs, knip, jscpd contre qualite-baseline.json) fait partie de la porte, après le typecheck ; un code mort ou un fichier qui grossit repart en correction, et la base du lot ne peut pas dépasser celle de main (--contre).
+  build: npx tsc --noEmit && node scripts/qualite.mjs --contre main
   # Mode worktree (L279) : un worktree par lot ; activé par défaut le 25-10 (L320, décision Sylvain après les essais L310 et L316 : −45 % et −22 % de mur, 3 intégrations automatiques).
   worktrees: true
   # Précheck sur Sonnet (L328, 25-10) : le local (claude-local) plantait sur ~1 lot sur 3 et disait « oui » à tort ; Sonnet tranche en ~16 s.

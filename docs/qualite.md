@@ -47,10 +47,10 @@ The baseline is also the project's list of cleanups: each cleanup lot is measure
 
 ## Where it runs
 
-- **The wave's gate**: `cadence.yaml` declares `orchestrate.build: npx tsc --noEmit && node scripts/qualite.mjs`. The
+- **The wave's gate**: `cadence.yaml` declares `orchestrate.build: npx tsc --noEmit && node scripts/qualite.mjs --contre main`. The
   build runs before the tests ([orchestrate.md](orchestrate.md)); a worse measure hands the lot back as a « build » finding,
   and the session is told the exact command.
-- **The CI**: `.github/workflows/tests.yml` runs `npm run qualite` after the typecheck, and `prepublishOnly` runs it too.
+- **The CI**: `.github/workflows/tests.yml` runs `npm run qualite -- --contre origin/main` after the typecheck (the checkout is full-depth), and `prepublishOnly` runs it too.
 
 ## Recipe for another project
 

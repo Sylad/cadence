@@ -69,9 +69,9 @@ jobs:
       # prepublishOnly de publish.yml : typecheck puis tests.
       - run: npm run typecheck
 
-      # Garde-fous de qualité (L462) : rien ne doit empirer par rapport à qualite-baseline.json (docs/qualite.md).
+      # Garde-fous de qualité (L462) : rien ne doit empirer par rapport à qualite-baseline.json, et la base ne peut pas dépasser celle de origin/main (docs/qualite.md).
       - name: Qualité du code (cliquet)
-        run: npm run qualite
+        run: npm run qualite -- --contre origin/main
       - run: npm test
 
       # Le run rouge de publish.yml faisait tourner la suite DANS `npm publish` (prepublishOnly), pas à côté : ici de même,

@@ -731,7 +731,7 @@ lots:
     created: 2026-10-31
   - id: L480
     title: "Tests instables sous charge (suite complète en parallèle) : test/orchestrate-worktree-plan-writes.test.ts R3 (créneaux libres [2,1] au lieu de [2,2], clone neuf de la release 1.32.0, vert 3/3 seul) et test/mise-en-service.test.ts L330 (vague 2026-10-31-0950-cad) — rendre les attentes déterministes"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-31
     started: 2026-10-31
@@ -739,6 +739,7 @@ lots:
       - { date: 2026-10-31, text: "Reprise du lead 31-10 (worktree .cadence/runs/2026-10-31-1250-cad/worktrees/cadence--L480, shas c07195bb + bde00cc7, non intégrés) : attentes observables (/proc, registre) au lieu de délais, plafond 120 s sur le test d'installation interrompue. NON VÉRIFIÉ : machine saturée (load 15–17), test/mise-en-service.test.ts ne termine pas sous charge (« Timeout calling onTaskUpdate », mettreEnService synchrones avec vrai tsc) ; régression de c07195bb ni prouvée ni écartée. À rejouer seul, machine calme, avant toute revue ; puis revue Opus et --integrate." }
       - { date: 2026-10-31, text: "31-10 17 h 26 : seconde intégration refusée elle aussi, machine calme (charge < 1, une seule vague codex en parallèle) : « error thrown while Vitest was running this test » au sommet rebasé — ce n'est donc probablement PAS la charge. À diagnostiquer : rejouer la suite au sommet rebasé dans le worktree (ou sur mini-blue), lire le test nommé avant l'erreur ; possiblement une barrière de c07195bb ou bde00cc7 qui lève après la fin d'un test." }
     review: { date: 2026-10-31, verdict: "conforme (revue Opus neuve : attentes observables plafonnées, le test échoue au lieu de pendre ; R3 25/25 verts sous charge 7 ; mesure du lead sur mini-blue : 60/60 trois fois) — suite : les 4 tsc synchrones de mise-en-service.test.ts bloquent la suite sous charge, lot à part ; revue courte du diff rebasé (patch-id différent) : compliant", commit: ead8d2e4fae481a512221c6d1855a93d0d7a9e10 }
+    finished: 2026-10-31
   - id: L481
     title: "Panneau des lots (/hud lots) : la section « ordre des projets » montre pour chaque projet la barre d'avancement colorée du bandeau (lots clos / total, couleur selon la part, en cours, +N cette semaine), pour lire l'avancement sans faire défiler le bandeau du bas (demande de Sylvain 31-10, captures du bandeau et du panneau) ; le glisser et Alt+↑/↓ restent"
     status: done
@@ -850,7 +851,7 @@ lots:
     created: 2026-10-31
   - id: L497
     title: "Sonde de cas limites avant la revue (goulot « bug de code » : cas limite 64 % des passes bug-code depuis la consigne L447, 69 % avant — la consigne écrite n'a rien changé) : étape d'orchestrate entre implement et review, session Sonnet neuve qui lit le diff du lot (et la fiche s'il y en a une) et cherche à le casser par des tests aux bornes (vide, absent, double, mauvais type, refusé, forme réelle des données, autres appelants) ; tout test qui échoue revient à implement comme constat avant la revue Opus ; clé orchestrate.probe (absente = rien ne change), posée sur cadence seul pour l'essai ; mesure par L430 (part bug-code et cas limite, lots à ≥ 2 passes, tokens par lot) pour garder ou retirer"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-31
@@ -868,6 +869,7 @@ lots:
       - { date: 2026-10-31, text: "Hypothèses (fiche sonde-cas-limites) — R9 : La sonde ne bloque jamais le lot : un échec, une coupure, un délai ou un rapport illisible écrivent un warning « sonde de cas limites non jouée : <cause> » et… ; si faux : Si un échec de la sonde devait rendre le lot au lead, l'issue passerait de warning à handed-back ; la sonde étant un essai à mesurer, l'échec silencieux fausse…" }
       - { date: 2026-10-31, text: "Lead 31-10 19:50 : orchestrate.probe ne peut PAS être posé dans le cadence.yaml de cadence par le lot — la copie en service (1.33.0) refuse une clé inconnue et toute commande sur le dépôt casse (vu à 18:36, clé commentée par 43a2a0a7). Le test R2 (test/orchestrate-sonde-l497.test.ts) ne doit donc pas exiger probe: true dans le cadence.yaml du dépôt ; le lead l'active après la mise en service. À corriger avec les 2 majeurs de la revue (probe.ts:141 contrôles d'après-session sautés, probe.ts:150 revue lancée avec des rouges hors budget, contraire à L145)." }
     review: { date: 2026-10-31, verdict: "conforme : revue Opus du lot entier conforme après 1 correction (test du rendu sur verrou après la sonde, a93a45ee + df6b2e9d), revue courte conforme (49/49, mutation : les 2 tests R9 tombent) ; arbitrage du lead sur R9 (constats de la sonde jamais bloquants, contrôles communs d'après-session appliqués) ; clé orchestrate.probe à poser après la mise en service", commit: df6b2e9d877e46d6ecc434036722c20c9a767ec1 }
+    finished: 2026-10-31
   - id: L498
     title: "File de lots pré-approuvés tirée à chaque créneau libre (inventaire des pertes du 31-10 (17→31-10) : 2 569 min de mur sans aucune session, 1,58 créneau occupé sur 3 en moyenne) : le lead approuve une liste ordonnée de lots (projet:lot) une fois, chaque vague vivante ou une vague neuve en tire le suivant dès qu'un créneau se libère, sans attendre le lead ; un lot non mûr (question, after non clos, uses tenu) est sauté et dit ; avec L421 (ajout à une vague vivante)"
     status: todo

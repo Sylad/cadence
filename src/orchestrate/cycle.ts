@@ -21,6 +21,7 @@ import { isOpen, RafError, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
 import { replayRed, TEST_WORKERS_ENV, testWorkersText } from './workers.js';
+import { openPlace, type Place } from './gate-place.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, gateText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
@@ -263,18 +264,21 @@ async function baselineFailures(c: LotCtx, command: string): Promise<string[] | 
   if (l.baseline?.verified && l.baseline.sha === sha && l.baseline.command === command) return l.baseline.failures;
   const dir = mkdtempSync(join(tmpdir(), 'cadence-baseline-'));
   const links: string[] = [];
+  let place: Place | undefined;
   try {
     git(l.repo, 'worktree', 'add', '--detach', '-f', dir, sha);
     links.push(...linkIgnored(l.repo, dir));
+    // Sur l'hôte `gate.host` quand il y en a un (L403) : le worktree local reste le lieu du rejeu si la connexion tombe.
+    place = await openPlace({ config: c.config, repo: l.repo, sha, dir, needClean: false, label: `porte du lot ${l.lot}`, detail: `(ligne de base ${sha.slice(0, 7)})`, local: (cmd) => sh(c, cmd, 30 * 60_000, {}, dir), say: (line) => c.wave.log(`${lotKey(l.project, l.lot)} · ${line}`) });
     // Le build d'abord, comme dans la porte (L333) : les tests lisent ce qu'il produit (`dist`), le départ sans lui rougirait tout. Un build rouge au départ
     // ne dit rien des tests : pas de ligne de base, l'appelant garde les tests pour rouges.
-    if (c.config.build && (await sh(c, c.config.build, 30 * 60_000, {}, dir)).code !== 0) return null;
-    const r = await sh(c, command, 30 * 60_000, {}, dir);
+    if (c.config.build && (await place.run(c.config.build)).code !== 0) return null;
+    const r = await place.run(command);
     // Ligne de base comprise (L354) : un rouge du sha de départ est rejoué seul dans le même worktree avant d'être retenu. Sous charge, un test
     // qui passe seul au départ rougirait ici et excuserait une vraie régression du lot (« déjà rouge au départ »). Un échec sans nom reste tel quel.
     const found = r.code === 0 ? [] : failedTests(r.output);
     const named = c.config.testReplay && found.length && !hasUnnamedFailure(r.output) ? found : [];
-    const { red: failures, unstable } = named.length ? await replayAlone(c, c.config.testReplay!, named, r.output, dir) : { red: found, unstable: [] as string[] };
+    const { red: failures, unstable } = named.length ? await replayAlone(c, c.config.testReplay!, named, r.output, place.run) : { red: found, unstable: [] as string[] };
     if (unstable.length) c.wave.log(`${lotKey(l.project, l.lot)} · ligne de base ${sha.slice(0, 7)} : ${unstable.length} test(s) rouge(s) sous charge, vert(s) rejoué(s) seul(s), non retenu(s) comme déjà rouge(s) : ${unstable.join(' ; ')}`);
     l.baseline = { sha, command, failures, verified: true };
     save(c);
@@ -282,6 +286,7 @@ async function baselineFailures(c: LotCtx, command: string): Promise<string[] | 
   } catch {
     return null;
   } finally {
+    place?.close();
     for (const k of links) if (lstatSync(k, { throwIfNoEntry: false })?.isSymbolicLink()) unlinkSync(k);
     try {
       git(l.repo, 'worktree', 'remove', '--force', dir);
@@ -1990,23 +1995,31 @@ type CheckRun = NonNullable<LotState['checks']>['runs'][number];
  * (un test déjà rouge au sha de départ n'en est pas un, L213). S'arrête au premier rouge : un build rouge rend le lot sans lancer les tests. Après une écriture (work) et, au sommet rebasé, avant l'avance de la branche du dépôt (R7).
  */
 async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promise<void> {
+  let place: Place | undefined;
   try {
-    await runChecks(c, red, runs);
+    const l = c.lot;
+    const local = (cmd: string) => sh(c, cmd);
+    // Hôte `gate.host` (L403) : le HEAD du worktree du lot, s'il est propre, est joué sur l'hôte ; sinon, ou sans hôte, en local.
+    const head = c.config.build || c.config.test ? tryGit(wd(c), ['rev-parse', 'HEAD']) : null;
+    place = head ? await openPlace({ config: c.config, repo: l.repo, sha: head, dir: wd(c), needClean: true, label: `porte du lot ${l.lot}`, local, say: (line) => c.wave.log(`${lotKey(l.project, l.lot)} · ${line}`) }) : { run: local, where: () => undefined, close: () => {} };
+    await runChecks(c, red, runs, place);
   } finally {
+    place?.close();
     // L395 : la porte se lit dans l'état du lot tant qu'une commande (ou le rejeu qui la suit) tourne, jamais après.
     c.lot.gate = undefined;
     save(c);
   }
 }
 
-async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promise<void> {
+async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Place): Promise<void> {
   const l = c.lot;
   for (const [label, command] of [['build', c.config.build], ['tests', c.config.test]] as const) {
     if (!command) continue;
     l.gate = { label, started: new Date().toISOString() };
     save(c);
-    const r = await sh(c, command);
-    const run: CheckRun = { label, command, code: r.code };
+    const r = await place.run(command);
+    const lieu = place.where();
+    const run: CheckRun = { label, command, code: r.code, ...(lieu ? { lieu } : {}) };
     runs.push(run);
     if (r.code === 0) continue;
     const vs: VsBase = label === 'tests' ? await againstBaseline(c, command, r.output) : { kind: 'unknown' };
@@ -2023,7 +2036,7 @@ async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promise<v
     // Sans `orchestrate.testReplay` rien n'est rejoué : le rouge est compté tel quel et rien n'est tenu pour instable (L354).
     const replay = label === 'tests' ? c.config.testReplay : undefined;
     const named = !replay ? [] : vs.kind === 'new' ? vs.nouveaux : !hasUnnamedFailure(r.output) ? failedTests(r.output) : [];
-    const { red: still, unstable } = named.length ? await replayAlone(c, replay!, named, r.output) : { red: [] as string[], unstable: [] as string[] };
+    const { red: still, unstable } = named.length ? await replayAlone(c, replay!, named, r.output, place.run) : { red: [] as string[], unstable: [] as string[] };
     if (unstable.length) {
       noteUnstable(c, unstable);
       run.instables = unstable;
@@ -2050,8 +2063,8 @@ async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promise<v
  * Rejoue SEULS (la commande `orchestrate.testReplay` où `{files}` devient les fichiers de ces tests, dans `cwd` : le worktree du lot, ou celui de la ligne de base) les tests rouges d'une suite entière (L354). Le 26-10, vitest à 31 workers par suite sur une machine à 4 sessions rougissait des tests
  * qui passaient seuls : quatre corrections vides (4 à 11 min chacune). Un test vert à un rejeu est `unstable` ; rouge aux rejeux, ou sans fichier désignable (rien à rejouer seul), il reste dans `red`. Le rejeu lui-même est `replayRed` (workers.ts), partagé avec `verify --gate` (L387).
  */
-function replayAlone(c: LotCtx, template: string, names: string[], output: string, cwd = wd(c)): Promise<{ red: string[]; unstable: string[] }> {
-  return replayRed((command) => sh(c, command, undefined, undefined, cwd), template, names, output);
+function replayAlone(c: LotCtx, template: string, names: string[], output: string, run: (command: string) => Promise<{ code: number; output: string }>): Promise<{ red: string[]; unstable: string[] }> {
+  return replayRed(run, template, names, output);
 }
 
 /** Trace des tests instables sous charge (L354) : le lot (`instables`, journal et `cadence perf`), un avertissement du lot (tableau de fin de vague) et une ligne du journal de la vague. */

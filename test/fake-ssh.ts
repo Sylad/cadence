@@ -22,6 +22,8 @@ export interface FakeRemote {
   down(on?: boolean): void;
   /** Toute commande qui contient l'un de ces textes est coupée : ssh sort en 255 (connexion perdue). Sans argument : rétabli. */
   lose(...patterns: string[]): void;
+  /** Seul le `n`-ième appel (1 pour le premier) dont la commande contient `pattern` est coupé ; les autres passent. */
+  loseNth(pattern: string, n: number): void;
   /** Nombre de cœurs et plateforme que l'hôte annonce. */
   machine(m: { nproc?: number; os?: string; arch?: string }): void;
 }
@@ -43,7 +45,10 @@ host="$1"; shift
 cmd="$*"
 printf '%s\\n' "$cmd" >> "$D/commands.log"
 if [ -f "$D/down" ]; then echo "ssh: connect to host $host port 22: Connection refused" >&2; exit 255; fi
-if [ -s "$D/lose" ] && printf '%s' "$cmd" | grep -q -F -f "$D/lose"; then echo "Connection to $host closed by remote host." >&2; exit 255; fi
+if [ -s "$D/lose" ] && printf '%s' "$cmd" | grep -q -F -f "$D/lose"; then
+  n=$(cat "$D/lose-count" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$D/lose-count"
+  if [ "$n" -ge "$(cat "$D/lose-nth" 2>/dev/null || echo 1)" ] && [ "$n" -le "$(cat "$D/lose-last" 2>/dev/null || echo 999999)" ]; then echo "Connection to $host closed by remote host." >&2; exit 255; fi
+fi
 cd "$D/home" || exit 255
 if [ "$tty" = 1 ]; then ( setsid sh -c "$cmd" ); exit $?; fi
 exec sh -c "$cmd"
@@ -72,7 +77,16 @@ export function fakeRemote(): FakeRemote {
     commands: () => lines('commands.log'),
     options: () => lines('options.log'),
     down: (on = true) => (on ? writeFileSync(join(dir, 'down'), '') : rmSync(join(dir, 'down'), { force: true })),
-    lose: (...patterns) => writeFileSync(join(dir, 'lose'), patterns.map((p) => `${p}\n`).join('')),
+    lose: (...patterns) => {
+      for (const f of ['lose-count', 'lose-nth', 'lose-last']) rmSync(join(dir, f), { force: true });
+      writeFileSync(join(dir, 'lose'), patterns.map((p) => `${p}\n`).join(''));
+    },
+    loseNth: (pattern, n) => {
+      rmSync(join(dir, 'lose-count'), { force: true });
+      writeFileSync(join(dir, 'lose'), `${pattern}\n`);
+      writeFileSync(join(dir, 'lose-nth'), `${n}\n`);
+      writeFileSync(join(dir, 'lose-last'), `${n}\n`);
+    },
     machine: (m) => {
       if (m.nproc !== undefined) writeFileSync(join(dir, 'nproc'), `${m.nproc}\n`);
       if (m.os) writeFileSync(join(dir, 'uname-s'), `${m.os}\n`);

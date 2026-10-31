@@ -57,6 +57,7 @@ interface RawStep {
   kind: string;
   status: string;
   report?: string;
+  constats?: unknown; // étape `probe` : textes des constats envoyés en correction
   commits?: string[];
   ended?: string;
   started?: string;
@@ -197,11 +198,10 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
       const name = basename(file, '.json');
       const fixSteps = steps.filter((s) => s.kind === 'fix' && done(s));
       const passes = fixSteps.map((fix): JournalPass => {
-        const review = [...steps].reverse().find((s) => s.n < fix.n && isReview(s.kind) && s.report);
-        // Une passe fix entre la revue et celle-ci a déjà traité ces constats : cette passe-ci (tests rouges) n'en a pas.
-        const handled = review ? fixSteps.some((f) => f.n > review.n && f.n < fix.n) : false;
-        const findings = review?.report && !handled ? findingsOf(readJson(join(waveDir, name, review.report))) : [];
-        return { key: `${wave}/${name}/${fix.n}`, project: rec.project, lot: rec.lot, visible: !!rec.visible, findings, commits: fix.commits ?? [], ...(fix.ended ? { fixEnded: fix.ended } : {}), ...(findings.length > 0 && review ? { reviewKind: review.kind } : {}) };
+        const review = [...steps].reverse().find((s) => s.n < fix.n && ((isReview(s.kind) && s.report) || (s.kind === 'probe' && Array.isArray(s.constats) && s.constats.length > 0)));
+        // La revue (ou la sonde, L497, qui porte ses constats dans son étape) qui précède. Une passe fix entre elle et celle-ci a déjà traité ces constats : cette passe-ci (tests rouges) n'en a pas.
+        const findings = !review || fixSteps.some((f) => f.n > review.n && f.n < fix.n) ? [] : review.kind === 'probe' ? (review.constats as unknown[]).filter((t): t is string => typeof t === 'string') : review.report ? findingsOf(readJson(join(waveDir, name, review.report))) : [];
+        return { key: `${wave}/${name}/${fix.n}`, project: rec.project, lot: rec.lot, visible: !!rec.visible, findings, commits: fix.commits ?? [], ...(fix.ended ? { fixEnded: fix.ended } : {}), ...(findings.length > 0 && review && review.kind !== 'probe' ? { reviewKind: review.kind } : {}) };
       });
       const precheck = precheckVerdictOf(rec, steps);
       const esc = rec.escalation;

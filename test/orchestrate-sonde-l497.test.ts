@@ -9,6 +9,7 @@ import { schemaFor, checkShape } from '../src/orchestrate/schemas.js';
 import { readJournals } from '../src/corrections.js';
 import { tempDir } from './helpers.js';
 import { claudeOut, commitFile, git, harness, probeReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
+import { lotSlug } from '../src/orchestrate/state.js';
 import { writeJournal, writeWave } from './perf-helpers.js';
 import { docText } from './docs-text.js';
 import { run } from '../src/cli.js';
@@ -321,11 +322,52 @@ describe('sonde de cas limites (L497)', () => {
   it('R7 — cadence corrections lit une passe fix issue de la sonde (texte « sonde de cas limites : ») et la classe sans erreur', () => {
     const runs = join(tempDir(), 'runs');
     writeWave(runs, 'w1');
-    writeJournal(runs, 'w1', 'alpha', 'L1', { steps: [{ kind: 'implement' }, { kind: 'probe' }, { kind: 'fix', constats: undefined }, { kind: 'review' }] });
+    writeJournal(runs, 'w1', 'alpha', 'L1', { steps: [{ kind: 'implement' }, { kind: 'probe' }, { kind: 'fix' }, { kind: 'review' }] });
+    const file = join(runs, 'w1', `${lotSlug('alpha', 'L1')}.json`);
+    const journal = JSON.parse(readFileSync(file, 'utf8'));
+    journal.steps[1].constats = ['sonde de cas limites : p.spec.ts > vide > rejette'];
+    writeFileSync(file, JSON.stringify(journal));
     const [j] = readJournals(runs);
     expect(j.steps.map((s) => s.kind)).toEqual(['implement', 'probe', 'fix', 'review']);
     expect(j.passes).toHaveLength(1);
-    expect(j.passes[0].findings).toEqual([]);
+    expect(j.passes[0].findings).toEqual(['sonde de cas limites : p.spec.ts > vide > rejette']);
+  });
+
+  it("R7 — l'étape probe du journal garde les constats qu'elle a envoyés en correction", async () => {
+    const h = harness({ script: { implement: [impl('a.ts')], probe: [probe()], fix: [fix('fixed.flag')], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true, test: REDGATE });
+    await runLot(c);
+    const step = h.store.readLot('demo', 'L1')!.steps.find((x) => x.kind === 'probe')!;
+    expect(step.constats).toHaveLength(1);
+    expect(step.constats![0]).toMatch(/^sonde de cas limites : /);
+    expect(step.constats![0]).toContain('p.spec.ts > vide > rejette');
+  });
+
+  it('R9 — une sonde coupée au délai qui laisse des fichiers non commités ne rend pas le lot', async () => {
+    const cut: Handler = (call) => {
+      writeFileSync(join(call.opts.cwd, 'a.ts'), '// modifié par la sonde coupée\n');
+      writeFileSync(join(call.opts.cwd, 'q.spec.ts'), '// non commité\n');
+      return { code: 143, stdout: '', stderr: '', timedOut: true };
+    };
+    const h = harness({ script: { implement: [impl('a.ts')], probe: [cut], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(warnings(c)).toContain('sonde de cas limites non jouée : délai dépassé');
+    expect(warnings(c)).toContain('sonde de cas limites : fichiers non commités laissés par la session retirés (a.ts, q.spec.ts)');
+    expect(git(h.repo, 'status', '--porcelain')).toBe('');
+  });
+
+  it("R9 — sans commit de la sonde, la revue garde les résultats de la porte jouée après l'écriture", async () => {
+    const nothing: Handler = () => claudeOut(probeReport({ commits: [] }));
+    const withProbe = harness({ script: { implement: [impl('a.ts')], probe: [nothing], review: [ok] } });
+    await runLot(withProbe.lot('L1', {}, { probe: true, test: 'true' }));
+    const without = harness({ script: { implement: [impl('a.ts')], review: [ok] } });
+    await runLot(without.lot('L1', {}, { test: 'true' }));
+    const brief = withProbe.calls.find((x) => x.kind === 'review')!.brief;
+    expect(without.calls.find((x) => x.kind === 'review')!.brief).toContain('(tests): green');
+    expect(brief).toContain('(tests): green');
   });
 
   it('R7 — cadence corrections ne casse pas sur un journal contenant steps[].kind = probe', () => {

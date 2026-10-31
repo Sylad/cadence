@@ -53,6 +53,8 @@ export interface StepState {
   cause?: string;
   /** Vrai quand la sortie structurée vient de la relance de mise en forme (jetons de la relance compris dans `tokens`). */
   formatRetry?: boolean;
+  /** Étape `probe` : textes (« sonde de cas limites : … ») des constats qu'elle a envoyés en correction ; `cadence corrections` les rattache à la passe fix qui suit. */
+  constats?: string[];
 }
 
 export interface Constat {

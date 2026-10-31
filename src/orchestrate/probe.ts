@@ -138,13 +138,8 @@ export async function probeStep<D extends ProbeDone>(io: ProbeIo<D>): Promise<vo
   const done = await io.play();
   if (!done) return;
   const step = l.steps[l.steps.length - 1]!;
-  let rep: ProbeReport | undefined;
-  if (done === PROBE_FAILED) unplayed(l, step.cause ?? 'échec');
-  else {
-    rep = readReport(l, done.report);
-    for (const q of io.take(done, rep ?? { questions: [] })) l.warnings.push(`sonde de cas limites : question sans réponse (la sonde ne bloque pas le lot) : « ${q.trim()} »`);
-    if (handedBack(io, done, step.headBefore)) return;
-  }
+  const rep = done === PROBE_FAILED ? unplayedReport(l, step) : readSession(io, done, step);
+  if (rep === 'rendu') return;
   // La porte du programme après la sonde comme après toute écriture, mais seulement si elle a commité : sans nouveau commit il n'y a rien de neuf à rejouer.
   const red: Constat[] = [];
   const runs: CheckRun[] = [];
@@ -155,8 +150,23 @@ export async function probeStep<D extends ProbeDone>(io: ProbeIo<D>): Promise<vo
     l.warnings.push(`sonde de cas limites : correction non jouée (budget du lot ${io.count()}), la revue part avec ses tests rouges : ${found.map((k) => k.texte).join(' ; ')}`);
   } else if (found.length) {
     l.warnings.push(`${PROBE_FINDING}${found.length} constat(s), passe de correction avant la revue`);
+    step.constats = found.map((k) => k.texte);
     io.fix(found);
     return;
   }
-  await io.review(runs);
+  // Sans nouveau commit, les contrôles de la porte jouée après l'écriture valent toujours pour ce HEAD : la revue les garde (sinon elle relance la suite et le build).
+  await io.review(moved ? runs : [...(l.checks?.runs ?? [])]);
+}
+
+/** La session n'a rien donné : un warning, pas de rapport. */
+function unplayedReport(l: LotState, step: StepState): undefined {
+  unplayed(l, step.cause ?? 'échec');
+  return undefined;
+}
+
+/** Le rapport d'une session qui a répondu : questions notées, verrou et dépôt contrôlés. `'rendu'` quand le lot est rendu. */
+function readSession<D extends ProbeDone>(io: ProbeIo<D>, done: D, step: StepState): ProbeReport | undefined | 'rendu' {
+  const rep = readReport(io.lot, done.report);
+  for (const q of io.take(done, rep ?? { questions: [] })) io.lot.warnings.push(`sonde de cas limites : question sans réponse (la sonde ne bloque pas le lot) : « ${q.trim()} »`);
+  return handedBack(io, done, step.headBefore) ? 'rendu' : rep;
 }

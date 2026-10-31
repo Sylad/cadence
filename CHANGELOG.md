@@ -82,7 +82,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- `cadence orchestrate` can play an edge-case probe before the review (L497, `orchestrate.probe: true`, `docs/orchestrate.md`): a fresh Sonnet session reads the lot's diff and tries to break it with tests at the edges (empty, absent, twice, wrong type, refused, real shape of the data, other callers); a new red test goes back to a correction pass as a finding `sonde de cas limites : …` before the Opus review. Off when the key is absent; set only in cadence's own `cadence.yaml` for the trial, to keep or drop on the figures of `cadence corrections` and `cadence perf` (L430).
+- `cadence orchestrate` can play an edge-case probe before the review (L497, `orchestrate.probe: true`, `docs/orchestrate.md`): a fresh Sonnet session reads the lot's diff and tries to break it with tests at the edges (empty, absent, twice, wrong type, refused, real shape of the data, other callers); a new red test goes back to a correction pass as a finding `sonde de cas limites : …` before the Opus review. Off when the key is absent; set only in cadence's own `cadence.yaml` for the trial, to keep or drop on the figures of `cadence corrections` and `cadence perf` (L430). A probe cut or failed never hands the lot back (what it left uncommitted is put back), the review keeps the gate's results when the probe commits nothing, and `cadence corrections` reads the probe's findings as those of the fix pass.
 
 ## [1.33.0] - 2026-10-31
 

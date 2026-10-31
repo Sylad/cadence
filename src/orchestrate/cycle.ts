@@ -935,7 +935,15 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
     if (tiersBefore && checkTiers(c, kind, step, tiersBefore)) return null;
     step.status = 'failed';
     step.cause = outcome.cause;
-    if (kind === 'probe') return PROBE_FAILED;
+    if (kind === 'probe') {
+      // R9 : une sonde en échec ou coupée ne rend pas le lot. Ce qu'elle a laissé non commité est remis (suivis restaurés, nouveaux fichiers retirés), un warning le nomme.
+      const left = dirtBetween(before, await snapshot(wd(c)));
+      if (left.length) {
+        restoreWorktree(wd(c), left);
+        l.warnings.push(`sonde de cas limites : fichiers non commités laissés par la session retirés (${left.join(', ')})`);
+      }
+      return PROBE_FAILED;
+    }
     if (write && outcome.cause === 'délai dépassé') {
       // L298 : le travail laissé par une étape d'écriture coupée au délai est signalé (commits, fichiers, tests), pas un « échec » sec ; L303 : dans les dépôts voisins aussi.
       const repos = [{ rel: '', path: wd(c), before }, ...neighbours.map((r, i) => ({ rel: r.rel, path: r.path, before: beforeOthers[i] }))];
@@ -2263,7 +2271,11 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     }
   }
   // Sonde de cas limites (L497) : une fois par lot, après la porte « code sans test », avant le bibliothécaire et la revue.
-  if (scheduleProbe(c.config, l, { skip: minorsPass || !alreadyDone, late: l.pass >= MAX_PASSES - 1, pays: fixAffordable(l, false, PROBE_RESERVE), count: budgetCount(l) })) return save(c);
+  if (scheduleProbe(c.config, l, { skip: minorsPass || !alreadyDone, late: l.pass >= MAX_PASSES - 1, pays: fixAffordable(l, false, PROBE_RESERVE), count: budgetCount(l) })) {
+    // Les contrôles de la porte restent au lot pendant la sonde : sans nouveau commit de sa part, la revue les reprend pour ce HEAD.
+    l.checks = runs.length ? { head: git(wd(c), 'rev-parse', 'HEAD'), tree: git(wd(c), 'rev-parse', 'HEAD^{tree}'), runs } : undefined;
+    return save(c);
+  }
   await toReview(c, runs, minorsPass);
 }
 

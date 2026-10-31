@@ -751,11 +751,12 @@ lots:
     finished: 2026-10-31
   - id: L484
     title: "Nettoyage A2 : retirer « export » des symboles jamais importés dans src/ref/ et test/, supprimer le type mort Exclusion (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § A ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-31
     notes:
       - { date: 2026-10-31, text: "Reste de L483 (31-10) : ETATS_REQUIS (src/spec.ts:9) et appelDe (src/spec.ts:26) encore exportés sans import" }
+    started: 2026-10-31
   - id: L485
     title: "Nettoyage B : retirer staleFiles et readFailedDeliveries (seuls les tests les appellent) et aligner les deux recopies de claudeConfigDir (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § B ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: todo

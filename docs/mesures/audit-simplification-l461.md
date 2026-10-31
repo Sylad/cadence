@@ -23,13 +23,15 @@ Colonne « Protégé par » : les tests qui échoueraient si le nettoyage change
 
 ### A. Retirer `export` des symboles que personne n'importe — gain fort, risque nul
 
-- **Quoi** : 150 des 152 exports/types signalés par knip sont utilisés dans leur propre fichier ; seul le mot `export` est en trop
-  (`audit.ts` 9, `config.ts` 8, `perf.ts` 8, `corrections.ts` 13, `ref/*` 36, `lead.ts` 5, `hud-context.ts` 6, `release.ts` 5…).
-  Les deux seuls vraiment morts (déclarés, jamais lus) : le type `Exclusion` (`ref/coverage.ts:72`) et `ÉcritBack` (`test/spec-helpers.ts:52`).
+- **Quoi** : 151 des 152 exports/types signalés par knip sont utilisés dans leur propre fichier ; seul le mot `export` est en trop
+  (`audit.ts` 9, `config.ts` 8, `perf.ts` 8, `corrections.ts` 13, `ref/*` 36, `lead.ts` 5, `hud-context.ts` 6, `release.ts` 5…,
+  dont `ÉcritBack`, type du paramètre de `ecritBack` dans `test/spec-helpers.ts:84`).
+  Le seul vraiment mort (déclaré, jamais lu) : le type `Exclusion` (`ref/coverage.ts:72`).
 - **Mesure** : base knip 153 → ≈ 3 (reste : `vite` non déclaré, voir E). Lignes : −0 (le contrôle est le compilateur).
 - **Protégé par** : `tsc --noEmit` (un import cassé ne compile plus) ; aucun test à toucher. Deux lots d'une demi-journée :
   `src/` (hors `ref/`) puis `src/ref/` + `test/`.
-- **Piège** : un export retiré dont le test est le seul lecteur (cf. B) fait échouer le test : traiter B avant.
+- **Pas de piège côté tests** : `knip.json` compte `test/**/*.test.ts` parmi les points d'entrée, donc un symbole qu'il signale n'est importé
+  par aucun test ; les fonctions de B (lues par des tests) ne sont pas dans sa liste et A ne les touche pas. A et B sont indépendants.
 
 ### B. Code de production que seuls les tests appellent — gain moyen, risque faible
 
@@ -38,10 +40,10 @@ Trois fonctions ne sont appelées par aucune ligne de production (`grep` sur `sr
 | Fonction | Fichier | Tests qui la lisent | Remarque |
 |---|---|---|---|
 | `staleFiles` | `src/clean.ts:231` | `clean.test.ts` | enveloppe de `scanStale(...).stale` ; le test peut appeler `scanStale` |
-| `claudeConfigDir` | `src/orchestrate/launch.ts:156` | `orchestrate-launch.test.ts` (L398) | **jumelle oubliée** : la même expression `env.CLAUDE_CONFIG_DIR \|\| join(…, '.claude')` est recopiée dans `orchestrate/command.ts:1766` et `ref/command.ts:39`. Le bon nettoyage est de **l'utiliser** aux deux endroits, pas de la supprimer |
+| `claudeConfigDir` | `src/orchestrate/launch.ts:156` | `orchestrate-launch.test.ts` (L398) | **jumelle oubliée, à une différence près** : `orchestrate/command.ts:1766` et `ref/command.ts:39` recopient `env.CLAUDE_CONFIG_DIR \|\| join(homedir(), '.claude')`, sans le `env.HOME \|\|` que `claudeConfigDir` lit avant `homedir()`. L'utiliser aux deux endroits change le dossier quand `HOME` diffère de `homedir()` (cas des tests qui simulent un `HOME`) : ce n'est donc **pas** un lot « sans changement observable » tel quel ; soit garder les deux copies et ne rien faire, soit l'aligner avec un test qui fixe la lecture de `HOME` aux deux appelants (hors périmètre de ce lot) |
 | `readFailedDeliveries` | `src/state.ts:295` | `deliver-rouge.test.ts`, `deliver-rouge-raison.test.ts` | enveloppe de `readFailedEntries(dir).map(e => e.day)` ; les 4 appels de test passent à `.map` |
 
-- **Mesure** : −3 fonctions (≈ −10 lignes), −2 copies de l'expression `claudeHome`. Base knip inchangée (ces trois sont exportées, importées par les tests) mais le code de production baisse.
+- **Mesure** : −2 fonctions (`staleFiles`, `readFailedDeliveries`, ≈ −7 lignes) ; `claudeConfigDir` reste tant que ses deux voisines ne sont pas alignées (ci-dessus). Base knip inchangée (ces trois sont exportées, importées par les tests) mais le code de production baisse.
 - **Protégé par** : les tests ci-dessus (ce sont eux qu'il faut adapter : « sauf ceux de code mort »).
 - Une trentaine d'autres exports ne sont lus que par un test (`articleHeadings`, `parseWaits`, `shellArg`, `buildRetryArgs`…) ;
   ils sont utilisés dans leur fichier, donc A suffit si le test les importe encore par le chemin d'un autre export. À ne pas

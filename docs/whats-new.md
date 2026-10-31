@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.33.0**: the lots panel shows each project's progress bar in its « ordre des projets » section, aligned in the desktop app; a simplification audit of the code, and dead exports removed.
 - **1.32.0**: code-quality guard rails in a ratchet (ESLint, sonarjs, knip, jscpd vs a versioned baseline), a recipe for TS, Python, Java, shell; `raf done` refuses a lot whose recorded review is `non conforme`.
 - **1.31.0**: `deliver --sha` refuses, outside a wave too, a sha that carries commits of a lot neither done nor ready (a `non conforme` verdict is not ready); `raf add/note/done` warn when a wave session writes in the main tree.
 - **1.30.0**: a question can be answered while its wave still runs; the sibling-repository check of 1.29.0 only flags commits that cite a lot of the wave; `session context` reads the lead's threshold from the lead's folder.
@@ -58,6 +59,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.33.0**: the lots panel (`/hud lots`) shows, on each row of its « ordre des projets » section, the progress bar of the band — closed lots over total, coloured by the share done, the lots in progress and `+N cette semaine` (L481, `docs/cadence-hud.md`); the bars all start at the same column, the project name sitting in a box as wide as the longest name, which a proportional font aligns where spaces did not (L494, L495). Dragging and Alt+↑ / Alt+↓ are unchanged. A read-only simplification audit of the code (L461, `docs/mesures/audit-simplification-l461.md`) ranks dead code, copies and split plans by gain and risk; its first cleanups remove exports nothing imports and a dead type (L483, L484), with no change of behaviour.
 
 **1.32.0**: code-quality guard rails for cadence itself and a reference recipe for any project (L462, `docs/qualite.md`): ESLint with typescript-eslint and sonarjs (file and function length, depth, parameters, cyclomatic and cognitive complexity), knip (dead code, unused exports and dependencies) and jscpd (duplicates), compared by `npm run qualite` to a versioned baseline — existing code passes, nothing may get worse, a file a lot touches can only improve; `--migrer` is the admitted path to move or split a file of the baseline, and a changed tool configuration or a new suppression directive is refused. The recipe gives the same ratchet for Python, Java and shell. `raf done` refuses, without `--force`, a lot whose recorded code-review verdict is non-compliant, even when the review covers all its commits (L476, `docs/raf.md`), the predicate `cadence deliver --sha` uses since 1.31.0.
 

@@ -361,6 +361,24 @@ describe('sonde de cas limites (L497)', () => {
     expect(git(h.repo, 'status', '--porcelain')).toBe('');
   });
 
+  it('R9 — une sonde coupée au délai après un git add (fichiers indexés, nouveau et modifié) ne rend pas le lot : index et arbre remis', async () => {
+    const cut: Handler = (call) => {
+      writeFileSync(join(call.opts.cwd, 'a.ts'), '// modifié puis indexé par la sonde coupée\n');
+      writeFileSync(join(call.opts.cwd, 'q.spec.ts'), '// nouveau, indexé, jamais commité\n');
+      git(call.opts.cwd, 'add', '--', 'a.ts', 'q.spec.ts');
+      return { code: 143, stdout: '', stderr: '', timedOut: true };
+    };
+    const h = harness({ script: { implement: [impl('a.ts')], probe: [cut], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(warnings(c)).not.toContain('arbre sale');
+    expect(warnings(c)).toContain('sonde de cas limites : fichiers non commités laissés par la session retirés (a.ts, q.spec.ts)');
+    expect(git(h.repo, 'status', '--porcelain')).toBe('');
+    expect(git(h.repo, 'show', 'HEAD:a.ts')).not.toContain('indexé');
+  });
+
   it('R9 — une sonde coupée au délai après un commit hors tests : commits au journal et warning nommé', async () => {
     const cut: Handler = (call) => {
       commitFile(call.opts.cwd, 'app.ts', 'probe(L1): app.ts');
@@ -439,6 +457,23 @@ describe('sonde de cas limites (L497)', () => {
     const c2 = h2.lot('L1', {}, { probe: true, testGate: GATE });
     await runLot(c2);
     expect(warnings(c2)).not.toContain('hors tests');
+  });
+
+  it('R8 — le brief probe porte la porte exacte du programme et la part de machine, comme implement', async () => {
+    const h = harness({ script: { implement: [impl('a.ts')], probe: [probe('q.spec.ts')], review: [ok] } });
+    h.wave.testWorkers = 3;
+    await runLot(h.lot('L1', {}, { probe: true, test: 'true', build: 'true' }));
+    const [implBrief, probeBrief] = [h.calls[0].brief, h.calls[1].brief];
+    expect(h.calls[1].kind).toBe('probe');
+    for (const brief of [implBrief, probeBrief]) {
+      expect(brief).toContain("The program's gate, played after every writing session, is exactly:");
+      expect(brief).toContain('- tests: `true`');
+      expect(brief).toContain('- build: `true`');
+      expect(brief).toContain('Machine share');
+      expect(brief).toContain('CADENCE_TEST_WORKERS=3');
+    }
+    // la revue, en lecture seule, ne reçoit ni l'un ni l'autre
+    expect(h.calls[2].brief).not.toContain("The program's gate");
   });
 
   it('R8 — le brief probe se rend sans accolade restante, avec et sans fiche', async () => {

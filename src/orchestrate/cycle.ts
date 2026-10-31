@@ -539,6 +539,9 @@ function avalOf(c: LotCtx, kind: SessionKind): string {
   return kind === 'review-small' && l.small && l.visible && screen ? `${text}\n${avalFicheText('ux', o)}` : text;
 }
 
+/** Les étapes dont le programme rejoue la porte après la session (L399) : elles reçoivent ses commandes exactes et la part de machine (L350). La sonde écrit des tests : sans la porte, elle joue le runner seul et commite un test que `tsc` ou la qualité mettent au rouge, d'où une passe de correction pour rien. */
+const writesCode = (kind: SessionKind): boolean => kind === 'implement' || kind === 'fix' || kind === 'probe';
+
 /** Consigne de la part de machine de la session (L350) ; vide quand la vague n'en a pas calculé. */
 const workersText = (c: LotCtx): string => (c.wave.testWorkers ? testWorkersText(c.wave.testWorkers) : '');
 
@@ -547,7 +550,7 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   const l = c.lot;
   const lot = plan.lot(l.lot);
   const tmpDir = c.wave.store.tmpDir(l.project, l.lot);
-  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', tmp: tmpText(tmpDir), workers: kind === 'implement' || kind === 'fix' ? workersText(c) : '', gate: kind === 'implement' || kind === 'fix' ? gateText(c.config) : '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '' };
+  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', tmp: tmpText(tmpDir), workers: writesCode(kind) ? workersText(c) : '', gate: writesCode(kind) ? gateText(c.config) : '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '' };
   if (l.visible) {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = newsText(l.lot, pwDir);
@@ -937,8 +940,10 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
     step.cause = outcome.cause;
     if (kind === 'probe') {
       // R9 : une sonde en échec ou coupée ne rend pas le lot. Ce qu'elle a laissé non commité est remis (suivis restaurés, nouveaux fichiers retirés), un warning le nomme.
+      // Coupée entre `git add` et son commit, elle laisse aussi l'index : il est désindexé d'abord, `restoreWorktree` ne remet que l'arbre de travail (sinon « AD q.spec.ts » et le lot rendu pour arbre sale).
       const left = dirtBetween(before, await snapshot(wd(c)));
       if (left.length) {
+        tryGit(wd(c), ['restore', '--staged', '--', ...left]);
         restoreWorktree(wd(c), left);
         l.warnings.push(`sonde de cas limites : fichiers non commités laissés par la session retirés (${left.join(', ')})`);
       }

@@ -47,9 +47,9 @@ export interface BriefVars {
   fiche?: string;
   /** Commande qui donne le diff du lot à la sonde de cas limites (L497) : `git diff <départ>..HEAD`, jamais le diff collé dans le brief ; requise par le gabarit probe, vide ailleurs. */
   diff?: string;
-  /** Part de la machine de la session (L350) : `testWorkersText(n)` pour implement, fix, passe des mineurs et passe du bibliothécaire ; vide ailleurs et sans vague. */
+  /** Part de la machine de la session (L350) : `testWorkersText(n)` pour implement, fix, probe, passe des mineurs et passe du bibliothécaire ; vide ailleurs et sans vague. */
   workers?: string;
-  /** Commandes exactes de la porte du programme (L399) : `gateText(config)` pour implement, fix, passe des mineurs et passe du bibliothécaire ; vide ailleurs et sans `orchestrate.test` ni `orchestrate.build`. */
+  /** Commandes exactes de la porte du programme (L399) : `gateText(config)` pour implement, fix, probe (L497 : la sonde commite des tests que la porte rejoue), passe des mineurs et passe du bibliothécaire ; vide ailleurs et sans `orchestrate.test` ni `orchestrate.build`. */
   gate?: string;
   /** Dossier temporaire de la session (L242) : `tmpText(dir)` ; vide sans vague (`--dry-run`, brief délégué à la main). */
   tmp?: string;

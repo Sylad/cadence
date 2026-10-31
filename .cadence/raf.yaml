@@ -852,6 +852,10 @@ lots:
     spec: true
     created: 2026-10-31
     started: 2026-10-31
+    notes:
+      - { date: 2026-10-31, text: "Revue de la fiche — mineur : docs/specs/sonde-cas-limites/fiche.yaml:76 — La source de R4 cite `src/orchestrate/cycle.ts:2300 (againstBaseline)`. `againstBaseline` est défini à cycle.ts:300. Le ligne 2300 est la logique des échecs annoncés (L213/L354/L361). La référence est à corriger : 300, ou 2295-2305 pour la logique d'annonce." }
+      - { date: 2026-10-31, text: "Revue de la fiche — mineur : docs/specs/sonde-cas-limites/fiche.yaml:62 — R2 ne liste pas tous les points de câblage de la nouvelle sorte. `SessionKind` (launch.ts:16), `FILES` de briefs.ts:147 (BriefName), `READ_ONLY` (launch.ts:251, la sonde écrit donc elle n'y entre pas), le plan à sec de command.ts:558 (`--dry-run` ne montrerait pas l'étape probe) et `timeouts` (work/review, config.ts:385) ne sont pas décrits. Quel délai s'applique à probe n'est pas dit, alors que R9 teste le délai. À noter pour l'implémentation : un test « dry-run montre la sonde » et la règle de délai (work ou review)." }
+      - { date: 2026-10-31, text: "Revue de la fiche — mineur : docs/specs/sonde-cas-limites/fiche.yaml:96 — Entrée volumineuse non traitée. Pour A2, aucune règle ne couvre un diff de lot très gros dans le brief probe. Aucun `sans_erreur` motivé non plus. À préciser (plafond ou renvoi au diff par commande), même si les autres briefs ont probablement le même comportement." }
   - id: L498
     title: "File de lots pré-approuvés tirée à chaque créneau libre (inventaire des pertes du 31-10 (17→31-10) : 2 569 min de mur sans aucune session, 1,58 créneau occupé sur 3 en moyenne) : le lead approuve une liste ordonnée de lots (projet:lot) une fois, chaque vague vivante ou une vague neuve en tire le suivant dès qu'un créneau se libère, sans attendre le lead ; un lot non mûr (question, after non clos, uses tenu) est sauté et dit ; avec L421 (ajout à une vague vivante)"
     status: todo

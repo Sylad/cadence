@@ -8,11 +8,11 @@ import { decodePng, encodePng, type Raster } from './png.js';
 import { readDocument } from './store.js';
 import { requireTools, type ToolPaths } from './tools.js';
 
-export const QUOI = ['couleurs', 'contraste', 'boites', 'texte'] as const;
-export type Quoi = (typeof QUOI)[number];
+const QUOI = ['couleurs', 'contraste', 'boites', 'texte'] as const;
+type Quoi = (typeof QUOI)[number];
 
 /** Largeur d'écran de référence, en pixels, à laquelle les mesures sont ramenées. */
-export const REFERENCE_WIDTH = 1440;
+const REFERENCE_WIDTH = 1440;
 
 /** Écart d'un canal (0-255) après arrondi de la moyenne d'un carré. */
 const COLOR_TOLERANCE = 1;
@@ -33,19 +33,19 @@ const MIN_INK_SHARE = 0.1;
 /** Confiance tesseract (0-100) à partir de laquelle la hauteur d'un mot sert à estimer la police. */
 const FONT_CONFIDENCE = 60;
 
-export interface Zone {
+interface Zone {
   x: number;
   y: number;
   l: number;
   h: number;
 }
-export interface Color {
+interface Color {
   hex: string;
   rgb: [number, number, number];
 }
 interface Box extends Zone {}
 
-export interface MeasureOptions {
+interface MeasureOptions {
   slug: string;
   page: string;
   zone: string;
@@ -72,14 +72,14 @@ function luminance([r, g, b]: [number, number, number]): number {
 }
 
 /** Rapport de contraste WCAG 2.2, non arrondi. */
-export function contrastRatio(a: [number, number, number], b: [number, number, number]): number {
+function contrastRatio(a: [number, number, number], b: [number, number, number]): number {
   const la = luminance(a);
   const lb = luminance(b);
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
 /** `page`, `x,y` (un point) ou `x,y,l,h` (un carré), en pixels de la page rendue. */
-export function parseZone(text: string, raster: Raster): { zone: Zone; point: boolean } {
+function parseZone(text: string, raster: Raster): { zone: Zone; point: boolean } {
   if (text === 'page') return { zone: { x: 0, y: 0, l: raster.width, h: raster.height }, point: false };
   const parts = text.split(',');
   const nums = parts.map((p) => (/^\d+$/.test(p.trim()) ? Number(p) : NaN));

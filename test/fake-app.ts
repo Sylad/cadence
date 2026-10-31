@@ -20,7 +20,7 @@ if (Number(delay) >= 0) setTimeout(() => http.createServer((q, r) => { r.statusC
 else setInterval(() => {}, 1000);
 `;
 
-export async function freePort(): Promise<number> {
+async function freePort(): Promise<number> {
   const s = createServer();
   await new Promise<void>((r) => s.listen(0, r));
   const port = (s.address() as AddressInfo).port;
@@ -28,7 +28,7 @@ export async function freePort(): Promise<number> {
   return port;
 }
 
-export interface FakeAppOpts {
+interface FakeAppOpts {
   stubborn?: boolean;
   status?: number;
   /** Devant la commande (ex. `cd sub && PORT=1 `). */

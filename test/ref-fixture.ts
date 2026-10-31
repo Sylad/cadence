@@ -18,7 +18,7 @@ export interface FixturePage {
 }
 
 /** PDF minimal (Helvetica 12, page 612×792 pt, image 2×2 RVB en ASCIIHex), écrit à la main : pas d'outil de génération à installer. */
-export function buildPdf(pages: FixturePage[]): string {
+function buildPdf(pages: FixturePage[]): string {
   const objs: string[] = [];
   const add = (s: string): number => objs.push(s);
   const font = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');

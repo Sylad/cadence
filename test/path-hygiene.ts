@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, symlinkSync } from 'node:fs';
 import { delimiter, isAbsolute, join, relative, resolve } from 'node:path';
 
 /** Les outils dont la suite ne doit pas dépendre : ce que le développeur a installé, ni vu en CI. */
-export const INSTALLED_TOOLS = ['raf', 'cadence'];
+const INSTALLED_TOOLS = ['raf', 'cadence'];
 
 const carries = (dir: string): boolean => INSTALLED_TOOLS.some((n) => existsSync(join(dir, n)));
 

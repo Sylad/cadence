@@ -12,10 +12,10 @@ import { sessionDeRef } from './session.js';
 /** Plafond déclaré d'une lecture : au plus 20 pages rendues lues d'un coup (design §5, « Taille »). Au-delà, `--sections` en choisit moins. */
 export const LECTURE_PAGES_MAX = 20;
 
-export const ANALYSE_MODELS: readonly Model[] = ['sonnet', 'opus', 'haiku'];
+const ANALYSE_MODELS: readonly Model[] = ['sonnet', 'opus', 'haiku'];
 
 /** Sortie structurée de la session : ce que l'agent dit de sa lecture ; le programme ne s'y fie pas, il relit le fichier. */
-export const ANALYSE_SCHEMA = {
+const ANALYSE_SCHEMA = {
   type: 'object',
   properties: {
     resume: { type: 'string', description: 'Two sentences: what the document is and what the reading holds.' },
@@ -25,7 +25,7 @@ export const ANALYSE_SCHEMA = {
   additionalProperties: false,
 };
 
-export interface AnalyseOptions extends Omit<AddOptions, 'out'> {
+interface AnalyseOptions extends Omit<AddOptions, 'out'> {
   model?: string;
   /** Modèle de la lecture B (défaut `opus`), avec `double` seulement. */
   modelB?: string;

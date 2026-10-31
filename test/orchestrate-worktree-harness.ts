@@ -11,10 +11,10 @@ import { tempDir } from './helpers.js';
 
 // L279 — doublures communes aux tests e2e des worktrees de lot : vrais dépôts git, sessions simulées.
 export const WAVE = '2026-10-04-1412';
-export type Kind = 'implement' | 'review' | 'fix' | 'review-small' | 'ux' | 'spec' | 'fiche';
+type Kind = 'implement' | 'review' | 'fix' | 'review-small' | 'ux' | 'spec' | 'fiche';
 export type Handler = (cwd: string, brief: string, args: string[]) => LaunchOutcome | Promise<LaunchOutcome>;
 
-export interface LotSpec {
+interface LotSpec {
   title: string;
   estimate?: number;
   after?: string[];
@@ -103,7 +103,7 @@ export function meeting(n: number, safetyMs = 4000) {
   };
 }
 
-export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Attend (au plus 5 s) qu'une condition soit vraie. */
 export async function until(cond: () => boolean): Promise<void> {

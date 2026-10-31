@@ -12,7 +12,7 @@ interface ToolSpec {
 const POPPLER = 'sudo apt install poppler-utils';
 
 /** Les outils du système dont `cadence ref` dépend, dans l'ordre où l'erreur les nomme. */
-export const TOOLS: ToolSpec[] = [
+const TOOLS: ToolSpec[] = [
   { name: 'pdftoppm', commands: ['pdftoppm'], install: POPPLER },
   { name: 'pdftotext', commands: ['pdftotext'], install: POPPLER },
   { name: 'pdfimages', commands: ['pdfimages'], install: POPPLER },

@@ -6,7 +6,7 @@ import { EXEMPLE } from './spec-helpers.js';
 
 export const DIR = 'docs/specs';
 
-export interface Opts { lot?: string; vert?: boolean; tests?: string; ecran?: string; sansFiche?: boolean; exemple?: string; extra?: string[]; racine?: string }
+interface Opts { lot?: string; vert?: boolean; tests?: string; ecran?: string; sansFiche?: boolean; exemple?: string; extra?: string[]; racine?: string }
 
 /** Ce que fait l'agent accept : fiche + fichiers de tests + acceptation.json, dans un seul commit rouge. */
 export function ecritAcceptation(repo: string, o: Opts = {}): { json: string; fiche: string; sha: string; test: string } {

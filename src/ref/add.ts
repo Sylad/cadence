@@ -8,7 +8,7 @@ import { readDocument, writeDocument, type StoredDocument, type StoredImage, typ
 import { requireTools } from './tools.js';
 
 /** Sans `--sections`, un document de cette taille ou plus petit est rendu en entier ; au-delà, seul l'index est construit. */
-export const WHOLE_DOCUMENT_MAX = 30;
+const WHOLE_DOCUMENT_MAX = 30;
 
 /** Une page de moins de 20 caractères de texte est tenue pour scannée (recette du skill norme-etude). */
 const SCANNED_MAX_CHARS = 20;
@@ -26,7 +26,7 @@ function ranges(pages: number[]): string {
 }
 
 /** `3-5,9` → [3, 4, 5, 9] (pages du PDF, 1 = première), sans doublon, dans l'ordre. */
-export function parseSections(text: string, pages: number): number[] {
+function parseSections(text: string, pages: number): number[] {
   const out = new Set<number>();
   for (const part of text.split(',')) {
     const m = /^\s*(\d+)(?:\s*-\s*(\d+))?\s*$/.exec(part);

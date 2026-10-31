@@ -12,7 +12,7 @@ const BRUIT = `<svg style="position:absolute" width="0" height="0"><filter id="b
 <feColorMatrix in="t" type="matrix" values="0 0 0 0 .25  0 0 0 0 .25  0 0 0 0 .25  1.2 0 0 0 -.38" result="grain"/>
 <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="grain"/></feMerge></filter></svg>`;
 
-export interface Navigateur {
+interface Navigateur {
   newContext(o: object): Promise<{ newPage(): Promise<Page>; close(): Promise<void> }>;
   close(): Promise<void>;
 }
@@ -38,7 +38,7 @@ export function chargerPlaywright(env: NodeJS.ProcessEnv, cwd: string): { chromi
   }
 }
 
-export type Playwright = ReturnType<typeof chargerPlaywright>;
+type Playwright = ReturnType<typeof chargerPlaywright>;
 
 /** Lance Chromium : un navigateur absent ou d'une autre version est un refus, avant que le moindre fichier soit écrit. */
 export async function lancer(playwright: Playwright): Promise<Navigateur> {

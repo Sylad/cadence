@@ -91,7 +91,7 @@ export function commitFile(cwd: string, file: string, message: string): { sha: s
   return { sha: git(cwd, 'rev-parse', 'HEAD'), sujet: message };
 }
 
-export interface Harness {
+interface Harness {
   repo: string;
   launch: string;
   store: RunStore;

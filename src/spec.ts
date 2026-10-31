@@ -6,7 +6,7 @@ import { RafError } from './plan.js';
 /** Les largeurs de rendu d'une fiche (L170, spec etape-spec S2). */
 export const LARGEURS = [1440, 390];
 /** Les états qu'une fiche porte au moins. */
-export const ETATS_REQUIS = ['vide', 'chargement', 'erreur'];
+const ETATS_REQUIS = ['vide', 'chargement', 'erreur'];
 
 const KEBAB = /^[a-z][a-z0-9-]*$/;
 const APPEL = /^(GET|POST|PUT|PATCH|DELETE) \/\S*$/;
@@ -23,7 +23,7 @@ const liste = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 /** Les ids d'une liste d'objets, dans l'ordre. */
 const idsDe = (v: unknown): string[] => liste(v).filter(isObj).map((x) => x.id).filter(texte);
 /** Un appel d'action : le sien, ou celui du contrat auquel elle renvoie (`contrat: Ax`, fiche mixte). */
-export function appelDe(action: Obj, contrats: unknown): string {
+function appelDe(action: Obj, contrats: unknown): string {
   if (texte(action.appel)) return action.appel;
   const c = liste(contrats).filter(isObj).find((x) => x.id === action.contrat);
   return c && texte(c.appel) ? c.appel : '';

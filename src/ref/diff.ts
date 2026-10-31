@@ -326,7 +326,7 @@ export function reprendreIds(lecture: Obj, precedent: Obj | undefined): void {
 }
 
 /** L'inventaire que `--out` va remplacer, s'il en est un de valide ; sinon rien (un fichier illisible ou d'une autre forme n'est pas un inventaire précédent). */
-export function inventairePrecedent(path: string): Obj | undefined {
+function inventairePrecedent(path: string): Obj | undefined {
   if (!existsSync(path)) return undefined;
   try {
     const doc = readInventaire(path) as Obj;

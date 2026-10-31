@@ -49,7 +49,7 @@ export function ecrit(cwd: string, o: Écrit = {}): string {
 
 export const EXEMPLE_BACK = join(__dirname, '..', 'docs', 'superpowers', 'specs', '2026-10-11-etape-spec-back-fiche-exemple.yaml');
 
-export interface ÉcritBack {
+interface ÉcritBack {
   /** Modifie la fiche avant qu'elle soit écrite. */
   fiche?: (doc: any) => void;
   /** Fiche mixte : la partie écran de l'exemple d'écran s'ajoute à la fiche back (ids A communs). */

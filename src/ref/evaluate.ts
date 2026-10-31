@@ -5,7 +5,7 @@ import { TYPES, checkInventaire, readInventaire } from './check.js';
 
 type Obj = Record<string, any>;
 
-export interface Compte {
+interface Compte {
   attendus: number;
   lus: number;
   /** Lus qui retrouvent un attendu par son identité ET disent la même chose (la mesure de rappel et de précision). */
@@ -16,19 +16,19 @@ export interface Compte {
   faux_lu: number;
 }
 
-export interface Taux extends Compte {
+interface Taux extends Compte {
   rappel: number | null;
   precision: number | null;
   taux_faux_lu: number | null;
 }
 
-export interface Piege {
+interface Piege {
   piege: string;
   attendus: number;
   trouves: number;
 }
 
-export interface Tokens {
+interface Tokens {
   total: number | null;
   pages: number | null;
   par_page: number | null;
@@ -36,7 +36,7 @@ export interface Tokens {
   exclus: string[];
 }
 
-export interface ResultatCas {
+interface ResultatCas {
   cas: string;
   /** Faux quand aucune lecture n'existe pour ce cas : tout l'attendu est alors manqué. */
   lecture: boolean;
@@ -47,7 +47,7 @@ export interface ResultatCas {
   pieges: Piege[];
 }
 
-export interface Evaluation {
+interface Evaluation {
   total: Taux;
   types: Record<string, Taux>;
   pieges: Piege[];

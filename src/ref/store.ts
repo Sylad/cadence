@@ -50,7 +50,7 @@ export function referencesDir(root: string, configPath: string, env: NodeJS.Proc
   return abs;
 }
 
-export const documentFile = (docDir: string): string => join(docDir, 'document.json');
+const documentFile = (docDir: string): string => join(docDir, 'document.json');
 
 export function readDocument(docDir: string): StoredDocument | null {
   const file = documentFile(docDir);

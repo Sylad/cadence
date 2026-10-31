@@ -27,7 +27,7 @@ export function lotIds(lot: Pick<Lot, 'title' | 'goal' | 'notes'>): string[] {
 }
 
 /** Les éléments que la fiche d'un lot justifie comme non pris (`<id> : <raison>` dans `sujet.perimetre.hors_perimetre`), par id. */
-export function nonPris(repo: string, specDir: string, lotId: string): Map<string, string> {
+function nonPris(repo: string, specDir: string, lotId: string): Map<string, string> {
   const out = new Map<string, string>();
   const doc = fichesDuDossier(repo, specDir).find(({ doc }) => (doc.sujet as { lot?: unknown } | undefined)?.lot === lotId)?.doc;
   const sujet = doc?.sujet as { perimetre?: { hors_perimetre?: unknown } } | undefined;
@@ -69,12 +69,7 @@ function where(e: Obj): string {
   return `p.${source.page}${zone}`;
 }
 
-export interface Exclusion {
-  id: string;
-  raison: string;
-}
-
-export interface Coverage {
+interface Coverage {
   /** Un élément par ligne ✗ : aucun lot, ou des lots qui ne sont pas faits. */
   gaps: { id: string; text: string }[];
   /** Les écarts de la liste `exclusions` (id inconnu, raison absente) : jamais comptés comme une exclusion. */
@@ -88,7 +83,7 @@ export interface Coverage {
  * Calcule la couverture d'un inventaire valide par les lots du plan (fait, abandonné compté pour rien) et par ses exclusions écrites. Un lot fait dont la fiche
  * justifie un élément comme non pris (`justifies`) ne le couvre pas : l'élément reste un écart tant que le lead ne l'a pas exclu par écrit ou fait par un autre lot.
  */
-export function computeCoverage(inventaire: Obj, lots: Pick<Lot, 'id' | 'title' | 'goal' | 'notes' | 'status'>[], justifies: (lotId: string) => Map<string, string> = () => new Map()): Coverage {
+function computeCoverage(inventaire: Obj, lots: Pick<Lot, 'id' | 'title' | 'goal' | 'notes' | 'status'>[], justifies: (lotId: string) => Map<string, string> = () => new Map()): Coverage {
   const elements = inventaire.elements as Obj[];
   const known = new Set(elements.map((e) => e.id as string));
   const byId = new Map<string, { id: string; status: string }[]>();

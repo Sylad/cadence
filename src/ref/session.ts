@@ -24,7 +24,7 @@ export interface SessionRef {
   echec: string;
 }
 
-export type ResultatSession = { kind: 'ok'; structured: unknown; tokens: number; session: string } | { kind: 'quota'; message: string };
+type ResultatSession = { kind: 'ok'; structured: unknown; tokens: number; session: string } | { kind: 'quota'; message: string };
 
 /**
  * Une session de la chaîne `ref` hors vague (mêmes sortie JSON, schéma, relance de mise en forme et relance d'une session coupée qu'orchestrate),

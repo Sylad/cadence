@@ -24,7 +24,7 @@ export interface PageText {
   height: number;
   lines: TextLine[];
 }
-export interface ListedImage {
+interface ListedImage {
   page: number;
   /** Rang de l'image dans la page, dans l'ordre de `pdfimages -list` (masques exclus) : celui de `pdftohtml`. */
   rank: number;
@@ -33,7 +33,7 @@ export interface ListedImage {
   pixelsW: number;
   pixelsH: number;
 }
-export interface HtmlRegion extends Box {
+interface HtmlRegion extends Box {
   page: number;
 }
 
@@ -119,7 +119,7 @@ export function renderPages(tools: ToolPaths, file: string, pages: number[], dir
 }
 
 /** Résolution des vignettes de toutes les pages (à parcourir pour repérer les planches d'un document sans texte). */
-export const THUMB_DPI = 40;
+const THUMB_DPI = 40;
 
 /** Vignettes basse résolution de toutes les pages dans `dir/page-<n>.png`. */
 export function renderThumbnails(tools: ToolPaths, file: string, total: number, dir: string): void {

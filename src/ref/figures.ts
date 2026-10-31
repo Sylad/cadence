@@ -30,7 +30,7 @@ export interface Unresolved {
   extrait: string;
 }
 
-export interface FigureIndex {
+interface FigureIndex {
   figures: Figure[];
   unresolved: Unresolved[];
 }

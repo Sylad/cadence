@@ -9,10 +9,10 @@ import { sessionDeRef, type SessionRef } from './session.js';
 type Obj = Record<string, any>;
 
 /** Marge (pixels de la page rendue) ajoutée de chaque côté de la zone d'un élément dans sa découpe : de quoi lire ce qui l'entoure. */
-export const MARGE_DECOUPE = 24;
+const MARGE_DECOUPE = 24;
 
 /** Sortie structurée du troisième regard : un verdict par numéro d'élément ; le programme ne retient que les verdicts valides. */
-export const REGARD_SCHEMA = {
+const REGARD_SCHEMA = {
   type: 'object',
   properties: {
     decisions: {
@@ -58,12 +58,12 @@ function decouper(docDir: string, e: Obj, numero: number, pages: Map<number, Ras
 /** Ce qu'une lecture a écrit d'un élément, sans ce qui renvoie à sa propre numérotation ni à sa confiance : le troisième regard juge ce qui est dit, pas qui le dit. */
 const POSE = (e: Obj): string => JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => !['id', 'confiance', 'cause', 'ocr', 'usage', 'ecran', 'cible', 'couvre'].includes(k))));
 
-export interface RegardOptions extends Omit<SessionRef, 'agent' | 'brief' | 'schema' | 'model' | 'echec'> {
+interface RegardOptions extends Omit<SessionRef, 'agent' | 'brief' | 'schema' | 'model' | 'echec'> {
   seuls: Item[];
   model: Model;
 }
 
-export type ResultatRegard = { kind: 'ok'; decisions: (Decision | undefined)[]; tokens: number; session: string; questions: string[] } | { kind: 'quota'; message: string };
+type ResultatRegard = { kind: 'ok'; decisions: (Decision | undefined)[]; tokens: number; session: string; questions: string[] } | { kind: 'quota'; message: string };
 
 /**
  * Le troisième regard : une session de `reference-verifier` qui ne voit que les éléments d'une seule lecture et leur découpe, et dit pour chacun

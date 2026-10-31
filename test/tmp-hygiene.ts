@@ -10,7 +10,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
  * La cible elle-même n'est pas résolue : si c'est un lien, c'est le lien qu'on supprimera, jamais ce qu'il désigne.
  * Rend `null` quand le parent n'existe pas (rien à supprimer), après le même refus textuel.
  */
-export function provenInside(path: string, root: string | undefined, allowRoot = false): string | null {
+function provenInside(path: string, root: string | undefined, allowRoot = false): string | null {
   if (!root) throw new Error(`Suppression refusée : pas de racine temporaire privée définie (${path}).`);
   const refuse = (): Error => new Error(`Suppression refusée : ${path} est hors de la racine temporaire privée ${root}.`);
   const inside = (r: string, p: string): boolean => {
@@ -65,7 +65,7 @@ function restoreRights(dir: string): void {
  * ou undefined s'il ne s'y trouve pas. Les chemins globaux (NODE_PATH, ~/.node_modules…) sont figés au démarrage du processus
  * et ne dépendent pas de `dir` : on ne les teste pas.
  */
-export function yamlResolvedFrom(dir: string): string | undefined {
+function yamlResolvedFrom(dir: string): string | undefined {
   for (let d = resolve(dir); ; d = dirname(d)) {
     const modules = join(d, 'node_modules');
     if (basename(d) !== 'node_modules' && existsSync(join(modules, 'yaml'))) {
@@ -116,7 +116,7 @@ export function pidFileText(pid: number = process.pid, host: string = hostname()
 }
 
 /** Le processus `pid` existe-t-il ? EPERM = il existe (à un autre utilisateur) ; ESRCH = mort. */
-export function isProcessAlive(pid: number): boolean {
+function isProcessAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
@@ -126,7 +126,7 @@ export function isProcessAlive(pid: number): boolean {
 }
 
 /** Ce qui décide qu'une racine est périmée ; injectable pour les tests. */
-export interface StaleCheck {
+interface StaleCheck {
   /** Le processus existe-t-il ? */
   alive?: (pid: number) => boolean;
   /** Nom de cette machine (défaut os.hostname()) : le fichier pid doit le porter. */

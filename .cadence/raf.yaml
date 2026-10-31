@@ -804,12 +804,14 @@ lots:
     created: 2026-10-31
   - id: L494
     title: "Panneau des lots, suite de L481 : aligner les barres d'avancement de « ordre des projets » en colonne (largeur réservée aux noms = le plus long, ex. jobmail-assistant), aujourd'hui chaque barre part après son nom et les débuts diffèrent (capture de Sylvain 31-10)"
-    status: doing
+    status: done
     estimate: 0.25
     visible: true
     created: 2026-10-31
     started: 2026-10-31
     review: { date: 2026-10-31, verdict: "compliant: aucun changement de code ; l'alignement existait depuis L481 (padEnd sur le nom le plus long dans projects-list.tsx:84-90) et le lot ajoute le test, le CHANGELOG et l'entrée News, sans écart (claude plugin test : 350 pass) — orchestré (vague 2026-10-31-1535-cad, 0 passe(s) de correction)", commit: 0ded496679d2a94b77de70ffd4963b4d26e1d662, reporte: { de: 834166b953bf783a275b05594039379344189b53, vers: 0ded496679d2a94b77de70ffd4963b4d26e1d662, patchId: e5db7566ca05cbb060aec1a617aabb86189ff0a4 } }
+    ux: { date: 2026-10-31, verdict: "conforme sur relecture du code et des tests rendus (barres alignées sur la largeur du nom le plus long, lignes sans barre alignées aussi — mineur de L481 couvert) ; rendu réel à confirmer par Sylvain après /reload-plugins" }
+    finished: 2026-10-31
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

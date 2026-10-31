@@ -83,6 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Added
 
 - The lots panel (`/hud lots`) shows, on each row of its « ordre des projets » section, the progress bar of the band: closed lots over total, coloured by the share done, the lots in progress and `+N cette semaine` (L481, [docs/cadence-hud.md](docs/cadence-hud.md)). Names are aligned; dragging and Alt+↑ / Alt+↓ are unchanged; with a `cadence` that gives no `progress` the row keeps `N lots non clos`.
+- In the lots panel, the progress bars of the « ordre des projets » section all start at the same column: the width reserved for names is the longest project name, e.g. `jobmail-assistant` (L494).
 - Simplification audit of the code (L461, `docs/mesures/audit-simplification-l461.md`): dead code, copies and split plans for `orchestrate/cycle.ts`, `orchestrate/command.ts` and `cli.ts`, each point ranked by gain and risk with the tests that protect it and its measure. Read-only: no code changed.
 
 ## [1.32.0] - 2026-10-31

@@ -1532,3 +1532,21 @@ test('L481 — un cadence qui ne donne pas progress : la ligne du projet garde l
   expect(text).toMatch(/cadence {2}2 lots non clos/)
   expect(text).toMatch(/ol {2}1 lot non clos/)
 })
+
+test('L494 — les barres d’avancement des projets partent de la même colonne, la largeur des noms étant celle du plus long', async ($, on) => {
+  const withProgress = [
+    { ...row('cadence', TOUR[0]!.lots), progress: { done: 3, doing: 0, todo: 7, added7: 0 } },
+    { ...row('jobmail-assistant', TOUR[1]!.lots), progress: { done: 5, doing: 0, todo: 5, added7: 0 } },
+    { ...row('ol', TOUR[1]!.lots), progress: { done: 9, doing: 0, todo: 1, added7: 0 } },
+  ]
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify(withProgress) }) })
+  await s.hud('lots')
+  const lines = (await s.draw(80, 30, 'terminal')).text.split('\n')
+  const columns = ['cadence', 'jobmail-assistant', 'ol'].map(name => {
+    const line = lines.find(l => new RegExp(`${name} +[▮▯]`).test(l))
+    expect(line, name).toBeDefined()
+    return line!.search(/[▮▯]/)
+  })
+  expect(new Set(columns).size).toBe(1)
+  expect(lines.find(l => /jobmail-assistant [▮▯]/.test(l))).toBeDefined() // le plus long garde une seule espace avant sa barre
+})

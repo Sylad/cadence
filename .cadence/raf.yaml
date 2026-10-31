@@ -847,10 +847,11 @@ lots:
     created: 2026-10-31
   - id: L497
     title: "Sonde de cas limites avant la revue (goulot « bug de code » : cas limite 64 % des passes bug-code depuis la consigne L447, 69 % avant — la consigne écrite n'a rien changé) : étape d'orchestrate entre implement et review, session Sonnet neuve qui lit le diff du lot (et la fiche s'il y en a une) et cherche à le casser par des tests aux bornes (vide, absent, double, mauvais type, refusé, forme réelle des données, autres appelants) ; tout test qui échoue revient à implement comme constat avant la revue Opus ; clé orchestrate.probe (absente = rien ne change), posée sur cadence seul pour l'essai ; mesure par L430 (part bug-code et cas limite, lots à ≥ 2 passes, tokens par lot) pour garder ou retirer"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-10-31
+    started: 2026-10-31
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

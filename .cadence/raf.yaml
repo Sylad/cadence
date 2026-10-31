@@ -610,13 +610,14 @@ lots:
       - { date: 2026-10-30, text: "Après L462 : s'appuyer sur ses mesures (ESLint, sonarjs, knip, jscpd) et sur sa ligne de base. Chaque nettoyage doit faire baisser la ligne de base. Découper les gros fichiers en modules cohérents, organisation pro (Sylvain, 30-10)." }
   - id: L462
     title: "Garde-fous de qualité du code, comme Checkstyle/PMD/Sonar en Java : ESLint + typescript-eslint (max-lines par fichier, max-lines-per-function, max-depth, max-params, complexity), eslint-plugin-sonarjs (complexité cognitive), knip (code mort, exports et dépendances inutilisés), jscpd (doublons) ; seuils de départ 400 lignes/fichier, 80/fonction, complexité cognitive 15 ; ligne de base « cliquet » versionnée (l'existant passe, rien ne peut empirer, un fichier touché ne peut que baisser) ; dans la porte (orchestrate.build) et la CI ; doc du rôle de chaque outil et du cliquet — demande de Sylvain le 30-10 (« bonnes pratiques pour être pris au sérieux »)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-30
     notes:
       - { date: 2026-10-30, text: "Portée élargie par Sylvain (30-10) : valable pour TOUS les projets et TOUTES les technos. L462 pose les garde-fous de cadence ET écrit la recette de référence réutilisable (docs/, générique, sans rien de propre à un projet), par techno : TS (ESLint, typescript-eslint, sonarjs, knip, jscpd), Python (ruff C901, radon, vulture), Java (Checkstyle, PMD/CPD, SpotBugs dans Maven), shell (shellcheck). Elle décrit aussi la ligne de base en cliquet et son branchement dans orchestrate.build et la CI. Les autres projets l'appliqueront ensuite, chacun dans un lot." }
     started: 2026-10-31
     review: { date: 2026-10-31, verdict: "conforme sur arbitrage du lead (31-10) : la reprise Fable corrige le majeur (configs eslint/knip/jscpd surveillées, 8718e0e7) sans régression (revue Opus : tsc 0, cliquet --contre main 0, qualite-l462 33/33) ; la nouvelle revue trouve encore des fichiers lus par les outils hors liste (.gitignore imbriqué, vitest.config.*, package.json scripts/main) — l'énumération ne converge pas, le contournement reste visible en revue de code : repris dans le lot de suite des trous du cliquet", commit: 8718e0e7147212290fab58d1c5823b5bc7897d3a }
+    finished: 2026-10-31
   - id: L463
     title: "Plans riches — statuts détaillés du projet, écrits et gardés (plan.statuses écrivable, transitions, raf status) (manque M1 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo
@@ -698,6 +699,21 @@ lots:
     started: 2026-10-31
     review: { date: 2026-10-31, verdict: "compliant — 0 bloquant, 0 majeur, 1 mineur (skills/session-close ne nomme pas le refus « non conforme ») — orchestré (vague 2026-10-31-0950-cad, 0 passe(s) de correction)", commit: 689e11e4c412e4f9d2a2b60d21766356362d18a8, reporte: { de: 1a6adfbb18832136304cf0a138dbc6ca3c75b2cb, vers: 689e11e4c412e4f9d2a2b60d21766356362d18a8, patchId: 7030aa0d38e23652c5df439d21331d87034ef688 } }
     finished: 2026-10-31
+  - id: L477
+    title: "Cliquet (suite de L462) : une fonction qui grossit sous le pire chiffre de son fichier passe, et comparerMigration compense un défaut neuf (fichier neuf) par un gain ailleurs — compter la somme des excès par fichier et par règle, refuser un défaut neuf même compensé ; test sur les deux cas mesurés par la revue"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-31
+  - id: L478
+    title: "Cliquet (suite de L462) : la base ne doit pas remonter (rm + --init ou édition à la main passent en porte et en CI : comparer à la base du sha de départ) et le découpage d'un fichier de la base doit avoir une voie admise (transfert documenté, mesure comparée au total) — cas L461"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-31
+  - id: L479
+    title: "Cliquet (suite de L462) : surveiller tous les fichiers que lisent ESLint, knip et jscpd (.gitignore imbriqués, vitest.config.*, package.json scripts/main/bin/exports, tsconfig.json pour knip) ou passer à une règle générale (tout changement hors code source pendant le lot est nommé) ; signaler .git/info/exclude non vide ; un outil absent de node_modules dit « npm install » au lieu de « Unexpected end of JSON input »"
+    status: todo
+    estimate: 0.25
+    created: 2026-10-31
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

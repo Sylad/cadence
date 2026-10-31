@@ -760,6 +760,7 @@ lots:
       - { date: 2026-10-31, text: "Reste de L483 (31-10) : ETATS_REQUIS (src/spec.ts:9) et appelDe (src/spec.ts:26) encore exportés sans import" }
     started: 2026-10-31
     docs_ok: { date: 2026-10-31, reason: "refactor interne : mot export retiré de symboles jamais importés, type mort Exclusion supprimé, cliquet abaissé ; aucune commande, option ni comportement documenté ne change" }
+    review: { date: 2026-10-31, verdict: "conforme (revue neuve : seuls des export retirés, type Exclusion supprimé, 29 lignes de base en moins, src/spec.ts identique à main ; tsc, cliquet --contre main et qualite-l484 verts)", commit: c079a23df917986d2a309a9c04b2c26936840ebc }
   - id: L485
     title: "Nettoyage B : retirer staleFiles et readFailedDeliveries (seuls les tests les appellent) et aligner les deux recopies de claudeConfigDir (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § B ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: todo

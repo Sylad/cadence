@@ -361,11 +361,12 @@ describe('sonde de cas limites (L497)', () => {
     expect(git(h.repo, 'status', '--porcelain')).toBe('');
   });
 
-  it('R9 — une sonde coupée au délai après un git add (fichiers indexés, nouveau et modifié) ne rend pas le lot : index et arbre remis', async () => {
+  it('R9 — une sonde coupée au délai après un git add (fichiers indexés, nouveau et modifié, plus un non indexé) ne rend pas le lot : index et arbre remis', async () => {
     const cut: Handler = (call) => {
       writeFileSync(join(call.opts.cwd, 'a.ts'), '// modifié puis indexé par la sonde coupée\n');
       writeFileSync(join(call.opts.cwd, 'q.spec.ts'), '// nouveau, indexé, jamais commité\n');
       git(call.opts.cwd, 'add', '--', 'a.ts', 'q.spec.ts');
+      writeFileSync(join(call.opts.cwd, 'r.spec.ts'), '// nouveau, non indexé\n'); // un chemin inconnu de l'index ne doit pas empêcher de désindexer les autres
       return { code: 143, stdout: '', stderr: '', timedOut: true };
     };
     const h = harness({ script: { implement: [impl('a.ts')], probe: [cut], review: [ok] } });
@@ -374,7 +375,7 @@ describe('sonde de cas limites (L497)', () => {
     expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
     expect(c.lot.status).toBe('ready');
     expect(warnings(c)).not.toContain('arbre sale');
-    expect(warnings(c)).toContain('sonde de cas limites : fichiers non commités laissés par la session retirés (a.ts, q.spec.ts)');
+    expect(warnings(c)).toContain('sonde de cas limites : fichiers non commités laissés par la session retirés (a.ts, q.spec.ts, r.spec.ts)');
     expect(git(h.repo, 'status', '--porcelain')).toBe('');
     expect(git(h.repo, 'show', 'HEAD:a.ts')).not.toContain('indexé');
   });

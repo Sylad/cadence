@@ -941,9 +941,10 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
     if (kind === 'probe') {
       // R9 : une sonde en échec ou coupée ne rend pas le lot. Ce qu'elle a laissé non commité est remis (suivis restaurés, nouveaux fichiers retirés), un warning le nomme.
       // Coupée entre `git add` et son commit, elle laisse aussi l'index : il est désindexé d'abord, `restoreWorktree` ne remet que l'arbre de travail (sinon « AD q.spec.ts » et le lot rendu pour arbre sale).
+      // Un fichier à la fois : un chemin inconnu de l'index (non indexé) fait refuser toute la commande, les autres resteraient indexés.
       const left = dirtBetween(before, await snapshot(wd(c)));
       if (left.length) {
-        tryGit(wd(c), ['restore', '--staged', '--', ...left]);
+        for (const f of left) tryGit(wd(c), ['restore', '--staged', '--', f]);
         restoreWorktree(wd(c), left);
         l.warnings.push(`sonde de cas limites : fichiers non commités laissés par la session retirés (${left.join(', ')})`);
       }

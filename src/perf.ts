@@ -245,7 +245,7 @@ function planLot(plans: Plans, project: string, lot: string): PlanLot | undefine
 }
 
 /** Rang d'affichage d'une sorte d'étape : l'ordre du cycle, les sortes inconnues après. */
-const KIND_ORDER = ['spec', 'maquette', 'fiche', 'precheck', 'implement', 'review', 'review-small', 'ux', 'fix', 'accept'];
+const KIND_ORDER = ['spec', 'maquette', 'fiche', 'precheck', 'implement', 'probe', 'review', 'review-small', 'ux', 'fix', 'accept'];
 const kindRank = (kind: string) => (KIND_ORDER.includes(kind) ? KIND_ORDER.indexOf(kind) : KIND_ORDER.length);
 
 /** Part de `counted` rangée en entrée quand une étape ne porte que ce compteur (journal ancien) : le reste est en sortie (R8 b). */

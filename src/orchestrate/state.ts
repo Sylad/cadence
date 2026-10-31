@@ -142,6 +142,8 @@ export interface LotState {
   reviewCounts?: number[];
   /** Vrai une fois la porte « code modifié sans test » jouée (L287) : elle ne se rejoue pas, que la correction ait ajouté un test ou non. */
   testGate?: boolean;
+  /** Vrai une fois la sonde de cas limites décidée (L497, `orchestrate.probe`) : jouée, ou écartée faute de passe ou de budget ; elle ne se rejoue pas. Absent sans la clé. */
+  probe?: boolean;
   /** Vrai une fois le bibliothécaire appelé avant la revue (L306), ou écarté faute de passe ou de budget : il ne se rappelle pas. */
   docsGate?: boolean;
   /** Vrai entre la décision de la passe du bibliothécaire et la fin de sa session `fix` : celle-ci reçoit le brief de la documentation et l'agent doc-keeper. */

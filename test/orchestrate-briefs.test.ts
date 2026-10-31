@@ -15,7 +15,7 @@ const lot = (extra: Partial<Lot> = {}): Lot => ({
 });
 
 describe('gabarits', () => {
-  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: '', captures: '' };
+  const vars = { chemin: '/r/p', lot: 'L9', titre: 'Un titre', objectif: 'faire X', commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: '', captures: '', diff: 'git diff abc..HEAD' };
 
   it('implement, fix et fix-minors interdisent de s\'arrêter sur une question d\'organisation (L52)', () => {
     for (const kind of ['implement', 'fix', 'fix-minors'] as const) {
@@ -354,7 +354,7 @@ describe('instantané des gabarits (L39)', () => {
     const dir = tempDir();
     cpSync(TEMPLATES_DIR, dir, { recursive: true });
     const snap = loadTemplates(dir);
-    expect(Object.keys(snap).sort()).toEqual(['accept', 'accept-back', 'fiche', 'fix', 'fix-docs', 'fix-minors', 'implement', 'maquette', 'precheck', 'review', 'review-recheck', 'review-small', 'spec', 'spec-back', 'ux']);
+    expect(Object.keys(snap).sort()).toEqual(['accept', 'accept-back', 'fiche', 'fix', 'fix-docs', 'fix-minors', 'implement', 'maquette', 'precheck', 'probe', 'review', 'review-recheck', 'review-small', 'spec', 'spec-back', 'ux']);
     writeFileSync(join(dir, 'review.md'), 'changé {{lot}}\n');
     expect(renderBrief('review', vars, snap)).toContain('Review lot `L9`');
     expect(renderBrief('review', vars, dir)).toBe('changé L9\n');

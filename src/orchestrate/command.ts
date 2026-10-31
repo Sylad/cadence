@@ -33,7 +33,7 @@ import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { groupLots, runPool } from './pool.js';
 import { repoBranch } from './integrate.js';
 import { baseBranchOf, keptLines, keptTrees, lotBranch, lotTreeDir, planFileSet, recoverTree, removeTree } from './worktree.js';
-import { schemaFor } from './schemas.js';
+import { agentOf, schemaFor } from './schemas.js';
 import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
@@ -366,7 +366,7 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
       refusals.push(`${key} : ${(e as Error).message}`);
       continue;
     }
-    if (info && olderThanEffort(info.version) && Object.values(env.config.effort).some((e) => e !== 'default')) {
+    if (info && olderThanEffort(info.version) && Object.entries(env.config.effort).some(([step, e]) => e !== 'default' && (step !== 'probe' || env.config.probe))) {
       refusals.push(`${key} : claude ${info.version} n'a pas --effort (2.1.284 requise) : mettre claude à jour, ou orchestrate.effort à « default » pour chaque passe`);
       continue;
     }
@@ -555,7 +555,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       const onPath = gate ? (deps.pathNode ?? (() => pathNodeVersion(io.env)))() : null;
       if (onPath && !matchesNvmrc(onPath, l.node.wanted)) io.out(`  ⚠ .nvmrc ${l.node.wanted} ≠ node du PATH ${onPath} : la porte et les autres commandes du programme tournent sous ${l.node.version} (lien node-bin en tête du PATH), pas sous ${onPath}`);
     }
-    const steps: { kind: 'precheck' | 'spec' | 'maquette' | 'fiche' | 'accept' | 'implement' | 'ux' | 'review' | 'review-small'; model: StepModel }[] = [{ kind: 'implement', model: l.model }];
+    const steps: { kind: 'precheck' | 'spec' | 'maquette' | 'fiche' | 'accept' | 'implement' | 'probe' | 'ux' | 'review' | 'review-small'; model: StepModel }[] = [{ kind: 'implement', model: l.model }];
     const specStage = !!(l.screen || l.specLot);
     if (specStage && env.config.accept) steps.unshift({ kind: 'accept', model: 'sonnet' });
     if (l.screen && env.config.maquette) steps.unshift({ kind: 'maquette', model: env.config.review.full });
@@ -566,6 +566,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       if (nothingToFind) io.out(`  contrôle préalable sauté : ${nothingToFind}`);
       else steps.unshift({ kind: 'precheck', model: env.config.precheckLocal ? 'local' : 'sonnet' });
     }
+    steps.push(...(env.config.probe ? [{ kind: 'probe' as const, model: 'sonnet' }] : [])); // L497 : entre l'écriture et la revue
     const { light, full } = env.config.review;
     if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: l.light ? light : full });
     else {
@@ -592,7 +593,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     io.out(l.light ? '  revue conforme avec mineurs : pas de passe des mineurs, ils sont rendus en notes' : '  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
     const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, lotSlug(l.project, l.lot), 'playwright');
     // brief écrit par --dry-run = base d'une délégation à la main : aucun dossier de vague (il n'existe pas)
-    const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '' };
+    const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '', diff: 'git diff <sha de départ>..HEAD' };
     vars.decisions = decisionsText(humanDecisions(lot, lot.parent ? env.loadPlan().lots().find((x) => x.id === lot.parent) : undefined));
     if (specStage) vars.spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen, back: !!l.specLot });
     if (l.screen && env.config.maquette) vars.maquette = maquetteText({ fiche: `${env.config.spec.dir}/<écran>/fiche.yaml`, passes: 0, max: env.config.maquetteReviews });
@@ -603,12 +604,11 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     }
     for (const s of steps) {
       const file = join(tmp, `${lotSlug(l.project, l.lot)}--${s.kind}.md`);
-      const brief = renderBrief(briefName(l, s.kind), s.kind === 'fiche' || vars.fiche === undefined ? vars : { ...vars, fiche: '' }, deps.templatesDir); // la consigne de revue de fiche ne sert qu'au brief de la fiche : implement et review en sont la base d'une délégation à la main
-      writeFileSync(file, brief);
+      writeFileSync(file, renderBrief(briefName(l, s.kind), s.kind === 'fiche' || vars.fiche === undefined ? vars : { ...vars, fiche: '' }, deps.templatesDir)); // la consigne de revue de fiche ne sert qu'au brief de la fiche : implement et review en sont la base d'une délégation à la main
       const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small, !!l.screen).playwright;
       const local = s.model === 'local';
       const args = (local ? buildLocalArgs : buildArgs)(
-        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model === 'local' ? 'sonnet' : s.model, local, effort: env.config.effort[s.kind === 'review-small' ? 'review' : s.kind], schema: schemaFor(s.kind), agent: s.kind === 'implement' ? undefined : s.kind === 'spec' ? 'spec-writer' : s.kind === 'accept' ? 'acceptance-writer' : s.kind === 'ux' || s.kind === 'maquette' ? 'ux-reviewer' : s.kind === 'precheck' ? 'precheck-reader' : 'code-reviewer', cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && (s.kind === 'implement' || s.kind === 'spec') ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright, disablePlugins: enabledPlugins(settingsFiles(deps.claudeHome, l.repo)) },
+        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model === 'local' ? 'sonnet' : s.model, local, effort: env.config.effort[s.kind === 'review-small' ? 'review' : s.kind], schema: schemaFor(s.kind), agent: agentOf(s.kind), cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && (s.kind === 'implement' || s.kind === 'spec') ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright, disablePlugins: enabledPlugins(settingsFiles(deps.claudeHome, l.repo)) },
         agents,
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
       io.out(`  ${s.kind} : ${local ? 'claude-local' : 'claude'} ${args.join(' ')}`);

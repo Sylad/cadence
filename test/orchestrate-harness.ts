@@ -50,7 +50,7 @@ export const reviewReport = (over: Record<string, unknown> = {}) => ({
 export interface Call {
   args: string[];
   opts: LaunchOpts;
-  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette' | 'fiche';
+  kind: 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette' | 'fiche' | 'probe';
   model: string;
   effort?: string;
   brief: string;
@@ -63,6 +63,9 @@ export const specReport = (over: Record<string, unknown> = {}) => ({ commits: []
 /** Rapport d'une étape accept. */
 export const acceptReport = (over: Record<string, unknown> = {}) => ({ commits: [], nonVerifie: [], questions: [], choix: [], resume: 'tests rouges écrits', ...over });
 
+/** Rapport d'une sonde de cas limites (L497). */
+export const probeReport = (over: Record<string, unknown> = {}) => ({ commits: [], echecs: [], nonVerifie: [], questions: [], choix: [], resume: 'bornes essayées', ...over });
+
 export const precheckReport = (over: Record<string, unknown> = {}) => ({ dejaPresent: 'non', preuves: [], resume: 'rien de présent', ...over });
 
 /** Le brief : après `-p` pour `claude`, premier argument pour `claude-local` (L146). */
@@ -71,6 +74,7 @@ export const briefOf = (args: string[]): string => (args[0] === '-p' ? args[1] :
 export function kindOf(args: string[]): Call['kind'] {
   const brief = briefOf(args);
   if (brief.includes('Pre-check for lot')) return 'precheck';
+  if (brief.includes('Edge-case probe for lot')) return 'probe';
   const agent = args.includes('--agent') ? args[args.indexOf('--agent') + 1] : null;
   if (agent === 'ux-reviewer') return brief.includes('UX review of the mockup') ? 'maquette' : 'ux';
   if (agent === 'spec-writer') return 'spec';

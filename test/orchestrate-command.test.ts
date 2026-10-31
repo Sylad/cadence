@@ -70,7 +70,7 @@ function parentWith(projects: Record<string, { title: string; estimate?: number;
   return { parent, dirs };
 }
 
-type Over = Partial<Record<'implement' | 'review' | 'fix' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette' | 'fiche', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
+type Over = Partial<Record<'implement' | 'review' | 'fix' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette' | 'fiche' | 'probe', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
 
 function fakeDeps(over: Over = {}, tweak: Partial<OrchestrateDeps> = {}): { deps: OrchestrateDeps; calls: { cwd: string; kind: string; model: string }[] } {
   const calls: { cwd: string; kind: string; model: string }[] = [];
@@ -183,6 +183,31 @@ describe('refus avant d\'agir (code 2)', () => {
       expect(r.err.join('\n')).toBe('');
       expect(r.code).toBe(0);
       expect(r.out.join('\n')).toContain('groupe/gamma:L1');
+    } finally {
+      removeDryRunBriefs(r.out.join('\n'));
+    }
+  });
+
+  it('L497 R2 — le plan à sec montre l\'étape probe quand la clé est vraie, et seulement alors', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const without = await run(parent, ['a:L1', '--dry-run']);
+    try {
+      expect(without.out.join('\n')).not.toContain('probe');
+    } finally {
+      removeDryRunBriefs(without.out.join('\n'));
+    }
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  probe: true\n');
+    git(dirs.a, 'add', '--', 'cadence.yaml');
+    git(dirs.a, 'commit', '-qm', 'chore: config');
+    const r = await run(parent, ['a:L1', '--dry-run']);
+    try {
+      const out = r.out.join('\n');
+      expect(out).toContain('étapes : implement (sonnet) → probe (sonnet) → review');
+      const file = [...out.matchAll(/^\s*brief : (.+?)\s*$/gm)].map((m) => m[1]!).find((f) => f.includes('--probe'));
+      expect(file).toBeDefined();
+      const brief = readFileSync(file!, 'utf8');
+      expect(brief).toContain('Edge-case probe for lot `L1`');
+      expect(brief).not.toMatch(/\{\{/);
     } finally {
       removeDryRunBriefs(r.out.join('\n'));
     }
@@ -456,6 +481,16 @@ describe('refus avant d\'agir (code 2)', () => {
     } finally {
       removeDryRunBriefs(r.out.join('\n'));
     }
+  });
+
+  it("L497 R1 — l'effort de la sonde ne compte pour le refus de claude < 2.1.284 que si la clé orchestrate.probe est vraie", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un' }] });
+    const old = fakeDeps({}, { claudeInfo: () => ({ version: '2.1.283', jsonSchema: true }) }).deps;
+    const all = ['precheck', 'spec', 'maquette', 'fiche', 'accept', 'implement', 'fix', 'review', 'ux'].map((k) => `${k}: default`).join(', ');
+    writeFileSync(join(dirs.a, 'cadence.yaml'), `orchestrate:\n  probe: true\n  effort: { ${all} }\n`);
+    git(dirs.a, 'add', 'cadence.yaml');
+    git(dirs.a, 'commit', '-q', '-m', 'cfg');
+    expect((await run(parent, ['a:L1', '--dry-run'], old)).err.join()).toContain("claude 2.1.283 n'a pas --effort");
   });
 
   it('--dry-run affiche --effort <niveau> dans la ligne de chaque passe, selon orchestrate.effort (L137)', async () => {

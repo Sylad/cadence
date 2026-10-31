@@ -13,7 +13,7 @@ import { killMarked, SESSION_MARK_VAR, TreeTracker } from '../proc.js';
 import { isQuotaMessage, lacksStructuredOutput, parseSession, salvageUsage, sumTokens, tokensOf, type SessionResult, type Tokens } from './result.js';
 
 /** Les étapes qui sont une session de claude. */
-export type SessionKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette' | 'fiche';
+export type SessionKind = 'implement' | 'fix' | 'review' | 'ux' | 'review-small' | 'precheck' | 'spec' | 'accept' | 'maquette' | 'fiche' | 'probe';
 /** Les étapes d'un lot : ses sessions, plus l'intégration à la branche du dépôt (L279, R14), que le programme joue seul : elle ne passe par aucune table de sessions (schéma, gabarit, modèle). */
 export type StepKind = SessionKind | 'integrate';
 export type Model = 'sonnet' | 'opus' | 'haiku';

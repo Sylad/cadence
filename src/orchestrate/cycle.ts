@@ -10,6 +10,8 @@ import { planLoader, readDocsConfig, readPlanConfig, type OrchestrateConfig } fr
 import { PLAN_ACTIONS, leadAnswerMessage, planCommitMessage } from '../plan-commit.js';
 import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
+import { citesPriorWork, precheckNothingToFind } from './precheck.js';
+import { PROBE_FAILED, PROBE_RESERVE, probeStep, probeVars, scheduleProbe, type ProbeIo } from './probe.js';
 import type { Day } from '../dates.js';
 import { changedFiles, dirtyPaths, gitCommonDir, isAncestor, readCommits, resolveCommit, restoreWorktree, tryGit, type Commit } from '../git.js';
 import { blockingLots, gitCommitsIn } from './table.js';
@@ -26,7 +28,7 @@ import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, t
 import { cleanPlaywrightOutput, pushed, remoteAdvances, snapshot, type Snapshot } from './guard.js';
 import { sumTokens, type Tokens } from './result.js';
 import { cutReport, EXTENSION_MS, MAX_EXTENSIONS, workTimeoutMs } from './timeouts.js';
-import { ACCEPT_SCHEMA, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
+import { ACCEPT_SCHEMA, agentOf, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
 import { type Acceptation, acceptationFile, acceptCommands, isAcceptList, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, planAcceptRuns, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
 import { lotIds, referenceIdsText } from '../ref/coverage.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
@@ -555,6 +557,7 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   vars.fiche = hasSpecStage(l) ? avalOf(c, kind) : '';
   // la vérification des ids d'un document de référence sur l'écran fini : la passe ux, ou la revue courte d'un petit lot visible qui n'a que celle-là (comme la conformité, avalOf)
   if (kind === 'ux' || (kind === 'review-small' && l.small && l.visible)) vars.ux = [vars.ux, referenceIdsText('ux', lotIds({ ...lot, goal: l.goal ?? lot.goal }))].filter(Boolean).join('\n');
+  if (kind === 'probe') Object.assign(vars, probeVars(ficheOf(c), lotCommitLines(c), startSha(c), l.lot));
   if (kind === 'implement' || kind === 'fix') vars.decisions = decisionsText(humanDecisions(lot, lot.parent ? plan.lots().find((x) => x.id === lot.parent) : undefined));
   if (kind === 'precheck' && local) vars.lecture = localReading({ ...lot, goal: l.goal ?? lot.goal });
   if (kind === 'spec') {
@@ -617,7 +620,7 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   }
   const brief = renderBrief(briefName(l, kind, !!c.integration), vars, c.wave.templates);
   // Les dépôts tiers (L456) : la consigne s'ajoute à tout brief d'écriture, sans passer par un gabarit (un gabarit modifié change l'empreinte que d'autres tests gardent).
-  return kind === 'implement' || kind === 'fix' || kind === 'spec' || kind === 'accept' ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief;
+  return ['implement', 'fix', 'spec', 'accept', 'probe'].includes(kind) ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief;
 }
 
 /** Les dépôts voisins du lot, vus avant et après une session. */
@@ -681,8 +684,8 @@ export function budgetStep(l: LotState): SessionKind | null {
   return step && step !== 'integrate' && WRITE_STEPS.includes(step) ? step : null;
 }
 
-/** Le budget du lot paie-t-il la passe de correction et la revue courte qui la suit ? Sans budget de lot : toujours. La part de l'escalade (L349) n'est pas à dépenser, sauf pour décider l'escalade elle-même (`escalating`). */
-const fixAffordable = (l: LotState, escalating = false): boolean => l.budget === undefined || lotSpent(l) + REVIEW_RESERVE < l.budget - (escalating ? 0 : heldForEscalation(l));
+/** Le budget du lot paie-t-il la passe de correction et la revue courte qui la suit ? Sans budget de lot : toujours. La part de l'escalade (L349) n'est pas à dépenser, sauf pour décider l'escalade elle-même (`escalating`). `extra` : le coût d'une étape de plus devant elles (la sonde, L497). */
+const fixAffordable = (l: LotState, escalating = false, extra = 0): boolean => l.budget === undefined || lotSpent(l) + extra + REVIEW_RESERVE < l.budget - (escalating ? 0 : heldForEscalation(l));
 
 /** Cause d'une suspension demandée par `--stop-after-current` (L79). */
 export const STOP_REQUESTED = 'arrêt demandé (--stop-after-current)';
@@ -727,19 +730,20 @@ function benchLocal(c: LotCtx, cause: string): void {
 const LOCAL_FAILED = Symbol('local-failed');
 
 /** Une session : budget et quota vérifiés avant, état écrit avant et après, journal gardé, contrôles du dépôt après. */
+async function session(c: LotCtx, kind: 'probe'): Promise<Done | null | typeof PROBE_FAILED>;
 async function session(c: LotCtx, kind: SessionKind, local: true): Promise<Done | null | typeof LOCAL_FAILED>;
 async function session(c: LotCtx, kind: SessionKind, local?: false): Promise<Done | null>;
-async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Done | null | typeof LOCAL_FAILED> {
+async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Done | null | typeof LOCAL_FAILED | typeof PROBE_FAILED> {
   const w = c.wave;
   const l = c.lot;
   if (dropped(c)) return stop(c, 'handed-back', DROPPED + unplayedAnswer(l));
   const halt = halted(w, l);
   if (halt) return suspend(c, halt);
-  const write = kind === 'implement' || kind === 'fix' || kind === 'spec' || kind === 'accept';
+  const write = kind === 'probe' || WRITE_STEPS.includes(kind); // la sonde écrit (ses tests) mais le budget ne la borne pas : il est vérifié avant de la décider
   // Le budget du lot borne l'écriture, jamais la revue (L145) : une revue est jouée dès que le code est à relire (sauf tests rouges après une écriture, cf. REVIEW_RESERVE), la passe fix réserve son coût.
-  if (write && (lotOver(l) || (kind === 'fix' && !fixAffordable(l)))) return overBudget(c, kind === 'fix' && !lotOver(l));
+  if (WRITE_STEPS.includes(kind) && (lotOver(l) || (kind === 'fix' && !fixAffordable(l)))) return overBudget(c, kind === 'fix' && !lotOver(l));
 
-  const model: StepModel = kind === 'spec' || kind === 'accept' || kind === 'fiche' ? 'sonnet' : write ? (kind === 'fix' && l.escalation?.stage === 'fix' ? l.escalation.model : l.model) : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
+  const model: StepModel = ['spec', 'accept', 'fiche', 'probe'].includes(kind) ? 'sonnet' : write ? (kind === 'fix' && l.escalation?.stage === 'fix' ? l.escalation.model : l.model) : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const effort = c.config.effort[kind === 'review-small' ? 'review' : kind];
   const before = await snapshot(wd(c));
   const neighbours = l.repos ?? [];
@@ -749,7 +753,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   const sessionId = randomUUID();
   const step: StepState = { n, kind, model, ...(effort !== 'default' ? { effort } : {}), status: 'running', sessionId, started: new Date().toISOString(), headBefore: before.head ?? undefined };
   l.steps.push(step);
-  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing', spec: 'implementing', accept: 'implementing', maquette: 'reviewing', fiche: 'reviewing' } as const;
+  const label = { implement: 'implementing', fix: 'fixing', review: 'reviewing', ux: 'reviewing', 'review-small': 'reviewing', precheck: 'implementing', spec: 'implementing', accept: 'implementing', maquette: 'reviewing', fiche: 'reviewing', probe: 'implementing' } as const;
   transition(c, label[kind]);
   w.log(`${lotKey(l.project, l.lot)} · session ${n} ${kind} (${model})`);
 
@@ -798,7 +802,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
       effort,
       local,
       schema: schemaFor(kind),
-      agent: kind === 'spec' ? 'spec-writer' : kind === 'accept' ? 'acceptance-writer' : kind === 'ux' || kind === 'maquette' ? 'ux-reviewer' : kind === 'precheck' ? 'precheck-reader' : kind === 'fix' && l.docsFix ? 'doc-keeper' : write ? undefined : 'code-reviewer',
+      agent: kind === 'fix' && l.docsFix ? 'doc-keeper' : agentOf(kind),
       cwd: wd(c),
       wave: w.id,
       lot: lotKey(l.project, l.lot),
@@ -931,6 +935,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
     if (tiersBefore && checkTiers(c, kind, step, tiersBefore)) return null;
     step.status = 'failed';
     step.cause = outcome.cause;
+    if (kind === 'probe') return PROBE_FAILED;
     if (write && outcome.cause === 'délai dépassé') {
       // L298 : le travail laissé par une étape d'écriture coupée au délai est signalé (commits, fichiers, tests), pas un « échec » sec ; L303 : dans les dépôts voisins aussi.
       const repos = [{ rel: '', path: wd(c), before }, ...neighbours.map((r, i) => ({ rel: r.rel, path: r.path, before: beforeOthers[i] }))];
@@ -1317,43 +1322,6 @@ function badReport(c: LotCtx, step: StepState, e: unknown): null {
 }
 
 /**
- * Mots du titre ou du goal qui disent que le lot reprend un constat : le livrable peut déjà exister. Mots entiers (« review » ne
- * se lit pas dans `qa-reviewer` ni `review-small`), au pluriel ou accordés pour « constat ».
- */
-const CITES_FINDING = /(?<![\w-])(?:constat\w*|revues?|reviews?|audits?)(?![\w-])/i;
-
-/**
- * Le texte du lot (titre, goal, objectif donné) cite un constat, ou un autre lot dont le travail a pu être fait. Pour un lot
- * `L<n>`, « L12 » compte dans le texte de `L30` (aussi dans « L12-L15 », « L12-bis », « L12.3 ») et non celui de `L12` ni d'un lot postérieur ; tout identifiant du plan qui n'est
- * pas `L<n>` (`Q-CAN5`, `B28.1`, `Q4/qa-expectations`) compte cité en entier (`B28.1` n'est pas `B28.10`), pour un lot `L<n>`
- * comme pour un autre ; un lot d'un autre projet (`cadence:L68`) compte toujours.
- */
-function citesPriorWork(text: string, lot: string, ids: string[]): boolean {
-  if (CITES_FINDING.test(text)) return true;
-  const { ids: cited, foreign } = citedLots(text, lot, ids);
-  return foreign || cited.length > 0;
-}
-
-/**
- * Les lots que le texte cite (même reconnaissance que `citesPriorWork`, L288/L292) : les identifiants du plan cités, et `foreign` quand il cite un lot d'un autre projet
- * (`cadence:L68`, dont on ne lit pas les commits ici).
- */
-function citedLots(text: string, lot: string, ids: string[]): { ids: string[]; foreign: boolean } {
-  const foreign = /(?<![\w-])[a-z][\w-]*:L\d+(?!\w)/i.test(text);
-  const own = /^L(\d+)$/.exec(lot);
-  const cited = (id: string) => new RegExp(`(?<![\\w.-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`).test(text);
-  return {
-    foreign,
-    ids: ids.filter((id) => {
-      if (id === lot) return false;
-      const n = /^L(\d+)$/.exec(id);
-      if (own && n) return Number(n[1]) < Number(own[1]) && new RegExp(`(?<![\\w-])${id}(?!\\w)`).test(text);
-      return cited(id);
-    }),
-  };
-}
-
-/**
  * Le contrôle préalable ne vaut que pour un lot sans commit (avec des commits, l'implémentation reprend légitimement) dont le
  * titre ou le goal (clé `goal:` du plan, ou `goal` donné au lancement) cite un constat ou un autre lot (L288, L292) : sans cela
  * rien ne laisse croire qu'un autre lot l'a déjà livré, et le contrôle coûtait 7 % des tokens pour 10 « oui » sur 30 mesurés
@@ -1368,38 +1336,7 @@ export function needsPrecheck(config: { precheck: boolean; precheckLocal?: boole
   return citesPriorWork(text, lot, plan.lots().map((x) => x.id));
 }
 
-/**
- * Un lot créé après le dernier commit de code du dépôt n'a rien à retrouver (L322) : tout ce que le dépôt contient date d'avant le lot, donc aucun autre lot ne l'a livré.
- * Rend la raison à écrire au journal, ou null quand le contrôle garde un sens. Le lot est daté par le commit qui a ajouté son id au plan, borné par sa clé `created` (une
- * migration ou un déplacement du plan ne rajeunit pas un vieux lot) ; le dernier commit de code est le dernier qui ne touche pas que le plan (`isPlanOnly`). Prudent : lot
- * qui travaille dans des dépôts voisins, id introuvable dans l'historique du plan, dépôt sans commit de code ou instants égaux → le contrôle reste.
- * Le contrôle reste aussi quand le titre ou le goal (ou le goal donné au lancement) cite un lot qui a déjà ses propres commits, ou un lot d'un autre projet : une « suite de revue L<n> » écrite
- * juste après le dernier correctif de L<n> liste des constats que les passes de correction de L<n> ont pu régler avant la création du lot (rejoué depuis le 24-10 : 5 lots sautés à tort,
- * dont 2 avec un vrai « partiel »).
- */
-export function precheckNothingToFind(plan: Plan, root: string, lot: string, repos: LotRepo[] = [], goal?: string): string | null {
-  if (repos.length) return null;
-  try {
-    const rel = relative(root, plan.path);
-    const idLine = `^\\s*- id: ["']?${lot.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}["']?\\s*$`;
-    // Pas de `--reverse` : avec `--follow`, git 2.43 ne rend rien sur un fichier renommé (`raf migrate`) ; le plus ancien est la dernière ligne.
-    const added = git(root, '-c', 'core.quotepath=off', 'log', '--follow', '--format=%ct', '-G', idLine, '--', rel).split('\n').filter(Boolean).pop();
-    if (!added) return null;
-    const created = plan.lot(lot).created;
-    const endOfCreated = created ? Date.parse(`${created}T23:59:59`) / 1000 : Infinity;
-    const createdAt = Math.min(Number(added), Number.isNaN(endOfCreated) ? Infinity : endOfCreated);
-    const log = git(root, 'log', '--format=%H %ct').split('\n').filter(Boolean);
-    const code = log.map((x) => x.split(' ')).find(([sha]) => !isPlanOnly(sha!, plan, root));
-    if (!code) return null;
-    if (createdAt <= Number(code[1])) return null;
-    const l = plan.lot(lot);
-    const { ids, foreign } = citedLots([l.title, l.goal, goal].filter(Boolean).join('\n'), lot, plan.lots().map((x) => x.id));
-    if (foreign || ids.some((id) => lotWork(plan, root, id).length > 0)) return null;
-    return `lot créé après le dernier commit de code du dépôt (${code[0]!.slice(0, 7)}) : rien à retrouver`;
-  } catch {
-    return null;
-  }
-}
+export { precheckNothingToFind };
 
 /**
  * Contrôle préalable (L77) : une session de lecture seule cherche si le livrable du lot est déjà dans le dépôt (fait par un
@@ -2147,6 +2084,9 @@ export function redExcerpt(k: Constat): string {
   return [head.replace(/\s*:$/, ''), ...shown, ...more].join(' ; ');
 }
 
+/** Violations du verrou des tests d'acceptation (L173) par les commits faits depuis `head` ; aucune sans HEAD de départ. */
+const sealedViolations = (c: LotCtx, head: string | undefined): string[] => (head ? lockViolations(wd(c), c.config.spec.dir, head, { rouge: c.lot.accept?.rouge ? { [c.lot.accept.acceptation]: c.lot.accept.rouge } : {}, lot: c.lot.lot, lotBase: c.lot.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(wd(c), lotWork(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha)), lotCommits: lotCommits(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha) }) : []);
+
 /** Étape d'écriture (implémentation, correction) : contrôles, puis étape suivante décidée. */
 async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const l = c.lot;
@@ -2200,7 +2140,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
 
   // Verrou des tests d'acceptation (L173) : ceux de TOUS les lots du dépôt, pas seulement du lot courant ; une modification est une question au lead. Contrôlé à CHAQUE fin de session, une question comprise (L200) :
   // une session qui remplace un test scellé puis pose une question ne passe pas par la reprise du lead pour se faire adopter.
-  const locked = done.step.headBefore ? lockViolations(wd(c), c.config.spec.dir, done.step.headBefore, { rouge: l.accept?.rouge ? { [l.accept.acceptation]: l.accept.rouge } : {}, lot: l.lot, lotBase: l.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(wd(c), lotWork(histPlan(c), wd(c), l.lot).map((k) => k.sha)), lotCommits: lotCommits(histPlan(c), wd(c), l.lot).map((k) => k.sha) }) : [];
+  const locked = sealedViolations(c, done.step.headBefore);
   if (locked.length) {
     stop(c, 'handed-back', `verrou des tests d'acceptation : ${locked.join(' ; ')}`);
     return;
@@ -2322,7 +2262,15 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
       }
     }
   }
-  // Bibliothécaire (L306) : docs.sync signale un document en retard sur les commits du lot → une passe doc-keeper avant la revue, une seule fois par lot, aux mêmes conditions de passe et de budget que la porte ci-dessus. Si elle ne touche pas le document, la revue part et porte l'écart (brief docs.sync, constat majeur).
+  // Sonde de cas limites (L497) : une fois par lot, après la porte « code sans test », avant le bibliothécaire et la revue.
+  if (scheduleProbe(c.config, l, { skip: minorsPass || !alreadyDone, late: l.pass >= MAX_PASSES - 1, pays: fixAffordable(l, false, PROBE_RESERVE), count: budgetCount(l) })) return save(c);
+  await toReview(c, runs, minorsPass);
+}
+
+/** Fin d'une écriture dont les portes sont passées : le bibliothécaire (L306), puis la première revue. Aussi la suite d'une sonde (L497) qui n'a rien à corriger. */
+async function toReview(c: LotCtx, runs: CheckRun[], minorsPass: boolean): Promise<void> {
+  const l = c.lot;
+  // Bibliothécaire (L306) : docs.sync signale un document en retard sur les commits du lot → une passe doc-keeper avant la revue, une seule fois par lot, aux mêmes conditions de passe et de budget que la porte « code sans test ». Si elle ne touche pas le document, la revue part et porte l'écart (brief docs.sync, constat majeur).
   if (!l.docsGate && !minorsPass) {
     const { gaps } = docGaps(c);
     if (gaps.length) {
@@ -2342,6 +2290,12 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   l.next = firstReview(c);
   save(c);
 }
+
+/** Ce que la sonde (probe.ts) emprunte au cycle. */
+const probeIo = (c: LotCtx): ProbeIo<Done> => ({
+  lot: c.lot, config: c.config, cwd: wd(c), play: () => session(c, 'probe'), take: (done, rep) => takeReport(c, done, rep), sealed: (head) => sealedViolations(c, head), dirt: dirtAfter, gate: (red, runs) => programChecks(c, red, runs),
+  fix: (constats) => toFix(c, constats, 'sonde de cas limites'), review: (runs) => toReview(c, runs, false), handBack: (why) => void stop(c, 'handed-back', why), pays: () => fixAffordable(c.lot), count: () => budgetCount(c.lot), head: () => git(wd(c), 'rev-parse', 'HEAD').trim(),
+});
 
 /** Mention « sans commit » du verdict quand la passe des mineurs n'a rien commité (l'UX finale conclut alors à la place de la passe). */
 const noCommitNote = (l: LotState): string => (l.warnings.some((w) => w.startsWith('passe des mineurs sans commit')) ? ' sans commit' : '');
@@ -3023,6 +2977,7 @@ export async function runLot(c: LotCtx): Promise<void> {
       else if (kind === 'maquette') await maquetteStep(c);
       else if (kind === 'accept') await acceptStep(c);
       else if (kind === 'implement' || kind === 'fix') await work(c, kind);
+      else if (kind === 'probe') await probeStep(probeIo(c));
       else if (kind === 'integrate') await integrateLot(c);
       else await review(c, kind);
       if (l.status === 'suspended' || l.status === 'question') return;

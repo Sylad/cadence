@@ -61,8 +61,20 @@ export const PRECHECK_SCHEMA = {
   required: ['dejaPresent', 'preuves', 'resume'],
 } as const;
 
+/** Sortie de la sonde de cas limites (L497) : les tests commités, et `echecs` les tests qu'elle annonce rouges (« test — borne — attendu », un par entrée). */
+export const PROBE_SCHEMA = {
+  type: 'object',
+  properties: { commits: WORK_SCHEMA.properties.commits, echecs: strings, nonVerifie: strings, questions: strings, choix: strings, resume: str },
+  required: ['commits', 'echecs', 'nonVerifie', 'questions', 'resume'],
+} as const;
+
 /** Une revue de maquette rend le même rapport qu'une revue d'ergonomie (REVIEW_SCHEMA). */
-export const schemaFor = (kind: SessionKind): object => (kind === 'precheck' ? PRECHECK_SCHEMA : kind === 'spec' ? SPEC_SCHEMA : kind === 'accept' ? ACCEPT_SCHEMA : kind === 'implement' || kind === 'fix' ? WORK_SCHEMA : REVIEW_SCHEMA);
+export const schemaFor = (kind: SessionKind): object => (kind === 'precheck' ? PRECHECK_SCHEMA : kind === 'spec' ? SPEC_SCHEMA : kind === 'accept' ? ACCEPT_SCHEMA : kind === 'probe' ? PROBE_SCHEMA : kind === 'implement' || kind === 'fix' ? WORK_SCHEMA : REVIEW_SCHEMA);
+
+/** L'agent du paquet de chaque étape qui en a un, ou `undefined` pour une écriture sans agent ; les revues et la fiche n'y sont pas : `code-reviewer`. */
+const STEP_AGENT: Partial<Record<SessionKind, string | undefined>> = { implement: undefined, fix: undefined, probe: undefined, spec: 'spec-writer', accept: 'acceptance-writer', ux: 'ux-reviewer', maquette: 'ux-reviewer', precheck: 'precheck-reader' };
+
+export const agentOf = (kind: SessionKind): string | undefined => (kind in STEP_AGENT ? STEP_AGENT[kind] : 'code-reviewer');
 
 export interface PrecheckReport {
   dejaPresent: 'oui' | 'partiel' | 'non';
@@ -97,6 +109,15 @@ export interface SpecReport {
 
 export interface AcceptReport {
   commits: { sha: string; sujet: string }[];
+  nonVerifie: string[];
+  questions: string[];
+  choix?: string[];
+  resume: string;
+}
+
+export interface ProbeReport {
+  commits: { sha: string; sujet: string }[];
+  echecs: string[];
   nonVerifie: string[];
   questions: string[];
   choix?: string[];

@@ -45,6 +45,8 @@ export interface BriefVars {
   accept?: string;
   /** Consigne de la fiche d'écran (L174) pour implement, fix, revue de code et UX de conformité d'un lot qui a une fiche ; vide ailleurs. */
   fiche?: string;
+  /** Commande qui donne le diff du lot à la sonde de cas limites (L497) : `git diff <départ>..HEAD`, jamais le diff collé dans le brief ; requise par le gabarit probe, vide ailleurs. */
+  diff?: string;
   /** Part de la machine de la session (L350) : `testWorkersText(n)` pour implement, fix, passe des mineurs et passe du bibliothécaire ; vide ailleurs et sans vague. */
   workers?: string;
   /** Commandes exactes de la porte du programme (L399) : `gateText(config)` pour implement, fix, passe des mineurs et passe du bibliothécaire ; vide ailleurs et sans `orchestrate.test` ni `orchestrate.build`. */
@@ -153,6 +155,7 @@ const FILES: Record<BriefName, string> = {
   accept: 'accept.md',
   maquette: 'maquette.md',
   implement: 'implement.md',
+  probe: 'probe.md',
   fix: 'fix.md',
   'fix-minors': 'fix-minors.md',
   'fix-docs': 'fix-docs.md',

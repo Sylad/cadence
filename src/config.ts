@@ -8,6 +8,7 @@ import { DEFAULT_TEST_PATTERNS, type TestGateConfig } from './testgate.js';
 import { gitRoot } from './git.js';
 import { planCommitProblem } from './plan-commit.js';
 import { isComposedGate } from './orchestrate/workers.js';
+import { booleanKey } from './yaml-keys.js';
 import { FIELDS, Plan, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
 interface PlanConfig {
@@ -345,6 +346,8 @@ export interface OrchestrateConfig {
   fiche: boolean;
   /** `precheck: local` (L146) : le contrôle préalable part sur `claude-local` (Ollama de Big-Blue) ; Sonnet reste le repli. */
   precheckLocal: boolean;
+  /** Sonde de cas limites (L497) entre l'écriture et la revue : une session Sonnet neuve cherche à casser le lot par des tests aux bornes. Absente ou `false` : rien ne change. */
+  probe?: boolean;
   /**
    * Les sessions de vague ont accès à la production (L168) ? Défaut : non, elles partent sans kubeconfig
    * (`KUBECONFIG=/dev/null`) ni jeton de prod. `true` lève la restriction pour ce projet.
@@ -387,7 +390,7 @@ export interface OrchestrateConfig {
 
 const EFFORTS = ['default', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type Effort = (typeof EFFORTS)[number];
-const EFFORT_STEPS = ['precheck', 'spec', 'maquette', 'fiche', 'accept', 'implement', 'fix', 'review', 'ux'] as const;
+const EFFORT_STEPS = ['precheck', 'spec', 'maquette', 'fiche', 'accept', 'implement', 'probe', 'fix', 'review', 'ux'] as const;
 export type EffortStep = (typeof EFFORT_STEPS)[number];
 
 /** Clé `verify:` de cadence.yaml (L389). */
@@ -419,11 +422,11 @@ export function readVerifyConfig(file: string): VerifyConfig {
 
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'testReplay', 'build', 'worktreeDeps', 'gate', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'continue', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'testReplay', 'build', 'worktreeDeps', 'gate', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'probe', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'continue', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, maquette: true, maquetteReviews: 3, fiche: true, precheckLocal: false, prodAccess: false, worktrees: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', fiche: 'medium', accept: 'medium', implement: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, maquette: true, maquetteReviews: 3, fiche: true, precheckLocal: false, prodAccess: false, worktrees: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', fiche: 'medium', accept: 'medium', implement: 'medium', probe: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   if (!existsSync(file)) return config;
   let raw: unknown;
   try {
@@ -477,10 +480,7 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     if (typeof o.maquetteReviews !== 'number' || !Number.isInteger(o.maquetteReviews) || o.maquetteReviews < 1) throw bad('maquetteReviews : entier supérieur ou égal à 1 attendu');
     config.maquetteReviews = o.maquetteReviews;
   }
-  if (o.fiche != null) {
-    if (typeof o.fiche !== 'boolean') throw bad('fiche : true ou false attendu');
-    config.fiche = o.fiche;
-  }
+  for (const k of ['fiche', 'probe'] as const) if (o[k] != null) config[k] = booleanKey(o[k], bad(`${k} : true ou false attendu`));
   if (o.precheck != null) {
     if (typeof o.precheck !== 'boolean' && o.precheck !== 'local') throw bad('precheck : true, false ou local attendu');
     config.precheck = o.precheck !== false;
@@ -563,7 +563,7 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     config.continue = setting;
   }
   if (o.effort != null) {
-    if (!isObject(o.effort)) throw bad('effort doit être un objet { precheck, spec, maquette, fiche, accept, implement, fix, review, ux }');
+    if (!isObject(o.effort)) throw bad('effort doit être un objet { precheck, spec, maquette, fiche, accept, implement, probe, fix, review, ux }');
     for (const [k, v] of Object.entries(o.effort)) {
       if (!(EFFORT_STEPS as readonly string[]).includes(k)) throw bad(`effort.${k} inconnu (attendu : ${EFFORT_STEPS.join(', ')})`);
       if (!EFFORTS.includes(v as Effort)) throw bad(`effort.${k} : ${EFFORTS.join(', ')} attendu`);

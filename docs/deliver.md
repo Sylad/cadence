@@ -172,6 +172,15 @@ itself never reads the working tree: a tracked file modified outside the deliver
 sha (the plan after `raf done`, say) neither refuses nor is reported, with or
 without `allowDirty`.
 
+**Outside a wave: the lots under the sha (L474).** `--sha` also refuses, with no wave running, a sha whose history carries work commits of a lot of the
+plan that is neither done nor ready — a commit cited « L49 » that sits above commits of L50 and L51 delivers them too (30-10: `09217b0` « L49 alone »
+shipped two lots nobody had reviewed). The interval checked runs from the last delivery of the journal (when it is in the history of `<sha>`) up to
+`<sha>`; with no such delivery, the whole history, the plan's adoption day and the plan-only, acknowledged and release commits left out as everywhere. A lot passes
+when it is `done` or dropped, or **ready**: its code review verdict covers all its commits. A lot to do or in progress, not reviewed or reviewed before later commits, holds the sha back; the
+refusal (exit 2, before anything runs) names each such lot with its state. `--dry-run` prints every lot of the interval with its state (`terminé`, `prêt`,
+`abandonné`, `en cours, non relu`, `à faire, non relu`, `en cours, relu avant N commit(s)`) after the same refusal checks, and refuses the same way when one blocks. A plain `cadence deliver` (HEAD) and a delivery during a wave (the
+wave's own guard, below) do not run this check; a commit that cites a lot the plan does not know (archived, unknown) makes no lot.
+
 **While a wave runs.** `cadence orchestrate` holds the repository: a plain `cadence deliver` is refused until every lot of the
 repository in the wave is ready or handed back. `--sha` is the exception (L277): it is accepted while the wave runs when no
 commit in the history of `<sha>` belongs to a lot of the wave that is not ready (running, queued, in question, suspended,

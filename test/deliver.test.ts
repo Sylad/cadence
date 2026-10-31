@@ -28,6 +28,14 @@ function pushedRepo(): string {
   return dir;
 }
 
+/** Le lot est en cours et relu jusqu'à `sha` : « prêt » pour la garde de `--sha` hors vague (L474). Le plan est écrit sans être commité. */
+function readyLot(dir: string, lot: string, sha: string): void {
+  const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
+  plan.setStatus(lot, 'doing', '2026-09-28');
+  plan.recordReview(lot, 'conforme', '2026-09-28', sha);
+  plan.save();
+}
+
 /**
  * L325 : sonde lancée par vite-node qui appelle deliver avec un relevé enrobé qui note `tracked` quand le suivi voit l'enfant
  * (fichier `child`) : le test envoie Ctrl-C quand le suivi connaît l'enfant, pas après un délai que la charge raccourcit.
@@ -433,6 +441,7 @@ describe('deliver : script du projet (L2)', () => {
       expect(await deliver(ctx(dir, { config: SCRIPT }).c, fakeDeps().deps)).toBe(0);
       commit(dir, 'feat(L1): cache');
       git(dir, 'push', '-q');
+      readyLot(dir, 'L1', headSha(dir)!);
       return { dir, target: headSha(dir)! };
     }
     const avance = (dir: string, subject: string) => {
@@ -682,6 +691,7 @@ describe('deliver : sha choisi et arbre partagé (L2)', () => {
     const api = headSha(dir)!;
     commit(dir, 'feat(L9): frontend');
     git(dir, 'push', '-q');
+    readyLot(dir, 'L1', api);
     const { deps, execs } = fakeDeps();
     const { c, out } = ctx(dir, { config: SCRIPT, sha: api.slice(0, 7) });
     expect(await deliver(c, deps)).toBe(0);
@@ -718,6 +728,7 @@ describe('deliver : sha choisi et arbre partagé (L2)', () => {
     const api = headSha(dir)!;
     commit(dir, 'feat(L9): frontend');
     git(dir, 'push', '-q');
+    readyLot(dir, 'L1', api);
     writeFileSync(join(dir, 'README.md'), 'plan modifié par raf done');
     const { deps, execs } = fakeDeps();
     const { c, err } = ctx(dir, { config: STRICT, sha: api.slice(0, 7) });

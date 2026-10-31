@@ -83,6 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Added
 
 - `raf add`, `raf note` and `raf done` warn on stderr when a session of a live wave is writing in the main tree of the repository (L475, `docs/raf.md`): a lot in implementation, review or fix that does not play in a worktree. A plan commit of the lead at that moment hands the lot back (2026-10-30: cadence L458 handed back by a plan commit during its review). The commands still write, exit code 0.
+- `cadence deliver --sha` refuses, outside a wave too, a sha whose history carries work commits of a lot that is neither done nor ready (code review covering its commits), and `--dry-run` lists the lots of the interval with their state (L474, `docs/deliver.md`): the 30-10 delivery of `09217b0` « L49 alone » had shipped L50 and L51, whose commits sat under L49, unreviewed. The interval starts at the last delivery of the journal; `deliver` with no `--sha` and deliveries during a wave are unchanged.
 
 ## [1.30.0] - 2026-10-30
 

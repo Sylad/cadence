@@ -123,8 +123,12 @@ deux niveaux différents (unitaire `prepareTree` contre vague complète) ; ils n
   Ce point ne peut donc pas être rangé dans un lot de nettoyage.
 - `test/orchestrate-registry.test.ts:304` (`R3 — un hold dont le TTL est échu…`) n'a aucun `expect` : il ne peut échouer que
   par dépassement de délai. Ajouter l'assertion sur le créneau rendu (test faible, pas vide).
-- Directives : 2 `eslint-disable` (`state.ts`, `orchestrate/baseline.ts`) et 4 étiquettes knip dans `qualite-l462.test.ts`
-  sont comptés par le cliquet ; à retirer en traitant A.
+- Directives : **rien à retirer**. Les 3 `eslint-disable-next-line no-control-regex` (`state.ts:190,192`, `orchestrate/baseline.ts:3`)
+  visent volontairement des caractères de contrôle et n'ont aucun lien avec les exports du point A : les retirer fait signaler
+  `no-control-regex` (base ESLint +3, cliquet `--contre main` rouge). Les étiquettes `@public` / `@internal` de
+  `test/qualite-l462.test.ts:443,446,467,468` sont des chaînes écrites dans des dossiers temporaires pour vérifier le compteur de
+  directives du cliquet, pas du code mort : les retirer modifierait un test qui ne porte pas sur du code mort. Protégés par
+  `qualite-l462.test.ts` (compteur de directives) et par `node scripts/qualite.mjs --contre main` (ESLint).
 
 ### Non retenu
 

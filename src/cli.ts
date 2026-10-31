@@ -28,6 +28,7 @@ import { configuredCap, expiredHoldLines, slotsLine, orchestrate, realOrchestrat
 import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { INTEGRATION_LOCK } from './orchestrate/integrate.js';
+import { mainTreeWorkers } from './orchestrate/main-tree.js';
 import { cadenceHome, liveWaves, openLotsIn, openWavesIn, waveLotsIn, type OpenWave } from './orchestrate/registry.js';
 import { blockingLots, LABEL, resumeCommand } from './orchestrate/table.js';
 import { bugCodeOf, bugCodePasses, classifyAll, classifySous, measure, ollamaClassifier, ollamaSousClassifier, readCache, readJournals, readRuns, readSousCache, renderReport, sampleKeys, serializeCache, serializeSousCache } from './corrections.js';
@@ -387,6 +388,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       plan.save();
       io.out(id);
       warnIntegrating(root, io.err);
+      warnWaveWorking(root, io.env, io.err);
       return 0;
     }
     case 'start':
@@ -424,7 +426,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (command === 'drop' && values.reason) plan.note(rest[0], `abandonné : ${values.reason}`, today);
       plan.save();
       io.out(`${rest[0]} → ${status}`);
-      if (status === 'done') warnIntegrating(root, io.err);
+      if (status === 'done') {
+        warnIntegrating(root, io.err);
+        warnWaveWorking(root, io.env, io.err);
+      }
       touchedLot(plan, rest[0], values.verbose, io);
       if (status === 'done' && !rest[0].includes('/')) {
         const lot = plan.lot(rest[0]);
@@ -474,6 +479,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       plan.note(rest[0], rest.slice(1).join(' '), today);
       plan.save();
       warnIntegrating(root, io.err);
+      warnWaveWorking(root, io.env, io.err);
       touchedLot(plan, rest[0], values.verbose, io);
       return 0;
     }
@@ -1085,6 +1091,20 @@ function warnIntegrating(root: string, err: (line: string) => void): void {
   if (!top || !statSync(join(top, '.git')).isDirectory()) return;
   const holder = activeLock(join(sharedStateDir(root), INTEGRATION_LOCK));
   if (holder) err(`avertissement : intégration en cours (vague ${holder.wave}, pid ${holder.pid}) — ce plan est un fichier suivi modifié de l'arbre principal, l'intégration en cours peut refuser son lot (arbre du dépôt modifié) : committer le plan sans attendre`);
+}
+
+/**
+ * Avertit (stderr, sans refuser) quand une session de vague écrit dans l'arbre principal du dépôt (L475) : un lot en implémentation, revue ou correction sans worktree.
+ * Un commit de plan du lead à ce moment-là rend le lot (cas du 30-10 : cadence L458 rendu par le commit du plan). Sans effet dans le worktree d'un lot, ou depuis une session de la vague (c'est elle qui tient l'arbre).
+ */
+function warnWaveWorking(root: string, env: Record<string, string | undefined>, err: (line: string) => void): void {
+  if (env.CADENCE_ORCHESTRATED) return;
+  const top = gitRoot(root);
+  if (!top || !statSync(join(top, '.git')).isDirectory()) return;
+  const holder = activeLock(join(sharedStateDir(root), REPO_LOCK));
+  if (!holder) return;
+  const working = mainTreeWorkers(cadenceHome(), holder.pid, top);
+  if (working?.length) err(`avertissement : la vague ${holder.wave} (pid ${holder.pid}) travaille dans l'arbre principal de ce dépôt (${working.join(', ')}) — un commit de plan maintenant rendrait ces lots à la revue ; attendre la fin de leur étape, ou écrire le plan sans le committer`);
 }
 
 /** La vague qui tient le verrou du dépôt tant qu'un de ses lots y travaille encore (état illisible : on la tient pour active) ; null si le dépôt est libre. Partagé par `deliver` et `spec reseal`. */

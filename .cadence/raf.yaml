@@ -1005,7 +1005,7 @@ lots:
     finished: 2026-11-01
   - id: L513
     title: "Agents design, idées des tests du 01-11 (ui-ux-pro-max, design-for-ai, claude-design-styles) : spec-writer — jetons de couleur sémantiques avec leur couleur de texte (on-*), rampe tirée de la couleur de la charte et rapport de contraste 4,5:1 joint à la fiche ; ux-reviewer — grille avant livraison (focus visible, prefers-reduced-motion, cursor, emoji en icône, largeurs 375/768/1024/1440) et contrôle statique des « tics d'IA » (règles de detect.mjs, Apache-2.0, attribution) en constats numérotés ; jamais de catalogue de styles génériques sur une app qui a une charte"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-11-01
@@ -1021,6 +1021,8 @@ lots:
       - { date: 2026-11-01, text: "Hypothèses (fiche agents-design-jetons-grille-tics) — R9 : Chaque tic trouvé est un constat numéroté T1, T2… (fichier, ligne, règle nommée, gravité) ; le rapport écrit « tics d'IA : 0 constat » quand il n'y en a pas et… ; si faux : Si les tics devaient être majeurs, plus de lots visibles seraient renvoyés en correction ; s'ils ne devaient pas être numérotés, seul le texte du rapport change" }
       - { date: 2026-11-01, text: "Hypothèses (fiche agents-design-jetons-grille-tics) — R12 : L'attribution de detect.mjs (nom de l'œuvre, auteur, dépôt, licence Apache-2.0, mention que les règles sont reformulées) est écrite dans un fichier NOTICE à la… ; si faux : Si l'attribution devait figurer en entier dans l'agent et que l'original porte un mot interdit par L448 R8, il faudrait réécrire ce test de L448 (question au l…" }
       - { date: 2026-11-01, text: "Hypothèses (fiche agents-design-jetons-grille-tics) — R15 : Le CHANGELOG (section Unreleased) nomme les jetons on-*, le contraste.md, la grille et les tics d'IA, avec l'attribution Apache-2.0 ; si faux : Si la doc ne devait rien dire des tics ou de l'attribution, seul un texte de doc change ; la règle R12 reste dans l'agent" }
+    review: { date: 2026-11-01, verdict: "conforme : revue Opus — 7 règles sur 16 de detect.mjs (37d7ae63) gardées, conformes au vrai fichier ; mineur de licence (Apache-2.0 pour les parties d'Impeccable, MIT pour purple-triplet et unmodified-shadcn-tokens) corrigé en 36f39df6", commit: 36f39df68641d6589e73647b4aa7bd54477d11bd }
+    finished: 2026-11-01
   - id: L514
     title: "Rejeu isolé des tests rouges pour une porte node --test (evatosorus) : lire le titre → fichier dans la sortie (location:) et prouver l'exécution d'un test vert sans fichier imprimé, sans changer failedTests pour les autres lanceurs — suite de L512 (décision de Sylvain du 01-11), faux rouge evatosorus L45"
     status: todo

@@ -1,0 +1,184 @@
+sujet:
+  id: passe-fix-sans-constat
+  titre: "orchestrate : pas de passe de correction sans constat, et un rouge qui passe seul est proposé comme instable"
+  lot: L522
+  perimetre:
+    modules: [src/orchestrate/cycle.ts, src/orchestrate/gate-notes.ts, templates/orchestrate/fix.md]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "la classification de cadence corrections (src/corrections.ts:284 : sans-constat quand p.findings est vide) : inchangée, la mesure avant/après la lit telle quelle"
+      - "le rejeu seul lui-même (replayGate, gate-parts.ts:148 ; L354) et sa déclaration par orchestrate.testReplay : inchangés, un rouge n'est toujours rejoué que sur une commande déclarée"
+      - "les tests « délai trop juste » (noteTight, L510) : ils gardent leur avertissement « relever le délai du test », sans proposition"
+      - "le cas où la porte du programme est verte alors que la session annonce des tests rouges (cycle.ts:2269) : question posée au lead, pas réglé ici"
+      - "scripts/temps-d-un-lot.mjs (livré par L517, branche cadence/2026-11-01-2030-cad/cadence--L517) : lu, jamais modifié"
+
+# Mesure de départ (étude L517, docs/mesures/temps-d-un-lot.md de la branche L517) : 580 passes de correction classées,
+# dont 73 « sans-constat » (13 %) ; 48 de ces 73 passes (tests rouges) finies sans commit. Une passe coûte 11,9 min et 126 k jetons (plan, L524).
+# Ce qui est déjà codé : un rouge de la porte absent de la ligne de base est rejoué seul deux fois au plus (cycle.ts:2047-2053,
+# docs/orchestrate.md:202) ; vert au rejeu il est « instable sous charge » (gate-notes.ts:10-19) : avertissement, journal, liste
+# `instables`, aucune passe. Reste : (1) toFix ouvre une passe même quand la liste de constats est vide (cycle.ts:2560 :
+# blockingConstats(rep) peut rendre [] alors que summary.conforme est faux parce que les totaux annoncés du rapport sont > 0,
+# cycle.ts:1328-1330) ; (2) l'instable n'est qu'un avertissement, aucun lot n'est proposé pour le stabiliser ; (3) la session fix
+# n'a pas la consigne de rejouer seul un rouge avant de le corriger.
+
+cas:
+  - id: C1
+    titre: "La revue juge le code non conforme mais ne liste aucun constat actionnable"
+    acteur: la vague (programme orchestrate)
+    declencheur: commande cadence orchestrate (fin d'une session de revue, toFix cycle.ts:2378)
+    preconditions:
+      - "le rapport de revue annonce au moins un bloquant ou un majeur (totaux), donc summary.conforme est faux"
+      - "aucun constat bloquant ou majeur du rapport n'a un texte lisible"
+    nominal:
+      - "Le programme calcule les constats actionnables (bloquants et majeurs au texte non vide)."
+      - "Il n'en trouve aucun."
+      - "Il n'ouvre pas de passe de correction : l.pass et l.next restent tels quels."
+      - "Il rend le lot au lead (handed-back) avec la raison dans le tableau et une ligne du journal."
+    alternatives:
+      - { si: "la revue liste au moins un bloquant ou un majeur au texte lisible", alors: "la passe de correction s'ouvre comme aujourd'hui", regles: [R1, R3] }
+      - { si: "la revue est conforme avec des mineurs", alors: "la passe des mineurs et les propositions sont inchangées", regles: [R4] }
+    resultat: "Pas de session fix qui n'aurait rien à lire ; le lead voit pourquoi dans le tableau."
+  - id: C2
+    titre: "Un test rouge de la porte passe seul : instable, proposé au lieu d'être corrigé"
+    acteur: la vague (programme orchestrate)
+    declencheur: commande cadence orchestrate (porte de tests après une session d'écriture, runChecks cycle.ts:2047)
+    preconditions:
+      - "orchestrate.test et orchestrate.testReplay sont déclarés"
+      - "un test est rouge dans la suite entière et absent de la ligne de base"
+    nominal:
+      - "Le programme rejoue le test seul, deux fois au plus."
+      - "Il passe au vert au rejeu."
+      - "Le programme le note instable : avertissement du lot, ligne du journal, liste instables."
+      - "Il ajoute une proposition de lot « à stabiliser » aux propositions du lot."
+      - "Aucune passe de correction : la revue a lieu."
+    alternatives:
+      - { si: "le test reste rouge aux deux rejeux", alors: "il est compté rouge et la passe de correction s'ouvre sur ce seul constat", regles: [R5] }
+      - { si: "orchestrate.testReplay n'est pas déclaré", alors: "rien n'est rejoué ni tenu pour instable, le rouge est compté tel quel", regles: [R7] }
+      - { si: "le test est rouge pour un délai trop juste", alors: "avertissement « relever le délai » inchangé, sans proposition d'instabilité", regles: [R8] }
+      - { si: "le même test est déjà instable dans ce lot", alors: "ni second avertissement ni seconde proposition", regles: [R6] }
+    resultat: "Le rouge de charge ne coûte plus de passe, et la dette (test instable) est proposée au lead au lieu d'être ignorée."
+  - id: C3
+    titre: "Une session fix démarre sur des tests rouges et l'un d'eux passe seul"
+    acteur: la session de correction
+    declencheur: brief fix (templates/orchestrate/fix.md)
+    preconditions:
+      - "une passe fix est ouverte (au moins un constat actionnable)"
+      - "un constat nomme des tests rouges"
+    nominal:
+      - "Le brief demande de rejouer chaque test rouge nommé seul avant d'écrire du code."
+      - "Un test vert seul n'est pas corrigé."
+      - "La session le range sous « choix » du rapport comme instable, à proposer, sans modifier le code pour lui."
+    alternatives:
+      - { si: "le test reste rouge seul", alors: "la session le corrige comme avant", regles: [R9] }
+    resultat: "Une session sans commit dit pourquoi (test instable) au lieu de chercher un défaut qui n'existe pas."
+  - id: C4
+    titre: "Le lead mesure l'effet avant et après"
+    acteur: le lead
+    declencheur: commande node scripts/temps-d-un-lot.mjs --corrections <corrections.json>
+    preconditions:
+      - "L517 est livré (le script n'existe pas encore sur la branche de L522)"
+      - "cadence corrections a classé les passes d'une fenêtre"
+    nominal:
+      - "Le script lit les passes par cause, dont la ligne sans-constat."
+      - "Le lead compare à la mesure de départ (73 sur 580, 13 %)."
+    alternatives: []
+    sans_alternative: "lecture seule d'un script existant ; ses échecs (option illisible, fenêtre vide) sont ceux de L517, hors de ce lot"
+    resultat: "La part des passes sans constat d'une fenêtre postérieure à la livraison est comparable à 13 %."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Une revue non conforme (code ou UX) qui ne laisse aucun constat bloquant ou majeur actionnable n'ouvre pas de passe de correction : ni l.pass incrémenté, ni next = fix, ni session fix."
+    statut: sourcee
+    source: "demande du lot : « la vague n'ouvre pas de passe fix quand la revue ne laisse aucun constat bloquant ou majeur actionnable » ; cause observée cycle.ts:2560 (blockingConstats peut rendre []) et :1328-1330 (conforme faux sur les totaux annoncés)"
+    tests: ["R1 — revue annonçant 1 bloquant sans aucun constat listé : aucune session fix, next inchangé, lot rendu", "R1 — revue UX non conforme sans constat actionnable : aucune session fix"]
+  - id: R2
+    cas: [C1]
+    enonce: "Le lot est alors rendu au lead (handed-back) avec la cause « revue non conforme sans constat actionnable (N bloquant(s), M majeur(s) annoncé(s), aucun constat lisible) : pas de passe de correction » dans le tableau et dans le journal de la vague."
+    statut: hypothese
+    si_faux: "Si le lead préfère que la revue soit rejouée une fois au lieu de rendre le lot, seule la sortie change (une relance de la revue au lieu de handed-back) ; aucune donnée en jeu."
+    tests: ["R2 — lot rendu : statut handed-back et cause nommant les totaux annoncés", "R2 — la ligne du journal de la vague porte le même texte"]
+  - id: R3
+    cas: [C1]
+    enonce: "Un constat est actionnable quand sa gravité est bloquant ou majeur et que son texte, une fois rogné, n'est pas vide ; les constats mineurs ne le sont jamais pour ouvrir une passe de correction."
+    statut: hypothese
+    si_faux: "Si un constat sans texte mais avec fichier et ligne doit suffire, seul le seuil d'ouverture change (ouvrir la passe plus souvent) ; aucune donnée en jeu."
+    tests: ["R3 — un majeur au texte vide ne compte pas, un majeur au texte lisible ouvre la passe", "R3 — des mineurs seuls n'ouvrent pas de passe par ce chemin"]
+  - id: R4
+    cas: [C1]
+    enonce: "Une revue conforme garde son comportement : passe des mineurs sous les conditions de cycle.ts:2520-2545, propositions des mineurs et des sous-tâches, conclusion ; la garde de R1 ne s'applique qu'aux ouvertures de passe pour constats bloquants ou majeurs."
+    statut: sourcee
+    source: "comportement codé cycle.ts:2520-2556 (wanted, minorPass, conforme → conclude) et tests existants du cycle (test/orchestrate-cycle.test.ts)"
+    tests: ["R4 — revue conforme avec mineurs : passe des mineurs ouverte comme avant", "R4 — revue conforme sans mineur : le lot conclut, aucune passe"]
+  - id: R5
+    cas: [C2]
+    enonce: "Un test rouge de la porte, absent de la ligne de base, est rejoué seul (deux fois au plus) avant toute passe ; seuls les tests encore rouges au rejeu entrent dans le constat qui ouvre la passe."
+    statut: sourcee
+    source: "règle codée cycle.ts:2047-2053 et 2074-2079 ; docs/orchestrate.md:202 (L354) ; test/orchestrate-porte-test.test.ts"
+    tests: ["R5 — un test rouge seul aux deux rejeux : constat unique de la passe, instable absent", "R5 — un test vert au rejeu : aucune passe de correction"]
+  - id: R6
+    cas: [C2]
+    enonce: "Un test noté instable (rouge dans la suite, vert seul) ajoute une proposition de lot « [instable] <test> — rouge dans la suite, vert rejoué seul : à stabiliser » aux propositions du lot, une fois par test ; l'avertissement, la ligne du journal et la liste instables de noteUnstable sont inchangés."
+    statut: hypothese
+    si_faux: "Si la proposition doit être formulée autrement ou portée par un autre canal (note du plan), seule la formulation change ; les propositions sont un tableau de textes déjà lu par le lead, aucun format en jeu."
+    tests: ["R6 — un test instable : une proposition « [instable] … à stabiliser » dans les propositions du lot", "R6 — le même test instable deux fois : une seule proposition et un seul avertissement", "R6 — avertissement, journal et liste instables inchangés"]
+  - id: R7
+    cas: [C2]
+    enonce: "Sans orchestrate.testReplay, aucun rejeu n'a lieu et rien n'est tenu pour instable ni proposé : un rouge est compté tel quel. cadence ne devine pas la commande de rejeu d'un lanceur."
+    statut: sourcee
+    source: "décision du 26-10 consignée docs/orchestrate.md:202 (« the replay is off unless the project declares its command ») ; cycle.ts:2046-2047"
+    tests: ["R7 — sans testReplay : un rouge ouvre la passe, aucune proposition d'instabilité"]
+  - id: R8
+    cas: [C2]
+    enonce: "Un test rouge pour un délai trop juste garde son avertissement « délai trop juste, pas un bug (pas de passe de correction) … relever le délai du test » et n'ajoute aucune proposition d'instabilité."
+    statut: sourcee
+    source: "gate-notes.ts:22-33 (noteTight, L510)"
+    tests: ["R8 — délai trop juste : avertissement inchangé, aucune proposition « [instable] »"]
+  - id: R9
+    cas: [C3]
+    enonce: "Le brief fix (templates/orchestrate/fix.md) demande de rejouer seul chaque test rouge nommé avant d'écrire du code, de ne pas corriger un test vert seul, et de le ranger sous « choix » comme instable à proposer ; un test rouge seul reste à corriger."
+    statut: hypothese
+    si_faux: "Si la consigne dans le brief est jugée insuffisante, seul le texte du gabarit change ; le programme n'en dépend pas."
+    tests: ["R9 — le brief fix contient la consigne de rejeu seul et de rangement sous « choix » d'un test vert seul", "R9 — le brief fix garde la règle « sans commit, choix dit pourquoi »"]
+  - id: R10
+    cas: [C4]
+    enonce: "La mesure avant/après est la ligne sans-constat de cadence corrections lue par scripts/temps-d-un-lot.mjs ; ce lot ne change ni la classification ni le script, et la mesure de départ (73 passes sur 580 classées, 13 % ; 48 de ces 73 finies sans commit) est consignée dans docs/orchestrate.md à côté de la règle."
+    statut: sourcee
+    source: "demande du lot : « mesure avant/après par scripts/temps-d-un-lot.mjs » ; src/corrections.ts:284 ; chiffres de l'étude L517"
+    tests: ["R10 — cadence corrections --json compte toujours une passe sans constat dans sans-constat (classification inchangée)", "R10 — docs/orchestrate.md cite la mesure de départ 73 sur 580"]
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate
+    entree: "un lot dont la revue de code ou UX rend un verdict non conforme"
+    sortie: "sans constat actionnable : lot handed-back, aucune session fix ; avec un constat actionnable : passe de correction comme avant"
+    erreurs:
+      - { code: log warn, message: "revue non conforme sans constat actionnable (N bloquant(s), M majeur(s) annoncé(s), aucun constat lisible) : pas de passe de correction" }
+    regles: [R1, R2, R3, R4]
+  - id: A2
+    appel: commande cadence orchestrate
+    entree: "une porte de tests rouge avec orchestrate.testReplay déclaré"
+    sortie: "un test vert seul : avertissement, journal, liste instables et proposition, aucune passe ; un test rouge seul : passe de correction"
+    erreurs:
+      - { code: log warn, message: "[instable] <test> — rouge dans la suite, vert rejoué seul : à stabiliser" }
+    regles: [R5, R6, R7, R8]
+  - id: A3
+    appel: commande cadence orchestrate
+    entree: "le brief fix d'une passe ouverte"
+    sortie: "un brief qui porte la consigne de rejeu seul d'un rouge"
+    erreurs: []
+    sans_erreur: "un gabarit rendu n'a pas d'échec propre ; un gabarit illisible échoue déjà comme tout brief (cycle.ts, briefFor)"
+    regles: [R9]
+  - id: A4
+    appel: commande node scripts/temps-d-un-lot.mjs
+    entree: "--corrections <corrections.json> (option de L517)"
+    sortie: "tableau des causes de passes dont la ligne sans-constat"
+    erreurs: []
+    sans_erreur: "script de L517, non modifié ici ; ses erreurs d'option sont les siennes"
+    regles: [R10]
+
+donnees:
+  - { id: D1, objet: "propositions du lot (proposals, journal du lot .cadence/runs/<vague>/<projet>--<lot>.json)", existant: true, modification: aucune, note: "tableau de textes existant ; une entrée de plus par test instable, format inchangé" }
+  - { id: D2, objet: "avertissements du lot (warnings) et journal de la vague", existant: true, modification: aucune, note: "un texte de plus pour le cas sans constat actionnable ; format inchangé" }
+  - { id: D3, objet: ".cadence/corrections.json et classification de src/corrections.ts", existant: true, modification: aucune, note: "lus par la mesure, ni écrits ni changés" }

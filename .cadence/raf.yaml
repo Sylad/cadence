@@ -1114,6 +1114,61 @@ lots:
       - { date: 2026-11-01, text: "Hypothèses (fiche passe-fix-sans-constat) — R3 : Un constat est actionnable quand sa gravité est bloquant ou majeur et que son texte, une fois rogné, n'est pas vide ; les constats mineurs ne le sont jamais po… ; si faux : Si un constat sans texte mais avec fichier et ligne doit suffire, seul le seuil d'ouverture change (ouvrir la passe plus souvent) ; aucune donnée en jeu" }
       - { date: 2026-11-01, text: "Hypothèses (fiche passe-fix-sans-constat) — R6 : Un test noté instable (rouge dans la suite, vert seul) ajoute une proposition de lot « [instable] <test> — rouge dans la suite, vert rejoué seul : à stabiliser… ; si faux : Si la proposition doit être formulée autrement ou portée par un autre canal (note du plan), seule la formulation change ; les propositions sont un tableau de t…" }
       - { date: 2026-11-01, text: "Hypothèses (fiche passe-fix-sans-constat) — R9 : Le brief fix (templates/orchestrate/fix.md) demande de rejouer seul chaque test rouge nommé avant d'écrire du code, de ne pas corriger un test vert seul, et de… ; si faux : Si la consigne dans le brief est jugée insuffisante, seul le texte du gabarit change ; le programme n'en dépend pas" }
+    review:
+      {
+        date: 2026-11-01,
+        verdict: "Conforme : les constats mineurs de la revue précédente sont corrigés et les corrections n'ont rien cassé.
+
+
+          Commits relus (`raf commits L522`) :
+
+          - 659f8b3 spec(L522) fiche back
+
+          - a634ea6 spec(L522) R11
+
+          - 90ce8a4 spec(L522) R11 précisé
+
+          - 1a51ec8 feat(L522)
+
+          - 13aee9c probe(L522)
+
+          - 826dc89 fix(L522) : noteUnstable dédoublonne
+
+          - 6258c5b fix(L522) : briefs, journal de l'escalade, doc
+
+          - 600d78c fix(L522) : titre du test probe 0/0
+
+
+          Commandes lancées : `npx vitest run` sur test/orchestrate-passe-fix-sans-constat-l522.test.ts et test/orchestrate-passe-fix-sans-constat-l522-probe.test.ts, 2 fichiers et 42 tests verts, code 0. tsc, qualite.mjs et la suite complète sont repris du programme (verts au HEAD 600d78c).
+
+
+          Corrections vérifiées :
+
+          1. **gate-notes.ts:12.** `noteUnstable` dédoublonne maintenant avec `[...new Set(tests)]` avant le filtre sur `l.instables`. Tous les appelants sont couverts. La probe :82 appelle `noteUnstable(c, ['t > x','t > x'])`, ce qui couvre le cas.
+
+          2. **no-finding.ts:14-18.** Quand une escalade est rendue sans constat lisible, le journal reçoit maintenant `<lot> · escalade <model> : lot rendu malgré l'escalade`. C'est la même ligne que celle de `toFix` (cycle.ts:2388). La garde `!esc.issue` évite d'écrire deux fois. Un nouveau test la vérifie ; il aurait échoué avant la correction, puisque la ligne n'était pas écrite.
+
+          3. **Briefs implement.md et fix.md.** Ils ajoutent « unless the program's gate is green (L522) », ce qui suit R11 et docs/orchestrate.md:196. Un test vérifie ce texte dans les deux gabarits.
+
+          4. **docs/orchestrate.md:202.** La doc dit maintenant que `next` est vidé. C'est exact : `stop` (cycle.ts:166) met `c.lot.next = null`. La doc de l'escalade (:243) décrit aussi le rendu sans constat.
+
+          5. **Probe :49.** Le titre « revue aux totaux 0/0 : conforme, ni rendue ni corrigée » correspond maintenant à ce que le test vérifie.
+
+
+          Le reste du lot tient :
+
+          - `handBackWithoutFinding` est appelé avant `toFix` sur le chemin code (cycle.ts:2558, avant `reviewCounts`) et sur le chemin UX (cycle.ts:2495).
+
+          - `l.constats` est vidé avant `stop`, donc la reprise de cycle.ts:2997 ne rouvre pas la passe.
+
+          - Je n'ai trouvé aucun texte resté sur l'ancienne règle de `nouveauxEchecs` dans docs ni dans les templates.
+
+          - L'arbre de travail est inchangé : il n'y a que les deux fichiers non suivis qui existaient déjà.
+
+
+          Aucun constat. — orchestré (vague 2026-11-01-2145-cad, 1 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase ne touche que CHANGELOG.md (conflit bien résolu sous [Unreleased]), aucun constat",
+        commit: 0658617f9219a7173e85c6b150e64b86e64c1a7f
+      }
   - id: L523
     title: "Brief d'implémentation enrichi pour coder juste du premier coup (étude L517 : bug-code 52 % des passes dont 223 cas limites, dérive d'architecture 10 %) : la session d'implémentation reçoit la grille du code-reviewer, écrit d'abord les tests des cas limites de son objectif, se relit contre cette grille avant de commiter ; le précheck transmet à l'implémentation ce qu'il a lu (fichiers concernés, code voisin à imiter, tests existants) pour éviter la relecture à froid (13,4 allers-retours de lecture par lot) ; mesure avant/après par scripts/temps-d-un-lot.mjs (passes par lot, cause des passes, allers-retours)"
     status: doing

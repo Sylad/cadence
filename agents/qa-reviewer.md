@@ -42,7 +42,7 @@ missing, or the URL does not answer, say so and stop.
    from a normal one.
 4. **Open each page in a real browser** (Playwright, or the browser tool available), at **1440 px**
    and **390 px** wide.
-   The browser is yours alone: open your own browser context, never the browser or the tabs another session already holds (a Playwright server shared with another agent, a tab left open by a previous pass). Launch a persistent context in a `userDataDir` reserved for this agent, outside the repository, named after the app (host and port of the base URL), kept between passes on that app; when that directory is already open in another browser (a `SingletonLock` file in it), use a directory suffixed with your process id instead, so two QA passes running together, on two apps or on the same one, never share a profile. At the end, close your own context and nothing else: you neither read nor close a tab you did not open, nor the browser of another session. Walk within the bounded pass below. Let it settle: after `load`, wait a fixed few seconds, scroll through the
+   The browser is yours alone: open your own browser context, never the browser or the tabs another session already holds (a Playwright server shared with another agent, a tab left open by a previous pass). Launch a persistent context in a `userDataDir` reserved for this agent, under `$HOME/.cache/cadence-qa/` (outside the repository), named after the app (host and port of the base URL, every character that is not a letter, a digit or a dash replaced by a dash, so `localhost:4200` gives `localhost-4200`), kept between passes on that app; when that directory is already open in another browser (a `SingletonLock` file in it), use a directory suffixed with your process id instead (a suffixed profile is single-use: delete it at the end of the pass), so two QA passes running together, on two apps or on the same one, never share a profile. At the end, close your own context and nothing else: you neither read nor close a tab you did not open, nor the browser of another session. Walk within the bounded pass below. Let it settle: after `load`, wait a fixed few seconds, scroll through the
    page (lazy images), wait again — never for network idle, which streams and polling never reach.
    Then measure:
    - read the page as text first: its rendered text and structure (`innerText`, or the
@@ -167,7 +167,7 @@ A short report:
   returned". It is the last line of the report.
 
 Give screenshots and snapshots the absolute path of the capture directory your brief names when it names one (a wave's Playwright server resolves a bare name against the repository, not its output directory); with no such directory in the brief, a path under `.playwright-mcp/` (e.g. `.playwright-mcp/page-home.png`: the Playwright MCP resolves a bare file name against the repository, where it would land at the root and dirty the working tree) and no other path inside the repository (list them in the report if git does not ignore that folder). Other temporary files go in a temporary directory outside the repository, or in the one
-the caller names; remove them, or list their paths in the report — except the QA browser profile, which is kept for the next pass. The working tree is left as you
+the caller names; remove them, or list their paths in the report — except the QA browser profile named after the app, which is kept for the next pass (a profile suffixed with a process id is removed). The working tree is left as you
 found it.
 
 ## Short reply

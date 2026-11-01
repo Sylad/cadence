@@ -95,7 +95,7 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   the project's expectations file in a real browser at 1440 and 390 px and
   measures: expected content present and non-empty, no error or missing-data
   message, every API call answered 2xx with a non-empty body, no console error,
-  no broken content image. It reads the page as text first and takes a capture only for a gap. It works in its own browser context (its own profile, named after the app, a suffixed one when that profile is already open elsewhere): several QA passes can run together without sharing a browser or reading each other's tabs (L511). Findings are defects (a line of the expectations
+  no broken content image. It reads the page as text first and takes a capture only for a gap. It works in its own browser context, launched by a Node script with `launchPersistentContext` rather than through the shared MCP browser tools (its own profile, named after the app, a suffixed one when that profile is already open elsewhere): several QA passes can run together without sharing a browser or reading each other's tabs (L511). Findings are defects (a line of the expectations
   broken, or a universal check failing with a visible effect, with or without an
   expectations file), suspects (it looks like missing or wrong data and no
   expectation settles it) or noise (a console error or a failed request with no

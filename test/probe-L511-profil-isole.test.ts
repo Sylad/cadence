@@ -31,7 +31,8 @@ describe('probe L511 — profil de navigateur isolé du qa-reviewer', () => {
   });
 
   it('l\'outil MCP playwright ne prend pas userDataDir : le texte nomme le moyen (script Bash/launchPersistentContext) de lancer le contexte persistant', () => {
-    expect(agent).toMatch(/launchPersistentContext|script/i);
+    expect(agent).toMatch(/do not use them/i);
+    expect(agent).toMatch(/launchPersistentContext[^.]*Bash|Bash[^.]*launchPersistentContext/i);
   });
 
   it('le skill lead ne contient plus « one at a time » / « une QA à la fois » pour la QA', () => {

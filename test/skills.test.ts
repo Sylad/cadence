@@ -268,6 +268,13 @@ describe('skills install', () => {
     expect(step4).toContain('never the user\'s own browser profile');
   });
 
+  it('agent qa-reviewer : R6 — le contexte persistant se lance par un script Bash (launchPersistentContext), jamais par les outils browser_* du MCP partagé (L511)', () => {
+    const method = qaAgent().section('Method');
+    const step4 = method.slice(method.indexOf(' 4. **Open each page'), method.indexOf(' 5. **GET only'));
+    expect(step4).toContain('`launchPersistentContext` from a Node script that you write outside the repository and run with Bash');
+    expect(step4).toContain('The `browser_*` tools of the Playwright MCP server take no `userDataDir` and use the one browser of the session that started you, which other agents use too: do not use them');
+  });
+
   it('docs : R5 — l\'isolation du navigateur est décrite dans docs/skills.md et le CHANGELOG, le lead ne limite plus à une QA à la fois (L511)', () => {
     expect(flat(readFileSync(join(import.meta.dirname, '..', 'docs', 'skills.md'), 'utf8'))).toContain('its own browser context (its own profile');
     expect(flat(readFileSync(join(import.meta.dirname, '..', 'CHANGELOG.md'), 'utf8'))).toContain('(L511');

@@ -981,6 +981,12 @@ lots:
     estimate: 0.5
     spec: true
     created: 2026-11-01
+  - id: L513
+    title: "Agents design, idées des tests du 01-11 (ui-ux-pro-max, design-for-ai, claude-design-styles) : spec-writer — jetons de couleur sémantiques avec leur couleur de texte (on-*), rampe tirée de la couleur de la charte et rapport de contraste 4,5:1 joint à la fiche ; ux-reviewer — grille avant livraison (focus visible, prefers-reduced-motion, cursor, emoji en icône, largeurs 375/768/1024/1440) et contrôle statique des « tics d'IA » (règles de detect.mjs, Apache-2.0, attribution) en constats numérotés ; jamais de catalogue de styles génériques sur une app qui a une charte"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-11-01
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

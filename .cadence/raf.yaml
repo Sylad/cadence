@@ -257,13 +257,14 @@ lots:
     created: 2026-10-29
   - id: L420
     title: "cadence deliver commite lui-même la note « article à rafraîchir » qu'il écrit dans le plan (28-10 : laissée non commitée, un commit à la main à chaque livraison)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-29
     notes:
       - { date: 2026-10-31, text: "31-10 : 3 récidives dans la soirée (warhammer L48, L220, evatosorus L6) : deliver laisse .cadence/raf.yaml modifié (note « article à rafraîchir ») et le livreur ne le commite pas → commit et porte à la main à chaque fois" }
     started: 2026-11-01
     review: { date: 2026-11-01, verdict: "conforme (1 note mineure : pas d'entrée CHANGELOG pour la suppression des groupes [ {vague} ], qui touche aussi raf done, spec green et spec reseal) — orchestré (vague 2026-11-01-0915-cad, 1 passe(s) de correction)", commit: b2e6745f68be44e86a5c76ee5ebf80f085332914, reporte: { de: 9a04051c49f72f94672cfdbaf5e3b730aafc55e8, vers: b2e6745f68be44e86a5c76ee5ebf80f085332914, patchId: ab6c85c6159c84b19e87b9269e120943f15c0341 } }
+    finished: 2026-11-01
   - id: L421
     title: Ajouter un lot à une vague vivante (--add <projet:lot>) au lieu d'en lancer une seconde, refusée dans le même dépôt ; le message du refus nomme cette commande (28-10)
     status: todo
@@ -945,11 +946,12 @@ lots:
     created: 2026-11-01
   - id: L508
     title: "Release : la porte et le clone de « cadence release » tournent avec un tag local provisoire v<version> posé (retiré si rouge), pour que les tests qui lisent le dernier tag (test/changelog.test.ts) voient la version publiée — 31-10 : v1.34.0 taguée verte, publication rouge"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-01
     started: 2026-11-01
     review: { date: 2026-11-01, verdict: "conforme : les trois constats mineurs traités sont corrigés et rien n'est cassé ; reste 1 note mineure sur un test, sans sous-tâche — orchestré (vague 2026-11-01-0915-cad, 0 passe(s) de correction + passe des mineurs)", commit: 029d0080975bc15588e466a4289c0b5eba5e9f25, reporte: { de: b24c7e74203db7a7fdfc4d527cc6731aecea2b25, vers: 029d0080975bc15588e466a4289c0b5eba5e9f25, patchId: eb254037cb57908bba333cc16640a4d561b516fc } }
+    finished: 2026-11-01
   - id: L509
     title: "raf done/review/ux lancent la commande de plan publié déclarée (cadence.yaml plan.publish, ex. « cd frontend && npm run plan ») et disent le fichier à commiter — 01-11 : livraison warhammer L61 rouge sur plan.json périmé après raf done"
     status: doing

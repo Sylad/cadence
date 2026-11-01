@@ -32,7 +32,7 @@ interface ProbeMoment {
  * Sans la clé `orchestrate.probe`, rien : ni champ ni warning.
  */
 export function scheduleProbe(config: Pick<OrchestrateConfig, 'probe'>, l: LotState, o: ProbeMoment): boolean {
-  if (!config.probe || l.probe || o.skip) return false;
+  if (!config.probe || l.probe || o.skip || l.express) return false;
   l.probe = true;
   if (!o.late && o.pays) {
     l.next = 'probe';

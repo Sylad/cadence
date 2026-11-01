@@ -39,6 +39,7 @@ import { baseBranchOf, keptLines, keptTrees, lotBranch, lotTreeDir, planFileSet,
 import { agentOf, schemaFor } from './schemas.js';
 import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
+import { isExpress } from './express.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { quotaText, renderDetail, renderTable, resumeCommand } from './table.js';
 import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, repairSnapshotModules, snapshotExists, waveReadsAnswerQueue, waveReadsControl, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
@@ -381,6 +382,7 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
     const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, ...(goal ? { goal } : {}), visible: lot.visible, small, ...(screen ? { screen } : {}), ...(lot.spec && !screen ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly });
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.estimate = lot.estimate;
+    if (isExpress({ estimate: lot.estimate, screen, specLot: state.specLot })) state.express = true;
     state.light = lot.estimate <= env.config.review.threshold;
     const escalating = !!env.config.escalation;
     state.budget = lotBudget(lot.estimate, screen ? 'screen' : lot.spec ? 'spec' : undefined, escalating);
@@ -514,19 +516,21 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     if (l.screen && env.config.maquette) steps.unshift({ kind: 'maquette', model: env.config.review.full });
     if (l.specLot && env.config.fiche) steps.unshift({ kind: 'fiche', model: 'sonnet' });
     if (specStage) steps.unshift({ kind: 'spec', model: 'sonnet' });
-    if (needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos, l.goal)) {
+    if (!l.express && needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos, l.goal)) {
       const nothingToFind = precheckNothingToFind(env.loadPlan(), l.repo, l.lot, l.repos, l.goal);
       if (nothingToFind) io.out(`  contrôle préalable sauté : ${nothingToFind}`);
       else steps.unshift({ kind: 'precheck', model: env.config.precheckLocal ? 'local' : 'sonnet' });
     }
-    steps.push(...(env.config.probe ? [{ kind: 'probe' as const, model: 'sonnet' }] : [])); // L497 : entre l'écriture et la revue
+    steps.push(...(env.config.probe && !l.express ? [{ kind: 'probe' as const, model: 'sonnet' }] : [])); // L497 : entre l'écriture et la revue
     const { light, full } = env.config.review;
-    if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: l.light ? light : full });
+    if (l.express) {
+      // L519 : une seule session, le lead lit le diff
+    } else if (l.small) steps.push({ kind: l.visible ? 'review-small' : 'review', model: l.light ? light : full });
     else {
       steps.push({ kind: 'review', model: l.light ? light : full });
       if (l.visible && env.config.ux) steps.push({ kind: 'ux', model: full }); // L221 : l'UX est jouée une fois, après la revue de code conforme
     }
-    io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.light ? ` — revue légère (${light}, pas de passe des mineurs ; un bloquant ou un majeur → correction puis revue ${full})` : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
+    io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.express ? ' — voie express (pas de précheck, de sonde ni de revue séparée : le lead lit le diff)' : ''}${l.light ? ` — revue légère (${light}, pas de passe des mineurs ; un bloquant ou un majeur → correction puis revue ${full})` : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
     for (const m of new Set(steps.map((s) => s.model))) {
       if (m !== 'local' && !MODEL_ALIASES.includes(m)) io.out(`  ⚠ modèle « ${m} » hors des alias ${MODEL_ALIASES.join(', ')} : passé tel quel à claude --model (un nom que le compte ne connaît pas fait échouer la session)`);
     }

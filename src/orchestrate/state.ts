@@ -120,6 +120,8 @@ export interface LotState {
   specAskedRules?: string[];
   /** Lot léger (estimate ≤ orchestrate.review.threshold, L108) : une revue légère, pas de passe des mineurs. Absent : lot ordinaire. */
   light?: boolean;
+  /** Voie express (L519, `isExpress`) : retouche d'au plus 0,1 j, une seule session d'écriture sans précheck, sonde, revue séparée ni porte « code sans test ». Absent : lot ordinaire. */
+  express?: true;
   model: AnyModel;
   readOnlyPlan: boolean;
   /** Dépôts voisins du lot (clé de lot `repos:`, L62), résolus au lancement : chemin déclaré et racine git. Absent : le dépôt du projet seul. */
@@ -221,6 +223,7 @@ export interface NewLot {
   small: boolean;
   screen?: Screen;
   specLot?: true;
+  express?: true;
   model: AnyModel;
   readOnlyPlan: boolean;
 }

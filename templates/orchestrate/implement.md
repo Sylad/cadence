@@ -4,6 +4,7 @@ Goal: {{objectif}}
 {{repos}}
 {{fiche}}
 {{decisions}}
+{{express}}
 Rules: test first; commit each sub-part as soon as its tests pass, with explicit paths (never
 `git add -A` or `commit -a`), and a message that cites the lot (`feat({{lot}}): …`); run the targeted tests of the code you touch (once, before committing) and the build, before reporting: the full suite is played once by the program as the gate given below, do not replay it (with no gate below, play the full suite yourself, once); do not push, deliver, run `raf done`, `raf ux` or
 `raf review`.

@@ -11,6 +11,7 @@ import { PLAN_ACTIONS, leadAnswerMessage, planCommitMessage } from '../plan-comm
 import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import { citesPriorWork, keepPrecheckReading, localYesNote, precheckNothingToFind } from './precheck.js';
+import { EXPRESS_BRIEF, EXPRESS_VERDICT, expressNewsText } from './express.js';
 import { PROBE_FAILED, PROBE_RESERVE, probeStep, probeVars, scheduleProbe, type ProbeIo } from './probe.js';
 import type { Day } from '../dates.js';
 import { changedFiles, dirtyPaths, gitCommonDir, isAncestor, readCommits, resolveCommit, restoreWorktree, tryGit, type Commit } from '../git.js';
@@ -575,10 +576,11 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', tmp: tmpText(tmpDir), workers: writesCode(kind) ? workersText(c) : '', gate: writesCode(kind) ? gateText(c.config) : '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '' };
   if (l.visible) {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
-    vars.news = newsText(l.lot, pwDir);
+    vars.news = l.express ? expressNewsText(pwDir) : newsText(l.lot, pwDir);
     vars.captures = capturesText(pwDir);
   }
   if (mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright) vars.shots = shotsText(playwrightDir(c.wave.store.lotDir(l.project, l.lot)));
+  if (kind === 'implement' && l.express) vars.express = EXPRESS_BRIEF;
   vars.fiche = hasSpecStage(l) ? avalOf(c, kind) : '';
   // la vérification des ids d'un document de référence sur l'écran fini : la passe ux, ou la revue courte d'un petit lot visible qui n'a que celle-là (comme la conformité, avalOf)
   if (kind === 'ux' || (kind === 'review-small' && l.small && l.visible)) vars.ux = [vars.ux, referenceIdsText('ux', lotIds({ ...lot, goal: l.goal ?? lot.goal }))].filter(Boolean).join('\n');
@@ -1437,6 +1439,7 @@ async function precheck(c: LotCtx): Promise<void> {
 
 /** Le lot passe-t-il par le contrôle préalable ? Un lot qui n'a rien à retrouver (L322) saute l'étape, et le journal du lot le dit. */
 function precheckOrSkip(c: LotCtx): boolean {
+  if (c.lot.express) return false;
   const plan = c.loadPlan();
   if (!needsPrecheck(c.config, plan, c.lot.repo, c.lot.lot, c.lot.repos, c.lot.goal)) return false;
   const nothing = precheckNothingToFind(histPlan(c), wd(c), c.lot.lot, c.lot.repos, c.lot.goal);
@@ -2267,7 +2270,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   }
   // Porte « code modifié sans test » (L287) : le diff du lot (son dépôt et ses voisins, fichiers supprimés exclus), toutes sessions comprises, touche du code sans fichier de test → correction directe, sans session de revue. Une seule fois par lot, jamais pendant la passe des mineurs, ni quand la correction prendrait la dernière passe (la revue n'en aurait plus), ni quand le budget du lot ne paie plus la correction (la revue, elle, part toujours).
   const gate = c.config.testGate;
-  if (gate && !l.testGate && !minorsPass) {
+  if (gate && !l.testGate && !minorsPass && !l.express) {
     // Le diff du lot : son dépôt et ses dépôts voisins (comme hasWork), sans les fichiers que le lot supprime (du code mort supprimé n'a pas de test à écrire).
     const touched = new Set([
       ...filesOf(wd(c), lotWork(plan, wd(c), l.lot), { withoutDeleted: true }),
@@ -2312,6 +2315,11 @@ async function toReview(c: LotCtx, runs: CheckRun[], minorsPass: boolean): Promi
     }
   }
   l.constats = [];
+  // Voie express (L519) : pas de revue séparée, le lead lit le diff ; le lot conclut sur le HEAD que la porte du programme vient de jouer.
+  if (l.express) {
+    await conclude(c, { conforme: true, bloquants: 0, majeurs: 0, mineurs: 0, verdict: EXPRESS_VERDICT, sousTaches: [], nonVerifie: [], head: git(wd(c), 'rev-parse', 'HEAD') });
+    return;
+  }
   l.checks = runs.length ? { head: git(wd(c), 'rev-parse', 'HEAD'), tree: git(wd(c), 'rev-parse', 'HEAD^{tree}'), runs } : undefined;
   l.next = firstReview(c);
   save(c);

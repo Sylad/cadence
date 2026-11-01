@@ -42,6 +42,8 @@ export interface BriefVars {
   spec?: string;
   /** Décisions de l'humain des notes du lot et de son parent (L344) : `decisionsText(humanDecisions(lot, parent))` pour implement et fix ; vide ailleurs et sans décision. */
   decisions?: string;
+  /** Consigne de la voie express (L519) pour l'implémentation d'un lot express : `EXPRESS_BRIEF` ; vide ailleurs. */
+  express?: string;
   /** Consigne de l'étape accept (L173) : fiche, maquette, commande dédiée, gabarit du lanceur, écarts de la passe précédente ; vide ailleurs. */
   accept?: string;
   /** Consigne de la fiche d'écran (L174) pour implement, fix, revue de code et UX de conformité d'un lot qui a une fiche ; vide ailleurs. */
@@ -206,7 +208,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', elsewhere: vars.elsewhere ?? '', ack: vars.ack ?? '', spec: vars.spec ?? '', decisions: vars.decisions ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', workers: vars.workers ?? '', gate: vars.gate ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '', lecture: vars.lecture ?? PLAN_READING } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', elsewhere: vars.elsewhere ?? '', ack: vars.ack ?? '', spec: vars.spec ?? '', decisions: vars.decisions ?? '', express: vars.express ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', workers: vars.workers ?? '', gate: vars.gate ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '', lecture: vars.lecture ?? PLAN_READING } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

@@ -1,0 +1,200 @@
+sujet:
+  id: agents-design-jetons-grille-tics
+  titre: "Agents design : jetons sémantiques et contraste (spec-writer), grille avant livraison et tics d'IA (ux-reviewer), jamais de catalogue de styles sur une app à charte"
+  lot: L513
+  perimetre:
+    modules:
+      - agents/spec-writer.md
+      - agents/ux-reviewer.md
+      - templates/orchestrate/spec.md
+      - templates/orchestrate/ux.md
+      - CHANGELOG.md
+    endpoints: []
+    jobs:
+      - "étape spec d'orchestrate (session spec-writer d'un lot à écran)"
+      - "étape ux d'orchestrate et revue d'un écran existant (raf ux, ux-reviewer)"
+    hors_perimetre:
+      - "le mode maquette et le mode conformité de ux-reviewer : captures à 1440 et 390 px et critères de L448 inchangés"
+      - "l'étape spec back (templates/orchestrate/spec-back.md) : pas d'écran, pas de couleur"
+      - "le format de la fiche (templates/fiche.yaml, cadence spec check), le schéma du rapport de revue et le nombre de revues"
+      - "l'exécution de detect.mjs : l'agent applique ses règles à la lecture du code, il n'embarque ni n'appelle le script"
+      - "toute dépendance à un plugin ou à une skill tierce : aucun appel, aucun nom de skill dans les agents ni les gabarits"
+
+cas:
+  - id: C1
+    titre: "Le spec-writer dessine un écran dont le produit n'a pas la couleur nécessaire"
+    acteur: l'agent spec-writer
+    declencheur: job spec (session spec d'un lot à écran)
+    preconditions:
+      - "le lot a un écran (screen:) ; le brief spec.md est rendu"
+      - "la charte du produit porte au moins une couleur de marque (variable CSS ou valeur existante)"
+      - "l'écran a besoin d'un rôle de couleur que la charte n'a pas (ex. état de succès, d'alerte, surface mise en avant)"
+    nominal:
+      - "La session relève les jetons de couleur de la charte et leur couleur de texte (variables CSS) avant de dessiner."
+      - "Pour chaque rôle manquant, elle nomme un jeton sémantique par son rôle (primary, success, warning, danger, surface…) et son jeton de texte associé on-<rôle>."
+      - "Les valeurs du jeton viennent d'une rampe tirée de la couleur de marque de la charte (même teinte, clartés étagées), jamais d'une palette importée."
+      - "Elle calcule le rapport de contraste de chaque paire jeton / on-jeton, retient la marche de la rampe qui atteint au moins 4,5:1, et l'écrit dans un fichier contraste.md du dossier de la spec."
+      - "La maquette emploie les jetons ; la fiche et contraste.md sont committées avec elle."
+    alternatives:
+      - { si: "la charte a déjà un jeton pour le rôle", alors: "il est réutilisé tel quel, aucun jeton n'est créé et la paire existante est seulement mesurée", regles: [R3] }
+      - { si: "une paire est sous 4,5:1", alors: "la marche de la rampe est changée jusqu'à 4,5:1, pas la taille du texte ; la paire mesurée finale figure dans contraste.md", regles: [R4] }
+      - { si: "le produit n'a ni variable CSS ni couleur de marque", alors: "aucune rampe n'est inventée : les valeurs existantes sont suivies et la mesure de contraste porte sur elles ; l'absence est écrite dans la fiche", regles: [R5] }
+    resultat: "Une maquette dont chaque couleur ajoutée est un jeton sémantique avec son on-*, issu de la charte, et un rapport de contraste joint à la fiche."
+  - id: C2
+    titre: "L'ux-reviewer passe la grille avant livraison sur l'écran qui tourne"
+    acteur: l'agent ux-reviewer
+    declencheur: job ux (étape ux d'un lot visible, raf ux) ou revue d'un écran existant
+    preconditions:
+      - "l'application est joignable (serveur local ou URL) avec un état réaliste"
+      - "le brief ux.md est rendu"
+    nominal:
+      - "La session relève, en plus de la méthode existante, les points de la grille : focus visible sur chaque élément interactif, prefers-reduced-motion respecté par les animations et transitions, curseur pointer sur les éléments cliquables, aucun emoji employé comme icône, aucun défilement horizontal aux largeurs 375, 768, 1024 et 1440 px."
+      - "Chaque point est coché ou non dans la liste à cocher du rapport, avec la mesure ou la capture qui le fonde."
+      - "Un point non conforme devient un constat classé bloquant, majeur ou mineur selon l'échelle existante."
+    alternatives:
+      - { si: "le mode est maquette ou conformité", alors: "la grille ne s'applique pas ; les captures restent à 1440 et 390 px", regles: [R7] }
+      - { si: "une largeur ne peut pas être rendue", alors: "elle est écrite dans nonVerifie, pas cochée", regles: [R6] }
+      - { si: "la grille est conforme", alors: "aucun constat n'est ajouté, la liste cochée suffit", regles: [R6] }
+    resultat: "Un rapport dont la liste à cocher couvre la grille aux quatre largeurs, sans nouveau mode ni nouvelle session."
+  - id: C3
+    titre: "L'ux-reviewer contrôle statiquement les tics d'IA dans le code du lot"
+    acteur: l'agent ux-reviewer
+    declencheur: job ux (étape ux d'un lot visible, raf ux)
+    preconditions:
+      - "le lot a des fichiers de front (HTML, CSS, composants) dans ses commits"
+    nominal:
+      - "La session lit le diff du lot et applique à la lecture, une à une, les règles de détection des tics d'IA reprises de detect.mjs (liste nommée dans l'agent)."
+      - "Chaque tic trouvé est un constat numéroté T1, T2… avec le fichier, la ligne, la règle et la gravité."
+      - "Un tic sans effet sur la tâche ni sur la lisibilité est mineur et reste une note du lot."
+    alternatives:
+      - { si: "aucun tic n'est trouvé", alors: "le rapport écrit « tics d'IA : 0 constat » dans la liste à cocher", regles: [R9] }
+      - { si: "le tic est un choix documenté de la charte du produit (CLAUDE.md, CSS existant)", alors: "il n'est pas un constat : la charte prime", regles: [R10] }
+      - { si: "le lot n'a aucun fichier de front", alors: "le contrôle est écrit non applicable dans la liste, sans constat", regles: [R9] }
+    resultat: "Des constats numérotés, fondés sur une règle nommée et une ligne de code, sans exécuter de script tiers."
+  - id: C4
+    titre: "Un agent design rencontre une app qui a une charte"
+    acteur: les agents spec-writer et ux-reviewer
+    declencheur: job spec ou job ux
+    preconditions:
+      - "le produit a une charte (CLAUDE.md et CSS ou variables existants)"
+    nominal:
+      - "L'agent lit la charte d'abord (déjà exigé) et s'y conforme."
+      - "Il ne propose, ne dessine ni ne reproche aucun style générique d'un catalogue (glassmorphism, brutalisme, néomorphisme, etc.)."
+    alternatives:
+      - { si: "le produit n'a aucune charte (pas de CSS ni de CLAUDE.md décrivant l'identité)", alors: "l'agent ne choisit pas un style : il suit les valeurs existantes et le signale dans nonVerifie ou dans la fiche", regles: [R11] }
+    resultat: "L'identité du produit est une contrainte, jamais un sujet de catalogue."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "agents/spec-writer.md demande, pour toute couleur que l'écran ajoute, un jeton sémantique nommé par son rôle et son jeton de texte on-<rôle> ; une couleur ajoutée sans on-* est un défaut de la spec."
+    statut: sourcee
+    source: "demande du lot : « jetons de couleur sémantiques avec leur couleur de texte (on-*) »"
+    tests: ["R1 — spec-writer.md exige un jeton sémantique et son on-* pour chaque couleur ajoutée", "R1 — le brief spec.md rendu porte la même consigne"]
+  - id: R2
+    cas: [C1]
+    enonce: "Les valeurs des jetons ajoutés viennent d'une rampe tirée de la couleur de marque de la charte (même teinte, clartés étagées) ; l'agent n'importe aucune palette externe."
+    statut: sourcee
+    source: "demande du lot : « rampe tirée de la couleur de la charte » ; agents/spec-writer.md étape 1 (« reuse what exists, invent nothing when an equivalent exists »)"
+    tests: ["R2 — spec-writer.md demande une rampe tirée de la couleur de marque de la charte", "R2 — spec-writer.md ne nomme aucune palette externe"]
+  - id: R3
+    cas: [C1]
+    enonce: "Un rôle déjà couvert par un jeton de la charte garde ce jeton : aucun jeton n'est créé en double ; seule la paire existante est mesurée."
+    statut: sourcee
+    source: "agents/spec-writer.md étape 2 (« A word or a message already in the product is kept », variables CSS du produit) ; agents/spec-writer.md étape 1"
+    tests: ["R3 — spec-writer.md garde « reuse what exists » et interdit un jeton en double", "R3 — un jeton existant n'apparaît pas dans la liste des jetons créés de contraste.md"]
+  - id: R4
+    cas: [C1]
+    enonce: "Le rapport de contraste joint à la fiche est le fichier contraste.md du dossier de la spec : une ligne par paire jeton / on-jeton avec les deux valeurs, le rapport calculé (WCAG 2.2, luminance relative) et ok ou non ; toute paire est à au moins 4,5:1, et une paire sous 4,5:1 se corrige en changeant la marche de la rampe, pas la taille du texte."
+    statut: sourcee
+    source: "demande du lot : « rapport de contraste 4,5:1 joint à la fiche » ; agents/ux-reviewer.md « Method » étape 3 (« text contrast ≥ 4.5:1 »)"
+    tests: ["R4 — spec-writer.md exige contraste.md, une ligne par paire, seuil 4,5:1", "R4 — le brief spec.md demande de committer contraste.md avec la fiche", "R4 — une paire à 4,49:1 est nommée non conforme par la consigne, une paire à 4,5:1 conforme"]
+  - id: R5
+    cas: [C1]
+    enonce: "Un produit sans variable CSS ni couleur de marque n'a aucune rampe inventée : l'agent suit les valeurs existantes, mesure leur contraste dans contraste.md et écrit l'absence de charte colorée dans la fiche."
+    statut: hypothese
+    si_faux: "Si l'agent devait proposer une rampe de départ dans ce cas, seule la consigne de l'agent change ; aucun produit existant n'est touché, la décision de couleur restant au lead."
+    tests: ["R5 — spec-writer.md interdit d'inventer une rampe sans couleur de marque", "R5 — spec-writer.md demande de mesurer les valeurs existantes dans ce cas"]
+  - id: R6
+    cas: [C2]
+    enonce: "agents/ux-reviewer.md porte une grille avant livraison, hors mode maquette et conformité, en cinq points : focus visible, prefers-reduced-motion, cursor pointer sur le cliquable, aucun emoji en icône, aucun défilement horizontal à 375, 768, 1024 et 1440 px ; chaque point est une ligne de la liste à cocher du rapport, une largeur non rendue va dans nonVerifie, et un point non conforme suit l'échelle bloquant / majeur / mineur existante."
+    statut: sourcee
+    source: "demande du lot : « grille avant livraison (focus visible, prefers-reduced-motion, cursor, emoji en icône, largeurs 375/768/1024/1440) » ; agents/ux-reviewer.md « Method » étape 3 (focus visible, reflow) et « Rank »"
+    tests: ["R6 — ux-reviewer.md contient les cinq points de la grille et les quatre largeurs", "R6 — ux-reviewer.md range une largeur non rendue dans nonVerifie", "R6 — un focus non visible reste classé selon l'échelle existante, sans nouvelle gravité"]
+  - id: R7
+    cas: [C2]
+    enonce: "La grille et le contrôle des tics ne valent que pour l'étape ux et la revue d'un écran existant : le mode maquette et le mode conformité gardent leur texte, leurs captures à 1440 et 390 px (maquette-<état>-<largeur>.png) et leurs critères."
+    statut: sourcee
+    source: "test/revue-maquette-criteres.test.ts (empreintes des sections et critères de L448) ; src/orchestrate/spec.ts:270 (largeurs de capture de la maquette) ; templates/orchestrate/maquette.md:8"
+    tests: ["R7 — la section Mockup mode et la section Conformity mode d'ux-reviewer.md n'ont pas changé", "R7 — le brief maquette rendu cite toujours 1440 px et 390 px et non 375", "R7 — les empreintes de L448 sont mises à jour seulement pour la section où la grille est insérée"]
+  - id: R8
+    cas: [C3]
+    enonce: "Le contrôle des tics d'IA est statique : l'agent applique à la lecture du diff les règles de detect.mjs listées dans son texte, sans exécuter ce script, sans outil de plus et sans changer la ligne tools de l'agent."
+    statut: sourcee
+    source: "demande du lot : « contrôle statique des tics d'IA (règles de detect.mjs…) » ; agents/ux-reviewer.md front matter (tools: Read, Grep, Glob, Bash, mcp__playwright…)"
+    tests: ["R8 — ux-reviewer.md liste les règles de tics reprises, une par ligne", "R8 — ux-reviewer.md n'appelle pas detect.mjs", "R8 — le front matter tools d'ux-reviewer est identique à celui d'avant"]
+  - id: R9
+    cas: [C3]
+    enonce: "Chaque tic trouvé est un constat numéroté T1, T2… (fichier, ligne, règle nommée, gravité) ; le rapport écrit « tics d'IA : 0 constat » quand il n'y en a pas et « non applicable » quand le lot n'a aucun fichier de front. Un tic sans effet sur la tâche est mineur, jamais bloquant."
+    statut: hypothese
+    si_faux: "Si les tics devaient être majeurs, plus de lots visibles seraient renvoyés en correction ; s'ils ne devaient pas être numérotés, seul le texte du rapport change. Aucune donnée ni contrat."
+    tests: ["R9 — ux-reviewer.md demande des constats T1, T2… avec fichier, ligne et règle", "R9 — ux-reviewer.md demande « tics d'IA : 0 constat » à défaut de tic", "R9 — ux-reviewer.md classe un tic sans effet sur la tâche en mineur"]
+  - id: R10
+    cas: [C3]
+    enonce: "Un tic qui est un choix de la charte du produit n'est pas un constat : la charte prime sur les règles de détection."
+    statut: sourcee
+    source: "agents/ux-reviewer.md « Do not » (« propose a new visual identity ») et « Inputs » (l'identité existante est une contrainte)"
+    tests: ["R10 — ux-reviewer.md excepte les choix de la charte du contrôle des tics"]
+  - id: R11
+    cas: [C4]
+    enonce: "Aucun des deux agents ne propose, ne dessine ni ne reproche un style générique de catalogue sur une app qui a une charte ; sans charte, l'agent suit les valeurs existantes et le dit, sans choisir de style."
+    statut: sourcee
+    source: "demande du lot : « jamais de catalogue de styles génériques sur une app qui a une charte » ; agents/ux-reviewer.md « Do not » (« propose a new visual identity »)"
+    tests: ["R11 — spec-writer.md et ux-reviewer.md interdisent un catalogue de styles génériques sur une app à charte", "R11 — aucun des deux agents ne liste de noms de styles (glassmorphism, brutalisme…) à proposer"]
+  - id: R12
+    cas: [C3]
+    enonce: "Le texte de l'agent reprenant les règles de detect.mjs porte l'attribution de l'original : nom de l'œuvre, licence Apache-2.0, mention que les règles sont reformulées ; un fichier NOTICE à la racine du paquet la reprend et figure dans files de package.json. Le paquet reste sous MIT."
+    statut: hypothese
+    si_faux: "Si l'attribution devait tenir dans le seul texte de l'agent, le NOTICE est retiré (package.json, un fichier) ; si le texte de l'original était repris tel quel plutôt que reformulé, la licence du fichier repris change et c'est une question. L'auteur et le dépôt exacts de detect.mjs ne sont pas dans le lot : l'implémentation les relève à la source avant d'écrire la mention."
+    tests: ["R12 — ux-reviewer.md contient « Apache-2.0 » et le nom de l'original auprès des règles", "R12 — NOTICE existe et est listé dans files de package.json", "R12 — LICENSE du paquet reste MIT"]
+  - id: R13
+    cas: [C1, C2, C3, C4]
+    enonce: "Aucun format ne change : la ligne tools des deux agents, le format de la fiche (templates/fiche.yaml, cadence spec check), le schéma du rapport de revue, maquetteReviews (3) et le plafond de sessions sont inchangés ; contraste.md est un fichier libre du dossier de la spec que le programme ne lit pas."
+    statut: sourcee
+    source: "docs/specs/revue-maquette-criteres-design/fiche.yaml R8, R11, R12 ; templates/orchestrate/spec.md (Sheet rules) ; src/orchestrate/schemas.js REVIEW_SCHEMA"
+    tests: ["R13 — une fiche valide avant le lot passe cadence spec check après le lot", "R13 — REVIEW_SCHEMA accepte et refuse les mêmes rapports qu'avant", "R13 — le front matter tools des deux agents est identique à celui d'avant"]
+  - id: R14
+    cas: [C1, C2, C3]
+    enonce: "L'installation n'écrase pas un agent modifié à la main : un projet qui a modifié sa copie garde son texte jusqu'à réinstallation."
+    statut: sourcee
+    source: "test/skills.test.ts:82-85 (copie « à la main » conservée à la réinstallation)"
+    tests: ["R14 — agent installé puis modifié à la main : réinstallation sans écrasement", "R14 — agent installé non modifié : reçoit le texte renforcé"]
+  - id: R15
+    cas: [C1, C3]
+    enonce: "Le CHANGELOG (section Unreleased) nomme les jetons on-*, le contraste.md, la grille et les tics d'IA, avec l'attribution Apache-2.0."
+    statut: hypothese
+    si_faux: "Si la doc ne devait rien dire des tics ou de l'attribution, seul un texte de doc change ; la règle R12 reste dans l'agent."
+    tests: ["R15 — CHANGELOG.md, section Unreleased, nomme on-*, contraste.md, la grille et les tics d'IA"]
+
+contrats:
+  - id: A1
+    appel: "job spec"
+    entree: "le brief templates/orchestrate/spec.md rendu et l'agent spec-writer ; la charte du produit et le lot à écran"
+    sortie: "maquette.html, fiche.yaml (même format), captures, et contraste.md dans docs/specs/<écran>/ quand l'écran ajoute une couleur ou mesure les paires existantes"
+    erreurs: []
+    sans_erreur: "le lot ne change aucun échec du job : une fiche non conforme est renvoyée comme avant (« spec non conforme après N passes : »)"
+    regles: [R1, R2, R3, R4, R5, R11, R13, R14, R15]
+  - id: A2
+    appel: "job ux"
+    entree: "le brief templates/orchestrate/ux.md rendu, l'agent ux-reviewer, l'application qui tourne et le diff du lot"
+    sortie: "le rapport structuré existant ; sa liste à cocher porte la grille aux quatre largeurs et la ligne des tics d'IA, les tics sont des constats T1, T2…"
+    erreurs: []
+    sans_erreur: "le lot ne change ni le schéma du rapport ni les échecs du job ; une largeur non rendue est une entrée de nonVerifie, pas une erreur"
+    regles: [R6, R7, R8, R9, R10, R11, R12, R13, R14, R15]
+
+donnees:
+  - { id: D1, objet: "agents/spec-writer.md (texte de l'agent, copié par l'installation)", existant: true, modification: aucune, note: "texte de consigne seulement, front matter inchangé (R13)" }
+  - { id: D2, objet: "agents/ux-reviewer.md (texte de l'agent, copié par l'installation)", existant: true, modification: aucune, note: "texte de consigne seulement, front matter inchangé ; les sections Mockup mode et Conformity mode inchangées (R7, R13)" }
+  - { id: D3, objet: "templates/orchestrate/spec.md et ux.md (briefs rendus)", existant: true, modification: aucune, note: "texte seulement, variables inchangées" }
+  - { id: D4, objet: "docs/specs/<écran>/contraste.md (rapport de contraste joint à la fiche)", existant: false, modification: aucune, note: "nouveau fichier de texte libre, non lu par le programme (R4, R13)" }
+  - { id: D5, objet: "NOTICE à la racine du paquet (attribution Apache-2.0)", existant: false, modification: aucune, note: "nouveau fichier de texte, ajouté à files de package.json (R12)" }

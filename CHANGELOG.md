@@ -84,6 +84,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Fixed
 
 - `cadence release` prints the local tag `v<version>` right after the version commit, before the gate, the fresh-clone replay and the evaluation, and each of those three removes it (`git tag -d`) when red; the push then sends that same tag (L508, [docs/releasing.md](docs/releasing.md)). The tests that read the latest tag (`test/changelog.test.ts`) saw the previous version during the 1.34.0 release: tagged green, publication red.
+- `raf ux <lot>` and `raf review <lot>` print, like `raf done`, the `git add` / `git commit` command for the plan and the published copy `plan.onWrite` regenerated (L509): a delivery whose CI checks the published plan was left red after a `raf ux` or `raf review` committed with the plan alone.
 
 ### Added
 

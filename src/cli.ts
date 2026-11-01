@@ -560,7 +560,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'ux':
     case 'review':
-      return gate(command, rest, loadPlan, root, today, io, !!values.verbose);
+      return gate(command, rest, loadPlan, root, today, io, !!values.verbose, planConfig?.commit);
     case 'commits': {
       need(1, 'commits <lot>');
       const plan = loadPlan();
@@ -767,12 +767,12 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
 }
 
 const GATES = {
-  ux: { on: 'revue UX obligatoire pour les lots visibles', already: 'revue UX déjà active' },
-  review: { on: 'revue de code obligatoire pour les lots à commits', already: 'revue de code déjà active' },
+  ux: { on: 'revue UX obligatoire pour les lots visibles', already: 'revue UX déjà active', action: PLAN_ACTIONS.uxRecorded },
+  review: { on: 'revue de code obligatoire pour les lots à commits', already: 'revue de code déjà active', action: PLAN_ACTIONS.reviewRecorded },
 };
 
 /** « raf ux … » et « raf review … » ont la même forme : activer la porte, ou noter le verdict d'un lot. */
-function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io, verbose: boolean): number {
+function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io, verbose: boolean, template: string | undefined): number {
   if (rest.length < 1) throw new RafError(`usage : raf ${kind} enable | ${kind} <lot> "verdict"`);
   const plan = loadPlan();
   if (rest[0] === 'enable') {
@@ -794,6 +794,9 @@ function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, ro
   }
   plan.save();
   touchedLot(plan, rest[0], verbose, io);
+  // Comme `raf done` (L371) : le plan et la copie publiée que `plan.onWrite` vient de régénérer partent dans le même commit (L509).
+  const uncommitted = uncommittedPlanCommand(plan, root, rest[0], template, GATES[kind].action);
+  if (uncommitted) io.out(uncommitted);
   return 0;
 }
 
@@ -815,7 +818,7 @@ function knownLot(plan: Plan, id: string, subtask: string): Lot {
 }
 
 /**
- * `raf done` écrit le plan et ne le commite jamais (voulu : raf n'a pas de réglage qui commite, docs/raf.md) : la commande de commit du plan et des fichiers
+ * `raf done`, `raf ux <lot>` et `raf review <lot>` (L509) écrivent le plan et ne le commitent jamais (voulu : raf n'a pas de réglage qui commite, docs/raf.md) : la commande de commit du plan et des fichiers
  * que `plan.onWrite` produit, au gabarit `plan.commit` du projet (L371). Null hors d'un dépôt git ou quand rien n'est à commiter.
  */
 function uncommittedPlanCommand(plan: Plan, root: string, lot: string, template: string | undefined, action: string = PLAN_ACTIONS.done): string | null {

@@ -24,6 +24,8 @@ export const PLAN_ACTIONS = {
   /** `raf archive` (L396) : le nombre de lots déplacés dans l'archive. */
   archived: (n: number) => `${n} lot(s) archivé(s)`,
   reviewRecorded: 'revue de code enregistrée',
+  /** `raf ux <lot>` ne commite pas : l'action de la commande de commit qu'il propose (L509). */
+  uxRecorded: 'verdict UX enregistré',
   reviewNoted: 'revue de code notée',
   /** `cadence deliver` pendant une vague (L388) : le lot de l'article ouvert, ou ses titres ajoutés en note. */
   articleOpened: 'article à rafraîchir ouvert',

@@ -61,6 +61,48 @@ export function unloadedSuites(output: string): string[] {
   return [...found].sort();
 }
 
+/** Le délai d'un test expiré : vitest « Test timed out in 30000ms », jest « Exceeded timeout of 5000 ms for a test ». */
+const TIMEOUT = /(?:timed out in|Exceeded timeout of)\s+(\d+)\s*ms/i;
+
+/**
+ * Le délai (ms) de chaque test qui a expiré dans la sortie d'un lanceur (L510) : le message d'expiration est lu sous le dernier test nommé rouge qui le précède, avec le nom que donne `failedTests`.
+ * Un message sans test nommé avant lui ne désigne rien et n'est pas retenu.
+ */
+export function timeoutLimits(output: string): Map<string, number> {
+  const limits = new Map<string, number>();
+  let current: string | null = null;
+  for (const raw of stripAnsi(output).split('\n')) {
+    if (FILE_LOAD_FAIL.test(raw)) continue;
+    for (const re of MARKERS) {
+      const m = re.exec(raw);
+      if (!m) continue;
+      const name = clean(m[1]);
+      current = name && !/^(?:Test Files?|Tests?)\b/.test(name) ? name : null;
+      break;
+    }
+    const t = TIMEOUT.exec(raw);
+    if (t && current) limits.set(current, Number(t[1]));
+  }
+  return limits;
+}
+
+/**
+ * La durée (ms) que la sortie d'un rejeu donne au test `name` du fichier `file` : la ligne du test (son dernier segment « suite > test » ou « Suite › test ») qui finit par une durée, sinon la ligne ✓ du fichier (« ✓ a.test.ts (3 tests) 24s »,
+ * une borne haute pour le test). Null quand aucune durée ne se lit.
+ */
+export function testDurationMs(output: string, name: string, file: string): number | null {
+  const leaf = name.split(/ > | › /).pop()!.trim();
+  const lines = stripAnsi(output).split('\n');
+  const read = (l: string): number | null => {
+    const m = /(\d+(?:\.\d+)?)\s*(ms|s)\)?\s*$/.exec(l);
+    return m ? Math.round(Number(m[1]) * (m[2] === 's' ? 1000 : 1)) : null;
+  };
+  const byTest = leaf ? lines.find((l) => l.includes(leaf) && read(l) !== null) : undefined;
+  if (byTest) return read(byTest);
+  const byFile = lines.find((l) => /^\s*[✓√]/.test(l) && l.includes(file) && read(l) !== null);
+  return byFile ? read(byFile) : null;
+}
+
 /** Sortie sans les séquences de couleur du lanceur. */
 export const stripAnsi = (s: string): string => s.replace(ANSI, '');
 

@@ -20,7 +20,7 @@ import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, RafError, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
-import { replayRed, TEST_WORKERS_ENV, testWorkersText } from './workers.js';
+import { replayRed, TEST_WORKERS_ENV, testWorkersText, type TightTest } from './workers.js';
 import { withPlace, type Place } from './gate-place.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, gateText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
@@ -2028,9 +2028,10 @@ async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Pla
     // Sans `orchestrate.testReplay` rien n'est rejoué : le rouge est compté tel quel et rien n'est tenu pour instable (L354).
     const replay = label === 'tests' ? c.config.testReplay : undefined;
     const named = !replay ? [] : vs.kind === 'new' ? vs.nouveaux : !hasUnnamedFailure(r.output) ? failedTests(r.output) : [];
-    const { red: still, unstable } = named.length ? await replayRed(place.run, replay!, named, r.output) : { red: [] as string[], unstable: [] as string[] };
+    const { red: still, unstable, tight } = named.length ? await replayRed(place.run, replay!, named, r.output) : { red: [] as string[], unstable: [] as string[], tight: [] as TightTest[] };
     if (unstable.length) {
-      noteUnstable(c, unstable);
+      noteUnstable(c, unstable.filter((t) => !tight.some((k) => k.test === t)));
+      noteTight(c, tight);
       run.instables = unstable;
     }
     if (unstable.length && !still.length) {
@@ -2058,6 +2059,20 @@ function noteUnstable(c: LotCtx, tests: string[]): void {
   if (!fresh.length) return;
   l.instables = [...(l.instables ?? []), ...fresh];
   const text = `${fresh.length} test(s) instable(s) sous charge (rouge(s) dans la suite, vert(s) rejoué(s) seul(s)), pas de passe de correction : ${fresh.join(' ; ')}`;
+  l.warnings.push(text);
+  c.wave.log(`${lotKey(l.project, l.lot)} · ${text}`);
+  save(c);
+}
+
+const seconds = (ms: number): string => `${Math.round(ms / 100) / 10} s`.replace(/\.0 s$/, ' s');
+
+/** Trace des tests au « délai trop juste » (L510) : rouges dans la suite pour avoir expiré, verts seuls mais près de leur délai. Le lot (`delaisJustes`) et un avertissement qui nomme chaque test, sa durée seul et son délai ; jamais de passe de correction. */
+function noteTight(c: LotCtx, tests: TightTest[]): void {
+  const l = c.lot;
+  const fresh = tests.filter((t) => !(l.delaisJustes ?? []).some((k) => k.test === t.test));
+  if (!fresh.length) return;
+  l.delaisJustes = [...(l.delaisJustes ?? []), ...fresh];
+  const text = `délai trop juste, pas un bug (pas de passe de correction) : ${fresh.map((t) => `${t.test} (${seconds(t.ms)} seul pour ${seconds(t.limit)} de délai)`).join(' ; ')} — relever le délai du test`;
   l.warnings.push(text);
   c.wave.log(`${lotKey(l.project, l.lot)} · ${text}`);
   save(c);

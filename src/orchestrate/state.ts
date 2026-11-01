@@ -174,6 +174,8 @@ export interface LotState {
   /** Ligne de base des tests (L213) : échecs déjà présents au sha de départ du lot, listés à part dans le tableau de fin de vague. `verified` : rejoués par le programme à ce sha ; sinon annoncés par la session, non vérifiés. */
   /** Tests « instables sous charge » (L354) : rouges dans la suite de la porte, verts rejoués seuls ; jamais comptés, jamais corrigés. Journal du lot et `cadence perf`. */
   instables?: string[];
+  /** Tests au « délai trop juste » (L510) : rouges dans la suite pour avoir expiré, verts seuls à au moins 80 % de leur délai ; jamais corrigés. Durée du rejeu seul et délai en ms. */
+  delaisJustes?: { test: string; ms: number; limit: number }[];
   baseline?: { sha: string; command?: string; failures: string[]; verified: boolean };
   /** Dossier où le Playwright d'une étape (ux, ou implement/fix d'un lot visible) a rangé captures et snapshots (dans le dossier de la vague, hors du dépôt). */
   uxCaptures?: string;
@@ -220,7 +222,7 @@ export interface NewLot {
 }
 
 export function newLot(o: NewLot): LotState {
-  return { ...o, status: 'queued', pass: 0, next: null, steps: [], constats: [], verdict: null, uxVerdict: null, questions: [], choix: [], answers: [], proposals: [], warnings: [], instables: undefined, outcome: null };
+  return { ...o, status: 'queued', pass: 0, next: null, steps: [], constats: [], verdict: null, uxVerdict: null, questions: [], choix: [], answers: [], proposals: [], warnings: [], instables: undefined, delaisJustes: undefined, outcome: null };
 }
 
 /** Un lot fini ne travaille plus dans son dépôt : prêt, rendu ou échoué. */

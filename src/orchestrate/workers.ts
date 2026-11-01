@@ -1,6 +1,6 @@
 // Part de la machine de chaque session (L350) : le 26-10, 32 cœurs et 4 sessions, vitest à 31 workers par suite, et des tests qui passaient seuls rougissaient ensemble.
 
-import { jestTestFiles, stripAnsi } from './baseline.js';
+import { jestTestFiles, stripAnsi, testDurationMs, timeoutLimits } from './baseline.js';
 
 /** Variable posée dans l'environnement des sessions et de la porte : le nombre de workers que leurs lanceurs de tests ont le droit d'ouvrir. */
 export const TEST_WORKERS_ENV = 'CADENCE_TEST_WORKERS';
@@ -79,15 +79,27 @@ const NO_TEST_RAN = /^\W*(?:no test files? found, exiting with code|no tests? fo
 /** Rejeux d'un test rouge de la porte, seul (L354) : rouge aux deux, il est compté. */
 const REPLAYS = 2;
 
+/** Un test vert seul mais à au moins cette part de son délai est un « délai trop juste » (L510) : 25 s pour 30 s le 31-10 (warhammer L61). */
+const TIGHT_RATIO = 0.8;
+
+/** Un test dont le rejeu seul a duré `ms` pour un délai de `limit` ms. */
+export interface TightTest {
+  test: string;
+  ms: number;
+  limit: number;
+}
+
 /**
  * Rejoue SEULS les tests `names` rouges dans `output` (L354, L387) : `run` exécute la commande `template` où `{files}` devient les fichiers de ces tests, dans le dossier de l'appelant (worktree du lot, de la ligne de base ou de `verify --gate`).
- * Un test vert à un rejeu est `unstable` ; rouge aux `REPLAYS` rejeux, ou sans fichier désignable (rien à rejouer seul), il reste dans `red`.
+ * Un test vert à un rejeu est `unstable` (et `tight` quand sa durée seul est près de son délai, L510) ; rouge aux `REPLAYS` rejeux, ou sans fichier désignable (rien à rejouer seul), il reste dans `red`.
  */
-export async function replayRed(run: (command: string) => Promise<{ code: number; output: string }>, template: string, names: string[], output: string): Promise<{ red: string[]; unstable: string[] }> {
+export async function replayRed(run: (command: string) => Promise<{ code: number; output: string }>, template: string, names: string[], output: string): Promise<{ red: string[]; unstable: string[]; tight: TightTest[] }> {
   const jest = jestTestFiles(output);
   const fileOf = (n: string): string | null => replayFile(n) ?? jest.get(n) ?? null;
   let red = names;
   const unstable: string[] = [];
+  const tight: TightTest[] = [];
+  const limits = timeoutLimits(output);
   for (let i = 0; i < REPLAYS; i++) {
     const replayable = red.filter((n) => fileOf(n));
     const files = [...new Set(replayable.map((n) => fileOf(n)!))];
@@ -97,7 +109,13 @@ export async function replayRed(run: (command: string) => Promise<{ code: number
     const ran = r.code === 0 && !NO_TEST_RAN.test(r.output);
     const passed = ran ? replayable.filter((n) => replayRanFile(r.output, fileOf(n)!)) : [];
     unstable.push(...passed);
+    // L510 : vert seul mais expiré dans la suite, et la durée du rejeu est près du délai : le test est trop juste, pas bugué. Sans délai lu dans la suite ou sans durée lisible au rejeu, rien n'est dit.
+    for (const n of passed) {
+      const limit = limits.get(n);
+      const ms = limit ? testDurationMs(r.output, n, fileOf(n)!) : null;
+      if (limit && ms !== null && ms >= TIGHT_RATIO * limit) tight.push({ test: n, ms, limit });
+    }
     red = red.filter((n) => !passed.includes(n));
   }
-  return { red, unstable };
+  return { red, unstable, tight };
 }

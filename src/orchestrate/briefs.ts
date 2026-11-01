@@ -215,7 +215,7 @@ export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates 
 }
 
 /**
- * Consigne `{{gate}}` (L399) : le programme rejoue après chaque écriture `orchestrate.test` et `orchestrate.build`, pas la commande que la session juge équivalente.
+ * Consigne `{{gate}}` (L399, L518) : le programme joue une fois après l'écriture `orchestrate.test` et `orchestrate.build` ; la session ne joue que les tests ciblés du code touché (la suite entière rejouée en session coûtait 2,7 suites par lot, étude L517) et le build tel quel, pas la commande qu'elle juge équivalente.
  * Du 22 au 28-10, des lots annoncés verts arrivaient rouges à la porte parce que la session avait joué `npm run build` (tsconfig.build.json : `src` seul)
  * alors que la porte joue `npx tsc --noEmit` (test et scripts compris) : L330, L353. Vide sans commande déclarée.
  */
@@ -224,7 +224,7 @@ export function gateText(gate: { test?: GateTest; build?: string }): string {
   const tests = !gate.test ? [] : isParts(gate.test) ? gate.test.map((p) => `- tests (run in \`${p.dir}/\`): \`${p.run}\``) : [`- tests: \`${gate.test}\``];
   const lines = [...tests, gate.build ? `- build: \`${gate.build}\`` : ''].filter(Boolean);
   if (!lines.length) return '';
-  return `The program's gate, played after every writing session, is exactly:\n${lines.join('\n')}\nRun these commands as written before reporting, not a narrower one (\`npm run build\` or \`npm test\` may cover less than the gate). A red there sends the lot back to a correction pass even when your own run was green.`;
+  return `The program's gate, played once by the program after your writing session, is exactly:\n${lines.join('\n')}\nPlay only the tests of the code you touch (targeted: one file or filter, never the full suite), once, before committing: the full suite is not yours to replay (L518). Play the build command as written, not a narrower one (\`npm run build\` may cover less than the gate). A red at the gate sends the lot back to a correction pass even when your own run was green.`;
 }
 
 /**

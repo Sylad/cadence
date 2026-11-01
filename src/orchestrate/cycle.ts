@@ -2024,6 +2024,7 @@ async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Pla
   for (const [label, command] of [['build', c.config.build], ['tests', c.config.test]] as const) {
     if (!command) continue;
     l.gate = { label, started: new Date().toISOString() };
+    if (label === 'tests') l.suiteRuns = (l.suiteRuns ?? 0) + 1;
     save(c);
     const r = await runGate(place.run, command); // porte en parties (L512) : toutes jouées, chacune dans son dossier ; le CheckRun porte le libellé « dir : run ; … »
     const run: CheckRun = { label, command: gateLabel(command), code: r.code, ...place.stamp() };

@@ -10,7 +10,7 @@ Minor findings:
 
 Fix each minor finding that is right, and nothing else. Rules: test first; commit each fix as soon as
 its tests pass, with explicit paths (never `git add -A` or `commit -a`), and a message that cites the
-lot (`fix({{lot}}): …`); run the project's full test suite and build before reporting; do not push,
+lot (`fix({{lot}}): …`); run the targeted tests of the code you touch (once, before committing) and the build, before reporting: the full suite is played once by the program as the gate given below, do not replay it (with no gate below, play the full suite yourself, once); do not push,
 deliver, run `raf done`, `raf ux` or `raf review`. Read the project's CLAUDE.md first.
 Never run `git checkout` or `git switch` to another commit or branch in this repository: the orchestrator watches it and a moved HEAD breaks the other sessions of the wave. To look at another sha, use a throwaway `git worktree add --detach <tmp> <sha>`, removed afterwards.
 Do not stop to ask. A finding that is wrong, or not worth its change, is not fixed: list it under

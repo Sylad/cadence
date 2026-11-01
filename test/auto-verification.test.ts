@@ -18,7 +18,7 @@ const bloc = (kind: 'implement' | 'fix'): string => {
 describe('auto-vérification en fin de session (L236)', () => {
   it('R1 — le brief implement impose, une fois les tests verts, la relecture du diff complet du lot', () => {
     const b = bloc('implement');
-    expect(b).toContain('full test suite');
+    expect(b).toContain('targeted tests');
     expect(b).toContain('complete diff of the lot');
     expect(b).toContain('before the review');
   });

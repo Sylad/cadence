@@ -160,6 +160,8 @@ export interface LotState {
   minorLines?: string[];
   /** Porte du programme en cours (L395) : sa commande tourne, sans session claude. Posée au départ de chaque commande (build, puis tests), retirée à sa fin ; lue par `--status` et la bande pour ne pas dire « implémentation » d'un lot qui attend sa suite. */
   gate?: { label: 'build' | 'tests'; started: string };
+  /** Fois où le programme a joué la suite complète de la porte pour ce lot (L518) : une par passe d'écriture, hors rejeux seuls des rouges. Absent tant que la porte n'a pas joué de tests ; colonne « suites » du tableau. */
+  suiteRuns?: number;
   /** Prochaine étape à jouer ; null = cycle terminé. Relue à la reprise. */
   next: StepKind | null;
   startedSha?: string;

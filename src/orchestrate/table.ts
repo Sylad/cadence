@@ -246,8 +246,8 @@ export function renderDetail(lots: LotState[], sel: string): string[] {
 
 /** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. `compact` (L441, `--status`) : sans le détail des lots, une seule ligne renvoie à `--status --detail`. */
 export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[]; now?: number; compact?: boolean } = {}): string[] {
-  const rows = lots.map((l) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`]);
-  const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée'];
+  const rows = lots.map((l) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`, String(l.suiteRuns ?? '—')]);
+  const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée', 'suites'];
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
   const line = (r: string[]) => r.map((c, i) => c.padEnd(widths[i])).join('  ').trimEnd();
   const out = [line(head), ...rows.map(line)];

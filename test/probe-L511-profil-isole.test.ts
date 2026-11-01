@@ -19,7 +19,12 @@ describe('probe L511 — profil de navigateur isolé du qa-reviewer', () => {
   });
 
   it('un profil en cours d\'usage dont le SingletonLock est périmé (crash) est traité : le texte dit comment le distinguer d\'un profil réellement ouvert', () => {
-    expect(agent).toMatch(/stale|dangling|process.{0,40}(alive|running)|no longer running/i);
+    expect(agent).toMatch(/SingletonLock[^.]*pid[^.]*no longer running[^.]*remove/i);
+  });
+
+  it('le profil nommé est tenté d\'abord ; le suffixé n\'est pris que si le lancement échoue parce qu\'il est ouvert (pas de test-puis-lancer)', () => {
+    expect(agent).toMatch(/launch (it|the named[^.]*) first[^.]*fails[^.]*(open|in use)[^.]*suffixed/i);
+    expect(agent).not.toMatch(/when that directory is already open in another browser \(a `SingletonLock` file in it\)/);
   });
 
   it('le nom du profil est un nom de dossier sûr (":" du port neutralisé)', () => {

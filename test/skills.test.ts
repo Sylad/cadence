@@ -153,7 +153,7 @@ describe('skills install', () => {
       'in a real browser',
       'at **1440 px** and **390 px** wide',
       'answered 2xx with a non-empty body: note the status and the response size',
-      '**Open each page in a real browser** (Playwright, or the browser tool available), at **1440 px** and **390 px** wide.',
+      '**Open each page in a real browser** (your own Playwright context, see below), at **1440 px** and **390 px** wide.',
       'A 200 with an empty or null body (`[]`, `{}`, `null`, 0 bytes) is a failure, unless its line says `may be empty when …`',
       'no console error',
       'no broken image among the content images',
@@ -261,7 +261,7 @@ describe('skills install', () => {
     expect(step4).toContain('your own browser context, never the browser or the tabs another session already holds');
     expect(step4).toContain('a `userDataDir` reserved for this agent');
     // R2 : le nom du profil porte l'application et un identifiant propre à l'agent ; deux QA en parallèle ne se partagent rien.
-    expect(step4).toContain('named after the app (host and port of the base URL, every character that is not a letter, a digit or a dash replaced by a dash, so `localhost:4200` gives `localhost-4200`), kept between passes on that app; when that directory is already open in another browser (a `SingletonLock` file in it), use a directory suffixed with your process id instead (a suffixed profile is single-use: delete it at the end of the pass), so two QA passes running together, on two apps or on the same one, never share a profile');
+    expect(step4).toContain('named after the app (host and port of the base URL, every character that is not a letter, a digit or a dash replaced by a dash, so `localhost:4200` gives `localhost-4200`), kept between passes on that app; launch it first, and do not test for a lock file before (two passes would both see none): only when the launch fails because that directory is open in another browser, use a directory suffixed with your process id instead (a suffixed profile is single-use: delete it at the end of the pass); a `SingletonLock` left by a browser that closed abruptly is a link `host-pid` whose pid is no longer running: remove that link and keep the named profile, so two QA passes running together, on two apps or on the same one, never share a profile');
     // R3 : à la fin, l'agent ferme son contexte seulement, jamais le navigateur ; les onglets des autres ne sont ni lus ni fermés.
     expect(step4).toContain('At the end, close your own context and nothing else: you neither read nor close a tab you did not open');
     // R4 : l\'ancienne clause « profil conservé entre passes, partagé » ne subsiste pas.

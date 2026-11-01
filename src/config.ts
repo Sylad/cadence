@@ -8,7 +8,7 @@ import { readGate } from './gate-config.js';
 import { DEFAULT_TEST_PATTERNS, type TestGateConfig } from './testgate.js';
 import { gitRoot } from './git.js';
 import { planCommitProblem } from './plan-commit.js';
-import { isComposedGate } from './orchestrate/workers.js';
+import { checkTestReplay, readGateTest, type GateTest } from './orchestrate/gate-parts.js';
 import { booleanKey } from './yaml-keys.js';
 import { FIELDS, Plan, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
@@ -300,8 +300,8 @@ export interface OrchestrateConfig {
   start?: string;
   /** Commande qui note le verdict de la revue de code ; `{lot}` et `{verdict}` y sont remplacés. */
   verdict?: string;
-  /** Commande de tests du projet, lancée par l'orchestrateur après une implémentation ou une correction. */
-  test?: string;
+  /** Commande de tests du projet, lancée par l'orchestrateur après une implémentation ou une correction ; ou la liste de ses parties `{ dir, run, replay? }` (L512), chacune jouée dans son dossier, chaque rouge attribué à la partie qui l'a imprimé. */
+  test?: GateTest;
   /**
    * Commande de rejeu seul d'un test rouge de la porte (L354), où `{files}` est remplacé par les fichiers des tests rouges. Absente : aucun rejeu, un rouge est compté tel quel
    * et rien n'est tenu pour instable (cadence ne devine pas comment rejouer un fichier sur le lanceur du projet, une porte composée comprise).
@@ -460,14 +460,14 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     if (!o.accept.length || o.accept.some((x) => typeof x !== 'string' || !x.trim())) throw bad('accept : commande non vide attendue (chaîne ou liste de commandes non vides)');
     config.accept = o.accept.map((x: string) => x.trim());
   }
-  for (const k of ['start', 'verdict', 'test', 'testReplay', 'build', 'accept'] as const) {
+  if (o.test != null) config.test = readGateTest(o.test, bad);
+  for (const k of ['start', 'verdict', 'testReplay', 'build', 'accept'] as const) {
     if (k === 'accept' && Array.isArray(o.accept)) continue;
     if (o[k] == null) continue;
     if (typeof o[k] !== 'string' || !(o[k] as string).trim()) throw bad(`${k} : commande non vide attendue`);
     config[k] = (o[k] as string).trim();
   }
-  if (config.testReplay && !config.testReplay.includes('{files}')) throw bad('testReplay : la commande doit contenir {files} (remplacé par les fichiers des tests rouges)');
-  if (config.testReplay && config.test && isComposedGate(config.test)) throw bad('testReplay : refusé quand orchestrate.test est une porte composée (&&, ||, sous-shell) : le rejeu seul ne vaut que pour un lanceur unique');
+  checkTestReplay(config.test, config.testReplay, bad);
   if (o.worktreeDeps != null) {
     const deps = o.worktreeDeps;
     if (!Array.isArray(deps) || !deps.length || deps.some((x) => typeof x !== 'string' || !x.trim() || isAbsolute(x) || x.split(/[\\/]/).includes('..'))) throw bad('worktreeDeps : liste de chemins relatifs au dépôt, sans « .. » (node_modules, .venv…)');

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { isParts, type GateTest } from './gate-parts.js';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RafError, type Lot } from '../plan.js';
@@ -201,8 +202,10 @@ export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates 
  * Du 22 au 28-10, des lots annoncés verts arrivaient rouges à la porte parce que la session avait joué `npm run build` (tsconfig.build.json : `src` seul)
  * alors que la porte joue `npx tsc --noEmit` (test et scripts compris) : L330, L353. Vide sans commande déclarée.
  */
-export function gateText(gate: { test?: string; build?: string }): string {
-  const lines = [gate.test ? `- tests: \`${gate.test}\`` : '', gate.build ? `- build: \`${gate.build}\`` : ''].filter(Boolean);
+export function gateText(gate: { test?: GateTest; build?: string }): string {
+  // Porte en parties (L512) : une ligne par partie, avec son dossier, jamais la liste sérialisée.
+  const tests = !gate.test ? [] : isParts(gate.test) ? gate.test.map((p) => `- tests (run in \`${p.dir}/\`): \`${p.run}\``) : [`- tests: \`${gate.test}\``];
+  const lines = [...tests, gate.build ? `- build: \`${gate.build}\`` : ''].filter(Boolean);
   if (!lines.length) return '';
   return `The program's gate, played after every writing session, is exactly:\n${lines.join('\n')}\nRun these commands as written before reporting, not a narrower one (\`npm run build\` or \`npm test\` may cover less than the gate). A red there sends the lot back to a correction pass even when your own run was green.`;
 }

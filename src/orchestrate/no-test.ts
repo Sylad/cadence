@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { readOrchestrateConfig } from '../config.js';
+import { readOrchestrateConfig, type OrchestrateConfig } from '../config.js';
 
 /** Un projet sans `orchestrate.test` (L327) : `probable` est la commande que ses fichiers laissent deviner, ou null. */
 export interface NoTestGate {
@@ -29,7 +29,7 @@ export function probableTestCommand(repo: string): string | null {
 
 /** Le projet n'a pas de `orchestrate.test` : ce qu'on en dit, ou null quand il en a un. Un cadence.yaml illisible ne se signale pas ici (il a déjà sa propre erreur). */
 export function noTestGate(repo: string): NoTestGate | null {
-  let test: string | undefined;
+  let test: OrchestrateConfig['test'];
   try {
     test = readOrchestrateConfig(join(repo, 'cadence.yaml')).test;
   } catch {

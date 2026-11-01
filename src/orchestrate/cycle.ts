@@ -20,7 +20,8 @@ import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, RafError, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
-import { replayRed, TEST_WORKERS_ENV, testWorkersText, type TightTest } from './workers.js';
+import { noteTight, noteUnstable } from './gate-notes.js';
+import { redAlone, replayRed, TEST_WORKERS_ENV, testWorkersText, type TightTest } from './workers.js';
 import { withPlace, type Place } from './gate-place.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, gateText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
@@ -262,6 +263,30 @@ async function baselineFailures(c: LotCtx, command: string): Promise<string[] | 
   const sha = startSha(c);
   if (!sha) return null;
   if (l.baseline?.verified && l.baseline.sha === sha && l.baseline.command === command) return l.baseline.failures;
+  return atStartSha(c, sha, async (place) => {
+    const r = await place.run(command);
+    // Ligne de base comprise (L354) : un rouge du sha de départ est rejoué seul dans le même worktree avant d'être retenu. Sous charge, un test
+    // qui passe seul au départ rougirait ici et excuserait une vraie régression du lot (« déjà rouge au départ »). Un échec sans nom reste tel quel.
+    const found = r.code === 0 ? [] : failedTests(r.output);
+    const named = c.config.testReplay && found.length && !hasUnnamedFailure(r.output) ? found : [];
+    const { red: failures, unstable } = named.length ? await replayRed(place.run, c.config.testReplay!, named, r.output) : { red: found, unstable: [] as string[] };
+    if (unstable.length) c.wave.log(`${lotKey(l.project, l.lot)} · ligne de base ${sha.slice(0, 7)} : ${unstable.length} test(s) rouge(s) sous charge, vert(s) rejoué(s) seul(s), non retenu(s) comme déjà rouge(s) : ${unstable.join(' ; ')}`);
+    l.baseline = { sha, command, failures, verified: true };
+    save(c);
+    return failures;
+  });
+}
+
+/** Parmi les tests rouges `names` du lot, ceux rouges SEULS aussi au sha de départ (L510) : la suite entière du départ a pu les voir verts (ordre, charge), ils n'en sont pas moins déjà rouges avant le lot. Vide sans `testReplay`, sans sha de départ, build du départ rouge ou worktree non monté. */
+async function redAtStart(c: LotCtx, names: string[], output: string): Promise<string[]> {
+  const sha = startSha(c);
+  const replay = c.config.testReplay;
+  return !sha || !replay || !names.length ? [] : (await atStartSha(c, sha, (place) => redAlone(place.run, replay, names, output))) ?? [];
+}
+
+/** Joue `fn` dans un worktree jetable du sha de départ (ligne de base L213, rouges au départ L510), liens vers les dossiers ignorés posés puis retirés avec lui. Null si le worktree ne se monte pas, si le build du départ est rouge ou si `fn` lève. */
+async function atStartSha<T>(c: LotCtx, sha: string, fn: (place: Place) => Promise<T | null>): Promise<T | null> {
+  const l = c.lot;
   const dir = mkdtempSync(join(tmpdir(), 'cadence-baseline-'));
   const links: string[] = [];
   try {
@@ -270,18 +295,9 @@ async function baselineFailures(c: LotCtx, command: string): Promise<string[] | 
     // Sur l'hôte `gate.host` quand il y en a un (L403) ; le worktree local reste le lieu du rejeu si la connexion tombe.
     return await withPlace({ config: c.config, repo: l.repo, sha, dir, needClean: false, label: `porte du lot ${l.lot}`, detail: `(ligne de base ${sha.slice(0, 7)})`, local: (cmd) => sh(c, cmd, 30 * 60_000, {}, dir), say: (line) => c.wave.log(`${lotKey(l.project, l.lot)} · ${line}`) }, async (place) => {
       // Le build d'abord, comme dans la porte (L333) : les tests lisent ce qu'il produit (`dist`), le départ sans lui rougirait tout. Un build rouge au départ
-      // ne dit rien des tests : pas de ligne de base, l'appelant garde les tests pour rouges.
+      // ne dit rien des tests : rien à rendre, l'appelant garde les tests pour rouges.
       if (c.config.build && (await place.run(c.config.build)).code !== 0) return null;
-      const r = await place.run(command);
-      // Ligne de base comprise (L354) : un rouge du sha de départ est rejoué seul dans le même worktree avant d'être retenu. Sous charge, un test
-      // qui passe seul au départ rougirait ici et excuserait une vraie régression du lot (« déjà rouge au départ »). Un échec sans nom reste tel quel.
-      const found = r.code === 0 ? [] : failedTests(r.output);
-      const named = c.config.testReplay && found.length && !hasUnnamedFailure(r.output) ? found : [];
-      const { red: failures, unstable } = named.length ? await replayRed(place.run, c.config.testReplay!, named, r.output) : { red: found, unstable: [] as string[] };
-      if (unstable.length) c.wave.log(`${lotKey(l.project, l.lot)} · ligne de base ${sha.slice(0, 7)} : ${unstable.length} test(s) rouge(s) sous charge, vert(s) rejoué(s) seul(s), non retenu(s) comme déjà rouge(s) : ${unstable.join(' ; ')}`);
-      l.baseline = { sha, command, failures, verified: true };
-      save(c);
-      return failures;
+      return fn(place);
     });
   } catch {
     return null;
@@ -2039,43 +2055,28 @@ async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Pla
       else run.code = 0;
       continue;
     }
+    // L510 : un rouge qui reste rouge seul dans le lot mais que la suite entière du départ avait vu vert (ordre, charge) peut être rouge seul au départ aussi : déjà rouge, ni correction ni escalade.
+    const atStart = still.length ? await redAtStart(c, still, r.output) : [];
+    if (atStart.length) {
+      const note = `${atStart.length} test(s) déjà rouge(s) au sha de départ ${startSha(c)?.slice(0, 7)} (rouge(s) seuls aussi, absent(s) de la ligne de base), pas un défaut du lot : ${atStart.join(' ; ')}`;
+      if (!l.warnings.includes(note)) l.warnings.push(note);
+      if (atStart.length === still.length) {
+        run.dejaRouges = atStart.length + (vs.kind === 'new' ? vs.existants : 0);
+        continue;
+      }
+    }
+    const fresh = still.filter((t) => !atStart.includes(t));
     const alone = unstable.length ? `\n(${unstable.length} test(s) rouge(s) sous charge, verts rejoués seuls : instables, à ne pas corriger)` : '';
     if (vs.kind === 'new') {
-      const left = vs.nouveaux.filter((t) => !unstable.includes(t));
+      const left = vs.nouveaux.filter((t) => !unstable.includes(t) && !atStart.includes(t));
       red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) : ${left.length} test(s) rouge(s) qui ne l'étaient pas au sha de départ :\n${left.map((t) => `- ${t}`).join('\n')}${vs.existants ? `\n(${vs.existants} autre(s) test(s) déjà rouge(s) au sha de départ : à ne pas corriger)` : ''}${alone}` });
       return;
     }
     // Des instables sont écartés : la sortie de la suite entière les montre encore en FAIL, le constat ne nomme que ceux qui restent rouges.
-    const shown = unstable.length ? `${still.length} test(s) rouge(s) après rejeu seul :\n${still.map((t) => `- ${t}`).join('\n')}` : r.output.trim().split('\n').slice(-40).join('\n');
+    const shown = unstable.length || atStart.length ? `${fresh.length} test(s) rouge(s) après rejeu seul :\n${fresh.map((t) => `- ${t}`).join('\n')}` : r.output.trim().split('\n').slice(-40).join('\n');
     red.push({ source: 'tests', gravite: 'bloquant', texte: `${command} en échec (code ${r.code}) :\n${shown}${alone}` });
     return;
   }
-}
-
-/** Trace des tests instables sous charge (L354) : le lot (`instables`, journal et `cadence perf`), un avertissement du lot (tableau de fin de vague) et une ligne du journal de la vague. */
-function noteUnstable(c: LotCtx, tests: string[]): void {
-  const l = c.lot;
-  const fresh = tests.filter((t) => !(l.instables ?? []).includes(t));
-  if (!fresh.length) return;
-  l.instables = [...(l.instables ?? []), ...fresh];
-  const text = `${fresh.length} test(s) instable(s) sous charge (rouge(s) dans la suite, vert(s) rejoué(s) seul(s)), pas de passe de correction : ${fresh.join(' ; ')}`;
-  l.warnings.push(text);
-  c.wave.log(`${lotKey(l.project, l.lot)} · ${text}`);
-  save(c);
-}
-
-const seconds = (ms: number): string => `${Math.round(ms / 100) / 10} s`.replace(/\.0 s$/, ' s');
-
-/** Trace des tests au « délai trop juste » (L510) : rouges dans la suite pour avoir expiré, verts seuls mais près de leur délai. Le lot (`delaisJustes`) et un avertissement qui nomme chaque test, sa durée seul et son délai ; jamais de passe de correction. */
-function noteTight(c: LotCtx, tests: TightTest[]): void {
-  const l = c.lot;
-  const fresh = tests.filter((t) => !(l.delaisJustes ?? []).some((k) => k.test === t.test));
-  if (!fresh.length) return;
-  l.delaisJustes = [...(l.delaisJustes ?? []), ...fresh];
-  const text = `délai trop juste, pas un bug (pas de passe de correction) : ${fresh.map((t) => `${t.test} (${seconds(t.ms)} seul pour ${seconds(t.limit)} de délai)`).join(' ; ')} — relever le délai du test`;
-  l.warnings.push(text);
-  c.wave.log(`${lotKey(l.project, l.lot)} · ${text}`);
-  save(c);
 }
 
 /**

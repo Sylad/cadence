@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runLot } from '../src/orchestrate/cycle.js';
-import { replayRed } from '../src/orchestrate/workers.js';
+import { redAlone, replayRed } from '../src/orchestrate/workers.js';
 import { timeoutLimits } from '../src/orchestrate/baseline.js';
 import { claudeOut, commitFile, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 import { tempDir } from './helpers.js';
@@ -97,5 +97,30 @@ describe('L510 R2 — un rouge déjà rouge à la ligne de base ne déclenche ni
     await runLot(h.lot('L1', {}, { test: gate }));
     expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
     expect(existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').length : 0).toBeLessThanOrEqual(1); // la ligne de base de L213 seule
+  });
+});
+
+describe('L510 R2 — bords du rejeu seul au sha de départ', () => {
+  it('R2 — un rejeu au départ qui échoue sans nommer le test (autre test rouge) n\'excuse pas le lot', async () => {
+    const h = harness({ script: { implement: [impl], fix: [fix('b.txt')], review: [ok] } });
+    const gate = `f() { case "$PWD" in *cadence-baseline*) if [ -n "$1" ]; then echo ' FAIL  test/z.test.ts > autre'; exit 1; fi; exit 0;; esac; [ -f b.txt ] && exit 0; [ -f a.txt ] || exit 0; echo ' FAIL  test/a.test.ts > tiroir'; exit 1; }; f "$@"`;
+    await runLot(h.lot('L1', {}, replaying(gate)));
+    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
+  });
+  const named = (code: number) => async () => ({ code, output: ' FAIL  test/a.test.ts > t\n' });
+  it('redAlone — rouge nommé aux deux rejeux : retenu ; vert au second : non', async () => {
+    expect(await redAlone(named(1), 'v {files}', ['test/a.test.ts > t'], '')).toEqual(['test/a.test.ts > t']);
+    let n = 0;
+    const flaky = async () => (++n === 1 ? { code: 1, output: ' FAIL  test/a.test.ts > t\n' } : { code: 0, output: ' ✓ test/a.test.ts\n' });
+    expect(await redAlone(flaky, 'v {files}', ['test/a.test.ts > t'], '')).toEqual([]);
+  });
+  it('redAlone — sans fichier désignable, rien n\'est rejoué ni retenu ; sortie 0 ou test non nommé : non retenu', async () => {
+    let calls = 0;
+    const count = async () => { calls++; return { code: 1, output: ' FAIL  cas sans fichier\n' }; };
+    expect(await redAlone(count, 'v {files}', ['cas sans fichier'], '')).toEqual([]);
+    expect(calls).toBe(0);
+    expect(await redAlone(named(0), 'v {files}', ['test/a.test.ts > t'], '')).toEqual([]);
+    expect(await redAlone(named(1), 'v {files}', ['test/b.test.ts > autre'], '')).toEqual([]);
+    expect(await redAlone(named(1), 'v {files}', [], '')).toEqual([]);
   });
 });

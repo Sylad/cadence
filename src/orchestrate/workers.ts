@@ -1,6 +1,6 @@
 // Part de la machine de chaque session (L350) : le 26-10, 32 cœurs et 4 sessions, vitest à 31 workers par suite, et des tests qui passaient seuls rougissaient ensemble.
 
-import { jestTestFiles, stripAnsi, testDurationMs, timeoutLimits } from './baseline.js';
+import { failedTests, jestTestFiles, stripAnsi, testDurationMs, timeoutLimits } from './baseline.js';
 
 /** Variable posée dans l'environnement des sessions et de la porte : le nombre de workers que leurs lanceurs de tests ont le droit d'ouvrir. */
 export const TEST_WORKERS_ENV = 'CADENCE_TEST_WORKERS';
@@ -78,6 +78,23 @@ const NO_TEST_RAN = /^\W*(?:no test files? found, exiting with code|no tests? fo
 
 /** Rejeux d'un test rouge de la porte, seul (L354) : rouge aux deux, il est compté. */
 const REPLAYS = 2;
+
+/**
+ * Parmi `names`, les tests rouges SEULS (L510) : `run` rejoue la commande `template` avec leurs fichiers, au plus `REPLAYS` fois ; un test reste s'il est nommé en échec par chaque rejeu, qui sort en échec. C'est une preuve positive : un rejeu qui échoue pour une autre raison
+ * (build cassé, fichier introuvable) ne nomme pas le test et ne l'excuse pas. Un test sans fichier désignable n'est pas rejoué, donc n'est jamais retenu. Sert à savoir si un rouge du lot était déjà rouge au sha de départ.
+ */
+export async function redAlone(run: (command: string) => Promise<{ code: number; output: string }>, template: string, names: string[], output: string): Promise<string[]> {
+  const jest = jestTestFiles(output);
+  const fileOf = (n: string): string | null => replayFile(n) ?? jest.get(n) ?? null;
+  let still = names.filter((n) => fileOf(n));
+  for (let i = 0; i < REPLAYS && still.length; i++) {
+    const files = [...new Set(still.map((n) => fileOf(n)!))];
+    const r = await run(template.replaceAll('{files}', () => files.map(shellArg).join(' ')));
+    const failing = r.code === 0 ? new Set<string>() : new Set(failedTests(r.output));
+    still = still.filter((n) => failing.has(n));
+  }
+  return still;
+}
 
 /** Un test vert seul mais à au moins cette part de son délai est un « délai trop juste » (L510) : 25 s pour 30 s le 31-10 (warhammer L61). */
 const TIGHT_RATIO = 0.8;

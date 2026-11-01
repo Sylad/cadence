@@ -32,7 +32,8 @@ import { INTEGRATION_LOCK } from './orchestrate/integrate.js';
 import { mainTreeWorkers } from './orchestrate/main-tree.js';
 import { cadenceHome, liveWaves, openLotsIn, openWavesIn, waveLotsIn, type OpenWave } from './orchestrate/registry.js';
 import { blockingLots, LABEL, resumeCommand } from './orchestrate/table.js';
-import { bugCodeOf, bugCodePasses, classifyAll, classifySous, measure, ollamaClassifier, ollamaSousClassifier, readCache, readJournals, readRuns, readSousCache, renderReport, renderTestsSansCode, sampleKeys, serializeCache, serializeSousCache } from './corrections.js';
+import { renderTestsSansCode, testsSansCode } from './corrections-sans-code.js';
+import { bugCodeOf, bugCodePasses, classifyAll, classifySous, measure, ollamaClassifier, ollamaSousClassifier, readCache, readJournals, readRuns, readSousCache, renderReport, sampleKeys, serializeCache, serializeSousCache } from './corrections.js';
 import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedEntries, renderPerf, type PerfResult } from './perf.js';
 import { findAcceptation, parseAcceptation, redAcceptations, resealAcceptation, resealForGreen, runAcceptation, setVert } from './orchestrate/accept.js';
 import { refCommand } from './ref/command.js';
@@ -1435,7 +1436,8 @@ async function corrections(rest: string[], values: { classify?: boolean; model?:
   }
   const m = measure(data, cache);
   const bugCode = bugCodeOf(bugCodePasses(data.passes, cache), sousCache);
-  io.out(values.json ? JSON.stringify(bugCode ? { ...m, bugCode } : m, null, 2) : [renderReport(m, bugCode), ...renderTestsSansCode(m)].join('\n'));
+  const sansCode = testsSansCode(data.passes);
+  io.out(values.json ? JSON.stringify({ ...m, testsSansCode: sansCode, ...(bugCode ? { bugCode } : {}) }, null, 2) : [renderReport(m, bugCode), ...renderTestsSansCode(sansCode)].join('\n'));
   return 0;
 }
 

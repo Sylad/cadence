@@ -44,7 +44,7 @@ describe('L510 R5 — cadence corrections mesure la part des passes lancées sur
     const out: string[] = [];
     const io = { cwd: root, env: {}, now: () => new Date('2026-11-01T10:00:00'), out: (l: string) => out.push(l), err: () => {} };
     expect(await run(['corrections'], io)).toBe(0);
-    expect(out.join('\n')).toMatch(/4 passes lancées sur des tests, 3 terminées sans changement de code \(75 %\)/);
+    expect(out.join('\n')).toMatch(/4 passes lancées sur des tests, 3 terminées sans changement de code \(75 %, passes sans commit\)/);
     out.length = 0;
     await run(['corrections', '--json'], io);
     expect(JSON.parse(out.join('\n')).testsSansCode).toEqual({ passes: 4, sansCode: 3 });

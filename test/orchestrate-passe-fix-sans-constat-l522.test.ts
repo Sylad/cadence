@@ -54,6 +54,12 @@ describe('L522 R1 — cas limite : revue neuve de l\'escalade (L337)', () => {
     expect(c.lot.outcome).toBe(WHY(1, 0));
     expect(c.lot.escalation?.issue).toBe('rendu');
   });
+  it('R1 — l\'escalade rendue sans constat lisible est tracée au journal comme celle de toFix', async () => {
+    const h = harness({ script: { implement: [impl()], review: [major, major, major, noFinding], fix: [fix('b.txt'), fix('c.txt'), fix('d.txt')] } });
+    const lines = withLog(h);
+    await runLot(h.lot('L1', {}, { escalation: { model: 'fable' } }));
+    expect(lines.some((l) => l.includes("escalade fable : lot rendu malgré l'escalade"))).toBe(true);
+  });
 });
 
 describe('L522 R2 — le lot est rendu avec la cause nommant les totaux annoncés', () => {
@@ -180,6 +186,12 @@ describe('L522 R5-R8 — un rouge de la porte est rejoué seul ; vert seul, il e
     const k = d.lot('L1');
     noteTight(k, [{ test: 't > y', ms: 25000, limit: 30000 }]);
     expect(k.lot.proposals).toEqual([]);
+  });
+});
+
+describe('L522 R11 — les briefs implement et fix ne promettent plus une passe quand la porte est verte', () => {
+  it.each(['implement.md', 'fix.md'])('R11 — le brief %s dit que nouveauxEchecs ne déclenche rien quand la porte du programme est verte', (f) => {
+    expect(readFileSync(join(TEMPLATES_DIR, f), 'utf8')).toContain("unless the program's gate is green (L522)");
   });
 });
 

@@ -1,7 +1,7 @@
 // Une revue non conforme n'ouvre une passe de correction que si elle laisse un constat actionnable (L522).
 
 import type { LotCtx } from './cycle.js';
-import type { Constat, ReviewSummary } from './state.js';
+import { lotKey, type Constat, type ReviewSummary } from './state.js';
 
 /**
  * Un constat est actionnable quand il est bloquant ou majeur et que son texte, rogné, n'est pas vide (`blockingConstats` ne garde déjà que les bloquants et majeurs).
@@ -11,7 +11,11 @@ import type { Constat, ReviewSummary } from './state.js';
 export function handBackWithoutFinding(c: LotCtx, constats: Constat[], summary: ReviewSummary, stop: (c: LotCtx, status: 'handed-back', outcome: string) => unknown): boolean {
   if (constats.some((k) => k.texte.trim())) return false;
   c.lot.constats = [];
-  if (c.lot.escalation && !c.lot.escalation.issue) c.lot.escalation.issue = 'rendu'; // la revue neuve de l'escalade (L337) n'a pas jugé le lot conforme : comme `toFix`, l'escalade est dite rendue
+  const esc = c.lot.escalation;
+  if (esc && !esc.issue) { // la revue neuve de l'escalade (L337) n'a pas jugé le lot conforme : comme `toFix`, l'escalade est dite rendue et tracée
+    esc.issue = 'rendu';
+    c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · escalade ${esc.model} : lot rendu malgré l'escalade`);
+  }
   stop(c, 'handed-back', `revue non conforme sans constat actionnable (${summary.bloquants} bloquant(s), ${summary.majeurs} majeur(s) annoncé(s), aucun constat lisible) : pas de passe de correction`);
   return true;
 }

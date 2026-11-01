@@ -13,7 +13,9 @@ gives `/cadence:session-start`, `/cadence:session-close`, `/cadence:deliver`,
 `/cadence:lead`, `/cadence:orchestrate`, the `ux-reviewer`, `code-reviewer` and `qa-reviewer` agents and the `livreur` delivery agent. Or copy them into the
 repository with `cadence skills install` (to `.claude/skills/cadence-*` and
 `.claude/agents/cadence-*.md`; `--dir` for another `.claude` folder,
-`--force` to overwrite local edits).
+`--force` to overwrite a copy that differs from the package's text, a local edit or an
+earlier version never edited: the command compares the copy to the text it installs, not to the
+version that installed it).
 
 - **session-start**: reports the facts briefly, proposes three lots from the
   plan, then waits for your priority — nothing starts before your answer.
@@ -50,7 +52,7 @@ repository with `cadence skills install` (to `.claude/skills/cadence-*` and
   edits code. Read-only for real: its `tools:` list is `Read, Grep, Glob, Bash` and the
   Playwright tools (`mcp__playwright`, and `mcp__plugin_playwright_playwright` when the
   browser comes from the Playwright plugin) — no `Edit`, no `Write`. In a wave it gives its captures the absolute path of the capture directory its brief names (a bare name would land in the repository); outside a wave, a path under `.playwright-mcp/` (e.g. `.playwright-mcp/page-home.png`; the Playwright MCP resolves a bare file name against the repository, where it would land at the root); `qa-reviewer` follows it too.
-  **Delivery grid (L513):** on the `ux` step and when reviewing an existing screen (not in mockup or conformity mode) its checklist carries a five-point grid — visible focus, `prefers-reduced-motion`, `cursor: pointer` on clickable elements, no emoji used as an icon, no horizontal scroll at 375, 768, 1024 and 1440 px (a width it could not render goes to `nonVerifie`; a failing point follows the blocking / major / minor scale) — and a static check of AI tics, the rules of `detect.mjs` (Apache-2.0, attribution in `NOTICE`) applied by reading the diff without running it. Each tic is a finding `T1`, `T2`… (file, line, named rule, severity); none gives `tics d’IA : 0 constat`, no front file `non applicable`; a tic that is a choice of the product's charter is not a finding. The grid is not repeated in the short reply.
+  **Delivery grid (L513):** on the `ux` step and when reviewing an existing screen (not in mockup or conformity mode) its checklist carries a five-point grid — visible focus, `prefers-reduced-motion`, `cursor: pointer` on clickable elements, no emoji used as an icon, no horizontal scroll at 375, 768, 1024 and 1440 px (a width it could not render goes to `nonVerifie`; a failing point follows the blocking / major / minor scale) — and a static check of AI tics, the rules of `detect.mjs` (Apache-2.0, attribution in `NOTICE`) applied by reading the diff without running it. Each tic is a finding `T1`, `T2`… (file, line, named rule, severity); none gives `tics d’IA : 0 constat`, no front file `non applicable`; a tic that is a choice of the product's charter is not a finding. The grid is not repeated in the short reply. Without a `Report file:` line (the orchestrated `ux` step, whose structured report has no checklist and whose schema is unchanged), a point that could not be checked goes to `nonVerifie` and the `verdict` line ends with the tally of the grid and the tics line (`grille 5/5 — tics d’IA : 0 constat`).
   **Short reply (L452):** with a `Report file: <absolute path>` line in the brief it answers in 15 lines at most (`Verdict:`, `Findings:` with
   the rule or measure of each, `Not verified:`, `Sub-tasks:`, `Report:`, `Captures:`) and writes the full report to that file (outside the repository, verdict last).
 - **code-reviewer** (agent): any stack; given a repository and a lot id, it reads

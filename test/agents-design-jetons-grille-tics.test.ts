@@ -29,9 +29,9 @@ const screen = { visible: true, screen: 'page' as const };
 const spec: Handler = (call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd) }));
 const impl: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')] }));
 const ok: Handler = () => claudeOut(reviewReport());
-const brief = async (kind: 'maquette' | 'spec') => {
-  const h = harness({ lots, script: { spec: [spec], maquette: [ok], implement: [impl], review: [ok] } });
-  await runLot(h.lot('L1', screen, { maquette: true }));
+const brief = async (kind: 'maquette' | 'spec' | 'ux') => {
+  const h = harness({ lots, script: { spec: [spec], maquette: [ok], implement: [impl], ux: [ok], review: [ok] } });
+  await runLot(h.lot('L1', screen, { maquette: true, ux: { url: 'http://localhost:4200' } }));
   return h.calls.find((c) => c.kind === kind)!.brief;
 };
 
@@ -107,6 +107,17 @@ describe('R6/R7 — grille avant livraison', () => {
     for (const s of ['prefers-reduced-motion', 'cursor', 'emoji', '768']) expect(courte, s).not.toContain(s);
     expect(plat(grille)).toMatch(/applies in every case, with or without a `Report file:` line/);
     expect(plat(grille)).toMatch(/checklist of the report file/);
+  });
+  it('R6 — sans ligne Report file (étape ux orchestrée), la grille et la ligne des tics vont dans nonVerifie et le verdict du rapport structuré, schéma inchangé', async () => {
+    const b = await brief('ux');
+    expect(b).not.toContain('Report file:');
+    expect(b).toContain('structured output');
+    const g = plat(grille);
+    expect(g).toMatch(/Without a `Report file:` line \(the orchestrated `ux` step\)/);
+    expect(g).toMatch(/a point that could not be checked goes in `nonVerifie`/);
+    expect(g).toMatch(/the `verdict` line ends with the tally of the grid and the tics line/);
+    expect(g).toMatch(/grille 5\/5 — tics d’IA : 0 constat/);
+    expect(g).toMatch(/the structured report has no checklist and its schema is unchanged/);
   });
   it('R6 — un focus non visible reste classé selon l’échelle existante, sans nouvelle gravité', () => {
     expect(plat(grille)).toMatch(/blocking \/ major \/ minor scale of the Method section, no severity of its own/);
@@ -234,14 +245,14 @@ describe('R13/R14/R15 — formats inchangés, installation, documentation', () =
     expect(await run(['skills', 'install'], o)).toBe(2);
     expect(readFileSync(file, 'utf8')).toBe('à la main');
   });
-  it('R14 — agent installé non modifié : reçoit le texte renforcé (avec --force ; sans, la mise à jour est refusée)', () => {
+  it('R14 — agent installé non modifié mais d’une version antérieure : refusé sans --force (la copie reste intacte), reçoit le texte renforcé avec --force', () => {
     const dest = join(tempDir(), 'agents');
     mkdirSync(dest, { recursive: true });
     const ancien = read('agents/ux-reviewer.md').replace(/\n## Delivery grid[\s\S]*$/, '\n').replace(/^name: .*$/m, 'name: cadence-ux-reviewer');
     const cible = join(dest, 'cadence-ux-reviewer.md');
     writeFileSync(cible, ancien);
     expect(ancien).not.toContain('## Delivery grid');
-    // installAgents compare la copie au nouveau texte, pas à la version installée : une mise à jour passe par --force.
+    // installAgents compare la copie au texte du paquet, pas à la version qui l'a installée : toute copie différente, même jamais retouchée, passe par --force.
     expect(() => installAgents(AGENTS_DIR, dest, false)).toThrow(/modifié\(s\) localement/);
     expect(readFileSync(cible, 'utf8')).toBe(ancien);
     installAgents(AGENTS_DIR, dest, true);

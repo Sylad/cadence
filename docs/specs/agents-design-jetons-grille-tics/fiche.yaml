@@ -117,10 +117,10 @@ regles:
     tests: ["R5 — spec-writer.md interdit d'inventer une rampe sans couleur de marque", "R5 — spec-writer.md demande de mesurer les valeurs existantes dans ce cas"]
   - id: R6
     cas: [C2]
-    enonce: "agents/ux-reviewer.md porte une grille avant livraison, dans une nouvelle section « ## Delivery grid » placée après « ## Short reply » (fin du fichier), hors mode maquette et conformité, en cinq points : focus visible, prefers-reduced-motion, cursor pointer sur le cliquable, aucun emoji en icône, aucun défilement horizontal à 375, 768, 1024 et 1440 px ; chaque point est une ligne de la liste à cocher du fichier de rapport (la section Short reply, 15 lignes au plus, ne la reprend pas), une largeur non rendue va dans nonVerifie, et un point non conforme suit l'échelle bloquant / majeur / mineur existante."
+    enonce: "agents/ux-reviewer.md porte une grille avant livraison, dans une nouvelle section « ## Delivery grid » placée après « ## Short reply » (fin du fichier), hors mode maquette et conformité, en cinq points : focus visible, prefers-reduced-motion, cursor pointer sur le cliquable, aucun emoji en icône, aucun défilement horizontal à 375, 768, 1024 et 1440 px ; chaque point est une ligne de la liste à cocher du fichier de rapport (la section Short reply, 15 lignes au plus, ne la reprend pas) ; sans ligne Report file (étape ux orchestrée, rapport structuré sans liste à cocher, schéma inchangé), un point non vérifié va dans nonVerifie et la ligne verdict se termine par le bilan de la grille et la ligne des tics (« grille 5/5 — tics d'IA : 0 constat ») ; une largeur non rendue va dans nonVerifie, et un point non conforme suit l'échelle bloquant / majeur / mineur existante."
     statut: sourcee
     source: "demande du lot : « grille avant livraison (focus visible, prefers-reduced-motion, cursor, emoji en icône, largeurs 375/768/1024/1440) » ; agents/ux-reviewer.md « Method » étape 3 (focus visible, reflow) et « Rank »"
-    tests: ["R6 — ux-reviewer.md contient les cinq points de la grille et les quatre largeurs", "R6 — ux-reviewer.md range une largeur non rendue dans nonVerifie", "R6 — la section Delivery grid est placée après Short reply et la réponse courte ne reprend pas la liste", "R6 — un focus non visible reste classé selon l'échelle existante, sans nouvelle gravité"]
+    tests: ["R6 — ux-reviewer.md contient les cinq points de la grille et les quatre largeurs", "R6 — ux-reviewer.md range une largeur non rendue dans nonVerifie", "R6 — la section Delivery grid est placée après Short reply et la réponse courte ne reprend pas la liste", "R6 — sans ligne Report file (étape ux orchestrée), la grille et la ligne des tics vont dans nonVerifie et le verdict du rapport structuré, schéma inchangé", "R6 — un focus non visible reste classé selon l'échelle existante, sans nouvelle gravité"]
   - id: R7
     cas: [C2]
     enonce: "La grille et le contrôle des tics ne valent que pour l'étape ux et la revue d'un écran existant. Ils ne vivent que dans la section nouvelle « ## Delivery grid », après « ## Short reply » : les sections Inputs, Mockup mode, Conformity mode, Method et Output d'ux-reviewer.md gardent leur texte et leurs empreintes (L448 R1 et R7 passent sans réécriture), et templates/orchestrate/ux.md reste identique (empreinte febe94677a4b9be7, L448 R7). Aucun test de L448 n'est réécrit ; le mode maquette garde ses captures à 1440 et 390 px."
@@ -165,10 +165,10 @@ regles:
     tests: ["R13 — une fiche valide avant le lot passe cadence spec check après le lot", "R13 — REVIEW_SCHEMA accepte et refuse les mêmes rapports qu'avant", "R13 — le front matter tools des deux agents est identique à celui d'avant"]
   - id: R14
     cas: [C1, C2, C3]
-    enonce: "Comportement existant, non modifié par le lot : la réinstallation d'un agent modifié à la main sans --force échoue (RafError « modifié(s) localement : --force pour écraser », code de sortie 2) et laisse la copie intacte ; un agent non modifié reçoit le texte renforcé."
+    enonce: "Comportement existant, non modifié par le lot : la réinstallation d'un agent modifié à la main sans --force échoue (RafError « modifié(s) localement : --force pour écraser », code de sortie 2) et laisse la copie intacte ; installAgents compare la copie au texte du paquet, pas à la version qui l'a installée : une copie jamais retouchée d'une version antérieure est refusée de même sans --force et reçoit le texte renforcé avec --force (seule une copie déjà identique passe sans option, « unchanged »)."
     statut: sourcee
     source: "src/skills.ts:44-66 (RafError sans --force) ; test/skills.test.ts:82-85 (code de sortie 2)"
-    tests: ["R14 — agent installé puis modifié à la main : réinstallation sans --force échoue (code 2) et la copie reste intacte", "R14 — agent installé non modifié : reçoit le texte renforcé"]
+    tests: ["R14 — agent installé puis modifié à la main : réinstallation sans --force échoue (code 2) et la copie reste intacte", "R14 — agent installé non modifié mais d'une version antérieure : refusé sans --force (la copie reste intacte), reçoit le texte renforcé avec --force"]
   - id: R15
     cas: [C1, C3]
     enonce: "Le CHANGELOG (section Unreleased) nomme les jetons on-*, le contraste.md, la grille et les tics d'IA, avec l'attribution Apache-2.0."
@@ -187,7 +187,7 @@ contrats:
   - id: A2
     appel: "job ux"
     entree: "le brief templates/orchestrate/ux.md rendu (inchangé), l'agent ux-reviewer, l'application qui tourne et le diff du lot"
-    sortie: "le rapport structuré existant ; sa liste à cocher porte la grille aux quatre largeurs et la ligne des tics d'IA, les tics sont des constats T1, T2…"
+    sortie: "le rapport structuré existant (sans liste à cocher, schéma inchangé) : un point de la grille non vérifié va dans nonVerifie, la ligne verdict se termine par le bilan de la grille aux quatre largeurs et la ligne des tics d'IA, les tics sont des constats T1, T2… ; avec une ligne Report file, la liste à cocher du fichier de rapport porte la grille et la ligne des tics"
     erreurs: []
     sans_erreur: "le lot ne change ni le schéma du rapport ni les échecs du job ; une largeur non rendue est une entrée de nonVerifie, pas une erreur"
     regles: [R6, R7, R8, R9, R10, R11, R12, R13, R14, R15]

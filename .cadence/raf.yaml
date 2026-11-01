@@ -1031,11 +1031,12 @@ lots:
     created: 2026-11-01
   - id: L515
     title: "CI « tests » rouge sur main depuis le 31-10 par construction : l'étape « Suite sous npm publish --dry-run » échoue « You cannot publish over the previously published versions » dès que package.json porte une version déjà publiée (tout commit hors release) — tolérer ce seul refus comme publish.yml (grep EPUBLISHCONFLICT/previously published), sans masquer un vrai rouge de la suite ; + test instable sous Node 24 : porte-deportee.test.ts R17 « deux remplissages simultanés de même empreinte » (run 41322154515)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-01
     started: 2026-11-01
     review: { date: 2026-11-01, verdict: "conforme (3 notes mineures : sortie du dry-run gardée jusqu'à la fin dans tests.yml, titres de sondes qui ne disent pas ce qu'elles testent, aide de test dupliquée) — orchestré (vague 2026-11-01-1700-cad, 1 passe(s) de correction)", commit: 0c5dc8140b74171bc69a3f6a361a7600bc113bec }
+    finished: 2026-11-01
   - id: L516
     title: deliver n'attend pas la CI d'un sha qui ne change que le plan (42 % des livraisons d'app, mesure du 01-11) + horodatage des étapes de deliver dans son journal
     status: todo

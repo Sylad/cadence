@@ -1086,11 +1086,12 @@ lots:
     started: 2026-11-01
   - id: L519
     title: "Voie express pour les retouches (estimate ≤ 0,1 j) : une seule session (pas de précheck, pas de sonde, pas de revue de code séparée : le lead lit le diff), le fichier et la portée nommés dans l'objectif, pas de nouveau test pour un changement purement visuel (la suite existante tourne), pas d'entrée Nouveautés par lot (regroupées par le lead à la livraison), porte complète une fois ; cible < 90 s de session pour un lot comme ol L239 (245 s mesurées le 01-11) ; à caler sur l'étude L517 ; décision de Sylvain du 01-11"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L517 ]
     goal: "Voie express pour les retouches (estimate ≤ 0,1 j), d'après l'étude L517 (levier 2 : ≈ 4,9 min et 51 k jetons de moins par lot) : une seule session, fichier et portée nommés dans l'objectif, pas de précheck, de sonde ni de revue de code séparée (le lead lit le diff et regarde la capture), pas de nouveau test pour un changement purement visuel, pas d'entrée Nouveautés par lot (regroupées par le lead à la livraison), porte complète une fois. ET la tâche locale du lead (demande de Sylvain du 01-11) : un lot marqué local (raf add --local) dit à cadence que le lead modifie lui-même ce dépôt ; pendant la tâche, le dépôt est verrouillé comme par une vague (aucune vague n'y démarre, --add y attend ou est refusé, et la tâche est refusée si un lot du dépôt est en cours) ; à la fin, porte une fois, capture, livraison, et le lot est tracé dans le plan comme les autres."
     created: 2026-11-01
+    started: 2026-11-01
   - id: L520
     title: "Créneaux : une vague réserve le plafond entier pour des lots qui attendent une dépendance (01-11 : vague cadence L517 → L518, L519 en worktrees, 1 session réelle, « créneaux libres : 0 sur 3 » pendant ~1 h) ; ne compter que les lots qui peuvent démarrer (dépendances prêtes), ou un créneau par dépôt tant qu'ils attendent"
     status: todo

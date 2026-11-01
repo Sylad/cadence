@@ -257,11 +257,12 @@ lots:
     created: 2026-10-29
   - id: L420
     title: "cadence deliver commite lui-même la note « article à rafraîchir » qu'il écrit dans le plan (28-10 : laissée non commitée, un commit à la main à chaque livraison)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-29
     notes:
       - { date: 2026-10-31, text: "31-10 : 3 récidives dans la soirée (warhammer L48, L220, evatosorus L6) : deliver laisse .cadence/raf.yaml modifié (note « article à rafraîchir ») et le livreur ne le commite pas → commit et porte à la main à chaque fois" }
+    started: 2026-11-01
   - id: L421
     title: Ajouter un lot à une vague vivante (--add <projet:lot>) au lieu d'en lancer une seconde, refusée dans le même dépôt ; le message du refus nomme cette commande (28-10)
     status: todo

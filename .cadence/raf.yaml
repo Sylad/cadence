@@ -977,10 +977,11 @@ lots:
     created: 2026-11-01
   - id: L512
     title: "Rejeu isolé des tests rouges pour une porte composée (&&, sous-shells) : aujourd'hui testReplay est refusé (config.ts:470), donc ni le rejeu seul de L350 ni le délai trop juste et le rouge au départ de L510 ne jouent pour warhammer (backend && frontend) ni evatosorus — faux rouges du 31-10 (L61 : 4 corrections + escalade Fable ; L45 : correction Fable). Rejeu par partie de la porte (préfixe de chemin → commande, ex. frontend/ → cd frontend && npx vitest run {files}) puis config des deux projets"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-11-01
+    started: 2026-11-01
   - id: L513
     title: "Agents design, idées des tests du 01-11 (ui-ux-pro-max, design-for-ai, claude-design-styles) : spec-writer — jetons de couleur sémantiques avec leur couleur de texte (on-*), rampe tirée de la couleur de la charte et rapport de contraste 4,5:1 joint à la fiche ; ux-reviewer — grille avant livraison (focus visible, prefers-reduced-motion, cursor, emoji en icône, largeurs 375/768/1024/1440) et contrôle statique des « tics d'IA » (règles de detect.mjs, Apache-2.0, attribution) en constats numérotés ; jamais de catalogue de styles génériques sur une app qui a une charte"
     status: todo

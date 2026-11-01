@@ -230,6 +230,8 @@ const trouverTranscript = (racine, sessionId) => {
  * Ventile un lot (état + journal de la vague + transcripts).
  * Mur d'un pas = ended − started − attente de créneau obtenue pendant le pas. Entre deux pas : porte de la vague (après une session d'écriture) ou orchestration ;
  * de la fin du dernier pas à la ligne « intégré » : intégration. Le détail d'une session d'écriture vient du transcript, s'il existe.
+ * Une session d'écriture « aboutie » est un pas implement ou fix au statut ok : seule elle compte dans `sessionsEcriture` et dans la vue de la session.
+ * Un pas d'écriture non abouti (failed, interrupted…) garde son mur et ses jetons dans la vue du lot (le lot les a payés) et est compté à part.
  */
 export function ventilerLot(etat, journalLot, transcripts) {
   const r = {
@@ -245,6 +247,7 @@ export function ventilerLot(etat, journalLot, transcripts) {
     suiteContexte: 0,
     sessionsLues: 0,
     sessionsEcriture: 0,
+    sessionsEcritureNonAbouties: 0,
   };
   const pas = (etat.steps ?? []).filter((s) => Number.isFinite(Date.parse(s.started)) && Date.parse(s.ended) >= Date.parse(s.started));
   const attentes = journalLot?.attentes ?? [];
@@ -257,7 +260,9 @@ export function ventilerLot(etat, journalLot, transcripts) {
     r.mur[poste] += t1 - t0 - attente;
     r.jetons[poste] += nb(s.tokens?.counted);
     if (pas[i + 1]) ajouterTrou(r, 'porte et orchestration', Date.parse(pas[i + 1].started) - t1);
-    if (s.kind === 'implement' || s.kind === 'fix') ajouterSession(r, s, transcripts, t1 - t0 - attente);
+    if (s.kind !== 'implement' && s.kind !== 'fix') return;
+    if (s.status === 'ok') ajouterSession(r, s, transcripts, t1 - t0 - attente);
+    else r.sessionsEcritureNonAbouties += 1;
   });
   const dernier = pas.at(-1);
   if (dernier && journalLot?.integre && journalLot.integre > Date.parse(dernier.ended)) ajouterTrou(r, 'intégration', journalLot.integre - Date.parse(dernier.ended));
@@ -273,7 +278,7 @@ function ajouterTrou(r, poste, trou) {
 }
 
 /**
- * Une session d'écriture : comptée, et ventilée si son transcript est lisible. Un transcript qui déborde du pas (session reprise)
+ * Une session d'écriture aboutie : comptée, et ventilée si son transcript est lisible. Un transcript qui déborde du pas (session reprise)
  * est ramené à `borneMs`, le mur du pas, pour que les postes de session ne dépassent pas le mur du lot.
  */
 function ajouterSession(r, pas, transcripts, borneMs) {
@@ -384,6 +389,7 @@ export function agreger(lots) {
     session,
     lotsLus: lus.length,
     sessionsEcriture: somme(gardes.map((l) => l.sessionsEcriture)),
+    sessionsEcritureNonAbouties: somme(gardes.map((l) => l.sessionsEcritureNonAbouties)),
     sessionsLues: somme(gardes.map((l) => l.sessionsLues)),
     suite: { ms: somme(lus.map((l) => l.suiteMs)), cibleesMs: somme(lus.map((l) => l.ciblesMs)), sortie: somme(lus.map((l) => l.suiteSortie)), contexte: somme(lus.map((l) => l.suiteContexte)) },
     coutPasse: { n: somme(gardes.map((l) => l.coutPasses.n)), ms: somme(gardes.map((l) => l.coutPasses.ms)), jetons: somme(gardes.map((l) => l.coutPasses.jetons)) },
@@ -412,7 +418,7 @@ function tableCauses(byCause) {
 export function rendre(a, corrections) {
   const out = [];
   const murTot = somme(Object.values(a.murTotal));
-  out.push(`${a.lots} lots avec une session d'écriture aboutie ; mur cumulé ${min(murTot)} min, ${k(somme(Object.values(a.jetonsTotal)))} jetons comptés (entrée, sortie, cache écrit ; hors cache lu) ; hors ${min(a.suspensionMin * 60000)} min de suspension (trous de plus de 30 min entre deux pas : question au lead, budget, nuit).`, '');
+  out.push(`${a.lots} lots avec une session d'écriture aboutie ; mur cumulé ${min(murTot)} min, ${k(somme(Object.values(a.jetonsTotal)))} jetons comptés (entrée, sortie, cache écrit ; hors cache lu) ; hors ${min(a.suspensionMin * 60000)} min de suspension (trous de plus de 30 min entre deux pas : question au lead, budget, nuit) ; ${a.sessionsEcritureNonAbouties} pas d'écriture non aboutis (failed, interrupted…) gardés dans le mur et les jetons du lot, hors vue de la session.`, '');
   out.push('| Poste (vue du lot) | Mur cumulé (min) | Part | Mur moyen par lot (min) | Jetons comptés | Part |', '|---|---|---|---|---|---|');
   const jTot = somme(Object.values(a.jetonsTotal));
   for (const p of POSTES_LOT) out.push(`| ${p} | ${min(a.murTotal[p])} | ${pct(a.murTotal[p], murTot)} | ${min(a.murTotal[p] / Math.max(1, a.lots))} | ${k(a.jetonsTotal[p])} | ${pct(a.jetonsTotal[p], jTot)} |`);

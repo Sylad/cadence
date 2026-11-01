@@ -148,6 +148,32 @@ describe('L517 — ventiler un lot', () => {
     const l = ventilerLot(etat([{ n: 1, kind: 'implement', status: 'ok', started: 'x', ended: 'y' }]), undefined, dir);
     expect(l.sessionsEcriture).toBe(0);
   });
+
+  it('un pas implement ou fix non abouti (failed, interrupted) n\'est pas une session aboutie : mur et jetons gardés dans la vue du lot, transcript non lu', () => {
+    const racine = tempDir();
+    mkdirSync(join(racine, '-wt-L1'));
+    writeFileSync(join(racine, '-wt-L1', 'S9.jsonl'), [debut(0), appel(5, 'a', 'Bash', { command: 'npx vitest run' }), resultat(65, 'a')].join('\n'));
+    const steps = [
+      pas(1, 'implement', '10:00:00', '10:10:00', 500, { status: 'failed', sessionId: 'S9' }),
+      pas(2, 'implement', '10:10:00', '10:20:00', 400, { status: 'interrupted' }),
+      pas(3, 'fix', '10:20:00', '10:25:00', 300, { status: 'ok' }),
+    ];
+    const l = ventilerLot(etat(steps), undefined, racine);
+    expect(l.sessionsEcriture).toBe(1);
+    expect(l.sessionsEcritureNonAbouties).toBe(2);
+    expect(l.sessionsLues).toBe(0);
+    expect(l.rejeuxSuiteSession).toBe(0);
+    expect(l.mur['implémentation']).toBe(20 * 60_000);
+    expect(l.jetons['implémentation']).toBe(900);
+    expect(l.mur['correction']).toBe(5 * 60_000);
+    const seulementNonAbouti = ventilerLot(etat([pas(1, 'implement', '10:00:00', '10:10:00', 500, { status: 'failed' })]), undefined, racine);
+    expect(seulementNonAbouti.sessionsEcriture).toBe(0);
+    const a = agreger([l, seulementNonAbouti]);
+    expect(a.lots).toBe(1);
+    expect(a.sessionsEcritureNonAbouties).toBe(2);
+    expect(rendre(a)).toContain('1 lots avec une session d\'écriture aboutie');
+    expect(rendre(a)).toContain('2 pas d\'écriture non aboutis (failed, interrupted…) gardés dans le mur et les jetons du lot, hors vue de la session');
+  });
 });
 
 describe('L517 — agréger et rendre', () => {

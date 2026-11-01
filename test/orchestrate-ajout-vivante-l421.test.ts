@@ -7,6 +7,9 @@ import type { ClaudeFn } from '../src/orchestrate/launch.js';
 import { claudeOut, commitFile, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
 import { tempDir } from './helpers.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { AddFeed, type AddEnv } from '../src/orchestrate/ajout.js';
+import { REPO_LOCK, releaseLock, takeLock } from '../src/orchestrate/lock.js';
+import { sharedStateDir } from '../src/state.js';
 import { join } from 'node:path';
 import { Plan } from '../src/plan.js';
 import { execFileSync } from 'node:child_process';
@@ -270,5 +273,35 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
     });
     await orchestrate(['a:L1', '--budget', '500k', '--max-sessions', '2'], io(parent).io, s.d);
     expect(err).toMatch(/b:L1 : le budget restant de la vague \(500000 tokens\) ne tient pas le budget du lot \(\d+\)/);
+  });
+
+  it("R14 — une demande encore en file quand plus rien ne joue est écartée et dite (« la vague a fini de jouer »), jamais perdue en silence", () => {
+    const store = new RunStore(tempDir(), 'w1');
+    mkdirSync(store.dir, { recursive: true });
+    const lines: string[] = [];
+    store.requestAdd({ project: 'b', lot: 'L1' });
+    store.requestAdd({ lot: 'L2' });
+    new AddFeed({ store, launch: '/x/parent', wctx: { log: (l: string) => lines.push(l) } } as unknown as AddEnv).drain('la vague a fini de jouer');
+    expect(store.addQueue()).toEqual([]);
+    expect(lines).toEqual(['b:L1 : ajout écarté (la vague a fini de jouer)', 'parent:L2 : ajout écarté (la vague a fini de jouer)']);
+  });
+
+  it("R15 — côté vague, un dépôt pris par une autre vague entre le dépôt de la demande et sa prise : le lot est écarté (cause dite), pas ajouté ; la vague finit", async () => {
+    const parent = parentWith(['a', 'b']);
+    const lock = join(sharedStateDir(join(parent, 'b')), REPO_LOCK);
+    const s = scene(parent, 'a:L1', async (store) => {
+      expect(takeLock(lock, { pid: process.ppid, wave: 'autre', started: 'x' }).ok).toBe(true);
+      try {
+        store.requestAdd({ project: 'b', lot: 'L1' });
+        await wait(() => store.addQueue().length === 0);
+      } finally {
+        releaseLock(lock, process.ppid);
+      }
+    });
+    expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    const store = RunStore.last(parent)!;
+    expect(readFileSync(join(store.dir, 'journal.log'), 'utf8')).toMatch(/b:L1 : ajout écarté \(b : une orchestration y est déjà en cours \(autre/);
+    expect(store.readWave()!.lots).toEqual(['a:L1']);
+    expect(s.played).toEqual(['a:L1']);
   });
 });

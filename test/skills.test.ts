@@ -275,6 +275,25 @@ describe('skills install', () => {
     expect(step4).toContain('The `browser_*` tools of the Playwright MCP server take no `userDataDir` and use the one browser of the session that started you, which other agents use too: do not use them');
   });
 
+  it('agent qa-reviewer : R7 — le script dit d\'où il charge le paquet playwright, le dépôt n\'en dépendant pas (L511)', () => {
+    const method = qaAgent().section('Method');
+    const step4 = method.slice(method.indexOf(' 4. **Open each page'), method.indexOf(' 5. **GET only'));
+    // Mesuré le 2026-11-01 : depuis $TMPDIR, require('playwright') échoue ; les seules copies sont dans les caches npx.
+    expect(step4).toContain('The script loads `playwright` from a package already on the machine');
+    expect(step4).toContain('the directory `CADENCE_PLAYWRIGHT` names when that variable is set');
+    expect(step4).toContain('the app repository\'s own `node_modules/playwright` when the app depends on it');
+    expect(step4).toContain('the package of the Playwright MCP server the wave started (`ps -eo args` shows `<dir>/node_modules/.bin/playwright-mcp`: load `<dir>/node_modules/playwright`)');
+    expect(step4).toContain('the newest `~/.npm/_npx/*/node_modules/playwright`');
+  });
+
+  it('agent qa-reviewer : R8 — Chromium embarqué absent : repli sur `channel: \'chrome\'`, jamais d\'installation, sinon « Not verified » et pas les outils browser_* (L511)', () => {
+    const method = qaAgent().section('Method');
+    const step4 = method.slice(method.indexOf(' 4. **Open each page'), method.indexOf(' 5. **GET only'));
+    expect(step4).toContain("when the launch fails because its executable is missing (`Executable doesn't exist`), relaunch with `channel: 'chrome'`");
+    expect(step4).toContain('Never install anything (`npm i`, `npx playwright install`, `npx -y`)');
+    expect(step4).toContain('When no candidate loads and launches, the pass does not take place: say so under « Not verified » as a missing browser tool and stop — the `browser_*` tools are not a fallback');
+  });
+
   it('docs : R5 — l\'isolation du navigateur est décrite dans docs/skills.md et le CHANGELOG, le lead ne limite plus à une QA à la fois (L511)', () => {
     expect(flat(readFileSync(join(import.meta.dirname, '..', 'docs', 'skills.md'), 'utf8'))).toContain('its own browser context (its own profile');
     expect(flat(readFileSync(join(import.meta.dirname, '..', 'CHANGELOG.md'), 'utf8'))).toContain('(L511');

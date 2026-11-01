@@ -1,4 +1,4 @@
-import { basename, join, relative } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import type { Args, OrchestrateDeps, OrchestrateIo, Target } from './command.js';
 import type { LotCtx, WaveCtx } from './cycle.js';
 import { lotFinished, lotKey, lotRepoPaths, type LotState, type RunStore, type WaveState } from './state.js';
@@ -34,8 +34,18 @@ const ALONE: (keyof Args)[] = ['lots', 'resume', 'status', 'drop', 'stopAfterCur
 /** `--add` ne se combine avec rien d'autre que `--wave` (L421) : vrai quand une autre action est donnée. */
 export const addNotAlone = (args: Args): boolean => ALONE.some((k) => (Array.isArray(args[k]) ? (args[k] as unknown[]).length > 0 : !!args[k] || args[k] === 0));
 
-/** La clé d'un lot tel que le lead l'a nommé : le projet donné, ou le dossier de lancement. */
-export const addKey = (launch: string, t: { project?: string; lot: string }): string => lotKey(t.project ?? basename(launch), t.lot);
+/**
+ * L'identifiant d'un projet dans la vague, le même quelle que soit la façon de le taper : le chemin donné résolu depuis le dossier de lancement (`./b`, `b/../b` → `b`),
+ * et le nom du dossier de lancement quand le projet est ce dossier (`.`, ou rien). Sans cela une vague lancée dans un dépôt avec `L1` rangeait son lot sous `a:L1` et
+ * `--add .:L2` cherchait ses lots et ses doublons sous `.` : dépendance non reconnue, doublon admis.
+ */
+export function projectName(cwd: string, project?: string): string {
+  if (!project) return basename(cwd);
+  return relative(cwd, resolve(cwd, project)) || basename(cwd);
+}
+
+/** La clé d'un lot tel que la vague le range : le projet résolu (`projectName`) et le lot. */
+export const addKey = (launch: string, t: { project?: string; lot: string }): string => lotKey(projectName(launch, t.project), t.lot);
 
 /** La commande qui ajoute le lot à la vague vivante qui tient le dépôt, quand cette vague a été lancée depuis ce dossier (`--add` ne voit que celles-là) ; sinon rien. */
 export function addHint(t: { projectDir: string; lot: string }, wave: string, launch: string): string {
@@ -63,7 +73,7 @@ export async function addToLive(args: Args, run: RunEnv, store: RunStore, checks
   const refusals: string[] = [];
   const targets = checks.resolveTargets({ lots: args.add }, io, refusals);
   if (!waveReadsAdds(store.dir)) refusals.push(`la vague ${store.id} ne lit pas la file d'ajouts (lancée avec une version de cadence d'avant L421) : attendre sa fin, puis lancer le lot dans une vague`);
-  const queued = store.addQueue().map((e) => ({ project: e.project ?? basename(launch), lot: e.lot, queued: true }));
+  const queued = store.addQueue().map((e) => ({ project: projectName(launch, e.project), lot: e.lot, queued: true }));
   const pre = refusals.length ? { refusals: [] as string[], lots: [] as LotState[] } : await checks.preflight(targets, run, { wave: store.id, lots: [...store.lots(), ...queued] });
   refusals.push(...pre.refusals, ...budgetRefusals(pre.lots, store.readWave()));
   if (refusals.length) {

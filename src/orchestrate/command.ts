@@ -31,7 +31,7 @@ import { canInstallPrePush, gitProcessRunning, indexLockRefusal, installPrePush,
 import { buildArgs, buildLocalArgs, killSessions, MODEL_ALIASES, mcpServersFor, readAgents, realClaude, enabledPlugins, settingsFiles, type AgentDef, type AnyModel, type ClaudeFn, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { groupLots, runPool } from './pool.js';
-import { AddFeed, addNotAlone, addToLive, openInRepo, type KnownLot, type LaunchChecks } from './ajout.js';
+import { AddFeed, addNotAlone, addToLive, openInRepo, projectName, type KnownLot, type LaunchChecks } from './ajout.js';
 import { repoRefusals, trackedDirty } from './depot.js';
 import { removeWorktree } from './retrait.js';
 import { repoBranch } from './integrate.js';
@@ -257,7 +257,7 @@ export function resolveTargets(args: Pick<Args, 'lots'>, io: OrchestrateIo, refu
   const seen = new Set<string>();
   for (const l of args.lots) {
     const projectDir = l.project ? resolve(io.cwd, l.project) : io.cwd;
-    const project = l.project ?? basename(io.cwd);
+    const project = projectName(io.cwd, l.project); // L421 : `.:L2` depuis le dépôt et `L2` désignent le même projet que les lots de la vague
     const key = lotKey(project, l.lot);
     if (seen.has(key)) {
       refusals.push(`${key} : lot donné deux fois`);

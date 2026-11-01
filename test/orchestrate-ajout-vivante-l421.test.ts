@@ -304,4 +304,58 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
     expect(store.readWave()!.lots).toEqual(['a:L1']);
     expect(s.played).toEqual(['a:L1']);
   });
+  it("R16 — vague lancée DANS le dépôt avec `L1` (projet = nom du dossier) : `--add .:L2` (la forme de l'indice) désigne le même projet — dépendance sur L1 reconnue, `.:L1` refusé en doublon, le lot joue sous `a:L2`", async () => {
+    const parent = parentWith(['a'], { a: 3 }, ['a']);
+    const repo = join(parent, 'a');
+    const seen: { code: number; err: string }[] = [];
+    let hint = '';
+    let codeL3 = -1;
+    const claude: ClaudeFn = async (args, o) => {
+      const kind = kindOf(args);
+      if (kind !== 'implement' && kind !== 'fix') return claudeOut(reviewReport());
+      const lot = /on lot `([^`]+)`/.exec(args[1])![1];
+      if (lot === 'L1') {
+        // Pas d'assertion ici : une exception dans la session ferait échouer la vague et masquerait la cause ; tout est jugé après.
+        const store = RunStore.last(repo)!;
+        const second = io(repo);
+        codeL3 = await orchestrate(['L3'], second.io, d); // le dépôt est tenu par la vague : l'indice propose --add
+        hint = second.err.join('\n');
+        const form = /--add (\S+:L3)/.exec(hint)?.[1] ?? '.:L3';
+        for (const target of [form.replace('L3', 'L1'), form.replace('L3', 'L2')]) {
+          const r = io(repo);
+          seen.push({ code: await orchestrate(['--add', target], r.io, d), err: r.err.join('\n') });
+        }
+        for (let i = 0; i < 300 && store.readLot('a', 'L2')?.status !== 'ready'; i++) await new Promise((r) => setTimeout(r, 10));
+      }
+      return claudeOut(workReport({ commits: [commitFile(o.cwd, `f-${lot}.txt`, `feat(${lot}): travail`)] }));
+    };
+    const d: OrchestrateDeps = { claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR, slotPollMs: 20 };
+    const code = await orchestrate(['L1', '--max-sessions', '2'], io(repo).io, d);
+    expect(codeL3).toBe(2);
+    expect(hint).toMatch(/pour y ajouter ce lot : cadence orchestrate --add \S+:L3 --wave/);
+    expect(seen[0]).toMatchObject({ code: 2 });
+    expect(seen[0]!.err).toMatch(/a:L1 : lot déjà dans la vague/);
+    expect(seen[1]).toMatchObject({ code: 0, err: '' });
+    const store = RunStore.last(repo)!;
+    expect(store.readWave()!.lots).toEqual(['a:L1', 'a:L2']);
+    expect(store.readWave()!.status).toBe('done');
+    expect(code).toBe(0);
+  });
+
+  it("R17 — un ajout mis en attente (dépôt occupé) est recontrôlé quand la vague le prend : `--stop-after-current` demandé entre-temps → écarté (« la vague s'arrête »), hors de wave.json, vague done", async () => {
+    const parent = parentWith(['a'], { a: 2 });
+    const s = scene(parent, 'a:L1', async (store) => {
+      expect(await orchestrate(['--add', 'a:L2'], io(parent).io, s.d)).toBe(0);
+      await new Promise((r) => setTimeout(r, 150)); // la vague a lu la file : a:L2 attend la fin de a:L1 dans son dépôt
+      expect(store.readLot('a', 'L2')).toBeNull();
+      expect(await orchestrate(['--stop-after-current'], io(parent).io, s.d)).toBe(0);
+    });
+    expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    const store = RunStore.last(parent)!;
+    expect(store.readWave()!.status).toBe('done');
+    expect(store.readWave()!.lots).toEqual(['a:L1']);
+    expect(store.addQueue()).toEqual([]);
+    expect(readFileSync(join(store.dir, 'journal.log'), 'utf8')).toMatch(/a:L2 : ajout écarté \(la vague s'arrête\)/);
+    expect(s.played).toEqual(['a:L1']);
+  });
 });

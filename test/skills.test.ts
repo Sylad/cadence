@@ -245,7 +245,7 @@ describe('skills install', () => {
     expect(qa.section('Output')).toContain('Without an expectations file, the draft comes here.');
     expect(qa.section('Output')).toContain('- **Verdict**, one line, alone — e.g. "6/6 pages as expected", "not as expected: 1 blocking (/players shows no player)",');
     // Le profil QA survit aux passes : il est exclu du nettoyage des fichiers temporaires.
-    expect(qa.section('Output')).toContain('Other temporary files go in a temporary directory outside the repository, or in the one the caller names; remove them, or list their paths in the report — except the QA browser profile, which is kept for the next pass. The working tree is left as you found it.');
+    expect(qa.section('Output')).toContain('Other temporary files go in a temporary directory outside the repository, or in the one the caller names; remove them, or list their paths in the report — except the QA browser profile named after the app, which is kept for the next pass (a profile suffixed with a process id is removed). The working tree is left as you found it.');
     expect(qa.description).toContain('without an expectations file it still runs its universal checks, reports what it saw and returns a draft one.');
     expect(qa.description).toContain('reports empty states, wrong data, error messages, failed or empty API calls, console errors and broken images.');
     // Déclencheur : toute livraison qui change ce qu'une page montre ou reçoit — pas seulement un lot « visible ».
@@ -261,7 +261,7 @@ describe('skills install', () => {
     expect(step4).toContain('your own browser context, never the browser or the tabs another session already holds');
     expect(step4).toContain('a `userDataDir` reserved for this agent');
     // R2 : le nom du profil porte l'application et un identifiant propre à l'agent ; deux QA en parallèle ne se partagent rien.
-    expect(step4).toContain('named after the app (host and port of the base URL), kept between passes on that app; when that directory is already open in another browser (a `SingletonLock` file in it), use a directory suffixed with your process id instead, so two QA passes running together, on two apps or on the same one, never share a profile');
+    expect(step4).toContain('named after the app (host and port of the base URL, every character that is not a letter, a digit or a dash replaced by a dash, so `localhost:4200` gives `localhost-4200`), kept between passes on that app; when that directory is already open in another browser (a `SingletonLock` file in it), use a directory suffixed with your process id instead (a suffixed profile is single-use: delete it at the end of the pass), so two QA passes running together, on two apps or on the same one, never share a profile');
     // R3 : à la fin, l'agent ferme son contexte seulement, jamais le navigateur ; les onglets des autres ne sont ni lus ni fermés.
     expect(step4).toContain('At the end, close your own context and nothing else: you neither read nor close a tab you did not open');
     // R4 : l\'ancienne clause « profil conservé entre passes, partagé » ne subsiste pas.

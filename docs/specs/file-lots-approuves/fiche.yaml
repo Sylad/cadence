@@ -1,0 +1,216 @@
+sujet:
+  id: file-lots-approuves
+  titre: File de lots pré-approuvés tirée à chaque créneau libre
+  lot: L498
+  perimetre:
+    modules: [src/orchestrate/command.ts, src/orchestrate/continue.ts, src/ready-free.ts, src/orchestrate/registry.ts, src/orchestrate/lock.ts, src/cli.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "l'ajout d'un lot à une vague vivante lui-même (--add <projet:lot>, lot L421) : la file l'utilise, elle ne le définit pas"
+      - "l'affichage de la file dans le HUD ou dans le tour du lead"
+      - "le skill lead (la consigne d'approuver une liste)"
+
+cas:
+  - id: C1
+    titre: Le lead approuve une liste ordonnée de lots une fois
+    acteur: le lead
+    declencheur: commande orchestrate queue add <projet:lot>…
+    preconditions:
+      - chaque projet:lot nomme un projet du dossier de lancement et un lot de son plan
+    nominal:
+      - "La commande lit les clés projet:lot dans l'ordre donné."
+      - "Chaque clé est vérifiée : projet connu, lot présent dans son plan, lot ni terminé ni déjà dans la file."
+      - "Les clés valides sont ajoutées à la fin de la file approuvée, dans l'ordre."
+      - "La commande affiche la file avec la position de chaque lot."
+    alternatives:
+      - { si: "aucune clé n'est donnée", alors: "refus, rien n'est écrit", regles: [R2] }
+      - { si: "une clé est mal formée, un projet ou un lot est inconnu, ou le lot est terminé", alors: "refus de toute la commande nommant la clé, rien n'est ajouté", regles: [R2] }
+      - { si: "une clé est déjà dans la file", alors: "elle garde sa position, un avertissement la nomme", regles: [R3] }
+    resultat: La file approuvée porte les lots dans l'ordre voulu par le lead.
+
+  - id: C2
+    titre: Le lead lit et retire des lots de la file
+    acteur: le lead
+    declencheur: commande orchestrate queue show, commande orchestrate queue drop <projet:lot>…
+    preconditions:
+      - aucune
+    nominal:
+      - "show liste les lots dans l'ordre avec leur état : en attente, tiré par la vague <id>, ou sauté avec sa cause."
+      - "drop retire les clés données de la file ; l'ordre des autres ne change pas."
+    alternatives:
+      - { si: "la file est vide", alors: "show dit « file approuvée vide : approuver des lots avec orchestrate queue add <projet:lot> »", regles: [R4] }
+      - { si: "drop nomme une clé absente de la file", alors: "refus nommant la clé", regles: [R4] }
+      - { si: "drop nomme un lot déjà tiré", alors: "refus, le lot est déjà dans une vague", regles: [R4] }
+    resultat: Le lead voit ce que la file contient et peut l'amender sans la refaire.
+
+  - id: C3
+    titre: Une vague vivante tire le lot suivant de la file dès qu'un créneau se libère
+    acteur: une vague d'orchestrate en cours
+    declencheur: libération d'un créneau de session (un lot de la vague a fini, est rendu ou posé en question)
+    preconditions:
+      - la file approuvée contient au moins un lot en attente
+      - la vague vit et aucune borne d'arrêt ne joue (stopReason nul)
+    nominal:
+      - "Le créneau se libère ; la vague n'attend pas la fin du tour en cours ni le lead."
+      - "Elle parcourt la file dans l'ordre et prend le premier lot mûr (R5)."
+      - "Elle réserve le lot dans la file (R7), le passe au contrôle préalable comme un lot donné puis l'ajoute à ses lots (même mécanisme que --add de L421)."
+      - "Le journal écrit « file : tire <projet:lot> (position n) »."
+    alternatives:
+      - { si: "le lot n'est pas mûr (question, after non clos, ressource uses: tenue)", alors: "il est sauté, reste en file à sa place et le journal le dit avec sa cause", regles: [R5, R6] }
+      - { si: "aucun lot de la file n'est mûr", alors: "le créneau reste libre, le journal dit « file : aucun lot mûr (n sauté(s)) »", regles: [R6] }
+      - { si: "une borne d'arrêt joue (question posée à la vague, deux lots rendus de suite, budget épuisé, --until, quota, --stop-after-current)", alors: "rien n'est tiré", regles: [R8] }
+      - { si: "le budget du lot dépasse le budget restant", alors: "lot sauté et dit, il reste en file", regles: [R8] }
+      - { si: "le dépôt du lot est tenu par une autre vague vivante", alors: "lot sauté et dit « une orchestration y est déjà en cours »", regles: [R9] }
+      - { si: "le contrôle préalable refuse le lot pour lui-même", alors: "le lot est exclu de cette vague, reste en file et la cause est dite", regles: [R10] }
+      - { si: "le plafond de sessions (vagues et holds du lead compris) est atteint", alors: "aucun créneau n'est libre, rien n'est tiré", regles: [R8] }
+    resultat: Le créneau libre est occupé par le lot suivant approuvé, sans passage par le lead.
+
+  - id: C4
+    titre: Une vague neuve démarre depuis la file
+    acteur: le lead (ou une vague neuve)
+    declencheur: commande orchestrate --queue
+    preconditions:
+      - la file approuvée contient au moins un lot en attente
+    nominal:
+      - "La vague démarre sans liste de lots donnée à la main."
+      - "Elle tire autant de lots mûrs de la file que de créneaux libres, dans l'ordre (R5), puis continue comme C3 à chaque créneau libéré."
+    alternatives:
+      - { si: "la file est vide ou sans lot mûr", alors: "refus de démarrer, la vague nomme les lots sautés et leurs causes", regles: [R6, R11] }
+      - { si: "une vague vit déjà dans le même dépôt", alors: "la nouvelle vague ne se lance pas, les lots de la file vont à la vague vivante (C3, L421)", regles: [R9] }
+      - { si: "des lots sont donnés à la main avec --queue", alors: "ils passent d'abord, la file complète les créneaux restants", regles: [R11] }
+    resultat: Une vague démarre sur la file sans que le lead choisisse les lots un à un.
+
+  - id: C5
+    titre: Deux vagues vivantes se disputent le même lot de la file
+    acteur: deux vagues d'orchestrate
+    declencheur: deux créneaux libérés au même instant
+    preconditions:
+      - le même lot est le premier mûr de la file pour les deux vagues
+    nominal:
+      - "La première vague réserve le lot de façon atomique."
+      - "La seconde voit la réservation, passe au lot mûr suivant."
+    alternatives: []
+    sans_alternative: "la réservation atomique est la seule branche ; la perte de la course n'est pas une erreur, c'est le cas nominal de la seconde vague (R7)"
+    resultat: Un lot n'est tiré qu'une fois.
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "La file approuvée est une liste ordonnée de clés projet:lot ; l'ordre d'ajout est l'ordre de tirage et reste celui du lead."
+    statut: sourcee
+    source: "demande du lot : « le lead approuve une liste ordonnée de lots (projet:lot) une fois »"
+    tests: ["R1 — trois lots ajoutés dans l'ordre B, A, C : la file les rend B, A, C"]
+  - id: R2
+    cas: [C1]
+    enonce: "queue add refuse en bloc, sans rien écrire, une liste vide ou une clé mal formée, de projet inconnu, de lot inconnu ou de lot terminé, en nommant la clé fautive."
+    statut: hypothese
+    si_faux: "Si une liste partiellement valide doit être acceptée, seul le refus en bloc devient un ajout des clés valides avec avertissement ; aucune donnée en jeu."
+    tests: ["R2 — clé de lot inconnu : refus nommant la clé, file inchangée", "R2 — liste vide : refus, file inchangée"]
+  - id: R3
+    cas: [C1]
+    enonce: "Une clé déjà présente en file garde sa position (pas de doublon) et l'ajout l'avertit."
+    statut: hypothese
+    si_faux: "Si le lead veut déplacer un lot en le réajoutant, il devra le retirer (drop) puis l'ajouter ; aucune donnée perdue."
+    tests: ["R3 — clé déjà en file : une seule occurrence, position inchangée, avertissement"]
+  - id: R4
+    cas: [C2]
+    enonce: "show dit l'état de chaque lot (en attente, tiré par la vague, sauté et sa cause) et, pour une file vide, comment la remplir ; drop refuse une clé absente ou déjà tirée en la nommant."
+    statut: hypothese
+    si_faux: "Seuls les libellés et le niveau de détail de show changent ; drop sur une clé absente pourrait devenir silencieux."
+    tests: ["R4 — file vide : show dit comment approuver des lots", "R4 — drop d'une clé absente : refus nommant la clé", "R4 — drop d'un lot déjà tiré : refus, file inchangée"]
+  - id: R5
+    cas: [C3, C4]
+    enonce: "Un lot de la file est mûr quand il est prêt au sens du tirage existant (à faire, after levé, ni récurrent ni en cours), qu'aucune question ne l'attend (« à décider », src/orchestrate/continue.ts:53 ; ou question posée) et qu'aucune de ses ressources uses: n'est tenue (src/ready-free.ts:101). La vague prend le premier lot mûr dans l'ordre de la file, pas le premier de la file."
+    statut: sourcee
+    source: "demande du lot : « un lot non mûr (question, after non clos, uses tenu) est sauté » ; critères repris de src/orchestrate/continue.ts:53 et src/ready-free.ts:101"
+    tests: ["R5 — premier lot de la file avec after non clos : le deuxième est tiré", "R5 — lot « à décider » : sauté", "R5 — lot dont uses: est tenu par un lot doing : sauté", "R5 — tous les lots mûrs : le premier de la file est tiré"]
+  - id: R6
+    cas: [C3, C4]
+    enonce: "Un lot sauté reste en file à sa place (il sera retenté au créneau suivant) et le journal le dit, une fois par cause, au format « file : lot sauté — <projet:lot> : <cause> » avec la cause « question posée », « after non clos (<lot>) » ou « ressource tenue (<nom>) »."
+    statut: sourcee
+    source: "demande du lot : « sauté et dit » ; format calqué sur « continue : lot sauté — » de src/orchestrate/command.ts:1034"
+    tests: ["R6 — after non clos : journal « file : lot sauté — p:L2 : after non clos (L1) » et lot toujours en file", "R6 — même cause sur deux créneaux : une seule ligne", "R6 — aucun lot mûr : le créneau reste libre et le journal le dit"]
+  - id: R7
+    cas: [C3, C5]
+    enonce: "Le tirage réserve le lot dans la file de façon atomique avant de le lancer : un lot de la file n'est tiré que par une seule vague, une seule fois, et une vague qui échoue après la réservation rend le lot à la file."
+    statut: hypothese
+    si_faux: "Sans réservation atomique, deux vagues joueraient le même lot (double travail, deux branches) ; c'est le seul risque, corrigé par un verrou de plus."
+    tests: ["R7 — deux tirages simultanés du même lot : un seul le prend", "R7 — vague interrompue avant le lancement : le lot revient en file"]
+  - id: R8
+    cas: [C3]
+    enonce: "Le tirage de la file respecte les bornes de la vague : stopReason (src/orchestrate/continue.ts, question posée, deux lots rendus de suite, --until, quota, --stop-after-current, budget épuisé), le plafond de sessions qui compte les holds du lead, et le budget restant (un lot qui n'y tient pas est sauté et dit, comme src/orchestrate/command.ts:920)."
+    statut: sourcee
+    source: "bornes déjà codées : src/orchestrate/continue.ts (stopReason) et src/orchestrate/command.ts:1019-1028 ; plafond avec holds : lot L424"
+    tests: ["R8 — vague en question : la file n'est pas tirée", "R8 — --stop-after-current : rien n'est tiré à la libération du créneau", "R8 — budget restant inférieur à celui du lot : lot sauté et dit, reste en file", "R8 — plafond atteint avec un hold du lead : aucun tirage"]
+  - id: R9
+    cas: [C3, C4]
+    enonce: "Une vague ne tire qu'un lot dont le dépôt est libre ou tenu par elle-même ; si le dépôt est tenu par une autre vague vivante le lot est sauté et dit « une orchestration y est déjà en cours (<vague>, pid <n>) », et au démarrage d'une vague neuve dans un dépôt déjà tenu les lots vont à la vague vivante (ajout L421)."
+    statut: sourcee
+    source: "refus existant src/orchestrate/command.ts:418 (« une orchestration y est déjà en cours ») ; demande du lot « avec L421 (ajout à une vague vivante) »"
+    tests: ["R9 — dépôt tenu par une autre vague : lot sauté avec le message du verrou", "R9 — dépôt tenu par la vague elle-même : lot tiré"]
+  - id: R10
+    cas: [C3]
+    enonce: "Un refus du contrôle préalable propre au lot l'exclut de la vague mais le laisse en file, avec sa cause dite ; un refus du dépôt (arbre sale, orchestration en cours) ne l'exclut que pour ce tirage."
+    statut: sourcee
+    source: "tirage existant src/orchestrate/command.ts:941-943 (refus propre au lot exclu pour la vague, refus de dépôt passager)"
+    tests: ["R10 — refus propre au lot : non retiré de la file, non retenté par cette vague", "R10 — arbre sale : retenté au créneau suivant"]
+  - id: R11
+    cas: [C4]
+    enonce: "orchestrate --queue démarre depuis la file ; sans lot mûr elle refuse de démarrer en listant les lots sautés et leurs causes ; avec des lots donnés à la main, ceux-ci passent avant et la file complète les créneaux restants."
+    statut: hypothese
+    si_faux: "Si la file doit être tirée par toute vague sans option, --queue devient le comportement par défaut ; seul le démarrage change."
+    tests: ["R11 — file sans lot mûr : refus listant les causes", "R11 — lots donnés et file : les lots donnés d'abord"]
+  - id: R12
+    cas: [C3, C4]
+    enonce: "Un lot approuvé dans la file échappe au réglage orchestrate.continue (exclude, maxEstimate) et au marqueur « non tirable » : l'approbation explicite du lead vaut tirage à la main (src/orchestrate/continue.ts:130 : les lots donnés à la main se jouent)."
+    statut: hypothese
+    si_faux: "Si le réglage doit primer, un lot approuvé mais exclu est sauté et dit « écarté du tirage : <cause> » ; aucune donnée en jeu."
+    tests: ["R12 — lot listé dans continue.exclude mais approuvé : tiré"]
+  - id: R13
+    cas: [C3]
+    enonce: "Un lot tiré de la file en sort (il appartient à la vague) ; la file ne contient plus que des lots non tirés."
+    statut: sourcee
+    source: "demande du lot : « en tire le suivant »"
+    tests: ["R13 — lot tiré : absent de la file, présent dans les lots de la vague"]
+
+contrats:
+  - id: A1
+    appel: commande orchestrate queue add
+    entree: "une ou plusieurs clés <projet:lot>, dans l'ordre"
+    sortie: "la file approuvée : une ligne « <position>. <projet:lot> — <titre> » par lot (code 0)"
+    erreurs:
+      - { code: HTTP 400, message: "queue add : aucun lot donné (attendu : <projet:lot>…)" }
+      - { code: HTTP 400, message: "queue add : <clé> : lot ou projet inconnu" }
+      - { code: HTTP 400, message: "queue add : <clé> : lot déjà terminé" }
+      - { code: log warn, message: "queue add : <clé> : déjà en file (position <n>)" }
+    regles: [R1, R2, R3]
+  - id: A2
+    appel: commande orchestrate queue show
+    entree: aucune
+    sortie: "la file avec l'état de chaque lot ; si elle est vide « file approuvée vide : approuver des lots avec orchestrate queue add <projet:lot> »"
+    erreurs: []
+    sans_erreur: "lecture seule ; une file absente se lit comme vide (R4)"
+    regles: [R4]
+  - id: A3
+    appel: commande orchestrate queue drop
+    entree: "une ou plusieurs clés <projet:lot>"
+    sortie: "la file restante (code 0)"
+    erreurs:
+      - { code: HTTP 400, message: "queue drop : <clé> : absent de la file" }
+      - { code: HTTP 400, message: "queue drop : <clé> : déjà tiré par la vague <id>" }
+    regles: [R4]
+  - id: A4
+    appel: commande orchestrate --queue
+    entree: "option --queue, éventuellement des lots donnés, --max-sessions, --until"
+    sortie: "une vague qui joue les lots mûrs de la file et en tire un à chaque créneau libéré ; journal « file : tire <projet:lot> (position <n>) »"
+    erreurs:
+      - { code: log info, message: "file : lot sauté — <projet:lot> : <cause>" }
+      - { code: log info, message: "file : aucun lot mûr (<n> sauté(s))" }
+      - { code: HTTP 400, message: "orchestrate --queue : aucun lot mûr dans la file approuvée" }
+    regles: [R5, R6, R7, R8, R9, R10, R11, R12, R13]
+
+donnees:
+  - { id: D1, objet: "file approuvée : liste ordonnée de clés projet:lot avec, pour chaque lot, son état (en attente, réservé par une vague, tiré) — emplacement et format à trancher (question Q1)", existant: false, modification: ajout, note: "nouvelle donnée, partagée entre vagues vivantes ; ne touche aucun format existant" }
+  - { id: D2, objet: "état de vague (lots, journal) et registre des vagues vivantes (waves/<pid>.json)", existant: true, modification: aucune, note: "lus pour savoir ce qui est tenu ; le lot tiré y entre comme un lot ajouté (L421)" }
+  - { id: D3, objet: "plan du projet (after, uses, notes « à décider »)", existant: true, modification: aucune, note: "lu seulement pour juger la maturité" }

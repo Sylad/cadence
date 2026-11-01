@@ -18,5 +18,5 @@ const plural = (n: number, one: string, many: string): string => `${n} ${n === 1
 /** La ligne du rapport lisible, vide sans passe de ce genre. À part de `renderReport` : le relevé de référence du 10-10 reproduit ce rapport mot pour mot. */
 export function renderTestsSansCode(t: TestsSansCode): string[] {
   if (t.passes === 0) return [];
-  return [`${plural(t.passes, 'passe lancée', 'passes lancées')} sur des tests, ${plural(t.sansCode, 'terminée', 'terminées')} sans changement de code (${Math.round((100 * t.sansCode) / t.passes)} %) (passes sans commit).`, ''];
+  return [`${plural(t.passes, 'passe lancée', 'passes lancées')} sur des tests, ${plural(t.sansCode, 'terminée', 'terminées')} sans changement de code (${Math.round((100 * t.sansCode) / t.passes)} %, passes sans commit).`, ''];
 }

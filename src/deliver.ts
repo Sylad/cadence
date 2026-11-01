@@ -630,8 +630,8 @@ function deliveredLots(ctx: DeliverCtx, ids: string[], prev: string | null, sha:
 
 /**
  * Livraison verte (L144) : les lots livrés dont le titre est public changent ce que les articles externes racontent, on ouvre
- * donc le lot qui les rafraîchit. Hors vague le plan est écrit mais pas commité ; pendant une vague (L388) il est commité avec les fichiers que produit `plan.onWrite`, avec
- * le gabarit `plan.commit`, pour ne pas laisser le plan modifié dans l'arbre où une session de la vague travaille — sauf si le plan ou ces fichiers l'étaient
+ * donc le lot qui les rafraîchit. Le plan est commité (L388 pendant une vague, L420 aussi hors vague : le livreur lancé à la main le laissait modifié) avec les fichiers que produit `plan.onWrite`, avec
+ * le gabarit `plan.commit` (sans la vague hors vague), pour ne pas laisser le plan modifié dans l'arbre — sauf si le plan ou ces fichiers l'étaient
  * déjà avant l'écriture (le lead y a des modifications que ce commit emporterait). Une erreur ici ne défait pas une livraison déjà faite.
  */
 function refreshArticles(ctx: DeliverCtx, ids: string[], sha: string): void {
@@ -656,9 +656,9 @@ function refreshArticles(ctx: DeliverCtx, ids: string[], sha: string): void {
     if (r.opened.length || r.noted.length) plan.save();
     const touched = [...r.opened, ...r.noted];
     let state = 'plan modifié, à commiter';
-    if (touched.length && ctx.duringWave && wasDirty) {
+    if (touched.length && wasDirty) {
       state = 'plan déjà modifié avant la livraison, non commité : à commiter avec vos modifications';
-    } else if (touched.length && ctx.duringWave) {
+    } else if (touched.length) {
       const message = planCommitMessage(ctx.planCommit, { lot: touched.join(', '), action: r.opened.length ? PLAN_ACTIONS.articleOpened : PLAN_ACTIONS.articleNoted, wave: ctx.waveId });
       try {
         state = `plan commité ${commitPaths(ctx.root, [planFile, ...dirtyPaths(ctx.root, plan.produced)], message)}`;

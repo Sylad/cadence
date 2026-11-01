@@ -141,13 +141,32 @@ describe('deliver pendant une vague (L388) : le plan écrit pour l\'article est 
     expect(subject(dir)).toBe('chore(L2): article à rafraîchir ouvert [W9]');
   });
 
-  it('R3 — hors vague : le plan reste écrit sans être commité, comme avant', async () => {
+  it('R3 — hors vague (livreur lancé à la main, L420) : le lot de l\'article est commité aussi, sans « orchestrate », l\'arbre reste propre', async () => {
     const { dir, base, deps, out } = await prete();
+    expect(await deliver(base, deps)).toBe(0);
+    expect(status(dir)).toBe('');
+    expect(subject(dir)).toBe('plan: L2 article à rafraîchir ouvert');
+    expect(out.join('\n')).not.toContain('à commiter');
+  });
+
+  it('R3b — hors vague, plan déjà modifié avant la livraison : rien n\'est commité à la place de l\'utilisateur (L420)', async () => {
+    const { dir, base, deps, out } = await prete();
+    const p = join(dir, '.cadence/raf.yaml');
+    writeFileSync(p, `${readFileSync(p, 'utf8')}# note\n`);
     const head = subject(dir);
+    const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+    expect(await deliver({ ...base, plan: Plan.load(p), sha }, deps)).toBe(0);
+    expect(subject(dir)).toBe(head);
+    expect(status(dir)).toBe('M .cadence/raf.yaml');
+    expect(out.join('\n')).toContain('plan déjà modifié avant la livraison');
+  });
+
+  it('R3c — hors vague, commit refusé : le plan reste écrit et la ligne le dit (L420)', async () => {
+    const { dir, base, deps, out } = await prete();
+    writeFileSync(join(dir, '.git/hooks/commit-msg'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
     expect(await deliver(base, deps)).toBe(0);
     expect(status(dir)).toBe('M .cadence/raf.yaml');
-    expect(subject(dir)).toBe(head);
-    expect(out.join('\n')).toContain('plan modifié, à commiter');
+    expect(out.join('\n')).toContain('commit du plan refusé');
   });
 
   it('R4 — plan déjà modifié par le lead avant la livraison : rien n\'est commité à sa place, la ligne le dit', async () => {

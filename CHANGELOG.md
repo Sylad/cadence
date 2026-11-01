@@ -85,6 +85,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - `orchestrate.gate.host` (and `gate.install`): the gate — `cadence verify --gate`, a wave's lot gate, the baseline and the replay alone — is played by ssh on another machine, at the sha pushed to a bare repository there, with a dependency cache keyed by the fingerprint of the lockfiles, a local fallback when the host does not answer, and a connection lost during a command (ssh 255) replayed locally, said in the output and the wave's journal and never counted red (L403, [docs/remote-gate.md](docs/remote-gate.md)). `gate.host` alone is not `gate.readsPlan`.
 
+### Fixed
+
+- `cadence deliver` outside a wave also commits the plan it wrote for the « article à rafraîchir » lot (L420, `docs/news.md`): the 31-10 deliveries run by hand left `.cadence/raf.yaml` modified and the lead committed it each time. Same rules as during a wave: only the plan and the `plan.onWrite` files, nothing committed when they already had changes or when a hook refuses, subject `plan: L9 article à rafraîchir ouvert` without the wave.
+
 ## [1.34.1] - 2026-11-01
 
 ### Fixed

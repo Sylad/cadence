@@ -11,7 +11,7 @@ import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { failedTests, hasUnnamedFailure, unloadedSuites } from './orchestrate/baseline.js';
 import { configuredCap } from './orchestrate/command.js';
 import { TEST_WORKERS_ENV, testWorkersFrom } from './orchestrate/workers.js';
-import { gateLabel, gateReplayable, redCandidates, replayGate, runGate, type GateTest } from './orchestrate/gate-parts.js';
+import { gateLabel, gateReplayable, gateUnnamed, replayGate, runGate, type GateTest } from './orchestrate/gate-parts.js';
 import { copyDeps, git, gitFailure, ignoredDeps, isCopiedDep } from './orchestrate/worktree.js';
 import { tryRemote } from './verify-gate-remote.js';
 import { GATE_TIMEOUT_MS, type Ran } from './remote-gate.js';
@@ -273,8 +273,8 @@ async function runSteps(steps: Step[], exec: (cmd: string) => Promise<Ran>, out:
     const unloaded = tests ? unloadedSuites(r.output) : [];
     // `orchestrate.testReplay` comme la porte d'une vague (L354, L387) : un rouge nommé est rejoué seul avant d'être compté ; vert au rejeu, il est instable sous charge.
     // Un échec que la sortie ne rattache à aucun test, ou un fichier qui ne se charge pas, n'est jamais rejoué.
-    // Porte en parties (L512) : l'échec sans nom ou le fichier qui ne se charge pas d'une partie ne bloque que le rejeu de cette partie (`replayGate`), pas celui des autres.
-    const replayable = tests && gateReplayable(step.gate, config.testReplay) && names.length > 0 && (r.parts ? redCandidates(r).length > 0 : unloaded.length === 0 && !hasUnnamedFailure(r.output));
+    // Porte en parties (L512) : une partie rouge sans test nommé, ou à échec sans nom, bloque tout rejeu (`gateUnnamed`) : l'instable d'une autre partie n'excuse jamais la porte.
+    const replayable = tests && gateReplayable(step.gate, config.testReplay) && names.length > 0 && unloaded.length === 0 && !gateUnnamed(r);
     const replays: number[] = [];
     const { red: still, unstable } = replayable
       ? await replayGate(async (c) => {

@@ -1,8 +1,8 @@
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { readOrchestrateConfig, type OrchestrateConfig } from '../src/config.js';
-import { gateLabel, gateReplayable, partCommand, redAloneGate, redCandidates, replayGate, runGate, type GateRan, type GatePart } from '../src/orchestrate/gate-parts.js';
+import { gateLabel, gateReplayable, gateUnnamed, partCommand, redAloneGate, redCandidates, replayGate, runGate, type GateRan, type GatePart } from '../src/orchestrate/gate-parts.js';
 import { gateText } from '../src/orchestrate/briefs.js';
 import { acceptText } from '../src/orchestrate/accept.js';
 import { tempDir } from './helpers.js';
@@ -129,11 +129,12 @@ describe('L512 R3 — chaque partie est lancée dans son dossier et chaque rouge
     const g = fakeRun({ 'cd backend && npm test': 'ok\n', 'cd frontend && npx vitest run': 'ok\n' });
     expect((await runGate(g.run, [back, front])).code).toBe(0);
   });
-  it('R3 — redCandidates : en parties, l\'échec sans nom d\'une partie ne retire pas les noms des autres ; en chaîne, tout ou rien comme avant', () => {
+  it('R3 — redCandidates : l\'échec sans nom d\'une partie rouge retire tout candidat (la porte reste rouge) ; en chaîne, tout ou rien comme avant', () => {
     const parts: GateRan = { code: 1, output: '', parts: [{ part: back, code: 1, output: 'Test suite failed to run\n' }, { part: front, code: 1, output: ' FAIL  src/x.spec.ts > charge\n' }] };
     parts.output = parts.parts!.map((p) => p.output).join('');
-    expect(redCandidates(parts)).toEqual(['src/x.spec.ts > charge']);
+    expect(redCandidates(parts)).toEqual([]);
     expect(redCandidates({ code: 1, output: parts.output })).toEqual([]);
+    expect(redCandidates({ code: 1, output: ' FAIL  src/x.spec.ts > charge\n' })).toEqual(['src/x.spec.ts > charge']);
   });
 });
 
@@ -243,5 +244,46 @@ describe('L512 R9 — les lecteurs de orchestrate.test affichent la liste par pa
     expect(Boolean(c.test || c.build)).toBe(true);
     expect(gateReplayable(c.test, c.testReplay)).toBe(true);
     expect(gateReplayable([back], undefined)).toBe(false);
+  });
+});
+
+describe('L512 R3 — une partie rouge sans test nommé garde la porte rouge (bloquant de la revue)', () => {
+  const unstable = { part: front, code: 1, output: ' FAIL  src/x.spec.ts > charge\n' };
+  it.each([
+    ['erreur de compilation', 'Error: type error in src/foo.ts\n'],
+    ['seuil de couverture', 'ERROR: Coverage for lines (50%) does not meet global threshold (80%)\n'],
+    ['dossier introuvable', "sh: 1: cd: can't cd to backend\n"],
+    ['fichier qui ne se charge pas', ' FAIL  src/a.spec.ts [ src/a.spec.ts ]\n'],
+  ])('R3 — backend rouge (%s) : aucun candidat au rejeu, rien n\'excuse la porte', (_, out) => {
+    const ran: GateRan = { code: 1, output: '', parts: [{ part: back, code: 1, output: out }, unstable] };
+    expect(gateUnnamed(ran)).toBe(true);
+    expect(redCandidates(ran)).toEqual([]);
+  });
+  it('R3 — backend vert et frontend rouge nommé : les candidats sont ceux du frontend ; forme chaîne : hasUnnamedFailure comme avant', () => {
+    const ran: GateRan = { code: 1, output: `[backend]\nError: ignorée, la partie est verte\n\n[frontend]\n${unstable.output}`, parts: [{ part: back, code: 0, output: 'Error: ignorée, la partie est verte\n' }, unstable] };
+    expect(gateUnnamed(ran)).toBe(false);
+    expect(redCandidates(ran)).toEqual(['src/x.spec.ts > charge']);
+    expect(gateUnnamed({ code: 1, output: 'Test suite failed to run\n' })).toBe(true);
+    expect(gateUnnamed({ code: 1, output: 'Error: type error\n' })).toBe(false); // chaîne : inchangé, un échec sans nom non reconnu reste jugé par failedTests vide
+  });
+});
+
+describe('L512 R7 — warhammer40k, docs/orchestrate.md et evatosorus', () => {
+  it('R7 — le YAML des deux parties de warhammer40k, tel que rendu au lead, est relu sans erreur par cadence', () => {
+    const c = read(`orchestrate:\n  test:\n    - { dir: backend, run: npm test }\n    - { dir: frontend, run: "npx vitest run --exclude '**/*.e2e.spec.ts'", replay: "npx vitest run --minWorkers=1 --maxWorkers=$CADENCE_TEST_WORKERS {files}" }\n  build: (cd backend && npm run build) && (cd frontend && npm run build)\n`);
+    expect(c.test).toEqual([{ dir: 'backend', run: 'npm test' }, { dir: 'frontend', run: "npx vitest run --exclude '**/*.e2e.spec.ts'", replay: 'npx vitest run --minWorkers=1 --maxWorkers=$CADENCE_TEST_WORKERS {files}' }]);
+    expect(gateLabel(c.test!)).toBe("backend : npm test ; frontend : npx vitest run --exclude '**/*.e2e.spec.ts'");
+    expect(partCommand((c.test as GatePart[])[1])).toBe("cd frontend && npx vitest run --exclude '**/*.e2e.spec.ts'");
+  });
+  const doc = () => readFileSync(new URL('../docs/orchestrate.md', import.meta.url), 'utf8');
+  it('R7 — docs/orchestrate.md décrit la forme liste et la forme chaîne conservée', () => {
+    const d = doc();
+    expect(d).toContain('**A gate declared in parts: each part runs in its folder, each red is replayed by the part that printed it (L512)**');
+    expect(d).toContain('`[{ dir, run, replay? }]`');
+    expect(d).toContain('The string form of `orchestrate.test` is accepted unchanged');
+    expect(d).toMatch(/^  test:\s+# or a LIST of parts \(L512/m);
+  });
+  it('R7 — docs/orchestrate.md indique qu\'evatosorus attend le lot L514', () => {
+    expect(doc()).toMatch(/`node --test` \(evatosorus\)[^\n]*L514/);
   });
 });

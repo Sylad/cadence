@@ -87,6 +87,16 @@ describe('L512 R3/R4 — la porte du lot en parties : chaque partie dans son dos
     expect(existsSync(log)).toBe(false);
     expect(c.lot.instables ?? []).toEqual([]);
   });
+  it('R3 — BLOQUANT revue : une partie rouge SANS test nommé (erreur de compilation) n\'est jamais excusée par les instables d\'une autre partie', async () => {
+    const log = join(tempDir(), 'rejeux.log');
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    scripts(h.repo, { backend: `[ -f ../a.txt ] || exit 0; [ -f ../b.txt ] && exit 0; echo "Error: type error in src/foo.ts"; exit 1`, frontend: launcher(log, 'src/x.spec.ts > charge') });
+    const c = h.lot('L1', {}, parts());
+    await runLot(c);
+    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
+    expect(h.calls[1].brief).toContain('type error in src/foo.ts');
+    expect(h.calls[1].brief).not.toMatch(/instables, à ne pas corriger/); // rien n'est tenu pour instable tant qu'une partie échoue sans nommer de test
+  });
 });
 
 describe('L512 R5 — nom imprimé rouge par deux parties : rejoué dans chacune, vert seulement si toutes le voient vert', () => {
@@ -258,6 +268,24 @@ describe('L512 R6/R9 — cadence verify --gate joue la porte en parties et rejou
     expect(r.text).not.toContain('instable');
     expect(lines(log).filter((l) => /\/backend src\/a\.spec\.ts$/.test(l))).toHaveLength(2);
     expect(lines(log).filter((l) => /\/frontend src\/a\.spec\.ts$/.test(l))).toHaveLength(1);
+  });
+  it.each([
+    ['erreur de compilation', 'echo "Error: type error in src/foo.ts"; exit 1'],
+    ['seuil de couverture', 'echo "ERROR: Coverage for lines (50%) does not meet global threshold (80%)"; exit 1'],
+    ['dossier introuvable', null],
+  ])('R3 — BLOQUANT revue : partie rouge sans test nommé (%s) + instables d\'une autre partie : la porte reste rouge, jamais 0', async (_, backend) => {
+    const log = join(tempDir(), 'gate.log');
+    const { repo, sha } = gateProject({ backend: backend ?? 'exit 0', frontend: FRONT_RED(log) }, '');
+    let at = sha;
+    if (backend === null) {
+      writeFileSync(join(repo, 'cadence.yaml'), `orchestrate:\n  test:\n    - { dir: nope, run: sh gate.sh }\n    - { dir: frontend, run: sh gate.sh, replay: "sh gate.sh {files}" }\nverify:\n  inPlace: false\n`);
+      git(repo, 'commit', '-qam', 'dossier introuvable');
+      at = git(repo, 'rev-parse', 'HEAD');
+    }
+    const r = await gate(repo, at);
+    expect(r.code).toBe(1);
+    expect(r.text).not.toContain(': vert');
+    expect(r.text).toMatch(/parties rouges : (backend|nope) \(code [1-9]\d*\)/);
   });
   it('R9 — forme chaîne : libellé et lancement inchangés', async () => {
     const repo = gitRepo();

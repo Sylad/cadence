@@ -98,9 +98,18 @@ export async function runGate(run: Runner, test: GateTest): Promise<GateRan> {
   return { code: parts.find((p) => p.code !== 0)?.code ?? 0, output: parts.map((p) => `[${p.part.dir}]\n${p.output}`).join('\n'), parts };
 }
 
-/** Les rouges nommés d'une porte, candidats au rejeu : forme chaîne, tout ou rien (un échec sans nom bloque le rejeu, L354) ; parties, tous les noms imprimés (l'échec sans nom d'une partie ne tient que ses rouges, `perPart`). */
+/**
+ * La porte a échoué pour autre chose qu'un test nommé : forme chaîne, `hasUnnamedFailure` (L354) ; parties, une partie rouge qui ne nomme aucun test (erreur de compilation, « can't cd to », lanceur
+ * planté) ou dont la sortie porte un échec sans nom (seuil de couverture, fichier qui ne se charge pas). Rien n'est alors rejoué ni excusé : la porte reste rouge, quoi que le rejeu des autres parties dise (revue du 01-11, bloquant : jamais de faux vert).
+ */
+export function gateUnnamed(ran: GateRan): boolean {
+  if (!ran.parts) return hasUnnamedFailure(ran.output);
+  return ran.parts.some((p) => p.code !== 0 && (hasUnnamedFailure(p.output) || failedTests(p.output).length === 0));
+}
+
+/** Les rouges nommés d'une porte, candidats au rejeu seul : vide dès que la porte a un échec sans test nommé (`gateUnnamed`), en chaîne comme en parties. */
 export function redCandidates(ran: GateRan): string[] {
-  return ran.parts || !hasUnnamedFailure(ran.output) ? failedTests(ran.output) : [];
+  return gateUnnamed(ran) ? [] : failedTests(ran.output);
 }
 
 /** Par partie rouge, les noms de `names` qu'elle a imprimés et le verdict de `judge` sur eux seuls ; null (rien de prouvable) pour une partie sans `replay` ou à échec sans nom. */

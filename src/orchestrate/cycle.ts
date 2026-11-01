@@ -19,10 +19,10 @@ import { citedRefs } from '../link.js';
 import { repoShas, repoWork, type LotRepo } from '../repos.js';
 import { isOpen, RafError, type Plan } from '../plan.js';
 import { isPlanOnly } from '../audit.js';
-import { compareBaseline, failedTests, hasUnnamedFailure } from './baseline.js';
+import { compareBaseline, failedTests } from './baseline.js';
 import { noteTight, noteUnstable } from './gate-notes.js';
 import { TEST_WORKERS_ENV, testWorkersText, type TightTest } from './workers.js';
-import { gateLabel, gateReplayable, redAloneGate, redCandidates, replayGate, runGate, type GateRan, type GateTest } from './gate-parts.js';
+import { gateLabel, gateReplayable, gateUnnamed, redAloneGate, redCandidates, replayGate, runGate, type GateRan, type GateTest } from './gate-parts.js';
 import { withPlace, type Place } from './gate-place.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, gateText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
@@ -320,9 +320,10 @@ async function atStartSha<T>(c: LotCtx, sha: string, fn: (place: Place) => Promi
 type VsBase = { kind: 'unknown' } | { kind: 'existing'; n: number } | { kind: 'new'; nouveaux: string[]; existants: number };
 
 /** Des tests rouges comparés à la ligne de base (L213) : tous déjà rouges au départ, ou au moins un nouveau, ou rien de comparable. */
-async function againstBaseline(c: LotCtx, command: GateTest, output: string): Promise<VsBase> {
-  const now = failedTests(output);
-  if (!now.length || hasUnnamedFailure(output)) return { kind: 'unknown' };
+async function againstBaseline(c: LotCtx, command: GateTest, ran: GateRan): Promise<VsBase> {
+  const now = failedTests(ran.output);
+  // Un échec sans test nommé (en chaîne, ou dans une partie rouge, L512) : rien n'est comparable ni excusable, les tests restent rouges.
+  if (!now.length || gateUnnamed(ran)) return { kind: 'unknown' };
   const base = await baselineFailures(c, command);
   if (!base?.length) return { kind: 'unknown' };
   const { nouveaux, existants } = compareBaseline(now, base);
@@ -2031,7 +2032,7 @@ async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Pla
     const run: CheckRun = { label, command: gateLabel(command), code: r.code, ...place.stamp() };
     runs.push(run);
     if (r.code === 0) continue;
-    const vs: VsBase = label === 'tests' ? await againstBaseline(c, command, r.output) : { kind: 'unknown' };
+    const vs: VsBase = label === 'tests' ? await againstBaseline(c, command, r) : { kind: 'unknown' };
     const onlyExisting = (n: number): void => {
       run.dejaRouges = n;
       const note = `${n} test(s) déjà rouge(s) au sha de départ ${(l.baseline?.sha ?? '').slice(0, 7)}, pas un défaut du lot : listés à part, la revue a lieu`;

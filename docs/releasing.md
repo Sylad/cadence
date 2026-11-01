@@ -34,8 +34,11 @@ Between the version commit and the gate it also prints a **provisional local tag
    (only what is committed), `npm ci`, then `npm run typecheck` and `npm test` (those the package declares; a package with neither gets no
    such step), the clone removed whatever the result. Red: no evaluation, tag removed. `.github/workflows/tests.yml` does the same on every
    push to `main`, from a fresh checkout.
+   With `orchestrate.gate.host` ([remote-gate.md](remote-gate.md)) the gate is played on another machine that receives only the commit
+   (`refs/cadence-gate/<sha>`), so that host does not see the provisional tag and a test reading the latest tag passes there without checking
+   anything; only the local fresh-clone replay, which does receive the tag, catches it, and it is printed only when the package declares `test` or `typecheck`.
 3. Run the plugin evaluation, `npm run eval:plugin` (billed, see [Evaluating the plugin](#evaluating-the-plugin-before-a-release)),
-   on that version commit; a case below the threshold stops the release until you have read it in the report.
+   on that version commit; a case below the threshold stops the release and removes the tag (step 2) until you have read it in the report; if you judge the case a false negative, run `git tag v<version>` again on the version commit before step 4.
 4. `git push origin main v<version>` (the tag already exists, step 2; `git tag v<version>` is not run twice) — the tag starts `.github/workflows/publish.yml`,
    which publishes to npm through Trusted Publishing (OIDC, no token stored anywhere): it checks the tag
    matches `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` and that `CHANGELOG.md` has a `## [x.y.z]` section for it (no section, no publication), then `npm publish --provenance`, where `prepublishOnly` runs the type-check, the quality ratchet (`npm run qualite`, [qualite.md](qualite.md): exit 1 when a measure got worse, 2 when a tool crashed or the baseline is missing) and the

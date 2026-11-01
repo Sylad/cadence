@@ -232,7 +232,7 @@ function steps(p: Planned, files: string[], branch: string): string[] {
     `git tag ${tag}    (tag local provisoire sur le commit de version : les tests qui lisent le dernier tag, comme test/changelog.test.ts, voient la version publiée ; retiré si une des trois étapes suivantes est rouge, jamais poussé avant)`,
     `cadence verify --gate --sha HEAD || ${untag}    (la suite et le build rejoués sur le commit de version, où le CHANGELOG n'a plus de [Unreleased] plein ; rouge = tag retiré, pas d'éval)`,
     ...(p.cloneScripts.length ? [cloneStep(p.cloneScripts, untag)] : []),
-    ...(p.hasEvalScript ? [`npm run eval:plugin -- --trust-plugin || ${untag}    (facturé ; un cas sous le seuil arrête la release et retire le tag)`] : []),
+    ...(p.hasEvalScript ? [`npm run eval:plugin -- --trust-plugin || ${untag}    (facturé ; un cas sous le seuil arrête la release et retire le tag ; si la lecture du rapport le juge faux, reposer le tag de l’étape 2 avant le push)`] : []),
     `git push origin ${branch} ${tag}    (le tag provisoire devient le tag de la release ; il lance le workflow de publication)`,
     'gh run watch    (jusqu\'à la fin du run de publication)',
     ...(p.isPrivate || p.packageName === '' ? [] : [`npm view ${p.packageName} version    (doit répondre ${p.version})`]),

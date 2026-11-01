@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
@@ -107,12 +107,27 @@ describe('L508 — tag provisoire : exécution réelle des étapes imprimées', 
     expect(r.status).toBe(1);
   });
 
-  it('prérelease : la version 1.2.4-rc.1 donne un tag v1.2.4-rc.1 cohérent dans pose, retrait et push', () => {
+  it('prérelease : « cadence release 1.2.4-rc.1 » est refusé, rien n’est écrit ni imprimé comme étape', () => {
     const dir = repo('1.2.4-rc.1');
-    const { out } = printed(dir, '1.2.4-rc.1');
-    if (!out.includes('git tag v1.2.4-rc.1')) return; // version explicite non supportée : rien à sonder
-    expect(out).toContain('git tag -d v1.2.4-rc.1');
-    expect(out).toContain('main v1.2.4-rc.1');
+    const out: string[] = [];
+    const errs: string[] = [];
+    const code = run(['release', '1.2.4-rc.1'], { cwd: dir, env: { RAF_TODAY: '2026-10-26' }, out: (l) => out.push(l), err: (l) => errs.push(l), now: () => new Date('2026-10-26T09:00:00') }) as number;
+    expect(code).not.toBe(0);
+    expect(errs.join('\n')).toContain('usage : cadence release');
+    expect(out.join('\n')).not.toContain('git tag');
+    expect(tags(dir)).toBe('');
+  });
+
+  it('reprise après une éval rouge jugée fausse : l’étape imprimée et la doc disent de reposer le tag', () => {
+    const o = printed(repo('1.2.4'), 'patch').out;
+    expect(cmd(o, 'npm run eval:plugin') + o).toContain('reposer le tag de l’étape 2');
+    const doc = readFileSync(join(__dirname, '../docs/releasing.md'), 'utf8');
+    expect(doc).toContain('git tag v<version>` again');
+  });
+
+  it('porte déportée : la doc dit que gate.host ne voit pas le tag provisoire', () => {
+    const doc = readFileSync(join(__dirname, '../docs/releasing.md'), 'utf8');
+    expect(doc).toMatch(/gate\.host[\s\S]{0,300}does not see the provisional tag/);
   });
 
   it('version déjà taguée : refus net, aucune étape imprimée (le tag provisoire d’un essai précédent bloque)', () => {

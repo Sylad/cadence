@@ -1084,6 +1084,7 @@ lots:
     after: [ L517 ]
     created: 2026-11-01
     started: 2026-11-01
+    review: { date: 2026-11-01, verdict: "conforme, 4 mineurs en notes (doc du compteur « suites », consigne contradictoire sans orchestrate.test, deux tests de sonde plus faibles que leur titre) — orchestré (vague 2026-11-01-2315-cad, 2 passe(s) de correction)", commit: 15d6359d7519578481c0be2e37903c77257b0b93, reporte: { de: 346c0f616e3849f0d9618db1716ba94abb4a9c41, vers: 15d6359d7519578481c0be2e37903c77257b0b93, patchId: 9bcaf98c0fdc16322075ed415d43d3e0ae2776e5 } }
   - id: L519
     title: "Voie express pour les retouches (estimate ≤ 0,1 j) : une seule session (pas de précheck, pas de sonde, pas de revue de code séparée : le lead lit le diff), le fichier et la portée nommés dans l'objectif, pas de nouveau test pour un changement purement visuel (la suite existante tourne), pas d'entrée Nouveautés par lot (regroupées par le lead à la livraison), porte complète une fois ; cible < 90 s de session pour un lot comme ol L239 (245 s mesurées le 01-11) ; à caler sur l'étude L517 ; décision de Sylvain du 01-11"
     status: doing

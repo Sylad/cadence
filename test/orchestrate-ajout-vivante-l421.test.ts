@@ -361,4 +361,51 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
     expect(store.addQueue()).toEqual([]);
     expect(s.played).toEqual(['a:L1']);
   });
+  it("R18 — un ajout en attente est écarté quand son lot est passé done dans le plan entre-temps (« le lot est done »), jamais joué, hors de wave.json", async () => {
+    const parent = parentWith(['a'], { a: 2 });
+    const repo = join(parent, 'a');
+    const s = scene(parent, 'a:L1', async (store) => {
+      expect(await orchestrate(['--add', 'a:L2'], io(parent).io, s.d)).toBe(0);
+      await new Promise((r) => setTimeout(r, 150)); // a:L2 attend la fin de a:L1 dans son dépôt
+      expect(store.readLot('a', 'L2')).toBeNull();
+      const plan = Plan.load(join(repo, '.cadence/raf.yaml'));
+      plan.setStatus('L2', 'done', '2026-10-04');
+      plan.save();
+      git(repo, 'commit', '-q', '-m', 'plan: L2 fini à la main', '--', '.cadence/raf.yaml');
+    });
+    await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d);
+    const store = RunStore.last(parent)!;
+    const journal = readFileSync(join(store.dir, 'journal.log'), 'utf8');
+    expect(journal).toMatch(/a:L2 : ajout écarté \(le lot est done\)/);
+    expect(journal).not.toMatch(/a:L2 : ajouté|a:L2 → /);
+    expect(store.readWave()!.lots).toEqual(['a:L1']);
+    expect(store.readLot('a', 'L2')).toBeNull();
+    expect(s.played).toEqual(['a:L1']);
+  });
+
+  it("R19 — un ajout en attente est écarté quand le budget de la vague ne couvre plus le lot au moment de la prise (le lot qui jouait a consommé entre-temps)", async () => {
+    const parent = parentWith(['a'], { a: 2 });
+    let added = -1;
+    const s = scene(parent, 'a:L1', async (store) => {
+      added = await orchestrate(['--add', 'a:L2'], io(parent).io, s.d); // il reste ~1,6 M : le budget du lot (750 k) tient
+      await new Promise((r) => setTimeout(r, 150));
+      expect(store.readLot('a', 'L2')).toBeNull();
+    });
+    // La session de a:L1 compte 900 k à sa fin : il reste ~700 k, moins que le budget du lot ajouté, sans que la vague soit à bout de budget.
+    const claude: ClaudeFn = async (args, o) => {
+      const out = await s.d.claude(args, o);
+      if (kindOf(args) !== 'implement') return out;
+      const raw = JSON.parse(out.stdout);
+      raw.usage.input_tokens = 900_000;
+      return { ...out, stdout: JSON.stringify(raw) };
+    };
+    await orchestrate(['a:L1', '--budget', '1600k', '--max-sessions', '2'], io(parent).io, { ...s.d, claude });
+    expect(added).toBe(0);
+    const store = RunStore.last(parent)!;
+    const journal = readFileSync(join(store.dir, 'journal.log'), 'utf8');
+    expect(journal).toMatch(/a:L2 : ajout écarté \(le budget restant de la vague ne tient pas le budget du lot \(750000\)\)/);
+    expect(journal).not.toMatch(/a:L2 : ajouté|a:L2 → /);
+    expect(store.readWave()!.lots).toEqual(['a:L1']);
+    expect(s.played).toEqual(['a:L1']);
+  });
 });

@@ -158,6 +158,22 @@ describe('L512 R6 — délai trop juste et rouge au départ (L510) par partie', 
     expect(base).toHaveLength(2);
     for (const l of base) expect(l).toMatch(/cadence-baseline-[^ ]*\/frontend src\/x\.spec\.ts$/);
   });
+  it('R6 — MAJEUR revue 2 : au sha de départ, backend rouge sans test nommé et frontend rouge de charge (vert seul) ; dans le lot le frontend casse vraiment : la correction a lieu, rien n\'est « déjà rouge »', async () => {
+    const log = join(tempDir(), 'base.log');
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    scripts(h.repo, {
+      backend: `case "$PWD" in *cadence-baseline*) echo "Error: type error in src/foo.ts"; exit 1;; esac; exit 0`,
+      frontend: `case "$PWD" in *cadence-baseline*) if [ -n "$1" ]; then echo "$PWD $@" >> ${log}; echo " ✓ $@ (1 test)"; exit 0; fi; echo ' FAIL  src/x.spec.ts > charge'; exit 1;; esac; [ -f ../a.txt ] || exit 0; [ -f ../b.txt ] && exit 0; echo ' FAIL  src/x.spec.ts > charge'; exit 1`,
+    });
+    const c = h.lot('L1', {}, parts());
+    await runLot(c);
+    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
+    expect(h.calls[1].brief).toContain('src/x.spec.ts > charge');
+    expect(c.lot.baseline?.failures).toEqual([]); // le rouge de charge du départ a été rejoué par sa partie et retiré, malgré le backend rouge sans nom
+    // deux rejeux dans <départ>/frontend : celui de la ligne de base (vert, x retiré des excuses) et celui du rouge seul au départ (L510, vert aussi : pas « déjà rouge »)
+    expect(lines(log).filter((l) => /cadence-baseline-[^ ]*\/frontend src\/x\.spec\.ts$/.test(l))).toHaveLength(2);
+    expect(c.lot.warnings.some((w) => /déjà rouge/.test(w))).toBe(false);
+  });
   it('R6 — build du départ rouge : rien n\'est excusé, la correction a lieu', async () => {
     const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
     scripts(h.repo, { backend: 'exit 0', frontend: `[ -f ../b.txt ] && exit 0; case "$PWD" in *cadence-baseline*) if [ -n "$1" ]; then echo ' FAIL  src/x.spec.ts > tiroir'; exit 1; fi; exit 0;; esac; [ -f ../a.txt ] || exit 0; echo ' FAIL  src/x.spec.ts > tiroir'; exit 1` });

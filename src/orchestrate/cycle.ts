@@ -22,7 +22,7 @@ import { isPlanOnly } from '../audit.js';
 import { compareBaseline, failedTests } from './baseline.js';
 import { noteTight, noteUnstable } from './gate-notes.js';
 import { TEST_WORKERS_ENV, testWorkersText, type TightTest } from './workers.js';
-import { gateLabel, gateReplayable, gateUnnamed, redAloneGate, redCandidates, replayGate, runGate, type GateRan, type GateTest } from './gate-parts.js';
+import { baselineCandidates, gateLabel, gateReplayable, gateUnnamed, redAloneGate, redCandidates, replayGate, runGate, type GateRan, type GateTest } from './gate-parts.js';
 import { withPlace, type Place } from './gate-place.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
 import { capturesText, gateText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
@@ -268,9 +268,9 @@ async function baselineFailures(c: LotCtx, test: GateTest): Promise<string[] | n
   return atStartSha(c, sha, async (place) => {
     const r = await runGate(place.run, test);
     // Ligne de base comprise (L354) : un rouge du sha de départ est rejoué seul dans le même worktree avant d'être retenu. Sous charge, un test
-    // qui passe seul au départ rougirait ici et excuserait une vraie régression du lot (« déjà rouge au départ »). Un échec sans nom reste tel quel.
+    // qui passe seul au départ rougirait ici et excuserait une vraie régression du lot (« déjà rouge au départ »). Un échec sans nom reste tel quel ; en parties (L512), partie par partie.
     const found = r.code === 0 ? [] : failedTests(r.output);
-    const named = gateReplayable(test, c.config.testReplay) && found.length ? redCandidates(r) : [];
+    const named = gateReplayable(test, c.config.testReplay) && found.length ? baselineCandidates(r) : [];
     const { red: failures, unstable } = named.length ? await replayGate(place.run, c.config.testReplay, named, r) : { red: found, unstable: [] as string[] };
     if (unstable.length) c.wave.log(`${lotKey(l.project, l.lot)} · ligne de base ${sha.slice(0, 7)} : ${unstable.length} test(s) rouge(s) sous charge, vert(s) rejoué(s) seul(s), non retenu(s) comme déjà rouge(s) : ${unstable.join(' ; ')}`);
     l.baseline = { sha, command, failures, verified: true };

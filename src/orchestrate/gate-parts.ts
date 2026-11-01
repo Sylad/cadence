@@ -107,9 +107,17 @@ export function gateUnnamed(ran: GateRan): boolean {
   return ran.parts.some((p) => p.code !== 0 && (hasUnnamedFailure(p.output) || failedTests(p.output).length === 0));
 }
 
-/** Les rouges nommés d'une porte, candidats au rejeu seul : vide dès que la porte a un échec sans test nommé (`gateUnnamed`), en chaîne comme en parties. */
+/** Les rouges nommés de la porte du LOT, candidats au rejeu seul : vide dès que la porte a un échec sans test nommé (`gateUnnamed`), en chaîne comme en parties — rien n'excuse alors le lot. */
 export function redCandidates(ran: GateRan): string[] {
   return gateUnnamed(ran) ? [] : failedTests(ran.output);
+}
+
+/**
+ * Les rouges nommés de la LIGNE DE BASE, candidats au rejeu seul : là, rejouer retire des excuses (un rouge de charge du départ ne doit pas excuser une vraie régression du lot), donc chaque partie est jugée pour elle-même :
+ * une partie rouge sans test nommé au départ ne retient que ses propres rouges (aucun), les noms des autres parties sont rejoués par leur partie (`perPart`). Forme chaîne : comme avant (tout ou rien).
+ */
+export function baselineCandidates(ran: GateRan): string[] {
+  return ran.parts ? failedTests(ran.output) : redCandidates(ran);
 }
 
 /** Par partie rouge, les noms de `names` qu'elle a imprimés et le verdict de `judge` sur eux seuls ; null (rien de prouvable) pour une partie sans `replay` ou à échec sans nom. */

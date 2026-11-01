@@ -62,6 +62,7 @@ export function unloadedSuites(output: string): string[] {
 }
 
 /** Le délai d'un test expiré : vitest « Test timed out in 30000ms », jest « Exceeded timeout of 5000 ms for a test ». */
+const SUMMARY = /^\s*(?:Test Files?|Tests?)\s+\d/;
 const TIMEOUT = /(?:timed out in|Exceeded timeout of)\s+(\d+)\s*ms/i;
 
 /**
@@ -80,6 +81,7 @@ export function timeoutLimits(output: string): Map<string, number> {
       current = name && !/^(?:Test Files?|Tests?)\b/.test(name) ? name : null;
       break;
     }
+    if (SUMMARY.test(raw)) current = null;
     const t = TIMEOUT.exec(raw);
     if (t && current) limits.set(current, Number(t[1]));
   }
@@ -97,7 +99,12 @@ export function testDurationMs(output: string, name: string, file: string): numb
     const m = /(\d+(?:\.\d+)?)\s*(ms|s)\)?\s*$/.exec(l);
     return m ? Math.round(Number(m[1]) * (m[2] === 's' ? 1000 : 1)) : null;
   };
-  const byTest = leaf ? lines.find((l) => l.includes(leaf) && read(l) !== null) : undefined;
+  // La ligne du test finit par son nom puis sa durée : un nom qui n'est que le sous-texte d'un voisin (« plan » / « plan-data ») ne la désigne pas.
+  const named = (l: string): boolean => {
+    const bare = l.replace(/\s*\(?\d+(?:\.\d+)?\s*m?s\)?\s*$/, '').trimEnd();
+    return bare.endsWith(leaf) && (bare.length === leaf.length || /[\s>›]/.test(bare[bare.length - leaf.length - 1]));
+  };
+  const byTest = leaf ? lines.find((l) => read(l) !== null && named(l)) : undefined;
   if (byTest) return read(byTest);
   const byFile = lines.find((l) => /^\s*[✓√]/.test(l) && l.includes(file) && read(l) !== null);
   return byFile ? read(byFile) : null;

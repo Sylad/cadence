@@ -86,7 +86,7 @@ const REPLAYS = 2;
 export async function redAlone(run: (command: string) => Promise<{ code: number; output: string }>, template: string, names: string[], output: string): Promise<string[]> {
   const jest = jestTestFiles(output);
   const fileOf = (n: string): string | null => replayFile(n) ?? jest.get(n) ?? null;
-  let still = names.filter((n) => fileOf(n));
+  let still = [...new Set(names)].filter((n) => fileOf(n));
   for (let i = 0; i < REPLAYS && still.length; i++) {
     const files = [...new Set(still.map((n) => fileOf(n)!))];
     const r = await run(template.replaceAll('{files}', () => files.map(shellArg).join(' ')));
@@ -113,7 +113,7 @@ export interface TightTest {
 export async function replayRed(run: (command: string) => Promise<{ code: number; output: string }>, template: string, names: string[], output: string): Promise<{ red: string[]; unstable: string[]; tight: TightTest[] }> {
   const jest = jestTestFiles(output);
   const fileOf = (n: string): string | null => replayFile(n) ?? jest.get(n) ?? null;
-  let red = names;
+  let red = [...new Set(names)];
   const unstable: string[] = [];
   const tight: TightTest[] = [];
   const limits = timeoutLimits(output);

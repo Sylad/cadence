@@ -13,7 +13,7 @@ export function testsSansCode(passes: FixPass[]): TestsSansCode {
   return { passes: onTests.length, sansCode: onTests.filter((p) => p.commits.length === 0).length };
 }
 
-const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+const plural = (n: number, one: string, many: string): string => `${n} ${n < 2 ? one : many}`;
 
 /** La ligne du rapport lisible, vide sans passe de ce genre. À part de `renderReport` : le relevé de référence du 10-10 reproduit ce rapport mot pour mot. */
 export function renderTestsSansCode(t: TestsSansCode): string[] {

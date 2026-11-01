@@ -1029,6 +1029,11 @@ lots:
     estimate: 0.5
     after: [ L512 ]
     created: 2026-11-01
+  - id: L515
+    title: "CI « tests » rouge sur main depuis le 31-10 par construction : l'étape « Suite sous npm publish --dry-run » échoue « You cannot publish over the previously published versions » dès que package.json porte une version déjà publiée (tout commit hors release) — tolérer ce seul refus comme publish.yml (grep EPUBLISHCONFLICT/previously published), sans masquer un vrai rouge de la suite ; + test instable sous Node 24 : porte-deportee.test.ts R17 « deux remplissages simultanés de même empreinte » (run 41322154515)"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-01
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

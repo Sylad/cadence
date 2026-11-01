@@ -943,9 +943,10 @@ lots:
     created: 2026-11-01
   - id: L508
     title: "Release : la porte et le clone de « cadence release » tournent avec un tag local provisoire v<version> posé (retiré si rouge), pour que les tests qui lisent le dernier tag (test/changelog.test.ts) voient la version publiée — 31-10 : v1.34.0 taguée verte, publication rouge"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-01
+    started: 2026-11-01
   - id: L509
     title: "raf done/review/ux lancent la commande de plan publié déclarée (cadence.yaml plan.publish, ex. « cd frontend && npm run plan ») et disent le fichier à commiter — 01-11 : livraison warhammer L61 rouge sur plan.json périmé après raf done"
     status: todo

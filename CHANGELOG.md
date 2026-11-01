@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `orchestrate.gate.host` (and `gate.install`): the gate — `cadence verify --gate`, a wave's lot gate, the baseline and the replay alone — is played by ssh on another machine, at the sha pushed to a bare repository there, with a dependency cache keyed by the fingerprint of the lockfiles, a local fallback when the host does not answer, and a connection lost during a command (ssh 255) replayed locally, said in the output and the wave's journal and never counted red (L403, [docs/remote-gate.md](docs/remote-gate.md)). `gate.host` alone is not `gate.readsPlan`.
+
 ## [1.34.1] - 2026-11-01
 
 ### Fixed
@@ -97,7 +101,6 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- `orchestrate.gate.host` (and `gate.install`): the gate — `cadence verify --gate`, a wave's lot gate, the baseline and the replay alone — is played by ssh on another machine, at the sha pushed to a bare repository there, with a dependency cache keyed by the fingerprint of the lockfiles, a local fallback when the host does not answer, and a connection lost during a command (ssh 255) replayed locally, said in the output and the wave's journal and never counted red (L403, [docs/remote-gate.md](docs/remote-gate.md)). `gate.host` alone is not `gate.readsPlan`.
 - The lots panel (`/hud lots`) shows, on each row of its « ordre des projets » section, the progress bar of the band: closed lots over total, coloured by the share done, the lots in progress and `+N cette semaine` (L481, [docs/cadence-hud.md](docs/cadence-hud.md)). Names are aligned; dragging and Alt+↑ / Alt+↓ are unchanged; with a `cadence` that gives no `progress` the row keeps `N lots non clos`.
 - In the lots panel, the progress bars of the « ordre des projets » section all start at the same column: the width reserved for names is the longest project name, e.g. `jobmail-assistant` (L494).
 - In the lots panel, the progress bars of the « ordre des projets » section now really line up in the desktop app: the project name sits in a box of fixed width instead of being padded with spaces, which a proportional font does not align (L495).

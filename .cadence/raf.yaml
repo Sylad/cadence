@@ -1107,10 +1107,11 @@ lots:
     started: 2026-11-01
   - id: L523
     title: "Brief d'implémentation enrichi pour coder juste du premier coup (étude L517 : bug-code 52 % des passes dont 223 cas limites, dérive d'architecture 10 %) : la session d'implémentation reçoit la grille du code-reviewer, écrit d'abord les tests des cas limites de son objectif, se relit contre cette grille avant de commiter ; le précheck transmet à l'implémentation ce qu'il a lu (fichiers concernés, code voisin à imiter, tests existants) pour éviter la relecture à froid (13,4 allers-retours de lecture par lot) ; mesure avant/après par scripts/temps-d-un-lot.mjs (passes par lot, cause des passes, allers-retours)"
-    status: todo
+    status: doing
     estimate: 0.75
     spec: true
     created: 2026-11-01
+    started: 2026-11-01
   - id: L524
     title: "Essai comparatif du modèle d'implémentation : Sonnet (défaut) contre Opus sur ~20 lots comparables (estimate 0,1–0,5 j, mêmes projets), un réglage orchestrate.implement.model par vague ; mesurer passes de correction, mur et jetons comptés totaux du lot (implémentation + corrections + revues) avec scripts/temps-d-un-lot.mjs ; décision chiffrée à Sylvain (une passe coûte 11,9 min et 126 k jetons, étude L517)"
     status: todo

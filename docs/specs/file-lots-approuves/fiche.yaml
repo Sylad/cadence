@@ -133,7 +133,7 @@ regles:
     tests: ["R6 — after non clos : journal « file : lot sauté — p:L2 : after non clos (L1) » et lot toujours en file", "R6 — même cause sur deux créneaux : une seule ligne", "R6 — aucun lot mûr : le créneau reste libre et le journal le dit"]
   - id: R7
     cas: [C3, C5]
-    enonce: "Le tirage réserve le lot dans la file de façon atomique avant de le lancer : un lot de la file n'est tiré que par une seule vague, une seule fois, et une vague qui échoue après la réservation rend le lot à la file."
+    enonce: "Le tirage réserve le lot dans queue.json (~/.cadence/orchestrate, à côté des créneaux) de façon atomique avant de le lancer : un lot de la file n'est tiré que par une seule vague, une seule fois, et une vague qui échoue après la réservation rend le lot à la file."
     statut: hypothese
     si_faux: "Sans réservation atomique, deux vagues joueraient le même lot (double travail, deux branches) ; c'est le seul risque, corrigé par un verrou de plus."
     tests: ["R7 — deux tirages simultanés du même lot : un seul le prend", "R7 — vague interrompue avant le lancement : le lot revient en file"]
@@ -211,6 +211,6 @@ contrats:
     regles: [R5, R6, R7, R8, R9, R10, R11, R12, R13]
 
 donnees:
-  - { id: D1, objet: "file approuvée : liste ordonnée de clés projet:lot avec, pour chaque lot, son état (en attente, réservé par une vague, tiré) — emplacement et format à trancher (question Q1)", existant: false, modification: ajout, note: "nouvelle donnée, partagée entre vagues vivantes ; ne touche aucun format existant" }
+  - { id: D1, objet: "queue.json dans l'état commun (CADENCE_HOME, par défaut ~/.cadence/orchestrate/queue.json), à côté de slots/ et waves/ : liste ordonnée de { clé projet:lot, état (en attente, réservé, tiré), vague } ; écrite par renommage atomique sous verrou, éditée par la commande orchestrate queue, ni commit ni écriture dans les plans", existant: false, modification: ajout, note: "nouveau fichier partagé entre vagues vivantes ; ne touche aucun format existant ; décision du lead : option (a), état commun à côté du registre des créneaux" }
   - { id: D2, objet: "état de vague (lots, journal) et registre des vagues vivantes (waves/<pid>.json)", existant: true, modification: aucune, note: "lus pour savoir ce qui est tenu ; le lot tiré y entre comme un lot ajouté (L421)" }
   - { id: D3, objet: "plan du projet (after, uses, notes « à décider »)", existant: true, modification: aucune, note: "lu seulement pour juger la maturité" }

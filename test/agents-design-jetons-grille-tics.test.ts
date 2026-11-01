@@ -234,11 +234,18 @@ describe('R13/R14/R15 — formats inchangés, installation, documentation', () =
     expect(await run(['skills', 'install'], o)).toBe(2);
     expect(readFileSync(file, 'utf8')).toBe('à la main');
   });
-  it('R14 — agent installé non modifié : reçoit le texte renforcé', () => {
+  it('R14 — agent installé non modifié : reçoit le texte renforcé (avec --force ; sans, la mise à jour est refusée)', () => {
     const dest = join(tempDir(), 'agents');
-    installAgents(AGENTS_DIR, dest, false);
-    const installe = readFileSync(join(dest, 'cadence-ux-reviewer.md'), 'utf8');
-    expect(installe).toContain('## Delivery grid');
+    mkdirSync(dest, { recursive: true });
+    const ancien = read('agents/ux-reviewer.md').replace(/\n## Delivery grid[\s\S]*$/, '\n').replace(/^name: .*$/m, 'name: cadence-ux-reviewer');
+    const cible = join(dest, 'cadence-ux-reviewer.md');
+    writeFileSync(cible, ancien);
+    expect(ancien).not.toContain('## Delivery grid');
+    // installAgents compare la copie au nouveau texte, pas à la version installée : une mise à jour passe par --force.
+    expect(() => installAgents(AGENTS_DIR, dest, false)).toThrow(/modifié\(s\) localement/);
+    expect(readFileSync(cible, 'utf8')).toBe(ancien);
+    installAgents(AGENTS_DIR, dest, true);
+    expect(readFileSync(cible, 'utf8')).toContain('## Delivery grid');
     expect(readFileSync(join(dest, 'cadence-spec-writer.md'), 'utf8')).toContain('on-<role>');
   });
   it('R15 — CHANGELOG.md, section Unreleased, nomme on-*, contraste.md, la grille et les tics d’IA', () => {

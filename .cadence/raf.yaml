@@ -1075,6 +1075,7 @@ lots:
     estimate: 0.5
     created: 2026-11-01
     started: 2026-11-01
+    review: { date: 2026-11-01, verdict: "conforme : le filtre « session d'écriture aboutie » est dans le code (pas implement/fix au statut ok seulement), test qui sait échouer, chiffres du document = sortie du script rejoué ; porte verte 5406 tests — reprise Fable par le lead après rendu pour budget", commit: e49fe494793b9666887ced7eaa48c73a8c636caf }
   - id: L518
     title: "Une seule porte complète par lot : la session d'implémentation ou de correction ne joue que les tests du code qu'elle touche (ciblés, une fois avant de commiter) ; la porte complète (orchestrate.test/build) n'est jouée qu'une fois par la vague, et son verdict est repris ensuite (verify --gate) ; le brief le dit et la vague le mesure (nombre de rejeux de la suite par lot, dans le tableau). Mesure du 01-11 : 5 rejeux de suite pour un lot d'une ligne (ol L239) ; à caler sur les chiffres de l'étude L517 ; décision de Sylvain du 01-11"
     status: todo

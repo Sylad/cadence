@@ -972,9 +972,10 @@ lots:
     finished: 2026-11-01
   - id: L511
     title: "qa-reviewer : chaque agent ouvre son propre contexte de navigateur (profil isolé) — 01-11 : deux QA lancées en parallèle (warhammer L222, avatar L13) partageaient le navigateur Playwright, l'une a lu un onglet de l'autre site puis le navigateur s'est fermé ; d'ici là, le skill lead dit « une QA à la fois »"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-01
+    started: 2026-11-01
   - id: L512
     title: "Rejeu isolé des tests rouges pour une porte composée (&&, sous-shells) : aujourd'hui testReplay est refusé (config.ts:470), donc ni le rejeu seul de L350 ni le délai trop juste et le rouge au départ de L510 ne jouent pour warhammer (backend && frontend) ni evatosorus — faux rouges du 31-10 (L61 : 4 corrections + escalade Fable ; L45 : correction Fable). Rejeu par partie de la porte (préfixe de chemin → commande, ex. frontend/ → cd frontend && npx vitest run {files}) puis config des deux projets"
     status: doing

@@ -1100,10 +1100,11 @@ lots:
     created: 2026-11-01
   - id: L522
     title: "Pas de passe de correction sans constat, et rouge isolé rejoué avant d'ouvrir une passe (étude L517 : 73 passes « sans-constat », 13 % des 580 passes classées ; 48 des 73 passes sur tests rouges finies sans commit) : la vague n'ouvre pas de passe fix quand la revue ne laisse aucun constat bloquant ou majeur actionnable ; un test rouge de la porte est rejoué seul avant d'ouvrir une passe, et un rouge qui passe seul est noté instable (lot proposé), pas corrigé par la session ; mesure avant/après par scripts/temps-d-un-lot.mjs"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-11-01
+    started: 2026-11-01
   - id: L523
     title: "Brief d'implémentation enrichi pour coder juste du premier coup (étude L517 : bug-code 52 % des passes dont 223 cas limites, dérive d'architecture 10 %) : la session d'implémentation reçoit la grille du code-reviewer, écrit d'abord les tests des cas limites de son objectif, se relit contre cette grille avant de commiter ; le précheck transmet à l'implémentation ce qu'il a lu (fichiers concernés, code voisin à imiter, tests existants) pour éviter la relecture à froid (13,4 allers-retours de lecture par lot) ; mesure avant/après par scripts/temps-d-un-lot.mjs (passes par lot, cause des passes, allers-retours)"
     status: todo

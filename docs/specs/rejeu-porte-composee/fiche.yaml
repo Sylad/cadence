@@ -44,7 +44,7 @@ cas:
       - { si: "le rejeu d'une partie échoue ou ne joue aucun test", alors: "les tests de cette partie restent rouges ; ceux des autres parties ne sont pas touchés", regles: [R4] }
       - { si: "les rouges viennent de deux parties", alors: "une commande par partie, chacune au plus deux fois", regles: [R4] }
       - { si: "un test sans fichier désignable (FAIL nom)", alors: "compté rouge d'emblée, comme aujourd'hui", regles: [R3] }
-    resultat: "Les faux rouges de warhammer (L61) et evatosorus (L45) ne déclenchent plus de correction ni d'escalade."
+    resultat: "Les faux rouges de warhammer (L61) ne déclenchent plus de correction ni d'escalade ; ceux d'evatosorus (L45) attendent un lot à part."
   - id: C3
     titre: "La ligne de base, le rouge au départ et verify --gate rejouent par partie"
     acteur: l'orchestrateur ou le lead (cadence verify --gate)
@@ -104,10 +104,10 @@ regles:
     tests: ["R5 — porte composée, test vert seul à 80 % du délai : délai trop juste, pas de correction", "R5 — rouge seul au départ : déjà rouge, ni correction ni escalade", "R5 — verify --gate : rouge instable rejoué par partie", "R5 — build du départ rouge : rien n'est excusé"]
   - id: R6
     cas: [C4]
-    enonce: "Une partie sans commande déclarée, ou dont le lanceur ne nomme pas ses tests rouges par un fichier (node --test d'evatosorus : titre seul, baseline.ts:6,38 et workers.ts:31), n'est pas rejouée : ses rouges sont comptés comme avant. evatosorus est donc hors de ce lot et ne reçoit pas de testReplay."
-    statut: hypothese
-    si_faux: "Si le lead veut le faux rouge L45 corrigé dans ce lot, il faut en plus une règle qui rattache le titre au fichier pour node --test (lecture de `location:`, preuve d'exécution d'un test vert sans fichier imprimé) : lot d'analyse de ce format, qui touche failedTests ; aucune donnée en jeu."
-    tests: ["R6 — fichier d'une partie non déclarée : rouge compté", "R6 — titre node --test sans fichier (« not ok 1 - un cas ») : non rejoué, compté rouge", "R6 — cadence.yaml de warhammer40k : relu sans erreur avec son testReplay"]
+    enonce: "Une partie sans commande déclarée, ou dont le lanceur ne nomme pas ses tests rouges par un fichier (node --test d'evatosorus : titre seul, baseline.ts:6,38 et workers.ts:31), n'est pas rejouée : ses rouges sont comptés comme avant. failedTests n'est pas modifié pour node --test dans ce lot. evatosorus ne reçoit pas de testReplay ; docs/orchestrate.md dit qu'il attend le lot à part (titre → fichier via location:, preuve d'exécution d'un test vert)."
+    statut: sourcee
+    source: "décision de Sylvain du 2026-11-01 : L512 reste borné aux portes composées dont les lanceurs donnent le fichier du test rouge (vitest : warhammer) ; evatosorus sera un lot à part ouvert par le lead, sans toucher à failedTests pour node --test"
+    tests: ["R6 — fichier d'une partie non déclarée : rouge compté", "R6 — titre node --test sans fichier (« not ok 1 - un cas ») : non rejoué, compté rouge, failedTests inchangé", "R6 — cadence.yaml de warhammer40k : relu sans erreur avec son testReplay", "R6 — docs/orchestrate.md indique qu'evatosorus attend un lot à part"]
   - id: R7
     cas: [C2, C3]
     enonce: "Le verdict (fichier vu dans la sortie, durée) s'applique au chemin passé dans {files}, y compris sans préfixe ; les listes rendues (red, unstable, tight.test) et redAlone portent les noms d'origine des tests, ceux que cycle.ts compare (unstable.includes)."

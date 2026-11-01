@@ -55,7 +55,10 @@ describe('raf ux et raf review disent le plan et la copie publiée à commiter (
       const hors = tempDir();
       cli(hors, 'init', '--project', 'demo');
       cli(hors, 'add', 'Lot un');
-      expect(cli(hors, commande, 'L1', 'conforme').out).not.toContain('plan non commité');
+      const horsDepot = cli(hors, commande, 'L1', 'conforme');
+      expect(horsDepot.code).toBe(0);
+      expect(horsDepot.err).toBe('');
+      expect(horsDepot.out).not.toContain('plan non commité');
       const repo = depot(PUBLIE);
       const inconnu = cli(repo, commande, 'L99', 'conforme');
       expect(inconnu.code).not.toBe(0);

@@ -1,0 +1,24 @@
+export const POSTES_SESSION: string[];
+export const POSTES_LOT: string[];
+export const SUSPENSION_MS: number;
+export function posteDeLOutil(nom: string, entree: Record<string, unknown>): string;
+export function estSuiteComplete(cmd: string): boolean;
+export function analyserSession(texte: string): {
+  dureeMs: number;
+  demarrageMs: number;
+  appels: number;
+  rejeuxTests: number;
+  rejeuxSuite: number;
+  suiteMs: number;
+  ciblesMs: number;
+  suiteSortie: number;
+  suiteContexte: number;
+  postes: Record<string, { ms: number; n: number; sortie: number; contexte: number }>;
+};
+export function lireJournal(texte: string): Map<string, { attentes: { t: number; ms: number }[]; integre: number | null }>;
+export function ventilerLot(etat: unknown, journalLot: { attentes: { t: number; ms: number }[]; integre: number | null } | undefined, transcripts: string): any;
+export function lireVagues(runs: string, since?: string, until?: string): { vague: string; etat: any; journal: any }[];
+export function trancheEstimate(e: number | null): string;
+export function agreger(lots: any[]): any;
+export function rendre(a: any, corrections?: { byCause?: Record<string, number> }): string;
+export function main(argv: string[]): string;

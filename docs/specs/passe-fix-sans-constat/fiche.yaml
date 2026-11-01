@@ -10,7 +10,6 @@ sujet:
       - "la classification de cadence corrections (src/corrections.ts:284 : sans-constat quand p.findings est vide) : inchangée, la mesure avant/après la lit telle quelle"
       - "le rejeu seul lui-même (replayGate, gate-parts.ts:148 ; L354) et sa déclaration par orchestrate.testReplay : inchangés, un rouge n'est toujours rejoué que sur une commande déclarée"
       - "les tests « délai trop juste » (noteTight, L510) : ils gardent leur avertissement « relever le délai du test », sans proposition"
-      - "le cas où la porte du programme est verte alors que la session annonce des tests rouges (cycle.ts:2269) : question posée au lead, pas réglé ici"
       - "scripts/temps-d-un-lot.mjs (livré par L517, branche cadence/2026-11-01-2030-cad/cadence--L517) : lu, jamais modifié"
 
 # Mesure de départ (étude L517, docs/mesures/temps-d-un-lot.md de la branche L517) : 580 passes de correction classées,
@@ -57,6 +56,7 @@ cas:
       - { si: "orchestrate.testReplay n'est pas déclaré", alors: "rien n'est rejoué ni tenu pour instable, le rouge est compté tel quel", regles: [R7] }
       - { si: "le test est rouge pour un délai trop juste", alors: "avertissement « relever le délai » inchangé, sans proposition d'instabilité", regles: [R8] }
       - { si: "le même test est déjà instable dans ce lot", alors: "ni second avertissement ni seconde proposition", regles: [R6] }
+      - { si: "la session annonce des tests rouges mais la porte du programme est verte (code 0)", alors: "la porte l'emporte : avertissement noté, revue normale, aucune passe de correction", regles: [R11] }
     resultat: "Le rouge de charge ne coûte plus de passe, et la dette (test instable) est proposée au lead au lieu d'être ignorée."
   - id: C3
     titre: "Une session fix démarre sur des tests rouges et l'un d'eux passe seul"
@@ -147,6 +147,12 @@ regles:
     statut: sourcee
     source: "demande du lot : « mesure avant/après par scripts/temps-d-un-lot.mjs » ; src/corrections.ts:284 ; chiffres de l'étude L517"
     tests: ["R10 — cadence corrections --json compte toujours une passe sans constat dans sans-constat (classification inchangée)", "R10 — docs/orchestrate.md cite la mesure de départ 73 sur 580"]
+  - id: R11
+    cas: [C2]
+    enonce: "Quand la porte de tests du programme est verte (orchestrate.test rejoué, code 0) et que la session annonce des tests rouges, la porte l'emporte : un avertissement « tests annoncés rouges par la session, mais la porte du programme verte (<commande>, code 0) : l'annonce n'est pas crue, pas de correction » est noté, la revue a lieu normalement et aucune passe de correction n'est ouverte. Cela remplace la règle codée « l'annonce vaut » (cycle.ts:2264-2269), qui ouvrait une passe sur le seul constat annoncé quand la porte était verte sans échecs de base déclarés ; la dérogation baseOnly de L361 (cycle.ts:2268) devient un cas particulier de cette règle."
+    statut: sourcee
+    source: "décision de Sylvain (réponse du lead à la question de cette fiche) : « quand la porte du programme est verte, elle l'emporte sur l'annonce « tests rouges » d'une session : avertissement noté, revue normale, pas de passe de correction » ; remplace cycle.ts:2264-2269"
+    tests: ["R11 — porte verte, session annonçant des tests rouges sans échecs de base déclarés : avertissement, revue, aucune passe", "R11 — porte verte et échecs de base déclarés seuls (L361) : même issue, avertissement inchangé ou fondu dans le nouveau", "R11 — porte rouge (code non nul) et annonce rouge : passe de correction comme avant", "R11 — sans orchestrate.test, l'annonce reste régie par les règles L215 inchangées"]
 
 contrats:
   - id: A1
@@ -162,7 +168,8 @@ contrats:
     sortie: "un test vert seul : avertissement, journal, liste instables et proposition, aucune passe ; un test rouge seul : passe de correction"
     erreurs:
       - { code: log warn, message: "[instable] <test> — rouge dans la suite, vert rejoué seul : à stabiliser" }
-    regles: [R5, R6, R7, R8]
+      - { code: log warn, message: "tests annoncés rouges par la session, mais la porte du programme verte (<commande>, code 0) : l'annonce n'est pas crue, pas de correction" }
+    regles: [R5, R6, R7, R8, R11]
   - id: A3
     appel: commande cadence orchestrate
     entree: "le brief fix d'une passe ouverte"

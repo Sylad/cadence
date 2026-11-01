@@ -949,6 +949,7 @@ lots:
     estimate: 1
     created: 2026-11-01
     started: 2026-11-01
+    review: { date: 2026-11-01, verdict: "conforme : les trois constats mineurs traités sont corrigés et rien n'est cassé ; reste 1 note mineure sur un test, sans sous-tâche — orchestré (vague 2026-11-01-0915-cad, 0 passe(s) de correction + passe des mineurs)", commit: 029d0080975bc15588e466a4289c0b5eba5e9f25, reporte: { de: b24c7e74203db7a7fdfc4d527cc6731aecea2b25, vers: 029d0080975bc15588e466a4289c0b5eba5e9f25, patchId: eb254037cb57908bba333cc16640a4d561b516fc } }
   - id: L509
     title: "raf done/review/ux lancent la commande de plan publié déclarée (cadence.yaml plan.publish, ex. « cd frontend && npm run plan ») et disent le fichier à commiter — 01-11 : livraison warhammer L61 rouge sur plan.json périmé après raf done"
     status: doing

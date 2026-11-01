@@ -41,7 +41,7 @@ const lockFile = (repo: string): string => join(sharedStateDir(repo), REPO_LOCK)
 
 /**
  * `cadence local start <lot>` : le lead va modifier lui-même ce dépôt pour un lot marqué `local`. Le dépôt est verrouillé comme par une vague (aucune vague n'y démarre,
- * `--add` y est refusé par le même contrôle de dépôt) et le lot passe à `doing`. Refus (`RafError`, rien n'est verrouillé ni écrit) : lot inconnu, non marqué local, déjà
+ * `--add` y est refusé par le même contrôle de dépôt) et le lot passe à `doing`. Refus (`RafError`, rien n'est verrouillé ni écrit ; si l'écriture du plan échoue, le verrou pris est relâché) : lot inconnu, non marqué local, déjà
  * fini, une orchestration ou une autre tâche locale qui tient le dépôt, un autre lot du dépôt en cours.
  */
 export function startLocal(repo: string, plan: Plan, lotId: string, d: Pick<LocalDeps, 'pid' | 'today' | 'now'>): void {
@@ -58,8 +58,13 @@ export function startLocal(repo: string, plan: Plan, lotId: string, d: Pick<Loca
   const taken = takeLock(lockFile(repo), { pid: d.pid, wave: localWave(lotId), started: d.now().toISOString() });
   if (!taken.ok) throw new RafError(`${repoName(repo)} : une orchestration y est déjà en cours (${taken.held.wave}, pid ${taken.held.pid}) — attendre sa fin`);
   if (lot.status === 'todo') {
-    plan.setStatus(lotId, 'doing', d.today);
-    plan.save();
+    try {
+      plan.setStatus(lotId, 'doing', d.today);
+      plan.save();
+    } catch (e) {
+      releaseLock(lockFile(repo), d.pid);
+      throw e;
+    }
   }
 }
 

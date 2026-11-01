@@ -3,7 +3,7 @@ sujet:
   titre: "Rejeu isolé des tests rouges pour une porte déclarée en parties : cadence lance chaque partie dans son dossier et attribue chaque rouge à la partie qui l'a imprimé"
   lot: L512
   perimetre:
-    modules: [src/config.ts, src/orchestrate/workers.ts, src/orchestrate/cycle.ts, src/orchestrate/baseline.ts, src/verify-gate.ts, docs/orchestrate.md]
+    modules: [src/config.ts, src/orchestrate/workers.ts, src/orchestrate/cycle.ts, src/orchestrate/baseline.ts, src/orchestrate/accept.ts, src/orchestrate/command.ts, src/orchestrate/gate-place.ts, src/verify-gate.ts, docs/orchestrate.md]
     endpoints: []
     jobs: []
     hors_perimetre:
@@ -41,11 +41,12 @@ cas:
       - "Un test est vert si le rejeu de sa partie sort en 0 et que son fichier figure dans la sortie de ce rejeu (règles L354) ; la durée et le délai servent à classer « délai trop juste » (L510)."
       - "Un test rouge aux deux rejeux reste rouge et part en correction."
     alternatives:
+      - { si: "un autre lecteur de orchestrate.test (contrôle de la session accept, porte du lot, prompt accept, verify --gate) reçoit la liste", alors: "il lance chaque partie dans son dossier, fusionne les sorties et affiche le libellé de la porte (R9)", regles: [R9] }
       - { si: "la partie n'a pas de replay", alors: "ses rouges sont comptés comme avant, sans rejeu", regles: [R3] }
       - { si: "le rejeu d'une partie échoue ou ne joue pas le fichier", alors: "les tests de cette partie restent rouges ; ceux des autres parties ne sont pas touchés", regles: [R4] }
       - { si: "les rouges viennent de deux parties", alors: "une commande de rejeu par partie, chacune au plus deux fois", regles: [R4] }
       - { si: "deux parties impriment le même chemin de test (src/a.spec.ts)", alors: "chaque partie est jugée sur son propre rejeu ; le nom n'est instable que si toutes les parties qui l'ont imprimé le voient vert, sinon il reste rouge", regles: [R5] }
-      - { si: "le dossier d'une partie est introuvable", alors: "la commande run sort en échec sans test nommé : la porte est rouge, rien n'est rejoué", regles: [R3] }
+      - { si: "le dossier d'une partie est introuvable", alors: "le lancement par partie convertit l'erreur ENOENT du démarrage (cwd inexistant) en échec : code non nul, sortie non vide qui nomme le dossier, sans test nommé : la porte est rouge, rien n'est rejoué", regles: [R3] }
       - { si: "un test sans fichier désignable (FAIL nom)", alors: "compté rouge d'emblée, comme aujourd'hui", regles: [R3] }
     resultat: "Les faux rouges de warhammer (L61) ne déclenchent plus de correction ni d'escalade."
   - id: C3
@@ -85,13 +86,13 @@ regles:
     enonce: "orchestrate.test peut être une liste non vide de parties { dir, run, replay? } : dir relatif, sans « .. », unique après normalisation ; run non vide ; replay, s'il est donné, non vide et contient {files}. testReplay (chaîne) avec une liste est refusé."
     statut: sourcee
     source: "décision de Sylvain du 2026-11-01 (« orchestrate.test accepte une liste [{ dir, run, replay? }] ») ; validations alignées sur config.ts:469 (« {files} ») et worktreeDeps. Le refus de testReplay avec une liste est tiré de la même décision (le rejeu se déclare par partie)"
-    tests: ["R2 — liste valide : acceptée", "R2 — liste vide : refusée", "R2 — dir absolu, vide ou avec « .. » : refusé, le message nomme le dir fautif", "R2 — dir en double : refusé", "R2 — run vide : refusé", "R2 — replay sans {files} : refusé", "R2 — testReplay en chaîne avec une liste : refusé"]
+    tests: ["R2 — liste valide : acceptée", "R2 — liste vide : refusée", "R2 — dir absolu, vide ou avec « .. » : refusé, message unique « dir invalide »", "R2 — dir en double : refusé", "R2 — run vide : refusé", "R2 — replay sans {files} : refusé", "R2 — testReplay en chaîne avec une liste : refusé", "R2 — run ou replay non chaîne, ou clé inconnue dans une partie : refusé"]
   - id: R3
     cas: [C2, C4]
-    enonce: "Cadence lance chaque partie séparément, dans son dossier dir, et attribue chaque test rouge à la partie dont la sortie l'a imprimé (failedTests sur la sortie de cette partie) : aucune analyse de chaîne, aucun préfixe de chemin, aucun accès disque. Une partie sans replay garde le comportement d'avant (ses rouges comptent, sans rejeu), comme un nom sans fichier désignable. Une partie dont le dossier est introuvable sort en échec sans test nommé : la porte est rouge. La porte en parties est verte si toutes les parties sortent en 0."
+    enonce: "Cadence lance chaque partie séparément, dans son dossier dir, et attribue chaque test rouge à la partie dont la sortie l'a imprimé (failedTests sur la sortie de cette partie) : aucune analyse de chaîne, aucun préfixe de chemin, aucun accès disque. Une partie sans replay garde le comportement d'avant (ses rouges comptent, sans rejeu), comme un nom sans fichier désignable. Une partie dont le dossier est introuvable ne lève pas : le lancement par partie convertit l'erreur ENOENT du démarrage (cwd inexistant) en un échec (code non nul, sortie non vide nommant le dossier), sans test nommé : la porte est rouge. La porte en parties est verte si toutes les parties sortent en 0."
     statut: sourcee
     source: "décision de Sylvain du 2026-11-01 : « Cadence lance chaque partie séparément, dans son dossier, et attribue chaque rouge à la partie qui l'a imprimé : plus d'analyse de chaîne composée, aucun faux vert. Une partie sans replay garde le comportement d'avant (rouge compté) » ; replayFile (workers.ts:31)"
-    tests: ["R3 — deux parties : chaque partie est lancée dans son dossier avec sa commande", "R3 — rouge imprimé par la partie frontend : attribué à frontend, jamais à backend", "R3 — partie backend sans replay : son rouge est compté, aucun rejeu", "R3 — dossier de partie introuvable : porte rouge, aucun test nommé, rien rejoué", "R3 — nom sans fichier désignable : rouge d'emblée", "R3 — toutes les parties sortent en 0 : porte verte"]
+    tests: ["R3 — dossier introuvable : ENOENT converti en code non nul avec sortie nommant le dossier", "R3 — deux parties : chaque partie est lancée dans son dossier avec sa commande", "R3 — rouge imprimé par la partie frontend : attribué à frontend, jamais à backend", "R3 — partie backend sans replay : son rouge est compté, aucun rejeu", "R3 — dossier de partie introuvable : porte rouge, aucun test nommé, rien rejoué", "R3 — nom sans fichier désignable : rouge d'emblée", "R3 — toutes les parties sortent en 0 : porte verte"]
   - id: R4
     cas: [C2]
     enonce: "Le rejeu se fait partie par partie : une commande replay par partie concernée, dans son dossier, au plus deux fois ; le verdict d'un test ne dépend que du rejeu de sa partie (sortie 0, fichier vu dans la sortie), l'échec d'une autre partie n'excuse ni ne condamne rien."
@@ -103,7 +104,7 @@ regles:
     enonce: "Les noms rendus (red, unstable, tight.test) et redAlone sont les noms imprimés par les lanceurs, sans réécriture. Si deux parties impriment le même nom, chaque partie est jugée sur son propre rejeu, et le nom n'est instable que si toutes les parties qui l'ont imprimé le voient vert : un seul rouge restant le garde dans red, jamais de faux vert (cycle.ts:2054 compare des noms avec unstable.includes)."
     statut: sourcee
     source: "décision de Sylvain du 2026-11-01 (« aucun faux vert ») ; revue de la fiche du 2026-11-01 (renvoi des noms) ; src/orchestrate/cycle.ts:2054"
-    tests: ["R5 — même chemin src/a.spec.ts rouge dans backend et frontend, vert seulement au rejeu de frontend : reste rouge, jamais instable", "R5 — même chemin vert au rejeu des deux parties : instable", "R5 — unstable, tight.test et red portent les noms imprimés", "R5 — redAlone rend les noms imprimés"]
+    tests: ["R5 — même chemin src/a.spec.ts rouge dans backend et frontend, vert seulement au rejeu de frontend : reste rouge, jamais instable", "R5 — même chemin vert au rejeu des deux parties : instable", "R5 — nom rouge dans backend (sans replay) et vert au rejeu de frontend : reste rouge, la partie sans replay garde son rouge", "R5 — unstable, tight.test et red portent les noms imprimés", "R5 — redAlone rend les noms imprimés"]
   - id: R6
     cas: [C3]
     enonce: "La ligne de base, le rouge seul au départ (L510) et verify --gate utilisent le même lancement et le même rejeu par partie ; le délai trop juste et le « déjà rouge » valent donc pour une porte en parties, règles L354/L510 inchangées. En cas de build du départ rouge ou de worktree qui ne se monte pas, rien n'est excusé."
@@ -122,6 +123,13 @@ regles:
     statut: hypothese
     si_faux: "Si la porte doit couper à la première partie rouge comme « && », les rouges des parties suivantes ne sont pas vus à cette passe : seul le temps de la porte et le nombre de passes changent, aucune donnée en jeu."
     tests: ["R8 — backend rouge : la partie frontend est quand même lancée et ses rouges sont vus"]
+
+  - id: R9
+    cas: [C2, C3]
+    enonce: "Tout lecteur de config.test (string | liste) traite la liste par partie, jamais comme une chaîne : (a) lancement : chaque partie est lancée dans son dossier avec sa commande run, toutes les parties même si l'une est rouge (R8) ; le code rendu est 0 si toutes sortent en 0, sinon celui de la première partie non nulle, dans l'ordre déclaré ; la sortie est la fusion des sorties, chaque partie précédée d'un en-tête « [dir] » ; (b) libellé affiché : la forme chaîne s'affiche telle quelle ; la liste s'affiche « dir : run » par partie, séparées par « ; », jamais « [object Object] ». Lecteurs : cycle.ts:1870 (contrôle de la session accept : orchestrate.test verte avec les tests rouges commités ; le constat « orchestrate.test échoue (code N) » porte le code fusionné et la queue de la sortie fusionnée) ; cycle.ts:2025 (runChecks : un CheckRun par partie, label « tests », command = « dir : run ») ; cycle.ts:2267 (message de la porte verte, libellé) ; accept.ts:463-464 (prompt de la session accept : la commande ordinaire est décrite partie par partie, chacune avec son dossier) ; command.ts:554 et gate-place.ts:48 (simple présence : une liste non vide compte comme une porte déclarée) ; la porte déportée (gate-place) joue chaque partie dans son dossier du worktree de l'hôte ; verify-gate.ts:153 (playGate : une étape « tests (dir) » par partie, toutes jouées, compte rendu par partie)."
+    statut: sourcee
+    source: "revue de la fiche du 2026-11-01 (majeur : lecteurs de config.test cycle.ts:1870, 2267, accept.ts:463-464, verify-gate.ts:153, gate-place.ts:48) ; décision de Sylvain du 2026-11-01 (« cadence lance chaque partie séparément, dans son dossier »)"
+    tests: ["R9 — contrôle accept (cycle.ts:1870) avec une liste : chaque partie lancée dans son dossier, jamais « [object Object] » lancé", "R9 — contrôle accept : une partie rouge donne le constat « orchestrate.test échoue » avec le code de la première partie non nulle et la sortie fusionnée en-têtée", "R9 — contrôle accept : toutes parties vertes, aucun constat", "R9 — runChecks : un CheckRun par partie, command « dir : run », porte rouge si une partie l'est", "R9 — message de porte verte (cycle.ts:2267) : libellé « backend : npm test ; frontend : … »", "R9 — prompt de la session accept : commande ordinaire décrite par partie, sans « [object Object] »", "R9 — forme chaîne : libellé, lancement et prompt inchangés", "R9 — playGate : une étape par partie, toutes jouées, code non nul si l'une est rouge", "R9 — porte déportée : chaque partie jouée dans son dossier du worktree de l'hôte", "R9 — command.ts et gate-place : liste non vide = porte déclarée"]
 
 contrats:
   - id: A1
@@ -142,14 +150,14 @@ contrats:
     sortie: "la porte lancée par partie et rejouée par partie, mêmes lignes de compte rendu qu'aujourd'hui"
     erreurs: []
     sans_erreur: "un rejeu en échec ne fait pas échouer la commande : il laisse les tests rouges (R4) ; les échecs de la porte sont ceux déjà couverts"
-    regles: [R3, R4, R5, R6, R8]
+    regles: [R3, R4, R5, R6, R8, R9]
   - id: A3
     appel: job porte-du-lot
     entree: "sortie rouge des parties de orchestrate.test, ligne de base, sha de départ"
     sortie: "rouges retenus, instables, délais trop justes, déjà rouges"
     erreurs: []
     sans_erreur: "le job ne répond à aucun appelant ; un rejeu qui échoue ne prouve rien et laisse le rouge (R4)"
-    regles: [R3, R4, R5, R6, R7, R8]
+    regles: [R3, R4, R5, R6, R7, R8, R9]
 
 donnees:
   - { id: D1, objet: "cadence.yaml orchestrate.test (chaîne ou liste de parties { dir, run, replay? })", existant: true, modification: changement, decision: "Sylvain, 01-11 : « orchestrate.test accepte une liste [{ dir, run, replay? }] … La forme chaîne reste acceptée telle quelle (compatibilité) »", note: "clé publique de configuration élargie (type chaîne | liste), jamais renommée ni retirée" }

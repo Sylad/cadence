@@ -342,7 +342,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
     expect(code).toBe(0);
   });
 
-  it("R17 — un ajout mis en attente (dépôt occupé) est recontrôlé quand la vague le prend : `--stop-after-current` demandé entre-temps → écarté (« la vague s'arrête »), hors de wave.json, vague done", async () => {
+  it("R17 — un ajout mis en attente (dépôt occupé) est recontrôlé quand la vague le prend : `--stop-after-current` demandé entre-temps → écarté (« la vague s'arrête »), jamais ajouté ni suspendu, hors de wave.json", async () => {
     const parent = parentWith(['a'], { a: 2 });
     const s = scene(parent, 'a:L1', async (store) => {
       expect(await orchestrate(['--add', 'a:L2'], io(parent).io, s.d)).toBe(0);
@@ -350,12 +350,15 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       expect(store.readLot('a', 'L2')).toBeNull();
       expect(await orchestrate(['--stop-after-current'], io(parent).io, s.d)).toBe(0);
     });
-    expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    // L'arrêt suspend aussi a:L1 avant sa revue (sémantique de --stop-after-current) : la vague est « interrupted » pour lui seul ; a:L2 n'y est pour rien.
+    await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d);
     const store = RunStore.last(parent)!;
-    expect(store.readWave()!.status).toBe('done');
+    const journal = readFileSync(join(store.dir, 'journal.log'), 'utf8');
+    expect(journal).toMatch(/a:L2 : ajout écarté \(la vague s'arrête\)/);
+    expect(journal).not.toMatch(/a:L2 : ajouté|a:L2 → /);
     expect(store.readWave()!.lots).toEqual(['a:L1']);
+    expect(store.readLot('a', 'L2')).toBeNull();
     expect(store.addQueue()).toEqual([]);
-    expect(readFileSync(join(store.dir, 'journal.log'), 'utf8')).toMatch(/a:L2 : ajout écarté \(la vague s'arrête\)/);
     expect(s.played).toEqual(['a:L1']);
   });
 });

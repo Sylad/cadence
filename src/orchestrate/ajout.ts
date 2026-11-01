@@ -116,6 +116,8 @@ export interface AddEnv {
   /** Pourquoi la vague ne prend plus de lot (incident, limite d'usage, budget épuisé, arrêt demandé), ou null. */
   stopCause: () => string | null;
   budgetLeft: () => number;
+  /** Pourquoi le lot ne se joue plus d'après son plan (fini entre-temps, disparu, plan illisible), ou null. */
+  planState: (c: LotCtx) => string | null;
   /** Le registre des vagues vivantes : dépôts tenus et créneaux occupés. */
   announce: () => void;
   checks: LaunchChecks;
@@ -125,7 +127,7 @@ export interface AddEnv {
 
 /**
  * Les lots déposés par `--add` (L421), pris par la vague entre deux étapes comme les réponses du lead. Un lot dont le dépôt est occupé par un lot qui joue attend dans `waiting`
- * (déjà contrôlé : il n'est pas relu à chaque tour) ; un lot qui ne tient plus au moment de la prise est écarté et dit au journal.
+ * (son contexte n'est pas reconstruit à chaque tour, mais ce qui l'écarterait est relu au moment de le prendre) ; un lot qui ne tient plus à cet instant est écarté et dit au journal.
  */
 export class AddFeed {
   private waiting = new Map<number, LotCtx>();
@@ -152,6 +154,13 @@ export class AddFeed {
     if ('refusals' in built) return this.discard(entry, built.refusals.map((r) => (r.startsWith(`${key} : `) ? r.slice(key.length + 3) : r)).join(' ; '));
     if (built.ctx.lot.budget! > e.budgetLeft()) return this.discard(entry, `le budget restant de la vague ne tient pas le budget du lot (${built.ctx.lot.budget})`);
     return built.ctx;
+  }
+
+  /** Un ajout resté en attente est recontrôlé quand la vague le prend : arrêt demandé, budget épuisé ou lot fini entre-temps l'écartent comme à la lecture de la file. */
+  private recheck(entry: AddEntry, c: LotCtx): LotCtx | null {
+    const e = this.e;
+    const why = e.stopCause() ?? (c.lot.budget! > e.budgetLeft() ? `le budget restant de la vague ne tient pas le budget du lot (${c.lot.budget})` : e.planState(c));
+    return why ? this.discard(entry, why) : c;
   }
 
   /** Prend le verrou et la garde de push d'un dépôt que la vague ne tient pas (ou plus) ; rend la cause du refus. */
@@ -196,7 +205,8 @@ export class AddFeed {
   async take(canRun: (c: LotCtx) => boolean): Promise<LotCtx[]> {
     const added: LotCtx[] = [];
     for (const entry of this.e.store.addQueue()) {
-      const c = this.waiting.get(entry.id) ?? (await this.prepare(entry));
+      const kept = this.waiting.get(entry.id);
+      const c = kept ? this.recheck(entry, kept) : await this.prepare(entry);
       if (!c) continue;
       if (!canRun(c)) {
         this.waiting.set(entry.id, c);

@@ -1157,6 +1157,14 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     store, wave, wctx, io, deps, launch, ctxs, all, lots, held, freed, repos, freeRepo, saveWave, checks: LAUNCH_CHECKS,
     stopCause: () => (wctx.incident ? 'incident' : wctx.quota.hit ? "limite d'usage atteinte" : budget.exhausted ? 'budget de la vague épuisé' : store.control().stopAfterCurrent ? "la vague s'arrête" : null),
     budgetLeft: () => budget.limit - budget.consumed,
+    planState: (c) => {
+      try {
+        const lot = projectEnv(c.lot.repo).loadPlan().lots().find((l) => l.id === c.lot.lot);
+        return !lot ? 'lot inconnu' : !isOpen(lot.status) ? `le lot est ${lot.status}` : null;
+      } catch (e) {
+        return (e as Error).message;
+      }
+    },
     announce: () => updateWaveReposSafe(home, repos.filter((x) => !freed.has(x)), lanes()),
     build: (t, known) => buildAdd(t, known, { wave: wave.id, ctxs, wctx, store, io, deps, launch }),
   });

@@ -273,7 +273,7 @@ lots:
     notes:
       - { date: 2026-10-29, text: "29-10 : même mur pour --resume --integrate d'une vague finie (2026-10-28-2210, L402) pendant qu'une autre vague du dépôt tourne (2026-10-29-cad) : « une orchestration y est déjà en cours » — l'intégration d'un lot revu devrait pouvoir passer, ou être mise en file par la vague vivante" }
     started: 2026-11-01
-    review: { date: 2026-11-01, verdict: "conforme : les deux majeurs de la revue de vague sont fermés (projet résolu par chemin, ajout en attente recontrôlé à la prise : arrêt, budget, état du plan) ; R16-R19 savent échouer (vérifié par neutralisation de chaque branche) ; porte verte 5285 tests — reprise Fable par le lead après rendu pour budget", commit: 447574b8178e4e184655ef0b7ada98c90672c136 }
+    review: { date: 2026-11-01, verdict: "conforme : les deux majeurs de la revue de vague sont fermés (projet résolu par chemin, ajout en attente recontrôlé à la prise : arrêt, budget, état du plan) ; R16-R19 savent échouer (vérifié par neutralisation de chaque branche) ; porte verte 5285 tests — reprise Fable par le lead après rendu pour budget ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase ne change que l'entrée CHANGELOG (1 mineur : Changed avant Added sous [Unreleased], sans ligne vide, contre l'ordre de docs/orchestrate.md:644) ; le code et les tests sont identiques à la version revue", commit: 37b99aedb2791e947b7bc8efbdeb05d9a386b0a6 }
   - id: L422
     title: "Table finale d'orchestrate : une sous-tâche proposée dont le fichier cité a été modifié par un commit du lot postérieur à la revue qui l'a émise est marquée « peut-être déjà traitée (<sha>) » (28-10 : L230 ouvert sur des propositions déjà corrigées, 5 passes perdues)"
     status: todo
@@ -902,7 +902,7 @@ lots:
     spec: true
     created: 2026-10-31
     started: 2026-11-01
-    after: [L421]
+    after: [ L421 ]
     goal: "Arbitrage du lead (01-11) sur les deux majeurs de la fiche : (1) le tirage s'appuie sur L421 (--add, ajout à une vague vivante) : dès qu'un créneau se libère, la file pousse le lot suivant dans la vague vivante qui tient son dépôt par le mécanisme de --add, ou lance une vague neuve si aucune ne le tient ; jamais d'injection dans un execute en cours par un autre chemin. (2) Portée : toute vague vivante tire de la file (lancée avec des lots donnés, --continue ou --queue) ; la file passe AVANT le tirage du plan de --continue ; un lot à la fois par créneau libéré. File dans l'état commun ~/.cadence/orchestrate/queue.json (décision de Sylvain), commandes ajout/retrait/liste sans commit. R13 aligné sur l'état tiré."
     notes:
       - { date: 2026-11-01, text: "Revue de la fiche — mineur : docs/specs/file-lots-approuves/fiche.yaml — Contrats A1 et A3 : les erreurs sont notées « HTTP 400 », alors que ce sont des commandes CLI. Le code actuel lève `RafError` (src/orchestrate/command.ts:767, 830). Il faut un code de sortie. Sans cela, le test ne peut pas asserter une valeur." }

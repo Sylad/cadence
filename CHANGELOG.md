@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.34.1] - 2026-11-01
+
 ### Fixed
 
 - Publication of 1.34.0, which failed after the tag: its CHANGELOG entry for the edge-case probe cited a lot with no commit in the tag. 1.34.1 carries everything 1.34.0 announced, including the steadier tests of `npm run service` under load (L480).

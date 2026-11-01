@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.34.1**: republishes 1.34.0, whose npm publication failed after the tag; same features (edge-case probe, steadier `mise-en-service` tests).
 - **1.34.0**: an optional edge-case probe (`orchestrate.probe: true`) tries to break a lot's diff with tests at the edges before the code review; flaky tests of `mise-en-service` made deterministic.
 - **1.33.0**: the lots panel shows each project's progress bar in its « ordre des projets » section, aligned in the desktop app; a simplification audit of the code, and dead exports removed.
 - **1.32.0**: code-quality guard rails in a ratchet (ESLint, sonarjs, knip, jscpd vs a versioned baseline), a recipe for TS, Python, Java, shell; `raf done` refuses a lot whose recorded review is `non conforme`.
@@ -60,6 +61,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.34.1**: 1.34.0 was tagged but its publication to npm failed (a CHANGELOG entry cited a lot with no commit in the tag); 1.34.1 publishes the same content, with that entry reworded. Install 1.34.1 to get the edge-case probe and the steadier tests of 1.34.0.
 
 **1.34.0**: `cadence orchestrate` can play an edge-case probe between the implementation and the code review (L497, `orchestrate.probe: true`, `docs/orchestrate.md`): a fresh Sonnet session reads the lot's diff, and the sheet when there is one, and writes tests at the edges — empty, absent, twice, wrong type, refused, the real shape of the data, the other callers; a red test sends the lot back to the implementation as a finding before the Opus review, which costs more. The probe's findings never block the lot (a failed or timed-out probe is a warning and the review goes on), while the checks common to every writing session — a dirty repository, the acceptance-test lock — apply to it too. Absent, nothing changes. It answers the « bug de code » bottleneck: edge cases were 64 % of the code-bug correction passes after two written instructions in the implementation brief. The test suite also stops blocking a Vitest worker for more than 60 s: `mise-en-service` compiles once per test file instead of five synchronous `tsc` runs (L480).
 

@@ -1,0 +1,137 @@
+sujet:
+  id: rejeu-porte-composee
+  titre: "Rejeu isolé des tests rouges pour une porte composée : une commande de rejeu par partie de la porte, choisie par le préfixe du chemin du test"
+  lot: L512
+  perimetre:
+    modules: [src/config.ts, src/orchestrate/workers.ts, src/orchestrate/cycle.ts, src/verify-gate.ts, docs/orchestrate.md]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le rejeu d'une porte à lanceur unique (testReplay en chaîne) : inchangé, y compris son refus sur une porte composée"
+      - "les règles L354 (deux rejeux, vert seul = instable, fichier vu dans la sortie) et L510 (délai trop juste, déjà rouge au départ) : réutilisées telles quelles, partie par partie"
+      - "les cadence.yaml de warhammer40k et d'evatosorus : dépôts frères, la déclaration se fait sur la branche wip/cadence-L512 de chacun (jamais sur main), par l'implémentation du lot"
+
+cas:
+  - id: C1
+    titre: "Le lead déclare un rejeu par partie dans cadence.yaml"
+    acteur: le lead
+    declencheur: lecture de cadence.yaml par toute commande cadence (orchestrate.testReplay)
+    preconditions:
+      - "orchestrate.test est une porte composée (a && b, sous-shell)"
+    nominal:
+      - "testReplay est un objet : préfixe de chemin → commande de rejeu contenant {files}."
+      - "cadence normalise chaque préfixe (un « / » final) et accepte la déclaration, même sur une porte composée."
+    alternatives:
+      - { si: "testReplay est une chaîne et la porte est composée", alors: "refus inchangé (config.ts:470)", regles: [R1] }
+      - { si: "un préfixe est vide, absolu, contient « .. » ou est en double, ou une commande est vide ou sans {files}, ou l'objet est vide", alors: "cadence.yaml refusé avec le message du contrat A1", regles: [R2] }
+    resultat: "La déclaration par partie est lue ; une chaîne seule garde son comportement."
+  - id: C2
+    titre: "Un test rouge de la porte composée est rejoué seul par la commande de sa partie"
+    acteur: l'orchestrateur (porte du lot, après une implémentation ou une correction)
+    declencheur: "porte orchestrate.test rouge avec des tests nommés, testReplay par partie déclaré"
+    preconditions:
+      - "au moins un test rouge nommé par un fichier"
+    nominal:
+      - "Chaque fichier rouge est attribué à une partie (R3)."
+      - "Pour chaque partie concernée, cadence lance sa commande avec {files} remplacé par les fichiers de cette partie, sans le préfixe, dans le dossier de l'appelant."
+      - "Un test est vert si le rejeu de SA partie sort en 0 et que son fichier figure dans la sortie de ce rejeu (règles L354) ; la durée et le délai servent à classer « délai trop juste » (L510)."
+      - "Un test rouge aux deux rejeux reste rouge et part en correction."
+    alternatives:
+      - { si: "le fichier n'est attribuable à aucune partie, ou à deux", alors: "il n'est pas rejoué, il est compté rouge", regles: [R3] }
+      - { si: "le rejeu d'une partie échoue ou ne joue aucun test", alors: "les tests de cette partie restent rouges ; ceux des autres parties ne sont pas touchés", regles: [R4] }
+      - { si: "les rouges viennent de deux parties", alors: "une commande par partie, chacune au plus deux fois", regles: [R4] }
+      - { si: "un test sans fichier désignable (FAIL nom)", alors: "compté rouge d'emblée, comme aujourd'hui", regles: [R3] }
+    resultat: "Les faux rouges de warhammer (L61) et evatosorus (L45) ne déclenchent plus de correction ni d'escalade."
+  - id: C3
+    titre: "La ligne de base, le rouge au départ et verify --gate rejouent par partie"
+    acteur: l'orchestrateur ou le lead (cadence verify --gate)
+    declencheur: "ligne de base L213, rouges seuls au sha de départ (L510), cadence verify --gate"
+    preconditions:
+      - "testReplay par partie déclaré ; rouges nommés dans la sortie de la porte"
+    nominal:
+      - "Les trois appelants passent par le même rejeu que C2, dans le worktree du sha ou le dossier de l'appelant."
+      - "Un test rouge seul aux deux rejeux au sha de départ est « déjà rouge » : aucune correction ni escalade."
+    alternatives:
+      - { si: "le build du départ est rouge ou le worktree ne se monte pas", alors: "rien n'est excusé (comportement L510 inchangé)", regles: [R5] }
+    resultat: "Même verdict d'instable, de délai trop juste et de déjà rouge pour une porte composée que pour un lanceur unique."
+  - id: C4
+    titre: "Les deux projets déclarent leur rejeu"
+    acteur: l'implémentation du lot
+    declencheur: modification de cadence.yaml de warhammer40k et d'evatosorus
+    preconditions:
+      - "dépôts frères : branche wip/cadence-L512, jamais main"
+    nominal:
+      - "warhammer40k : backend/ → cd backend && …, frontend/ → cd frontend && npx vitest run … {files}."
+      - "evatosorus : la partie des scripts de test → cd frontend && node --test {files}."
+      - "Chaque cadence.yaml se relit sans erreur."
+    alternatives:
+      - { si: "le lanceur d'une partie n'imprime pas de noms que failedTests sait lire", alors: "aucun rejeu pour cette partie : ses rouges sont comptés comme avant", regles: [R6] }
+    resultat: "Les deux projets bénéficient du rejeu isolé."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Un testReplay en chaîne reste refusé quand orchestrate.test est une porte composée ; en chaîne sur un lanceur unique il fonctionne comme avant."
+    statut: sourcee
+    source: "src/config.ts:470 et docs/orchestrate.md (« A composed gate is not supported (decision of 26-10) ») : la forme chaîne n'a pas de moyen de choisir le lanceur"
+    tests: ["R1 — testReplay en chaîne + porte composée : cadence.yaml refusé", "R1 — testReplay en chaîne + lanceur unique : accepté, rejeu inchangé"]
+  - id: R2
+    cas: [C1]
+    enonce: "testReplay peut être un objet préfixe de chemin → commande ; il est valide si non vide, chaque préfixe est relatif, sans « .. » et unique après normalisation, chaque commande non vide contient {files}. Cette forme est acceptée avec une porte composée."
+    statut: sourcee
+    source: "demande du lot : « Rejeu par partie de la porte (préfixe de chemin → commande, ex. frontend/ → cd frontend && npx vitest run {files}) » ; validations alignées sur config.ts:469 et worktreeDeps"
+    tests: ["R2 — objet valide sur porte composée : accepté", "R2 — préfixe « .. » ou absolu : refusé", "R2 — commande sans {files} : refusée", "R2 — objet vide ou préfixe en double : refusé"]
+  - id: R3
+    cas: [C2]
+    enonce: "Le fichier d'un test rouge appartient à la partie dont le préfixe est le plus long début de son chemin ; à défaut (le lanceur imprime le chemin relatif à son dossier), à l'unique partie où préfixe + chemin existe dans le dossier du rejeu. {files} reçoit le chemin sans le préfixe. Aucune partie, ou plusieurs à égalité : le test n'est pas rejoué et reste rouge."
+    statut: hypothese
+    si_faux: "Si les lanceurs impriment toujours le chemin depuis la racine du dépôt, seule la seconde étape (existence) est inutile ; si le chemin doit être passé avec son préfixe, seul le retrait du préfixe change. Aucune donnée en jeu."
+    tests: ["R3 — chemin « frontend/src/a.spec.ts » : partie frontend, {files} = src/a.spec.ts", "R3 — chemin relatif existant seulement sous backend/ : partie backend", "R3 — chemin présent sous deux parties : non rejoué, rouge", "R3 — chemin inconnu ou nom sans fichier : rouge d'emblée"]
+  - id: R4
+    cas: [C2]
+    enonce: "Le rejeu se fait partie par partie : une commande par partie concernée, au plus deux fois ; le verdict d'un test ne dépend que du rejeu de sa partie (sortie 0, test exécuté, fichier vu dans la sortie), l'échec d'une autre partie n'excuse ni ne condamne rien."
+    statut: sourcee
+    source: "src/orchestrate/workers.ts:121-128 (règle L354 : un rejeu en échec ne conclut rien pour un test qu'il ne nomme pas ; REPLAYS = 2), appliquée à chaque partie"
+    tests: ["R4 — rouges de deux parties : deux commandes, chacune avec ses seuls fichiers", "R4 — la partie backend échoue au rejeu : les tests frontend verts restent instables", "R4 — rejeu sans test exécuté : tests de la partie rouges", "R4 — rouge aux deux rejeux : reste rouge"]
+  - id: R5
+    cas: [C3]
+    enonce: "La ligne de base, le rouge seul au départ (L510) et verify --gate utilisent le même rejeu par partie ; le délai trop juste et le « déjà rouge » valent donc pour une porte composée, avec les règles L354/L510 inchangées."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:271,283,2045 et src/verify-gate.ts:272 : les quatre appelants passent testReplay à replayRed/redAlone"
+    tests: ["R5 — porte composée, test vert seul à 80 % du délai : délai trop juste, pas de correction", "R5 — rouge seul au départ : déjà rouge, ni correction ni escalade", "R5 — verify --gate : rouge instable rejoué par partie", "R5 — build du départ rouge : rien n'est excusé"]
+  - id: R6
+    cas: [C4]
+    enonce: "Une partie sans commande déclarée, ou dont le lanceur ne nomme pas ses tests rouges, n'est pas rejouée : ses rouges sont comptés comme avant."
+    statut: hypothese
+    si_faux: "Si evatosorus (node --test) exige un rejeu sur un format de sortie que failedTests ne lit pas, il faudra un lot d'analyse de ce format ; aucune donnée en jeu."
+    tests: ["R6 — fichier d'une partie non déclarée : rouge compté", "R6 — cadence.yaml de warhammer40k et d'evatosorus : relus sans erreur avec leur testReplay"]
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate (lecture de cadence.yaml, clé orchestrate.testReplay)
+    entree: "une chaîne (comme aujourd'hui) ou un objet { <préfixe>/: <commande avec {files}> }"
+    sortie: "la configuration lue ; la chaîne garde son sens, l'objet active le rejeu par partie"
+    erreurs:
+      - { code: "log error", message: "cadence.yaml : orchestrate.testReplay : refusé quand orchestrate.test est une porte composée (&&, ||, sous-shell) : le rejeu seul ne vaut que pour un lanceur unique" }
+      - { code: "log error", message: "cadence.yaml : orchestrate.testReplay : au moins une partie attendue (préfixe de chemin → commande)" }
+      - { code: "log error", message: "cadence.yaml : orchestrate.testReplay : préfixe invalide (chemin relatif, sans « .. », unique)" }
+      - { code: "log error", message: "cadence.yaml : orchestrate.testReplay : la commande de la partie doit contenir {files} (remplacé par les fichiers des tests rouges)" }
+    regles: [R1, R2]
+  - id: A2
+    appel: commande cadence verify --gate
+    entree: "porte rouge, testReplay par partie déclaré"
+    sortie: "le rejeu de la porte par partie, mêmes lignes de compte rendu qu'aujourd'hui"
+    erreurs: []
+    sans_erreur: "un rejeu en échec ne fait pas échouer la commande : il laisse les tests rouges (R4) ; les échecs de la porte sont ceux déjà couverts"
+    regles: [R3, R4, R5]
+  - id: A3
+    appel: job porte-du-lot
+    entree: "sortie rouge de orchestrate.test, ligne de base, sha de départ"
+    sortie: "rouges retenus, instables, délais trop justes, déjà rouges"
+    erreurs: []
+    sans_erreur: "le job ne répond à aucun appelant ; un rejeu qui échoue ne prouve rien et laisse le rouge (R4, R6)"
+    regles: [R3, R4, R5, R6]
+
+donnees:
+  - { id: D1, objet: "cadence.yaml orchestrate.testReplay (chaîne ou objet préfixe → commande)", existant: true, modification: ajout, decision: "la demande du lot fixe la forme (préfixe de chemin → commande) ; additive, la chaîne reste valide et inchangée (R1)", note: "clé publique de configuration élargie, jamais renommée ni retirée" }
+  - { id: D2, objet: "baseline du lot (failures, command)", existant: true, modification: aucune, note: "format inchangé" }

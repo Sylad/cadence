@@ -267,13 +267,14 @@ lots:
     finished: 2026-11-01
   - id: L421
     title: Ajouter un lot à une vague vivante (--add <projet:lot>) au lieu d'en lancer une seconde, refusée dans le même dépôt ; le message du refus nomme cette commande (28-10)
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-29
     notes:
       - { date: 2026-10-29, text: "29-10 : même mur pour --resume --integrate d'une vague finie (2026-10-28-2210, L402) pendant qu'une autre vague du dépôt tourne (2026-10-29-cad) : « une orchestration y est déjà en cours » — l'intégration d'un lot revu devrait pouvoir passer, ou être mise en file par la vague vivante" }
     started: 2026-11-01
     review: { date: 2026-11-01, verdict: "conforme : les deux majeurs de la revue de vague sont fermés (projet résolu par chemin, ajout en attente recontrôlé à la prise : arrêt, budget, état du plan) ; R16-R19 savent échouer (vérifié par neutralisation de chaque branche) ; porte verte 5285 tests — reprise Fable par le lead après rendu pour budget ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase ne change que l'entrée CHANGELOG (1 mineur : Changed avant Added sous [Unreleased], sans ligne vide, contre l'ordre de docs/orchestrate.md:644) ; le code et les tests sont identiques à la version revue", commit: 37b99aedb2791e947b7bc8efbdeb05d9a386b0a6 }
+    finished: 2026-11-01
   - id: L422
     title: "Table finale d'orchestrate : une sous-tâche proposée dont le fichier cité a été modifié par un commit du lot postérieur à la revue qui l'a émise est marquée « peut-être déjà traitée (<sha>) » (28-10 : L230 ouvert sur des propositions déjà corrigées, 5 passes perdues)"
     status: todo

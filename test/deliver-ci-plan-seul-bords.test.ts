@@ -7,6 +7,7 @@ import { headSha } from '../src/git.js';
 import { Plan } from '../src/plan.js';
 import { appendDelivery, sharedStateDir as stateDir } from '../src/state.js';
 import { cleanupTempDirs, commit, gitRepo, tempDir } from './helpers.js';
+import { ctx as bancCtx, fakeDeps as banc, livre, planCommit } from './deliver-ci-plan-seul-banc.js';
 
 afterEach(() => cleanupTempDirs());
 
@@ -17,77 +18,8 @@ const COMMAND = parseDeliverConfig('deliver:\n  ci:\n    command: ./ci.sh\n  dep
 const NONE = parseDeliverConfig('deliver:\n  ci: none\n  deploy:\n    - echo a\n  verify:\n    - command: "true"\n', 'cadence.yaml');
 const SCRIPT = parseDeliverConfig('deliver:\n  script: ./livrer.sh\n  verify:\n    - command: "true"\n', 'cadence.yaml');
 
-async function livre(): Promise<string> {
-  const origin = tempDir();
-  git(origin, 'init', '-q', '--bare', '-b', 'main');
-  const dir = gitRepo();
-  const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'demo', 'L', '2026-09-28');
-  plan.add('Cache', '2026-09-28');
-  plan.save();
-  writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  ci: none\n');
-  git(dir, 'add', '.');
-  commit(dir, 'chore: plan');
-  git(dir, 'remote', 'add', 'origin', origin);
-  git(dir, 'push', '-q', '-u', 'origin', 'main');
-  appendDelivery(stateDir(dir), '2026-09-28', headSha(dir)!);
-  return dir;
-}
-
-function planCommit(dir: string, title: string): void {
-  const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
-  plan.add(title, '2026-09-28');
-  plan.save();
-  git(dir, 'add', '.cadence/raf.yaml');
-  commit(dir, `chore(plan): ${title}`);
-  git(dir, 'push', '-q');
-}
-
-function fakeDeps(over: Partial<DeliverDeps> & { runs?: GhRun[]; exit?: (cmd: string) => number; deployMs?: number } = {}) {
-  let clock = START;
-  const execs: string[] = [];
-  const ghCalls: string[] = [];
-  const { runs, exit, deployMs = 0, ...rest } = over;
-  const deps: DeliverDeps = {
-    exec: (cmd) => {
-      execs.push(cmd);
-      if (cmd.startsWith('echo')) clock += deployMs;
-      return exit ? exit(cmd) : 0;
-    },
-    gh: (sha) => {
-      ghCalls.push(sha);
-      return runs ?? [{ name: 'ci', status: 'completed', conclusion: 'success' }];
-    },
-    ghReady: () => null,
-    fetch: async () => ({ status: 200, text: 'ok' }),
-    sleep: async (ms) => {
-      clock += ms;
-    },
-    now: () => clock,
-    ...rest,
-  };
-  return { deps, execs, ghCalls };
-}
-
-function ctx(dir: string, config = GITHUB, over: Record<string, unknown> = {}) {
-  const out: string[] = [];
-  const err: string[] = [];
-  return {
-    c: {
-      root: dir,
-      state: stateDir(dir),
-      plan: 'plan' in over ? (over.plan as Plan | null) : Plan.load(join(dir, '.cadence/raf.yaml')),
-      config,
-      today: '2026-09-28',
-      dryRun: false,
-      args: [] as string[],
-      out: (l: string) => out.push(l),
-      err: (l: string) => err.push(l),
-      ...over,
-    },
-    out,
-    err,
-  };
-}
+const ctx = (dir: string, config = GITHUB, over: Record<string, unknown> = {}) => bancCtx(dir, config, over);
+const fakeDeps = (over: Parameters<typeof banc>[1] = {}) => banc(START, over);
 
 const stepsFile = (dir: string) => join(stateDir(dir), 'deliveries-steps.log');
 const steps = (dir: string) =>
@@ -152,7 +84,7 @@ describe('deliver — bords L516', () => {
     expect(h.ghCalls).toHaveLength(1);
   });
 
-  it('R3 — la livraison précédente est un nom de branche (main) : la CI n\'est pas sautée sur ce non-sha', async () => {
+  it('R3 — la livraison précédente est une référence relative (HEAD~1) : la CI n\'est pas sautée sur ce non-sha', async () => {
     const dir = await livre();
     planCommit(dir, 'Un');
     appendFileSync(join(stateDir(dir), 'deliveries.log'), '2026-09-28 HEAD~1\n');

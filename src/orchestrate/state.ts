@@ -187,6 +187,8 @@ export interface LotState {
   precheck?: string;
   /** Verdict du contrôle préalable une fois lu (« oui » sans preuve = « partiel »), gardé au journal pour mesurer la part de « oui » (L288). Absent : pas de contrôle. */
   precheckVerdict?: 'oui' | 'partiel' | 'non';
+  /** Ce que le contrôle préalable a lu (fichiers, code voisin, tests), rogné et borné (L523) ; joint au brief de la première implémentation, jamais à une reprise ni à une correction. Absent : pas de lecture. */
+  precheckLu?: string;
   /** Réponse de l'humain à une question, jointe au brief de la prochaine session puis effacée. */
   pendingAnswer?: string | null;
   verdict: string | null;

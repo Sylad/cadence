@@ -54,10 +54,10 @@ export const REVIEW_SCHEMA = {
   required: ['bloquants', 'majeurs', 'mineurs', 'constats', 'sousTaches', 'nonVerifie', 'verdict'],
 } as const;
 
-/** Sortie du contrôle préalable : `dejaPresent` vaut « oui » (rien à faire), « partiel » ou « non ». */
+/** Sortie du contrôle préalable : `dejaPresent` vaut « oui » (rien à faire), « partiel » ou « non ». `lu` (L523, facultatif) est ce que le lecteur a lu : fichiers, code voisin, tests. */
 export const PRECHECK_SCHEMA = {
   type: 'object',
-  properties: { dejaPresent: { type: 'string', enum: ['oui', 'partiel', 'non'] }, preuves: strings, resume: str },
+  properties: { dejaPresent: { type: 'string', enum: ['oui', 'partiel', 'non'] }, preuves: strings, resume: str, lu: str },
   required: ['dejaPresent', 'preuves', 'resume'],
 } as const;
 
@@ -80,6 +80,8 @@ export interface PrecheckReport {
   dejaPresent: 'oui' | 'partiel' | 'non';
   preuves: string[];
   resume: string;
+  /** Facultatif, et pas contrôlé par `checkShape` (hors `required`) : le type n'est pas garanti, `precheck()` le vérifie. */
+  lu?: unknown;
 }
 
 export interface WorkReport {

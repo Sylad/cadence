@@ -10,7 +10,7 @@ import { planLoader, readDocsConfig, readPlanConfig, type OrchestrateConfig } fr
 import { PLAN_ACTIONS, leadAnswerMessage, planCommitMessage } from '../plan-commit.js';
 import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
-import { citesPriorWork, precheckNothingToFind } from './precheck.js';
+import { citesPriorWork, keepPrecheckReading, localYesNote, precheckNothingToFind } from './precheck.js';
 import { PROBE_FAILED, PROBE_RESERVE, probeStep, probeVars, scheduleProbe, type ProbeIo } from './probe.js';
 import type { Day } from '../dates.js';
 import { changedFiles, dirtyPaths, gitCommonDir, isAncestor, readCommits, resolveCommit, restoreWorktree, tryGit, type Commit } from '../git.js';
@@ -25,7 +25,7 @@ import { TEST_WORKERS_ENV, testWorkersText, type TightTest } from './workers.js'
 import { baselineCandidates, gateLabel, gateReplayable, gateUnnamed, redAloneGate, redCandidates, replayGate, runGate, type GateRan, type GateTest } from './gate-parts.js';
 import { withPlace, type Place } from './gate-place.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
-import { capturesText, gateText, headline, integrationText, localReading, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
+import { capturesText, gateText, headline, integrationText, localReading, precheckBrief, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, enabledPlugins, settingsFiles, type AgentDef, type AnyModel, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, remoteAdvances, snapshot, type Snapshot } from './guard.js';
@@ -640,7 +640,7 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
         ? `A previous session was interrupted; resume from these commits of the lot already present:\n${mine}`
         : 'A previous session was interrupted before any commit of the lot; start again from the current state of the repository.';
     }
-    if (kind === 'implement' && l.precheck) vars.commits = [vars.commits, l.precheck].filter(Boolean).join('\n');
+    if (kind === 'implement') vars.commits = precheckBrief(vars.commits, l.precheck, interrupted ? undefined : l.precheckLu);
     if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
   const brief = renderBrief(briefName(l, kind, !!c.integration), vars, c.wave.templates);
@@ -1399,7 +1399,7 @@ async function precheck(c: LotCtx): Promise<void> {
       if (rep?.dejaPresent === 'oui') {
         localYes = true;
         rep = null;
-      }
+      } else if (rep) rep.lu = undefined; // « non » ou « partiel » du local, accepté sans relecture par Sonnet : sa lecture n'est pas gardée (L523)
     }
   }
   if (!rep) {
@@ -1414,13 +1414,7 @@ async function precheck(c: LotCtx): Promise<void> {
       return;
     }
   }
-  if (localYes) {
-    l.warnings.push(
-      rep.dejaPresent === 'oui'
-        ? 'contrôle préalable : « oui » du modèle local, confirmé par Sonnet'
-        : `contrôle préalable : le modèle local a dit « oui », Sonnet dit « ${rep.dejaPresent} » — le local s'est trompé, repasser orchestrate.precheck à true`,
-    );
-  }
+  if (localYes) l.warnings.push(localYesNote(rep.dejaPresent));
   const proofs = rep.preuves.length ? ` (${rep.preuves.join(' ; ')})` : '';
   // « oui » sans preuve ne se vérifie pas : il vaut « partiel », l'implémentation part avec le constat.
   const unproven = rep.dejaPresent === 'oui' && rep.preuves.length === 0;
@@ -1434,6 +1428,7 @@ async function precheck(c: LotCtx): Promise<void> {
     l.precheck = `A pre-check found part of the deliverable already in the repository (do not redo it): ${rep.resume.trim()}${proofs}`;
     l.warnings.push(`contrôle préalable : livrable en partie présent — ${rep.resume.trim()}${proofs}`);
   }
+  keepPrecheckReading(l, rep.lu);
   l.next = firstWrite(c);
   save(c);
 }

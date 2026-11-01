@@ -74,3 +74,30 @@ export function precheckNothingToFind(plan: Plan, root: string, lot: string, rep
     return null;
   }
 }
+
+/** Taille permise de la lecture du précheck rangée dans l'état du lot, marqueur compris (L523). */
+export const PRECHECK_LU_MAX = 4000;
+const PRECHECK_LU_CUT = '[…tronqué]';
+
+/** Ligne du journal quand Sonnet a relu un « oui » du modèle local (L146) : il le confirme ou le contredit. */
+export function localYesNote(verdict: 'oui' | 'partiel' | 'non'): string {
+  return verdict === 'oui'
+    ? 'contrôle préalable : « oui » du modèle local, confirmé par Sonnet'
+    : `contrôle préalable : le modèle local a dit « oui », Sonnet dit « ${verdict} » — le local s'est trompé, repasser orchestrate.precheck à true`;
+}
+
+/**
+ * Range la lecture du précheck (`lu` du rapport, facultatif : `checkShape` ne le contrôle pas) dans `precheckLu` du lot : rognée de ses
+ * espaces, coupée à `PRECHECK_LU_MAX` caractères marqueur compris. Rien n'est rangé quand `lu` est absent, vide ou d'espaces ; un `lu`
+ * qui n'est pas une chaîne est écarté avec un avertissement.
+ */
+export function keepPrecheckReading(lot: { precheckLu?: string; warnings: string[] }, lu: unknown): void {
+  if (lu === undefined) return;
+  if (typeof lu !== 'string') {
+    lot.warnings.push('contrôle préalable : champ lu ignoré (mal typé)');
+    return;
+  }
+  const text = lu.trim();
+  if (!text) return;
+  lot.precheckLu = text.length > PRECHECK_LU_MAX ? `${text.slice(0, PRECHECK_LU_MAX - PRECHECK_LU_CUT.length)}${PRECHECK_LU_CUT}` : text;
+}

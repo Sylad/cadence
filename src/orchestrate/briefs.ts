@@ -144,6 +144,23 @@ export function localReading(lot: { title: string; goal?: string; notes: { date?
   ].join('\n');
 }
 
+/**
+ * Ce que le précheck apporte au brief de l'implémentation : son constat (« partiel ») puis, séparée par une ligne vide, ce qu'il a lu
+ * (L523), pour que la session parte de là au lieu de tout relire à froid. `lu` n'est passé qu'à la première passe : la lecture date du
+ * début du lot, une reprise après interruption a des commits à relire (l'appelant ne le passe pas). Sans constat ni lecture, `commits` est rendu tel quel.
+ */
+export function precheckBrief(commits: string, finding: string | undefined, lu: string | undefined): string {
+  const withFinding = finding ? [commits, finding].filter(Boolean).join('\n') : commits;
+  if (!lu) return withFinding;
+  const reading = [
+    'Pre-check reading (L523): the read-only pre-check of this lot, at the start of the lot, looked in the repository and read this.',
+    'Start from these files, the neighbouring code to imitate and the existing tests it names, without searching for them again;',
+    'reopen a file only to modify it or when this reading is not enough, and re-read the lines you edit (the reading dates from the start of the lot).',
+    lu,
+  ].join('\n');
+  return [withFinding, reading].filter(Boolean).join('\n\n');
+}
+
 /** Un gabarit : un par étape, plus les variantes (passe des mineurs, passe du bibliothécaire, revue courte qui suit la passe des mineurs). */
 export type BriefName = SessionKind | 'fix-minors' | 'fix-docs' | 'review-recheck' | 'spec-back' | 'accept-back';
 

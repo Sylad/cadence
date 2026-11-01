@@ -983,6 +983,9 @@ lots:
     spec: true
     created: 2026-11-01
     started: 2026-11-01
+    notes:
+      - { date: 2026-11-01, text: "Revue de la fiche — mineur : docs/specs/rejeu-porte-composee/fiche.yaml:28 — C2 / R4 : le contrôle « fichier figurant dans la sortie » (`replayRanFile`, workers.ts) se fait avec le chemin passé dans {files}. Avec le préfixe retiré (src/a.spec.ts), le verdict doit s'appliquer à ce chemin court mais revenir aux noms d'origine dans `unstable`, `tight` et `red`. La fiche ne le dit pas et n'a aucun test sur ce renvoi de noms, alors que cycle.ts:2054 compare des noms avec `unstable.includes`." }
+      - { date: 2026-11-01, text: "Revue de la fiche — mineur : docs/specs/rejeu-porte-composee/fiche.yaml:1 — Le type de `testReplay` passe de `string` (config.ts:309) à `string | objet`, et il est lu par cycle.ts:271-283, cycle.ts:2045 et verify-gate.ts:272-279 (4 appelants). La fiche nomme les appelants en R5 mais ne mentionne pas docs/orchestrate.md comme à mettre à jour pour la forme objet. Le périmètre le liste, mais aucun test ni aucune règle ne couvre la doc. À noter seulement." }
   - id: L513
     title: "Agents design, idées des tests du 01-11 (ui-ux-pro-max, design-for-ai, claude-design-styles) : spec-writer — jetons de couleur sémantiques avec leur couleur de texte (on-*), rampe tirée de la couleur de la charte et rapport de contraste 4,5:1 joint à la fiche ; ux-reviewer — grille avant livraison (focus visible, prefers-reduced-motion, cursor, emoji en icône, largeurs 375/768/1024/1440) et contrôle statique des « tics d'IA » (règles de detect.mjs, Apache-2.0, attribution) en constats numérotés ; jamais de catalogue de styles génériques sur une app qui a une charte"
     status: todo

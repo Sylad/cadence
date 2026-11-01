@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-11-01
+
 ### Fixed
 
 - `qa-reviewer` opens its own browser context, in a profile of its own (L511, [docs/skills.md](docs/skills.md)): on 2026-11-01 two QA passes started together (warhammer L222, avatar L13) shared the Playwright browser, one read a tab of the other site, then the browser closed. The agent now launches a persistent context (`launchPersistentContext`, from a Node script run with Bash — the `browser_*` tools of the shared Playwright MCP take no `userDataDir` and are not used) in a `userDataDir` named after the app (a suffixed one when that directory is already open in another browser), never reads or closes a tab it did not open, and closes only its own context; the lead skill no longer limits the QA to one at a time. The script loads `playwright` from a package already on the machine (the repository does not depend on it: `CADENCE_PLAYWRIGHT`, the app's `node_modules`, the package of the wave's Playwright MCP server, else the newest npx cache) and relaunches with `channel: 'chrome'` when the bundled Chromium is missing; it never installs anything, and with no loadable Playwright the pass goes under « Not verified » instead of falling back on the shared `browser_*` tools.

@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- The `implement` brief carries the grid of the code-reviewer, the order « tests of the edge cases first, seen failing, then code » and a re-reading of the diff against the grid before the last commit; the pre-check reports what it read in an optional `lu` field, kept as `precheckLu` and given to the first `implement` pass (not to a resumed one nor to `fix`) so that it does not read the repository again from scratch (L523, [docs/orchestrate.md](docs/orchestrate.md#the-downstream-briefs-sheet-rule--test--green-conformity-hypothèses); [before/after measure](docs/mesures/brief-implementation-enrichi-avant-apres.md), « after » line still to fill).
+
 ## [1.36.0] - 2026-11-01
 
 ### Changed

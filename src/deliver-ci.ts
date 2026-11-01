@@ -14,13 +14,13 @@ export const stamped = (deps: Pick<DeliverDeps, 'now'>, line: string): string =>
 
 /**
  * Livraison précédente quand la CI du sha n'a pas à être attendue : un seul fichier hors plan dans précédente..sha suffit à
- * l'exiger. Null (CI attendue) sans plan, sans livraison précédente, si elle n'est pas un ancêtre du sha ou l'égale, si la
+ * l'exiger. Null (CI attendue) sans plan, sans livraison précédente, si elle n'est pas un ancêtre du sha ou l'égale, si elle n'est pas un sha complet (ligne du journal écrite à la main), si la
  * lecture échoue ou rend aucun commit : on ne saute la CI que sur une preuve (au moins un commit, tous plan seul).
  */
 export function planOnlySince(ctx: DeliverCtx, sha: string): string | null {
   if (!ctx.plan) return null;
   const prev = lastDelivery(ctx.state);
-  if (!prev || prev === sha || !isAncestor(ctx.root, prev, sha)) return null;
+  if (!prev || !/^[0-9a-f]{40,64}$/.test(prev) || prev === sha || !isAncestor(ctx.root, prev, sha)) return null;
   try {
     const commits = readCommits(ctx.root, { range: `${prev}..${sha}` });
     return commits.length > 0 && commits.every((c) => isPlanOnly(c.sha, ctx.plan!, ctx.root)) ? prev : null;

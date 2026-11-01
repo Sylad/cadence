@@ -1071,9 +1071,10 @@ lots:
     finished: 2026-11-01
   - id: L517
     title: "Étude — où part le temps d'un lot : sur les vagues des 15 derniers jours (états .cadence/runs/*, transcripts des sessions, deliveries.log), ventiler le mur et les tokens de chaque lot par poste — démarrage de session froide, lectures (allers-retours avec le modèle), écriture, tests et builds (nombre de rejeux par lot : dans la session, puis porte de la vague), Nouveautés et captures, revues, passes de correction et leur cause (cadence corrections --classify), attente de créneau, intégration, livraison ; croiser avec l'estimate du lot ; livrer docs/mesures/temps-d-un-lot.md (méthode rejouable par un script, chiffres, trois leviers chiffrés en minutes et tokens économisés). Mesure du 01-11 qui la motive : un séparateur d'UI (ol L239) = 245 s d'implémentation dont ~120 s de tests rejoués 5 fois, ~45 s de Nouveautés, 5 allers-retours de lecture ; 30 % des lots à ≥ 2 passes ; décision de Sylvain du 01-11"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-01
+    started: 2026-11-01
   - id: L518
     title: "Une seule porte complète par lot : la session d'implémentation ou de correction ne joue que les tests du code qu'elle touche (ciblés, une fois avant de commiter) ; la porte complète (orchestrate.test/build) n'est jouée qu'une fois par la vague, et son verdict est repris ensuite (verify --gate) ; le brief le dit et la vague le mesure (nombre de rejeux de la suite par lot, dans le tableau). Mesure du 01-11 : 5 rejeux de suite pour un lot d'une ligne (ol L239) ; à caler sur les chiffres de l'étude L517 ; décision de Sylvain du 01-11"
     status: todo

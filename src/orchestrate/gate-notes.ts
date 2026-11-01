@@ -9,7 +9,7 @@ type NoteCtx = Pick<LotCtx, 'lot' | 'wave'>;
 /** Trace des tests instables sous charge (L354) : le lot (`instables`, journal et `cadence perf`), un avertissement du lot (tableau de fin de vague) et une ligne du journal de la vague. */
 export function noteUnstable(c: NoteCtx, tests: string[]): void {
   const l = c.lot;
-  const fresh = tests.filter((t) => !(l.instables ?? []).includes(t));
+  const fresh = [...new Set(tests)].filter((t) => !(l.instables ?? []).includes(t));
   if (!fresh.length) return;
   l.instables = [...(l.instables ?? []), ...fresh];
   const text = `${fresh.length} test(s) instable(s) sous charge (rouge(s) dans la suite, vert(s) rejoué(s) seul(s)), pas de passe de correction : ${fresh.join(' ; ')}`;

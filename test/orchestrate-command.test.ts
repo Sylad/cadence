@@ -1709,6 +1709,24 @@ describe('budget par lot (L78, recalibré L194)', () => {
     expect(store.readLot('b', 'L1')!.light).toBe(true);
   });
 
+  it('voie express (L519) : un lot de 0,1 j au plus est lancé express, son dry-run n\'annonce que implement, sans précheck, sonde ni revue ; un lot de 0,11 j reste ordinaire', async () => {
+    const { parent } = parentWith({ a: [{ title: 'retouche', estimate: 0.1 }], b: [{ title: 'un peu plus', estimate: 0.11 }] });
+    const r = io(parent);
+    await orchestrate(['a:L1', 'b:L1', '--dry-run'], r.io, fakeDeps().deps);
+    const text = r.out.join('\n');
+    try {
+      expect(text).toMatch(/étapes : implement \(sonnet\) — petit lot — voie express[^\n]*\n/);
+      expect(text).not.toMatch(/voie express[^\n]*revue légère/);
+      expect(text).toMatch(/étapes : implement \(sonnet\) → review \(sonnet\) — petit lot — revue légère/);
+    } finally {
+      removeDryRunBriefs(text);
+    }
+    await orchestrate(['a:L1', 'b:L1', '--budget', '1'], io(parent).io, fakeDeps().deps);
+    const store = RunStore.last(parent)!;
+    expect(store.readLot('a', 'L1')!.express).toBe(true);
+    expect(store.readLot('b', 'L1')!.express).toBeUndefined();
+  });
+
   it('revue proportionnée (L108) : seuil > 0,5, le dry-run d\'un lot léger non petit annonce le modèle léger', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'gros mais léger', estimate: 1 }] });
     writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  review: { threshold: 2 }\n');

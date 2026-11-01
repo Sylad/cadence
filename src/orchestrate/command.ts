@@ -530,7 +530,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
       steps.push({ kind: 'review', model: l.light ? light : full });
       if (l.visible && env.config.ux) steps.push({ kind: 'ux', model: full }); // L221 : l'UX est jouée une fois, après la revue de code conforme
     }
-    io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.express ? ' — voie express (pas de précheck, de sonde ni de revue séparée : le lead lit le diff)' : ''}${l.light ? ` — revue légère (${light}, pas de passe des mineurs ; un bloquant ou un majeur → correction puis revue ${full})` : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
+    io.out(`  étapes : ${steps.map((s) => `${s.kind} (${s.model})`).join(' → ')}${l.small ? ' — petit lot' : ''}${l.express ? ' — voie express (pas de précheck, de sonde ni de revue séparée : le lead lit le diff)' : ''}${l.light && !l.express ? ` — revue légère (${light}, pas de passe des mineurs ; un bloquant ou un majeur → correction puis revue ${full})` : ''}${l.visible && !env.config.ux ? ' — UX à faire par le lead (orchestrate.ux absent)' : ''}`);
     for (const m of new Set(steps.map((s) => s.model))) {
       if (m !== 'local' && !MODEL_ALIASES.includes(m)) io.out(`  ⚠ modèle « ${m} » hors des alias ${MODEL_ALIASES.join(', ')} : passé tel quel à claude --model (un nom que le compte ne connaît pas fait échouer la session)`);
     }

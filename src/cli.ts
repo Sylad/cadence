@@ -12,6 +12,7 @@ import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './veri
 import { verifyGate } from './verify-gate.js';
 import { ganttData, renderGantt } from './gantt.js';
 import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
+import { printUncommittedPlan } from './plan-uncommitted.js';
 import { dirtyPaths, gitRoot, tryGit, isTracked, readCommits, matchesHead, resolveCommit, stage, stagedFiles, syncIndexWithHead } from './git.js';
 import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { gateRefusal, pushRefusal, UNGATED_ENV } from './push-guard.js';
@@ -438,8 +439,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         if (lot.visible && !loadEntries(newsDir).some((e) => e.lots.includes(lot.id))) {
           io.out(`${lot.id} est visible : écrire l'entrée : cadence news new ${lot.id}`);
         }
-        const uncommitted = uncommittedPlanCommand(plan, root, lot.id, planConfig?.commit);
-        if (uncommitted) io.out(uncommitted);
+        printUncommittedPlan(io.out, plan, root, lot.id, planConfig?.commit);
       }
       return 0;
     }
@@ -462,8 +462,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (moved.length === 0) io.out('rien à archiver');
       else if (!dry) {
         if (plan.republishes) io.err('raf: plan.onWrite republie le fichier du plan sans les lots archivés : le générateur de la copie publiée doit aussi lire .cadence/archive/*.yaml (clé `lots`), sinon l\'historique livré disparaît de la feuille de route publique');
-        const uncommitted = uncommittedPlanCommand(plan, root, moved[0].lot.id, planConfig?.commit, PLAN_ACTIONS.archived(moved.length));
-        if (uncommitted) io.out(uncommitted);
+        printUncommittedPlan(io.out, plan, root, moved[0].lot.id, planConfig?.commit, PLAN_ACTIONS.archived(moved.length));
       }
       return 0;
     }
@@ -560,7 +559,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'ux':
     case 'review':
-      return gate(command, rest, loadPlan, root, today, io, !!values.verbose, planConfig?.commit);
+      return gate(command, rest, loadPlan, root, today, io, { verbose: !!values.verbose, commit: planConfig?.commit });
     case 'commits': {
       need(1, 'commits <lot>');
       const plan = loadPlan();
@@ -772,7 +771,7 @@ const GATES = {
 };
 
 /** « raf ux … » et « raf review … » ont la même forme : activer la porte, ou noter le verdict d'un lot. */
-function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io, verbose: boolean, template: string | undefined): number {
+function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io, opts: { verbose: boolean; commit: string | undefined }): number {
   if (rest.length < 1) throw new RafError(`usage : raf ${kind} enable | ${kind} <lot> "verdict"`);
   const plan = loadPlan();
   if (rest[0] === 'enable') {
@@ -793,10 +792,9 @@ function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, ro
     plan.recordReview(rest[0], verdict, today, plan.readonly ? null : (lotWork(plan, root, rest[0])[0]?.sha ?? null), neighbours?.repos.length ? repoShas(plan, neighbours.repos, rest[0]) : undefined);
   }
   plan.save();
-  touchedLot(plan, rest[0], verbose, io);
+  touchedLot(plan, rest[0], opts.verbose, io);
   // Comme `raf done` (L371) : le plan et la copie publiée que `plan.onWrite` vient de régénérer partent dans le même commit (L509).
-  const uncommitted = uncommittedPlanCommand(plan, root, rest[0], template, GATES[kind].action);
-  if (uncommitted) io.out(uncommitted);
+  printUncommittedPlan(io.out, plan, root, rest[0], opts.commit, GATES[kind].action);
   return 0;
 }
 
@@ -815,22 +813,6 @@ function knownLot(plan: Plan, id: string, subtask: string): Lot {
   const lot = plan.lots().find((l) => l.id === id);
   if (!lot) throw new RafError(id.includes('/') ? `${subtask} : ${id}` : `lot inconnu : ${id}`);
   return lot;
-}
-
-/**
- * `raf done`, `raf ux <lot>` et `raf review <lot>` (L509) écrivent le plan et ne le commitent jamais (voulu : raf n'a pas de réglage qui commite, docs/raf.md) : la commande de commit du plan et des fichiers
- * que `plan.onWrite` produit, au gabarit `plan.commit` du projet (L371). Null hors d'un dépôt git ou quand rien n'est à commiter.
- */
-function uncommittedPlanCommand(plan: Plan, root: string, lot: string, template: string | undefined, action: string = PLAN_ACTIONS.done): string | null {
-  const repo = gitRoot(root);
-  if (!repo) return null;
-  // Seuls les chemins que git voit modifiés : `git add` d'un chemin absent ou ignoré est fatal.
-  const paths = dirtyPaths(repo, [relative(repo, plan.path), ...plan.files, ...plan.produced, ...plan.archiveFiles().map((f) => relative(repo, f))]);
-  if (paths.length === 0) return null;
-  const quote = (t: string) => (/^[\w./-]+$/.test(t) ? t : `'${t.replaceAll("'", "'\\''")}'`);
-  const message = planCommitMessage(template, { lot, action });
-  const list = paths.map(quote).join(' ');
-  return `plan non commité : raf ne commite jamais (voulu, ce n'est pas un réglage), à commiter :\n  git add -- ${list} && git commit -m ${quote(message)} -- ${list}`;
 }
 
 function describe(l: Lot, commits: number): string {

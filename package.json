@@ -17,6 +17,7 @@
     "templates",
     ".claude-plugin",
     "README.md",
+    "NOTICE",
     "docs/raf.md",
     "docs/orchestrate.md",
     "docs/deliver.md",

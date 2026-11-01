@@ -116,3 +116,29 @@ session and a call by hand without it have none.
 - If you cannot write the file, say so on the first line of the reply and give the whole report in the reply, as if
   the brief had no report file: a verdict whose evidence nobody can read is lost.
 - With no `Report file:` line in the brief, give the complete report in your reply.
+
+## Delivery grid
+
+This section applies in every case, with or without a `Report file:` line, to the UX step of a visible lot and to the review of an existing screen. It does not apply in mockup mode or conformity mode, whose captures stay at 1440 px and 390 px. Each point is a line of the checklist of the report file, ticked or not, with the measure or the capture that supports it; the short reply does not repeat the list. A point that fails is a finding on the blocking / major / minor scale of the Method section, no severity of its own (a focus that is not visible is ranked like any other accessibility gap).
+
+Points, at widths **375, 768, 1024 and 1440 px**:
+
+- visible focus on every interactive element;
+- `prefers-reduced-motion` respected by animations and transitions;
+- `cursor: pointer` on what is clickable;
+- no emoji used as an icon;
+- no horizontal scroll at any of the four widths.
+
+A width that cannot be rendered goes in `nonVerifie`, not ticked.
+
+**AI tics.** This is a static check: apply these rules while reading the diff of the lot, one by one; never run `detect.mjs` and use no tool beyond those above. They are reworded from the rules of `detect.mjs` (Apache-2.0; author, repository and licence in the NOTICE file of the package). Each tic found is a numbered finding T1, T2… with its file, line, named rule and severity. A tic with no effect on the task or on legibility is minor and stays a note of the lot; a tic that harms legibility or slows the user follows the existing scale (major, or blocking if a task or accessibility fails), no severity of its own. A tic that is a choice of the product's charter is not a finding: the charter wins over the rules. The checklist carries a line `tics d’IA : 0 constat` when none is found, and `tics d’IA : non applicable` when the lot has no front file.
+
+- `tic-gradient-text`: text filled with a gradient (`background-clip: text`);
+- `tic-violet-gradient`: a violet-to-pink or indigo-to-blue gradient as the background of a page or hero;
+- `tic-side-border`: a thick coloured border on one side only of a rounded card;
+- `tic-blur-panel`: translucent panels with a `backdrop-filter` blur as the default look of every card;
+- `tic-glow-shadow`: a large coloured glow (`box-shadow`) on every card or button;
+- `tic-bounce-easing`: bounce or elastic easing on ordinary interface transitions;
+- `tic-nested-cards`: a card inside a card inside a card.
+
+On a product that has a charter, never propose, draw or blame a generic style from a catalogue; with no charter, follow the existing values and say so, and choose no style.

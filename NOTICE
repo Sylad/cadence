@@ -1,0 +1,17 @@
+cadence — third-party attribution
+
+The "Delivery grid" section of agents/ux-reviewer.md lists AI-tic rules that are
+reworded (not copied) from the rules of the work `detect.mjs`, licensed under
+the Apache License, Version 2.0 (Apache-2.0): https://www.apache.org/licenses/LICENSE-2.0
+
+Work:        detect.mjs (static detection of AI-generated interface tics)
+Licence:     Apache-2.0 (as stated by the request of lot L513)
+Author:      not recorded — to be read at the source of the original
+Repository:  not recorded — to be read at the source of the original
+
+The original was not at hand when this file was written, so the author and the
+repository are left to be filled in from it, and the rules of the agent were
+written without it, from the kinds of tic the work is known to detect; the
+script is neither bundled nor run.
+
+The package itself stays under the MIT licence (see LICENSE).

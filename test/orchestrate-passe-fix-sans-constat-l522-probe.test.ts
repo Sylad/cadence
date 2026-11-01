@@ -46,7 +46,7 @@ describe('L522 R1/R3 probe — bords de l\'actionnable', () => {
     expect(c.lot.proposals.some((p) => p.includes('nit'))).toBe(true);
     expect(c.lot.constats).toEqual([]);
   });
-  it('R2 probe — rendu sans constat : aucune comptabilité de reviewCounts pour ce tour, outcome au texte exact avec 0/0', async () => {
+  it('R2 probe — revue aux totaux 0/0 : conforme, ni rendue ni corrigée', async () => {
     const h = harness({ script: { implement: [impl()], review: [rev({ bloquants: 0, majeurs: 0 })] } });
     const c = h.lot('L1');
     await runLot(c);

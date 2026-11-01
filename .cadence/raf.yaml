@@ -1071,11 +1071,12 @@ lots:
     finished: 2026-11-01
   - id: L517
     title: "Étude — où part le temps d'un lot : sur les vagues des 15 derniers jours (états .cadence/runs/*, transcripts des sessions, deliveries.log), ventiler le mur et les tokens de chaque lot par poste — démarrage de session froide, lectures (allers-retours avec le modèle), écriture, tests et builds (nombre de rejeux par lot : dans la session, puis porte de la vague), Nouveautés et captures, revues, passes de correction et leur cause (cadence corrections --classify), attente de créneau, intégration, livraison ; croiser avec l'estimate du lot ; livrer docs/mesures/temps-d-un-lot.md (méthode rejouable par un script, chiffres, trois leviers chiffrés en minutes et tokens économisés). Mesure du 01-11 qui la motive : un séparateur d'UI (ol L239) = 245 s d'implémentation dont ~120 s de tests rejoués 5 fois, ~45 s de Nouveautés, 5 allers-retours de lecture ; 30 % des lots à ≥ 2 passes ; décision de Sylvain du 01-11"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-01
     started: 2026-11-01
     review: { date: 2026-11-01, verdict: "conforme : le filtre « session d'écriture aboutie » est dans le code (pas implement/fix au statut ok seulement), test qui sait échouer, chiffres du document = sortie du script rejoué ; porte verte 5406 tests — reprise Fable par le lead après rendu pour budget ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase ne touche que le contexte du CHANGELOG, les fichiers du lot sont identiques à la version relue ; 1 note mineure (chiffres de L517 périmés dans brief-implementation-enrichi-avant-apres.md:33 et orchestrate.md:427)", commit: 9bbf7d13329a05b3a2121a523f151d45ed483604 }
+    finished: 2026-11-01
   - id: L518
     title: "Une seule porte complète par lot : la session d'implémentation ou de correction ne joue que les tests du code qu'elle touche (ciblés, une fois avant de commiter) ; la porte complète (orchestrate.test/build) n'est jouée qu'une fois par la vague, et son verdict est repris ensuite (verify --gate) ; le brief le dit et la vague le mesure (nombre de rejeux de la suite par lot, dans le tableau). Mesure du 01-11 : 5 rejeux de suite pour un lot d'une ligne (ol L239) ; à caler sur les chiffres de l'étude L517 ; décision de Sylvain du 01-11"
     status: todo
@@ -1101,7 +1102,7 @@ lots:
     created: 2026-11-01
   - id: L522
     title: "Pas de passe de correction sans constat, et rouge isolé rejoué avant d'ouvrir une passe (étude L517 : 73 passes « sans-constat », 13 % des 580 passes classées ; 48 des 73 passes sur tests rouges finies sans commit) : la vague n'ouvre pas de passe fix quand la revue ne laisse aucun constat bloquant ou majeur actionnable ; un test rouge de la porte est rejoué seul avant d'ouvrir une passe, et un rouge qui passe seul est noté instable (lot proposé), pas corrigé par la session ; mesure avant/après par scripts/temps-d-un-lot.mjs"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-11-01
@@ -1170,9 +1171,10 @@ lots:
           Aucun constat. — orchestré (vague 2026-11-01-2145-cad, 1 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase ne touche que CHANGELOG.md (conflit bien résolu sous [Unreleased]), aucun constat",
         commit: 0658617f9219a7173e85c6b150e64b86e64c1a7f
       }
+    finished: 2026-11-01
   - id: L523
     title: "Brief d'implémentation enrichi pour coder juste du premier coup (étude L517 : bug-code 52 % des passes dont 223 cas limites, dérive d'architecture 10 %) : la session d'implémentation reçoit la grille du code-reviewer, écrit d'abord les tests des cas limites de son objectif, se relit contre cette grille avant de commiter ; le précheck transmet à l'implémentation ce qu'il a lu (fichiers concernés, code voisin à imiter, tests existants) pour éviter la relecture à froid (13,4 allers-retours de lecture par lot) ; mesure avant/après par scripts/temps-d-un-lot.mjs (passes par lot, cause des passes, allers-retours)"
-    status: doing
+    status: done
     estimate: 0.75
     spec: true
     created: 2026-11-01
@@ -1189,6 +1191,7 @@ lots:
       - { date: 2026-11-01, text: "Hypothèses (fiche brief-implementation-enrichi) — R6 : Quand le verdict est « non », « partiel » ou « oui » sans preuve (traité comme partiel), le programme range le lu rogné de ses espaces dans precheckLu de l'éta… ; si faux : Si la lecture devait aussi être gardée pour un « oui » prouvé, elle serait écrite avant le stop ; si le lu du modèle local devait être gardé, des lectures plus…" }
       - { date: 2026-11-01, text: "Hypothèses (fiche brief-implementation-enrichi) — R7 : precheckLu fait au plus 4000 caractères, marqueur compris : un texte plus long est coupé pour que début + « […tronqué] » fasse exactement 4000 caractères ; un… ; si faux : Une autre borne (2000 ou 8000) change une constante et le test ; sans borne, un lecteur bavard alourdirait chaque brief d'implémentation et l'état du lot" }
     review: { date: 2026-11-01, verdict: "conforme : le constat 4 est corrigé par un test qui compare `precheckBrief` à l'ancienne jonction pour chaque cas, avec ou sans constat et avec ou sans commits. Le test peut échouer, aucune régression n'apparaît, et les 49 tests du lot passent. Les constats 1 à 3 restent ouverts : c'est au lead d'aligner la fiche. — orchestré (vague 2026-11-01-2145-cad, 1 passe(s) de correction + passe des mineurs)", commit: 423feda2f1a43029e7af256df6d1409706e9b28f, reporte: { de: df655adc136ade5d8166a3560705c0ccbfeb5591, vers: 423feda2f1a43029e7af256df6d1409706e9b28f, patchId: 083ba3f918242408c7d3e18b90dfc5818d88e47f } }
+    finished: 2026-11-01
   - id: L524
     title: "Essai comparatif du modèle d'implémentation : Sonnet (défaut) contre Opus sur ~20 lots comparables (estimate 0,1–0,5 j, mêmes projets), un réglage orchestrate.implement.model par vague ; mesurer passes de correction, mur et jetons comptés totaux du lot (implémentation + corrections + revues) avec scripts/temps-d-un-lot.mjs ; décision chiffrée à Sylvain (une passe coûte 11,9 min et 126 k jetons, étude L517)"
     status: todo

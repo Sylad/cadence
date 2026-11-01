@@ -76,6 +76,7 @@ export interface Lot {
   screen?: Screen;
   /** Le lot change un comportement (étape spec back) : posé à la planification, jamais déduit du titre. Absent = pas de spec. */
   spec?: true;
+  local?: true; // lot du lead (L519, `raf add --local`) : fait à la main, `cadence local start` verrouille le dépôt comme une vague ; absent = lot de vague
   /** Titre public du lot, en langage du public (pages Nouveautés et Plan) ; absent = pas de titre public. */
   public?: string;
   /** Objectif du lot (clé `goal:`, L258) : remplace le titre comme objectif des briefs d'orchestrate quand le titre est périmé ; absent = le titre. */
@@ -133,6 +134,8 @@ function cleanUses(names: string[]): string[] {
   for (const n of names) if (!RESOURCE_NAME.test(n)) throw new RafError(invalidResource(n));
   return [...new Set(names)];
 }
+
+const trueFlags = (flags: Record<string, boolean | undefined>): Record<string, true> => Object.fromEntries(Object.entries(flags).filter(([, on]) => on).map(([k]) => [k, true])); // les drapeaux vrais, chacun à `true` : les absents et les faux ne s'écrivent pas
 
 export type Ref = { lot: string; task?: string };
 
@@ -688,7 +691,7 @@ export class Plan {
     return node as YAMLMap;
   }
 
-  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; spec?: boolean; public?: string; every?: number; after?: string[]; uses?: string[] } = {}): string {
+  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; spec?: boolean; local?: boolean; public?: string; every?: number; after?: string[]; uses?: string[] } = {}): string {
     this.writable();
     if (opts.screen !== undefined) {
       if (!SCREENS.includes(opts.screen)) throw new RafError(`screen inconnu : ${String(opts.screen)} (${SCREENS.join(', ')})`);
@@ -706,11 +709,9 @@ export class Plan {
     }
     const entry: Record<string, unknown> = { id, title };
     if (pub !== undefined) entry.public = pub;
-    Object.assign(entry, { status: 'todo', estimate: opts.estimate ?? 1 });
-    if (opts.quickwin) entry.quickwin = true;
-    if (opts.visible) entry.visible = true;
+    Object.assign(entry, { status: 'todo', estimate: opts.estimate ?? 1 }, trueFlags({ quickwin: opts.quickwin, visible: opts.visible }));
     if (opts.screen) entry.screen = opts.screen;
-    if (opts.spec) entry.spec = true;
+    Object.assign(entry, trueFlags({ spec: opts.spec, local: opts.local }));
     if (opts.every !== undefined) entry.every = opts.every;
     if (opts.after?.length) entry.after = opts.after;
     if (opts.uses?.length) entry.uses = cleanUses(opts.uses);
@@ -1175,7 +1176,7 @@ function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lo
     quickwin: raw.quickwin === true,
     visible: raw.visible === true,
     ...(screen ? { screen } : {}),
-    ...(spec ? { spec } : {}),
+    ...(spec ? { spec } : {}), ...(raw.local === true ? { local: true as const } : {}),
     ...(gate ? { gate } : {}),
     ...(typeof raw.public === 'string' && raw.public.trim() !== '' ? { public: raw.public.trim() } : {}),
     ...(typeof raw.goal === 'string' && raw.goal.trim() !== '' ? { goal: raw.goal.trim() } : {}),

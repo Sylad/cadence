@@ -12,7 +12,7 @@ const io = {
 
 if (tool === 'raf') {
   process.exitCode = await run(args, io);
-} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'spec', 'ref', 'config', 'release'].includes(tool)) {
+} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'spec', 'ref', 'config', 'release', 'local'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   process.exitCode = await run([tool], io);
@@ -37,6 +37,9 @@ if (tool === 'raf') {
   cadence ref measure <slug> <page> <page | x,y | x,y,l,h> [--quoi couleurs|contraste|boites|texte] [--largeur 1440] [--json]
                     mesure une zone d'une page rendue : couleurs, contraste WCAG 2.2, boîtes, mots OCR et taille de police estimée,
                     ramenés à 1440 px de large, tolérance déclarée
+  cadence local start|done <lot>
+                    tâche locale du lead sur un lot posé par raf add --local : start verrouille le dépôt comme une vague,
+                    done joue la porte une fois et libère le dépôt si elle est verte
   cadence release patch|minor|major [--dry-run]
                     prépare le commit de version (fichiers de version, CHANGELOG) sans rien commiter ni publier ;
                     imprime les étapes du lead dans l'ordre et vérifie docs/whats-new.md

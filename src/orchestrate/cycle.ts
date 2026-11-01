@@ -11,7 +11,6 @@ import { PLAN_ACTIONS, leadAnswerMessage, planCommitMessage } from '../plan-comm
 import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import { citesPriorWork, keepPrecheckReading, localYesNote, precheckNothingToFind } from './precheck.js';
-import { EXPRESS_BRIEF, EXPRESS_VERDICT, expressNewsText } from './express.js';
 import { PROBE_FAILED, PROBE_RESERVE, probeStep, probeVars, scheduleProbe, type ProbeIo } from './probe.js';
 import type { Day } from '../dates.js';
 import { changedFiles, dirtyPaths, gitCommonDir, isAncestor, readCommits, resolveCommit, restoreWorktree, tryGit, type Commit } from '../git.js';
@@ -26,7 +25,7 @@ import { TEST_WORKERS_ENV, testWorkersText, type TightTest } from './workers.js'
 import { baselineCandidates, gateLabel, gateReplayable, gateUnnamed, redAloneGate, redCandidates, replayGate, runGate, type GateRan, type GateTest } from './gate-parts.js';
 import { withPlace, type Place } from './gate-place.js';
 import { APP_TIMEOUT_S, startApp, type AppState } from './app.js';
-import { capturesText, gateText, headline, integrationText, localReading, precheckBrief, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
+import { capturesText, EXPRESS_BRIEF, expressNewsText, gateText, headline, integrationText, localReading, precheckBrief, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars, type Templates } from './briefs.js';
 import { SlotAbandoned } from './registry.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, trackGroup, writeMcpConfig, enabledPlugins, settingsFiles, type AgentDef, type AnyModel, type ClaudeFn, type Model, type SessionKind, type StepModel } from './launch.js';
 import { cleanPlaywrightOutput, pushed, remoteAdvances, snapshot, type Snapshot } from './guard.js';
@@ -41,7 +40,7 @@ import { bulletLines, maquetteText, reviewedText } from './maquette.js';
 import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, answerAltersRule, hypothesisNote, LEAD_SOURCE, ruleIdsSourcedByLead, sourceRules, specText, type FicheParts } from './spec.js';
 import { handBackWithoutFinding } from './no-finding.js';
 import { decisionsText, humanDecisions } from './decisions.js';
-import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs, type Constat, type LotState, type ReviewSummary, type RunStore, type StepState } from './state.js';
+import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE, expressSummary, lotKey, lotRepoPaths, neighbourDirs, type Constat, type LotState, type ReviewSummary, type RunStore, type StepState } from './state.js';
 import { advance, baseMoved, INTEGRATE_WAIT_MS, MAX_REPLAYS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
 import { mutexFor } from './mutex.js';
 import { readTier, stillThird, takeTiers, tierMoved, tierRepos, wipBranch, type TierRead } from './tiers.js';
@@ -573,14 +572,13 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   const l = c.lot;
   const lot = plan.lot(l.lot);
   const tmpDir = c.wave.store.tmpDir(l.project, l.lot);
-  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', tmp: tmpText(tmpDir), workers: writesCode(kind) ? workersText(c) : '', gate: writesCode(kind) ? gateText(c.config) : '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '' };
+  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', express: kind === 'implement' && l.express ? EXPRESS_BRIEF : '', tmp: tmpText(tmpDir), workers: writesCode(kind) ? workersText(c) : '', gate: writesCode(kind) ? gateText(c.config) : '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '' };
   if (l.visible) {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = l.express ? expressNewsText(pwDir) : newsText(l.lot, pwDir);
     vars.captures = capturesText(pwDir);
   }
   if (mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright) vars.shots = shotsText(playwrightDir(c.wave.store.lotDir(l.project, l.lot)));
-  if (kind === 'implement' && l.express) vars.express = EXPRESS_BRIEF;
   vars.fiche = hasSpecStage(l) ? avalOf(c, kind) : '';
   // la vérification des ids d'un document de référence sur l'écran fini : la passe ux, ou la revue courte d'un petit lot visible qui n'a que celle-là (comme la conformité, avalOf)
   if (kind === 'ux' || (kind === 'review-small' && l.small && l.visible)) vars.ux = [vars.ux, referenceIdsText('ux', lotIds({ ...lot, goal: l.goal ?? lot.goal }))].filter(Boolean).join('\n');
@@ -1439,9 +1437,8 @@ async function precheck(c: LotCtx): Promise<void> {
 
 /** Le lot passe-t-il par le contrôle préalable ? Un lot qui n'a rien à retrouver (L322) saute l'étape, et le journal du lot le dit. */
 function precheckOrSkip(c: LotCtx): boolean {
-  if (c.lot.express) return false;
   const plan = c.loadPlan();
-  if (!needsPrecheck(c.config, plan, c.lot.repo, c.lot.lot, c.lot.repos, c.lot.goal)) return false;
+  if (c.lot.express || !needsPrecheck(c.config, plan, c.lot.repo, c.lot.lot, c.lot.repos, c.lot.goal)) return false;
   const nothing = precheckNothingToFind(histPlan(c), wd(c), c.lot.lot, c.lot.repos, c.lot.goal);
   if (nothing) c.lot.warnings.push(`contrôle préalable sauté : ${nothing}`);
   return !nothing;
@@ -2316,10 +2313,7 @@ async function toReview(c: LotCtx, runs: CheckRun[], minorsPass: boolean): Promi
   }
   l.constats = [];
   // Voie express (L519) : pas de revue séparée, le lead lit le diff ; le lot conclut sur le HEAD que la porte du programme vient de jouer.
-  if (l.express) {
-    await conclude(c, { conforme: true, bloquants: 0, majeurs: 0, mineurs: 0, verdict: EXPRESS_VERDICT, sousTaches: [], nonVerifie: [], head: git(wd(c), 'rev-parse', 'HEAD') });
-    return;
-  }
+  if (l.express) return conclude(c, expressSummary(git(wd(c), 'rev-parse', 'HEAD')));
   l.checks = runs.length ? { head: git(wd(c), 'rev-parse', 'HEAD'), tree: git(wd(c), 'rev-parse', 'HEAD^{tree}'), runs } : undefined;
   l.next = firstReview(c);
   save(c);

@@ -113,6 +113,17 @@ export function newsText(lot: string, captureDir?: string): string {
   ].join('\n');
 }
 
+/** Consigne `{{express}}` du brief d'implémentation d'un lot express ; vide ailleurs. */
+export const EXPRESS_BRIEF = [
+  'Express lane (touch-up of at most 0.1 day): this is the only session of the lot. There is no precheck, no edge-case probe and no separate code review: the lead reads the diff and looks at the capture. So name the file and the scope you touched in your report, keep the diff to what the goal says, and do not widen it.',
+  'No new test for a purely visual change (the existing suite runs and must stay green); a change of behaviour still gets its test first. The full suite and the build run once, at the end.',
+].join('\n');
+
+/** Consigne `{{news}}` d'un lot express `visible` : pas d'entrée Nouveautés par lot, la capture seule (le lead regroupe les entrées à la livraison). */
+export function expressNewsText(captureDir: string): string {
+  return `No News entry for this lot (express lane): the lead groups the entries at delivery. Do not run \`cadence news new\`. Take a capture of the result (it lands in the wave's output directory, \`${captureDir}\`): the lead looks at it instead of a separate review.`;
+}
+
 /** Consigne des briefs de correction d'un lot `visible` : où la vague range les captures Playwright (même dossier que l'étape implement). */
 export function capturesText(captureDir: string): string {
   return `A Playwright capture taken with the absolute path given above lands in \`${captureDir}\` (outside the repository; this session may read it): a screenshot a finding asks for is copied from there into \`docs/nouveautes/captures/\`.`;
@@ -185,6 +196,9 @@ const FILES: Record<BriefName, string> = {
   'review-recheck': 'review-recheck.md',
 };
 
+/** Les variables dont l'absence se rend par un texte vide : le brief d'une étape qui n'en a pas l'usage ne les fournit pas. */
+const BLANK_WHEN_ABSENT = ['repos', 'integration', 'docs', 'elsewhere', 'ack', 'spec', 'decisions', 'accept', 'maquette', 'tmp', 'workers', 'gate', 'shots', 'fiche', 'express'] as const;
+
 /** Texte des gabarits, lu une fois : une vague rend tous ses briefs depuis le même instantané. */
 export type Templates = Record<BriefName, string>;
 
@@ -208,7 +222,7 @@ export function loadTemplates(dir = TEMPLATES_DIR): Templates {
 export function renderBrief(kind: BriefName, vars: BriefVars, source: Templates | string = TEMPLATES_DIR): string {
   const text = typeof source === 'string' ? loadTemplates(source)[kind] : source[kind];
   const out = text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => {
-    const v = ({ ...vars, repos: vars.repos ?? '', integration: vars.integration ?? '', docs: vars.docs ?? '', elsewhere: vars.elsewhere ?? '', ack: vars.ack ?? '', spec: vars.spec ?? '', decisions: vars.decisions ?? '', express: vars.express ?? '', accept: vars.accept ?? '', maquette: vars.maquette ?? '', tmp: vars.tmp ?? '', workers: vars.workers ?? '', gate: vars.gate ?? '', shots: vars.shots ?? '', fiche: vars.fiche ?? '', lecture: vars.lecture ?? PLAN_READING } as unknown as Record<string, string | undefined>)[name];
+    const v = ({ ...vars, ...Object.fromEntries(BLANK_WHEN_ABSENT.map((k) => [k, vars[k] ?? ''])), lecture: vars.lecture ?? PLAN_READING } as unknown as Record<string, string | undefined>)[name];
     if (v === undefined) throw new RafError(`gabarit ${FILES[kind]} : valeur manquante pour {{${name}}}`);
     return v;
   });

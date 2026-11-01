@@ -28,8 +28,7 @@ import { findProjects, readDepth, leadTour, TITLE_MAX, truncate, readLeadUx, tou
 import { configuredCap, expiredHoldLines, slotsLine, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
-import { INTEGRATION_LOCK } from './orchestrate/integrate.js';
-import { mainTreeWorkers } from './orchestrate/main-tree.js';
+import { waveHolding, warnIntegrating, warnWaveWorking } from './repo-busy.js';
 import { cadenceHome, liveWaves, openLotsIn, openWavesIn, waveLotsIn, type OpenWave } from './orchestrate/registry.js';
 import { blockingLots, LABEL, resumeCommand } from './orchestrate/table.js';
 import { renderTestsSansCode, testsSansCode } from './corrections-sans-code.js';
@@ -41,6 +40,7 @@ import { coverageCommand } from './ref/coverage.js';
 import { release } from './release.js';
 import { applyMigration, describeMigration, planMigration, unhandledError } from './migrate.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
+import { localCommand } from './local-task.js';
 import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
@@ -60,13 +60,14 @@ export interface Io {
 const HELP = `raf — plan « reste à faire » versionné dans le dépôt, relié aux commits
 
   raf init [--project nom] [--prefix L] [--no-hook]
-  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--public "titre public"] [--every jours] [--after L2,L4] [--uses banc,passerelle] [--parent L3]
+  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--local] [--public "titre public"] [--every jours] [--after L2,L4] [--uses banc,passerelle] [--parent L3]
   raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
   raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (seule la valeur page adopte l'étape spec d'orchestrate)
   raf visible <id> on|off   pose ou retire visible: d'un lot existant (changement visible : entrée Nouveautés et étape UX d'orchestrate) ; off est refusé tant que le lot a un screen:
   raf spec <id> on|off   pose ou retire spec: d'un lot existant (le lot change un comportement : étape spec back d'orchestrate)
   raf move <id> --before|--after <id>   réordonne un lot (ou une sous-tâche) dans le plan, parmi ceux du même parent ; refusé pendant une vague du dépôt, sur un lot archivé et sur un plan en lecture seule
   raf uses <lot> [<ressource>…]   remplace les ressources partagées du lot (uses:, déclarées par resources: dans le cadence.yaml du dossier parent ; raf check refuse un nom non déclaré) ; sans nom, retire la clé
+  cadence local start <lot> | local done <lot>   tâche locale du lead (lot posé par raf add --local) : start verrouille le dépôt comme une vague (aucune vague n'y démarre, --add y est refusé) et passe le lot à doing, refusé si une orchestration ou un autre lot du dépôt est en cours ; done joue la porte du projet UNE fois, libère le dépôt si elle est verte (la capture, cadence deliver et raf done restent au lead) et le garde verrouillé sinon
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits ; rouvre un lot done ou dropped (→ todo, finished retiré, note « rouvert ») — la seule façon de rouvrir, archivé compris (il revient dans le fichier du plan)
   raf note <id> "texte"
@@ -191,6 +192,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       visible: { type: 'boolean' },
       screen: { type: 'string' },
       spec: { type: 'boolean' },
+      local: { type: 'boolean' },
       public: { type: 'string' },
       every: { type: 'string' },
       dir: { type: 'string' },
@@ -370,10 +372,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       let id: string;
       if (values.parent) {
-        if (values.screen !== undefined) throw new RafError('--screen se pose sur un lot, pas sur une sous-tâche');
-        if (values.spec) throw new RafError('--spec se pose sur un lot, pas sur une sous-tâche');
-        if (values.public !== undefined) throw new RafError('--public se pose sur un lot, pas sur une sous-tâche');
-        if (values.every !== undefined) throw new RafError('--every se pose sur un lot, pas sur une sous-tâche');
+        for (const [flag, given] of [['screen', values.screen !== undefined], ['spec', values.spec], ['local', values.local], ['public', values.public !== undefined], ['every', values.every !== undefined]]) {
+          if (given) throw new RafError(`--${flag} se pose sur un lot, pas sur une sous-tâche`);
+        }
         if (values.uses !== undefined) throw new RafError(`uses se pose sur un lot, pas sur une sous-tâche : ${values.parent}`);
         id = plan.addTask(values.parent, rest.join(' '));
       } else {
@@ -385,7 +386,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         if (values.public !== undefined) refuseLongTitle(values.public);
         const uses = values.uses?.split(',').map((n) => n.trim()).filter(Boolean);
         if (uses?.length === 0) throw new RafError(invalidResource(''));
-        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, public: values.public, every, after, uses });
+        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, local: values.local, public: values.public, every, after, uses });
       }
       plan.save();
       io.out(id);
@@ -759,6 +760,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       io.out(base);
       return 0;
     }
+    case 'local':
+      return localCommand(rest, { repo: gitRoot(root) ?? root, loadPlan, today, now: io.now, gate: (sha) => verifyGateCommand({ sha }, io), out: io.out, err: io.err });
     case 'news':
       return news(rest, loadPlan(), newsDir, today, values, io, refuseLongTitle, () => hypothesesOf(root, configPath));
     default:
@@ -1067,40 +1070,6 @@ function prePush(root: string, io: Io, remoteName: string | undefined, configPat
   }
   io.err(`raf: ${refusal}`);
   return REFUSED;
-}
-
-/**
- * Avertit (stderr, sans refuser) quand une intégration du dépôt est en cours (L425) : le plan écrit dans l'arbre principal est un fichier suivi modifié, et
- * l'intégration en cours le voit et refuse son lot (« arbre du dépôt modifié »). Seul l'arbre principal est concerné : dans le worktree d'un lot, l'écriture
- * ne change pas l'arbre que l'intégration contrôle.
- */
-function warnIntegrating(root: string, err: (line: string) => void): void {
-  const top = gitRoot(root);
-  if (!top || !statSync(join(top, '.git')).isDirectory()) return;
-  const holder = activeLock(join(sharedStateDir(root), INTEGRATION_LOCK));
-  if (holder) err(`avertissement : intégration en cours (vague ${holder.wave}, pid ${holder.pid}) — ce plan est un fichier suivi modifié de l'arbre principal, l'intégration en cours peut refuser son lot (arbre du dépôt modifié) : committer le plan sans attendre`);
-}
-
-/**
- * Avertit (stderr, sans refuser) quand une session de vague écrit dans l'arbre principal du dépôt (L475) : un lot en implémentation, revue ou correction sans worktree.
- * Un commit de plan du lead à ce moment-là rend le lot (cas du 30-10 : cadence L458 rendu par le commit du plan). Sans effet dans le worktree d'un lot, ou depuis une session de la vague (c'est elle qui tient l'arbre).
- */
-function warnWaveWorking(root: string, env: Record<string, string | undefined>, err: (line: string) => void): void {
-  if (env.CADENCE_ORCHESTRATED) return;
-  const top = gitRoot(root);
-  if (!top || !statSync(join(top, '.git')).isDirectory()) return;
-  const holder = activeLock(join(sharedStateDir(root), REPO_LOCK));
-  if (!holder) return;
-  const working = mainTreeWorkers(cadenceHome(), holder.pid, top);
-  if (working?.length) err(`avertissement : la vague ${holder.wave} (pid ${holder.pid}) travaille dans l'arbre principal de ce dépôt (${working.join(', ')}) — un commit de plan maintenant rendrait ces lots à la revue ; attendre la fin de leur étape, ou écrire le plan sans le committer`);
-}
-
-/** La vague qui tient le verrou du dépôt tant qu'un de ses lots y travaille encore (état illisible : on la tient pour active) ; null si le dépôt est libre. Partagé par `deliver` et `spec reseal`. */
-function waveHolding(root: string): { wave: string; pid: number } | null {
-  const orchestrating = activeLock(join(sharedStateDir(root), REPO_LOCK));
-  if (!orchestrating) return null;
-  const stillOpen = openLotsIn(cadenceHome(), orchestrating.pid, root);
-  return stillOpen === null || stillOpen.length > 0 ? orchestrating : null;
 }
 
 /**

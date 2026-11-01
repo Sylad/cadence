@@ -213,6 +213,9 @@ export interface LotState {
 export const LOCAL_PRECHECK_UNREADABLE = 'contrôle préalable : rapport du modèle local illisible';
 export const PRECHECK_UNREADABLE = 'contrôle préalable illisible, implémentation lancée';
 
+/** Ce que la voie express (L519) enregistre à la place d'une revue : conforme sans constat, la lecture du diff étant celle du lead. `head` : le HEAD que la porte du programme vient de jouer. */
+export const expressSummary = (head: string): ReviewSummary => ({ conforme: true, bloquants: 0, majeurs: 0, mineurs: 0, verdict: 'conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture', sousTaches: [], nonVerifie: [], head });
+
 export interface NewLot {
   project: string;
   repo: string;

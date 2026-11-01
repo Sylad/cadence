@@ -1079,10 +1079,11 @@ lots:
     finished: 2026-11-01
   - id: L518
     title: "Une seule porte complète par lot : la session d'implémentation ou de correction ne joue que les tests du code qu'elle touche (ciblés, une fois avant de commiter) ; la porte complète (orchestrate.test/build) n'est jouée qu'une fois par la vague, et son verdict est repris ensuite (verify --gate) ; le brief le dit et la vague le mesure (nombre de rejeux de la suite par lot, dans le tableau). Mesure du 01-11 : 5 rejeux de suite pour un lot d'une ligne (ol L239) ; à caler sur les chiffres de l'étude L517 ; décision de Sylvain du 01-11"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L517 ]
     created: 2026-11-01
+    started: 2026-11-01
   - id: L519
     title: "Voie express pour les retouches (estimate ≤ 0,1 j) : une seule session (pas de précheck, pas de sonde, pas de revue de code séparée : le lead lit le diff), le fichier et la portée nommés dans l'objectif, pas de nouveau test pour un changement purement visuel (la suite existante tourne), pas d'entrée Nouveautés par lot (regroupées par le lead à la livraison), porte complète une fois ; cible < 90 s de session pour un lot comme ol L239 (245 s mesurées le 01-11) ; à caler sur l'étude L517 ; décision de Sylvain du 01-11"
     status: todo

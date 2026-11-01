@@ -88,10 +88,11 @@ export function localYesNote(verdict: 'oui' | 'partiel' | 'non'): string {
 
 /**
  * Range la lecture du précheck (`lu` du rapport, facultatif : `checkShape` ne le contrôle pas) dans `precheckLu` du lot : rognée de ses
- * espaces, coupée à `PRECHECK_LU_MAX` caractères marqueur compris. Rien n'est rangé quand `lu` est absent, vide ou d'espaces ; un `lu`
+ * espaces, coupée à `PRECHECK_LU_MAX` caractères marqueur compris (au plus : un caractère hors plan de base n'est pas coupé en deux). Elle remplace toute lecture rangée plus tôt. Rien n'est rangé quand `lu` est absent, vide ou d'espaces ; un `lu`
  * qui n'est pas une chaîne est écarté avec un avertissement.
  */
 export function keepPrecheckReading(lot: { precheckLu?: string; warnings: string[] }, lu: unknown): void {
+  delete lot.precheckLu; // un précheck rejoué sans lecture ne laisse pas l'ancienne
   if (lu === undefined) return;
   if (typeof lu !== 'string') {
     lot.warnings.push('contrôle préalable : champ lu ignoré (mal typé)');
@@ -99,5 +100,11 @@ export function keepPrecheckReading(lot: { precheckLu?: string; warnings: string
   }
   const text = lu.trim();
   if (!text) return;
-  lot.precheckLu = text.length > PRECHECK_LU_MAX ? `${text.slice(0, PRECHECK_LU_MAX - PRECHECK_LU_CUT.length)}${PRECHECK_LU_CUT}` : text;
+  if (text.length <= PRECHECK_LU_MAX) {
+    lot.precheckLu = text;
+    return;
+  }
+  let end = PRECHECK_LU_MAX - PRECHECK_LU_CUT.length;
+  if (/[\uD800-\uDBFF]/.test(text[end - 1])) end -= 1; // ne pas couper une paire de substitution en deux
+  lot.precheckLu = `${text.slice(0, end)}${PRECHECK_LU_CUT}`;
 }

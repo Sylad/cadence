@@ -640,7 +640,9 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
         ? `A previous session was interrupted; resume from these commits of the lot already present:\n${mine}`
         : 'A previous session was interrupted before any commit of the lot; start again from the current state of the repository.';
     }
-    if (kind === 'implement') vars.commits = precheckBrief(vars.commits, l.precheck, interrupted ? undefined : l.precheckLu);
+    // La lecture ne va qu'à la première passe implement : la session en cours (« running ») ne compte pas, toute autre passe implement déjà jouée l'exclut.
+    const firstPass = !l.steps.some((s) => s.kind === 'implement' && s.status !== 'running');
+    if (kind === 'implement') vars.commits = precheckBrief(vars.commits, l.precheck, firstPass ? l.precheckLu : undefined);
     if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
   const brief = renderBrief(briefName(l, kind, !!c.integration), vars, c.wave.templates);

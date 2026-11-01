@@ -20,6 +20,14 @@ describe('L518 R1 — la session ne joue que les tests ciblés, la porte complè
     expect(text).toMatch(/once, before committing/);
   });
 
+  it('R1 — gateText sans orchestrate.test : le programme ne joue pas la suite, la session la joue elle-même, une fois', () => {
+    const text = gateText({ build: 'npx tsc --noEmit' });
+    expect(text).toContain('`npx tsc --noEmit`');
+    expect(text).toMatch(/play the full suite yourself, once/);
+    expect(text).not.toMatch(/never the full suite/);
+    expect(text).not.toMatch(/not yours to replay/);
+  });
+
   it('R1 — gateText : le build reste joué tel quel par la session (L399)', () => {
     expect(gateText({ build: 'npx tsc --noEmit' })).toMatch(/build.*as written/s);
   });

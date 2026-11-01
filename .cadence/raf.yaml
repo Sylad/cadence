@@ -1008,6 +1008,10 @@ lots:
     spec: true
     created: 2026-11-01
     started: 2026-11-01
+    notes:
+      - { date: 2026-11-01, text: "Revue de la fiche — mineur : docs/specs/agents-design-jetons-grille-tics/fiche.yaml — R12 est marquée hypothese alors qu'elle touche à la licence (Apache-2.0, fichier NOTICE, package.json). Le si_faux est présent, mais la licence « Apache-2.0 » vient du seul énoncé du lot et n'est pas vérifiée à la source. Rien ne bloque, mais l'implémentation doit la lire avant d'écrire NOTICE." }
+      - { date: 2026-11-01, text: "Revue de la fiche — mineur : docs/specs/agents-design-jetons-grille-tics/fiche.yaml — R14 (sourcée par test/skills.test.ts:82-85) décrit mal src/skills.ts:44-66. Sans --force, la réinstallation d'un agent modifié lève une RafError (« modifié(s) localement : --force pour écraser ») et le test attend le code de sortie 2. Elle ne se contente pas de « garder son texte ». R14 n'est pas un comportement du lot et ses tests ne font que rejouer un comportement existant. La formulation devrait mentionner l'échec sans --force." }
+      - { date: 2026-11-01, text: "Revue de la fiche — mineur : docs/specs/agents-design-jetons-grille-tics/fiche.yaml — R9 (tics mineurs, jamais bloquants, constats T1…) est une hypothèse sans conflit de contrat. Mais « tic sans effet = mineur » exclut qu'un tic nuisant à la lisibilité soit majeur sans le dire. La règle ne donne pas la gravité d'un tic qui a un effet. Le test « classe un tic sans effet en mineur » ne vérifie pas l'autre branche. Ajouter la branche, ou marquer explicitement qu'elle suit l'échelle existante. Par ailleurs, R6 impose cinq points dans « la liste à cocher du rapport », alors que la section Short reply (15 lignes au plus) ne les reprend pas : à préciser, c'est le fichier de rapport qui porte la liste." }
   - id: L514
     title: "Rejeu isolé des tests rouges pour une porte node --test (evatosorus) : lire le titre → fichier dans la sortie (location:) et prouver l'exécution d'un test vert sans fichier imprimé, sans changer failedTests pour les autres lanceurs — suite de L512 (décision de Sylvain du 01-11), faux rouge evatosorus L45"
     status: todo

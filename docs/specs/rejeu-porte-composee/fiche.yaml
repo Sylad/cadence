@@ -34,12 +34,12 @@ cas:
     preconditions:
       - "au moins un test rouge nommé par un fichier"
     nominal:
-      - "Chaque fichier rouge est attribué (R3) : à la partie dont le préfixe commence son chemin (préfixe retiré dans {files}), sinon candidat de toutes les parties, chemin tel quel. Aucun accès disque : tout passe par la commande de rejeu, sur la machine où elle s'exécute."
+      - "Chaque fichier rouge est attribué (R3) : seul un chemin qui commence par le préfixe d'une seule partie est rejoué (préfixe retiré dans {files}) ; un chemin sans préfixe, ou attribuable à plusieurs parties, n'est pas rejoué et son rouge compte. Aucun accès disque : tout passe par la commande de rejeu."
       - "Pour chaque partie concernée, cadence lance sa commande avec {files} remplacé par les fichiers de cette partie, dans le dossier de l'appelant."
       - "Un test est vert si le rejeu d'une partie qui le concerne sort en 0 et que son fichier (tel que passé dans {files}) figure dans la sortie de ce rejeu (règles L354) ; la durée et le délai servent à classer « délai trop juste » (L510). Les noms rendus (red, unstable, tight) sont les noms d'origine (R7)."
       - "Un test rouge aux deux rejeux reste rouge et part en correction."
     alternatives:
-      - { si: "le chemin ne commence par aucun préfixe", alors: "il est rejoué dans chaque partie, tel quel ; seule une partie qui sort en 0 en imprimant ce fichier le rend vert, sinon il reste rouge", regles: [R3] }
+      - { si: "le chemin ne commence par aucun préfixe, ou par plusieurs préfixes de même longueur", alors: "il n'est pas rejoué : son rouge compte, jamais de faux vert (règle du lead)", regles: [R3] }
       - { si: "le dossier de la commande d'une partie est introuvable (cd échoue, y compris sur la porte distante)", alors: "la commande sort en échec : rien n'est conclu pour les tests de cette partie, ils restent rouges", regles: [R3, R4] }
       - { si: "le rejeu d'une partie échoue ou ne joue aucun test", alors: "les tests de cette partie restent rouges ; ceux des autres parties ne sont pas touchés", regles: [R4] }
       - { si: "les rouges viennent de deux parties", alors: "une commande par partie, chacune au plus deux fois", regles: [R4] }
@@ -86,10 +86,10 @@ regles:
     tests: ["R2 — objet valide sur porte composée : accepté", "R2 — préfixe « .. » ou absolu : refusé", "R2 — commande sans {files} : refusée", "R2 — objet vide ou préfixe en double : refusé"]
   - id: R3
     cas: [C2]
-    enonce: "L'attribution est purement textuelle, sans lecture de disque (le rejeu peut s'exécuter sur une porte distante). Le chemin du fichier d'un test rouge qui commence par un préfixe déclaré (le plus long) va à cette seule partie, avec {files} = le chemin sans le préfixe ; le préfixe est le dossier de lancement de la commande, les tests hors de ce dossier ne sont pas pris en charge. Un chemin sans préfixe (le lanceur l'imprime relatif à son dossier) est candidat de chaque partie, tel quel : seule une partie dont le rejeu sort en 0 en imprimant ce fichier (règle L354, replayRanFile) le rend vert ; les autres n'en concluent rien. Un dossier introuvable fait échouer la commande (cd) : les tests de cette partie restent rouges. Un nom sans fichier désignable n'est pas rejoué."
-    statut: hypothese
-    si_faux: "Si les lanceurs impriment toujours le chemin depuis la racine du dépôt, le cas « sans préfixe » (rejeu dans chaque partie, quelques exécutions de plus) ne sert pas ; si le chemin doit être passé avec son préfixe, seul le retrait du préfixe change. Aucune donnée en jeu."
-    tests: ["R3 — chemin « frontend/src/a.spec.ts » : partie frontend seule, {files} = src/a.spec.ts", "R3 — chemin « src/a.spec.ts » sans préfixe, présent sous frontend/ seulement : vert par la seule partie qui l'imprime, l'autre ne conclut rien", "R3 — chemin sans préfixe imprimé par aucune partie : reste rouge", "R3 — dossier de la partie introuvable (commande en échec) : tests rouges, aucune lecture de disque local", "R3 — nom sans fichier désignable : rouge d'emblée"]
+    enonce: "Règle tranchée par le lead : un chemin sans préfixe déclaré, ou attribuable à plusieurs parties, N'EST PAS rejoué et son rouge compte, jamais de faux vert. L'attribution est purement textuelle, sans lecture de disque. Le chemin qui commence par le préfixe le plus long d'une seule partie va à cette partie, avec {files} = le chemin sans le préfixe. Un dossier introuvable fait échouer la commande (cd) : les tests de cette partie restent rouges. Un nom sans fichier désignable n'est pas rejoué. Limite connue : si les lanceurs (vitest) impriment des chemins relatifs à leur dossier de lancement, donc sans préfixe, le rejeu reste inopérant pour warhammer ; la fiche ne contourne pas la règle et pose la question au lead."
+    statut: sourcee
+    source: "but du lot L512 : « un chemin sans préfixe, ou attribuable à plusieurs parties, N'EST PAS rejoué — son rouge compte, jamais de faux vert ; règle testée » (décision du lead, revue de fiche du 01-11)"
+    tests: ["R3 — chemin « frontend/src/a.spec.ts » : partie frontend seule, {files} = src/a.spec.ts", "R3 — chemin sans préfixe « src/a.spec.ts » : non rejoué, rouge compté, même s'il existe sous frontend/", "R3 — faux vert : backend/src/app.spec.ts imprimé src/app.spec.ts avec un src/app.spec.ts aussi sous frontend/ : reste rouge, jamais instable", "R3 — chemin attribuable à deux parties (deux préfixes de même longueur) : non rejoué, rouge compté", "R3 — dossier de la partie introuvable (commande en échec) : tests rouges, aucune lecture de disque local", "R3 — nom sans fichier désignable : rouge d'emblée"]
   - id: R4
     cas: [C2]
     enonce: "Le rejeu se fait partie par partie : une commande par partie concernée, au plus deux fois ; le verdict d'un test ne dépend que du rejeu de sa partie (sortie 0, test exécuté, fichier vu dans la sortie), l'échec d'une autre partie n'excuse ni ne condamne rien."

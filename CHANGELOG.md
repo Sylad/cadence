@@ -84,6 +84,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Changed
 
 - The `implement` brief carries the grid of the code-reviewer, the order « tests of the edge cases first, seen failing, then code » and a re-reading of the diff against the grid before the last commit; the pre-check reports what it read in an optional `lu` field, kept as `precheckLu` and given to the first `implement` pass (not to a resumed one nor to `fix`) so that it does not read the repository again from scratch (L523, [docs/orchestrate.md](docs/orchestrate.md#the-downstream-briefs-sheet-rule--test--green-conformity-hypothèses); [before/after measure](docs/mesures/brief-implementation-enrichi-avant-apres.md), « after » line still to fill).
+- `cadence orchestrate` opens no correction pass without a finding (L522, [docs/orchestrate.md](docs/orchestrate.md)): a non-conforme review (code or UX) that lists no blocking or major finding with a readable text hands the lot back with the announced totals as the cause (73 of 580 classified passes, 13 %, were « sans-constat » in the L517 study). A test red in the suite and green alone is proposed as a lot (`[instable] … à stabiliser`), the `fix` brief asks to replay a red test alone before correcting it, and a green program gate now always outweighs a session's claim of red tests (the L361 exception on `echecsDeBase` / `nouveauxEchecs` is gone).
 
 ## [1.36.0] - 2026-11-01
 

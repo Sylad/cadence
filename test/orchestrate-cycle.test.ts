@@ -2080,7 +2080,7 @@ describe('correction ordinaire interrompue puis reprise (L40)', () => {
     // La 1re correction commite mais annonce ses tests rouges : le lot repart en correction, la 2e passe n'a rien à ajouter.
     const redFix: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'b.txt', 'fix(L1): b')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }));
     const h = harness({ script: { implement: [impl()], review: [major, ok], fix: [redFix, nothing] } });
-    const c = h.lot('L1', {}, { test: 'test -f a.txt' });
+    const c = h.lot('L1'); // sans orchestrate.test : avec une porte verte, l'annonce de tests rouges n'est pas crue (L522 R11)
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'fix', 'review']);
     expect(c.lot.status).toBe('ready');
@@ -2804,18 +2804,18 @@ describe('ligne de base des tests (L213)', () => {
     expect(c.lot.pass).toBe(0);
     expect(c.lot.warnings.join('\n')).toContain('porte du programme verte');
   });
-  it('R2 — porte du programme verte mais nouveauxEchecs non vide : la correction a lieu (L361)', async () => {
+  it('R2 — porte du programme verte et nouveauxEchecs non vide : la porte l\'emporte, pas de correction (L361, réécrit par L522 R11)', async () => {
     const h = harness({ script: { implement: [impl('a.txt', { tests: rouge, echecsDeBase: ['autre-lot > cas ancien'], nouveauxEchecs: ['lot > nouveau'] })], fix: [fix('b.txt')], review: [ok] } });
     const c = h.lot('L1', {}, { test: 'exit 0' });
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+    expect(kinds(h)).toEqual(['implement', 'review']);
   });
-  it('R3 — porte verte, session vert:false sans nouveauxEchecs (absent) ou sans echecsDeBase : la correction a lieu comme avant (L361)', async () => {
+  it('R3 — porte verte, session vert:false sans nouveauxEchecs (absent) ou sans echecsDeBase : pas de correction (L361, réécrit par L522 R11)', async () => {
     for (const extra of [{ echecsDeBase: ['autre-lot > cas ancien'] }, { nouveauxEchecs: [] as string[] }]) {
       const h = harness({ script: { implement: [impl('a.txt', { tests: rouge, ...extra })], fix: [fix('b.txt')], review: [ok] } });
       const c = h.lot('L1', {}, { test: 'exit 0' });
       await runLot(c);
-      expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+      expect(kinds(h)).toEqual(['implement', 'review']);
     }
   });
   it('sans orchestrate.test : vert:false avec nouveauxEchecs non vide : correction, les nouveaux échecs dans le constat', async () => {

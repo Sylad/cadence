@@ -9,6 +9,8 @@ Commits of the lot so far:
 Findings to fix:
 {{constats}}
 
+Red tests named above (L522): before writing any code, replay each red test named alone, with the project's own single-test command. A test that is red alone is a defect: fix it. A test that is green when replayed alone is unstable under load, not a defect of the lot: do not change code for it, and list it under « choix » of your report as unstable, to be proposed to the lead for its own lot.
+
 Rules: test first; commit each fix as soon as its tests pass, with explicit paths (never
 `git add -A` or `commit -a`), and a message that cites the lot (`fix({{lot}}): …`); run the project's
 full test suite and build before reporting; do not push, deliver, run `raf done`, `raf ux` or

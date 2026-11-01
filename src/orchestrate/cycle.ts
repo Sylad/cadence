@@ -38,9 +38,9 @@ import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval
 import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
 import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, answerAltersRule, hypothesisNote, LEAD_SOURCE, ruleIdsSourcedByLead, sourceRules, specText, type FicheParts } from './spec.js';
-import type { Constat, LotState, ReviewSummary, RunStore, StepState } from './state.js';
+import { handBackWithoutFinding } from './no-finding.js';
 import { decisionsText, humanDecisions } from './decisions.js';
-import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
+import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs, type Constat, type LotState, type ReviewSummary, type RunStore, type StepState } from './state.js';
 import { advance, baseMoved, INTEGRATE_WAIT_MS, MAX_REPLAYS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
 import { mutexFor } from './mutex.js';
 import { readTier, stillThird, takeTiers, tierMoved, tierRepos, wipBranch, type TierRead } from './tiers.js';
@@ -2234,7 +2234,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   else if (made === 0) l.warnings.push(kind === 'fix' ? 'fix sans nouveau commit : revue lancée sur les commits du lot, avec la raison de la session (choix)' : `${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
 
   const red: Constat[] = [];
-  // Tests annoncés rouges (L213) : avec orchestrate.test, le programme rejoue et compare à la ligne de base, la session n'est crue que si les tests y sont rouges autrement que par des échecs de départ ; sans, la liste des échecs de base de la session, non vérifiée.
+  // Tests annoncés rouges (L213) : avec orchestrate.test, le programme rejoue et compare à la ligne de base, la session n'est crue que si les tests y sont rouges autrement que par des échecs de départ, et jamais quand sa porte est verte (L522, quels que soient echecsDeBase et nouveauxEchecs) ; sans, la liste des échecs de base de la session, non vérifiée.
   const claimed: Constat = { source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` };
   let deferred = false;
   const declared = (rep.echecsDeBase ?? []).map((t) => t.trim()).filter(Boolean);
@@ -2258,11 +2258,7 @@ async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
     if (green) red.push(green);
   }
   if (red.length === 0) await programChecks(c, red, runs);
-  // La session annonçait des tests rouges et le programme ne les voit ni déjà rouges au départ (L213) ni instables sous charge (L354, verts rejoués seuls) : l'annonce vaut.
-  // L361 : la porte du programme est verte (code 0) et la session n'annonce que des échecs de base (echecsDeBase non vide, nouveauxEchecs présent et vide) : rien de rouge pour le programme, rien de nouveau pour la session → revue, sans correction ni escalade.
-  const gateGreen = runs.some((r) => r.label === 'tests' && r.code === 0);
-  const baseOnly = declared.length > 0 && !!newFailures && !newFailures.length;
-  if (deferred && red.length === 0 && gateGreen && baseOnly) l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${gateLabel(c.config.test ?? '')}, code 0) et aucun nouvel échec déclaré (nouveauxEchecs vide) : les échecs sont ceux de la base qu'elle déclare (${declared.length}) ; pas de correction`);
+  if (deferred && red.length === 0 && runs.some((r) => r.label === 'tests' && r.code === 0 && !r.instables?.length)) l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${gateLabel(c.config.test ?? '')}, code 0) : l'annonce n'est pas crue, pas de correction`);
   else if (deferred && red.length === 0 && !runs.some((r) => r.label === 'tests' && (r.dejaRouges || r.instables?.length))) red.push(claimed);
   if (red.length) {
     toFix(c, red, 'tests rouges');
@@ -2493,6 +2489,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     save(c);
     // L'UX est la dernière étape (L221) : conforme, le lot conclut avec la revue de code ; sinon une correction (jamais une revue de code d'office), la revue de code et l'UX rejouée suivent.
     if (summary.conforme) return () => conclude(c, l.code!, noCommitNote(l));
+    if (handBackWithoutFinding(c, l.constats, summary, stop)) return;
     toFix(c, l.constats, 'UX non conforme');
     return;
   }
@@ -2555,6 +2552,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     return;
   }
   const constats = blockingConstats(rep, 'code');
+  if (handBackWithoutFinding(c, constats, summary, stop)) return;
   (l.reviewCounts ??= []).push(constats.length);
   toFix(c, constats, 'revue non conforme');
 }

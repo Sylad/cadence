@@ -15,6 +15,11 @@ export function noteUnstable(c: NoteCtx, tests: string[]): void {
   const text = `${fresh.length} test(s) instable(s) sous charge (rouge(s) dans la suite, vert(s) rejoué(s) seul(s)), pas de passe de correction : ${fresh.join(' ; ')}`;
   l.warnings.push(text);
   c.wave.log(`${lotKey(l.project, l.lot)} · ${text}`);
+  // Le rouge de charge ne coûte plus de passe, mais la dette reste au lead : un lot à stabiliser (L522).
+  for (const t of fresh) {
+    const proposal = `[instable] ${t} — rouge dans la suite, vert rejoué seul : à stabiliser`;
+    if (!l.proposals.includes(proposal)) l.proposals.push(proposal);
+  }
   c.wave.store.writeLot(l);
 }
 

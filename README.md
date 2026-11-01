@@ -49,7 +49,7 @@ Details: [docs/skills.md](docs/skills.md) and [docs/cadence-hud.md](docs/cadence
 
 - [docs/raf.md](docs/raf.md): the plan, its commands and its file.
 - [docs/orchestrate.md](docs/orchestrate.md): waves, budgets, and [the edge-case probe](docs/orchestrate.md#the-edge-case-probe-orchestrateprobe-l497).
-- [docs/deliver.md](docs/deliver.md): wait for the CI, deploy, verify the effect; [docs/remote-gate.md](docs/remote-gate.md): the gate on another machine.
+- [docs/deliver.md](docs/deliver.md): wait for the CI (not for a plan-only sha), deploy, verify the effect, timestamped steps; [docs/remote-gate.md](docs/remote-gate.md): the gate on another machine.
 - [docs/spec.md](docs/spec.md): screen and back-end sheets.
 - [docs/ref.md](docs/ref.md): reference documents (specs, norms, mock-ups) and the coverage of their elements by the lots.
 - [docs/lead.md](docs/lead.md): the lead workflow, and the `livreur` agent that delivers a ready lot for it.

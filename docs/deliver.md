@@ -133,6 +133,24 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   5 minutes is a failure (you probably pushed another commit than the one you
   deliver); every run must end `success`, `skipped` or `neutral`. `gh` errors
   are retried, and reported with their cause after 5 minutes.
+- **CI not waited for on a plan-only sha** (L516): with `ci: github` or a CI command (no `deliver.script`, which
+  carries its own CI), when the previous delivery (`deliveries.log`) is an ancestor of the sha and **every** commit of
+  `previous..sha` only touches the plan (the same test as `raf check`, `isPlanOnly`), nothing is waited for: no
+  `gh run list`, no CI command. The output says `→ CI : non attendue (aucun fichier hors plan depuis <previous sha>)`
+  and the deploy and the checks run as usual. One commit that touches anything else (source, tests, docs,
+  `cadence.yaml` outside its `plan` key) is enough to wait for the CI as before; so is any case where this cannot be
+  proved: no previous delivery, a previous delivery outside the history of the sha or equal to it, no plan loaded, an
+  unreadable or empty range. `--dry-run` announces it with the same words on its CI line (`CI : non attendue (…)`).
+- **Timestamps and step journal** (L516): every step line of the output (`→ script`, `→ CI`, `→ déploiement i/n`,
+  `→ vérification i/n`, `✓ livré`) starts with the UTC time `HH:MM:SS`, and `✓ livré` ends with `en N s`, the time
+  since the lock was taken. The failure messages, the exit codes, `deliveries.log` (`day sha`) and
+  `deliveries-failed.log` are unchanged. Each step played (the CI wait, each deploy command, each check) also appends
+  one JSON line to `<git common dir>/cadence/deliveries-steps.log`, append-only, with the keys `lots` (lots cited since
+  the previous delivery, `[]` if none), `sha`, `projet`, `etape` (`ci`, `deploiement i/n`, `verification i/n`), `debut`
+  and `fin` (ISO 8601 UTC), `duree_s` (seconds, rounded) and `resultat` (`ok` or `echec`). A failing step writes its
+  `echec` line before `deliver` exits 1; steps not played write nothing (no `ci` line when the CI is not waited for or
+  `ci: none`). The project script (`deliver.script`) is not a step of this journal. `--dry-run` writes nothing. A write
+  error only prints a warning (`deliver : journal des étapes non écrit : <cause>`): the delivery and its code stand.
 - Commands get `CADENCE_SHA`, `CADENCE_SHORT` (7 characters) and `CADENCE_BRANCH` (a `deliver.script` also gets `CADENCE_DEPLOYED_FILE`, see below);
   `${SHA}` and `${SHORT}` are replaced in `url` and `contains`.
 - On success the lots cited by the commits since the previous delivery are

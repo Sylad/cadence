@@ -179,6 +179,27 @@ export function appendDelivery(dir: string, day: Day, sha: string): void {
   appendFileSync(join(dir, 'deliveries.log'), `${day} ${sha}\n`);
 }
 
+/** Une étape jouée par deliver (L516) : une ligne NDJSON de `deliveries-steps.log`. */
+interface DeliveryStep {
+  /** Lots cités par les commits livrés, [] quand aucun n'est connu. */
+  lots: string[];
+  sha: string;
+  projet: string;
+  /** « ci », « deploiement i/n » ou « verification i/n ». */
+  etape: string;
+  /** ISO 8601 UTC. */
+  debut: string;
+  fin: string;
+  /** Secondes, entier arrondi de fin − debut. */
+  duree_s: number;
+  resultat: 'ok' | 'echec';
+}
+
+/** Ajoute une étape à `deliveries-steps.log` (ajout seul, une ligne JSON par étape) ; `deliveries.log` n'est pas touché. */
+export function appendStep(dir: string, step: DeliveryStep): void {
+  appendFileSync(join(dir, 'deliveries-steps.log'), `${JSON.stringify(step)}\n`);
+}
+
 /** Classe d'une livraison rouge : où elle a cassé. `refus` : le script a refusé avant d'agir (code 2). */
 export const FAIL_CLASSES = ['refus', 'ci', 'deploiement', 'verification'] as const;
 export type FailClass = (typeof FAIL_CLASSES)[number];

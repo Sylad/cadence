@@ -7,6 +7,7 @@ import { onTermination, readProcs, SIGNAL_GRACE_MS, SIGNAL_PENDING_MS, TreeTrack
 import type { Day } from './dates.js';
 import { deliveryLots, isPlanOnly } from './audit.js';
 import { commitPaths, dirtyPaths, headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
+import { planOnlySince, pollGithubCi, stamped, stepJournal } from './deliver-ci.js';
 import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
 import { citedRefs } from './link.js';
 import { describeArticle, openArticleLots, type ArticleRule } from './articles.js';
@@ -103,11 +104,8 @@ export interface DeliverCtx {
   err: (line: string) => void;
 }
 
-const POLL_CI = 15_000;
-const CI_APPEAR = 300_000;
 /** Intervalle de réessai d'une vérification : celui de deliver ET de `cadence verify --retry`. */
 const POLL_VERIFY = 10_000;
-const CI_OK = new Set(['success', 'skipped', 'neutral']);
 const GH_TIMEOUT = 60_000;
 export const TIMED_OUT = 124;
 
@@ -337,6 +335,27 @@ export function describeCheck(c: VerifyCheck, sha: string): string {
 const guardMessage = (sha: string, lots: { id: string; state: string }[]) =>
   `${sha.slice(0, 7)} contient des commits de lots ni terminés ni prêts : ${lots.map((l) => `${l.id} (${l.state})`).join(', ')} ; livrer un sha antérieur, ou relire ces lots (raf review) avant`;
 
+/** La simulation de `--dry-run` : ce que la livraison jouerait, sans rien exécuter. */
+function describeSimulation(ctx: DeliverCtx, sha: string, env: Record<string, string>, branch: string, script: string | null): void {
+  const { config, out } = ctx;
+  out(`Livraison de ${env.CADENCE_SHORT} (${branch}) — simulation, rien n'est exécuté`);
+  if (script !== null) {
+    out(`  Script du projet : ${script}`);
+    out(`    (CI, déploiement et contrôles métier sont les siens ; délai ${config.deployTimeout} s)`);
+  } else {
+    const skipped = config.ci === 'none' ? null : planOnlySince(ctx, sha);
+    if (skipped) out(`  CI : non attendue (aucun fichier hors plan depuis ${skipped.slice(0, 7)})`);
+    else out(`  CI : ${typeof config.ci === 'string' ? config.ci : config.ci.command}${config.ci === 'none' ? '' : ` (délai ${config.ciTimeout} s)`}`);
+    out('  Déploiement :');
+    if (config.deploy.length === 0) out('    (aucune commande)');
+    config.deploy.forEach((c, i) => out(`    ${i + 1}. ${c}`));
+  }
+  if (ctx.articles?.length) out(`  Articles rafraîchis après une livraison verte (lot « Article <projet> à rafraîchir ») : ${ctx.articles.map(describeArticle).join(', ')}`);
+  if (config.verify.length) out(`  Vérifications (réessayées pendant ${config.verifyTimeout} s) :`);
+  config.verify.forEach((c, i) => out(`    ${i + 1}. ${describeCheck(c, sha)}`));
+  out(`  Variables : ${Object.entries(env).map(([k, v]) => `${k}=${v}`).join(' ')}`);
+}
+
 /** Livre HEAD. 0 livré, 1 étape en échec, 2 refus avant d'agir. */
 export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<number> {
   const { config, out, err } = ctx;
@@ -390,24 +409,10 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
   const branch = atHead ? (repo.branch ?? 'HEAD détachée') : 'sha choisi, antérieur ou étranger à la tête';
   const env = { CADENCE_SHA: sha, CADENCE_SHORT: sha.slice(0, 7), CADENCE_BRANCH: atHead ? (repo.branch ?? '') : '' };
   if (ctx.dryRun) {
-    out(`Livraison de ${env.CADENCE_SHORT} (${branch}) — simulation, rien n'est exécuté`);
-    if (script !== null) {
-      out(`  Script du projet : ${script}`);
-      out(`    (CI, déploiement et contrôles métier sont les siens ; délai ${config.deployTimeout} s)`);
-    } else {
-      out(`  CI : ${typeof config.ci === 'string' ? config.ci : config.ci.command}${config.ci === 'none' ? '' : ` (délai ${config.ciTimeout} s)`}`);
-      out('  Déploiement :');
-      if (config.deploy.length === 0) out('    (aucune commande)');
-      config.deploy.forEach((c, i) => out(`    ${i + 1}. ${c}`));
-    }
-    if (ctx.articles?.length) out(`  Articles rafraîchis après une livraison verte (lot « Article <projet> à rafraîchir ») : ${ctx.articles.map(describeArticle).join(', ')}`);
-    if (config.verify.length) out(`  Vérifications (réessayées pendant ${config.verifyTimeout} s) :`);
-    config.verify.forEach((c, i) => out(`    ${i + 1}. ${describeCheck(c, sha)}`));
-    out(`  Variables : ${Object.entries(env).map(([k, v]) => `${k}=${v}`).join(' ')}`);
+    describeSimulation(ctx, sha, env, branch, script);
     if (undelivered.length) return refuse(guardMessage(sha, undelivered));
     return 0;
   }
-
   if (lock && removeStaleLock(ctx.state, lock)) {
     err(`deliver : verrou périmé retiré (pid ${lock.pid} mort, ${lock.sha.slice(0, 7)})`);
   }
@@ -419,6 +424,7 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     return refuse(lockFault(lockPath(ctx.state), e));
   }
   if (!taken) return refuse('une autre livraison vient de démarrer');
+  const startedAt = deps.now();
   try {
     const fail = (msg: string, cls: FailClass, tail: string[] = []) => {
       err(`deliver : ${msg}`);
@@ -432,9 +438,11 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     };
     out(`Livraison de ${env.CADENCE_SHORT} (${branch})`);
 
+    const step = stepJournal(ctx, deps, sha, () => deliveredIds(ctx, lastDelivery(ctx.state), sha));
+
     let declared: string | null = null;
     if (script !== null) {
-      out(`→ script du projet : ${script}`);
+      out(stamped(deps, `→ script du projet : ${script}`));
       // Le script qui déploie un autre commit que CADENCE_SHA y écrit son sha : cadence ne le devine pas.
       const file = join(ctx.state, `deployed-${process.pid}`);
       try {
@@ -454,18 +462,26 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
         rmSync(file, { force: true });
       }
     } else {
-      const ci = await waitCi(ctx, deps, sha, env);
-      // Seule une commande de CI a une sortie : pour `ci: github`, lastOutput serait celle d'une commande antérieure.
-      if (ci) return fail(ci, 'ci', typeof config.ci === 'object' ? deps.lastOutput?.() : []);
+      const skipped = config.ci === 'none' ? null : planOnlySince(ctx, sha);
+      if (skipped) out(stamped(deps, `→ CI : non attendue (aucun fichier hors plan depuis ${skipped.slice(0, 7)})`));
+      else {
+        const ciStart = deps.now();
+        const ci = await waitCi(ctx, deps, sha, env);
+        if (config.ci !== 'none') step('ci', ciStart, ci === null);
+        // Seule une commande de CI a une sortie : pour `ci: github`, lastOutput serait celle d'une commande antérieure.
+        if (ci) return fail(ci, 'ci', typeof config.ci === 'object' ? deps.lastOutput?.() : []);
+      }
 
       for (const [i, cmd] of config.deploy.entries()) {
-        out(`→ déploiement ${i + 1}/${config.deploy.length} : ${cmd}`);
+        out(stamped(deps, `→ déploiement ${i + 1}/${config.deploy.length} : ${cmd}`));
+        const deployStart = deps.now();
         const code = await deps.exec(cmd, env, config.deployTimeout * 1000);
+        step(`deploiement ${i + 1}/${config.deploy.length}`, deployStart, code === 0);
         if (code !== 0) return fail(`déploiement en échec (${codeText(code)}) : ${cmd}`, 'deploiement', deps.lastOutput?.());
       }
     }
 
-    const failed = await verifyAll(ctx, deps, sha, env);
+    const failed = await verifyAll(ctx, deps, sha, env, step);
     if (failed) return fail(failed.message, 'verification', failed.tail);
 
     // Ce qui est journalisé : le sha que le script déclare (CADENCE_DEPLOYED_FILE) l'emporte. Sans déclaration, hors vague, un script qui a commité
@@ -490,9 +506,10 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     const ids = deliveredIds(ctx, lastDelivery(ctx.state), final);
     const delivered = deliveredLots(ctx, ids, lastDelivery(ctx.state), final);
     appendDelivery(ctx.state, ctx.today, final);
-    if (how === 'declared') out(`✓ livré : ${final.slice(0, 7)} (sha déclaré par le script)`);
-    else if (how === 'moved') out(`✓ livré : ${final.slice(0, 7)} (tête déplacée par le script depuis ${env.CADENCE_SHORT})`);
-    else out(`✓ livré${config.verify.length ? ' et vérifié' : ''} : ${env.CADENCE_SHORT}`);
+    const took = `en ${Math.round((deps.now() - startedAt) / 1000)} s`;
+    if (how === 'declared') out(stamped(deps, `✓ livré : ${final.slice(0, 7)} (sha déclaré par le script) ${took}`));
+    else if (how === 'moved') out(stamped(deps, `✓ livré : ${final.slice(0, 7)} (tête déplacée par le script depuis ${env.CADENCE_SHORT}) ${took}`));
+    else out(stamped(deps, `✓ livré${config.verify.length ? ' et vérifié' : ''} : ${env.CADENCE_SHORT} ${took}`));
     if (delivered) out(delivered);
     refreshArticles(ctx, ids, final);
     return 0;
@@ -506,44 +523,11 @@ async function waitCi(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: Reco
   const { ci, ciTimeout } = ctx.config;
   if (ci === 'none') return null;
   if (typeof ci === 'object') {
-    ctx.out(`→ CI : ${ci.command}`);
+    ctx.out(stamped(deps, `→ CI : ${ci.command}`));
     const code = await deps.exec(ci.command, env, ciTimeout * 1000);
     return code === 0 ? null : `CI en échec (${codeText(code)}) : ${ci.command}`;
   }
-  ctx.out(`→ CI : attente des runs GitHub de ${sha.slice(0, 7)}`);
-  const start = deps.now();
-  let last = '';
-  let failingSince: number | null = null;
-  for (;;) {
-    let runs: GhRun[] = [];
-    let error: string | null = null;
-    try {
-      runs = deps.gh(sha);
-      failingSince = null;
-    } catch (e) {
-      // Erreur passagère (réseau, quota d'API) : on réessaie ; persistante, on abandonne avec sa cause.
-      error = (e as Error).message;
-      failingSince ??= deps.now();
-    }
-    const elapsed = deps.now() - start;
-    if (error !== null) {
-      if (deps.now() - failingSince! >= CI_APPEAR || elapsed >= ciTimeout * 1000) return `gh run list en échec : ${error}`;
-      ctx.err(`  gh run list en échec, nouvel essai : ${error}`);
-    } else if (runs.length === 0) {
-      if (elapsed >= CI_APPEAR) return `aucun run CI pour ce sha après ${CI_APPEAR / 60_000} min (le commit poussé est-il celui que la CI construit ?)`;
-    } else {
-      const pending = runs.filter((r) => r.status !== 'completed');
-      const summary = `${runs.length} run(s), ${runs.length - pending.length} terminé(s)`;
-      if (summary !== last) ctx.out(`  ${summary}`);
-      last = summary;
-      if (pending.length === 0) {
-        const bad = runs.filter((r) => !CI_OK.has(r.conclusion));
-        return bad.length ? `CI en échec : ${bad.map((r) => `${r.name} (${r.conclusion})`).join(', ')}` : null;
-      }
-    }
-    if (elapsed >= ciTimeout * 1000) return `CI non terminée après ${ciTimeout} s`;
-    await deps.sleep(POLL_CI);
-  }
+  return pollGithubCi(ctx, deps, sha);
 }
 
 /** Un essai d'une vérification : cause de l'échec, ou null. Partagé par deliver et `cadence verify`. */
@@ -587,12 +571,20 @@ export async function retryCheck(
 }
 
 /** Chaque vérification est réessayée jusqu'au délai commun ; message d'échec ou null. */
-async function verifyAll(ctx: DeliverCtx, deps: DeliverDeps, sha: string, env: Record<string, string>): Promise<{ message: string; tail: string[] } | null> {
+async function verifyAll(
+  ctx: DeliverCtx,
+  deps: DeliverDeps,
+  sha: string,
+  env: Record<string, string>,
+  step: (etape: string, debut: number, ok: boolean) => void,
+): Promise<{ message: string; tail: string[] } | null> {
   const deadline = deps.now() + ctx.config.verifyTimeout * 1000;
   for (const [i, c] of ctx.config.verify.entries()) {
     const label = describeCheck(c, sha);
-    ctx.out(`→ vérification ${i + 1}/${ctx.config.verify.length} : ${label}`);
+    ctx.out(stamped(deps, `→ vérification ${i + 1}/${ctx.config.verify.length} : ${label}`));
+    const checkStart = deps.now();
     const reason = await retryCheck(c, deps, sha, env, deadline, () => deadline - deps.now());
+    step(`verification ${i + 1}/${ctx.config.verify.length}`, checkStart, reason === null);
     if (reason !== null) return { message: `vérification en échec après ${ctx.config.verifyTimeout} s : ${label} — ${reason}`, tail: c.command !== undefined ? (deps.lastOutput?.() ?? []) : [] };
   }
   return null;

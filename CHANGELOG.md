@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- `cadence deliver` no longer waits for the CI of a sha whose commits since the previous delivery only touch the plan (L516, [docs/deliver.md](docs/deliver.md)): 42 % of the app deliveries measured on 2026-11-01 were such shas, each paying the CI wait for nothing. It says `→ CI : non attendue (aucun fichier hors plan depuis <sha>)`, runs the deploy and the checks, and waits as before as soon as one commit touches anything else or the proof is missing (no previous delivery, history rewritten, no plan, empty range). Every step line of the output now starts with its UTC time and `✓ livré` ends with its duration, and each step played appends a JSON line to `deliveries-steps.log` (next to `deliveries.log`, which is unchanged) so that « CI wait against deploy » can be measured without a throwaway script.
+
 ## [1.35.0] - 2026-11-01
 
 ### Fixed

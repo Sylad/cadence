@@ -976,6 +976,7 @@ lots:
     estimate: 1
     created: 2026-11-01
     started: 2026-11-01
+    review: { date: 2026-11-01, verdict: "conforme : les 3 constats mineurs de la revue précédente sont corrigés (verrou testé avant lancement, verrou périmé, ouverture de l'étape 4 qui renvoyait aux outils browser_*), 1 note mineure (captures, qa-reviewer.md:169) — orchestré (vague 2026-11-01-1330-cad, 3 passe(s) de correction + passe des mineurs)", commit: 260a7e4d7e43563a51a1acd7477b3f9bacf43c7a, reporte: { de: 49eae817de58309dc2453fec0ce5fb3611fcb656, vers: 260a7e4d7e43563a51a1acd7477b3f9bacf43c7a, patchId: a92feb184294b3731d1a11db498b4530990d65b8 } }
   - id: L512
     title: "Rejeu isolé des tests rouges pour une porte composée (&&, sous-shells) : aujourd'hui testReplay est refusé (config.ts:470), donc ni le rejeu seul de L350 ni le délai trop juste et le rouge au départ de L510 ne jouent pour warhammer (backend && frontend) ni evatosorus — faux rouges du 31-10 (L61 : 4 corrections + escalade Fable ; L45 : correction Fable). Rejeu par partie de la porte (préfixe de chemin → commande, ex. frontend/ → cd frontend && npx vitest run {files}) puis config des deux projets"
     status: doing

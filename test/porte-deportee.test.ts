@@ -368,6 +368,14 @@ describe('L403 — cache sûr en concurrence (R17)', () => {
     expect(readdirSync(join(p.work, 'deps', caches(p)[0])).sort()).toEqual(['.paths', 'node_modules']);
   });
 
+  it('R17 — six portes simultanées sur un hôte neuf : le dépôt de travail est créé une fois, aucune ne se replie à cause de la création', async () => {
+    const p = project(withInstall());
+    const runs = await Promise.all(Array.from({ length: 6 }, () => gate(p)));
+    expect(runs.map((r) => r.text).filter((t) => t.includes('dépôt de travail impossible'))).toEqual([]);
+    expect(runs.map((r) => r.code)).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(readdirSync(join(p.work)).filter((n) => n.startsWith('repo.git'))).toEqual(['repo.git']);
+  });
+
   it('R17 — temporaire orphelin d\'un appel précédent nettoyé', async () => {
     const p = project(withInstall());
     await gate(p);

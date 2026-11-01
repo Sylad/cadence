@@ -203,14 +203,14 @@ async function probeHost(o: OpenOpts): Promise<{ platform: string; cores: number
   return { platform: `${os.toLowerCase()}-${archOf(arch)}`, cores: Number.isFinite(nproc) && nproc >= 1 ? nproc : 1 };
 }
 
-/** Crée le dossier de travail de l'hôte (dépôt nu, orphelins retirés, R17, R19) et y pousse le sha (R5) ; rend la cause d'un échec. */
+/** Crée le dossier de travail de l'hôte (dépôt nu créé à part puis renommé : deux portes simultanées ne s'y disputent pas, orphelins retirés, R17, R19) et y pousse le sha (R5) ; rend la cause d'un échec. */
 async function pushSha(o: OpenOpts, w: Work): Promise<string | null> {
   const { host, env } = o;
   const { head, bare, root } = w;
   const init = await ssh({
     host,
     env,
-    script: `${head}set -e; mkdir -p "$R/deps" "$R/wt"; [ -d ${bare} ] || git init --bare -q ${bare}; ` +
+    script: `${head}set -e; mkdir -p "$R/deps" "$R/wt"; [ -d ${bare} ] || { git init --bare -q ${bare}.init-$$ && mv ${bare}.init-$$ ${bare} 2>/dev/null; }; rm -rf ${bare}.init-$$ ${bare}/repo.git.init-$$; [ -d ${bare} ]; ` +
       `find "$R/wt" -mindepth 1 -maxdepth 1 -mmin +${ORPHAN_MIN} -exec rm -rf {} + 2>/dev/null || true; ` +
       `find "$R/deps" -mindepth 1 -maxdepth 1 -name '.tmp-*' -mmin +${ORPHAN_MIN} -exec rm -rf {} + 2>/dev/null || true; git -C ${bare} worktree prune 2>/dev/null || true`,
   });

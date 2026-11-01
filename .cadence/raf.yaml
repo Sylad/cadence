@@ -273,6 +273,7 @@ lots:
     notes:
       - { date: 2026-10-29, text: "29-10 : même mur pour --resume --integrate d'une vague finie (2026-10-28-2210, L402) pendant qu'une autre vague du dépôt tourne (2026-10-29-cad) : « une orchestration y est déjà en cours » — l'intégration d'un lot revu devrait pouvoir passer, ou être mise en file par la vague vivante" }
     started: 2026-11-01
+    review: { date: 2026-11-01, verdict: "conforme : les deux majeurs de la revue de vague sont fermés (projet résolu par chemin, ajout en attente recontrôlé à la prise : arrêt, budget, état du plan) ; R16-R19 savent échouer (vérifié par neutralisation de chaque branche) ; porte verte 5285 tests — reprise Fable par le lead après rendu pour budget", commit: 447574b8178e4e184655ef0b7ada98c90672c136 }
   - id: L422
     title: "Table finale d'orchestrate : une sous-tâche proposée dont le fichier cité a été modifié par un commit du lot postérieur à la revue qui l'a émise est marquée « peut-être déjà traitée (<sha>) » (28-10 : L230 ouvert sur des propositions déjà corrigées, 5 passes perdues)"
     status: todo

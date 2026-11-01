@@ -3,10 +3,11 @@ sujet:
   titre: "deliver n'attend pas la CI d'un sha qui ne change que le plan, et horodate ses étapes"
   lot: L516
   perimetre:
-    modules: [src/deliver.ts, src/audit.ts, docs/deliver.md]
+    modules: [src/deliver.ts, src/state.ts, src/audit.ts, docs/deliver.md]
     endpoints: []
     jobs: []
     hors_perimetre:
+      - "un lecteur du journal des étapes (perf ou commande) : le lot ne fait que l'écrire"
       - "le format de deliveries.log et de deliveries-failed.log : inchangés (ils sont lus par perf, le HUD et lastDelivery)"
       - "les projets à script de livraison (deliver.script) : la CI y est celle du script, cadence ne l'attend pas"
       - "le déploiement et les vérifications : ils restent joués pour un sha plan seul"
@@ -43,10 +44,14 @@ cas:
       - "Chaque ligne d'étape écrite sur la sortie (script, CI, déploiement i/n, vérifications, livré) commence par l'heure UTC HH:MM:SS lue sur deps.now()."
       - "La ligne finale « ✓ livré » donne la durée totale en secondes."
       - "Les lignes de log sont écrites au fil de l'eau, pas à la fin."
+      - "À la fin de chaque étape (attente de la CI, chaque commande de déploiement, chaque vérification), deliver ajoute une ligne NDJSON au journal des étapes (deliveries-steps.log), à côté de deliveries.log."
     alternatives:
       - { si: "une étape échoue", alors: "la ligne d'échec porte son heure ; le message d'échec écrit dans deliveries-failed.log reste sans heure", regles: [R7] }
-      - { si: "--dry-run", alors: "aucune heure : rien ne s'exécute", regles: [R5] }
-    resultat: "Le journal de la livraison dit quand chaque étape a commencé, donc laquelle a pris le temps."
+      - { si: "--dry-run", alors: "aucune heure et aucune ligne dans le journal des étapes : rien ne s'exécute", regles: [R5, R8] }
+      - { si: "une étape échoue ou expire", alors: "sa ligne du journal des étapes est écrite avec resultat « échec » avant la sortie en code 1", regles: [R9] }
+      - { si: "la CI n'est pas attendue (sha plan seul), ou ci vaut none, ou un script de projet est déclaré", alors: "aucune ligne d'étape CI n'est écrite : l'étape n'a pas eu lieu", regles: [R10] }
+      - { si: "l'écriture du journal des étapes échoue (disque plein, droit)", alors: "la livraison continue, un avertissement est écrit sur la sortie", regles: [R11] }
+    resultat: "Le journal de la livraison dit quand chaque étape a commencé, donc laquelle a pris le temps ; le journal des étapes permet de refaire la mesure « attente CI contre déploiement » sans script jetable."
 
 regles:
   - id: R1
@@ -83,7 +88,7 @@ regles:
     cas: [C2]
     enonce: "Chaque ligne d'étape de la sortie de deliver (→ script, → CI, → déploiement i/n, vérifications, ✓ livré) commence par « HH:MM:SS » en UTC lu sur deps.now() ; la ligne ✓ livré se termine par « en N s » (durée depuis la prise du verrou)."
     statut: hypothese
-    si_faux: "Si la forme voulue est une date complète, un fuseau local ou un fichier, seul le texte change pour la sortie ; un fichier est une question à part (voir les questions du rapport)."
+    si_faux: "Si la forme voulue est une date complète, un fuseau local ou un fichier, seul le texte change pour la sortie ; le fichier des étapes est couvert à part (R8)."
     tests: ["R6 — now injecté : chaque ligne d'étape porte l'heure UTC attendue", "R6 — ✓ livré donne la durée totale en secondes"]
   - id: R7
     cas: [C2]
@@ -91,6 +96,30 @@ regles:
     statut: sourcee
     source: "lecteurs src/state.ts:178-180 (appendDelivery), 228-232, lastDelivery state.ts:243-248 (split ' ')[1], src/perf.ts:8, docs/perf.md:85-89, docs/cadence-hud.md:94 (script du HUD qui relit « day sha »)"
     tests: ["R7 — deliveries.log garde exactement « jour sha »", "R7 — deliveries-failed.log garde exactement sa ligne d'avant, sans heure"]
+  - id: R8
+    cas: [C2]
+    enonce: "Chaque étape jouée écrit une ligne NDJSON, en ajout seul, dans un nouveau fichier deliveries-steps.log placé à côté de deliveries.log (même dossier <git common dir>/cadence). La ligne porte : lots (identifiants connus, [] sinon), sha, projet, etape, debut et fin (ISO 8601 UTC, lus sur deps.now()), duree_s (secondes, entier arrondi de fin − debut), resultat (« ok » ou « echec »). Étapes : « ci », une étape par commande de déploiement (« deploiement i/n »), une par vérification (« verification i/n »). deliveries.log et ses lecteurs ne sont pas touchés."
+    statut: sourcee
+    source: "réponse du lead à la question du lot : un NOUVEAU journal à part, deliveries.log intact ; une ligne NDJSON par étape ; champs lot(s) si connus, sha, projet, étape, début et fin ISO 8601, durée en secondes, résultat ok/échec ; en ajout seul. Le nom du fichier et les clés exactes sont des choix de l'agent (voir choix)."
+    tests: ["R8 — livraison verte : une ligne JSON valide par étape jouée, dans l'ordre, avec les huit clés", "R8 — duree_s égale fin − debut avec un now injecté", "R8 — dry-run : le fichier n'est ni créé ni modifié", "R8 — un second deliver ajoute sans réécrire les lignes déjà présentes"]
+  - id: R9
+    cas: [C2]
+    enonce: "Une étape qui échoue ou expire (CI non terminée ou en échec, commande de déploiement ou vérification non nulle) écrit sa ligne avec resultat « echec » avant que deliver rende 1 ; les étapes suivantes, non jouées, n'écrivent rien."
+    statut: sourcee
+    source: "réponse du lead : résultat ok/échec par étape ; les échecs d'étape existent déjà (src/deliver.ts waitCi 505-547, code 1)"
+    tests: ["R9 — commande de déploiement en échec : ligne resultat echec, aucune ligne pour les vérifications", "R9 — CI expirée : ligne ci resultat echec"]
+  - id: R10
+    cas: [C2]
+    enonce: "Une étape non jouée n'écrit pas de ligne : pas de ligne « ci » quand la CI n'est pas attendue (R1), quand ci vaut none ou avec un script de projet."
+    statut: hypothese
+    si_faux: "Si le mesureur voulait une ligne « ci » de durée 0 pour un sha plan seul, il faudrait ajouter un résultat « saute » ; seule la lecture du journal change, aucune donnée existante en jeu."
+    tests: ["R10 — sha plan seul : aucune ligne ci dans deliveries-steps.log", "R10 — ci none : aucune ligne ci"]
+  - id: R11
+    cas: [C2]
+    enonce: "Une erreur d'écriture de deliveries-steps.log n'interrompt pas la livraison ni ne change son code de sortie : elle donne un avertissement sur la sortie, et deliveries.log reste écrit."
+    statut: hypothese
+    si_faux: "Si le journal des étapes devait être bloquant, une livraison déjà déployée serait rendue rouge pour une mesure ; on retirerait le try/catch, sans donnée en jeu."
+    tests: ["R11 — journal des étapes non inscriptible : livraison verte, code 0, avertissement affiché"]
 
 contrats:
   - id: A1
@@ -101,9 +130,11 @@ contrats:
       - { code: log error, message: "deliver : <sha7> non poussé : la CI n'a rien construit (git push)", note: "inchangé (src/deliver.ts:359), code 2" }
       - { code: log error, message: "deliver : CI non terminée après <N> s", note: "inchangé, code 1 : seulement quand R2 ou R3 imposent d'attendre" }
       - { code: log error, message: "deliver : CI en échec : <run> (<conclusion>)", note: "inchangé, code 1" }
-    regles: [R1, R2, R3, R4, R5, R6, R7]
+      - { code: log warn, message: "deliver : journal des étapes non écrit : <cause>", note: "nouveau, ne change pas le code de sortie (R11)" }
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11]
 
 donnees:
   - { id: D1, objet: "<git common dir>/cadence/deliveries.log (« jour sha » par livraison verte)", existant: true, modification: aucune, note: "relu pour trouver la livraison précédente (lastDelivery) ; format et écriture inchangés (R7)" }
   - { id: D2, objet: "<git common dir>/cadence/deliveries-failed.log", existant: true, modification: aucune, note: "format inchangé (R7)" }
   - { id: D3, objet: "historique git de précédente..sha (git log, fichiers changés par commit)", existant: true, modification: aucune, note: "lu seulement, via isPlanOnly (src/audit.ts:94)" }
+  - { id: D4, objet: "<git common dir>/cadence/deliveries-steps.log (NDJSON : lots, sha, projet, etape, debut, fin, duree_s, resultat)", existant: false, modification: ajout, note: "nouveau fichier, en ajout seul, sans lecteur dans cadence pour ce lot ; décision du lead : journal à part, deliveries.log intact (R8)" }

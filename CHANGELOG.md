@@ -77,8 +77,13 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 | `/hud lots`: a read-only panel of the open lots of every project (tree, states, `after:` links); `pre-push` hook refusing a push that carries a lot not ready | [1.21.0](#1210---2026-10-28) |
 
 1.5.0 was tagged but never published to npm: what it brought is first available in 1.5.1.
+1.34.0 was tagged but never published to npm: what it brought is first available in 1.34.1.
 
 ## [Unreleased]
+
+### Fixed
+
+- Publication of 1.34.0, which failed after the tag: its CHANGELOG entry for the edge-case probe cited a lot with no commit in the tag. 1.34.1 carries everything 1.34.0 announced, including the steadier tests of `npm run service` under load (L480).
 
 ## [1.34.0] - 2026-10-31
 

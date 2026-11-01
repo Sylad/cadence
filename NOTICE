@@ -1,18 +1,21 @@
 cadence — third-party attribution
 
 The "Delivery grid" section of agents/ux-reviewer.md lists AI-tic rules that are
-reworded (not copied) from the rules of the work `detect.mjs`, licensed under
-the Apache License, Version 2.0 (Apache-2.0): https://www.apache.org/licenses/LICENSE-2.0
+reworded (not copied) from the rules of the work `detect.mjs`. Its parts ported
+from Impeccable are under the Apache License, Version 2.0 (Apache-2.0,
+https://www.apache.org/licenses/LICENSE-2.0); its own rules are under MIT.
 
 Work:        scripts/detect.mjs (static detection of AI-generated interface tics)
 Repository:  https://github.com/ryanthedev/design-for-ai
 Commit read: 37d7ae63d1afa45eb57ec90bc246cef6dd60c033 (shallow clone, read only, 2026-11-01)
-Licence:     Apache-2.0, as declared in the header of scripts/detect.mjs. The
-             repository carries no LICENSE file; its .claude-plugin/plugin.json
-             declares "license": "MIT" for the plugin as a whole. The header of
-             detect.mjs states that parts of the detector are ported from
-             Impeccable (https://github.com/pbakaus/impeccable, Copyright
-             Impeccable contributors, Apache-2.0) with modifications.
+Licence:     per rule. The header of scripts/detect.mjs limits Apache-2.0 to the
+             parts ported from Impeccable (https://github.com/pbakaus/impeccable,
+             Copyright Impeccable contributors, Apache-2.0) with modifications:
+             nested-cards, gradient-text, dark-glow, overused-font and
+             marketing-buzzword. It names purple-triplet and
+             unmodified-shadcn-tokens as new rules of design-for-ai, under MIT
+             (.claude-plugin/plugin.json declares "license": "MIT"; the
+             repository carries no LICENSE file).
 Original authors: the design-for-ai authors (ryanthedev); Impeccable contributors
              for the ported parts.
 

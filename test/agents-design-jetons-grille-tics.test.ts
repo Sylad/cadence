@@ -222,6 +222,7 @@ describe('R11/R12 — pas de catalogue de styles, attribution', () => {
     expect(notice).toContain('scripts/detect.mjs');
     expect(notice).toContain('https://github.com/ryanthedev/design-for-ai');
     expect(notice).toMatch(/37d7ae63d1afa45eb57ec90bc246cef6dd60c033/);
+    expect(notice).toMatch(/MIT/);
     expect(notice).toMatch(/header of scripts\/detect\.mjs/);
     expect(notice).toMatch(/seven are kept[^]*nine are not/);
   });

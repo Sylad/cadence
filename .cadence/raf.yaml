@@ -961,15 +961,23 @@ lots:
     review: { date: 2026-11-01, verdict: "conforme : revue de la vague conforme ; rebasé sur main (L420, L508) sans conflit de code (docs/raf.md fusionné, CHANGELOG par merge=union), tsc et vitest verts (5028 tests)", commit: 6b1a9146240b5093967149f1a176a93f7d9c6371 }
     finished: 2026-11-01
   - id: L510
-    title: "Faux rouges restants malgré le rejeu isolé (L350) : (1) un test qui expire près de sa limite même seul (warhammer L61, 31-10 : plan-data 25 s seul pour 30 s de délai → 4 corrections + escalade Fable sans défaut) — la porte lit la durée du test rejoué et classe « délai trop juste » au lieu de « bug », avec le test nommé dans la table ; (2) un rouge déjà rouge à la ligne de base ne doit déclencher ni correction ni escalade (evatosorus L45, 31-10 : correction Fable sur le test du tiroir de L23) ; mesurer dans cadence corrections la part des passes lancées sur des tests puis terminées sans changement de code, sur les deux dernières fenêtres"
+    title: "Faux rouges, porte à lanceur unique (testReplay) : un test vert seul à ≥ 80 % de son délai est classé « délai trop juste » au lieu de partir en correction ; un rouge déjà rouge seul au sha de départ ne part ni en correction ni en escalade ; cadence corrections mesure les passes lancées sur des tests terminées sans changement de code, sur deux fenêtres. Les portes composées (warhammer L61, evatosorus L45) sont L512"
     status: doing
     estimate: 0.5
     created: 2026-11-01
     started: 2026-11-01
+    notes:
+      - { date: 2026-11-01, text: "titre remplacé : « Faux rouges restants malgré le rejeu isolé (L350) : (1) un test qui expire près de sa limite même seul (warhammer L61, 31-10 : plan-data 25 s seul pour 30 s de délai → 4 corrections + escalade Fable sans défaut) — la porte lit la durée du test rejoué et classe « délai trop juste » au lieu de « bug », avec le test nommé dans la table ; (2) un rouge déjà rouge à la ligne de base ne doit déclencher ni correction ni escalade (evatosorus L45, 31-10 : correction Fable sur le test du tiroir de L23) ; mesurer dans cadence corrections la part des passes lancées sur des tests puis terminées sans changement de code, sur les deux dernières fenêtres »" }
   - id: L511
     title: "qa-reviewer : chaque agent ouvre son propre contexte de navigateur (profil isolé) — 01-11 : deux QA lancées en parallèle (warhammer L222, avatar L13) partageaient le navigateur Playwright, l'une a lu un onglet de l'autre site puis le navigateur s'est fermé ; d'ici là, le skill lead dit « une QA à la fois »"
     status: todo
     estimate: 1
+    created: 2026-11-01
+  - id: L512
+    title: "Rejeu isolé des tests rouges pour une porte composée (&&, sous-shells) : aujourd'hui testReplay est refusé (config.ts:470), donc ni le rejeu seul de L350 ni le délai trop juste et le rouge au départ de L510 ne jouent pour warhammer (backend && frontend) ni evatosorus — faux rouges du 31-10 (L61 : 4 corrections + escalade Fable ; L45 : correction Fable). Rejeu par partie de la porte (préfixe de chemin → commande, ex. frontend/ → cd frontend && npx vitest run {files}) puis config des deux projets"
+    status: todo
+    estimate: 0.5
+    spec: true
     created: 2026-11-01
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

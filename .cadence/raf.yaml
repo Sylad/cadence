@@ -263,6 +263,7 @@ lots:
     notes:
       - { date: 2026-10-31, text: "31-10 : 3 récidives dans la soirée (warhammer L48, L220, evatosorus L6) : deliver laisse .cadence/raf.yaml modifié (note « article à rafraîchir ») et le livreur ne le commite pas → commit et porte à la main à chaque fois" }
     started: 2026-11-01
+    review: { date: 2026-11-01, verdict: "conforme (1 note mineure : pas d'entrée CHANGELOG pour la suppression des groupes [ {vague} ], qui touche aussi raf done, spec green et spec reseal) — orchestré (vague 2026-11-01-0915-cad, 1 passe(s) de correction)", commit: b2e6745f68be44e86a5c76ee5ebf80f085332914, reporte: { de: 9a04051c49f72f94672cfdbaf5e3b730aafc55e8, vers: b2e6745f68be44e86a5c76ee5ebf80f085332914, patchId: ab6c85c6159c84b19e87b9269e120943f15c0341 } }
   - id: L421
     title: Ajouter un lot à une vague vivante (--add <projet:lot>) au lieu d'en lancer une seconde, refusée dans le même dépôt ; le message du refus nomme cette commande (28-10)
     status: todo

@@ -1,0 +1,172 @@
+sujet:
+  id: brief-implementation-enrichi
+  titre: "Brief d'implémentation enrichi : grille du code-reviewer, cas limites d'abord, lecture du précheck transmise"
+  lot: L523
+  perimetre:
+    modules: [templates/orchestrate/implement.md, templates/orchestrate/precheck.md, agents/precheck-reader.md, src/orchestrate/schemas.ts, src/orchestrate/state.ts, src/orchestrate/cycle.ts, README.md, CHANGELOG.md, docs/mesures]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le brief fix et les briefs fix-minors, spec, spec-back, accept, accept-back, review* : inchangés (R4)"
+      - "l'agent code-reviewer : sa grille ne change pas, le brief implement la reprend (R1)"
+      - "le schéma du rapport de la session d'implémentation (WORK_SCHEMA) : aucun champ ajouté"
+      - "le champ precheck (constat « partiel ») et precheckVerdict : inchangés, la lecture a son propre champ precheckLu (R9)"
+      - "le script scripts/temps-d-un-lot.mjs lui-même (livré par L517) : le lot s'en sert, il ne le modifie pas"
+
+cas:
+  - id: C1
+    titre: "La session d'implémentation reçoit la grille du code-reviewer et s'y relit"
+    acteur: le programme (orchestrate) puis la session implement
+    declencheur: commande cadence orchestrate (étape implement, renderBrief('implement'))
+    preconditions:
+      - le lot est dans une vague
+    nominal:
+      - "Le programme rend implement.md : le brief contient la grille que le code-reviewer applique au diff (bug de code, dérive d'architecture, test manquant ou qui ne peut pas échouer, bloc dupliqué, code mort, erreur avalée, entrée crue, documentation qui ne suit pas)."
+      - "La session liste les cas limites de son objectif, écrit d'abord leurs tests et les voit échouer pour la bonne raison, puis code."
+      - "Avant son dernier commit, elle relit son diff contre la grille et corrige ce qui manque."
+      - "Un point qu'elle ne tient pas est écrit sous choix ou nonVerifie de son rapport."
+    alternatives:
+      - { si: "un cas limite n'est pas couvert par la fiche du lot", alors: "elle ne le code pas : elle l'écrit sous nonVerifie ou choix (consigne existante)", regles: [R2] }
+      - { si: "un point de la grille ne peut pas être tenu", alors: "elle le déclare dans la prose du rapport, sans nouveau champ", regles: [R3] }
+      - { si: "le brief est rendu pour une autre étape (fix, fix-minors, spec, accept, review)", alors: "il ne porte pas ce bloc", regles: [R4] }
+    resultat: "Un brief implement qui porte la grille et l'ordre « cas limites testés d'abord, relecture contre la grille avant le dernier commit »."
+  - id: C2
+    titre: "Le précheck rend ce qu'il a lu"
+    acteur: le lecteur du précheck (session précheck, en lecture seule)
+    declencheur: commande cadence orchestrate (étape precheck, renderBrief('precheck'))
+    preconditions:
+      - le lot passe par le précheck (orchestrate.precheck actif, lot sans commit, critère de L322 non satisfait)
+    nominal:
+      - "Le lecteur cherche le livrable comme avant."
+      - "Il rend, en plus de dejaPresent, preuves et resume, un champ optionnel lu : les fichiers concernés (chemin:ligne), le code voisin à imiter et les tests existants qu'il a ouverts."
+      - "Le programme range ce texte rogné dans l'état du lot, champ precheckLu."
+    alternatives:
+      - { si: "le rapport n'a pas de champ lu, ou il est vide ou fait d'espaces", alors: "precheckLu reste absent, le précheck est valide", regles: [R5, R6] }
+      - { si: "lu n'est pas une chaîne", alors: "il est écarté avec un avertissement, le reste du rapport vaut", regles: [R6] }
+      - { si: "lu dépasse la taille permise", alors: "il est tronqué avec un marqueur", regles: [R7] }
+      - { si: "le verdict est « oui » prouvé", alors: "le lot est rendu au lead, aucune implémentation ne part, precheckLu n'est pas rangé", regles: [R6] }
+      - { si: "le modèle local dit « oui »", alors: "Sonnet relit et son lu est celui qu'on range", regles: [R6] }
+    resultat: "Un état de lot qui garde la lecture du précheck à côté de son verdict, sans toucher à ce verdict."
+  - id: C3
+    titre: "L'implémentation part de la lecture du précheck au lieu de relire à froid"
+    acteur: le programme puis la session implement
+    declencheur: commande cadence orchestrate (première étape implement après un précheck)
+    preconditions:
+      - "l'état du lot porte precheckLu"
+    nominal:
+      - "Le programme joint au brief un bloc qui donne la lecture du précheck et dit à la session de partir de ces fichiers, du code voisin et des tests cités, sans les chercher à nouveau."
+      - "La session rouvre un fichier seulement pour le modifier ou quand la lecture ne suffit pas, et vérifie les lignes qu'elle édite."
+    alternatives:
+      - { si: "l'état n'a pas precheckLu (précheck sauté, désactivé, lot repris d'une vague, ancien état)", alors: "le brief est identique à celui d'avant le lot", regles: [R8, R9] }
+      - { si: "le brief est rendu pour une passe fix", alors: "le bloc n'y figure pas", regles: [R8] }
+    resultat: "Un brief implement qui fournit les fichiers à lire, le modèle à imiter et les tests existants."
+  - id: C4
+    titre: "Le lead mesure l'effet avant et après"
+    acteur: le lead
+    declencheur: commande node scripts/temps-d-un-lot.mjs (méthode de L517) bornée par la création des vagues, avec cadence corrections --since/--until
+    preconditions:
+      - "L517 est livré (le script et docs/mesures/temps-d-un-lot.md existent)"
+      - "des vagues existent avant et après la mise en service de L523"
+    nominal:
+      - "Le lead rejoue le script pour les lots des vagues créées jusqu'à la borne (avant) puis après elle."
+      - "Il consigne dans docs/mesures/ les passes par lot, leur cause (bug-code, dont cas limites ; dérive d'architecture) et le nombre d'allers-retours de lecture, avec les chiffres de l'étude L517 comme référence (bug-code 52 % des passes dont 223 cas limites, dérive 10 %, 13,4 allers-retours de lecture par lot)."
+    alternatives: []
+    sans_alternative: "la mesure est une lecture seule ; ses échecs sont ceux du script de L517 (usage, dossier illisible)"
+    resultat: "Un document daté qui compare avant et après sur les trois mesures."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Le brief implement contient la grille du code-reviewer sous forme de texte fixe : bug de code (résultat faux, erreur non gérée, entrée crue), dérive d'architecture (responsabilité dans le mauvais module, bloc dupliqué, couche sautée), test manquant ou qui ne peut pas échouer, code mort, erreur avalée, documentation qui ne suit pas, convention écrite du projet non suivie."
+    statut: sourcee
+    source: "titre du lot L523 : « la session d'implémentation reçoit la grille du code-reviewer » ; grille de agents/code-reviewer.md (étape 6 de la méthode, 'Check, and measure where a number exists') ; le brief la désigne déjà sans la donner : templates/orchestrate/implement.md:29"
+    tests: ["R1 — le brief implement porte chaque famille de la grille du code-reviewer", "R1 — la grille du brief reprend les familles de l'étape 6 de agents/code-reviewer.md"]
+  - id: R2
+    cas: [C1]
+    enonce: "Le brief demande d'écrire d'abord, pour chaque cas limite de l'objectif (vide, absent, deux fois, mauvais ordre, mauvais type, refusé, forme réelle des données, autres appelants), un test, de le voir échouer sans le code, puis de coder ; un cas que la fiche ne couvre pas n'est ni codé ni testé et va sous nonVerifie ou choix."
+    statut: sourcee
+    source: "titre du lot L523 : « écrit d'abord les tests des cas limites de son objectif » ; consigne existante templates/orchestrate/implement.md:24 (liste des cas limites avant le code, un test qui échoue sans le code, cas hors fiche non codé) et implement.md:7 (« test first »)"
+    tests: ["R2 — le brief implement ordonne d'écrire d'abord les tests des cas limites et de les voir échouer avant le code", "R2 — le brief garde le cas hors fiche sous nonVerifie ou choix"]
+  - id: R3
+    cas: [C1]
+    enonce: "Avant son dernier commit, la session relit son diff contre la grille (R1) et corrige ; un point qu'elle ne tient pas est écrit sous choix ou nonVerifie du rapport, sans nouveau champ de rapport."
+    statut: hypothese
+    si_faux: "Si la relecture devait précéder chaque commit de sous-partie (et non le dernier), seule la phrase du brief change ; si le programme devait lire la vérification, il faudrait un champ de WORK_SCHEMA : une question à part sur le contrat du rapport."
+    tests: ["R3 — le brief implement demande de relire le diff contre la grille avant le dernier commit et d'écrire les points non tenus sous choix ou nonVerifie", "R3 — WORK_SCHEMA n'a pas de nouveau champ"]
+  - id: R4
+    cas: [C1]
+    enonce: "Le bloc est du texte fixe de implement.md : aucun marqueur {{…}} ni variable de BriefVars ajoutés, le rendu ne laisse aucune accolade, et les briefs fix, fix-minors, spec, spec-back, accept, accept-back et review* ne portent pas la grille."
+    statut: hypothese
+    si_faux: "Si le brief fix devait porter la grille, fix.md changerait avec ses tests de rendu ; un marqueur de plus exigerait une variable dans briefs.ts (BriefVars) et les tests de rendu."
+    tests: ["R4 — implement se rend sans accolade restante avec les variables existantes", "R4 — fix, fix-minors, spec, accept et review-small n'ont pas le bloc de la grille"]
+  - id: R5
+    cas: [C2]
+    enonce: "Le brief precheck demande, en plus du verdict, la lecture : les fichiers concernés (chemin:ligne), le code voisin à imiter et les tests existants ouverts, dans un champ lu du rapport. Le champ est optionnel : PRECHECK_SCHEMA ne l'ajoute pas à required, un rapport sans lu reste valide, et dejaPresent, preuves et resume gardent leur sens."
+    statut: hypothese
+    si_faux: "Si la lecture devait être obligatoire, un précheck sans lu serait refusé comme illisible (PRECHECK_UNREADABLE) : tous les rapports d'avant le lot et du modèle local échoueraient ; le coût est le contrat du rapport du précheck, interne au programme."
+    tests: ["R5 — le brief precheck demande les fichiers concernés, le code voisin à imiter et les tests existants", "R5 — un rapport de précheck sans lu passe checkShape", "R5 — lu n'est pas dans required de PRECHECK_SCHEMA"]
+  - id: R6
+    cas: [C2]
+    enonce: "Quand le verdict est « non », « partiel » ou « oui » sans preuve (traité comme partiel), le programme range le lu rogné de ses espaces dans precheckLu de l'état du lot ; il ne range rien quand lu est absent, vide, fait d'espaces ou n'est pas une chaîne (ce dernier cas ajoute l'avertissement « contrôle préalable : champ lu ignoré (mal typé) ») ; un « oui » prouvé rend le lot sans implémentation et sans precheckLu ; après un « oui » du modèle local, c'est le lu de Sonnet qui est rangé."
+    statut: hypothese
+    si_faux: "Si la lecture devait aussi être gardée pour un « oui » prouvé, elle serait écrite avant le stop ; si le lu mal typé devait invalider tout le rapport, il faudrait l'ajouter à required (R5)."
+    tests: ["R6 — verdict non avec lu : precheckLu porte le texte rogné", "R6 — verdict partiel avec lu : precheckLu est rangé et precheck garde le constat", "R6 — lu absent, vide ou d'espaces : precheckLu absent", "R6 — lu non chaîne : precheckLu absent et avertissement", "R6 — oui prouvé : lot rendu, precheckLu absent", "R6 — oui du modèle local puis non de Sonnet : precheckLu vient de Sonnet"]
+  - id: R7
+    cas: [C2]
+    enonce: "precheckLu est tronqué à 4000 caractères, le texte se terminant par « […tronqué] » ; un texte de 4000 caractères ou moins est rangé tel quel."
+    statut: hypothese
+    si_faux: "Une autre borne (2000 ou 8000) change une constante et le test ; sans borne, un lecteur bavard alourdirait chaque brief d'implémentation et l'état du lot."
+    tests: ["R7 — un lu de 4001 caractères est tronqué avec le marqueur", "R7 — un lu de 4000 caractères est rangé sans marqueur"]
+  - id: R8
+    cas: [C3]
+    enonce: "Pour l'étape implement, quand l'état porte precheckLu, le brief joint un bloc qui donne cette lecture et dit de partir de ces fichiers, du code voisin et des tests cités sans les rechercher, de ne rouvrir un fichier que pour le modifier ou quand la lecture ne suffit pas, et de relire les lignes qu'on édite (la lecture date du début du lot). Sans precheckLu, le brief est identique à celui d'avant le lot ; la passe fix ne reçoit jamais le bloc."
+    statut: sourcee
+    source: "titre du lot L523 : « le précheck transmet à l'implémentation ce qu'il a lu (fichiers concernés, code voisin à imiter, tests existants) » ; jonction existante du constat precheck : src/orchestrate/cycle.ts:643"
+    tests: ["R8 — implement avec precheckLu contient la lecture et la consigne de ne pas relire à froid", "R8 — implement sans precheckLu est identique au brief d'avant", "R8 — le brief fix ne contient pas precheckLu", "R8 — avec precheck partiel et precheckLu, le brief porte le constat puis la lecture"]
+  - id: R9
+    cas: [C2, C3]
+    enonce: "precheckLu est un champ optionnel de l'état du lot, ajouté seul : precheck (le constat « partiel ») et precheckVerdict ne sont ni renommés ni détournés, et un état écrit avant le lot, sans precheckLu, se relit et se rejoue sans changement."
+    statut: sourcee
+    source: "décision de Sylvain à la question de la fiche : « champ optionnel dédié precheckLu: string dans l'état du lot, ajout pur (anciens états lisibles inchangés) ; le champ precheck existant reste le verdict et n'est pas détourné » ; src/orchestrate/state.ts:187-189 ; src/corrections.ts:166-167 lit precheckVerdict"
+    tests: ["R9 — un état sans precheckLu se relit et le brief implement est celui d'avant", "R9 — le précheck n'écrit pas la lecture dans precheck ni dans precheckVerdict", "R9 — cadence corrections lit toujours precheckVerdict d'un journal portant precheckLu"]
+  - id: R10
+    cas: [C4]
+    enonce: "La mesure avant/après est un document de docs/mesures/ qui rejoue scripts/temps-d-un-lot.mjs sur les lots des vagues créées jusqu'à la borne puis après elle (même règle de borne que L222 : la date de création de la vague, pas le début de l'implement), et compare les passes par lot, la part de bug-code (cas limites compris) et de dérive d'architecture, et les allers-retours de lecture, avec pour référence les chiffres de L517 ; le document dit que la borne est invalide quand une vague à cheval est encore reprenable."
+    statut: sourcee
+    source: "titre du lot L523 : « mesure avant/après par scripts/temps-d-un-lot.mjs (passes par lot, cause des passes, allers-retours) » ; règle de borne de docs/specs/autocontrole-avant-revue/fiche.yaml (R9) et docs/mesures/autocontrole-avant-revue-2026-10-15.md:8 ; chiffres de l'étude L517 cités par le titre du lot"
+    tests: ["R10 — le document de mesure nomme scripts/temps-d-un-lot.mjs, les trois mesures et la borne par création de vague", "R10 — le README renvoie au document de mesure avant/après de L523"]
+  - id: R11
+    cas: [C1, C2, C3]
+    enonce: "Le README (section des briefs en aval et du précheck) et le CHANGELOG décrivent la grille dans le brief implement, le champ lu du précheck et precheckLu, dans les mêmes commits que le comportement."
+    statut: sourcee
+    source: "consigne templates/orchestrate/implement.md:12-13 (README et CHANGELOG à jour dans les mêmes commits)"
+    tests: ["R11 — le README décrit la grille du brief implement et la lecture transmise par le précheck", "R11 — le CHANGELOG cite L523"]
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate (brief implement.md)
+    entree: "BriefVars existantes (chemin, lot, titre, objectif, repos, fiche, decisions, commits, reponse…) ; commits porte, pour la première implémentation après un précheck, le constat precheck puis le bloc de lecture precheckLu"
+    sortie: "le brief texte avec la grille, l'ordre cas limites d'abord, la relecture avant le dernier commit (R1 à R3) et, si l'état porte precheckLu, le bloc de lecture (R8) ; consignes existantes conservées"
+    erreurs:
+      - { code: log error, message: "gabarit implement.md : valeur manquante pour {{chemin}}" }
+    regles: [R1, R2, R3, R4, R8, R9]
+  - id: A2
+    appel: commande cadence orchestrate (rapport de la session precheck)
+    entree: "rapport structuré { dejaPresent: oui|partiel|non, preuves: string[], resume: string, lu?: string }"
+    sortie: "état du lot : precheckVerdict, precheck (partiel) inchangés ; precheckLu rangé selon R6 et R7 ; l'implémentation part, sauf « oui » prouvé"
+    erreurs:
+      - { code: log warn, message: "contrôle préalable illisible, implémentation lancée" }
+      - { code: log warn, message: "contrôle préalable : champ lu ignoré (mal typé)" }
+    regles: [R5, R6, R7, R9]
+  - id: A3
+    appel: commande node scripts/temps-d-un-lot.mjs
+    entree: "le dossier .cadence/runs et la borne de création de vague, selon l'usage du script de L517"
+    sortie: "passes par lot, cause des passes et allers-retours de lecture, avant et après la borne"
+    erreurs: []
+    sans_erreur: "lecture seule, sans appelant ; ses échecs (usage, journal illisible) sont ceux du script de L517, que ce lot n'altère pas"
+    regles: [R10]
+
+donnees:
+  - { id: D1, objet: "état du lot (.cadence/runs/<vague>/…, champ precheckLu: string)", existant: true, modification: ajout, decision: "Oui (Sylvain) : champ optionnel dédié precheckLu: string dans l'état du lot, ajout pur ; le champ precheck existant reste le verdict et n'est pas détourné.", note: "optionnel, absent des anciens états, jamais lu par cadence corrections" }
+  - { id: D2, objet: "rapport structuré du précheck (PRECHECK_SCHEMA, champ optionnel lu)", existant: true, modification: ajout, decision: "Couvert par la réponse de Sylvain sur precheckLu (ajout optionnel et pur) ; le nom lu du champ du rapport est une hypothèse écrite en R5.", note: "pas dans required : les rapports sans lu restent valides" }
+  - { id: D3, objet: "docs/mesures/ (document avant/après)", existant: false, modification: aucune, note: "nouveau document, sans donnée de production" }

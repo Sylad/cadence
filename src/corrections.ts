@@ -263,13 +263,15 @@ interface Measure {
   byVisibilityCause: { visible: Record<CauseOrNone, number>; hidden: Record<CauseOrNone, number> };
   byProjectCause: Record<string, Record<CauseOrNone, number>>;
   agreement: { reviewed: number; agree: number };
+  /** Passes lancées sur des tests rouges (sans constat de revue) et, parmi elles, celles terminées sans commit (L510) : la session a rendu sa passe sans changer le code. */
+  testsSansCode: { passes: number; sansCode: number };
 }
 
 const tally = (): Tally => ({ lots: 0, atLeast1: 0, atLeast2: 0, passes: 0 });
 const causes = (): Record<CauseOrNone, number> => ({ ...Object.fromEntries([...CAUSES, 'sans-constat', 'non-classe'].map((c) => [c, 0])) } as Record<CauseOrNone, number>);
 
 export function measure(data: Runs, cache: Map<string, Classification>): Measure {
-  const m: Measure = { total: tally(), byProject: {}, byVisibility: { visible: tally(), hidden: tally() }, byCause: causes(), byVisibilityCause: { visible: causes(), hidden: causes() }, byProjectCause: {}, agreement: { reviewed: 0, agree: 0 } };
+  const m: Measure = { total: tally(), byProject: {}, byVisibility: { visible: tally(), hidden: tally() }, byCause: causes(), byVisibilityCause: { visible: causes(), hidden: causes() }, byProjectCause: {}, agreement: { reviewed: 0, agree: 0 }, testsSansCode: { passes: 0, sansCode: 0 } };
   for (const l of data.lots) {
     const groups = [m.total, (m.byProject[l.project] ??= tally()), l.visible ? m.byVisibility.visible : m.byVisibility.hidden];
     for (const t of groups) {
@@ -281,6 +283,10 @@ export function measure(data: Runs, cache: Map<string, Classification>): Measure
   }
   for (const p of data.passes) {
     const c = cache.get(p.key);
+    if (p.findings.length === 0) {
+      m.testsSansCode.passes++;
+      if (p.commits.length === 0) m.testsSansCode.sansCode++;
+    }
     const cause: CauseOrNone = p.findings.length === 0 ? 'sans-constat' : c ? (c.manual ?? c.cause) : 'non-classe';
     m.byCause[cause]++;
     (p.visible ? m.byVisibilityCause.visible : m.byVisibilityCause.hidden)[cause]++;
@@ -581,6 +587,7 @@ function renderSousCauses(b: BugCode): string[] {
   return out;
 }
 
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const pct = (a: number, b: number) => (b === 0 ? '—' : `${Math.round((100 * a) / b)} %`);
 /** Les causes qu'une meilleure spécification évite (critère de réussite de l'étape spec). */
 const SPEC_CAUSES: Cause[] = ['spec-floue', 'regle-inventee', 'test-manquant'];
@@ -607,4 +614,11 @@ export function renderReport(m: Measure, bugCode?: BugCode | null): string {
   if (m.agreement.reviewed > 0) out.push(`Échantillon relu à la main : ${m.agreement.reviewed} passes, le modèle local est d'accord avec la relecture sur ${m.agreement.agree} (${pct(m.agreement.agree, m.agreement.reviewed)}) ; la cause relue prime dans les tableaux.`, '');
   if (bugCode) out.push(...renderSousCauses(bugCode));
   return out.join('\n');
+}
+
+/** La ligne des passes lancées sur des tests terminées sans changement de code (L510) ; vide sans passe de ce genre. À part de `renderReport` : le relevé de référence du 10-10 reproduit ce rapport mot pour mot. */
+export function renderTestsSansCode(m: Measure): string[] {
+  const t = m.testsSansCode;
+  if (t.passes === 0) return [];
+  return [`${plural(t.passes, 'passe lancée', 'passes lancées')} sur des tests, ${plural(t.sansCode, 'terminée', 'terminées')} sans changement de code (${pct(t.sansCode, t.passes)}) (passes sans commit).`, ''];
 }

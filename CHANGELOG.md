@@ -88,6 +88,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- `cadence corrections` prints the passes launched on red tests that ended without a code change (L510, [docs/corrections.md](docs/corrections.md)): `N passes lancées sur des tests, M terminées sans changement de code (P %)`, and `testsSansCode: { passes, sansCode }` in `--json`. Over `--since`/`--until` windows of 7 days it measures how often the gate sent a session to fix something that needed no fix ([docs/mesures/tests-sans-code-2026-11-01.md](docs/mesures/tests-sans-code-2026-11-01.md)).
+
 - `orchestrate.gate.host` (and `gate.install`): the gate — `cadence verify --gate`, a wave's lot gate, the baseline and the replay alone — is played by ssh on another machine, at the sha pushed to a bare repository there, with a dependency cache keyed by the fingerprint of the lockfiles, a local fallback when the host does not answer, and a connection lost during a command (ssh 255) replayed locally, said in the output and the wave's journal and never counted red (L403, [docs/remote-gate.md](docs/remote-gate.md)). `gate.host` alone is not `gate.readsPlan`.
 
 ### Fixed

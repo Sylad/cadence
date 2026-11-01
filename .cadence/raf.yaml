@@ -1003,10 +1003,11 @@ lots:
       - { date: 2026-11-01, text: "Revue de la fiche — mineur : docs/specs/rejeu-porte-composee/fiche.yaml:146 — A1 n'a aucun message pour un run ou un replay qui n'est pas une chaîne ni pour une clé inconnue dans une partie, alors que le test R2 les prévoit (« refusé »). Ajouter un message, ou dire que le message « run de la partie ne peut pas être vide » les couvre. Le message « dir invalide » ne nomme toujours pas le dir fautif (noté à la 1re revue)." }
   - id: L513
     title: "Agents design, idées des tests du 01-11 (ui-ux-pro-max, design-for-ai, claude-design-styles) : spec-writer — jetons de couleur sémantiques avec leur couleur de texte (on-*), rampe tirée de la couleur de la charte et rapport de contraste 4,5:1 joint à la fiche ; ux-reviewer — grille avant livraison (focus visible, prefers-reduced-motion, cursor, emoji en icône, largeurs 375/768/1024/1440) et contrôle statique des « tics d'IA » (règles de detect.mjs, Apache-2.0, attribution) en constats numérotés ; jamais de catalogue de styles génériques sur une app qui a une charte"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-11-01
+    started: 2026-11-01
   - id: L514
     title: "Rejeu isolé des tests rouges pour une porte node --test (evatosorus) : lire le titre → fichier dans la sortie (location:) et prouver l'exécution d'un test vert sans fichier imprimé, sans changer failedTests pour les autres lanceurs — suite de L512 (décision de Sylvain du 01-11), faux rouge evatosorus L45"
     status: todo

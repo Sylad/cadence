@@ -10,7 +10,8 @@ import { sharedStateDir } from './state.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { failedTests, hasUnnamedFailure, unloadedSuites } from './orchestrate/baseline.js';
 import { configuredCap } from './orchestrate/command.js';
-import { replayRed, TEST_WORKERS_ENV, testWorkersFrom } from './orchestrate/workers.js';
+import { TEST_WORKERS_ENV, testWorkersFrom } from './orchestrate/workers.js';
+import { gateLabel, gateReplayable, redCandidates, replayGate, runGate, type GateTest } from './orchestrate/gate-parts.js';
 import { copyDeps, git, gitFailure, ignoredDeps, isCopiedDep } from './orchestrate/worktree.js';
 import { tryRemote } from './verify-gate-remote.js';
 import { GATE_TIMEOUT_MS, type Ran } from './remote-gate.js';
@@ -148,9 +149,10 @@ function reuseRecorded(f: RecordedGate, steps: { name: string; cmd: string }[], 
 
 async function playGate(ctx: GateCtx): Promise<number> {
   const { repo, sha, config, out } = ctx;
-  const steps = [
-    ...(config.build ? [{ name: 'build', cmd: config.build }] : []),
-    ...(config.test ? [{ name: 'tests', cmd: config.test }] : []),
+  // `cmd` est le libellé (celui du CheckRun d'une vague, pour reprendre son verdict) ; `gate` ce qui est joué : pour des parties (L512), chacune dans son dossier.
+  const steps: Step[] = [
+    ...(config.build ? [{ name: 'build', cmd: config.build, gate: config.build }] : []),
+    ...(config.test ? [{ name: 'tests', cmd: gateLabel(config.test), gate: config.test }] : []),
   ];
   const short = sha.slice(0, 7);
   const base = ctx.env ?? process.env;
@@ -256,10 +258,12 @@ async function playGate(ctx: GateCtx): Promise<number> {
  * Les étapes de la porte jouées par `exec` (une commande locale dans un dossier, ou sur l'hôte) ; le code de sortie (0 vert, 1 rouge) et la ligne de verdict, écrite par l'appelant une fois sûr qu'elle vaut pour le sha.
  * Les lignes passent par `out` ; `exec` qui rend `lost` (connexion perdue, R6) interrompt la porte par `ConnectionLost`.
  */
-async function runSteps(steps: { name: string; cmd: string }[], exec: (cmd: string) => Promise<Ran>, out: (line: string) => void, config: OrchestrateConfig, short: string): Promise<{ code: number; summary: string }> {
+type Step = { name: string; cmd: string; gate: GateTest };
+
+async function runSteps(steps: Step[], exec: (cmd: string) => Promise<Ran>, out: (line: string) => void, config: OrchestrateConfig, short: string): Promise<{ code: number; summary: string }> {
   let red = 0;
   for (const step of steps) {
-    const r = await exec(step.cmd);
+    const r = await runGate(exec, step.gate);
     if (r.code === 0) {
       out(`✓ ${step.name} (${step.cmd})`);
       continue;
@@ -269,14 +273,15 @@ async function runSteps(steps: { name: string; cmd: string }[], exec: (cmd: stri
     const unloaded = tests ? unloadedSuites(r.output) : [];
     // `orchestrate.testReplay` comme la porte d'une vague (L354, L387) : un rouge nommé est rejoué seul avant d'être compté ; vert au rejeu, il est instable sous charge.
     // Un échec que la sortie ne rattache à aucun test, ou un fichier qui ne se charge pas, n'est jamais rejoué.
-    const replayable = tests && config.testReplay && names.length > 0 && unloaded.length === 0 && !hasUnnamedFailure(r.output);
+    // Porte en parties (L512) : l'échec sans nom ou le fichier qui ne se charge pas d'une partie ne bloque que le rejeu de cette partie (`replayGate`), pas celui des autres.
+    const replayable = tests && gateReplayable(step.gate, config.testReplay) && names.length > 0 && (r.parts ? redCandidates(r).length > 0 : unloaded.length === 0 && !hasUnnamedFailure(r.output));
     const replays: number[] = [];
     const { red: still, unstable } = replayable
-      ? await replayRed(async (c) => {
+      ? await replayGate(async (c) => {
           const p = await exec(c);
           replays.push(p.code);
           return p;
-        }, config.testReplay!, names, r.output)
+        }, config.testReplay, names, r)
       : { red: names, unstable: [] as string[] };
     if (replayable && still.length === 0) {
       out(`✓ ${step.name} (${step.cmd}) — ${unstable.length} test(s) rouge(s) sous charge, verts rejoués seuls (instables sous charge) :`);
@@ -285,6 +290,7 @@ async function runSteps(steps: { name: string; cmd: string }[], exec: (cmd: stri
     }
     red++;
     out(`✗ ${step.name} (${step.cmd}) — code ${r.code}`);
+    if (r.parts) out(`  parties rouges : ${r.parts.filter((p) => p.code !== 0).map((p) => `${p.part.dir} (code ${p.code})`).join(', ')}`);
     for (const n of still) out(`  - ${n}`);
     for (const n of unloaded) out(`  - ${n} (ne se charge pas)`);
     // Un rejeu a eu lieu : dire lequel, pour qu'un rejeu en échec pour une autre raison qu'un vrai rouge (commande cassée, aucun test exécuté) ne passe pas pour une confirmation du rouge.

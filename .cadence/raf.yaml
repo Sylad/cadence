@@ -941,6 +941,16 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-01
+  - id: L508
+    title: "Release : la porte et le clone de « cadence release » tournent avec un tag local provisoire v<version> posé (retiré si rouge), pour que les tests qui lisent le dernier tag (test/changelog.test.ts) voient la version publiée — 31-10 : v1.34.0 taguée verte, publication rouge"
+    status: todo
+    estimate: 1
+    created: 2026-11-01
+  - id: L509
+    title: "raf done/review/ux lancent la commande de plan publié déclarée (cadence.yaml plan.publish, ex. « cd frontend && npm run plan ») et disent le fichier à commiter — 01-11 : livraison warhammer L61 rouge sur plan.json périmé après raf done"
+    status: todo
+    estimate: 1
+    created: 2026-11-01
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

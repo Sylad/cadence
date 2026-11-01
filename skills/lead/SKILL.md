@@ -263,7 +263,7 @@ user must find there) and returns measured findings; it reads only, and never lo
 blocking findings back to the human — a page whose main content is missing, or that shows an error,
 is a defect even when the delivery checks are green — with its proposed follow-up lines. A project
 without an expectations file gets a draft back: show it to the human, who corrects it and decides
-whether it is committed. It is not a gate: `raf done` does not wait for it, and a finding becomes a
+whether it is committed. Several `qa-reviewer` passes may run together: each opens its own browser context (its own profile), so two apps are walked without sharing a browser. It is not a gate: `raf done` does not wait for it, and a finding becomes a
 new lot, not a reopened one.
 
 Give the `qa-reviewer` the same line `Report file: <absolute path>` (outside the repository): it answers in 5 lines

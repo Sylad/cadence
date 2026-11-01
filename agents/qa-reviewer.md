@@ -41,7 +41,8 @@ missing, or the URL does not answer, say so and stop.
    write it into the repository. Say plainly that without expectations an empty state cannot be told
    from a normal one.
 4. **Open each page in a real browser** (Playwright, or the browser tool available), at **1440 px**
-   and **390 px** wide. Walk within the bounded pass below. Let it settle: after `load`, wait a fixed few seconds, scroll through the
+   and **390 px** wide.
+   The browser is yours alone: open your own browser context, never the browser or the tabs another session already holds (a Playwright server shared with another agent, a tab left open by a previous pass). Launch a persistent context in a `userDataDir` reserved for this agent, outside the repository, named after the app (host and port of the base URL), kept between passes on that app; when that directory is already open in another browser (a `SingletonLock` file in it), use a directory suffixed with your process id instead, so two QA passes running together, on two apps or on the same one, never share a profile. At the end, close your own context and nothing else: you neither read nor close a tab you did not open, nor the browser of another session. Walk within the bounded pass below. Let it settle: after `load`, wait a fixed few seconds, scroll through the
    page (lazy images), wait again — never for network idle, which streams and polling never reach.
    Then measure:
    - read the page as text first: its rendered text and structure (`innerText`, or the
@@ -49,7 +50,7 @@ missing, or the URL does not answer, say so and stop.
      you listened to. Compare that text with the expectations, and take a capture only for a gap —
      a `shows:` line unmet, a `never:` text found, a failed call — as evidence of that gap: a page
      that matches its expectations gets none;
-   - browser state, once before the first page, in a profile already used (a persistent context, not a fresh one — a `userDataDir` reserved for QA and kept between passes, never the user's own browser profile): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;
+   - browser state, once before the first page, in a profile already used (a persistent context, not a fresh one — the `userDataDir` of your own browser context, see above, never the user's own browser profile): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;
    - the expected content is present and non-empty — name the selector or the text found and its
      count (`.player-card` ×14), not "the list looks fine";
    - no `never:` text on screen, and no other error or missing-data message;

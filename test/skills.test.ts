@@ -255,6 +255,25 @@ describe('skills install', () => {
     expect(qa.description).toContain('Read-only — does not modify code, log in or submit anything.');
   });
 
+  it('agent qa-reviewer : R1 — chaque agent ouvre son propre contexte de navigateur, profil isolé (L511)', () => {
+    const step4 = qaAgent().section('Method').slice(qaAgent().section('Method').indexOf(' 4. **Open each page'), qaAgent().section('Method').indexOf(' 5. **GET only'));
+    // R1 : un profil par agent, jamais le navigateur ni les onglets d'une autre session.
+    expect(step4).toContain('your own browser context, never the browser or the tabs another session already holds');
+    expect(step4).toContain('a `userDataDir` reserved for this agent');
+    // R2 : le nom du profil porte l'application et un identifiant propre à l'agent ; deux QA en parallèle ne se partagent rien.
+    expect(step4).toContain('named after the app (host and port of the base URL), kept between passes on that app; when that directory is already open in another browser (a `SingletonLock` file in it), use a directory suffixed with your process id instead, so two QA passes running together, on two apps or on the same one, never share a profile');
+    // R3 : à la fin, l'agent ferme son contexte seulement, jamais le navigateur ; les onglets des autres ne sont ni lus ni fermés.
+    expect(step4).toContain('At the end, close your own context and nothing else: you neither read nor close a tab you did not open');
+    // R4 : l\'ancienne clause « profil conservé entre passes, partagé » ne subsiste pas.
+    expect(step4).toContain('never the user\'s own browser profile');
+  });
+
+  it('docs : R5 — l\'isolation du navigateur est décrite dans docs/skills.md et le CHANGELOG, le lead ne limite plus à une QA à la fois (L511)', () => {
+    expect(flat(readFileSync(join(import.meta.dirname, '..', 'docs', 'skills.md'), 'utf8'))).toContain('its own browser context (its own profile');
+    expect(flat(readFileSync(join(import.meta.dirname, '..', 'CHANGELOG.md'), 'utf8'))).toContain('(L511');
+    expect(flat(readFileSync(join(SKILLS_DIR, 'lead', 'SKILL.md'), 'utf8'))).toContain('Several `qa-reviewer` passes may run together: each opens its own browser context');
+  });
+
   it('agent qa-reviewer : amendements du second passage réel (L10) — chaque clause est épinglée', () => {
     const method = qaAgent().section('Method');
     const step = (from: string, to: string): string => method.slice(method.indexOf(from), method.indexOf(to));
@@ -264,7 +283,7 @@ describe('skills install', () => {
     const step6 = step(' 6. **Classify', ' 7. **Rank');
     const step7 = method.slice(method.indexOf(' 7. **Rank'));
     // État du navigateur : le bundle chargé contre celui que référence index.html relu sans cache, puis le cache vidé.
-    expect(step4).toContain("browser state, once before the first page, in a profile already used (a persistent context, not a fresh one — a `userDataDir` reserved for QA and kept between passes, never the user's own browser profile): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;");
+    expect(step4).toContain("browser state, once before the first page, in a profile already used (a persistent context, not a fresh one — the `userDataDir` of your own browser context, see above, never the user's own browser profile): compare the bundle the page loaded (its script URL) with the one `index.html` references, re-read without cache — a returning visitor still holds the old one, so a difference is stated in the report — then clear the cache and measure;");
     // « GET only » n'est pas « sans effet » : un CDN met en cache une sonde sur un actif absent.
     expect(step5).toContain('GET only is not "without effect": a probe on an asset name that does not exist is cached by a CDN and then served to real visitors. Request only URLs the app itself uses, or add a cache-busting query parameter.');
     // La minute de calme se passe hors de l'app.

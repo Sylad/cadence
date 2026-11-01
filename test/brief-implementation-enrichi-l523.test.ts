@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readJournals } from '../src/corrections.js';
-import { renderBrief } from '../src/orchestrate/briefs.js';
+import { precheckBrief, renderBrief } from '../src/orchestrate/briefs.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { checkShape, PRECHECK_SCHEMA, WORK_SCHEMA } from '../src/orchestrate/schemas.js';
 import { claudeOut, commitFile, git, harness, precheckReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
@@ -249,6 +249,16 @@ describe('L523 — la lecture dans le brief implement (R8, R9)', () => {
     const brief = h.calls.find((k) => k.kind === 'implement')!.brief;
     expect(brief).not.toContain(LECTURE);
     expect(brief).toContain('A pre-check found part of the deliverable already in the repository (do not redo it): la moitié (a.ts)');
+  });
+
+  it('R8 — implement sans precheckLu est identique au brief d\'avant : precheckBrief rend exactement l\'ancienne jonction', () => {
+    const avant = (commits: string, constat?: string) => (constat ? [commits, constat].filter(Boolean).join('\n') : commits);
+    for (const commits of ['', '- abc1234 feat(L1): a']) {
+      for (const constat of [undefined, '', 'A pre-check found part of the deliverable: la moitié']) {
+        expect(precheckBrief(commits, constat, undefined)).toBe(avant(commits, constat));
+        expect(precheckBrief(commits, constat, '')).toBe(avant(commits, constat));
+      }
+    }
   });
 
   it('R8 — le brief fix ne contient pas precheckLu', async () => {

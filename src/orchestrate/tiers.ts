@@ -1,6 +1,7 @@
 import { lstatSync, readdirSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { git, gitFailure, tryGit } from './worktree.js';
+import { lotKey, lotRepoPaths, type LotState } from './state.js';
 
 /** Voie prévue pour un travail qui doit toucher un dépôt tiers (L456) : une branche à part, jamais la branche principale. */
 export const wipBranch = (project: string, lot: string): string => `wip/${project}-${lot}`;
@@ -118,4 +119,13 @@ export function tierMoved(repo: string, before: TierRead, after: TierRead, lots:
     return { branch, detail: lines.slice(0, SHOWN).join(' | ') + more };
   }
   return null;
+}
+
+/**
+ * Les dépôts tiers de la session qui le sont encore à sa fin (L421) : un lot ajouté (`--add`) pendant la session a pu prendre l'un d'eux, dont la branche principale bouge alors
+ * légitimement, comme celle des autres lots de la vague (R14).
+ */
+export function stillThird(before: Map<string, TierRead>, wave: Pick<LotState, 'project' | 'lot' | 'repo' | 'repos'>[], mine: string): [string, TierRead][] {
+  const ofOthers = new Set(wave.filter((x) => lotKey(x.project, x.lot) !== mine).flatMap(lotRepoPaths));
+  return [...before].filter(([repo]) => !ofOthers.has(repo));
 }

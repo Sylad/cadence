@@ -58,7 +58,9 @@ picture, not its source.
    soon as the folder keeps several unfinished waves). While the wave is still running the same command (or
    `cadence orchestrate --answer <project>:<lot> "…"`) queues the answer and the live wave replays the lot at
    once, whatever the other lots do (L407). The lead never answers in the
-   human's place. `--drop` and `--stop-after-current` steer a wave that is running.
+   human's place. `--drop` and `--stop-after-current` steer a wave that is running, and
+   `cadence orchestrate --add <project>:<lot> [--wave <wave>]` adds a lot to it instead of launching a second
+   wave, which is refused in a repository the first one holds; the refusal names this command (L421).
 4. **Review.** The final table of the wave lists the lots ready, handed back, and the line
    « livrable jusqu'à <sha> » for a ready lot stacked under a handed-back one. Minor findings come back in
    the table: one becomes a lot of its own only if it describes an observable bug.

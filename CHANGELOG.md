@@ -84,6 +84,13 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Changed
 
 - `cadence deliver` no longer waits for the CI of a sha whose commits since the previous delivery only touch the plan (L516, [docs/deliver.md](docs/deliver.md)): 42 % of the app deliveries measured on 2026-11-01 were such shas, each paying the CI wait for nothing. It says `→ CI : non attendue (aucun fichier hors plan depuis <sha>)`, runs the deploy and the checks, and waits as before as soon as one commit touches anything else or the proof is missing (no previous delivery, history rewritten, no plan, empty range). Every step line of the output now starts with its UTC time and `✓ livré` ends with its duration, and each step played appends a JSON line to `deliveries-steps.log` (next to `deliveries.log`, which is unchanged) so that « CI wait against deploy » can be measured without a throwaway script.
+### Added
+
+- `cadence orchestrate --add <project:lot> [--wave <wave>]` adds a lot to a live wave instead of launching a second one (L421, [docs/orchestrate.md](docs/orchestrate.md)): the lot is checked like a launched one, queued in the wave's `adds.log`, and played by the live wave as soon as a session slot is free (after the lots of its repository that are playing). The refusal `une orchestration y est déjà en cours` of a second launch in the same repository now names this command, with the lot and the wave.
+
+### Fixed
+
+- A lot added to a live wave no longer hands back a session running in a sibling repository for « a commit on the main branch of another repository »: the repository of an added lot is the wave's from then on (L421).
 
 ## [1.35.0] - 2026-11-01
 

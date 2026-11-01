@@ -148,6 +148,18 @@ export function waveReadsAnswerQueue(waveDir: string): boolean {
 }
 
 /**
+ * La vague lit-elle la file d'ajouts `adds.log` (L421, `--add`) ? Une vague lancée avant L421 ne la lirait jamais : le lot y dormirait. Sans instantané : on suppose que oui.
+ */
+export function waveReadsAdds(waveDir: string): boolean {
+  if (!snapshotExists(waveDir)) return true;
+  try {
+    return readFileSync(join(toolDirOf(waveDir), 'dist', 'orchestrate', 'state.js'), 'utf8').includes('adds.log');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * L'instantané de la vague connaît-il `--budget projet:lot=+N` (L223) ? Un instantané plus ancien relit l'argument avec son `parseBudget` et le refuse
  * comme budget invalide. Sans instantané : rien à relire, on suppose que oui.
  */

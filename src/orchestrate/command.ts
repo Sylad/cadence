@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { availableParallelism, homedir, tmpdir } from 'node:os';
 import { testWorkersFrom } from './workers.js';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readOrchestrateConfig, readPlanConfig, type OrchestrateConfig } from '../config.js';
 import { PLAN_ACTIONS, commitMsgHook, leadAnswerMessage, commitMsgRefusal, planCommitMessage } from '../plan-commit.js';
 import { isDay, toDay, type Day } from '../dates.js';
@@ -31,6 +31,9 @@ import { canInstallPrePush, gitProcessRunning, indexLockRefusal, installPrePush,
 import { buildArgs, buildLocalArgs, killSessions, MODEL_ALIASES, mcpServersFor, readAgents, realClaude, enabledPlugins, settingsFiles, type AgentDef, type AnyModel, type ClaudeFn, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { groupLots, runPool } from './pool.js';
+import { AddFeed, addNotAlone, addToLive, openInRepo, type KnownLot, type LaunchChecks } from './ajout.js';
+import { repoRefusals, trackedDirty } from './depot.js';
+import { removeWorktree } from './retrait.js';
 import { repoBranch } from './integrate.js';
 import { baseBranchOf, keptLines, keptTrees, lotBranch, lotTreeDir, planFileSet, recoverTree, removeTree } from './worktree.js';
 import { agentOf, schemaFor } from './schemas.js';
@@ -85,58 +88,9 @@ const REPO_WAIT_POLL_MS = 5_000;
 
 export const DEFAULT_BUDGET = 2_000_000;
 
-/**
- * Budget d'un lot ordinaire (L78, L128, recalibré L194). Mesuré sur le TOTAL de chaque lot dans `.cadence/runs` (toutes les vagues
- * où il est passé, 250 lots, 11-10), rangé par estimate : jusqu'à 0,5 j p90 374 k (152 lots), de 0,5 à 1 j p90 732 k (88 lots, max
- * 1,09 M), au-delà d'un jour p90 1,14 M pour les 10 lots de 1,25 à 2 j (570 k par jour d'estimate), max 1,7 M (L188). Le plafond
- * de L78 (400 k par jour) rendait au lead, au deuxième tour, un lot de 1 j (L188 : 483 k puis 495 k).
- * Plancher relevé de 450 k à 540 k (L218) avec la réserve de la passe fix (155 k) : 14 k + 282 k + 80 k + 155 k = 531 k arrondis, la marge avant refus du fix reste 385 k.
- * Relevé à 600 k (L247), mesuré sur 16–22-10 : 145 lots à 540 k, p90 451 k, 3 au-dessus (tous maritime-atlas : 12 lots, p90 556 k, max 609 k) ; la marge
- * avant refus du fix passe à 445 k. Les lots à 750 k (60 lots, p90 571 k, 0 dépassement) et à 1,3 M (20 lots, p90 904 k, 1 dépassement) tiennent : inchangés.
- * Remesuré sur 17–23-10 (L280, `docs/perf/recalage-2026-10-24.md`) : 0 lot sur 309 au-dessus de son budget, p90 452 k à 600 k, 563 k à 750 k, 875 k à 1,3 M : tous inchangés, avec au moins 10 % de marge.
- */
-const LOT_BUDGET_FLOOR = 600_000;
-/** Lot de plus de 0,5 j et d'au plus 1 j : p90 mesuré du total, 732 k arrondis à 750 k. */
-const LOT_BUDGET_ONE_DAY = 750_000;
-/** Tokens par jour d'estimate au-delà d'un jour : p90 1,14 M pour 2 j. */
-const LOT_BUDGET_PER_DAY = 570_000;
-/**
- * Total d'un lot à `screen:` (L194), étapes spec, maquette et accept comprises : p90 1,28 M sur 5 lots (L113 1,12 M, L25 1,28 M, L50 877 k,
- * L85 758 k, L43 238 k), arrondi à 1,3 M. Remplace l'allocation de L191 (+350 k au budget d'estimate), qui ne payait ni l'UX de
- * conformité ni les passes de correction.
- */
-const SCREEN_LOT_BUDGET = 1_300_000;
-/**
- * Allocation d'un lot à fiche `spec: true` (L188/L191), en plus du budget dérivé de l'estimate : sessions spec, fiche et accept hors de
- * l'estimate d'écriture. Relevée de 350 k à 450 k (L218) : la chaîne avant implement du lot spec warhammer L120 a coûté 388 k (350 k : pire cas
- * mesuré des étapes d'un lot à écran, ol L113 : 349 k) ; cadence L217 n'en a pris que 176 k.
- */
-export const SPEC_STAGE_ALLOCATION = 450_000;
+export { lotBudget, lotBudgetBasis, SPEC_STAGE_ALLOCATION, type SpecStage } from './lot-budget.js';
+import { lotBudget, lotBudgetBasis, type SpecStage } from './lot-budget.js';
 
-export type SpecStage = 'screen' | 'spec';
-
-/** Base mesurée d'un budget, pour `--dry-run` : l'estimate (et l'étape spec) d'où il sort. */
-export function lotBudgetBasis(estimate: number, stage?: SpecStage, escalationModel?: string): string {
-  const base = ordinaryBasis(estimate, stage);
-  return escalationModel ? `${base}, plus ${ESCALATION_RESERVE} réservés à l'escalade ${escalationModel}` : base;
-}
-
-function ordinaryBasis(estimate: number, stage?: SpecStage): string {
-  if (stage === 'screen' && lotBudget(estimate, stage) === SCREEN_LOT_BUDGET) return "p90 mesuré du total d'un lot à écran, étapes spec, maquette et accept comprises";
-  const ordinary = lotBudget(estimate);
-  const basis = estimate <= 0.5 ? "plancher d'un lot jusqu'à 0,5 j" : estimate <= 1 ? "p90 mesuré du total d'un lot de 0,5 à 1 j" : Math.round(estimate * LOT_BUDGET_PER_DAY) <= LOT_BUDGET_ONE_DAY ? `plancher de ${LOT_BUDGET_ONE_DAY} au-delà d'un jour, l'estimate × ${LOT_BUDGET_PER_DAY} ne le dépasse pas encore` : `${LOT_BUDGET_PER_DAY} par jour, p90 mesuré du total au-delà d'un jour`;
-  if (!stage) return basis;
-  return `${ordinary} dérivés de l'estimate (${basis}), plus ${SPEC_STAGE_ALLOCATION} pour les étapes spec, ${stage === 'screen' ? 'maquette' : 'fiche'} et accept`;
-}
-
-/** Budget d'un lot, dérivé de son estimate et de sa catégorie : empêche quelques lots d'avaler le budget de la vague au détriment des autres. Un lot à `screen:` vaut le total mesuré d'un lot à écran (L194) ; un lot à `spec: true` y ajoute l'allocation de son étape (L191) ; `escalation` (orchestrate.escalation déclarée) y ajoute la part de l'escalade (L349). */
-export const lotBudget = (estimate: number, stage?: SpecStage, escalation = false): number => lotBaseBudget(estimate, stage) + (escalation ? ESCALATION_RESERVE : 0);
-
-const lotBaseBudget = (estimate: number, stage?: SpecStage): number => {
-  const ordinary = estimate <= 0.5 ? LOT_BUDGET_FLOOR : Math.max(LOT_BUDGET_ONE_DAY, Math.round(estimate * LOT_BUDGET_PER_DAY));
-  if (stage === 'screen') return Math.max(SCREEN_LOT_BUDGET, ordinary + SPEC_STAGE_ALLOCATION);
-  return ordinary + (stage === 'spec' ? SPEC_STAGE_ALLOCATION : 0);
-};
 /** Sessions simultanées, toutes vagues confondues (`--max-sessions`, ou CADENCE_MAX_SESSIONS). */
 export const DEFAULT_MAX_SESSIONS = 2;
 
@@ -173,6 +127,8 @@ export interface Args {
   drop: { project?: string; lot: string }[];
   /** `--stop-after-current` (L79) : la vague vivante finit ses sessions en cours puis s'arrête, reprenable. */
   stopAfterCurrent: boolean;
+  /** `--add projet:lot` (L421) : ajoute un lot à une vague vivante (`--wave` si plusieurs tournent) au lieu d'en lancer une seconde, refusée dans le même dépôt. */
+  add: { project?: string; lot: string; model?: AnyModel }[];
   /** `--integrate projet:lot` (L279, R27), avec `--resume` : rejoue à l'intégration un lot rendu à cette étape (`next: integrate`) ; ni `--resume` seul ni `--drop`, `--answer`, `--budget` ne le font. `--replay projet:lot` (L279, R26/R27, décision du lead du 24-10) en est la forme générale : elle rejoue aussi un lot rendu sur « écriture de plan refusée » (notes d'hypothèses ou de mineurs de la fiche) à l'étape gardée. */
   integrate: { project?: string; lot: string; replay?: boolean }[];
   /** `--remove-worktree projet:lot` (L279, R20) : retire le worktree et la branche conservés d'un lot ; `--abandon-commits` confirme l'abandon de ses commits non intégrés. */
@@ -222,7 +178,7 @@ function lotBudgetArg(text: string): Args['lotBudgets'][number] {
 }
 
 export function parseOrchestrateArgs(argv: string[]): Args {
-  const a: Args = { lots: [], lotBudgets: [], dryRun: false, waits: false, watch: false, continue: false, answers: [], drop: [], stopAfterCurrent: false, integrate: [], abandonCommits: false };
+  const a: Args = { lots: [], lotBudgets: [], dryRun: false, waits: false, watch: false, continue: false, answers: [], drop: [], stopAfterCurrent: false, add: [], integrate: [], abandonCommits: false };
   const optional = (i: number) => (argv[i + 1] !== undefined && !argv[i + 1].startsWith('-') && !LOT_LIKE.test(argv[i + 1]) ? argv[i + 1] : undefined);
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
@@ -257,6 +213,7 @@ export function parseOrchestrateArgs(argv: string[]): Args {
     } else if (t === '--wave') a.wave = value(t);
     else if (t === '--drop') a.drop.push(lotArg(value(t)));
     else if (t === '--stop-after-current') a.stopAfterCurrent = true;
+    else if (t === '--add') a.add.push(lotArg(value(t)));
     else if (t === '--integrate') a.integrate.push(lotArg(value(t)));
     else if (t === '--replay') a.integrate.push({ ...lotArg(value(t)), replay: true });
     else if (t === '--remove-worktree') a.removeWorktree = lotArg(value(t));
@@ -278,7 +235,7 @@ export function parseOrchestrateArgs(argv: string[]): Args {
   return a;
 }
 
-interface Target {
+export interface Target {
   project: string;
   projectDir: string;
   repo: string;
@@ -295,7 +252,7 @@ export function projectEnv(repo: string): { config: OrchestrateConfig; loadPlan:
 
 const isProject = (dir: string) => existsSync(join(dir, PLAN_DEFAULT)) || existsSync(join(dir, PLAN_LEGACY)) || (existsSync(join(dir, 'cadence.yaml')) && /^plan\s*:/m.test(readFileSync(join(dir, 'cadence.yaml'), 'utf8')));
 
-function resolveTargets(args: Args, io: OrchestrateIo, refusals: string[]): Target[] {
+export function resolveTargets(args: Pick<Args, 'lots'>, io: OrchestrateIo, refusals: string[]): Target[] {
   const out: Target[] = [];
   const seen = new Set<string>();
   for (const l of args.lots) {
@@ -325,10 +282,6 @@ function resolveTargets(args: Args, io: OrchestrateIo, refusals: string[]): Targ
   return out;
 }
 
-async function trackedDirty(repo: string): Promise<string[]> {
-  return (await snapshot(repo, { remote: false })).tracked.map((l) => l.slice(3));
-}
-
 /** `--effort` date de claude 2.1.284 (L137). Une version illisible n'est pas refusée. */
 function olderThanEffort(version: string): boolean {
   const m = /(\d+)\.(\d+)\.(\d+)/.exec(version);
@@ -343,7 +296,7 @@ function notLoggedIn(deps: OrchestrateDeps): string | null {
 }
 
 /** Préconditions : tout ce qui peut être refusé l'est ici, avant d'agir, sans verrou ni écriture. */
-async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, opts: { resume?: boolean } = {}): Promise<{ refusals: string[]; lots: LotState[] }> {
+export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Target[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, opts: { resume?: boolean; addTo?: { wave: string; lots: KnownLot[] } } = {}): Promise<{ refusals: string[]; lots: LotState[] }> {
   const refusals: string[] = [];
   if (io.env.CADENCE_ORCHESTRATED) refusals.push(`orchestrate ne se lance pas depuis une session orchestrée (vague ${io.env.CADENCE_ORCHESTRATED})`);
   const info = deps.claudeInfo();
@@ -355,8 +308,15 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
   const lots: LotState[] = [];
   const repoChecked = new Set<string>();
   const byProject = new Map<string, string[]>();
+  // L421 : les lots déjà portés par la vague qui reçoit l'ajout comptent comme « plus tôt dans la vague » pour les dépendances.
+  for (const l of opts.addTo?.lots ?? []) byProject.set(l.project, [...(byProject.get(l.project) ?? []), l.lot]);
   for (const t of targets) {
     const key = lotKey(t.project, t.lot);
+    const already = opts.addTo?.lots.find((l) => l.project === t.project && l.lot === t.lot);
+    if (already) {
+      refusals.push(`${key} : lot déjà ${already.queued ? "en file d'ajout dans" : 'dans'} la vague ${opts.addTo!.wave}`);
+      continue;
+    }
     let env: ReturnType<typeof projectEnv>;
     let plan: Plan;
     try {
@@ -408,14 +368,7 @@ async function preflight(args: Args, targets: Target[], io: OrchestrateIo, deps:
     for (const repo of [t.repo, ...neighbours.repos.map((r) => r.path)]) {
       if (repoChecked.has(repo)) continue;
       repoChecked.add(repo);
-      const dirty = await trackedDirty(repo);
-      if (dirty.length) refusals.push(`${basename(repo)} : arbre sale, ${dirty.length} fichier(s) suivi(s) modifié(s) : ${dirty.join(', ')}`);
-      const locked = indexLockRefusal(repo, io.now(), deps.gitRunning ?? gitProcessRunning);
-      if (locked) refusals.push(`${basename(repo)} : ${locked}`);
-      const hook = canInstallPrePush(repo);
-      if (hook) refusals.push(`${basename(repo)} : ${hook}`);
-      const busy = activeLock(join(sharedStateDir(repo), REPO_LOCK));
-      if (busy && !opts.resume) refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
+      refusals.push(...(await repoRefusals(repo, t, { io, deps, launch }, opts)));
     }
     const node = resolveNode(t.repo, nvmVersionsDir(io.env));
     if (node.kind === 'missing') {
@@ -715,40 +668,6 @@ function waveExists(wave: string, io: OrchestrateIo): number {
   return 2;
 }
 
-/**
- * `--remove-worktree projet:lot` (L279, R20) : seule commande qui retire un worktree conservé. Refus (code 2, rien retiré) pour le worktree d'une vague vivante (même avec `--abandon-commits`), et tant qu'un commit du lot n'est ni
- * intégré à la branche du dépôt ni confirmé abandonné par `--abandon-commits` ; un worktree entièrement intégré se retire sans option. `--wave` désigne la vague
- * quand plusieurs ont laissé un worktree pour ce lot.
- */
-function removeWorktree(args: Args, io: OrchestrateIo): number {
-  const t = args.removeWorktree!;
-  const key = `${t.project ?? basename(io.cwd)}:${t.lot}`;
-  const projectDir = t.project ? resolve(io.cwd, t.project) : io.cwd;
-  const repo = existsSync(projectDir) ? gitRoot(projectDir) : null;
-  const kept = repo ? keptTrees(repo, { includeActive: true }).filter((k) => k.lot === key && (args.wave === undefined || k.wave === args.wave)) : [];
-  if (!repo || kept.length === 0) {
-    io.err(`orchestrate : ${key} : aucun worktree conservé`);
-    return 2;
-  }
-  if (kept.length > 1) {
-    io.err(`orchestrate : ${key} : plusieurs worktrees conservés (vagues ${kept.map((k) => k.wave).join(', ')}) : précisez --wave`);
-    return 2;
-  }
-  const k = kept[0]!;
-  if (k.active) {
-    // une vague vivante joue encore ce lot (ses sessions travaillent dans ce dossier) : refus sans rien retirer, même avec --abandon-commits
-    io.err(`orchestrate : ${key} : la vague ${k.wave} est vivante et joue ce lot : worktree non retirable (arrêter la vague d'abord)`);
-    return 2;
-  }
-  const gone = removeTree({ repo, dir: k.dir ?? '', branch: k.branch, base: k.base }, { abandon: args.abandonCommits });
-  if (!gone.ok) {
-    io.err(gone.dirty ? `orchestrate : ${key} : fichiers suivis modifiés dans le worktree (${gone.dirty.join(', ')}), --abandon-commits pour les abandonner` : gone.untracked ? `orchestrate : ${key} : fichiers non suivis dans le worktree (${gone.untracked.join(', ')}), --abandon-commits pour les abandonner` : `orchestrate : ${key} : ${gone.unintegrated} commit(s) non intégré(s), --abandon-commits pour les abandonner`);
-    return 2;
-  }
-  io.out(`orchestrate : ${key} : worktree retiré (${gone.abandoned} commit(s) abandonné(s))`);
-  return 0;
-}
-
 /** L382 : `claude auth status` peut durer jusqu'à 20 s ; en --continue, preflight() le relancerait pour chaque lot candidat de chaque tour. Une seule lecture par lancement (une vague). */
 function onceAuth(deps: OrchestrateDeps): OrchestrateDeps {
   const read = deps.claudeAuth;
@@ -757,11 +676,43 @@ function onceAuth(deps: OrchestrateDeps): OrchestrateDeps {
   return { ...deps, claudeAuth: () => (cached ??= { value: read() }).value };
 }
 
+/** `--status` (L395) : le tableau des vagues vivantes et de la vague suivie, une fois ou rafraîchi avec `--watch` jusqu'à ce que plus rien ne tourne. */
+async function statusCommand(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch: string): Promise<number> {
+  maxSessions(args, io); // une valeur invalide est refusée ici aussi
+  const view = () => statusView(args, launch, configuredCap(io.env, args.maxSessions), io.now());
+  if (!args.watch) {
+    const { live, table } = view();
+    printStatus(io, live, table); // sans identifiant (pas de tableau) : les vagues vivantes suffisent
+    return 0;
+  }
+  // --watch : le même tableau, rafraîchi ; il s'arrête seul quand plus aucune vague ne tourne (le dernier rendu reste affiché)
+  const sleep = deps.watchSleep ?? ((ms: number) => new Promise<void>((res) => setTimeout(res, ms)));
+  const seconds = args.interval ?? DEFAULT_WATCH_INTERVAL;
+  for (;;) {
+    const { live, table, running } = view();
+    io.out(CLEAR_SCREEN);
+    printStatus(io, live, table);
+    if (!running) return 0;
+    io.out('');
+    io.out(`rafraîchi toutes les ${seconds} s — Ctrl-C pour quitter`);
+    await sleep(seconds * 1000);
+  }
+}
+
+/** Les vagues vivantes, puis (s'il y en a un) le tableau de la vague suivie, séparés d'une ligne vide. */
+function printStatus(io: OrchestrateIo, live: string[], table: string[] | undefined): void {
+  for (const line of live) io.out(line);
+  if (!table) return;
+  if (live.length) io.out('');
+  for (const line of table) io.out(line);
+}
+
 /** Point d'entrée de `cadence orchestrate`. 0 prêts · 1 rendus au lead · 2 refus avant d'agir · 3 suspendue (budget, quota). */
 export async function orchestrate(argv: string[], io: OrchestrateIo, deps: OrchestrateDeps): Promise<number> {
   deps = onceAuth(deps);
   const args = parseOrchestrateArgs(argv);
   const launch = io.cwd;
+  if (args.add.length && addNotAlone(args)) throw new RafError('--add ne se combine avec aucune autre action (seul --wave désigne la vague qui reçoit les lots)');
   const today: Day = io.env.RAF_TODAY && isDay(io.env.RAF_TODAY) ? io.env.RAF_TODAY : toDay(io.now());
 
   if ((args.until !== undefined || args.priority !== undefined) && !args.continue) throw new RafError('--until et --priority s\'utilisent avec --continue');
@@ -796,38 +747,14 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     for (const line of renderWaits(readWaits(launch, args.since))) io.out(line);
     return 0;
   }
-  if (args.status !== undefined) {
-    maxSessions(args, io); // une valeur invalide est refusée ici aussi
-    if (!args.watch) {
-      const { live, table } = statusView(args, launch, configuredCap(io.env, args.maxSessions), io.now());
-      for (const line of live) io.out(line);
-      if (!table) return 0; // sans identifiant : les vagues vivantes suffisent
-      if (live.length) io.out('');
-      for (const line of table) io.out(line);
-      return 0;
-    }
-    // --watch : le même tableau, rafraîchi ; il s'arrête seul quand plus aucune vague ne tourne (le dernier rendu reste affiché)
-    const sleep = deps.watchSleep ?? ((ms: number) => new Promise<void>((res) => setTimeout(res, ms)));
-    for (;;) {
-      const { live, table, running } = statusView(args, launch, configuredCap(io.env, args.maxSessions), io.now());
-      io.out(CLEAR_SCREEN);
-      for (const line of live) io.out(line);
-      if (table) {
-        if (live.length) io.out('');
-        for (const line of table) io.out(line);
-      }
-      if (!running) return 0;
-      io.out('');
-      io.out(`rafraîchi toutes les ${args.interval ?? DEFAULT_WATCH_INTERVAL} s — Ctrl-C pour quitter`);
-      await sleep((args.interval ?? DEFAULT_WATCH_INTERVAL) * 1000);
-    }
-  }
+  if (args.status !== undefined) return statusCommand(args, io, deps, launch);
   if (args.removeWorktree) return removeWorktree(args, io);
   if (args.resume !== undefined) return resume(args, argv, io, deps, launch, today);
+  if (args.add.length) return addOnlyLive(args, io, deps, launch);
   if (args.drop.length || args.stopAfterCurrent) return control(args, io);
   if (args.answers.length) return answerOnly(args, io);
 
-  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
+  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --add projet:lot [--wave vague] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);
@@ -1022,6 +949,7 @@ async function continueRounds(first: number, wave: WaveState, all: LotState[], s
   const cap = maxSessions(args, io);
   let code = first;
   for (;;) {
+    for (const l of all) exclude.add(lotKey(l.project, l.lot)); // L421 : les lots ajoutés à la main pendant la vague ne sont pas tirés une seconde fois
     const questions = all.filter((l) => l.status === 'question').length;
     const remaining = wave.status === 'suspended-budget' ? 0 : wave.budget - wave.consumed;
     const why = stopReason({ now: io.now(), until: args.untilAt, quotaHit: wave.status === 'suspended-quota', questions, streak: handedBackStreak(all), interrupted: wave.status === 'interrupted' && questions === 0, stopRequested: store.control().stopAfterCurrent, remaining });
@@ -1066,6 +994,7 @@ function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: st
     const why = !requested ? null : group.some((c) => c.lot.repos?.length) ? 'des lots du groupe ont des dépôts voisins (repos:)' : !branch ? 'le dépôt est en HEAD détaché' : null;
     if (why) log(`orchestrate : ${basename(repo)} : worktrees demandés mais ${why} : lots joués à la suite`);
     for (const c of group) {
+      if (c.tree) continue; // L421 : un lot ajouté en cours de vague replanifie son groupe ; les arbres déjà posés (et leur état actif) ne sont pas refaits
       const lotBr = lotBranch(wave, c.lot.project, c.lot.lot);
       // Chemin de reprise d'un lot rendu hors intégration : sa branche d'une vague passée devient celle de cette vague (recoverTree), puis se retrouve comme une reprise (R11).
       const dir = lotTreeDir(store.dir, c.lot.project, c.lot.lot, repo);
@@ -1224,6 +1153,14 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     // registre illisible : le décompte des créneaux libres reste celui des dépôts
   }
 
+  const adds = new AddFeed({
+    store, wave, wctx, io, deps, launch, ctxs, all, lots, held, freed, repos, freeRepo, saveWave, checks: LAUNCH_CHECKS,
+    stopCause: () => (wctx.incident ? 'incident' : wctx.quota.hit ? "limite d'usage atteinte" : budget.exhausted ? 'budget de la vague épuisé' : store.control().stopAfterCurrent ? "la vague s'arrête" : null),
+    budgetLeft: () => budget.limit - budget.consumed,
+    announce: () => updateWaveReposSafe(home, repos.filter((x) => !freed.has(x)), lanes()),
+    build: (t, known) => buildAdd(t, known, { wave: wave.id, ctxs, wctx, store, io, deps, launch }),
+  });
+
   // Ctrl-C, SIGTERM : les sessions sont tuées en bloc, les étapes marquées interrompues, les verrous et hooks libérés.
   const forget = onTermination(async () => {
     killSessions();
@@ -1268,7 +1205,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     }, (lots) => lots.every((c) => c.tree), {
       pollMs: deps.slotPollMs ?? ANSWER_POLL_MS,
       // L407 : les réponses déposées par `--answer` pendant la vague sont prises entre deux étapes ; un lot qui n'est plus en question ne rejoue rien.
-      take: (canRun) => {
+      take: async (canRun) => {
         const taken: LotCtx[] = [];
         for (const e of store.answerQueue()) {
           const c = ctxs.find((x) => lotKey(x.lot.project, x.lot.lot) === e.lot);
@@ -1295,9 +1232,11 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
             // registre illisible : le décompte reste celui du dernier écrit
           }
         }
-        return taken;
+        return [...taken, ...(await adds.take(canRun))];
       },
     });
+    // L421 : un ajout encore en file quand plus rien ne joue ne sera plus lu : écarté et dit.
+    adds.drain('la vague a fini de jouer');
     handBackDroppedQuestions(ctxs); // un lot en question retiré pendant la vague : rendu avant de fixer le statut de la vague
   } finally {
     forget();
@@ -1346,6 +1285,38 @@ function answerLive(args: Args, io: OrchestrateIo, store: RunStore): number {
     io.out(`${key} : réponse déposée — la vague ${store.id} la prend entre deux étapes et rejoue le lot dès qu'un créneau est libre`);
   }
   return 0;
+}
+
+const LAUNCH_CHECKS: LaunchChecks = { resolveTargets, preflight: (targets, run, addTo) => preflight({ dryRun: false }, targets, run.io, run.deps, run.launch, { addTo }) };
+
+/** `--add` (L421) : la vague vivante de ce dossier reçoit les lots (le travail est dans `ajout.ts`). */
+async function addOnlyLive(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch: string): Promise<number> {
+  const store = liveStore('--add', args, io);
+  return typeof store === 'number' ? store : addToLive(args, { io, deps, launch }, store, LAUNCH_CHECKS);
+}
+
+/**
+ * Le contexte d'un lot ajouté en cours de vague (L421) : le contrôle préalable d'un lot de lancement (les lots de la vague comptent pour les dépendances), le lien du Node,
+ * puis un worktree seulement si tous les lots encore à jouer de son dépôt y sont aussi ; sinon il attend la fin de ceux qui jouent dans l'arbre du dépôt.
+ */
+async function buildAdd(t: Target, known: KnownLot[], w: { wave: string; ctxs: LotCtx[]; wctx: WaveCtx; store: RunStore; io: OrchestrateIo; deps: OrchestrateDeps; launch: string }): Promise<{ ctx: LotCtx } | { refusals: string[] }> {
+  const pre = await LAUNCH_CHECKS.preflight([t], w, { wave: w.wave, lots: known });
+  const lot = pre.lots[0];
+  if (pre.refusals.length || !lot) return { refusals: pre.refusals };
+  if (lot.node) lot.node.link = (w.deps.linkNode ?? linkNodeBin)(w.store.dir, lot.node.version, lot.node.bin);
+  const ctx = contexts([lot], [projectEnv(lot.repo)], w.wctx)[0]!;
+  const open = openInRepo(w.ctxs, ctx);
+  planTrees(open.every((o) => o.tree) ? [...open, ctx] : [ctx], w.store, w.wave, w.wctx.log);
+  return { ctx };
+}
+
+/** Le registre des vagues vivantes : dépôts tenus et créneaux occupés ; illisible, le décompte reste celui du dernier écrit. */
+function updateWaveReposSafe(home: string, repos: string[], lanes: number | undefined): void {
+  try {
+    updateWaveRepos(home, process.pid, repos, lanes);
+  } catch {
+    // registre illisible : le décompte reste celui du dernier écrit
+  }
 }
 
 /** La vague vivante, pour `--answer` seul (sans --resume) : la même recherche que `--drop`. */

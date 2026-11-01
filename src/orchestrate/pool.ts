@@ -35,11 +35,11 @@ export function groupLots(ctxs: LotCtx[]): LotCtx[][] {
  * (son worktree n'existe pas encore, R3). `answers` (L407) : à chaque tour, et au plus tard après `pollMs`, les lots en question dont le lead a déposé la réponse repartent comme une file de plus (un créneau libre ; sans worktree, jamais en même temps qu'un autre lot du même dépôt). `onSettled` est appelé quand un lot a fini de jouer (L132 : command.ts libère alors les dépôts que plus aucun lot ne tient). Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
  */
 /**
- * La file des réponses du lead à une vague vivante (L407) : `take(canRun)` applique les réponses déposées aux lots en question que `canRun` accepte et rend ces lots,
- * prêts à être rejoués ; `pollMs` est l'attente entre deux lectures quand aucune file ne finit.
+ * La file des demandes du lead à une vague vivante (L407 : réponses, L421 : lots ajoutés) : `take(canRun)` applique les réponses déposées aux lots en question que `canRun` accepte et ajoute les lots demandés,
+ * et rend ces lots, prêts à être joués ; `pollMs` est l'attente entre deux lectures quand aucune file ne finit.
  */
 export interface AnswerFeed {
-  take: (canRun: (c: LotCtx) => boolean) => LotCtx[];
+  take: (canRun: (c: LotCtx) => boolean) => LotCtx[] | Promise<LotCtx[]>;
   pollMs: number;
 }
 
@@ -111,7 +111,7 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
   };
   for (;;) {
     admitted.length = 0;
-    for (const c of answers?.take(canRun) ?? []) {
+    for (const c of (await answers?.take(canRun)) ?? []) {
       live.add(c);
       pending.push([c]);
     }

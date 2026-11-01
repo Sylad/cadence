@@ -401,19 +401,22 @@ export class RunStore {
   }
 
   /**
-   * File des réponses du lead à une vague vivante (L407) : `answers.log`, en ajout seul, une ligne JSON par réponse déposée (`{id, lot, text}`) ou par réponse prise (`{taken: id}`).
-   * La vague la relit entre deux étapes ; une réponse prise ou écartée n'y figure plus. Une ligne illisible est ignorée. Pas de `.json` : `lots()` le prendrait pour un lot.
+   * Lit une file en ajout seul de la vague (`answers.log`, `adds.log`) : une ligne JSON par demande (`{id, …}`) ou par demande prise (`{taken: id}`) ; une demande prise n'y figure plus.
+   * Une ligne vide ou illisible est ignorée, et `parse` écarte une ligne dont la forme n'est pas celle de la file. Pas de `.json` : `lots()` le prendrait pour un lot.
    */
-  answerQueue(): { id: number; lot: string; text: string }[] {
-    const f = join(this.dir, 'answers.log');
+  private queue<T extends { id: number }>(file: string, parse: (o: Record<string, unknown>) => Omit<T, 'id'> | null): T[] {
+    const f = join(this.dir, file);
     if (!existsSync(f)) return [];
-    const entries: { id: number; lot: string; text: string }[] = [];
+    const entries: T[] = [];
     const taken = new Set<number>();
     for (const line of readFileSync(f, 'utf8').split('\n')) {
       try {
-        const o = JSON.parse(line) as { id?: unknown; lot?: unknown; text?: unknown; taken?: unknown };
+        const o = JSON.parse(line) as Record<string, unknown>;
         if (typeof o.taken === 'number') taken.add(o.taken);
-        else if (typeof o.id === 'number' && typeof o.lot === 'string' && typeof o.text === 'string') entries.push({ id: o.id, lot: o.lot, text: o.text });
+        else if (typeof o.id === 'number') {
+          const rest = parse(o);
+          if (rest) entries.push({ id: o.id, ...rest } as T);
+        }
       } catch {
         // ligne vide ou illisible : ignorée
       }
@@ -421,11 +424,24 @@ export class RunStore {
     return entries.filter((e) => !taken.has(e.id));
   }
 
+  /** Numéro suivant d'une file : un de plus que le plus grand déjà écrit. */
+  private nextId(file: string): number {
+    const f = join(this.dir, file);
+    const last = existsSync(f) ? [...readFileSync(f, 'utf8').matchAll(/^\{"id":(\d+),/gm)].map((m) => Number(m[1])) : [];
+    return Math.max(0, ...last) + 1;
+  }
+
+  /**
+   * File des réponses du lead à une vague vivante (L407) : `answers.log`, une ligne JSON par réponse déposée (`{id, lot, text}`).
+   * La vague la relit entre deux étapes.
+   */
+  answerQueue(): { id: number; lot: string; text: string }[] {
+    return this.queue('answers.log', (o) => (typeof o.lot === 'string' && typeof o.text === 'string' ? { lot: o.lot, text: o.text } : null));
+  }
+
   /** Dépose une réponse dans la file ; rend son numéro. */
   requestAnswer(lot: string, text: string): number {
-    const f = join(this.dir, 'answers.log');
-    const last = existsSync(f) ? [...readFileSync(f, 'utf8').matchAll(/^\{"id":(\d+),/gm)].map((m) => Number(m[1])) : [];
-    const id = Math.max(0, ...last) + 1;
+    const id = this.nextId('answers.log');
     appendFileSync(join(this.dir, 'answers.log'), `${JSON.stringify({ id, lot, text })}\n`);
     return id;
   }
@@ -433,6 +449,26 @@ export class RunStore {
   /** La réponse `id` est prise (jouée, écartée ou retirée par son auteur) : elle ne sera plus relue. */
   markAnswerTaken(id: number): void {
     appendFileSync(join(this.dir, 'answers.log'), `${JSON.stringify({ taken: id })}\n`);
+  }
+
+  /**
+   * File des lots à ajouter à une vague vivante (L421, `--add`) : `adds.log`, une ligne JSON par demande (`{id, lot, project?, model?}`), le projet étant écrit comme le lead l'a donné
+   * (nom de dossier depuis le dossier de lancement). La vague la relit entre deux étapes, comme celle des réponses.
+   */
+  addQueue(): { id: number; project?: string; lot: string; model?: string }[] {
+    return this.queue('adds.log', (o) => (typeof o.lot === 'string' ? { lot: o.lot, ...(typeof o.project === 'string' ? { project: o.project } : {}), ...(typeof o.model === 'string' ? { model: o.model } : {}) } : null));
+  }
+
+  /** Dépose un lot à ajouter ; rend son numéro. */
+  requestAdd(t: { project?: string; lot: string; model?: string }): number {
+    const id = this.nextId('adds.log');
+    appendFileSync(join(this.dir, 'adds.log'), `${JSON.stringify({ id, lot: t.lot, ...(t.project ? { project: t.project } : {}), ...(t.model ? { model: t.model } : {}) })}\n`);
+    return id;
+  }
+
+  /** La demande `id` est prise (lot ajouté ou écarté) : elle ne sera plus relue. */
+  markAddTaken(id: number): void {
+    appendFileSync(join(this.dir, 'adds.log'), `${JSON.stringify({ taken: id })}\n`);
   }
 
   journal(line: string): void {

@@ -43,7 +43,7 @@ import { decisionsText, humanDecisions } from './decisions.js';
 import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE, lotKey, lotRepoPaths, neighbourDirs } from './state.js';
 import { advance, baseMoved, INTEGRATE_WAIT_MS, MAX_REPLAYS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
 import { mutexFor } from './mutex.js';
-import { readTier, takeTiers, tierMoved, tierRepos, wipBranch, type TierRead } from './tiers.js';
+import { readTier, stillThird, takeTiers, tierMoved, tierRepos, wipBranch, type TierRead } from './tiers.js';
 import { branchExists, git, gitFailure, integrated, linkIgnored, lotBranch, planFileSet, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */
@@ -1126,7 +1126,7 @@ function checkTiers(c: LotCtx, kind: SessionKind, step: StepState, before: Map<s
   const w = c.wave;
   const key = lotKey(l.project, l.lot);
   const wip = wipBranch(l.project, l.lot);
-  for (const [repo, b] of before) {
+  for (const [repo, b] of stillThird(before, w.store.lots(), key)) {
     const name = basename(repo);
     let a: TierRead;
     try {

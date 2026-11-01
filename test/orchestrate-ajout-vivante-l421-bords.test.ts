@@ -8,7 +8,7 @@ import { AGENTS_DIR } from '../src/skills.js';
 import type { ClaudeFn } from '../src/orchestrate/launch.js';
 import { claudeOut, commitFile, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
 import { tempDir } from './helpers.js';
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Plan } from '../src/plan.js';
 import { execFileSync } from 'node:child_process';
@@ -130,7 +130,6 @@ describe('L421 — bords de --add', () => {
     const id = store.requestAdd({ lot: 'L2' });
     expect(id).toBe(2);
     expect(store.addQueue().map((e) => e.lot)).toEqual(['L1', 'L2']);
-    appendFileSync(join(store.dir, 'adds.log'), '');
   });
 
   it('stillThird : vague vide, aucun dépôt avant, lot seul, dépôt partagé par un autre lot', () => {

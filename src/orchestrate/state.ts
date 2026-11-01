@@ -462,13 +462,21 @@ export class RunStore {
   /** Dépose un lot à ajouter ; rend son numéro. */
   requestAdd(t: { project?: string; lot: string; model?: string }): number {
     const id = this.nextId('adds.log');
-    appendFileSync(join(this.dir, 'adds.log'), `${JSON.stringify({ id, lot: t.lot, ...(t.project ? { project: t.project } : {}), ...(t.model ? { model: t.model } : {}) })}\n`);
+    this.appendAddLine({ id, lot: t.lot, ...(t.project ? { project: t.project } : {}), ...(t.model ? { model: t.model } : {}) });
     return id;
   }
 
   /** La demande `id` est prise (lot ajouté ou écarté) : elle ne sera plus relue. */
   markAddTaken(id: number): void {
-    appendFileSync(join(this.dir, 'adds.log'), `${JSON.stringify({ taken: id })}\n`);
+    this.appendAddLine({ taken: id });
+  }
+
+  /** Ajoute une ligne à `adds.log`, après un saut de ligne si une écriture interrompue a laissé la dernière sans le sien (sinon les deux lignes se collent et sont perdues). */
+  private appendAddLine(o: object): void {
+    const f = join(this.dir, 'adds.log');
+    const before = existsSync(f) ? readFileSync(f, 'utf8') : '';
+    const cut = before !== '' && !before.endsWith('\n');
+    appendFileSync(f, `${cut ? '\n' : ''}${JSON.stringify(o)}\n`);
   }
 
   journal(line: string): void {

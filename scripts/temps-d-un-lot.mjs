@@ -28,9 +28,15 @@ const RE_REDIRECTION = /(^|\s)\d*>>?\s*(?!&|\/dev\/null)\S|\bsed\s+(-\w*i|--in-p
 const sansPrefixe = (cmd) => cmd.replace(RE_PREFIXE, '').trim();
 /** Une commande de lecture seule (grep, cat…) : ses arguments citent des mots (vitest, tsc, rm) sans les exécuter. */
 const estLectureSeule = (cmd) => RE_LECTEUR.test(cmd) && !RE_CHAINE.test(cmd) && !RE_REDIRECTION.test(cmd);
+/** Une commande git de modification seule : ses éventuelles étapes de tests ou de build (git add … ; npx vitest run) la rangent au poste de ces étapes. */
+const estGitSeul = (cmd) => {
+  if (!/^git\b/.test(cmd) || RE_GIT_LECTURE.test(cmd)) return false;
+  const autres = cmd.replace(/"[^"]*"|'[^']*'/g, '""').split(/&&|\|\||[;\n()]/).map((x) => x.trim()).filter((x) => x && !/^git\b/.test(sansPrefixe(x)));
+  return !autres.some((x) => RE_TESTS.test(x) || RE_BUILD.test(x));
+};
 /** Premier motif qui reconnaît la commande : l'ordre est la priorité. */
 const REGLES_BASH = [
-  [{ test: (c) => /^git\b/.test(c) && !RE_GIT_LECTURE.test(c) }, 'git'],
+  [{ test: estGitSeul }, 'git'],
   [{ test: estLectureSeule }, 'lectures'],
   [RE_TESTS, 'tests'],
   [RE_BUILD, 'build'],
@@ -51,7 +57,7 @@ function posteHorsBash(nom, entree) {
 }
 
 /**
- * Poste d'un appel d'outil. Priorité : tests > build > Nouveautés > captures > écriture > git > lectures > attente.
+ * Poste d'un appel d'outil. Priorité : git seul (sans étape de tests ni de build) > lecture seule > tests > build > Nouveautés > captures > attente > écriture > lectures.
  * @param {string} nom nom de l'outil (`Bash`, `Read`, `Edit`, `mcp__playwright__…`)
  * @param {Record<string, unknown>} entree entrée de l'appel
  * @returns {string} un des postes de POSTES_SESSION (hors démarrage et modèle seul)
@@ -72,7 +78,7 @@ export function estSuiteComplete(cmd) {
 const vide = () => Object.fromEntries(POSTES_SESSION.map((p) => [p, { ms: 0, n: 0, sortie: 0, contexte: 0 }]));
 
 /**
- * Ventile une session (transcript JSONL) par poste. Un aller-retour = le temps du modèle qui précède l'appel + le temps de l'outil jusqu'à son résultat.
+ * Ventile une session (transcript JSONL) par poste. Un aller-retour = le temps du modèle qui précède l'appel + le temps de l'outil jusqu'à son résultat (le temps déjà couvert par un appel parallèle n'est pas compté deux fois).
  * Avant le premier appel : démarrage froid. Après le dernier résultat : « modèle seul » (rapport final). Les jetons de sortie et le contexte relu
  * (cache lu + écrit + entrée) d'un message vont au poste de son premier appel d'outil.
  * @param {string} texte contenu du fichier .jsonl
@@ -94,7 +100,8 @@ export function analyserSession(texte) {
     const modeleMs = Math.max(0, a.t - precedent);
     const finOutil = Math.max(a.t, resultats.get(e.id) ?? a.t);
     postes[premier ? 'démarrage' : a.poste].ms += modeleMs;
-    postes[a.poste].ms += finOutil - a.t;
+    const outilMs = Math.max(0, finOutil - Math.max(a.t, precedent));
+    postes[a.poste].ms += outilMs;
     postes[a.poste].n += 1;
     premier = false;
     const msg = payes.has(a.msg) ? undefined : messages.get(a.msg);
@@ -103,7 +110,7 @@ export function analyserSession(texte) {
       postes[a.poste].sortie += msg.sortie;
       postes[a.poste].contexte += msg.contexte;
     }
-    if (a.poste === 'tests') compterRejeu(r, a, modeleMs + finOutil - a.t, messages.get(a.msg));
+    if (a.poste === 'tests') compterRejeu(r, a, modeleMs + outilMs, messages.get(a.msg));
     precedent = Math.max(precedent, finOutil);
   }
   postes['modèle seul'].ms += Math.max(0, fin - precedent);

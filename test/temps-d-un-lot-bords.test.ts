@@ -18,6 +18,15 @@ describe('L517 bords — classer des commandes réelles', () => {
   it('git commit dont le message cite « rm » ou « cp » reste « git »', () => {
     expect(poste('git commit -m "fix: rm le doublon"')).toBe('git');
   });
+  it('git add puis tests sur plusieurs lignes est classé « tests », pas « git »', () => {
+    expect(poste('git add a.ts && git commit -m x\n(cd backend && npx jest --silent); (cd frontend && npx vitest run)')).toBe('tests');
+  });
+  it('git checkout suivi d\'un build est classé « build »', () => {
+    expect(poste('git checkout -- a.ts && npx tsc --noEmit')).toBe('build');
+  });
+  it('git commit dont le message cite vitest reste « git »', () => {
+    expect(poste('git add a.ts && git commit -m "fix: vitest rejoué"')).toBe('git');
+  });
   it('grep qui cherche le mot vitest est une lecture, pas des tests', () => {
     expect(poste('grep -rn vitest package.json')).toBe('lectures');
   });
@@ -67,6 +76,12 @@ describe('L517 bords — session', () => {
     const r = analyserSession([debut(0), appel(5, 'a', 'Read', {}), resultat(8, 'a'), appel(9, 'b', 'Bash', { command: 'npx vitest run' }), resultat(50, 'b')].join('\n'));
     const somme = Object.values(r.postes).reduce((x, p) => x + p.ms, 0);
     expect(somme).toBe(r.dureeMs);
+  });
+  it('deux appels en parallèle : le temps d\'outil commun n\'est compté qu\'une fois', () => {
+    const r = analyserSession([debut(0), appel(10, 'a', 'Bash', { command: 'npx vitest run' }), appel(10, 'b', 'Bash', { command: 'npx tsc --noEmit' }), resultat(70, 'a'), resultat(70, 'b')].join('\n'));
+    const somme = Object.values(r.postes).reduce((x, p) => x + p.ms, 0);
+    expect(somme).toBe(r.dureeMs);
+    expect(r.postes['tests'].ms + r.postes['build'].ms).toBe(60_000);
   });
   it('content en chaîne (message user texte) ou null ne casse pas', () => {
     const l = JSON.stringify({ type: 'assistant', timestamp: t(1), message: { id: 'x', content: null } });

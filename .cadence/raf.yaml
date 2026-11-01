@@ -1086,6 +1086,17 @@ lots:
     status: todo
     estimate: 0.5
     after: [ L517 ]
+    goal: "Voie express pour les retouches (estimate ≤ 0,1 j), d'après l'étude L517 (levier 2 : ≈ 4,9 min et 51 k jetons de moins par lot) : une seule session, fichier et portée nommés dans l'objectif, pas de précheck, de sonde ni de revue de code séparée (le lead lit le diff et regarde la capture), pas de nouveau test pour un changement purement visuel, pas d'entrée Nouveautés par lot (regroupées par le lead à la livraison), porte complète une fois. ET la tâche locale du lead (demande de Sylvain du 01-11) : un lot marqué local (raf add --local) dit à cadence que le lead modifie lui-même ce dépôt ; pendant la tâche, le dépôt est verrouillé comme par une vague (aucune vague n'y démarre, --add y attend ou est refusé, et la tâche est refusée si un lot du dépôt est en cours) ; à la fin, porte une fois, capture, livraison, et le lot est tracé dans le plan comme les autres."
+    created: 2026-11-01
+  - id: L520
+    title: "Créneaux : une vague réserve le plafond entier pour des lots qui attendent une dépendance (01-11 : vague cadence L517 → L518, L519 en worktrees, 1 session réelle, « créneaux libres : 0 sur 3 » pendant ~1 h) ; ne compter que les lots qui peuvent démarrer (dépendances prêtes), ou un créneau par dépôt tant qu'ils attendent"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-01
+  - id: L521
+    title: "Livraison pendant une vague dans un dépôt SANS worktrees : raf done et la note de deliver --sha écrivent le plan dans l'arbre où la vague travaille, et la vague rend le lot suivant « dépôt sale après implement » (01-11, avatar L57 après la livraison de L56) ; raf done pendant une vague de l'arbre partagé diffère son écriture (ou l'écrit hors de l'arbre) jusqu'à la fin de l'étape, et le skill lead dit l'ordre sûr"
+    status: todo
+    estimate: 0.25
     created: 2026-11-01
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

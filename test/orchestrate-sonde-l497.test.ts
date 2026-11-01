@@ -470,7 +470,7 @@ describe('sonde de cas limites (L497)', () => {
     const [implBrief, probeBrief] = [h.calls[0].brief, h.calls[1].brief];
     expect(h.calls[1].kind).toBe('probe');
     for (const brief of [implBrief, probeBrief]) {
-      expect(brief).toContain("The program's gate, played after every writing session, is exactly:");
+      expect(brief).toContain("The program's gate, played once by the program after your writing session, is exactly:");
       expect(brief).toContain('- tests: `true`');
       expect(brief).toContain('- build: `true`');
       expect(brief).toContain('Machine share');

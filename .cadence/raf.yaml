@@ -896,10 +896,11 @@ lots:
     finished: 2026-10-31
   - id: L498
     title: "File de lots pré-approuvés tirée à chaque créneau libre (inventaire des pertes du 31-10 (17→31-10) : 2 569 min de mur sans aucune session, 1,58 créneau occupé sur 3 en moyenne) : le lead approuve une liste ordonnée de lots (projet:lot) une fois, chaque vague vivante ou une vague neuve en tire le suivant dès qu'un créneau se libère, sans attendre le lead ; un lot non mûr (question, after non clos, uses tenu) est sauté et dit ; avec L421 (ajout à une vague vivante)"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-10-31
+    started: 2026-11-01
   - id: L499
     title: "Parité porte ↔ CI (inventaire des pertes du 31-10 (17→31-10) : 37 livraisons rouges, ~12 h estimées, dont des tests joués en CI seulement, ex. e2e warhammer) : cadence lit les commandes de test des workflows CI du dépôt et signale (lead tour, orchestrate --dry-run, verify --gate) celles que orchestrate.test/build ne jouent pas ; avec L482"
     status: todo

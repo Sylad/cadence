@@ -1,0 +1,109 @@
+sujet:
+  id: deliver-ci-plan-seul
+  titre: "deliver n'attend pas la CI d'un sha qui ne change que le plan, et horodate ses étapes"
+  lot: L516
+  perimetre:
+    modules: [src/deliver.ts, src/audit.ts, docs/deliver.md]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le format de deliveries.log et de deliveries-failed.log : inchangés (ils sont lus par perf, le HUD et lastDelivery)"
+      - "les projets à script de livraison (deliver.script) : la CI y est celle du script, cadence ne l'attend pas"
+      - "le déploiement et les vérifications : ils restent joués pour un sha plan seul"
+      - "la liste des fichiers du plan (isPlanOnly, src/audit.ts:94) : réutilisée telle quelle"
+
+cas:
+  - id: C1
+    titre: "Le lead livre un sha dont tous les commits depuis la dernière livraison ne touchent que le plan"
+    acteur: le lead (ou le livreur)
+    declencheur: commande cadence deliver --sha <sha>
+    preconditions:
+      - "ci vaut github ou une commande, pas none, et aucun script de livraison n'est déclaré"
+      - "le sha est poussé, le verrou est libre, la livraison précédente (deliveries.log) est un ancêtre du sha"
+      - "chaque commit de précédente..sha est un commit d'entretien du plan (isPlanOnly)"
+    nominal:
+      - "deliver calcule les commits de précédente..sha et constate qu'ils sont tous plan seul."
+      - "Il écrit « → CI : non attendue » avec la cause (aucun fichier hors plan depuis <sha précédent>) et ne lance ni gh ni la commande de CI."
+      - "Il joue le déploiement et les vérifications comme d'habitude."
+      - "Il journalise la livraison (deliveries.log, format inchangé) et rend 0."
+    alternatives:
+      - { si: "un seul commit de l'intervalle touche un autre fichier que le plan (source, test, doc, cadence.yaml hors clé du plan)", alors: "la CI est attendue comme avant", regles: [R2] }
+      - { si: "aucune livraison précédente, ou elle n'est pas un ancêtre du sha (historique réécrit, sha étranger), ou elle est égale au sha", alors: "la CI est attendue comme avant", regles: [R3] }
+      - { si: "ci vaut none, ou un script de livraison est déclaré", alors: "rien ne change : pas de ligne « non attendue », le script garde sa CI", regles: [R4] }
+      - { si: "lecture de l'intervalle impossible (git échoue)", alors: "la CI est attendue comme avant, sans erreur", regles: [R3] }
+      - { si: "--dry-run", alors: "la simulation annonce la CI non attendue sans rien exécuter", regles: [R5] }
+    resultat: "Un sha plan seul est livré sans attendre les runs GitHub (jusqu'à ciTimeout, 1800 s par défaut)."
+  - id: C2
+    titre: "deliver horodate chaque étape"
+    acteur: le lead (ou le livreur)
+    declencheur: commande cadence deliver [--sha <sha>]
+    preconditions:
+      - "la livraison passe les préconditions et prend le verrou"
+    nominal:
+      - "Chaque ligne d'étape écrite sur la sortie (script, CI, déploiement i/n, vérifications, livré) commence par l'heure UTC HH:MM:SS lue sur deps.now()."
+      - "La ligne finale « ✓ livré » donne la durée totale en secondes."
+      - "Les lignes de log sont écrites au fil de l'eau, pas à la fin."
+    alternatives:
+      - { si: "une étape échoue", alors: "la ligne d'échec porte son heure ; le message d'échec écrit dans deliveries-failed.log reste sans heure", regles: [R7] }
+      - { si: "--dry-run", alors: "aucune heure : rien ne s'exécute", regles: [R5] }
+    resultat: "Le journal de la livraison dit quand chaque étape a commencé, donc laquelle a pris le temps."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Quand ci vaut github ou une commande, que la livraison précédente est un ancêtre du sha et que tous les commits de précédente..sha sont plan seul (isPlanOnly), deliver n'attend pas la CI : ni gh run list, ni la commande de CI ; déploiement et vérifications sont joués."
+    statut: sourcee
+    source: "demande du lot L516 : « deliver n'attend pas la CI d'un sha qui ne change que le plan » ; critère plan seul = src/audit.ts:94 (isPlanOnly), déjà utilisé par src/deliver.ts:616"
+    tests: ["R1 — intervalle de commits plan seul : gh n'est pas interrogé, la CI-commande n'est pas lancée, le déploiement et les vérifications le sont, code 0"]
+  - id: R2
+    cas: [C1]
+    enonce: "Un seul commit de l'intervalle qui n'est pas plan seul suffit pour attendre la CI, comme aujourd'hui (src/deliver.ts:457)."
+    statut: sourcee
+    source: "demande du lot (« qui ne change que le plan ») ; comportement actuel src/deliver.ts:457 et waitCi 505-547"
+    tests: ["R2 — un commit source parmi des commits plan : la CI est attendue", "R2 — un commit de cadence.yaml hors clé du plan : la CI est attendue"]
+  - id: R3
+    cas: [C1]
+    enonce: "Sans livraison précédente, ou si elle n'est pas un ancêtre du sha, ou si elle égale le sha, ou si la lecture de l'intervalle échoue, la CI est attendue : on ne saute la CI que sur une preuve."
+    statut: hypothese
+    si_faux: "Si un premier sha plan seul devait aussi sauter la CI, il faudrait une base de comparaison autre que deliveries.log (par ex. origin/main avant le push) ; le seul effet est une attente de CI de plus, aucune donnée en jeu."
+    tests: ["R3 — pas de deliveries.log : la CI est attendue", "R3 — livraison précédente hors de l'historique du sha : la CI est attendue", "R3 — précédente égale au sha : la CI est attendue"]
+  - id: R4
+    cas: [C1]
+    enonce: "Avec ci: none ou un script de livraison (deliver.script), la sortie et le comportement sont inchangés : aucune ligne « CI non attendue »."
+    statut: sourcee
+    source: "src/deliver.ts:442-458 (le script porte sa CI) et waitCi:507 (none rend null sans ligne)"
+    tests: ["R4 — ci none : sortie identique à l'actuelle", "R4 — script de projet : sortie identique, aucun calcul d'intervalle"]
+  - id: R5
+    cas: [C1, C2]
+    enonce: "Avec --dry-run, la ligne CI devient « CI : non attendue (aucun fichier hors plan depuis <sha précédent>) » quand R1 s'applique, sans heure ; rien n'est exécuté et le code de sortie est celui d'aujourd'hui."
+    statut: hypothese
+    si_faux: "Si la simulation devait garder l'ancienne ligne « CI : github (délai N s) », seul le texte de la simulation change."
+    tests: ["R5 — dry-run sur un sha plan seul : annonce la CI non attendue sans appeler gh", "R5 — dry-run sur un sha avec source : ligne CI inchangée"]
+  - id: R6
+    cas: [C2]
+    enonce: "Chaque ligne d'étape de la sortie de deliver (→ script, → CI, → déploiement i/n, vérifications, ✓ livré) commence par « HH:MM:SS » en UTC lu sur deps.now() ; la ligne ✓ livré se termine par « en N s » (durée depuis la prise du verrou)."
+    statut: hypothese
+    si_faux: "Si la forme voulue est une date complète, un fuseau local ou un fichier, seul le texte change pour la sortie ; un fichier est une question à part (voir les questions du rapport)."
+    tests: ["R6 — now injecté : chaque ligne d'étape porte l'heure UTC attendue", "R6 — ✓ livré donne la durée totale en secondes"]
+  - id: R7
+    cas: [C2]
+    enonce: "L'horodatage ne touche ni deliveries.log (« jour sha »), ni deliveries-failed.log (« jour sha [classe] raison ⏎ lignes »), ni les messages d'échec, ni les codes de sortie 0, 1, 2."
+    statut: sourcee
+    source: "lecteurs src/state.ts:178-180 (appendDelivery), 228-232, lastDelivery state.ts:243-248 (split ' ')[1], src/perf.ts:8, docs/perf.md:85-89, docs/cadence-hud.md:94 (script du HUD qui relit « day sha »)"
+    tests: ["R7 — deliveries.log garde exactement « jour sha »", "R7 — deliveries-failed.log garde exactement sa ligne d'avant, sans heure"]
+
+contrats:
+  - id: A1
+    appel: commande cadence deliver
+    entree: "[--sha <sha>] [--dry-run] [args du script] ; cadence.yaml deliver.ci (github | none | command), ciTimeout, deploy, verify"
+    sortie: "code 0 livré (et vérifié), 1 une étape a échoué après le verrou, 2 refusé avant d'agir ; sortie lisible : étapes horodatées (R6), « → CI : non attendue » pour un sha plan seul (R1)"
+    erreurs:
+      - { code: log error, message: "deliver : <sha7> non poussé : la CI n'a rien construit (git push)", note: "inchangé (src/deliver.ts:359), code 2" }
+      - { code: log error, message: "deliver : CI non terminée après <N> s", note: "inchangé, code 1 : seulement quand R2 ou R3 imposent d'attendre" }
+      - { code: log error, message: "deliver : CI en échec : <run> (<conclusion>)", note: "inchangé, code 1" }
+    regles: [R1, R2, R3, R4, R5, R6, R7]
+
+donnees:
+  - { id: D1, objet: "<git common dir>/cadence/deliveries.log (« jour sha » par livraison verte)", existant: true, modification: aucune, note: "relu pour trouver la livraison précédente (lastDelivery) ; format et écriture inchangés (R7)" }
+  - { id: D2, objet: "<git common dir>/cadence/deliveries-failed.log", existant: true, modification: aucune, note: "format inchangé (R7)" }
+  - { id: D3, objet: "historique git de précédente..sha (git log, fichiers changés par commit)", existant: true, modification: aucune, note: "lu seulement, via isPlanOnly (src/audit.ts:94)" }

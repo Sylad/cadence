@@ -156,7 +156,9 @@ describe('R6/R7 — grille avant livraison', () => {
 describe('R8/R9/R10 — tics d’IA', () => {
   const regles = grille.split('\n').filter((l) => /^- `tic-/.test(l));
   it('R8 — ux-reviewer.md liste les règles de tics reprises, une par ligne', () => {
-    expect(regles.length).toBeGreaterThanOrEqual(6);
+    expect(regles.map((l) => l.match(/^- `(tic-[a-z-]+)`/)![1]).sort()).toEqual(
+      ['tic-dark-glow', 'tic-gradient-text', 'tic-marketing-buzzword', 'tic-nested-cards', 'tic-overused-font', 'tic-purple-triplet', 'tic-unmodified-shadcn-tokens'],
+    );
     expect(new Set(regles.map((l) => l.match(/^- `(tic-[a-z-]+)`/)![1])).size).toBe(regles.length);
     expect(plat(grille)).toMatch(/static check: apply these rules while reading the diff/);
   });
@@ -207,6 +209,21 @@ describe('R11/R12 — pas de catalogue de styles, attribution', () => {
     expect(notice).toContain('Apache-2.0');
     expect(notice).toMatch(/reworded|reformulées/);
     expect(JSON.parse(read('package.json')).files).toContain('NOTICE');
+  });
+  it('R12 — les sept règles viennent des 16 règles réelles de detect.mjs : compte, rejetées et exceptions de charte dites', () => {
+    const t = plat(grille);
+    expect(t).toMatch(/16 rules[^]*seven of the 16 are kept, the nine others are not/);
+    for (const s of ['icon-tile-stack', 'hero-eyebrow-chip', 'repeated-section-kickers', 'uniform-low-opacity-shadow', 'monotonous-spacing', 'em-dash-overuse', 'numbered-section-markers', 'aphoristic-cadence', 'theater-slop-phrase']) expect(t, s).toContain(s);
+    expect(t).toMatch(/tic-overused-font`[^\n]*flag only when it is not the charter's choice/);
+    expect(t).toMatch(/tic-purple-triplet`[^\n]*flag only when it is not the charter's choice/);
+  });
+  it('R12 — NOTICE donne le fichier, le dépôt, le sha lu et la licence exacte', () => {
+    const notice = read('NOTICE');
+    expect(notice).toContain('scripts/detect.mjs');
+    expect(notice).toContain('https://github.com/ryanthedev/design-for-ai');
+    expect(notice).toMatch(/37d7ae63d1afa45eb57ec90bc246cef6dd60c033/);
+    expect(notice).toMatch(/header of scripts\/detect\.mjs/);
+    expect(notice).toMatch(/seven are kept[^]*nine are not/);
   });
   it('R12 — LICENSE du paquet reste MIT', () => {
     expect(read('LICENSE')).toMatch(/^MIT License/);

@@ -4,14 +4,22 @@ The "Delivery grid" section of agents/ux-reviewer.md lists AI-tic rules that are
 reworded (not copied) from the rules of the work `detect.mjs`, licensed under
 the Apache License, Version 2.0 (Apache-2.0): https://www.apache.org/licenses/LICENSE-2.0
 
-Work:        detect.mjs (static detection of AI-generated interface tics),
-             the anti-pattern detector of the Impeccable project
-Licence:     Apache-2.0 (licence field of the package metadata of Impeccable)
-Author:      Paul Bakaus
-Repository:  https://github.com/pbakaus/impeccable
+Work:        scripts/detect.mjs (static detection of AI-generated interface tics)
+Repository:  https://github.com/ryanthedev/design-for-ai
+Commit read: 37d7ae63d1afa45eb57ec90bc246cef6dd60c033 (shallow clone, read only, 2026-11-01)
+Licence:     Apache-2.0, as declared in the header of scripts/detect.mjs. The
+             repository carries no LICENSE file; its .claude-plugin/plugin.json
+             declares "license": "MIT" for the plugin as a whole. The header of
+             detect.mjs states that parts of the detector are ported from
+             Impeccable (https://github.com/pbakaus/impeccable, Copyright
+             Impeccable contributors, Apache-2.0) with modifications.
+Original authors: the design-for-ai authors (ryanthedev); Impeccable contributors
+             for the ported parts.
 
-The rules of the agent are written from the kinds of tic that detector reports,
-in our own words; the script is neither bundled nor run, and no text of the
-original is copied.
+Of the 16 rules of detect.mjs, seven are kept and reworded (nested-cards,
+gradient-text, purple-triplet, unmodified-shadcn-tokens, dark-glow,
+overused-font, marketing-buzzword) and nine are not. The rules of the agent are
+written in our own words with their own thresholds and charter exceptions; the
+script is neither bundled nor run, and no text of the original is copied.
 
 The package itself stays under the MIT licence (see LICENSE).

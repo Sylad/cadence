@@ -1069,6 +1069,23 @@ lots:
       - { date: 2026-11-01, text: "Hypothèses (fiche deliver-ci-plan-seul) — R11 : Une erreur d'écriture de deliveries-steps.log n'interrompt pas la livraison ni ne change son code de sortie : elle donne un avertissement sur la sortie, et del… ; si faux : Si le journal des étapes devait être bloquant, une livraison déjà déployée serait rendue rouge pour une mesure ; on retirerait le try/catch, sans donnée en jeu" }
     review: { date: 2026-11-01, verdict: "conforme (1 note mineure : imports orphelins dans les tests après l'extraction du banc) — orchestré (vague 2026-11-01-1815-cad, 1 passe(s) de correction + passe des mineurs)", commit: b51bd9c83d26f83fea35c6fb7a01dbbc64d2125f, reporte: { de: b02bd4c136f679489ddaa1509425dad13d72ea78, vers: b51bd9c83d26f83fea35c6fb7a01dbbc64d2125f, patchId: e39192f8d66cceafb8a7d1bec1b0c8100d1fdc82 } }
     finished: 2026-11-01
+  - id: L517
+    title: "Étude — où part le temps d'un lot : sur les vagues des 15 derniers jours (états .cadence/runs/*, transcripts des sessions, deliveries.log), ventiler le mur et les tokens de chaque lot par poste — démarrage de session froide, lectures (allers-retours avec le modèle), écriture, tests et builds (nombre de rejeux par lot : dans la session, puis porte de la vague), Nouveautés et captures, revues, passes de correction et leur cause (cadence corrections --classify), attente de créneau, intégration, livraison ; croiser avec l'estimate du lot ; livrer docs/mesures/temps-d-un-lot.md (méthode rejouable par un script, chiffres, trois leviers chiffrés en minutes et tokens économisés). Mesure du 01-11 qui la motive : un séparateur d'UI (ol L239) = 245 s d'implémentation dont ~120 s de tests rejoués 5 fois, ~45 s de Nouveautés, 5 allers-retours de lecture ; 30 % des lots à ≥ 2 passes ; décision de Sylvain du 01-11"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-01
+  - id: L518
+    title: "Une seule porte complète par lot : la session d'implémentation ou de correction ne joue que les tests du code qu'elle touche (ciblés, une fois avant de commiter) ; la porte complète (orchestrate.test/build) n'est jouée qu'une fois par la vague, et son verdict est repris ensuite (verify --gate) ; le brief le dit et la vague le mesure (nombre de rejeux de la suite par lot, dans le tableau). Mesure du 01-11 : 5 rejeux de suite pour un lot d'une ligne (ol L239) ; à caler sur les chiffres de l'étude L517 ; décision de Sylvain du 01-11"
+    status: todo
+    estimate: 0.5
+    after: [ L517 ]
+    created: 2026-11-01
+  - id: L519
+    title: "Voie express pour les retouches (estimate ≤ 0,1 j) : une seule session (pas de précheck, pas de sonde, pas de revue de code séparée : le lead lit le diff), le fichier et la portée nommés dans l'objectif, pas de nouveau test pour un changement purement visuel (la suite existante tourne), pas d'entrée Nouveautés par lot (regroupées par le lead à la livraison), porte complète une fois ; cible < 90 s de session pour un lot comme ol L239 (245 s mesurées le 01-11) ; à caler sur l'étude L517 ; décision de Sylvain du 01-11"
+    status: todo
+    estimate: 0.5
+    after: [ L517 ]
+    created: 2026-11-01
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

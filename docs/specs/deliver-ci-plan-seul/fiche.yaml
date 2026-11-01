@@ -32,6 +32,7 @@ cas:
       - { si: "aucune livraison précédente, ou elle n'est pas un ancêtre du sha (historique réécrit, sha étranger), ou elle est égale au sha", alors: "la CI est attendue comme avant", regles: [R3] }
       - { si: "ci vaut none, ou un script de livraison est déclaré", alors: "rien ne change : pas de ligne « non attendue », le script garde sa CI", regles: [R4] }
       - { si: "lecture de l'intervalle impossible (git échoue)", alors: "la CI est attendue comme avant, sans erreur", regles: [R3] }
+      - { si: "aucun plan n'est chargé (DeliverCtx.plan null, projet sans plan lisible), ou l'intervalle ne contient aucun commit", alors: "la CI est attendue comme avant, sans plantage", regles: [R3] }
       - { si: "--dry-run", alors: "la simulation annonce la CI non attendue sans rien exécuter", regles: [R5] }
     resultat: "Un sha plan seul est livré sans attendre les runs GitHub (jusqu'à ciTimeout, 1800 s par défaut)."
   - id: C2
@@ -68,10 +69,10 @@ regles:
     tests: ["R2 — un commit source parmi des commits plan : la CI est attendue", "R2 — un commit de cadence.yaml hors clé du plan : la CI est attendue"]
   - id: R3
     cas: [C1]
-    enonce: "Sans livraison précédente, ou si elle n'est pas un ancêtre du sha, ou si elle égale le sha, ou si la lecture de l'intervalle échoue, la CI est attendue : on ne saute la CI que sur une preuve."
+    enonce: "Sans livraison précédente, ou si elle n'est pas un ancêtre du sha, ou si elle égale le sha, ou si la lecture de l'intervalle échoue, ou s'il n'y a aucun plan chargé (DeliverCtx.plan null, src/deliver.ts:80, isPlanOnly exigeant un Plan, src/audit.ts:94), ou si l'intervalle lu est vide, la CI est attendue (sauter exige au moins un commit, et tous plan seul) : on ne saute la CI que sur une preuve."
     statut: hypothese
     si_faux: "Si un premier sha plan seul devait aussi sauter la CI, il faudrait une base de comparaison autre que deliveries.log (par ex. origin/main avant le push) ; le seul effet est une attente de CI de plus, aucune donnée en jeu."
-    tests: ["R3 — pas de deliveries.log : la CI est attendue", "R3 — livraison précédente hors de l'historique du sha : la CI est attendue", "R3 — précédente égale au sha : la CI est attendue"]
+    tests: ["R3 — plan absent (null) : la CI est attendue, sans exception", "R3 — intervalle vide (lecture sans erreur qui rend []) : la CI est attendue", "R3 — pas de deliveries.log : la CI est attendue", "R3 — livraison précédente hors de l'historique du sha : la CI est attendue", "R3 — précédente égale au sha : la CI est attendue"]
   - id: R4
     cas: [C1]
     enonce: "Avec ci: none ou un script de livraison (deliver.script), la sortie et le comportement sont inchangés : aucune ligne « CI non attendue »."

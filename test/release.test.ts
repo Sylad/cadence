@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
@@ -294,10 +294,10 @@ describe('cadence release — rien n’est publié', () => {
     const order = [
       'git add package.json package-lock.json .claude-plugin/plugin.json .claude-plugin/marketplace.json CHANGELOG.md docs/whats-new.md',
       'git commit',
+      'git tag v1.2.4',
       'cadence verify --gate --sha HEAD',
       'git clone',
       'npm run eval:plugin -- --trust-plugin',
-      'git tag v1.2.4',
       'git push origin main v1.2.4',
       'gh run watch',
       `npm view ${NAME} version`,
@@ -483,8 +483,8 @@ describe('cadence release — mises en forme et dépôts atypiques', () => {
     git(dir, 'commit', '-qam', 'chore: private');
     const r = release(dir, 'patch');
     expect(r.out).toContain('git tag v1.2.4');
-    expect(r.out.indexOf('cadence verify --gate --sha HEAD'), 'la porte reste avant le tag sans étape d’éval').toBeGreaterThan(r.out.indexOf('git commit'));
-    expect(r.out.indexOf('cadence verify --gate --sha HEAD')).toBeLessThan(r.out.indexOf('git tag v1.2.4'));
+    expect(r.out.indexOf('git tag v1.2.4'), 'le tag provisoire suit le commit').toBeGreaterThan(r.out.indexOf('git commit'));
+    expect(r.out.indexOf('cadence verify --gate --sha HEAD'), 'la porte suit le tag provisoire sans étape d’éval').toBeGreaterThan(r.out.indexOf('git tag v1.2.4'));
     expect(r.out).not.toMatch(/eval:plugin/);
     expect(r.out).not.toMatch(/npm view/);
   });
@@ -577,8 +577,8 @@ describe('cadence release — passage en clone neuf (L446)', () => {
     expect(at('npm run typecheck'), line).toBeGreaterThan(at('npm ci'));
     expect(at('npm test'), line).toBeGreaterThan(at('npm run typecheck'));
     expect(at('rm -rf'), line).toBeGreaterThan(at('npm test'));
-    expect(r.out.indexOf('git clone'), 'après la porte, avant le tag').toBeGreaterThan(r.out.indexOf('cadence verify --gate --sha HEAD'));
-    expect(r.out.indexOf('git clone')).toBeLessThan(r.out.indexOf('git tag v1.2.4'));
+    expect(r.out.indexOf('git clone'), 'après la porte').toBeGreaterThan(r.out.indexOf('cadence verify --gate --sha HEAD'));
+    expect(r.out.indexOf('git clone'), 'après le tag provisoire, que le clone reçoit').toBeGreaterThan(r.out.indexOf('git tag v1.2.4'));
   });
 
   it('L446 — le clone ne rejoue que les scripts que le paquet déclare : sans script typecheck, pas de typecheck ; sans test ni typecheck, pas de clone', () => {
@@ -599,5 +599,55 @@ describe('cadence release — passage en clone neuf (L446)', () => {
   it('L446 — tests.yml tourne sur chaque push de main (un clone neuf par run), en plus des branches diag/**', () => {
     const wf = readFileSync(join(process.cwd(), '.github/workflows/tests.yml'), 'utf8');
     expect(wf).toMatch(/push:\s*\n\s*branches:\s*\[[^\]]*\bmain\b[^\]]*'diag\/\*\*'[^\]]*\]/);
+  });
+});
+
+describe('cadence release — tag local provisoire (L508)', () => {
+  const lines = (out: string) => out.split('\n');
+  const find = (out: string, s: string) => lines(out).find((l) => l.includes(s)) ?? '';
+  const untag = '{ git tag -d v1.2.4; false; }';
+
+  it('R1 — le tag v<version> est posé en local juste après le commit de version, avant la porte, le clone et l’éval : ils voient la version publiée', () => {
+    const r = release(project({ whatsNew: WHATS_NEW_DONE }), 'patch');
+    const at = (s: string) => r.out.indexOf(s);
+    expect(find(r.out, 'git tag v1.2.4')).toMatch(/^\s*\d+\. git tag v1\.2\.4 /);
+    expect(at('git tag v1.2.4')).toBeGreaterThan(at('git commit'));
+    for (const later of ['cadence verify --gate', 'git clone', 'eval:plugin']) expect(at(later), later).toBeGreaterThan(at('git tag v1.2.4'));
+  });
+
+  it('R2 — la porte, le clone et l’éval retirent le tag provisoire quand ils sont rouges', () => {
+    const r = release(project({ whatsNew: WHATS_NEW_DONE }), 'patch');
+    expect(find(r.out, 'cadence verify --gate --sha HEAD')).toContain(`|| ${untag}`);
+    expect(find(r.out, 'git clone')).toContain(`test $r -eq 0 || ${untag}`);
+    expect(find(r.out, 'npm run eval:plugin')).toContain(`|| ${untag}`);
+  });
+
+  it('R3 — le tag n’est posé qu’une fois : pas de second `git tag` après les étapes, le push envoie le tag provisoire', () => {
+    const r = release(project({ whatsNew: WHATS_NEW_DONE }), 'patch');
+    expect(lines(r.out).filter((l) => /^\s*\d+\. git tag v1\.2\.4\b/.test(l))).toHaveLength(1);
+    expect(r.out.split('git tag v1.2.4').length - 1, 'les autres mentions sont des `git tag -d`').toBe(1);
+    expect(find(r.out, 'git push origin')).toContain('main v1.2.4');
+  });
+
+  it('R4 — sans script typecheck/test ni éval, seule la porte porte le retrait ; l’étape d’éval absente ne laisse pas de retrait orphelin', () => {
+    const dir = project({ whatsNew: WHATS_NEW_DONE });
+    const pkg = JSON.parse(read(dir, 'package.json'));
+    pkg.scripts = {};
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
+    git(dir, 'commit', '-qam', 'chore: sans scripts');
+    const out = release(dir, 'patch').out;
+    expect(lines(out).filter((l) => l.includes('git tag -d'))).toHaveLength(1);
+  });
+
+  it('R5 — le retrait s’exécute vraiment : rouge, le tag disparaît et le code reste non nul ; vert, il reste', () => {
+    const dir = project();
+    const printed = /\|\| (\{ git tag -d v1\.2\.4; false; \})/.exec(find(release(project(), 'patch').out, 'cadence verify --gate'))?.[1] ?? '';
+    expect(printed).not.toBe('');
+    const play = (status: string) => spawnSync('sh', ['-c', `git tag v1.2.4 && ${status} || ${printed}`], { cwd: dir, encoding: 'utf8' });
+    const red = play('false');
+    expect(red.status).not.toBe(0);
+    expect(git(dir, 'tag', '--list')).toBe('');
+    expect(play('true').status).toBe(0);
+    expect(git(dir, 'tag', '--list').trim()).toBe('v1.2.4');
   });
 });

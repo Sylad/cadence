@@ -4,6 +4,7 @@
 
 A version exists in three places and is published in two; a release does all of it, in this order.
 `cadence release patch|minor|major [--dry-run]` (L341) prepares step 1 and prints steps 2 to 6 in order; it publishes nothing.
+Between the version commit and the gate it also prints a **provisional local tag** `v<version>` (L508), see step 2.
 
 1. Bump `version` in `package.json` (then `npm install` to refresh `package-lock.json`),
    `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, and write the version's section of
@@ -16,10 +17,14 @@ A version exists in three places and is published in two; a release does all of 
    in that commit, not before the review. A commit that touches any other file
    — or another field of a manifest, or a dependency in `package-lock.json` — is work like any other and has
    to be reviewed.
-2. Replay the project's gate on that commit: `cadence verify --gate --sha HEAD` (L380). The version commit empties
+2. Put the provisional local tag on that commit, then replay the project's gate on it (L508). Some tests read the latest tag
+   (`test/changelog.test.ts` checks that a lot cited under the latest tagged version has a commit in that tag); run before the tag
+   exists, they still see the previous version, which is how 1.34.0 was tagged green and failed its publication. The tag is made first, local only, and the gate,
+   the fresh-clone replay and the evaluation below each remove it (`git tag -d`, the step stays red) when they fail; nothing is pushed
+   until step 4. The gate: `cadence verify --gate --sha HEAD` (L380). The version commit empties
    `## [Unreleased]` of `CHANGELOG.md`, and a test that read only that section would pass before it and fail after — the red
    publish run of 1.14.0 (L368) and the stopped 1.15.2 (L380) — so the suite is run on the commit that will be tagged, before the
-   billed evaluation and before the tag. Red: fix it in a commit of its own and redo the version commit. A test that looks
+   billed evaluation and before the push. Red: fix it in a commit of its own and redo the version commit. A test that looks
    for the entry of a lot in the CHANGELOG reads the section that carries it (`[Unreleased]` or the published version) through
    `changelogSectionOf` (`test/changelog-section.ts`); `test/changelog-garde.test.ts` refuses a test that selects `## [Unreleased]`
    of the repository's CHANGELOG itself. The gate runs in the lead's tree or in a copy of it, both full of files git does not track
@@ -27,11 +32,11 @@ A version exists in three places and is published in two; a release does all of 
    `hud-*` tests that read those types, present in every local tree and absent from the CI checkout (L446). So the same commit is
    also replayed **in a fresh `git clone`** — the next step the command prints: `git clone --no-hardlinks` of the repository
    (only what is committed), `npm ci`, then `npm run typecheck` and `npm test` (those the package declares; a package with neither gets no
-   such step), the clone removed whatever the result. Red: no evaluation and no tag. `.github/workflows/tests.yml` does the same on every
+   such step), the clone removed whatever the result. Red: no evaluation, tag removed. `.github/workflows/tests.yml` does the same on every
    push to `main`, from a fresh checkout.
 3. Run the plugin evaluation, `npm run eval:plugin` (billed, see [Evaluating the plugin](#evaluating-the-plugin-before-a-release)),
    on that version commit; a case below the threshold stops the release until you have read it in the report.
-4. `git tag v<version> && git push origin main v<version>` — the tag starts `.github/workflows/publish.yml`,
+4. `git push origin main v<version>` (the tag already exists, step 2; `git tag v<version>` is not run twice) — the tag starts `.github/workflows/publish.yml`,
    which publishes to npm through Trusted Publishing (OIDC, no token stored anywhere): it checks the tag
    matches `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` and that `CHANGELOG.md` has a `## [x.y.z]` section for it (no section, no publication), then `npm publish --provenance`, where `prepublishOnly` runs the type-check, the quality ratchet (`npm run qualite`, [qualite.md](qualite.md): exit 1 when a measure got worse, 2 when a tool crashed or the baseline is missing) and the
    tests and `prepare` builds `dist/`; a red suite or a measure that got worse stops the publication (fix the code, then `npm run qualite:cliquet` locks the gain); then it creates the GitHub release with that CHANGELOG section as its text. The trusted publisher is declared
@@ -85,8 +90,9 @@ introduction (the newest version first, as the file is read). Exit code 1 when a
 version files are written, the commit is not ready. `--dry-run` reads the forms the same way (nothing is written) and exits 1 on the same findings, so the forms can be checked before the real run.
 
 It prints the lead's steps, in order, and runs none: the `git add` of exactly the files of the version commit and the commit,
-`cadence verify --gate --sha HEAD` (always printed, before the evaluation and the tag), the replay in a fresh clone (L446: `git clone --no-hardlinks`, `npm ci`, `npm run typecheck` and `npm test` for the scripts `package.json` declares, none printed when it declares neither),
-`npm run eval:plugin -- --trust-plugin` (only when `package.json` has that script), `git tag v<x.y.z>`, `git push origin <branch> v<x.y.z>`,
+the provisional tag `git tag v<x.y.z>` (L508: made before the gate, removed by `git tag -d` when the gate, the clone replay or the evaluation is red),
+`cadence verify --gate --sha HEAD` (always printed, before the evaluation), the replay in a fresh clone (L446: `git clone --no-hardlinks`, `npm ci`, `npm run typecheck` and `npm test` for the scripts `package.json` declares, none printed when it declares neither),
+`npm run eval:plugin -- --trust-plugin` (only when `package.json` has that script), `git push origin <branch> v<x.y.z>`,
 `gh run watch`, `npm view <package> version` (not for a private package) and, only with a `.claude-plugin/plugin.json`,
 the plugin update: `claude plugin marketplace update <marketplace>` first (without it the installed plugin stays at the old
 version; skipped when the marketplace has no name), then `claude plugin update <plugin>@<marketplace>`, then `/reload-plugins`

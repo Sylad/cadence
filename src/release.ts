@@ -217,21 +217,23 @@ function whatsNewIssues(text: string, version: string): string[] {
  * types que Claude Code génère dans plugins/cadence-hud et que seul un clone ne porte pas). `git clone` du dépôt courant ne prend que ce qui est commité,
  * `--no-hardlinks` pour ne rien partager avec lui ; le clone est retiré, vert ou rouge.
  */
-function cloneStep(scripts: string[]): string {
+function cloneStep(scripts: string[], untag: string): string {
   const run = scripts.map((n) => (n === 'test' ? 'npm test' : `npm run ${n}`)).join(' && ');
-  return `d=$(mktemp -d) && git clone -q --no-hardlinks . "$d/c" && (cd "$d/c" && npm ci && ${run}); r=$?; rm -rf "$d"; test $r -eq 0    (la suite dans un git clone neuf, comme publish.yml ; rouge = pas de tag)`;
+  return `d=$(mktemp -d) && git clone -q --no-hardlinks . "$d/c" && (cd "$d/c" && npm ci && ${run}); r=$?; rm -rf "$d"; test $r -eq 0 || ${untag}    (la suite dans un git clone neuf, qui reçoit le tag provisoire, comme publish.yml ; rouge = tag retiré)`;
 }
 
 /** Les étapes que le lead joue, dans l'ordre : la commande n'en fait aucune. */
 function steps(p: Planned, files: string[], branch: string): string[] {
   const tag = `v${p.version}`;
+  // Rouge à la porte, au clone ou à l'éval : le tag provisoire est retiré, la release n'a pas eu lieu.
+  const untag = `{ git tag -d ${tag}; false; }`;
   const out = [
     `git add ${files.join(' ')} && git commit -m "release: ${p.version}"`,
-    'cadence verify --gate --sha HEAD    (la suite et le build rejoués sur le commit de version, où le CHANGELOG n\'a plus de [Unreleased] plein ; rouge = pas d\'éval ni de tag)',
-    ...(p.cloneScripts.length ? [cloneStep(p.cloneScripts)] : []),
-    ...(p.hasEvalScript ? ['npm run eval:plugin -- --trust-plugin    (facturé ; un cas sous le seuil arrête la release)'] : []),
-    `git tag ${tag}`,
-    `git push origin ${branch} ${tag}    (le tag lance le workflow de publication)`,
+    `git tag ${tag}    (tag local provisoire sur le commit de version : les tests qui lisent le dernier tag, comme test/changelog.test.ts, voient la version publiée ; retiré si une des trois étapes suivantes est rouge, jamais poussé avant)`,
+    `cadence verify --gate --sha HEAD || ${untag}    (la suite et le build rejoués sur le commit de version, où le CHANGELOG n'a plus de [Unreleased] plein ; rouge = tag retiré, pas d'éval)`,
+    ...(p.cloneScripts.length ? [cloneStep(p.cloneScripts, untag)] : []),
+    ...(p.hasEvalScript ? [`npm run eval:plugin -- --trust-plugin || ${untag}    (facturé ; un cas sous le seuil arrête la release et retire le tag)`] : []),
+    `git push origin ${branch} ${tag}    (le tag provisoire devient le tag de la release ; il lance le workflow de publication)`,
     'gh run watch    (jusqu\'à la fin du run de publication)',
     ...(p.isPrivate || p.packageName === '' ? [] : [`npm view ${p.packageName} version    (doit répondre ${p.version})`]),
     ...(p.pluginName ? [

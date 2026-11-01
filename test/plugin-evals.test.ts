@@ -147,11 +147,11 @@ describe('lancement de la suite', () => {
     expect(readme).toMatch(/billed/i);
     expect(readme).not.toMatch(/replaces the real trial/);
     expect(readme).toMatch(/--no-publish/);
-    // l'évaluation est une étape ordonnée de « Releasing », entre le commit de version et le tag
+    // l'évaluation est une étape ordonnée de « Releasing », entre le commit de version et le push du tag (posé en local avant la porte, L508)
     const releasing = readFileSync(join(root, 'docs/releasing.md'), 'utf8');
     const rel = releasing.slice(releasing.indexOf('# Releasing'), releasing.indexOf('## Evaluating the plugin'));
     expect(rel.indexOf('npm run eval:plugin')).toBeGreaterThan(rel.indexOf('Bump `version`'));
-    expect(rel.indexOf('npm run eval:plugin')).toBeLessThan(rel.indexOf('git tag v<version>'));
+    expect(rel.indexOf('npm run eval:plugin')).toBeLessThan(rel.indexOf('git push origin main v<version>'));
     expect(readme).toMatch(/claude plugin eval \. --case deliver-sha[^\n]*--no-publish[^\n]*--max-cost-usd/);
   });
 });

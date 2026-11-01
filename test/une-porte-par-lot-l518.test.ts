@@ -43,6 +43,8 @@ describe('L518 R1 — la session ne joue que les tests ciblés, la porte complè
       const bloc = out.slice(out.indexOf('Auto-verification once the tests are green')).split('\n\n')[0]!;
       expect(bloc, kind).toContain('targeted tests and the build pass');
       expect(bloc, kind).not.toContain('full test suite');
+      expect(bloc, kind).not.toMatch(/rerun the suite/);
+      expect(bloc, kind).toContain('rerun the targeted tests and the build');
     }
   });
 

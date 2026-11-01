@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.35.0**: a test already red before a lot, or that only needs more time, no longer costs correction passes, including on a gate declared in parts; QA passes run in browsers of their own; design agents check contrast and AI tics.
 - **1.34.1**: republishes 1.34.0, whose npm publication failed after the tag; same features (edge-case probe, steadier `mise-en-service` tests).
 - **1.34.0**: an optional edge-case probe (`orchestrate.probe: true`) tries to break a lot's diff with tests at the edges before the code review; flaky tests of `mise-en-service` made deterministic.
 - **1.33.0**: the lots panel shows each project's progress bar in its « ordre des projets » section, aligned in the desktop app; a simplification audit of the code, and dead exports removed.
@@ -61,6 +62,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.35.0**: the wave's gate stops paying for reds that need no fix. With `orchestrate.testReplay`, a red that stays red alone in the lot is replayed alone at the start sha, and one already failing there is « déjà rouge »: no correction pass, no escalation; a test that expired in the whole suite and passes alone at 80 % or more of its delay is a « délai trop juste », a warning naming the test with its duration and its delay (L510, `docs/orchestrate.md`). On a gate played in several folders, `orchestrate.test` takes a list of parts `[{ dir, run, replay? }]` and each part plays, replays and attributes its own reds, so a composed gate gets the same two verdicts (L512, `docs/orchestrate.md`, « A gate declared in parts »; evatosorus `node --test` is not covered yet). `cadence corrections` now counts the passes launched on tests that ended without a code change (L510, `docs/corrections.md`). The gate can also run on another machine through `orchestrate.gate.host`, by ssh at the pushed sha, with a local fallback and a lost connection replayed locally, never counted red (L403, `docs/remote-gate.md`). The `qa-reviewer` opens a browser context and a profile of its own, so two QA passes started together no longer share a tab (L511, `docs/skills.md`). The `spec-writer` joins a `contraste.md` (WCAG 2.2 ratios, 4.5:1 at least) to each sheet, and the `ux-reviewer` gets a delivery grid and a static check of AI tics (L513, `docs/orchestrate.md`). Small fixes: `cadence release` prints its local tag before the gate and removes it when red (L508, `docs/releasing.md`), `raf ux` and `raf review` print the commit command for the regenerated plan (L509), and `cadence deliver` outside a wave commits the plan it wrote for the « article à rafraîchir » lot (L420, `docs/news.md`).
 
 **1.34.1**: 1.34.0 was tagged but its publication to npm failed (a CHANGELOG entry cited a lot with no commit in the tag); 1.34.1 publishes the same content, with that entry reworded. Install 1.34.1 to get the edge-case probe and the steadier tests of 1.34.0.
 

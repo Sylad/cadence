@@ -79,6 +79,16 @@ jobs:
       - name: Environnement que npm donne à ses scripts
         run: npm run env | grep -E '^(npm_config_(tmp|cache|prefix|git|ignore_scripts)|TMPDIR|INIT_CWD|HOME|GIT_)' || true
 
+      # Un commit hors release porte une version déjà publiée : npm refuse alors le dry-run APRÈS prepublishOnly (la suite a donc été jouée et passée)
+      # par « You cannot publish over the previously published versions ». Ce seul refus, lu sur une ligne d'erreur de npm comme dans publish.yml
+      # (la sortie de la suite peut citer ces mots sans être un conflit), est toléré ; tout autre échec, dont un rouge de la suite, reste rouge.
       - name: Suite sous npm publish --dry-run
         continue-on-error: false
-        run: npm publish --dry-run --access public
+        run: |
+          if out="$(npm publish --dry-run --access public 2>&1)"; then
+            echo "$out"
+          else
+            echo "$out"
+            printf '%s' "$out" | grep -qE '^npm (error|ERR!) (code EPUBLISHCONFLICT|.*previously published)' || exit 1
+            echo "La version de package.json est déjà publiée : npm refuse le dry-run après la suite, c'est attendu hors release."
+          fi

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tempDir } from './helpers.js';
 import { join } from 'node:path';
@@ -333,5 +333,50 @@ describe('doublon de run pour un même tag (L64)', () => {
     expect(comment).toBeGreaterThan(workflow.indexOf('id: registry'));
     expect(comment).toBeLessThan(workflow.indexOf('- name: Publier sur npm'));
     expect(workflow.slice(comment, workflow.indexOf('- name: Publier sur npm'))).toMatch(/sauté[^\n]*(typecheck|tests)|(typecheck|tests)[^\n]*sauté/i);
+  });
+});
+
+describe('étape « Suite sous npm publish --dry-run » de tests.yml (L515)', () => {
+  const tests = readFileSync(join(root, '.github/workflows/tests.yml'), 'utf8');
+  const step = tests.match(/- name: Suite sous npm publish --dry-run\n(?:\s+continue-on-error: false\n)?\s+run: \|\n((?:\s{10}.*\n)+)/)?.[1];
+
+  // Exécute le script de l'étape tel quel, avec un faux npm qui écrit `output` et sort avec `code`.
+  const run = (code: number, output: string) => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'sortie.txt'), output);
+    writeFileSync(join(dir, 'npm'), `#!/bin/sh\ncat "${join(dir, 'sortie.txt')}"\nexit ${code}\n`);
+    chmodSync(join(dir, 'npm'), 0o755);
+    return spawnSync('bash', ['-e', '-c', step!], { env: { ...process.env, PATH: `${dir}:${process.env.PATH}` }, encoding: 'utf8' });
+  };
+
+  it('l\'étape est trouvée', () => {
+    expect(step).toBeDefined();
+  });
+
+  it('dry-run vert : étape verte', () => {
+    expect(run(0, 'npm notice Publishing\n').status).toBe(0);
+  });
+
+  it('refus « previously published » de npm (version déjà publiée) : toléré, et dit', () => {
+    const r = run(1, 'npm error code E403\nnpm error 403 403 Forbidden - PUT: You cannot publish over the previously published versions: 0.1.0.\n');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('déjà publiée');
+  });
+
+  it('refus EPUBLISHCONFLICT (ancien format npm ERR!) : toléré', () => {
+    expect(run(1, 'npm ERR! code EPUBLISHCONFLICT\n').status).toBe(0);
+  });
+
+  it('rouge de la suite qui cite « previously published » sans ligne d\'erreur de npm : reste rouge', () => {
+    const r = run(1, ' FAIL  test/x.test.ts > refuse previously published\nnpm error code ELIFECYCLE\nnpm error prepublishOnly failed\n');
+    expect(r.status).toBe(1);
+  });
+
+  it('autre échec de npm (réseau, authentification) : reste rouge', () => {
+    expect(run(1, 'npm error code E401\nnpm error Unable to authenticate\n').status).toBe(1);
+  });
+
+  it('échec sans aucune sortie : reste rouge', () => {
+    expect(run(1, '').status).toBe(1);
   });
 });

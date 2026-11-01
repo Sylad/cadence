@@ -19,9 +19,19 @@ const RE_LECTURE = /^(grep|rg|sed|cat|ls|head|tail|find|wc|awk|stat|file|jq|diff
 
 const OUTILS_FIXES = { Read: 'lectures', Grep: 'lectures', Glob: 'lectures', StructuredOutput: 'modèle seul' };
 const RE_PYTHON_ECRIT = /\.write\(|\.replace\(|open\([^)]*['"][wa]['"]/;
-const RE_GIT_LECTURE = /\bgit (log|show|diff|status|grep|ls-files|blame)\b/;
+const RE_GIT_LECTURE = /^git (log|show|diff|status|grep|ls-files|blame)\b/;
+const RE_PREFIXE = /^\s*(cd\s+\S+\s*(&&|;)\s*|\w+=\S+\s*;\s*)+/;
+const RE_LECTEUR = /^(grep|rg|sed|cat|ls|head|tail|find|wc|awk|stat|file|jq|diff)\b/;
+const RE_CHAINE = /&&|;/;
+const RE_REDIRECTION = /(^|\s)\d*>>?\s*(?!&|\/dev\/null)\S|\bsed\s+(-\w*i|--in-place)|\btee\b|-delete\b|-exec\b/;
+/** Commande sans le `cd x &&` ou `VAR=v ;` qui la précède. */
+const sansPrefixe = (cmd) => cmd.replace(RE_PREFIXE, '').trim();
+/** Une commande de lecture seule (grep, cat…) : ses arguments citent des mots (vitest, tsc, rm) sans les exécuter. */
+const estLectureSeule = (cmd) => RE_LECTEUR.test(cmd) && !RE_CHAINE.test(cmd) && !RE_REDIRECTION.test(cmd);
 /** Premier motif qui reconnaît la commande : l'ordre est la priorité. */
 const REGLES_BASH = [
+  [{ test: (c) => /^git\b/.test(c) && !RE_GIT_LECTURE.test(c) }, 'git'],
+  [{ test: estLectureSeule }, 'lectures'],
   [RE_TESTS, 'tests'],
   [RE_BUILD, 'build'],
   [RE_NEWS, 'Nouveautés'],
@@ -29,7 +39,6 @@ const REGLES_BASH = [
   [/^sleep\b/, 'attente'],
   [{ test: (c) => RE_ECRITURE.test(c) || (/\bpython3?\b/.test(c) && RE_PYTHON_ECRIT.test(c)) }, 'écriture'],
   [/^(python3?|node)\b/, 'lectures'],
-  [{ test: (c) => /^git\b/.test(c) && !RE_GIT_LECTURE.test(c) }, 'git'],
   [RE_LECTURE, 'lectures'],
 ];
 
@@ -49,14 +58,15 @@ function posteHorsBash(nom, entree) {
  */
 export function posteDeLOutil(nom, entree) {
   if (nom !== 'Bash' && nom !== 'bash') return posteHorsBash(nom, entree);
-  const cmd = String(entree?.command ?? '').replace(/^\s*(cd\s+\S+\s*(&&|;)\s*|\w+=\S+\s*;\s*)+/, '');
-  return REGLES_BASH.find(([motif]) => motif.test(cmd.trim()))?.[1] ?? 'autre outil';
+  const cmd = sansPrefixe(String(entree?.command ?? ''));
+  return REGLES_BASH.find(([motif]) => motif.test(cmd))?.[1] ?? 'autre outil';
 }
 
 /** Une commande de tests joue la suite complète quand elle ne nomme aucun fichier ni filtre. */
 export function estSuiteComplete(cmd) {
-  if (!RE_TESTS.test(cmd)) return false;
-  return !/(\.test\.|\.spec\.|\btest\/|\bsrc\/|\s-t\s|--testNamePattern|\s-- )/.test(cmd);
+  const c = sansPrefixe(cmd);
+  if (posteDeLOutil('Bash', { command: c }) !== 'tests') return false;
+  return !/(\.test\.|\.spec\.|\btest\/|\bsrc\/|\s-t\s|--testNamePattern|\s-- )/.test(c);
 }
 
 const vide = () => Object.fromEntries(POSTES_SESSION.map((p) => [p, { ms: 0, n: 0, sortie: 0, contexte: 0 }]));
@@ -116,6 +126,9 @@ function compterRejeu(r, appel, ms, message) {
   r.suiteContexte += message?.contexte ?? 0;
 }
 
+/** Un nombre de jetons ou de jours : 0 quand la valeur n'en est pas un (une chaîne numérique est convertie). */
+const nb = (x) => (Number.isFinite(Number(x)) && x !== null && x !== '' ? Number(x) : 0);
+
 /** Une ligne JSONL du transcript, ou null (vide, illisible, sans date, ni assistant ni user). */
 function ligneDuTranscript(ligne) {
   if (ligne.trim() === '') return null;
@@ -125,16 +138,17 @@ function ligneDuTranscript(ligne) {
   } catch {
     return null;
   }
+  if (d === null || typeof d !== 'object') return null;
   const t = Date.parse(d.timestamp ?? '');
   return Number.isFinite(t) && (d.type === 'assistant' || d.type === 'user') ? { d, t } : null;
 }
 
 /** Un bloc de message : un appel d'outil (assistant) ou son résultat (user, le premier seul compte). */
 function noterBloc({ appels, evenements, resultats }, d, t, c) {
-  if (d.type === 'assistant' && c.type === 'tool_use') {
+  if (d.type === 'assistant' && c?.type === 'tool_use' && !appels.has(c.id)) {
     appels.set(c.id, { t, poste: posteDeLOutil(c.name, c.input), cmd: String(c.input?.command ?? ''), msg: d.message.id });
     evenements.push({ t, genre: 'appel', id: c.id });
-  } else if (d.type === 'user' && c.type === 'tool_result') {
+  } else if (d.type === 'user' && c?.type === 'tool_result') {
     evenements.push({ t, genre: 'resultat', id: c.tool_use_id });
     if (!resultats.has(c.tool_use_id)) resultats.set(c.tool_use_id, t);
   }
@@ -156,15 +170,17 @@ function lireTranscript(texte) {
     fin = Math.max(fin, t);
     for (const c of Array.isArray(d.message?.content) ? d.message.content : []) noterBloc({ appels, evenements, resultats }, d, t, c);
     const u = d.type === 'assistant' && d.message?.id ? d.message.usage : undefined;
-    if (u) messages.set(d.message.id, { sortie: u.output_tokens ?? 0, contexte: (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) });
+    if (u) messages.set(d.message.id, { sortie: nb(u.output_tokens), contexte: nb(u.input_tokens) + nb(u.cache_read_input_tokens) + nb(u.cache_creation_input_tokens) });
   }
   evenements.sort((x, y) => x.t - y.t);
   return { debut, fin, evenements, appels, messages, resultats };
 }
 
+/** « 1 h 2 min 5 s » en millisecondes, ou null quand le texte ne contient aucune durée. */
 const DUREE_MS = (s) => {
-  const m = /(?:(\d+) min)?\s*(?:(\d+) s)?/.exec(s);
-  return ((Number(m?.[1] ?? 0) * 60) + Number(m?.[2] ?? 0)) * 1000;
+  const m = /^\s*(?:(\d+) h)?\s*(?:(\d+) min)?\s*(?:(\d+) s)?\s*$/.exec(s);
+  if (!m || (m[1] === undefined && m[2] === undefined && m[3] === undefined)) return null;
+  return ((Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0)) * 60 + Number(m[3] ?? 0)) * 1000;
 };
 
 /**
@@ -174,13 +190,15 @@ const DUREE_MS = (s) => {
 export function lireJournal(texte) {
   const lots = new Map();
   const get = (k) => lots.get(k) ?? lots.set(k, { attentes: [], integre: null }).get(k);
-  for (const l of texte.split('\n')) {
+  for (const l of texte.split(/\r?\n/)) {
     const m = /^(\S+) (\S+?:\S+?) (?:· )?(.*)$/.exec(l);
     if (!m) continue;
     const t = Date.parse(m[1]);
     if (!Number.isFinite(t)) continue;
     const o = /créneau de session obtenu après (.*?) d'attente/.exec(m[3]);
-    if (o) get(m[2]).attentes.push({ t, ms: DUREE_MS(o[1]) });
+    const ms = o ? DUREE_MS(o[1]) : null;
+    if (ms !== null) get(m[2]).attentes.push({ t, ms });
+    else if (o) continue;
     else if (/^intégré(\s|$)/.test(m[3])) get(m[2]).integre = t;
   }
   return lots;
@@ -221,7 +239,7 @@ export function ventilerLot(etat, journalLot, transcripts) {
     sessionsLues: 0,
     sessionsEcriture: 0,
   };
-  const pas = (etat.steps ?? []).filter((s) => Number.isFinite(Date.parse(s.started)) && Number.isFinite(Date.parse(s.ended)));
+  const pas = (etat.steps ?? []).filter((s) => Number.isFinite(Date.parse(s.started)) && Date.parse(s.ended) >= Date.parse(s.started));
   const attentes = journalLot?.attentes ?? [];
   pas.forEach((s, i) => {
     const t0 = Date.parse(s.started);
@@ -230,9 +248,9 @@ export function ventilerLot(etat, journalLot, transcripts) {
     const attente = Math.min(t1 - t0, attentes.filter((a) => a.t >= t0 && a.t <= t1).reduce((x, a) => x + a.ms, 0));
     r.mur['attente de créneau'] += attente;
     r.mur[poste] += t1 - t0 - attente;
-    r.jetons[poste] += s.tokens?.counted ?? 0;
+    r.jetons[poste] += nb(s.tokens?.counted);
     if (pas[i + 1]) ajouterTrou(r, 'porte et orchestration', Date.parse(pas[i + 1].started) - t1);
-    if (s.kind === 'implement' || s.kind === 'fix') ajouterSession(r, s, transcripts);
+    if (s.kind === 'implement' || s.kind === 'fix') ajouterSession(r, s, transcripts, t1 - t0 - attente);
   });
   const dernier = pas.at(-1);
   if (dernier && journalLot?.integre && journalLot.integre > Date.parse(dernier.ended)) ajouterTrou(r, 'intégration', journalLot.integre - Date.parse(dernier.ended));
@@ -247,12 +265,18 @@ function ajouterTrou(r, poste, trou) {
   else r.suspensionMs += trou;
 }
 
-/** Une session d'écriture : comptée, et ventilée si son transcript est lisible. */
-function ajouterSession(r, pas, transcripts) {
+/**
+ * Une session d'écriture : comptée, et ventilée si son transcript est lisible. Un transcript qui déborde du pas (session reprise)
+ * est ramené à `borneMs`, le mur du pas, pour que les postes de session ne dépassent pas le mur du lot.
+ */
+function ajouterSession(r, pas, transcripts, borneMs) {
   r.sessionsEcriture += 1;
-  const f = pas.sessionId ? trouverTranscript(transcripts, pas.sessionId) : null;
+  const f = typeof pas.sessionId === 'string' && /^[\w.-]+$/.test(pas.sessionId) ? trouverTranscript(transcripts, pas.sessionId) : null;
   if (!f) return;
-  const x = analyserSession(readFileSync(f, 'utf8'));
+  const brut = analyserSession(readFileSync(f, 'utf8'));
+  const k = brut.dureeMs > borneMs ? borneMs / brut.dureeMs : 1;
+  const x = { ...brut, suiteMs: brut.suiteMs * k, ciblesMs: brut.ciblesMs * k };
+  x.postes = Object.fromEntries(POSTES_SESSION.map((p) => [p, { ...brut.postes[p], ms: brut.postes[p].ms * k }]));
   r.sessionsLues += 1;
   r.rejeuxSession += x.rejeuxTests;
   r.rejeuxSuiteSession += x.rejeuxSuite;
@@ -271,13 +295,13 @@ function coutDesPasses(pas) {
     const apres = pas[i + 1];
     cout.n += 1;
     cout.ms += Date.parse(s.ended) - Date.parse(s.started);
-    cout.jetons += s.tokens?.counted ?? 0;
+    cout.jetons += nb(s.tokens?.counted);
     if (!apres) return;
     const trou = Date.parse(apres.started) - Date.parse(s.ended);
     if (trou > 0 && trou <= SUSPENSION_MS) cout.ms += trou;
     if (apres.kind === 'review' || apres.kind === 'review-small') {
       cout.ms += Date.parse(apres.ended) - Date.parse(apres.started);
-      cout.jetons += apres.tokens?.counted ?? 0;
+      cout.jetons += nb(apres.tokens?.counted);
     }
   });
   return cout;
@@ -285,6 +309,7 @@ function coutDesPasses(pas) {
 
 /** Vagues créées dans [since, until] (ISO), lues dans `runs`. */
 export function lireVagues(runs, since, until) {
+  for (const [nom, d] of [['since', since], ['until', until]]) if (d && !Number.isFinite(Date.parse(d))) throw new Error(`--${nom} : date illisible « ${d} »`);
   return readdirSync(runs).sort().flatMap((nom) => lireVague(join(runs, nom), nom, since, until));
 }
 

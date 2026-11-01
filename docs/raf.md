@@ -169,10 +169,10 @@ plan:
   commit: 'chore({lot}): {action} (orchestrate {vague})'
 ```
 
-- `raf done <lot>` does not commit the plan (it never does, see below) but prints the command that would, with this template: `{action}` is `terminé` and, outside a wave, the group holding `{vague}` is dropped (`chore(L12): terminé`). Without a template: `plan: L12 terminé`.
+- `raf done <lot>` does not commit the plan (it never does, see below) but prints the command that would, with this template: `{action}` is `terminé` and, outside a wave, the parenthesised or bracketed group holding `{vague}` is dropped (`chore(L12): terminé`). Without a template: `plan: L12 terminé`.
 - `{lot}` is required (a commit must cite its lot); `{action}` is what was done (`démarré`, `revue de code enregistrée`, `revue de code notée`, `hypothèses de la fiche <sujet> notées`, `mineurs de la revue de <revue> notés`, `règles R1, R2 sourcées par la réponse du lead`, `test d'acceptation rescellé (<test>)`);
   `{vague}` is the wave id. A word between braces that is none of these, an empty template or one on several lines is refused when the config is read.
-- Outside a wave (`spec reseal`) there is no wave: the parenthesised group that holds `{vague}` is dropped, so the template above gives `chore(L17): test d'acceptation rescellé (…)`.
+- Outside a wave (`spec reseal`) there is no wave: the parenthesised or square-bracketed group that holds `{vague}` is dropped, so the template above gives `chore(L17): test d'acceptation rescellé (…)`.
 - Absent, the subject is the one above, unchanged. The key needs `plan:` to be an object (`plan: .cadence/raf.yaml` as a plain path has nowhere to put it: write `plan: { path: …, commit: … }`).
 - `cadence spec green` (L366) commits its `acceptation-<lot>.json` with the template too when there is one (`{action}` = `acceptation verte, vert: true posé par cadence spec green`); without one its subject stays `chore(<lot>): …`. The tests it reseals are listed in the commit body, never in the subject, which therefore does not grow with them.
 - The commit of the fiche sourced by the lead's answer takes the template too (its default, `docs(<lot>): règle R3 sourcée par la réponse du lead (orchestrate <wave>)`, is already Conventional but can exceed `header-max-length` with several rules and a wave id). The `test(<lot>): …` and `chore(<lot>): …` commits of the cycle (acceptation sealed, `vert: true` set) and the work commits are already Conventional and are not templated.

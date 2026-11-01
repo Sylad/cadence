@@ -53,11 +53,11 @@ export function planCommitProblem(template: string): string | null {
 
 /**
  * Le message d'un commit de plan : le gabarit du projet (`plan.commit`), à défaut celui d'avant L343.
- * Hors vague, un groupe entre parenthèses qui porte `{vague}` disparaît avec elle, au lieu de laisser « (orchestrate ) ».
+ * Hors vague, un groupe entre parenthèses ou crochets qui porte `{vague}` disparaît avec elle, au lieu de laisser « (orchestrate ) » ou « [] ».
  */
 export function planCommitMessage(template: string | undefined, v: { lot: string; action: string; wave?: string }): string {
   let t = template ?? (v.wave === undefined ? PLAN_COMMIT_PLAIN : PLAN_COMMIT_WAVE);
-  if (v.wave === undefined) t = t.replace(/\s*\([^()]*\{vague\}[^()]*\)/g, '').replaceAll('{vague}', '');
+  if (v.wave === undefined) t = t.replace(/\s*(?:\([^()]*\{vague\}[^()]*\)|\[[^\[\]]*\{vague\}[^\[\]]*\])/g, '').replaceAll('{vague}', '');
   return t.replaceAll('{lot}', () => v.lot).replaceAll('{vague}', () => v.wave ?? '').replaceAll('{action}', () => v.action);
 }
 

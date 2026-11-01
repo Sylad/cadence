@@ -7,13 +7,13 @@ sujet:
       - agents/spec-writer.md
       - agents/ux-reviewer.md
       - templates/orchestrate/spec.md
-      - templates/orchestrate/ux.md
       - CHANGELOG.md
     endpoints: []
     jobs:
       - "étape spec d'orchestrate (session spec-writer d'un lot à écran)"
       - "étape ux d'orchestrate et revue d'un écran existant (raf ux, ux-reviewer)"
     hors_perimetre:
+      - "templates/orchestrate/ux.md : brief inchangé (empreinte figée par L448 R7) ; la grille et les tics vivent dans agents/ux-reviewer.md seul"
       - "le mode maquette et le mode conformité de ux-reviewer : captures à 1440 et 390 px et critères de L448 inchangés"
       - "l'étape spec back (templates/orchestrate/spec-back.md) : pas d'écran, pas de couleur"
       - "le format de la fiche (templates/fiche.yaml, cadence spec check), le schéma du rapport de revue et le nombre de revues"
@@ -48,8 +48,8 @@ cas:
       - "l'application est joignable (serveur local ou URL) avec un état réaliste"
       - "le brief ux.md est rendu"
     nominal:
-      - "La session relève, en plus de la méthode existante, les points de la grille : focus visible sur chaque élément interactif, prefers-reduced-motion respecté par les animations et transitions, curseur pointer sur les éléments cliquables, aucun emoji employé comme icône, aucun défilement horizontal aux largeurs 375, 768, 1024 et 1440 px."
-      - "Chaque point est coché ou non dans la liste à cocher du rapport, avec la mesure ou la capture qui le fonde."
+      - "La session relève, en plus de la méthode existante (section Method inchangée), selon la section « Delivery grid » ajoutée à la fin de agents/ux-reviewer.md, les points de la grille : focus visible sur chaque élément interactif, prefers-reduced-motion respecté par les animations et transitions, curseur pointer sur les éléments cliquables, aucun emoji employé comme icône, aucun défilement horizontal aux largeurs 375, 768, 1024 et 1440 px."
+      - "Chaque point est coché ou non dans la liste à cocher du fichier de rapport (la réponse courte ne la reprend pas), avec la mesure ou la capture qui le fonde."
       - "Un point non conforme devient un constat classé bloquant, majeur ou mineur selon l'échelle existante."
     alternatives:
       - { si: "le mode est maquette ou conformité", alors: "la grille ne s'applique pas ; les captures restent à 1440 et 390 px", regles: [R7] }
@@ -117,16 +117,16 @@ regles:
     tests: ["R5 — spec-writer.md interdit d'inventer une rampe sans couleur de marque", "R5 — spec-writer.md demande de mesurer les valeurs existantes dans ce cas"]
   - id: R6
     cas: [C2]
-    enonce: "agents/ux-reviewer.md porte une grille avant livraison, hors mode maquette et conformité, en cinq points : focus visible, prefers-reduced-motion, cursor pointer sur le cliquable, aucun emoji en icône, aucun défilement horizontal à 375, 768, 1024 et 1440 px ; chaque point est une ligne de la liste à cocher du rapport, une largeur non rendue va dans nonVerifie, et un point non conforme suit l'échelle bloquant / majeur / mineur existante."
+    enonce: "agents/ux-reviewer.md porte une grille avant livraison, dans une nouvelle section « ## Delivery grid » placée après « ## Short reply » (fin du fichier), hors mode maquette et conformité, en cinq points : focus visible, prefers-reduced-motion, cursor pointer sur le cliquable, aucun emoji en icône, aucun défilement horizontal à 375, 768, 1024 et 1440 px ; chaque point est une ligne de la liste à cocher du fichier de rapport (la section Short reply, 15 lignes au plus, ne la reprend pas), une largeur non rendue va dans nonVerifie, et un point non conforme suit l'échelle bloquant / majeur / mineur existante."
     statut: sourcee
     source: "demande du lot : « grille avant livraison (focus visible, prefers-reduced-motion, cursor, emoji en icône, largeurs 375/768/1024/1440) » ; agents/ux-reviewer.md « Method » étape 3 (focus visible, reflow) et « Rank »"
-    tests: ["R6 — ux-reviewer.md contient les cinq points de la grille et les quatre largeurs", "R6 — ux-reviewer.md range une largeur non rendue dans nonVerifie", "R6 — un focus non visible reste classé selon l'échelle existante, sans nouvelle gravité"]
+    tests: ["R6 — ux-reviewer.md contient les cinq points de la grille et les quatre largeurs", "R6 — ux-reviewer.md range une largeur non rendue dans nonVerifie", "R6 — la section Delivery grid est placée après Short reply et la réponse courte ne reprend pas la liste", "R6 — un focus non visible reste classé selon l'échelle existante, sans nouvelle gravité"]
   - id: R7
     cas: [C2]
-    enonce: "La grille et le contrôle des tics ne valent que pour l'étape ux et la revue d'un écran existant : le mode maquette et le mode conformité gardent leur texte, leurs captures à 1440 et 390 px (maquette-<état>-<largeur>.png) et leurs critères."
+    enonce: "La grille et le contrôle des tics ne valent que pour l'étape ux et la revue d'un écran existant. Ils ne vivent que dans la section nouvelle « ## Delivery grid », après « ## Short reply » : les sections Inputs, Mockup mode, Conformity mode, Method et Output d'ux-reviewer.md gardent leur texte et leurs empreintes (L448 R1 et R7 passent sans réécriture), et templates/orchestrate/ux.md reste identique (empreinte febe94677a4b9be7, L448 R7). Aucun test de L448 n'est réécrit ; le mode maquette garde ses captures à 1440 et 390 px."
     statut: sourcee
-    source: "test/revue-maquette-criteres.test.ts (empreintes des sections et critères de L448) ; src/orchestrate/spec.ts:270 (largeurs de capture de la maquette) ; templates/orchestrate/maquette.md:8"
-    tests: ["R7 — la section Mockup mode et la section Conformity mode d'ux-reviewer.md n'ont pas changé", "R7 — le brief maquette rendu cite toujours 1440 px et 390 px et non 375", "R7 — les empreintes de L448 sont mises à jour seulement pour la section où la grille est insérée"]
+    source: "test/revue-maquette-criteres.test.ts:50-55 et 120-127 (empreintes des sections et critères de L448) ; src/orchestrate/spec.ts:270 (largeurs de capture de la maquette) ; templates/orchestrate/maquette.md:8"
+    tests: ["R7 — la section Mockup mode et la section Conformity mode d'ux-reviewer.md n'ont pas changé", "R7 — le brief maquette rendu cite toujours 1440 px et 390 px et non 375", "R7 — les empreintes de Inputs, Conformity mode, Method et Output d'ux-reviewer.md sont celles de L448 (aucune mise à jour)", "R7 — templates/orchestrate/ux.md garde l'empreinte febe94677a4b9be7", "R7 — la section Delivery grid est absente des cinq sections empreintées"]
   - id: R8
     cas: [C3]
     enonce: "Le contrôle des tics d'IA est statique : l'agent applique à la lecture du diff les règles de detect.mjs listées dans son texte, sans exécuter ce script, sans outil de plus et sans changer la ligne tools de l'agent."
@@ -135,10 +135,10 @@ regles:
     tests: ["R8 — ux-reviewer.md liste les règles de tics reprises, une par ligne", "R8 — ux-reviewer.md n'appelle pas detect.mjs", "R8 — le front matter tools d'ux-reviewer est identique à celui d'avant"]
   - id: R9
     cas: [C3]
-    enonce: "Chaque tic trouvé est un constat numéroté T1, T2… (fichier, ligne, règle nommée, gravité) ; le rapport écrit « tics d'IA : 0 constat » quand il n'y en a pas et « non applicable » quand le lot n'a aucun fichier de front. Un tic sans effet sur la tâche est mineur, jamais bloquant."
+    enonce: "Chaque tic trouvé est un constat numéroté T1, T2… (fichier, ligne, règle nommée, gravité) ; le rapport écrit « tics d'IA : 0 constat » quand il n'y en a pas et « non applicable » quand le lot n'a aucun fichier de front. Un tic sans effet sur la tâche ni la lisibilité est mineur ; un tic qui nuit à la lisibilité ou ralentit l'utilisateur suit l'échelle existante (majeur, ou bloquant si une tâche ou l'accessibilité échoue), sans gravité propre."
     statut: hypothese
     si_faux: "Si les tics devaient être majeurs, plus de lots visibles seraient renvoyés en correction ; s'ils ne devaient pas être numérotés, seul le texte du rapport change. Aucune donnée ni contrat."
-    tests: ["R9 — ux-reviewer.md demande des constats T1, T2… avec fichier, ligne et règle", "R9 — ux-reviewer.md demande « tics d'IA : 0 constat » à défaut de tic", "R9 — ux-reviewer.md classe un tic sans effet sur la tâche en mineur"]
+    tests: ["R9 — ux-reviewer.md demande des constats T1, T2… avec fichier, ligne et règle", "R9 — ux-reviewer.md demande « tics d'IA : 0 constat » à défaut de tic", "R9 — ux-reviewer.md classe un tic sans effet sur la tâche en mineur", "R9 — ux-reviewer.md renvoie un tic nuisant à la lisibilité à l'échelle existante, sans gravité propre"]
   - id: R10
     cas: [C3]
     enonce: "Un tic qui est un choix de la charte du produit n'est pas un constat : la charte prime sur les règles de détection."
@@ -153,10 +153,10 @@ regles:
     tests: ["R11 — spec-writer.md et ux-reviewer.md interdisent un catalogue de styles génériques sur une app à charte", "R11 — aucun des deux agents ne liste de noms de styles (glassmorphism, brutalisme…) à proposer"]
   - id: R12
     cas: [C3]
-    enonce: "Le texte de l'agent reprenant les règles de detect.mjs porte l'attribution de l'original : nom de l'œuvre, licence Apache-2.0, mention que les règles sont reformulées ; un fichier NOTICE à la racine du paquet la reprend et figure dans files de package.json. Le paquet reste sous MIT."
+    enonce: "L'attribution de detect.mjs (nom de l'œuvre, auteur, dépôt, licence Apache-2.0, mention que les règles sont reformulées) est écrite dans un fichier NOTICE à la racine du paquet, listé dans files de package.json ; le paquet reste sous MIT. Le texte de agents/ux-reviewer.md ne nomme que « detect.mjs », « Apache-2.0 » et renvoie à NOTICE pour le reste ; il ne copie ni le nom de l'auteur ni celui du dépôt. Aucun fichier de agents/ ni de templates/orchestrate/ ne contient les chaînes interdites par L448 R8 (« knowledge-work-plugins », « design-critique », « ux-copy », « accessibility-review », « Anthropic »), même si l'original les porte : elles ne sont écrites que dans NOTICE."
     statut: hypothese
-    si_faux: "Si l'attribution devait tenir dans le seul texte de l'agent, le NOTICE est retiré (package.json, un fichier) ; si le texte de l'original était repris tel quel plutôt que reformulé, la licence du fichier repris change et c'est une question. L'auteur et le dépôt exacts de detect.mjs ne sont pas dans le lot : l'implémentation les relève à la source avant d'écrire la mention."
-    tests: ["R12 — ux-reviewer.md contient « Apache-2.0 » et le nom de l'original auprès des règles", "R12 — NOTICE existe et est listé dans files de package.json", "R12 — LICENSE du paquet reste MIT"]
+    si_faux: "Si l'attribution devait figurer en entier dans l'agent et que l'original porte un mot interdit par L448 R8, il faudrait réécrire ce test de L448 (question au lead) ; ici seul NOTICE (package.json, un fichier) est concerné. La licence Apache-2.0 vient du seul énoncé du lot : l'implémentation relève l'auteur, le dépôt et la licence à la source avant d'écrire NOTICE, et si le texte de l'original était repris tel quel plutôt que reformulé, c'est une question."
+    tests: ["R12 — ux-reviewer.md contient « detect.mjs », « Apache-2.0 » et « NOTICE » auprès des règles", "R12 — NOTICE existe, nomme l'original et sa licence, et est listé dans files de package.json", "R12 — LICENSE du paquet reste MIT", "R12 — aucun fichier de agents/ ni de templates/orchestrate/ ne contient les chaînes interdites de L448 R8"]
   - id: R13
     cas: [C1, C2, C3, C4]
     enonce: "Aucun format ne change : la ligne tools des deux agents, le format de la fiche (templates/fiche.yaml, cadence spec check), le schéma du rapport de revue, maquetteReviews (3) et le plafond de sessions sont inchangés ; contraste.md est un fichier libre du dossier de la spec que le programme ne lit pas."
@@ -165,10 +165,10 @@ regles:
     tests: ["R13 — une fiche valide avant le lot passe cadence spec check après le lot", "R13 — REVIEW_SCHEMA accepte et refuse les mêmes rapports qu'avant", "R13 — le front matter tools des deux agents est identique à celui d'avant"]
   - id: R14
     cas: [C1, C2, C3]
-    enonce: "L'installation n'écrase pas un agent modifié à la main : un projet qui a modifié sa copie garde son texte jusqu'à réinstallation."
+    enonce: "Comportement existant, non modifié par le lot : la réinstallation d'un agent modifié à la main sans --force échoue (RafError « modifié(s) localement : --force pour écraser », code de sortie 2) et laisse la copie intacte ; un agent non modifié reçoit le texte renforcé."
     statut: sourcee
-    source: "test/skills.test.ts:82-85 (copie « à la main » conservée à la réinstallation)"
-    tests: ["R14 — agent installé puis modifié à la main : réinstallation sans écrasement", "R14 — agent installé non modifié : reçoit le texte renforcé"]
+    source: "src/skills.ts:44-66 (RafError sans --force) ; test/skills.test.ts:82-85 (code de sortie 2)"
+    tests: ["R14 — agent installé puis modifié à la main : réinstallation sans --force échoue (code 2) et la copie reste intacte", "R14 — agent installé non modifié : reçoit le texte renforcé"]
   - id: R15
     cas: [C1, C3]
     enonce: "Le CHANGELOG (section Unreleased) nomme les jetons on-*, le contraste.md, la grille et les tics d'IA, avec l'attribution Apache-2.0."
@@ -186,7 +186,7 @@ contrats:
     regles: [R1, R2, R3, R4, R5, R11, R13, R14, R15]
   - id: A2
     appel: "job ux"
-    entree: "le brief templates/orchestrate/ux.md rendu, l'agent ux-reviewer, l'application qui tourne et le diff du lot"
+    entree: "le brief templates/orchestrate/ux.md rendu (inchangé), l'agent ux-reviewer, l'application qui tourne et le diff du lot"
     sortie: "le rapport structuré existant ; sa liste à cocher porte la grille aux quatre largeurs et la ligne des tics d'IA, les tics sont des constats T1, T2…"
     erreurs: []
     sans_erreur: "le lot ne change ni le schéma du rapport ni les échecs du job ; une largeur non rendue est une entrée de nonVerifie, pas une erreur"
@@ -194,7 +194,7 @@ contrats:
 
 donnees:
   - { id: D1, objet: "agents/spec-writer.md (texte de l'agent, copié par l'installation)", existant: true, modification: aucune, note: "texte de consigne seulement, front matter inchangé (R13)" }
-  - { id: D2, objet: "agents/ux-reviewer.md (texte de l'agent, copié par l'installation)", existant: true, modification: aucune, note: "texte de consigne seulement, front matter inchangé ; les sections Mockup mode et Conformity mode inchangées (R7, R13)" }
-  - { id: D3, objet: "templates/orchestrate/spec.md et ux.md (briefs rendus)", existant: true, modification: aucune, note: "texte seulement, variables inchangées" }
+  - { id: D2, objet: "agents/ux-reviewer.md (texte de l'agent, copié par l'installation)", existant: true, modification: aucune, note: "texte de consigne seulement, front matter inchangé ; section « Delivery grid » ajoutée en fin de fichier, les cinq sections empreintées par L448 inchangées (R6, R7, R13)" }
+  - { id: D3, objet: "templates/orchestrate/spec.md (brief rendu) ; ux.md reste inchangé", existant: true, modification: aucune, note: "texte seulement, variables inchangées ; ux.md non touché (R7)" }
   - { id: D4, objet: "docs/specs/<écran>/contraste.md (rapport de contraste joint à la fiche)", existant: false, modification: aucune, note: "nouveau fichier de texte libre, non lu par le programme (R4, R13)" }
   - { id: D5, objet: "NOTICE à la racine du paquet (attribution Apache-2.0)", existant: false, modification: aucune, note: "nouveau fichier de texte, ajouté à files de package.json (R12)" }

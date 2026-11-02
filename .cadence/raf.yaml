@@ -701,7 +701,7 @@ lots:
       - { date: 2026-11-02, text: "Hypothèses (fiche maquette-legere-lots-visibles) — R12 : Le budget d'un lot à maquette légère est le budget ordinaire de son estimate plus l'allocation d'étapes spec de 450 000 jetons (stage spec), et non le forfait… ; si faux : Si le coût mesuré de la chaîne légère est plus haut ou plus bas, seule la constante change (une mesure à refaire sur deux fenêtres), sans effet sur les données" }
   - id: L460
     title: "Guide des notions de cadence pour un humain (docs/concepts.md, lié en tête du README) : une page qui explique, chacune en quelques phrases et dans l'ordre où on les rencontre, plan et lot, verdicts (revue, UX), session et vague, étapes d'un lot (spec, code, revue, correction, UX, prêt) et QUI fait chacune, porte de tests (reprise, copie jetable), worktree par lot et intégration, livrable jusqu'à <sha>, lead, livreur, créneaux et holds, escalade, mise en service et release ; 3 à 4 schémas SVG simples (parcours d'un lot, vague et créneaux, worktrees → main, livraison au sha), un glossaire ; le détail technique reste dans les docs existantes, liées — demande de Sylvain le 30-10 (« cadence est devenu complexe, je veux que ce soit bien expliqué »)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-30
     notes:
@@ -749,6 +749,7 @@ lots:
         commit: e91ae43e2bc01ac58287cf935349b81b9d7e3007,
         reporte: { de: 9adf6c040671f202ee42ac1f1de407f2d28dcef1, vers: e91ae43e2bc01ac58287cf935349b81b9d7e3007, patchId: 1e42236e4839e0ecda8606fc4852878de89cc2cc }
       }
+    finished: 2026-11-02
   - id: L461
     title: "Audit de simplification du code (lecture seule, relecteur neuf en Fable) : code mort (exports jamais appelés, options ou branches sans effet, ce qui a été remplacé sans être retiré), doublons (blocs copiés, fonctions jumelles), fichiers trop gros et leurs découpages naturels (orchestrate/cycle.ts 3047 lignes, orchestrate/command.ts 1679, cli.ts 1597 au 30-10), tests redondants ou vides ; liste classée par gain et par risque, chaque point avec les tests qui le protègent déjà (ou « non protégé ») et sa mesure ; aucun changement. Chaque point retenu devient un lot de nettoyage ≤ 0,5 j, sans changement de comportement observable (suite verte sans toucher aux tests sauf ceux de code mort), mesuré avant/après — demande de Sylvain le 30-10"
     status: done

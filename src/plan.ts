@@ -929,10 +929,10 @@ export class Plan {
 
   /**
    * Pose le `state:` d'un lot (`raf status`, L463) sous la garde de `plan.transitions`, et note le message daté. Le statut de base en est
-   * dérivé : seuls todo → doing (le lot démarre) et doing → todo (`started:` retiré s'il n'a pas de commit, gardé sinon, comme la réouverture)
-   * se font ici, pour que l'état bloqué se quitte vers l'état d'avant quel que soit son statut de base ; les autres changements de base
-   * gardent leur commande et leurs portes (`raf done`, `drop`, `todo`). Entrer dans l'état bloqué mémorise l'état d'avant (`state_before:`),
-   * `back` y revient sans garde. `commits` compte les commits qui citent le lot (lu seulement pour doing → todo).
+   * dérivé : seuls todo → doing (le lot démarre) et doing → todo (`started:` retiré ; refusé dès qu'un commit cite le lot, la porte de
+   * `raf todo`) se font ici, pour que l'état bloqué se quitte vers l'état d'avant quel que soit son statut de base ; les autres changements
+   * de base gardent leur commande et leurs portes (`raf done`, `drop`, `todo`). Entrer dans l'état bloqué mémorise l'état d'avant
+   * (`state_before:`), `back` y revient sans garde de transition. `commits` compte les commits qui citent le lot (lu seulement pour doing → todo).
    */
   setState(ref: string, target: string | null, today: Day, opts: { back?: boolean; message?: string } = {}, commits: () => number = () => 0): string {
     this.writable();
@@ -957,8 +957,8 @@ export class Plan {
     const node = this.lotNode(ref);
     const base = model.states[to];
     if (base !== lot.status) {
-      const command = rebase(node, lot, base, today, commits);
-      if (command) throw new RafError(`${ref} : ${to} a pour statut de base ${base}, ${lot.status} aujourd'hui — passer par raf ${command} ${ref}`);
+      const refused = rebase(node, lot, { ref, to, base }, today, commits);
+      if (refused) throw new RafError(refused);
     }
     this.writeState(node, to, to === model.blocked ? from : undefined);
     const message = opts.message?.trim();

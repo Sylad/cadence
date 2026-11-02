@@ -98,16 +98,45 @@ describe('bords de raf status — bloqué et retour', () => {
     expect(yaml(dir)).not.toContain('started');
   });
 
-  it('a_faire → bloque, un commit cite le lot, puis --back — attendu : retour à a_faire, started gardé', () => {
-    const dir = projet();
-    raf(dir, 'status', 'L1', 'bloque');
+  function commitCitant(dir: string) {
     writeFileSync(join(dir, 'f.txt'), 'x');
     execFileSync('git', ['add', 'f.txt'], { cwd: dir });
     execFileSync('git', ['commit', '-m', 'feat(L1): travail'], { cwd: dir });
-    expect(raf(dir, 'status', 'L1', '--back').code).toBe(0);
-    expect(yaml(dir)).toContain('state: a_faire');
-    expect(yaml(dir)).toMatch(/status: todo/);
-    expect(yaml(dir)).toContain('started');
+  }
+
+  it('a_faire → bloque, un commit cite le lot, puis --back — retour vers todo refusé comme raf todo — attendu : exit 2, lot inchangé, raf check vert', () => {
+    const dir = projet();
+    raf(dir, 'status', 'L1', 'bloque');
+    commitCitant(dir);
+    const avant = yaml(dir);
+    const r = raf(dir, 'status', 'L1', '--back');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/1 commit\(s\) qui le citent/);
+    expect(r.err).toMatch(/raf status L1 <état>/);
+    expect(yaml(dir)).toBe(avant);
+    expect(raf(dir, 'check').code).toBe(0);
+  });
+
+  it('un lot doing avec un commit vers un état todo (sans transitions) — attendu : refusé, status doing gardé, raf check vert', () => {
+    const dir = projet('plan:\n  states: { a_faire: todo, en_cours: doing, bloque: todo, termine: done, abandonne: dropped }\n');
+    raf(dir, 'start', 'L1');
+    commitCitant(dir);
+    expect(raf(dir, 'todo', 'L1').code).not.toBe(0);
+    const r = raf(dir, 'status', 'L1', 'a_faire');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/commit\(s\) qui le citent/);
+    expect(yaml(dir)).toMatch(/status: doing/);
+    expect(yaml(dir)).toContain('state: en_cours');
+    expect(raf(dir, 'check').code).toBe(0);
+  });
+
+  it('un lot doing avec un commit vers un blockedState de base todo — attendu : refusé, pas de state_before écrit', () => {
+    const dir = projet(PLAN_YAML.replace('bloque: doing', 'bloque: todo'));
+    raf(dir, 'start', 'L1');
+    commitCitant(dir);
+    expect(raf(dir, 'status', 'L1', 'bloque').code).not.toBe(0);
+    expect(yaml(dir)).toMatch(/status: doing/);
+    expect(yaml(dir)).not.toContain('state_before');
   });
 
   it('un lot doing passe à un blockedState de base todo — attendu : accepté, le lot repasse todo', () => {

@@ -103,14 +103,24 @@ export function stateProblems(model: StateModel, lot: Pick<Lot, 'state' | 'statu
 
 /**
  * Applique à `node` le changement de statut de base de `raf status` : todo → doing démarre le lot, doing → todo le remet en attente
- * (`started:` retiré s'il n'a pas de commit). Autre changement : rien n'est touché, rend la commande qui s'en charge.
+ * (`started:` retiré) — refusé, comme `raf todo`, dès qu'un commit cite le lot : le remettre en attente perdrait leur lien. Rend le refus
+ * (`move` nomme le lot, l'état visé et son statut de base), `undefined` quand le changement est fait. Autre changement : rien n'est touché,
+ * le refus renvoie à sa commande.
  */
-export function rebase(node: YAMLMap, lot: Lot, base: Status, today: Day, commits: () => number): 'done' | 'drop' | 'todo' | undefined {
+export function rebase(node: YAMLMap, lot: Lot, move: { ref: string; to: string; base: Status }, today: Day, commits: () => number): string | undefined {
+  const { ref, to, base } = move;
   if (lot.status === 'todo' && base === 'doing') {
     node.set('status', 'doing');
     if (!lot.started) node.set('started', today);
-  } else if (lot.status === 'doing' && base === 'todo') {
+    return undefined;
+  }
+  if (lot.status === 'doing' && base === 'todo') {
+    const n = commits();
+    if (n > 0) return `${ref} a ${n} commit(s) qui le citent : le remettre en attente perdrait leur lien — un état doing (raf status ${ref} <état>), ou raf drop ${ref}`;
     node.set('status', 'todo');
-    if (commits() === 0) node.delete('started');
-  } else return base === 'done' ? 'done' : base === 'dropped' ? 'drop' : 'todo';
+    node.delete('started');
+    return undefined;
+  }
+  const command = base === 'done' ? 'done' : base === 'dropped' ? 'drop' : 'todo';
+  return `${ref} : ${to} a pour statut de base ${base}, ${lot.status} aujourd'hui — passer par raf ${command} ${ref}`;
 }

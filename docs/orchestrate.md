@@ -531,7 +531,7 @@ suspended, except for such a visible lot, where the UX session needs budget and 
 **Choices, not questions**: the author brief tells the session to decide minor interpretation questions itself and to list them under `choix` in its report; the reviewer receives that list to re-read, and the final table prints each one (`choix fait : …`); `--status` does not (L441: its table is compact, one line per lot, and ends with one line naming the lots that have a detail) — `--status --detail <project:lot>` prints them. A session stops with a question only on a real blocker: a decision that changes the scope or the architecture or is costly to undo, AND that the plan, its notes and CLAUDE.md do not settle; everything else is a choice.
 
 **Frozen copy of the tool (L61)**: at the real start of a wave (not with `--dry-run` or `--status`), cadence copies the
-parts of its package that run the wave (`bin/`, `dist/`, `templates/`, `agents/`, `skills/`, `package.json`; `node_modules`
+parts of its package that run the wave (`bin/`, `dist/`, `templates/`, `agents/`, `skills/`, `scripts/qualite.mjs` and its `.d.mts` (imported by the integration), `package.json`; `node_modules`
 is linked, not copied) into `.cadence/runs/<wave>/tool/` and relaunches the orchestrate process from that copy (the
 parent process waits, relays the signals and exits with the same code or signal). Code, brief templates and agents
 therefore come from the snapshot: a wave can orchestrate cadence itself, and a session of the wave may edit

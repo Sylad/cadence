@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join, sep } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
@@ -34,7 +34,7 @@ export const isSnapshotChild = (env: NodeJS.ProcessEnv, root = PACKAGE_ROOT): bo
 const BIN_ENTRIES = { raf: 'raf.js', cadence: 'cadence.js' };
 
 /** Ce du paquet qui sert à l'exécution d'une vague ; node_modules est lié, jamais copié. */
-const COPIED = ['bin', 'dist', 'templates', 'agents', 'skills', 'package.json'];
+const COPIED = ['bin', 'dist', 'templates', 'agents', 'skills', 'scripts/qualite.mjs', 'scripts/qualite.d.mts', 'package.json'];
 
 /** Dossier et sorties du processus relancé : ceux du `io` de l'appelant. */
 export interface LineSink {
@@ -81,7 +81,9 @@ export function takeSnapshot(waveDir: string, packageRoot: string): string {
   mkdirSync(tool, { recursive: true });
   for (const name of COPIED) {
     const from = join(packageRoot, name);
-    if (existsSync(from)) cpSync(from, join(tool, name), { recursive: true });
+    if (!existsSync(from)) continue;
+    mkdirSync(dirname(join(tool, name)), { recursive: true });
+    cpSync(from, join(tool, name), { recursive: true });
   }
   symlinkSync(modules, join(tool, 'node_modules'), 'dir');
   // Comme npm à l'installation : `raf` et `cadence` sont les bin/*.js de la copie (shebang `env node` conservé).

@@ -28,6 +28,8 @@ function fakePackage(): string {
   cpSync(join(ROOT, 'templates'), join(pkg, 'templates'), { recursive: true });
   cpSync(AGENTS_DIR, join(pkg, 'agents'), { recursive: true });
   mkdirSync(join(pkg, 'skills'));
+  mkdirSync(join(pkg, 'scripts'));
+  for (const n of ['qualite.mjs', 'qualite.d.mts']) writeFileSync(join(pkg, 'scripts', n), `// ${n}\n`);
   writeFileSync(join(pkg, 'package.json'), '{"name":"x"}\n');
   fakeYaml(join(pkg, 'node_modules'));
   return pkg;
@@ -107,6 +109,8 @@ describe('L61 — instantané de la vague (<vague>/tool/)', () => {
     expect(s.reexecs[0].env[RESERVED_ENV]).toBe('2026-10-04-1412');
     for (const f of ['bin/cadence.js', 'dist/cli.js', 'templates/orchestrate/review.md', 'package.json']) expect(existsSync(join(wave, 'tool', f)), f).toBe(true);
     expect(existsSync(join(wave, 'tool/agents'))).toBe(true);
+    // L538 : l'intégration importe scripts/qualite.mjs depuis dist/ ; la copie doit l'embarquer comme le paquet publié
+    for (const f of ['scripts/qualite.mjs', 'scripts/qualite.d.mts']) expect(existsSync(join(wave, 'tool', f)), f).toBe(true);
     expect(lstatSync(join(wave, 'tool/node_modules')).isSymbolicLink()).toBe(true);
     expect(new RunStore(parent, '2026-10-04-1412').readWave()!.status).toBe('done');
   });

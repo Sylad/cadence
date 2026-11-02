@@ -404,7 +404,7 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
 /** Une copie du paquet jetable (construit depuis src/) qu'on peut modifier sans toucher au vrai : le « paquet courant » d'une vague. */
 function livePackage(): string {
   const pkg = tempDir();
-  for (const n of ['bin', 'dist', 'templates', 'agents', 'skills', 'package.json']) cpSync(join(testPackage(), n), join(pkg, n), { recursive: true });
+  for (const n of ['bin', 'dist', 'templates', 'agents', 'skills', 'scripts', 'package.json']) cpSync(join(testPackage(), n), join(pkg, n), { recursive: true });
   symlinkSync(join(testPackage(), 'node_modules'), join(pkg, 'node_modules'), 'dir');
   return pkg;
 }

@@ -110,6 +110,8 @@ fonctions les plus longues du fichier.
 - **Mesure** : `max-lines` 1 475 → ≈ 600 pour `command.ts` (le corps de `orchestrate` + `execute`).
 - **Protégé par** : `orchestrate-command.test.ts` (2 239 l.) et 22 autres fichiers (`orchestrate-control`, `orchestrate-reprise-*`, `orchestrate-reseal`…).
 
+- **Fait (L489, 02-11)** : `command.ts` (1 768 → 269 lignes) est coupé en `command-args`, `preflight`, `draw`, `dry-run`, `status`, `execute` et `resume` (aucun module au-dessus de 400 lignes). `budget-basis` n'a pas été créé : `lotBudget*` vivait déjà dans `lot-budget.ts`. `execute` (avec `continueRounds` et l'ajout en vague vivante) a son module, ce que le tableau ne prévoyait pas : `resume` l'appelle, et le laisser dans `command.ts` aurait fait un cycle d'import `command` ↔ `resume`. Mesuré sur la ligne de base : `max-lines` 1 468 → 0 ; `complexity`, `cognitive-complexity` et `max-lines-per-function` déplacées telles quelles (501, 710, 762), à découper fonction par fonction dans un autre lot.
+
 **C3. `cli.ts` (1 619 l.)** : `dispatch` fait 597 lignes (complexité 526 pour le fichier, cognitive 723).
 Le `switch` de ~40 `case` se découpe en **un module par famille de commandes**, `dispatch` ne gardant que la table
 commande → fonction : `cli/gates.ts` (`gate`, `preCommit`, `postCommit`, `prePush`, `warn*`), `cli/spec-commands.ts`

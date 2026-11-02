@@ -41,8 +41,8 @@ function planCommit(repo: string): string {
   return git(repo, 'rev-parse', 'HEAD');
 }
 
-async function gate(files: Record<string, string>, opts: { hops?: number; planFile?: string | undefined; atRecorded?: boolean } = {}) {
-  const { repo, sha, mark } = project(files);
+async function gate(files: Record<string, string>, opts: { hops?: number; planFile?: string | undefined; atRecorded?: boolean; gateYaml?: string } = {}) {
+  const { repo, sha, mark } = project(files, opts.gateYaml);
   const launch = tempDir();
   wave(launch, repo, sha, mark);
   let top = sha;
@@ -55,6 +55,22 @@ async function gate(files: Record<string, string>, opts: { hops?: number; planFi
 }
 
 describe('L482 — bords de la détection du plan cité', () => {
+  it.each([
+    ['docs/guide.json', 'docs'],
+    ['.cadence/notes.json', '.cadence'],
+    ['CHANGELOG', 'CHANGELOG'],
+  ])('E0 — %s cite le plan : exclu (%s), verdict repris', async (file) => {
+    const r = await gate({ [file]: `'${PLAN}'\n` });
+    expect(r.text).toContain('verdict repris');
+    expect(r.ran).toBe(false);
+  });
+
+  it('E0 — cadence.yaml qui cite le plan en commentaire : exclu, verdict repris', async () => {
+    const r = await gate({}, { gateYaml: `# le plan est ${PLAN}\n` });
+    expect(r.text).toContain('verdict repris');
+    expect(r.ran).toBe(false);
+  });
+
   it('E1 — un lecteur dans docsite/ (préfixe de « docs » seulement) compte : porte rejouée', async () => {
     const r = await gate({ 'docsite/p.test.ts': `'${PLAN}'\n` });
     expect(r.text).toContain('verdict rejoué');

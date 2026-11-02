@@ -41,12 +41,12 @@ Inside a wave, a lot goes through these steps, each in a fresh session. Dashed b
 
 | Step | What happens | Who |
 |---|---|---|
-| **spec** | For a lot that creates a screen (`screen: page`) or has a behaviour to pin down (`spec: true`): a mockup and a **sheet** (fields, states, numbered rules); reviewed before any code, and the acceptance tests are written from it, committed red and locked | the `spec-writer` agent, reviewed by the `ux-reviewer` (mockup) or the `code-reviewer` (sheet); the program locks the tests |
+| **spec** | For a lot that creates a screen (`screen: page`) or has a behaviour to pin down (`spec: true`): a mockup and a **sheet** (fields, states, numbered rules); reviewed before any code, and the acceptance tests are written from it, committed red and locked | the `spec-writer` agent, reviewed by the `ux-reviewer` (mockup) or the `code-reviewer` (sheet); then the `acceptance-writer` agent, a separate session, writes the tests; the program locks them |
 | **code** | Test first, then the code, commits that cite the lot; the lot's own tests must pass | a fresh session of the program |
 | **review** | Reads the diff against the lot (and the sheet, rule by rule) and returns findings: blocking, major, minor | the `code-reviewer` agent; the program records `raf review` when it is compliant |
 | **correction** | Only if the review is not compliant: a new session fixes the findings, then a new review. Two passes at most, three when the findings converge; then the lot is **handed back** | a fresh session; the program decides how many |
 | **UX** | For a visible lot: the screen is opened in a real browser, in each state, with captures at 1440 and 390 px | the `ux-reviewer` agent for the report; the verdict is **the human's**, or the lead's when the parent folder says `lead.ux: lead` |
-| **ready** | The lot is integrated (see [below](#one-worktree-per-lot-and-integration)); the lead re-checks it, records `raf done`, delivers it | the lead |
+| **ready** | In worktree mode the lot is integrated (see [below](#one-worktree-per-lot-and-integration)); without worktree (the default) it is ready as soon as its review is compliant; the lead re-checks it, records `raf done`, delivers it | the lead |
 
 Before all that, a lot whose title cites a finding or another lot gets a **precheck**: « is it already done? ». Small lots (half a day or
 less) get a single review pass. Detail: [fonctionnement.md](fonctionnement.md#2-a-lot-inside-a-wave), [spec.md](spec.md).

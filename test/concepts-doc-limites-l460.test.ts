@@ -19,7 +19,7 @@ describe('L460 — limites de docs/concepts.md', () => {
     expect(checkLinks(root, ['README.md', 'docs/concepts.md', 'docs/fonctionnement.md', 'docs/overview.md'])).toEqual([])
   })
 
-  it('chaque SVG est du XML bien formé, à balises équilibrées et sans identifiant en double', () => {
+  it("chaque SVG se termine par </svg> et n'a pas d'identifiant en double", () => {
     for (const f of svgs) {
       const s = read(`docs/${f}`)
       expect(s.trim().endsWith('</svg>'), f).toBe(true)
@@ -62,7 +62,7 @@ describe('L460 — limites de docs/concepts.md', () => {
         if (!/text-anchor="middle"/.test(m[1])) continue
         const box = rects.find((r) => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.h)
         if (!box) continue
-        expect(m[2].length * fs * 0.5, `${f}: « ${m[2]} »`).toBeLessThanOrEqual(box.w)
+        expect(m[2].replace(/&(lt|gt|amp);/g, '_').length * fs * 0.5, `${f}: « ${m[2]} »`).toBeLessThanOrEqual(box.w)
       }
     }
   })
@@ -132,5 +132,37 @@ describe('L460 — limites de docs/concepts.md', () => {
       expect(svg, f).toContain('with --continue')
       expect(svg, f).not.toMatch(/drawn at once|takes it\./)
     }
+  })
+
+  it('les SVG ont des balises équilibrées (bonne formation minimale)', () => {
+    for (const f of svgs) {
+      const stack: string[] = []
+      for (const m of read(`docs/${f}`).matchAll(/<(\/?)([a-zA-Z][\w:-]*)\b[^>]*?(\/?)>/g)) {
+        if (m[3]) continue
+        if (m[1]) expect(stack.pop(), f).toBe(m[2])
+        else stack.push(m[2])
+      }
+      expect(stack, f).toEqual([])
+    }
+  })
+
+  it("la figure 3 nomme la branche comme le texte : cadence/<wave>/<project>--<lot>", () => {
+    for (const f of svgs.filter((n) => n.includes('worktrees'))) {
+      const s = read(`docs/${f}`)
+      expect(s, f).not.toMatch(/&lt;wave&gt;\/L\d/)
+      expect(s, f).toContain('&lt;wave&gt;/&lt;project&gt;--L1')
+    }
+  })
+
+  it("l'étape ready ne promet l'intégration que en mode worktree (tableau et figure 1)", () => {
+    const md = read('docs/concepts.md')
+    const row = md.split('\n').find((l) => l.startsWith('| **ready**'))!
+    expect(row).toMatch(/worktree mode/)
+    for (const f of svgs.filter((n) => n.includes('-lot-'))) expect(read(`docs/${f}`), f).toContain('integrated (worktree mode)')
+  })
+
+  it("l'étape spec nomme l'acceptance-writer pour les tests d'acceptation", () => {
+    const row = read('docs/concepts.md').split('\n').find((l) => l.startsWith('| **spec**'))!
+    expect(row).toContain('acceptance-writer')
   })
 })

@@ -8,6 +8,7 @@ import { normalizeLot } from './plan-read.js';
 import { currentState, defaultState, rebase, stateProblems, transitionProblem, type StateModel } from './plan-states.js';
 import { DOCS_OK_FILE, readDocsOkFile } from './docs-ok-file.js';
 import { checkedExtras, withExtras, type ExtraDecls } from './plan-extras.js';
+import { DOTTED, escapeRe, extractRefs, idRefs, pickId, type Ref } from './plan-ids.js';
 import { ARCHIVE_DIR, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, selectArchivable, type Kept } from './archive.js';
 
 /** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
@@ -146,7 +147,7 @@ function cleanUses(names: string[]): string[] {
 
 const trueFlags = (flags: Record<string, boolean | undefined>): Record<string, true> => Object.fromEntries(Object.entries(flags).filter(([, on]) => on).map(([k]) => [k, true])); // les drapeaux vrais, chacun à `true` : les absents et les faux ne s'écrivent pas
 
-export type Ref = { lot: string; task?: string };
+export { escapeRe, extractRefs, readIdPattern, type Ref } from './plan-ids.js';
 
 export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible', 'screen', 'spec', 'public', 'every', 'last', 'after', 'created', 'started', 'finished', 'notes', 'repos', 'parent', 'gate', 'goal'] as const;
 /** Nature de l'écran d'un lot visible : nouvelle page, nouveau composant, parcours modifié. */
@@ -200,48 +201,6 @@ export interface PlanSettings {
 
 export function isOpen(status: Status): boolean {
   return status === 'todo' || status === 'doing';
-}
-
-export function escapeRe(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Ce qui ne peut pas suivre un identifiant cité : un point suivi d'un caractère de mot — « L1.4 » n'est
- * pas le lot L1, « NC2.4 » n'est pas NC2 — alors que le point qui finit une phrase (« voir L1. ») passe.
- * Même garde pour le format de raf et pour les identifiants d'un plan en lecture seule.
- */
-const DOTTED = '\\.\\w';
-
-/** Matches `L3` or `L3/t1` as whole words. Group 1 = lot id, group 2 = task id. */
-function refPattern(prefix: string): RegExp {
-  return new RegExp(`(?<![\\w/])(${escapeRe(prefix)}\\d+)(?:/(t\\d+))?(?!\\w|${DOTTED})`, 'g');
-}
-
-export function extractRefs(text: string, prefix: string): Ref[] {
-  return [...text.matchAll(refPattern(prefix))].map((m) => ({ lot: m[1], task: m[2] }));
-}
-
-/**
- * Le motif des références d'un plan natif qui déclare `plan.idPattern` (L465) : `<préfixe>\d+` ou le motif du projet, puis un sous-id `/slug` facultatif
- * (`X7/t1-fusion`). Même garde que les autres formats : pas collé à un mot, un chemin ou un point suivi d'un mot (« X3.x »), le point de fin de phrase passe.
- * Groupes nommés `id` et `sub` : le motif du projet peut porter ses propres groupes numérotés.
- */
-function idRefPattern(prefix: string, idPattern: string): RegExp {
-  return new RegExp(`(?<![\\w/.-])(?<id>${escapeRe(prefix)}\\d+|(?:${idPattern}))(?:/(?<sub>[\\w-]+(?:\\.[\\w-]+)*))?(?![\\w-]|${DOTTED})`, 'g');
-}
-
-/** Ce que le motif `plan.idPattern` a de refusable (ancres, groupe nommé réservé, id vide), null s'il est utilisable. Vérifié à la lecture de cadence.yaml. */
-export function idPatternProblem(idPattern: string): string | null {
-  if (idPattern.trim() === '') return 'est vide';
-  if (/^\^|(?<!\\)\$$/.test(idPattern)) return 'ne prend pas d\'ancre (^ ou $) : le motif est ancré par raf';
-  try {
-    idRefPattern('L', idPattern);
-    if (new RegExp(`^(?:${idPattern})$`).test('')) return 'accepte l\'identifiant vide';
-  } catch (e) {
-    return `n'est pas une expression régulière utilisable (${(e as Error).message.split('\n')[0]})`;
-  }
-  return null;
 }
 
 function initialContent(project: string, prefix: string, since: Day): string {
@@ -484,11 +443,7 @@ export class Plan {
    * les identifiants du plan eux-mêmes, quelle que soit leur forme (`E-A2`, `NC2.4`, `B33/t1-fusion`).
    */
   readonly refs = (text: string): Ref[] => {
-    if (!this.settings.format) {
-      if (this.settings.idPattern === undefined) return extractRefs(text, this.prefix);
-      // Un sous-id « t<n> » est une sous-tâche du lot ; tout autre (« t1-fusion ») n'est qu'une précision sur le lot cité.
-      return [...text.matchAll(idRefPattern(this.prefix, this.settings.idPattern))].map((m) => ({ lot: m.groups!.id, ...(m.groups!.sub && /^t\d+$/.test(m.groups!.sub) ? { task: m.groups!.sub } : {}) }));
-    }
+    if (!this.settings.format) return this.settings.idPattern === undefined ? extractRefs(text, this.prefix) : idRefs(text, this.prefix, this.settings.idPattern);
     const { refs, tasks, ids } = this.read();
     if (!refs) return [];
     return [...text.matchAll(refs)].flatMap((m): Ref[] => {
@@ -752,10 +707,9 @@ export class Plan {
     // Les lots archivés sont dans `lots()` : leur identifiant n'est jamais réutilisé.
     const known = new Set(this.lots().map((l) => l.id));
     for (const dep of opts.after ?? []) if (!known.has(dep)) throw new RafError(`dépendance inconnue : ${dep}`);
-    const re = new RegExp(`^${escapeRe(this.prefix)}(\\d+)$`);
-    const max = Math.max(0, ...[...known].map((id) => Number(re.exec(id)?.[1] ?? 0)));
-    const id = opts.id === undefined ? `${this.prefix}${max + 1}` : this.freeId(opts.id, known);
-    if (opts.under !== undefined && !known.has(opts.under)) throw new RafError(`lot parent inconnu : ${opts.under}`);
+    const picked = pickId(this.prefix, opts.id, opts.under, this.settings.idPattern, known);
+    if ('problem' in picked) throw new RafError(picked.problem);
+    const { id } = picked;
     const pub = opts.public === undefined ? undefined : cleanPublic(opts.public);
     if (opts.every !== undefined && !(Number.isInteger(opts.every) && opts.every > 0)) {
       throw new RafError(`périodicité invalide : ${opts.every} (un nombre entier de jours, 1 au moins)`);
@@ -778,16 +732,6 @@ export class Plan {
       if (isSeq(seq)) seq.flow = true;
     }
     (this.doc.get('lots') as YAMLSeq).add(node);
-    return id;
-  }
-
-  /** Un identifiant donné à `raf add --id` (L465) : conforme à `plan.idPattern`, sans « / » (réservé aux sous-tâches), jamais déjà pris (archivés compris). */
-  private freeId(id: string, known: Set<string>): string {
-    const pattern = this.settings.idPattern;
-    if (pattern === undefined) throw new RafError('--id exige plan.idPattern dans cadence.yaml : sans motif déclaré, les identifiants sont <préfixe><n> générés par raf');
-    if (id.includes('/')) throw new RafError(`identifiant invalide : ${id} (« / » est réservé aux sous-tâches)`);
-    if (!new RegExp(`^(?:${pattern})$`).test(id)) throw new RafError(`identifiant invalide : ${id === '' ? '(vide)' : id} ne suit pas plan.idPattern (${pattern})`);
-    if (known.has(id)) throw new RafError(`identifiant déjà pris : ${id}`);
     return id;
   }
 

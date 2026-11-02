@@ -7,7 +7,6 @@ import { statusCommand } from './raf-status.js';
 import { defaultPlan, PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readSessionConfig, readVerifyConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
 import { lotJson, lotLines } from './lot-lines.js';
-import { parseSet } from './plan-extras.js';
 import { audit, exemptPlanOnly, gateWaiting, hypothesesOf, isNonConformingVerdict, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork, workByLot } from './audit.js';
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
@@ -22,7 +21,8 @@ import { installHook, pendingCommitMessage, REFUSED } from './hook.js';
 import { gateRefusal, pushRefusal, UNGATED_ENV } from './push-guard.js';
 import { citedRefs, linkCommits } from './link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, publicTitleTooLong, stampEntries } from './news.js';
-import { invalidResource, Plan, RafError, SCREENS, STATUSES, setPlanNotice, type Lot, type Screen, type Status } from './plan.js';
+import { addLot } from './cli-add.js';
+import { Plan, RafError, SCREENS, STATUSES, setPlanNotice, type Lot, type Screen, type Status } from './plan.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
 import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
@@ -383,27 +383,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     case 'add': {
       need(1, 'add "titre"');
       const plan = loadPlan();
-      let id: string;
-      if (values.parent) {
-        if (values.id !== undefined) throw new RafError('--id se pose sur un lot, pas sur une sous-tâche');
-        if (values.under !== undefined) throw new RafError('--under se pose sur un lot, pas sur une sous-tâche : --parent crée une sous-tâche, --under un sous-lot');
-        for (const [flag, given] of [['screen', values.screen !== undefined], ['spec', values.spec], ['local', values.local], ['public', values.public !== undefined], ['every', values.every !== undefined]]) {
-          if (given) throw new RafError(`--${flag} se pose sur un lot, pas sur une sous-tâche`);
-        }
-        if (values.uses !== undefined) throw new RafError(`uses se pose sur un lot, pas sur une sous-tâche : ${values.parent}`);
-        if (values.set !== undefined) throw new RafError(`--set se pose sur un lot, pas sur une sous-tâche : ${values.parent}`);
-        id = plan.addTask(values.parent, rest.join(' '));
-      } else {
-        const estimate = values.estimate === undefined ? undefined : Number(values.estimate);
-        if (estimate !== undefined && !(estimate > 0)) throw new RafError(`estimation invalide : ${values.estimate}`);
-        const after = values.after ? values.after.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-        const every = values.every === undefined ? undefined : Number(values.every);
-        if (every !== undefined && !(Number.isInteger(every) && every > 0)) throw new RafError(`périodicité invalide : ${values.every} (un nombre entier de jours)`);
-        if (values.public !== undefined) refuseLongTitle(values.public);
-        const uses = values.uses?.split(',').map((n) => n.trim()).filter(Boolean);
-        if (uses?.length === 0) throw new RafError(invalidResource(''));
-        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, local: values.local, public: values.public, every, after, uses, extras: parseSet(values.set), id: values.id, under: values.under });
-      }
+      const id = addLot(plan, values, rest.join(' '), today, refuseLongTitle);
       plan.save();
       io.out(id);
       warnIntegrating(root, io.err);

@@ -1,5 +1,6 @@
 import { isDay, type Day } from './dates.js';
 import { RESOURCE_NAME, RESOURCES_BAD_LIST, SCREENS, STATUSES, type Gate, type Lot, type LotRepoDecl, type Screen, type Status, type Verdict } from './plan.js';
+import { readParent } from './plan-ids.js';
 
 const GATE_INVALID = 'gate invalide : count: entier ≥ 1 et un critère spec: true ou screen: page attendus';
 
@@ -53,16 +54,11 @@ export function normalizeLot(raw: Record<string, unknown>, problems: string[] = 
   }
   checkStateNames(raw, problems);
   const gate = readGate(raw.gate, problems);
-  let parent: string | undefined;
-  if (raw.parent != null) {
-    if (typeof raw.parent === 'string' && raw.parent.trim() !== '') parent = raw.parent.trim();
-    else problems.push(`parent : un identifiant de lot attendu (reçu « ${String(raw.parent)} »)`);
-  }
   const okRaw = raw.docs_ok as Record<string, unknown> | undefined;
   const docsOk = okRaw && typeof okRaw === 'object' && typeof okRaw.reason === 'string' && okRaw.reason.trim() !== '' ? { date: String(okRaw.date ?? ''), reason: okRaw.reason.trim() } : undefined;
   return {
     id: String(raw.id),
-    ...(parent ? { parent } : {}),
+    ...readParent(raw.parent, problems),
     title: String(raw.title ?? ''),
     status,
     ...(typeof raw.state === 'string' && raw.state.trim() !== '' ? { state: raw.state.trim() } : {}),

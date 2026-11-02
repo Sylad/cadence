@@ -1452,9 +1452,10 @@ lots:
     review: { date: 2026-11-02, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-02-1825-cad, 1 passe(s) de correction)", commit: 322b9fb7cdcc4ca4ce4d0f4f8b07e411c150d7f7 }
   - id: L536
     title: "Ids libres (plan.idPattern) : raf archive range un lot archivé par le nombre final de son id (archive.ts:40), AB-1 passe de la 1re à la 2e place de raf list après archive, contre la promesse de docs/raf.md:73 ; et sous idPattern, fix(L12-bis), feat(L3-L5), release-L3 ne citent plus L12/L3 (garde d'avant perdue) — revue de L465"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-02
+    started: 2026-11-02
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

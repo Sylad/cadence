@@ -379,13 +379,13 @@ function parentWith(lotsOf: Lot[], orch = ''): { parent: string; dir: string } {
   git(dir, 'config', 'user.email', 't@example.com');
   git(dir, 'config', 'user.name', 'T');
   git(dir, 'config', 'commit.gpgsign', 'false');
-  const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'a', 'L', '2026-09-01');
+  const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'a', 'L', '2026-09-01');
   for (const l of lotsOf) plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, visible: l.visible || !!l.screen, screen: l.screen, spec: l.spec });
   plan.save();
   const lines = orch.split('\n').filter(Boolean);
   const withPrecheck = lines.some((x) => x.startsWith('precheck:'));
   writeFileSync(join(dir, 'cadence.yaml'), `orchestrate:\n${[...(withPrecheck ? [] : ['precheck: false']), ...lines].map((x) => `  ${x}`).join('\n')}\n`);
-  git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+  git(dir, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
   git(dir, 'commit', '-qm', 'chore: plan');
   return { parent, dir };
 }

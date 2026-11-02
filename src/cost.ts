@@ -14,7 +14,8 @@ export function stepEuros(step: CostStep, prices: PriceGrid): number | { missing
   if (!usage) return 0;
   const price: ModelPrice | undefined = step.model === 'sonnet' || step.model === 'opus' || step.model === 'haiku' ? prices[step.model] : undefined;
   if (!price) return { missing: step.model === 'sonnet' || step.model === 'opus' || step.model === 'haiku' ? step.model : 'inconnu' };
-  return ((usage.input + usage.cacheWrite) * price.input + usage.output * price.output + usage.cacheRead * price.cacheRead) / 1_000_000;
+  const n = (v: unknown): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  return ((n(usage.input) + n(usage.cacheWrite)) * price.input + n(usage.output) * price.output + n(usage.cacheRead) * price.cacheRead) / 1_000_000;
 }
 
 /** Un montant en euros, deux décimales et virgule : `4,80 €`. */

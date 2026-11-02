@@ -33,18 +33,20 @@ describe('L435 limites — verify vert et journal des livraisons', () => {
     expect(journal(d)).toBe('');
   });
 
-  it('ligne rouge sans sha : un sha vide n\'est jamais inscrit', () => {
+  // Une rouge écrite sans sha se relit sans classe (la raison prend la place du sha) : aucune garde de plus n'est nécessaire dans recordVerifiedDelivery.
+  it('ligne rouge de classe vérification sans sha : un sha vide n\'est jamais inscrit', () => {
     const d = stateDir();
-    writeFileSync(join(d, 'deliveries-failed.log'), '2026-10-29\n');
+    appendFailedDelivery(d, '2026-10-29', '', 'vérification en échec', 'verification');
     expect(recordVerifiedDelivery(d, '2026-10-29', '')).toBe(false);
     expect(journal(d)).toBe('');
   });
 
   it('ligne rouge illisible en dernier : la dernière lisible décide, pas de crash', () => {
     const d = stateDir();
-    appendFailedDelivery(d, '2026-10-29', SHA, 'CI en échec');
+    appendFailedDelivery(d, '2026-10-29', SHA, 'vérification en échec', 'verification');
     writeFileSync(join(d, 'deliveries-failed.log'), `${readFileSync(join(d, 'deliveries-failed.log'), 'utf8')}pas une ligne\n`);
-    expect(() => recordVerifiedDelivery(d, '2026-10-29', SHA)).not.toThrow();
+    expect(recordVerifiedDelivery(d, '2026-10-29', SHA)).toBe(true);
+    expect(journal(d)).toBe(`2026-10-29 ${SHA}\n`);
   });
 
   it('sha court contre sha complet du journal rouge : pas d\'inscription fausse', () => {
@@ -56,13 +58,13 @@ describe('L435 limites — verify vert et journal des livraisons', () => {
 
   it('vert strictement égal en date de modification au rouge : le rouge est effaçable une seule fois', () => {
     const d = stateDir();
-    appendFailedDelivery(d, '2026-10-29', SHA, 'CI en échec');
+    appendFailedDelivery(d, '2026-10-29', SHA, 'vérification en échec', 'verification');
     appendDelivery(d, '2026-10-28', SHA);
     utimesSync(join(d, 'deliveries-failed.log'), 1000, 1000);
     utimesSync(join(d, 'deliveries.log'), 1000, 1000);
-    recordVerifiedDelivery(d, '2026-10-29', SHA);
-    recordVerifiedDelivery(d, '2026-10-29', SHA);
-    expect(journal(d).split('\n').filter(Boolean).length).toBeLessThanOrEqual(2);
+    expect(recordVerifiedDelivery(d, '2026-10-29', SHA)).toBe(true);
+    expect(recordVerifiedDelivery(d, '2026-10-29', SHA)).toBe(false);
+    expect(journal(d)).toBe(`2026-10-28 ${SHA}\n2026-10-29 ${SHA}\n`);
   });
 
   it('journal rouge absent : false, aucun fichier créé', () => {
@@ -73,7 +75,7 @@ describe('L435 limites — verify vert et journal des livraisons', () => {
 
   it('verify sans --sha explicite : sha vide ne touche pas au journal', async () => {
     const d = stateDir();
-    appendFailedDelivery(d, '2026-10-29', SHA, 'CI en échec');
+    appendFailedDelivery(d, '2026-10-29', SHA, 'vérification en échec', 'verification');
     await verifyCommand({ config, sha: '', retry: 0, out: () => {}, journal: { dir: d, day: '2026-10-29', effects } }, deps(0));
     expect(journal(d)).toBe('');
   });

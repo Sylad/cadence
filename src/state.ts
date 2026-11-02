@@ -262,7 +262,7 @@ export function appendFailedDelivery(dir: string, day: Day, sha: string, reason:
  */
 export function recordVerifiedDelivery(dir: string, day: Day, sha: string): boolean {
   const last = readFailedEntries(dir).at(-1);
-  if (!sha || !last || last.sha !== sha || last.cls !== 'verification') return false;
+  if (!last || last.sha !== sha || last.cls !== 'verification') return false;
   try {
     const green = join(dir, 'deliveries.log');
     if (existsSync(green) && statSync(green).mtimeMs > statSync(join(dir, 'deliveries-failed.log')).mtimeMs) return false;

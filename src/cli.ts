@@ -6,7 +6,7 @@ import { refuseRedAcceptation } from './raf-close-checks.js';
 import { statusCommand } from './raf-status.js';
 import { defaultPlan, PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readSessionConfig, readVerifyConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
-import { lotLines } from './lot-lines.js';
+import { lotJson, lotLines } from './lot-lines.js';
 import { parseSet } from './plan-extras.js';
 import { audit, exemptPlanOnly, gateWaiting, hypothesesOf, isNonConformingVerdict, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork, workByLot } from './audit.js';
 import { short } from './check.js';
@@ -87,7 +87,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf show <id> [--notes]   le lot : statut, dates, after, titre public, visible et verdict ux (lot visible), notes datées, commits comptés ; --notes : les notes seules
   raf commits <id>      les commits du lot que compte la porte de revue de code, du plus ancien au plus récent
   raf now               ce qui est en cours, la suite, les derniers terminés
-  raf list [--status todo|doing|done|dropped]
+  raf list [--status todo|doing|done|dropped] [--json]   les lots, une ligne chacun ; --json : un tableau JSON des lots (clés du fichier du plan, champs d'extension sous extras)
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot, citant un id inconnu ou des lots sans y travailler, sans réécrire l'historique ; raf check --ignored les liste
   raf docs-ok <lot> --reason texte   acquitte l'écart docs.sync d'un lot (documentation en retard) avec la raison pour laquelle la documentation reste telle quelle (plan en lecture seule : .cadence/docs-ok.yaml, le plan n'est pas touché) ; lu par raf check et par orchestrate, qui ne rend jamais prêt un lot avec un écart ouvert
@@ -595,7 +595,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       if (values.status && !STATUSES.includes(values.status as Status)) throw new RafError(`statut inconnu : ${values.status}`);
       const shown = plan.lots().filter((l) => !values.status || l.status === values.status);
-      if (values.json) io.out(JSON.stringify(shown, null, 2));
+      if (values.json) io.out(JSON.stringify(shown.map(lotJson), null, 2));
       else for (const l of shown) io.out(`${l.id.padEnd(6)} ${l.status.padEnd(8)} ${l.quickwin ? '⚡ ' : ''}${l.title}`);
       return 0;
     }

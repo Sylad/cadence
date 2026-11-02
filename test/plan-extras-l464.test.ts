@@ -190,6 +190,18 @@ describe('R5 — raf show et raf list --json montrent les champs d\'extension', 
     cadence(dir, 'add', 'A');
     expect(JSON.parse(cadence(dir, 'list', '--json').out)[0]).not.toHaveProperty('extras');
   });
+  it('R5 — list --json : les noms du contrat (clés du fichier), sans les champs internes', () => {
+    const dir = project(EXTRAS);
+    cadence(dir, 'add', 'A', '--set', 'theme=ui');
+    cadence(dir, 'docs-ok', 'L1', '--reason', 'inchangée');
+    const lot = JSON.parse(cadence(dir, 'list', '--json').out)[0];
+    expect(Object.keys(lot).sort()).toEqual(['after', 'created', 'docs_ok', 'estimate', 'extras', 'id', 'notes', 'quickwin', 'status', 'tasks', 'title', 'visible']);
+    expect(lot.docs_ok).toEqual({ date: '2026-11-02', reason: 'inchangée' });
+  });
+  it('R5 — l\'aide et le tableau des commandes citent list --json', () => {
+    expect(cadence(project(EXTRAS), '--help').out).toMatch(/raf list \[--status [^\]]*\] \[--json\]/);
+    expect(readFileSync(join(__dirname, '../docs/raf.md'), 'utf8')).toMatch(/\| `raf list \[--status s\] \[--json\]` \|/);
+  });
   it('R5 — list sans --json garde sa sortie d\'avant', () => {
     const dir = project(EXTRAS);
     cadence(dir, 'add', 'A', '--set', 'theme=ui');

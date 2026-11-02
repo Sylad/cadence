@@ -1429,6 +1429,7 @@ lots:
     estimate: 0.25
     created: 2026-11-02
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme — orchestré (vague 2026-11-02-1825-cad, 0 passe(s) de correction)", commit: 757f80ad37a7b87b98017ed48c4ec99812bcf685, reporte: { de: 43087ac864d0e844b86c18dec3c675353836006b, vers: 757f80ad37a7b87b98017ed48c4ec99812bcf685, patchId: 991c5bcb9fc25f9d777f81e03d3de553d71baf80 } }
   - id: L533
     title: "Test instable sur le runner GitHub : test/orchestrate-creneaux-libres-l527-probe.test.ts « --priority explicite : l'ordre du tirage suit la ligne de commande » — rouge dans le run de publication de 1.40.0 (expected false to be true, 2,4 s), vert dans la porte et le clone neuf locaux ; attendre l'événement plutôt qu'un délai, sans changer le contrat"
     status: doing

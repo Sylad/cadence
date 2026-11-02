@@ -340,11 +340,12 @@ lots:
     finished: 2026-10-29
   - id: L430
     title: "Mesure de L428 : relire cadence perf sur 2 fenêtres après le 29-10 (part « bug de code » des passes classées, part conforme du premier coup, lots à ≥ 2 passes) contre l'avant de docs/mesures/bug-code-2026-10-29.md ; garder, ajuster ou retirer le bloc « Limits and rules » du brief implement"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-10-29
     notes:
       - { date: 2026-10-31, text: "31-10 : mesure intermédiaire (cadence corrections --classify --since 2026-10-30, 86 passes) : bug de code 44 (51 % des classées, 53 % avant), cas limite 64 % des bug-code (69 % avant), lots ≥ 2 passes 26 % (27 % avant) — consignes L428/L447 sans effet net ; mécanisme suivant L497 (sonde avant revue), à mesurer aussi" }
+    started: 2026-11-02
   - id: L431
     title: "verify --gate --sha joue la porte dans l'arbre principal (« propre, au sha ») pendant une vague vivante du dépôt : une intégration déplace HEAD au milieu, verdict non probant, 5 min perdues (29-10, L427) — pendant une vague vivante du dépôt, toujours une copie jetable"
     status: done

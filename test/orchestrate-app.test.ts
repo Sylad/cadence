@@ -275,22 +275,24 @@ describe('verrou par hôte:port de l\'URL (L60)', () => {
     const lock = uxLockFile(t.url);
     writeFileSync(lock, String(process.pid));
     // L199 : l'attente d'une seconde n'est plus vécue au mur (un setTimeout de 1 s contre un délai de 3 s dépendait de la charge) :
-    // le verrou est rendu tôt et l'horloge de l'orchestrateur saute de 28 s au même instant, le reste est donc ~2 s quelle que soit la charge.
-    // L528 : le délai de 30 s laisse 28 s de marge au mur avant que l'attente du verrou n'expire (3 s : rouge sous charge, « url tenue par une autre vague »).
+    // le verrou est rendu tôt et l'horloge de l'orchestrateur saute au même instant, le reste est donc fixe quelle que soit la charge.
+    // L528/L540 : la sonde du verrou dort 500 ms puis reprend ; si ce réveil, sous charge, arrive après le reste (délai moins le saut),
+    // le verrou est « obtenu après le délai » et le message devient « url tenue par une autre vague ». Le reste est donc de 5 s (délai 25 s,
+    // saut 20 s, attendues au mur par la sonde) : il faut un réveil en retard de plus de 5 s pour que le test rougisse (2 s avec 30 s et 28 s : rouge dans la suite de L539).
     const real = Date.now.bind(Date);
     let skew = 0;
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => real() + skew);
     const timer = setTimeout(() => {
-      skew = 28_000;
+      skew = 20_000;
       rmSync(lock, { force: true });
     }, 100);
     try {
-      const app = await startApp({ ...opts(t), timeoutMs: 30_000 });
+      const app = await startApp({ ...opts(t), timeoutMs: 25_000 });
       expect(app.state.kind).toBe('unverified');
       if (app.state.kind !== 'unverified') return;
-      // ~2 s restantes en théorie ; sous charge, le reste ne peut que baisser : on borne (0 à 2 s), jamais le délai complet
-      expect(app.state.cause).toMatch(/n'a pas répondu en [0-2] s/);
-      expect(app.state.cause).not.toContain('en 30 s');
+      // ~5 s restantes en théorie ; sous charge, le reste ne peut que baisser : on borne (0 à 5 s), jamais le délai complet
+      expect(app.state.cause).toMatch(/n'a pas répondu en [0-5] s/);
+      expect(app.state.cause).not.toContain('en 25 s');
     } finally {
       clearTimeout(timer);
       clock.mockRestore();

@@ -8,6 +8,7 @@ import type { Day } from './dates.js';
 import { parseDeliverConfig } from './deliver.js';
 import { commitPaths, dirtyPaths, gitRoot, restorePaths } from './git.js';
 import { findProjects, isProject, readDepth, readLeadContextThreshold, readLeadUx } from './lead.js';
+import { readMemoryIndexMax } from './memory-index.js';
 import { readPriority } from './orchestrate/continue.js';
 import { Plan, RafError, type PlanSettings } from './plan.js';
 
@@ -36,6 +37,7 @@ export function validateConfig(file: string, root: string): void {
   readDocsConfig(file);
   readReferencesConfig(file);
   readMigrateConfig(file);
+  readMemoryIndexMax(file);
   readLeadUx(dirname(file));
   readLeadContextThreshold(dirname(file));
   readDepth(dirname(file));

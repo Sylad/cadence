@@ -73,7 +73,7 @@ function tourLines(c: MemoryCheck): string[] {
  * Clé `memory.indexMaxBytes` de cadence.yaml : seuil, en octets, de l'avertissement ; `undefined` quand elle est absente.
  * Une valeur qui n'est pas un entier ≥ 1 est refusée.
  */
-function readMemoryIndexMax(file: string): number | undefined {
+export function readMemoryIndexMax(file: string): number | undefined {
   if (!existsSync(file)) return undefined;
   let raw: unknown;
   try {

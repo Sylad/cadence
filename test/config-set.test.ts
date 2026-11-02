@@ -129,6 +129,19 @@ describe('cadence config set --all (L342)', () => {
     expect(git(b, 'rev-list', '--count', 'HEAD').trim()).toBe('1');
   });
 
+  it('R7 — memory.indexMaxBytes invalide (0, « 8k ») est refusé par config set avant toute écriture, une valeur valide passe (L442)', () => {
+    const parent = tempDir();
+    const a = project(parent, 'alpha', { 'cadence.yaml': COMMENTED });
+    for (const bad of ['0', '8k', '1.5']) {
+      const r = cadence(parent, 'config', 'set', 'memory.indexMaxBytes', bad, '--all');
+      expect(r.code).toBe(1);
+      expect(r.out).toMatch(/alpha.*arrêt.*ne se relit pas.*memory\.indexMaxBytes/);
+      expect(readFileSync(join(a, 'cadence.yaml'), 'utf8')).toBe(COMMENTED);
+    }
+    expect(cadence(parent, 'config', 'set', 'memory.indexMaxBytes', '5000', '--all').code).toBe(0);
+    expect(readFileSync(join(a, 'cadence.yaml'), 'utf8')).toMatch(/indexMaxBytes: 5000/);
+  });
+
   it('R7 — ne pousse pas : le dépôt distant ne reçoit rien', () => {
     const parent = tempDir();
     const remote = gitRepo();

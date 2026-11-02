@@ -888,6 +888,7 @@ lots:
     estimate: 0.25
     created: 2026-10-31
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme (1 mineur, note du lot : libellé du refus inchangé pour les nouvelles clés/fichiers) — orchestré (vague 2026-11-02-1530-cont, 3 passe(s) de correction)", commit: ffd96e54206c842bb7aea61a8ab0f100ae4ba864, reporte: { de: 6d874505626244dd47856ae425d4a80fbe839a32, vers: ffd96e54206c842bb7aea61a8ab0f100ae4ba864, patchId: 59ab7d2c5292f8da6ee155f568d466ac89a24a74 } }
   - id: L480
     title: "Tests instables sous charge (suite complète en parallèle) : test/orchestrate-worktree-plan-writes.test.ts R3 (créneaux libres [2,1] au lieu de [2,2], clone neuf de la release 1.32.0, vert 3/3 seul) et test/mise-en-service.test.ts L330 (vague 2026-10-31-0950-cad) — rendre les attentes déterministes"
     status: done

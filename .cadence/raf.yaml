@@ -282,11 +282,12 @@ lots:
     finished: 2026-11-01
   - id: L422
     title: "Table finale d'orchestrate : une sous-tâche proposée dont le fichier cité a été modifié par un commit du lot postérieur à la revue qui l'a émise est marquée « peut-être déjà traitée (<sha>) » (28-10 : L230 ouvert sur des propositions déjà corrigées, 5 passes perdues)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-29
     started: 2026-11-02
     review: { date: 2026-11-02, verdict: "conforme, 4 mineurs (citedFiles manque « fichier:ligne. » et « fichier:ligne: », doc « oldest » inexacte, deux tests sans l'assertion de leur titre) — orchestré (vague 2026-11-02-1205-cont, 2 passe(s) de correction)", commit: 7ac0c9ba51e7e762bd68be25358e14504a3c2360, reporte: { de: 91f61ab0a21635cba73fbe0f337ea7a6b91e41d3, vers: 7ac0c9ba51e7e762bd68be25358e14504a3c2360, patchId: 37b2f6d298f8c4a32acdee2f18d51e34b04ddd91 } }
+    finished: 2026-11-02
   - id: L424
     title: "Plafond de sessions : la vague compte les sessions du lead (cadence lead hold) avant de prendre un créneau — 29-10, vague 2026-10-29-cad : 2 sessions lancées pour 3/3 alors qu'un hold du lead était actif (4 agents pour un plafond de 3) ; le journal dit « 3/3 en cours » sans le hold"
     status: done

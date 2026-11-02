@@ -478,6 +478,35 @@ lots:
       - { date: 2026-11-02, text: "Hypothèses (fiche index-memoire-seuil) — R3 : Une entrée datée est une ligne de liste (« - ») de l'index dont le texte commence par un jour « jj-mm » (précédé au plus de « ** », « [ » et « ⚠ ») ; si faux : Si des entrées datées n'ont leur date que dans le nom du fichier, elles ne sont pas proposées et la proposition est plus étroite ; aucune donnée n'est touchée…" }
       - { date: 2026-11-02, text: "Hypothèses (fiche index-memoire-seuil) — R6 : Index absent ou au plus égal au seuil : la sortie de session close et de lead tour est octet pour octet celle d'avant le lot ; si faux : Si un projet doit voir une ligne « mémoire » même saine, la sortie d'avant change : les tests existants des deux commandes le montrent tout de suite" }
       - { date: 2026-11-02, text: "Hypothèses (fiche index-memoire-seuil) — R7 : Le seuil par défaut est 12000 octets, pour les deux commandes ; si faux : Si le bon défaut est autre (l'index de 15,7 Ko a pesé ~8k tokens le 30-10), seule la constante change ; si une valeur invalide doit replier sur 12000 au lieu d…" }
+    review:
+      {
+        date: 2026-11-02,
+        verdict: "conforme — 0 bloquant, 0 majeur, 2 mineurs (notes : message « aucune entrée datée » d'A1 sans son préfixe, deux titres de tests de sonde inexacts) — orchestré (vague 2026-11-02-1205-cont, 2 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : Conforme : le rebase n'a touché que le CHANGELOG, conflit bien résolu, le code et les tests du lot sont identiques octet pour octet à ceux d'avant le rebase.
+
+
+          **Ce que j'ai lu.** Les 8 commits de `raf commits L442`, de 227a60f (spec) à 6b97de2 (fix `config set`), et le diff `git diff main...HEAD` : 14 fichiers, +965/−4.
+
+
+          **Ce que j'ai vérifié.**
+
+          - Avec `git reflog`, j'ai retrouvé l'ancienne pointe (126b7867) et l'ancienne base (f66d583e).
+
+          - J'ai comparé le diff d'avant le rebase (`git diff f66d583e 126b7867`) à celui d'après (`git diff main HEAD`) avec `diff`.
+
+          - Pour `src`, `test`, `docs`, `skills` et `README.md`, les deux diffs sont identiques (`IDENTICAL`).
+
+          - La seule différence est dans le CHANGELOG. Sur `main`, L422 avait ouvert un `### Added` dans `## [Unreleased]`. Le conflit est résolu en ajoutant les deux entrées L442 (`config set` et l'avertissement sur la mémoire) dans ce même `### Added`, après celle de L422. Il n'y a donc pas de double titre `### Added` (lignes 82 à 88), et `[1.39.0]` suit normalement.
+
+
+          **Résultat.** Les commits arrivés sur `main` pendant le lot (L422, et des commits du plan pour L438, L442 et L459) ne modifient aucune ligne que le lot touche. Les hunks de `src/cli.ts` (ligne mémoire du tour, `SessionCtx.memory`), de `src/session.ts` et de `src/config-set.ts` s'appliquent tels quels. Le programme a passé tsc, qualite.mjs et vitest au vert sur cette pointe.
+
+
+          Rien à signaler.
+
+
+          Compliant",
+        commit: 6b97de2c44009044f4a0011dd53d240e0de3417e
+      }
   - id: L443
     title: "orchestrate --resume --integrate refusé parce qu'une autre vague tient le dépôt : attendre la fin de cette vague (ou intégrer à côté, les worktrees isolant déjà les lots) au lieu de sortir en 2 — L414 a attendu 80 min le 30-10"
     status: done

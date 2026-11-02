@@ -1660,6 +1660,24 @@ describe('budget par lot (L78, recalibré L194)', () => {
     }
   });
 
+  it("--dry-run (L209, L459) : un lot component déjà entré dans la chaîne avec son acceptation garde son budget d'écran ; une fiche seule (que la maquette légère écrit aussi) le laisse léger", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un composant', estimate: 0.5, screen: 'component' }, { title: 'un autre', estimate: 0.5, screen: 'journey' }] });
+    mkdirSync(join(dirs.a, 'docs/specs/carte'), { recursive: true });
+    writeFileSync(join(dirs.a, 'docs/specs/carte/fiche.yaml'), 'ecran:\n  id: carte\n  lot: L1\n');
+    writeFileSync(join(dirs.a, 'docs/specs/carte/acceptation-L2.json'), '{}');
+    const r = io(parent);
+    await orchestrate(['a:L1', 'a:L2', '--dry-run'], r.io, fakeDeps().deps);
+    const text = r.out.join('\n');
+    try {
+      const [, one, two] = text.split('étapes :');
+      expect(one).toMatch(/spec \(sonnet\)/);
+      expect(two).toMatch(/spec \(sonnet\)/);
+      expect(text.match(/budget du lot : \d+/g)).toEqual(['budget du lot : 1050000', 'budget du lot : 1300000']);
+    } finally {
+      removeDryRunBriefs(text);
+    }
+  });
+
   it("--dry-run (L209) : un lot component à spec: true déjà entré dans la chaîne (fiche ou acceptation présentes) garde son étape spec et son budget d'écran", async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un composant', estimate: 0.5, screen: 'component', spec: true }, { title: 'un autre', estimate: 0.5, screen: 'journey', spec: true }] });
     mkdirSync(join(dirs.a, 'docs/specs/carte'), { recursive: true });

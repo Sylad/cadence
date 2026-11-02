@@ -122,7 +122,7 @@ export function candidates(launch: string, o: DrawOpts): Candidate[] {
         o.skipped?.push(`${project}:${lot.id} écarté du tirage : ${why}`);
         continue;
       }
-      if (lotBudget(lot.estimate, budgetStage(lot, stageScreen(dir, specDir, lot, maquette), maquette), escalating) > o.remaining) continue;
+      if (lotBudget(lot.estimate, budgetStage(lot, stageScreen(dir, specDir, lot, maquette), maquette, dir, specDir), escalating) > o.remaining) continue;
       out.push({ project, dir, lot });
     }
   }

@@ -42,8 +42,18 @@ export function lightMaquette(lot: { visible?: boolean; spec?: boolean; estimate
   return maquette && !!lot.visible && !lot.spec && typeof lot.estimate === 'number' && lot.estimate > EXPRESS_MAX_ESTIMATE && lot.screen !== 'page';
 }
 
-/** Le lot est une maquette légère : son état a une étape spec (`screen` posé au lancement) et son lot du plan répond à `lightMaquette`. Relu du plan à chaque appel, aucun champ d'état. */
-export const lightLot = (state: { screen?: Screen }, lot: Parameters<typeof lightMaquette>[0], maquette: boolean): boolean => !!state.screen && lightMaquette(lot, maquette);
+/**
+ * Le lot a une acceptation scellée (`acceptation-<lot>.json` à côté d'une fiche à bloc `ecran` de `dir`) : il est entré dans la chaîne complète
+ * avant L459 (spec → maquette → accept) et la garde, même s'il répond aujourd'hui à `lightMaquette` ; une maquette légère n'écrit jamais d'acceptation.
+ */
+export function sealedAcceptation(repo: string, dir: string, lot: string): boolean {
+  const acceptation = acceptationFile('fiche.yaml', lot);
+  return fichesDuDossier(repo, dir).some(({ name, doc }) => isObj(doc.ecran) && existsSync(join(repo, dir, name, acceptation)));
+}
+
+/** Le lot est une maquette légère : son état a une étape spec (`screen` posé au lancement), son lot du plan répond à `lightMaquette` et il n'a pas d'acceptation scellée (`sealedAcceptation`). Relu du plan et du dépôt à chaque appel, aucun champ d'état. */
+export const lightLot = (state: { screen?: Screen }, lot: Parameters<typeof lightMaquette>[0] & { id: string }, maquette: boolean, repo: string, dir: string): boolean =>
+  !!state.screen && lightMaquette(lot, maquette) && !sealedAcceptation(repo, dir, lot.id);
 
 /** `screen` de l'état d'un lot à étape spec : celui de `specScreen`, ou, pour une maquette légère, celui du plan (`component` quand le plan n'en déclare pas : l'état ne sert alors qu'à dire « ce lot a une étape spec »). */
 export function stageScreen(repo: string, dir: string, lot: { id: string; visible?: boolean; spec?: boolean; estimate?: number; screen?: Screen }, maquette: boolean): Screen | undefined {
@@ -51,8 +61,8 @@ export function stageScreen(repo: string, dir: string, lot: { id: string; visibl
 }
 
 /** Catégorie de budget d'un lot (`lotBudget`) : `screen` pour un écran page, `light` pour une maquette légère, `spec` pour un lot `spec: true` sans écran. */
-export function budgetStage(lot: { visible?: boolean; spec?: boolean; estimate?: number; screen?: Screen }, stateScreen: Screen | undefined, maquette: boolean): SpecStage | undefined {
-  if (stateScreen) return lightMaquette(lot, maquette) ? 'light' : 'screen';
+export function budgetStage(lot: { id: string; visible?: boolean; spec?: boolean; estimate?: number; screen?: Screen }, stateScreen: Screen | undefined, maquette: boolean, repo: string, dir: string): SpecStage | undefined {
+  if (stateScreen) return lightLot({ screen: stateScreen }, lot, maquette, repo, dir) ? 'light' : 'screen';
   return lot.spec ? 'spec' : undefined;
 }
 

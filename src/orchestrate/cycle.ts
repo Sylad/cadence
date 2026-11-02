@@ -593,7 +593,7 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     vars.spec = specText({
       dir: c.config.spec.dir,
       render: c.config.spec.render,
-      screen: l.screen, light: lightLot(l, lot, c.config.maquette),
+      screen: l.screen, light: lightLot(l, lot, c.config.maquette, wd(c), c.config.spec.dir),
       back,
       problems: l.specProblems,
       review: !reviewed.length ? undefined : back ? reviewedSheetText(reviewed, !!l.screen, session) : reviewedText(reviewed, session),
@@ -610,7 +610,7 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     vars.reponse = '';
   }
   if (kind === 'maquette') {
-    vars.maquette = maquetteText({ fiche: ficheOf(c) ?? '', passes: l.maquette?.passes ?? 0, max: c.config.maquetteReviews, previous: l.maquetteConstats, light: lightLot(l, lot, c.config.maquette) });
+    vars.maquette = maquetteText({ fiche: ficheOf(c) ?? '', passes: l.maquette?.passes ?? 0, max: c.config.maquetteReviews, previous: l.maquetteConstats, light: lightLot(l, lot, c.config.maquette, wd(c), c.config.spec.dir) });
     vars.reponse = '';
   }
   if (kind === 'accept') {
@@ -1481,7 +1481,7 @@ function afterMaquette(c: LotCtx, fiche: string): SessionKind {
   // Des constats de la revue de fiche attendent la revue de la maquette (lot mixte) : les deux partent ensemble à la seconde passe `spec`.
   if (l.ficheConstats?.length) return 'spec';
   // Une maquette légère n'a pas de règles de comportement à verrouiller : pas d'accept, même si orchestrate.accept est déclaré.
-  if (lightLot(l, c.loadPlan().lot(l.lot), c.config.maquette)) return 'implement';
+  if (lightLot(l, c.loadPlan().lot(l.lot), c.config.maquette, wd(c), c.config.spec.dir)) return 'implement';
   if (!c.config.accept) {
     if (!l.warnings.includes(NO_ACCEPT)) l.warnings.push(NO_ACCEPT);
     return 'implement';

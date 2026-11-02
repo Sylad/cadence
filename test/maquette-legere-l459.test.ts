@@ -6,7 +6,8 @@ import { runLot } from '../src/orchestrate/cycle.js';
 import { lotBudget } from '../src/orchestrate/lot-budget.js';
 import { orchestrate, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { newLot } from '../src/orchestrate/state.js';
-import { budgetStage, lightMaquette, stageScreen } from '../src/orchestrate/spec.js';
+import { budgetStage, lightLot, lightMaquette, sealedAcceptation, stageScreen } from '../src/orchestrate/spec.js';
+import { sealAcceptation } from '../src/orchestrate/accept.js';
 import { Plan } from '../src/plan.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { acceptReport, claudeOut, commitFile, git, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
@@ -28,7 +29,7 @@ const light = { visible: true, screen: 'component' as const };
 const lots = [{ title: 'Un composant', screen: 'component' as const, estimate: 0.6 }];
 
 describe('R1 — quels lots entrent dans la chaîne légère', () => {
-  it('R1 — lot visible screen: component d\'estimate 0,3 : étapes precheck, spec, maquette, implement, review, ux', async () => {
+  it('R1 — lot visible screen: component d\'estimate 0,6 : étapes precheck, spec, maquette, implement, review, ux', async () => {
     const { parent } = parentWith([{ title: 'Un composant, suite du constat de revue', estimate: 0.6, screen: 'component', visible: true }], 'precheck: true\nux:\n  url: http://localhost:4200');
     const r = await dry(parent, ['a:L1']);
     try {
@@ -116,6 +117,39 @@ describe('R1 — quels lots entrent dans la chaîne légère', () => {
   });
 });
 
+describe('R1 — lot déjà entré dans la chaîne complète avec une acceptation scellée (L209, revue L459)', () => {
+  it('L209 — lot visible component à acceptation-<lot>.json scellée : garde accept (l.accept posé, rouge scellé), pas la chaîne légère', async () => {
+    const h = harness({ lots, script: { implement: [impl], review: [ok] } });
+    ecrit(h.repo);
+    const a = ecritAcceptation(h.repo, { sansFiche: true });
+    sealAcceptation(h.repo, a.json);
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation scellée', '--', a.json);
+    expect(sealedAcceptation(h.repo, 'docs/specs', 'L1')).toBe(true);
+    expect(lightLot(light, { id: 'L1', ...h.plan().lot('L1') }, true, h.repo, 'docs/specs')).toBe(false);
+    expect(budgetStage(h.plan().lot('L1'), 'component', true, h.repo, 'docs/specs')).toBe('screen');
+    const c = h.lot('L1', { ...light, maquette: { passes: 1, conforme: true, verdict: 'conforme' } }, { ...cfg, accept: 'true', test: 'true' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.accept?.acceptation).toBe(a.json);
+    expect(c.lot.accept?.rouge).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('L209 — dry-run : lot visible component à acceptation scellée annonce accept et le budget d\'écran de 1,3 M', async () => {
+    const { parent, dir } = parentWith([{ title: 'un composant', estimate: 0.6, screen: 'component', visible: true }], 'accept: npx vitest run acceptation');
+    mkdirSync(join(dir, 'docs/specs/carte'), { recursive: true });
+    writeFileSync(join(dir, 'docs/specs/carte/fiche.yaml'), 'ecran:\n  id: carte\n  lot: L1\n');
+    writeFileSync(join(dir, 'docs/specs/carte/acceptation-L1.json'), '{}');
+    const r = await dry(parent, ['a:L1']);
+    try {
+      expect(r.line).toMatch(/spec \(sonnet\) → maquette \(opus\) → accept \(sonnet\) → implement/);
+      expect(r.text).toContain('budget du lot : 1300000');
+    } finally {
+      removeDryRunBriefs(r.text);
+    }
+  });
+});
+
 describe('R2 — orchestrate.maquette: false', () => {
   it('R2 — orchestrate.maquette: false : lot component sans étape spec ni maquette', async () => {
     const { parent } = parentWith([{ title: 'un composant', estimate: 0.4, screen: 'component', visible: true }, { title: 'sans screen', estimate: 0.4, visible: true }], 'maquette: false');
@@ -138,6 +172,18 @@ describe('R3 — lot qui ne change aucun écran', () => {
     expect(c.lot.spec).toEqual({ sousSeuil: 'le lot ne change que le nom d\'une classe CSS interne' });
     expect(c.lot.warnings.join('\n')).toContain('sous le seuil');
     expect(git(h.repo, 'ls-files', 'docs/specs').trim()).toBe('');
+  });
+});
+
+describe('R3 — une retouche de composant n\'est pas sous le seuil (revue L459)', () => {
+  it('R3 — le brief spec d\'un lot léger réserve sousSeuil au lot qui ne change rien de visible : une retouche de composant écrit sa maquette', async () => {
+    const h = harness({ lots, script: { spec: [spec], maquette: [ok], implement: [impl], review: [ok] } });
+    await runLot(h.lot('L1', light, cfg));
+    const b = h.calls.find((c) => c.kind === 'spec')!.brief;
+    expect(b).not.toContain('(no new page)');
+    expect(b).toContain('changes nothing the user can see');
+    expect(b).toContain('A change to a component, a state, a text or a style of an existing screen is NOT under the threshold');
+    expect(b).toContain('only the states the lot touches');
   });
 });
 
@@ -347,13 +393,13 @@ describe('R12 — budget', () => {
       removeDryRunBriefs(r.text);
     }
     expect(lotBudget(0.3, 'light')).toBe(lotBudget(0.3) + 450_000);
-    expect(budgetStage({ visible: true, estimate: 0.3, screen: 'component' }, 'component', true)).toBe('light');
+    expect(budgetStage({ id: 'L1', visible: true, estimate: 0.3, screen: 'component' }, 'component', true, tempDir(), 'docs/specs')).toBe('light');
   });
 
   it('R12 — budget d\'un lot screen: page inchangé', () => {
-    expect(budgetStage({ visible: true, estimate: 0.3, screen: 'page' }, 'page', true)).toBe('screen');
+    expect(budgetStage({ id: 'L1', visible: true, estimate: 0.3, screen: 'page' }, 'page', true, tempDir(), 'docs/specs')).toBe('screen');
     expect(lotBudget(0.3, 'screen')).toBe(1_300_000);
-    expect(budgetStage({ visible: true, spec: true, estimate: 0.3 }, undefined, true)).toBe('spec');
+    expect(budgetStage({ id: 'L1', visible: true, spec: true, estimate: 0.3 }, undefined, true, tempDir(), 'docs/specs')).toBe('spec');
   });
 });
 

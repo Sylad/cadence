@@ -977,6 +977,7 @@ lots:
     created: 2026-10-31
     started: 2026-11-02
     docs_ok: { date: 2026-11-02, reason: nettoyage interne D5–D6 sans changement de comportement ; aucune doc ne cite ces fonctions }
+    review: { date: 2026-11-02, verdict: "conforme : factorisation D5–D6 sans changement de comportement, base du cliquet sans descente sous main, tsc et suite complète verts", commit: 57049db4188c63d2dc0a5f4a58e2a6dcb1e87e92 }
   - id: L488
     title: "Découpage C3 : cli.ts en modules par famille de commandes, dispatch réduit à une table (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C3 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: done

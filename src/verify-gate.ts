@@ -79,14 +79,14 @@ export interface GateCtx {
 }
 
 /**
- * Les fichiers suivis au sha, hors documentation (`docs/`, `.md`, `.txt`), plan et `cadence.yaml`, qui citent le chemin du plan (L482) ; vide si aucun ou si git échoue.
+ * Les fichiers suivis au sha, hors documentation (`docs/`, `.md`, `.txt`), journal `CHANGELOG` (nom exact), plan et `cadence.yaml`, qui citent le chemin du plan (L482) ; vide si aucun ou si git échoue.
  * Chaîne cherchée telle quelle (`-F`), pas comme un motif.
  */
 function planReaders(repo: string, sha: string, planFile: string | undefined): string[] {
   if (!planFile) return [];
   try {
-    const out = git(repo, 'grep', '-l', '-I', '-F', '-e', planFile, sha, '--', '.', ':(exclude)docs', ':(exclude)*.md', ':(exclude)*.txt', ':(exclude).cadence', ':(exclude)cadence.yaml', ':(exclude)CHANGELOG*');
-    return out.split('\n').map((l) => l.slice(sha.length + 1)).filter(Boolean);
+    const out = git(repo, 'grep', '-l', '-z', '-I', '-F', '-e', planFile, sha, '--', '.', ':(exclude)docs', ':(exclude)*.md', ':(exclude)*.txt', ':(exclude).cadence', ':(exclude)cadence.yaml', ':(exclude)CHANGELOG');
+    return out.split('\0').map((l) => l.slice(sha.length + 1)).filter(Boolean);
   } catch {
     return []; // git grep rend 1 sans correspondance
   }

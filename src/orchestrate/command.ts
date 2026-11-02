@@ -482,7 +482,8 @@ function planMessageLines(repo: string, l: LotState, wave: string, dir: string):
   ];
 }
 
-function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budget: number, id: string, multiSlot: boolean): void {
+/** `wave` : la vague simulée — son identifiant, son budget et si elle a plus d'un créneau (L527 : tout lot d'un dépôt en worktrees y joue alors dans le sien). */
+function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, { budget, id, multiSlot }: { budget: number; id: string; multiSlot: boolean }): void {
   const tmp = mkdtempSync(join(tmpdir(), 'cadence-orchestrate-'));
   const agents = agentsOf(deps);
   io.out(`vague ${id} — simulation, rien n'est lancé (budget ${budget} tokens comptés)`);
@@ -780,7 +781,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.dryRun) {
     const id = waveId(io, args.wave, launch);
     if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) return waveExists(args.wave, io);
-    dryRun(pre.lots, io, deps, budget, id, maxSessions(args, io) > 1);
+    dryRun(pre.lots, io, deps, { budget, id, multiSlot: maxSessions(args, io) > 1 });
     for (const l of [...estimateLines(pre.lots, launch, (w) => io.err(`orchestrate : ${w}`)), ...(args.continue ? freeLines(launch, pre.lots) : [])]) io.out(l);
     if (args.continue) await continueDryRun(args, io, deps, launch, pre.lots, budget, firstSkipped);
     return 0;

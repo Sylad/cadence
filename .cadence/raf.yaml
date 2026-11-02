@@ -457,10 +457,11 @@ lots:
     finished: 2026-10-29
   - id: L442
     title: "session-close et lead tour : avertir quand l'index mémoire de Claude Code (MEMORY.md, chargé à chaque tour) dépasse un seuil de taille, et proposer de regrouper les entrées datées sous une ligne vers un index secondaire — l'index a pesé ~8k de la charge fixe du lead le 30-10 (demande de Sylvain)"
-    status: todo
+    status: doing
     estimate: 0.25
     spec: true
     created: 2026-10-29
+    started: 2026-11-02
   - id: L443
     title: "orchestrate --resume --integrate refusé parce qu'une autre vague tient le dépôt : attendre la fin de cette vague (ou intégrer à côté, les worktrees isolant déjà les lots) au lieu de sortir en 2 — L414 a attendu 80 min le 30-10"
     status: done

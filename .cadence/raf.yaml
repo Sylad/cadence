@@ -410,10 +410,13 @@ lots:
     finished: 2026-10-30
   - id: L438
     title: "Alerte de joignabilité des machines : une sonde depuis Big-Blue (ping + API k3s) écrit sur Discord (webhook discord-idle) quand dark-blue ne répond plus — le 29-10 il s'est éteint à 20:05 et on ne l'a su qu'à la livraison de 20:43 (config locale, rien de propre à notre dossier dans le code de cadence)"
-    status: doing
+    status: dropped
     estimate: 0.25
     created: 2026-10-29
     started: 2026-11-02
+    finished: 2026-11-02
+    notes:
+      - { date: 2026-11-02, text: "abandonné : déjà livré dans cluster-sante (bigblue/cluster-alert.sh, L2/L3 : ping dark-blue, nœud k3s Ready, 4 sites, Discord au changement d'état) — config locale, rien à mettre dans cadence" }
   - id: L439
     title: "Livreur délégué : pour un lot prêt, une sous-session fait la chaîne lead (verify --gate au sha, verdict UX sur captures selon lead.ux, raf done, commit du plan et des fichiers de plan.onWrite, push du sha, deliver, qa-reviewer) et rend UNE ligne au lead (« L84 livré 3d6edf4, QA 2/2 ») ou une question ; livraisons toujours une à une — le contexte du lead a atteint 460k le 29-10 surtout par ces chaînes (~10 appels par lot) (demande de Sylvain)"
     status: done

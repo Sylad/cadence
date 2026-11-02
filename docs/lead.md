@@ -10,7 +10,7 @@ summaries, decides with the human, and leaves the work to fresh short sessions r
   <img alt="The lead workflow in three lanes (human, lead session, orchestrate program and agents), from the tour of the projects to the close of the session" src="lead-workflow-light.svg">
 </picture>
 
-Dashed boxes are conditional steps: the precheck runs only for a lot without a commit yet whose title cites a finding (`constat`, `revue`, `review`, `audit`) or another lot (unless `orchestrate.precheck: false`), and the spec, sheet review and accept steps run only for a `screen: page` lot or a `spec: true` lot. The skill itself is `skills/lead/SKILL.md`; this page is its
+Dashed boxes are conditional steps: the precheck runs only for a lot without a commit yet whose title cites a finding (`constat`, `revue`, `review`, `audit`) or another lot (unless `orchestrate.precheck: false`), and the spec steps depend on the lot: a `screen: page` lot or a `spec: true` lot plays the full chain (spec, sheet review or mockup review, accept); a visible lot above 0.1 day without `screen: page` plays spec then the light mockup review, with no accept unless it already has a sealed acceptation (L459). The skill itself is `skills/lead/SKILL.md`; this page is its
 picture, not its source.
 
 ## The steps

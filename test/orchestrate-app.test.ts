@@ -275,21 +275,22 @@ describe('verrou par hôte:port de l\'URL (L60)', () => {
     const lock = uxLockFile(t.url);
     writeFileSync(lock, String(process.pid));
     // L199 : l'attente d'une seconde n'est plus vécue au mur (un setTimeout de 1 s contre un délai de 3 s dépendait de la charge) :
-    // le verrou est rendu tôt et l'horloge de l'orchestrateur saute d'une seconde au même instant, le reste est donc ~2 s quelle que soit la charge.
+    // le verrou est rendu tôt et l'horloge de l'orchestrateur saute de 28 s au même instant, le reste est donc ~2 s quelle que soit la charge.
+    // L528 : le délai de 30 s laisse 28 s de marge au mur avant que l'attente du verrou n'expire (3 s : rouge sous charge, « url tenue par une autre vague »).
     const real = Date.now.bind(Date);
     let skew = 0;
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => real() + skew);
     const timer = setTimeout(() => {
-      skew = 1_000;
+      skew = 28_000;
       rmSync(lock, { force: true });
     }, 100);
     try {
-      const app = await startApp({ ...opts(t), timeoutMs: 3_000 });
+      const app = await startApp({ ...opts(t), timeoutMs: 30_000 });
       expect(app.state.kind).toBe('unverified');
       if (app.state.kind !== 'unverified') return;
       // ~2 s restantes en théorie ; sous charge, le reste ne peut que baisser : on borne (0 à 2 s), jamais le délai complet
       expect(app.state.cause).toMatch(/n'a pas répondu en [0-2] s/);
-      expect(app.state.cause).not.toContain('en 3 s');
+      expect(app.state.cause).not.toContain('en 30 s');
     } finally {
       clearTimeout(timer);
       clock.mockRestore();

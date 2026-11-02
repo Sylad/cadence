@@ -26,7 +26,7 @@ sujet:
       - "les lots spec: true sans écran et la partie back d'une fiche mixte"
       - "la voie express (estimate ≤ 0,1 j, src/orchestrate/express.ts:10) et les lots non visibles : chemin ordinaire inchangé"
       - "le calcul de « sessions ux par lot visible » dans src/perf.ts : la mesure compte déjà les étapes ux (src/perf.ts:590), aucun changement de formule"
-      - "le format de l'état d'un lot (src/orchestrate/state.ts) et le schéma de la fiche : voir les questions"
+      - "le schéma de la fiche (cadence spec check inchangé) et le format de l'état d'un lot (aucun champ ajouté)"
 
 cas:
   - id: C1
@@ -43,7 +43,7 @@ cas:
       - "Il planifie precheck → spec → maquette → implement → review → ux (l'étape accept est sautée)."
       - "Il alloue au lot le budget ordinaire plus l'allocation d'étapes spec (stage spec de lot-budget.ts)."
     alternatives:
-      - { si: "le lot a screen: page, ou une fiche à bloc ecran du lot existe déjà", alors: "il suit la chaîne complète existante, inchangée", regles: [R1] }
+      - { si: "le lot a screen: page", alors: "il suit la chaîne complète existante, inchangée", regles: [R1] }
       - { si: "le lot est express, non visible ou spec: true", alors: "il suit son chemin ordinaire, sans étape spec ni maquette", regles: [R1] }
       - { si: "orchestrate.maquette vaut false", alors: "le lot suit le chemin ordinaire : la maquette légère est la revue de maquette, sans elle rien n'est à valider", regles: [R2] }
       - { si: "une fiche légère du lot, valide et relue conforme, existe déjà (reprise)", alors: "les étapes spec et maquette sont sautées", regles: [R9] }
@@ -110,15 +110,17 @@ cas:
 regles:
   - id: R1
     cas: [C1]
-    enonce: "Entrent dans la chaîne maquette légère les seuls lots visibles, sans spec: true, d'estimate > 0,1 j, dont screen: est component, journey ou absent, et qui n'ont pas déjà une fiche à bloc ecran ; screen: page garde sa chaîne complète."
+    enonce: "Entrent dans la chaîne maquette légère les seuls lots visibles, sans spec: true, d'estimate > 0,1 j, dont le screen du plan n'est pas page (component, journey ou absent) ; le caractère « léger » se déduit du plan à chaque appel (screen différent de page), sans champ d'état ni clé de fiche, donc il survit à la reprise et à l'écriture de la fiche ; screen: page garde sa chaîne complète."
     statut: sourcee
-    source: "demande du lot L459 : « lots visibles sans screen: page (screen: component, retouches, revues UX d'écran) » ; express.ts:10 (une retouche ≤ 0,1 j se joue en une session) ; spec.ts:26-32 (une fiche déjà entrée garde sa chaîne)"
+    source: "demande du lot L459 : « lots visibles sans screen: page (screen: component, retouches, revues UX d'écran) » ; express.ts:10 (une retouche ≤ 0,1 j se joue en une session) ; décision du lead : « un lot est léger quand il est visible et que son screen vaut autre chose que page », déduit de l'existant, sans nouveau champ ; spec.ts:26-32 (specScreen) ne conserve pas component quand le lot n'est pas entré, et le renvoie une fois la fiche écrite : le classement lit donc lot.screen du plan, pas specScreen seul"
     tests:
       - "R1 — lot visible screen: component d'estimate 0,3 : étapes precheck, spec, maquette, implement, review, ux"
       - "R1 — lot visible sans screen d'estimate 0,3 : même chaîne"
       - "R1 — lot visible d'estimate 0,1 (express) : aucune étape spec ni maquette"
       - "R1 — lot non visible ou spec: true : chemin ordinaire inchangé"
       - "R1 — lot screen: page : chaîne complète avec accept, inchangée"
+      - "R1 — lot component après écriture de sa fiche à bloc ecran : toujours léger (sans accept), pas basculé en chaîne complète"
+      - "R1 — état de lot ancien sans nouveau champ, relu : classement identique, aucune erreur"
   - id: R2
     cas: [C1]
     enonce: "Avec orchestrate.maquette: false, un lot visible sans screen: page suit le chemin ordinaire (aucune étape spec ni maquette)."
@@ -239,4 +241,4 @@ contrats:
 donnees:
   - { id: D1, objet: "plan (.cadence/raf.yaml) : visible, screen, spec, estimate d'un lot", existant: true, modification: aucune, note: "lus pour classer le lot, jamais modifiés" }
   - { id: D2, objet: "docs/specs/<écran>/ (fiche.yaml, maquette.html, maquette-*.png, actuel-*.png)", existant: true, modification: aucune, note: "même dossier et même format de fiche que l'écran page ; les actuel-*.png sont de simples fichiers ajoutés (R10)" }
-  - { id: D3, objet: "état d'un lot (src/orchestrate/state.ts : screen, maquette, specRuns)", existant: true, modification: aucune, note: "aucun champ ajouté par cette fiche ; voir la question sur le marqueur « léger »" }
+  - { id: D3, objet: "état d'un lot (src/orchestrate/state.ts : screen, maquette, specRuns)", existant: true, modification: aucune, note: "aucun champ ajouté : « léger » se déduit de visible et de screen différent de page dans le plan (décision du lead), relu à chaque appel ; un état ancien reste valide tel quel" }

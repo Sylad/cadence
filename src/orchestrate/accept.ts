@@ -234,7 +234,7 @@ export function resealForGreen(repo: string, path: string, today: string): { ref
   const file = join(repo, path);
   const a = parseAcceptation(readFileSync(file, 'utf8'));
   if (typeof a === 'string') throw new Error(`${path} : ${a}`);
-  const fichiers = a.fichiers.map((f) => posix.normalize(f));
+  const fichiers = [...new Set(a.fichiers.map((f) => posix.normalize(f)))];
   const absents = fichiers.filter((f) => !existsSync(join(repo, f)));
   if (absents.length) throw new Error(`test(s) listé(s) absent(s) de ${path} : ${absents.join(', ')}`);
   const doc = JSON.parse(readFileSync(file, 'utf8')) as Obj;

@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.38.0] - 2026-11-02
+
 ### Added
 
 - Express lane for touch-ups (L519, [docs/orchestrate.md](docs/orchestrate.md)): a lot of at most 0.1 day without screen or spec sheet is played in one writing session, with no precheck, probe, separate review or « code sans test » gate and no News entry per lot (the lead reads the diff, looks at the capture and groups the entries at delivery); the program's gate still plays once. The L517 study sizes it at about 4.9 min and 51 k tokens less per lot.

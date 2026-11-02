@@ -84,10 +84,11 @@ export function readParent(raw: unknown, problems: string[]): { parent?: string 
   return {};
 }
 
-/** `plan.idPattern` lu dans cadence.yaml : le motif, ou l'erreur que `bad` fabrique (qui nomme la clé). */
-export function readIdPattern(raw: unknown, bad: (what: string) => Error): string {
+/** `plan.idPattern` lu dans cadence.yaml : `{ idPattern }` (rien sans la clé), ou l'erreur que `bad` fabrique (qui nomme la clé). */
+export function readIdPattern(raw: unknown, bad: (what: string) => Error): { idPattern?: string } {
+  if (raw == null) return {};
   if (typeof raw !== 'string') throw bad('idPattern doit être une expression régulière (texte)');
   const problem = idPatternProblem(raw);
   if (problem) throw bad(`idPattern ${problem}`);
-  return raw;
+  return { idPattern: raw };
 }

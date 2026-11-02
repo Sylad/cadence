@@ -102,10 +102,9 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   }
   if (p.ignore != null) settings.ignore = list(p.ignore);
   if (p.files != null) settings.files = list(p.files);
-  if (p.idPattern != null) settings.idPattern = readIdPattern(p.idPattern, bad);
   if (p.onWrite != null) settings.onWrite = readOnWrite(p.onWrite, root ?? dirname(resolve(file)), bad);
   if (FORMAT_KEYS.some((k) => p[k] != null)) settings.format = parseFormat(p, bad);
-  Object.assign(settings, parseStates(p, bad, settings.format !== undefined), readExtras(p.extras, !!settings.format, bad));
+  Object.assign(settings, parseStates(p, bad, settings.format !== undefined), readExtras(p.extras, !!settings.format, bad), readIdPattern(p.idPattern, bad));
   if (p.path != null && String(p.path).trim() === '') throw bad('path est vide');
   if (p.add != null && (typeof p.add !== 'string' || !p.add.includes('{title}'))) throw bad('add doit être une commande qui contient {title}');
   if (p.commit != null) {

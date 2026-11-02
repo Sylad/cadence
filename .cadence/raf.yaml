@@ -995,6 +995,7 @@ lots:
     created: 2026-10-31
     started: 2026-11-02
     docs_ok: { date: 2026-11-02, reason: découpage interne d'orchestrate/command.ts ; le dernier fix ne change que des commentaires d'ajout.ts et pool.ts ; CHANGELOG écrit (bd9958c8) }
+    review: { date: 2026-11-02, verdict: "conforme : découpage d'orchestrate/command.ts en modules sans changement de comportement (CLI réel identique à main en --dry-run, --status et refus), base du cliquet sans descente sous main, tsc et suite complète verts", commit: 77904c2a0f5b5b3c5b1990f7e0b02eba112b1b4a }
   - id: L490
     title: "Découpage C1a : orchestrate/cycle.ts — ctx puis budget, brief, plan-writes (façade de ré-export) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C1 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: todo

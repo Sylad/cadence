@@ -65,7 +65,8 @@ export interface Io {
 const HELP = `raf — plan « reste à faire » versionné dans le dépôt, relié aux commits
 
   raf init [--project nom] [--prefix L] [--no-hook]
-  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--local] [--public "titre public"] [--every jours] [--after L2,L4] [--uses banc,passerelle] [--set champ=valeur]… [--parent L3]
+  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--local] [--public "titre public"] [--every jours] [--after L2,L4] [--uses banc,passerelle] [--set champ=valeur]… [--parent L3] [--id AB-1.2 [--under AB-1]]
+  raf estimate <id> <jours>   remplace l'estimation d'un lot existant (archivé compris) ; --id pose un identifiant libre conforme à plan.idPattern (cadence.yaml), --under en fait un sous-lot à plat (parent: AB-1, hors préfixe), --parent une sous-tâche
   raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
   raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (seule la valeur page adopte l'étape spec d'orchestrate)
   raf visible <id> on|off   pose ou retire visible: d'un lot existant (changement visible : entrée Nouveautés et étape UX d'orchestrate) ; off est refusé tant que le lot a un screen:
@@ -207,6 +208,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       uses: { type: 'string' },
       set: { type: 'string', multiple: true },
       parent: { type: 'string' },
+      id: { type: 'string' },
+      under: { type: 'string' },
       force: { type: 'boolean' },
       back: { type: 'boolean' },
       reason: { type: 'string' },
@@ -382,6 +385,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       let id: string;
       if (values.parent) {
+        if (values.id !== undefined) throw new RafError('--id se pose sur un lot, pas sur une sous-tâche');
+        if (values.under !== undefined) throw new RafError('--under se pose sur un lot, pas sur une sous-tâche : --parent crée une sous-tâche, --under un sous-lot');
         for (const [flag, given] of [['screen', values.screen !== undefined], ['spec', values.spec], ['local', values.local], ['public', values.public !== undefined], ['every', values.every !== undefined]]) {
           if (given) throw new RafError(`--${flag} se pose sur un lot, pas sur une sous-tâche`);
         }
@@ -397,7 +402,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         if (values.public !== undefined) refuseLongTitle(values.public);
         const uses = values.uses?.split(',').map((n) => n.trim()).filter(Boolean);
         if (uses?.length === 0) throw new RafError(invalidResource(''));
-        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, local: values.local, public: values.public, every, after, uses, extras: parseSet(values.set) });
+        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, local: values.local, public: values.public, every, after, uses, extras: parseSet(values.set), id: values.id, under: values.under });
       }
       plan.save();
       io.out(id);
@@ -535,6 +540,13 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       if (rest[1] !== 'none' && !(SCREENS as readonly string[]).includes(rest[1])) throw new RafError(`screen inconnu : ${rest[1]} (${SCREENS.join(', ')}, none)`);
       plan.setScreen(rest[0], rest[1] === 'none' ? null : (rest[1] as Screen));
+      plan.save();
+      return 0;
+    }
+    case 'estimate': {
+      if (rest.length !== 2) throw new RafError('usage : raf estimate <id> <jours>');
+      const plan = loadPlan();
+      plan.setEstimate(rest[0], rest[1].trim() === '' ? NaN : Number(rest[1]));
       plan.save();
       return 0;
     }

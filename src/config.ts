@@ -12,7 +12,7 @@ import { planCommitProblem } from './plan-commit.js';
 import { parseStates } from './plan-states.js';
 import { checkTestReplay, readGateTest, type GateTest } from './orchestrate/gate-parts.js';
 import { booleanKey, isObject, list } from './yaml-keys.js';
-import { FIELDS, Plan, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
+import { FIELDS, idPatternProblem, Plan, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
 interface PlanConfig {
   /** Chemin du plan, relatif à la racine du dépôt. */
@@ -24,7 +24,7 @@ interface PlanConfig {
   settings: PlanSettings;
 }
 
-const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add', 'onWrite', 'commit', 'states', 'transitions', 'doneState', 'blockedState', 'extras'];
+const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add', 'onWrite', 'commit', 'states', 'transitions', 'doneState', 'blockedState', 'extras', 'idPattern'];
 const ON_WRITE_KEYS = ['command', 'files'];
 const FORMAT_KEYS = ['lots', 'fields', 'statuses', 'estimates'];
 
@@ -102,6 +102,12 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   }
   if (p.ignore != null) settings.ignore = list(p.ignore);
   if (p.files != null) settings.files = list(p.files);
+  if (p.idPattern != null) {
+    if (typeof p.idPattern !== 'string') throw bad('idPattern doit être une expression régulière (texte)');
+    const problem = idPatternProblem(p.idPattern);
+    if (problem) throw bad(`idPattern ${problem}`);
+    settings.idPattern = p.idPattern;
+  }
   if (p.onWrite != null) settings.onWrite = readOnWrite(p.onWrite, root ?? dirname(resolve(file)), bad);
   if (FORMAT_KEYS.some((k) => p[k] != null)) settings.format = parseFormat(p, bad);
   Object.assign(settings, parseStates(p, bad, settings.format !== undefined), readExtras(p.extras, !!settings.format, bad));

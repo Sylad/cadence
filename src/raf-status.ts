@@ -16,7 +16,7 @@ function listStates(plan: Plan, out: (line: string) => void): void {
 
 /** `raf status` (L463) : sans argument la liste des états ; `<id> <état> ["message"]` ou `<id> --back ["message"]` pose l'état d'un lot. */
 export function statusCommand(plan: Plan, rest: string[], back: boolean, today: Day, out: (line: string) => void): number {
-  if (rest.length === 0) {
+  if (rest.length === 0 && !back) {
     listStates(plan, out);
     return 0;
   }

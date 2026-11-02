@@ -42,6 +42,10 @@ function parseTransitions(raw: unknown, states: Record<string, Status>, bad: Bad
   return transitions;
 }
 
+function requireNames(p: Record<string, unknown>, bad: Bad): void {
+  for (const k of ['doneState', 'blockedState']) if (p[k] != null && typeof p[k] !== 'string') throw bad(`${k} : un nom d'état attendu`);
+}
+
 /**
  * Lit `plan.states`, `plan.transitions`, `plan.doneState` et `plan.blockedState` de cadence.yaml : `{ states }` ou `{}` quand rien n'est déclaré.
  * `foreign` : le plan est tenu par un autre outil (lots, fields, statuses, estimates), dont les états sont les siens.
@@ -55,6 +59,7 @@ export function parseStates(p: Record<string, unknown>, bad: Bad, foreign: boole
   const states = parseBases(p.states, bad);
   const model: StateModel = { states };
   if (p.transitions != null) model.transitions = parseTransitions(p.transitions, states, bad);
+  requireNames(p, bad);
   if (p.doneState != null) {
     if (states[String(p.doneState)] !== 'done') throw bad(`doneState : « ${String(p.doneState)} » n'est pas un état done`);
     model.done = String(p.doneState);

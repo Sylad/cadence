@@ -19,6 +19,11 @@ function readGate(raw: unknown, problems: string[]): Gate | undefined {
   return { count: g.count as number, criterion: criteria[0]! };
 }
 
+/** `state:` et `state_before:` écrits à la main avec un non-texte : signalés, la clé étant écartée. */
+function checkStateNames(raw: Record<string, unknown>, problems: string[]): void {
+  for (const k of ['state', 'state_before']) if (raw[k] != null && typeof raw[k] !== 'string') problems.push(`${k} : un nom d'état attendu (reçu « ${String(raw[k])} »)`);
+}
+
 export function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lot {
   const status = STATUSES.includes(raw.status as Status) ? (raw.status as Status) : 'todo';
   const asDay = (field: string): Day | undefined => {
@@ -46,6 +51,7 @@ export function normalizeLot(raw: Record<string, unknown>, problems: string[] = 
     if (raw.spec === true) spec = true;
     else if (raw.spec !== false) problems.push(`spec : true ou false attendu (reçu « ${String(raw.spec)} »)`);
   }
+  checkStateNames(raw, problems);
   const gate = readGate(raw.gate, problems);
   const okRaw = raw.docs_ok as Record<string, unknown> | undefined;
   const docsOk = okRaw && typeof okRaw === 'object' && typeof okRaw.reason === 'string' && okRaw.reason.trim() !== '' ? { date: String(okRaw.date ?? ''), reason: okRaw.reason.trim() } : undefined;

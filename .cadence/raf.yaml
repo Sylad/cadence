@@ -1236,11 +1236,14 @@ lots:
       - { date: 2026-11-02, text: "Mineurs de revue (02-11) : test R1 n'exerce pas le cas de l'issue (verrou déjà muet avant spec green) ; message cli.ts:1156 dit « avant de poser vert: true » au lieu des empreintes ; docs/orchestrate.md:409 « Three guards » pour quatre puces." }
   - id: L527
     title: "orchestrate remplit seul les créneaux libres avec le lot prêt suivant, une fois l'ordre convenu (--priority / priority: du cadence.yaml parent) : plafond, un dépôt par session ou un worktree par lot, ressources partagées respectés, chaque démarrage dit dans le journal ; cas le plus coûteux : lot rendu dès le précheck (créneau libre en quelques secondes) ; vu le 02-11 : L525 ajouté à la vague de L526 attend derrière lui (lot seul joué dans l'arbre principal) pendant qu'un créneau reste vide (issue #21, compte pro)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-02
     started: 2026-11-02
     review: { date: 2026-11-02, verdict: "conforme : lot tiré ou ajouté par --add reçoit son worktree dès que le plafond > 1 (avec ou sans --continue), tirage automatique sous --continue dans l'ordre de priorité, dry-run aligné — 3 notes mineures (simulation sans filtre de ressources, JSDoc orphelin, test probe de priorité faible) — revue Opus du lead, passe 3 ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (972fca6) ne change que le contexte du lot. Les conflits de command.ts (ligne dryRun + estimateLines de L529) et du CHANGELOG (section Unreleased partagée avec L418/L529) sont bien résolus, et l'arbre rebasé = l'ancien tip 7c226f7 + le seul diff de main, sans rien de perdu ni d'ajouté.", commit: a8997fb08c7615a6a12db6ffaa9ec0c49238748e }
+    finished: 2026-11-02
+    notes:
+      - { date: 2026-11-02, text: "Notes mineures de la revue passe 3 (02-11) : la simulation --dry-run --continue ne filtre pas les ressources partagées ; un JSDoc orphelin ; le test de la sonde sur la priorité est faible." }
   - id: L528
     title: "Test instable sous charge : test/orchestrate-app.test.ts « verrou par hôte:port de l'URL (L60) > délai dépassé après une attente du verrou : le message annonce le délai restant » — rouge dans le clone neuf de la release 1.38.1 (attendu /n'a pas répondu en [0-2] s/, reçu « url tenue par une autre vague »), vert 3/3 rejoué seul : horloge simulée ou marge, sans changer le contrat"
     status: done

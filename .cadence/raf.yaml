@@ -1435,6 +1435,7 @@ lots:
     estimate: 0.1
     created: 2026-11-02
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-02-1825-cad, 0 passe(s) de correction)", commit: 4ecc3ab77189b2b6a395b9ccc66c225636f595f9, reporte: { de: 56a0ef8a6c1471a032d4d144c0a46ecc2882cab7, vers: 4ecc3ab77189b2b6a395b9ccc66c225636f595f9, patchId: fabfa43af86030677afcd5da43f034b34ed1889c } }
   - id: L534
     title: "Jeu de données « pires cas » pour les lots d'écran (issue #22, compte pro) : un jeu réaliste posé une fois à côté du jeu de démo (noms longs ou d'une lettre, compte à 0 et à 1, champs optionnels absents, grands nombres, texte non latin, liste longue), branché au même endroit que la démo et basculé en mode dev seulement (?data=worst) ; spec-writer, ux-reviewer et qa-reviewer capturent chaque état avec les deux jeux ; le jeu reste en test de non-régression (idée : skill break-ui d'emilkowalski/skills, MIT)"
     status: todo

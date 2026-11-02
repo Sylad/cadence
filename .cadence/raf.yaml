@@ -1094,9 +1094,10 @@ lots:
       - { date: 2026-11-01, text: "Revue de la fiche — mineur : docs/specs/file-lots-approuves/fiche.yaml:176 — Incohérence interne : R13 dit « la file ne contient plus que des lots non tirés » (un lot tiré en sort), alors que C2, R4 (l.122), A3 (l.231) et D1 (l.248) gardent un état « tiré » dans queue.json, que `show` l'affiche (« tiré par la vague <id> ») et que `drop` le refuse « déjà tiré ». Les tests R13 (« absent de la file ») et R4 (« drop d'un lot déjà tiré ») se contredisent selon la lecture. Dire si le lot tiré reste en file avec l'état tiré (puis R13 doit parler du tirage, pas de la présence) ou s'il est retiré (puis supprimer l'erreur « déjà tiré »)." }
   - id: L499
     title: "Parité porte ↔ CI (inventaire des pertes du 31-10 (17→31-10) : 37 livraisons rouges, ~12 h estimées, dont des tests joués en CI seulement, ex. e2e warhammer) : cadence lit les commandes de test des workflows CI du dépôt et signale (lead tour, orchestrate --dry-run, verify --gate) celles que orchestrate.test/build ne jouent pas ; avec L482"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-31
+    started: 2026-11-02
   - id: L500
     title: "Précheck : tests d'acceptation scellés et fichiers partagés (inventaire des pertes du 31-10 (17→31-10) : 19 questions sur 43 portent sur un test scellé d'un autre lot, médiane 56 min de blocage ; 28 intégrations refusées dont 16 conflits) : avant implement, le précheck liste les tests scellés que le lot risque de toucher et les fichiers que touche aussi un autre lot de la vague ou un worktree conservé, dans le brief et dans le tableau"
     status: todo

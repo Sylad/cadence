@@ -1,22 +1,26 @@
 import { gateProgress, gateText } from './audit.js';
 import type { Lot, Plan } from './plan.js';
+import { formatWindow, windowOf } from './plan-window.js';
 
 /** Les lignes de tête de `raf show` : titre, état détaillé (L463), objectif, dates, dépendances, drapeaux, champs d'extension (L464), acquittement docs et condition de tirage. Une ligne par fait posé, aucune pour un fait absent. */
 export function lotLines(plan: Plan, lot: Lot): string[] {
-  const lines = [...headLines(lot), ...flagLines(lot)];
+  const lots = plan.lots();
+  const lines = [...headLines(lot, lots), ...flagLines(lot)];
   if (lot.docsOk) lines.push(`docs-ok : ${lot.docsOk.date} — ${lot.docsOk.reason}`);
-  const gate = gateProgress(plan.lots(), lot);
+  const gate = gateProgress(lots, lot);
   if (lot.gate && gate) lines.push(lot.gate.invalid ? `gate : ${gateText(gate)}` : `gate : ${gate.n} lots ${gate.label} faits`);
   return lines;
 }
 
-function headLines(lot: Lot): string[] {
+function headLines(lot: Lot, lots: Lot[]): string[] {
   const lines = [`${lot.id}  ${lot.status}  ${lot.title}`];
   if (lot.state) lines.push(`état : ${lot.state}`);
   if (lot.goal) lines.push(`goal : ${lot.goal}`);
   const dates = [['créé', lot.created], ['démarré', lot.started], [lot.status === 'dropped' ? 'abandonné' : 'terminé', lot.finished]].filter(([, d]) => d);
   if (dates.length) lines.push(dates.map(([k, d]) => `${k} : ${d}`).join('  '));
   if (lot.after.length) lines.push(`after : ${lot.after.join(', ')}`);
+  const planned = windowOf(lots, lot);
+  if (planned) lines.push(`prévu : ${formatWindow(planned)}`);
   if (lot.public) lines.push(`public : ${lot.public}`);
   return lines;
 }

@@ -13,6 +13,7 @@ interface GanttData {
     start: Day;
     end: Day;
     projected: boolean;
+    planned: boolean;
     commits: number;
     estimate: number;
     after: string[];
@@ -34,6 +35,7 @@ export function ganttData(project: string, bars: Bar[], today: Day, generated: s
       start: b.start,
       end: b.end,
       projected: b.projected,
+      planned: b.planned === true,
       commits: b.commits,
       estimate: b.lot.estimate,
       after: b.lot.after,
@@ -138,7 +140,7 @@ const SCRIPT = `
   var tip = document.getElementById('tip');
   function showTip(ev, b) {
     tip.replaceChildren();
-    var lines = [b.id + ' — ' + b.title, LABELS[b.status] + (b.projected ? ' (prévision)' : '') + ' · ' + b.start + ' → ' + b.end,
+    var lines = [b.id + ' — ' + b.title, LABELS[b.status] + (b.planned ? ' (fenêtre prévue)' : b.projected ? ' (prévision)' : '') + ' · ' + b.start + ' → ' + b.end,
       'estimation ' + b.estimate + ' j · ' + b.commits + ' commit(s)' + (b.tasks.total ? ' · sous-tâches ' + b.tasks.done + '/' + b.tasks.total : '')];
     if (b.after.length) lines.push('après ' + b.after.join(', '));
     b.notes.slice(-3).forEach(function (n) { lines.push(n.date + ' : ' + n.text); });

@@ -15,7 +15,7 @@ async function raf(dir: string, env: Record<string, string>, ...argv: string[]) 
 }
 
 const COMMANDES = [
-  'init', 'add', 'start', 'done', 'drop', 'archive', 'status', 'todo', 'note', 'did', 'title', 'uses', 'move', 'public', 'screen', 'estimate', 'visible',
+  'init', 'add', 'start', 'done', 'drop', 'archive', 'status', 'todo', 'note', 'did', 'title', 'uses', 'plan', 'move', 'public', 'screen', 'estimate', 'visible',
   'spec', 'ux', 'review', 'commits', 'show', 'list', 'now', 'ignore', 'docs-ok', 'check', 'gantt', 'hook', 'session', 'deliver', 'verify', 'skills', 'local', 'news',
   'lead', 'config', 'corrections', 'perf', 'ref', 'release', 'migrate',
 ];

@@ -7,6 +7,7 @@ import { repoStatus, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
 import type { Lot, Plan } from './plan.js';
 import { staleNoteLines, staleNotes, staleText } from './stale-notes.js';
+import { windowLines } from './plan-window.js';
 import { lockAlive, readLock, readNext, readSessionMark, writeSessionMark } from './state.js';
 
 export interface SessionCtx {
@@ -150,6 +151,8 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
   }
 
   section(out, 'En attente', gateWaiting(lots, blocked).map(({ lot, text }) => `${lot.id}  ${lot.title}  (${text})`));
+
+  section(out, 'Fenêtres prévues', windowLines(lots, today));
 
   const recent = period(ctx, opts.since);
   const done = byLotLines(recent);

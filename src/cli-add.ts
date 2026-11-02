@@ -2,6 +2,7 @@
 import { invalidResource, RafError, type Plan, type Screen } from './plan.js';
 import type { Day } from './dates.js';
 import { parseSet } from './plan-extras.js';
+import { parseWindow } from './plan-window.js';
 
 /** Les options de `raf add` telles que `parseArgs` les rend. */
 interface AddValues {
@@ -18,6 +19,7 @@ interface AddValues {
   every?: string;
   after?: string;
   uses?: string;
+  planned?: string;
   set?: string[];
 }
 
@@ -25,7 +27,7 @@ interface AddValues {
 function addSubTask(plan: Plan, parent: string, values: AddValues, title: string): string {
   if (values.id !== undefined) throw new RafError('--id se pose sur un lot, pas sur une sous-tâche');
   if (values.under !== undefined) throw new RafError('--under se pose sur un lot, pas sur une sous-tâche : --parent crée une sous-tâche, --under un sous-lot');
-  for (const [flag, given] of [['screen', values.screen !== undefined], ['spec', values.spec], ['local', values.local], ['public', values.public !== undefined], ['every', values.every !== undefined]]) {
+  for (const [flag, given] of [['screen', values.screen !== undefined], ['spec', values.spec], ['local', values.local], ['public', values.public !== undefined], ['every', values.every !== undefined], ['planned', values.planned !== undefined]]) {
     if (given) throw new RafError(`--${flag} se pose sur un lot, pas sur une sous-tâche`);
   }
   if (values.uses !== undefined) throw new RafError(`uses se pose sur un lot, pas sur une sous-tâche : ${parent}`);
@@ -44,5 +46,5 @@ export function addLot(plan: Plan, values: AddValues, title: string, today: Day,
   if (values.public !== undefined) refuseLongTitle(values.public);
   const uses = values.uses?.split(',').map((n) => n.trim()).filter(Boolean);
   if (uses?.length === 0) throw new RafError(invalidResource(''));
-  return plan.add(title, today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, local: values.local, public: values.public, every, after, uses, extras: parseSet(values.set), id: values.id, under: values.under });
+  return plan.add(title, today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, local: values.local, public: values.public, every, after, uses, planned: values.planned === undefined ? undefined : parseWindow(values.planned), extras: parseSet(values.set), id: values.id, under: values.under });
 }

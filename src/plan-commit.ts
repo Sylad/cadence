@@ -23,6 +23,8 @@ export const PLAN_ACTIONS = {
   done: 'terminé',
   /** `raf archive` (L396) : le nombre de lots déplacés dans l'archive. */
   archived: (n: number) => `${n} lot(s) archivé(s)`,
+  /** `raf plan --propose --apply` (L466) : le nombre de fenêtres posées. */
+  planned: (n: number) => `${n} fenêtre(s) prévue(s) posée(s)`,
   reviewRecorded: 'revue de code enregistrée',
   /** `raf ux <lot>` ne commite pas : l'action de la commande de commit qu'il propose (L509). */
   uxRecorded: 'verdict UX enregistré',

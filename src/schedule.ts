@@ -1,6 +1,7 @@
 import { endAfterWorkdays, maxDay, workdayAt, workdaysThrough, type Day } from './dates.js';
 import type { Commit } from './git.js';
 import type { Lot } from './plan.js';
+import { windowResolver } from './plan-window.js';
 import { isRecurring } from './recurring.js';
 
 export interface Bar {
@@ -9,6 +10,8 @@ export interface Bar {
   end: Day;
   /** True when the dates are a forecast rather than history. */
   projected: boolean;
+  /** Les bornes viennent de la fenêtre prévue du lot (propre ou héritée, L466), non de la file. */
+  planned?: true;
   commits: number;
 }
 
@@ -45,7 +48,7 @@ export function schedule(all: Lot[], commitsByLot: Map<string, Commit[]>, today:
     0,
     ...[...bars.values()].filter((b) => b.lot.status === 'doing').map((b) => workdaysThrough(today, b.end)),
   );
-  let pending = lots.filter((l) => l.status === 'todo');
+  let pending = placePlanned(all, lots, bars, count);
   while (pending.length > 0) {
     const ready = (l: Lot) =>
       l.after.every((d) => bars.has(d) || !lots.some((x) => x.id === d && x.status === 'todo'));
@@ -71,4 +74,15 @@ export function schedule(all: Lot[], commitsByLot: Map<string, Commit[]>, today:
   }
 
   return lots.flatMap((l) => bars.get(l.id) ?? []);
+}
+
+/** Les lots à faire qui portent une fenêtre prévue (propre ou héritée, L466) prennent ses bornes et ne passent pas par la file ; rend ceux qui y passent. */
+function placePlanned(all: Lot[], lots: Lot[], bars: Map<string, Bar>, count: (id: string) => number): Lot[] {
+  const windowOf = windowResolver(all);
+  const todo = lots.filter((l) => l.status === 'todo');
+  return todo.filter((lot) => {
+    const w = windowOf(lot)?.window;
+    if (w) bars.set(lot.id, { lot, start: w.from, end: w.to, projected: true, planned: true, commits: count(lot.id) });
+    return !w;
+  });
 }

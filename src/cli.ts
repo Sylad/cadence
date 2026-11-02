@@ -3,6 +3,7 @@ import { isDay, toDay, type Day } from './dates.js';
 import { gitRoot } from './git.js';
 import { RafError, setPlanNotice } from './plan.js';
 import { cmdAdd, cmdArchive, cmdDid, cmdDocsOk, cmdEstimate, cmdIgnore, cmdMove, cmdNote, cmdPublic, cmdScreen, cmdSetStatus, cmdStatus, cmdTitle, cmdTodo, cmdUses, cmdVisible } from './cli/lot-commands.js';
+import { cmdPlan } from './cli/plan-commands.js';
 import { cmdCheck, cmdCommits, cmdGantt, cmdList, cmdNews, cmdNow, cmdRef, cmdShow } from './cli/read-commands.js';
 import { cmdGate, cmdHook } from './cli/gates.js';
 import { cmdInit, cmdMigrate, cmdSkills } from './cli/setup-commands.js';
@@ -22,7 +23,7 @@ export { ensureGitignore } from './cli/setup-commands.js';
 const HELP = `raf — plan « reste à faire » versionné dans le dépôt, relié aux commits
 
   raf init [--project nom] [--prefix L] [--no-hook]
-  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--local] [--public "titre public"] [--every jours] [--after L2,L4] [--uses banc,passerelle] [--set champ=valeur]… [--parent L3] [--id AB-1.2 [--under AB-1]]
+  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--local] [--public "titre public"] [--every jours] [--after L2,L4] [--uses banc,passerelle] [--planned AAAA-MM-JJ..AAAA-MM-JJ] [--set champ=valeur]… [--parent L3] [--id AB-1.2 [--under AB-1]]
   raf estimate <id> <jours>   remplace l'estimation d'un lot existant (archivé compris) ; --id pose un identifiant libre conforme à plan.idPattern (cadence.yaml), --under en fait un sous-lot à plat (parent: AB-1, hors préfixe), --parent une sous-tâche
   raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
   raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (seule la valeur page adopte l'étape spec d'orchestrate)
@@ -30,6 +31,8 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf spec <id> on|off   pose ou retire spec: d'un lot existant (le lot change un comportement : étape spec back d'orchestrate)
   raf move <id> --before|--after <id>   réordonne un lot (ou une sous-tâche) dans le plan, parmi ceux du même parent ; refusé pendant une vague du dépôt, sur un lot archivé et sur un plan en lecture seule
   raf uses <lot> [<ressource>…]   remplace les ressources partagées du lot (uses:, déclarées par resources: dans le cadence.yaml du dossier parent ; raf check refuse un nom non déclaré) ; sans nom, retire la clé
+  raf plan <lot> AAAA-MM-JJ..AAAA-MM-JJ | <lot> --clear   pose, remplace ou retire la fenêtre prévue d'un lot (planned: from..to ; un seul jour vaut une fenêtre d'un jour) ; un sous-lot sans fenêtre propre hérite de celle de son parent ; lue par session start (retards, échéances), raf show et le Gantt
+  raf plan --propose [--per-day n] [--from AAAA-MM-JJ] [--apply]   propose une fenêtre par lot à faire sans fenêtre (jours ouvrés à partir de --from, aujourd'hui par défaut ; n jours d'estimation par jour ouvré, 1 par défaut ; lots prêts d'abord) ; --apply les écrit d'un coup et dit la commande du commit ; plan.requirePlanned: true (cadence.yaml) fait refuser raf add sans --planned
   cadence local start <lot> [--ttl minutes] | local done <lot> | local abort <lot>   tâche locale du lead (lot posé par raf add --local) : start verrouille le dépôt comme une vague (aucune vague n'y démarre, --add y est refusé) et passe le lot à doing, refusé si une orchestration ou un autre lot du dépôt est en cours ; le verrou est déclaré (60 min par défaut), tenu sans processus jusqu'à done ou abort, signalé en ⚠ par lead tour et orchestrate --status au-delà du délai ; done joue la porte du projet UNE fois, libère le dépôt si elle est verte (la capture, la revue du diff, cadence deliver et raf done restent au lead) et le garde verrouillé sinon ; abort libère sans porte
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf status [<id> <état> ["message"] | <id> --back ["message"]]   états détaillés du projet (cadence.yaml : plan.states) : pose l'état d'un lot sous la garde de plan.transitions et note le message ; --back sort de l'état bloqué vers l'état d'avant ; sans argument, liste les états. start / done / drop / todo posent eux-mêmes l'état de leur statut
@@ -150,6 +153,7 @@ const WITH_PLAN: Record<string, (c: Ctx) => number | Promise<number>> = {
   did: cmdDid,
   title: cmdTitle,
   uses: cmdUses,
+  plan: cmdPlan,
   move: cmdMove,
   public: cmdPublic,
   screen: cmdScreen,

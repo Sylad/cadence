@@ -6,7 +6,7 @@ import type { ArticleRule } from './articles.js';
 import type { DocSyncRule } from './docsync.js';
 import { readGate } from './gate-config.js';
 import { DEFAULT_TEST_PATTERNS, type TestGateConfig } from './testgate.js';
-import { readExtras } from './plan-extras.js';
+import { readExtras, readRequirePlanned } from './plan-extras.js';
 import { gitRoot } from './git.js';
 import { planCommitProblem } from './plan-commit.js';
 import { parseStates } from './plan-states.js';
@@ -24,7 +24,7 @@ interface PlanConfig {
   settings: PlanSettings;
 }
 
-const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add', 'onWrite', 'commit', 'states', 'transitions', 'doneState', 'blockedState', 'extras', 'idPattern'];
+const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add', 'onWrite', 'commit', 'states', 'transitions', 'doneState', 'blockedState', 'extras', 'idPattern', 'requirePlanned'];
 const ON_WRITE_KEYS = ['command', 'files'];
 const FORMAT_KEYS = ['lots', 'fields', 'statuses', 'estimates'];
 
@@ -99,7 +99,7 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   if (p.files != null) settings.files = list(p.files);
   if (p.onWrite != null) settings.onWrite = readOnWrite(p.onWrite, root ?? dirname(resolve(file)), bad);
   if (FORMAT_KEYS.some((k) => p[k] != null)) settings.format = parseFormat(p, bad);
-  Object.assign(settings, parseStates(p, bad, settings.format !== undefined), readExtras(p.extras, !!settings.format, bad), readIdPattern(p.idPattern, bad));
+  Object.assign(settings, parseStates(p, bad, settings.format !== undefined), readExtras(p.extras, !!settings.format, bad), readIdPattern(p.idPattern, bad), readRequirePlanned(p.requirePlanned, settings.format !== undefined, bad));
   if (p.path != null && String(p.path).trim() === '') throw bad('path est vide');
   if (p.add != null && (typeof p.add !== 'string' || !p.add.includes('{title}'))) throw bad('add doit être une commande qui contient {title}');
   if (p.commit != null) {

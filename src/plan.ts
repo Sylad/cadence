@@ -8,6 +8,7 @@ import { normalizeLot } from './plan-read.js';
 import { currentState, defaultState, rebase, stateProblems, transitionProblem, type StateModel } from './plan-states.js';
 import { DOCS_OK_FILE, readDocsOkFile } from './docs-ok-file.js';
 import { checkedExtras, withExtras, type ExtraDecls } from './plan-extras.js';
+import { lotRef, putFlowKey, putPlanned, refuseUnplanned, type PlannedWindow } from './plan-window.js';
 import { DOTTED, escapeRe, extractRefs, idRefs, pickId, type Ref } from './plan-ids.js';
 import { ARCHIVE_DIR, PLACE_KEY, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, reopenArchived, selectArchivable, type Kept } from './archive.js';
 
@@ -97,6 +98,8 @@ export interface Lot {
   after: string[];
   /** Ressources partagées que le lot occupe (clé `uses:`, L251) ; absente sans clé, ou si la clé est mal formée (remontée par check). */
   uses?: string[];
+  /** Fenêtre prévue (clé `planned: { from, to }`, L466) ; absente sans clé, ou si la clé est mal formée (remontée par check). Un sous-lot sans fenêtre propre hérite de celle de son parent (`windowOf`). */
+  planned?: PlannedWindow;
   created?: Day;
   started?: Day;
   finished?: Day;
@@ -195,6 +198,8 @@ export interface PlanSettings {
    * `raf add --id` la valide, et la reconnaissance des ids dans les messages de commit la suit (sous-ids `LOT/slug` compris).
    */
   idPattern?: string;
+  /** `plan.requirePlanned` (L466) : `raf add` refuse un lot sans fenêtre prévue (propre ou héritée de son parent) ; un lot récurrent en est exempt. Jamais avec `format`. */
+  requirePlanned?: boolean;
   /** Fichier de configuration effectivement lu (--config), absolu ; cadence.yaml à la racine par défaut. */
   config?: string;
 }
@@ -696,7 +701,7 @@ export class Plan {
     return node as YAMLMap;
   }
 
-  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; spec?: boolean; local?: boolean; public?: string; every?: number; after?: string[]; uses?: string[]; extras?: Record<string, string>; id?: string; under?: string } = {}): string {
+  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; spec?: boolean; local?: boolean; public?: string; every?: number; after?: string[]; uses?: string[]; planned?: PlannedWindow; extras?: Record<string, string>; id?: string; under?: string } = {}): string {
     this.writable();
     if (opts.screen !== undefined) {
       if (!SCREENS.includes(opts.screen)) throw new RafError(`screen inconnu : ${String(opts.screen)} (${SCREENS.join(', ')})`);
@@ -713,6 +718,7 @@ export class Plan {
       throw new RafError(`périodicité invalide : ${opts.every} (un nombre entier de jours, 1 au moins)`);
     }
     const extras = checkedExtras(this.settings.extras, opts.extras);
+    refuseUnplanned(this.settings.requirePlanned, this.lots(), id, opts);
     const entry: Record<string, unknown> = { id, title };
     if (opts.under !== undefined) entry.parent = opts.under;
     if (pub !== undefined) entry.public = pub;
@@ -729,6 +735,7 @@ export class Plan {
       const seq = node.get(key);
       if (isSeq(seq)) seq.flow = true;
     }
+    putPlanned(this.doc, node, opts.planned);
     (this.doc.get('lots') as YAMLSeq).add(node);
     return id;
   }
@@ -785,16 +792,13 @@ export class Plan {
       node.delete('uses');
       return;
     }
-    const list = this.doc.createNode(uses) as YAMLSeq;
-    list.flow = true;
-    if (node.has('uses')) {
-      node.set('uses', list);
-      return;
-    }
-    const keys = node.items.map((p) => String((p.key as { value?: unknown })?.value ?? p.key));
-    const created = keys.indexOf('created');
-    const after = keys.indexOf('after');
-    node.items.splice(created >= 0 ? created : after >= 0 ? after + 1 : keys.length, 0, this.doc.createPair('uses', list));
+    putFlowKey(this.doc, node, 'uses', uses);
+  }
+
+  /** Pose, remplace ou (avec `null`) retire la fenêtre prévue d'un lot de tout statut (clé `planned:` en flow, avant `created:`, L466). Jamais sur une sous-tâche. */
+  setPlanned(ref: string, window: PlannedWindow | null): void {
+    this.writable();
+    putPlanned(this.doc, this.lotNode(lotRef(ref)), window);
   }
 
   /**

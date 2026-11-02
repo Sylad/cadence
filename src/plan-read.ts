@@ -1,6 +1,7 @@
 import { isDay, type Day } from './dates.js';
 import { RESOURCE_NAME, RESOURCES_BAD_LIST, SCREENS, STATUSES, type Gate, type Lot, type LotRepoDecl, type Screen, type Status, type Verdict } from './plan.js';
 import { readParent } from './plan-ids.js';
+import { readPlanned } from './plan-window.js';
 
 const GATE_INVALID = 'gate invalide : count: entier ≥ 1 et un critère spec: true ou screen: page attendus';
 
@@ -75,6 +76,7 @@ export function normalizeLot(raw: Record<string, unknown>, problems: string[] = 
     ...(last ? { last } : {}),
     after,
     ...(uses?.length ? { uses } : {}),
+    ...readPlanned(raw.planned, problems),
     created: asDay('created'),
     started: asDay('started'),
     finished: asDay('finished'),

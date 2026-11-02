@@ -7,6 +7,13 @@ export function isDay(value: unknown): value is Day {
   return typeof value === 'string' && DAY_RE.test(value);
 }
 
+/** Une date qui existe au calendrier : `2026-02-30` a la forme d'un jour (`isDay`) sans en être un. */
+export function isCalendarDay(value: unknown): value is Day {
+  if (!isDay(value)) return false;
+  const date = parse(value);
+  return !Number.isNaN(date.getTime()) && format(date) === value;
+}
+
 export function toDay(date: Date): Day {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');

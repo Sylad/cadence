@@ -46,5 +46,7 @@ export function addLot(plan: Plan, values: AddValues, title: string, today: Day,
   if (values.public !== undefined) refuseLongTitle(values.public);
   const uses = values.uses?.split(',').map((n) => n.trim()).filter(Boolean);
   if (uses?.length === 0) throw new RafError(invalidResource(''));
-  return plan.add(title, today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, local: values.local, public: values.public, every, after, uses, planned: values.planned === undefined ? undefined : parseWindow(values.planned), extras: parseSet(values.set), id: values.id, under: values.under });
+  const planned = values.planned === undefined ? undefined : parseWindow(values.planned);
+  plan.requireWindow({ planned, every, under: values.under });
+  return plan.add(title, today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, local: values.local, public: values.public, every, after, uses, planned, extras: parseSet(values.set), id: values.id, under: values.under });
 }

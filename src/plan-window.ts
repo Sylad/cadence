@@ -101,20 +101,33 @@ const round = (n: number) => Math.round(n * 1e6) / 1e6;
  */
 export function proposeWindows(lots: Lot[], opts: { from: Day; perDay: number }): { id: string; window: PlannedWindow }[] {
   const resolve = windowResolver(lots);
-  let pending = lots.filter((l) => l.status === 'todo' && !isRecurring(l) && !resolve(l));
+  const candidates = lots.filter((l) => l.status === 'todo' && !isRecurring(l) && !resolve(l));
+  const byId = new Map(lots.map((l) => [l.id, l]));
+  const open = new Set(candidates.map((l) => l.id));
+  // Un sous-lot sans fenêtre dont un ancêtre est à placer en hérite une fois l'ancêtre placé : il n'a pas de fenêtre à lui (elle sortirait de celle du parent).
+  const placedBy = (l: Lot): string => {
+    let top = l.id;
+    for (let p = l.parent ? byId.get(l.parent) : undefined, seen = new Set([l.id]); p && !seen.has(p.id); p = p.parent ? byId.get(p.parent) : undefined) {
+      seen.add(p.id);
+      if (open.has(p.id)) top = p.id;
+    }
+    return top;
+  };
+  let pending = candidates.filter((l) => placedBy(l) === l.id);
   const waiting = new Set(pending.map((l) => l.id));
+  const host = (id: string): string => { const l = byId.get(id); return l && open.has(id) ? placedBy(l) : id; };
   const ends = new Map<string, number>();
   const out: { id: string; window: PlannedWindow }[] = [];
   let cursor = 0;
   while (pending.length > 0) {
-    const lot = pending.find((l) => !l.after.some((d) => waiting.has(d))) ?? pending[0]!;
+    const lot = pending.find((l) => !l.after.some((d) => waiting.has(host(d)))) ?? pending[0]!;
     pending = pending.filter((l) => l !== lot);
     waiting.delete(lot.id);
     let start = cursor;
     for (const d of lot.after) {
-      const dated = lots.find((l) => l.id === d);
-      const w = dated && !waiting.has(d) ? resolve(dated)?.window : undefined;
-      start = Math.max(start, ends.get(d) ?? (w ? workdaysThrough(opts.from, w.to) : 0));
+      const dated = lots.find((l) => l.id === host(d));
+      const w = dated && !waiting.has(dated.id) ? resolve(dated)?.window : undefined;
+      start = Math.max(start, ends.get(host(d)) ?? (w ? workdaysThrough(opts.from, w.to) : 0));
     }
     const stop = round(start + lot.estimate / opts.perDay);
     ends.set(lot.id, stop);

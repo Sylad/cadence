@@ -701,6 +701,9 @@ export class Plan {
     return node as YAMLMap;
   }
 
+  /** `plan.requirePlanned` pour `raf add` seul : `config set` et les lots ouverts par le programme (article à rafraîchir) n'ont pas de fenêtre. */
+  requireWindow = (opts: { planned?: PlannedWindow; every?: number; under?: string }): void => refuseUnplanned(this.settings.requirePlanned, this.lots(), '', opts);
+
   add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; spec?: boolean; local?: boolean; public?: string; every?: number; after?: string[]; uses?: string[]; planned?: PlannedWindow; extras?: Record<string, string>; id?: string; under?: string } = {}): string {
     this.writable();
     if (opts.screen !== undefined) {
@@ -718,7 +721,6 @@ export class Plan {
       throw new RafError(`périodicité invalide : ${opts.every} (un nombre entier de jours, 1 au moins)`);
     }
     const extras = checkedExtras(this.settings.extras, opts.extras);
-    refuseUnplanned(this.settings.requirePlanned, this.lots(), id, opts);
     const entry: Record<string, unknown> = { id, title };
     if (opts.under !== undefined) entry.parent = opts.under;
     if (pub !== undefined) entry.public = pub;

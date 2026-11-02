@@ -5,9 +5,10 @@ import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { run } from '../src/cli.js';
 import { readPlanConfig } from '../src/config.js';
+import { configSet } from '../src/config-set.js';
 import { Plan } from '../src/plan.js';
 import { normalizeLot } from '../src/plan-read.js';
-import { parseWindow, proposeWindows, windowOf } from '../src/plan-window.js';
+import { parseWindow, proposeWindows, windowIssues, windowOf } from '../src/plan-window.js';
 import { schedule } from '../src/schedule.js';
 import { ganttData } from '../src/gantt.js';
 import { gitRepo, NO_BACKGROUND_GIT, tempDir } from './helpers.js';
@@ -153,6 +154,15 @@ describe('R4 — raf plan <lot> J1..J2 pose, remplace ou retire la fenêtre', ()
   });
 });
 
+describe('R4 — raf plan --propose : sous-lots sans fenêtre', () => {
+  it('R4 — un sous-lot sans fenêtre dont le parent est à placer hérite de lui : pas de fenêtre propre qui sorte de celle du parent', () => {
+    const lots = [lot('AB-1'), lot('AB-1.1', { parent: 'AB-1' }), lot('AB-1.2', { parent: 'AB-1' })].map((l) => normalizeLot(l));
+    const out = proposeWindows(lots, { from: '2026-11-02', perDay: 1 });
+    expect(out.map((p) => p.id)).toEqual(['AB-1']);
+    expect(windowIssues(lots.map((l) => (l.id === 'AB-1' ? { ...l, planned: out[0]!.window } : l)))).toEqual([]);
+  });
+});
+
 describe('R5 — plan.requirePlanned : raf add exige une fenêtre', () => {
   const REQUIRE = 'plan:\n  requirePlanned: true\n';
   it('R5 — sans la clé, ou à false, raf add n\'exige rien', async () => {
@@ -177,6 +187,15 @@ describe('R5 — plan.requirePlanned : raf add exige une fenêtre', () => {
     const refused = await cad(dir, 'add', 'Fils', '--id', 'AB-2', '--under', 'L2');
     expect(refused.code).toBe(2);
     expect(refused.err).toMatch(/requirePlanned/);
+  });
+  it('R5 — le contrôle est celui de raf add : config set et les lots ouverts par le programme ne sont pas refusés', () => {
+    const dir = project([lot('L1', { planned: W('2026-11-03', '2026-11-04') })], REQUIRE);
+    const r = configSet(dir, 'orchestrate.test', 'npm test', { depth: 0 }, TODAY);
+    expect(r.code).toBe(0);
+    expect(r.lines.join('\n')).not.toMatch(/requirePlanned : une fenêtre/);
+    expect(r.lines.join('\n')).toMatch(/✓/);
+    const plan = Plan.load(join(dir, PLAN), { requirePlanned: true });
+    expect(() => plan.add('Article', TODAY, { estimate: 0.5 })).not.toThrow();
   });
   it('R5 — un lot récurrent (--every) ne se planifie pas : exempté', async () => {
     const dir = project([], REQUIRE);

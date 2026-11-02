@@ -40,7 +40,7 @@ function checkMemoryIndex(env: MemoryEnv, dir: string, max: number): MemoryCheck
     buf = readFileSync(memoryIndexPath(env, dir));
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
-    return code === 'ENOENT' ? { kind: 'ok' } : { kind: 'unreadable', cause: `${code ?? 'erreur'} : ${(e as Error).message.split('\n')[0]}` };
+    return code === 'ENOENT' ? { kind: 'ok' } : { kind: 'unreadable', cause: (e as Error).message.split('\n')[0] };
   }
   if (buf.length <= max) return { kind: 'ok' };
   return { kind: 'over', size: buf.length, max, ...datedEntries(buf.toString('utf8')) };

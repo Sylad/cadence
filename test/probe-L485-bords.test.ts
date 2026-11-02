@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -56,8 +56,10 @@ describe('L485 — fonctions retirées', () => {
 });
 
 describe('L485 — cliquet', () => {
-  it('node scripts/qualite.mjs --contre main passe', () => {
-    const r = execFileSync('node', ['scripts/qualite.mjs', '--contre', 'main'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  // le clone de la CI (actions/checkout) n'a pas de branche locale main : la base est alors origin/main, comme tests.yml
+  const base = ['main', 'origin/main'].find((ref) => spawnSync('git', ['rev-parse', '--verify', '--quiet', ref], { cwd: root }).status === 0);
+  it.skipIf(!base)('node scripts/qualite.mjs --contre main passe', () => {
+    const r = execFileSync('node', ['scripts/qualite.mjs', '--contre', base!], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     expect(r).toBeTypeOf('string');
   }, 300000);
 });

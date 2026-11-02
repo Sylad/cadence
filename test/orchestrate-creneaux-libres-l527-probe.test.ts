@@ -131,14 +131,10 @@ describe('L527 probe — bords du remplissage des créneaux libres', () => {
 
   it('--priority explicite : l’ordre du tirage suit la ligne de commande, pas le cadence.yaml parent', async () => {
     const parent = parentWith(['a', 'b', 'c']);
-    // a tient son créneau jusqu'à ce que c ait été tiré : l'événement attendu est le tirage, pas un état transitoire du lot ni un délai
-    const s: ReturnType<typeof scene> = scene(parent, 'a', async () => {
-      await wait(() => s.played.some((p) => p.startsWith('c:')));
-    });
+    const s = scene(parent, null, async () => {});
     await orchestrate(['--continue', '--max-sessions', '2', '--priority', 'c,b,a'], io(parent).io, s.d);
-    const j = journal(parent);
-    void j;
-    expect(s.played[0].endsWith('c:L1') || s.played[0].includes('c')).toBe(true);
-    expect(s.played.indexOf(s.played.find((p) => p.startsWith('c'))!)).toBeLessThan(s.played.indexOf(s.played.find((p) => p.startsWith('a'))!));
+    // l'ordre du tirage est celui de la vague (wave.json) ; ni l'ordre d'appel de claude ni celui des lignes « → implementing » du journal ne le sont : c et b partent ensemble, leur préparation parallèle s'y double sous charge
+    const tires = RunStore.last(parent)!.readWave()!.lots.map((k) => k.split(':')[0]);
+    expect(tires).toEqual(['c', 'b', 'a']);
   });
 });

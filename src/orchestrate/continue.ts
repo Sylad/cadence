@@ -6,7 +6,10 @@ import { planLoader, type OrchestrateConfig } from '../config.js';
 import { gitRoot } from '../git.js';
 import { findProjects, isProject } from '../lead.js';
 import { RafError, type Lot } from '../plan.js';
-import { lotBudget, projectEnv } from './command.js';
+import { lotBudget, projectEnv, type Args, type OrchestrateIo, type Target } from './command.js';
+import { readyFree } from '../ready-free.js';
+import { lotFinished, lotKey, type LotState, type RunStore } from './state.js';
+import type { Budget } from './cycle.js';
 import { specScreen } from './spec.js';
 import { STOP_REQUESTED } from './cycle.js';
 
@@ -170,4 +173,46 @@ export function stopReason(f: StopFacts): string | null {
   if (f.until && f.now.getTime() >= f.until.getTime()) return 'fenêtre horaire close (--until)';
   if (f.remaining <= 0) return 'budget épuisé';
   return null;
+}
+
+/** Lots rendus ou en échec de suite, en comptant depuis le dernier lot de la vague. */
+export function handedBackStreak(all: LotState[]): number {
+  let n = 0;
+  for (const l of [...all].reverse()) {
+    if (l.status === 'handed-back' || l.status === 'failed') n++;
+    else break;
+  }
+  return n;
+}
+
+export interface FillFacts {
+  args: Pick<Args, 'priority' | 'untilAt'>;
+  io: Pick<OrchestrateIo, 'now'>;
+  launch: string;
+  home: string;
+  store: Pick<RunStore, 'control'>;
+  /** Les lots de la vague, jouées ou non, reprise et ajouts compris. */
+  all: LotState[];
+  budget: Budget;
+  quotaHit: boolean;
+  incident: boolean;
+}
+
+/**
+ * L527 : les lots que le créneau libre d'une vague `--continue` peut recevoir, dans l'ordre de priorité : ceux du plan que `candidates` tire (hors lots de la vague) et dont aucune ressource
+ * n'est prise (`readyFree` : lots en cours, vagues vivantes dont celle-ci). Vide quand une borne de `stopReason` joue (arrêt demandé, limite d'usage, question, deux lots rendus de suite, `--until`, budget).
+ * Le budget que les lots qui jouent encore n'ont pas dépensé reste réservé : le lot suivant doit tenir dans le reste.
+ */
+export function fillTargets(f: FillFacts): Target[] {
+  const reserved = f.all.filter((l) => !lotFinished(l)).reduce((n, l) => n + Math.max(0, (l.budget ?? 0) - l.steps.reduce((t, s) => t + (s.tokens?.counted ?? 0), 0)), 0);
+  const remaining = f.budget.limit - f.budget.consumed - reserved;
+  const why = stopReason({ now: f.io.now(), until: f.args.untilAt, quotaHit: f.quotaHit, questions: f.all.filter((l) => l.status === 'question').length, streak: handedBackStreak(f.all), interrupted: f.incident, stopRequested: f.store.control().stopAfterCurrent, remaining });
+  if (why) return [];
+  const dirs = isProject(f.launch) ? [f.launch] : findProjects(f.launch);
+  const libres = readyFree(dirs, f.home);
+  const exclude = new Set(f.all.map((l) => lotKey(l.project, l.lot)));
+  return candidates(f.launch, { priority: f.args.priority ?? readPriority(f.launch), exclude, remaining }).flatMap((c) => {
+    const repo = gitRoot(c.dir);
+    return repo && libres.get(c.dir)?.some((l) => l.id === c.lot.id) ? [{ project: c.project, projectDir: c.dir, repo, lot: c.lot.id, model: 'sonnet' as const }] : [];
+  });
 }

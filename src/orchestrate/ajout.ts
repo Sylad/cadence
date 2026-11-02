@@ -132,6 +132,12 @@ export interface AddEnv {
  */
 export class AddFeed {
   private waiting = new Map<number, LotCtx>();
+  /** Les lots tirés du plan (L527) dont le dépôt était pris quand ils ont été contrôlés : gardés pour ne pas refaire le contrôle à chaque lecture. */
+  private drawn = new Map<string, LotCtx>();
+  /** Les lots tirés du plan (L527) que le contrôle a refusés pour eux-mêmes : écartés pour la vague, comme un lot sauté au tirage. */
+  private refused = new Set<string>();
+  /** Les causes déjà dites au journal (L527) : un refus passager (arbre sale, dépôt tenu) est relu à chaque lecture de la file mais dit une fois. */
+  private said = new Set<string>();
 
   constructor(private e: AddEnv) {}
 
@@ -189,7 +195,7 @@ export class AddFeed {
     return refused;
   }
 
-  private admit(entry: AddEntry, c: LotCtx): void {
+  private admit(entry: AddEntry | null, c: LotCtx): void {
     const e = this.e;
     e.ctxs.push(c);
     e.all.push(c.lot);
@@ -197,8 +203,10 @@ export class AddFeed {
     e.wave.lots.push(lotKey(c.lot.project, c.lot.lot));
     e.store.writeLot(c.lot);
     e.saveWave();
-    e.store.markAddTaken(entry.id);
-    this.waiting.delete(entry.id);
+    if (entry) {
+      e.store.markAddTaken(entry.id);
+      this.waiting.delete(entry.id);
+    }
     e.wctx.log(`${lotKey(c.lot.project, c.lot.lot)} : ajouté à la vague ${e.wave.id}`);
   }
 
@@ -224,9 +232,71 @@ export class AddFeed {
     return added;
   }
 
+  private say(line: string): void {
+    if (this.said.has(line)) return;
+    this.said.add(line);
+    this.e.wctx.log(line);
+  }
+
+  /** Le contexte d'un lot tiré du plan : celui gardé (recontrôlé : arrêt, budget, lot fini) ou celui que le contrôle préalable construit ; null quand il est refusé ou ne tient pas (L527). */
+  private async control(t: Target, key: string, badRepos: Set<string>): Promise<LotCtx | null> {
+    const e = this.e;
+    const kept = this.drawn.get(key);
+    if (kept) {
+      if (kept.lot.budget! <= e.budgetLeft() && !e.planState(kept)) return kept;
+      this.drawn.delete(key);
+      return null;
+    }
+    const known = [...e.ctxs, ...this.waiting.values()].map((x) => ({ project: x.lot.project, lot: x.lot.lot }));
+    const built = await e.build(t, known);
+    if ('refusals' in built) {
+      // Un refus propre au lot l'écarte pour la vague ; celui du dépôt (arbre sale, orchestration en cours) est passager : le lot est relu à la lecture suivante.
+      if (built.refusals.some((r) => r.startsWith(`${key} : `))) this.refused.add(key);
+      else badRepos.add(t.repo); // les autres lots de ce dépôt buteraient sur la même cause, ce tour-ci
+      for (const r of built.refusals) this.say(`continue : lot sauté — ${r}`);
+      return null;
+    }
+    return built.ctx.lot.budget! <= e.budgetLeft() ? built.ctx : null;
+  }
+
+  /**
+   * L527 : remplit au plus `free` créneaux libres avec les lots prêts du plan (`targets`, déjà dans l'ordre de priorité et filtrés sur les ressources libres), chacun contrôlé comme un lot ajouté.
+   * Un lot dont le dépôt est pris par un lot qui joue (`canRun`) est gardé pour la lecture suivante, le lot d'un autre dépôt passe devant ; un lot refusé est sauté pour la vague, dit au journal ;
+   * un lot que le budget restant ne tient pas n'est ni pris ni écarté (un moins cher peut passer, ou le tour suivant).
+   */
+  async fill(targets: Target[], free: number, canRun: (c: LotCtx) => boolean): Promise<LotCtx[]> {
+    const e = this.e;
+    const added: LotCtx[] = [];
+    const badRepos = new Set<string>();
+    for (const t of targets) {
+      const key = lotKey(t.project, t.lot);
+      if (added.length >= free || e.stopCause()) break;
+      if (this.refused.has(key)) continue;
+      if (badRepos.has(t.repo)) continue;
+      const c = await this.control(t, key, badRepos);
+      if (!c) continue;
+      if (!canRun(c)) {
+        this.drawn.set(key, c);
+        continue;
+      }
+      this.drawn.delete(key);
+      const refused = this.holdAll(c);
+      if (refused) {
+        this.say(`continue : lot sauté — ${key} : ${refused}`);
+        continue;
+      }
+      e.wctx.log(`continue : tire ${key} (créneau libre)`);
+      this.admit(null, c);
+      added.push(c);
+    }
+    if (added.length) e.announce();
+    return added;
+  }
+
   /** Les demandes encore en file quand plus rien ne joue ne seront plus lues : écartées et dites. */
   drain(why: string): void {
     this.waiting.clear();
+    this.drawn.clear();
     for (const entry of this.e.store.addQueue()) this.discard(entry, why);
   }
 }

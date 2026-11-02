@@ -26,7 +26,7 @@ import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
 import { costlyHypotheses, specScreen, specText } from './spec.js';
 import { fichesDuDossier } from '../spec.js';
-import { candidates, parsePriority, parseUntil, drawSettingsReport, readPriority, stopReason, type Candidate } from './continue.js';
+import { candidates, fillTargets, handedBackStreak, parsePriority, parseUntil, drawSettingsReport, readPriority, stopReason, type Candidate } from './continue.js';
 import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, leadReviewedHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, gitProcessRunning, indexLockRefusal, installPrePush, keepGateGuard, longDuration, removePrePush, snapshot } from './guard.js';
 import { buildArgs, buildLocalArgs, killSessions, MODEL_ALIASES, mcpServersFor, readAgents, realClaude, enabledPlugins, settingsFiles, type AgentDef, type AnyModel, type ClaudeFn, type SessionKind, type StepModel } from './launch.js';
@@ -833,7 +833,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
       if (l.node) l.node.link = (deps.linkNode ?? linkNodeBin)(store.dir, l.node.version, l.node.bin);
       store.writeLot(l);
     }
-    const code = await continueRounds(await execute(wave, pre.lots, store, io, deps, today, maxSessions(args, io)), wave, pre.lots, store, io, deps, today, args, launch);
+    const code = await continueRounds(await execute(wave, pre.lots, store, io, deps, today, args), wave, pre.lots, store, io, deps, today, args, launch);
     abandon();
     return code;
   } catch (e) {
@@ -928,16 +928,6 @@ async function continueDryRun(args: Args, io: OrchestrateIo, deps: OrchestrateDe
   io.out(rounds.length ? `  tirés ensuite, par tour (budget décompté sur les estimations) : ${rounds.join(' · ')}${rounds.length === DRY_RUN_ROUNDS ? ' · …' : ''}` : '  aucun autre lot prêt à tirer');
 }
 
-/** Lots rendus ou en échec de suite, en comptant depuis le dernier lot de la vague. */
-function handedBackStreak(all: LotState[]): number {
-  let n = 0;
-  for (const l of [...all].reverse()) {
-    if (l.status === 'handed-back' || l.status === 'failed') n++;
-    else break;
-  }
-  return n;
-}
-
 /**
  * `--continue` (L147) : tant qu'aucune borne ne joue, tire jusqu'à `cap` lots prêts du plan et les joue dans la même vague
  * (même budget, même dossier d'état). Sans `--continue`, rend le code tel quel. Bornes : budget, `--until`, limite d'usage,
@@ -975,7 +965,7 @@ async function continueRounds(first: number, wave: WaveState, all: LotState[], s
     store.writeWave(wave);
     all.push(...drawn.lots);
     say(`continue : tire ${drawn.lots.map((l) => lotKey(l.project, l.lot)).join(', ')}`);
-    code = await execute(wave, drawn.lots, store, io, deps, today, cap, all);
+    code = await execute(wave, drawn.lots, store, io, deps, today, args, all);
     if (code === 2) return code;
   }
 }
@@ -1022,7 +1012,8 @@ function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: st
 }
 
 /** Pose les verrous et les hooks, joue la vague, range l'état, rend le tableau et le code de sortie. */
-async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: OrchestrateIo, deps: OrchestrateDeps, today: Day, cap: number, all: LotState[] = lots): Promise<number> {
+async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: OrchestrateIo, deps: OrchestrateDeps, today: Day, args: Args, all: LotState[] = lots): Promise<number> {
+  const cap = maxSessions(args, io);
   const launch = store.launchDir;
   // La configuration des projets est lue avant de poser quoi que ce soit : un cadence.yaml illisible ne laisse ni verrou ni hook.
   const envs = lots.map((lot) => projectEnv(lot.repo));
@@ -1197,6 +1188,9 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     release();
   });
   const finished = lotFinished;
+  /** L527 : les lots prêts du plan que le créneau libre peut recevoir (rien sans `--continue`) ; `adds.fill` les contrôle et les prend. */
+  const refill = async (canRun: (c: LotCtx) => boolean, free: number): Promise<LotCtx[]> =>
+    args.continue && free > 0 ? adds.fill(fillTargets({ args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }), free, canRun) : [];
   try {
     await runPool(ctxs, cap, all, (c) => {
       // Un lot rendu ou en échec garde son worktree et sa branche (R12) : le journal en donne le chemin.
@@ -1217,7 +1211,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     }, (lots) => lots.every((c) => c.tree), {
       pollMs: deps.slotPollMs ?? ANSWER_POLL_MS,
       // L407 : les réponses déposées par `--answer` pendant la vague sont prises entre deux étapes ; un lot qui n'est plus en question ne rejoue rien.
-      take: async (canRun) => {
+      take: async (canRun, free) => {
         const taken: LotCtx[] = [];
         for (const e of store.answerQueue()) {
           const c = ctxs.find((x) => lotKey(x.lot.project, x.lot.lot) === e.lot);
@@ -1244,7 +1238,8 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
             // registre illisible : le décompte reste celui du dernier écrit
           }
         }
-        return [...taken, ...(await adds.take(canRun))];
+        const added = await adds.take(canRun);
+        return [...taken, ...added, ...(await refill(canRun, free - taken.length - added.length))];
       },
     });
     // L421 : un ajout encore en file quand plus rien ne joue ne sera plus lu : écarté et dit.
@@ -1702,7 +1697,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
       return removed.length && !lots.every((l) => l.status === 'ready') ? 1 : 0;
     }
     played = true;
-    return continueRounds(await execute(wave, live, store, io, deps, today, maxSessions(args, io), lots), wave, lots, store, io, deps, today, args, launch);
+    return continueRounds(await execute(wave, live, store, io, deps, today, args, lots), wave, lots, store, io, deps, today, args, launch);
   } finally {
     if (!played) for (const f of taken) releaseLock(f, process.pid);
   }

@@ -60,6 +60,22 @@ describe('ordonnanceur', () => {
     expect(mine.map((l) => l.split(':')[1])).toEqual(['implement', 'review', 'implement', 'review']);
   });
 
+  it("L527 — la file des demandes reçoit le nombre de créneaux que ni une file qui joue ni une file en attente n'occupe", async () => {
+    const s = setup();
+    const seen: number[] = [];
+    // quatre lots dans trois dépôts (a en porte deux) : trois files pour trois créneaux
+    await runPool(s.ctxs, 3, [], () => {}, () => false, {
+      pollMs: 5,
+      take: (_canRun, free) => {
+        seen.push(free);
+        return [];
+      },
+    });
+    expect(seen[0]).toBe(0); // trois files (a, b, c) pour trois créneaux : aucun libre
+    expect(Math.max(...seen)).toBe(3); // tout est fini : les trois créneaux sont libres
+    expect(seen.every((n) => n >= 0 && n <= 3)).toBe(true);
+  });
+
   it('le budget atteint : les lots suivants sont suspendus, aucune nouvelle session', async () => {
     const s = setup(2000);
     await runPool(s.ctxs);

@@ -87,6 +87,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Fixed
 
 - `cadence release` reads the whole « In two lines » list of `docs/whats-new.md`, not only the new version's line (L418, [docs/releasing.md](docs/releasing.md)): a bullet of another version over 240 characters or a long paragraph fallen among the short lines is a finding (exit 1) before the version commit and the tag, as `test/readme-accueil.test.ts` would find it at the gate (the 1.22.0 publication of 28-10 failed on it). The printed steps say to read each by its exit code, never behind a pipe, and `publish.yml` / `tests.yml` no longer pipe into `grep` (here-strings), so no filter hides the code of the suite.
+### Changed
+
+- `cadence orchestrate --continue` fills a free session slot by itself (L527, GitHub issue #21, [docs/orchestrate.md](docs/orchestrate.md)): as soon as a lot has finished playing — handed back at the pre-check included — and a slot of the cap stays empty, the wave draws the next ready lot of the plan in the declared priority order (`--priority`, `priority:` of the parent `cadence.yaml`) without waiting for the lots still playing; it used to draw only between rounds, so a lot added to a wave waited behind the other one while a slot stayed idle. The cap, one session per repository (or one worktree per lot), the shared resources, the draw settings (`continue:`), the budget (what the lots still playing have not spent stays reserved) and the stops of the draw (`--stop-after-current`, usage limit, question, two lots handed back in a row, `--until`) hold as before; each start is told in the journal (`continue : tire <project>:<lot> (créneau libre)`).
 
 ## [1.38.1] - 2026-11-02
 

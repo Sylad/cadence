@@ -70,6 +70,15 @@ describe('L463 + L464 — états détaillés et champs d\'extension dans le mêm
     expect(check).toMatch(/nulle_part/);
     expect(check).toMatch(/theme « zzz » hors de enum/);
   });
+  it('raf list --json exporte la clé du fichier state_before sur un lot bloqué, jamais stateBefore', () => {
+    const dir = project();
+    raf(dir, 'add', 'Un lot', '--set', 'theme=ui');
+    raf(dir, 'start', 'L1');
+    expect(raf(dir, 'status', 'L1', 'bloque').code).toBe(0);
+    const lot = JSON.parse(raf(dir, 'list', '--json').out)[0];
+    expect(lot).toMatchObject({ state: 'bloque', state_before: 'en_cours', extras: { theme: 'ui', owner: 'claude' } });
+    expect(lot).not.toHaveProperty('stateBefore');
+  });
   it('plan.extras ne peut pas prendre le nom des clés d\'état (state, state_before)', () => {
     const dir = gitRepo();
     writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  extras:\n    state: {}\n');

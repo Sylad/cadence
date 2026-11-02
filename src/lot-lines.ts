@@ -34,10 +34,10 @@ function flagLines(lot: Lot): string[] {
 }
 
 /**
- * Le lot tel que `raf list --json` l'exporte (L464) : les clés du fichier du plan (`docs_ok`, pas `docsOk`), sans `problems` (diagnostic de `raf check`).
+ * Le lot tel que `raf list --json` l'exporte (L464) : les clés du fichier du plan (`docs_ok`, `state_before`, pas `docsOk` ni `stateBefore`), sans `problems` (diagnostic de `raf check`).
  * Les noms exportés sont ceux que garantit docs/stabilite.md : renommer un champ du type interne `Lot` ne les change pas.
  */
 export function lotJson(lot: Lot): Record<string, unknown> {
-  const { docsOk, problems: _problems, ...rest } = lot;
-  return { ...rest, ...(docsOk ? { docs_ok: docsOk } : {}) };
+  const { docsOk, stateBefore, problems: _problems, ...rest } = lot;
+  return { ...rest, ...(docsOk ? { docs_ok: docsOk } : {}), ...(stateBefore ? { state_before: stateBefore } : {}) };
 }

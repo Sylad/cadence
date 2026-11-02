@@ -47,13 +47,16 @@ error output, nothing on the standard one, and exits 1. The derivation is built 
 
 ## Spec step (design, first steps delivered)
 
-For a visible lot that adds a page (`screen: page`; a component or a journey follows the ordinary path since L209), `orchestrate` gets a step
+For a visible lot that adds a page (`screen: page`), `orchestrate` gets a step
 before the code: a static HTML mockup in the project's own style (1440 and 390 px; empty, loading and
 error states) and a machine-readable screen sheet (fields, numbered rules `R1…` each marked *sourced*
 or *hypothesis*, actions → API calls). The `ux-reviewer` agent reads the mockup before any code; the
 acceptance tests are written from the sheet, red, by a session other than the implementer's; the
 implementation gets the sheet, the code review checks rule → test → green, the hypotheses go into the
-lot's news entry, and a human is asked only about a choice that is costly to undo. The design is in
+lot's news entry, and a human is asked only about a choice that is costly to undo. A visible lot above 0.1 day
+with `screen: component`, `journey` or no `screen:` (and no `spec: true`) plays a lighter version since L459: spec → mockup
+of the touched states only (current screen and target), mockup review, then the code, with no `accept` and a budget of
+ordinary plus 450 k (1.05 M for a lot up to half a day), see [The light mockup](orchestrate.md#the-light-mockup-l459). The design is in
 `docs/superpowers/specs/2026-10-10-etape-spec-design.md` (with an example sheet and the plan of the
 lots that deliver it). Delivered so far: the sheet templates `templates/fiche.yaml` (screen) and `templates/fiche-back.yaml` (a lot without a screen: `sujet`, `cas`, `regles`, `contrats`, `donnees`), `cadence spec check`
 (the sheet's invariants) and `cadence spec qa` (the screen's `docs/qa/expectations.md` section, derived

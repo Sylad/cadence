@@ -537,7 +537,7 @@ export class Plan {
     // L396 : l'archive est un détail de stockage — les lots archivés reprennent leur place parmi ceux du fichier actif, comme un seul plan.
     const archived = this.loadArchives().flatMap((a) => archiveLots(a.doc).toJSON() as Record<string, unknown>[]);
     const read = (r: Record<string, unknown>) => withExtras(normalizeLot(r), r, this.settings.extras);
-    const places = new Map(archived.flatMap((r) => (typeof r[PLACE_KEY] === 'string' ? [[String(r.id), r[PLACE_KEY] as string] as const] : [])));
+    const places = new Map(archived.flatMap((r) => (typeof r[PLACE_KEY] === 'string' || r[PLACE_KEY] === null ? [[String(r.id), (r[PLACE_KEY] as string | null) ?? ''] as const] : [])));
     const lots = mergeArchived(archived.map(read), this.activeRaw().map(read), places);
     const model = this.settings.states;
     return model ? lots.map((l) => ({ ...l, problems: [...l.problems, ...stateProblems(model, l)] })) : lots;

@@ -45,15 +45,15 @@ describe('L435 — verify vert après une livraison rouge du même sha', () => {
   it('R3 — sans livraison rouge, ou rouge d\'un autre sha, rien n\'est écrit', async () => {
     const d = stateDir();
     await verify(d, SHA);
-    appendFailedDelivery(d, '2026-10-29', OTHER, 'CI en échec');
+    appendFailedDelivery(d, '2026-10-29', OTHER, 'vérification en échec', 'verification');
     await verify(d, SHA);
     expect(journal(d)).toBe('');
   });
 
   it('R4 — une livraison rouge plus récente d\'un autre sha n\'est pas effacée', async () => {
     const d = stateDir();
-    appendFailedDelivery(d, '2026-10-28', SHA, 'CI en échec');
-    appendFailedDelivery(d, '2026-10-29', OTHER, 'CI en échec');
+    appendFailedDelivery(d, '2026-10-28', SHA, 'vérification en échec', 'verification');
+    appendFailedDelivery(d, '2026-10-29', OTHER, 'vérification en échec', 'verification');
     await verify(d, SHA);
     expect(journal(d)).toBe('');
   });

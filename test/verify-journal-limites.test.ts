@@ -48,7 +48,7 @@ describe('L435 limites — verify vert et journal des livraisons', () => {
 
   it('sha court contre sha complet du journal rouge : pas d\'inscription fausse', () => {
     const d = stateDir();
-    appendFailedDelivery(d, '2026-10-29', SHA, 'CI en échec');
+    appendFailedDelivery(d, '2026-10-29', SHA, 'vérification en échec', 'verification');
     expect(recordVerifiedDelivery(d, '2026-10-29', SHA.slice(0, 7))).toBe(false);
     expect(journal(d)).toBe('');
   });

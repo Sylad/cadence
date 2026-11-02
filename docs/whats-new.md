@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.43.0**: the ratchet baseline is recomputed at integration (no more conflict hand-backs); `docs.sync` lets internal `refactor` commits through; `raf archive` keeps `raf list` order.
 - **1.42.1**: republishes 1.42.0, whose npm publication failed on two tests of the CI clone (no `main` branch, a draw-order probe that depended on timing); same features.
 - **1.42.0**: free plan identifiers (`plan.idPattern`, `raf add --id`, `raf estimate`); `--integrate` accepted while a wave runs; fair slot sharing between waves; the gate notices code that reads the plan.
 - **1.41.0**: richer plans (detailed states, extension fields); a light mockup step for visible lots that are not pages; `verify --sha` clears a red delivery; the quality ratchet watches its tools' config files.
@@ -71,6 +72,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.43.0**: fewer lots handed back for bookkeeping. When `qualite-baseline.json` is the only file in conflict at the integration of `cadence orchestrate`, the program recomputes it commit by commit (the repository's value plus the commit's own reductions, checked with the gate's rule), so a lot that lowers the baseline from an old `main` is integrated without a manual rebase and the ratchet stays green at the integrated tip; `scripts/qualite.mjs` now ships with the package (L538, `docs/orchestrate.md`, `docs/qualite.md`). `docs.sync` no longer reports « documentation en retard » for commits of type `refactor(L12): …` (cleanup or internal split with no change of behaviour); `refactor!:`, a `BREAKING CHANGE:` footer and every other type still count (L537, `docs/news.md`). With `plan.idPattern`, `raf archive` keeps an archived lot in its place in `raf list` through a `place:` key, and `raf todo` moves only the reopened lot to the end (L536).
 
 **1.42.1**: republishes 1.42.0, whose npm publication failed on two tests only (the ratchet test assumed a local `main` branch, the `--priority` probe read a timing-dependent order); no behaviour changes.
 

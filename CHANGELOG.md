@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-11-02
+
 ### Fixed
 
 - The integration of `cadence orchestrate` no longer hands a lot back for a `qualite-baseline.json` conflict, nor turns the ratchet red at the integrated tip (L538, `docs/orchestrate.md`, `docs/qualite.md`): a lot that lowers the baseline from an old `main` collided at the rebase every time (L485, L486, L487, L536, L465: one manual rebase each). When the baseline is the only file in conflict, the program writes, commit by commit, the repository's value plus the commit's signed difference (its start minus the commit, floored at 0, a key at 0 removed, sorted), after checking the commit with the gate's own rule (`comparerMigration`: no key of an existing file goes up, no total goes up); a commit that raises the baseline, a baseline that is missing at one of the three stages or not a flat key → number map, or another file in conflict, is still aborted as before. The journal says `<project>:<lot> qualite-baseline.json : base recalculée sur main + baisses du lot (<n> commit(s))`. `scripts/qualite.mjs` is now published with the package and copied into the wave's frozen `tool/` copy, since the integration imports it.

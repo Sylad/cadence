@@ -266,6 +266,10 @@ delivery is another sha's (writing would hide it), when it is not of class `[ver
 verify proves nothing about a commit that was never built or deployed), when there is no red delivery, or when
 `deliveries.log` was already modified after `deliveries-failed.log`. `deliveries-failed.log`
 is never rewritten, so `cadence perf` still counts the red delivery and now also the green one.
+One limit: the red line keeps the sha the delivery *started* from, so the green line written by
+`verify` is that sha too, even when a green `deliver` would have written the sha its script
+declared (`CADENCE_DEPLOYED_FILE`) or the head it moved to — that sha is not kept anywhere once the
+delivery is red; deliver again when the journal must name it.
 
 Exit code: **0** every check green · **1** at least one red effect · **2** nothing
 to verify or invalid configuration.

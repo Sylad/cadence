@@ -1833,20 +1833,28 @@ describe('--continue (L147)', () => {
     const o = io(parent);
     expect(await orchestrate(['a:L1', '--continue', '--until', '17:00', '--dry-run'], o.io, fakeDeps().deps)).toBe(0);
     removeDryRunBriefs(o.out.join('\n'));
-    expect(o.out.join('\n')).toMatch(/--continue : priorité .*jusqu'à 17:00\n.*tirés ensuite, par tour .*: tour 1 : a:L2/);
+    expect(o.out.join('\n')).toMatch(/--continue : priorité .*jusqu'à 17:00\n.*tirés ensuite, un par un .*: a:L2$/m);
   });
 
-  it('--dry-run --continue simule les tours avec la règle de draw (un lot par dépôt par tour) et dit les lots sautés', async () => {
+  it('--dry-run --continue simule le remplissage des créneaux libres comme la vague (un lot à la fois, dans l\'ordre de priorité, budget décompté sur les estimations) et dit les lots sautés (L527)', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'a1' }, { title: 'a2' }, { title: 'a3' }, { title: 'a4' }], b: [{ title: 'b1' }, { title: 'b2' }], c: [{ title: 'c1' }] });
     writeFileSync(join(dirs.c, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n# sale\n');
     const o = io(parent);
-    expect(await orchestrate(['--continue', '--dry-run', '--priority', 'a,b,c', '--max-sessions', '2', '--budget', '8M'], o.io, fakeDeps().deps)).toBe(0);
+    expect(await orchestrate(['--continue', '--dry-run', '--priority', 'b,a,c', '--max-sessions', '2', '--budget', '8M'], o.io, fakeDeps().deps)).toBe(0);
     removeDryRunBriefs(o.out.join('\n'));
     const text = o.out.join('\n');
-    // premier tirage : a:L1, b:L1 (lots donnés, affichés par la simulation) ; ensuite un seul lot de a par tour tant que b en a, puis a seul complète
-    expect(text).toMatch(/tirés ensuite, par tour .*: tour 1 : a:L2, b:L2 · tour 2 : a:L3, a:L4/);
+    // premier tirage : b:L1, a:L1 (un lot par dépôt, affichés par la simulation) ; ensuite lot par lot dans l'ordre de priorité, b d'abord, plus de « tour »
+    expect(text).toMatch(/tirés ensuite, un par un au fil des créneaux libres, dans l'ordre de priorité \(budget décompté sur les estimations\) : b:L2, a:L2, a:L3, a:L4$/m);
+    expect(text).not.toMatch(/tour 1/);
     expect(text.match(/lot sauté — c : arbre sale/g)).toHaveLength(1);
-    expect(text).not.toMatch(/tour 1 : a:L2, a:L3/);
+  });
+
+  it("--dry-run --continue : le budget borne la liste des lots tirés ensuite, un lot qui ne tient plus n'est pas listé", async () => {
+    const { parent } = parentWith({ a: [{ title: 'a1' }, { title: 'a2' }, { title: 'a3', estimate: 2 }, { title: 'a4' }] });
+    const o = io(parent);
+    expect(await orchestrate(['--continue', '--dry-run', '--max-sessions', '1', '--budget', String(3 * lotBudget(1) + 1)], o.io, fakeDeps().deps)).toBe(0);
+    removeDryRunBriefs(o.out.join('\n'));
+    expect(o.out.join('\n')).toMatch(/tirés ensuite, un par un .*: a:L2, a:L4$/m); // a:L3 (2 j) ne tient pas dans le reste, a:L4 (1 j) passe
   });
 
   it("L390 R9 — --dry-run --continue applique orchestrate.continue et affiche le réglage et les lots écartés ; la vague ne joue pas le lot écarté", async () => {

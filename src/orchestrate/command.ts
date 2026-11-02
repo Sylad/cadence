@@ -895,12 +895,14 @@ async function draw(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch
 }
 
 /** Nombre de tours que la simulation de `--dry-run --continue` déroule au plus. */
-const DRY_RUN_ROUNDS = 10;
+/** Le plus de lots que `--dry-run --continue` liste après le premier tirage. */
+const DRY_RUN_LOTS = 10;
 
 /**
- * `--dry-run --continue` : ce que les tirages suivants joueraient, par tour, avec la même fonction `draw` que la vague (un lot par dépôt
- * par tour, contrôle préalable, budget) ; les lots sautés disent pourquoi. Le budget est décompté sur l'estimation des lots tirés
- * (la consommation réelle n'est pas connue). `firstSkipped` : causes écartées au premier tirage, quand il a fourni les lots donnés.
+ * `--dry-run --continue` : ce que le remplissage des créneaux libres tirerait ensuite (L527), avec la même fonction `draw` que la vague, un lot à la fois
+ * (`n = 1` : le premier lot prêt dans l'ordre de priorité, contrôle préalable, budget), comme la vague remplit chaque créneau libre ; les lots sautés disent pourquoi.
+ * Le budget est décompté sur l'estimation des lots tirés (la consommation réelle n'est pas connue) et la simulation ne sait pas quel dépôt sera occupé à chaque
+ * regard : elle liste les lots dans l'ordre où le remplissage les prendrait si chaque dépôt était libre. `firstSkipped` : causes écartées au premier tirage, quand il a fourni les lots donnés.
  */
 async function continueDryRun(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch: string, given: LotState[], budget: number, firstSkipped: string[]): Promise<void> {
   io.out(`--continue : priorité ${priorityOf(args, launch).join(' > ') || '(aucune déclarée : ordre alphabétique)'}${args.until ? ` · jusqu'à ${args.until}` : ''}`);
@@ -916,16 +918,16 @@ async function continueDryRun(args: Args, io: OrchestrateIo, deps: OrchestrateDe
   const exclude = new Set(given.map((l) => lotKey(l.project, l.lot)));
   for (const line of drawSettingsReport(launch, exclude)) io.out(`  ${line}`);
   let remaining = budget - given.reduce((sum, l) => sum + (l.budget ?? 0), 0);
-  const cap = maxSessions(args, io);
-  const rounds: string[] = [];
-  for (let round = 1; round <= DRY_RUN_ROUNDS && remaining > 0; round++) {
-    const drawn = await draw(args, io, deps, launch, exclude, remaining, cap);
+  const next: string[] = [];
+  while (next.length < DRY_RUN_LOTS && remaining > 0) {
+    const drawn = await draw(args, io, deps, launch, exclude, remaining, 1);
     skip(drawn.skipped);
-    if (drawn.lots.length === 0) break;
-    rounds.push(`tour ${round} : ${drawn.lots.map((l) => lotKey(l.project, l.lot)).join(', ')}`);
-    remaining -= drawn.lots.reduce((sum, l) => sum + (l.budget ?? 0), 0);
+    const lot = drawn.lots[0];
+    if (!lot) break;
+    next.push(lotKey(lot.project, lot.lot));
+    remaining -= lot.budget ?? 0;
   }
-  io.out(rounds.length ? `  tirés ensuite, par tour (budget décompté sur les estimations) : ${rounds.join(' · ')}${rounds.length === DRY_RUN_ROUNDS ? ' · …' : ''}` : '  aucun autre lot prêt à tirer');
+  io.out(next.length ? `  tirés ensuite, un par un au fil des créneaux libres, dans l'ordre de priorité (budget décompté sur les estimations) : ${next.join(', ')}${next.length === DRY_RUN_LOTS ? ' · …' : ''}` : '  aucun autre lot prêt à tirer');
 }
 
 /**

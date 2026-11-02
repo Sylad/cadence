@@ -875,9 +875,10 @@ lots:
     started: 2026-11-02
   - id: L478
     title: "Cliquet (suite de L462) : la base ne doit pas remonter (rm + --init ou édition à la main passent en porte et en CI : comparer à la base du sha de départ) et le découpage d'un fichier de la base doit avoir une voie admise (transfert documenté, mesure comparée au total) — cas L461"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-31
+    started: 2026-11-02
   - id: L479
     title: "Cliquet (suite de L462) : surveiller tous les fichiers que lisent ESLint, knip et jscpd (.gitignore imbriqués, vitest.config.*, package.json scripts/main/bin/exports, tsconfig.json pour knip) ou passer à une règle générale (tout changement hors code source pendant le lot est nommé) ; signaler .git/info/exclude non vide ; un outil absent de node_modules dit « npm install » au lieu de « Unexpected end of JSON input »"
     status: todo

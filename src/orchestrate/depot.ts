@@ -3,6 +3,7 @@ import { sharedStateDir } from '../state.js';
 import { addHint, type RunEnv } from './ajout.js';
 import { canInstallPrePush, gitProcessRunning, indexLockRefusal, snapshot } from './guard.js';
 import { activeLock, REPO_LOCK } from './lock.js';
+import { heldRefusal } from '../local-task.js';
 
 /** Les fichiers suivis modifiés d'un dépôt. */
 export async function trackedDirty(repo: string): Promise<string[]> {
@@ -26,6 +27,6 @@ export async function repoRefusals(repo: string, t: { projectDir: string; lot: s
     const hook = canInstallPrePush(repo);
     if (hook) out.push(`${name} : ${hook}`);
   }
-  if (busy && !opts.resume && !ours) out.push(`${name} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})${addHint(t, busy.wave, run.launch)}`);
+  if (busy && !opts.resume && !ours) out.push(`${heldRefusal(repo, busy)}${addHint(t, busy.wave, run.launch)}`);
   return out;
 }

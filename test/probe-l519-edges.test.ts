@@ -6,7 +6,7 @@ import { Plan } from '../src/plan.js';
 import { sharedStateDir } from '../src/state.js';
 import { REPO_LOCK, activeLock, takeLock } from '../src/orchestrate/lock.js';
 import { isExpress } from '../src/orchestrate/express.js';
-import { finishLocal, localWave, ownerPid, startLocal, type LocalDeps } from '../src/local-task.js';
+import { finishLocal, localWave, startLocal, type LocalDeps } from '../src/local-task.js';
 import { commit, gitRepo } from './helpers.js';
 
 const TODAY = '2026-11-01';
@@ -94,7 +94,7 @@ describe('L519 edge — startLocal', () => {
   it('tâche locale d\'un autre lot qui tient le dépôt : refus nommant la tâche, verrou intact', async () => {
     const dir = await repoWith(['--local'], ['--local']);
     startLocal(dir, plan(dir), 'L1', deps({ pid: process.ppid }));
-    expect(() => startLocal(dir, plan(dir), 'L2', deps())).toThrow(/local:L1/);
+    expect(() => startLocal(dir, plan(dir), 'L2', deps())).toThrow(/tâche locale du lead y est en cours \(L1,/);
     expect(activeLock(lockFile(dir))?.wave).toBe('local:L1');
   });
   it('id vide : lot inconnu', async () => {
@@ -148,27 +148,6 @@ describe('L519 edge — finishLocal', () => {
       expect(await finishLocal(dir, 'L1', deps({ gate: async () => g }))).not.toBe(0);
       expect(activeLock(lockFile(dir))).not.toBeNull();
     }
-  });
-});
-
-describe('L519 edge — ownerPid', () => {
-  it('stat toujours nul : rend le point de départ', () => {
-    expect(ownerPid(4242, () => null)).toBe(4242);
-  });
-  it('boucle de ppid (a → b → a) : s\'arrête et rend le départ', () => {
-    const tbl: Record<number, { name: string; ppid: number }> = { 10: { name: 'bash', ppid: 11 }, 11: { name: 'bash', ppid: 10 } };
-    expect(ownerPid(10, (p) => tbl[p] ?? null)).toBe(10);
-  });
-  it('claude à profondeur 3 : trouvé ; à profondeur 20 : non (départ rendu)', () => {
-    const chain = (n: number, claudeAt: number) => (p: number) => (p > 100 + n ? null : { name: p === 100 + claudeAt ? 'claude' : 'sh', ppid: p + 1 });
-    expect(ownerPid(100, chain(30, 3))).toBe(103);
-    expect(ownerPid(100, chain(30, 20))).toBe(100);
-  });
-  it('départ 0, 1 ou négatif : rend le départ sans lire /proc', () => {
-    const stat = vi.fn(() => ({ name: 'claude', ppid: 1 }));
-    expect(ownerPid(1, stat)).toBe(1);
-    expect(ownerPid(0, stat)).toBe(0);
-    expect(stat).not.toHaveBeenCalled();
   });
 });
 

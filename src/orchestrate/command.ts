@@ -8,6 +8,7 @@ import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readOrchestrateConfig, readPlanC
 import { PLAN_ACTIONS, commitMsgHook, leadAnswerMessage, commitMsgRefusal, planCommitMessage } from '../plan-commit.js';
 import { isDay, toDay, type Day } from '../dates.js';
 import { gitRoot, hooksDir } from '../git.js';
+import { heldRefusal, localOverdueLines } from '../local-task.js';
 import { onTermination } from '../proc.js';
 import { stopApps } from './app.js';
 import { Plan, RafError, isOpen } from '../plan.js';
@@ -340,6 +341,11 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
       refusals.push(`${key} : le lot est ${lot.status}`);
       continue;
     }
+    // Un lot local (L519) est au lead, jamais à une vague : ni lancement, ni --add, ni tirage de --continue.
+    if (lot.local) {
+      refusals.push(`${key} : lot local (raf add --local) : le lead le fait lui-même (cadence local start ${t.lot}), une vague ne le joue pas`);
+      continue;
+    }
     if (plan.readonly && lot.status === 'todo' && !env.config.start) {
       refusals.push(`${key} : plan en lecture seule : démarrer le lot avec l'outil du projet (ou déclarer orchestrate.start dans cadence.yaml)`);
       continue;
@@ -643,7 +649,7 @@ const ANSWER_POLL_MS = 2000;
 function statusView(args: Args, launch: string, cap: number, now: Date): { live: string[]; table?: string[]; running: boolean } {
   const id = statusWave(args);
   const store = id !== undefined ? RunStore.find(launch, id) : RunStore.last(launch);
-  const live = [...liveLines(cap, now), ...expiredHoldLines(now)];
+  const live = [...liveLines(cap, now), ...expiredHoldLines(now), ...localOverdueLines((isLeadProject(launch) ? [launch] : findProjects(launch)).map((d) => gitRoot(d) ?? d), now)];
   const waveLive = liveWaves(cadenceHome()).length > 0;
   if (!store && live.length && id === undefined) return { live, running: waveLive };
   if (!store) throw new RafError(id !== undefined ? `vague inconnue : ${id}` : 'aucune vague dans ce dossier');
@@ -1072,7 +1078,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
     const l = takeLock(file, { pid: process.pid, wave: wave.id, started: new Date().toISOString() });
     // Le verrou déjà à ce pid : pris par la reprise qui a attendu l'autre vague (L443).
     if (!l.ok && l.held.pid !== process.pid) {
-      io.err(`orchestrate : ${basename(r)} : une orchestration y est déjà en cours (${l.held.wave}, pid ${l.held.pid})`);
+      io.err(`orchestrate : ${heldRefusal(r, l.held)}`);
       release();
       return 2;
     }
@@ -1579,7 +1585,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
         }
         // Un refus déjà posé sur un dépôt précédent (même vague, attente échue) : les suivants ne font plus attendre, la reprise sort en 2.
         if (!waitFor || refusals.length || Date.now() >= deadline) {
-          refusals.push(`${basename(repo)} : une orchestration y est déjà en cours (${busy.wave}, pid ${busy.pid})`);
+          refusals.push(heldRefusal(repo, busy));
           break;
         }
         if (!waiting) {

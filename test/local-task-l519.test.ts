@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { Plan } from '../src/plan.js';
 import { sharedStateDir } from '../src/state.js';
 import { REPO_LOCK, activeLock, releaseLock, takeLock } from '../src/orchestrate/lock.js';
 import { repoRefusals } from '../src/orchestrate/depot.js';
-import { finishLocal, localWave, ownerPid, startLocal, type LocalDeps } from '../src/local-task.js';
+import { LOCAL_TTL_MINUTES, abortLocal, finishLocal, localOverdueLines, localWave, startLocal, type LocalDeps } from '../src/local-task.js';
+import { orchestrate, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
+import { AGENTS_DIR } from '../src/skills.js';
 import { commit, gitRepo } from './helpers.js';
 
 const TODAY = '2026-11-01';
@@ -93,11 +95,14 @@ describe('L519 R6 — cadence local start verrouille le dépôt comme une vague'
     expect(activeLock(lockFile(dir))?.wave).toBe(localWave('L1'));
   });
 
-  it('R6 — un verrou de porteur mort (tâche abandonnée) est repris', async () => {
+  it('R6 — le verrou d\'une vague morte est repris ; celui d\'une tâche locale (déclaré, sans porteur) ne l\'est jamais', async () => {
     const dir = await repoWith(['--local']);
-    takeLock(lockFile(dir), { pid: 2 ** 22 + 12345, wave: localWave('L1'), started: 'x' });
+    takeLock(lockFile(dir), { pid: 2 ** 22 + 12345, wave: 'w-morte', started: 'x' });
     startLocal(dir, plan(dir), 'L1', deps());
-    expect(activeLock(lockFile(dir))?.pid).toBe(process.pid);
+    expect(activeLock(lockFile(dir))?.wave).toBe(localWave('L1'));
+    await finishLocal(dir, 'L1', deps());
+    takeLock(lockFile(dir), { pid: 2 ** 22 + 12345, wave: localWave('L1'), started: 'x', until: '2026-11-01T10:00:00.000Z' });
+    expect(() => startLocal(dir, plan(dir), 'L1', deps())).toThrow(/déjà en cours/);
   });
 });
 
@@ -108,7 +113,7 @@ describe('L519 R7 — pendant la tâche, aucune vague ni ajout n\'entre dans le 
     const runEnv = { io: { now: () => new Date(), out: () => {}, err: () => {} }, deps: { gitRunning: () => false }, launch: dir } as unknown as Parameters<typeof repoRefusals>[2];
     for (const opts of [{}, { addTo: { wave: 'w1' } }]) {
       const out = await repoRefusals(dir, { projectDir: dir, lot: 'L2' }, runEnv, opts);
-      expect(out.join('\n')).toMatch(/orchestration y est déjà en cours \(local:L1, pid \d+\)/);
+      expect(out.join('\n')).toMatch(/tâche locale du lead y est en cours \(L1,.*cadence local done L1/);
     }
   });
 
@@ -132,7 +137,7 @@ describe('L519 R8 — cadence local done : porte une fois, puis le dépôt est r
     expect(code).toBe(0);
     expect(plays).toBe(1);
     expect(existsSync(lockFile(dir))).toBe(false);
-    expect(out.join('\n')).toMatch(/capture.*cadence deliver.*raf done L1/s);
+    expect(out.join('\n')).toMatch(/capture.*diff.*raf review L1.*cadence deliver.*raf done L1/s);
   });
 
   it('R8 — porte rouge : code 1, le verrou reste (le lead corrige puis rejoue)', async () => {
@@ -177,21 +182,103 @@ describe('L519 R9 — la commande', () => {
   });
 });
 
-describe('L519 R10 — le porteur du verrou survit au shell de la commande', () => {
-  const chain: Record<number, { name: string; ppid: number }> = { 50: { name: 'bash', ppid: 40 }, 40: { name: 'bash', ppid: 30 }, 30: { name: 'claude', ppid: 20 }, 20: { name: 'zsh', ppid: 1 } };
-  const stat = (pid: number) => chain[pid] ?? null;
+describe('L519 R10 — le verrou d\'une tâche locale tient sans processus porteur (revue : le shell de l\'outil Bash meurt à chaque appel)', () => {
+  const DEAD = 2 ** 22 + 12345;
+  const T0 = new Date('2026-11-01T09:00:00Z');
+  const minutes = (n: number) => new Date(T0.getTime() + n * 60_000);
 
-  it('R10 — le premier ancêtre nommé claude porte le verrou, pas le shell éphémère', () => {
-    expect(ownerPid(50, stat)).toBe(30);
+  it('R10 — le processus qui a posé le verrou est mort : le verrou tient, une vague est refusée, local done le lève', async () => {
+    const dir = await repoWith(['--local'], []);
+    startLocal(dir, plan(dir), 'L1', deps({ pid: DEAD }));
+    const held = activeLock(lockFile(dir));
+    expect(held?.wave).toBe(localWave('L1'));
+    expect(held?.until).toBe(minutes(LOCAL_TTL_MINUTES).toISOString());
+    const runEnv = { io: { now: () => new Date(), out: () => {}, err: () => {} }, deps: { gitRunning: () => false }, launch: dir } as unknown as Parameters<typeof repoRefusals>[2];
+    expect((await repoRefusals(dir, { projectDir: dir, lot: 'L2' }, runEnv, {})).join('\n')).toMatch(/tâche locale du lead y est en cours \(L1,/);
+    expect(takeLock(lockFile(dir), { pid: process.pid, wave: 'w1', started: 'x' }).ok).toBe(false);
+    expect(await finishLocal(dir, 'L1', deps({ pid: DEAD }))).toBe(0);
+    expect(existsSync(lockFile(dir))).toBe(false);
   });
 
-  it('R10 — sans claude parmi les ancêtres, le parent direct', () => {
-    expect(ownerPid(20, stat)).toBe(20);
+  it('R10 — le TTL est déclaré (--ttl, 60 min par défaut comme lead hold) ; échu, le verrou tient toujours et se signale en ⚠ avec la sortie', async () => {
+    const dir = await repoWith(['--local']);
+    startLocal(dir, plan(dir), 'L1', deps({ pid: DEAD, ttlMinutes: 30 }));
+    expect(activeLock(lockFile(dir))?.until).toBe(minutes(30).toISOString());
+    expect(localOverdueLines([dir], minutes(29))).toEqual([]);
+    expect(activeLock(lockFile(dir))?.wave).toBe(localWave('L1'));
+    const lines = localOverdueLines([dir], minutes(100));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/^⚠ tâche locale échue : L1 \(.*depuis 1 h 10 min\).*cadence local done L1.*cadence local abort L1/);
+    expect(activeLock(lockFile(dir))?.wave).toBe(localWave('L1')); // jamais libéré en silence
   });
 
-  it('R10 — un parent illisible ou une chaîne qui boucle ne bloque pas : le parent direct', () => {
-    expect(ownerPid(99, stat)).toBe(99);
-    const loop: Record<number, { name: string; ppid: number }> = { 5: { name: 'sh', ppid: 6 }, 6: { name: 'sh', ppid: 5 } };
-    expect(ownerPid(5, (p) => loop[p] ?? null)).toBe(5);
+  it('R10 — lead tour et orchestrate --status signalent la tâche échue', async () => {
+    const dir = await repoWith(['--local']);
+    startLocal(dir, plan(dir), 'L1', deps({ pid: DEAD, ttlMinutes: 10 }));
+    const tour = await rafAt(dir, minutes(30), 'lead', 'tour');
+    expect(tour.out).toContain('⚠ tâche locale échue : L1');
+    expect(tour.out).toMatch(/dépôt .*tâche locale L1/);
+    const before = await rafAt(dir, minutes(5), 'lead', 'tour');
+    expect(before.out).not.toContain('⚠ tâche locale');
+    const st = await orchestrateIn(dir, ['--status'], minutes(30));
+    expect(st.out.join('\n')).toContain('⚠ tâche locale échue : L1');
+  });
+
+  it('R10 — cadence local abort <lot> lève le verrou sans porte, laisse le plan tel quel ; refusé sans tâche de ce lot', async () => {
+    const dir = await repoWith(['--local']);
+    startLocal(dir, plan(dir), 'L1', deps({ pid: DEAD }));
+    expect(() => abortLocal(dir, 'L2')).toThrow(/aucune tâche locale en cours pour L2/);
+    const out: string[] = [];
+    abortLocal(dir, 'L1', (l) => out.push(l));
+    expect(existsSync(lockFile(dir))).toBe(false);
+    expect(plan(dir).lot('L1').status).toBe('doing');
+    expect(out.join('\n')).toMatch(/raf todo L1/);
+    expect((await raf(dir, 'local', 'abort', 'L1')).code).toBe(2);
+    expect((await raf(dir, 'local', 'start', 'L1', '--ttl', '0')).code).toBe(2);
+    expect((await raf(dir, 'local', 'start', 'L1', '--ttl', '15')).code).toBe(0);
+    expect(activeLock(lockFile(dir))?.until).toBe(new Date(new Date(`${TODAY}T09:00:00`).getTime() + 15 * 60_000).toISOString());
+    expect((await raf(dir, 'local', 'abort', 'L1')).code).toBe(0);
   });
 });
+
+describe('L519 R11 — une vague ne joue pas un lot local (revue, constat 2)', () => {
+  it('R11 — orchestrate <projet>:<lot local> --dry-run est refusé en nommant la voie du lead ; le lot de vague voisin passe', async () => {
+    const dir = await repoWith(['--local'], []);
+    writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
+    commit(dir, 'chore: config');
+    const r = await orchestrateIn(dir, ['.:L1', '.:L2', '--dry-run'], new Date());
+    expect(r.code).toBe(2);
+    expect(r.err.join('\n')).toMatch(/:L1 : lot local .*cadence local start L1/);
+    expect(r.err.join('\n')).not.toMatch(/:L2/);
+    expect(plan(dir).lot('L1').status).toBe('todo');
+  });
+});
+
+describe('L519 R12 — le hook pre-push reconnaît la tâche locale (revue, constat 4)', () => {
+  it('R12 — pendant une tâche locale, pas de « vague local:L1 : état illisible » : le push passe sans avertissement de vague', async () => {
+    const dir = await repoWith(['--local']);
+    startLocal(dir, plan(dir), 'L1', deps({ pid: 2 ** 22 + 12345 }));
+    const out: string[] = [];
+    const err: string[] = [];
+    const head = (await import('../src/git.js')).tryGit(dir, ['rev-parse', 'HEAD'])!;
+    const code = await run(['hook', 'pre-push'], { cwd: dir, env: { RAF_TODAY: TODAY }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date(), stdin: () => `refs/heads/main ${head} refs/heads/main ${'0'.repeat(40)}\n` });
+    expect(code).toBe(0);
+    expect(err.join('\n')).not.toMatch(/état illisible|vague local/);
+  });
+});
+
+function rafAt(dir: string, now: Date, ...argv: string[]) {
+  const out: string[] = [];
+  const err: string[] = [];
+  const code = run(argv, { cwd: dir, env: { RAF_TODAY: TODAY }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => now });
+  return Promise.resolve(code).then((c) => ({ code: c, out: out.join('\n'), err: err.join('\n') }));
+}
+
+async function orchestrateIn(dir: string, argv: string[], now: Date) {
+  const deps: OrchestrateDeps = { claude: async () => { throw new Error('aucune session ne doit s\'ouvrir'); }, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), claudeAuth: () => ({ loggedIn: true }), agentsDir: AGENTS_DIR };
+  const out: string[] = [];
+  const err: string[] = [];
+  const io: OrchestrateIo = { cwd: dir, env: { RAF_TODAY: TODAY }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => now };
+  const code = await orchestrate(argv, io, deps);
+  return { code, out, err };
+}

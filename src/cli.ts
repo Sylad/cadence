@@ -24,7 +24,7 @@ import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { configSet } from './config-set.js';
 import { movePriority } from './priority.js';
-import { findProjects, readDepth, leadTour, TITLE_MAX, truncate, readLeadUx, tourFreeLine, readLeadContextThreshold, findLeadDir, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
+import { findProjects, isProject, readDepth, leadTour, TITLE_MAX, truncate, readLeadUx, tourFreeLine, readLeadContextThreshold, findLeadDir, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
 import { configuredCap, expiredHoldLines, slotsLine, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
@@ -40,7 +40,7 @@ import { coverageCommand } from './ref/coverage.js';
 import { release } from './release.js';
 import { applyMigration, describeMigration, planMigration, unhandledError } from './migrate.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
-import { localCommand } from './local-task.js';
+import { localCommand, localLotOf, localOverdueLines, localRepoNote } from './local-task.js';
 import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
@@ -67,7 +67,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf spec <id> on|off   pose ou retire spec: d'un lot existant (le lot change un comportement : étape spec back d'orchestrate)
   raf move <id> --before|--after <id>   réordonne un lot (ou une sous-tâche) dans le plan, parmi ceux du même parent ; refusé pendant une vague du dépôt, sur un lot archivé et sur un plan en lecture seule
   raf uses <lot> [<ressource>…]   remplace les ressources partagées du lot (uses:, déclarées par resources: dans le cadence.yaml du dossier parent ; raf check refuse un nom non déclaré) ; sans nom, retire la clé
-  cadence local start <lot> | local done <lot>   tâche locale du lead (lot posé par raf add --local) : start verrouille le dépôt comme une vague (aucune vague n'y démarre, --add y est refusé) et passe le lot à doing, refusé si une orchestration ou un autre lot du dépôt est en cours ; done joue la porte du projet UNE fois, libère le dépôt si elle est verte (la capture, cadence deliver et raf done restent au lead) et le garde verrouillé sinon
+  cadence local start <lot> [--ttl minutes] | local done <lot> | local abort <lot>   tâche locale du lead (lot posé par raf add --local) : start verrouille le dépôt comme une vague (aucune vague n'y démarre, --add y est refusé) et passe le lot à doing, refusé si une orchestration ou un autre lot du dépôt est en cours ; le verrou est déclaré (60 min par défaut), tenu sans processus jusqu'à done ou abort, signalé en ⚠ par lead tour et orchestrate --status au-delà du délai ; done joue la porte du projet UNE fois, libère le dépôt si elle est verte (la capture, la revue du diff, cadence deliver et raf done restent au lead) et le garde verrouillé sinon ; abort libère sans porte
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
   raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits ; rouvre un lot done ou dropped (→ todo, finished retiré, note « rouvert ») — la seule façon de rouvrir, archivé compris (il revient dans le fichier du plan)
   raf note <id> "texte"
@@ -284,6 +284,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       if (free) io.out(free);
       // une session du lead dont le TTL est échu (L278) : rien ne l'arrête, le tour la signale (hors --json, comme les créneaux)
       for (const l of expiredHoldLines(io.now())) io.out(l);
+      // une tâche locale (L519) au-delà de son délai : le dépôt reste verrouillé, le tour le dit au lieu de le libérer en silence
+      for (const l of localOverdueLines(tourRoots(parent, depth), io.now())) io.out(l);
       // le réglage lead.ux du cadence.yaml du dossier (L197) : le lead lit ici qui pose le verdict UX, au lieu d'ouvrir le fichier
       try {
         if (readLeadUx(parent) === 'lead') io.out('verdict UX : lead (le lead pose raf ux d\'après le rapport du ux-reviewer et les captures ; l\'humain n\'est consulté qu\'en cas de doute)');
@@ -761,7 +763,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return 0;
     }
     case 'local':
-      return localCommand(rest, { repo: gitRoot(root) ?? root, loadPlan, today, now: io.now, gate: (sha) => verifyGateCommand({ sha }, io), out: io.out, err: io.err });
+      return localCommand(rest, values.ttl, { repo: gitRoot(root) ?? root, loadPlan, today, now: io.now, gate: (sha) => verifyGateCommand({ sha }, io), out: io.out, err: io.err });
     case 'news':
       return news(rest, loadPlan(), newsDir, today, values, io, refuseLongTitle, () => hypothesesOf(root, configPath));
     default:
@@ -1042,7 +1044,8 @@ function prePush(root: string, io: Io, remoteName: string | undefined, configPat
     return 0;
   }
   const holding = waveHolding(root);
-  if (holding) {
+  // Une tâche locale du lead (L519) tient le dépôt comme une vague, mais n'a pas de lots de vague : rien à vérifier pour la première garde, et pas de faux « état illisible ».
+  if (holding && !localLotOf(holding.wave)) {
     const lots = waveLotsIn(cadenceHome(), holding.pid, root);
     if (lots === null) {
       io.err(`raf: vague ${holding.wave} : état illisible, push non vérifié`);
@@ -1285,6 +1288,20 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   }
   io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha}${r.ficheAmendee ? `, fiche amendée en ${r.ficheAmendee}` : ''} ; raison dans ${json} et en note du lot ${cite}${tracked ? '' : ' (plan à commiter)'}`);
   return 0;
+}
+
+/** Les racines git des projets du tour (la clé `depth:` du dossier, un seul niveau si elle est illisible : le tour a déjà sa ligne d'erreur). */
+function tourRoots(parent: string, depth: number | undefined): string[] {
+  let levels = depth;
+  if (levels === undefined) {
+    try {
+      levels = readDepth(parent);
+    } catch {
+      levels = 1;
+    }
+  }
+  const dirs = findProjects(parent, levels);
+  return (dirs.length === 0 && isProject(parent) ? [parent] : dirs).map((d) => gitRoot(d) ?? d);
 }
 
 /** Durée par défaut (minutes) d'une session du lead inscrite par `lead hold` : de quoi finir un correctif ou une revue, pas de quoi oublier la réservation toute la journée. */

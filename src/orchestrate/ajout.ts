@@ -4,6 +4,7 @@ import type { LotCtx, WaveCtx } from './cycle.js';
 import { lotFinished, lotKey, lotRepoPaths, type LotState, type RunStore, type WaveState } from './state.js';
 import { cadenceHome, liveWaves } from './registry.js';
 import { REPO_LOCK, takeLock } from './lock.js';
+import { heldRefusal } from '../local-task.js';
 import { installPrePush } from './guard.js';
 import { sharedStateDir } from '../state.js';
 import { waveReadsAdds } from './snapshot.js';
@@ -169,7 +170,7 @@ export class AddFeed {
     const file = join(sharedStateDir(repo), REPO_LOCK);
     if (e.held.includes(file)) return null;
     const l = takeLock(file, { pid: process.pid, wave: e.wave.id, started: new Date().toISOString() });
-    if (!l.ok && l.held.pid !== process.pid) return `${basename(repo)} : une orchestration y est déjà en cours (${l.held.wave}, pid ${l.held.pid})`;
+    if (!l.ok && l.held.pid !== process.pid) return heldRefusal(repo, l.held);
     e.held.push(file);
     fresh.push(repo);
     if (l.ok && l.stale) e.wctx.log(`orchestrate : verrou de dépôt périmé retiré (${basename(repo)}, pid ${l.stale.pid} mort)`);

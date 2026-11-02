@@ -9,6 +9,11 @@ export interface OLock {
   started: string;
   /** Heure de démarrage du processus porteur : avec le pid, son identité (un pid se réutilise). Absente des anciens verrous. */
   start?: string;
+  /**
+   * Verrou déclaré (tâche locale du lead, L519) : tenu sans processus porteur, jusqu'à sa libération explicite (`releaseLock`), que `pid` vive ou non.
+   * `until` est l'échéance annoncée (TTL) : passée, le verrou tient toujours — il se signale en ⚠ (`lockOverdue`), il ne tombe jamais en silence.
+   */
+  until?: string;
 }
 
 /**
@@ -36,13 +41,16 @@ function read(file: string): (OLock & { unreadable?: boolean; ageMs: number }) |
   }
   try {
     const raw = JSON.parse(text);
-    return { pid: Number(raw.pid), wave: String(raw.wave), started: String(raw.started), start: raw.start === undefined ? undefined : String(raw.start), ageMs };
+    return { pid: Number(raw.pid), wave: String(raw.wave), started: String(raw.started), start: raw.start === undefined ? undefined : String(raw.start), ...(raw.until === undefined ? {} : { until: String(raw.until) }), ageMs };
   } catch {
     return { pid: 0, wave: '?', started: '?', unreadable: true, ageMs };
   }
 }
 
-const alive = (l: { pid: number; start?: string; unreadable?: boolean; ageMs: number }) => (l.unreadable ? l.ageMs < 5_000 : holderAlive(l.pid, l.start));
+const alive = (l: { pid: number; start?: string; until?: string; unreadable?: boolean; ageMs: number }) => (l.unreadable ? l.ageMs < 5_000 : l.until !== undefined || holderAlive(l.pid, l.start));
+
+/** Un verrou déclaré dont l'échéance est passée à `now` ; faux pour un verrou de processus (il n'a pas d'échéance). */
+export const lockOverdue = (l: OLock, now: Date): boolean => l.until !== undefined && Date.parse(l.until) <= now.getTime();
 
 /** Le verrou s'il est tenu par un processus vivant, sinon null (absent ou périmé). */
 export function activeLock(file: string): OLock | null {
@@ -79,7 +87,7 @@ export function takeLock(file: string, given: OLock): { ok: true; stale?: OLock 
       continue;
     }
     const now = read(aside);
-    if (now && now.pid === seen.pid && now.wave === seen.wave && now.started === seen.started && now.start === seen.start) {
+    if (now && now.pid === seen.pid && now.wave === seen.wave && now.started === seen.started && now.start === seen.start && now.until === seen.until) {
       stale = { pid: seen.pid, wave: seen.wave, started: seen.started, start: seen.start };
       rmSync(aside, { force: true });
     } else {

@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cadence spec green <lot>` handles a lot closed at `vert: true` but WITHOUT `empreintes` (closed before the seal, GitHub issue #20, L526, [docs/orchestrate.md](docs/orchestrate.md)): it used to answer « déjà vert » while `spec reseal` answered « pas scellée », so the total lock of the waves had no way out. The command now replays the dedicated acceptance command and, green, seals the listed tests that have no fingerprint (the ones already sealed are kept, no `resceaux` entry) in a commit of the file alone that cites the lot (`chore(<lot>): empreintes de l'acceptation posées par cadence spec green`); red, nothing changes, exit 1. A lot green AND sealed still answers « déjà vert » without running anything.
+
 ## [1.38.0] - 2026-11-02
 
 ### Added

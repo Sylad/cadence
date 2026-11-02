@@ -32,6 +32,8 @@ export const PLAN_ACTIONS = {
   articleNoted: 'article à rafraîchir : titres livrés notés',
   /** `spec green` (L366) : jamais la liste des tests rescellés, elle va dans le corps du commit (header-max-length de commitlint). */
   specGreen: 'acceptation verte, vert: true posé par cadence spec green',
+  /** `cadence spec green` sur un lot déjà `vert: true` mais sans empreintes (L526). */
+  specGreenScelle: 'empreintes de l\'acceptation posées par cadence spec green',
   resealed: (norm: string) => `test d'acceptation rescellé (${norm})`,
   /** En minuscule : `subject-case` de config-conventional refuse une majuscule initiale (L343). */
   leadAnswer: (ids: string[]) => `${ids.length > 1 ? 'règles' : 'règle'} ${ids.join(', ')} ${ids.length > 1 ? 'sourcées' : 'sourcée'} par la réponse du lead`,

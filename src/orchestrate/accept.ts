@@ -4,6 +4,7 @@ import { isAbsolute, join, posix } from 'node:path';
 import { parse } from 'yaml';
 import type { Ref } from '../plan.js';
 import { citedRefs } from '../link.js';
+import { PLAN_ACTIONS } from '../plan-commit.js';
 import { isParts, type GateTest } from './gate-parts.js';
 
 // Étape accept d'orchestrate (L173, spec etape-spec S5) : le fichier acceptation.json d'un lot et le verrou de ses tests rouges.
@@ -225,10 +226,11 @@ export function runAcceptation(repo: string, json: string, accept: string | stri
 /**
  * `cadence spec green` (L366) : la commande d'acceptation vient de passer au vert sur les tests tels qu'ils sont. Ceux qu'un lot mené à la main a mis au point
  * après le commit rouge ont une empreinte scellée périmée : le verrou les signalerait encore à chaque lot suivant. Chaque empreinte différente est refaite et
- * journalisée dans `resceaux` (comme `spec reseal`, sans fiche amendée) ; le commit qui pose `vert: true` devient ainsi le commit rouge. Rend les tests rescellés.
+ * journalisée dans `resceaux` (comme `spec reseal`, sans fiche amendée) ; le commit qui pose `vert: true` devient ainsi le commit rouge. Un test SANS empreinte (lot clos avant le scellement, L526)
+ * n'a rien de périmé : il est scellé (`sealAcceptation`, sans entrée de journal). Rend les tests rescellés (`refaits`) et ceux qui viennent d'être scellés (`scelles`).
  * L'appelant s'est assuré que les tests listés sont commités (l'empreinte rescellée est celle de l'arbre de travail) ; un test absent est refusé.
  */
-export function resealForGreen(repo: string, path: string, today: string): string[] {
+export function resealForGreen(repo: string, path: string, today: string): { refaits: string[]; scelles: string[] } {
   const file = join(repo, path);
   const a = parseAcceptation(readFileSync(file, 'utf8'));
   if (typeof a === 'string') throw new Error(`${path} : ${a}`);
@@ -238,18 +240,31 @@ export function resealForGreen(repo: string, path: string, today: string): strin
   const doc = JSON.parse(readFileSync(file, 'utf8')) as Obj;
   const empreintes = isObj(doc.empreintes) ? (doc.empreintes as Record<string, string>) : {};
   const journal = Array.isArray(doc.resceaux) ? doc.resceaux : [];
-  const refaits = fichiers.filter((f) => empreintes[f] !== git(repo, 'hash-object', '--', f).trim());
+  const scelles = fichiers.filter((f) => !empreintes[f]);
+  const refaits = fichiers.filter((f) => empreintes[f] && empreintes[f] !== git(repo, 'hash-object', '--', f).trim());
+  for (const f of scelles) empreintes[f] = git(repo, 'hash-object', '--', f).trim();
   for (const f of refaits) {
     const apres = git(repo, 'hash-object', '--', f).trim();
-    journal.push({ test: f, raison: 'cadence spec green : tests mis au point après le commit rouge, acceptation verte sur ces tests', date: today, avant: empreintes[f] ?? '', apres });
+    journal.push({ test: f, raison: 'cadence spec green : tests mis au point après le commit rouge, acceptation verte sur ces tests', date: today, avant: empreintes[f]!, apres });
     empreintes[f] = apres;
   }
-  if (refaits.length) {
+  if (refaits.length || scelles.length) {
     doc.empreintes = empreintes;
-    doc.resceaux = journal;
+    if (refaits.length) doc.resceaux = journal;
     writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
   }
-  return refaits;
+  return { refaits, scelles };
+}
+
+/** Les fichiers listés qui n'ont pas d'empreinte scellée (L526 : lot clos à `vert: true` avant le scellement, ou scellé en partie). */
+export function sansEmpreinte(a: Acceptation): string[] {
+  return a.fichiers.map((f) => posix.normalize(f)).filter((f) => !a.empreintes?.[f]);
+}
+
+/** Ce que `cadence spec green` fait d'une acceptation (L526) : rien si elle est verte et scellée ; sinon rejouer, puis poser `vert: true` (rouge) ou seulement les empreintes (verte, clos avant le scellement). */
+export function modeSpecGreen(a: Acceptation): { deja: boolean; action: string; reste: string; fait: string } {
+  const sansSceau = a.vert && sansEmpreinte(a).length > 0;
+  return { deja: a.vert && !sansSceau, action: sansSceau ? PLAN_ACTIONS.specGreenScelle : PLAN_ACTIONS.specGreen, reste: sansSceau ? 'reste sans empreintes' : 'reste à vert: false', fait: sansSceau ? 'empreintes posées' : 'vert: true' };
 }
 
 /** Pose `vert: true` dans le fichier (le cycle, jamais une session) ; le commit est à faire. */

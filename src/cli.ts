@@ -34,7 +34,7 @@ import { blockingLots, LABEL, resumeCommand } from './orchestrate/table.js';
 import { renderTestsSansCode, testsSansCode } from './corrections-sans-code.js';
 import { bugCodeOf, bugCodePasses, classifyAll, classifySous, measure, ollamaClassifier, ollamaSousClassifier, readCache, readJournals, readRuns, readSousCache, renderReport, sampleKeys, serializeCache, serializeSousCache } from './corrections.js';
 import { computePerf, perfHeader, perfWindows, readPlans, readProjectDeliveries, readProjectFailedEntries, renderPerf, type PerfResult } from './perf.js';
-import { findAcceptation, parseAcceptation, redAcceptations, resealAcceptation, resealForGreen, runAcceptation, setVert } from './orchestrate/accept.js';
+import { findAcceptation, parseAcceptation, redAcceptations, resealAcceptation, resealForGreen, runAcceptation, modeSpecGreen, setVert } from './orchestrate/accept.js';
 import { refCommand } from './ref/command.js';
 import { coverageCommand } from './ref/coverage.js';
 import { release } from './release.js';
@@ -1144,7 +1144,9 @@ function specGreen(args: string[], ctx: { root: string; loadPlan: () => Plan; co
   if (!json) throw new RafError(`${lotId} : aucune acceptation sous ${config.spec.dir} (le lot n'a pas passé l'étape accept)`);
   const doc = parseAcceptation(readFileSync(join(repo, json), 'utf8'));
   if (typeof doc === 'string') throw new RafError(`${json} : ${doc}`);
-  if (doc.vert) {
+  // Vert mais sans empreintes (L526, issue #20) : clos avant le scellement, il tient le verrou total sans qu'aucun chemin ne le scelle. On rejoue l'acceptation et, verte, on pose les empreintes.
+  const mode = modeSpecGreen(doc);
+  if (mode.deja) {
     io.out(`${lotId} : ${json} est déjà vert, rien à faire`);
     return 0;
   }
@@ -1156,23 +1158,24 @@ function specGreen(args: string[], ctx: { root: string; loadPlan: () => Plan; co
   if (orphans.length) throw new RafError(`fichiers listés dans ${json} sous la racine d'aucune commande de orchestrate.accept : ${orphans.join(', ')}`);
   const failed = runs.filter((r) => r.code !== 0);
   if (failed.length) {
-    io.err(`${lotId} : tests d'acceptation encore rouges (${failed.map((r) => `${r.command}, code ${r.code}`).join(' ; ')}), ${json} reste à vert: false`);
+    io.err(`${lotId} : tests d'acceptation encore rouges (${failed.map((r) => `${r.command}, code ${r.code}`).join(' ; ')}), ${json} ${mode.reste}`);
     for (const r of failed) io.err(r.output.trim().split('\n').slice(-40).join('\n'));
     return 1;
   }
   const before = readFileSync(join(repo, json), 'utf8');
-  let resceles: string[];
+  let sealed: ReturnType<typeof resealForGreen>;
   try {
-    resceles = resealForGreen(repo, json, ctx.today);
+    sealed = resealForGreen(repo, json, ctx.today);
   } catch (e) {
     throw new RafError(`${lotId} : ${(e as Error).message}`);
   }
-  setVert(repo, json);
+  const resceles = sealed.refaits;
+  setVert(repo, json); // déjà vrai pour un lot vert sans empreintes : le fichier garde ce qu'il avait
   try {
     git(repo, ['add', '--', json]);
     // Le sujet reste court et fixe (le gabarit `plan.commit` du projet s'il y en a un, comme tout commit écrit par cadence, L343) ; les tests rescellés, sans borne, vont dans le corps, une ligne chacun.
     const template = readPlanConfig(join(repo, 'cadence.yaml'), repo)?.commit;
-    const subject = template ? planCommitMessage(template, { lot: lotId, action: PLAN_ACTIONS.specGreen }) : `chore(${lotId}): ${PLAN_ACTIONS.specGreen}`;
+    const subject = template ? planCommitMessage(template, { lot: lotId, action: mode.action }) : `chore(${lotId}): ${mode.action}`;
     const body = resceles.length ? ['empreintes rescellées (tests mis au point depuis le commit rouge) :', ...resceles.map((f) => `- ${f}`)].join('\n') : null;
     git(repo, ['commit', '-q', '-m', subject, ...(body ? ['-m', body] : []), '--', json]);
   } catch (e) {
@@ -1186,7 +1189,7 @@ function specGreen(args: string[], ctx: { root: string; loadPlan: () => Plan; co
     const out = e as { stderr?: string; stdout?: string; message: string };
     throw new RafError(`spec green : le commit a échoué, ${json} est revenu tel qu'avant la commande — ${(out.stderr || out.stdout || out.message).trim().split('\n').slice(-5).join(' | ')}`);
   }
-  io.out(`${lotId} : ${json} → vert: true, commit ${git(repo, ['rev-parse', '--short', 'HEAD']).trim()}${resceles.length ? ` ; empreintes rescellées (tests mis au point depuis le commit rouge) : ${resceles.join(', ')}` : ''}`);
+  io.out(`${lotId} : ${json} → ${mode.fait}${sealed.scelles.length ? ` (${sealed.scelles.join(', ')})` : ''}, commit ${git(repo, ['rev-parse', '--short', 'HEAD']).trim()}${resceles.length ? ` ; empreintes rescellées (tests mis au point depuis le commit rouge) : ${resceles.join(', ')}` : ''}`);
   return 0;
 }
 

@@ -723,7 +723,10 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const target = values.sha ? { sha: resolveCommit(root, values.sha) ?? '', note: null } : defaultTarget(root, config);
       if (values.sha && !target.sha) throw new RafError(`--sha ${values.sha} : commit introuvable`);
       // Une ligne verte écrite par verify (L435) est une livraison : mêmes effets que deliver (lots annoncés, article à rafraîchir, L144).
-      const effects = deliveredEffects({ root, configPath, planPath, loadPlan, newsDir, today, waveId: waveHolding(root, 'deliver')?.wave, io });
+      // verify lit le verrou sans refuser : une tâche locale du lead (L519) n'empêche pas de rejouer les vérifications, et n'est pas une vague à citer.
+      const holding = waveHolding(root);
+      const waveId = holding && !localLotOf(holding.wave) ? holding.wave : undefined;
+      const effects = deliveredEffects({ root, configPath, planPath, loadPlan, newsDir, today, waveId, io });
       return verifyCommand({ config, sha: target.sha, note: target.note, retry, out: io.out, journal: { dir: sharedStateDir(root), day: today, effects } }, realCheckDeps(root));
     }
     case 'skills': {

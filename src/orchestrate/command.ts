@@ -482,7 +482,7 @@ function planMessageLines(repo: string, l: LotState, wave: string, dir: string):
   ];
 }
 
-function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budget: number, id: string): void {
+function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budget: number, id: string, multiSlot: boolean): void {
   const tmp = mkdtempSync(join(tmpdir(), 'cadence-orchestrate-'));
   const agents = agentsOf(deps);
   io.out(`vague ${id} — simulation, rien n'est lancé (budget ${budget} tokens comptés)`);
@@ -499,7 +499,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, budg
     if (l.goal) io.out(`  objectif donné : ${l.goal} (à la place du titre dans les briefs)`);
     io.out(`  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, l.screen ? 'screen' : l.specLot ? 'spec' : undefined, l.escalationReserve ? env.config.escalation?.model : undefined)})`);
     const mine = lots.filter((o) => o.repo === l.repo);
-    const together = env.config.worktrees && mine.length > 1 && !mine.some((o) => o.repos?.length) && !!repoBranch(l.repo);
+    const together = env.config.worktrees && (mine.length > 1 || multiSlot) && !mine.some((o) => o.repos?.length) && !!repoBranch(l.repo);
     io.out(together ? `  file ${basename(l.repo)} · en parallèle des autres lots du dépôt, dans son worktree (cadence/${id}/${lotSlug(l.project, l.lot)}, créé à la prise du créneau)` : `  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
     if (l.repos?.length) io.out(`  dépôts voisins : ${l.repos.map((r) => r.rel).join(', ')} (verrou, garde de push et --add-dir ; leurs commits citent ${l.lot})`);
     if (l.node) {
@@ -780,7 +780,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.dryRun) {
     const id = waveId(io, args.wave, launch);
     if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) return waveExists(args.wave, io);
-    dryRun(pre.lots, io, deps, budget, id);
+    dryRun(pre.lots, io, deps, budget, id, maxSessions(args, io) > 1);
     for (const l of [...estimateLines(pre.lots, launch, (w) => io.err(`orchestrate : ${w}`)), ...(args.continue ? freeLines(launch, pre.lots) : [])]) io.out(l);
     if (args.continue) await continueDryRun(args, io, deps, launch, pre.lots, budget, firstSkipped);
     return 0;
@@ -975,16 +975,16 @@ function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[], wctx:
 }
 
 /**
- * Quels lots jouent dans un worktree (L279). Un groupe de lots du même dépôt (`groupLots`) y joue si `orchestrate.worktrees` est vrai, s'il a au moins deux lots,
- * (ou, pour une vague `--continue` à plusieurs créneaux, `fillable` : le lot seul d'un dépôt y joue aussi, pour que le créneau libre reçoive le lot suivant du même dépôt, L527), si le dépôt est sur une branche et si aucun de ses lots n'a de dépôt voisin (`repos:`, R2) ; sinon les lots restent à la suite, avec un avertissement qui dit pourquoi.
+ * Quels lots jouent dans un worktree (L279). Un groupe de lots du même dépôt (`groupLots`) y joue si `orchestrate.worktrees` est vrai, s'il a au moins deux lots
+ * ou si la vague a plus d'un créneau (`multiSlot`, L527 : tout lot d'un tel dépôt reçoit son worktree — donné seul, tiré par le remplissage ou apporté par `--add`, avec ou sans `--continue` — pour qu'un créneau libre reçoive le lot suivant du même dépôt), si le dépôt est sur une branche et si aucun de ses lots n'a de dépôt voisin (`repos:`, R2) ; sinon les lots restent à la suite, avec un avertissement qui dit pourquoi.
  * Un lot dont la branche existe déjà (reprise, R11) retrouve son worktree quel que soit le groupe ; un lot rendu à l'intégration dont la branche a disparu n'en reçoit pas. La branche de départ est celle du dépôt du lead à cet instant,
  * ou celle que la branche du lot a notée à sa création.
  */
-function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: string) => void, fillable = false): void {
+function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: string) => void, multiSlot: boolean): void {
   for (const group of groupLots(ctxs)) {
     const repo = group[0].lot.repo;
     const branch = repoBranch(repo);
-    const requested = (group.length > 1 || fillable) && group.every((c) => c.config.worktrees);
+    const requested = (group.length > 1 || multiSlot) && group.every((c) => c.config.worktrees);
     const why = !requested ? null : group.some((c) => c.lot.repos?.length) ? 'des lots du groupe ont des dépôts voisins (repos:)' : !branch ? 'le dépôt est en HEAD détaché' : null;
     if (why) log(`orchestrate : ${basename(repo)} : worktrees demandés mais ${why} : lots joués à la suite`);
     for (const c of group) {
@@ -1141,7 +1141,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   wave.pid = process.pid;
   saveWave();
   const ctxs = contexts(lots, envs, wctx);
-  planTrees(ctxs, store, wave.id, wctx.log, !!args.continue && cap > 1);
+  planTrees(ctxs, store, wave.id, wctx.log, cap > 1);
   try {
     updateWaveRepos(home, process.pid, repos, lanes());
   } catch {
@@ -1161,7 +1161,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
       }
     },
     announce: () => updateWaveReposSafe(home, repos.filter((x) => !freed.has(x)), lanes()),
-    build: (t, known) => buildAdd(t, known, { wave: wave.id, ctxs, wctx, store, io, deps, launch }),
+    build: (t, known) => buildAdd(t, known, { wave: wave.id, ctxs, wctx, store, io, deps, launch, multiSlot: cap > 1 }),
   });
 
   // Ctrl-C, SIGTERM : les sessions sont tuées en bloc, les étapes marquées interrompues, les verrous et hooks libérés.
@@ -1303,17 +1303,17 @@ async function addOnlyLive(args: Args, io: OrchestrateIo, deps: OrchestrateDeps,
 }
 
 /**
- * Le contexte d'un lot ajouté en cours de vague (L421) : le contrôle préalable d'un lot de lancement (les lots de la vague comptent pour les dépendances), le lien du Node,
- * puis un worktree seulement si tous les lots encore à jouer de son dépôt y sont aussi ; sinon il attend la fin de ceux qui jouent dans l'arbre du dépôt.
+ * Le contexte d'un lot ajouté en cours de vague (L421) ou tiré par le remplissage d'un créneau libre (L527) : le contrôle préalable d'un lot de lancement (les lots de la vague comptent pour les dépendances), le lien du Node,
+ * puis un worktree si son dépôt est en `worktrees: true` et la vague a plus d'un créneau (`multiSlot`), ou si tous les lots encore à jouer de son dépôt y sont ; sinon il attend la fin de ceux qui jouent dans l'arbre du dépôt.
  */
-async function buildAdd(t: Target, known: KnownLot[], w: { wave: string; ctxs: LotCtx[]; wctx: WaveCtx; store: RunStore; io: OrchestrateIo; deps: OrchestrateDeps; launch: string }): Promise<{ ctx: LotCtx } | { refusals: string[] }> {
+async function buildAdd(t: Target, known: KnownLot[], w: { wave: string; ctxs: LotCtx[]; wctx: WaveCtx; store: RunStore; io: OrchestrateIo; deps: OrchestrateDeps; launch: string; multiSlot: boolean }): Promise<{ ctx: LotCtx } | { refusals: string[] }> {
   const pre = await LAUNCH_CHECKS.preflight([t], w, { wave: w.wave, lots: known });
   const lot = pre.lots[0];
   if (pre.refusals.length || !lot) return { refusals: pre.refusals };
   if (lot.node) lot.node.link = (w.deps.linkNode ?? linkNodeBin)(w.store.dir, lot.node.version, lot.node.bin);
   const ctx = contexts([lot], [projectEnv(lot.repo)], w.wctx)[0]!;
   const open = openInRepo(w.ctxs, ctx);
-  planTrees(open.every((o) => o.tree) ? [...open, ctx] : [ctx], w.store, w.wave, w.wctx.log);
+  planTrees(open.every((o) => o.tree) ? [...open, ctx] : [ctx], w.store, w.wave, w.wctx.log, w.multiSlot);
   return { ctx };
 }
 

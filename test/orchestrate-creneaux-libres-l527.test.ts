@@ -211,4 +211,81 @@ describe('L527 — --continue remplit seul les créneaux libres', () => {
     await orchestrate(['L1', '--continue', '--max-sessions', '2'], io(dir).io, d);
     expect(l2During).toBe('ready');
   });
+
+  /** Un dépôt en `orchestrate.worktrees: true`, commité. */
+  const worktreesOn = (dir: string) => {
+    writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  worktrees: true\n');
+    git(dir, 'add', '--', 'cadence.yaml');
+    git(dir, 'commit', '-q', '-m', 'chore: worktrees');
+  };
+
+  /** Des sessions d'écriture dont chacune peut attendre un fait de la vague (`holds`, par projet:lot) ; `maxIn` : le plus de sessions à la fois par projet. */
+  function sessions(parent: string, holds: Record<string, (store: RunStore) => Promise<void>>) {
+    const inRepo = new Map<string, number>();
+    const maxIn = new Map<string, number>();
+    const claude: ClaudeFn = async (args, o) => {
+      const kind = kindOf(args);
+      if (kind !== 'implement' && kind !== 'fix') return claudeOut(reviewReport());
+      const project = /on project `([^`]+)`/.exec(args[1])?.[1] ?? o.cwd.split('/').pop()!.replace(/--.*$/, '');
+      const lot = /on lot `([^`]+)`/.exec(args[1])![1];
+      inRepo.set(project, (inRepo.get(project) ?? 0) + 1);
+      maxIn.set(project, Math.max(maxIn.get(project) ?? 0, inRepo.get(project)!));
+      try {
+        await (holds[`${project}:${lot}`] ?? (() => new Promise((r) => setTimeout(r, 30))))(RunStore.last(parent)!);
+      } finally {
+        inRepo.set(project, inRepo.get(project)! - 1);
+      }
+      return claudeOut(workReport({ commits: [commitFile(o.cwd, `f-${lot}.txt`, `feat(${lot}): travail`)] }));
+    };
+    const d: OrchestrateDeps = { claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR, slotPollMs: 20 };
+    return { d, maxIn };
+  }
+
+  it("R10 — un lot tiré par le remplissage dans un dépôt en worktrees dont plus aucun lot ne joue reçoit son worktree : le lot suivant du même dépôt remplit le créneau libre pendant qu'il joue", async () => {
+    const parent = parentWith(['a', 'b'], { a: 3 });
+    worktreesOn(join(parent, 'a'));
+    const s = sessions(parent, {
+      // b tient son créneau jusqu'à ce que a:L2, tiré dans le créneau libéré par a:L1 (plus aucun lot de a ne joue alors), soit en écriture
+      'b:L1': async (store) => {
+        await wait(() => store.readLot('a', 'L1')?.status === 'ready');
+        await wait(() => store.readLot('a', 'L2')?.status === 'implementing');
+      },
+      // a:L2 ne rend la main qu'une fois a:L3 prêt : a:L3 doit jouer en même temps que lui, dans son worktree
+      'a:L2': async (store) => {
+        await wait(() => store.readLot('a', 'L3')?.status === 'ready');
+      },
+    });
+    expect(await orchestrate(['--continue', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(s.maxIn.get('a')).toBe(2);
+    expect(journal(parent)).toMatch(/a:L2 · worktree créé/);
+    expect(journal(parent)).toMatch(/a:L3 · worktree créé/);
+    expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1', 'b:L1', 'a:L2', 'a:L3']);
+  });
+
+  it("R11 — sans --continue, dans un dépôt en worktrees et un plafond > 1, le lot donné seul joue dans son worktree et un lot apporté par --add joue en parallèle dès qu'un créneau est libre", async () => {
+    const parent = parentWith(['a'], { a: 2 });
+    const dir = join(parent, 'a');
+    worktreesOn(dir);
+    let l1WhileL2Ready = '';
+    const s = sessions(parent, {
+      'a:L1': async (store) => {
+        expect(await orchestrate(['--add', 'a:L2'], io(parent).io, s.d)).toBe(0);
+        await wait(() => store.readLot('a', 'L2')?.status === 'ready');
+        l1WhileL2Ready = store.readLot('a', 'L1')!.status;
+      },
+    });
+    expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(l1WhileL2Ready).toBe('implementing');
+    expect(s.maxIn.get('a')).toBe(2);
+    expect(journal(parent)).toMatch(/a:L1 · worktree créé/);
+    expect(journal(parent)).toMatch(/a:L2 · worktree créé/);
+  });
+
+  it('R11 — avec un plafond de 1, le lot donné seul joue dans le dépôt, sans worktree', async () => {
+    const parent = parentWith(['a']);
+    worktreesOn(join(parent, 'a'));
+    const s = sessions(parent, {});
+    expect(await orchestrate(['a:L1', '--max-sessions', '1'], io(parent).io, s.d)).toBe(0);
+    expect(journal(parent)).not.toMatch(/worktree créé/);
+  });
 });

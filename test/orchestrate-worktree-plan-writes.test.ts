@@ -56,14 +56,22 @@ describe('R2 — seuls les lots qui peuvent jouer ensemble passent en worktree',
     expect(f.calls.every((c) => c.cwd === repo)).toBe(true);
     expect(branches(repo)).toBe('');
   });
-  it('R2 — un lot seul d\'un dépôt : joué dans le dépôt, pas de worktree', async () => {
+  it('R2 — un lot seul d\'un dépôt, plafond de 1 : joué dans le dépôt, pas de worktree', async () => {
     const { parent, repo } = setup([{ title: 'un' }]);
     const f = fake();
-    const r = await run(parent, ['a:L1'], f);
+    const r = await run(parent, ['a:L1', '--max-sessions', '1'], f);
     expect(r.code).toBe(0);
     expect(f.calls.every((c) => c.cwd === repo)).toBe(true);
     expect(r.out).not.toContain('worktrees demandés');
     expect(existsSync(join(store(parent).dir, 'worktrees'))).toBe(false);
+  });
+  it('L527 — un lot seul d\'un dépôt, plafond > 1 : joué dans son worktree (un --add du même dépôt pourra jouer en parallèle)', async () => {
+    const { parent, repo } = setup([{ title: 'un' }]);
+    const f = fake();
+    const r = await run(parent, ['a:L1'], f);
+    expect(r.code).toBe(0);
+    expect(f.calls.filter((c) => c.kind === 'implement').every((c) => inWorktree(c.cwd) && c.cwd !== repo)).toBe(true);
+    expect(r.out).not.toContain('worktrees demandés');
   });
 });
 

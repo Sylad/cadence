@@ -78,6 +78,35 @@ export interface GateCtx {
   cores?: number;
 }
 
+/**
+ * Les fichiers suivis au sha, hors documentation (`docs/`, `.md`, `.txt`), plan et `cadence.yaml`, qui citent le chemin du plan (L482) ; vide si aucun ou si git échoue.
+ * Chaîne cherchée telle quelle (`-F`), pas comme un motif.
+ */
+function planReaders(repo: string, sha: string, planFile: string | undefined): string[] {
+  if (!planFile) return [];
+  try {
+    const out = git(repo, 'grep', '-l', '-I', '-F', '-e', planFile, sha, '--', '.', ':(exclude)docs', ':(exclude)*.md', ':(exclude)*.txt', ':(exclude).cadence', ':(exclude)cadence.yaml', ':(exclude)CHANGELOG*');
+    return out.split('\n').map((l) => l.slice(sha.length + 1)).filter(Boolean);
+  } catch {
+    return []; // git grep rend 1 sans correspondance
+  }
+}
+
+/** Le plan dont les commits seuls sont traversés : aucun si un test le lit, déclaré (L450) ou deviné d'après le code qui cite son chemin sans que `gate.readsPlan` le dise (L482). */
+function crossablePlan(repo: string, sha: string, planFile: string | undefined, declared: unknown): string | undefined {
+  return declared || planReaders(repo, sha, planFile).length ? undefined : planFile;
+}
+
+/** La fin de la raison du rejeu quand les commits de plan seuls ne sont pas traversés : déclaré (L450) ou deviné d'après le code (L482) ; vide sinon. */
+function planNote(repo: string, sha: string, planFile: string | undefined, declared: unknown): string {
+  const crossing = ' ; les commits de plan seuls ne reprennent pas le verdict d\'un sha dessous';
+  if (!planFile) return '';
+  if (declared) return ` (orchestrate.gate.readsPlan : un test lit le plan${crossing.replace(' ;', ',')})`;
+  const readers = planReaders(repo, sha, planFile);
+  if (!readers.length) return '';
+  return ` (le code lit le plan, gate.readsPlan absent : ${readers.slice(0, 3).join(', ')}${readers.length > 3 ? ', …' : ''} cite ${planFile}${crossing} — déclarer orchestrate.gate.readsPlan)`;
+}
+
 /** Pourquoi l'arbre principal ne peut pas porter la porte au sha : non propre ou à un autre commit ; null s'il le peut. */
 function mainTreeObstacle(repo: string, sha: string): string | null {
   try {
@@ -164,12 +193,12 @@ async function playGate(ctx: GateCtx): Promise<number> {
   let recorded: ReturnType<typeof recordedGate> = { reason: 'aucune porte de vague enregistrée pour ce sha' };
   try {
     // Un test qui lit le plan (orchestrate.gate.readsPlan, L450) voit un autre contenu après un `raf done` : les commits de plan seuls ne sont pas traversés.
-    recorded = recordedGate(ctx.launchDirs ?? [], repo, sha, steps, config.gate?.readsPlan ? undefined : ctx.planFile);
+    recorded = recordedGate(ctx.launchDirs ?? [], repo, sha, steps, crossablePlan(repo, sha, ctx.planFile, config.gate?.readsPlan));
   } catch (e) {
     recorded = { reason: `état des vagues illisible (${gitFailure(e)})` };
   }
   if ('found' in recorded) return reuseRecorded(recorded.found, steps, sha, out);
-  const replayReason = `verdict rejoué : ${recorded.reason}${config.gate?.readsPlan && ctx.planFile ? ' (orchestrate.gate.readsPlan : un test lit le plan, les commits de plan seuls ne reprennent pas le verdict d\'un sha dessous)' : ''}`;
+  const replayReason = `verdict rejoué : ${recorded.reason}${planNote(repo, sha, ctx.planFile, config.gate?.readsPlan)}`;
   const obstacle = mainTreeObstacle(repo, sha);
   const mode = ctx.verify?.inPlace;
   const remote = await tryRemote(ctx, short, replayReason, (exec, emit) => runSteps(steps, exec, emit, config, short));

@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.38.1**: `spec green` seals a lot closed at `vert: true` without fingerprints (issue #20); `deliver`, `raf move`, `spec reseal` and `spec green` refuse cleanly during a local task.
 - **1.38.0**: an express lane plays a touch-up of at most 0.1 day in one session; `raf add --local` and `cadence local start|done|abort` lock a repository while the lead edits it by hand.
 - **1.37.0**: one full test suite per lot, played by the gate (`suites` column); no correction pass without a finding; a richer implementation brief; `scripts/temps-d-un-lot.mjs` measures where a lot's time goes.
 - **1.36.0**: `cadence deliver` no longer waits for the CI of a sha whose commits only touch the plan, with timed steps and a `deliveries-steps.log` journal; `orchestrate --add` puts a lot in a live wave.
@@ -65,6 +66,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.38.1**: `cadence spec green <lot>` now handles a lot closed at `vert: true` with no fingerprints (closed before the seal, GitHub issue #20): it replays the lot's acceptance command and, green, writes the fingerprints in a commit that cites the lot, so a later lot that amends one of its tests no longer has to be finished outside a wave (L526, `docs/orchestrate.md`). During a local task of the lead (1.38.0), `cadence deliver`, `raf move`, `cadence spec reseal` and `cadence spec green` refuse with a message that names the task and how to end it, instead of « état illisible » or an impossible `--sha` hint (L525, `docs/raf.md`).
 
 **1.38.0**: two ways to make a small change cheaper (L519, decided on 01-11 after a one-line UI separator cost 245 s of implementation). The **express lane**: a lot of at most 0.1 day with no screen sheet nor spec is played by `cadence orchestrate` in a single writing session, without precheck, edge-case probe, separate code review or « code sans test » gate, and without a News entry per lot; the lead reads the diff and the capture, groups the entries at delivery, and the program's gate still plays once (`docs/orchestrate.md`). The **local task**: `raf add --local` marks a lot the lead does by hand, and `cadence local start <lot>` locks the repository like a wave (no wave starts there, `--add` and `--continue` refuse it, and the task itself is refused while a wave or another lot of the repository runs). The lock is declared with a `--ttl` (60 min by default, like `lead hold`) and carried by no process; past its TTL it still holds and `lead tour` and `orchestrate --status` show a ⚠ until `cadence local done` (gate green) or `cadence local abort`. A wave refuses a `local` lot, and the pre-push hook recognises the task instead of reporting an unreadable wave (`docs/raf.md`).
 

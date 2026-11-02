@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.38.1] - 2026-11-02
+
 ### Fixed
 
 - `cadence deliver` and `raf move` while a local task of the lead holds the repository (L525, [docs/raf.md](docs/raf.md)): the refusal names the task and its exit (« une tâche locale du lead y est en cours (L1, depuis …) — la finir (cadence local done L1) ou l'abandonner (cadence local abort L1) »), like `orchestrate --add`; it used to read « vague local:L1 — état illisible » and, for `deliver`, advise a `--sha` that cannot exist.

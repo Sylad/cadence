@@ -1010,6 +1010,7 @@ lots:
     docs_ok: { date: 2026-11-02, reason: "découpage interne de cycle.ts (C1a), façade de ré-export ; les fix suivants ne changent que des imports et un test" }
     notes:
       - { date: 2026-11-02, text: "02-11 23 h 20 : intégration suspendue par l'arrêt de minuit (revue conforme du lead dans le worktree, 5c7896d) → cadence orchestrate --resume --wave 2026-11-02-2140-cont (reprend L490, L493, L499)" }
+    review: { date: 2026-11-02, verdict: "conforme : découpage C1a de cycle.ts (ctx, budget, brief, plan-writes) derrière une façade de ré-export, sans changement de comportement ; mineur : gain du cliquet de 6 lignes non figé", commit: 5c7896d775ca44e36371a2ef446dcec0104fc795 }
   - id: L491
     title: "Découpage C1b : orchestrate/cycle.ts — session (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C1 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: doing

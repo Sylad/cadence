@@ -1478,6 +1478,7 @@ lots:
     estimate: 0.25
     created: 2026-11-02
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme : 0 bloquant, 0 majeur, 2 mineurs en notes (un cas de R4 qui ne peut pas échouer, côté orchestrate couvert seulement par un test qui compte un appel dans le source) — orchestré (vague 2026-11-02-2030-pub, 1 passe(s) de correction)", commit: 75aa6007600dc06ba5e65be4e3a1906b88ec3e64 }
   - id: L538
     title: "Ligne de base du cliquet à l'intégration : un lot qui baisse qualite-baseline.json depuis un main ancien entre en conflit au rebase ou rend le cliquet rouge au sommet intégré (02-11 : L485, L486, L487, L536, L465 — un rebase manuel chaque fois) ; l'intégration recalcule la base sur main + les baisses propres au lot (même méthode que les rebases manuels du 02-11), avec un test"
     status: todo

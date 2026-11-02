@@ -123,7 +123,7 @@ describe('L531 — équité entre vagues pour le créneau qui se libère', () =>
     expect(slotPlace(all, parent, undefined, 'finance:L1')).toEqual({ fresh: false, rank: 0 });
     expect(slotPlace(all, parent, undefined, 'inconnu:L9')).toEqual({});
     expect(slotPlace(all, parent, undefined, undefined)).toEqual({});
-    writeFileSync(join(parent, 'cadence.yaml'), 'priority: []\n');
-    expect(slotPlace(all, parent, undefined, 'finance:L1')).toEqual({ fresh: false, rank: 0 });
+    writeFileSync(join(parent, 'cadence.yaml'), 'priority: []\n'); // illisible (liste vide) : pas de rang, et non le rang 0 du plus prioritaire
+    expect(slotPlace(all, parent, undefined, 'finance:L1')).toEqual({ fresh: false });
   });
 });

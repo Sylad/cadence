@@ -7,7 +7,7 @@ import { changedFiles, fileAt, isAncestor, preloadChangedFiles, readCommits, typ
 import { citedRefs, linkCommits, scopeOf, type Linked } from './link.js';
 import { PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readNewsConfig, readOrchestrateConfig } from './config.js';
 import { ficheHypotheses } from './spec.js';
-import { docSyncGaps, filesOf, gapMessage } from './docsync.js';
+import { docSyncCommits, docSyncGaps, filesOf, gapMessage } from './docsync.js';
 import { type Entry, loadEntries, newsIssues, PUBLIC_TITLE_DEFAULT, publicTitleTooLong, reusedNewsTitle } from './news.js';
 import { isRecurring } from './recurring.js';
 import { resourceIssues } from './resources.js';
@@ -247,7 +247,7 @@ function docSyncIssues(plan: Plan, root: string, byLot: Map<string, Commit[]>): 
     .lots()
     .filter((l) => !l.docsOk)
     .filter((l) => l.status === 'doing' || (l.status === 'done' && !!since && !!l.finished && l.finished >= since))
-    .flatMap((l) => docSyncGaps(sync, filesOf(root, workCommits(plan, root, byLot.get(l.id) ?? []))).map((g) => ({ message: gapMessage(l.id, g) })));
+    .flatMap((l) => docSyncGaps(sync, filesOf(root, docSyncCommits(workCommits(plan, root, byLot.get(l.id) ?? [])))).map((g) => ({ message: gapMessage(l.id, g) })));
 }
 
 /** Commits qui portent du travail sur un lot : ni antérieurs à l'adoption du plan, ni acquittés (`raf ignore`), ni réduits au plan, ni une simple version. */

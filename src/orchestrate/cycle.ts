@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { coveredTasks, lotCommits, lotWork } from '../audit.js';
 import { planLoader, readDocsConfig, readPlanConfig, type OrchestrateConfig } from '../config.js';
 import { PLAN_ACTIONS, leadAnswerMessage, planCommitMessage } from '../plan-commit.js';
-import { articleRepoDir, articlesBrief, docSyncBrief, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
+import { articleRepoDir, articlesBrief, docSyncBrief, docSyncCommits, docSyncGaps, filesOf, gapMessage, type DocSyncGap, type DocSyncRule } from '../docsync.js';
 import { testGateMissing } from '../testgate.js';
 import { citesPriorWork, keepPrecheckReading, localYesNote, precheckNothingToFind } from './precheck.js';
 import { PROBE_FAILED, PROBE_RESERVE, probeStep, probeVars, scheduleProbe, type ProbeIo } from './probe.js';
@@ -466,7 +466,7 @@ function docGaps(c: LotCtx): { sync: DocSyncRule[]; gaps: DocSyncGap[] } {
   const { sync } = docsConfig(c);
   const plan = histPlan(c);
   const acknowledged = !!plan.lots().find((x) => x.id === c.lot.lot)?.docsOk;
-  return { sync, gaps: sync.length && !acknowledged ? docSyncGaps(sync, filesOf(wd(c), lotWork(plan, wd(c), c.lot.lot))) : [] };
+  return { sync, gaps: sync.length && !acknowledged ? docSyncGaps(sync, filesOf(wd(c), docSyncCommits(lotWork(plan, wd(c), c.lot.lot)))) : [] };
 }
 
 /** Cause du renvoi au lead d'un lot dont l'écart docs.sync est ouvert (L317), null sans écart. */

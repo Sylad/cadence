@@ -2,6 +2,14 @@ import { resolve } from 'node:path';
 import type { ArticleRule } from './articles.js';
 import { changedFiles, type Commit } from './git.js';
 
+/**
+ * Commits dont les fichiers comptent pour `docs.sync` (L537) : ceux de type `refactor` (`refactor(L1): …`) sont un nettoyage ou
+ * un découpage déclaré sans changement de commande, de clé ni de sortie, donc sans document à écrire. `refactor!` reste un changement.
+ */
+export function docSyncCommits(commits: Commit[]): Commit[] {
+  return commits.filter((c) => !/^refactor(\([^)]*\))?:/.test(c.subject));
+}
+
 /** Une paire de la clé `docs.sync` de cadence.yaml : si des commits touchent `paths`, ils touchent aussi un des `docs`. */
 export interface DocSyncRule {
   paths: string[];

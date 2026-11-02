@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { run } from '../src/cli.js';
 import { readDocsConfig } from '../src/config.js';
-import { docSyncMatcher } from '../src/docsync.js';
+import { docSyncMatcher, docSyncCommits } from '../src/docsync.js';
 import { renderBrief } from '../src/orchestrate/briefs.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
@@ -200,5 +200,39 @@ describe('brief de revue : docs.sync', () => {
       expect(renderBrief(kind, { ...vars, docs: 'DOCS-CALCULÉ' }), kind).toContain('DOCS-CALCULÉ');
       expect(renderBrief(kind, vars), kind).not.toContain('docs.sync');
     }
+  });
+});
+
+describe('docs.sync : un lot de refactor ne demande pas de documentation (L537)', () => {
+  it('R1 — des commits « refactor(L1): … » seuls ne rendent pas la documentation en retard', async () => {
+    const dir = await repo();
+    work(dir, 'refactor(L1): découpe interne', ['src/a.ts', 'src/b.ts']);
+    const { code, out } = await cad(dir, 'check');
+    expect(out).not.toContain('documentation en retard');
+    expect(code).toBe(0);
+  });
+
+  it('R2 — un commit feat/fix du même lot garde l\'écart, sans lister les fichiers du refactor', async () => {
+    const dir = await repo();
+    work(dir, 'refactor(L1): découpe interne', ['src/a.ts']);
+    work(dir, 'fix(L1): comportement', ['src/b.ts']);
+    const { out } = await cad(dir, 'check');
+    expect(out).toContain('src/b.ts sans toucher README.md');
+    expect(out).not.toContain('src/a.ts');
+  });
+
+  it('R3 — « refactor! » (rupture) et un sujet qui ne commence pas par refactor restent des commits de comportement', async () => {
+    const dir = await repo();
+    work(dir, 'refactor(L1)!: rupture de la sortie', ['src/a.ts']);
+    expect((await cad(dir, 'check')).out).toContain('documentation en retard');
+    const nu = await repo();
+    work(nu, 'feat(L1): refactor de la commande', ['src/a.ts']);
+    expect((await cad(nu, 'check')).out).toContain('documentation en retard');
+  });
+
+  it('R4 — docSyncCommits lit le sujet : portée facultative, liste vide acceptée', () => {
+    const c = (subject: string) => ({ subject }) as never;
+    expect(docSyncCommits([])).toEqual([]);
+    expect(docSyncCommits([c('refactor: x'), c('refactor(L1/t2): x'), c('refactor(L1)!: x'), c('Refactor(L1): x'), c('feat: x')]).map((x: { subject: string }) => x.subject)).toEqual(['refactor(L1)!: x', 'Refactor(L1): x', 'feat: x']);
   });
 });

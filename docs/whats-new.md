@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.41.0**: richer plans (detailed states, extension fields); a light mockup step for visible lots that are not pages; `verify --sha` clears a red delivery; the quality ratchet watches its tools' config files.
 - **1.40.0**: `docs/concepts.md`, the notions of cadence for a human; a proposed sub-task maybe already done is flagged; a warning when the memory index loaded every turn grows too big.
 - **1.39.0**: `orchestrate --continue` fills free slots by priority, one worktree per lot when the cap allows (issue #21); waves show their cost in euros before and after.
 - **1.38.1**: `spec green` seals a lot closed at `vert: true` without fingerprints (issue #20); `deliver`, `raf move`, `spec reseal` and `spec green` refuse cleanly during a local task.
@@ -68,6 +69,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.41.0**: plans can say more without leaving cadence. `plan.statuses` declares the detailed states of a project with their allowed transitions, and `raf status <lot> <state>` writes them; `plan.extras` declares extension fields, validated and kept on every write, set with `raf add --set key=value`; both live together in one plan (L463, L464, `docs/raf.md`). A visible lot that is not a whole page (a component, a touch-up, a UX review of a screen) now gets a light mockup — the current screen and the target, the states it touches — reviewed by the `ux-reviewer` before the code, then checked for conformity after; a lot already entered with a sealed acceptance keeps its full chain (L459, `docs/spec.md`). `cadence verify --sha` green after a red delivery of the same sha records it in the deliveries journal, so the red line goes away without delivering again; it no longer stops on a local task of the lead or an unreadable plan (L435, `docs/deliver.md`). The quality ratchet watches every file its tools read (nested `.gitignore`, `vitest.config.*`, `package.json` entries, `tsconfig.json`), so a configuration change cannot loosen it unnoticed (L479, `docs/qualite.md`).
 
 **1.40.0**: a guide for humans, `docs/concepts.md`, linked at the top of the README, explains each notion of cadence in a few sentences, in the order you meet them: plan and lot, verdicts, session and wave, the steps of a lot and who plays each, the test gate, worktree and integration, « livrable jusqu'à » (L460). In the final table and `--status --detail`, a proposed sub-task whose cited file was changed by a commit of the lot after the review that proposed it is marked `— peut-être déjà traitée (<sha>)`, so a review no longer feeds the next one with work already done (L422). `cadence session close` and `cadence lead tour` warn when the Claude Code `MEMORY.md` index, loaded at every turn, outgrows a size threshold (`memory.indexMaxBytes`), and propose to group its dated entries behind one line; `cadence config set` reads that key back like the others, so a wrong value stops with nothing written (L442). A measure of the earlier change to the passes, read on two windows of `cadence perf`, is recorded (L430).
 

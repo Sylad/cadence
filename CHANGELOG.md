@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-11-02
+
 ### Added
 
 - The quality ratchet (`node scripts/qualite.mjs --contre`) compares more of what ESLint, knip and jscpd read: `vitest.config.*`, `vite.config.*`, `tsconfig.json`, nested `.gitignore` files and the `scripts`, `main`, `bin` and `exports` keys of `package.json` can no longer change in a lot unnoticed; a non-empty `.git/info/exclude` is reported as a warning; a tool missing from `node_modules` says « npm install » (exit 2) instead of « Unexpected end of JSON input »; a generated, untracked `.gitignore` inside an already-ignored folder is not a change (one that a negation pattern such as `!.gitignore` keeps un-ignored still is), so the ratchet no longer refuses in the main checkout (L479, [docs/qualite.md](docs/qualite.md)).

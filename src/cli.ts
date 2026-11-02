@@ -112,7 +112,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   cadence ref eval <attendu.json | dossier> <lecture.json | dossier> [--json]   note une lecture contre l'inventaire attendu (vérité connue) : rappel et précision par type, faux lu (éléments sûrs et faux), pièges trouvés, tokens par page (usage.tokens de la lecture) ; lecture d'un autre document refusée (code 2) ; sur dossiers, un cas par sous-dossier (attendu.json / lecture.json)
   cadence ref corpus <dossier> [--sans-rendu]   écrit le corpus synthétique à vérité connue (7 pièges : texte ambigu levé par une figure, figure qui contredit, table en image, gabarit BUFR, contrôle translucide, page Proposal, scan bruité) : par cas document.html et attendu.json, puis document.pdf et page-<n>.png (1700×2200) rendus par Playwright (CADENCE_PLAYWRIGHT = dossier du paquet) ; dossier existant ou Playwright introuvable : code 2
   cadence release patch|minor|major [--dry-run]   prépare le commit de version (package.json, package-lock.json, plugin.json, marketplace.json, CHANGELOG.md) sans commiter ni publier ; imprime les étapes du lead et vérifie docs/whats-new.md : refus sur un arbre sale, un [Unreleased] vide ou une version déjà taguée
-  cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert, 1 effet rouge, 2 rien à vérifier
+  cadence verify [--retry s] [--sha rév]   rejoue deliver.verify hors livraison : 0 vert (et, au sha de la dernière livraison rouge, l’inscrit au journal des livraisons), 1 effet rouge, 2 rien à vérifier
   cadence verify --gate --sha rév [--project dossier]   porte du projet (orchestrate.build puis orchestrate.test) : reprend le verdict enregistré par la vague quand son sha est le même et son arbre identique, sans rien rejouer (la sortie dit « verdict repris de la porte de la vague ») ; sinon la rejoue (« verdict rejoué : raison ») au sha dans l'arbre principal s'il est propre au sha, sinon dans un worktree jetable aux dépendances copiées (orchestrate.worktreeDeps), puis le retire : 0 vert, 1 rouge avec les tests en échec, 2 rien à rejouer ; le verdict (0 ou 1) est noté par sha et le hook pre-push refuse un push dont le sha n'a pas de verdict vert (CADENCE_PUSH_UNGATED=1 passe outre)
   raf news new <lot…> [--title t] | list | check | stamp | build [-o dossier]   (aussi « cadence news … »)
 
@@ -726,7 +726,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
       const target = values.sha ? { sha: resolveCommit(root, values.sha) ?? '', note: null } : defaultTarget(root, config);
       if (values.sha && !target.sha) throw new RafError(`--sha ${values.sha} : commit introuvable`);
-      return verifyCommand({ config, sha: target.sha, note: target.note, retry, out: io.out }, realCheckDeps(root));
+      return verifyCommand({ config, sha: target.sha, note: target.note, retry, out: io.out, journal: { dir: sharedStateDir(root), day: today } }, realCheckDeps(root));
     }
     case 'skills': {
       if (rest[0] !== 'install') throw new RafError('usage : cadence skills install [--dir .claude] [--force]');

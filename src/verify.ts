@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
 import { headSha, repoStatus, upstreamHead, upstreamIsDefaultBranch } from './git.js';
-import { lastDelivery, sharedStateDir } from './state.js';
+import type { Day } from './dates.js';
+import { lastDelivery, recordVerifiedDelivery, sharedStateDir } from './state.js';
 import { onTermination } from './proc.js';
 import { describeCheck, realDeps, retryCheck, TIMED_OUT, type CheckDeps, type DeliverConfig, type VerifyCheck } from './deliver.js';
 
@@ -126,6 +127,8 @@ interface VerifyCtx {
   /** Secondes de réessai ; 0 = une seule passe. */
   retry: number;
   out: (line: string) => void;
+  /** Journal des livraisons où un verify vert au sha de la dernière livraison rouge s'inscrit (L435) ; absent : rien n'est écrit. */
+  journal?: { dir: string; day: Day };
 }
 
 /** Délai de chaque essai d'une vérification de `cadence verify`. */
@@ -147,7 +150,11 @@ export async function verifyCommand(ctx: VerifyCtx, deps: CheckDeps): Promise<nu
   const results = await replayChecks(config.verify, deps, ctx.sha, verifyEnv(ctx.sha), { retryMs: ctx.retry * 1000, attemptMs: VERIFY_ATTEMPT_MS });
   for (const r of results) out(resultLine(r));
   out(summaryLine(results));
-  return results.some((r) => r.reason !== null) ? 1 : 0;
+  if (results.some((r) => r.reason !== null)) return 1;
+  if (ctx.journal && recordVerifiedDelivery(ctx.journal.dir, ctx.journal.day, ctx.sha)) {
+    out(`verify : ${ctx.sha.slice(0, 7)} avait une livraison rouge, l'effet est vert — inscrit au journal des livraisons`);
+  }
+  return 0;
 }
 
 /**

@@ -234,8 +234,9 @@ about it anywhere, the script declares it in `CADENCE_DEPLOYED_FILE` (above). Ex
 ## verify: replay the effect checks, outside a delivery
 
 A green delivery says the effect was right *then*. `cadence verify` replays the
-`deliver.verify` checks of `cadence.yaml` at any time — no CI, no deploy, no lock,
-no journal entry, nothing written.
+`deliver.verify` checks of `cadence.yaml` at any time — no CI, no deploy, no lock.
+It writes nothing, with one exception (below): a green verify at the sha of the last
+red delivery.
 
 ```sh
 cadence verify                # one pass, one line per check, then a one-line summary
@@ -248,6 +249,17 @@ cadence verify --sha 6b0d9aa  # the sha that replaces ${SHA} / ${SHORT} (default
 ✗ GET https://ol.example/api/lineup → 200, contient « "starters" » — « "starters" » absent de la réponse
 verify : 1 effet rouge sur 2 vérifications
 ```
+
+**A green verify clears a red delivery of the same sha** (L435). When every check is
+green and the sha verified is the one of the *last* line of `deliveries-failed.log`
+(a delivery that failed on an outage, say, while the effect is there), `verify` appends
+`day sha` to `deliveries.log` and prints `verify : <sha> avait une livraison rouge,
+l'effet est vert — inscrit au journal des livraisons`; the `cadence-hud` panel, which
+shows the red line until `deliveries.log` is newer than `deliveries-failed.log`, drops
+it without delivering again. Nothing is written when a check is red, when the last red
+delivery is another sha's (writing would hide it), when there is no red delivery, or when
+`deliveries.log` was already modified after `deliveries-failed.log`. `deliveries-failed.log`
+is never rewritten, so `cadence perf` still counts the red delivery and now also the green one.
 
 Exit code: **0** every check green · **1** at least one red effect · **2** nothing
 to verify or invalid configuration.

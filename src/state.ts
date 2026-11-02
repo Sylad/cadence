@@ -252,6 +252,26 @@ export function appendFailedDelivery(dir: string, day: Day, sha: string, reason:
   appendFileSync(join(dir, 'deliveries-failed.log'), `${[head, ...kept].join(TAIL_SEP)}\n`);
 }
 
+/**
+ * `cadence verify` vert au sha de la DERNIÈRE livraison rouge (L435) : l'effet est bien là, la livraison est donc
+ * faite — une ligne « jour sha » rejoint `deliveries.log`, ce qui efface la ligne rouge du panneau (le journal vert
+ * modifié après le rouge la remplace) sans relivrer. Rien n'est écrit quand la dernière livraison rouge est celle
+ * d'un autre sha (elle resterait cachée), quand il n'y en a pas, ou quand le journal vert est déjà postérieur au
+ * rouge (les dates de modification des fichiers décident, comme au panneau). Retourne si une ligne a été écrite.
+ */
+export function recordVerifiedDelivery(dir: string, day: Day, sha: string): boolean {
+  const last = readFailedEntries(dir).at(-1);
+  if (!last || last.sha !== sha) return false;
+  try {
+    const green = join(dir, 'deliveries.log');
+    if (existsSync(green) && statSync(green).mtimeMs > statSync(join(dir, 'deliveries-failed.log')).mtimeMs) return false;
+  } catch {
+    return false;
+  }
+  appendDelivery(dir, day, sha);
+  return true;
+}
+
 export interface FailedDelivery {
   day: Day;
   sha: string;

@@ -797,7 +797,7 @@ lots:
     uses: [ plan-coeur ]
     created: 2026-10-30
     started: 2026-11-02
-    review: { date: 2026-11-02, verdict: "conforme : fusion juste après rebase sur main (plan.states, --set/plan.extras gardés), cliquet --contre main à 0 après 7507fcf, tsc et suite complète verts", commit: 7507fcf9dc29d8a12ab64fc14d4b03f8eb652742 }
+    review: { date: 2026-11-02, verdict: "conforme : 0 bloquant, 0 majeur, 4 mineurs (1 sous-tâche proposée : LOT_LIKE d'orchestrate ignore les ids de plan.idPattern) — orchestré (vague 2026-11-02-1205-cont, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (e089ef3, L482) n'a changé que la place de l'entrée L465 dans le CHANGELOG, désormais sous [Unreleased] après L482. Le code, les tests et la doc du lot sont identiques à la version déjà revue, et L482 n'en touche aucun fichier (src/verify-gate.ts seulement).", commit: f4fa335577c3a766269840dea9cde477c0347824 }
   - id: L466
     title: "Plans riches — fenêtre prévue et planification (planned: from..to, raf plan, --propose) (manque M4 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo

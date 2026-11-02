@@ -954,20 +954,22 @@ lots:
     finished: 2026-10-31
   - id: L485
     title: "Nettoyage B : retirer staleFiles et readFailedDeliveries (seuls les tests les appellent) et aligner les deux recopies de claudeConfigDir (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § B ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-31
     started: 2026-11-02
     docs_ok: { date: 2026-11-02, reason: CHANGELOG écrit dans fb7882a ; fonctions internes absentes des README et de docs/ ; seul l'audit L461 (relevé daté) les cite }
     review: { date: 2026-11-02, verdict: "conforme : rebasé sur main, seule baisse du lot gardée dans la base (ref/command.ts 30 → 29), alignement HOME testé ; note mineure : la sonde cliquet de npm test dépend d'une branche locale main ; revue courte du diff rebasé (patch-id différent) : conforme après rebase : diff main...HEAD relu, sans constat de la part du rebase. Retrait de staleFiles et readFailedDeliveries sans référence restante, deux recopies alignées sur claudeConfigDir, base du cliquet −1 (ref/command.ts complexity 30 → 29) seule ligne changée, entrée Changed sous [Unreleased] sans doublon de section", commit: 6c44ec27fb31af1d7ea84bd29e26d341fc3a7a3f }
+    finished: 2026-11-02
   - id: L486
     title: "Nettoyage D1–D4 : doublons Ollama, buildArgs/buildRetryArgs, lecture de verrou, choix d'agent d'une étape (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § D ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-31
     started: 2026-11-02
     docs_ok: { date: 2026-11-02, reason: "refactor interne sans changement visible (D1–D4) ; ni README, ni CHANGELOG, ni docs/ ne citent ces fonctions" }
     review: { date: 2026-11-02, verdict: "conforme : nettoyage D1–D4 sans changement de comportement, rebasé sur main, base du cliquet réduite aux seules baisses du lot, tsc, cliquet et suite complète verts ; revue courte du diff rebasé (patch-id différent) : conforme : la reprise après rebase est propre, D1 à D4 ne changent aucun comportement et la base du cliquet ne fait que baisser (jscpd corrections/lock/state retirés, complexités en baisse)", commit: 8680a93f6c5c1c93157ab03de5b82420f77a7c02 }
+    finished: 2026-11-02
   - id: L487
     title: "Nettoyage D5–D6 : lecture d'une clé et du fichier cadence.yaml factorisées (config.ts, continue.ts, lead.ts, resources.ts) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § D ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: todo

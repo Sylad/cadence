@@ -777,9 +777,10 @@ lots:
     started: 2026-11-02
   - id: L464
     title: "Plans riches — champs d'extension déclarés, validés et conservés (plan.extras, raf add --set) (manque M2 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-30
+    started: 2026-11-02
   - id: L465
     title: "Plans riches — identifiants libres et sous-lots à plat (plan.idPattern, parent: hors préfixe) (manque M3 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo

@@ -42,7 +42,7 @@ import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { isExpress } from './express.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
-import { quotaText, renderDetail, renderTable, resumeCommand } from './table.js';
+import { estimateLines, launchPrices, quotaText, renderDetail, renderTable, resumeCommand } from './table.js';
 import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, repairSnapshotModules, snapshotExists, waveReadsAnswerQueue, waveReadsControl, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, withoutLaunchVars, spawnReexec, takeSnapshot, toolDirOf, type SnapshotDeps } from './snapshot.js';
 
 export interface OrchestrateIo {
@@ -657,7 +657,7 @@ function statusView(args: Args, launch: string, cap: number, now: Date): { live:
       throw new RafError((e as Error).message);
     }
   }
-  return { live, table: [...renderTable(store.readWave()!, lots, { compact: true }), ...keptLines(lots.map((l) => l.repo), now.getTime())], running };
+  return { live, table: [...renderTable(store.readWave()!, lots, { compact: true, prices: launchPrices(launch, (w) => live.push(`⚠ ${w}`)) }), ...keptLines(lots.map((l) => l.repo), now.getTime())], running };
 }
 
 /** La vague que `--status` suit (L395) : `--status <id>` ou `--status --wave <id>` ; aucune : la dernière du dossier. Deux ids différents : refus. */
@@ -781,7 +781,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     const id = waveId(io, args.wave, launch);
     if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) return waveExists(args.wave, io);
     dryRun(pre.lots, io, deps, budget, id);
-    if (args.continue) for (const l of freeLines(launch, pre.lots)) io.out(l);
+    for (const l of [...estimateLines(pre.lots, launch, (w) => io.err(`orchestrate : ${w}`)), ...(args.continue ? freeLines(launch, pre.lots) : [])]) io.out(l);
     if (args.continue) await continueDryRun(args, io, deps, launch, pre.lots, budget, firstSkipped);
     return 0;
   }
@@ -1259,7 +1259,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   }
   if (wctx.incident) io.err(`orchestrate : incident — ${wctx.incident}`);
   if (wctx.quota.hit) io.err(`orchestrate : quota atteint — ${quotaText(wctx.quota.message ?? '')}`.trim());
-  for (const line of renderTable(wave, all)) io.out(line);
+  for (const line of renderTable(wave, all, { prices: launchPrices(launch, (w) => io.err(`orchestrate : ${w}`)) })) io.out(line);
   for (const line of keptLines(all.map((l) => l.repo))) io.out(line); // les worktrees conservés, avec leur chemin (R19)
   if (wave.status === 'suspended-budget' || wave.status === 'suspended-quota') return 3;
   return all.every((l) => l.status === 'ready') ? 0 : 1;
@@ -1697,7 +1697,7 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
         wave.status = 'done';
         store.writeWave(wave);
       }
-      for (const line of renderTable(wave, lots)) io.out(line);
+      for (const line of renderTable(wave, lots, { prices: launchPrices(launch, (w) => io.err(`orchestrate : ${w}`)) })) io.out(line);
       for (const line of keptLines(lots.map((l) => l.repo))) io.out(line);
       return removed.length && !lots.every((l) => l.status === 'ready') ? 1 : 0;
     }

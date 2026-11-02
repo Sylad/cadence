@@ -71,6 +71,8 @@ perf:
 An unknown key (under `perf`, under a model, or a model other than `sonnet`, `opus`, `haiku`), a negative or non-numeric price, or an unreadable file refuses the command before any journal is read (`raf: …`, exit 1, no output).
 Without `perf.prices` (absent or empty) the cost is `n/d` and a warning says where to declare it; the other indicators are served.
 
+The same grid prices the waves (L529, [orchestrate](orchestrate.md#cost-in-euros-before-and-after-a-wave-l529)): `orchestrate --dry-run` announces an estimate in euros per lot and for the wave, the final table and `--status` print the real cost.
+
 **Cost of a step** = (`input` + `cacheWrite`) × input price + `output` × output price + `cacheRead` × cacheRead price, per million tokens, at the price of the step's own model. Assumptions written in the sheet (`docs/specs/perf-tokens-delais-cout/fiche.yaml`, R8):
 cache writes are billed at the input price (the grid has no write price, so the cost is slightly underestimated if they are billed more); a step that only carries `counted` (an old journal) is split 90 % input, 10 % output, no cache read;
 a step without any readable token costs 0 € (the lot stays in the population); a `local` step costs 0 € whatever its counters (outside quota and budget) and needs no price.

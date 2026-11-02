@@ -1,5 +1,8 @@
 import { lotWork } from '../audit.js';
-import { planLoader } from '../config.js';
+import { planLoader, type PriceGrid } from '../config.js';
+import { costView } from './cout.js';
+
+export { estimateLines, launchPrices } from './cout.js';
 import { gitRoot, isAncestor } from '../git.js';
 import { repoWork } from '../repos.js';
 import { quotaReset } from './result.js';
@@ -245,15 +248,16 @@ export function renderDetail(lots: LotState[], sel: string): string[] {
 }
 
 /** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. `compact` (L441, `--status`) : sans le détail des lots, une seule ligne renvoie à `--status --detail`. */
-export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[]; now?: number; compact?: boolean } = {}): string[] {
-  const rows = lots.map((l) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`, String(l.suiteRuns ?? '—')]);
-  const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée', 'suites'];
+export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[]; now?: number; compact?: boolean; /** Grille `perf.prices` (L529) : sans elle, ni colonne ni total en euros. */ prices?: PriceGrid | null } = {}): string[] {
+  const cost = costView(lots, deps.prices);
+  const rows = lots.map((l, i) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`, ...cost.cells[i]!, String(l.suiteRuns ?? '—')]);
+  const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée', ...cost.head, 'suites'];
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
   const line = (r: string[]) => r.map((c, i) => c.padEnd(widths[i])).join('  ').trimEnd();
   const out = [line(head), ...rows.map(line)];
   const by = (s: LotState['status']) => lots.filter((l) => l.status === s).length;
   const tail = [`${by('ready')} prêt(s)`, by('question') ? `${by('question')} question(s)` : '', by('handed-back') + by('failed') ? `${by('handed-back') + by('failed')} rendu(s) au lead` : '', by('suspended') ? `${by('suspended')} suspendu(s)` : ''].filter(Boolean);
-  out.push(`vague ${wave.id} : ${k(wave.consumed)} / ${m(wave.budget)} comptés (lecture de cache ${m(wave.cacheRead)}) — ${tail.join(', ')} — ${wave.status}`);
+  out.push(`vague ${wave.id} : ${k(wave.consumed)} / ${m(wave.budget)} comptés (lecture de cache ${m(wave.cacheRead)})${cost.total} — ${tail.join(', ')} — ${wave.status}`);
   for (const l of lots.filter((x) => x.status === 'question')) {
     out.push(`question : ${l.project}:${l.lot} — « ${l.questions.join(' / ')} » (${resumeAnswerHint(wave.id, l)})`);
   }

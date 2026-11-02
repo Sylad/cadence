@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- Cost in euros before and after a wave (L529, [docs/orchestrate.md](docs/orchestrate.md), [docs/perf.md](docs/perf.md)): with a `perf.prices` grid in the `cadence.yaml` of the launch folder, `orchestrate --dry-run` announces, after the simulated lots and their token budgets, an estimate in euros per lot (the budget priced at the lot's writing model, 90 % input / 10 % output; cache reads and review steps are not in it) and for the wave; the final table and `--status` print a `€` column, the real cost of each lot, and the wave total on the `vague …` line (`n/d` for a lot with a model the grid does not price). Without the grid nothing changes; a malformed grid prints a warning and the table still comes out.
+
 ## [1.38.1] - 2026-11-02
 
 ### Fixed

@@ -1,5 +1,6 @@
 import { join, relative, sep } from 'node:path';
-import { planLoader, type ModelPrice, type PriceGrid } from './config.js';
+import { planLoader, type PriceGrid } from './config.js';
+import { euros, stepEuros } from './cost.js';
 import { bugCodeOf, CAUSES, isReview as isReviewKind, sousCausesRanked, type BugCode, type Cause, type Classification, type Journal, type JournalPass, type JournalStep, type SousClassification } from './corrections.js';
 import { addDays, diffDays, isDay, toDay, type Day } from './dates.js';
 import { gitCommonDir } from './git.js';
@@ -247,19 +248,6 @@ function planLot(plans: Plans, project: string, lot: string): PlanLot | undefine
 /** Rang d'affichage d'une sorte d'étape : l'ordre du cycle, les sortes inconnues après. */
 const KIND_ORDER = ['spec', 'maquette', 'fiche', 'precheck', 'implement', 'probe', 'review', 'review-small', 'ux', 'fix', 'accept'];
 const kindRank = (kind: string) => (KIND_ORDER.includes(kind) ? KIND_ORDER.indexOf(kind) : KIND_ORDER.length);
-
-/** Part de `counted` rangée en entrée quand une étape ne porte que ce compteur (journal ancien) : le reste est en sortie (R8 b). */
-const COUNTED_INPUT_SHARE = 0.9;
-
-/** Coût en euros d'une étape (R8) ; le nom du modèle sans prix quand il en faudrait un. */
-function stepEuros(step: JournalStep, prices: PriceGrid): number | { missing: string } {
-  if (step.model === 'local') return 0;
-  const usage = step.usage ?? (step.counted === undefined ? null : { input: COUNTED_INPUT_SHARE * step.counted, cacheWrite: 0, cacheRead: 0, output: (1 - COUNTED_INPUT_SHARE) * step.counted });
-  if (!usage) return 0;
-  const price: ModelPrice | undefined = step.model === 'sonnet' || step.model === 'opus' || step.model === 'haiku' ? prices[step.model] : undefined;
-  if (!price) return { missing: step.model === 'sonnet' || step.model === 'opus' || step.model === 'haiku' ? step.model : 'inconnu' };
-  return ((usage.input + usage.cacheWrite) * price.input + usage.output * price.output + usage.cacheRead * price.cacheRead) / 1_000_000;
-}
 
 const median = (xs: number[]): number | null => {
   if (xs.length === 0) return null;
@@ -769,7 +757,7 @@ function value(v: number | null, kind: Kind): string {
   if (kind === 'tokens') return `${num(v / 1000)} k`;
   if (kind === 'days') return `${num(v)} j`;
   if (kind === 'min') return `${num(v)} min`;
-  if (kind === 'eur') return `${v.toFixed(2).replace('.', ',')} €`;
+  if (kind === 'eur') return euros(v);
   return num(v);
 }
 const signed = (c: number) => `${c >= 0 ? '+' : '−'}${Math.round(100 * Math.abs(c))} %`;

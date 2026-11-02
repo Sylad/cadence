@@ -23,11 +23,13 @@ export function extractRefs(text: string, prefix: string): Ref[] {
 
 /**
  * Le motif des références d'un plan natif qui déclare `plan.idPattern` : `<préfixe>\d+` ou le motif du projet, puis un sous-id `/slug` facultatif
- * (`X7/t1-fusion`). Même garde que les autres formats : pas collé à un mot, un chemin ou un point suivi d'un mot (« X3.x »), le point de fin de phrase passe.
+ * (`X7/t1-fusion`). Garde des `<préfixe>\d+` : celle du format de raf (pas collés à un mot ni à un chemin, pas suivis d'un point et d'un mot ; « feat(L3-L5) » cite L3 et L5) ; les ids du motif du projet, plus strictes, refusent aussi un `-` ou un `.` avant et un `-` après (« AB-1-x »). Le point de fin de phrase passe.
  * Seul le groupe nommé `sub` est capturé, après le motif du projet : ses groupes numérotés (`([A-Z])\1\d+`) gardent leur numéro. L'id est le reste de la correspondance.
  */
 function idRefPattern(prefix: string, idPattern: string): RegExp {
-  return new RegExp(`(?<![\\w/.-])(?:${escapeRe(prefix)}\\d+|(?:${idPattern}))(?:/(?<sub>[\\w-]+(?:\\.[\\w-]+)*))?(?![\\w-]|${DOTTED})`, 'g');
+  const own = `(?<![\\w/])${escapeRe(prefix)}\\d+`;
+  const free = `(?<![\\w/.-])(?:${idPattern})(?=/|(?!-))`;
+  return new RegExp(`(?:${own}|${free})(?:/(?<sub>[\\w-]+(?:\\.[\\w-]+)*)(?![\\w-]|${DOTTED})|(?!\\w|${DOTTED}))`, 'g');
 }
 
 /** Références d'un message dans un plan natif qui déclare `plan.idPattern`. Un sous-id `t<n>` est une sous-tâche du lot ; tout autre (`t1-fusion`) n'est qu'une précision sur le lot cité. */

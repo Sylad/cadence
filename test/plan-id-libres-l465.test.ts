@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { readPlanConfig } from '../src/config.js';
 import { Plan } from '../src/plan.js';
+import { idRefs } from '../src/plan-ids.js';
 import { commit, gitRepo, tempDir, NO_BACKGROUND_GIT } from './helpers.js';
 
 // L465 — plan.idPattern : identifiants libres et sous-lots à plat dans un plan natif (M3).
@@ -206,5 +207,21 @@ describe('R6 — raf estimate <id> <jours> change l\'estimation d\'un lot exista
       expect(r.code, args.join(' ')).not.toBe(0);
     }
     expect(plan(dir)).toBe(before);
+  });
+});
+
+describe('R2 — les ids <préfixe>\\d+ gardent leur garde d\'avant sous plan.idPattern', () => {
+  const PATTERN = '[A-Z]{1,3}-?\\d+(?:\\.\\d+)*';
+  it.each([
+    ['feat(L3-L5): x', ['L3', 'L5']],
+    ['Merge branch L3-fix', ['L3']],
+    ['release-L3', ['L3']],
+    ['v1.L3', ['L3']],
+    ['fix(L12-bis): x', ['L12']],
+  ])('« %s » cite %j', (msg, lots) => {
+    expect(idRefs(msg, 'L', PATTERN).map((r) => r.lot)).toEqual(lots);
+  });
+  it('un id du motif reste refusé collé à un tiret', () => {
+    expect(idRefs('release-AB-1 et AB-1-x', 'L', PATTERN)).toEqual([]);
   });
 });

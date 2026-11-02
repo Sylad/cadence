@@ -86,6 +86,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - `docs.sync` no longer reports « documentation en retard » for a lot of cleanup or internal split declared with no change of behaviour (L537, `docs/news.md`): commits of type `refactor(L12): …` are left out of the files the rule reads, in `raf check`, `cadence lead tour` and the librarian gate of `cadence orchestrate`, so no wave cycle is lost to a manual `raf docs-ok`. `refactor!:`, a refactor whose body carries a `BREAKING CHANGE:` footer, and every other type still count; a document written in a refactor commit still counts for the lot.
 - With `plan.idPattern`, `raf archive` no longer reorders `raf list`: every archived lot, `L<n>` ids included, is archived with a `place:` key (the lot that preceded it in the plan as presented, archived lots included, so separate runs keep the order) and keeps its place; the final number of its id no longer decides; reopening an archived lot (`raf todo`) moves that lot alone to the end of the plan, the archived lots that followed it keep their place; `plan.extras.place` is refused, `place` being a key `raf` writes (L536). Commit messages such as `fix(L12-bis)`, `feat(L3-L5)`, `release-L3` cite L12/L3 again under `plan.idPattern` (fixed by L465, covered by its tests).
 
+## [1.42.1] - 2026-11-02
+
+### Fixed
+
+- The 1.42.0 publication went red on the GitHub runner (L539), on two tests and no code: the ratchet test (L485) assumed a local `main` branch, which the CI clone does not have, and now compares to `origin/main` when `main` is absent (as `tests.yml` does); the L527 probe « --priority explicite » read the draw order from the order in which the two parallel first sessions call `claude`, which flips under load (reproduced on one CPU), and now reads it from the wave (`wave.json`). No behaviour of cadence changes.
+
 ## [1.42.0] - 2026-11-02
 
 ### Added

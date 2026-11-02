@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.42.1**: republishes 1.42.0, whose npm publication failed on two tests of the CI clone (no `main` branch, a draw-order probe that depended on timing); same features.
 - **1.42.0**: free plan identifiers (`plan.idPattern`, `raf add --id`, `raf estimate`); `--integrate` accepted while a wave runs; fair slot sharing between waves; the gate notices code that reads the plan.
 - **1.41.0**: richer plans (detailed states, extension fields); a light mockup step for visible lots that are not pages; `verify --sha` clears a red delivery; the quality ratchet watches its tools' config files.
 - **1.40.0**: `docs/concepts.md`, the notions of cadence for a human; a proposed sub-task maybe already done is flagged; a warning when the memory index loaded every turn grows too big.
@@ -70,6 +71,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.42.1**: republishes 1.42.0, whose npm publication failed on two tests only (the ratchet test assumed a local `main` branch, the `--priority` probe read a timing-dependent order); no behaviour changes.
 
 **1.42.0**: plans can use your own identifiers. `plan.idPattern` accepts free ids (`AB-1.2`) in a writable plan, with `raf add --id`, flat sub-lots under a parent with `raf add --under`, commit references that follow the pattern, and `raf estimate <id> <days>` (L465). `cadence orchestrate --resume --wave <wave> --integrate <project:lot>` is now accepted while the wave still runs: a lot reviewed `conforme` is integrated without waiting for the end of a long `--continue` wave (L532, `docs/orchestrate.md`). Waves sharing the session slots take a freed slot in a common, fair order instead of letting one `--continue` wave starve a review (L531). `cadence verify --gate` replays the gate when code quotes the plan's path while `gate.readsPlan` is absent (L482, `docs/deliver.md`). `src/cli.ts` is split into one module per family of commands, with no behaviour change (L488, L485), and `raf estimate` rejects a non-number cleanly (L535).
 

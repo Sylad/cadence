@@ -1197,7 +1197,7 @@ function specGreen(args: string[], ctx: { root: string; loadPlan: () => Plan; co
 function refuseWhileWaveHolds(ctx: { root: string; loadPlan: () => Plan }, command: 'spec reseal' | 'spec green'): void {
   // Comme `deliver` : la vague tient le verrou du dépôt tant qu'un de ses lots y travaille (état illisible : on refuse).
   // Le refus est UN message : la vague vivante qui tient le verrou (à attendre) et les vagues arrêtées du dépôt, avec leurs dossiers et leurs commandes (L238).
-  const orchestrating = waveHolding(ctx.root);
+  const orchestrating = waveHolding(ctx.root, command);
   if (orchestrating) {
     const repo = gitRoot(ctx.root) ?? ctx.root;
     let open: OpenWave[] = [];

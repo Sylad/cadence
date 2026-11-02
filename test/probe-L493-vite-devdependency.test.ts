@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const lire = (f: string) => JSON.parse(readFileSync(join(process.cwd(), f), 'utf8'));
@@ -39,12 +39,25 @@ describe('probe L493 — vite déclaré en devDependency', () => {
     const brut = readFileSync(join(process.cwd(), 'qualite-baseline.json'), 'utf8');
     expect(brut).not.toMatch(/,\s*}/);
     expect(brut.endsWith('\n')).toBe(true);
+    const cles = Object.keys(base);
+    expect(cles).toEqual([...cles].sort());
   });
 
-  it('tout import nu de vite dans le dépôt est couvert par package.json', () => {
+  it('tout import nu de vite ou vitest trouvé dans src, test et scripts est couvert par package.json', () => {
     const pkg = lire('package.json');
     const declares = { ...pkg.dependencies, ...pkg.devDependencies };
-    expect(declares.vite).toBeDefined();
-    expect(declares.vitest).toBeDefined();
+    const sources = (dir: string): string[] =>
+      readdirSync(join(process.cwd(), dir), { withFileTypes: true }).flatMap((e) => {
+        const chemin = `${dir}/${e.name}`;
+        if (e.isDirectory()) return sources(chemin);
+        return /\.(ts|mjs|js)$/.test(e.name) ? [chemin] : [];
+      });
+    const imports = new Set<string>();
+    for (const f of ['src', 'test', 'scripts'].flatMap(sources)) {
+      const texte = readFileSync(join(process.cwd(), f), 'utf8');
+      for (const m of texte.matchAll(/^\s*import\b[^'"\n]*?from\s+['"](vite|vitest)(?:\/[^'"]*)?['"]/gm)) imports.add(m[1]);
+    }
+    expect(imports.has('vite')).toBe(true);
+    for (const nom of imports) expect(declares[nom], nom).toBeDefined();
   });
 });

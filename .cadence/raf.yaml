@@ -1018,9 +1018,10 @@ lots:
     started: 2026-11-02
   - id: L493
     title: "Nettoyage E : déclarer vite en devDependency, assertion manquante du R3 de orchestrate-registry.test.ts (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § E ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-31
+    started: 2026-11-02
   - id: L494
     title: "Panneau des lots, suite de L481 : aligner les barres d'avancement de « ordre des projets » en colonne (largeur réservée aux noms = le plus long, ex. jobmail-assistant), aujourd'hui chaque barre part après son nom et les débuts diffèrent (capture de Sylvain 31-10)"
     status: done

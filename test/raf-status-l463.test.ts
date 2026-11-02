@@ -143,14 +143,13 @@ describe('raf status', () => {
     expect(raf(dir, 'status', 'L1', 'b').code).toBe(0);
   });
 
-  it('todo → état doing démarre le lot (started posé) ; les autres changements de statut de base renvoient à leur commande', () => {
+  it('todo → état doing démarre le lot (started posé) ; un lot clos et les autres changements de statut de base renvoient à leur commande', () => {
     const dir = projet('plan:\n  states: { a: todo, b: doing, c: done, x: dropped }\n');
     expect(raf(dir, 'status', 'L1', 'c').err).toMatch(/raf done L1/);
     expect(raf(dir, 'status', 'L1', 'x').err).toMatch(/raf drop L1/);
     expect(raf(dir, 'status', 'L1', 'b').code).toBe(0);
     expect(yaml(dir)).toMatch(/status: doing\n\s+state: b/);
     expect(yaml(dir)).toContain('started: 2026-11-02');
-    expect(raf(dir, 'status', 'L1', 'a').err).toMatch(/raf todo L1/);
     raf(dir, 'done', 'L1');
     expect(raf(dir, 'status', 'L1', 'b').err).toMatch(/raf todo L1/);
   });

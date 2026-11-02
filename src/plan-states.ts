@@ -1,3 +1,5 @@
+import type { YAMLMap } from 'yaml';
+import type { Day } from './dates.js';
 import { isObject, list } from './yaml-keys.js';
 import { STATUSES, type Lot, type Status } from './plan.js';
 
@@ -97,4 +99,18 @@ export function stateProblems(model: StateModel, lot: Pick<Lot, 'state' | 'statu
   const base = Object.hasOwn(model.states, lot.state) ? model.states[lot.state] : undefined;
   if (base === undefined) return [`état « ${lot.state} » non déclaré (cadence.yaml : plan.states)`];
   return base === lot.status ? [] : [`état « ${lot.state} » (${base}) contredit status: ${lot.status}`];
+}
+
+/**
+ * Applique à `node` le changement de statut de base de `raf status` : todo → doing démarre le lot, doing → todo le remet en attente
+ * (`started:` retiré s'il n'a pas de commit). Autre changement : rien n'est touché, rend la commande qui s'en charge.
+ */
+export function rebase(node: YAMLMap, lot: Lot, base: Status, today: Day, commits: () => number): 'done' | 'drop' | 'todo' | undefined {
+  if (lot.status === 'todo' && base === 'doing') {
+    node.set('status', 'doing');
+    if (!lot.started) node.set('started', today);
+  } else if (lot.status === 'doing' && base === 'todo') {
+    node.set('status', 'todo');
+    if (commits() === 0) node.delete('started');
+  } else return base === 'done' ? 'done' : base === 'dropped' ? 'drop' : 'todo';
 }

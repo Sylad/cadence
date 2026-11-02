@@ -5,7 +5,7 @@ import { dirtyContents } from './git.js';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
 import { normalizeLot } from './plan-read.js';
-import { currentState, defaultState, stateProblems, transitionProblem, type StateModel } from './plan-states.js';
+import { currentState, defaultState, rebase, stateProblems, transitionProblem, type StateModel } from './plan-states.js';
 import { ARCHIVE_DIR, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, selectArchivable, type Kept } from './archive.js';
 
 /** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
@@ -929,10 +929,12 @@ export class Plan {
 
   /**
    * Pose le `state:` d'un lot (`raf status`, L463) sous la garde de `plan.transitions`, et note le message daté. Le statut de base en est
-   * dérivé : seul todo → doing se fait ici (le lot démarre) ; les autres changements de base gardent leur commande et leurs portes
-   * (`raf done`, `drop`, `todo`). Entrer dans l'état bloqué mémorise l'état d'avant (`state_before:`), `back` y revient sans garde.
+   * dérivé : seuls todo → doing (le lot démarre) et doing → todo (`started:` retiré s'il n'a pas de commit, gardé sinon, comme la réouverture)
+   * se font ici, pour que l'état bloqué se quitte vers l'état d'avant quel que soit son statut de base ; les autres changements de base
+   * gardent leur commande et leurs portes (`raf done`, `drop`, `todo`). Entrer dans l'état bloqué mémorise l'état d'avant (`state_before:`),
+   * `back` y revient sans garde. `commits` compte les commits qui citent le lot (lu seulement pour doing → todo).
    */
-  setState(ref: string, target: string | null, today: Day, opts: { back?: boolean; message?: string } = {}): string {
+  setState(ref: string, target: string | null, today: Day, opts: { back?: boolean; message?: string } = {}, commits: () => number = () => 0): string {
     this.writable();
     const model = this.settings.states;
     if (!model) throw new RafError('aucun état déclaré : cadence.yaml plan.states');
@@ -955,13 +957,8 @@ export class Plan {
     const node = this.lotNode(ref);
     const base = model.states[to];
     if (base !== lot.status) {
-      if (lot.status === 'todo' && base === 'doing') {
-        node.set('status', 'doing');
-        if (!lot.started) node.set('started', today);
-      } else {
-        const command = base === 'done' ? 'done' : base === 'dropped' ? 'drop' : 'todo';
-        throw new RafError(`${ref} : ${to} a pour statut de base ${base}, ${lot.status} aujourd'hui — passer par raf ${command} ${ref}`);
-      }
+      const command = rebase(node, lot, base, today, commits);
+      if (command) throw new RafError(`${ref} : ${to} a pour statut de base ${base}, ${lot.status} aujourd'hui — passer par raf ${command} ${ref}`);
     }
     this.writeState(node, to, to === model.blocked ? from : undefined);
     const message = opts.message?.trim();

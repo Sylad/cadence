@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
@@ -85,14 +86,36 @@ describe('bords de raf status — arguments', () => {
 });
 
 describe('bords de raf status — bloqué et retour', () => {
-  it('a_faire → bloque puis --back — retour vers un état todo — attendu : refus et plan inchangé', () => {
+  it('a_faire → bloque puis --back — retour vers un état todo — attendu : le lot revient a_faire, todo, sans refus', () => {
     const dir = projet();
     raf(dir, 'status', 'L1', 'bloque');
     expect(yaml(dir)).toContain('state_before: a_faire');
-    const avant = yaml(dir);
     const r = raf(dir, 'status', 'L1', '--back');
-    expect(r.code).not.toBe(0);
-    expect(yaml(dir)).toBe(avant);
+    expect(r.code).toBe(0);
+    expect(yaml(dir)).toMatch(/status: todo/);
+    expect(yaml(dir)).toContain('state: a_faire');
+    expect(yaml(dir)).not.toContain('state_before');
+    expect(yaml(dir)).not.toContain('started');
+  });
+
+  it('a_faire → bloque, un commit cite le lot, puis --back — attendu : retour à a_faire, started gardé', () => {
+    const dir = projet();
+    raf(dir, 'status', 'L1', 'bloque');
+    writeFileSync(join(dir, 'f.txt'), 'x');
+    execFileSync('git', ['add', 'f.txt'], { cwd: dir });
+    execFileSync('git', ['commit', '-m', 'feat(L1): travail'], { cwd: dir });
+    expect(raf(dir, 'status', 'L1', '--back').code).toBe(0);
+    expect(yaml(dir)).toContain('state: a_faire');
+    expect(yaml(dir)).toMatch(/status: todo/);
+    expect(yaml(dir)).toContain('started');
+  });
+
+  it('un lot doing passe à un blockedState de base todo — attendu : accepté, le lot repasse todo', () => {
+    const dir = projet(PLAN_YAML.replace('bloque: doing', 'bloque: todo'));
+    raf(dir, 'start', 'L1');
+    expect(raf(dir, 'status', 'L1', 'bloque').code).toBe(0);
+    expect(yaml(dir)).toMatch(/status: todo/);
+    expect(yaml(dir)).toContain('state_before: en_cours');
   });
 
   it('raf done --force depuis bloque — sortie par done — attendu : state: termine, state_before retiré', () => {

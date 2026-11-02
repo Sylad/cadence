@@ -15,14 +15,15 @@ function listStates(plan: Plan, out: (line: string) => void): void {
 }
 
 /** `raf status` (L463) : sans argument la liste des états ; `<id> <état> ["message"]` ou `<id> --back ["message"]` pose l'état d'un lot. */
-export function statusCommand(plan: Plan, rest: string[], back: boolean, today: Day, out: (line: string) => void): number {
+export function statusCommand(plan: Plan, rest: string[], ctx: { back: boolean; today: Day; out: (line: string) => void; commits: (plan: Plan, id: string) => number }): number {
+  const { back, today, out } = ctx;
   if (rest.length === 0 && !back) {
     listStates(plan, out);
     return 0;
   }
   const first = back ? 1 : 2;
   if (rest.length < first) throw new RafError('usage : raf status <id> <état> ["message"] | raf status <id> --back ["message"]');
-  const state = plan.setState(rest[0], back ? null : rest[1], today, { back, message: rest.slice(first).join(' ') });
+  const state = plan.setState(rest[0], back ? null : rest[1], today, { back, message: rest.slice(first).join(' ') }, () => ctx.commits(plan, rest[0]));
   plan.save();
   out(`${rest[0]} → ${state}`);
   return 0;

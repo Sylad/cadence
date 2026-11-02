@@ -461,7 +461,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       return 0;
     }
     case 'status':
-      return statusCommand(loadPlan(), rest, !!values.back, today, io.out);
+      return statusCommand(loadPlan(), rest, { back: !!values.back, today, out: io.out, commits: (p, id) => lotWork(p, root, id).length });
     case 'todo': {
       need(1, 'todo <id> [--reason texte]');
       const plan = loadPlan();

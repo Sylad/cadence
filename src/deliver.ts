@@ -588,14 +588,6 @@ async function verifyAll(
   return null;
 }
 
-/**
- * Ligne des lots cités depuis la livraison précédente, ou null (première livraison, rien de cité).
- *
- * Plan en lecture seule : seuls les lots EN COURS sont annoncés. Ses identifiants sont de forme libre, et
- * un message cite volontiers un numéro qui en a la forme (réserve « R1 » d'une revue) ou un lot clos
- * nommé pour le contexte — les annoncer « livrés » ferait fermer à tort. L'état est celui du départ de
- * la livraison : le plan a été lu avant que le script du projet ne ferme lui-même les lots qu'il livre.
- */
 /** Ce qu'il faut pour annoncer les lots livrés et rafraîchir leur article : deliver, et `cadence verify` quand il inscrit une ligne verte (L435). */
 export type DeliveredCtx = Pick<DeliverCtx, 'root' | 'plan' | 'today' | 'articles' | 'publicTitle' | 'planCommit' | 'waveId' | 'out' | 'err'>;
 
@@ -612,6 +604,14 @@ export function announceDelivered(ctx: DeliveredCtx, prev: string | null, sha: s
   refreshArticles(ctx, ids, sha);
 }
 
+/**
+ * Ligne des lots cités depuis la livraison précédente, ou null (première livraison, rien de cité).
+ *
+ * Plan en lecture seule : seuls les lots EN COURS sont annoncés. Ses identifiants sont de forme libre, et
+ * un message cite volontiers un numéro qui en a la forme (réserve « R1 » d'une revue) ou un lot clos
+ * nommé pour le contexte — les annoncer « livrés » ferait fermer à tort. L'état est celui du départ de
+ * la livraison : le plan a été lu avant que le script du projet ne ferme lui-même les lots qu'il livre.
+ */
 /** Lots cités par les commits livrés depuis la livraison précédente ; vide quand elle est inconnue ou hors de l'historique. */
 function deliveredIds(ctx: DeliveredCtx, prev: string | null, sha: string): string[] {
   if (!ctx.plan || !prev || prev === sha || !isAncestor(ctx.root, prev, sha)) return [];

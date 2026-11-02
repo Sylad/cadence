@@ -756,7 +756,6 @@ const GATES = {
   review: { on: 'revue de code obligatoire pour les lots à commits', already: 'revue de code déjà active', action: PLAN_ACTIONS.reviewRecorded },
 };
 
-/** « raf ux … » et « raf review … » ont la même forme : activer la porte, ou noter le verdict d'un lot. */
 /**
  * Ce qu'une livraison verte annonce et ouvre (lots livrés, article à rafraîchir, L144) : pour `cadence deliver` et pour la ligne verte
  * que `cadence verify` inscrit (L435). Sans `public:`, un lot visible tire son titre de sa Nouveauté la plus récente.
@@ -768,6 +767,7 @@ function deliveredEffects(p: { root: string; configPath: string; planPath: strin
   return { root, plan, today: p.today, articles: readDocsConfig(configPath).articles, publicTitle, planCommit: readPlanConfig(configPath, root)?.commit, waveId: p.waveId, out: io.out, err: io.err };
 }
 
+/** « raf ux … » et « raf review … » ont la même forme : activer la porte, ou noter le verdict d'un lot. */
 function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io, opts: { verbose: boolean; commit: string | undefined }): number {
   if (rest.length < 1) throw new RafError(`usage : raf ${kind} enable | ${kind} <lot> "verdict"`);
   const plan = loadPlan();

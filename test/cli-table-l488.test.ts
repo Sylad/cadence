@@ -51,7 +51,7 @@ describe('L488 — cli.ts : la table de commandes', () => {
   it('R4 — les commandes sans plan (lead, config, perf, corrections, release, migrate, spec check, ref, session --all) ne lisent pas un cadence.yaml fautif', async () => {
     const dir = gitRepo();
     writeFileSync(join(dir, 'cadence.yaml'), 'plan: [pas, un, chemin]\n');
-    for (const argv of [['lead', 'tour'], ['config', 'set', 'k', 'v'], ['perf'], ['corrections'], ['migrate', 'extra'], ['spec', 'check'], ['ref', 'check'], ['session', 'start', '--all']]) {
+    for (const argv of [['lead', 'tour'], ['config', 'set', 'k', 'v'], ['perf'], ['corrections'], ['release'], ['migrate', 'extra'], ['spec', 'check'], ['ref', 'check'], ['session', 'start', '--all']]) {
       const r = await raf(dir, {}, ...argv);
       expect(r.err, argv.join(' ')).not.toContain('plan');
     }
@@ -61,9 +61,9 @@ describe('L488 — cli.ts : la table de commandes', () => {
     const dir = gitRepo();
     writeFileSync(join(dir, 'cadence.yaml'), 'plan: [pas, un, chemin]\n');
     const coverage = await raf(dir, {}, 'ref', 'coverage', 'inventaire.json');
-    expect(coverage.err).toContain('plan');
+    expect(coverage.err).toContain('plan doit être');
     const check = await raf(dir, {}, 'ref', 'check', 'inventaire.json');
-    expect(check.err).not.toContain('plan:');
+    expect(check.err).not.toContain('plan doit être');
   });
 
   it('R6 — done, ux, review et deliver sont refusés dans une vague orchestrée, avant toute lecture du lot', async () => {

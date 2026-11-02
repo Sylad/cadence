@@ -879,8 +879,11 @@ lots:
     title: "Cliquet (suite de L462) : une fonction qui grossit sous le pire chiffre de son fichier passe, et comparerMigration compense un défaut neuf (fichier neuf) par un gain ailleurs — compter la somme des excès par fichier et par règle, refuser un défaut neuf même compensé ; test sur les deux cas mesurés par la revue"
     status: doing
     estimate: 0.25
+    spec: true
     created: 2026-10-31
     started: 2026-11-02
+    notes:
+      - { date: 2026-11-02, text: "02-11 soir : arrêté après 7 passes (3 corrections Fable hors vague). Chaque revue trouve un nouveau trou parce que le contrat de --migrer n'est pas écrit : une correction et un découpage ne se distinguent pas (cli.ts 1000 → 350 + cli-plan.ts 650 refusé, cas le plus courant ; second découpage après --ecrire refusé ; piecesNeuves complexité 16 rend la porte rouge). Passé en spec: true : écrire d'abord la fiche des règles de --migrer (correction, découpage, déplacement, migrations successives) avec un tableau de cas, puis reprendre le code. Worktree conservé (8 commits, tête f1a83bf1) : rapports passe 5 à 7 dans le scratchpad du lead du 02-11." }
   - id: L478
     title: "Cliquet (suite de L462) : la base ne doit pas remonter (rm + --init ou édition à la main passent en porte et en CI : comparer à la base du sha de départ) et le découpage d'un fichier de la base doit avoir une voie admise (transfert documenté, mesure comparée au total) — cas L461"
     status: dropped

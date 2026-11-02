@@ -24,21 +24,25 @@ export function extractRefs(text: string, prefix: string): Ref[] {
 /**
  * Le motif des références d'un plan natif qui déclare `plan.idPattern` : `<préfixe>\d+` ou le motif du projet, puis un sous-id `/slug` facultatif
  * (`X7/t1-fusion`). Même garde que les autres formats : pas collé à un mot, un chemin ou un point suivi d'un mot (« X3.x »), le point de fin de phrase passe.
- * Groupes nommés `id` et `sub` : le motif du projet peut porter ses propres groupes numérotés.
+ * Seul le groupe nommé `sub` est capturé, après le motif du projet : ses groupes numérotés (`([A-Z])\1\d+`) gardent leur numéro. L'id est le reste de la correspondance.
  */
 function idRefPattern(prefix: string, idPattern: string): RegExp {
-  return new RegExp(`(?<![\\w/.-])(?<id>${escapeRe(prefix)}\\d+|(?:${idPattern}))(?:/(?<sub>[\\w-]+(?:\\.[\\w-]+)*))?(?![\\w-]|${DOTTED})`, 'g');
+  return new RegExp(`(?<![\\w/.-])(?:${escapeRe(prefix)}\\d+|(?:${idPattern}))(?:/(?<sub>[\\w-]+(?:\\.[\\w-]+)*))?(?![\\w-]|${DOTTED})`, 'g');
 }
 
 /** Références d'un message dans un plan natif qui déclare `plan.idPattern`. Un sous-id `t<n>` est une sous-tâche du lot ; tout autre (`t1-fusion`) n'est qu'une précision sur le lot cité. */
 export function idRefs(text: string, prefix: string, idPattern: string): Ref[] {
-  return [...text.matchAll(idRefPattern(prefix, idPattern))].map((m) => ({ lot: m.groups!.id, ...(/^t\d+$/.test(m.groups!.sub ?? '') ? { task: m.groups!.sub } : {}) }));
+  return [...text.matchAll(idRefPattern(prefix, idPattern))].map((m) => {
+    const sub = m.groups!.sub;
+    return { lot: sub === undefined ? m[0] : m[0].slice(0, -(sub.length + 1)), ...(/^t\d+$/.test(sub ?? '') ? { task: sub } : {}) };
+  });
 }
 
-/** Ce que le motif `plan.idPattern` a de refusable (ancres, groupe nommé réservé, id vide), null s'il est utilisable. Vérifié à la lecture de cadence.yaml. */
+/** Ce que le motif `plan.idPattern` a de refusable (ancres, groupe nommé `id` ou `sub` réservé, id vide), null s'il est utilisable. Vérifié à la lecture de cadence.yaml. */
 function idPatternProblem(idPattern: string): string | null {
   if (idPattern.trim() === '') return 'est vide';
   if (/^\^|(?<!\\)\$$/.test(idPattern)) return "ne prend pas d'ancre (^ ou $) : le motif est ancré par raf";
+  if (/\(\?<(?:id|sub)>/.test(idPattern)) return 'ne peut pas nommer un groupe « id » ou « sub » (noms réservés à raf)';
   try {
     idRefPattern('L', idPattern);
     if (new RegExp(`^(?:${idPattern})$`).test('')) return "accepte l'identifiant vide";

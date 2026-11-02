@@ -526,7 +526,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     case 'estimate': {
       if (rest.length !== 2) throw new RafError('usage : raf estimate <id> <jours>');
       const plan = loadPlan();
-      plan.setEstimate(rest[0], rest[1].trim() === '' ? NaN : Number(rest[1]));
+      plan.setEstimate(rest[0], /^\d+(\.\d+)?$/.test(rest[1].trim()) ? Number(rest[1]) : NaN);
       plan.save();
       return 0;
     }

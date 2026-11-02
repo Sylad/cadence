@@ -304,6 +304,9 @@ describe('plafond de sessions et sessions du lead (L424)', () => {
   it("R3 — un hold dont le TTL est échu ne retient plus de créneau", async () => {
     const home = tempDir();
     addHold(home, 'vieille', 10, new Date(Date.now() - 3600_000));
-    (await acquireSlot(home, 1, { wave: 'a', pollMs: 10 }))();
+    const release = await acquireSlot(home, 1, { wave: 'a', pollMs: 10 });
+    expect(liveSlots(home)).toHaveLength(1); // le créneau unique est rendu à la session, pas retenu par le hold échu
+    release();
+    expect(liveSlots(home)).toHaveLength(0);
   });
 });

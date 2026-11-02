@@ -336,6 +336,5 @@
   "eslint|src/verify-gate.ts|max-lines-per-function|total": 98,
   "eslint|src/verify-gate.ts|sonarjs/cognitive-complexity": 2,
   "eslint|src/verify-gate.ts|sonarjs/cognitive-complexity|total": 64,
-  "knip|src/spec.ts|exports": 2,
-  "knip|test/vitest-config-clone-neuf.test.ts|unlisted": 1
+  "knip|src/spec.ts|exports": 2
 }

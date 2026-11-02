@@ -391,7 +391,7 @@ lots:
     estimate: 0.25
     created: 2026-10-29
     started: 2026-11-02
-    review: { date: 2026-11-02, verdict: "conforme : verify lit le verrou sans refuser (tâche locale du lead), ne lit le plan qu'après avoir inscrit une ligne verte (plan illisible : rejoue quand même), tests de limites mordants, limite du sha déclaré documentée — revue Opus du lead après reprise (rendu malgré l'escalade)", commit: bee8cffc0387177796040c5e1f0c48dbd748fb07 }
+    review: { date: 2026-11-02, verdict: "conforme : verify lit le verrou sans refuser (tâche locale du lead), ne lit le plan qu'après avoir inscrit une ligne verte (plan illisible : rejoue quand même), tests de limites mordants, limite du sha déclaré documentée — revue Opus du lead après reprise (rendu malgré l'escalade) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase ne change aucun patch du lot (range-diff identique pour les 14 commits) ; 1 note mineure : ligne vide supprimée avant « ## [1.39.0] » dans CHANGELOG.md", commit: ca49772849761169ab0c3ee7b97cd98d1d3a57bd }
   - id: L436
     title: "raf done avec plan.onWrite : la commande de commit proposée ne cite que .cadence/raf.yaml alors que le script a régénéré d'autres fichiers (frontend/public/plan-data/plan.json) — deliver refuse ensuite « 1 fichier modifié » ; citer les fichiers écrits par plan.onWrite (finance, ol, warhammer le 29-10)"
     status: done

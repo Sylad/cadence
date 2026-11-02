@@ -89,6 +89,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
+- `cadence orchestrate`: fairness between waves for a freed session slot (L531, `docs/orchestrate.md`). Sessions waiting for a slot register in the `waiters/` folder of the cadence home and take the slot in a common order: the next step of a lot already playing first, then the first step of a freshly drawn lot, then the project's rank in `priority:`, then the oldest wait, all waves together. On 02-11 a review of maritime waited (3/3 taken by the `--continue` wave) while the fill could draw a lower-ranked app lot.
+
 - Cleanup (L485): `cadence ref analyse` and `cadence orchestrate` now read the Claude Code folder through the same function as `cadence session close` (`CLAUDE_CONFIG_DIR`, else `HOME/.claude` of the given environment, else the user's home): they no longer skip `HOME`, which only differs from the user's home when a test simulates one. The helpers `staleFiles` and `readFailedDeliveries`, called only by tests, are removed; the quality baseline drops by 1 measure.
 
 ### Fixed

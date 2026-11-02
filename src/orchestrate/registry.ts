@@ -5,6 +5,7 @@ import type { Tokens } from './result.js';
 import { processStart } from '../proc.js';
 import { gitCommonDir } from '../git.js';
 import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState } from './state.js';
+import { hasRoom, whileWaiting } from './attente.js';
 import { activeLock, holderAlive, releaseLock, takeLock, type OLock } from './lock.js';
 
 /**
@@ -238,6 +239,9 @@ export class SlotAbandoned extends Error {
  * Deux vagues qui prennent en même temps se départagent au recomptage : si le total dépasse `cap` une fois
  * le créneau pris, il est rendu et l'attente reprend.
  *
+ * `fresh`/`rank` (L531) : quand plusieurs sessions attendent, le créneau qui se libère va à l'étape suivante d'un lot déjà en cours (`fresh` faux, défaut) avant un nouveau tirage (`fresh`),
+ * puis au projet le plus haut dans `priority:` (`rank` le plus petit), puis à l'attente la plus ancienne, toutes vagues confondues ; une session ne prend un créneau que si aucune attente vivante ne la précède (`attente.ts`).
+ *
  * `onWait(holders, waitedMs)` : appelé quand on commence à attendre (0 ms), puis toutes les minutes.
  * `onGot(waitedMs)` : appelé à l'obtention, seulement si on a attendu.
  * `abandon()` : relu seulement pendant une VRAIE attente, c'est-à-dire une fois qu'une première tentative n'a pas trouvé de créneau libre,
@@ -245,10 +249,15 @@ export class SlotAbandoned extends Error {
  * `--stop-after-current` ne laissent pas un lot en attente). Un créneau libre est toujours pris, même si une demande est déjà posée :
  * la relance d'une session coupée n'est pas une attente, la demande d'arrêt s'applique ensuite.
  */
-export async function acquireSlot(
+export async function acquireSlot(home: string, cap: number, opts: Parameters<typeof takeSlot>[2]): Promise<() => void> {
+  return whileWaiting(home, opts, (myTurn) => takeSlot(home, cap, opts, myTurn));
+}
+
+async function takeSlot(
   home: string,
   cap: number,
-  opts: { wave: string; slots?: (home: string) => OLock[]; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number, limit: number, leadHolds: LeadHold[]) => void; onGot?: (waitedMs: number) => void; abandon?: () => string | null; now?: () => number },
+  opts: { wave: string; fresh?: boolean; rank?: number; slots?: (home: string) => OLock[]; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number, limit: number, leadHolds: LeadHold[]) => void; onGot?: (waitedMs: number) => void; abandon?: () => string | null; now?: () => number },
+  myTurn: () => boolean,
 ): Promise<() => void> {
   mkdirSync(slotsDir(home), { recursive: true });
   const now = opts.now ?? Date.now; // injectable : les tests pilotent l'horloge
@@ -265,7 +274,7 @@ export async function acquireSlot(
     if (reportedAt !== null) checkAbandon(); // pas à la première tentative : un créneau libre est pris même si une demande est posée
     // Les sessions du lead (`lead hold`) tournent hors de toute vague mais prennent un créneau : relues à chaque comptage (L424).
     const taken = () => live(home).length + liveHolds(home, new Date()).length;
-    if (taken() < limit) {
+    if (hasRoom(taken, limit, myTurn)) {
       for (let k = 0; k < MAX_SLOT_INDEX; k++) {
         const file = join(slotsDir(home), `slot-${k}.lock`);
         const got = takeLock(file, { pid: process.pid, wave: opts.wave, started: new Date().toISOString() });

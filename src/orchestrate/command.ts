@@ -32,6 +32,7 @@ import { canInstallPrePush, gitProcessRunning, indexLockRefusal, installPrePush,
 import { buildArgs, buildLocalArgs, claudeConfigDir, killSessions, MODEL_ALIASES, mcpServersFor, readAgents, realClaude, enabledPlugins, settingsFiles, type AgentDef, type AnyModel, type ClaudeFn, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { groupLots, runPool } from './pool.js';
+import { slotPlace } from './attente.js';
 import { AddFeed, addNotAlone, addToLive, openInRepo, projectName, type KnownLot, type LaunchChecks } from './ajout.js';
 import { repoRefusals, trackedDirty } from './depot.js';
 import { adoptLeadReview, depositIntegrations, depositsOnly, integrationText, runsElsewhere, takeIntegrations } from './integration-vivante.js';
@@ -1089,9 +1090,8 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   }
 
   // Plafond de sessions simultanées, toutes vagues confondues : chaque session attend un créneau libre avant de partir.
-  const claude: ClaudeFn = async (args, o) => {
-    const free = await acquireSlot(home, cap, {
-      wave: wave.id,
+  const claude: ClaudeFn = async (argv, o) => {
+    const free = await acquireSlot(home, cap, { wave: wave.id, ...slotPlace(all, launch, args.priority, o.lot), // L531 : place dans la file des créneaux, commune aux vagues
       pollMs: deps.slotPollMs,
       // L332 : une demande écrite pendant l'attente (`--drop` de ce lot, `--stop-after-current`) l'interrompt ; la session ne part pas.
       abandon: () => {
@@ -1106,7 +1106,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
       onGot: (ms) => wctx.log(`${o.lot ? `${o.lot} · ` : ''}créneau de session obtenu après ${duration(ms)} d'attente`),
     });
     try {
-      return await deps.claude(args, o);
+      return await deps.claude(argv, o);
     } finally {
       free();
     }

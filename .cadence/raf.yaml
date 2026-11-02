@@ -940,9 +940,10 @@ lots:
     finished: 2026-10-31
   - id: L485
     title: "Nettoyage B : retirer staleFiles et readFailedDeliveries (seuls les tests les appellent) et aligner les deux recopies de claudeConfigDir (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § B ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-31
+    started: 2026-11-02
   - id: L486
     title: "Nettoyage D1–D4 : doublons Ollama, buildArgs/buildRetryArgs, lecture de verrou, choix d'agent d'une étape (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § D ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: todo

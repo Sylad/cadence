@@ -129,3 +129,21 @@ describe('sonde L536 — place: bords', () => {
     expect(fileIds(p.file)).toEqual(['X3', 'AB-1']);
   });
 });
+
+// L536 (escalade) — `placeRanked` doit tenir à l'échelle d'un plan à ids libres (maritime-atlas : 685 lots) : les lots archivés
+// forment une seule chaîne de `place:`, et l'ancien algorithme (un tour par maillon, `out.some` sur tout le plan) coûtait k²·n.
+// Mesure sans horloge : les lectures de `.id`, comptées par un accesseur, bornées à un multiple du nombre de lots.
+describe('sonde L536 — place: à l’échelle', () => {
+  it('1000 lots dont 800 archivés en chaîne : lectures d’id linéaires, ordre du plan conservé', () => {
+    let reads = 0;
+    const counted = (id: string) => ({ get id() { reads++; return id; } }) as unknown as Lot;
+    const order = Array.from({ length: 1000 }, (_, i) => `AB-${i + 1}`);
+    const isArchived = (i: number) => i % 5 !== 0;
+    const archived = order.filter((_, i) => isArchived(i)).map(counted);
+    const active = order.filter((_, i) => !isArchived(i)).map(counted);
+    const places = new Map<string, string>(order.flatMap((id, i) => (isArchived(i) ? [[id, order[i - 1] ?? '']] : [])));
+    const r = mergeArchived(archived, active, places);
+    expect(ids(r)).toEqual(order);
+    expect(reads).toBeLessThan(50 * order.length);
+  });
+});

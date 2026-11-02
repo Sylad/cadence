@@ -61,24 +61,43 @@ export function mergeArchived(archived: Lot[], active: Lot[], places: ReadonlyMa
   return placeRanked(out, archived.filter((l) => places.has(l.id)), places);
 }
 
-/** Pose les lots à rang derrière leur prédécesseur ; un lot dont le prédécesseur est lui-même à rang attend qu'il soit posé. */
+/**
+ * Pose les lots à rang derrière leur prédécesseur, en un passage (L536 : sous `plan.idPattern` les archivés forment une seule chaîne de rangs,
+ * un plan de 685 lots ne peut pas payer k²·n à chaque lecture). Les lots d'un même rang se suivent dans l'ordre d'archivage (celui du fichier),
+ * chacun suivi des lots dont il est lui-même le rang ; le rang vide ouvre le plan. Un lot dont le prédécesseur ne viendra jamais (inconnu,
+ * cycle, lui-même) va à la fin du plan, dans l'ordre d'archivage.
+ */
 function placeRanked(out: Lot[], ranked: Lot[], places: ReadonlyMap<string, string>): Lot[] {
-  let pending = ranked;
-  while (pending.length > 0) {
-    const waiting = pending.filter((l) => places.get(l.id) !== '' && !out.some((o) => o.id === places.get(l.id)));
-    const ready = pending.filter((l) => !waiting.includes(l));
-    // Aucun prédécesseur ne viendra : le dernier recours est la fin du plan.
-    if (ready.length === 0) return [...out, ...waiting];
-    for (const l of ready) {
-      const from = places.get(l.id)!;
-      let pos = from === '' ? 0 : out.findIndex((o) => o.id === from) + 1;
-      // Derrière les lots déjà posés au même rang : l'ordre d'archivage (celui du fichier) se conserve.
-      while (pos < out.length && places.get(out[pos].id) === from) pos++;
-      out.splice(pos, 0, l);
-    }
-    pending = waiting;
+  const followers = new Map<string, Lot[]>();
+  for (const l of ranked) {
+    const from = places.get(l.id)!;
+    followers.set(from, [...(followers.get(from) ?? []), l]);
   }
-  return out;
+  const result: Lot[] = [];
+  const placed = new Set<Lot>();
+  // Un lot posé entraîne ses suiveurs, puis les leurs : le parcours en profondeur (pile explicite, une chaîne peut être longue) rend
+  // exactement l'ordre que donnait la pose tour par tour.
+  const emit = (from: string) => {
+    const stack = [[...(followers.get(from) ?? [])].reverse()];
+    while (stack.length > 0) {
+      const next = stack[stack.length - 1].pop();
+      if (next === undefined) stack.pop();
+      else if (!placed.has(next)) {
+        result.push(next);
+        placed.add(next);
+        stack.push([...(followers.get(next.id) ?? [])].reverse());
+      }
+    }
+  };
+  emit('');
+  // Un prédécesseur dont l'id est aussi dans le fichier actif (plan déjà en erreur) : les suiveurs vont derrière celui du fichier.
+  const seen = new Set<string>();
+  for (const lot of out) {
+    result.push(lot);
+    if (!seen.has(lot.id)) emit(lot.id);
+    seen.add(lot.id);
+  }
+  return [...result, ...ranked.filter((l) => !placed.has(l))];
 }
 
 /**

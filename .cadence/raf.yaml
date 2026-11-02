@@ -1245,9 +1245,10 @@ lots:
     finished: 2026-11-02
   - id: L529
     title: "Coût en euros : orchestrate --dry-run annonce, à côté du budget en tokens, une estimation en euros de chaque lot et de la vague (grille perf.prices de cadence.yaml, base p90 mesurée comme le budget) ; la table finale et --status affichent le coût réel en euros par lot et pour la vague (idée tirée d'un outil d'agents payant à l'appel qui annonce le prix avant et le total après, vidéo vue le 02-11)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-02
+    started: 2026-11-02
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

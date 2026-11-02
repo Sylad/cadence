@@ -8,7 +8,7 @@ export function lireJscpd(rapport: { duplicates?: { firstFile: { name: string };
 export function comparer(base: Mesure, courant: Mesure): { pires: { cle: string; avant: number; apres: number }[]; mieux: { cle: string; avant: number; apres: number }[] };
 export function lireBase(racine: string): Mesure;
 export function mesurer(racine: string): Mesure;
-export type Ref = { nom: string; base: Mesure | null; existe?: (chemin: string) => boolean; config?: (chemin: string) => string | null };
+export type Ref = { nom: string; base: Mesure | null; existe?: (chemin: string) => boolean; config?: (chemin: string) => string | null; fichiers?: () => string[] };
 export function comparerMigration(avant: Mesure, apres: Mesure, existe: (chemin: string) => boolean): { cle: string; avant: number; apres: number }[];
 export function lireRef(racine: string, ref: string): Ref;
 export function appliquer(racine: string, mode: 'verifier' | 'init' | 'ecrire' | 'migrer', mesure?: Mesure, ref?: Ref | null): { code: number; texte: string };

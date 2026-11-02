@@ -66,6 +66,16 @@ anything, and the ratchet closes them:
   `.jscpd.json` and `package.json#jscpd`, and knip as jscpd respect `.gitignore`. Of `package.json`, only the `knip` and
   `jscpd` keys are compared. Changing a threshold is a decision of the plan, delivered alone; a lot judged by those
   thresholds cannot move them. The lot that adopts the tools (no baseline at its start) introduces its configs freely.
+  The comparison also covers what knip and vitest read: `vitest.config.*`, `vitest.workspace.*`, `vite.config.*` (all of
+  `ts`, `mts`, `cts`, `js`, `mjs`, `cjs`), `tsconfig.json`, every nested `.gitignore` (at the start of the lot or now;
+  `node_modules` and `.git` are not walked), and in `package.json` the keys `scripts`, `main`, `bin` and `exports` next to
+  `knip` and `jscpd` (knip finds its entry points there).
+- **A hidden path**: `.git/info/exclude` is not versioned, so it cannot be compared to the start of the lot. When it holds
+  a pattern (a line that is neither blank nor a comment) the command adds a warning to its output, success or refusal,
+  naming the first three patterns. It does not fail: that file legitimately holds local paths.
+
+A tool missing from `node_modules` (a fresh clone without `npm install`) exits 2 with « eslint est absent de node_modules :
+lancer « npm install » », instead of the JSON error the empty output of a node that could not start used to give.
 
 **When the start of the lot has no baseline yet** (the lot that introduces the ratchet, while `main` moves under it):
 the baseline measured at the start no longer matches the code once `main` is merged or the lot rebased, since `main`'s

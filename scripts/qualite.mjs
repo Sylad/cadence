@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, globSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const BASELINE = 'qualite-baseline.json';
@@ -144,6 +144,8 @@ export const lireBase = (racine) => JSON.parse(readFileSync(join(racine, BASELIN
 const ecrireBase = (racine, mesure) => writeFileSync(join(racine, BASELINE), `${JSON.stringify(trier(mesure), null, 2)}\n`);
 
 function lancer(racine, bin, args, accepte) {
+  // un outil absent ferait sortir node avec 1 et rien sur stdout, que le JSON.parse d'après lirait comme « Unexpected end of JSON input »
+  if (!existsSync(join(racine, 'node_modules', bin))) throw new Error(`${bin.split('/')[0]} est absent de node_modules (${racine}) : lancer « npm install » puis relancer.`);
   const r = spawnSync(process.execPath, [join(racine, 'node_modules', bin), ...args], { cwd: racine, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
   // un outil qui plante ne doit jamais passer pour « zéro défaut »
   if (r.error || !accepte.includes(r.status)) throw new Error(`${bin} a échoué (code ${r.status}) : ${r.error?.message ?? r.stderr.slice(0, 500)}`);
@@ -186,7 +188,8 @@ export function lireRef(racine, ref) {
   const show = git('show', `${sha}:${BASELINE}`);
   const existe = (chemin) => git('cat-file', '-e', `${sha}:${chemin}`).status === 0;
   const config = (chemin) => { const r = git('show', `${sha}:${chemin}`); return r.status === 0 ? r.stdout : null; };
-  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, config };
+  const fichiers = () => git('ls-tree', '-r', '--name-only', sha).stdout.split('\n').filter(Boolean);
+  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, config, fichiers };
 }
 
 // Les seuils et les exclusions des trois outils : les relever ferait baisser la mesure sans corriger le code. Tout ce que les
@@ -197,8 +200,12 @@ const CONFIGS = [
   'knip.json', 'knip.jsonc', '.knip.json', '.knip.jsonc', 'knip.ts', 'knip.js', 'knip.config.ts', 'knip.config.js',
   '.jscpd.json',
   '.gitignore',
+  // knip lit la config de vitest (ses entrées, son plugin) et tsconfig.json (ses chemins, son périmètre) ; vitest se rabat sur vite.config.*
+  ...['ts', 'mts', 'cts', 'js', 'mjs', 'cjs'].flatMap((e) => [`vitest.config.${e}`, `vitest.workspace.${e}`, `vite.config.${e}`]),
+  'tsconfig.json',
 ];
-const CLES_PACKAGE = ['knip', 'jscpd'];
+// package.json : knip y lit ses points d'entrée (scripts, main, bin, exports) ; jscpd et knip leur config
+const CLES_PACKAGE = ['knip', 'jscpd', 'scripts', 'main', 'bin', 'exports'];
 
 // la valeur d'une clé de package.json, sérialisée pour la comparer ; null si le fichier manque, est illisible ou n'a pas la clé
 const section = (texte, cle) => {
@@ -212,7 +219,14 @@ const etat = (depart, actuel) => (depart === null ? 'nouveau' : actuel === null 
 // les libellés « fichier (nouveau|supprimé|modifié) » des couples (nom, départ, actuel) qui diffèrent
 const differences = (couples) => couples.filter(([, depart, actuel]) => depart !== actuel).map(([nom, depart, actuel]) => `${nom} (${etat(depart, actuel)})`);
 
-const fichiersChanges = (racine, ref) => differences(CONFIGS.map((f) => [f, ref.config(f), lireSiPresent(racine, f)]));
+// les .gitignore imbriqués (src/.gitignore…), ceux du départ comme ceux d'aujourd'hui ; node_modules et .git ne sont pas parcourus
+const gitignoresImbriques = (racine, ref) => {
+  const ici = globSync('**/.gitignore', { cwd: racine, exclude: (d) => ['node_modules', '.git'].includes(basename(String(d.name ?? d))) }).map((f) => f.split('\\').join('/'));
+  const depart = (ref.fichiers?.() ?? []).filter((f) => basename(f) === '.gitignore');
+  return [...new Set([...ici, ...depart])].filter((f) => f !== '.gitignore').sort();
+};
+
+const fichiersChanges = (racine, ref) => differences([...CONFIGS, ...gitignoresImbriques(racine, ref)].map((f) => [f, ref.config(f), lireSiPresent(racine, f)]));
 
 function clesPackageChangees(racine, ref) {
   const depart = ref.config('package.json');
@@ -227,6 +241,14 @@ function configChangee(racine, ref) {
   const changees = [...fichiersChanges(racine, ref), ...clesPackageChangees(racine, ref)];
   if (!changees.length) return null;
   return { code: 1, texte: `${changees.join(', ')} diffère(nt) de ${ref.nom} : un seuil ou une exclusion ne se change pas dans un lot qui est jugé par eux (corriger le code ; changer une config est une décision du plan, livrée seule).` };
+}
+
+/** Les motifs actifs de .git/info/exclude (hors commentaires et lignes vides) ; vide hors dépôt git ou sans ce fichier. */
+function exclusLocaux(racine) {
+  const r = spawnSync('git', ['rev-parse', '--git-path', 'info/exclude'], { cwd: racine, encoding: 'utf8' });
+  const chemin = r.status === 0 ? resolve(racine, r.stdout.trim()) : null;
+  if (!chemin || !existsSync(chemin)) return [];
+  return readFileSync(chemin, 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
 }
 
 const ligne = ({ cle, avant, apres }) => `  ${cle} : ${avant} → ${apres}`;
@@ -263,6 +285,12 @@ function empire(pires, ref) {
  * « réparerait » la base au lieu du code et la porte comme la CI resteraient vertes.
  */
 export function appliquer(racine, mode, mesure = mesurer(racine), ref = null) {
+  const resultat = decider(racine, mode, mesure, ref);
+  const exclus = exclusLocaux(racine);
+  return exclus.length ? { ...resultat, texte: `${resultat.texte}\nAvertissement : .git/info/exclude n'est pas vide (${exclus.slice(0, 3).join(', ')}${exclus.length > 3 ? `, … ${exclus.length - 3} autre(s)` : ''}) ; il n'est pas versionné et ESLint, knip et jscpd ne le comparent pas au départ : ces chemins échappent peut-être à la mesure (docs/qualite.md).` } : resultat;
+}
+
+function decider(racine, mode, mesure, ref) {
   const existe = existsSync(join(racine, BASELINE));
   const config = configChangee(racine, ref);
   if (config) return config;

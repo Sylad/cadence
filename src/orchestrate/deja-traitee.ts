@@ -10,9 +10,9 @@ export type TouchedSince = (l: LotState, head: string, file: string) => string |
 /** Les fichiers que le texte d'une proposition cite (`src/a.ts`, `src/a.ts:42`, `` `docs/z.md` ``), dans l'ordre, sans doublon ; les adresses web et les nombres (`1.5`) n'en sont pas. */
 export function citedFiles(text: string): string[] {
   const out: string[] = [];
-  for (const raw of text.split(/[\s`'"“”«»(),;]+/)) {
-    const tok = raw.replace(/:\d+(-\d+)?$/, '').replace(/[.:!?]+$/, '');
-    if (!tok || tok.includes('://') || !/^[\w@.\-/]+\.[A-Za-z][A-Za-z0-9]+$/.test(tok) || out.includes(tok)) continue;
+  for (const raw of text.split(/[\s`'"“”«»(),;*[\]<>]+/)) {
+    const tok = raw.replace(/(:\d+(-\d+)?)+$/, '').replace(/[.:!?]+$/, '').replace(/^(\.\/)+/, '');
+    if (!tok || tok.includes('://') || !/^[\p{L}\p{N}_@.\-/]+\.[A-Za-z][A-Za-z0-9]+$/u.test(tok) || out.includes(tok)) continue;
     out.push(tok);
   }
   return out;
@@ -47,7 +47,12 @@ export function proposalLine(l: LotState, proposal: string, touched: TouchedSinc
   const head = l.proposalHeads?.[proposal];
   if (!proposal.startsWith(SUBTASK) || !head) return proposal;
   for (const file of citedFiles(proposal)) {
-    const sha = touched(l, head, file);
+    let sha: string | null = null;
+    try {
+      sha = touched(l, head, file);
+    } catch {
+      continue;
+    }
     if (sha) return `${proposal} — peut-être déjà traitée (${sha})`;
   }
   return proposal;

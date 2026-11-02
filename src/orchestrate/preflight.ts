@@ -18,6 +18,7 @@ import { nvmVersionsDir, resolveNode } from './node-env.js';
 import type { OrchestrateDeps, OrchestrateIo } from './command.js';
 import type { Args } from './command-args.js';
 import { lotBudget } from './lot-budget.js';
+import { readAgents, type AgentDef } from './launch.js';
 
 export interface Target {
   project: string;
@@ -193,3 +194,5 @@ export function matchesNvmrc(version: string, wanted: string): boolean {
   const w = wanted.replace(/^v/, '');
   return v === w || v.startsWith(`${w}.`);
 }
+
+export const agentsOf = (deps: OrchestrateDeps): Record<string, AgentDef> => readAgents(deps.agentsDir);

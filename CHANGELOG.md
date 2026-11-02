@@ -84,6 +84,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Added
 
 - `cadence verify --gate` no longer takes over a wave's verdict under plan-only commits when tracked code or tests (outside docs; the file named exactly `CHANGELOG` aside, names shown unquoted) quote the plan's path while `orchestrate.gate.readsPlan` is absent: the gate is replayed and the reason line says « le code lit le plan, gate.readsPlan absent » with the files (L482, [docs/deliver.md](docs/deliver.md)).
+- `plan.idPattern` in `cadence.yaml`: free identifiers (`AB-1.2`) in a writable plan, `raf add --id`, flat sub-lots with `raf add --under` (`parent:` outside the prefix, read in a native plan by `raf check` for idleness, by `lead tour --json` as `parent` and by the lots panel, which groups them under their parent), commit references that follow the pattern (`X7/t1-fusion` included), and `raf estimate <id> <days>` (L465)
 
 ## [1.41.0] - 2026-11-02
 
@@ -97,9 +98,6 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Changed
 
 - `cadence verify` green at the sha of the last red delivery writes it to the delivery journal (L435, [docs/deliver.md](docs/deliver.md)): the effect is there, so the delivery is done; the line joins `deliveries.log`, the red line of the `cadence-hud` panel goes away without delivering again (`ol 3d6edf4`, red during the dark-blue outage and green at the verification on 29-10), and the command says it. The line is a delivery: as after `cadence deliver`, the lots cited since the previous green delivery are announced (`livré : L…`) and the article lot is opened (`docs.articles`, L144), since the next delivery starts from this line. Nothing is written when a check is red, when the last red delivery is another sha's (it would be hidden), when it is not of class `[verification]` (a red CI, refusal or deployment stays: the checks do not always read the sha), when there is none, or when a green delivery already came after the red one.
-### Added
-
-- `plan.idPattern` in `cadence.yaml`: free identifiers (`AB-1.2`) in a writable plan, `raf add --id`, flat sub-lots with `raf add --under` (`parent:` outside the prefix, read in a native plan by `raf check` for idleness, by `lead tour --json` as `parent` and by the lots panel, which groups them under their parent), commit references that follow the pattern (`X7/t1-fusion` included), and `raf estimate <id> <days>` (L465)
 
 ## [1.40.0] - 2026-11-02
 

@@ -8,7 +8,7 @@ import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readOrchestrateConfig, readPlanC
 import { PLAN_ACTIONS, commitMsgHook, leadAnswerMessage, commitMsgRefusal, planCommitMessage } from '../plan-commit.js';
 import { isDay, toDay, type Day } from '../dates.js';
 import { gitRoot, hooksDir } from '../git.js';
-import { heldRefusal, localOverdueLines } from '../local-task.js';
+import { heldRefusal, localLotRefusal, localOverdueLines } from '../local-task.js';
 import { onTermination } from '../proc.js';
 import { stopApps } from './app.js';
 import { Plan, RafError, isOpen } from '../plan.js';
@@ -337,13 +337,9 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
       refusals.push(`${key} : lot inconnu`);
       continue;
     }
-    if (!isOpen(lot.status)) {
-      refusals.push(`${key} : le lot est ${lot.status}`);
-      continue;
-    }
-    // Un lot local (L519) est au lead, jamais à une vague : ni lancement, ni --add, ni tirage de --continue.
-    if (lot.local) {
-      refusals.push(`${key} : lot local (raf add --local) : le lead le fait lui-même (cadence local start ${t.lot}), une vague ne le joue pas`);
+    const shut = !isOpen(lot.status) ? `le lot est ${lot.status}` : localLotRefusal(lot); // un lot local (L519) est au lead, jamais à une vague
+    if (shut) {
+      refusals.push(`${key} : ${shut}`);
       continue;
     }
     if (plan.readonly && lot.status === 'todo' && !env.config.start) {
@@ -400,9 +396,7 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
   return { refusals, lots };
 }
 
-function agentsOf(deps: OrchestrateDeps): Record<string, AgentDef> {
-  return readAgents(deps.agentsDir);
-}
+const agentsOf = (deps: OrchestrateDeps): Record<string, AgentDef> => readAgents(deps.agentsDir);
 
 const WAVE_ID_RE = /^[\w.-]+$/;
 

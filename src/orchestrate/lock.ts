@@ -30,6 +30,9 @@ export function holderAlive(pid: number, start?: string): boolean {
 /** Nom du verrou d'orchestration d'un dépôt, dans l'état commun aux worktrees (celui de `deliver`). */
 export const REPO_LOCK = 'orchestrate.lock';
 
+/** Un champ facultatif du verrou, tel qu'écrit ; absent : absent. */
+const optional = (v: unknown): string | undefined => (v === undefined ? undefined : String(v));
+
 function read(file: string): (OLock & { unreadable?: boolean; ageMs: number }) | null {
   let text: string;
   let ageMs: number;
@@ -41,7 +44,7 @@ function read(file: string): (OLock & { unreadable?: boolean; ageMs: number }) |
   }
   try {
     const raw = JSON.parse(text);
-    return { pid: Number(raw.pid), wave: String(raw.wave), started: String(raw.started), start: raw.start === undefined ? undefined : String(raw.start), ...(raw.until === undefined ? {} : { until: String(raw.until) }), ageMs };
+    return { pid: Number(raw.pid), wave: String(raw.wave), started: String(raw.started), start: optional(raw.start), until: optional(raw.until), ageMs };
   } catch {
     return { pid: 0, wave: '?', started: '?', unreadable: true, ageMs };
   }
@@ -87,8 +90,8 @@ export function takeLock(file: string, given: OLock): { ok: true; stale?: OLock 
       continue;
     }
     const now = read(aside);
-    if (now && now.pid === seen.pid && now.wave === seen.wave && now.started === seen.started && now.start === seen.start && now.until === seen.until) {
-      stale = { pid: seen.pid, wave: seen.wave, started: seen.started, start: seen.start };
+    if (now && now.pid === seen.pid && now.wave === seen.wave && now.started === seen.started && now.start === seen.start) {
+      stale = { pid: seen.pid, wave: seen.wave, started: seen.started, start: seen.start, until: seen.until };
       rmSync(aside, { force: true });
     } else {
       try {

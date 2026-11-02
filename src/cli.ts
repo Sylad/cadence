@@ -40,7 +40,7 @@ import { coverageCommand } from './ref/coverage.js';
 import { release } from './release.js';
 import { applyMigration, describeMigration, planMigration, unhandledError } from './migrate.js';
 import { checkFiche, deriveQa, readFiche, summary } from './spec.js';
-import { localCommand, localLotOf, localOverdueLines, localRepoNote } from './local-task.js';
+import { localCommand, localLotOf, localOverdueLines } from './local-task.js';
 import { readHudContext } from './hud-context.js';
 import { sessionClose, sessionStart, type SessionCtx } from './session.js';
 import { clearNext, readNext, sharedStateDir, stateDir, writeNext } from './state.js';
@@ -283,9 +283,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const free = tourFreeLine(rows);
       if (free) io.out(free);
       // une session du lead dont le TTL est échu (L278) : rien ne l'arrête, le tour la signale (hors --json, comme les créneaux)
-      for (const l of expiredHoldLines(io.now())) io.out(l);
-      // une tâche locale (L519) au-delà de son délai : le dépôt reste verrouillé, le tour le dit au lieu de le libérer en silence
-      for (const l of localOverdueLines(tourRoots(parent, depth), io.now())) io.out(l);
+      // … et une tâche locale (L519) au-delà de son délai : le dépôt reste verrouillé, le tour le dit au lieu de le libérer en silence
+      for (const l of [...expiredHoldLines(io.now()), ...localOverdueLines(tourRoots(parent, depth), io.now())]) io.out(l);
       // le réglage lead.ux du cadence.yaml du dossier (L197) : le lead lit ici qui pose le verdict UX, au lieu d'ouvrir le fichier
       try {
         if (readLeadUx(parent) === 'lead') io.out('verdict UX : lead (le lead pose raf ux d\'après le rapport du ux-reviewer et les captures ; l\'humain n\'est consulté qu\'en cas de doute)');

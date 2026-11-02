@@ -124,13 +124,15 @@ export function localOverdueLines(repos: string[], now: Date): string[] {
   return lines;
 }
 
-/** Ce que le tableau du lead dit du dépôt : « tâche locale L1 », avec « (échue) » au TTL passé ; null sans tâche locale. */
-export function localRepoNote(repo: string, now: Date): string | null {
+/** Ce que le tableau du lead dit du dépôt : « tâche locale L1 », avec « (échue) » au TTL passé ; vide sans tâche locale. */
+export function localRepoNotes(repo: string, now: Date): string[] {
   const held = activeLock(lockFile(repo));
   const lot = held && localLotOf(held.wave);
-  if (!held || !lot) return null;
-  return `tâche locale ${lot}${lockOverdue(held, now) ? ' (échue)' : ''}`;
+  return held && lot ? [`tâche locale ${lot}${lockOverdue(held, now) ? ' (échue)' : ''}`] : [];
 }
+
+/** Le refus qu'un lot local oppose à une vague (lancement, `--add`, `--continue`) : il est au lead ; null pour un lot de vague. */
+export const localLotRefusal = (lot: { id: string; local?: true }): string | null => (lot.local ? `lot local (raf add --local) : le lead le fait lui-même (cadence local start ${lot.id}), une vague ne le joue pas` : null);
 
 const repoName = (repo: string): string => repo.split('/').filter(Boolean).pop() ?? repo;
 

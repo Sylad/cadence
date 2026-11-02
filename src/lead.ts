@@ -3,7 +3,7 @@ import { basename, dirname, join, relative, sep } from 'node:path';
 import { audit, gateWaiting, nextUp, planCommits, workByLot } from './audit.js';
 import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readPlanConfig } from './config.js';
 import { diffDays, type Day } from './dates.js';
-import { localRepoNote } from './local-task.js';
+import { localRepoNotes } from './local-task.js';
 import { gitRoot, repoStatus } from './git.js';
 import { linkCommits } from './link.js';
 import { commitCount, lastActivity, lockStatus } from './session.js';
@@ -230,8 +230,7 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     if (s.dirty || s.untracked) row.repo.push('non commité');
     if (s.ahead) row.repo.push('non poussé');
     if (lockStatus(sharedStateDir(root))?.live) row.repo.push('livraison en cours');
-    const local = localRepoNote(root, new Date());
-    if (local) row.repo.push(local);
+    row.repo.push(...localRepoNotes(root, new Date()));
     const kept = keptTrees(root);
     if (kept.length) row.worktrees = kept;
     const noTest = noTestGate(root);

@@ -54,6 +54,15 @@ describe('L479 bords — .gitignore imbriqués', () => {
     expect(appliquer(dir, 'verifier', {}, ref).code).toBe(0);
   });
 
+  it('R-négation — un .gitignore imbriqué neuf qui n\'est PAS ignoré (motif « !.gitignore » à la racine) reste compté', () => {
+    const { dir, ref } = depotReel({ '.gitignore': '.*\n!.gitignore\n' });
+    mkdirSync(join(dir, 'src'));
+    writeFileSync(join(dir, 'src/.gitignore'), 'gros.ts\n');
+    const r = appliquer(dir, 'verifier', {}, ref);
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain('src/.gitignore (nouveau)');
+  });
+
   it('un .gitignore profond (a/b/c/d/.gitignore) neuf est refusé', () => {
     const { dir, ref } = depotReel({});
     mkdirSync(join(dir, 'a/b/c/d'), { recursive: true });

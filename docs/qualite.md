@@ -63,12 +63,12 @@ anything, and the ratchet closes them:
   `modifié`). That is not only the three files this repository uses: ESLint 9 loads `eslint.config.js` **before**
   `eslint.config.mjs` (then `.cjs`, `.ts`, `.mts`, `.cts`), knip reads `knip.json`, `knip.jsonc`, `.knip.json`,
   `.knip.jsonc`, `knip.ts`, `knip.js`, `knip.config.ts`, `knip.config.js` and `package.json#knip`, jscpd reads
-  `.jscpd.json` and `package.json#jscpd`, and knip as jscpd respect `.gitignore`. Of `package.json`, only the `knip` and
-  `jscpd` keys are compared. Changing a threshold is a decision of the plan, delivered alone; a lot judged by those
-  thresholds cannot move them. The lot that adopts the tools (no baseline at its start) introduces its configs freely.
+  `.jscpd.json` and `package.json#jscpd`, and knip as jscpd respect `.gitignore`. Changing a threshold is a decision of
+  the plan, delivered alone; a lot judged by those thresholds cannot move them. The lot that adopts the tools (no baseline at its start) introduces its configs freely.
   The comparison also covers what knip and vitest read: `vitest.config.*`, `vitest.workspace.*`, `vite.config.*` (all of
   `ts`, `mts`, `cts`, `js`, `mjs`, `cjs`), `tsconfig.json`, every nested `.gitignore` (at the start of the lot or now;
-  `node_modules` and `.git` are not walked; an untracked one that another `.gitignore` rule already ignores, such as the `types/.gitignore` Claude Code generates, is not counted, while one that ignores itself with `*` is), and in `package.json` the keys `scripts`, `main`, `bin` and `exports` next to
+  `node_modules` and `.git` are not walked; an untracked one that another `.gitignore` rule already ignores, such as the `types/.gitignore` Claude Code generates, is not counted, while one that ignores itself with `*` is, and so is one that a
+  negation pattern such as `!.gitignore` keeps un-ignored), and in `package.json` the keys `scripts`, `main`, `bin` and `exports` next to
   `knip` and `jscpd` (knip finds its entry points there).
 - **A hidden path**: `.git/info/exclude` is not versioned, so it cannot be compared to the start of the lot. When it holds
   a pattern (a line that is neither blank nor a comment) the command adds a warning to its output, success or refusal,

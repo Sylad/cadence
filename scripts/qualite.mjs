@@ -230,12 +230,13 @@ const gitignoresImbriques = (racine, ref) => {
   };
   parcourir('');
   // un .gitignore posé dans un dossier ignoré par une règle d'AILLEURS (généré, non suivi) ne change rien à ce que knip et jscpd
-  // mesurent ; celui qui s'ignore lui-même (`*`) est une vraie règle neuve et reste compté
+  // mesurent ; celui qui s'ignore lui-même (`*`) est une vraie règle neuve et reste compté. check-ignore -v cite aussi le chemin
+  // qu'un motif de négation (`!.gitignore`) remet dans le dépôt : lui n'est PAS ignoré, il reste compté
   const ignores = ici.length ? spawnSync('git', ['check-ignore', '-v', '-z', '--stdin'], { cwd: racine, input: ici.join('\0'), encoding: 'utf8' }) : null;
   const exclus = new Set();
   if (ignores?.status === 0) {
-    const champs = ignores.stdout.split('\0');
-    for (let i = 0; i + 3 < champs.length; i += 4) if (champs[i] !== champs[i + 3]) exclus.add(champs[i + 3]);
+    const champs = ignores.stdout.split('\0'); // source, ligne, motif, chemin
+    for (let i = 0; i + 3 < champs.length; i += 4) if (champs[i] !== champs[i + 3] && !champs[i + 2].startsWith('!')) exclus.add(champs[i + 3]);
   }
   const depart = (ref.fichiers?.() ?? []).filter((f) => basename(f) === '.gitignore');
   return [...new Set([...ici.filter((f) => !exclus.has(f)), ...depart])].filter((f) => f !== '.gitignore').sort();

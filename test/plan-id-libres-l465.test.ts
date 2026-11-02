@@ -156,10 +156,19 @@ describe('R4 — sous-lot à plat : parent: hors préfixe', () => {
     cadence(dir, 'add', 'Fils', '--id', 'AB-1.2', '--under', 'AB-1');
     cadence(dir, 'start', 'AB-1');
     cadence(dir, 'start', 'AB-1.2');
+    cadence(dir, 'add', 'Autre père', '--id', 'AB-3');
+    cadence(dir, 'add', 'Pas un fils', '--id', 'AB-3.1');
+    cadence(dir, 'start', 'AB-3');
+    cadence(dir, 'start', 'AB-3.1');
+    writeFileSync(join(dir, PLAN), plan(dir).replaceAll('started: 2026-11-02', 'started: 2026-10-01'));
     execFileSync('git', [...NO_BACKGROUND_GIT, 'add', '-A'], { cwd: dir });
     execFileSync('git', [...NO_BACKGROUND_GIT, 'commit', '-q', '-m', 'plan'], { cwd: dir });
     commit(dir, 'feat(AB-1.2): travail', '2026-11-02T08:00:00');
-    expect(cadence(dir, 'check').out).not.toMatch(/AB-1 en cours sans commit/);
+    commit(dir, 'feat(AB-3.1): travail', '2026-11-02T08:01:00');
+    const out = cadence(dir, 'check').out;
+    expect(out).not.toMatch(/AB-1 en cours sans commit/);
+    // Le même travail sur un lot qui n'est pas déclaré sous-lot (pas de parent:) ne compte pas pour AB-3.
+    expect(out).toMatch(/AB-3 en cours sans commit depuis \d+ j/);
   });
 });
 

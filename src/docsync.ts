@@ -52,8 +52,8 @@ export function filesOf(root: string, commits: Commit[], opts: { withoutDeleted?
   return new Set(commits.flatMap((c) => changedFiles(root, c.sha, opts)));
 }
 
-/** Les règles que ces fichiers enfreignent : ils touchent `paths` sans qu'aucun `docs` ne soit parmi les fichiers `written` (par défaut les mêmes). */
-function docSyncGaps(rules: DocSyncRule[], files: Set<string>, written: Set<string> = files): DocSyncGap[] {
+/** Les règles que ces fichiers enfreignent : ils touchent `paths` sans qu'aucun `docs` ne soit parmi les fichiers `written`. */
+function docSyncGaps(rules: DocSyncRule[], files: Set<string>, written: Set<string>): DocSyncGap[] {
   const gaps: DocSyncGap[] = [];
   for (const rule of rules) {
     if ([...written].some(docSyncSet(rule.docs))) continue;

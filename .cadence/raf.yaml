@@ -1429,9 +1429,10 @@ lots:
     created: 2026-11-02
   - id: L533
     title: "Test instable sur le runner GitHub : test/orchestrate-creneaux-libres-l527-probe.test.ts « --priority explicite : l'ordre du tirage suit la ligne de commande » — rouge dans le run de publication de 1.40.0 (expected false to be true, 2,4 s), vert dans la porte et le clone neuf locaux ; attendre l'événement plutôt qu'un délai, sans changer le contrat"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-11-02
+    started: 2026-11-02
   - id: L534
     title: "Jeu de données « pires cas » pour les lots d'écran (issue #22, compte pro) : un jeu réaliste posé une fois à côté du jeu de démo (noms longs ou d'une lettre, compte à 0 et à 1, champs optionnels absents, grands nombres, texte non latin, liste longue), branché au même endroit que la démo et basculé en mode dev seulement (?data=worst) ; spec-writer, ux-reviewer et qa-reviewer capturent chaque état avec les deux jeux ; le jeu reste en test de non-régression (idée : skill break-ui d'emilkowalski/skills, MIT)"
     status: todo

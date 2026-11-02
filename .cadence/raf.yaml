@@ -972,12 +972,13 @@ lots:
     finished: 2026-11-02
   - id: L487
     title: "Nettoyage D5–D6 : lecture d'une clé et du fichier cadence.yaml factorisées (config.ts, continue.ts, lead.ts, resources.ts) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § D ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-10-31
     started: 2026-11-02
     docs_ok: { date: 2026-11-02, reason: nettoyage interne D5–D6 sans changement de comportement ; aucune doc ne cite ces fonctions }
     review: { date: 2026-11-02, verdict: "conforme : rebasé sur 1.42.0, base du cliquet = main + les 10 baisses du lot, tsc, cliquet et suite complète verts", commit: 46cbd78f21f7801cee39bba9209df20ebc8317fc }
+    finished: 2026-11-02
   - id: L488
     title: "Découpage C3 : cli.ts en modules par famille de commandes, dispatch réduit à une table (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C3 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: done
@@ -1465,11 +1466,12 @@ lots:
     finished: 2026-11-02
   - id: L536
     title: "Ids libres (plan.idPattern) : raf archive range un lot archivé par le nombre final de son id (archive.ts:40), AB-1 passe de la 1re à la 2e place de raf list après archive, contre la promesse de docs/raf.md:73 ; et sous idPattern, fix(L12-bis), feat(L3-L5), release-L3 ne citent plus L12/L3 (garde d'avant perdue) — revue de L465"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-02
     started: 2026-11-02
     review: { date: 2026-11-02, verdict: "conforme : ordre d'archive des ids libres et garde des ids du préfixe rétablis, placeRanked linéaire (999815e) avec ordre de sortie identique, tsc, cliquet et suite complète verts ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (L487) laisse le diff du lot identique, aucun fichier touché en commun", commit: af50d341a879a1abf2391de4dd8ba6de0b414018 }
+    finished: 2026-11-02
   - id: L537
     title: "docs.sync rend « documentation en retard » un lot de nettoyage ou découpage interne déclaré sans changement de comportement (02-11 : L485, L486, L487, un cycle de vague perdu chaque fois, acquittement à la main) : ne pas exiger de doc quand le diff ne change ni commande, ni clé, ni sortie (ou laisser le libraire acquitter dans le worktree), avec un test"
     status: todo
@@ -1480,6 +1482,11 @@ lots:
     status: todo
     estimate: 0.5
     spec: true
+    created: 2026-11-02
+  - id: L539
+    title: "Publication 1.42.0 rouge sur le runner GitHub (run 41507045657) : (1) test « L485 — cliquet > node scripts/qualite.mjs --contre main passe » suppose une branche locale main, absente du clone de la CI (ne jouer que si main existe, ou comparer à origin/main comme tests.yml) ; (2) sonde L527 « --priority explicite » encore rouge sur le runner après L533 (2,2 s) : trouver la vraie cause (lire le test et le tirage, reproduire sous charge avec un CPU limité), sans changer le contrat ; puis release 1.42.1"
+    status: todo
+    estimate: 0.25
     created: 2026-11-02
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

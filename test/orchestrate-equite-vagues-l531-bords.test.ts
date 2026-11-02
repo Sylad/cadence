@@ -40,7 +40,7 @@ describe('L531 bords — attentes illisibles, doublons, rang neutre', () => {
   it('deux créneaux libres, deux attentes simultanées : les deux partent (la tête ne monopolise pas)', async () => {
     const home = tempDir();
     const got: string[] = [];
-    const run = (w: string, o: object) => acquireSlot(home, 2, { wave: w, pollMs: POLL, ...o }).then((f) => got.push(w) && f);
+    const run = (w: string, o: object) => acquireSlot(home, 2, { wave: w, pollMs: POLL, ...o }).then((f) => { got.push(w); return f; });
     const frees = await Promise.all([run('a', { fresh: true, rank: 0 }), run('b', { fresh: false, rank: 5 })]);
     expect(got.sort()).toEqual(['a', 'b']);
     frees.forEach((f) => f());

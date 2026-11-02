@@ -1246,11 +1246,12 @@ lots:
     finished: 2026-11-02
   - id: L529
     title: "Coût en euros : orchestrate --dry-run annonce, à côté du budget en tokens, une estimation en euros de chaque lot et de la vague (grille perf.prices de cadence.yaml, base p90 mesurée comme le budget) ; la table finale et --status affichent le coût réel en euros par lot et pour la vague (idée tirée d'un outil d'agents payant à l'appel qui annonce le prix avant et le total après, vidéo vue le 02-11)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-02
     started: 2026-11-02
     review: { date: 2026-11-02, verdict: "conforme — 0 bloquant, 0 majeur, 1 mineur en note (réserve d'escalade chiffrée au prix du modèle d'écriture dans l'estimation du --dry-run) — orchestré (vague 2026-11-02-0955-cad, 3 passe(s) de correction)", commit: aca577d685d56a43aa80e48a3b2c5e672168a2a2, reporte: { de: 0ea31c16806c4b220cee319373fb2de8dc994382, vers: aca577d685d56a43aa80e48a3b2c5e672168a2a2, patchId: c421579d4271384aeab9986eaa6e03414065b34b } }
+    finished: 2026-11-02
   - id: L530
     title: "Panneau des lots, « Dernière livraison par projet » : sur un plan tenu par un autre outil (maritime, raf.py), les lots passés « deploye » hors de cadence deliver (livrer.sh, bump gitops à la main) restent comptés « clos non livrés » — 02-11 : 12 lots E-GL5 en prod affichés non livrés ; lire le statut livré du plan (plan.fields) en plus de deliveries.log"
     status: todo

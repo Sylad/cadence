@@ -1211,9 +1211,10 @@ lots:
     created: 2026-11-01
   - id: L525
     title: "deliver et raf move pendant une tâche locale (L519) : refus avec heldRefusal, pas de « vague local:L1 — état illisible » ni de conseil --sha impossible — revue passe 3 du 02-11"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-02
+    started: 2026-11-02
   - id: L526
     title: "spec green sur un lot vert: true SANS empreintes (lot clos avant le scellement) : rejouer l'acceptation (orchestrate.accept) et, verte, poser les empreintes dans un commit qui cite le lot — aujourd'hui spec green dit « déjà vert », spec reseal « pas scellée », le verrou des vagues rend tout lot qui adapte un de ses tests (issue #20, compte pro, constaté en 1.37.0)"
     status: doing

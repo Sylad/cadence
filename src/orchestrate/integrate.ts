@@ -6,6 +6,7 @@ import { sharedStateDir } from '../state.js';
 import { activeLock, releaseLock, takeLock, type OLock } from './lock.js';
 import { mergeUnreleased, moveToUnreleased, settleLotEntries, unreleasedSections } from './changelog-merge.js';
 import { mutexFor } from './mutex.js';
+import { readPlanConfig } from '../config.js';
 import { Plan } from '../plan.js';
 import { parseDocument } from 'yaml';
 import { git, gitFailure, tryGit } from './worktree.js';
@@ -99,11 +100,15 @@ function resolvePlan(work: string): boolean {
   if (files.length !== 1) return false;
   const file = files[0];
   try {
+    // Les champs d'extension déclarés (L464) sont des propriétés des lots : sans les réglages, `bare` ne verrait pas un champ changé.
+    // Seuls les champs d'extension sont passés : le `plan.onWrite` du projet ne doit pas se lancer pendant un rebase.
+    const extras = readPlanConfig(join(work, 'cadence.yaml'), work)?.settings.extras;
+    const settings = extras ? { extras } : {};
     const stage = (n: number) => {
       const text = run(work, 'show', `:${n}:${file}`);
       writeFileSync(join(work, file), text);
       const head = parseDocument(text).toJSON() as Record<string, unknown> | null;
-      return { lots: Plan.load(join(work, file)).lots(), head: JSON.stringify({ ...(head ?? {}), lots: undefined }) };
+      return { lots: Plan.load(join(work, file), settings).lots(), head: JSON.stringify({ ...(head ?? {}), lots: undefined }) };
     };
     const [b, o, t] = [stage(1), stage(2), stage(3)];
     const [base, ours, theirs] = [b.lots, o.lots, t.lots];
@@ -114,7 +119,7 @@ function resolvePlan(work: string): boolean {
     if (!added.length || theirs.length !== base.length || theirs.some((t) => bare(t) !== bare(base.find((b) => b.id === t.id) ?? { review: 1 }))) return false;
     if (added.some((t) => review(ours.find((o) => o.id === t.id)) !== review(base.find((b) => b.id === t.id)))) return false;
     writeFileSync(join(work, file), run(work, 'show', `:2:${file}`));
-    const plan = Plan.load(join(work, file));
+    const plan = Plan.load(join(work, file), settings);
     for (const t of added) plan.recordReview(t.id, t.review!.verdict, t.review!.date, t.review!.commit ?? null, t.review!.repos, t.review!.reporte);
     plan.save();
     run(work, 'add', '--', file);

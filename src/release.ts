@@ -202,17 +202,23 @@ function whatsNewIssues(text: string, version: string): string[] {
     const at = hits.findIndex((h) => h.v === version);
     if (at < 0) {
       issues.push(`${WHATS_NEW} : ${form} ${absent} — l'écrire ${where}`);
-      return;
+      return -1;
     }
     if (at > 0) issues.push(`${WHATS_NEW} : ${form} ${misplaced} (après la version ${hits[at - 1].v} ; la plus récente va en premier) — la déplacer ${where}`);
     if (max !== undefined && hits[at].l.length > max) issues.push(`${WHATS_NEW} : ${form} trop longue (${hits[at].l.length} caractères, ${max} au plus)`);
+    return hits[at].i;
   };
-  check('ligne de « In two lines »', 'manquante', 'mal placée', /^- \*\*(\d+\.\d+\.\d+)\*\*:/, 0, split, 'en tête de la liste', SHORT_LINE_MAX);
+  const own = check('ligne de « In two lines »', 'manquante', 'mal placée', /^- \*\*(\d+\.\d+\.\d+)\*\*:/, 0, split, 'en tête de la liste', SHORT_LINE_MAX);
   check('paragraphe long', 'manquant', 'mal placé', /^\*\*(\d+\.\d+\.\d+)\*\*:/, split, lines.length, 'juste après l’introduction de « Version by version »');
-  // Le test « deux lignes » du dépôt lit toute la liste courte, pas seulement la version qui sort (1.22.0, 28-10 : un paragraphe long y était tombé, la publication a échoué).
-  lines.slice(0, split).forEach((l, i) => {
-    const bullet = /^- \*\*(\d+\.\d+\.\d+)\*\*:/.exec(l);
-    if (bullet && bullet[1] !== version && l.length > SHORT_LINE_MAX) issues.push(`${WHATS_NEW} : « In two lines » : la ligne de la version ${bullet[1]} fait ${l.length} caractères, ${SHORT_LINE_MAX} au plus — la raccourcir (le détail va dans « Version by version »)`);
+  // Le test « deux lignes » du dépôt lit toute la section « In two lines », jusqu'au prochain titre « ## », et toute ligne `- **x.y.z**` (deux-points ou non) :
+  // les autres lignes que celle de la version qui sort comptent (1.22.0, 28-10 : un paragraphe long y était tombé, la publication a échoué).
+  const start = Math.max(0, lines.findIndex((l) => /^##\s+In two lines\s*$/.test(l)));
+  const next = lines.findIndex((l, i) => i > start && l.startsWith('## '));
+  const end = next < 0 ? lines.length : next;
+  lines.slice(start, end).forEach((l, k) => {
+    const i = start + k;
+    const bullet = /^- \*\*(\d+\.\d+\.\d+)\*\*/.exec(l);
+    if (bullet && i !== own && l.length > SHORT_LINE_MAX) issues.push(`${WHATS_NEW} : « In two lines » : la ligne de la version ${bullet[1]} fait ${l.length} caractères, ${SHORT_LINE_MAX} au plus — la raccourcir (le détail va dans « Version by version »)`);
     const long = /^\*\*(\d+\.\d+\.\d+)\*\*:/.exec(l);
     if (long) issues.push(`${WHATS_NEW} : « In two lines » : le paragraphe long de la version ${long[1]} n’y a pas sa place (ligne ${i + 1}) — le mettre dans « Version by version »`);
   });

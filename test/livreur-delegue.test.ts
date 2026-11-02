@@ -128,9 +128,9 @@ describe('agent livreur (L439)', () => {
     expect(ux).toMatch(/prints neither line is not visible/)
   })
 
-  it('R7 — les lignes que l\'agent lit sont celles que raf show imprime (src/lot-lines.ts, appelé par src/cli.ts)', () => {
-    const cli = readFileSync(join(root, 'src/cli.ts'), 'utf8')
-    const show = cli.slice(cli.indexOf("case 'show': {"), cli.indexOf("case 'list': {"))
+  it('R7 — les lignes que l\'agent lit sont celles que raf show imprime (src/lot-lines.ts, appelé par src/cli/read-commands.ts)', () => {
+    const cli = readFileSync(join(root, 'src/cli/read-commands.ts'), 'utf8')
+    const show = cli.slice(cli.indexOf('export function cmdShow('), cli.indexOf('export function', cli.indexOf('export function cmdShow(') + 1))
     expect(show).toContain('lotLines(plan, lot)')
     const lines = readFileSync(join(root, 'src/lot-lines.ts'), 'utf8')
     expect(lines).toContain("lines.push('visible : oui')")

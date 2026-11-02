@@ -1944,15 +1944,19 @@ describe('--continue (L147)', () => {
   });
 
   it("le premier tirage prend au plus UN lot par dépôt tant que d'autres dépôts ont des lots prêts ; la suite remplit les créneaux libres un lot à la fois, dans l'ordre de priorité (L527)", async () => {
-    const { parent } = parentWith({ a: [{ title: 'a un' }, { title: 'a deux' }, { title: 'a trois' }, { title: 'a quatre' }], b: [{ title: 'b un' }, { title: 'b deux' }] });
+    // Les deux dépôts en worktrees : chaque lot peut jouer dès qu'un créneau est libre, seule la priorité décide de l'ordre du remplissage (b avant a, contre l'ordre alphabétique).
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }, { title: 'a deux' }, { title: 'a trois' }], b: [{ title: 'b un' }, { title: 'b deux' }, { title: 'b trois' }] });
+    for (const dir of Object.values(dirs)) {
+      writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  worktrees: true\n');
+      git(dir, 'commit', '-qam', 'chore: worktrees');
+    }
     const f = fakeDeps();
     const o = io(parent);
-    await orchestrate(['--continue', '--priority', 'a,b', '--max-sessions', '2'], o.io, f.deps);
+    expect(await orchestrate(['--continue', '--priority', 'b,a', '--max-sessions', '2'], o.io, f.deps)).toBe(0);
     const lots = RunStore.last(parent)!.readWave()!.lots;
-    expect(lots.slice(0, 2)).toEqual(['a:L1', 'b:L1']);
-    expect(lots.slice(2).sort()).toEqual(['a:L2', 'a:L3', 'a:L4', 'b:L2']);
-    expect(lots.filter((l) => l.startsWith('a:'))).toEqual(['a:L1', 'a:L2', 'a:L3', 'a:L4']); // les lots d'un dépôt, dans l'ordre du plan
-    expect(o.out.filter((l) => l.startsWith('continue : tire '))).toHaveLength(4);
+    expect(lots.slice(0, 2)).toEqual(['b:L1', 'a:L1']); // premier tirage : un lot par dépôt, b d'abord
+    expect(lots.slice(2)).toEqual(['b:L2', 'b:L3', 'a:L2', 'a:L3']); // remplissage : b tant qu'il a des lots prêts, puis a — un remplissage qui ignorerait --priority tirerait a:L2 avant b:L2
+    expect(o.out.filter((l) => l.startsWith('continue : tire ')).map((l) => l.replace(/ \(créneau libre\)$/, ''))).toEqual(['continue : tire b:L2', 'continue : tire b:L3', 'continue : tire a:L2', 'continue : tire a:L3']);
   });
 });
 

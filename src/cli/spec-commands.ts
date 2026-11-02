@@ -257,11 +257,9 @@ function spec(rest: string[], io: Io): number {
 
 /** raf spec <id> on|off, spec green <lot>, spec reseal <lot> <test> : le verbe de raf et les deux chemins du lead. */
 export function cmdSpec(c: Ctx): number | Promise<number> {
-  const green = c.rest[0] === 'green';
-  const reseal = c.rest[0] === 'reseal';
   const { rest, values, io, today, root, configPath, loadPlan } = c;
-  if (green) return specGreen(rest.slice(1), { root, loadPlan, configPath, today }, io);
-  if (reseal) return specReseal(rest.slice(1), values.reason, values.porteur, { root, loadPlan, configPath, today }, io);
+  if (rest[0] === 'green') return specGreen(rest.slice(1), { root, loadPlan, configPath, today }, io);
+  if (rest[0] === 'reseal') return specReseal(rest.slice(1), values.reason, values.porteur, { root, loadPlan, configPath, today }, io);
   if (rest.length !== 2 || (rest[1] !== 'on' && rest[1] !== 'off')) throw new RafError('usage : raf spec <id> on|off (ou cadence spec check|qa <fiche.yaml>)');
   const plan = loadPlan();
   if (!plan.setSpec(rest[0], rest[1] === 'on')) {

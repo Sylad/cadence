@@ -503,15 +503,13 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
         how = 'moved';
       }
     }
-    const ids = deliveredIds(ctx, lastDelivery(ctx.state), final);
-    const delivered = deliveredLots(ctx, ids, lastDelivery(ctx.state), final);
+    const prev = lastDelivery(ctx.state);
     appendDelivery(ctx.state, ctx.today, final);
     const took = `en ${Math.round((deps.now() - startedAt) / 1000)} s`;
     if (how === 'declared') out(stamped(deps, `✓ livré : ${final.slice(0, 7)} (sha déclaré par le script) ${took}`));
     else if (how === 'moved') out(stamped(deps, `✓ livré : ${final.slice(0, 7)} (tête déplacée par le script depuis ${env.CADENCE_SHORT}) ${took}`));
     else out(stamped(deps, `✓ livré${config.verify.length ? ' et vérifié' : ''} : ${env.CADENCE_SHORT} ${took}`));
-    if (delivered) out(delivered);
-    refreshArticles(ctx, ids, final);
+    announceDelivered(ctx, prev, final);
     return 0;
   } finally {
     releaseLock(ctx.state, process.pid);
@@ -598,8 +596,24 @@ async function verifyAll(
  * nommé pour le contexte — les annoncer « livrés » ferait fermer à tort. L'état est celui du départ de
  * la livraison : le plan a été lu avant que le script du projet ne ferme lui-même les lots qu'il livre.
  */
+/** Ce qu'il faut pour annoncer les lots livrés et rafraîchir leur article : deliver, et `cadence verify` quand il inscrit une ligne verte (L435). */
+export type DeliveredCtx = Pick<DeliverCtx, 'root' | 'plan' | 'today' | 'articles' | 'publicTitle' | 'planCommit' | 'waveId' | 'out' | 'err'>;
+
+/**
+ * Ce qui suit la ligne verte du journal, depuis la livraison verte précédente `prev` (celle d'AVANT la ligne écrite) : les lots cités
+ * par les commits livrés sont annoncés (« livré : L… »), puis le lot de l'article à rafraîchir est ouvert (L144). Partagé par deliver
+ * et par `cadence verify` (L435) : la ligne que verify écrit est une livraison, la suivante partira d'elle, les lots d'entre-deux se
+ * disent donc ici ou jamais.
+ */
+export function announceDelivered(ctx: DeliveredCtx, prev: string | null, sha: string): void {
+  const ids = deliveredIds(ctx, prev, sha);
+  const delivered = deliveredLots(ctx, ids, prev, sha);
+  if (delivered) ctx.out(delivered);
+  refreshArticles(ctx, ids, sha);
+}
+
 /** Lots cités par les commits livrés depuis la livraison précédente ; vide quand elle est inconnue ou hors de l'historique. */
-function deliveredIds(ctx: DeliverCtx, prev: string | null, sha: string): string[] {
+function deliveredIds(ctx: DeliveredCtx, prev: string | null, sha: string): string[] {
   if (!ctx.plan || !prev || prev === sha || !isAncestor(ctx.root, prev, sha)) return [];
   const lots = ctx.plan.lots();
   const known = new Set((ctx.plan.readonly ? lots.filter((l) => l.status === 'doing') : lots).map((l) => l.id));
@@ -611,7 +625,7 @@ function deliveredIds(ctx: DeliverCtx, prev: string | null, sha: string): string
   return [...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
-function deliveredLots(ctx: DeliverCtx, ids: string[], prev: string | null, sha: string): string | null {
+function deliveredLots(ctx: DeliveredCtx, ids: string[], prev: string | null, sha: string): string | null {
   if (!ctx.plan || !prev || prev === sha) return null;
   if (!isAncestor(ctx.root, prev, sha)) {
     return `livraison précédente (${prev.slice(0, 7)}) hors de l'historique de ${sha.slice(0, 7)} (réécrit ?) : lots livrés non calculés`;
@@ -626,7 +640,7 @@ function deliveredLots(ctx: DeliverCtx, ids: string[], prev: string | null, sha:
  * le gabarit `plan.commit` (sans la vague hors vague), pour ne pas laisser le plan modifié dans l'arbre — sauf si le plan ou ces fichiers l'étaient
  * déjà avant l'écriture (le lead y a des modifications que ce commit emporterait). Une erreur ici ne défait pas une livraison déjà faite.
  */
-function refreshArticles(ctx: DeliverCtx, ids: string[], sha: string): void {
+function refreshArticles(ctx: DeliveredCtx, ids: string[], sha: string): void {
   if (!ctx.plan || !ctx.articles?.length || !ids.length) return;
   try {
     // Relu : le script du projet a pu fermer des lots ou commiter le plan depuis le départ de la livraison, save() ne doit pas l'écraser.

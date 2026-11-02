@@ -16,12 +16,13 @@ const stateDir = () => {
   mkdirSync(d, { recursive: true });
   return d;
 };
+const effects = { root: '', plan: null, today: '2026-10-29' as const, out: () => {}, err: () => {} };
 const journal = (d: string) => (existsSync(join(d, 'deliveries.log')) ? readFileSync(join(d, 'deliveries.log'), 'utf8') : '');
 
 describe('L435 limites — verify vert et journal des livraisons', () => {
   it('dossier d\'état absent : le verify vert reste vert (code 0), sans exception', async () => {
     const d = join(tempDir(), 'inexistant');
-    const r = await verifyCommand({ config, sha: SHA, retry: 0, out: () => {}, journal: { dir: d, day: '2026-10-29' } }, deps(0));
+    const r = await verifyCommand({ config, sha: SHA, retry: 0, out: () => {}, journal: { dir: d, day: '2026-10-29', effects } }, deps(0));
     expect(r).toBe(0);
   });
 
@@ -73,7 +74,7 @@ describe('L435 limites — verify vert et journal des livraisons', () => {
   it('verify sans --sha explicite : sha vide ne touche pas au journal', async () => {
     const d = stateDir();
     appendFailedDelivery(d, '2026-10-29', SHA, 'CI en échec');
-    await verifyCommand({ config, sha: '', retry: 0, out: () => {}, journal: { dir: d, day: '2026-10-29' } }, deps(0));
+    await verifyCommand({ config, sha: '', retry: 0, out: () => {}, journal: { dir: d, day: '2026-10-29', effects } }, deps(0));
     expect(journal(d)).toBe('');
   });
 });

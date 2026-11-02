@@ -11,7 +11,7 @@ import { parseSet } from './plan-extras.js';
 import { audit, exemptPlanOnly, gateWaiting, hypothesesOf, isNonConformingVerdict, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork, workByLot } from './audit.js';
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
-import { deliver, parseDeliverConfig, realDeps, shellQuote } from './deliver.js';
+import { deliver, parseDeliverConfig, realDeps, shellQuote, type DeliveredCtx } from './deliver.js';
 import { defaultTarget, effectLines, realCheckDeps, verifyCommand } from './verify.js';
 import { verifyGate } from './verify-gate.js';
 import { ganttData, renderGantt } from './gantt.js';
@@ -710,12 +710,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       }
       if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans docs/deliver.md du paquet @sylad/cadence)`);
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
-      const plan = existsSync(planPath) ? loadPlan() : null;
-      const articles = readDocsConfig(configPath).articles;
-      // Sans public: d'un lot visible, le site reprend le titre de sa Nouveauté la plus récente.
-      const publicTitle = (lot: Lot) => lot.public ?? (lot.visible ? loadEntries(newsDir).find((e) => e.lots.includes(lot.id))?.title : undefined);
-      const ctx = { root, state: sharedStateDir(root), plan, config, today, dryRun: !!values['dry-run'], sha: values.sha, duringWave: !!orchestrating, waveId: orchestrating?.wave, planCommit: readPlanConfig(configPath, root)?.commit, args: rest, articles, publicTitle, out: io.out, err: io.err };
-      return deliver(ctx, realDeps(root));
+      const effects = deliveredEffects({ root, configPath, planPath, loadPlan, newsDir, today, waveId: orchestrating?.wave, io });
+      return deliver({ ...effects, state: sharedStateDir(root), config, dryRun: !!values['dry-run'], sha: values.sha, duringWave: !!orchestrating, args: rest }, realDeps(root));
     }
     case 'verify': {
       if (values.gate) return verifyGateCommand(values, io);
@@ -726,7 +722,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
       const target = values.sha ? { sha: resolveCommit(root, values.sha) ?? '', note: null } : defaultTarget(root, config);
       if (values.sha && !target.sha) throw new RafError(`--sha ${values.sha} : commit introuvable`);
-      return verifyCommand({ config, sha: target.sha, note: target.note, retry, out: io.out, journal: { dir: sharedStateDir(root), day: today } }, realCheckDeps(root));
+      // Une ligne verte écrite par verify (L435) est une livraison : mêmes effets que deliver (lots annoncés, article à rafraîchir, L144).
+      const effects = deliveredEffects({ root, configPath, planPath, loadPlan, newsDir, today, waveId: waveHolding(root, 'deliver')?.wave, io });
+      return verifyCommand({ config, sha: target.sha, note: target.note, retry, out: io.out, journal: { dir: sharedStateDir(root), day: today, effects } }, realCheckDeps(root));
     }
     case 'skills': {
       if (rest[0] !== 'install') throw new RafError('usage : cadence skills install [--dir .claude] [--force]');
@@ -759,6 +757,17 @@ const GATES = {
 };
 
 /** « raf ux … » et « raf review … » ont la même forme : activer la porte, ou noter le verdict d'un lot. */
+/**
+ * Ce qu'une livraison verte annonce et ouvre (lots livrés, article à rafraîchir, L144) : pour `cadence deliver` et pour la ligne verte
+ * que `cadence verify` inscrit (L435). Sans `public:`, un lot visible tire son titre de sa Nouveauté la plus récente.
+ */
+function deliveredEffects(p: { root: string; configPath: string; planPath: string; loadPlan: () => Plan; newsDir: string; today: Day; waveId: string | undefined; io: Io }): DeliveredCtx {
+  const { root, configPath, newsDir, io } = p;
+  const publicTitle = (lot: Lot) => lot.public ?? (lot.visible ? loadEntries(newsDir).find((e) => e.lots.includes(lot.id))?.title : undefined);
+  const plan = existsSync(p.planPath) ? p.loadPlan() : null;
+  return { root, plan, today: p.today, articles: readDocsConfig(configPath).articles, publicTitle, planCommit: readPlanConfig(configPath, root)?.commit, waveId: p.waveId, out: io.out, err: io.err };
+}
+
 function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io, opts: { verbose: boolean; commit: string | undefined }): number {
   if (rest.length < 1) throw new RafError(`usage : raf ${kind} enable | ${kind} <lot> "verdict"`);
   const plan = loadPlan();

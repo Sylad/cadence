@@ -256,7 +256,11 @@ green and the sha verified is the one of the *last* line of `deliveries-failed.l
 `day sha` to `deliveries.log` and prints `verify : <sha> avait une livraison rouge,
 l'effet est vert — inscrit au journal des livraisons`; the `cadence-hud` panel, which
 shows the red line until `deliveries.log` is newer than `deliveries-failed.log`, drops
-it without delivering again. Nothing is written when a check is red, when the last red
+it without delivering again. That line **is** a delivery: as after `cadence deliver`, the
+lots cited by the commits since the previous green delivery are announced (`livré : L… — raf
+done …`) and the « Article <project> à rafraîchir » lot is opened when one has a public title
+(`docs.articles`, L144) — the next delivery starts from this line, so the lots in between are
+said here or never. Nothing is written when a check is red, when the last red
 delivery is another sha's (writing would hide it), when it is not of class `[verification]`
 (a red `[ci]`, `[refus]` or `[deploiement]` stays: checks do not always read the sha, so a green
 verify proves nothing about a commit that was never built or deployed), when there is no red delivery, or when

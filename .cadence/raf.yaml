@@ -1485,9 +1485,10 @@ lots:
     created: 2026-11-02
   - id: L539
     title: "Publication 1.42.0 rouge sur le runner GitHub (run 41507045657) : (1) test « L485 — cliquet > node scripts/qualite.mjs --contre main passe » suppose une branche locale main, absente du clone de la CI (ne jouer que si main existe, ou comparer à origin/main comme tests.yml) ; (2) sonde L527 « --priority explicite » encore rouge sur le runner après L533 (2,2 s) : trouver la vraie cause (lire le test et le tirage, reproduire sous charge avec un CPU limité), sans changer le contrat ; puis release 1.42.1"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-02
+    started: 2026-11-02
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

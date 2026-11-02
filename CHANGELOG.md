@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-11-02
+
 ### Added
 
 - `docs/concepts.md` (L460, linked at the top of the README): the notions of cadence for a human, each in a few sentences and in the order you meet them (plan and lot, verdicts, session and wave, the steps of a lot and who does each, the test gate, worktree and integration, « livrable jusqu'à `<sha>` », lead and `livreur`, slots and holds, escalation, putting into service and release), four light/dark figures and a glossary; the technical detail stays in the pages it links.

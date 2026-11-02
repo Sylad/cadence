@@ -61,4 +61,43 @@ describe('L536 — raf archive garde l’ordre d’un plan à ids libres', () =>
     expect(ids(mergeArchived([lot('X9')], [lot('AB-1'), lot('L7')], new Map([['X9', '']])))).toEqual(['X9', 'AB-1', 'L7']);
     expect(ids(mergeArchived([lot('X9')], [lot('AB-1'), lot('L7')], new Map([['X9', 'ZZ-0']])))).toEqual(['AB-1', 'L7', 'X9']);
   });
+
+  it('L536 — un lot à id ordinaire L7 parmi des ids libres garde sa place (le nombre de son id ne décide pas)', () => {
+    const a = planWith(['L7', 'AB-1'], ['L7']);
+    a.load().archive('2026-11-02');
+    expect(ids(a.load().lots())).toEqual(['L7', 'AB-1']);
+    const b = planWith(['L5', 'AB-9', 'L7'], ['L7']);
+    b.load().archive('2026-11-02');
+    expect(ids(b.load().lots())).toEqual(['L5', 'AB-9', 'L7']);
+    const c = planWith(['L7', 'X3', 'AB-1'], ['L7', 'X3']);
+    c.load().archive('2026-11-02');
+    expect(ids(c.load().lots())).toEqual(['L7', 'X3', 'AB-1']);
+  });
+
+  it('L536 — deux lots archivés à des passages différents gardent l’ordre du plan, même si le plus tardif est dans un fichier d’année lu avant', () => {
+    const p = planWith(['X3', 'AB-1', 'L7'], []);
+    // X3 fini en 2027, AB-1 fini en 2026 mais archivé après.
+    const first = p.load();
+    first.setStatus('X3', 'done', '2027-01-05', { force: true });
+    first.save();
+    first.archive('2027-01-06');
+    const second = p.load();
+    second.setStatus('AB-1', 'done', '2026-12-20', { force: true });
+    second.save();
+    p.load().archive('2027-01-07');
+    expect(ids(p.load().lots())).toEqual(['X3', 'AB-1', 'L7']);
+  });
+
+  it('L536 — [A1, X3, B2, C4] : un prédécesseur commun ne fait pas passer B2 devant X3', () => {
+    const p = planWith(['A1', 'X3', 'B2', 'C4'], []);
+    const f = p.load();
+    f.setStatus('X3', 'done', '2027-01-05', { force: true });
+    f.save();
+    f.archive('2027-01-06');
+    const g = p.load();
+    g.setStatus('B2', 'done', '2026-12-20', { force: true });
+    g.save();
+    p.load().archive('2027-01-07');
+    expect(ids(p.load().lots())).toEqual(['A1', 'X3', 'B2', 'C4']);
+  });
 });

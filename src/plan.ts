@@ -658,14 +658,12 @@ export class Plan {
     // De quoi revenir en arrière en mémoire : les items du plan, ceux de chaque archive déjà chargée, et le nombre d'archives (les nouvelles s'ajoutent à la fin).
     const archives = this.loadArchives();
     const snapshot = { items: [...seq.items], archives: archives.map((a) => ({ a, items: [...archiveLots(a.doc).items], dirty: a.dirty })) };
-    const own = new RegExp(`^${escapeRe(this.prefix)}\\d+$`);
+    // Sous plan.idPattern, le nombre final d'un id ne dit rien de l'ordre : chaque lot archivé garde le lot qui le précède dans le plan
+    // PRÉSENTÉ (archivés compris, ordre d'avant ce passage), pas dans le fichier seul — deux passages successifs gardent ainsi l'ordre du plan.
+    const merged = this.settings.idPattern === undefined ? [] : this.lots().map((l) => l.id);
     for (const n of nodes) {
       const lot = move.find((l) => l.id === String(n.get('id')))!;
-      // Un id hors <préfixe><n> (plan.idPattern) n'a pas de numéro qui dise sa place : il garde le lot qui le précédait dans le fichier.
-      if (!own.test(lot.id)) {
-        const before = seq.items[seq.items.indexOf(n) - 1];
-        n.set(PLACE_KEY, isMap(before) ? String(before.get('id')) : '');
-      }
+      if (this.settings.idPattern !== undefined) n.set(PLACE_KEY, merged[merged.indexOf(lot.id) - 1] ?? '');
       const target = this.archiveFor(archiveYear(lot, today));
       archiveLots(target.doc).add(n);
       target.dirty = true;

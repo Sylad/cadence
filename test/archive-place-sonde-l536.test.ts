@@ -17,7 +17,7 @@ function planWith(order: string[], done: Record<string, string>, pattern: string
   Plan.create(file, 'demo', 'L', '2026-01-01');
   const open = () => Plan.load(file, pattern ? { idPattern: pattern } : {});
   const plan = open();
-  for (const id of order) plan.add(`lot ${id}`, '2026-01-01', { id });
+  for (const id of order) plan.add(`lot ${id}`, '2026-01-01', pattern ? { id } : {});
   for (const [id, day] of Object.entries(done)) plan.setStatus(id, 'done', day, { force: true });
   plan.save();
   return { file, load: open };
@@ -71,7 +71,7 @@ describe('sonde L536 — place: bords', () => {
   });
 
   it('plan à ids ordinaires <préfixe><n> : aucune clé place: écrite', () => {
-    const p = planWith(['L1', 'L2', 'L3'], { L2: '2026-11-02' }, undefined);
+    const p = planWith(['L1', 'L2', 'L3'], { L2: '2026-11-02' }, '');
     p.load().archive('2026-11-02');
     expect(readFileSync(archiveFile(p.file, '2026'), 'utf8')).not.toContain('place:');
     expect(ids(p.load().lots())).toEqual(['L1', 'L2', 'L3']);

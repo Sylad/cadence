@@ -39,12 +39,12 @@ export function selectArchivable(lots: Lot[], before?: Day, blocked: (lot: Lot) 
 /** Le numéro d'un identifiant (`L12` → 12) ; NaN pour un identifiant sans numéro. */
 const num = (id: string) => Number(/\d+$/.exec(id)?.[0] ?? NaN);
 
-/** La clé d'un lot archivé qui garde sa place : l'identifiant du lot qui le précédait dans le fichier du plan (vide : il le commençait). */
+/** La clé d'un lot archivé qui garde sa place : l'identifiant du lot qui le précédait dans le plan présenté (vide : il le commençait). */
 export const PLACE_KEY = 'place';
 
 /**
  * Les lots archivés remis à leur place parmi ceux du fichier actif. Un lot qui porte un rang (`places` : id → id du lot qui le précédait
- * dans le fichier au moment de l'archivage, `raf archive` le pose sur les ids hors `<préfixe>\d+`, où le nombre final de l'id ne dit rien de
+ * dans le plan présenté au moment de l'archivage, `raf archive` le pose sur tout lot archivé dès que `plan.idPattern` est déclaré : le nombre final d'un id ne dit alors rien de
  * l'ordre) revient juste après ce lot, en tête quand le rang est vide, à la fin quand le lot du rang n'existe plus. Les autres vont juste
  * avant le premier lot actif de numéro plus grand, à la fin sinon, entre eux par numéro. L'ordre du fichier actif ne bouge jamais ; un plan que
  * `raf add` tient dans l'ordre des numéros (le cas ordinaire) se lit exactement comme avant l'archivage (L396).

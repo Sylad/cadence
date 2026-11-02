@@ -96,4 +96,47 @@ describe('L422 — table finale : « peut-être déjà traitée »', () => {
     expect(citedFiles('')).toEqual([]);
     expect(citedFiles('src/a.ts src/a.ts')).toEqual(['src/a.ts']);
   });
+  it('R10 — les commits relus sont ceux des étapes du lot : un lot intégré par rebase ne marque pas le commit que la revue a lu, un lot non intégré marque son commit postérieur', () => {
+    const repo = gitRepo();
+    commitFile(repo, 'base.ts', 'chore: base');
+    git(repo, 'switch', '-q', '-c', 'lot');
+    const read = commitFile(repo, 'a.ts', 'feat(L1): lu par la revue');
+    const fix = commitFile(repo, 'b.ts', 'fix(L1): après la revue');
+    const p = '[sous-tâche code] a.ts : extraire';
+    const q = '[sous-tâche code] b.ts : renommer';
+    const l = lot([p, q], { [p]: read.sha, [q]: read.sha }, repo);
+    l.steps.push({ n: 1, kind: 'implement', model: 'sonnet', status: 'ok', started: '2026-11-02T10:00:00Z', commits: [`${read.sha.slice(0, 7)} ${read.sujet}`, `${fix.sha.slice(0, 7)} ${fix.sujet}`] });
+    // Non intégré : les commits ne sont que sur la branche du lot, git (HEAD du dépôt) ne les voit pas.
+    const lines = renderTable(wave, [l]).join('\n');
+    expect(lines).toContain(`${q} — peut-être déjà traitée (${fix.sha.slice(0, 7)})`);
+    expect(lines).not.toContain(`${p} — peut`);
+    // Intégré : main a avancé, la branche est réécrite par le rebase, le HEAD de la revue (avant rebase) n'est plus dans l'histoire de main.
+    git(repo, 'switch', '-q', 'main');
+    commitFile(repo, 'plan.md', 'plan: avance');
+    git(repo, 'switch', '-q', 'lot');
+    git(repo, 'rebase', '-q', 'main');
+    git(repo, 'switch', '-q', 'main');
+    git(repo, 'merge', '-q', '--ff-only', 'lot');
+    const after = renderTable(wave, [l]).join('\n');
+    expect(after).toContain(`${q} — peut-être déjà traitée (${fix.sha.slice(0, 7)})`);
+    expect(after).not.toContain(`${p} — peut`);
+  });
+
+  it('R11 — le mode compact (--status) ne lit pas git pour marquer, et chaque lot ne charge ses commits qu\'une fois', () => {
+    const q = '[sous-tâche code] src/a.ts src/b.ts src/c.ts : x';
+    const r = '[sous-tâche code] src/d.ts src/e.ts : y';
+    const l = lot([q, r], { [q]: 'rev0001', [r]: 'rev0001' });
+    let reads = 0;
+    const touchedSince = () => (reads++, null);
+    renderTable(wave, [l], { compact: true, touchedSince });
+    expect(reads).toBe(0);
+    let loads = 0;
+    renderTable(wave, [l], { touchedSince });
+    expect(reads).toBe(5);
+    const repo = gitRepo();
+    const c = commitFile(repo, 'a.ts', 'feat(L1): x');
+    const m = lot([q, r], { [q]: c.sha, [r]: c.sha }, repo);
+    renderTable(wave, [m], { lotCommits: () => (loads++, [c.sha.slice(0, 7)]) });
+    expect(loads).toBeLessThanOrEqual(2);
+  });
 });

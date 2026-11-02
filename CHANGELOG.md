@@ -83,7 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- `cadence orchestrate` marks, in the final table and in `--status --detail`, a proposed sub-task whose cited file was modified by a commit of the lot made after the review that issued it: `— peut-être déjà traitée (<sha>)` (L422, [docs/orchestrate.md](docs/orchestrate.md)). On 28-10 L230 was opened on proposals the fix pass had already corrected, 5 passes lost. Minors, sub-tasks citing no file and the states written before this change are left unmarked.
+- `cadence orchestrate` marks, in the final table and in `--status --detail`, a proposed sub-task whose cited file was modified by a commit of the lot made after the review that issued it: `— peut-être déjà traitée (<sha>)` (L422, [docs/orchestrate.md](docs/orchestrate.md)). On 28-10 L230 was opened on proposals the fix pass had already corrected, 5 passes lost. Minors, sub-tasks citing no file and the states written before this change are left unmarked. The commits read are those the steps noted (the review's HEAD and they share the same branch state, rebase or not), git read once per lot and `--status` reads nothing.
 
 ## [1.39.0] - 2026-11-02
 

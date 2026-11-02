@@ -24,15 +24,28 @@ export function citedFiles(text: string): string[] {
  * lecture impossible, ne marque rien : mieux vaut une proposition sans marque qu'une marque fausse.
  */
 export function touchedByLotCommits(commits: (l: LotState) => string[]): TouchedSince {
+  // Une lecture par lot et par commit pour tout le rendu : le tableau pose la question pour chaque couple (proposition, fichier cité).
+  const lotShas = new Map<LotState, string[]>();
+  const files = new Map<string, string[] | null>();
+  const filesOf = (repo: string, c: string): string[] | null => {
+    const key = `${repo}\0${c}`;
+    if (!files.has(key)) {
+      try {
+        files.set(key, changedFiles(repo, c));
+      } catch {
+        files.set(key, null);
+      }
+    }
+    return files.get(key)!;
+  };
   return (l, head, file) => {
     if (!resolveCommit(l.repo, head)) return null;
-    for (const c of commits(l)) {
+    if (!lotShas.has(l)) lotShas.set(l, commits(l));
+    for (const c of lotShas.get(l)!) {
       if (isAncestor(l.repo, c, head)) continue;
-      try {
-        if (changedFiles(l.repo, c).some((f) => f === file || f.endsWith(`/${file}`))) return c.slice(0, 7);
-      } catch {
-        return null;
-      }
+      const changed = filesOf(l.repo, c);
+      if (!changed) return null;
+      if (changed.some((f) => f === file || f.endsWith(`/${file}`))) return c.slice(0, 7);
     }
     return null;
   };
@@ -58,5 +71,5 @@ export function proposalLine(l: LotState, proposal: string, touched: TouchedSinc
   return proposal;
 }
 
-/** La lecture à employer : celle que l'appelant donne (tests), sinon git sur les commits du lot (`lotCommits` de l'appelant, sinon `fromGit`). */
+/** La lecture à employer : celle que l'appelant donne (tests), sinon git sur les commits du lot (`lotCommits` de l'appelant, sinon `fromGit` : ceux des étapes). */
 export const touchedReader = (deps: { touchedSince?: TouchedSince; lotCommits?: (l: LotState) => string[] }, fromGit: (l: LotState) => string[]): TouchedSince => deps.touchedSince ?? touchedByLotCommits(deps.lotCommits ?? fromGit);

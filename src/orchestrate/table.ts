@@ -85,6 +85,16 @@ function gitCommitsOf(l: LotState): string[] {
   }
 }
 
+/**
+ * Les commits que les étapes du lot ont notés (entrées `<sha> <sujet>`, du plus ancien au plus récent), à défaut ceux que git lui attribue :
+ * les sha de la revue (`proposalHeads`) et ceux-là sont du même état de la branche, alors que git, lu depuis le HEAD du dépôt, ne voit pas
+ * les commits d'un lot non intégré et ne retrouve, après l'intégration par rebase, que des commits réécrits.
+ */
+function reviewedCommitsOf(l: LotState): string[] {
+  const noted = [...new Set(l.steps.flatMap((s) => s.commits ?? []).filter((c) => !c.startsWith('[')).map((c) => c.split(' ')[0]))];
+  return noted.length ? noted : gitCommitsOf(l);
+}
+
 const sameCommit = (a: string, b: string) => a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a));
 
 /**
@@ -244,8 +254,21 @@ export function renderDetail(lots: LotState[], sel: string, deps: { touchedSince
   if (found.length === 0) throw new Error(`lot inconnu dans cette vague : ${sel} (lots : ${lots.map((l) => `${l.project}:${l.lot}`).join(', ')})`);
   if (found.length > 1) throw new Error(`lot ambigu : ${sel} (${found.map((l) => `${l.project}:${l.lot}`).join(', ')}) : donner projet:lot`);
   const l = found[0]!;
-  const lines = detailLines(l, touchedReader(deps, gitCommitsOf));
+  const lines = detailLines(l, touchedReader(deps, reviewedCommitsOf));
   return lines.length ? lines : [`${l.project}:${l.lot} — aucun détail (ni objectif, capture, choix, proposition, ni verdict UX)`];
+}
+
+/** Les lignes de signal et de détail de chaque lot, ajoutées à `out` ; rend les lots qui ont un détail. Compact : les lignes de détail ne sont pas imprimées, seul leur nombre compte, et la marque L422 n'en change pas le nombre : aucune lecture git. */
+function perLotLines(lots: LotState[], out: string[], deps: { touchedSince?: TouchedSince; lotCommits?: (l: LotState) => string[]; compact?: boolean }): string[] {
+  const touched: TouchedSince = deps.compact ? () => null : touchedReader(deps, reviewedCommitsOf);
+  const withDetail: string[] = [];
+  for (const l of lots) {
+    out.push(...signalLines(l));
+    const lines = detailLines(l, touched);
+    if (lines.length > 0) withDetail.push(`${l.project}:${l.lot}`);
+    if (!deps.compact) out.push(...lines);
+  }
+  return withDetail;
 }
 
 /** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. `compact` (L441, `--status`) : sans le détail des lots, une seule ligne renvoie à `--status --detail`. */
@@ -269,13 +292,7 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
   for (const d of deliverable(lots, deps.isAncestor ?? isAncestor, deps.lotCommits ?? gitCommitsOf)) {
     out.push(`${d.ready.project}:${d.ready.lot} — livrable jusqu'à ${d.sha} (dernier commit de ${d.ready.lot}, sous ${d.under.lot} ${d.under.status === 'handed-back' || d.under.status === 'failed' ? 'rendu' : LABEL[d.under.status]}) : git push origin ${d.sha}:main && cadence deliver --sha ${d.sha}`);
   }
-  const touched = touchedReader(deps, gitCommitsOf);
-  for (const l of lots) {
-    out.push(...signalLines(l));
-    if (deps.compact) continue;
-    out.push(...detailLines(l, touched));
-  }
-  const withDetail = lots.filter((l) => detailLines(l, touched).length > 0).map((l) => `${l.project}:${l.lot}`);
+  const withDetail = perLotLines(lots, out, deps);
   if (deps.compact && withDetail.length) out.push(`détail (objectif, captures, base de tests, choix, propositions, verdict UX) : cadence orchestrate --status --detail <projet:lot> — ${withDetail.join(', ')}`);
   return out;
 }

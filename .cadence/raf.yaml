@@ -1215,6 +1215,7 @@ lots:
     estimate: 0.25
     created: 2026-11-02
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme (2 notes mineures : tests spec reseal/green seulement négatifs, doc/CHANGELOG muets sur spec reseal/green) — orchestré (vague 2026-11-02-0845-cad, 1 passe(s) de correction)", commit: ea3514644bd5303fcebc863f37bbc4df737446bd }
   - id: L526
     title: "spec green sur un lot vert: true SANS empreintes (lot clos avant le scellement) : rejouer l'acceptation (orchestrate.accept) et, verte, poser les empreintes dans un commit qui cite le lot — aujourd'hui spec green dit « déjà vert », spec reseal « pas scellée », le verrou des vagues rend tout lot qui adapte un de ses tests (issue #20, compte pro, constaté en 1.37.0)"
     status: doing

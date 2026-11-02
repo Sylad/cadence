@@ -83,7 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
-- `docs.sync` no longer reports « documentation en retard » for a lot of cleanup or internal split declared with no change of behaviour (L537, `docs/news.md`): commits of type `refactor(L12): …` are left out of the files the rule reads, in `raf check`, `cadence lead tour` and the librarian gate of `cadence orchestrate`, so no wave cycle is lost to a manual `raf docs-ok`. `refactor!:` and every other type still count.
+- `docs.sync` no longer reports « documentation en retard » for a lot of cleanup or internal split declared with no change of behaviour (L537, `docs/news.md`): commits of type `refactor(L12): …` are left out of the files the rule reads, in `raf check`, `cadence lead tour` and the librarian gate of `cadence orchestrate`, so no wave cycle is lost to a manual `raf docs-ok`. `refactor!:`, a refactor whose body carries a `BREAKING CHANGE:` footer, and every other type still count; a document written in a refactor commit still counts for the lot.
 - With `plan.idPattern`, `raf archive` no longer reorders `raf list`: every archived lot, `L<n>` ids included, is archived with a `place:` key (the lot that preceded it in the plan as presented, archived lots included, so separate runs keep the order) and keeps its place; the final number of its id no longer decides; reopening an archived lot (`raf todo`) moves that lot alone to the end of the plan, the archived lots that followed it keep their place; `plan.extras.place` is refused, `place` being a key `raf` writes (L536). Commit messages such as `fix(L12-bis)`, `feat(L3-L5)`, `release-L3` cite L12/L3 again under `plan.idPattern` (fixed by L465, covered by its tests).
 
 ## [1.42.0] - 2026-11-02

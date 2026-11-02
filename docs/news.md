@@ -150,7 +150,7 @@ to be reported as one **major** finding per line — a stale document is not lef
 memory of a sentence. Touching a document is what the program checks; whether its text is true is
 still the review's reading. The commits of neighbouring repositories (`repos:`) are not audited.
 
-A commit of type `refactor` (`refactor(L7): …`, no `!`) is left out of that reading (L537): a cleanup or an internal split declared with no change of command, key or output has no document to write, so a lot made only of such commits is no gap, and a lot that also holds a `feat` or `fix` is judged on those commits' files alone. `refactor!:` (a breaking change) still counts. `cadence orchestrate` reads the same commits, so the librarian is not called for a pure refactor.
+A commit of type `refactor` (`refactor(L7): …`, no `!`) is left out of that reading (L537): a cleanup or an internal split declared with no change of command, key or output has no document to write, so a lot made only of such commits is no gap, and a lot that also holds a `feat` or `fix` is judged on those commits' files alone. `refactor!:` or a `BREAKING CHANGE:` footer in the body (a breaking change) still counts, and a document written in a refactor commit still satisfies the rule. `cadence orchestrate` reads the same commits, so the librarian is not called for a pure refactor.
 
 A gap is closed by writing the document, or **acknowledged** when the documents really stay true: `raf docs-ok <lot> --reason "why"` (L317; the reason is required) writes a dated `docs_ok:` key on the lot, which `raf check`, `cadence lead tour` and `cadence orchestrate` all read. There is no silent third way: a lot with an open gap does not end ready in a wave.
 

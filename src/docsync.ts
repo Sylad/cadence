@@ -4,10 +4,16 @@ import { changedFiles, type Commit } from './git.js';
 
 /**
  * Commits dont les fichiers comptent pour `docs.sync` (L537) : ceux de type `refactor` (`refactor(L1): …`) sont un nettoyage ou
- * un découpage déclaré sans changement de commande, de clé ni de sortie, donc sans document à écrire. `refactor!` reste un changement.
+ * un découpage déclaré sans changement de commande, de clé ni de sortie, donc sans document à écrire. `refactor!` et un refactor
+ * dont le corps porte le pied `BREAKING CHANGE:` restent un changement.
  */
-export function docSyncCommits(commits: Commit[]): Commit[] {
-  return commits.filter((c) => !/^refactor(\([^)]*\))?:/.test(c.subject));
+function docSyncCommits(commits: Commit[]): Commit[] {
+  return commits.filter((c) => !/^refactor(\([^)]*\))?:/.test(c.subject) || /^BREAKING[ -]CHANGE:/m.test(c.body));
+}
+
+/** Les écarts d'un lot : les fichiers de `paths` viennent des commits qui comptent, mais un document écrit dans un refactor reste écrit. */
+export function lotDocSyncGaps(rules: DocSyncRule[], root: string, commits: Commit[]): DocSyncGap[] {
+  return docSyncGaps(rules, filesOf(root, docSyncCommits(commits)), filesOf(root, commits));
 }
 
 /** Une paire de la clé `docs.sync` de cadence.yaml : si des commits touchent `paths`, ils touchent aussi un des `docs`. */
@@ -46,11 +52,11 @@ export function filesOf(root: string, commits: Commit[], opts: { withoutDeleted?
   return new Set(commits.flatMap((c) => changedFiles(root, c.sha, opts)));
 }
 
-/** Les règles que ces fichiers enfreignent : ils touchent `paths` sans qu'aucun `docs` ne soit parmi eux. */
-export function docSyncGaps(rules: DocSyncRule[], files: Set<string>): DocSyncGap[] {
+/** Les règles que ces fichiers enfreignent : ils touchent `paths` sans qu'aucun `docs` ne soit parmi les fichiers `written` (par défaut les mêmes). */
+function docSyncGaps(rules: DocSyncRule[], files: Set<string>, written: Set<string> = files): DocSyncGap[] {
   const gaps: DocSyncGap[] = [];
   for (const rule of rules) {
-    if ([...files].some(docSyncSet(rule.docs))) continue;
+    if ([...written].some(docSyncSet(rule.docs))) continue;
     const inPaths = docSyncSet(rule.paths);
     const touched = [...files].filter(inPaths).sort();
     if (touched.length) gaps.push({ rule, touched });

@@ -203,7 +203,7 @@ describe('orchestrate appelle le bibliothécaire avant la revue (L306)', () => {
 
   it('R24 — les écarts docs.sync sont calculés au même endroit pour la porte du bibliothécaire et le brief de revue', () => {
     const cycle = readFileSync(join(root, 'src', 'orchestrate', 'cycle.ts'), 'utf8');
-    expect(cycle.match(/docSyncGaps\(/g)).toHaveLength(1);
+    expect(cycle.match(/lotDocSyncGaps\(/g)).toHaveLength(1);
   });
 
   it('R17 — la passe des mineurs ne rappelle pas le bibliothécaire', async () => {

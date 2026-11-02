@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { run } from '../src/cli.js';
 import { readDocsConfig } from '../src/config.js';
-import { docSyncMatcher, docSyncCommits } from '../src/docsync.js';
+import { docSyncMatcher } from '../src/docsync.js';
 import { renderBrief } from '../src/orchestrate/briefs.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
@@ -230,9 +230,30 @@ describe('docs.sync : un lot de refactor ne demande pas de documentation (L537)'
     expect((await cad(nu, 'check')).out).toContain('documentation en retard');
   });
 
-  it('R4 — docSyncCommits lit le sujet : portée facultative, liste vide acceptée', () => {
-    const c = (subject: string) => ({ subject }) as never;
-    expect(docSyncCommits([])).toEqual([]);
-    expect(docSyncCommits([c('refactor: x'), c('refactor(L1/t2): x'), c('refactor(L1)!: x'), c('Refactor(L1): x'), c('feat: x')]).map((x: { subject: string }) => x.subject)).toEqual(['refactor(L1)!: x', 'Refactor(L1): x', 'feat: x']);
+  it('R4 — le sujet est lu : portée facultative, portée composée ; majuscule et « ! » restent des changements', async () => {
+    for (const [subject, gap] of [['refactor: x', false], ['refactor(L1/t2): x', false], ['refactor(L1)!: x', true], ['Refactor(L1): x', true], ['feat(L1): x', true]] as const) {
+      const dir = await repo();
+      work(dir, subject, ['src/a.ts']);
+      expect((await cad(dir, 'check')).out.includes('documentation en retard'), subject).toBe(gap);
+    }
+  });
+
+  it('R5 — un document écrit dans un commit refactor compte pour le feat du même lot', async () => {
+    const dir = await repo();
+    work(dir, 'feat(L1): comportement', ['src/a.ts']);
+    work(dir, 'refactor(L1): réécrit la doc', ['README.md']);
+    expect((await cad(dir, 'check')).out).not.toContain('documentation en retard');
+  });
+
+  it('R6 — un refactor dont le corps porte « BREAKING CHANGE: » reste un changement', async () => {
+    const dir = await repo();
+    work(dir, 'refactor(L1): renomme la sortie\n\nBREAKING CHANGE: la sortie change', ['src/a.ts']);
+    expect((await cad(dir, 'check')).out).toContain('documentation en retard');
+    const pied = await repo();
+    work(pied, 'refactor(L1): x\n\ntexte\nBREAKING-CHANGE: y', ['src/a.ts']);
+    expect((await cad(pied, 'check')).out).toContain('documentation en retard');
+    const cite = await repo();
+    work(cite, 'refactor(L1): x\n\nun BREAKING CHANGE: cité en ligne', ['src/a.ts']);
+    expect((await cad(cite, 'check')).out).not.toContain('documentation en retard');
   });
 });

@@ -128,12 +128,14 @@ describe('agent livreur (L439)', () => {
     expect(ux).toMatch(/prints neither line is not visible/)
   })
 
-  it('R7 — les lignes que l\'agent lit sont celles que raf show imprime (src/cli.ts)', () => {
+  it('R7 — les lignes que l\'agent lit sont celles que raf show imprime (src/lot-lines.ts, appelé par src/cli.ts)', () => {
     const cli = readFileSync(join(root, 'src/cli.ts'), 'utf8')
     const show = cli.slice(cli.indexOf("case 'show': {"), cli.indexOf("case 'list': {"))
-    expect(show).toContain("io.out('visible : oui')")
-    expect(show).toContain("`ux : ${lot.ux.verdict}` : 'ux : absent'")
-    expect(show).toContain('`screen : ${lot.screen}`')
+    expect(show).toContain('lotLines(plan, lot)')
+    const lines = readFileSync(join(root, 'src/lot-lines.ts'), 'utf8')
+    expect(lines).toContain("lines.push('visible : oui')")
+    expect(lines).toContain("`ux : ${lot.ux.verdict}` : 'ux : absent'")
+    expect(lines).toContain('`screen : ${lot.screen}`')
   })
 
   it('R8 — agents/livreur.md prend l\'URL dans le brief et interdit de l\'inventer', () => {

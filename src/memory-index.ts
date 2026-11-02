@@ -19,11 +19,13 @@ const DATED = /^- (?:\*\*)?\[?(?:⚠️?\s*)?(?:0[1-9]|[12]\d|3[01])-(?:0[1-9]|1
 function datedEntries(text: string): { count: number; bytes: number } {
   let count = 0;
   let bytes = 0;
-  for (const line of text.split('\n')) {
+  const lines = text.replace(/^\uFEFF/, '').split('\n');
+  for (const [i, line] of lines.entries()) {
     const bare = line.replace(/\r$/, '');
     if (!DATED.test(bare)) continue;
     count++;
-    bytes += Buffer.byteLength(bare) + 1;
+    // la fin de ligne ne compte que si elle existe : la dernière ligne peut ne pas en avoir
+    bytes += Buffer.byteLength(line) + (i < lines.length - 1 ? 1 : 0);
   }
   return { count, bytes };
 }

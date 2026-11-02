@@ -1052,9 +1052,10 @@ lots:
     finished: 2026-10-31
   - id: L496
     title: "docs.sync : un lot de nettoyage sans effet documenté (retrait d'export, découpage de fichier, doublon factorisé) ne doit plus être rendu au lead avant la revue — accepter l'acquittement à l'avance (raf docs-ok posé avant la vague, valable pour les commits qui suivent) ou une clé docs: none sur le lot ; cas du 31-10 : L483 et L484 rendus deux fois pour 30 fichiers dont aucun document ne change, et L485–L493 sont du même type"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-31
+    started: 2026-11-02
   - id: L497
     title: "Sonde de cas limites avant la revue (goulot « bug de code » : cas limite 64 % des passes bug-code depuis la consigne L447, 69 % avant — la consigne écrite n'a rien changé) : étape d'orchestrate entre implement et review, session Sonnet neuve qui lit le diff du lot (et la fiche s'il y en a une) et cherche à le casser par des tests aux bornes (vide, absent, double, mauvais type, refusé, forme réelle des données, autres appelants) ; tout test qui échoue revient à implement comme constat avant la revue Opus ; clé orchestrate.probe (absente = rien ne change), posée sur cadence seul pour l'essai ; mesure par L430 (part bug-code et cas limite, lots à ≥ 2 passes, tokens par lot) pour garder ou retirer"
     status: done

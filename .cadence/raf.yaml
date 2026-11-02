@@ -967,6 +967,7 @@ lots:
     created: 2026-10-31
     started: 2026-11-02
     docs_ok: { date: 2026-11-02, reason: "refactor interne sans changement visible (D1–D4) ; ni README, ni CHANGELOG, ni docs/ ne citent ces fonctions" }
+    review: { date: 2026-11-02, verdict: "conforme : nettoyage D1–D4 sans changement de comportement, rebasé sur main, base du cliquet réduite aux seules baisses du lot, tsc, cliquet et suite complète verts", commit: c7acd82ff72cae92cf21e99750497a5a32d2a530 }
   - id: L487
     title: "Nettoyage D5–D6 : lecture d'une clé et du fichier cadence.yaml factorisées (config.ts, continue.ts, lead.ts, resources.ts) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § D ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: todo

@@ -464,6 +464,26 @@ export class RunStore {
   }
 
   /**
+   * File des intégrations demandées à une vague vivante (L532, `--resume --integrate` sur une vague qui tourne encore) : `integrates.log`, une ligne JSON par demande (`{id, lot}`, le lot écrit `projet:lot`).
+   * La vague la relit entre deux étapes, comme celle des réponses.
+   */
+  integrateQueue(): { id: number; lot: string }[] {
+    return this.queue('integrates.log', (o) => (typeof o.lot === 'string' ? { lot: o.lot } : null));
+  }
+
+  /** Dépose une intégration dans la file ; rend son numéro. */
+  requestIntegrate(lot: string): number {
+    const id = this.nextId('integrates.log');
+    appendFileSync(join(this.dir, 'integrates.log'), `${JSON.stringify({ id, lot })}\n`);
+    return id;
+  }
+
+  /** La demande `id` est prise (intégration reprise ou écartée) : elle ne sera plus relue. */
+  markIntegrateTaken(id: number): void {
+    appendFileSync(join(this.dir, 'integrates.log'), `${JSON.stringify({ taken: id })}\n`);
+  }
+
+  /**
    * File des lots à ajouter à une vague vivante (L421, `--add`) : `adds.log`, une ligne JSON par demande (`{id, lot, project?, model?}`), le projet étant écrit comme le lead l'a donné
    * (nom de dossier depuis le dossier de lancement). La vague la relit entre deux étapes, comme celle des réponses.
    */

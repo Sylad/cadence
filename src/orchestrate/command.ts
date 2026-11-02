@@ -34,6 +34,7 @@ import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { groupLots, runPool } from './pool.js';
 import { AddFeed, addNotAlone, addToLive, openInRepo, projectName, type KnownLot, type LaunchChecks } from './ajout.js';
 import { repoRefusals, trackedDirty } from './depot.js';
+import { adoptLeadReview, depositIntegrations, depositsOnly, integrationText, runsElsewhere, takeIntegrations } from './integration-vivante.js';
 import { removeWorktree } from './retrait.js';
 import { repoBranch } from './integrate.js';
 import { baseBranchOf, keptLines, keptTrees, lotBranch, lotTreeDir, planFileSet, recoverTree, removeTree } from './worktree.js';
@@ -1234,6 +1235,8 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
             taken.push(c);
           }
         }
+        // L532 : les intégrations déposées par `--resume --integrate` pendant la vague sont reprises de la même façon, au tour où le lot peut jouer.
+        taken.push(...(await takeIntegrations({ store, ctxs, wctx, settled }, canRun)));
         if (taken.length) {
           try {
             updateWaveRepos(home, process.pid, repos.filter((x) => !freed.has(x)), lanes());
@@ -1424,6 +1427,8 @@ export function resumeArgv(argv: string[], id: string): string[] {
 async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, today: Day): Promise<number> {
   const store = typeof args.resume === 'string' ? RunStore.find(launch, args.resume) : singleUnfinished(launch);
   if (!store) throw new RafError(`vague inconnue : ${args.resume}`);
+  // L532 : `--integrate` seul sur une vague qui tourne encore dépose l'intégration dans sa file au lieu de refuser ; dit avant l'instantané (le dépôt ne demande rien à son code) ; une reprise qui attend le dépôt (L443) est inscrite vivante mais ne joue pas encore : la vague doit être « running ». Avec une autre option de reprise ou --replay, le refus ci-dessous reste.
+  if (depositsOnly(args, runsElsewhere(store, launch))) return depositIntegrations(args.integrate, io, store);
   if (deps.snapshot) {
     // La reprise tourne sur l'instantané de la vague, jamais sur le dist/ courant ; une vague d'avant L61 n'en a pas.
     if (LOT_LIKE.test(store.id) && snapshotExists(store.dir)) {
@@ -1650,18 +1655,12 @@ async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: Orche
     for (const l of integ) {
       const k = lotKey(l.project, l.lot);
       const lead = leadReviewed.get(l);
-      if (lead) {
-        // La revue du lead tient lieu de revue du lot : le rebase reporte son verdict (même patch-id) ou joue la revue courte du diff rebasé.
-        l.next = 'integrate';
-        l.code = { conforme: true, bloquants: 0, majeurs: 0, mineurs: 0, verdict: lead.verdict, sousTaches: [], nonVerifie: [], head: lead.head };
-        l.verdict = lead.verdict;
-        l.constats = [];
-      }
+      if (lead) adoptLeadReview(l, lead);
       const planNote = l.next !== 'integrate'; // rendu sur une écriture de plan refusée (--replay) : le lot repart de l'étape gardée
       if (planNote && l.outcome?.startsWith(HYPOTHESES_HANDBACK)) l.hypotheses = undefined; // les notes d'hypothèses se posent de nouveau (sans doublon) à l'entrée de l'étape
       l.status = 'suspended';
       l.outcome = null;
-      const text = lead ? `intégration reprise (--resume --integrate) : revue conforme du lead hors vague, ${lead.head.slice(0, 7)}` : planNote ? `écriture du plan reprise à l'étape ${l.next} (--resume --replay)` : 'intégration reprise (--resume --integrate)';
+      const text = planNote ? `écriture du plan reprise à l'étape ${l.next} (--resume --replay)` : integrationText(lead ?? null);
       store.journal(`${k} → suspended — ${text}`);
       io.out(`${k} → suspended — ${text}`);
     }

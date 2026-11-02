@@ -85,6 +85,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - `cadence verify --gate` no longer takes over a wave's verdict under plan-only commits when tracked code or tests (outside docs; the file named exactly `CHANGELOG` aside, names shown unquoted) quote the plan's path while `orchestrate.gate.readsPlan` is absent: the gate is replayed and the reason line says « le code lit le plan, gate.readsPlan absent » with the files (L482, [docs/deliver.md](docs/deliver.md)).
 - `plan.idPattern` in `cadence.yaml`: free identifiers (`AB-1.2`) in a writable plan, `raf add --id`, flat sub-lots with `raf add --under` (`parent:` outside the prefix, read in a native plan by `raf check` for idleness, by `lead tour --json` as `parent` and by the lots panel, which groups them under their parent), commit references that follow the pattern (`X7/t1-fusion` included), and `raf estimate <id> <days>` (L465)
+- `cadence orchestrate --resume --wave <wave> --integrate <project:lot>` is accepted while the wave is still running (L532, [docs/orchestrate.md](docs/orchestrate.md)): the request goes into a queue the live wave reads between two steps, instead of `la vague … tourne encore`. A lot reviewed `conforme` by the lead in its worktree is integrated without waiting for the end of a long `--continue` wave.
 
 ### Changed
 

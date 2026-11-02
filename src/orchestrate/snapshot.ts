@@ -148,6 +148,18 @@ export function waveReadsAnswerQueue(waveDir: string): boolean {
 }
 
 /**
+ * La vague lit-elle la file d'intégrations `integrates.log` (L532, `--resume --integrate` sur une vague vivante) ? Une vague lancée avant L532 ne la lirait jamais : la demande y dormirait. Sans instantané : on suppose que oui.
+ */
+export function waveReadsIntegrateQueue(waveDir: string): boolean {
+  if (!snapshotExists(waveDir)) return true;
+  try {
+    return readFileSync(join(toolDirOf(waveDir), 'dist', 'orchestrate', 'state.js'), 'utf8').includes('integrates.log');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * La vague lit-elle la file d'ajouts `adds.log` (L421, `--add`) ? Une vague lancée avant L421 ne la lirait jamais : le lot y dormirait. Sans instantané : on suppose que oui.
  */
 export function waveReadsAdds(waveDir: string): boolean {

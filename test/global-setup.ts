@@ -11,13 +11,16 @@ const REPO = fileURLToPath(new URL('..', import.meta.url));
 /**
  * Paquet jetable construit depuis src/ (et non le dist/ en service) : les tests qui relancent un fils
  * (instantané d'une vague, bin/cadence.js) testent ainsi le code source courant, sans dépendre d'un `npm run build`.
- * Même forme qu'un paquet installé : dist/ (tsc -p tsconfig.build.json), bin/, templates/, agents/, skills/, package.json, node_modules lié.
+ * Même forme qu'un paquet installé : dist/ (tsc -p tsconfig.build.json), bin/, templates/, agents/, skills/, scripts/qualite.mjs, package.json, node_modules lié.
  */
 function buildThrowawayPackage(into: string): string {
   const pkg = join(into, 'package-jetable');
   mkdirSync(pkg);
   runCompiler(process.execPath, [join(REPO, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.build.json', '--outDir', join(pkg, 'dist')], REPO);
   for (const n of ['bin', 'templates', 'agents', 'skills', 'package.json']) cpSync(join(REPO, n), join(pkg, n), { recursive: true });
+  // L538 : integrate.ts importe scripts/qualite.mjs, que le paquet publié embarque (package.json « files »).
+  mkdirSync(join(pkg, 'scripts'));
+  for (const n of ['qualite.mjs', 'qualite.d.mts']) cpSync(join(REPO, 'scripts', n), join(pkg, 'scripts', n));
   symlinkSync(join(REPO, 'node_modules'), join(pkg, 'node_modules'), 'dir');
   return pkg;
 }

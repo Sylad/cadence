@@ -803,12 +803,13 @@ lots:
       - { date: 2026-11-02, text: "Mineurs de la revue après rebase (02-11) : doc de parent: natif à compléter (raf.md:81 raf check, lead.md lead tour --json, cadence-hud.md) ; tests « archivé compris » qui n'archivent rien (probe-L465-bords:123, plan-id-libres-l465:99) ; sous-id /slug lu sous-tâche seulement en t<n> sous idPattern (plan-ids.ts:39), écart avec le chemin étranger, à reprendre en M10 ; raf check signale ES2022/UTF8 inconnus sous idPattern" }
   - id: L466
     title: "Plans riches — fenêtre prévue et planification (planned: from..to, raf plan, --propose) (manque M4 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
-    status: doing
+    status: done
     estimate: 0.5
     uses: [ plan-coeur ]
     created: 2026-10-30
     started: 2026-11-02
     review: { date: 2026-11-02, verdict: "conforme après 1 correction mineure (estimation des sous-lots dans --propose) — orchestré (vague 2026-11-02-2140-cont, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que la mise en page du CHANGELOG (1 note mineure, ligne vide manquante avant « ### Added »), le code, les tests et la doc du lot sont identiques à avant le rebase", commit: 6db87cb06fb3f2c2fa421b935a8664c764240d76 }
+    finished: 2026-11-02
   - id: L467
     title: "Plans riches — gains rapides groupés (raf quickwins par champ d'extension) (manque M5 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo
@@ -1007,6 +1008,8 @@ lots:
     created: 2026-10-31
     started: 2026-11-02
     docs_ok: { date: 2026-11-02, reason: "découpage interne de cycle.ts (C1a), façade de ré-export ; les fix suivants ne changent que des imports et un test" }
+    notes:
+      - { date: 2026-11-02, text: "02-11 23 h 20 : intégration suspendue par l'arrêt de minuit (revue conforme du lead dans le worktree, 5c7896d) → cadence orchestrate --resume --wave 2026-11-02-2140-cont (reprend L490, L493, L499)" }
   - id: L491
     title: "Découpage C1b : orchestrate/cycle.ts — session (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C1 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: doing
@@ -1539,11 +1542,12 @@ lots:
     finished: 2026-11-02
   - id: L541
     title: "Base du cliquet fusionnée en silence au rebase (suite de L538, hypothèse R8 de sa fiche) : sans conflit textuel, git garde une base ancienne qui resserre des fichiers sous main (vu le 02-11 sur L485, L486 et L536 : cliquet rouge au sommet intégré, rebase à la main) ; l'intégration applique aussi la règle de L538 (base de main + baisses propres au lot) quand le lot touche qualite-baseline.json sans conflit, avec un test"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-02
     started: 2026-11-02
     review: { date: 2026-11-02, verdict: "compliant (2 minor notes) — orchestré (vague 2026-11-02-2140-cont, 0 passe(s) de correction)", commit: 449267b7b6136c734cc13a247f4ea7ba222a91ac, reporte: { de: e0bd6cbcdcc41402ecd76058eb3824363bbae4ce, vers: 449267b7b6136c734cc13a247f4ea7ba222a91ac, patchId: 6945271e8033b338dae75840f3c3c5c0b8088c2f } }
+    finished: 2026-11-02
   - id: L542
     title: "docs.sync : L537 ne suffit pas — un lot de découpage (refactor) suivi de commits fix(L…) de correction (imports, tests, commentaires) est encore rendu « documentation en retard » (02-11 soir : L489, L490) ; juger le diff entier du lot (aucune commande, clé, sortie ni export public changé) plutôt que le type de chaque commit, avec un test sur ce cas"
     status: todo

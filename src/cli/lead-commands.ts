@@ -6,7 +6,7 @@ import { gitRoot } from '../git.js';
 import { RafError } from '../plan.js';
 import { configSet } from '../config-set.js';
 import { movePriority } from '../priority.js';
-import { findProjects, isProject, leadTour, readDepth, readLeadUx, tourFreeLine, tourLine, tourNoTestLines, tourWorktreeLines } from '../lead.js';
+import { findProjects, isProject, leadTour, readDepth, readLeadUx, tourCiLines, tourFreeLine, tourLine, tourNoTestLines, tourWorktreeLines } from '../lead.js';
 import { tourMemoryLines } from '../memory-index.js';
 import { localOverdueLines } from '../local-task.js';
 import { configuredCap, expiredHoldLines, slotsLine } from '../orchestrate/command.js';
@@ -114,8 +114,8 @@ export function cmdLead(c: EarlyCtx): number {
     // les worktrees de lot que des vagues ont conservés : aucun n'est oublié en silence (L279, R19)
     // … puis l'index MEMORY.md du dossier, s'il pèse trop (L442) : le lead propose le regroupement, rien n'est écrit
     for (const l of [...tourWorktreeLines(rows, io.now().getTime()), ...tourMemoryLines(io.env, parent)]) io.out(l);
-    // un projet sans orchestrate.test : la vague ne lancera pas la suite (L327)
-    for (const l of tourNoTestLines(rows)) io.out(l);
+    // un projet sans orchestrate.test : la vague ne lancera pas la suite (L327) ; puis ce que la CI joue et que la porte ne joue pas (L499)
+    for (const l of [...tourNoTestLines(rows), ...tourCiLines(rows)]) io.out(l);
     // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
     // toujours imprimés, même sans vague ni session du lead (L416) : un créneau vide se lit, il ne se déduit pas d'une ligne absente
     io.out(slotsLine(configuredCap(io.env), io.now()).line);

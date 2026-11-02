@@ -13,6 +13,7 @@ import { configuredCap } from './orchestrate/command.js';
 import { TEST_WORKERS_ENV, testWorkersFrom } from './orchestrate/workers.js';
 import { gateLabel, gateReplayable, gateUnnamed, replayGate, runGate, type GateTest } from './orchestrate/gate-parts.js';
 import { copyDeps, git, gitFailure, ignoredDeps, isCopiedDep } from './orchestrate/worktree.js';
+import { reportCiParity } from './orchestrate/ci-parity.js';
 import { tryRemote } from './verify-gate-remote.js';
 import { GATE_TIMEOUT_MS, type Ran } from './remote-gate.js';
 
@@ -176,13 +177,17 @@ function reuseRecorded(f: RecordedGate, steps: { name: string; cmd: string }[], 
   return 0;
 }
 
-async function playGate(ctx: GateCtx): Promise<number> {
-  const { repo, sha, config, out } = ctx;
-  // `cmd` est le libellé (celui du CheckRun d'une vague, pour reprendre son verdict) ; `gate` ce qui est joué : pour des parties (L512), chacune dans son dossier.
-  const steps: Step[] = [
+/** `cmd` est le libellé (celui du CheckRun d'une vague, pour reprendre son verdict) ; `gate` ce qui est joué : pour des parties (L512), chacune dans son dossier. */
+function gateSteps(config: OrchestrateConfig): Step[] {
+  return [
     ...(config.build ? [{ name: 'build', cmd: config.build, gate: config.build }] : []),
     ...(config.test ? [{ name: 'tests', cmd: gateLabel(config.test), gate: config.test }] : []),
   ];
+}
+
+async function playGate(ctx: GateCtx): Promise<number> {
+  const { repo, sha, config, out } = ctx;
+  const steps = gateSteps(config);
   const short = sha.slice(0, 7);
   const base = ctx.env ?? process.env;
   const env = { ...base, [TEST_WORKERS_ENV]: String(testWorkersFrom(base, ctx.cores ?? availableParallelism(), configuredCap(base))) };
@@ -197,6 +202,8 @@ async function playGate(ctx: GateCtx): Promise<number> {
   } catch (e) {
     recorded = { reason: `état des vagues illisible (${gitFailure(e)})` };
   }
+  // L499 : ce que la CI joue et que la porte ne joue pas, dit avant le verdict, repris ou rejoué.
+  reportCiParity(repo, out);
   if ('found' in recorded) return reuseRecorded(recorded.found, steps, sha, out);
   const replayReason = `verdict rejoué : ${recorded.reason}${planNote(repo, sha, ctx.planFile, config.gate?.readsPlan)}`;
   const obstacle = mainTreeObstacle(repo, sha);

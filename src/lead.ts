@@ -15,6 +15,7 @@ import { readNext, sharedStateDir, stateDir } from './state.js';
 import { freeLine, readyFree, type FreeLot } from './ready-free.js';
 import { cadenceHome } from './orchestrate/registry.js';
 import { staleNotes, staleText } from './stale-notes.js';
+import { ciGapsField, ciParityText, type CiGap } from './orchestrate/ci-parity.js';
 import { noTestGate, noTestText, type NoTestGate } from './orchestrate/no-test.js';
 import { KEPT_TITLE, keptLine, keptTrees, type KeptTree } from './orchestrate/worktree.js';
 
@@ -126,6 +127,8 @@ export interface TourRow {
   worktrees?: KeptTree[];
   /** Le projet ne déclare pas `orchestrate.test` (L327) : la vague ne lancera pas la suite ; absent quand il le déclare. */
   noTest?: NoTestGate;
+  /** Commandes de test des workflows CI que la porte ne joue pas (L499) ; absent quand il n'y en a aucune. */
+  ciGaps?: CiGap[];
 }
 
 const empty = (project: string): TourRow => ({ project, doing: [], drift: [], notes: [], next: null, progress: { done: 0, doing: 0, todo: 0, added7: 0 }, repo: [] });
@@ -221,6 +224,7 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     if (kept.length) row.worktrees = kept;
     const noTest = noTestGate(root);
     if (noTest) row.noTest = noTest;
+    Object.assign(row, ciGapsField(root));
   } catch (e) {
     return { ...empty(row.project), error: (e instanceof Error ? e.message : String(e)).split('\n')[0]! };
   }
@@ -276,6 +280,11 @@ export function tourWorktreeLines(rows: TourRow[], now = Date.now()): string[] {
 /** Une ligne par projet sans `orchestrate.test` (L327) : la vague ne lancera pas la suite ; rien quand tous le déclarent. */
 export function tourNoTestLines(rows: TourRow[]): string[] {
   return rows.filter((r) => r.noTest).map((r) => `${r.project} · ${noTestText(r.noTest!)}`);
+}
+
+/** Une ligne par projet et par commande de test de la CI que la porte ne joue pas (L499) ; rien quand la porte couvre la CI. */
+export function tourCiLines(rows: TourRow[]): string[] {
+  return rows.flatMap((r) => (r.ciGaps ?? []).map((g) => `${r.project} · ${ciParityText(g)}`));
 }
 
 const DRIFT_SHOWN = 2;

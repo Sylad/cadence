@@ -6,6 +6,8 @@ import { PLAN_ACTIONS, commitMsgHook, leadAnswerMessage, commitMsgRefusal, planC
 import { decisionsText, humanDecisions } from './decisions.js';
 import { headline, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { acceptationFile, acceptText, redAcceptations } from './accept.js';
+import type { Plan } from '../plan.js';
+import { reportCiParity } from './ci-parity.js';
 import { noTestGate, noTestText } from './no-test.js';
 import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
@@ -75,6 +77,31 @@ function planMessageLines(repo: string, l: LotState, wave: string, dir: string):
   ];
 }
 
+/** Les dépôts dont une remarque de porte a déjà été écrite : chacune l'est une fois par dépôt, pas par lot. */
+interface RepoSaid {
+  noTestSaid: Set<string>;
+  ciSaid: Set<string>;
+  redSaid: Set<string>;
+}
+
+/** Ce que le dry-run dit une fois d'un dépôt de la vague : porte de tests absente (L327), parité porte ↔ CI (L499), acceptation rouge d'un lot clos (L366). */
+function repoNotices(repo: string, io: OrchestrateIo, said: RepoSaid, specDir: string, loadPlan: () => Plan): void {
+  const noTest = said.noTestSaid.has(repo) ? null : noTestGate(repo);
+  said.noTestSaid.add(repo);
+  if (noTest) io.out(`  ${basename(repo)} · ${noTestText(noTest)}`);
+  if (!said.ciSaid.has(repo)) {
+    said.ciSaid.add(repo);
+    reportCiParity(repo, io.out, `  ⚠ ${basename(repo)} · `);
+  }
+  if (said.redSaid.has(repo)) return;
+  said.redSaid.add(repo);
+  // L366 : l'acceptation à vert: false d'un lot clos à la main verrouille ses tests pour tous les lots du dépôt, sans que ce lot y ait touché.
+  const closed = new Set(loadPlan().lots().filter((x) => x.status === 'done').map((x) => x.id));
+  for (const red of redAcceptations(repo, specDir)) {
+    if (closed.has(red.lot)) io.out(`  ⚠ ${basename(repo)} · acceptation rouge d'un lot clos : ${red.lot} (${red.path}, vert: false) — le verrou des tests d'acceptation peut bloquer les lots de la vague ; cadence spec green ${red.lot}`);
+  }
+}
+
 /** `wave` : la vague simulée — son identifiant, son budget et si elle a plus d'un créneau (L527 : tout lot d'un dépôt en worktrees y joue alors dans le sien). */
 export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, { budget, id, multiSlot }: { budget: number; id: string; multiSlot: boolean }): void {
   const tmp = mkdtempSync(join(tmpdir(), 'cadence-orchestrate-'));
@@ -83,8 +110,7 @@ export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDep
   const login = notLoggedIn(deps);
   if (login) io.out(`⚠ ${login} — sans cela le vrai lancement est refusé`);
   const repos = [...new Set(lots.map((l) => l.repo))];
-  const noTestSaid = new Set<string>();
-  const redSaid = new Set<string>();
+  const said = { noTestSaid: new Set<string>(), ciSaid: new Set<string>(), redSaid: new Set<string>() };
   for (const l of lots) {
     const env = projectEnv(l.repo);
     const lot = env.loadPlan().lot(l.lot);
@@ -129,17 +155,7 @@ export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDep
       if (m !== 'local' && !MODEL_ALIASES.includes(m)) io.out(`  ⚠ modèle « ${m} » hors des alias ${MODEL_ALIASES.join(', ')} : passé tel quel à claude --model (un nom que le compte ne connaît pas fait échouer la session)`);
     }
     for (const line of planMessageLines(l.repo, l, id, env.config.spec.dir)) io.out(line);
-    const noTest = noTestSaid.has(l.repo) ? null : noTestGate(l.repo);
-    noTestSaid.add(l.repo);
-    if (noTest) io.out(`  ${basename(l.repo)} · ${noTestText(noTest)}`);
-    if (!redSaid.has(l.repo)) {
-      redSaid.add(l.repo);
-      // L366 : l'acceptation à vert: false d'un lot clos à la main verrouille ses tests pour tous les lots du dépôt, sans que ce lot y ait touché.
-      const closed = new Set(env.loadPlan().lots().filter((x) => x.status === 'done').map((x) => x.id));
-      for (const red of redAcceptations(l.repo, env.config.spec.dir)) {
-        if (closed.has(red.lot)) io.out(`  ⚠ ${basename(l.repo)} · acceptation rouge d'un lot clos : ${red.lot} (${red.path}, vert: false) — le verrou des tests d'acceptation peut bloquer les lots de la vague ; cadence spec green ${red.lot}`);
-      }
-    }
+    repoNotices(l.repo, io, said, env.config.spec.dir, env.loadPlan);
     io.out(`  corrections : ${MAX_PASSES} passe(s) au plus (${MAX_PASSES_CONVERGING} si la revue converge), en session neuve`);
     io.out(l.light ? '  revue conforme avec mineurs : pas de passe des mineurs, ils sont rendus en notes' : '  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
     const pwDir = join(resolve(RunStore.runsDir(io.cwd)), id, lotSlug(l.project, l.lot), 'playwright');

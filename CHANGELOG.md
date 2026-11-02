@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `cadence lead tour`, `cadence orchestrate --dry-run` and `cadence verify --gate` flag the test commands that the CI workflows of the repository play (`.github/workflows/`) and that `orchestrate.test` / `orchestrate.build` do not (L499, `docs/orchestrate.md`, `docs/lead.md`, `docs/deliver.md`): `parité porte ↔ CI : la CI (ci.yml) joue « npx playwright test », que orchestrate.test et orchestrate.build ne jouent pas`. The gate's verdict and exit code are unchanged; `lead tour --json` gets a `ciGaps` field.
+
 ### Fixed
 
 - The integration of `cadence orchestrate` also recomposes the ratchet's baseline when git merges `qualite-baseline.json` without a conflict (L541, `docs/orchestrate.md`): a lot that changed the file kept an older baseline than `main`'s (a key both sides lowered, a key `main` removed), the ratchet turned red at the integrated tip and the rebase was done by hand (L485, L486, L536). The program now applies the L538 rule to the lot's tip and writes the result in a commit of its own, with a journal line; a lot that does not touch the file or raises it is left as git made it.

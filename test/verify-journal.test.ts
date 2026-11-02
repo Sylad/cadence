@@ -28,7 +28,7 @@ const out = (lines: string[]) => (l: string) => lines.push(l);
 const noEffects = (lines: string[]) => ({ root: '', plan: null, today: '2026-10-29' as const, out: out(lines), err: out(lines) });
 async function verify(d: string, sha: string, code = 0) {
   const lines: string[] = [];
-  const exit = await verifyCommand({ config, sha, retry: 0, out: out(lines), journal: { dir: d, day: '2026-10-29', effects: noEffects(lines) } }, deps(code));
+  const exit = await verifyCommand({ config, sha, retry: 0, out: out(lines), journal: { dir: d, day: '2026-10-29', effects: () => noEffects(lines) } }, deps(code));
   return { exit, lines };
 }
 

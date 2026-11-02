@@ -16,7 +16,7 @@ const stateDir = () => {
   mkdirSync(d, { recursive: true });
   return d;
 };
-const effects = { root: '', plan: null, today: '2026-10-29' as const, out: () => {}, err: () => {} };
+const effects = () => ({ root: '', plan: null, today: '2026-10-29' as const, out: () => {}, err: () => {} });
 const journal = (d: string) => (existsSync(join(d, 'deliveries.log')) ? readFileSync(join(d, 'deliveries.log'), 'utf8') : '');
 
 describe('L435 limites — verify vert et journal des livraisons', () => {

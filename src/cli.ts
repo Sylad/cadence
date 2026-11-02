@@ -726,7 +726,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       // verify lit le verrou sans refuser : une tâche locale du lead (L519) n'empêche pas de rejouer les vérifications, et n'est pas une vague à citer.
       const holding = waveHolding(root);
       const waveId = holding && !localLotOf(holding.wave) ? holding.wave : undefined;
-      const effects = deliveredEffects({ root, configPath, planPath, loadPlan, newsDir, today, waveId, io });
+      const effects = () => deliveredEffects({ root, configPath, planPath, loadPlan, newsDir, today, waveId, io });
       return verifyCommand({ config, sha: target.sha, note: target.note, retry, out: io.out, journal: { dir: sharedStateDir(root), day: today, effects } }, realCheckDeps(root));
     }
     case 'skills': {

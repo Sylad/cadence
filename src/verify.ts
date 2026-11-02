@@ -130,8 +130,9 @@ interface VerifyCtx {
   /**
    * Journal des livraisons où un verify vert au sha de la dernière livraison rouge s'inscrit (L435) ; absent : rien n'est écrit.
    * `effects` : la ligne écrite est une livraison verte, elle annonce les lots livrés depuis la précédente et ouvre l'article à rafraîchir.
+   * Construits seulement quand une ligne est écrite : un plan illisible n'empêche pas de rejouer les vérifications.
    */
-  journal?: { dir: string; day: Day; effects: DeliveredCtx };
+  journal?: { dir: string; day: Day; effects: () => DeliveredCtx };
 }
 
 /** Délai de chaque essai d'une vérification de `cadence verify`. */
@@ -158,7 +159,14 @@ export async function verifyCommand(ctx: VerifyCtx, deps: CheckDeps): Promise<nu
     const prev = lastDelivery(ctx.journal.dir); // lu avant l'écriture : la livraison précédente, d'où partent les lots annoncés
     if (recordVerifiedDelivery(ctx.journal.dir, ctx.journal.day, ctx.sha)) {
       out(`verify : ${ctx.sha.slice(0, 7)} avait une livraison rouge, l'effet est vert — inscrit au journal des livraisons`);
-      announceDelivered(ctx.journal.effects, prev, ctx.sha);
+      let effects: DeliveredCtx;
+      try {
+        effects = ctx.journal.effects();
+      } catch (e) {
+        out(`verify : lots livrés non annoncés — ${(e as Error).message.split('\n')[0]}`);
+        return 0;
+      }
+      announceDelivered(effects, prev, ctx.sha);
     }
   }
   return 0;

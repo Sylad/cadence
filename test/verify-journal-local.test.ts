@@ -7,7 +7,7 @@ import { REPO_LOCK } from '../src/orchestrate/lock.js';
 import { appendFailedDelivery, sharedStateDir } from '../src/state.js';
 import { cleanupTempDirs, commit, gitRepo, tempDir } from './helpers.js';
 
-// L435 — verify lit le verrou du dépôt sans refuser : une tâche locale du lead (L519) n'empêche pas de rejouer les vérifications.
+// L435 — verify rejoue les vérifications quoi qu'il arrive au reste : une tâche locale du lead (L519) ou un plan illisible ne l'en empêchent pas.
 
 const fileHome = process.env.CADENCE_HOME;
 beforeEach(() => {
@@ -25,7 +25,7 @@ async function cli(dir: string, ...argv: string[]) {
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
-describe('L435 — verify sous une tâche locale du lead', () => {
+describe('L435 — verify sous une tâche locale du lead ou un plan illisible', () => {
   it('verify --sha rejoue et inscrit sa ligne malgré le verrou local:L1', async () => {
     const dir = gitRepo();
     await cli(dir, 'init', '--project', 'demo', '--no-hook');
@@ -42,5 +42,33 @@ describe('L435 — verify sous une tâche locale du lead', () => {
     expect(r.code).toBe(0);
     expect(r.out).toContain('inscrit au journal des livraisons');
     expect(readFileSync(join(state, 'deliveries.log'), 'utf8')).toBe(`2026-11-02 ${sha}\n`);
+  });
+
+  it('plan illisible : verify rejoue les vérifications, code 0 si vert', async () => {
+    const dir = gitRepo();
+    await cli(dir, 'init', '--project', 'demo', '--no-hook');
+    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  ci: none\n  deploy: echo ok\n  verify:\n    - command: "true"\n');
+    commit(dir, 'chore: init');
+    writeFileSync(join(dir, '.cadence/raf.yaml'), 'projet: [oops\n');
+    const r = await cli(dir, 'verify', '--sha', headSha(dir)!);
+    expect(r.err).toBe('');
+    expect(r.out).toContain('verify : 1/1 vérifications vertes');
+    expect(r.code).toBe(0);
+  });
+
+  it('plan illisible et ligne verte inscrite : la ligne reste, verify dit que les lots ne sont pas annoncés, code 0', async () => {
+    const dir = gitRepo();
+    await cli(dir, 'init', '--project', 'demo', '--no-hook');
+    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  ci: none\n  deploy: echo ok\n  verify:\n    - command: "true"\n');
+    commit(dir, 'chore: init');
+    writeFileSync(join(dir, '.cadence/raf.yaml'), 'projet: [oops\n');
+    const sha = headSha(dir)!;
+    const state = sharedStateDir(dir);
+    mkdirSync(state, { recursive: true });
+    appendFailedDelivery(state, '2026-11-02', sha, 'vérification en échec', 'verification');
+    const r = await cli(dir, 'verify', '--sha', sha);
+    expect(r.code).toBe(0);
+    expect(readFileSync(join(state, 'deliveries.log'), 'utf8')).toBe(`2026-11-02 ${sha}\n`);
+    expect(r.out).toContain('lots livrés non annoncés');
   });
 });

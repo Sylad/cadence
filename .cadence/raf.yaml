@@ -256,6 +256,7 @@ lots:
     estimate: 0.25
     created: 2026-10-29
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: 'conforme (1 remarque mineure, sans sous-tâche : le test « aucun pipe » des workflows ne voit pas un pipe dans un \"$(…)\" entre guillemets) — orchestré (vague 2026-11-02-0955-cad, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant', commit: b325c65580a0f61e487c2b1322995776709001b8 }
   - id: L420
     title: "cadence deliver commite lui-même la note « article à rafraîchir » qu'il écrit dans le plan (28-10 : laissée non commitée, un commit à la main à chaque livraison)"
     status: done

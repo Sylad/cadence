@@ -90,7 +90,7 @@ describe('candidats', () => {
     expect(draw(800_000)).toEqual(['L2']);
     expect(draw(1_300_000)).toEqual(['L1', 'L2']);
   });
-  it("L209 : un lot screen: component ou journey se tire au budget ordinaire, seul page compte l'étape spec", () => {
+  it("L209, L459 : un lot screen: component ou journey visible se tire au budget ordinaire plus 450 k (maquette légère), seul page compte le forfait de 1,3 M", () => {
     const parent = tempDir();
     const dir = join(parent, 'ol');
     mkdirSync(dir);
@@ -100,7 +100,8 @@ describe('candidats', () => {
     plan.add('page', '2026-10-01', { estimate: 0.5, visible: true, screen: 'page' });
     plan.save();
     const draw = (remaining: number) => candidates(dir, { priority: [], exclude: new Set(), remaining }).map((c) => c.lot.id);
-    expect(draw(800_000)).toEqual(['L1', 'L2']);
+    expect(draw(1_000_000)).toEqual([]);
+    expect(draw(1_050_000)).toEqual(['L1', 'L2']);
     expect(draw(1_300_000)).toEqual(['L1', 'L2', 'L3']);
   });
   it("L349 : un projet qui déclare orchestrate.escalation tire au budget du lot avec sa part d'escalade (775 k pour un lot de 0,5 j), les autres au budget ordinaire", () => {

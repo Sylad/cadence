@@ -29,7 +29,7 @@ function setup(scenario: Record<string, unknown[]>, opts: { cadenceYaml?: string
   plan.save();
   // Le contrôle préalable (L77) a son propre test ; ailleurs il est coupé pour que les étapes attendues restent les mêmes.
   const yaml = opts.cadenceYaml ?? 'orchestrate:\n';
-  writeFileSync(join(dir, 'cadence.yaml'), yaml.replace('orchestrate:\n', `orchestrate:\n  precheck: ${opts.precheck ?? false}\n`));
+  writeFileSync(join(dir, 'cadence.yaml'), yaml.replace('orchestrate:\n', `orchestrate:\n  precheck: ${opts.precheck ?? false}\n  maquette: false\n`));
   git(dir, 'add', '.');
   git(dir, 'commit', '-q', '-m', 'chore: plan');
   let bare = '';

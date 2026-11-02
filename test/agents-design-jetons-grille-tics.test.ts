@@ -124,7 +124,7 @@ describe('R6/R7 — grille avant livraison', () => {
     expect(entre(ux, '## Method', '## Output')).toContain('*major* (slows or misleads)');
   });
   it('R7 — la section Mockup mode et la section Conformity mode d’ux-reviewer.md n’ont pas changé', () => {
-    expect(empreinte(entre(ux, '## Mockup mode', '## Conformity mode'))).toBe('538465dc482c59c4');
+    expect(empreinte(entre(ux, '## Mockup mode', '## Conformity mode'))).toBe('b243e11eae02f628');
     expect(empreinte(entre(ux, '## Conformity mode', '## Method'))).toBe('0e678bf38c96081f');
   });
   it('R7 — le brief maquette rendu cite toujours 1440 px et 390 px et non 375', async () => {

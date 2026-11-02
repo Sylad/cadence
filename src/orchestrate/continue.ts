@@ -10,7 +10,7 @@ import { lotBudget, projectEnv, type Args, type OrchestrateIo, type Target } fro
 import { readyFree } from '../ready-free.js';
 import { lotFinished, lotKey, type LotState, type RunStore } from './state.js';
 import type { Budget } from './cycle.js';
-import { specScreen } from './spec.js';
+import { budgetStage, stageScreen } from './spec.js';
 import { STOP_REQUESTED } from './cycle.js';
 
 /** `--until 18:00` : l'heure d'aujourd'hui (date de `now`) à partir de laquelle la vague ne tire plus de lot. */
@@ -104,11 +104,13 @@ export function candidates(launch: string, o: DrawOpts): Candidate[] {
     }
     let specDir = 'docs/specs';
     let escalating = false;
+    let maquette = true;
     let setting: OrchestrateConfig['continue'];
     try {
       const config = projectEnv(dir).config;
       specDir = config.spec.dir;
       escalating = !!config.escalation;
+      maquette = config.maquette;
       setting = config.continue;
     } catch {
       // configuration illisible : le dossier par défaut
@@ -120,7 +122,7 @@ export function candidates(launch: string, o: DrawOpts): Candidate[] {
         o.skipped?.push(`${project}:${lot.id} écarté du tirage : ${why}`);
         continue;
       }
-      if (lotBudget(lot.estimate, specScreen(dir, specDir, lot) ? 'screen' : lot.spec ? 'spec' : undefined, escalating) > o.remaining) continue;
+      if (lotBudget(lot.estimate, budgetStage(lot, stageScreen(dir, specDir, lot, maquette), maquette), escalating) > o.remaining) continue;
       out.push({ project, dir, lot });
     }
   }

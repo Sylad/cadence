@@ -8,7 +8,7 @@ import type { Constat } from './state.js';
 export const bulletLines = (constats: Constat[]): string[] => constats.map((k) => `- [${k.gravite}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`);
 
 /** Consigne de la revue de maquette dans le brief : la fiche, la maquette, les captures attendues, le rang de la revue sur le plafond `max` (L230). */
-export function maquetteText(o: { fiche: string; passes: number; max: number; previous?: Constat[] }): string {
+export function maquetteText(o: { fiche: string; passes: number; max: number; previous?: Constat[]; light?: boolean }): string {
   const folder = posix.dirname(o.fiche);
   const rank = o.passes + 1;
   const later = rank >= 2;
@@ -19,6 +19,11 @@ export function maquetteText(o: { fiche: string; passes: number; max: number; pr
       ? `This is review ${rank} of ${o.max}${rank >= o.max ? ', the last review' : ''}: the spec writer fixed the points of the previous one (below). Check them first, then run the whole sweep again and report ALL the blocking and major findings of it in this report. Mark \`inchange: true\` on every blocking or major finding about a point the spec writer did not change and the previous review had not raised.`
       : `This is the first review of this mockup (${o.max} review${o.max > 1 ? 's' : ''} at most): there is no later review to keep a finding for. Report ALL the blocking and major findings in this first report; do not keep one back for a later review.`,
   ];
+  if (o.light) {
+    lines.push(
+      `Light mockup (L459): the sheet covers only the states the lot touches. Sweep those states only, at ${LARGEURS.join(' and ')} px, and compare the target of each one to the capture of the current screen \`${folder}/actuel-<état>-<largeur>.png\` (a free file, not checked by the program; when one is missing the spec writer said so under "nonVerifie": judge the target against the code and the neighbouring pages). Report what makes the target worse than the current screen or inconsistent with the rest of the application, not the defects of the screen the lot does not touch.`,
+    );
+  }
   if (later && o.previous?.length) lines.push('', 'Points of the previous review that the spec writer had to fix:', ...bulletLines(o.previous));
   return lines.join('\n');
 }

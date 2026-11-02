@@ -215,7 +215,7 @@ describe('refus avant d\'agir (code 2)', () => {
 
   it("L249 — dry-run (délégation à la main) : aucun brief écrit ne porte la consigne de captures de la vague (nom de fichier résolu sur le dépôt, dossier de vague inexistant)", async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un', visible: true }] });
-    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  ux:\n    url: http://localhost:4200\n');
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  maquette: false\n  ux:\n    url: http://localhost:4200\n');
     git(dirs.a, 'add', '--', 'cadence.yaml');
     git(dirs.a, 'commit', '-qm', 'chore: config');
     const r = await run(parent, ['a:L1', '--dry-run']);
@@ -274,7 +274,7 @@ describe('refus avant d\'agir (code 2)', () => {
 
   it("R8 — dry-run d'un lot visible : la ligne étapes liste review avant ux (L221)", async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'un', visible: true }] });
-    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  ux:\n    url: http://localhost:4200\n');
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  maquette: false\n  ux:\n    url: http://localhost:4200\n');
     git(dirs.a, 'add', '--', 'cadence.yaml');
     git(dirs.a, 'commit', '-qm', 'chore: config');
     const r = await run(parent, ['a:L1', '--dry-run']);
@@ -305,7 +305,7 @@ describe('refus avant d\'agir (code 2)', () => {
   });
 
   it("--dry-run (L171) : un lot avec screen: annonce l'étape spec (Sonnet, agent spec-writer, Playwright) avant implement, son brief est rendu sans {{…}}", async () => {
-    const { parent } = parentWith({ a: [{ title: 'un écran', screen: 'page' }], b: [{ title: 'sans écran', visible: true }] });
+    const { parent } = parentWith({ a: [{ title: 'un écran', screen: 'page' }], b: [{ title: 'sans écran' }] });
     const r = await run(parent, ['a:L1', 'b:L1', '--dry-run']);
     try {
       const out = r.out.join('\n');
@@ -1176,7 +1176,7 @@ describe('une vague', () => {
     git(dir, 'config', 'user.name', 'T');
     git(dir, 'config', 'commit.gpgsign', 'false');
     writeFileSync(join(dir, 'docs/plan/taches.yaml'), 'taches:\n- id: Q4/accueil-4-ux12\n  titre: sous-tâche\n  etat: en_cours\n  parent: SQ4\n  visible: true\n- id: SQ4\n  titre: parent\n  etat: en_cours\n');
-    writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  path: docs/plan/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, parent: parent, visible: visible }\n  statuses: { todo: prevu, doing: en_cours, done: deploye }\norchestrate:\n  precheck: false\n');
+    writeFileSync(join(dir, 'cadence.yaml'), 'plan:\n  path: docs/plan/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, parent: parent, visible: visible }\n  statuses: { todo: prevu, doing: en_cours, done: deploye }\norchestrate:\n  precheck: false\n  maquette: false\n');
     git(dir, 'add', '--', 'docs/plan/taches.yaml', 'cadence.yaml');
     git(dir, 'commit', '-q', '-m', 'chore: plan');
     const id = 'ma:Q4/accueil-4-ux12';
@@ -1622,8 +1622,11 @@ describe('budget par lot (L78, recalibré L194)', () => {
     }
   });
 
-  it("--dry-run (L209) : un lot screen: component ou journey reprend le chemin ordinaire — ni spec, ni maquette, ni accept, budget ordinaire", async () => {
-    const { parent } = parentWith({ a: [{ title: 'un composant', estimate: 0.5, screen: 'component' }, { title: 'un parcours', estimate: 0.5, screen: 'journey' }], b: [{ title: 'une page', estimate: 0.5, screen: 'page' }] });
+  it("--dry-run (L209, L459) : avec orchestrate.maquette: false, un lot screen: component ou journey reprend le chemin ordinaire — ni spec, ni maquette, ni accept, budget ordinaire", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un composant', estimate: 0.5, screen: 'component' }, { title: 'un parcours', estimate: 0.5, screen: 'journey' }], b: [{ title: 'une page', estimate: 0.5, screen: 'page' }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  maquette: false\n');
+    git(dirs.a, 'add', '--', 'cadence.yaml');
+    git(dirs.a, 'commit', '-qm', 'chore: maquette coupée');
     const r = io(parent);
     await orchestrate(['a:L1', 'a:L2', 'b:L1', '--dry-run'], r.io, fakeDeps().deps);
     const text = r.out.join('\n');
@@ -1657,8 +1660,8 @@ describe('budget par lot (L78, recalibré L194)', () => {
     }
   });
 
-  it("--dry-run (L209) : un lot component déjà entré dans la chaîne (fiche ou acceptation présentes) garde son étape spec et son budget d'écran", async () => {
-    const { parent, dirs } = parentWith({ a: [{ title: 'un composant', estimate: 0.5, screen: 'component' }, { title: 'un autre', estimate: 0.5, screen: 'journey' }] });
+  it("--dry-run (L209) : un lot component à spec: true déjà entré dans la chaîne (fiche ou acceptation présentes) garde son étape spec et son budget d'écran", async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'un composant', estimate: 0.5, screen: 'component', spec: true }, { title: 'un autre', estimate: 0.5, screen: 'journey', spec: true }] });
     mkdirSync(join(dirs.a, 'docs/specs/carte'), { recursive: true });
     writeFileSync(join(dirs.a, 'docs/specs/carte/fiche.yaml'), 'ecran:\n  id: carte\n  lot: L1\n');
     writeFileSync(join(dirs.a, 'docs/specs/carte/acceptation-L2.json'), '{}');

@@ -24,6 +24,8 @@ On top of the usability and accessibility checks, check the **consistency mockup
 - every state of `etats` has its section `#etat-<état>`; the `masque` of an empty-state rule really hides the fields it names;
 - the units, formats and wording the sheet declares are those shown.
 
+Light mockup (the brief says so): the sheet and the mockup cover only the states the lot touches. Sweep those states only, and compare the target of each one to the capture of the current screen `actuel-<état>-<largeur>.png` in the same folder (a free file the program does not check; when it is missing the spec writer said why under `nonVerifie`, judge the target against the code and the neighbouring pages). A defect of the screen that the lot does not touch is not a finding of this review.
+
 **Criteria added in mockup mode** — in this mode only (conformity mode and the review of an existing screen keep their text). Each one carries its named rule or the value to count; the checks of the method below (contrast, targets, keyboard, focus, alternatives, colour, reflow, data display) are already written there and are not repeated here.
 
 **Family: visual hierarchy**

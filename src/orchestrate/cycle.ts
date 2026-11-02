@@ -37,7 +37,7 @@ import { lotIds, referenceIdsText } from '../ref/coverage.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
 import { ficheReviewText, reviewedSheetText } from './fiche.js';
 import { bulletLines, maquetteText, reviewedText } from './maquette.js';
-import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, answerAltersRule, hypothesisNote, LEAD_SOURCE, ruleIdsSourcedByLead, sourceRules, specText, type FicheParts } from './spec.js';
+import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, findFiche, hypothesisLines, answerAltersRule, hypothesisNote, lightLot, LEAD_SOURCE, ruleIdsSourcedByLead, sourceRules, specText, type FicheParts } from './spec.js';
 import { handBackWithoutFinding } from './no-finding.js';
 import { decisionsText, humanDecisions } from './decisions.js';
 import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE, expressSummary, lotKey, lotRepoPaths, neighbourDirs, type Constat, type LotState, type ReviewSummary, type RunStore, type StepState } from './state.js';
@@ -593,7 +593,7 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     vars.spec = specText({
       dir: c.config.spec.dir,
       render: c.config.spec.render,
-      screen: l.screen,
+      screen: l.screen, light: lightLot(l, lot, c.config.maquette),
       back,
       problems: l.specProblems,
       review: !reviewed.length ? undefined : back ? reviewedSheetText(reviewed, !!l.screen, session) : reviewedText(reviewed, session),
@@ -610,7 +610,7 @@ function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     vars.reponse = '';
   }
   if (kind === 'maquette') {
-    vars.maquette = maquetteText({ fiche: ficheOf(c) ?? '', passes: l.maquette?.passes ?? 0, max: c.config.maquetteReviews, previous: l.maquetteConstats });
+    vars.maquette = maquetteText({ fiche: ficheOf(c) ?? '', passes: l.maquette?.passes ?? 0, max: c.config.maquetteReviews, previous: l.maquetteConstats, light: lightLot(l, lot, c.config.maquette) });
     vars.reponse = '';
   }
   if (kind === 'accept') {
@@ -1480,6 +1480,8 @@ function afterMaquette(c: LotCtx, fiche: string): SessionKind {
   const l = c.lot;
   // Des constats de la revue de fiche attendent la revue de la maquette (lot mixte) : les deux partent ensemble à la seconde passe `spec`.
   if (l.ficheConstats?.length) return 'spec';
+  // Une maquette légère n'a pas de règles de comportement à verrouiller : pas d'accept, même si orchestrate.accept est déclaré.
+  if (lightLot(l, c.loadPlan().lot(l.lot), c.config.maquette)) return 'implement';
   if (!c.config.accept) {
     if (!l.warnings.includes(NO_ACCEPT)) l.warnings.push(NO_ACCEPT);
     return 'implement';

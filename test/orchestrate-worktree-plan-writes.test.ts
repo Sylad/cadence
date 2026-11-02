@@ -181,7 +181,7 @@ describe('R15 — les gardes de dépôt valent pour chaque worktree', () => {
 describe('R16 — une seule application lancée à la fois dans le dépôt', () => {
   async function uxWave(lots: Parameters<typeof setup>[0], ux: (parent: () => string) => (cwd: string, brief: string) => Promise<ReturnType<typeof claudeOut>>) {
     const app = await fakeApp(0);
-    const { parent, repo } = setup(lots, `worktrees: true\nux: { command: '${app.command}', url: '${app.url}', timeout: 3 }`);
+    const { parent, repo } = setup(lots, `worktrees: true\nmaquette: false\nux: { command: '${app.command}', url: '${app.url}', timeout: 3 }`);
     const f = fake({ ux: ux(() => parent) });
     const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '3'], f);
     return { parent, repo, f, r };

@@ -5,6 +5,8 @@ import { isMap, isNode, isScalar, isSeq, parse, parseDocument, stringify, type N
 import type { Screen } from '../plan.js';
 import { acceptationFile } from './accept.js';
 import { checkFiche, fichesDuDossier, LARGEURS } from '../spec.js';
+import { EXPRESS_MAX_ESTIMATE } from './express.js';
+import type { SpecStage } from './lot-budget.js';
 
 // Étape spec d'orchestrate (L171, spec etape-spec S3) : ce que le programme sait de la sortie de la session `spec`.
 
@@ -29,6 +31,29 @@ export function specScreen(repo: string, dir: string, lot: { id: string; screen?
   const acceptation = acceptationFile('fiche.yaml', lot.id);
   const entered = fichesDuDossier(repo, dir).some(({ name, doc }) => isObj(doc.ecran) && (doc.ecran.lot === lot.id || existsSync(join(repo, dir, name, acceptation))));
   return entered ? lot.screen : undefined;
+}
+
+/**
+ * Maquette légère (L459) : un lot visible, sans `spec: true`, d'estimate au-dessus de la retouche (voie express), dont le `screen:` du plan n'est pas `page`
+ * (`component`, `journey` ou absent) passe par spec → maquette avant le code, sans accept. Se déduit du plan à chaque appel, sans champ d'état :
+ * `orchestrate.maquette: false` la retire (la maquette légère est la revue de maquette, sans elle rien n'est à valider).
+ */
+export function lightMaquette(lot: { visible?: boolean; spec?: boolean; estimate?: number; screen?: Screen }, maquette: boolean): boolean {
+  return maquette && !!lot.visible && !lot.spec && typeof lot.estimate === 'number' && lot.estimate > EXPRESS_MAX_ESTIMATE && lot.screen !== 'page';
+}
+
+/** Le lot est une maquette légère : son état a une étape spec (`screen` posé au lancement) et son lot du plan répond à `lightMaquette`. Relu du plan à chaque appel, aucun champ d'état. */
+export const lightLot = (state: { screen?: Screen }, lot: Parameters<typeof lightMaquette>[0], maquette: boolean): boolean => !!state.screen && lightMaquette(lot, maquette);
+
+/** `screen` de l'état d'un lot à étape spec : celui de `specScreen`, ou, pour une maquette légère, celui du plan (`component` quand le plan n'en déclare pas : l'état ne sert alors qu'à dire « ce lot a une étape spec »). */
+export function stageScreen(repo: string, dir: string, lot: { id: string; visible?: boolean; spec?: boolean; estimate?: number; screen?: Screen }, maquette: boolean): Screen | undefined {
+  return specScreen(repo, dir, lot) ?? (lightMaquette(lot, maquette) ? (lot.screen ?? 'component') : undefined);
+}
+
+/** Catégorie de budget d'un lot (`lotBudget`) : `screen` pour un écran page, `light` pour une maquette légère, `spec` pour un lot `spec: true` sans écran. */
+export function budgetStage(lot: { visible?: boolean; spec?: boolean; estimate?: number; screen?: Screen }, stateScreen: Screen | undefined, maquette: boolean): SpecStage | undefined {
+  if (stateScreen) return lightMaquette(lot, maquette) ? 'light' : 'screen';
+  return lot.spec ? 'spec' : undefined;
 }
 
 /** Texte sans accents ni majuscules, pour les mots-clés. */
@@ -261,18 +286,35 @@ export function hypothesisLines(doc: unknown): string[] {
 /** Texte de la note du lot pour une hypothèse (une note par règle). */
 export const hypothesisNote = (sujet: string, line: string): string => `Hypothèses (fiche ${sujet}) — ${line}`;
 
+/** Consigne de rendu de la maquette : la commande que le projet déclare (`orchestrate.spec.render`), sinon Playwright. `use` : comment la reprendre. */
+const renderLine = (render: string | undefined, use: string): string =>
+  render
+    ? `The project declares how to render mockups (\`orchestrate.spec.render\`): \`${render}\` (from the repository root). ${use}; fall back on Playwright only if it cannot run, and say so under "nonVerifie".`
+    : 'No render command is declared (`orchestrate.spec.render`): render with Playwright (open `maquette.html` as a local file, resize to each width, open each `#etat-<état>`).';
+
+/** Consigne de la maquette d'un lot `screen: page` (ou déjà entré dans la chaîne complète). */
+const pageLines = (o: { dir: string; render?: string; screen?: string }): string[] => [
+    `The lot declares \`screen: ${o.screen}\`. The specs of this project live in \`${o.dir}/<écran>/\` (one folder per screen, \`<écran>\` = the kebab-case \`ecran.id\` of the sheet).`,
+    `Render each state of the mockup at ${LARGEURS.map((w) => `${w}`).join(' and ')} px width: one capture per state and per width, named \`maquette-<état>-<largeur>.png\` (e.g. \`maquette-vide-1440.png\`).`,
+
+  renderLine(o.render, 'Use it'),
+];
+
+/** Consigne de la maquette légère (L459) : l'écran actuel et la version visée des seuls états touchés. */
+const lightLines = (o: { dir: string; render?: string }): string[] => [
+    `This lot is a visible lot that is not a whole page: write a light mockup, before any code. The specs of this project live in \`${o.dir}/<écran>/\` (one folder per screen, \`<écran>\` = the kebab-case \`ecran.id\` of the sheet).`,
+    'Cover only the states the lot touches (not the whole screen). For each touched state, capture the CURRENT screen of the application at each width, then the target version: the sheet and the mockup are limited to the states, fields and rules the lot changes.',
+    `Name the captures of the current screen \`actuel-<état>-<largeur>.png\` and those of the target \`maquette-<état>-<largeur>.png\`, one per touched state and per width (${LARGEURS.join(' and ')} px; e.g. \`actuel-vide-1440.png\`, \`maquette-vide-1440.png\`), in the folder of the sheet. The program checks the captures of the target, not the \`actuel-*\` ones.`,
+    'If the current screen cannot be captured (the application does not start, the page is protected), say so under "nonVerifie" and base the mockup on the code: never invent a capture of the current screen.',
+    'Each touched state is a section `id="etat-<état>"` of `maquette.html`, and each touched field carries a `data-testid`.',
+
+  renderLine(o.render, 'Use it for the target'),
+];
+
 /** Consigne propre à l'étape spec dans le brief : dossier, largeurs, commande de rendu, et les écarts de la passe précédente. */
-export function specText(o: { dir: string; render?: string; screen?: string; back?: boolean; problems?: string[]; review?: string; template?: string; templateBack?: string }): string {
+export function specText(o: { dir: string; render?: string; screen?: string; light?: boolean; back?: boolean; problems?: string[]; review?: string; template?: string; templateBack?: string }): string {
   const lines: string[] = [];
-  if (o.screen) {
-    lines.push(
-      `The lot declares \`screen: ${o.screen}\`. The specs of this project live in \`${o.dir}/<écran>/\` (one folder per screen, \`<écran>\` = the kebab-case \`ecran.id\` of the sheet).`,
-      `Render each state of the mockup at ${LARGEURS.map((w) => `${w}`).join(' and ')} px width: one capture per state and per width, named \`maquette-<état>-<largeur>.png\` (e.g. \`maquette-vide-1440.png\`).`,
-      o.render
-        ? `The project declares how to render mockups (\`orchestrate.spec.render\`): \`${o.render}\` (from the repository root). Use it; fall back on Playwright only if it cannot run, and say so under "nonVerifie".`
-        : 'No render command is declared (`orchestrate.spec.render`): render with Playwright (open `maquette.html` as a local file, resize to each width, open each `#etat-<état>`).',
-    );
-  }
+  if (o.screen) lines.push(...(o.light ? lightLines(o) : pageLines(o)));
   if (o.back) {
     lines.push(
       o.screen
@@ -280,7 +322,7 @@ export function specText(o: { dir: string; render?: string; screen?: string; bac
         : `The lot declares \`spec: true\` (it changes a behaviour, with no screen). The specs of this project live in \`${o.dir}/<sujet>/\` (one folder per subject, \`<sujet>\` = the kebab-case \`sujet.id\` of the sheet); the sheet has no screen part.`,
     );
   }
-  if (o.screen && !o.back) {
+  if (o.screen && !o.back && !o.light) {
     lines.push(
       `If the lot also changes a behaviour (an API call, a stored datum, a contract), add the back part to the same sheet: \`sujet\`, \`cas\`, \`contrats\`, \`donnees\` next to \`ecran\` (\`sujet.id\` = \`ecran.id\` = the folder name, \`sujet.lot\` = \`ecran.lot\`); the program then also has the sheet reviewed (rules sourced, contradictions, errors and limits, one test per rule), before the mockup. A lot that only draws a screen keeps a sheet without \`sujet\`.`,
     );

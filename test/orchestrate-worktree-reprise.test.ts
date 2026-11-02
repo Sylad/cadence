@@ -224,7 +224,7 @@ describe('R2 — le worktree d\'une vague lancée à la racine du dépôt est ho
 describe('R3 — l\'intégration a lieu une fois l\'application UX arrêtée', () => {
   it('R3 — à l\'avance de la branche du dépôt, l\'application de la revue UX ne répond plus', async () => {
     const app = await fakeApp(0);
-    const { parent, repo } = setup([{ title: 'un', estimate: 1, visible: true }, { title: 'deux' }], `worktrees: true\nux: { command: '${app.command}', url: '${app.url}', timeout: 5 }`);
+    const { parent, repo } = setup([{ title: 'un', estimate: 1, visible: true }, { title: 'deux' }], `worktrees: true\nmaquette: false\nux: { command: '${app.command}', url: '${app.url}', timeout: 5 }`);
     const f = fake({ ux: async () => claudeOut(reviewReport()) });
     // Un hook post-merge note, à chaque avance de la branche du dépôt, si l'application répond encore.
     const seen = join(tempDir(), 'avances.txt');

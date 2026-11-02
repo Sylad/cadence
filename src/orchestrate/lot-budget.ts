@@ -28,7 +28,8 @@ const SCREEN_LOT_BUDGET = 1_300_000;
  */
 export const SPEC_STAGE_ALLOCATION = 450_000;
 
-export type SpecStage = 'screen' | 'spec';
+/** `light` : maquette légère (L459), un lot visible sans `screen: page` qui passe par spec et maquette sans accept ; son budget est celui d'un lot `spec`. */
+export type SpecStage = 'screen' | 'spec' | 'light';
 
 /** Base mesurée d'un budget, pour `--dry-run` : l'estimate (et l'étape spec) d'où il sort. */
 export function lotBudgetBasis(estimate: number, stage?: SpecStage, escalationModel?: string): string {
@@ -41,7 +42,7 @@ function ordinaryBasis(estimate: number, stage?: SpecStage): string {
   const ordinary = lotBudget(estimate);
   const basis = estimate <= 0.5 ? "plancher d'un lot jusqu'à 0,5 j" : estimate <= 1 ? "p90 mesuré du total d'un lot de 0,5 à 1 j" : Math.round(estimate * LOT_BUDGET_PER_DAY) <= LOT_BUDGET_ONE_DAY ? `plancher de ${LOT_BUDGET_ONE_DAY} au-delà d'un jour, l'estimate × ${LOT_BUDGET_PER_DAY} ne le dépasse pas encore` : `${LOT_BUDGET_PER_DAY} par jour, p90 mesuré du total au-delà d'un jour`;
   if (!stage) return basis;
-  return `${ordinary} dérivés de l'estimate (${basis}), plus ${SPEC_STAGE_ALLOCATION} pour les étapes spec, ${stage === 'screen' ? 'maquette' : 'fiche'} et accept`;
+  return `${ordinary} dérivés de l'estimate (${basis}), plus ${SPEC_STAGE_ALLOCATION} pour ${stage === 'light' ? 'les étapes spec et maquette' : `les étapes spec, ${stage === 'screen' ? 'maquette' : 'fiche'} et accept`}`;
 }
 
 /** Budget d'un lot, dérivé de son estimate et de sa catégorie : empêche quelques lots d'avaler le budget de la vague au détriment des autres. Un lot à `screen:` vaut le total mesuré d'un lot à écran (L194) ; un lot à `spec: true` y ajoute l'allocation de son étape (L191) ; `escalation` (orchestrate.escalation déclarée) y ajoute la part de l'escalade (L349). */
@@ -50,5 +51,5 @@ export const lotBudget = (estimate: number, stage?: SpecStage, escalation = fals
 const lotBaseBudget = (estimate: number, stage?: SpecStage): number => {
   const ordinary = estimate <= 0.5 ? LOT_BUDGET_FLOOR : Math.max(LOT_BUDGET_ONE_DAY, Math.round(estimate * LOT_BUDGET_PER_DAY));
   if (stage === 'screen') return Math.max(SCREEN_LOT_BUDGET, ordinary + SPEC_STAGE_ALLOCATION);
-  return ordinary + (stage === 'spec' ? SPEC_STAGE_ALLOCATION : 0);
+  return ordinary + (stage === 'spec' || stage === 'light' ? SPEC_STAGE_ALLOCATION : 0);
 };

@@ -24,7 +24,7 @@ import { acceptationFile, acceptText, redAcceptations } from './accept.js';
 import { noTestGate, noTestText } from './no-test.js';
 import { ficheReviewText } from './fiche.js';
 import { maquetteText } from './maquette.js';
-import { costlyHypotheses, specScreen, specText } from './spec.js';
+import { budgetStage, costlyHypotheses, lightLot, specText, stageScreen } from './spec.js';
 import { fichesDuDossier } from '../spec.js';
 import { candidates, fillTargets, handedBackStreak, parsePriority, parseUntil, drawSettingsReport, readPriority, stopReason, type Candidate } from './continue.js';
 import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, leadReviewedHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
@@ -380,14 +380,14 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
     }
     const small = lot.estimate <= 0.5 || lot.quickwin;
     const goal = args.goal ?? lot.goal;
-    const screen = specScreen(t.repo, env.config.spec.dir, lot);
+    const screen = stageScreen(t.repo, env.config.spec.dir, lot, env.config.maquette);
     const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, ...(goal ? { goal } : {}), visible: lot.visible, small, ...(screen ? { screen } : {}), ...(lot.spec && !screen ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly });
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.estimate = lot.estimate;
     if (isExpress({ estimate: lot.estimate, screen, specLot: state.specLot })) state.express = true;
     state.light = lot.estimate <= env.config.review.threshold;
     const escalating = !!env.config.escalation;
-    state.budget = lotBudget(lot.estimate, screen ? 'screen' : lot.spec ? 'spec' : undefined, escalating);
+    state.budget = lotBudget(lot.estimate, budgetStage(lot, screen, env.config.maquette), escalating);
     if (escalating) state.escalationReserve = ESCALATION_RESERVE;
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
     if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin, ...(node.skipped ? { skipped: node.skipped } : {}) };
@@ -498,7 +498,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, { bu
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
     if (l.goal) io.out(`  objectif donné : ${l.goal} (à la place du titre dans les briefs)`);
-    io.out(`  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, l.screen ? 'screen' : l.specLot ? 'spec' : undefined, l.escalationReserve ? env.config.escalation?.model : undefined)})`);
+    io.out(`  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, budgetStage(lot, l.screen, env.config.maquette), l.escalationReserve ? env.config.escalation?.model : undefined)})`);
     const mine = lots.filter((o) => o.repo === l.repo);
     const together = env.config.worktrees && (mine.length > 1 || multiSlot) && !mine.some((o) => o.repos?.length) && !!repoBranch(l.repo);
     io.out(together ? `  file ${basename(l.repo)} · en parallèle des autres lots du dépôt, dans son worktree (cadence/${id}/${lotSlug(l.project, l.lot)}, créé à la prise du créneau)` : `  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);
@@ -513,7 +513,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, { bu
     }
     const steps: { kind: 'precheck' | 'spec' | 'maquette' | 'fiche' | 'accept' | 'implement' | 'probe' | 'ux' | 'review' | 'review-small'; model: StepModel }[] = [{ kind: 'implement', model: l.model }];
     const specStage = !!(l.screen || l.specLot);
-    if (specStage && env.config.accept) steps.unshift({ kind: 'accept', model: 'sonnet' });
+    if (specStage && env.config.accept && !lightLot(l, lot, env.config.maquette)) steps.unshift({ kind: 'accept', model: 'sonnet' });
     if (l.screen && env.config.maquette) steps.unshift({ kind: 'maquette', model: env.config.review.full });
     if (l.specLot && env.config.fiche) steps.unshift({ kind: 'fiche', model: 'sonnet' });
     if (specStage) steps.unshift({ kind: 'spec', model: 'sonnet' });
@@ -553,10 +553,10 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, { bu
     // brief écrit par --dry-run = base d'une délégation à la main : aucun dossier de vague (il n'existe pas)
     const vars: BriefVars = { chemin: l.repo, lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', ux: '', choix: '', checks: '', news: l.visible ? newsText(l.lot) : '', captures: '', diff: 'git diff <sha de départ>..HEAD' };
     vars.decisions = decisionsText(humanDecisions(lot, lot.parent ? env.loadPlan().lots().find((x) => x.id === lot.parent) : undefined));
-    if (specStage) vars.spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen, back: !!l.specLot });
-    if (l.screen && env.config.maquette) vars.maquette = maquetteText({ fiche: `${env.config.spec.dir}/<écran>/fiche.yaml`, passes: 0, max: env.config.maquetteReviews });
+    if (specStage) vars.spec = specText({ dir: env.config.spec.dir, render: env.config.spec.render, screen: l.screen, light: lightLot(l, lot, env.config.maquette), back: !!l.specLot });
+    if (l.screen && env.config.maquette) vars.maquette = maquetteText({ fiche: `${env.config.spec.dir}/<écran>/fiche.yaml`, passes: 0, max: env.config.maquetteReviews, light: lightLot(l, lot, env.config.maquette) });
     if (l.specLot && env.config.fiche) vars.fiche = ficheReviewText({ fiche: `${env.config.spec.dir}/<sujet>/fiche.yaml`, passes: 0 });
-    if (specStage && env.config.accept) {
+    if (specStage && env.config.accept && !lightLot(l, lot, env.config.maquette)) {
       const folder = `${env.config.spec.dir}/${l.screen ? '<écran>' : '<sujet>'}`;
       vars.accept = acceptText({ fiche: `${folder}/fiche.yaml`, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: false, acceptation: acceptationFile(`${folder}/fiche.yaml`, l.lot), command: env.config.accept ?? '', test: env.config.test });
     }

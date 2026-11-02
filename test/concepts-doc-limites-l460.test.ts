@@ -124,4 +124,13 @@ describe('L460 — limites de docs/concepts.md', () => {
       expect(s, f).not.toMatch(/\b(TODO|FIXME|XXX)\b/)
     }
   })
+
+  it('le tirage d\u2019un lot du plan dans un créneau libre est lié à --continue (texte et figures)', () => {
+    expect(read('docs/concepts.md')).toMatch(/with `--continue`, a freed slot/)
+    for (const f of svgs.filter((n) => n.startsWith('concepts-vague-'))) {
+      const svg = read(`docs/${f}`)
+      expect(svg, f).toContain('with --continue')
+      expect(svg, f).not.toMatch(/drawn at once|takes it\./)
+    }
+  })
 })

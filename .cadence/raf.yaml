@@ -252,9 +252,10 @@ lots:
     finished: 2026-10-30
   - id: L418
     title: "Release : le script de publication lit le vrai code de sortie de la suite (pipefail, aucun | grep final qui masque un rouge) et joue le test whats-new « deux lignes » avant le tag — 28-10 : test rouge commité, publication npm de 1.22.0 échouée"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-29
+    started: 2026-11-02
   - id: L420
     title: "cadence deliver commite lui-même la note « article à rafraîchir » qu'il écrit dans le plan (28-10 : laissée non commitée, un commit à la main à chaque livraison)"
     status: done

@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.39.0**: `orchestrate --continue` fills free slots by priority, one worktree per lot when the cap allows (issue #21); waves show their cost in euros before and after.
 - **1.38.1**: `spec green` seals a lot closed at `vert: true` without fingerprints (issue #20); `deliver`, `raf move`, `spec reseal` and `spec green` refuse cleanly during a local task.
 - **1.38.0**: an express lane plays a touch-up of at most 0.1 day in one session; `raf add --local` and `cadence local start|done|abort` lock a repository while the lead edits it by hand.
 - **1.37.0**: one full test suite per lot, played by the gate (`suites` column); no correction pass without a finding; a richer implementation brief; `scripts/temps-d-un-lot.mjs` measures where a lot's time goes.
@@ -66,6 +67,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.39.0**: free slots no longer stay empty (GitHub issue #21, L527, `docs/orchestrate.md`). With `--continue`, once the order is agreed (`--priority` or `priority:` of the parent `cadence.yaml`), the wave starts the next ready lot in each slot as soon as one frees up — a lot handed back at its pre-check frees its slot in seconds —, in priority order, within the session cap, the shared resources and one session per repository or one worktree per lot, and the journal says so. In a repository with `orchestrate.worktrees: true` and a cap above 1, every lot gets its own worktree, a lot launched alone or brought by `--add` included, so a second lot of the same repository plays in parallel instead of waiting; `--dry-run --continue` now simulates the draws one by one, as the wave plays them. `cadence orchestrate --dry-run` also announces the cost in euros of each lot and of the wave beside its token budget, and the final table and `--status` show the real cost (L529, price grid `perf.prices`). `cadence release` reads the « In two lines » section of `docs/whats-new.md` the way the test does, so a line too long or a duplicate is caught before the tag (L418), and a timing test that turned red under load in a fresh clone has a wide margin (L528).
 
 **1.38.1**: `cadence spec green <lot>` now handles a lot closed at `vert: true` with no fingerprints (closed before the seal, GitHub issue #20): it replays the lot's acceptance command and, green, writes the fingerprints in a commit that cites the lot, so a later lot that amends one of its tests no longer has to be finished outside a wave (L526, `docs/orchestrate.md`). During a local task of the lead (1.38.0), `cadence deliver`, `raf move`, `cadence spec reseal` and `cadence spec green` refuse with a message that names the task and how to end it, instead of « état illisible » or an impossible `--sha` hint (L525, `docs/raf.md`).
 

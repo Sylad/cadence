@@ -12,7 +12,7 @@ import { articleRepoDir, articlesBrief, docSyncBrief, filesOf, gapMessage, lotDo
 import { testGateMissing } from '../testgate.js';
 import { citesPriorWork, keepPrecheckReading, localYesNote, precheckNothingToFind } from './precheck.js';
 import { PROBE_FAILED, PROBE_RESERVE, probeStep, probeVars, scheduleProbe, type ProbeIo } from './probe.js';
-import type { Day } from '../dates.js';
+import { Day } from '../dates.js';
 import { changedFiles, dirtyPaths, gitCommonDir, isAncestor, readCommits, resolveCommit, restoreWorktree, tryGit, type Commit } from '../git.js';
 import { blockingLots, gitCommitsIn } from './table.js';
 import { citedRefs } from '../link.js';
@@ -45,212 +45,19 @@ import { advance, baseMoved, INTEGRATE_WAIT_MS, MAX_REPLAYS, mergeBase, patchId,
 import { mutexFor } from './mutex.js';
 import { readTier, stillThird, takeTiers, tierMoved, tierRepos, wipBranch, type TierRead } from './tiers.js';
 import { branchExists, git, gitFailure, integrated, linkIgnored, lotBranch, planFileSet, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
+import { MAX_PASSES, MAX_PASSES_CONVERGING, Budget, countInterrupted, type LotCtx, workDir as wd, histPlan, short, save, transition, escalatedSession, stop, startSha, hasSpecStage, propose } from './cycle/ctx.js';
+import { lotSpent, lotOver, budgetCount, REVIEW_RESERVE, WRITE_STEPS, fixAffordable, dropped, DROPPED, unplayedAnswer, halted, overBudget, suspend } from './cycle/budget.js';
+import { trackedPaths, planTemplate, planMessage, planBefore, commitPlan, noteHypotheses, noteMinors, foreignDirty, leadMoved, refusal, planWrite } from './cycle/plan-writes.js';
+import { docsConfig, docGaps, openDocGap, partsOf, ficheOf, briefFor, specBudget } from './cycle/brief.js';
 
-/** Passes de correction au plus, puis la main est rendue au lead. */
-export const MAX_PASSES = 2;
-/** Plafond quand la revue converge (L205) : le nombre de bloquants+majeurs a baissé d'une revue à l'autre et il n'en reste qu'un. */
-export const MAX_PASSES_CONVERGING = MAX_PASSES + 1;
-
-export class Budget {
-  consumed = 0;
-  cacheRead = 0;
-  constructor(public limit: number) {}
-  add(t: Tokens): void {
-    this.consumed += t.counted;
-    this.cacheRead += t.cacheRead;
-  }
-  get exhausted(): boolean {
-    return this.consumed >= this.limit;
-  }
-}
-
-/**
- * Compte au budget les tokens d'une étape tuée (signal) ou retrouvée morte (reprise), relus dans le journal de sa
- * session (`--session-id`). Une étape déjà comptée (`tokens`) ne l'est jamais deux fois. Vrai quand quelque chose a été compté.
- */
-export function countInterrupted(claudeHome: string | undefined, repo: string, step: StepState, budget: Budget): boolean {
-  if (!claudeHome || !step.sessionId || step.tokens || step.model === 'local') return false; // le modèle local n'a rien pris au quota
-  const spent = journalTokens(claudeHome, repo, step.sessionId);
-  if (!spent) return false;
-  step.tokens = spent.tokens;
-  step.peakContext = peakContext(claudeHome, repo, step.sessionId);
-  budget.add(spent.tokens);
-  return true;
-}
-
-export interface WaveCtx {
-  id: string;
-  store: RunStore;
-  budget: Budget;
-  claude: ClaudeFn;
-  agents: Record<string, AgentDef>;
-  today: Day;
-  /** ~/.claude : pour relire le pic de contexte des sessions. */
-  claudeHome?: string;
-  /** Gabarits des briefs, lus une fois au début de la vague (et à sa reprise) : modifier un fichier en cours de vague ne change rien. */
-  templates: Templates;
-  quota: { hit: boolean; message?: string };
-  /** Part de la machine de chaque session (L350) : posée en CADENCE_TEST_WORKERS dans les sessions et la porte, et dite aux gabarits. Absent (vague construite à la main) : rien n'est posé. */
-  testWorkers?: number;
-  /** Push ou revue qui a modifié le dépôt : la vague s'arrête. */
-  incident: string | null;
-  /** Dépôts salis par une revue (L133) → lot en cause : les lots qui restent dans leur file sont suspendus, ceux des autres dépôts continuent. */
-  dirtyRepos?: Map<string, string>;
-  /** Parmi `dirtyRepos`, ceux laissés en HEAD déplacé par une session d'écriture (L214) : même file retenue, autre message. */
-  movedRepos?: Set<string>;
-  /** Pourquoi le modèle local est écarté pour la suite de la vague (L322) : posé au premier échec d'une session locale, il envoie les lots suivants droit à Sonnet. */
-  localOut?: string;
-  log: (line: string) => void;
-  saveWave: () => void;
-  /** Attente du verrou d'intégration du dépôt (L279, R25) : bornes par défaut INTEGRATE_WAIT_MS et INTEGRATE_POLL_MS ; réglables pour les tests. */
-  integrate?: { waitMs?: number; pollMs?: number };
-}
-
-/** Le worktree prévu pour un lot (L279) : créé à la prise du créneau (`active` une fois prêt), retrouvé à la reprise. */
-export interface LotTree {
-  dir: string;
-  branch: string;
-  /** Branche du dépôt sur laquelle le lot est parti et à laquelle il s'intègre (R24). */
-  base: string;
-  active: boolean;
-}
-
-export interface LotCtx {
-  wave: WaveCtx;
-  lot: LotState;
-  config: OrchestrateConfig;
-  loadPlan: () => Plan;
-  /** Issue du lancement de l'application par le programme, le temps de l'étape qui la voit (L60). */
-  app?: AppState;
-  /** Worktree du lot (L279) ; absent : le lot joue dans le dépôt lui-même. */
-  tree?: LotTree;
-  /** Posé le temps de la revue courte du diff rebasé (R17) : le brief le dit à la session. */
-  integration?: { base: string };
-}
+/** Façade (C1a, L490) : le contexte, le budget, le brief et les écritures du plan vivent dans `cycle/` ; les noms publics restent exportés d'ici. */
+export { MAX_PASSES, MAX_PASSES_CONVERGING, Budget, countInterrupted, workDir } from './cycle/ctx.js';
+export type { WaveCtx, LotTree, LotCtx } from './cycle/ctx.js';
+export { lotSpent, ESCALATION_RESERVE, heldForEscalation, REVIEW_RESERVE, budgetStep, STOP_REQUESTED, DROPPED } from './cycle/budget.js';
+export { HYPOTHESES_HANDBACK, planNoteHandBack, leadReviewedHandBack } from './cycle/plan-writes.js';
+export { briefName } from './cycle/brief.js';
 
 const TERMINAL = new Set(['ready', 'handed-back', 'failed']);
-
-/**
- * Où le lot travaille (L279) : son worktree quand il en a un, sinon le dépôt du projet. Tout ce que le cycle lit ou écrit du travail du lot — sessions,
- * commits, contrôles, fiche, acceptation — passe par là ; le plan, lui, n'est jamais lu ni écrit ici que dans le dépôt du projet (`c.lot.repo`, R21).
- */
-export const workDir = (c: LotCtx): string => (c.tree?.active ? c.tree.dir : c.lot.repo);
-const wd = workDir;
-
-/** Le plan tel que les lectures d'historique (lotWork, isPlanOnly, coveredTasks, unreviewedWork) le voient depuis `wd(c)` : son chemin est celui du fichier correspondant dans le worktree (R21). */
-const histPlan = (c: LotCtx): Plan => (wd(c) === c.lot.repo ? c.loadPlan() : planSeenFrom(c.loadPlan(), c.lot.repo, wd(c)));
-
-const short = (c: { sha: string; subject: string }) => `${c.sha.slice(0, 7)} ${c.subject}`;
-
-function save(c: LotCtx): void {
-  c.wave.store.writeLot(c.lot);
-}
-
-function transition(c: LotCtx, status: LotState['status'], outcome?: string): void {
-  c.lot.status = status;
-  if (outcome !== undefined) c.lot.outcome = outcome;
-  save(c);
-  c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} → ${status}${outcome ? ` — ${outcome}` : ''}`);
-}
-
-/** Une session jouée au modèle d'escalade (L337) : la correction escaladée et la revue neuve qui la suit. L'UX, la fiche, le précheck… gardent leur modèle. */
-const escalatedSession = (c: LotCtx, kind: SessionKind): boolean =>
-  c.lot.escalation?.stage === 'fix' && (kind === 'fix' || kind === 'review' || kind === 'review-small');
-
-/**
- * Rend ou échoue le lot. `noResult` : la session escaladée n'a rien rendu (sortie vide, erreur de lancement, coupure, délai) — seul cas où l'escalade est dite
- * « en échec » (L338) : le modèle n'a pas jugé le lot. Un retrait (--drop) ou un incident du dépôt pendant l'escalade laisse l'escalade sans issue : ce n'est pas
- * un échec du modèle et `cadence perf` ne le compte pas contre lui.
- */
-const stop = (c: LotCtx, status: 'handed-back' | 'failed', outcome: string, noResult = false): null => {
-  c.lot.next = null;
-  const e = c.lot.escalation;
-  if (e && !e.issue && noResult) {
-    // Une session escaladée a échoué ou été coupée (L337) : le modèle n'a pas jugé le lot. `toFix` pose `rendu` avant de rendre un lot sur un verdict.
-    e.stage = 'done';
-    e.issue = 'échec';
-    c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · escalade ${e.model} : session sans résultat, le lot n'a pas été jugé par ce modèle`);
-  }
-  transition(c, status, outcome);
-  return null;
-};
-
-/** Fichiers suivis modifiés (chemins), d'après `git status --porcelain`. */
-function trackedPaths(s: Snapshot): string[] {
-  return s.tracked.map((l) => l.slice(3).replace(/^.* -> /, '').replace(/^"|"$/g, ''));
-}
-
-/** Le gabarit `plan.commit` du projet (L343), undefined sans. */
-const planTemplate = (c: LotCtx): string | undefined => readPlanConfig(join(c.lot.repo, 'cadence.yaml'), c.lot.repo)?.commit;
-
-/** Le message d'un commit de plan de la vague : le gabarit `plan.commit` du projet (L343), à défaut le message d'avant. */
-function planMessage(c: LotCtx, action: string): string {
-  return planCommitMessage(planTemplate(c), { lot: c.lot.lot, action, wave: c.wave.id });
-}
-
-/** Le contenu des fichiers du plan déjà modifiés, non commités, avant une écriture de cadence (null : absent du disque) : ce qu'un commit refusé remet (`commitPlan`). */
-type PlanBefore = Map<string, string | null>;
-
-/**
- * Ce que le lead a modifié dans le plan sans commiter, pris AVANT que cadence n'écrive : les fichiers suivis modifiés que `commitPlan` accepte (le plan, ce qui est
- * tenu avec lui, les acceptation.json), avec leur contenu. Un commit de plan refusé (hook) les remet tels quels au lieu de les ramener à HEAD (L343).
- */
-function planBefore(c: LotCtx, repo = c.lot.repo): PlanBefore {
-  const ownFile = planOwnFile(c, repo);
-  const kept: PlanBefore = new Map();
-  for (const f of trackedDirty(repo).filter(ownFile)) {
-    try {
-      kept.set(f, readFileSync(join(repo, f), 'utf8'));
-    } catch {
-      kept.set(f, null);
-    }
-  }
-  return kept;
-}
-
-/**
- * Commit d'entretien du plan, chemins explicites. Rend un message d'arbre sale quand autre chose que le plan a bougé.
- * Dans le dépôt du projet (`root` par défaut) : jamais dans un worktree de lot (R21). Les commits de TRAVAIL du cycle (scellé et `vert: true` de l'acceptation)
- * se font, eux, dans `wd(c)`, sur la branche du lot.
- * `before` : ce que le lead avait modifié sans commiter avant l'écriture (`planBefore`) ; un commit refusé le remet, et ramène à HEAD ce que cadence seule a écrit.
- */
-async function commitPlan(c: LotCtx, message: string, root = c.lot.repo, before: PlanBefore = new Map()): Promise<string | null> {
-  const repo = root;
-  const ownFile = planOwnFile(c, repo);
-  // Les fichiers de plan.onWrite (L346) entrent même non suivis : le premier plan publié n'est pas encore au dépôt.
-  // Les fichiers d'année de l'archive (L396) aussi : un `raf archive` non commité pendant la vague les crée ou les réécrit, et le plan seul commité laisserait HEAD sans les lots archivés.
-  // Chemins relatifs au dépôt du projet (comme `plan.maintained`), même quand `root` est un worktree de lot ; vide pour un plan en lecture seule.
-  const plan = c.loadPlan();
-  const archives = plan.archiveFiles().map((f) => relative(c.lot.repo, f));
-  const dirty = [...new Set([...trackedPaths(await snapshot(repo, { remote: false })), ...dirtyPaths(repo, [...plan.produced, ...archives])])];
-  if (dirty.length === 0) return null;
-  const foreign = dirty.filter((f) => !ownFile(f));
-  if (foreign.length) return `arbre sale (fichiers hors plan) : ${foreign.join(', ')}`;
-  try {
-    git(repo, 'add', '--', ...dirty);
-    git(repo, 'commit', '-q', '-m', message, '--', ...dirty);
-  } catch (e) {
-    // Commit refusé (hook commit-msg…, L343) ou index verrouillé (L385) : le plan n'a pas à rester indexé ni modifié par cadence, le lot suivant y verrait un dépôt sale et serait rendu.
-    // Ce que le lead avait modifié sans commiter (raf add, raf note pendant la session) est remis, pas effacé.
-    // Un index.lock bloque aussi la désindexation et le checkout : le désindexage est tenté sans plus, et l'arbre de travail est remis sans passer par l'index.
-    tryGit(repo, ['restore', '--staged', '--', ...dirty]);
-    const own = dirty.filter((f) => !before.has(f));
-    if (own.length) restoreWorktree(repo, own);
-    for (const [f, text] of before) {
-      if (!dirty.includes(f)) continue;
-      if (text === null) rmSync(join(repo, f), { force: true });
-      else writeFileSync(join(repo, f), text);
-    }
-    throw e;
-  }
-  return null;
-}
-
-/**
- * Sha d'où le lot est parti : le parent de son plus ancien commit de travail (un lot relancé, ou déjà en partie commité, a ses propres
- * commits avant la vague), à défaut le HEAD d'avant la première session de la vague.
- */
-const startSha = (c: LotCtx): string | undefined => lotStartHead(wd(c), lotWork(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha)) ?? c.lot.steps.find((s) => s.headBefore)?.headBefore;
 
 /**
  * Échecs des tests au sha de départ du lot (L213) : la commande est rejouée dans un worktree jetable de ce sha, hors du dépôt,
@@ -399,337 +206,15 @@ async function startLot(c: LotCtx): Promise<string | null> {
   return null;
 }
 
-function lotCommitLines(c: LotCtx): string {
-  const plan = histPlan(c);
-  const mine = lotWork(plan, wd(c), c.lot.lot).reverse().map((k) => `- ${short(k)}`);
-  const theirs = (c.lot.repos ?? []).flatMap((r) => repoWork(plan, r, c.lot.lot).reverse().map((k) => `- [${r.rel}] ${short(k)}`));
-  return [...mine, ...theirs].join('\n');
-}
-
 /** Le lot a déjà du travail (commits citant le lot) dans son dépôt ou dans un dépôt voisin. */
 function hasWork(plan: Plan, root: string, l: Pick<LotState, 'repos' | 'lot'>): boolean {
   return lotWork(plan, root, l.lot).length > 0 || (l.repos ?? []).some((r) => repoWork(plan, r, l.lot).length > 0);
-}
-
-function constatLines(constats: Constat[]): string {
-  return constats
-    .map((k) => `- [${k.gravite}${k.source === 'code' ? '' : ` / ${k.source}`}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`)
-    .join('\n');
-}
-
-/** Consigne de captures : `uxText` n'alimente que `ux` et `review-small` d'un petit lot visible, deux étapes qui chargent toujours le serveur Playwright de la vague. */
-const shotsAt = (dir: string): string => `Take screenshots at 1440 and 390 px width, in the wave's capture directory (outside the repository), each named with its full path, e.g. \`${dir}/home-1440px.png\`.`;
-
-function uxText(c: LotCtx): string {
-  const ux = c.config.ux;
-  const SHOTS_TEXT = shotsAt(playwrightDir(c.wave.store.lotDir(c.lot.project, c.lot.lot)));
-  if (!ux) {
-    return 'No way to run the app is declared (cadence.yaml: orchestrate.ux): review the interface from the code, and list under "nonVerifie" what you could not see.';
-  }
-  if (c.app?.kind === 'ready') return [`The running app is at ${ux.url}.`, SHOTS_TEXT].join(' ');
-  if (c.app) return `The app could not be verified (${c.app.kind === 'busy' ? 'the port is already in use' : 'it did not start'}): review the interface from the code, and list under "nonVerifie" what you could not see.`;
-  return [
-    ux.url ? `The running app is at ${ux.url}.` : '',
-    ux.command ? `Start the app with: ${ux.command} (from the repository root), and stop it when you are done.` : '',
-    SHOTS_TEXT,
-  ]
-    .filter(Boolean)
-    .join(' ');
-}
-
-function choixText(choix: string[]): string {
-  if (!choix.length) return '';
-  return ['The author decided these interpretation questions on its own; re-read each choice against the lot, its notes and the code, and report a finding if one is wrong or changes the scope:', ...choix.map((x) => `- ${x}`)].join('\n');
-}
-
-/** Tests et build déjà lancés par le programme au HEAD relu : le relecteur ne les refait pas (L75). Vide si HEAD a bougé depuis ou si rien n'a tourné. */
-function checksText(c: LotCtx): string {
-  const b = c.lot.baseline;
-  // Sans orchestrate.test aucun rejeu : la base annoncée par la session (non vérifiée) est la seule trace des échecs de départ ; elle s'ajoute aux runs du programme (le build), elle ne les remplace pas.
-  const declared = b && !b.verified && b.failures.length ? `The author reports ${b.failures.length} test(s) already red at the start sha${b.sha ? ` ${b.sha.slice(0, 7)}` : ''}, before this lot (not verified by the program):\n${b.failures.map((t) => `- ${t}`).join('\n')}\nThey are not defects of this lot, do not report them as findings; a failing test outside this list is still a finding.` : '';
-  const k = c.lot.checks;
-  if (!k?.runs.length || k.head !== git(wd(c), 'rev-parse', 'HEAD')) return declared;
-  const runs = k.runs.map((r) => {
-    const alone = r.instables?.length ? `${r.instables.length} test(s) red under load in the whole suite, green when replayed alone, not defects: ${r.instables.join(' ; ')}` : '';
-    const state = r.code === 0 ? 'green' : r.dejaRouges ? `RED, exit code ${r.code}, but every failing test (${r.dejaRouges}) was already red at the start sha${c.lot.baseline?.sha ? ` ${c.lot.baseline.sha.slice(0, 7)}` : ''}: not a defect of this lot, do not report them as findings` : `RED, exit code ${r.code}`;
-    return `- \`${r.command}\` (${r.label}): ${state}${alone ? `${r.code === 0 ? ';' : '. Also'} ${alone}` : ''}`;
-  });
-  const ran = [`The program already ran these checks at HEAD ${k.head.slice(0, 7)}, just before this review:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
-  return declared ? `${ran}\n${declared}` : ran;
-}
-
-/** La clé `docs` du cadence.yaml du projet de ce lot. */
-const docsConfig = (c: LotCtx) => readDocsConfig(histPlan(c).configFile ?? join(wd(c), 'cadence.yaml'));
-
-/** Écarts docs.sync des commits du lot (L143), calculés au moment de la demande : ni gardés ni écrits d'avance. Un écart acquitté et motivé (`raf docs-ok`, L317) n'en est plus un. */
-function docGaps(c: LotCtx): { sync: DocSyncRule[]; gaps: DocSyncGap[] } {
-  const { sync } = docsConfig(c);
-  const plan = histPlan(c);
-  const acknowledged = !!plan.lots().find((x) => x.id === c.lot.lot)?.docsOk;
-  return { sync, gaps: sync.length && !acknowledged ? lotDocSyncGaps(sync, wd(c), lotWork(plan, wd(c), c.lot.lot)) : [] };
-}
-
-/** Cause du renvoi au lead d'un lot dont l'écart docs.sync est ouvert (L317), null sans écart. */
-function openDocGap(c: LotCtx): string | null {
-  const { gaps } = docGaps(c);
-  if (!gaps.length) return null;
-  return `documentation en retard (docs.sync) : ${gaps.flatMap((g) => g.touched).join(', ')} sans la documentation attendue, et aucun écart acquitté — écrire la documentation, ou \`raf docs-ok ${c.lot.lot} --reason "…"\` si elle reste vraie`;
-}
-
-/** Consigne docs.sync du brief de revue (L143). */
-function docsText(c: LotCtx): string {
-  const { sync, gaps } = docGaps(c);
-  return sync.length ? docSyncBrief(sync, gaps) : '';
-}
-
-/** Gabarit d'une étape : la passe des mineurs et la revue courte qui la suit ont chacune le leur. */
-export function briefName(l: LotState, kind: SessionKind, integration = false): BriefName {
-  if (l.specLot && !l.screen && (kind === 'spec' || kind === 'accept')) return `${kind}-back`;
-  if (kind === 'fix' && l.docsFix) return 'fix-docs';
-  if (kind === 'fix' && l.minorFix) return 'fix-minors';
-  if (kind === 'review-small' && l.minorPass && !integration && !(l.small && l.visible)) return 'review-recheck'; // la revue d'intégration (R17) garde le gabarit qui porte {{integration}}
-  return kind;
-}
-
-/** Fichier livré avec le paquet à côté des gabarits, joint à un brief (la session ne lit pas le dossier du paquet) ; undefined s'il manque. */
-function packageFile(name: string): string | undefined {
-  try {
-    return readFileSync(join(TEMPLATES_DIR, '..', name), 'utf8');
-  } catch {
-    return undefined;
-  }
-}
-
-/** Gabarit de fiche livré avec le paquet, joint au brief de la spec. */
-const ficheTemplate = (): string | undefined => packageFile('fiche.yaml');
-
-/** Gabarit de la partie back de la fiche (L187), joint au brief de la spec d'un lot `spec: true`. */
-const ficheBackTemplate = (): string | undefined => packageFile('fiche-back.yaml');
-
-/** Le lot passe par l'étape spec : il déclare `screen:` (écran) ou `spec: true` (comportement sans écran, L188). */
-const hasSpecStage = (l: LotState): boolean => !!(l.screen || l.specLot);
-
-/**
- * Les parties que la fiche du lot doit avoir : l'écran d'un lot à `screen:`, le sujet d'un lot à `spec: true` (sans écran). Un lot mixte est un lot
- * `screen:` dont la FICHE a une partie back (bloc `sujet`, décision du lead) : la fiche écrite le dit, pas un champ du plan.
- */
-const partsOf = (c: LotCtx, fiche?: string | null): FicheParts => ({ screen: !!c.lot.screen, back: !!c.lot.specLot || (!!c.lot.screen && !!fiche && ficheHasBack(wd(c), fiche)) });
-
-/** Gabarit du lanceur de tests livré avec le paquet, joint au brief de l'étape accept. */
-const acceptRunner = (): string | undefined => packageFile('acceptation-runner.mjs');
-
-/** Fiche du lot : celle de l'étape spec, ou la fiche retrouvée dans le dépôt (reprise). */
-function ficheOf(c: LotCtx): string | null {
-  const l = c.lot;
-  return l.spec && 'fiche' in l.spec ? l.spec.fiche : findFiche(wd(c), c.config.spec.dir, l.lot);
-}
-
-/**
- * Consigne de la fiche pour les étapes en aval d'un lot qui en a une (L174) : implement, fix, revue de code, UX de conformité.
- * Vide quand le lot n'a pas de fiche (sous le seuil, ou pas encore écrite) ou qu'elle est illisible.
- */
-function avalOf(c: LotCtx, kind: SessionKind): string {
-  const l = c.lot;
-  const step = kind === 'implement' || kind === 'fix' || kind === 'ux' ? kind : kind === 'review' || kind === 'review-small' ? 'review' : null;
-  const fiche = step ? ficheOf(c) : null;
-  if (!step || !fiche) return '';
-  let rules: string[];
-  let contracts: string[];
-  let screen: boolean;
-  try {
-    const doc = parse(readFileSync(join(wd(c), fiche), 'utf8'));
-    rules = ficheRules(doc);
-    contracts = ficheContracts(doc);
-    screen = hasScreenPart(doc);
-  } catch {
-    return '';
-  }
-  if (!rules.length || (step === 'ux' && !screen)) return '';
-  const acceptation = l.accept?.acceptation ?? findAcceptation(wd(c), c.config.spec.dir, l.lot) ?? undefined;
-  const o = { fiche, rules, acceptation, rouge: l.accept?.rouge, contracts, screen };
-  const text = avalFicheText(step, o);
-  // la revue courte d'un petit lot visible est sa seule passe : elle porte aussi la conformité à la maquette
-  return kind === 'review-small' && l.small && l.visible && screen ? `${text}\n${avalFicheText('ux', o)}` : text;
-}
-
-/** Les étapes dont le programme rejoue la porte après la session (L399) : elles reçoivent ses commandes exactes et la part de machine (L350). La sonde écrit des tests : sans la porte, elle joue le runner seul et commite un test que `tsc` ou la qualité mettent au rouge, d'où une passe de correction pour rien. */
-const writesCode = (kind: SessionKind): boolean => kind === 'implement' || kind === 'fix' || kind === 'probe';
-
-/** Consigne de la part de machine de la session (L350) ; vide quand la vague n'en a pas calculé. */
-const workersText = (c: LotCtx): string => (c.wave.testWorkers ? testWorkersText(c.wave.testWorkers) : '');
-
-function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
-  const plan = c.loadPlan();
-  const l = c.lot;
-  const lot = plan.lot(l.lot);
-  const tmpDir = c.wave.store.tmpDir(l.project, l.lot);
-  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', express: kind === 'implement' && l.express ? EXPRESS_BRIEF : '', tmp: tmpText(tmpDir), workers: writesCode(kind) ? workersText(c) : '', gate: writesCode(kind) ? gateText(c.config) : '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '' };
-  if (l.visible) {
-    const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
-    vars.news = l.express ? expressNewsText(pwDir) : newsText(l.lot, pwDir);
-    vars.captures = capturesText(pwDir);
-  }
-  if (mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright) vars.shots = shotsText(playwrightDir(c.wave.store.lotDir(l.project, l.lot)));
-  vars.fiche = hasSpecStage(l) ? avalOf(c, kind) : '';
-  // la vérification des ids d'un document de référence sur l'écran fini : la passe ux, ou la revue courte d'un petit lot visible qui n'a que celle-là (comme la conformité, avalOf)
-  if (kind === 'ux' || (kind === 'review-small' && l.small && l.visible)) vars.ux = [vars.ux, referenceIdsText('ux', lotIds({ ...lot, goal: l.goal ?? lot.goal }))].filter(Boolean).join('\n');
-  if (kind === 'probe') Object.assign(vars, probeVars(ficheOf(c), lotCommitLines(c), startSha(c), l.lot));
-  if (kind === 'implement' || kind === 'fix') vars.decisions = decisionsText(humanDecisions(lot, lot.parent ? plan.lots().find((x) => x.id === lot.parent) : undefined));
-  if (kind === 'precheck' && local) vars.lecture = localReading({ ...lot, goal: l.goal ?? lot.goal });
-  if (kind === 'spec') {
-    const reviewed = [...(l.ficheConstats ?? []), ...(l.maquetteConstats ?? [])];
-    const written = ficheOf(c);
-    const back = partsOf(c, written).back;
-    const session = { run: (l.specRuns ?? 0) + 1, max: specBudget(c) };
-    vars.spec = specText({
-      dir: c.config.spec.dir,
-      render: c.config.spec.render,
-      screen: l.screen, light: lightLot(l, lot, c.config.maquette, wd(c), c.config.spec.dir),
-      back,
-      problems: l.specProblems,
-      review: !reviewed.length ? undefined : back ? reviewedSheetText(reviewed, !!l.screen, session) : reviewedText(reviewed, session),
-      template: l.screen ? ficheTemplate() : undefined,
-      templateBack: back || l.screen ? ficheBackTemplate() : undefined,
-    });
-    vars.spec = [vars.spec, referenceIdsText('spec', lotIds({ ...lot, goal: l.goal ?? lot.goal }))].filter(Boolean).join('\n\n');
-    const mine = lotCommitLines(c);
-    if (mine) vars.commits = `Commits of the lot already present (do not redo them; fix or complete the spec from them):\n${mine}`;
-    if (l.pendingAnswer) vars.reponse = l.specAsked?.length ? answeredText(l.specAsked, l.pendingAnswer, ruleIdsSourcedByLead(wd(c), ficheOf(c) ?? '', l.specAskedRules ?? [])) : `Answer from the human to your earlier question: ${l.pendingAnswer}`;
-  }
-  if (kind === 'fiche') {
-    vars.fiche = ficheReviewText({ fiche: ficheOf(c) ?? '', passes: l.fiche?.passes ?? 0, previous: l.ficheConstats });
-    vars.reponse = '';
-  }
-  if (kind === 'maquette') {
-    vars.maquette = maquetteText({ fiche: ficheOf(c) ?? '', passes: l.maquette?.passes ?? 0, max: c.config.maquetteReviews, previous: l.maquetteConstats, light: lightLot(l, lot, c.config.maquette, wd(c), c.config.spec.dir) });
-    vars.reponse = '';
-  }
-  if (kind === 'accept') {
-    const fiche = ficheOf(c) ?? '';
-    const folder = posix.dirname(fiche);
-    vars.accept = acceptText({ fiche, maquette: `${folder}/maquette.html`, screen: !!l.screen, back: !!l.screen && partsOf(c, fiche).back, acceptation: acceptationFile(fiche, l.lot), command: c.config.accept ?? '', test: c.config.test, runner: acceptRunner(), problems: l.acceptProblems });
-    vars.objectif = ''; // l'oracle est écrit depuis la fiche et la maquette seules, pas depuis le texte du lot
-    vars.commits = '';
-    if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
-  }
-  if (kind === 'implement' || kind === 'fix') {
-    const interrupted = [...l.steps].reverse().find((s) => s.kind === kind && s.status === 'interrupted');
-    if (kind === 'fix') {
-      vars.commits = lotCommitLines(c);
-      vars.constats = constatLines(l.constats);
-      if (l.docsFix) {
-        vars.elsewhere = articlesBrief(l.repo, docsConfig(c).articles ?? []);
-        vars.ack = wd(c) === l.repo && histPlan(c).readonly
-          ? `run \`raf docs-ok ${l.lot} --reason "why the documentation stays true"\` (a reason is required): the plan is kept by another tool and is not written, the acknowledgement goes to \`.cadence/docs-ok.yaml\`; then commit that file alone (\`git add -- .cadence/docs-ok.yaml\`; message \`chore(${l.lot}): docs-ok\`).`
-          : wd(c) === l.repo
-          ? `run \`raf docs-ok ${l.lot} --reason "why the documentation stays true"\` (a reason is required), then commit the plan file alone (\`git add -- .cadence/raf.yaml\`, or the path of the plan; message \`chore(${l.lot}): docs-ok\`).`
-          : `this is a worktree, where only the program writes the plan: do not run \`raf docs-ok\` and do not touch the plan file. Make no commit and say under "choix" why the documentation stays true: the lot is handed back to the lead, who acknowledges it in the main checkout (\`raf docs-ok ${l.lot} --reason "…"\`).`;
-      }
-    } else if (interrupted) {
-      const mine = lotCommitLines(c);
-      vars.commits = mine
-        ? `A previous session was interrupted; resume from these commits of the lot already present:\n${mine}`
-        : 'A previous session was interrupted before any commit of the lot; start again from the current state of the repository.';
-    }
-    // La lecture ne va qu'à la première passe implement : la session en cours (« running ») ne compte pas, toute autre passe implement déjà jouée l'exclut.
-    const firstPass = !l.steps.some((s) => s.kind === 'implement' && s.status !== 'running');
-    if (kind === 'implement') vars.commits = precheckBrief(vars.commits, l.precheck, firstPass ? l.precheckLu : undefined);
-    if (l.pendingAnswer) vars.reponse = `Answer from the human to your earlier question: ${l.pendingAnswer}`;
-  }
-  const brief = renderBrief(briefName(l, kind, !!c.integration), vars, c.wave.templates);
-  // Les dépôts tiers (L456) : la consigne s'ajoute à tout brief d'écriture, sans passer par un gabarit (un gabarit modifié change l'empreinte que d'autres tests gardent).
-  return ['implement', 'fix', 'spec', 'accept', 'probe'].includes(kind) ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief;
 }
 
 /** Les dépôts voisins du lot, vus avant et après une session. */
 type Others = { repo: LotRepo; before: Snapshot; after: Snapshot }[];
 
 type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapshot; others: Others };
-
-/** Tokens comptés par les sessions d'un lot (un lot repris compte ses étapes d'avant). */
-export const lotSpent = (l: LotState): number => l.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
-
-/** Le lot a dépensé son propre budget (L78) : il ne compte plus que sur le lead, la vague garde le sien pour les autres. */
-const lotOver = (l: LotState): boolean => l.budget !== undefined && lotSpent(l) >= l.budget - heldForEscalation(l);
-
-/**
- * Coût réservé à l'escalade de modèle (L349) : une correction puis une revue neuve complète, jouées au modèle d'escalade. `lotBudget` l'ajoute au budget dérivé de
- * l'estimate quand `orchestrate.escalation` est déclarée, comme REVIEW_RESERVE paie la dernière passe : sans elle, l'escalade (L337) ne jouait que sur les lots
- * qui avaient peu consommé (cadence L341 494 k / 600 k et L342 572 k / 600 k, rendus « escalade fable non jouée (budget) »). ESTIMATION, aucune mesure : aucune
- * escalade n'a été jouée depuis L337 (le seul journal qui en porte une, cadence L342, l'a laissée non jouée). Elle est déduite des journaux `.cadence/runs` du
- * 2026-10-26 (823 passes fix : p90 67 k ; 1 009 revues complètes : p90 109 k), soit 176 k, arrondis à 175 k, au nombre de tokens comptés du modèle des passes
- * (le comptage ne distingue pas le tarif du modèle). À remesurer sur les premières escalades jouées (`cadence perf`, « Escalade de modèle »).
- */
-export const ESCALATION_RESERVE = 175_000;
-
-/** Part du budget que les passes ordinaires doivent laisser à l'escalade : retenue tant que l'escalade n'est pas engagée (ou écartée), libérée ensuite. */
-export const heldForEscalation = (l: LotState): number => (l.escalation ? 0 : (l.escalationReserve ?? 0));
-
-/**
- * Compteur du lot face au budget de ses passes ordinaires, pour les messages de refus (L349) : la part retenue pour l'escalade en est déduite et nommée
- * (« 6000 / 160999 tokens comptés, 175000 retenus pour l'escalade sur 335999 »), sinon un refus dans cette part contredirait ses propres chiffres ; sans
- * part retenue, le texte d'avant (« 6000 / 335999 tokens comptés »).
- */
-const budgetCount = (l: LotState): string => {
-  const held = heldForEscalation(l);
-  return `${lotSpent(l)} / ${(l.budget ?? 0) - held} tokens comptés${held ? `, ${held} retenus pour l'escalade sur ${l.budget}` : ''}`;
-};
-
-/**
- * Coût réservé à une passe de correction et à la revue courte qui la suit (L145, étendu L218). Réserve fixe de 155 k tokens comptés :
- * p90 d'une passe fix (65 k) plus p90 d'une revue courte Opus (88 k), arrondi. Mesure faite le 2026-10-15 sur les journaux
- * `.cadence/runs` (523 fichiers de lot) : 497 passes fix Sonnet, médiane 45 k, p90 65 k, max 124 k ; 272 revues courtes Opus,
- * médiane 45 k, p90 88 k ; la somme des p90 majore le p90 de la somme, elle n'a pas été recalculée par lot. La réserve de L145 (65 k, revue
- * seule) laissait un lot rendu avant la correction à 740 k / 800 k (warhammer L120) ou 406 k / 450 k (maritime B26.1). Une passe fix ne part
- * que s'il reste de quoi payer la correction ET sa revue ; sinon le lot est rendu avec « correction non jouée (budget) ».
- * Seule exception : des tests rouges après une écriture (work() appelle toFix() sans revue) — la passe fix suivante peut
- * alors être refusée et le lot revient au lead sans revue, avec ses constats.
- */
-export const REVIEW_RESERVE = 155_000;
-
-/** Étapes d'écriture : les seules que le budget du lot borne (`session`), donc les seules qu'il puisse laisser non jouées. */
-const WRITE_STEPS: readonly SessionKind[] = ['implement', 'fix', 'spec', 'accept'];
-
-/**
- * Étape d'écriture que le budget a laissée non jouée (L223), pour un lot rendu au lead sur budget ; null sinon. `stop` vide `next` : l'étape se lit
- * dans l'outcome que `overBudget` écrit (« étape « fix » non jouée »), repli sur `next` s'il est resté. Reconnu par ce texte (aucun marqueur dans
- * l'état) : « correction non jouée (budget) » ou « budget du lot atteint ».
- */
-export function budgetStep(l: LotState): SessionKind | null {
-  if (l.status !== 'handed-back' || !/correction non jouée \(budget\)|budget du lot atteint/.test(l.outcome ?? '')) return null;
-  const named = /étape « ([\w-]+) » non jouée/.exec(l.outcome ?? '')?.[1] as SessionKind | undefined;
-  const step = named ?? l.next;
-  return step && step !== 'integrate' && WRITE_STEPS.includes(step) ? step : null;
-}
-
-/** Le budget du lot paie-t-il la passe de correction et la revue courte qui la suit ? Sans budget de lot : toujours. La part de l'escalade (L349) n'est pas à dépenser, sauf pour décider l'escalade elle-même (`escalating`). `extra` : le coût d'une étape de plus devant elles (la sonde, L497). */
-const fixAffordable = (l: LotState, escalating = false, extra = 0): boolean => l.budget === undefined || lotSpent(l) + extra + REVIEW_RESERVE < l.budget - (escalating ? 0 : heldForEscalation(l));
-
-/** Cause d'une suspension demandée par `--stop-after-current` (L79). */
-export const STOP_REQUESTED = 'arrêt demandé (--stop-after-current)';
-
-/** Le lot a-t-il été écarté de la vague par `--drop` (L79) ? */
-const dropped = (c: LotCtx): boolean => c.wave.store.control().drops.includes(lotKey(c.lot.project, c.lot.lot));
-export const DROPPED = 'retiré de la vague (--drop)';
-
-/** Mention de la réponse du lead restée en attente : un lot rendu sans que la session l'ait lue le dit (comme overBudget). */
-const unplayedAnswer = (l: LotState): string => (l.pendingAnswer ? ` ; la réponse du lead (« ${l.pendingAnswer} ») n'a pas été jouée` : '');
-
-/** Pourquoi plus aucune session ne doit partir (incident, quota, budget), sinon null. */
-function halted(w: WaveCtx, lot?: LotState): string | null {
-  if (w.store.control().stopAfterCurrent) return STOP_REQUESTED;
-  if (w.incident) return `vague arrêtée : ${w.incident}`;
-  if (lot && w.dirtyRepos) {
-    for (const r of lotRepoPaths(lot)) {
-      const by = w.dirtyRepos.get(r);
-      if (by && w.movedRepos?.has(r)) return `dépôt ${r} laissé en HEAD déplacé par ${by} : à remettre sur sa branche par le lead avant de reprendre`;
-      if (by) return `dépôt ${r} sali par la revue de ${by} : à nettoyer par le lead avant de reprendre`;
-    }
-  }
-  if (w.quota.hit) return 'quota atteint';
-  if (w.budget.exhausted) return 'budget atteint';
-  return null;
-}
 
 /** Modèle d'une revue (L108) : la revue légère d'un lot léger tant qu'aucune correction n'a eu lieu, sinon la revue complète (UX comprise). */
 function reviewModel(c: LotCtx, kind: SessionKind): AnyModel {
@@ -1289,43 +774,12 @@ function lostVerdict(c: LotCtx, kind: SessionKind, report: unknown): string {
   return ` ; ${text}`;
 }
 
-/**
- * Budget du lot atteint avant une session d'écriture : le lot est rendu au lead (reprendre ne lui rendrait pas de budget), les autres continuent.
- * `reserve` : le budget n'est pas dépensé, mais la passe fix ne laisserait pas de quoi rejouer la revue (L145).
- */
-function overBudget(c: LotCtx, reserve = false): null {
-  const l = c.lot;
-  // Une réponse du lead encore en attente n'a pas été consommée : elle ne doit pas se perdre sans qu'on le dise.
-  const answer = l.pendingAnswer ? ` ; la réponse du lead (« ${l.pendingAnswer} ») n'a pas été jouée` : '';
-  const basis = hasSpecStage(l) ? 'estimate et étape spec' : "dérivé de l'estimate";
-  const why = reserve ? `budget du lot : ${budgetCount(l)} (${basis}), il ne reste pas de quoi payer la correction et la revue courte qui la suivrait (${REVIEW_RESERVE} réservés)` : `budget du lot atteint (${budgetCount(l)}, ${basis})`;
-  // Tests rouges après une écriture : la passe fix refusée aurait suivi, le lot revient sans revue (L145) — la cause le dit.
-  const red = l.next === 'fix' && l.constats.some((k) => k.source === 'tests');
-  // Passe d'écriture qui vient d'être jouée, nommée d'après le compteur : l.pass - 1 passes de correction l'ont précédée (minorPass reste vrai après la passe des mineurs). Sans passe jouée, un lot repris déjà revu compte ses tests rouges depuis la revue de sa branche ; jamais revu (L315), c'est l'implémentation qui les a laissés.
-  const played = l.pass - 1;
-  const after = l.minorPass && played === (l.minorPassAt ?? 0) ? 'la passe des mineurs' : played > 0 ? `la passe fix ${played}` : l.resumedFrom && l.resumedReviewed ? 'la dernière revue de la branche reprise' : "l'implémentation";
-  const notPlayed = l.next === 'fix' ? 'correction non jouée (budget) : ' : '';
-  const prefix = notPlayed + (red ? `tests rouges après ${after}, correction suivante non abordable : ` : '');
-  const unreviewed = red ? ' ; le lot revient sans revue, avec ses constats' : '';
-  return stop(c, 'handed-back', `${prefix}${why} : étape « ${l.next ?? '?'} » non jouée${answer}${unreviewed}, à décider par le lead`);
-}
-
-function suspend(c: LotCtx, why: string): null {
-  transition(c, 'suspended', why);
-  return null;
-}
-
 function summarize(rep: ReviewReport, head: string, repoHeads?: Record<string, string>): ReviewSummary {
   // Rien d'un rapport n'est cru sur parole : un constat de gravité majeure compte même si les totaux annoncés disent 0.
   const count = (g: string) => rep.constats.filter((k) => k.gravite === g).length;
   const bloquants = Math.max(rep.bloquants, count('bloquant'));
   const majeurs = Math.max(rep.majeurs, count('majeur'));
   return { conforme: bloquants === 0 && majeurs === 0, bloquants, majeurs, mineurs: Math.max(rep.mineurs, count('mineur')), verdict: rep.verdict.trim(), sousTaches: rep.sousTaches, nonVerifie: rep.nonVerifie, head, ...(repoHeads ? { repoHeads } : {}) };
-}
-
-function propose(c: LotCtx, text: string, head?: string): void {
-  if (!c.lot.proposals.includes(text)) c.lot.proposals.push(text);
-  if (head) (c.lot.proposalHeads ??= {})[text] ??= head;
 }
 
 const minorLine = (source: string, k: { fichier?: string; ligne?: number; texte: string }) => `[mineur ${source}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`;
@@ -1584,9 +1038,6 @@ function sourceAnsweredRules(c: LotCtx): boolean {
   }
 }
 
-/** Plafond de sessions `spec` du lot (L230) : les revues de maquette d'un lot à écran, sinon deux. Fiche et maquette partagent `l.specRuns`. */
-const specBudget = (c: LotCtx): number => (c.lot.screen && c.config.maquette ? c.config.maquetteReviews : 2);
-
 /**
  * Étape spec (L171, spec etape-spec S3) : la session écrit maquette, captures et fiche dans `<spec.dir>/<écran>/`, le programme
  * en relève les écarts (une seconde passe, puis le lot est rendu), une hypothèse coûteuse à défaire devient une question au lead,
@@ -1693,65 +1144,6 @@ async function settleHypotheses(c: LotCtx): Promise<boolean> {
     return false;
   }
   return noteHypotheses(c, hypothesisLines(doc), typeof doc.sujet?.id === 'string' ? doc.sujet.id : posix.basename(posix.dirname(fiche)));
-}
-
-/**
- * Pose en note du lot une ligne par hypothèse de la fiche (rien de plus que ce que la note dit déjà : une reprise ne duplique pas) et la commite avec le
- * plan. Un plan tenu par un autre outil (lecture seule) ne reçoit rien : la ligne devient une proposition rendue au lead. Rend vrai quand le lot est rendu.
- */
-async function noteHypotheses(c: LotCtx, lines: string[], sujet: string): Promise<boolean> {
-  const l = c.lot;
-  l.hypotheses = lines;
-  if (!lines.length) return false;
-  const texts = lines.map((x) => hypothesisNote(sujet, x));
-  const dirty = await planWrite(c, async () => {
-    const plan = c.loadPlan();
-    if (plan.readonly) {
-      for (const t of texts) propose(c, `[note à poser] ${t}`);
-      return null;
-    }
-    const have = new Set(plan.lot(l.lot).notes.map((n) => n.text));
-    const fresh = texts.filter((t) => !have.has(t));
-    if (!fresh.length) return null;
-    const before = planBefore(c);
-    for (const t of fresh) plan.note(l.lot, t, c.wave.today);
-    plan.save();
-    return commitPlan(c, planMessage(c, PLAN_ACTIONS.hypotheses(sujet)), c.lot.repo, before);
-  });
-  if (dirty) {
-    handBackPlan(c, `${HYPOTHESES_HANDBACK}${dirty}`);
-    return true;
-  }
-  return false;
-}
-
-/**
- * Les mineurs de la revue de la fiche vont en notes du lot (spec etape-spec-back § 4), pas au tableau de fin de vague : une note par constat, sans doublon
- * à la reprise, commitée avec le plan. Un plan en lecture seule ne reçoit rien : la ligne devient une proposition `[note à poser]` rendue au lead.
- * Rend vrai quand le lot est rendu (arbre sale).
- */
-async function noteMinors(c: LotCtx, rep: ReviewReport, label: string): Promise<boolean> {
-  const texts = rep.constats.filter((k) => k.gravite === 'mineur').map((k) => `Revue de ${label} — mineur : ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`);
-  if (!texts.length) return false;
-  const dirty = await planWrite(c, async () => {
-    const plan = c.loadPlan();
-    if (plan.readonly) {
-      for (const t of texts) propose(c, `[note à poser] ${t}`);
-      return null;
-    }
-    const have = new Set(plan.lot(c.lot.lot).notes.map((n) => n.text));
-    const fresh = [...new Set(texts)].filter((t) => !have.has(t));
-    if (!fresh.length) return null;
-    const before = planBefore(c);
-    for (const t of fresh) plan.note(c.lot.lot, t, c.wave.today);
-    plan.save();
-    return commitPlan(c, planMessage(c, PLAN_ACTIONS.minors(label)), c.lot.repo, before);
-  });
-  if (dirty) {
-    handBackPlan(c, `${MINORS_HANDBACK}${label} : ${dirty}`);
-    return true;
-  }
-  return false;
 }
 
 /** Ce qui distingue les deux revues de la spec : la fiche back relue par code-reviewer (L188), la maquette relue par ux-reviewer (L172). */
@@ -2656,86 +2048,6 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
     }
   }
   return null;
-}
-
-/**
- * Les fichiers que le cycle a le droit de commiter dans `repo` : le plan, ce qui est tenu avec lui, et les acceptation.json (L173), où il pose le scellé et `vert: true`.
- * Source commune de `commitPlan` et de `foreignDirty`.
- */
-function planOwnFile(c: LotCtx, repo: string): (f: string) => boolean {
-  const plan = c.loadPlan();
-  const own = new Set([relative(repo, plan.path), ...plan.maintained]);
-  const specDir = `${c.config.spec.dir.replace(/\/+$/, '')}/`;
-  return (f) => own.has(f) || (f.startsWith(specDir) && isAcceptationFile(f));
-}
-
-/** Les fichiers suivis modifiés du dépôt du projet qui ne sont ni le plan, ni ce qui est tenu avec lui, ni une acceptation : ce que `commitPlan` refuserait (R26). */
-function foreignDirty(c: LotCtx): string[] {
-  const ownFile = planOwnFile(c, c.lot.repo);
-  return trackedDirty(c.lot.repo).filter((f) => !ownFile(f));
-}
-
-/** Pourquoi le dépôt du lead n'est plus celui que l'intégration a vu au départ : branche changée ou HEAD détaché (R24), fichier suivi modifié (R8). Null s'il est intact. */
-function leadMoved(repo: string, base: string): string | null {
-  const cur = repoBranch(repo);
-  if (cur !== base) return `le dépôt est sur ${cur ?? 'HEAD détaché'} et non sur ${base}`;
-  const dirty = trackedDirty(repo);
-  return dirty.length ? `arbre du dépôt modifié (${dirty.join(', ')})` : null;
-}
-
-/** Un refus d'écrire le plan par Plan.save() (plan.onWrite en échec, L346) est la cause d'un lot rendu, pas une erreur du lot. */
-async function refusal(write: () => Promise<string | null>): Promise<string | null> {
-  try {
-    return await write();
-  } catch (e) {
-    if (e instanceof RafError) return e.message;
-    throw e;
-  }
-}
-
-/** Une écriture de plan du programme (R21, R26) : sous la file et le verrou du dépôt, le dépôt encore sur la branche de départ, aucun fichier suivi modifié hors plan. Rend la cause du refus, null si l'écriture a eu lieu. Hors worktree, rien ne change. */
-async function planWrite(c: LotCtx, doWrite: () => Promise<string | null>): Promise<string | null> {
-  const write = () => refusal(doWrite);
-  if (!c.tree) return write();
-  const l = c.lot;
-  const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, c.wave.integrate);
-  if (!grant.ok) return `écriture du plan refusée : verrou tenu par ${grant.holder.wave} (pid ${grant.holder.pid})`;
-  try {
-    const cur = repoBranch(l.repo);
-    if (cur !== c.tree.base) return `écriture du plan refusée : dépôt sur ${cur ?? 'HEAD détaché'} et non ${c.tree.base}`;
-    const foreign = foreignDirty(c);
-    if (foreign.length) return `écriture du plan refusée : arbre du dépôt modifié (${foreign.join(', ')})`;
-    return await write();
-  } finally {
-    grant.release();
-  }
-}
-
-/** Début de la cause d'un lot rendu sur le refus d'écrire les notes d'hypothèses de sa fiche, et des mineurs de la revue de sa fiche (handBackPlan). */
-export const HYPOTHESES_HANDBACK = 'notes des hypothèses de la fiche : ';
-const MINORS_HANDBACK = 'notes des mineurs de la revue de ';
-
-/**
- * Lot rendu sur une écriture de plan refusée hors intégration (R26) : en worktree il garde l'étape atteinte (`next`), et `--resume --replay` le rejoue à cette étape
- * (décision du lead du 24-10). Aucun champ d'état : la cause rendue le désigne.
- */
-export const planNoteHandBack = (l: LotState): boolean => l.status === 'handed-back' && l.next !== null && l.next !== undefined && !!l.outcome && (l.outcome.startsWith(HYPOTHESES_HANDBACK) || l.outcome.startsWith(MINORS_HANDBACK));
-
-/**
- * Un lot rendu hors de l'étape d'intégration (budget, revue non conforme…) que le lead a fait corriger puis revoir hors vague (L370) : sa revue de code du plan
- * porte le dernier commit de travail du lot dans son worktree, donc rien n'a été commité après elle. Rend le sha relu et le verdict du lead, ou null.
- */
-export function leadReviewedHandBack(l: LotState, plan: Plan, treeDir: string): { head: string; verdict: string } | null {
-  if (l.status !== 'handed-back' || l.next === 'integrate' || planNoteHandBack(l) || !existsSync(join(treeDir, '.git'))) return null;
-  const review = plan.lots().find((x) => x.id === l.lot)?.review;
-  const tip = lotWork(plan, treeDir, l.lot)[0]?.sha;
-  return review?.commit && tip && review.commit === tip ? { head: tip, verdict: review.verdict } : null;
-}
-
-/** Une écriture de plan refusée rend le lot au lead ; en worktree, il garde l'étape atteinte pour la reprise (R26), sinon `stop` la vide comme avant. */
-function handBackPlan(c: LotCtx, why: string): void {
-  if (c.tree) transition(c, 'handed-back', why);
-  else stop(c, 'handed-back', why);
 }
 
 /** Ce qui sépare le verdict de la revue du lot de celui de sa revue courte du diff rebasé (R17). */

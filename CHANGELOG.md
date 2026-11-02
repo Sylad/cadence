@@ -87,6 +87,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Added
 
 - Rich plans, planned window (L466, `docs/raf.md`, `docs/session.md`; gap M4 of the maritime-atlas migration study): a lot carries `planned: { from, to }` (`raf plan <lot> J1..J2`, `--clear`, `raf add --planned`), a sub-lot inherits its parent's window, `plan.requirePlanned: true` makes `raf add` refuse a lot with no window, and `raf plan --propose [--per-day n] [--from J] [--apply]` lays the lots `todo` that have none on working days (ready lots first) and writes them in one plan write. `session start` reads the late lots and the deadlines of the week, `raf show`, `raf list --json`, `raf check` (a sub-lot outside its parent's window) and the Gantt page read the window. `plan.requirePlanned` is checked by `raf add` alone (not by `config set` nor the program's own lots), and `--propose` gives no window of its own to a sub-lot whose parent is to be placed.
+### Changed
+
+- `orchestrate/cycle.ts` is split, first part (L490, C1a of `docs/mesures/audit-simplification-l461.md`): the context, the budget, the session briefs and the plan writes move to `src/orchestrate/cycle/` (`ctx`, `budget`, `brief`, `plan-writes`), `cycle.ts` stays the entry point and re-exports their public names. No change of behaviour; the `max-lines` baseline of `cycle.ts` goes from 2360 to 1893.
 
 ## [1.43.0] - 2026-11-02
 

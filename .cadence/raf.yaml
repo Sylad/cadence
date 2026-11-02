@@ -919,11 +919,12 @@ lots:
     finished: 2026-10-31
   - id: L482
     title: "verify --gate n'hérite pas le verdict du parent sous un commit de plan seul quand le code du projet lit le fichier de plan (détecter le chemin du plan cité dans les sources/tests, ou avertir à orchestrate --dry-run / lead tour : « le code lit le plan, gate.readsPlan absent ») — 31-10 : codex sans readsPlan, deux builds Cloudflare rouges (titres publics L50, L58) derrière une porte « verte » héritée"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-31
     started: 2026-11-02
     review: { date: 2026-11-02, verdict: "conforme : 3 notes mineures (R5 ne peut pas échouer, assistants de test dupliqués, une phrase de deliver.md à mettre à jour) — orchestré (vague 2026-11-02-1530-cont, 2 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main n'a rien cassé dans le changement du lot. Le seul effet du rebase est l'entrée CHANGELOG, qu'af82d6c a correctement replacée sous [Unreleased] après la publication de la 1.41.0. src/verify-gate.ts, les deux fichiers de test et docs/deliver.md / docs/orchestrate.md sont inchangés par le rebase. Le parent des commits du lot reste 46cdb892, dernier commit de main sur verify-gate.ts.", commit: 42dbbe782d45d6a45870e00455a331133bc6c37d }
+    finished: 2026-11-02
   - id: L483
     title: "Nettoyage A1 : retirer « export » des symboles jamais importés dans src/ hors ref/ (knip) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § A ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: done

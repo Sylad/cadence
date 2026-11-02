@@ -1419,9 +1419,10 @@ lots:
     created: 2026-11-02
   - id: L531
     title: "Équité entre vagues : un créneau qui se libère va d'abord à la session qui attend déjà dans une autre vague (étape suivante d'un lot en cours), avant tout nouveau tirage de --continue — 02-11 : la revue de maritime E-GL5.13 attendait (3/3 pris par la vague --continue) pendant que le remplissage pouvait tirer un lot d'app de rang inférieur ; respecter aussi l'ordre de priority: entre les vagues"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-02
+    started: 2026-11-02
   - id: L532
     title: "Intégrer un lot rendu puis repris par le lead (revue conforme dans son worktree) pendant que SA vague tourne encore : --resume --integrate est refusé (« la vague … tourne encore ») et, avec --continue, la vague peut durer des heures ; déposer l'intégration comme un --add, jouée entre deux étapes — vu le 02-11 sur L527 puis L435"
     status: todo

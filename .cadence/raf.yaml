@@ -984,6 +984,7 @@ lots:
     created: 2026-10-31
     started: 2026-11-02
     docs_ok: { date: 2026-11-02, reason: "découpage interne de cli.ts en modules, commandes et sorties inchangées" }
+    review: { date: 2026-11-02, verdict: "conforme — orchestré (vague 2026-11-02-1825-cad, 2 passe(s) de correction + passe des mineurs)", commit: 92d7ba466e29397ba7d2b843a2fdcb9b860548de, reporte: { de: fa8fcbe97be74504574df3f281f1817366cc31e7, vers: 92d7ba466e29397ba7d2b843a2fdcb9b860548de, patchId: 8eee7ed2e1f7df047b6ce5e224a7ed039479131c } }
   - id: L489
     title: "Découpage C2 : orchestrate/command.ts en modules (arguments, budget, preflight, dry-run, status, resume) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C2 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: todo

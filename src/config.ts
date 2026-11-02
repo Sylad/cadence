@@ -104,8 +104,7 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   if (p.files != null) settings.files = list(p.files);
   if (p.onWrite != null) settings.onWrite = readOnWrite(p.onWrite, root ?? dirname(resolve(file)), bad);
   if (FORMAT_KEYS.some((k) => p[k] != null)) settings.format = parseFormat(p, bad);
-  Object.assign(settings, parseStates(p, bad, settings.format !== undefined));
-  Object.assign(settings, readExtras(p.extras, !!settings.format, bad));
+  Object.assign(settings, parseStates(p, bad, settings.format !== undefined), readExtras(p.extras, !!settings.format, bad));
   if (p.path != null && String(p.path).trim() === '') throw bad('path est vide');
   if (p.add != null && (typeof p.add !== 'string' || !p.add.includes('{title}'))) throw bad('add doit être une commande qui contient {title}');
   if (p.commit != null) {
@@ -180,10 +179,9 @@ export function readNewsConfig(file: string): NewsConfig {
   if (n == null) return {};
   if (!isObject(n)) throw new RafError(`${file} : news doit être un objet { publicTitleMax }`);
   for (const k of Object.keys(n)) if (k !== 'publicTitleMax') throw new RafError(`${file} : news.${k} inconnu (attendu : publicTitleMax)`);
-  const max = n.publicTitleMax;
-  if (max == null) return {};
-  if (typeof max !== 'number' || !Number.isInteger(max) || max < 1) throw new RafError(`${file} : news.publicTitleMax : nombre entier de caractères (≥ 1) attendu`);
-  return { publicTitleMax: max };
+  if (n.publicTitleMax == null) return {};
+  if (typeof n.publicTitleMax !== 'number' || !Number.isInteger(n.publicTitleMax) || n.publicTitleMax < 1) throw new RafError(`${file} : news.publicTitleMax : nombre entier de caractères (≥ 1) attendu`);
+  return { publicTitleMax: n.publicTitleMax };
 }
 
 interface HookConfig {

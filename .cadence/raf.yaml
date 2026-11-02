@@ -1469,7 +1469,7 @@ lots:
     estimate: 0.25
     created: 2026-11-02
     started: 2026-11-02
-    review: { date: 2026-11-02, verdict: "conforme : ordre d'archive des ids libres et garde des ids du préfixe rétablis, placeRanked linéaire (999815e) avec ordre de sortie identique, tsc, cliquet et suite complète verts", commit: 999815e19144c29fd4613284854b5b560f092436 }
+    review: { date: 2026-11-02, verdict: "conforme : rebasé sur 1.42.0, reopenArchived déplacé sans changement de comportement, plan.ts sous sa base, tsc, cliquet et suite complète verts", commit: e7817ebf630944870899789435aad5cd30cfa310 }
   - id: L537
     title: "docs.sync rend « documentation en retard » un lot de nettoyage ou découpage interne déclaré sans changement de comportement (02-11 : L485, L486, L487, un cycle de vague perdu chaque fois, acquittement à la main) : ne pas exiger de doc quand le diff ne change ni commande, ni clé, ni sortie (ou laisser le libraire acquitter dans le worktree), avec un test"
     status: todo

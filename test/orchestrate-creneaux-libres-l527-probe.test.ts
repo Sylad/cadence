@@ -131,9 +131,9 @@ describe('L527 probe — bords du remplissage des créneaux libres', () => {
 
   it('--priority explicite : l’ordre du tirage suit la ligne de commande, pas le cadence.yaml parent', async () => {
     const parent = parentWith(['a', 'b', 'c']);
-    const s = scene(parent, 'a', async (store) => {
-      await wait(() => store.readLot('c', 'L1')?.status === 'ready' || store.readLot('b', 'L1')?.status === 'ready');
-      await new Promise((r) => setTimeout(r, 100));
+    // a tient son créneau jusqu'à ce que c ait été tiré : l'événement attendu est le tirage, pas un état transitoire du lot ni un délai
+    const s: ReturnType<typeof scene> = scene(parent, 'a', async () => {
+      await wait(() => s.played.some((p) => p.startsWith('c:')));
     });
     await orchestrate(['--continue', '--max-sessions', '2', '--priority', 'c,b,a'], io(parent).io, s.d);
     const j = journal(parent);

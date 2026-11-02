@@ -50,4 +50,19 @@ describe('L529 — coût en euros au tableau de fin de vague et de reprise', () 
     expect(rows).toHaveLength(2);
     expect(again.out).toMatch(/^vague .*\d+,\d\d €/m);
   });
+
+  it('R13 bis — une reprise dont --drop retire le seul lot à rejouer (rien à relancer) imprime aussi la colonne € et le total', async () => {
+    const { parent } = setup();
+    writeFileSync(join(parent, 'cadence.yaml'), PRICES);
+    const first = await run(parent, ['a:L1', '--budget', '1000'], fake({ implement: writes(meeting(1)) }));
+    expect(first.code).toBe(3);
+    const g = fake();
+    const again = await run(parent, ['--resume', WAVE, '--drop', 'a:L1', '--budget', '5M'], g);
+    expect(again.code).toBe(1);
+    expect(g.calls).toHaveLength(0); // aucune session rejouée : le tableau vient de la branche de reprise sans lot vivant
+    const rows = tableRows(again.out);
+    expect(rows).toHaveLength(1);
+    for (const row of rows) expect(row).toMatch(/\d+,\d\d €/);
+    expect(again.out).toMatch(/^vague .*\d+,\d\d €/m);
+  });
 });

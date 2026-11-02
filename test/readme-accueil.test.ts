@@ -87,7 +87,8 @@ describe('README en page d’accueil (L232)', () => {
   });
 
   it('R9 — aucun renvoi en texte du code ni des gabarits ne pointe vers une section déplacée du README', () => {
-    const cli = read('src/cli.ts');
+    // cli.ts ne garde que le dispatch : les textes d'aide vivent dans les modules de src/cli/
+    const cli = ['src/cli.ts', ...readdirSync(join(root, 'src/cli')).filter((f: string) => f.endsWith('.ts')).map((f: string) => `src/cli/${f}`)].map((p: string) => read(p)).join('\n');
     expect(cli).not.toMatch(/« cadence\.yaml » dans le README/);
     expect(cli).toContain('docs/deliver.md');
     expect(cli).not.toMatch(/correspondance des champs, voir le README/);

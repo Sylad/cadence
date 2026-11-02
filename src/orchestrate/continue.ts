@@ -185,6 +185,12 @@ export function handedBackStreak(all: LotState[]): number {
   return n;
 }
 
+/** Les lots que le créneau libre peut recevoir, leurs ressources, et le budget qui leur reste une fois celui des lots qui jouent réservé. */
+export interface FillPlan {
+  targets: Array<Target & { uses: string[] }>;
+  room: number;
+}
+
 export interface FillFacts {
   args: Pick<Args, 'priority' | 'untilAt'>;
   io: Pick<OrchestrateIo, 'now'>;
@@ -201,18 +207,19 @@ export interface FillFacts {
 /**
  * L527 : les lots que le créneau libre d'une vague `--continue` peut recevoir, dans l'ordre de priorité : ceux du plan que `candidates` tire (hors lots de la vague) et dont aucune ressource
  * n'est prise (`readyFree` : lots en cours, vagues vivantes dont celle-ci). Vide quand une borne de `stopReason` joue (arrêt demandé, limite d'usage, question, deux lots rendus de suite, `--until`, budget).
- * Le budget que les lots qui jouent encore n'ont pas dépensé reste réservé : le lot suivant doit tenir dans le reste.
+ * Le budget que les lots qui jouent encore n'ont pas dépensé reste réservé : le lot suivant doit tenir dans le reste (`room`, que `AddFeed.fill` décompte de chaque lot qu'il prend, comme les ressources `uses`).
  */
-export function fillTargets(f: FillFacts): Target[] {
+export function fillTargets(f: FillFacts): FillPlan {
   const reserved = f.all.filter((l) => !lotFinished(l)).reduce((n, l) => n + Math.max(0, (l.budget ?? 0) - l.steps.reduce((t, s) => t + (s.tokens?.counted ?? 0), 0)), 0);
   const remaining = f.budget.limit - f.budget.consumed - reserved;
   const why = stopReason({ now: f.io.now(), until: f.args.untilAt, quotaHit: f.quotaHit, questions: f.all.filter((l) => l.status === 'question').length, streak: handedBackStreak(f.all), interrupted: f.incident, stopRequested: f.store.control().stopAfterCurrent, remaining });
-  if (why) return [];
+  if (why) return { targets: [], room: 0 };
   const dirs = isProject(f.launch) ? [f.launch] : findProjects(f.launch);
   const libres = readyFree(dirs, f.home);
   const exclude = new Set(f.all.map((l) => lotKey(l.project, l.lot)));
-  return candidates(f.launch, { priority: f.args.priority ?? readPriority(f.launch), exclude, remaining }).flatMap((c) => {
+  const targets = candidates(f.launch, { priority: f.args.priority ?? readPriority(f.launch), exclude, remaining }).flatMap((c) => {
     const repo = gitRoot(c.dir);
-    return repo && libres.get(c.dir)?.some((l) => l.id === c.lot.id) ? [{ project: c.project, projectDir: c.dir, repo, lot: c.lot.id, model: 'sonnet' as const }] : [];
+    return repo && libres.get(c.dir)?.some((l) => l.id === c.lot.id) ? [{ project: c.project, projectDir: c.dir, repo, lot: c.lot.id, model: 'sonnet' as const, uses: c.lot.uses ?? [] }] : [];
   });
+  return { targets, room: remaining };
 }

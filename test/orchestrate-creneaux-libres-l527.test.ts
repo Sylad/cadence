@@ -74,6 +74,13 @@ function scene(parent: string, holder: string, hold: (store: RunStore) => Promis
   return { d, played, maxIn, maxAll: () => maxAll };
 }
 
+/** Les tirages du journal avant que le premier lot tiré soit prêt : ce qu'un même remplissage a engagé à la fois. */
+const drawnTogether = (parent: string): number => {
+  const lines = journal(parent).split('\n');
+  const firstReady = lines.findIndex((l) => l.includes('→ ready'));
+  return lines.slice(0, firstReady).filter((l) => l.includes('(créneau libre)')).length;
+};
+
 const journal = (parent: string) => readFileSync(join(RunStore.last(parent)!.dir, 'journal.log'), 'utf8');
 
 describe('L527 — --continue remplit seul les créneaux libres', () => {
@@ -159,5 +166,49 @@ describe('L527 — --continue remplit seul les créneaux libres', () => {
     });
     await orchestrate(['--continue', '--max-sessions', '2', '--budget', String(2 * lotBudget(1) + 1)], io(parent).io, s.d);
     expect(cStatus).toBe('absent');
+  });
+
+  it("R7 — deux créneaux libres à la fois : deux lots qui veulent la même ressource ne sont pas tirés ensemble", async () => {
+    const parent = parentWith(['a', 'b', 'c'], {}, { b: ['banc'], c: ['banc'] }, 'resources: [banc]\n');
+    const s = scene(parent, 'a:L1', async (store) => {
+      await wait(() => store.readLot('b', 'L1')?.status === 'ready');
+      await new Promise((r) => setTimeout(r, 200));
+    });
+    expect(await orchestrate(['a:L1', '--continue', '--max-sessions', '3'], io(parent).io, s.d)).toBe(0);
+    expect(s.played.sort()).toEqual(['a:L1', 'b:L1', 'c:L1']);
+    expect(drawnTogether(parent)).toBe(1); // le second lot du banc attend que le premier soit prêt
+  });
+
+  it("R8 — deux créneaux libres à la fois : le budget réservé se décompte d'un lot tiré à l'autre", async () => {
+    const parent = parentWith(['a', 'b', 'c']);
+    const s = scene(parent, 'a:L1', async (store) => {
+      await wait(() => store.readLot('b', 'L1')?.status === 'ready' && store.readLot('c', 'L1')?.status === 'ready');
+    });
+    // Le budget tient trois lots moins un demi : a réservé, il reste la place d'un seul lot de plus à la fois.
+    await orchestrate(['a:L1', '--continue', '--max-sessions', '3', '--budget', String(Math.floor(2.5 * lotBudget(1)))], io(parent).io, s.d);
+    expect(drawnTogether(parent)).toBe(1);
+  });
+
+  it("R9 — un seul dépôt en worktrees : le lot donné seul joue dans son worktree, le créneau libre reçoit le lot suivant pendant qu'il joue", async () => {
+    const parent = parentWith(['a'], { a: 3 });
+    const dir = join(parent, 'a');
+    writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n  worktrees: true\n');
+    git(dir, 'add', '--', 'cadence.yaml');
+    git(dir, 'commit', '-q', '-m', 'chore: worktrees');
+    let l2During = 'absent';
+    const claude: ClaudeFn = async (args, o) => {
+      const kind = kindOf(args);
+      if (kind !== 'implement' && kind !== 'fix') return claudeOut(reviewReport());
+      const lot = /on lot `([^`]+)`/.exec(args[1])![1];
+      if (lot === 'L1') {
+        const store = RunStore.last(dir)!;
+        await wait(() => store.readLot('a', 'L2')?.status === 'ready');
+        l2During = 'ready';
+      }
+      return claudeOut(workReport({ commits: [commitFile(o.cwd, `f-${lot}.txt`, `feat(${lot}): travail`)] }));
+    };
+    const d: OrchestrateDeps = { claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR, slotPollMs: 20 };
+    await orchestrate(['L1', '--continue', '--max-sessions', '2'], io(dir).io, d);
+    expect(l2During).toBe('ready');
   });
 });

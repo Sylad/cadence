@@ -1,5 +1,6 @@
 import { basename, join, relative, resolve } from 'node:path';
 import type { Args, OrchestrateDeps, OrchestrateIo, Target } from './command.js';
+import type { FillPlan } from './continue.js';
 import type { LotCtx, WaveCtx } from './cycle.js';
 import { lotFinished, lotKey, lotRepoPaths, type LotState, type RunStore, type WaveState } from './state.js';
 import { cadenceHome, liveWaves } from './registry.js';
@@ -239,11 +240,11 @@ export class AddFeed {
   }
 
   /** Le contexte d'un lot tiré du plan : celui gardé (recontrôlé : arrêt, budget, lot fini) ou celui que le contrôle préalable construit ; null quand il est refusé ou ne tient pas (L527). */
-  private async control(t: Target, key: string, badRepos: Set<string>): Promise<LotCtx | null> {
+  private async control(t: Target, key: string, badRepos: Set<string>, room: number): Promise<LotCtx | null> {
     const e = this.e;
     const kept = this.drawn.get(key);
     if (kept) {
-      if (kept.lot.budget! <= e.budgetLeft() && !e.planState(kept)) return kept;
+      if (kept.lot.budget! <= Math.min(e.budgetLeft(), room) && !e.planState(kept)) return kept;
       this.drawn.delete(key);
       return null;
     }
@@ -256,24 +257,27 @@ export class AddFeed {
       for (const r of built.refusals) this.say(`continue : lot sauté — ${r}`);
       return null;
     }
-    return built.ctx.lot.budget! <= e.budgetLeft() ? built.ctx : null;
+    return built.ctx.lot.budget! <= Math.min(e.budgetLeft(), room) ? built.ctx : null;
   }
 
   /**
-   * L527 : remplit au plus `free` créneaux libres avec les lots prêts du plan (`targets`, déjà dans l'ordre de priorité et filtrés sur les ressources libres), chacun contrôlé comme un lot ajouté.
+   * L527 : remplit au plus `free` créneaux libres avec les lots prêts du plan (`plan.targets`, déjà dans l'ordre de priorité et filtrés sur les ressources libres), chacun contrôlé comme un lot ajouté.
+   * Ce qu'un lot pris engage est décompté avant le suivant : son budget du `plan.room`, ses ressources `uses` (un lot qui veut une ressource que ce remplissage vient de prendre attend la lecture suivante).
    * Un lot dont le dépôt est pris par un lot qui joue (`canRun`) est gardé pour la lecture suivante, le lot d'un autre dépôt passe devant ; un lot refusé est sauté pour la vague, dit au journal ;
    * un lot que le budget restant ne tient pas n'est ni pris ni écarté (un moins cher peut passer, ou le tour suivant).
    */
-  async fill(targets: Target[], free: number, canRun: (c: LotCtx) => boolean): Promise<LotCtx[]> {
+  async fill(plan: FillPlan, free: number, canRun: (c: LotCtx) => boolean): Promise<LotCtx[]> {
     const e = this.e;
     const added: LotCtx[] = [];
     const badRepos = new Set<string>();
-    for (const t of targets) {
+    const taken = new Set<string>();
+    let room = plan.room;
+    for (const t of plan.targets) {
       const key = lotKey(t.project, t.lot);
       if (added.length >= free || e.stopCause()) break;
       if (this.refused.has(key)) continue;
-      if (badRepos.has(t.repo)) continue;
-      const c = await this.control(t, key, badRepos);
+      if (badRepos.has(t.repo) || t.uses.some((r) => taken.has(r))) continue;
+      const c = await this.control(t, key, badRepos, room);
       if (!c) continue;
       if (!canRun(c)) {
         this.drawn.set(key, c);
@@ -288,6 +292,8 @@ export class AddFeed {
       e.wctx.log(`continue : tire ${key} (créneau libre)`);
       this.admit(null, c);
       added.push(c);
+      room -= c.lot.budget!;
+      for (const r of t.uses) taken.add(r);
     }
     if (added.length) e.announce();
     return added;

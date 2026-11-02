@@ -976,15 +976,15 @@ function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[], wctx:
 
 /**
  * Quels lots jouent dans un worktree (L279). Un groupe de lots du même dépôt (`groupLots`) y joue si `orchestrate.worktrees` est vrai, s'il a au moins deux lots,
- * si le dépôt est sur une branche et si aucun de ses lots n'a de dépôt voisin (`repos:`, R2) ; sinon les lots restent à la suite, avec un avertissement qui dit pourquoi.
+ * (ou, pour une vague `--continue` à plusieurs créneaux, `fillable` : le lot seul d'un dépôt y joue aussi, pour que le créneau libre reçoive le lot suivant du même dépôt, L527), si le dépôt est sur une branche et si aucun de ses lots n'a de dépôt voisin (`repos:`, R2) ; sinon les lots restent à la suite, avec un avertissement qui dit pourquoi.
  * Un lot dont la branche existe déjà (reprise, R11) retrouve son worktree quel que soit le groupe ; un lot rendu à l'intégration dont la branche a disparu n'en reçoit pas. La branche de départ est celle du dépôt du lead à cet instant,
  * ou celle que la branche du lot a notée à sa création.
  */
-function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: string) => void): void {
+function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (line: string) => void, fillable = false): void {
   for (const group of groupLots(ctxs)) {
     const repo = group[0].lot.repo;
     const branch = repoBranch(repo);
-    const requested = group.length > 1 && group.every((c) => c.config.worktrees);
+    const requested = (group.length > 1 || fillable) && group.every((c) => c.config.worktrees);
     const why = !requested ? null : group.some((c) => c.lot.repos?.length) ? 'des lots du groupe ont des dépôts voisins (repos:)' : !branch ? 'le dépôt est en HEAD détaché' : null;
     if (why) log(`orchestrate : ${basename(repo)} : worktrees demandés mais ${why} : lots joués à la suite`);
     for (const c of group) {
@@ -1141,7 +1141,7 @@ async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: O
   wave.pid = process.pid;
   saveWave();
   const ctxs = contexts(lots, envs, wctx);
-  planTrees(ctxs, store, wave.id, wctx.log);
+  planTrees(ctxs, store, wave.id, wctx.log, !!args.continue && cap > 1);
   try {
     updateWaveRepos(home, process.pid, repos, lanes());
   } catch {

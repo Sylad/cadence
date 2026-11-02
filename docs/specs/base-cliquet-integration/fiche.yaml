@@ -1,0 +1,107 @@
+sujet:
+  id: base-cliquet-integration
+  titre: Ligne de base du cliquet recalculée à l'intégration
+  lot: L538
+  perimetre:
+    modules: [src/orchestrate/integrate.ts, scripts/qualite.mjs]
+    endpoints: []
+    jobs: ["étape d'intégration de orchestrate (rebaseOnto, appelée par cycle.ts:2787)"]
+    hors_perimetre:
+      - "le calcul de la mesure (ESLint, knip, jscpd) et les règles du cliquet de scripts/qualite.mjs : inchangés"
+      - "le conflit d'un autre fichier que qualite-baseline.json : toujours abandonné comme aujourd'hui"
+
+cas:
+  - id: C1
+    titre: Un lot qui baisse la base est rebasé sur un main qui a bougé
+    acteur: l'étape d'intégration de orchestrate
+    declencheur: commande orchestrate (intégration d'un lot, rebaseOnto)
+    preconditions:
+      - la branche du lot modifie qualite-baseline.json en baissant des clés depuis le point de départ du lot
+      - main a avancé depuis ce point de départ et a lui aussi modifié qualite-baseline.json (conflit de rebase)
+    nominal:
+      - Le rebase s'arrête sur un commit du lot, qualite-baseline.json étant le seul fichier en conflit.
+      - L'intégration lit les trois versions (départ du commit, main, commit du lot).
+      - Elle écrit la base de main moins, clé par clé, la baisse propre au commit (départ − lot), jamais sous 0, une clé à 0 retirée, triée comme ecrireBase.
+      - Elle l'ajoute à l'index et poursuit le rebase.
+      - Les contrôles du sommet intégré (cliquet compris) passent et le lot est avancé.
+    alternatives:
+      - { si: le commit du lot fait monter une clé par rapport à son départ, alors: le conflit n'est pas résolu et le rebase est abandonné comme aujourd'hui, regles: [R3] }
+      - { si: un autre fichier est aussi en conflit, alors: rebase abandonné, rien n'est résolu, regles: [R4] }
+      - { si: la base ainsi recalculée reste sous la mesure du sommet intégré, alors: les tests rouges refusent l'intégration comme aujourd'hui, regles: [R5] }
+      - { si: main et le lot ont baissé la même clé, alors: la baisse n'est retranchée qu'une fois de plus, jamais sous 0, regles: [R2] }
+    resultat: Le lot s'intègre sans rebase manuel, avec la base de main moins ses baisses propres.
+  - id: C2
+    titre: Le rebase se fait sans conflit sur la base
+    acteur: l'étape d'intégration de orchestrate
+    declencheur: commande orchestrate (intégration d'un lot, rebaseOnto)
+    preconditions:
+      - le lot ne touche pas qualite-baseline.json, ou git fusionne les deux versions sans conflit
+    nominal:
+      - Le rebase réussit.
+      - qualite-baseline.json est laissé tel que git l'a produit.
+    alternatives: []
+    sans_alternative: aucune résolution n'est tentée sans conflit sur la base ; un échec éventuel du cliquet est celui de C1 (R5)
+    resultat: Comportement inchangé.
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Quand qualite-baseline.json est le seul fichier en conflit pendant le rebase, chaque clé vaut la valeur de main moins la baisse du commit rejoué (valeur au départ du commit moins valeur du commit, si positive), bornée à 0 ; les clés que le commit ne baisse pas gardent la valeur de main ; une clé à 0 est retirée ; le fichier est écrit trié, en JSON indenté de 2 espaces et terminé par un saut de ligne."
+    statut: sourcee
+    source: "demande du lot (« recalcule la base sur main + les baisses propres au lot, même méthode que les rebases manuels du 02-11 ») ; format d'écriture : scripts/qualite.mjs:129 (ecrireBase) ; une clé absente vaut 0 : scripts/qualite.mjs:101-102 (comparer)"
+    tests: ["R1 — lot qui baisse deux clés, main qui en a monté une autre : la base rebasée porte main + les baisses du lot", "R1 — clé baissée à 0 par le lot : retirée du fichier, fichier trié et terminé par un saut de ligne"]
+  - id: R2
+    cas: [C1]
+    enonce: "Une clé que main et le lot ont toutes deux baissée reçoit la valeur de main moins la baisse du lot, sans passer sous 0."
+    statut: hypothese
+    si_faux: Si le cumul des deux baisses est faux (la même amélioration comptée deux fois), la base sera trop basse et le cliquet rouge au sommet intégré (R5) refuse l'intégration ; la correction serait de prendre le minimum des deux valeurs, sans donnée en jeu.
+    tests: ["R2 — clé baissée par main et par le lot : jamais négative, jamais sous 0"]
+  - id: R3
+    cas: [C1]
+    enonce: "Un commit du lot qui fait monter une clé de qualite-baseline.json par rapport à son départ (clé neuve comprise) n'est pas résolu : le rebase est abandonné et l'intégration est refusée par « intégration impossible : conflit en rebasant … (fichiers : qualite-baseline.json) »."
+    statut: sourcee
+    source: "docs/qualite.md:37-38 (« la base ne peut que baisser ») ; scripts/qualite.mjs:197-203 (baseRemonte) ; message de conflit existant : src/orchestrate/cycle.ts:2790"
+    tests: ["R3 — le lot monte une clé : conflit signalé, branche du lot et de main inchangées"]
+  - id: R4
+    cas: [C1]
+    enonce: "Si un autre fichier que qualite-baseline.json est aussi en conflit, rien n'est résolu et le rebase est abandonné comme aujourd'hui."
+    statut: sourcee
+    source: "src/orchestrate/integrate.ts:177-205 (rebaseOnto : tout autre conflit est abandonné) ; test/orchestrate-worktree-integration.test.ts:101"
+    tests: ["R4 — base et un autre fichier en conflit : rebase abandonné, fichiers listés"]
+  - id: R5
+    cas: [C1, C2]
+    enonce: "La résolution ne contourne pas le cliquet : les contrôles du sommet intégré rejouent le cliquet, et une base trop basse refuse l'intégration avec les tests rouges, la branche de main inchangée."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:2800-2806 (integratedChecks puis « tests rouges au sommet intégré ») ; cadence.yaml:18 (le cliquet fait partie de la porte)"
+    tests: ["R5 — base recalculée trop basse pour la mesure : intégration refusée, main inchangé"]
+  - id: R6
+    cas: [C1]
+    enonce: "La résolution rejoue commit par commit : chaque commit du lot qui touche la base est traité avec ses propres trois versions, et la base finale cumule les baisses de tous les commits."
+    statut: hypothese
+    si_faux: Si le lot ne devait compter que la baisse cumulée de son sommet, le résultat final serait le même (les baisses s'additionnent) ; seul le nombre de tours de résolution changerait.
+    tests: ["R6 — deux commits du lot qui baissent la même clé : baisses cumulées sur la base de main"]
+  - id: R7
+    cas: [C1]
+    enonce: "Chaque résolution est écrite au journal de la vague, comme celle du CHANGELOG (« qualite-baseline.json : base recalculée sur main + baisses du lot (n commit(s)) »)."
+    statut: hypothese
+    si_faux: Si le journal ne doit pas la mentionner, seul le texte du journal change.
+    tests: ["R7 — résolution de la base : une ligne de journal avec le nombre de commits"]
+  - id: R8
+    cas: [C2]
+    enonce: "Sans conflit sur qualite-baseline.json, le rebase n'y touche pas (résultat identique à celui de git)."
+    statut: hypothese
+    si_faux: Si une fusion sans conflit donnait une base trop haute ou trop basse, le cliquet rouge (R5) la signalerait ; une correction éventuelle serait d'appliquer la même recomposition après tout rebase (un lot à part).
+    tests: ["R8 — lot qui ne touche pas la base : fichier identique à celui de main après le rebase"]
+
+contrats:
+  - id: A1
+    appel: commande orchestrate (intégration d'un lot, rebaseOnto)
+    entree: "la branche du lot et la branche de base (main) du dépôt"
+    sortie: "rebase réussi avec qualite-baseline.json recalculée sur main + baisses du lot, ou refus sans rien changer"
+    erreurs:
+      - { code: log warn, message: "intégration impossible : conflit en rebasant <branche> sur <base> (fichiers : qualite-baseline.json)" }
+      - { code: log warn, message: "intégration refusée : tests rouges au sommet intégré (<extrait>) ; branche du dépôt inchangée, worktree conservé : <dir>" }
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8]
+
+donnees:
+  - { id: D1, objet: "qualite-baseline.json (carte plate clé → nombre, triée)", existant: true, modification: aucune, note: "format et écriture inchangés (ecrireBase) ; seule la façon de résoudre le conflit de rebase change" }

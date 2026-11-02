@@ -803,10 +803,11 @@ lots:
       - { date: 2026-11-02, text: "Mineurs de la revue après rebase (02-11) : doc de parent: natif à compléter (raf.md:81 raf check, lead.md lead tour --json, cadence-hud.md) ; tests « archivé compris » qui n'archivent rien (probe-L465-bords:123, plan-id-libres-l465:99) ; sous-id /slug lu sous-tâche seulement en t<n> sous idPattern (plan-ids.ts:39), écart avec le chemin étranger, à reprendre en M10 ; raf check signale ES2022/UTF8 inconnus sous idPattern" }
   - id: L466
     title: "Plans riches — fenêtre prévue et planification (planned: from..to, raf plan, --propose) (manque M4 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
-    status: todo
+    status: doing
     estimate: 0.5
     uses: [ plan-coeur ]
     created: 2026-10-30
+    started: 2026-11-02
   - id: L467
     title: "Plans riches — gains rapides groupés (raf quickwins par champ d'extension) (manque M5 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo

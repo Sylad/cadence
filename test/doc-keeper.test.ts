@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readAgents } from '../src/orchestrate/launch.js';
 import { readDocsConfig } from '../src/config.js';
@@ -202,8 +202,10 @@ describe('orchestrate appelle le bibliothécaire avant la revue (L306)', () => {
   });
 
   it('R24 — les écarts docs.sync sont calculés au même endroit pour la porte du bibliothécaire et le brief de revue', () => {
-    const cycle = readFileSync(join(root, 'src', 'orchestrate', 'cycle.ts'), 'utf8');
-    expect(cycle.match(/lotDocSyncGaps\(/g)).toHaveLength(1);
+    const dir = join(root, 'src', 'orchestrate');
+    const sources = ['cycle.ts', ...readdirSync(join(dir, 'cycle')).filter((f) => f.endsWith('.ts')).map((f) => join('cycle', f))];
+    const appels = sources.reduce((n, f) => n + (readFileSync(join(dir, f), 'utf8').match(/lotDocSyncGaps\(/g)?.length ?? 0), 0);
+    expect(appels).toBe(1);
   });
 
   it('R17 — la passe des mineurs ne rappelle pas le bibliothécaire', async () => {

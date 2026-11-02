@@ -41,7 +41,7 @@ import { answeredText, checkSpec, costlyHypotheses, ficheHasBack, ficheReady, fi
 import { handBackWithoutFinding } from './no-finding.js';
 import { decisionsText, humanDecisions } from './decisions.js';
 import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE, expressSummary, lotKey, lotRepoPaths, neighbourDirs, type Constat, type LotState, type ReviewSummary, type RunStore, type StepState } from './state.js';
-import { advance, baseMoved, INTEGRATE_WAIT_MS, MAX_REPLAYS, mergeBase, patchId, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
+import { advance, baseMoved, INTEGRATE_WAIT_MS, MAX_REPLAYS, mergeBase, patchId, rebaseNotes, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
 import { mutexFor } from './mutex.js';
 import { readTier, stillThird, takeTiers, tierMoved, tierRepos, wipBranch, type TierRead } from './tiers.js';
 import { branchExists, git, gitFailure, integrated, linkIgnored, lotBranch, planFileSet, planSeenFrom, prepareTree, removeTree, trackedDirty } from './worktree.js';
@@ -2788,9 +2788,7 @@ async function integrateLot(c: LotCtx): Promise<void> {
         if (rebased.kind === 'conflict') {
           return refuse(`intégration impossible : conflit en rebasant ${t.branch} sur ${t.base}${rebased.files.length ? ` (fichiers : ${rebased.files.join(', ')})` : ` (${rebased.detail})`} ; ${kept}`);
         }
-        if (rebased.kind === 'rebased' && rebased.changelog > 0) c.wave.log(`${key} CHANGELOG.md : conflit d'ajout pur résolu par union sous [Unreleased] (${rebased.changelog} commit(s))`);
-        if (rebased.kind === 'rebased' && rebased.moved > 0) c.wave.log(`${key} CHANGELOG.md : ${rebased.moved} entrée(s) du lot replacée(s) sous [Unreleased], une publication a eu lieu pendant la branche`);
-        if (rebased.kind === 'rebased' && rebased.settled) c.wave.log(`${key} CHANGELOG.md : une entrée finale par lot, les versions intermédiaires du lot écartées`);
+        if (rebased.kind === 'rebased') rebaseNotes(rebased, key).forEach((note) => c.wave.log(note));
         const tip = git(t.dir, 'rev-parse', 'HEAD');
         if (tip !== reviewed) {
           // Le rebase a changé les commits : tests et build rejoués au sommet rebasé, avant que la branche du dépôt ne bouge (R7).

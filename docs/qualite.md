@@ -85,6 +85,11 @@ baseline (`--init` refuses as soon as `main` has a baseline: from then on `--ecr
 The refusal itself says so: when the start of the lot has no baseline, the list of measures that got worse ends with
 that command.
 
+**Integration of a lot that lowers the baseline** (L538): when `cadence orchestrate` rebases the lot on a `main` that changed the baseline too, the
+conflict on `qualite-baseline.json` is resolved by the program, commit by commit, as `main`'s baseline plus the lot's own difference (never below 0),
+after applying the rule above to the commit (`--migrer`'s: no existing file's key up, no total up). No manual rebase is needed; the details are in
+[orchestrate.md](orchestrate.md#one-worktree-per-lot-orchestrateworktrees-l279).
+
 The baseline is also the project's list of cleanups: each cleanup lot is measured by what it removes from it.
 
 ## Where it runs

@@ -141,7 +141,9 @@ export function comparerMigration(avant, apres, existe) {
 const trier = (mesure) => Object.fromEntries(Object.entries(mesure).sort(([a], [b]) => (a < b ? -1 : 1)));
 
 export const lireBase = (racine) => JSON.parse(readFileSync(join(racine, BASELINE), 'utf8'));
-const ecrireBase = (racine, mesure) => writeFileSync(join(racine, BASELINE), `${JSON.stringify(trier(mesure), null, 2)}\n`);
+/** Le texte de la ligne de base : trié par clé, JSON indenté de 2 espaces, terminé par un saut de ligne. */
+export const serialiser = (mesure) => `${JSON.stringify(trier(mesure), null, 2)}\n`;
+const ecrireBase = (racine, mesure) => writeFileSync(join(racine, BASELINE), serialiser(mesure));
 
 function lancer(racine, bin, args, accepte) {
   // un outil absent ferait sortir node avec 1 et rien sur stdout, que le JSON.parse d'après lirait comme « Unexpected end of JSON input »

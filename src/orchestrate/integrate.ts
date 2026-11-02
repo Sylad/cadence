@@ -10,6 +10,7 @@ import { readPlanConfig } from '../config.js';
 import { Plan } from '../plan.js';
 import { parseDocument } from 'yaml';
 import { git, gitFailure, tryGit } from './worktree.js';
+import { BASELINE, comparerMigration, serialiser, type Mesure } from '../../scripts/qualite.mjs';
 
 /** Verrou d'intégration d'un dépôt (L279, R10) : dans l'état commun aux worktrees, au format du verrou d'orchestration, sous un autre nom. */
 export const INTEGRATION_LOCK = 'orchestrate-integration.lock';
@@ -62,7 +63,7 @@ export const repoBranch = (repo: string): string | null => tryGit(repo, 'symboli
 /** Point de départ de `rev` par rapport à la branche `base` : le dernier ancêtre commun. */
 export const mergeBase = (cwd: string, rev: string, base: string): string => git(cwd, 'merge-base', rev, `refs/heads/${base}`);
 
-export type Rebase = { kind: 'forwarded' } | { kind: 'rebased'; before: string; after: string; changelog: number; moved: number; settled: boolean } | { kind: 'conflict'; files: string[]; detail: string };
+export type Rebase = { kind: 'forwarded' } | { kind: 'rebased'; before: string; after: string; changelog: number; baseline: number; moved: number; settled: boolean } | { kind: 'conflict'; files: string[]; detail: string };
 
 const CHANGELOG = 'CHANGELOG.md';
 const REBASE_ENV = { ...process.env, GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true' };
@@ -129,6 +130,41 @@ function resolvePlan(work: string): boolean {
   }
 }
 
+/** La ligne de base lue à l'étape `n` du conflit en cours : une carte plate clé → nombre, sinon une erreur (étape absente, JSON invalide, valeur non numérique). */
+function baselineStage(work: string, n: number): Mesure {
+  const map: unknown = JSON.parse(run(work, 'show', `:${n}:${BASELINE}`));
+  if (typeof map !== 'object' || map === null || Array.isArray(map) || Object.values(map).some((v) => typeof v !== 'number' || !Number.isFinite(v))) throw new Error(`${BASELINE} (étape ${n}) n'est pas une carte clé → nombre`);
+  return map as Mesure;
+}
+
+/**
+ * Résout le conflit en cours quand c'est `qualite-baseline.json` seul (L538) : chaque clé vaut la valeur de la branche du dépôt plus la différence signée du
+ * commit rejoué (son départ moins lui), bornée à 0, une clé à 0 retirée — la base de main moins les baisses propres au commit. Le commit est d'abord contrôlé
+ * comme la porte (`comparerMigration`, départ du commit contre commit ; un fichier « existe » s'il est dans le parent du commit rejoué, `REBASE_HEAD^`) :
+ * un commit qui fait monter la base n'est pas résolu. Faux, sans rien toucher, pour tout autre conflit, une des trois étapes absente ou illisible.
+ */
+function resolveBaseline(work: string): boolean {
+  const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
+  if (files.length !== 1 || files[0] !== BASELINE) return false;
+  try {
+    // Pendant un rebase, l'étape 1 est le parent du commit rejoué, l'étape 2 la branche du dépôt (« ours »), l'étape 3 le commit du lot (« theirs »).
+    const [start, ours, theirs] = [baselineStage(work, 1), baselineStage(work, 2), baselineStage(work, 3)];
+    const parent = run(work, 'rev-parse', '--verify', 'REBASE_HEAD^').trim(); // sans parent lisible, aucun fichier ne compterait comme existant : le contrôle serait levé
+    const existe = (chemin: string) => tryGit(work, 'cat-file', '-e', `${parent}:${chemin}`) !== null;
+    if (comparerMigration(start, theirs, existe).length) return false;
+    const merged: Mesure = {};
+    for (const k of new Set([...Object.keys(start), ...Object.keys(ours), ...Object.keys(theirs)])) {
+      const value = (ours[k] ?? 0) + (theirs[k] ?? 0) - (start[k] ?? 0);
+      if (value > 0) merged[k] = value;
+    }
+    writeFileSync(join(work, BASELINE), serialiser(merged));
+    run(work, 'add', '--', BASELINE);
+    return true;
+  } catch {
+    return false; // le fichier est laissé en conflit : le `rebase --abort` de l'appelant le restaure
+  }
+}
+
 /**
  * Après un rebase réussi : les entrées que le lot a ajoutées sous `[Unreleased]` et qu'une publication de la branche a laissées sous la version publiée
  * (git les y range sans conflit quand le bloc a été renommé) sont remises sous le `[Unreleased]` de la branche, dans un commit à part (L362). Rend leur nombre.
@@ -170,7 +206,7 @@ export function settleOwnEntries(work: string, base: string, before: string, sta
 
 /**
  * Rebase le worktree `work` sur la branche `base` (R6). Une branche qui descend déjà du sommet de `base` n'a rien à rebaser (fast-forward pur : aucun sha ne
- * change). Un conflit d'ajout pur dans le CHANGELOG est résolu par union à chaque commit qui le porte (L314, `changelog` les compte), un conflit du plan quand le commit n'y ajoute que des revues de lot (L370). Tout autre conflit — ou
+ * change). Un conflit d'ajout pur dans le CHANGELOG est résolu par union à chaque commit qui le porte (L314, `changelog` les compte), un conflit du plan quand le commit n'y ajoute que des revues de lot (L370), un conflit de `qualite-baseline.json` seul par la base de la branche moins les baisses du commit (L538, `baseline` les compte). Tout autre conflit — ou
  * tout autre échec du rebase — est abandonné (`rebase --abort`) : la branche du lot et son arbre restent tels qu'avant, la branche du dépôt n'a pas été
  * touchée, personne ne résout le conflit à l'aveugle.
  */
@@ -178,6 +214,7 @@ export function rebaseOnto(work: string, base: string): Rebase {
   const before = git(work, 'rev-parse', 'HEAD');
   if (tryGit(work, 'merge-base', '--is-ancestor', `refs/heads/${base}`, 'HEAD') !== null) return { kind: 'forwarded' };
   let changelog = 0;
+  let baseline = 0;
   const start = tryGit(work, 'show', `${mergeBase(work, 'HEAD', base)}:${CHANGELOG}`) ?? undefined;
   try {
     run(work, 'rebase', `refs/heads/${base}`);
@@ -185,12 +222,15 @@ export function rebaseOnto(work: string, base: string): Rebase {
     let failure = first;
     // Chaque tour règle le commit sur lequel le rebase s'est arrêté ; un lot ne porte pas des centaines de commits, la borne évite seulement une boucle sans fin.
     for (let turn = 0; ; turn++) {
-      if (turn >= 200 || !(resolveChangelog(work, start) || resolvePlan(work))) {
+      const doc = resolveChangelog(work, start);
+      const base = !doc && resolveBaseline(work);
+      if (turn >= 200 || !(doc || base || resolvePlan(work))) {
         const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
         tryGit(work, 'rebase', '--abort');
         return { kind: 'conflict', files, detail: gitFailure(failure) };
       }
-      changelog++;
+      if (base) baseline++;
+      else changelog++;
       try {
         run(work, 'rebase', '--continue');
         break;
@@ -201,7 +241,17 @@ export function rebaseOnto(work: string, base: string): Rebase {
   }
   const moved = moveOwnEntries(work, base, before, start);
   const settled = settleOwnEntries(work, base, before, start);
-  return { kind: 'rebased', before, after: git(work, 'rev-parse', 'HEAD'), changelog, moved, settled };
+  return { kind: 'rebased', before, after: git(work, 'rev-parse', 'HEAD'), changelog, baseline, moved, settled };
+}
+
+/** Les lignes de journal d'un rebase réussi : une par résolution que le programme a faite à la place de git (CHANGELOG, base du cliquet), vide si git a tout fait seul. */
+export function rebaseNotes(r: Extract<Rebase, { kind: 'rebased' }>, key: string): string[] {
+  return [
+    r.changelog > 0 && `${key} CHANGELOG.md : conflit d'ajout pur résolu par union sous [Unreleased] (${r.changelog} commit(s))`,
+    r.baseline > 0 && `${key} ${BASELINE} : base recalculée sur main + baisses du lot (${r.baseline} commit(s))`,
+    r.moved > 0 && `${key} CHANGELOG.md : ${r.moved} entrée(s) du lot replacée(s) sous [Unreleased], une publication a eu lieu pendant la branche`,
+    r.settled && `${key} CHANGELOG.md : une entrée finale par lot, les versions intermédiaires du lot écartées`,
+  ].filter((n): n is string => typeof n === 'string');
 }
 
 /**

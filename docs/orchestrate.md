@@ -707,6 +707,18 @@ nothing below applies and the wave behaves as before; any other value is refused
      the lot's tip (nor under a version the tip itself carries: an entry the lot published itself is final), drops them from the result (under `[Unreleased]` and under a version), and puts back an entry of the tip that is missing, in a commit of
      its own (`docs: CHANGELOG — une entrée finale par lot …`); an entry the repository's branch also carries is left alone. The union of an earlier replayed commit files the lot's entry at the end of its section; where the lot first put it (top of the section included) does not matter for the next replayed commit. The journal says
      `<project>:<lot> CHANGELOG.md : une entrée finale par lot, les versions intermédiaires du lot écartées`. **A bare entry** (L383): an entry written under `## [Unreleased]` without a section on one side, against a section (`### Fixed`) the other side added, is not a free text: it is filed under that section (the entries of the repository's branch first), so the result has one title and one entry per lot. The section is the only one the two sides added to the base, or the only one they carry; with none, or several candidates, the conflict is left by hand. Anything else — an entry that
+     **The ratchet's baseline** (L538): a lot that lowers `qualite-baseline.json` from an old `main` collides with the lots integrated since (the file is a
+     column of lines, so two edits on neighbouring keys conflict). When it is the **only** file in conflict, the program writes, for each key, the
+     repository's value plus the replayed commit's signed difference (the commit's parent version minus the commit's, so `main` minus the commit's
+     lowering), floored at 0, a key at 0 removed, the file sorted, indented by 2 spaces and ending with a newline (the format of `scripts/qualite.mjs`);
+     a key lowered by both sides is lowered twice, floored at 0. Beforehand the commit is checked with the gate's rule (`comparerMigration`, the commit's parent against
+     the commit; a file « exists » if it is in the parent of the replayed commit): a key of an existing file that goes up, or a total that goes up,
+     is not resolved. It is done **commit by commit**, so an intermediate commit that raises the baseline aborts the rebase even if a later one lowers it
+     again (the gate checks each state the same way). It is not resolved either when one of the three versions (parent, repository, commit) is missing
+     (the lot or the repository creates or deletes the file) or is not a flat key → number map. The journal says
+     `<project>:<lot> qualite-baseline.json : base recalculée sur main + baisses du lot (<n> commit(s))`. The ratchet is not bypassed: the checks of step 3 replay it at the
+     integrated tip, and a baseline too low for the measure hands the lot back with the red tests. Without a conflict on the baseline, git's result is kept.
+     Anything else — a CHANGELOG entry that
      was already there removed or reworded, free text under `[Unreleased]`, the rest of the
      file changed on both sides, another file in conflict with it — aborts the rebase and hands the lot back as above. The rebased commits differ, so
      steps 3 and 4 apply: tests replayed, and a short review since the patch-id changed;

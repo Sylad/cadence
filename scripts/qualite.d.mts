@@ -6,6 +6,7 @@ export function lireKnip(json: { files?: string[]; issues?: Record<string, unkno
 export function lireDirectives(racine: string, perimetres: Record<string, Iterable<string>>): Mesure;
 export function lireJscpd(rapport: { duplicates?: { firstFile: { name: string }; secondFile: { name: string }; lines?: number }[] }): Mesure;
 export function comparer(base: Mesure, courant: Mesure): { pires: { cle: string; avant: number; apres: number }[]; mieux: { cle: string; avant: number; apres: number }[] };
+export function serialiser(mesure: Mesure): string;
 export function lireBase(racine: string): Mesure;
 export function mesurer(racine: string): Mesure;
 export type Ref = { nom: string; base: Mesure | null; existe?: (chemin: string) => boolean; config?: (chemin: string) => string | null; fichiers?: () => string[] };

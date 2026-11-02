@@ -717,7 +717,11 @@ nothing below applies and the wave behaves as before; any other value is refused
      again (the gate checks each state the same way). It is not resolved either when one of the three versions (parent, repository, commit) is missing
      (the lot or the repository creates or deletes the file) or is not a flat key → number map. The journal says
      `<project>:<lot> qualite-baseline.json : base recalculée sur main + baisses du lot (<n> commit(s))`. The ratchet is not bypassed: the checks of step 3 replay it at the
-     integrated tip, and a baseline too low for the measure hands the lot back with the red tests. Without a conflict on the baseline, git's result is kept.
+     integrated tip, and a baseline too low for the measure hands the lot back with the red tests. Without a conflict on the baseline, git's result is kept **unless the lot changed the file** (L541): git may then keep a baseline older than `main`'s
+     (a key both sides lowered to the same value, a key `main` removed) that tightens files below `main`. After the rebase the program applies the same rule to
+     the lot's tip (same check as the gate, the starting point against the tip) and, when the result differs from git's, writes it in a commit of its own
+     (`fix(base): qualite-baseline.json — …`); the journal says `<project>:<lot> qualite-baseline.json : base recomposée sur main + baisses du lot (fusion sans conflit de git corrigée)`.
+     A lot that does not touch the file, raises it, deletes it, or whose versions are unreadable is left as git made it.
      Anything else — a CHANGELOG entry that
      was already there removed or reworded, free text under `[Unreleased]`, the rest of the
      file changed on both sides, another file in conflict with it — aborts the rebase and hands the lot back as above. The rebased commits differ, so

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { rebaseOnto } from '../src/orchestrate/integrate.js';
+import { rebaseNotes, rebaseOnto } from '../src/orchestrate/integrate.js';
 import { lotBranch, lotTreeDir, prepareTree } from '../src/orchestrate/worktree.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { claudeOut, commitFile, git, workReport } from './orchestrate-harness.js';
@@ -140,6 +140,49 @@ describe('R8 — sans conflit sur la base', () => {
     const s = scene({ start: { [A]: 3, [B]: 3 }, main: { [A]: 3, [B]: 1 }, lot: [{ 'x.txt': 'x\n' }] });
     expect(rebaseOnto(s.t.dir, 'main')).toMatchObject({ kind: 'rebased', baseline: 0 });
     expect(s.read()).toBe(git(s.repo, 'show', `main:${BASE}`) + '\n');
+  });
+});
+
+describe('L541 — la base fusionnée sans conflit par git', () => {
+  const commits = (s: ReturnType<typeof scene>) => git(s.t.dir, 'log', '--format=%s', 'main..HEAD').split('\n');
+  it('R8 — le lot et main baissent la même clé à la même valeur (fusion propre de git) : la base recomposée la retire, dans un commit à part', () => {
+    // A : 3→1 des deux côtés, git garde 1 sans conflit ; la règle de L538 (1 + 1 - 3, bornée à 0) retire la clé.
+    const s = scene({ start: { [A]: 3, [B]: 4, [C]: 3 }, main: { [A]: 1, [B]: 4, [C]: 3 }, lot: [{ [A]: 1, [B]: 4, [C]: 3 }, { 'x.txt': 'x\n' }] });
+    expect(rebaseOnto(s.t.dir, 'main')).toMatchObject({ kind: 'rebased', baseline: 0, silent: true });
+    expect(JSON.parse(s.read())).toEqual({ [B]: 4, [C]: 3 });
+    expect(commits(s)[0]).toMatch(/^fix\(base\): /);
+    expect(git(s.t.dir, 'status', '--porcelain')).toBe('');
+  });
+  it('R8 — fusion propre déjà égale à la recomposition (le lot baisse A, main monte C, lignes séparées) : aucun commit de plus', () => {
+    const s = scene({ start: { [A]: 5, [B]: 4, [C]: 3 }, main: { [A]: 5, [B]: 4, [C]: 6 }, lot: [{ [A]: 2, [B]: 4, [C]: 3 }] });
+    const rebased = rebaseOnto(s.t.dir, 'main');
+    expect(rebased).toMatchObject({ kind: 'rebased', baseline: 0, silent: false });
+    expect(JSON.parse(s.read())).toEqual({ [A]: 2, [B]: 4, [C]: 6 });
+    expect(commits(s)).toEqual(['feat(L1): commit 1']);
+  });
+  it('R8 — le lot ne touche pas la base : aucun commit de plus, même si main l\'a baissée', () => {
+    const s = scene({ start: { [A]: 3, [B]: 3 }, main: { [A]: 3, [B]: 1 }, lot: [{ 'x.txt': 'x\n' }] });
+    expect(rebaseOnto(s.t.dir, 'main')).toMatchObject({ kind: 'rebased', silent: false });
+    expect(commits(s)).toEqual(['feat(L1): commit 1']);
+  });
+  it('R8 — le lot monte une clé d\'un fichier existant sans conflit : la base n\'est pas recomposée (la porte la refuse)', () => {
+    const s = scene({ start: { [A]: 3, [B]: 4, [C]: 3 }, main: { [A]: 3, [B]: 4, [C]: 1 }, lot: [{ [A]: 4, [B]: 4, [C]: 3 }] });
+    expect(rebaseOnto(s.t.dir, 'main')).toMatchObject({ kind: 'rebased', silent: false });
+    expect(JSON.parse(s.read())).toEqual({ [A]: 4, [B]: 4, [C]: 1 });
+  });
+  it('R8 — le lot supprime qualite-baseline.json sans conflit : rien n\'est recomposé', () => {
+    const s = scene({ start: { [A]: 3, [B]: 4 }, main: { 'y.txt': 'y\n' }, lot: [null] });
+    expect(rebaseOnto(s.t.dir, 'main')).toMatchObject({ kind: 'rebased', silent: false });
+    expect(existsSync(join(s.t.dir, BASE))).toBe(false);
+  });
+  it('R8 — base du lot illisible (JSON invalide) sans conflit : rien n\'est recomposé, pas d\'erreur', () => {
+    const s = scene({ start: { [A]: 3, [B]: 4 }, main: { 'y.txt': 'y\n' }, lot: ['pas du json\n'] });
+    expect(rebaseOnto(s.t.dir, 'main')).toMatchObject({ kind: 'rebased', silent: false });
+    expect(s.read()).toBe('pas du json\n');
+  });
+  it('R8 — le journal dit la base recomposée sans conflit', () => {
+    const notes = rebaseNotes({ kind: 'rebased', before: 'a', after: 'b', changelog: 0, baseline: 0, moved: 0, settled: false, silent: true }, 'p:L1');
+    expect(notes).toEqual([`p:L1 ${BASE} : base recomposée sur main + baisses du lot (fusion sans conflit de git corrigée)`]);
   });
 });
 

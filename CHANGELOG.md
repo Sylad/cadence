@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- The integration of `cadence orchestrate` also recomposes the ratchet's baseline when git merges `qualite-baseline.json` without a conflict (L541, `docs/orchestrate.md`): a lot that changed the file kept an older baseline than `main`'s (a key both sides lowered, a key `main` removed), the ratchet turned red at the integrated tip and the rebase was done by hand (L485, L486, L536). The program now applies the L538 rule to the lot's tip and writes the result in a commit of its own, with a journal line; a lot that does not touch the file or raises it is left as git made it.
+
 ## [1.43.0] - 2026-11-02
 
 ### Fixed

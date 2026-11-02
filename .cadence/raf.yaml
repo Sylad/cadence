@@ -1541,9 +1541,12 @@ lots:
     review: { date: 2026-11-02, verdict: "compliant (2 minor notes) — orchestré (vague 2026-11-02-2140-cont, 0 passe(s) de correction)", commit: 449267b7b6136c734cc13a247f4ea7ba222a91ac, reporte: { de: e0bd6cbcdcc41402ecd76058eb3824363bbae4ce, vers: 449267b7b6136c734cc13a247f4ea7ba222a91ac, patchId: 6945271e8033b338dae75840f3c3c5c0b8088c2f } }
   - id: L542
     title: "docs.sync : L537 ne suffit pas — un lot de découpage (refactor) suivi de commits fix(L…) de correction (imports, tests, commentaires) est encore rendu « documentation en retard » (02-11 soir : L489, L490) ; juger le diff entier du lot (aucune commande, clé, sortie ni export public changé) plutôt que le type de chaque commit, avec un test sur ce cas"
-    status: todo
+    status: dropped
     estimate: 0.25
     created: 2026-11-02
+    finished: 2026-11-02
+    notes:
+      - { date: 2026-11-02, text: "abandonné : doublon de L496 (même défaut, ouvert le 31-10), en cours dans la vague 2140-cont ; le cas L489/L490 (refactor puis fix) est à vérifier dans sa revue" }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

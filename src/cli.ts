@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileS
 import { execFileSync } from 'node:child_process';
 import { basename, dirname, join, posix, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { refuseRedAcceptation } from './raf-close-checks.js';
+import { statusCommand } from './raf-status.js';
 import { defaultPlan, PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readSessionConfig, readVerifyConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
 import { audit, exemptPlanOnly, gateProgress, gateText, gateWaiting, hypothesesOf, isNonConformingVerdict, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork, workByLot } from './audit.js';
@@ -70,6 +72,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf uses <lot> [<ressource>…]   remplace les ressources partagées du lot (uses:, déclarées par resources: dans le cadence.yaml du dossier parent ; raf check refuse un nom non déclaré) ; sans nom, retire la clé
   cadence local start <lot> [--ttl minutes] | local done <lot> | local abort <lot>   tâche locale du lead (lot posé par raf add --local) : start verrouille le dépôt comme une vague (aucune vague n'y démarre, --add y est refusé) et passe le lot à doing, refusé si une orchestration ou un autre lot du dépôt est en cours ; le verrou est déclaré (60 min par défaut), tenu sans processus jusqu'à done ou abort, signalé en ⚠ par lead tour et orchestrate --status au-delà du délai ; done joue la porte du projet UNE fois, libère le dépôt si elle est verte (la capture, la revue du diff, cadence deliver et raf done restent au lead) et le garde verrouillé sinon ; abort libère sans porte
   raf start <id>        raf done <id> [--force]        raf drop <id> [--reason texte]
+  raf status [<id> <état> ["message"] | <id> --back ["message"]]   états détaillés du projet (cadence.yaml : plan.states) : pose l'état d'un lot sous la garde de plan.transitions et note le message ; --back sort de l'état bloqué vers l'état d'avant ; sans argument, liste les états. start / done / drop / todo posent eux-mêmes l'état de leur statut
   raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits ; rouvre un lot done ou dropped (→ todo, finished retiré, note « rouvert ») — la seule façon de rouvrir, archivé compris (il revient dans le fichier du plan)
   raf note <id> "texte"
   --verbose             avec done, ux, review, note, move ou public : imprime la ligne « id  état  titre entier » du lot touché ; avec hook post-commit : le titre entier (sinon 60 caractères au plus)
@@ -202,6 +205,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       uses: { type: 'string' },
       parent: { type: 'string' },
       force: { type: 'boolean' },
+      back: { type: 'boolean' },
       reason: { type: 'string' },
       porteur: { type: 'string' },
       status: { type: 'string' },
@@ -411,22 +415,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         if (pub) refuseLongTitle(pub, lot?.public ? '' : ' — titre de la Nouveauté reprise par le site : corriger l\'entrée ou poser raf public');
       }
       // Le plan ne lit pas git : lui dire combien de commits du lot sa revue ne couvre pas quand elle est exigée.
-      // Un lot clos avec une acceptation à vert: false bloque les vagues suivantes du dépôt (verrou des tests d'acceptation, L366).
-      if (status === 'done' && !rest[0].includes('/')) {
-        const repo = gitRoot(root) ?? root;
-        let dir: string | null = null;
-        try {
-          dir = readOrchestrateConfig(configPath).spec.dir;
-        } catch {
-          // un cadence.yaml illisible ne doit pas empêcher de clore un lot : `cadence check` en parle
-        }
-        const red = dir === null ? undefined : redAcceptations(repo, dir).find((a) => a.lot === rest[0]);
-        if (red) {
-          const text = `${rest[0]} : ${red.path} est à vert: false — clos ainsi, le lot bloquerait les vagues suivantes du dépôt (verrou des tests d'acceptation) ; cadence spec green ${rest[0]} lance la commande d'acceptation et pose vert: true`;
-          if (!values.force) throw new RafError(`${text} (--force pour passer outre)`);
-          io.err(`avertissement : ${text}`);
-        }
-      }
+      if (status === 'done' && !rest[0].includes('/')) refuseRedAcceptation(root, configPath, rest[0], !!values.force, io.err);
       const unreviewed = status === 'done' && plan.reviewSince && !plan.readonly && !values.force ? unreviewedWork(plan, root, rest[0]) : 0;
       const verdict = status === 'done' && !rest[0].includes('/') ? plan.lots().find((l) => l.id === rest[0])?.review?.verdict : undefined;
       const nonConforming = verdict !== undefined && isNonConformingVerdict(verdict);
@@ -471,6 +460,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       }
       return 0;
     }
+    case 'status':
+      return statusCommand(loadPlan(), rest, !!values.back, today, io.out);
     case 'todo': {
       need(1, 'todo <id> [--reason texte]');
       const plan = loadPlan();
@@ -585,6 +576,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         return 0;
       }
       io.out(`${lot.id}  ${lot.status}  ${lot.title}`);
+      if (lot.state) io.out(`état : ${lot.state}`);
       if (lot.goal) io.out(`goal : ${lot.goal}`);
       const dates = [['créé', lot.created], ['démarré', lot.started], [lot.status === 'dropped' ? 'abandonné' : 'terminé', lot.finished]].filter(([, d]) => d);
       if (dates.length) io.out(dates.map(([k, d]) => `${k} : ${d}`).join('  '));

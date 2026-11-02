@@ -64,6 +64,7 @@ raf gantt                         # .cadence/gantt.html (next to the plan)
 | `raf public <id> "title"` · `raf public <id> --clear` | set, replace or remove the public title of a lot |
 | `raf start <id>` · `raf done <id> [--force]` · `raf drop <id> [--reason text]` | dated transitions (`done` refuses open sub-tasks unless `--force`, with the code-review gate active (`raf review enable`) a lot whose commits its review does not cover, **and a lot whose recorded review verdict says `non conforme` / `not compliant` even when it covers every commit** (L476: `non conforme : 1 bloquant` at the last commit no longer closes; `conforme après 1 correction` is compliant; redo the review with `raf review <id> "verdict"` after the fix, or `--force`), and a lot whose `acceptation-<lot>.json` is still `vert: false`, L366: closed like that it would lock every later wave of the repository, see `cadence spec green`; with `--force` it only warns on stderr. Like every `raf` command it only writes the plan file and **never commits** it: when the plan or a file `plan.onWrite` produces is left with changes, `done`, `ux <lot>` and `review <lot>` print the `git add` / `git commit` command that takes them, the subject from the `plan.commit` template, L371) |
 | `cadence spec green <lot>` | L366: run the dedicated acceptance command (`orchestrate.accept`) on a lot driven or closed by hand; green, set `vert: true` in its `acceptation-<lot>.json` and commit that file alone (subject `chore(<lot>): acceptation verte, vert: true posé par cadence spec green` or the `plan.commit` template; the resealed tests are listed in the commit body, never in the subject), resealing the fingerprints of the listed tests refined since the red commit (journal `resceaux`) so the lock goes quiet; a listed test changed but not committed is refused. Red: exit 1, nothing changed. A lot already `vert: true` whose tests lack fingerprints (L526) is replayed and, green, sealed (subject `chore(<lot>): empreintes de l'acceptation posées par cadence spec green`). Refused for a `todo` lot, during a wave, and while an unfinished wave keeps a lot of the repository open; see [orchestrate](orchestrate.md) |
+| `raf status [<id> <state> ["message"] \| <id> --back ["message"]]` | the project's **detailed states** (L463, `plan.states`, [below](#detailed-states-planstates-l463)): sets the `state:` of a lot under the guard of `plan.transitions` and notes the message (`état bloque : attend la passerelle`); the base status is derived from the state — a `todo` lot moved to a `doing` state starts (`started:` set), any other change of base status goes through its own command and gates (`raf done`, `drop`, `todo`; refused with the command to use). Entering the `plan.blockedState` remembers the state before in `state_before:`, `--back` returns to it; with no argument it lists the states with their base status, their number of lots and their transitions. Refused without `plan.states`, on a sub-task, on an unknown state, on the state the lot already has |
 | `raf todo <id> [--reason text]` | put a started lot back to `todo` (`doing` → `todo`, `started:` removed, dated note « remis en attente : reason »): refused when work commits cite the lot (plan-only and version commits do not count, as `raf commits`), or on a sub-task; sub-tasks and other keys are left as they are. **Reopening** (L396): on a `done` or `dropped` lot, `raf todo` is THE command — never the YAML — that reopens it (`→ todo`, `finished:` removed, `started:` kept so its commits stay its own, dated note « rouvert (était done) : reason »); `raf start`/`raf done`/`raf drop` on a closed lot say so (`L3 est done ; le rouvrir si c'est voulu : raf todo L3`). An archived lot reopened this way comes back into the plan file at that write |
 | `raf migrate [--dry-run]` | move `docs/plan/raf.yaml` to `.cadence/raf.yaml` and rewrite the readers of the old path in the repository, see [Moving the plan: `raf migrate`](#moving-the-plan-raf-migrate) |
 | `raf note <id> "text"` | dated note — keep decisions next to the work |
@@ -214,6 +215,24 @@ rather than on the plan; it prints no legacy warning and never commits (review t
 migrate:
   keep: [docs/specs/**, test/legacy-plan.test.ts]   # cite docs/plan/raf.yaml without reading the plan
 ```
+
+## Detailed states: `plan.states` (L463)
+
+A project that tracks more than `todo`, `doing`, `done` and `dropped` (« tested », « delivered », « blocked »…) declares its own states in `cadence.yaml`. The base status stays the four above — every gate of cadence (`raf done`, reviews, UX, `raf now`, the Gantt) reads only it — and each state names the base status it belongs to:
+
+```yaml
+plan:
+  states: { a_faire: todo, en_cours: doing, bloque: doing, termine: done, livre: done, abandonne: dropped }
+  transitions:                       # optional: without it nothing is guarded
+    a_faire: [en_cours, bloque, abandonne]
+    en_cours: [bloque, termine, abandonne]
+    bloque: [en_cours, abandonne]
+    termine: [livre]                 # a state with no entry is terminal once `transitions` is declared
+  doneState: termine                 # what `raf done` sets (default: the first done state)
+  blockedState: bloque               # `raf status <lot> --back` returns from it
+```
+
+`states` is an ordered object, state → base status, and must hold at least one `todo`, one `doing` and one `done` state. The state is written as `state:` right after `status:` (and `state_before:` while blocked). `raf start`, `raf done`, `raf drop` and `raf todo` set the state of their status themselves (`doing` → the first `doing` state, `done` → `doneState`, …) and obey `plan.transitions` too — refused with the allowed states, `--force` passes (`raf todo`, the reopening, is not guarded). A lot with no `state:` (written before the declaration) is read in the default state of its status. `raf check` reports a `state:` that is not declared or whose base status contradicts `status:`. `raf show` prints `état :`. `plan.states` does not go with a plan held by another tool (`lots`, `fields`, `statuses`, `estimates`): its states are its own.
 
 ## Plan file
 

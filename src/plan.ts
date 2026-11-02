@@ -4,6 +4,8 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { dirtyContents } from './git.js';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
+import { normalizeLot } from './plan-read.js';
+import { currentState, defaultState, stateProblems, transitionProblem, type StateModel } from './plan-states.js';
 import { ARCHIVE_DIR, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, selectArchivable, type Kept } from './archive.js';
 
 /** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
@@ -68,6 +70,10 @@ export interface Lot {
   parent?: string;
   title: string;
   status: Status;
+  /** État détaillé du projet (clé `state:`, L463, `plan.states`) ; absent sans déclaration ou pour un lot écrit avant elle. */
+  state?: string;
+  /** État d'avant le blocage (clé `state_before:`) : celui où `raf status <lot> --back` revient. */
+  stateBefore?: string;
   estimate: number;
   quickwin: boolean;
   /** Changement visible par l'utilisateur : une entrée Nouveautés est attendue à la livraison. */
@@ -119,7 +125,6 @@ export interface LotRepoDecl {
 /** Condition de tirage d'un lot : `count` lots done portant `spec: true` ou `screen: page`. Mal formée (`invalid`), elle n'est jamais remplie. */
 export type Gate = { count: number; criterion: 'spec' | 'screen'; invalid?: undefined } | { invalid: true };
 
-const GATE_INVALID = 'gate invalide : count: entier ≥ 1 et un critère spec: true ou screen: page attendus';
 
 export class RafError extends Error {}
 
@@ -176,6 +181,8 @@ export interface PlanSettings {
   /** Fichier d'attendus QA (clé `qa.expectations` de cadence.yaml) : tenu avec le plan, docs/qa/expectations.md par défaut. */
   qaExpectations?: string;
   format?: PlanFormat;
+  /** États détaillés du projet (`plan.states`, L463) ; jamais avec `format`. */
+  states?: StateModel;
   /** Fichier de configuration effectivement lu (--config), absolu ; cadence.yaml à la racine par défaut. */
   config?: string;
 }
@@ -537,7 +544,14 @@ export class Plan {
     }
     // L396 : l'archive est un détail de stockage — les lots archivés reprennent leur place parmi ceux du fichier actif, comme un seul plan.
     const archived = this.loadArchives().flatMap((a) => archiveLots(a.doc).toJSON() as Record<string, unknown>[]);
-    return mergeArchived(archived.map((r) => normalizeLot(r)), this.activeRaw().map((r) => normalizeLot(r)));
+    const lots = mergeArchived(archived.map((r) => normalizeLot(r)), this.activeRaw().map((r) => normalizeLot(r)));
+    const model = this.settings.states;
+    return model ? lots.map((l) => ({ ...l, problems: [...l.problems, ...stateProblems(model, l)] })) : lots;
+  }
+
+  /** Les états détaillés déclarés (`plan.states`), ou undefined. */
+  get stateModel(): StateModel | undefined {
+    return this.settings.states;
   }
 
   lot(id: string): Lot {
@@ -853,6 +867,10 @@ export class Plan {
     if (!isOpen(lot.status)) {
       throw new RafError(`${lotId} est ${lot.status} ; le rouvrir si c'est voulu : raf todo ${lotId}`);
     }
+    const model = this.settings.states;
+    const target = model ? defaultState(model, status) : undefined;
+    const refused = model && target !== undefined && !opts.force ? transitionProblem(model, currentState(model, lot), target) : null;
+    if (refused) throw new RafError(`${lotId} : ${refused} — raf status ${lotId} <état> (--force pour passer outre)`);
     if (status === 'done') {
       const open = lot.tasks.filter((t) => isOpen(t.status)).map((t) => `${lotId}/${t.id}`);
       if (open.length > 0 && !opts.force) {
@@ -875,6 +893,7 @@ export class Plan {
       }
     }
     node.set('status', status);
+    this.syncState(node, status);
     if (!lot.started && status !== 'dropped') node.set('started', today);
     if (status === 'done' || status === 'dropped') node.set('finished', today);
   }
@@ -894,6 +913,7 @@ export class Plan {
     if (lot.status === 'done' || lot.status === 'dropped') {
       const node = this.lotNode(ref);
       node.set('status', 'todo');
+      this.syncState(node, 'todo');
       node.delete('finished');
       this.note(ref, reason.trim() ? `rouvert (était ${lot.status}) : ${reason.trim()}` : `rouvert (était ${lot.status})`, today);
       return;
@@ -902,8 +922,68 @@ export class Plan {
     if (n > 0) throw new RafError(`${ref} a ${n} commit(s) qui le citent : le remettre en attente perdrait leur lien — raf drop ou le laisser doing`);
     const node = this.lotNode(ref);
     node.set('status', 'todo');
+    this.syncState(node, 'todo');
     node.delete('started');
     this.note(ref, reason.trim() ? `remis en attente : ${reason.trim()}` : 'remis en attente', today);
+  }
+
+  /**
+   * Pose le `state:` d'un lot (`raf status`, L463) sous la garde de `plan.transitions`, et note le message daté. Le statut de base en est
+   * dérivé : seul todo → doing se fait ici (le lot démarre) ; les autres changements de base gardent leur commande et leurs portes
+   * (`raf done`, `drop`, `todo`). Entrer dans l'état bloqué mémorise l'état d'avant (`state_before:`), `back` y revient sans garde.
+   */
+  setState(ref: string, target: string | null, today: Day, opts: { back?: boolean; message?: string } = {}): string {
+    this.writable();
+    const model = this.settings.states;
+    if (!model) throw new RafError('aucun état déclaré : cadence.yaml plan.states');
+    if (ref.includes('/')) throw new RafError(`raf status se pose sur un lot, pas une sous-tâche : ${ref}`);
+    const lot = this.lot(ref);
+    const from = currentState(model, lot);
+    let to = target ?? '';
+    if (opts.back) {
+      if (!model.blocked) throw new RafError('aucun état bloqué déclaré : cadence.yaml plan.blockedState');
+      if (from !== model.blocked) throw new RafError(`${ref} n'est pas bloqué (état ${from})`);
+      if (!lot.stateBefore) throw new RafError(`${ref} : état d'avant introuvable (state_before: absent) — raf status ${ref} <état>`);
+      if (!Object.hasOwn(model.states, lot.stateBefore)) throw new RafError(`${ref} : l'état d'avant « ${lot.stateBefore} » n'est plus déclaré — raf status ${ref} <état>`);
+      to = lot.stateBefore;
+    } else {
+      if (!Object.hasOwn(model.states, to)) throw new RafError(`état inconnu : ${to} (déclarés : ${Object.keys(model.states).join(', ')})`);
+      if (to === from) throw new RafError(`${ref} est déjà ${to}`);
+      const refused = transitionProblem(model, from, to);
+      if (refused) throw new RafError(`${ref} : ${refused}`);
+    }
+    const node = this.lotNode(ref);
+    const base = model.states[to];
+    if (base !== lot.status) {
+      if (lot.status === 'todo' && base === 'doing') {
+        node.set('status', 'doing');
+        if (!lot.started) node.set('started', today);
+      } else {
+        const command = base === 'done' ? 'done' : base === 'dropped' ? 'drop' : 'todo';
+        throw new RafError(`${ref} : ${to} a pour statut de base ${base}, ${lot.status} aujourd'hui — passer par raf ${command} ${ref}`);
+      }
+    }
+    this.writeState(node, to, to === model.blocked ? from : undefined);
+    const message = opts.message?.trim();
+    if (message) this.note(ref, `état ${to} : ${message}`, today);
+    return to;
+  }
+
+  /** Met l'état d'un lot au diapason de son nouveau statut de base (`start`, `done`, `drop`, `todo`) ; sans `plan.states`, ne touche à rien. */
+  private syncState(node: YAMLMap, status: Status): void {
+    if (this.settings.states) this.writeState(node, defaultState(this.settings.states, status));
+  }
+
+  /** Écrit `state:` (et `state_before:`) juste après `status:` ; `undefined` retire la clé. */
+  private writeState(node: YAMLMap, state: string | undefined, before?: string): void {
+    for (const [key, value] of [['state', state], ['state_before', before]] as const) {
+      if (value === undefined) node.delete(key);
+      else if (node.has(key)) node.set(key, value);
+      else {
+        const keys = node.items.map((p) => String((p.key as { value?: unknown })?.value ?? p.key));
+        node.items.splice(Math.max(keys.indexOf('status'), keys.indexOf('state')) + 1, 0, this.doc.createPair(key, value));
+      }
+    }
   }
 
   /** Remplace le titre d'un lot, de tout statut, et note l'ancien titre ; refuse un titre vide ou identique. */
@@ -1115,126 +1195,9 @@ function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] 
   return lots;
 }
 
-/** Lit `gate: { count: N, spec: true }` ou `{ count: N, screen: page }` ; toute autre forme est un problème du lot et une condition jamais remplie. */
-function readGate(raw: unknown, problems: string[]): Gate | undefined {
-  if (raw == null) return undefined;
-  const invalid = (): Gate => {
-    problems.push(GATE_INVALID);
-    return { invalid: true };
-  };
-  if (typeof raw !== 'object' || Array.isArray(raw)) return invalid();
-  const g = raw as Record<string, unknown>;
-  if (!Number.isInteger(g.count) || (g.count as number) < 1) return invalid();
-  const criteria = [...(g.spec === true ? ['spec' as const] : []), ...(g.screen === 'page' ? ['screen' as const] : [])];
-  const others = Object.keys(g).filter((k) => k !== 'count' && k !== 'spec' && k !== 'screen');
-  if (criteria.length !== 1 || others.length || ('spec' in g && g.spec !== true) || ('screen' in g && g.screen !== 'page')) return invalid();
-  return { count: g.count as number, criterion: criteria[0]! };
-}
-
 /** Un titre public vide ne dirait rien au public : refusé plutôt qu'écrit. */
 function cleanPublic(text: string): string {
   const t = text.trim();
   if (t === '') throw new RafError('titre public vide — raf public <id> "titre" (ou --clear pour l\'effacer)');
   return t;
-}
-
-function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lot {
-  const status = STATUSES.includes(raw.status as Status) ? (raw.status as Status) : 'todo';
-  const asDay = (field: string): Day | undefined => {
-    const v = raw[field];
-    if (v == null) return undefined;
-    if (isDay(v)) return v;
-    problems.push(`${field} « ${String(v)} » n'est pas une date AAAA-MM-JJ`);
-    return undefined;
-  };
-  const after = raw.after == null ? [] : Array.isArray(raw.after) ? raw.after.map(String) : [String(raw.after)];
-  const last = asDay('last');
-  let uses: string[] | undefined;
-  if (raw.uses != null) {
-    if (Array.isArray(raw.uses) && raw.uses.every((n) => typeof n === 'string' && RESOURCE_NAME.test(n))) uses = [...new Set(raw.uses as string[])];
-    else problems.push(`uses ${RESOURCES_BAD_LIST}`);
-  }
-  let screen: Screen | undefined;
-  if (raw.screen != null) {
-    if (SCREENS.includes(raw.screen as Screen)) screen = raw.screen as Screen;
-    else problems.push(`screen « ${String(raw.screen)} » inconnu (${SCREENS.join(', ')})`);
-    if (screen && raw.visible !== true) problems.push(`screen « ${screen} » sans visible : un écran est un changement visible`);
-  }
-  let spec: true | undefined;
-  if (raw.spec != null) {
-    if (raw.spec === true) spec = true;
-    else if (raw.spec !== false) problems.push(`spec : true ou false attendu (reçu « ${String(raw.spec)} »)`);
-  }
-  const gate = readGate(raw.gate, problems);
-  const okRaw = raw.docs_ok as Record<string, unknown> | undefined;
-  const docsOk = okRaw && typeof okRaw === 'object' && typeof okRaw.reason === 'string' && okRaw.reason.trim() !== '' ? { date: String(okRaw.date ?? ''), reason: okRaw.reason.trim() } : undefined;
-  return {
-    id: String(raw.id),
-    title: String(raw.title ?? ''),
-    status,
-    estimate: typeof raw.estimate === 'number' && raw.estimate > 0 ? raw.estimate : 1,
-    quickwin: raw.quickwin === true,
-    visible: raw.visible === true,
-    ...(screen ? { screen } : {}),
-    ...(spec ? { spec } : {}), ...(raw.local === true ? { local: true as const } : {}),
-    ...(gate ? { gate } : {}),
-    ...(typeof raw.public === 'string' && raw.public.trim() !== '' ? { public: raw.public.trim() } : {}),
-    ...(typeof raw.goal === 'string' && raw.goal.trim() !== '' ? { goal: raw.goal.trim() } : {}),
-    ...(Number.isInteger(raw.every) && (raw.every as number) > 0 ? { every: raw.every as number } : {}),
-    ...(last ? { last } : {}),
-    after,
-    ...(uses?.length ? { uses } : {}),
-    created: asDay('created'),
-    started: asDay('started'),
-    finished: asDay('finished'),
-    notes: Array.isArray(raw.notes)
-      ? raw.notes.map((n: Record<string, unknown>) => ({ date: String(n.date ?? ''), text: String(n.text ?? '') }))
-      : [],
-    tasks: Array.isArray(raw.tasks)
-      ? raw.tasks.map((t: Record<string, unknown>) => ({
-          id: String(t.id),
-          title: String(t.title ?? ''),
-          status: STATUSES.includes(t.status as Status) ? (t.status as Status) : 'todo',
-        }))
-      : [],
-    ...(repoList(raw.repos).length ? { repos: repoList(raw.repos) } : {}),
-    ...(asVerdict(raw.ux) ? { ux: asVerdict(raw.ux) } : {}),
-    ...(asVerdict(raw.review) ? { review: asVerdict(raw.review) } : {}),
-    ...(docsOk ? { docsOk } : {}),
-    problems,
-  };
-}
-
-/**
- * Dépôts voisins déclarés : une chaîne (le chemin) ou un objet `{ path, cite }`, seuls ou en liste (une valeur seule vaut une
- * liste d'un dépôt). Une entrée sans chemin textuel est écartée ; un `cite` vide ou non textuel vaut pas de `cite`.
- */
-function repoList(raw: unknown): LotRepoDecl[] {
-  const items = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
-  const out: LotRepoDecl[] = [];
-  for (const item of items) {
-    const path = typeof item === 'string' ? item : item && typeof item === 'object' && typeof (item as Record<string, unknown>).path === 'string' ? ((item as Record<string, unknown>).path as string) : '';
-    if (path.trim() === '') continue;
-    const cite = item && typeof item === 'object' ? (item as Record<string, unknown>).cite : undefined;
-    out.push({ path: path.trim(), ...(typeof cite === 'string' && cite.trim() !== '' ? { cite: cite.trim() } : {}) });
-  }
-  return out;
-}
-
-function asVerdict(raw: unknown): Verdict | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
-  const v = raw as Record<string, unknown>;
-  // Écrit à la main sans verdict (clé absente, vide ou blanche) : rien n'a été dit de la revue, la porte
-  // reste fermée — comme `raf ux` et `raf review` refusent d'enregistrer un verdict vide.
-  if (String(v.verdict ?? '').trim() === '') return undefined;
-  const verdict: Verdict = { date: String(v.date ?? ''), verdict: String(v.verdict) };
-  // Champ présent mais vide : relu « jusqu'à rien », comme un verdict noté sans commit.
-  if ('commit' in v) verdict.commit = v.commit == null || String(v.commit).trim() === '' ? null : String(v.commit).trim();
-  if (v.repos && typeof v.repos === 'object' && !Array.isArray(v.repos)) {
-    const repos = Object.entries(v.repos as Record<string, unknown>).map(([k, sha]) => [k, sha == null || String(sha).trim() === '' ? null : String(sha).trim()] as const);
-    if (repos.length) verdict.repos = Object.fromEntries(repos);
-  }
-  const r = v.reporte as Record<string, unknown> | null | undefined;
-  if (r && typeof r === 'object' && !Array.isArray(r) && r.de != null && r.vers != null) verdict.reporte = { de: String(r.de), vers: String(r.vers), patchId: String(r.patchId ?? '') };
-  return verdict;
 }

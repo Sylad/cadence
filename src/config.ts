@@ -8,8 +8,9 @@ import { readGate } from './gate-config.js';
 import { DEFAULT_TEST_PATTERNS, type TestGateConfig } from './testgate.js';
 import { gitRoot } from './git.js';
 import { planCommitProblem } from './plan-commit.js';
+import { parseStates } from './plan-states.js';
 import { checkTestReplay, readGateTest, type GateTest } from './orchestrate/gate-parts.js';
-import { booleanKey } from './yaml-keys.js';
+import { booleanKey, isObject, list } from './yaml-keys.js';
 import { FIELDS, Plan, RafError, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
 interface PlanConfig {
@@ -22,12 +23,10 @@ interface PlanConfig {
   settings: PlanSettings;
 }
 
-const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add', 'onWrite', 'commit'];
+const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add', 'onWrite', 'commit', 'states', 'transitions', 'doneState', 'blockedState'];
 const ON_WRITE_KEYS = ['command', 'files'];
 const FORMAT_KEYS = ['lots', 'fields', 'statuses', 'estimates'];
 
-const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
-const list = (v: unknown): string[] => (v == null ? [] : Array.isArray(v) ? v.map(String) : [String(v)]);
 
 /** Chemin réel (liens symboliques résolus) du plus proche ancêtre existant, le reste rattaché tel quel. */
 function realish(p: string): string {
@@ -104,6 +103,7 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   if (p.files != null) settings.files = list(p.files);
   if (p.onWrite != null) settings.onWrite = readOnWrite(p.onWrite, root ?? dirname(resolve(file)), bad);
   if (FORMAT_KEYS.some((k) => p[k] != null)) settings.format = parseFormat(p, bad);
+  Object.assign(settings, parseStates(p, bad, settings.format !== undefined));
   if (p.path != null && String(p.path).trim() === '') throw bad('path est vide');
   if (p.add != null && (typeof p.add !== 'string' || !p.add.includes('{title}'))) throw bad('add doit être une commande qui contient {title}');
   if (p.commit != null) {

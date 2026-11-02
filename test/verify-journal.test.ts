@@ -60,7 +60,7 @@ describe('L435 — verify vert après une livraison rouge du même sha', () => {
 
   it('R5 — deux verify de suite n\'écrivent qu\'une ligne', async () => {
     const d = stateDir();
-    appendFailedDelivery(d, '2026-10-29', SHA, 'CI en échec');
+    appendFailedDelivery(d, '2026-10-29', SHA, 'vérification en échec');
     touch(join(d, 'deliveries-failed.log'), 1000);
     await verify(d, SHA);
     await verify(d, SHA);
@@ -69,7 +69,7 @@ describe('L435 — verify vert après une livraison rouge du même sha', () => {
 
   it('R6 — une livraison verte du même sha déjà postérieure au rouge : rien de plus', async () => {
     const d = stateDir();
-    appendFailedDelivery(d, '2026-10-28', SHA, 'CI en échec');
+    appendFailedDelivery(d, '2026-10-28', SHA, 'vérification en échec');
     touch(join(d, 'deliveries-failed.log'), 1000);
     appendDelivery(d, '2026-10-28', SHA);
     touch(join(d, 'deliveries.log'), 2000);
@@ -81,10 +81,19 @@ describe('L435 — verify vert après une livraison rouge du même sha', () => {
     const d = stateDir();
     appendDelivery(d, '2026-10-27', SHA);
     touch(join(d, 'deliveries.log'), 1000);
-    appendFailedDelivery(d, '2026-10-29', SHA, 'CI en échec');
+    appendFailedDelivery(d, '2026-10-29', SHA, 'vérification en échec');
     touch(join(d, 'deliveries-failed.log'), 2000);
     expect(recordVerifiedDelivery(d, '2026-10-29', SHA)).toBe(true);
     expect(journal(d)).toBe(`2026-10-27 ${SHA}\n2026-10-29 ${SHA}\n`);
+  });
+
+  it('R9 — une livraison rouge d\'une autre classe que « vérification » (CI, refus, déploiement) n\'est jamais effacée', async () => {
+    for (const [cls, reason] of [['ci', 'CI en échec'], ['refus', 'refus'], ['deploiement', 'déploiement en échec'], [undefined, 'CI en échec']] as const) {
+      const d = stateDir();
+      appendFailedDelivery(d, '2026-10-29', SHA, reason, cls);
+      expect((await verify(d, SHA)).exit).toBe(0);
+      expect(journal(d)).toBe('');
+    }
   });
 
   it('R8 — sans journal passé (verify hors dépôt de suivi) rien n\'est écrit et rien ne casse', async () => {

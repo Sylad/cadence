@@ -252,12 +252,14 @@ verify : 1 effet rouge sur 2 vérifications
 
 **A green verify clears a red delivery of the same sha** (L435). When every check is
 green and the sha verified is the one of the *last* line of `deliveries-failed.log`
-(a delivery that failed on an outage, say, while the effect is there), `verify` appends
+(a `[verification]` delivery that failed on an outage, say, while the effect is there), `verify` appends
 `day sha` to `deliveries.log` and prints `verify : <sha> avait une livraison rouge,
 l'effet est vert — inscrit au journal des livraisons`; the `cadence-hud` panel, which
 shows the red line until `deliveries.log` is newer than `deliveries-failed.log`, drops
 it without delivering again. Nothing is written when a check is red, when the last red
-delivery is another sha's (writing would hide it), when there is no red delivery, or when
+delivery is another sha's (writing would hide it), when it is not of class `[verification]`
+(a red `[ci]`, `[refus]` or `[deploiement]` stays: checks do not always read the sha, so a green
+verify proves nothing about a commit that was never built or deployed), when there is no red delivery, or when
 `deliveries.log` was already modified after `deliveries-failed.log`. `deliveries-failed.log`
 is never rewritten, so `cadence perf` still counts the red delivery and now also the green one.
 

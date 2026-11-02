@@ -972,9 +972,10 @@ lots:
     finished: 2026-11-02
   - id: L487
     title: "Nettoyage D5–D6 : lecture d'une clé et du fichier cadence.yaml factorisées (config.ts, continue.ts, lead.ts, resources.ts) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § D ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-10-31
+    started: 2026-11-02
   - id: L488
     title: "Découpage C3 : cli.ts en modules par famille de commandes, dispatch réduit à une table (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C3 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: todo

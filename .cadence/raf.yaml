@@ -869,9 +869,10 @@ lots:
     finished: 2026-10-31
   - id: L477
     title: "Cliquet (suite de L462) : une fonction qui grossit sous le pire chiffre de son fichier passe, et comparerMigration compense un défaut neuf (fichier neuf) par un gain ailleurs — compter la somme des excès par fichier et par règle, refuser un défaut neuf même compensé ; test sur les deux cas mesurés par la revue"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-31
+    started: 2026-11-02
   - id: L478
     title: "Cliquet (suite de L462) : la base ne doit pas remonter (rm + --init ou édition à la main passent en porte et en CI : comparer à la base du sha de départ) et le découpage d'un fichier de la base doit avoir une voie admise (transfert documenté, mesure comparée au total) — cas L461"
     status: todo

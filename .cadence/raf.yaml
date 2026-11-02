@@ -1444,10 +1444,11 @@ lots:
     created: 2026-11-02
   - id: L535
     title: "raf estimate <id> abc ou .5 répond « estimation invalide : NaN » au lieu de la valeur saisie (cli.ts:536 remplace la saisie par NaN avant setEstimate) — revue de L465"
-    status: todo
+    status: doing
     estimate: 0.1
     quickwin: true
     created: 2026-11-02
+    started: 2026-11-02
   - id: L536
     title: "Ids libres (plan.idPattern) : raf archive range un lot archivé par le nombre final de son id (archive.ts:40), AB-1 passe de la 1re à la 2e place de raf list après archive, contre la promesse de docs/raf.md:73 ; et sous idPattern, fix(L12-bis), feat(L3-L5), release-L3 ne citent plus L12/L3 (garde d'avant perdue) — revue de L465"
     status: todo

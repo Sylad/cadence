@@ -24,7 +24,7 @@ export interface RunEnv {
   launch: string;
 }
 
-/** Les contrôles de lancement de command.ts, passés par l'appelant : ce module ne les importe pas (command.ts l'importe). */
+/** Les contrôles de lancement d'execute.ts (LAUNCH_CHECKS), passés par l'appelant : ce module ne les importe pas (execute.ts l'importe). */
 export interface LaunchChecks {
   resolveTargets: (args: Pick<Args, 'lots'>, io: OrchestrateIo, refusals: string[]) => Target[];
   /** Le contrôle préalable d'un lot de lancement, pour des lots ajoutés à la vague `addTo.wave` (qui porte déjà `addTo.lots`). */
@@ -97,7 +97,7 @@ export async function addToLive(args: Args, run: RunEnv, store: RunStore, checks
   return 0;
 }
 
-/** Ce que la vague en cours d'`execute` prête à la file d'ajouts : ses états partagés (mutés par l'ajout) et les gestes de command.ts. */
+/** Ce que la vague en cours d'`execute` prête à la file d'ajouts : ses états partagés (mutés par l'ajout) et les gestes d'execute.ts. */
 export interface AddEnv {
   store: RunStore;
   wave: WaveState;

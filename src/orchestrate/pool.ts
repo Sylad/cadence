@@ -1,7 +1,7 @@
 import { runLot, type LotCtx } from './cycle.js';
 import { lotKey, lotRepoPaths, type LotState } from './state.js';
 
-/** Valeur de repli de `runPool` quand l'appelant ne donne pas de plafond ; le réglage réel est DEFAULT_MAX_SESSIONS, `--max-sessions` ou CADENCE_MAX_SESSIONS (command.ts). */
+/** Valeur de repli de `runPool` quand l'appelant ne donne pas de plafond ; le réglage réel est DEFAULT_MAX_SESSIONS, `--max-sessions` ou CADENCE_MAX_SESSIONS (command-args.ts). */
 export const SLOTS = 2;
 
 /**
@@ -29,10 +29,10 @@ export function groupLots(ctxs: LotCtx[]): LotCtx[][] {
 
 /**
  * Ordonnanceur : une file par dépôt, les lots d'un dépôt l'un après l'autre dans l'ordre donné, `slots` files au plus en parallèle. Deux lots qui partagent un dépôt
- * sont dans la même file : jamais deux sessions dans un même dépôt (le plafond global des sessions de toutes les vagues est tenu par command.ts).
+ * sont dans la même file : jamais deux sessions dans un même dépôt (le plafond global des sessions de toutes les vagues est tenu par execute.ts).
  * `parallel(groupe)` (L279) : les lots de ce groupe sont chacun leur propre file — ils jouent ensemble, chacun dans son worktree, dans la limite de `slots` ;
  * un lot qui dépend d'un lot du groupe attend qu'il soit fini (ready après son intégration) avant de partir, et le lot en attente d'une place n'est pas commencé
- * (son worktree n'existe pas encore, R3). `answers` (L407) : à chaque tour, et au plus tard après `pollMs`, les lots en question dont le lead a déposé la réponse repartent comme une file de plus (un créneau libre ; sans worktree, jamais en même temps qu'un autre lot du même dépôt). `onSettled` est appelé quand un lot a fini de jouer (L132 : command.ts libère alors les dépôts que plus aucun lot ne tient). Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
+ * (son worktree n'existe pas encore, R3). `answers` (L407) : à chaque tour, et au plus tard après `pollMs`, les lots en question dont le lead a déposé la réponse repartent comme une file de plus (un créneau libre ; sans worktree, jamais en même temps qu'un autre lot du même dépôt). `onSettled` est appelé quand un lot a fini de jouer (L132 : execute.ts libère alors les dépôts que plus aucun lot ne tient). Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
  */
 /**
  * La file des demandes du lead à une vague vivante (L407 : réponses, L421 : lots ajoutés) : `take(canRun, free)` applique les réponses déposées aux lots en question que `canRun` accepte et ajoute les lots demandés,

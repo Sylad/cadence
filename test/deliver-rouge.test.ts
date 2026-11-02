@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { deliver, parseDeliverConfig, type DeliverCtx, type DeliverDeps } from '../src/deliver.js';
 import { headSha } from '../src/git.js';
 import { Plan } from '../src/plan.js';
-import { readFailedDeliveries, sharedStateDir as stateDir, writeLock } from '../src/state.js';
+import { readFailedEntries, sharedStateDir as stateDir, writeLock } from '../src/state.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -100,12 +100,12 @@ describe('deliver — journal des livraisons rouges (L227)', () => {
 
   it('R2 — le journal rouge se lit ligne à ligne, une ligne illisible est ignorée, un fichier absent ou illisible donne une liste vide', () => {
     const dir = tempDir();
-    expect(readFailedDeliveries(dir)).toEqual([]);
+    expect(readFailedEntries(dir).map((e) => e.day)).toEqual([]);
     writeFileSync(join(dir, 'deliveries-failed.log'), '2026-10-10 abc CI en échec\nn importe quoi\n2026-10-11 def x\n');
-    expect(readFailedDeliveries(dir)).toEqual(['2026-10-10', '2026-10-11']);
+    expect(readFailedEntries(dir).map((e) => e.day)).toEqual(['2026-10-10', '2026-10-11']);
     const unreadable = tempDir();
     mkdirSync(join(unreadable, 'deliveries-failed.log'));
-    expect(readFailedDeliveries(unreadable)).toEqual([]);
+    expect(readFailedEntries(unreadable).map((e) => e.day)).toEqual([]);
   });
 
   it.skipIf(process.getuid?.() === 0)('R9 — journal rouge non inscriptible : deliver sort 1 avec son message d\'échec et l\'avertissement', async () => {

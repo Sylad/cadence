@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { chmodSync } from 'node:fs';
 import { parseSession, isQuotaMessage } from '../src/orchestrate/result.js';
 import { buildArgs, buildLocalArgs, buildRetryArgs, killSessions, realClaude, mcpServersFor, writeMcpConfig, claudeConfigDir, enabledPlugins, settingsFiles, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
+import { realOrchestrateDeps } from '../src/orchestrate/command.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { tempDir } from './helpers.js';
 
@@ -141,6 +142,11 @@ describe('buildArgs', () => {
     expect(enabledPlugins([join(d, 'absent.json')])).toEqual([]);
     writeFileSync(join(home, 'settings.json'), JSON.stringify({ theme: 'dark' }));
     expect(enabledPlugins([join(home, 'settings.json')])).toEqual([]);
+  });
+
+  it('L485 — les dépendances réelles de orchestrate lisent le dossier de Claude comme claudeConfigDir : HOME de l\'environnement donné, CLAUDE_CONFIG_DIR d\'abord', () => {
+    expect(realOrchestrateDeps({ HOME: '/home/simule' }).claudeHome).toBe('/home/simule/.claude');
+    expect(realOrchestrateDeps({ HOME: '/home/simule', CLAUDE_CONFIG_DIR: '/cfg' }).claudeHome).toBe('/cfg');
   });
 
   it('L398 — claudeConfigDir respecte CLAUDE_CONFIG_DIR, sinon HOME/.claude', () => {

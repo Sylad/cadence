@@ -226,8 +226,3 @@ export function scanStale(root: string, patterns: string[], days: number, today:
     unreadable: [...unreadable].sort(),
   };
 }
-
-/** Éléments périmés à proposer (voir `scanStale`), du plus vieux au plus récent. Ne supprime rien. */
-export function staleFiles(root: string, patterns: string[], days: number, today: Day): Stale[] {
-  return scanStale(root, patterns, days, today).stale;
-}

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, lstatSync, lutimesSync, mkdirSync, readdirSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { addDays, diffDays, toDay } from '../src/dates.js';
-import { scanStale, staleFiles } from '../src/clean.js';
+import { scanStale } from '../src/clean.js';
 import { CLEAN_TODAY, cleanAt, gitRepo, tempDir } from './helpers.js';
 
 const TODAY = CLEAN_TODAY;
@@ -35,7 +35,7 @@ afterEach(() => {
 /** root lit tout malgré les droits : les tests de lecture refusée n'ont pas de sens sous root. */
 const asRoot = process.getuid?.() === 0;
 
-describe('staleFiles — dépôts git', () => {
+describe('scanStale — dépôts git', () => {
   it('ne propose jamais un dossier qui est un dépôt git', () => {
     const tmp = tempDir();
     const clone = join(tmp, 'clone');
@@ -43,7 +43,7 @@ describe('staleFiles — dépôts git', () => {
     git(clone, 'init', '-q');
     touch(join(tmp, 'libre.png'));
     ageTree(clone);
-    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'libre.png')]);
+    expect(names(scanStale(tmp, [`${tmp}/*`], 7, TODAY).stale)).toEqual([join(tmp, 'libre.png')]);
   });
 
   it('ne propose jamais un dossier qui contient un dépôt git, même profond', () => {
@@ -52,7 +52,7 @@ describe('staleFiles — dépôts git', () => {
     mkdirSync(join(outer, 'a/b/clone'), { recursive: true });
     git(join(outer, 'a/b/clone'), 'init', '-q');
     ageTree(outer);
-    expect(staleFiles(tmp, [`${tmp}/*`], 7, TODAY)).toEqual([]);
+    expect(scanStale(tmp, [`${tmp}/*`], 7, TODAY).stale).toEqual([]);
   });
 
   it('ne propose pas un dossier dont un fichier est suivi par un dépôt situé hors de la racine', () => {
@@ -63,7 +63,7 @@ describe('staleFiles — dépôts git', () => {
     git(autre, 'commit', '-qm', 'chore: suivi');
     touch(join(autre, 'dossier'));
     touch(join(autre, 'libre.png'));
-    expect(names(staleFiles(root, [`${autre}/*`], 7, TODAY))).toEqual([join(autre, 'libre.png')]);
+    expect(names(scanStale(root, [`${autre}/*`], 7, TODAY).stale)).toEqual([join(autre, 'libre.png')]);
   });
 
   // Ici le dossier porte un FICHIER `.git` (« gitdir: … ») : le travail non commité qu'il contient
@@ -79,7 +79,7 @@ describe('staleFiles — dépôts git', () => {
     touch(join(tmp, 'libre.png'));
     ageTree(wt);
     ageTree(join(tmp, 'libre.png'));
-    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'libre.png')]);
+    expect(names(scanStale(tmp, [`${tmp}/*`], 7, TODAY).stale)).toEqual([join(tmp, 'libre.png')]);
   });
 
   it('un dossier à fichier .git façon sous-module avec du travail non commité n’est jamais proposé', () => {
@@ -89,7 +89,7 @@ describe('staleFiles — dépôts git', () => {
     touch(join(tmp, 'sub/travail-non-commite.txt'));
     touch(join(tmp, 'libre.png'));
     ageTree(join(tmp, 'sub'));
-    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'libre.png')]);
+    expect(names(scanStale(tmp, [`${tmp}/*`], 7, TODAY).stale)).toEqual([join(tmp, 'libre.png')]);
   });
 
   // Sans entrée `.git` : un dossier git se reconnaît à son contenu, comme git le fait (HEAD + objects/ + refs/).
@@ -98,8 +98,8 @@ describe('staleFiles — dépôts git', () => {
     git(tmp, 'init', '-q', '--bare', 'backup.git');
     touch(join(tmp, 'libre.png'));
     ageTree(tmp);
-    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'libre.png')]);
-    expect(staleFiles(tmp, [`${tmp}/*/*`, `${tmp}/*/*/*`, `${tmp}/backup.git/HEAD`], 7, TODAY)).toEqual([]);
+    expect(names(scanStale(tmp, [`${tmp}/*`], 7, TODAY).stale)).toEqual([join(tmp, 'libre.png')]);
+    expect(scanStale(tmp, [`${tmp}/*/*`, `${tmp}/*/*/*`, `${tmp}/backup.git/HEAD`], 7, TODAY).stale).toEqual([]);
   });
 
   it('un dossier qui contient un miroir (clone --mirror) n’est jamais proposé, ni le miroir, ni son contenu', () => {
@@ -111,7 +111,7 @@ describe('staleFiles — dépôts git', () => {
     mkdirSync(join(tmp, 'work'));
     git(join(tmp, 'work'), 'clone', '-q', '--mirror', source, 'mirror.git');
     ageTree(tmp);
-    expect(staleFiles(tmp, [`${tmp}/*`, `${tmp}/*/*`, `${tmp}/*/*/*`, `${tmp}/*/*/*/*`], 7, TODAY)).toEqual([]);
+    expect(scanStale(tmp, [`${tmp}/*`, `${tmp}/*/*`, `${tmp}/*/*/*`, `${tmp}/*/*/*/*`], 7, TODAY).stale).toEqual([]);
   });
 
   it('un dossier git séparé (--separate-git-dir) n’est jamais proposé, ni ce qu’il contient', () => {
@@ -120,7 +120,7 @@ describe('staleFiles — dépôts git', () => {
     execFileSync('git', ['init', '-q', '--separate-git-dir', join(tmp, 'gitdir'), travail], { stdio: 'ignore' });
     touch(join(tmp, 'libre.png'));
     ageTree(tmp);
-    expect(names(staleFiles(tmp, [`${tmp}/*`, `${tmp}/*/*`, `${tmp}/*/*/*`], 7, TODAY))).toEqual([join(tmp, 'libre.png')]);
+    expect(names(scanStale(tmp, [`${tmp}/*`, `${tmp}/*/*`, `${tmp}/*/*/*`], 7, TODAY).stale)).toEqual([join(tmp, 'libre.png')]);
   });
 
   it('un dossier d’administration d’arbre de travail (HEAD + commondir) n’est jamais proposé, ni ce qu’il contient', () => {
@@ -130,7 +130,7 @@ describe('staleFiles — dépôts git', () => {
     git(repo, 'worktree', 'add', '-q', join(tempDir(), 'wt'));
     execFileSync('cp', ['-r', join(repo, '.git/worktrees/wt'), join(tmp, 'admin')]);
     ageTree(tmp);
-    expect(staleFiles(tmp, [`${tmp}/*`, `${tmp}/*/*`], 7, TODAY)).toEqual([]);
+    expect(scanStale(tmp, [`${tmp}/*`, `${tmp}/*/*`], 7, TODAY).stale).toEqual([]);
   });
 
   // Dans un hook git (pre-commit…), GIT_INDEX_FILE et GIT_DIR sont hérités : git répondrait pour un
@@ -148,7 +148,7 @@ describe('staleFiles — dépôts git', () => {
       const avant = process.env[variable];
       process.env[variable] = valeur;
       try {
-        expect(staleFiles(repo, [`${repo}/*.png`], 7, TODAY)).toEqual([]);
+        expect(scanStale(repo, [`${repo}/*.png`], 7, TODAY).stale).toEqual([]);
       } finally {
         if (avant === undefined) delete process.env[variable];
         else process.env[variable] = avant;
@@ -166,7 +166,7 @@ describe('staleFiles — dépôts git', () => {
     git(repo, 'commit', '-qm', 'chore: suivis');
     touch(join(repo, 'libre.png'));
     for (const n of noms) touch(join(repo, n));
-    expect(names(staleFiles(repo, [`${repo}/*.png`], 7, TODAY))).toEqual([join(repo, 'libre.png')]);
+    expect(names(scanStale(repo, [`${repo}/*.png`], 7, TODAY).stale)).toEqual([join(repo, 'libre.png')]);
   });
 
   it('un fichier suivi qu’on atteint par un lien symbolique reste protégé', () => {
@@ -177,7 +177,7 @@ describe('staleFiles — dépôts git', () => {
     git(autre, 'commit', '-qm', 'chore: suivi');
     const lien = tempDir();
     symlinkSync(autre, join(lien, 'vers'));
-    expect(staleFiles(root, [`${lien}/vers/*.png`], 7, TODAY)).toEqual([]);
+    expect(scanStale(root, [`${lien}/vers/*.png`], 7, TODAY).stale).toEqual([]);
   });
 
   it('un fichier suivi dont le nom commence par .. n’est pas pris pour « hors du dépôt »', () => {
@@ -185,29 +185,29 @@ describe('staleFiles — dépôts git', () => {
     touch(join(dir, '..weird'));
     git(dir, 'add', '..weird');
     git(dir, 'commit', '-qm', 'chore: suivi');
-    expect(staleFiles(dir, ['..*'], 7, TODAY)).toEqual([]);
+    expect(scanStale(dir, ['..*'], 7, TODAY).stale).toEqual([]);
   });
 });
 
-describe('staleFiles — motifs', () => {
+describe('scanStale — motifs', () => {
   it('« * » n’attrape pas les noms en « . », comme le shell', () => {
     const dir = tempDir();
     touch(join(dir, '.env'));
     touch(join(dir, 'a.png'));
-    expect(names(staleFiles(dir, [`${dir}/*`], 7, TODAY))).toEqual([join(dir, 'a.png')]);
+    expect(names(scanStale(dir, [`${dir}/*`], 7, TODAY).stale)).toEqual([join(dir, 'a.png')]);
   });
 
   it('un motif commençant par « . » attrape les noms cachés', () => {
     const dir = tempDir();
     touch(join(dir, '.cache-vieux'));
     touch(join(dir, '.autre'));
-    expect(names(staleFiles(dir, [`${dir}/.cache-*`], 7, TODAY))).toEqual([join(dir, '.cache-vieux')]);
+    expect(names(scanStale(dir, [`${dir}/.cache-*`], 7, TODAY).stale)).toEqual([join(dir, '.cache-vieux')]);
   });
 
   it('« * » ne traverse pas non plus un dossier caché au milieu du chemin', () => {
     const dir = tempDir();
     touch(join(dir, '.caché/vieux.png'));
-    expect(staleFiles(dir, [`${dir}/*/vieux.png`], 7, TODAY)).toEqual([]);
+    expect(scanStale(dir, [`${dir}/*/vieux.png`], 7, TODAY).stale).toEqual([]);
   });
 
   it('« * » ne descend jamais dans un lien symbolique vers un dossier extérieur ; le lien seul peut être proposé', () => {
@@ -218,8 +218,8 @@ describe('staleFiles — motifs', () => {
     touch(join(dehors, 'precieux/du-jour.txt'), cleanAt(0, '08:00:00'));
     symlinkSync(join(dehors, 'precieux'), join(tmp, 'lien'));
     lutimesSync(join(tmp, 'lien'), OLD, OLD);
-    expect(staleFiles(tmp, [`${tmp}/*/*`, `${tmp}/*/*/*`, `${tmp}/*/these.txt`], 7, TODAY)).toEqual([]);
-    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'lien')]);
+    expect(scanStale(tmp, [`${tmp}/*/*`, `${tmp}/*/*/*`, `${tmp}/*/these.txt`], 7, TODAY).stale).toEqual([]);
+    expect(names(scanStale(tmp, [`${tmp}/*`], 7, TODAY).stale)).toEqual([join(tmp, 'lien')]);
   });
 
   it('« * » ne descend jamais dans un lien vers un ancêtre (tmp/self → ..) : la racine n’est pas reparcourue', () => {
@@ -229,7 +229,7 @@ describe('staleFiles — motifs', () => {
     symlinkSync('..', join(root, 'tmp/self'));
     lutimesSync(join(root, 'tmp/self'), OLD, OLD);
     ageTree(join(root, 'tmp'));
-    expect(staleFiles(root, ['tmp/*/*', 'tmp/*/*/*'], 7, TODAY)).toEqual([]);
+    expect(scanStale(root, ['tmp/*/*', 'tmp/*/*/*'], 7, TODAY).stale).toEqual([]);
   });
 
   it('une fois un « * » franchi, un segment écrit en entier ne suit plus un lien non plus (tmp/*/out/*)', () => {
@@ -239,7 +239,7 @@ describe('staleFiles — motifs', () => {
     mkdirSync(join(tmp, 'run1'));
     symlinkSync(join(dehors, 'precieux'), join(tmp, 'run1/out'));
     ageTree(tmp);
-    expect(staleFiles(tmp, [`${tmp}/*/out/*`, `${tmp}/*/out/these.docx`], 7, TODAY)).toEqual([]);
+    expect(scanStale(tmp, [`${tmp}/*/out/*`, `${tmp}/*/out/these.docx`], 7, TODAY).stale).toEqual([]);
   });
 
   it('un segment écrit en entier suit le lien symbolique, comme cd', () => {
@@ -247,7 +247,7 @@ describe('staleFiles — motifs', () => {
     const dehors = tempDir();
     touch(join(dehors, 'vieux.png'));
     symlinkSync(dehors, join(tmp, 'partage'));
-    expect(names(staleFiles(tmp, [`${tmp}/partage/*`], 7, TODAY))).toEqual([join(tmp, 'partage/vieux.png')]);
+    expect(names(scanStale(tmp, [`${tmp}/partage/*`], 7, TODAY).stale)).toEqual([join(tmp, 'partage/vieux.png')]);
   });
 
   it('.git n’est jamais proposé, même par un motif en « . »', () => {
@@ -255,11 +255,11 @@ describe('staleFiles — motifs', () => {
     touch(join(dir, '.gitx'));
     // Tout l'arbre est vieilli, .git compris : seul le refus de .git le protège, pas son contenu frais.
     ageTree(dir);
-    expect(names(staleFiles(dir, [`${dir}/.git*`], 7, TODAY))).toEqual([join(dir, '.gitx')]);
+    expect(names(scanStale(dir, [`${dir}/.git*`], 7, TODAY).stale)).toEqual([join(dir, '.gitx')]);
   });
 });
 
-describe('staleFiles — contenu des dossiers et .git', () => {
+describe('scanStale — contenu des dossiers et .git', () => {
   it('l’âge d’un dossier est la date la plus récente de son contenu', () => {
     const tmp = tempDir();
     touch(join(tmp, 'travail/notes.md'), cleanAt(-1));
@@ -267,7 +267,7 @@ describe('staleFiles — contenu des dossiers et .git', () => {
     touch(join(tmp, 'vieux/a/b.txt'));
     touch(join(tmp, 'vieux/a'));
     touch(join(tmp, 'vieux'));
-    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'vieux')]);
+    expect(names(scanStale(tmp, [`${tmp}/*`], 7, TODAY).stale)).toEqual([join(tmp, 'vieux')]);
   });
 
   // `tar xf`, `cp -a`, `rsync -a` rendent un mtime ancien à un fichier créé à l'instant ; son ctime,
@@ -284,11 +284,11 @@ describe('staleFiles — contenu des dossiers et .git', () => {
     const ctimeDay = (path: string) => toDay(new Date(lstatSync(path).ctimeMs));
     const création = ctimeDay(join(tmp, 'copie.png'));
     // Trois jours après leur création réelle : sous le seuil de 7 j, malgré un mtime de 100 j.
-    expect(staleFiles(tmp, [`${tmp}/*`], 7, addDays(création, 3))).toEqual([]);
+    expect(scanStale(tmp, [`${tmp}/*`], 7, addDays(création, 3)).stale).toEqual([]);
     // Le ctime ne fait pas rajeunir indéfiniment : passé le seuil, l'âge est celui du ctime (pas 100 j).
     // Chaque âge se mesure à son propre ctime, au cas où la création des deux entrées enjambe minuit.
     const plusTard = addDays(création, 10);
-    const trouvés = staleFiles(tmp, [`${tmp}/*`], 7, plusTard);
+    const trouvés = scanStale(tmp, [`${tmp}/*`], 7, plusTard).stale;
     expect(trouvés.map((s) => s.path).sort()).toEqual([join(tmp, 'copie.png'), join(tmp, 'extrait')]);
     for (const s of trouvés) expect(s.age).toBe(diffDays(ctimeDay(s.path), plusTard));
   });
@@ -299,8 +299,8 @@ describe('staleFiles — contenu des dossiers et .git', () => {
     mkdirSync(clone);
     git(clone, 'init', '-q');
     ageTree(clone);
-    expect(staleFiles(tmp, [`${tmp}/repo/.*/*`], 7, TODAY)).toEqual([]);
-    expect(staleFiles(tmp, [`${tmp}/repo/.git/*`, `${tmp}/repo/.*`], 7, TODAY)).toEqual([]);
+    expect(scanStale(tmp, [`${tmp}/repo/.*/*`], 7, TODAY).stale).toEqual([]);
+    expect(scanStale(tmp, [`${tmp}/repo/.git/*`, `${tmp}/repo/.*`], 7, TODAY).stale).toEqual([]);
   });
 
   it('l’âge d’un dossier ancien vient d’un fichier d’aujourd’hui caché profondément : non proposé', () => {
@@ -308,7 +308,7 @@ describe('staleFiles — contenu des dossiers et .git', () => {
     touch(join(tmp, 'ancien/a/b/c/du-jour.txt'), cleanAt(0, '08:00:00'));
     for (const d of ['ancien/a/b/c', 'ancien/a/b', 'ancien/a', 'ancien']) touch(join(tmp, d));
     touch(join(tmp, 'vieux.png'));
-    expect(names(staleFiles(tmp, [`${tmp}/*`], 7, TODAY))).toEqual([join(tmp, 'vieux.png')]);
+    expect(names(scanStale(tmp, [`${tmp}/*`], 7, TODAY).stale)).toEqual([join(tmp, 'vieux.png')]);
   });
 
   it('un .git au milieu du chemin protège même quand git, lui, répond « non suivi »', () => {
@@ -316,11 +316,11 @@ describe('staleFiles — contenu des dossiers et .git', () => {
     const repo = gitRepo();
     touch(join(repo, 'vendor/.git/vieux.png'));
     ageTree(repo);
-    expect(staleFiles(repo, [`${repo}/vendor/.*/*`, `${repo}/*/.git/vieux.png`], 7, TODAY)).toEqual([]);
+    expect(scanStale(repo, [`${repo}/vendor/.*/*`, `${repo}/*/.git/vieux.png`], 7, TODAY).stale).toEqual([]);
   });
 });
 
-describe('staleFiles — rien de ce qui n’a pu être mesuré entièrement', () => {
+describe('scanStale — rien de ce qui n’a pu être mesuré entièrement', () => {
   for (const mode of [0o311, 0o300, 0o000]) {
     it.skipIf(asRoot)(`un dossier illisible (${mode.toString(8).padStart(4, '0')}) qui contient un clone n’est jamais proposé, ni son contenu`, () => {
       const tmp = tempDir();
@@ -330,7 +330,7 @@ describe('staleFiles — rien de ce qui n’a pu être mesuré entièrement', ()
       touch(join(tmp, 'libre.png'));
       ageTree(tmp);
       lock(join(tmp, 'ferme'), mode);
-      const r = staleFiles(tmp, [`${tmp}/*`, `${tmp}/ferme/*`, `${tmp}/ferme/vieux.png`, `${tmp}/ferme/clone`], 7, TODAY);
+      const r = scanStale(tmp, [`${tmp}/*`, `${tmp}/ferme/*`, `${tmp}/ferme/vieux.png`, `${tmp}/ferme/clone`], 7, TODAY).stale;
       expect(names(r)).toEqual([join(tmp, 'libre.png')]);
     });
   }
@@ -341,7 +341,7 @@ describe('staleFiles — rien de ce qui n’a pu être mesuré entièrement', ()
     ageTree(tmp);
     lock(join(tmp, 'sans-x'), 0o644);
     // Compter l'enfant illisible comme très vieux (new Date(0)) ou l'ignorer proposerait le dossier.
-    expect(staleFiles(tmp, [`${tmp}/*`], 7, TODAY)).toEqual([]);
+    expect(scanStale(tmp, [`${tmp}/*`], 7, TODAY).stale).toEqual([]);
   });
 
   it.skipIf(asRoot)('le dossier d’un motif qu’on ne peut pas lister ne livre rien, même par un nom écrit en entier', () => {
@@ -376,24 +376,24 @@ describe('staleFiles — rien de ce qui n’a pu être mesuré entièrement', ()
   });
 });
 
-describe('staleFiles — la racine', () => {
+describe('scanStale — la racine', () => {
   it('ne propose jamais la racine ni un dossier qui la contient', () => {
     const tmp = tempDir();
     const root = join(tmp, 'parent/projet');
     touch(join(root, 'vieux.png'));
     touch(join(tmp, 'libre.png'));
     ageTree(tmp);
-    const r = staleFiles(root, [`${tmp}/*`, `${tmp}/parent/*`, '.'], 7, TODAY);
+    const r = scanStale(root, [`${tmp}/*`, `${tmp}/parent/*`, '.'], 7, TODAY).stale;
     expect(names(r)).toEqual([join(tmp, 'libre.png')]);
   });
 });
 
-describe('staleFiles — seuil et ~', () => {
+describe('scanStale — seuil et ~', () => {
   it('un âge égal au seuil n’est pas proposé, un jour de plus l’est', () => {
     const dir = tempDir();
     touch(join(dir, 'egal.png'), cleanAt(-7));
     touch(join(dir, 'plus.png'), cleanAt(-8));
-    const r = staleFiles(dir, [`${dir}/*`], 7, TODAY);
+    const r = scanStale(dir, [`${dir}/*`], 7, TODAY).stale;
     expect(r.map((s) => [s.path, s.age])).toEqual([[join(dir, 'plus.png'), 8]]);
   });
 
@@ -405,7 +405,7 @@ describe('staleFiles — seuil et ~', () => {
     const avant = process.env.HOME;
     process.env.HOME = home;
     try {
-      expect(names(staleFiles(tempDir(), ['~/partage/*', '~'], 7, TODAY))).toEqual([home, join(home, 'partage/vieux.png')]);
+      expect(names(scanStale(tempDir(), ['~/partage/*', '~'], 7, TODAY).stale)).toEqual([home, join(home, 'partage/vieux.png')]);
     } finally {
       if (avant === undefined) delete process.env.HOME;
       else process.env.HOME = avant;

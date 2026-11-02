@@ -1,7 +1,7 @@
 import { gateProgress, gateText } from '../audit.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { availableParallelism, homedir, tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { testWorkersFrom } from './workers.js';
 import { basename, join, relative, resolve } from 'node:path';
 import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readOrchestrateConfig, readPlanConfig, type OrchestrateConfig } from '../config.js';
@@ -29,7 +29,7 @@ import { fichesDuDossier } from '../spec.js';
 import { candidates, fillTargets, handedBackStreak, parsePriority, parseUntil, drawSettingsReport, readPriority, stopReason, type Candidate } from './continue.js';
 import { precheckNothingToFind, Budget, ESCALATION_RESERVE, DROPPED, STOP_REQUESTED, MAX_PASSES, REVIEW_RESERVE, budgetStep, heldForEscalation, lotSpent, MAX_PASSES_CONVERGING, briefName, countInterrupted, planNoteHandBack, leadReviewedHandBack, HYPOTHESES_HANDBACK, handBackDroppedQuestions, needsPrecheck, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { canInstallPrePush, gitProcessRunning, indexLockRefusal, installPrePush, keepGateGuard, longDuration, removePrePush, snapshot } from './guard.js';
-import { buildArgs, buildLocalArgs, killSessions, MODEL_ALIASES, mcpServersFor, readAgents, realClaude, enabledPlugins, settingsFiles, type AgentDef, type AnyModel, type ClaudeFn, type SessionKind, type StepModel } from './launch.js';
+import { buildArgs, buildLocalArgs, claudeConfigDir, killSessions, MODEL_ALIASES, mcpServersFor, readAgents, realClaude, enabledPlugins, settingsFiles, type AgentDef, type AnyModel, type ClaudeFn, type SessionKind, type StepModel } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { groupLots, runPool } from './pool.js';
 import { AddFeed, addNotAlone, addToLive, openInRepo, projectName, type KnownLot, type LaunchChecks } from './ajout.js';
@@ -1744,6 +1744,6 @@ export function realOrchestrateDeps(env: NodeJS.ProcessEnv): OrchestrateDeps {
     },
     agentsDir: AGENTS_DIR,
     snapshot: child ? undefined : { packageRoot: PACKAGE_ROOT, reexec: spawnReexec },
-    claudeHome: env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'),
+    claudeHome: claudeConfigDir(env),
   };
 }

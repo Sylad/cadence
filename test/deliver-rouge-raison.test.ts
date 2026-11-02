@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { deliver, parseDeliverConfig, realDeps, type DeliverCtx, type DeliverDeps } from '../src/deliver.js';
 import { headSha } from '../src/git.js';
 import { Plan } from '../src/plan.js';
-import { readFailedDeliveries, readFailedEntries, sharedStateDir as stateDir } from '../src/state.js';
+import { readFailedEntries, sharedStateDir as stateDir } from '../src/state.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -114,7 +114,7 @@ describe('deliver — raison et classe d\'une livraison rouge (L282)', () => {
       { day: '2026-10-11', sha: 'def', cls: 'ci', reason: 'CI en échec', tail: ['a', 'b'] },
       { day: '2026-10-12', sha: 'ghi', cls: null, reason: '[bizarre] x', tail: [] },
     ]);
-    expect(readFailedDeliveries(dir)).toEqual(['2026-10-10', '2026-10-11', '2026-10-12']);
+    expect(readFailedEntries(dir).map((e) => e.day)).toEqual(['2026-10-10', '2026-10-11', '2026-10-12']);
   });
 
   it('R8 — exec réel : lastOutput rend les dernières lignes de la commande (stdout et stderr), remises à zéro à chaque commande', async () => {

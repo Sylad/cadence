@@ -114,6 +114,17 @@ describe('cadence ref analyse (L265)', () => {
     expect(settings).not.toMatch(/SECRET|permissions|hooks/);
   });
 
+  it('L485 — sans CLAUDE_CONFIG_DIR, les réglages se lisent sous le HOME de l\'environnement donné, comme claudeConfigDir', async () => {
+    const s = setup();
+    const home = join(s.base, 'home-simule');
+    mkdirSync(join(home, '.claude'), { recursive: true });
+    writeFileSync(join(home, '.claude', 'settings.json'), JSON.stringify({ enabledPlugins: { 'superpowers@m': true } }));
+    delete s.env.CLAUDE_CONFIG_DIR;
+    s.env.HOME = home;
+    expect((await analyse(s)).code).toBe(0);
+    expect(JSON.parse(s.appels()[0]!.settings!)).toEqual({ enabledPlugins: { 'superpowers@m': false } });
+  });
+
   it('L398 — sans plugin activé, la session n\'a ni --settings ni --setting-sources', async () => {
     const s = setup();
     expect((await analyse(s)).code).toBe(0);

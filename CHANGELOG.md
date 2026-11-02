@@ -99,6 +99,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - `cadence verify` green at the sha of the last red delivery writes it to the delivery journal (L435, [docs/deliver.md](docs/deliver.md)): the effect is there, so the delivery is done; the line joins `deliveries.log`, the red line of the `cadence-hud` panel goes away without delivering again (`ol 3d6edf4`, red during the dark-blue outage and green at the verification on 29-10), and the command says it. The line is a delivery: as after `cadence deliver`, the lots cited since the previous green delivery are announced (`livré : L…`) and the article lot is opened (`docs.articles`, L144), since the next delivery starts from this line. Nothing is written when a check is red, when the last red delivery is another sha's (it would be hidden), when it is not of class `[verification]` (a red CI, refusal or deployment stays: the checks do not always read the sha), when there is none, or when a green delivery already came after the red one.
 
+### Changed
+
+- Cleanup (L485): `cadence ref analyse` and `cadence orchestrate` now read the Claude Code folder through the same function as `cadence session close` (`CLAUDE_CONFIG_DIR`, else `HOME/.claude` of the given environment, else the user's home): they no longer skip `HOME`, which only differs from the user's home when a test simulates one. The helpers `staleFiles` and `readFailedDeliveries`, called only by tests, are removed; the quality baseline drops by 8 measures.
+
 ## [1.40.0] - 2026-11-02
 
 ### Added

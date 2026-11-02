@@ -332,8 +332,3 @@ export function readFailedEntries(dir: string): FailedDelivery[] {
     return [];
   }
 }
-
-/** Les jours de `deliveries-failed.log` (une ligne par livraison rouge), dans l'ordre du fichier. */
-export function readFailedDeliveries(dir: string): Day[] {
-  return readFailedEntries(dir).map((e) => e.day);
-}

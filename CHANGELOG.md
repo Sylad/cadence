@@ -90,6 +90,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - Cleanup (L485): `cadence ref analyse` and `cadence orchestrate` now read the Claude Code folder through the same function as `cadence session close` (`CLAUDE_CONFIG_DIR`, else `HOME/.claude` of the given environment, else the user's home): they no longer skip `HOME`, which only differs from the user's home when a test simulates one. The helpers `staleFiles` and `readFailedDeliveries`, called only by tests, are removed; the quality baseline drops by 1 measure.
 
+### Fixed
+
+- `raf estimate <id> abc` (or `.5`) now answers « estimation invalide : abc » with the value typed instead of « NaN » (L535).
+
 ## [1.41.0] - 2026-11-02
 
 ### Added

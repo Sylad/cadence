@@ -136,6 +136,16 @@ describe('raf estimate : bords', () => {
     cadence(dir, 'add', 'a', '--id', 'AB-1');
     for (const v of ['Infinity', 'NaN', '1e400', '', '  ']) expect(cadence(dir, 'estimate', 'AB-1', v).code, v).not.toBe(0);
   });
+  it('saisie non numérique : le message cite la saisie, pas NaN', () => {
+    const dir = project();
+    cadence(dir, 'add', 'a', '--id', 'AB-1');
+    for (const v of ['abc', '.5']) {
+      const r = cadence(dir, 'estimate', 'AB-1', v);
+      expect(r.code, v).not.toBe(0);
+      expect(r.err, v).toContain(`estimation invalide : ${v} `);
+      expect(r.err, v).not.toContain('NaN');
+    }
+  });
   it('lot déjà terminé : estimation remplacée', () => {
     const dir = project();
     cadence(dir, 'add', 'a', '--id', 'AB-1');

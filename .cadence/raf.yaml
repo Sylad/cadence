@@ -1474,9 +1474,10 @@ lots:
     finished: 2026-11-02
   - id: L537
     title: "docs.sync rend « documentation en retard » un lot de nettoyage ou découpage interne déclaré sans changement de comportement (02-11 : L485, L486, L487, un cycle de vague perdu chaque fois, acquittement à la main) : ne pas exiger de doc quand le diff ne change ni commande, ni clé, ni sortie (ou laisser le libraire acquitter dans le worktree), avec un test"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-02
+    started: 2026-11-02
   - id: L538
     title: "Ligne de base du cliquet à l'intégration : un lot qui baisse qualite-baseline.json depuis un main ancien entre en conflit au rebase ou rend le cliquet rouge au sommet intégré (02-11 : L485, L486, L487, L536, L465 — un rebase manuel chaque fois) ; l'intégration recalcule la base sur main + les baisses propres au lot (même méthode que les rebases manuels du 02-11), avec un test"
     status: todo

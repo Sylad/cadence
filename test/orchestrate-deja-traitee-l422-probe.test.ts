@@ -85,7 +85,7 @@ describe('L422 probe — proposalLine', () => {
 
 describe('L422 probe — vrai dépôt git', () => {
   const p = '[sous-tâche code] src/a.ts : à reprendre';
-  const render = (repo: string, head: string, shas: string[], prop = p) => renderDetail([lot([prop], { [prop]: head }, repo)], 'demo:L1', { lotCommits: () => shas }).join('\n');
+  const render = (repo: string, head: string, shas: string[], prop = p) => renderTable(wave, [lot([prop], { [prop]: head }, repo)], { lotCommits: () => shas }).join('\n');
 
   it('le commit de la revue lui-même (head) ne marque pas', () => {
     const repo = gitRepo();

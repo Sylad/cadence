@@ -5,11 +5,11 @@ import { join, relative } from 'node:path';
 import { parse } from 'yaml';
 import { onTermination, readProcs, SIGNAL_GRACE_MS, SIGNAL_PENDING_MS, TreeTracker } from './proc.js';
 import type { Day } from './dates.js';
-import { deliveryLots, isPlanOnly } from './audit.js';
-import { commitPaths, dirtyPaths, headSha, isAncestor, onRemote, readCommits, repoStatus, resolveCommit } from './git.js';
+import { deliveryLots } from './audit.js';
+import { commitPaths, dirtyPaths, headSha, isAncestor, onRemote, repoStatus, resolveCommit } from './git.js';
 import { planOnlySince, pollGithubCi, stamped, stepJournal } from './deliver-ci.js';
 import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
-import { citedRefs } from './link.js';
+import { deliveredIds, deliveredLots } from './deliver-lots.js';
 import { describeArticle, openArticleLots, type ArticleRule } from './articles.js';
 import { RafError, type Lot, type Plan } from './plan.js';
 import { appendDelivery, appendFailedDelivery, type FailClass, lastDelivery, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
@@ -602,36 +602,6 @@ export function announceDelivered(ctx: DeliveredCtx, prev: string | null, sha: s
   const delivered = deliveredLots(ctx, ids, prev, sha);
   if (delivered) ctx.out(delivered);
   refreshArticles(ctx, ids, sha);
-}
-
-/**
- * Ligne des lots cités depuis la livraison précédente, ou null (première livraison, rien de cité).
- *
- * Plan en lecture seule : seuls les lots EN COURS sont annoncés. Ses identifiants sont de forme libre, et
- * un message cite volontiers un numéro qui en a la forme (réserve « R1 » d'une revue) ou un lot clos
- * nommé pour le contexte — les annoncer « livrés » ferait fermer à tort. L'état est celui du départ de
- * la livraison : le plan a été lu avant que le script du projet ne ferme lui-même les lots qu'il livre.
- */
-/** Lots cités par les commits livrés depuis la livraison précédente ; vide quand elle est inconnue ou hors de l'historique. */
-function deliveredIds(ctx: DeliveredCtx, prev: string | null, sha: string): string[] {
-  if (!ctx.plan || !prev || prev === sha || !isAncestor(ctx.root, prev, sha)) return [];
-  const lots = ctx.plan.lots();
-  const known = new Set((ctx.plan.readonly ? lots.filter((l) => l.status === 'doing') : lots).map((l) => l.id));
-  const ids = new Set<string>();
-  for (const c of readCommits(ctx.root, { range: `${prev}..${sha}` })) {
-    if (isPlanOnly(c.sha, ctx.plan, ctx.root)) continue; // entretien du plan : ne livre rien, même s'il cite des lots
-    for (const r of citedRefs(c, ctx.plan.refs)) if (known.has(r.lot)) ids.add(r.lot);
-  }
-  return [...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-}
-
-function deliveredLots(ctx: DeliveredCtx, ids: string[], prev: string | null, sha: string): string | null {
-  if (!ctx.plan || !prev || prev === sha) return null;
-  if (!isAncestor(ctx.root, prev, sha)) {
-    return `livraison précédente (${prev.slice(0, 7)}) hors de l'historique de ${sha.slice(0, 7)} (réécrit ?) : lots livrés non calculés`;
-  }
-  if (ids.length === 0) return null;
-  return `livré : ${ids.join(', ')} — ${ctx.plan.readonly ? "à fermer avec l'outil du projet" : 'raf done'} si l'effet est celui attendu`;
 }
 
 /**

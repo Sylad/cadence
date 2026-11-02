@@ -86,11 +86,10 @@ export const hasRoom = (taken: () => number, limit: number, myTurn: () => boolea
 export function slotPlace(all: LotState[], launch: string, given: string[] | undefined, key?: string): { fresh?: boolean; rank?: number } {
   const l = key ? all.find((x) => lotKey(x.project, x.lot) === key) : undefined;
   if (!l) return {};
-  let priority: string[] = [];
+  const fresh = l.steps.length <= 1;
   try {
-    priority = given ?? readPriority(launch);
+    return { fresh, rank: priorityRank(l.project, given ?? readPriority(launch)) };
   } catch {
-    // priority: illisible : rang neutre, le lancement n'en dépend pas
+    return { fresh }; // priority: illisible : rang neutre (après tous les déclarés), le lancement n'en dépend pas
   }
-  return { fresh: l.steps.length <= 1, rank: priorityRank(l.project, priority) };
 }

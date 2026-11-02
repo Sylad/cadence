@@ -808,6 +808,7 @@ lots:
     uses: [ plan-coeur ]
     created: 2026-10-30
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme après 1 correction mineure (estimation des sous-lots dans --propose) — orchestré (vague 2026-11-02-2140-cont, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que la mise en page du CHANGELOG (1 note mineure, ligne vide manquante avant « ### Added »), le code, les tests et la doc du lot sont identiques à avant le rebase", commit: 6db87cb06fb3f2c2fa421b935a8664c764240d76 }
   - id: L467
     title: "Plans riches — gains rapides groupés (raf quickwins par champ d'extension) (manque M5 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo

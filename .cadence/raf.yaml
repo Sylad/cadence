@@ -1097,9 +1097,10 @@ lots:
     review: { date: 2026-11-02, verdict: "conforme : verrou de tâche locale déclaré (TTL, ⚠ à l'échéance), plus porté par un processus ; vague refuse un lot local ; revue nommée avant raf done ; pre-push reconnaît la tâche — 4 mineurs, 1 sous-tâche (deliver/move pendant une tâche locale) — revue Opus du lead, passe 3 ; revue courte du diff rebasé (patch-id différent) : conforme : 1 mineur, la consigne express « full suite … run once, at the end » est ambiguë à côté de la porte ciblée de L518", commit: 1d52c5a27caa6b16d4d4a76b8ca4ec38f5a9500e }
     finished: 2026-11-02
     tasks:
-      - { id: t1, title: "deliver et raf move pendant une tâche locale : refus avec heldRefusal (pas de « vague local:L1 — état illisible » ni de conseil --sha impossible) — revue passe 3 du 02-11", status: todo }
+      - { id: t1, title: "deliver et raf move pendant une tâche locale : refus avec heldRefusal (pas de « vague local:L1 — état illisible » ni de conseil --sha impossible) — revue passe 3 du 02-11", status: dropped }
     notes:
       - { date: 2026-11-02, text: "Revue passe 3 (Opus, 02-11) : conforme, 4 mineurs dont pid réutilisé (held.pid === process.pid, quasi inatteignable) ; rapport complet non conservé. Constat 1 de la passe 2 (ownerPid) corrigé par un verrou déclaré à TTL (Fable)." }
+      - { date: 2026-11-02, text: "[L519/t1] abandonné : devient un lot à part (L519 clos)" }
   - id: L520
     title: "Créneaux : une vague réserve le plafond entier pour des lots qui attendent une dépendance (01-11 : vague cadence L517 → L518, L519 en worktrees, 1 session réelle, « créneaux libres : 0 sur 3 » pendant ~1 h) ; ne compter que les lots qui peuvent démarrer (dépendances prêtes), ou un créneau par dépôt tant qu'ils attendent"
     status: todo
@@ -1208,6 +1209,11 @@ lots:
     estimate: 0.5
     after: [ L523 ]
     created: 2026-11-01
+  - id: L525
+    title: "deliver et raf move pendant une tâche locale (L519) : refus avec heldRefusal, pas de « vague local:L1 — état illisible » ni de conseil --sha impossible — revue passe 3 du 02-11"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-02
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

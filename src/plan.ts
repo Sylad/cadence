@@ -9,7 +9,7 @@ import { currentState, defaultState, rebase, stateProblems, transitionProblem, t
 import { DOCS_OK_FILE, readDocsOkFile } from './docs-ok-file.js';
 import { checkedExtras, withExtras, type ExtraDecls } from './plan-extras.js';
 import { DOTTED, escapeRe, extractRefs, idRefs, pickId, type Ref } from './plan-ids.js';
-import { ARCHIVE_DIR, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, selectArchivable, type Kept } from './archive.js';
+import { ARCHIVE_DIR, PLACE_KEY, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, selectArchivable, type Kept } from './archive.js';
 
 /** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
 const ON_WRITE_TIMEOUT_MS = 120_000;
@@ -537,7 +537,8 @@ export class Plan {
     // L396 : l'archive est un détail de stockage — les lots archivés reprennent leur place parmi ceux du fichier actif, comme un seul plan.
     const archived = this.loadArchives().flatMap((a) => archiveLots(a.doc).toJSON() as Record<string, unknown>[]);
     const read = (r: Record<string, unknown>) => withExtras(normalizeLot(r), r, this.settings.extras);
-    const lots = mergeArchived(archived.map(read), this.activeRaw().map(read));
+    const places = new Map(archived.flatMap((r) => (typeof r[PLACE_KEY] === 'string' ? [[String(r.id), r[PLACE_KEY] as string] as const] : [])));
+    const lots = mergeArchived(archived.map(read), this.activeRaw().map(read), places);
     const model = this.settings.states;
     return model ? lots.map((l) => ({ ...l, problems: [...l.problems, ...stateProblems(model, l)] })) : lots;
   }
@@ -631,7 +632,10 @@ export class Plan {
       const back = seq.items.filter((n): n is YAMLMap => isMap(n) && !['done', 'dropped'].includes(String(n.get('status'))));
       if (back.length === 0) continue;
       seq.items = seq.items.filter((n) => !back.includes(n as YAMLMap));
-      for (const n of back) active.add(n);
+      for (const n of back) {
+        n.delete(PLACE_KEY);
+        active.add(n);
+      }
       a.dirty = true;
     }
   }
@@ -654,8 +658,14 @@ export class Plan {
     // De quoi revenir en arrière en mémoire : les items du plan, ceux de chaque archive déjà chargée, et le nombre d'archives (les nouvelles s'ajoutent à la fin).
     const archives = this.loadArchives();
     const snapshot = { items: [...seq.items], archives: archives.map((a) => ({ a, items: [...archiveLots(a.doc).items], dirty: a.dirty })) };
+    const own = new RegExp(`^${escapeRe(this.prefix)}\\d+$`);
     for (const n of nodes) {
       const lot = move.find((l) => l.id === String(n.get('id')))!;
+      // Un id hors <préfixe><n> (plan.idPattern) n'a pas de numéro qui dise sa place : il garde le lot qui le précédait dans le fichier.
+      if (!own.test(lot.id)) {
+        const before = seq.items[seq.items.indexOf(n) - 1];
+        n.set(PLACE_KEY, isMap(before) ? String(before.get('id')) : '');
+      }
       const target = this.archiveFor(archiveYear(lot, today));
       archiveLots(target.doc).add(n);
       target.dirty = true;

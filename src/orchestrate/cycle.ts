@@ -491,23 +491,20 @@ export function briefName(l: LotState, kind: SessionKind, integration = false): 
   return kind;
 }
 
-/** Gabarit de fiche livré avec le paquet, joint au brief de la spec (la session ne lit pas le dossier du paquet). */
-function ficheTemplate(): string | undefined {
+/** Fichier livré avec le paquet à côté des gabarits, joint à un brief (la session ne lit pas le dossier du paquet) ; undefined s'il manque. */
+function packageFile(name: string): string | undefined {
   try {
-    return readFileSync(join(TEMPLATES_DIR, '..', 'fiche.yaml'), 'utf8');
+    return readFileSync(join(TEMPLATES_DIR, '..', name), 'utf8');
   } catch {
     return undefined;
   }
 }
 
+/** Gabarit de fiche livré avec le paquet, joint au brief de la spec. */
+const ficheTemplate = (): string | undefined => packageFile('fiche.yaml');
+
 /** Gabarit de la partie back de la fiche (L187), joint au brief de la spec d'un lot `spec: true`. */
-function ficheBackTemplate(): string | undefined {
-  try {
-    return readFileSync(join(TEMPLATES_DIR, '..', 'fiche-back.yaml'), 'utf8');
-  } catch {
-    return undefined;
-  }
-}
+const ficheBackTemplate = (): string | undefined => packageFile('fiche-back.yaml');
 
 /** Le lot passe par l'étape spec : il déclare `screen:` (écran) ou `spec: true` (comportement sans écran, L188). */
 const hasSpecStage = (l: LotState): boolean => !!(l.screen || l.specLot);
@@ -519,13 +516,7 @@ const hasSpecStage = (l: LotState): boolean => !!(l.screen || l.specLot);
 const partsOf = (c: LotCtx, fiche?: string | null): FicheParts => ({ screen: !!c.lot.screen, back: !!c.lot.specLot || (!!c.lot.screen && !!fiche && ficheHasBack(wd(c), fiche)) });
 
 /** Gabarit du lanceur de tests livré avec le paquet, joint au brief de l'étape accept. */
-function acceptRunner(): string | undefined {
-  try {
-    return readFileSync(join(TEMPLATES_DIR, '..', 'acceptation-runner.mjs'), 'utf8');
-  } catch {
-    return undefined;
-  }
-}
+const acceptRunner = (): string | undefined => packageFile('acceptation-runner.mjs');
 
 /** Fiche du lot : celle de l'étape spec, ou la fiche retrouvée dans le dépôt (reprise). */
 function ficheOf(c: LotCtx): string | null {

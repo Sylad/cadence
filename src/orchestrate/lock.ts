@@ -1,7 +1,7 @@
 import { linkSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { processStart } from '../proc.js';
-import { pidAlive } from '../state.js';
+import { pidAlive, readLockJson } from '../state.js';
 
 export interface OLock {
   pid: number;
@@ -33,22 +33,7 @@ export const REPO_LOCK = 'orchestrate.lock';
 /** Un champ facultatif du verrou, tel qu'écrit ; absent : absent. */
 const optional = (v: unknown): string | undefined => (v === undefined ? undefined : String(v));
 
-function read(file: string): (OLock & { unreadable?: boolean; ageMs: number }) | null {
-  let text: string;
-  let ageMs: number;
-  try {
-    ageMs = Date.now() - statSync(file).mtimeMs;
-    text = readFileSync(file, 'utf8');
-  } catch {
-    return null;
-  }
-  try {
-    const raw = JSON.parse(text);
-    return { pid: Number(raw.pid), wave: String(raw.wave), started: String(raw.started), start: optional(raw.start), until: optional(raw.until), ageMs };
-  } catch {
-    return { pid: 0, wave: '?', started: '?', unreadable: true, ageMs };
-  }
-}
+const read = (file: string) => readLockJson<OLock>(file, (raw) => ({ pid: Number(raw.pid), wave: String(raw.wave), started: String(raw.started), start: optional(raw.start), until: optional(raw.until) }), { pid: 0, wave: '?', started: '?' });
 
 const alive = (l: { pid: number; start?: string; until?: string; unreadable?: boolean; ageMs: number }) => (l.unreadable ? l.ageMs < 5_000 : l.until !== undefined || holderAlive(l.pid, l.start));
 

@@ -186,18 +186,21 @@ export function enabledPlugins(files: string[]): string[] {
  */
 const settingsArgs = (spec: StepSpec): string[] => (spec.disablePlugins?.length ? ['--settings', JSON.stringify({ enabledPlugins: Object.fromEntries(spec.disablePlugins.map((id) => [id, false])) })] : []);
 
-export function buildArgs(spec: StepSpec, agents: Record<string, AgentDef>): string[] {
-  const args = ['-p', spec.brief, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model, ...effortArgs(spec)];
+/** Le corps commun d'une session `claude -p` et de sa relance : prompt, schéma, modèle, effort, agent restreint, puis (après `session`) mode de permission, dossiers, plugins désactivés, interdits et MCP. `session` : `--session-id <id>` ou `--resume <id>`. */
+function claudeArgs(spec: StepSpec, agents: Record<string, AgentDef>, prompt: string, session: ['--session-id' | '--resume', string]): string[] {
+  const args = ['-p', prompt, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model, ...effortArgs(spec)];
   if (spec.agent) {
     if (!agents[spec.agent]) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
     args.push('--agents', JSON.stringify(agentsFor(spec, agents)), '--agent', spec.agent);
   }
-  args.push('--session-id', spec.sessionId, '--permission-mode', spec.permissionMode);
+  args.push(...session, '--permission-mode', spec.permissionMode);
   for (const d of spec.addDirs) args.push('--add-dir', d);
   args.push(...settingsArgs(spec), '--disallowedTools', ...DISALLOWED);
   if (spec.mcpConfig) args.push('--strict-mcp-config', '--mcp-config', spec.mcpConfig);
   return args;
 }
+
+export const buildArgs = (spec: StepSpec, agents: Record<string, AgentDef>): string[] => claudeArgs(spec, agents, spec.brief, ['--session-id', spec.sessionId]);
 
 /**
  * Arguments de `claude-local` (L146) : le prompt vient en premier, le script ajoute lui-même `--bare`, `--model` et le
@@ -257,18 +260,7 @@ const isCut = (out: LaunchOutcome): boolean => !out.timedOut && out.code > 128 &
 export const FORMAT_RETRY_PROMPT = 'Return your report now in the required format (the JSON structure of the schema), exactly as you concluded it. Do not do any further work, do not add anything else.';
 
 /** Arguments de la relance : même session (--resume), mêmes schéma, modèle, agent (outils restreints), mode de permission, dossiers et interdits. */
-export function buildRetryArgs(spec: StepSpec, sessionId: string, agents: Record<string, AgentDef>): string[] {
-  const args = ['-p', FORMAT_RETRY_PROMPT, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model, ...effortArgs(spec)];
-  if (spec.agent) {
-    if (!agents[spec.agent]) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
-    args.push('--agents', JSON.stringify(agentsFor(spec, agents)), '--agent', spec.agent);
-  }
-  args.push('--resume', sessionId, '--permission-mode', spec.permissionMode);
-  for (const d of spec.addDirs) args.push('--add-dir', d);
-  args.push(...settingsArgs(spec), '--disallowedTools', ...DISALLOWED);
-  if (spec.mcpConfig) args.push('--strict-mcp-config', '--mcp-config', spec.mcpConfig);
-  return args;
-}
+export const buildRetryArgs = (spec: StepSpec, sessionId: string, agents: Record<string, AgentDef>): string[] => claudeArgs(spec, agents, FORMAT_RETRY_PROMPT, ['--resume', sessionId]);
 
 /**
  * Lance une session et range son issue : ok, quota atteint, ou échec nommé (jamais de nouvel essai ici), à une

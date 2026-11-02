@@ -74,7 +74,13 @@ export const schemaFor = (kind: SessionKind): object => (kind === 'precheck' ? P
 /** L'agent du paquet de chaque étape qui en a un, ou `undefined` pour une écriture sans agent ; les revues et la fiche n'y sont pas : `code-reviewer`. */
 const STEP_AGENT: Partial<Record<SessionKind, string | undefined>> = { implement: undefined, fix: undefined, probe: undefined, spec: 'spec-writer', accept: 'acceptance-writer', ux: 'ux-reviewer', maquette: 'ux-reviewer', precheck: 'precheck-reader' };
 
-export const agentOf = (kind: SessionKind): string | undefined => (kind in STEP_AGENT ? STEP_AGENT[kind] : 'code-reviewer');
+const agentOf = (kind: SessionKind): string | undefined => (kind in STEP_AGENT ? STEP_AGENT[kind] : 'code-reviewer');
+
+/** L'agent d'une étape, la passe du bibliothécaire (`fix` de documentation) comprise : un seul choix pour la session réelle et pour le `--dry-run`. */
+export const stepAgent = (kind: SessionKind, docsFix?: boolean): string | undefined => (kind === 'fix' && docsFix ? 'doc-keeper' : agentOf(kind));
+
+/** La clé de `effort` d'une étape : la revue d'un petit lot visible (`review-small`) prend l'effort de `review`. */
+export const effortKey = <K extends SessionKind>(kind: K): Exclude<K, 'review-small'> | 'review' => (kind === 'review-small' ? 'review' : (kind as Exclude<K, 'review-small'>));
 
 export interface PrecheckReport {
   dejaPresent: 'oui' | 'partiel' | 'non';

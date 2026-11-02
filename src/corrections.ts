@@ -316,30 +316,36 @@ Règle de départ : si le code livré ne fait pas ce que le lot ou le commit ann
 - test-manquant : le code est juste mais un comportement n'est pas couvert, ou un test ne vérifie pas ce que son titre promet ;
 - faux-constat : la revue se trompe (le code était correct, constat infondé, hors lot, sans effet réel).`;
 
+/** Appel `/api/chat` d'Ollama (température 0, sortie contrainte par `format`) : le texte du message, null sur réponse refusée ou échec réseau. Commun au classeur et au sous-classeur. */
+async function ollamaChat(opts: { url: string; model: string; fetch?: typeof fetch }, format: object, system: string, user: string): Promise<string | null> {
+  const doFetch = opts.fetch ?? fetch;
+  try {
+    const res = await doFetch(`${opts.url.replace(/\/$/, '')}/api/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: opts.model,
+        stream: false,
+        options: { temperature: 0 },
+        format,
+        messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+      }),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { message?: { content?: string } };
+    return body.message?.content ?? '';
+  } catch {
+    return null;
+  }
+}
+
 /** Classeur sur un modèle local servi par Ollama (/api/chat, température 0, sortie contrainte par un schéma) : hors quota Anthropic. */
 export function ollamaClassifier(opts: { url: string; model: string; fetch?: typeof fetch }): Classifier {
-  const doFetch = opts.fetch ?? fetch;
   return async (pass) => {
     const findings = pass.findings.length ? pass.findings.map((f, i) => `${i + 1}. ${f.slice(0, 1500)}`).join('\n') : '(aucun constat lisible)';
     const user = `Lot ${pass.project} ${pass.lot}.\nConstats de la revue :\n${findings}\n\nCommits de la correction :\n${pass.commits.join('\n') || '(aucun)'}`;
-    try {
-      const res = await doFetch(`${opts.url.replace(/\/$/, '')}/api/chat`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: opts.model,
-          stream: false,
-          options: { temperature: 0 },
-          format: { type: 'object', properties: { cause: { type: 'string', enum: [...CAUSES] }, raison: { type: 'string' } }, required: ['cause', 'raison'] },
-          messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: user }],
-        }),
-      });
-      if (!res.ok) return null;
-      const body = (await res.json()) as { message?: { content?: string } };
-      return parseCause(body.message?.content ?? '');
-    } catch {
-      return null;
-    }
+    const text = await ollamaChat(opts, { type: 'object', properties: { cause: { type: 'string', enum: [...CAUSES] }, raison: { type: 'string' } }, required: ['cause', 'raison'] }, SYSTEM, user);
+    return text === null ? null : parseCause(text);
   };
 }
 
@@ -456,28 +462,11 @@ ${SOUS_CAUSES.map((s) => `- ${s} : ${SOUS_DEFINITIONS[s]} ;`).join('\n')}`;
 
 /** Sous-classeur sur un modèle local servi par Ollama (comme `ollamaClassifier` : /api/chat, température 0, sortie contrainte par un schéma à sept valeurs). */
 export function ollamaSousClassifier(opts: { url: string; model: string; fetch?: typeof fetch }): SousClassifier {
-  const doFetch = opts.fetch ?? fetch;
   return async (pass) => {
     const findings = pass.findings.map((f, i) => `${i + 1}. ${f.slice(0, 1500)}`).join('\n');
     const user = `Lot ${pass.project} ${pass.lot}.\nConstats de la revue :\n${findings}\n\nCommits de la correction :\n${pass.commits.join('\n') || '(aucun)'}`;
-    try {
-      const res = await doFetch(`${opts.url.replace(/\/$/, '')}/api/chat`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: opts.model,
-          stream: false,
-          options: { temperature: 0 },
-          format: { type: 'object', properties: { sous: { type: 'string', enum: [...SOUS_CAUSES] }, raison: { type: 'string' } }, required: ['sous', 'raison'] },
-          messages: [{ role: 'system', content: SOUS_SYSTEM }, { role: 'user', content: user }],
-        }),
-      });
-      if (!res.ok) return null;
-      const body = (await res.json()) as { message?: { content?: string } };
-      return parseSousCause(body.message?.content ?? '');
-    } catch {
-      return null;
-    }
+    const text = await ollamaChat(opts, { type: 'object', properties: { sous: { type: 'string', enum: [...SOUS_CAUSES] }, raison: { type: 'string' } }, required: ['sous', 'raison'] }, SOUS_SYSTEM, user);
+    return text === null ? null : parseSousCause(text);
   };
 }
 

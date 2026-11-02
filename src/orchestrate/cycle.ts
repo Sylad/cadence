@@ -31,7 +31,7 @@ import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, t
 import { cleanPlaywrightOutput, pushed, remoteAdvances, snapshot, type Snapshot } from './guard.js';
 import { sumTokens, type Tokens } from './result.js';
 import { cutReport, EXTENSION_MS, MAX_EXTENSIONS, workTimeoutMs } from './timeouts.js';
-import { ACCEPT_SCHEMA, agentOf, checkShape, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
+import { ACCEPT_SCHEMA, checkShape, effortKey, PRECHECK_SCHEMA, REVIEW_SCHEMA, schemaFor, SPEC_SCHEMA, stepAgent, WORK_SCHEMA, type AcceptReport, type PrecheckReport, type ReviewReport, type SpecReport, type WorkReport } from './schemas.js';
 import { type Acceptation, acceptationFile, acceptCommands, isAcceptList, acceptText, checkAcceptation, findAcceptation, isAcceptationFile, lockViolations, lotStartHead, parseAcceptation, planAcceptRuns, redSha, resealedRouge, sealAcceptation, setVert } from './accept.js';
 import { lotIds, referenceIdsText } from '../ref/coverage.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from './aval.js';
@@ -762,7 +762,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
   if (WRITE_STEPS.includes(kind) && (lotOver(l) || (kind === 'fix' && !fixAffordable(l)))) return overBudget(c, kind === 'fix' && !lotOver(l));
 
   const model: StepModel = ['spec', 'accept', 'fiche', 'probe'].includes(kind) ? 'sonnet' : write ? (kind === 'fix' && l.escalation?.stage === 'fix' ? l.escalation.model : l.model) : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
-  const effort = c.config.effort[kind === 'review-small' ? 'review' : kind];
+  const effort = c.config.effort[effortKey(kind)];
   const before = await snapshot(wd(c));
   const neighbours = l.repos ?? [];
   const beforeOthers = await Promise.all(neighbours.map((r) => snapshot(r.path)));
@@ -820,7 +820,7 @@ async function session(c: LotCtx, kind: SessionKind, local = false): Promise<Don
       effort,
       local,
       schema: schemaFor(kind),
-      agent: kind === 'fix' && l.docsFix ? 'doc-keeper' : agentOf(kind),
+      agent: stepAgent(kind, l.docsFix),
       cwd: wd(c),
       wave: w.id,
       lot: lotKey(l.project, l.lot),

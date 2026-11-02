@@ -74,7 +74,11 @@ export function lockPath(dir: string): string {
   return join(dir, 'deliver.lock');
 }
 
-function readLockFile(file: string): (Lock & { unreadable?: boolean; ageMs: number }) | null {
+/**
+ * Lit un fichier de verrou : null s'il est absent ou illisible du système de fichiers ; sinon son contenu mis en forme par `fromRaw` et l'âge du fichier,
+ * ou `broken` (marqué `unreadable`) quand ce n'est pas du JSON. Commun au verrou de livraison et à celui de l'orchestration.
+ */
+export function readLockJson<T extends object>(file: string, fromRaw: (raw: Record<string, unknown>) => T, broken: T): (T & { unreadable?: boolean; ageMs: number }) | null {
   let text: string;
   let ageMs: number;
   try {
@@ -84,12 +88,13 @@ function readLockFile(file: string): (Lock & { unreadable?: boolean; ageMs: numb
     return null;
   }
   try {
-    const raw = JSON.parse(text);
-    return { pid: Number(raw.pid), sha: String(raw.sha), started: String(raw.started), ageMs };
+    return { ...fromRaw(JSON.parse(text)), ageMs };
   } catch {
-    return { pid: 0, sha: '?', started: '?', unreadable: true, ageMs };
+    return { ...broken, unreadable: true, ageMs };
   }
 }
+
+const readLockFile = (file: string) => readLockJson<Lock>(file, (raw) => ({ pid: Number(raw.pid), sha: String(raw.sha), started: String(raw.started) }), { pid: 0, sha: '?', started: '?' });
 
 export function readLock(dir: string): (Lock & { unreadable?: boolean; ageMs: number }) | null {
   return readLockFile(lockPath(dir));

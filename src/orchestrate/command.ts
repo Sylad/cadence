@@ -37,7 +37,7 @@ import { repoRefusals, trackedDirty } from './depot.js';
 import { removeWorktree } from './retrait.js';
 import { repoBranch } from './integrate.js';
 import { baseBranchOf, keptLines, keptTrees, lotBranch, lotTreeDir, planFileSet, recoverTree, removeTree } from './worktree.js';
-import { agentOf, schemaFor } from './schemas.js';
+import { effortKey, schemaFor, stepAgent } from './schemas.js';
 import { resolveLotRepos } from '../repos.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, lotSlug, neighbourDirs, newLot, RunStore, type LotState, type WaveState } from './state.js';
 import { isExpress } from './express.js';
@@ -566,7 +566,7 @@ function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, { bu
       const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small, !!l.screen).playwright;
       const local = s.model === 'local';
       const args = (local ? buildLocalArgs : buildArgs)(
-        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model === 'local' ? 'sonnet' : s.model, local, effort: env.config.effort[s.kind === 'review-small' ? 'review' : s.kind], schema: schemaFor(s.kind), agent: agentOf(s.kind), cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && (s.kind === 'implement' || s.kind === 'spec') ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright, disablePlugins: enabledPlugins(settingsFiles(deps.claudeHome, l.repo)) },
+        { kind: s.kind, sessionId: '<uuid>', brief: '<brief>', model: s.model === 'local' ? 'sonnet' : s.model, local, effort: env.config.effort[effortKey(s.kind)], schema: schemaFor(s.kind), agent: stepAgent(s.kind), cwd: l.repo, wave: id, permissionMode: env.config.permissionMode, addDirs: [...env.config.addDirs, ...(playwright && (s.kind === 'implement' || s.kind === 'spec') ? [pwDir] : []), ...neighbourDirs(l)], timeoutMs: 0, mcpConfig: '<mcp>', playwright, disablePlugins: enabledPlugins(settingsFiles(deps.claudeHome, l.repo)) },
         agents,
       ).map((a) => (a.startsWith('{') ? '<json>' : a));
       io.out(`  ${s.kind} : ${local ? 'claude-local' : 'claude'} ${args.join(' ')}`);

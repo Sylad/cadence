@@ -13,7 +13,7 @@ export interface PlannedWindow {
 type Windowed = Pick<Lot, 'id' | 'planned' | 'parent'>;
 
 const FORM = 'AAAA-MM-JJ..AAAA-MM-JJ, ou un seul jour AAAA-MM-JJ, début avant la fin';
-/** Marge (en jours ouvrés) en deçà de laquelle une fin de fenêtre est une échéance à dire à la reprise. */
+/** Marge (en jours) en deçà de laquelle une fin de fenêtre est une échéance à dire à la reprise. */
 const DUE_DAYS = 7;
 
 /** `J1..J2` (ou `J` seul : la fenêtre d'un jour) lu en fenêtre ; `RafError` sinon. */

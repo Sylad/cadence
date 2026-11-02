@@ -9,6 +9,9 @@ import type { Ctx } from './context.js';
 
 const USAGE = 'usage : raf plan <lot> AAAA-MM-JJ..AAAA-MM-JJ | raf plan <lot> --clear | raf plan --propose [--per-day n] [--from AAAA-MM-JJ] [--apply]';
 
+/** Le plus petit `--per-day` : en deçà, la durée d'un lot se compterait en milliers de jours ouvrés. */
+const MIN_PER_DAY = 0.01;
+
 /** raf plan … : pose, retire ou propose les fenêtres prévues. */
 export function cmdPlan(c: Ctx): number | Promise<number> {
   const { rest, values } = c;
@@ -39,7 +42,7 @@ function setWindow(c: Ctx): number {
 function propose(c: Ctx): number {
   const { values, io, today, root, planConfig, loadPlan } = c;
   const perDayText = values['per-day'];
-  if (perDayText !== undefined && !(/^\d+(\.\d+)?$/.test(perDayText.trim()) && Number(perDayText) > 0)) throw new RafError(`--per-day invalide : ${perDayText} (un nombre de jours de travail par jour ouvré, > 0)`);
+  if (perDayText !== undefined && !(/^\d+(\.\d+)?$/.test(perDayText.trim()) && Number(perDayText) >= MIN_PER_DAY)) throw new RafError(`--per-day invalide : ${perDayText} (un nombre de jours de travail par jour ouvré, ${MIN_PER_DAY} au moins)`);
   if (values.from !== undefined && !isCalendarDay(values.from)) throw new RafError(`--from invalide : ${values.from} (attendu AAAA-MM-JJ)`);
   const plan = loadPlan();
   const lots = plan.lots();

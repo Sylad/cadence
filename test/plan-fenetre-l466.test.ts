@@ -296,6 +296,7 @@ describe('R7 — raf plan --propose [--per-day n] [--from J], puis --apply', () 
       [['L1', '2026-11-03', '--from', '2026-11-03'], /--propose/],
       [['L1', '2026-11-03', '--per-day', '2'], /--propose/],
       [['--propose', '--per-day', '0'], /--per-day/],
+      [['--propose', '--per-day', '0.001'], /--per-day/], // 1 j de travail ferait 1000 jours ouvrés : refusé plutôt que de calculer longtemps
       [['--propose', '--per-day', '-1'], /--per-day/],
       [['--propose', '--per-day', 'beaucoup'], /--per-day/],
       [['--propose', '--per-day', 'Infinity'], /--per-day/],

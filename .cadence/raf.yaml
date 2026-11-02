@@ -784,6 +784,7 @@ lots:
     estimate: 0.5
     created: 2026-10-30
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme : champs d'extension déclarés, validés et conservés (plan.extras, raf add --set), coexistent avec les statuts détaillés de L463 (clés réservées state/state_before, test de coexistence), raf list --json exporte state_before — revue Opus du lead après rebase", commit: 04814fb07e7e4957103a2e5461dd941eef8ad2be }
   - id: L465
     title: "Plans riches — identifiants libres et sous-lots à plat (plan.idPattern, parent: hors préfixe) (manque M3 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: doing

@@ -81,6 +81,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- Express lane for touch-ups (L519, [docs/orchestrate.md](docs/orchestrate.md)): a lot of at most 0.1 day without screen or spec sheet is played in one writing session, with no precheck, probe, separate review or « code sans test » gate and no News entry per lot (the lead reads the diff, looks at the capture and groups the entries at delivery); the program's gate still plays once. The L517 study sizes it at about 4.9 min and 51 k tokens less per lot.
+- `raf add --local` and `cadence local start|done|abort <lot>` (L519, [docs/raf.md](docs/raf.md)): a lot the lead does by hand locks the repository like a wave (no wave starts, `--add` and `--continue` refuse it, refused itself when a wave or another lot of the repository is running); the lock is declared (`--ttl`, 60 min by default, as `lead hold`), carried by no process, held until `local done` or `local abort`, and `lead tour` / `orchestrate --status` print a ⚠ past the delay instead of releasing it; `local done` plays the gate once and frees the repository, the lead then reads the diff and records `raf review` before `raf done`; the pre-push hook recognises the local task (no false « état illisible » warning).
+
 ## [1.37.0] - 2026-11-02
 
 ### Changed
@@ -91,8 +96,6 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - The writing sessions of `cadence orchestrate` play only the targeted tests of the code they touch, once before committing; the full suite is played once by the program as the gate and `cadence verify --gate` takes its verdict back (L518, [docs/orchestrate.md](docs/orchestrate.md)). The final table and `--status` gain a `suites` column: how many times the program played the full suite for each lot.
 ### Added
 
-- Express lane for touch-ups (L519, [docs/orchestrate.md](docs/orchestrate.md)): a lot of at most 0.1 day without screen or spec sheet is played in one writing session, with no precheck, probe, separate review or « code sans test » gate and no News entry per lot (the lead reads the diff, looks at the capture and groups the entries at delivery); the program's gate still plays once. The L517 study sizes it at about 4.9 min and 51 k tokens less per lot.
-- `raf add --local` and `cadence local start|done|abort <lot>` (L519, [docs/raf.md](docs/raf.md)): a lot the lead does by hand locks the repository like a wave (no wave starts, `--add` and `--continue` refuse it, refused itself when a wave or another lot of the repository is running); the lock is declared (`--ttl`, 60 min by default, as `lead hold`), carried by no process, held until `local done` or `local abort`, and `lead tour` / `orchestrate --status` print a ⚠ past the delay instead of releasing it; `local done` plays the gate once and frees the repository, the lead then reads the diff and records `raf review` before `raf done`; the pre-push hook recognises the local task (no false « état illisible » warning).
 - `node scripts/temps-d-un-lot.mjs` splits the wall time and the tokens of every lot of a window of waves by item (preparation, implementation, tests and builds replayed, reads, news, captures, review, correction passes with their cause, slot wait, gate, integration) from the wave states, the journals and the session transcripts (L517); the measure of 17-10 → 01-11 and the three levers it sizes (a full suite once per lot, an express lane for touch-ups, fewer edge-case passes) are in [docs/mesures/temps-d-un-lot.md](docs/mesures/temps-d-un-lot.md).
 
 ## [1.36.0] - 2026-11-01

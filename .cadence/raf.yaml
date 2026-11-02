@@ -1240,6 +1240,7 @@ lots:
     estimate: 0.5
     created: 2026-11-02
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme : lot tiré ou ajouté par --add reçoit son worktree dès que le plafond > 1 (avec ou sans --continue), tirage automatique sous --continue dans l'ordre de priorité, dry-run aligné — 3 notes mineures (simulation sans filtre de ressources, JSDoc orphelin, test probe de priorité faible) — revue Opus du lead, passe 3", commit: 0b75a6f27efe27fc230cd8dc8d9771d4163fa6df }
   - id: L528
     title: "Test instable sous charge : test/orchestrate-app.test.ts « verrou par hôte:port de l'URL (L60) > délai dépassé après une attente du verrou : le message annonce le délai restant » — rouge dans le clone neuf de la release 1.38.1 (attendu /n'a pas répondu en [0-2] s/, reçu « url tenue par une autre vague »), vert 3/3 rejoué seul : horloge simulée ou marge, sans changer le contrat"
     status: done

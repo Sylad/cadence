@@ -1494,6 +1494,11 @@ lots:
     started: 2026-11-02
     review: { date: 2026-11-02, verdict: "compliant (1 minor note: unguarded origin/main probe test in test/probe-L539-bords.test.ts) — orchestré (vague 2026-11-02-2030-pub, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant (1 note mineure : le test cliquet origin/main de probe-L539 n'est pas conditionnel)", commit: 2ba9226ebbc5840ede8558e5a11415a8361b052b }
     finished: 2026-11-02
+  - id: L540
+    title: "Test instable sous charge, de retour après L528 : test/orchestrate-app.test.ts « verrou par hôte:port de l'URL (L60) > délai dépassé après une attente du verrou : le message annonce le délai restant » — rouge dans la suite de L539 (02-11), vert seul ; trouver la vraie cause (horloge, marge ou ordre), sans changer le contrat"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-02
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

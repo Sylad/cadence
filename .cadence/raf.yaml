@@ -346,6 +346,7 @@ lots:
     notes:
       - { date: 2026-10-31, text: "31-10 : mesure intermédiaire (cadence corrections --classify --since 2026-10-30, 86 passes) : bug de code 44 (51 % des classées, 53 % avant), cas limite 64 % des bug-code (69 % avant), lots ≥ 2 passes 26 % (27 % avant) — consignes L428/L447 sans effet net ; mécanisme suivant L497 (sonde avant revue), à mesurer aussi" }
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-02-1205-cont, 0 passe(s) de correction)", commit: a7da7f53f7f15d088656247a71d591365a569f6e, reporte: { de: afa8c2517de2d5a98c231f4989f5a1c9642b64a6, vers: a7da7f53f7f15d088656247a71d591365a569f6e, patchId: 04c5a9ab92a36fee559282a9337691b956073cef } }
   - id: L431
     title: "verify --gate --sha joue la porte dans l'arbre principal (« propre, au sha ») pendant une vague vivante du dépôt : une intégration déplace HEAD au milieu, verdict non probant, 5 min perdues (29-10, L427) — pendant une vague vivante du dépôt, toujours une copie jetable"
     status: done

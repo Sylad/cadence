@@ -1,5 +1,7 @@
 # How cadence works
 
+New to the vocabulary? Start with [the notions of cadence](concepts.md); this page is the mechanics.
+
 A versioned plan (`raf`) tied to the commits, waves of fresh sessions driven by a program
 (`cadence orchestrate`), a lead that decides and re-verifies, then deliveries proved by their effect.
 Four figures go from the isolated lot to the tool itself. Dashed boxes are conditional steps; a

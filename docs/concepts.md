@@ -1,0 +1,159 @@
+[← cadence](../README.md)
+
+# The notions of cadence, for a human
+
+cadence has become a rich tool, and its vocabulary comes faster than its pages. This one explains each notion in a few sentences,
+**in the order you meet them**, with four figures; the technical detail stays in the pages it links, and the
+[glossary](#glossary) at the end is the one-line version. You do not need to know cadence to read it: the journey of a lot
+([figure 1](#the-steps-of-a-lot)) is the five minutes to keep if you keep only one thing.
+
+## Plan and lot
+
+The **plan** is a file in your repository (`.cadence/raf.yaml`): the list of what is left to do and what was done.
+Each item is a **lot**: a piece of work small enough to be finished in a day or two, with an identifier (`L12`), a title, an
+estimate and a status (`todo`, `doing`, `done`, or `dropped`). A commit that belongs to a lot cites it in its subject:
+`feat(L12): …`. That link is the whole idea: from any commit you know what it was for, from any lot you know its commits.
+The `raf` command reads and writes the plan; `raf check` lists the commits that cite no lot. Detail: [raf.md](raf.md).
+
+## Verdicts
+
+A lot is not finished when its code is written, but when two independent readers said so, and the plan keeps their word:
+the **review verdict** (`raf review`) says the code is compliant, the **UX verdict** (`raf ux`) says the screen is
+usable, for a lot that shows one (a `visible` lot). A verdict is recorded by the program (the review) or by the lead (the UX verdict, on the human's word), not by
+the session that wrote the code. `raf done` is refused while a sub-task is open. Detail: [raf.md](raf.md), [news.md](news.md).
+
+## Session and wave
+
+A **session** is one fresh run of Claude Code with a brief and a single job (write the spec, write the code, review, fix). It
+remembers nothing of the previous one: what it needs is in the brief and in the repository. A **wave** is a run of
+`cadence orchestrate` over several lots: the program (not a model) starts the sessions, chains the steps of each lot, runs
+the tests, and prints a final table with the lots ready and the lots handed back. A session cannot ask you anything: when it is
+stuck it stops and reports, and the question comes back to you through the lead. Detail: [orchestrate.md](orchestrate.md).
+
+## The steps of a lot
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="concepts-lot-dark.svg">
+  <img alt="A lot goes through spec, code, review, correction, UX and ready; under each step, who does it: spec-writer, a fresh session, the code-reviewer, a fresh session, the ux-reviewer, the lead" src="concepts-lot-light.svg">
+</picture>
+
+Inside a wave, a lot goes through these steps, each in a fresh session. Dashed boxes are conditional.
+
+| Step | What happens | Who |
+|---|---|---|
+| **spec** | For a lot that creates a screen (`screen: page`) or has a behaviour to pin down (`spec: true`): a mockup and a **sheet** (fields, states, numbered rules); reviewed before any code, and the acceptance tests are written from it, committed red and locked | the `spec-writer` agent, reviewed by the `ux-reviewer` (mockup) or the `code-reviewer` (sheet); the program locks the tests |
+| **code** | Test first, then the code, commits that cite the lot; the lot's own tests must pass | a fresh session of the program |
+| **review** | Reads the diff against the lot (and the sheet, rule by rule) and returns findings: blocking, major, minor | the `code-reviewer` agent; the program records `raf review` when it is compliant |
+| **correction** | Only if the review is not compliant: a new session fixes the findings, then a new review. Two passes at most, three when the findings converge; then the lot is **handed back** | a fresh session; the program decides how many |
+| **UX** | For a visible lot: the screen is opened in a real browser, in each state, with captures at 1440 and 390 px | the `ux-reviewer` agent for the report; the verdict is **the human's**, or the lead's when the parent folder says `lead.ux: lead` |
+| **ready** | The lot is integrated (see [below](#one-worktree-per-lot-and-integration)); the lead re-checks it, records `raf done`, delivers it | the lead |
+
+Before all that, a lot whose title cites a finding or another lot gets a **precheck**: « is it already done? ». Small lots (half a day or
+less) get a single review pass. Detail: [fonctionnement.md](fonctionnement.md#2-a-lot-inside-a-wave), [spec.md](spec.md).
+
+## The test gate
+
+After each writing session the program plays the project's own **gate**: the build (`orchestrate.build`), then the tests
+(`orchestrate.test`). A session's « the tests pass » is never taken on trust. Three rules keep the gate honest:
+
+- **Already red at the start.** If a test fails, the program replays the suite at the sha the lot started from, in a **throwaway copy**
+  of the repository (a temporary `git worktree` outside it, removed afterwards). A test that was already red is not the lot's fault: no correction pass,
+  and the table lists it apart.
+- **Replayed alone.** With `orchestrate.testReplay`, a test red in the whole suite is replayed alone: green alone means a load
+  failure, not a defect, so no correction is spent on it. Without this key, nothing is replayed.
+- **A test that reads the plan.** The commits that only touch the plan are crossed when the gate's verdict is carried over them. A project whose
+  tests read `.cadence/raf.yaml` says so with `orchestrate.gate: { readsPlan: true }`, or the gate would not see a break.
+
+A **resume** (`cadence orchestrate --resume`) picks a suspended or handed-back wave where it stopped, instead of starting again.
+Detail: [orchestrate.md](orchestrate.md#orchestrate), [deliver.md](deliver.md), [remote-gate.md](remote-gate.md).
+
+## One worktree per lot, and integration
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="concepts-worktrees-dark.svg">
+  <img alt="Three lots each work in their own worktree on their own branch; at the end of their cycle they pass one at a time through the integration (rebase, replayed checks, fast-forward) into main" src="concepts-worktrees-light.svg">
+</picture>
+
+By default a wave plays the lots of a repository one after the other. With `orchestrate.worktrees: true`, independent lots play **at the same
+time**, each in its own **worktree** (a second checkout of the same repository, in its own folder) on its own branch
+`cadence/<wave>/<project>--<lot>`, so two sessions never edit the same files. When a lot's cycle ends, the program **integrates** it: one
+lot at a time under a lock, it rebases the branch on the tip of `main`, replays the checks, and fast-forwards `main`. Only then is the
+lot `ready`. If `main` moved in the meantime the rebase is replayed, twice at most, then the lot is handed back. Two rules protect
+you: the program, not the sessions, writes the plan; and a session never commits on the `main` branch of another repository
+(it uses a `wip/` branch). Detail: [orchestrate.md](orchestrate.md#one-worktree-per-lot-orchestrateworktrees-l279).
+
+## Deliverable up to a sha
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="concepts-livraison-dark.svg">
+  <img alt="Commits stack on main: L1 and L2 are ready, L3 is handed back, L4 is ready above it; the deliverable sha is the last commit of L2, so L3 and L4 are not pushed" src="concepts-livraison-light.svg">
+</picture>
+
+Lots commit on top of each other on `main`. When a ready lot sits **under** a lot that is not ready, pushing `HEAD` would also publish
+unreviewed code. The final table then says « **livrable jusqu'à `<sha>`** »: the last commit of the highest ready lot that has no
+unfinished lot beneath it. You ship exactly that, and nothing above:
+
+```sh
+git push origin <sha>:main && cadence deliver --sha <sha>
+```
+
+`cadence deliver` waits for the CI of that exact sha, deploys, and replays the effect checks: a delivery is finished only when its effect is proved.
+Where the project declares a gate, the `pre-push` hook refuses a sha with no green `cadence verify --gate`. Detail: [deliver.md](deliver.md), [orchestrate.md](orchestrate.md#orchestrate).
+
+## Lead and delivery agent
+
+The **lead** is a Claude Code session (`/cadence:lead`) that drives the waves for you: it reads the state of every project
+(`cadence lead tour`), proposes lots, starts the waves, relays each line of the journal and each question, **re-verifies** what comes back
+(git log, tests, build, `raf check`), then delivers. It never codes and never commits where a wave runs. The **delivery agent**
+(`livreur`) is a subagent the lead hands one ready lot to: it checks the sha, runs the gate, records `raf done`, pushes the sha and
+delivers, then reports in one line. You stay the one who decides what matters, and the UX verdict if you did not delegate it.
+Detail: [lead.md](lead.md), [skills.md](skills.md).
+
+## Slots and holds
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="concepts-vague-dark.svg">
+  <img alt="A queue of lots feeds the slots of a wave: two sessions running, a slot held by a fix the lead started by hand, a free slot drawn at once; the wave's table goes to the lead" src="concepts-vague-light.svg">
+</picture>
+
+The machine and your quota are shared, so at most **N sessions run at once**: N is the cap (`CADENCE_MAX_SESSIONS` or `--max-sessions`, 2 by default;
+the lead never raises it itself). Each running session occupies a **slot**; a lot waits in the queue until one is free, and a freed slot is
+filled at once by the next ready lot of the plan. A session the lead starts by hand (a fix, a QA pass) is invisible to the waves, so
+the lead declares it with `cadence lead hold <label>` and lifts it with `cadence lead release <label>`: a **hold** takes a slot, and
+the waves wait for it instead of overtaking it. `cadence orchestrate --status` prints `créneaux libres : 1 sur 3`. Detail: [lead.md](lead.md#lead-hold-and-release), [orchestrate.md](orchestrate.md#orchestrate).
+
+## Escalation
+
+A lot that is still not compliant after its correction passes would normally be handed back. A project can ask for one more try
+with a stronger model: `orchestrate.escalation: { model: fable }` plays one correction and one fresh review on that model first
+(absent, nothing changes; it costs a share of the lot's budget). If that is not enough, the lot is **handed back** to the lead,
+who either fixes it, answers the question, or brings it to you: the question always reaches a human, never a session. Detail: [orchestrate.md](orchestrate.md#orchestrate), [perf.md](perf.md).
+
+## Putting into service and release
+
+Two moments are easy to confuse. **Putting into service** concerns cadence itself, where the `raf` and `cadence` commands you type must
+not run the code a wave is rewriting: they read a separate copy, updated only by `npm run service -- <sha>`, which refuses a sha
+that is not an ancestor of `HEAD` or whose lots are not `done`. A **release** is a published version: `cadence release patch|minor|major` writes the version
+files and the changelog, then prints the steps the lead plays (tag, gate, push, CI, publication). Detail: [fonctionnement.md](fonctionnement.md#4-putting-cadence-itself-in-service), [releasing.md](releasing.md).
+
+## Glossary
+
+- **plan**: the file `.cadence/raf.yaml` that lists the lots; the single source of truth.
+- **lot**: one item of the plan, cited by its commits (`feat(L12): …`).
+- **verdict**: the recorded opinion of a reviewer on a lot: `raf review` (code) and `raf ux` (screen).
+- **session**: one fresh Claude Code run with a brief and one job.
+- **wave**: a `cadence orchestrate` run that plays several lots and prints a table of what is ready and what is handed back.
+- **sheet**: the written spec of a screen or a behaviour, with numbered rules, each tested.
+- **gate**: the build and the tests the program plays after each session, with the already-red baseline and the replay alone.
+- **readsPlan**: `orchestrate.gate` key declaring that a test reads the plan, so plan-only commits are not crossed.
+- **worktree**: a second checkout of the repository on its own branch, one per lot, so lots play at the same time.
+- **integration**: rebasing a lot on the tip of `main`, replaying the checks and fast-forwarding, one lot at a time, before `ready`.
+- **handed back**: a lot the wave could not finish and returns to the lead with its cause.
+- **deliverable up to**: the sha up to which a delivery is safe, below the first lot that is not ready.
+- **lead**: the session that drives the waves, re-verifies and delivers; it never codes.
+- **delivery agent**: the `livreur` subagent that delivers one ready lot and reports in one line.
+- **slot**: one place under the cap of simultaneous sessions.
+- **hold**: a slot kept by a session the lead started by hand, so waves do not overtake it.
+- **escalation**: one more correction and review on a stronger model before a lot is handed back.
+- **service**: the separate copy of cadence the `PATH` commands read, updated by `npm run service -- <sha>`.
+- **release**: a published version, prepared by `cadence release`.

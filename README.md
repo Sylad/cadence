@@ -4,6 +4,7 @@ A small working method that lives in your repository: a versioned plan linked to
 waves of fresh AI sessions driven by a program, and deliveries proved by their effect.
 It is for solo developers and AI-assisted sessions who lose track of *what is left to do* and *what each commit was for*:
 cadence keeps both in plain files next to the code, and [Claude Code](https://claude.com/claude-code) skills turn it into rituals.
+New to the words (lot, wave, hold…)? [docs/concepts.md](docs/concepts.md) explains each notion, with four figures.
 
 ## Start
 
@@ -15,8 +16,7 @@ raf init
 raf add "My first lot" --estimate 1
 ```
 
-Then `raf start L1`, commit with `feat(L1): …`, `raf now` to see where you are, `raf done L1` when it is finished.
-`raf -v` prints the installed version. Every command is in [docs/raf.md](docs/raf.md).
+Then `raf start L1`, commit with `feat(L1): …`, `raf now` to see where you are, `raf done L1` when finished. Every command: [docs/raf.md](docs/raf.md).
 
 ## Lead several projects in 10 minutes
 

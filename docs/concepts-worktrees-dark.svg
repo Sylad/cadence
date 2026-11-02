@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 330" width="1100" height="330" role="img" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#e6edf3">
+<title>Worktrees to main</title>
+<desc>Each lot works on its own branch in its own worktree; at the end of its cycle it is rebased onto the tip of main, its checks are replayed, and it is fast-forwarded into main one lot at a time under a lock.</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/></marker></defs>
+<rect width="1100" height="330" fill="#0d1117"/>
+<rect x="20" y="30" width="200" height="56" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="120" y="54" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">worktree L1</text>
+<text x="120" y="71" text-anchor="middle" font-size="11.5" fill="#8b949e">branch cadence/&lt;wave&gt;/L1</text>
+<rect x="280" y="30" width="180" height="56" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="370" y="54" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">cycle</text>
+<text x="370" y="71" text-anchor="middle" font-size="11.5" fill="#8b949e">code · review · UX</text>
+<polyline points="220,58 278,58" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<polyline points="460,58 518,58" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="20" y="110" width="200" height="56" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="120" y="134" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">worktree L2</text>
+<text x="120" y="151" text-anchor="middle" font-size="11.5" fill="#8b949e">branch cadence/&lt;wave&gt;/L2</text>
+<rect x="280" y="110" width="180" height="56" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="370" y="134" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">cycle</text>
+<text x="370" y="151" text-anchor="middle" font-size="11.5" fill="#8b949e">code · review · UX</text>
+<polyline points="220,138 278,138" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<polyline points="460,138 518,138" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="20" y="190" width="200" height="56" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="120" y="214" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">worktree L3</text>
+<text x="120" y="231" text-anchor="middle" font-size="11.5" fill="#8b949e">branch cadence/&lt;wave&gt;/L3</text>
+<rect x="280" y="190" width="180" height="56" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="370" y="214" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">cycle</text>
+<text x="370" y="231" text-anchor="middle" font-size="11.5" fill="#8b949e">code · review · UX</text>
+<polyline points="220,218 278,218" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<polyline points="460,218 518,218" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="520" y="30" width="240" height="216" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="640" y="142" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3"></text>
+<text x="640" y="56" text-anchor="middle" font-size="13.5" font-weight="600" fill="#e6edf3">Integration</text>
+<text x="640" y="120" text-anchor="middle" font-size="11.5" fill="#e6edf3">one lot at a time (lock)</text>
+<text x="640" y="142" text-anchor="middle" font-size="11.5" fill="#8b949e">1. rebase onto the tip of main</text>
+<text x="640" y="160" text-anchor="middle" font-size="11.5" fill="#8b949e">2. replay the checks</text>
+<text x="640" y="178" text-anchor="middle" font-size="11.5" fill="#8b949e">3. fast-forward main</text>
+<text x="640" y="200" text-anchor="middle" font-size="11.5" fill="#8b949e">main moved? replay, twice at most</text>
+<polyline points="760,138 858,138" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="860" y="100" width="220" height="76" rx="6" fill="#0c2d6b" stroke="#58a6ff" stroke-width="2"/>
+<text x="970" y="134" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">main</text>
+<text x="970" y="151" text-anchor="middle" font-size="11.5" fill="#8b949e">linear history, then ready</text>
+<text x="970" y="196" text-anchor="middle" font-size="11.5" fill="#8b949e">the plan is written here, by the program</text>
+<text x="550" y="280" text-anchor="middle" font-size="11.5" fill="#8b949e">orchestrate.worktrees: true lets independent lots of one repository play at the same time.</text>
+<text x="550" y="300" text-anchor="middle" font-size="11.5" fill="#8b949e">Without it, lots play one after the other in the repository itself.</text>
+</svg>

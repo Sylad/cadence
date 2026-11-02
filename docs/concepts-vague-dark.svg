@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 390" width="1100" height="390" role="img" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#e6edf3">
+<title>Wave and slots</title>
+<desc>A wave plays its lots in fresh sessions under a cap of slots; a lot waits in the queue until a slot is free, and a session the lead started by hand is held and takes a slot.</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/></marker></defs>
+<rect width="1100" height="390" fill="#0d1117"/>
+<rect x="20" y="44" width="170" height="240" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="105" y="160" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">Queue</text>
+<text x="105" y="177" text-anchor="middle" font-size="11.5" fill="#8b949e">lots waiting, in the</text>
+<text x="105" y="190" text-anchor="middle" font-size="11.5" fill="#8b949e">priority order</text>
+<text x="105" y="222" text-anchor="middle" font-size="11.5" fill="#8b949e">a lot that depends on</text>
+<text x="105" y="238" text-anchor="middle" font-size="11.5" fill="#8b949e">another waits for it</text>
+<text x="230" y="26" text-anchor="start" font-size="11.5" font-weight="600" fill="#e6edf3">SLOTS: as many sessions at once as the cap (CADENCE_MAX_SESSIONS)</text>
+<rect x="270" y="44" width="380" height="52" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="460" y="66" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">slot 1 · L1</text>
+<text x="460" y="83" text-anchor="middle" font-size="11.5" fill="#8b949e">implementation: a session running</text>
+<polyline points="190,164 268,70" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="270" y="108" width="380" height="52" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="460" y="130" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">slot 2 · L2</text>
+<text x="460" y="147" text-anchor="middle" font-size="11.5" fill="#8b949e">review: a session running</text>
+<polyline points="190,164 268,134" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="270" y="172" width="380" height="52" rx="6" fill="#0c2d6b" stroke="#58a6ff" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="460" y="194" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">slot 3 · hold</text>
+<text x="460" y="211" text-anchor="middle" font-size="11.5" fill="#8b949e">a fix started by hand by the lead</text>
+<polyline points="190,164 268,198" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="270" y="236" width="380" height="52" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="460" y="258" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">slot 4 · free</text>
+<text x="460" y="275" text-anchor="middle" font-size="11.5" fill="#8b949e">the next ready lot is drawn at once</text>
+<polyline points="190,164 268,262" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="740" y="44" width="200" height="80" rx="6" fill="#0d1117" stroke="#8b949e" stroke-width="1.5"/>
+<text x="840" y="80" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">Table of the wave</text>
+<text x="840" y="97" text-anchor="middle" font-size="11.5" fill="#8b949e">ready · handed back · questions</text>
+<polyline points="650,70 738,84" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<rect x="740" y="170" width="200" height="80" rx="6" fill="#0c2d6b" stroke="#58a6ff" stroke-width="2"/>
+<text x="840" y="206" text-anchor="middle" font-weight="600" font-size="13.5" fill="#e6edf3">The lead</text>
+<text x="840" y="223" text-anchor="middle" font-size="11.5" fill="#8b949e">relays, re-checks, delivers</text>
+<polyline points="840,124 840,168" fill="none" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<text x="550" y="330" text-anchor="middle" font-size="11.5" fill="#8b949e">A hold (cadence lead hold) counts against the cap like a running session: the wave waits for it instead of overtaking it.</text>
+<text x="550" y="352" text-anchor="middle" font-size="11.5" fill="#8b949e">A lot handed back frees its slot at once; the next ready lot of the plan takes it.</text>
+</svg>

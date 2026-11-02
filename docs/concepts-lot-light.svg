@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 300" width="1100" height="300" role="img" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#1f2328">
+<title>Journey of a lot</title>
+<desc>A lot goes through spec, code, review, correction when the review is not compliant, UX if the lot is visible, then ready; below each step, who does it.</desc>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#57606a"/></marker></defs>
+<rect width="1100" height="300" fill="#ffffff"/>
+<text x="20" y="26" text-anchor="start" font-size="11.5" font-weight="600" fill="#57606a">STEP</text>
+<text x="20" y="168" text-anchor="start" font-size="11.5" font-weight="600" fill="#57606a">WHO</text>
+<rect x="20" y="40" width="160" height="60" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="100" y="66" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">spec</text>
+<text x="100" y="83" text-anchor="middle" font-size="11.5" fill="#57606a">if screen or spec: true</text>
+<rect x="200" y="40" width="160" height="60" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="280" y="66" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">code</text>
+<text x="280" y="83" text-anchor="middle" font-size="11.5" fill="#57606a">test first</text>
+<rect x="380" y="40" width="160" height="60" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
+<text x="460" y="66" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">review</text>
+<text x="460" y="83" text-anchor="middle" font-size="11.5" fill="#57606a">code</text>
+<rect x="560" y="40" width="160" height="60" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="640" y="66" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">correction</text>
+<text x="640" y="83" text-anchor="middle" font-size="11.5" fill="#57606a">if not compliant</text>
+<rect x="740" y="40" width="160" height="60" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="820" y="66" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">UX</text>
+<text x="820" y="83" text-anchor="middle" font-size="11.5" fill="#57606a">if visible</text>
+<rect x="920" y="40" width="160" height="60" rx="6" fill="#ddf4ff" stroke="#0969da" stroke-width="2"/>
+<text x="1000" y="66" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">ready</text>
+<text x="1000" y="83" text-anchor="middle" font-size="11.5" fill="#57606a">integrated</text>
+<polyline points="180,70 198,70" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+<polyline points="360,70 378,70" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+<polyline points="540,70 558,70" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+<polyline points="720,70 738,70" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+<polyline points="900,70 918,70" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
+<polyline points="640,40 640,22 460,22 460,38" fill="none" stroke="#57606a" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#arr)"/>
+<text x="550" y="16" text-anchor="middle" font-size="11.5" fill="#57606a">back to the review after each correction</text>
+<rect x="20" y="180" width="160" height="56" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1"/>
+<text x="100" y="204" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1f2328">spec-writer</text>
+<text x="100" y="222" text-anchor="middle" font-size="11.5" fill="#57606a">then reviewer</text>
+<rect x="200" y="180" width="160" height="56" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1"/>
+<text x="280" y="204" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1f2328">fresh session</text>
+<text x="280" y="222" text-anchor="middle" font-size="11.5" fill="#57606a">of the program</text>
+<rect x="380" y="180" width="160" height="56" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1"/>
+<text x="460" y="204" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1f2328">code-reviewer</text>
+<text x="460" y="222" text-anchor="middle" font-size="11.5" fill="#57606a">agent</text>
+<rect x="560" y="180" width="160" height="56" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1"/>
+<text x="640" y="204" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1f2328">fresh session</text>
+<text x="640" y="222" text-anchor="middle" font-size="11.5" fill="#57606a">2 passes, 3 if it converges</text>
+<rect x="740" y="180" width="160" height="56" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1"/>
+<text x="820" y="204" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1f2328">ux-reviewer</text>
+<text x="820" y="222" text-anchor="middle" font-size="11.5" fill="#57606a">then the human</text>
+<rect x="920" y="180" width="160" height="56" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1"/>
+<text x="1000" y="204" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1f2328">the lead</text>
+<text x="1000" y="222" text-anchor="middle" font-size="11.5" fill="#57606a">re-checks, raf done</text>
+<text x="550" y="270" text-anchor="middle" font-size="11.5" fill="#57606a">Dashed: a conditional step. The program chains the sessions; the verdicts of the review and of the UX pass are recorded in the plan.</text>
+</svg>

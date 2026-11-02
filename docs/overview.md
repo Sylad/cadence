@@ -74,7 +74,7 @@ The two plugins are independent. `cadence@cadence` carries the rituals, which ca
 | [docs/stabilite.md](stabilite.md) | what is guaranteed from 1.0.0 and what is not |
 | [docs/qualite.md](qualite.md) | code-quality guard rails: ESLint (typescript-eslint, sonarjs), knip and jscpd compared to a versioned baseline by a ratchet (`npm run qualite`, `--init`, `--ecrire`, `--migrer`, `--contre`), in the wave's gate and the CI; the recipe for TypeScript, Python, Java and shell |
 
-Also: [news](news.md) (changelog, UX, code and QA reviews, documentation that follows the code), [quality](qualite.md), [session](session.md), [corrections](corrections.md), [perf](perf.md), [skills and agents](skills.md), [cadence-hud](cadence-hud.md), [releasing](releasing.md), [overview](overview.md), [how it all works](fonctionnement.md) (four figures).
+Also: [news](news.md) (changelog, UX, code and QA reviews, documentation that follows the code), [quality](qualite.md), [session](session.md), [corrections](corrections.md), [perf](perf.md), [skills and agents](skills.md), [cadence-hud](cadence-hud.md), [releasing](releasing.md), [overview](overview.md), [the notions, for a human](concepts.md), [how it all works](fonctionnement.md) (four figures).
 
 <details>
 <summary>The four tools in short</summary>

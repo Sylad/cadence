@@ -84,6 +84,9 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Added
 
 - Cost in euros before and after a wave (L529, [docs/orchestrate.md](docs/orchestrate.md), [docs/perf.md](docs/perf.md)): with a `perf.prices` grid in the `cadence.yaml` of the launch folder, `orchestrate --dry-run` announces, after the simulated lots and their token budgets, an estimate in euros per lot (the budget priced at the lot's writing model, 90 % input / 10 % output; cache reads and review steps are not in it) and for the wave; the final table and `--status` print a `€` column, the real cost of each lot, and the wave total on the `vague …` line (`n/d` for a lot with a model the grid does not price). Without the grid nothing changes; a malformed grid prints a warning and the table still comes out.
+### Fixed
+
+- `cadence release` reads the whole « In two lines » list of `docs/whats-new.md`, not only the new version's line (L418, [docs/releasing.md](docs/releasing.md)): a bullet of another version over 240 characters or a long paragraph fallen among the short lines is a finding (exit 1) before the version commit and the tag, as `test/readme-accueil.test.ts` would find it at the gate (the 1.22.0 publication of 28-10 failed on it). The printed steps say to read each by its exit code, never behind a pipe, and `publish.yml` / `tests.yml` no longer pipe into `grep` (here-strings), so no filter hides the code of the suite.
 
 ## [1.38.1] - 2026-11-02
 

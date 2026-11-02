@@ -86,6 +86,10 @@ It refuses, with exit code 2 and nothing written:
 
 Write the two forms of the new version in `docs/whats-new.md` **before** running the command: the file may be modified (it is the one tracked file allowed to be, since the version commit holds it) and the command then reads the forms it finds. Run after the forms are written, it exits 0; if it exits 1 the version files are already written, so fix `docs/whats-new.md` by hand and do not run the command again (it would bump once more).
 
+The check reads the whole « In two lines » list, as `test/readme-accueil.test.ts` (R5) does at the gate, and not only the line of the new version (L418): a bullet of any other version over 240 characters, or a long paragraph (`**x.y.z**: …`, no leading `- `) that fell among the short lines, is a finding too (exit 1). That is the 1.22.0 publication of 28-10, stopped by that very test after a long form had been committed in the list; the command now says it before the version commit and the tag.
+
+The steps it prints are read by their exit code, never through a pipe: a `| tail` or a trailing `| grep` after the suite hands the shell the filter's code, and a red suite looks green (28-10, 29-10). The same holds for the workflows: `publish.yml` and `tests.yml` read the output of `npm publish` (and the diagnostics) with `grep … <<< "$out"`, no pipe (`test/publish-workflow.test.ts`), because under `set -o pipefail` a `printf | grep -q` over the long output of the suite would fail on a `SIGPIPE`.
+
 `docs/whats-new.md` is **not written by the command** (the two forms are prose, written by hand or by a session): it checks that
 both are there and in their place, and says where to write what is missing. The « In two lines » line of the version is the
 first of the list and at most 240 characters; the long paragraph is the first of « Version by version », right after its

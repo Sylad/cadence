@@ -380,3 +380,16 @@ describe('étape « Suite sous npm publish --dry-run » de tests.yml (L515)', ()
     expect(run(1, '').status).toBe(1);
   });
 });
+
+describe('L418 — le code de sortie d’une étape est le vrai (28-10 : un rouge masqué par `| tail`)', () => {
+  const lignes = (f: string) => readFileSync(join(root, '.github/workflows', f), 'utf8').split('\n').filter((l) => !l.trim().startsWith('#'));
+  it.each(['publish.yml', 'tests.yml'])('%s : aucun pipe dans une commande (un `| grep` final lit un code qui n’est pas celui de la suite)', (f) => {
+    const pipes = lignes(f).filter((l) => !/run: \|\s*$/.test(l))
+      .filter((l) => /(^|[^|])\|([^|]|$)/.test(l.replace(/'[^']*'|"[^"]*"/g, '')));
+    expect(pipes).toEqual([]);
+  });
+
+  it('publish.yml : le conflit de publication se lit sur la sortie capturée de npm publish, sans pipe', () => {
+    expect(workflow).toMatch(/grep -qE '\^npm \(error\|ERR!\) \(code EPUBLISHCONFLICT[^\n]*<<< "\$out" \|\| exit 1/);
+  });
+});

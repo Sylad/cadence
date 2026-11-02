@@ -209,6 +209,13 @@ function whatsNewIssues(text: string, version: string): string[] {
   };
   check('ligne de « In two lines »', 'manquante', 'mal placée', /^- \*\*(\d+\.\d+\.\d+)\*\*:/, 0, split, 'en tête de la liste', SHORT_LINE_MAX);
   check('paragraphe long', 'manquant', 'mal placé', /^\*\*(\d+\.\d+\.\d+)\*\*:/, split, lines.length, 'juste après l’introduction de « Version by version »');
+  // Le test « deux lignes » du dépôt lit toute la liste courte, pas seulement la version qui sort (1.22.0, 28-10 : un paragraphe long y était tombé, la publication a échoué).
+  lines.slice(0, split).forEach((l, i) => {
+    const bullet = /^- \*\*(\d+\.\d+\.\d+)\*\*:/.exec(l);
+    if (bullet && bullet[1] !== version && l.length > SHORT_LINE_MAX) issues.push(`${WHATS_NEW} : « In two lines » : la ligne de la version ${bullet[1]} fait ${l.length} caractères, ${SHORT_LINE_MAX} au plus — la raccourcir (le détail va dans « Version by version »)`);
+    const long = /^\*\*(\d+\.\d+\.\d+)\*\*:/.exec(l);
+    if (long) issues.push(`${WHATS_NEW} : « In two lines » : le paragraphe long de la version ${long[1]} n’y a pas sa place (ligne ${i + 1}) — le mettre dans « Version by version »`);
+  });
   return issues;
 }
 
@@ -273,7 +280,7 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
     }
   }
 
-  out('étapes du lead, dans l\'ordre (la commande n\'en joue aucune) :');
+  out('étapes du lead, dans l\'ordre (la commande n\'en joue aucune ; chacune se lit par son code de sortie : jamais de pipe (`| tail`, `| grep`) derrière une commande dont le code de sortie compte, il lui substitue celui du filtre) :');
   for (const s of steps(p, files, branch)) out(s);
   return ready ? 0 : 1;
 }

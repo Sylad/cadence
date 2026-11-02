@@ -60,7 +60,7 @@ jobs:
           node --version
           npm --version
           git config --global --list || true
-          env | grep '^GIT_' || echo "aucune variable GIT_*"
+          grep '^GIT_' <<< "$(env)" || echo "aucune variable GIT_*"
 
       # Le README est une page d'accueil (L232) : aucun lien relatif ni ancre cassé dans lui et dans les pages docs/.
       - name: Liens du README et des pages docs/
@@ -77,7 +77,7 @@ jobs:
       # Le run rouge de publish.yml faisait tourner la suite DANS `npm publish` (prepublishOnly), pas à côté : ici de même,
       # sans --provenance ni jeton, le dry-run ne publie rien. `npm run env` est un script interne de npm : l'environnement donné aux scripts.
       - name: Environnement que npm donne à ses scripts
-        run: npm run env | grep -E '^(npm_config_(tmp|cache|prefix|git|ignore_scripts)|TMPDIR|INIT_CWD|HOME|GIT_)' || true
+        run: grep -E '^(npm_config_(tmp|cache|prefix|git|ignore_scripts)|TMPDIR|INIT_CWD|HOME|GIT_)' <<< "$(npm run env)" || true
 
       # Un commit hors release porte une version déjà publiée : npm refuse alors le dry-run APRÈS prepublishOnly (la suite a donc été jouée et passée)
       # par « You cannot publish over the previously published versions ». Ce seul refus, lu sur une ligne d'erreur de npm comme dans publish.yml
@@ -89,6 +89,6 @@ jobs:
             echo "$out"
           else
             echo "$out"
-            printf '%s' "$out" | grep -qE '^npm (error|ERR!) (code EPUBLISHCONFLICT|.*previously published)' || exit 1
+            grep -qE '^npm (error|ERR!) (code EPUBLISHCONFLICT|.*previously published)' <<< "$out" || exit 1
             echo "La version de package.json est déjà publiée : npm refuse le dry-run après la suite, c'est attendu hors release."
           fi

@@ -376,6 +376,26 @@ describe('cadence release — docs/whats-new.md', () => {
     expect(r.out).toMatch(/ligne de « In two lines » trop longue/);
   });
 
+  it('L418 R1 — une ligne trop longue d’une AUTRE version de « In two lines » est signalée (le test « deux lignes » du dépôt les lit toutes)', () => {
+    const dir = project({ whatsNew: WHATS_NEW_DONE.replace('the old release.\n\n## Version', `${'y'.repeat(260)}\n\n## Version`) });
+    const r = release(dir, 'patch');
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/« In two lines » : la ligne de la version 1\.2\.3 fait 2\d\d caractères, 240 au plus/);
+  });
+
+  it('L418 R1 — un paragraphe long tombé dans « In two lines » (1.22.0, 28-10) est signalé, même pour une version ancienne', () => {
+    const dir = project({ whatsNew: WHATS_NEW_DONE.replace('- **1.2.3**: the old release.\n', '- **1.2.3**: the old release.\n\n**1.2.2**: a long paragraph that fell among the short lines.\n') });
+    const r = release(dir, 'patch');
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/« In two lines » : le paragraphe long de la version 1\.2\.2 n’y a pas sa place/);
+  });
+
+  it('L418 R1 — deux formes en place et lignes courtes : aucun écart signalé', () => {
+    const r = release(project({ whatsNew: WHATS_NEW_DONE }), 'patch');
+    expect(r.code).toBe(0);
+    expect(r.out).not.toMatch(/« In two lines » :/);
+  });
+
   it('R10 — un paragraphe long inséré après une version plus ancienne est signalé comme mal placé', () => {
     const misplaced = WHATS_NEW_DONE.replace(/\*\*1\.2\.4\*\*: the long paragraph\.\n\n(\*\*1\.2\.3\*\*: [^\n]*\n)/, '$1\n**1.2.4**: the long paragraph.\n');
     const dir = project({ whatsNew: misplaced });
@@ -649,5 +669,15 @@ describe('cadence release — tag local provisoire (L508)', () => {
     expect(git(dir, 'tag', '--list')).toBe('');
     expect(play('true').status).toBe(0);
     expect(git(dir, 'tag', '--list').trim()).toBe('v1.2.4');
+  });
+});
+
+describe('L418 — les étapes imprimées lisent le vrai code de sortie', () => {
+  it('R2 — aucune commande imprimée ne porte un pipe (`| tail`, `| grep` masquent le code de la suite) et la consigne le dit', () => {
+    const r = release(project({ whatsNew: WHATS_NEW_DONE }), 'patch');
+    const commandes = r.out.split('\n').filter((l) => /^\s+\d+\.\s/.test(l)).map((l) => l.replace(/^\s*\d+\.\s*/, '').split('    (')[0]);
+    expect(commandes.length).toBeGreaterThan(5);
+    expect(commandes.filter((c) => /(^|[^|])\|([^|]|$)/.test(c))).toEqual([]);
+    expect(r.out).toMatch(/jamais de pipe[^\n]*code de sortie/);
   });
 });

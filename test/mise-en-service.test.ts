@@ -20,7 +20,7 @@ function commitAll(dir: string, message: string, ...paths: string[]) {
   return git(dir, 'rev-parse', 'HEAD');
 }
 
-/** Dépôt de travail : copie du paquet (sources, bin, scripts npm) avec un plan, node_modules du dépôt réel en lien. */
+/** Dépôt de travail : copie du paquet (sources, bin, scripts/qualite.mjs, scripts npm) avec un plan, node_modules du dépôt réel en lien. */
 function workRepo(statuses: Record<string, string> = { L1: 'done' }) {
   const dir = tempDir();
   git(dir, 'init', '-q', '-b', 'main');
@@ -28,11 +28,14 @@ function workRepo(statuses: Record<string, string> = { L1: 'done' }) {
   git(dir, 'config', 'user.name', 'T');
   git(dir, 'config', 'commit.gpgsign', 'false');
   for (const n of ['src', 'bin', 'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.build.json']) cpSync(join(REPO, n), join(dir, n), { recursive: true });
+  // L538 : src/orchestrate/integrate.ts importe ../../scripts/qualite.mjs, sans quoi le tsc de l'installation échoue
+  mkdirSync(join(dir, 'scripts'));
+  for (const n of ['qualite.mjs', 'qualite.d.mts']) cpSync(join(REPO, 'scripts', n), join(dir, 'scripts', n));
   mkdirSync(join(dir, 'docs/plan'), { recursive: true });
   writeFileSync(join(dir, 'docs/plan/raf.yaml'), plan(statuses));
   writeFileSync(join(dir, '.gitignore'), 'dist/\nnode_modules/\n');
   symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'), 'dir');
-  const first = commitAll(dir, 'feat(L1): premier', 'src', 'bin', 'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.build.json', 'docs/plan/raf.yaml', '.gitignore');
+  const first = commitAll(dir, 'feat(L1): premier', 'src', 'bin', 'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.build.json', 'scripts', 'docs/plan/raf.yaml', '.gitignore');
   return { dir, first };
 }
 

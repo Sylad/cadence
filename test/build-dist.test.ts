@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, readFileSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -12,6 +12,9 @@ afterAll(cleanupTempDirs);
 function copyOfPackage(): string {
   const dir = tempDir();
   for (const n of ['src', 'package.json', 'tsconfig.json', 'tsconfig.build.json']) cpSync(join(REPO, n), join(dir, n), { recursive: true });
+  // L538 : src/orchestrate/integrate.ts importe ../../scripts/qualite.mjs, sans quoi la compilation échoue
+  mkdirSync(join(dir, 'scripts'));
+  for (const n of ['qualite.mjs', 'qualite.d.mts']) cpSync(join(REPO, 'scripts', n), join(dir, 'scripts', n));
   symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'), 'dir');
   return dir;
 }

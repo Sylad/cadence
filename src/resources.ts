@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { parse } from 'yaml';
+import { readYamlFile } from './yaml-keys.js';
 import { isOpen, RafError, RESOURCE_NAME, RESOURCES_BAD_LIST, type Lot } from './plan.js';
 
 /** Les ressources déclarées (clé `resources:`, L251) et le cadence.yaml qui les déclare, ou celui du dossier parent quand aucun n'en porte. */
@@ -19,12 +19,7 @@ export function readResources(root: string): Resources {
   for (let dir = dirname(root); ; dir = dirname(dir)) {
     const file = join(dir, 'cadence.yaml');
     if (existsSync(file) && statSync(file).isFile()) {
-      let raw: unknown;
-      try {
-        raw = parse(readFileSync(file, 'utf8'));
-      } catch (e) {
-        throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-      }
+      const raw = readYamlFile(file);
       if (raw != null && typeof raw === 'object' && Object.hasOwn(raw, 'resources')) {
         const list = (raw as { resources: unknown }).resources ?? [];
         if (!Array.isArray(list) || !list.every((n) => typeof n === 'string' && RESOURCE_NAME.test(n))) throw new RafError(`${file} : resources ${RESOURCES_BAD_LIST}`);

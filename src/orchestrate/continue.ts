@@ -1,11 +1,10 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { parse } from 'yaml';
 import { nextUp } from '../audit.js';
 import { planLoader, type OrchestrateConfig } from '../config.js';
 import { gitRoot } from '../git.js';
 import { findProjects, isProject } from '../lead.js';
 import { RafError, type Lot } from '../plan.js';
+import { readYamlKey } from '../yaml-keys.js';
 import { lotBudget, projectEnv, type Args, type OrchestrateIo, type Target } from './command.js';
 import { readyFree } from '../ready-free.js';
 import { lotFinished, lotKey, type LotState, type RunStore } from './state.js';
@@ -33,14 +32,7 @@ export function parsePriority(text: string): string[] {
 /** Clé `priority:` du cadence.yaml du dossier de lancement (le dossier parent des projets) ; absente : aucune priorité déclarée. */
 export function readPriority(launchDir: string): string[] {
   const file = join(launchDir, 'cadence.yaml');
-  if (!existsSync(file)) return [];
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const p = (raw as { priority?: unknown } | null)?.priority;
+  const p = readYamlKey(file, 'priority');
   if (p == null) return [];
   if (!Array.isArray(p) || p.length === 0 || p.some((n) => typeof n !== 'string' || !n.trim())) throw new RafError(`${file} : priority doit être une liste de noms de projets`);
   return p.map((n: string) => n.trim());

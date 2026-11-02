@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
 import { audit, gateWaiting, nextUp, planCommits, workByLot } from './audit.js';
 import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readPlanConfig } from './config.js';
@@ -7,7 +7,7 @@ import { localRepoNotes } from './local-task.js';
 import { gitRoot, repoStatus } from './git.js';
 import { linkCommits } from './link.js';
 import { commitCount, lastActivity, lockStatus } from './session.js';
-import { parse } from 'yaml';
+import { isObject, readYamlFile, readYamlKey } from './yaml-keys.js';
 import { isOpen, RafError, type Lot } from './plan.js';
 import { isRecurring } from './recurring.js';
 import { priorityRank, readPriority } from './orchestrate/continue.js';
@@ -21,14 +21,7 @@ import { KEPT_TITLE, keptLine, keptTrees, type KeptTree } from './orchestrate/wo
 /** Le bloc `lead:` du cadence.yaml du dossier parent (absent = `undefined`) ; un `lead` qui n'est pas une table est refusé en nommant `key`. */
 function readLeadBlock(parent: string, key: string, expected: string): { file: string; block: Record<string, unknown> } | undefined {
   const file = join(parent, 'cadence.yaml');
-  if (!existsSync(file)) return undefined;
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const l = (raw as { lead?: unknown } | null)?.lead;
+  const l = readYamlKey(file, 'lead');
   if (l == null) return undefined;
   if (typeof l !== 'object' || Array.isArray(l)) throw new RafError(`${file} : ${key} doit être ${expected}`);
   return { file, block: l as Record<string, unknown> };
@@ -49,8 +42,8 @@ export function findLeadDir(start: string): string {
     const file = join(dir, 'cadence.yaml');
     if (existsSync(file)) {
       try {
-        const raw = parse(readFileSync(file, 'utf8')) as Record<string, unknown> | null;
-        if (raw && typeof raw === 'object' && ('lead' in raw || 'priority' in raw)) return dir;
+        const raw = readYamlFile(file);
+        if (isObject(raw) && ('lead' in raw || 'priority' in raw)) return dir;
       } catch {
         // un yaml illisible n'est pas celui d'un lead qu'on puisse lire : on continue de remonter
       }
@@ -74,14 +67,7 @@ export function readLeadContextThreshold(parent: string): number {
 /** Clé `depth:` du cadence.yaml du dossier parent (L201, issue #8), à côté de `priority:` : combien de niveaux `lead tour` parcourt (1 : sous-dossiers directs, le défaut). */
 export function readDepth(parent: string): number {
   const file = join(parent, 'cadence.yaml');
-  if (!existsSync(file)) return 1;
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const d = (raw as { depth?: unknown } | null)?.depth;
+  const d = readYamlKey(file, 'depth');
   if (d == null) return 1;
   if (typeof d !== 'number' || !Number.isInteger(d) || d < 1) throw new RafError(`${file} : depth doit être un entier ≥ 1`);
   return d;

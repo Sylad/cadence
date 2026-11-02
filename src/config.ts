@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { isDay, type Day } from './dates.js';
@@ -11,7 +11,7 @@ import { gitRoot } from './git.js';
 import { planCommitProblem } from './plan-commit.js';
 import { parseStates } from './plan-states.js';
 import { checkTestReplay, readGateTest, type GateTest } from './orchestrate/gate-parts.js';
-import { booleanKey, isObject, list } from './yaml-keys.js';
+import { booleanKey, isObject, list, readYamlFile, readYamlKey } from './yaml-keys.js';
 import { FIELDS, Plan, RafError, readIdPattern, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
 interface PlanConfig {
@@ -77,13 +77,8 @@ function readOnWrite(v: unknown, cwd: string, bad: (what: string) => RafError): 
  * Null quand le fichier ou la clé manque — le plan est alors .cadence/raf.yaml (ou docs/plan/raf.yaml hérité) au format de raf.
  */
 export function readPlanConfig(file: string, root?: string): PlanConfig | null {
-  if (!existsSync(file)) return null;
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
+  const raw = readYamlFile(file);
+  if (raw === undefined) return null;
   const doc = raw as { plan?: unknown; qa?: unknown } | null;
   const qa = readQa(doc?.qa, file, root);
   const p = doc?.plan;
@@ -168,14 +163,7 @@ interface NewsConfig {
 
 /** Clé `news:` de cadence.yaml. */
 export function readNewsConfig(file: string): NewsConfig {
-  if (!existsSync(file)) return {};
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const n = (raw as { news?: unknown } | null)?.news;
+  const n = readYamlKey(file, 'news');
   if (n == null) return {};
   if (!isObject(n)) throw new RafError(`${file} : news doit être un objet { publicTitleMax }`);
   for (const k of Object.keys(n)) if (k !== 'publicTitleMax') throw new RafError(`${file} : news.${k} inconnu (attendu : publicTitleMax)`);
@@ -193,14 +181,7 @@ const AUTOSTART = ['warn', 'refuse', 'start'];
 
 /** Clé `hook:` de cadence.yaml. */
 export function readHookConfig(file: string): HookConfig {
-  if (!existsSync(file)) return {};
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const h = (raw as { hook?: unknown } | null)?.hook;
+  const h = readYamlKey(file, 'hook');
   if (h == null) return {};
   if (!isObject(h)) throw new RafError(`${file} : hook doit être un objet { autostart }`);
   for (const k of Object.keys(h)) if (k !== 'autostart') throw new RafError(`${file} : hook.${k} inconnu (attendu : autostart)`);
@@ -223,14 +204,7 @@ const PRICE_KEYS = ['input', 'output', 'cacheRead'] as const;
 
 /** Clé `perf.prices` de cadence.yaml : la grille de prix du coût par lot livré ; null sans grille (clé absente ou vide). */
 export function readPerfConfig(file: string): PriceGrid | null {
-  if (!existsSync(file)) return null;
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const perf = (raw as { perf?: unknown } | null)?.perf;
+  const perf = readYamlKey(file, 'perf');
   if (perf == null) return null;
   if (!isObject(perf)) throw new RafError(`${file} : perf doit être un objet { prices }`);
   for (const k of Object.keys(perf)) if (k !== 'prices') throw new RafError(`${file} : perf.${k} inconnu (attendu : prices)`);
@@ -269,14 +243,7 @@ interface SessionConfig {
  * joués par cadence au lieu d'être remplacés.
  */
 export function readSessionConfig(file: string): SessionConfig {
-  if (!existsSync(file)) return {};
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const s = (raw as { session?: unknown } | null)?.session;
+  const s = readYamlKey(file, 'session');
   if (s == null) return {};
   if (!isObject(s)) throw new RafError(`${file} : session doit être un objet { start, close, clean, cleanDays }`);
   const config: SessionConfig = {};
@@ -414,14 +381,7 @@ export interface VerifyConfig {
 
 /** Clé `verify:` de cadence.yaml. Absente : `{}`. */
 export function readVerifyConfig(file: string): VerifyConfig {
-  if (!existsSync(file)) return {};
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const v = (raw as { verify?: unknown } | null)?.verify;
+  const v = readYamlKey(file, 'verify');
   if (v == null) return {};
   if (!isObject(v)) throw new RafError(`${file} : verify doit être un objet { inPlace }`);
   for (const k of Object.keys(v)) if (k !== 'inPlace') throw new RafError(`${file} : verify.${k} inconnu (attendu : inPlace)`);
@@ -437,14 +397,7 @@ const ORCH_KEYS = ['start', 'verdict', 'test', 'testReplay', 'build', 'worktreeD
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
   const config: OrchestrateConfig = { precheck: true, maquette: true, maquetteReviews: 3, fiche: true, precheckLocal: false, prodAccess: false, worktrees: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', fiche: 'medium', accept: 'medium', implement: 'medium', probe: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
-  if (!existsSync(file)) return config;
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const o = (raw as { orchestrate?: unknown } | null)?.orchestrate;
+  const o = readYamlKey(file, 'orchestrate');
   if (o == null) return config;
   const bad = (what: string) => new RafError(`${file} : orchestrate.${what}`);
   const checkUxUrl = (url: string) => {
@@ -621,13 +574,7 @@ const DOCS_KEYS = ['sync', 'since', 'articles'];
 /** Clé `docs:` de cadence.yaml : `docs.sync`, la documentation qui doit suivre le code. */
 export function readDocsConfig(file: string): DocsConfig {
   const none: DocsConfig = { sync: [] };
-  if (!existsSync(file)) return none;
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
+  const raw = readYamlFile(file);
   if ((raw as { describedBy?: unknown } | null)?.describedBy != null) {
     throw new RafError(`${file} : describedBy n'existe plus (L308) : les documents hors dépôt se déclarent dans docs.articles, { repo, file } relatif au projet`);
   }
@@ -677,14 +624,7 @@ interface ReferencesConfig {
 
 /** Clé `references:` de cadence.yaml. */
 export function readReferencesConfig(file: string): ReferencesConfig {
-  if (!existsSync(file)) return {};
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const r = (raw as { references?: unknown } | null)?.references;
+  const r = readYamlKey(file, 'references');
   if (r == null) return {};
   if (!isObject(r)) throw new RafError(`${file} : references doit être un objet { dir }`);
   for (const k of Object.keys(r)) if (k !== 'dir') throw new RafError(`${file} : references.${k} inconnu (attendu : dir)`);
@@ -701,14 +641,7 @@ interface MigrateConfig {
 /** Clé `migrate:` de cadence.yaml (L284) : `migrate.keep`. */
 export function readMigrateConfig(file: string): MigrateConfig {
   const none: MigrateConfig = { keep: [] };
-  if (!existsSync(file)) return none;
-  let raw: unknown;
-  try {
-    raw = parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    throw new RafError(`${file} illisible : ${(e as Error).message.split('\n')[0]}`);
-  }
-  const m = (raw as { migrate?: unknown } | null)?.migrate;
+  const m = readYamlKey(file, 'migrate');
   if (m == null) return none;
   if (!isObject(m)) throw new RafError(`${file} : migrate doit être un objet { keep }`);
   for (const k of Object.keys(m)) if (k !== 'keep') throw new RafError(`${file} : migrate.${k} inconnu (attendu : keep)`);

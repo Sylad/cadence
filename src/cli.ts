@@ -516,7 +516,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const plan = loadPlan();
       plan.move(rest[0], place, values[place]!); // en mémoire : les refus de la commande (plan en lecture seule, parent, archive) passent avant celui de la vague
       // Un lot de la vague s'appuie sur l'ordre du plan qu'il a lu : le réordonner sous ses pieds est refusé tant que la vague tient le dépôt.
-      const holding = waveHolding(root);
+      const holding = waveHolding(root, 'move');
       if (holding) throw new RafError(`move : orchestration en cours (vague ${holding.wave}, pid ${holding.pid}) — attendre que les lots de ce dépôt soient finis (le verrou tombe dès que tous sont prêts ou rendus), puis relancer`);
       plan.save();
       touchedLot(plan, rest[0], values.verbose, io);
@@ -708,7 +708,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     }
     case 'deliver': {
       if (!gitRoot(io.cwd)) throw new RafError('deliver : à lancer dans un dépôt git');
-      const orchestrating = waveHolding(root);
+      const orchestrating = waveHolding(root, 'deliver');
       if (orchestrating) {
         const refusal = `deliver : orchestration en cours (vague ${orchestrating.wave}, pid ${orchestrating.pid})`;
         if (values.sha === undefined) throw new RafError(`${refusal} — livrer une fois les lots de ce dépôt finis (le verrou tombe dès que tous sont prêts ou rendus), ou un sha « livrable jusqu'à » de la vague (--sha)`);

@@ -83,6 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `cadence deliver` and `raf move` while a local task of the lead holds the repository (L525, [docs/raf.md](docs/raf.md)): the refusal names the task and its exit (« une tâche locale du lead y est en cours (L1, depuis …) — la finir (cadence local done L1) ou l'abandonner (cadence local abort L1) »), like `orchestrate --add`; it used to read « vague local:L1 — état illisible » and, for `deliver`, advise a `--sha` that cannot exist.
 - `cadence spec green <lot>` handles a lot closed at `vert: true` but WITHOUT `empreintes` (closed before the seal, GitHub issue #20, L526, [docs/orchestrate.md](docs/orchestrate.md)): it used to answer « déjà vert » while `spec reseal` answered « pas scellée », so the total lock of the waves had no way out. The command now replays the dedicated acceptance command and, green, seals the listed tests that have no fingerprint (the ones already sealed are kept, no `resceaux` entry) in a commit of the file alone that cites the lot (`chore(<lot>): empreintes de l'acceptation posées par cadence spec green`); red, nothing changes, exit 1. A lot green AND sealed still answers « déjà vert » without running anything.
 
 ## [1.38.0] - 2026-11-02

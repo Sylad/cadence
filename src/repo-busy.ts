@@ -1,11 +1,13 @@
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { gitRoot } from './git.js';
-import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
+import { activeLock, REPO_LOCK, type OLock } from './orchestrate/lock.js';
 import { INTEGRATION_LOCK } from './orchestrate/integrate.js';
 import { mainTreeWorkers } from './orchestrate/main-tree.js';
 import { cadenceHome, openLotsIn } from './orchestrate/registry.js';
 import { sharedStateDir } from './state.js';
+import { heldRefusal, localLotOf } from './local-task.js';
+import { RafError } from './plan.js';
 
 // Ce que `raf`, `deliver` et `spec` lisent du verrou du dépôt : une orchestration (ou une tâche locale du lead, L519) qui le tient, ou une intégration en cours.
 
@@ -35,10 +37,11 @@ export function warnWaveWorking(root: string, env: Record<string, string | undef
   if (working?.length) err(`avertissement : la vague ${holder.wave} (pid ${holder.pid}) travaille dans l'arbre principal de ce dépôt (${working.join(', ')}) — un commit de plan maintenant rendrait ces lots à la revue ; attendre la fin de leur étape, ou écrire le plan sans le committer`);
 }
 
-/** La vague qui tient le verrou du dépôt tant qu'un de ses lots y travaille encore (état illisible : on la tient pour active) ; null si le dépôt est libre. Partagé par `deliver` et `spec reseal`. */
-export function waveHolding(root: string): { wave: string; pid: number } | null {
+/** La vague qui tient le verrou du dépôt tant qu'un de ses lots y travaille encore (état illisible : on la tient pour active) ; null si le dépôt est libre. Une tâche locale du lead (L519) la tient toujours (elle n'a pas de lots de vague à lire). Avec `refusing` (le nom de la commande), une tâche locale refuse la commande d'un `RafError` qui la nomme et dit comment la finir, sans lire de vague ni conseiller `--sha` : `deliver` et `raf move`. Partagé par `deliver`, `raf move`, le hook pre-push et `spec reseal`. */
+export function waveHolding(root: string, refusing?: string): OLock | null {
   const orchestrating = activeLock(join(sharedStateDir(root), REPO_LOCK));
   if (!orchestrating) return null;
+  if (refusing && localLotOf(orchestrating.wave)) throw new RafError(`${refusing} : ${heldRefusal(root, orchestrating)}`);
   const stillOpen = openLotsIn(cadenceHome(), orchestrating.pid, root);
   return stillOpen === null || stillOpen.length > 0 ? orchestrating : null;
 }

@@ -976,12 +976,14 @@ lots:
     estimate: 0.5
     created: 2026-10-31
     started: 2026-11-02
+    docs_ok: { date: 2026-11-02, reason: nettoyage interne D5–D6 sans changement de comportement ; aucune doc ne cite ces fonctions }
   - id: L488
     title: "Découpage C3 : cli.ts en modules par famille de commandes, dispatch réduit à une table (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C3 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: doing
     estimate: 0.5
     created: 2026-10-31
     started: 2026-11-02
+    docs_ok: { date: 2026-11-02, reason: "découpage interne de cli.ts en modules, commandes et sorties inchangées" }
   - id: L489
     title: "Découpage C2 : orchestrate/command.ts en modules (arguments, budget, preflight, dry-run, status, resume) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C2 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: todo
@@ -1460,6 +1462,11 @@ lots:
     estimate: 0.25
     created: 2026-11-02
     started: 2026-11-02
+  - id: L537
+    title: "docs.sync rend « documentation en retard » un lot de nettoyage ou découpage interne déclaré sans changement de comportement (02-11 : L485, L486, L487, un cycle de vague perdu chaque fois, acquittement à la main) : ne pas exiger de doc quand le diff ne change ni commande, ni clé, ni sortie (ou laisser le libraire acquitter dans le worktree), avec un test"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-02
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

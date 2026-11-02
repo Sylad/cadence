@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Document, isMap, isSeq, parseDocument, type YAMLSeq } from 'yaml';
+import { Document, isMap, isSeq, parseDocument, type YAMLMap, type YAMLSeq } from 'yaml';
 import type { Day } from './dates.js';
 import type { Lot } from './plan.js';
 
@@ -79,6 +79,33 @@ function placeRanked(out: Lot[], ranked: Lot[], places: ReadonlyMap<string, stri
     pending = waiting;
   }
   return out;
+}
+
+/**
+ * Les rangs à réécrire quand des lots archivés rouvrent (`back`, parmi `nodes`, les lots de toutes les archives) : un lot dont le `place:` nommait un lot
+ * rouvert est re-pointé sur le prédécesseur de celui-ci, de proche en proche, pour que seul le lot rouvert bouge dans le plan présenté (L536). Un lot rouvert
+ * sans rang (archivé avant `plan.idPattern`) prend pour prédécesseur celui du plan présenté (`order`, lu seulement alors). Rend les lots restés archivés dont le rang change.
+ */
+export function repointPlaces(nodes: YAMLMap[], back: YAMLMap[], order: () => string[]): Map<YAMLMap, string> {
+  const places = new Map<YAMLMap, string>();
+  for (const n of nodes) {
+    const v = n.get(PLACE_KEY);
+    if (typeof v === 'string' || v === null) places.set(n, v ?? '');
+  }
+  let presented: string[] | undefined;
+  for (const n of back.filter((b) => !places.has(b))) {
+    presented ??= order();
+    places.set(n, presented[presented.indexOf(String(n.get('id'))) - 1] ?? '');
+  }
+  const moved = new Map<YAMLMap, string>();
+  for (const n of back) {
+    const id = String(n.get('id'));
+    for (const s of nodes.filter((o) => places.get(o) === id)) {
+      places.set(s, places.get(n)!);
+      if (!back.includes(s)) moved.set(s, places.get(s)!);
+    }
+  }
+  return moved;
 }
 
 /** Année de rangement d'un lot : celle de sa fin, à défaut de sa création, à défaut d'aujourd'hui. */

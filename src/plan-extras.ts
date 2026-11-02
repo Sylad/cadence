@@ -1,3 +1,4 @@
+import { PLACE_KEY } from './archive.js';
 import { FIELDS, RafError, type Lot } from './plan.js';
 
 /** Un champ d'extension déclaré (`plan.extras`, L464) : valeurs permises, et valeur d'un lot qui n'en porte pas. Sans règle, tout texte non vide est permis. */
@@ -10,8 +11,8 @@ export type ExtraDecls = Record<string, ExtraDecl>;
 
 const EXTRA_KEYS = ['enum', 'default'];
 const EXTRA_NAME = /^[a-z][a-z0-9_]*$/;
-/** Les clés que raf lit ou écrit sur un lot : un champ d'extension ne peut pas en prendre le nom. */
-const LOT_KEYS = ['tasks', 'uses', 'local', 'ux', 'review', 'docs_ok', 'extras', 'problems', 'state', 'state_before'];
+/** Les clés que raf lit ou écrit sur un lot (`place` : le rang d'un lot archivé sous `plan.idPattern`, L536) : un champ d'extension ne peut pas en prendre le nom. */
+const LOT_KEYS = ['tasks', 'uses', 'local', 'ux', 'review', 'docs_ok', 'extras', 'problems', 'state', 'state_before', PLACE_KEY];
 
 const nonEmptyText = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 

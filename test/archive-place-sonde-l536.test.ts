@@ -119,8 +119,8 @@ describe('sonde L536 — place: bords', () => {
     const re = p.load();
     re.putBack('AB-1', '2026-11-04', 'rouvert', () => 0);
     re.save();
-    const out = ids(p.load().lots());
-    expect(out.sort()).toEqual(['AB-1', 'L7', 'X3']);
+    // X3 suivait AB-1 : il garde sa place (en tête) quand AB-1 part en fin de plan.
+    expect(ids(p.load().lots())).toEqual(['X3', 'L7', 'AB-1']);
   });
 
   it('raf archive --before : un lot à id libre sans finished: reste, sans place: écrit', () => {

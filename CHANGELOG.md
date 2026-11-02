@@ -100,7 +100,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Fixed
 
 - `raf estimate <id> abc` (or `.5`) now answers « estimation invalide : abc » with the value typed instead of « NaN » (L535).
-- With `plan.idPattern`, `raf archive` no longer reorders `raf list`: every archived lot, `L<n>` ids included, is archived with a `place:` key (the lot that preceded it in the plan as presented, archived lots included, so separate runs keep the order) and keeps its place; the final number of its id no longer decides (L536). Commit messages such as `fix(L12-bis)`, `feat(L3-L5)`, `release-L3` cite L12/L3 again under `plan.idPattern` (fixed by L465, covered by its tests).
+- With `plan.idPattern`, `raf archive` no longer reorders `raf list`: every archived lot, `L<n>` ids included, is archived with a `place:` key (the lot that preceded it in the plan as presented, archived lots included, so separate runs keep the order) and keeps its place; the final number of its id no longer decides; reopening an archived lot (`raf todo`) moves that lot alone to the end of the plan, the archived lots that followed it keep their place; `plan.extras.place` is refused, `place` being a key `raf` writes (L536). Commit messages such as `fix(L12-bis)`, `feat(L3-L5)`, `release-L3` cite L12/L3 again under `plan.idPattern` (fixed by L465, covered by its tests).
 
 ## [1.41.0] - 2026-11-02
 

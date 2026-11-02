@@ -9,7 +9,7 @@ import { currentState, defaultState, rebase, stateProblems, transitionProblem, t
 import { DOCS_OK_FILE, readDocsOkFile } from './docs-ok-file.js';
 import { checkedExtras, withExtras, type ExtraDecls } from './plan-extras.js';
 import { DOTTED, escapeRe, extractRefs, idRefs, pickId, type Ref } from './plan-ids.js';
-import { ARCHIVE_DIR, PLACE_KEY, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, selectArchivable, type Kept } from './archive.js';
+import { ARCHIVE_DIR, PLACE_KEY, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, repointPlaces, selectArchivable, type Kept } from './archive.js';
 
 /** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
 const ON_WRITE_TIMEOUT_MS = 120_000;
@@ -623,19 +623,24 @@ export class Plan {
 
   /**
    * Un lot archivé qui n'est plus clos (`raf todo` sur un lot done archivé) revient à la fin du fichier du plan à l'écriture :
-   * l'archive ne porte que des lots done ou dropped, et le plan actif reste le seul fichier à porter du travail ouvert.
+   * l'archive ne porte que des lots done ou dropped, et le plan actif reste le seul fichier à porter du travail ouvert. Seul lui bouge :
+   * les lots archivés dont le `place:` le nommait (L536) sont re-pointés sur le lot qui le précédait, et gardent leur place dans le plan présenté.
    */
   private reopened(): void {
     const active = this.doc.get('lots') as YAMLSeq;
-    for (const a of this.archives ?? []) {
-      const seq = archiveLots(a.doc);
-      const back = seq.items.filter((n): n is YAMLMap => isMap(n) && !['done', 'dropped'].includes(String(n.get('status'))));
-      if (back.length === 0) continue;
-      seq.items = seq.items.filter((n) => !back.includes(n as YAMLMap));
-      for (const n of back) {
+    const archives = this.archives ?? [];
+    const nodes = archives.flatMap((a) => archiveLots(a.doc).items.filter(isMap).map((n) => ({ a, n: n as YAMLMap })));
+    const back = nodes.filter(({ n }) => !['done', 'dropped'].includes(String(n.get('status'))));
+    if (back.length === 0) return;
+    const moved = repointPlaces(nodes.map(({ n }) => n), back.map(({ n }) => n), () => this.lots().map((l) => l.id));
+    for (const { a, n } of nodes) {
+      if (back.some((b) => b.n === n)) {
+        const seq = archiveLots(a.doc);
+        seq.items = seq.items.filter((i) => i !== n);
         n.delete(PLACE_KEY);
         active.add(n);
-      }
+      } else if (moved.has(n)) n.set(PLACE_KEY, moved.get(n));
+      else continue;
       a.dirty = true;
     }
   }

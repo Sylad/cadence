@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { mergeArchived } from '../src/archive.js';
+import { readPlanConfig } from '../src/config.js';
 import { Plan, type Lot } from '../src/plan.js';
 import { fileIds } from './archive-helpers.js';
 import { tempDir } from './helpers.js';
@@ -99,5 +100,47 @@ describe('L536 — raf archive garde l’ordre d’un plan à ids libres', () =>
     g.save();
     p.load().archive('2027-01-07');
     expect(ids(p.load().lots())).toEqual(['A1', 'X3', 'B2', 'C4']);
+  });
+  it('L536 — rouvrir un lot archivé ne déplace pas les lots archivés qui le suivaient (seul le rouvert va en fin de plan)', () => {
+    const p = planWith(['L1', 'L2', 'L3', 'L4'], ['L2', 'L3']);
+    p.load().archive('2026-11-02');
+    const re = p.load();
+    re.putBack('L2', '2026-11-04', 'rouvert', () => 0);
+    re.save();
+    // Sans idPattern on lirait L1, L3, L4, L2 : la même chose ici, L3 reste derrière L1.
+    expect(ids(p.load().lots())).toEqual(['L1', 'L3', 'L4', 'L2']);
+    expect(fileIds(p.file)).toEqual(['L1', 'L4', 'L2']);
+    const year = readFileSync(join(dirname(p.file), 'archive', '2026.yaml'), 'utf8');
+    expect(year).toMatch(/id: L3[\s\S]*place: L1/);
+  });
+
+  it('L536 — rouvrir deux lots qui se suivent : leur successeur archivé suit le prédécesseur resté archivé', () => {
+    const p = planWith(['A1', 'X3', 'B2', 'C4', 'D5'], ['X3', 'B2', 'C4']);
+    p.load().archive('2026-11-02');
+    const re = p.load();
+    re.putBack('X3', '2026-11-04', 'rouvert', () => 0);
+    re.putBack('B2', '2026-11-04', 'rouvert', () => 0);
+    re.save();
+    expect(ids(p.load().lots())).toEqual(['A1', 'C4', 'D5', 'X3', 'B2']);
+  });
+
+  it('L536 — rouvrir un lot archivé sans place: (archive d’avant idPattern) : son successeur à rang suit le lot qui précédait le rouvert', () => {
+    const p = planWith(['L1', 'L2', 'X3', 'L4'], ['L2']);
+    const noPattern = Plan.load(p.file, {});
+    noPattern.archive('2026-11-02');
+    const later = p.load();
+    later.setStatus('X3', 'done', '2026-11-03', { force: true });
+    later.archive('2026-11-03');
+    expect(ids(p.load().lots())).toEqual(['L1', 'L2', 'X3', 'L4']);
+    const re = p.load();
+    re.putBack('L2', '2026-11-04', 'rouvert', () => 0);
+    re.save();
+    expect(ids(p.load().lots())).toEqual(['L1', 'X3', 'L4', 'L2']);
+  });
+
+  it('L536 — place est une clé de raf (écrite par raf archive, effacée à la réouverture) : plan.extras.place est refusé', () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'cadence.yaml'), `plan:\n  idPattern: '${PATTERN}'\n  extras:\n    place: {}\n`);
+    expect(() => readPlanConfig(join(dir, 'cadence.yaml'))).toThrow(/plan\.extras\.place.*champ de raf/);
   });
 });

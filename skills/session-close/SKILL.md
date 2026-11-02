@@ -59,6 +59,12 @@ With no project named, run `cadence session close --all` from the parent folder,
 4. **Memory, filtered** (only if you keep a persistent memory): write down what the repository does
    NOT already say — a trap and its cause, a decision or correction from the human, a collaboration
    rule. Test: "do `git log` or the docs already say it?" → then no memory.
+   When the report has a section "Mémoire" (the `MEMORY.md` index of this folder weighs more than
+   `memory.indexMaxBytes` of `cadence.yaml`, 12000 bytes by default), propose to group the dated entries it
+   counts under one line that points to a secondary index (a memory file holding them): the index is loaded
+   at every turn, so its weight is paid by every session. Move the entries only after the human agrees, then
+   run `cadence session close` again — the section is gone or the size has dropped. Without the agreement
+   nothing moves and the warning comes back at the next close. The command never writes the memory.
 5. **Skills and agents, on threshold, PROPOSED**: a skill when the same chain of commands was done by
    hand at least twice today; an agent update when an agent got something wrong or its domain moved.
    List them with the benefit; the human decides. Never create them here.

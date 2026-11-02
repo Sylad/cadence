@@ -24,6 +24,7 @@ import { schedule } from './schedule.js';
 import { AGENTS_DIR, installAgents, installSkills, SKILLS_DIR } from './skills.js';
 import { configSet } from './config-set.js';
 import { movePriority } from './priority.js';
+import { closeMemoryLines, tourMemoryLines } from './memory-index.js';
 import { findProjects, isProject, readDepth, leadTour, TITLE_MAX, truncate, readLeadUx, tourFreeLine, readLeadContextThreshold, findLeadDir, tourLine, tourNoTestLines, tourWorktreeLines } from './lead.js';
 import { configuredCap, expiredHoldLines, slotsLine, orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
 import { addHold, releaseHold } from './orchestrate/registry.js';
@@ -273,7 +274,8 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       }
       for (const r of rows) io.out(tourLine(r));
       // les worktrees de lot que des vagues ont conservés : aucun n'est oublié en silence (L279, R19)
-      for (const l of tourWorktreeLines(rows, io.now().getTime())) io.out(l);
+      // … puis l'index MEMORY.md du dossier, s'il pèse trop (L442) : le lead propose le regroupement, rien n'est écrit
+      for (const l of [...tourWorktreeLines(rows, io.now().getTime()), ...tourMemoryLines(io.env, parent)]) io.out(l);
       // un projet sans orchestrate.test : la vague ne lancera pas la suite (L327)
       for (const l of tourNoTestLines(rows)) io.out(l);
       // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
@@ -699,7 +701,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       const sconf = rest[0] === 'start' || rest[0] === 'close' ? readSessionConfig(configPath) : {};
       const facts = rest[0] === 'start' || rest[0] === 'close' ? sconf[rest[0]] : undefined;
       const clean = rest[0] === 'close' && sconf.clean ? { patterns: sconf.clean, days: sconf.cleanDays } : undefined;
-      const sctx: SessionCtx = { plan: loadPlan(), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, now: io.now(), out: io.out, facts, clean };
+      const sctx: SessionCtx = { plan: loadPlan(), root, newsDir, state: stateDir(root), shared: sharedStateDir(root), today, now: io.now(), out: io.out, facts, clean, memory: closeMemoryLines(io.env, io.cwd, configPath) };
       if (rest[0] !== 'start') return session(rest, sctx, values);
       // La reprise rejoue les vérifications d'effet (un essai, borné) : un effet rouge d'hier se lit avec les faits du matin.
       const effects = morningEffects(configPath, root);

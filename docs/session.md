@@ -123,3 +123,35 @@ The command deletes nothing, never fails on the cleanup and does not change the 
 The commands get `CADENCE_SINCE` and `CADENCE_TODAY`. `CADENCE_SINCE` is the `--since` as given; on `session close` without `--since` it is the instant of the last `session start` as an ISO 8601 UTC string (`2026-09-28T07:12:00.000Z`), or `<today> 00:00` when no mark exists.
 The commands add facts and decide nothing: a failing command is reported and changes neither
 the exit code nor the verdict.
+
+## Memory index size (L442)
+
+Claude Code loads the `MEMORY.md` index of the folder it was launched in at every turn: a long index is a
+fixed cost of every session. `cadence session close` weighs it and, above a threshold, prints a "Mémoire"
+section:
+
+```
+Mémoire : l'index MEMORY.md pèse 15700 octets (seuil 12000)
+  14 entrée(s) datée(s) (9100 octets) à regrouper sous une ligne vers un index secondaire — le skill propose, l'humain décide
+```
+
+- **Where it looks.** `<CLAUDE_CONFIG_DIR or ~/.claude>/projects/<folder>/memory/MEMORY.md`, where `<folder>` is the
+  working directory of the command (never the git root: Claude Code indexes the folder it was launched in) with every
+  character that is not a letter or a digit replaced by `-`. A symbolic link is followed. With `--all`, each project
+  section weighs its own memory.
+- **When it speaks.** Only when the file is strictly larger than the threshold, in bytes: 12000 by default, or
+  `memory.indexMaxBytes` (an integer ≥ 1) in the `cadence.yaml` the command reads. An absent index, an empty one or
+  one at the threshold prints nothing. A value that is not an integer ≥ 1 stops the close (exit code 2, no report), as
+  `session.cleanDays` does.
+- **Dated entries.** A list line (`- `) whose text starts with a day `dd-mm`, after at most `**`, `[` and `⚠`
+  (`- **[31-10 : …`). The name of the linked file does not count, so the line that points to the secondary index is
+  never counted. With none, the section says `aucune entrée datée à regrouper`.
+- **What it does not do.** It is a proposal, not a condition: the exit code and the « prêt à fermer » line are those of
+  a close without the warning, and cadence never writes the memory. The [session-close skill](skills.md) proposes the
+  grouping and moves the entries only after the human agrees.
+- **Unreadable index** (a folder, no read permission): one line `Mémoire : l'index MEMORY.md est illisible (<cause>), sa taille n'est pas contrôlée`; the rest of the report is printed.
+
+```yaml
+memory:
+  indexMaxBytes: 12000   # bytes; the default
+```

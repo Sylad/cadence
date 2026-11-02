@@ -27,6 +27,8 @@ export interface SessionCtx {
   effects?: string[];
   /** Motifs de fichiers de travail à proposer au nettoyage de clôture (cadence.yaml : session.clean). */
   clean?: { patterns: string[]; days?: number };
+  /** Les lignes de la section « Mémoire » de la clôture (L442) : l'index MEMORY.md de Claude Code pesé contre son seuil ; lève (RafError) si la clé du seuil est invalide. */
+  memory?: () => string[];
 }
 
 const FACTS_TIMEOUT = 120_000;
@@ -178,8 +180,15 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
   return 0;
 }
 
+/** La section « Mémoire » (L442), calculée avant tout rapport ; vide sans mesure demandée. */
+function memoryLines(ctx: SessionCtx): string[] {
+  return ctx.memory?.() ?? [];
+}
+
 export function sessionClose(ctx: SessionCtx, opts: { since?: string }): number {
   const { plan, out, today } = ctx;
+  // Mesuré avant tout rapport : une clé memory.indexMaxBytes invalide arrête la clôture sans rien imprimer.
+  const memory = memoryLines(ctx);
   out(`${plan.project} — clôture du ${today}`);
 
   const window = closeWindow(ctx, opts.since);
@@ -208,6 +217,8 @@ export function sessionClose(ctx: SessionCtx, opts: { since?: string }): number 
 
   section(out, 'Faits propres au projet', projectFacts(ctx, window.since));
 
+  // Comme le nettoyage : un avertissement qui propose, hors des points ouverts ; l'index n'est jamais écrit ici.
+  memory.forEach((l) => out(l));
   // Une proposition, pas une condition : rien n'est supprimé ici, le skill demande l'accord. Le
   // nettoyage ne change jamais le verdict et ne fait jamais tomber la clôture.
   if (ctx.clean?.patterns.length) {

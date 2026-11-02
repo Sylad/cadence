@@ -64,6 +64,12 @@ not truncated) or on a net bottleneck (`⚠ goulot`): at most one improvement lo
 their place, and the human decides. Never open a lot for a micro-optimisation or for the variation of a single window.
 Without a `⚠`, the header is empty and you say nothing about perf.
 
+A line `mémoire · MEMORY.md <n> octets > seuil <s> · …` (after the worktree lines) says the `MEMORY.md` index of the parent
+folder, loaded at every turn of your session, weighs more than `memory.indexMaxBytes` (12000 bytes by default): relay it in one
+line and propose to group its dated entries under one line that points to a secondary index. Do it only after the human agrees;
+the tour only measures, it never writes the memory. A line `mémoire · MEMORY.md illisible (…)` or the error line
+`cadence.yaml · ✗ erreur : memory.indexMaxBytes …` is relayed as it is. `--json` never carries it.
+
 Then report to the human in a compact table — one row per project — and propose **three** items
 across projects, each with project, lot id and one sentence of justification: finish what is in
 progress, then drift that blocks a delivery, then ready quick wins. **Stop and wait for the priority.**

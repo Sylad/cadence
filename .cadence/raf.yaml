@@ -1510,6 +1510,7 @@ lots:
     estimate: 0.1
     created: 2026-11-02
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-02-2110-cad, 0 passe(s) de correction)", commit: 79351cb68df1168c66b67775bcb9332b3fd4c510, reporte: { de: 75cbee82420ac0c91f478f067b826528a160bf8d, vers: 79351cb68df1168c66b67775bcb9332b3fd4c510, patchId: 8d6c2b8dd26d9dc63a86747442832a85a6a21e9e } }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -707,6 +707,48 @@ lots:
     notes:
       - { date: 2026-10-30, text: "Partir de l'existant : docs/fonctionnement.md, docs/overview.md et leurs schémas (fonctionnement-lot, -wave, -lead, -service, cycle-vague, en clair et sombre). D'abord mesurer ce qui manque ou est périmé par rapport aux notions de la liste : worktree, intégration, livrable jusqu'à, livreur, holds, escalade, readsPlan, tolérances de L456… Ensuite compléter ou restructurer ces pages, sans créer de doublon. docs/concepts.md n'est créé que si fonctionnement.md ne peut pas jouer ce rôle. Un lecteur qui ne connaît pas cadence doit comprendre le parcours d'un lot en 5 minutes." }
     started: 2026-11-02
+    review:
+      {
+        date: 2026-11-02,
+        verdict: "conforme : les constats déjà traités sont bien corrigés, il reste 1 constat mineur en note.
+
+
+          Commits relus avec `raf commits L460` :
+
+          - 85aee0a feat(L460) : docs/concepts.md
+
+          - 99b859c probe(L460)
+
+          - 9610e3f fix(L460) : `--continue`
+
+          - 9adf6c0 fix(L460) : ready, acceptance-writer, figure 3, test SVG
+
+
+          Commandes lancées :
+
+          - `xmllint --noout docs/concepts-*.svg` : propre sur les 8 fichiers.
+
+          - `npx vitest run test/concepts-doc-limites-l460.test.ts` : 1 fichier, 17/17 verts.
+
+
+          Corrections vérifiées dans le code :
+
+          - **Étape ready** : la ligne 49 dit maintenant « In worktree mode … integrated; without worktree (the default) … ». C'est juste. Dans src/config.ts:439, `worktrees` vaut `false` par défaut, et src/orchestrate/cycle.ts:2601-2613 passe à `ready` sans intégration quand `c.tree?.active` est faux.
+
+          - **acceptance-writer** : la ligne 47 le nomme. L'agent existe dans `agents/acceptance-writer.md` et dans `schemas.ts:75` (`accept: 'acceptance-writer'`).
+
+          - **Branche de la figure 3** : le libellé `cadence/<wave>/<project>--L1` correspond à `lotBranch` (worktree.ts:38) et à `lotSlug` (state.ts:253), comme le texte de la ligne 79.
+
+          - **`--continue`** : le texte (ligne 121), la figure 2 et son texte alternatif sont cohérents avec l'option `--continue` de command.ts:223 et avec docs/orchestrate.md.
+
+
+          Les tests ajoutés peuvent échouer et vérifient bien ce que dit leur titre. L'ancien titre ne promet plus que la fin par `</svg>` et des identifiants uniques. Pour l'estimateur de largeur, compter une entité `&lt;`, `&gt;` ou `&amp;` comme un seul caractère correspond au rendu.
+
+
+          Aucune régression : aucun code applicatif n'a été touché, et l'arbre de travail est inchangé. Les seuls fichiers non suivis, `evals/results` et `plugins/…/types`, sont hors du lot. — orchestré (vague 2026-11-02-1205-cont, 1 passe(s) de correction + passe des mineurs)",
+        commit: e91ae43e2bc01ac58287cf935349b81b9d7e3007,
+        reporte: { de: 9adf6c040671f202ee42ac1f1de407f2d28dcef1, vers: e91ae43e2bc01ac58287cf935349b81b9d7e3007, patchId: 1e42236e4839e0ecda8606fc4852878de89cc2cc }
+      }
   - id: L461
     title: "Audit de simplification du code (lecture seule, relecteur neuf en Fable) : code mort (exports jamais appelés, options ou branches sans effet, ce qui a été remplacé sans être retiré), doublons (blocs copiés, fonctions jumelles), fichiers trop gros et leurs découpages naturels (orchestrate/cycle.ts 3047 lignes, orchestrate/command.ts 1679, cli.ts 1597 au 30-10), tests redondants ou vides ; liste classée par gain et par risque, chaque point avec les tests qui le protègent déjà (ou « non protégé ») et sa mesure ; aucun changement. Chaque point retenu devient un lot de nettoyage ≤ 0,5 j, sans changement de comportement observable (suite verte sans toucher aux tests sauf ceux de code mort), mesuré avant/après — demande de Sylvain le 30-10"
     status: done

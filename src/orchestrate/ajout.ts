@@ -273,30 +273,34 @@ export class AddFeed {
     const taken = new Set<string>();
     let room = plan.room;
     for (const t of plan.targets) {
-      const key = lotKey(t.project, t.lot);
       if (added.length >= free || e.stopCause()) break;
-      if (this.refused.has(key)) continue;
-      if (badRepos.has(t.repo) || t.uses.some((r) => taken.has(r))) continue;
+      const key = lotKey(t.project, t.lot);
+      if (this.refused.has(key) || badRepos.has(t.repo) || t.uses.some((r) => taken.has(r))) continue;
       const c = await this.control(t, key, badRepos, room);
-      if (!c) continue;
-      if (!canRun(c)) {
-        this.drawn.set(key, c);
-        continue;
-      }
-      this.drawn.delete(key);
-      const refused = this.holdAll(c);
-      if (refused) {
-        this.say(`continue : lot sauté — ${key} : ${refused}`);
-        continue;
-      }
-      e.wctx.log(`continue : tire ${key} (créneau libre)`);
-      this.admit(null, c);
+      if (!c || !this.start(key, c, canRun)) continue;
       added.push(c);
       room -= c.lot.budget!;
       for (const r of t.uses) taken.add(r);
     }
     if (added.length) e.announce();
     return added;
+  }
+
+  /** Prend le lot contrôlé `c` : faux quand le dépôt est pris (gardé pour la lecture suivante) ou que la prise est refusée (sauté, dit au journal). */
+  private start(key: string, c: LotCtx, canRun: (c: LotCtx) => boolean): boolean {
+    if (!canRun(c)) {
+      this.drawn.set(key, c);
+      return false;
+    }
+    this.drawn.delete(key);
+    const refused = this.holdAll(c);
+    if (refused) {
+      this.say(`continue : lot sauté — ${key} : ${refused}`);
+      return false;
+    }
+    this.e.wctx.log(`continue : tire ${key} (créneau libre)`);
+    this.admit(null, c);
+    return true;
   }
 
   /** Les demandes encore en file quand plus rien ne joue ne seront plus lues : écartées et dites. */

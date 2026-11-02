@@ -776,6 +776,7 @@ lots:
     estimate: 0.5
     created: 2026-10-30
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme : 2 mineurs (hook autostart muet sous transitions, --back prend l'état donné pour un message) — orchestré (vague 2026-11-02-1205-cont, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 6a2b649e6c069074771a3b5f1f00f26a97b747f5 }
   - id: L464
     title: "Plans riches — champs d'extension déclarés, validés et conservés (plan.extras, raf add --set) (manque M2 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: doing

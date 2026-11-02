@@ -18,7 +18,7 @@ cas:
     acteur: l'humain ou l'agent qui ferme la session
     declencheur: commande cadence session close
     preconditions:
-      - "le fichier MEMORY.md de la mémoire de Claude Code du dossier d'invocation existe"
+      - "le fichier MEMORY.md de la mémoire de Claude Code du dossier de lancement (le cwd de la commande, pas la racine git) existe"
       - "sa taille dépasse le seuil (par défaut 12000 octets)"
     nominal:
       - "La clôture localise l'index du dossier d'invocation (R1) et mesure sa taille en octets (R2)."
@@ -28,7 +28,9 @@ cas:
       - "Le skill session-close, à son étape mémoire, propose le regroupement et ne l'exécute qu'avec l'accord de l'humain (R8)."
     alternatives:
       - { si: "l'index est absent ou sa taille est au plus égale au seuil", alors: "aucune section, la sortie est celle d'avant le lot", regles: [R2, R6] }
-      - { si: "le seuil est posé dans cadence.yaml (memory.indexMaxBytes)", alors: "il remplace le défaut ; une valeur qui n'est pas un entier ≥ 1 est refusée", regles: [R7] }
+      - { si: "le seuil est posé dans cadence.yaml (memory.indexMaxBytes)", alors: "il remplace le défaut ; une valeur qui n'est pas un entier ≥ 1 est une erreur bloquante (code 2, aucun rapport), comme session.cleanDays", regles: [R7] }
+      - { si: "CLAUDE_CONFIG_DIR est vide, ou l'index fait 0 octet, ou il a des fins de ligne CRLF, ou c'est un lien symbolique", alors: "variable vide = absente ; 0 octet = aucun avertissement ; CRLF compté comme LF ; lien suivi (taille de la cible)", regles: [R1, R2, R3] }
+      - { si: "la commande est lancée avec --all", alors: "chaque section de projet mesure la mémoire de son propre dossier (cwd du projet), sans mesure du dossier parent", regles: [R1] }
       - { si: "l'index existe mais aucune entrée n'est datée", alors: "la section dit la taille et qu'aucune entrée datée n'est à regrouper", regles: [R3, R4] }
       - { si: "l'index est illisible (droits, dossier au lieu d'un fichier)", alors: "une ligne le dit, la clôture continue et son code de sortie ne change pas", regles: [R5, R9] }
     resultat: "L'humain voit dans le rapport de clôture que l'index pèse trop et quelles entrées regrouper, sans que la clôture tombe."
@@ -37,13 +39,14 @@ cas:
     acteur: le lead (session Claude Code du dossier parent)
     declencheur: commande cadence lead tour
     preconditions:
-      - "l'index MEMORY.md du dossier parent (celui du tour) dépasse le seuil"
+      - "l'index MEMORY.md du dossier parent (celui du tour) dépasse le seuil, lu dans le cadence.yaml de ce dossier parent ou par défaut"
     nominal:
       - "Le tour localise l'index du dossier parent (R1) et le mesure (R2)."
       - "Après les lignes de projets et celles des worktrees, il imprime une ligne « mémoire » : taille, seuil, nombre d'entrées datées (R4)."
       - "Le lead propose le regroupement à l'humain sans l'imposer (R8)."
     alternatives:
       - { si: "l'index est sous le seuil, absent ou illisible sans autre effet", alors: "aucune ligne en plus, sauf la ligne d'illisibilité", regles: [R6, R9] }
+      - { si: "memory.indexMaxBytes du cadence.yaml du dossier parent est invalide", alors: "le tour continue (code 0), sans ligne « mémoire », avec une ligne d'erreur « cadence.yaml · ✗ erreur : … » comme pour lead.ux", regles: [R7] }
       - { si: "le tour est demandé avec --json", alors: "la sortie JSON est inchangée, l'avertissement n'y figure pas", regles: [R10] }
     resultat: "Le lead lit en une ligne que sa charge fixe est gonflée par la mémoire, au lieu de le découvrir à la mesure."
   - id: C3
@@ -63,22 +66,22 @@ cas:
 regles:
   - id: R1
     cas: [C1, C2]
-    enonce: "L'index mesuré est <CLAUDE_CONFIG_DIR ou ~/.claude>/projects/<dossier>/memory/MEMORY.md, où <dossier> est le chemin absolu du dossier d'invocation dont chaque « / » et chaque « . » devient « - » ; pour la clôture le dossier d'invocation est celui où la commande tourne (une seule mesure, même avec --all), pour le tour le dossier parent du tour."
+    enonce: "L'index mesuré est projectLogDir(claudeConfigDir(env), dossier)/memory/MEMORY.md : le calcul existant de launch.ts (dossier de config = CLAUDE_CONFIG_DIR, vide traité comme absent, sinon ~/.claude ; dossier de projet = chemin absolu dont tout caractère non alphanumérique devient « - », « _ », « . », « / » et espace compris), sans second calcul. Le dossier est le cwd de la commande (io.cwd, jamais la racine git : Claude Code indexe le dossier de lancement) pour session close, le dossier parent résolu pour lead tour. Avec session close --all, sessionAll relance la commande dans chaque projet avec cwd = ce projet : chaque section mesure sa propre mémoire, aucune mesure du dossier parent, aucun avertissement partagé. Un lien symbolique MEMORY.md est suivi."
     statut: sourcee
-    source: "dossiers réels de ~/.claude/projects (ex. -home-sylvain-ladoire-projects-developpeur--cadence-runs-… : « /.cadence » donne « --cadence ») et memory/MEMORY.md du projet developpeur"
-    tests: ["R1 — chemin /home/u/p/.cadence/x donne -home-u-p--cadence-x", "R1 — CLAUDE_CONFIG_DIR remplace ~/.claude"]
+    source: "src/orchestrate/launch.ts:448 (projectLogDir : cwd.replace(/[^a-zA-Z0-9]/g, '-')) et :156 (claudeConfigDir) ; src/cli.ts:1508-1545 (sessionAll : run() avec cwd: dir) ; dossier réel -home-sylvain-ladoire--claude pour /home/sylvain_ladoire/.claude"
+    tests: ["R1 — chemin /home/u/p/.cadence/x donne -home-u-p--cadence-x", "R1 — chemin /home/sylvain_ladoire/p donne -home-sylvain-ladoire-p (« _ » aplati)", "R1 — chemin avec espace : « - »", "R1 — CLAUDE_CONFIG_DIR remplace ~/.claude", "R1 — CLAUDE_CONFIG_DIR vide : ~/.claude", "R1 — lancé dans un sous-dossier d'un dépôt git : le dossier du cwd est mesuré, pas la racine git", "R1 — session close --all : chaque section mesure la mémoire de son projet et pas celle du parent", "R1 — MEMORY.md lien symbolique : la taille de la cible est mesurée"]
   - id: R2
     cas: [C1, C2]
     enonce: "La taille est celle du fichier en octets ; l'avertissement n'a lieu que si elle dépasse strictement le seuil (égale au seuil : rien)."
     statut: hypothese
     si_faux: "Si le seuil se compte en lignes ou en tokens, seul le calcul de la taille change (aucune donnée en jeu) ; le lot pèse en octets car le lead n'a pas de tokenizer."
-    tests: ["R2 — 12000 octets pile : aucun avertissement", "R2 — 12001 octets : avertissement", "R2 — fichier absent : aucun avertissement"]
+    tests: ["R2 — fichier de 0 octet : aucun avertissement", "R2 — 12000 octets pile : aucun avertissement", "R2 — 12001 octets : avertissement", "R2 — fichier absent : aucun avertissement"]
   - id: R3
     cas: [C1, C2]
-    enonce: "Une entrée datée est une ligne de liste (« - ») de l'index dont le texte commence par un jour « jj-mm » (précédé au plus de « ** », « [ » et « ⚠ ») ou dont le nom de fichier lié contient une date « _aaaa_mm_jj » ; les autres lignes (profil, titres, lignes de renvoi) ne sont jamais comptées."
+    enonce: "Une entrée datée est une ligne de liste (« - ») de l'index dont le texte commence par un jour « jj-mm » (précédé au plus de « ** », « [ » et « ⚠ »). Le nom de fichier lié ne compte pas : une ligne de renvoi vers l'index secondaire, ou une entrée déjà regroupée, n'est donc jamais comptée. Les fins de ligne CRLF et LF sont équivalentes ; profil, titres et lignes de renvoi ne sont jamais comptés."
     statut: hypothese
-    si_faux: "Si les entrées datées se reconnaissent autrement, le nombre proposé change et la proposition est plus ou moins large ; aucune donnée n'est touchée puisque rien n'est écrit."
-    tests: ["R3 — « - **[31-10 : … » est datée", "R3 — lien vers x_2026_10_13.md est datée", "R3 — « - [Profil](profil.md) » n'est pas datée", "R3 — ligne de titre « ## … » n'est pas comptée"]
+    si_faux: "Si des entrées datées n'ont leur date que dans le nom du fichier, elles ne sont pas proposées et la proposition est plus étroite ; aucune donnée n'est touchée puisque rien n'est écrit. Le vrai MEMORY.md (lignes 2 à 31) a toutes ses entrées datées par préfixe."
+    tests: ["R3 — « - **[31-10 : … » est datée", "R3 — « - [31-10 …] » et « - **[⚠ 31-10 … » sont datées", "R3 — lien vers x_2026_10_13.md sans préfixe jj-mm n'est pas daté", "R3 — « - [Profil](profil.md) » n'est pas datée", "R3 — ligne de titre « ## … » n'est pas comptée", "R3 — ligne de renvoi « - [Archives datées](memoire-archive_2026_10_30.md) » n'est pas comptée : après regroupement correct, plus d'entrée datée à proposer", "R3 — fins de ligne CRLF : même nombre qu'en LF"]
   - id: R4
     cas: [C1, C2, C3]
     enonce: "Le message dit la taille, le seuil, le nombre d'entrées datées et leur poids en octets, et propose de les regrouper sous une ligne vers un index secondaire ; avec zéro entrée datée il le dit au lieu de proposer."
@@ -89,7 +92,7 @@ regles:
     cas: [C1]
     enonce: "L'avertissement ne compte pas parmi les points ouverts : le code de sortie de session close et la ligne « prêt à fermer » ou « pas fermé » restent ceux d'avant."
     statut: sourcee
-    source: "src/session.ts:150-153 (open = écarts non avertissement + dépôt + livraison) ; le nettoyage proposé ne change jamais le verdict (src/session.ts:130-131)"
+    source: "src/session.ts:228 et :232 (open = écarts non avertissement + dépôt + verrou ; code 0 si open vaut 0, sinon 1) ; src/session.ts:211-212 (« une proposition, pas une condition » : le nettoyage ne change jamais le verdict)"
     tests: ["R5 — index trop gros et dépôt propre : code 0 et « ✓ prêt à fermer »", "R5 — index trop gros et dépôt sale : le nombre de points ouverts est inchangé"]
   - id: R6
     cas: [C1, C2]
@@ -98,11 +101,11 @@ regles:
     si_faux: "Si un projet doit voir une ligne « mémoire » même saine, la sortie d'avant change : les tests existants des deux commandes le montrent tout de suite."
     tests: ["R6 — sortie de lead tour inchangée sans index", "R6 — sortie de session close inchangée sous le seuil"]
   - id: R7
-    cas: [C1]
-    enonce: "Le seuil par défaut est 12000 octets ; la clé memory.indexMaxBytes du cadence.yaml du dossier d'invocation le remplace ; une valeur qui n'est pas un entier ≥ 1 est refusée avec le texte du contrat A3."
+    cas: [C1, C2]
+    enonce: "Le seuil par défaut est 12000 octets, pour les deux commandes. La clé memory.indexMaxBytes le remplace : pour session close dans le cadence.yaml lu par la commande (configPath, le fichier de session.clean) ; pour lead tour dans le cadence.yaml du dossier parent (comme readLeadUx), si bien qu'un même seuil donne le même résultat aux deux. Une valeur qui n'est pas un entier ≥ 1 est une erreur bloquante pour session close (RafError, code de sortie 2, rien d'autre imprimé, comme session.cleanDays config.ts:288) ; pour lead tour elle n'arrête pas le tour (code 0) : une ligne « cadence.yaml · ✗ erreur : … » comme pour lead.ux (cli.ts:292-294) et aucune ligne « mémoire »."
     statut: hypothese
-    si_faux: "Si le bon défaut est autre (l'index de 15,7 Ko a pesé ~8k tokens le 30-10), seule la constante change ; la clé est facultative et son absence ne change aucun comportement existant."
-    tests: ["R7 — sans clé : seuil 12000", "R7 — memory.indexMaxBytes: 5000 : seuil 5000", "R7 — memory.indexMaxBytes: 0 ou « abc » : refus avec le message exact"]
+    si_faux: "Si le bon défaut est autre (l'index de 15,7 Ko a pesé ~8k tokens le 30-10), seule la constante change ; si une valeur invalide doit replier sur 12000 au lieu d'échouer, seul le code de sortie de close d'une config invalide change ; la clé est facultative et son absence ne change aucun comportement existant."
+    tests: ["R7 — sans clé : seuil 12000 (close et tour)", "R7 — memory.indexMaxBytes: 5000 : seuil 5000 en close et en tour, même verdict sur un index de 6000 octets", "R7 — close avec memory.indexMaxBytes: 0 ou « abc » : code 2 et message exact, aucun rapport", "R7 — tour avec memory.indexMaxBytes: 0 : code 0, ligne d'erreur, pas de ligne « mémoire »"]
   - id: R8
     cas: [C1, C2, C3]
     enonce: "cadence ne modifie jamais la mémoire : la section et la ligne proposent seulement ; le regroupement se fait après l'accord de l'humain, par l'agent, d'après le skill session-close (étape mémoire) et le skill lead."
@@ -113,8 +116,8 @@ regles:
     cas: [C1, C2]
     enonce: "Un index illisible ne fait jamais échouer la commande : une ligne le dit avec la cause, et la suite du rapport ou du tour est imprimée."
     statut: sourcee
-    source: "src/session.ts:138-141 (nettoyage interrompu : un message, la clôture continue) et src/cli.ts:292-294 (une erreur de lecture de cadence.yaml n'arrête pas le tour)"
-    tests: ["R9 — MEMORY.md est un dossier : une ligne d'illisibilité, code de sortie inchangé", "R9 — MEMORY.md sans droit de lecture : idem"]
+    source: "src/session.ts:211-222 (nettoyage interrompu : un message, la clôture continue) et src/cli.ts:292-294 (une erreur de lecture de cadence.yaml n'arrête pas le tour)"
+    tests: ["R9 — MEMORY.md est un dossier : une ligne d'illisibilité, code de sortie inchangé", "R9 — MEMORY.md sans droit de lecture : idem (test sauté quand il tourne en root, où la lecture réussit)"]
   - id: R10
     cas: [C2]
     enonce: "Avec --json, la sortie de lead tour reste le tableau des lignes de projets, sans champ ni ligne en plus."
@@ -125,7 +128,7 @@ regles:
 contrats:
   - id: A1
     appel: commande cadence session close
-    entree: "options existantes (--since, --all, --depth) ; lit MEMORY.md (R1) et memory.indexMaxBytes de cadence.yaml (R7)"
+    entree: "options existantes (--since, --all, --depth) ; lit MEMORY.md du cwd (R1, par projet avec --all) et memory.indexMaxBytes de cadence.yaml (R7)"
     sortie: "rapport existant ; en plus, quand l'index dépasse le seuil, une section « Mémoire : l'index MEMORY.md pèse <n> octets (seuil <s>) » suivie de la ligne « <k> entrée(s) datée(s) (<b> octets) à regrouper sous une ligne vers un index secondaire — le skill propose, l'humain décide » ; code de sortie inchangé"
     erreurs:
       - { code: log warn, message: "Mémoire : l'index MEMORY.md est illisible (<cause>), sa taille n'est pas contrôlée" }
@@ -133,17 +136,18 @@ contrats:
     regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9]
   - id: A2
     appel: commande cadence lead tour
-    entree: "options existantes ; lit MEMORY.md du dossier parent (R1)"
+    entree: "options existantes ; lit MEMORY.md du dossier parent (R1) et memory.indexMaxBytes de son cadence.yaml (R7)"
     sortie: "tableau existant ; en plus, quand l'index dépasse le seuil, une ligne « mémoire · MEMORY.md <n> octets > seuil <s> · <k> entrée(s) datée(s) à regrouper (cadence session close détaille) » après les lignes de worktrees ; --json inchangé"
     erreurs:
       - { code: log warn, message: "mémoire · MEMORY.md illisible (<cause>)" }
-    regles: [R1, R2, R3, R4, R6, R8, R9, R10]
+      - { code: log error, message: "cadence.yaml · ✗ erreur : memory.indexMaxBytes doit être un entier ≥ 1 (octets), pas <valeur>" }
+    regles: [R1, R2, R3, R4, R6, R7, R8, R9, R10]
   - id: A3
     appel: commande cadence session close (clé memory.indexMaxBytes invalide)
     entree: "cadence.yaml avec memory.indexMaxBytes qui n'est pas un entier ≥ 1"
-    sortie: "aucun rapport de mémoire ; le reste de la commande suit sa règle actuelle pour un cadence.yaml invalide"
+    sortie: "aucun rapport ; erreur bloquante, code de sortie 2 (RafError, comme session.cleanDays) ; lead tour, lui, continue avec code 0 (A2)"
     erreurs:
-      - { code: log warn, message: "cadence.yaml : memory.indexMaxBytes doit être un entier ≥ 1 (octets), pas <valeur>" }
+      - { code: log error, message: "<fichier> : memory.indexMaxBytes doit être un entier ≥ 1 (octets), pas <valeur>" }
     regles: [R7]
 
 donnees:

@@ -1,0 +1,242 @@
+sujet:
+  id: maquette-legere-lots-visibles
+  titre: "Maquette légère validée par l'ux-reviewer avant le code, pour les lots visibles sans screen: page"
+  lot: L459
+  perimetre:
+    modules:
+      - src/orchestrate/spec.ts
+      - src/orchestrate/command.ts
+      - src/orchestrate/cycle.ts
+      - src/orchestrate/maquette.ts
+      - src/orchestrate/aval.ts
+      - src/orchestrate/lot-budget.ts
+      - src/orchestrate/express.ts
+      - templates/orchestrate/spec.md
+      - templates/orchestrate/maquette.md
+      - agents/spec-writer.md
+      - agents/ux-reviewer.md
+      - docs/orchestrate.md
+      - docs/perf.md
+    endpoints: []
+    jobs:
+      - "étapes spec, maquette et ux (mode conformité) d'orchestrate pour un lot visible sans screen: page"
+      - "commande cadence perf (ligne « sessions ux par lot visible »)"
+    hors_perimetre:
+      - "les lots screen: page : leur chaîne spec → maquette → accept → implement → review → ux est inchangée (docs/orchestrate.md, « The spec step of a lot with screen: »)"
+      - "les lots spec: true sans écran et la partie back d'une fiche mixte"
+      - "la voie express (estimate ≤ 0,1 j, src/orchestrate/express.ts:10) et les lots non visibles : chemin ordinaire inchangé"
+      - "le calcul de « sessions ux par lot visible » dans src/perf.ts : la mesure compte déjà les étapes ux (src/perf.ts:590), aucun changement de formule"
+      - "le format de l'état d'un lot (src/orchestrate/state.ts) et le schéma de la fiche : voir les questions"
+
+cas:
+  - id: C1
+    titre: "Un lot visible sans screen: page entre dans la chaîne maquette légère au lancement de la vague"
+    acteur: le programme (orchestrate)
+    declencheur: commande cadence orchestrate (lancement, ou --dry-run qui liste les étapes)
+    preconditions:
+      - "le lot est visible, sans spec: true, et son estimate est supérieure à 0,1 j (ni express)"
+      - "son screen: vaut component ou journey, ou est absent (retouche d'écran, revue UX d'écran)"
+      - "orchestrate.maquette n'est pas false"
+    nominal:
+      - "Le programme lit visible, screen, spec et estimate dans le plan."
+      - "Il classe le lot « maquette légère »."
+      - "Il planifie precheck → spec → maquette → implement → review → ux (l'étape accept est sautée)."
+      - "Il alloue au lot le budget ordinaire plus l'allocation d'étapes spec (stage spec de lot-budget.ts)."
+    alternatives:
+      - { si: "le lot a screen: page, ou une fiche à bloc ecran du lot existe déjà", alors: "il suit la chaîne complète existante, inchangée", regles: [R1] }
+      - { si: "le lot est express, non visible ou spec: true", alors: "il suit son chemin ordinaire, sans étape spec ni maquette", regles: [R1] }
+      - { si: "orchestrate.maquette vaut false", alors: "le lot suit le chemin ordinaire : la maquette légère est la revue de maquette, sans elle rien n'est à valider", regles: [R2] }
+      - { si: "une fiche légère du lot, valide et relue conforme, existe déjà (reprise)", alors: "les étapes spec et maquette sont sautées", regles: [R9] }
+    resultat: "Le lot visible sans écran page a une étape maquette avant tout code."
+  - id: C2
+    titre: "La session spec écrit une maquette légère : l'écran actuel et la version visée"
+    acteur: l'agent spec-writer
+    declencheur: job spec (lot classé maquette légère)
+    preconditions:
+      - "C1 a classé le lot"
+      - "l'application actuelle se lit dans le dépôt (charte, composants, pages voisines)"
+    nominal:
+      - "L'agent lit la charte, les composants et les pages voisines, comme pour un écran page."
+      - "Il capture l'écran actuel aux deux largeurs (actuel-<état>-1440.png et actuel-<état>-390.png) pour chaque état touché."
+      - "Il écrit maquette.html avec la version visée : une section #etat-<état> par état touché seulement, les champs touchés portant data-testid."
+      - "Il capture la version visée (maquette-<état>-1440.png et -390.png) et écrit fiche.yaml (bloc ecran) limitée aux états, champs et règles que le lot change."
+      - "Il commite le tout en un commit qui cite le lot."
+    alternatives:
+      - { si: "le lot ne change aucun écran", alors: "l'agent écrit sousSeuil, rien n'est écrit, le lot passe à implement", regles: [R3] }
+      - { si: "l'écran actuel ne peut pas être capturé (application qui ne démarre pas, page protégée)", alors: "l'agent le dit dans nonVerifie et la maquette se fonde sur le code", regles: [R4] }
+      - { si: "un état de la fiche n'a pas sa section ou une capture visée aux deux largeurs", alors: "le programme renvoie la liste à une session spec fraîche", regles: [R5] }
+      - { si: "une règle hypothese est coûteuse à défaire", alors: "le lot passe en question, comme pour un écran page", regles: [R5] }
+    resultat: "Une fiche, une maquette et des captures « avant / après » limitées aux états touchés."
+  - id: C3
+    titre: "L'ux-reviewer valide la maquette légère avant le code"
+    acteur: l'agent ux-reviewer (mode maquette)
+    declencheur: job maquette (lot classé maquette légère)
+    preconditions:
+      - "la fiche et la maquette de C2 sont valides et commitées"
+    nominal:
+      - "Le brief maquette demande le balayage complet des seuls états de la fiche, à 1440 et 390 px, et la comparaison de la version visée à la capture de l'écran actuel."
+      - "La revue rend ses constats ; conforme (ni bloquant ni majeur), le lot passe à implement."
+    alternatives:
+      - { si: "un constat bloquant ou majeur", alors: "retour à une session spec, jusqu'à orchestrate.maquetteReviews revues (3 par défaut), mêmes règles que pour un écran page", regles: [R6] }
+      - { si: "la dernière revue permise est encore non conforme", alors: "le lot est rendu au lead, rien n'est implémenté", regles: [R6] }
+    resultat: "Une maquette validée graphiquement avant la première ligne de code."
+  - id: C4
+    titre: "La passe ux après le code compare l'application à la maquette légère"
+    acteur: l'agent ux-reviewer (mode conformité)
+    declencheur: job ux (revue de code conforme, lot classé maquette légère)
+    preconditions:
+      - "la maquette a été relue conforme en C3"
+      - "la revue de code est conforme"
+    nominal:
+      - "Le brief ux est celui de la conformité (src/orchestrate/aval.ts:85) : application contre maquette et captures, état par état de la fiche, aux deux largeurs, sans refaire l'audit de tout l'écran."
+      - "Le verdict est rendu comme aujourd'hui (bloquant, majeur, mineur)."
+    alternatives:
+      - { si: "le lot est un petit lot visible (review-small)", alors: "sa passe unique reçoit le même brief de conformité", regles: [R7] }
+      - { si: "orchestrate.ux est absent ou l'application ne démarre pas", alors: "aucune session ux, la note existante « UX à faire par le lead » est gardée", regles: [R7] }
+    resultat: "Une revue UX d'écran qui ne redécouvre pas ce que la maquette a déjà réglé."
+  - id: C5
+    titre: "Le lead mesure l'effet sur deux fenêtres"
+    acteur: le lead
+    declencheur: commande cadence perf
+    preconditions:
+      - "des lots visibles rendus dans la fenêtre"
+    nominal:
+      - "cadence perf affiche « sessions ux par lot visible » (1,6 sur la fenêtre du 30-10)."
+      - "Le lead compare à la cible 1,2 sur deux fenêtres consécutives après la mise en service."
+    alternatives:
+      - { si: "la fenêtre n'a aucun lot visible rendu", alors: "la ligne reste « — » comme aujourd'hui, aucune conclusion", regles: [R8] }
+    resultat: "La cible 1,2 est tenue ou le lot est repris."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Entrent dans la chaîne maquette légère les seuls lots visibles, sans spec: true, d'estimate > 0,1 j, dont screen: est component, journey ou absent, et qui n'ont pas déjà une fiche à bloc ecran ; screen: page garde sa chaîne complète."
+    statut: sourcee
+    source: "demande du lot L459 : « lots visibles sans screen: page (screen: component, retouches, revues UX d'écran) » ; express.ts:10 (une retouche ≤ 0,1 j se joue en une session) ; spec.ts:26-32 (une fiche déjà entrée garde sa chaîne)"
+    tests:
+      - "R1 — lot visible screen: component d'estimate 0,3 : étapes precheck, spec, maquette, implement, review, ux"
+      - "R1 — lot visible sans screen d'estimate 0,3 : même chaîne"
+      - "R1 — lot visible d'estimate 0,1 (express) : aucune étape spec ni maquette"
+      - "R1 — lot non visible ou spec: true : chemin ordinaire inchangé"
+      - "R1 — lot screen: page : chaîne complète avec accept, inchangée"
+  - id: R2
+    cas: [C1]
+    enonce: "Avec orchestrate.maquette: false, un lot visible sans screen: page suit le chemin ordinaire (aucune étape spec ni maquette)."
+    statut: hypothese
+    si_faux: "Si la spec seule devait rester sans revue de maquette, une étape spec isolée serait ajoutée à ce lot : seule la liste des étapes change, aucune donnée en jeu."
+    tests: ["R2 — orchestrate.maquette: false : lot component sans étape spec ni maquette"]
+  - id: R3
+    cas: [C2]
+    enonce: "Un lot qui ne change aucun écran rend un sousSeuil d'une ligne, n'écrit rien et passe à implement ; la raison reste un avertissement du lot."
+    statut: sourcee
+    source: "docs/orchestrate.md, « Under the threshold » de l'étape spec d'un lot à screen ; agents/spec-writer.md (« Under the threshold, say so »)"
+    tests: ["R3 — lot component sans changement d'écran : sousSeuil, aucune fiche, étape suivante implement"]
+  - id: R4
+    cas: [C2]
+    enonce: "Une maquette légère porte, pour chaque état touché, la capture de l'écran actuel et celle de la version visée aux deux largeurs ; quand l'écran actuel ne peut pas être capturé, l'agent le déclare dans nonVerifie au lieu d'inventer une capture."
+    statut: sourcee
+    source: "demande du lot L459 : « maquette légère (capture de l'écran actuel + version visée, états touchés) » ; LARGEURS 1440 et 390 (src/spec.ts) ; agents/spec-writer.md (« Render and look »)"
+    tests:
+      - "R4 — le brief spec du lot léger nomme actuel-<état>-<largeur>.png et maquette-<état>-<largeur>.png pour chaque état touché"
+      - "R4 — écran actuel non capturable : nonVerifie renseigné et aucune capture actuelle fabriquée"
+  - id: R5
+    cas: [C2]
+    enonce: "Le programme applique à la fiche légère les contrôles de la fiche d'un écran page (spec check, section #etat-<état> par état, data-testid par champ, captures visées aux deux largeurs, commit, arbre propre) et la règle « un choix coûteux est une question » ; il ne contrôle pas les captures actuel-*, qui restent un fichier libre comme contraste.md."
+    statut: sourcee
+    source: "src/orchestrate/spec.ts:197-262 (checkSpec) et :49-62 (costlyHypotheses) ; docs/orchestrate.md, « What the program checks » ; hypothèse sur les captures actuel-* : voir R10"
+    tests:
+      - "R5 — fiche légère sans capture visée à 390 px : renvoyée à une session spec avec le point nommé"
+      - "R5 — fiche légère avec une hypothèse coûteuse : le lot passe en question"
+      - "R5 — absence des captures actuel-* : aucun renvoi"
+  - id: R6
+    cas: [C3]
+    enonce: "La revue de la maquette légère est la boucle existante : jusqu'à orchestrate.maquetteReviews revues (3 par défaut), constats bloquants et majeurs renvoyés à la spec, lot rendu au lead avec « maquette non conforme après N revues : … » si la dernière reste non conforme."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:1461-1475 et :1595 (specBudget), :1651 (message de rendu) ; docs/orchestrate.md, « The loop, orchestrate.maquetteReviews reviews at most »"
+    tests:
+      - "R6 — maquette légère non conforme à la 3e revue : lot rendu avec le message de maquette non conforme"
+      - "R6 — maquette légère conforme à la 1re revue : étape suivante implement sans session spec de plus"
+      - "R6 — maquetteReviews: 1 : la 1re revue non conforme rend le lot"
+  - id: R7
+    cas: [C4]
+    enonce: "Après le code, la passe ux d'un lot à maquette légère reçoit le brief de conformité (application contre maquette et captures, états de la fiche) au lieu de l'audit complet ; un petit lot visible garde sa passe unique review-small avec ce brief ; sans orchestrate.ux ou application qui ne démarre pas, aucune session ux n'est jouée."
+    statut: sourcee
+    source: "src/orchestrate/aval.ts:85 (brief de conformité d'un lot à écran) ; docs/orchestrate.md, « One UX review per lot (L221) » ; demande du lot L459 : « puis conformité après »"
+    tests:
+      - "R7 — lot léger : le brief ux contient la conformité à la maquette et ses captures"
+      - "R7 — petit lot visible léger : review-small avec le brief de conformité"
+      - "R7 — sans orchestrate.ux : aucune session ux et la note « UX à faire par le lead » est écrite"
+  - id: R8
+    cas: [C5]
+    enonce: "La mesure « sessions ux par lot visible » ne change pas de formule : étapes ux et review-small ok sur les lots visibles rendus de la fenêtre ; sans lot visible rendu, la ligne reste vide ; la cible 1,2 s'évalue sur deux fenêtres, depuis la mise en service."
+    statut: sourcee
+    source: "src/perf.ts:590 et :741 ; docs/perf.md:34 ; demande du lot L459 : « 1,6 le 30-10, cible 1,2 sur deux fenêtres »"
+    tests:
+      - "R8 — 3 sessions ux sur 2 lots visibles = 1,5 (formule inchangée)"
+      - "R8 — fenêtre sans lot visible rendu : aucune valeur, pas de division par zéro"
+  - id: R9
+    cas: [C1]
+    enonce: "À la reprise, un lot dont la fiche légère passe les contrôles du programme et dont la maquette est déjà relue conforme (ou dont le code suit déjà la fiche) ne rejoue ni la spec ni la maquette."
+    statut: sourcee
+    source: "src/orchestrate/cycle.ts:1474 (acceptationProof, codeAfterFiche) ; spec.ts:76 (ficheReady) ; docs/orchestrate.md, « On resume the spec step is skipped only when a sheet … »"
+    tests: ["R9 — reprise d'un lot léger avec fiche valide et maquette conforme : étape suivante implement"]
+  - id: R10
+    cas: [C2]
+    enonce: "Les captures de l'écran actuel se nomment actuel-<état>-<largeur>.png dans le dossier de la fiche, et la revue ux les consulte via le brief ; leur nom est une convention du brief, pas un contrôle du programme."
+    statut: hypothese
+    si_faux: "Si un autre nom ou un contrôle par le programme était voulu, seuls le brief, le nom et la liste des contrôles changent ; aucune donnée existante ni aucun format publié n'est touché."
+    tests: ["R10 — le brief maquette du lot léger nomme actuel-<état>-<largeur>.png"]
+  - id: R11
+    cas: [C1]
+    enonce: "L'étape accept (tests d'acceptation rouges) est sautée pour une maquette légère : une retouche d'écran ne porte pas de règles de comportement à verrouiller."
+    statut: hypothese
+    si_faux: "Si le lead veut le verrou des tests rouges aussi sur ces lots, l'étape accept est ajoutée à la chaîne et au budget : la liste des étapes et le coût changent, aucune donnée existante."
+    tests: ["R11 — lot léger avec orchestrate.accept déclaré : la chaîne n'a pas d'étape accept"]
+  - id: R12
+    cas: [C1]
+    enonce: "Le budget d'un lot à maquette légère est le budget ordinaire de son estimate plus l'allocation d'étapes spec de 450 000 jetons (stage spec), et non le forfait de 1,3 M d'un écran page."
+    statut: hypothese
+    si_faux: "Si le coût mesuré de la chaîne légère est plus haut ou plus bas, seule la constante change (une mesure à refaire sur deux fenêtres), sans effet sur les données."
+    tests: ["R12 — budget d'un lot léger d'estimate 0,3 = ordinaire + 450 000", "R12 — budget d'un lot screen: page inchangé"]
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate
+    entree: "un plan avec un lot visible, d'estimate > 0,1 j, sans spec: true, à screen: component, journey ou absent ; --dry-run liste les étapes sans rien écrire"
+    sortie: "la chaîne du lot : precheck → spec → maquette → implement → review → ux, son budget et ses sessions ; screen: page et les autres lots inchangés"
+    erreurs: []
+    sans_erreur: "la commande ne gagne aucune erreur : l'erreur de configuration de orchestrate.maquetteReviews (src/config.ts:482) est déjà codée et inchangée"
+    regles: [R1, R2, R11, R12]
+  - id: A2
+    appel: job spec
+    entree: "le brief spec du lot léger : lot, dossier docs/specs, gabarit de fiche écran, consigne « actuel + visé, états touchés »"
+    sortie: "docs/specs/<écran>/fiche.yaml, maquette.html, maquette-<état>-<largeur>.png, actuel-<état>-<largeur>.png, commit spec(L…) ; ou sousSeuil"
+    erreurs:
+      - { code: log warn, message: "spec non conforme après 3 passes : <points>" }
+    regles: [R3, R4, R5, R9, R10]
+  - id: A3
+    appel: job maquette
+    entree: "la fiche et la maquette légères ; brief maquette de l'ux-reviewer, rang de la revue sur orchestrate.maquetteReviews"
+    sortie: "verdict de revue : conforme, ou constats bloquants et majeurs renvoyés à la spec"
+    erreurs:
+      - { code: log warn, message: "maquette non conforme après 3 revues : <constats restants>" }
+    regles: [R6]
+  - id: A4
+    appel: job ux
+    entree: "le lot léger après revue de code conforme ; brief de conformité à la maquette et à ses captures"
+    sortie: "verdict ux (bloquant, majeur, mineur) comme aujourd'hui"
+    erreurs: []
+    sans_erreur: "l'absence d'orchestrate.ux ou une application qui ne démarre pas ne sont pas de nouvelles erreurs : la note existante « UX à faire par le lead » est écrite (R7)"
+    regles: [R7]
+  - id: A5
+    appel: commande cadence perf
+    entree: "une fenêtre de journaux de vague"
+    sortie: "la ligne « sessions ux par lot visible », sa valeur et la décision « ux » si elle se dégrade de plus de 25 %"
+    erreurs: []
+    sans_erreur: "lecture seule, sans nouvelle entrée ; une fenêtre sans lot visible rendu affiche une valeur vide (R8)"
+    regles: [R8]
+
+donnees:
+  - { id: D1, objet: "plan (.cadence/raf.yaml) : visible, screen, spec, estimate d'un lot", existant: true, modification: aucune, note: "lus pour classer le lot, jamais modifiés" }
+  - { id: D2, objet: "docs/specs/<écran>/ (fiche.yaml, maquette.html, maquette-*.png, actuel-*.png)", existant: true, modification: aucune, note: "même dossier et même format de fiche que l'écran page ; les actuel-*.png sont de simples fichiers ajoutés (R10)" }
+  - { id: D3, objet: "état d'un lot (src/orchestrate/state.ts : screen, maquette, specRuns)", existant: true, modification: aucune, note: "aucun champ ajouté par cette fiche ; voir la question sur le marqueur « léger »" }

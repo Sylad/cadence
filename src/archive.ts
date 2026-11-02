@@ -105,7 +105,7 @@ function placeRanked(out: Lot[], ranked: Lot[], places: ReadonlyMap<string, stri
  * rouvert est re-pointé sur le prédécesseur de celui-ci, de proche en proche, pour que seul le lot rouvert bouge dans le plan présenté (L536). Un lot rouvert
  * sans rang (archivé avant `plan.idPattern`) prend pour prédécesseur celui du plan présenté (`order`, lu seulement alors). Rend les lots restés archivés dont le rang change.
  */
-export function repointPlaces(nodes: YAMLMap[], back: YAMLMap[], order: () => string[]): Map<YAMLMap, string> {
+function repointPlaces(nodes: YAMLMap[], back: YAMLMap[], order: () => string[]): Map<YAMLMap, string> {
   const places = new Map<YAMLMap, string>();
   for (const n of nodes) {
     const v = n.get(PLACE_KEY);
@@ -125,6 +125,27 @@ export function repointPlaces(nodes: YAMLMap[], back: YAMLMap[], order: () => st
     }
   }
   return moved;
+}
+
+/**
+ * Les lots archivés qui ne sont plus clos (`raf todo` sur un lot done archivé) reviennent à la fin de la liste `active` du plan : seuls eux bougent,
+ * les lots restés archivés dont le `place:` les nommait sont re-pointés (`repointPlaces`, L536). Chaque archive touchée est marquée `dirty`.
+ */
+export function reopenArchived(archives: { doc: Document; dirty: boolean }[], active: YAMLSeq, order: () => string[]): void {
+  const nodes = archives.flatMap((a) => archiveLots(a.doc).items.filter(isMap).map((n) => ({ a, n: n as YAMLMap })));
+  const back = nodes.filter(({ n }) => !['done', 'dropped'].includes(String(n.get('status'))));
+  if (back.length === 0) return;
+  const moved = repointPlaces(nodes.map(({ n }) => n), back.map(({ n }) => n), order);
+  for (const { a, n } of nodes) {
+    if (back.some((b) => b.n === n)) {
+      const seq = archiveLots(a.doc);
+      seq.items = seq.items.filter((i) => i !== n);
+      n.delete(PLACE_KEY);
+      active.add(n);
+    } else if (moved.has(n)) n.set(PLACE_KEY, moved.get(n));
+    else continue;
+    a.dirty = true;
+  }
 }
 
 /** Année de rangement d'un lot : celle de sa fin, à défaut de sa création, à défaut d'aujourd'hui. */

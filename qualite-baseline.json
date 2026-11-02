@@ -197,7 +197,7 @@
   "eslint|src/plan.ts|complexity": 5,
   "eslint|src/plan.ts|complexity|total": 110,
   "eslint|src/plan.ts|max-lines": 1,
-  "eslint|src/plan.ts|max-lines|total": 909,
+  "eslint|src/plan.ts|max-lines|total": 904,
   "eslint|src/plan.ts|max-params": 1,
   "eslint|src/plan.ts|max-params|total": 6,
   "eslint|src/plan.ts|sonarjs/cognitive-complexity": 4,

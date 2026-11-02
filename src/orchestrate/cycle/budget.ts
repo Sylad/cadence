@@ -1,7 +1,6 @@
 import { type SessionKind } from '../launch.js';
-import { type Tokens } from '../result.js';
 import { lotKey, lotRepoPaths, type LotState } from '../state.js';
-import { Budget, type WaveCtx, type LotCtx, transition, stop, hasSpecStage } from './ctx.js';
+import { type WaveCtx, type LotCtx, transition, stop, hasSpecStage } from './ctx.js';
 
 /** Tokens comptés par les sessions d'un lot (un lot repris compte ses étapes d'avant). */
 export const lotSpent = (l: LotState): number => l.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);

@@ -1,15 +1,13 @@
-import { coveredTasks, lotWork } from '../../audit.js';
+import { lotWork } from '../../audit.js';
 import { type OrchestrateConfig } from '../../config.js';
 import { Day } from '../../dates.js';
 import { type Plan } from '../../plan.js';
-import { isPlanOnly } from '../../audit.js';
 import { type AppState } from '../app.js';
 import { type Templates } from '../briefs.js';
 import { journalTokens, peakContext, type AgentDef, type ClaudeFn, type SessionKind } from '../launch.js';
 import { type Tokens } from '../result.js';
 import { lotStartHead } from '../accept.js';
 import { lotKey, type LotState, type RunStore, type StepState } from '../state.js';
-import { INTEGRATE_WAIT_MS } from '../integrate.js';
 import { planSeenFrom } from '../worktree.js';
 
 /** Passes de correction au plus, puis la main est rendue au lead. */

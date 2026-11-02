@@ -18,7 +18,7 @@ import { answeredText, ficheHasBack, findFiche, lightLot, ruleIdsSourcedByLead, 
 import { decisionsText, humanDecisions } from '../decisions.js';
 import { type Constat, type LotState } from '../state.js';
 import { git } from '../worktree.js';
-import { type LotCtx, workDir as wd, histPlan, short, stop, startSha, hasSpecStage } from './ctx.js';
+import { type LotCtx, workDir as wd, histPlan, short, startSha, hasSpecStage } from './ctx.js';
 
 function lotCommitLines(c: LotCtx): string {
   const plan = histPlan(c);

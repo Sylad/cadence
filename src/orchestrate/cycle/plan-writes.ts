@@ -3,7 +3,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { lotWork } from '../../audit.js';
 import { readPlanConfig } from '../../config.js';
 import { PLAN_ACTIONS, planCommitMessage } from '../../plan-commit.js';
-import { dirtyPaths, restoreWorktree, tryGit, type Commit } from '../../git.js';
+import { dirtyPaths, restoreWorktree, tryGit } from '../../git.js';
 import { RafError, type Plan } from '../../plan.js';
 import { snapshot, type Snapshot } from '../guard.js';
 import { type ReviewReport } from '../schemas.js';
@@ -12,7 +12,7 @@ import { hypothesisNote } from '../spec.js';
 import { type LotState } from '../state.js';
 import { repoBranch, takeRepoWrite } from '../integrate.js';
 import { git, trackedDirty } from '../worktree.js';
-import { type LotCtx, workDir as wd, transition, stop, propose } from './ctx.js';
+import { type LotCtx, transition, stop, propose } from './ctx.js';
 
 /** Fichiers suivis modifiés (chemins), d'après `git status --porcelain`. */
 export function trackedPaths(s: Snapshot): string[] {
@@ -170,7 +170,7 @@ export function leadMoved(repo: string, base: string): string | null {
 }
 
 /** Un refus d'écrire le plan par Plan.save() (plan.onWrite en échec, L346) est la cause d'un lot rendu, pas une erreur du lot. */
-export async function refusal(write: () => Promise<string | null>): Promise<string | null> {
+async function refusal(write: () => Promise<string | null>): Promise<string | null> {
   try {
     return await write();
   } catch (e) {

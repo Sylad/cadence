@@ -6,7 +6,9 @@ import { refuseRedAcceptation } from './raf-close-checks.js';
 import { statusCommand } from './raf-status.js';
 import { defaultPlan, PLAN_DEFAULT, PLAN_LEGACY, readDocsConfig, readHookConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readSessionConfig, readVerifyConfig } from './config.js';
 import { repoSections, repoShas, resolveLotRepos } from './repos.js';
-import { audit, exemptPlanOnly, gateProgress, gateText, gateWaiting, hypothesesOf, isNonConformingVerdict, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork, workByLot } from './audit.js';
+import { lotLines } from './lot-lines.js';
+import { parseSet } from './plan-extras.js';
+import { audit, exemptPlanOnly, gateWaiting, hypothesesOf, isNonConformingVerdict, ownFiles, isPlanOnly, lotWork, nextUp, planCommits, unreviewedWork, workByLot } from './audit.js';
 import { short } from './check.js';
 import { isDay, toDay, type Day } from './dates.js';
 import { deliver, parseDeliverConfig, realDeps, shellQuote } from './deliver.js';
@@ -63,7 +65,7 @@ export interface Io {
 const HELP = `raf — plan « reste à faire » versionné dans le dépôt, relié aux commits
 
   raf init [--project nom] [--prefix L] [--no-hook]
-  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--local] [--public "titre public"] [--every jours] [--after L2,L4] [--uses banc,passerelle] [--parent L3]
+  raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--local] [--public "titre public"] [--every jours] [--after L2,L4] [--uses banc,passerelle] [--set champ=valeur]… [--parent L3]
   raf public <id> "titre public" | --clear   titre du lot dans le langage du public (pages Nouveautés et Plan)
   raf screen <id> page|component|journey|none   pose, remplace ou retire screen: d'un lot visible existant (seule la valeur page adopte l'étape spec d'orchestrate)
   raf visible <id> on|off   pose ou retire visible: d'un lot existant (changement visible : entrée Nouveautés et étape UX d'orchestrate) ; off est refusé tant que le lot a un screen:
@@ -203,6 +205,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
       title: { type: 'string' },
       after: { type: 'string' },
       uses: { type: 'string' },
+      set: { type: 'string', multiple: true },
       parent: { type: 'string' },
       force: { type: 'boolean' },
       back: { type: 'boolean' },
@@ -383,6 +386,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
           if (given) throw new RafError(`--${flag} se pose sur un lot, pas sur une sous-tâche`);
         }
         if (values.uses !== undefined) throw new RafError(`uses se pose sur un lot, pas sur une sous-tâche : ${values.parent}`);
+        if (values.set !== undefined) throw new RafError(`--set se pose sur un lot, pas sur une sous-tâche : ${values.parent}`);
         id = plan.addTask(values.parent, rest.join(' '));
       } else {
         const estimate = values.estimate === undefined ? undefined : Number(values.estimate);
@@ -393,7 +397,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         if (values.public !== undefined) refuseLongTitle(values.public);
         const uses = values.uses?.split(',').map((n) => n.trim()).filter(Boolean);
         if (uses?.length === 0) throw new RafError(invalidResource(''));
-        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, local: values.local, public: values.public, every, after, uses });
+        id = plan.add(rest.join(' '), today, { estimate, quickwin: values.quickwin, visible: values.visible, screen: values.screen as Screen | undefined, spec: values.spec, local: values.local, public: values.public, every, after, uses, extras: parseSet(values.set) });
       }
       plan.save();
       io.out(id);
@@ -575,22 +579,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
         for (const n of notes) io.out(n);
         return 0;
       }
-      io.out(`${lot.id}  ${lot.status}  ${lot.title}`);
-      if (lot.state) io.out(`état : ${lot.state}`);
-      if (lot.goal) io.out(`goal : ${lot.goal}`);
-      const dates = [['créé', lot.created], ['démarré', lot.started], [lot.status === 'dropped' ? 'abandonné' : 'terminé', lot.finished]].filter(([, d]) => d);
-      if (dates.length) io.out(dates.map(([k, d]) => `${k} : ${d}`).join('  '));
-      if (lot.after.length) io.out(`after : ${lot.after.join(', ')}`);
-      if (lot.public) io.out(`public : ${lot.public}`);
-      // L439 : le livreur lit ici si le lot est visible et s'il porte un verdict UX ; deux lignes stables, absentes d'un lot non visible.
-      if (lot.visible) io.out('visible : oui');
-      if (lot.screen) io.out(`screen : ${lot.screen}`);
-      if (lot.visible) io.out(lot.ux ? `ux : ${lot.ux.verdict}` : 'ux : absent');
-      if (lot.spec) io.out('spec : true');
-      if (lot.uses) io.out(`uses : ${lot.uses.join(', ')}`);
-      if (lot.docsOk) io.out(`docs-ok : ${lot.docsOk.date} — ${lot.docsOk.reason}`);
-      const gate = gateProgress(plan.lots(), lot);
-      if (lot.gate && gate) io.out(lot.gate.invalid ? `gate : ${gateText(gate)}` : `gate : ${gate.n} lots ${gate.label} faits`);
+      for (const line of lotLines(plan, lot)) io.out(line);
       if (notes.length) {
         io.out('notes :');
         // Les lignes suivantes d'une note multiligne s'alignent sous son texte, pas en colonne 0.
@@ -605,9 +594,9 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
     case 'list': {
       const plan = loadPlan();
       if (values.status && !STATUSES.includes(values.status as Status)) throw new RafError(`statut inconnu : ${values.status}`);
-      for (const l of plan.lots().filter((l) => !values.status || l.status === values.status)) {
-        io.out(`${l.id.padEnd(6)} ${l.status.padEnd(8)} ${l.quickwin ? '⚡ ' : ''}${l.title}`);
-      }
+      const shown = plan.lots().filter((l) => !values.status || l.status === values.status);
+      if (values.json) io.out(JSON.stringify(shown, null, 2));
+      else for (const l of shown) io.out(`${l.id.padEnd(6)} ${l.status.padEnd(8)} ${l.quickwin ? '⚡ ' : ''}${l.title}`);
       return 0;
     }
     case 'now':

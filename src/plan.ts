@@ -6,6 +6,8 @@ import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
 import { normalizeLot } from './plan-read.js';
 import { currentState, defaultState, rebase, stateProblems, transitionProblem, type StateModel } from './plan-states.js';
+import { DOCS_OK_FILE, readDocsOkFile } from './docs-ok-file.js';
+import { checkedExtras, withExtras, type ExtraDecls } from './plan-extras.js';
 import { ARCHIVE_DIR, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, selectArchivable, type Kept } from './archive.js';
 
 /** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
@@ -109,6 +111,8 @@ export interface Lot {
   docsOk?: { date: Day; reason: string };
   /** Condition de tirage (L219) : pas avant `count` lots done portant le critère. Absente sans champ `gate`. */
   gate?: Gate;
+  /** Champs d'extension déclarés par `plan.extras` (L464) que le lot porte ou reçoit par défaut ; absent quand aucun. */
+  extras?: Record<string, string>;
   /** Champs écrits à la main illisibles (dates mal formées…), remontés par check. */
   problems: string[];
 }
@@ -183,6 +187,8 @@ export interface PlanSettings {
   format?: PlanFormat;
   /** États détaillés du projet (`plan.states`, L463) ; jamais avec `format`. */
   states?: StateModel;
+  /** `plan.extras` (L464) : les champs d'extension d'un lot. Jamais avec `format` (plan en lecture seule). */
+  extras?: ExtraDecls;
   /** Fichier de configuration effectivement lu (--config), absolu ; cadence.yaml à la racine par défaut. */
   config?: string;
 }
@@ -544,7 +550,8 @@ export class Plan {
     }
     // L396 : l'archive est un détail de stockage — les lots archivés reprennent leur place parmi ceux du fichier actif, comme un seul plan.
     const archived = this.loadArchives().flatMap((a) => archiveLots(a.doc).toJSON() as Record<string, unknown>[]);
-    const lots = mergeArchived(archived.map((r) => normalizeLot(r)), this.activeRaw().map((r) => normalizeLot(r)));
+    const read = (r: Record<string, unknown>) => withExtras(normalizeLot(r), r, this.settings.extras);
+    const lots = mergeArchived(archived.map(read), this.activeRaw().map(read));
     const model = this.settings.states;
     return model ? lots.map((l) => ({ ...l, problems: [...l.problems, ...stateProblems(model, l)] })) : lots;
   }
@@ -705,7 +712,7 @@ export class Plan {
     return node as YAMLMap;
   }
 
-  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; spec?: boolean; local?: boolean; public?: string; every?: number; after?: string[]; uses?: string[] } = {}): string {
+  add(title: string, today: Day, opts: { estimate?: number; quickwin?: boolean; visible?: boolean; screen?: Screen; spec?: boolean; local?: boolean; public?: string; every?: number; after?: string[]; uses?: string[]; extras?: Record<string, string> } = {}): string {
     this.writable();
     if (opts.screen !== undefined) {
       if (!SCREENS.includes(opts.screen)) throw new RafError(`screen inconnu : ${String(opts.screen)} (${SCREENS.join(', ')})`);
@@ -721,6 +728,7 @@ export class Plan {
     if (opts.every !== undefined && !(Number.isInteger(opts.every) && opts.every > 0)) {
       throw new RafError(`périodicité invalide : ${opts.every} (un nombre entier de jours, 1 au moins)`);
     }
+    const extras = checkedExtras(this.settings.extras, opts.extras);
     const entry: Record<string, unknown> = { id, title };
     if (pub !== undefined) entry.public = pub;
     Object.assign(entry, { status: 'todo', estimate: opts.estimate ?? 1 }, trueFlags({ quickwin: opts.quickwin, visible: opts.visible }));
@@ -729,6 +737,7 @@ export class Plan {
     if (opts.every !== undefined) entry.every = opts.every;
     if (opts.after?.length) entry.after = opts.after;
     if (opts.uses?.length) entry.uses = cleanUses(opts.uses);
+    Object.assign(entry, extras);
     entry.created = today;
     const node = this.doc.createNode(entry) as YAMLMap;
     for (const key of ['after', 'uses']) {
@@ -1104,25 +1113,6 @@ export class Plan {
 }
 
 /** Lit une liste écrite dans un autre format : champs traduits, entrées à parent repliées en sous-tâches. */
-/** Fichier d'acquittement docs-ok d'un plan en lecture seule, relatif à la racine du dépôt (L386). */
-const DOCS_OK_FILE = '.cadence/docs-ok.yaml';
-
-/** Les acquittements du fichier : lot → { date, reason }. Une entrée sans raison n'acquitte rien ; un fichier illisible est une erreur qui le nomme. */
-function readDocsOkFile(file: string | null): Record<string, { date: Day; reason: string }> {
-  if (!file || !existsSync(file)) return {};
-  const doc = parseDocument(readFileSync(file, 'utf8'));
-  if (doc.errors.length > 0) throw new RafError(`${file} : ${doc.errors[0].message}`);
-  const raw = doc.toJSON() as unknown;
-  if (raw == null) return {};
-  if (typeof raw !== 'object' || Array.isArray(raw)) throw new RafError(`${file} : la racine doit être un objet (lot → { date, reason })`);
-  const out: Record<string, { date: Day; reason: string }> = {};
-  for (const [id, v] of Object.entries(raw)) {
-    const e = v as { date?: unknown; reason?: unknown } | null;
-    if (e && typeof e === 'object' && typeof e.reason === 'string' && e.reason.trim() !== '') out[id] = { date: String(e.date ?? ''), reason: e.reason.trim() };
-  }
-  return out;
-}
-
 function foreignLots(raw: Record<string, unknown>[], format: PlanFormat): Lot[] {
   const entries = raw.map((r, i) => {
     if (!r || typeof r !== 'object' || Array.isArray(r)) throw new RafError(`entrée n° ${i + 1} du plan : un objet est attendu`);

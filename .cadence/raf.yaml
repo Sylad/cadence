@@ -1482,10 +1482,11 @@ lots:
     finished: 2026-11-02
   - id: L538
     title: "Ligne de base du cliquet à l'intégration : un lot qui baisse qualite-baseline.json depuis un main ancien entre en conflit au rebase ou rend le cliquet rouge au sommet intégré (02-11 : L485, L486, L487, L536, L465 — un rebase manuel chaque fois) ; l'intégration recalcule la base sur main + les baisses propres au lot (même méthode que les rebases manuels du 02-11), avec un test"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-11-02
+    started: 2026-11-02
   - id: L539
     title: "Publication 1.42.0 rouge sur le runner GitHub (run 41507045657) : (1) test « L485 — cliquet > node scripts/qualite.mjs --contre main passe » suppose une branche locale main, absente du clone de la CI (ne jouer que si main existe, ou comparer à origin/main comme tests.yml) ; (2) sonde L527 « --priority explicite » encore rouge sur le runner après L533 (2,2 s) : trouver la vraie cause (lire le test et le tirage, reproduire sous charge avec un CPU limité), sans changer le contrat ; puis release 1.42.1"
     status: done

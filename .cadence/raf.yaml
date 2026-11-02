@@ -1425,9 +1425,10 @@ lots:
     started: 2026-11-02
   - id: L532
     title: "Intégrer un lot rendu puis repris par le lead (revue conforme dans son worktree) pendant que SA vague tourne encore : --resume --integrate est refusé (« la vague … tourne encore ») et, avec --continue, la vague peut durer des heures ; déposer l'intégration comme un --add, jouée entre deux étapes — vu le 02-11 sur L527 puis L435"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-02
+    started: 2026-11-02
   - id: L533
     title: "Test instable sur le runner GitHub : test/orchestrate-creneaux-libres-l527-probe.test.ts « --priority explicite : l'ordre du tirage suit la ligne de commande » — rouge dans le run de publication de 1.40.0 (expected false to be true, 2,4 s), vert dans la porte et le clone neuf locaux ; attendre l'événement plutôt qu'un délai, sans changer le contrat"
     status: doing

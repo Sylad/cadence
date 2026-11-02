@@ -225,3 +225,17 @@ describe('R2 — les ids <préfixe>\\d+ gardent leur garde d\'avant sous plan.id
     expect(idRefs('release-AB-1 et AB-1-x', 'L', PATTERN)).toEqual([]);
   });
 });
+
+describe('R7 — la documentation d\'usage lit parent: dans un plan natif, pas seulement dans un plan tenu par un autre outil', () => {
+  const doc = (f: string) => readFileSync(join(import.meta.dirname, '..', f), 'utf8');
+  it('R7 — docs/raf.md (raf check), docs/lead.md (lead tour --json) et docs/cadence-hud.md (panneau des lots) ne réservent plus parent: au plan d\'un autre outil', () => {
+    expect(doc('docs/raf.md')).not.toContain('entries carrying `parent:` in a plan kept by another tool');
+    expect(doc('docs/lead.md')).not.toContain('In a plan kept by another tool, `parent` is the lot\'s own `parent:` field');
+    expect(doc('docs/cadence-hud.md')).not.toContain('In a plan kept by another tool the sub-lots come from `parent:`');
+  });
+  it('R7 — chaque lecteur dit que parent: vaut aussi pour un plan natif (raf add --under)', () => {
+    expect(doc('docs/raf.md')).toMatch(/idle lots \(an open lot whose sub-lots, entries carrying `parent:` \(native plan, `raf add --under`, L465, or a plan kept by another tool\)/);
+    expect(doc('docs/lead.md')).toContain('A lot that carries `parent:` itself (a sub-lot laid flat, `raf add --under` in a native plan, L465, or the field of a plan kept by another tool) carries it as `parent`');
+    expect(doc('docs/cadence-hud.md')).toContain('A lot carrying `parent:` (a sub-lot laid flat by `raf add --under`, L465, or the field of a plan kept by another tool) is shown under its parent and counted in `N lots non clos`');
+  });
+});

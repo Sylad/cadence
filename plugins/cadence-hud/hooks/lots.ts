@@ -40,7 +40,7 @@ export const stampsSignature = (stdout: string): string => {
   }
 }
 
-/** Une sous-tâche native : son id est `<lot>/<n>` et son parent est ce lot (le sous-lot d'un plan tenu par un autre outil a un id propre). */
+/** Une sous-tâche native : son id est `<lot>/<n>` et son parent est ce lot (un sous-lot à plat, `parent:` posé par `raf add --under` ou par un autre outil, a un id propre). */
 export const isTask = (l: TourLot): boolean => l.parent !== undefined && l.id.startsWith(`${l.parent}/`)
 
 /** Le nombre de lots non clos d'un projet : les sous-lots de Lot.parent comptent, les sous-tâches natives non. */

@@ -1487,6 +1487,9 @@ lots:
     spec: true
     created: 2026-11-02
     started: 2026-11-02
+    notes:
+      - { date: 2026-11-02, text: "Revue de la fiche — mineur : docs/specs/base-cliquet-integration/fiche.yaml:48 — R3 refuse par commit : un lot dont un commit intermédiaire monte une clé et un commit suivant la rebaisse serait abandonné alors que son sommet baisse. À préciser (accepté tel quel ou non) pour éviter une surprise, car R6 rejoue commit par commit." }
+      - { date: 2026-11-02, text: "Revue de la fiche — mineur : docs/specs/base-cliquet-integration/fiche.yaml:88 — R2 et R6 sont marquées « hypothese » alors qu'elles découlent de R1 (même formule, clé baissée des deux côtés, cumul par commit) ; l'ensemble reste sans catégorie coûteuse. Le test R2 « jamais négative, jamais sous 0 » est redondant dans son titre, et le test R8 (« identique à main ») gagnerait à citer le fichier comparé." }
   - id: L539
     title: "Publication 1.42.0 rouge sur le runner GitHub (run 41507045657) : (1) test « L485 — cliquet > node scripts/qualite.mjs --contre main passe » suppose une branche locale main, absente du clone de la CI (ne jouer que si main existe, ou comparer à origin/main comme tests.yml) ; (2) sonde L527 « --priority explicite » encore rouge sur le runner après L533 (2,2 s) : trouver la vraie cause (lire le test et le tirage, reproduire sous charge avec un CPU limité), sans changer le contrat ; puis release 1.42.1"
     status: done

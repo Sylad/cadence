@@ -203,6 +203,8 @@ export interface LotState {
   answers: string[];
   /** Mineurs et sous-tâches proposées, rendus au lead (pas ajoutés au plan). */
   proposals: string[];
+  /** Pour une sous-tâche proposée : le HEAD que la revue qui l'a émise a lu (L422), pour marquer au tableau celles que des commits du lot ont pu traiter depuis. Absent des états plus anciens. */
+  proposalHeads?: Record<string, string>;
   warnings: string[];
   /** Commit du plan qui porte le verdict enregistré. */
   outcome: string | null;

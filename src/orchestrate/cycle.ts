@@ -1332,17 +1332,19 @@ function summarize(rep: ReviewReport, head: string, repoHeads?: Record<string, s
   return { conforme: bloquants === 0 && majeurs === 0, bloquants, majeurs, mineurs: Math.max(rep.mineurs, count('mineur')), verdict: rep.verdict.trim(), sousTaches: rep.sousTaches, nonVerifie: rep.nonVerifie, head, ...(repoHeads ? { repoHeads } : {}) };
 }
 
-function propose(c: LotCtx, text: string): void {
+function propose(c: LotCtx, text: string, head?: string): void {
   if (!c.lot.proposals.includes(text)) c.lot.proposals.push(text);
+  if (head) (c.lot.proposalHeads ??= {})[text] ??= head;
 }
 
 const minorLine = (source: string, k: { fichier?: string; ligne?: number; texte: string }) => `[mineur ${source}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`;
 
 const withoutLine = (line: string) => line.replace(/^(\[mineur \w+\] .*?):\d+ — /, '$1 — ');
 
-function addProposals(c: LotCtx, rep: ReviewReport, source: string, withMinors = true): void {
+function addProposals(c: LotCtx, rep: ReviewReport, source: string, head: string, withMinors = true): void {
   if (withMinors) for (const k of rep.constats.filter((k) => k.gravite === 'mineur')) propose(c, minorLine(source, k));
-  for (const t of rep.sousTaches) propose(c, `[sous-tâche ${source}] ${t}`);
+  // La première revue qui émet la proposition en garde la date : une revue suivante qui la redit ne la rajeunit pas.
+  for (const t of rep.sousTaches.map((t) => `[sous-tâche ${source}] ${t}`)) propose(c, t, head);
 }
 
 function minorConstats(rep: ReviewReport): Constat[] {
@@ -1800,7 +1802,7 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
   const summary = summarize(rep, done.after.head ?? '');
   const passes = (l[r.kind]?.passes ?? 0) + 1;
   // Fiche : les mineurs sont des notes du lot (design § 4). Maquette : inchangé (propositions du tableau final).
-  addProposals(c, rep, r.kind, r.kind !== 'fiche');
+  addProposals(c, rep, r.kind, summary.head, r.kind !== 'fiche');
   // Un lot rendu sur le refus d'écrire ses notes (R26) rejoue cette revue à la reprise : le compte des passes n'est posé qu'une fois les notes écrites.
   if (r.kind === 'fiche' && (await noteMinors(c, rep, `la ${r.label}`))) return;
   l[r.kind] = { passes, conforme: summary.conforme, verdict: summary.verdict };
@@ -2486,7 +2488,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   const summary = summarize(rep, done.after.head ?? '', done.others.length ? Object.fromEntries(done.others.map((o) => [o.repo.rel, o.after.head ?? ''])) : undefined);
   if (kind === 'ux') {
     l.ux = summary;
-    addProposals(c, rep, 'ux');
+    addProposals(c, rep, 'ux', summary.head);
     l.uxVerdict = summary.verdict;
     l.constats = blockingConstats(rep, 'ux');
     save(c);
@@ -2535,7 +2537,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     l.proposals = left;
     l.minorLines = [];
   }
-  addProposals(c, rep, 'code', !minorPass);
+  addProposals(c, rep, 'code', summary.head, !minorPass);
   if (summary.conforme) (l.reviewCounts ??= []).push(0); // une revue conforme compte pour 0 dans la comparaison de la convergence (L205)
   if (minorPass) {
     l.minorPass = true;

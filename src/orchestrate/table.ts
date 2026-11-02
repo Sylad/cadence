@@ -6,6 +6,7 @@ export { estimateLines, launchPrices } from './cout.js';
 import { gitRoot, isAncestor } from '../git.js';
 import { repoWork } from '../repos.js';
 import { quotaReset } from './result.js';
+import { proposalLine, touchedReader, type TouchedSince } from './deja-traitee.js';
 import type { LotState, StepState, WaveState } from './state.js';
 
 const k = (n: number) => `${Math.round(n / 1000)} k`;
@@ -214,7 +215,7 @@ function signalLines(l: LotState): string[] {
 }
 
 /** Le détail d'un lot (L441) : ce que le tableau compact de `--status` n'imprime pas et que `--status --detail <lot>` donne. */
-function detailLines(l: LotState): string[] {
+function detailLines(l: LotState, touched: TouchedSince): string[] {
   const out: string[] = [];
   if (l.goal) out.push(`${l.project}:${l.lot} — objectif donné : ${l.goal}`);
   if (l.uxNote) out.push(`${l.project}:${l.lot} — ${l.uxNote}`);
@@ -228,7 +229,7 @@ function detailLines(l: LotState): string[] {
   }
   for (const x of l.choix ?? []) out.push(`${l.project}:${l.lot} — choix fait : ${x}`);
   for (const h of l.hypotheses ?? []) out.push(`${l.project}:${l.lot} — hypothèse de la fiche : ${h}`);
-  for (const p of l.proposals) out.push(`${l.project}:${l.lot} — proposé : ${p}`);
+  for (const p of l.proposals) out.push(`${l.project}:${l.lot} — proposé : ${proposalLine(l, p, touched)}`);
   if (l.uxVerdict && l.visible) out.push(`${l.project}:${l.lot} — verdict UX pour « raf ux » : ${l.uxVerdict}`);
   return out;
 }
@@ -237,18 +238,18 @@ function detailLines(l: LotState): string[] {
  * `--status --detail <lot>` (L441) : les lignes de détail d'un lot de la vague, lues dans l'état de la vague (le fichier de chaque lot).
  * `sel` : `projet:lot` ou le seul `lot` s'il est unique dans la vague. Lot inconnu ou ambigu : lève.
  */
-export function renderDetail(lots: LotState[], sel: string): string[] {
+export function renderDetail(lots: LotState[], sel: string, deps: { touchedSince?: TouchedSince } = {}): string[] {
   const hit = lots.filter((l) => `${l.project}:${l.lot}` === sel);
   const found = hit.length ? hit : sel.includes(':') ? [] : lots.filter((l) => l.lot === sel);
   if (found.length === 0) throw new Error(`lot inconnu dans cette vague : ${sel} (lots : ${lots.map((l) => `${l.project}:${l.lot}`).join(', ')})`);
   if (found.length > 1) throw new Error(`lot ambigu : ${sel} (${found.map((l) => `${l.project}:${l.lot}`).join(', ')}) : donner projet:lot`);
   const l = found[0]!;
-  const lines = detailLines(l);
+  const lines = detailLines(l, touchedReader(deps, gitCommitsOf));
   return lines.length ? lines : [`${l.project}:${l.lot} — aucun détail (ni objectif, capture, choix, proposition, ni verdict UX)`];
 }
 
 /** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. `compact` (L441, `--status`) : sans le détail des lots, une seule ligne renvoie à `--status --detail`. */
-export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[]; now?: number; compact?: boolean; /** Grille `perf.prices` (L529) : sans elle, ni colonne ni total en euros. */ prices?: PriceGrid | null } = {}): string[] {
+export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[]; /** Fichier modifié par un commit du lot après la revue (L422) ; par défaut git, sur `lotCommits`. */ touchedSince?: TouchedSince; now?: number; compact?: boolean; /** Grille `perf.prices` (L529) : sans elle, ni colonne ni total en euros. */ prices?: PriceGrid | null } = {}): string[] {
   const cost = costView(lots, deps.prices);
   const rows = lots.map((l, i) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`, ...cost.cells[i]!, String(l.suiteRuns ?? '—')]);
   const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée', ...cost.head, 'suites'];
@@ -268,12 +269,13 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
   for (const d of deliverable(lots, deps.isAncestor ?? isAncestor, deps.lotCommits ?? gitCommitsOf)) {
     out.push(`${d.ready.project}:${d.ready.lot} — livrable jusqu'à ${d.sha} (dernier commit de ${d.ready.lot}, sous ${d.under.lot} ${d.under.status === 'handed-back' || d.under.status === 'failed' ? 'rendu' : LABEL[d.under.status]}) : git push origin ${d.sha}:main && cadence deliver --sha ${d.sha}`);
   }
+  const touched = touchedReader(deps, gitCommitsOf);
   for (const l of lots) {
     out.push(...signalLines(l));
     if (deps.compact) continue;
-    out.push(...detailLines(l));
+    out.push(...detailLines(l, touched));
   }
-  const withDetail = lots.filter((l) => detailLines(l).length > 0).map((l) => `${l.project}:${l.lot}`);
+  const withDetail = lots.filter((l) => detailLines(l, touched).length > 0).map((l) => `${l.project}:${l.lot}`);
   if (deps.compact && withDetail.length) out.push(`détail (objectif, captures, base de tests, choix, propositions, verdict UX) : cadence orchestrate --status --detail <projet:lot> — ${withDetail.join(', ')}`);
   return out;
 }

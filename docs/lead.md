@@ -24,11 +24,13 @@ picture, not its source.
    For each lot the program runs, in fresh sessions and in this order: `precheck → spec → maquette →
    accept → implement → review → ux`. The **precheck** applies to a lot without a commit yet whose title cites a finding (`constat`, `revue`, `review`, `audit`) or another lot (unless
    `orchestrate.precheck: false`; L288). The spec steps exist only for a lot that declares
-   a `screen:` of `page` (a visible lot that creates or changes a whole screen; `screen: component` and `screen: journey`
-   lots take the ordinary path, straight to the implementation, unless they already have a sheet) or `spec: true` (a lot without a screen
+   a `screen:` of `page` (a visible lot that creates or changes a whole screen) or `spec: true` (a lot without a screen
    that still has a behaviour to pin down: `precheck → spec → fiche → accept → implement → review`);
-   spec, sheet review and accept apply to `screen: page` and to `spec: true` alike; the other lots go
-   straight from the precheck (when it applies) to the implementation:
+   spec, sheet review and accept apply to `screen: page` and to `spec: true` alike. A visible lot above
+   0.1 day with `screen: component`, `screen: journey` or no `screen:` (and no `spec: true`) plays the
+   **light mockup** instead (L459): `precheck → spec → maquette → implement → review → ux`, no accept, and
+   the `ux` pass checks conformity to the mockup. The other lots go straight from the precheck (when it
+   applies) to the implementation:
    - **spec**: the `spec-writer` agent draws a static mockup to the project's own style and writes the
      screen sheet (`fiche.yaml`: fields, states, numbered rules), rendered at 1440 and 390 px;
    - **fiche** (a lot with a back-end part: `spec: true`, or a screen lot whose sheet has a `sujet` block):

@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.42.0] - 2026-11-02
+
 ### Added
 
 - `cadence verify --gate` no longer takes over a wave's verdict under plan-only commits when tracked code or tests (outside docs; the file named exactly `CHANGELOG` aside, names shown unquoted) quote the plan's path while `orchestrate.gate.readsPlan` is absent: the gate is replayed and the reason line says « le code lit le plan, gate.readsPlan absent » with the files (L482, [docs/deliver.md](docs/deliver.md)).

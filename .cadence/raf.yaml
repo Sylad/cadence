@@ -1424,6 +1424,7 @@ lots:
     estimate: 0.25
     created: 2026-11-02
     started: 2026-11-02
+    review: { date: 2026-11-02, verdict: "conforme, 3 notes mineures (rang 0 d'une vague lancée sans priority:, raccord command.ts non affirmé par un test, titre de test de bord trop large) — orchestré (vague 2026-11-02-1825-cad, 2 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main ne change que le contexte de deux hunks (import de command.ts, place de l'entrée CHANGELOG, toujours sous Unreleased/Changed) et ne casse rien dans le changement du lot", commit: 96398ae274689313668ccf6f8cb4962ecaff72bd }
   - id: L532
     title: "Intégrer un lot rendu puis repris par le lead (revue conforme dans son worktree) pendant que SA vague tourne encore : --resume --integrate est refusé (« la vague … tourne encore ») et, avec --continue, la vague peut durer des heures ; déposer l'intégration comme un --add, jouée entre deux étapes — vu le 02-11 sur L527 puis L435"
     status: doing

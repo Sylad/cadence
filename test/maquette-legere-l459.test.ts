@@ -126,7 +126,7 @@ describe('R1 — lot déjà entré dans la chaîne complète avec une acceptatio
     git(h.repo, 'add', '--', a.json);
     git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation scellée', '--', a.json);
     expect(sealedAcceptation(h.repo, 'docs/specs', 'L1')).toBe(true);
-    expect(lightLot(light, { id: 'L1', ...h.plan().lot('L1') }, true, h.repo, 'docs/specs')).toBe(false);
+    expect(lightLot(light, h.plan().lot('L1'), true, h.repo, 'docs/specs')).toBe(false);
     expect(budgetStage(h.plan().lot('L1'), 'component', true, h.repo, 'docs/specs')).toBe('screen');
     const c = h.lot('L1', { ...light, maquette: { passes: 1, conforme: true, verdict: 'conforme' } }, { ...cfg, accept: 'true', test: 'true' });
     await runLot(c);

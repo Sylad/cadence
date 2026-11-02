@@ -2,7 +2,7 @@
 // Le cliquet compare la mesure à qualite-baseline.json : l'existant passe, rien ne peut empirer, ce qui baisse se fige.
 // Lancé par `npm run qualite` (porte orchestrate.build et CI) ; la recette est dans docs/qualite.md.
 import { spawnSync } from 'node:child_process';
-import { existsSync, globSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, globSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -188,7 +188,7 @@ export function lireRef(racine, ref) {
   const show = git('show', `${sha}:${BASELINE}`);
   const existe = (chemin) => git('cat-file', '-e', `${sha}:${chemin}`).status === 0;
   const config = (chemin) => { const r = git('show', `${sha}:${chemin}`); return r.status === 0 ? r.stdout : null; };
-  const fichiers = () => git('ls-tree', '-r', '--name-only', sha).stdout.split('\n').filter(Boolean);
+  const fichiers = () => git('ls-tree', '-r', '-z', '--name-only', sha).stdout.split('\0').filter(Boolean);
   return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, config, fichiers };
 }
 
@@ -221,7 +221,14 @@ const differences = (couples) => couples.filter(([, depart, actuel]) => depart !
 
 // les .gitignore imbriqués (src/.gitignore…), ceux du départ comme ceux d'aujourd'hui ; node_modules et .git ne sont pas parcourus
 const gitignoresImbriques = (racine, ref) => {
-  const ici = globSync('**/.gitignore', { cwd: racine, exclude: (d) => ['node_modules', '.git'].includes(basename(String(d.name ?? d))) }).map((f) => f.split('\\').join('/'));
+  const ici = [];
+  const parcourir = (rel) => {
+    for (const e of readdirSync(join(racine, rel), { withFileTypes: true })) {
+      const chemin = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) { if (e.name !== 'node_modules' && e.name !== '.git') parcourir(chemin); } else if (e.name === '.gitignore') ici.push(chemin);
+    }
+  };
+  parcourir('');
   const depart = (ref.fichiers?.() ?? []).filter((f) => basename(f) === '.gitignore');
   return [...new Set([...ici, ...depart])].filter((f) => f !== '.gitignore').sort();
 };

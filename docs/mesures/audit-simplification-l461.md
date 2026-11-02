@@ -117,6 +117,7 @@ commande → fonction : `cli/gates.ts` (`gate`, `preCommit`, `postCommit`, `preP
 `cli/stats-commands.ts` (`corrections`, `perf`, `readPerf`), `cli/lead-commands.ts` (`leadHold`, `leadPriority`).
 - **Mesure** : `max-lines` 1 399 → ≈ 400 ; `max-lines-per-function` de `dispatch` 542 → ≈ 80 (table).
 - **Protégé par** : 101 fichiers de test appellent `run()` de `cli.ts` ; c'est le plus protégé des trois.
+- **Fait (L488, 02-11)** : `src/cli/` porte `lot-commands`, `read-commands`, `gates`, `setup-commands`, `spec-commands`, `session-commands`, `deliver-commands`, `stats-commands`, `lead-commands` et `context` ; `dispatch` (21 lignes) lit deux tables, `BEFORE_PLAN` (les commandes qui ne lisent pas le plan : lead, config, corrections, perf, ref hors coverage, release, migrate, spec check|qa, session --all) puis `WITH_PLAN`. Mesuré sur la ligne de base : `complexity` 523 → 318 (somme sur `cli.ts` et ses modules), `cognitive-complexity` 702 → 343, `max-lines` 1 382 → 0 et `max-lines-per-function` 533 → 0 (aucun module ne dépasse 400 lignes ni aucune fonction 80). Les fonctions longues déplacées telles quelles (`specReseal`, `specGreen`, `corrections`, `cmdLead`, `cmdSetStatus`…) gardent leur complexité : elles sont à découper une à une, pas dans ce lot.
 - **Risque moyen** : l'ordre des `case` porte des priorités (options partagées) ; relire le `switch` pour ne pas perdre une garde commune.
 
 ### D. Doublons — gain faible à moyen, risque faible

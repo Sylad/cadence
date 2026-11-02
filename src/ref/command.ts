@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import type { Io } from '../cli.js';
+import type { Io } from '../cli/context.js';
 import { RafError } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { claudeConfigDir, realClaude, readAgents } from '../orchestrate/launch.js';

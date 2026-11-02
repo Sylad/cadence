@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import type { Io } from '../cli.js';
+import type { Io } from '../cli/context.js';
 import { RafError, type Lot, type Plan } from '../plan.js';
 import { isProgramNote } from '../orchestrate/decisions.js';
 import { fichesDuDossier } from '../spec.js';

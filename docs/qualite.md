@@ -24,7 +24,7 @@ Putting a threshold on existing code turns hundreds of findings red on day one, 
 threshold until it means nothing, or sprinkle `eslint-disable`. The ratchet keeps the thresholds honest instead:
 
 1. `node scripts/qualite.mjs --init` measures once and writes `qualite-baseline.json`, a flat map sorted by key,
-   versioned with the code. A key is `tool|file|rule` (`eslint|src/cli.ts|max-lines`, `knip|src/audit.ts|exports`,
+   versioned with the code. A key is `tool|file|rule` (`eslint|src/plan.ts|max-lines`, `knip|src/audit.ts|exports`,
    `jscpd|src/config.ts`) and its value a count. Two metrics have a `…|total` or `…|lignes` twin that sums the figures:
    for ESLint, every key has a `…|total` (the sum of the figures measured, a file of 1397 lines records 1397, three
    functions of cognitive complexity 463, 20 and 18 record 501), and for jscpd every file has a `…|lignes` (the lines

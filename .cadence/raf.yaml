@@ -387,11 +387,12 @@ lots:
       - { date: 2026-10-29, text: "abandonné : prémisse fausse : le refus sort bien en 2 (vérifié) ; le 0 lu venait du | tail -40 de la commande de lancement du lead, récidive de L423" }
   - id: L435
     title: "cadence verify --sha vert après une livraison rouge du même sha : l'inscrire au journal des livraisons (ou le panneau l'affiche « vérifié depuis »), pour que la ligne rouge disparaisse sans relivrer — ol 3d6edf4 rouge pendant la panne de dark-blue, vert à la vérification (29-10)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-29
     started: 2026-11-02
     review: { date: 2026-11-02, verdict: "conforme : verify lit le verrou sans refuser (tâche locale du lead), ne lit le plan qu'après avoir inscrit une ligne verte (plan illisible : rejoue quand même), tests de limites mordants, limite du sha déclaré documentée — revue Opus du lead après reprise (rendu malgré l'escalade) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase ne change aucun patch du lot (range-diff identique pour les 14 commits) ; 1 note mineure : ligne vide supprimée avant « ## [1.39.0] » dans CHANGELOG.md", commit: ca49772849761169ab0c3ee7b97cd98d1d3a57bd }
+    finished: 2026-11-02
   - id: L436
     title: "raf done avec plan.onWrite : la commande de commit proposée ne cite que .cadence/raf.yaml alors que le script a régénéré d'autres fichiers (frontend/public/plan-data/plan.json) — deliver refuse ensuite « 1 fichier modifié » ; citer les fichiers écrits par plan.onWrite (finance, ol, warhammer le 29-10)"
     status: done
@@ -687,7 +688,7 @@ lots:
     finished: 2026-10-30
   - id: L459
     title: "Étape maquette pour les lots visibles sans screen: page (screen: component, retouches, revues UX d'écran) : maquette légère (capture de l'écran actuel + version visée, états touchés) validée par l'ux-reviewer en mode maquette AVANT le code, puis conformité après ; mesure : « sessions ux par lot visible » de cadence perf (1,6 le 30-10, cible 1,2) sur deux fenêtres — demande de Sylvain le 30-10 (« coder à partir de specs déjà validées graphiquement »)"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-30
@@ -701,6 +702,7 @@ lots:
       - { date: 2026-11-02, text: "Hypothèses (fiche maquette-legere-lots-visibles) — R11 : L'étape accept (tests d'acceptation rouges) est sautée pour une maquette légère : une retouche d'écran ne porte pas de règles de comportement à verrouiller ; si faux : Si le lead veut le verrou des tests rouges aussi sur ces lots, l'étape accept est ajoutée à la chaîne et au budget : la liste des étapes et le coût changent, a…" }
       - { date: 2026-11-02, text: "Hypothèses (fiche maquette-legere-lots-visibles) — R12 : Le budget d'un lot à maquette légère est le budget ordinaire de son estimate plus l'allocation d'étapes spec de 450 000 jetons (stage spec), et non le forfait… ; si faux : Si le coût mesuré de la chaîne légère est plus haut ou plus bas, seule la constante change (une mesure à refaire sur deux fenêtres), sans effet sur les données" }
     review: { date: 2026-11-02, verdict: "conforme : maquette légère pour les lots visibles sans screen: page (spec puis maquette validée par l'ux-reviewer avant le code), gabarit spec sans sousSeuil pour une retouche, acceptation scellée sous L209 gardée, docs alignées (spec, orchestrate, raf, lead) — revue Opus du lead après reprise (rendu malgré l'escalade) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main ne change rien au lot (diff identique hors contexte du CHANGELOG), le refactor packageFile de cycle.ts garde le même comportement, R1–R12 ont toutes leurs tests", commit: cfd03c7152485cd465d834b5fd88b1f2f53c5b3f }
+    finished: 2026-11-02
   - id: L460
     title: "Guide des notions de cadence pour un humain (docs/concepts.md, lié en tête du README) : une page qui explique, chacune en quelques phrases et dans l'ordre où on les rencontre, plan et lot, verdicts (revue, UX), session et vague, étapes d'un lot (spec, code, revue, correction, UX, prêt) et QUI fait chacune, porte de tests (reprise, copie jetable), worktree par lot et intégration, livrable jusqu'à <sha>, lead, livreur, créneaux et holds, escalade, mise en service et release ; 3 à 4 schémas SVG simples (parcours d'un lot, vague et créneaux, worktrees → main, livraison au sha), un glossaire ; le détail technique reste dans les docs existantes, liées — demande de Sylvain le 30-10 (« cadence est devenu complexe, je veux que ce soit bien expliqué »)"
     status: done
@@ -886,11 +888,12 @@ lots:
       - { date: 2026-11-02, text: "abandonné : déjà livré sous L462 (scripts/qualite.mjs : comparerMigration, --migrer, base comparée au merge-base) — précheck du 02-11" }
   - id: L479
     title: "Cliquet (suite de L462) : surveiller tous les fichiers que lisent ESLint, knip et jscpd (.gitignore imbriqués, vitest.config.*, package.json scripts/main/bin/exports, tsconfig.json pour knip) ou passer à une règle générale (tout changement hors code source pendant le lot est nommé) ; signaler .git/info/exclude non vide ; un outil absent de node_modules dit « npm install » au lieu de « Unexpected end of JSON input »"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-31
     started: 2026-11-02
     review: { date: 2026-11-02, verdict: "conforme (1 mineur, note du lot : libellé du refus inchangé pour les nouvelles clés/fichiers) — orchestré (vague 2026-11-02-1530-cont, 3 passe(s) de correction)", commit: ffd96e54206c842bb7aea61a8ab0f100ae4ba864, reporte: { de: 6d874505626244dd47856ae425d4a80fbe839a32, vers: ffd96e54206c842bb7aea61a8ab0f100ae4ba864, patchId: 59ab7d2c5292f8da6ee155f568d466ac89a24a74 } }
+    finished: 2026-11-02
   - id: L480
     title: "Tests instables sous charge (suite complète en parallèle) : test/orchestrate-worktree-plan-writes.test.ts R3 (créneaux libres [2,1] au lieu de [2,2], clone neuf de la release 1.32.0, vert 3/3 seul) et test/mise-en-service.test.ts L330 (vague 2026-10-31-0950-cad) — rendre les attentes déterministes"
     status: done

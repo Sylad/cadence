@@ -21,11 +21,14 @@ cas:
     nominal:
       - Le rebase s'arrête sur un commit du lot, qualite-baseline.json étant le seul fichier en conflit.
       - L'intégration lit les trois versions (départ du commit, main, commit du lot).
+      - Elle vérifie que le commit n'empire pas la base selon la règle de comparerMigration (départ du commit contre commit).
       - Elle écrit la base de main moins, clé par clé, la baisse propre au commit (départ − lot), jamais sous 0, une clé à 0 retirée, triée comme ecrireBase.
       - Elle l'ajoute à l'index et poursuit le rebase.
       - Les contrôles du sommet intégré (cliquet compris) passent et le lot est avancé.
     alternatives:
-      - { si: le commit du lot fait monter une clé par rapport à son départ, alors: le conflit n'est pas résolu et le rebase est abandonné comme aujourd'hui, regles: [R3] }
+      - { si: le commit du lot fait empirer la base au sens de la porte (une clé d'un fichier qui existait au départ monte, ou le total d'une mesure monte), alors: le conflit n'est pas résolu et le rebase est abandonné comme aujourd'hui, regles: [R3] }
+      - { si: le commit du lot déplace ou découpe des fichiers (clés de chemins neufs, total qui ne monte pas), alors: la différence signée du commit est appliquée à main, regles: [R3] }
+      - { si: une des trois versions de qualite-baseline.json manque ou n'est pas une carte plate clé → nombre, alors: le rebase est abandonné, regles: [R9] }
       - { si: un autre fichier est aussi en conflit, alors: rebase abandonné, rien n'est résolu, regles: [R4] }
       - { si: la base ainsi recalculée reste sous la mesure du sommet intégré, alors: les tests rouges refusent l'intégration comme aujourd'hui, regles: [R5] }
       - { si: main et le lot ont baissé la même clé, alors: la baisse n'est retranchée qu'une fois de plus, jamais sous 0, regles: [R2] }
@@ -48,20 +51,20 @@ regles:
     cas: [C1]
     enonce: "Quand qualite-baseline.json est le seul fichier en conflit pendant le rebase, chaque clé vaut la valeur de main moins la baisse du commit rejoué (valeur au départ du commit moins valeur du commit, si positive), bornée à 0 ; les clés que le commit ne baisse pas gardent la valeur de main ; une clé à 0 est retirée ; le fichier est écrit trié, en JSON indenté de 2 espaces et terminé par un saut de ligne."
     statut: sourcee
-    source: "demande du lot (« recalcule la base sur main + les baisses propres au lot, même méthode que les rebases manuels du 02-11 ») ; format d'écriture : scripts/qualite.mjs:129 (ecrireBase) ; une clé absente vaut 0 : scripts/qualite.mjs:101-102 (comparer)"
+    source: "demande du lot (« recalcule la base sur main + les baisses propres au lot, même méthode que les rebases manuels du 02-11 ») ; format d'écriture : scripts/qualite.mjs:144 (ecrireBase) ; une clé absente vaut 0 : scripts/qualite.mjs:100-102 (comparer)"
     tests: ["R1 — lot qui baisse deux clés, main qui en a monté une autre : la base rebasée porte main + les baisses du lot", "R1 — clé baissée à 0 par le lot : retirée du fichier, fichier trié et terminé par un saut de ligne"]
   - id: R2
     cas: [C1]
     enonce: "Une clé que main et le lot ont toutes deux baissée reçoit la valeur de main moins la baisse du lot, sans passer sous 0."
     statut: hypothese
     si_faux: Si le cumul des deux baisses est faux (la même amélioration comptée deux fois), la base sera trop basse et le cliquet rouge au sommet intégré (R5) refuse l'intégration ; la correction serait de prendre le minimum des deux valeurs, sans donnée en jeu.
-    tests: ["R2 — clé baissée par main et par le lot : jamais négative, jamais sous 0"]
+    tests: ["R2 — clé baissée par main (3→1) et par le lot (3→1) : la valeur écrite dans qualite-baseline.json est 0 et la clé est retirée"]
   - id: R3
     cas: [C1]
-    enonce: "Un commit du lot qui fait monter une clé de qualite-baseline.json par rapport à son départ (clé neuve comprise) n'est pas résolu : le rebase est abandonné et l'intégration est refusée par « intégration impossible : conflit en rebasant … (fichiers : qualite-baseline.json) »."
+    enonce: "Le contrôle d'un commit du lot reprend la règle de la porte (comparerMigration, départ du commit contre commit) : une clé d'un fichier qui existait au départ du commit ne peut pas monter, un chemin neuf part libre, et le total de chaque mesure sur tous les fichiers ne peut pas monter. Si ce contrôle relève un empirement, le conflit n'est pas résolu : le rebase est abandonné et l'intégration est refusée par « intégration impossible : conflit en rebasant … (fichiers : qualite-baseline.json) ». Sinon la différence signée (commit − départ) est appliquée à la valeur de main clé par clé (une clé de chemin neuf ou découpé peut donc monter), bornée à 0. Le contrôle se fait commit par commit : un commit intermédiaire qui empire la base fait abandonner le rebase même si un commit suivant la rebaisse (accepté tel quel : un lot s'écrit en commits qui ne montent pas, comme la porte le vérifie à chaque état)."
     statut: sourcee
-    source: "docs/qualite.md:37-38 (« la base ne peut que baisser ») ; scripts/qualite.mjs:197-203 (baseRemonte) ; message de conflit existant : src/orchestrate/cycle.ts:2790"
-    tests: ["R3 — le lot monte une clé : conflit signalé, branche du lot et de main inchangées"]
+    source: "scripts/qualite.mjs:129-137 (comparerMigration : « un chemin neuf part libre », total non en hausse) et :275-279 (baseRemonte, utilisée par la porte cadence.yaml:19) ; docs/qualite.md:37-38 (« la base ne peut que baisser ») ; message de conflit existant : src/orchestrate/cycle.ts:2789"
+    tests: ["R3 — le lot monte une clé d'un fichier existant : conflit signalé, branche du lot et de main inchangées", "R3 — le lot découpe un fichier (clés neuves, total non en hausse) : rebase réussi, base de main plus la différence du commit", "R3 — le lot ajoute un chemin neuf qui fait monter le total : conflit signalé", "R3 — commit intermédiaire qui monte une clé puis commit qui la rebaisse : rebase abandonné"]
   - id: R4
     cas: [C1]
     enonce: "Si un autre fichier que qualite-baseline.json est aussi en conflit, rien n'est résolu et le rebase est abandonné comme aujourd'hui."
@@ -72,7 +75,7 @@ regles:
     cas: [C1, C2]
     enonce: "La résolution ne contourne pas le cliquet : les contrôles du sommet intégré rejouent le cliquet, et une base trop basse refuse l'intégration avec les tests rouges, la branche de main inchangée."
     statut: sourcee
-    source: "src/orchestrate/cycle.ts:2800-2806 (integratedChecks puis « tests rouges au sommet intégré ») ; cadence.yaml:18 (le cliquet fait partie de la porte)"
+    source: "src/orchestrate/cycle.ts:2797-2800 (integratedChecks puis « tests rouges au sommet intégré ») ; cadence.yaml:18 (le cliquet fait partie de la porte)"
     tests: ["R5 — base recalculée trop basse pour la mesure : intégration refusée, main inchangé"]
   - id: R6
     cas: [C1]
@@ -91,7 +94,13 @@ regles:
     enonce: "Sans conflit sur qualite-baseline.json, le rebase n'y touche pas (résultat identique à celui de git)."
     statut: hypothese
     si_faux: Si une fusion sans conflit donnait une base trop haute ou trop basse, le cliquet rouge (R5) la signalerait ; une correction éventuelle serait d'appliquer la même recomposition après tout rebase (un lot à part).
-    tests: ["R8 — lot qui ne touche pas la base : fichier identique à celui de main après le rebase"]
+    tests: ["R8 — lot qui ne touche pas la base : qualite-baseline.json identique à celui de main après le rebase"]
+  - id: R9
+    cas: [C1]
+    enonce: "Si, à l'arrêt du rebase, l'une des trois versions de qualite-baseline.json (étape 1 départ du commit, 2 main, 3 commit du lot) manque (conflit add/add ou modify/delete) ou n'est pas un JSON qui est une carte plate clé → nombre, rien n'est résolu : le rebase est abandonné comme pour R3 et R4, avec le même message de conflit."
+    statut: sourcee
+    source: "src/orchestrate/integrate.ts:102 (resolvePlan : toute lecture qui échoue dans le try abandonne la résolution) ; demande du lot (la résolution ne s'applique qu'à une base lisible)"
+    tests: ["R9 — le lot crée qualite-baseline.json (étape 1 absente) : rebase abandonné, conflit signalé", "R9 — main ou le lot supprime le fichier (étape 2 ou 3 absente) : rebase abandonné", "R9 — version en JSON invalide ou non plate (valeur non numérique) : rebase abandonné"]
 
 contrats:
   - id: A1
@@ -101,7 +110,7 @@ contrats:
     erreurs:
       - { code: log warn, message: "intégration impossible : conflit en rebasant <branche> sur <base> (fichiers : qualite-baseline.json)" }
       - { code: log warn, message: "intégration refusée : tests rouges au sommet intégré (<extrait>) ; branche du dépôt inchangée, worktree conservé : <dir>" }
-    regles: [R1, R2, R3, R4, R5, R6, R7, R8]
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9]
 
 donnees:
   - { id: D1, objet: "qualite-baseline.json (carte plate clé → nombre, triée)", existant: true, modification: aucune, note: "format et écriture inchangés (ecrireBase) ; seule la façon de résoudre le conflit de rebase change" }

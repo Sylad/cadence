@@ -1591,9 +1591,10 @@ lots:
     created: 2026-11-03
   - id: L545
     title: "Panneau des lots, ce qui attend une décision : un lot retiré d'une vague par le lead (--drop) n'est pas une décision en attente — maritime-atlas:B6 et DI1 (retirés le 27-10) remontaient depuis la lecture des vagues finies de 7 jours (vu par Sylvain le 29-10) — ex L412 t2"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-03
+    started: 2026-11-03
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -16,8 +16,8 @@ export function markDelivered(ctx: DeliveredCtx, ids: string[], sha: string): vo
   try {
     const plan = ctx.plan.reloaded();
     const wanted = new Set(ids);
-    const open = plan.lots().filter((l) => wanted.has(l.id) && l.status === 'done' && !l.delivered).map((l) => l.id);
-    const marked = open.filter((id) => {
+    const pending = plan.lots().filter((l) => wanted.has(l.id) && l.status === 'done' && !l.delivered).map((l) => l.id);
+    const marked = pending.filter((id) => {
       const refused = plan.markDelivered(id, { date: ctx.today, sha });
       if (refused) ctx.err(`deliver : ${id} non marqué livré : ${refused}`);
       return !refused;

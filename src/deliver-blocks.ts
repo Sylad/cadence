@@ -17,18 +17,22 @@ function blockPath(raw: string): { path: string } | { why: string } {
 export function readBlocks(v: unknown, bad: (what: string) => Error): Blocks | undefined {
   if (v === undefined) return undefined;
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw bad('blocks : un objet { nom: [chemins] } attendu');
-  const blocks: Blocks = {};
-  for (const [name, paths] of Object.entries(v)) {
-    if (name.trim() === '') throw bad('blocks : nom de bloc vide');
-    if (!Array.isArray(paths) || paths.length === 0) throw bad(`blocks.${name} : au moins un chemin attendu`);
-    blocks[name] = paths.map((p) => {
-      if (typeof p !== 'string') throw bad(`blocks.${name} : un chemin est un texte`);
-      const r = blockPath(p);
-      if ('why' in r) throw bad(`blocks.${name} : ${r.why}`);
-      return r.path;
-    });
-  }
-  return blocks;
+  // fromEntries : un nom comme « __proto__ » devient une clé du bloc, pas le prototype de l'objet.
+  return Object.fromEntries(
+    Object.entries(v).map(([name, paths]) => {
+      if (name.trim() === '') throw bad('blocks : nom de bloc vide');
+      if (!Array.isArray(paths) || paths.length === 0) throw bad(`blocks.${name} : au moins un chemin attendu`);
+      return [
+        name,
+        paths.map((p) => {
+          if (typeof p !== 'string') throw bad(`blocks.${name} : un chemin est un texte`);
+          const r = blockPath(p);
+          if ('why' in r) throw bad(`blocks.${name} : ${r.why}`);
+          return r.path;
+        }),
+      ];
+    }),
+  );
 }
 
 /** Un fichier appartient à un chemin quand il lui est égal ou situé dessous, par segments (« src/api » ne retient pas « src/api2/x.ts »). */

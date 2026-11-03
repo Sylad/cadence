@@ -1831,9 +1831,10 @@ lots:
     finished: 2026-11-03
   - id: L560
     title: "orchestrate : --agents porte la définition de TOUS les agents du paquet en un seul argument (issue #28, ~94 Ko mesurés contre 22 Ko le 10-04) — au-delà de 128 Kio toute étape avec agent échoue en spawn E2BIG : ne passer que l'agent de l'étape (ou les définitions par fichier) ; test qui mesure la taille de l'argument --agents d'une étape et la borne ; à jouer APRÈS L559 (même lancement de session claude -p)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-03
+    started: 2026-11-03
   - id: L561
     title: "Contrôle après l'étape spec : signaler deux captures d'états différents à la même largeur qui ont la même empreinte (et une capture sombre identique à sa claire), et les renvoyer à la session spec comme point manquant (issue #29 : deux tours de revue maquette perdus le 03-11 sur des captures copiées)"
     status: done

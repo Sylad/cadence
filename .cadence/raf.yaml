@@ -823,12 +823,13 @@ lots:
     finished: 2026-11-03
   - id: L468
     title: "Plans riches — écriture du plan sûre entre sessions (verrou inter-processus) (manque M6 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
-    status: doing
+    status: done
     estimate: 0.5
     uses: [ plan-coeur ]
     created: 2026-10-30
     started: 2026-11-03
     review: { date: 2026-11-03, verdict: "conforme — orchestré (vague 2026-11-02-2140-cont, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main ne change que l'emplacement de l'entrée du CHANGELOG, désormais sous [Unreleased] ; aucun constat", commit: dfc0ddd6c379db0725e204a0db57e728e10933b8 }
+    finished: 2026-11-03
   - id: L469
     title: "Plans riches — livré ≠ terminé (deliver écrit delivered: et l'état livré, blocs par chemins) (manque M7 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo

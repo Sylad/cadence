@@ -275,4 +275,21 @@ describe('R13 — cadence verify vert marque comme deliver', () => {
     await verifyCommand({ config, sha, retry: 0, out: (l) => out.push(l), journal: { dir: f.state, day: DAY, effects } }, deps);
     expect(delivered(f)).toEqual(['L1', 'L2']);
   });
+  it('R17 — verify vert après un échec de livraison --block api : la ligne écrite garde le bloc, le lot web n\'est pas marqué', async () => {
+    const f = fx({ blocks: true });
+    await go(f); // S0
+    ship(f, ['src/web/w.ts'], 'feat(L2): w');
+    ship(f, ['src/api/a.ts'], 'feat(L1): a');
+    edit(f, closed('L1', 'L2'));
+    sh(f.dir, 'push', '-q');
+    const sha = head(f);
+    appendFailedDelivery(f.state, DAY, sha, '[bloc api] vérification en échec', 'verification');
+    const config = parseDeliverConfig(f.yaml, 'cadence.yaml');
+    const out: string[] = [];
+    const effects = () => ({ root: f.dir, plan: planOf(f), today: DAY, out: (l: string) => out.push(l), err: (l: string) => out.push(l) });
+    const deps = { exec: async () => 0, fetch: async () => ({ status: 200, text: '' }), sleep: async () => {}, now: () => 0 };
+    await verifyCommand({ config, sha, retry: 0, out: (l) => out.push(l), journal: { dir: f.state, day: DAY, effects } }, deps);
+    expect(delivered(f)).toEqual(['L1']);
+    expect(readFileSync(join(f.state, 'deliveries.log'), 'utf8').trim().split('\n').at(-1)).toBe(`${DAY} ${sha} api`);
+  });
 });

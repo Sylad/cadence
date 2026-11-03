@@ -84,6 +84,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Added
 
 - Delivered ≠ finished (L469, `docs/deliver.md`, `docs/raf.md`): a green delivery (`cadence deliver`, and the green line of `cadence verify`) writes `delivered: { date, sha }` on every finished lot cited by the commits of its range (sub-tasks included; archived lots in their year file, committed with the plan) and, with the new `plan.deliveredState`, moves it from `doneState` to that state, respecting `plan.transitions`; `raf done` after the delivery marks the lot with the first line of `deliveries.log` that reaches its commits (`L1 livré le <day> (<sha7>)`); `raf show` prints `livré : <day> <sha7>`. `deliver.blocks` and `cadence deliver --block <name>` deliver by paths: only the lots cited by commits that touch the block are marked, and `deliveries.log` takes an optional third field, the block (`day sha api`), which the other readers ignore.
+- `cadence verify` green after a red `--block` delivery marks only that block (L469, [docs/deliver.md](docs/deliver.md)): the red line keeps the block (`[bloc api]`), the green line written by `verify` is `day sha api` and only the lots touching the block are announced and marked; `cadence --help` lists `deliver --block`.
 
 ### Fixed
 

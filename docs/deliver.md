@@ -44,7 +44,7 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   process died is removed with a warning); with `ci: github`, `gh` installed and
   logged in.
 - **Red delivery log** (L282): a failure after the lock is taken appends one line to
-  `<git common dir>/cadence/deliveries-failed.log`: `day sha [class] reason ⏎ line ⏎ line`.
+  `<git common dir>/cadence/deliveries-failed.log`: `day sha [class] [bloc name] reason ⏎ line ⏎ line` (`[bloc name]` only for a `--block` delivery, L469).
   The class says where it broke: `refus` (the project script exited with code 2 — the
   convention of `deliver` itself for « refused before acting »), `ci`, `deploiement`
   (the project script with any other code, a deploy command, an unusable
@@ -308,7 +308,7 @@ verify : 1 effet rouge sur 2 vérifications
 **A green verify clears a red delivery of the same sha** (L435). When every check is
 green and the sha verified is the one of the *last* line of `deliveries-failed.log`
 (a `[verification]` delivery that failed on an outage, say, while the effect is there), `verify` appends
-`day sha` to `deliveries.log` and prints `verify : <sha> avait une livraison rouge,
+`day sha` (`day sha block` when the red delivery was a `--block` one: only that block is announced and marked, L469) to `deliveries.log` and prints `verify : <sha> avait une livraison rouge,
 l'effet est vert — inscrit au journal des livraisons`; the `cadence-hud` panel, which
 shows the red line until `deliveries.log` is newer than `deliveries-failed.log`, drops
 it without delivering again. That line **is** a delivery: as after `cadence deliver`, the

@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
 import { headSha, repoStatus, upstreamHead, upstreamIsDefaultBranch } from './git.js';
 import type { Day } from './dates.js';
-import { lastDelivery, recordVerifiedDelivery, sharedStateDir } from './state.js';
+import { lastDelivery, readFailedEntries, recordVerifiedDelivery, sharedStateDir } from './state.js';
 import { previousDelivery } from './deliver-blocks.js';
 import { onTermination } from './proc.js';
 import { announceDelivered, describeCheck, realDeps, retryCheck, TIMED_OUT, type CheckDeps, type DeliveredCtx, type DeliverConfig, type VerifyCheck } from './deliver.js';
@@ -157,7 +157,8 @@ export async function verifyCommand(ctx: VerifyCtx, deps: CheckDeps): Promise<nu
   out(summaryLine(results));
   if (results.some((r) => r.reason !== null)) return 1;
   if (ctx.journal) {
-    const prev = previousDelivery({ state: ctx.journal.dir, config }); // lu avant l'écriture : la livraison précédente, d'où partent les lots annoncés
+    const block = readFailedEntries(ctx.journal.dir).at(-1)?.block; // le bloc de la livraison rouge : verify vert ne livre que lui (L469)
+    const prev = previousDelivery({ state: ctx.journal.dir, block, config }); // lu avant l'écriture : la livraison précédente, d'où partent les lots annoncés
     if (recordVerifiedDelivery(ctx.journal.dir, ctx.journal.day, ctx.sha)) {
       out(`verify : ${ctx.sha.slice(0, 7)} avait une livraison rouge, l'effet est vert — inscrit au journal des livraisons`);
       let effects: DeliveredCtx;
@@ -167,7 +168,7 @@ export async function verifyCommand(ctx: VerifyCtx, deps: CheckDeps): Promise<nu
         out(`verify : lots livrés non annoncés — ${(e as Error).message.split('\n')[0]}`);
         return 0;
       }
-      announceDelivered(effects, prev, ctx.sha);
+      announceDelivered({ ...effects, block, config: { blocks: config.blocks } }, prev, ctx.sha);
     }
   }
   return 0;

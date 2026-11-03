@@ -269,6 +269,7 @@ const clean = (line: string, max: number): string => {
  * Ajoute une livraison rouge à `deliveries-failed.log` : une ligne « jour sha [classe] raison ⏎ ligne ⏎ ligne ».
  * La raison est la première ligne du message d'échec ; `tail` (sortie de la commande en échec) est borné à ses
  * 5 dernières lignes non vides de 200 caractères, sans séquence ANSI, secrets probables masqués (raison comprise).
+ * Une livraison `--block` (L469) ouvre sa raison par « [bloc nom] » : la ligne verte que `cadence verify` inscrit ensuite garde le bloc (`readFailedEntries`).
  */
 export function appendFailedDelivery(dir: string, day: Day, sha: string, reason: string, cls?: FailClass, tail: string[] = []): void {
   const kept = tail.flatMap((l) => clean(l, LINE_MAX) || []).slice(-TAIL_LINES);
@@ -278,7 +279,7 @@ export function appendFailedDelivery(dir: string, day: Day, sha: string, reason:
 
 /**
  * `cadence verify` vert au sha de la DERNIÈRE livraison rouge (L435) : l'effet est bien là, la livraison est donc
- * faite — une ligne « jour sha » rejoint `deliveries.log`, ce qui efface la ligne rouge du panneau (le journal vert
+ * faite — une ligne « jour sha [bloc] » (le bloc de la livraison rouge, L469) rejoint `deliveries.log`, ce qui efface la ligne rouge du panneau (le journal vert
  * modifié après le rouge la remplace) sans relivrer. Rien n'est écrit quand la dernière livraison rouge est celle
  * d'un autre sha (elle resterait cachée), quand elle n'est pas de classe « vérification » (une CI rouge, un refus ou
  * un déploiement raté ne se lavent pas : les vérifications ne lisent pas toujours le sha), quand il n'y en a pas, ou quand le journal vert est déjà postérieur au
@@ -293,7 +294,7 @@ export function recordVerifiedDelivery(dir: string, day: Day, sha: string): bool
   } catch {
     return false;
   }
-  appendDelivery(dir, day, sha);
+  appendDelivery(dir, day, sha, last.block);
   return true;
 }
 
@@ -304,6 +305,8 @@ export interface FailedDelivery {
   cls: FailClass | null;
   reason: string;
   tail: string[];
+  /** Bloc de la livraison `--block` (L469) ; absent pour une livraison sans bloc. */
+  block?: string;
 }
 
 export function lastDelivery(dir: string): string | null {
@@ -364,7 +367,9 @@ export function readFailedEntries(dir: string): FailedDelivery[] {
         if (written) reason = reason.slice(c![0].length);
         // Sans [cls] écrit : le fichier n'est jamais réécrit, la classe se déduit du libellé à la lecture.
         const cls = written ?? (c ? null : classFromReason(reason));
-        return [{ day: m[1] as Day, sha: m[2] ?? '', cls, reason, tail }];
+        const b = /^\[bloc ([^\]]+)\] ?/.exec(reason);
+        if (b) reason = reason.slice(b[0].length);
+        return [{ day: m[1] as Day, sha: m[2] ?? '', cls, reason, tail, ...(b ? { block: b[1]! } : {}) }];
       });
   } catch {
     return [];

@@ -28,9 +28,10 @@ if (tool === 'raf') {
   cadence session next "ligne" …       notes pour la prochaine session (remplacent les précédentes)
   cadence session next --clear         efface ces notes ; sans ligne ni --clear, la commande refuse
   cadence session context [--session <id>]   contexte de la session (variable CLAUDE_CODE_SESSION_ID, sinon la seule du dossier) publié par la bande cadence-hud ; code 2 sans chiffre frais
-  cadence deliver [--dry-run] [--sha rév] [--config cadence.yaml] [-- arguments du script du projet]
+  cadence deliver [--block nom] [--dry-run] [--sha rév] [--config cadence.yaml] [-- arguments du script du projet]
                     CI du sha poussé → déploiement → vérifications de l'effet ;
-                    ou le script de livraison du projet (deliver.script), sous verrou et journal
+                    ou le script de livraison du projet (deliver.script), sous verrou et journal ;
+                    --block nom : ne livre (marque livrés) que les lots dont un commit touche les chemins du bloc (deliver.blocks)
   cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]
                     enregistre un document de référence hors du dépôt : pages rendues, texte positionné, images, index des figures
                     et des passages qui les citent ; exige poppler, ImageMagick et tesseract (outil absent nommé avec sa commande, code 2)

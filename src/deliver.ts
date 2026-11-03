@@ -437,7 +437,7 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
       err(`deliver : ${msg}`);
       // Une livraison rouge s'inscrit au journal des rouges (perf) ; son écriture ne change ni le code ni le message d'échec.
       try {
-        appendFailedDelivery(ctx.state, ctx.today, sha, msg, cls, tail);
+        appendFailedDelivery(ctx.state, ctx.today, sha, ctx.block === undefined ? msg : `[bloc ${ctx.block}] ${msg}`, cls, tail);
       } catch (e) {
         err(`deliver : journal des livraisons rouges non écrit : ${(e as Error).message}`);
       }

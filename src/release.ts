@@ -58,7 +58,7 @@ function lockDrift(pkg: Json, lock: Json): string[] {
 }
 
 /** Les sections d'un CHANGELOG « Keep a Changelog » : le corps de [Unreleased] et le texte à partir de la section suivante. */
-function splitUnreleased(text: string): { before: string; body: string; after: string } {
+export function splitUnreleased(text: string): { before: string; body: string; after: string } {
   const head = /^## \[Unreleased\][^\n]*\n/m.exec(text);
   if (!head) throw new RafError(`release : ${CHANGELOG} n'a pas de section « ## [Unreleased] » à renommer`);
   const start = head.index + head[0].length;
@@ -67,8 +67,8 @@ function splitUnreleased(text: string): { before: string; body: string; after: s
   return { before: text.slice(0, head.index), body: text.slice(start, end), after: text.slice(end) };
 }
 
-/** Un titre de sous-section répété sous [Unreleased] (à la casse près) : la trace d'une fusion de lots qui a recopié la section ; publié, il doublerait les entrées. */
-function refuseDuplicateTitles(body: string): void {
+/** Un titre de sous-section répété sous [Unreleased] (à la casse près ; refusé à la release et par la porte, `test/changelog-unreleased-titres-l568.test.ts`) : la trace d'une fusion de lots qui a recopié la section ; publié, il doublerait les entrées. */
+export function refuseDuplicateTitles(body: string): void {
   const seen = new Set<string>();
   for (const [, title] of body.matchAll(/^### (.+?)\s*$/gm)) {
     const key = title.toLowerCase();

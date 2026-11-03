@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { rebaseOnto } from '../src/orchestrate/integrate.js';
 import { mergeUnreleased, moveToUnreleased } from '../src/orchestrate/changelog-merge.js';
@@ -14,18 +14,31 @@ const log = (unreleased: string, tail = '## [1.0.0] - 2026-01-01\n\n### Added\n\
 const unreleased = (t: string) => t.slice(t.indexOf('## [Unreleased]'), t.indexOf('## [1.0.0]'));
 const BASE = log('### Added\n\n- base A\n');
 
-describe('L568 — main réordonne les sections pendant que deux lots ajoutent chacun une ligne', () => {
-  const base = log('### Added\n\n- base A\n\n### Fixed\n\n- base F\n');
-  it('L568 — un seul titre par section, ordre Keep a Changelog, aucune entrée recopiée, quel que soit le côté qui réordonne', () => {
-    const lot = log('### Added\n\n- base A\n- ajout du lot\n\n### Fixed\n\n- base F\n- correctif du lot\n');
-    const main = log('### Fixed\n\n- base F\n- correctif de main\n\n### Added\n\n- base A\n- ajout de main\n');
-    for (const out of [mergeUnreleased(base, lot, main), mergeUnreleased(base, main, lot)]) {
-      const text = unreleased(out as string);
-      expect(text.match(/^### Added$/gm)).toHaveLength(1);
-      expect(text.match(/^### Fixed$/gm)).toHaveLength(1);
-      expect(text.indexOf('### Added')).toBeLessThan(text.indexOf('### Fixed'));
-      for (const e of ['base A', 'base F', 'ajout du lot', 'ajout de main', 'correctif du lot', 'correctif de main']) expect(text.match(new RegExp(`- ${e}$`, 'gm'))).toHaveLength(1);
-    }
+describe('L568 — main réordonne les sections pendant que le lot ajoute une ligne dans chacune, à l\'intégration réelle', () => {
+  it('L568 — le rebase d\'intégration, avec le .gitattributes du projet : un seul titre par section, ordre Keep a Changelog, aucune entrée recopiée', () => {
+    const repo = gitRepo();
+    // Le .gitattributes du projet, s'il y en a un : un `merge=union` sur le CHANGELOG résoudrait le fichier par lignes, sans conflit, avant que la fusion par section soit appelée (L510).
+    const attributes = join(import.meta.dirname, '..', '.gitattributes');
+    if (existsSync(attributes)) copyFileSync(attributes, join(repo, '.gitattributes'));
+    writeFileSync(join(repo, 'CHANGELOG.md'), log('### Added\n\n- base A\n\n### Fixed\n\n- base F\n'));
+    git(repo, 'add', '--', '.');
+    git(repo, 'commit', '-q', '-m', 'init');
+    const store = new RunStore(tempDir(), 'w1');
+    const t = { repo, dir: lotTreeDir(store.dir, 'p', 'L1'), branch: lotBranch('w1', 'p', 'L1'), base: 'main', lot: 'p:L1' };
+    expect(prepareTree(t).ok).toBe(true);
+    writeFileSync(join(t.dir, 'CHANGELOG.md'), log('### Added\n\n- base A\n- ajout du lot\n\n### Fixed\n\n- base F\n- correctif du lot\n'));
+    git(t.dir, 'add', '--', 'CHANGELOG.md');
+    git(t.dir, 'commit', '-q', '-m', 'feat(L1): lot');
+    writeFileSync(join(repo, 'CHANGELOG.md'), log('### Fixed\n\n- base F\n- correctif de main\n\n### Added\n\n- base A\n- ajout de main\n'));
+    git(repo, 'add', '--', 'CHANGELOG.md');
+    git(repo, 'commit', '-q', '-m', 'feat(L2): main réordonne');
+    const r = rebaseOnto(t.dir, 'main');
+    expect(r).toMatchObject({ kind: 'rebased' });
+    const text = unreleased(readFileSync(join(t.dir, 'CHANGELOG.md'), 'utf8'));
+    expect(text.match(/^### Added$/gm)).toHaveLength(1);
+    expect(text.match(/^### Fixed$/gm)).toHaveLength(1);
+    expect(text.indexOf('### Added')).toBeLessThan(text.indexOf('### Fixed'));
+    for (const e of ['base A', 'base F', 'ajout du lot', 'ajout de main', 'correctif du lot', 'correctif de main']) expect(text.match(new RegExp(`- ${e}$`, 'gm'))).toHaveLength(1);
   });
 });
 

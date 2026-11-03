@@ -1867,6 +1867,7 @@ lots:
     estimate: 0.25
     created: 2026-11-03
     started: 2026-11-03
+    review: { date: 2026-11-03, verdict: "conforme : 2 mineurs (une reprise avec seulement des constats de tests passe en Opus ; aucun test pour l'entrée « documentation en retard ») laissés en notes — orchestré (vague 2026-11-03-2100-cad, 2 passe(s) de correction)", commit: 300e38b79bf81c331f417f4d809897ad1db7030c, reporte: { de: 9948cc7b701bdc71fcbf5b30c203e84d247d3e4a, vers: 300e38b79bf81c331f417f4d809897ad1db7030c, patchId: eaafbb83d43c79ab5792503a1c2cf214904eedfb } }
   - id: L566
     title: "Porte après un commit de plan seul quand des tests lisent le plan (orchestrate.gate.readsPlan) : ne rejouer QUE les tests et scripts qui lisent le plan (détectés ou déclarés), et reprendre le verdict du sha du dessous pour le reste, au lieu de rejouer build + suite complète (mesuré le 03-11 : codex, maritime, evatosorus, ol, warhammer rejouent 5 min et plus pour une ligne de plan ; sur maritime, des scripts de skills /reprise et /cloture suffisent à déclencher le rejeu)"
     status: doing

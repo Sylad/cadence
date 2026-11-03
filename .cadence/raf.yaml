@@ -1595,6 +1595,16 @@ lots:
     estimate: 0.25
     created: 2026-11-03
     started: 2026-11-03
+  - id: L546
+    title: "spec reseal (issue #23) : accepter plusieurs <test> dans une même commande et un seul commit (deux tests scellés d'un lot livré réécrits par le porteur : aucun des deux ne peut être rescellé, « le verrou garde le reste ») ; sujet de commit court et fixe, chemins et raison dans le corps (comme spec green) — le sujet actuel dépasse header-max-length de commitlint ; l'erreur cite la règle de commitlint qui refuse, pas seulement « found 1 problems »"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-03
+  - id: L547
+    title: "cadence-hud (issue #24) : sans vague vivante, les barres de projets suivent le cwd de la dernière vague finie (ou de la session), pas le dossier qui porte priority: — quand un dossier avec priority: englobe le cwd de la vague, le tour s'y lance (une barre par projet), quel que soit le dossier de la vague ou du shell"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-03
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

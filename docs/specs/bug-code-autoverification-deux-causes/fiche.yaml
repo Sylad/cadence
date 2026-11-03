@@ -1,0 +1,131 @@
+# L543 — suite de L428 et L447 (docs/mesures/bug-code-2026-10-29.md, bug-code-2026-10-30.md) : la commande de sous-classement existe (L447),
+# la consigne « edge cases » est posée (L447) et mesurée sans effet net (L428 note du 31-10). L543 classe la fenêtre courante par cause
+# avec la commande existante, puis durcit la liste « Self-check before handing back » du brief implement sur les DEUX sous-causes dominantes.
+# Aucun code applicatif : le lot écrit un document de mesure et change le texte d'un gabarit de brief.
+sujet:
+  id: bug-code-autoverification-deux-causes
+  titre: "Goulot « bug de code » : classer la fenêtre par sous-cause, durcir l'auto-vérification avant rendu du brief implement sur les deux causes dominantes, mesurer avant/après"
+  lot: L543
+  perimetre:
+    modules: [templates/orchestrate/implement.md, docs/mesures, docs/orchestrate.md]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "src/corrections.ts, la commande cadence corrections et cadence perf, les caches corrections.json et corrections-sous-causes.json : utilisés tels quels, formats et sorties inchangés (L447 R9)"
+      - "le brief fix, le brief spec-back, la revue, la sonde de cas limites (L497) et la porte locale (src/testgate.ts) : un seul maillon reçoit un mécanisme"
+      - "le bloc « Limits and rules, before the walkthrough » et son marqueur [L447] : ils restent tels quels (un seul [L447] dans implement.md, tests L447 R8 et L523 R12)"
+      - "la mesure sur les fenêtres suivantes : le protocole est écrit, les lignes « après » sont remplies par un lot de mesure ultérieur"
+
+cas:
+  - id: C1
+    titre: Le lead classe la fenêtre courante par cause puis par sous-cause
+    acteur: le lead (la session du lot L543 joue la commande)
+    declencheur: commande cadence corrections --classify --since 2026-10-27
+    preconditions:
+      - le dossier des projets a des journaux sous .cadence/runs
+      - Ollama répond (modèle local déjà utilisé par L447)
+    nominal:
+      - La commande classe les passes par cause puis les passes bug-code par sous-cause, comme avant (copies des deux caches, pour ne pas toucher ceux du lead).
+      - La session lit le tableau « Bug de code par sous-cause » et en tire les deux sous-causes qui pèsent le plus de passes.
+      - Elle écrit le tableau, les deux causes retenues et leur part dans docs/mesures/bug-code-2026-11-03.md, avec la ligne « Avant » (part conforme du premier coup, passes classées, bug de code).
+    alternatives:
+      - { si: "Ollama ne répond pas ou des passes restent sans sous-cause", alors: "le document le dit ; les deux causes sont prises sur le dernier tableau mesuré (docs/mesures/bug-code-2026-10-30.md) et marquées « non remesurées »", regles: [R1, R2] }
+      - { si: "deux sous-causes à égalité pour la deuxième place, ou la sous-cause « autre » en tête", alors: "l'égalité se tranche dans l'ordre de SOUS_CAUSES ; « autre » n'est jamais retenue", regles: [R1] }
+      - { si: "moins de deux sous-causes ont au moins une passe", alors: "une seule cause est retenue, un seul point est durci, le document le dit", regles: [R1] }
+    resultat: Un tableau daté et deux causes désignées par la mesure, pas par la mémoire.
+  - id: C2
+    titre: Une session implement lit le brief durci et s'auto-vérifie avant de rendre
+    acteur: la session implement d'un lot (orchestrate)
+    declencheur: rendu du gabarit templates/orchestrate/implement.md par cadence orchestrate
+    preconditions:
+      - le gabarit porte le durcissement posé par L543
+    nominal:
+      - Le brief rendu contient la liste « Self-check before handing back » avec, en plus des cinq puces existantes, une puce par cause retenue, marquée « [L543] ».
+      - Chaque puce demande une vérification précise à faire sur le diff avant de rendre, et une trace dans le rapport (résumé, « choix » ou « nonVerifie »).
+      - La session fait la vérification, corrige ce qu'elle trouve (test d'abord) et écrit la trace.
+    alternatives:
+      - { si: "le brief est rendu pour un lot de correction (gabarit fix.md) ou de spec", alors: "il ne change pas : seul implement.md porte le durcissement", regles: [R4] }
+      - { si: "le lot n'a pas de fiche", alors: "la puce du contrat s'applique à l'énoncé du lot, comme la puce « tests » du gabarit", regles: [R3] }
+      - { si: "le lot ne touche aucun code (documentation seule)", alors: "la session le dit dans la trace au lieu de jouer des cas ; la puce ne force aucune entrée à inventer", regles: [R3] }
+    resultat: "Les deux causes dominantes sont vérifiées par la session avant la revue, avec une preuve lisible."
+  - id: C3
+    titre: Le lead mesure l'effet avant/après sur la part conforme du premier coup
+    acteur: le lead
+    declencheur: commande cadence perf puis cadence corrections --classify sur les fenêtres suivantes
+    preconditions:
+      - le durcissement est mis en service (npm run service), les vagues comptées sont créées après
+    nominal:
+      - Le lead lit la part conforme du premier coup et la part des deux causes retenues dans F1 puis F2.
+      - Il les compare à la ligne « Avant » du document de mesure.
+      - Il garde, ajuste ou retire les puces [L543] selon la lecture écrite dans le document.
+    alternatives:
+      - { si: "la part conforme du premier coup monte alors que les deux causes ne baissent pas, ou l'inverse", alors: "ce n'est pas un gain attribuable : le document demande de classer d'abord, de comparer ensuite", regles: [R5] }
+      - { si: "L428, L447 et L497 sont mesurés sur la même fenêtre", alors: "la lecture le dit : l'effet de L543 ne s'isole pas, il s'ajoute", regles: [R5] }
+    resultat: Un protocole qui dit quoi relever, sur quel dénominateur, et ce qui décide de garder le mécanisme.
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Les deux causes dominantes sont les deux sous-causes (hors « autre ») qui pèsent le plus de passes bug-code classées dans la fenêtre mesurée par cadence corrections --classify ; égalité tranchée dans l'ordre de SOUS_CAUSES ; moins de deux sous-causes non vides, une seule cause. Le document de mesure donne le tableau, les deux causes et leur part des passes bug-code."
+    statut: hypothese
+    si_faux: "Si le lead préfère deux maillons de la table R2 de L447 (et non deux sous-causes), seul le choix des deux puces change (un texte de gabarit, aucune donnée stockée)."
+    tests: ["R1 — le document de mesure contient le tableau des sept sous-causes et nomme exactement deux causes retenues", "R1 — les deux causes nommées sont les deux plus lourdes du tableau du document, « autre » exclue", "R1 — égalité en deuxième place : l'ordre de SOUS_CAUSES tranche (cas du tableau du document)"]
+  - id: R2
+    cas: [C1]
+    enonce: "La mesure du lot est celle de la commande existante, utilisée telle quelle : les copies des caches sont modifiées, pas ceux du lead ; sans Ollama, aucune sous-cause n'est inventée à la main, le document reprend le tableau du 30-10 en le disant."
+    statut: sourcee
+    source: "docs/mesures/bug-code-2026-10-30.md §1 (commande, copies des caches) et §2 (« lecture honnête » : classification du modèle local, pas de relecture à la main) ; L447 R3 (un échec n'entre pas au cache)"
+    tests: ["R2 — le document de mesure donne la commande exacte et la fenêtre (--since), et dit si Ollama a répondu", "R2 — le document ne compte aucune passe classée à la main : chaque ligne du tableau vient de la commande ou du tableau du 30-10 daté"]
+  - id: R3
+    cas: [C2]
+    enonce: "La liste « Self-check before handing back » du brief implement gagne une puce par cause retenue (au plus deux), chacune marquée « [L543] » une seule fois, formulée comme une vérification faite sur son propre diff avant de rendre et laissant une trace dans le rapport. Si la cause est cas-limite : pour chaque fonction, motif ou commande ajouté ou changé, un tableau « entrée, attendu, obtenu » joué une fois sur le chemin réel, rendu en trace (« resume » ou « nonVerifie »). Si la cause est contrat-mal-lu : pour chaque règle Rn de la fiche (ou de l'énoncé du lot), citer le mot de la règle et la ligne de code qui la tient, relire l'énoncé après le code, et mettre sous « choix » toute différence. Les puces ne dupliquent pas le bloc « Limits and rules » (renvoi, pas de second bloc), et le marqueur [L447] reste seul dans ce bloc."
+    statut: hypothese
+    si_faux: "Seul le texte de deux puces d'un gabarit change (aucune donnée, aucun contrat publié) ; si la mesure de R1 désigne d'autres causes, le texte des puces suit la cause (une puce par cause retenue)."
+    tests: ["R3 — implement.md rendu : la liste Self-check porte exactement autant de puces [L543] que de causes retenues par le document de mesure", "R3 — chaque puce [L543] demande une vérification sur le diff et une trace dans le rapport (resume, choix ou nonVerifie)", "R3 — la puce de la cause cas-limite demande entrée, attendu, obtenu et le chemin réel", "R3 — la puce de la cause contrat-mal-lu demande la citation de la règle et de la ligne de code", "R3 — [L543] n'est pas dans le bloc « Limits and rules » et [L447] reste une seule fois dans implement.md et jamais dans Self-check", "R3 — le brief rendu n'a aucune accolade restante et les cinq puces existantes de Self-check sont inchangées"]
+  - id: R4
+    cas: [C2]
+    enonce: "Le durcissement se limite au gabarit implement.md : le marqueur [L543] n'est dans aucun autre gabarit de brief (fix, spec, spec-back, review, probe) ni dans src/testgate.ts."
+    statut: sourcee
+    source: "L447 R8 et test/bug-code-mecanisme-l447.test.ts:83 (un marqueur dans un seul gabarit) ; titre du lot : « durcir le brief d'implémentation »"
+    tests: ["R4 — [L543] est absent de tous les gabarits de templates/orchestrate sauf implement.md", "R4 — [L543] est absent de src/testgate.ts"]
+  - id: R5
+    cas: [C3]
+    enonce: "Le document de mesure fixe le protocole sur deux fenêtres de 7 jours (F1, F2), créées après la mise en service du gabarit durci : « Passes classées » = toutes les passes moins celles sans revue (tests rouges) ; relevés : part conforme du premier coup (cadence perf), part des passes bug-code, part de chacune des deux causes retenues, lots à ≥ 2 passes ; ligne « Avant » remplie, lignes F1 et F2 « à mesurer ». Règle de lecture : le mécanisme est utile si la part conforme monte ET si la part des deux causes baisse sans que les lots à ≥ 2 passes montent ; sinon le texte ou le maillon est à revoir. Il note que L428, L447 et L497 sont mesurés sur les mêmes fenêtres."
+    statut: sourcee
+    source: "titre du lot : « mesure avant/après sur la part conforme du premier coup » ; protocole de docs/mesures/bug-code-2026-10-30.md §4 (dénominateur 243 − 42, F1/F2, mise en service) repris"
+    tests: ["R5 — le document contient le protocole F1/F2 avec la ligne « Avant » remplie et les lignes F1 et F2 « à mesurer »", "R5 — le document donne le dénominateur (toutes les passes moins les sans revue) et la borne de mise en service", "R5 — le document dit que L428, L447 et L497 sont mesurés ensemble"]
+  - id: R6
+    cas: [C2, C3]
+    enonce: "La documentation suit le changement dans les mêmes commits : docs/orchestrate.md décrit les puces [L543] sous le paragraphe L447 et renvoie au document de mesure, sans figure non vérifiée ; le CHANGELOG et docs/whats-new.md l'annoncent."
+    statut: sourcee
+    source: "gabarit implement.md, « Documentation » (README et docs suivent le comportement) ; précédent docs/orchestrate.md:448 et docs/whats-new.md (L447)"
+    tests: ["R6 — docs/orchestrate.md cite [L543] et le chemin du document de mesure, qui existe", "R6 — le CHANGELOG et whats-new citent L543"]
+
+contrats:
+  - id: A1
+    appel: commande cadence corrections [dossier] --classify --since 2026-10-27 --cache <copie> --cache-sous-causes <copie>
+    entree: "options existantes, aucune nouvelle ; copies des deux caches"
+    sortie: "rapport existant avec la section « Bug de code par sous-cause » ; exécutée par la session du lot pour la mesure, sans changement de la commande"
+    erreurs:
+      - { code: log error, message: "<fichier> : JSON illisible (un objet clé → classement est attendu), corrigez ou supprimez le fichier" }
+      - { code: log error, message: "<fichier> : sous-cause inconnue pour <clé> : <valeur>" }
+    regles: [R1, R2]
+  - id: A2
+    appel: commande cadence orchestrate (rendu du brief implement)
+    entree: "le gabarit templates/orchestrate/implement.md et les variables du lot"
+    sortie: "brief implement dont la liste Self-check porte les puces [L543] ; brief fix et autres inchangés"
+    erreurs: []
+    sans_erreur: "le rendu du gabarit n'a pas de nouvelle variable : il échoue comme avant (accolade restante) et aucune erreur n'est ajoutée ; les messages existants de renderBrief ne changent pas"
+    regles: [R3, R4]
+  - id: A3
+    appel: commande cadence perf [dossier]
+    entree: aucune nouvelle option
+    sortie: "inchangée (L447 R9) ; lue par le lead pour la part conforme du premier coup"
+    erreurs: []
+    sans_erreur: "lecture seule déjà couverte par L447 (R7) ; ce lot ne la modifie pas"
+    regles: [R5, R6]
+
+donnees:
+  - { id: D1, objet: "templates/orchestrate/implement.md (liste Self-check before handing back)", existant: true, modification: changement, note: "texte de gabarit : puces [L543] ajoutées ; aucun format stocké ni contrat publié", decision: "pas de question au lead : texte de brief, corrigeable sans reprise de données (le gabarit n'est pas une route ni un format de cache)" }
+  - { id: D2, objet: "docs/mesures/bug-code-2026-11-03.md", existant: false, modification: aucune, note: "nouveau document de mesure et de protocole (R1, R2, R5)" }
+  - { id: D3, objet: ".cadence/corrections.json et .cadence/corrections-sous-causes.json", existant: true, modification: aucune, note: "lus par la commande, jamais réécrits par ce lot (copies de travail) ; formats inchangés" }

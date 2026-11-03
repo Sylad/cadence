@@ -61,14 +61,13 @@ export const uxAfterReview = (c: LotCtx): boolean => !c.lot.small && c.lot.visib
 /** Les passes que déclenche un contrôle du programme, sans revue : elles ne font pas passer la revue d'un lot léger à Opus (L565). */
 const PROGRAM_FIXES: ReadonlySet<string> = new Set(['tests rouges', 'code sans test', 'documentation en retard']);
 
-const markHeavy = (l: LotState, what: string): void => {
-  if (!PROGRAM_FIXES.has(what)) l.heavyFix = true;
+const countProgramFix = (l: LotState, what: string): void => {
+  if (PROGRAM_FIXES.has(what)) l.programFixes = (l.programFixes ?? 0) + 1;
 };
 
 /** Une passe de correction de plus, ou la main rendue au lead quand les deux sont faites. */
 export function toFix(c: LotCtx, constats: Constat[], what: string): void {
   const l = c.lot;
-  markHeavy(l, what);
   l.constats = constats;
   // Revue qui converge (L205) : un seul constat bloquant ou majeur reste, après une baisse d'une revue à l'autre → une passe de plus (budget : fixAffordable, à l'entrée de la session).
   const counts = l.reviewCounts ?? [];
@@ -100,6 +99,7 @@ export function toFix(c: LotCtx, constats: Constat[], what: string): void {
     c.wave.log(`${lotKey(l.project, l.lot)} · escalade ${esc.model} : ${what} après ${l.pass} passe(s), une correction puis une revue neuve`);
   }
   l.pass += 1;
+  countProgramFix(l, what);
   l.next = 'fix';
   save(c);
 }

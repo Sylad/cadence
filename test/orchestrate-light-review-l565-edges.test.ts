@@ -17,35 +17,35 @@ describe('L565 — la revue légère après une passe du programme', () => {
     await runLot(c);
     expect(h.calls.map((x) => x.kind)).toEqual(['implement', 'fix', 'review']);
     expect(models(h)).toEqual(['sonnet']);
-    expect(c.lot.heavyFix).toBeUndefined();
+    expect(c.lot.pass).toBe(c.lot.programFixes);
   });
 
-  it('L565 R1 — deux passes de tests rouges de suite : la revue reste Sonnet, heavyFix absent', async () => {
+  it('L565 R1 — deux passes de tests rouges de suite : la revue reste Sonnet, tous les passes du programme', async () => {
     const h = harness({ script: { implement: [impl()], fix: [fix('c.txt'), fix('b.txt')], review: [ok] } });
     const c = h.lot('L1', { light: true }, { test: RED });
     await runLot(c);
     expect(h.calls.map((x) => x.kind)).toEqual(['implement', 'fix', 'fix', 'review']);
     expect(models(h)).toEqual(['sonnet']);
-    expect(c.lot.heavyFix).toBeUndefined();
+    expect(c.lot.pass).toBe(c.lot.programFixes);
   });
 
-  it('L565 R2 — un majeur trouvé par la revue marque heavyFix, qui reste vrai après des tests rouges réparés', async () => {
+  it('L565 R2 — un majeur trouvé par la revue fait dépasser pass de programFixes, ce qui reste vrai après des tests rouges réparés', async () => {
     const h = harness({ script: { implement: [impl()], fix: [fix('c.txt'), fix('b.txt')], review: [major, ok] } });
     const c = h.lot('L1', { light: true }, { test: 'test -f c.txt && { test -f b.txt || exit 3; } || true' });
     await runLot(c);
-    expect(c.lot.heavyFix).toBe(true);
+    expect(c.lot.pass).toBeGreaterThan(c.lot.programFixes ?? 0);
     expect(models(h)[0]).toBe('sonnet');
     expect(models(h).slice(1).every((m) => m === 'opus')).toBe(true);
   });
 
-  it('L565 R2 — état hérité (pass > 0, sans heavyFix, d\'avant le lot) : la revue est Opus, pas Sonnet', async () => {
+  it('L565 R2 — état hérité (pass > 0, sans programFixes, d\'avant le lot) : la revue est Opus, pas Sonnet', async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });
     const c = h.lot('L1', { light: true, pass: 1 });
     await runLot(c);
     expect(models(h)).toEqual(['opus']);
   });
 
-  it('L565 R3 — lot léger : un lot non léger avec heavyFix absent reste Opus après tests rouges', async () => {
+  it('L565 R3 — lot léger : un lot non léger avec tous les passes du programme reste Opus après tests rouges', async () => {
     const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
     const c = h.lot('L1', { light: false }, { test: RED });
     await runLot(c);

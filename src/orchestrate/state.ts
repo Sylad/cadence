@@ -120,8 +120,8 @@ export interface LotState {
   specAskedRules?: string[];
   /** Lot léger (estimate ≤ orchestrate.review.threshold, L108) : une revue légère, pas de passe des mineurs. Absent : lot ordinaire. */
   light?: boolean;
-  /** Une passe de correction née d'autre chose qu'un contrôle du programme (tests rouges, code sans test, documentation en retard) a eu lieu : la revue d'un lot léger passe alors à la revue complète (L565). */
-  heavyFix?: true;
+  /** Passes de correction nées d'un contrôle du programme (tests rouges, code sans test, documentation en retard), comptées dans `pass` : la revue d'un lot léger passe à la revue complète dès que `pass` dépasse ce compte (L565). Absent : aucune. */
+  programFixes?: number;
   /** Voie express (L519, `isExpress`) : retouche d'au plus 0,1 j, une seule session d'écriture sans précheck, sonde, revue séparée ni porte « code sans test ». Absent : lot ordinaire. */
   express?: true;
   model: AnyModel;

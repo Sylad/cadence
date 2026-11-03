@@ -30,7 +30,7 @@ function reviewModel(c: LotCtx, kind: SessionKind): AnyModel {
   const { light, full } = c.config.review;
   // Escalade (L337) : la revue neuve qui suit la correction escaladée se joue au modèle de l'escalade ; l'UX garde le sien.
   if (c.lot.escalation?.stage === 'fix' && (kind === 'review' || kind === 'review-small')) return c.lot.escalation.model;
-  return c.lot.light && !c.lot.heavyFix && (kind === 'review' || kind === 'review-small') ? light : full;
+  return c.lot.light && c.lot.pass <= (c.lot.programFixes ?? 0) && (kind === 'review' || kind === 'review-small') ? light : full;
 }
 
 /** Écarte le modèle local pour le reste de la vague (L322) : le premier échec suffit, les lots suivants n'attendent pas de le constater à leur tour. */

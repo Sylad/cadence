@@ -118,7 +118,7 @@ export function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (l
 }
 
 /** Pose les verrous et les hooks, joue la vague, range l'état, rend le tableau et le code de sortie. */
-export async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: OrchestrateIo, deps: OrchestrateDeps, today: Day, args: Args, all: LotState[] = lots, shared: ReadonlySet<string> = new Set()): Promise<number> {
+export async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: OrchestrateIo, deps: OrchestrateDeps, today: Day, args: Args, all: LotState[] = lots): Promise<number> {
   const cap = maxSessions(args, io);
   const launch = store.launchDir;
   // La configuration des projets est lue avant de poser quoi que ce soit : un cadence.yaml illisible ne laisse ni verrou ni hook.
@@ -129,8 +129,8 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   excludeState(launch);
   const home = cadenceHome();
   const held: string[] = [];
-  // L553 : un dépôt que tient une autre vague vivante et où la reprise n'intègre que (`shared`) n'a ici ni verrou, ni garde de push, ni inscription : ils restent à cette vague.
-  const repos = [...new Set(lots.flatMap(lotRepoPaths))].filter((r) => !shared.has(r));
+  // L553 : un dépôt que tient une autre vague vivante et où la reprise n'intègre que (`args.shared`) n'a ici ni verrou, ni garde de push, ni inscription : ils restent à cette vague.
+  const repos = [...new Set(lots.flatMap(lotRepoPaths))].filter((r) => !args.shared?.has(r));
   /** Libère un dépôt : son verrou et sa garde de push (L132 : dès que ses lots sont finis, pas à la fin de la vague). */
   const freed = new Set<string>();
   /** Lots dont la vague a fini de jouer (prêts, rendus, en échec ou suspendus) : ils ne tiennent plus de créneau. */

@@ -179,13 +179,6 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
   // L553 : dépôts tenus par une AUTRE vague vivante dont la reprise ne prend pas le verrou (voir `passesBetweenSteps`).
   const shared = new Set<string>();
   const stopBefore = store.control().stopAfterCurrent;
-  /**
-   * L553 : le verrou du dépôt est celui d'une autre VAGUE (pas une tâche locale du lead, qui écrit dans l'arbre principal) et la reprise n'y joue que des intégrations de lots
-   * qui ont leur worktree : rien d'autre n'écrit dans le dépôt, l'intégration est déjà sérialisée par son propre verrou.
-   */
-  const passesBetweenSteps = (repo: string, busy: { wave: string }): boolean =>
-    !localLotOf(busy.wave) &&
-    live.filter((l) => lotRepoPaths(l).includes(repo)).every((l) => integ.includes(l) && existsSync(join(lotTreeDir(store.dir, l.project, l.lot, l.repo), '.git')));
   try {
     for (const repo of new Set(live.flatMap(lotRepoPaths))) {
       const file = join(sharedStateDir(repo), REPO_LOCK);
@@ -209,7 +202,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
           break;
         }
         // L553 : l'intégration d'un lot en worktree n'attend pas la fin d'une autre vague : comme un push du lead, elle passe entre ses étapes (son rebase rejoue si `main` avance, le verrou d'intégration les départage).
-        if (waitFor && passesBetweenSteps(repo, busy)) {
+        if (waitFor && passesBetweenSteps(store, live, integ, repo, busy)) {
           shared.add(repo);
           io.out(`orchestrate : ${basename(repo)} : tenu par la vague ${busy.wave} (pid ${busy.pid}) : l'intégration passe entre ses étapes, sans attendre sa fin`);
           break;
@@ -286,18 +279,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
       store.journal(`${k} → suspended — ${text}`);
       io.out(`${k} → suspended — ${text}`);
     }
-    for (const l of integ) {
-      const k = lotKey(l.project, l.lot);
-      const lead = leadReviewed.get(l);
-      if (lead) adoptLeadReview(l, lead);
-      const planNote = l.next !== 'integrate'; // rendu sur une écriture de plan refusée (--replay) : le lot repart de l'étape gardée
-      if (planNote && l.outcome?.startsWith(HYPOTHESES_HANDBACK)) l.hypotheses = undefined; // les notes d'hypothèses se posent de nouveau (sans doublon) à l'entrée de l'étape
-      l.status = 'suspended';
-      l.outcome = null;
-      const text = planNote ? `écriture du plan reprise à l'étape ${l.next} (--resume --replay)` : integrationText(lead ?? null);
-      store.journal(`${k} → suspended — ${text}`);
-      io.out(`${k} → suspended — ${text}`);
-    }
+    for (const l of integ) resumeIntegration(l, leadReviewed.get(l), store, io);
     for (const l of live) {
       if (l.status === 'implementing' || l.status === 'reviewing' || l.status === 'fixing') l.status = 'suspended';
       store.writeLot(l);
@@ -307,24 +289,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
     if (!(waiting && !stopBefore && store.control().stopAfterCurrent)) store.clearStopRequest();
     // L557 (issue #26) : un lot nommé par --integrate qui portait un retrait déjà appliqué (--drop d'une reprise précédente) est repris à la main puis revu : le retrait est consommé, sinon la vague le rendrait au lead sans l'intégrer.
     store.consumeDrops(integ.map((l) => lotKey(l.project, l.lot)));
-    for (const l of removed) {
-      const k = lotKey(l.project, l.lot);
-      store.requestDrop(k);
-      store.journal(`demande : retirer ${k} de la vague (--resume --drop)`);
-      io.out(`${k} : retrait demandé — le lot est rendu au lead sans être rejoué`);
-      l.next = null;
-      l.status = 'handed-back';
-      l.outcome = DROPPED;
-      store.writeLot(l);
-      store.journal(`${k} → handed-back — ${DROPPED}`);
-      // Un lot retiré garde son worktree et sa branche (R12) : le journal en donne le chemin.
-      const branch = lotBranch(wave.id, l.project, l.lot);
-      if (baseBranchOf(l.repo, branch)) {
-        const line = `orchestrate : ${k} : worktree conservé : ${lotTreeDir(store.dir, l.project, l.lot, l.repo)} (branche ${branch})`;
-        io.out(line);
-        store.journal(line);
-      }
-    }
+    for (const l of removed) markRemoved(l, wave.id, store, io);
     if (live.length === 0) {
       if (lots.every(lotFinished)) {
         wave.status = 'done';
@@ -335,8 +300,49 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
       return removed.length && !lots.every((l) => l.status === 'ready') ? 1 : 0;
     }
     played = true;
-    return continueRounds(await execute(wave, live, store, io, deps, today, args, lots, shared), wave, lots, store, io, deps, today, args, launch);
+    return continueRounds(await execute(wave, live, store, io, deps, today, { ...args, shared }, lots), wave, lots, store, io, deps, today, args, launch);
   } finally {
     if (!played) for (const f of taken) releaseLock(f, process.pid);
   }
+}
+
+/** Un lot retiré par `--drop` : la demande est déposée, le lot est rendu au lead sans être rejoué ; son worktree et sa branche restent (R12). */
+function markRemoved(l: LotState, waveId: string, store: RunStore, io: OrchestrateIo): void {
+  const k = lotKey(l.project, l.lot);
+  store.requestDrop(k);
+  store.journal(`demande : retirer ${k} de la vague (--resume --drop)`);
+  io.out(`${k} : retrait demandé — le lot est rendu au lead sans être rejoué`);
+  l.next = null;
+  l.status = 'handed-back';
+  l.outcome = DROPPED;
+  store.writeLot(l);
+  store.journal(`${k} → handed-back — ${DROPPED}`);
+  // Un lot retiré garde son worktree et sa branche (R12) : le journal en donne le chemin.
+  const branch = lotBranch(waveId, l.project, l.lot);
+  if (baseBranchOf(l.repo, branch)) {
+    const line = `orchestrate : ${k} : worktree conservé : ${lotTreeDir(store.dir, l.project, l.lot, l.repo)} (branche ${branch})`;
+    io.out(line);
+    store.journal(line);
+  }
+}
+
+/**
+ * L553 : le verrou du dépôt est celui d'une autre VAGUE (pas une tâche locale du lead, qui écrit dans l'arbre principal) et la reprise n'y joue que des intégrations de lots
+ * qui ont leur worktree : rien d'autre n'écrit dans le dépôt, l'intégration est déjà sérialisée par son propre verrou.
+ */
+function passesBetweenSteps(store: RunStore, live: LotState[], integ: LotState[], repo: string, busy: { wave: string }): boolean {
+  return !localLotOf(busy.wave) && live.filter((l) => lotRepoPaths(l).includes(repo)).every((l) => integ.includes(l) && existsSync(join(lotTreeDir(store.dir, l.project, l.lot, l.repo), '.git')));
+}
+
+/** Un lot repris par `--integrate` ou `--replay` repart suspendu : à l'intégration, ou à l'étape d'écriture de plan gardée ; avec la revue du lead hors vague quand elle tient lieu de revue (L370). */
+function resumeIntegration(l: LotState, lead: { head: string; verdict: string } | undefined, store: RunStore, io: OrchestrateIo): void {
+  const k = lotKey(l.project, l.lot);
+  if (lead) adoptLeadReview(l, lead);
+  const planNote = l.next !== 'integrate'; // rendu sur une écriture de plan refusée (--replay) : le lot repart de l'étape gardée
+  if (planNote && l.outcome?.startsWith(HYPOTHESES_HANDBACK)) l.hypotheses = undefined; // les notes d'hypothèses se posent de nouveau (sans doublon) à l'entrée de l'étape
+  l.status = 'suspended';
+  l.outcome = null;
+  const text = planNote ? `écriture du plan reprise à l'étape ${l.next} (--resume --replay)` : integrationText(lead ?? null);
+  store.journal(`${k} → suspended — ${text}`);
+  io.out(`${k} → suspended — ${text}`);
 }

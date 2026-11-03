@@ -3,6 +3,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { defaultPlan, readDocsConfig, readOrchestrateConfig, readPlanConfig, readVerifyConfig } from '../config.js';
 import { type Day } from '../dates.js';
+import { blockProblem } from '../deliver-blocks.js';
 import { deliver, type DeliveredCtx, parseDeliverConfig, realDeps } from '../deliver.js';
 import { defaultTarget, realCheckDeps, verifyCommand } from '../verify.js';
 import { verifyGate } from '../verify-gate.js';
@@ -73,8 +74,14 @@ export function cmdDeliver(c: Ctx): number | Promise<number> {
   }
   if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans docs/deliver.md du paquet @sylad/cadence)`);
   const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
+  // Refusé avant toute étape (aucun script, aucune ligne de journal) : un bloc inconnu livrerait sans filtre.
+  const refused = values.block === undefined ? null : blockProblem(values.block, config);
+  if (refused) {
+    io.err(`deliver : ${refused}`);
+    return 1;
+  }
   const effects = deliveredEffects({ root, configPath, planPath, loadPlan, newsDir, today, waveId: orchestrating?.wave, io });
-  return deliver({ ...effects, state: sharedStateDir(root), config, dryRun: !!values['dry-run'], sha: values.sha, duringWave: !!orchestrating, args: rest }, realDeps(root));
+  return deliver({ ...effects, state: sharedStateDir(root), config, dryRun: !!values['dry-run'], sha: values.sha, block: values.block, duringWave: !!orchestrating, args: rest }, realDeps(root));
 }
 
 /** cadence verify [--gate] : rejoue deliver.verify, ou la porte du projet. */

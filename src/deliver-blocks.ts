@@ -39,3 +39,10 @@ export function blocksTouched(files: string[], blocks: Blocks): string[] {
 
 /** Les noms des blocs de `deliver.blocks`, [] sans la clé : de quoi lire la ligne d'où part une livraison (`lastDeliveryFor`). */
 export const declaredBlocks = (config: { blocks?: Blocks }): string[] => Object.keys(config.blocks ?? {});
+
+/** Pourquoi `--block` est refusé (bloc inconnu, ou aucun bloc déclaré) ; null quand le bloc est déclaré. */
+export function blockProblem(block: string, config: { blocks?: Blocks }): string | null {
+  const declared = declaredBlocks(config);
+  if (declared.length === 0) return `--block ${block} : aucun bloc déclaré (deliver.blocks dans cadence.yaml)`;
+  return declared.includes(block) ? null : `--block ${block} : bloc inconnu (déclarés : ${declared.join(', ')})`;
+}

@@ -196,6 +196,17 @@ describe('cadence spec green : le chemin du lead pour un lot clos à vert: false
     }
   })
 
+  it('spec reseal : le skill lead dit que la commande prend plusieurs tests en un seul commit (L546, issue #23)', () => {
+    const skill = read('skills/lead/SKILL.md')
+    expect(skill).toContain('cadence spec reseal <lot> <test> [<test> …]')
+    expect(skill).toContain('all or nothing')
+  })
+
+  it("spec reseal : docs/raf.md ne met plus de chemin dans le sujet du commit de plan (L546)", () => {
+    const raf = read('docs/raf.md')
+    expect(raf).not.toContain('rescellé (')
+  })
+
   it('la liste des sous-commandes spec (docs/overview.md, docs/fonctionnement.md) cite green', () => {
     expect(read('docs/overview.md')).toContain('`cadence spec check\\|qa\\|reseal\\|green`')
     expect(read('docs/fonctionnement.md')).toContain('cadence spec green')

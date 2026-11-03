@@ -1740,6 +1740,7 @@ lots:
     estimate: 1
     created: 2026-11-03
     started: 2026-11-03
+    review: { date: 2026-11-03, verdict: "conforme (1 note mineure : réécriture de control.log non atomique sur la vague vivante) — orchestré (vague 2026-11-03-1605-cad, 1 passe(s) de correction + passe des mineurs sans commit)", commit: 041b5fcb4af555919b27d9e23bba79aeb3fec6c4, reporte: { de: ccb63265af3eef6d5778e71686e493d83338c3b4, vers: 041b5fcb4af555919b27d9e23bba79aeb3fec6c4, patchId: 9f0e6ca021406d8e396afd9775ed2f0dd4cd8677 } }
   - id: L558
     title: "Ressources par chemins : une ressource déclarée dans cadence.yaml peut porter des chemins (resources: { cycle-ts: { paths: [src/orchestrate/cycle.ts, src/orchestrate/cycle/] } }) et la vague la tient pour tout lot dont le diff les touche, sans uses: posé à la main (03-11 : L520 a modifié cycle.ts sans uses: [cycle-ts] pendant que L492 le découpait → conflit à l'intégration, lot rendu) --estimate 0.5 --spec"
     status: todo

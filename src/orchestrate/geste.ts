@@ -1,3 +1,4 @@
+import { LOT_LIKE } from './command-args.js';
 import { DROPPED } from './cycle/budget.js';
 import { planNoteHandBack } from './cycle/plan-writes.js';
 import type { LotState } from './state.js';
@@ -24,7 +25,7 @@ export const replayGesture = (waveId: string, key: string, alive: boolean): stri
 export const newWaveGesture = (key: string): string => `cadence orchestrate ${key}`;
 
 /**
- * LE geste suivant d'un lot rendu au lead (L554), chaîne vide quand il n'y en a pas un d'exact : écart docs.sync (acquitter, puis rejouer), rendu à l'intégration (`--integrate`, déposé tout de suite même sur
+ * LE geste suivant d'un lot rendu au lead (L554), chaîne vide quand il n'y en a pas un d'exact : écart docs.sync (acquitter dans le dépôt principal, puis une nouvelle vague qui retrouve le worktree), rendu à l'intégration (`--integrate`, déposé tout de suite même sur
  * une vague vivante), écriture de plan refusée (`--replay`), lot retiré (nouvelle vague). `wave.status === 'running'` : la vague est vivante, ses `--replay` se jouent à sa fin.
  */
 export function lotGesture(wave: { id: string; status: string }, l: Pick<LotState, 'project' | 'lot' | 'status' | 'next' | 'outcome'>): string {
@@ -32,7 +33,7 @@ export function lotGesture(wave: { id: string; status: string }, l: Pick<LotStat
   const key = `${l.project}:${l.lot}`;
   const alive = wave.status === 'running';
   if (l.outcome === DROPPED) return newWaveGesture(key);
-  if (l.outcome?.startsWith(DOCS_GAP)) return `raf docs-ok ${l.lot} --reason "…", puis ${alive ? 'à la fin de la vague ' : ''}: ${resumeCommand(wave.id, '--replay', key)}`;
+  if (l.outcome?.startsWith(DOCS_GAP)) return `raf docs-ok ${l.lot} --reason "…" (dépôt principal, plan commité), puis ${alive ? 'à la fin de la vague ' : ''}: ${newWaveGesture(key)}`;
   if (l.next === 'integrate') return resumeCommand(wave.id, '--integrate', key);
   if (planNoteHandBack(l as LotState)) return replayGesture(wave.id, key, alive);
   return '';
@@ -60,4 +61,28 @@ export function gestureColumn(wave: { id: string; status: string }, lots: Parame
   const gestes = lots.map((l) => lotGesture(wave, l));
   const any = gestes.some(Boolean);
   return { head: any ? ['geste'] : [], cells: gestes.map((g) => (any ? [g] : [])) };
+}
+
+/**
+ * La reprise d'une vague SANS ses `--replay` (L554) : un `--replay` refusé fait sortir toute la reprise en 2 ; cette ligne nomme la commande qui reprend le reste. Chaîne vide quand `--replay` était la seule option
+ * (rien d'autre à reprendre). `--answer` prend deux valeurs, `--resume` une vague facultative, `--wave` une vague.
+ */
+export function resumeWithoutReplay(waveId: string, argv: string[]): string {
+  const rest: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const t = argv[i]!;
+    if (t === '--wave' || t === '--replay') i++;
+    else if (t === '--resume') {
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith('-') && !LOT_LIKE.test(next)) i++;
+    } else if (t === '--answer') rest.push(t, argv[++i] ?? '', argv[++i] ?? '');
+    else rest.push(t);
+  }
+  return rest.length ? resumeCommand(waveId, ...rest) : '';
+}
+
+/** Les refus d'une reprise, suivis (quand l'un d'eux vise un `--replay`) de la ligne qui nomme la reprise sans `--replay` (L554). */
+export function withReplayHint(refusals: string[], waveId: string, argv: string[]): string[] {
+  const without = refusals.some((r) => r.startsWith('--replay ')) ? resumeWithoutReplay(waveId, argv) : '';
+  return without ? [...refusals, `un --replay refusé refuse toute la reprise : la reprise sans --replay : ${without}`] : refusals;
 }

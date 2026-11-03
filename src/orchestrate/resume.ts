@@ -17,7 +17,7 @@ import { baseBranchOf, keptLines, lotBranch, lotTreeDir } from './worktree.js';
 import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { launchPrices, renderTable } from './table.js';
-import { gestureSuffix, stillRunningRefusal } from './geste.js';
+import { gestureSuffix, stillRunningRefusal, withReplayHint } from './geste.js';
 import { SnapshotRefusal, repairSnapshotModules, snapshotExists, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, toolDirOf } from './snapshot.js';
 import { answerLive, control, singleUnfinished } from './status.js';
 import { continueRounds, execute } from './execute.js';
@@ -253,7 +253,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
       if (d.length) refusals.push(`${basename(dir)} : arbre sale, ${d.length} fichier(s) suivi(s) modifié(s) : ${d.join(', ')}`);
     }
     if (refusals.length) {
-      for (const r of refusals) io.err(`orchestrate : ${r}`);
+      for (const r of withReplayHint(refusals, wave.id, argv)) io.err(`orchestrate : ${r}`);
       return 2;
     }
     for (const [l, node] of nodes) {

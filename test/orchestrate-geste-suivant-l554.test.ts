@@ -3,7 +3,7 @@ import { claudeOut, commitFile, reviewReport } from './orchestrate-harness.js';
 import { fake, lotOf, run, setup, store, until, WAVE } from './orchestrate-worktree-harness.js';
 import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { DROPPED, HYPOTHESES_HANDBACK } from '../src/orchestrate/cycle.js';
-import { DOCS_GAP, lotGesture } from '../src/orchestrate/geste.js';
+import { DOCS_GAP, lotGesture, resumeWithoutReplay } from '../src/orchestrate/geste.js';
 import { renderTable } from '../src/orchestrate/table.js';
 import type { LotState, WaveState } from '../src/orchestrate/state.js';
 import { tempDir } from './helpers.js';
@@ -23,10 +23,10 @@ const live = { id: WAVE_ID, status: 'running' } as const;
 const stopped = { id: WAVE_ID, status: 'suspended' } as const;
 
 describe("L554 — le geste d'un lot rendu (lotGesture)", () => {
-  it("R1 — un lot rendu pour docs.sync : « raf docs-ok » puis, à la fin d'une vague vivante, --resume --wave W --replay P:L", () => {
+  it("R1 — un lot rendu pour docs.sync : « raf docs-ok » (dépôt principal, plan commité) puis, à la fin d'une vague vivante, une NOUVELLE vague cadence orchestrate P:L", () => {
     const l = lot({ outcome: `${DOCS_GAP} : README.md sans la documentation attendue` });
-    expect(lotGesture(live, l)).toBe(`raf docs-ok L1 --reason "…", puis à la fin de la vague : cadence orchestrate --resume --wave ${WAVE_ID} --replay a:L1`);
-    expect(lotGesture(stopped, l)).toBe(`raf docs-ok L1 --reason "…", puis : cadence orchestrate --resume --wave ${WAVE_ID} --replay a:L1`);
+    expect(lotGesture(live, l)).toBe(`raf docs-ok L1 --reason "…" (dépôt principal, plan commité), puis à la fin de la vague : cadence orchestrate a:L1`);
+    expect(lotGesture(stopped, l)).toBe(`raf docs-ok L1 --reason "…" (dépôt principal, plan commité), puis : cadence orchestrate a:L1`);
   });
   it("R2 — rendu à l'intégration : --integrate (déposé tout de suite, même sur une vague vivante) ; écriture de plan refusée : --replay", () => {
     expect(lotGesture(live, lot({ next: 'integrate', outcome: 'rebase' }))).toBe(`cadence orchestrate --resume --wave ${WAVE_ID} --integrate a:L1`);
@@ -82,7 +82,7 @@ async function liveWave(onL2: (parent: string) => Promise<void>, fakePid = true)
 }
 
 describe("L554 — les refus d'une vague vivante disent le geste", () => {
-  it("R1/R5 — --integrate d'un lot rendu pour docs.sync, sur une vague vivante : le refus dit raf docs-ok puis le --replay de la fin de vague", async () => {
+  it("R1/R5 — --integrate d'un lot rendu pour docs.sync, sur une vague vivante : le refus dit raf docs-ok puis la nouvelle vague de la fin", async () => {
     let err = '';
     await liveWave(async (parent) => {
       const s = store(parent);
@@ -93,7 +93,7 @@ describe("L554 — les refus d'une vague vivante disent le geste", () => {
       err = (await run(parent, ['--resume', '--wave', WAVE, '--integrate', 'a:L1'], fake())).err;
     });
     expect(err).toContain('raf docs-ok L1 --reason');
-    expect(err).toContain(`à la fin de la vague : cadence orchestrate --resume --wave ${WAVE} --replay a:L1`);
+    expect(err).toContain('à la fin de la vague : cadence orchestrate a:L1');
   });
   it('R5 — --replay sur une vague vivante : le refus « tourne encore » donne la commande à jouer à la fin', async () => {
     let err = '';
@@ -122,5 +122,20 @@ describe("L554 — les refus d'une vague vivante disent le geste", () => {
     }, false);
     expect(err).toMatch(/a:L1 : lot déjà dans la vague/);
     expect(err).toContain('retiré de la vague : le lancer dans une nouvelle vague : cadence orchestrate a:L1');
+  });
+});
+
+describe('L554 — un --replay refusé nomme la reprise sans --replay', () => {
+  it('R7 — resumeWithoutReplay retire --replay, --wave et --resume mais garde les autres options (--answer à deux valeurs)', () => {
+    expect(resumeWithoutReplay('W', ['--resume', '--wave', 'W', '--replay', 'a:L1', '--drop', 'a:L2'])).toBe('cadence orchestrate --resume --wave W --drop a:L2');
+    expect(resumeWithoutReplay('W', ['--resume', 'W', '--answer', 'a:L2', 'oui', '--replay', 'a:L1'])).toBe('cadence orchestrate --resume --wave W --answer a:L2 oui');
+    expect(resumeWithoutReplay('W', ['--resume', '--wave', 'W', '--replay', 'a:L1'])).toBe('');
+  });
+  it("R7 — --replay refusé avec un --drop : le refus nomme la commande qui reprend le reste", async () => {
+    let err = '';
+    await liveWave(async (parent) => {
+      err = (await run(parent, ['--resume', '--wave', WAVE, '--replay', 'a:L2', '--drop', 'a:L1'], fake())).err;
+    }, false);
+    expect(err).toContain(`la reprise sans --replay : cadence orchestrate --resume --wave ${WAVE} --drop a:L1`);
   });
 });

@@ -1614,6 +1614,7 @@ lots:
     estimate: 0.25
     created: 2026-11-03
     started: 2026-11-03
+    review: { date: 2026-11-03, verdict: "conforme (1 note mineure : JSDoc de tourFolder à rafraîchir) — orchestré (vague 2026-11-02-2140-cont, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme, 1 note mineure : une entrée L545 en double dans la section [1.44.0] du CHANGELOG, laissée par la résolution du conflit au rebase", commit: 55bf39352b630060287f39e4379de2cf1a8ff651 }
   - id: L548
     title: "Issues GitHub suivies par le plan (03-11 : #20 et #21 réglées en 1.38.1 et 1.42.1 restées ouvertes, rappel de Sylvain) : cadence lead tour liste les issues ouvertes du dépôt (gh, si disponible) sans lot qui les cite et celles dont le lot est publié ; cadence release imprime pour chaque lot de la version qui cite « issue #n » la commande gh issue close avec un commentaire (lot + version) ; rien n'est fermé sans le lead"
     status: todo

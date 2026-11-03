@@ -102,11 +102,14 @@ function leaves(repo: string, dir: string, text: string, depth = SCRIPT_DEPTH): 
       cwd = posix.normalize(posix.join(cwd, cd[1] ?? cd[2] ?? cd[3]!));
       return [];
     }
-    const m = /^(?:npm|pnpm|yarn)(?: run)? ([\w:.-]+)\s*(?:--(?:\s.*)?)?$/.exec(unwrap(s));
+    const m = new RegExp(`^(?:npm|pnpm|yarn)(?: run)? ([\\w:.-]+)(?:\\s+${NPM_QUIET_OPTION})*\\s*(?:--(?:\\s.*)?)?$`).exec(unwrap(s));
     const body = m && depth > 0 ? packageScripts(repo, cwd)[m[1]!] : undefined;
     return body === undefined ? [s] : leaves(repo, cwd, body, depth - 1);
   });
 }
+
+/** Les options de npm qui peuvent suivre le nom du script sans changer ce qu'il joue (`npm test --silent`) ; `--workspace` ou `--prefix` visent un autre package.json et restent hors de la liste. */
+const NPM_QUIET_OPTION = '(?:--silent|--if-present|--quiet|-s|-q)';
 
 /** Les options qui désignent une autre suite ou un autre projet : elles restent dans la clé, avec leur valeur. */
 const SUITE_OPTION = /^(-c|-p|--config|--project|--projects|--selectProjects)(=.*)?$/;

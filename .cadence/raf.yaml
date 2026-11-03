@@ -1662,6 +1662,10 @@ lots:
     spec: true
     created: 2026-11-03
     started: 2026-11-03
+    notes:
+      - { date: 2026-11-03, text: "Revue de la fiche — mineur : docs/specs/accept-regles-du-lot/fiche.yaml:50 — Sources mal localisées. R1 cite accept.ts:314, qui est une accolade fermante ; la boucle sur les règles est à la ligne 317. R5 cite accept.ts:322, alors que le message est à la ligne 317 (et « fiche illisible » à la ligne 319). Le test existant `test/orchestrate-accept.test.ts` est aux lignes 49-53 (le « :52 » est approximatif)." }
+      - { date: 2026-11-03, text: "Revue de la fiche — mineur : docs/specs/accept-regles-du-lot/fiche.yaml:62 — R3 (clé `regles` ignorée sur une fiche non partagée) contredit en partie R2, qui dit que la liste « définit les règles du lot ». Un lot seul qui déclare `regles` verra la liste ignorée sans message. Aucun test de R3 n'assert l'absence de message ; le test nommé « toutes les règles sont exigées comme avant » ne couvre pas le cas d'une clé déclarée." }
+      - { date: 2026-11-03, text: "Revue de la fiche — mineur : docs/specs/accept-regles-du-lot/fiche.yaml:66 — Le test R4 « non scellée : toujours signalé » est bien nommé, mais le critère « scellée » (`empreintes` posées pour tous les fichiers, ou seulement correspondant au fichier qui contient le nom) n'est pas précisé. Le code a déjà `sansEmpreinte` et `hasSeals` ; la règle devrait nommer le critère retenu." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

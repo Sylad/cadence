@@ -100,7 +100,7 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
     const key = lotKey(t.project, t.lot);
     const already = opts.addTo?.lots.find((l) => l.project === t.project && l.lot === t.lot);
     if (already) {
-      refusals.push(`${key} : lot déjà ${already.queued ? "en file d'ajout dans" : 'dans'} la vague ${opts.addTo!.wave}${droppedAddSuffix(already, key)}`);
+      refusals.push(`${key} : lot déjà ${already.queued ? "en file d'ajout dans" : 'dans'} la vague ${opts.addTo!.wave}${droppedAddSuffix(already, key, launch)}`);
       continue;
     }
     let env: ReturnType<typeof projectEnv>;

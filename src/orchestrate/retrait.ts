@@ -27,7 +27,7 @@ export function removeWorktree(args: Args, io: OrchestrateIo): number {
   const k = kept[0]!;
   if (k.active) {
     // une vague vivante joue encore ce lot (ses sessions travaillent dans ce dossier) : refus sans rien retirer, même avec --abandon-commits
-    io.err(`orchestrate : ${key} : la vague ${k.wave} est vivante et joue ce lot : worktree non retirable (arrêter la vague d'abord) ; ${atWaveEnd(`cadence orchestrate --remove-worktree ${key} --wave ${k.wave}`)}`);
+    io.err(`orchestrate : ${key} : la vague ${k.wave} est vivante et joue ce lot : worktree non retirable (arrêter la vague d'abord) ; ${atWaveEnd(`cadence orchestrate --remove-worktree ${t.project ?? '.'}:${t.lot} --wave ${k.wave}`)}`);
     return 2;
   }
   const gone = removeTree({ repo, dir: k.dir ?? '', branch: k.branch, base: k.base }, { abandon: args.abandonCommits });

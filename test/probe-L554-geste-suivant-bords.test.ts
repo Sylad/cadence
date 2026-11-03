@@ -76,14 +76,14 @@ describe('probe L554 — lotGesture / suffixes', () => {
     expect(lotGesture(live, lot({ next: 'integrate', outcome: `${DOCS_GAP} : x` }))).toContain('raf docs-ok');
   });
   it('lot retiré : --integrate n’est jamais proposé', () => {
-    expect(lotGesture(live, lot({ next: 'integrate', outcome: DROPPED }))).toBe('cadence orchestrate a:L1');
+    expect(lotGesture(live, lot({ next: 'integrate', outcome: DROPPED }))).toBe('à la fin de la vague : cadence orchestrate a:L1');
   });
   it('lot terminé (done) avec outcome DROPPED : aucun geste', () => {
     expect(lotGesture(live, lot({ status: 'done' as LotState['status'], outcome: DROPPED }))).toBe('');
   });
   it('gestureSuffix : vide sans geste, tiret + geste sinon', () => {
     expect(gestureSuffix(live, lot({ outcome: 'revue non conforme' }))).toBe('');
-    expect(gestureSuffix(live, lot({ outcome: DROPPED }))).toBe(' — le geste : cadence orchestrate a:L1');
+    expect(gestureSuffix(live, lot({ outcome: DROPPED }))).toBe(' — le geste : à la fin de la vague : cadence orchestrate a:L1');
   });
   it('droppedAddSuffix : lot en file (sans statut) ou retiré non rendu : rien', () => {
     expect(droppedAddSuffix({}, 'a:L1')).toBe('');

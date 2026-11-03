@@ -44,7 +44,7 @@ function checkTarget(store: RunStore, t: { project?: string; lot: string }, seen
   const l = matches[0];
   const key = lotKey(l.project, l.lot);
   if (seen.includes(key)) return { refusal: `--integrate ${key} : lot visé deux fois` };
-  if (!integrationHandBack(store, l)) return { refusal: `--integrate ${key} : le lot n'est pas rendu à l'étape d'intégration (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})${gestureSuffix({ id: store.id, status: store.readWave()?.status ?? '' }, l)}` };
+  if (!integrationHandBack(store, l)) return { refusal: `--integrate ${key} : le lot n'est pas rendu à l'étape d'intégration (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})${gestureSuffix({ id: store.id, status: store.readWave()?.status ?? '', cwd: store.readWave()?.cwd }, l)}` };
   return { key };
 }
 

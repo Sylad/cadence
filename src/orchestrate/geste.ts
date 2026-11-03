@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import { LOT_LIKE } from './command-args.js';
 import { DROPPED } from './cycle/budget.js';
 import { planNoteHandBack } from './cycle/plan-writes.js';
@@ -21,26 +22,32 @@ export const atWaveEnd = (command: string): string => `à la fin de la vague : $
 /** La commande de rejeu d'un lot (`--replay`), à jouer à la fin de la vague quand elle est vivante. */
 export const replayGesture = (waveId: string, key: string, alive: boolean): string => (alive ? atWaveEnd : (c: string) => c)(resumeCommand(waveId, '--replay', key));
 
-/** Le geste d'un lot retiré de la vague (`--drop`) : `--add` le refuse (déjà dans la vague), il se relance dans une nouvelle vague. */
-export const newWaveGesture = (key: string): string => `cadence orchestrate ${key}`;
+/**
+ * Le geste d'un lot qui repart dans une NOUVELLE vague (retiré par `--drop`, ou écart docs.sync acquitté) : `--add` le refuse (déjà dans la vague). `launch` : le dossier qui a lancé la vague ; quand c'est le dépôt du lot
+ * (clé `<dossier>:<lot>`), la commande rejouable est `.:<lot>` (`a:L1` y serait lu comme le sous-dossier `a/a`).
+ */
+export const newWaveGesture = (key: string, launch?: string): string => {
+  const at = key.lastIndexOf(':');
+  return `cadence orchestrate ${launch !== undefined && key.slice(0, at) === basename(launch) ? `.${key.slice(at)}` : key}`;
+};
 
 /**
  * LE geste suivant d'un lot rendu au lead (L554), chaîne vide quand il n'y en a pas un d'exact : écart docs.sync (acquitter dans le dépôt principal, puis une nouvelle vague qui retrouve le worktree), rendu à l'intégration (`--integrate`, déposé tout de suite même sur
  * une vague vivante), écriture de plan refusée (`--replay`), lot retiré (nouvelle vague). `wave.status === 'running'` : la vague est vivante, ses `--replay` se jouent à sa fin.
  */
-export function lotGesture(wave: { id: string; status: string }, l: Pick<LotState, 'project' | 'lot' | 'status' | 'next' | 'outcome'>): string {
+export function lotGesture(wave: { id: string; status: string; cwd?: string }, l: Pick<LotState, 'project' | 'lot' | 'status' | 'next' | 'outcome'>): string {
   if (l.status !== 'handed-back') return '';
   const key = `${l.project}:${l.lot}`;
   const alive = wave.status === 'running';
-  if (l.outcome === DROPPED) return newWaveGesture(key);
-  if (l.outcome?.startsWith(DOCS_GAP)) return `raf docs-ok ${l.lot} --reason "…" (dépôt principal, plan commité), puis ${alive ? 'à la fin de la vague ' : ''}: ${newWaveGesture(key)}`;
+  if (l.outcome === DROPPED) return alive ? atWaveEnd(newWaveGesture(key, wave.cwd)) : newWaveGesture(key, wave.cwd);
+  if (l.outcome?.startsWith(DOCS_GAP)) return `raf docs-ok ${l.lot} --reason "…" (dépôt principal, plan commité), puis ${alive ? 'à la fin de la vague ' : ''}: ${newWaveGesture(key, wave.cwd)}`;
   if (l.next === 'integrate') return resumeCommand(wave.id, '--integrate', key);
   if (planNoteHandBack(l as LotState)) return replayGesture(wave.id, key, alive);
   return '';
 }
 
 /** Le suffixe d'un refus « le lot n'est pas rendu à… » : le geste du lot s'il en a un (L554). */
-export function gestureSuffix(wave: { id: string; status: string }, l: Parameters<typeof lotGesture>[1]): string {
+export function gestureSuffix(wave: { id: string; status: string; cwd?: string }, l: Parameters<typeof lotGesture>[1]): string {
   const gesture = lotGesture(wave, l);
   return gesture ? ` — le geste : ${gesture}` : '';
 }
@@ -51,13 +58,13 @@ export function stillRunningRefusal(alive: { wave: string; pid: number }, target
   return `la vague ${alive.wave} tourne encore (pid ${alive.pid})${targets.length ? ` : ${atWaveEnd(resumeCommand(alive.wave, ...options))}` : ''}`;
 }
 
-/** Le suffixe du refus d'un `--add` dont le lot est déjà dans la vague : retiré par --drop, il se relance dans une nouvelle vague (L554). */
-export function droppedAddSuffix(known: { status?: string; outcome?: string | null }, key: string): string {
-  return known.status === 'handed-back' && known.outcome === DROPPED ? ` : retiré de la vague : le lancer dans une nouvelle vague : ${newWaveGesture(key)}` : '';
+/** Le suffixe du refus d'un `--add` (vague vivante) dont le lot est déjà dans la vague : retiré par --drop, il se relance dans une nouvelle vague, à la fin de celle-ci (L554). */
+export function droppedAddSuffix(known: { status?: string; outcome?: string | null }, key: string, launch?: string): string {
+  return known.status === 'handed-back' && known.outcome === DROPPED ? ` : retiré de la vague : le lancer dans une nouvelle vague, ${atWaveEnd(newWaveGesture(key, launch))}` : '';
 }
 
 /** La colonne « geste » d'un tableau de vague (L554) : son en-tête et la cellule de chaque lot, rien quand aucun lot n'a un geste. */
-export function gestureColumn(wave: { id: string; status: string }, lots: Parameters<typeof lotGesture>[1][]): { head: string[]; cells: string[][] } {
+export function gestureColumn(wave: { id: string; status: string; cwd?: string }, lots: Parameters<typeof lotGesture>[1][]): { head: string[]; cells: string[][] } {
   const gestes = lots.map((l) => lotGesture(wave, l));
   const any = gestes.some(Boolean);
   return { head: any ? ['geste'] : [], cells: gestes.map((g) => (any ? [g] : [])) };

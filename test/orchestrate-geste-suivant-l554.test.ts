@@ -27,6 +27,7 @@ describe("L554 — le geste d'un lot rendu (lotGesture)", () => {
     const l = lot({ outcome: `${DOCS_GAP} : README.md sans la documentation attendue` });
     expect(lotGesture(live, l)).toBe(`raf docs-ok L1 --reason "…" (dépôt principal, plan commité), puis à la fin de la vague : cadence orchestrate a:L1`);
     expect(lotGesture(stopped, l)).toBe(`raf docs-ok L1 --reason "…" (dépôt principal, plan commité), puis : cadence orchestrate a:L1`);
+    expect(lotGesture({ ...stopped, cwd: '/x/a' }, l)).toContain('puis : cadence orchestrate .:L1');
   });
   it("R2 — rendu à l'intégration : --integrate (déposé tout de suite, même sur une vague vivante) ; écriture de plan refusée : --replay", () => {
     expect(lotGesture(live, lot({ next: 'integrate', outcome: 'rebase' }))).toBe(`cadence orchestrate --resume --wave ${WAVE_ID} --integrate a:L1`);
@@ -34,7 +35,9 @@ describe("L554 — le geste d'un lot rendu (lotGesture)", () => {
     expect(lotGesture(live, lot({ next: 'review', outcome: `${HYPOTHESES_HANDBACK} x` }))).toBe(`à la fin de la vague : cadence orchestrate --resume --wave ${WAVE_ID} --replay a:L1`);
   });
   it('R3 — lot retiré (--drop) : nouvelle vague ; lot rendu sans geste connu, ou lot non rendu : rien', () => {
-    expect(lotGesture(live, lot({ outcome: DROPPED }))).toBe('cadence orchestrate a:L1');
+    expect(lotGesture(stopped, lot({ outcome: DROPPED }))).toBe('cadence orchestrate a:L1');
+    expect(lotGesture(live, lot({ outcome: DROPPED }))).toBe('à la fin de la vague : cadence orchestrate a:L1');
+    expect(lotGesture({ ...live, cwd: '/x/a' }, lot({ outcome: DROPPED }))).toBe('à la fin de la vague : cadence orchestrate .:L1');
     expect(lotGesture(live, lot({ outcome: 'revue non conforme' }))).toBe('');
     expect(lotGesture(live, lot({ outcome: null }))).toBe('');
     expect(lotGesture(live, lot({ status: 'ready', outcome: DOCS_GAP }))).toBe('');
@@ -58,8 +61,9 @@ describe('L554 — la colonne « geste » de status', () => {
 const blocking = () => claudeOut(reviewReport({ bloquants: 1, constats: [{ gravite: 'bloquant', fichier: 'L1-implement.txt', ligne: 1, texte: 'à corriger' }], verdict: 'non conforme : un bloquant' }));
 
 /** Une vague L1 + L2 vivante (faux pid) : L1 est rendu ; `onL2` agit pendant que L2 « tourne ». */
-async function liveWave(onL2: (parent: string) => Promise<void>, fakePid = true) {
-  const { parent } = setup([{ title: 'un' }, { title: 'deux' }]);
+async function liveWave(onL2: (parent: string) => Promise<void>, fakePid = true, fromRepo = false) {
+  const { parent: root, repo } = setup([{ title: 'un' }, { title: 'deux' }]);
+  const parent = fromRepo ? repo : root; // le dossier de lancement : le dépôt lui-même (lots `L1`) ou son parent (lots `a:L1`)
   const f = fake({
     review: (_cwd, brief) => (lotOf(brief) === 'L1' ? blocking() : claudeOut(reviewReport())),
     implement: async (cwd, brief) => {
@@ -77,7 +81,7 @@ async function liveWave(onL2: (parent: string) => Promise<void>, fakePid = true)
       return claudeOut({ commits: [commitFile(cwd, `${l}.txt`, `feat(${l}): travail`)], tests: { commande: 'x', resultat: 'ok', vert: true }, build: { commande: 'x', resultat: 'ok', vert: true }, nonVerifie: [], questions: [], resume: 'ok', choix: [] });
     },
   });
-  await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
+  await run(parent, fromRepo ? ['L1', 'L2', '--max-sessions', '2'] : ['a:L1', 'a:L2', '--max-sessions', '2'], f);
   return parent;
 }
 
@@ -121,7 +125,25 @@ describe("L554 — les refus d'une vague vivante disent le geste", () => {
       err = (await run(parent, ['--add', 'a:L1', '--wave', WAVE], fake())).err;
     }, false);
     expect(err).toMatch(/a:L1 : lot déjà dans la vague/);
-    expect(err).toContain('retiré de la vague : le lancer dans une nouvelle vague : cadence orchestrate a:L1');
+    expect(err).toContain('retiré de la vague : le lancer dans une nouvelle vague, à la fin de la vague : cadence orchestrate a:L1');
+  });
+  it("R6 — vague lancée depuis le dépôt : --add d'un lot retiré dit « à la fin de la vague : cadence orchestrate .:L1 » (le lancer maintenant renvoie vers --add)", async () => {
+    let err = '';
+    await liveWave(async (parent) => {
+      const s = store(parent);
+      const l = s.readLot('a', 'L1')!;
+      l.outcome = DROPPED;
+      s.writeLot(l);
+      err = (await run(parent, ['--add', '.:L1', '--wave', WAVE], fake())).err;
+    }, false, true);
+    expect(err).toContain('à la fin de la vague : cadence orchestrate .:L1');
+  });
+  it('R5 — vague lancée depuis le dépôt : --remove-worktree donne la commande rejouable depuis ce dossier (.:L2)', async () => {
+    let err = '';
+    await liveWave(async (parent) => {
+      err = (await run(parent, ['--remove-worktree', 'L2', '--wave', WAVE], fake())).err;
+    }, false, true);
+    expect(err).toContain(`à la fin de la vague : cadence orchestrate --remove-worktree .:L2 --wave ${WAVE}`);
   });
 });
 

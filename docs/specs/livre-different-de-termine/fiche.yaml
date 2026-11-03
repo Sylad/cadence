@@ -291,7 +291,7 @@ regles:
     tests: ["R29 — annonce d'avant inchangée", "R29 — ligne « lots marqués livrés » imprimée seulement si un lot est marqué"]
   - id: R30
     cas: [C3]
-    enonce: "Tout lecteur de deliveries.log lit les deux premiers champs et ignore le 3e : lastDelivery (src/state.ts:290), readDeliveries (src/state.ts:298, qui alimente perf.ts:926 et stats) et la lecture de verify/deliver-ci donnent le même résultat sur « jour sha » et sur « jour sha bloc » ; cadence verify écrit « jour sha » (sans bloc)."
+    enonce: "Tout lecteur de deliveries.log lit les deux premiers champs et ignore le 3e : lastDelivery (src/state.ts:290), readDeliveries (src/state.ts:298, qui alimente perf.ts:926 et stats) et la lecture de verify/deliver-ci donnent le même résultat sur « jour sha » et sur « jour sha bloc » ; cadence verify écrit « jour sha » après une livraison sans bloc, et « jour sha bloc » (le bloc de la ligne rouge qu'il rattrape) après une livraison rouge --block (R35)."
     statut: sourcee
     source: "réponse du lead — décision de Sylvain (03-11) : « vérifie chaque lecteur de deliveries.log dans src/ et ajoute un test qui lit une ligne à 3 champs » ; lecteurs : src/state.ts:290-305 (split sur l'espace, champs 0 et 1), src/perf.ts:926-937, src/verify.ts:119,159, src/deliver-ci.ts:22, src/deliver.ts:384,441,506"
     tests: ["R30 — lastDelivery lit le sha d'une ligne à 3 champs", "R30 — readDeliveries lit le jour d'une ligne à 3 champs", "R30 — journal mêlant lignes à 2 et 3 champs : jours et dernier sha corrects", "R30 — cadence verify vert : ligne écrite sans bloc"]
@@ -319,6 +319,12 @@ regles:
     statut: hypothese
     si_faux: "Si ces appelants gardaient la dernière ligne quel que soit le bloc, --block web après --block api partirait du sha d'api : la garde ne nommerait pas les lots web non livrés et la CI serait sautée sur une plage trop courte ; seul le point de départ de la plage change."
     tests: ["R34 — garde deliver.ts:384 : --block web après --block api nomme les lots non livrés depuis la ligne valant pour web", "R34 — planOnlySince --block web après --block api : part de la ligne valant pour web, la CI n'est pas sautée si un commit non plan seul s'y trouve", "R34 — planOnlySince sans bloc : plus ancienne des dernières lignes (R33)", "R34 — prev de l'annonce et deliveredIds suivent la même ligne", "R34 — journal sans bloc : les cinq appelants rendent le même sha qu'avant"]
+  - id: R35
+    cas: [C3]
+    enonce: "Après une livraison rouge --block <b>, cadence verify vert réécrit la ligne « jour sha <b> » avec le bloc de la ligne rouge qu'il rattrape (verify.ts:160) : une ligne sans bloc vaudrait pour tous les blocs et marquerait les lots des autres blocs, contre R17."
+    statut: sourcee
+    source: "décision du lead, 03-11, revue 11 de L469"
+    tests: ["R35 — verify vert après un échec de livraison --block api : la ligne écrite garde le bloc, le lot web n'est pas marqué"]
 
 contrats:
   - id: A1
@@ -333,11 +339,11 @@ contrats:
     regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R17, R18, R19, R20, R21, R22, R29, R30, R33, R34]
   - id: A2
     appel: commande cadence verify
-    entree: "comme avant (ligne verte « jour sha » écrite par verify)"
+    entree: "comme avant (ligne verte écrite par verify : « jour sha » après une livraison sans bloc, « jour sha bloc » avec le bloc de la ligne rouge après une livraison rouge --block, R35)"
     sortie: "comme A1 pour les lots marqués ; le reste inchangé"
     erreurs: []
     sans_erreur: "les échecs de marquage sont les avertissements de A1 (R7, R12) ; verify n'a pas d'autre branche d'erreur nouvelle"
-    regles: [R13]
+    regles: [R13, R35]
   - id: A3
     appel: commande raf done <id>
     entree: "<id> d'un lot (ou L1/t1 d'une sous-tâche) ; deliveries.log"

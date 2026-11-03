@@ -275,7 +275,7 @@ describe('R13 — cadence verify vert marque comme deliver', () => {
     await verifyCommand({ config, sha, retry: 0, out: (l) => out.push(l), journal: { dir: f.state, day: DAY, effects } }, deps);
     expect(delivered(f)).toEqual(['L1', 'L2']);
   });
-  it('R17 — verify vert après un échec de livraison --block api : la ligne écrite garde le bloc, le lot web n\'est pas marqué', async () => {
+  it('R35 — verify vert après un échec de livraison --block api : la ligne écrite garde le bloc, le lot web n\'est pas marqué', async () => {
     const f = fx({ blocks: true });
     await go(f); // S0
     ship(f, ['src/web/w.ts'], 'feat(L2): w');

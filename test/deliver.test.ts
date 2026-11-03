@@ -1015,7 +1015,7 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
 
   it.each([false, true])('(b) SIGTERM envoyé à cadence seul pendant le script (bump par un petit-enfant : %s) : le script et ses descendants meurent, un seul bump', async (grandchild) => {
     const logs = tempDir();
-    const dir = scriptRepo(logs, 3, '', grandchild);
+    const dir = scriptRepo(logs, 60, '', grandchild); // L555 : le sommeil (60 s) dépasse le test, comme au test SIGINT : la charge ne peut pas laisser le script bumper de lui-même
     const probe = writeProbe(logs, dir); // L555 : SIGTERM seulement une fois le script adopté par le suivi (pas dès que `first` existe)
     const first = spawn(join(process.cwd(), 'node_modules/.bin/vite-node'), [probe], { detached: true, stdio: 'ignore' });
     const exited = new Promise<void>((r) => first.on('exit', () => r()));
@@ -1024,13 +1024,12 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
       const scriptPid = Number(readFileSync(join(logs, 'first'), 'utf8').trim());
       process.kill(first.pid!, 'SIGTERM'); // à cadence SEUL, pas au groupe
       await exited;
-      // pas de borne de durée : sous charge elle ne prouve rien ; le script (3 s) est mort ou ne bumpera jamais
+      // pas de borne de durée : sous charge elle ne prouve rien ; le script (60 s) doit être mort
       expect(await until(() => !alive(scriptPid), 10_000)).toBe(true);
 
       const second = await run(['deliver'], { cwd: dir, env: {}, out: () => {}, err: () => {}, now: () => new Date() });
       expect(second).toBe(0);
-      await pause(3_000);
-      expect(lines(join(logs, 'bumps'))).toEqual(['bumped']);
+      expect(lines(join(logs, 'bumps'))).toEqual(['bumped']); // le premier script est mort : son bump (après 60 s) n'aura jamais lieu
     } finally {
       try {
         process.kill(-first.pid!, 'SIGKILL');

@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.46.0**: worst-case data set for screen lots (`qa.worstData`); accept checks only the lot's rules on a shared sheet; `uses:` held inside a wave.
 - **1.45.0**: safe plan writes between sessions; GitHub issues followed by the tour and the release; `spec reseal` of several tests; panel bars follow `priority:`.
 - **1.44.0**: a harder self-check before handing back (edge-case trace, rule-by-rule check); `raf quickwins`; planned windows; gate ↔ CI parity warning; dropped lots leave the panel.
 - **1.43.0**: the ratchet baseline is recomputed at integration (no more conflict hand-backs); `docs.sync` lets internal `refactor` commits through; `raf archive` keeps `raf list` order.
@@ -74,6 +75,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.46.0**: a worst-case data set for the screen steps (L534, GitHub issue #22): a project that declares `qa.worstData` in `cadence.yaml` has its spec, mockup, UX and QA briefs open the screens with that set (long names, empty lists, large numbers) as well as the demo one; without the key nothing changes. On a screen sheet shared by several lots, the accept step only requires the tests of the lot's own rules — a list `regles` declared in `acceptation-<lot>.json`, or else the rules its `spec`/`docs` commits added or changed on the sheet (L552, GitHub issue #25). Shared resources (`uses:`) are now held inside a wave: two lots named at launch that carry the same resource play one after the other (L551). `docs.sync` judges the whole diff of a lot that holds a `refactor`, so an internal split followed by small fixes is no longer handed back as « documentation en retard » (L542). `orchestrate/cycle.ts` is split further, with no change of behaviour (L491), and a lock test that turned red under load is steady (L550).
 
 **1.45.0**: the plan is safe to write from several sessions at once (L468): `raf` and `cadence` take an inter-process lock on the plan file, so two writers never lose each other's lines. GitHub issues follow the plan (L548): `cadence lead tour` lists the open issues no lot cites and those whose lot is published, and `cadence release` prints the `gh issue close` command of each issue the version settles; nothing is closed without the lead. `cadence spec reseal` takes several tests in one command and one commit, with a short fixed subject and the paths and reason in the body, and names the commitlint rule that refuses a commit (L546, GitHub issue #23). The lots panel's project bars follow the folder that carries `priority:` instead of the last wave's directory (L547, GitHub issue #24). The edge-case probe recognises a test file of a sub-package (L549), and the signal tests wait for the process to die instead of checking at once (L505).
 

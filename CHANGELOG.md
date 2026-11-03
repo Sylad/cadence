@@ -81,19 +81,18 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.46.0] - 2026-11-03
+
 ### Added
 
 - Sheet shared by several lots (L552, GitHub issue #25, `docs/orchestrate.md` « The accept step »): `checkAcceptation` requires only the tests of the lot's own rules, i.e. the optional key `regles` of its `acceptation-<lot>.json` (counted in the lock) or, without it, the rules that its `spec(<lot>)` and `docs(<lot>)` commits add or modify on the sheet (safe fallback: every rule); a test name already in another lot's sealed acceptation of the same sheet is accepted. Without the key and on a single-lot sheet nothing changes. The `accept` and `accept-back` briefs and the `acceptance-writer` agent tell the session the same: only the rules of its lot, declared with `regles`.
+- Worst-case data set for the screen steps (L534, [docs/orchestrate.md](docs/orchestrate.md#the-spec-step-of-a-lot-with-screen), template `templates/jeu-pires-cas.md`; issue #22): a project that declares `qa.worstData` in `cadence.yaml` (the parameter or path that loads its set, for example `?data=worst`, dev mode only) gets a second capture of each state with that set from the `spec` step (`maquette-<état>-pires-cas-<largeur>.png`), and one checklist line per state, width and data set in the mockup review, the `ux` pass and the `qa-reviewer` brief. The key is validated like `qa.expectations` (one line, a string); without it nothing changes. The template lists the eight families to cover and asks for a regression test.
 
 ### Changed
 
 - Shared resources (`uses:`) are held inside a wave (L551): two lots named at launch that carry the same resource play one after the other instead of together (before, only the `--continue` draw and the `prêts, ressources libres` line counted them).
-
 - `orchestrate/cycle.ts` is split, second part (L491, C1b of `docs/mesures/audit-simplification-l461.md`): `session` and its guards (third-party repositories, lead push, moved HEAD, stray files, plan touched in the worktree) move to `src/orchestrate/cycle/session.ts`; `summarize` joins the report shapes in `schemas.ts`. No change of behaviour; the `max-lines` baseline of `cycle.ts` goes from 1893 to 1382, but the two files together total 1898 (+5 import lines): the overall total only stays flat thanks to a gain from another lot in `plan.ts`.
 - `docs.sync` judges the whole diff of a lot that holds a `refactor` (L542, `docs/news.md`): the `fix`/`test`/`chore`/`style` commits written after it are left out like the refactor itself when they only change test files, comments (including JSDoc ` * …` lines), blank lines, one-line imports, or only add/remove `export` before a declaration, so « refactor then fix(imports/comments) » (L489, L490) is no longer « documentation en retard » (measured: no gap left on both lots). A fix that changes any other code line, one written before the refactor, a `feat`, a `BREAKING CHANGE:` footer, or a lot with no refactor still count.
-### Added
-
-- Worst-case data set for the screen steps (L534, [docs/orchestrate.md](docs/orchestrate.md#the-spec-step-of-a-lot-with-screen), template `templates/jeu-pires-cas.md`; issue #22): a project that declares `qa.worstData` in `cadence.yaml` (the parameter or path that loads its set, for example `?data=worst`, dev mode only) gets a second capture of each state with that set from the `spec` step (`maquette-<état>-pires-cas-<largeur>.png`), and one checklist line per state, width and data set in the mockup review, the `ux` pass and the `qa-reviewer` brief. The key is validated like `qa.expectations` (one line, a string); without it nothing changes. The template lists the eight families to cover and asks for a regression test.
 
 ## [1.45.0] - 2026-11-03
 

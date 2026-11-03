@@ -181,7 +181,7 @@ describe('R15 — les gardes de dépôt valent pour chaque worktree', () => {
 describe('R16 — une seule application lancée à la fois dans le dépôt', () => {
   async function uxWave(lots: Parameters<typeof setup>[0], ux: (parent: () => string) => (cwd: string, brief: string) => Promise<ReturnType<typeof claudeOut>>) {
     const app = await fakeApp(0);
-    const { parent, repo } = setup(lots, `worktrees: true\nmaquette: false\nux: { command: '${app.command}', url: '${app.url}', timeout: 3 }`);
+    const { parent, repo } = setup(lots, `worktrees: true\nmaquette: false\nux: { command: '${app.command}', url: '${app.url}', timeout: 60 }`); // L567 : le délai ne borne que le démarrage de l'application (rendu dès qu'elle répond), pas la file : 3 s ne tenait pas au lancement de node sous charge
     const f = fake({ ux: ux(() => parent) });
     const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '3'], f);
     return { parent, repo, f, r };
@@ -194,7 +194,7 @@ describe('R16 — une seule application lancée à la fois dans le dépôt', () 
       () => async () => {
         active++;
         peak = Math.max(peak, active);
-        await sleep(4500); // plus long que le délai d'attente de l'URL (3 s, large pour une machine chargée) : sans file en mémoire, le second lot abandonnerait son UX
+        await sleep(4500); // L2 arrive à la file pendant ce temps : sans file en mémoire, il lancerait sa propre application et `peak` vaudrait 2
         active--;
         return claudeOut(reviewReport());
       },

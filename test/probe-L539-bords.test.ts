@@ -95,7 +95,7 @@ describe('L539 — --priority, bords du tirage lu dans la vague', () => {
       const parent = parentWith(['a', 'b', 'c']);
       expect((await run(parent, ['--continue', '--max-sessions', '3', '--priority', 'c,b,a'], k % 2 ? 0 : 25)).lots).toEqual(['c', 'b', 'a']);
     }
-  });
+  }, 180_000); // L567 : six vagues complètes (neuf dépôts git, dix-huit worktrees) : 8 s seules, 30 s sous charge, le délai de 30 s par défaut tombait sur le travail, pas sur un blocage
 });
 
 describe('L539 — versions de la 1.42.1 alignées', () => {

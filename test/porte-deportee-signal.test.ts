@@ -44,7 +44,8 @@ describe('L403 — signal pendant la porte déportée (R10, R19)', () => {
       await place.run(marker);
     });
     const wt = join(remote.home, '.cadence-gate', h.repo.split('/').pop()!, 'wt');
-    for (let i = 0; i < 100 && !alive(pattern); i++) await new Promise((r) => setTimeout(r, 100));
+    // L567 : jusqu'à 30 s au démarrage de la commande distante (ssh simulé, worktree, install) sous charge
+    for (let i = 0; i < 300 && !alive(pattern); i++) await new Promise((r) => setTimeout(r, 100));
     expect(alive(pattern)).toBe(true);
     expect(registered.size).toBeGreaterThan(0);
     await Promise.all([...registered].map((f) => f('SIGTERM')));
@@ -54,5 +55,5 @@ describe('L403 — signal pendant la porte déportée (R10, R19)', () => {
     expect(alive(pattern)).toBe(false);
     expect(existsSync(wt) ? readdirSync(wt) : []).toEqual([]);
     expect(registered.size).toBe(0);
-  }, 30_000);
+  }, 90_000);
 });

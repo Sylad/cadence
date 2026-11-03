@@ -1,7 +1,8 @@
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { afterAll, describe, expect, it } from 'vitest';
 import { checkAccepted, checkLotsDone, copiesDesVaguesNonFinies, direMod, direPurge, fingerprint, lanceursConnus, mettreEnService } from '../scripts/mise-en-service.mjs';
 import { takeSnapshot } from '../src/orchestrate/snapshot.js';
@@ -85,23 +86,25 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(realpathSync(join(binDir, 'raf'))).not.toContain(realpathSync(dir));
   });
 
-  it("npm run build, un build:service-like, prepare et un fichier src modifié dans le dépôt de travail laissent l'empreinte du service inchangée", () => {
+  it("npm run build, un build:service-like, prepare et un fichier src modifié dans le dépôt de travail laissent l'empreinte du service inchangée", async () => {
     const { dir, first } = workRepo();
     const { root, binDir } = places();
     mettreEnService({ repo: dir, rev: first, root, binDir, install });
     const before = fingerprint(join(root, 'service'));
 
-    execFileSync('npm', ['run', '--silent', 'build'], { cwd: dir, stdio: 'pipe' });
-    execFileSync('npm', ['run', '--silent', 'prepare'], { cwd: dir, stdio: 'pipe' }); // écrit dist/ du dépôt de travail
+    // L567 : trois tsc complets à la suite ; en asynchrone pour ne pas bloquer le worker (vitest attend 60 s sa réponse à onTaskUpdate), avec un délai à la mesure de leur coût sous charge (29 s sur 30 relevés avec quatre suites en parallèle)
+    const npmRun = (script: string) => promisify(execFile)('npm', ['run', '--silent', script], { cwd: dir });
+    await npmRun('build');
+    await npmRun('prepare'); // écrit dist/ du dépôt de travail
     appendFileSync(join(dir, 'src/dates.ts'), '\nexport const nonRevu = 1;\n');
     appendFileSync(join(dir, 'bin/raf.js'), '\n// non revu\n');
-    execFileSync('npm', ['run', '--silent', 'prepare'], { cwd: dir, stdio: 'pipe' });
+    await npmRun('prepare');
     commitAll(dir, 'feat(L2): non revu', 'src', 'bin');
 
     expect(fingerprint(join(root, 'service'))).toBe(before);
     expect(readFileSync(join(root, 'service', 'bin', 'raf.js'), 'utf8')).not.toContain('non revu');
     expect(readFileSync(join(root, 'service', 'dist', 'dates.js'), 'utf8')).not.toContain('nonRevu');
-  });
+  }, 180_000);
 
   it("npm ci (réinstallation des dépendances) dans le dépôt de travail ne touche pas non plus au service", () => {
     const { dir, first } = workRepo();

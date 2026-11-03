@@ -1933,9 +1933,10 @@ lots:
     started: 2026-11-03
   - id: L568
     title: "Fusion du CHANGELOG au rebase d'intégration : l'union d'un conflit d'ajout pur sous [Unreleased] crée un second ### Fixed et recopie les entrées d'autres lots (03-11 : L564 avec L561 L553 L557 en double, puis L556 avec L553 L557 — chaque intégration de la soirée l'a reproduit, et cadence release publierait les doublons) — fusionner par section (un titre par section, ordre Keep a Changelog) et dédupliquer les lignes identiques ; test : deux lots qui ajoutent chacun une ligne pendant que main réordonne les sections ; et un contrôle de la porte qui refuse un [Unreleased] à titre de section dupliqué"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-03
+    started: 2026-11-03
   - id: L569
     title: "Intégration : un conflit de rebase qui ne porte QUE sur le plan (.cadence/raf.yaml) se fusionne seul — version de main + les écritures du lot (sa revue, ses notes, son état), au lieu de rendre le lot (03-11 : L556, L469 rendus pour ce seul conflit, et à chaque commit de plan du lead sur main il a fallu rebaser à la main les quatre lots en file)"
     status: todo

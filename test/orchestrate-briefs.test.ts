@@ -107,6 +107,20 @@ describe('gabarits', () => {
     }
   });
 
+  it("L552 — briefs accept et accept-back, agent acceptance-writer : sur une fiche partagée seules les règles du lot sont dues, la clé « regles » les déclare, un test déjà vert d'un autre lot n'est pas réécrit", () => {
+    const texts = { accept: renderBrief('accept', vars), 'accept-back': renderBrief('accept-back', vars), agent: read('../agents/acceptance-writer.md') };
+    for (const [name, text] of Object.entries(texts)) {
+      expect(text, name).toContain('shared by several lots');
+      expect(text, name).toMatch(/rules of (the|your) lot/);
+      expect(text, name).toContain('"regles"');
+      expect(text, name).toContain('sealed acceptation of another lot');
+      expect(text, name).not.toMatch(/acceptance tests of every rule/);
+    }
+    // la consigne « chaque test doit échouer » reste, bornée aux règles du lot
+    expect(texts.accept).toContain('Every test must FAIL');
+    expect(texts['accept-back']).toContain('Every test must FAIL');
+  });
+
   it("R7 — brief review d'un lot à acceptation scellée : relecture des assertions contre la fiche demandée", () => {
     const out = renderBrief('review', vars);
     expect(out).toContain('sealed acceptation');

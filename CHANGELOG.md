@@ -83,7 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- Sheet shared by several lots (L552, GitHub issue #25, `docs/orchestrate.md` « The accept step »): `checkAcceptation` requires only the tests of the lot's own rules, i.e. the optional key `regles` of its `acceptation-<lot>.json` (counted in the lock) or, without it, the rules that its `spec(<lot>)` and `docs(<lot>)` commits add or modify on the sheet (safe fallback: every rule); a test name already in another lot's sealed acceptation of the same sheet is accepted. Without the key and on a single-lot sheet nothing changes.
+- Sheet shared by several lots (L552, GitHub issue #25, `docs/orchestrate.md` « The accept step »): `checkAcceptation` requires only the tests of the lot's own rules, i.e. the optional key `regles` of its `acceptation-<lot>.json` (counted in the lock) or, without it, the rules that its `spec(<lot>)` and `docs(<lot>)` commits add or modify on the sheet (safe fallback: every rule); a test name already in another lot's sealed acceptation of the same sheet is accepted. Without the key and on a single-lot sheet nothing changes. The `accept` and `accept-back` briefs and the `acceptance-writer` agent tell the session the same: only the rules of its lot, declared with `regles`.
 
 ### Changed
 

@@ -1644,11 +1644,12 @@ lots:
     finished: 2026-11-03
   - id: L550
     title: "Test instable sous charge : test/orchestrate-worktree-integration.test.ts, R24 / R8 › L443 (verrou du dépôt tenu par un processus vivant de la même vague : la seconde reprise est refusée tout de suite) — rouge dans la suite, vert seul, vu par la porte de L549 le 03-11 ; même famille que L505 (contrôle sans attente d'un état de processus)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-03
     started: 2026-11-03
     review: { date: 2026-11-03, verdict: "conforme (2 notes mineures : import `commitFile` inutilisé, 3ᵉ test de la sonde qui vérifie moins que son titre) — orchestré (vague 2026-11-03-1215-cad, 1 passe(s) de correction)", commit: 42a1fc54be654764c4a87bfa9a3ce89cb1720714, reporte: { de: 5860b9ab7d0bc833af118eeb24327b0774b75620, vers: 42a1fc54be654764c4a87bfa9a3ce89cb1720714, patchId: aa5de2b02423482930c06d48e4480a5c71c64a4f } }
+    finished: 2026-11-03
   - id: L551
     title: "Ressources partagées (uses:) tenues DANS une vague : deux lots nommés au lancement qui portent la même ressource jouent l'un après l'autre (03-11 : L491 et L492, tous deux uses: [cycle-ts], lancés en parallèle par la vague 2026-11-03-1215-cad ; L492 retiré à la main) — aujourd'hui seule la ligne « prêts, ressources libres » et le tirage de --continue en tiennent compte"
     status: todo

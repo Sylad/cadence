@@ -1,0 +1,187 @@
+sujet:
+  id: ressources-par-chemins
+  titre: "Ressources par chemins : resources: peut porter des chemins, la vague tient la ressource de tout lot dont le diff les touche"
+  lot: L558
+  perimetre:
+    modules:
+      - src/resources.ts
+      - src/plan.ts
+      - src/ready-free.ts
+      - src/orchestrate/pool.ts
+      - src/orchestrate/integrate.ts
+      - src/orchestrate/cycle.ts
+      - src/orchestrate/cycle/integrate-lot.ts
+      - src/orchestrate/worktree.ts
+      - docs/raf.md
+      - CHANGELOG.md
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "tout motif à jokers (glob) dans paths: : un chemin est un fichier ou un dossier littéral"
+      - "la lecture des fichiers non commités d'un worktree : seuls les commits du lot comptent"
+      - "la résolution automatique d'un conflit : le lot rendu reste rendu (le message le dit mieux, c'est tout)"
+      - "un verrou à l'écriture : un lot dont le diff touche un chemin n'est jamais empêché de travailler, seule son intégration peut attendre"
+
+cas:
+  - id: C1
+    titre: Le lead déclare une ressource avec ses chemins
+    acteur: le lead
+    declencheur: clé resources du cadence.yaml du dossier parent, lue par commande raf check et par la vague
+    preconditions:
+      - le dossier parent porte un cadence.yaml
+    nominal:
+      - "Le lead écrit « resources: { cycle-ts: { paths: [src/orchestrate/cycle.ts, src/orchestrate/cycle/] } } »."
+      - "readResources rend les noms (ici cycle-ts) comme avant et, en plus, les chemins normalisés de chaque ressource (R3)."
+      - "raf check ne signale rien : un lot qui pose « uses: [cycle-ts] » à la main trouve sa ressource déclarée."
+    alternatives:
+      - { si: "resources reste une liste de noms (forme de L251)", alors: "lue et contrôlée comme aujourd'hui, aucune ressource n'a de chemin", regles: [R1] }
+      - { si: "une ressource de la table n'a pas de paths (« banc: {} » ou « banc: ») ", alors: "ressource sans chemin, elle ne se déduit jamais d'un diff", regles: [R2] }
+      - { si: "un chemin est absolu, vide, contient « .. », « \\ » ou un joker, ou paths n'est pas une liste de textes, ou l'entrée porte une autre clé que paths", alors: "erreur de lecture nommant le fichier et la ressource, jamais une ressource sans chemin silencieuse", regles: [R4] }
+      - { si: "un chemin s'écrit « ./src/x.ts », « src//x.ts » ou « src/orchestrate/cycle/ »", alors: "normalisé avant tout usage", regles: [R3] }
+      - { si: "le même chemin figure deux fois, ou sous deux ressources", alors: "dédoublonné dans une ressource ; sous deux ressources, un diff qui le touche déduit les deux", regles: [R3, R5] }
+    resultat: "Une ressource qui connaît ses chemins, lisible par la vague, raf check et le tour du lead."
+  - id: C2
+    titre: La vague déduit du diff les ressources qu'un lot tient
+    acteur: la vague
+    declencheur: calcul des ressources tenues (pool.ts resourceLock, ready-free.ts taken), pour un lot en jeu qui a un worktree
+    preconditions:
+      - une ressource déclarée porte des chemins
+      - le lot a une branche de worktree avec au moins un commit sur sa base
+    nominal:
+      - "Les fichiers du lot sont ceux des commits « base..tête » de sa branche (R6), la base lue par baseBranchOf."
+      - "Chaque ressource dont un chemin couvre un de ces fichiers est tenue par le lot, en plus de ses uses: posés à la main (R5)."
+      - "readyFree n'offre pas, en face des créneaux libres, un lot prêt dont les uses: sont tenus ainsi ; resourceLock fait attendre la file qui en veut une."
+    alternatives:
+      - { si: "le lot n'a aucun commit, ou sa branche ou sa clé cadence-base n'existe plus", alors: "aucune ressource déduite (seuls ses uses: tiennent)", regles: [R6] }
+      - { si: "aucune ressource déclarée ne porte de chemin", alors: "comportement de L251 / L551 inchangé", regles: [R1, R5] }
+      - { si: "le lot est fini (ready, failed, handed-back, intégré)", alors: "il ne tient plus rien, comme pour uses:", regles: [R5] }
+    resultat: "Un lot qui touche cycle.ts tient cycle-ts sans uses: posé à la main, aussi loin que le code le voit (R7)."
+  - id: C3
+    titre: Un lot fini en premier attend l'ancien qui touche la même ressource
+    acteur: la vague
+    declencheur: étape integrate d'un lot (cycle.ts, integrateLot), avant la prise du verrou d'intégration
+    preconditions:
+      - le lot a un worktree actif et une ressource à chemins est déclarée
+      - "un autre lot de la vague, du même dépôt, est encore en jeu (ni fini ni rendu) et n'est pas lui-même à l'étape integrate"
+    nominal:
+      - "Le lot tardif calcule ses ressources par son diff complet (R6)."
+      - "Pour chaque lot plus ancien en jeu, il lit le diff PARTIEL « base..tête » de la branche de cet ancien au moment du contrôle (R8)."
+      - "L'ancien a déjà un commit sur un chemin d'une ressource du tardif : le tardif attend la fin de l'ancien, journalise l'attente, puis s'intègre (R8)."
+      - "Le contrôle est rejoué à chaque passage entre deux étapes (R9), puis l'intégration suit comme aujourd'hui (verrou, rebase, contrôles, avance)."
+    alternatives:
+      - { si: "l'ancien n'a aucun commit sur la ressource", alors: "le tardif s'intègre sans attendre", regles: [R8] }
+      - { si: "l'ancien touche la ressource après le contrôle", alors: "pas d'attente ; si le rebase en conflit, le message de C4 nomme la ressource", regles: [R10] }
+      - { si: "l'ancien est lui aussi à l'étape integrate, ou déjà rendu ou en échec", alors: "pas d'attente (le verrou d'intégration les ordonne ; attendre un rendu ne mène à rien)", regles: [R9] }
+      - { si: "l'ancien est supprimé : branche absente ou sans cadence-base", alors: "il ne touche rien, pas d'attente", regles: [R6] }
+      - { si: "l'ancien n'a pas fini après la durée d'attente d'intégration", alors: "le tardif est rendu au lead, worktree conservé, repris par --resume --integrate", regles: [R9] }
+      - { si: "aucune ressource à chemins n'est déclarée, ou le diff du tardif n'en touche aucune", alors: "comportement d'aujourd'hui", regles: [R1, R8] }
+    resultat: "L520 (fini avant L492) ne s'intègre pas par-dessus un cycle.ts que L492 découpe déjà : il attend, puis s'intègre."
+  - id: C4
+    titre: Un conflit d'intégration sur une ressource se lit sans enquête
+    acteur: le lead
+    declencheur: rebaseOnto rend un conflit pendant l'étape integrate (integrate-lot.ts:166)
+    preconditions:
+      - le conflit porte sur au moins un fichier
+      - "un des fichiers en conflit est couvert par un chemin d'une ressource déclarée"
+    nominal:
+      - "Le message existant « intégration impossible : conflit en rebasant … » est gardé tel quel."
+      - "Pour chaque ressource touchée par un fichier en conflit, il ajoute le fichier et les commits de la branche de départ qui l'ont modifié depuis le départ du lot (R10)."
+      - "Le lot est rendu comme aujourd'hui (next: integrate, worktree conservé)."
+    alternatives:
+      - { si: "aucun fichier en conflit n'est couvert par une ressource, ou le conflit n'a pas de liste de fichiers", alors: "message d'aujourd'hui, mot pour mot", regles: [R10] }
+      - { si: "plusieurs commits (de plusieurs lots) ou un commit hors vague ont modifié le fichier", alors: "tous les commits sont listés par sha et sujet, au plus 3 puis « +N autres »", regles: [R10] }
+    resultat: "Le lead sait quelle ressource, quel fichier et quels commits ont causé le conflit."
+
+regles:
+  - id: R1
+    cas: [C1, C2, C3]
+    enonce: "Sans ressource à chemins, tout est comme avant : la liste de noms de L251 se lit et se contrôle de la même façon, resourceIssues, readyFree et resourceLock rendent le même résultat, l'intégration n'attend rien."
+    statut: sourcee
+    source: "src/resources.ts:22 (liste de noms), src/ready-free.ts:101, src/orchestrate/pool.ts:73-84 ; demande du lot : une ressource PEUT porter des chemins (ajout facultatif)"
+    tests: ["R1 — resources en liste de noms : readResources, raf check, readyFree et resourceLock rendent le résultat d'avant", "R1 — aucun chemin déclaré : l'étape integrate ne lit aucun diff d'un autre lot"]
+  - id: R2
+    cas: [C1]
+    enonce: "Une ressource peut s'écrire dans une table « nom: { paths: [...] } » ; « nom: {} » et « nom: » (vide) valent une ressource sans chemin. Un cadence.yaml s'écrit en une seule forme : liste de noms OU table, pas de liste mêlée de noms et de tables. Les noms de la table suivent RESOURCE_NAME ; les noms tenus pour déclarés (raf check, uses:) sont ses clés."
+    statut: sourcee
+    source: "demande du lot : « resources: { cycle-ts: { paths: [src/orchestrate/cycle.ts, src/orchestrate/cycle/] } } » ; src/plan.ts:128 (RESOURCE_NAME)"
+    tests: ["R2 — table avec paths : names contient la clé et paths ses chemins", "R2 — « banc: {} » et « banc: » : ressource sans chemin", "R2 — un lot « uses: [cycle-ts] » n'est pas signalé par raf check quand cycle-ts est une clé de la table", "R2 — liste mêlée [banc, { cycle-ts: … }] : erreur de lecture"]
+  - id: R3
+    cas: [C1]
+    enonce: "Un chemin se normalise avant tout usage : « ./ » de tête retiré, « // » réduit à « / », « / » final retiré (« src/orchestrate/cycle/ » et « src/orchestrate/cycle » désignent la même chose), doublons d'une même ressource retirés, ordre conservé. Un chemin est relatif à la racine du dépôt du lot. Il couvre le fichier de ce nom et tout fichier dessous, en comparant segment par segment (« src/a » ne couvre pas « src/ab.ts »)."
+    statut: hypothese
+    si_faux: "Si un chemin sans « / » final ne devait désigner qu'un fichier, seule la comparaison change (une ligne) ; aucune donnée ni contrat publié n'est en jeu."
+    tests: ["R3 — « ./src/x.ts » et « src//x.ts » valent « src/x.ts »", "R3 — « src/orchestrate/cycle/ » couvre src/orchestrate/cycle/sh.ts", "R3 — « src/a » ne couvre pas src/ab.ts", "R3 — « src/x.ts/ » vaut « src/x.ts » et couvre le fichier", "R3 — deux fois le même chemin dans une ressource : un seul gardé"]
+  - id: R4
+    cas: [C1]
+    enonce: "Une table mal formée est une erreur de lecture nommant le fichier, la ressource et la cause, jamais une ressource sans chemin silencieuse : paths pas une liste de textes ; chemin vide, absolu (« / » de tête), contenant « .. », « \\ » ou un joker (« * », « ? », « [ ») ; entrée qui porte une autre clé que paths ; nom hors RESOURCE_NAME (message existant)."
+    statut: hypothese
+    si_faux: "Si un chemin à joker devait être accepté, seule la validation change (L558 ne les couvre pas) ; un cadence.yaml déjà écrit n'est pas touché."
+    tests: ["R4 — paths: src/x.ts (texte, pas liste) : erreur nommant le fichier et la ressource", "R4 — chemin « /etc/x » : erreur", "R4 — chemin « ../x » : erreur", "R4 — chemin « src\\x » : erreur", "R4 — chemin « src/*.ts » : erreur", "R4 — chemin vide : erreur", "R4 — clé « path: » (faute de frappe) : erreur « clé inconnue »"]
+  - id: R5
+    cas: [C1, C2]
+    enonce: "Les ressources tenues par un lot en jeu sont l'union de ses uses: posés à la main et de celles que son diff touche (R6). Un fichier couvert par des chemins de deux ressources en tient deux. Un lot fini ne tient plus rien. Les uses: à la main restent tenus sans diff."
+    statut: sourcee
+    source: "demande du lot : « la vague la tient pour tout lot dont le diff les touche, sans uses: posé à la main » ; src/ready-free.ts:59,76 et src/orchestrate/pool.ts:73-84 (uses: tenus par les lots non finis)"
+    tests: ["R5 — lot sans uses: dont le diff touche cycle.ts : readyFree n'offre pas un lot prêt « uses: [cycle-ts] »", "R5 — lot « uses: [banc] » sans diff : banc reste tenu", "R5 — fichier sous deux ressources : les deux sont tenues", "R5 — lot fini : plus aucune ressource tenue"]
+  - id: R6
+    cas: [C2, C3]
+    enonce: "Le diff d'un lot est la liste des fichiers des COMMITS de sa branche depuis le point de départ de sa base (« git diff --name-only --no-renames <merge-base>..<branche> » : un renommage compte l'ancien et le nouveau chemin). La branche se recalcule par lotBranch (worktree.ts:38) et la base par baseBranchOf (worktree.ts:75), le LotState ne portant ni l'une ni l'autre ; une branche absente ou sans clé cadence-base donne un diff vide. Les fichiers non commités ne comptent pas."
+    statut: sourcee
+    source: "src/orchestrate/worktree.ts:38 et :75 ; src/orchestrate/state.ts:82+ (LotState sans base ni branche) ; note du lead 03-11 (lecture du diff partiel : base..tête)"
+    tests: ["R6 — deux commits : les fichiers des deux sont dans le diff", "R6 — renommage de cycle.ts : l'ancien et le nouveau chemin comptent", "R6 — fichier modifié non commité : absent du diff", "R6 — branche supprimée ou sans cadence-base : diff vide, aucune erreur"]
+  - id: R7
+    cas: [C2]
+    enonce: "Le diff d'un lot n'est connu qu'au fil de son travail (ses commits) : les ressources déduites tiennent donc surtout la fin du lot et l'intégration (R8), et ne retiennent qu'une file qui joue encore (resourceLock ne vaut que pendant que la file joue). Les uses: posés à la main restent le seul moyen de tenir une ressource avant le premier commit."
+    statut: sourcee
+    source: "src/orchestrate/pool.ts:70-84 (resourceLock ne tient que pendant que la file joue) ; revue de la fiche 03-11 (C2 / R6 a)"
+    tests: ["R7 — lot sans commit : aucune ressource déduite, le lot prêt voisin est offert", "R7 — lot d'une file qui joue encore, ayant déjà un commit sur cycle.ts : la file voisine qui veut cycle-ts attend"]
+  - id: R8
+    cas: [C3]
+    enonce: "À l'étape integrate, le lot tardif attend la fin de tout lot plus ancien encore en jeu (même vague ou vague vivante, même dépôt) dont les commits déjà faits (diff partiel « base..tête » de son worktree au moment du contrôle) touchent un chemin d'une ressource que touche le diff complet du tardif ; sinon il s'intègre sans attendre. Si l'ancien touche la ressource plus tard, R10 est le filet. L'attente est journalisée (lot attendu, ressource, chemin) et se lève dès que l'ancien est fini."
+    statut: sourcee
+    source: "décision du lead 03-11 (R6 b) : lecture du diff PARTIEL, le tardif attend la fin de l'ancien s'ils touchent la même ressource, sinon il s'intègre, le message lisible est le filet"
+    tests: ["R8 — ancien ayant déjà un commit sur cycle.ts, tardif fini en premier : il attend puis s'intègre", "R8 — ancien sans commit sur la ressource : le tardif s'intègre sans attendre", "R8 — l'ancien touche une autre ressource que le tardif : pas d'attente", "R8 — aucun lot plus ancien en jeu : pas d'attente"]
+  - id: R9
+    cas: [C3]
+    enonce: "Le contrôle de R8 est réévalué à chaque passage entre deux étapes. Il ne retient pas un lot pour un ancien qui est lui-même à l'étape integrate, rendu ou en échec (pas d'attente circulaire : le verrou d'intégration ordonne les intégrations). L'attente est bornée par la durée d'attente d'intégration de la vague (INTEGRATE_WAIT_MS, 10 minutes, c.wave.integrate?.waitMs) : au-delà, le tardif est rendu au lead avec le message de A2, worktree conservé et next: integrate, repris par --resume --integrate."
+    statut: hypothese
+    si_faux: "Si l'attente devait être sans borne ou d'une autre durée, seul le seuil change ; si elle devait aussi attendre un ancien rendu, le lot attendrait un lot qui ne reprendra pas sans le lead."
+    tests: ["R9 — ancien repassant à une étape après le premier contrôle : le tardif réévalue", "R9 — deux lots à integrate sur la même ressource : aucun n'attend l'autre, pas d'interblocage", "R9 — ancien rendu (handed-back) : le tardif s'intègre", "R9 — ancien encore en jeu après waitMs : le tardif est rendu avec le message d'attente, worktree conservé"]
+  - id: R10
+    cas: [C3, C4]
+    enonce: "Quand rebaseOnto rend un conflit avec des fichiers, le message existant est gardé mot pour mot et, pour chaque ressource que couvre un fichier en conflit, complété de « ressource « <nom> » : <fichier> modifié dans <base> depuis le départ du lot par <sha7> <sujet>[, …] » : les commits de la branche de départ qui ont touché ce fichier depuis le point de départ du lot (au plus 3, puis « +N autres »), ce qui couvre plusieurs lots comme un commit extérieur à la vague, sans chercher quel lot en est l'auteur. Un conflit sans fichier ou hors ressource garde le message d'aujourd'hui."
+    statut: hypothese
+    si_faux: "Si le message devait nommer le lot auteur, il faudrait que l'intégration garde la liste des fichiers de chaque lot (aujourd'hui rebaseOnto ne rend que les fichiers en conflit) : plus de code, aucune donnée de plus."
+    tests: ["R10 — conflit sur cycle.ts : le message garde le texte d'avant et nomme cycle-ts, le fichier et le commit de base", "R10 — deux commits de base sur le fichier : les deux sont listés", "R10 — quatre commits : trois puis « +1 autre »", "R10 — conflit sur un fichier hors ressource : message identique à celui d'avant", "R10 — conflit sans liste de fichiers : message identique à celui d'avant"]
+
+contrats:
+  - id: A1
+    appel: commande raf check
+    entree: "options existantes inchangées ; cadence.yaml du dossier parent avec resources: en liste de noms ou en table"
+    sortie: "un écart « ✗ » par ressource non déclarée d'un lot ouvert (une clé de la table est déclarée), code 1 ; sinon la sortie existante"
+    erreurs:
+      - { code: log error, message: "✗ <lot> utilise la ressource « <nom> », non déclarée dans <fichier> (resources:)" }
+      - { code: log error, message: "<fichier> : resources doit être une liste de noms de ressources" }
+      - { code: log error, message: "<fichier> : resources.<nom> : chemin invalide « <chemin> » (relatif au dépôt, sans « .. », « \\ » ni joker)" }
+      - { code: log error, message: "<fichier> : resources.<nom> : paths doit être une liste de chemins" }
+      - { code: log error, message: "<fichier> : resources.<nom> : clé inconnue « <clé> » (seule paths est connue)" }
+    regles: [R1, R2, R3, R4]
+  - id: A2
+    appel: commande orchestrate
+    entree: "étape integrate d'un lot en worktree, avec une ressource à chemins déclarée"
+    sortie: "le lot s'intègre comme avant, après avoir attendu au besoin l'ancien qui touche la même ressource (ligne de journal « <projet:lot> intégration différée : <projet:lot ancien> touche la ressource « <nom> » (<chemin>) »)"
+    erreurs:
+      - { code: log error, message: "intégration refusée : <projet:lot ancien>, encore en jeu, touche la ressource « <nom> » (<chemin>) depuis plus de <durée> ; worktree conservé : <dossier>" }
+      - { code: log error, message: "intégration impossible : conflit en rebasant <branche> sur <base> (fichiers : <liste>) ; ressource « <nom> » : <fichier> modifié dans <base> depuis le départ du lot par <sha7> <sujet> ; worktree conservé : <dossier>" }
+    regles: [R6, R8, R9, R10]
+  - id: A3
+    appel: commande lead tour
+    entree: "options existantes inchangées ; ressources à chemins déclarées, lots en jeu avec worktree"
+    sortie: "la ligne des lots prêts libres (freeLine) sans ceux dont les uses: sont tenus par un lot dont le diff touche les chemins de la ressource ; sans chemin déclaré, la sortie d'avant"
+    erreurs: []
+    sans_erreur: "le tour n'a pas de nouvelle branche d'échec : un cadence.yaml mal formé est déjà signalé par sa ligne de tour (R4) et ne tient aucune ressource, comme aujourd'hui"
+    regles: [R1, R5, R6, R7]
+
+donnees:
+  - { id: D1, objet: "cadence.yaml du dossier parent : clé resources (liste de noms, ou table nom: { paths: [chemins] })", existant: true, modification: ajout, decision: "demande du lot L558 : « resources: { cycle-ts: { paths: [src/orchestrate/cycle.ts, src/orchestrate/cycle/] } } » ; la liste de noms de L251 reste valide et lue pareil ; risque connu : une version plus ancienne de raf/cadence qui lit le même cadence.yaml refuse la table (src/resources.ts:22 exige une liste de textes), d'où la règle R2 : on ne passe un fichier à la table que pour y poser des chemins" , note: "ajout de forme ; readResources garde names et ajoute les chemins par ressource" }
+  - { id: D2, objet: "branche cadence/<vague>/<lot> et config git branch.<nom>.cadence-base", existant: true, modification: aucune, note: "lues seules pour calculer le diff d'un lot (R6) ; rien n'est écrit, aucun fichier d'état de vague ne change" }

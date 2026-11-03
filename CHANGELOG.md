@@ -81,16 +81,16 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- Free slots count only the lots that hold a claude session (L520, `docs/orchestrate.md`): in a repository in `orchestrate.worktrees` mode, a lot that waits for a dependency (`en attente de : …`) or is in the test gate (the build and the tests of the program, no claude session) no longer holds a slot in the registry, and the wave updates it when a lot enters or leaves the gate. On 2026-11-01 a wave L517 → L518, L519 with one real session read `créneaux libres : 0 sur 3` for an hour; on 2026-11-03 three lots in their gate counted as three taken slots. The load of the gates stays bounded as before: at most `--max-sessions` lots play at once in a wave, each gate with its own `CADENCE_TEST_WORKERS` share.
+
 ## [1.46.0] - 2026-11-03
 
 ### Added
 
 - Sheet shared by several lots (L552, GitHub issue #25, `docs/orchestrate.md` « The accept step »): `checkAcceptation` requires only the tests of the lot's own rules, i.e. the optional key `regles` of its `acceptation-<lot>.json` (counted in the lock) or, without it, the rules that its `spec(<lot>)` and `docs(<lot>)` commits add or modify on the sheet (safe fallback: every rule); a test name already in another lot's sealed acceptation of the same sheet is accepted. Without the key and on a single-lot sheet nothing changes. The `accept` and `accept-back` briefs and the `acceptance-writer` agent tell the session the same: only the rules of its lot, declared with `regles`.
 - Worst-case data set for the screen steps (L534, [docs/orchestrate.md](docs/orchestrate.md#the-spec-step-of-a-lot-with-screen), template `templates/jeu-pires-cas.md`; issue #22): a project that declares `qa.worstData` in `cadence.yaml` (the parameter or path that loads its set, for example `?data=worst`, dev mode only) gets a second capture of each state with that set from the `spec` step (`maquette-<état>-pires-cas-<largeur>.png`), and one checklist line per state, width and data set in the mockup review, the `ux` pass and the `qa-reviewer` brief. The key is validated like `qa.expectations` (one line, a string); without it nothing changes. The template lists the eight families to cover and asks for a regression test.
-
-### Changed
-
-- Free slots count only the lots that hold a claude session (L520, `docs/orchestrate.md`): in a repository in `orchestrate.worktrees` mode, a lot that waits for a dependency (`en attente de : …`) or is in the test gate (the build and the tests of the program, no claude session) no longer holds a slot in the registry, and the wave updates it when a lot enters or leaves the gate. On 2026-11-01 a wave L517 → L518, L519 with one real session read `créneaux libres : 0 sur 3` for an hour; on 2026-11-03 three lots in their gate counted as three taken slots. The load of the gates stays bounded as before: at most `--max-sessions` lots play at once in a wave, each gate with its own `CADENCE_TEST_WORKERS` share.
 
 - Shared resources (`uses:`) are held inside a wave (L551): two lots named at launch that carry the same resource play one after the other instead of together (before, only the `--continue` draw and the `prêts, ressources libres` line counted them).
 - `orchestrate/cycle.ts` is split, second part (L491, C1b of `docs/mesures/audit-simplification-l461.md`): `session` and its guards (third-party repositories, lead push, moved HEAD, stray files, plan touched in the worktree) move to `src/orchestrate/cycle/session.ts`; `summarize` joins the report shapes in `schemas.ts`. No change of behaviour; the `max-lines` baseline of `cycle.ts` goes from 1893 to 1382, but the two files together total 1898 (+5 import lines): the overall total only stays flat thanks to a gain from another lot in `plan.ts`.

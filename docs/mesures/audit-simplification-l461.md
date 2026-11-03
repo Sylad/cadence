@@ -94,7 +94,7 @@ puis les étapes une par une. Un lot = `ctx` + 3 modules feuilles ; un second = 
 - **Protégé par** : `orchestrate-cycle.test.ts` (3 105 l.) et 46 autres fichiers qui importent `cycle.js`
   (`orchestrate-spec-back`, `orchestrate-aval`, `orchestrate-guards`, `orchestrate-porte-test`, `orchestrate-worktree-*`…) ; fortement protégé.
 - **Risque** : cycles d'import (`session` ↔ étapes) — d'où `ctx` en premier ; fonctions `session` et `work` à ne **pas** réécrire dans ce lot (les couper en plus petites est un lot à part).
-- **Fait (L491, 03-11)** : `session` et ses gardes (`checkTiers`, `leadDelivery`, `handBack`, `moveStray`, `planTouched`, `badReport`) sont dans `cycle/session.ts` (619 lignes). `summarize`, que `lostVerdict` partage avec la revue, est dans `schemas.ts` (la forme du rapport) pour qu'aucun module `cycle/` n'importe `cycle.ts`. Mesuré : `max-lines` de `cycle.ts` 1 893 → 1 382, total des fichiers 5 035 → 5 035 (transfert) ; `session` garde sa complexité et sa longueur (à couper dans un autre lot).
+- **Fait (L491, 03-11)** : `session` et ses gardes (`checkTiers`, `leadDelivery`, `handBack`, `moveStray`, `planTouched`, `badReport`) sont dans `cycle/session.ts` (619 lignes). `summarize`, que `lostVerdict` partage avec la revue, est dans `schemas.ts` (la forme du rapport) pour qu'aucun module `cycle/` n'importe `cycle.ts`. Mesuré : `max-lines` de `cycle.ts` 1 893 → 1 382, `cycle/session.ts` 516 ; le cliquet (`--contre main`) ne voit aucun total monter (transfert, +5 lignes d'import entre les deux fichiers) ; `session` garde sa complexité et sa longueur (à couper dans un autre lot).
 
 **C2. `orchestrate/command.ts` (1 768 l., complexité 769)** : `resume` (286 l.) et `execute` (229 l.) sont les deux
 fonctions les plus longues du fichier.

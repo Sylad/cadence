@@ -1034,13 +1034,14 @@ lots:
     finished: 2026-11-03
   - id: L492
     title: "Découpage C1c : orchestrate/cycle.ts — les étapes (precheck, spec, accept, checks, work, review, integrate) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C1 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
-    status: doing
+    status: done
     estimate: 0.5
     uses: [ cycle-ts ]
     created: 2026-10-31
     started: 2026-11-02
     docs_ok: { date: 2026-11-03, reason: "découpage interne de cycle.ts (C1c) : aucune commande, clé, sortie ni export public changé ; même faux positif que corrige L542 (lead, 03-11)" }
     review: { date: 2026-11-03, verdict: "conforme : revue courte Opus conforme avant le conflit ; rebase sur main résolu par le lead (sous-agent Opus) — changements de L520 reportés dans cycle/checks.ts, de L552 dans cycle/accept-step.ts, comparaison ligne à ligne avec le cycle.ts de main (seule différence : export), doublon CHANGELOG retiré ; tsc, cliquet et suite complète verts (6875 tests)", commit: a4ec228ceb089f2a07436e9de0ea18bb64c53bd7 }
+    finished: 2026-11-03
   - id: L493
     title: "Nettoyage E : déclarer vite en devDependency, assertion manquante du R3 de orchestrate-registry.test.ts (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § E ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: done
@@ -1723,6 +1724,7 @@ lots:
     created: 2026-11-03
     notes:
       - { date: 2026-11-03, text: "03-11 : même famille vue sur test/porte-deportee.test.ts › L403 R19 (délai : la commande distante arrêtée côté hôte, plus de processus du groupe) — rouge sous charge, vert seul (porte de L492) ; traiter les deux tests ensemble" }
+      - { date: 2026-11-03, text: "03-11 : même famille vue sur test/orchestrate-worktree-plan-writes.test.ts › R16 (deux lots à écran : une seule application lancée à la fois) — rouge sous charge, vert seul (porte de L469 ; déjà vu par la revue de L534)" }
     started: 2026-11-03
   - id: L556
     title: "Hook du plugin « retour → geste » (03-11, après 1 h 40 perdue et 8 gestes refusés) : PostToolUse Bash qui, quand la sortie d'une commande cadence/raf contient un refus connu (« une orchestration y est déjà en cours », « tenu par la vague … attente de sa fin », « pas rendu à l'étape d'intégration », « la vague … tourne encore », « lot déjà dans la vague », « ne tient pas le budget du lot », « Unknown option '-- », code 137…) ajoute au contexte du lead le geste exact (même table que le lot du geste suivant imprimé, une seule source) ; plus un rappel quand une commande Bash du lead contient une boucle d'attente (while/until + pgrep -f) — même mécanisme que L502 --estimate 0.5 --spec"

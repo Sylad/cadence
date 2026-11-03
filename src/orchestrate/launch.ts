@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import type { Effort } from '../config.js';
@@ -367,28 +367,45 @@ export function killSessions(): void {
 /**
  * Le prompt d'un `claude -p <prompt> …` (L559, issue #27) : il part sur stdin, jamais en argument. Un argument est plafonné à 128 Kio sous Linux
  * (MAX_ARG_STRLEN) et le brief d'un lot dont la fiche est grosse (~270 Ko) faisait échouer le `spawn` en E2BIG. `claude -p` sans prompt lit stdin.
- * Les arguments qui ne commencent pas par `-p` (`--version`, `auth status`) et ceux de `claude-local` (son script lit le prompt en `$1`) restent tels quels.
+ * Les arguments qui ne commencent pas par `-p` (`--version`, `auth status`) restent tels quels. `claude-local` lit son prompt en `$1` (son script
+ * redirige stdin vers /dev/null) : sous la limite il reste en argument, au-delà il est écrit dans un fichier (`localBriefFile`) que `$1` désigne.
  */
 function promptOnStdin(args: string[], local: boolean | undefined): { args: string[]; prompt?: string } {
   if (local || args[0] !== '-p' || args.length < 2) return { args };
   return { args: [args[0], ...args.slice(2)], prompt: args[1] };
 }
 
+/** Plus gros prompt gardé en `$1` de `claude-local` : sous MAX_ARG_STRLEN (128 Kio) avec de la marge. */
+const LOCAL_PROMPT_MAX_BYTES = 100_000;
+
+/** Brief d'une étape `claude-local` trop gros pour `$1` : écrit dans un fichier du dossier temporaire de la session, remplacé en `$1` par la consigne de le lire. */
+function localBriefFile(args: string[], tmp: string | undefined): { args: string[]; dir?: string } {
+  if (Buffer.byteLength(args[0] ?? '') <= LOCAL_PROMPT_MAX_BYTES) return { args };
+  const dir = mkdtempSync(join(tmp || tmpdir(), 'cadence-brief-'));
+  const file = join(dir, 'brief.md');
+  writeFileSync(file, args[0]!);
+  return { args: [`Ton brief entier est dans le fichier ${file} (trop gros pour cette ligne de commande) : lis-le en entier avec l'outil Read, puis exécute-le.`, ...args.slice(1)], dir };
+}
+
 /** Vrai lanceur : `claude` (ou CADENCE_CLAUDE_BIN) dans son propre groupe de processus, tué en bloc au délai. */
 export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env, localBin = 'claude-local'): ClaudeFn {
   return (given, opts) =>
     new Promise((resolve) => {
-      const { args, prompt } = promptOnStdin(given, opts.local);
+      const piped = promptOnStdin(given, opts.local);
+      const { args, prompt } = piped;
+      const big = opts.local ? localBriefFile(given, opts.env?.TMPDIR) : { args };
+      const finalArgs = big.args;
       // Marque héritée par tous les descendants, même orphelins rattachés à init (un shell qui sort aussitôt après
       // `nohup srv &` échappe à tout relevé de l'arbre) : à la fin de la session, tout ce qui la porte est tué.
       const mark = randomUUID();
       marks.add(mark);
       const inherited = { ...base };
       for (const v of opts.unset ?? []) delete inherited[v];
-      const child = spawn(opts.local ? localBin : bin, args, { cwd: opts.cwd, env: { ...inherited, ...opts.env, [SESSION_MARK_VAR]: mark }, stdio: [prompt === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], detached: true });
+      const child = spawn(opts.local ? localBin : bin, finalArgs, { cwd: opts.cwd, env: { ...inherited, ...opts.env, [SESSION_MARK_VAR]: mark }, stdio: [prompt === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], detached: true });
       const pid = child.pid;
       if (pid === undefined) {
         marks.delete(mark);
+        if (big.dir) rmSync(big.dir, { recursive: true, force: true });
         child.once('error', (e) => resolve({ code: 127, stdout: '', stderr: String(e.message), timedOut: false }));
         return;
       }
@@ -446,6 +463,7 @@ export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env, l
         live.delete(pid);
         reap();
         marks.delete(mark);
+        if (big.dir) rmSync(big.dir, { recursive: true, force: true });
         resolve({ code: code ?? (signal ? 137 : 1), stdout: Buffer.concat(out).toString('utf8'), stderr: Buffer.concat(err).toString('utf8'), timedOut });
       });
     });

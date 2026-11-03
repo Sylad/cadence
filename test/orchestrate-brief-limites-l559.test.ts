@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { realClaude, buildArgs, buildLocalArgs, buildRetryArgs, type StepSpec } from '../src/orchestrate/launch.js';
@@ -85,7 +85,7 @@ describe('L559 limites — le prompt sur stdin', () => {
     expect(out.code).not.toBe(0);
   });
 
-  it('claude-local avec un brief de plus de 128 Kio : la session démarre aussi (le prompt est en $1 : E2BIG reste possible)', async () => {
+  it('claude-local avec un brief de plus de 128 Kio : la session démarre, le brief est lu dans un fichier que $1 désigne', async () => {
     const dir = tempDir();
     const f = fauxClaude(dir);
     const brief = 'règle é '.repeat(40_000);
@@ -93,6 +93,29 @@ describe('L559 limites — le prompt sur stdin', () => {
     const out = await realClaude('claude', process.env, f.bin)(buildLocalArgs(spec(brief), {}), { cwd: dir, env: {}, timeoutMs: 30_000, local: true });
     expect(out.stderr).toBe('');
     expect(out.code).toBe(0);
+    const argv = JSON.parse(lire(f.argv)) as string[];
+    expect(Buffer.byteLength(argv[0]!)).toBeLessThan(4096);
+    const file = /(\/\S+\.md)/.exec(argv[0]!)?.[1];
+    expect(file).toBeDefined();
+    expect(existsSync(file!)).toBe(false); // supprimé à la fin de la session
+  });
+
+  it('claude-local avec un brief de plus de 128 Kio : le fichier du brief existe pendant la session et contient le brief entier', async () => {
+    const dir = tempDir();
+    const bin = join(dir, 'peek.mjs');
+    const copy = join(dir, 'copy.txt');
+    writeFileSync(bin, `#!/usr/bin/env node\nimport { readFileSync, writeFileSync } from 'node:fs';\nconst f = /(\\/\\S+\\.md)/.exec(process.argv[2])[1];\nwriteFileSync(${JSON.stringify(copy)}, readFileSync(f, 'utf8'));\nprocess.stdout.write('{}');\n`, { mode: 0o755 });
+    const brief = 'règle é '.repeat(40_000);
+    const out = await realClaude('claude', process.env, bin)(buildLocalArgs(spec(brief), {}), { cwd: dir, env: { TMPDIR: dir }, timeoutMs: 30_000, local: true });
+    expect(out.code).toBe(0);
+    expect(lire(copy)).toBe(brief);
+  });
+
+  it('claude-local avec un brief court : le prompt reste en $1, sans fichier', async () => {
+    const dir = tempDir();
+    const f = fauxClaude(dir);
+    await realClaude('claude', process.env, f.bin)(buildLocalArgs(spec('court'), {}), { cwd: dir, env: {}, timeoutMs: 30_000, local: true });
+    expect((JSON.parse(lire(f.argv)) as string[])[0]).toBe('court');
   });
 });
 

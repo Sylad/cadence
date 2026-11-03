@@ -17,6 +17,8 @@ Self-check before handing back (the recurring findings of the reviews). Go throu
 - no dead code, and no test that cannot fail: a test whose assertion is always true, or that does not exercise the rule it names;
 - screens: for a modified screen, the capture due of each state, at 1440 and 390 px, with a file name (where it goes is the Playwright paragraph's rule); a lot with no modified screen owes none, and says so;
 - no false comment: a comment, a docstring or a message never describes a behaviour the code no longer has or does not have.
+- edge-case trace [L543] (the first cause of the code bugs: 131 of the 208 `bug-code` passes of the 27-10 → 03-11 window): check it on your own diff before you hand back. Do not list the inputs again, the « edge cases » point (L447) of the block below asks for that list and for playing it; add only the TRACE: in "resume", one line per input listed at that point, « entrée → attendu → obtenu », and any input you did not play under "nonVerifie";
+- misread-contract check [L543] (the second cause: 37 of the 208): check it on your own diff before you hand back. For each rule Rn of the fiche (or of the lot's statement), quote the « mot de la règle » and the « ligne de code » that holds it, re-read the statement after the code, and put every difference under "choix";
 A point you cannot hold is written under "choix" or "nonVerifie" of your report, not left unsaid.
 
 Limits and rules, before the walkthrough (a code bug found by the review is the first cause of correction passes: 100 of the 143 classified passes of the 23–29-10 window). Re-read your diff against the fiche (if there is one) and the lot, then:

@@ -6,6 +6,10 @@ import { specText } from '../src/orchestrate/spec.js';
 import { maquetteText } from '../src/orchestrate/maquette.js';
 import { worstReviewText, worstUxText } from '../src/orchestrate/pires-cas.js';
 import { tempDir } from './helpers.js';
+import { runLot } from '../src/orchestrate/cycle.js';
+import { Plan } from '../src/plan.js';
+import { claudeOut, commitFile, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
+import { ecrit } from './spec-helpers.js';
 
 const read = (f: string): string => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const flat = (f: string): string => read(f).replace(/\s+/g, ' ');
@@ -149,5 +153,29 @@ describe('L534 — gabarit templates/jeu-pires-cas.md et documentation', () => {
     expect(flat('docs/orchestrate.md')).toContain('qa.worstData');
     expect(flat('docs/spec.md')).toContain('templates/jeu-pires-cas.md');
     expect(flat('README.md')).toContain('docs/orchestrate.md');
+  });
+});
+
+describe('L534 — la valeur de qa.worstData atteint les briefs réels du cycle', () => {
+  const pageLot = [{ title: 'Une page', screen: 'page' as const, estimate: 1 }];
+  const impl: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')] }));
+  const ok: Handler = () => claudeOut(reviewReport());
+  const spec: Handler = (call) => claudeOut(specReport({ fiche: ecrit(call.opts.cwd) }));
+  const cycle = async (worst: string | undefined) => {
+    const h = harness({ lots: pageLot, script: { spec: [spec], maquette: [ok], implement: [impl], review: [ok], ux: [ok] } });
+    const c = h.lot('L1', { visible: true, screen: 'page' }, { maquette: true, ux: { url: 'http://localhost:4200' } });
+    const planFile = join(h.repo, '.cadence/raf.yaml');
+    c.loadPlan = () => Plan.load(planFile, worst ? { qaWorstData: worst } : {});
+    await runLot(c);
+    return (kind: string) => h.calls.find((x) => x.kind === kind)!.brief;
+  };
+
+  it('R9 — avec qa.worstData déclarée, les briefs spec, maquette et ux réels (briefFor) citent sa valeur', async () => {
+    const brief = await cycle(WORST);
+    for (const kind of ['spec', 'maquette', 'ux']) expect(brief(kind), kind).toContain(WORST);
+  });
+  it('R2 — sans qa.worstData, les briefs réels du cycle ne parlent pas du jeu pires cas', async () => {
+    const brief = await cycle(undefined);
+    for (const kind of ['spec', 'maquette', 'ux']) expect(brief(kind), kind).not.toContain('data=worst');
   });
 });

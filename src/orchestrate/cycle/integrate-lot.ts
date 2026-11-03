@@ -1,4 +1,4 @@
-import { type LotCtx, histPlan, workDir as wd, stop, save, transition, propose, short } from './ctx.js';
+import { type LotCtx, histPlan, workDir as wd, stop, save, transition, propose } from './ctx.js';
 import { type ReviewSummary, lotKey } from '../state.js';
 import { repoShas, repoWork } from '../../repos.js';
 import { lotWork, coveredTasks } from '../../audit.js';

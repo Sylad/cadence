@@ -1,6 +1,6 @@
 import { type LotCtx, workDir as wd } from './ctx.js';
 import { toolBinOf, withoutLaunchVars } from '../snapshot.js';
-import { delimiter, resolve } from 'node:path';
+import { delimiter } from 'node:path';
 import { spawn } from 'node:child_process';
 import { TEST_WORKERS_ENV } from '../workers.js';
 import { trackGroup } from '../launch.js';

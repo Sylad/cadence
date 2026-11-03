@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { Plan } from '../src/plan.js';
+import { chmodSync, existsSync, readdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { Plan, RafError } from '../src/plan.js';
 import { tempDir } from './helpers.js';
 
 // L468 (M6) — écriture du plan sûre entre sessions : verrou inter-processus `<plan>.lock` et refus d'écraser un plan changé depuis sa lecture.
@@ -153,5 +153,24 @@ describe('R5 — un plan en lecture seule ne prend aucun verrou', () => {
     const p = Plan.load(path, { format: { lots: 'lots' } } as never);
     expect(() => p.save()).toThrow(/lecture seule/);
     expect(existsSync(`${path}.lock`)).toBe(false);
+  });
+});
+
+describe('R6 — une pose du verrou qui échoue (autre raison qu\'un verrou déjà là) est un refus lisible, le plan intact', () => {
+  // Le verrou vit à côté du plan : un dossier non inscriptible (ou sans liens physiques) refuse sa pose. Joué seulement hors root, qui ignore les droits.
+  it.skipIf(process.getuid?.() === 0)('R6 — dossier du plan en lecture seule : RafError nommant EACCES et le verrou, plan inchangé, aucun .tmp laissé', () => {
+    const p = fresh();
+    const dir = dirname(p.path);
+    const before = readFileSync(p.path, 'utf8');
+    p.add('A', T);
+    chmodSync(dir, 0o555);
+    try {
+      expect(() => p.save()).toThrow(RafError);
+      expect(() => p.save()).toThrow(/pose du verrou du plan refusée \(EACCES, .*raf\.yaml\.lock.*\) — plan inchangé/);
+      expect(readFileSync(p.path, 'utf8')).toBe(before);
+      expect(readdirSync(dir).filter((f) => f !== 'raf.yaml')).toEqual([]);
+    } finally {
+      chmodSync(dir, 0o755);
+    }
   });
 });

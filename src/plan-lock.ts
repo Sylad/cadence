@@ -36,15 +36,28 @@ function waitMs(): number {
 const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 /**
+ * Pose le verrou (vrai) ou le trouve déjà là (faux). Toute autre raison d'échouer (EACCES sur le dossier du plan, EROFS, ENOSPC, EPERM ou EMLINK
+ * sur un système de fichiers sans liens physiques) est un refus lisible : le plan n'a pas été touché, et l'erreur le dit au lieu d'une pile Node.
+ */
+function tryLink(file: string, lock: PlanLock, refuse: (message: string) => Error): boolean {
+  try {
+    return linkNewFile(file, JSON.stringify(lock), process.pid);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    throw refuse(`pose du verrou du plan refusée (${code ? `${code}, ` : ''}${(e as Error).message}) — plan inchangé ; le dossier du plan doit être inscriptible et accepter les liens physiques (${file})`);
+  }
+}
+
+/**
  * Joue `fn` avec le verrou `file` (L468) : un fichier posé de façon atomique, porteur identifié par pid et heure de démarrage. Un verrou
  * tenu par un processus vivant fait attendre (jusqu'à `CADENCE_PLAN_LOCK_WAIT_MS`, 30 s par défaut) puis refuser ; un verrou dont le porteur est
- * mort (ou dont le pid a été repris) est écarté. Le verrou est rendu quoi qu'il arrive à `fn`.
+ * mort (ou dont le pid a été repris) est écarté ; une pose impossible (dossier non inscriptible, pas de liens physiques) est refusée en le disant. Le verrou est rendu quoi qu'il arrive à `fn`.
  */
 export function withPlanLock<T>(file: string, refuse: (message: string) => Error, fn: () => T): T {
   const lock: PlanLock = { pid: process.pid, started: new Date().toISOString(), start: processStart(process.pid) ?? undefined };
   const limit = Date.now() + waitMs();
   for (;;) {
-    if (linkNewFile(file, JSON.stringify(lock), process.pid)) break;
+    if (tryLink(file, lock, refuse)) break;
     const seen = read(file);
     if (seen && !held(seen)) {
       removeStaleFile(file, (aside) => {

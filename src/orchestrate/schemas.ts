@@ -1,4 +1,5 @@
 import type { SessionKind } from './launch.js';
+import type { ReviewSummary } from './state.js';
 
 const str = { type: 'string' } as const;
 const num = { type: 'number' } as const;
@@ -153,4 +154,13 @@ export function checkShape<T>(value: unknown, schema: { required: readonly strin
     if (!ok) throw new Error(`sortie structurée : champ « ${k} » mal typé (attendu ${want})`);
   }
   return value as T;
+}
+
+/** Le résumé d'un rapport de revue : les totaux annoncés ne sont pas crus sur parole (un constat de gravité majeure compte même si le total dit 0). */
+export function summarize(rep: ReviewReport, head: string, repoHeads?: Record<string, string>): ReviewSummary {
+  // Rien d'un rapport n'est cru sur parole : un constat de gravité majeure compte même si les totaux annoncés disent 0.
+  const count = (g: string) => rep.constats.filter((k) => k.gravite === g).length;
+  const bloquants = Math.max(rep.bloquants, count('bloquant'));
+  const majeurs = Math.max(rep.majeurs, count('majeur'));
+  return { conforme: bloquants === 0 && majeurs === 0, bloquants, majeurs, mineurs: Math.max(rep.mineurs, count('mineur')), verdict: rep.verdict.trim(), sousTaches: rep.sousTaches, nonVerifie: rep.nonVerifie, head, ...(repoHeads ? { repoHeads } : {}) };
 }

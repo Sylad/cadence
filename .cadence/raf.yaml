@@ -1661,11 +1661,12 @@ lots:
     finished: 2026-11-03
   - id: L551
     title: "Ressources partagées (uses:) tenues DANS une vague : deux lots nommés au lancement qui portent la même ressource jouent l'un après l'autre (03-11 : L491 et L492, tous deux uses: [cycle-ts], lancés en parallèle par la vague 2026-11-03-1215-cad ; L492 retiré à la main) — aujourd'hui seule la ligne « prêts, ressources libres » et le tirage de --continue en tiennent compte"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-03
     started: 2026-11-03
     review: { date: 2026-11-03, verdict: "compliant (1 minor : `loadPlan` non gardé dans le verrou de ressources) — orchestré (vague 2026-11-03-1345-l552, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: f82306696ef5df304be53d5e45b586742a702277 }
+    finished: 2026-11-03
   - id: L552
     title: "accept (issue #25) : sur une fiche d'écran partagée par plusieurs lots, checkAcceptation n'exige que les tests des règles du lot — celles qu'il ajoute ou modifie (commits docs(<lot>) de la fiche) ou une liste déclarée dans acceptation-<lot>.json — et accepte un nom de test déjà présent dans l'acceptation scellée d'un autre lot de la même fiche ; aujourd'hui un lot qui amende 10 règles sur 133 échoue sur les ~120 autres et chaque --resume retombe sur le même échec"
     status: doing

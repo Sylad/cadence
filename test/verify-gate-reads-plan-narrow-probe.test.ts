@@ -89,9 +89,9 @@ describe('L566 probe — bords du rejeu restreint sous commit de plan', () => {
     expect(r.code).toBe(0);
   });
 
-  it('P7 — readsPlan liste + src qui cite le plan : la déclaration prime, seuls les fichiers déclarés sont rejoués', async () => {
+  it('P7 — readsPlan liste + src qui cite le plan : la porte entière est rejouée (L566, la liste ne couvre pas le code)', async () => {
     const r = await play({ files: { 'src/lit.ts': `'${PLAN}'\n` }, gateYaml: '  gate:\n    readsPlan: [test/x.test.ts]\n' });
-    expect(r.log).toBe('replay\ntest/x.test.ts\n');
+    expect(r.log).toBe('build\ntests\n');
   });
 
   it('P8 — chemin déclaré avec $ et ; : cité pour le shell, aucune injection', async () => {

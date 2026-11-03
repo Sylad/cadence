@@ -108,7 +108,7 @@ describe('L566 — sous un commit de plan seul, la porte ne rejoue que les tests
   });
 
   it('R7 — seuls des scripts (hors tests) citent le plan : verdict repris en entier, rien n\'est rejoué, les scripts sont nommés', async () => {
-    const r = await gateAbovePlan({ files: { 'skills/reprise/scripts/faits.mjs': `'${PLAN}'\n`, 'scripts/cloture.sh': `cat ${PLAN}\n` } });
+    const r = await gateAbovePlan({ files: { 'skills/reprise/scripts/faits.mjs': `'${PLAN}'\n`, '.claude/skills/cloture/scripts/faits.sh': `cat ${PLAN}\n` } });
     expect(r.code).toBe(0);
     expect(r.log).toBe('');
     expect(r.text).toContain('verdict repris');
@@ -134,6 +134,21 @@ describe('L566 — sous un commit de plan seul, la porte ne rejoue que les tests
 
   it('R11 — un code applicatif (src) cite le plan en plus d\'un test : la porte entière est rejouée (L482)', async () => {
     const r = await gateAbovePlan({ files: { ...READER, 'src/lit-le-plan.ts': `'${PLAN}'\n` }, replay: true });
+    expect(r.log).toBe('build\ntests\n');
+  });
+
+  it('R12 — un helper ou une fixture sous test/ cite le plan (pas un fichier de test) : la porte entière est rejouée, jamais passé au rejeu comme un test', async () => {
+    const r = await gateAbovePlan({ files: { 'test/plan-reel.ts': `'${PLAN}'\n`, 'test/a.test.ts': 'x\n' }, replay: true });
+    expect(r.log).toBe('build\ntests\n');
+  });
+
+  it('R13 — un script sous scripts/ (lancé par le build ou un test) cite le plan : la porte entière est rejouée, verdict non repris', async () => {
+    const r = await gateAbovePlan({ files: { 'scripts/plan-data.mjs': `'${PLAN}'\n` }, replay: true });
+    expect(r.log).toBe('build\ntests\n');
+  });
+
+  it('R14 — liste déclarée et un workflow CI ou un src cite le plan : la déclaration ne dispense pas de la porte entière', async () => {
+    const r = await gateAbovePlan({ files: { '.github/workflows/ci.yml': `run: cat ${PLAN}\n` }, gateYaml: '  gate:\n    readsPlan: [test/x.test.ts]\n', replay: true });
     expect(r.log).toBe('build\ntests\n');
   });
 });

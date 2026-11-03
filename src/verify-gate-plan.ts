@@ -34,13 +34,13 @@ function planNote(repo: string, sha: string, planFile: string | undefined, decla
 }
 
 
-/** Un fichier de test d'après son chemin : un dossier `test`/`tests`/`__tests__`/`e2e`/`spec(s)`, ou un nom `*.test.*`, `*.spec.*`, `*.e2e.*`, `*_test.*`, `test_*`. */
-const isTestFile = (path: string): boolean => /(^|\/)(tests?|__tests__|e2e|specs?)\//i.test(path) || /\.(test|spec|e2e)\.[^/]+$/i.test(path) || /(^|\/)test_[^/]*$|_test\.[^/]+$/i.test(path);
+/** Un fichier de test d'après son nom : `*.test.*`, `*.spec.*`, `*.e2e.*`, `*_test.*`, `test_*`. Le dossier ne suffit pas : un helper ou une fixture sous `test/` n'est pas un test que `testReplay` sait jouer, et le test qui l'importe ne cite pas le plan lui-même. */
+const isTestFile = (path: string): boolean => /\.(test|spec|e2e)\.[^/]+$/i.test(path) || /(^|\/)test_[^/]*$|_test\.[^/]+$/i.test(path);
 
-/** Un script d'outillage d'après son chemin : sous un dossier `skills/` ou `scripts/` (les scripts des skills /reprise et /cloture, l'outillage du dépôt). */
-const isToolScript = (path: string): boolean => /(^|\/)(skills|scripts)\//.test(path);
+/** Un script de skill d'après son chemin : sous un dossier `skills/` (les scripts des skills /reprise et /cloture). Pas `scripts/` : le build ou un test du projet peut le lancer. */
+const isToolScript = (path: string): boolean => /(^|\/)skills\//.test(path);
 
-/** Ce que la porte rejoue sous un commit de plan seul quand le verdict du sha dessous vaut pour le reste (L566) : les tests `files` (vide : aucun), les `scripts` d'outillage qui citent le plan sans être des tests. */
+/** Ce que la porte rejoue sous un commit de plan seul quand le verdict du sha dessous vaut pour le reste (L566) : les tests `files` (vide : aucun), les `scripts` de skills qui citent le plan sans être des tests. */
 interface PlanReplay {
   files: string[];
   scripts: string[];
@@ -48,19 +48,19 @@ interface PlanReplay {
 
 /**
  * Les lecteurs du plan à rejouer seuls (L566), ou null quand la porte entière reste à rejouer : plan inconnu, porte en parties ou rejeu seul (`testReplay`) absent (cadence ne devine pas comment jouer un fichier),
- * un autre code que des tests et des scripts d'outillage qui cite le plan (src, CI : L482), `readsPlan: true` dont aucun test n'est détecté (lecteur inconnu, par prudence).
- * Déclaré en liste : ces chemins, tous. Sinon les fichiers qui citent le plan (L482) qui sont des tests ; non déclaré et seulement des scripts d'outillage qui le citent : rien à rejouer, le verdict du dessous vaut
+ * un autre code que des tests et des scripts de skills qui cite le plan (src, CI : L482), `readsPlan: true` dont aucun test n'est détecté (lecteur inconnu, par prudence).
+ * Déclaré en liste : ces chemins, tous. Sinon les fichiers qui citent le plan (L482) qui sont des tests ; non déclaré et seulement des scripts de skills qui le citent : rien à rejouer, le verdict du dessous vaut
  * en entier (un test qui lance un script se déclare en liste).
  */
 function planReplay(repo: string, sha: string, planFile: string | undefined, declared: unknown, config: OrchestrateConfig): PlanReplay | null {
   if (!planFile) return null;
   const canReplay = typeof config.test === 'string' && !!config.testReplay;
-  if (Array.isArray(declared)) return canReplay ? { files: declared as string[], scripts: [] } : null;
   const readers = planReaders(repo, sha, planFile);
-  if (!readers.length) return null;
   const files = readers.filter(isTestFile);
   const scripts = readers.filter((r) => !isTestFile(r) && isToolScript(r));
   if (files.length + scripts.length < readers.length) return null;
+  if (Array.isArray(declared)) return canReplay ? { files: declared as string[], scripts } : null;
+  if (!readers.length) return null;
   if (files.length) return canReplay ? { files, scripts } : null;
   return declared ? null : { files: [], scripts };
 }

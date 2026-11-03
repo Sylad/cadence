@@ -253,7 +253,7 @@ export interface OrchestrateConfig {
    */
   worktreeDeps?: string[];
   /**
-   * `gate.readsPlan` (L450) : un test de la porte lit le plan du projet (`true`, ou la liste des chemins des tests qui le lisent, pour la trace). `cadence verify --gate` ne reprend alors plus le verdict
+   * `gate.readsPlan` (L450) : un test de la porte lit le plan du projet (`true`, ou la liste des chemins des tests qui le lisent : avec `testReplay` et une porte de vague enregistrée dessous, ce sont les seuls fichiers rejoués sous un commit de plan seul, L566, sauf si du code hors tests cite le plan). `cadence verify --gate` ne reprend alors plus le verdict
    * d'une vague sous des commits qui ne changent que le plan (L444) : un `raf done` change ce que ce test lit, la porte est rejouée. Absente : ces commits sont traversés.
    */
   gate?: {

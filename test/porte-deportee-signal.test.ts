@@ -37,16 +37,21 @@ describe('L403 — signal pendant la porte déportée (R10, R19)', () => {
     const remote = fakeRemote();
     const h = harness();
     const env = { ...process.env, ...remote.env };
-    const run = withPlace({ config: { gate: { host: 'machine' }, test: 'sleep 31337.4' } as OrchestrateConfig, repo: h.repo, sha: hgit(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: false, label: 'porte du lot L1', local: async () => ({ code: 0, output: '' }), say: () => {}, env }, async (place) => {
-      await place.run('sleep 31337.4');
+    // L555 : marqueur propre à ce processus de test (pgrep -f voit toute la machine, dont les sessions de vague parallèles), ancré en fin de ligne
+    const marker = `sleep 31337.${process.pid}`;
+    const pattern = `sleep 31337\\.${process.pid}$`;
+    const run = withPlace({ config: { gate: { host: 'machine' }, test: marker } as OrchestrateConfig, repo: h.repo, sha: hgit(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: false, label: 'porte du lot L1', local: async () => ({ code: 0, output: '' }), say: () => {}, env }, async (place) => {
+      await place.run(marker);
     });
     const wt = join(remote.home, '.cadence-gate', h.repo.split('/').pop()!, 'wt');
-    for (let i = 0; i < 100 && !alive('sleep 31337.4'); i++) await new Promise((r) => setTimeout(r, 100));
-    expect(alive('sleep 31337.4')).toBe(true);
+    for (let i = 0; i < 100 && !alive(pattern); i++) await new Promise((r) => setTimeout(r, 100));
+    expect(alive(pattern)).toBe(true);
     expect(registered.size).toBeGreaterThan(0);
     await Promise.all([...registered].map((f) => f('SIGTERM')));
     await run;
-    expect(alive('sleep 31337.4')).toBe(false);
+    // l'arrêt du groupe n'est pas instantané sous charge : jusqu'à 10 s au dernier processus pour disparaître
+    for (let t = 0; t < 10_000 && alive(pattern); t += 100) await new Promise((r) => setTimeout(r, 100));
+    expect(alive(pattern)).toBe(false);
     expect(existsSync(wt) ? readdirSync(wt) : []).toEqual([]);
     expect(registered.size).toBe(0);
   }, 30_000);

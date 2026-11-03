@@ -78,7 +78,7 @@ export interface Lot {
   state?: string;
   /** État d'avant le blocage (clé `state_before:`) : celui où `raf status <lot> --back` revient. */
   stateBefore?: string;
-  estimate: number;
+  estimate: number; unestimated?: true; // unestimated : aucune estimation lisible (absente, nulle, pas un nombre) : `estimate` vaut 1 par défaut (L467, `raf quickwins` les liste à part)
   quickwin: boolean;
   /** Changement visible par l'utilisateur : une entrée Nouveautés est attendue à la livraison. */
   visible: boolean;
@@ -156,7 +156,6 @@ export const FIELDS = ['id', 'title', 'status', 'estimate', 'quickwin', 'visible
 /** Nature de l'écran d'un lot visible : nouvelle page, nouveau composant, parcours modifié. */
 export const SCREENS = ['page', 'component', 'journey'] as const;
 export type Screen = (typeof SCREENS)[number];
-
 export type Field = (typeof FIELDS)[number];
 
 /**

@@ -4,7 +4,7 @@ import { gitRoot } from './git.js';
 import { RafError, setPlanNotice } from './plan.js';
 import { cmdAdd, cmdArchive, cmdDid, cmdDocsOk, cmdEstimate, cmdIgnore, cmdMove, cmdNote, cmdPublic, cmdScreen, cmdSetStatus, cmdStatus, cmdTitle, cmdTodo, cmdUses, cmdVisible } from './cli/lot-commands.js';
 import { cmdPlan } from './cli/plan-commands.js';
-import { cmdCheck, cmdCommits, cmdGantt, cmdList, cmdNews, cmdNow, cmdRef, cmdShow } from './cli/read-commands.js';
+import { cmdCheck, cmdCommits, cmdGantt, cmdList, cmdNews, cmdNow, cmdQuickwins, cmdRef, cmdShow } from './cli/read-commands.js';
 import { cmdGate, cmdHook } from './cli/gates.js';
 import { cmdInit, cmdMigrate, cmdSkills } from './cli/setup-commands.js';
 import { cmdSpec, cmdSpecChecks } from './cli/spec-commands.js';
@@ -48,6 +48,7 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf show <id> [--notes]   le lot : statut, dates, after, titre public, visible et verdict ux (lot visible), notes datées, commits comptés ; --notes : les notes seules
   raf commits <id>      les commits du lot que compte la porte de revue de code, du plus ancien au plus récent
   raf now               ce qui est en cours, la suite, les derniers terminés
+  raf quickwins [--by champ] [--max j]   les gains rapides prêts (estimation ≤ 0,25 j, ou ⚡), groupés par un champ d'extension déclaré (plan.extras) ; à part, les prêts sans estimation
   raf list [--status todo|doing|done|dropped] [--json]   les lots, une ligne chacun ; --json : un tableau JSON des lots (clés du fichier du plan, champs d'extension sous extras)
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot, citant un id inconnu ou des lots sans y travailler, sans réécrire l'historique ; raf check --ignored les liste
@@ -166,6 +167,7 @@ const WITH_PLAN: Record<string, (c: Ctx) => number | Promise<number>> = {
   show: cmdShow,
   list: cmdList,
   now: cmdNow,
+  quickwins: cmdQuickwins,
   ignore: cmdIgnore,
   'docs-ok': cmdDocsOk,
   check: cmdCheck,

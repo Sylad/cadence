@@ -26,6 +26,11 @@ function checkStateNames(raw: Record<string, unknown>, problems: string[]): void
   for (const k of ['state', 'state_before']) if (raw[k] != null && typeof raw[k] !== 'string') problems.push(`${k} : un nom d'état attendu (reçu « ${String(raw[k])} »)`);
 }
 
+/** L'estimation d'un lot : celle du plan, ou 1 jour par défaut avec la marque `unestimated` (L467). */
+function readEstimate(v: unknown): { estimate: number; unestimated?: true } {
+  return typeof v === 'number' && v > 0 ? { estimate: v } : { estimate: 1, unestimated: true };
+}
+
 export function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lot {
   const status = STATUSES.includes(raw.status as Status) ? (raw.status as Status) : 'todo';
   const asDay = (field: string): Day | undefined => {
@@ -64,7 +69,7 @@ export function normalizeLot(raw: Record<string, unknown>, problems: string[] = 
     status,
     ...(typeof raw.state === 'string' && raw.state.trim() !== '' ? { state: raw.state.trim() } : {}),
     ...(typeof raw.state_before === 'string' && raw.state_before.trim() !== '' ? { stateBefore: raw.state_before.trim() } : {}),
-    estimate: typeof raw.estimate === 'number' && raw.estimate > 0 ? raw.estimate : 1,
+    ...readEstimate(raw.estimate),
     quickwin: raw.quickwin === true,
     visible: raw.visible === true,
     ...(screen ? { screen } : {}),

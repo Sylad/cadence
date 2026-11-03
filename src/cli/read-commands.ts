@@ -12,6 +12,7 @@ import { linkCommits } from '../link.js';
 import { buildNews, loadEntries, newEntry, newsData, newsIssues, stampEntries } from '../news.js';
 import { type Lot, Plan, RafError, type Status, STATUSES } from '../plan.js';
 import { dueLine, recurringByDue } from '../recurring.js';
+import { quickwinLines, quickwins, readMax } from '../quickwins.js';
 import { schedule } from '../schedule.js';
 import { coverageCommand } from '../ref/coverage.js';
 import { type Ctx, type Io, knownLot } from './context.js';
@@ -203,6 +204,14 @@ export function cmdGantt(c: Ctx): number | Promise<number> {
 /** raf now : ce qui est en cours, la suite, les derniers terminés. */
 export function cmdNow(c: Ctx): number {
   return now(c.loadPlan(), c.root, c.newsDir, c.today, c.io);
+}
+
+/** raf quickwins [--by champ] [--max jours] : les gains rapides prêts, groupés par un champ d'extension, et les prêts non estimés (L467). */
+export function cmdQuickwins(c: Ctx): number {
+  const { values, io, loadPlan, planConfig } = c;
+  const declared = Object.keys(planConfig?.settings.extras ?? {});
+  for (const l of quickwinLines(quickwins(loadPlan(), { by: values.by, max: readMax(values.max), declared }), values.by)) io.out(l);
+  return 0;
 }
 
 /** raf news … : les entrées Nouveautés. */

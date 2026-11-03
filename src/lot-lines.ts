@@ -42,6 +42,6 @@ function flagLines(lot: Lot): string[] {
  * Les noms exportés sont ceux que garantit docs/stabilite.md : renommer un champ du type interne `Lot` ne les change pas.
  */
 export function lotJson(lot: Lot): Record<string, unknown> {
-  const { docsOk, stateBefore, problems: _problems, ...rest } = lot;
+  const { docsOk, stateBefore, problems: _problems, unestimated: _unestimated, ...rest } = lot;
   return { ...rest, ...(docsOk ? { docs_ok: docsOk } : {}), ...(stateBefore ? { state_before: stateBefore } : {}) };
 }

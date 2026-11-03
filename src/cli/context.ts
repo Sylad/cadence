@@ -28,6 +28,8 @@ const OPTIONS = {
     'no-hook': { type: 'boolean' },
     estimate: { type: 'string' },
     quickwin: { type: 'boolean' },
+    by: { type: 'string' },
+    max: { type: 'string' },
     visible: { type: 'boolean' },
     screen: { type: 'string' },
     spec: { type: 'boolean' },

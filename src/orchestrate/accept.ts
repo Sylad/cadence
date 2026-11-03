@@ -5,6 +5,7 @@ import { parse } from 'yaml';
 import type { Ref } from '../plan.js';
 import { citedRefs } from '../link.js';
 import { PLAN_ACTIONS } from '../plan-commit.js';
+import { testsAbsents, type Partage } from './accept-regles.js';
 import { isParts, type GateTest } from './gate-parts.js';
 
 // Étape accept d'orchestrate (L173, spec etape-spec S5) : le fichier acceptation.json d'un lot et le verrou de ses tests rouges.
@@ -25,6 +26,8 @@ export interface Acceptation {
   e2e?: boolean;
   /** Empreinte git (blob) de chaque fichier de tests, posée par le programme au scellé. */
   empreintes?: Record<string, string>;
+  /** Ids des règles de la fiche dont le lot doit les tests (L552) ; lue telle quelle, `checkAcceptation` la valide (une valeur fausse y est un écart). Comptée dans le verrou comme toute clé autre que `vert`. */
+  regles?: unknown;
   /** Journal des rescellés d'un seul test (`cadence spec reseal`, L200) : le test, la raison donnée par le lead, la date et les deux empreintes. */
   resceaux?: { test: string; raison: string; date: string; avant: string; apres: string; porteur?: string; ficheAmendee?: string }[];
 }
@@ -76,7 +79,7 @@ export function parseAcceptation(text: string): Acceptation | string {
   if (typeof vert !== 'boolean') return 'clé « vert » (booléen) attendue';
   const empreintes = isObj(doc.empreintes) ? (Object.fromEntries(Object.entries(doc.empreintes).filter(([, v]) => typeof v === 'string')) as Record<string, string>) : undefined;
   const resceaux = Array.isArray(doc.resceaux) ? (doc.resceaux.filter((r) => isObj(r) && ['test', 'raison', 'date', 'avant', 'apres'].every((k) => typeof r[k] === 'string')) as NonNullable<Acceptation['resceaux']>) : undefined;
-  return { lot, fiche, fichiers: fichiers as string[], vert, ...(doc.e2e === true ? { e2e: true } : {}), ...(empreintes ? { empreintes } : {}), ...(resceaux?.length ? { resceaux } : {}) };
+  return { lot, fiche, fichiers: fichiers as string[], vert, ...(doc.e2e === true ? { e2e: true } : {}), ...(empreintes ? { empreintes } : {}), ...(doc.regles !== undefined ? { regles: doc.regles } : {}), ...(resceaux?.length ? { resceaux } : {}) };
 }
 
 /** JSON à clés triées, sans la clé `vert` : la forme que le verrou compare. */
@@ -281,7 +284,8 @@ export function setVert(repo: string, path: string): void {
 }
 
 /** Écarts de l'`acceptation.json` écrit par la session accept (vide = accepté). `base` : la tête d'avant la première session accept ; un fichier de tests qui y existe déjà ne peut pas être listé. */
-export function checkAcceptation(repo: string, path: string, lot: string, fiche: string, base?: string): string[] {
+export function checkAcceptation(repo: string, path: string, lot: string, fiche: string, ...suite: [base?: string, partage?: Partage]): string[] {
+  const [base, partage] = suite;
   const file = join(repo, path);
   if (!existsSync(file)) return [`${path} : acceptation.json absent (le lister dans ${path}, avec les fichiers de tests, dans le commit rouge)`];
   const a = parseAcceptation(readFileSync(file, 'utf8'));
@@ -314,7 +318,7 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
   }
   try {
     const doc = parse(readFileSync(join(repo, fiche), 'utf8')) as { regles?: { id?: unknown; tests?: unknown }[] };
-    for (const r of doc.regles ?? []) for (const t of Array.isArray(r.tests) ? r.tests : []) if (typeof t === 'string' && !texts.includes(t) && !texts.includes(t.replace(/'/g, "\\'"))) problems.push(`${r.id} : test « ${t} » (nom prévu dans la fiche) absent des fichiers listés`);
+    problems.push(...testsAbsents({ repo, path, a, lot, fiche, texts, partage }, doc.regles ?? []));
   } catch {
     problems.push(`${fiche} : fiche illisible`);
   }

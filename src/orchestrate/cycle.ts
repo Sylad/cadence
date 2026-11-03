@@ -407,7 +407,7 @@ function acceptationProof(c: LotCtx, fiche: string): boolean {
     return existsSync(join(wd(c), norm)) && emp[norm] === git(wd(c), 'hash-object', '--', norm).trim();
   });
   if (!sealed) return false;
-  return checkAcceptation(wd(c), json, l.lot, fiche).length === 0;
+  return checkAcceptation(wd(c), json, l.lot, fiche, undefined, { dir: c.config.spec.dir, refsOf: c.loadPlan().refs }).length === 0;
 }
 
 /** Chemins salis par une session : suivis modifiés, nouveaux fichiers non suivis, et ceux des dépôts voisins. */
@@ -657,7 +657,7 @@ const tail = (output: string, n = 40): string => output.trim().split('\n').slice
 async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore: string | undefined): Promise<string[]> {
   const l = c.lot;
   const out = headBefore ? lockViolations(wd(c), c.config.spec.dir, headBefore, { skip: json }) : [];
-  out.push(...checkAcceptation(wd(c), json, l.lot, fiche, l.steps.find((s) => s.kind === 'accept')?.headBefore));
+  out.push(...checkAcceptation(wd(c), json, l.lot, fiche, l.steps.find((s) => s.kind === 'accept')?.headBefore, { dir: c.config.spec.dir, refsOf: c.loadPlan().refs }));
   if (out.length) return out;
   const red = await runAccept(c, json);
   if (red.orphans.length) out.push(`fichiers listés dans ${json} sous la racine d'aucune commande de orchestrate.accept (le dossier de son « cd <dossier> && » initial, sinon le dépôt) : ${red.orphans.join(', ')} — aucun lanceur ne les prendrait`);

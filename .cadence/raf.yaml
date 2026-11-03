@@ -1583,6 +1583,7 @@ lots:
     notes:
       - { date: 2026-11-02, text: "abandonné : doublon de L496 (même défaut, ouvert le 31-10), en cours dans la vague 2140-cont ; le cas L489/L490 (refactor puis fix) est à vérifier dans sa revue" }
       - { date: 2026-11-02, text: "rouvert (était dropped) : rouvert : le précheck de L496 juge le besoin couvert par L537, mais le cas refactor suivi de fix (L489, L490) ne l'est pas" }
+      - { date: 2026-11-03, text: "Lead 03-11 : premier essai (vague 2140-cont) abandonné après un SIGKILL de session ; constat de la revue à reprendre : L489 et L490 restent « documentation en retard » parce que les commits fix qui ne retouchent que des commentaires JSDoc (lignes ' * …', ex. pool.ts:32 et :35) sont classés comme du code par INERT_LINE depuis d39453e (6a7eaf4 les jugeait inertes) ; mesurer avec lotDocSyncGaps sur les vrais commits de L489 et L490 (écart attendu : [])." }
     started: 2026-11-03
   - id: L543
     title: "Première écriture : le goulot « bug de code » (141 passes classées sur 214, conforme du premier coup 63 % → 45 % sur deux fenêtres, cadence perf du 03-11) — classer ces constats de revue par cause (cas limite oublié, test absent, contrat mal lu, régression ailleurs…), puis durcir le brief d'implémentation sur les deux causes dominantes (auto-vérification avant rendu) ; mesure avant/après sur la part conforme du premier coup"

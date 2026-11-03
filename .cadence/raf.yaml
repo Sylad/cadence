@@ -1624,6 +1624,7 @@ lots:
     estimate: 0.5
     created: 2026-11-03
     started: 2026-11-03
+    review: { date: 2026-11-03, verdict: "conforme : 1 note mineure (l'exclusion des lots de projets frères dans hasLot est partielle et codée en dur, sans effet sur le plan actuel) — orchestré (vague 2026-11-02-2140-cont, 2 passe(s) de correction + passe des mineurs)", commit: c3a493b9cb0272ea6f0b676779f92cb46763fa53, reporte: { de: 83e9ab76846d8f99ea5250d770d456f21b0d769a, vers: c3a493b9cb0272ea6f0b676779f92cb46763fa53, patchId: 084f727d31e36c98ffce8cbd47e33e78a8f1326f } }
   - id: L549
     title: "Sonde de cas limites : faux avertissement « la session a modifié du code hors tests » pour un fichier de test d'un sous-paquet (03-11, L545 : plugins/cadence-hud/tests/decisions-l545-drop.probe.test.ts) — reconnaître *.test.ts / tests/ à toute profondeur, test sur ce chemin"
     status: done

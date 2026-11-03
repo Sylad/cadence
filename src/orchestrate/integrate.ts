@@ -6,9 +6,7 @@ import { sharedStateDir } from '../state.js';
 import { activeLock, releaseLock, takeLock, type OLock } from './lock.js';
 import { mergeUnreleased, moveToUnreleased, settleLotEntries, unreleasedSections } from './changelog-merge.js';
 import { mutexFor } from './mutex.js';
-import { readPlanConfig } from '../config.js';
-import { Plan } from '../plan.js';
-import { parseDocument } from 'yaml';
+import { isMap, isNode, isSeq, parseDocument, type YAMLMap, type YAMLSeq } from 'yaml';
 import { git, gitFailure, tryGit } from './worktree.js';
 import { BASELINE, comparerMigration, serialiser, type Mesure } from '../../scripts/qualite.mjs';
 
@@ -89,44 +87,85 @@ function resolveChangelog(work: string, start: string | undefined): boolean {
   }
 }
 
+/** Champs d'un lot que le lot écrit lui-même (L569) : sa revue, ses notes, ses tâches, son état. Tout autre champ (estimation, titre, extension déclarée…) est une décision du lead. */
+const LOT_WRITES = ['review', 'ux', 'notes', 'tasks', 'status', 'state', 'state_before', 'started', 'finished'];
+
+/** Les lots d'un plan lu à une étape du conflit : leur carte YAML, par identifiant, plus la tête du plan (tout sauf `lots`). */
+function planStage(work: string, file: string, n: number) {
+  const doc = parseDocument(run(work, 'show', `:${n}:${file}`));
+  const lots = doc.get('lots');
+  if (doc.errors.length || !isSeq(lots)) throw new Error(`${file} (étape ${n}) : plan illisible`);
+  const byId = new Map<string, YAMLMap>();
+  for (const item of lots.items) {
+    if (!isMap(item) || byId.has(String(item.get('id')))) throw new Error(`${file} (étape ${n}) : lot sans identifiant ou en double`);
+    byId.set(String(item.get('id')), item);
+  }
+  return { doc, byId, head: JSON.stringify({ ...(doc.toJSON() as Record<string, unknown>), lots: undefined }) };
+}
+
+const keyName = (p: { key: unknown }) => String((p.key as { value?: unknown }).value ?? p.key);
+const jsonOf = (n: unknown) => JSON.stringify(isNode(n) ? n.toJSON() : (n ?? null));
+
+/** Les notes que `t` ajoute à celles de `b`, ou null quand il en a réécrit ou retiré une. */
+function addedNotes(t: YAMLSeq, b: YAMLSeq | undefined): unknown[] | null {
+  const base = b?.items ?? [];
+  if (t.items.length < base.length || jsonOf(t.items.slice(0, base.length)) !== jsonOf(base)) return null;
+  return t.items.slice(base.length);
+}
+
+/** L'écriture qui reprend le champ `key` du lot `t` sur `o`, `null` sans écriture à faire, `false` en conflit : les `notes` ajoutées des deux côtés s'ajoutent. */
+function fieldWrite(key: string, [t, b, o]: [YAMLMap, YAMLMap, YAMLMap]): (() => void) | null | false {
+  const [tv, bv, ov] = [jsonOf(t.get(key, true)), jsonOf(b.get(key, true)), jsonOf(o.get(key, true))];
+  if (tv === bv || tv === ov) return null; // le commit n'y a pas touché, ou la branche du dépôt a déjà la même valeur
+  if (!LOT_WRITES.includes(key)) return false;
+  const [ts, os, bs] = [t.get(key, true), o.get(key, true), b.get(key, true)];
+  if (ov === bv) return () => (t.has(key) ? o.set(key, ts) : o.delete(key));
+  const added = key === 'notes' && isSeq(ts) && isSeq(os) ? addedNotes(ts, isSeq(bs) ? bs : undefined) : null;
+  return added && isSeq(os) ? () => os.items.push(...added) : false;
+}
+
 /**
- * Résout le conflit en cours quand c'est le plan seul et que le commit du lot rejoué n'y ajoute que des revues de lot (L370 : le `raf review` du lead dans
- * le worktree) : le plan de la branche du dépôt est gardé, et chaque revue ajoutée est réécrite dessus par l'API du plan. Faux, sans rien toucher, si le
- * commit change autre chose que des revues — un autre champ d'un lot, un lot ajouté ou retiré, ou la tête du plan hors `lots` (`acknowledged:` après un
- * `raf ignore`, `reviewSince`, un réglage) : repris tel quel, le plan du dépôt perdrait ce changement sans message —, ou si la branche du dépôt a elle-même
- * changé une de ces revues.
+ * Les écritures à rejouer sur le lot `o` de la branche du dépôt pour reprendre celles du lot `t` depuis son départ `b`, ou null s'il y a conflit : un champ
+ * hors `LOT_WRITES` changé par le commit, ou un champ du lot changé aussi par la branche du dépôt à une autre valeur (hors `notes`, qui s'ajoutent).
+ */
+function lotWrites(t: YAMLMap, b: YAMLMap, o: YAMLMap): Array<() => void> | null {
+  const writes: Array<() => void> = [];
+  for (const key of new Set([...t.items, ...b.items].map(keyName))) {
+    const w = fieldWrite(key, [t, b, o]);
+    if (w === false) return null;
+    if (w) writes.push(w);
+  }
+  return writes;
+}
+
+/**
+ * Résout le conflit en cours quand c'est le plan seul (L370, L569) : la version de la branche du dépôt, plus les écritures du commit rejoué sur les champs que
+ * le lot écrit lui-même (`LOT_WRITES` : revue, notes, tâches, état). Champ par champ, depuis le plan au point de départ du commit : un champ que le commit a
+ * changé est repris sur la branche du dépôt, sauf si elle l'a changé aussi à une autre valeur — les `notes`, ajoutées des deux côtés, se mettent bout à bout.
+ * Faux, sans rien toucher, si le commit change autre chose (un champ hors `LOT_WRITES`, un lot ajouté ou retiré, la tête du plan hors `lots` — `acknowledged:`
+ * après un `raf ignore`, `reviewSince`, un réglage —, que reprendre le plan du dépôt perdrait sans message), ou si un lot manque à la branche du dépôt.
  */
 function resolvePlan(work: string): boolean {
   const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
   if (files.length !== 1) return false;
   const file = files[0];
   try {
-    // Les champs d'extension déclarés (L464) sont des propriétés des lots : sans les réglages, `bare` ne verrait pas un champ changé.
-    // Seuls les champs d'extension sont passés : le `plan.onWrite` du projet ne doit pas se lancer pendant un rebase.
-    const extras = readPlanConfig(join(work, 'cadence.yaml'), work)?.settings.extras;
-    const settings = extras ? { extras } : {};
-    const stage = (n: number) => {
-      const text = run(work, 'show', `:${n}:${file}`);
-      writeFileSync(join(work, file), text);
-      const head = parseDocument(text).toJSON() as Record<string, unknown> | null;
-      return { lots: Plan.load(join(work, file), settings).lots(), head: JSON.stringify({ ...(head ?? {}), lots: undefined }) };
-    };
-    const [b, o, t] = [stage(1), stage(2), stage(3)];
-    const [base, ours, theirs] = [b.lots, o.lots, t.lots];
-    if (t.head !== b.head) return false;
-    const bare = (l: { review?: unknown }) => JSON.stringify({ ...l, review: undefined });
-    const review = (l: { review?: unknown } | undefined) => JSON.stringify(l?.review ?? null);
-    const added = theirs.filter((t) => review(t) !== review(base.find((b) => b.id === t.id)));
-    if (!added.length || theirs.length !== base.length || theirs.some((t) => bare(t) !== bare(base.find((b) => b.id === t.id) ?? { review: 1 }))) return false;
-    if (added.some((t) => review(ours.find((o) => o.id === t.id)) !== review(base.find((b) => b.id === t.id)))) return false;
-    writeFileSync(join(work, file), run(work, 'show', `:2:${file}`));
-    const plan = Plan.load(join(work, file), settings);
-    for (const t of added) plan.recordReview(t.id, t.review!.verdict, t.review!.date, t.review!.commit ?? null, t.review!.repos, t.review!.reporte);
-    plan.save();
+    const [base, ours, theirs] = [planStage(work, file, 1), planStage(work, file, 2), planStage(work, file, 3)];
+    if (theirs.head !== base.head || theirs.byId.size !== base.byId.size) return false;
+    const writes: Array<() => void> = [];
+    for (const [id, t] of theirs.byId) {
+      const [b, o] = [base.byId.get(id), ours.byId.get(id)];
+      const mine = b && o ? lotWrites(t, b, o) : null;
+      if (!mine) return false;
+      writes.push(...mine);
+    }
+    if (!writes.length) return false; // aucune écriture du lot à reprendre : le conflit vient d'ailleurs
+    for (const w of writes) w();
+    writeFileSync(join(work, file), ours.doc.toString());
     run(work, 'add', '--', file);
     return true;
   } catch {
-    return false; // le fichier écrasé est restauré par le `rebase --abort` de l'appelant
+    return false; // le fichier est laissé en conflit : le `rebase --abort` de l'appelant le restaure
   }
 }
 

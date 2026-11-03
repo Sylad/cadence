@@ -85,6 +85,20 @@ describe('L532 — intégration déposée sur une vague vivante', () => {
     expect(s.readWave()!.status).toBe('done');
   });
 
+  it("R557 — un --drop déjà appliqué est consommé par l'intégration prise sur la vague vivante : le lot est intégré, jamais rendu « retiré de la vague » (issue #26)", async () => {
+    const w = await liveWave(async ({ parent, dir }) => {
+      store(parent).requestDrop('a:L1');
+      store(parent).requestDrop('a:L2');
+      leadFixes(dir, true);
+      await resumeIntegrate(parent);
+      await until(() => store(parent).readLot('a', 'L1')?.status === 'ready');
+    });
+    const s = store(w.parent);
+    expect(s.readLot('a', 'L1')!.status).toBe('ready');
+    expect(s.control().drops).toEqual(['a:L2']);
+    expect(readFileSync(join(s.dir, 'journal.log'), 'utf8')).not.toMatch(/a:L1 → handed-back — retiré de la vague/);
+  });
+
   it("R2 — un lot sans revue du lead, inconnu, ou qui n'est pas rendu est refusé (code 2) et rien n'est déposé", async () => {
     const codes: { code: number; err: string }[] = [];
     const w = await liveWave(async ({ parent, dir }) => {

@@ -117,6 +117,8 @@ export async function takeIntegrations(w: { store: RunStore; ctxs: LotCtx[]; wct
     c.lot.status = 'suspended';
     c.lot.outcome = null;
     store.writeLot(c.lot);
+    // L557 (issue #26) : l'intégration explicite l'emporte sur un retrait déjà appliqué, sinon la première session du lot le relirait et le rendrait au lead.
+    store.consumeDrops([e.lot]);
     store.markIntegrateTaken(e.id);
     wctx.log(`${e.lot} → suspended — ${integrationText(back.lead)}`);
     // Le lot avait fini de jouer (`settled`) : il rejoue, il tient de nouveau un créneau (L433).

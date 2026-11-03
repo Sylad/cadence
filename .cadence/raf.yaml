@@ -1692,6 +1692,11 @@ lots:
       - { date: 2026-11-03, text: "Hypothèses (fiche accept-regles-du-lot) — R8 : Deux acceptations partagent une fiche quand leurs clés « fiche » désignent le même chemin (posix normalisé) et que leurs lots diffèrent ; seules les acceptatio… ; si faux : Si le partage devait dépendre du scellé, une fiche à deux lots dont l'un n'est pas scellé serait vérifiée comme à un lot seul (tous les tests exigés) ; seule l…" }
       - { date: 2026-11-03, text: "Hypothèses (fiche accept-regles-du-lot) — R11 : checkAcceptation reçoit une sixième entrée optionnelle { dir, refsOf } (config.spec.dir et plan.refs) ; sans elle la fiche est tenue pour non partagée et les c… ; si faux : Si l'implémentation lit dir et refs autrement (paramètres séparés, config globale), seule la signature interne change ; l'invariant reste que les deux appelant…" }
       - { date: 2026-11-03, text: "Hypothèses (fiche accept-regles-du-lot) — R12 : Les erreurs de lecture d'une autre acceptation ne produisent jamais d'écart pour le lot courant : fichier JSON illisible ou invalide, fichier de tests absent,… ; si faux : Si ces cas doivent bloquer, le lot courant serait renvoyé sur une faute d'un autre lot qu'il ne peut pas corriger ; seule l'absence d'écart changerait" }
+  - id: L553
+    title: "Intégration bloquée : orchestrate --integrate d'un lot d'une vague finie attend la fin de toute autre vague du dépôt (« tenu par la vague … attente de sa fin ») au lieu de passer entre deux de ses étapes comme un push toléré (03-11 : L534 revu conforme, intégration bloquée, le lead a arrêté la vague 1345 pour la faire passer → 1 h 40 sans lot) --estimate 0.25"
+    status: todo
+    estimate: 1
+    created: 2026-11-03
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

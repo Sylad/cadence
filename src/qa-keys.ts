@@ -40,7 +40,7 @@ function readQa(qa: unknown, file: string, workRoot?: string): string | undefine
 function readWorstData(qa: unknown, file: string): string | undefined {
   const v = isObject(qa) ? qa.worstData : undefined;
   if (v == null) return undefined;
-  if (typeof v !== 'string' || /[\r\n]/.test(v.trim())) throw new RafError(`${file} : qa.worstData doit être une chaîne sur une seule ligne (le paramètre ou le chemin qui charge le jeu pires cas)`);
+  if (typeof v !== 'string' || /[\r\n\u0085\u2028\u2029]/.test(v.trim())) throw new RafError(`${file} : qa.worstData doit être une chaîne sur une seule ligne (le paramètre ou le chemin qui charge le jeu pires cas)`);
   return v.trim() || undefined;
 }
 

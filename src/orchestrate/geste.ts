@@ -104,8 +104,10 @@ export function withReplayHint(refusals: string[], waveId: string, argv: string[
 const WAVE_MARK = '<vague>';
 const LOT_MARK = '<projet:lot>';
 
-/** Les fragments par lesquels un refus dit DÉJÀ son geste (suffixes de `gestureSuffix`, `stillRunningRefusal`, `droppedAddSuffix`, `addHint`, `withReplayHint`) : le hook n'y ajoute rien. */
-const OWN_GESTURE = ['— le geste :', 'à la fin de la vague :', 'retiré de la vague : le lancer dans une nouvelle vague', 'pour y ajouter ce lot :', 'la reprise sans --replay :'];
+/** Les fragments par lesquels un refus dit DÉJÀ son geste sur sa propre ligne (suffixes de `gestureSuffix`, `stillRunningRefusal`, `droppedAddSuffix`, `addHint`) : le hook n'y ajoute rien. */
+const OWN_GESTURE = ['— le geste :', 'à la fin de la vague :', 'retiré de la vague : le lancer dans une nouvelle vague', 'pour y ajouter ce lot :'];
+/** Le fragment de `withReplayHint`, imprimé sur une ligne à part APRÈS les refus de la reprise (resume.ts) : il porte le geste de toute la reprise, les lignes au-dessus n'en reçoivent aucun. */
+const REPLAY_HINT = 'la reprise sans --replay :';
 
 /** Au plus ce nombre de gestes par sortie (une sortie qui répète ses refus ne noie pas le contexte du lead). */
 export const MAX_GESTURES = 5;
@@ -137,11 +139,14 @@ const REFUSALS: Refusal[] = [
 /**
  * LA table refus → geste (L556), lue par le hook « retour → geste » : chaque ligne de `text` qui porte un refus connu et pas déjà son geste rend le geste exact, construit avec
  * `resumeCommand`, `atWaveEnd` et `newWaveGesture`. Un refus distinct (même motif, mêmes valeurs) compte une fois, dans l'ordre de la sortie, au plus `MAX_GESTURES`.
- * La ligne d'avancement « tenu par la vague … attente de sa fin » n'est pas un refus : aucune entrée.
+ * La ligne d'avancement « tenu par la vague … attente de sa fin » n'est pas un refus : aucune entrée. Les lignes qui précèdent la ligne
+ * « la reprise sans --replay : » (R8) sont les refus de la reprise que cette ligne couvre : elles ne rendent rien.
  */
 export function refusalGestures(text: string): string[] {
   const found = new Map<string, string>();
-  for (const line of text.split('\n')) {
+  const lines = text.split('\n');
+  const hint = lines.findIndex((l) => l.includes(REPLAY_HINT));
+  for (const line of lines.slice(hint + 1)) {
     if (found.size >= MAX_GESTURES) break;
     if (OWN_GESTURE.some((m) => line.includes(m))) continue;
     for (const { when, gesture } of REFUSALS) {

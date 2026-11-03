@@ -182,6 +182,18 @@ describe('L556 — le refus qui porte déjà son geste (R8)', () => {
   it('R8 — « a:L1 : lot déjà dans la vague w1 : retiré de la vague : le lancer dans une nouvelle vague, à la fin de la vague : cadence orchestrate a:L1 » : aucune sortie', async () => {
     expect(await retour(post(CMD, 'a:L1 : lot déjà dans la vague w1 : retiré de la vague : le lancer dans une nouvelle vague, à la fin de la vague : cadence orchestrate a:L1'))).toEqual(silent);
   });
+  it("R8 — un --replay refusé (« pas rendu à l'étape d'intégration ni sur une écriture de plan refusée ») suivi, sur sa propre ligne, de « la reprise sans --replay : … » : aucune sortie", async () => {
+    // withReplayHint imprime l'indication sur une ligne à part, après les refus : le geste porte sur toute la reprise, les lignes au-dessus n'en reçoivent aucun.
+    const out = [
+      "orchestrate : --replay a:L1 : le lot n'est pas rendu à l'étape d'intégration ni sur une écriture de plan refusée (doing, étape work : sans cause)",
+      'orchestrate : un --replay refusé refuse toute la reprise : la reprise sans --replay : cadence orchestrate --resume --wave w1 --integrate "b:L2"',
+    ].join('\n');
+    expect(await retour(failure('cadence orchestrate --resume --wave w1 --replay a:L1 --integrate b:L2', `Exit code 2\n${out}`))).toEqual(silent);
+  });
+  it("R8 — un refus qui suit la ligne « la reprise sans --replay : » dans la même sortie (une autre commande du segment) garde son geste", async () => {
+    const out = ['orchestrate : un --replay refusé refuse toute la reprise : la reprise sans --replay : cadence orchestrate --resume --wave w1', 'la vague w2 tourne encore (pid 7)'].join('\n');
+    expect(gestes((await retour(post(CMD, out))).out)).toEqual([atWaveEnd(resumeCommand('w2'))]);
+  });
 });
 
 describe('L556 — le hook ne gêne jamais (R9)', () => {

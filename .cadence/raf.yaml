@@ -1718,11 +1718,12 @@ lots:
     started: 2026-11-03
   - id: L555
     title: "Test instable sous charge : test/deliver.test.ts, deliver : délai dépassé et SIGTERM à cadence seul (L20) › (b) SIGTERM pendant le script, bump par un petit-enfant : rouge dans la suite, vert seul (porte de L542, 03-11) ; même famille que L505 et L550 --estimate 0.25"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-03
     notes:
       - { date: 2026-11-03, text: "03-11 : même famille vue sur test/porte-deportee.test.ts › L403 R19 (délai : la commande distante arrêtée côté hôte, plus de processus du groupe) — rouge sous charge, vert seul (porte de L492) ; traiter les deux tests ensemble" }
+    started: 2026-11-03
   - id: L556
     title: "Hook du plugin « retour → geste » (03-11, après 1 h 40 perdue et 8 gestes refusés) : PostToolUse Bash qui, quand la sortie d'une commande cadence/raf contient un refus connu (« une orchestration y est déjà en cours », « tenu par la vague … attente de sa fin », « pas rendu à l'étape d'intégration », « la vague … tourne encore », « lot déjà dans la vague », « ne tient pas le budget du lot », « Unknown option '-- », code 137…) ajoute au contexte du lead le geste exact (même table que le lot du geste suivant imprimé, une seule source) ; plus un rappel quand une commande Bash du lead contient une boucle d'attente (while/until + pgrep -f) — même mécanisme que L502 --estimate 0.5 --spec"
     status: todo

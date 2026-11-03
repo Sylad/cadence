@@ -174,8 +174,8 @@ regles:
   - id: R11
     cas: [C1]
     enonce: "La commande retour lit deux formes d'entrée : l'événement PostToolUse (la sortie dans tool_response : stdout, stderr, ou un texte) et l'événement PostToolUseFailure (le texte d'erreur dans error, qui porte le code « Exit code N »). Les deux champs sont lus quel que soit l'événement annoncé, pour qu'un refus de code 2 soit vu par l'un ou l'autre."
-    statut: hypothese
-    si_faux: "Si Claude Code envoie la sortie sous un autre champ, le geste n'est pas rendu (rien ne change pour le lead) ; seule la lecture du champ est à corriger."
+    statut: sourcee
+    source: réponse du lead, 2026-11-03, vague 2026-11-03-2100-cad
     tests:
       - "R11 — PostToolUse avec tool_response.stdout portant un refus : le geste est rendu"
       - "R11 — PostToolUse avec tool_response.stderr portant un refus : le geste est rendu"

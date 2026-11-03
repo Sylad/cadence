@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isMap, isNode, isScalar, isSeq, parse, parseDocument, stringify, type Node } from 'yaml';
@@ -275,7 +276,41 @@ export function checkSpec(repo: string, fiche: string, lot: string, parts: Fiche
     for (const c of list(doc.champs)) if (typeof c.id === 'string' && !new RegExp(`data-testid=["']${c.id}["']`).test(html)) problems.push(`maquette.html : data-testid="${c.id}" absent (chaque champ de la fiche le porte)`);
   }
   for (const e of etats) for (const w of LARGEURS) need(`${folder}/maquette-${e}-${w}.png`, 'capture');
+  problems.push(...copiedCaptures(repo, folder, etats));
   return problems;
+}
+
+/**
+ * Les captures copiées (L561, issue #29) : à une largeur, deux états qui ont la même empreinte (une capture recopiée pour un autre état),
+ * et une capture sombre `maquette-<état>-sombre-<largeur>.png` identique à sa claire. Une capture absente n'est pas comparée (l'absence est déjà un écart).
+ */
+function copiedCaptures(repo: string, folder: string, etats: string[]): string[] {
+  const digest = (name: string): string | undefined => {
+    const file = join(repo, folder, name);
+    return existsSync(file) ? createHash('sha256').update(readFileSync(file)).digest('hex') : undefined;
+  };
+  const names = [...new Set(etats)];
+  return LARGEURS.flatMap((w) => [...sameFingerprint(names.map((e) => `maquette-${e}-${w}.png`), digest, folder, w), ...darkCopies(names, w, digest, folder)]);
+}
+
+/** Un écart par groupe de captures de même empreinte parmi celles d'une largeur. */
+function sameFingerprint(files: string[], digest: (name: string) => string | undefined, folder: string, w: number): string[] {
+  const byDigest = new Map<string, string[]>();
+  for (const name of files) {
+    const d = digest(name);
+    if (d) byDigest.set(d, [...(byDigest.get(d) ?? []), name]);
+  }
+  return [...byDigest.values()].filter((g) => g.length > 1).map((g) => `${g.map((n) => `${folder}/${n}`).join(', ')} : même empreinte pour des états différents à ${w} px (captures copiées : rendre chaque état de la maquette, sans recopier une capture)`);
+}
+
+/** Un écart par capture sombre identique à la claire du même état et de la même largeur. */
+function darkCopies(etats: string[], w: number, digest: (name: string) => string | undefined, folder: string): string[] {
+  return etats
+    .filter((e) => {
+      const d = digest(`maquette-${e}-sombre-${w}.png`);
+      return d !== undefined && d === digest(`maquette-${e}-${w}.png`);
+    })
+    .map((e) => `${folder}/maquette-${e}-sombre-${w}.png : capture sombre identique à la claire ${folder}/maquette-${e}-${w}.png (rendre la maquette en thème sombre, sans recopier la capture claire)`);
 }
 
 /** Première phrase d'un texte, ramenée à une longueur lisible dans une note. */
@@ -306,7 +341,7 @@ const renderLine = (render: string | undefined, use: string): string =>
 /** Consigne de la maquette d'un lot `screen: page` (ou déjà entré dans la chaîne complète). */
 const pageLines = (o: { dir: string; render?: string; screen?: string }): string[] => [
     `The lot declares \`screen: ${o.screen}\`. The specs of this project live in \`${o.dir}/<écran>/\` (one folder per screen, \`<écran>\` = the kebab-case \`ecran.id\` of the sheet).`,
-    `Render each state of the mockup at ${LARGEURS.map((w) => `${w}`).join(' and ')} px width: one capture per state and per width, named \`maquette-<état>-<largeur>.png\` (e.g. \`maquette-vide-1440.png\`).`,
+    `Render each state of the mockup at ${LARGEURS.map((w) => `${w}`).join(' and ')} px width: one capture per state and per width, named \`maquette-<état>-<largeur>.png\` (e.g. \`maquette-vide-1440.png\`). Each capture is rendered from its own state: the program compares the files and sends back two states of one width with the same fingerprint, and a dark capture (\`maquette-<état>-sombre-<largeur>.png\`) identical to its light one.`,
 
   renderLine(o.render, 'Use it'),
 ];

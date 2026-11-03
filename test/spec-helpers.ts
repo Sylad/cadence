@@ -16,6 +16,10 @@ export interface Écrit {
   dossier?: string;
   /** Racine des specs, si elle diffère de docs/specs. */
   racine?: string;
+  /** Contenu d'une capture par son nom de fichier ; par défaut chaque capture a le sien (état et largeur). */
+  contenu?: (fichier: string) => string | undefined;
+  /** Captures en plus de celles de la fiche, écrites avec leur contenu par défaut (ex. `maquette-vide-sombre-1440.png`). */
+  captures?: string[];
 }
 
 /** Ce que fait un agent spec : fiche, maquette, captures, un commit qui cite le lot. */
@@ -36,9 +40,13 @@ export function ecrit(cwd: string, o: Écrit = {}): string {
     for (const w of [1440, 390]) {
       const f = `maquette-${e}-${w}.png`;
       if (o.sansCapture?.includes(f)) continue;
-      writeFileSync(join(dir, f), 'png');
+      writeFileSync(join(dir, f), o.contenu?.(f) ?? `png ${e} ${w}`);
       files.push(f);
     }
+  }
+  for (const f of o.captures ?? []) {
+    writeFileSync(join(dir, f), o.contenu?.(f) ?? `png ${f}`);
+    files.push(f);
   }
   const rel = files.map((f) => `${racine}/${nom}/${f}`);
   git(cwd, 'add', '--', ...rel);
@@ -94,7 +102,7 @@ export function ecritBack(cwd: string, o: ÉcritBack = {}): string {
     writeFileSync(join(dir, 'maquette.html'), `<!doctype html>\n${html}\n`);
     rel.push(`${racine}/${doc.sujet.id}/maquette.html`);
     for (const e of doc.etats as string[]) for (const w of [1440, 390]) {
-      writeFileSync(join(dir, `maquette-${e}-${w}.png`), 'png');
+      writeFileSync(join(dir, `maquette-${e}-${w}.png`), `png ${e} ${w}`);
       rel.push(`${racine}/${doc.sujet.id}/maquette-${e}-${w}.png`);
     }
   }

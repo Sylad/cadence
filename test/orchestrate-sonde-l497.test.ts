@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { readOrchestrateConfig } from '../src/config.js';
 import { runLot, lotSpent } from '../src/orchestrate/cycle.js';
 import { renderBrief } from '../src/orchestrate/briefs.js';
@@ -267,6 +267,17 @@ describe('sonde de cas limites (L497)', () => {
     expect(c.lot.outcome).toContain('tests rouges');
     expect(c.lot.outcome).toContain('correction suivante non abordable');
     expect(c.lot.outcome).toContain('sans revue');
+  });
+
+  it("R8 — un fichier de test d'un sous-paquet (tests/ ou *.test.ts à toute profondeur) n'est pas du code hors tests, app.ts oui", async () => {
+    const nested: Handler = (call) => claudeOut(probeReport({ commits: ['plugins/hud/tests/drop.probe.test.ts', 'plugins/hud/src/x.test.ts', 'plugins/hud/__tests__/y.ts', 'plugins/hud/src/app.ts'].map((f) => {
+      mkdirSync(dirname(join(call.opts.cwd, f)), { recursive: true });
+      return commitFile(call.opts.cwd, f, `probe(L1): ${f}`);
+    }) }));
+    const h = harness({ script: { implement: [impl('a.ts', 'a.spec.ts')], probe: [nested], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true, testGate: GATE });
+    await runLot(c);
+    expect(c.lot.warnings).toContain('sonde de cas limites : la session a modifié du code hors tests (plugins/hud/src/app.ts)');
   });
 
   it('R8 — sans testGate déclaré, un commit de la sonde ne déclenche pas le warning « hors tests »', async () => {

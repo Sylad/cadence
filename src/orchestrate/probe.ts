@@ -2,6 +2,7 @@
 // Le cycle (cycle.ts) lui prête ses mécanismes par `ProbeIo` : budget, session, porte du programme, passe de correction, revue.
 import type { OrchestrateConfig } from '../config.js';
 import { docSyncSet, filesOf } from '../docsync.js';
+import { DEFAULT_TEST_PATTERNS } from '../testgate.js';
 import { readCommits } from '../git.js';
 import type { BriefVars } from './briefs.js';
 import { checkShape, PROBE_SCHEMA, type ProbeReport } from './schemas.js';
@@ -97,11 +98,11 @@ function readReport(l: LotState, report: unknown): ProbeReport | undefined {
   }
 }
 
-/** Les fichiers commités par la sonde qui ne sont pas des tests (R8) : un warning les nomme, rien n'est retiré. Sans `testGate.tests` déclaré, rien ne distingue un test d'un autre. */
+/** Les fichiers commités par la sonde qui ne sont pas des tests (R8) : un warning les nomme, rien n'est retiré. Sans `testGate.tests` déclaré, rien ne distingue un test d'un autre ; un fichier de test à toute profondeur (`DEFAULT_TEST_PATTERNS` : `*.test.*`, `tests/`, `__tests__/`) en est un même si la porte ne le déclare pas (sous-paquet). */
 function warnOutsideTests(io: ProbeIo<ProbeDone>, headBefore: string | undefined): void {
   const tests = io.config.testGate?.tests;
   if (!tests) return;
-  const isTest = docSyncSet(tests);
+  const isTest = docSyncSet([...tests, ...DEFAULT_TEST_PATTERNS]);
   const outside = [...filesOf(io.cwd, readCommits(io.cwd, { range: headBefore ? `${headBefore}..HEAD` : undefined }))].filter((f) => !isTest(f)).sort();
   if (outside.length) io.lot.warnings.push(`sonde de cas limites : la session a modifié du code hors tests (${outside.join(', ')})`);
 }

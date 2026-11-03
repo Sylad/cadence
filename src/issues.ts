@@ -64,7 +64,7 @@ function publishedLots(root: string, lots: Lot[]): Set<string> {
 }
 
 /**
- * Les lignes d'issues du tour pour un projet (L548) : chaque issue ouverte qu'aucun lot du plan ne cite, puis chacune dont tous les lots qui la citent sont clos et
+ * Les lignes d'issues du tour pour un projet (L548) : chaque issue ouverte qu'aucun lot du plan ne cite, puis chacune dont tous les lots qui la citent (hors lots abandonnés) sont clos et
  * cités dans une version publiée du CHANGELOG (la fermer revient au lead). Vide sans `gh`, sans plan lisible ou sans issue concernée.
  */
 export function issueLines(dir: string, project: string, env: NodeJS.ProcessEnv): string[] {
@@ -79,7 +79,7 @@ export function issueLines(dir: string, project: string, env: NodeJS.ProcessEnv)
   if (!open?.length) return [];
   const published = publishedLots(root, lots);
   const citing = new Map<number, Lot[]>();
-  for (const l of lots) for (const n of lotIssues(l)) citing.set(n, [...(citing.get(n) ?? []), l]);
+  for (const l of lots) if (l.status !== 'dropped') for (const n of lotIssues(l)) citing.set(n, [...(citing.get(n) ?? []), l]);
   const lines: string[] = [];
   for (const i of open) {
     const by = citing.get(i.number) ?? [];

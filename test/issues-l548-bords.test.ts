@@ -103,4 +103,15 @@ describe('cadence lead tour — issues, bords (L548)', () => {
     expect(out).toMatch(/L1, L2 sont publiés/);
     expect(out.match(/issue #20 «/g)).toHaveLength(1);
   });
+  it('un lot abandonné (dropped) qui cite l’issue ne la rend pas muette : publiée par un lot done, elle est à fermer', async () => {
+    const dir = project(lot('L1', 'done', 'a (issue #14)') + lot('L2', 'dropped', 'b (issue #14)'), '# Changelog\n\n## [Unreleased]\n\n## [1.0.0] - 2026-10-01\n\n- (L1).\n');
+    const { out } = await tour(dir, fakeGh(JSON.stringify([{ number: 14, title: 't' }])));
+    expect(out).toMatch(/issue #14 « t » · ouverte, mais L1 est publié/);
+    expect(out).not.toMatch(/L2/);
+  });
+  it('une issue citée seulement par des lots abandonnés : « aucun lot du plan ne la cite »', async () => {
+    const dir = project(lot('L3', 'dropped', 'c (issue #15)'));
+    const { out } = await tour(dir, fakeGh(JSON.stringify([{ number: 15, title: 't' }])));
+    expect(out).toMatch(/issue #15 « t » · ouverte, aucun lot du plan ne la cite/);
+  });
 });

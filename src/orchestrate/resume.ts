@@ -157,8 +157,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
     else integ.push(l);
   }
   // Un lot retiré ne jouera rien : il ne subit ni le verrou du dépôt, ni le .nvmrc, ni l'arbre sale — un refus pour LUI ne doit pas faire échouer la reprise des autres.
-  const live: LotState[] = [];
-  const removed: LotState[] = [];
+  const [live, removed]: LotState[][] = [[], []];
   for (const l of lots) {
     if (lotFinished(l) && !raised.has(l) && !integ.includes(l)) continue;
     for (const s of l.steps) {
@@ -291,6 +290,8 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
     if (args.budget !== undefined) wave.budget = wave.consumed + args.budget;
     // Un arrêt demandé à la vague d'avant ne doit pas arrêter celle-ci ; celui demandé pendant l'attente (la reprise est alors visible de --stop-after-current) est gardé.
     if (!(waiting && !stopBefore && store.control().stopAfterCurrent)) store.clearStopRequest();
+    // L557 (issue #26) : un lot nommé par --integrate qui portait un retrait déjà appliqué (--drop d'une reprise précédente) est repris à la main puis revu : le retrait est consommé, sinon la vague le rendrait au lead sans l'intégrer.
+    store.consumeDrops(integ.map((l) => lotKey(l.project, l.lot)));
     for (const l of removed) {
       const k = lotKey(l.project, l.lot);
       store.requestDrop(k);

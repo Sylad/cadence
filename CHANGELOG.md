@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cadence orchestrate --resume --wave <wave> --integrate <project:lot>` on a lot removed by an earlier `--drop`, then taken over by hand and reviewed in its worktree, integrates it instead of handing it back about 30 seconds later with `retiré de la vague (--drop)` (L557, issue #26, `docs/orchestrate.md`): an explicit `--integrate` consumes the removal already applied to that lot; the removals of the other lots stay.
+
 ### Changed
 
 - Free slots count only the lots that hold a claude session (L520, `docs/orchestrate.md`): in a repository in `orchestrate.worktrees` mode, a lot that waits for a dependency (`en attente de : …`) or is in the test gate (the build and the tests of the program, no claude session) no longer holds a slot in the registry, and the wave updates it when a lot enters or leaves the gate. On 2026-11-01 a wave L517 → L518, L519 with one real session read `créneaux libres : 0 sur 3` for an hour; on 2026-11-03 three lots in their gate counted as three taken slots. The load of the gates stays bounded as before: at most `--max-sessions` lots play at once in a wave, each gate with its own `CADENCE_TEST_WORKERS` share.

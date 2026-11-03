@@ -404,6 +404,16 @@ export class RunStore {
     appendFileSync(join(this.dir, 'control.log'), 'stop-after-current\n');
   }
 
+  /** Consomme les retraits déjà appliqués de ces lots (L557) : un `--integrate` explicite l'emporte sur un `--drop` d'avant, toutes les lignes `drop <lot>` du lot s'effacent, celles des autres lots restent. */
+  consumeDrops(keys: string[]): void {
+    const f = join(this.dir, 'control.log');
+    if (!keys.length || !existsSync(f)) return;
+    const drop = new Set(keys.map((k) => `drop ${k}`));
+    const lines = readFileSync(f, 'utf8').split('\n').filter((l) => l.trim() !== '');
+    if (!lines.some((l) => drop.has(l.trim()))) return;
+    writeFileSync(f, lines.filter((l) => !drop.has(l.trim())).map((l) => `${l}\n`).join(''));
+  }
+
   /** Efface l'arrêt demandé (`--resume`) ; les retraits restent. */
   clearStopRequest(): void {
     const f = join(this.dir, 'control.log');

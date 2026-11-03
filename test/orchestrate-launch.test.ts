@@ -171,6 +171,25 @@ describe('buildArgs', () => {
     expect(rev[rev.indexOf('--agent') + 1]).toBe('code-reviewer');
   });
 
+  it('L560 — --agents ne porte que l\'agent de l\'étape, lancement et relance : sa taille reste sous 128 Kio (E2BIG, issue #28)', () => {
+    const agents = readAgents(AGENTS_DIR);
+    const names = Object.keys(agents);
+    expect(names.length).toBeGreaterThan(1);
+    const all = Buffer.byteLength(JSON.stringify(agents));
+    for (const name of names) {
+      for (const args of [buildArgs({ ...spec, agent: name }, agents), buildRetryArgs({ ...spec, agent: name }, 'sid', agents)]) {
+        const json = args[args.indexOf('--agents') + 1];
+        expect(Object.keys(JSON.parse(json)), name).toEqual([name]);
+        expect(Buffer.byteLength(json), name).toBeLessThan(131_072);
+        expect(args[args.indexOf('--agent') + 1]).toBe(name);
+      }
+    }
+    // la borne tient même si le paquet grossit : un paquet de 200 Ko ne pèse rien de plus pour une étape
+    const big = { ...agents, enorme: { description: 'd', prompt: 'x'.repeat(200_000) } };
+    expect(Buffer.byteLength(buildArgs({ ...spec, agent: names[0] }, big).join('\0'))).toBeLessThan(131_072 + all);
+    for (const a of buildArgs({ ...spec, agent: names[0] }, big)) expect(Buffer.byteLength(a)).toBeLessThan(131_072);
+  });
+
   it('une implémentation n\'a ni --agent ni --agents', () => {
     const args = buildArgs({ ...spec, kind: 'implement', agent: undefined, model: 'sonnet', addDirs: [] }, {});
     expect(args).not.toContain('--agent');

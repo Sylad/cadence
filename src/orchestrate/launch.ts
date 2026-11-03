@@ -138,11 +138,16 @@ export const DISALLOWED = ['Agent', 'Monitor', 'Bash(git push:*)', 'Bash(cadence
 /** Outils MCP du serveur Playwright, par le préfixe du serveur (sonde réelle du 07-10 : `mcp__playwright` expose tous les `browser_*`). */
 export const PLAYWRIGHT_TOOLS = 'mcp__playwright';
 
-/** Agents passés à `--agents` : l'agent d'une étape qui charge Playwright, s'il a une liste d'outils, y gagne les outils du serveur (sinon il ne peut pas l'appeler). */
+/**
+ * Agents passés à `--agents` (L560) : le seul agent de l'étape, pas tout le paquet (94 Ko mesurés contre 22 Ko le 10-04 : au-delà de 128 Kio
+ * par argument, le spawn échoue en E2BIG, issue #28). Sans agent d'étape, rien. S'il charge Playwright et a une liste d'outils, il y gagne
+ * les outils du serveur (sinon il ne peut pas l'appeler).
+ */
 function agentsFor(spec: StepSpec, agents: Record<string, AgentDef>): Record<string, AgentDef> {
-  const a = spec.agent ? agents[spec.agent] : undefined;
-  if (!spec.playwright || !spec.agent || !a?.tools) return agents;
-  return { ...agents, [spec.agent]: { ...a, tools: [...a.tools, ...(a.tools.includes(PLAYWRIGHT_TOOLS) ? [] : [PLAYWRIGHT_TOOLS])] } };
+  const a = agents[spec.agent ?? ''];
+  if (!spec.agent || !a) return {};
+  if (!spec.playwright || !a.tools) return { [spec.agent]: a };
+  return { [spec.agent]: { ...a, tools: [...a.tools, ...(a.tools.includes(PLAYWRIGHT_TOOLS) ? [] : [PLAYWRIGHT_TOOLS])] } };
 }
 
 function effortArgs(spec: StepSpec): string[] {

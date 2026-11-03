@@ -11,9 +11,19 @@ import { session, badReport } from './session.js';
 import { type AcceptReport, checkShape, ACCEPT_SCHEMA } from '../schemas.js';
 import { commitPlan } from './plan-writes.js';
 import { type Constat } from '../state.js';
-const NO_TEST_ACCEPT = 'étape accept : orchestrate.test absent, rien ne prouve que les tests rouges sont exclus du lanceur de tests et de la CI (vérifier à la main la config du lanceur avant de livrer)';export const NO_ACCEPT = 'étape accept ignorée : orchestrate.accept absent (commande dédiée aux tests d\'acceptation), le lot passe de spec à implement sans tests rouges';/** L'acceptation du lot : celle que git suit déjà pour lui (même un ancien `acceptation.json`), sinon `acceptation-<lot>.json` à côté de la fiche. */
-export const lotAcceptation = (c: LotCtx, fiche: string): string => findAcceptation(wd(c), c.config.spec.dir, c.lot.lot) ?? acceptationFile(fiche, c.lot.lot);export const listed = (c: LotCtx, json: string): boolean => existsSync(join(wd(c), json));/** Une acceptation porte-t-elle une empreinte par fichier listé ? Le contenu n'est pas comparé (L233) : `empreintes: {}` ou celles d'un autre fichier ne scellent rien. */
-const hasSeals = (doc: Acceptation): boolean => !!doc.empreintes && doc.fichiers.every((f) => !!(doc.empreintes as Record<string, string>)[posix.normalize(f)]);/**
+const NO_TEST_ACCEPT = 'étape accept : orchestrate.test absent, rien ne prouve que les tests rouges sont exclus du lanceur de tests et de la CI (vérifier à la main la config du lanceur avant de livrer)';
+
+export const NO_ACCEPT = 'étape accept ignorée : orchestrate.accept absent (commande dédiée aux tests d\'acceptation), le lot passe de spec à implement sans tests rouges';
+
+/** L'acceptation du lot : celle que git suit déjà pour lui (même un ancien `acceptation.json`), sinon `acceptation-<lot>.json` à côté de la fiche. */
+export const lotAcceptation = (c: LotCtx, fiche: string): string => findAcceptation(wd(c), c.config.spec.dir, c.lot.lot) ?? acceptationFile(fiche, c.lot.lot);
+
+export const listed = (c: LotCtx, json: string): boolean => existsSync(join(wd(c), json));
+
+/** Une acceptation porte-t-elle une empreinte par fichier listé ? Le contenu n'est pas comparé (L233) : `empreintes: {}` ou celles d'un autre fichier ne scellent rien. */
+const hasSeals = (doc: Acceptation): boolean => !!doc.empreintes && doc.fichiers.every((f) => !!(doc.empreintes as Record<string, string>)[posix.normalize(f)]);
+
+/**
  * Une acceptation conforme et SCELLÉE par le programme (empreintes posées), rouge ou verte (`vert: true`, lot relancé dans une nouvelle vague ; une verte et scellée vaut
  * preuve même si son scellé ne tient plus, L233) : elle n'a pu être écrite qu'après la revue de la maquette et les tests rouges, qui ne sont donc pas rejoués. Sans `orchestrate.accept`, aucune preuve.
  */
@@ -36,8 +46,12 @@ export function acceptationProof(c: LotCtx, fiche: string): boolean {
   });
   if (!sealed) return false;
   return checkAcceptation(wd(c), json, l.lot, fiche, undefined, { dir: c.config.spec.dir, refsOf: c.loadPlan().refs }).length === 0;
-}/** Résultat d'une commande de `orchestrate.accept` lancée pour le lot. */
-interface AcceptRun { command: string; code: number; output: string }/**
+}
+
+/** Résultat d'une commande de `orchestrate.accept` lancée pour le lot. */
+interface AcceptRun { command: string; code: number; output: string }
+
+/**
  * Commandes dédiées aux tests d'acceptation du lot (une chaîne ou une liste, L189) : `{acceptation}` y est remplacé, `CADENCE_ACCEPTATION` (chemin absolu
  * dans les deux cas) et `CADENCE_ACCEPTATION_ROOT` (sa racine) posés. Une commande sans fichier listé sous sa racine n'est pas lancée ; les fichiers
  * listés sous aucune racine sont rendus (`orphans`) sans rien lancer.
@@ -50,7 +64,11 @@ async function runAccept(c: LotCtx, json: string): Promise<{ runs: AcceptRun[]; 
   const runs: AcceptRun[] = [];
   for (const r of plan.runs) runs.push({ command: r.command, ...(await sh(c, r.command.replaceAll('{acceptation}', abs), 30 * 60_000, { CADENCE_ACCEPTATION: abs, CADENCE_ACCEPTATION_ROOT: r.root || '.' })) });
   return { runs, orphans: [] };
-}const tail = (output: string, n = 40): string => output.trim().split('\n').slice(-n).join('\n');/** Écarts des tests d'acceptation écrits par la session (vide = acceptés) : autres lots intacts, acceptation.json conforme, tests rouges, config.test toujours verte. */
+}
+
+const tail = (output: string, n = 40): string => output.trim().split('\n').slice(-n).join('\n');
+
+/** Écarts des tests d'acceptation écrits par la session (vide = acceptés) : autres lots intacts, acceptation.json conforme, tests rouges, config.test toujours verte. */
 async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore: string | undefined): Promise<string[]> {
   const l = c.lot;
   const out = headBefore ? lockViolations(wd(c), c.config.spec.dir, headBefore, { skip: json }) : [];
@@ -66,7 +84,9 @@ async function acceptProblems(c: LotCtx, fiche: string, json: string, headBefore
     if (ordinary.code !== 0) out.push(`orchestrate.test échoue (code ${ordinary.code}) avec les tests rouges commités : les fichiers listés dans ${json} ne sont pas exclus de la config du lanceur (partagée avec la CI) tant que vert est false\n${tail(ordinary.output, 15)}`);
   }
   return out;
-}/**
+}
+
+/**
  * Écart de l'acceptation verte et scellée `json` par rapport à ce qu'elle était à `first` (tête d'avant la première session accept du lot), ou null.
  * Admis : le même contenu, ou un rescellé du lead (`cadence spec reseal`, L200) : `vert` et `empreintes` toujours posés, journal `resceaux` allongé, aucun commit
  * du fichier dans une session de la vague, fichier propre. Tout le reste (vert: false, journal effacé, réécriture commitée par la session) est rendu au lead (L233).
@@ -89,7 +109,9 @@ function greenDrift(c: LotCtx, json: string, first: string, before: string, was:
   const journal = (a: Acceptation): number => a.resceaux?.length ?? 0;
   if (typeof now !== 'string' && now.vert && now.empreintes && journal(now) > journal(was) && !bySession && !dirty) return null;
   return 'acceptation verte réécrite depuis la première session accept (vert, empreintes ou resceaux changés ; seul un rescellé du lead, `cadence spec reseal`, est admis) : remettre le fichier comme avant la session, par exemple `git checkout <commit vert> -- <fichier>` puis `--resume`';
-}/**
+}
+
+/**
  * Étape accept (L173, spec etape-spec S5) : une session distincte de l'implémenteur écrit, depuis la fiche et la maquette seules, les tests
  * d'acceptation rouges. Le programme vérifie (acceptation.json conforme, autres lots intacts, commande dédiée rouge, config.test verte),
  * accorde une seconde passe, puis SCELLE le fichier (empreintes) dans un commit du cycle : c'est le commit rouge du verrou.
@@ -170,7 +192,9 @@ export async function acceptStep(c: LotCtx): Promise<void> {
   l.accept = { acceptation: json, rouge: git(wd(c), 'rev-parse', 'HEAD') };
   l.next = 'implement';
   save(c);
-}/**
+}
+
+/**
  * Retour au vert (S5) : à la fin de chaque implement/fix, quand la commande dédiée passe, le CYCLE (jamais une session) pose `vert: true`
  * dans l'acceptation.json du lot et le commite ; les fichiers rejoignent alors config.test et la CI. Rend un constat quand elle échoue.
  */

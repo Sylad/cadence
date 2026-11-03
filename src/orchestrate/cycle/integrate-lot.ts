@@ -18,7 +18,9 @@ export interface Reporte {
   de: string;
   vers: string;
   patchId: string;
-}/**
+}
+
+/**
  * Revue conforme : le verdict est enregistré avec le sha relu, puis le commit du plan. `raf done` reste au lead.
  * Un lot en worktree (L279) n'écrit rien au plan ici : le verdict et la clôture des sous-tâches attendent l'intégration, qui les écrit après l'avance de la branche
  * du dépôt (R22, R23) ; le lot passe alors à l'étape `integrate`, la seule que `--resume --integrate` rejoue (R14, R27).
@@ -60,7 +62,9 @@ export async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): 
   }
   l.next = null;
   transition(c, 'ready', 'prêt à livrer');
-}/**
+}
+
+/**
  * Écrit au plan, dans le dépôt du projet, l'entrée du lot : verdict (au sha `commit`, avec la trace `reporte` d'un verdict reporté), sous-tâches couvertes
  * passées à done, puis le commit du plan seul ; pour un plan en lecture seule, l'outil `orchestrate.verdict` du projet, lancé dans ce dépôt (R21, R23).
  * Rend la cause d'un refus (arbre sale hors plan), null sinon. Un verdict déjà écrit et commité au même sha n'est pas écrit deux fois (reprise de l'intégration, R23).
@@ -110,8 +114,14 @@ async function writeVerdict(c: LotCtx, verdict: string, commit: string | null, r
     }
   }
   return null;
-}/** Ce qui sépare le verdict de la revue du lot de celui de sa revue courte du diff rebasé (R17). */
-const SHORT_REVIEW_TRACE = ' ; revue courte du diff rebasé (patch-id différent) : ';const minutesText = (ms: number): string => (ms % 60_000 === 0 ? `${ms / 60_000} minute${ms === 60_000 ? '' : 's'}` : `${Math.round(ms / 1000)} s`);/**
+}
+
+/** Ce qui sépare le verdict de la revue du lot de celui de sa revue courte du diff rebasé (R17). */
+const SHORT_REVIEW_TRACE = ' ; revue courte du diff rebasé (patch-id différent) : ';
+
+const minutesText = (ms: number): string => (ms % 60_000 === 0 ? `${ms / 60_000} minute${ms === 60_000 ? '' : 's'}` : `${Math.round(ms / 1000)} s`);
+
+/**
  * Intégration d'un lot en worktree à la branche du dépôt (L279, C2), AVANT sa transition à ready (R22). Sous le verrou d'intégration : branche du dépôt encore
  * celle de départ (R24), aucun fichier suivi modifié (R8), rebase sur le sommet courant (conflit : abandonné, rendu au lead, R6), contrôles rejoués au sommet
  * rebasé (R7), report du verdict si le patch-id est le même (R9) ou revue courte du diff rebasé sinon (R17), avance en fast-forward, puis écriture du plan dans le
@@ -212,7 +222,9 @@ export async function integrateLot(c: LotCtx): Promise<void> {
   else t.active = false;
   l.next = null;
   transition(c, 'ready', 'prêt à livrer');
-}/**
+}
+
+/**
  * Revue courte (`review-small`) du diff rebasé (R17), jouée sous le verrou d'intégration. `refused` : le nombre de constats bloquants ou majeurs, dit en clair ;
  * `null` : la session n'a pas eu lieu (budget, quota, arrêt) et le lot est suspendu ou rendu par `session`.
  */

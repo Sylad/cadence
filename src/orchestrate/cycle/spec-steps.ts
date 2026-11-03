@@ -23,7 +23,9 @@ export function firstWrite(c: LotCtx): SessionKind {
   if (!hasSpecStage(l) || l.spec) return 'implement';
   const fiche = findFiche(wd(c), c.config.spec.dir, l.lot);
   return fiche && ficheReady(wd(c), fiche, l.lot, partsOf(c, fiche)) ? afterSpec(c, fiche) : 'spec';
-}/**
+}
+
+/**
  * Étape qui suit une spec écrite : la revue UX de la maquette (S4) tant qu'elle n'est pas conforme (`orchestrate.maquette`), sauf si une
  * acceptation conforme est déjà commitée (elle n'a pu être écrite qu'après la revue) ; puis les tests d'acceptation rouges (S5).
  */
@@ -32,12 +34,16 @@ function afterSpec(c: LotCtx, fiche: string): SessionKind {
   // Revue de la fiche back (L188) d'abord, puis celle de la maquette d'un lot mixte ; la même preuve (acceptation scellée, code déjà commité) dispense des deux.
   if (c.config.fiche && partsOf(c, fiche).back && !l.fiche?.conforme && !acceptationProof(c, fiche) && !codeAfterFiche(c, fiche)) return 'fiche';
   return afterFiche(c, fiche);
-}/** Étape qui suit une fiche relue : la revue UX de la maquette d'un lot à écran (S4), sinon `afterMaquette`. */
+}
+
+/** Étape qui suit une fiche relue : la revue UX de la maquette d'un lot à écran (S4), sinon `afterMaquette`. */
 function afterFiche(c: LotCtx, fiche: string): SessionKind {
   const l = c.lot;
   if (l.screen && c.config.maquette && !l.maquette?.conforme && !acceptationProof(c, fiche) && !codeAfterFiche(c, fiche)) return 'maquette';
   return afterMaquette(c, fiche);
-}/** Étape qui suit une maquette relue (ou une fiche, pour un lot sans écran) : les tests d'acceptation rouges (S5) quand le projet déclare sa commande dédiée et qu'aucune acceptation conforme n'est déjà commitée, sinon l'implémentation. */
+}
+
+/** Étape qui suit une maquette relue (ou une fiche, pour un lot sans écran) : les tests d'acceptation rouges (S5) quand le projet déclare sa commande dédiée et qu'aucune acceptation conforme n'est déjà commitée, sinon l'implémentation. */
 function afterMaquette(c: LotCtx, fiche: string): SessionKind {
   const l = c.lot;
   // Des constats de la revue de fiche attendent la revue de la maquette (lot mixte) : les deux partent ensemble à la seconde passe `spec`.
@@ -54,7 +60,9 @@ function afterMaquette(c: LotCtx, fiche: string): SessionKind {
     return 'implement';
   }
   return 'accept';
-}/** Le lot a déjà du code commité après sa fiche : l'implémentation n'a pu partir qu'une fois la maquette relue, la revue n'est pas rejouée (même sans `orchestrate.accept`). */
+}
+
+/** Le lot a déjà du code commité après sa fiche : l'implémentation n'a pu partir qu'une fois la maquette relue, la revue n'est pas rejouée (même sans `orchestrate.accept`). */
 function codeAfterFiche(c: LotCtx, fiche: string): boolean {
   const l = c.lot;
   let sha: string;
@@ -75,7 +83,9 @@ function codeAfterFiche(c: LotCtx, fiche: string): boolean {
     if (typeof doc !== 'string') for (const f of doc.fichiers) tests.add(posix.normalize(f));
   }
   return lotWork(histPlan(c), wd(c), l.lot).some((k) => after.has(k.sha) && changedFiles(wd(c), k.sha).some((f) => !f.startsWith(dir) && !tests.has(f)));
-}/**
+}
+
+/**
  * La réponse du lead à une question sur des hypothèses coûteuses de la fiche (L297) : le programme passe lui-même ces règles en `sourcee`
  * (`réponse du lead, <date>, vague <id>`) et commite la fiche AVANT la session spec reprise, qui pourrait être perdue ou ne rien écrire — la fiche est alors
  * conforme quand la revue de fiche la lit. Une réponse qui supprime ou change la règle (`answerAltersRule`) n'en source aucune. Rend vrai quand le lot est rendu (fiche introuvable, commit refusé).
@@ -96,7 +106,9 @@ function sourceAnsweredRules(c: LotCtx): boolean {
     stop(c, 'handed-back', `réponse du lead non reportée dans la fiche ${fiche} : ${(e as Error).message.split('\n')[0]}`);
     return true;
   }
-}/**
+}
+
+/**
  * Étape spec (L171, spec etape-spec S3) : la session écrit maquette, captures et fiche dans `<spec.dir>/<écran>/`, le programme
  * en relève les écarts (une seconde passe, puis le lot est rendu), une hypothèse coûteuse à défaire devient une question au lead,
  * et une sortie sous le seuil (le lot ne change aucun écran) rend le lot au chemin actuel.
@@ -182,7 +194,9 @@ export async function specStep(c: LotCtx): Promise<void> {
   l.next = afterSpec(c, fiche);
   if (l.next === 'fiche') l.ficheConstats = kept; // la seconde revue de fiche les relit
   save(c);
-}/**
+}
+
+/**
  * Un lot sans écran n'a pas de Nouveauté : les hypothèses de sa fiche vont en notes du lot (une par règle) et au tableau de fin de vague (spec
  * etape-spec-back § 7). Elles se lisent sur la fiche FINALE, juste avant `accept` ou `implement` : après la revue de la fiche et sa seconde passe
  * (une hypothèse changée ou retirée en passe 2 ne laisse pas la note de la passe 1), et aussi pour une fiche déjà présente à la reprise.
@@ -200,7 +214,9 @@ export async function settleHypotheses(c: LotCtx): Promise<boolean> {
     return false;
   }
   return noteHypotheses(c, hypothesisLines(doc), typeof doc.sujet?.id === 'string' ? doc.sujet.id : posix.basename(posix.dirname(fiche)));
-}/** Ce qui distingue les deux revues de la spec : la fiche back relue par code-reviewer (L188), la maquette relue par ux-reviewer (L172). */
+}
+
+/** Ce qui distingue les deux revues de la spec : la fiche back relue par code-reviewer (L188), la maquette relue par ux-reviewer (L172). */
 interface SpecReview {
   kind: 'fiche' | 'maquette';
   /** Nom de l'objet relu dans les messages (« la fiche », « la maquette »). */
@@ -210,7 +226,13 @@ interface SpecReview {
   after: (c: LotCtx, fiche: string) => SessionKind;
   /** Étape suivante quand des constats renvoient à la spec. */
   retry: (c: LotCtx, fiche: string) => SessionKind;
-}const FICHE_REVIEW: SpecReview = { kind: 'fiche', label: 'fiche', source: 'code', after: afterFiche, retry: afterFiche };const MAQUETTE_REVIEW: SpecReview = { kind: 'maquette', label: 'maquette', source: 'ux', after: afterMaquette, retry: () => 'spec' };/**
+}
+
+const FICHE_REVIEW: SpecReview = { kind: 'fiche', label: 'fiche', source: 'code', after: afterFiche, retry: afterFiche };
+
+const MAQUETTE_REVIEW: SpecReview = { kind: 'maquette', label: 'maquette', source: 'ux', after: afterMaquette, retry: () => 'spec' };
+
+/**
  * Revue de la spec (fiche ou maquette) : une session de lecture seule. Un bloquant ou un majeur renvoie à la spec (avec les constats ; pour un lot mixte, ceux des deux revues ensemble), puis la spec est relue : deux revues pour la fiche,
  * `orchestrate.maquetteReviews` pour la maquette, dans le plafond de sessions spec du lot (`specBudget`) ; ce qui reste à la dernière revue est rendu au lead.
  * Les mineurs de la fiche vont en notes du lot (ceux de la maquette restent des propositions). Ce verdict n'est pas `raf review` ni `raf ux` : la revue après code garde ce rôle.
@@ -265,4 +287,8 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
   l[key] = constats.length ? constats : [{ source: r.source, gravite: 'majeur', texte: summary.verdict }];
   l.next = r.retry(c, fiche);
   save(c);
-}export const ficheStep = (c: LotCtx): Promise<void> => reviewSpecStep(c, FICHE_REVIEW);export const maquetteStep = (c: LotCtx): Promise<void> => reviewSpecStep(c, MAQUETTE_REVIEW);
+}
+
+export const ficheStep = (c: LotCtx): Promise<void> => reviewSpecStep(c, FICHE_REVIEW);
+
+export const maquetteStep = (c: LotCtx): Promise<void> => reviewSpecStep(c, MAQUETTE_REVIEW);

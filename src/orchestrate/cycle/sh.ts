@@ -4,7 +4,9 @@ import { delimiter, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { TEST_WORKERS_ENV } from '../workers.js';
 import { trackGroup } from '../launch.js';
-export const shEscape = (s: string) => s.replace(/\s+/g, ' ').replace(/[\\"$`]/g, '\\$&');/** Commande du projet, asynchrone : la boucle d'événements reste libre (délai de l'autre créneau, signaux). Son groupe est tué au délai et au signal. */
+export const shEscape = (s: string) => s.replace(/\s+/g, ' ').replace(/[\\"$`]/g, '\\$&');
+
+/** Commande du projet, asynchrone : la boucle d'événements reste libre (délai de l'autre créneau, signaux). Son groupe est tué au délai et au signal. */
 /**
  * PATH des commandes que le programme lance lui-même (porte, ligne de base, démarrage, acceptation, verdict) : le même que celui des sessions,
  * le lien `node-bin/<version>` du .nvmrc du lot en tête (L351). Sans .nvmrc, rien : le PATH hérité reste tel quel.
@@ -12,7 +14,9 @@ export const shEscape = (s: string) => s.replace(/\s+/g, ' ').replace(/[\\"$`]/g
 function nodePath(c: LotCtx): { PATH?: string } {
   const link = c.lot.node?.link;
   return link ? { PATH: [toolBinOf(c.wave.store.dir), link, process.env.PATH ?? ''].filter(Boolean).join(delimiter) } : {};
-}export function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000, env: Record<string, string> = {}, cwd = wd(c)): Promise<{ code: number; output: string }> {
+}
+
+export function sh(c: LotCtx, command: string, timeoutMs = 30 * 60_000, env: Record<string, string> = {}, cwd = wd(c)): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
     const child = spawn('sh', ['-c', command], { cwd, env: { ...withoutLaunchVars(process.env), ...nodePath(c), ...(c.wave.testWorkers ? { [TEST_WORKERS_ENV]: String(c.wave.testWorkers) } : {}), ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     const pid = child.pid;

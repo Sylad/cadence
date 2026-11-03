@@ -8,7 +8,9 @@ import { type VsBase, againstBaseline, redAtStart } from './baseline-run.js';
 import { type TightTest } from '../workers.js';
 import { noteUnstable, noteTight } from '../gate-notes.js';
 /** Un contrôle lancé par le programme : sa commande, son code, et les tests rouges qui l'étaient déjà au sha de départ (L213). */
-export type CheckRun = NonNullable<LotState['checks']>['runs'][number];/**
+export type CheckRun = NonNullable<LotState['checks']>['runs'][number];
+
+/**
  * Les contrôles du programme (`orchestrate.build` puis `orchestrate.test`, L333 : les tests e2e lisent le `dist` que seul le build produit), joués dans `wd(c)` : chaque résultat est ajouté à `runs`, chaque rouge NOUVEAU à `red`
  * (un test déjà rouge au sha de départ n'en est pas un, L213). S'arrête au premier rouge : un build rouge rend le lot sans lancer les tests. Après une écriture (work) et, au sommet rebasé, avant l'avance de la branche du dépôt (R7).
  */
@@ -20,7 +22,9 @@ export async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[])
     // L395 : la porte se lit dans l'état du lot tant qu'une commande (ou le rejeu qui la suit) tourne, jamais après.
     setGate(c, undefined);
   }
-}async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Place): Promise<void> {
+}
+
+async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Place): Promise<void> {
   const l = c.lot;
   for (const [label, command] of [['build', c.config.build], ['tests', c.config.test]] as const) {
     if (!command) continue;
@@ -76,7 +80,9 @@ export async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[])
     red.push({ source: 'tests', gravite: 'bloquant', texte: `${run.command} en échec (code ${r.code}) :\n${shown}${alone}` });
     return;
   }
-}/**
+}
+
+/**
  * Contrôles du sommet intégré (L328) : un rouge est relancé une fois avant de rendre le lot. Le 25-10, L326 a été rendu pour un rouge de charge (L325 tournait en même
  * temps) alors que le même sommet rejoué seul était vert. Rouge deux fois = rendu, avec le résultat de la seconde passe ; vert à la relance = une alerte sur le lot et une ligne du journal.
  */
@@ -91,7 +97,11 @@ export async function integratedChecks(c: LotCtx, key: string): Promise<{ red: C
   await programChecks(c, red, runs);
   if (!red.length) c.lot.warnings.push(`rouge au sommet intégré, vert à la relance (charge de la machine ?) : ${first.map(redExcerpt).join(' ; ')}`);
   return { red, runs };
-}const EXCERPT_LINES = 10;/**
+}
+
+const EXCERPT_LINES = 10;
+
+/**
  * Le constat rouge d'un contrôle, en une ligne pour le motif d'un refus (L328) : la commande, puis les tests rouges nommés quand le constat les liste (« - nom »),
  * sinon la fin de la sortie. La première ligne seule laissait « npx vitest run en échec (code 1) : » sans un nom de test.
  */

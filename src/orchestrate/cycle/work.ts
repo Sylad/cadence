@@ -21,7 +21,9 @@ import { testGateMissing } from '../../testgate.js';
 import { fixAffordable, budgetCount } from './budget.js';
 import { scheduleProbe, PROBE_RESERVE, type ProbeIo } from '../probe.js';
 /** Violations du verrou des tests d'acceptation (L173) par les commits faits depuis `head` ; aucune sans HEAD de départ. */
-const sealedViolations = (c: LotCtx, head: string | undefined): string[] => (head ? lockViolations(wd(c), c.config.spec.dir, head, { rouge: c.lot.accept?.rouge ? { [c.lot.accept.acceptation]: c.lot.accept.rouge } : {}, lot: c.lot.lot, lotBase: c.lot.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(wd(c), lotWork(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha)), lotCommits: lotCommits(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha) }) : []);/** Étape d'écriture (implémentation, correction) : contrôles, puis étape suivante décidée. */
+const sealedViolations = (c: LotCtx, head: string | undefined): string[] => (head ? lockViolations(wd(c), c.config.spec.dir, head, { rouge: c.lot.accept?.rouge ? { [c.lot.accept.acceptation]: c.lot.accept.rouge } : {}, lot: c.lot.lot, lotBase: c.lot.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(wd(c), lotWork(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha)), lotCommits: lotCommits(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha) }) : []);
+
+/** Étape d'écriture (implémentation, correction) : contrôles, puis étape suivante décidée. */
 export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> {
   const l = c.lot;
   const minorsPass = kind === 'fix' && l.minorFix === true;
@@ -199,7 +201,9 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
     return save(c);
   }
   await toReview(c, runs, minorsPass);
-}/** Fin d'une écriture dont les portes sont passées : le bibliothécaire (L306), puis la première revue. Aussi la suite d'une sonde (L497) qui n'a rien à corriger. */
+}
+
+/** Fin d'une écriture dont les portes sont passées : le bibliothécaire (L306), puis la première revue. Aussi la suite d'une sonde (L497) qui n'a rien à corriger. */
 async function toReview(c: LotCtx, runs: CheckRun[], minorsPass: boolean): Promise<void> {
   const l = c.lot;
   // Bibliothécaire (L306) : docs.sync signale un document en retard sur les commits du lot → une passe doc-keeper avant la revue, une seule fois par lot, aux mêmes conditions de passe et de budget que la porte « code sans test ». Si elle ne touche pas le document, la revue part et porte l'écart (brief docs.sync, constat majeur).
@@ -223,7 +227,9 @@ async function toReview(c: LotCtx, runs: CheckRun[], minorsPass: boolean): Promi
   l.checks = runs.length ? { head: git(wd(c), 'rev-parse', 'HEAD'), tree: git(wd(c), 'rev-parse', 'HEAD^{tree}'), runs } : undefined;
   l.next = firstReview(c);
   save(c);
-}/** Ce que la sonde (probe.ts) emprunte au cycle. */
+}
+
+/** Ce que la sonde (probe.ts) emprunte au cycle. */
 export const probeIo = (c: LotCtx): ProbeIo<Done> => ({
   lot: c.lot, config: c.config, cwd: wd(c), play: () => session(c, 'probe'), take: (step, rep) => takeReport(c, { step }, rep), sealed: (head) => sealedViolations(c, head), dirt: dirtAfter, gate: (red, runs) => programChecks(c, red, runs),
   fix: (constats) => toFix(c, constats, 'sonde de cas limites'), review: (runs) => toReview(c, runs, false), handBack: (why) => void stop(c, 'handed-back', why), pays: () => fixAffordable(c.lot), head: () => git(wd(c), 'rev-parse', 'HEAD').trim(),

@@ -14,9 +14,15 @@ import { type ReviewReport, checkShape, REVIEW_SCHEMA, summarize } from '../sche
 import { addProposals, blockingConstats, minorConstats, withoutLine, minorLine } from './shared.js';
 import { handBackWithoutFinding } from '../no-finding.js';
 /** Mention « sans commit » du verdict quand la passe des mineurs n'a rien commité (l'UX finale conclut alors à la place de la passe). */
-const noCommitNote = (l: LotState): string => (l.warnings.some((w) => w.startsWith('passe des mineurs sans commit')) ? ' sans commit' : '');/** Revue de code qui clôt le cycle : complète, ou courte une fois la passe des mineurs jouée. */
-const codeReview = (l: LotState): SessionKind => (l.minorPass ? 'review-small' : 'review');/** Note d'un lot que sa session a rendu `visible` après le lancement de la vague (L454) : son verdict UX n'existe pas encore, le lead le sait. */
-const VISIBLE_ADDED = 'visible ajouté en cours de vague, étape UX à jouer';/**
+const noCommitNote = (l: LotState): string => (l.warnings.some((w) => w.startsWith('passe des mineurs sans commit')) ? ' sans commit' : '');
+
+/** Revue de code qui clôt le cycle : complète, ou courte une fois la passe des mineurs jouée. */
+const codeReview = (l: LotState): SessionKind => (l.minorPass ? 'review-small' : 'review');
+
+/** Note d'un lot que sa session a rendu `visible` après le lancement de la vague (L454) : son verdict UX n'existe pas encore, le lead le sait. */
+const VISIBLE_ADDED = 'visible ajouté en cours de vague, étape UX à jouer';
+
+/**
  * Relit `visible` dans le plan du worktree après une session d'écriture (L454) : un lot que sa session a rendu visible (warhammer L37 et L43,
  * 30-10) est lancé non visible, et sortait « prêt » sans étape UX. Il le devient dans l'état du lot, donc l'UX est jouée (`uxAfterReview`, ou la
  * revue courte d'un petit lot) ; sans application déclarée, il est rendu avec la note. Un plan illisible, ou un lot qui n'est plus visible
@@ -35,7 +41,9 @@ function addedVisible(c: LotCtx): void {
   l.visible = true;
   if (!c.config.ux) l.uxNote = `${VISIBLE_ADDED} (aucune application déclarée : cadence.yaml orchestrate.ux)`;
   c.wave.log(`${lotKey(l.project, l.lot)} · ${VISIBLE_ADDED}`);
-}/**
+}
+
+/**
  * Première étape après un travail d'écriture (L221) : la revue de code, jamais l'UX. La revue UX d'un lot visible est jouée une seule fois,
  * après la dernière revue de code conforme (`uxAfterReview`), sur le code qui sera livré.
  */
@@ -45,8 +53,12 @@ export function firstReview(c: LotCtx): SessionKind {
   if (l.small) return l.visible || l.minorPass ? 'review-small' : 'review'; // passe unique code + ergonomie ; sans écran, une revue de code
   if (l.visible && !c.config.ux && !l.uxNote?.startsWith(VISIBLE_ADDED)) l.uxNote = 'UX à faire par le lead (aucune application déclarée : cadence.yaml orchestrate.ux)';
   return codeReview(l);
-}/** La revue de code conforme d'un lot visible non petit est-elle suivie de la revue UX ? Sans `orchestrate.ux`, le lot conclut (note « UX à faire par le lead »). */
-export const uxAfterReview = (c: LotCtx): boolean => !c.lot.small && c.lot.visible && !!c.config.ux;/** Une passe de correction de plus, ou la main rendue au lead quand les deux sont faites. */
+}
+
+/** La revue de code conforme d'un lot visible non petit est-elle suivie de la revue UX ? Sans `orchestrate.ux`, le lot conclut (note « UX à faire par le lead »). */
+export const uxAfterReview = (c: LotCtx): boolean => !c.lot.small && c.lot.visible && !!c.config.ux;
+
+/** Une passe de correction de plus, ou la main rendue au lead quand les deux sont faites. */
 export function toFix(c: LotCtx, constats: Constat[], what: string): void {
   const l = c.lot;
   l.constats = constats;
@@ -82,9 +94,15 @@ export function toFix(c: LotCtx, constats: Constat[], what: string): void {
   l.pass += 1;
   l.next = 'fix';
   save(c);
-}/** Les deux étapes qui voient l'application : la revue UX, et la passe unique d'un petit lot visible. */
-const seesApp = (l: LotState, kind: SessionKind) => kind === 'ux' || (kind === 'review-small' && l.small && l.visible);const appNote = (state: AppState, ux: { url?: string }): string =>
-  state.kind === 'busy' ? `UX non vérifiée : port occupé (${ux.url} répond déjà, l'application n'a pas été lancée)` : state.kind === 'unverified' ? `UX non vérifiée : ${state.cause}` : '';/**
+}
+
+/** Les deux étapes qui voient l'application : la revue UX, et la passe unique d'un petit lot visible. */
+const seesApp = (l: LotState, kind: SessionKind) => kind === 'ux' || (kind === 'review-small' && l.small && l.visible);
+
+const appNote = (state: AppState, ux: { url?: string }): string =>
+  state.kind === 'busy' ? `UX non vérifiée : port occupé (${ux.url} répond déjà, l'application n'a pas été lancée)` : state.kind === 'unverified' ? `UX non vérifiée : ${state.cause}` : '';
+
+/**
  * Avec `command` ET `url`, le programme lance l'application avant l'étape et la tue après (succès, erreur ou signal) :
  * port occupé ou application muette, la revue UX n'a pas lieu (étape `skipped`, note dans le lot) et le lot conclut
  * sur la dernière revue de code conforme (R6) ; la passe unique d'un petit lot, elle, a lieu sur le code seul.
@@ -137,8 +155,12 @@ export async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'):
     if (skipped && l.code) await conclude(c, l.code, noCommitNote(l));
   }
   await conclusion?.();
-}/** Ce qu'une étape de revue laisse à faire une fois l'application arrêtée : conclure le lot. */
-type Conclusion = () => Promise<void>;async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promise<Conclusion | undefined> {
+}
+
+/** Ce qu'une étape de revue laisse à faire une fois l'application arrêtée : conclure le lot. */
+type Conclusion = () => Promise<void>;
+
+async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Promise<Conclusion | undefined> {
   const l = c.lot;
   const done = await session(c, kind);
   if (!done) return;

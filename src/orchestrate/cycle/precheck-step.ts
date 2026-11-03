@@ -20,7 +20,9 @@ export function needsPrecheck(config: { precheck: boolean; precheckLocal?: boole
   const l = plan.lot(lot);
   const text = [l.title, l.goal, goal].filter(Boolean).join('\n');
   return citesPriorWork(text, lot, plan.lots().map((x) => x.id));
-}/**
+}
+
+/**
  * Contrôle préalable (L77) : une session de lecture seule cherche si le livrable du lot est déjà dans le dépôt (fait par un
  * autre lot). « oui » rend le lot sans ouvrir d'implémentation ; « partiel » joint le constat au brief de l'implémentation.
  * Un rapport illisible ne bloque pas : avertissement, l'implémentation part.
@@ -77,7 +79,9 @@ export async function precheck(c: LotCtx): Promise<void> {
   keepPrecheckReading(l, rep.lu);
   l.next = firstWrite(c);
   save(c);
-}/** Le lot passe-t-il par le contrôle préalable ? Un lot qui n'a rien à retrouver (L322) saute l'étape, et le journal du lot le dit. */
+}
+
+/** Le lot passe-t-il par le contrôle préalable ? Un lot qui n'a rien à retrouver (L322) saute l'étape, et le journal du lot le dit. */
 export function precheckOrSkip(c: LotCtx): boolean {
   const plan = c.loadPlan();
   if (c.lot.express || !needsPrecheck(c.config, plan, c.lot.repo, c.lot.lot, c.lot.repos, c.lot.goal)) return false;

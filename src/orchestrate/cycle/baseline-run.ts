@@ -33,11 +33,15 @@ async function baselineFailures(c: LotCtx, test: GateTest): Promise<string[] | n
     save(c);
     return failures;
   });
-}/** Parmi les tests rouges `names` du lot, ceux rouges SEULS aussi au sha de départ (L510) : la suite entière du départ a pu les voir verts (ordre, charge), ils n'en sont pas moins déjà rouges avant le lot. Vide sans `testReplay`, sans sha de départ, build du départ rouge ou worktree non monté. */
+}
+
+/** Parmi les tests rouges `names` du lot, ceux rouges SEULS aussi au sha de départ (L510) : la suite entière du départ a pu les voir verts (ordre, charge), ils n'en sont pas moins déjà rouges avant le lot. Vide sans `testReplay`, sans sha de départ, build du départ rouge ou worktree non monté. */
 export async function redAtStart(c: LotCtx, names: string[], ran: GateRan): Promise<string[]> {
   const sha = startSha(c);
   return !sha || !gateReplayable(c.config.test, c.config.testReplay) || !names.length ? [] : (await atStartSha(c, sha, (place) => redAloneGate(place.run, c.config.testReplay, names, ran))) ?? [];
-}/** Joue `fn` dans un worktree jetable du sha de départ (ligne de base L213, rouges au départ L510), liens vers les dossiers ignorés posés puis retirés avec lui. Null si le worktree ne se monte pas, si le build du départ est rouge ou si `fn` lève. */
+}
+
+/** Joue `fn` dans un worktree jetable du sha de départ (ligne de base L213, rouges au départ L510), liens vers les dossiers ignorés posés puis retirés avec lui. Null si le worktree ne se monte pas, si le build du départ est rouge ou si `fn` lève. */
 async function atStartSha<T>(c: LotCtx, sha: string, fn: (place: Place) => Promise<T | null>): Promise<T | null> {
   const l = c.lot;
   const dir = mkdtempSync(join(tmpdir(), 'cadence-baseline-'));
@@ -67,7 +71,11 @@ async function atStartSha<T>(c: LotCtx, sha: string, fn: (place: Place) => Promi
       // rien à élaguer
     }
   }
-}export type VsBase = { kind: 'unknown' } | { kind: 'existing'; n: number } | { kind: 'new'; nouveaux: string[]; existants: number };/** Des tests rouges comparés à la ligne de base (L213) : tous déjà rouges au départ, ou au moins un nouveau, ou rien de comparable. */
+}
+
+export type VsBase = { kind: 'unknown' } | { kind: 'existing'; n: number } | { kind: 'new'; nouveaux: string[]; existants: number };
+
+/** Des tests rouges comparés à la ligne de base (L213) : tous déjà rouges au départ, ou au moins un nouveau, ou rien de comparable. */
 export async function againstBaseline(c: LotCtx, command: GateTest, ran: GateRan): Promise<VsBase> {
   const now = failedTests(ran.output);
   // Un échec sans test nommé (en chaîne, ou dans une partie rouge, L512) : rien n'est comparable ni excusable, les tests restent rouges.

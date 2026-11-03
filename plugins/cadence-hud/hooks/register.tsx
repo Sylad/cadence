@@ -97,6 +97,22 @@ const onlyBooleans = (v: Record<string, unknown>): Record<string, boolean> => Ob
 /** Garde le dernier mot du panneau sur un déplacement (fait, sans effet, ou refusé avec sa raison) : il s'affiche sous le titre. */
 const say = ($: EngineInterface, text: string, kind: LotsNotice['kind']): Promise<void> => update($, lotsNotice, () => ({ text, kind }) satisfies LotsNotice).then(() => undefined)
 
+/**
+ * Le dossier interrogé par `cadence lead tour` (L547) : le dossier à `priority:` qui englobe le cwd de la première vague (vivante, sinon la dernière finie), à défaut ce cwd ;
+ * sans vague, le dossier de la session. `cache` retient la réponse du résolveur par cwd (un échec n'est pas retenu).
+ */
+const tourDir = async ($: EngineInterface, waves: readonly Wave[], sessionCwd: string | undefined, cache: Map<string, string>): Promise<string | null> => {
+  const cwd = waves[0]?.cwd
+  if (!cwd) return tourFolder(waves, sessionCwd)
+  const known = cache.get(cwd)
+  if (known) return known
+  const r = await $.process.run(['python3', '-I', '-c', LAUNCH_FOLDER, cwd], { timeoutMs: 4_000 }).catch(() => undefined)
+  if (!r || r.exitCode !== 0) return cwd
+  const folder = launchFolder(r.stdout, cwd)
+  cache.set(cwd, folder)
+  return folder
+}
+
 export const register: Register = on => {
   let timer: Timer | undefined
   let isRefreshing = false
@@ -114,6 +130,8 @@ export const register: Register = on => {
   let boardGen = 0
   // Une relecture demandée pendant qu'une autre est en vol : à relancer à la fin de celle-ci
   let tourAgain = false
+  // L547 : par cwd de vague, le dossier à priority: qui l'englobe (un seul python3 par dossier) ; vidé au démarrage de la session
+  const waveFolders = new Map<string, string>()
 
   on('session.start', async ($, e, next) => {
     // Le dossier du tableau est celui de lancement, pas le dossier courant du shell : un cd du lead dans un sous-projet
@@ -124,6 +142,7 @@ export const register: Register = on => {
       sessionCwd = r && r.exitCode === 0 ? launchFolder(r.stdout, e.cwd) : e.cwd
     }
     tourSignature = undefined
+    waveFolders.clear()
     // Une session démarre sans commande d'arrière-plan ; un rechargement à chaud du mod aussi (il refait session.start) :
     // le compte repart de zéro plutôt que de garder des identifiants dont la fin ne reviendra jamais (vu 08-10 : « 3 cmd »).
     await update($, commands, () => [])
@@ -223,7 +242,7 @@ export const register: Register = on => {
     // Les livraisons (L412, L415) : lues tant que le panneau des lots est ouvert, à chaque rafraîchissement (quelques `stat` par projet) : les échecs pour « ce qui attend une décision »,
     // la dernière de chaque projet pour son bloc ; un journal illisible n'en montre aucune.
     const refreshDeliveries = async (found: Wave[]) => {
-      const folder = tourFolder(found, sessionCwd)
+      const folder = await tourDir($, found, sessionCwd, waveFolders)
       if (!folder || !(await isLotsOpen($))) return
       const [failed, latest] = await Promise.all([
         $.process.run(['python3', '-I', '-c', DELIVERIES, folder], { timeoutMs: 4_000 }).then(r => (r.exitCode === 0 ? parseDeliveries(r.stdout) : []), () => []),
@@ -237,7 +256,7 @@ export const register: Register = on => {
     // Hors de refresh() (un `cadence` lent ne retarde pas la bande) et sans effet sur `error` : cadence absent = pas de lignes de projets.
     // La même lecture nourrit le panneau des lots (L401) ; tant qu'il est ouvert, la date de modification des plans fait aussi relire.
     const refreshProjects = async (found: Wave[], at: number) => {
-      const folder = tourFolder(found, sessionCwd)
+      const folder = await tourDir($, found, sessionCwd, waveFolders)
       if (isTouring || !folder) return
       const stamps = (await isLotsOpen($)) ? await $.process.run(['python3', '-I', '-c', PLAN_STAMPS, folder], { timeoutMs: 4_000 }).then(r => (r.exitCode === 0 ? stampsSignature(r.stdout) : ''), () => '') : ''
       const signature = stamps ? `${waveSignature(found)}#${stamps}` : waveSignature(found)
@@ -737,7 +756,7 @@ export const register: Register = on => {
     const projectAsk = parseProjectMoveAsk(e.data, board?.rows ?? [])
     if (projectAsk) {
       if (isMoving) return {}
-      const folder = tourFolder(allWaves, sessionCwd)
+      const folder = await tourDir($, allWaves, sessionCwd, waveFolders)
       if (!folder) {
         await say($, 'dossier des plans inconnu : rien n\'a été déplacé', 'refused')
         return {}
@@ -770,7 +789,7 @@ export const register: Register = on => {
       await say($, plan.text, 'unchanged')
       return {}
     }
-    const folder = tourFolder(allWaves, sessionCwd)
+    const folder = await tourDir($, allWaves, sessionCwd, waveFolders)
     if (!folder) {
       await say($, 'dossier des plans inconnu : rien n\'a été déplacé', 'refused')
       return {}

@@ -1226,6 +1226,49 @@ test('un cd du lead dans un sous-projet ne déplace pas le dossier du tableau : 
   expect(hud.state('projects')).toBeDefined()
 })
 
+// L547 (issue #24) : le tour se lance dans le dossier qui porte `priority:`, quel que soit le cwd de la vague ou celui du shell
+const tourOfWaveCwd = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], waveCwd: string, shell: string, resolver: (cwd: string) => string | null) => {
+  wired(on)
+  const clock = mock.clock(on)
+  const runs: string[][] = []
+  on('command.register', () => ({ value: {} }) as never)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
+  on('agent.list', () => ({ value: [] }) as never)
+  on('process.run', async (_$, e) => {
+    const argv = (e as unknown as { argv: string[] }).argv
+    runs.push(argv)
+    if (argv[0] === 'cadence') return { value: { exitCode: 0, stdout: JSON.stringify(TOUR), stderr: '' } } as never
+    if (argv[3] === COLLECTOR) return { value: { exitCode: 0, stdout: JSON.stringify({ waves: [{ ...WAVE, cwd: waveCwd, live: false }], ended: [], holds: [], cap: 2 }), stderr: '' } } as never
+    if (argv.includes(LAUNCH_FOLDER)) {
+      const found = resolver(argv[argv.length - 1]!)
+      return found === null ? ({ value: { exitCode: 1, stdout: '', stderr: 'x' } } as never) : ({ value: { exitCode: 0, stdout: `${found}\n`, stderr: '' } } as never)
+    }
+    return { value: { exitCode: 0, stdout: '[]', stderr: '' } } as never
+  })
+  await $.session.start({ cwd: shell, surface: 'terminal', isInteractive: true } as never)
+  await settle()
+  await clock.advance(5_000)
+  await settle()
+  return [...new Set(runs.filter(a => a[0] === 'cadence' && a[2] === 'tour').map(a => a[3]))]
+}
+const PRIORITY_ABOVE = (cwd: string) => (cwd.startsWith('/w/') ? '/w' : cwd)
+
+test('L547 R1 — sans vague vivante, le tour se lance dans le dossier à priority: qui englobe le cwd de la dernière vague finie, pas dans ce cwd ni dans celui du shell', async ($, on) => {
+  expect(await tourOfWaveCwd($, on, '/w/ol', '/ailleurs', PRIORITY_ABOVE)).toEqual(['/w'])
+})
+
+test('L547 R2 — le dossier de la vague (sous-dossier du projet) se résout lui aussi vers le dossier à priority:', async ($, on) => {
+  expect(await tourOfWaveCwd($, on, '/w/ol/sub/deep', '/w/cadence', PRIORITY_ABOVE)).toEqual(['/w'])
+})
+
+test('L547 R3 — sans dossier à priority: au-dessus du cwd de la vague, le tour reste dans ce cwd', async ($, on) => {
+  expect(await tourOfWaveCwd($, on, '/solo/proj', '/w/ol', PRIORITY_ABOVE)).toEqual(['/solo/proj'])
+})
+
+test('L547 R4 — si le résolveur échoue, le tour retombe sur le cwd de la vague', async ($, on) => {
+  expect(await tourOfWaveCwd($, on, '/solo/proj', '/w/ol', c => (c === '/solo/proj' ? null : '/w'))).toEqual(['/solo/proj'])
+})
+
 const PROJECTS = activeProjects(parseTour(JSON.stringify(TOUR)))
 
 test('la bande écrit une ligne par projet actif, repliable par /hud projets', async ($, on) => {

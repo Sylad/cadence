@@ -4,8 +4,11 @@ import * as budget from '../src/orchestrate/cycle/budget.js';
 import * as brief from '../src/orchestrate/cycle/brief.js';
 import * as ctx from '../src/orchestrate/cycle/ctx.js';
 import * as planWrites from '../src/orchestrate/cycle/plan-writes.js';
+import * as checks from '../src/orchestrate/cycle/checks.js';
+import * as precheckStep from '../src/orchestrate/cycle/precheck-step.js';
+import * as questions from '../src/orchestrate/cycle/questions.js';
 
-/** Découpage C1a (L490) : `cycle.ts` reste le point d'entrée des tests et des autres modules, il ré-exporte ce qui a bougé dans `cycle/`. */
+/** Découpages C1a (L490) et C1c (L492) : `cycle.ts` reste le point d'entrée des tests et des autres modules, il ré-exporte ce qui a bougé dans `cycle/`. */
 describe('orchestrate/cycle.ts, façade de ré-export (C1a)', () => {
   it('ctx — les contextes et leurs constantes sortent de cycle.ts sans changer d\'identité', () => {
     expect(facade.Budget).toBe(ctx.Budget);
@@ -27,5 +30,13 @@ describe('orchestrate/cycle.ts, façade de ré-export (C1a)', () => {
     expect(facade.planNoteHandBack).toBe(planWrites.planNoteHandBack);
     expect(facade.leadReviewedHandBack).toBe(planWrites.leadReviewedHandBack);
     expect(facade.HYPOTHESES_HANDBACK).toBe(planWrites.HYPOTHESES_HANDBACK);
+  });
+
+  it('étapes (C1c) — le contrôle préalable, l\'extrait rouge et les questions non bloquantes sortent de cycle.ts sans changer d\'identité', () => {
+    expect(facade.needsPrecheck).toBe(precheckStep.needsPrecheck);
+    expect(facade.redExcerpt).toBe(checks.redExcerpt);
+    expect(facade.isNonQuestion).toBe(questions.isNonQuestion);
+    expect(facade.handBackDroppedQuestions).toBe(questions.handBackDroppedQuestions);
+    expect(typeof facade.runLot).toBe('function');
   });
 });

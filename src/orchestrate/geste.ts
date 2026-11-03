@@ -124,7 +124,7 @@ const REFUSALS: Refusal[] = [
   { when: /pas rendu à l'étape d'intégration/, gesture: () => ['integration', "lire l'état de la vague (colonne geste) : cadence orchestrate --status"] },
   { when: /la vague (?:(\S+) )?tourne encore/, gesture: (m) => [`running ${m[1] ?? ''}`, atWaveEnd(resumeCommand(m[1] ?? WAVE_MARK))] },
   {
-    when: /(?:^|\s)(?:([^\s:]+:[^\s:]+) : )?lot déjà/,
+    when: /(?:^|\s)(?:([^\s:]+:[^\s:]+) : )?lot déjà (?:en file d'ajout dans|dans) la vague/,
     gesture: (m) => [`already ${m[1] ?? ''}`, `le lot ${m[1] ?? LOT_MARK} est déjà dans la vague : cadence orchestrate --status`],
   },
   { when: /^\s*(?:orchestrate : )?(?:([^\s:]+:[^\s:]+) : )?.*ne tient pas le budget du lot/, gesture: (m) => [`budget ${m[1] ?? ''}`, atWaveEnd(newWaveGesture(m[1] ?? LOT_MARK))] },

@@ -52,6 +52,11 @@ describe('L556 — le geste d’un refus connu (R1, R4, R6)', () => {
     const b = await retour(post(CMD, 'a:L1 : lot déjà dans la vague w1'));
     expect(gestes(a.out)).toEqual(gestes(b.out));
   });
+  it('R1 — un texte « lot déjà » sans « dans la vague » (titre, note, état) n’est pas le refus du lot déjà dans la vague : aucune sortie', async () => {
+    for (const text of ['title: Reprendre un lot déjà commencé', 'lot déjà en file', 'a:L1 : lot déjà retiré →']) {
+      expect(await retour(post('raf show L9', text))).toEqual(silent);
+    }
+  });
   it('R4 — le geste de « tourne encore » est identique, caractère pour caractère, à la sortie de resumeCommand et atWaveEnd pour la même vague', async () => {
     const r = await retour(post(CMD, 'la vague w1 tourne encore (pid 7)'));
     expect(gestes(r.out)).toEqual([atWaveEnd(resumeCommand('w1'))]);

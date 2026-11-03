@@ -170,8 +170,9 @@ describe('L403 — la porte jouée sur l\'hôte (C1)', () => {
     const p = project(`  test: ${marker}\n  gate:\n    host: machine\n    install: mkdir -p node_modules\n`);
     await gate(p, p.sha, { timeoutMs: 1500 });
     // L555 : l'arrêt du groupe n'est pas instantané sous charge : on laisse jusqu'à 10 s au dernier processus pour disparaître
-    for (let t = 0; t < 10_000 && spawnPgrep(marker); t += 100) await new Promise((r) => setTimeout(r, 100));
-    expect(spawnPgrep(marker)).toBe(false);
+    const pattern = `sleep 31337\\.${process.pid}$`; // ancré : un pid qui commence pareil n'est pas le nôtre
+    for (let t = 0; t < 10_000 && spawnPgrep(pattern); t += 100) await new Promise((r) => setTimeout(r, 100));
+    expect(spawnPgrep(pattern)).toBe(false);
   });
 
   it('R19 — nettoyage en échec : dit dans la sortie, worktree orphelin retiré au prochain appel', async () => {

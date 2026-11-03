@@ -1595,6 +1595,7 @@ lots:
     estimate: 0.25
     created: 2026-11-03
     started: 2026-11-03
+    review: { date: 2026-11-03, verdict: "conforme, 2 notes mineures (constante DROPPED recopiée sans test qui la relie à src, sonde sur l'issue de mauvais type qui vérifie moins que son titre) — orchestré (vague 2026-11-02-2140-cont, 1 passe(s) de correction)", commit: 5c411bb857b40f38b08f0492d18ecec7b9b2e817, reporte: { de: 45fc21ddda2acafcd77c2a905e2c070bcdf8f764, vers: 5c411bb857b40f38b08f0492d18ecec7b9b2e817, patchId: b0d605d77f0bf805de988c66412dc2aa724ca403 } }
   - id: L546
     title: "spec reseal (issue #23) : accepter plusieurs <test> dans une même commande et un seul commit (deux tests scellés d'un lot livré réécrits par le porteur : aucun des deux ne peut être rescellé, « le verrou garde le reste ») ; sujet de commit court et fixe, chemins et raison dans le corps (comme spec green) — le sujet actuel dépasse header-max-length de commitlint ; l'erreur cite la règle de commitlint qui refuse, pas seulement « found 1 problems »"
     status: doing

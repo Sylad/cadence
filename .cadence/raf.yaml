@@ -1022,7 +1022,7 @@ lots:
     finished: 2026-11-03
   - id: L491
     title: "Découpage C1b : orchestrate/cycle.ts — session (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C1 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
-    status: doing
+    status: done
     estimate: 0.5
     uses: [ cycle-ts ]
     created: 2026-10-31
@@ -1030,6 +1030,7 @@ lots:
     notes:
       - { date: 2026-11-02, text: "02-11 soir : retiré de la vague 2140-cont (tiré en parallèle de L490 sur le même cycle.ts) ; ressource cycle-ts posée sur L490-L492 pour qu'ils passent l'un après l'autre." }
     review: { date: 2026-11-03, verdict: "conforme (1 mineur : une phrase du bilan dans docs/mesures/audit-simplification-l461.md:97 dit « ne monte que » au lieu de « ne reste stable que ») — orchestré (vague 2026-11-03-1215-cad, 2 passe(s) de correction + passe des mineurs)", commit: 0267cf771e3310ed4a6314a46cfe6f3447de1a33, reporte: { de: 1cdf905236be6b4394930cc5f6054f65a6ccdf10, vers: 0267cf771e3310ed4a6314a46cfe6f3447de1a33, patchId: 79fdd421630adf2cefcae036520aea9ea0ff2623 } }
+    finished: 2026-11-03
   - id: L492
     title: "Découpage C1c : orchestrate/cycle.ts — les étapes (precheck, spec, accept, checks, work, review, integrate) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C1 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: doing

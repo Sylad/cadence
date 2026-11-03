@@ -1865,7 +1865,7 @@ lots:
     estimate: 0.25
     created: 2026-11-03
     started: 2026-11-03
-    review: { date: 2026-11-03, verdict: "conforme (revue courte du diff rebasé, 03-11 : seul majeur = CHANGELOG [Unreleased] dédoublé par le rebase, corrigé par le lead ; test de fusion du CHANGELOG 24/24)", commit: 8db062df12db1eaa2cef7d65e3d1691e9ec530de }
+    review: { date: 2026-11-03, verdict: "conforme (revue courte du diff rebasé, 03-11 : seul majeur = CHANGELOG dédoublé par le rebase ; CHANGELOG refait depuis main + la seule entrée L564 par le lead)", commit: c62fdd86f8d88be40a2bd6a9e0030a335a169bfe }
   - id: L565
     title: "Voie express conservée après une correction : un petit lot (estimate ≤ 0,25 j) garde la revue courte (review-small, Sonnet) après une passe qui ne répare que des tests rouges ou un contrôle du programme ; il ne bascule en revue Opus que si une revue a trouvé un bloquant ou un majeur. Mesuré le 03-11 : L559, L561, L564 à 0,25 j ont tous eu une revue Opus complète après une correction de tests (0 review-small dans la vague 2100-cad) — perf : 43 % conformes du premier coup"
     status: doing

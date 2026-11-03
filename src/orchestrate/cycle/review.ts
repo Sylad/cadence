@@ -58,9 +58,17 @@ export function firstReview(c: LotCtx): SessionKind {
 /** La revue de code conforme d'un lot visible non petit est-elle suivie de la revue UX ? Sans `orchestrate.ux`, le lot conclut (note « UX à faire par le lead »). */
 export const uxAfterReview = (c: LotCtx): boolean => !c.lot.small && c.lot.visible && !!c.config.ux;
 
+/** Les passes que déclenche un contrôle du programme, sans revue : elles ne font pas passer la revue d'un lot léger à Opus (L565). */
+const PROGRAM_FIXES: ReadonlySet<string> = new Set(['tests rouges', 'code sans test', 'documentation en retard']);
+
+const markHeavy = (l: LotState, what: string): void => {
+  if (!PROGRAM_FIXES.has(what)) l.heavyFix = true;
+};
+
 /** Une passe de correction de plus, ou la main rendue au lead quand les deux sont faites. */
 export function toFix(c: LotCtx, constats: Constat[], what: string): void {
   const l = c.lot;
+  markHeavy(l, what);
   l.constats = constats;
   // Revue qui converge (L205) : un seul constat bloquant ou majeur reste, après une baisse d'une revue à l'autre → une passe de plus (budget : fixAffordable, à l'entrée de la session).
   const counts = l.reviewCounts ?? [];

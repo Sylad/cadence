@@ -25,12 +25,12 @@ import { docsConfig, briefFor } from './brief.js';
 /** Ce qu'une session rend : son étape, son rapport, le dépôt du lot et ses dépôts voisins (`others`) vus avant et après. */
 export type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapshot; others: { repo: LotRepo; before: Snapshot; after: Snapshot }[] };
 
-/** Modèle d'une revue (L108) : la revue légère d'un lot léger tant qu'aucune correction n'a eu lieu, sinon la revue complète (UX comprise). */
+/** Modèle d'une revue (L108) : la revue légère d'un lot léger tant qu'aucune correction née d'une revue n'a eu lieu (une passe de tests rouges ou de contrôle du programme ne compte pas, L565), sinon la revue complète (UX comprise). */
 function reviewModel(c: LotCtx, kind: SessionKind): AnyModel {
   const { light, full } = c.config.review;
   // Escalade (L337) : la revue neuve qui suit la correction escaladée se joue au modèle de l'escalade ; l'UX garde le sien.
   if (c.lot.escalation?.stage === 'fix' && (kind === 'review' || kind === 'review-small')) return c.lot.escalation.model;
-  return c.lot.light && c.lot.pass === 0 && (kind === 'review' || kind === 'review-small') ? light : full;
+  return c.lot.light && !c.lot.heavyFix && (kind === 'review' || kind === 'review-small') ? light : full;
 }
 
 /** Écarte le modèle local pour le reste de la vague (L322) : le premier échec suffit, les lots suivants n'attendent pas de le constater à leur tour. */

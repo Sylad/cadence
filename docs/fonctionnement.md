@@ -43,7 +43,7 @@ to the lead; « partial » passes what exists to the implementation. Then:
   declares `orchestrate.accept`.
 - every other lot goes straight to the **implementation**: test first, commits that cite the lot.
 
-After the implementation: the **code review** (Opus, Sonnet for a lot of 0.25 day or less); a
+After the implementation: the **code review** (Opus, Sonnet for a lot of 0.25 day or less, kept after a pass that only repaired red tests or a program check); a
 **correction** in a fresh session if the review is not compliant, two passes at most, and a third
 only when the review converges (the count of blocking + major findings dropped and only one is
 left), each followed by a review. A compliant review makes the program record `raf review` itself;

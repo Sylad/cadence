@@ -348,6 +348,30 @@ describe('revue proportionnée (L108)', () => {
     expect(c.lot.proposals).toHaveLength(1);
   });
 
+  it('L565 R1 — lot léger : une passe qui ne répare que des tests rouges laisse la revue en Sonnet', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    const c = h.lot('L1', { light: true }, { test: 'test -f b.txt || { echo boom >&2; exit 3; }' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+    expect(h.calls.filter((x) => x.kind === 'review').map((x) => x.model)).toEqual(['sonnet']);
+    expect(c.lot.status).toBe('ready');
+  });
+
+  it('L565 R2 — lot léger : tests rouges réparés puis revue non conforme (majeur) → correction, la revue suivante est Opus', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt'), fix('c.txt')], review: [major, ok] } });
+    const c = h.lot('L1', { light: true }, { test: 'test -f b.txt || { echo boom >&2; exit 3; }' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'fix', 'review', 'fix', 'review']);
+    expect(h.calls.filter((x) => x.kind === 'review').map((x) => x.model)).toEqual(['sonnet', 'opus']);
+  });
+
+  it('L565 R3 — lot non léger : la revue après des tests rouges reste Opus', async () => {
+    const h = harness({ script: { implement: [impl()], fix: [fix('b.txt')], review: [ok] } });
+    const c = h.lot('L1', {}, { test: 'test -f b.txt || { echo boom >&2; exit 3; }' });
+    await runLot(c);
+    expect(h.calls.filter((x) => x.kind === 'review').map((x) => x.model)).toEqual(['opus']);
+  });
+
   it('lot léger : les deux passes de correction restent le plafond', async () => {
     const h = harness({ script: { implement: [impl()], review: [major, major, major], fix: [fix('b.txt'), fix('c.txt')] } });
     const c = h.lot('L1', { light: true });

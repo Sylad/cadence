@@ -233,7 +233,7 @@ orchestrate:
 **Review sized to the lot (L108)**: a lot whose `estimate` is ≤ `orchestrate.review.threshold` (0.25 day by default)
 is *light*: one single review (Sonnet by default, `code-reviewer` agent, same criteria), no minors pass — the minors are
 returned to the lead as notes (proposals). A blocking or major finding on a light lot still triggers a correction, and
-the review that follows is the full one (Opus); the cap of two correction passes is unchanged (except the convergence pass above). A bigger lot keeps the
+the review that follows is the full one (Opus). A pass that only repairs red tests or a check of the program (tests, code without a test, documentation behind) does not count (L565, measured on 2026-11-03: L559, L561 and L564, all 0.25 day, had a full Opus review after a test fix): the light lot keeps its Sonnet review until a review has found a blocking or major finding. The cap of two correction passes is unchanged (except the convergence pass above). A bigger lot keeps the
 chain described above (Opus, two corrections, minors pass). `--dry-run` shows « revue légère » on a light lot.
 
 ```yaml

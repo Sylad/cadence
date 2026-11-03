@@ -23,6 +23,19 @@ const TEST_SCRIPT = /^(npm|pnpm|yarn) run (test|e2e)\S*/;
 const WRAPPER = /^(xvfb-run|timeout|time|env|nice)(\s+-\S+)*(\s+\d+[smhd]?)?\s+/;
 /** Les variables d'environnement en tête de commande, valeur entre guillemets comprise. */
 const ENV_PREFIX = /^(\w+=("[^"]*"|'[^']*'|\S*)\s+)+/;
+/** Une redirection (`2>&1`, `>out.log`, `&>`, `<in`) : le groupe est vide quand la cible est le mot suivant (`> out.log`). */
+const REDIRECTION = /^(?:\d*>>?&?\d*|&>>?|\d*<&?\d*)(\S*)$/;
+
+/** `command` sans ses variables d'environnement de tête, ses enveloppes (`xvfb-run`, `timeout`…) ni `npx`, répétés jusqu'à épuisement (`timeout 60 CI=1 npx vitest`). */
+function unwrap(command: string): string {
+  let rest = command;
+  for (let again = true; again; ) {
+    const next = rest.replace(ENV_PREFIX, '').replace(WRAPPER, '').replace(/^npx(\s+(--no-install|-y|--yes))?\s+/, '');
+    again = next !== rest;
+    rest = next;
+  }
+  return rest;
+}
 
 function packageScripts(repo: string, dir: string): Record<string, string> {
   if (dir.startsWith('..') || isAbsolute(dir)) return {}; // hors du dépôt : rien à lire
@@ -34,7 +47,14 @@ function packageScripts(repo: string, dir: string): Record<string, string> {
   }
 }
 
-/** Découpe une ligne sur `&&`, `||`, `|` et `;` hors des guillemets ; chaque parenthèse (sous-shell, `$(…)`) devient un segment `(` ou `)`. */
+/** Le caractère `i` de `line` sépare deux commandes : `|`, `;` ou un `&` qui n'est pas celui d'une redirection (`2>&1`, `>&2`, `&> f`). */
+function isSeparator(line: string, i: number): boolean {
+  const c = line[i];
+  if (c === '|' || c === ';') return true;
+  return c === '&' && line[i - 1] !== '>' && line[i + 1] !== '>';
+}
+
+/** Découpe une ligne sur `&&`, `||`, `|` et `;` hors des guillemets (les redirections `2>&1` restent dans leur commande) ; chaque parenthèse (sous-shell, `$(…)`) devient un segment `(` ou `)`. */
 function splitLine(line: string): string[] {
   const parts: string[] = [];
   let quote = '';
@@ -48,7 +68,7 @@ function splitLine(line: string): string[] {
     } else if (c === '(' || c === ')') {
       parts.push(line.slice(from, i), c);
       from = i + 1;
-    } else if (c === '&' || c === '|' || c === ';') {
+    } else if (isSeparator(line, i)) {
       parts.push(line.slice(from, i));
       if ((c === '&' || c === '|') && line[i + 1] === c) i++;
       from = i + 1;
@@ -64,7 +84,7 @@ function segments(text: string): string[] {
   return lines.flatMap(splitLine);
 }
 
-/** Les commandes feuilles de `text`, `npm test` / `npm run x` remplacés par le script de package.json de `dir` (suivi à travers les `cd`, que la parenthèse fermante d'un sous-shell annule) quand il existe. */
+/** Les commandes feuilles de `text`, `npm test` / `npm run x` (variables d'environnement et enveloppes devant comprises : `CI=true npm test`) remplacés par le script de package.json de `dir` (suivi à travers les `cd`, que la parenthèse fermante d'un sous-shell annule) quand il existe. */
 function leaves(repo: string, dir: string, text: string, depth = SCRIPT_DEPTH): string[] {
   let cwd = dir;
   const outer: string[] = [];
@@ -82,7 +102,7 @@ function leaves(repo: string, dir: string, text: string, depth = SCRIPT_DEPTH): 
       cwd = posix.normalize(posix.join(cwd, cd[1] ?? cd[2] ?? cd[3]!));
       return [];
     }
-    const m = /^(?:npm|pnpm|yarn)(?: run)? ([\w:.-]+)\s*(?:--(?:\s.*)?)?$/.exec(s);
+    const m = /^(?:npm|pnpm|yarn)(?: run)? ([\w:.-]+)\s*(?:--(?:\s.*)?)?$/.exec(unwrap(s));
     const body = m && depth > 0 ? packageScripts(repo, cwd)[m[1]!] : undefined;
     return body === undefined ? [s] : leaves(repo, cwd, body, depth - 1);
   });
@@ -91,15 +111,21 @@ function leaves(repo: string, dir: string, text: string, depth = SCRIPT_DEPTH): 
 /** Les options qui désignent une autre suite ou un autre projet : elles restent dans la clé, avec leur valeur. */
 const SUITE_OPTION = /^(-c|-p|--config|--project|--projects|--selectProjects)(=.*)?$/;
 
-/** La clé de comparaison : sans variables d'environnement ni `npx`, coupée au premier argument qui commence par `-` (les autres options ne font pas une autre commande), mais gardant les options de `SUITE_OPTION` où qu'elles soient. */
-function key(command: string): string {
-  let rest = command;
-  for (let again = true; again; ) {
-    const next = rest.replace(ENV_PREFIX, '').replace(WRAPPER, '').replace(/^npx(\s+(--no-install|-y|--yes))?\s+/, '');
-    again = next !== rest;
-    rest = next;
+/** `words` sans ses redirections (`2>&1`, `> out.log` avec sa cible, `2>/dev/null`) : elles ne font pas une autre commande. */
+function withoutRedirections(words: string[]): string[] {
+  const kept: string[] = [];
+  for (let i = 0; i < words.length; i++) {
+    const r = REDIRECTION.exec(words[i]!);
+    if (!r) kept.push(words[i]!);
+    else if (r[1] === '') i++; // la cible est le mot suivant
   }
-  const words = rest.replace(/^python3?\s+-m\s+pytest\b/, 'pytest').replace(/^mvn(\s+-\S+)*\s+/, 'mvn ').split(/\s+/);
+  return kept;
+}
+
+/** La clé de comparaison : sans variables d'environnement, `npx` ni redirections, coupée au premier argument qui commence par `-` (les autres options ne font pas une autre commande), mais gardant les options de `SUITE_OPTION` où qu'elles soient. */
+function key(command: string): string {
+  const rest = unwrap(command);
+  const words = withoutRedirections(rest.replace(/^python3?\s+-m\s+pytest\b/, 'pytest').replace(/^mvn(\s+-\S+)*\s+/, 'mvn ').split(/\s+/));
   const end = words.findIndex((w) => w.startsWith('-') && !SUITE_OPTION.test(w));
   const kept = end < 0 ? words : words.slice(0, end);
   const tail = end < 0 ? [] : words.slice(end);
@@ -144,7 +170,7 @@ function gateKeys(repo: string, test: GateTest | undefined, build: string | unde
  * Les commandes de test des workflows CI du dépôt que la porte ne joue pas (L499), dans l'ordre des fichiers, chacune une fois ; vide sans workflows,
  * sans `orchestrate.test` ni `orchestrate.build` (rien à comparer : `noTestGate` le dit déjà) ou avec un cadence.yaml illisible (il a sa propre erreur).
  * Une commande est une commande de test (lanceur reconnu, `npm test` et `npm run <script>` dépliés par le package.json de son dossier) ; deux commandes sont la même
- * si elles ne diffèrent que par les variables d'environnement, `npx` et les options (`--coverage`) : un fichier nommé, une configuration (`-c`, `--config`) ou un projet (`--project`, `--selectProjects`, `-p`) reste une autre commande.
+ * si elles ne diffèrent que par les variables d'environnement, `npx`, les redirections (`2>&1`, `> out.log`) et les options (`--coverage`) : un fichier nommé, une configuration (`-c`, `--config`) ou un projet (`--project`, `--selectProjects`, `-p`) reste une autre commande.
  */
 export function ciParityGaps(repo: string): CiGap[] {
   let test: GateTest | undefined;

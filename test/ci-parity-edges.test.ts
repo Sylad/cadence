@@ -139,4 +139,21 @@ describe('parité porte ↔ CI — bords (L499)', () => {
     const files = { 'package.json': '{"scripts":{"test:e2e":"vitest run -c vitest.e2e.config.ts"}}' };
     expect(ci('npm run test:e2e', files)).toEqual(['vitest run -c vitest.e2e.config.ts']);
   });
+  it('E23 — une variable d\'environnement devant un script npm ne l\'empêche pas d\'être déplié (CI=true npm test, DEBUG=… npm run test:e2e -- …)', () => {
+    const files = { 'package.json': '{"scripts":{"test":"vitest run"}}' };
+    expect(ci('CI=true npm test', files)).toEqual([]);
+    const wh = { 'frontend/package.json': '{"scripts":{"test:e2e":"vitest run -c vitest.e2e.config.ts"}}' };
+    const gate = 'orchestrate:\n  test:\n    - { dir: frontend, run: npm run test:e2e }\n';
+    const wf = WF('      - run: DEBUG=pw:api npm run test:e2e -- --reporter=junit\n        working-directory: frontend\n');
+    expect(ciParityGaps(project({ '.github/workflows/ci.yml': wf, ...wh }, gate)).map((g) => g.command)).toEqual([]);
+    expect(ciParityGaps(project({ '.github/workflows/ci.yml': wf, ...wh })).map((g) => g.command)).toEqual(['vitest run -c vitest.e2e.config.ts']);
+  });
+
+  it('E24 — une redirection (2>&1 | tee, > out.log, 2>/dev/null) ne coupe pas la commande et ne compte pas dans la clé', () => {
+    expect(ci('npx vitest run 2>&1 | tee log')).toEqual([]);
+    expect(ci('npx vitest run > out.log')).toEqual([]);
+    expect(ci('npx vitest run 2>/dev/null')).toEqual([]);
+    expect(ci('npx vitest run 2>&1 -c vitest.e2e.config.ts')).toEqual(['npx vitest run 2>&1 -c vitest.e2e.config.ts']);
+    expect(ci('npx playwright test --reporter=line 2>&1 | tee e2e.log')).toEqual(['npx playwright test --reporter=line 2>&1']);
+  });
 });

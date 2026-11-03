@@ -1040,6 +1040,7 @@ lots:
     created: 2026-10-31
     started: 2026-11-02
     docs_ok: { date: 2026-11-03, reason: "découpage interne de cycle.ts (C1c) : aucune commande, clé, sortie ni export public changé ; même faux positif que corrige L542 (lead, 03-11)" }
+    review: { date: 2026-11-03, verdict: "conforme : revue courte Opus conforme avant le conflit ; rebase sur main résolu par le lead (sous-agent Opus) — changements de L520 reportés dans cycle/checks.ts, de L552 dans cycle/accept-step.ts, comparaison ligne à ligne avec le cycle.ts de main (seule différence : export), doublon CHANGELOG retiré ; tsc, cliquet et suite complète verts (6875 tests)", commit: a4ec228ceb089f2a07436e9de0ea18bb64c53bd7 }
   - id: L493
     title: "Nettoyage E : déclarer vite en devDependency, assertion manquante du R3 de orchestrate-registry.test.ts (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § E ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: done

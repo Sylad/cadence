@@ -426,10 +426,10 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
     expect(verdict).toContain('seconde lecture');
     expect(verdict).not.toContain('rebase sans dégât');
   });
-  /** Une autre vague vivante (un `sleep`) tient le dépôt ; `after` ms plus tard elle finit (le processus meurt) — jamais si `after` est null. */
-  async function otherWaveHolds(repo: string, after: number | null) {
+  /** Un autre porteur vivant (un `sleep`) tient le dépôt — par défaut une tâche locale du lead (L519), que la reprise attend (L443) ; une autre VAGUE vivante est tolérée (L553) ; `after` ms plus tard elle finit (le processus meurt) — jamais si `after` est null. */
+  async function otherWaveHolds(repo: string, after: number | null, wave = 'local:L9') {
     const sleeper = spawn('sleep', ['30'], { stdio: 'ignore' });
-    writeFileSync(join(sharedStateDir(repo), REPO_LOCK), JSON.stringify({ pid: sleeper.pid, wave: 'autre-vague', started: '2026-10-04T00:00:00Z' }));
+    writeFileSync(join(sharedStateDir(repo), REPO_LOCK), JSON.stringify({ pid: sleeper.pid, wave, started: '2026-10-04T00:00:00Z' }));
     if (after !== null) setTimeout(() => sleeper.kill(), after);
     return sleeper;
   }
@@ -441,8 +441,41 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
       const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }), { repoWait: { waitMs: 20_000, pollMs: 50 } });
       expect(again.err).toMatch(/^orchestrate : verrou de dépôt périmé retiré \(a, pid \d+ mort\)$/); // le verrou de l'autre vague, tombé avec son processus, est repris
       expect(again.code).toBe(0);
-      expect(again.out.match(/a : tenu par la vague autre-vague \(pid \d+\) : attente de sa fin/g)).toHaveLength(1);
+      expect(again.out.match(/a : tenu par la vague local:L9 \(pid \d+\) : attente de sa fin/g)).toHaveLength(1);
       expect(store(parent).readLot('a', lot)!.status).toBe('ready');
+    } finally {
+      sleeper.kill();
+    }
+  });
+  it('L553 — le dépôt est tenu par une autre VAGUE vivante : --resume --integrate d\'un lot en worktree n\'attend pas sa fin, intègre entre ses étapes, laisse son verrou', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const sleeper = await otherWaveHolds(repo, null, 'autre-vague');
+    const t0 = Date.now();
+    try {
+      const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }), { repoWait: { waitMs: 20_000, pollMs: 50 } });
+      expect(again.err).toBe('');
+      expect(again.code).toBe(0);
+      expect(again.out).not.toContain('attente de sa fin');
+      expect(again.out).toContain('a : tenu par la vague autre-vague');
+      expect(again.out).toContain("l'intégration passe entre ses étapes");
+      expect(Date.now() - t0).toBeLessThan(15_000);
+      expect(store(parent).readLot('a', lot)!.status).toBe('ready');
+      expect(subjects(repo).some((s) => s.startsWith(`feat(${lot})`))).toBe(true);
+      expect(activeLock(join(sharedStateDir(repo), REPO_LOCK))?.pid).toBe(sleeper.pid); // le verrou de l'autre vague n'est ni pris ni retiré
+      expect(liveWaves(cadenceHome())).toHaveLength(0);
+    } finally {
+      sleeper.kill();
+    }
+  });
+  it('L553 — la tâche locale du lead tient le dépôt : l\'attente reste (elle écrit dans l\'arbre principal), refus en 2 à l\'échéance', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const sleeper = await otherWaveHolds(repo, null, 'local:L9');
+    try {
+      const r = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
+      expect(r.code).toBe(2);
+      expect(r.out).toContain('attente de sa fin');
     } finally {
       sleeper.kill();
     }
@@ -559,7 +592,7 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
     try {
       const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
       expect(again.code).toBe(2);
-      expect(again.err).toMatch(new RegExp(`orchestrate : a : une orchestration y est déjà en cours \\(autre-vague, pid ${sleeper.pid}\\)`));
+      expect(again.err).toContain('orchestrate : a : une tâche locale du lead y est en cours (L9, depuis');
       expect(store(parent).readLot('a', lot)!.status).toBe('handed-back');
     } finally {
       sleeper.kill();

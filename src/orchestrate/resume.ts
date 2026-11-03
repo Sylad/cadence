@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { planLoader } from '../config.js';
 import { type Day } from '../dates.js';
-import { heldRefusal } from '../local-task.js';
+import { heldRefusal, localLotOf } from '../local-task.js';
 import { RafError } from '../plan.js';
 import { pidAlive, sharedStateDir } from '../state.js';
 import { cadenceHome, liveWaves, registerWave, unregisterWave } from './registry.js';
@@ -176,7 +176,16 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
   let waiting = false;
   // Verrous pris à la fin de l'attente : tenus jusqu'à `execute` (qui les retrouve à son pid), pour qu'une autre reprise qui attendait le même dépôt ne le voie pas libre pendant le .nvmrc, l'arbre et l'écriture des lots.
   const taken: string[] = [];
+  // L553 : dépôts tenus par une AUTRE vague vivante dont la reprise ne prend pas le verrou (voir `passesBetweenSteps`).
+  const shared = new Set<string>();
   const stopBefore = store.control().stopAfterCurrent;
+  /**
+   * L553 : le verrou du dépôt est celui d'une autre VAGUE (pas une tâche locale du lead, qui écrit dans l'arbre principal) et la reprise n'y joue que des intégrations de lots
+   * qui ont leur worktree : rien d'autre n'écrit dans le dépôt, l'intégration est déjà sérialisée par son propre verrou.
+   */
+  const passesBetweenSteps = (repo: string, busy: { wave: string }): boolean =>
+    !localLotOf(busy.wave) &&
+    live.filter((l) => lotRepoPaths(l).includes(repo)).every((l) => integ.includes(l) && existsSync(join(lotTreeDir(store.dir, l.project, l.lot, l.repo), '.git')));
   try {
     for (const repo of new Set(live.flatMap(lotRepoPaths))) {
       const file = join(sharedStateDir(repo), REPO_LOCK);
@@ -197,6 +206,12 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
         // entre son verrou et son inscription par `execute` (le garde « tourne encore » ci-dessus ne la voit pas encore) : refus, pas d'attente.
         if (busy.wave === wave.id) {
           refusals.push(`la vague ${wave.id} tourne encore (pid ${busy.pid}, verrou de ${basename(repo)})`);
+          break;
+        }
+        // L553 : l'intégration d'un lot en worktree n'attend pas la fin d'une autre vague : comme un push du lead, elle passe entre ses étapes (son rebase rejoue si `main` avance, le verrou d'intégration les départage).
+        if (waitFor && passesBetweenSteps(repo, busy)) {
+          shared.add(repo);
+          io.out(`orchestrate : ${basename(repo)} : tenu par la vague ${busy.wave} (pid ${busy.pid}) : l'intégration passe entre ses étapes, sans attendre sa fin`);
           break;
         }
         // Un refus déjà posé sur un dépôt précédent (même vague, attente échue) : les suivants ne font plus attendre, la reprise sort en 2.
@@ -320,7 +335,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
       return removed.length && !lots.every((l) => l.status === 'ready') ? 1 : 0;
     }
     played = true;
-    return continueRounds(await execute(wave, live, store, io, deps, today, args, lots), wave, lots, store, io, deps, today, args, launch);
+    return continueRounds(await execute(wave, live, store, io, deps, today, args, lots, shared), wave, lots, store, io, deps, today, args, launch);
   } finally {
     if (!played) for (const f of taken) releaseLock(f, process.pid);
   }

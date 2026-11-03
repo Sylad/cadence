@@ -255,6 +255,15 @@ plan:
 - **`raf add "title" --set theme=ui`** writes the key on the new lot (before `created:`); `--set` can be repeated, the value is cut at the first `=` (`--set fiche=docs/a=b.md`). Refused, with nothing written: a field that is not declared (the message lists the declared ones; without `plan.extras`, it says so), a value outside `enum`, `--set theme` or `--set theme=` without a value, the same field twice, and `--set` with `--parent` (a sub-task has no field).
 - **`raf show`** prints one `field : value` line per field the lot carries or receives by default. **`raf list --json`** prints the lots (filtered by `--status`) as one JSON array with the fields of the lot under the names of the plan file (`docs_ok`, not `docsOk`; `problems`, the diagnostics of `raf check`, is not exported), the extension fields under `extras` (absent when the plan declares none or the lot has none). A field is set on an existing lot by editing the file; there is no `raf` command for it yet.
 
+## Writing the plan from several sessions (L468)
+
+Every write of the plan (`raf`, `cadence orchestrate`, `cadence deliver`, `config set`: one path, `Plan.save()`) is safe between processes:
+
+- **A write lock**, `<plan>.lock` next to the plan (`.cadence/raf.yaml.lock`), created atomically and holding the pid and start time of its owner. Another session that writes meanwhile waits (30 s at most; `CADENCE_PLAN_LOCK_WAIT_MS` changes it) and then refuses, the plan untouched: `plan tenu par une autre session (pid 4242, depuis 2026-11-03T08:00:00.000Z) — écriture refusée après 30 s, plan inchangé ; relancer quand elle a fini (ou retirer <plan>.lock si plus aucun processus ne l'écrit)`. A lock whose owner is dead (or whose pid was reused by another process), or an unreadable lock file older than 5 s, is a stale lock: it is removed and the write goes on. The lock is released whatever happens to the write (including a failing `plan.onWrite`). A plan kept by another tool (read-only) takes no lock.
+- **No overwriting of a change you have not read**: `save()` compares the plan on disk with what the process read (or wrote last). If another session changed it in between, the write is refused (`plan modifié par une autre session depuis sa lecture — écriture refusée, son changement est gardé ; relancer la commande pour repartir du plan à jour`) instead of replacing the file with a stale copy: nothing is lost, rerun the command.
+- **Not covered**: committing the plan. cadence does not commit the plan from `raf` (by design); a project that wants it commits it itself, outside `plan.onWrite` (a failing `git add` on `index.lock` there would refuse the write). A command run by `plan.onWrite` must not write the plan itself: it would wait for the lock its parent holds.
+- Add `*.lock` of the plan to `.gitignore` if sessions may be killed mid-write; the leftover file is removed by the next write.
+
 ## Plan file
 
 ```yaml

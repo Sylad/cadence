@@ -2,6 +2,9 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { dirtyContents } from './git.js';
+import { initialContent } from './plan-init.js';
+import { assertPlanUnchanged, withPlanLock } from './plan-lock.js';
+import { ON_WRITE_TIMEOUT_MS, failureReason } from './plan-onwrite.js';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
 import { normalizeLot } from './plan-read.js';
@@ -11,21 +14,6 @@ import { checkedExtras, withExtras, type ExtraDecls } from './plan-extras.js';
 import { lotRef, putFlowKey, putPlanned, refuseUnplanned, type PlannedWindow } from './plan-window.js';
 import { DOTTED, escapeRe, extractRefs, idRefs, pickId, type Ref } from './plan-ids.js';
 import { ARCHIVE_DIR, PLACE_KEY, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, reopenArchived, selectArchivable, type Kept } from './archive.js';
-
-/** Délai de la commande `plan.onWrite` : une republication du plan, pas un build. */
-const ON_WRITE_TIMEOUT_MS = 120_000;
-
-/**
- * La raison d'un échec de `plan.onWrite` en une ligne (L429) : la première ligne « Error: … » de la sortie d'erreur (un script Node qui jette
- * imprime d'abord le fichier, le code fautif et un caret, puis le motif, puis la pile : garder la fin de la pile cachait le motif) ; sans
- * ligne de ce genre, la première ligne non vide de la sortie d'erreur, puis de la sortie standard. Les lignes de pile (« at … ») et la
- * bannière « Node.js v… » ne sont jamais la raison.
- */
-function failureReason(stderr: string | null, stdout: string | null): string {
-  const lines = (text: string | null) => (text ?? '').split('\n').map((l) => l.trim()).filter((l) => l && !/^at\s/.test(l) && !/^Node\.js v\d/.test(l));
-  const err = lines(stderr);
-  return err.find((l) => /^(?:\w+)?Error\b/.test(l)) ?? err[0] ?? lines(stdout)[0] ?? '';
-}
 
 /** Où va un avertissement de `save()` (la commande a réussi mais quelque chose cloche) : stderr, ou le `err` du CLI qui a lancé l'écriture. */
 let notice: (line: string) => void = (line) => void process.stderr.write(`${line}\n`);
@@ -207,18 +195,6 @@ export function isOpen(status: Status): boolean {
   return status === 'todo' || status === 'doing';
 }
 
-function initialContent(project: string, prefix: string, since: Day): string {
-  return `# Plan « reste à faire » tenu par raf (https://github.com/Sylad/cadence).
-# Édité par le CLI, mais les modifications à la main et les commentaires sont préservés.
-# Un commit appartient à un lot quand son message cite l'identifiant (${prefix}3, ${prefix}3/t1).
-version: 1
-project: ${JSON.stringify(project)}
-prefix: ${prefix}
-since: ${since}       # raf check ignore les commits antérieurs à l'adoption
-lots: []
-`;
-}
-
 /** Exemption d'un commit : `sha` complet ou `subject` exact (au moins l'un), datée et motivée. */
 interface Acknowledged {
   sha?: string;
@@ -234,6 +210,8 @@ export class Plan {
     /** false quand le fichier écrit à la main met les « - » en colonne de la clé parente. */
     private readonly indentSeq: boolean,
     private readonly settings: PlanSettings = {},
+    /** Le plan tel qu'il était sur le disque à la dernière lecture ou écriture de cet objet (L468) : `save()` refuse d'écraser un plan qui a changé depuis. */
+    private onDisk = '',
   ) {}
 
   /** Un plan lu dans un autre format ne change pas : sa lecture et le motif de ses références sont gardés. */
@@ -279,12 +257,12 @@ export class Plan {
     if (settings.format) {
       const key = settings.format.lots;
       if (!isSeq(doc.get(key))) throw new RafError(`${path} : la clé « ${key} » doit porter la liste des lots (cadence.yaml : plan.lots)`);
-      return new Plan(path, doc, true, settings);
+      return new Plan(path, doc, true, settings, text);
     }
     const lots = doc.get('lots');
     if (!isSeq(lots)) doc.set('lots', doc.createNode([]));
     else lots.flow = false; // « lots: [] » écrit par init : passer en style bloc
-    return new Plan(path, doc, !/^lots:[^\n]*\n(?:#[^\n]*\n)*- /m.test(text), settings);
+    return new Plan(path, doc, !/^lots:[^\n]*\n(?:#[^\n]*\n)*- /m.test(text), settings, text);
   }
 
   /** Le plan tel qu'il est maintenant sur le disque (un script a pu l'écrire depuis la lecture), mêmes réglages. */
@@ -303,6 +281,11 @@ export class Plan {
 
   save(): void {
     this.writable();
+    withPlanLock(`${this.path}.lock`, (m) => new RafError(m), () => this.saveLocked());
+  }
+
+  private saveLocked(): void {
+    const current = assertPlanUnchanged(this.path, this.onDisk, (m) => new RafError(m));
     const hook = this.settings.onWrite;
     // L396 : chaque lot est réécrit dans le fichier d'où il vient — le plan, ou son fichier d'année si un lot archivé a été touché.
     this.reopened();
@@ -336,6 +319,7 @@ export class Plan {
       throw new RafError(`écriture du plan refusée (${code ? `${code}, ` : ''}${(e as Error).message}) — plan et archive inchangés`);
     }
     for (const a of archives) a.dirty = false;
+    this.onDisk = readFileSync(this.path, 'utf8');
     if (!hook) return;
     const limit = hook.timeoutMs ?? ON_WRITE_TIMEOUT_MS;
     const before = dirtyContents(hook.cwd);
@@ -353,6 +337,7 @@ export class Plan {
       return;
     }
     restore();
+    this.onDisk = current; // le plan est revenu tel qu'avant
     const why = r.error ? (r.error as NodeJS.ErrnoException).code === 'ETIMEDOUT' ? `délai de ${limit / 1000} s dépassé` : r.error.message : `code ${r.status ?? r.signal}`;
     const tail = failureReason(r.stderr, r.stdout);
     throw new RafError(`plan.onWrite en échec (${hook.command}, ${why})${tail ? ` : ${tail}` : ''} — écriture refusée, plan inchangé`);

@@ -1605,6 +1605,7 @@ lots:
     estimate: 0.5
     created: 2026-11-03
     started: 2026-11-03
+    review: { date: 2026-11-03, verdict: "conforme après 1 correction : 2 mineurs (chemin de test long non coupé dans le corps, contre body-max-line-length ; test de sortie colorisée vert par le repli) — orchestré (vague 2026-11-02-2140-cont, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme après 1 correction : le rebase a laissé une entrée L541 en double sous [1.44.0] dans CHANGELOG.md", commit: 8a073bbc0040e5d6f9e6d0c6a2fb0848191093f7 }
   - id: L547
     title: "cadence-hud (issue #24) : sans vague vivante, les barres de projets suivent le cwd de la dernière vague finie (ou de la session), pas le dossier qui porte priority: — quand un dossier avec priority: englobe le cwd de la vague, le tour s'y lance (une barre par projet), quel que soit le dossier de la vague ou du shell"
     status: doing

@@ -1146,9 +1146,10 @@ lots:
     created: 2026-10-31
   - id: L505
     title: "Tests SIGHUP instables : test/orchestrate-e2e.test.ts:368 (process.kill(pid,0) ne lève pas encore) et test/verify.test.ts:443, rouges 1 fois sur 7 chacun sur mini-blue (diagnostic L480 du 31-10) — attendre un signal observable au lieu d'un délai"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-31
+    started: 2026-11-03
   - id: L506
     title: "Porte déportée : un pid par commande distante (pas un seul wt/<id>.pid écrasé) — après un délai suivi d'une autre commande, le groupe du build en délai n'est pas tué sur l'hôte (R19, mineur de la revue de L403)"
     status: todo

@@ -6,6 +6,7 @@ import { PLAN_LEGACY } from '../config.js';
 import { audit, isNonConformingVerdict, lotWork, planCommits, unreviewedWork } from '../audit.js';
 import { short } from '../check.js';
 import { isDay } from '../dates.js';
+import { markClosedLot } from '../deliver-close.js';
 import { PLAN_ACTIONS } from '../plan-commit.js';
 import { printUncommittedPlan } from '../plan-uncommitted.js';
 import { resolveCommit } from '../git.js';
@@ -47,9 +48,11 @@ export function cmdSetStatus(c: Ctx): number | Promise<number> {
   const verdict = status === 'done' && !rest[0].includes('/') ? plan.lots().find((l) => l.id === rest[0])?.review?.verdict : undefined;
   const nonConforming = verdict !== undefined && isNonConformingVerdict(verdict);
   plan.setStatus(rest[0], status, today, { force: values.force, unreviewed, nonConforming });
+  const delivery = status === 'done' ? markClosedLot(plan, root, configPath, rest[0], io.err) : null;
   if (command === 'drop' && values.reason) plan.note(rest[0], `abandonné : ${values.reason}`, today);
   plan.save();
   io.out(`${rest[0]} → ${status}`);
+  if (delivery) io.out(delivery);
   if (status === 'done') {
     warnIntegrating(root, io.err);
     warnWaveWorking(root, io.env, io.err);

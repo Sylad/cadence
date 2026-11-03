@@ -1626,11 +1626,17 @@ lots:
     started: 2026-11-03
   - id: L549
     title: "Sonde de cas limites : faux avertissement « la session a modifié du code hors tests » pour un fichier de test d'un sous-paquet (03-11, L545 : plugins/cadence-hud/tests/decisions-l545-drop.probe.test.ts) — reconnaître *.test.ts / tests/ à toute profondeur, test sur ce chemin"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-03
     started: 2026-11-03
     review: { date: 2026-11-03, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-02-2140-cont, 0 passe(s) de correction)", commit: 0a057e590e75ddf60bc5cc94bcfd9a7ced53abe2, reporte: { de: ad3eda33bf6ec5c7d7c0d4e5b64895a8d9744b39, vers: 0a057e590e75ddf60bc5cc94bcfd9a7ced53abe2, patchId: 60f505292272d3c6414d840ac358de27c4ecd869 } }
+    finished: 2026-11-03
+  - id: L550
+    title: "Test instable sous charge : test/orchestrate-worktree-integration.test.ts, R24 / R8 › L443 (verrou du dépôt tenu par un processus vivant de la même vague : la seconde reprise est refusée tout de suite) — rouge dans la suite, vert seul, vu par la porte de L549 le 03-11 ; même famille que L505 (contrôle sans attente d'un état de processus)"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-03
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -257,3 +257,96 @@ describe('docs.sync : un lot de refactor ne demande pas de documentation (L537)'
     expect((await cad(cite, 'check')).out).not.toContain('documentation en retard');
   });
 });
+
+describe('docs.sync : un refactor suivi de corrections inertes ne demande pas de documentation (L542)', () => {
+  /** Un commit qui écrit `text` dans `file`, sujet donné. */
+  function commitText(dir: string, subject: string, file: string, text: string) {
+    write(dir, file, text);
+    git(dir, 'add', '--', file);
+    commit(dir, subject, '2026-10-09T10:00:00');
+  }
+  const BASE = "import { a } from './a.js';\nexport function f() {\n  return 1;\n}\n";
+  const DOCUMENTED = "/**\n * Retourne un.\n */\nexport function f() {\n  return 1;\n}\n";
+
+  it('R7 — refactor puis fix(imports), fix(commentaire) et fix(test) : pas de retard', async () => {
+    const dir = await repo();
+    commitText(dir, 'refactor(L1): découpe', 'src/b.ts', BASE);
+    commitText(dir, 'fix(L1): import corrigé', 'src/b.ts', BASE.replace("'./a.js'", "'./c.js'"));
+    commitText(dir, 'fix(L1): commentaire', 'src/b.ts', `// la fonction\n${BASE.replace("'./a.js'", "'./c.js'")}`);
+    commitText(dir, 'fix(L1): test', 'src/b.test.ts', 'it("x", () => {});\n');
+    const { code, out } = await cad(dir, 'check');
+    expect(out).not.toContain('documentation en retard');
+    expect(code).toBe(0);
+  });
+
+  it('R8 — un fix qui change une ligne de code après le refactor garde l\'écart, sans les fichiers inertes', async () => {
+    const dir = await repo();
+    commitText(dir, 'refactor(L1): découpe', 'src/b.ts', BASE);
+    commitText(dir, 'refactor(L1): déplace', 'src/c.ts', BASE);
+    commitText(dir, 'fix(L1): import', 'src/c.ts', BASE.replace("'./a.js'", "'./d.js'"));
+    commitText(dir, 'fix(L1): sortie', 'src/b.ts', BASE.replace('return 1', 'return 2'));
+    const { out } = await cad(dir, 'check');
+    expect(out).toContain('src/b.ts sans toucher README.md');
+    expect(out).not.toContain('src/c.ts');
+  });
+
+  it('R9 — sans refactor dans le lot, un fix d\'import seul reste un changement', async () => {
+    const dir = await repo();
+    commitText(dir, 'fix(L1): import', 'src/b.ts', BASE);
+    expect((await cad(dir, 'check')).out).toContain('documentation en retard');
+  });
+
+  it('R10 — un feat, ou un fix portant BREAKING CHANGE, après le refactor reste un changement', async () => {
+    const feat = await repo();
+    work(feat, 'refactor(L1): découpe', ['src/a.ts']);
+    commitText(feat, 'feat(L1): import', 'src/b.ts', BASE);
+    expect((await cad(feat, 'check')).out).toContain('documentation en retard');
+    const cassant = await repo();
+    commitText(cassant, 'refactor(L1): découpe', 'src/b.ts', BASE);
+    commitText(cassant, 'fix(L1): commentaire\n\nBREAKING CHANGE: sortie', 'src/b.ts', `// x\n${BASE}`);
+    expect((await cad(cassant, 'check')).out).toContain('documentation en retard');
+  });
+
+  it('R11 — une ligne de code mêlée à des imports dans un même fix compte', async () => {
+    const dir = await repo();
+    commitText(dir, 'refactor(L1): découpe', 'src/b.ts', BASE);
+    commitText(dir, 'fix(L1): imports', 'src/b.ts', `${BASE.replace("'./a.js'", "'./c.js'")}export const k = 2;\n`);
+    expect((await cad(dir, 'check')).out).toContain('src/b.ts');
+  });
+
+  it('R12 — un fix qui ne retouche que des lignes « * … » de JSDoc après le refactor est inerte (L489, L490)', async () => {
+    const dir = await repo();
+    commitText(dir, 'refactor(L1): découpe', 'src/b.ts', DOCUMENTED);
+    commitText(dir, 'fix(L1): commentaire JSDoc', 'src/b.ts', DOCUMENTED.replace('Retourne un.', 'Retourne un, toujours.'));
+    expect((await cad(dir, 'check')).out).not.toContain('documentation en retard');
+  });
+
+  it('R13 — une ligne « * … » qui est une multiplication (se termine par « ; ») reste du code', async () => {
+    const dir = await repo();
+    const produit = 'export const k =\n  2\n  * 3;\n';
+    commitText(dir, 'refactor(L1): découpe', 'src/b.ts', 'export const k =\n  2\n  * 2;\n');
+    commitText(dir, 'fix(L1): produit', 'src/b.ts', produit);
+    expect((await cad(dir, 'check')).out).toContain('src/b.ts');
+  });
+
+  it('R14 — un fix inerte écrit AVANT le refactor reste un changement', async () => {
+    const dir = await repo();
+    commitText(dir, 'fix(L1): import', 'src/b.ts', BASE);
+    commitText(dir, 'refactor(L1): découpe', 'src/c.ts', BASE);
+    expect((await cad(dir, 'check')).out).toContain('src/b.ts');
+  });
+
+  it('R15 — un fix qui seulement retire ou ajoute « export » devant une déclaration est inerte (L490)', async () => {
+    const dir = await repo();
+    commitText(dir, 'refactor(L1): découpe', 'src/b.ts', 'export async function refusal() {\n  return 1;\n}\n');
+    commitText(dir, 'fix(L1): refusal interne', 'src/b.ts', 'async function refusal() {\n  return 1;\n}\n');
+    expect((await cad(dir, 'check')).out).not.toContain('documentation en retard');
+  });
+
+  it('R16 — un fix qui exporte une nouvelle déclaration (sans version non exportée retirée) reste un changement', async () => {
+    const dir = await repo();
+    commitText(dir, 'refactor(L1): découpe', 'src/b.ts', 'function refusal() {\n  return 1;\n}\n');
+    commitText(dir, 'fix(L1): export ajouté', 'src/b.ts', 'function refusal() {\n  return 1;\n}\nexport function autre() {\n  return 2;\n}\n');
+    expect((await cad(dir, 'check')).out).toContain('src/b.ts');
+  });
+});

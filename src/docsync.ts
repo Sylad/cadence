@@ -1,19 +1,54 @@
 import { resolve } from 'node:path';
 import type { ArticleRule } from './articles.js';
-import { changedFiles, type Commit } from './git.js';
+import { changedFiles, changedLines, type Commit } from './git.js';
+
+const REFACTOR = /^refactor(\([^)]*\))?:/;
+const CORRECTION = /^(fix|test|chore|style)(\([^)]*\))?:/;
+const TEST_FILE = /(^|\/)(test|tests|__tests__)\/|\.(test|spec)\.[cm]?[jt]sx?$/;
+/**
+ * Une ligne qui ne change ni commande, ni clé, ni sortie : vide, commentaire (`//`, bloc fermé en fin de ligne ou ouvert, fermeture
+ * seule, ligne `* …` de JSDoc) ou import d'une seule ligne et rien après. Une ligne `* …` qui se termine par `;` est la suite d'une expression (multiplication), donc du code.
+ */
+const INERT_LINE = /^\s*($|\/\/|\/\*(?!.*\*\/)|\/\*.*\*\/\s*$|\*\/\s*$|\*(?!.*;\s*$)(\s.*)?$|import\s[^;]*\sfrom\s+['"][^'"]*['"];?\s*$|import\s*['"][^'"]*['"];?\s*$|\}\s*from\s+['"][^'"]*['"];?\s*$)/;
+
+const BREAKING = (c: Commit) => /^BREAKING[ -]CHANGE:/m.test(c.body);
+
+/** Un commit de correction (fix, test, chore, style) dont le diff ne touche que des tests, des commentaires et des imports. */
+function isInertCorrection(root: string, c: Commit): boolean {
+  if (!CORRECTION.test(c.subject) || BREAKING(c)) return false;
+  for (const [file, lines] of changedLines(root, c.sha)) if (!TEST_FILE.test(file) && !withoutExportToggles(lines).every((l) => INERT_LINE.test(l))) return false;
+  return true;
+}
 
 /**
- * Commits dont les fichiers comptent pour `docs.sync` (L537) : ceux de type `refactor` (`refactor(L1): …`) sont un nettoyage ou
- * un découpage déclaré sans changement de commande, de clé ni de sortie, donc sans document à écrire. `refactor!` et un refactor
- * dont le corps porte le pied `BREAKING CHANGE:` restent un changement.
+ * Écarte les lignes que le commit ne fait que (dé)exporter : la même déclaration retirée avec `export ` et ajoutée sans (ou
+ * l'inverse) rend un symbole interne au module, sans commande, clé ni sortie changée (L490 : `export async function refusal` → `async function refusal`).
  */
-function docSyncCommits(commits: Commit[]): Commit[] {
-  return commits.filter((c) => !/^refactor(\([^)]*\))?:/.test(c.subject) || /^BREAKING[ -]CHANGE:/m.test(c.body));
+function withoutExportToggles(lines: string[]): string[] {
+  const bare = (l: string) => l.replace(/^(\s*)export\s+(?!default\b)/, '$1');
+  const exported = new Set(lines.filter((l) => bare(l) !== l).map(bare));
+  const plain = new Set(lines.filter((l) => bare(l) === l));
+  const toggled = (l: string) => (bare(l) !== l ? plain.has(bare(l)) : exported.has(l));
+  return lines.filter((l) => !toggled(l));
+}
+
+/**
+ * Commits dont les fichiers comptent pour `docs.sync` (L537, L542) : ceux de type `refactor` (`refactor(L1): …`) sont un nettoyage ou
+ * un découpage déclaré sans changement de commande, de clé ni de sortie, donc sans document à écrire. `refactor!` et un refactor
+ * dont le corps porte le pied `BREAKING CHANGE:` restent un changement. Les commits de correction qui suivent le plus ancien refactor
+ * du lot (imports, tests, commentaires seuls : le diff entier reste sans changement visible) sont écartés de même ; un fix qui touche
+ * une autre ligne de code, ou qui précède le refactor, reste un changement.
+ */
+function docSyncCommits(root: string, commits: Commit[]): Commit[] {
+  const isRefactor = (c: Commit) => REFACTOR.test(c.subject) && !BREAKING(c);
+  // Les commits d'un lot vont du plus récent au plus ancien : « après le refactor » veut dire avant lui dans la liste.
+  const oldestRefactor = commits.map(isRefactor).lastIndexOf(true);
+  return commits.filter((c, i) => !isRefactor(c) && !(i < oldestRefactor && isInertCorrection(root, c)));
 }
 
 /** Les écarts d'un lot : les fichiers de `paths` viennent des commits qui comptent, mais un document écrit dans un refactor reste écrit. */
 export function lotDocSyncGaps(rules: DocSyncRule[], root: string, commits: Commit[]): DocSyncGap[] {
-  return docSyncGaps(rules, filesOf(root, docSyncCommits(commits)), filesOf(root, commits));
+  return docSyncGaps(rules, filesOf(root, docSyncCommits(root, commits)), filesOf(root, commits));
 }
 
 /** Une paire de la clé `docs.sync` de cadence.yaml : si des commits touchent `paths`, ils touchent aussi un des `docs`. */

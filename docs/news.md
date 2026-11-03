@@ -152,6 +152,8 @@ still the review's reading. The commits of neighbouring repositories (`repos:`) 
 
 A commit of type `refactor` (`refactor(L7): …`, no `!`) is left out of that reading (L537): a cleanup or an internal split declared with no change of command, key or output has no document to write, so a lot made only of such commits is no gap, and a lot that also holds a `feat` or `fix` is judged on those commits' files alone. `refactor!:` or a `BREAKING CHANGE:` footer in the body (a breaking change) still counts, and a document written in a refactor commit still satisfies the rule. `cadence orchestrate` reads the same commits, so the librarian is not called for a pure refactor.
 
+In a lot that holds such a refactor, the correction commits written after it (`fix`, `test`, `chore`, `style`, no `!`, no `BREAKING CHANGE:` footer) are left out too (L542) when their diff only touches test files, comments (`//`, `/* … */`, JSDoc ` * …` lines), blank lines and one-line `import … from` lines, or only adds or removes `export` before a declaration: the lot's whole diff then changes no command, key, output or public export. A fix that changes any other line of a source file, a fix written before the refactor, a `feat`, or a lot with no refactor commit is still read; an import split over several lines, or a ` * …;` line (a multiplication), counts as code (the safe side).
+
 A gap is closed by writing the document, or **acknowledged** when the documents really stay true: `raf docs-ok <lot> --reason "why"` (L317; the reason is required) writes a dated `docs_ok:` key on the lot, which `raf check`, `cadence lead tour` and `cadence orchestrate` all read. There is no silent third way: a lot with an open gap does not end ready in a wave.
 
 ### The librarian: `doc-keeper`

@@ -115,6 +115,22 @@ export function changedFiles(cwd: string, sha: string, opts: { withoutDeleted?: 
   return git(cwd, ['-c', 'core.quotepath=off', 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', ...(opts.withoutDeleted ? ['--diff-filter=d'] : []), sha]).split('\0').filter(Boolean);
 }
 
+/** Lignes ajoutées ou retirées d'un commit, par fichier (`git diff-tree -p -U0`) : le texte sans le `+`/`-`, les en-têtes de fichier écartés ; un changement de mode ou de contenu binaire, sans ligne, y laisse son en-tête git (jamais une ligne inerte). */
+export function changedLines(cwd: string, sha: string): Map<string, string[]> {
+  const out = git(cwd, ['-c', 'core.quotepath=off', 'diff-tree', '--root', '--no-commit-id', '-p', '-U0', '--no-color', '--no-renames', sha]);
+  const byFile = new Map<string, string[]>();
+  let lines: string[] | null = null;
+  for (const l of out.split('\n')) {
+    const head = /^diff --git a\/.* b\/(.*)$/.exec(l);
+    if (head) {
+      lines = byFile.get(head[1]) ?? [];
+      byFile.set(head[1], lines);
+    } else if (lines && /^(old mode|new mode|Binary files|GIT binary patch)/.test(l)) lines.push(l);
+    else if (lines && /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l)) lines.push(l.slice(1));
+  }
+  return byFile;
+}
+
 /** Fichiers modifiés par commit (hors suppressions écartées), par dépôt : un sha ne change jamais de contenu. */
 const filesCache = new Map<string, string[]>();
 

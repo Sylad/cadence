@@ -12,8 +12,9 @@ sujet:
       - src/config.ts             # KEYS (src/config.ts:27) : ajout de deliveredState
       - src/cli/deliver-commands.ts   # option --block de cadence deliver
       - src/cli/lot-commands.ts   # raf done : lecture de deliveries.log après la fermeture
-      - src/state.ts              # appendDelivery (3e champ optionnel), lecture des lignes du journal (lastDelivery, readDeliveries inchangés pour deux champs)
-      - src/verify.ts             # cadence verify : la ligne verte qu'il écrit passe par announceDelivered (marquage identique)
+      - src/state.ts              # appendDelivery (3e champ optionnel) ; NOUVEAU lecteur lastDeliveryFor(dir, bloc?) (R22, R33, R34) ; lastDelivery et readDeliveries gardés tels quels (ils lisent deux champs, R30)
+      - src/verify.ts             # cadence verify : la ligne verte qu'il écrit passe par announceDelivered (marquage identique) ; verify.ts:159 (prev) passe à lastDeliveryFor sans bloc (R34)
+      - src/deliver-ci.ts         # planOnlySince (deliver-ci.ts:22, saut de la CI) passe à lastDeliveryFor, avec le bloc de la livraison (R34)
     endpoints: []
     jobs: []
     commandes:
@@ -93,6 +94,8 @@ cas:
       - { si: "deux blocs sont livrés l'un après l'autre sur le même sha", alors: "chacun marque ses lots : la plage de chaque bloc part de la dernière ligne verte qui vaut pour lui", regles: [R22] }
       - { si: "un lot de la plage ne touche que d'autres blocs", alors: "il n'est pas marqué par cette livraison, il le sera par la livraison de son bloc", regles: [R17, R22] }
       - { si: "le journal contient des lignes anciennes à 2 champs", alors: "elles valent pour tous les blocs", regles: [R22, R30] }
+      - { si: "une livraison complète (sans --block) suit une livraison --block", alors: "sa plage part de la plus ancienne des dernières lignes valant pour chaque bloc déclaré : le lot d'un autre bloc non encore marqué est vu par elle (R5 évite de relivrer les autres)", regles: [R33] }
+      - { si: "la garde des lots non livrés, l'annonce, le journal des étapes ou le saut de CI lisent le journal", alors: "ils partent de la même ligne que la sélection (celle du bloc, ou la plus ancienne des dernières sans --block)", regles: [R34] }
     resultat: Seuls les lots cités par des commits du bloc, dans la plage de cette livraison, sont marqués ; l'historique n'est jamais réécrit.
   - id: C4
     titre: Le projet déclare ses blocs et son état livré
@@ -240,10 +243,10 @@ regles:
     tests: ["R21 — blocs déclarés, sans --block : tous les lots de la plage marqués"]
   - id: R22
     cas: [C3]
-    enonce: "deliveries.log reçoit un 3e champ OPTIONNEL, le nom du bloc : « jour sha [bloc] ». Une livraison --block <b> écrit « jour sha b » ; une livraison sans --block écrit « jour sha » comme aujourd'hui. Une ligne sans bloc compte pour TOUS les blocs. La plage d'une livraison du bloc b part de la dernière ligne verte qui vaut pour b (une ligne de b, ou une ligne sans bloc) : --block api puis --block web sur le même sha, chaque bloc marque ses lots. Une livraison sans --block part de la dernière ligne verte, quel qu'en soit le bloc."
+    enonce: "deliveries.log reçoit un 3e champ OPTIONNEL, le nom du bloc : « jour sha [bloc] ». Une livraison --block <b> écrit « jour sha b » ; une livraison sans --block écrit « jour sha » comme aujourd'hui. Une ligne sans bloc compte pour TOUS les blocs. La plage d'une livraison du bloc b part de la dernière ligne verte qui vaut pour b (une ligne de b, ou une ligne sans bloc) : --block api puis --block web sur le même sha, chaque bloc marque ses lots. La livraison sans --block est réglée par R33."
     statut: sourcee
     source: "réponse du lead — décision de Sylvain (03-11), qui remplace l'ancienne R22 (plage unique, aucun format ajouté)"
-    tests: ["R22 — --block api puis --block web sur le même sha : chaque bloc marque ses lots", "R22 — ligne ancienne à 2 champs : vaut pour tous les blocs", "R22 — --block api écrit « jour sha api », sans --block « jour sha »", "R22 — plage de api ignore la ligne d'un autre bloc"]
+    tests: ["R22 — --block api puis --block web sur le même sha : chaque bloc marque ses lots", "R22 — ligne ancienne à 2 champs : vaut pour tous les blocs", "R22 — --block api écrit « jour sha api », sans --block « jour sha »", "R22 — plage de api ignore la ligne d'un autre bloc", "R22 — lastDeliveryFor(web) après une ligne api : rend la dernière ligne valant pour web, pas celle d'api"]
   - id: R23
     cas: [C4]
     enonce: deliver.blocks doit être un objet dont chaque nom est non vide et dont chaque valeur est une liste non vide de textes ; sinon la lecture est refusée.
@@ -304,6 +307,18 @@ regles:
     statut: hypothese
     si_faux: "Si un tel commit devait compter pour les lignes de tous les blocs, un lot hors blocs serait marqué par la première livraison de bloc venue : seul le choix de la ligne retenue par raf done change (aucun stockage)."
     tests: ["R32 — lot hors blocs, ligne --block api seule : non marqué", "R32 — lot hors blocs, ligne sans bloc : marqué"]
+  - id: R33
+    cas: [C3]
+    enonce: "Une livraison SANS --block, quand le journal porte des lignes de bloc, part de la plus ancienne (position dans le fichier) des dernières lignes valant pour chaque bloc déclaré dans deliver.blocks (la dernière ligne sans bloc vaut pour tous). Scénario : lignes « j S1 api » puis livraison complète à S2 : la ligne retenue est celle d'avant S1 qui valait pour web, donc un lot web done avec des commits avant S1 est vu et marqué. Les lots déjà marqués ne sont pas relivrés (R5). Sans ligne de bloc ou sans deliver.blocks, elle est la dernière ligne, comme avant. Une ligne dont le nom n'est pas un bloc déclaré ne vaut que pour ce nom : elle est ignorée par cette règle."
+    statut: hypothese
+    si_faux: "Si la livraison complète devait partir de la dernière ligne quel qu'en soit le bloc, un lot d'un bloc non livré antérieur à la ligne d'un autre bloc resterait « terminé non livré » à jamais ; la plage est plus large que le choix d'avant, sans stockage ni format en plus (le journal de R22 est inchangé)."
+    tests: ["R33 — « j S1 api » puis livraison complète à S2 : le lot web antérieur à S1 est marqué", "R33 — lot api déjà marqué par --block api : non relivré par la livraison complète", "R33 — journal sans ligne de bloc : plage depuis la dernière ligne, comme avant", "R33 — ligne d'un bloc non déclaré : ignorée"]
+  - id: R34
+    cas: [C1, C3]
+    enonce: "Le nouveau lecteur lastDeliveryFor(dir, bloc?) rend le sha de la dernière ligne verte valant pour le bloc (R22), ou, sans bloc, celui de la ligne de R33 ; lastDelivery (src/state.ts:290) reste « dernière ligne quel que soit le bloc » et n'a plus d'appelant de plage. Les cinq appelants qui lisent la ligne précédente passent au nouveau lecteur, avec le bloc de la livraison : la garde des lots non livrés (deliver.ts:384, bloquante), deliveredIds du journal des étapes (deliver.ts:441), prev de l'annonce (deliver.ts:506), prev de cadence verify (verify.ts:159, sans bloc) et planOnlySince (deliver-ci.ts:22, saut de la CI). Sans deliver.blocks ni ligne de bloc, ils rendent le même sha qu'avant."
+    statut: hypothese
+    si_faux: "Si ces appelants gardaient la dernière ligne quel que soit le bloc, --block web après --block api partirait du sha d'api : la garde ne nommerait pas les lots web non livrés et la CI serait sautée sur une plage trop courte ; seul le point de départ de la plage change."
+    tests: ["R34 — garde deliver.ts:384 : --block web après --block api nomme les lots non livrés depuis la ligne valant pour web", "R34 — planOnlySince --block web après --block api : part de la ligne valant pour web, la CI n'est pas sautée si un commit non plan seul s'y trouve", "R34 — planOnlySince sans bloc : plus ancienne des dernières lignes (R33)", "R34 — prev de l'annonce et deliveredIds suivent la même ligne", "R34 — journal sans bloc : les cinq appelants rendent le même sha qu'avant"]
 
 contrats:
   - id: A1
@@ -315,7 +330,7 @@ contrats:
       - { code: log error, message: "deliver : --block api : aucun bloc déclaré (deliver.blocks dans cadence.yaml)" }
       - { code: log warn, message: "deliver : L1 non marqué livré : transition termine → livre refusée par plan.transitions" }
       - { code: log warn, message: "deliver : lots livrés non marqués : <cause>" }
-    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R17, R18, R19, R20, R21, R22, R29, R30]
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R17, R18, R19, R20, R21, R22, R29, R30, R33, R34]
   - id: A2
     appel: commande cadence verify
     entree: "comme avant (ligne verte « jour sha » écrite par verify)"

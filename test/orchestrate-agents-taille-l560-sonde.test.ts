@@ -63,10 +63,11 @@ describe('L560 sonde — --agents ne porte que l\'agent de l\'étape', () => {
     expect(Buffer.byteLength(args[args.indexOf('--agents') + 1])).toBeLessThan(200);
   });
 
-  it('l\'agent de l\'étape lui-même énorme (> 128 Kio) : la borne le détecte', () => {
-    const args = buildArgs({ ...base, agent: 'a' } as StepSpec, { a: { description: 'd', prompt: 'x'.repeat(140_000) } });
-    // attendu : refus nommé plutôt qu'un spawn E2BIG
-    expect(Buffer.byteLength(args[args.indexOf('--agents') + 1])).toBeLessThan(131_072);
+  it('l\'agent de l\'étape lui-même énorme (> 128 Kio) : refus nommé avant le spawn, lancement et relance', () => {
+    const pkg = { a: { description: 'd', prompt: 'x'.repeat(140_000) } };
+    const s = { ...base, agent: 'a' } as StepSpec;
+    expect(() => buildArgs(s, pkg)).toThrow(/agent trop gros.*a/);
+    expect(() => buildRetryArgs(s, 'sid', pkg)).toThrow(/agent trop gros.*a/);
   });
 
   it('étape locale : le prompt de l\'agent suivi du brief, pas de --agents', () => {

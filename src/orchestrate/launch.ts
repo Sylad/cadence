@@ -144,10 +144,18 @@ export const PLAYWRIGHT_TOOLS = 'mcp__playwright';
  * les outils du serveur (sinon il ne peut pas l'appeler).
  */
 function agentsFor(spec: StepSpec, agents: Record<string, AgentDef>): Record<string, AgentDef> {
-  const a = agents[spec.agent ?? ''];
+  const a = agentOf(spec, agents);
   if (!spec.agent || !a) return {};
   if (!spec.playwright || !a.tools) return { [spec.agent]: a };
   return { [spec.agent]: { ...a, tools: [...a.tools, ...(a.tools.includes(PLAYWRIGHT_TOOLS) ? [] : [PLAYWRIGHT_TOOLS])] } };
+}
+
+/** Limite d'un argument de ligne de commande sous Linux (`MAX_ARG_STRLEN`) : au-delà, le spawn échoue en E2BIG. */
+const MAX_ARG_BYTES = 131_072;
+
+/** La définition de l'agent de l'étape, lue sur les seules clés propres du paquet (`constructor`, `__proto__`… ne sont pas des agents). */
+function agentOf(spec: StepSpec, agents: Record<string, AgentDef>): AgentDef | undefined {
+  return spec.agent && Object.hasOwn(agents, spec.agent) ? agents[spec.agent] : undefined;
 }
 
 function effortArgs(spec: StepSpec): string[] {
@@ -195,8 +203,10 @@ const settingsArgs = (spec: StepSpec): string[] => (spec.disablePlugins?.length 
 function claudeArgs(spec: StepSpec, agents: Record<string, AgentDef>, prompt: string, session: ['--session-id' | '--resume', string]): string[] {
   const args = ['-p', prompt, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema), '--model', spec.model, ...effortArgs(spec)];
   if (spec.agent) {
-    if (!agents[spec.agent]) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
-    args.push('--agents', JSON.stringify(agentsFor(spec, agents)), '--agent', spec.agent);
+    if (!agentOf(spec, agents)) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
+    const json = JSON.stringify(agentsFor(spec, agents));
+    if (Buffer.byteLength(json) >= MAX_ARG_BYTES) throw new RafError(`agent trop gros pour l'argument --agents (${Buffer.byteLength(json)} octets, limite ${MAX_ARG_BYTES}) : ${spec.agent}`);
+    args.push('--agents', json, '--agent', spec.agent);
   }
   args.push(...session, '--permission-mode', spec.permissionMode);
   for (const d of spec.addDirs) args.push('--add-dir', d);
@@ -213,7 +223,7 @@ export const buildArgs = (spec: StepSpec, agents: Record<string, AgentDef>): str
  * passent par `--tools`. Pas de `--effort`, pas de MCP (aucune étape locale n'en charge).
  */
 export function buildLocalArgs(spec: StepSpec, agents: Record<string, AgentDef>): string[] {
-  const a = spec.agent ? agents[spec.agent] : undefined;
+  const a = agentOf(spec, agents);
   if (spec.agent && !a) throw new RafError(`agent introuvable dans le paquet : ${spec.agent}`);
   const args = [a ? `${a.prompt}\n\n${spec.brief}` : spec.brief, '--output-format', 'json', '--json-schema', JSON.stringify(spec.schema)];
   if (a?.tools) args.push('--tools', a.tools.join(','));

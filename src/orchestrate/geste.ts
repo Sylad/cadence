@@ -63,9 +63,12 @@ export function gestureColumn(wave: { id: string; status: string }, lots: Parame
   return { head: any ? ['geste'] : [], cells: gestes.map((g) => (any ? [g] : [])) };
 }
 
+/** Un argument rendu rejouable dans le shell : entre guillemets doubles dès qu'il contient autre chose que des caractères sûrs (ou qu'il est vide). */
+const doubleQuoted = (arg: string): string => (/^[A-Za-z0-9_@%+=:,./-]+$/.test(arg) ? arg : `"${arg.replace(/(["\\$`])/g, '\\$1')}"`);
+
 /**
  * La reprise d'une vague SANS ses `--replay` (L554) : un `--replay` refusé fait sortir toute la reprise en 2 ; cette ligne nomme la commande qui reprend le reste. Chaîne vide quand `--replay` était la seule option
- * (rien d'autre à reprendre). `--answer` prend deux valeurs, `--resume` une vague facultative, `--wave` une vague.
+ * (rien d'autre à reprendre). `--answer` prend deux valeurs (un `--answer` incomplet n'est pas reproduit), les arguments à espaces sont entre guillemets, `--resume` une vague facultative, `--wave` une vague.
  */
 export function resumeWithoutReplay(waveId: string, argv: string[]): string {
   const rest: string[] = [];
@@ -75,8 +78,11 @@ export function resumeWithoutReplay(waveId: string, argv: string[]): string {
     else if (t === '--resume') {
       const next = argv[i + 1];
       if (next !== undefined && !next.startsWith('-') && !LOT_LIKE.test(next)) i++;
-    } else if (t === '--answer') rest.push(t, argv[++i] ?? '', argv[++i] ?? '');
-    else rest.push(t);
+    } else if (t === '--answer') {
+      const [key, text] = [argv[i + 1], argv[i + 2]];
+      i += 2;
+      if (key !== undefined && text !== undefined) rest.push(t, doubleQuoted(key), doubleQuoted(text));
+    } else rest.push(doubleQuoted(t));
   }
   return rest.length ? resumeCommand(waveId, ...rest) : '';
 }

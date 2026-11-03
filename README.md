@@ -50,7 +50,7 @@ Details: [docs/skills.md](docs/skills.md) and [docs/cadence-hud.md](docs/cadence
 - [docs/raf.md](docs/raf.md): the plan, its commands, its file, and [a lot of the lead](docs/raf.md#a-lot-of-the-lead-local-l519).
 - [Waves](docs/orchestrate.md): [probe](docs/orchestrate.md#the-edge-case-probe-orchestrateprobe-l497), [express](docs/orchestrate.md#express-lane-l519).
 - [Brief grid and pre-check reading](docs/mesures/brief-implementation-enrichi-avant-apres.md): grid of the code-reviewer in the `implement` brief (L523).
-- [docs/deliver.md](docs/deliver.md): wait for the CI, deploy, verify the effect, [mark the finished lots as delivered](docs/deliver.md#delivered--finished-delivered-plandeliveredstate-and-blocks-l469); [docs/remote-gate.md](docs/remote-gate.md): the gate on another machine.
+- [docs/deliver.md](docs/deliver.md): CI, deploy, verify, mark lots delivered (delivered ≠ finished); [remote gate](docs/remote-gate.md).
 - [docs/spec.md](docs/spec.md): screen and back-end sheets.
 - [docs/ref.md](docs/ref.md): reference documents (specs, norms, mock-ups) and the coverage of their elements by the lots.
 - [docs/lead.md](docs/lead.md): the lead workflow, the `livreur` agent, and [the memory index warning](docs/session.md#memory-index-size-l442) (L442).

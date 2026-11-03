@@ -118,4 +118,25 @@ describe('parité porte ↔ CI — bords (L499)', () => {
   it('E19 — le workflow réel du dépôt : npm test (= vitest run) est couvert, rien de faux n\'est signalé', () => {
     expect(ciParityGaps(process.cwd()).map((g) => g.command)).toEqual([]);
   });
+
+  it('E20 — sous-shells : (cd backend && npm test) && (cd frontend && npx vitest run) est lu, le cd ne fuit pas hors de la parenthèse', () => {
+    const files = { 'backend/package.json': '{"scripts":{"test":"jest"}}', 'frontend/package.json': '{"scripts":{"test":"vitest run"}}' };
+    const gate = 'orchestrate:\n  test:\n    - { dir: backend, run: npm test }\n    - { dir: frontend, run: npx vitest run }\n';
+    expect(ci('(cd backend && npm test) && (cd frontend && npx vitest run)', files, gate)).toEqual([]);
+    expect(ci('(cd frontend && npm test)', files, gate)).toEqual([]);
+    expect(ci('(cd backend && true); npm test', { ...files, 'package.json': '{"scripts":{"test":"playwright test"}}' }, gate)).toEqual(['playwright test']);
+  });
+
+  it('E21 — une option qui désigne une autre suite (-c, --config, --project) fait une autre commande', () => {
+    expect(ci('npx vitest run -c vitest.e2e.config.ts')).toEqual(['npx vitest run -c vitest.e2e.config.ts']);
+    expect(ci('npx jest --config ./test/jest-e2e.json', {}, 'orchestrate:\n  test: npx jest\n')).toEqual(['npx jest --config ./test/jest-e2e.json']);
+    const pw = 'orchestrate:\n  test: npx playwright test --project=chromium\n';
+    expect(ci('npx playwright test --project=firefox', {}, pw)).toEqual(['npx playwright test --project=firefox']);
+    expect(ci('npx playwright test --project=chromium --headed', {}, pw)).toEqual([]);
+  });
+
+  it('E22 — le script test:e2e d\'un package.json (vitest run -c …) n\'est pas couvert par une porte vitest run', () => {
+    const files = { 'package.json': '{"scripts":{"test:e2e":"vitest run -c vitest.e2e.config.ts"}}' };
+    expect(ci('npm run test:e2e', files)).toEqual(['vitest run -c vitest.e2e.config.ts']);
+  });
 });

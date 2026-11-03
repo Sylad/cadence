@@ -34,7 +34,7 @@ function packageScripts(repo: string, dir: string): Record<string, string> {
   }
 }
 
-/** Découpe une ligne sur `&&`, `||`, `|` et `;` hors des guillemets. */
+/** Découpe une ligne sur `&&`, `||`, `|` et `;` hors des guillemets ; chaque parenthèse (sous-shell, `$(…)`) devient un segment `(` ou `)`. */
 function splitLine(line: string): string[] {
   const parts: string[] = [];
   let quote = '';
@@ -45,6 +45,9 @@ function splitLine(line: string): string[] {
       if (c === quote) quote = '';
     } else if (c === '"' || c === "'") {
       quote = c;
+    } else if (c === '(' || c === ')') {
+      parts.push(line.slice(from, i), c);
+      from = i + 1;
     } else if (c === '&' || c === '|' || c === ';') {
       parts.push(line.slice(from, i));
       if ((c === '&' || c === '|') && line[i + 1] === c) i++;
@@ -61,10 +64,19 @@ function segments(text: string): string[] {
   return lines.flatMap(splitLine);
 }
 
-/** Les commandes feuilles de `text`, `npm test` / `npm run x` remplacés par le script de package.json de `dir` (suivi à travers les `cd`) quand il existe. */
+/** Les commandes feuilles de `text`, `npm test` / `npm run x` remplacés par le script de package.json de `dir` (suivi à travers les `cd`, que la parenthèse fermante d'un sous-shell annule) quand il existe. */
 function leaves(repo: string, dir: string, text: string, depth = SCRIPT_DEPTH): string[] {
   let cwd = dir;
+  const outer: string[] = [];
   return segments(text).flatMap((s) => {
+    if (s === '(') {
+      outer.push(cwd);
+      return [];
+    }
+    if (s === ')') {
+      cwd = outer.pop() ?? cwd;
+      return [];
+    }
     const cd = /^cd\s+(?:"([^"]*)"|'([^']*)'|(\S+))$/.exec(s);
     if (cd) {
       cwd = posix.normalize(posix.join(cwd, cd[1] ?? cd[2] ?? cd[3]!));
@@ -76,7 +88,10 @@ function leaves(repo: string, dir: string, text: string, depth = SCRIPT_DEPTH): 
   });
 }
 
-/** La clé de comparaison : sans variables d'environnement ni `npx`, et coupée au premier argument qui commence par `-` (les options ne font pas une autre commande). */
+/** Les options qui désignent une autre suite ou un autre projet : elles restent dans la clé, avec leur valeur. */
+const SUITE_OPTION = /^(-c|-p|--config|--project|--projects|--selectProjects)(=.*)?$/;
+
+/** La clé de comparaison : sans variables d'environnement ni `npx`, coupée au premier argument qui commence par `-` (les autres options ne font pas une autre commande), mais gardant les options de `SUITE_OPTION` où qu'elles soient. */
 function key(command: string): string {
   let rest = command;
   for (let again = true; again; ) {
@@ -85,8 +100,16 @@ function key(command: string): string {
     rest = next;
   }
   const words = rest.replace(/^python3?\s+-m\s+pytest\b/, 'pytest').replace(/^mvn(\s+-\S+)*\s+/, 'mvn ').split(/\s+/);
-  const end = words.findIndex((w) => w.startsWith('-'));
-  return (end < 0 ? words : words.slice(0, end)).join(' ');
+  const end = words.findIndex((w) => w.startsWith('-') && !SUITE_OPTION.test(w));
+  const kept = end < 0 ? words : words.slice(0, end);
+  const tail = end < 0 ? [] : words.slice(end);
+  tail.forEach((w, i) => {
+    if (!SUITE_OPTION.test(w)) return;
+    kept.push(w);
+    const value = tail[i + 1];
+    if (!w.includes('=') && value !== undefined && !value.startsWith('-')) kept.push(value);
+  });
+  return kept.join(' ');
 }
 
 const isTest = (command: string): boolean => TEST_RUNNER.test(key(command)) || TEST_SCRIPT.test(key(command));
@@ -121,7 +144,7 @@ function gateKeys(repo: string, test: GateTest | undefined, build: string | unde
  * Les commandes de test des workflows CI du dépôt que la porte ne joue pas (L499), dans l'ordre des fichiers, chacune une fois ; vide sans workflows,
  * sans `orchestrate.test` ni `orchestrate.build` (rien à comparer : `noTestGate` le dit déjà) ou avec un cadence.yaml illisible (il a sa propre erreur).
  * Une commande est une commande de test (lanceur reconnu, `npm test` et `npm run <script>` dépliés par le package.json de son dossier) ; deux commandes sont la même
- * si elles ne diffèrent que par les variables d'environnement, `npx` et les options (`--coverage`) : un fichier ou un projet nommé reste une autre commande.
+ * si elles ne diffèrent que par les variables d'environnement, `npx` et les options (`--coverage`) : un fichier nommé, une configuration (`-c`, `--config`) ou un projet (`--project`, `--selectProjects`, `-p`) reste une autre commande.
  */
 export function ciParityGaps(repo: string): CiGap[] {
   let test: GateTest | undefined;

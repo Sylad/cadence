@@ -1868,9 +1868,10 @@ lots:
     started: 2026-11-03
   - id: L566
     title: "Porte après un commit de plan seul quand des tests lisent le plan (orchestrate.gate.readsPlan) : ne rejouer QUE les tests et scripts qui lisent le plan (détectés ou déclarés), et reprendre le verdict du sha du dessous pour le reste, au lieu de rejouer build + suite complète (mesuré le 03-11 : codex, maritime, evatosorus, ol, warhammer rejouent 5 min et plus pour une ligne de plan ; sur maritime, des scripts de skills /reprise et /cloture suffisent à déclencher le rejeu)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-03
+    started: 2026-11-03
   - id: L567
     title: "Tests instables sous charge vus le 03-11, à rendre déterministes : mise-en-service L195 (build:service-like), sonde L492 des imports frais, orchestrate-worktree-plan-writes R16, probe-L539-bords (départ simultané), porte-deportee R19, test R10 de L556 (EPIPE sur spawnSync input) — chacun reproduit sous charge (suites parallèles) puis corrigé, sans retry masquant"
     status: todo

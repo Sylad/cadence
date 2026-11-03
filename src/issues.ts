@@ -17,12 +17,12 @@ interface OpenIssue {
 }
 
 /**
- * Les numéros que le texte cite par « issue #n » (casse libre), chacun une fois, dans l'ordre : « issues #20 et #21 » et « issues #20, #21 »
+ * Les numéros que le texte cite par « issue #n » (casse libre, espaces ou saut de ligne entre les deux, numéro terminé), chacun une fois, dans l'ordre : « issues #20 et #21 » et « issues #20, #21 »
  * donnent les deux. Un « #20 » sans le mot, « issue 20 » ou « reissue #3 » ne citent rien.
  */
 export function issueNumbers(text: string): number[] {
   const found: number[] = [];
-  for (const m of text.matchAll(/\bissues? #(\d+)((?:(?:,\s*|\s+(?:et|and)\s+|\s*&\s*)#\d+)*)/gi)) {
+  for (const m of text.matchAll(/\bissues?\s+#(\d+)(?!\w)((?:(?:,\s*|\s+(?:et|and)\s+|\s*&\s*)#\d+(?!\w))*)/gi)) {
     for (const n of [m[1]!, ...(m[2]!.match(/\d+/g) ?? [])]) if (!found.includes(Number(n))) found.push(Number(n));
   }
   return found;
@@ -42,7 +42,11 @@ function openIssues(cwd: string, env: NodeJS.ProcessEnv): OpenIssue[] | null {
   try {
     const list: unknown = JSON.parse(raw);
     if (!Array.isArray(list)) return null;
-    return list.filter((i): i is OpenIssue => typeof i?.number === 'number' && typeof i?.title === 'string');
+    const seen = new Set<number>();
+    return list
+      .filter((i): i is OpenIssue => typeof i?.number === 'number' && typeof i?.title === 'string')
+      .filter((i) => !seen.has(i.number) && seen.add(i.number))
+      .map((i) => ({ number: i.number, title: i.title.replace(/\s+/g, ' ').trim() }));
   } catch {
     return null;
   }

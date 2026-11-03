@@ -1569,6 +1569,9 @@ lots:
     spec: true
     created: 2026-11-03
     started: 2026-11-03
+    notes:
+      - { date: 2026-11-03, text: "Revue de la fiche — mineur : docs/specs/bug-code-autoverification-deux-causes/fiche.yaml:28 — C1 n'utilise comme repli que le tableau du 30-10 et ne cite pas la mesure intermédiaire du 31-10 (.cadence/raf.yaml:351, cas limite 64 %, bug de code 51 %), plus récente : l'« Avant » et le repli peuvent contredire cette note sans le dire." }
+      - { date: 2026-11-03, text: "Revue de la fiche — mineur : docs/specs/bug-code-autoverification-deux-causes/fiche.yaml:97 — R5 : la règle de lecture (« part conforme monte ET part des deux causes baisse ») est une décision de l'auteur marquée « sourcee » alors que la source ne porte que le dénominateur et le protocole F1/F2 ; le critère de décision du 30-10 §4 portait sur la part des cas limites seule. À noter, sans conséquence de coût." }
   - id: L544
     title: "Panneau des lots, commande repliée : un mot coupé ne se recolle pas avec le retrait de 3 espaces des lignes suivantes (30–36 colonnes : maritime-atlas:Q4/accueil + -4-ux12 ; id de vague coupé à 18 colonnes) ; R25 colle sans le retrait, contrairement à son titre — ex L412 t1, mineur de la 3e revue (29-10)"
     status: todo

@@ -48,11 +48,11 @@ export function cmdSetStatus(c: Ctx): number | Promise<number> {
   const verdict = status === 'done' && !rest[0].includes('/') ? plan.lots().find((l) => l.id === rest[0])?.review?.verdict : undefined;
   const nonConforming = verdict !== undefined && isNonConformingVerdict(verdict);
   plan.setStatus(rest[0], status, today, { force: values.force, unreviewed, nonConforming });
-  const delivery = status === 'done' ? markClosedLot(plan, root, configPath, rest[0], io.err) : null;
+  const delivery = markClosedLot(plan, { root, configPath, err: io.err }, rest[0], status);
   if (command === 'drop' && values.reason) plan.note(rest[0], `abandonné : ${values.reason}`, today);
   plan.save();
   io.out(`${rest[0]} → ${status}`);
-  if (delivery) io.out(delivery);
+  delivery.forEach((line) => io.out(line));
   if (status === 'done') {
     warnIntegrating(root, io.err);
     warnWaveWorking(root, io.env, io.err);

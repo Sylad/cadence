@@ -27,10 +27,9 @@ function checkStateNames(raw: Record<string, unknown>, problems: string[]): void
 }
 
 /** `delivered: { date, sha }` : les deux faits ou rien (une clé mal formée est ignorée, comme `state_before:`). */
-function readDelivered(raw: unknown): Lot['delivered'] {
-  if (!raw || typeof raw !== 'object') return undefined;
-  const { date, sha } = raw as Record<string, unknown>;
-  return isDay(date) && typeof sha === 'string' && sha.trim() !== '' ? { date, sha: sha.trim() } : undefined;
+function readDelivered(raw: unknown): Pick<Lot, 'delivered'> {
+  const { date, sha } = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  return isDay(date) && typeof sha === 'string' && sha.trim() !== '' ? { delivered: { date, sha: sha.trim() } } : {};
 }
 
 /** L'estimation d'un lot : celle du plan, ou 1 jour par défaut avec la marque `unestimated` (L467). */
@@ -76,7 +75,7 @@ export function normalizeLot(raw: Record<string, unknown>, problems: string[] = 
     status,
     ...(typeof raw.state === 'string' && raw.state.trim() !== '' ? { state: raw.state.trim() } : {}),
     ...(typeof raw.state_before === 'string' && raw.state_before.trim() !== '' ? { stateBefore: raw.state_before.trim() } : {}),
-    ...(readDelivered(raw.delivered) ? { delivered: readDelivered(raw.delivered) } : {}),
+    ...readDelivered(raw.delivered),
     ...readEstimate(raw.estimate),
     quickwin: raw.quickwin === true,
     visible: raw.visible === true,

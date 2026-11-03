@@ -46,8 +46,21 @@ function parseTransitions(raw: unknown, states: Record<string, Status>, bad: Bad
   return transitions;
 }
 
-function requireNames(p: Record<string, unknown>, bad: Bad): void {
+/** `doneState`, `deliveredState` (L469) et `blockedState` : un nom d'état déclaré, de statut done pour les deux premiers, todo ou doing pour le dernier. */
+function stateNames(p: Record<string, unknown>, states: Record<string, Status>, bad: Bad): Pick<StateModel, 'done' | 'delivered' | 'blocked'> {
   for (const k of ['doneState', 'deliveredState', 'blockedState']) if (p[k] != null && typeof p[k] !== 'string') throw bad(`${k} : un nom d'état attendu`);
+  const names: Pick<StateModel, 'done' | 'delivered' | 'blocked'> = {};
+  for (const [key, field] of [['doneState', 'done'], ['deliveredState', 'delivered']] as const) {
+    if (p[key] == null) continue;
+    if (states[String(p[key])] !== 'done') throw bad(`${key} : « ${String(p[key])} » n'est pas un état done`);
+    names[field] = String(p[key]);
+  }
+  if (p.blockedState != null) {
+    const base = states[String(p.blockedState)];
+    if (base !== 'todo' && base !== 'doing') throw bad(`blockedState : « ${String(p.blockedState)} » doit être un état todo ou doing`);
+    names.blocked = String(p.blockedState);
+  }
+  return names;
 }
 
 /**
@@ -63,20 +76,7 @@ export function parseStates(p: Record<string, unknown>, bad: Bad, foreign: boole
   const states = parseBases(p.states, bad);
   const model: StateModel = { states };
   if (p.transitions != null) model.transitions = parseTransitions(p.transitions, states, bad);
-  requireNames(p, bad);
-  if (p.doneState != null) {
-    if (states[String(p.doneState)] !== 'done') throw bad(`doneState : « ${String(p.doneState)} » n'est pas un état done`);
-    model.done = String(p.doneState);
-  }
-  if (p.deliveredState != null) {
-    if (states[String(p.deliveredState)] !== 'done') throw bad(`deliveredState : « ${String(p.deliveredState)} » n'est pas un état done`);
-    model.delivered = String(p.deliveredState);
-  }
-  if (p.blockedState != null) {
-    const base = states[String(p.blockedState)];
-    if (base !== 'todo' && base !== 'doing') throw bad(`blockedState : « ${String(p.blockedState)} » doit être un état todo ou doing`);
-    model.blocked = String(p.blockedState);
-  }
+  Object.assign(model, stateNames(p, states, bad));
   return { states: model };
 }
 

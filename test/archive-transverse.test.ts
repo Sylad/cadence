@@ -70,7 +70,10 @@ async function depot() {
 }
 
 /** La ligne « livré : … » d'une livraison depuis `first` (journal neuf à chaque appel : la livraison ne dépend que de l'historique et du plan). */
-async function livre(dir: string, first: string): Promise<string> {
+async function livre(source: string, first: string): Promise<string> {
+  // Dans une copie : deliver marque les lots livrés dans le plan (L469), ce qui changerait le plan que les autres sorties lisent.
+  const dir = join(tempDir(), 'copie');
+  execFileSync('git', ['clone', '-q', source, dir], { stdio: 'ignore' });
   const state = tempDir();
   appendDelivery(state, '2025-01-01', first);
   const out: string[] = [];

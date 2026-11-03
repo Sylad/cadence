@@ -40,7 +40,7 @@ export function fx(o: { settings?: PlanSettings; blocks?: boolean; yaml?: string
   git(dir, 'config', 'commit.gpgsign', 'false');
   git(dir, 'config', 'core.fileMode', 'false');
   const planFile = join(dir, '.cadence/raf.yaml');
-  const plan = Plan.create(planFile, 'demo', 'L', '2026-10-01');
+  const plan = Plan.create(planFile, 'demo', 'L', '2026-09-01');
   for (const t of ['Alertes', 'Carte', 'Fonds']) plan.add(t, '2026-10-01');
   for (const id of ['L1', 'L2', 'L3']) plan.setStatus(id, 'doing', '2026-10-02');
   plan.save();

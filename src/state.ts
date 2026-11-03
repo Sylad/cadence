@@ -181,7 +181,7 @@ export function pidAlive(pid: number): boolean {
 }
 
 /** Une ligne verte de `deliveries.log` : « jour sha [bloc] » (L469) ; le bloc est le nom de `--block`, absent d'une livraison complète et des lignes anciennes. */
-export interface DeliveryLine {
+interface DeliveryLine {
   day: string;
   sha: string;
   block?: string;

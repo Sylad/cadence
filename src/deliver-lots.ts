@@ -19,7 +19,7 @@ export function deliveredIds(ctx: DeliveredCtx, prev: string | null, sha: string
   const known = new Set((ctx.plan.readonly ? lots.filter((l) => l.status === 'doing') : lots).map((l) => l.id));
   const ids = new Set<string>();
   // --block (L469) : seuls les commits qui touchent un chemin du bloc comptent, dans la plage de CETTE livraison seulement.
-  const paths = ctx.block === undefined ? undefined : ctx.blocks?.[ctx.block];
+  const paths = ctx.block === undefined ? undefined : ctx.config?.blocks?.[ctx.block];
   for (const c of readCommits(ctx.root, { range: `${prev}..${sha}` })) {
     if (isPlanOnly(c.sha, ctx.plan, ctx.root)) continue; // entretien du plan : ne livre rien, même s'il cite des lots
     if (paths && !changedFiles(ctx.root, c.sha).some((f) => paths.some((p) => underPath(f, p)))) continue;

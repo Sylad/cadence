@@ -1,8 +1,8 @@
 import { basename } from 'node:path';
 import { isPlanOnly } from './audit.js';
 import { isAncestor, readCommits } from './git.js';
-import { appendStep, lastDeliveryFor } from './state.js';
-import { declaredBlocks } from './deliver-blocks.js';
+import { appendStep } from './state.js';
+import { previousDelivery } from './deliver-blocks.js';
 import type { DeliverCtx, DeliverDeps, GhRun } from './deliver.js';
 
 const POLL_CI = 15_000;
@@ -20,7 +20,7 @@ export const stamped = (deps: Pick<DeliverDeps, 'now'>, line: string): string =>
  */
 export function planOnlySince(ctx: DeliverCtx, sha: string): string | null {
   if (!ctx.plan) return null;
-  const prev = lastDeliveryFor(ctx.state, ctx.block, declaredBlocks(ctx.config));
+  const prev = previousDelivery(ctx);
   if (!prev || !/^[0-9a-f]{40,64}$/.test(prev) || prev === sha || !isAncestor(ctx.root, prev, sha)) return null;
   try {
     const commits = readCommits(ctx.root, { range: `${prev}..${sha}` });

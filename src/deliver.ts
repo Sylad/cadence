@@ -1,20 +1,20 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { constants } from 'node:os';
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 import { parse } from 'yaml';
 import { onTermination, readProcs, SIGNAL_GRACE_MS, SIGNAL_PENDING_MS, TreeTracker } from './proc.js';
 import type { Day } from './dates.js';
 import { deliveryLots } from './audit.js';
-import { commitPaths, dirtyPaths, headSha, isAncestor, onRemote, repoStatus, resolveCommit } from './git.js';
+import { headSha, isAncestor, onRemote, repoStatus, resolveCommit } from './git.js';
 import { planOnlySince, pollGithubCi, stamped, stepJournal } from './deliver-ci.js';
+import { refreshArticles } from './deliver-articles.js';
 import { markDelivered } from './deliver-mark.js';
-import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
 import { deliveredIds, deliveredLots } from './deliver-lots.js';
-import { type Blocks, declaredBlocks, readBlocks } from './deliver-blocks.js';
-import { describeArticle, openArticleLots, type ArticleRule } from './articles.js';
+import { type Blocks, previousDelivery, readBlocks } from './deliver-blocks.js';
+import { describeArticle, type ArticleRule } from './articles.js';
 import { RafError, type Lot, type Plan } from './plan.js';
-import { appendDelivery, appendFailedDelivery, type FailClass, lastDeliveryFor, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
+import { appendDelivery, appendFailedDelivery, type FailClass, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
 
 export interface VerifyCheck {
   url?: string;
@@ -192,7 +192,7 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
     verify: checks,
     verifyTimeout: seconds('verifyTimeout', 300),
     deployTimeout: seconds('deployTimeout', 1800),
-    ...(cfg.blocks === undefined ? {} : { blocks: readBlocks(cfg.blocks, bad) }),
+    blocks: readBlocks(cfg.blocks, bad),
   };
 }
 
@@ -388,7 +388,7 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
   // Pendant une vague, la garde de la vague (cli, `blockingLots`) en tient lieu.
   let undelivered: { id: string; state: string }[] = [];
   if (ctx.sha !== undefined && !ctx.duringWave && ctx.plan) {
-    const last = lastDeliveryFor(ctx.state, ctx.block, declaredBlocks(config));
+    const last = previousDelivery(ctx);
     const from = last && isAncestor(ctx.root, last, sha) ? last : null;
     const lots = deliveryLots(ctx.plan, ctx.root, sha, from);
     if (ctx.dryRun) {
@@ -445,8 +445,7 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     };
     out(`Livraison de ${env.CADENCE_SHORT} (${branch})`);
 
-    const reading: DeliveredCtx = { ...ctx, blocks: config.blocks };
-    const step = stepJournal(ctx, deps, sha, () => deliveredIds(reading, lastDeliveryFor(ctx.state, ctx.block, declaredBlocks(config)), sha));
+    const step = stepJournal(ctx, deps, sha, () => deliveredIds(ctx, previousDelivery(ctx), sha));
 
     let declared: string | null = null;
     if (script !== null) {
@@ -511,13 +510,13 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
         how = 'moved';
       }
     }
-    const prev = lastDeliveryFor(ctx.state, ctx.block, declaredBlocks(config));
+    const prev = previousDelivery(ctx);
     appendDelivery(ctx.state, ctx.today, final, ctx.block);
     const took = `en ${Math.round((deps.now() - startedAt) / 1000)} s`;
     if (how === 'declared') out(stamped(deps, `✓ livré : ${final.slice(0, 7)} (sha déclaré par le script) ${took}`));
     else if (how === 'moved') out(stamped(deps, `✓ livré : ${final.slice(0, 7)} (tête déplacée par le script depuis ${env.CADENCE_SHORT}) ${took}`));
     else out(stamped(deps, `✓ livré${config.verify.length ? ' et vérifié' : ''} : ${env.CADENCE_SHORT} ${took}`));
-    announceDelivered(reading, prev, final);
+    announceDelivered(ctx, prev, final);
     return 0;
   } finally {
     releaseLock(ctx.state, process.pid);
@@ -597,7 +596,7 @@ async function verifyAll(
 }
 
 /** Ce qu'il faut pour annoncer les lots livrés et rafraîchir leur article : deliver, et `cadence verify` quand il inscrit une ligne verte (L435). */
-export type DeliveredCtx = Pick<DeliverCtx, 'root' | 'plan' | 'today' | 'articles' | 'publicTitle' | 'planCommit' | 'waveId' | 'block' | 'out' | 'err'> & { blocks?: Blocks };
+export type DeliveredCtx = Pick<DeliverCtx, 'root' | 'plan' | 'today' | 'articles' | 'publicTitle' | 'planCommit' | 'waveId' | 'block' | 'out' | 'err'> & { config?: Pick<DeliverConfig, 'blocks'> };
 
 /**
  * Ce qui suit la ligne verte du journal, depuis la livraison verte précédente `prev` (celle d'AVANT la ligne écrite) : les lots cités
@@ -611,50 +610,4 @@ export function announceDelivered(ctx: DeliveredCtx, prev: string | null, sha: s
   if (delivered) ctx.out(delivered);
   markDelivered(ctx, ids, sha);
   refreshArticles(ctx, ids, sha);
-}
-
-/**
- * Livraison verte (L144) : les lots livrés dont le titre est public changent ce que les articles externes racontent, on ouvre
- * donc le lot qui les rafraîchit. Le plan est commité (L388 pendant une vague, L420 aussi hors vague : le livreur lancé à la main le laissait modifié) avec les fichiers que produit `plan.onWrite`, avec
- * le gabarit `plan.commit` (sans la vague hors vague), pour ne pas laisser le plan modifié dans l'arbre — sauf si le plan ou ces fichiers l'étaient
- * déjà avant l'écriture (le lead y a des modifications que ce commit emporterait). Une erreur ici ne défait pas une livraison déjà faite.
- */
-function refreshArticles(ctx: DeliveredCtx, ids: string[], sha: string): void {
-  if (!ctx.plan || !ctx.articles?.length || !ids.length) return;
-  try {
-    // Relu : le script du projet a pu fermer des lots ou commiter le plan depuis le départ de la livraison, save() ne doit pas l'écraser.
-    const plan = ctx.plan.reloaded();
-    const planFile = relative(ctx.root, plan.path);
-    const held = [planFile, ...plan.produced];
-    const wasDirty = dirtyPaths(ctx.root, held).length > 0;
-    const wanted = new Set(ids);
-    const r = openArticleLots({
-      plan,
-      root: ctx.root,
-      rules: ctx.articles,
-      delivered: plan.lots().filter((l) => wanted.has(l.id)),
-      publicTitle: ctx.publicTitle ?? ((l) => l.public),
-      sha,
-      today: ctx.today,
-    });
-    for (const w of r.warnings) ctx.err(`deliver : ${w}`);
-    if (r.opened.length || r.noted.length) plan.save();
-    const touched = [...r.opened, ...r.noted];
-    let state = 'plan modifié, à commiter';
-    if (touched.length && wasDirty) {
-      state = 'plan déjà modifié avant la livraison, non commité : à commiter avec vos modifications';
-    } else if (touched.length) {
-      const message = planCommitMessage(ctx.planCommit, { lot: touched.join(', '), action: r.opened.length ? PLAN_ACTIONS.articleOpened : PLAN_ACTIONS.articleNoted, wave: ctx.waveId });
-      try {
-        state = `plan commité ${commitPaths(ctx.root, [planFile, ...dirtyPaths(ctx.root, plan.produced)], message)}`;
-      } catch (e) {
-        state = `commit du plan refusé (${(e as Error).message}), plan modifié, à commiter`;
-      }
-    }
-    for (const id of r.opened) ctx.out(`article à rafraîchir : ${id} « ${plan.lot(id).title} » ouvert (${state}) — à jouer dans une vague ordinaire`);
-    for (const id of r.noted) ctx.out(`article à rafraîchir : ${id} déjà ouvert, titres livrés ajoutés en note (${state})`);
-    for (const m of r.manual) ctx.out(`article à rafraîchir : ${m}`);
-  } catch (e) {
-    ctx.err(`deliver : article à rafraîchir non ouvert — ${(e as Error).message}`);
-  }
 }

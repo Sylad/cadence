@@ -2,8 +2,8 @@ import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
 import { headSha, repoStatus, upstreamHead, upstreamIsDefaultBranch } from './git.js';
 import type { Day } from './dates.js';
-import { lastDelivery, lastDeliveryFor, recordVerifiedDelivery, sharedStateDir } from './state.js';
-import { declaredBlocks } from './deliver-blocks.js';
+import { lastDelivery, recordVerifiedDelivery, sharedStateDir } from './state.js';
+import { previousDelivery } from './deliver-blocks.js';
 import { onTermination } from './proc.js';
 import { announceDelivered, describeCheck, realDeps, retryCheck, TIMED_OUT, type CheckDeps, type DeliveredCtx, type DeliverConfig, type VerifyCheck } from './deliver.js';
 
@@ -157,7 +157,7 @@ export async function verifyCommand(ctx: VerifyCtx, deps: CheckDeps): Promise<nu
   out(summaryLine(results));
   if (results.some((r) => r.reason !== null)) return 1;
   if (ctx.journal) {
-    const prev = lastDeliveryFor(ctx.journal.dir, undefined, declaredBlocks(ctx.config)); // lu avant l'écriture : la livraison précédente, d'où partent les lots annoncés
+    const prev = previousDelivery({ state: ctx.journal.dir, config }); // lu avant l'écriture : la livraison précédente, d'où partent les lots annoncés
     if (recordVerifiedDelivery(ctx.journal.dir, ctx.journal.day, ctx.sha)) {
       out(`verify : ${ctx.sha.slice(0, 7)} avait une livraison rouge, l'effet est vert — inscrit au journal des livraisons`);
       let effects: DeliveredCtx;

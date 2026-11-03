@@ -1,4 +1,5 @@
 import { posix } from 'node:path';
+import { lastDeliveryFor } from './state.js';
 
 /** Blocs de livraison (`deliver.blocks`, L469) : nom → chemins relatifs au dépôt, normalisés. */
 export type Blocks = Record<string, string[]>;
@@ -12,8 +13,9 @@ function blockPath(raw: string): { path: string } | { why: string } {
   return { path: rel };
 }
 
-/** Clé `deliver.blocks` lue ; `bad` fabrique l'erreur « cadence.yaml : deliver.<ce qui cloche> ». */
-export function readBlocks(v: unknown, bad: (what: string) => Error): Blocks {
+/** Clé `deliver.blocks` lue (undefined sans la clé) ; `bad` fabrique l'erreur « cadence.yaml : deliver.<ce qui cloche> ». */
+export function readBlocks(v: unknown, bad: (what: string) => Error): Blocks | undefined {
+  if (v === undefined) return undefined;
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw bad('blocks : un objet { nom: [chemins] } attendu');
   const blocks: Blocks = {};
   for (const [name, paths] of Object.entries(v)) {
@@ -37,8 +39,11 @@ export function blocksTouched(files: string[], blocks: Blocks): string[] {
   return Object.keys(blocks).filter((b) => files.some((f) => blocks[b].some((p) => underPath(f, p))));
 }
 
-/** Les noms des blocs de `deliver.blocks`, [] sans la clé : de quoi lire la ligne d'où part une livraison (`lastDeliveryFor`). */
-export const declaredBlocks = (config: { blocks?: Blocks }): string[] => Object.keys(config.blocks ?? {});
+/** Les noms des blocs de `deliver.blocks`, [] sans la clé. */
+const declaredBlocks = (config: { blocks?: Blocks }): string[] => Object.keys(config.blocks ?? {});
+
+/** Sha de la livraison précédente d'où part cette livraison : la ligne du bloc livré, ou celle de la livraison complète (`lastDeliveryFor`). */
+export const previousDelivery = (ctx: { state: string; block?: string; config: { blocks?: Blocks } }): string | null => lastDeliveryFor(ctx.state, ctx.block, declaredBlocks(ctx.config));
 
 /** Pourquoi `--block` est refusé (bloc inconnu, ou aucun bloc déclaré) ; null quand le bloc est déclaré. */
 export function blockProblem(block: string, config: { blocks?: Blocks }): string | null {

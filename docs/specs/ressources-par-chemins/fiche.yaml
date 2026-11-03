@@ -18,6 +18,7 @@ sujet:
     jobs: []
     hors_perimetre:
       - "tout motif à jokers (glob) dans paths: : un chemin est un fichier ou un dossier littéral"
+      - "l'attente d'un lot d'une AUTRE vague : la liste des lots en jeu est celle de la vague du tardif (R10)"
       - "la lecture des fichiers non commités d'un worktree : seuls les commits du lot comptent"
       - "la résolution automatique d'un conflit : le lot rendu reste rendu (le message le dit mieux, c'est tout)"
       - "un verrou à l'écriture : un lot dont le diff touche un chemin n'est jamais empêché de travailler, seule son intégration peut attendre"
@@ -62,18 +63,18 @@ cas:
     declencheur: étape integrate d'un lot (cycle.ts, integrateLot), avant la prise du verrou d'intégration
     preconditions:
       - le lot a un worktree actif et une ressource à chemins est déclarée
-      - "un autre lot de la vague, du même dépôt, est encore en jeu (ni fini ni rendu) et n'est pas lui-même à l'étape integrate"
+      - "un autre lot de la MÊME vague et du même dépôt, lancé avant lui (R10), est encore en jeu (ni fini ni rendu) et n'est pas lui-même à l'étape integrate ; les lots d'une autre vague sont hors périmètre"
     nominal:
       - "Le lot tardif calcule ses ressources par son diff complet (R6)."
-      - "Pour chaque lot plus ancien en jeu, il lit le diff PARTIEL « base..tête » de la branche de cet ancien au moment du contrôle (R8)."
+      - "Pour chaque lot plus ancien en jeu (R10), il lit le diff PARTIEL « base..tête » de la branche de cet ancien au moment du contrôle (R8)."
       - "L'ancien a déjà un commit sur un chemin d'une ressource du tardif : le tardif attend la fin de l'ancien, journalise l'attente, puis s'intègre (R8)."
       - "Le contrôle est rejoué à chaque passage entre deux étapes (R9), puis l'intégration suit comme aujourd'hui (verrou, rebase, contrôles, avance)."
     alternatives:
       - { si: "l'ancien n'a aucun commit sur la ressource", alors: "le tardif s'intègre sans attendre", regles: [R8] }
-      - { si: "l'ancien touche la ressource après le contrôle", alors: "pas d'attente ; si le rebase en conflit, le message de C4 nomme la ressource", regles: [R10] }
+      - { si: "l'ancien touche la ressource après le contrôle", alors: "pas d'attente ; si le rebase en conflit, le message de C4 nomme la ressource", regles: [R11] }
       - { si: "l'ancien est lui aussi à l'étape integrate, ou déjà rendu ou en échec", alors: "pas d'attente (le verrou d'intégration les ordonne ; attendre un rendu ne mène à rien)", regles: [R9] }
       - { si: "l'ancien est supprimé : branche absente ou sans cadence-base", alors: "il ne touche rien, pas d'attente", regles: [R6] }
-      - { si: "l'ancien n'a pas fini après la durée d'attente d'intégration", alors: "le tardif est rendu au lead, worktree conservé, repris par --resume --integrate", regles: [R9] }
+      - { si: "l'ancien met longtemps à finir", alors: "le tardif attend sans borne de durée et sans tenir le verrou d'intégration du dépôt ; l'attente cesse dès que l'ancien est fini, rendu ou en échec", regles: [R9] }
       - { si: "aucune ressource à chemins n'est déclarée, ou le diff du tardif n'en touche aucune", alors: "comportement d'aujourd'hui", regles: [R1, R8] }
     resultat: "L520 (fini avant L492) ne s'intègre pas par-dessus un cycle.ts que L492 découpe déjà : il attend, puis s'intègre."
   - id: C4
@@ -85,11 +86,11 @@ cas:
       - "un des fichiers en conflit est couvert par un chemin d'une ressource déclarée"
     nominal:
       - "Le message existant « intégration impossible : conflit en rebasant … » est gardé tel quel."
-      - "Pour chaque ressource touchée par un fichier en conflit, il ajoute le fichier et les commits de la branche de départ qui l'ont modifié depuis le départ du lot (R10)."
+      - "Pour chaque ressource touchée par un fichier en conflit, il ajoute le fichier et les commits de la branche de départ qui l'ont modifié depuis le départ du lot (R11)."
       - "Le lot est rendu comme aujourd'hui (next: integrate, worktree conservé)."
     alternatives:
-      - { si: "aucun fichier en conflit n'est couvert par une ressource, ou le conflit n'a pas de liste de fichiers", alors: "message d'aujourd'hui, mot pour mot", regles: [R10] }
-      - { si: "plusieurs commits (de plusieurs lots) ou un commit hors vague ont modifié le fichier", alors: "tous les commits sont listés par sha et sujet, au plus 3 puis « +N autres »", regles: [R10] }
+      - { si: "aucun fichier en conflit n'est couvert par une ressource, ou le conflit n'a pas de liste de fichiers", alors: "message d'aujourd'hui, mot pour mot", regles: [R11] }
+      - { si: "plusieurs commits (de plusieurs lots) ou un commit hors vague ont modifié le fichier", alors: "tous les commits sont listés par sha et sujet, au plus 3 puis « +N autres »", regles: [R11] }
     resultat: "Le lead sait quelle ressource, quel fichier et quels commits ont causé le conflit."
 
 regles:
@@ -137,22 +138,28 @@ regles:
     tests: ["R7 — lot sans commit : aucune ressource déduite, le lot prêt voisin est offert", "R7 — lot d'une file qui joue encore, ayant déjà un commit sur cycle.ts : la file voisine qui veut cycle-ts attend"]
   - id: R8
     cas: [C3]
-    enonce: "À l'étape integrate, le lot tardif attend la fin de tout lot plus ancien encore en jeu (même vague ou vague vivante, même dépôt) dont les commits déjà faits (diff partiel « base..tête » de son worktree au moment du contrôle) touchent un chemin d'une ressource que touche le diff complet du tardif ; sinon il s'intègre sans attendre. Si l'ancien touche la ressource plus tard, R10 est le filet. L'attente est journalisée (lot attendu, ressource, chemin) et se lève dès que l'ancien est fini."
+    enonce: "À l'étape integrate, le lot tardif attend la fin de tout lot plus ancien encore en jeu (R10 : même vague, même dépôt) dont les commits déjà faits (diff partiel « base..tête » de son worktree au moment du contrôle) touchent un chemin d'une ressource que touche le diff complet du tardif ; sinon il s'intègre sans attendre. Si l'ancien touche la ressource plus tard, R11 est le filet. L'attente est journalisée (lot attendu, ressource, chemin) et se lève dès que l'ancien est fini."
     statut: sourcee
     source: "décision du lead 03-11 (R6 b) : lecture du diff PARTIEL, le tardif attend la fin de l'ancien s'ils touchent la même ressource, sinon il s'intègre, le message lisible est le filet"
     tests: ["R8 — ancien ayant déjà un commit sur cycle.ts, tardif fini en premier : il attend puis s'intègre", "R8 — ancien sans commit sur la ressource : le tardif s'intègre sans attendre", "R8 — l'ancien touche une autre ressource que le tardif : pas d'attente", "R8 — aucun lot plus ancien en jeu : pas d'attente"]
   - id: R9
     cas: [C3]
-    enonce: "Le contrôle de R8 est réévalué à chaque passage entre deux étapes. Il ne retient pas un lot pour un ancien qui est lui-même à l'étape integrate, rendu ou en échec (pas d'attente circulaire : le verrou d'intégration ordonne les intégrations). L'attente est bornée par la durée d'attente d'intégration de la vague (INTEGRATE_WAIT_MS, 10 minutes, c.wave.integrate?.waitMs) : au-delà, le tardif est rendu au lead avec le message de A2, worktree conservé et next: integrate, repris par --resume --integrate."
-    statut: hypothese
-    si_faux: "Si l'attente devait être sans borne ou d'une autre durée, seul le seuil change ; si elle devait aussi attendre un ancien rendu, le lot attendrait un lot qui ne reprendra pas sans le lead."
-    tests: ["R9 — ancien repassant à une étape après le premier contrôle : le tardif réévalue", "R9 — deux lots à integrate sur la même ressource : aucun n'attend l'autre, pas d'interblocage", "R9 — ancien rendu (handed-back) : le tardif s'intègre", "R9 — ancien encore en jeu après waitMs : le tardif est rendu avec le message d'attente, worktree conservé"]
+    enonce: "Le contrôle de R8 est réévalué à chaque passage entre deux étapes. Il ne retient pas un lot pour un ancien qui est lui-même à l'étape integrate, rendu ou en échec (pas d'attente circulaire : le verrou d'intégration ordonne les intégrations). L'attente n'a PAS de borne de durée : elle dure tant que l'ancien est en jeu (un ancien qui découpe cycle.ts travaille bien plus de 10 minutes) et se lève dès qu'il est fini, rendu ou en échec ; INTEGRATE_WAIT_MS ne s'applique qu'à l'attente du verrou fichier (integrate-lot.ts:147), pas à elle. Le verrou d'intégration du dépôt n'est pas pris pendant l'attente (le contrôle précède la prise du verrou) : les autres lots du dépôt s'intègrent pendant ce temps."
+    statut: sourcee
+    source: "décision du lead 03-11 (R6 b) : « le tardif attend la fin de l'ancien » (aucune borne dans la décision) ; scénario du lot : L520 fini, L492 encore à l'œuvre depuis 1 h, L520 ne doit pas être rendu sans conflit réel ; src/orchestrate/integrate.ts:18 (INTEGRATE_WAIT_MS borne le verrou fichier seul)"
+    tests: ["R9 — ancien repassant à une étape après le premier contrôle : le tardif réévalue", "R9 — deux lots à integrate sur la même ressource : aucun n'attend l'autre, pas d'interblocage", "R9 — ancien rendu (handed-back) : le tardif s'intègre", "R9 — ancien encore en jeu bien après INTEGRATE_WAIT_MS : le tardif attend toujours, n'est pas rendu", "R9 — pendant l'attente, le verrou d'intégration du dépôt n'est pas tenu : un autre lot s'intègre"]
   - id: R10
+    cas: [C3]
+    enonce: "Les lots à examiner par R8 sont ceux de la MÊME vague que le tardif, du même dépôt, encore en jeu (ni fini, ni rendu, ni en échec, ni à l'étape integrate), pris dans la liste des lots que le cycle de la vague tient déjà. Un lot est « plus ancien » que le tardif quand il est lancé avant lui : sa position dans cette liste, qui suit l'ordre de lancement de la vague. Les lots d'une autre vague ne sont pas lus (integrateLot ne voit que sa vague) : le message de R11 reste leur filet."
+    statut: hypothese
+    si_faux: "Si l'ancienneté devait se mesurer autrement (date du worktree) ou couvrir une autre vague vivante, seul le choix de la liste et de l'ordre change dans l'étape integrate ; aucune donnée ni contrat publié n'est en jeu."
+    tests: ["R10 — lot lancé après le tardif, avec un commit sur la même ressource : le tardif n'attend pas", "R10 — lot d'une autre vague touchant la ressource : pas d'attente", "R10 — lot d'un autre dépôt touchant le même chemin : pas d'attente", "R10 — aucun lot plus ancien en jeu : pas d'attente"]
+  - id: R11
     cas: [C3, C4]
     enonce: "Quand rebaseOnto rend un conflit avec des fichiers, le message existant est gardé mot pour mot et, pour chaque ressource que couvre un fichier en conflit, complété de « ressource « <nom> » : <fichier> modifié dans <base> depuis le départ du lot par <sha7> <sujet>[, …] » : les commits de la branche de départ qui ont touché ce fichier depuis le point de départ du lot (au plus 3, puis « +N autres »), ce qui couvre plusieurs lots comme un commit extérieur à la vague, sans chercher quel lot en est l'auteur. Un conflit sans fichier ou hors ressource garde le message d'aujourd'hui."
     statut: hypothese
     si_faux: "Si le message devait nommer le lot auteur, il faudrait que l'intégration garde la liste des fichiers de chaque lot (aujourd'hui rebaseOnto ne rend que les fichiers en conflit) : plus de code, aucune donnée de plus."
-    tests: ["R10 — conflit sur cycle.ts : le message garde le texte d'avant et nomme cycle-ts, le fichier et le commit de base", "R10 — deux commits de base sur le fichier : les deux sont listés", "R10 — quatre commits : trois puis « +1 autre »", "R10 — conflit sur un fichier hors ressource : message identique à celui d'avant", "R10 — conflit sans liste de fichiers : message identique à celui d'avant"]
+    tests: ["R11 — conflit sur cycle.ts : le message garde le texte d'avant et nomme cycle-ts, le fichier et le commit de base", "R11 — deux commits de base sur le fichier : les deux sont listés", "R11 — quatre commits : trois puis « +1 autre »", "R11 — conflit sur un fichier hors ressource : message identique à celui d'avant", "R11 — conflit sans liste de fichiers : message identique à celui d'avant"]
 
 contrats:
   - id: A1
@@ -171,9 +178,8 @@ contrats:
     entree: "étape integrate d'un lot en worktree, avec une ressource à chemins déclarée"
     sortie: "le lot s'intègre comme avant, après avoir attendu au besoin l'ancien qui touche la même ressource (ligne de journal « <projet:lot> intégration différée : <projet:lot ancien> touche la ressource « <nom> » (<chemin>) »)"
     erreurs:
-      - { code: log error, message: "intégration refusée : <projet:lot ancien>, encore en jeu, touche la ressource « <nom> » (<chemin>) depuis plus de <durée> ; worktree conservé : <dossier>" }
       - { code: log error, message: "intégration impossible : conflit en rebasant <branche> sur <base> (fichiers : <liste>) ; ressource « <nom> » : <fichier> modifié dans <base> depuis le départ du lot par <sha7> <sujet> ; worktree conservé : <dossier>" }
-    regles: [R6, R8, R9, R10]
+    regles: [R6, R8, R9, R11, R10]
   - id: A3
     appel: commande lead tour
     entree: "options existantes inchangées ; ressources à chemins déclarées, lots en jeu avec worktree"

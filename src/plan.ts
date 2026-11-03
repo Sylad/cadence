@@ -64,6 +64,8 @@ export interface Lot {
   status: Status;
   /** État détaillé du projet (clé `state:`, L463, `plan.states`) ; absent sans déclaration ou pour un lot écrit avant elle. */
   state?: string;
+  /** Livraison du lot (clé `delivered: { date, sha }`, L469) : le jour et le sha de la livraison verte qui le contient ; absente tant que le lot n'est pas livré — « terminé » et « livré » sont deux faits. */
+  delivered?: { date: Day; sha: string };
   /** État d'avant le blocage (clé `state_before:`) : celui où `raf status <lot> --back` revient. */
   stateBefore?: string;
   estimate: number; unestimated?: true; // unestimated : aucune estimation lisible (absente, nulle, pas un nombre) : `estimate` vaut 1 par défaut (L467, `raf quickwins` les liste à part)
@@ -961,6 +963,36 @@ export class Plan {
     const message = opts.message?.trim();
     if (message) this.note(ref, `état ${to} : ${message}`, today);
     return to;
+  }
+
+  /**
+   * Marque livré un lot terminé (L469) : pose `delivered: { date, sha }` et, avec `plan.deliveredState`, passe de doneState à cet état.
+   * Rend `null` quand c'est fait ou sans objet (le lot est déjà livré ou n'est pas terminé), sinon le refus de `plan.transitions`
+   * (alors ni `delivered:` ni l'état ne sont posés). Une sous-tâche ne se livre pas.
+   */
+  markDelivered(id: string, at: { date: Day; sha: string }): string | null {
+    this.writable();
+    const lot = this.lot(id);
+    if (lot.delivered || lot.status !== 'done') return null;
+    const model = this.settings.states;
+    const to = model?.delivered;
+    const toDelivered = model && to !== undefined && currentState(model, lot) === defaultState(model, 'done');
+    if (model && to !== undefined && toDelivered) {
+      const refused = transitionProblem(model, currentState(model, lot), to);
+      if (refused) return `transition ${currentState(model, lot)} → ${to} refusée par plan.transitions`;
+    }
+    const node = this.lotNode(id);
+    putFlowKey(this.doc, node, 'delivered', at);
+    if (toDelivered) this.writeState(node, to);
+    return null;
+  }
+
+  /** Les fichiers (absolus : le plan, ou un fichier d'année de l'archive) qui portent ces lots. */
+  holdingFiles(ids: string[]): string[] {
+    const wanted = new Set(ids);
+    const holds = (seq: YAMLSeq) => seq.items.some((n) => isMap(n) && wanted.has(String(n.get('id'))));
+    const files = this.loadArchives().filter((a) => holds(archiveLots(a.doc))).map((a) => a.file);
+    return holds(this.doc.get('lots') as YAMLSeq) ? [this.path, ...files] : files;
   }
 
   /** Met l'état d'un lot au diapason de son nouveau statut de base (`start`, `done`, `drop`, `todo`) ; sans `plan.states`, ne touche à rien. */

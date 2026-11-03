@@ -14,6 +14,8 @@ export interface StateModel {
   transitions?: Record<string, string[]>;
   /** État que pose `raf done` (le « terminé non livré ») ; absent : le premier état done. */
   done?: string;
+  /** État que pose la livraison (`plan.deliveredState`, L469) sur un lot terminé qu'elle contient ; absent : l'état n'est jamais modifié par la livraison. */
+  delivered?: string;
   /** État bloqué : `raf status` y mémorise l'état d'avant (`state_before:`), `--back` y revient. */
   blocked?: string;
 }
@@ -45,16 +47,16 @@ function parseTransitions(raw: unknown, states: Record<string, Status>, bad: Bad
 }
 
 function requireNames(p: Record<string, unknown>, bad: Bad): void {
-  for (const k of ['doneState', 'blockedState']) if (p[k] != null && typeof p[k] !== 'string') throw bad(`${k} : un nom d'état attendu`);
+  for (const k of ['doneState', 'deliveredState', 'blockedState']) if (p[k] != null && typeof p[k] !== 'string') throw bad(`${k} : un nom d'état attendu`);
 }
 
 /**
- * Lit `plan.states`, `plan.transitions`, `plan.doneState` et `plan.blockedState` de cadence.yaml : `{ states }` ou `{}` quand rien n'est déclaré.
+ * Lit `plan.states`, `plan.transitions`, `plan.doneState`, `plan.deliveredState` et `plan.blockedState` de cadence.yaml : `{ states }` ou `{}` quand rien n'est déclaré.
  * `foreign` : le plan est tenu par un autre outil (lots, fields, statuses, estimates), dont les états sont les siens.
  */
 export function parseStates(p: Record<string, unknown>, bad: Bad, foreign: boolean): { states?: StateModel } {
   if (p.states == null) {
-    for (const k of ['transitions', 'doneState', 'blockedState']) if (p[k] != null) throw bad(`${k} demande plan.states`);
+    for (const k of ['transitions', 'doneState', 'deliveredState', 'blockedState']) if (p[k] != null) throw bad(`${k} demande plan.states`);
     return {};
   }
   if (foreign) throw bad('states ne va pas avec un plan tenu par un autre outil (lots, fields, statuses, estimates) : ses états sont les siens');
@@ -65,6 +67,10 @@ export function parseStates(p: Record<string, unknown>, bad: Bad, foreign: boole
   if (p.doneState != null) {
     if (states[String(p.doneState)] !== 'done') throw bad(`doneState : « ${String(p.doneState)} » n'est pas un état done`);
     model.done = String(p.doneState);
+  }
+  if (p.deliveredState != null) {
+    if (states[String(p.deliveredState)] !== 'done') throw bad(`deliveredState : « ${String(p.deliveredState)} » n'est pas un état done`);
+    model.delivered = String(p.deliveredState);
   }
   if (p.blockedState != null) {
     const base = states[String(p.blockedState)];

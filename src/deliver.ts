@@ -10,6 +10,7 @@ import { commitPaths, dirtyPaths, headSha, isAncestor, onRemote, repoStatus, res
 import { planOnlySince, pollGithubCi, stamped, stepJournal } from './deliver-ci.js';
 import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
 import { deliveredIds, deliveredLots } from './deliver-lots.js';
+import { type Blocks, readBlocks } from './deliver-blocks.js';
 import { describeArticle, openArticleLots, type ArticleRule } from './articles.js';
 import { RafError, type Lot, type Plan } from './plan.js';
 import { appendDelivery, appendFailedDelivery, type FailClass, lastDelivery, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
@@ -41,6 +42,8 @@ export interface DeliverConfig {
   verifyTimeout: number;
   /** Secondes maximum par commande de déploiement. */
   deployTimeout: number;
+  /** Blocs de chemins (`deliver.blocks`, L469) : `cadence deliver --block <nom>` ne marque livrés que les lots dont un commit touche le bloc ; absent sans la clé. */
+  blocks?: Blocks;
 }
 
 export interface GhRun {
@@ -186,6 +189,7 @@ export function parseDeliverConfig(text: string, file: string): DeliverConfig {
     verify: checks,
     verifyTimeout: seconds('verifyTimeout', 300),
     deployTimeout: seconds('deployTimeout', 1800),
+    ...(cfg.blocks === undefined ? {} : { blocks: readBlocks(cfg.blocks, bad) }),
   };
 }
 

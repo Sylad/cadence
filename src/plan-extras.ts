@@ -12,7 +12,7 @@ export type ExtraDecls = Record<string, ExtraDecl>;
 const EXTRA_KEYS = ['enum', 'default'];
 const EXTRA_NAME = /^[a-z][a-z0-9_]*$/;
 /** Les clés que raf lit ou écrit sur un lot (`place` : le rang d'un lot archivé sous `plan.idPattern`, L536) : un champ d'extension ne peut pas en prendre le nom. */
-const LOT_KEYS = ['tasks', 'uses', 'planned', 'local', 'ux', 'review', 'docs_ok', 'extras', 'problems', 'state', 'state_before', PLACE_KEY];
+const LOT_KEYS = ['tasks', 'uses', 'planned', 'local', 'ux', 'review', 'docs_ok', 'extras', 'problems', 'state', 'state_before', 'delivered', PLACE_KEY];
 
 const nonEmptyText = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 

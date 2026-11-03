@@ -18,6 +18,7 @@ function headLines(lot: Lot, lots: Lot[]): string[] {
   if (lot.goal) lines.push(`goal : ${lot.goal}`);
   const dates = [['créé', lot.created], ['démarré', lot.started], [lot.status === 'dropped' ? 'abandonné' : 'terminé', lot.finished]].filter(([, d]) => d);
   if (dates.length) lines.push(dates.map(([k, d]) => `${k} : ${d}`).join('  '));
+  if (lot.delivered) lines.push(`livré : ${lot.delivered.date} ${lot.delivered.sha.slice(0, 7)}`);
   if (lot.after.length) lines.push(`after : ${lot.after.join(', ')}`);
   const planned = windowOf(lots, lot);
   if (planned) lines.push(`prévu : ${formatWindow(planned)}`);

@@ -27,6 +27,18 @@ function release(dir: string, ...argv: string[]) {
 }
 
 describe('cadence release — issues à fermer (L548)', () => {
+  it('L568 — un [Unreleased] à titre de section dupliqué est refusé, la release ne touche rien', () => {
+    const dir = project(null, '### Fixed\n\n- A (L1).\n\n### Added\n\n- B (L2).\n\n### Fixed\n\n- C (L3).\n');
+    const err: string[] = [];
+    const code = run(['release', 'patch'], { cwd: dir, env: { RAF_TODAY: '2026-11-03' }, out: () => {}, err: (l) => err.push(l), now: () => new Date('2026-11-03T09:00:00') });
+    expect(code).toBe(2);
+    expect(err.join('\n')).toMatch(/« ### Fixed » plus d'une fois/);
+    expect(execFileSync('git', ['status', '--porcelain'], { cwd: dir }).toString()).toBe('');
+  });
+  it('L568 — le même titre sous une version publiée plus bas n\'est pas un doublon', () => {
+    const dir = project(null, '### Fixed\n\n- A (L1).\n');
+    expect(release(dir, 'patch', '--dry-run')).not.toContain('plus d\'une fois');
+  });
   it('R7 — un lot de la version qui cite « issue #n » : la commande gh issue close avec le lot et la version', () => {
     const dir = project(lot('L526', 'Réglée (issue #20)'), '- Corrigé (L526).\n');
     expect(release(dir, 'patch', '--dry-run')).toContain('gh issue close 20 --comment "Réglée par L526, publiée en 1.2.4"');

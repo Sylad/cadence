@@ -14,6 +14,21 @@ const log = (unreleased: string, tail = '## [1.0.0] - 2026-01-01\n\n### Added\n\
 const unreleased = (t: string) => t.slice(t.indexOf('## [Unreleased]'), t.indexOf('## [1.0.0]'));
 const BASE = log('### Added\n\n- base A\n');
 
+describe('L568 — main réordonne les sections pendant que deux lots ajoutent chacun une ligne', () => {
+  const base = log('### Added\n\n- base A\n\n### Fixed\n\n- base F\n');
+  it('L568 — un seul titre par section, ordre Keep a Changelog, aucune entrée recopiée, quel que soit le côté qui réordonne', () => {
+    const lot = log('### Added\n\n- base A\n- ajout du lot\n\n### Fixed\n\n- base F\n- correctif du lot\n');
+    const main = log('### Fixed\n\n- base F\n- correctif de main\n\n### Added\n\n- base A\n- ajout de main\n');
+    for (const out of [mergeUnreleased(base, lot, main), mergeUnreleased(base, main, lot)]) {
+      const text = unreleased(out as string);
+      expect(text.match(/^### Added$/gm)).toHaveLength(1);
+      expect(text.match(/^### Fixed$/gm)).toHaveLength(1);
+      expect(text.indexOf('### Added')).toBeLessThan(text.indexOf('### Fixed'));
+      for (const e of ['base A', 'base F', 'ajout du lot', 'ajout de main', 'correctif du lot', 'correctif de main']) expect(text.match(new RegExp(`- ${e}$`, 'gm'))).toHaveLength(1);
+    }
+  });
+});
+
 describe('R1 — union par section de deux ajouts sous [Unreleased]', () => {
   it('R1 — deux entrées ajoutées à la même section : les deux restent, celle de base d\'abord, ours puis theirs', () => {
     const ours = log('### Added\n\n- base A\n- entrée ours\n');

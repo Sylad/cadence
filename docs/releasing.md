@@ -78,7 +78,7 @@ It refuses, with exit code 2 and nothing written:
 
 - a tracked file modified, `docs/whats-new.md` excepted (an untracked file does not count: the commit names its paths);
 - a missing `CHANGELOG.md` (the one file that is not skipped: the release renames its `[Unreleased]` section);
-- an `[Unreleased]` section that is missing or holds nothing but sub-section titles;
+- an `[Unreleased]` section that is missing or holds nothing but sub-section titles, or that carries the same sub-section title (`### Fixed`) twice (L568: the trace of a lot merge that copied the section; published, the entries would be doubled);
 - a version already tagged (`v<x.y.z>`);
 - a `package-lock.json` that is not at the version of `package.json`, or whose dependencies differ from those of `package.json`
   (a `npm install` would move them: commit that apart, before the release);

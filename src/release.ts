@@ -67,6 +67,15 @@ function splitUnreleased(text: string): { before: string; body: string; after: s
   return { before: text.slice(0, head.index), body: text.slice(start, end), after: text.slice(end) };
 }
 
+/** Un titre de sous-section répété sous [Unreleased] : la trace d'une fusion de lots qui a recopié la section ; publié, il doublerait les entrées. */
+function refuseDuplicateTitles(body: string): void {
+  const seen = new Set<string>();
+  for (const [, title] of body.matchAll(/^### (.+?)\s*$/gm)) {
+    if (seen.has(title)) throw new RafError(`release : la section [Unreleased] de ${CHANGELOG} porte « ### ${title} » plus d'une fois — une fusion de lots a recopié le titre ; n'en garder qu'un, avec les entrées une seule fois`);
+    seen.add(title);
+  }
+}
+
 /** Une section est vide quand elle n'a que des titres de sous-section (« ### Added ») et des lignes blanches. */
 function hasEntries(body: string): boolean {
   return body.split('\n').some((l) => l.trim() !== '' && !/^#{3,}\s/.test(l));
@@ -157,6 +166,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
   if (!existsSync(join(root, CHANGELOG))) throw new RafError(`release : ${CHANGELOG} n'existe pas — la release renomme sa section [Unreleased], il faut donc un ${CHANGELOG} qui en porte une`);
   const changelog = readFileSync(join(root, CHANGELOG), 'utf8');
   const { before, body, after } = splitUnreleased(changelog);
+  refuseDuplicateTitles(body);
   if (!hasEntries(body)) throw new RafError(`release : la section [Unreleased] est vide dans ${CHANGELOG} — rien à publier ; y écrire ce qui change pour l'utilisateur (lots cités)`);
   // Une section [Unreleased] vide reste au-dessus : sans elle, la fusion de CHANGELOG du mode worktree d'orchestrate ne trouve plus où poser les entrées des lots suivants.
   put(CHANGELOG, `${before}## [Unreleased]\n\n## [${version}] - ${today}\n${body}${after}`);

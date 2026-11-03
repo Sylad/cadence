@@ -1733,9 +1733,10 @@ lots:
     finished: 2026-11-03
   - id: L556
     title: "Hook du plugin « retour → geste » (03-11, après 1 h 40 perdue et 8 gestes refusés) : PostToolUse Bash qui, quand la sortie d'une commande cadence/raf contient un refus connu (« une orchestration y est déjà en cours », « tenu par la vague … attente de sa fin », « pas rendu à l'étape d'intégration », « la vague … tourne encore », « lot déjà dans la vague », « ne tient pas le budget du lot », « Unknown option '-- », code 137…) ajoute au contexte du lead le geste exact (même table que le lot du geste suivant imprimé, une seule source) ; plus un rappel quand une commande Bash du lead contient une boucle d'attente (while/until + pgrep -f) — même mécanisme que L502 --estimate 0.5 --spec"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-03
+    started: 2026-11-03
   - id: L557
     title: "orchestrate (issue #26) : un --drop appliqué est consommé — --resume --wave <w> --integrate <lot> sur un lot retiré puis repris à la main et revu (raf review dans son worktree) l'intègre au lieu de rejouer le retrait (« handed-back — retiré de la vague (--drop) » ~30 s après « intégration reprise ») ; un --integrate explicite l'emporte sur un --drop déjà appliqué --estimate 0.25"
     status: done

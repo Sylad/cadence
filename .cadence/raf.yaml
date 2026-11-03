@@ -1916,7 +1916,7 @@ lots:
     estimate: 0.5
     created: 2026-11-03
     started: 2026-11-03
-    review: { date: 2026-11-03, verdict: "conforme (décision du lead 03-11 sur le périmètre ; revue courte du diff rebasé : seul majeur = entrée CHANGELOG triplée par le rebase, CHANGELOG refait depuis main + version finale par le lead) ; 2 mineurs en note", commit: 7df1adda7d745efd33cddba9b1910698dba23553 }
+    review: { date: 2026-11-03, verdict: "conforme (décision du lead 03-11 sur le seul majeur de la revue 7, de périmètre) : le rejeu restreint est correct ; quand le code de l'application lit le plan (codex, evatosorus, ol : plan affiché par le site) le rejeu complet reste légitime ; maritime en profite dès qu'il déclare testReplay (suite après publication) ; 2 mineurs en note ; revue courte du diff rebasé (patch-id différent) : conforme (revue d'intégration : le rebase n'a rien changé au diff du lot, à part les décalages de lignes ; une seule entrée L566 dans le CHANGELOG)", commit: 17479b9ac960a75573973de548440e1aa611b1ab }
     notes:
       - { date: 2026-11-03, text: "Décision du lead (03-11, revue 7) : périmètre = projets dont seuls des tests ou scripts lisent le plan. Un plan lu par le code de l'app (plan-public.ts du codex, d'evatosorus ; plan-data.mjs d'ol) impose le rejeu complet, à juste titre. Suite : déclarer orchestrate.gate.testReplay dans maritime-atlas/cadence.yaml après publication, puis mesurer un commit de plan seul." }
   - id: L567

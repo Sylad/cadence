@@ -3,17 +3,42 @@ import { killedGesture, MAX_GESTURES, refusalGestures } from './orchestrate/gest
 /** Le rappel de la commande `attente` (L556) : une boucle d'attente sur un processus ne remplace ni la notification de fin ni le journal de la vague. */
 const WAIT_REMINDER = "rappel : pas de boucle d'attente sur un processus (while/until + pgrep -f) : lancer la commande en tâche de fond et attendre sa notification de fin, suivre le journal de la vague avec Monitor, lire l'état avec cadence orchestrate --status.";
 
-/** Une boucle d'attente : while ou until suivi, avant le do de la boucle, d'un pgrep à l'option -f (-f, -af, -fl…). Détection textuelle : un faux positif ne coûte qu'un rappel de trop. */
-const WAIT_LOOP = /\b(?:while|until)\b(?:(?!\bdo\b)[\s\S])*?\bpgrep\s+(?:-[A-Za-z]+\s+)*-[A-Za-z]*f/;
+/** Les mots qui comptent pour une boucle d'attente : l'ouverture (while, until), le do qui la ferme, et pgrep. */
+const LOOP_WORDS = /\b(?:while|until|do|pgrep)\b/g;
 
-/** Les séparateurs de commandes du shell (le premier mot de chaque segment est la commande jouée). */
-const SEPARATORS = /&&|\|\||;|\||\n/;
+/** Une boucle d'attente : while ou until suivi, avant le do de la boucle, d'un pgrep à l'option -f (-f, -af, -fl…, même après une option à valeur : -u $USER -f). Détection textuelle en un seul passage : un faux positif ne coûte qu'un rappel de trop. */
+function hasWaitLoop(command: string): boolean {
+  let inHead = false;
+  for (const m of command.matchAll(LOOP_WORDS)) {
+    if (m[0] === 'while' || m[0] === 'until') inHead = true;
+    else if (m[0] === 'do') inHead = false;
+    else if (inHead) {
+      const args = command.slice(m.index + m[0].length).split(/[;|&()\n]/, 1)[0]!;
+      if (args.split(/\s+/).some((w) => /^-[A-Za-z]*f/.test(w))) return true;
+    }
+  }
+  return false;
+}
+
+/** Les morceaux d'une commande : un texte entre guillemets, un caractère échappé, un séparateur (&& || ; | retour à la ligne) ou du texte courant. */
+const SHELL_TOKEN = /"(?:\\[\s\S]|[^"\\])*"?|'[^']*'?|\\[\s\S]|&&|\|\||[;|\n]|[^"'\\;|&\n]+|&/g;
+const SEPARATOR = /^(?:&&|\|\||[;|\n])$/;
+
+/** Découpe la commande aux séparateurs du shell hors guillemets : le premier mot de chaque segment est la commande jouée. */
+function splitSegments(command: string): string[] {
+  const segments = [''];
+  for (const [token] of command.matchAll(SHELL_TOKEN)) {
+    if (SEPARATOR.test(token)) segments.push('');
+    else segments[segments.length - 1] += token;
+  }
+  return segments;
+}
 
 /** Un segment cadence/raf : après d'éventuelles affectations NOM=valeur et `npx`, le premier mot est cadence ou raf (avec ou sans chemin). Rend ses mots après ce premier, ou null. */
 function cadenceArgs(segment: string): string[] | null {
   let rest = segment.trim();
   for (;;) {
-    const next = rest.replace(/^(?:[A-Za-z_]\w*=\S*|npx)\s+/, '');
+    const next = rest.replace(/^(?:[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|[^\s"'])*|npx)\s+/, '');
     if (next === rest) break;
     rest = next;
   }
@@ -33,7 +58,7 @@ function outputOf(input: Record<string, unknown>): string {
 /** Vrai quand le code de sortie est 137 : « Exit code 137 » du texte d'erreur, ou un code numérique de la réponse de l'outil. */
 function killed(input: Record<string, unknown>, text: string): boolean {
   const response = input.tool_response as Record<string, unknown> | string | undefined;
-  const code = typeof response === 'object' ? (response.exit_code ?? response.exitCode) : undefined;
+  const code = typeof response === 'object' && response !== null ? (response.exit_code ?? response.exitCode) : undefined;
   return code === 137 || /Exit code 137(?!\d)/.test(text);
 }
 
@@ -48,7 +73,7 @@ function killedGestureOf(segments: string[][]): string {
 
 /** Les gestes d'une commande cadence/raf : ceux des refus de sa sortie, puis celui du 137 ; rien quand la commande n'a aucun segment cadence/raf. */
 function returnGestures(data: Record<string, unknown>, command: string): string[] {
-  const segments = command.split(SEPARATORS).map(cadenceArgs).filter((a): a is string[] => a !== null);
+  const segments = splitSegments(command).map(cadenceArgs).filter((a): a is string[] => a !== null);
   if (!segments.length) return [];
   const text = outputOf(data);
   const gestures = refusalGestures(text);
@@ -60,7 +85,7 @@ export function claudeHookContext(name: string, input: unknown): { event: string
   const data = input as Record<string, unknown> | null;
   const command = (data?.tool_input as { command?: unknown } | undefined)?.command;
   if (!data || data.agent_id || typeof command !== 'string') return null;
-  if (name === 'attente') return WAIT_LOOP.test(command) ? { event: 'PreToolUse', text: WAIT_REMINDER } : null;
+  if (name === 'attente') return hasWaitLoop(command) ? { event: 'PreToolUse', text: WAIT_REMINDER } : null;
   const gestures = returnGestures(data, command);
   if (!gestures.length) return null;
   return { event: data.hook_event_name === 'PostToolUseFailure' ? 'PostToolUseFailure' : 'PostToolUse', text: ['retour → geste :', ...gestures].join('\n') };

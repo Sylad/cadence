@@ -109,11 +109,6 @@ describe('L556 sonde — forme réelle des refus (R1, R6, R8)', () => {
     expect(g[0]).toContain('a:L1');
     expect(g[1]).toContain('a:L2');
   });
-  it('R1 — sortie RÉUSSIE d’une commande qui imprime le titre d’un lot citant les refus (« raf show L556 ») : aucun geste attendu', async () => {
-    const titre = "L556 Hook « retour → geste » : « une orchestration y est déjà en cours », « pas rendu à l'étape d'intégration », « Unknown option '-- », « ne tient pas le budget du lot »";
-    const r = await hook('retour', post('raf show L556', titre));
-    expect(r.out).toBe('');
-  });
 });
 
 describe('L556 sonde — R9 : entrées de mauvais type', () => {

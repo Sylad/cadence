@@ -1916,7 +1916,7 @@ lots:
     estimate: 0.5
     created: 2026-11-03
     started: 2026-11-03
-    review: { date: 2026-11-03, verdict: "conforme (décision du lead 03-11 sur le seul majeur de la revue 7, de périmètre : rejeu complet légitime quand le code de l'app lit le plan ; maritime en profite dès qu'il déclare testReplay) ; 2 mineurs en note", commit: d373f93d7e509343e696d84263b11d24dbb032bf }
+    review: { date: 2026-11-03, verdict: "conforme (décision du lead 03-11 sur le périmètre ; revue courte du diff rebasé : seul majeur = entrée CHANGELOG triplée par le rebase, CHANGELOG refait depuis main + version finale par le lead) ; 2 mineurs en note", commit: 7df1adda7d745efd33cddba9b1910698dba23553 }
     notes:
       - { date: 2026-11-03, text: "Décision du lead (03-11, revue 7) : périmètre = projets dont seuls des tests ou scripts lisent le plan. Un plan lu par le code de l'app (plan-public.ts du codex, d'evatosorus ; plan-data.mjs d'ol) impose le rejeu complet, à juste titre. Suite : déclarer orchestrate.gate.testReplay dans maritime-atlas/cadence.yaml après publication, puis mesurer un commit de plan seul." }
   - id: L567

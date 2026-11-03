@@ -1,0 +1,159 @@
+sujet:
+  id: accept-regles-du-lot
+  titre: "checkAcceptation n'exige, sur une fiche partagée, que les tests des règles du lot"
+  lot: L552
+  perimetre:
+    modules: [src/orchestrate/accept.ts, src/orchestrate/cycle.ts]
+    endpoints: []
+    jobs: [orchestrate-accept]
+    hors_perimetre:
+      - "le verrou lockViolations, le commit rouge (redSha) et le scellé : inchangés, sauf que la clé « regles » entre dans ce qu'ils comparent (R9)"
+      - "la commande d'acceptation (orchestrate.accept) et le rejeu des tests rouges"
+      - "cadence spec reseal et cadence spec green"
+
+cas:
+  - id: C1
+    titre: Un lot amende quelques règles d'une fiche partagée et n'en déclare pas la liste
+    acteur: la session accept d'un lot, jugée par le cycle d'orchestrate
+    declencheur: job orchestrate-accept (appel de checkAcceptation après la session accept, et à la reprise)
+    preconditions:
+      - "la fiche est citée par au moins une autre acceptation-<lot>.json lisible au HEAD sous spec.dir (fiche partagée)"
+      - "acceptation-<lot>.json du lot ne porte pas la clé « regles »"
+      - "au moins un commit spec(<lot>) ou docs(<lot>) a ajouté ou modifié des règles de la fiche"
+    nominal:
+      - "checkAcceptation lit la fiche et détermine les règles du lot : celles qu'ajoutent ou modifient les commits de sujet spec ou docs qui citent le lot."
+      - "Il exige dans les fichiers listés les tests de ces règles seulement."
+      - "Un test absent produit l'écart habituel ; sinon le tableau d'écarts est vide."
+    alternatives:
+      - { si: "aucun commit du lot ne touche la fiche, ou aucun n'y ajoute ni ne modifie de règle", alors: toutes les règles de la fiche sont exigées (repli sûr), regles: [R5, R6] }
+      - { si: "un commit test(<lot>) touche la fiche", alors: il ne compte pas dans les règles du lot, regles: [R2] }
+      - { si: "git ne peut pas lire l'historique de la fiche", alors: repli sûr, toutes les règles exigées, regles: [R5] }
+    resultat: Le lot n'est renvoyé en accept que pour les tests de ses propres règles.
+  - id: C2
+    titre: Un lot déclare la liste de ses règles dans son acceptation
+    acteur: la session accept d'un lot
+    declencheur: job orchestrate-accept (appel de checkAcceptation)
+    preconditions:
+      - "acceptation-<lot>.json porte la clé optionnelle « regles »"
+    nominal:
+      - "checkAcceptation lit la clé « regles » (ids de règles de la fiche)."
+      - "Elle prime sur toute déduction par les commits, sur fiche partagée comme sur fiche seule."
+      - "Il exige les tests de ces règles seulement."
+    alternatives:
+      - { si: "la clé n'est pas une liste non vide d'ids non vides, ou un id n'existe pas dans la fiche", alors: écart nommé, aucune sélection n'est déduite, regles: [R4] }
+    resultat: La liste déclarée fixe les règles dont les tests sont exigés.
+  - id: C3
+    titre: Un nom de test prévu par la fiche vit déjà dans l'acceptation d'un autre lot de la même fiche
+    acteur: la session accept d'un lot
+    declencheur: job orchestrate-accept (appel de checkAcceptation)
+    preconditions:
+      - "la fiche est partagée"
+      - "un test exigé par le lot est absent des fichiers listés du lot mais présent dans les fichiers d'une autre acceptation de la fiche"
+    nominal:
+      - "Pour chaque test exigé absent des fichiers du lot, checkAcceptation cherche son nom dans les fichiers listés des autres acceptations de la même fiche."
+      - "Si cette autre acceptation est scellée, le test est accepté, sans écart."
+    alternatives:
+      - { si: "l'autre acceptation n'est pas scellée, ou illisible, ou son fichier est absent", alors: le test reste signalé comme absent, sans écart sur l'autre lot, regles: [R7, R8] }
+    resultat: Un test déjà écrit et scellé par un autre lot n'est pas réexigé.
+  - id: C4
+    titre: Un lot seul sur sa fiche, sans liste, est vérifié comme avant
+    acteur: la session accept d'un lot
+    declencheur: job orchestrate-accept (appel de checkAcceptation)
+    preconditions:
+      - "aucune autre acceptation lisible du HEAD ne cite la fiche"
+      - "acceptation-<lot>.json ne porte pas la clé « regles »"
+    nominal:
+      - "checkAcceptation exige les tests de toutes les règles de la fiche, avec les mêmes messages qu'avant."
+    alternatives: []
+    sans_alternative: "c'est la branche inchangée ; ses écarts sont ceux déjà couverts par R10 (mêmes messages)"
+    resultat: Aucune différence observable par rapport au comportement actuel.
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Sur une fiche partagée par plusieurs lots et sans clé « regles », checkAcceptation n'exige que les tests des règles du lot ; les tests des autres règles de la fiche ne produisent aucun écart."
+    statut: sourcee
+    source: "demande du lot L552 (issue #25) ; comportement actuel qui exige tous les tests : src/orchestrate/accept.ts:317"
+    tests: ["R1 — fiche partagée, lot qui amende 2 règles sur 5 : seuls leurs tests sont exigés"]
+  - id: R2
+    cas: [C1]
+    enonce: "Un commit est du lot quand son sujet est de type spec ou docs et cite le lot (portée lue comme citedRefs, link.ts:27) ; un commit test(<lot>), feat, fix ou autre ne compte pas, même s'il touche la fiche."
+    statut: sourcee
+    source: "demande du lot L552, décision du lead (option A : la fiche est écrite par spec(<lot>), la réponse du lead est un docs(<lot>) ; ne compter que docs est la brèche reproduite par la revue du 03-11)"
+    tests: ["R2 — un commit spec(<lot>) compte", "R2 — un commit docs(<lot>) compte", "R2 — un commit test(<lot>) qui touche la fiche ne compte pas"]
+  - id: R3
+    cas: [C1]
+    enonce: "Une règle est ajoutée ou modifiée par un commit du lot quand, entre le parent du commit et le commit, son id est nouveau dans la fiche ou son objet YAML (cas, énoncé, statut, source, si_faux, tests) a changé ; la fiche est comparée analysée, un changement de mise en forme ou de commentaire ne compte pas, et une règle supprimée ne compte pas (elle n'a plus de test). Les règles du lot sont l'union sur les commits du lot qui ont touché la fiche."
+    statut: hypothese
+    si_faux: "Si une règle simplement reformatée doit compter, ou si seul le texte de l'énoncé compte, le lot exigerait un peu plus ou moins de tests ; rien n'est stocké, seule la sélection change."
+    tests: ["R3 — règle ajoutée : exigée", "R3 — règle modifiée dans un commit docs(<lot>) : exigée", "R3 — règle inchangée ou reformatée seulement : non exigée", "R3 — règles du lot réparties sur deux commits : union exigée"]
+  - id: R4
+    cas: [C2]
+    enonce: "Une clé « regles » valide est une liste non vide d'ids non vides, tous présents dans la fiche. Sinon c'est un écart « <acceptation> : clé « regles » : liste non vide d'ids de règles de la fiche attendue » (valeur non-tableau, tableau vide, id non chaîne ou vide) ou « <acceptation> : clé « regles » : règle « <id> » absente de la fiche » ; aucune sélection n'est alors déduite des commits."
+    statut: hypothese
+    si_faux: "Si une liste vide ou un id inconnu doit être ignoré en silence ou replier sur toutes les règles, seuls ces messages changent ; le risque d'un id mal orthographié qui n'exige aucun test serait alors silencieux."
+    tests: ["R4 — regles non tableau : écart nommé", "R4 — regles vide : écart nommé", "R4 — id inconnu : écart nommé", "R4 — id non chaîne ou vide : écart nommé"]
+  - id: R5
+    cas: [C1, C2]
+    enonce: "Repli sûr : sur fiche partagée, sans liste et sans commit du lot sur la fiche (ou historique illisible), toutes les règles de la fiche sont exigées."
+    statut: sourcee
+    source: "demande du lot L552 : « Repli sûr : aucun commit du lot sur la fiche et pas de liste → toutes les règles exigées »"
+    tests: ["R5 — aucun commit du lot sur la fiche partagée : toutes les règles exigées", "R5 — historique de la fiche illisible : toutes les règles exigées"]
+  - id: R6
+    cas: [C1]
+    enonce: "Sur fiche partagée, sans liste, si des commits du lot ont touché la fiche mais qu'aucun n'y ajoute ni ne modifie de règle (R3), toutes les règles restent exigées."
+    statut: hypothese
+    si_faux: "Si ce repli ne doit exiger aucun test, un lot dont les commits ne citent pas bien le lot passerait sans test ; avec le repli sûr il reste bloqué et corrigible en déclarant « regles »."
+    tests: ["R6 — commits du lot sur la fiche sans règle touchée : toutes les règles exigées"]
+  - id: R7
+    cas: [C3]
+    enonce: "Un test exigé et absent des fichiers du lot est accepté quand son nom figure dans un fichier listé par l'acceptation d'un autre lot de la même fiche et que cette acceptation est scellée. Scellée = chaque fichier listé porte une empreinte (le critère hasSeals de cycle.ts:386, sans comparer le contenu) ; le vert ou l'état du lot est indifférent. Le même test dans une acceptation non scellée reste signalé."
+    statut: sourcee
+    source: "demande du lot L552 : « Un nom de test déjà présent dans l'acceptation scellée d'un autre lot de la même fiche est accepté » ; critère de scellé : src/orchestrate/cycle.ts:386"
+    tests: ["R7 — nom présent dans l'acceptation scellée d'un autre lot : accepté", "R7 — nom présent dans une acceptation non scellée : toujours signalé", "R7 — nom absent de partout : toujours signalé"]
+  - id: R8
+    cas: [C3]
+    enonce: "Deux acceptations partagent une fiche quand leurs clés « fiche » désignent le même chemin (posix normalisé) et que leurs lots diffèrent ; seules les acceptations lisibles au HEAD de spec.dir comptent (listAcceptations). Le partage ne dépend ni du vert, ni du scellé, ni de l'état du lot. L'acceptation du lot lui-même n'est jamais « un autre lot »."
+    statut: hypothese
+    si_faux: "Si le partage devait dépendre du scellé, une fiche à deux lots dont l'un n'est pas scellé serait vérifiée comme à un lot seul (tous les tests exigés) ; seule la sélection change."
+    tests: ["R8 — autre acceptation non scellée sur la même fiche : la fiche est partagée", "R8 — autre acceptation sur une autre fiche : fiche non partagée", "R8 — la propre acceptation du lot ne partage pas la fiche"]
+  - id: R9
+    cas: [C2]
+    enonce: "La clé « regles » est comptée dans le verrou : elle reste dans le fichier à l'analyse, au scellé et à la comparaison du commit rouge (canon ne retire que la clé « vert », accept.ts:83), si bien que la modifier après le commit rouge est un écart du verrou comme toute autre clé."
+    statut: sourcee
+    source: "demande du lot L552 (« comptée dans le verrou ») ; src/orchestrate/accept.ts:83 (canon)"
+    tests: ["R9 — la clé regles modifiée après le commit rouge change le commit rouge", "R9 — le scellé conserve la clé regles"]
+  - id: R10
+    cas: [C4]
+    enonce: "Sans la clé « regles » et sur une fiche à un seul lot, checkAcceptation se comporte comme avant : toutes les règles sont exigées, avec les mêmes messages."
+    statut: sourcee
+    source: "demande du lot L552 : « Sans la clé et sur une fiche à un seul lot, rien ne change » ; tests existants test/orchestrate-accept.test.ts:43-54"
+    tests: ["R10 — fiche à un seul lot, sans regles : toutes les règles exigées comme avant", "R10 — fiche à un seul lot, regles déclarée : la liste est appliquée"]
+  - id: R11
+    cas: [C1, C2, C3]
+    enonce: "checkAcceptation reçoit une sixième entrée optionnelle { dir, refsOf } (config.spec.dir et plan.refs) ; sans elle la fiche est tenue pour non partagée et les commits ne sont pas lus. Les deux appelants de cycle.ts (lignes 410 et 660) la passent."
+    statut: hypothese
+    si_faux: "Si l'implémentation lit dir et refs autrement (paramètres séparés, config globale), seule la signature interne change ; l'invariant reste que les deux appelants appliquent les mêmes règles."
+    tests: ["R11 — acceptProblems et acceptationProof donnent le même verdict sur une fiche partagée"]
+  - id: R12
+    cas: [C3]
+    enonce: "Les erreurs de lecture d'une autre acceptation ne produisent jamais d'écart pour le lot courant : fichier JSON illisible ou invalide, fichier de tests absent, fichier supprimé du HEAD ; l'autre acceptation est sautée et ses noms ne sont pas comptés."
+    statut: hypothese
+    si_faux: "Si ces cas doivent bloquer, le lot courant serait renvoyé sur une faute d'un autre lot qu'il ne peut pas corriger ; seule l'absence d'écart changerait."
+    tests: ["R12 — acceptation voisine illisible : aucun écart pour le lot courant"]
+
+contrats:
+  - id: A1
+    appel: job orchestrate-accept
+    entree: "checkAcceptation(repo, acceptation-<lot>.json, lot, fiche, base?, { dir, refsOf }?) : le fichier d'acceptation du lot, la fiche YAML, l'historique git et les autres acceptations de spec.dir"
+    sortie: "tableau d'écarts, vide quand l'acceptation est acceptée ; sur fiche partagée seuls les tests des règles du lot (R1-R3, R5-R6) ou de la liste « regles » (R4) sont exigés, hors ceux déjà dans une acceptation scellée voisine (R7)"
+    erreurs:
+      - { code: log warn, message: "<id> : test « <nom> » (nom prévu dans la fiche) absent des fichiers listés" }
+      - { code: log warn, message: "<acceptation> : clé « regles » : liste non vide d'ids de règles de la fiche attendue" }
+      - { code: log warn, message: "<acceptation> : clé « regles » : règle « <id> » absente de la fiche" }
+      - { code: log warn, message: "<fiche> : fiche illisible" }
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12]
+
+donnees:
+  - { id: D1, objet: "acceptation-<lot>.json : clé optionnelle « regles » (liste d'ids de règles de la fiche)", existant: true, modification: ajout, decision: "nom « regles » confirmé par le lead dans la demande du lot (« nom confirmé par le lead ») ; clé optionnelle, un fichier sans elle se lit et se scelle comme avant (R10)", note: "comptée dans le verrou : canon ne retire que « vert » (accept.ts:83)" }
+  - { id: D2, objet: "historique git de la fiche et acceptation-*.json des autres lots de spec.dir", existant: true, modification: aucune, note: "lus seulement, jamais écrits" }

@@ -1720,13 +1720,14 @@ lots:
     finished: 2026-11-03
   - id: L554
     title: "Chaque refus d'orchestrate et chaque lot rendu imprime LE geste suivant exact (03-11, demande de Sylvain après 1 h 40 perdues) : --integrate d'un lot rendu pour docs.sync → « raf docs-ok … puis à la fin de la vague : --resume --wave W --replay P:L » ; --replay/--remove-worktree sur vague vivante → la commande à jouer à la fin ; --add d'un lot déjà retiré → nouvelle vague ; --integrate qui attend une autre vague → ne réserve pas de créneau et le dit ; status : une colonne « geste » par lot rendu"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-03
     started: 2026-11-03
     notes:
       - { date: 2026-11-03, text: "titre remplacé : « Chaque refus d'orchestrate et chaque lot rendu imprime LE geste suivant exact (03-11, demande de Sylvain après 1 h 40 perdues) : --integrate d'un lot rendu pour docs.sync → « raf docs-ok … puis à la fin de la vague : --resume --wave W --replay P:L » ; --replay/--remove-worktree sur vague vivante → la commande à jouer à la fin ; --add d'un lot déjà retiré → nouvelle vague ; --integrate qui attend une autre vague → ne réserve pas de créneau et le dit ; status : une colonne « geste » par lot rendu --estimate 0.5 »" }
     review: { date: 2026-11-03, verdict: "conforme : revue Opus du lead sur l'état final (après la correction Fable 145b7ef0, cible .:<lot> résolue par namesLot dans retrait, resume, status, integration-vivante) — 0 bloquant ; 2 mineurs notés : stillRunningRefusal (geste.ts:56) imprime une reprise qui perd --drop/--budget/--answer, et answerLive/control de status.ts sans test propre du helper ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (L553) ne change que le contexte du lot, aucun constat", commit: eddbca6c1add1b3797c8a3f87e1af885614e5256 }
+    finished: 2026-11-03
   - id: L555
     title: "Test instable sous charge : test/deliver.test.ts, deliver : délai dépassé et SIGTERM à cadence seul (L20) › (b) SIGTERM pendant le script, bump par un petit-enfant : rouge dans la suite, vert seul (porte de L542, 03-11) ; même famille que L505 et L550"
     status: done

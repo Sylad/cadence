@@ -8,7 +8,8 @@ import { newLot, RunStore } from '../src/orchestrate/state.js';
 import { HYPOTHESES_HANDBACK } from '../src/orchestrate/cycle.js';
 import { activeLock, REPO_LOCK } from '../src/orchestrate/lock.js';
 import { lotTreeDir } from '../src/orchestrate/worktree.js';
-import { claudeOut, git, reviewReport, workReport } from './orchestrate-harness.js';
+import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
+import { Plan } from '../src/plan.js';
 import { fake, lotOf, meeting, run, setup, store, WAVE } from './orchestrate-worktree-harness.js';
 import { tempDir } from './helpers.js';
 
@@ -54,12 +55,22 @@ function holder(repo: string, wave: string) {
   return sleeper;
 }
 
+/** Inscrit la vague porteuse du verrou (aucun de ses lots n'écrit dans l'arbre principal) : sans cela `mainTreeWorkers` rend null et la reprise attend quelle que soit la garde testée. */
+function carry(repo: string, sleeper: { pid?: number }, wave: string, lots: { lot: string; status: string }[] = []) {
+  const launch = tempDir();
+  const other = RunStore.reserve(launch, wave)!;
+  other.writeWave({ id: wave, status: 'running', created: 'x', lots: lots.map((l) => `a:${l.lot}`) } as never);
+  for (const l of lots) other.writeLot({ ...newLot({ project: 'a', repo, lot: l.lot, title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false }), status: l.status as never });
+  registerWave(process.env.CADENCE_HOME!, { pid: sleeper.pid!, wave, started: 'x', cwd: launch, repos: [repo] });
+}
+
 describe('L553 — cas où l\'intégration doit continuer d\'attendre', () => {
   it('worktree du lot absent — autre vague vivante tient le dépôt, lot sans .git de worktree — attendre puis refuser (2)', async () => {
     const { parent, repo, lot } = await handedBack();
     const l = store(parent).readLot('a', lot)!;
     rmSync(join(lotTreeDir(store(parent).dir, l.project, l.lot, l.repo), '.git'), { force: true });
     const sleeper = holder(repo, 'autre-vague');
+    carry(repo, sleeper, 'autre-vague');
     try {
       const r = await run(parent, ['--resume', WAVE, '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
       expect(r.out).not.toContain("l'intégration passe entre ses étapes");
@@ -76,6 +87,7 @@ describe('L553 — cas où l\'intégration doit continuer d\'attendre', () => {
     o.next = 'implement' as typeof o.next;
     store(parent).writeLot(o);
     const sleeper = holder(repo, 'autre-vague');
+    carry(repo, sleeper, 'autre-vague');
     try {
       const r = await run(parent, ['--resume', WAVE, '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
       expect(r.out).not.toContain("l'intégration passe entre ses étapes");
@@ -87,6 +99,7 @@ describe('L553 — cas où l\'intégration doit continuer d\'attendre', () => {
   it('id de vague « local: » vide — verrou d\'une vague nommée « local: » sans lot — doit se comporter comme une tâche locale (attente)', async () => {
     const { parent, repo, lot } = await handedBack();
     const sleeper = holder(repo, 'local:');
+    carry(repo, sleeper, 'local:');
     try {
       const r = await run(parent, ['--resume', WAVE, '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
       expect(r.out).not.toContain("l'intégration passe entre ses étapes");
@@ -95,13 +108,15 @@ describe('L553 — cas où l\'intégration doit continuer d\'attendre', () => {
       sleeper.kill();
     }
   });
-  it('--replay — reprise --replay (pas --integrate) avec une autre vague vivante — pas de crash, code 0, 1 ou 2', async () => {
+  it('--replay — reprise --replay d\'un lot rendu à l\'intégration (il ne rejoue que l\'intégration) — passe entre les étapes de la vague porteuse inscrite, comme --integrate', async () => {
     const { parent, repo, lot } = await handedBack();
     const sleeper = holder(repo, 'autre-vague');
+    carry(repo, sleeper, 'autre-vague');
     try {
       const r = await run(parent, ['--resume', WAVE, '--replay', `a:${lot}`], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
-      expect([0, 1, 2]).toContain(r.code);
-      expect(r.err).not.toMatch(/TypeError|undefined/);
+      expect(r.out).toContain("l'intégration passe entre ses étapes");
+      expect(r.out).not.toContain('attente de sa fin');
+      expect(r.code).toBe(0);
     } finally {
       sleeper.kill();
     }
@@ -109,6 +124,7 @@ describe('L553 — cas où l\'intégration doit continuer d\'attendre', () => {
   it('reprise sans --integrate — autre vague tient le dépôt, reprise simple — refus (2), sans « passe entre ses étapes »', async () => {
     const { parent, repo } = await handedBack();
     const sleeper = holder(repo, 'autre-vague');
+    carry(repo, sleeper, 'autre-vague');
     try {
       const r = await run(parent, ['--resume', WAVE], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
       expect(r.out).not.toContain("l'intégration passe entre ses étapes");
@@ -142,10 +158,40 @@ describe('L553 — cas où l\'intégration doit continuer d\'attendre', () => {
     l.outcome = `${HYPOTHESES_HANDBACK}refusées`;
     store(parent).writeLot(l);
     const sleeper = holder(repo, 'autre-vague');
+    carry(repo, sleeper, 'autre-vague');
     try {
       const r = await run(parent, ['--resume', WAVE, '--replay', `a:${lot}`], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
       expect(r.out).not.toContain("l'intégration passe entre ses étapes");
       expect(r.code).toBe(2);
+    } finally {
+      sleeper.kill();
+    }
+  });
+});
+
+describe('L553 — le cas sûr : lot revu par le lead', () => {
+  it('lot rendu sur une revue non conforme puis revu conforme par le lead dans son worktree — passe entre les étapes de la vague porteuse inscrite, sans attendre', async () => {
+    const blocking = () => claudeOut(reviewReport({ bloquants: 1, constats: [{ gravite: 'bloquant', fichier: 'L1-implement.txt', ligne: 1, texte: 'à corriger' }], verdict: 'non conforme : un bloquant' }));
+    const { parent, repo } = setup([{ title: 'un' }]);
+    const f = fake({ review: blocking, fix: (cwd) => claudeOut({ commits: [commitFile(cwd, 'L1-fix.txt', 'fix(L1): travail')], tests: { commande: 'x', resultat: 'ok', vert: true }, build: { commande: 'x', resultat: 'ok', vert: true }, nonVerifie: [], questions: [], resume: 'ok', choix: [] }) });
+    const first = await run(parent, ['a:L1'], f);
+    if (first.code === 2) throw new Error(first.err);
+    const l = store(parent).readLot('a', 'L1')!;
+    expect(l.status).toBe('handed-back');
+    const dir = lotTreeDir(store(parent).dir, 'a', 'L1', repo);
+    commitFile(dir, 'lead.txt', 'fix(L1): correction du lead hors vague');
+    const plan = Plan.load(join(dir, '.cadence/raf.yaml'));
+    plan.recordReview('L1', 'conforme : relu par le lead', '2026-10-27', git(dir, 'rev-parse', 'HEAD'));
+    plan.save();
+    git(dir, 'add', '--', '.cadence/raf.yaml');
+    git(dir, 'commit', '-q', '-m', 'plan: revue du lead L1');
+    const sleeper = holder(repo, 'autre-vague');
+    carry(repo, sleeper, 'autre-vague');
+    try {
+      const r = await run(parent, ['--resume', WAVE, '--integrate', 'a:L1'], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
+      expect(r.out).toContain("l'intégration passe entre ses étapes");
+      expect(r.out).not.toContain('attente de sa fin');
+      expect(r.code).toBe(0);
     } finally {
       sleeper.kill();
     }

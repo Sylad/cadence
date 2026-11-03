@@ -477,8 +477,12 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
     const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
     git(repo, 'checkout', '-q', 'main');
     const sleeper = await otherWaveHolds(repo, null, 'local:L9');
+    const launch = tempDir();
+    RunStore.reserve(launch, 'local:L9')!.writeWave({ id: 'local:L9', status: 'running', created: 'x', lots: [] } as never); // inscrite, sans lot dans l'arbre principal : seul le nom « local: » fait attendre
+    registerWave(cadenceHome(), { pid: sleeper.pid!, wave: 'local:L9', started: 'x', cwd: launch, repos: [repo] });
     try {
       const r = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
+      expect(r.out).not.toContain("l'intégration passe entre ses étapes");
       expect(r.code).toBe(2);
       expect(r.out).toContain('attente de sa fin');
     } finally {

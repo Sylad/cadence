@@ -179,6 +179,14 @@ describe('R5 — le protocole de mesure sur deux fenêtres', () => {
     expect(mesure).toMatch(/part conforme[^\n]*monte[^\n]*ET[^\n]*baisse/);
   });
 
+  it('R5 — la commande cadence perf du protocole est bornée par --since (mise en service) et lancée le dernier jour de la fenêtre', () => {
+    const lignes = mesure.split('\n').filter((l) => /^cadence perf\b/.test(l));
+    expect(lignes.length).toBeGreaterThan(0);
+    for (const l of lignes) expect(l).toMatch(/--since </);
+    expect(mesure).toMatch(/dernier jour de (la fenêtre|F)/);
+    expect(mesure).not.toMatch(/prennent les mêmes bornes pour les deux commandes/);
+  });
+
   it('R5 — le document dit que L428, L447 et L497 sont mesurés ensemble', () => {
     expect(mesure).toMatch(/L428, L447 et L497[^\n]*ensemble/);
   });

@@ -1839,6 +1839,43 @@ lots:
     estimate: 0.25
     created: 2026-11-03
     started: 2026-11-03
+    review:
+      {
+        date: 2026-11-03,
+        verdict: "conforme (1 note mineure : la garde hasOwn de buildLocalArgs n'est pas testée, cas inatteignable)
+
+
+          Commits relus : 1034639 fix(L560) : --agents ne porte que l'agent de l'étape · dd9b682 probe(L560) : tests aux bornes de --agents · bcc4ca3 fix(L560) : agent hérité d'Object.prototype refusé, agent seul > 128 Kio refusé avant le spawn.
+
+
+          Commande lancée : `npx vitest run test/orchestrate-launch.test.ts test/orchestrate-agents-taille-l560-sonde.test.ts`, 2 fichiers et 66 tests verts.
+
+
+          Mesures :
+
+          - Les fichiers agents/*.md pèsent 92 984 octets en tout ; le plus gros, qa-reviewer, fait 20,1 Ko. Une étape ne passe donc plus qu'un agent d'environ 20 Ko au plus.
+
+          - Le refus utilise `>= 131 072`, ce qui correspond bien à MAX_ARG_STRLEN, terminateur NUL compris.
+
+          - Le test L560 échouerait avant le correctif : avec tout le paquet, les clés de --agents ne valent pas [name].
+
+          - La relance de mise en forme (`buildRetryArgs`) passe par le même `claudeArgs`, elle est donc couverte.
+
+
+          Choix d'interprétation de l'auteur, relus contre le lot :
+
+          - Un seul agent plutôt que des fichiers : c'est l'une des deux options que le lot nomme.
+
+          - Pas de `--agents` sans agent d'étape : c'est le comportement existant.
+
+          - Refus nommé « agent trop gros » : cohérent avec l'erreur « agent introuvable » déjà levée au même endroit.
+
+          - Rien de cela ne change le périmètre.
+
+
+          Documentation : docs/orchestrate.md (« Brief size ») et CHANGELOG suivent le changement ; la ligne 894 (« reviewer agents their --agents / --agent ») reste exacte. — orchestré (vague 2026-11-03-2100-cad, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : après le rebase sur main, `--agents` ne porte plus que l'agent de l'étape, au lancement comme à la relance de mise en forme. Le refus d'un nom hérité du prototype (`constructor`…) et le refus nommé d'un agent de 128 Kio ou plus sont en place, et la doc L559 ainsi que le CHANGELOG ont été correctement fusionnés. Aucun constat.",
+        commit: 11b33fff068e0f4969d68ff99e2fbf52e7ab54b8
+      }
   - id: L561
     title: "Contrôle après l'étape spec : signaler deux captures d'états différents à la même largeur qui ont la même empreinte (et une capture sombre identique à sa claire), et les renvoyer à la session spec comme point manquant (issue #29 : deux tours de revue maquette perdus le 03-11 sur des captures copiées)"
     status: done

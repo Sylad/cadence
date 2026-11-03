@@ -81,22 +81,23 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.44.0] - 2026-11-03
+
 ### Added
 
 - Rich plans, grouped quick wins (L467, `docs/raf.md`, `docs/session.md`; gap M5 of the maritime-atlas migration study): `raf quickwins [--by field] [--max days]` lists the ready lots that are small (estimate ≤ 0.25 day by default, or flagged `quickwin: true`), grouped by an extension field declared in `plan.extras`, and apart the ready lots with no estimate; `cadence session start` prints the same list in a « Gains rapides » section.
 - `cadence lead tour`, `cadence orchestrate --dry-run` and `cadence verify --gate` flag the test commands that the CI workflows of the repository play (`.github/workflows/`) and that `orchestrate.test` / `orchestrate.build` do not (L499, `docs/orchestrate.md`, `docs/lead.md`, `docs/deliver.md`): `parité porte ↔ CI : la CI (ci.yml) joue « npx playwright test », que orchestrate.test et orchestrate.build ne jouent pas`. The gate's verdict and exit code are unchanged; `lead tour --json` gets a `ciGaps` field. Edges (L499): subshells `(cd x && npm test)`, configuration and project options (`-c`, `--config`, `--project`) kept in the comparison, wrapped runners (`xvfb-run`, `timeout`…), `python -m pytest`, `mvn -B test`, quoted env values, `cd dir && npm test`, `pnpm|yarn test`, commands quoted in an `echo`, a non-directory `.github/workflows`, environment variables in front of an npm script (`CI=true npm test` is unfolded like `npm test`) and redirections (`2>&1 | tee log`, `> out.log` neither split the command nor make another one) are handled.
-
-### Fixed
-- The lots panel (`/hud lots`) no longer lists a lot the lead dropped from a wave (`--drop`) under « ce qui attend une décision »: it was a decision already taken, and read back from the finished waves of the last 7 days (L545).
-
-- The integration of `cadence orchestrate` also recomposes the ratchet's baseline when git merges `qualite-baseline.json` without a conflict (L541, `docs/orchestrate.md`): a lot that changed the file kept an older baseline than `main`'s (a key both sides lowered, a key `main` removed), the ratchet turned red at the integrated tip and the rebase was done by hand (L485, L486, L536). The program now applies the L538 rule to the lot's tip and writes the result in a commit of its own, with a journal line; a lot that does not touch the file or raises it is left as git made it.
-### Added
-
 - Rich plans, planned window (L466, `docs/raf.md`, `docs/session.md`; gap M4 of the maritime-atlas migration study): a lot carries `planned: { from, to }` (`raf plan <lot> J1..J2`, `--clear`, `raf add --planned`), a sub-lot inherits its parent's window, `plan.requirePlanned: true` makes `raf add` refuse a lot with no window, and `raf plan --propose [--per-day n] [--from J] [--apply]` lays the lots `todo` that have none on working days (ready lots first) and writes them in one plan write. `session start` reads the late lots and the deadlines of the week, `raf show`, `raf list --json`, `raf check` (a sub-lot outside its parent's window) and the Gantt page read the window. `plan.requirePlanned` is checked by `raf add` alone (not by `config set` nor the program's own lots), and `--propose` gives no window of its own to a sub-lot whose parent is to be placed.
+
 ### Changed
 
 - The « Self-check before handing back » list of the `implement` brief gains two bullets marked `[L543]` for the two dominant sub-causes of the code bugs (L543, [docs/mesures/bug-code-2026-11-03.md](docs/mesures/bug-code-2026-11-03.md), `docs/orchestrate.md`): on the 27-10 → 03-11 window, 131 of the 208 `bug-code` passes are edge cases and 37 misread contracts. The session writes a trace in its report (one line « entrée → attendu → obtenu » per listed input; the word of each rule and the line of code that holds it) before handing back. No other brief changes; the measure on two windows is written, the « after » lines stay to be measured.
 - `orchestrate/cycle.ts` is split, first part (L490, C1a of `docs/mesures/audit-simplification-l461.md`): the context, the budget, the session briefs and the plan writes move to `src/orchestrate/cycle/` (`ctx`, `budget`, `brief`, `plan-writes`), `cycle.ts` stays the entry point and re-exports their public names. No change of behaviour; the `max-lines` baseline of `cycle.ts` goes from 2360 to 1893.
+
+### Fixed
+
+- The lots panel (`/hud lots`) no longer lists a lot the lead dropped from a wave (`--drop`) under « ce qui attend une décision »: it was a decision already taken, and read back from the finished waves of the last 7 days (L545).
+- The integration of `cadence orchestrate` also recomposes the ratchet's baseline when git merges `qualite-baseline.json` without a conflict (L541, `docs/orchestrate.md`): a lot that changed the file kept an older baseline than `main`'s (a key both sides lowered, a key `main` removed), the ratchet turned red at the integrated tip and the rebase was done by hand (L485, L486, L536). The program now applies the L538 rule to the lot's tip and writes the result in a commit of its own, with a journal line; a lot that does not touch the file or raises it is left as git made it.
 
 ## [1.43.0] - 2026-11-02
 

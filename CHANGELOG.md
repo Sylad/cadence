@@ -85,9 +85,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - Rich plans, safe plan writes between sessions (L468, `docs/raf.md`; gap M6 of the maritime-atlas migration study): every write of the plan takes a lock `<plan>.lock` (atomic, pid + start time of its owner, 30 s wait then a clear refusal naming the holder, a dead owner's lock removed, released even when the write fails), and `save()` refuses to overwrite a plan, or a year file of the archive, that another session changed since it was read, keeping their change. A lock that cannot be created for another reason than one already there (plan folder not writable, read-only or full file system, no hard links) is a readable refusal (`pose du verrou du plan refusée (EACCES, …) — plan inchangé`) instead of a raw Node error that `raf` and the wave printed as a stack.
 
-## [1.44.0] - 2026-11-03
+### Fixed
 
 - `cadence spec reseal <lot> <test>… --reason` takes several tests and commits them together (L546, GitHub issue #23, [docs/spec.md](docs/spec.md), [docs/orchestrate.md](docs/orchestrate.md)): two sealed tests of a delivered lot rewritten by the carrier no longer leave one of them impossible to re-seal (the first re-seal left the other as a lock violation, and the lock was refused for the second). The command is all or nothing (a named test unchanged, unlisted or a third listed test touched refuses it before any write), writes one `resceaux` entry per test, and commits in ONE commit whose subject is short and fixed (`test(L2): acceptation rescellée du lot livré L1`); the paths (one `- <path>` line each), the reason (wrapped at 90 columns) and the amended sheet go in the body, as `spec green` does, so the `header-max-length` of commitlint no longer refuses it; the plan commit of the note is short and fixed too. When a hook refuses a commit (`spec reseal`, `spec green`), the error quotes the commitlint rule that refuses (`header must not be longer than 100 characters [header-max-length]`), not only « found 1 problems ».
+
+## [1.44.0] - 2026-11-03
+
 
 - The integration of `cadence orchestrate` also recomposes the ratchet's baseline when git merges `qualite-baseline.json` without a conflict (L541, `docs/orchestrate.md`): a lot that changed the file kept an older baseline than `main`'s (a key both sides lowered, a key `main` removed), the ratchet turned red at the integrated tip and the rebase was done by hand (L485, L486, L536). The program now applies the L538 rule to the lot's tip and writes the result in a commit of its own, with a journal line; a lot that does not touch the file or raises it is left as git made it.
 ### Added

@@ -83,7 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
-- `orchestrate/cycle.ts` is split, second part (L491, C1b of `docs/mesures/audit-simplification-l461.md`): `session` and its guards (third-party repositories, lead push, moved HEAD, stray files, plan touched in the worktree) move to `src/orchestrate/cycle/session.ts`; `summarize` joins the report shapes in `schemas.ts`. No change of behaviour; the `max-lines` baseline of `cycle.ts` goes from 1893 to 1382, the total does not rise.
+- `orchestrate/cycle.ts` is split, second part (L491, C1b of `docs/mesures/audit-simplification-l461.md`): `session` and its guards (third-party repositories, lead push, moved HEAD, stray files, plan touched in the worktree) move to `src/orchestrate/cycle/session.ts`; `summarize` joins the report shapes in `schemas.ts`. No change of behaviour; the `max-lines` baseline of `cycle.ts` goes from 1893 to 1382, but the two files together total 1898 (+5 import lines): the overall total only stays flat thanks to a gain from another lot in `plan.ts`.
 
 ## [1.45.0] - 2026-11-03
 

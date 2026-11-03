@@ -52,7 +52,10 @@ function openIssues(cwd: string, env: NodeJS.ProcessEnv): OpenIssue[] | null {
   }
 }
 
-const hasLot = (text: string, id: string) => new RegExp(`(?<![\\w/])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w/])`).test(text);
+/** Les projets frères dont le CHANGELOG rappelle les lots (« finance L130 of the wave … ») : leur numéro n'est pas celui du plan courant. */
+const OTHER_PROJECTS = 'finance|warhammer|ol|maritime|aetherwx|jobmail|evatosorus|eywa';
+
+const hasLot = (text: string, id: string) => new RegExp(`(?<![\\w/])(?<!\\b(?:${OTHER_PROJECTS})\\s+)${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w/])`).test(text);
 
 /** Les lots que le CHANGELOG cite dans une version publiée (toute section « ## [x] » autre que [Unreleased]). */
 function publishedLots(root: string, lots: Lot[]): Set<string> {

@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.45.0**: safe plan writes between sessions; GitHub issues followed by the tour and the release; `spec reseal` of several tests; panel bars follow `priority:`.
 - **1.44.0**: a harder self-check before handing back (edge-case trace, rule-by-rule check); `raf quickwins`; planned windows; gate ↔ CI parity warning; dropped lots leave the panel.
 - **1.43.0**: the ratchet baseline is recomputed at integration (no more conflict hand-backs); `docs.sync` lets internal `refactor` commits through; `raf archive` keeps `raf list` order.
 - **1.42.1**: republishes 1.42.0, whose npm publication failed on two tests of the CI clone (no `main` branch, a draw-order probe that depended on timing); same features.
@@ -73,6 +74,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.45.0**: the plan is safe to write from several sessions at once (L468): `raf` and `cadence` take an inter-process lock on the plan file, so two writers never lose each other's lines. GitHub issues follow the plan (L548): `cadence lead tour` lists the open issues no lot cites and those whose lot is published, and `cadence release` prints the `gh issue close` command of each issue the version settles; nothing is closed without the lead. `cadence spec reseal` takes several tests in one command and one commit, with a short fixed subject and the paths and reason in the body, and names the commitlint rule that refuses a commit (L546, GitHub issue #23). The lots panel's project bars follow the folder that carries `priority:` instead of the last wave's directory (L547, GitHub issue #24). The edge-case probe recognises a test file of a sub-package (L549), and the signal tests wait for the process to die instead of checking at once (L505).
 
 **1.44.0**: a harder self-check before the first writing is handed back. On the 27-10 → 03-11 window the code bug is still the first cause of correction passes (L543, `docs/mesures/bug-code-2026-11-03.md`): 131 of the 208 `bug-code` passes are edge cases and 37 misread contracts, so the `implement` brief's « Self-check before handing back » list gains two bullets marked `[L543]`, each a check on the session's own diff with a trace in its report (one line « entrée → attendu → obtenu » per listed input; the word of each rule and the line of code that holds it). No other brief changes. The measure on two windows is written; its « after » lines are to be measured. Also: `raf quickwins` groups the small ready lots by an extension field (L467); the lead tour, `orchestrate --dry-run` and `verify --gate` flag the test commands the CI plays and the gate does not (L499); the lots panel no longer shows a lot dropped from a wave as a pending decision (L545); a planned window per lot (`raf plan`, L466); the ratchet baseline is recomposed when git merges it silently (L541); `orchestrate/cycle.ts` is split, with no change of behaviour (L490).
 

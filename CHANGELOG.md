@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.45.0] - 2026-11-03
+
 ### Added
 
 - Rich plans, safe plan writes between sessions (L468, `docs/raf.md`; gap M6 of the maritime-atlas migration study): every write of the plan takes a lock `<plan>.lock` (atomic, pid + start time of its owner, 30 s wait then a clear refusal naming the holder, a dead owner's lock removed, released even when the write fails), and `save()` refuses to overwrite a plan, or a year file of the archive, that another session changed since it was read, keeping their change. A lock that cannot be created for another reason than one already there (plan folder not writable, read-only or full file system, no hard links) is a readable refusal (`pose du verrou du plan refusée (EACCES, …) — plan inchangé`) instead of a raw Node error that `raf` and the wave printed as a stack.

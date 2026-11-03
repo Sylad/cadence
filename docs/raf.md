@@ -127,8 +127,8 @@ the date. `cadence raf …` is the same as `raf …`.
 ## Shared resources: `uses:` and `resources:`
 
 Some projects of a folder share one thing that only one lot at a time can use (a test bench, a gateway, a
-device). L251 (GitHub issue #13, 1/3) lets the plan **declare** it; nothing locks on it yet (`raf start` and
-`cadence orchestrate` ignore `uses:`).
+device). L251 (GitHub issue #13, 1/3) lets the plan **declare** it; `raf start` ignores it, `cadence orchestrate`
+holds it (the `--continue` draw, the `prêts, ressources libres` line and, inside a wave, the pool: see the last point).
 
 - The folder that holds the projects lists the resources in its `cadence.yaml`, next to `depth:` and `priority:`:
   `resources: [banc, passerelle]`. A name is a word of lowercase letters, digits, `-` and `_`.
@@ -146,6 +146,9 @@ device). L251 (GitHub issue #13, 1/3) lets the plan **declare** it; nothing lock
   an unreadable `cadence.yaml`, or a `resources:` that is not a list of valid names, is a gap naming the file
   (`<file> : resources doit être une liste de noms de ressources`), never an empty list. A plan where no open lot carries `uses:` gets the same
   `raf check` as before.
+- **Inside a wave (L551).** Two lots named at launch (or added, or drawn) that carry the same resource play one after the other, even in different repositories:
+  the pool does not start a queue while a queue that plays holds one of its lots' resources, and starts it as soon as that queue has finished. Lots with no
+  common resource, and lots with no `uses:`, are not held. (The `--continue` draw and the `prêts, ressources libres` line already counted the resources.)
 
 ## Where the plan is
 

@@ -83,6 +83,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
+- Shared resources (`uses:`) are held inside a wave (L551): two lots named at launch that carry the same resource play one after the other instead of together (before, only the `--continue` draw and the `prêts, ressources libres` line counted them).
+
 - `orchestrate/cycle.ts` is split, second part (L491, C1b of `docs/mesures/audit-simplification-l461.md`): `session` and its guards (third-party repositories, lead push, moved HEAD, stray files, plan touched in the worktree) move to `src/orchestrate/cycle/session.ts`; `summarize` joins the report shapes in `schemas.ts`. No change of behaviour; the `max-lines` baseline of `cycle.ts` goes from 1893 to 1382, but the two files together total 1898 (+5 import lines): the overall total only stays flat thanks to a gain from another lot in `plan.ts`.
 - `docs.sync` judges the whole diff of a lot that holds a `refactor` (L542, `docs/news.md`): the `fix`/`test`/`chore`/`style` commits written after it are left out like the refactor itself when they only change test files, comments (including JSDoc ` * …` lines), blank lines, one-line imports, or only add/remove `export` before a declaration, so « refactor then fix(imports/comments) » (L489, L490) is no longer « documentation en retard » (measured: no gap left on both lots). A fix that changes any other code line, one written before the refactor, a `feat`, a `BREAKING CHANGE:` footer, or a lot with no refactor still count.
 

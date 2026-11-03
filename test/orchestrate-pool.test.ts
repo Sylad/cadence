@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { runPool } from '../src/orchestrate/pool.js';
 import type { LotCtx } from '../src/orchestrate/cycle.js';
 import type { ClaudeFn } from '../src/orchestrate/launch.js';
-import { claudeOut, commitFile, harness, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
+import { claudeOut, commitFile, git, harness, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
 
 /** Trois dépôts, deux lots dans le premier ; un lanceur qui mesure la concurrence. */
 function setup(budget?: number, rendezvous = false) {
@@ -100,5 +102,47 @@ describe('ordonnanceur', () => {
     expect(s.ctxs[0].lot.status).toBe('ready');
     expect(s.ctxs[1].lot.status).toBe('ready');
     expect(s.ctxs[1].lot.outcome).not.toMatch(/en attente/);
+  });
+
+  /** Pose `uses:` sur le lot L1 des dépôts b et c (hs[1], hs[2]). */
+  const useResources = (s: ReturnType<typeof setup>, b: string[], c: string[]) => {
+    for (const [h, names] of [[s.hs[1], b], [s.hs[2], c]] as const) {
+      writeFileSync(join(dirname(h.repo), 'cadence.yaml'), 'resources: [cycle-ts, autre, gateway]\n'); // une ressource non déclarée rend le lot (resourceIssues)
+      const plan = h.plan();
+      plan.setUses('L1', names);
+      plan.save();
+      git(h.repo, 'add', '--', '.cadence/raf.yaml');
+      git(h.repo, 'commit', '-q', '-m', 'chore: uses');
+    }
+  };
+  const order = (s: ReturnType<typeof setup>) => s.log.map((l) => (l.startsWith(s.hs[1].repo) ? 'b' : l.startsWith(s.hs[2].repo) ? 'c' : 'a')).filter((x) => x !== 'a').join('');
+
+  it('L551 — deux lots de dépôts différents qui portent la même ressource jouent l\'un après l\'autre, sans se chevaucher', async () => {
+    const s = setup();
+    useResources(s, ['cycle-ts'], ['cycle-ts', 'autre']);
+    await runPool(s.ctxs, 3);
+    expect(['bbcc', 'ccbb']).toContain(order(s));
+    expect(s.ctxs.map((c) => c.lot.status)).toEqual(['ready', 'ready', 'ready', 'ready']);
+  });
+
+  it('L551 — le lot sans ressource ne attend pas : il joue pendant que le premier lot à ressource joue', async () => {
+    const s = setup(undefined, true); // rendez-vous : la première session de chaque dépôt attend qu'un autre dépôt soit actif
+    useResources(s, ['cycle-ts'], ['cycle-ts']);
+    await runPool(s.ctxs, 3); // un lot sans ressource retenu par erreur ferait attendre le rendez-vous pour toujours
+    expect(s.ctxs.map((c) => c.lot.status)).toEqual(['ready', 'ready', 'ready', 'ready']);
+  });
+
+  it('L551 — des ressources différentes ne se retiennent pas : les deux lots jouent ensemble', async () => {
+    const s = setup(undefined, true);
+    useResources(s, ['cycle-ts'], ['gateway']);
+    await runPool(s.ctxs, 3);
+    expect(s.ctxs.map((c) => c.lot.status)).toEqual(['ready', 'ready', 'ready', 'ready']);
+  });
+
+  it('L551 — le lot retenu part quand le lot qui tient la ressource a fini, même avec un seul créneau libre à ce moment', async () => {
+    const s = setup();
+    useResources(s, ['cycle-ts'], ['cycle-ts']);
+    await runPool(s.ctxs, 2);
+    expect(['bbcc', 'ccbb']).toContain(order(s));
   });
 });

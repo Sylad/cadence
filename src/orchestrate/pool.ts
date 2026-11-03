@@ -32,7 +32,7 @@ export function groupLots(ctxs: LotCtx[]): LotCtx[][] {
  * sont dans la même file : jamais deux sessions dans un même dépôt (le plafond global des sessions de toutes les vagues est tenu par execute.ts).
  * `parallel(groupe)` (L279) : les lots de ce groupe sont chacun leur propre file — ils jouent ensemble, chacun dans son worktree, dans la limite de `slots` ;
  * un lot qui dépend d'un lot du groupe attend qu'il soit fini (ready après son intégration) avant de partir, et le lot en attente d'une place n'est pas commencé
- * (son worktree n'existe pas encore, R3). `answers` (L407) : à chaque tour, et au plus tard après `pollMs`, les lots en question dont le lead a déposé la réponse repartent comme une file de plus (un créneau libre ; sans worktree, jamais en même temps qu'un autre lot du même dépôt). `onSettled` est appelé quand un lot a fini de jouer (L132 : execute.ts libère alors les dépôts que plus aucun lot ne tient). Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
+ * (son worktree n'existe pas encore, R3). Les lots qui portent la même ressource `uses:` (L551) jouent l'un après l'autre : la file qui en veut une que tient une file qui joue attend qu'elle ait fini (les dépôts différents ne s'en préoccupent pas, la ressource est un verrou de plus). `answers` (L407) : à chaque tour, et au plus tard après `pollMs`, les lots en question dont le lead a déposé la réponse repartent comme une file de plus (un créneau libre ; sans worktree, jamais en même temps qu'un autre lot du même dépôt). `onSettled` est appelé quand un lot a fini de jouer (L132 : execute.ts libère alors les dépôts que plus aucun lot ne tient). Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
  */
 /**
  * La file des demandes du lead à une vague vivante (L407 : réponses, L421 : lots ajoutés) : `take(canRun, free)` applique les réponses déposées aux lots en question que `canRun` accepte et ajoute les lots demandés,
@@ -42,6 +42,35 @@ export function groupLots(ctxs: LotCtx[]): LotCtx[][] {
 export interface AnswerFeed {
   take: (canRun: (c: LotCtx) => boolean, free: number) => LotCtx[] | Promise<LotCtx[]>;
   pollMs: number;
+}
+
+/** La file d'un lot seul (groupe en parallèle) dont une dépendance joue encore. */
+function waitsDependency(queue: LotCtx[], ctxs: LotCtx[], live: Set<LotCtx>): boolean {
+  return (
+    queue.length === 1 &&
+    (queue[0].lot.dependsOn ?? []).some((id) => {
+      const dep = ctxs.find((o) => o.lot.project === queue[0].lot.project && o.lot.lot === id);
+      return !!dep && live.has(dep) && dep.lot.status !== 'ready';
+    })
+  );
+}
+
+/**
+ * Les ressources `uses:` (L551) tenues par les files qui jouent : les lots non finis de ces files les tiennent, `wants(queue)` dit si un lot de la file en veut une.
+ * Les `uses:` d'un lot sont lus du plan une fois.
+ */
+function resourceLock(running: Map<Promise<void>, LotCtx[]>, live: Set<LotCtx>): { wants: (queue: LotCtx[]) => boolean } {
+  const cache = new WeakMap<LotCtx, string[]>();
+  const usesOf = (c: LotCtx): string[] => {
+    if (!cache.has(c)) cache.set(c, c.loadPlan().lots().find((l) => l.id === c.lot.lot)?.uses ?? []);
+    return cache.get(c)!;
+  };
+  return {
+    wants: (queue) => {
+      const held = new Set([...running.values()].flatMap((q) => q.filter((o) => live.has(o)).flatMap(usesOf)));
+      return held.size > 0 && queue.some((c) => usesOf(c).some((r) => held.has(r)));
+    },
+  };
 }
 
 export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] = [], onSettled: (c: LotCtx) => void = () => {}, parallel: (lots: LotCtx[]) => boolean = () => false, answers?: AnswerFeed): Promise<void> {
@@ -88,15 +117,12 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
     for (const c of queue) live.delete(c);
   };
 
-  /** La file d'un lot seul (groupe en parallèle) dont une dépendance joue encore : elle ne part pas. */
-  const blocked = (queue: LotCtx[]) =>
-    queue.length === 1 &&
-    (queue[0].lot.dependsOn ?? []).some((id) => {
-      const dep = ctxs.find((o) => o.lot.project === queue[0].lot.project && o.lot.lot === id);
-      return !!dep && live.has(dep) && dep.lot.status !== 'ready';
-    });
-
   const running = new Map<Promise<void>, LotCtx[]>();
+  const resources = resourceLock(running, live);
+
+  /** La file qui ne part pas : celle d'un lot seul (groupe en parallèle) dont une dépendance joue encore, ou celle dont un lot veut une ressource qu'une file qui joue tient (L551). */
+  const blocked = (queue: LotCtx[]) => waitsDependency(queue, ctxs, live) || resources.wants(queue);
+
   const start = (queue: LotCtx[]) => {
     const p = runQueue(queue).finally(() => running.delete(p));
     running.set(p, queue);

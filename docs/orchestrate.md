@@ -645,6 +645,8 @@ When a plan commit is refused all the same (a hook of the project, a header too 
 > so a resumed wave (`--resume`, `--integrate`, `--replay`, `--continue`) needs nothing more than its configuration or its `cadence/<wave>/…` branch. The other projects keep the default (key absent
 > or `false`: one lot at a time, in the repository) until the lead decides otherwise.
 
+**Shared resources (L551).** Whatever the mode, two lots of the wave that carry the same `uses:` resource (`raf uses`) never play together, even in different repositories: the queue of the second waits until the queue that holds the resource has finished, then starts (the pool, `src/orchestrate/pool.ts`). It is an added lock, like the repository one; lots without `uses:` or with other resources are not held.
+
 By default a wave plays the lots of one repository one after the other, in the repository itself: a lot with four correction passes
 holds the whole queue. With `orchestrate: { worktrees: true }` in the project's `cadence.yaml`, two independent lots of the same repository
 play **at the same time**, each in its own `git worktree` on its own branch, within the session cap (`--max-sessions`). Absent or `false`,

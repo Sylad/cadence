@@ -332,7 +332,7 @@ for d in [folder] + [os.path.join(folder, n) for n in names]:
     failed_at, failed_lines = read(os.path.join(log, 'deliveries-failed.log'))
     green = None
     for l in reversed(green_lines):
-        m = re.match(r'^(\\d{4}-\\d\\d-\\d\\d) (\\S+)\\s*$', l)
+        m = re.match(r'^(\\d{4}-\\d\\d-\\d\\d) (\\S+)(?: \\S+)?\\s*$', l)
         if m:
             green = (m.group(1), m.group(2))
             break

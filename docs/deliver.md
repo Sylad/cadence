@@ -143,7 +143,7 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   unreadable or empty range. `--dry-run` announces it with the same words on its CI line (`CI : non attendue (…)`).
 - **Timestamps and step journal** (L516): every step line of the output (`→ script`, `→ CI`, `→ déploiement i/n`,
   `→ vérification i/n`, `✓ livré`) starts with the UTC time `HH:MM:SS`, and `✓ livré` ends with `en N s`, the time
-  since the lock was taken. The failure messages, the exit codes, `deliveries.log` (`day sha`) and
+  since the lock was taken. The failure messages, the exit codes, `deliveries.log` (`day sha`, plus an optional block name, [below](#delivered--finished-delivered-plandeliveredstate-and-blocks-l469)) and
   `deliveries-failed.log` are unchanged. Each step played (the CI wait, each deploy command, each check) also appends
   one JSON line to `<git common dir>/cadence/deliveries-steps.log`, append-only, with the keys `lots` (lots cited since
   the previous delivery, `[]` if none), `sha`, `projet`, `etape` (`ci`, `deploiement i/n`, `verification i/n`), `debut`
@@ -162,6 +162,61 @@ cadence deliver              # 0 delivered and verified · 1 a step failed · 2 
   lots without delivering anything.
 - With [`docs.articles`](news.md#an-article-elsewhere-that-follows-the-delivery), a green delivery of lots with a
   public title also opens the lot `Article <project> à rafraîchir` in the plan (committed, with the files `plan.onWrite` produces, during a wave as well as outside one, L388, L420).
+
+## Delivered ≠ finished: `delivered:`, `plan.deliveredState` and blocks (L469)
+
+A lot is **finished** (`done`, `raf done`) when its work is closed in the plan, and **delivered** when a green delivery contains its commits.
+Two facts, two keys: the lot carries `delivered: { date, sha }` (the day of the delivery and the full sha of the green line written to
+`deliveries.log`), and, with [`plan.deliveredState`](raf.md#detailed-states-planstates-l463), the state `livre` after `termine`.
+
+```yaml
+plan:
+  states: { a_faire: todo, en_cours: doing, termine: done, livre: done }
+  doneState: termine
+  deliveredState: livre   # same checks as doneState: needs plan.states, a declared state whose base status is done
+deliver:
+  blocks:                 # optional: name → paths relative to the repository, for `cadence deliver --block <name>`
+    api: [src/api]
+    web: [src/web/]
+```
+
+**What a green delivery does** (`cadence deliver`, and the green line `cadence verify` writes after a red delivery, with the same message):
+after the green line and the usual `livré : L1, L2 — raf done si l'effet est celui attendu` announcement, every lot that is
+**finished** and cited by a commit of the range *previous green line..delivered sha* (directly or by one of its sub-tasks `L1/t1`; a plan-upkeep
+commit cites nothing) and has no `delivered:` yet receives `delivered: { date: <today>, sha: <delivered sha> }`. With `plan.deliveredState`, a lot in `doneState` (or in the
+default done state when it has no `state:`) moves to it; a lot in another done state keeps its state. It prints
+`lots marqués livrés : L1, L2 — delivered: <day> <sha7> (plan commité <sha7>)` and commits the plan, every archive file it changed
+(`.cadence/archive/<year>.yaml`) and the files `plan.onWrite` produces, so the tree stays clean.
+
+- The plan is read again just before: a lot the project script closed during the delivery is seen and marked, and what the script committed is kept.
+- A lot still `todo` or `doing` is never marked, even when cited by its sub-tasks; a lot that already has `delivered:` is not delivered again.
+- If `plan.transitions` forbids `doneState → deliveredState`, the lot is left as it is (neither `delivered:` nor state) and
+  `deliver : L1 non marqué livré : transition termine → livre refusée par plan.transitions` goes to the error output; the delivery stays green.
+- If the plan, an archive file to write or a `plan.onWrite` file was already modified before the marking, `delivered:` is written but not
+  committed, and the line says `plan déjà modifié avant la livraison, non commité : à commiter avec vos modifications`.
+- A write or commit error prints `deliver : lots livrés non marqués : <cause>`; the delivery already done stays green (exit code 0).
+- A read-only plan (kept by another tool) is never written: only the lots in progress are announced, as before. `--dry-run`, a first delivery, or a previous delivery outside the history of the sha mark nothing.
+
+**Closing after the delivery** (the usual flow: deliver, look at the effect, then `raf done`): the lot was still open when the delivery ran, so
+`raf done L1` looks in `deliveries.log`, from the oldest line to the newest, for the **first** green line whose sha reaches (is, or descends from) a
+commit of the lot that is not plan-only; the lot gets `delivered:` with that line's day and sha (and `deliveredState`, same rules) and the command adds
+`L1 livré le <day> (<sha7>)`. A line without a valid day or sha, or whose sha the repository does not know, is skipped; when no line fits the lot stays
+finished and not delivered, silently. `raf done` on a sub-task or on a read-only plan reads nothing. `raf show <id>` prints `livré : <day> <sha7>` for a delivered lot.
+
+**Blocks** (`deliver.blocks`): a project that delivers in parts (an API, a web front) declares them as paths. Each path is normalised
+(separators, a leading `./` and a trailing `/` removed) and refused when empty, absolute, outside the repository (`..`) or reduced to `.` (it would be the whole repository).
+`cadence deliver --block api` plays the delivery as usual, and marks only the lots cited by a commit **of the range** that changes a file under one of the paths of `api`
+(`src/api` holds `src/api/x.ts` but not `src/api2/x.ts`); a lot that touches only another block is marked by that block's delivery, and a commit that touches several blocks counts for each.
+An unknown block, or `--block` with no `deliver.blocks`, is refused before any step (`deliver : --block api : bloc inconnu (déclarés : web, worker)`,
+exit code 1). Without `--block`, `deliver.blocks` is ignored for the selection.
+
+`deliveries.log` keeps one line per green delivery, `day sha`, with an **optional third field**, the block: `--block api` writes `day sha api`.
+A line without block (an old line, a full delivery, `cadence verify`) counts for every block. A delivery of block `b` starts from the last green line that counts for `b`, so `--block api`
+then `--block web` on the same sha each mark their lots. A full delivery after a block delivery starts from the oldest of the last lines that count for each declared block, so a `web` lot
+that predates a `--block api` line is still seen (a lot that already has `delivered:` is never delivered twice). The guard of the lots not delivered, the announcement, the step journal,
+the CI skip and `cadence verify` read the same line. Readers of the journal (`readDeliveries`, the panels, `perf`) read the first two fields and ignore the third.
+With `deliver.blocks`, `raf done` applies the first-line rule block by block: for each block touched by a commit of the lot it keeps the first line that counts for that block and reaches such a commit,
+and the oldest of those lines gives `delivered:`; a commit that touches no block is reached only by a line without block.
 
 ## A project with its own delivery script
 

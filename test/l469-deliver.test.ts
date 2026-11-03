@@ -247,6 +247,16 @@ describe('C1 — plan, archive, écriture', () => {
     expect(f.err.some((l) => l.startsWith('deliver : lots livrés non marqués : écriture du plan refusée'))).toBe(true);
     expect(lastDelivery(f.state)).toBe(head(f));
   });
+  it('R12 — commit du plan refusé : avertissement, delivered écrit dans le plan, code 0', async () => {
+    const f = await started();
+    ship(f, ['src/a.ts'], 'feat(L1): a');
+    edit(f, closed('L1'));
+    writeFileSync(join(f.dir, '.git/hooks/commit-msg'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    expect(await go(f)).toBe(0);
+    expect(f.err.some((l) => l.startsWith('deliver : lots livrés non marqués : commit du plan refusé'))).toBe(true);
+    expect(planOf(f).lot('L1').delivered?.date).toBe(DAY);
+    expect(sh(f.dir, 'diff', '--cached', '--name-only')).toBe('');
+  });
   it('R29 — annonce d\'avant inchangée ; ligne « lots marqués livrés » seulement si un lot est marqué', async () => {
     const f = await started();
     ship(f, ['src/a.ts'], 'feat(L1): a');

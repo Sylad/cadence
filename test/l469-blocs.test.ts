@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { planOnlySince } from '../src/deliver-ci.js';
 import { parseDeliverConfig } from '../src/deliver.js';
@@ -217,6 +219,15 @@ describe('R34 — les lecteurs de la ligne précédente suivent le bloc', () => 
     // web part de S0 (ligne valant pour lui) : L2, antérieur à la ligne api, est annoncé et marqué ; L1 (api) n'est pas du bloc
     expect(f.out).toContain('livré : L2 — raf done si l\'effet est celui attendu');
     expect(f.out.some((l) => l.startsWith('lots marqués livrés : L2'))).toBe(true);
+  });
+  it('R34 — deliveredIds du journal des étapes suit la ligne du bloc', async () => {
+    const f = await started();
+    ship(f, ['src/web/w.ts'], 'feat(L2): w');
+    await go(f, { block: 'api' }); // S1 api
+    sh(f.dir, 'push', '-q');
+    await go(f, { block: 'web' });
+    const steps = readFileSync(join(f.state, 'deliveries-steps.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { lots: string[] });
+    expect(steps.at(-1)!.lots).toEqual(['L2']);
   });
   it('R34 — journal sans bloc : les appelants rendent le même sha qu\'avant (annonce depuis la dernière ligne)', async () => {
     const f = fx();

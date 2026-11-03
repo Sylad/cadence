@@ -235,10 +235,11 @@ plan:
     bloque: [en_cours, abandonne]
     termine: [livre]                 # a state with no entry is terminal once `transitions` is declared
   doneState: termine                 # what `raf done` sets (default: the first done state)
+  deliveredState: livre              # what a green delivery sets on a finished lot (L469, see deliver.md); same checks as doneState
   blockedState: bloque               # `raf status <lot> --back` returns from it
 ```
 
-`states` is an ordered object, state → base status, and must hold at least one `todo`, one `doing` and one `done` state. The state is written as `state:` right after `status:` (and `state_before:` while blocked). `raf start`, `raf done`, `raf drop` and `raf todo` set the state of their status themselves (`doing` → the first `doing` state, `done` → `doneState`, …) and obey `plan.transitions` too — refused with the allowed states, `--force` passes (`raf todo`, the reopening, is not guarded). A lot with no `state:` (written before the declaration) is read in the default state of its status. `raf check` reports a `state:` that is not declared or whose base status contradicts `status:`. `raf show` prints `état :`. `plan.states` does not go with a plan held by another tool (`lots`, `fields`, `statuses`, `estimates`): its states are its own.
+`states` is an ordered object, state → base status, and must hold at least one `todo`, one `doing` and one `done` state. The state is written as `state:` right after `status:` (and `state_before:` while blocked). `deliveredState` is optional; the lot also carries `delivered: { date, sha }`, written by `cadence deliver` or by `raf done` after a delivery, kept by every rewrite of the plan, moved with the lot by `raf archive` and shown by `raf show` as `livré : <day> <sha7>` ([Delivered ≠ finished](deliver.md#delivered--finished-delivered-plandeliveredstate-and-blocks-l469)). `raf start`, `raf done`, `raf drop` and `raf todo` set the state of their status themselves (`doing` → the first `doing` state, `done` → `doneState`, …) and obey `plan.transitions` too — refused with the allowed states, `--force` passes (`raf todo`, the reopening, is not guarded). A lot with no `state:` (written before the declaration) is read in the default state of its status. `raf check` reports a `state:` that is not declared or whose base status contradicts `status:`. `raf show` prints `état :`. `plan.states` does not go with a plan held by another tool (`lots`, `fields`, `statuses`, `estimates`): its states are its own.
 
 ## Extension fields: `plan.extras` (L464)
 

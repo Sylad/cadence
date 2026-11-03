@@ -1227,7 +1227,8 @@ test('un cd du lead dans un sous-projet ne déplace pas le dossier du tableau : 
 })
 
 // L547 (issue #24) : le tour se lance dans le dossier qui porte `priority:`, quel que soit le cwd de la vague ou celui du shell
-const tourOfWaveCwd = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], waveCwd: string, shell: string, resolver: (cwd: string) => string | null) => {
+// Les dossiers passés à `cadence <sous-commande>` (tour, perf) pour une vague de cwd `waveCwd` (finie, ou vivante) et un shell en `shell`.
+const cadenceFolders = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], waveCwd: string, shell: string, resolver: (cwd: string) => string | null, live = false) => {
   wired(on)
   const clock = mock.clock(on)
   const runs: string[][] = []
@@ -1238,7 +1239,7 @@ const tourOfWaveCwd = async ($: Parameters<TestBody>[0], on: Parameters<TestBody
     const argv = (e as unknown as { argv: string[] }).argv
     runs.push(argv)
     if (argv[0] === 'cadence') return { value: { exitCode: 0, stdout: JSON.stringify(TOUR), stderr: '' } } as never
-    if (argv[3] === COLLECTOR) return { value: { exitCode: 0, stdout: JSON.stringify({ waves: [{ ...WAVE, cwd: waveCwd, live: false }], ended: [], holds: [], cap: 2 }), stderr: '' } } as never
+    if (argv[3] === COLLECTOR) return { value: { exitCode: 0, stdout: JSON.stringify({ waves: [{ ...WAVE, cwd: waveCwd, live }], ended: [], holds: [], cap: 2 }), stderr: '' } } as never
     if (argv.includes(LAUNCH_FOLDER)) {
       const found = resolver(argv[argv.length - 1]!)
       return found === null ? ({ value: { exitCode: 1, stdout: '', stderr: 'x' } } as never) : ({ value: { exitCode: 0, stdout: `${found}\n`, stderr: '' } } as never)
@@ -1249,8 +1250,10 @@ const tourOfWaveCwd = async ($: Parameters<TestBody>[0], on: Parameters<TestBody
   await settle()
   await clock.advance(5_000)
   await settle()
-  return [...new Set(runs.filter(a => a[0] === 'cadence' && a[2] === 'tour').map(a => a[3]))]
+  const foldersOf = (sub: string) => [...new Set(runs.filter(a => a[0] === 'cadence' && a.includes(sub)).map(a => a[a.indexOf(sub) + 1]))]
+  return { tours: foldersOf('tour'), perfs: foldersOf('perf') }
 }
+const tourOfWaveCwd = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], waveCwd: string, shell: string, resolver: (cwd: string) => string | null) => (await cadenceFolders($, on, waveCwd, shell, resolver)).tours
 const PRIORITY_ABOVE = (cwd: string) => (cwd.startsWith('/w/') ? '/w' : cwd)
 
 test('L547 R1 — sans vague vivante, le tour se lance dans le dossier à priority: qui englobe le cwd de la dernière vague finie, pas dans ce cwd ni dans celui du shell', async ($, on) => {
@@ -1267,6 +1270,10 @@ test('L547 R3 — sans dossier à priority: au-dessus du cwd de la vague, le tou
 
 test('L547 R4 — si le résolveur échoue, le tour retombe sur le cwd de la vague', async ($, on) => {
   expect(await tourOfWaveCwd($, on, '/solo/proj', '/w/ol', c => (c === '/solo/proj' ? null : '/w'))).toEqual(['/solo/proj'])
+})
+
+test('L547 R5 — le temps habituel (cadence perf) se lit dans le cwd de la vague vivante, où est son journal, pas dans le dossier du tour', async ($, on) => {
+  expect(await cadenceFolders($, on, '/w/ol', '/ailleurs', PRIORITY_ABOVE, true)).toEqual({ tours: ['/w'], perfs: ['/w/ol'] })
 })
 
 const PROJECTS = activeProjects(parseTour(JSON.stringify(TOUR)))

@@ -281,9 +281,12 @@ export const register: Register = on => {
         await update($, lotsFailed, () => false)
         await update($, lotsAt, () => at)
         boardGen = gen
-        // le temps habituel d'un lot (L414) ne sert qu'aux lots en cours : sans vague vivante, pas de lecture ; une lecture qui échoue garde la précédente
-        if (found.some(w => w.live)) {
-          const perf = await $.process.run(['cadence', 'perf', folder, '--json'], { timeoutMs: 20_000 }).catch(() => null)
+        // le temps habituel d'un lot (L414) ne sert qu'aux lots en cours : sans vague vivante, pas de lecture ; une lecture qui échoue garde la précédente.
+        // Il se lit dans le cwd de la vague vivante, où elle écrit son journal (`<cwd>/.cadence/runs`), pas dans le dossier du tour (L547) :
+        // le dossier à `priority:` au-dessus n'a pas forcément de journal, et le sien serait celui d'autres vagues.
+        const journal = found.find(w => w.live)?.cwd
+        if (journal) {
+          const perf = await $.process.run(['cadence', 'perf', journal, '--json'], { timeoutMs: 20_000 }).catch(() => null)
           if (perf && perf.exitCode === 0) await update($, lotsTypical, () => parseTypical(perf.stdout))
         }
       } catch {

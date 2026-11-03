@@ -15,8 +15,11 @@ interface PlanLock {
   start?: string;
 }
 
+/** Un pid absent ou non entier (JSON valide mais pas un verrou) vaut 0 : jamais vivant, et égal à lui-même à la relecture (NaN ne l'est pas). */
+const pidOf = (v: unknown) => (Number.isInteger(Number(v)) ? Number(v) : 0);
+
 const read = (file: string) =>
-  readLockJson<PlanLock>(file, (raw) => ({ pid: Number(raw.pid), started: String(raw.started), start: raw.start === undefined ? undefined : String(raw.start) }), { pid: 0, started: '?' });
+  readLockJson<PlanLock>(file, (raw) => ({ pid: pidOf(raw?.pid), started: String(raw.started), start: raw.start === undefined ? undefined : String(raw.start) }), { pid: 0, started: '?' });
 
 function held(l: NonNullable<ReturnType<typeof read>>): boolean {
   if (l.unreadable) return l.ageMs < UNREADABLE_GRACE_MS;

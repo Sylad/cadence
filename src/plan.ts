@@ -325,6 +325,7 @@ export class Plan {
     const before = dirtyContents(hook.cwd);
     const r = spawnSync('sh', ['-c', hook.command], { cwd: hook.cwd, encoding: 'utf8', timeout: limit, stdio: ['ignore', 'pipe', 'pipe'] });
     if (r.status === 0) {
+      this.onDisk = readFileSync(this.path, 'utf8'); // la commande a pu réécrire le plan elle-même (verrou tenu : aucune autre session) : ce n'est pas un changement étranger
       // Ce que la commande a réellement écrit (L436) : un fichier hors de `files` (déclaration incomplète) doit quand même être commité avec le plan,
       // sans quoi la livraison refuse « 1 fichier modifié ». Le plan, les archives et les fichiers déclarés ont leur propre chemin.
       const known = new Set([...written.map((p) => relative(hook.cwd, p)), ...hook.files]);

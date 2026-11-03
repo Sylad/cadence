@@ -27,7 +27,7 @@ const loaders: Record<string, () => Promise<unknown>> = {
   'spec-steps': () => import('../src/orchestrate/cycle/spec-steps.js'),
   'work': () => import('../src/orchestrate/cycle/work.js'),
 };
-// L567 : après vi.resetModules() chaque import retransforme tout le graphe du cycle ; le délai par défaut (5 s) tombait sur ce travail, pas sur un cycle d'import qui bloquerait, sous charge
+// L567 : après vi.resetModules() chaque import retransforme tout le graphe du cycle ; le délai par défaut de la suite (30 s, vitest.config.ts) est porté à 60 s pour ne pas tomber sur ce travail sous charge, pas sur un cycle d'import qui bloquerait ; cause déduite, aucun échec reproduit
 const IMPORT_FRAIS_MS = 60_000;
 const modules = readdirSync(dir).filter((f) => f.endsWith('.ts')).map((f) => f.replace(/\.ts$/, ''));
 

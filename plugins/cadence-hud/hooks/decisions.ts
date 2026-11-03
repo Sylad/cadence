@@ -59,8 +59,9 @@ export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedD
         const text = (l.questions ?? []).map(firstLine).filter(q => q !== '').join(' / ')
         out.push({ kind: 'question', project: l.project, lot: l.lot, text: text || 'question sans texte', command: from(w.cwd, `cadence orchestrate --resume --wave ${w.id} --answer ${key} "…"`) })
       } else if (l.status === 'handed-back' || l.status === 'failed') {
-        if ((l.outcome ?? '').startsWith(DROPPED_PREFIX)) continue // retiré par le lead : une décision déjà prise (L545)
-        out.push({ kind: 'rendu', project: l.project, lot: l.lot, text: firstLine(l.outcome ?? '') || lotStatusFr(l.status) })
+        const outcome = typeof l.outcome === 'string' ? firstLine(l.outcome) : '' // un état illisible (nombre, objet) vaut une issue vide
+        if (outcome.startsWith(DROPPED_PREFIX)) continue // retiré par le lead : une décision déjà prise (L545)
+        out.push({ kind: 'rendu', project: l.project, lot: l.lot, text: outcome || lotStatusFr(l.status) })
       } else if (l.status === 'ready' && l.visible === true && typeof l.uxVerdict === 'string' && l.uxVerdict !== '') {
         out.push({ kind: 'ux', project: l.project, lot: l.lot, text: firstLine(l.uxVerdict), command: from(l.repo, `raf ux ${l.lot} "verdict"`) })
       }

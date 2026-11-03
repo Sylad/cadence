@@ -1002,7 +1002,7 @@ lots:
     finished: 2026-11-02
   - id: L490
     title: "Découpage C1a : orchestrate/cycle.ts — ctx puis budget, brief, plan-writes (façade de ré-export) (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C1 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
-    status: doing
+    status: done
     estimate: 0.5
     uses: [ cycle-ts ]
     created: 2026-10-31
@@ -1011,6 +1011,7 @@ lots:
     notes:
       - { date: 2026-11-02, text: "02-11 23 h 20 : intégration suspendue par l'arrêt de minuit (revue conforme du lead dans le worktree, 5c7896d) → cadence orchestrate --resume --wave 2026-11-02-2140-cont (reprend L490, L493, L499)" }
     review: { date: 2026-11-03, verdict: "conforme : découpage C1a de cycle.ts (ctx, budget, brief, plan-writes) derrière une façade de ré-export, sans changement de comportement ; mineur : gain du cliquet de 6 lignes non figé ; revue courte du diff rebasé (patch-id différent) : conforme (re-revue après rebase : seul le CHANGELOG a bougé, à sa bonne place sous [Unreleased] / Changed ; aucun constat)", commit: 20ef8b0177ebc07c13d3b2337101be032fd4b96b }
+    finished: 2026-11-03
   - id: L491
     title: "Découpage C1b : orchestrate/cycle.ts — session (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § C1 ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: doing

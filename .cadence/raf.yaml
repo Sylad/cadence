@@ -1834,9 +1834,10 @@ lots:
     created: 2026-11-03
   - id: L561
     title: "Contrôle après l'étape spec : signaler deux captures d'états différents à la même largeur qui ont la même empreinte (et une capture sombre identique à sa claire), et les renvoyer à la session spec comme point manquant (issue #29 : deux tours de revue maquette perdus le 03-11 sur des captures copiées)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-03
+    started: 2026-11-03
   - id: L562
     title: "Boucle de revue maquette qui ne converge pas (issue #30) : dès la revue 2, un majeur sur un point inchangé et absent de la revue précédente ne compte plus pour la non-conformité (il va au tableau en suite pour le lead) ; la revue 1 balaie les tailles de la fiche ; un lot rendu avec seulement de tels constats le dit dans son verdict"
     status: todo

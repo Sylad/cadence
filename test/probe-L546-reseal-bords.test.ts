@@ -96,6 +96,17 @@ describe('L546 bord — commitRefusal', () => {
     expect(() => commitRefusal('refusé')).not.toThrow();
   });
 
+  it('le message de l’erreur (ligne « Command failed » + sortie répétée) n’est pas lu quand stderr existe : sortie exacte, règle une fois', () => {
+    const stderr = 'header must not be longer than 100 characters [header-max-length]';
+    const e = { stderr, stdout: '', message: `Command failed: git commit -q -m s -m - a\n\nraison : voir [ticket-12]\n${stderr}` };
+    expect(commitRefusal(e)).toBe(stderr);
+  });
+
+  it('hook sans règle : sa sortie est rendue telle quelle, même si la raison du corps finit par [ticket-12]', () => {
+    const e = { stderr: 'refusé par le hook', message: 'Command failed: git commit -m s -m raison : voir [ticket-12]\nrefusé par le hook' };
+    expect(commitRefusal(e)).toBe('refusé par le hook');
+  });
+
   it('sortie vide partout : ne renvoie pas une chaîne vide', () => {
     expect(commitRefusal({ stderr: '', stdout: '', message: '' }).length).toBeGreaterThan(0);
   });

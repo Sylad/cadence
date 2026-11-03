@@ -132,7 +132,9 @@ export function resealCommitMessage(o: { cite: string; livre?: string; tests: st
 /** Ce que dit un hook qui refuse un commit : les règles de commitlint qui refusent (`… [header-max-length]`) d'abord, la fin de la sortie sinon (« found 1 problems » seul ne dit pas laquelle). */
 export function commitRefusal(e: unknown): string {
   const out = (typeof e === 'object' && e !== null ? e : { message: String(e) }) as { stderr?: string; stdout?: string; message?: string };
-  const lines = [out.stderr, out.stdout, out.message].map((t) => (t ?? '').trim()).filter(Boolean).join('\n').split('\n');
+  const sortie = [out.stderr, out.stdout].map((t) => (t ?? '').trim()).filter(Boolean);
+  // `message` (Node) répète la ligne « Command failed: git commit … -m <corps> » et le stderr : il ne sert que sans sortie du hook.
+  const lines = (sortie.length ? sortie : [(out.message ?? '').trim()]).join('\n').split('\n');
   const rules = lines.filter((l) => /\[[a-z][a-z0-9-]*\]\s*$/.test(l)).map((l) => l.replace(/^[✖✗⚠\s]+/, '').trim());
   return (rules.length ? rules : lines.slice(-5)).join(' | ').trim() || 'le hook de commit a refusé, sans rien dire';
 }

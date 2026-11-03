@@ -1939,6 +1939,7 @@ lots:
     estimate: 0.25
     created: 2026-11-03
     started: 2026-11-03
+    review: { date: 2026-11-03, verdict: "conforme après 1 correction (3 mineurs : liste des fichiers en conflit incomplète dans le cas partiel CHANGELOG + base, un test L548 qui ne peut pas échouer, docs/orchestrate.md:704 périmé) — orchestré (vague 2026-11-03-2100-cad, 3 passe(s) de correction)", commit: 07bbdd19f0b98391d974fd9feb39b176748d5e53, reporte: { de: 0fcfd83ffacaea1d480958af7deba26dd53d1215, vers: 07bbdd19f0b98391d974fd9feb39b176748d5e53, patchId: b5a4146583af3f8aecf405d4f4d687e7ffe5af15 } }
   - id: L569
     title: "Intégration : un conflit de rebase qui ne porte QUE sur le plan (.cadence/raf.yaml) se fusionne seul — version de main + les écritures du lot (sa revue, ses notes, son état), au lieu de rendre le lot (03-11 : L556, L469 rendus pour ce seul conflit, et à chaque commit de plan du lead sur main il a fallu rebaser à la main les quatre lots en file)"
     status: done

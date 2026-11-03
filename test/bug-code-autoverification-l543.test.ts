@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { renderBrief } from '../src/orchestrate/briefs.js';
 import { SOUS_CAUSES } from '../src/corrections.js';
+import { changelogSectionOf } from './changelog-section.js';
 
 const path = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const read = (p: string) => readFileSync(path(p), 'utf8');
@@ -197,8 +198,7 @@ describe('R6 — la documentation suit', () => {
   });
 
   it('R6 — le CHANGELOG et whats-new citent L543', () => {
-    const changelog = read('../CHANGELOG.md');
-    expect(changelog.slice(changelog.indexOf('## [Unreleased]'), changelog.indexOf('## [1.43.0]'))).toContain('L543');
+    expect(changelogSectionOf(read('../CHANGELOG.md'), 'L543')).not.toBe('');
     expect(read('../docs/whats-new.md')).toContain('L543');
   });
 });

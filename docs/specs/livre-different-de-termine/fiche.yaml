@@ -12,6 +12,7 @@ sujet:
       - src/config.ts             # KEYS (src/config.ts:27) : ajout de deliveredState
       - src/cli/deliver-commands.ts   # option --block de cadence deliver
       - src/cli/lot-commands.ts   # raf done : lecture de deliveries.log après la fermeture
+      - src/state.ts              # appendDelivery (3e champ optionnel), lecture des lignes du journal (lastDelivery, readDeliveries inchangés pour deux champs)
       - src/verify.ts             # cadence verify : la ligne verte qu'il écrit passe par announceDelivered (marquage identique)
     endpoints: []
     jobs: []
@@ -24,7 +25,7 @@ sujet:
       - "cadence.yaml : plan.deliveredState (nouvelle clé de premier niveau de plan, à ajouter à KEYS, src/config.ts:27)"
       - "cadence.yaml : deliver.blocks (seule clé ajoutée sous deliver ; lue par parseDeliverConfig, src/deliver.ts:122)"
     hors_perimetre:
-      - "le format de deliveries.log et ses lecteurs (« jour sha », inchangés) ; aucun journal par bloc (cf. R22)"
+      - "aucun journal par bloc : deliveries.log reste un seul fichier, une ligne par livraison verte, avec un 3e champ optionnel (R22, R30)"
       - "raf todo (réouverture) : ne touche pas à delivered: dans ce lot"
       - "raf check : ne contrôle pas encore la forme de delivered:"
       - "l'ordre d'écriture du plan pendant une vague (lot L521)"
@@ -70,6 +71,7 @@ cas:
       - Le lot reçoit delivered {jour de la ligne, sha de la ligne} et l'état deliveredState (R6) ; raf done imprime « <id> livré le <jour> (<sha7>) ».
     alternatives:
       - { si: "aucune ligne n'atteint un commit du lot", alors: "le lot reste terminé non livré, sans message", regles: [R15] }
+      - { si: "deliver.blocks est déclaré", alors: "la règle de la première ligne s'applique bloc par bloc", regles: [R31, R32] }
       - { si: "une ligne est illisible ou son sha inconnu du dépôt", alors: "elle est sautée", regles: [R15] }
       - { si: "raf done vise une sous-tâche ou le plan est en lecture seule", alors: "aucune lecture du journal", regles: [R16] }
     resultat: Le lot fermé après coup porte le jour et le sha de la première livraison qui le contient.
@@ -88,7 +90,9 @@ cas:
       - { si: "deliver est lancé sans --block", alors: "les blocs sont ignorés et tous les lots de la plage sont retenus", regles: [R21] }
       - { si: "un lot done ancien touche le bloc mais n'est cité par aucun commit de la plage", alors: "il n'est pas marqué", regles: [R19] }
       - { si: "un commit modifie des fichiers de plusieurs blocs", alors: "son lot est retenu par chacun de ces blocs", regles: [R17, R18] }
-      - { si: "deux blocs sont livrés l'un après l'autre sur le même sha", alors: "le second voit une plage vide", regles: [R22] }
+      - { si: "deux blocs sont livrés l'un après l'autre sur le même sha", alors: "chacun marque ses lots : la plage de chaque bloc part de la dernière ligne verte qui vaut pour lui", regles: [R22] }
+      - { si: "un lot de la plage ne touche que d'autres blocs", alors: "il n'est pas marqué par cette livraison, il le sera par la livraison de son bloc", regles: [R17, R22] }
+      - { si: "le journal contient des lignes anciennes à 2 champs", alors: "elles valent pour tous les blocs", regles: [R22, R30] }
     resultat: Seuls les lots cités par des commits du bloc, dans la plage de cette livraison, sont marqués ; l'historique n'est jamais réécrit.
   - id: C4
     titre: Le projet déclare ses blocs et son état livré
@@ -206,10 +210,10 @@ regles:
     tests: ["R16 — raf done L1/t1 : lot non marqué", "R16 — plan en lecture seule : raf done inchangé"]
   - id: R17
     cas: [C3]
-    enonce: Avec --block <nom>, seuls les lots cités par un commit de la plage qui modifie au moins un fichier d'un des chemins du bloc sont retenus pour le marquage (R1-R13).
+    enonce: Avec --block <nom>, seuls les lots cités par un commit non « plan seul » de la plage qui modifie au moins un fichier d'un des chemins du bloc sont retenus pour le marquage (R1-R13) ; un lot de la plage qui ne touche que d'autres blocs reste non marqué et sera marqué par la livraison de son bloc.
     statut: sourcee
-    source: "titre du lot (« blocs par chemins ») ; étude M7 l.107 (« deliver.blocks: {api: [src/api], …} … filtrent par chemins »)"
-    tests: ["R17 — commit hors du bloc : lot non marqué", "R17 — commit touchant le bloc : lot marqué"]
+    source: "titre du lot (« blocs par chemins ») ; étude M7 l.107 (« deliver.blocks: {api: [src/api], …} … filtrent par chemins ») ; décision de Sylvain (03-11), réponse du lead"
+    tests: ["R17 — commit hors du bloc : lot non marqué", "R17 — commit touchant le bloc : lot marqué", "R17 — lot ne touchant que web, livraison --block api : non marqué"]
   - id: R18
     cas: [C3]
     enonce: Un fichier appartient à un chemin quand il lui est égal ou situé dessous, par segments (« src/api » ne retient pas « src/api2/x.ts ») ; un commit qui touche plusieurs blocs retient son lot pour chacun.
@@ -230,16 +234,16 @@ regles:
     tests: ["R20 — bloc inconnu : refus, deliveries.log inchangé", "R20 — aucun bloc déclaré : refus", "R20 — --block vide : refus"]
   - id: R21
     cas: [C3]
-    enonce: "Sans --block, deliver.blocks est ignoré : tous les lots de la plage sont retenus, comme pour un projet sans blocs."
+    enonce: "Sans --block, deliver.blocks est ignoré pour la sélection : tous les lots de la plage sont retenus, comme pour un projet sans blocs."
     statut: hypothese
     si_faux: "Si les blocs devaient s'appliquer sans option, une livraison complète ne marquerait que les lots d'un bloc ; seul le tri change."
     tests: ["R21 — blocs déclarés, sans --block : tous les lots de la plage marqués"]
   - id: R22
     cas: [C3]
-    enonce: "Une livraison avec --block joue toutes ses étapes et écrit la même ligne « jour sha » ; la plage de la suivante part de cette ligne, quel que soit le bloc : deux blocs livrés l'un après l'autre sur le même sha, le second voit une plage vide et ne marque rien."
-    statut: hypothese
-    si_faux: "Si chaque bloc devait avoir sa plage, il faudrait un journal par bloc (nouveau stockage à décider avec le lead) ; ici aucun format n'est ajouté, et raf done (R14) rattrape un lot fermé après coup."
-    tests: ["R22 — --block api puis --block web sur le même sha : second marquage vide, journal à une ligne par livraison"]
+    enonce: "deliveries.log reçoit un 3e champ OPTIONNEL, le nom du bloc : « jour sha [bloc] ». Une livraison --block <b> écrit « jour sha b » ; une livraison sans --block écrit « jour sha » comme aujourd'hui. Une ligne sans bloc compte pour TOUS les blocs. La plage d'une livraison du bloc b part de la dernière ligne verte qui vaut pour b (une ligne de b, ou une ligne sans bloc) : --block api puis --block web sur le même sha, chaque bloc marque ses lots. Une livraison sans --block part de la dernière ligne verte, quel qu'en soit le bloc."
+    statut: sourcee
+    source: "réponse du lead — décision de Sylvain (03-11), qui remplace l'ancienne R22 (plage unique, aucun format ajouté)"
+    tests: ["R22 — --block api puis --block web sur le même sha : chaque bloc marque ses lots", "R22 — ligne ancienne à 2 champs : vaut pour tous les blocs", "R22 — --block api écrit « jour sha api », sans --block « jour sha »", "R22 — plage de api ignore la ligne d'un autre bloc"]
   - id: R23
     cas: [C4]
     enonce: deliver.blocks doit être un objet dont chaque nom est non vide et dont chaque valeur est une liste non vide de textes ; sinon la lecture est refusée.
@@ -282,6 +286,24 @@ regles:
     statut: hypothese
     si_faux: "Si la ligne d'annonce devait être fusionnée avec la nouvelle, seul le texte imprimé change ; aucune sortie lue par un script n'est connue."
     tests: ["R29 — annonce d'avant inchangée", "R29 — ligne « lots marqués livrés » imprimée seulement si un lot est marqué"]
+  - id: R30
+    cas: [C3]
+    enonce: "Tout lecteur de deliveries.log lit les deux premiers champs et ignore le 3e : lastDelivery (src/state.ts:290), readDeliveries (src/state.ts:298, qui alimente perf.ts:926 et stats) et la lecture de verify/deliver-ci donnent le même résultat sur « jour sha » et sur « jour sha bloc » ; cadence verify écrit « jour sha » (sans bloc)."
+    statut: sourcee
+    source: "réponse du lead — décision de Sylvain (03-11) : « vérifie chaque lecteur de deliveries.log dans src/ et ajoute un test qui lit une ligne à 3 champs » ; lecteurs : src/state.ts:290-305 (split sur l'espace, champs 0 et 1), src/perf.ts:926-937, src/verify.ts:119,159, src/deliver-ci.ts:22, src/deliver.ts:384,441,506"
+    tests: ["R30 — lastDelivery lit le sha d'une ligne à 3 champs", "R30 — readDeliveries lit le jour d'une ligne à 3 champs", "R30 — journal mêlant lignes à 2 et 3 champs : jours et dernier sha corrects", "R30 — cadence verify vert : ligne écrite sans bloc"]
+  - id: R31
+    cas: [C2]
+    enonce: "Quand deliver.blocks existe, raf done applique la règle de la première ligne (R14) bloc par bloc : pour chaque bloc que touche un commit non « plan seul » qui cite le lot, il retient la première ligne verte qui vaut pour ce bloc (ligne de ce bloc ou sans bloc) et dont le sha atteint un tel commit ; delivered = jour et sha de la plus ancienne de ces lignes retenues."
+    statut: sourcee
+    source: "réponse du lead — décision de Sylvain (03-11) : « raf done (R15) : même règle de première ligne, appliquée bloc par bloc quand deliver.blocks existe »"
+    tests: ["R31 — lot touchant api et web, lignes api puis web : la ligne api est retenue", "R31 — ligne d'un autre bloc non retenue pour ce lot", "R31 — sans deliver.blocks : règle R14 inchangée"]
+  - id: R32
+    cas: [C2]
+    enonce: "Avec deliver.blocks, un commit du lot qui ne touche aucun chemin de bloc n'est atteint que par une ligne sans bloc."
+    statut: hypothese
+    si_faux: "Si un tel commit devait compter pour les lignes de tous les blocs, un lot hors blocs serait marqué par la première livraison de bloc venue : seul le choix de la ligne retenue par raf done change (aucun stockage)."
+    tests: ["R32 — lot hors blocs, ligne --block api seule : non marqué", "R32 — lot hors blocs, ligne sans bloc : marqué"]
 
 contrats:
   - id: A1
@@ -293,7 +315,7 @@ contrats:
       - { code: log error, message: "deliver : --block api : aucun bloc déclaré (deliver.blocks dans cadence.yaml)" }
       - { code: log warn, message: "deliver : L1 non marqué livré : transition termine → livre refusée par plan.transitions" }
       - { code: log warn, message: "deliver : lots livrés non marqués : <cause>" }
-    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R17, R18, R19, R20, R21, R22, R29]
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R17, R18, R19, R20, R21, R22, R29, R30]
   - id: A2
     appel: commande cadence verify
     entree: "comme avant (ligne verte « jour sha » écrite par verify)"
@@ -307,7 +329,7 @@ contrats:
     sortie: "inchangée, plus « <id> livré le <jour> (<sha7>) » quand une ligne du journal atteint un commit du lot ; code 0"
     erreurs: []
     sans_erreur: "aucune ligne utilisable est le cas nominal « terminé non livré » sans message (R15) ; les refus de raf done existants sont inchangés"
-    regles: [R6, R14, R15, R16]
+    regles: [R6, R14, R15, R16, R31, R32]
   - id: A4
     appel: commande raf show <id>
     entree: "<id> d'un lot"
@@ -341,4 +363,4 @@ donnees:
   - { id: D1, objet: "plan natif .cadence/raf.yaml (et .cadence/archive/<année>.yaml) : clé de lot delivered: {date, sha}", existant: true, modification: ajout, decision: "titre du lot L469 et étude M7 l.107 : « deliver écrit delivered: {date, sha} » (réponse du lead à Q-MIG1, 30-10) ; clé optionnelle, un lot sans elle se lit comme avant", note: "date = jour AAAA-MM-JJ ; sha = sha complet ; le lot archivé la porte dans son fichier d'année" }
   - { id: D2, objet: "cadence.yaml : clé plan.deliveredState", existant: true, modification: ajout, decision: "décision du lead 03-11, D2 (note du lot) : mêmes règles que doneState", note: "optionnelle ; absente, l'état n'est jamais modifié" }
   - { id: D3, objet: "cadence.yaml : clé deliver.blocks { nom: [chemins] }", existant: true, modification: ajout, decision: "titre du lot et étude M7 l.107 : « les blocs sont déclarés (deliver.blocks: {api: [src/api], …}) et filtrent par chemins »", note: "optionnelle ; absente, deliver est inchangé" }
-  - { id: D4, objet: "deliveries.log (« jour sha », une ligne par livraison verte)", existant: true, modification: aucune, note: "lu par raf done en plus de deliver ; format et écriture inchangés (décision du lead 03-11, R15)" }
+  - { id: D4, objet: "deliveries.log (« jour sha [bloc] », une ligne par livraison verte)", existant: true, modification: ajout, decision: "décision de Sylvain (03-11), réponse du lead : 3e champ optionnel = nom du bloc ; une ligne sans bloc vaut pour tous les blocs", note: "rétrocompatible : les journaux existants restent valides, les lecteurs actuels lisent les deux premiers champs ; lu par raf done en plus de deliver" }

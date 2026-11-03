@@ -36,7 +36,8 @@ export const PLAN_ACTIONS = {
   specGreen: 'acceptation verte, vert: true posé par cadence spec green',
   /** `cadence spec green` sur un lot déjà `vert: true` mais sans empreintes (L526). */
   specGreenScelle: 'empreintes de l\'acceptation posées par cadence spec green',
-  resealed: (norm: string) => `test d'acceptation rescellé (${norm})`,
+  /** `spec reseal` (L546) : jamais les chemins des tests, ils sont dans le commit du rescellé et en note du lot (header-max-length de commitlint). */
+  resealed: 'test d\'acceptation rescellé',
   /** En minuscule : `subject-case` de config-conventional refuse une majuscule initiale (L343). */
   leadAnswer: (ids: string[]) => `${ids.length > 1 ? 'règles' : 'règle'} ${ids.join(', ')} ${ids.length > 1 ? 'sourcées' : 'sourcée'} par la réponse du lead`,
 };
@@ -96,4 +97,37 @@ export function commitMsgRefusal(root: string, message: string): string | null {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** Un texte coupé aux espaces à `width` colonnes (le corps d'un commit : `body-max-line-length` de commitlint). */
+function wrap(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (line && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line ? `${line} ${word}` : word;
+    }
+  }
+  return line ? [...lines, line] : lines;
+}
+
+/**
+ * Le message du commit de `spec reseal` (L546) : le sujet est court et fixe (comme `spec green`), les chemins, la raison (coupée à 90 colonnes) et la fiche amendée,
+ * sans borne, vont dans le corps ; un sujet qui les portait dépassait `header-max-length` de commitlint. `livre` : l'id du lot livré rescellé par le lot `cite`.
+ */
+export function resealCommitMessage(o: { cite: string; livre?: string; tests: string[]; reason: string; ficheAmendee?: string }): [subject: string, body: string] {
+  const subject = `test(${o.cite}): acceptation rescellée${o.livre ? ` du lot livré ${o.livre}` : ''}`;
+  const body = [...o.tests.map((t) => `- ${t}`), '', ...wrap(`raison : ${o.reason.trim()}`, 90), ...(o.ficheAmendee ? ['', `fiche amendée en ${o.ficheAmendee}`] : [])].join('\n');
+  return [subject, body];
+}
+
+/** Ce que dit un hook qui refuse un commit : les règles de commitlint qui refusent (`… [header-max-length]`) d'abord, la fin de la sortie sinon (« found 1 problems » seul ne dit pas laquelle). */
+export function commitRefusal(e: unknown): string {
+  const out = e as { stderr?: string; stdout?: string; message: string };
+  const lines = (out.stderr || out.stdout || out.message).trim().split('\n');
+  const rules = lines.filter((l) => /\[[a-z][a-z0-9-]*\]\s*$/.test(l)).map((l) => l.replace(/^[✖✗⚠\s]+/, '').trim());
+  return (rules.length ? rules : lines.slice(-5)).join(' | ');
 }

@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join, posix, relative, resolve } from 'node:path';
 import { readOrchestrateConfig, readPlanConfig } from '../config.js';
 import { type Day } from '../dates.js';
-import { PLAN_ACTIONS, planCommitMessage } from '../plan-commit.js';
+import { commitRefusal, PLAN_ACTIONS, planCommitMessage, resealCommitMessage } from '../plan-commit.js';
 import { gitRoot } from '../git.js';
 import { Plan, RafError } from '../plan.js';
 import { waveHolding } from '../repo-busy.js';
@@ -122,8 +122,7 @@ function specGreen(args: string[], ctx: { root: string; loadPlan: () => Plan; co
     } catch {
       // rien d'indexé : rien à défaire
     }
-    const out = e as { stderr?: string; stdout?: string; message: string };
-    throw new RafError(`spec green : le commit a échoué, ${json} est revenu tel qu'avant la commande — ${(out.stderr || out.stdout || out.message).trim().split('\n').slice(-5).join(' | ')}`);
+    throw new RafError(`spec green : le commit a échoué, ${json} est revenu tel qu'avant la commande — ${commitRefusal(e)}`);
   }
   io.out(`${lotId} : ${json} → ${mode.fait}${sealed.scelles.length ? ` (${sealed.scelles.join(', ')})` : ''}, commit ${git(repo, ['rev-parse', '--short', 'HEAD']).trim()}${resceles.length ? ` ; empreintes rescellées (tests mis au point depuis le commit rouge) : ${resceles.join(', ')}` : ''}`);
   return 0;
@@ -147,15 +146,15 @@ function refuseWhileWaveHolds(ctx: { root: string; loadPlan: () => Plan }, comma
 }
 
 /**
- * `cadence spec reseal <lot> <test> --reason texte` (L200) : le chemin du lead quand un test d'acceptation scellé du lot EN COURS contredit la fiche.
- * Le test est corrigé dans l'arbre de travail (fiche inchangée, ou amendée et commitée par des commits du lot, L217) ; la commande refait l'empreinte de ce seul test, journalise la raison dans
- * acceptation.json, commite test + acceptation (le nouveau commit rouge), et note la raison au lot. Le verrou garde tout le reste.
+ * `cadence spec reseal <lot> <test>… --reason texte` (L200) : le chemin du lead quand un test d'acceptation scellé du lot EN COURS contredit la fiche.
+ * Les tests (un ou plusieurs, L546) sont corrigés dans l'arbre de travail (fiche inchangée, ou amendée et commitée par des commits du lot, L217) ; la commande refait l'empreinte des seuls tests nommés, journalise la raison dans
+ * acceptation.json, commite tests + acceptation en UN commit au sujet court et fixe, chemins et raison dans le corps (le nouveau commit rouge), et note la raison au lot. Le verrou garde tout le reste.
  */
 function specReseal(args: string[], reason: string | undefined, porteur: string | undefined, ctx: { root: string; loadPlan: () => Plan; configPath: string; today: Day }, io: Io): number {
-  if (args.length !== 2 || !reason?.trim()) throw new RafError('usage : cadence spec reseal <lot> <test> --reason "pourquoi le test contredit la fiche" [--porteur <lot en cours>, pour un lot livré]');
+  if (args.length < 2 || !reason?.trim()) throw new RafError('usage : cadence spec reseal <lot> <test>… --reason "pourquoi le test contredit la fiche" [--porteur <lot en cours>, pour un lot livré]');
   if (io.env.CADENCE_ORCHESTRATED) throw new RafError(`spec reseal refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead, hors session`);
   refuseWhileWaveHolds(ctx, 'spec reseal');
-  const [lotId, test] = args as [string, string];
+  const [lotId, ...tests] = args as [string, ...string[]];
   const plan = ctx.loadPlan();
   const lot = plan.lot(lotId);
   const repo = gitRoot(ctx.root) ?? ctx.root;
@@ -177,36 +176,38 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   // Le verrou du rescellé couvre tous les lots ouverts du dépôt, pas seulement le porteur : on refuse dès qu'un lot DE CE DÉPÔT, encore en cours au plan, reste ouvert dans une vague non terminée.
   const open = unfinishedWaves(ctx.root, repo, plan);
   if (open.length) throw new RafError(openWavesRefusal(open, 'spec reseal'));
-  const before = { json: readFileSync(join(repo, json), 'utf8'), test: existsSync(join(repo, test)) ? readFileSync(join(repo, test), 'utf8') : '' };
-  let r: { avant: string; apres: string; ficheAmendee?: string };
+  const norms = [...new Set(tests.map((t) => posix.normalize(t)))];
+  const before = { json: readFileSync(join(repo, json), 'utf8'), tests: norms.map((n) => ({ norm: n, text: existsSync(join(repo, n)) ? readFileSync(join(repo, n), 'utf8') : '' })) };
+  let r: ReturnType<typeof resealAcceptation>;
   try {
-    r = resealAcceptation(repo, json, test, reason, ctx.today, livre ? porteur : undefined, plan.refs, plan.lots().filter((l) => l.status === 'done').map((l) => l.id));
+    r = resealAcceptation(repo, json, norms, reason, ctx.today, livre ? porteur : undefined, plan.refs, plan.lots().filter((l) => l.status === 'done').map((l) => l.id));
   } catch (e) {
     throw new RafError((e as Error).message);
   }
-  const norm = posix.normalize(test);
+  const paths = [json, ...norms];
   try {
-    git(repo, ['add', '--', json, norm]);
-    git(repo, ['commit', '-q', '-m', `test(${cite}): acceptation rescellée${livre ? ` du lot livré ${lotId}` : ''}, ${norm} : ${reason.trim()}${r.ficheAmendee ? ` (fiche amendée en ${r.ficheAmendee})` : ''}`, '--', json, norm]);
+    git(repo, ['add', '--', ...paths]);
+    const [subject, body] = resealCommitMessage({ cite, livre: livre ? lotId : undefined, tests: norms, reason, ficheAmendee: r.ficheAmendee });
+    git(repo, ['commit', '-q', '-m', subject, '-m', body, '--', ...paths]);
   } catch (e) {
     // Atomique : un commit refusé (hook pre-commit, ...) ne laisse ni empreinte refaite ni index à moitié prêt ; le test retrouve le texte du lead.
     writeFileSync(join(repo, json), before.json);
-    writeFileSync(join(repo, norm), before.test);
+    for (const t of before.tests) writeFileSync(join(repo, t.norm), t.text);
     try {
-      git(repo, ['reset', '-q', '--', json, norm]);
+      git(repo, ['reset', '-q', '--', ...paths]);
     } catch {
       // rien d'indexé : rien à défaire
     }
-    const out = e as { stderr?: string; stdout?: string; message: string };
-    throw new RafError(`spec reseal : le commit du rescellé a échoué, ${json} et ${norm} sont revenus tels qu'avant la commande (rien n'est rescellé) — ${(out.stderr || out.stdout || out.message).trim().split('\n').slice(-5).join(' | ')}`);
+    throw new RafError(`spec reseal : le commit du rescellé a échoué, ${paths.join(', ')} sont revenus tels qu'avant la commande (rien n'est rescellé) — ${commitRefusal(e)}`);
   }
   const sha = git(repo, ['rev-parse', '--short', 'HEAD']).trim();
+  const detail = r.resceles.map((x) => `${x.test} (${x.avant.slice(0, 7)} → ${x.apres.slice(0, 7)})`).join(', ');
   // Un plan tenu par un autre outil ne se modifie pas d'ici : la raison est déjà dans acceptation.json et dans le commit, la note reste à la main du lead.
   if (plan.readonly) {
-    io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha}${r.ficheAmendee ? `, fiche amendée en ${r.ficheAmendee}` : ''} ; raison dans ${json} et dans le commit — note à ajouter au lot ${cite} avec l'outil du projet (plan en lecture seule)`);
+    io.out(`${lotId} : ${detail} rescellé(s), commit ${sha}${r.ficheAmendee ? `, fiche amendée en ${r.ficheAmendee}` : ''} ; raison dans ${json} et dans le commit — note à ajouter au lot ${cite} avec l'outil du projet (plan en lecture seule)`);
     return 0;
   }
-  plan.note(cite, `test d'acceptation rescellé${livre ? ` (lot livré ${lotId}, ` : ' ('}${norm}, ${r.ficheAmendee ? `fiche amendée en ${r.ficheAmendee}` : 'fiche inchangée'}) : ${reason.trim()}`, ctx.today);
+  plan.note(cite, `test d'acceptation rescellé${livre ? ` (lot livré ${lotId}, ` : ' ('}${norms.join(', ')}, ${r.ficheAmendee ? `fiche amendée en ${r.ficheAmendee}` : 'fiche inchangée'}) : ${reason.trim()}`, ctx.today);
   try {
     plan.save();
   } catch (e) {
@@ -222,14 +223,13 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
       // Les fichiers de plan.onWrite (L346) partent avec la note : la commande a tourné à l'écriture du plan.
       const withPlan = [planRel, ...dirtyPaths(repo, produced)];
       git(repo, ['add', '--', ...withPlan]);
-      git(repo, ['commit', '-q', '-m', planCommitMessage(readPlanConfig(join(repo, 'cadence.yaml'), repo)?.commit, { lot: cite, action: PLAN_ACTIONS.resealed(norm) }), '--', ...withPlan]);
+      git(repo, ['commit', '-q', '-m', planCommitMessage(readPlanConfig(join(repo, 'cadence.yaml'), repo)?.commit, { lot: cite, action: PLAN_ACTIONS.resealed }), '--', ...withPlan]);
     } catch (e) {
       // Le rescellé est fait (commit ${sha}) : on ne le défait pas, on dit où en est la note, au lieu d'une pile d'appels.
-      const out = e as { stderr?: string; stdout?: string; message: string };
-      throw new RafError(`spec reseal : le rescellé a eu lieu (commit ${sha}) mais le commit de la note du lot a échoué — la note est écrite dans ${planRel}, à commiter à la main (un plan sale arrêterait la vague suivante) — ${(out.stderr || out.stdout || out.message).trim().split('\n').slice(-5).join(' | ')}`);
+      throw new RafError(`spec reseal : le rescellé a eu lieu (commit ${sha}) mais le commit de la note du lot a échoué — la note est écrite dans ${planRel}, à commiter à la main (un plan sale arrêterait la vague suivante) — ${commitRefusal(e)}`);
     }
   }
-  io.out(`${lotId} : ${norm} rescellé (${r.avant.slice(0, 7)} → ${r.apres.slice(0, 7)}), commit ${sha}${r.ficheAmendee ? `, fiche amendée en ${r.ficheAmendee}` : ''} ; raison dans ${json} et en note du lot ${cite}${tracked ? '' : ' (plan à commiter)'}`);
+  io.out(`${lotId} : ${detail} rescellé(s), commit ${sha}${r.ficheAmendee ? `, fiche amendée en ${r.ficheAmendee}` : ''} ; raison dans ${json} et en note du lot ${cite}${tracked ? '' : ' (plan à commiter)'}`);
   return 0;
 }
 

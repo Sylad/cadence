@@ -60,7 +60,7 @@ describe('resealAcceptation : refaire l’empreinte d’un seul test, la fiche i
     expect(apres.empreintes[second]).toBe(avant.empreintes[second]);
     expect(apres.vert).toBe(false);
     expect(apres.resceaux).toEqual([{ test: a.test, raison: 'regex /\\d{1,2} / contre « T3 2027 annoncée »', date: '2026-10-12', avant: avant.empreintes[a.test], apres: apres.empreintes[a.test] }]);
-    expect(r.avant).toBe(avant.empreintes[a.test]);
+    expect(r.resceles).toEqual([{ test: a.test, avant: avant.empreintes[a.test], apres: apres.empreintes[a.test] }]);
   });
 
   it('après le commit du rescellé, le verrou est de nouveau muet ; il garde le reste (un autre test modifié reste un écart)', () => {
@@ -487,7 +487,8 @@ describe('cadence spec reseal d’un lot livré (L212)', () => {
     const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'onglet lu à « blank » en CI', '--porteur', 'L2');
     expect(r.err).toBe('');
     expect(r.code).toBe(0);
-    expect(git(repo, 'log', '-2', '--format=%s').split('\n')[1]).toBe(`test(L2): acceptation rescellée du lot livré L1, ${a.test} : onglet lu à « blank » en CI`);
+    expect(git(repo, 'log', '-2', '--format=%s').split('\n')[1]).toBe('test(L2): acceptation rescellée du lot livré L1');
+    expect(git(repo, 'log', '-2', '--format=%b').trim()).toContain(`- ${a.test}\n\nraison : onglet lu à « blank » en CI`);
     const doc = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
     expect(doc.vert).toBe(true);
     expect(doc.resceaux).toHaveLength(1);
@@ -649,7 +650,7 @@ describe('rescellé atomique et interdit aux sessions', () => {
 
 describe('aide de cadence', () => {
   it('liste cadence spec reseal, le seul chemin de correction d’un test scellé faux', () => {
-    expect(readFileSync(join(__dirname, '..', 'bin', 'cadence.js'), 'utf8')).toContain('cadence spec reseal <lot> <test> --reason');
+    expect(readFileSync(join(__dirname, '..', 'bin', 'cadence.js'), 'utf8')).toContain('cadence spec reseal <lot> <test>… --reason');
   });
 });
 
@@ -807,7 +808,7 @@ describe('cadence spec reseal avec une fiche amendée dans le lot (L217)', () =>
     const plan = readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8');
     expect(plan).toContain(`fiche amendée en ${sha}`);
     expect(plan).not.toContain('fiche inchangée');
-    expect(git(repo, 'log', '-2', '--format=%s').split('\n')[1]).toContain(`fiche amendée en ${sha}`);
+    expect(git(repo, 'log', '-2', '--format=%B%x00').split('\0')[1]).toContain(`fiche amendée en ${sha}`);
   });
 
   it('R6 — hook pre-commit qui refuse, fiche amendée : journal et test restaurés, fiche intacte', () => {
@@ -1102,5 +1103,151 @@ describe('cadence spec reseal d’un lot livré, fiche amendée par un autre lot
     const r = reseal(repo, a.test);
     expect(r.code).not.toBe(0);
     expect(r.err).toContain('ne cite ni L1');
+  });
+});
+
+// L546 (issue #23) : plusieurs tests d'un même lot rescellés d'une commande et d'un commit, au sujet court et fixe, et la règle de commitlint qui refuse citée.
+describe('cadence spec reseal <lot> <test> <test>… (L546, issue #23)', () => {
+  const cli = (repo: string, ...argv: string[]) => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = run(argv, { cwd: repo, env: { RAF_TODAY: '2026-11-03' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-11-03T10:00:00') });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  };
+  const touche = (repo: string, ...tests: string[]) => { for (const t of tests) writeFileSync(join(repo, t), `${readFileSync(join(repo, t), 'utf8')}// réécrit par le porteur\n`); };
+  /** L1 livré, L2 en cours (porteur) ; `troisieme` ajoute un troisième test scellé que le verrou doit garder. */
+  function livre(troisieme = false) {
+    const s = lotScelle({ vert: true });
+    const third = 'test/troisieme.acceptation.test.ts';
+    if (troisieme) {
+      writeFileSync(join(s.repo, third), "it('troisième', () => { throw new Error('rouge'); });\n");
+      const doc = JSON.parse(readFileSync(join(s.repo, s.a.json), 'utf8'));
+      doc.fichiers.push(third);
+      doc.empreintes[third] = git(s.repo, 'hash-object', third).trim();
+      writeFileSync(join(s.repo, s.a.json), JSON.stringify(doc, null, 2));
+      commitPaths(s.repo, 'test(L1): troisième fichier', third, s.a.json);
+    }
+    cli(s.repo, 'init', '--project', 'demo');
+    cli(s.repo, 'add', 'Lot un');
+    cli(s.repo, 'add', 'Lot deux');
+    cli(s.repo, 'start', 'L1');
+    cli(s.repo, 'done', 'L1', '--force');
+    cli(s.repo, 'start', 'L2');
+    commitPaths(s.repo, 'plan: L1 L2', '.cadence/raf.yaml', '.cadence/notes/.gitkeep', '.gitignore');
+    return { ...s, third };
+  }
+  const commitMsgHook = (repo: string, body: string) => {
+    const hook = join(repo, '.git', 'hooks', 'commit-msg');
+    writeFileSync(hook, `#!/bin/sh\n${body}\n`);
+    chmodSync(hook, 0o755);
+  };
+
+  it('R1 — deux tests d’un lot livré, une commande, UN commit : les deux empreintes refaites, deux entrées au journal, le verrou muet', () => {
+    const { repo, a, second } = livre();
+    touche(repo, a.test, second);
+    const r = cli(repo, 'spec', 'reseal', 'L1', a.test, second, '--reason', 'deux tests réécrits par L2', '--porteur', 'L2');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(git(repo, 'log', '--format=%s', '-3').split('\n')[1]).toBe('test(L2): acceptation rescellée du lot livré L1');
+    expect(git(repo, 'show', '--name-only', '--format=', 'HEAD~1').split('\n').filter(Boolean).sort()).toEqual([a.json, a.test, second].sort());
+    const doc = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
+    expect(doc.resceaux.map((e: { test: string }) => e.test)).toEqual([a.test, second]);
+    expect(doc.vert).toBe(true);
+    expect(r.out).toContain(a.test);
+    expect(r.out).toContain(second);
+    expect(git(repo, 'status', '--porcelain').trim()).toBe('');
+    expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
+  });
+
+  it('R2 — le sujet est court et fixe, les chemins et la raison vont dans le corps, une ligne chacun', () => {
+    const { repo, a, second } = livre();
+    touche(repo, a.test, second);
+    const raison = `${'raison très longue '.repeat(12)}fin`;
+    expect(cli(repo, 'spec', 'reseal', 'L1', a.test, second, '--reason', raison, '--porteur', 'L2').code).toBe(0);
+    const msg = git(repo, 'log', '-2', '--format=%B%x00').split('\0')[1]!.trim().split('\n');
+    expect(msg[0]!.length).toBeLessThanOrEqual(72);
+    expect(msg[1]).toBe('');
+    expect(msg).toContain(`- ${a.test}`);
+    expect(msg).toContain(`- ${second}`);
+    expect(msg.every((l) => l.length <= 100)).toBe(true);
+    expect(msg.join(' ').replace(/\s+/g, ' ')).toContain(raison);
+  });
+
+  it('R2 — le même sujet court sert à un lot en cours (un seul test), la fiche amendée va dans le corps', () => {
+    const s = lotScelle();
+    cli(s.repo, 'init', '--project', 'demo');
+    cli(s.repo, 'add', 'Lot un');
+    cli(s.repo, 'start', 'L1');
+    commitPaths(s.repo, 'plan: L1', '.cadence/raf.yaml', '.cadence/notes/.gitkeep', '.gitignore');
+    touche(s.repo, s.a.test);
+    expect(cli(s.repo, 'spec', 'reseal', 'L1', s.a.test, '--reason', 'contredit la fiche').code).toBe(0);
+    expect(git(s.repo, 'log', '-2', '--format=%s').split('\n')[1]).toBe('test(L1): acceptation rescellée');
+    expect(git(s.repo, 'log', '-2', '--format=%b').trim()).toContain(`- ${s.a.test}`);
+  });
+
+  it('R3 — un troisième test listé et touché reste un écart : refus nommant ce test, rien n’est écrit ni commité', () => {
+    const { repo, a, second, third } = livre(true);
+    touche(repo, a.test, second, third);
+    const json = readFileSync(join(repo, a.json), 'utf8');
+    const head = git(repo, 'rev-parse', 'HEAD').trim();
+    const r = cli(repo, 'spec', 'reseal', 'L1', a.test, second, '--reason', 'x', '--porteur', 'L2');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain(third);
+    expect(readFileSync(join(repo, a.json), 'utf8')).toBe(json);
+    expect(git(repo, 'rev-parse', 'HEAD').trim()).toBe(head);
+  });
+
+  it('R3 — un troisième test intact : les deux nommés se rescellent, l’empreinte du troisième est gardée', () => {
+    const { repo, a, second, third } = livre(true);
+    touche(repo, a.test, second);
+    expect(cli(repo, 'spec', 'reseal', 'L1', a.test, second, '--reason', 'x', '--porteur', 'L2').code).toBe(0);
+    const doc = JSON.parse(readFileSync(join(repo, a.json), 'utf8'));
+    expect(doc.empreintes[third]).toBe(git(repo, 'hash-object', third).trim());
+    expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
+  });
+
+  it('R4 — un des deux tests inchangé, non listé ou nommé deux fois : refus entier (ou entrée unique), acceptation.json intacte', () => {
+    const { repo, a, second } = livre();
+    touche(repo, a.test);
+    const json = readFileSync(join(repo, a.json), 'utf8');
+    expect(() => resealAcceptation(repo, a.json, [a.test, second], 'x', '2026-11-03')).toThrow(new RegExp(`${second.replace(/\./g, '\\.')} est inchangé depuis le scellé`));
+    expect(() => resealAcceptation(repo, a.json, [a.test, 'test/inconnu.test.ts'], 'x', '2026-11-03')).toThrow(/n'est pas listé/);
+    expect(readFileSync(join(repo, a.json), 'utf8')).toBe(json);
+    const r = resealAcceptation(repo, a.json, [a.test, `./${a.test}`], 'x', '2026-11-03');
+    expect(r.resceles).toHaveLength(1);
+    expect(JSON.parse(readFileSync(join(repo, a.json), 'utf8')).resceaux).toHaveLength(1);
+  });
+
+  it('R5 — le sujet court passe un commit-msg à header-max-length 100, là où l’ancien sujet (chemins + raison) était refusé', () => {
+    const { repo, a, second } = livre();
+    commitMsgHook(repo, 'head -n1 "$1" | awk \'{ if (length($0) > 100) { print "✖   header must not be longer than 100 characters [header-max-length]" > "/dev/stderr"; exit 1 } }\'');
+    touche(repo, a.test, second);
+    const r = cli(repo, 'spec', 'reseal', 'L1', a.test, second, '--reason', 'une raison '.repeat(15), '--porteur', 'L2');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+  });
+
+  it('R6 — un commit refusé par commitlint : l’erreur cite la règle qui refuse, pas seulement « found 1 problems »', () => {
+    const { repo, a, second } = livre();
+    commitMsgHook(repo, 'printf "⧗   input: test(L2): x\\n✖   header must not be longer than 100 characters, current length is 140 [header-max-length]\\n\\n✖   found 1 problems, 0 warnings\\nⓘ   Get help: https://github.com/conventional-changelog/commitlint/#what-is-commitlint\\n\\nhusky - commit-msg script failed (code 1)\\n" >&2; exit 1');
+    touche(repo, a.test, second);
+    const r = cli(repo, 'spec', 'reseal', 'L1', a.test, second, '--reason', 'x', '--porteur', 'L2');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(/header-max-length/);
+    expect(r.err).toMatch(/rien n'est rescellé/);
+  });
+
+  it('R6 — sans règle reconnaissable, la fin de la sortie du hook est gardée comme avant', () => {
+    const { repo, a } = livre();
+    commitMsgHook(repo, 'echo "refusé par le hook" >&2; exit 1');
+    touche(repo, a.test);
+    const r = cli(repo, 'spec', 'reseal', 'L1', a.test, '--reason', 'x', '--porteur', 'L2');
+    expect(r.err).toMatch(/refusé par le hook/);
+  });
+
+  it('usage : au moins un test, une raison', () => {
+    const { repo, a } = livre();
+    expect(cli(repo, 'spec', 'reseal', 'L1', '--reason', 'x', '--porteur', 'L2').err).toContain('usage : cadence spec reseal <lot> <test>');
+    expect(cli(repo, 'spec', 'reseal', 'L1', a.test, '--porteur', 'L2').err).toContain('usage');
   });
 });

@@ -146,26 +146,28 @@ export function sealAcceptation(repo: string, path: string): void {
 }
 
 /**
- * Rescelle UN test (L200, `cadence spec reseal`, le lead — jamais une session) : le test d'un lot en cours contredit sa fiche et le verrou total
- * ne laisse aucun chemin de correction. Seule l'empreinte du test nommé est refaite (les autres fichiers listés restent inchangés), la raison et les deux
+ * Rescelle un ou plusieurs tests (L200, L546, `cadence spec reseal`, le lead — jamais une session) : le test d'un lot en cours contredit sa fiche et le verrou total
+ * ne laisse aucun chemin de correction. Seules les empreintes des tests nommés sont refaites, tout ou rien (les autres fichiers listés restent inchangés), la raison et les deux
  * empreintes vont dans `resceaux`. Le commit (test + acceptation) est à faire : il devient le commit rouge.
  * La fiche est celle du commit rouge, ou (L217) une fiche amendée par des commits qui citent tous le lot (`refsOf` : `plan.refs`, lu comme `citedRefs` ;
  * lot livré : le lot, son `porteur` ou, L229, l'un des `livres`, les lots done du plan — la fiche vivante fait foi) et commitée : l'entrée porte alors `ficheAmendee`, le sha court du dernier commit qui l'a touchée.
  */
-export function resealAcceptation(repo: string, path: string, test: string, reason: string, today: string, porteur?: string, refsOf: (text: string) => Ref[] = () => [], livres: string[] = []): { avant: string; apres: string; lot: string; ficheAmendee?: string } {
+export function resealAcceptation(repo: string, path: string, test: string | string[], reason: string, today: string, porteur?: string, refsOf: (text: string) => Ref[] = () => [], livres: string[] = []): { resceles: { test: string; avant: string; apres: string }[]; lot: string; ficheAmendee?: string } {
   const file = join(repo, path);
   const a = parseAcceptation(readFileSync(file, 'utf8'));
   if (typeof a === 'string') throw new Error(`${path} : ${a}`);
   if (!reason.trim()) throw new Error('--reason est obligatoire : la raison du rescellé va dans acceptation.json et en note du lot');
   if (porteur && !a.vert) throw new Error(`${path} n'est pas verte : un lot porteur (${porteur}) ne vaut que pour le test scellé d'un lot livré (vert: true)`);
-  const norm = posix.normalize(test);
+  const norms = [...new Set((Array.isArray(test) ? test : [test]).map((t) => posix.normalize(t)))];
   const fichiers = a.fichiers.map((f) => posix.normalize(f));
-  if (!fichiers.includes(norm)) throw new Error(`${test} n'est pas listé dans ${path} (fichiers : ${fichiers.join(', ')})`);
-  const avant = a.empreintes?.[norm];
-  if (!a.empreintes || !avant) throw new Error(`${path} n'est pas scellée (pas d'empreinte pour ${norm}) : l'étape accept n'est pas finie, rien à resceller`);
+  const inconnu = norms.find((n) => !fichiers.includes(n));
+  if (inconnu) throw new Error(`${inconnu} n'est pas listé dans ${path} (fichiers : ${fichiers.join(', ')})`);
+  const nonScelle = norms.find((n) => !a.empreintes?.[n]);
+  if (nonScelle) throw new Error(`${path} n'est pas scellée (pas d'empreinte pour ${nonScelle}) : l'étape accept n'est pas finie, rien à resceller`);
   const red = redSha(repo, path);
   if (!red) throw new Error(`${path} : pas de commit rouge lisible`);
-  if (!existsSync(join(repo, norm))) throw new Error(`${norm} : fichier absent (un test supprimé ne se rescelle pas)`);
+  const absent = norms.find((n) => !existsSync(join(repo, n)));
+  if (absent) throw new Error(`${absent} : fichier absent (un test supprimé ne se rescelle pas)`);
   // Une fiche modifiée dans l'arbre de travail ou l'index n'est pas celle d'un commit du lot : elle se commite d'abord.
   if (git(repo, 'status', '--porcelain', '--', a.fiche).trim() !== '') throw new Error(`la fiche ${a.fiche} a des modifications non commitées : la commiter (en citant ${a.lot}) avant le rescellé`);
   let ficheAmendee: string | undefined;
@@ -181,16 +183,18 @@ export function resealAcceptation(repo: string, path: string, test: string, reas
     if (fautif) throw new Error(`la fiche ${a.fiche} a été modifiée depuis le commit rouge ${red.slice(0, 7)} par un commit qui ne cite pas ${a.lot} : ${fautif.sha.slice(0, 7)}`);
     ficheAmendee = commits[0]?.sha.slice(0, 7);
   }
-  const touches = fichiers.filter((f) => f !== norm && (!gitOk(repo, 'diff', '--quiet', red, '--', f) || !existsSync(join(repo, f)) || a.empreintes?.[f] !== git(repo, 'hash-object', '--', f).trim()));
-  if (touches.length) throw new Error(`autre(s) test(s) listé(s) modifié(s) depuis le commit rouge : ${touches.join(', ')} (le rescellé ne couvre que ${norm}, le verrou garde le reste)`);
-  const apres = git(repo, 'hash-object', '--', norm).trim();
-  if (apres === avant) throw new Error(`${norm} est inchangé depuis le scellé : rien à resceller`);
+  const touches = fichiers.filter((f) => !norms.includes(f) && (!gitOk(repo, 'diff', '--quiet', red, '--', f) || !existsSync(join(repo, f)) || a.empreintes?.[f] !== git(repo, 'hash-object', '--', f).trim()));
+  if (touches.length) throw new Error(`autre(s) test(s) listé(s) modifié(s) depuis le commit rouge : ${touches.join(', ')} (le rescellé ne couvre que ${norms.join(', ')}, le verrou garde le reste)`);
+  // Tout ou rien : un test nommé inchangé refuse la commande entière, avant la moindre écriture.
+  const resceles = norms.map((norm) => ({ test: norm, avant: a.empreintes![norm]!, apres: git(repo, 'hash-object', '--', norm).trim() }));
+  const inchanges = resceles.filter((r) => r.apres === r.avant).map((r) => r.test);
+  if (inchanges.length) throw new Error(`${inchanges.map((t) => `${t} est inchangé depuis le scellé`).join(' ; ')} : rien à resceller`);
   const doc = JSON.parse(readFileSync(file, 'utf8')) as Obj;
-  (doc.empreintes as Record<string, string>)[norm] = apres;
+  for (const r of resceles) (doc.empreintes as Record<string, string>)[r.test] = r.apres;
   const journal = Array.isArray(doc.resceaux) ? doc.resceaux : [];
-  doc.resceaux = [...journal, { test: norm, raison: reason.trim(), date: today, avant, apres, ...(porteur ? { porteur } : {}), ...(ficheAmendee ? { ficheAmendee } : {}) }];
+  doc.resceaux = [...journal, ...resceles.map((r) => ({ test: r.test, raison: reason.trim(), date: today, avant: r.avant, apres: r.apres, ...(porteur ? { porteur } : {}), ...(ficheAmendee ? { ficheAmendee } : {}) }))];
   writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
-  return { avant, apres, lot: a.lot, ...(ficheAmendee ? { ficheAmendee } : {}) };
+  return { resceles, lot: a.lot, ...(ficheAmendee ? { ficheAmendee } : {}) };
 }
 
 /** Les acceptations de `dir` à `vert: false` au HEAD : leur chemin et le lot qu'elles portent. Un fichier illisible n'en est pas une. */

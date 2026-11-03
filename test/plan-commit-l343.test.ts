@@ -95,7 +95,7 @@ describe('R3 — le gabarit s\'applique à tous les commits de plan écrits par 
     git(repo, 'commit', '-q', '-m', 'test(L1): scellée');
     writeFileSync(join(repo, a.test), `${readFileSync(join(repo, a.test), 'utf8')}// corrigé\n`);
     expect(cli('spec', 'reseal', 'L1', a.test, '--reason', 'le test contredit la fiche')).toBe(0);
-    expect(git(repo, 'log', '-1', '--format=%s')).toBe(`chore(L1): test d'acceptation rescellé (${a.test})`);
+    expect(git(repo, 'log', '-1', '--format=%s')).toBe("chore(L1): test d'acceptation rescellé");
   });
 });
 

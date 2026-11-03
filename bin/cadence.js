@@ -70,9 +70,9 @@ if (tool === 'raf') {
                     les invariants d'une fiche d'écran, back ou mixte (étape spec ; gabarits templates/fiche.yaml, fiche-back.yaml) ; code 1 si un écart, 2 si illisible
   cadence spec qa <fiche.yaml>
                     la section de docs/qa/expectations.md dérivée de la fiche (shows, never, api), sur la sortie standard
-  cadence spec reseal <lot> <test> --reason "pourquoi" [--porteur <lot en cours>]
-                    le chemin du lead quand un test d'acceptation scellé du lot en cours contredit la fiche : le test corrigé dans l'arbre,
-                    l'empreinte de ce seul test refaite, la raison dans acceptation.json et en note du lot ; hors vague orchestrée.
+  cadence spec reseal <lot> <test>… --reason "pourquoi" [--porteur <lot en cours>]
+                    le chemin du lead quand un test d'acceptation scellé du lot en cours contredit la fiche : le ou les tests corrigés dans l'arbre,
+                    l'empreinte des seuls tests nommés refaite (un seul commit, tout ou rien), la raison dans acceptation.json et en note du lot ; hors vague orchestrée.
                     Lot livré (vert: true), test instable au contrat inchangé : --porteur nomme le lot en cours qui porte la correction
   cadence skills install [--dir .claude] [--force]
                     installe les skills Claude Code session-start, session-close, deliver et l'agent ux-reviewer`);

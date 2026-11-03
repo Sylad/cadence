@@ -6,6 +6,7 @@ import { sharedStateDir } from '../src/state.js';
 import { activeLock, REPO_LOCK } from '../src/orchestrate/lock.js';
 import { linkNodeBin } from '../src/orchestrate/node-env.js';
 import { INTEGRATION_LOCK } from '../src/orchestrate/integrate.js';
+import { RunStore } from '../src/orchestrate/state.js';
 import { cadenceHome, liveSlots, liveWaves, registerWave } from '../src/orchestrate/registry.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
 import { branches, conflictWave, fake, inWorktree, lotOf, meeting, planOf, run, setup, sharedFile, store, subjects, writes } from './orchestrate-worktree-harness.js';
@@ -451,6 +452,10 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
     const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
     git(repo, 'checkout', '-q', 'main');
     const sleeper = await otherWaveHolds(repo, null, 'autre-vague');
+    const launch = tempDir();
+    const holderStore = RunStore.reserve(launch, 'autre-vague')!; // la vague porteuse est inscrite, aucun de ses lots n'écrit dans l'arbre principal
+    holderStore.writeWave({ id: 'autre-vague', status: 'running', created: 'x', lots: [] } as never);
+    registerWave(cadenceHome(), { pid: sleeper.pid!, wave: 'autre-vague', started: 'x', cwd: launch, repos: [repo] });
     const t0 = Date.now();
     try {
       const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }), { repoWait: { waitMs: 20_000, pollMs: 50 } });
@@ -463,7 +468,7 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
       expect(store(parent).readLot('a', lot)!.status).toBe('ready');
       expect(subjects(repo).some((s) => s.startsWith(`feat(${lot})`))).toBe(true);
       expect(activeLock(join(sharedStateDir(repo), REPO_LOCK))?.pid).toBe(sleeper.pid); // le verrou de l'autre vague n'est ni pris ni retiré
-      expect(liveWaves(cadenceHome())).toHaveLength(0);
+      expect(liveWaves(cadenceHome()).map((w) => w.wave)).toEqual(['autre-vague']); // la reprise ne s'inscrit pas : seule la vague porteuse reste
     } finally {
       sleeper.kill();
     }

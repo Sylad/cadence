@@ -3,6 +3,9 @@ import { spawn } from 'node:child_process';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sharedStateDir } from '../src/state.js';
+import { registerWave } from '../src/orchestrate/registry.js';
+import { newLot, RunStore } from '../src/orchestrate/state.js';
+import { HYPOTHESES_HANDBACK } from '../src/orchestrate/cycle.js';
 import { activeLock, REPO_LOCK } from '../src/orchestrate/lock.js';
 import { lotTreeDir } from '../src/orchestrate/worktree.js';
 import { claudeOut, git, reviewReport, workReport } from './orchestrate-harness.js';
@@ -108,6 +111,39 @@ describe('L553 — cas où l\'intégration doit continuer d\'attendre', () => {
     const sleeper = holder(repo, 'autre-vague');
     try {
       const r = await run(parent, ['--resume', WAVE], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
+      expect(r.out).not.toContain("l'intégration passe entre ses étapes");
+      expect(r.code).toBe(2);
+    } finally {
+      sleeper.kill();
+    }
+  });
+  it('R1 — la vague porteuse a un lot en implémentation dans l\'arbre principal (sans worktree) — l\'intégration y écrirait sous sa session : attendre puis refuser (2)', async () => {
+    const { parent, repo, lot } = await handedBack();
+    const sleeper = holder(repo, 'autre-vague');
+    const launch = tempDir();
+    const other = RunStore.reserve(launch, 'autre-vague')!;
+    other.writeWave({ id: 'autre-vague', status: 'running', created: 'x', lots: ['a:L9'] } as never);
+    other.writeLot({ ...newLot({ project: 'a', repo, lot: 'L9', title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false }), status: 'implementing' });
+    registerWave(process.env.CADENCE_HOME!, { pid: sleeper.pid!, wave: 'autre-vague', started: 'x', cwd: launch, repos: [repo] });
+    try {
+      const r = await run(parent, ['--resume', WAVE, '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
+      expect(r.out).not.toContain("l'intégration passe entre ses étapes");
+      expect(r.out).toContain('attente de sa fin');
+      expect(r.code).toBe(2);
+    } finally {
+      sleeper.kill();
+    }
+  });
+  it('R2 — --replay d\'un lot rendu sur des notes d\'hypothèses (il rejouera des sessions) — ne passe pas entre les étapes : attendre puis refuser (2)', async () => {
+    const { parent, repo, lot } = await handedBack();
+    const l = store(parent).readLot('a', lot)!;
+    l.next = 'implement' as typeof l.next;
+    l.status = 'handed-back';
+    l.outcome = `${HYPOTHESES_HANDBACK}refusées`;
+    store(parent).writeLot(l);
+    const sleeper = holder(repo, 'autre-vague');
+    try {
+      const r = await run(parent, ['--resume', WAVE, '--replay', `a:${lot}`], fake(), { repoWait: { waitMs: 300, pollMs: 50 } });
       expect(r.out).not.toContain("l'intégration passe entre ses étapes");
       expect(r.code).toBe(2);
     } finally {

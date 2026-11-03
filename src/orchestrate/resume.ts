@@ -12,6 +12,7 @@ import { type SessionKind } from './launch.js';
 import { activeLock, REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { trackedDirty } from './depot.js';
 import { adoptLeadReview, depositIntegrations, depositsOnly, integrationText, runsElsewhere } from './integration-vivante.js';
+import { mainTreeWorkers } from './main-tree.js';
 import { baseBranchOf, keptLines, lotBranch, lotTreeDir } from './worktree.js';
 import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
@@ -179,6 +180,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
   // L553 : dépôts tenus par une AUTRE vague vivante dont la reprise ne prend pas le verrou (voir `passesBetweenSteps`).
   const shared = new Set<string>();
   const stopBefore = store.control().stopAfterCurrent;
+  const playsIntegrationOnly = (l: LotState) => integ.includes(l) && (l.next === 'integrate' || leadReviewed.has(l)) && existsSync(join(lotTreeDir(store.dir, l.project, l.lot, l.repo), '.git'));
   try {
     for (const repo of new Set(live.flatMap(lotRepoPaths))) {
       const file = join(sharedStateDir(repo), REPO_LOCK);
@@ -202,7 +204,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
           break;
         }
         // L553 : l'intégration d'un lot en worktree n'attend pas la fin d'une autre vague : comme un push du lead, elle passe entre ses étapes (son rebase rejoue si `main` avance, le verrou d'intégration les départage).
-        if (waitFor && passesBetweenSteps(store, live, integ, repo, busy)) {
+        if (waitFor && passesBetweenSteps(live, playsIntegrationOnly, repo, busy)) {
           shared.add(repo);
           io.out(`orchestrate : ${basename(repo)} : tenu par la vague ${busy.wave} (pid ${busy.pid}) : l'intégration passe entre ses étapes, sans attendre sa fin`);
           break;
@@ -327,11 +329,12 @@ function markRemoved(l: LotState, waveId: string, store: RunStore, io: Orchestra
 }
 
 /**
- * L553 : le verrou du dépôt est celui d'une autre VAGUE (pas une tâche locale du lead, qui écrit dans l'arbre principal) et la reprise n'y joue que des intégrations de lots
- * qui ont leur worktree : rien d'autre n'écrit dans le dépôt, l'intégration est déjà sérialisée par son propre verrou.
+ * L553 : le verrou du dépôt est celui d'une autre VAGUE (pas une tâche locale du lead, qui écrit dans l'arbre principal), aucune de ses sessions ne travaille dans l'arbre principal
+ * (`mainTreeWorkers`, L475 : `main` avancerait sous elle) et la reprise n'y joue que des intégrations de lots qui ont leur worktree (rendus à l'étape d'intégration, ou revus par le lead :
+ * pas un `--replay` qui rejoue des sessions) : rien d'autre n'écrit dans le dépôt, l'intégration est déjà sérialisée par son propre verrou.
  */
-function passesBetweenSteps(store: RunStore, live: LotState[], integ: LotState[], repo: string, busy: { wave: string }): boolean {
-  return localLotOf(busy.wave) === null && live.filter((l) => lotRepoPaths(l).includes(repo)).every((l) => integ.includes(l) && existsSync(join(lotTreeDir(store.dir, l.project, l.lot, l.repo), '.git')));
+function passesBetweenSteps(live: LotState[], playsIntegrationOnly: (l: LotState) => boolean, repo: string, busy: { wave: string; pid: number }): boolean {
+  return localLotOf(busy.wave) === null && live.filter((l) => lotRepoPaths(l).includes(repo)).every(playsIntegrationOnly) && mainTreeWorkers(cadenceHome(), busy.pid, repo)?.length === 0;
 }
 
 /** Un lot repris par `--integrate` ou `--replay` repart suspendu : à l'intégration, ou à l'étape d'écriture de plan gardée ; avec la revue du lead hors vague quand elle tient lieu de revue (L370). */

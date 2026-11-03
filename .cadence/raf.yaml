@@ -1038,6 +1038,7 @@ lots:
     uses: [ cycle-ts ]
     created: 2026-10-31
     started: 2026-11-02
+    docs_ok: { date: 2026-11-03, reason: "découpage interne de cycle.ts (C1c) : aucune commande, clé, sortie ni export public changé ; même faux positif que corrige L542 (lead, 03-11)" }
   - id: L493
     title: "Nettoyage E : déclarer vite en devDependency, assertion manquante du R3 de orchestrate-registry.test.ts (décision de Sylvain 31-10 ; détail, mesures et tests protecteurs dans docs/mesures/audit-simplification-l461.md § E ; sans changement de comportement ; la ligne de base du cliquet doit baisser)"
     status: done

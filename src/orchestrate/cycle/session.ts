@@ -25,7 +25,6 @@ import { docsConfig, briefFor } from './brief.js';
 /** Ce qu'une session rend : son étape, son rapport, le dépôt du lot et ses dépôts voisins (`others`) vus avant et après. */
 export type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapshot; others: { repo: LotRepo; before: Snapshot; after: Snapshot }[] };
 
-
 /** Modèle d'une revue (L108) : la revue légère d'un lot léger tant qu'aucune correction n'a eu lieu, sinon la revue complète (UX comprise). */
 function reviewModel(c: LotCtx, kind: SessionKind): AnyModel {
   const { light, full } = c.config.review;

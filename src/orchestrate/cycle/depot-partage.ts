@@ -28,6 +28,7 @@ interface RepoHoldsCtx {
   log: (line: string) => void;
 }
 
+/** Le registre des vagues vivantes : dépôts tenus et créneaux occupés ; illisible, le décompte reste celui du dernier écrit. */
 export function updateWaveReposSafe(home: string, repos: string[], lanes: number | undefined): void {
   try {
     updateWaveRepos(home, process.pid, repos, lanes);

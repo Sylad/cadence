@@ -62,7 +62,7 @@ describe('R1 — les deux causes dominantes viennent du tableau mesuré', () => 
 
   it('R1 — égalité en deuxième place : l\'ordre de SOUS_CAUSES tranche (cas du tableau du document)', () => {
     const [, second] = retenues;
-    const ex = tableau.filter((l) => l.cause !== 'autre' && l.cause !== retenues[0] && l.passes === tableau.find((t) => t.cause === second)!.passes);
+    const ex = tableau.filter((l) => l.cause !== 'autre' && l.cause !== retenues[0] && l.cause !== second && l.passes === tableau.find((t) => t.cause === second)!.passes);
     // toutes les causes à égalité avec la deuxième passent derrière elle dans SOUS_CAUSES
     for (const e of ex) expect(SOUS_CAUSES.indexOf(second!)).toBeLessThanOrEqual(SOUS_CAUSES.indexOf(e.cause));
     // et le document dit la part des deux causes parmi les passes bug-code

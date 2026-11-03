@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- `orchestrate/cycle.ts` is split, second part (L491, C1b of `docs/mesures/audit-simplification-l461.md`): `session` and its guards (third-party repositories, lead push, moved HEAD, stray files, plan touched in the worktree) move to `src/orchestrate/cycle/session.ts`; `summarize` joins the report shapes in `schemas.ts`. No change of behaviour; the `max-lines` baseline of `cycle.ts` goes from 1893 to 1382, the total does not rise.
+
 ## [1.45.0] - 2026-11-03
 
 ### Added
@@ -109,7 +113,6 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - The « Self-check before handing back » list of the `implement` brief gains two bullets marked `[L543]` for the two dominant sub-causes of the code bugs (L543, [docs/mesures/bug-code-2026-11-03.md](docs/mesures/bug-code-2026-11-03.md), `docs/orchestrate.md`): on the 27-10 → 03-11 window, 131 of the 208 `bug-code` passes are edge cases and 37 misread contracts. The session writes a trace in its report (one line « entrée → attendu → obtenu » per listed input; the word of each rule and the line of code that holds it) before handing back. No other brief changes; the measure on two windows is written, the « after » lines stay to be measured.
 - `orchestrate/cycle.ts` is split, first part (L490, C1a of `docs/mesures/audit-simplification-l461.md`): the context, the budget, the session briefs and the plan writes move to `src/orchestrate/cycle/` (`ctx`, `budget`, `brief`, `plan-writes`), `cycle.ts` stays the entry point and re-exports their public names. No change of behaviour; the `max-lines` baseline of `cycle.ts` goes from 2360 to 1893.
-- `orchestrate/cycle.ts` is split, second part (L491, C1b of `docs/mesures/audit-simplification-l461.md`): `session` and its guards (third-party repositories, lead push, moved HEAD, stray files, plan touched in the worktree) move to `src/orchestrate/cycle/session.ts`; `summarize` joins the report shapes in `schemas.ts`. No change of behaviour; the `max-lines` baseline of `cycle.ts` goes from 1893 to 1382, the total does not rise.
 
 ### Fixed
 

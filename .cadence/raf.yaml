@@ -1313,11 +1313,12 @@ lots:
       - { date: 2026-11-02, text: "[L519/t1] abandonné : devient un lot à part (L519 clos)" }
   - id: L520
     title: "Créneaux : une vague réserve le plafond entier pour des lots qui attendent une dépendance (01-11 : vague cadence L517 → L518, L519 en worktrees, 1 session réelle, « créneaux libres : 0 sur 3 » pendant ~1 h) ; ne compter que les lots qui peuvent démarrer (dépendances prêtes), ou un créneau par dépôt tant qu'ils attendent"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-01
     notes:
       - { date: 2026-11-03, text: "03-11 (vu par Sylvain deux fois, barre à « 2 libres sur 3 ») : même effet pour un lot dans sa PORTE de tests (vitest, pas de session claude) — la vague 1345-l552 compte L492/L542/L552 en porte comme 3 créneaux pris, 1 seule session claude réelle, L551 et L469 en attente. Élargir le lot : un lot en porte (ou en attente de dépendance) ne tient pas un créneau de session ; la porte a sa propre borne de charge (CADENCE_TEST_WORKERS ou une limite de portes simultanées)." }
+    started: 2026-11-03
   - id: L521
     title: "Livraison pendant une vague dans un dépôt SANS worktrees : raf done et la note de deliver --sha écrivent le plan dans l'arbre où la vague travaille, et la vague rend le lot suivant « dépôt sale après implement » (01-11, avatar L57 après la livraison de L56) ; raf done pendant une vague de l'arbre partagé diffère son écriture (ou l'écrit hors de l'arbre) jusqu'à la fin de l'étape, et le skill lead dit l'ordre sûr"
     status: todo

@@ -99,16 +99,19 @@ export function commitMsgRefusal(root: string, message: string): string | null {
   }
 }
 
-/** Un texte coupé aux espaces à `width` colonnes (le corps d'un commit : `body-max-line-length` de commitlint). */
+/** Un texte coupé aux espaces à `width` colonnes (le corps d'un commit : `body-max-line-length` de commitlint) ; un mot plus long que la ligne est coupé en morceaux, sauf une URL (commitlint l'exempte). */
 function wrap(text: string, width: number): string[] {
   const lines: string[] = [];
   let line = '';
-  for (const word of text.split(/\s+/).filter(Boolean)) {
-    if (line && line.length + 1 + word.length > width) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = line ? `${line} ${word}` : word;
+  for (const mot of text.split(/\s+/).filter(Boolean)) {
+    const morceaux = mot.length > width && !/^https?:\/\//.test(mot) ? mot.match(new RegExp(`.{1,${width}}`, 'g')) ?? [mot] : [mot];
+    for (const word of morceaux) {
+      if (line && line.length + 1 + word.length > width) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = line ? `${line} ${word}` : word;
+      }
     }
   }
   return line ? [...lines, line] : lines;
@@ -126,8 +129,8 @@ export function resealCommitMessage(o: { cite: string; livre?: string; tests: st
 
 /** Ce que dit un hook qui refuse un commit : les règles de commitlint qui refusent (`… [header-max-length]`) d'abord, la fin de la sortie sinon (« found 1 problems » seul ne dit pas laquelle). */
 export function commitRefusal(e: unknown): string {
-  const out = e as { stderr?: string; stdout?: string; message: string };
-  const lines = (out.stderr || out.stdout || out.message).trim().split('\n');
+  const out = (typeof e === 'object' && e !== null ? e : { message: String(e) }) as { stderr?: string; stdout?: string; message?: string };
+  const lines = [out.stderr, out.stdout, out.message].map((t) => (t ?? '').trim()).filter(Boolean).join('\n').split('\n');
   const rules = lines.filter((l) => /\[[a-z][a-z0-9-]*\]\s*$/.test(l)).map((l) => l.replace(/^[✖✗⚠\s]+/, '').trim());
-  return (rules.length ? rules : lines.slice(-5)).join(' | ');
+  return (rules.length ? rules : lines.slice(-5)).join(' | ').trim() || 'le hook de commit a refusé, sans rien dire';
 }

@@ -1604,9 +1604,10 @@ lots:
     started: 2026-11-03
   - id: L547
     title: "cadence-hud (issue #24) : sans vague vivante, les barres de projets suivent le cwd de la dernière vague finie (ou de la session), pas le dossier qui porte priority: — quand un dossier avec priority: englobe le cwd de la vague, le tour s'y lance (une barre par projet), quel que soit le dossier de la vague ou du shell"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-03
+    started: 2026-11-03
   - id: L548
     title: "Issues GitHub suivies par le plan (03-11 : #20 et #21 réglées en 1.38.1 et 1.42.1 restées ouvertes, rappel de Sylvain) : cadence lead tour liste les issues ouvertes du dépôt (gh, si disponible) sans lot qui les cite et celles dont le lot est publié ; cadence release imprime pour chaque lot de la version qui cite « issue #n » la commande gh issue close avec un commentaire (lot + version) ; rien n'est fermé sans le lead"
     status: todo

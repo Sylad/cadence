@@ -1313,13 +1313,14 @@ lots:
       - { date: 2026-11-02, text: "[L519/t1] abandonné : devient un lot à part (L519 clos)" }
   - id: L520
     title: "Créneaux : une vague réserve le plafond entier pour des lots qui attendent une dépendance (01-11 : vague cadence L517 → L518, L519 en worktrees, 1 session réelle, « créneaux libres : 0 sur 3 » pendant ~1 h) ; ne compter que les lots qui peuvent démarrer (dépendances prêtes), ou un créneau par dépôt tant qu'ils attendent"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-01
     notes:
       - { date: 2026-11-03, text: "03-11 (vu par Sylvain deux fois, barre à « 2 libres sur 3 ») : même effet pour un lot dans sa PORTE de tests (vitest, pas de session claude) — la vague 1345-l552 compte L492/L542/L552 en porte comme 3 créneaux pris, 1 seule session claude réelle, L551 et L469 en attente. Élargir le lot : un lot en porte (ou en attente de dépendance) ne tient pas un créneau de session ; la porte a sa propre borne de charge (CADENCE_TEST_WORKERS ou une limite de portes simultanées)." }
     started: 2026-11-03
     review: { date: 2026-11-03, verdict: "compliant — orchestré (vague 2026-11-03-1605-cad, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant after 1 fix (CHANGELOG : restaurer le `### Changed` de 1.46.0 perdu à la rebase)", commit: 88fa0c9edf71dd3e89549af83dd67bd59158cec4 }
+    finished: 2026-11-03
   - id: L521
     title: "Livraison pendant une vague dans un dépôt SANS worktrees : raf done et la note de deliver --sha écrivent le plan dans l'arbre où la vague travaille, et la vague rend le lot suivant « dépôt sale après implement » (01-11, avatar L57 après la livraison de L56) ; raf done pendant une vague de l'arbre partagé diffère son écriture (ou l'écrit hors de l'arbre) jusqu'à la fin de l'étape, et le skill lead dit l'ordre sûr"
     status: todo
@@ -1717,8 +1718,15 @@ lots:
     status: todo
     estimate: 1
     created: 2026-11-03
+    notes:
+      - { date: 2026-11-03, text: "03-11 : même famille vue sur test/porte-deportee.test.ts › L403 R19 (délai : la commande distante arrêtée côté hôte, plus de processus du groupe) — rouge sous charge, vert seul (porte de L492) ; traiter les deux tests ensemble" }
   - id: L556
     title: "Hook du plugin « retour → geste » (03-11, après 1 h 40 perdue et 8 gestes refusés) : PostToolUse Bash qui, quand la sortie d'une commande cadence/raf contient un refus connu (« une orchestration y est déjà en cours », « tenu par la vague … attente de sa fin », « pas rendu à l'étape d'intégration », « la vague … tourne encore », « lot déjà dans la vague », « ne tient pas le budget du lot », « Unknown option '-- », code 137…) ajoute au contexte du lead le geste exact (même table que le lot du geste suivant imprimé, une seule source) ; plus un rappel quand une commande Bash du lead contient une boucle d'attente (while/until + pgrep -f) — même mécanisme que L502 --estimate 0.5 --spec"
+    status: todo
+    estimate: 1
+    created: 2026-11-03
+  - id: L557
+    title: "orchestrate (issue #26) : un --drop appliqué est consommé — --resume --wave <w> --integrate <lot> sur un lot retiré puis repris à la main et revu (raf review dans son worktree) l'intègre au lieu de rejouer le retrait (« handed-back — retiré de la vague (--drop) » ~30 s après « intégration reprise ») ; un --integrate explicite l'emporte sur un --drop déjà appliqué --estimate 0.25"
     status: todo
     estimate: 1
     created: 2026-11-03

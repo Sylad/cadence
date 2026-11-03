@@ -147,8 +147,8 @@ regles:
   - id: R7
     cas: [C1]
     enonce: "Si plan.transitions refuse doneState → deliveredState, le lot n'est pas marqué (ni delivered: ni état), deliver écrit un avertissement qui nomme le lot et les deux états, et la livraison reste verte (code 0)."
-    statut: hypothese
-    si_faux: "Si la transition devait être ignorée par la livraison (comme --force), le lot serait marqué malgré plan.transitions ; seul le sort de ce lot change, aucune donnée irréversible."
+    statut: sourcee
+    source: "réponse du lead (03-11) : la livraison respecte plan.transitions, elle ne contourne jamais une règle du plan posée par l'humain"
     tests: ["R7 — transition refusée : lot non marqué, avertissement, code 0", "R7 — transition permise : lot marqué"]
   - id: R8
     cas: [C1]

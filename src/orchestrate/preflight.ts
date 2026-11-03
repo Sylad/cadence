@@ -8,6 +8,7 @@ import { localLotRefusal } from '../local-task.js';
 import { Plan, isOpen } from '../plan.js';
 import { budgetStage, stageScreen } from './spec.js';
 import { ESCALATION_RESERVE } from './cycle.js';
+import { droppedAddSuffix } from './geste.js';
 import { type AnyModel } from './launch.js';
 import { projectName, type KnownLot } from './ajout.js';
 import { repoRefusals } from './depot.js';
@@ -99,7 +100,7 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
     const key = lotKey(t.project, t.lot);
     const already = opts.addTo?.lots.find((l) => l.project === t.project && l.lot === t.lot);
     if (already) {
-      refusals.push(`${key} : lot déjà ${already.queued ? "en file d'ajout dans" : 'dans'} la vague ${opts.addTo!.wave}`);
+      refusals.push(`${key} : lot déjà ${already.queued ? "en file d'ajout dans" : 'dans'} la vague ${opts.addTo!.wave}${droppedAddSuffix(already, key)}`);
       continue;
     }
     let env: ReturnType<typeof projectEnv>;

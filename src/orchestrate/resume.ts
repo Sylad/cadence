@@ -17,6 +17,7 @@ import { baseBranchOf, keptLines, lotBranch, lotTreeDir } from './worktree.js';
 import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState } from './state.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { launchPrices, renderTable } from './table.js';
+import { gestureSuffix, stillRunningRefusal } from './geste.js';
 import { SnapshotRefusal, repairSnapshotModules, snapshotExists, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, toolDirOf } from './snapshot.js';
 import { answerLive, control, singleUnfinished } from './status.js';
 import { continueRounds, execute } from './execute.js';
@@ -84,7 +85,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
   const info = deps.claudeInfo();
   if (!info) refusals.push('claude introuvable (CADENCE_CLAUDE_BIN, ou claude dans le PATH)');
   const alive = liveWaves(cadenceHome()).find((w) => w.wave === wave.id && w.cwd === launch && w.pid !== process.pid);
-  if (alive) refusals.push(`la vague ${alive.wave} tourne encore (pid ${alive.pid})`);
+  if (alive) refusals.push(stillRunningRefusal(alive, args.integrate));
   // Une vague terminée ne se reprend que pour rejouer un lot visé par --budget projet:lot=+N (L223) ; ce lot est vérifié plus bas.
   if (wave.status === 'done' && !args.lotBudgets.length && !args.integrate.length) refusals.push(`la vague ${wave.id} est terminée`);
 
@@ -154,7 +155,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
       if (r) leadReviewed.set(l, r);
       return r;
     })()) integ.push(l);
-    else if (l.status !== 'handed-back' || (l.next !== 'integrate' && !(t.replay && planNoteHandBack(l)))) refusals.push(`${opt} ${key} : le lot n'est pas rendu ${t.replay ? "à l'étape d'intégration ni sur une écriture de plan refusée" : "à l'étape d'intégration"} (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})`);
+    else if (l.status !== 'handed-back' || (l.next !== 'integrate' && !(t.replay && planNoteHandBack(l)))) refusals.push(`${opt} ${key} : le lot n'est pas rendu ${t.replay ? "à l'étape d'intégration ni sur une écriture de plan refusée" : "à l'étape d'intégration"} (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})${gestureSuffix(wave, l)}`);
     else integ.push(l);
   }
   // Un lot retiré ne jouera rien : il ne subit ni le verrou du dépôt, ni le .nvmrc, ni l'arbre sale — un refus pour LUI ne doit pas faire échouer la reprise des autres.
@@ -218,7 +219,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
           registerWave(cadenceHome(), { pid: process.pid, wave: wave.id, started: new Date().toISOString(), cwd: launch, repos: [] });
           waiting = true;
         }
-        if (announced !== busy.wave) io.out(`orchestrate : ${basename(repo)} : tenu par la vague ${busy.wave} (pid ${busy.pid}) : attente de sa fin avant de reprendre l'intégration`);
+        if (announced !== busy.wave) io.out(`orchestrate : ${basename(repo)} : tenu par la vague ${busy.wave} (pid ${busy.pid}) : attente de sa fin avant de reprendre l'intégration (l'attente ne réserve aucun créneau de session : les autres sessions ne sont pas bloquées)`);
         announced = busy.wave;
         await new Promise<void>((res) => setTimeout(res, Math.min(waitFor.pollMs, Math.max(1, deadline - Date.now()))));
       }

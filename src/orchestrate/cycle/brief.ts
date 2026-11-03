@@ -19,6 +19,7 @@ import { answeredText, ficheHasBack, findFiche, lightLot, ruleIdsSourcedByLead, 
 import { decisionsText, humanDecisions } from '../decisions.js';
 import { type Constat, type LotState } from '../state.js';
 import { git } from '../worktree.js';
+import { DOCS_GAP } from '../geste.js';
 import { type LotCtx, workDir as wd, histPlan, short, startSha, hasSpecStage } from './ctx.js';
 
 function lotCommitLines(c: LotCtx): string {
@@ -90,7 +91,7 @@ export function docGaps(c: LotCtx): { sync: DocSyncRule[]; gaps: DocSyncGap[] } 
 export function openDocGap(c: LotCtx): string | null {
   const { gaps } = docGaps(c);
   if (!gaps.length) return null;
-  return `documentation en retard (docs.sync) : ${gaps.flatMap((g) => g.touched).join(', ')} sans la documentation attendue, et aucun écart acquitté — écrire la documentation, ou \`raf docs-ok ${c.lot.lot} --reason "…"\` si elle reste vraie`;
+  return `${DOCS_GAP} : ${gaps.flatMap((g) => g.touched).join(', ')} sans la documentation attendue, et aucun écart acquitté — écrire la documentation, ou \`raf docs-ok ${c.lot.lot} --reason "…"\` si elle reste vraie`;
 }
 
 /** Consigne docs.sync du brief de revue (L143). */

@@ -15,7 +15,7 @@ import type { AnyModel } from './launch.js';
 export type AddEntry = { id: number; project?: string; lot: string; model?: string };
 
 /** Un lot de la vague (ou déjà en file d'ajout) vu par le contrôle préalable d'un ajout. */
-export type KnownLot = { project: string; lot: string; queued?: boolean };
+export type KnownLot = { project: string; lot: string; queued?: boolean; /** État du lot de la vague (absent d'un lot en file) : un lot retiré par --drop se relance dans une nouvelle vague (L554). */ status?: LotState['status']; outcome?: string | null };
 
 /** Où et avec quoi tourne la commande : sa sortie, ses dépendances et le dossier de lancement. */
 export interface RunEnv {

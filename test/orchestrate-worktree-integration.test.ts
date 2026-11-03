@@ -444,6 +444,7 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
       expect(again.err).toMatch(/^orchestrate : verrou de dépôt périmé retiré \(a, pid \d+ mort\)$/); // le verrou de l'autre vague, tombé avec son processus, est repris
       expect(again.code).toBe(0);
       expect(again.out.match(/a : tenu par la vague local:L9 \(pid \d+\) : attente de sa fin/g)).toHaveLength(1);
+      expect(again.out).toContain("l'attente ne réserve aucun créneau de session"); // L554
       expect(store(parent).readLot('a', lot)!.status).toBe('ready');
     } finally {
       sleeper.kill();

@@ -6,7 +6,7 @@ import { trackedDirty } from './depot.js';
 import { cadenceHome, liveWaves } from './registry.js';
 import { waveReadsIntegrateQueue } from './snapshot.js';
 import { lotKey, type LotState, type RunStore } from './state.js';
-import { resumeCommand } from './table.js';
+import { gestureSuffix, resumeCommand } from './geste.js';
 import { lotTreeDir } from './worktree.js';
 import type { OrchestrateIo } from './command.js';
 
@@ -44,7 +44,7 @@ function checkTarget(store: RunStore, t: { project?: string; lot: string }, seen
   const l = matches[0];
   const key = lotKey(l.project, l.lot);
   if (seen.includes(key)) return { refusal: `--integrate ${key} : lot visé deux fois` };
-  if (!integrationHandBack(store, l)) return { refusal: `--integrate ${key} : le lot n'est pas rendu à l'étape d'intégration (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})` };
+  if (!integrationHandBack(store, l)) return { refusal: `--integrate ${key} : le lot n'est pas rendu à l'étape d'intégration (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})${gestureSuffix({ id: store.id, status: store.readWave()?.status ?? '' }, l)}` };
   return { key };
 }
 

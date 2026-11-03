@@ -3,9 +3,11 @@ import { planLoader, type PriceGrid } from '../config.js';
 import { costView } from './cout.js';
 
 export { estimateLines, launchPrices } from './cout.js';
+export { resumeCommand } from './geste.js';
 import { gitRoot, isAncestor } from '../git.js';
 import { repoWork } from '../repos.js';
 import { quotaReset } from './result.js';
+import { gestureColumn, resumeCommand } from './geste.js';
 import { proposalLine, touchedReader, type TouchedSince } from './deja-traitee.js';
 import type { LotState, StepState, WaveState } from './state.js';
 
@@ -202,16 +204,7 @@ export function blockingLots(lots: LotState[], repo: string, sha: string, ancest
 /** Tests déjà rouges au départ listés un par un dans le tableau ; au-delà, un compte. */
 const BASELINE_LISTED = 30;
 
-/**
- * La commande de reprise d'une vague, SEULE forme que le programme imprime (L309) : `--resume --wave <id>` et non `--resume <id>`, car un id qui ressemble à un lot
- * (`suite2`) est lu comme un lot à lancer sans `--wave` (et refusé), et `--resume` sans vague est refusé dès que le dossier en garde plusieurs non terminées.
- * `extra` : les options qui suivent (`--drop a:L1`, `--integrate a:L1`...).
- */
-export function resumeCommand(waveId: string, ...extra: string[]): string {
-  return ['cadence orchestrate --resume --wave', waveId, ...extra].join(' ');
-}
-
-/** La commande qui répond à une question (L309) : la reprise ci-dessus, avec `--answer`. */
+/** La commande qui répond à une question (L309) : `resumeCommand` avec `--answer`. */
 export function resumeAnswerHint(waveId: string, l: Pick<LotState, 'project' | 'lot'>): string {
   return resumeCommand(waveId, '--answer', `${l.project}:${l.lot}`, '"…"');
 }
@@ -274,8 +267,10 @@ function perLotLines(lots: LotState[], out: string[], deps: { touchedSince?: Tou
 /** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. `compact` (L441, `--status`) : sans le détail des lots, une seule ligne renvoie à `--status --detail`. */
 export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[]; /** Fichier modifié par un commit du lot après la revue (L422) ; par défaut git, sur `lotCommits`. */ touchedSince?: TouchedSince; now?: number; compact?: boolean; /** Grille `perf.prices` (L529) : sans elle, ni colonne ni total en euros. */ prices?: PriceGrid | null } = {}): string[] {
   const cost = costView(lots, deps.prices);
-  const rows = lots.map((l, i) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`, ...cost.cells[i]!, String(l.suiteRuns ?? '—')]);
-  const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée', ...cost.head, 'suites'];
+  // L554 : une colonne « geste » (LE geste suivant exact d'un lot rendu) quand au moins un lot en a un.
+  const geste = gestureColumn(wave, lots);
+  const rows = lots.map((l, i) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`, ...cost.cells[i]!, String(l.suiteRuns ?? '—'), ...geste.cells[i]!]);
+  const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée', ...cost.head, 'suites', ...geste.head];
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
   const line = (r: string[]) => r.map((c, i) => c.padEnd(widths[i])).join('  ').trimEnd();
   const out = [line(head), ...rows.map(line)];

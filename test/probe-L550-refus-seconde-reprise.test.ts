@@ -50,7 +50,7 @@ describe('probe L550 — seconde reprise refusée', () => {
       expect(r.code).toBe(2);
       // La première reprise est inscrite vivante : le garde « tourne encore » refuse, et le verrou du dépôt tenu par une autre vague ajoute son propre refus.
       expect(r.err.trim().split('\n')).toEqual([
-        `orchestrate : la vague 2026-10-04-1412 tourne encore (pid ${s.pid})`,
+        `orchestrate : la vague 2026-10-04-1412 tourne encore (pid ${s.pid}) : à la fin de la vague : cadence orchestrate --resume --wave 2026-10-04-1412 --integrate a:${lot}`, // L554 : le geste
         `orchestrate : a : une orchestration y est déjà en cours (autre-vague, pid ${s.pid})`,
       ]);
       expect(activeLock(join(sharedStateDir(repo), REPO_LOCK))?.pid).toBe(s.pid);

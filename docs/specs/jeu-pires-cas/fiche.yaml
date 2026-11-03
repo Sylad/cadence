@@ -1,0 +1,140 @@
+sujet:
+  id: jeu-pires-cas
+  titre: Jeu de données « pires cas » capturé avec le jeu de démo par les étapes d'écran
+  lot: L534
+  perimetre:
+    modules: [src/orchestrate/spec.ts, src/orchestrate/briefs.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le jeu de données lui-même d'un produit : il vit dans le produit, à côté de son jeu de démo, et cadence n'en embarque pas"
+      - "une nouvelle clé de cadence.yaml pour déclarer le jeu (voir questions du rapport)"
+
+cas:
+  - id: C1
+    titre: Le spec-writer capture chaque état avec le jeu de démo et avec le jeu pires cas
+    acteur: le spec-writer d'un lot d'écran
+    declencheur: commande orchestrate (brief de l'étape spec, texte produit par specText)
+    preconditions:
+      - le lot déclare un écran (page ou maquette légère)
+      - le CLAUDE.md du projet décrit un mode dev ?data=worst branché au même endroit que la démo
+    nominal:
+      - Le brief demande de lire dans le CLAUDE.md du projet comment activer le jeu pires cas.
+      - Pour chaque état capturé de l'écran actuel (actuel-*), la session capture avec les deux jeux.
+      - Les captures du jeu pires cas sont nommées avec le suffixe « -pires-cas » avant la largeur.
+      - Les défauts vus (texte coupé, débordement, état vide mal gérée) corrigent la maquette ou deviennent une règle de la fiche.
+    alternatives:
+      - { si: le projet ne décrit aucun jeu pires cas, alors: la session capture avec le jeu de démo seul et le dit sous nonVerifie, sans en inventer un, regles: [R2] }
+      - { si: le lot est une fiche back sans écran, alors: le brief ne mentionne pas le jeu pires cas, regles: [R3] }
+    resultat: Chaque état de l'écran est vu avec des données typiques et avec des données extrêmes.
+  - id: C2
+    titre: Les revues ux-reviewer et qa-reviewer parcourent chaque état avec les deux jeux
+    acteur: ux-reviewer ou qa-reviewer
+    declencheur: briefs de revue de maquette, de revue ux et de passe qa
+    preconditions:
+      - le projet décrit le mode ?data=worst
+    nominal:
+      - La session lit la description du jeu dans le CLAUDE.md du projet.
+      - Elle parcourt chaque état à 1440 px et 390 px avec la démo, puis avec ?data=worst.
+      - Le rapport (liste à cocher) a une ligne par état, largeur et jeu.
+    alternatives:
+      - { si: le serveur est en production ou le mode dev est absent, alors: ?data=worst n'est pas utilisé, la session le dit sous nonVerifie, regles: [R4] }
+      - { si: le jeu pires cas montre un défaut, alors: sa gravité suit l'échelle existante, un texte coupé qui masque une action est majeur, sinon mineur, regles: [R5] }
+    resultat: Le rapport couvre les deux jeux ou dit lequel n'a pas pu être vu.
+  - id: C3
+    titre: Un modèle de jeu pires cas guide l'auteur d'un produit
+    acteur: un auteur de projet qui adopte cadence
+    declencheur: lecture du gabarit templates/jeu-pires-cas.md (cité par docs/spec.md)
+    preconditions:
+      - le projet a un jeu de démo
+    nominal:
+      - Le gabarit liste les familles à couvrir (nom très long, nom d'une lettre, compte à 0, compte à 1, champ facultatif absent, grand nombre, texte non latin, liste longue).
+      - Il demande un jeu réaliste, posé une fois à côté de la démo et branché au même endroit.
+      - Il demande que l'activation soit réservée au mode dev (?data=worst), sans effet en production.
+      - Il demande un test de non-régression qui charge le jeu et vérifie qu'il couvre chaque famille.
+    alternatives: []
+    sans_alternative: le gabarit est un texte lu par un humain ; il n'a pas d'autre branche
+    resultat: Le projet obtient un jeu structuré identique d'un produit à l'autre.
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: Le brief de l'étape spec d'un lot d'écran demande la capture de chaque état avec le jeu de démo et avec le jeu pires cas, ce dernier nommé maquette-<état>-pires-cas-<largeur>.png (et actuel-<état>-pires-cas-<largeur>.png en maquette légère).
+    statut: sourcee
+    source: "demande du lot : « spec-writer, ux-reviewer et qa-reviewer capturent chaque état avec les deux jeux » ; nommage existant src/orchestrate/spec.ts:308"
+    tests: ["R1 — specText d'un lot d'écran cite ?data=worst et le nom maquette-<état>-pires-cas-<largeur>.png", "R1 — specText d'une maquette légère cite aussi actuel-<état>-pires-cas-<largeur>.png"]
+  - id: R2
+    cas: [C1]
+    enonce: Quand le projet ne décrit aucun jeu pires cas, la session n'en invente pas ; elle capture avec la démo seule et l'écrit sous nonVerifie.
+    statut: sourcee
+    source: "règle existante agents/spec-writer.md : « never invent a capture » (écran actuel non capturable), étendue au jeu"
+    tests: ["R2 — le brief demande nonVerifie quand le jeu est absent et interdit d'en inventer un"]
+  - id: R3
+    cas: [C1]
+    enonce: Le brief d'une fiche back (sans écran) ne parle pas du jeu pires cas et reste identique à celui d'avant le lot.
+    statut: hypothese
+    si_faux: Si le jeu doit aussi servir à des exemples de données d'API, le brief back en parlerait ; seul son texte change.
+    tests: ["R3 — specText back sans écran : aucune mention de ?data=worst"]
+  - id: R4
+    cas: [C2]
+    enonce: Le jeu pires cas ne se bascule qu'en mode dev, par ?data=worst ; en production le paramètre est sans effet, et la revue ne le demande que sur un serveur dev.
+    statut: sourcee
+    source: "demande du lot : « basculé en mode dev seulement (?data=worst) »"
+    tests: ["R4 — les agents ux-reviewer et qa-reviewer citent ?data=worst et sa réserve au mode dev", "R4 — le gabarit exige que le paramètre soit sans effet en production"]
+  - id: R5
+    cas: [C2]
+    enonce: Un défaut vu seulement avec le jeu pires cas suit l'échelle de gravité existante des revues ; il n'a pas de gravité propre.
+    statut: hypothese
+    si_faux: Si ces défauts devaient être plus sévères, seul le texte des agents change (aucune donnée en jeu).
+    tests: ["R5 — les agents ne définissent aucune échelle de gravité propre au jeu pires cas"]
+  - id: R6
+    cas: [C2]
+    enonce: Les briefs de revue de maquette, de ux et de qa demandent une ligne de la liste à cocher par état, par largeur et par jeu.
+    statut: sourcee
+    source: "demande du lot ; liste à cocher existante templates/orchestrate/maquette.md (une ligne par état à 1440 et 390)"
+    tests: ["R6 — le brief maquette.md demande les deux jeux dans la liste à cocher", "R6 — le brief ux.md et le brief qa citent les deux jeux"]
+  - id: R7
+    cas: [C3]
+    enonce: Le gabarit templates/jeu-pires-cas.md énumère huit familles - nom très long, nom d'une lettre, compte à 0, compte à 1, champ facultatif absent, grand nombre, texte non latin, liste longue - et exige un jeu réaliste, posé une fois à côté de la démo et branché au même endroit.
+    statut: sourcee
+    source: "demande du lot : « noms longs ou d'une lettre, compte à 0 et à 1, champs optionnels absents, grands nombres, texte non latin, liste longue »"
+    tests: ["R7 — le gabarit contient chacune des huit familles", "R7 — le gabarit demande le branchement au même endroit que la démo"]
+  - id: R8
+    cas: [C3]
+    enonce: Le gabarit exige un test de non-régression du produit qui charge le jeu et vérifie que chaque famille y figure.
+    statut: sourcee
+    source: "demande du lot : « le jeu reste en test de non-régression »"
+    tests: ["R8 — le gabarit demande un test qui échoue si une famille disparaît du jeu"]
+  - id: R9
+    cas: [C1, C2]
+    enonce: Le jeu est découvert dans le CLAUDE.md du projet, sans nouvelle clé de cadence.yaml.
+    statut: hypothese
+    si_faux: Si le lead préfère une clé déclarative, c'est un contrat de configuration publié (voir questions) ; les briefs changeraient de source de lecture.
+    tests: ["R9 — les briefs renvoient au CLAUDE.md du projet et ne lisent aucune clé nouvelle", "R9 — la configuration d'un projet sans jeu reste lue comme avant"]
+
+contrats:
+  - id: A1
+    appel: commande orchestrate (brief de l'étape spec d'un lot d'écran)
+    entree: "lot avec screen: page ou maquette légère, dossier de specs"
+    sortie: "texte du brief : captures démo et pires cas, noms -pires-cas, nonVerifie si le jeu est absent"
+    erreurs: []
+    sans_erreur: la construction du brief est un assemblage de texte sans échec propre ; le jeu absent est une consigne, pas une erreur
+    regles: [R1, R2, R3, R9]
+  - id: A2
+    appel: commande orchestrate (briefs de revue maquette, ux et qa)
+    entree: "lot d'écran, captures et fiche"
+    sortie: "texte des briefs : parcours des deux jeux, liste à cocher par jeu, réserve au mode dev"
+    erreurs: []
+    sans_erreur: assemblage de texte sans échec propre ; un serveur sans mode dev est consigné sous nonVerifie par la session
+    regles: [R4, R5, R6, R9]
+  - id: A3
+    appel: commande spec check <fiche>
+    entree: "fiche.yaml existante"
+    sortie: "inchangée : le jeu pires cas n'ajoute aucune clé à la fiche"
+    erreurs: []
+    sans_erreur: la commande est inchangée par le lot
+    regles: [R9]
+
+donnees:
+  - { id: D1, objet: "templates/jeu-pires-cas.md (nouveau gabarit texte)", existant: false, modification: ajout, note: "liste des huit familles, branchement, mode dev, test de non-régression" }
+  - { id: D2, objet: "consigne ajoutée aux briefs spec, maquette, ux, qa et aux agents (texte, rien de stocké)", existant: false, modification: ajout, note: "fiche, cadence.yaml et plan inchangés" }

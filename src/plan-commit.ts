@@ -99,13 +99,15 @@ export function commitMsgRefusal(root: string, message: string): string | null {
   }
 }
 
-/** Un texte coupé aux espaces à `width` colonnes (le corps d'un commit : `body-max-line-length` de commitlint) ; un mot plus long que la ligne est coupé en morceaux, sauf une URL (commitlint l'exempte). */
+/** Un mot en morceaux de `width` colonnes au plus ; une URL reste entière (commitlint l'exempte). */
+const morceaux = (mot: string, width: number): string[] => (/^https?:\/\//.test(mot) ? [mot] : mot.match(new RegExp(`.{1,${width}}`, 'gu')) ?? []);
+
+/** Un texte coupé aux espaces à `width` colonnes (le corps d'un commit : `body-max-line-length` de commitlint). */
 function wrap(text: string, width: number): string[] {
   const lines: string[] = [];
   let line = '';
   for (const mot of text.split(/\s+/).filter(Boolean)) {
-    const morceaux = mot.length > width && !/^https?:\/\//.test(mot) ? mot.match(new RegExp(`.{1,${width}}`, 'g')) ?? [mot] : [mot];
-    for (const word of morceaux) {
+    for (const word of morceaux(mot, width)) {
       if (line && line.length + 1 + word.length > width) {
         lines.push(line);
         line = word;

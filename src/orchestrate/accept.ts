@@ -158,7 +158,7 @@ export function resealAcceptation(repo: string, path: string, test: string | str
   if (typeof a === 'string') throw new Error(`${path} : ${a}`);
   if (!reason.trim()) throw new Error('--reason est obligatoire : la raison du rescellé va dans acceptation.json et en note du lot');
   if (porteur && !a.vert) throw new Error(`${path} n'est pas verte : un lot porteur (${porteur}) ne vaut que pour le test scellé d'un lot livré (vert: true)`);
-  const norms = [...new Set((Array.isArray(test) ? test : [test]).map((t) => posix.normalize(t)))];
+  const norms = [...new Set([test].flat().map((t) => posix.normalize(t)))];
   if (!norms.length) throw new Error('aucun test à resceller : nommer au moins un test scellé');
   const fichiers = a.fichiers.map((f) => posix.normalize(f));
   const inconnu = norms.find((n) => !fichiers.includes(n));

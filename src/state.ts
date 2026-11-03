@@ -180,8 +180,27 @@ export function pidAlive(pid: number): boolean {
   }
 }
 
-export function appendDelivery(dir: string, day: Day, sha: string): void {
-  appendFileSync(join(dir, 'deliveries.log'), `${day} ${sha}\n`);
+/** Une ligne verte de `deliveries.log` : « jour sha [bloc] » (L469) ; le bloc est le nom de `--block`, absent d'une livraison complète et des lignes anciennes. */
+export interface DeliveryLine {
+  day: string;
+  sha: string;
+  block?: string;
+}
+
+export function appendDelivery(dir: string, day: Day, sha: string, block?: string): void {
+  appendFileSync(join(dir, 'deliveries.log'), `${day} ${sha}${block === undefined ? '' : ` ${block}`}\n`);
+}
+
+/** Les lignes de `deliveries.log` qui portent un sha, dans l'ordre du fichier ; vide si le fichier est absent. Le jour n'est pas vérifié ici (lastDelivery ne le lisait pas). */
+export function readDeliveryLines(dir: string): DeliveryLine[] {
+  const file = join(dir, 'deliveries.log');
+  if (!existsSync(file)) return [];
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .flatMap((l): DeliveryLine[] => {
+      const [day = '', sha, block] = l.trim().split(' ');
+      return sha ? [{ day, sha, ...(block ? { block } : {}) }] : [];
+    });
 }
 
 /** Une étape jouée par deliver (L516) : une ligne NDJSON de `deliveries-steps.log`. */
@@ -292,6 +311,20 @@ export function lastDelivery(dir: string): string | null {
   if (!existsSync(file)) return null;
   const last = readFileSync(file, 'utf8').trim().split('\n').pop();
   return last?.split(' ')[1] ?? null;
+}
+
+/**
+ * Sha de la livraison précédente d'où part une livraison (L469). `block` : la dernière ligne qui vaut pour lui (la sienne, ou une ligne sans bloc,
+ * qui vaut pour tous). Sans `block` et avec les blocs `declared` de deliver.blocks : la plus ancienne (position dans le fichier) des dernières lignes
+ * valant pour chaque bloc déclaré — un lot d'un bloc que seule une livraison d'un autre bloc a suivie reste dans la plage ; un bloc sans aucune ligne ne compte pas.
+ * Sans `declared`, la dernière ligne quel que soit son bloc (`lastDelivery`).
+ */
+export function lastDeliveryFor(dir: string, block?: string, declared: string[] = []): string | null {
+  const lines = readDeliveryLines(dir);
+  const lastFor = (b: string) => lines.map((l) => l.block === undefined || l.block === b).lastIndexOf(true);
+  if (block === undefined && declared.length === 0) return lines.at(-1)?.sha ?? null;
+  const positions = (block === undefined ? declared : [block]).map(lastFor).filter((i) => i >= 0);
+  return positions.length ? lines[Math.min(...positions)]!.sha : null;
 }
 
 /** Tous les jours de `deliveries.log` (une ligne « jour sha » par livraison verte), dans l'ordre du fichier ; null si le fichier est absent ou illisible. Lecture seule : ne crée rien. */

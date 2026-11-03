@@ -1916,6 +1916,9 @@ lots:
     estimate: 0.5
     created: 2026-11-03
     started: 2026-11-03
+    review: { date: 2026-11-03, verdict: "conforme (décision du lead 03-11 sur le seul majeur de la revue 7, de périmètre) : le rejeu restreint est correct ; quand le code de l'application lit le plan (codex, evatosorus, ol : plan affiché par le site) le rejeu complet reste légitime ; maritime en profite dès qu'il déclare testReplay (suite après publication) ; 2 mineurs en note", commit: fcc6b4b9b2d67e1148e48e4b9724d1afecfbd5df }
+    notes:
+      - { date: 2026-11-03, text: "Décision du lead (03-11, revue 7) : périmètre = projets dont seuls des tests ou scripts lisent le plan. Un plan lu par le code de l'app (plan-public.ts du codex, d'evatosorus ; plan-data.mjs d'ol) impose le rejeu complet, à juste titre. Suite : déclarer orchestrate.gate.testReplay dans maritime-atlas/cadence.yaml après publication, puis mesurer un commit de plan seul." }
   - id: L567
     title: "Tests instables sous charge vus le 03-11, à rendre déterministes : mise-en-service L195 (build:service-like), sonde L492 des imports frais, orchestrate-worktree-plan-writes R16, probe-L539-bords (départ simultané), porte-deportee R19, test R10 de L556 (EPIPE sur spawnSync input) — chacun reproduit sous charge (suites parallèles) puis corrigé, sans retry masquant"
     status: doing

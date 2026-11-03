@@ -76,3 +76,8 @@ export function assertPlanUnchanged(path: string, seen: string, refuse: (message
   if (current !== seen) throw refuse(`plan modifié par une autre session depuis sa lecture (${path}) — écriture refusée, son changement est gardé ; relancer la commande pour repartir du plan à jour`);
   return current;
 }
+
+/** `assertPlanUnchanged` pour chaque fichier de la liste (les fichiers d'année réécrits avec le plan) : `onDisk` est son texte lu ou écrit en dernier, '' s'il n'existe pas encore. */
+export function assertFilesUnchanged(files: { file: string; onDisk: string }[], refuse: (message: string) => Error): void {
+  for (const f of files) assertPlanUnchanged(f.file, f.onDisk, refuse);
+}

@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node
 import { dirname, join, relative, resolve } from 'node:path';
 import { dirtyContents } from './git.js';
 import { initialContent } from './plan-init.js';
-import { assertPlanUnchanged, withPlanLock } from './plan-lock.js';
+import { assertFilesUnchanged, assertPlanUnchanged, withPlanLock } from './plan-lock.js';
 import { ON_WRITE_TIMEOUT_MS, failureReason } from './plan-onwrite.js';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
@@ -13,7 +13,7 @@ import { DOCS_OK_FILE, readDocsOkFile } from './docs-ok-file.js';
 import { checkedExtras, withExtras, type ExtraDecls } from './plan-extras.js';
 import { lotRef, putFlowKey, putPlanned, refuseUnplanned, type PlannedWindow } from './plan-window.js';
 import { DOTTED, escapeRe, extractRefs, idRefs, pickId, type Ref } from './plan-ids.js';
-import { ARCHIVE_DIR, PLACE_KEY, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchiveDoc, reopenArchived, selectArchivable, type Kept } from './archive.js';
+import { ARCHIVE_DIR, PLACE_KEY, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchive, reopenArchived, selectArchivable, type Kept } from './archive.js';
 
 /** Où va un avertissement de `save()` (la commande a réussi mais quelque chose cloche) : stderr, ou le `err` du CLI qui a lancé l'écriture. */
 let notice: (line: string) => void = (line) => void process.stderr.write(`${line}\n`);
@@ -290,6 +290,7 @@ export class Plan {
     // L396 : chaque lot est réécrit dans le fichier d'où il vient — le plan, ou son fichier d'année si un lot archivé a été touché.
     this.reopened();
     const archives = (this.archives ?? []).filter((a) => a.dirty);
+    assertFilesUnchanged(archives, (m) => new RafError(m)); // `raf note` sur un lot archivé ne touche que son fichier d'année : il se compare comme le plan
     const hadDir = existsSync(this.archiveDir);
     const written = [...archives.map((a) => a.file), this.path, ...(hook ? hook.files.map((f) => resolve(hook.cwd, f)) : [])];
     const kept = written.map((p) => [p, existsSync(p) ? readFileSync(p) : null] as const);
@@ -307,7 +308,7 @@ export class Plan {
         }
       }
       if (!hadDir) rmSync(this.archiveDir, { recursive: true, force: true });
-      for (const a of archives) a.dirty = true;
+      for (const a of archives) [a.dirty, a.onDisk] = [true, kept.find(([p]) => p === a.file)?.[1]?.toString('utf8') ?? ''];
     };
     try {
       if (archives.length > 0) mkdirSync(this.archiveDir, { recursive: true });
@@ -318,7 +319,7 @@ export class Plan {
       const code = (e as NodeJS.ErrnoException).code;
       throw new RafError(`écriture du plan refusée (${code ? `${code}, ` : ''}${(e as Error).message}) — plan et archive inchangés`);
     }
-    for (const a of archives) a.dirty = false;
+    for (const a of archives) [a.dirty, a.onDisk] = [false, readFileSync(a.file, 'utf8')];
     this.onDisk = readFileSync(this.path, 'utf8');
     if (!hook) return;
     const limit = hook.timeoutMs ?? ON_WRITE_TIMEOUT_MS;
@@ -565,7 +566,7 @@ export class Plan {
   }
 
   /** Un fichier d'année chargé ; `dirty` quand un de ses lots a été touché ou ajouté depuis la lecture : `save()` le réécrit. */
-  private archives?: { file: string; doc: Document; dirty: boolean }[];
+  private archives?: { file: string; doc: Document; dirty: boolean; /** Texte du fichier tel que lu ou écrit en dernier par ce processus ('' pour un fichier d'année pas encore écrit). */ onDisk: string }[];
 
   /** Un chemin tel que l'utilisateur le voit : relatif à la racine du dépôt (le dossier du cadence.yaml, à défaut le parent du dossier du plan). */
   private shown(file: string): string {
@@ -580,7 +581,7 @@ export class Plan {
     if (!this.archives) {
       const archives = this.archiveFiles().map((file) => {
         try {
-          return { file, doc: readArchiveDoc(file), dirty: false };
+          return readArchive(file);
         } catch (e) {
           throw new RafError((e as Error).message);
         }
@@ -604,7 +605,7 @@ export class Plan {
     const file = join(this.archiveDir, `${year}.yaml`);
     let found = archives.find((a) => a.file === file);
     if (!found) {
-      found = { file, doc: newArchiveDoc(year), dirty: true };
+      found = { file, doc: newArchiveDoc(year), dirty: true, onDisk: '' };
       archives.push(found);
       archives.sort((a, b) => (a.file < b.file ? -1 : 1));
     }

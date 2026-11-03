@@ -159,19 +159,20 @@ export function archiveFiles(dir: string): string[] {
   return readdirSync(dir).filter((f) => /^\d{4}\.yaml$/.test(f)).sort().map((f) => join(dir, f));
 }
 
-/** La liste des lots d'un document d'archive (toujours présente : `readArchiveDoc` et `newArchiveDoc` la garantissent). */
+/** La liste des lots d'un document d'archive (toujours présente : `readArchive` et `newArchiveDoc` la garantissent). */
 export function archiveLots(doc: Document): YAMLSeq {
   return doc.get('lots') as YAMLSeq;
 }
 
-/** Un fichier d'archive lu tel quel ; une archive illisible est une erreur nommée, pas un lot de moins. */
-export function readArchiveDoc(file: string): Document {
-  const doc = parseDocument(readFileSync(file, 'utf8'));
+/** Un fichier d'archive lu tel quel, avec son texte (`onDisk`, pour refuser de l'écraser s'il change) ; une archive illisible est une erreur nommée, pas un lot de moins. */
+export function readArchive(file: string): { file: string; doc: Document; dirty: boolean; onDisk: string } {
+  const onDisk = readFileSync(file, 'utf8');
+  const doc = parseDocument(onDisk);
   if (doc.errors.length > 0) throw new Error(`${file} : ${doc.errors[0].message}`);
   const lots = isMap(doc.contents) ? doc.get('lots') : undefined;
   if (!isSeq(lots)) throw new Error(`${file} : la clé « lots » doit porter la liste des lots archivés`);
   lots.flow = false;
-  return doc;
+  return { file, doc, dirty: false, onDisk };
 }
 
 /** Le document d'un fichier d'année qui n'existe pas encore. */

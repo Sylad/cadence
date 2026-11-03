@@ -3,7 +3,7 @@ sujet:
   titre: Jeu de données « pires cas » capturé avec le jeu de démo par les étapes d'écran
   lot: L534
   perimetre:
-    modules: [src/orchestrate/spec.ts, src/orchestrate/briefs.ts, src/config.ts]
+    modules: [src/orchestrate/spec.ts, src/orchestrate/briefs.ts, src/config.ts, src/plan.ts (PlanSettings, qui porte qaExpectations et portera worstData jusqu'au brief qa), templates/orchestrate/spec.md, templates/orchestrate/maquette.md, templates/orchestrate/ux.md, agents/spec-writer.md, agents/ux-reviewer.md, agents/qa-reviewer.md]
     endpoints: []
     jobs: []
     hors_perimetre:
@@ -24,7 +24,7 @@ cas:
       - Les captures du jeu pires cas sont nommées avec le suffixe « -pires-cas » avant la largeur.
       - Les défauts vus (texte coupé, débordement, état vide mal gérée) corrigent la maquette ou deviennent une règle de la fiche.
     alternatives:
-      - { si: le projet ne déclare pas qa.worstData, alors: la session capture avec le jeu de démo seul et le dit sous nonVerifie, sans en inventer un, regles: [R2] }
+      - { si: le projet ne déclare pas qa.worstData, alors: le brief reste muet sur le jeu et la session capture avec le jeu de démo seul, comme avant le lot, regles: [R2] }
       - { si: le lot est une fiche back sans écran, alors: le brief ne mentionne pas le jeu pires cas, regles: [R3] }
       - { si: qa.worstData est mal formée, alors: la lecture de cadence.yaml est refusée avec un message qui nomme la clé, regles: [R10] }
     resultat: Chaque état de l'écran est vu avec des données typiques et avec des données extrêmes.
@@ -39,7 +39,7 @@ cas:
       - Elle parcourt chaque état à 1440 px et 390 px avec la démo, puis avec le jeu pires cas (qa.worstData).
       - Le rapport (liste à cocher) a une ligne par état, largeur et jeu.
     alternatives:
-      - { si: le serveur est en production ou le mode dev est absent, alors: ?data=worst n'est pas utilisé, la session le dit sous nonVerifie, regles: [R4] }
+      - { si: le serveur est en production ou le mode dev est absent, alors: le jeu pires cas n'est pas chargé, la session le dit sous nonVerifie, regles: [R4] }
       - { si: le jeu pires cas montre un défaut, alors: sa gravité suit l'échelle existante, un texte coupé qui masque une action est majeur, sinon mineur, regles: [R5] }
     resultat: Le rapport couvre les deux jeux ou dit lequel n'a pas pu être vu.
   - id: C3
@@ -66,10 +66,10 @@ regles:
     tests: ["R1 — specText d'un lot d'écran cite ?data=worst et le nom maquette-<état>-pires-cas-<largeur>.png", "R1 — specText d'une maquette légère cite aussi actuel-<état>-pires-cas-<largeur>.png"]
   - id: R2
     cas: [C1]
-    enonce: Quand le projet ne déclare pas qa.worstData, le brief ne parle pas de jeu à charger et la session n'en invente pas ; elle capture avec la démo seule et l'écrit sous nonVerifie.
+    enonce: Quand le projet ne déclare pas qa.worstData, le brief reste muet sur le jeu pires cas (aucune phrase d'absence, aucune consigne de nonVerifie) ; la session capture avec la démo seule, comme avant le lot.
     statut: sourcee
-    source: "règle existante agents/spec-writer.md : « never invent a capture » (écran actuel non capturable), étendue au jeu"
-    tests: ["R2 — le brief demande nonVerifie quand le jeu est absent et interdit d'en inventer un"]
+    source: "réponse de Sylvain, 03-11 : « les briefs n'envoient une session chercher le jeu que dans les projets qui la déclarent » ; « son absence ne change rien pour les projets existants »"
+    tests: ["R2 — sans qa.worstData, le brief spec d'un lot d'écran ne contient aucune mention du jeu pires cas ni consigne de nonVerifie à son sujet"]
   - id: R3
     cas: [C1]
     enonce: Le brief d'une fiche back (sans écran) ne parle pas du jeu pires cas et reste identique à celui d'avant le lot.
@@ -78,10 +78,10 @@ regles:
     tests: ["R3 — specText back sans écran : aucune mention de ?data=worst"]
   - id: R4
     cas: [C2]
-    enonce: Le jeu pires cas ne se bascule qu'en mode dev, par ?data=worst ; en production le paramètre est sans effet, et la revue ne le demande que sur un serveur dev.
+    enonce: Le jeu pires cas ne se bascule qu'en mode dev ; la consigne vit dans les briefs (spec, maquette, ux, qa), qui citent la valeur de qa.worstData et la réservent au mode dev, et jamais dans les textes statiques des agents, qui renvoient seulement au brief sans nommer le paramètre ; le gabarit exige que le paramètre soit sans effet en production.
     statut: sourcee
-    source: "demande du lot : « basculé en mode dev seulement (?data=worst) »"
-    tests: ["R4 — les agents ux-reviewer et qa-reviewer citent ?data=worst et sa réserve au mode dev", "R4 — le gabarit exige que le paramètre soit sans effet en production"]
+    source: "demande du lot : « basculé en mode dev seulement (?data=worst) » ; réponse de Sylvain, 03-11 (découverte par la clé déclarative seulement)"
+    tests: ["R4 — avec qa.worstData, les briefs maquette, ux et qa réservent le jeu au mode dev", "R4 — agents/ux-reviewer.md et agents/qa-reviewer.md ne contiennent pas ?data=worst", "R4 — le gabarit exige que le paramètre soit sans effet en production"]
   - id: R5
     cas: [C2]
     enonce: Un défaut vu seulement avec le jeu pires cas suit l'échelle de gravité existante des revues ; il n'a pas de gravité propre.
@@ -108,13 +108,13 @@ regles:
     tests: ["R8 — le gabarit demande un test qui échoue si une famille disparaît du jeu"]
   - id: R9
     cas: [C1, C2]
-    enonce: Le jeu est découvert par la clé déclarative qa.worstData de cadence.yaml, jamais par le CLAUDE.md ; les briefs ne parlent du jeu que si la clé est déclarée, et citent sa valeur telle quelle.
+    enonce: Le jeu est découvert par la clé déclarative qa.worstData de cadence.yaml, jamais par le CLAUDE.md ; les briefs ne parlent du jeu que si la clé est déclarée, et citent sa valeur telle quelle (les agents statiques ne la nomment pas, R4).
     statut: sourcee
     source: "réponse de Sylvain, 03-11 : « une clé déclarative dans cadence.yaml, par exemple qa.worstData ; les briefs n'envoient une session chercher le jeu que dans les projets qui la déclarent ; pas de découverte par le CLAUDE.md »"
     tests: ["R9 — avec qa.worstData déclarée, les briefs spec, maquette, ux et qa citent sa valeur", "R9 — sans qa.worstData, aucun brief ne mentionne le jeu pires cas ni le CLAUDE.md pour le trouver"]
   - id: R10
     cas: [C1, C2]
-    enonce: "qa.worstData est une chaîne non vide sur une seule ligne (le paramètre ou le chemin) ; une valeur vide ou faite d'espaces vaut absente ; un type faux (nombre, liste, objet, booléen) ou une valeur sur plusieurs lignes est refusé avec un message qui nomme la clé, comme qa.expectations."
+    enonce: "qa.worstData est une chaîne non vide sur une seule ligne (le paramètre ou le chemin) ; une valeur vide ou faite d'espaces vaut absente ; un type faux (nombre, liste, objet, booléen) ou une valeur sur plusieurs lignes est refusé avec un message qui nomme la clé, comme qa.expectations. La valeur est écrite par le projet lui-même et recopiée telle quelle dans le brief ; la contrainte d'une seule ligne borne l'injection de consignes multiples."
     statut: sourcee
     source: "réponse de Sylvain, 03-11 : « la clé est documentée et validée comme les autres (une valeur mal formée est refusée avec un message) » ; modèle src/config.ts:46-57 (qa.expectations)"
     tests: ["R10 — qa.worstData numérique est refusée avec un message contenant qa.worstData", "R10 — qa.worstData sur deux lignes est refusée", "R10 — qa.worstData vide vaut absente", "R10 — qa.worstData « ?data=worst » est lue sans espaces autour"]
@@ -129,9 +129,9 @@ contrats:
   - id: A1
     appel: commande orchestrate (brief de l'étape spec d'un lot d'écran)
     entree: "lot avec screen: page ou maquette légère, dossier de specs"
-    sortie: "texte du brief : captures démo et pires cas, noms -pires-cas, nonVerifie si le jeu est absent"
+    sortie: "texte du brief : captures démo et pires cas, noms -pires-cas si qa.worstData est déclarée ; texte d'avant le lot sinon"
     erreurs: []
-    sans_erreur: la construction du brief est un assemblage de texte sans échec propre ; le jeu absent est une consigne, pas une erreur
+    sans_erreur: la construction du brief est un assemblage de texte sans échec propre ; le jeu absent laisse le brief muet, ce n'est pas une erreur
     regles: [R1, R2, R3, R9, R11]
   - id: A2
     appel: commande orchestrate (briefs de revue maquette, ux et qa)

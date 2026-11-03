@@ -12,9 +12,9 @@ As a plugin:
 gives `/cadence:session-start`, `/cadence:session-close`, `/cadence:deliver`,
 `/cadence:lead`, `/cadence:orchestrate`, the `ux-reviewer`, `code-reviewer` and `qa-reviewer` agents, the `livreur` delivery agent and the
 [retour → geste hook](lead.md#the-retour--geste-hook) (`hooks/hooks.json` at the root of the plugin: `cadence claude-hook retour` after every Bash
-command, `cadence claude-hook attente` before it; each line is a no-op when `cadence` is not on the `PATH`, so the plugin needs `@sylad/cadence` installed). Or copy the skills and agents into the
+command, `cadence claude-hook attente` before it; each line is a no-op when `cadence` is not on the `PATH`, so the plugin needs `@sylad/cadence` installed). Or copy them into the
 repository with `cadence skills install` (to `.claude/skills/cadence-*` and
-`.claude/agents/cadence-*.md`; the hook is **not** copied: it comes with the plugin only; `--dir` for another `.claude` folder,
+`.claude/agents/cadence-*.md`; the hook is **not** copied, it comes with the plugin only; `--dir` for another `.claude` folder,
 `--force` to overwrite a copy that differs from the package's text, a local edit or an
 earlier version never edited: the command compares the copy to the text it installs, not to the
 version that installed it).

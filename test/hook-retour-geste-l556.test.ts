@@ -346,7 +346,7 @@ describe('L556 — hooks/hooks.json du plugin (R10)', () => {
   });
   it('R10 — la commande de chaque ligne sort en 0 sans texte quand cadence est absent du PATH', () => {
     for (const event of Object.keys(file.hooks)) {
-      const out = execFileSync('/bin/sh', ['-c', commandOf(event)], { env: { PATH: '/nonexistent' }, encoding: 'utf8', input: '{}' });
+      const out = execFileSync('/bin/sh', ['-c', commandOf(event)], { env: { PATH: '/nonexistent' }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
       expect(out).toBe('');
     }
   });

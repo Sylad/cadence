@@ -233,7 +233,7 @@ orchestrate:
 **Review sized to the lot (L108)**: a lot whose `estimate` is ≤ `orchestrate.review.threshold` (0.25 day by default)
 is *light*: one single review (Sonnet by default, `code-reviewer` agent, same criteria), no minors pass — the minors are
 returned to the lead as notes (proposals). A blocking or major finding on a light lot still triggers a correction, and
-the review that follows is the full one (Opus). A pass that only repairs red tests or a check of the program (tests, code without a test, documentation behind) does not count (L565, measured on 2026-11-03: L559, L561 and L564, all 0.25 day, had a full Opus review after a test fix): the light lot keeps its Sonnet review until a review has found a blocking or major finding. The cap of two correction passes is unchanged (except the convergence pass above). A bigger lot keeps the
+the review that follows is the full one (Opus). A pass that only repairs red tests or a check of the program (tests, code without a test, documentation behind, red test of the edge-case probe) does not count (L565, measured on 2026-11-03: L559, L561 and L564, all 0.25 day, had a full Opus review after a test fix): the light lot keeps its Sonnet review until a review has found a blocking or major finding. The cap of two correction passes is unchanged (except the convergence pass above). A bigger lot keeps the
 chain described above (Opus, two corrections, minors pass). `--dry-run` shows « revue légère » on a light lot.
 
 ```yaml
@@ -264,7 +264,7 @@ nor when the lot budget no longer pays the correction and the review after it (a
 
 The diff read is that of the lot's repository **and** of its neighbour repositories (`repos:`, same as the « work already present » check; patterns apply to each repository's own paths, so a test in a neighbour lifts the gate). Files a commit **deletes** do not count as code without a test (`git diff-tree --diff-filter=d`): a lot that removes dead code used to trigger a pass of about 65 k tokens for nothing. `docs.sync` still sees deleted files.
 
-On a light lot (see « Review sized to the lot »), the gate's correction pass is pass 1: the review that follows is therefore the full one (Opus), not the light one (Sonnet). A light lot that touches code without a test pays the correction **and** an Opus review.
+On a light lot (see « Review sized to the lot »), the gate's correction pass is a check of the program, not a finding of a review (L565): the review that follows stays the light one (Sonnet). A light lot that touches code without a test pays the correction and a Sonnet review.
 
 ```yaml
 orchestrate:

@@ -59,7 +59,7 @@ export function firstReview(c: LotCtx): SessionKind {
 export const uxAfterReview = (c: LotCtx): boolean => !c.lot.small && c.lot.visible && !!c.config.ux;
 
 /** Les passes que déclenche un contrôle du programme, sans revue : elles ne font pas passer la revue d'un lot léger à Opus (L565). */
-const PROGRAM_FIXES: ReadonlySet<string> = new Set(['tests rouges', 'code sans test', 'documentation en retard']);
+const PROGRAM_FIXES: ReadonlySet<string> = new Set(['tests rouges', 'code sans test', 'documentation en retard', 'sonde de cas limites']);
 
 const countProgramFix = (l: LotState, what: string): void => {
   if (PROGRAM_FIXES.has(what)) l.programFixes = (l.programFixes ?? 0) + 1;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { runLot } from '../src/orchestrate/cycle.js';
-import { claudeOut, commitFile, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
+import { claudeOut, commitFile, harness, probeReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 
 const GATE = { code: ['*.ts'], tests: ['*.spec.ts'], except: [] as string[], threshold: 1 };
 const impl = (file = 'a.txt'): Handler => (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, file, `feat(L1): ${file}`)] }));
@@ -8,6 +8,8 @@ const fix = (file: string): Handler => (call) => claudeOut(workReport({ commits:
 const ok: Handler = () => claudeOut(reviewReport());
 const major: Handler = () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }], verdict: 'non conforme' }));
 const models = (h: ReturnType<typeof harness>) => h.calls.filter((x) => x.kind === 'review' || x.kind === 'review-small').map((x) => x.model);
+const probe: Handler = (call) => claudeOut(probeReport({ commits: [commitFile(call.opts.cwd, 'p.spec.ts', 'probe(L1): p.spec.ts')] }));
+const PROBE_RED = 'if [ -f p.spec.ts ] && [ ! -f fixed.flag ]; then echo "FAIL  p.spec.ts > vide > rejette"; exit 1; fi';
 const RED = 'test -f b.txt || { echo boom >&2; exit 3; }';
 
 describe('L565 — la revue légère après une passe du programme', () => {
@@ -57,5 +59,14 @@ describe('L565 — la revue légère après une passe du programme', () => {
     const c = h.lot('L1', { light: true, resumedFrom: 'abc', constats: [{ source: 'code', gravite: 'majeur', fichier: 'a.txt', texte: 'reste' }] } as never);
     await runLot(c);
     expect(models(h).every((m) => m === 'opus')).toBe(true);
+  });
+
+  it('L565 R1 — test de la sonde rouge réparé par une passe : la revue d\'un lot léger reste Sonnet (L559, L564)', async () => {
+    const h = harness({ script: { implement: [impl()], probe: [probe], fix: [fix('fixed.flag')], review: [ok] } });
+    const c = h.lot('L1', { light: true }, { probe: true, test: PROBE_RED });
+    await runLot(c);
+    expect(h.calls.map((x) => x.kind)).toEqual(['implement', 'probe', 'fix', 'review']);
+    expect(models(h)).toEqual(['sonnet']);
+    expect(c.lot.pass).toBe(c.lot.programFixes);
   });
 });

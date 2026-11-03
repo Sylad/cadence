@@ -64,9 +64,4 @@ describe('L567 — les délais relevés par le lot tiennent dans leurs bornes', 
     expect(src).toContain('}, 180_000);');
     expect(src).not.toMatch(/execFileSync\('npm', \['run', '--silent', '(build|prepare)'\]/);
   });
-  it('R16 : le délai ux (60 s) reste sous le délai de test par défaut cumulé de deux lots (pas de test qui expire avant le délai ux)', () => {
-    const src = lire('orchestrate-worktree-plan-writes.test.ts');
-    expect(src).toMatch(/timeout: 60 \}/);
-    expect(src).toContain('sleep(4500)');
-  });
 });

@@ -1497,6 +1497,9 @@ lots:
     spec: true
     created: 2026-11-02
     started: 2026-11-03
+    notes:
+      - { date: 2026-11-03, text: "Revue de la fiche — mineur : docs/specs/jeu-pires-cas/fiche.yaml:7 — Le périmètre est incomplet. Il liste spec.ts, briefs.ts et config.ts, mais la clé doit aussi traverser PlanSettings (src/plan.ts:176 porte qaExpectations) et toucher les gabarits templates/orchestrate/{spec,maquette,ux}.md et agents/*.md (D2). Un lecteur de la fiche ne voit pas où le brief qa lit la valeur." }
+      - { date: 2026-11-03, text: "Revue de la fiche — mineur : docs/specs/jeu-pires-cas/fiche.yaml:99 — Rien ne couvre le cas où qa.worstData contient du texte injecté dans le brief tel quel (R9 « telle quelle »). La valeur est écrite par le projet lui-même, donc le risque est faible, mais la fiche ne l'écarte pas : une ligne dans sans_erreur de A4 suffirait. R10 impose déjà une seule ligne." }
   - id: L535
     title: "raf estimate <id> abc ou .5 répond « estimation invalide : NaN » au lieu de la valeur saisie (cli.ts:536 remplace la saisie par NaN avant setEstimate) — revue de L465"
     status: done

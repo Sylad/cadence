@@ -83,7 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- `cadence lead tour`, `cadence orchestrate --dry-run` and `cadence verify --gate` flag the test commands that the CI workflows of the repository play (`.github/workflows/`) and that `orchestrate.test` / `orchestrate.build` do not (L499, `docs/orchestrate.md`, `docs/lead.md`, `docs/deliver.md`): `parité porte ↔ CI : la CI (ci.yml) joue « npx playwright test », que orchestrate.test et orchestrate.build ne jouent pas`. The gate's verdict and exit code are unchanged; `lead tour --json` gets a `ciGaps` field.
+- `cadence lead tour`, `cadence orchestrate --dry-run` and `cadence verify --gate` flag the test commands that the CI workflows of the repository play (`.github/workflows/`) and that `orchestrate.test` / `orchestrate.build` do not (L499, `docs/orchestrate.md`, `docs/lead.md`, `docs/deliver.md`): `parité porte ↔ CI : la CI (ci.yml) joue « npx playwright test », que orchestrate.test et orchestrate.build ne jouent pas`. The gate's verdict and exit code are unchanged; `lead tour --json` gets a `ciGaps` field. Edges (L499): wrapped runners (`xvfb-run`, `timeout`…), `python -m pytest`, `mvn -B test`, quoted env values, `cd dir && npm test`, `pnpm|yarn test`, commands quoted in an `echo` and a non-directory `.github/workflows` are handled.
 
 ### Fixed
 

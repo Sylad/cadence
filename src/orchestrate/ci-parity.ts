@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, posix } from 'node:path';
+import { isAbsolute, join, posix } from 'node:path';
 import { parse } from 'yaml';
 import { readOrchestrateConfig } from '../config.js';
 import { isObject } from '../yaml-keys.js';
@@ -16,12 +16,16 @@ const WORKFLOWS = '.github/workflows';
 /** Profondeur à laquelle un script npm qui en appelle un autre est suivi (garde contre `a` → `b` → `a`). */
 const SCRIPT_DEPTH = 3;
 /** Les lanceurs de tests reconnus, au début d'une commande (après `npx`, les variables d'environnement et les scripts npm dépliés). */
-const TEST_RUNNER = /^(npm (run )?test\b|(vitest|jest|mocha|playwright test|cypress run|pytest|python3? -m pytest|tox|rspec|phpunit|mvn (-\S+ )*(test|verify)|gradlew? test|go test|cargo test|dotnet test|ng (test|e2e))\b)/;
+const TEST_RUNNER = /^((npm|pnpm|yarn) (run )?test(?![\w-])|(vitest|jest|mocha|playwright test|cypress run|pytest|python3? -m pytest|tox|rspec|phpunit|mvn (test|verify)|gradlew? test|go test|cargo test|dotnet test|ng (test|e2e))(?![\w-]))/;
 /** Un script npm de test que package.json ne définit pas (ou illisible) : le nom suffit. */
-const TEST_SCRIPT = /^npm run (test|e2e)\S*/;
-const SEGMENT = /&&|\|\||\||;/;
+const TEST_SCRIPT = /^(npm|pnpm|yarn) run (test|e2e)\S*/;
+/** Les enveloppes d'un lanceur (écran virtuel, délai…), retirées avant la reconnaissance. */
+const WRAPPER = /^(xvfb-run|timeout|time|env|nice)(\s+-\S+)*(\s+\d+[smhd]?)?\s+/;
+/** Les variables d'environnement en tête de commande, valeur entre guillemets comprise. */
+const ENV_PREFIX = /^(\w+=("[^"]*"|'[^']*'|\S*)\s+)+/;
 
 function packageScripts(repo: string, dir: string): Record<string, string> {
+  if (dir.startsWith('..') || isAbsolute(dir)) return {}; // hors du dépôt : rien à lire
   try {
     const pkg = JSON.parse(readFileSync(join(repo, dir, 'package.json'), 'utf8')) as { scripts?: unknown };
     return isObject(pkg.scripts) ? Object.fromEntries(Object.entries(pkg.scripts).filter((e): e is [string, string] => typeof e[1] === 'string')) : {};
@@ -30,25 +34,57 @@ function packageScripts(repo: string, dir: string): Record<string, string> {
   }
 }
 
-/** Les commandes simples d'un texte shell : lignes (continuations `\` jointes, commentaires et vides écartés) puis `&&`, `||`, `|` et `;`. */
-function segments(text: string): string[] {
-  const lines = text.replace(/\s*\\\n\s*/g, ' ').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
-  return lines.flatMap((l) => l.split(SEGMENT).map((s) => s.trim()).filter(Boolean));
+/** Découpe une ligne sur `&&`, `||`, `|` et `;` hors des guillemets. */
+function splitLine(line: string): string[] {
+  const parts: string[] = [];
+  let quote = '';
+  let from = 0;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]!;
+    if (quote) {
+      if (c === quote) quote = '';
+    } else if (c === '"' || c === "'") {
+      quote = c;
+    } else if (c === '&' || c === '|' || c === ';') {
+      parts.push(line.slice(from, i));
+      if ((c === '&' || c === '|') && line[i + 1] === c) i++;
+      from = i + 1;
+    }
+  }
+  parts.push(line.slice(from));
+  return parts.map((s) => s.trim()).filter(Boolean);
 }
 
-/** Les commandes feuilles de `text`, `npm test` / `npm run x` remplacés par le script de package.json de `dir` quand il existe. */
+/** Les commandes simples d'un texte shell : lignes (continuations `\` jointes, commentaires et vides écartés) puis `&&`, `||`, `|` et `;` hors guillemets. */
+function segments(text: string): string[] {
+  const lines = text.replace(/\s*\\\r?\n\s*/g, ' ').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  return lines.flatMap(splitLine);
+}
+
+/** Les commandes feuilles de `text`, `npm test` / `npm run x` remplacés par le script de package.json de `dir` (suivi à travers les `cd`) quand il existe. */
 function leaves(repo: string, dir: string, text: string, depth = SCRIPT_DEPTH): string[] {
-  const scripts = packageScripts(repo, dir);
+  let cwd = dir;
   return segments(text).flatMap((s) => {
+    const cd = /^cd\s+(?:"([^"]*)"|'([^']*)'|(\S+))$/.exec(s);
+    if (cd) {
+      cwd = posix.normalize(posix.join(cwd, cd[1] ?? cd[2] ?? cd[3]!));
+      return [];
+    }
     const m = /^(?:npm|pnpm|yarn)(?: run)? ([\w:.-]+)\s*(?:--(?:\s.*)?)?$/.exec(s);
-    const body = m && depth > 0 ? scripts[m[1]!] : undefined;
-    return body === undefined ? [s] : leaves(repo, dir, body, depth - 1);
+    const body = m && depth > 0 ? packageScripts(repo, cwd)[m[1]!] : undefined;
+    return body === undefined ? [s] : leaves(repo, cwd, body, depth - 1);
   });
 }
 
 /** La clé de comparaison : sans variables d'environnement ni `npx`, et coupée au premier argument qui commence par `-` (les options ne font pas une autre commande). */
 function key(command: string): string {
-  const words = command.replace(/^(\w+=\S*\s+)+/, '').replace(/^npx(\s+(--no-install|-y|--yes))?\s+/, '').split(/\s+/);
+  let rest = command;
+  for (let again = true; again; ) {
+    const next = rest.replace(ENV_PREFIX, '').replace(WRAPPER, '').replace(/^npx(\s+(--no-install|-y|--yes))?\s+/, '');
+    again = next !== rest;
+    rest = next;
+  }
+  const words = rest.replace(/^python3?\s+-m\s+pytest\b/, 'pytest').replace(/^mvn(\s+-\S+)*\s+/, 'mvn ').split(/\s+/);
   const end = words.findIndex((w) => w.startsWith('-'));
   return (end < 0 ? words : words.slice(0, end)).join(' ');
 }
@@ -100,7 +136,13 @@ export function ciParityGaps(repo: string): CiGap[] {
   const played = gateKeys(repo, test, build);
   const seen = new Set<string>();
   const gaps: CiGap[] = [];
-  for (const workflow of readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)).sort()) {
+  let files: string[];
+  try {
+    files = readdirSync(dir);
+  } catch {
+    return []; // .github/workflows n'est pas un dossier
+  }
+  for (const workflow of files.filter((f) => /\.ya?ml$/.test(f)).sort()) {
     for (const { run, dir: cwd } of workflowRuns(join(dir, workflow))) {
       for (const command of leaves(repo, cwd, run)) {
         if (!isTest(command) || played.has(key(command)) || seen.has(key(command))) continue;

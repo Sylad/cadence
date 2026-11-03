@@ -1,0 +1,344 @@
+# Fiche back du lot L469 — livré ≠ terminé (manque M7 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md:107).
+sujet:
+  id: livre-different-de-termine
+  titre: "Livré ≠ terminé — deliver écrit delivered: et l'état livré, blocs par chemins"
+  lot: L469
+  perimetre:
+    modules:
+      - src/deliver.ts            # parseDeliverConfig (clé deliver.blocks), announceDelivered (marquage après la ligne verte)
+      - src/deliver-lots.ts       # sélection des lots cités depuis la livraison précédente
+      - src/plan.ts               # clé de lot delivered: (lecture, conservation, écriture), archives comprises
+      - src/plan-states.ts        # plan.deliveredState (mêmes validations que doneState)
+      - src/config.ts             # KEYS (src/config.ts:27) : ajout de deliveredState
+      - src/cli/deliver-commands.ts   # option --block de cadence deliver
+      - src/cli/lot-commands.ts   # raf done : lecture de deliveries.log après la fermeture
+      - src/verify.ts             # cadence verify : la ligne verte qu'il écrit passe par announceDelivered (marquage identique)
+    endpoints: []
+    jobs: []
+    commandes:
+      - cadence deliver [--block <nom>] [--dry-run]
+      - cadence verify (ligne verte écrite)
+      - raf done <id>
+      - raf show <id>
+    cles_lues:
+      - "cadence.yaml : plan.deliveredState (nouvelle clé de premier niveau de plan, à ajouter à KEYS, src/config.ts:27)"
+      - "cadence.yaml : deliver.blocks (seule clé ajoutée sous deliver ; lue par parseDeliverConfig, src/deliver.ts:122)"
+    hors_perimetre:
+      - "le format de deliveries.log et ses lecteurs (« jour sha », inchangés) ; aucun journal par bloc (cf. R22)"
+      - "raf todo (réouverture) : ne touche pas à delivered: dans ce lot"
+      - "raf check : ne contrôle pas encore la forme de delivered:"
+      - "l'ordre d'écriture du plan pendant une vague (lot L521)"
+      - "un plan tenu par un autre outil (lecture seule) : rien n'y est écrit"
+
+cas:
+  - id: C1
+    titre: Une livraison verte marque livrés les lots terminés qu'elle contient
+    acteur: le lead (ou le livreur lancé à la main) qui lance cadence deliver
+    declencheur: commande cadence deliver (ou la ligne verte de cadence verify)
+    preconditions:
+      - le plan est natif et modifiable ; une livraison verte précédente existe dans l'historique du sha livré
+      - des lots sont done (peut-être archivés) et cités par des commits de la plage précédente..sha
+    nominal:
+      - "deliver joue ses étapes, écrit la ligne verte « jour sha » comme avant puis annonce « livré : … » comme avant."
+      - Le plan est relu (le script du projet a pu fermer des lots), et les lots done cités par un commit non « plan seul » de la plage, directement ou par une de leurs sous-tâches, sont retenus.
+      - "Chaque lot retenu sans delivered: reçoit delivered {date du jour, sha livré} ; son état passe à plan.deliveredState s'il est déclaré et que le lot est dans l'état doneState."
+      - "deliver imprime « lots marqués livrés : L1, L2 — delivered: <jour> <sha7> », puis commite le plan et les fichiers d'archive modifiés."
+    alternatives:
+      - { si: "un lot cité est ouvert (todo ou doing)", alors: "il n'est pas marqué, même cité par ses sous-tâches", regles: [R4] }
+      - { si: "le lot a déjà delivered:", alors: "il n'est pas relivré", regles: [R5] }
+      - { si: "le lot n'est cité que par des sous-tâches mais est done", alors: "il est marqué", regles: [R3] }
+      - { si: "plan.deliveredState est absent", alors: "delivered: est écrit et l'état reste", regles: [R6] }
+      - { si: "plan.transitions refuse doneState → deliveredState", alors: "le lot n'est pas marqué, un avertissement est écrit, la livraison reste verte", regles: [R7] }
+      - { si: "le plan est tenu par un autre outil (lecture seule)", alors: "rien n'est écrit et l'annonce est celle d'avant", regles: [R8] }
+      - { si: "le lot est archivé", alors: "son fichier d'archive est modifié et commité avec le plan", regles: [R9] }
+      - { si: "le plan ou une archive était déjà modifié avant la livraison", alors: "rien n'est commité et le message le dit", regles: [R10] }
+      - { si: "--dry-run, première livraison ou livraison précédente hors de l'historique", alors: "rien n'est écrit", regles: [R11] }
+      - { si: "l'écriture ou le commit du plan échoue", alors: "un avertissement est écrit et la livraison reste verte", regles: [R12] }
+      - { si: "la ligne verte vient de cadence verify", alors: "le marquage est le même", regles: [R13] }
+    resultat: "Un lot done porte delivered: {date, sha} et l'état livré ; terminé et livré sont deux faits distincts du plan."
+  - id: C2
+    titre: Le lot est fermé après la livraison (flux de la skill deliver)
+    acteur: le lead qui ferme un lot déjà livré
+    declencheur: commande raf done <id>
+    preconditions:
+      - "la livraison verte a eu lieu avant raf done (le lot était encore ouvert à ce moment : C1 ne l'a donc pas marqué)"
+      - deliveries.log contient des lignes « jour sha »
+    nominal:
+      - raf done ferme le lot comme avant (gardes inchangées).
+      - raf done parcourt les lignes de deliveries.log de la plus ancienne à la plus récente.
+      - Il retient la première ligne dont le sha atteint un commit non « plan seul » qui cite le lot (lot ou sous-tâche).
+      - Le lot reçoit delivered {jour de la ligne, sha de la ligne} et l'état deliveredState (R6) ; raf done imprime « <id> livré le <jour> (<sha7>) ».
+    alternatives:
+      - { si: "aucune ligne n'atteint un commit du lot", alors: "le lot reste terminé non livré, sans message", regles: [R15] }
+      - { si: "une ligne est illisible ou son sha inconnu du dépôt", alors: "elle est sautée", regles: [R15] }
+      - { si: "raf done vise une sous-tâche ou le plan est en lecture seule", alors: "aucune lecture du journal", regles: [R16] }
+    resultat: Le lot fermé après coup porte le jour et le sha de la première livraison qui le contient.
+  - id: C3
+    titre: Livrer un bloc de chemins
+    acteur: le lead d'un projet à plusieurs blocs (api, web…)
+    declencheur: commande cadence deliver --block <nom>
+    preconditions:
+      - "cadence.yaml déclare deliver.blocks { nom: [chemins] }"
+    nominal:
+      - deliver refuse un bloc inconnu avant toute étape.
+      - La livraison se joue comme sans --block et écrit sa ligne verte inchangée.
+      - Parmi les commits de la plage précédente..sha, seuls ceux qui modifient un fichier du bloc désignent des lots à marquer (C1, R1-R13).
+    alternatives:
+      - { si: "le bloc n'est pas déclaré ou aucun bloc n'est déclaré", alors: "refus avant toute étape", regles: [R20] }
+      - { si: "deliver est lancé sans --block", alors: "les blocs sont ignorés et tous les lots de la plage sont retenus", regles: [R21] }
+      - { si: "un lot done ancien touche le bloc mais n'est cité par aucun commit de la plage", alors: "il n'est pas marqué", regles: [R19] }
+      - { si: "un commit modifie des fichiers de plusieurs blocs", alors: "son lot est retenu par chacun de ces blocs", regles: [R17, R18] }
+      - { si: "deux blocs sont livrés l'un après l'autre sur le même sha", alors: "le second voit une plage vide", regles: [R22] }
+    resultat: Seuls les lots cités par des commits du bloc, dans la plage de cette livraison, sont marqués ; l'historique n'est jamais réécrit.
+  - id: C4
+    titre: Le projet déclare ses blocs et son état livré
+    acteur: le mainteneur du projet
+    declencheur: lecture de cadence.yaml par cadence deliver, raf et cadence verify
+    preconditions:
+      - cadence.yaml porte plan.deliveredState et/ou deliver.blocks
+    nominal:
+      - La lecture accepte plan.deliveredState (état déclaré de statut done, avec plan.states) et deliver.blocks (nom → liste de chemins relatifs au dépôt).
+      - Les chemins sont normalisés (séparateurs, « ./ », « / » final retirés).
+    alternatives:
+      - { si: "plan.deliveredState est sans plan.states, d'un mauvais type, non déclaré ou non done", alors: "refus nommant la clé", regles: [R25] }
+      - { si: "deliver.blocks n'est pas un objet, un nom est vide ou une liste est vide", alors: "refus", regles: [R23] }
+      - { si: "un chemin est vide, absolu, hors du dépôt ou ramené à « . » (« ./ », « src/.. »)", alors: "refus", regles: [R24] }
+      - { si: "la clé n'est pas dans KEYS", alors: "elle serait refusée comme inconnue ; elle y est ajoutée", regles: [R26] }
+      - { si: "un lot porte delivered:", alors: "il est lu, conservé aux réécritures et affiché par raf show", regles: [R27, R28] }
+    resultat: Le projet déclare où est son état livré et ses blocs ; une déclaration dégénérée est refusée avant toute livraison.
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Pour chaque lot done cité par un commit non « plan seul » de la plage précédente..sha livré, deliver écrit delivered {date, sha} : date = jour de la livraison, sha = sha complet de la ligne verte écrite."
+    statut: sourcee
+    source: "titre du lot (« deliver écrit delivered: ») ; étude M7 docs/plan/etude-migration-cadence.md:107 (« delivered: {date, sha} ») ; plage et filtre plan seul : src/deliver-lots.ts:15-23"
+    tests: ["R1 — lot done cité dans la plage : delivered {date du jour, sha livré} écrit", "R1 — commit « plan seul » qui cite le lot : lot non marqué"]
+  - id: R2
+    cas: [C1]
+    enonce: "Le plan est relu juste avant le marquage : un lot que le script du projet a fermé pendant la livraison est vu done et marqué, et l'écriture ne défait pas ce que le script a commité."
+    statut: sourcee
+    source: "src/deliver.ts:616 (« Relu : le script du projet a pu fermer des lots ou commiter le plan depuis le départ de la livraison »)"
+    tests: ["R2 — lot fermé par le script de livraison : marqué livré", "R2 — plan modifié par le script : modification conservée après le marquage"]
+  - id: R3
+    cas: [C1]
+    enonce: Un lot déjà done dont seules les sous-tâches (L1/t1) portent les commits de la plage est marqué livré par la livraison qui les contient ; une citation de sous-tâche compte comme une citation du lot.
+    statut: sourcee
+    source: "décision du lead 03-11 (note du lot) : lecture de la phrase de l'étude M7 l.107, qui parle d'un lot ouvert ; majeur (2) de la revue de la vague 1605"
+    tests: ["R3 — lot done cité seulement par L1/t1 : marqué livré", "R3 — lot done cité par L1 et par L1/t1 : un seul marquage"]
+  - id: R4
+    cas: [C1]
+    enonce: "Une sous-tâche ne livre jamais un lot ouvert : un lot todo ou doing, cité par lui-même ou par ses sous-tâches, n'est ni marqué ni modifié."
+    statut: sourcee
+    source: "étude M7 docs/plan/etude-migration-cadence.md:107 (« une sous-tâche livrée ne livre pas son lot ») ; décision du lead 03-11 (note du lot)"
+    tests: ["R4 — lot doing cité par L1/t1 : ni delivered ni état modifiés", "R4 — lot todo cité : non marqué"]
+  - id: R5
+    cas: [C1]
+    enonce: "Un lot qui porte déjà delivered: n'est pas relivré : delivered: et son état restent tels quels à la livraison suivante."
+    statut: sourcee
+    source: "étude M7 docs/plan/etude-migration-cadence.md:107 (« un lot fermé n'est pas relivré »)"
+    tests: ["R5 — lot déjà livré cité par une seconde livraison : delivered inchangé", "R5 — lot déjà livré : aucun commit de plan créé"]
+  - id: R6
+    cas: [C1, C2]
+    enonce: "Avec plan.deliveredState, un lot dont l'état courant est doneState (ou, sans state:, l'état par défaut de done) passe à deliveredState en recevant delivered: ; un lot dans un autre état done garde son état ; sans plan.deliveredState l'état n'est jamais modifié."
+    statut: sourcee
+    source: "décision du lead 03-11 D2 (note du lot) ; étude M7 l.107 (« passe l'état « terminé non livré » (M1) à « livré » ») ; état par défaut : src/plan-states.ts:77-80"
+    tests: ["R6 — état termine : passe à livre avec delivered", "R6 — état done autre que doneState : état inchangé, delivered écrit", "R6 — sans deliveredState : état inchangé"]
+  - id: R7
+    cas: [C1]
+    enonce: "Si plan.transitions refuse doneState → deliveredState, le lot n'est pas marqué (ni delivered: ni état), deliver écrit un avertissement qui nomme le lot et les deux états, et la livraison reste verte (code 0)."
+    statut: hypothese
+    si_faux: "Si la transition devait être ignorée par la livraison (comme --force), le lot serait marqué malgré plan.transitions ; seul le sort de ce lot change, aucune donnée irréversible."
+    tests: ["R7 — transition refusée : lot non marqué, avertissement, code 0", "R7 — transition permise : lot marqué"]
+  - id: R8
+    cas: [C1]
+    enonce: "Avec un plan en lecture seule (tenu par un autre outil) deliver n'écrit rien dans le plan, et n'annonce « livré : » que les lots en cours, comme avant."
+    statut: sourcee
+    source: "docs/deliver.md:158 (« read-only plan, only the lots that were in progress when the delivery started ») ; src/deliver-lots.ts:23-24"
+    tests: ["R8 — plan en lecture seule : plan inchangé, annonce identique à celle d'avant"]
+  - id: R9
+    cas: [C1]
+    enonce: Un lot archivé (.cadence/archive/<année>.yaml) est marqué dans son fichier d'archive ; le commit du plan emporte le plan, chaque fichier d'archive modifié et les fichiers produits par plan.onWrite, de sorte que l'arbre reste propre.
+    statut: sourcee
+    source: "majeur (1) de la revue de la vague 1605 (note du lot : archive modifiée par markDelivered jamais commitée) ; écriture par fichier d'origine : src/plan.ts:294-317"
+    tests: ["R9 — lot archivé : delivered écrit dans le fichier d'année", "R9 — après deliver, git status est propre (plan et archive commités)"]
+  - id: R10
+    cas: [C1]
+    enonce: "Si le plan, une archive à écrire ou un fichier de plan.onWrite était déjà modifié avant le marquage, deliver écrit le marquage mais ne commite pas, et le dit (« plan déjà modifié avant la livraison, non commité : à commiter avec vos modifications »)."
+    statut: sourcee
+    source: "src/deliver.ts:636 (même garde que le plan écrit pour un article, L420)"
+    tests: ["R10 — plan modifié avant la livraison : marquage écrit, pas de commit, message"]
+  - id: R11
+    cas: [C1]
+    enonce: Avec --dry-run, sans livraison précédente, ou avec une livraison précédente égale au sha ou hors de son historique, aucun lot n'est marqué et le plan n'est pas touché.
+    statut: sourcee
+    source: "src/deliver-lots.ts:16 (plage vide) ; docs/deliver.md:152 (« --dry-run writes nothing »)"
+    tests: ["R11 — --dry-run : plan inchangé", "R11 — première livraison : aucun lot marqué", "R11 — livraison précédente hors historique : aucun lot marqué"]
+  - id: R12
+    cas: [C1]
+    enonce: "Une erreur d'écriture ou de commit du plan écrit « deliver : lots livrés non marqués : <cause> » sur la sortie d'erreur ; la livraison déjà faite reste verte et le code de sortie 0."
+    statut: sourcee
+    source: "src/deliver.ts:611 (« Une erreur ici ne défait pas une livraison déjà faite »)"
+    tests: ["R12 — plan non inscriptible : avertissement, ligne verte conservée, code 0"]
+  - id: R13
+    cas: [C1]
+    enonce: La ligne verte que cadence verify inscrit marque les lots comme deliver, depuis la livraison verte précédente, avec le même format de message.
+    statut: sourcee
+    source: "src/deliver.ts:596-600 (announceDelivered « partagé par deliver et par cadence verify », L435) ; src/verify.ts:169"
+    tests: ["R13 — cadence verify vert : lots done cités marqués livrés"]
+  - id: R14
+    cas: [C2]
+    enonce: raf done parcourt les lignes vertes de deliveries.log de la plus ancienne à la plus récente et retient la première dont le sha atteint (commit ancêtre ou égal) un commit non « plan seul » qui cite le lot ; delivered = jour et sha de cette ligne ; l'état suit R6 ; la sortie ajoute « <id> livré le <jour> (<sha7>) ».
+    statut: sourcee
+    source: "décision du lead 03-11, R15 (note du lot) ; majeur (3) de la revue de la vague 1605 (flux de la skill deliver : raf done APRÈS la livraison)"
+    tests: ["R14 — deux lignes atteignent le lot : la plus ancienne est retenue", "R14 — commit plan seul seul : ligne non retenue", "R14 — message « livré le » imprimé"]
+  - id: R15
+    cas: [C2]
+    enonce: Une ligne illisible de deliveries.log (sans jour valide, sans sha, sha inconnu du dépôt) est sautée ; si aucune ligne ne convient, le lot reste terminé non livré, sans message ni erreur ; le format du journal et de deliver sont inchangés.
+    statut: sourcee
+    source: "décision du lot du lead 03-11, R15 (note du lot : « ligne illisible sautée ; aucune : reste terminé non livré, sans message ; format du journal et deliver inchangés »)"
+    tests: ["R15 — ligne illisible sautée, la suivante retenue", "R15 — aucune ligne : lot done sans delivered, sans message", "R15 — journal absent : raf done inchangé"]
+  - id: R16
+    cas: [C2]
+    enonce: "raf done sur une sous-tâche, ou sur un plan en lecture seule, ne lit pas deliveries.log et ne marque rien ; raf done sur un lot qui a déjà delivered: n'est pas possible (le lot est déjà fermé)."
+    statut: hypothese
+    si_faux: "Si une sous-tâche fermée devait marquer son lot, un lot ouvert serait donné livré à tort, contre l'étude M7 l.107 (R4) ; le comportement de raf done sur sous-tâche resterait celui d'avant."
+    tests: ["R16 — raf done L1/t1 : lot non marqué", "R16 — plan en lecture seule : raf done inchangé"]
+  - id: R17
+    cas: [C3]
+    enonce: Avec --block <nom>, seuls les lots cités par un commit de la plage qui modifie au moins un fichier d'un des chemins du bloc sont retenus pour le marquage (R1-R13).
+    statut: sourcee
+    source: "titre du lot (« blocs par chemins ») ; étude M7 l.107 (« deliver.blocks: {api: [src/api], …} … filtrent par chemins »)"
+    tests: ["R17 — commit hors du bloc : lot non marqué", "R17 — commit touchant le bloc : lot marqué"]
+  - id: R18
+    cas: [C3]
+    enonce: Un fichier appartient à un chemin quand il lui est égal ou situé dessous, par segments (« src/api » ne retient pas « src/api2/x.ts ») ; un commit qui touche plusieurs blocs retient son lot pour chacun.
+    statut: hypothese
+    si_faux: "Si la comparaison devait être un préfixe de texte, « src/api2/ » entrerait dans le bloc « src/api » : seul le tri des lots à marquer change."
+    tests: ["R18 — src/api2/x.ts n'appartient pas au bloc src/api", "R18 — commit sur deux blocs : lot retenu par chacun"]
+  - id: R19
+    cas: [C3]
+    enonce: "La sélection par bloc ne lit que la plage de la livraison (précédente..sha) : un lot done avant la livraison précédente, même s'il touche le bloc, n'est jamais marqué ; aucun lot de l'historique n'est marqué « livré » avec une date ou un sha de la livraison courante."
+    statut: sourcee
+    source: "majeur (4) de la revue de la vague 1605 (note du lot : la fiche doit borner la sélection sans réécrire l'historique) ; src/deliver-lots.ts:16-23"
+    tests: ["R19 — lot done ancien touchant le bloc, absent de la plage : non marqué", "R19 — plan de 29 lots done sans delivered, première utilisation de --block : seuls les lots cités par la plage sont marqués"]
+  - id: R20
+    cas: [C3]
+    enonce: --block sur un nom absent de deliver.blocks, ou sans aucun bloc déclaré, est refusé avant toute étape (aucun script, aucune ligne de journal, code 1).
+    statut: hypothese
+    si_faux: "Si un bloc inconnu devait livrer sans filtre, la livraison s'exécuterait avec tous les lots : refuser est le choix prudent, seul le code de sortie change."
+    tests: ["R20 — bloc inconnu : refus, deliveries.log inchangé", "R20 — aucun bloc déclaré : refus", "R20 — --block vide : refus"]
+  - id: R21
+    cas: [C3]
+    enonce: "Sans --block, deliver.blocks est ignoré : tous les lots de la plage sont retenus, comme pour un projet sans blocs."
+    statut: hypothese
+    si_faux: "Si les blocs devaient s'appliquer sans option, une livraison complète ne marquerait que les lots d'un bloc ; seul le tri change."
+    tests: ["R21 — blocs déclarés, sans --block : tous les lots de la plage marqués"]
+  - id: R22
+    cas: [C3]
+    enonce: "Une livraison avec --block joue toutes ses étapes et écrit la même ligne « jour sha » ; la plage de la suivante part de cette ligne, quel que soit le bloc : deux blocs livrés l'un après l'autre sur le même sha, le second voit une plage vide et ne marque rien."
+    statut: hypothese
+    si_faux: "Si chaque bloc devait avoir sa plage, il faudrait un journal par bloc (nouveau stockage à décider avec le lead) ; ici aucun format n'est ajouté, et raf done (R14) rattrape un lot fermé après coup."
+    tests: ["R22 — --block api puis --block web sur le même sha : second marquage vide, journal à une ligne par livraison"]
+  - id: R23
+    cas: [C4]
+    enonce: deliver.blocks doit être un objet dont chaque nom est non vide et dont chaque valeur est une liste non vide de textes ; sinon la lecture est refusée.
+    statut: hypothese
+    si_faux: "Si une liste vide devait signifier « tout le dépôt », elle livrerait sans filtre ; seul le refus change."
+    tests: ["R23 — deliver.blocks liste au lieu d'un objet : refus", "R23 — nom de bloc vide : refus", "R23 — liste de chemins vide : refus"]
+  - id: R24
+    cas: [C4]
+    enonce: Chaque chemin de bloc est normalisé comme les fichiers de plan.onWrite (séparateurs, « ./ » initial, « / » final retirés) puis refusé s'il est vide, absolu (« / », « // »), hors du dépôt (« .. », « src/../.. ») ou ramené à « . » (« . », « ./ », « src/.. »).
+    statut: sourcee
+    source: "normalisation de src/config.ts:38 (posix.normalize) et refus src/config.ts:39 (onWrite.files hors du dépôt) ; notes de la revue de la fiche (cas dégénérés « ./ » et « // »)"
+    tests: ["R24 — chemin absolu « /etc » : refus", "R24 — « // » : refus hors du dépôt", "R24 — « ./ » et « . » : refus « désigne tout le dépôt »", "R24 — « src/.. » : refus tout le dépôt", "R24 — « ../x » : refus hors du dépôt", "R24 — chaîne vide : refus", "R24 — « src\\api/ » : accepté, normalisé en « src/api »"]
+  - id: R25
+    cas: [C4]
+    enonce: plan.deliveredState suit les validations de plan.doneState — refusé sans plan.states, refusé si ce n'est pas un nom, refusé si l'état n'est pas déclaré ou n'a pas le statut done ; la clé est ajoutée au périmètre de la lecture des états.
+    statut: sourcee
+    source: "décision du lead 03-11, D2 (note du lot) ; src/plan-states.ts:47-48 (nom attendu), :57 (demande plan.states), :65-67 (doneState : état done)"
+    tests: ["R25 — deliveredState sans plan.states : refusé", "R25 — deliveredState non déclaré : refusé", "R25 — deliveredState d'état doing : refusé", "R25 — deliveredState nombre : refusé", "R25 — deliveredState valide : lu"]
+  - id: R26
+    cas: [C4]
+    enonce: « deliveredState » est ajouté à KEYS ; sans cela la clé serait refusée comme inconnue.
+    statut: sourcee
+    source: "src/config.ts:27 (KEYS) et :61 (« <clé> inconnu (attendu : …) ») ; décision du lead 03-11, D2"
+    tests: ["R26 — plan.deliveredState n'est pas refusé comme clé inconnue", "R26 — une clé voisine inconnue reste refusée"]
+  - id: R27
+    cas: [C4]
+    enonce: "La clé de lot delivered: {date, sha} est lue dans le plan natif (actif ou archive), conservée à chaque réécriture du plan (raf note, raf archive…), et déplacée avec le lot par raf archive."
+    statut: sourcee
+    source: "titre du lot (« deliver écrit delivered: ») ; étude M7 l.107 ; décision du lead 30-10 (Q-MIG1, étude)"
+    tests: ["R27 — raf note sur un lot livré : delivered conservé", "R27 — raf archive d'un lot livré : delivered dans l'archive"]
+  - id: R28
+    cas: [C4]
+    enonce: "raf show <id> affiche « livré : <jour> <sha7> » pour un lot qui porte delivered:, et rien sinon."
+    statut: hypothese
+    si_faux: "Si l'affichage devait attendre un lot d'écran ou raf export (M8), seule la sortie de raf show change ; la donnée est écrite quand même."
+    tests: ["R28 — lot livré : ligne « livré : » affichée", "R28 — lot non livré : aucune ligne « livré : »"]
+  - id: R29
+    cas: [C1]
+    enonce: "L'annonce existante « livré : L… — raf done si l'effet est celui attendu » reste identique ; deliver ajoute après elle la ligne « lots marqués livrés : L1, L2 — delivered: <jour> <sha7> » quand au moins un lot est marqué, et rien sinon."
+    statut: hypothese
+    si_faux: "Si la ligne d'annonce devait être fusionnée avec la nouvelle, seul le texte imprimé change ; aucune sortie lue par un script n'est connue."
+    tests: ["R29 — annonce d'avant inchangée", "R29 — ligne « lots marqués livrés » imprimée seulement si un lot est marqué"]
+
+contrats:
+  - id: A1
+    appel: commande cadence deliver [--block <nom>] [--dry-run]
+    entree: "option --block <nom> (nouvelle) ; cadence.yaml deliver.blocks et plan.deliveredState ; plan natif ; deliveries.log"
+    sortie: "inchangée, plus « lots marqués livrés : L1, L2 — delivered: <jour> <sha7> » et l'état du commit du plan (« plan commité <sha7> » ou « plan déjà modifié avant la livraison, non commité : à commiter avec vos modifications ») ; code 0"
+    erreurs:
+      - { code: log error, message: "deliver : --block api : bloc inconnu (déclarés : web, worker)" }
+      - { code: log error, message: "deliver : --block api : aucun bloc déclaré (deliver.blocks dans cadence.yaml)" }
+      - { code: log warn, message: "deliver : L1 non marqué livré : transition termine → livre refusée par plan.transitions" }
+      - { code: log warn, message: "deliver : lots livrés non marqués : <cause>" }
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R17, R18, R19, R20, R21, R22, R29]
+  - id: A2
+    appel: commande cadence verify
+    entree: "comme avant (ligne verte « jour sha » écrite par verify)"
+    sortie: "comme A1 pour les lots marqués ; le reste inchangé"
+    erreurs: []
+    sans_erreur: "les échecs de marquage sont les avertissements de A1 (R7, R12) ; verify n'a pas d'autre branche d'erreur nouvelle"
+    regles: [R13]
+  - id: A3
+    appel: commande raf done <id>
+    entree: "<id> d'un lot (ou L1/t1 d'une sous-tâche) ; deliveries.log"
+    sortie: "inchangée, plus « <id> livré le <jour> (<sha7>) » quand une ligne du journal atteint un commit du lot ; code 0"
+    erreurs: []
+    sans_erreur: "aucune ligne utilisable est le cas nominal « terminé non livré » sans message (R15) ; les refus de raf done existants sont inchangés"
+    regles: [R6, R14, R15, R16]
+  - id: A4
+    appel: commande raf show <id>
+    entree: "<id> d'un lot"
+    sortie: "inchangée, plus « livré : <jour> <sha7> » si delivered: est posé"
+    erreurs: []
+    sans_erreur: "raf show n'a pas de refus nouveau : un lot inconnu garde son erreur existante"
+    regles: [R28]
+  - id: A5
+    appel: commande cadence deliver (lecture de cadence.yaml)
+    entree: "cadence.yaml : deliver.blocks, plan.deliveredState"
+    sortie: "configuration lue"
+    erreurs:
+      - { code: log error, message: "cadence.yaml : deliver.blocks : un objet { nom: [chemins] } attendu" }
+      - { code: log error, message: "cadence.yaml : deliver.blocks : nom de bloc vide" }
+      - { code: log error, message: "cadence.yaml : deliver.blocks.api : au moins un chemin attendu" }
+      - { code: log error, message: "cadence.yaml : deliver.blocks.api : « /etc » est hors du dépôt" }
+      - { code: log error, message: "cadence.yaml : deliver.blocks.api : « ./ » désigne tout le dépôt (un bloc se déclare par un sous-chemin)" }
+      - { code: log error, message: "cadence.yaml : plan.deliveredState demande plan.states" }
+      - { code: log error, message: "cadence.yaml : plan.deliveredState : un nom d'état attendu" }
+      - { code: log error, message: "cadence.yaml : plan.deliveredState : « bloque » n'est pas un état done" }
+    regles: [R23, R24, R25, R26]
+  - id: A6
+    appel: commande raf note <id> "texte"
+    entree: "lot portant delivered:"
+    sortie: "inchangée ; delivered: conservé"
+    erreurs: []
+    sans_erreur: "seule la conservation de la clé est vérifiée ; les refus de raf note sont inchangés"
+    regles: [R27]
+
+donnees:
+  - { id: D1, objet: "plan natif .cadence/raf.yaml (et .cadence/archive/<année>.yaml) : clé de lot delivered: {date, sha}", existant: true, modification: ajout, decision: "titre du lot L469 et étude M7 l.107 : « deliver écrit delivered: {date, sha} » (réponse du lead à Q-MIG1, 30-10) ; clé optionnelle, un lot sans elle se lit comme avant", note: "date = jour AAAA-MM-JJ ; sha = sha complet ; le lot archivé la porte dans son fichier d'année" }
+  - { id: D2, objet: "cadence.yaml : clé plan.deliveredState", existant: true, modification: ajout, decision: "décision du lead 03-11, D2 (note du lot) : mêmes règles que doneState", note: "optionnelle ; absente, l'état n'est jamais modifié" }
+  - { id: D3, objet: "cadence.yaml : clé deliver.blocks { nom: [chemins] }", existant: true, modification: ajout, decision: "titre du lot et étude M7 l.107 : « les blocs sont déclarés (deliver.blocks: {api: [src/api], …}) et filtrent par chemins »", note: "optionnelle ; absente, deliver est inchangé" }
+  - { id: D4, objet: "deliveries.log (« jour sha », une ligne par livraison verte)", existant: true, modification: aucune, note: "lu par raf done en plus de deliver ; format et écriture inchangés (décision du lead 03-11, R15)" }

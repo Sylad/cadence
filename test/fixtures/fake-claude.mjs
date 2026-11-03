@@ -27,7 +27,8 @@ if (argv[0] === '--help') {
 }
 
 const flag = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined);
-const brief = argv[1];
+// le brief arrive sur stdin (L559) ; en argument pour un appel à la main (`-p <brief>`)
+const brief = argv[0] === '-p' && argv[1] && !argv[1].startsWith('--') ? argv[1] : argv[0] === '-p' ? readFileSync(0, 'utf8') : argv[1];
 const agent = flag('--agent');
 const resumeId = flag('--resume');
 const kind = resumeId ? /^fake-(.+)-\d+$/.exec(resumeId)?.[1] : brief.startsWith('Pre-check for lot') ? 'precheck' : agent === 'ux-reviewer' ? 'ux' : agent === 'code-reviewer' ? (brief.includes('single pass') ? 'review-small' : 'review') : brief.includes('found the defects below') ? 'fix' : 'implement';
@@ -42,7 +43,7 @@ const index = resumeId ? Number(/-(\d+)$/.exec(resumeId)[1]) : (used[kind] ?? 0)
 if (!resumeId) used[kind] = index + 1;
 const action = resumeId ? { structured: used.pending[resumeId]?.structured, noStructured: used.pending[resumeId]?.resumeNoStructured, usageLimit: used.pending[resumeId]?.resumeUsageLimit, tokens: { output: 7 } } : ((scenario[kind] ?? [])[index] ?? scenario[`${kind}*`] ?? {});
 
-const entry = { kind, lot, cwd: process.cwd(), model: flag('--model'), orchestrated: process.env.CADENCE_ORCHESTRATED ?? null, kubeconfig: process.env.KUBECONFIG ?? null, leaked: ['CADENCE_SNAPSHOT', 'CADENCE_WAVE_RESERVED'].filter((k) => k in process.env), path: process.env.PATH ?? null, resume: argv.includes('--resume'), resumeId: resumeId ?? null, sessionId: flag('--session-id'), schema: flag('--json-schema') ?? null, argv };
+const entry = { kind, lot, cwd: process.cwd(), model: flag('--model'), orchestrated: process.env.CADENCE_ORCHESTRATED ?? null, kubeconfig: process.env.KUBECONFIG ?? null, leaked: ['CADENCE_SNAPSHOT', 'CADENCE_WAVE_RESERVED'].filter((k) => k in process.env), path: process.env.PATH ?? null, resume: argv.includes('--resume'), resumeId: resumeId ?? null, sessionId: flag('--session-id'), brief, schema: flag('--json-schema') ?? null, argv };
 entry.which = Object.fromEntries(['raf', 'cadence'].map((n) => [n, spawnSync('sh', ['-c', `command -v ${n}`], { encoding: 'utf8' }).stdout.trim()]));
 const dedans = (parent, enfant) => { const r = relative(parent, enfant); return r === '' || (!r.startsWith('..') && !isAbsolute(r)); };
 if ((action.commits ?? []).length > 0) {

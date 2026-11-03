@@ -6,10 +6,10 @@ import { LARGEURS } from '../spec.js';
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** Une ligne par règle de la fiche : id, [état ou cas, statut], énoncé, message exact, tests prévus. Vide quand le document n'est pas une fiche. */
-export function ficheRules(doc: unknown): string[] {
+/** Une ligne par règle de la fiche (celles de `only` seulement, quand il est donné, L559) : id, [état ou cas, statut], énoncé, message exact, tests prévus. Vide quand le document n'est pas une fiche. */
+export function ficheRules(doc: unknown, only?: ReadonlySet<string> | null): string[] {
   if (!isObj(doc) || !Array.isArray(doc.regles)) return [];
-  return doc.regles.filter(isObj).map((r) => {
+  return doc.regles.filter(isObj).filter((r) => !only || only.has(String(r.id))).map((r) => {
     const message = typeof r.message === 'string' ? ` Message: « ${r.message} ».` : '';
     const tests = Array.isArray(r.tests) ? ` Tests: ${r.tests.map((t) => `« ${String(t)} »`).join(', ')}.` : '';
     const where = typeof r.etat === 'string' ? r.etat : Array.isArray(r.cas) ? r.cas.join(', ') : '';
@@ -34,8 +34,10 @@ export type AvalKind = 'implement' | 'fix' | 'review' | 'ux';
 export interface AvalOpts {
   /** Chemin (relatif au dépôt) de la fiche. */
   fiche: string;
-  /** `ficheRules(doc)`. */
+  /** `ficheRules(doc, règles du lot)`. */
   rules: string[];
+  /** Nombre de règles de la fiche laissées de côté parce qu'elles sont celles d'autres lots (L559) ; absent ou 0 : la liste est celle de la fiche entière. */
+  others?: number;
   /** Fichier d'acceptation du lot (chemin relatif), quand l'étape accept a eu lieu. */
   acceptation?: string;
   /** Commit rouge des tests d'acceptation, pour la revue. */
@@ -46,15 +48,19 @@ export interface AvalOpts {
   screen?: boolean;
 }
 
+/** Phrase des règles laissées de côté (L559) ; vide quand la liste est celle de la fiche entière. */
+const omittedText = (others?: number): string => (others ? `\nThe sheet holds ${others} other rules, those of other lots: they are left out of this brief, do not implement, test or review them.` : '');
+
 /** Consigne de la fiche pour une étape en aval : `{{fiche}}` des gabarits implement, fix, review et ux. */
 export function avalFicheText(kind: AvalKind, o: AvalOpts): string {
   const folder = posix.dirname(o.fiche);
   const maquette = `${folder}/maquette.html`;
   const screen = o.screen !== false;
   const contracts = o.contracts?.length ? `\nIts contracts (the calls the code must hold, with the exact codes and messages of their errors) are:\n${o.contracts.join('\n')}` : '';
+  const omitted = omittedText(o.others);
   const head = screen
-    ? `This lot has a screen sheet: \`${o.fiche}\` (mockup \`${maquette}\`). It is the reference of the screen; its rules are:\n${o.rules.join('\n')}${contracts}`
-    : `This lot has a spec sheet: \`${o.fiche}\` (no screen: use cases, rules, contracts and data). It is the reference of the behaviour; its rules are:\n${o.rules.join('\n')}${contracts}`;
+    ? `This lot has a screen sheet: \`${o.fiche}\` (mockup \`${maquette}\`). It is the reference of the screen; its rules are:\n${o.rules.join('\n')}${omitted}${contracts}`
+    : `This lot has a spec sheet: \`${o.fiche}\` (no screen: use cases, rules, contracts and data). It is the reference of the behaviour; its rules are:\n${o.rules.join('\n')}${omitted}${contracts}`;
   if (kind === 'implement' || kind === 'fix') {
     return [
       head,

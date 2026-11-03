@@ -11,6 +11,7 @@ import { capturesText, EXPRESS_BRIEF, expressNewsText, gateText, headline, integ
 import { mcpServersFor, playwrightDir, type SessionKind } from '../launch.js';
 import { acceptationFile, acceptText, findAcceptation } from '../accept.js';
 import { lotIds, referenceIdsText } from '../../ref/coverage.js';
+import { reglesDuLotPourBrief } from '../accept-regles.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from '../aval.js';
 import { ficheReviewText, reviewedSheetText } from '../fiche.js';
 import { maquetteText, reviewedText } from '../maquette.js';
@@ -139,6 +140,14 @@ export function ficheOf(c: LotCtx): string | null {
   return l.spec && 'fiche' in l.spec ? l.spec.fiche : findFiche(wd(c), c.config.spec.dir, l.lot);
 }
 
+/** Les règles de la fiche pour le brief : celles du lot seulement (une fiche partagée par plusieurs lots pèse ~270 Ko, comme l'étape accept, L559, issue #27) et le nombre des autres. Des ids qui ne désignent aucune règle de la fiche ne vident pas le brief : toutes les règles. */
+function lotRules(c: LotCtx, doc: unknown, fiche: string, acceptation: string | undefined): { rules: string[]; others: number } {
+  const all = ficheRules(doc);
+  const own = ficheRules(doc, reglesDuLotPourBrief({ repo: wd(c), lot: c.lot.lot, fiche, acceptation, partage: { dir: c.config.spec.dir, refsOf: c.loadPlan().refs } }));
+  const rules = own.length ? own : all;
+  return { rules, others: all.length - rules.length };
+}
+
 /**
  * Consigne de la fiche pour les étapes en aval d'un lot qui en a une (L174) : implement, fix, revue de code, UX de conformité.
  * Vide quand le lot n'a pas de fiche (sous le seuil, ou pas encore écrite) ou qu'elle est illisible.
@@ -148,20 +157,21 @@ function avalOf(c: LotCtx, kind: SessionKind): string {
   const step = kind === 'implement' || kind === 'fix' || kind === 'ux' ? kind : kind === 'review' || kind === 'review-small' ? 'review' : null;
   const fiche = step ? ficheOf(c) : null;
   if (!step || !fiche) return '';
+  const acceptation = l.accept?.acceptation ?? findAcceptation(wd(c), c.config.spec.dir, l.lot) ?? undefined;
   let rules: string[];
+  let others = 0;
   let contracts: string[];
   let screen: boolean;
   try {
     const doc = parse(readFileSync(join(wd(c), fiche), 'utf8'));
-    rules = ficheRules(doc);
+    ({ rules, others } = lotRules(c, doc, fiche, acceptation));
     contracts = ficheContracts(doc);
     screen = hasScreenPart(doc);
   } catch {
     return '';
   }
   if (!rules.length || (step === 'ux' && !screen)) return '';
-  const acceptation = l.accept?.acceptation ?? findAcceptation(wd(c), c.config.spec.dir, l.lot) ?? undefined;
-  const o = { fiche, rules, acceptation, rouge: l.accept?.rouge, contracts, screen };
+  const o = { fiche, rules, others, acceptation, rouge: l.accept?.rouge, contracts, screen };
   const text = avalFicheText(step, o);
   // la revue courte d'un petit lot visible est sa seule passe : elle porte aussi la conformité à la maquette
   return kind === 'review-small' && l.small && l.visible && screen ? `${text}\n${avalFicheText('ux', o)}` : text;

@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
-import { posix } from 'node:path';
+import { join, posix } from 'node:path';
 import { parse } from 'yaml';
 import { citedRefs } from '../link.js';
 import type { Ref } from '../plan.js';
@@ -67,7 +68,7 @@ function auHead(repo: string, path: string): Acceptation | null {
  * Les autres acceptations lisibles au HEAD de `dir` qui visent la même fiche (R8) : null si aucune (fiche non partagée) ; sinon le texte des fichiers de tests
  * de celles qui sont scellées (R7 : une empreinte par fichier listé, le contenu n'est pas comparé).
  */
-function voisines(j: Jugement, dir: string): { scellees: string } | null {
+function voisines(j: Pick<Jugement, 'repo' | 'path' | 'lot' | 'fiche'>, dir: string): { scellees: string } | null {
   const autres = listAcceptations(j.repo, dir)
     .filter((p) => p !== j.path)
     .map((p) => auHead(j.repo, p))
@@ -83,7 +84,7 @@ function reglesA(repo: string, rev: string, fiche: string): Map<string, unknown>
 }
 
 /** Les commits de sujet `spec` ou `docs` qui citent le lot (`citedRefs`) et ont touché la fiche (R2) ; les `test(<lot>)` et autres types ne comptent pas. */
-function commitsDuLot(j: Jugement, refsOf: Partage['refsOf']): string[] {
+function commitsDuLot(j: Pick<Jugement, 'repo' | 'lot' | 'fiche'>, refsOf: Partage['refsOf']): string[] {
   const out: string[] = [];
   for (const entree of git(j.repo, 'log', '--format=%H%x1f%s%x1f%b%x1e', '--', j.fiche).split('\x1e')) {
     const [sha, subject = '', body = ''] = entree.trim().split('\x1f');
@@ -96,7 +97,7 @@ function commitsDuLot(j: Jugement, refsOf: Partage['refsOf']): string[] {
  * Les règles du lot sur une fiche partagée, sans liste déclarée (R3) : celles qu'ajoutent ou modifient (objet YAML différent, mise en forme indifférente) ses commits.
  * Null (toutes les règles) quand aucun commit du lot ne touche une règle, ou que l'historique est illisible (R5, R6).
  */
-function reglesDuLot(j: Jugement, refsOf: Partage['refsOf']): Set<string> | null {
+function reglesDuLot(j: Pick<Jugement, 'repo' | 'lot' | 'fiche'>, refsOf: Partage['refsOf']): Set<string> | null {
   const touchees = new Set<string>();
   try {
     for (const sha of commitsDuLot(j, refsOf)) {
@@ -138,4 +139,26 @@ export function testsAbsents(j: Jugement, regles: Regle[]): string[] {
   return regles
     .filter((r) => !sel.exiges || sel.exiges.has(String(r.id)))
     .flatMap((r) => (Array.isArray(r.tests) ? r.tests : []).filter(manque).map((t) => `${r.id} : test « ${t} » (nom prévu dans la fiche) absent des fichiers listés`));
+}
+
+/** L'acceptation du lot lue dans l'arbre de travail, ou null si elle est absente ou illisible. */
+function lue(repo: string, path: string): Acceptation | null {
+  try {
+    const a = parseAcceptation(readFileSync(join(repo, path), 'utf8'));
+    return typeof a === 'string' ? null : a;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Les règles du lot pour les briefs en aval (L559, issue #27) : la clé « regles » de son acceptation si elle est une liste non vide d'ids, sinon, sur une fiche
+ * que d'autres lots visent aussi, celles que ses commits `spec`/`docs` touchent ; null (toutes les règles) sinon, comme `testsAbsents`. Jamais d'écart : un brief
+ * garde toutes les règles plutôt que d'en perdre.
+ */
+export function reglesDuLotPourBrief(o: { repo: string; lot: string; fiche: string; acceptation?: string; partage: Partage }): Set<string> | null {
+  const j = { repo: o.repo, path: o.acceptation ?? '', lot: o.lot, fiche: o.fiche };
+  const a = o.acceptation ? lue(o.repo, o.acceptation) : null;
+  if (Array.isArray(a?.regles) && a.regles.length > 0 && a.regles.every((i) => typeof i === 'string' && i)) return new Set(a.regles as string[]);
+  return voisines(j, o.partage.dir) ? reglesDuLot(j, o.partage.refsOf) : null;
 }

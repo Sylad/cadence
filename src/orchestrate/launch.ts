@@ -364,17 +364,28 @@ export function killSessions(): void {
   marks.clear();
 }
 
+/**
+ * Le prompt d'un `claude -p <prompt> …` (L559, issue #27) : il part sur stdin, jamais en argument. Un argument est plafonné à 128 Kio sous Linux
+ * (MAX_ARG_STRLEN) et le brief d'un lot dont la fiche est grosse (~270 Ko) faisait échouer le `spawn` en E2BIG. `claude -p` sans prompt lit stdin.
+ * Les arguments qui ne commencent pas par `-p` (`--version`, `auth status`) et ceux de `claude-local` (son script lit le prompt en `$1`) restent tels quels.
+ */
+function promptOnStdin(args: string[], local: boolean | undefined): { args: string[]; prompt?: string } {
+  if (local || args[0] !== '-p' || args.length < 2) return { args };
+  return { args: [args[0], ...args.slice(2)], prompt: args[1] };
+}
+
 /** Vrai lanceur : `claude` (ou CADENCE_CLAUDE_BIN) dans son propre groupe de processus, tué en bloc au délai. */
 export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env, localBin = 'claude-local'): ClaudeFn {
-  return (args, opts) =>
+  return (given, opts) =>
     new Promise((resolve) => {
+      const { args, prompt } = promptOnStdin(given, opts.local);
       // Marque héritée par tous les descendants, même orphelins rattachés à init (un shell qui sort aussitôt après
       // `nohup srv &` échappe à tout relevé de l'arbre) : à la fin de la session, tout ce qui la porte est tué.
       const mark = randomUUID();
       marks.add(mark);
       const inherited = { ...base };
       for (const v of opts.unset ?? []) delete inherited[v];
-      const child = spawn(opts.local ? localBin : bin, args, { cwd: opts.cwd, env: { ...inherited, ...opts.env, [SESSION_MARK_VAR]: mark }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+      const child = spawn(opts.local ? localBin : bin, args, { cwd: opts.cwd, env: { ...inherited, ...opts.env, [SESSION_MARK_VAR]: mark }, stdio: [prompt === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], detached: true });
       const pid = child.pid;
       if (pid === undefined) {
         marks.delete(mark);
@@ -382,6 +393,11 @@ export function realClaude(bin: string, base: NodeJS.ProcessEnv = process.env, l
         return;
       }
       live.add(pid);
+      if (prompt !== undefined) {
+        // EPIPE : une session qui sort sans lire son stdin (échec au démarrage) a déjà son code et sa sortie ; l'écriture ratée n'a rien de plus à dire.
+        child.stdin!.on('error', () => undefined);
+        child.stdin!.end(prompt);
+      }
       // Le groupe ne suffit pas : un serveur de dev lancé par la session (setsid, nohup, npm qui se détache) a son propre
       // groupe et survivait à la session (L83). L'arbre est suivi pendant toute la session ; la marque rattrape ce
       // qui a quitté l'arbre entre deux relevés.

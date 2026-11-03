@@ -450,7 +450,7 @@ describe('(L61/t3) le vrai fils lit ses gabarits dans la copie', () => {
     expect(r.code).toBe(0);
     expect(readFileSync(live, 'utf8')).toContain('GABARIT MODIFIE');
     const review = s.calls().find((c) => c.kind === 'review')!;
-    expect(review.argv[1]).toContain('Review lot `L1`');
-    expect(review.argv[1]).not.toContain('GABARIT MODIFIE');
+    expect(review.brief).toContain('Review lot `L1`');
+    expect(review.brief).not.toContain('GABARIT MODIFIE');
   });
 });

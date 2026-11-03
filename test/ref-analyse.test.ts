@@ -19,7 +19,7 @@ type Obj = Record<string, any>;
 const FAKE = `#!/usr/bin/env node
 const fs = require('node:fs');
 const args = process.argv.slice(2);
-const brief = args[args.indexOf('-p') + 1];
+const brief = fs.readFileSync(0, 'utf8');
 const lectureFile = /(\\S+\\/lectures\\/a\\.json)/.exec(brief)[1];
 fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ args, cwd: process.cwd(), brief, lecturePresente: fs.existsSync(lectureFile), settings: args.includes('--settings') ? args[args.indexOf('--settings') + 1] : null }) + '\\n');
 const mode = process.env.FAKE_MODE || 'ok';

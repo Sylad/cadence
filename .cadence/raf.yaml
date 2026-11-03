@@ -1108,11 +1108,12 @@ lots:
       - { date: 2026-11-01, text: "Revue de la fiche — mineur : docs/specs/file-lots-approuves/fiche.yaml:176 — Incohérence interne : R13 dit « la file ne contient plus que des lots non tirés » (un lot tiré en sort), alors que C2, R4 (l.122), A3 (l.231) et D1 (l.248) gardent un état « tiré » dans queue.json, que `show` l'affiche (« tiré par la vague <id> ») et que `drop` le refuse « déjà tiré ». Les tests R13 (« absent de la file ») et R4 (« drop d'un lot déjà tiré ») se contredisent selon la lecture. Dire si le lot tiré reste en file avec l'état tiré (puis R13 doit parler du tirage, pas de la présence) ou s'il est retiré (puis supprimer l'erreur « déjà tiré »)." }
   - id: L499
     title: "Parité porte ↔ CI (inventaire des pertes du 31-10 (17→31-10) : 37 livraisons rouges, ~12 h estimées, dont des tests joués en CI seulement, ex. e2e warhammer) : cadence lit les commandes de test des workflows CI du dépôt et signale (lead tour, orchestrate --dry-run, verify --gate) celles que orchestrate.test/build ne jouent pas ; avec L482"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-31
     started: 2026-11-02
     review: { date: 2026-11-03, verdict: "conforme — 4 mineurs en notes (lanceurs via pnpm/yarn direct, option d'enveloppe entre guillemets, `npm run e2e:*` non défini signalé, scripts shell de test non reconnus) — orchestré (vague 2026-11-02-2140-cont, 3 passe(s) de correction)", commit: 4130177d1d58658c56be9bacba32dfe2b9f51047, reporte: { de: 3cd96ce1a93c00e4fa09dc4b4f223bc1cb702b3f, vers: 4130177d1d58658c56be9bacba32dfe2b9f51047, patchId: 718c62f6dfbd956a988504e3fc4431d7798a8a61 } }
+    finished: 2026-11-03
   - id: L500
     title: "Précheck : tests d'acceptation scellés et fichiers partagés (inventaire des pertes du 31-10 (17→31-10) : 19 questions sur 43 portent sur un test scellé d'un autre lot, médiane 56 min de blocage ; 28 intégrations refusées dont 16 conflits) : avant implement, le précheck liste les tests scellés que le lot risque de toucher et les fichiers que touche aussi un autre lot de la vague ou un worktree conservé, dans le brief et dans le tableau"
     status: todo

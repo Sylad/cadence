@@ -1618,9 +1618,10 @@ lots:
     finished: 2026-11-03
   - id: L548
     title: "Issues GitHub suivies par le plan (03-11 : #20 et #21 réglées en 1.38.1 et 1.42.1 restées ouvertes, rappel de Sylvain) : cadence lead tour liste les issues ouvertes du dépôt (gh, si disponible) sans lot qui les cite et celles dont le lot est publié ; cadence release imprime pour chaque lot de la version qui cite « issue #n » la commande gh issue close avec un commentaire (lot + version) ; rien n'est fermé sans le lead"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-03
+    started: 2026-11-03
   - id: L549
     title: "Sonde de cas limites : faux avertissement « la session a modifié du code hors tests » pour un fichier de test d'un sous-paquet (03-11, L545 : plugins/cadence-hud/tests/decisions-l545-drop.probe.test.ts) — reconnaître *.test.ts / tests/ à toute profondeur, test sur ce chemin"
     status: doing

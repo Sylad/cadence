@@ -44,6 +44,17 @@ export interface AnswerFeed {
   pollMs: number;
 }
 
+/** Les dépendances d'un lot qui ne sont pas prêtes (`ctxs` et `known` disent l'état de chacune). */
+function missingDeps(c: LotCtx, ctxs: LotCtx[], known: LotState[]): string[] {
+  const state = (id: string) => [...ctxs.map((o) => o.lot), ...known].find((o) => o.project === c.lot.project && o.lot === id)?.status;
+  return (c.lot.dependsOn ?? []).filter((id) => state(id) !== 'ready');
+}
+
+/** Un lot pas encore commencé (aucune étape) dont une dépendance n'est pas prête : il attend, aucune session ne joue pour lui (L520). */
+export function awaitsDependency(c: LotCtx, ctxs: LotCtx[], known: LotState[]): boolean {
+  return c.lot.steps.length === 0 && (c.lot.status === 'queued' || c.lot.status === 'suspended') && missingDeps(c, ctxs, known).length > 0;
+}
+
 /** La file d'un lot seul (groupe en parallèle) dont une dépendance joue encore. */
 function waitsDependency(queue: LotCtx[], ctxs: LotCtx[], live: Set<LotCtx>): boolean {
   return (
@@ -85,8 +96,8 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
       progress = false;
       for (const c of todo) {
         const state = (id: string) => [...ctxs.map((o) => o.lot), ...known].find((o) => o.project === c.lot.project && o.lot === id)?.status;
-        const missing = (c.lot.dependsOn ?? []).filter((id) => state(id) !== 'ready');
-        if (missing.length && c.lot.steps.length === 0 && (c.lot.status === 'queued' || c.lot.status === 'suspended')) {
+        const missing = missingDeps(c, ctxs, known);
+        if (awaitsDependency(c, ctxs, known)) {
           // Une dépendance suspendue, en question ou pas encore jouée (reprise) : le lot attend, il reste reprenable.
           // Seule une dépendance rendue au lead ou en échec le rend aussi.
           const dead = missing.filter((id) => ['handed-back', 'failed'].includes(state(id) ?? 'failed'));

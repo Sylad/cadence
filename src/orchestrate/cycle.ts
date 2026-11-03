@@ -33,7 +33,7 @@ import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE, expressSummary, lotKey,
 import { advance, baseMoved, INTEGRATE_WAIT_MS, MAX_REPLAYS, mergeBase, patchId, rebaseNotes, rebaseOnto, repoBranch, takeRepoWrite } from './integrate.js';
 import { mutexFor } from './mutex.js';
 import { branchExists, git, gitFailure, integrated, linkIgnored, lotBranch, prepareTree, removeTree, trackedDirty } from './worktree.js';
-import { MAX_PASSES, MAX_PASSES_CONVERGING, type LotCtx, workDir as wd, histPlan, short, save, transition, stop, startSha, hasSpecStage, propose } from './cycle/ctx.js';
+import { MAX_PASSES, MAX_PASSES_CONVERGING, type LotCtx, workDir as wd, histPlan, short, save, setGate, transition, stop, startSha, hasSpecStage, propose } from './cycle/ctx.js';
 import { lotSpent, budgetCount, fixAffordable, dropped, DROPPED, halted, suspend } from './cycle/budget.js';
 import { trackedPaths, planTemplate, planMessage, planBefore, commitPlan, noteHypotheses, noteMinors, foreignDirty, leadMoved, planWrite } from './cycle/plan-writes.js';
 import { session, badReport, benchLocal, dirtBetween, LOCAL_FAILED, type Done } from './cycle/session.js';
@@ -813,8 +813,7 @@ async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promi
     await withPlace({ config: c.config, repo: c.lot.repo, sha: tryGit(wd(c), ['rev-parse', 'HEAD']), dir: wd(c), needClean: true, label: `porte du lot ${c.lot.lot}`, local: (cmd) => sh(c, cmd), say: (line) => c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · ${line}`) }, (place) => runChecks(c, red, runs, place));
   } finally {
     // L395 : la porte se lit dans l'état du lot tant qu'une commande (ou le rejeu qui la suit) tourne, jamais après.
-    c.lot.gate = undefined;
-    save(c);
+    setGate(c, undefined);
   }
 }
 
@@ -822,9 +821,8 @@ async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Pla
   const l = c.lot;
   for (const [label, command] of [['build', c.config.build], ['tests', c.config.test]] as const) {
     if (!command) continue;
-    l.gate = { label, started: new Date().toISOString() };
     if (label === 'tests') l.suiteRuns = (l.suiteRuns ?? 0) + 1;
-    save(c);
+    setGate(c, { label, started: new Date().toISOString() });
     const r = await runGate(place.run, command); // porte en parties (L512) : toutes jouées, chacune dans son dossier ; le CheckRun porte le libellé « dir : run ; … »
     const run: CheckRun = { label, command: gateLabel(command), code: r.code, ...place.stamp() };
     runs.push(run);

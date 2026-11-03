@@ -65,6 +65,8 @@ export interface WaveCtx {
   /** Pourquoi le modèle local est écarté pour la suite de la vague (L322) : posé au premier échec d'une session locale, il envoie les lots suivants droit à Sonnet. */
   localOut?: string;
   log: (line: string) => void;
+  /** Appelé quand un lot entre dans la porte de tests ou en sort (L520) : la vague recompte les créneaux qu'elle tient. */
+  slotsChanged?: () => void;
   saveWave: () => void;
   /** Attente du verrou d'intégration du dépôt (L279, R25) : bornes par défaut INTEGRATE_WAIT_MS et INTEGRATE_POLL_MS ; réglables pour les tests. */
   integrate?: { waitMs?: number; pollMs?: number };
@@ -106,6 +108,13 @@ export const short = (c: { sha: string; subject: string }) => `${c.sha.slice(0, 
 
 export function save(c: LotCtx): void {
   c.wave.store.writeLot(c.lot);
+}
+
+/** Entre dans la porte de tests ou en sort (L520) : le lot ne tient plus de créneau de session tant qu'il y est, la vague recompte ceux qu'elle tient. */
+export function setGate(c: LotCtx, gate: LotState['gate']): void {
+  c.lot.gate = gate;
+  save(c);
+  c.wave.slotsChanged?.();
 }
 
 export function transition(c: LotCtx, status: LotState['status'], outcome?: string): void {

@@ -15,7 +15,7 @@ import { Budget, DROPPED, STOP_REQUESTED, countInterrupted, handBackDroppedQuest
 import { installPrePush, keepGateGuard, removePrePush } from './guard.js';
 import { killSessions, type ClaudeFn } from './launch.js';
 import { REPO_LOCK, releaseLock, takeLock } from './lock.js';
-import { groupLots, runPool } from './pool.js';
+import { awaitsDependency, groupLots, runPool } from './pool.js';
 import { slotPlace } from './attente.js';
 import { AddFeed, addToLive, openInRepo, type KnownLot, type LaunchChecks } from './ajout.js';
 import { takeIntegrations } from './integration-vivante.js';
@@ -134,8 +134,8 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   const freed = new Set<string>();
   /** Lots dont la vague a fini de jouer (prêts, rendus, en échec ou suspendus) : ils ne tiennent plus de créneau. */
   const settled = new Set<LotCtx>();
-  /** Lots que la vague a encore à jouer, en cours ou en attente, sur les dépôts qu'elle tient encore (un par dépôt, un par lot en worktree) : ce que le registre compte pour les créneaux libres (L433 : un lot fini ne garde plus de créneau, 0 quand plus rien n'est à jouer). Absent (undefined) tant qu'aucun lot ne joue dans un worktree : le calcul reste celui des dépôts tenus. */
-  const lanes = (): number | undefined => ctxs.some((c) => c.tree) ? groupLots(ctxs).filter((g) => g.every((c) => lotRepoPaths(c.lot).every((r) => !freed.has(r)))).reduce((n, g) => { const todo = g.filter((c) => !settled.has(c)).length; return n + (g.every((c) => c.tree) ? todo : Math.min(1, todo)); }, 0) : undefined; // hors mode worktree, rien n'est écrit : le registre compte les dépôts tenus, comme avant L279
+  /** Lots que la vague a encore à jouer ET qui tiennent une session claude, sur les dépôts qu'elle tient encore (un par dépôt, un par lot en worktree) : ce que le registre compte pour les créneaux libres (L433 : un lot fini ne garde plus de créneau, 0 quand plus rien n'est à jouer). L520 : un lot qui attend une dépendance ou qui est dans la porte de tests (`gate`, aucune session claude) n'en tient pas. Absent (undefined) tant qu'aucun lot ne joue dans un worktree : le calcul reste celui des dépôts tenus. */
+  const lanes = (): number | undefined => ctxs.some((c) => c.tree) ? groupLots(ctxs).filter((g) => g.every((c) => lotRepoPaths(c.lot).every((r) => !freed.has(r)))).reduce((n, g) => { const todo = g.filter((c) => !settled.has(c) && !c.lot.gate && !awaitsDependency(c, ctxs, all)).length; return n + (g.every((c) => c.tree) ? todo : Math.min(1, todo)); }, 0) : undefined; // hors mode worktree, rien n'est écrit : le registre compte les dépôts tenus, comme avant L279
   const freeRepo = (r: string) => {
     freed.add(r);
     const file = join(sharedStateDir(r), REPO_LOCK);
@@ -240,6 +240,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
       store.journal(line);
     },
     saveWave,
+    slotsChanged: () => updateWaveReposSafe(home, repos.filter((x) => !freed.has(x)), lanes()),
     integrate: deps.integrate,
   };
   wave.status = 'running';
@@ -247,11 +248,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   saveWave();
   const ctxs = contexts(lots, envs, wctx);
   planTrees(ctxs, store, wave.id, wctx.log, cap > 1);
-  try {
-    updateWaveRepos(home, process.pid, repos, lanes());
-  } catch {
-    // registre illisible : le décompte des créneaux libres reste celui des dépôts
-  }
+  updateWaveReposSafe(home, repos, lanes());
 
   const adds = new AddFeed({
     store, wave, wctx, io, deps, launch, ctxs, all, lots, held, freed, repos, freeRepo, saveWave, checks: LAUNCH_CHECKS,
@@ -304,11 +301,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
       if (c.tree?.active && c.lot.status === 'handed-back' && c.lot.next === 'integrate') wctx.log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : rendu à l'intégration : reprise par ${resumeCommand(wctx.id, '--integrate', lotKey(c.lot.project, c.lot.lot))}`);
       // Un dépôt dont tous les lots de la vague (reprise comprise) sont prêts ou rendus peut être livré pendant que la vague continue ailleurs.
       settled.add(c);
-      try {
-        updateWaveRepos(home, process.pid, repos.filter((x) => !freed.has(x)), lanes());
-      } catch {
-        // registre illisible : le décompte reste celui du dernier écrit
-      }
+      updateWaveReposSafe(home, repos.filter((x) => !freed.has(x)), lanes());
       if (wctx.incident) return;
       for (const r of lotRepoPaths(c.lot)) {
         if (held.includes(join(sharedStateDir(r), REPO_LOCK)) && all.filter((l) => lotRepoPaths(l).includes(r)).every(finished)) freeRepo(r);

@@ -67,12 +67,13 @@ function splitUnreleased(text: string): { before: string; body: string; after: s
   return { before: text.slice(0, head.index), body: text.slice(start, end), after: text.slice(end) };
 }
 
-/** Un titre de sous-section répété sous [Unreleased] : la trace d'une fusion de lots qui a recopié la section ; publié, il doublerait les entrées. */
+/** Un titre de sous-section répété sous [Unreleased] (à la casse près) : la trace d'une fusion de lots qui a recopié la section ; publié, il doublerait les entrées. */
 function refuseDuplicateTitles(body: string): void {
   const seen = new Set<string>();
   for (const [, title] of body.matchAll(/^### (.+?)\s*$/gm)) {
-    if (seen.has(title)) throw new RafError(`release : la section [Unreleased] de ${CHANGELOG} porte « ### ${title} » plus d'une fois — une fusion de lots a recopié le titre ; n'en garder qu'un, avec les entrées une seule fois`);
-    seen.add(title);
+    const key = title.toLowerCase();
+    if (seen.has(key)) throw new RafError(`release : la section [Unreleased] de ${CHANGELOG} porte « ### ${title} » plus d'une fois — une fusion de lots a recopié le titre ; n'en garder qu'un, avec les entrées une seule fois`);
+    seen.add(key);
   }
 }
 

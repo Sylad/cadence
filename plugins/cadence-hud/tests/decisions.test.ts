@@ -182,3 +182,21 @@ test('L412 R24 — aucune ligne repliée n’est une commande exécutable seule 
   expect(pasted(cut)).toBe(command)
   expect(cut.map(l => l.trim()).join(' ')).not.toBe(command)
 })
+
+test('L545 R1 — un lot retiré de la vague par le lead (--drop) n’attend aucune décision : ni seul, ni avec la mention de la réponse non jouée ; un autre lot rendu, ou dont la cause cite seulement le retrait, reste', () => {
+  const drop = 'retiré de la vague (--drop)'
+  const w = wave([
+    wlot('B6', 'handed-back', { outcome: drop }),
+    wlot('DI1', 'handed-back', { outcome: `${drop} ; la réponse du lead (« oui ») n'a pas été jouée` }),
+    wlot('L2', 'handed-back', { outcome: 'revue non conforme' }),
+    wlot('L3', 'handed-back', { outcome: `le lead a dit : ${drop}` }),
+    wlot('L4', 'handed-back'),
+  ], { live: false, ended: '2026-10-27T12:00:00Z' })
+  expect(decisionsOf([], [], [w]).map(x => (x.kind === 'livraison' ? '' : x.lot))).toEqual(['L2', 'L3', 'L4'])
+})
+
+test('L545 R2 — un lot retiré dans une vague plus récente masque sa décision d’une vague plus ancienne (la plus récente tranche)', () => {
+  const older = wave([wlot('B6', 'handed-back', { outcome: 'cause' })], { id: 'old', live: false, ended: '2026-10-26T10:00:00Z' })
+  const newer = wave([wlot('B6', 'handed-back', { outcome: 'retiré de la vague (--drop)' })], { id: 'new', live: false, ended: '2026-10-27T10:00:00Z' })
+  expect(decisionsOf([], [], [newer, older])).toEqual([])
+})

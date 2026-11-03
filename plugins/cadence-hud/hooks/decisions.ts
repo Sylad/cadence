@@ -10,6 +10,9 @@ export type Decision =
   | { kind: 'ux'; project: string; lot: string; text: string; command: string }
   | { kind: 'livraison'; project: string; text: string }
 
+/** Le début de l'issue d'un lot que le lead a retiré de la vague (`--drop`) : le DROPPED de src/orchestrate/cycle/budget.ts (le plugin ne lit pas src/), suivi au besoin de la mention de la réponse non jouée. */
+const DROPPED_PREFIX = 'retiré de la vague (--drop)'
+
 /** La première ligne non vide d'un texte. */
 const firstLine = (text: string): string => text.split('\n').map(l => l.trim()).find(l => l !== '') ?? ''
 
@@ -26,7 +29,7 @@ const from = (folder: string | null | undefined, command: string): string => (fo
  * (`question`), un lot rendu au lead (`handed-back`, `failed` : la cause est la première ligne de son issue, à défaut son statut), un verdict UX à poser (lot prêt, visible, dont
  * la revue a rendu un verdict) et une livraison en échec par projet.
  * Les vagues vivantes passent d'abord, puis les finies de la plus récente à la plus ancienne (une vague n'est lue qu'une fois) ; un lot n'est compté que dans la première vague qui
- * le porte (repris dans une vague plus récente, c'est elle qui tranche) ; un lot suspendu n'attend rien de la personne.
+ * le porte (repris dans une vague plus récente, c'est elle qui tranche) ; un lot suspendu n'attend rien de la personne, ni un lot que le lead a retiré de la vague (`--drop` : son issue commence par « retiré de la vague (--drop) », L545 ; il compte quand même comme vu, la vague la plus récente tranche).
  * Le plan tranche (`board`, le tableau du panneau lu de `cadence lead tour --json`) : une décision dont le lot n'est plus ouvert dans un projet que le tour a lu (ligne sans erreur,
  * avec ses lots) n'est plus affichée — un verdict UX posé puis `raf done`, un lot rendu puis repris et clos, une question dont le lot est clos. Un projet absent du tableau, en erreur
  * ou sans lots (cadence trop ancien) garde ses décisions : on ne sait pas. Une livraison en échec ne dépend pas du plan.
@@ -56,6 +59,7 @@ export const decisionsOf = (waves: readonly Wave[], deliveries: readonly FailedD
         const text = (l.questions ?? []).map(firstLine).filter(q => q !== '').join(' / ')
         out.push({ kind: 'question', project: l.project, lot: l.lot, text: text || 'question sans texte', command: from(w.cwd, `cadence orchestrate --resume --wave ${w.id} --answer ${key} "…"`) })
       } else if (l.status === 'handed-back' || l.status === 'failed') {
+        if ((l.outcome ?? '').startsWith(DROPPED_PREFIX)) continue // retiré par le lead : une décision déjà prise (L545)
         out.push({ kind: 'rendu', project: l.project, lot: l.lot, text: firstLine(l.outcome ?? '') || lotStatusFr(l.status) })
       } else if (l.status === 'ready' && l.visible === true && typeof l.uxVerdict === 'string' && l.uxVerdict !== '') {
         out.push({ kind: 'ux', project: l.project, lot: l.lot, text: firstLine(l.uxVerdict), command: from(l.repo, `raf ux ${l.lot} "verdict"`) })

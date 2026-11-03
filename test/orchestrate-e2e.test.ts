@@ -406,7 +406,7 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(alive(pid)).toBe(true);
     child.kill('SIGTERM');
     await exited;
-    expect(alive(pid)).toBe(false);
+    await waitFor('le processus de la session UX est mort', () => !alive(pid));
   }, 20_000);
 });
 

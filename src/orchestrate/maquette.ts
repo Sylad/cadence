@@ -1,5 +1,6 @@
 import { posix } from 'node:path';
 import { LARGEURS } from '../spec.js';
+import { worstReviewText } from './pires-cas.js';
 import type { Constat } from './state.js';
 
 // Revue UX de la maquette (L172, spec etape-spec S4) : ce que le programme dit à l'agent ux-reviewer en mode « maquette », et à l'agent spec à la passe suivante.
@@ -8,7 +9,7 @@ import type { Constat } from './state.js';
 export const bulletLines = (constats: Constat[]): string[] => constats.map((k) => `- [${k.gravite}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`);
 
 /** Consigne de la revue de maquette dans le brief : la fiche, la maquette, les captures attendues, le rang de la revue sur le plafond `max` (L230). */
-export function maquetteText(o: { fiche: string; passes: number; max: number; previous?: Constat[]; light?: boolean }): string {
+export function maquetteText(o: { fiche: string; passes: number; max: number; previous?: Constat[]; light?: boolean; worst?: string }): string {
   const folder = posix.dirname(o.fiche);
   const rank = o.passes + 1;
   const later = rank >= 2;
@@ -24,6 +25,8 @@ export function maquetteText(o: { fiche: string; passes: number; max: number; pr
       `Light mockup (L459): the sheet covers only the states the lot touches. Sweep those states only, at ${LARGEURS.join(' and ')} px, and compare the target of each one to the capture of the current screen \`${folder}/actuel-<état>-<largeur>.png\` (a free file, not checked by the program; when one is missing the spec writer said so under "nonVerifie": judge the target against the code and the neighbouring pages). Report what makes the target worse than the current screen or inconsistent with the rest of the application, not the defects of the screen the lot does not touch.`,
     );
   }
+  const worst = worstReviewText(o.worst);
+  if (worst) lines.push(`${worst} The spec writer committed the captures with the worst-case data under the names \`maquette-<état>-pires-cas-<largeur>.png\`: look at them too.`);
   if (later && o.previous?.length) lines.push('', 'Points of the previous review that the spec writer had to fix:', ...bulletLines(o.previous));
   return lines.join('\n');
 }

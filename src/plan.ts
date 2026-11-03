@@ -175,6 +175,8 @@ export interface PlanSettings {
   onWrite?: { command: string; files: string[]; cwd: string; timeoutMs?: number };
   /** Fichier d'attendus QA (clé `qa.expectations` de cadence.yaml) : tenu avec le plan, docs/qa/expectations.md par défaut. */
   qaExpectations?: string;
+  /** Paramètre ou chemin du jeu de données « pires cas » du produit (clé `qa.worstData` de cadence.yaml, L534) : absent, les briefs d'écran n'en parlent pas. */
+  qaWorstData?: string;
   format?: PlanFormat;
   /** États détaillés du projet (`plan.states`, L463) ; jamais avec `format`. */
   states?: StateModel;
@@ -422,6 +424,11 @@ export class Plan {
   /** Fichier d'attendus QA du `qa-reviewer`, relatif à la racine du dépôt. */
   get qaExpectations(): string {
     return this.settings.qaExpectations ?? 'docs/qa/expectations.md';
+  }
+
+  /** Jeu de données « pires cas » déclaré par le projet (`qa.worstData`), repris tel quel dans les briefs d'écran ; absent sans la clé. */
+  get qaWorstData(): string | undefined {
+    return this.settings.qaWorstData;
   }
 
   /** Tout ce qui est tenu avec le plan sans être du travail : plan.files et le fichier d'attendus QA. Source unique de l'audit et de l'orchestrateur. */

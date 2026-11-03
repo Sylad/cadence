@@ -119,6 +119,12 @@ session and a call by hand without it have none.
   the brief had no report file: a verdict whose evidence nobody can read is lost.
 - With no `Report file:` line in the brief, give the complete report in your reply.
 
+## Worst-case data
+
+When your brief gives a worst-case data set, walk every state at each width with the demo data and then with that set, and keep one
+checklist line per state, per width and per data set. Load it only the way the brief says. If the server cannot load it, say so
+under `nonVerifie`. A defect seen only with it is ranked on the usual severity scale of this report: it has no scale of its own.
+
 ## Delivery grid
 
 This section applies in every case, with or without a `Report file:` line, to the UX step of a visible lot and to the review of an existing screen. It does not apply in mockup mode or conformity mode, whose captures stay at 1440 px and 390 px. With a `Report file:` line, each point is a line of the checklist of the report file, ticked or not, with the measure or the capture that supports it; the short reply does not repeat the list. Without a `Report file:` line (the orchestrated `ux` step), the structured report has no checklist and its schema is unchanged: a point that could not be checked goes in `nonVerifie` (`grille : focus visible non vérifié`), and the `verdict` line ends with the tally of the grid and the tics line, e.g. `… — grille 5/5 — tics d’IA : 0 constat`, so the lead knows the grid was passed. In both cases a point that fails is a finding on the blocking / major / minor scale of the Method section, no severity of its own (a focus that is not visible is ranked like any other accessibility gap).

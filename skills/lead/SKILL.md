@@ -277,6 +277,8 @@ without an expectations file gets a draft back: show it to the human, who correc
 whether it is committed. Several `qa-reviewer` passes may run together: each opens its own browser context (its own profile), so two apps are walked without sharing a browser. It is not a gate: `raf done` does not wait for it, and a finding becomes a
 new lot, not a reopened one.
 
+When `cadence.yaml` declares `qa.worstData`, add one line to its brief: the value of `qa.worstData` as the way to load the project's worst-case data set, to be loaded in dev mode only (it has no effect in production). Ask it to walk every page at each width with the demo data and the worst-case data, one line per page, width and data set, and to name under `nonVerifie` a set it could not load. Without the key, say nothing about it.
+
 Give the `qa-reviewer` the same line `Report file: <absolute path>` (outside the repository): it answers in 5 lines
 (verdict, blocking findings, follow-ups, the path) and keeps the full report, with its measurements, in that file; read the
 file only to show the human a blocking finding or to commit the draft of an expectations file.

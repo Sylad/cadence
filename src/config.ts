@@ -1,5 +1,5 @@
-import { existsSync, realpathSync, statSync } from 'node:fs';
-import { basename, dirname, isAbsolute, join, posix, relative, resolve } from 'node:path';
+import { existsSync, statSync } from 'node:fs';
+import { dirname, isAbsolute, join, posix, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { isDay, type Day } from './dates.js';
 import type { ArticleRule } from './articles.js';
@@ -7,7 +7,7 @@ import type { DocSyncRule } from './docsync.js';
 import { readGate } from './gate-config.js';
 import { DEFAULT_TEST_PATTERNS, type TestGateConfig } from './testgate.js';
 import { readExtras, readRequirePlanned } from './plan-extras.js';
-import { gitRoot } from './git.js';
+import { readQaSettings } from './qa-keys.js';
 import { planCommitProblem } from './plan-commit.js';
 import { parseStates } from './plan-states.js';
 import { checkTestReplay, readGateTest, type GateTest } from './orchestrate/gate-parts.js';
@@ -28,34 +28,6 @@ const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', '
 const ON_WRITE_KEYS = ['command', 'files'];
 const FORMAT_KEYS = ['lots', 'fields', 'statuses', 'estimates'];
 
-
-/** Chemin réel (liens symboliques résolus) du plus proche ancêtre existant, le reste rattaché tel quel. */
-function realish(p: string): string {
-  try {
-    return realpathSync(p);
-  } catch {
-    const up = dirname(p);
-    return up === p ? p : join(realish(up), basename(p));
-  }
-}
-
-/**
- * Clé `qa:` : le fichier d'attendus QA, ramené à la forme que git rapporte (relatif à la racine du dépôt,
- * séparateurs posix, sans `./`). Un chemin absolu est lu depuis la racine du dépôt de travail que donne le CLI, à défaut la racine git du dossier du fichier (hors dépôt git, ce dossier). Une valeur vide vaut absente ; un type faux ou un chemin hors du dépôt est refusé.
- */
-function readQa(qa: unknown, file: string, workRoot?: string): string | undefined {
-  if (qa == null) return undefined;
-  if (!isObject(qa)) throw new RafError(`${file} : qa doit être un objet`);
-  const v = qa.expectations;
-  if (v == null) return undefined;
-  if (typeof v !== 'string') throw new RafError(`${file} : qa.expectations doit être un chemin`);
-  const raw = v.trim().replace(/\\/g, '/');
-  if (raw === '') return undefined;
-  const root = workRoot ?? gitRoot(dirname(resolve(file))) ?? dirname(resolve(file));
-  const rel = posix.normalize(isAbsolute(raw) ? relative(realish(root), realish(raw)).replace(/\\/g, '/') : raw);
-  if (rel === '.' || rel === '..' || rel.startsWith('../') || isAbsolute(rel)) throw new RafError(`${file} : qa.expectations « ${v.trim()} » est hors du dépôt`);
-  return rel;
-}
 
 /** Clé `plan.onWrite` (L346) : la commande qui republie le plan après chaque écriture, lancée dans `cwd` (la racine du dépôt), et les fichiers qu'elle produit (relatifs au dépôt, jamais hors de lui). */
 function readOnWrite(v: unknown, cwd: string, bad: (what: string) => RafError): NonNullable<PlanSettings['onWrite']> {
@@ -80,16 +52,15 @@ export function readPlanConfig(file: string, root?: string): PlanConfig | null {
   const raw = readYamlFile(file);
   if (raw === undefined) return null;
   const doc = raw as { plan?: unknown; qa?: unknown } | null;
-  const qa = readQa(doc?.qa, file, root);
+  const qaSettings = readQaSettings(doc?.qa, file, root);
   const p = doc?.plan;
-  if (p == null) return qa ? { settings: { qaExpectations: qa } } : null;
+  if (p == null) return Object.keys(qaSettings).length ? { settings: qaSettings } : null;
   const bad = (what: string) => new RafError(`${file} : plan.${what}`);
-  if (typeof p === 'string' && p.trim() !== '') return { path: p, settings: { ...(qa ? { qaExpectations: qa } : {}) } };
+  if (typeof p === 'string' && p.trim() !== '') return { path: p, settings: qaSettings };
   if (!isObject(p)) throw new RafError(`${file} : plan doit être un chemin ou un objet`);
   for (const k of Object.keys(p)) if (!KEYS.includes(k)) throw bad(`${k} inconnu (attendu : ${KEYS.join(', ')})`);
 
-  const settings: PlanSettings = {};
-  if (qa) settings.qaExpectations = qa;
+  const settings: PlanSettings = { ...qaSettings };
   if (p.project != null) settings.project = String(p.project);
   if (p.since != null) {
     if (!isDay(p.since)) throw bad(`since « ${String(p.since)} » n'est pas une date AAAA-MM-JJ`);

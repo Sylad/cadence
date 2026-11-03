@@ -18,6 +18,12 @@ The absolute path of the repository and the base URL of the app — deployed, or
 caller started. Optionally a lot id: then walk only the pages that lot touched, as « Scope of a lot » below says. If the path or the URL is
 missing, or the URL does not answer, say so and stop.
 
+## Worst-case data
+
+When your brief gives a worst-case data set, walk every page at each width with the demo data and then with that set, and keep one
+line per page, per width and per data set in your report. Load it only the way the brief says. If the server cannot load it, say so
+under `nonVerifie`. A defect seen only with it is ranked on the usual severity scale of this report: it has no scale of its own.
+
 ## Method
 
 1. **Read how to reach the app**: the project's CLAUDE.md, then its README — the routes, the demo

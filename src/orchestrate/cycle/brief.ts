@@ -14,6 +14,7 @@ import { lotIds, referenceIdsText } from '../../ref/coverage.js';
 import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from '../aval.js';
 import { ficheReviewText, reviewedSheetText } from '../fiche.js';
 import { maquetteText, reviewedText } from '../maquette.js';
+import { worstUxText } from '../pires-cas.js';
 import { answeredText, ficheHasBack, findFiche, lightLot, ruleIdsSourcedByLead, specText, type FicheParts } from '../spec.js';
 import { decisionsText, humanDecisions } from '../decisions.js';
 import { type Constat, type LotState } from '../state.js';
@@ -185,7 +186,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   if (mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright) vars.shots = shotsText(playwrightDir(c.wave.store.lotDir(l.project, l.lot)));
   vars.fiche = hasSpecStage(l) ? avalOf(c, kind) : '';
   // la vérification des ids d'un document de référence sur l'écran fini : la passe ux, ou la revue courte d'un petit lot visible qui n'a que celle-là (comme la conformité, avalOf)
-  if (kind === 'ux' || (kind === 'review-small' && l.small && l.visible)) vars.ux = [vars.ux, referenceIdsText('ux', lotIds({ ...lot, goal: l.goal ?? lot.goal }))].filter(Boolean).join('\n');
+  if (kind === 'ux' || (kind === 'review-small' && l.small && l.visible)) vars.ux = [vars.ux, worstUxText(kind, !!l.screen, plan.qaWorstData), referenceIdsText('ux', lotIds({ ...lot, goal: l.goal ?? lot.goal }))].filter(Boolean).join('\n');
   if (kind === 'probe') Object.assign(vars, probeVars(ficheOf(c), lotCommitLines(c), startSha(c), l.lot));
   if (kind === 'implement' || kind === 'fix') vars.decisions = decisionsText(humanDecisions(lot, lot.parent ? plan.lots().find((x) => x.id === lot.parent) : undefined));
   if (kind === 'precheck' && local) vars.lecture = localReading({ ...lot, goal: l.goal ?? lot.goal });
@@ -198,7 +199,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
       dir: c.config.spec.dir,
       render: c.config.spec.render,
       screen: l.screen, light: lightLot(l, lot, c.config.maquette, wd(c), c.config.spec.dir),
-      back,
+      back, worst: plan.qaWorstData,
       problems: l.specProblems,
       review: !reviewed.length ? undefined : back ? reviewedSheetText(reviewed, !!l.screen, session) : reviewedText(reviewed, session),
       template: l.screen ? ficheTemplate() : undefined,
@@ -214,7 +215,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     vars.reponse = '';
   }
   if (kind === 'maquette') {
-    vars.maquette = maquetteText({ fiche: ficheOf(c) ?? '', passes: l.maquette?.passes ?? 0, max: c.config.maquetteReviews, previous: l.maquetteConstats, light: lightLot(l, lot, c.config.maquette, wd(c), c.config.spec.dir) });
+    vars.maquette = maquetteText({ fiche: ficheOf(c) ?? '', passes: l.maquette?.passes ?? 0, max: c.config.maquetteReviews, previous: l.maquetteConstats, light: lightLot(l, lot, c.config.maquette, wd(c), c.config.spec.dir), worst: plan.qaWorstData });
     vars.reponse = '';
   }
   if (kind === 'accept') {

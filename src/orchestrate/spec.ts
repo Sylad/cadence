@@ -6,6 +6,7 @@ import type { Screen } from '../plan.js';
 import { acceptationFile } from './accept.js';
 import { checkFiche, fichesDuDossier, LARGEURS } from '../spec.js';
 import { EXPRESS_MAX_ESTIMATE } from './express.js';
+import { worstSpecLines } from './pires-cas.js';
 import type { SpecStage } from './lot-budget.js';
 
 // Étape spec d'orchestrate (L171, spec etape-spec S3) : ce que le programme sait de la sortie de la session `spec`.
@@ -322,9 +323,9 @@ const lightLines = (o: { dir: string; render?: string }): string[] => [
 ];
 
 /** Consigne propre à l'étape spec dans le brief : dossier, largeurs, commande de rendu, et les écarts de la passe précédente. */
-export function specText(o: { dir: string; render?: string; screen?: string; light?: boolean; back?: boolean; problems?: string[]; review?: string; template?: string; templateBack?: string }): string {
+export function specText(o: { dir: string; render?: string; screen?: string; light?: boolean; back?: boolean; problems?: string[]; review?: string; template?: string; templateBack?: string; worst?: string }): string {
   const lines: string[] = [];
-  if (o.screen) lines.push(...(o.light ? lightLines(o) : pageLines(o)));
+  if (o.screen) lines.push(...(o.light ? lightLines(o) : pageLines(o)), ...worstSpecLines(o.worst, !!o.light));
   if (o.back) {
     lines.push(
       o.screen

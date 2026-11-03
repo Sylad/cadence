@@ -155,7 +155,7 @@ export function isProject(dir: string): boolean {
   try {
     const c = readPlanConfig(conf);
     // Une clé qa: seule ne désigne aucun plan.
-    return !!c && (!!c.path || Object.keys(c.settings).some((k) => k !== 'qaExpectations'));
+    return !!c && (!!c.path || Object.keys(c.settings).some((k) => k !== 'qaExpectations' && k !== 'qaWorstData'));
   } catch {
     return true; // un cadence.yaml illisible reste un projet : sa ligne dit l'erreur
   }

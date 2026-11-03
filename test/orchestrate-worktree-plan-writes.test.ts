@@ -189,18 +189,22 @@ describe('R16 — une seule application lancée à la fois dans le dépôt', () 
   it('R16 — deux lots à écran : une seule application lancée à la fois dans le dépôt', async () => {
     let active = 0;
     let peak = 0;
+    const launchesSeen: number[] = [];
     const { f, parent } = await uxWave(
       [{ title: 'un', estimate: 1, visible: true }, { title: 'deux', estimate: 1, visible: true }],
-      () => async () => {
+      (parent) => async () => {
         active++;
         peak = Math.max(peak, active);
-        await sleep(4500); // L2 arrive à la file pendant ce temps : sans file en mémoire, il lancerait sa propre application et `peak` vaudrait 2
+        await sleep(4500); // L2 arrive à la file pendant ce temps
+        // Sans file en mémoire, L2 journaliserait son lancement dès son arrivée et attendrait sur le verrou d'URL entre processus (tenu par le même pid) : avec un délai de 60 s `peak` resterait à 1 et les deux UX auraient lieu, seul le journal le distingue.
+        launchesSeen.push(readFileSync(join(store(parent()).dir, 'journal.log'), 'utf8').split("lancement de l'application").length - 1);
         active--;
         return claudeOut(reviewReport());
       },
     );
     expect(f.calls.filter((c) => c.kind === 'ux')).toHaveLength(2); // la seconde revue UX a bien eu lieu, après la première
     expect(peak).toBe(1);
+    expect(launchesSeen[0]).toBe(1); // à mi-session de L1, L2 attend encore la file en mémoire : il n'a pas commencé à lancer son application
     for (const id of ['L1', 'L2']) expect(store(parent).readLot('a', id)!.uxNote ?? '').not.toContain('url tenue');
   });
   it('R16 — le verrou d\'application est par dépôt, pris seulement par les étapes qui lancent l\'application : une étape sans application d\'un autre lot n\'attend pas ce verrou', async () => {

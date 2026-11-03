@@ -832,10 +832,11 @@ lots:
     finished: 2026-11-03
   - id: L469
     title: "Plans riches — livré ≠ terminé (deliver écrit delivered: et l'état livré, blocs par chemins) (manque M7 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
-    status: todo
+    status: doing
     estimate: 0.5
     uses: [ plan-coeur ]
     created: 2026-10-30
+    started: 2026-11-03
   - id: L470
     title: "Plans riches — export JSON stable du plan et flux d'événements (raf export, raf events) (manque M8 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo

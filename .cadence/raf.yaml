@@ -1941,11 +1941,12 @@ lots:
     started: 2026-11-03
   - id: L569
     title: "Intégration : un conflit de rebase qui ne porte QUE sur le plan (.cadence/raf.yaml) se fusionne seul — version de main + les écritures du lot (sa revue, ses notes, son état), au lieu de rendre le lot (03-11 : L556, L469 rendus pour ce seul conflit, et à chaque commit de plan du lead sur main il a fallu rebaser à la main les quatre lots en file)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-04
     started: 2026-11-03
     review: { date: 2026-11-03, verdict: "conforme : 0 bloquant, 0 majeur, 2 mineurs (un lot absent de la branche du dépôt, même non touché par le commit, rend encore le lot ; une note ajoutée des deux côtés se dédouble) — orchestré (vague 2026-11-03-2100-cad, 0 passe(s) de correction)", commit: af8e2b9202c88a3a8723a9a00f3de24418bc3def, reporte: { de: 45db0e85f74378f00ee845ca6843953930b1a305, vers: af8e2b9202c88a3a8723a9a00f3de24418bc3def, patchId: 143529eb8836d6cba4ef9eeb77635f50bf90f3b7 } }
+    finished: 2026-11-04
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

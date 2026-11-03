@@ -39,7 +39,7 @@ It can read a plan your tracker keeps (read-only) and write its plan commits in 
 
 ```
 /plugin marketplace add Sylad/cadence
-/plugin install cadence@cadence        # skills and reviewer agents; needs @sylad/cadence above
+/plugin install cadence@cadence        # skills, reviewer agents and the retour → geste hook (docs/lead.md); needs @sylad/cadence above
 /plugin install cadence-hud@cadence    # the status band, works without the CLI
 ```
 

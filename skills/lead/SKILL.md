@@ -205,6 +205,9 @@ is recorded by the lead's own `raf ux` or, for a lot it hands over, by the `livr
 
 ## 3. Check
 
+A `retour → geste :` or `rappel :` line that the cadence plugin's hook adds to a Bash result is read before any other gesture: it is the exact command the program names for the refusal (`docs/lead.md`, « The retour → geste hook »).
+
+
 0. After an orchestrated wave the review is already done, by a fresh session: read the table, then go to
    point 2. For a lot delegated by hand:
 0b. For a lot delegated by hand, `raf check` or the `dérive` column reporting `documentation en retard` is handled **before** the review: hand the lot to the `doc-keeper` agent (a fresh subagent; the absolute path of the project and the lot id; it updates the documents, or only lists them if you say read-only). Read the `docs.articles` key of the project's `cadence.yaml` yourself and put its entries (`repo`, `file`, and the absolute path of that repository, `repo` being relative to the project) in the brief, with read access to that repository for the subagent: the agent examines a document outside the repository only if the brief names it, and with no entry (the key is absent by default) you name none. A proposed lot it returns for a document outside the repository (`docs.articles`) is yours to decide: it never writes to that plan. Add a line `Report file: <absolute path>` (outside the repository) to the brief: it answers in 15 lines at most and writes its full report there (L452); read the file only to apply a document it only listed.

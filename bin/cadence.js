@@ -12,7 +12,7 @@ const io = {
 
 if (tool === 'raf') {
   process.exitCode = await run(args, io);
-} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'spec', 'ref', 'config', 'release', 'local'].includes(tool)) {
+} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'spec', 'ref', 'config', 'release', 'local', 'claude-hook'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   process.exitCode = await run([tool], io);
@@ -41,6 +41,8 @@ if (tool === 'raf') {
   cadence local start|done <lot>
                     tâche locale du lead sur un lot posé par raf add --local : start verrouille le dépôt comme une vague,
                     done joue la porte une fois et libère le dépôt si elle est verte
+  cadence claude-hook retour|attente
+                    hook Bash du plugin (hooks/hooks.json) : lit le JSON de Claude Code sur l'entrée standard, imprime le geste d'un refus connu ou le rappel contre la boucle d'attente, sort toujours en 0
   cadence release patch|minor|major [--dry-run]
                     prépare le commit de version (fichiers de version, CHANGELOG) sans rien commiter ni publier ;
                     imprime les étapes du lead dans l'ordre et vérifie docs/whats-new.md

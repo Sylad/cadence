@@ -99,3 +99,65 @@ export function withReplayHint(refusals: string[], waveId: string, argv: string[
   const without = refusals.some((r) => r.startsWith('--replay ')) ? resumeWithoutReplay(waveId, argv) : '';
   return without ? [...refusals, `un --replay refusé refuse toute la reprise : la reprise sans --replay : ${without}`] : refusals;
 }
+
+/** Les repères que le geste porte quand la sortie ne donne pas la valeur (L556) : jamais un identifiant inventé. */
+const WAVE_MARK = '<vague>';
+const LOT_MARK = '<projet:lot>';
+
+/** Les fragments par lesquels un refus dit DÉJÀ son geste (suffixes de `gestureSuffix`, `stillRunningRefusal`, `droppedAddSuffix`, `addHint`, `withReplayHint`) : le hook n'y ajoute rien. */
+const OWN_GESTURE = ['— le geste :', 'à la fin de la vague :', 'retiré de la vague : le lancer dans une nouvelle vague', 'pour y ajouter ce lot :', 'la reprise sans --replay :'];
+
+/** Au plus ce nombre de gestes par sortie (une sortie qui répète ses refus ne noie pas le contexte du lead). */
+export const MAX_GESTURES = 5;
+
+/** Le geste de l'option inconnue : `cadence --help` liste les commandes et leurs options (`cadence orchestrate --help` est refusé comme option inconnue). */
+const HELP_GESTURE = 'cadence --help (la liste des commandes et de leurs options)';
+
+/** Une entrée de la table : le motif du refus dans une ligne, puis la clé du refus distinct (motif et valeurs) et son geste. */
+type Refusal = { when: RegExp; gesture: (m: RegExpExecArray) => [key: string, gesture: string] };
+
+const REFUSALS: Refusal[] = [
+  {
+    when: /une orchestration y est déjà en cours(?: \(([^\s,)]+))?/,
+    gesture: (m) => [`held ${m[1] ?? ''}`, `la vague ${m[1] ?? WAVE_MARK} tient le dépôt : ne pas boucler, attendre la notification de fin de sa tâche de fond ; l'état : cadence orchestrate --status`],
+  },
+  { when: /pas rendu à l'étape d'intégration/, gesture: () => ['integration', "lire l'état de la vague (colonne geste) : cadence orchestrate --status"] },
+  { when: /la vague (?:(\S+) )?tourne encore/, gesture: (m) => [`running ${m[1] ?? ''}`, atWaveEnd(resumeCommand(m[1] ?? WAVE_MARK))] },
+  {
+    when: /(?:^|\s)(?:([^\s:]+:[^\s:]+) : )?lot déjà/,
+    gesture: (m) => [`already ${m[1] ?? ''}`, `le lot ${m[1] ?? LOT_MARK} est déjà dans la vague : cadence orchestrate --status`],
+  },
+  { when: /^\s*(?:orchestrate : )?(?:([^\s:]+:[^\s:]+) : )?.*ne tient pas le budget du lot/, gesture: (m) => [`budget ${m[1] ?? ''}`, atWaveEnd(newWaveGesture(m[1] ?? LOT_MARK))] },
+  {
+    when: /Unknown option(?: '([^']*)')?|option inconnue : (\S+)/,
+    gesture: (m) => [`option ${m[1] ?? m[2] ?? ''}`, (m[1] ?? m[2]) ? `l'option ${m[1] ?? m[2]} est inconnue : ${HELP_GESTURE}` : HELP_GESTURE],
+  },
+];
+
+/**
+ * LA table refus → geste (L556), lue par le hook « retour → geste » : chaque ligne de `text` qui porte un refus connu et pas déjà son geste rend le geste exact, construit avec
+ * `resumeCommand`, `atWaveEnd` et `newWaveGesture`. Un refus distinct (même motif, mêmes valeurs) compte une fois, dans l'ordre de la sortie, au plus `MAX_GESTURES`.
+ * La ligne d'avancement « tenu par la vague … attente de sa fin » n'est pas un refus : aucune entrée.
+ */
+export function refusalGestures(text: string): string[] {
+  const found = new Map<string, string>();
+  for (const line of text.split('\n')) {
+    if (found.size >= MAX_GESTURES) break;
+    if (OWN_GESTURE.some((m) => line.includes(m))) continue;
+    for (const { when, gesture } of REFUSALS) {
+      const m = when.exec(line);
+      if (!m) continue;
+      const [key, text] = gesture(m);
+      if (!found.has(key)) found.set(key, text);
+    }
+  }
+  return [...found.values()].slice(0, MAX_GESTURES);
+}
+
+/**
+ * Le geste d'une commande cadence/raf sortie en 137 (le processus a été tué, L556) : pour `cadence orchestrate`, la reprise de la vague (`wave` : l'id de son `--wave`, `<vague>` sinon) ;
+ * pour toute autre commande, la relance en tâche de fond.
+ */
+export function killedGesture(orchestrate: boolean, wave?: string): string {
+  return orchestrate ? resumeCommand(wave ?? WAVE_MARK) : 'le processus a été tué (137) : relancer la même commande en tâche de fond';
+}

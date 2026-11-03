@@ -12,6 +12,7 @@ import { cmdSession, cmdSessionAll } from './cli/session-commands.js';
 import { cmdDeliver, cmdLocal, cmdVerify } from './cli/deliver-commands.js';
 import { corrections, perf } from './cli/stats-commands.js';
 import { cmdConfig, cmdLead } from './cli/lead-commands.js';
+import { claudeHook } from './claude-hook.js';
 import { refCommand } from './ref/command.js';
 import { release } from './release.js';
 import { orchestrate, realOrchestrateDeps } from './orchestrate/command.js';
@@ -136,6 +137,8 @@ const BEFORE_PLAN: Record<string, (c: EarlyCtx) => number | Promise<number> | nu
   // Prépare le commit de version : écrit les fichiers de version, ne commite ni ne publie rien (L341).
   release: (c) => release(c.rest, !!c.values['dry-run'], c.root, c.today, c.io.out),
   migrate: cmdMigrate,
+  // Le hook du plugin « retour → geste » (L556) : sort toujours en 0, avant toute lecture du plan.
+  'claude-hook': (c) => claudeHook(c.rest[0], () => (c.io.stdin ? c.io.stdin() : readFileSync(0, 'utf8')), c.io.out),
   spec: cmdSpecChecks,
   session: (c) => cmdSessionAll(c, run),
 };

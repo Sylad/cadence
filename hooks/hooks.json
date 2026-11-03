@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "PostToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "command -v cadence >/dev/null 2>&1 && cadence claude-hook retour || true" }] }],
+    "PostToolUseFailure": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "command -v cadence >/dev/null 2>&1 && cadence claude-hook retour || true" }] }],
+    "PreToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "command -v cadence >/dev/null 2>&1 && cadence claude-hook attente || true" }] }]
+  }
+}

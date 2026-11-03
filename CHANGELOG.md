@@ -84,6 +84,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Added
 
 - Rich plans, safe plan writes between sessions (L468, `docs/raf.md`; gap M6 of the maritime-atlas migration study): every write of the plan takes a lock `<plan>.lock` (atomic, pid + start time of its owner, 30 s wait then a clear refusal naming the holder, a dead owner's lock removed, released even when the write fails), and `save()` refuses to overwrite a plan, or a year file of the archive, that another session changed since it was read, keeping their change. A lock that cannot be created for another reason than one already there (plan folder not writable, read-only or full file system, no hard links) is a readable refusal (`pose du verrou du plan refusée (EACCES, …) — plan inchangé`) instead of a raw Node error that `raf` and the wave printed as a stack.
+- GitHub issues followed by the plan (L548, [docs/lead.md](docs/lead.md#lead-tour), [docs/releasing.md](docs/releasing.md)): 1.38.1 and 1.42.1 settled issues #20 and #21, which stayed open. `cadence lead tour` now lists, with `gh` when it is there (silent otherwise), the open issues of each project that no lot cites (`issue #n` in a lot's title or notes) and those whose lots are all done and cited in a published CHANGELOG section; `cadence release` prints, for each issue cited by a lot of the version, the `gh issue close n --comment "Réglée par L…, publiée en x.y.z"` command. Nothing is closed by cadence: the lead runs the command.
 
 ### Fixed
 

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { currentBranch, hasTrackedChanges, tagExists } from './git.js';
 import { RafError } from './plan.js';
 import type { Day } from './dates.js';
+import { releaseIssueLines } from './issues.js';
 
 const BUMPS = ['patch', 'minor', 'major'] as const;
 type Bump = (typeof BUMPS)[number];
@@ -73,6 +74,8 @@ function hasEntries(body: string): boolean {
 
 interface Planned {
   version: string;
+  /** Le corps de [Unreleased], celui qui devient la section de la version. */
+  body: string;
   current: string;
   writes: Map<string, string>;
   files: string[];
@@ -173,6 +176,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
 
   return {
     version,
+    body,
     current,
     writes,
     files,
@@ -288,5 +292,7 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
 
   out('étapes du lead, dans l\'ordre (la commande n\'en joue aucune ; chacune se lit par son code de sortie : jamais de pipe (`| tail`, `| grep`) derrière une commande dont le code de sortie compte, il lui substitue celui du filtre) :');
   for (const s of steps(p, files, branch)) out(s);
+  // les lots de la version qui citent une issue GitHub (L548) : le lead ferme, une fois la publication vérifiée ; la commande n'en ferme aucune
+  releaseIssueLines(root, p.body, p.version).forEach((l) => out(l));
   return ready ? 0 : 1;
 }

@@ -90,6 +90,8 @@ The check reads the whole « In two lines » list, as `test/readme-accueil.test.
 
 The steps it prints are read by their exit code, never through a pipe: a `| tail` or a trailing `| grep` after the suite hands the shell the filter's code, and a red suite looks green (28-10, 29-10). The same holds for the workflows: `publish.yml` and `tests.yml` read the output of `npm publish` (and the diagnostics) with `grep … <<< "$out"`, no pipe (`test/publish-workflow.test.ts`), because under `set -o pipefail` a `printf | grep -q` over the long output of the suite would fail on a `SIGPIPE`.
 
+After the steps, when a lot named in the version's section (the `[Unreleased]` body that becomes `## [x.y.z]`, matched on the whole lot id, so `L52` is not `L526`) cites a GitHub issue in its title or notes as `issue #n` (L548), the command prints `issues à fermer, une fois la publication vérifiée` and, for each issue, `gh issue close n --comment "Réglée par L526, publiée en x.y.z"` (one command per issue, naming every lot of the version that cites it). Nothing is closed by the command (it does not even call `gh`): the lead runs them once the publication is checked. `--dry-run` prints them too. No plan, or no lot citing an issue: nothing is printed. `cadence lead tour` lists the issues that stay open although their lot is published ([lead tour](lead.md#lead-tour)).
+
 `docs/whats-new.md` is **not written by the command** (the two forms are prose, written by hand or by a session): it checks that
 both are there and in their place, and says where to write what is missing. The « In two lines » line of the version is the
 first of the list and at most 240 characters; the long paragraph is the first of « Version by version », right after its

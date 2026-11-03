@@ -1,9 +1,10 @@
 // Les commandes du lead : lead tour|priority|hold|release, config set (L488, sorti de cli.ts).
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, join, relative, resolve, sep } from 'node:path';
 import { type Day } from '../dates.js';
 import { gitRoot } from '../git.js';
 import { RafError } from '../plan.js';
+import { issueLines } from '../issues.js';
 import { configSet } from '../config-set.js';
 import { movePriority } from '../priority.js';
 import { findProjects, isProject, leadTour, readDepth, readLeadUx, tourCiLines, tourFreeLine, tourLine, tourNoTestLines, tourWorktreeLines } from '../lead.js';
@@ -15,8 +16,8 @@ import { perfHeader } from '../perf.js';
 import { readPerf } from './stats-commands.js';
 import { type EarlyCtx, type Io } from './context.js';
 
-/** Les racines git des projets du tour (la clé `depth:` du dossier, un seul niveau si elle est illisible : le tour a déjà sa ligne d'erreur). */
-function tourRoots(parent: string, depth: number | undefined): string[] {
+/** Les dossiers des projets du tour (la clé `depth:` du dossier, un seul niveau si elle est illisible : le tour a déjà sa ligne d'erreur). */
+function tourDirs(parent: string, depth: number | undefined): string[] {
   let levels = depth;
   if (levels === undefined) {
     try {
@@ -26,7 +27,15 @@ function tourRoots(parent: string, depth: number | undefined): string[] {
     }
   }
   const dirs = findProjects(parent, levels);
-  return (dirs.length === 0 && isProject(parent) ? [parent] : dirs).map((d) => gitRoot(d) ?? d);
+  return dirs.length === 0 && isProject(parent) ? [parent] : dirs;
+}
+
+/** Les racines git des projets du tour. */
+const tourRoots = (parent: string, depth: number | undefined): string[] => tourDirs(parent, depth).map((d) => gitRoot(d) ?? d);
+
+/** Les lignes d'issues GitHub du tour (L548), un projet après l'autre, nommé comme sa ligne ; rien sans `gh`. */
+function tourIssueLines(parent: string, depth: number | undefined, env: NodeJS.ProcessEnv): string[] {
+  return tourDirs(parent, depth).flatMap((d) => issueLines(d, d === parent ? basename(d) : relative(parent, d).split(sep).join('/'), env));
 }
 
 /** Durée par défaut (minutes) d'une session du lead inscrite par `lead hold` : de quoi finir un correctif ou une revue, pas de quoi oublier la réservation toute la journée. */
@@ -115,7 +124,8 @@ export function cmdLead(c: EarlyCtx): number {
     // … puis l'index MEMORY.md du dossier, s'il pèse trop (L442) : le lead propose le regroupement, rien n'est écrit
     for (const l of [...tourWorktreeLines(rows, io.now().getTime()), ...tourMemoryLines(io.env, parent)]) io.out(l);
     // un projet sans orchestrate.test : la vague ne lancera pas la suite (L327) ; puis ce que la CI joue et que la porte ne joue pas (L499)
-    for (const l of [...tourNoTestLines(rows), ...tourCiLines(rows)]) io.out(l);
+    // … puis les issues GitHub ouvertes qu'aucun lot ne cite, ou dont le lot est publié (L548) : le lead les ferme, le tour n'en ferme aucune
+    for (const l of [...tourNoTestLines(rows), ...tourCiLines(rows), ...tourIssueLines(parent, depth, io.env)]) io.out(l);
     // les créneaux libres viennent du registre, le lead les lit au lieu de les calculer (L141)
     // toujours imprimés, même sans vague ni session du lead (L416) : un créneau vide se lit, il ne se déduit pas d'une ligne absente
     io.out(slotsLine(configuredCap(io.env), io.now()).line);

@@ -365,8 +365,17 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(liveWaves(cadenceHome())).toEqual([]);
     expect(existsSync(join(s.dir, '.git/cadence/orchestrate.lock'))).toBe(false);
     expect(existsSync(join(s.dir, '.git/hooks/pre-push'))).toBe(false);
-    expect(() => process.kill(pid, 0)).toThrow(); // la session est morte
-    expect(() => process.kill(worker[0], 0)).toThrow(); // et le processus de la vague aussi
+    // la mort d'un processus se constate un instant après la sortie de cadence : on attend le signal observable (kill(pid,0) lève)
+    const dead = (p: number) => () => {
+      try {
+        process.kill(p, 0);
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    await waitFor('la session est morte', dead(pid));
+    await waitFor('le processus de la vague est mort', dead(worker[0]));
   }, 20_000);
 
   // L60 : le signal reçu pendant la revue UX tue aussi l'application, détachée dans son propre groupe de processus.

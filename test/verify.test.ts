@@ -439,7 +439,7 @@ describe('realCheckDeps.exec : vérifications en groupe détaché (verify, sessi
         // la vérification est dans sa propre session : le signal du terminal ne l'atteint pas directement
         process.kill(-child.pid!, sig);
         expect(await exited).toBe(sig); // cadence sort comme sans relais : tué par le même signal
-        const survived = !(await until(() => !alive(checkPid), 2_000));
+        const survived = !(await until(() => !alive(checkPid), 10_000));
         expect(survived).toBe(false);
       } finally {
         for (const pid of [-child.pid!, checkPid]) {

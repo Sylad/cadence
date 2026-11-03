@@ -36,3 +36,6 @@ export const underPath = (file: string, path: string): boolean => file === path 
 export function blocksTouched(files: string[], blocks: Blocks): string[] {
   return Object.keys(blocks).filter((b) => files.some((f) => blocks[b].some((p) => underPath(f, p))));
 }
+
+/** Les noms des blocs de `deliver.blocks`, [] sans la clé : de quoi lire la ligne d'où part une livraison (`lastDeliveryFor`). */
+export const declaredBlocks = (config: { blocks?: Blocks }): string[] => Object.keys(config.blocks ?? {});

@@ -1,5 +1,6 @@
 import { isPlanOnly } from './audit.js';
-import { isAncestor, readCommits } from './git.js';
+import { changedFiles, isAncestor, readCommits } from './git.js';
+import { underPath } from './deliver-blocks.js';
 import { citedRefs } from './link.js';
 import type { DeliveredCtx } from './deliver.js';
 
@@ -17,8 +18,11 @@ export function deliveredIds(ctx: DeliveredCtx, prev: string | null, sha: string
   const lots = ctx.plan.lots();
   const known = new Set((ctx.plan.readonly ? lots.filter((l) => l.status === 'doing') : lots).map((l) => l.id));
   const ids = new Set<string>();
+  // --block (L469) : seuls les commits qui touchent un chemin du bloc comptent, dans la plage de CETTE livraison seulement.
+  const paths = ctx.block === undefined ? undefined : ctx.blocks?.[ctx.block];
   for (const c of readCommits(ctx.root, { range: `${prev}..${sha}` })) {
     if (isPlanOnly(c.sha, ctx.plan, ctx.root)) continue; // entretien du plan : ne livre rien, même s'il cite des lots
+    if (paths && !changedFiles(ctx.root, c.sha).some((f) => paths.some((p) => underPath(f, p)))) continue;
     for (const r of citedRefs(c, ctx.plan.refs)) if (known.has(r.lot)) ids.add(r.lot);
   }
   return [...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));

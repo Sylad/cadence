@@ -8,12 +8,13 @@ import type { Day } from './dates.js';
 import { deliveryLots } from './audit.js';
 import { commitPaths, dirtyPaths, headSha, isAncestor, onRemote, repoStatus, resolveCommit } from './git.js';
 import { planOnlySince, pollGithubCi, stamped, stepJournal } from './deliver-ci.js';
+import { markDelivered } from './deliver-mark.js';
 import { PLAN_ACTIONS, planCommitMessage } from './plan-commit.js';
 import { deliveredIds, deliveredLots } from './deliver-lots.js';
-import { type Blocks, readBlocks } from './deliver-blocks.js';
+import { type Blocks, declaredBlocks, readBlocks } from './deliver-blocks.js';
 import { describeArticle, openArticleLots, type ArticleRule } from './articles.js';
 import { RafError, type Lot, type Plan } from './plan.js';
-import { appendDelivery, appendFailedDelivery, type FailClass, lastDelivery, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
+import { appendDelivery, appendFailedDelivery, type FailClass, lastDeliveryFor, lockAlive, lockFault, lockPath, readLock, releaseLock, removeStaleLock, writeLock } from './state.js';
 
 export interface VerifyCheck {
   url?: string;
@@ -97,6 +98,8 @@ export interface DeliverCtx {
   waveId?: string;
   /** Gabarit `plan.commit` du projet (L343) : le message du commit du plan écrit pour un article pendant une vague. */
   planCommit?: string;
+  /** Bloc livré (`--block`, L469) : seuls les lots cités par un commit qui touche ses chemins sont marqués livrés ; absent : tous les lots de la plage. */
+  block?: string;
   /** Arguments de la ligne de commande, ajoutés au script du projet. */
   args: string[];
   /** Articles d'un dépôt voisin à rafraîchir après une livraison verte (clé `docs.articles`, L144). */
@@ -385,7 +388,7 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
   // Pendant une vague, la garde de la vague (cli, `blockingLots`) en tient lieu.
   let undelivered: { id: string; state: string }[] = [];
   if (ctx.sha !== undefined && !ctx.duringWave && ctx.plan) {
-    const last = lastDelivery(ctx.state);
+    const last = lastDeliveryFor(ctx.state, ctx.block, declaredBlocks(config));
     const from = last && isAncestor(ctx.root, last, sha) ? last : null;
     const lots = deliveryLots(ctx.plan, ctx.root, sha, from);
     if (ctx.dryRun) {
@@ -442,7 +445,8 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
     };
     out(`Livraison de ${env.CADENCE_SHORT} (${branch})`);
 
-    const step = stepJournal(ctx, deps, sha, () => deliveredIds(ctx, lastDelivery(ctx.state), sha));
+    const reading: DeliveredCtx = { ...ctx, blocks: config.blocks };
+    const step = stepJournal(ctx, deps, sha, () => deliveredIds(reading, lastDeliveryFor(ctx.state, ctx.block, declaredBlocks(config)), sha));
 
     let declared: string | null = null;
     if (script !== null) {
@@ -507,13 +511,13 @@ export async function deliver(ctx: DeliverCtx, deps: DeliverDeps): Promise<numbe
         how = 'moved';
       }
     }
-    const prev = lastDelivery(ctx.state);
-    appendDelivery(ctx.state, ctx.today, final);
+    const prev = lastDeliveryFor(ctx.state, ctx.block, declaredBlocks(config));
+    appendDelivery(ctx.state, ctx.today, final, ctx.block);
     const took = `en ${Math.round((deps.now() - startedAt) / 1000)} s`;
     if (how === 'declared') out(stamped(deps, `✓ livré : ${final.slice(0, 7)} (sha déclaré par le script) ${took}`));
     else if (how === 'moved') out(stamped(deps, `✓ livré : ${final.slice(0, 7)} (tête déplacée par le script depuis ${env.CADENCE_SHORT}) ${took}`));
     else out(stamped(deps, `✓ livré${config.verify.length ? ' et vérifié' : ''} : ${env.CADENCE_SHORT} ${took}`));
-    announceDelivered(ctx, prev, final);
+    announceDelivered(reading, prev, final);
     return 0;
   } finally {
     releaseLock(ctx.state, process.pid);
@@ -593,7 +597,7 @@ async function verifyAll(
 }
 
 /** Ce qu'il faut pour annoncer les lots livrés et rafraîchir leur article : deliver, et `cadence verify` quand il inscrit une ligne verte (L435). */
-export type DeliveredCtx = Pick<DeliverCtx, 'root' | 'plan' | 'today' | 'articles' | 'publicTitle' | 'planCommit' | 'waveId' | 'out' | 'err'>;
+export type DeliveredCtx = Pick<DeliverCtx, 'root' | 'plan' | 'today' | 'articles' | 'publicTitle' | 'planCommit' | 'waveId' | 'block' | 'out' | 'err'> & { blocks?: Blocks };
 
 /**
  * Ce qui suit la ligne verte du journal, depuis la livraison verte précédente `prev` (celle d'AVANT la ligne écrite) : les lots cités
@@ -605,6 +609,7 @@ export function announceDelivered(ctx: DeliveredCtx, prev: string | null, sha: s
   const ids = deliveredIds(ctx, prev, sha);
   const delivered = deliveredLots(ctx, ids, prev, sha);
   if (delivered) ctx.out(delivered);
+  markDelivered(ctx, ids, sha);
   refreshArticles(ctx, ids, sha);
 }
 

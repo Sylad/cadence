@@ -1499,7 +1499,7 @@ lots:
     finished: 2026-11-02
   - id: L534
     title: "Jeu de données « pires cas » pour les lots d'écran (issue #22, compte pro) : un jeu réaliste posé une fois à côté du jeu de démo (noms longs ou d'une lettre, compte à 0 et à 1, champs optionnels absents, grands nombres, texte non latin, liste longue), branché au même endroit que la démo et basculé en mode dev seulement (?data=worst) ; spec-writer, ux-reviewer et qa-reviewer capturent chaque état avec les deux jeux ; le jeu reste en test de non-régression (idée : skill break-ui d'emilkowalski/skills, MIT)"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-11-02
@@ -1512,6 +1512,7 @@ lots:
       - { date: 2026-11-03, text: "Hypothèses (fiche jeu-pires-cas) — R3 : Le brief d'une fiche back (sans écran) ne parle pas du jeu pires cas et reste identique à celui d'avant le lot ; si faux : Si le jeu doit aussi servir à des exemples de données d'API, le brief back en parlerait ; seul son texte change" }
       - { date: 2026-11-03, text: "Hypothèses (fiche jeu-pires-cas) — R5 : Un défaut vu seulement avec le jeu pires cas suit l'échelle de gravité existante des revues ; il n'a pas de gravité propre ; si faux : Si ces défauts devaient être plus sévères, seul le texte des agents change (aucune donnée en jeu)" }
     review: { date: 2026-11-03, verdict: "conforme : revue Opus du lead sur l'état final du worktree (après la correction Fable et f621a00f) — 0 bloquant, 3 mineurs notés (brief ux du dry-run sans la consigne pires cas, captures actuel-*-pires-cas non citées en revue de maquette légère, consigne « serveur dev » en mode maquette) ; revue courte du diff rebasé (patch-id différent) : conforme après rebase : 0 bloquant, 0 majeur, 1 mineur (double sous-titre ### Added dans CHANGELOG [Unreleased], né de la fusion avec L552)", commit: 9082f28814b83ed0c3fd575e40376fd6143ab09d }
+    finished: 2026-11-03
   - id: L535
     title: "raf estimate <id> abc ou .5 répond « estimation invalide : NaN » au lieu de la valeur saisie (cli.ts:536 remplace la saisie par NaN avant setEstimate) — revue de L465"
     status: done

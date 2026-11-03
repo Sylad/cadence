@@ -331,7 +331,7 @@ function markRemoved(l: LotState, waveId: string, store: RunStore, io: Orchestra
  * qui ont leur worktree : rien d'autre n'écrit dans le dépôt, l'intégration est déjà sérialisée par son propre verrou.
  */
 function passesBetweenSteps(store: RunStore, live: LotState[], integ: LotState[], repo: string, busy: { wave: string }): boolean {
-  return !localLotOf(busy.wave) && live.filter((l) => lotRepoPaths(l).includes(repo)).every((l) => integ.includes(l) && existsSync(join(lotTreeDir(store.dir, l.project, l.lot, l.repo), '.git')));
+  return localLotOf(busy.wave) === null && live.filter((l) => lotRepoPaths(l).includes(repo)).every((l) => integ.includes(l) && existsSync(join(lotTreeDir(store.dir, l.project, l.lot, l.repo), '.git')));
 }
 
 /** Un lot repris par `--integrate` ou `--replay` repart suspendu : à l'intégration, ou à l'étape d'écriture de plan gardée ; avec la revue du lead hors vague quand elle tient lieu de revue (L370). */

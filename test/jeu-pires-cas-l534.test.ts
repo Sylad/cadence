@@ -201,11 +201,11 @@ describe('L534 — le brief écrit par `cadence orchestrate --dry-run` (contrat 
     git(dir, 'config', 'user.email', 't@example.com');
     git(dir, 'config', 'user.name', 'T');
     git(dir, 'config', 'commit.gpgsign', 'false');
-    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'a', 'L', '2026-09-01');
+    const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'a', 'L', '2026-09-01');
     plan.add('Une page', '2026-10-01', { estimate: 1, visible: true, screen: 'page' });
     plan.save();
     writeFileSync(join(dir, 'cadence.yaml'), `orchestrate:\n  precheck: false\n${worst ? `qa:\n  worstData: ${worst}\n` : ''}`);
-    git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+    git(dir, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
     git(dir, 'commit', '-q', '-m', 'chore: plan');
     return parent;
   };

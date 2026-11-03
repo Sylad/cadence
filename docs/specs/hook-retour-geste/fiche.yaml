@@ -39,6 +39,7 @@ cas:
       - { si: "la commande sort en 137", alors: "le geste est la reprise de la vague (--wave lu dans la commande, sinon <vague>), ou la relance en tâche de fond pour une autre commande", regles: [R5, R6] }
       - { si: "la sortie contient plusieurs refus, ou le même refus plusieurs fois", alors: "un geste par refus distinct, au plus cinq", regles: [R14] }
       - { si: "le hook a été lancé par un sous-agent", alors: "aucune sortie", regles: [R15] }
+      - { si: "la commande est une lecture (raf show, list, now, cadence lead tour, orchestrate --status, session start) dont un titre ou une note cite un refus", alors: "aucun geste : sa sortie n'est pas lue", regles: [R16] }
     resultat: "Le lead a, dans son contexte, la commande à jouer après un refus connu, tirée de la même table que le geste suivant imprimé par le programme."
   - id: C2
     titre: "Le lead s'apprête à jouer une boucle d'attente sur un processus : un rappel avant l'exécution"
@@ -97,7 +98,7 @@ regles:
     si_faux: "Si une forme est manquée, le lead ne reçoit pas le geste (ce qu'il a déjà aujourd'hui) ; si une forme est prise à tort, un geste inutile s'ajoute. Aucune donnée en jeu : seule la liste des formes change."
     tests:
       - "R3 — « cd x && cadence orchestrate a:L1 » : segment reconnu, geste rendu"
-      - "R3 — « npx cadence orchestrate --resume », « FOO=1 cadence verify » et « /opt/bin/cadence status » : reconnus"
+      - "R3 — « npx cadence orchestrate --resume », « FOO=1 cadence verify » et « /opt/bin/cadence deliver » : reconnus"
       - "R3 — « echo cadence ; ls » et « grep raf notes.txt » avec un refus connu dans la sortie : aucune sortie du hook"
       - "R3 — « cadencex orchestrate » : non reconnu, aucune sortie"
       - "R3 — « git commit -m 'cadence : une orchestration y est déjà en cours' » : aucune sortie"
@@ -112,7 +113,7 @@ regles:
       - "R4 — le geste de « budget » est identique à atWaveEnd(newWaveGesture('a:L1'))"
   - id: R5
     cas: [C1]
-    enonce: "Une commande cadence/raf qui sort en 137 (texte d'erreur « Exit code 137 » de l'événement d'échec, ou code de sortie 137 de la réponse de l'outil) rend un geste : pour cadence orchestrate, la reprise de la vague, cadence orchestrate --resume --wave <id> avec l'id de l'option --wave de la commande, sinon le repère <vague> ; pour toute autre commande cadence/raf, relancer la commande en tâche de fond (le processus a été tué). Un 137 d'une commande sans segment cadence/raf ne dit rien."
+    enonce: "Une commande cadence/raf qui sort en 137 (texte d'erreur « Exit code 137 » du seul champ error de l'événement d'échec, ou code de sortie numérique 137 de la réponse de l'outil ; la sortie stdout/stderr n'est jamais lue pour le 137 : un titre qui cite « Exit code 137 » n'est pas un code de sortie) rend un geste : pour cadence orchestrate, la reprise de la vague, cadence orchestrate --resume --wave <id> avec l'id de l'option --wave de la commande, sinon le repère <vague> ; pour toute autre commande cadence/raf, relancer la commande en tâche de fond (le processus a été tué). Un 137 d'une commande sans segment cadence/raf ne dit rien."
     statut: hypothese
     si_faux: "La forme exacte du code dans les données de Claude Code est supposée : si elle diffère, le 137 n'est pas reconnu (le lead n'a pas de geste, comme aujourd'hui) et seule la lecture du champ change."
     tests:
@@ -121,6 +122,7 @@ regles:
       - "R5 — « cadence verify --gate --sha HEAD » et « Exit code 137 » : le geste dit de relancer en tâche de fond"
       - "R5 — « sleep 9 » et « Exit code 137 » : aucune sortie du hook"
       - "R5 — « Exit code 1370 » ou « Exit code 13 » : pas le code 137, aucune sortie"
+      - "R5 — « raf show L556 » sortie 0, stdout contenant « Exit code 137 » dans un titre : aucun geste (revue L556)"
   - id: R6
     cas: [C1]
     enonce: "Quand la sortie ne donne pas la valeur dont le geste a besoin (vague, projet:lot), le geste porte le repère générique <vague> ou <projet:lot> : le hook n'invente jamais un identifiant."
@@ -219,6 +221,18 @@ regles:
       - "R15 — retour avec agent_id et un refus connu : aucune sortie"
       - "R15 — rappel avec agent_id et une boucle d'attente : aucune sortie"
       - "R15 — sans agent_id, les mêmes entrées rendent le geste et le rappel"
+  - id: R16
+    cas: [C1]
+    enonce: "Le hook ne lit la sortie (refus de R1 et R7) que si un segment cadence/raf de la commande (découpe de R3) PEUT refuser : cadence orchestrate hors --status et --dry-run, cadence deliver, cadence verify, cadence local (son refus « une orchestration y est déjà en cours », src/local-task.ts:37), cadence spec reseal|green, raf add|start|done|review|ux|docs-ok. Les commandes de lecture (raf show, raf list, raf now, cadence lead tour, cadence orchestrate --status, cadence session start, et toute autre commande hors de cette liste) sont ignorées : un refus cité dans un titre ou une note de leur sortie ne produit aucun geste. Le 137 (R5) n'est pas une sortie : il reste lu pour tout segment cadence/raf."
+    statut: sourcee
+    source: "décision du lead, 03-11, revue L556 (suite 2 : faux gestes sur un refus cité dans un titre ou une note)"
+    si_faux: "Une option inconnue (R7) tapée sur une commande de lecture ne reçoit plus de geste (le message de parseArgs suffit) ; une commande qui refuse et manque à la liste n'a pas de geste, seule la liste change."
+    tests:
+      - "R16 — raf show d'un lot dont le titre contient « lot déjà dans la vague » : aucune sortie"
+      - "R16 — raf list, raf now, cadence lead tour, cadence orchestrate --status, --dry-run et cadence session start qui citent un refus : aucune sortie"
+      - "R16 — « cadence orchestrate --add a:L1 » qui imprime « lot déjà dans la vague w1 » : geste rendu"
+      - "R16 — cadence deliver, spec reseal|green, local start et raf add|start|done|review|ux|docs-ok sont lus"
+      - "R16 — une commande de lecture tuée (Exit code 137 dans error) garde le geste du 137"
 
 contrats:
   - id: A1
@@ -227,7 +241,7 @@ contrats:
     sortie: "rien, ou le JSON { hookSpecificOutput: { hookEventName, additionalContext } } avec un geste par refus ; code 0 dans tous les cas"
     erreurs: []
     sans_erreur: "le hook ne répond à personne par un code : il sort toujours en 0, sans texte, sur toute entrée vide, illisible, incomplète ou démesurée (R9)"
-    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R11, R12, R14, R15]
+    regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R11, R12, R14, R15, R16]
   - id: A2
     appel: "commande cadence claude-hook attente"
     entree: "JSON de Claude Code sur l'entrée standard (événement PreToolUse, outil Bash) : tool_input.command, agent_id éventuel"

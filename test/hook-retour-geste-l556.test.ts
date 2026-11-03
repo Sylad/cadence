@@ -107,8 +107,8 @@ describe('L556 — les segments cadence/raf de la commande (R3)', () => {
   it('R3 — « cd x && cadence orchestrate a:L1 » : segment reconnu, geste rendu', async () => {
     expect(await speaks('cd x && cadence orchestrate a:L1')).toBe(true);
   });
-  it('R3 — « npx cadence orchestrate --resume », « FOO=1 cadence verify » et « /opt/bin/cadence status » : reconnus', async () => {
-    for (const c of ['npx cadence orchestrate --resume', 'FOO=1 cadence verify', '/opt/bin/cadence status', 'raf status', 'ls | cadence x', 'a;\ncadence b']) expect(await speaks(c)).toBe(true);
+  it('R3 — « npx cadence orchestrate --resume », « FOO=1 cadence verify » et « /opt/bin/cadence deliver » : reconnus', async () => {
+    for (const c of ['npx cadence orchestrate --resume', 'FOO=1 cadence verify', '/opt/bin/cadence deliver', 'raf done L1', 'ls | cadence verify', 'a;\ncadence orchestrate b']) expect(await speaks(c)).toBe(true);
   });
   it('R3 — « echo cadence ; ls » et « grep raf notes.txt » avec un refus connu dans la sortie : aucune sortie du hook', async () => {
     expect(await speaks('echo cadence ; ls')).toBe(false);
@@ -152,7 +152,7 @@ describe('L556 — le code 137 (R5)', () => {
 
 describe('L556 — l’option inconnue (R7)', () => {
   it("R7 — « raf: Unknown option '--bogus'. To specify a positional argument … » : le geste cite --bogus et donne cadence --help", async () => {
-    const r = await retour(failure('cadence raf --bogus', "Exit code 2\nraf: Unknown option '--bogus'. To specify a positional argument starting with a '-', place it at the end of the command after '--'"));
+    const r = await retour(failure('raf done L1 --bogus', "Exit code 2\nraf: Unknown option '--bogus'. To specify a positional argument starting with a '-', place it at the end of the command after '--'"));
     expect(gestes(r.out)).toHaveLength(1);
     expect(gestes(r.out)[0]).toContain('--bogus');
     expect(gestes(r.out)[0]).toContain('cadence --help');
@@ -355,5 +355,46 @@ describe('L556 — hooks/hooks.json du plugin (R10)', () => {
     expect(hud).toHaveProperty('modules');
     expect(hud).not.toHaveProperty('hooks');
     expect(file).not.toHaveProperty('modules');
+  });
+});
+
+describe('L556 — le 137 lu dans le seul champ error (R5, revue L556)', () => {
+  it('R5 — « raf show L556 » sortie 0, stdout contenant « Exit code 137 » dans un titre : aucun geste', async () => {
+    expect(await retour(post('raf show L556', 'L556 [doing] hook — « Exit code 137 » de l’événement d’échec'))).toEqual(silent);
+  });
+  it('R5 — « cadence verify » sortie 0, stdout contenant « Exit code 137 » : aucun geste (seul le champ error porte le code)', async () => {
+    expect(await retour(post('cadence verify', 'note : Exit code 137 vu hier'))).toEqual(silent);
+  });
+  it('R5 — tool_response en texte contenant « Exit code 137 » : aucun geste', async () => {
+    expect(await retour(JSON.stringify({ hook_event_name: 'PostToolUse', tool_input: { command: CMD }, tool_response: 'Exit code 137' }))).toEqual(silent);
+  });
+});
+
+describe('L556 — seules les commandes qui peuvent refuser sont lues (R16)', () => {
+  const ALREADY = 'L9 [todo] titre : « a:L1 : lot déjà dans la vague w1 »';
+  it('R16 — raf show d’un lot dont le titre contient « lot déjà dans la vague » : aucune sortie', async () => {
+    expect(await retour(post('raf show L9', ALREADY))).toEqual(silent);
+  });
+  it('R16 — raf list, raf now, cadence lead tour, cadence orchestrate --status, --dry-run et cadence session start qui citent un refus : aucune sortie', async () => {
+    for (const c of ['raf list', 'raf now', 'cadence lead tour', 'cadence orchestrate --status', 'cadence orchestrate a:L1 --dry-run', 'cadence session start']) {
+      expect(await retour(post(c, `${ALREADY}\nla vague w1 tourne encore (pid 7)`))).toEqual(silent);
+    }
+  });
+  it('R16 — « cadence orchestrate --add a:L1 » qui imprime « lot déjà dans la vague w1 » : geste rendu', async () => {
+    const r = await retour(failure('cadence orchestrate --add a:L1', 'Exit code 2\norchestrate : a:L1 : lot déjà dans la vague w1'));
+    expect(gestes(r.out)).toHaveLength(1);
+    expect(gestes(r.out)[0]).toContain('cadence orchestrate --status');
+  });
+  it('R16 — cadence deliver, spec reseal|green, local start et raf add|start|done|review|ux|docs-ok sont lus', async () => {
+    for (const c of ['cadence deliver', 'cadence spec reseal x', 'cadence spec green x', 'cadence local start L1', 'raf add "t"', 'raf start L1', 'raf done L1', 'raf review L1 ok', 'raf ux L1 ok', 'raf docs-ok L1']) {
+      expect((await retour(post(c, 'la vague w1 tourne encore (pid 7)'))).out, c).not.toBe('');
+    }
+  });
+  it('R16 — cadence spec show (lecture) qui cite un refus : aucune sortie', async () => {
+    expect(await retour(post('cadence spec show x', 'la vague w1 tourne encore (pid 7)'))).toEqual(silent);
+  });
+  it('R16 — une commande de lecture tuée (Exit code 137 dans error) garde le geste du 137 (R5)', async () => {
+    const r = await retour(failure('raf show L9', 'Exit code 137'));
+    expect(gestes(r.out)[0]).toContain('tâche de fond');
   });
 });

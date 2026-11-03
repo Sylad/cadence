@@ -73,7 +73,7 @@ describe('L556 sonde — R7 : l’option inconnue', () => {
     expect(gestes(same.out)).toHaveLength(1);
   });
   it('R7 — « Unknown option \'-x\' » (option courte) : le geste cite -x', async () => {
-    const r = await hook('retour', failure('raf list', "raf: Unknown option '-x'."));
+    const r = await hook('retour', failure('raf start L1 -x', "raf: Unknown option '-x'."));
     expect(gestes(r.out)[0]).toContain('-x');
   });
   it('R7 — fin de ligne CRLF : le nom de l’option est lu sans \\r', async () => {

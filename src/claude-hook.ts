@@ -34,7 +34,7 @@ function splitSegments(command: string): string[] {
   return segments;
 }
 
-/** Un segment cadence/raf : après d'éventuelles affectations NOM=valeur et `npx`, le premier mot est cadence ou raf (avec ou sans chemin). Rend ses mots après ce premier, ou null. */
+/** Un segment cadence/raf : après d'éventuelles affectations NOM=valeur et `npx`, le premier mot est cadence ou raf (avec ou sans chemin). Rend le programme (cadence ou raf) suivi de ses mots, ou null. */
 function cadenceArgs(segment: string): string[] | null {
   let rest = segment.trim();
   for (;;) {
@@ -43,7 +43,19 @@ function cadenceArgs(segment: string): string[] | null {
     rest = next;
   }
   const words = rest.split(/\s+/);
-  return /^(?:\S*\/)?(?:cadence|raf)$/.test(words[0]!) ? words.slice(1) : null;
+  const program = /^(?:\S*\/)?(cadence|raf)$/.exec(words[0]!)?.[1];
+  return program ? [program, ...words.slice(1)] : null;
+}
+
+/** Les commandes de raf qui écrivent le plan et peuvent refuser (R16). */
+const RAF_REFUSING = new Set(['add', 'start', 'done', 'review', 'ux', 'docs-ok']);
+
+/** Vrai pour un segment qui PEUT refuser (R16) : cadence orchestrate hors --status et --dry-run, cadence deliver, verify, local, spec reseal|green, raf add|start|done|review|ux|docs-ok. Une commande de lecture (raf show, list, now, cadence lead tour, orchestrate --status, session start) peut citer un refus dans un titre ou une note : sa sortie n'est pas lue. */
+function canRefuse([program, sub, ...rest]: string[]): boolean {
+  if (program === 'raf') return RAF_REFUSING.has(sub ?? '');
+  if (sub === 'orchestrate') return !rest.some((w) => w === '--status' || w === '--dry-run');
+  if (sub === 'spec') return rest[0] === 'reseal' || rest[0] === 'green';
+  return sub === 'deliver' || sub === 'verify' || sub === 'local';
 }
 
 const asText = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -55,29 +67,28 @@ function outputOf(input: Record<string, unknown>): string {
   return [response, asText(input.error)].join('\n');
 }
 
-/** Vrai quand le code de sortie est 137 : « Exit code 137 » du texte d'erreur, ou un code numérique de la réponse de l'outil. */
-function killed(input: Record<string, unknown>, text: string): boolean {
+/** Vrai quand le code de sortie est 137 (R5) : « Exit code 137 » du seul champ `error` (PostToolUseFailure), ou un code numérique de la réponse de l'outil. La sortie (stdout, stderr) n'est jamais lue ici : un titre qui cite « Exit code 137 » n'est pas un code de sortie. */
+function killed(input: Record<string, unknown>): boolean {
   const response = input.tool_response as Record<string, unknown> | string | undefined;
   const code = typeof response === 'object' && response !== null ? (response.exit_code ?? response.exitCode) : undefined;
-  return code === 137 || /Exit code 137(?!\d)/.test(text);
+  return code === 137 || /Exit code 137(?!\d)/.test(asText(input.error));
 }
 
 /** Le geste du 137 : la reprise de la vague d'un `cadence orchestrate` (son `--wave`, ou `--wave=`), sinon la relance en tâche de fond. */
 function killedGestureOf(segments: string[][]): string {
-  const orchestrate = segments.find((a) => a[0] === 'orchestrate');
+  const orchestrate = segments.find((a) => a[0] === 'cadence' && a[1] === 'orchestrate');
   const at = orchestrate?.findIndex((w) => w === '--wave' || w.startsWith('--wave=')) ?? -1;
   const word = orchestrate?.[at];
   const wave = word === '--wave' ? orchestrate?.[at + 1] : word?.slice('--wave='.length);
   return killedGesture(orchestrate !== undefined, wave && !wave.startsWith('-') ? wave : undefined);
 }
 
-/** Les gestes d'une commande cadence/raf : ceux des refus de sa sortie, puis celui du 137 ; rien quand la commande n'a aucun segment cadence/raf. */
+/** Les gestes d'une commande cadence/raf : ceux des refus de sa sortie quand un segment peut refuser (R16), puis celui du 137 ; rien quand la commande n'a aucun segment cadence/raf. */
 function returnGestures(data: Record<string, unknown>, command: string): string[] {
   const segments = splitSegments(command).map(cadenceArgs).filter((a): a is string[] => a !== null);
   if (!segments.length) return [];
-  const text = outputOf(data);
-  const gestures = refusalGestures(text);
-  return killed(data, text) && gestures.length < MAX_GESTURES ? [...gestures, killedGestureOf(segments)] : gestures;
+  const gestures = segments.some(canRefuse) ? refusalGestures(outputOf(data)) : [];
+  return killed(data) && gestures.length < MAX_GESTURES ? [...gestures, killedGestureOf(segments)] : gestures;
 }
 
 /** Le texte que le lead doit lire, ou null : `retour` (geste d'un refus de cadence/raf, ou du code 137) et `attente` (rappel contre la boucle d'attente). Toujours null pour un sous-agent (agent_id). */

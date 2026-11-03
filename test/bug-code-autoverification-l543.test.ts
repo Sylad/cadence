@@ -201,6 +201,9 @@ describe('R6 — la documentation suit', () => {
     expect(existsSync(path(`../${MESURE}`))).toBe(true);
     // sous le paragraphe L447
     expect(doc.indexOf(MARQUEUR)).toBeGreaterThan(doc.indexOf('The edge-cases point, sharpened (L447)'));
+    // la part conforme a baissé (63 % → 45 %) : la ligne ne la dit pas stable
+    expect(ligne).not.toMatch(/did not move the first-time/);
+    expect(ligne).toContain('63 % → 45 %');
     // aucune figure non vérifiée : celles de la ligne viennent du document de mesure
     for (const n of ligne!.match(/\b\d+(?: %)?/g) ?? []) if (n !== '543') expect(mesure, n).toContain(n.replace(' %', ''));
   });

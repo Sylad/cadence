@@ -31,6 +31,10 @@ describe('R23 — deliver.blocks : forme', () => {
   it('R23 — un chemin qui n\'est pas un texte : refus', () => {
     expect(refused('    api: [3]\n')).toBe('cadence.yaml : deliver.blocks.api : un chemin est un texte');
   });
+  it('R23 — un bloc nommé « __proto__ » est une clé du bloc, pas le prototype', () => {
+    const b = blocks('    "__proto__": [src/x]\n')!;
+    expect(Object.keys(b)).toEqual(['__proto__']);
+  });
   it('R23 — sans deliver.blocks : aucun bloc', () => {
     expect(parseDeliverConfig(DELIVER, 'cadence.yaml').blocks).toBeUndefined();
   });

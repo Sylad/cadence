@@ -318,7 +318,9 @@ export function checkAcceptation(repo: string, path: string, lot: string, fiche:
   }
   try {
     const doc = parse(readFileSync(join(repo, fiche), 'utf8')) as { regles?: { id?: unknown; tests?: unknown }[] };
-    problems.push(...testsAbsents({ repo, path, a, lot, fiche, texts, partage }, doc.regles ?? []));
+    // une clé « regles » chaîne se lisait sans lever (la boucle itérait ses caractères, sans test) : aucun écart, comme avant (R10)
+    const regles = typeof doc.regles === 'string' ? [] : (doc.regles ?? []);
+    problems.push(...testsAbsents({ repo, path, a, lot, fiche, texts, partage }, regles));
   } catch {
     problems.push(`${fiche} : fiche illisible`);
   }

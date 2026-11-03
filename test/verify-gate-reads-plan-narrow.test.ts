@@ -76,6 +76,12 @@ describe('L566 — sous un commit de plan seul, la porte ne rejoue que les tests
     expect(r.text).toMatch(/: vert/);
   });
 
+  it('R1 — readsPlan : liste incomplète : un test détecté qui cite le plan hors de la liste est rejoué aussi (union)', async () => {
+    const files = { 'test/a.test.ts': `readFileSync('${PLAN}')\n`, 'test/b.test.ts': `readFileSync('${PLAN}')\n` };
+    const r = await gateAbovePlan({ files, gateYaml: '  gate:\n    readsPlan: [test/a.test.ts]\n', replay: true });
+    expect(r.log).toBe('replay\ntest/a.test.ts\ntest/b.test.ts\n');
+  });
+
   it('R2 — sans déclaration, un test qui cite le plan est détecté : lui seul est rejoué', async () => {
     const r = await gateAbovePlan({ files: { ...READER, 'src/a.ts': 'export const a = 1;\n' }, replay: true });
     expect(r.code).toBe(0);

@@ -49,7 +49,7 @@ interface PlanReplay {
 /**
  * Les lecteurs du plan à rejouer seuls (L566), ou null quand la porte entière reste à rejouer : plan inconnu, porte en parties ou rejeu seul (`testReplay`) absent (cadence ne devine pas comment jouer un fichier),
  * un autre code que des tests et des scripts de skills qui cite le plan (src, CI : L482), `readsPlan: true` dont aucun test n'est détecté (lecteur inconnu, par prudence).
- * Déclaré en liste : ces chemins, tous. Sinon les fichiers qui citent le plan (L482) qui sont des tests ; non déclaré et seulement des scripts de skills qui le citent : rien à rejouer, le verdict du dessous vaut
+ * Déclaré en liste : ces chemins, plus les tests détectés qui n'y figurent pas (une liste incomplète ne masque pas un test). Sinon les fichiers qui citent le plan (L482) qui sont des tests ; non déclaré et seulement des scripts de skills qui le citent : rien à rejouer, le verdict du dessous vaut
  * en entier (un test qui lance un script se déclare en liste).
  */
 function planReplay(repo: string, sha: string, planFile: string | undefined, declared: unknown, config: OrchestrateConfig): PlanReplay | null {
@@ -59,7 +59,7 @@ function planReplay(repo: string, sha: string, planFile: string | undefined, dec
   const files = readers.filter(isTestFile);
   const scripts = readers.filter((r) => !isTestFile(r) && isToolScript(r));
   if (files.length + scripts.length < readers.length) return null;
-  if (Array.isArray(declared)) return canReplay ? { files: declared as string[], scripts } : null;
+  if (Array.isArray(declared)) return canReplay ? { files: [...new Set([...(declared as string[]), ...files])], scripts } : null;
   if (!readers.length) return null;
   if (files.length) return canReplay ? { files, scripts } : null;
   return declared ? null : { files: [], scripts };

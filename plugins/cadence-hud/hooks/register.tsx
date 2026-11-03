@@ -101,16 +101,22 @@ const say = ($: EngineInterface, text: string, kind: LotsNotice['kind']): Promis
  * Le dossier interrogé par `cadence lead tour` (L547) : le dossier à `priority:` qui englobe le cwd de la première vague (vivante, sinon la dernière finie), à défaut ce cwd ;
  * sans vague, le dossier de la session. `cache` retient la réponse du résolveur par cwd (un échec n'est pas retenu).
  */
-const tourDir = async ($: EngineInterface, waves: readonly Wave[], sessionCwd: string | undefined, cache: Map<string, string>): Promise<string | null> => {
+const tourDir = async ($: EngineInterface, waves: readonly Wave[], sessionCwd: string | undefined, cache: Map<string, Promise<string>>): Promise<string | null> => {
   const cwd = waves[0]?.cwd
   if (!cwd) return tourFolder(waves, sessionCwd)
   const known = cache.get(cwd)
   if (known) return known
-  const r = await $.process.run(['python3', '-I', '-c', LAUNCH_FOLDER, cwd], { timeoutMs: 4_000 }).catch(() => undefined)
-  if (!r || r.exitCode !== 0) return cwd
-  const folder = launchFolder(r.stdout, cwd)
-  cache.set(cwd, folder)
-  return folder
+  // la promesse est retenue avant l'await : des lectures concurrentes du même cwd partagent un seul python3
+  const asking = (async () => {
+    const r = await $.process.run(['python3', '-I', '-c', LAUNCH_FOLDER, cwd], { timeoutMs: 4_000 }).catch(() => undefined)
+    if (!r || r.exitCode !== 0) {
+      cache.delete(cwd)
+      return cwd
+    }
+    return launchFolder(r.stdout, cwd)
+  })()
+  cache.set(cwd, asking)
+  return asking
 }
 
 export const register: Register = on => {
@@ -131,7 +137,7 @@ export const register: Register = on => {
   // Une relecture demandée pendant qu'une autre est en vol : à relancer à la fin de celle-ci
   let tourAgain = false
   // L547 : par cwd de vague, le dossier à priority: qui l'englobe (un seul python3 par dossier) ; vidé au démarrage de la session
-  const waveFolders = new Map<string, string>()
+  const waveFolders = new Map<string, Promise<string>>()
 
   on('session.start', async ($, e, next) => {
     // Le dossier du tableau est celui de lancement, pas le dossier courant du shell : un cd du lead dans un sous-projet

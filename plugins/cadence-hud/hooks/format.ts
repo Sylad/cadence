@@ -438,7 +438,7 @@ export const tourDue = (lastSignature: string | undefined, lastAt: number, signa
   lastSignature === undefined || signature !== lastSignature || now - lastAt >= TOUR_REFRESH_MS
 
 /** Le dossier interrogé par `cadence lead tour` : celui d'où la vague a été lancée, sinon celui de la session ; null s'il n'y en a aucun. Un dossier parent de projets donne une ligne par projet, un projet sans sous-projet sa propre ligne. */
-export const tourFolder = (waves: readonly Wave[], sessionCwd: string | undefined): string | null => waves[0]?.cwd ?? sessionCwd ?? null
+export const tourFolder = (waves: readonly Wave[], sessionCwd: string | undefined): string | null => waves[0]?.cwd || sessionCwd || null
 
 /**
  * Lit la sortie du résolveur de dossier de lancement : le cwd lui-même ou l'un de ses ancêtres ; toute autre sortie

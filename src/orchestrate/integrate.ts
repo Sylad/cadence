@@ -67,14 +67,17 @@ const CHANGELOG = 'CHANGELOG.md';
 const REBASE_ENV = { ...process.env, GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true' };
 const run = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: REBASE_ENV });
 
+/** Un fichier que le programme sait résoudre à côté de l'autre : sans `merge=union` (L568), un commit qui touche le CHANGELOG et la base les met en conflit ensemble. */
+const pairConflict = (file: string): boolean => file === CHANGELOG || file === BASELINE;
+
 /**
- * Résout le conflit en cours quand c'est le CHANGELOG seul et de l'ajout pur sous `[Unreleased]` (L314) : écrit l'union, l'ajoute à l'index. Faux, sans rien
+ * Résout le conflit en cours quand le CHANGELOG (seul, ou avec la base du cliquet, que `resolveBaseline` résout ensuite) est de l'ajout pur sous `[Unreleased]` (L314) : écrit l'union, l'ajoute à l'index. Faux, sans rien
  * toucher, pour tout autre conflit (un autre fichier avec lui, une entrée de base modifiée, une étape de base absente). `start` : le CHANGELOG au point de
  * départ de la branche (L323), pour qu'un commit puisse réécrire l'entrée qu'un commit précédent du lot a ajoutée.
  */
 function resolveChangelog(work: string, start: string | undefined): boolean {
   const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
-  if (files.length !== 1 || files[0] !== CHANGELOG) return false;
+  if (!files.includes(CHANGELOG) || !files.every(pairConflict)) return false;
   try {
     // Pendant un rebase, l'étape 2 est la branche du dépôt (« ours »), l'étape 3 le commit du lot rejoué (« theirs »).
     const merged = mergeUnreleased(run(work, 'show', `:1:${CHANGELOG}`), run(work, 'show', `:2:${CHANGELOG}`), run(work, 'show', `:3:${CHANGELOG}`), start);
@@ -190,14 +193,14 @@ function recompose(start: Mesure, ours: Mesure, theirs: Mesure): Mesure {
 }
 
 /**
- * Résout le conflit en cours quand c'est `qualite-baseline.json` seul (L538) : chaque clé vaut la valeur de la branche du dépôt plus la différence signée du
+ * Résout le conflit en cours quand c'est `qualite-baseline.json` (seul, ou avec le CHANGELOG que `resolveChangelog` résout d'abord, L568) (L538) : chaque clé vaut la valeur de la branche du dépôt plus la différence signée du
  * commit rejoué (son départ moins lui), bornée à 0, une clé à 0 retirée — la base de main moins les baisses propres au commit. Le commit est d'abord contrôlé
  * comme la porte (`comparerMigration`, départ du commit contre commit ; un fichier « existe » s'il est dans le parent du commit rejoué, `REBASE_HEAD^`) :
  * un commit qui fait monter la base n'est pas résolu. Faux, sans rien toucher, pour tout autre conflit, une des trois étapes absente ou illisible.
  */
 function resolveBaseline(work: string): boolean {
   const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
-  if (files.length !== 1 || files[0] !== BASELINE) return false;
+  if (!files.includes(BASELINE) || !files.every(pairConflict)) return false;
   try {
     // Pendant un rebase, l'étape 1 est le parent du commit rejoué, l'étape 2 la branche du dépôt (« ours »), l'étape 3 le commit du lot (« theirs »).
     const [start, ours, theirs] = [baselineStage(work, 1), baselineStage(work, 2), baselineStage(work, 3)];
@@ -295,14 +298,14 @@ export function rebaseOnto(work: string, base: string): Rebase {
     // Chaque tour règle le commit sur lequel le rebase s'est arrêté ; un lot ne porte pas des centaines de commits, la borne évite seulement une boucle sans fin.
     for (let turn = 0; ; turn++) {
       const doc = resolveChangelog(work, start);
-      const base = !doc && resolveBaseline(work);
+      const base = resolveBaseline(work);
       if (turn >= 200 || !(doc || base || resolvePlan(work))) {
         const files = (tryGit(work, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
         tryGit(work, 'rebase', '--abort');
         return { kind: 'conflict', files, detail: gitFailure(failure) };
       }
-      if (base) baseline++;
-      else changelog++;
+      baseline += Number(base);
+      changelog += Number(doc);
       try {
         run(work, 'rebase', '--continue');
         break;

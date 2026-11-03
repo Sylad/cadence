@@ -3,12 +3,12 @@ sujet:
   titre: Jeu de données « pires cas » capturé avec le jeu de démo par les étapes d'écran
   lot: L534
   perimetre:
-    modules: [src/orchestrate/spec.ts, src/orchestrate/briefs.ts]
+    modules: [src/orchestrate/spec.ts, src/orchestrate/briefs.ts, src/config.ts]
     endpoints: []
     jobs: []
     hors_perimetre:
       - "le jeu de données lui-même d'un produit : il vit dans le produit, à côté de son jeu de démo, et cadence n'en embarque pas"
-      - "une nouvelle clé de cadence.yaml pour déclarer le jeu (voir questions du rapport)"
+      - "la valeur de qa.worstData dans le cadence.yaml d'un produit : chaque produit déclare la sienne"
 
 cas:
   - id: C1
@@ -17,25 +17,26 @@ cas:
     declencheur: commande orchestrate (brief de l'étape spec, texte produit par specText)
     preconditions:
       - le lot déclare un écran (page ou maquette légère)
-      - le CLAUDE.md du projet décrit un mode dev ?data=worst branché au même endroit que la démo
+      - le cadence.yaml du projet déclare qa.worstData (le paramètre ou le chemin qui charge le jeu pires cas)
     nominal:
-      - Le brief demande de lire dans le CLAUDE.md du projet comment activer le jeu pires cas.
+      - Le brief donne la valeur de qa.worstData lue dans cadence.yaml comme moyen d'activer le jeu pires cas (par exemple ?data=worst).
       - Pour chaque état capturé de l'écran actuel (actuel-*), la session capture avec les deux jeux.
       - Les captures du jeu pires cas sont nommées avec le suffixe « -pires-cas » avant la largeur.
       - Les défauts vus (texte coupé, débordement, état vide mal gérée) corrigent la maquette ou deviennent une règle de la fiche.
     alternatives:
-      - { si: le projet ne décrit aucun jeu pires cas, alors: la session capture avec le jeu de démo seul et le dit sous nonVerifie, sans en inventer un, regles: [R2] }
+      - { si: le projet ne déclare pas qa.worstData, alors: la session capture avec le jeu de démo seul et le dit sous nonVerifie, sans en inventer un, regles: [R2] }
       - { si: le lot est une fiche back sans écran, alors: le brief ne mentionne pas le jeu pires cas, regles: [R3] }
+      - { si: qa.worstData est mal formée, alors: la lecture de cadence.yaml est refusée avec un message qui nomme la clé, regles: [R10] }
     resultat: Chaque état de l'écran est vu avec des données typiques et avec des données extrêmes.
   - id: C2
     titre: Les revues ux-reviewer et qa-reviewer parcourent chaque état avec les deux jeux
     acteur: ux-reviewer ou qa-reviewer
     declencheur: briefs de revue de maquette, de revue ux et de passe qa
     preconditions:
-      - le projet décrit le mode ?data=worst
+      - le projet déclare qa.worstData
     nominal:
-      - La session lit la description du jeu dans le CLAUDE.md du projet.
-      - Elle parcourt chaque état à 1440 px et 390 px avec la démo, puis avec ?data=worst.
+      - La session lit la valeur de qa.worstData donnée par son brief.
+      - Elle parcourt chaque état à 1440 px et 390 px avec la démo, puis avec le jeu pires cas (qa.worstData).
       - Le rapport (liste à cocher) a une ligne par état, largeur et jeu.
     alternatives:
       - { si: le serveur est en production ou le mode dev est absent, alors: ?data=worst n'est pas utilisé, la session le dit sous nonVerifie, regles: [R4] }
@@ -65,7 +66,7 @@ regles:
     tests: ["R1 — specText d'un lot d'écran cite ?data=worst et le nom maquette-<état>-pires-cas-<largeur>.png", "R1 — specText d'une maquette légère cite aussi actuel-<état>-pires-cas-<largeur>.png"]
   - id: R2
     cas: [C1]
-    enonce: Quand le projet ne décrit aucun jeu pires cas, la session n'en invente pas ; elle capture avec la démo seule et l'écrit sous nonVerifie.
+    enonce: Quand le projet ne déclare pas qa.worstData, le brief ne parle pas de jeu à charger et la session n'en invente pas ; elle capture avec la démo seule et l'écrit sous nonVerifie.
     statut: sourcee
     source: "règle existante agents/spec-writer.md : « never invent a capture » (écran actuel non capturable), étendue au jeu"
     tests: ["R2 — le brief demande nonVerifie quand le jeu est absent et interdit d'en inventer un"]
@@ -107,10 +108,22 @@ regles:
     tests: ["R8 — le gabarit demande un test qui échoue si une famille disparaît du jeu"]
   - id: R9
     cas: [C1, C2]
-    enonce: Le jeu est découvert dans le CLAUDE.md du projet, sans nouvelle clé de cadence.yaml.
-    statut: hypothese
-    si_faux: Si le lead préfère une clé déclarative, c'est un contrat de configuration publié (voir questions) ; les briefs changeraient de source de lecture.
-    tests: ["R9 — les briefs renvoient au CLAUDE.md du projet et ne lisent aucune clé nouvelle", "R9 — la configuration d'un projet sans jeu reste lue comme avant"]
+    enonce: Le jeu est découvert par la clé déclarative qa.worstData de cadence.yaml, jamais par le CLAUDE.md ; les briefs ne parlent du jeu que si la clé est déclarée, et citent sa valeur telle quelle.
+    statut: sourcee
+    source: "réponse de Sylvain, 03-11 : « une clé déclarative dans cadence.yaml, par exemple qa.worstData ; les briefs n'envoient une session chercher le jeu que dans les projets qui la déclarent ; pas de découverte par le CLAUDE.md »"
+    tests: ["R9 — avec qa.worstData déclarée, les briefs spec, maquette, ux et qa citent sa valeur", "R9 — sans qa.worstData, aucun brief ne mentionne le jeu pires cas ni le CLAUDE.md pour le trouver"]
+  - id: R10
+    cas: [C1, C2]
+    enonce: "qa.worstData est une chaîne non vide sur une seule ligne (le paramètre ou le chemin) ; une valeur vide ou faite d'espaces vaut absente ; un type faux (nombre, liste, objet, booléen) ou une valeur sur plusieurs lignes est refusé avec un message qui nomme la clé, comme qa.expectations."
+    statut: sourcee
+    source: "réponse de Sylvain, 03-11 : « la clé est documentée et validée comme les autres (une valeur mal formée est refusée avec un message) » ; modèle src/config.ts:46-57 (qa.expectations)"
+    tests: ["R10 — qa.worstData numérique est refusée avec un message contenant qa.worstData", "R10 — qa.worstData sur deux lignes est refusée", "R10 — qa.worstData vide vaut absente", "R10 — qa.worstData « ?data=worst » est lue sans espaces autour"]
+  - id: R11
+    cas: [C1, C2]
+    enonce: L'absence de qa.worstData ne change rien pour les projets existants - la lecture de qa.expectations, du plan et les briefs sont identiques à ceux d'avant le lot - et la clé est documentée dans docs/ avec le gabarit templates/jeu-pires-cas.md.
+    statut: sourcee
+    source: "réponse de Sylvain, 03-11 : « son absence ne change rien pour les projets existants » ; clé « documentée »"
+    tests: ["R11 — cadence.yaml avec seulement qa.expectations est lu comme avant (même résultat)", "R11 — sans qa.worstData, specText est identique au texte d'avant le lot pour un lot d'écran", "R11 — la clé qa.worstData figure dans docs/"]
 
 contrats:
   - id: A1
@@ -119,22 +132,30 @@ contrats:
     sortie: "texte du brief : captures démo et pires cas, noms -pires-cas, nonVerifie si le jeu est absent"
     erreurs: []
     sans_erreur: la construction du brief est un assemblage de texte sans échec propre ; le jeu absent est une consigne, pas une erreur
-    regles: [R1, R2, R3, R9]
+    regles: [R1, R2, R3, R9, R11]
   - id: A2
     appel: commande orchestrate (briefs de revue maquette, ux et qa)
     entree: "lot d'écran, captures et fiche"
     sortie: "texte des briefs : parcours des deux jeux, liste à cocher par jeu, réserve au mode dev"
     erreurs: []
     sans_erreur: assemblage de texte sans échec propre ; un serveur sans mode dev est consigné sous nonVerifie par la session
-    regles: [R4, R5, R6, R9]
+    regles: [R4, R5, R6, R9, R11]
   - id: A3
     appel: commande spec check <fiche>
     entree: "fiche.yaml existante"
     sortie: "inchangée : le jeu pires cas n'ajoute aucune clé à la fiche"
     erreurs: []
     sans_erreur: la commande est inchangée par le lot
-    regles: [R9]
+    regles: [R11]
+  - id: A4
+    appel: commande lecture-cadence-yaml (clé qa.worstData)
+    entree: "cadence.yaml avec qa.worstData: <chaîne>"
+    sortie: "la valeur rognée, transmise aux briefs ; absente si la clé manque ou est vide"
+    erreurs:
+      - { code: log error, message: "<fichier> : qa.worstData doit être une chaîne sur une seule ligne (le paramètre ou le chemin qui charge le jeu pires cas)" }
+    regles: [R9, R10, R11]
 
 donnees:
   - { id: D1, objet: "templates/jeu-pires-cas.md (nouveau gabarit texte)", existant: false, modification: ajout, note: "liste des huit familles, branchement, mode dev, test de non-régression" }
   - { id: D2, objet: "consigne ajoutée aux briefs spec, maquette, ux, qa et aux agents (texte, rien de stocké)", existant: false, modification: ajout, note: "fiche, cadence.yaml et plan inchangés" }
+  - { id: D3, objet: "cadence.yaml, clé qa.worstData (chaîne facultative, à côté de qa.expectations)", existant: true, modification: ajout, decision: "Sylvain, 03-11 : une clé déclarative dans cadence.yaml, par exemple qa.worstData ; documentée et validée comme les autres ; son absence ne change rien", note: "clé facultative ; sans elle la lecture est celle d'avant" }

@@ -1,14 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readPlanConfig } from '../src/config.js';
+import { orchestrate, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
+import { AGENTS_DIR } from '../src/skills.js';
 import { specText } from '../src/orchestrate/spec.js';
 import { maquetteText } from '../src/orchestrate/maquette.js';
 import { worstReviewText, worstUxText } from '../src/orchestrate/pires-cas.js';
-import { tempDir } from './helpers.js';
+import { removeDryRunBriefs, tempDir } from './helpers.js';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { Plan } from '../src/plan.js';
-import { claudeOut, commitFile, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
+import { claudeOut, commitFile, git, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
 import { ecrit } from './spec-helpers.js';
 
 const read = (f: string): string => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
@@ -177,5 +179,72 @@ describe('L534 — la valeur de qa.worstData atteint les briefs réels du cycle'
   it('R2 — sans qa.worstData, les briefs réels du cycle ne parlent pas du jeu pires cas', async () => {
     const brief = await cycle(undefined);
     for (const kind of ['spec', 'maquette', 'ux']) expect(brief(kind), kind).not.toContain('data=worst');
+  });
+});
+
+describe('L534 — le brief écrit par `cadence orchestrate --dry-run` (contrat A1)', () => {
+  // Le registre des vagues est propre à chaque test (L150), comme dans orchestrate-command.test.ts.
+  const fileHome = process.env.CADENCE_HOME;
+  beforeEach(() => {
+    process.env.CADENCE_HOME = tempDir();
+  });
+  afterEach(() => {
+    process.env.CADENCE_HOME = fileHome;
+  });
+
+  /** Un projet `a` sous un dossier parent, un lot d'écran L1, et la clé qa.worstData de cadence.yaml selon `worst`. */
+  const project = (worst: string | undefined): string => {
+    const parent = tempDir();
+    const dir = join(parent, 'a');
+    mkdirSync(dir, { recursive: true });
+    git(dir, 'init', '-q', '-b', 'main');
+    git(dir, 'config', 'user.email', 't@example.com');
+    git(dir, 'config', 'user.name', 'T');
+    git(dir, 'config', 'commit.gpgsign', 'false');
+    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'a', 'L', '2026-09-01');
+    plan.add('Une page', '2026-10-01', { estimate: 1, visible: true, screen: 'page' });
+    plan.save();
+    writeFileSync(join(dir, 'cadence.yaml'), `orchestrate:\n  precheck: false\n${worst ? `qa:\n  worstData: ${worst}\n` : ''}`);
+    git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+    git(dir, 'commit', '-q', '-m', 'chore: plan');
+    return parent;
+  };
+  /** Les briefs spec et maquette que le dry-run écrit (lus aux chemins des lignes « brief : … »), puis leur dossier supprimé. */
+  const dryRunBriefs = async (worst: string | undefined): Promise<Record<string, string>> => {
+    const parent = project(worst);
+    const out: string[] = [];
+    const io: OrchestrateIo = { cwd: parent, env: { RAF_TODAY: '2026-10-04' }, out: (l) => out.push(l), err: (l) => out.push(l), now: () => new Date('2026-10-04T14:12:00') };
+    const deps: OrchestrateDeps = { claude: async () => { throw new Error('--dry-run ne lance aucune session'); }, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR };
+    const code = await orchestrate(['a:L1', '--dry-run'], io, deps);
+    const text = out.join('\n');
+    try {
+      expect(code, text).toBe(0);
+      const briefs: Record<string, string> = {};
+      for (const kind of ['spec', 'maquette']) {
+        const line = text.split('\n').find((l) => l.includes('brief :') && l.includes(`a--L1--${kind}.md`));
+        expect(line, `ligne « brief : » de l'étape ${kind}\n${text}`).toBeDefined();
+        briefs[kind] = readFileSync(line!.replace(/^\s*brief : /, '').trim(), 'utf8');
+      }
+      return briefs;
+    } finally {
+      removeDryRunBriefs(text);
+    }
+  };
+
+  it('R1 — avec qa.worstData, le brief spec du --dry-run d\'un lot d\'écran cite sa valeur et maquette-<état>-pires-cas-<largeur>.png', async () => {
+    const briefs = await dryRunBriefs(WORST);
+    expect(briefs.spec).toContain(WORST);
+    expect(briefs.spec).toContain('maquette-<état>-pires-cas-<largeur>.png');
+    expect(briefs.spec).toContain('maquette-<état>-<largeur>.png');
+  });
+  it('R9 — avec qa.worstData, le brief maquette du --dry-run cite sa valeur et le réserve au mode dev (R4)', async () => {
+    const briefs = await dryRunBriefs('?data=autre');
+    expect(briefs.maquette).toContain('?data=autre');
+    expect(briefs.maquette).toMatch(/dev mode only/);
+    expect(briefs.spec).toContain('?data=autre');
+  });
+  it('R2 — sans qa.worstData, les briefs spec et maquette du --dry-run ne parlent pas du jeu pires cas', async () => {
+    const briefs = await dryRunBriefs(undefined);
+    for (const kind of ['spec', 'maquette']) expect(briefs[kind], kind).not.toMatch(/data=worst|pires-cas|dev mode only/);
   });
 });

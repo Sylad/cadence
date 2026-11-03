@@ -41,7 +41,7 @@ time limit has run out stops counting in the slots but is not dropped (L278): a 
 
 The bar is lots done over lots done + in progress + to do (dropped and recurring lots left out); the count of lots in progress is followed by their ids (`2 en cours : L149 L153`), cut to three then `…` (`5 en cours : L1 L2 L3 …`), the count alone at zero;
 `+N cette semaine` counts the lots created in the last 7 days (today and the six before) and is left out at zero. The source is
-`cadence lead tour <folder> --json` (the folder a wave was launched from, otherwise the session's: a folder of projects gives one line per project, a project with no sub-project gives its own single line),
+`cadence lead tour <folder> --json` (run in the folder carrying `priority:` that encloses the launch folder of the wave, the live one or else the last finished one, so a wave launched from a project or a sub-folder no longer narrows the bars to that project (issue #24, L547); with no such folder above, the wave's own folder; with no wave, the session's launch folder: a folder of projects gives one line per project, a project with no sub-project gives its own single line),
 read again at every wave transition and otherwise every minute; without `cadence` on the PATH, the
 lines are simply not drawn.
 

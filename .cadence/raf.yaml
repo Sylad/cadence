@@ -1823,11 +1823,12 @@ lots:
       - { date: 2026-11-03, text: "Revue de la fiche — mineur : docs/specs/ressources-par-chemins/fiche.yaml:111 — R3 : les cas limites relevés par la première revue (« . » seul, « ./ » seul, « src/./x ») ne sont toujours pas dits. « ./ » devient un chemin vide après normalisation et couvrirait tout le dépôt, alors que R4 ne rejette que le vide avant normalisation. Préciser « rejeté après normalisation » et ajouter un test. Un conflit au second tour de rebase (R11, « départ du lot » = merge-base au moment du conflit) reste aussi sans précision." }
   - id: L559
     title: "orchestrate : spawn E2BIG à l'implémentation d'un lot dont la fiche d'écran est grosse (issue #27, ~270 Ko, 133 règles) — le brief passe en un seul argument de claude -p (MAX_ARG_STRLEN 128 Kio sous Linux) : passer TOUT brief par stdin (ou un fichier) quelle que soit sa taille, et réduire {{fiche}} aux règles du lot comme l'étape accept depuis 1.46 ; test qui rend un brief > 128 Kio et vérifie que la session démarre"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-03
     started: 2026-11-03
     review: { date: 2026-11-03, verdict: "conforme (2 notes mineures : le test qui fige « 1 other rules », le repli de lotRules sans test) — orchestré (vague 2026-11-03-2100-cad, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main ne modifie que le CHANGELOG (entrée L559 unique, sous Fixed après Changed), les 4 commits du lot sont identiques d'après git range-diff, aucun constat", commit: f8fd56881ff38ce83a6395ad03f4a2127ede7bbd }
+    finished: 2026-11-03
   - id: L560
     title: "orchestrate : --agents porte la définition de TOUS les agents du paquet en un seul argument (issue #28, ~94 Ko mesurés contre 22 Ko le 10-04) — au-delà de 128 Kio toute étape avec agent échoue en spawn E2BIG : ne passer que l'agent de l'étape (ou les définitions par fichier) ; test qui mesure la taille de l'argument --agents d'une étape et la borne ; à jouer APRÈS L559 (même lancement de session claude -p)"
     status: todo

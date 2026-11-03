@@ -147,6 +147,40 @@ describe("L554 — les refus d'une vague vivante disent le geste", () => {
   });
 });
 
+describe("L554 — depuis le dépôt, une cible `.:<lot>` désigne le lot comme la vague l'a rangé (<dossier>:<lot>)", () => {
+  /** La commande que le refus imprime après « à la fin de la vague : cadence orchestrate », en arguments. */
+  const printed = (err: string): string[] => /à la fin de la vague : cadence orchestrate ([^\n]+)/.exec(err)![1]!.split(' ');
+  it('R8 — la commande --remove-worktree .:L1 --wave W imprimée par le refus de la vague vivante, rejouée telle quelle à sa fin, retire le worktree', async () => {
+    let err = '';
+    let live = '';
+    const parent = await liveWave(async (p) => {
+      err = (await run(p, ['--remove-worktree', 'L1', '--wave', WAVE], fake())).err;
+      live = (await run(p, ['--integrate', '.:L1', '--resume', '--wave', WAVE], fake())).err; // dépôt d'une intégration sur la vague vivante
+    }, false, true);
+    expect(err).toContain(`à la fin de la vague : cadence orchestrate --remove-worktree .:L1 --wave ${WAVE}`);
+    expect(live).not.toContain('lot inconnu');
+    expect(live).toContain("--integrate a:L1 : le lot n'est pas rendu à l'étape d'intégration");
+    const r = await run(parent, [...printed(err), '--abandon-commits'], fake());
+    expect(r.err).not.toContain('aucun worktree conservé');
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('orchestrate : a:L1 : worktree retiré');
+  });
+  it('R8 — --resume --answer / --drop / --budget / --integrate .:L1 depuis le dépôt : le lot est reconnu (refus sur son état, jamais « lot inconnu »)', async () => {
+    const parent = await liveWave(async () => {}, false, true);
+    const errs = await Promise.all([
+      run(parent, ['--resume', '--wave', WAVE, '--answer', '.:L1', 'oui'], fake()),
+      run(parent, ['--resume', '--wave', WAVE, '--drop', '.:L1'], fake()),
+      run(parent, ['--resume', '--wave', WAVE, '--budget', '.:L1=+50000'], fake()),
+      run(parent, ['--resume', '--wave', WAVE, '--integrate', '.:L1'], fake()),
+    ]).then((rs) => rs.map((r) => r.err));
+    for (const e of errs) expect(e).not.toContain('lot inconnu');
+    expect(errs[0]).toContain("--answer a:L1 : le lot n'attend pas de réponse");
+    expect(errs[1]).toContain('--drop a:L1 : le lot est déjà fini');
+    expect(errs[2]).toContain('--budget a:L1 : le lot n\'est pas rendu sur budget');
+    expect(errs[3]).toContain("--integrate a:L1 : le lot n'est pas rendu à l'étape d'intégration");
+  });
+});
+
 describe('L554 — un --replay refusé nomme la reprise sans --replay', () => {
   it('R7 — resumeWithoutReplay retire --replay, --wave et --resume mais garde les autres options (--answer à deux valeurs)', () => {
     expect(resumeWithoutReplay('W', ['--resume', '--wave', 'W', '--replay', 'a:L1', '--drop', 'a:L2'])).toBe('cadence orchestrate --resume --wave W --drop a:L2');

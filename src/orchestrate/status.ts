@@ -8,6 +8,7 @@ import { cadenceHome, expiredHolds, freeSlots, liveHolds, liveSlots, liveWaves }
 import { longDuration } from './guard.js';
 import { keptLines } from './worktree.js';
 import { lotFinished, lotKey, RunStore, type LotState } from './state.js';
+import { namesLot } from './ajout.js';
 import { launchPrices, renderDetail, renderTable, resumeCommand } from './table.js';
 import { waveReadsAnswerQueue, waveReadsControl } from './snapshot.js';
 import { preflight } from './preflight.js';
@@ -157,7 +158,7 @@ export function answerLive(args: Args, io: OrchestrateIo, store: RunStore): numb
   const refusals: string[] = [];
   const keys: { key: string; text: string }[] = [];
   for (const a of args.answers) {
-    const matches = lots.filter((l) => l.lot === a.lot && (a.project ? l.project === a.project : true));
+    const matches = lots.filter((l) => namesLot(store.launchDir, a, l));
     const where = `${a.project ? `${a.project}:` : ''}${a.lot}`;
     if (matches.length !== 1) refusals.push(matches.length ? `--answer ${where} : plusieurs projets portent ce lot, précisez projet:lot` : `--answer ${where} : lot inconnu dans la vague ${store.id}`);
     else if (matches[0].status !== 'question') refusals.push(`--answer ${lotKey(matches[0].project, matches[0].lot)} : le lot n'attend pas de réponse (${matches[0].status})`);
@@ -222,7 +223,7 @@ export function control(args: Args, io: OrchestrateIo): number {
   const refusals: string[] = [];
   const keys: string[] = [];
   for (const d of args.drop) {
-    const matches = lots.filter((l) => l.lot === d.lot && (d.project ? l.project === d.project : true));
+    const matches = lots.filter((l) => namesLot(store.launchDir, d, l));
     const where = `${d.project ? `${d.project}:` : ''}${d.lot}`;
     if (matches.length !== 1) refusals.push(matches.length ? `--drop ${where} : plusieurs projets portent ce lot, précisez projet:lot` : `--drop ${where} : lot inconnu dans la vague ${store.id}`);
     else if (lotFinished(matches[0])) refusals.push(`--drop ${lotKey(matches[0].project, matches[0].lot)} : le lot est déjà fini (${matches[0].status})`);

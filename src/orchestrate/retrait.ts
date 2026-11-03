@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { gitRoot } from '../git.js';
 import type { Args, OrchestrateIo } from './command.js';
+import { addKey } from './ajout.js';
 import { atWaveEnd } from './geste.js';
 import { keptTrees, removeTree } from './worktree.js';
 
@@ -12,7 +13,7 @@ import { keptTrees, removeTree } from './worktree.js';
  */
 export function removeWorktree(args: Args, io: OrchestrateIo): number {
   const t = args.removeWorktree!;
-  const key = `${t.project ?? basename(io.cwd)}:${t.lot}`;
+  const key = addKey(io.cwd, t); // le projet résolu (`.` depuis le dépôt → son nom), la clé sous laquelle prepareTree a rangé le worktree
   const projectDir = t.project ? resolve(io.cwd, t.project) : io.cwd;
   const repo = existsSync(projectDir) ? gitRoot(projectDir) : null;
   const kept = repo ? keptTrees(repo, { includeActive: true }).filter((k) => k.lot === key && (args.wave === undefined || k.wave === args.wave)) : [];

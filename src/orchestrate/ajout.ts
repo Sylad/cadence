@@ -49,6 +49,13 @@ export function projectName(cwd: string, project?: string): string {
 /** La clé d'un lot tel que la vague le range : le projet résolu (`projectName`) et le lot. */
 export const addKey = (launch: string, t: { project?: string; lot: string }): string => lotKey(projectName(launch, t.project), t.lot);
 
+/**
+ * Vrai quand une cible tapée (`--integrate .:L1`, `--answer L1`, `--drop a:L1`) désigne ce lot de la vague : son projet, s'il est donné, résolu depuis le dossier de
+ * lancement comme la vague l'a rangé (`projectName`), ou n'importe quel projet sinon. Sans cela `.:L1` tapé depuis le dépôt — la forme que les gestes imprimés
+ * donnent (L554) — cherchait un projet `.` et répondait « lot inconnu ».
+ */
+export const namesLot = (launch: string, t: { project?: string; lot: string }, l: { project: string; lot: string }): boolean => l.lot === t.lot && (!t.project || l.project === projectName(launch, t.project));
+
 /** La commande qui ajoute le lot à la vague vivante qui tient le dépôt, quand cette vague a été lancée depuis ce dossier (`--add` ne voit que celles-là) ; sinon rien. */
 export function addHint(t: { projectDir: string; lot: string }, wave: string, launch: string): string {
   if (!liveWaves(cadenceHome()).some((w) => w.wave === wave && w.cwd === launch)) return '';

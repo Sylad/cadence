@@ -23,6 +23,7 @@ import { answerLive, control, singleUnfinished } from './status.js';
 import { continueRounds, execute } from './execute.js';
 import type { OrchestrateDeps, OrchestrateIo } from './command.js';
 import { LOT_LIKE, type Args } from './command-args.js';
+import { namesLot } from './ajout.js';
 
 const REPO_WAIT_MS = 3 * 60 * 60_000;
 const REPO_WAIT_POLL_MS = 5_000;
@@ -91,7 +92,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
 
   const lots = store.lots();
   for (const a of args.answers) {
-    const l = lots.find((x) => x.lot === a.lot && (a.project ? x.project === a.project : true));
+    const l = lots.find((x) => namesLot(launch, a, x));
     if (!l) refusals.push(`--answer ${a.project ? `${a.project}:` : ''}${a.lot} : lot inconnu dans la vague ${wave.id}`);
     else if (l.status !== 'question') refusals.push(`--answer ${lotKey(l.project, l.lot)} : le lot n'attend pas de réponse (${l.status})`);
     else {
@@ -103,7 +104,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
   // --resume --drop projet:lot (L79) : le lot est retiré avant d'être rejoué — le seul moyen de retirer un lot d'une vague arrêtée, --drop seul refusant une vague qui ne tourne plus.
   const drops: string[] = [];
   for (const d of args.drop) {
-    const matches = lots.filter((x) => x.lot === d.lot && (d.project ? x.project === d.project : true));
+    const matches = lots.filter((x) => namesLot(launch, d, x));
     const where = `${d.project ? `${d.project}:` : ''}${d.lot}`;
     if (matches.length !== 1) refusals.push(matches.length ? `--drop ${where} : plusieurs projets portent ce lot, précisez projet:lot` : `--drop ${where} : lot inconnu dans la vague ${wave.id}`);
     else if (lotFinished(matches[0])) refusals.push(`--drop ${lotKey(matches[0].project, matches[0].lot)} : le lot est déjà fini (${matches[0].status})`);
@@ -111,10 +112,10 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
   }
   // --resume --budget projet:lot=+N (L223) : un lot rendu sur budget est remis en jeu avec son budget relevé (N reste la marge des passes ordinaires : la part de l'escalade encore retenue, L349, s'y ajoute). Il subit ensuite les gardes d'un lot vivant.
   const raised = new Map<LotState, { from: number; to: number; step: SessionKind }>();
-  const answered = args.answers.map((a) => lots.filter((x) => x.lot === a.lot && (a.project ? x.project === a.project : true))).filter((m) => m.length === 1).map((m) => m[0]);
-  const dropped = args.drop.map((d) => lots.filter((x) => x.lot === d.lot && (d.project ? x.project === d.project : true))).filter((m) => m.length === 1).map((m) => m[0]);
+  const answered = args.answers.map((a) => lots.filter((x) => namesLot(launch, a, x))).filter((m) => m.length === 1).map((m) => m[0]);
+  const dropped = args.drop.map((d) => lots.filter((x) => namesLot(launch, d, x))).filter((m) => m.length === 1).map((m) => m[0]);
   for (const b of args.lotBudgets) {
-    const matches = lots.filter((x) => x.lot === b.lot && (b.project ? x.project === b.project : true));
+    const matches = lots.filter((x) => namesLot(launch, b, x));
     const where = `${b.project ? `${b.project}:` : ''}${b.lot}`;
     if (matches.length !== 1) {
       refusals.push(matches.length ? `--budget ${where} : plusieurs projets portent ce lot, précisez projet:lot` : `--budget ${where} : lot inconnu dans la vague ${wave.id}`);
@@ -133,9 +134,9 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
   const integ: LotState[] = [];
   // L370 : un lot rendu hors de l'intégration que le lead a fait corriger puis revoir hors vague (revue conforme au dernier commit du worktree) est repris à l'intégration avec ce verdict.
   const leadReviewed = new Map<LotState, { head: string; verdict: string }>();
-  const budgeted = args.lotBudgets.map((b) => lots.filter((x) => x.lot === b.lot && (b.project ? x.project === b.project : true))).filter((m) => m.length === 1).map((m) => m[0]);
+  const budgeted = args.lotBudgets.map((b) => lots.filter((x) => namesLot(launch, b, x))).filter((m) => m.length === 1).map((m) => m[0]);
   for (const t of args.integrate) {
-    const matches = lots.filter((x) => x.lot === t.lot && (t.project ? x.project === t.project : true));
+    const matches = lots.filter((x) => namesLot(launch, t, x));
     const opt = t.replay ? '--replay' : '--integrate';
     const where = `${t.project ? `${t.project}:` : ''}${t.lot}`;
     if (matches.length !== 1) {

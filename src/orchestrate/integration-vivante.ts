@@ -6,6 +6,7 @@ import { trackedDirty } from './depot.js';
 import { cadenceHome, liveWaves } from './registry.js';
 import { waveReadsIntegrateQueue } from './snapshot.js';
 import { lotKey, type LotState, type RunStore } from './state.js';
+import { namesLot } from './ajout.js';
 import { gestureSuffix, resumeCommand } from './geste.js';
 import { lotTreeDir } from './worktree.js';
 import type { OrchestrateIo } from './command.js';
@@ -38,7 +39,7 @@ export const integrationText = (lead: { head: string } | null): string => (lead 
 
 /** Le contrôle d'une cible de `--integrate` : sa clé `projet:lot`, ou le refus. */
 function checkTarget(store: RunStore, t: { project?: string; lot: string }, seen: string[]): { key: string } | { refusal: string } {
-  const matches = store.lots().filter((l) => l.lot === t.lot && (t.project ? l.project === t.project : true));
+  const matches = store.lots().filter((l) => namesLot(store.launchDir, t, l));
   const where = `${t.project ? `${t.project}:` : ''}${t.lot}`;
   if (matches.length !== 1) return { refusal: matches.length ? `--integrate ${where} : plusieurs projets portent ce lot, précisez projet:lot` : `--integrate ${where} : lot inconnu dans la vague ${store.id}` };
   const l = matches[0];

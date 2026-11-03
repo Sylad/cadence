@@ -270,7 +270,7 @@ describe('L552 R9/R10/R11 — verrou, fiche seule, appelants', () => {
 });
 
 describe('L552 R11 — les deux appelants de cycle.ts passent le même contexte', () => {
-  it('R11 — acceptProblems et acceptationProof donnent le même verdict sur une fiche partagée', async () => {
+  const parAcceptProblems = async () => {
     const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { accept: [(call) => { ecritAcceptation(call.opts.cwd, { sansFiche: true, tests: nomsDe('R2').map((n) => `it('${n}', () => { throw new Error('rouge'); });`).join('\n') }); return claudeOut(acceptReport()); }], implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'done.flag', 'feat(L1): a')] }))], review: [() => claudeOut(reviewReport())] } });
     const fiche = ecrit(h.repo);
     ecritAcceptation(h.repo, { lot: 'L9', sansFiche: true, extra: [] }); // un autre lot sur la même fiche, non scellé
@@ -283,8 +283,8 @@ describe('L552 R11 — les deux appelants de cycle.ts passent le même contexte'
     await runLot(c);
     expect(c.lot.acceptProblems).toBeUndefined(); // acceptProblems : R1, R3, R4 ne sont pas exigés
     expect(h.calls.map((k) => k.kind)).toEqual(['accept', 'implement', 'review']);
-  });
-  it('R11 — acceptationProof : une acceptation rouge scellée sur fiche partagée vaut preuve (le lot ne repasse pas par accept)', async () => {
+  };
+  const parAcceptationProof = async () => {
     const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'done.flag', 'feat(L1): a')] }))], review: [() => claudeOut(reviewReport())] } });
     const a = ecritAcceptation(h.repo, { sansFiche: true, tests: nomsDe('R2').map((n) => `it('${n}', () => { throw new Error('rouge'); });`).join('\n') });
     const fiche = ecrit(h.repo);
@@ -300,6 +300,10 @@ describe('L552 R11 — les deux appelants de cycle.ts passent le même contexte'
     const c = h.lot('L1', { visible: true, screen: 'page' as const }, { accept: 'test -f done.flag' });
     await runLot(c);
     expect(h.calls.map((k) => k.kind)).toEqual(['implement', 'review']); // sans le contexte, R1, R3, R4 seraient signalés absents : la preuve tomberait et le lot repartirait en accept
+  };
+  it('R11 — acceptProblems et acceptationProof donnent le même verdict sur une fiche partagée', async () => {
+    await parAcceptProblems(); // acceptProblems : R1, R3, R4 ne sont pas exigés, le lot passe accept → implement → review
+    await parAcceptationProof(); // acceptationProof : même fiche, même verdict, le lot saute accept
   });
 });
 

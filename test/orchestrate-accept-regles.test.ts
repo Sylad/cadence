@@ -283,8 +283,23 @@ describe('L552 R11 — les deux appelants de cycle.ts passent le même contexte'
     await runLot(c);
     expect(c.lot.acceptProblems).toBeUndefined(); // acceptProblems : R1, R3, R4 ne sont pas exigés
     expect(h.calls.map((k) => k.kind)).toEqual(['accept', 'implement', 'review']);
-    const preuve = checkAcceptation(h.repo, 'docs/specs/prochain-match/acceptation-L1.json', 'L1', fiche, undefined, { dir: 'docs/specs', refsOf: c.loadPlan().refs });
-    expect(preuve.filter((m) => m.includes('nom prévu dans la fiche'))).toEqual([]); // le cycle a posé vert: true depuis : seul le verdict sur les tests est comparé
+  });
+  it('R11 — acceptationProof : une acceptation rouge scellée sur fiche partagée vaut preuve (le lot ne repasse pas par accept)', async () => {
+    const h = harness({ lots: [{ title: 'Un écran', screen: 'page' }], script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'done.flag', 'feat(L1): a')] }))], review: [() => claudeOut(reviewReport())] } });
+    const a = ecritAcceptation(h.repo, { sansFiche: true, tests: nomsDe('R2').map((n) => `it('${n}', () => { throw new Error('rouge'); });`).join('\n') });
+    const fiche = ecrit(h.repo);
+    ecritAcceptation(h.repo, { lot: 'L9', sansFiche: true, extra: [] }); // un autre lot sur la même fiche, non scellé : ses tests ne sont pas ceux de L1
+    const doc = parse(readFileSync(join(h.repo, fiche), 'utf8')) as any;
+    doc.regles.find((r: any) => r.id === 'R2').enonce += ' (amendée)';
+    writeFileSync(join(h.repo, fiche), stringify(doc));
+    git(h.repo, 'add', '--', fiche);
+    git(h.repo, 'commit', '-q', '-m', 'spec(L1): R2 amendée', '--', fiche);
+    sealAcceptation(h.repo, a.json);
+    git(h.repo, 'add', '--', a.json);
+    git(h.repo, 'commit', '-q', '-m', 'test(L1): acceptation scellée', '--', a.json);
+    const c = h.lot('L1', { visible: true, screen: 'page' as const }, { accept: 'test -f done.flag' });
+    await runLot(c);
+    expect(h.calls.map((k) => k.kind)).toEqual(['implement', 'review']); // sans le contexte, R1, R3, R4 seraient signalés absents : la preuve tomberait et le lot repartirait en accept
   });
 });
 

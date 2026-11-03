@@ -139,6 +139,7 @@ describe('parité porte ↔ CI — bords (L499)', () => {
     const files = { 'package.json': '{"scripts":{"test:e2e":"vitest run -c vitest.e2e.config.ts"}}' };
     expect(ci('npm run test:e2e', files)).toEqual(['vitest run -c vitest.e2e.config.ts']);
   });
+
   it('E23 — une variable d\'environnement devant un script npm ne l\'empêche pas d\'être déplié (CI=true npm test, DEBUG=… npm run test:e2e -- …)', () => {
     const files = { 'package.json': '{"scripts":{"test":"vitest run"}}' };
     expect(ci('CI=true npm test', files)).toEqual([]);
@@ -154,6 +155,7 @@ describe('parité porte ↔ CI — bords (L499)', () => {
     expect(ci('npx vitest run > out.log')).toEqual([]);
     expect(ci('npx vitest run 2>/dev/null')).toEqual([]);
     expect(ci('npx vitest run 2>&1 -c vitest.e2e.config.ts')).toEqual(['npx vitest run 2>&1 -c vitest.e2e.config.ts']);
+    expect(ci('npx vitest run 2>&1 -c vitest.e2e.config.ts', {}, 'orchestrate:\n  test: npx vitest run -c vitest.e2e.config.ts\n')).toEqual([]);
     expect(ci('npx playwright test --reporter=line 2>&1 | tee e2e.log')).toEqual(['npx playwright test --reporter=line 2>&1']);
   });
 });

@@ -23,8 +23,8 @@ const TEST_SCRIPT = /^(npm|pnpm|yarn) run (test|e2e)\S*/;
 const WRAPPER = /^(xvfb-run|timeout|time|env|nice)(\s+-\S+)*(\s+\d+[smhd]?)?\s+/;
 /** Les variables d'environnement en tête de commande, valeur entre guillemets comprise. */
 const ENV_PREFIX = /^(\w+=("[^"]*"|'[^']*'|\S*)\s+)+/;
-/** Une redirection (`2>&1`, `>out.log`, `&>`, `<in`) : le groupe est vide quand la cible est le mot suivant (`> out.log`). */
-const REDIRECTION = /^(?:\d*>>?&?\d*|&>>?|\d*<&?\d*)(\S*)$/;
+/** Une redirection : vers un descripteur (`2>&1`, `>&2`, sans groupe) ou vers un fichier (`>out.log`, `&>`, `<in`), dont le groupe est vide quand la cible est le mot suivant (`> out.log`). */
+const REDIRECTION = /^(?:\d*>>?&\d+|(?:&>>?|\d*>>?|\d*<)(\S*))$/;
 
 /** `command` sans ses variables d'environnement de tête, ses enveloppes (`xvfb-run`, `timeout`…) ni `npx`, répétés jusqu'à épuisement (`timeout 60 CI=1 npx vitest`). */
 function unwrap(command: string): string {

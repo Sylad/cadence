@@ -1034,6 +1034,7 @@ lots:
     estimate: 0.5
     created: 2026-10-31
     started: 2026-11-02
+    review: { date: 2026-11-03, verdict: "conforme — orchestré (vague 2026-11-02-2140-cont, 0 passe(s) de correction + passe des mineurs)", commit: 9ad0d12d27b6ae1d9d170449b81b35775ec51093, reporte: { de: a4bea608c9342faf486fcbb4bbca7d63de6649f3, vers: 9ad0d12d27b6ae1d9d170449b81b35775ec51093, patchId: 5cd2acc57977583cb57c0c600094dd511e833599 } }
   - id: L494
     title: "Panneau des lots, suite de L481 : aligner les barres d'avancement de « ordre des projets » en colonne (largeur réservée aux noms = le plus long, ex. jobmail-assistant), aujourd'hui chaque barre part après son nom et les débuts diffèrent (capture de Sylvain 31-10)"
     status: done

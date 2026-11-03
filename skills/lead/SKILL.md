@@ -70,6 +70,11 @@ line and propose to group its dated entries under one line that points to a seco
 the tour only measures, it never writes the memory. A line `mémoire · MEMORY.md illisible (…)` or the error line
 `cadence.yaml · ✗ erreur : memory.indexMaxBytes …` is relayed as it is. `--json` never carries it.
 
+Lines `<project> · issue #n « … » · ouverte, …` (L548, needs `gh`) name an open GitHub issue that no lot of the plan cites, or one whose
+lots are all published (`… mais L526 est publié — la fermer : gh issue close n`). Relay each in one line; close an issue, or
+open a lot for it, only after the human agrees — the tour and the `gh issue close` commands that `cadence release` prints only
+show, they close nothing. See `docs/lead.md`.
+
 Then report to the human in a compact table — one row per project — and propose **three** items
 across projects, each with project, lot id and one sentence of justification: finish what is in
 progress, then drift that blocks a delivery, then ready quick wins. **Stop and wait for the priority.**

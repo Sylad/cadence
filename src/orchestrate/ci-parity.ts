@@ -109,7 +109,7 @@ function leaves(repo: string, dir: string, text: string, depth = SCRIPT_DEPTH): 
 }
 
 /** Les options de npm qui peuvent suivre le nom du script sans changer ce qu'il joue (`npm test --silent`) ; `--workspace` ou `--prefix` visent un autre package.json et restent hors de la liste. */
-const NPM_QUIET_OPTION = '(?:--silent|--if-present|--quiet|-s|-q)';
+const NPM_QUIET_OPTION = '(?:--silent(?:=true)?|--if-present|--quiet|--loglevel=silent|-s|-q)';
 
 /** Les options qui désignent une autre suite ou un autre projet : elles restent dans la clé, avec leur valeur. */
 const SUITE_OPTION = /^(-c|-p|--config|--project|--projects|--selectProjects)(=.*)?$/;

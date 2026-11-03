@@ -1931,6 +1931,7 @@ lots:
     estimate: 0.5
     created: 2026-11-03
     started: 2026-11-03
+    review: { date: 2026-11-03, verdict: "conforme — orchestré (vague 2026-11-03-2100-cad, 1 passe(s) de correction + passe des mineurs)", commit: 038d1699c1d365c3684a2764ee5d28c7eb9e6544, reporte: { de: d15e743a68905cce102938bd601ecdfd87e39b6e, vers: 038d1699c1d365c3684a2764ee5d28c7eb9e6544, patchId: c93d272ee990d910821e25c1eec355cb2e7bd319 } }
   - id: L568
     title: "Fusion du CHANGELOG au rebase d'intégration : l'union d'un conflit d'ajout pur sous [Unreleased] crée un second ### Fixed et recopie les entrées d'autres lots (03-11 : L564 avec L561 L553 L557 en double, puis L556 avec L553 L557 — chaque intégration de la soirée l'a reproduit, et cadence release publierait les doublons) — fusionner par section (un titre par section, ordre Keep a Changelog) et dédupliquer les lignes identiques ; test : deux lots qui ajoutent chacun une ligne pendant que main réordonne les sections ; et un contrôle de la porte qui refuse un [Unreleased] à titre de section dupliqué"
     status: doing

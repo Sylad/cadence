@@ -27,6 +27,8 @@ const loaders: Record<string, () => Promise<unknown>> = {
   'spec-steps': () => import('../src/orchestrate/cycle/spec-steps.js'),
   'work': () => import('../src/orchestrate/cycle/work.js'),
 };
+// L567 : après vi.resetModules() chaque import retransforme tout le graphe du cycle ; le délai par défaut (5 s) tombait sur ce travail, pas sur un cycle d'import qui bloquerait, sous charge
+const IMPORT_FRAIS_MS = 60_000;
 const modules = readdirSync(dir).filter((f) => f.endsWith('.ts')).map((f) => f.replace(/\.ts$/, ''));
 
 describe('L492 — chaque module de cycle/ se charge seul en premier (cycles d\'import)', () => {
@@ -35,14 +37,14 @@ describe('L492 — chaque module de cycle/ se charge seul en premier (cycles d\'
       vi.resetModules();
       const mod = await loaders[m]!();
       expect(mod).toBeTruthy();
-    });
+    }, IMPORT_FRAIS_MS);
   }
   it('import frais de la façade cycle.ts', async () => {
     vi.resetModules();
     const mod = await import('../src/orchestrate/cycle.js');
     expect(typeof mod.runLot).toBe('function');
     expect(typeof mod.needsPrecheck).toBe('function');
-  });
+  }, IMPORT_FRAIS_MS);
 });
 
 describe('L492 — isNonQuestion aux bords', () => {

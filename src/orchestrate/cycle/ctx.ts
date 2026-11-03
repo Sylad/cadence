@@ -42,6 +42,13 @@ export function countInterrupted(claudeHome: string | undefined, repo: string, s
   return true;
 }
 
+/**
+ * L553 : issue d'une prise de dépôt par la vague (`WaveCtx.claimRepo`). `kept` : le dépôt est à la vague depuis le départ (verrou et garde posés par `execute`) ;
+ * `passing` : la vague porteuse le tient encore, l'intégration passe entre ses étapes ; `claimed` : la porteuse l'a libéré, la vague vient de le prendre (verrou, garde, inscription) ;
+ * `taken` : la porteuse l'a libéré et un autre (vague, tâche locale) l'a pris entre-temps — rien n'y est écrit.
+ */
+export type RepoClaim = { kind: 'kept' } | { kind: 'passing'; holder: { wave: string; pid: number } } | { kind: 'claimed'; freed: { wave: string; pid: number } } | { kind: 'taken'; freed: { wave: string; pid: number }; holder: { wave: string; pid: number } };
+
 export interface WaveCtx {
   id: string;
   store: RunStore;
@@ -70,6 +77,8 @@ export interface WaveCtx {
   saveWave: () => void;
   /** Attente du verrou d'intégration du dépôt (L279, R25) : bornes par défaut INTEGRATE_WAIT_MS et INTEGRATE_POLL_MS ; réglables pour les tests. */
   integrate?: { waitMs?: number; pollMs?: number };
+  /** L553 : où en est le dépôt d'une reprise qui intègre entre les étapes d'une autre vague (voir `RepoClaim`) ; prend le dépôt si cette vague l'a libéré. Absent (vague construite à la main) : tout dépôt est `kept`. */
+  claimRepo?: (repo: string) => RepoClaim;
 }
 
 /** Le worktree prévu pour un lot (L279) : créé à la prise du créneau (`active` une fois prêt), retrouvé à la reprise. */

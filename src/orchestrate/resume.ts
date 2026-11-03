@@ -177,8 +177,8 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
   let waiting = false;
   // Verrous pris à la fin de l'attente : tenus jusqu'à `execute` (qui les retrouve à son pid), pour qu'une autre reprise qui attendait le même dépôt ne le voie pas libre pendant le .nvmrc, l'arbre et l'écriture des lots.
   const taken: string[] = [];
-  // L553 : dépôts tenus par une AUTRE vague vivante dont la reprise ne prend pas le verrou (voir `passesBetweenSteps`).
-  const shared = new Set<string>();
+  // L553 : dépôts tenus par une AUTRE vague vivante (la porteuse) dont la reprise ne prend pas le verrou (voir `passesBetweenSteps`).
+  const shared = new Map<string, { wave: string; pid: number }>();
   const stopBefore = store.control().stopAfterCurrent;
   const playsIntegrationOnly = (l: LotState) => integ.includes(l) && (l.next === 'integrate' || leadReviewed.has(l)) && existsSync(join(lotTreeDir(store.dir, l.project, l.lot, l.repo), '.git'));
   try {
@@ -205,7 +205,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
         }
         // L553 : l'intégration d'un lot en worktree n'attend pas la fin d'une autre vague : comme un push du lead, elle passe entre ses étapes (son rebase rejoue si `main` avance, le verrou d'intégration les départage).
         if (waitFor && passesBetweenSteps(live, playsIntegrationOnly, repo, busy)) {
-          shared.add(repo);
+          shared.set(repo, { wave: busy.wave, pid: busy.pid });
           io.out(`orchestrate : ${basename(repo)} : tenu par la vague ${busy.wave} (pid ${busy.pid}) : l'intégration passe entre ses étapes, sans attendre sa fin`);
           break;
         }

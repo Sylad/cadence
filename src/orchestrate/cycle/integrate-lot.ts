@@ -12,6 +12,7 @@ import { PLAN_ACTIONS } from '../../plan-commit.js';
 import { sh, shEscape } from './sh.js';
 import { integratedChecks, redExcerpt } from './checks.js';
 import { session } from './session.js';
+import { lateRefusal } from './depot-partage.js';
 import { checkShape, type ReviewReport, REVIEW_SCHEMA } from '../schemas.js';
 /** Trace d'un verdict reporté après un rebase (R9) : le sha relu, le sha intégré qui le remplace, et le patch-id (le même des deux côtés) qui le garantit. */
 export interface Reporte {
@@ -188,8 +189,8 @@ export async function integrateLot(c: LotCtx): Promise<void> {
             l.verdict = verdict;
           }
         }
-        // Les contrôles rejoués et la revue courte ont pu durer : le lead a pu changer de branche ou salir son arbre depuis le contrôle du départ (R24, R8).
-        const late = leadMoved(l.repo, t.base);
+        // Les contrôles rejoués et la revue courte ont pu durer : le lead a pu changer de branche ou salir son arbre depuis le contrôle du départ (R24, R8), ou un tiers a pu prendre le dépôt libéré par la vague porteuse (L553, `lateRefusal`).
+        const late = lateRefusal(c.wave, l.repo, t.base);
         if (late) return refuse(`intégration refusée : ${late} ; branche du dépôt inchangée, ${kept}`);
         try {
           advance(l.repo, t.branch);

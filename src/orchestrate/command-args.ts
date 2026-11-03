@@ -8,8 +8,8 @@ import { resumeCommand } from './table.js';
 export const DEFAULT_MAX_SESSIONS = 2;
 
 export interface Args {
-  /** Interne (L553) : posé par la reprise, jamais lu de la ligne de commande — les dépôts tenus par une autre vague vivante où elle n'intègre que ; `execute` n'y prend ni verrou ni garde de push. */
-  shared?: ReadonlySet<string>;
+  /** Interne (L553) : posé par la reprise, jamais lu de la ligne de commande — les dépôts tenus par une autre vague vivante (la porteuse, par dépôt) où elle n'intègre que ; `execute` n'y prend ni verrou ni garde de push tant que cette vague les tient, et les prend à son compte dès qu'elle les libère (`WaveCtx.claimRepo`). */
+  shared?: ReadonlyMap<string, { wave: string; pid: number }>;
   lots: { project?: string; lot: string; model?: AnyModel }[];
   dryRun: boolean;
   status?: string | true;

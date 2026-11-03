@@ -8,11 +8,11 @@ import { onTermination } from '../proc.js';
 import { stopApps } from './app.js';
 import { isOpen } from '../plan.js';
 import { sharedStateDir } from '../state.js';
-import { acquireSlot, cadenceHome, registerWave, unregisterWave, updateWaveRepos } from './registry.js';
+import { acquireSlot, cadenceHome, registerWave, updateWaveRepos } from './registry.js';
 import { loadTemplates } from './briefs.js';
 import { fillTargets, handedBackStreak, stopReason } from './continue.js';
 import { Budget, DROPPED, STOP_REQUESTED, countInterrupted, handBackDroppedQuestions, workDir, type LotCtx, type WaveCtx } from './cycle.js';
-import { installPrePush, keepGateGuard, removePrePush } from './guard.js';
+import { installPrePush } from './guard.js';
 import { killSessions, type ClaudeFn } from './launch.js';
 import { REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { awaitsDependency, groupLots, runPool } from './pool.js';
@@ -26,6 +26,7 @@ import { linkNodeBin } from './node-env.js';
 import { launchPrices, quotaText, renderTable, resumeCommand } from './table.js';
 import { agentsOf, preflight, projectEnv, resolveTargets, type Target } from './preflight.js';
 import { dryRun } from './dry-run.js';
+import { repoHolds, updateWaveReposSafe } from './cycle/depot-partage.js';
 import { draw } from './draw.js';
 import { control, duration, liveStore, maxSessions } from './status.js';
 import type { OrchestrateDeps, OrchestrateIo } from './command.js';
@@ -129,41 +130,17 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   excludeState(launch);
   const home = cadenceHome();
   const held: string[] = [];
-  // L553 : un dépôt que tient une autre vague vivante et où la reprise n'intègre que (`args.shared`) n'a ici ni verrou, ni garde de push, ni inscription : ils restent à cette vague.
-  const repos = [...new Set(lots.flatMap(lotRepoPaths))].filter((r) => !args.shared?.has(r));
-  /** Libère un dépôt : son verrou et sa garde de push (L132 : dès que ses lots sont finis, pas à la fin de la vague). */
+  // L553 : un dépôt que tient une autre vague vivante et où la reprise n'intègre que (`args.shared`) n'a ici ni verrou, ni garde de push, ni inscription : ils restent à cette vague
+  // tant qu'elle le tient ; dès qu'elle le libère, `claimRepo` (depot-partage.ts) les prend, sinon `deliver`, une nouvelle vague ou une tâche locale pourrait écrire le dépôt sous l'intégration.
+  const shared = new Map(args.shared ?? []);
+  const repos = [...new Set(lots.flatMap(lotRepoPaths))].filter((r) => !shared.has(r));
+  /** Dépôts libérés : verrou et garde de push rendus (L132 : dès que leurs lots sont finis, pas à la fin de la vague). */
   const freed = new Set<string>();
   /** Lots dont la vague a fini de jouer (prêts, rendus, en échec ou suspendus) : ils ne tiennent plus de créneau. */
   const settled = new Set<LotCtx>();
   /** Lots que la vague a encore à jouer ET qui tiennent une session claude, sur les dépôts qu'elle tient encore (un par dépôt, un par lot en worktree) : ce que le registre compte pour les créneaux libres (L433 : un lot fini ne garde plus de créneau, 0 quand plus rien n'est à jouer). L520 : un lot qui attend une dépendance ou qui est dans la porte de tests (`gate`, aucune session claude) n'en tient pas. Absent (undefined) tant qu'aucun lot ne joue dans un worktree : le calcul reste celui des dépôts tenus. */
   const lanes = (): number | undefined => ctxs.some((c) => c.tree) ? groupLots(ctxs).filter((g) => g.every((c) => lotRepoPaths(c.lot).every((r) => !freed.has(r)))).reduce((n, g) => { const todo = g.filter((c) => !settled.has(c) && !c.lot.gate && !awaitsDependency(c, ctxs, all)).length; return n + (g.every((c) => c.tree) ? todo : Math.min(1, todo)); }, 0) : undefined; // hors mode worktree, rien n'est écrit : le registre compte les dépôts tenus, comme avant L279
-  const freeRepo = (r: string) => {
-    freed.add(r);
-    const file = join(sharedStateDir(r), REPO_LOCK);
-    releaseLock(file, process.pid);
-    held.splice(0, held.length, ...held.filter((f) => f !== file));
-    removePrePush(r, wave.id);
-    keepGateGuard(r);
-    try {
-      updateWaveRepos(home, process.pid, repos.filter((x) => !freed.has(x)), lanes());
-    } catch {
-      // registre illisible : `--status` garde la liste de départ, le verrou est bien tombé
-    }
-  };
-  const release = () => {
-    for (const f of held) releaseLock(f, process.pid);
-    held.length = 0;
-    for (const r of repos) {
-      if (freed.has(r)) continue;
-      removePrePush(r, wave.id);
-      keepGateGuard(r);
-    }
-    try {
-      unregisterWave(home, process.pid);
-    } catch {
-      // registre illisible : l'entrée d'un processus mort est écartée à la prochaine inscription
-    }
-  };
+  const { freeRepo, release, claimRepo } = repoHolds({ waveId: wave.id, home, held, freed, repos, shared, lanes, log: (line) => wctx.log(line) });
 
   for (const r of repos) {
     const file = join(sharedStateDir(r), REPO_LOCK);
@@ -243,6 +220,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
     saveWave,
     slotsChanged: () => updateWaveReposSafe(home, repos.filter((x) => !freed.has(x)), lanes()),
     integrate: deps.integrate,
+    claimRepo,
   };
   wave.status = 'running';
   wave.pid = process.pid;
@@ -384,11 +362,3 @@ async function buildAdd(t: Target, known: KnownLot[], w: { wave: string; ctxs: L
   return { ctx };
 }
 
-/** Le registre des vagues vivantes : dépôts tenus et créneaux occupés ; illisible, le décompte reste celui du dernier écrit. */
-function updateWaveReposSafe(home: string, repos: string[], lanes: number | undefined): void {
-  try {
-    updateWaveRepos(home, process.pid, repos, lanes);
-  } catch {
-    // registre illisible : le décompte reste celui du dernier écrit
-  }
-}

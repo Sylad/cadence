@@ -3,7 +3,8 @@ import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sharedStateDir } from '../src/state.js';
-import { activeLock, REPO_LOCK } from '../src/orchestrate/lock.js';
+import { activeLock, releaseLock, REPO_LOCK } from '../src/orchestrate/lock.js';
+import { guardPresent, installPrePush, keepGateGuard, removePrePush } from '../src/orchestrate/guard.js';
 import { linkNodeBin } from '../src/orchestrate/node-env.js';
 import { INTEGRATION_LOCK } from '../src/orchestrate/integrate.js';
 import { RunStore } from '../src/orchestrate/state.js';
@@ -471,6 +472,67 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
       expect(liveWaves(cadenceHome()).map((w) => w.wave)).toEqual(['autre-vague']); // la reprise ne s'inscrit pas : seule la vague porteuse reste
     } finally {
       sleeper.kill();
+    }
+  });
+  /** L553 : une vague porteuse vivante (un `sleep` inscrit au registre, sans lot dans l'arbre principal) tient le dépôt, verrou ET garde de push ; `free` la fait lâcher les deux (`freeRepo`/`release` d'`execute`, sans MARK). */
+  async function holderWave(repo: string) {
+    const sleeper = await otherWaveHolds(repo, null, 'autre-vague');
+    const launch = tempDir();
+    RunStore.reserve(launch, 'autre-vague')!.writeWave({ id: 'autre-vague', status: 'running', created: 'x', lots: [] } as never);
+    registerWave(cadenceHome(), { pid: sleeper.pid!, wave: 'autre-vague', started: 'x', cwd: launch, repos: [repo] });
+    expect(installPrePush(repo, 'autre-vague').ok).toBe(true);
+    const free = () => {
+      releaseLock(join(sharedStateDir(repo), REPO_LOCK), sleeper.pid!);
+      removePrePush(repo, 'autre-vague');
+      keepGateGuard(repo);
+    };
+    return { sleeper, free };
+  }
+  it('L553 — la vague porteuse libère le dépôt (verrou et garde) pendant la revue courte : pas d\'incident, la reprise prend le dépôt à son compte, intègre, puis le rend', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const { sleeper, free } = await holderWave(repo);
+    try {
+      const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => { free(); return claudeOut(reviewReport({ verdict: 'seconde lecture' })); } }), { repoWait: { waitMs: 20_000, pollMs: 50 } });
+      expect(again.err).toBe('');
+      expect(again.code).toBe(0);
+      expect(again.out).not.toContain('incident');
+      expect(again.out).toContain("a : tenu par la vague autre-vague");
+      expect(again.out).toContain('a : libéré par la vague autre-vague pendant l\'intégration : la reprise le prend (verrou et garde de push)');
+      const l = store(parent).readLot('a', lot)!;
+      expect(l.status).toBe('ready');
+      expect(subjects(repo).some((s) => s.startsWith(`feat(${lot})`))).toBe(true);
+      expect(activeLock(join(sharedStateDir(repo), REPO_LOCK))).toBeNull(); // pris par la reprise, rendu à sa fin
+      expect(guardPresent(repo)).toBe(false); // sa garde aussi
+      expect(liveWaves(cadenceHome()).map((w) => w.wave)).toEqual(['autre-vague']); // la reprise s'est désinscrite à sa fin ; la porteuse (vivante, qui n'a lâché que ce dépôt) reste
+    } finally {
+      sleeper.kill();
+    }
+  });
+  it('L553 — la vague porteuse libère le dépôt pendant la revue courte et un tiers le prend : l\'avance est refusée, lot rendu next: integrate, branche du dépôt inchangée', async () => {
+    const { parent, repo, lot } = await movesDuringShortReview((repo) => git(repo, 'checkout', '-q', '-b', 'autre'));
+    git(repo, 'checkout', '-q', 'main');
+    const { sleeper, free } = await holderWave(repo);
+    const third = spawn('sleep', ['30'], { stdio: 'ignore' });
+    try {
+      const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => {
+        free();
+        writeFileSync(join(sharedStateDir(repo), REPO_LOCK), JSON.stringify({ pid: third.pid, wave: 'local:L7', started: '2026-10-04T00:00:00Z' }));
+        return claudeOut(reviewReport({ verdict: 'seconde lecture' }));
+      } }), { repoWait: { waitMs: 20_000, pollMs: 50 } });
+      expect(again.err).toBe('');
+      expect(again.code).toBe(1);
+      expect(again.out).not.toContain('incident');
+      const l = store(parent).readLot('a', lot)!;
+      expect(l.status).toBe('handed-back');
+      expect(l.next).toBe('integrate');
+      expect(l.outcome).toMatch(/^intégration refusée : le dépôt, libéré par la vague autre-vague, est tenu par local:L7 \(pid \d+\) ; branche du dépôt inchangée, worktree conservé : /);
+      expect(git(repo, 'log', '--format=%s', 'main').split('\n').some((s) => s.startsWith(`feat(${lot})`))).toBe(false);
+      expect(activeLock(join(sharedStateDir(repo), REPO_LOCK))?.pid).toBe(third.pid); // le verrou du tiers n'est ni pris ni retiré
+      expect(guardPresent(repo)).toBe(false);
+    } finally {
+      sleeper.kill();
+      third.kill();
     }
   });
   it('L553 — la tâche locale du lead tient le dépôt : l\'attente reste (elle écrit dans l\'arbre principal), refus en 2 à l\'échéance', async () => {

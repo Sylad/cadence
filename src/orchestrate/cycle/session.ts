@@ -10,6 +10,7 @@ import { type LotRepo } from '../../repos.js';
 import { SlotAbandoned } from '../registry.js';
 import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, writeMcpConfig, enabledPlugins, settingsFiles, type AnyModel, type SessionKind, type StepModel } from '../launch.js';
 import { pushed, remoteAdvances, snapshot, type Snapshot } from '../guard.js';
+import { guardLost } from './depot-partage.js';
 import { sumTokens, type Tokens } from '../result.js';
 import { cutReport, EXTENSION_MS, MAX_EXTENSIONS, workTimeoutMs } from '../timeouts.js';
 import { checkShape, effortKey, REVIEW_SCHEMA, schemaFor, summarize, stepAgent, type ReviewReport } from '../schemas.js';
@@ -21,10 +22,9 @@ import { lotOver, WRITE_STEPS, fixAffordable, dropped, DROPPED, unplayedAnswer, 
 import { trackedPaths } from './plan-writes.js';
 import { docsConfig, briefFor } from './brief.js';
 
-/** Les dépôts voisins du lot, vus avant et après une session. */
-type Others = { repo: LotRepo; before: Snapshot; after: Snapshot }[];
+/** Ce qu'une session rend : son étape, son rapport, le dépôt du lot et ses dépôts voisins (`others`) vus avant et après. */
+export type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapshot; others: { repo: LotRepo; before: Snapshot; after: Snapshot }[] };
 
-export type Done = { step: StepState; report: unknown; before: Snapshot; after: Snapshot; others: Others };
 
 /** Modèle d'une revue (L108) : la revue légère d'un lot léger tant qu'aucune correction n'a eu lieu, sinon la revue complète (UX comprise). */
 function reviewModel(c: LotCtx, kind: SessionKind): AnyModel {
@@ -311,7 +311,7 @@ export async function session(c: LotCtx, kind: SessionKind, local = false): Prom
 
   const after = await snapshot(wd(c));
   const afterOthers = await Promise.all(neighbours.map((r) => snapshot(r.path)));
-  const others: Others = neighbours.map((repo, i) => ({ repo, before: beforeOthers[i], after: afterOthers[i] }));
+  const others: Done['others'] = neighbours.map((repo, i) => ({ repo, before: beforeOthers[i], after: afterOthers[i] }));
   step.headAfter = after.head ?? undefined;
   // Le dépôt du projet d'abord, puis chaque voisin : mêmes contrôles, l'incident nomme le dépôt voisin.
   const watched = [{ where: '', path: wd(c), repo: c.lot.repo, before, after }, ...others.map((o) => ({ where: ` dans ${o.repo.rel}`, path: o.repo.path, repo: o.repo.path, before: o.before, after: o.after }))];
@@ -326,7 +326,7 @@ export async function session(c: LotCtx, kind: SessionKind, local = false): Prom
       w.saveWave();
       return stop(c, 'failed', `incident : ${w.incident}`);
     }
-    if (b.guard && !a.guard) {
+    if (guardLost(w, repo, b, a, (text) => w.log(`${lotKey(l.project, l.lot)} · session ${n} ${kind} : ${text}${where}`))) { // L553 : sur un dépôt partagé, la garde disparue est celle de la vague porteuse qui l'a libéré : pas un incident
       step.status = 'failed';
       step.cause = `le hook pre-push de garde a disparu${where}`;
       w.incident = `le hook pre-push de garde a été supprimé${where} pendant ${lotKey(l.project, l.lot)} (${kind})`;

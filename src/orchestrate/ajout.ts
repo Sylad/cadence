@@ -77,6 +77,7 @@ export function resumeRefusal(store: RunStore, l: Pick<LotState, 'project' | 'lo
   const branch = lotBranch(store.id, l.project, l.lot);
   if (!baseBranchOf(l.repo, branch)) return `la branche ${branch} de la vague n'existe plus`;
   if (!existsSync(dir)) return `le worktree ${dir} n'existe plus`;
+  if (!existsSync(join(dir, '.git'))) return `${dir} n'est plus un worktree git`;
   const dirty = trackedDirty(dir);
   return dirty.length ? `fichiers non commités dans ${dir} : ${dirty.join(', ')} ; les commiter, puis rejouer : ${addGesture(store.id, lotKey(l.project, l.lot), launch)}` : null;
 }
@@ -100,7 +101,7 @@ export function resumeNext(c: LotCtx, old: LotCtx): 'correction' | 'revue' | 'é
   l.outcome = null;
   const reviewed = l.constats.some((k) => k.source === 'code');
   l.resumedFrom = c.wave.id;
-  l.resumedReviewed = reviewed || l.steps.some((st) => st.kind.startsWith('review'));
+  l.resumedReviewed = !!old.lot.resumedReviewed || reviewed || l.steps.some((st) => st.kind.startsWith('review'));
   if (reviewed) {
     toFix(c, l.constats, 'reprise du lot rendu');
     return 'correction';

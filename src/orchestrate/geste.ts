@@ -38,7 +38,7 @@ export const newWaveGesture = (key: string, launch?: string): string => {
  * Lu par le contrôle préalable de `--add` et par `lotGesture` : les deux lectures ne peuvent pas diverger.
  */
 export const addableHandBack = (l: { status?: string; next?: string | null; outcome?: string | null }): boolean =>
-  l.status === 'handed-back' && l.next !== 'integrate' && !!l.outcome && FIN_DE_CYCLE_WHATS.some((w) => l.outcome!.startsWith(`${w} après `));
+  l.status === 'handed-back' && l.next !== 'integrate' && typeof l.outcome === 'string' && FIN_DE_CYCLE_WHATS.some((w) => (l.outcome as string).startsWith(`${w} après `));
 
 /** La commande `--add` qui reprend un lot rendu dans la vague vivante (L563) ; `.:<lot>` quand le projet est le dossier de lancement (`newWaveGesture`). */
 export const addGesture = (waveId: string, key: string, launch?: string): string => `cadence orchestrate --add ${newWaveGesture(key, launch).slice('cadence orchestrate '.length)} --wave ${waveId}`;

@@ -312,16 +312,23 @@ export function unintegratedCommits(repo: string, branch: string, base: string):
   return Number(tryGit(repo, 'rev-list', '--count', `refs/heads/${branch}`, '--not', `refs/heads/${base}`) ?? 0);
 }
 
-/** Fichiers suivis modifiés d'un arbre (`git status --porcelain`, sans les fichiers non suivis). */
+/** Fichiers suivis modifiés d'un arbre (`git status --porcelain -z`, sans les fichiers non suivis). */
 export function trackedDirty(dir: string): string[] {
   let out = '';
   try {
     // pas de trim : la première colonne d'un `status --porcelain` peut être une espace
-    out = execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    out = execFileSync('git', ['status', '--porcelain', '-z', '--untracked-files=no'], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   } catch {
     // arbre illisible : rien de modifié connu
   }
-  return out.split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^.* -> /, ''));
+  // -z : noms bruts, sans guillemets ni octal ; une renommée ou copiée (R, C) est suivie de son chemin d'origine, qu'on saute
+  const entries = out.split('\0').filter(Boolean);
+  const files: string[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    files.push(entries[i].slice(3));
+    if (/[RC]/.test(entries[i].slice(0, 2))) i++;
+  }
+  return files;
 }
 
 /**

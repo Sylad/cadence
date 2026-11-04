@@ -43,14 +43,14 @@ const daysBetween = (from: string, to: string): number | null => {
 export const ageLabel = (days: number): string => (days <= 0 ? 'aujourd’hui' : days === 1 ? 'hier' : `il y a ${days} j`)
 
 /**
- * La dernière livraison de chaque projet et ses lots clos non livrés, à l'heure `at`. Un lot clos est livré quand une livraison verte a eu lieu le jour de sa clôture ou après
+ * La dernière livraison de chaque projet et ses lots clos non livrés, à l'heure `at`. Un lot clos est livré quand le plan le dit (`delivered`, L530 : livré hors de cadence deliver) ou quand une livraison verte a eu lieu le jour de sa clôture ou après
  * (la règle du délai de livraison de `cadence perf`) : non livré, il est clos APRÈS le jour de la dernière verte — une livraison rouge ne livre rien ; sans verte jamais, tous les
  * lots clos le sont. Le plan est lu dans `board` (`closed` de `cadence lead tour --json`) : sans lui, `undelivered` est nul — on ne sait pas, ce n'est pas « rien à livrer ».
  */
 export const deliveriesOf = (last: readonly LastDelivery[], board: LotsBoard | null, at: number): DeliveryRow[] =>
   last.map(d => {
     const row = board?.rows.find(r => r.project === d.project && !r.error)
-    const undelivered = row?.closed ? row.closed.filter(c => d.green === null || c.finished > d.green).map(c => c.id) : null
+    const undelivered = row?.closed ? row.closed.filter(c => !c.delivered && (d.green === null || c.finished > d.green)).map(c => c.id) : null
     return { project: d.project, sha: d.sha.slice(0, 7), age: Math.max(0, daysBetween(d.day, dayOf(at)) ?? 0), status: d.status, undelivered }
   })
 

@@ -89,3 +89,14 @@ test('L415 R11 — la hauteur : un projet par ligne et le titre, dans ce que dé
   expect(deliveriesHeight(3, 40, 19)).toBe(0)
   expect(deliveriesHeight(3, 40, 30)).toBe(0)
 })
+
+test('L530 R1 — un lot que le plan dit livré (hors cadence deliver) n’est pas « clos non livré », même clos après la dernière livraison verte', () => {
+  const b = parseLotsBoard(JSON.stringify([{ project: 'maritime', lots: [], closed: [{ id: 'E-GL5a', finished: '2026-10-29', delivered: true }, { id: 'E-GL5b', finished: '2026-10-29', delivered: false }, { id: 'X1', finished: '2026-10-30' }] }]))
+  expect(b.rows[0]!.closed).toEqual([{ id: 'E-GL5a', finished: '2026-10-29', delivered: true }, { id: 'E-GL5b', finished: '2026-10-29' }, { id: 'X1', finished: '2026-10-30' }])
+  expect(deliveriesOf([last('maritime')], b, NOW)[0]!.undelivered).toEqual(['E-GL5b', 'X1'])
+})
+
+test('L530 R1 — tous les clos livrés par le plan : « rien à livrer », et sans aucune livraison verte', () => {
+  const b: LotsBoard = { rows: [{ project: 'maritime', lots: [], closed: [{ id: 'A', finished: '2026-10-01', delivered: true }] }], outdated: false }
+  expect(deliveriesOf([last('maritime', { status: 'rouge', green: null })], b, NOW)[0]!.undelivered).toEqual([])
+})

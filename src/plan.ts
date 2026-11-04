@@ -156,8 +156,8 @@ export type Field = (typeof FIELDS)[number];
 export interface PlanFormat {
   /** Clé racine qui porte la liste. */
   lots: string;
-  /** Champ de raf → clés du fichier, la première présente l'emporte. */
-  fields: Partial<Record<Field, string[]>>;
+  /** Champ de raf → clés du fichier, la première présente l'emporte ; `delivered` (L530) n'est pas un champ de raf : les clés du jour de livraison d'un lot. */
+  fields: Partial<Record<Field | 'delivered', string[]>>;
   /** État du fichier → statut de raf. */
   statuses: Record<string, Status>;
   /** Libellé d'effort du fichier → jours. */

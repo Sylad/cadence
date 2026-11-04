@@ -116,4 +116,31 @@ describe('champ closed de cadence lead tour --json (L415)', () => {
     expect(tourRow(nativeProject(lot('L1', 'todo')), '2026-10-30')).not.toHaveProperty('closed');
     expect(tourRow('/nonexistent-l415', '2026-10-30')).not.toHaveProperty('closed');
   });
+
+  describe('R1 — lot livré hors de cadence deliver, lu dans le plan (L530)', () => {
+    const foreign = (fields: string, entries: string): string => {
+      const dir = gitRepo();
+      mkdirSync(join(dir, 'suivi'));
+      writeFileSync(join(dir, 'cadence.yaml'), `plan:\n  path: suivi/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, finished: livre_le${fields} }\n  statuses: { todo: prevu, done: [deploye, valide] }\n`);
+      writeFileSync(join(dir, 'suivi/taches.yaml'), `taches:\n${entries}`);
+      return dir;
+    };
+
+    it('R1 — plan.fields.delivered : un lot dont la clé mappée porte un jour est marqué delivered dans closed, les autres non', () => {
+      const dir = foreign(', delivered: deploye_le', '  - { id: T1, titre: A, etat: deploye, livre_le: 2026-10-20, deploye_le: 2026-10-21 }\n  - { id: T2, titre: B, etat: valide, livre_le: 2026-10-22 }\n');
+      expect(tourRow(dir, '2026-10-30').closed).toEqual([{ id: 'T1', finished: '2026-10-20', delivered: true }, { id: 'T2', finished: '2026-10-22' }]);
+    });
+
+    it('R1 — un horodatage vaut son jour ; une valeur qui n’est pas un jour (vide, texte, false) ne livre rien', () => {
+      const dir = foreign(', delivered: deploye_le', '  - { id: T1, titre: A, etat: deploye, livre_le: 2026-10-20, deploye_le: "2026-10-21T08:00:00Z" }\n  - { id: T2, titre: B, etat: deploye, livre_le: 2026-10-20, deploye_le: "bientôt" }\n  - { id: T3, titre: C, etat: deploye, livre_le: 2026-10-20, deploye_le: false }\n');
+      expect(tourRow(dir, '2026-10-30').closed).toEqual([{ id: 'T1', finished: '2026-10-20', delivered: true }, { id: 'T2', finished: '2026-10-20' }, { id: 'T3', finished: '2026-10-20' }]);
+    });
+
+    it('R1 — sans plan.fields.delivered, rien n’est marqué ; plan natif : delivered: { date, sha } marque le lot', () => {
+      const dir = foreign('', '  - { id: T1, titre: A, etat: deploye, livre_le: 2026-10-20, deploye_le: 2026-10-21 }\n');
+      expect(tourRow(dir, '2026-10-30').closed).toEqual([{ id: 'T1', finished: '2026-10-20' }]);
+      const natif = nativeProject(done('L1', '2026-10-20', '    delivered: { date: 2026-10-21, sha: abcdef1 }\n') + done('L2', '2026-10-22'));
+      expect(tourRow(natif, '2026-10-30').closed).toEqual([{ id: 'L1', finished: '2026-10-20', delivered: true }, { id: 'L2', finished: '2026-10-22' }]);
+    });
+  });
 });

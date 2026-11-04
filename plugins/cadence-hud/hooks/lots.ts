@@ -23,7 +23,7 @@ export const parseLotsBoard = (stdout: string): LotsBoard => {
       ...(typeof r.error === 'string' && r.error ? { error: r.error } : {}),
       ...(isProgress(r.progress) ? { progress: r.progress } : {}),
       ...(Array.isArray(r.doing) ? { doing: r.doing.filter((d): d is { id: string } => typeof d?.id === 'string').map(d => ({ id: d.id })) } : {}),
-      ...(Array.isArray(r.closed) ? { closed: r.closed.filter((c): c is { id: string; finished: string } => typeof c?.id === 'string' && typeof c?.finished === 'string').map(c => ({ id: c.id, finished: c.finished })) } : {}),
+      ...(Array.isArray(r.closed) ? { closed: r.closed.filter((c): c is { id: string; finished: string; delivered?: unknown } => typeof c?.id === 'string' && typeof c?.finished === 'string').map(c => ({ id: c.id, finished: c.finished, ...(c.delivered === true ? { delivered: true as const } : {}) })) } : {}),
       ...(Array.isArray(r.lots) ? { lots: r.lots.filter((l): l is TourLot => typeof l?.id === 'string').map(l => ({ ...l, after: Array.isArray(l.after) ? l.after : [] })) } : {}),
     }))
   const readable = rows.filter(r => !r.error)

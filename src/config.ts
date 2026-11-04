@@ -96,8 +96,8 @@ function parseFormat(p: Record<string, unknown>, bad: (what: string) => RafError
   for (const key of ['fields', 'statuses', 'estimates']) if (p[key] != null && !isObject(p[key])) throw bad(`${key} doit être un objet`);
 
   for (const [field, keys] of Object.entries((p.fields ?? {}) as Record<string, unknown>)) {
-    if (!FIELDS.includes(field as Field)) throw bad(`fields.${field} inconnu (attendu : ${FIELDS.join(', ')})`);
-    format.fields[field as Field] = list(keys);
+    if (field !== 'delivered' && !FIELDS.includes(field as Field)) throw bad(`fields.${field} inconnu (attendu : ${[...FIELDS, 'delivered'].join(', ')})`);
+    format.fields[field as Field | 'delivered'] = list(keys);
   }
   for (const [status, theirs] of Object.entries((p.statuses ?? {}) as Record<string, unknown>)) {
     if (!STATUSES.includes(status as Status)) throw bad(`statuses.${status} inconnu (attendu : ${STATUSES.join(', ')})`);

@@ -2146,6 +2146,11 @@ lots:
     status: todo
     estimate: 0.5
     created: 2026-11-04
+  - id: L583
+    title: "Config des tests, livrée seule : vitest.workspace.ts à deux projets, le projet « lourds » (probe-L539-bords, mise-en-service L195) joué après les autres dans un seul fork — mesuré par L579 : 2 à 3 s seuls, 12 à 13 s sous une charge moyenne de 127 ; la porte, le clone et la CI jouent les deux projets ; décision du lead du 04-11 (changer une config est une décision du plan, livrée seule)"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-04
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

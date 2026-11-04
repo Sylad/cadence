@@ -2192,7 +2192,7 @@ lots:
     estimate: 0.25
     created: 2026-11-04
     started: 2026-11-04
-    review: { date: 2026-11-04, verdict: "conforme : touches() écarte les liens symboliques non suivis du worktree (L583 n'est plus refusé à tort) et passe --no-renames (un renommage src→test remonte le chemin supprimé) ; 2 tests ajoutés, 12 verts, qualite.mjs --contre main sort 0 en worktree", commit: e64420580685e258eb36c04cef62dfb1dbd87ae1 }
+    review: { date: 2026-11-04, verdict: "compliant after 0 blocking fix: 2 minor notes (--no-renames on touches(), project names containing « -- ») — orchestré (vague 2026-11-04-1310-cad, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : la rebase n'a rien cassé au changement du lot (3 commits de code relus, test/qualite-l586.test.ts 12 verts), 0 constat", commit: e82291f08191dc95a35d4d1654bdfb175a1963e3 }
   - id: L587
     title: "Une vague de lots nommés remplit ses créneaux libres : quand un créneau se libère et que sa file est vide, elle tire le lot prêt suivant du plan (même tirage que --continue : priority: du cadence.yaml parent, ressources uses: libres, lots mûrs seulement, filtre L390), jusqu'à la fin du budget ; --no-fill garde l'ancien comportement ; chaque tirage est une ligne du journal (« créneau libre rempli par <lot> ») — 04-11 : vagues 1015-cad et 1310-cad remplies à la main par --add sur événement, créneaux vides entre deux événements, vu par Sylvain"
     status: done

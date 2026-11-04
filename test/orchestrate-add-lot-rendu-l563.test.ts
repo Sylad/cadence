@@ -190,6 +190,18 @@ describe("L563 — resumeNext : l'état du lot rendu et l'étape où il repart",
     expect(lotOver(fresh.lot)).toBe(false);
     expect(fresh.lot.steps).toEqual(old.lot.steps);
   });
+  it("R2 — la demande d'ajout (@modèle) et le plan relu l'emportent : model, small, visible, light, express, repos, goal restent ceux du ctx neuf", () => {
+    const { fresh, old } = pair({ model: 'sonnet', small: false, visible: false, light: true, express: true, goal: 'ancien', repos: [{ rel: '../b', path: '/x/b' }], constats: [constat('code')] } as Partial<LotState>);
+    Object.assign(fresh.lot, { model: 'opus', small: true, visible: true, goal: 'neuf' });
+    delete fresh.lot.light;
+    delete fresh.lot.express;
+    delete fresh.lot.repos;
+    resumeNext(fresh, old);
+    expect(fresh.lot).toMatchObject({ model: 'opus', small: true, visible: true, goal: 'neuf' });
+    expect(fresh.lot.light).toBeUndefined();
+    expect(fresh.lot.express).toBeUndefined();
+    expect(fresh.lot.repos).toBeUndefined();
+  });
   it('R6 — lot repris : pass à 0 (1 après la correction posée), escalation vide, statut queued, outcome vidé', () => {
     const { fresh, old } = pair({ pass: 2, constats: [], steps: [step('review', 1)], escalation: { model: 'fable', stage: 'done', issue: 'rendu' } as LotState['escalation'] });
     resumeNext(fresh, old);
@@ -383,6 +395,34 @@ describe('L563 — R4 / R12 / R5 / R9 : la prise par la vague', () => {
     expect(t.log.join('\n')).toContain('ajout écarté à la prise');
     expect(t.oldLot.status).toBe('handed-back');
   });
+  it("R7 — la vague finit avant la prise : demande écartée (drain), lot toujours handed-back", async () => {
+    const s = scene();
+    s.st.requestAdd({ project: 'a', lot: 'L1' });
+    await s.feed.take(() => false);
+    s.feed.drain('la vague a fini de jouer');
+    expect(s.st.addQueue()).toEqual([]);
+    expect(s.log.join('\n')).toContain('ajout écarté (la vague a fini de jouer)');
+    expect(s.oldLot.status).toBe('handed-back');
+    expect(s.ctxs).toEqual([s.oldCtx]);
+  });
+  it("R6 — budget neuf supérieur au budget restant de la vague, à la prise : demande écartée, lot inchangé", async () => {
+    const s = scene();
+    (s.feed as unknown as { e: AddEnv }).e.budgetLeft = () => 99; // le budget d'un lot neuf est 100
+    s.st.requestAdd({ project: 'a', lot: 'L1' });
+    expect(await s.feed.take(() => true)).toEqual([]);
+    expect(s.log.join('\n')).toContain('le budget restant de la vague ne tient pas le budget du lot (100)');
+    expect(s.oldLot.status).toBe('handed-back');
+  });
+  it("R5 — lot rendu ajouté : même worktree, mêmes commits, compté une fois dans le budget (dépensé + neuf, pas deux fois)", async () => {
+    const s = scene();
+    const head = git(s.dir, 'rev-parse', 'HEAD');
+    s.st.requestAdd({ project: 'a', lot: 'L1' });
+    const [c] = await s.feed.take(() => true);
+    expect(git(s.dir, 'rev-parse', 'HEAD')).toBe(head);
+    expect((c!.tree as { dir: string }).dir).toBe(s.dir);
+    expect(c!.lot.budget).toBe(lotSpent(s.oldLot) + 100);
+    expect(s.all.reduce((n, l) => n + (l.budget ?? 0), 0)).toBe(c!.lot.budget);
+  });
   it("R7 — le lot n'est plus rendu quand la vague le prend : demande écartée, lot inchangé", async () => {
     const s = scene();
     s.st.requestAdd({ project: 'a', lot: 'L1' });
@@ -521,6 +561,45 @@ describe('L563 — --add sur une vague vivante (e2e)', () => {
       expect(r!.code, outcome).toBe(2);
       expect(r!.err, outcome).toMatch(/a:L1 : lot déjà dans la vague/);
     }
+  });
+
+  it("R1 — lot déjà en file d'ajout : refus inchangé « déjà en file d'ajout dans la vague », code 2", async () => {
+    let r: { code: number; err: string } | undefined;
+    await liveWave(async (p, repo) => {
+      commitFile(treeOf(p, repo), 'lead-fix.txt', 'fix(L1): correctif du lead');
+      store(p).requestAdd({ project: 'a', lot: 'L1' }); // L2 tient le dépôt : la demande attend
+      r = await run(p, ['--add', 'a:L1', '--wave', WAVE], fake());
+      expect(store(p).addQueue()).toHaveLength(1); // rien de plus déposé
+    });
+    expect(r!.code).toBe(2);
+    expect(r!.err).toMatch(new RegExp(`a:L1 : lot déjà en file d'ajout dans la vague ${WAVE}`));
+  });
+
+  it("R3 — lot rendu sur budget : refus « lot déjà dans la vague » inchangé, code 2, rien déposé", async () => {
+    let r: { code: number; err: string } | undefined;
+    await liveWave(async (p) => {
+      const l = store(p).readLot('a', 'L1')!;
+      l.outcome = "budget du lot atteint (900/900) : étape « fix » non jouée, à décider par le lead";
+      store(p).writeLot(l);
+      r = await run(p, ['--add', 'a:L1', '--wave', WAVE], fake());
+      expect(store(p).addQueue()).toEqual([]);
+    });
+    expect(r!.code).toBe(2);
+    expect(r!.err).toMatch(/a:L1 : lot déjà dans la vague/);
+  });
+
+  it("R6 — budget neuf supérieur au budget restant de la vague : refus inchangé, code 2, rien déposé", async () => {
+    let r: { code: number; err: string } | undefined;
+    await liveWave(async (p, repo) => {
+      commitFile(treeOf(p, repo), 'lead-fix.txt', 'fix(L1): correctif du lead');
+      const w = store(p).readWave()!;
+      store(p).writeWave({ ...w, budget: w.consumed + 1 });
+      r = await run(p, ['--add', 'a:L1', '--wave', WAVE], fake());
+      expect(store(p).addQueue()).toEqual([]);
+      store(p).writeWave(w);
+    });
+    expect(r!.code).toBe(2);
+    expect(r!.err).toMatch(/a:L1 : le budget restant de la vague \(\d+ tokens\) ne tient pas le budget du lot/);
   });
 
   it('R10 — --replay sur vague vivante : refus inchangé', async () => {

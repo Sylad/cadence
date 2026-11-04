@@ -226,11 +226,20 @@ async function pushSha(o: OpenOpts, w: Work): Promise<string | null> {
   });
   if (init.code !== 0) return `dépôt de travail impossible : ${causeOf(init)}`;
   const push = await new Promise<Ran>((res) => {
-    const child = spawn('git', ['push', '-q', '--no-verify', `${host}:${root}/repo.git`, `${o.sha}:refs/cadence-gate/${o.sha}`], { cwd: o.repo, env: { ...env, GIT_SSH_COMMAND: `ssh -o BatchMode=yes -o ConnectTimeout=${CONNECT_S}`, GIT_TERMINAL_PROMPT: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('git', ['push', '-q', '--no-verify', `${host}:${root}/repo.git`, `${o.sha}:refs/cadence-gate/${o.sha}`], { cwd: o.repo, env: { ...env, GIT_SSH_COMMAND: `ssh -o BatchMode=yes -o ConnectTimeout=${CONNECT_S}`, GIT_TERMINAL_PROMPT: '0' }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    // Le groupe du push (git et son ssh) est inscrit comme un ssh local : un SIGTERM ou SIGHUP reçu par cadence seul le tue aussi.
+    const pgid = child.pid;
+    if (pgid !== undefined) liveSsh.add(pgid);
     let output = '';
     for (const s of [child.stdout, child.stderr]) s.on('data', (d: Buffer) => (output += d.toString()));
     child.once('error', (e) => res({ code: 127, output: e.message }));
-    child.once('close', (code) => res({ code: code ?? 1, output }));
+    child.once('close', (code) => {
+      if (pgid !== undefined) {
+        killGroup(pgid);
+        liveSsh.delete(pgid);
+      }
+      res({ code: code ?? 1, output });
+    });
   });
   if (push.code === 0) return null;
   // Deux pushes simultanés du même sha (vague en parallèle, verify --gate) se disputent la même référence : le perdant échoue alors que le sha est arrivé.

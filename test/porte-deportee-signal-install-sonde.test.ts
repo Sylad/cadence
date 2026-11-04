@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fakeRemote } from './fake-ssh.js';
 import { cleanupTempDirs, tempDir } from './helpers.js';
@@ -93,13 +93,34 @@ describe('L507 R10 — signal pendant gate.install', () => {
     expect(registered.size).toBe(0);
   }, 60_000);
 
-  it('porte fermée : le signal suivant ne tue plus le ssh d\'une autre porte déjà fermée, et rien ne reste inscrit', async () => {
+  it('porte fermée : le gestionnaire de signal est retiré, rien ne reste inscrit', async () => {
     const s = setup();
     const o = await openRemoteGate(opts(s, 'mkdir -p node_modules'));
     if (!o.ok) throw new Error(o.cause);
     expect(o.gate.close()).toBeNull();
     expect(registered.size).toBe(0);
   }, 60_000);
+
+  it('signal pendant le git push du sha : le push et son ssh local sont tués aussi', async () => {
+    const s = setup();
+    const tag = `${process.pid}`;
+    // git met son propre exec-path devant le PATH : un faux git-receive-pack ne passerait pas ; un hook pre-receive dans le dépôt nu de l'hôte, créé d'avance, tient le push.
+    const bare = join(s.remote.home, '.cadence-gate', 'depot', 'repo.git');
+    mkdirSync(join(s.remote.home, '.cadence-gate', 'depot'), { recursive: true });
+    git(s.repo, 'init', '--bare', '-q', bare);
+    const hang = join(bare, 'hooks', 'pre-receive');
+    writeFileSync(hang, `#!/bin/sh\nsleep 31403.${tag}\n`);
+    chmodSync(hang, 0o755);
+    const opening = openRemoteGate(opts(s, 'mkdir -p node_modules'));
+    await until(() => alive(`sleep 31403\\.${tag}$`));
+    expect(alive(`sleep 31403\\.${tag}$`)).toBe(true);
+    await Promise.all([...registered].map((f) => f('SIGTERM')));
+    await until(() => !alive(`sleep 31403\\.${tag}$`), 10_000);
+    const still = alive(`sleep 31403\\.${tag}$`);
+    kill(`sleep 31403\\.${tag}$`);
+    await opening;
+    expect(still).toBe(false);
+  }, 90_000);
 
   it('signal pendant la sonde de l\'hôte (avant le worktree) : un gestionnaire est déjà inscrit pour tuer le ssh de la sonde', async () => {
     const s = setup();

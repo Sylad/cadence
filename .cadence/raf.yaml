@@ -884,10 +884,11 @@ lots:
     finished: 2026-11-04
   - id: L472
     title: "Plans riches — import d'un plan d'un autre format vers le natif, réversible (raf import --from-config --verify) (manque M10 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
-    status: todo
+    status: doing
     estimate: 0.5
     uses: [ plan-coeur ]
     created: 2026-10-30
+    started: 2026-11-04
   - id: L473
     title: "Plans riches — signal « lot dont toutes les sous-tâches sont fermées » (raf now, session start) (manque M11 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo

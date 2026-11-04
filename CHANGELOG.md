@@ -102,11 +102,14 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - A plan commit in a neighbouring repository is no longer a false incident (L593, [docs/orchestrate.md](docs/orchestrate.md)): a commit that touches only the plan files of that repository (`plan.path`, `plan.files` of its own `cadence.yaml`) is tolerated even when its subject cites a lot of the wave, and the journal says so (04-11: three `plan: add Q-MIG2..4` commits of the lead in maritime-atlas handed L589 back). A commit that also touches another file is still a finding.
 
+### Fixed
+
+- A lot that waits for its integration turn (another integration of the repository is running) gives back its slot (L591, [docs/orchestrate.md](docs/orchestrate.md), « Integration, before `ready` »): the pool no longer counts its queue, and the registry no longer counts its lane, so the lots waiting for a slot start meanwhile; the lot then takes its turn without asking for a slot again (an integration launches one short review). On 04-11 (wave 1310-cad) L514, L586 and L473 arrived together, L530 L587 L588 started only after the last integration, ~9 minutes with two empty slots.
+
 ## [1.53.1] - 2026-11-04
 
 ### Fixed
 
-- A lot that waits for its integration turn (another integration of the repository is running) gives back its slot (L591, [docs/orchestrate.md](docs/orchestrate.md), « Integration, before `ready` »): the pool no longer counts its queue, and the registry no longer counts its lane, so the lots waiting for a slot start meanwhile; the lot then takes its turn without asking for a slot again (an integration launches one short review). On 04-11 (wave 1310-cad) L514, L586 and L473 arrived together, L530 L587 L588 started only after the last integration, ~9 minutes with two empty slots.
 - `raf done` is refused (exit 2, `done différé`, plan untouched) while a session of a live wave works in the main tree of a repository without worktrees (L521, `docs/raf.md`, skill `lead`): the plan it wrote stayed a modified file there and the next lot was handed back as « dépôt sale après implement » (avatar L57 after L56, 01-11). The message gives the safe order — wait for the end of that step, then run `raf done` again — and `--now` writes at once. `raf add` and `raf note` still only warn; `cadence deliver --sha` already commits its plan (L388).
 
 ## [1.53.0] - 2026-11-04

@@ -164,6 +164,6 @@ export function movedOutsideDeliveries(repo: string, before: TierRead, after: Ti
   const delivered = deliveredLots(wave.lots, wave.mine);
   const tolerated: string[] = [];
   const moved = tierMoved(repo, before, after, { lots: wave.lots.map((x) => x.lot), delivered, onDelivered: (line) => tolerated.push(line) });
-  if (tolerated.length) wave.log(`commit de livraison (${wave.lots.filter((x) => delivered.includes(x.lot)).map((x) => `${x.project}:${x.lot}`).join(', ')}) toléré dans ${basename(repo)} : ${tolerated.join(' | ')}`);
+  if (tolerated.length) wave.log(`commit de livraison (${wave.lots.filter((x) => delivered.includes(x.lot) && tolerated.some((line) => citesLot(line.slice(line.indexOf(' ') + 1), [x.lot]))).map((x) => `${x.project}:${x.lot}`).join(', ')}) toléré dans ${basename(repo)} : ${tolerated.join(' | ')}`);
   return moved;
 }

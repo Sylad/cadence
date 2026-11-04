@@ -357,6 +357,22 @@ describe('L472 — bords de l\'import', () => {
     // Le lecteur replie aussi le sous-lot à plat d'origine (AB-1/t1-fusion) : la sous-tâche native est à côté de lui.
     expect(read.tasks).toContainEqual({ id: 't1', title: 'Sous-tâche native', status: 'todo' });
   });
+  it('R40 — une sous-tâche native qui reprendrait l\'identifiant à plat d\'un sous-lot d\'origine (AB-1/t1) : --to-config refuse en nommant l\'identifiant et les deux entrées, et n\'écrit rien', () => {
+    const dir = project(SOURCE.replace('ident: AB-1/t1-fusion', 'ident: AB-1/t1'));
+    expect(raf(dir, 'import', '--from-config', '--out', '.cadence/raf.yaml').code).toBe(0);
+    const origin = switched(dir);
+    expect(raf(dir, 'add', 'Neuve', '--parent', 'AB-1').code).toBe(0);
+    const r = raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...origin);
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('AB-1/t1 : identifiant en double (deux entrées : le lot AB-1/t1, la tâche t1 de AB-1)');
+    expect(existsSync(join(dir, 'tmp/retour.yaml'))).toBe(false);
+  });
+  it('R40 — --from-config nomme aussi les deux entrées qui portent le même identifiant', () => {
+    const dir = project(SOURCE.replace('ident: AB-2', 'ident: AB-1'));
+    const r = raf(dir, 'import', '--from-config', '--out', 'tmp/natif.yaml');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('AB-1 : identifiant en double (deux entrées : l\'entrée n° 1, l\'entrée n° 3)');
+  });
   it('R39 — sans --verify, un plan natif que raf ne relirait pas pareil (spec mappé sur un chemin) est refusé avant toute écriture ; avec --verify aussi, rien n\'est écrit', () => {
     const config = CONFIG.replace('    last: [dernier]\n', '    last: [dernier]\n    spec: [fiche]\n');
     const dir = project(SOURCE.replace('    theme: infra\n', '    theme: infra\n    fiche: docs/x.md\n'), config);

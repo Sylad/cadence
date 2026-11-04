@@ -33,6 +33,14 @@ function refuse(problems: string[]): never {
   throw new RafError(problems.join('\n'));
 }
 
+/** Les identifiants déjà portés, chacun avec l'entrée qui le porte : les deux sens refusent qu'une seconde entrée le reprenne, en nommant les deux (aucun renommage d'office). */
+type Claims = Map<string, string>;
+function claimId(claims: Claims, id: string, entry: string, problems: string[]): void {
+  const first = claims.get(id);
+  if (first !== undefined) problems.push(`${id} : identifiant en double (deux entrées : ${first}, ${entry})`);
+  else claims.set(id, entry);
+}
+
 /** Le statut d'une entrée : celui de raf, et l'état d'origine (`state:`) quand `plan.statuses` en traduit. */
 function putStatus(entry: Entry, theirs: unknown, lot: Lot, format: PlanFormat, fail: (what: string) => void): void {
   const mapped = Object.keys(format.statuses).length > 0;
@@ -75,13 +83,12 @@ function originOf(entry: Entry, r: Entry, used: Partial<Record<Field, string>>, 
 }
 
 /** Une entrée du fichier d'origine, en natif : clés de raf, `state:` = l'état d'origine, `estimate_label:` = le libellé d'effort d'origine. */
-function nativeEntry(r: Entry, i: number, how: { format: PlanFormat; renames: Renames; today: Day }, seen: Set<string>, problems: string[]): Entry {
+function nativeEntry(r: Entry, i: number, how: { format: PlanFormat; renames: Renames; today: Day }, claims: Claims, problems: string[]): Entry {
   const { format, renames, today } = how;
   const e = readForeignEntry(r, i, format);
   const id = e.lot.id;
   const fail = (what: string) => void problems.push(`${id} : ${what}`);
-  if (seen.has(id)) fail('identifiant en double (deux entrées)');
-  seen.add(id);
+  claimId(claims, id, `l'entrée n° ${i + 1}`, problems);
   e.lot.problems.forEach(fail);
   const used = e.used;
   const take = (field: Field): unknown => (used[field] === undefined ? undefined : r[used[field]!]);
@@ -103,8 +110,8 @@ function nativeEntry(r: Entry, i: number, how: { format: PlanFormat; renames: Re
 /** Les entrées d'un plan d'un autre format, en natif. Refuse, en les nommant toutes, ce qu'il ne saurait pas tenir sans perte. */
 export function nativeEntries(raw: Entry[], format: PlanFormat, renames: Renames, today: Day): Entry[] {
   const problems: string[] = [];
-  const seen = new Set<string>();
-  const out = raw.map((r, i) => nativeEntry(r, i, { format, renames, today }, seen, problems));
+  const claims: Claims = new Map();
+  const out = raw.map((r, i) => nativeEntry(r, i, { format, renames, today }, claims, problems));
   if (problems.length > 0) refuse(problems);
   return out;
 }
@@ -171,11 +178,22 @@ function taskEntries(n: Entry, format: PlanFormat, problems: string[]): Entry[] 
   });
 }
 
-/** Des entrées natives, au format d'origine (l'écriture inverse) : chaque lot, puis ses sous-tâches en entrées à plat. `raf done` et les autres écritures du natif ne laissent pas toujours `state:` d'accord avec `status:` : `stateOf` en tient compte. */
+/** Les identifiants que le retour écrirait : une sous-tâche native (`<lot>/t<n>`, raf add --parent) peut reprendre celui d'un sous-lot à plat venu de l'origine — refusé comme à l'aller. Les lots d'abord, pour nommer l'entrée d'origine en premier. */
+function claimBackIds(native: Entry[], problems: string[]): void {
+  const claims: Claims = new Map();
+  for (const n of native) claimId(claims, String(n.id), `le lot ${String(n.id)}`, problems);
+  for (const n of native) {
+    if (!Array.isArray(n.tasks)) continue;
+    for (const t of n.tasks as Entry[]) claimId(claims, `${String(n.id)}/${String(t.id)}`, `la tâche ${String(t.id)} de ${String(n.id)}`, problems);
+  }
+}
+
+/** Des entrées natives, au format d'origine (l'écriture inverse) : chaque lot, puis ses sous-tâches en entrées à plat ; deux entrées au même identifiant sont refusées (claimId). `raf done` et les autres écritures du natif ne laissent pas toujours `state:` d'accord avec `status:` : `stateOf` en tient compte. */
 export function foreignEntries(native: Entry[], format: PlanFormat, renames: Renames): Entry[] {
   const problems: string[] = [];
   const back = Object.fromEntries(Object.entries(renames).map(([from, to]) => [to, from]));
   const out = native.flatMap((n) => [foreignEntry(n, format, back, problems), ...taskEntries(n, format, problems)]);
+  claimBackIds(native, problems);
   if (problems.length > 0) refuse(problems);
   return out;
 }

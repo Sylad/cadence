@@ -149,7 +149,7 @@ describe.each(Object.entries(svgs))('schéma %s', (variant, file) => {
   })
 
   it('a trois couloirs et les étapes du workflow', () => {
-    for (const s of ['Human', 'Lead session', 'orchestrate', 'cadence lead tour', '--wave', 'journal.log',
+    for (const s of ['Human', 'Lead session', 'orchestrate', 'cadence lead tour', '--wave', 'orchestrate --follow',
       '--resume --answer', 'raf ux', 'raf done', 'qa-reviewer', 'limit', 'session-close', 'session next', 'cadence deliver']) {
       expect(svg, `${variant}: ${s}`).toContain(s)
     }

@@ -96,7 +96,7 @@ proposed sub-tasks back to the human (add a line `Report file: <absolute path>` 
 ### 2b. A wave through `cadence orchestrate`
 
 Once the human has chosen the lots, the lead runs, **in the background** (it is notified at the end; no
-silent wait, no polling loop — `cadence orchestrate --status` shows where the wave is, and the follow-up below pushes each transition):
+silent wait, no polling loop — `cadence orchestrate --status` shows where the wave is, and the follow-up below pushes only the lines that ask for a gesture of yours):
 
 ```sh
 cadence orchestrate <project>:<lot> <project>:<lot>@haiku … --wave <id> [--budget 2M] [--no-fill]
@@ -109,7 +109,7 @@ For a single lot whose title is stale, add `--goal "<what done looks like>"` (re
 **Make the wave visible to the human.** Name the background task after what it runs — « vague `<id>` :
 `<project>:<lot>`, … » (its `description`), so the task list says which projects and lots, not just « a task
 is running » — and pass `--wave <id>` (e.g. `2026-10-08-1030`) so its state folder is known in advance. Right after
-starting it, arm **one follow-up** (the Monitor tool) on the wave: `cadence orchestrate --follow --wave <id>` reads its journal and prints only the lines that ask for a gesture of yours (a lot ready, handed back or failed, a question, budget or quota reached, a lot integrated), not the implementing / reviewing / fixing transitions (on 04-11 `tail -F` pushed 453 lines into the lead's context, 91 of them useful). The final table is not in the journal: it arrives with the background task's end notification. The follow-up ends by itself with « fin de vague <id> : <status> » (a later `--resume` needs a new `--follow`):
+starting it, arm **one follow-up** (the Monitor tool) on the wave: `cadence orchestrate --follow --wave <id>` reads its journal and prints only the lines written from then on that ask for a gesture of yours (a lot ready, handed back or failed, a question, budget or quota reached, an incident — push detected, repository dirtied or HEAD moved by a review —, a lot integrated), not the implementing / reviewing / fixing transitions (on 04-11 `tail -F` pushed 453 lines into the lead's context, 91 of them useful). The final table is not in the journal: it arrives with the background task's end notification. The follow-up ends by itself with « fin de vague <id> : <status> », about 30 s after the wave stops (a later `--resume` needs a new `--follow`, which does not replay the lines already relayed):
 
 ```sh
 cadence orchestrate --follow --wave <id>     # from the folder the wave was launched in

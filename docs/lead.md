@@ -53,7 +53,7 @@ picture, not its source.
 
    The program records `raf review` itself once the review is compliant.
 3. **Relay.** The lead follows the wave with `cadence orchestrate --follow --wave <id>` (the journal reduced
-   to the lines that ask for a gesture: ready, handed back, question, budget reached, integrated) and tells the human each line in one sentence, with no polling loop. A
+   to the lines that ask for a gesture: ready, handed back, question, budget reached, incident, integrated) and tells the human each line in one sentence, with no polling loop. A
    question from a session comes back to the human at once; the answer goes in with
    `cadence orchestrate --resume --wave <wave> --answer <project>:<lot> "…"` (the wave is named: the
    command is printed under each question of the table, ready to run; without a wave, `--resume` is refused as

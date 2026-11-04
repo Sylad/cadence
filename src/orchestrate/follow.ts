@@ -10,8 +10,11 @@ import type { Args } from './command-args.js';
 const DEFAULT_FOLLOW_INTERVAL = 5;
 /** Relevés accordés à une vague nommée d'avance (`--wave`) pour écrire son état avant qu'elle soit déclarée inconnue. */
 const STATE_WAIT_POLLS = 30;
-/** Relevés accordés à une vague dont l'état est écrit mais qui n'est pas finie (reprise) pour s'inscrire au registre des vagues vivantes : `--resume` ne s'y inscrit qu'après l'instantané, les verrous et les gardes de push. */
-const REGISTER_WAIT_POLLS = 6;
+/**
+ * Relevés consécutifs hors du registre des vagues vivantes avant que la vague soit tenue pour finie. Une vague reprise (`--resume`, même sur un statut `done` avec `--integrate` ou `--budget projet:lot=+N`)
+ * ne s'y inscrit qu'après l'instantané, les verrous et les gardes de push, et une vague `--continue` le quitte entre deux tours (0,8 à 7,6 s mesurés) : un seul relevé absent n'est pas une fin.
+ */
+const ABSENT_POLLS = 6;
 
 /** Le texte d'une ligne du journal, sans l'horodatage ISO qui la précède. */
 function body(line: string): string {
@@ -19,14 +22,16 @@ function body(line: string): string {
 }
 
 /**
- * Cette ligne du journal demande-t-elle un geste du lead (L588) ? Oui : un lot prêt, rendu (rendu, échoué, rendu à l'intégration), en question, arrêté sur budget ou quota, ou intégré.
- * Non : les transitions de travail (implementing, reviewing, fixing), les sessions, les worktrees, les demandes de contrôle et le reste — 91 lignes utiles sur 453 le 04-11.
+ * Cette ligne du journal demande-t-elle un geste du lead (L588) ? Oui : un lot prêt, rendu (rendu, échoué, rendu à l'intégration), en question, intégré, ou suspendu — sur budget ou quota,
+ * ou par un incident (push détecté, dépôt sali ou HEAD déplacé par une revue : à nettoyer par le lead avant de reprendre).
+ * Non : les transitions de travail (implementing, reviewing, fixing), les suspensions qui sont le geste du lead lui-même (`--stop-after-current`, `--resume --integrate|--replay|--budget`,
+ * nommé entre parenthèses dans leur texte), les sessions, les worktrees, les demandes de contrôle et le reste — 91 lignes utiles sur 453 le 04-11.
  * Seul l'état écrit APRÈS la flèche compte : « → fixing — … ready … » ne remonte pas.
  */
 export function leadLine(line: string): boolean {
   const text = body(line);
   if (/^\S+ → (?:ready|handed-back|failed|question)(?: — |$)/.test(text)) return true;
-  if (/^\S+ → suspended — (?:budget|quota) atteint/.test(text)) return true;
+  if (/^\S+ → suspended — /.test(text)) return !/\(--[a-z-]+(?: --[a-z-]+)*\)/.test(text);
   if (/^\S+ intégré : \S+\.\.\S+$/.test(text)) return true;
   return /^orchestrate : \S+ : rendu à l'intégration/.test(text);
 }
@@ -46,7 +51,8 @@ export function checkFollowFlags(args: Args): void {
 }
 
 /**
- * `--follow` (L588) : suit le journal d'une vague et n'imprime que les lignes de `leadLine`, avec leur horodatage, depuis le début du journal ; à l'arrêt de la vague, une dernière ligne « fin de vague » dit son statut.
+ * `--follow` (L588) : suit le journal d'une vague et n'imprime que les lignes de `leadLine`, avec leur horodatage, écrites après son armement (un suivi réarmé après `--resume` ne rejoue pas
+ * les prêts et les questions déjà relayés ; le journal entier reste dans `--status` et `tail`) ; quand la vague a quitté le registre depuis `ABSENT_POLLS` relevés, une dernière ligne « fin de vague » dit son statut.
  * Remplace `tail -F journal.log` du skill lead : la vague écrit ~450 lignes, le lead n'a à agir que sur un cinquième.
  */
 export async function followCommand(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch: string): Promise<number> {
@@ -55,12 +61,11 @@ export async function followCommand(args: Args, io: OrchestrateIo, deps: Orchest
   const store = await waveStore(args.wave, launch, () => sleep(ms));
   const reader = journalReader(join(store.dir, 'journal.log'));
   const live = () => liveWaves(cadenceHome()).some((w) => w.wave === store.id);
-  // Une vague arrêtée (suspended-*, interrupted) peut être en train d'être reprise : son statut d'avant la reprise n'est pas sa fin.
-  for (let polls = 0; polls < REGISTER_WAIT_POLLS && store.readWave()?.status !== 'done' && !live(); polls++) await sleep(ms);
+  let absent = 0;
   for (;;) {
-    const running = live();
+    absent = live() ? 0 : absent + 1;
     for (const line of reader()) io.out(line);
-    if (!running) {
+    if (absent > ABSENT_POLLS) {
       io.out(`fin de vague ${store.id} : ${store.readWave()?.status ?? 'illisible'}`);
       return 0;
     }
@@ -80,12 +85,14 @@ async function waveStore(wave: string | undefined, launch: string, wait: () => P
   return store;
 }
 
-/** Relève le journal : à chaque appel, les lignes de geste écrites depuis le précédent ; une ligne non terminée attend sa fin. Un journal absent est un journal vide. */
+/** Relève le journal : à chaque appel, les lignes de geste écrites depuis le précédent (depuis l'armement au premier) ; une ligne non terminée attend sa fin. Un journal absent est un journal vide. */
 function journalReader(file: string): () => string[] {
-  let done = 0; // caractères déjà traités
+  const read = () => (existsSync(file) ? readFileSync(file, 'utf8') : '');
+  const endOf = (text: string) => text.lastIndexOf('\n') + 1;
+  let done = endOf(read()); // caractères déjà traités
   return () => {
-    const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
-    const end = text.lastIndexOf('\n') + 1;
+    const text = read();
+    const end = endOf(text);
     if (end <= done) return [];
     const lines = text.slice(done, end).split('\n').filter(leadLine);
     done = end;

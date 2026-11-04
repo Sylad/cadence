@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { run } from '../src/cli.js';
+import { PLAN_LEGACY } from '../src/config.js';
 import { gitRepo } from './helpers.js';
 
 // Sonde L470 — les bords de raf export et raf events.
@@ -54,8 +55,8 @@ describe('L470 bords — raf events', () => {
   it('un plan déplacé (raf migrate, git mv) garde son historique d\'état et ne reçoit pas de faux etat au jour du déplacement', () => {
     const dir = project();
     raf(dir, 'add', 'A');
-    const legacy = 'docs/plan/raf.yaml';
-    execFileSync('mkdir', ['-p', join(dir, 'docs/plan')]);
+    const legacy = PLAN_LEGACY;
+    execFileSync('mkdir', ['-p', dirname(join(dir, legacy))]);
     commit(dir, '2026-09-30T10:00:00', 'plan', PLAN, 'cadence.yaml');
     git(dir, 'mv', PLAN, legacy);
     process.env.TEST_DAY = '2026-10-01T10:00:00';

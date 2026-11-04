@@ -67,12 +67,16 @@ describe('R1 — la porte refuse un lot qui pose une clé inconnue de la copie e
   });
   it('R1 — cadence.yaml déjà invalide au départ et non touché par le lot : pas de correction (ce n\'est pas son défaut)', async () => {
     const { parent, repo } = setup([{ title: 'un' }]);
-    writeFileSync(join(repo, 'cadence.yaml'), `${ORIGINAL}  cleInconnue: true\n`);
+    // `news: 42` : la vague démarre (le départ ne relit qu'`orchestrate:`) et seule la relecture complète de la porte la refuserait.
+    writeFileSync(join(repo, 'cadence.yaml'), `${ORIGINAL}news: 42\n`);
     git(repo, 'add', '--', 'cadence.yaml');
     git(repo, 'commit', '-q', '-m', 'chore: clé');
     const f = fake();
-    await run(parent, ['a:L1'], f);
+    const r = await run(parent, ['a:L1'], f);
+    expect(r.code).toBe(0);
+    expect(f.calls.filter((c) => c.kind === 'implement')).toHaveLength(1);
     expect(f.calls.filter((c) => c.kind === 'fix')).toHaveLength(0);
+    expect(store(parent).readLot('a', 'L1')!.status).toBe('ready');
   });
 });
 

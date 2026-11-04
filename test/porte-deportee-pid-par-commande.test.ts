@@ -15,15 +15,15 @@ const settle = async (pattern: string): Promise<boolean> => {
   return alive(pattern);
 };
 
-function setup() {
+function setup(nom = 'depot') {
   const remote = fakeRemote();
-  const repo = join(tempDir(), 'depot');
+  const repo = join(tempDir(), nom);
   mkdirSync(repo);
   for (const a of [['init', '-q', '-b', 'main'], ['config', 'user.email', 't@example.com'], ['config', 'user.name', 'T'], ['config', 'commit.gpgsign', 'false']]) git(repo, ...a);
   writeFileSync(join(repo, 'a.txt'), '1\n');
   git(repo, 'add', '.');
   git(repo, 'commit', '-q', '-m', 'init');
-  return { remote, repo, sha: git(repo, 'rev-parse', 'HEAD'), wt: join(remote.home, '.cadence-gate', 'depot', 'wt') };
+  return { remote, repo, sha: git(repo, 'rev-parse', 'HEAD'), wt: join(remote.home, '.cadence-gate', nom, 'wt') };
 }
 const open = async (s: ReturnType<typeof setup>) => {
   const o = await openRemoteGate({ host: 'machine', install: 'mkdir -p node_modules', repo: s.repo, sha: s.sha, depsFrom: s.repo, env: s.remote.env, timeoutMs: 30_000, workers: () => 1 });
@@ -112,14 +112,14 @@ describe('R19 — un pid par commande distante', () => {
     expect(await settle(`sleep 81112\\.${tag}$`)).toBe(false);
   });
 
-  it('commande avec espace et apostrophes dans le chemin de pid : chaque run écrit son propre fichier distinct', async () => {
-    const s = setup();
+  it('dépôt dont le dossier a un espace et une apostrophe : le pid est écrit, lu et tué à la fermeture', async () => {
+    const s = setup("l'atelier de test");
     const gate = await open(s);
-    await gate.run('true', 30_000);
-    await gate.run('true', 30_000);
-    const files = pidFiles(s);
-    expect(new Set(files).size).toBe(files.length);
-    expect(files.every((f) => /\.\d+\.pid$/.test(f))).toBe(true);
-    gate.close();
+    const tag = `${process.pid}`;
+    await gate.run(`sleep 91111.${tag}`, 1200);
+    expect(pidFiles(s).length).toBeGreaterThanOrEqual(1);
+    expect(gate.close()).toBeNull();
+    expect(await settle(`sleep 91111\\.${tag}$`)).toBe(false);
+    expect(existsSync(s.wt) ? readdirSync(s.wt) : []).toEqual([]);
   });
 });

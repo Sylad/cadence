@@ -4,7 +4,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { dirtyContents } from './git.js';
 import { initialContent } from './plan-init.js';
 import { assertFilesUnchanged, assertPlanUnchanged, withPlanLock } from './plan-lock.js';
-import { ON_WRITE_TIMEOUT_MS, failureReason } from './plan-onwrite.js';
+import { ON_WRITE_TIMEOUT_MS, failureMessage, noticeHookFiles } from './plan-onwrite.js';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
 import { normalizeLot } from './plan-read.js';
@@ -173,9 +173,9 @@ export interface PlanSettings {
   files?: string[];
   /**
    * `plan.onWrite` (L346) : commande lancée à la racine du dépôt (`cwd`, le dossier de cadence.yaml) après chaque écriture du plan, et fichiers qu'elle produit.
-   * Ils sont tenus avec le plan (mêmes règles que `files`) et commités avec lui. Un échec de la commande refuse l'écriture.
+   * Ils sont tenus avec le plan (mêmes règles que `files`) et commités avec lui. Un échec de la commande refuse l'écriture (`onFailure: refuse`, le défaut) ou la laisse passer avec un avertissement (`warn`, L471).
    */
-  onWrite?: { command: string; files: string[]; cwd: string; timeoutMs?: number };
+  onWrite?: { command: string; files: string[]; cwd: string; timeoutMs?: number; onFailure?: 'refuse' | 'warn' };
   /** Fichier d'attendus QA (clé `qa.expectations` de cadence.yaml) : tenu avec le plan, docs/qa/expectations.md par défaut. */
   qaExpectations?: string;
   /** Paramètre ou chemin du jeu de données « pires cas » du produit (clé `qa.worstData` de cadence.yaml, L534) : absent, les briefs d'écran n'en parlent pas. */
@@ -301,8 +301,9 @@ export class Plan {
     const kept = written.map((p) => [p, existsSync(p) ? readFileSync(p) : null] as const);
     // « Plan inchangé » vaut pour l'archive aussi : un fichier d'année né de cette écriture disparaît, le dossier avec. Un fichier qui n'a pas bougé
     // (l'écriture a échoué avant lui, ou sur lui) n'est pas réécrit : le remettre échouerait de la même façon.
-    const restore = () => {
+    const restore = (only?: Set<string>) => {
       for (const [p, content] of kept) {
+        if (only && !only.has(p)) continue;
         const now = existsSync(p) ? readFileSync(p) : null;
         if (now === content || (now && content && now.equals(content))) continue;
         try {
@@ -312,6 +313,7 @@ export class Plan {
           /* le fichier d'origine est intact ou le même : rien de plus à faire */
         }
       }
+      if (only) return;
       if (!hadDir) rmSync(this.archiveDir, { recursive: true, force: true });
       for (const a of archives) [a.dirty, a.onDisk] = [true, kept.find(([p]) => p === a.file)?.[1]?.toString('utf8') ?? ''];
     };
@@ -332,22 +334,15 @@ export class Plan {
     const r = spawnSync('sh', ['-c', hook.command], { cwd: hook.cwd, encoding: 'utf8', timeout: limit, stdio: ['ignore', 'pipe', 'pipe'] });
     if (r.status === 0) {
       this.onDisk = readFileSync(this.path, 'utf8'); // la commande a pu réécrire le plan elle-même (verrou tenu : aucune autre session) : ce n'est pas un changement étranger
-      // Ce que la commande a réellement écrit (L436) : un fichier hors de `files` (déclaration incomplète) doit quand même être commité avec le plan,
-      // sans quoi la livraison refuse « 1 fichier modifié ». Le plan, les archives et les fichiers déclarés ont leur propre chemin.
-      const known = new Set([...written.map((p) => relative(hook.cwd, p)), ...hook.files]);
-      const undeclared = [...dirtyContents(hook.cwd)].filter(([f, content]) => before.get(f) !== content && !known.has(f)).map(([f]) => f);
-      for (const f of undeclared) this.writtenByHook.add(f);
-      if (undeclared.length > 0) notice(`raf: plan.onWrite a écrit ${undeclared.join(', ')}, absent de plan.onWrite.files — l'ajouter dans cadence.yaml (il est cité dans le commit proposé cette fois)`);
-      // Un chemin mal déclaré laisse le vrai fichier produit hors du commit du plan (le constat d'origine du lot) : le dire.
-      const missing = hook.files.filter((f) => !existsSync(resolve(hook.cwd, f)));
-      if (missing.length > 0) notice(`raf: plan.onWrite a réussi mais le fichier déclaré est absent : ${missing.join(', ')} — vérifier plan.onWrite.files dans cadence.yaml`);
+      noticeHookFiles(hook, before, written, this.writtenByHook, notice);
       return;
     }
-    restore();
+    const failed = failureMessage(hook.command, r, limit);
+    // L471 : en `warn` (un miroir injoignable) le plan reste écrit et seuls les fichiers déclarés, peut-être à moitié écrits par la commande, sont remis.
+    restore(hook.onFailure === 'warn' ? new Set(hook.files.map((f) => resolve(hook.cwd, f))) : undefined);
+    if (hook.onFailure === 'warn') return notice(`raf: ${failed} — plan écrit quand même (plan.onWrite.onFailure: warn), la copie publiée n'est pas à jour`);
     this.onDisk = current; // le plan est revenu tel qu'avant
-    const why = r.error ? (r.error as NodeJS.ErrnoException).code === 'ETIMEDOUT' ? `délai de ${limit / 1000} s dépassé` : r.error.message : `code ${r.status ?? r.signal}`;
-    const tail = failureReason(r.stderr, r.stdout);
-    throw new RafError(`plan.onWrite en échec (${hook.command}, ${why})${tail ? ` : ${tail}` : ''} — écriture refusée, plan inchangé`);
+    throw new RafError(`${failed} — écriture refusée, plan inchangé`);
   }
 
   get project(): string {

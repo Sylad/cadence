@@ -43,7 +43,7 @@ describe('R1 — la clé plan.onWrite se lit et se valide', () => {
   it('R1 — command et files lus, la commande tourne à la racine du dépôt (le dossier de cadence.yaml)', () => {
     const dir = tempDir();
     writeFileSync(join(dir, 'cadence.yaml'), config('npm run plan'));
-    expect(readPlanConfig(join(dir, 'cadence.yaml'))?.settings.onWrite).toEqual({ command: 'npm run plan', files: [OUT], cwd: dir });
+    expect(readPlanConfig(join(dir, 'cadence.yaml'))?.settings.onWrite).toEqual({ command: 'npm run plan', files: [OUT], cwd: dir, onFailure: 'refuse' });
   });
   it('R1 — files absent : aucun fichier produit déclaré', () => {
     expect(read("plan:\n  onWrite: { command: 'make' }\n")()?.settings.onWrite?.files).toEqual([]);
@@ -184,6 +184,79 @@ describe('R3 bis — chemin mal déclaré et commande qui ne finit pas', () => {
     plan.add('x', '2026-10-26');
     expect(() => plan.save()).toThrow(/plan\.onWrite en échec.*ENOENT.*plan inchangé/);
     expect(readFileSync(path, 'utf8')).toBe(before);
+  });
+});
+
+describe('M9 (L471) — onFailure: refuse|warn', () => {
+  const warn = (command: string, files = `[${OUT}]`) => `plan:\n  onWrite: { command: '${command}', files: ${files}, onFailure: warn }\n`;
+  const read = (yaml: string) => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'cadence.yaml'), yaml);
+    return () => readPlanConfig(join(dir, 'cadence.yaml'));
+  };
+  it('R10 — onFailure se lit : absent = refuse, warn et refuse acceptés', () => {
+    expect(read(config('make'))()?.settings.onWrite?.onFailure).toBe('refuse');
+    expect(read(warn('make'))()?.settings.onWrite?.onFailure).toBe('warn');
+    expect(read("plan:\n  onWrite: { command: make, onFailure: refuse }\n")()?.settings.onWrite?.onFailure).toBe('refuse');
+  });
+  it('R10 — une valeur inconnue ou d\'un autre type est refusée en nommant la clé', () => {
+    expect(read("plan:\n  onWrite: { command: make, onFailure: ignore }\n")).toThrow(/plan\.onWrite\.onFailure doit être refuse ou warn/);
+    expect(read("plan:\n  onWrite: { command: make, onFailure: true }\n")).toThrow(/plan\.onWrite\.onFailure/);
+    expect(read("plan:\n  onWrite: { command: make, onFailure: '' }\n")).toThrow(/plan\.onWrite\.onFailure/);
+  });
+  it('R11 — warn : la commande échoue, le plan est écrit (exit 0), l\'avertissement nomme commande, code et motif', () => {
+    const dir = project(warn(`echo boum >&2 && exit 7`));
+    const r = cadence(dir, 'add', 'écrit quand même');
+    expect(r.code).toBe(0);
+    expect(readFileSync(join(dir, PLAN), 'utf8')).toContain('écrit quand même');
+    expect(r.err).toContain('plan.onWrite en échec');
+    expect(r.err).toContain('code 7');
+    expect(r.err).toContain('boum');
+    expect(r.err).toContain('plan écrit quand même');
+    expect(r.err).not.toContain('plan inchangé');
+  });
+  it('R11 — warn : l\'écriture suivante passe sans « plan modifié par une autre session » (le plan écrit est la référence)', () => {
+    const dir = project(warn('exit 1'));
+    expect(cadence(dir, 'add', 'un').code).toBe(0);
+    expect(cadence(dir, 'add', 'deux').code).toBe(0);
+    expect(readFileSync(join(dir, PLAN), 'utf8')).toContain('deux');
+  });
+  it('R11 — warn : un fichier déclaré à moitié écrit par la commande en échec est remis tel qu\'avant, un fichier qui n\'existait pas est retiré', () => {
+    const dir = project(warn(`${GENERATE} && exit 1`));
+    expect(cadence(dir, 'add', 'a').code).toBe(0);
+    expect(existsSync(join(dir, OUT))).toBe(false);
+    mkdirSync(join(dir, 'public'), { recursive: true });
+    writeFileSync(join(dir, OUT), 'ancien\n');
+    expect(cadence(dir, 'add', 'b').code).toBe(0);
+    expect(readFileSync(join(dir, OUT), 'utf8')).toBe('ancien\n');
+  });
+  it('R11 — warn : la commande qui réussit ne change rien (aucun avertissement, fichier produit)', () => {
+    const dir = project(warn(GENERATE));
+    const r = cadence(dir, 'add', 'ok');
+    expect(r.code).toBe(0);
+    expect(r.err).toBe('');
+    expect(existsSync(join(dir, OUT))).toBe(true);
+  });
+  it('R11 — warn : délai dépassé et commande qui ne démarre pas sont des avertissements aussi, le plan reste écrit', () => {
+    const dir = project('');
+    const path = join(dir, PLAN);
+    const slow = Plan.load(path, { onWrite: { command: 'sleep 5', files: [], cwd: dir, timeoutMs: 200, onFailure: 'warn' } });
+    slow.add('lent', '2026-10-26');
+    expect(() => slow.save()).not.toThrow();
+    expect(readFileSync(path, 'utf8')).toContain('lent');
+    const lost = Plan.load(path, { onWrite: { command: 'true', files: [], cwd: join(dir, 'nulle-part'), onFailure: 'warn' } });
+    lost.add('perdu', '2026-10-26');
+    expect(() => lost.save()).not.toThrow();
+    expect(readFileSync(path, 'utf8')).toContain('perdu');
+  });
+  it('R12 — refuse explicite se comporte comme le défaut : écriture refusée, plan inchangé', () => {
+    const dir = project(config('true'));
+    writeFileSync(join(dir, 'cadence.yaml'), "plan:\n  onWrite: { command: 'exit 3', onFailure: refuse }\n");
+    const before = readFileSync(join(dir, PLAN), 'utf8');
+    const r = cadence(dir, 'add', 'x');
+    expect(r.code).toBe(2);
+    expect(r.err).toContain('écriture refusée, plan inchangé');
+    expect(readFileSync(join(dir, PLAN), 'utf8')).toBe(before);
   });
 });
 

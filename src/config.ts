@@ -9,6 +9,7 @@ import { DEFAULT_TEST_PATTERNS, type TestGateConfig } from './testgate.js';
 import { readExtras, readRequirePlanned } from './plan-extras.js';
 import { readQaSettings } from './qa-keys.js';
 import { planCommitProblem } from './plan-commit.js';
+import { readOnWrite } from './config-onwrite.js';
 import { parseStates } from './plan-states.js';
 import { checkTestReplay, readGateTest, type GateTest } from './orchestrate/gate-parts.js';
 import { booleanKey, isObject, list, readYamlFile, readYamlKey } from './yaml-keys.js';
@@ -25,23 +26,8 @@ interface PlanConfig {
 }
 
 const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add', 'onWrite', 'commit', 'states', 'transitions', 'doneState', 'deliveredState', 'blockedState', 'extras', 'idPattern', 'requirePlanned'];
-const ON_WRITE_KEYS = ['command', 'files'];
 const FORMAT_KEYS = ['lots', 'fields', 'statuses', 'estimates'];
 
-
-/** Clé `plan.onWrite` (L346) : la commande qui republie le plan après chaque écriture, lancée dans `cwd` (la racine du dépôt), et les fichiers qu'elle produit (relatifs au dépôt, jamais hors de lui). */
-function readOnWrite(v: unknown, cwd: string, bad: (what: string) => RafError): NonNullable<PlanSettings['onWrite']> {
-  if (!isObject(v)) throw bad('onWrite doit être un objet { command, files }');
-  for (const k of Object.keys(v)) if (!ON_WRITE_KEYS.includes(k)) throw bad(`onWrite.${k} inconnu (attendu : ${ON_WRITE_KEYS.join(', ')})`);
-  if (typeof v.command !== 'string' || v.command.trim() === '') throw bad('onWrite.command doit être une commande');
-  const files = list(v.files).map((f) => {
-    const rel = posix.normalize(f.trim().replace(/\\/g, '/'));
-    if (rel === '.' || rel === '..' || rel.startsWith('../') || isAbsolute(rel)) throw bad(`onWrite.files « ${f} » est hors du dépôt`);
-    if (existsSync(resolve(cwd, rel)) && statSync(resolve(cwd, rel)).isDirectory()) throw bad(`onWrite.files « ${f} » est un dossier (déclarer les fichiers produits, pas leur dossier)`);
-    return rel;
-  });
-  return { command: v.command, files, cwd };
-}
 
 /**
  * Clé `plan:` de cadence.yaml : où est le plan et, s'il est tenu par un autre outil, comment le lire.

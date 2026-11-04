@@ -62,7 +62,7 @@ regles:
     tests: ["R5 — 14 lots livrés : une ligne « livrés : 14 » sous les lots en cours, aucune ligne par lot livré", "R5 — aucun lot livré : pas de ligne « livrés »"]
   - id: R6
     etat: charge
-    enonce: "La ligne « livrés : N » est repliée par défaut ; un clic (ou Entrée) la déplie : chaque lot livré y a sa ligne (id, titre, « ✔ livré »), sous la ligne ; un second clic la replie. Le choix se garde comme celui de « + N lots »."
+    enonce: "La ligne « livrés : N » est repliée par défaut ; un clic (ou Entrée) la déplie : chaque lot livré y a sa ligne (id, titre, « ✔ livré »), sous la ligne ; un second clic la replie. Le choix ouvert/fermé se garde dans la clé lotsViews existante du $.store, sans nouveau stockage."
     message: ~
     champs: [ligne-livres, lot-id-livre, lot-etat-livre]
     statut: sourcee

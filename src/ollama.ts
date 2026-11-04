@@ -4,11 +4,12 @@ import { UNREACHABLE } from './corrections-echecs.js';
 /** Les options d'un appel Ollama ; `onFail` reçoit la raison de chaque réponse perdue (L575). */
 export interface OllamaOpts { url: string; model: string; fetch?: typeof fetch; onFail?: (reason: string) => void }
 
-/** Appel `/api/chat` d'Ollama (température 0, sortie contrainte par `format`) : le texte du message, null sur réponse refusée ou échec réseau (la raison va à `onFail`). Commun au classeur et au sous-classeur. */
+/** Appel `/api/chat` d'Ollama (température 0, sortie contrainte par `format`) : le texte du message, null sur réponse refusée, illisible ou échec réseau (la raison va à `onFail`). Commun au classeur et au sous-classeur. */
 export async function ollamaChat(opts: OllamaOpts, format: object, system: string, user: string): Promise<string | null> {
   const doFetch = opts.fetch ?? fetch;
+  let res: Response;
   try {
-    const res = await doFetch(`${opts.url.replace(/\/$/, '')}/api/chat`, {
+    res = await doFetch(`${opts.url.replace(/\/$/, '')}/api/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -19,14 +20,19 @@ export async function ollamaChat(opts: OllamaOpts, format: object, system: strin
         messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       }),
     });
-    if (!res.ok) {
-      opts.onFail?.(`réponse HTTP ${res.status}`);
-      return null;
-    }
+  } catch {
+    opts.onFail?.(UNREACHABLE);
+    return null;
+  }
+  if (!res.ok) {
+    opts.onFail?.(`réponse HTTP ${res.status}`);
+    return null;
+  }
+  try {
     const body = (await res.json()) as { message?: { content?: string } };
     return body.message?.content ?? '';
   } catch {
-    opts.onFail?.(UNREACHABLE);
+    opts.onFail?.('réponse illisible');
     return null;
   }
 }

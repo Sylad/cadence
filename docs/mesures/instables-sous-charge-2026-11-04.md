@@ -12,8 +12,10 @@ Mesure « avant » : les lignes `N test(s) instable(s) sous charge` des `journal
 | `verify` — SIGINT relayé | 2 | non établie ; le test attend déjà des événements (fichier pid, mort du pid) avec des bornes de 15 et 10 s | non corrigé (SIGHUP : L505) |
 | `orchestrate-worktree-plan-writes` — R16 | 2 | démarrage de l'application et file au mur | corrigé avant (L567) |
 | `orchestrate-app` — délai restant | 1 | réveil de la sonde du verrou en retard sur le saut d'horloge | corrigé avant (L528, L540) |
-| `orchestrate-app` — verrou vide volé au bout de 5 s | 1 | non établie | **non corrigé** |
-| `probe-L539-bords` — 6 fois de suite | 1 | délais à la mesure du travail | corrigé avant (L567) |
+| `orchestrate-app` — verrou vide volé au bout de 5 s | 1 | horloge, lue dans le code : le test écrit un verrou vide puis attend au mur (`startApp`, 600 ms) ; `takeUrlLock` (`src/orchestrate/app.ts`) vole un verrou vide dès que `age >= 5_000`, âge mesuré à l'horloge réelle (mtime contre maintenant) ; plus de 5 s sous charge entre l'écriture et la première sonde, et le verrou est volé. Rejoué seul : vert | **non corrigé** : proposé au lead comme lot propre (horloge simulée comme dans le test « délai restant ») |
+| `probe-L539-bords` — 6 fois de suite | 1 | délais à la mesure du travail | **récidive mesurée** : le correctif de L567 (442228a) ne fait que porter le délai du test à 180 s, et la ligne du 04-11T13:20:38Z (`cadence:L558`, worktree qui contient 442228a) l'a vu instable après lui. Cause non levée, à reprendre par un lot propre |
 | `orchestrate-worktree-integration` — L443 | 1 | refus attendu sous un délai de 2 s | corrigé avant (L550) |
 
-« Après » : à relever dans les prochaines vagues avec la commande ci-dessus ; les trois tests non corrigés sont ceux à surveiller. Rien n'a été relevé sur le gate de cette session (non rejoué par elle).
+Les « corrigé avant » de L540 (5 s de marge au réveil de la sonde), L567 (R16 « attendus plus largement », 180 s de `probe-L539-bords`) élargissent un délai au lieu d'attendre un événement : ils réduisent la fréquence, pas la cause. Seul `deliver` (f) attend un événement (L577).
+
+« Après » : à relever dans les prochaines vagues avec la commande ci-dessus ; à surveiller : les trois non corrigés (R17, `verify` SIGINT, verrou vide) et `probe-L539-bords`, déjà instable une fois après son correctif (13:20:38Z, vague de cette session). Le gate de cette session n'a pas été rejoué par elle.

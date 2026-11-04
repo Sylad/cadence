@@ -161,8 +161,8 @@ export async function specStep(c: LotCtx): Promise<void> {
   const inDir = fiche === '' || fiche.startsWith(`${c.config.spec.dir.replace(/\/+$/, '')}/`);
   const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/${what}/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/${what}/fiche.yaml)`] : fiche ? checkSpec(wd(c), fiche, l.lot, partsOf(c, fiche)) : [`aucune fiche écrite : ${c.config.spec.dir}/${what}/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change ${l.screen ? 'aucun écran' : 'aucun comportement'})`];
   if (problems.length) {
-    if ((l.specRuns ?? 0) >= specBudget(c)) {
-      stop(c, 'handed-back', `spec non conforme après ${specBudget(c)} passes : ${problems.join(' ; ')}`);
+    if ((l.specRuns ?? 0) >= specMax(c)) {
+      stop(c, 'handed-back', `spec non conforme après ${l.specRuns} passes : ${problems.join(' ; ')}`);
       return;
     }
     l.specProblems = problems;
@@ -238,20 +238,21 @@ function logUnchangedDefects(c: LotCtx, rep: ReviewReport, passes: number): void
   for (const k of rep.constats) if ((k.gravite === 'bloquant' || k.gravite === 'majeur') && k.inchange === true) c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · défaut de revue : maquette, revue ${passes}, majeur sur un point inchangé absent de la revue ${passes - 1} : ${k.texte}`);
 }
 
-/** Un seul constat bloquant ou majeur, et c'est un majeur (L572) : le lead le corrige en une ligne, le verdict le dit avec son fichier:ligne. Rien sinon, le verdict de l'agent reste. */
-function onlyMajor(constats: Constat[]): string | undefined {
+/** Un seul constat bloquant ou majeur (totaux annoncés compris : `total`), et c'est un majeur (L572) : le lead le corrige en une ligne, le verdict le dit avec son fichier:ligne. Rien sinon, le verdict de l'agent reste. */
+function onlyMajor(constats: Constat[], total: number): string | undefined {
   const [k] = constats;
-  if (constats.length !== 1 || k.gravite !== 'majeur') return undefined;
+  if (total !== 1 || constats.length !== 1 || k.gravite !== 'majeur') return undefined;
   const at = k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : '';
   return `un seul majeur, corrigeable par le lead : ${at}${k.texte}`;
 }
 
 /** Le lot est rendu au lead : revues épuisées (deux pour la fiche, trois si elle converge — L572 —, `maquetteReviews` pour la maquette), ou plus de session spec pour la passe suivante. Vrai quand il l'a été. */
-function handBack(c: LotCtx, r: SpecReview, passes: number, constats: Constat[], agentVerdict: string): boolean {
+function handBack(c: LotCtx, r: SpecReview, passes: number, constats: Constat[], summary: ReturnType<typeof summarize>): boolean {
   const l = c.lot;
-  if (r.kind === 'fiche') (l.ficheCounts ??= []).push(constats.length);
+  const total = summary.bloquants + summary.majeurs;
+  if (r.kind === 'fiche') (l.ficheCounts ??= []).push(total);
   const reviews = r.kind === 'maquette' ? c.config.maquetteReviews : ficheConverging(l) ? 3 : 2;
-  const verdict = (r.kind === 'fiche' ? onlyMajor(constats) : undefined) ?? agentVerdict;
+  const verdict = (r.kind === 'fiche' ? onlyMajor(constats, total) : undefined) ?? summary.verdict;
   const left = `${verdict}\n${bulletLines(constats).join('\n')}`;
   if (passes >= reviews) {
     stop(c, 'handed-back', `${r.label} non conforme après ${reviews} revue${reviews > 1 ? 's' : ''} : ${left}`);
@@ -306,7 +307,7 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
     save(c);
     return;
   }
-  if (handBack(c, r, passes, constats, summary.verdict)) return;
+  if (handBack(c, r, passes, constats, summary)) return;
   l[key] = constats.length ? constats : [{ source: r.source, gravite: 'majeur', texte: summary.verdict }];
   l.next = r.retry(c, fiche);
   save(c);

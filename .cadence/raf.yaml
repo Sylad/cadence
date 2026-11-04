@@ -1206,9 +1206,10 @@ lots:
     finished: 2026-11-03
   - id: L506
     title: "Porte déportée : un pid par commande distante (pas un seul wt/<id>.pid écrasé) — après un délai suivi d'une autre commande, le groupe du build en délai n'est pas tué sur l'hôte (R19, mineur de la revue de L403)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-01
+    started: 2026-11-04
   - id: L507
     title: "Porte déportée : au Ctrl-C/SIGTERM d'une vague (gate-place) et pendant gate.install de verify --gate, tuer le ssh local et fermer côté hôte (R10/R19, mineur de la revue de L403)"
     status: todo

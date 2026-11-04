@@ -50,7 +50,7 @@ describe('L572 ficheConverging / specMax : bornes', () => {
 
 describe('L572 ficheReviewText : brief de la 3ᵉ revue', () => {
   it('passes 2 : « third and last », points « previous », et jamais « second »', () => {
-    const t = ficheReviewText({ fiche: 'f.yaml', passes: 2, previous: [{ source: 'fiche', gravite: 'majeur', texte: 'R9 : x', fichier: 'a.ts', ligne: 1 }] });
+    const t = ficheReviewText({ fiche: 'f.yaml', passes: 2, previous: [{ source: 'code', gravite: 'majeur', texte: 'R9 : x', fichier: 'a.ts', ligne: 1 }] });
     expect(t).toMatch(/third and last/);
     expect(t).not.toMatch(/second and last/);
     expect(t).toContain('R9 : x');

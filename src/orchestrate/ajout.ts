@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import type { Args, OrchestrateDeps, OrchestrateIo, Target } from './command.js';
 import type { FillPlan } from './continue.js';
@@ -7,6 +8,11 @@ import { cadenceHome, liveWaves } from './registry.js';
 import { REPO_LOCK, takeLock } from './lock.js';
 import { heldRefusal } from '../local-task.js';
 import { installPrePush } from './guard.js';
+import { addableHandBack, addGesture } from './geste.js';
+import { baseBranchOf, lotBranch, lotTreeDir, trackedDirty } from './worktree.js';
+import { lotSpent } from './cycle/budget.js';
+import { firstReview, toFix } from './cycle/review.js';
+import { firstWrite } from './cycle/spec-steps.js';
 import { sharedStateDir } from '../state.js';
 import { waveReadsAdds } from './snapshot.js';
 import type { AnyModel } from './launch.js';
@@ -15,7 +21,7 @@ import type { AnyModel } from './launch.js';
 export type AddEntry = { id: number; project?: string; lot: string; model?: string };
 
 /** Un lot de la vague (ou déjà en file d'ajout) vu par le contrôle préalable d'un ajout. */
-export type KnownLot = { project: string; lot: string; queued?: boolean; /** État du lot de la vague (absent d'un lot en file) : un lot retiré par --drop se relance dans une nouvelle vague (L554). */ status?: LotState['status']; outcome?: string | null };
+export type KnownLot = { project: string; lot: string; queued?: boolean; /** État du lot de la vague (absent d'un lot en file) : un lot retiré par --drop se relance dans une nouvelle vague (L554). */ status?: LotState['status']; outcome?: string | null; /** L'étape où le lot a été rendu : `integrate` n'est jamais ajoutable (L563). */ next?: LotState['next'] };
 
 /** Où et avec quoi tourne la commande : sa sortie, ses dépendances et le dossier de lancement. */
 export interface RunEnv {
@@ -62,6 +68,47 @@ export function addHint(t: { projectDir: string; lot: string }, wave: string, la
   return ` ; pour y ajouter ce lot : cadence orchestrate --add ${relative(launch, t.projectDir) || '.'}:${t.lot} --wave ${wave}`;
 }
 
+/**
+ * R4 (L563) : pourquoi un lot rendu ne peut pas être repris, ou null. Son worktree conservé et la branche de la vague doivent exister, et l'arbre n'a aucun fichier suivi modifié (le correctif du lead est commité) :
+ * le programme ne commite ni ne jette jamais l'arbre du lead, le refus nomme les fichiers et la commande à rejouer après le commit.
+ */
+export function resumeRefusal(store: RunStore, l: Pick<LotState, 'project' | 'lot' | 'repo'>, launch: string): string | null {
+  const dir = lotTreeDir(store.dir, l.project, l.lot, l.repo);
+  const branch = lotBranch(store.id, l.project, l.lot);
+  if (!baseBranchOf(l.repo, branch)) return `la branche ${branch} de la vague n'existe plus`;
+  if (!existsSync(dir)) return `le worktree ${dir} n'existe plus`;
+  const dirty = trackedDirty(dir);
+  return dirty.length ? `fichiers non commités dans ${dir} : ${dirty.join(', ')} ; les commiter, puis rejouer : ${addGesture(store.id, lotKey(l.project, l.lot), launch)}` : null;
+}
+
+/**
+ * La prise d'un lot rendu (L563) : le ctx neuf (`c`, de `e.build` : steps vides, sans constats) reçoit une COPIE de l'état de l'ancien ctx de la vague (`old`), puis, dans cet ordre (R6) :
+ * pass 0, escalade vidée, budget = dépensé + budget d'un lot neuf, steps gardés, queued sans outcome ; l'état de reprise (R11 : `resumedFrom` = la vague, `resumedReviewed`, comme execute.ts:planTrees) ;
+ * ENFIN `next`, car `runLot` ne passe pas par son bloc de départ pour un lot qui garde ses steps : `toFix` sur les constats de revue de code (pass déjà à 0), sinon `firstReview` (la revue du correctif
+ * du lead) quand le lot a passé une revue, sinon `firstWrite`. Rend l'étape choisie, pour le journal.
+ */
+export function resumeNext(c: LotCtx, old: LotCtx): 'correction' | 'revue' | 'écriture' {
+  const l = c.lot;
+  const { budget, escalationReserve, node } = l;
+  Object.assign(l, structuredClone(old.lot));
+  l.node = node;
+  l.escalationReserve = escalationReserve;
+  l.pass = 0;
+  delete l.escalation;
+  l.budget = lotSpent(old.lot) + budget!;
+  l.status = 'queued';
+  l.outcome = null;
+  const reviewed = l.constats.some((k) => k.source === 'code');
+  l.resumedFrom = c.wave.id;
+  l.resumedReviewed = reviewed || l.steps.some((st) => st.kind.startsWith('review'));
+  if (reviewed) {
+    toFix(c, l.constats, 'reprise du lot rendu');
+    return 'correction';
+  }
+  l.next = l.resumedReviewed ? firstReview(c) : firstWrite(c);
+  return l.resumedReviewed ? 'revue' : 'écriture';
+}
+
 /** Refus d'un ajout (code 2) ou rien : les lots déjà dans la vague ou en file ne sont pas rejoués, le budget restant doit tenir celui de chaque lot ajouté. */
 function budgetRefusals(lots: LotState[], wave: WaveState | null): string[] {
   let remaining = wave ? wave.budget - wave.consumed : Infinity;
@@ -82,8 +129,15 @@ export async function addToLive(args: Args, run: RunEnv, store: RunStore, checks
   const refusals: string[] = [];
   const targets = checks.resolveTargets({ lots: args.add }, io, refusals);
   if (!waveReadsAdds(store.dir)) refusals.push(`la vague ${store.id} ne lit pas la file d'ajouts (lancée avec une version de cadence d'avant L421) : attendre sa fin, puis lancer le lot dans une vague`);
+  // R4 (L563) : un lot rendu qu'on reprend doit avoir son worktree conservé, commité, avant toute écriture.
+  const inWave = store.lots();
+  for (const t of targets) {
+    const rendu = inWave.find((l) => lotKey(l.project, l.lot) === addKey(launch, t));
+    const why = rendu && addableHandBack(rendu) ? resumeRefusal(store, rendu, launch) : null;
+    if (why) refusals.push(`${lotKey(rendu!.project, rendu!.lot)} : worktree du lot introuvable ou arbre sale : ${why}`);
+  }
   const queued = store.addQueue().map((e) => ({ project: projectName(launch, e.project), lot: e.lot, queued: true }));
-  const pre = refusals.length ? { refusals: [] as string[], lots: [] as LotState[] } : await checks.preflight(targets, run, { wave: store.id, lots: [...store.lots(), ...queued] });
+  const pre = refusals.length ? { refusals: [] as string[], lots: [] as LotState[] } : await checks.preflight(targets, run, { wave: store.id, lots: [...inWave, ...queued] });
   refusals.push(...pre.refusals, ...budgetRefusals(pre.lots, store.readWave()));
   if (refusals.length) {
     for (const r of refusals) io.err(`orchestrate : ${r}`);
@@ -149,8 +203,8 @@ export class AddFeed {
 
   constructor(private e: AddEnv) {}
 
-  private discard(entry: AddEntry, why: string): null {
-    this.e.wctx.log(`${addKey(this.e.launch, entry)} : ajout écarté (${why})`);
+  private discard(entry: AddEntry, why: string, line = `${addKey(this.e.launch, entry)} : ajout écarté (${why})`): null {
+    this.e.wctx.log(line);
     this.e.store.markAddTaken(entry.id);
     this.waiting.delete(entry.id);
     return null;
@@ -164,7 +218,12 @@ export class AddFeed {
     if (stop) return this.discard(entry, stop);
     const refusals: string[] = [];
     const targets = e.checks.resolveTargets({ lots: [{ project: entry.project, lot: entry.lot, model: entry.model as AnyModel | undefined }] }, e.io, refusals);
-    const known = [...e.ctxs, ...this.waiting.values()].map((c) => ({ project: c.lot.project, lot: c.lot.lot }));
+    // R12 (L563) : un lot rendu en fin de cycle n'est pas « déjà dans la vague » pour sa propre reprise ; son arbre est recontrôlé à la prise.
+    const old = this.oldOf(key);
+    const resumable = old && addableHandBack(old.lot) ? old : undefined;
+    const cut = resumable ? this.treeRefusal(resumable.lot) : null;
+    if (cut) return this.discard(entry, cut, `orchestrate : ${key} : ajout écarté à la prise : ${cut}`);
+    const known = [...e.ctxs.filter((c) => c !== resumable), ...this.waiting.values()].map((c) => ({ project: c.lot.project, lot: c.lot.lot }));
     const built = refusals.length ? { refusals } : await e.build(targets[0]!, known);
     if ('refusals' in built) return this.discard(entry, built.refusals.map((r) => (r.startsWith(`${key} : `) ? r.slice(key.length + 3) : r)).join(' ; '));
     if (built.ctx.lot.budget! > e.budgetLeft()) return this.discard(entry, `le budget restant de la vague ne tient pas le budget du lot (${built.ctx.lot.budget})`);
@@ -174,8 +233,22 @@ export class AddFeed {
   /** Un ajout resté en attente est recontrôlé quand la vague le prend : arrêt demandé, budget épuisé ou lot fini entre-temps l'écartent comme à la lecture de la file. */
   private recheck(entry: AddEntry, c: LotCtx): LotCtx | null {
     const e = this.e;
+    const old = this.oldOf(lotKey(c.lot.project, c.lot.lot));
+    const cut = old ? (addableHandBack(old.lot) ? this.treeRefusal(old.lot) : "le lot n'est plus rendu en fin de cycle") : null;
+    if (cut) return this.discard(entry, cut, `orchestrate : ${addKey(e.launch, entry)} : ajout écarté à la prise : ${cut}`);
     const why = e.stopCause() ?? (c.lot.budget! > e.budgetLeft() ? `le budget restant de la vague ne tient pas le budget du lot (${c.lot.budget})` : e.planState(c));
     return why ? this.discard(entry, why) : c;
+  }
+
+  /** L'ancien contexte du lot dans la vague (le lot rendu qu'une prise remplace), s'il y est. */
+  private oldOf(key: string): LotCtx | undefined {
+    return this.e.ctxs.find((c) => lotKey(c.lot.project, c.lot.lot) === key);
+  }
+
+  /** R4 rejoué à la prise (R12) : la cause, écrite comme le refus de `--add`, ou null. */
+  private treeRefusal(l: LotState): string | null {
+    const why = resumeRefusal(this.e.store, l, this.e.launch);
+    return why ? `worktree du lot introuvable ou arbre sale : ${why}` : null;
   }
 
   /** Prend le verrou et la garde de push d'un dépôt que la vague ne tient pas (ou plus) ; rend la cause du refus. */
@@ -203,19 +276,31 @@ export class AddFeed {
     return refused;
   }
 
-  private admit(entry: AddEntry | null, c: LotCtx): void {
+  /**
+   * Admet le lot dans la vague. Un lot rendu repris (`old`, R5) REMPLACE son ancien ctx à sa place dans `ctxs`, `all` et `lots` (une seule occurrence), et reçoit son état de `resumeNext` ;
+   * `wave.lots` porte déjà sa clé.
+   */
+  private admit(entry: AddEntry | null, c: LotCtx, old?: LotCtx): void {
     const e = this.e;
-    e.ctxs.push(c);
-    e.all.push(c.lot);
-    if (e.lots !== e.all) e.lots.push(c.lot);
-    e.wave.lots.push(lotKey(c.lot.project, c.lot.lot));
+    const key = lotKey(c.lot.project, c.lot.lot);
+    const resumed = old ? resumeNext(c, old) : null;
+    const put = <T>(list: T[], same: (x: T) => boolean, item: T): void => {
+      const i = list.findIndex(same);
+      if (i < 0) list.push(item);
+      else list[i] = item;
+    };
+    put(e.ctxs, (x) => x === old, c);
+    put(e.all, (x) => x === old?.lot, c.lot);
+    if (e.lots !== e.all) put(e.lots, (x) => x === old?.lot, c.lot);
+    if (!e.wave.lots.includes(key)) e.wave.lots.push(key);
     e.store.writeLot(c.lot);
     e.saveWave();
     if (entry) {
       e.store.markAddTaken(entry.id);
       this.waiting.delete(entry.id);
     }
-    e.wctx.log(`${lotKey(c.lot.project, c.lot.lot)} : ajouté à la vague ${e.wave.id}`);
+    e.wctx.log(`${key} : ajouté à la vague ${e.wave.id}`);
+    if (resumed) e.wctx.log(`${key} : reprise du lot rendu à ${resumed === 'correction' ? 'la correction' : resumed === 'revue' ? 'la revue' : "l'écriture"}, worktree ${c.tree?.dir ?? c.lot.repo}`);
   }
 
   /** Les lots ajoutés à ce tour, prêts à être joués ; `canRun` dit si le dépôt du lot est libre (jamais deux sessions dans un même dépôt hors worktree). */
@@ -232,7 +317,7 @@ export class AddFeed {
       const refused = this.holdAll(c);
       if (refused) this.discard(entry, refused);
       else {
-        this.admit(entry, c);
+        this.admit(entry, c, this.oldOf(lotKey(c.lot.project, c.lot.lot)));
         added.push(c);
       }
     }

@@ -2,6 +2,7 @@ import { basename } from 'node:path';
 import { LOT_LIKE } from './command-args.js';
 import { DROPPED } from './cycle/budget.js';
 import { planNoteHandBack } from './cycle/plan-writes.js';
+import { FIN_DE_CYCLE_WHATS } from './cycle/review.js';
 import type { LotState } from './state.js';
 
 /** Début de la cause d'un lot rendu parce que son écart docs.sync est ouvert (L317) : la seule source, lue par le renvoi (`openDocGap`) et par le geste. */
@@ -32,8 +33,19 @@ export const newWaveGesture = (key: string, launch?: string): string => {
 };
 
 /**
+ * Un lot rendu que le lead peut reprendre par `--add` après avoir corrigé son worktree (L563) : rendu (`handed-back`), pas à l'intégration, et un outcome qui commence par
+ * `<what> après ` pour l'un des `FIN_DE_CYCLE_WHATS` (liste blanche, la même que celle que `toFix` écrit). Tout autre rendu (incident, budget, étape spec ou accept, outcome inconnu ou vide) ne l'est pas.
+ * Lu par le contrôle préalable de `--add` et par `lotGesture` : les deux lectures ne peuvent pas diverger.
+ */
+export const addableHandBack = (l: { status?: string; next?: string | null; outcome?: string | null }): boolean =>
+  l.status === 'handed-back' && l.next !== 'integrate' && !!l.outcome && FIN_DE_CYCLE_WHATS.some((w) => l.outcome!.startsWith(`${w} après `));
+
+/** La commande `--add` qui reprend un lot rendu dans la vague vivante (L563) ; `.:<lot>` quand le projet est le dossier de lancement (`newWaveGesture`). */
+export const addGesture = (waveId: string, key: string, launch?: string): string => `cadence orchestrate --add ${newWaveGesture(key, launch).slice('cadence orchestrate '.length)} --wave ${waveId}`;
+
+/**
  * LE geste suivant d'un lot rendu au lead (L554), chaîne vide quand il n'y en a pas un d'exact : écart docs.sync (acquitter dans le dépôt principal, puis une nouvelle vague qui retrouve le worktree), rendu à l'intégration (`--integrate`, déposé tout de suite même sur
- * une vague vivante), écriture de plan refusée (`--replay`), lot retiré (nouvelle vague). `wave.status === 'running'` : la vague est vivante, ses `--replay` se jouent à sa fin.
+ * une vague vivante), écriture de plan refusée (`--replay`), lot retiré (nouvelle vague), lot rendu en fin de cycle sur une vague vivante (`--add`, L563). `wave.status === 'running'` : la vague est vivante, ses `--replay` se jouent à sa fin.
  */
 export function lotGesture(wave: { id: string; status: string; cwd?: string }, l: Pick<LotState, 'project' | 'lot' | 'status' | 'next' | 'outcome'>): string {
   if (l.status !== 'handed-back') return '';
@@ -43,6 +55,8 @@ export function lotGesture(wave: { id: string; status: string; cwd?: string }, l
   if (l.outcome?.startsWith(DOCS_GAP)) return `raf docs-ok ${l.lot} --reason "…" (dépôt principal, plan commité), puis ${alive ? 'à la fin de la vague ' : ''}: ${newWaveGesture(key, wave.cwd)}`;
   if (l.next === 'integrate') return resumeCommand(wave.id, '--integrate', key);
   if (planNoteHandBack(l as LotState)) return replayGesture(wave.id, key, alive);
+  // L563 : sur une vague vivante, le lot rendu en fin de cycle se rajoute tout de suite ; le geste ne lit pas l'arbre, un arbre sale est refusé par `--add` avec ses fichiers (R4).
+  if (alive && addableHandBack(l)) return addGesture(wave.id, key, wave.cwd);
   return '';
 }
 

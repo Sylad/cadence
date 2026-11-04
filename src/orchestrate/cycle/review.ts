@@ -65,6 +65,15 @@ const countProgramFix = (l: LotState, what: string): void => {
   if (PROGRAM_FIXES.has(what)) l.programFixes = (l.programFixes ?? 0) + 1;
 };
 
+/**
+ * LISTE BLANCHE des rendus que le lead peut reprendre par `--add` après un correctif (L563) : les six `what` de `toFix` au plafond de passes. `finDeCycleOutcome` écrit l'outcome
+ * avec elle, `addableHandBack` (geste.ts) la lit : la liste de l'écrivain et celle du lecteur sont la même. Un outcome qui n'en commence pas par l'un n'est jamais ajoutable.
+ */
+export const FIN_DE_CYCLE_WHATS = ['revue non conforme', 'tests rouges', 'code sans test', 'documentation en retard', 'sonde de cas limites', 'UX non conforme'] as const;
+
+/** Le début de l'outcome d'un lot rendu au plafond de passes (`<what> après <N> passe(s) de correction`) : `toFix` l'écrit, `addableHandBack` le reconnaît par `<what> après `. */
+export const finDeCycleOutcome = (what: string, pass: number): string => `${what} après ${pass} passe(s) de correction`;
+
 /** Une passe de correction de plus, ou la main rendue au lead quand les deux sont faites. */
 export function toFix(c: LotCtx, constats: Constat[], what: string): void {
   const l = c.lot;
@@ -74,7 +83,7 @@ export function toFix(c: LotCtx, constats: Constat[], what: string): void {
   const converging = what === 'revue non conforme' && counts.length >= 2 && counts[counts.length - 1] === 1 && counts[counts.length - 1] < counts[counts.length - 2];
   const cap = converging ? MAX_PASSES_CONVERGING : MAX_PASSES;
   if (l.pass >= cap) {
-    const text = `${what} après ${l.pass} passe(s) de correction`;
+    const text = finDeCycleOutcome(what, l.pass);
     const esc = c.config.escalation;
     // Escalade (L337) : une seule fois, pour une revue de code non conforme ou des tests rouges (l'UX garde sa règle) ; déjà engagée, le lot est rendu.
     if (l.escalation) {

@@ -8,7 +8,7 @@ import { localLotRefusal } from '../local-task.js';
 import { Plan, isOpen } from '../plan.js';
 import { budgetStage, stageScreen } from './spec.js';
 import { ESCALATION_RESERVE } from './cycle.js';
-import { droppedAddSuffix } from './geste.js';
+import { addableHandBack, droppedAddSuffix } from './geste.js';
 import { type AnyModel } from './launch.js';
 import { projectName, type KnownLot } from './ajout.js';
 import { repoRefusals } from './depot.js';
@@ -99,7 +99,8 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
   for (const l of opts.addTo?.lots ?? []) byProject.set(l.project, [...(byProject.get(l.project) ?? []), l.lot]);
   for (const t of targets) {
     const key = lotKey(t.project, t.lot);
-    const already = opts.addTo?.lots.find((l) => l.project === t.project && l.lot === t.lot);
+    // L563 : un lot rendu en fin de cycle (liste blanche, geste.ts) se reprend : il n'est pas « déjà dans la vague » (son arbre est contrôlé par `--add`, ajout.ts).
+    const already = opts.addTo?.lots.find((l) => l.project === t.project && l.lot === t.lot && !addableHandBack(l));
     if (already) {
       refusals.push(`${key} : lot déjà ${already.queued ? "en file d'ajout dans" : 'dans'} la vague ${opts.addTo!.wave}${droppedAddSuffix(already, key, launch)}`);
       continue;

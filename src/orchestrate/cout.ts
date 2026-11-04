@@ -54,5 +54,5 @@ export function costView(lots: LotState[], prices: PriceGrid | null | undefined,
   const per = lots.map((l) => sumEuros(stepsOf(l), prices));
   const sum = waveEuros(per);
   const unpriced = [...new Set(lots.flatMap((l) => missingModels(stepsOf(l), prices)))];
-  return { head: [currency ?? 'coût'], cells: per.map((e) => [e === null ? 'n/d' : euros(e, currency)]), total: ` — ${euros(sum.total, currency)}${sum.unknown ? ` (${unknownText(sum.unknown, unpriced)})` : ''}` };
+  return { head: [currency || 'coût'], cells: per.map((e) => [e === null ? 'n/d' : euros(e, currency)]), total: ` — ${euros(sum.total, currency)}${sum.unknown ? ` (${unknownText(sum.unknown, unpriced)})` : ''}` };
 }

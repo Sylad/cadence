@@ -871,6 +871,7 @@ lots:
     uses: [ plan-coeur ]
     created: 2026-10-30
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "conforme — 0 bloquant, 0 majeur, 1 mineur en note : un lot archivé avant la borne --since puis rouvert donne from: null au lieu de son dernier état — orchestré (vague 2026-11-04-1310-cad, 3 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main ne change que le contexte du CHANGELOG, aucun constat", commit: 79f7e0c4a7b23d2e1dd6e1ed7cf2917ad2798c2e }
   - id: L471
     title: "Plans riches — plan.onWrite tolérant (onFailure: refuse|warn) (manque M9 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo

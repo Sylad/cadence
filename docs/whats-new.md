@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.53.0**: `raf import --from-config` / `--to-config`; a last-pass budget top-up; the probe no longer commits a red file; kept branches found under a former project name.
 - **1.52.0**: `perf.prices` takes any model name (Fable included) and `perf.currency`; `plan.onWrite.onFailure: refuse | warn`; tests unstable under load wait for events.
 - **1.51.0**: resources carry paths (held for any lot whose diff touches them); `--add` takes back a lot the live wave handed back; `raf export` and `raf events`.
 - **1.50.0**: `corrections --classify` says when Ollama is unreachable; a config key set before its service install no longer breaks a repository; no false incident on a delivery's gitops commit.
@@ -81,6 +82,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.53.0**: `raf import --from-config` brings a plan kept in another format into the native plan and `--to-config` writes it back, refusing two entries with the same identifier in both directions (L472). When a lot can no longer pay its last correction and short review while its review converges, the wave tops its budget up from its own remainder, within `orchestrate.budgetTopUp` (L584). The edge-case probe no longer leaves a red or unwired test file in the lot: a probe file is either run by the gate and green, or not committed, and paths with spaces or accents are cleaned for real (L580, GitHub issue #37). A new wave finds a lot's kept branch under the project's former name, and its dry run says when a kept branch is not taken and why (L581, GitHub issue #38). Ctrl-C or SIGTERM on a wave kills the ssh and the push of the remote gate (L507).
 
 **1.52.0**: `perf.prices` takes any model name, the same names as `orchestrate.escalation.model` and `@<model>`, so the Fable escalations — the most expensive steps — are priced by the model their journal records, and a step whose model has no price is counted apart and named instead of leaving the cost silently; `perf.currency` names the money of the grid (L578, GitHub issue #36). `plan.onWrite.onFailure: refuse | warn` lets a failing regeneration of the published copy of the plan warn instead of refusing the write (L471). The remote gate keeps one pid per remote command (L506). Five tests that turned red under load and green alone now wait for the event instead of a fixed delay, with the measure of the twelve such tests of 01 to 04-11 (L577; the four left are a lot of their own).
 

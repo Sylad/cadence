@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.53.0] - 2026-11-04
+
 ### Added
 
 - `raf import --from-config` and `--to-config` (L472, [docs/raf.md](docs/raf.md) « Importing a plan from another format »): a plan kept in another format (`plan.lots`, `plan.fields`, `plan.statuses`, `plan.estimates`) is written in raf's own format without loss — original states kept as `state:`, efforts in days with `estimate_label:`, flat sub-lots with `parent:`, unmapped keys copied as they are (a key that carries a raf name is refused, or kept under another name with `--rename old=new`), the original file never rewritten — and `--to-config` writes it back after writes made in raf's format. The native text is re-read as raf would read it before anything is written, with or without `--verify` (a plan `raf check` would reject is never written); `--verify` re-reads the written file the same way; `--dry-run` checks without writing. Anything raf could not keep is refused by lot and key. The way back gives each field the key and the form it had (second alias, full timestamp, note as a text, numeric id), and `--verify` compares them strictly. A sub-task added in raf's format (`raf add --parent`) comes back as a flat entry `AB-1/t1` under `parent: AB-1`, which the read-only reader folds into a sub-task again. `--to-config` leaves `journal.ndjson` unchanged and says so (`journal.ndjson inchangé : format déclaratif à venir, L582`); rewriting the journal is the separate lot L582.

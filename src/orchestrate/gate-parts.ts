@@ -3,7 +3,7 @@
 // cadence lance chaque partie séparément, dans son dossier, et attribue chaque rouge à la partie qui l'a imprimé ; une partie sans `replay` garde ses rouges comptés ; la forme chaîne reste telle quelle.
 // Ce module ne change que le lieu du lancement et l'attribution des noms : les règles de verdict (deux rejeux, fichier vu dans la sortie, délai trop juste) restent celles de workers.ts.
 
-import { isAbsolute, join, posix } from 'node:path';
+import { isAbsolute, posix } from 'node:path';
 import { failedTests, hasUnnamedFailure } from './baseline.js';
 import { isComposedGate, redAlone, replayRed, shellArg, type TightTest } from './workers.js';
 

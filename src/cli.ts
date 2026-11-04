@@ -3,6 +3,7 @@ import { isDay, toDay, type Day } from './dates.js';
 import { gitRoot } from './git.js';
 import { RafError, setPlanNotice } from './plan.js';
 import { cmdAdd, cmdArchive, cmdDid, cmdDocsOk, cmdEstimate, cmdIgnore, cmdMove, cmdNote, cmdPublic, cmdScreen, cmdSetStatus, cmdStatus, cmdTitle, cmdTodo, cmdUses, cmdVisible } from './cli/lot-commands.js';
+import { cmdImport } from './cli/import-commands.js';
 import { cmdPlan } from './cli/plan-commands.js';
 import { cmdCheck, cmdCommits, cmdEvents, cmdExport, cmdGantt, cmdList, cmdNews, cmdNow, cmdQuickwins, cmdRef, cmdShow } from './cli/read-commands.js';
 import { cmdGate, cmdHook } from './cli/gates.js';
@@ -58,6 +59,8 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf docs-ok <lot> --reason texte   acquitte l'écart docs.sync d'un lot (documentation en retard) avec la raison pour laquelle la documentation reste telle quelle (plan en lecture seule : .cadence/docs-ok.yaml, le plan n'est pas touché) ; lu par raf check et par orchestrate, qui ne rend jamais prêt un lot avec un écart ouvert
   raf archive [--before date] [--dry-run]   déplace les lots done et dropped (terminés avant la date, s'il y en a une) du fichier du plan vers .cadence/archive/<année>.yaml ; le plan chargé présente toujours tous les lots (show, list, check, now, news, perf… inchangés), seules les sessions ne lisent jamais l'archive ; reste dans le plan un lot qui a un écart ouvert (raf check) ; un id présent dans deux fichiers est une erreur nommée ; refusé tant que le plan est à docs/plan/raf.yaml (raf migrate d'abord) ; rejouable
   raf gantt [-o .cadence/gantt.html]
+  raf import --from-config [--out plan-natif.yaml] [--verify] [--rename ancien=nouveau]… [--force] [--dry-run]   écrit en natif (.cadence/raf.yaml par défaut) le plan tenu par un autre outil que décrit cadence.yaml (plan.lots, fields, statuses, estimates), sans perte : états d'origine gardés (state:), effort en jours (estimate_label:), sous-lots à plat avec parent:, clés non mappées recopiées telles quelles (--rename pour celles qui portent un nom du natif) ; le fichier d'origine n'est jamais touché ; --verify relit le fichier écrit et rejoue l'écriture inverse ; --dry-run vérifie sans écrire
+  raf import --to-config [--from plan-natif.yaml] [--out plan.yaml] [--rename ancien=nouveau]… [--force] [--dry-run]   le chemin inverse : réécrit au format d'origine (états, effort en libellé, alias, clés non mappées) le plan natif, écritures faites depuis comprises ; remplace la liste des lots du fichier d'origine (--force) en gardant ses autres clés ; refuse un statut qu'aucun état du format ne porte
   cadence config set <clé> <valeur> --all [--dry-run] [--depth n]   pose la même clé dans le cadence.yaml de chaque projet du dossier (ceux de lead tour), commentaires et ordre gardés, un lot de config qui la cite (raf add + start) et un commit à chemin explicite par projet ; ne pousse pas ; liste ce qui est fait et sauté (dépôt sale, déjà posée, plan en lecture seule) ; s'arrête sur une config qui ne se relit pas
   raf migrate [--dry-run]   déplace docs/plan/raf.yaml vers .cadence/raf.yaml (git mv) et réécrit les lecteurs du chemin dans le dépôt ; --dry-run les liste sans rien toucher ; refus tant qu'un lecteur n'est pas traité (migrate.keep de cadence.yaml pour ceux qui ne lisent pas le plan) ; rejouable
   raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start)
@@ -160,6 +163,7 @@ const WITH_PLAN: Record<string, (c: Ctx) => number | Promise<number>> = {
   title: cmdTitle,
   uses: cmdUses,
   plan: cmdPlan,
+  import: cmdImport,
   move: cmdMove,
   public: cmdPublic,
   screen: cmdScreen,

@@ -546,6 +546,11 @@ export class Plan {
     return found;
   }
 
+  /** Les entrées du fichier du plan telles qu'écrites (clés du fichier, sous la clé `plan.lots` d'un plan d'un autre format), sans l'archive : ce que `raf import` traduit. */
+  rawEntries(): Record<string, unknown>[] {
+    return (this.doc.get(this.settings.format?.lots ?? 'lots') as YAMLSeq).toJSON() as Record<string, unknown>[];
+  }
+
   /** Les lots du fichier du plan seul : ce que `raf archive` peut déplacer. */
   private activeRaw(): Record<string, unknown>[] {
     return (this.doc.get('lots') as YAMLSeq).toJSON() as Record<string, unknown>[];

@@ -1902,6 +1902,9 @@ lots:
     spec: true
     created: 2026-11-03
     started: 2026-11-04
+    notes:
+      - { date: 2026-11-04, text: "Revue de la fiche — mineur : docs/specs/revue-maquette-suite-inchange/fiche.yaml — R3 : le verdict de l'agent est repris tel quel, puis on ajoute « — conforme, … ». Si l'agent écrit « non conforme » parce qu'il a un majeur, le verdict gardé se contredit lui-même. Aucun test ne couvre ce libellé. Ajouter un test ou un cas, ou préciser le texte." }
+      - { date: 2026-11-04, text: "Revue de la fiche — mineur : docs/specs/revue-maquette-suite-inchange/fiche.yaml — R6 : le test « brief de la revue 1 : aucune consigne sur ce qui ne bloque pas » n'a pas de chaîne précise à vérifier. Il risque d'être trop faible, ou de casser sur l'ancien brief de maquette.ts:20 qui demande déjà de marquer inchange. Nommer la chaîne absente. R2 est une hypothèse bien déclarée avec si_faux, mais le préfixe « [suite ux] » ne figure pas dans withoutLine (shared.ts:17, qui ne traite que « [mineur …] »). Sa déduplication « même texte redit » (cas où la ligne change) n'est pas spécifiée." }
   - id: L563
     title: "--add (ou --replay) d'un lot rendu par la vague vivante après un correctif du lead dans son worktree conservé : reprendre le worktree et repartir à l'étape que choisirait la reprise (correction avec les derniers constats, ou la revue), au lieu de « lot déjà dans la vague » (issue #31 : un lot corrigé est resté une heure à l'arrêt avec des créneaux libres)"
     status: doing

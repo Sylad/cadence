@@ -1305,10 +1305,11 @@ lots:
     finished: 2026-11-01
   - id: L514
     title: "Rejeu isolé des tests rouges pour une porte node --test (evatosorus) : lire le titre → fichier dans la sortie (location:) et prouver l'exécution d'un test vert sans fichier imprimé, sans changer failedTests pour les autres lanceurs — suite de L512 (décision de Sylvain du 01-11), faux rouge evatosorus L45"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L512 ]
     created: 2026-11-01
+    started: 2026-11-04
   - id: L515
     title: "CI « tests » rouge sur main depuis le 31-10 par construction : l'étape « Suite sous npm publish --dry-run » échoue « You cannot publish over the previously published versions » dès que package.json porte une version déjà publiée (tout commit hors release) — tolérer ce seul refus comme publish.yml (grep EPUBLISHCONFLICT/previously published), sans masquer un vrai rouge de la suite ; + test instable sous Node 24 : porte-deportee.test.ts R17 « deux remplissages simultanés de même empreinte » (run 41322154515)"
     status: done

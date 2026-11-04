@@ -17,7 +17,7 @@ export function readOnWrite(v: unknown, cwd: string, bad: (what: string) => RafE
     if (existsSync(resolve(cwd, rel)) && statSync(resolve(cwd, rel)).isDirectory()) throw bad(`onWrite.files « ${f} » est un dossier (déclarer les fichiers produits, pas leur dossier)`);
     return rel;
   });
-  const onFailure = v.onFailure ?? 'refuse';
+  const onFailure = 'onFailure' in v ? v.onFailure : 'refuse'; // `onFailure: ~` (null) n'est pas « absent » : refusé
   if (!ON_FAILURE.some((m) => m === onFailure)) throw bad(`onWrite.onFailure doit être ${ON_FAILURE.join(' ou ')} (reçu : ${JSON.stringify(onFailure)})`);
   return { command: v.command, files, cwd, onFailure: onFailure as (typeof ON_FAILURE)[number] };
 }

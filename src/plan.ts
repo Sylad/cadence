@@ -338,8 +338,8 @@ export class Plan {
       return;
     }
     const failed = failureMessage(hook.command, r, limit);
-    // L471 : en `warn` (un miroir injoignable) le plan reste écrit et seuls les fichiers déclarés, peut-être à moitié écrits par la commande, sont remis.
-    restore(hook.onFailure === 'warn' ? new Set(hook.files.map((f) => resolve(hook.cwd, f))) : undefined);
+    // L471 : en `warn` (un miroir injoignable) le plan reste écrit et seuls les fichiers déclarés, peut-être à moitié écrits par la commande, sont remis (jamais le plan ni ses archives, même déclarés par erreur).
+    restore(hook.onFailure === 'warn' ? new Set(hook.files.map((f) => resolve(hook.cwd, f)).filter((p) => p !== this.path && !archives.some((a) => a.file === p))) : undefined);
     if (hook.onFailure === 'warn') return notice(`raf: ${failed} — plan écrit quand même (plan.onWrite.onFailure: warn), la copie publiée n'est pas à jour`);
     this.onDisk = current; // le plan est revenu tel qu'avant
     throw new RafError(`${failed} — écriture refusée, plan inchangé`);

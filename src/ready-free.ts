@@ -48,6 +48,28 @@ const plansOf = (dir: string): Lot[] => planLoader(repoOf(dir))().lots();
 /** Un lot qu'une vague tient : son dépôt et son id suffisent à le reconnaître et à retrouver ses `uses:`. */
 type Held = Pick<LotState, 'repo' | 'lot'>;
 
+/** Les lots non finis de chaque vague vivante de `home` ; une vague à l'état illisible n'en tient aucun (elle ne tient alors aucune ressource connue). */
+function liveLots(home: string): { wave: string; lots: LotState[] }[] {
+  return liveWaves(home).flatMap((w) => {
+    try {
+      return [{ wave: w.wave, lots: RunStore.find(w.cwd, w.wave)?.lots().filter((l) => !lotFinished(l)) ?? [] }];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** Les ressources à chemins que les diffs des lots `live` d'une vague déduisent (L558, R5) ; un cadence.yaml illisible ne déduit rien (sa ligne de tour le dit). */
+function deducedByWave(wave: string, live: LotState[]): string[] {
+  return live.flatMap((l) => {
+    try {
+      return deducedResources(l.repo, lotBranch(wave, l.project, l.lot), declaredFor(l.repo));
+    } catch {
+      return [];
+    }
+  });
+}
+
 /**
  * Les ressources prises à cet instant : celles des lots `doing` des projets `dirs` et de ceux qui partagent leurs ressources (`sharingProjects` : lancé depuis l'un d'eux,
  * on voit aussi les autres), celles des lots non finis des vagues vivantes (un lot de vague n'est `doing` dans le plan qu'une fois sa session partie ; avec, L558 R5,
@@ -64,21 +86,9 @@ function taken(dirs: string[], home: string, held: Held[]): { resources: Set<str
       // plan illisible : sa ligne de tour le dit, il ne tient aucune ressource connue
     }
   }
-  for (const w of liveWaves(home)) {
-    let live: LotState[];
-    try {
-      live = RunStore.find(w.cwd, w.wave)?.lots().filter((l) => !lotFinished(l)) ?? [];
-    } catch {
-      continue; // état de vague illisible : la vague ne tient aucune ressource connue
-    }
-    held = [...held, ...live];
-    for (const l of live) {
-      try {
-        for (const r of deducedResources(l.repo, lotBranch(w.wave, l.project, l.lot), declaredFor(l.repo))) resources.add(r);
-      } catch {
-        // cadence.yaml du dépôt illisible : aucune ressource déduite (sa ligne de tour le dit)
-      }
-    }
+  for (const { wave, lots } of liveLots(home)) {
+    held = [...held, ...lots];
+    for (const r of deducedByWave(wave, lots)) resources.add(r);
   }
   for (const s of held) {
     running.add(lotAt(repoOf(s.repo), s.lot));

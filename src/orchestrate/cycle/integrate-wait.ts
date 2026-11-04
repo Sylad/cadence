@@ -16,14 +16,14 @@ const WORKING: ReadonlySet<LotState['status']> = new Set(['implementing', 'fixin
 export const works = (l: Pick<LotState, 'status' | 'next'>): boolean => l.next !== 'integrate' && WORKING.has(l.status);
 
 /** Le lot plus ancien qui retient l'intégration (R8) : il touche par ses commits un chemin de `resource` que le diff du tardif touche aussi. */
-export interface Blocking {
+interface Blocking {
   lot: LotState;
   resource: string;
   path: string;
 }
 
 /** Reçoit un lot dont git n'a pas pu lire le diff et la cause (R12). */
-export type Warn = (lot: LotState, cause: string) => void;
+type Warn = (lot: LotState, cause: string) => void;
 
 /**
  * Le premier lot plus ancien que le tardif `c` qui retient son intégration (R8), ou null. Les lots examinés (R10) : ceux de `c.wave.store.lots()`, relu à

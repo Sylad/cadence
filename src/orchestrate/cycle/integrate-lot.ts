@@ -1,11 +1,11 @@
-import { type LotCtx, histPlan, workDir as wd, stop, save, transition, propose } from './ctx.js';
+import { type LotCtx, type LotTree, histPlan, workDir as wd, stop, save, transition, propose } from './ctx.js';
 import { type ReviewSummary, lotKey } from '../state.js';
 import { repoShas, repoWork } from '../../repos.js';
 import { lotWork, coveredTasks } from '../../audit.js';
 import { openDocGap } from './brief.js';
 import { git, trackedDirty, lotBranch, branchExists, integrated, gitFailure, removeTree } from '../worktree.js';
 import { foreignDirty, planBefore, commitPlan, planMessage, leadMoved } from './plan-writes.js';
-import { repoBranch, INTEGRATE_WAIT_MS, takeRepoWrite, rebaseOnto, rebaseNotes, patchId, mergeBase, advance, baseMoved, MAX_REPLAYS } from '../integrate.js';
+import { repoBranch, INTEGRATE_WAIT_MS, takeRepoWrite, rebaseOnto, rebaseNotes, patchId, mergeBase, advance, baseMoved, MAX_REPLAYS, type Rebase } from '../integrate.js';
 import { relative } from 'node:path';
 import { RafError } from '../../plan.js';
 import { PLAN_ACTIONS } from '../../plan-commit.js';
@@ -126,6 +126,15 @@ const SHORT_REVIEW_TRACE = ' ; revue courte du diff rebasé (patch-id différent
 const minutesText = (ms: number): string => (ms % 60_000 === 0 ? `${ms / 60_000} minute${ms === 60_000 ? '' : 's'}` : `${Math.round(ms / 1000)} s`);
 
 /**
+ * Le refus d'un rebase en conflit (R6 de L279) : le message d'avant, complété (L558, R11) pour chaque ressource à chemins qu'un fichier en conflit couvre des commits
+ * de la base qui l'ont modifié depuis le départ du lot.
+ */
+function conflictRefusal(repo: string, t: LotTree, rebased: Extract<Rebase, { kind: 'conflict' }>): string {
+  const files = rebased.files.length ? ` (fichiers : ${rebased.files.join(', ')})` : ` (${rebased.detail})`;
+  return `intégration impossible : conflit en rebasant ${t.branch} sur ${t.base}${files}${conflictNotes(t.dir, t.base, rebased.files, declaredFor(repo))}`;
+}
+
+/**
  * Intégration d'un lot en worktree à la branche du dépôt (L279, C2), AVANT sa transition à ready (R22). D'abord, hors verrou, l'attente d'un lot plus ancien de la
  * vague qui travaille sur une ressource à chemins que le lot touche aussi (L558, `awaitOlder`). Puis sous le verrou d'intégration : branche du dépôt encore
  * celle de départ (R24), aucun fichier suivi modifié (R8), rebase sur le sommet courant (conflit : abandonné, rendu au lead, R6), contrôles rejoués au sommet
@@ -149,8 +158,7 @@ export async function integrateLot(c: LotCtx): Promise<void> {
   const t = c.tree;
   const kept = `worktree conservé : ${t.dir}`;
   const waitMs = c.wave.integrate?.waitMs ?? INTEGRATE_WAIT_MS;
-  // L558 (R8) : avant le verrou, le lot attend la fin d'un lot plus ancien de la vague qui travaille déjà sur un chemin d'une ressource que son diff touche.
-  await awaitOlder(c);
+  await awaitOlder(c); // L558 (R8) : avant le verrou, la fin d'un lot plus ancien de la vague qui travaille déjà sur une ressource à chemins que le diff touche
   const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, c.wave.integrate);
   if (!grant.ok) return refuse(`intégration refusée : verrou d'intégration tenu par ${grant.holder.wave} (pid ${grant.holder.pid}) depuis plus de ${minutesText(waitMs)} ; ${kept}`);
   // Un refus tardif garde `l.verdict` avec la trace de la revue courte déjà jouée : reprise, elle est rejouée et remplace l'ancienne trace au lieu de s'y ajouter.
@@ -170,11 +178,7 @@ export async function integrateLot(c: LotCtx): Promise<void> {
         verdict = opening;
         reporte = undefined;
         const rebased = rebaseOnto(t.dir, t.base);
-        if (rebased.kind === 'conflict') {
-          // L558 (R11) : pour chaque ressource à chemins qu'un fichier en conflit couvre, les commits de la base qui l'ont modifié depuis le départ du lot.
-          const notes = conflictNotes(t.dir, t.base, rebased.files, declaredFor(l.repo));
-          return refuse(`intégration impossible : conflit en rebasant ${t.branch} sur ${t.base}${rebased.files.length ? ` (fichiers : ${rebased.files.join(', ')})` : ` (${rebased.detail})`}${notes} ; ${kept}`);
-        }
+        if (rebased.kind === 'conflict') return refuse(`${conflictRefusal(l.repo, t, rebased)} ; ${kept}`);
         if (rebased.kind === 'rebased') rebaseNotes(rebased, key).forEach((note) => c.wave.log(note));
         const tip = git(t.dir, 'rev-parse', 'HEAD');
         if (tip !== reviewed) {

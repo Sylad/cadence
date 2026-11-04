@@ -151,6 +151,28 @@ holds it (the `--continue` draw, the `prêts, ressources libres` line and, insid
 - **Inside a wave (L551).** Two lots named at launch (or added, or drawn) that carry the same resource play one after the other, even in different repositories:
   the pool does not start a queue while a queue that plays holds one of its lots' resources, and starts it as soon as that queue has finished. Lots with no
   common resource, and lots with no `uses:`, are not held. (The `--continue` draw and the `prêts, ressources libres` line already counted the resources.)
+- **A resource with paths (L558).** A resource can name the files it stands for, so a lot that touches them holds it without a hand-written `uses:`
+  (on 2026-11-03 a lot modified `cycle.ts` without `uses: [cycle-ts]` while another was splitting it: conflict at integration, lot handed back).
+  The key is then a table instead of a list:
+  ```yaml
+  resources:
+    cycle-ts:
+      paths: [src/orchestrate/cycle.ts, src/orchestrate/cycle/]
+    banc: {}        # a resource without paths (`banc:` with no value is the same)
+  ```
+  The keys of the table are the declared names (`raf check`, `uses:`), with the same `RESOURCE_NAME` rule. A file is written in one form, list **or** table,
+  never a list mixing names and tables; an older `raf` or `cadence` that reads the same file refuses the table, so switch a file to the table only to put paths in it.
+  A path is relative to the root of the lot's repository and covers the file of that name and everything under it, segment by segment (`src/a` does not cover `src/ab.ts`).
+  It is normalised before any use: `.` segments removed (`./src/x.ts`, `src/./x`), `//` reduced, trailing `/` removed (`src/orchestrate/cycle/` and `src/orchestrate/cycle` are
+  the same), duplicates of one resource dropped. The same path, or the same file, may sit under two resources: a diff that touches it holds both.
+  A malformed table is a reading error naming the file and the resource, never a silent resource without paths (`raf check` prints it, exit code 1):
+  `<file> : resources mêle des noms et des tables : écrire soit une liste de noms, soit une table nom: { paths: [...] }`;
+  `<file> : resources.<nom> : nom de ressource invalide (lettres minuscules, chiffres, - et _)`;
+  `<file> : resources.<nom> : paths doit être une liste de chemins` (a string, a number, a list with a non-string, an entry that is neither empty nor a table);
+  `<file> : resources.<nom> : clé inconnue « <clé> » (seule paths est connue)`;
+  `<file> : resources.<nom> : chemin invalide « <chemin> » (relatif au dépôt, sans « .. », « \ » ni joker)` for an absolute path, a `..` segment, a backslash
+  (`src\x`, `src\`), a glob character (`*`, `?`, `[`), an empty path, or a path empty after normalisation (`.`, `./`, `././`: it would cover the whole repository).
+  What the wave does with the paths is in [docs/orchestrate.md](orchestrate.md#one-worktree-per-lot-orchestrateworktrees-l279) (« Resources deduced from the diff »).
 
 ## Where the plan is
 

@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
+import { blobs } from '../src/git.js';
 import { gitRepo } from './helpers.js';
 
 // L470 — correctifs de la revue : ordre réel des changements d'état d'un même jour, merges, commits d'entretien du plan.
@@ -26,9 +27,9 @@ function commit(dir: string, stamp: string, message: string, ...paths: string[])
   git(dir, 'commit', '-q', '-m', message, '--', ...paths);
   return git(dir, 'rev-parse', 'HEAD');
 }
-function project(lots = 1) {
+function project(lots = 1, config = CONFIG) {
   const dir = gitRepo();
-  writeFileSync(join(dir, 'cadence.yaml'), CONFIG);
+  writeFileSync(join(dir, 'cadence.yaml'), config);
   raf(dir, 'init', '--project', 'demo', '--no-hook');
   // Adoption avant les jours des commits d'essai : sinon `raf commits` les écarte comme antérieurs au plan.
   writeFileSync(join(dir, PLAN), readFileSync(join(dir, PLAN), 'utf8').replace(/^since: \S+/m, 'since: 2026-10-01'));
@@ -83,5 +84,63 @@ describe('L470 — correctifs de la revue', () => {
     const shas = events(dir).filter((e) => e.type === 'commit').map((e) => e.sha);
     expect(shas).toEqual([work]);
     expect(raf(dir, 'commits', 'L1').out).toContain(work.slice(0, 7));
+  });
+  it('coût — sans plan.states, l\'historique du plan n\'est pas relu : une version illisible n\'est jamais vue, aucun etat', () => {
+    const dir = project(1, 'plan: {}\n');
+    const p = join(dir, PLAN);
+    const good = readFileSync(p, 'utf8');
+    writeFileSync(p, 'lots: [unclosed\n');
+    commit(dir, '2026-10-11T09:00:00', 'plan cassé', PLAN);
+    writeFileSync(p, good);
+    commit(dir, '2026-10-12T09:00:00', 'plan réparé', PLAN);
+    const r = raf(dir, 'events', '--json');
+    expect(r.code).toBe(0);
+    expect(r.err).toBe('');
+    expect(JSON.parse(r.out).events.filter((e: { type: string }) => e.type === 'etat')).toEqual([]);
+  });
+  it('coût — seuls les commits dont le diff ajoute ou retire une ligne state: sont relus : une version illisible qui n\'en touche aucune passe sans lecture, les etat restent exacts', () => {
+    const dir = project();
+    raf(dir, 'start', 'L1');
+    raf(dir, 'status', 'L1', 'code');
+    const c1 = commit(dir, '2026-10-11T09:00:00', 'plan: code', PLAN);
+    const p = join(dir, PLAN);
+    const good = readFileSync(p, 'utf8');
+    writeFileSync(p, `${good}broken: [unclosed\n`);
+    commit(dir, '2026-10-12T09:00:00', 'plan cassé sans toucher state:', PLAN);
+    writeFileSync(p, good);
+    commit(dir, '2026-10-13T09:00:00', 'plan réparé', PLAN);
+    raf(dir, 'status', 'L1', 'teste');
+    const c2 = commit(dir, '2026-10-14T09:00:00', 'plan: teste', PLAN);
+    const r = raf(dir, 'events', '--json');
+    expect(r.err).toBe('');
+    expect(JSON.parse(r.out).events.filter((e: { type: string }) => e.type === 'etat')).toEqual([
+      { day: '2026-10-11', type: 'etat', lot: 'L1', from: null, to: 'code', sha: c1 },
+      { day: '2026-10-14', type: 'etat', lot: 'L1', from: 'code', to: 'teste', sha: c2 },
+    ]);
+  });
+  it('coût — une version illisible dont le diff touche state: est bien relue et signalée ; le changement suivant part du dernier état lisible', () => {
+    const dir = project();
+    const p = join(dir, PLAN);
+    const good = readFileSync(p, 'utf8');
+    writeFileSync(p, 'lots:\n  - id: L1\n    state: [unclosed\n');
+    commit(dir, '2026-10-11T09:00:00', 'plan cassé', PLAN);
+    writeFileSync(p, good.replace('status: todo', 'status: doing').replace(/(id: L1\n)/, '$1    state: code\n'));
+    const c = commit(dir, '2026-10-12T09:00:00', 'plan réparé', PLAN);
+    const r = raf(dir, 'events', '--json');
+    expect(r.err).toMatch(/illisible/);
+    expect(JSON.parse(r.out).events.filter((e: { type: string }) => e.type === 'etat')).toEqual([{ day: '2026-10-12', type: 'etat', lot: 'L1', from: null, to: 'code', sha: c }]);
+  });
+  it('coût — blobs lit plusieurs blobs en un seul git cat-file --batch, découpés à l\'octet (UTF-8), un id inconnu est absent', () => {
+    const dir = project();
+    writeFileSync(join(dir, 'a.txt'), 'é à ü\n');
+    writeFileSync(join(dir, 'b.txt'), 'second\n');
+    commit(dir, '2026-10-11T09:00:00', 'feat(L1): deux fichiers', 'a.txt', 'b.txt');
+    const [a, b] = ['a.txt', 'b.txt'].map((f) => git(dir, 'rev-parse', `HEAD:${f}`));
+    const got = blobs(dir, [a, '0'.repeat(40), b]);
+    expect([...got.entries()]).toEqual([
+      [a, 'é à ü\n'],
+      [b, 'second\n'],
+    ]);
+    expect(blobs(dir, [])).toEqual(new Map());
   });
 });

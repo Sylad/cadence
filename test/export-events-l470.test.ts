@@ -197,13 +197,13 @@ describe('L470 — raf events', () => {
     expect(types).not.toContain('etat');
     expect(types).toContain('demarre');
   });
-  it('R16 — l\'historique du plan illisible à un commit : avertissement sur la sortie d\'erreur, les autres événements restent', () => {
+  it('R16 — l\'historique du plan illisible à un commit (relu : son diff touche une ligne state:) : avertissement sur la sortie d\'erreur, les autres événements restent', () => {
     const dir = project();
     raf(dir, 'add', 'A');
     commit(dir, '2026-10-10', 'plan', PLAN, 'cadence.yaml');
     const p = join(dir, PLAN);
     const good = readFileSync(p, 'utf8');
-    writeFileSync(p, 'lots: [unclosed\n');
+    writeFileSync(p, 'lots:\n  - id: L1\n    state: [unclosed\n');
     commit(dir, '2026-10-11', 'plan cassé', PLAN);
     writeFileSync(p, good.replace('status: todo', 'status: doing').replace(/(id: L1\n)/, '$1    state: code\n'));
     commit(dir, '2026-10-12', 'plan réparé', PLAN);

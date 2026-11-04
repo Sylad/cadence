@@ -165,6 +165,31 @@ export function fileAt(cwd: string, rev: string, file: string): string | null {
   }
 }
 
+/** Le contenu de plusieurs blobs en un seul `git cat-file --batch` (un `git show` par version coûterait un processus chacun) ; un id inconnu est absent du résultat. */
+export function blobs(cwd: string, ids: string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  if (ids.length === 0) return out;
+  let buf: Buffer;
+  try {
+    buf = execFileSync('git', ['cat-file', '--batch'], { cwd, input: `${ids.join('\n')}\n`, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 1024 });
+  } catch {
+    return out;
+  }
+  // Format : `<id> blob <taille>\n<contenu>\n`, ou `<id> missing\n` ; la taille est en octets, le découpage se fait sur le Buffer.
+  let pos = 0;
+  while (pos < buf.length) {
+    const nl = buf.indexOf(10, pos);
+    if (nl < 0) break;
+    const [id, kind, size] = buf.subarray(pos, nl).toString('utf8').split(' ');
+    pos = nl + 1;
+    if (kind !== 'blob') continue;
+    const n = Number(size);
+    out.set(id, buf.subarray(pos, pos + n).toString('utf8'));
+    pos += n + 1;
+  }
+  return out;
+}
+
 export function tryGit(cwd: string, args: string[]): string | null {
   try {
     return git(cwd, args).trim();

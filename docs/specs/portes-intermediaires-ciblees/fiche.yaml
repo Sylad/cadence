@@ -11,6 +11,9 @@ sujet:
       - "le rejeu seul des rouges (testReplay, L354) et la ligne de base (L213) : réutilisés tels quels"
       - "cadence verify --gate (L397) : il ne reprend que le verdict d'une suite complète, jamais celui d'une porte ciblée"
       - "les tests que les sessions jouent elles-mêmes (L518) : inchangés"
+      - "un diff qui ne touche que des fichiers qu'aucun test n'importe (docs, cadence.yaml, gabarits) : il tombe en repli complet par R3, sans gain, c'est le cas du lot de doc"
+      - "un lot multi-dépôts (l.repos) : la porte ciblée ne lit que le diff du dépôt principal ; les fichiers des dépôts voisins ne sont pas visés, leur couverture reste celle de la suite complète d'intégration"
+      - "la voie express (L519) conclut sur la porte du programme : elle conclura sur une porte ciblée, le lead lisant le diff ; aucun changement de code prévu"
       - "le calcul d'un graphe de dépendances propre à cadence : le lien fichier → test est celui de vitest related ou de la commande testRelated"
 
 cas:
@@ -21,7 +24,7 @@ cas:
     preconditions:
       - "orchestrate.test est déclaré, sous forme de chaîne"
       - "startedSha est connu et le diff startedSha..HEAD touche au moins un fichier"
-      - "une commande liée existe : orchestrate.testRelated, ou à défaut orchestrate.test qui lance vitest"
+      - "une commande liée existe : orchestrate.testRelated, ou à défaut une commande dérivée de orchestrate.test (R13)"
     nominal:
       - "Le programme liste les fichiers modifiés entre startedSha et HEAD (supprimés exclus)."
       - "Il joue le build comme avant, puis la commande liée sur ces fichiers (placeholder {files})."
@@ -40,8 +43,8 @@ cas:
     preconditions:
       - "le lot est relu conforme"
     nominal:
-      - "Avant l'avance de la branche, le programme cherche une suite complète verte pour l'arbre du sommet (checks.tree, L397)."
-      - "Il n'en trouve pas (les portes précédentes étaient ciblées) : il joue le build puis la suite complète, une fois."
+      - "À chaque tour de la boucle de rebase (integrate-lot.ts:176), avant l'avance de la branche, le programme cherche dans l.checks une suite complète verte pour l'arbre du sommet (R5)."
+      - "Il n'en trouve pas (les portes précédentes étaient ciblées) : il appelle integratedChecks en mode complet forcé (R14) : build puis suite complète, une fois pour ce sommet."
       - "Il enregistre l'entrée complète dans portes (durée, code), incrémente suiteRuns et l'intégration continue."
     alternatives:
       - { si: "une suite complète verte est déjà enregistrée pour l'arbre du sommet (repli de C1)", alors: "elle n'est pas rejouée", regles: [R5] }
@@ -55,7 +58,7 @@ cas:
       - "le lot a passé au moins une porte de tests"
     nominal:
       - "Le tableau lit suiteRuns (suites complètes) et la liste portes du lot."
-      - "La colonne « suites » garde le nombre de suites complètes ; la durée totale des portes s'y ajoute si elle tient sans élargir la table."
+      - "La colonne « suites » garde le nombre de suites complètes, inchangée ; la durée et le périmètre de chaque porte se lisent dans le détail du lot (rendu non compact, R10)."
     alternatives:
       - { si: "l'état a été écrit avant ce lot (portes absent)", alors: "portes se lit comme une liste vide, suiteRuns inchangé, sans plantage", regles: [R8] }
       - { si: "aucune porte de tests n'a joué", alors: "la colonne affiche « — »", regles: [R9] }
@@ -70,9 +73,9 @@ regles:
     tests: ["R1 — implement puis fix : chaque porte joue la commande liée sur les fichiers du diff et jamais orchestrate.test"]
   - id: R2
     cas: [C1]
-    enonce: "Une clé orchestrate.testRelated, chaîne contenant {files}, remplace la commande par défaut ; {files} y devient les fichiers du diff. Sans {files}, ou avec orchestrate.test en parties, cadence.yaml est refusé."
+    enonce: "Une clé orchestrate.testRelated, chaîne contenant {files}, remplace la commande par défaut ; {files} y devient les fichiers du diff. Sans {files}, ou avec orchestrate.test en parties, cadence.yaml est refusé ; avec une orchestrate.test composée, testRelated reste accepté (c'est lui qui est joué en ciblé, la composée ne l'est qu'en complet)."
     statut: sourcee
-    source: "demande du lot L590 : « ou orchestrate.testRelated déclaré dans cadence.yaml » ; validation sur le modèle de testReplay (src/orchestrate/gate-parts.ts:73-77)"
+    source: "demande du lot L590 : « ou orchestrate.testRelated déclaré dans cadence.yaml » ; validation sur le modèle de checkTestReplay (src/orchestrate/gate-parts.ts:82-89)"
     tests: ["R2 — testRelated avec {files} : la commande jouée porte les fichiers du diff", "R2 — testRelated sans {files} : cadence.yaml refusé avec le motif exact"]
   - id: R3
     cas: [C1]
@@ -82,16 +85,16 @@ regles:
     tests: ["R3 — diff sans test lié : la suite complète est jouée et l'entrée porte le motif « aucun test lié »"]
   - id: R4
     cas: [C1]
-    enonce: "Sans commande liée possible (ni testRelated ni vitest dans la chaîne orchestrate.test, orchestrate.test en parties, startedSha absent, diff vide ou illisible), la porte joue la suite complète comme avant."
+    enonce: "Sans commande liée possible (ni testRelated ni dérivation de R13, startedSha absent, diff vide ou illisible), la porte joue la suite complète comme avant ; orchestrate.test en parties ou composée sans testRelated tombe là aussi."
     statut: hypothese
     si_faux: "Si une porte non vitest doit rester ciblée, elle déclare testRelated ; seul le repli change, aucune donnée en jeu."
-    tests: ["R4 — test non vitest sans testRelated : suite complète jouée", "R4 — startedSha absent : suite complète jouée"]
+    tests: ["R4 — test non vitest sans testRelated : suite complète jouée", "R4 — startedSha absent : suite complète jouée", "R4 — build && vitest run sans testRelated : suite complète jouée, jamais ciblée"]
   - id: R5
     cas: [C2]
-    enonce: "À l'intégration, la suite complète est jouée une seule fois, y compris quand le sommet n'a pas été rebasé (tip égal au commit relu), sauf si une suite complète verte est déjà enregistrée pour l'arbre du sommet."
+    enonce: "À l'intégration, la suite complète est jouée une seule fois par sommet, y compris quand le sommet n'a pas été rebasé (tip égal au commit relu), sauf si l.checks porte déjà une suite complète verte pour l'arbre du sommet : l.checks.tree égal à l'arbre de HEAD et un run label 'tests', portee 'complete' (absent = complete), command égale à gateLabel(orchestrate.test), code 0. Un rebase rejoué (MAX_REPLAYS) change le sommet donc l'arbre : la suite y est rejouée, c'est un autre sommet."
     statut: sourcee
-    source: "demande du lot L590 : « la suite complète une seule fois, à la porte d'intégration » ; aujourd'hui les contrôles d'intégration ne jouent que si le rebase change le sommet (src/orchestrate/cycle/integrate-lot.ts:182-186)"
-    tests: ["R5 — sommet non rebasé après portes ciblées : une suite complète est jouée à l'intégration", "R5 — suite complète verte déjà enregistrée pour l'arbre : pas de seconde suite"]
+    source: "demande du lot L590 : « la suite complète une seule fois, à la porte d'intégration » ; aujourd'hui integratedChecks n'est appelé que si tip !== reviewed (src/orchestrate/cycle/integrate-lot.ts:182-187) ; la recherche par arbre et par commande est celle de src/gate-record.ts:81-100, restreinte au lot courant"
+    tests: ["R5 — sommet non rebasé après portes ciblées : une suite complète est jouée à l'intégration", "R5 — suite complète verte déjà enregistrée pour l'arbre : pas de seconde suite", "R5 — rebase rejoué : le nouveau sommet rejoue la suite complète", "R5 — seule une porte ciblée verte enregistrée : suite complète jouée"]
   - id: R6
     cas: [C1]
     enonce: "Un rouge d'une porte ciblée suit le même chemin qu'un rouge complet : ligne de base, rejeu seul, instables, déjà rouges, puis constat de correction."
@@ -102,7 +105,7 @@ regles:
     cas: [C2]
     enonce: "Un rouge de la suite complète au sommet intégré est relancé une fois puis refuse l'intégration, comme avant."
     statut: sourcee
-    source: "règle codée src/orchestrate/cycle/checks.ts:109-120 (L328)"
+    source: "règle codée src/orchestrate/cycle/checks.ts:112-127 (L328)"
     tests: ["R7 — suite complète rouge deux fois : intégration refusée avec les tests rouges"]
   - id: R8
     cas: [C3]
@@ -118,22 +121,40 @@ regles:
     tests: ["R9 — sans orchestrate.test : suiteRuns absent et colonne « — »"]
   - id: R10
     cas: [C3]
-    enonce: "La colonne « suites » du tableau affiche le nombre de suites complètes comme avant ; la durée totale des portes s'y ajoute (par exemple « 1 · 6 min ») seulement si elle tient sans élargir la table, sinon la colonne reste le nombre seul."
+    enonce: "La colonne « suites » du tableau reste String(suiteRuns ?? '—') : aucune durée n'y entre (test L518 inchangé). La durée et le périmètre des portes (portee, nombre de fichiers, code, durée) se lisent dans le détail du lot du rendu non compact (--status --detail et fin de vague), une ligne par porte, absente quand portes est vide."
     statut: hypothese
-    si_faux: "Si le lead préfère une colonne durée ou aucune durée, seul le rendu du tableau change."
-    tests: ["R10 — un lot à une suite complète et deux portes ciblées : le nombre 1 reste lu et la durée totale s'ajoute", "R10 — sans portes : le nombre seul, comme L518", "R10 — la largeur de la table n'augmente pas"]
+    si_faux: "Si le lead préfère une colonne durée dans la table, seul le rendu change et le test L518 (en-tête « durée suites ») est à réécrire par lui."
+    tests: ["R10 — un lot à une suite complète et deux portes ciblées : la colonne suites lit 1 et le détail liste trois portes avec durée", "R10 — sans portes : colonne et détail comme L518", "R10 — l'en-tête et la largeur de la table sont ceux d'avant"]
   - id: R11
     cas: [C1, C2]
-    enonce: "Le verdict enregistré dans checks et repris par cadence verify --gate ne vaut que pour une suite complète : une porte ciblée verte n'est jamais reprise comme verdict de la suite."
+    enonce: "Le verdict enregistré dans checks et repris par cadence verify --gate ne vaut que pour une suite complète : une porte ciblée verte n'est jamais reprise comme verdict de la suite. Mécanisme : le CheckRun d'une porte ciblée porte une command différente de orchestrate.test (la commande liée dérivée) ET un champ portee 'ciblee' (absent = complete) ; src/gate-record.ts:90 ne reprend qu'un run dont command égale celle de la porte et dont portee n'est pas 'ciblee'."
     statut: sourcee
-    source: "règle codée L397 (src/orchestrate/state.ts, champ checks.tree) : verify --gate reprend les résultats pour un arbre identique"
-    tests: ["R11 — porte ciblée verte : verify --gate rejoue la suite"]
+    source: "règle codée L397 (src/orchestrate/state.ts, champ checks.tree) : verify --gate reprend les résultats pour un arbre identique ; src/gate-record.ts:90 (r.label==='tests' && r.command === s.cmd && r.code===0), revue de la fiche du 04-11"
+    tests: ["R11 — porte ciblée verte : verify --gate rejoue la suite", "R11 — CheckRun ciblé : command différente de orchestrate.test et portee 'ciblee'"]
   - id: R12
     cas: [C1]
-    enonce: "Sans test lié sur vitest related, le programme reconnaît « aucun test » à la sortie « No test files found » ; la même reconnaissance vaut pour testRelated."
+    enonce: "« Aucun test lié » se reconnaît par la détection déjà codée NO_TEST_RAN (src/orchestrate/workers.ts:101, ligne de fin du lanceur : vitest, jest, pytest ; sortie de code 0 exigée comme workers.ts:149), réutilisée telle quelle, pour vitest related comme pour testRelated ; aucune seconde détection."
+    statut: sourcee
+    source: "src/orchestrate/workers.ts:101 et :149 ; revue de la fiche du 04-11"
+    tests: ["R12 — sortie « No test files found, exiting with code 0 » : repli sur la suite complète", "R12 — vraie sortie rouge : pas de repli", "R12 — mots « no test files found » cités dans le titre d'un test : pas de repli"]
+  - id: R13
+    cas: [C1]
+    enonce: "Sans testRelated, la commande liée dérive de orchestrate.test seulement si c'est une chaîne simple (isComposedGate faux, pas de parties) qui vaut `[npx ]vitest run[ options]` : elle devient `[npx ]vitest related --run[ options] {files}`, options conservées, {files} = fichiers du diff séparés par des espaces. `npx vitest run` donne `npx vitest related --run <fichiers>`. Toute autre forme (npm test, lanceur d'espace de travail, a && b contenant vitest, sous-shell) ne dérive rien : repli complet (R4) ou testRelated déclaré."
     statut: hypothese
-    si_faux: "Si le texte ou le code de sortie diffère selon la version de vitest ou de la commande, la détection manque et un diff sans test lié part en faux rouge : à remplacer par un code de sortie convenu."
-    tests: ["R12 — sortie « No test files found » : repli sur la suite complète", "R12 — vraie sortie rouge : pas de repli"]
+    si_faux: "Si une forme plus large doit se dériver, le lead déclare testRelated ; seul le repli change, aucune donnée en jeu. gate-parts.ts:82-89 refuse déjà testReplay sur une composée parce que les fichiers n'atteignent que le dernier lanceur."
+    tests: ["R13 — npx vitest run : la commande jouée est npx vitest related --run avec les fichiers", "R13 — vitest run --reporter=dot : options conservées", "R13 — build && vitest run : aucune dérivation, suite complète", "R13 — npm test : aucune dérivation, suite complète"]
+  - id: R14
+    cas: [C1, C2]
+    enonce: "programChecks et integratedChecks reçoivent une portée : 'ciblee' par défaut pour les appelants de work.ts (implement, fix, probe, y compris la sonde work.ts:234) ; integratedChecks force 'complete', y compris à sa relance (L328). Sans ce mode, l'intégration jouerait une porte ciblée."
+    statut: sourcee
+    source: "demande du lot L590 : « la suite complète une seule fois, à la porte d'intégration » ; appelants src/orchestrate/cycle/work.ts:171 et :234, checks.ts:40 et :112-127 ; revue de la fiche du 04-11"
+    tests: ["R14 — integratedChecks : la suite complète est jouée même si les portes précédentes étaient ciblées", "R14 — sonde : porte ciblée"]
+  - id: R15
+    cas: [C1]
+    enonce: "Le brief de revue (src/orchestrate/cycle/brief.ts:70-78) dit, pour un CheckRun ciblé, que seuls les tests liés aux fichiers du lot ont été joués et que la suite complète sera jouée par le programme à l'intégration ; la consigne « do not rerun the whole suite » reste."
+    statut: hypothese
+    si_faux: "Si le brief reste muet, le relecteur croit à une suite complète verte ; seul le texte du brief change."
+    tests: ["R15 — brief d'un lot à porte ciblée : le texte dit « targeted »", "R15 — brief d'une suite complète : texte inchangé"]
 
 contrats:
   - id: A1
@@ -142,18 +163,18 @@ contrats:
     sortie: "build et tests liés joués ; entrée ajoutée à portes ; constat si rouge"
     erreurs:
       - { code: log warn, message: "porte ciblée sans test lié : suite complète jouée" }
-    regles: [R1, R3, R4, R6, R8, R11, R12]
+    regles: [R1, R3, R4, R6, R8, R11, R12, R13, R14, R15]
   - id: A2
     appel: job porte-integration
     entree: "sommet du lot, suiteRuns"
     sortie: "suite complète jouée une fois, ou non rejouée si déjà verte pour l'arbre"
     erreurs:
       - { code: log warn, message: "rouge au sommet intégré, vert à la relance (charge de la machine ?)" }
-    regles: [R5, R7, R11]
+    regles: [R5, R7, R11, R14]
   - id: A3
     appel: "commande cadence orchestrate --status"
     entree: "état du lot"
-    sortie: "colonne suites : nombre de suites complètes (+ durée totale des portes si elle tient), « — » sans porte"
+    sortie: "colonne suites : nombre de suites complètes, « — » sans porte ; détail du lot : une ligne par porte (portée, durée)"
     erreurs: []
     sans_erreur: "lecture seule de l'état ; un état ancien sans portes se lit comme liste vide (R8)"
     regles: [R8, R9, R10]
@@ -168,3 +189,4 @@ contrats:
 donnees:
   - { id: D1, objet: "état du lot (LotState) : suiteRuns inchangé (nombre de suites complètes), nouveau champ facultatif portes: liste de { portee, fichiers, code, duree, motif? }", existant: true, modification: ajout, decision: "le lead a tranché : suiteRuns reste un nombre de suites complètes, portes est un nouveau champ, absent = liste vide", note: "ancien état lisible tel quel (R8)" }
   - { id: D2, objet: "cadence.yaml, clé orchestrate.testRelated", existant: false, modification: aucune, note: "nouvelle clé facultative, absente = comportement par défaut (R4)" }
+  - { id: D3, objet: "état du lot, checks.runs[] (CheckRun) : champ facultatif portee 'ciblee'|'complete'", existant: true, modification: ajout, decision: "ajout facultatif, absent = complete : les enregistrements d'avant le lot se lisent comme avant (R11) ; posé en hypothèse par le spec writer, à confirmer par le lead", note: "sert gate-record.ts:90, brief.ts et la recherche de R5" }

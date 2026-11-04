@@ -50,11 +50,11 @@ describe('L577 probe : deliver exec, attente du descendant par événement', () 
 });
 
 describe('L577 probe : la mesure documentée', () => {
-  it('les lignes du tableau totalisent les 20 rouges annoncés', () => {
+  it('les lignes du tableau totalisent les 22 lignes que la commande de la mesure rend', () => {
     const doc = readFileSync(join(__dirname, '..', 'docs/mesures/instables-sous-charge-2026-11-04.md'), 'utf8');
     const rows = doc.split('\n').filter((l) => /^\| `/.test(l));
     const total = rows.reduce((s, l) => s + Number(l.split('|')[2].trim()), 0);
-    expect(rows.length).toBe(11);
-    expect(total).toBe(20);
+    expect(rows.length).toBe(12);
+    expect(total).toBe(22);
   });
 });

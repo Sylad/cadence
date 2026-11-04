@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.52.0**: `perf.prices` takes any model name (Fable included) and `perf.currency`; `plan.onWrite.onFailure: refuse | warn`; tests unstable under load wait for events.
 - **1.51.0**: resources carry paths (held for any lot whose diff touches them); `--add` takes back a lot the live wave handed back; `raf export` and `raf events`.
 - **1.50.0**: `corrections --classify` says when Ollama is unreachable; a config key set before its service install no longer breaks a repository; no false incident on a delivery's gitops commit.
 - **1.49.0**: lot budgets follow the measure; a pre-check of shared files and sealed tests; the sheet review converges (3rd pass); the mockup index is completed from `maquette_ecran`; piped gate commands refused.
@@ -80,6 +81,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.52.0**: `perf.prices` takes any model name, the same names as `orchestrate.escalation.model` and `@<model>`, so the Fable escalations — the most expensive steps — are priced by the model their journal records, and a step whose model has no price is counted apart and named instead of leaving the cost silently; `perf.currency` names the money of the grid (L578, GitHub issue #36). `plan.onWrite.onFailure: refuse | warn` lets a failing regeneration of the published copy of the plan warn instead of refusing the write (L471). The remote gate keeps one pid per remote command (L506). Five tests that turned red under load and green alone now wait for the event instead of a fixed delay, with the measure of the twelve such tests of 01 to 04-11 (L577; the four left are a lot of their own).
 
 **1.51.0**: a shared resource declared in the parent `cadence.yaml` can carry paths (L558): the wave holds it for any lot whose diff touches them, with no `uses:` set by hand; at integration a later lot waits for an older lot of the same wave only while that lot is really working on the resource, and a rebase conflict on a resource's file names the resource and the commits that touched it. `cadence orchestrate --add <project:lot>` takes back a lot the live wave handed back at the end of its cycle, once the lead has fixed and reviewed it in its kept worktree, instead of answering « lot déjà dans la vague » (L563, GitHub issue #31); one predicate decides which hand-backs can be added, an unknown incident never can. `raf export` gives the plan as one stable JSON document and `raf events` its stream of events (L470). Four older screen sheets now pass `cadence spec check` (L576).
 

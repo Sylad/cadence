@@ -58,3 +58,4 @@ migrate:
     - test/orchestrate-command.test.ts          # le plan d'un autre outil, taches.yaml (plan: path)
     - test/orchestrate-worktree-harness.ts
     - test/orchestrate-worktree-plan-writes.test.ts
+    - test/import-l472.test.ts                  # le plan d'un autre outil, taches.yaml (plan: path)

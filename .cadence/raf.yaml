@@ -2032,6 +2032,7 @@ lots:
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "conforme : revue Opus de la vague 2026-11-04-1015-cad (session 7) ; rebasé sur main après L572 par le lead (conflit d'import de spec-steps.ts fusionné, completeIndex + specMax/ficheConverging gardés), build vert, 10 fichiers ciblés / 596 tests verts", commit: 0a4ff0b7d725ffcd3affc9c1769f002be1cd52f9 }
   - id: L574
     title: "Empreintes figées des tests de garde (test/revue-maquette-criteres.test.ts R11, test/agents-design-jetons-grille-tics.test.ts R13…) : remplacées par des tests de comportement (une fiche valide d'avant passe toujours cadence spec check ; le gabarit garde ses clés), plus d'empreinte de fichier — 04-11 : trois lots (L570, L562, L573) arrêtés en question pour une simple mise à jour d'empreinte"
     status: todo

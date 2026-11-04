@@ -25,13 +25,13 @@ cas:
     nominal:
       - "Le programme liste les fichiers modifiés entre startedSha et HEAD (supprimés exclus)."
       - "Il joue le build comme avant, puis la commande liée sur ces fichiers (placeholder {files})."
-      - "Il enregistre dans suiteRuns une entrée : portée ciblée, nombre de fichiers, code, durée."
+      - "Il enregistre dans la liste portes une entrée : portée ciblée, fichiers, code, durée ; suiteRuns ne bouge pas."
       - "Vert : le lot passe à la suite du cycle sans que la suite complète ait été jouée."
     alternatives:
       - { si: "les tests liés sont rouges", alors: "même traitement qu'une suite rouge : ligne de base, rejeu seul, puis constat et correction", regles: [R6] }
       - { si: "aucun test n'est lié aux fichiers du diff", alors: "la suite complète est jouée à la place, portée complète, motif enregistré", regles: [R3] }
       - { si: "ni testRelated ni vitest dans orchestrate.test, ou orchestrate.test en parties, ou startedSha absent, ou diff vide ou illisible", alors: "la suite complète est jouée comme avant", regles: [R4] }
-      - { si: "orchestrate.test est absent", alors: "aucune suite jouée, suiteRuns absent, comme avant", regles: [R9] }
+      - { si: "orchestrate.test est absent", alors: "aucune suite jouée, suiteRuns et portes absents, comme avant", regles: [R9] }
     resultat: "Une porte courte après chaque écriture, sans suite complète."
   - id: C2
     titre: "La porte d'intégration joue la suite complète une seule fois"
@@ -40,9 +40,9 @@ cas:
     preconditions:
       - "le lot est relu conforme"
     nominal:
-      - "Avant l'avance de la branche, le programme cherche dans suiteRuns une suite complète verte pour l'arbre du sommet."
+      - "Avant l'avance de la branche, le programme cherche une suite complète verte pour l'arbre du sommet (checks.tree, L397)."
       - "Il n'en trouve pas (les portes précédentes étaient ciblées) : il joue le build puis la suite complète, une fois."
-      - "Il enregistre l'entrée complète (durée, code) et l'intégration continue."
+      - "Il enregistre l'entrée complète dans portes (durée, code), incrémente suiteRuns et l'intégration continue."
     alternatives:
       - { si: "une suite complète verte est déjà enregistrée pour l'arbre du sommet (repli de C1)", alors: "elle n'est pas rejouée", regles: [R5] }
       - { si: "la suite complète est rouge au sommet intégré", alors: "relancée une fois (L328), puis intégration refusée comme avant", regles: [R7] }
@@ -54,10 +54,10 @@ cas:
     preconditions:
       - "le lot a passé au moins une porte de tests"
     nominal:
-      - "Le tableau lit les entrées de suiteRuns du lot."
-      - "La colonne « suites » dit le nombre de suites complètes et de portes ciblées."
+      - "Le tableau lit suiteRuns (suites complètes) et la liste portes du lot."
+      - "La colonne « suites » garde le nombre de suites complètes ; la durée totale des portes s'y ajoute si elle tient sans élargir la table."
     alternatives:
-      - { si: "l'état a été écrit avant ce lot (suiteRuns est un nombre)", alors: "il se lit comme ce nombre de suites complètes, sans plantage", regles: [R8] }
+      - { si: "l'état a été écrit avant ce lot (portes absent)", alors: "portes se lit comme une liste vide, suiteRuns inchangé, sans plantage", regles: [R8] }
       - { si: "aucune porte de tests n'a joué", alors: "la colonne affiche « — »", regles: [R9] }
     resultat: "Le coût des portes est mesurable par lot."
 
@@ -88,7 +88,7 @@ regles:
     tests: ["R4 — test non vitest sans testRelated : suite complète jouée", "R4 — startedSha absent : suite complète jouée"]
   - id: R5
     cas: [C2]
-    enonce: "À l'intégration, la suite complète est jouée une seule fois, y compris quand le sommet n'a pas été rebasé (tip égal au commit relu), sauf si suiteRuns porte déjà une suite complète verte pour l'arbre du sommet."
+    enonce: "À l'intégration, la suite complète est jouée une seule fois, y compris quand le sommet n'a pas été rebasé (tip égal au commit relu), sauf si une suite complète verte est déjà enregistrée pour l'arbre du sommet."
     statut: sourcee
     source: "demande du lot L590 : « la suite complète une seule fois, à la porte d'intégration » ; aujourd'hui les contrôles d'intégration ne jouent que si le rebase change le sommet (src/orchestrate/cycle/integrate-lot.ts:182-186)"
     tests: ["R5 — sommet non rebasé après portes ciblées : une suite complète est jouée à l'intégration", "R5 — suite complète verte déjà enregistrée pour l'arbre : pas de seconde suite"]
@@ -106,10 +106,10 @@ regles:
     tests: ["R7 — suite complète rouge deux fois : intégration refusée avec les tests rouges"]
   - id: R8
     cas: [C3]
-    enonce: "Chaque porte de tests enregistre une entrée dans suiteRuns : portée (ciblée ou complète), nombre de fichiers, code, durée en secondes. Un suiteRuns nombre écrit avant le lot se lit comme autant de suites complètes."
+    enonce: "suiteRuns reste un nombre : celui des suites complètes. Chaque porte de tests (ciblée ou complète) ajoute en plus une entrée { portee: 'ciblee'|'complete', fichiers, code, duree (secondes), motif? } à la liste portes de l'état du lot ; portes absent dans un ancien état se lit comme une liste vide."
     statut: sourcee
-    source: "demande du lot L590 : « chaque porte enregistre sa durée et son périmètre dans suiteRuns (aujourd'hui un simple compteur) » ; forme exacte : question au lead"
-    tests: ["R8 — porte ciblée : l'entrée porte portée, fichiers, code et durée", "R8 — état ancien (suiteRuns nombre) : lu comme suites complètes, sans plantage"]
+    source: "décision du lead : « suiteRuns reste un nombre, celui des suites COMPLÈTES (contrat lu par table.ts, les tests L518 et les états de vagues déjà écrits, inchangé) ; nouveau champ portes » ; demande du lot L590 : « chaque porte enregistre sa durée et son périmètre »"
+    tests: ["R8 — porte ciblée : portes reçoit portee, fichiers, code et duree, suiteRuns inchangé", "R8 — état ancien sans portes : lu comme liste vide, sans plantage", "R8 — suite complète : suiteRuns +1 et une entrée complete"]
   - id: R9
     cas: [C1, C3]
     enonce: "Sans orchestrate.test, aucune porte de tests ne joue et suiteRuns reste absent ; le tableau affiche « — »."
@@ -118,10 +118,10 @@ regles:
     tests: ["R9 — sans orchestrate.test : suiteRuns absent et colonne « — »"]
   - id: R10
     cas: [C3]
-    enonce: "La colonne « suites » du tableau affiche le nombre de suites complètes suivi du nombre de portes ciblées, par exemple « 1 (+2 ciblées) » ; sans porte ciblée elle reste le nombre seul."
+    enonce: "La colonne « suites » du tableau affiche le nombre de suites complètes comme avant ; la durée totale des portes s'y ajoute (par exemple « 1 · 6 min ») seulement si elle tient sans élargir la table, sinon la colonne reste le nombre seul."
     statut: hypothese
-    si_faux: "Si le lead préfère deux colonnes ou la durée totale, seul le rendu du tableau change."
-    tests: ["R10 — un lot à une suite complète et deux portes ciblées : « 1 (+2 ciblées) »", "R10 — sans porte ciblée : le nombre seul, comme L518"]
+    si_faux: "Si le lead préfère une colonne durée ou aucune durée, seul le rendu du tableau change."
+    tests: ["R10 — un lot à une suite complète et deux portes ciblées : le nombre 1 reste lu et la durée totale s'ajoute", "R10 — sans portes : le nombre seul, comme L518", "R10 — la largeur de la table n'augmente pas"]
   - id: R11
     cas: [C1, C2]
     enonce: "Le verdict enregistré dans checks et repris par cadence verify --gate ne vaut que pour une suite complète : une porte ciblée verte n'est jamais reprise comme verdict de la suite."
@@ -139,7 +139,7 @@ contrats:
   - id: A1
     appel: job porte-apres-ecriture
     entree: "diff startedSha..HEAD, orchestrate.test, orchestrate.testRelated facultatif"
-    sortie: "build et tests liés joués ; entrée ajoutée à suiteRuns ; constat si rouge"
+    sortie: "build et tests liés joués ; entrée ajoutée à portes ; constat si rouge"
     erreurs:
       - { code: log warn, message: "porte ciblée sans test lié : suite complète jouée" }
     regles: [R1, R3, R4, R6, R8, R11, R12]
@@ -153,9 +153,9 @@ contrats:
   - id: A3
     appel: "commande cadence orchestrate --status"
     entree: "état du lot"
-    sortie: "colonne suites : complètes et ciblées, « — » sans porte"
+    sortie: "colonne suites : nombre de suites complètes (+ durée totale des portes si elle tient), « — » sans porte"
     erreurs: []
-    sans_erreur: "lecture seule de l'état ; un suiteRuns ancien se lit comme un nombre (R8)"
+    sans_erreur: "lecture seule de l'état ; un état ancien sans portes se lit comme liste vide (R8)"
     regles: [R8, R9, R10]
   - id: A4
     appel: commande cadence-orchestrate-config
@@ -166,5 +166,5 @@ contrats:
     regles: [R2]
 
 donnees:
-  - { id: D1, objet: "état du lot (.cadence/runs/.../state, LotState.suiteRuns)", existant: true, modification: changement, decision: "à trancher par le lead : voir la question sur la forme de suiteRuns", note: "nombre aujourd'hui, liste d'entrées demandée par le lot ; l'ancien nombre reste lisible (R8)" }
+  - { id: D1, objet: "état du lot (LotState) : suiteRuns inchangé (nombre de suites complètes), nouveau champ facultatif portes: liste de { portee, fichiers, code, duree, motif? }", existant: true, modification: ajout, decision: "le lead a tranché : suiteRuns reste un nombre de suites complètes, portes est un nouveau champ, absent = liste vide", note: "ancien état lisible tel quel (R8)" }
   - { id: D2, objet: "cadence.yaml, clé orchestrate.testRelated", existant: false, modification: aucune, note: "nouvelle clé facultative, absente = comportement par défaut (R4)" }

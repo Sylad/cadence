@@ -2194,11 +2194,12 @@ lots:
     started: 2026-11-04
   - id: L587
     title: "Une vague de lots nommés remplit ses créneaux libres : quand un créneau se libère et que sa file est vide, elle tire le lot prêt suivant du plan (même tirage que --continue : priority: du cadence.yaml parent, ressources uses: libres, lots mûrs seulement, filtre L390), jusqu'à la fin du budget ; --no-fill garde l'ancien comportement ; chaque tirage est une ligne du journal (« créneau libre rempli par <lot> ») — 04-11 : vagues 1015-cad et 1310-cad remplies à la main par --add sur événement, créneaux vides entre deux événements, vu par Sylvain"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "compliant : 0 bloquant, 0 majeur, 2 mineurs (commentaire resté sur l'ancienne règle, déduplication du journal non testée) — orchestré (vague 2026-11-04-1310-cad, 3 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : rebase sans effet sur le lot (8 commits relus, seule la place de l'entrée CHANGELOG a bougé), aucun constat", commit: 3a0601b9fbd0836588da4e1e273952e612b54fff }
+    finished: 2026-11-04
   - id: L588
     title: "cadence orchestrate --follow [--wave v] : suit le journal et n'émet que les lignes qui demandent un geste du lead (prêt, rendu, question, intégré, budget atteint, incident, fin de vague), pas les transitions implementing/reviewing/fixing ; le skill lead l'utilise à la place de tail -F — 04-11 : 453 événements remontés au lead sur 3 vagues dont 91 utiles (20 %), ~300-400 k tokens de contexte du lead pour rien"
     status: doing

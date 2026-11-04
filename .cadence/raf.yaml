@@ -2106,11 +2106,14 @@ lots:
     review: { date: 2026-11-04, verdict: "compliant — orchestré (vague 2026-11-04-1310-cad, 0 passe(s) de correction)", commit: 206550e381efb139ad2daeb377a7e41515ede6f9, reporte: { de: aa1f2c29404a83d4df23376a270b82e73e452722, vers: 206550e381efb139ad2daeb377a7e41515ede6f9, patchId: aa86affca04c69faa596721f7f4706296faec64a } }
     finished: 2026-11-04
   - id: L577
-    title: "Tests instables sous charge stabilisés : 20 rouges dans la suite, verts rejoués seuls, sur les vagues du 01 au 04-11 (orchestrate-creneaux-libres-l527-probe ×6, porte-deportee ×3, deliver ×3, verify ×2, orchestrate-worktree-plan-writes ×2, orchestrate-app ×2, probe-L539-bords, orchestrate-worktree-integration) : pour chacun, la cause (attente à durée fixe, verrou, horloge, port) et un correctif qui attend l'événement au lieu d'un délai ; mesure avant/après par les lignes « instable(s) sous charge » des journaux"
+    title: "Tests instables sous charge, première série (L577) : mesure des 12 tests des vagues du 01 au 04-11 (docs/mesures/instables-sous-charge-2026-11-04.md) et 5 tests corrigés par une attente d'événement (deliver (f), orchestrate-app verrou vide et délai restant, orchestrate-worktree-plan-writes R16 ×2) ; les 4 restants vont à L579"
     status: doing
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
+    notes:
+      - { date: 2026-11-04, text: "titre remplacé : « Tests instables sous charge stabilisés : 20 rouges dans la suite, verts rejoués seuls, sur les vagues du 01 au 04-11 (orchestrate-creneaux-libres-l527-probe ×6, porte-deportee ×3, deliver ×3, verify ×2, orchestrate-worktree-plan-writes ×2, orchestrate-app ×2, probe-L539-bords, orchestrate-worktree-integration) : pour chacun, la cause (attente à durée fixe, verrou, horloge, port) et un correctif qui attend l'événement au lieu d'un délai ; mesure avant/après par les lignes « instable(s) sous charge » des journaux »" }
+    review: { date: 2026-11-04, verdict: "conforme : arbitrage du lead (04-11) — revue Fable de la vague 2026-11-04-1310-cad : code des 4 correctifs vérifié, tests rejoués seuls verts ; le seul majeur était de périmètre (4 tests sur 12 sans correctif), le lot est ramené par raf title à ce qu'il livre et les 4 restants passent à L579", commit: 8e3675d6f68ec8d8fe1118eb1c0b5cfb7f789b33 }
   - id: L578
     title: "perf.prices accepte tout nom de modèle (issue #36) : mêmes noms que escalation.model et @<modèle> (fable compris), une étape est chiffrée par le modèle que son journal enregistre ; une étape d'un modèle sans prix est comptée à part et nommée, jamais silencieusement hors coût ; perf.currency optionnel (défaut sans symbole imposé) au lieu d'un « € » fixe pour une grille saisie en dollars"
     status: done

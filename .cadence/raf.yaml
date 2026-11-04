@@ -1155,11 +1155,12 @@ lots:
     finished: 2026-11-03
   - id: L500
     title: "Précheck : tests d'acceptation scellés et fichiers partagés (inventaire des pertes du 31-10 (17→31-10) : 19 questions sur 43 portent sur un test scellé d'un autre lot, médiane 56 min de blocage ; 28 intégrations refusées dont 16 conflits) : avant implement, le précheck liste les tests scellés que le lot risque de toucher et les fichiers que touche aussi un autre lot de la vague ou un worktree conservé, dans le brief et dans le tableau"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-31
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "compliant — 0 bloquant, 0 majeur, 2 mineurs en note (repli sur nom de fichier nu sans extension ; limite documentée pour les lots de la vague qui n'ont pas encore démarré) — orchestré (vague 2026-11-04-1015-cad, 1 passe(s) de correction)", commit: 38024dc49def46b16366488963eb34dca0958306, reporte: { de: 25368fbb66f1805e061b807676350cacc847202a, vers: 38024dc49def46b16366488963eb34dca0958306, patchId: 4006ee0222e1ed47bf0bf4c6d5878c69ff4baea0 } }
+    finished: 2026-11-04
   - id: L501
     title: "Budget de lot calé sur la mesure (inventaire des pertes du 31-10 (17→31-10) : 34 lots rendus pour budget, ~800 min et 11 M tokens, médiane 106 min avant reprise) : le budget par défaut d'un lot vient du p90 des tokens par estimate que cadence perf calcule déjà (fenêtre glissante), borné, et le --dry-run dit d'où vient le chiffre"
     status: todo

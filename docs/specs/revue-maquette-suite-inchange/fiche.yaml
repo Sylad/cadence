@@ -77,6 +77,19 @@ cas:
     alternatives:
       - { si: "la revue est la première", alors: "le brief ne parle pas du marquage", regles: [R6] }
     resultat: "L'agent sait que le marquage est la voie d'un majeur tardif vers le lead."
+  - id: C5
+    titre: "La règle R7 de revue-maquette-exhaustive (« état du lot inchangé ») est remplacée"
+    acteur: l'implémenteur du lot
+    declencheur: "job maquette (revue de rang 2 ou plus, majeur marqué inchange: true)"
+    preconditions:
+      - "test/orchestrate-maquette-exhaustive.test.ts:188-221 et docs/specs/revue-maquette-exhaustive/fiche.yaml (R7) fixent aujourd'hui qu'un majeur marqué n'a aucun effet sur le verdict, l'état et la boucle"
+    nominal:
+      - "Le lot L562 remplace cette partie de R7 : un majeur marqué en revue 2 rend la revue conforme (R1) et change kinds, maquette.conforme et maquette.verdict (R3)."
+      - "La ligne de journal « <projet>:<lot> · défaut de revue : maquette, revue <n>, majeur sur un point inchangé absent de la revue <n-1> : <texte> » (spec-steps.ts:268) est conservée telle quelle."
+      - "Le test « R7 — l'état du lot après la ligne est identique à celui sans marque » est réécrit dans le même lot pour dire l'inverse ; les autres tests R7/R8 de ce fichier restent verts sans changement."
+    alternatives:
+      - { si: "le majeur marqué est en revue 1, ou n'est pas un majeur marqué strictement (mineur, non booléen)", alors: "aucune ligne de journal et l'état du lot est celui d'avant, comme les tests R7/R8 existants le fixent", regles: [R7] }
+    resultat: "Aucune contradiction cachée : l'ancienne règle « état inchangé » est déclarée remplacée, la ligne de journal reste."
 
 regles:
   - id: R1
@@ -137,6 +150,15 @@ regles:
       - "R6 — brief de la revue 2 : « ne bloque pas » et « lead » présents près de inchange"
       - "R6 — brief de la revue 1 : aucune consigne sur ce qui ne bloque pas"
       - "R6 — rapport sans inchange ou avec inchange non booléen : accepté, comme avant"
+  - id: R7
+    cas: [C5]
+    enonce: "La partie « le verdict, l'état du lot et la boucle sont inchangés » de la règle R7 de revue-maquette-exhaustive est remplacée par R1 à R4 : en revue 2 ou plus, un majeur marqué inchange: true rend la revue conforme (kinds, status, maquette.conforme et maquette.verdict diffèrent d'un rapport non marqué). La ligne de journal « défaut de revue » (spec-steps.ts:268) est conservée à l'identique : même texte, même condition (revue ≥ 2, bloquant ou majeur marqué strictement true, une ligne par constat), écrite par c.wave.log et jamais dans l.warnings ; elle ne change ni les tests R7/R8 qui la vérifient ni la règle R8 (marque non booléenne lue comme faux). Seul le test « R7 — l'état du lot après la ligne est identique à celui sans marque » (test/orchestrate-maquette-exhaustive.test.ts:206-213) est réécrit dans ce lot."
+    statut: sourcee
+    source: "demande du lot L562 (un majeur marqué ne compte plus : contredit par construction l'état inchangé de test/orchestrate-maquette-exhaustive.test.ts:206-213 et de docs/specs/revue-maquette-exhaustive R7) ; ligne de journal : src/orchestrate/cycle/spec-steps.ts:268 et test lignes 197-199, que le lot ne demande pas de retirer"
+    tests:
+      - "R7 — revue 2, majeur marqué : l'état du lot diffère de celui d'un majeur non marqué (kinds sans session spec, maquette.conforme vrai) — remplace l'ancien test « état identique »"
+      - "R7 — revue 2, majeur marqué : c.wave.log reçoit toujours exactement la ligne « défaut de revue : maquette, revue 2, … » et l.warnings ne la contient pas"
+      - "R7 — revue 1 avec inchange: true, ou revue 2 avec mineur marqué ou marque non booléenne : aucune ligne de journal"
 
 contrats:
   - id: A1
@@ -146,7 +168,7 @@ contrats:
     erreurs:
       - { code: log error, message: "maquette non conforme après <n> revues : <verdict>" }
       - { code: log error, message: "maquette non conforme et la spec a déjà joué <n> sessions : <verdict>" }
-    regles: [R1, R2, R3, R4, R5, R6]
+    regles: [R1, R2, R3, R4, R5, R6, R7]
 
 donnees:
   - { id: D1, objet: "l.proposals de l'état du lot (state.ts)", existant: true, modification: aucune, note: "des lignes de texte de plus « [suite ux] … » ; format de la liste inchangé" }

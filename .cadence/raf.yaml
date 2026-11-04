@@ -2129,6 +2129,16 @@ lots:
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
+  - id: L580
+    title: "Étape probe (issue #37) : un fichier de sonde n'est jamais commité rouge ni hors porte — soit il est joué par la porte du projet et vert au dernier commit du lot, soit il n'est pas commité ; ses attentes qui ne sont pas des règles du lot reviennent en constats de revue ou en sous-tâches proposées ; le fichier respecte les linters du dépôt (shellcheck vu rouge sur main après une livraison, 3 lots en un jour)"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-04
+  - id: L581
+    title: "Nouvelle vague et branche gardée sous l'ancien nom du projet (issue #38) : cadence/<vague>/<repo>--<lot> est retrouvée comme cadence/<vague>/<org>__<repo>--<lot> (les deux formes, la plus récente d'abord) ; à défaut le --dry-run dit qu'une branche ancienne du lot existe et n'est pas reprise — 5 commits de travail ignorés le 04-11 au compte pro"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-04
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

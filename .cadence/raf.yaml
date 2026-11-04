@@ -1826,7 +1826,7 @@ lots:
   - id: L558
     goal: "Fiche de L558 corrigée puis code. Écrire SOURCÉES dans R6 (b) les deux décisions du lead du 03-11 : (1) diff PARTIEL — le lot tardif regarde les commits déjà faits par le lot plus ancien encore en jeu (base..tête de son worktree, réévalué entre deux étapes) ; s'ils touchent un chemin de la même ressource il attend la fin de l'ancien avant de s'intégrer, sinon il s'intègre ; le message lisible de (c) est le filet. (2) il n'attend l'ancien QUE s'il travaille réellement (implementing, fixing, reviewing, ou étape en attente d'un créneau dans la même vague après avoir commencé) ; ancien en question, suspended, handed-back, failed ou queued : pas d'attente. Tests : ancien avec commit sur cycle.ts → attente puis intégration ; ancien sans commit sur la ressource → pas d'attente ; un test par état (question, suspended, queued → pas d'attente ; implementing → attente). Traiter les mineurs ouverts des revues de fiche (formes de chemin limites rejetées APRÈS normalisation, messages de A1, ligne de journal « intégration différée » assertée, source c.wave.store.lots())."
     title: "Ressources par chemins : une ressource déclarée dans cadence.yaml peut porter des chemins (resources: { cycle-ts: { paths: [src/orchestrate/cycle.ts, src/orchestrate/cycle/] } }) et la vague la tient pour tout lot dont le diff les touche, sans uses: posé à la main (03-11 : L520 a modifié cycle.ts sans uses: [cycle-ts] pendant que L492 le découpait → conflit à l'intégration, lot rendu)"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-11-03
@@ -1876,6 +1876,7 @@ lots:
       - { date: 2026-11-04, text: "Hypothèses (fiche ressources-par-chemins) — R11 : Quand rebaseOnto rend un conflit avec des fichiers, le message existant est gardé mot pour mot et, pour chaque ressource que couvre un fichier en conflit, comp… ; si faux : Si le message devait nommer le lot auteur, il faudrait que l'intégration garde la liste des fichiers de chaque lot (aujourd'hui rebaseOnto ne rend que les fich…" }
       - { date: 2026-11-04, text: "Hypothèses (fiche ressources-par-chemins) — R12 : Toute lecture du diff d'un lot (R6) qui échoue côté git, sans que la branche soit absente, rend un diff VIDE sans lever d'erreur, comme une branche absente : b… ; si faux : Si un diff illisible devait arrêter la vague ou rendre le lot, seul le traitement de l'échec change (un catch de moins ou un rendu de plus) ; aucune donnée ni…" }
     review: { date: 2026-11-04, verdict: "conforme : revue Opus de la vague 2026-11-04-1310-cad (session 10) ; rebasé sur main par le lead (sonde L492 : union integrate-wait + partage-step ; CHANGELOG : entrées L558 et L470 gardées), build vert, sonde + 4 tests L558 / 138 verts", commit: 29a5976e1e35d9b6c27fa041cc659f64f330e39d }
+    finished: 2026-11-04
   - id: L559
     title: "orchestrate : spawn E2BIG à l'implémentation d'un lot dont la fiche d'écran est grosse (issue #27, ~270 Ko, 133 règles) — le brief passe en un seul argument de claude -p (MAX_ARG_STRLEN 128 Kio sous Linux) : passer TOUT brief par stdin (ou un fichier) quelle que soit sa taille, et réduire {{fiche}} aux règles du lot comme l'étape accept depuis 1.46 ; test qui rend un brief > 128 Kio et vérifie que la session démarre"
     status: done

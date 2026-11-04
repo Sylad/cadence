@@ -2045,6 +2045,7 @@ lots:
     estimate: 0.25
     created: 2026-11-04
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "compliant: 2 minor notes (L576 referenced but absent from the plan; probe kept in test/) — orchestré (vague 2026-11-04-1015-cad, 1 passe(s) de correction)", commit: 0793a6065a98f7347ce27987a50093733db833ce, reporte: { de: b30c11c315ad66c5d7d1b8fe61f63443726fca04, vers: 0793a6065a98f7347ce27987a50093733db833ce, patchId: 71c983242107dbcf3f1591d305c93c1809d25410 } }
   - id: L575
     title: "cadence corrections --classify sans Ollama joignable (issue #35) : une ligne dès le départ « Ollama injoignable sur <OLLAMA_HOST> : rien n'est classé » et un code de sortie non nul, au lieu de « 53/53 », exit 0 et {} écrit ; si le modèle répond en partie, le compte des passes non classées et la raison ; corrections.json n'est pas écrasé par un résultat vide"
     status: doing

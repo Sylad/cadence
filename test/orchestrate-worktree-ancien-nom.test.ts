@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync } from 'node:fs';
+import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { baseBranchOf, legacyLotSlug, lotBranch, lotTreeDir, prepareTree, recoverTree } from '../src/orchestrate/worktree.js';
 import { commitFile, git } from './orchestrate-harness.js';
@@ -125,5 +125,46 @@ describe('R2 — le --dry-run dit qu\'une branche ancienne du lot existe, et si 
     const r = await run(parent, ['a:L1', '--dry-run'], fake());
     removeDryRunBriefs(r.out);
     expect(r.out).not.toContain("d'une vague précédente");
+  });
+});
+
+describe('R2 — le --dry-run applique les refus de recoverTree et en dit la cause (L581, constat de la revue courte d\'intégration)', () => {
+  it('R2 — worktree gardé avec un fichier suivi modifié : « n\'est pas reprise » avec le fichier, comme la vraie vague', async () => {
+    const { parent, repo } = setup();
+    const old = kept(repo, 'w1', 'a', 'L1', 2, 1000);
+    writeFileSync(join(old.dir, 'base.txt'), 'modifié\n');
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).toContain(`branche ${old.branch} d'une vague précédente (2 commit(s) non intégré(s)) : n'est pas reprise, son worktree porte des fichiers suivis modifiés (base.txt)`);
+    expect(r.out).not.toContain('reprise par la vague');
+  });
+  it('R2 — un commit de la branche gardée modifie le plan : « n\'est pas reprise » avec le fichier du plan', async () => {
+    const { parent, repo } = setup();
+    const old = kept(repo, 'w1', 'a', 'L1', 1, 1000);
+    appendFileSync(join(old.dir, '.cadence/raf.yaml'), '# touché\n');
+    git(old.dir, 'commit', '-q', '-am', 'feat(L1): touche le plan');
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).toContain(`branche ${old.branch} d'une vague précédente (2 commit(s) non intégré(s)) : n'est pas reprise, un de ses commits modifie le plan (.cadence/raf.yaml)`);
+    expect(r.out).not.toContain('reprise par la vague');
+  });
+  it('R2 — la plus récente refusée : la plus ancienne n\'est pas reprise non plus, la cause ne la dit pas « reprise »', async () => {
+    const { parent, repo } = setup();
+    const older = kept(repo, 'w1', 'a', 'L1', 1, 1000);
+    const newer = kept(repo, 'w2', 'a', 'L1', 1, 2000);
+    writeFileSync(join(newer.dir, 'base.txt'), 'modifié\n');
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).toContain(`branche ${newer.branch} d'une vague précédente (1 commit(s) non intégré(s)) : n'est pas reprise, son worktree porte des fichiers suivis modifiés (base.txt)`);
+    expect(r.out).toContain(`branche ${older.branch} d'une vague précédente (1 commit(s) non intégré(s)) : n'est pas reprise, seule la plus récente du lot (${newer.branch}) est examinée, et elle est refusée`);
+  });
+  it('R2 — worktree propre et plan intact : « reprise par la vague », et la vraie reprise l\'accepte', async () => {
+    const { parent, repo } = setup();
+    const old = kept(repo, 'w1', 'a', 'L1', 2, 1000);
+    const r = await run(parent, ['a:L1', '--dry-run'], fake());
+    removeDryRunBriefs(r.out);
+    expect(r.out).toContain(`branche ${old.branch} d'une vague précédente (2 commit(s) non intégré(s)) : reprise par la vague (le lot repart de son travail)`);
+    const dir = lotTreeDir(join(parent, '.cadence', 'runs', 'w2'), 'a', 'L1');
+    expect(recoverTree(repo, lotBranch('w2', 'a', 'L1'), dir, 'main', { planFiles: new Set(['.cadence/raf.yaml']), alsoSlugs: [] })).toEqual({ from: old.branch, unintegrated: 2 });
   });
 });

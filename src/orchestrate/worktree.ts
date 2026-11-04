@@ -286,10 +286,8 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
   if (!found || branchSha(repo, branch) !== null) return null;
   tryGit(repo, 'worktree', 'prune');
   const moved = found.dir !== null && existsSync(found.dir);
-  const dirty = moved && existsSync(join(found.dir as string, '.git')) ? trackedDirty(found.dir as string) : [];
-  if (dirty.length) return { from: found.branch, refused: `son worktree porte des fichiers suivis modifiés (${dirty.join(', ')})` };
-  const touched = (tryGit(repo, 'log', '--name-only', '--format=', `refs/heads/${found.branch}`, '--not', `refs/heads/${base}`) ?? '').split('\n').find((f) => planFiles.has(f));
-  if (touched) return { from: found.branch, refused: `un de ses commits modifie le plan (${touched})` };
+  const refused = recoveryRefusal(repo, found, base, planFiles);
+  if (refused) return { from: found.branch, refused };
   try {
     if (moved) {
       mkdirSync(dirname(dir), { recursive: true });
@@ -301,6 +299,17 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
     return { from: found.branch, refused: `déplacement ou renommage de la branche refusé par git (${gitFailure(e)}), rien n'a bougé` };
   }
   return { from: found.branch, unintegrated: found.unintegrated };
+}
+
+/**
+ * Pourquoi la reprise refuserait cette branche gardée sans y toucher, ou null : son worktree porte un fichier suivi modifié (R11), ou un de ses commits
+ * touche un fichier du plan (`planFiles`, relatifs au dépôt). Ne touche à rien : `recoverTree` et le `--dry-run` (L581) appliquent ainsi les mêmes refus.
+ */
+export function recoveryRefusal(repo: string, found: KeptTree, base: string, planFiles: ReadonlySet<string>): string | null {
+  const dirty = found.dir !== null && existsSync(join(found.dir, '.git')) ? trackedDirty(found.dir) : [];
+  if (dirty.length) return `son worktree porte des fichiers suivis modifiés (${dirty.join(', ')})`;
+  const touched = (tryGit(repo, 'log', '--name-only', '--format=', `refs/heads/${found.branch}`, '--not', `refs/heads/${base}`) ?? '').split('\n').find((f) => planFiles.has(f));
+  return touched ? `un de ses commits modifie le plan (${touched})` : null;
 }
 
 /**

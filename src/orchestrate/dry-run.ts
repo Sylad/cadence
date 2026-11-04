@@ -17,7 +17,7 @@ import { drawSettingsReport } from './continue.js';
 import { precheckNothingToFind, MAX_PASSES, MAX_PASSES_CONVERGING, briefName, needsPrecheck } from './cycle.js';
 import { buildArgs, buildLocalArgs, MODEL_ALIASES, mcpServersFor, enabledPlugins, settingsFiles, type StepModel } from './launch.js';
 import { repoBranch } from './integrate.js';
-import { keptBranchesOfLot, legacyLotSlug, lotBranch, type KeptTree } from './worktree.js';
+import { keptBranchesOfLot, legacyLotSlug, lotBranch, planFileSet, recoveryRefusal, type KeptTree } from './worktree.js';
 import { effortKey, schemaFor, stepAgent } from './schemas.js';
 import { lotKey, lotSlug, neighbourDirs, RunStore, type LotState } from './state.js';
 import { matchesNvmrc, notLoggedIn, pathNodeVersion, projectEnv } from './preflight.js';
@@ -106,22 +106,25 @@ function repoNotices(repo: string, io: OrchestrateIo, said: RepoSaid, specDir: s
 
 /**
  * Ce que la vague ferait des branches gardées d'une vague passée qui portent le travail du lot (L581, issue #38), sous le nom actuel ou l'ancien (`<repo>--<lot>`) :
- * une ligne par branche non intégrée, qui dit si elle est reprise (`recoverTree`) ou pas, et pourquoi. Un lot rendu à l'intégration (`next: integrate`) est repris à part : non concerné.
+ * une ligne par branche non intégrée, qui dit si elle est reprise ou pas, et pourquoi, avec les refus mêmes de `recoverTree` (`recoveryRefusal` : worktree modifié, plan touché).
+ * Le lot d'un dry-run est neuf (`next` à null) : la reprise à part d'un lot rendu à l'intégration (`next: integrate`, execute.ts) n'y est pas simulée.
+ * Un `git worktree move` ou `git branch -m` refusé ne se voit qu'à la vraie vague.
  */
-function keptBranchLines(l: LotState, id: string, worktrees: boolean): string[] {
+function keptBranchLines(l: LotState, id: string, worktrees: boolean, planFiles: ReadonlySet<string>): string[] {
   const branch = repoBranch(l.repo);
   const legacy = legacyLotSlug(l.project, l.lot);
   const found = keptBranchesOfLot(l.repo, lotBranch(id, l.project, l.lot), [lotSlug(l.project, l.lot), ...(legacy ? [legacy] : [])]);
-  const taken = worktrees && branch ? found.find((t) => t.base === branch) : undefined;
-  return found.map((t) => `  branche ${t.branch} d'une vague précédente (${t.unintegrated} commit(s) non intégré(s)) : ${t === taken ? 'reprise par la vague (le lot repart de son travail)' : notTakenCause(t, branch, worktrees, taken)}`);
+  const first = worktrees && branch ? found.find((t) => t.base === branch) : undefined;
+  const refused = first ? recoveryRefusal(l.repo, first, first.base, planFiles) : null;
+  return found.map((t) => `  branche ${t.branch} d'une vague précédente (${t.unintegrated} commit(s) non intégré(s)) : ${t !== first ? notTakenCause(t, branch, worktrees, first, refused) : refused ? `n'est pas reprise, ${refused}` : 'reprise par la vague (le lot repart de son travail)'}`);
 }
 
-/** Pourquoi `recoverTree` ne prend pas cette branche gardée (L581). */
-function notTakenCause(t: KeptTree, branch: string | null, worktrees: boolean, taken?: KeptTree): string {
+/** Pourquoi `recoverTree` ne prend pas cette branche gardée, quand ce n'est pas la plus récente partie de la branche du dépôt (L581). */
+function notTakenCause(t: KeptTree, branch: string | null, worktrees: boolean, first: KeptTree | undefined, refused: string | null): string {
   if (!worktrees) return "n'est pas reprise, orchestrate.worktrees n'est pas actif";
   if (!branch) return "n'est pas reprise, le dépôt est en HEAD détaché";
   if (t.base !== branch) return `n'est pas reprise, elle est partie de ${t.base} et le dépôt est sur ${branch}`;
-  return `n'est pas reprise, une branche plus récente du lot (${taken?.branch}) l'est`;
+  return refused ? `n'est pas reprise, seule la plus récente du lot (${first?.branch}) est examinée, et elle est refusée` : `n'est pas reprise, une branche plus récente du lot (${first?.branch}) l'est`;
 }
 
 /** `wave` : la vague simulée — son identifiant, son budget et si elle a plus d'un créneau (L527 : tout lot d'un dépôt en worktrees y joue alors dans le sien). */
@@ -176,7 +179,7 @@ export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDep
     for (const m of new Set(steps.map((s) => s.model))) {
       if (m !== 'local' && !MODEL_ALIASES.includes(m)) io.out(`  ⚠ modèle « ${m} » hors des alias ${MODEL_ALIASES.join(', ')} : passé tel quel à claude --model (un nom que le compte ne connaît pas fait échouer la session)`);
     }
-    for (const line of [...keptBranchLines(l, id, env.config.worktrees), ...planMessageLines(l.repo, l, id, env.config.spec.dir)]) io.out(line);
+    for (const line of [...keptBranchLines(l, id, env.config.worktrees, planFileSet(env.loadPlan(), l.repo)), ...planMessageLines(l.repo, l, id, env.config.spec.dir)]) io.out(line);
     repoNotices(l.repo, io, said, env.config.spec.dir, env.loadPlan);
     io.out(`  corrections : ${MAX_PASSES} passe(s) au plus (${MAX_PASSES_CONVERGING} si la revue converge), en session neuve`);
     io.out(l.light ? '  revue conforme avec mineurs : pas de passe des mineurs, ils sont rendus en notes' : '  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');

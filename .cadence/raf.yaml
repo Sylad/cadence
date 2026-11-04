@@ -2017,6 +2017,11 @@ lots:
     status: todo
     estimate: 0.5
     created: 2026-11-04
+  - id: L573
+    title: "Étape spec, fiche avec maquette ET maquette_ecran (issue #34) : un champ ou un état dessiné dans la page maquette_ecran mais absent de l'index maquette ne fait plus échouer trois passes — le programme complète l'index (entrée data-testid, section etat-…) et copie les captures maquette-<état>-<largeur>.png à partir de la fiche et de maquette_ecran, ou à défaut le brief spec nomme le fichier d'index et la forme exacte de l'entrée ; le constat dit « présent dans maquette_ecran, absent de l'index »"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-04
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

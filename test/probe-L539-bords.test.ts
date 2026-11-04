@@ -90,12 +90,11 @@ describe('L539 — --priority, bords du tirage lu dans la vague', () => {
     else expect(r.lots).toEqual(['b', 'a']);
   });
 
-  it('le contrat tient 6 fois de suite avec trois sessions en parallèle (ordre de départ simultané)', async () => {
-    for (let k = 0; k < 6; k++) {
-      const parent = parentWith(['a', 'b', 'c']);
-      expect((await run(parent, ['--continue', '--max-sessions', '3', '--priority', 'c,b,a'], k % 2 ? 0 : 25)).lots).toEqual(['c', 'b', 'a']);
-    }
-  }, 180_000); // L567 : six vagues complètes (neuf dépôts git, dix-huit worktrees) : 8 s seules, 30 s sous charge, le délai de 30 s par défaut tombait sur le travail, pas sur un blocage
+  // L579 : six vagues dans UN test (180 s de délai, 105 à 125 s sous charge) bornaient le travail lui-même ; une vague par test, chacune sous le délai par défaut
+  it.each([0, 1, 2, 3, 4, 5])('le contrat tient avec trois sessions en parallèle (ordre de départ simultané), vague %i sur 6', async (k) => {
+    const parent = parentWith(['a', 'b', 'c']);
+    expect((await run(parent, ['--continue', '--max-sessions', '3', '--priority', 'c,b,a'], k % 2 ? 0 : 25)).lots).toEqual(['c', 'b', 'a']);
+  });
 });
 
 describe('L539 — versions de la 1.42.1 alignées', () => {

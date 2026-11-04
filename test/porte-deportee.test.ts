@@ -4,7 +4,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSyn
 import { join } from 'node:path';
 import { readOrchestrateConfig, readVerifyConfig } from '../src/config.js';
 import { verdictFor } from '../src/gate-verdict.js';
-import { lockfileFingerprint, shq } from '../src/remote-gate.js';
+import { lockfileFingerprint, openRemoteGate, shq } from '../src/remote-gate.js';
 import { newLot, RunStore, type LotState } from '../src/orchestrate/state.js';
 import { verifyGate } from '../src/verify-gate.js';
 import { fakeRemote, type FakeRemote } from './fake-ssh.js';
@@ -173,6 +173,20 @@ describe('L403 — la porte jouée sur l\'hôte (C1)', () => {
     const pattern = `sleep 31337\\.${process.pid}$`; // ancré : un pid qui commence pareil n'est pas le nôtre
     for (let t = 0; t < 10_000 && spawnPgrep(pattern); t += 100) await new Promise((r) => setTimeout(r, 100));
     expect(spawnPgrep(pattern)).toBe(false);
+  });
+
+  it('R19 — délai puis autre commande : le groupe de la commande en délai est aussi arrêté côté hôte (un pid par commande)', async () => {
+    const marker = `sleep 31338.${process.pid}`;
+    const p = project('  test: true\n  gate:\n    host: machine\n    install: mkdir -p node_modules\n');
+    const o = await openRemoteGate({ host: 'machine', install: 'mkdir -p node_modules', repo: p.repo, sha: p.sha, depsFrom: p.repo, env: p.remote.env, timeoutMs: 30_000, workers: () => 1 });
+    if (!o.ok) throw new Error(o.cause);
+    const pattern = `sleep 31338\\.${process.pid}$`;
+    await o.gate.run(marker, 1500);
+    await o.gate.run('true', 30_000);
+    expect(o.gate.close()).toBeNull();
+    for (let t = 0; t < 10_000 && spawnPgrep(pattern); t += 100) await new Promise((r) => setTimeout(r, 100));
+    expect(spawnPgrep(pattern)).toBe(false);
+    expect(trees(p)).toEqual([]);
   });
 
   it('R19 — nettoyage en échec : dit dans la sortie, worktree orphelin retiré au prochain appel', async () => {

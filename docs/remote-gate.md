@@ -74,7 +74,7 @@ is the verdict of the command: 1 is a red, as locally.
 
 ## Timeout, Ctrl-C, signals
 
-Remote commands run with a terminal (`ssh -tt`) and their process group id is kept on the host. At the timeout (30 minutes per command), on Ctrl-C or on a signal, cadence kills the local
+Remote commands run with a terminal (`ssh -tt`) and their process group id is kept on the host, one file per command (a command that times out and is followed by another one keeps its own). At the timeout (30 minutes per command), on Ctrl-C or on a signal, cadence kills the local
 ssh and then sends the host a separate command that kills the group and removes the worktree. If that command fails the output says
 `nettoyage de l'hôte <host> en échec (<cause>) — le worktree orphelin y sera retiré au prochain appel`.
 

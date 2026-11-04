@@ -231,8 +231,9 @@ async function pushSha(o: OpenOpts, w: Work): Promise<string | null> {
 /** Arrête ce qui tourne encore de cette porte sur l'hôte et en retire les worktrees et le cache temporaire (R10, R19) ; rend la cause si l'hôte n'a pas pu être nettoyé. */
 function cleanupHost(o: OpenOpts, w: Work): string | null {
   const { head, bare, id } = w;
-  const script = `${head}for i in ${id} ${id}-i; do if [ -f "$R/wt/$i.pid" ]; then p=$(cat "$R/wt/$i.pid"); kill -s KILL -- "-$p" 2>/dev/null || true; fi; ` +
-    `git -C ${bare} worktree remove --force "$R/wt/$i" 2>/dev/null || rm -rf "$R/wt/$i"; rm -f "$R/wt/$i.pid"; done; rm -rf "$R/deps/.tmp-${id}"; git -C ${bare} worktree prune 2>/dev/null || true`;
+  // Un fichier pid par commande distante (`<id>.<n>.pid`) et un pour l'installation (`<id>-i.pid`) : tous lus, le groupe de chacun tué.
+  const script = `${head}for f in "$R/wt/${id}".*pid "$R/wt/${id}-i.pid"; do if [ -f "$f" ]; then p=$(cat "$f"); kill -s KILL -- "-$p" 2>/dev/null || true; rm -f "$f"; fi; done; ` +
+    `for i in ${id} ${id}-i; do git -C ${bare} worktree remove --force "$R/wt/$i" 2>/dev/null || rm -rf "$R/wt/$i"; done; rm -rf "$R/deps/.tmp-${id}"; git -C ${bare} worktree prune 2>/dev/null || true`;
   const r = spawnSync('ssh', sshArgs({ host: o.host, env: o.env, script }), { env: o.env, encoding: 'utf8', timeout: 30_000 });
   return r.status === 0 ? null : `${(r.stderr || r.stdout || `code ${r.status}`).trim().split('\n').slice(-1)[0]}`;
 }
@@ -283,11 +284,14 @@ async function prepare(o: OpenOpts, onWork: (w: Work) => void): Promise<Opened> 
   const cache = await prepareCache(o, w, probe.platform);
   if (typeof cache !== 'string') return fail(cache.cause, 'cache');
   const workers = o.workers(probe.cores);
+  let runs = 0;
   const gate: RemoteGate = {
     host,
     cache,
-    run: (command, timeoutMs) =>
-      ssh({ host, env, tty: true, timeoutMs, script: `${w.head}echo $$ > "$R/wt/${id}.pid"; cd ${w.wt} && export CADENCE_TEST_WORKERS=${workers} && exec sh -c ${shq(command)}` }),
+    run: (command, timeoutMs) => {
+      const pid = `"$R/wt/${id}.${++runs}.pid"`;
+      return ssh({ host, env, tty: true, timeoutMs, script: `${w.head}echo $$ > ${pid}; cd ${w.wt} && export CADENCE_TEST_WORKERS=${workers} && exec sh -c ${shq(command)}` });
+    },
     close: () => cleanupHost(o, w),
   };
   return { ok: true, gate };

@@ -109,6 +109,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- The remote gate keeps one pid file per remote command instead of one `wt/<id>.pid` overwritten by the next command (L506, [docs/remote-gate.md](docs/remote-gate.md)): after a command timed out and another one ran, the process group of the timed-out build was left running on the host at cleanup. Cleanup now kills the group of every command.
 - `cadence corrections --classify` no longer reports « 53/53 », exit 0 and an empty `{}` when Ollama is not reachable (L575, issue #35, [docs/corrections.md](docs/corrections.md)): it prints at once `Ollama injoignable sur <OLLAMA_HOST> : rien n'est classé`, exits 1 and writes nothing. When the model answers only in part, a line gives the count of passes left unclassified and the reasons (`classement : 2 passes non classées sur 3 (réponse HTTP 500 ×2)`); the classified ones are kept, the exit code stays 0. `corrections.json` is only written when a pass entered it (a missing file is still created empty when there is nothing to classify).
 
 ## [1.49.0] - 2026-11-04

@@ -126,7 +126,7 @@ for f in sorted(glob.glob(os.path.join(home, 'waves', '*.json'))):
     out.append({
         'id': r['wave'], 'pid': pid, 'cwd': r['cwd'], 'cap': r.get('cap'), 'started': r.get('started'),
         'status': w.get('status'), 'budget': w.get('budget'), 'consumed': w.get('consumed'),
-        'live': True, 'repos': len(r.get('repos') or []), 'lots': read_lots(d, True),
+        'live': True, 'repos': len(r.get('repos') or []), 'lanes': r.get('lanes'), 'lots': read_lots(d, True),
     })
 
 cwd = os.getcwd()

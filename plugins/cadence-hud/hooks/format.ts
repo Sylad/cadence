@@ -460,15 +460,29 @@ export const liveHolds = (holds: readonly LeadHold[], now: number): LeadHold[] =
 /** Les sessions du lead dont le TTL est échu à `now` (à l'échéance exacte, déjà) : rien ne les arrête, la bande les signale (L278). */
 export const expiredHolds = (holds: readonly LeadHold[], now: number): LeadHold[] => holds.filter(h => Date.parse(h.expires) <= now)
 
-/** Les créneaux que le lead peut encore donner, comme `cadence orchestrate --status` : le plafond moins, pour chaque vague vivante, le plus petit de son plafond et des dépôts qu'elle tient, moins les sessions du lead. */
-export const freeSlots = (waves: readonly Wave[], cap: number, leadSessions: number): number =>
-  Math.max(0, cap - waves.filter(w => w.live).reduce((n, w) => n + Math.min(w.cap ?? cap, w.repos ?? 0), 0) - leadSessions)
+/**
+ * Les créneaux que le lead peut encore donner, comme `cadence orchestrate --status` (`freeSlots` du registre) : le plafond moins, pour chaque
+ * vague vivante, le plus petit du plafond commun (le plus bas des plafonds connus, `cap` sinon) et de ce qu'elle tient — un créneau par lot
+ * qu'elle joue à la fois en mode worktree (`lanes`, session ou porte de tests/build), un par dépôt tenu sans `lanes` —, moins les sessions du lead.
+ * Une vague sans plafond connu compte pour `cap`.
+ */
+export const freeSlots = (waves: readonly Wave[], cap: number, leadSessions: number): number => {
+  const live = waves.filter(w => w.live)
+  const caps = live.map(w => w.cap).filter((c): c is number => c !== undefined && Number.isFinite(c) && c >= 1)
+  const common = Math.min(cap, ...caps)
+  return Math.max(0, cap - live.reduce((n, w) => n + Math.min(w.cap !== undefined ? common : cap, w.lanes ?? w.repos ?? 0), 0) - leadSessions)
+}
 
-/** « sessions du lead : 1 · créneaux libres : 2 sur 3 » (sans le premier segment à zéro) ; null sans vague vivante ni session du lead : rien à dire. */
+/** Les lots des vagues vivantes en porte de tests ou de build : ils tiennent un créneau sans session claude, la bande les nomme pour qu'un « 0 libre » ne se lise pas comme des créneaux vides. */
+export const gatedLots = (waves: readonly Wave[]): string[] => waves.filter(w => w.live).flatMap(w => w.lots.filter(l => l.gate).map(l => l.lot))
+
+/** « sessions du lead : 1 · créneaux libres : 0 sur 3 · 2 en porte : L514 L473 » (sans le premier segment à zéro, sans le dernier sans lot en porte) ; null sans vague vivante ni session du lead : rien à dire. */
 export const slotsLine = (waves: readonly Wave[], holds: readonly LeadHold[], cap: number): string | null => {
   if (!waves.some(w => w.live) && holds.length === 0) return null
   const lead = holds.length > 0 ? `sessions du lead : ${holds.length} · ` : ''
-  return `${lead}créneaux libres : ${freeSlots(waves, cap, holds.length)} sur ${cap}`
+  const gated = gatedLots(waves)
+  const porte = gated.length > 0 ? ` · ${gated.length} en porte : ${gated.join(' ')}` : ''
+  return `${lead}créneaux libres : ${freeSlots(waves, cap, holds.length)} sur ${cap}${porte}`
 }
 
 /** « correctif-L12  depuis 4 min · reste 56 min » : l'étiquette, l'âge (omis si la date est illisible) et le TTL restant. */

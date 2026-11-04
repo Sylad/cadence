@@ -84,6 +84,8 @@ export type Wave = {
   live: boolean
   /** Nombre de dépôts que la vague tient encore (registre des vagues) : ils prennent chacun un créneau, dans la limite de son plafond. */
   repos?: number
+  /** Lots que la vague joue à la fois en mode worktree (registre des vagues, L589) : un créneau chacun, dépôt tenu ou non ; absent hors worktree ou d'un cadence plus ancien. */
+  lanes?: number
   /** Fin de la vague (date de son wave.json), seulement quand `live` est fausse. */
   ended?: string
   lots: WaveLot[]

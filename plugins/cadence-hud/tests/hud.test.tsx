@@ -1425,6 +1425,38 @@ test('R3 — les créneaux libres se calculent comme cadence orchestrate --statu
   expect(freeSlots([{ ...live, live: false }], 3, 0)).toBe(3)
 })
 
+test('L589 — en mode worktree, une vague occupe un créneau par lot actif (lanes), pas par dépôt tenu', () => {
+  // la vague tient 1 dépôt mais joue 3 lots en worktrees : --status disait 0 sur 3, la bande disait 2
+  const wt = { ...WAVE, cap: 3, repos: 1, lanes: 3 }
+  expect(freeSlots([wt], 3, 0)).toBe(0)
+  expect(freeSlots([{ ...wt, lanes: 2 }], 3, 0)).toBe(1)
+  // lanes plafonné par le plafond de la vague, puis par les sessions du lead
+  expect(freeSlots([{ ...wt, cap: 2, lanes: 3 }], 3, 0)).toBe(1)
+  expect(freeSlots([{ ...wt, lanes: 1 }], 3, 1)).toBe(1)
+  // lanes à zéro (tous les lots en attente ou réglés) : rien de tenu, même avec des dépôts
+  expect(freeSlots([{ ...wt, lanes: 0 }], 3, 0)).toBe(3)
+  // sans lanes (hors worktree, ou vague d'un cadence plus ancien), les dépôts tenus comptent comme avant
+  expect(freeSlots([{ ...wt, lanes: undefined, repos: 2 }], 3, 0)).toBe(1)
+  // plafond commun : la vague la plus basse fait loi pour toutes, comme registry.freeSlots
+  expect(freeSlots([{ ...wt, cap: 2, lanes: 2 }, { ...wt, id: 'b', cap: 3, lanes: 3 }], 3, 0)).toBe(0)
+  expect(freeSlots([{ ...wt, cap: 3, lanes: 3 }, { ...wt, id: 'b', cap: undefined, lanes: 3 }], 3, 0)).toBe(0)
+  // une vague terminée ne tient rien
+  expect(freeSlots([{ ...wt, live: false }], 3, 0)).toBe(3)
+})
+
+test('L589 — la ligne nomme les lots en porte : « créneaux libres : 0 sur 3 · 2 en porte : L514 L473 »', () => {
+  const lot = (id: string, gate: boolean) => ({ ...WAVE.lots[1], lot: id, status: 'ready', gate: gate ? { label: 'tests', started: '2026-10-07T19:11:11.066Z' } : null })
+  const wave = { ...WAVE, cap: 3, repos: 1, lanes: 3, lots: [lot('L514', true), lot('L473', true), lot('L586', false)] }
+  expect(slotsLine([wave], [], 3)).toBe('créneaux libres : 0 sur 3 · 2 en porte : L514 L473')
+  // aucune porte : la ligne reste celle de --status
+  expect(slotsLine([{ ...wave, lots: [lot('L586', false)] }], [], 3)).toBe('créneaux libres : 0 sur 3')
+  // une vague terminée ne nomme pas ses portes ; les sessions du lead gardent leur segment devant
+  expect(slotsLine([{ ...wave, live: false }], [HOLD], 3)).toBe('sessions du lead : 1 · créneaux libres : 2 sur 3')
+  expect(slotsLine([wave], [HOLD], 3)).toBe('sessions du lead : 1 · créneaux libres : 0 sur 3 · 2 en porte : L514 L473')
+  // plusieurs vagues vivantes : les portes de chacune sont comptées et listées
+  expect(slotsLine([wave, { ...wave, id: 'b', lots: [lot('L9', true)] }], [], 3)).toBe('créneaux libres : 0 sur 3 · 3 en porte : L514 L473 L9')
+})
+
 test('R4 — la ligne des créneaux suit orchestrate --status, et se tait sans vague ni session', () => {
   expect(slotsLine([], [HOLD], 3)).toBe('sessions du lead : 1 · créneaux libres : 2 sur 3')
   expect(slotsLine([{ ...WAVE, repos: 1 }], [HOLD, { ...HOLD, label: 'qa' }], 3)).toBe('sessions du lead : 2 · créneaux libres : 0 sur 3')
@@ -1440,6 +1472,7 @@ test('R5 — le collecteur rend aussi les sessions du lead et le plafond, un anc
   expect(out.cap).toBe(3)
   expect(parseCollected(JSON.stringify([WAVE]))).toMatchObject({ holds: [], cap: 2 })
   expect(parseCollected(JSON.stringify({ waves: [], holds: [], cap: 0 })).cap).toBe(2)
+  expect(parseCollected(JSON.stringify({ waves: [{ ...WAVE, repos: 1, lanes: 3 }] })).waves[0]).toMatchObject({ repos: 1, lanes: 3 })
   expect(parseCollected('{}')).toEqual({ waves: [], holds: [], cap: 2, ended: [] })
 })
 

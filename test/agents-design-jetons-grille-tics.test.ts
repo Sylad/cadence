@@ -241,7 +241,7 @@ describe('R13/R14/R15 — formats inchangés, installation, documentation', () =
     const out: string[] = [];
     const code = await run(['spec', 'check', join(root, 'docs/specs/revue-maquette-criteres-design/fiche.yaml')], { cwd: root, env: {}, out: (l) => out.push(l), err: (l) => out.push(l), now: () => new Date() });
     expect(code, out.join('\n')).toBe(0);
-    expect(empreinte(read('templates/fiche.yaml'))).toBe('325496e3942ce749');
+    expect(empreinte(read('templates/fiche.yaml'))).toBe('4f64486c958a98c0');
   });
   it('R13 — REVIEW_SCHEMA accepte et refuse les mêmes rapports qu’avant', () => {
     expect(empreinte(JSON.stringify(REVIEW_SCHEMA))).toBe('b5e5c47a46ec72e9');

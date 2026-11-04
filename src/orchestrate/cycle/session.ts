@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { basename, dirname, join, relative } from 'node:path';
 import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { articleRepoDir } from '../../docsync.js';
-import { PROBE_FAILED } from '../probe.js';
-import { changedFiles, isAncestor, readCommits, restoreWorktree, tryGit } from '../../git.js';
+import { PROBE_FAILED, noteRemoved } from '../probe.js';
+import { changedFiles, isAncestor, readCommits, restoreWorktree, tryGit, unquotePath } from '../../git.js';
 import { blockingLots, gitCommitsIn } from '../table.js';
 import { type LotRepo } from '../../repos.js';
 import { SlotAbandoned } from '../registry.js';
@@ -251,11 +251,10 @@ export async function session(c: LotCtx, kind: SessionKind, local = false): Prom
       // R9 : une sonde en échec ou coupée ne rend pas le lot. Ce qu'elle a laissé non commité est remis (suivis restaurés, nouveaux fichiers retirés), un warning le nomme.
       // Coupée entre `git add` et son commit, elle laisse aussi l'index : il est désindexé d'abord, `restoreWorktree` ne remet que l'arbre de travail (sinon « AD q.spec.ts » et le lot rendu pour arbre sale).
       // Un fichier à la fois : un chemin inconnu de l'index (non indexé) fait refuser toute la commande, les autres resteraient indexés.
-      const left = dirtBetween(before, await snapshot(wd(c)));
+      const left = dirtBetween(before, await snapshot(wd(c))).map(unquotePath);
       if (left.length) {
         for (const f of left) tryGit(wd(c), ['restore', '--staged', '--', f]);
-        restoreWorktree(wd(c), left);
-        l.warnings.push(`sonde de cas limites : fichiers non commités laissés par la session retirés (${left.join(', ')})`);
+        noteRemoved(l, restoreWorktree(wd(c), left));
       }
       return PROBE_FAILED;
     }
@@ -519,30 +518,6 @@ function handBack(c: LotCtx, kind: SessionKind, report: unknown, step: StepState
   (w.dirtyRepos ??= new Map()).set(path, lotKey(l.project, l.lot));
   const what = traces.length ? ` (${traces.join(', ')})` : b.head !== a.head ? ' (commit)' : '';
   return stop(c, 'handed-back', `incident : ${kind} de ${lotKey(l.project, l.lot)} a modifié le dépôt${where}${what}${lostVerdict(c, kind, report)}`);
-}
-
-/** Décode un chemin de `git status --porcelain` : entre guillemets, avec les échappements du C-quoting (`\303\251`, `\"`, `\\`, `\t`…). */
-function unquotePath(f: string): string {
-  if (!/^".*"$/s.test(f)) return f;
-  const bytes: number[] = [];
-  const esc: Record<string, number> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13 };
-  const body = f.slice(1, -1);
-  for (let i = 0; i < body.length; i++) {
-    const ch = body[i];
-    if (ch !== '\\') {
-      bytes.push(...Buffer.from(ch));
-      continue;
-    }
-    const oct = /^[0-7]{3}/.exec(body.slice(i + 1));
-    if (oct) {
-      bytes.push(parseInt(oct[0], 8));
-      i += 3;
-    } else {
-      const n = body[++i];
-      bytes.push(...(n in esc ? [esc[n]] : Buffer.from(n)));
-    }
-  }
-  return Buffer.from(bytes).toString('utf8');
 }
 
 /** Déplace des fichiers non suivis (chemins relatifs au dépôt, décodés) sous `to`, arborescence gardée ; renvoie ceux qui l'ont été (s'arrête au premier échec). */

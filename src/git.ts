@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 export interface Commit {
@@ -368,18 +368,55 @@ export function restorePaths(root: string, paths: string[]): void {
 /**
  * Remet `paths` comme à HEAD dans l'arbre de travail seulement, sans toucher à l'index : possible quand un `index.lock` bloque
  * tout ce qui l'écrit (`restorePaths`, `git checkout`). Un fichier que HEAD ne connaît pas est supprimé.
+ * `paths` sont des chemins décodés (`unquotePath` sur une ligne de `git status --porcelain`) ; rend ceux qui ont vraiment été remis ou retirés.
  */
-export function restoreWorktree(root: string, paths: string[]): void {
+export function restoreWorktree(root: string, paths: string[]): string[] {
+  const done: string[] = [];
   for (const f of paths) {
     let text: Buffer;
     try {
       text = execFileSync('git', ['show', `HEAD:${f}`], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 1024 });
     } catch {
-      rmSync(resolve(root, f), { force: true });
+      try {
+        rmSync(resolve(root, f), { force: true });
+      } catch {
+        continue;
+      }
+      if (!existsSync(resolve(root, f))) done.push(f);
       continue;
     }
-    writeFileSync(resolve(root, f), text);
+    try {
+      writeFileSync(resolve(root, f), text);
+      done.push(f);
+    } catch {
+      /* non remis : absent de la liste rendue */
+    }
   }
+  return done;
+}
+
+/** Décode un chemin de `git status --porcelain` : entre guillemets, avec les échappements du C-quoting (`\303\251`, `\"`, `\\`, `\t`…). */
+export function unquotePath(f: string): string {
+  if (!/^".*"$/s.test(f)) return f;
+  const bytes: number[] = [];
+  const esc: Record<string, number> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13 };
+  const body = f.slice(1, -1);
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch !== '\\') {
+      bytes.push(...Buffer.from(ch));
+      continue;
+    }
+    const oct = /^[0-7]{3}/.exec(body.slice(i + 1));
+    if (oct) {
+      bytes.push(parseInt(oct[0], 8));
+      i += 3;
+    } else {
+      const n = body[++i];
+      bytes.push(...(n in esc ? [esc[n]] : Buffer.from(n)));
+    }
+  }
+  return Buffer.from(bytes).toString('utf8');
 }
 
 /** Chemin du verrou de l'index de `repo` (`<git-dir>/index.lock`, celui du worktree s'il en est un). */

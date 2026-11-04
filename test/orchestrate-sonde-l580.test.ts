@@ -81,6 +81,25 @@ describe("un fichier de sonde non commité ne reste pas dans le dépôt (L580, i
     expect(c.lot.warnings).toContain('sonde de cas limites : fichiers non commités laissés par la session retirés (hors.spec.ts)');
   });
 
+  it("R6 — des fichiers non suivis au nom accentué ou avec espace (cités en C-quoting par git status) sont bien retirés, le warning les nomme décodés", async () => {
+    const two: Handler = (call) => {
+      writeFileSync(join(call.opts.cwd, 'sonde-règle.spec.ts'), "it('r', () => {});\n");
+      writeFileSync(join(call.opts.cwd, 'avec espace.spec.ts'), "it('e', () => {});\n");
+      return claudeOut(probeReport());
+    };
+    const h = harness({ script: { implement: [impl('a.ts')], probe: [two], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
+    expect(existsSync(join(h.repo, 'sonde-règle.spec.ts'))).toBe(false);
+    expect(existsSync(join(h.repo, 'avec espace.spec.ts'))).toBe(false);
+    expect(git(h.repo, 'status', '--porcelain')).toBe('');
+    const w = c.lot.warnings.find((x) => x.includes('laissés par la session retirés'));
+    expect(w).toContain('sonde-règle.spec.ts');
+    expect(w).toContain('avec espace.spec.ts');
+    expect(w).not.toContain('"');
+  });
+
   it("R6 — le fichier non suivi laissé avec des attentes horsRegle : les warnings et la sous-tâche proposée sont gardés", async () => {
     const h = harness({ script: { implement: [impl('a.ts')], probe: [leaves('hors.spec.ts', { horsRegle: ['hors.spec.ts — nom vide — refus'] })], review: [ok] } });
     const c = h.lot('L1', {}, { probe: true });

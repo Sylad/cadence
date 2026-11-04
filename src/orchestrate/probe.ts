@@ -3,7 +3,7 @@
 import type { OrchestrateConfig } from '../config.js';
 import { docSyncSet, filesOf } from '../docsync.js';
 import { DEFAULT_TEST_PATTERNS } from '../testgate.js';
-import { readCommits } from '../git.js';
+import { readCommits, unquotePath } from '../git.js';
 import type { BriefVars } from './briefs.js';
 import { checkShape, PROBE_SCHEMA, type ProbeReport } from './schemas.js';
 import type { Constat, LotState, StepState } from './state.js';
@@ -74,10 +74,10 @@ export interface ProbeIo<D extends ProbeDone> {
   sealed(head: string | undefined): string[];
   /** Fichiers laissés sales par la session. */
   dirt(done: D): string[];
-  /** Les fichiers NON SUIVIS que la session a laissés dans le dépôt du lot (apparus pendant la session, jamais commités). */
+  /** Les fichiers NON SUIVIS que la session a laissés dans le dépôt du lot (apparus pendant la session, jamais commités), chemins décodés (`unquotePath`). */
   left(done: D): string[];
-  /** Retire ces fichiers de l'arbre de travail. */
-  remove(files: string[]): void;
+  /** Retire ces fichiers de l'arbre de travail ; rend ceux qui l'ont vraiment été. */
+  remove(files: string[]): string[];
   /** La porte du programme (build puis tests) : ajoute les rouges nouveaux à `red` et chaque contrôle à `runs`. */
   gate(red: Constat[], runs: CheckRun[]): Promise<void>;
   /** La passe de correction ordinaire, avec ces constats. */
@@ -183,6 +183,11 @@ function cutSession<D extends ProbeDone>(io: ProbeIo<D>, step: StepState): undef
   return handedBack(io, [], step.headBefore) ? 'rendu' : undefined;
 }
 
+/** Warning des fichiers laissés par la sonde : seuls ceux vraiment retirés (rendus par `restoreWorktree`) y sont nommés. */
+export function noteRemoved(lot: LotState, removed: string[]): void {
+  if (removed.length) lot.warnings.push(`sonde de cas limites : fichiers non commités laissés par la session retirés (${removed.join(', ')})`);
+}
+
 /**
  * Le rapport d'une session qui a répondu : questions notées, attentes hors règle rendues au lead (même si le lot est rendu ensuite), verrou et dépôt contrôlés. `'rendu'` quand le lot est rendu.
  * Un fichier NON SUIVI laissé par la sonde (un test qu'elle n'a pas commité, par la règle « pas commité » du brief) n'est pas un dépôt sale : il est retiré et un warning le nomme, comme après une sonde coupée (session.ts).
@@ -193,10 +198,9 @@ function readSession<D extends ProbeDone>(io: ProbeIo<D>, done: D, step: StepSta
   for (const q of io.take(step, rep ?? { questions: [] })) io.lot.warnings.push(`sonde de cas limites : question sans réponse (la sonde ne bloque pas le lot) : « ${q.trim()} »`);
   noteHorsRegle(io.lot, rep);
   const left = io.left(done);
-  if (left.length) {
-    io.remove(left);
-    io.lot.warnings.push(`sonde de cas limites : fichiers non commités laissés par la session retirés (${left.join(', ')})`);
-  }
-  const dirt = io.dirt(done).filter((f) => !left.includes(f));
+  // Seuls les fichiers vraiment retirés sont nommés « retirés » et sortent du dépôt sale ; un fichier resté rend le lot comme tout dépôt sale.
+  const removed = left.length ? io.remove(left) : [];
+  noteRemoved(io.lot, removed);
+  const dirt = io.dirt(done).filter((f) => !removed.includes(unquotePath(f)));
   return handedBack(io, dirt, step.headBefore) ? 'rendu' : rep;
 }

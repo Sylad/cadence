@@ -1163,9 +1163,10 @@ lots:
     finished: 2026-11-04
   - id: L501
     title: "Budget de lot calé sur la mesure (inventaire des pertes du 31-10 (17→31-10) : 34 lots rendus pour budget, ~800 min et 11 M tokens, médiane 106 min avant reprise) : le budget par défaut d'un lot vient du p90 des tokens par estimate que cadence perf calcule déjà (fenêtre glissante), borné, et le --dry-run dit d'où vient le chiffre"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-31
+    started: 2026-11-04
   - id: L502
     title: "Hook du plugin contre le pipe qui masque le code de sortie (inventaire des pertes du 31-10 (17→31-10) : 4 récidives du lead malgré la règle, L423 L434 ouverts à tort) : PreToolUse Bash qui refuse une commande de porte, de test, de push ou de livraison (cadence, raf, git push, npm test, vitest…) suivie de | tail/head/grep sans set -o pipefail ni PIPESTATUS, avec le message qui dit quoi écrire"
     status: done

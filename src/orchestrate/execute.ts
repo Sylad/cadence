@@ -20,7 +20,7 @@ import { slotPlace } from './attente.js';
 import { AddFeed, addToLive, openInRepo, type KnownLot, type LaunchChecks } from './ajout.js';
 import { takeIntegrations } from './integration-vivante.js';
 import { repoBranch } from './integrate.js';
-import { baseBranchOf, keptLines, lotBranch, lotTreeDir, planFileSet, recoverTree } from './worktree.js';
+import { baseBranchOf, keptLines, legacyLotSlug, lotBranch, lotTreeDir, planFileSet, recoverTree } from './worktree.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin } from './node-env.js';
 import { launchCost, quotaText, renderTable, resumeCommand } from './table.js';
@@ -81,6 +81,12 @@ export function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[]
   return lots.map((lot, i) => ({ wave: wctx, lot, config: envs[i].config, loadPlan: envs[i].loadPlan }));
 }
 
+/** La forme ancienne du nom de branche d'un lot, en liste pour `recoverTree` (L581) : vide quand le projet n'en a pas. */
+const oldSlugs = (project: string, lot: string): string[] => {
+  const old = legacyLotSlug(project, lot);
+  return old ? [old] : [];
+};
+
 /**
  * Quels lots jouent dans un worktree (L279). Un groupe de lots du même dépôt (`groupLots`) y joue si `orchestrate.worktrees` est vrai, s'il a au moins deux lots
  * ou si la vague a plus d'un créneau (`multiSlot`, L527 : tout lot d'un tel dépôt reçoit son worktree — donné seul, tiré par le remplissage ou apporté par `--add`, avec ou sans `--continue` — pour qu'un créneau libre reçoive le lot suivant du même dépôt), si le dépôt est sur une branche et si aucun de ses lots n'a de dépôt voisin (`repos:`, R2) ; sinon les lots restent à la suite, avec un avertissement qui dit pourquoi.
@@ -99,7 +105,7 @@ export function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (l
       const lotBr = lotBranch(wave, c.lot.project, c.lot.lot);
       // Chemin de reprise d'un lot rendu hors intégration : sa branche d'une vague passée devient celle de cette vague (recoverTree), puis se retrouve comme une reprise (R11).
       const dir = lotTreeDir(store.dir, c.lot.project, c.lot.lot, repo);
-      const recovered = !baseBranchOf(repo, lotBr) && c.lot.next !== 'integrate' && branch && c.config.worktrees ? recoverTree(repo, lotBr, dir, branch, planFileSet(c.loadPlan(), repo)) : null;
+      const recovered = !baseBranchOf(repo, lotBr) && c.lot.next !== 'integrate' && branch && c.config.worktrees ? recoverTree(repo, lotBr, dir, branch, { planFiles: planFileSet(c.loadPlan(), repo), alsoSlugs: oldSlugs(c.lot.project, c.lot.lot) }) : null;
       if (recovered && 'refused' in recovered) log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente non reprise : ${recovered.refused} ; le lot repart de zéro (à nettoyer à la main, ou intégration à la main documentée)`);
       else if (recovered) {
         log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente reprise (${recovered.unintegrated} commit(s) non intégré(s)) : le lot repart de son travail`);

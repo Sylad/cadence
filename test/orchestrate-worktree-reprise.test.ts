@@ -115,7 +115,7 @@ describe('R1 — recoverTree refuse une branche que la reprise ne mènerait pas 
     const old = oldBranch(repo, 'w1', 'L1', 1);
     commitFile(old.dir, '.cadence/raf.yaml', 'feat(L1): plan');
     const dir = lotTreeDir(join(parent, '.cadence', 'runs', 'w2'), 'a', 'L1');
-    const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), dir, 'main', new Set(['.cadence/raf.yaml']));
+    const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), dir, 'main', { planFiles: new Set(['.cadence/raf.yaml']), alsoSlugs: [] });
     expect(got).toEqual({ from: old.branch, refused: expect.stringContaining('.cadence/raf.yaml') });
     expect(existsSync(old.dir)).toBe(true);
     expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim()).toBe(old.branch);

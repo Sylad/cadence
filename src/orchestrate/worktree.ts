@@ -38,6 +38,15 @@ export const tryGit = (cwd: string, ...args: string[]): string | null => {
 export const lotBranch = (wave: string, project: string, lot: string): string => `cadence/${wave}/${lotSlug(project, lot).replace(/^\./, '_')}`;
 
 /**
+ * La forme ancienne du nom de branche d'un lot (L581, issue #38) : avant que le projet soit adressé `<org>/<repo>`, la branche était `cadence/<vague>/<repo>--<lot>`.
+ * Rend `<repo>--<lot>` (dernier segment du projet), ou null quand le projet n'a pas de « / » : sa forme ancienne est la forme actuelle.
+ */
+export const legacyLotSlug = (project: string, lot: string): string | null => {
+  const last = project.split('/').pop() as string;
+  return last === project ? null : lotSlug(last, lot);
+};
+
+/**
  * Dossier du worktree du lot : sous le dossier de la vague (R14). Une vague lancée depuis la racine du dépôt a son dossier DANS le dépôt : le worktree
  * irait alors sous son arbre ; avec `repo`, il part sous le dossier des worktrees de cadence (`<CADENCE_HOME>/worktrees/<vague>-<empreinte du dossier>/`), hors du dépôt.
  */
@@ -265,17 +274,15 @@ export function prepareTree(t: TreeSpec): { ok: true; reused: boolean } | { ok: 
 /**
  * Chemin de reprise d'un lot rendu hors intégration (revue non conforme, tests rouges, HEAD déplacé, plan touché, verrou d'acceptation : sa branche et son
  * worktree sont conservés) : la nouvelle vague du même lot retrouve la branche `cadence/<vague>/<projet>--<lot>` LA PLUS RÉCENTE (date de création notée par cadence)
- * d'une vague passée, reconnue, partie de la même branche `base` et qui porte des commits non intégrés. Elle est renommée au nom de la nouvelle vague
+ * d'une vague passée, reconnue, partie de la même branche `base` et qui porte des commits non intégrés. Le nom `<projet>--<lot>` se retrouve sous les deux formes, l'actuelle et celles de `alsoSlugs` (L581 : l'ancienne, `<repo>--<lot>`), la plus récente des deux d'abord. Elle est renommée au nom de la nouvelle vague
  * (git emporte la config de cadence) et son worktree déplacé vers `dir` : le reste de l'orchestration, qui ne connaît que les noms de la vague, la voit
  * comme la sienne. Rend la branche reprise, ou null (rien à reprendre). Jamais la branche d'une vague vivante.
  * Une branche que la reprise ne pourrait pas mener à l'intégration est refusée sans y toucher (`refused` dit pourquoi) : son worktree porte un fichier suivi modifié
- * (R11 : comme `--resume`, la session n'y démarre pas), ou un de ses commits touche un fichier du plan (`planFiles`, relatifs au dépôt : le plan n'est écrit que par le programme). Un `git worktree move` ou `git branch -m` qui échoue est refusé de même, avec la cause de git (le déplacement est défait).
+ * (R11 : comme `--resume`, la session n'y démarre pas), ou un de ses commits touche un fichier du plan (`opts.planFiles`, relatifs au dépôt : le plan n'est écrit que par le programme). Un `git worktree move` ou `git branch -m` qui échoue est refusé de même, avec la cause de git (le déplacement est défait).
  */
-export function recoverTree(repo: string, branch: string, dir: string, base: string, planFiles: ReadonlySet<string> = new Set()): { from: string; unintegrated: number } | { from: string; refused: string } | null {
-  const slug = branch.split('/').slice(2).join('/');
-  const found = keptTrees(repo)
-    .filter((t) => t.branch !== branch && t.branch.split('/').slice(2).join('/') === slug && t.base === base && t.unintegrated > 0)
-    .sort((a, b) => b.created - a.created || (a.branch < b.branch ? 1 : -1))[0];
+export function recoverTree(repo: string, branch: string, dir: string, base: string, opts: { planFiles: ReadonlySet<string>; alsoSlugs: readonly string[] } = { planFiles: new Set(), alsoSlugs: [] }): { from: string; unintegrated: number } | { from: string; refused: string } | null {
+  const { planFiles, alsoSlugs } = opts;
+  const found = keptBranchesOfLot(repo, branch, [branch.split('/').slice(2).join('/'), ...alsoSlugs]).find((t) => t.base === base);
   if (!found || branchSha(repo, branch) !== null) return null;
   tryGit(repo, 'worktree', 'prune');
   const moved = found.dir !== null && existsSync(found.dir);
@@ -294,6 +301,16 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
     return { from: found.branch, refused: `déplacement ou renommage de la branche refusé par git (${gitFailure(e)}), rien n'a bougé` };
   }
   return { from: found.branch, unintegrated: found.unintegrated };
+}
+
+/**
+ * Les branches gardées d'une vague passée qui portent le travail du lot sous l'une de ses formes (`slugs`) et ne sont pas intégrées (L581) : ce que le `--dry-run` dit d'une reprise.
+ * Ne touche à rien. La plus récente d'abord.
+ */
+export function keptBranchesOfLot(repo: string, branch: string, slugs: readonly string[]): KeptTree[] {
+  return keptTrees(repo)
+    .filter((t) => t.branch !== branch && slugs.includes(t.branch.split('/').slice(2).join('/')) && t.unintegrated > 0)
+    .sort((a, b) => b.created - a.created || (a.branch < b.branch ? 1 : -1));
 }
 
 /** Les fichiers du plan qu'une session ne doit pas toucher, relatifs au dépôt : le fichier de plan, la page Gantt, ce qui est généré avec (`plan.files`, les fichiers de `plan.onWrite`) et les fichiers d'année de l'archive (L396). */

@@ -2163,9 +2163,10 @@ lots:
     finished: 2026-11-04
   - id: L582
     title: "Plans riches — format de journal d'événements déclaratif (plan.journal ou équivalent) : --to-config réécrit aussi journal.ndjson au format déclaré (M10 de l'étude maritime-atlas docs/plan/etude, §152) ; reste un préalable à la bascule de maritime (§125) ; séparé de L472 par décision du lead du 04-11"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-04
+    started: 2026-11-04
   - id: L583
     title: "Config des tests, livrée seule : vitest.workspace.ts à deux projets, le projet « lourds » (probe-L539-bords, mise-en-service L195) joué après les autres dans un seul fork — mesuré par L579 : 2 à 3 s seuls, 12 à 13 s sous une charge moyenne de 127 ; la porte, le clone et la CI jouent les deux projets ; décision du lead du 04-11 (changer une config est une décision du plan, livrée seule)"
     status: doing

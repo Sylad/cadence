@@ -2119,6 +2119,11 @@ lots:
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "compliant (2 minor notes: reste de vocabulaire « euros » dans docs/perf.md et orchestrate.md ; withoutPrice sur objet ordinaire) — orchestré (vague 2026-11-04-1310-cad, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant : la grille accepte tout nom de modèle par nom exact, les modèles sans prix sont nommés partout, `perf.currency` est optionnel ; seul reste un reliquat mineur de « euros » dans la doc", commit: 916ad4f8765108e83cd2aa360412db28f23c4348 }
     finished: 2026-11-04
+  - id: L579
+    title: "Les 4 tests instables laissés par L577 (docs/mesures/instables-sous-charge-2026-11-04.md) : porte-deportee R17 deux remplissages et verify SIGINT relayé (cause NON établie : la trouver d'abord, en rejouant le test sous charge mesurée, avant tout correctif), probe-L539-bords et mise-en-service L195 (délai qui borne le travail lui-même : le scinder ou le sortir de la suite parallèle) ; un correctif qui attend l'événement, jamais un délai élargi"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-04
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

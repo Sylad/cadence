@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cadence corrections --classify` no longer reports « 53/53 », exit 0 and an empty `{}` when Ollama is not reachable (L575, issue #35, [docs/corrections.md](docs/corrections.md)): it prints at once `Ollama injoignable sur <OLLAMA_HOST> : rien n'est classé`, exits 1 and writes nothing. When the model answers only in part, a line gives the count of passes left unclassified and the reasons (`classement : 2 passes non classées sur 3 (réponse HTTP 500 ×2)`); the classified ones are kept, the exit code stays 0. `corrections.json` is only written when a pass entered it (a missing file is still created empty when there is nothing to classify).
+
 ### Changed
 
 - A delivery's commit in a neighbouring repository is no longer a false incident (L503, [docs/orchestrate.md](docs/orchestrate.md)): the tag bump that `deploy.sh` commits in the GitOps repository during `cadence deliver --sha` of a ready lot of the wave cites that lot, and used to hand the lot being written back (31-10: warhammer L221 delivered while L220 played). A commit that cites only ready lots found in `deliveries.log` is tolerated and the journal says so; one that also cites the lot in progress or an undelivered lot of the wave still hands it back.

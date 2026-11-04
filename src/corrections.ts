@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE } from './orchestrate/state.js';
 import { RafError } from './plan.js';
+import { failIfNull, ollamaChat, type OllamaOpts } from './ollama.js';
 
 /** Les causes d'une passe de correction (L165), dans l'ordre où le rapport les liste. */
 export const CAUSES = ['spec-floue', 'regle-inventee', 'derive-architecture', 'donnees-sql', 'bug-code', 'test-manquant', 'faux-constat'] as const;
@@ -316,52 +317,36 @@ Règle de départ : si le code livré ne fait pas ce que le lot ou le commit ann
 - test-manquant : le code est juste mais un comportement n'est pas couvert, ou un test ne vérifie pas ce que son titre promet ;
 - faux-constat : la revue se trompe (le code était correct, constat infondé, hors lot, sans effet réel).`;
 
-/** Appel `/api/chat` d'Ollama (température 0, sortie contrainte par `format`) : le texte du message, null sur réponse refusée ou échec réseau. Commun au classeur et au sous-classeur. */
-async function ollamaChat(opts: { url: string; model: string; fetch?: typeof fetch }, format: object, system: string, user: string): Promise<string | null> {
-  const doFetch = opts.fetch ?? fetch;
-  try {
-    const res = await doFetch(`${opts.url.replace(/\/$/, '')}/api/chat`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: opts.model,
-        stream: false,
-        options: { temperature: 0 },
-        format,
-        messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-      }),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { message?: { content?: string } };
-    return body.message?.content ?? '';
-  } catch {
-    return null;
-  }
-}
-
 /** Classeur sur un modèle local servi par Ollama (/api/chat, température 0, sortie contrainte par un schéma) : hors quota Anthropic. */
-export function ollamaClassifier(opts: { url: string; model: string; fetch?: typeof fetch }): Classifier {
+export function ollamaClassifier(opts: OllamaOpts): Classifier {
   return async (pass) => {
     const findings = pass.findings.length ? pass.findings.map((f, i) => `${i + 1}. ${f.slice(0, 1500)}`).join('\n') : '(aucun constat lisible)';
     const user = `Lot ${pass.project} ${pass.lot}.\nConstats de la revue :\n${findings}\n\nCommits de la correction :\n${pass.commits.join('\n') || '(aucun)'}`;
     const text = await ollamaChat(opts, { type: 'object', properties: { cause: { type: 'string', enum: [...CAUSES] }, raison: { type: 'string' } }, required: ['cause', 'raison'] }, SYSTEM, user);
-    return text === null ? null : parseCause(text);
+    return text === null ? null : failIfNull(opts, parseCause(text));
   };
 }
 
-/** Classe les passes absentes du cache, une à une ; un échec n'entre pas au cache (une relance le reprend). */
-export async function classifyAll(passes: FixPass[], cache: Map<string, Classification>, classify: Classifier, model: string, progress?: (done: number, total: number) => void, checkpoint?: { every: number; save: () => void }): Promise<void> {
+/** Classe les passes absentes du cache, une à une ; un échec n'entre pas au cache (une relance le reprend). Rend le nombre d'entrées ajoutées ; `checkpoint.stop` est lu après chaque passe. */
+export async function classifyAll(passes: FixPass[], cache: Map<string, Classification>, classify: Classifier, model: string, progress?: (done: number, total: number) => void, checkpoint?: { every: number; save: () => void; stop?: () => boolean }): Promise<number> {
   const todo = passes.filter((p) => p.findings.length > 0 && !cache.has(p.key));
   let done = 0;
+  let added = 0;
   for (const p of todo) {
     const cause = await classify(p);
-    if (cause) cache.set(p.key, { cause, by: `ollama:${model}` });
+    if (cause) {
+      cache.set(p.key, { cause, by: `ollama:${model}` });
+      added++;
+    }
     done++;
+    // L575 : le premier échec réseau sans rien de classé arrête la boucle avant tout affichage de progression.
+    if (checkpoint?.stop?.()) break;
     progress?.(done, todo.length);
     // Sauvegarde périodique : une interruption (Ctrl-C, Ollama tombé) ne perd que les derniers classements.
     if (checkpoint && done % checkpoint.every === 0) checkpoint.save();
   }
   if (checkpoint && done % checkpoint.every !== 0) checkpoint.save();
+  return added;
 }
 
 /** n clés réparties à intervalle régulier dans l'ordre trié : le même échantillon à chaque lecture. */
@@ -461,12 +446,12 @@ const SOUS_SYSTEM = `Tu sous-classes une passe de correction déjà classée « 
 ${SOUS_CAUSES.map((s) => `- ${s} : ${SOUS_DEFINITIONS[s]} ;`).join('\n')}`;
 
 /** Sous-classeur sur un modèle local servi par Ollama (comme `ollamaClassifier` : /api/chat, température 0, sortie contrainte par un schéma à sept valeurs). */
-export function ollamaSousClassifier(opts: { url: string; model: string; fetch?: typeof fetch }): SousClassifier {
+export function ollamaSousClassifier(opts: OllamaOpts): SousClassifier {
   return async (pass) => {
     const findings = pass.findings.map((f, i) => `${i + 1}. ${f.slice(0, 1500)}`).join('\n');
     const user = `Lot ${pass.project} ${pass.lot}.\nConstats de la revue :\n${findings}\n\nCommits de la correction :\n${pass.commits.join('\n') || '(aucun)'}`;
     const text = await ollamaChat(opts, { type: 'object', properties: { sous: { type: 'string', enum: [...SOUS_CAUSES] }, raison: { type: 'string' } }, required: ['sous', 'raison'] }, SOUS_SYSTEM, user);
-    return text === null ? null : parseSousCause(text);
+    return text === null ? null : failIfNull(opts, parseSousCause(text));
   };
 }
 

@@ -4,7 +4,8 @@ import { join, resolve } from 'node:path';
 import { type Day } from '../dates.js';
 import { RafError } from '../plan.js';
 import { renderTestsSansCode, testsSansCode } from '../corrections-sans-code.js';
-import { bugCodeOf, bugCodePasses, classifyAll, classifySous, measure, ollamaClassifier, ollamaSousClassifier, readCache, readJournals, readRuns, readSousCache, renderReport, sampleKeys, serializeCache, serializeSousCache } from '../corrections.js';
+import { bugCodeOf, bugCodePasses, measure, readCache, readJournals, readRuns, readSousCache, renderReport, sampleKeys } from '../corrections.js';
+import { classify } from './classify-run.js';
 import { renderPerf } from '../perf.js';
 import { readPerf } from '../perf-read.js';
 import { type Io } from './context.js';
@@ -34,16 +35,8 @@ export async function corrections(rest: string[], values: { classify?: boolean; 
     return 1;
   }
   if (values.classify) {
-    const url = io.env.OLLAMA_HOST ?? 'http://localhost:11434';
-    await classifyAll(data.passes, cache, ollamaClassifier({ url, model }), model, (done, total) => {
-      if (done % 25 === 0 || done === total) io.err(`classement : ${done}/${total}`);
-    }, { every: 10, save: () => writeFileSync(cacheFile, serializeCache(cache)) });
-    writeFileSync(cacheFile, serializeCache(cache));
-    const saveSous = () => writeFileSync(sousFile, serializeSousCache(sousCache));
-    const added = await classifySous(data.passes, cache, sousCache, ollamaSousClassifier({ url, model }), model, (done, total) => {
-      if (done % 25 === 0 || done === total) io.err(`sous-causes : ${done}/${total}`);
-    }, { every: 10, save: saveSous });
-    if (added > 0) saveSous();
+    const code = await classify({ passes: data.passes, cache, sousCache, cacheFile, sousFile, model, url: io.env.OLLAMA_HOST ?? 'http://localhost:11434' }, io);
+    if (code !== 0) return code;
   }
   if (sample !== undefined) {
     const byKey = new Map(data.passes.map((p) => [p.key, p]));

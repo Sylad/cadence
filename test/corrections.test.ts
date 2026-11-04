@@ -318,11 +318,8 @@ describe('cadence corrections', () => {
     }
   });
 
-  it('--classify sans Ollama ne crée pas d\'entrée au cache ; --sample invalide est refusé', async () => {
+  it('--sample invalide est refusé', async () => {
     const parent = parentWithRuns();
-    const r = await cadEnv(parent, { OLLAMA_HOST: 'http://127.0.0.1:1' }, 'corrections', parent, '--classify');
-    expect(r.code).toBe(0);
-    expect(JSON.parse(readFileSync(join(parent, '.cadence', 'corrections.json'), 'utf8'))).toEqual({});
     for (const bad of ['0', 'x', '1.5']) {
       const e = await cad(parent, 'corrections', parent, '--sample', bad);
       expect(e.code).not.toBe(0);
@@ -475,5 +472,108 @@ describe('cadence corrections', () => {
     const r = await cad(tempDir(), 'corrections');
     expect(r.code).not.toBe(0);
     expect(r.err).toContain('journal');
+  });
+});
+
+describe('cadence corrections --classify : Ollama absent ou partiel (L575, issue #35)', () => {
+  async function cad(dir: string, env: Record<string, string>, ...argv: string[]) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await run(argv, { cwd: dir, env: { RAF_TODAY: '2026-10-10', ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-10T10:00:00') });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  }
+  function parentWithRuns() {
+    const parent = tempDir();
+    const runs = join(parent, '.cadence', 'runs');
+    mkdirSync(runs, { recursive: true });
+    cpSync(fixture(), runs, { recursive: true });
+    return parent;
+  }
+  async function serve(answer: (n: number) => { status: number; body: string }) {
+    let n = 0;
+    const server = createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        if (req.url !== '/api/chat') { res.statusCode = 200; res.end('{}'); return; }
+        const a = answer(n++);
+        res.statusCode = a.status;
+        res.setHeader('content-type', 'application/json');
+        res.end(a.body);
+      });
+    });
+    await new Promise<void>((ok) => server.listen(0, '127.0.0.1', ok));
+    return { host: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, close: () => server.close() };
+  }
+  const ok = (cause: string) => ({ status: 200, body: JSON.stringify({ message: { content: `{"cause":"${cause}","raison":"r"}` } }) });
+
+  it('R1 — Ollama injoignable : une ligne dès le départ, code 1, aucun « n/n » de progression', async () => {
+    const parent = parentWithRuns();
+    const r = await cad(parent, { OLLAMA_HOST: 'http://127.0.0.1:1' }, 'corrections', parent, '--classify');
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("Ollama injoignable sur http://127.0.0.1:1 : rien n'est classé");
+    expect(r.err).not.toMatch(/classement : \d+\/\d+/);
+    expect(r.out).toBe('');
+  });
+
+  it("R2 — injoignable : corrections.json absent n'est pas créé, un fichier existant reste intact", async () => {
+    const parent = parentWithRuns();
+    const file = join(parent, '.cadence', 'corrections.json');
+    await cad(parent, { OLLAMA_HOST: 'http://127.0.0.1:1' }, 'corrections', parent, '--classify');
+    expect(existsSync(file)).toBe(false);
+    const kept = '{"w1/alpha--L1/3":{"cause":"bug-code","by":"ollama:m","manual":"bug-code"}}';
+    writeFileSync(file, kept);
+    await cad(parent, { OLLAMA_HOST: 'http://127.0.0.1:1' }, 'corrections', parent, '--classify');
+    expect(readFileSync(file, 'utf8')).toBe(kept);
+  });
+
+  it('R3 — le modèle répond en partie : le compte des passes non classées et la raison, code 0, les classées sont écrites', async () => {
+    const srv = await serve((n) => (n === 0 ? ok('test-manquant') : { status: 500, body: '{}' }));
+    try {
+      const parent = parentWithRuns();
+      const r = await cad(parent, { OLLAMA_HOST: srv.host }, 'corrections', parent, '--classify');
+      expect(r.code).toBe(0);
+      expect(r.err).toContain('classement : 2 passes non classées sur 3 (réponse HTTP 500 ×2)');
+      expect(Object.keys(JSON.parse(readFileSync(join(parent, '.cadence', 'corrections.json'), 'utf8')))).toHaveLength(1);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it('R4 — joignable mais aucune réponse exploitable : la raison, code 1, corrections.json non écrit', async () => {
+    const srv = await serve(() => ({ status: 200, body: JSON.stringify({ message: { content: 'bof' } }) }));
+    try {
+      const parent = parentWithRuns();
+      const r = await cad(parent, { OLLAMA_HOST: srv.host }, 'corrections', parent, '--classify');
+      expect(r.code).toBe(1);
+      expect(r.err).toContain('classement : 3 passes non classées sur 3 (réponse hors liste ×3)');
+      expect(existsSync(join(parent, '.cadence', 'corrections.json'))).toBe(false);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it("R5 — rien à classer : pas de sonde, pas d'erreur, même avec un hôte injoignable", async () => {
+    const srv = await serve(() => ok('test-manquant'));
+    const parent = parentWithRuns();
+    try {
+      await cad(parent, { OLLAMA_HOST: srv.host }, 'corrections', parent, '--classify');
+    } finally {
+      srv.close();
+    }
+    const r = await cad(parent, { OLLAMA_HOST: 'http://127.0.0.1:1' }, 'corrections', parent, '--classify');
+    expect(r.code).toBe(0);
+    expect(r.err).not.toContain('injoignable');
+  });
+
+  it('R6 — réponses hors liste en cours de route : comptées avec leur raison, les passes déjà classées sont gardées', async () => {
+    const srv = await serve((n) => (n === 0 ? ok('test-manquant') : { status: 200, body: JSON.stringify({ message: { content: '{"cause":"autre"}' } }) }));
+    try {
+      const parent = parentWithRuns();
+      const r = await cad(parent, { OLLAMA_HOST: srv.host }, 'corrections', parent, '--classify');
+      expect(r.err).toContain('classement : 2 passes non classées sur 3 (réponse hors liste ×2)');
+      expect(Object.keys(JSON.parse(readFileSync(join(parent, '.cadence', 'corrections.json'), 'utf8')))).toHaveLength(1);
+    } finally {
+      srv.close();
+    }
   });
 });

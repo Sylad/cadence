@@ -167,14 +167,16 @@ type Opened = { ok: true; gate: RemoteGate } | { ok: false; stage: 'host' | 'cac
 export async function openRemoteGate(o: OpenOpts): Promise<Opened> {
   if (!isSha(o.sha)) throw new Error(`sha invalide pour la porte déportée : ${o.sha}`);
   // Dès la préparation (gate.install dure jusqu'à 30 min) et jusqu'à `close`, Ctrl-C ou un signal arrête ce qui tourne sur l'hôte et en retire le worktree (R10, R19).
-  let forget = (): void => {};
+  // Inscrit avant la sonde de l'hôte (ssh jusqu'à 30 s) : un signal tue déjà ce ssh ; l'hôte n'est nettoyé qu'une fois son dossier de travail connu.
+  let work: Work | undefined;
+  let forget = onTermination(() => {
+    // Le ssh local d'abord (sonde, gate.install, commande de la porte), puis l'hôte : un nettoyage qui échoue ne laisse pas le ssh tourner.
+    for (const pgid of liveSsh) killGroup(pgid);
+    if (work) cleanupHost(o, work);
+  });
   try {
     const opened = await prepare(o, (w) => {
-      forget = onTermination(() => {
-        // Le ssh local d'abord (gate.install, commande de la porte), puis l'hôte : un nettoyage qui échoue ne laisse pas le ssh tourner.
-        for (const pgid of liveSsh) killGroup(pgid);
-        cleanupHost(o, w);
-      });
+      work = w;
     });
     if (!opened.ok) forget();
     else {

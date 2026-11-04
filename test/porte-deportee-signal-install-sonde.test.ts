@@ -103,11 +103,12 @@ describe('L507 R10 — signal pendant gate.install', () => {
 
   it('signal pendant la sonde de l\'hôte (avant le worktree) : un gestionnaire est déjà inscrit pour tuer le ssh de la sonde', async () => {
     const s = setup();
-    // la sonde (uname) est lente : le ssh simulé la fait dormir via un uname ralenti n'existe pas, on observe donc l'inscription au premier ssh
-    s.remote.lose('uname'); // la sonde échoue vite ; l'instant avant l'inscription est le seul créneau
+    s.remote.lose('uname'); // la sonde échoue : le gestionnaire doit pourtant être inscrit dès l'appel, avant son ssh, puis retiré
     const opening = openRemoteGate(opts(s, 'mkdir -p node_modules'));
     const seen = registered.size;
-    await opening;
+    const o = await opening;
     expect(seen).toBeGreaterThan(0);
+    expect(o.ok).toBe(false);
+    expect(registered.size).toBe(0);
   }, 60_000);
 });

@@ -97,7 +97,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
-- Remote gate (L507, [docs/remote-gate.md](docs/remote-gate.md) « Timeout, Ctrl-C, signals »): Ctrl-C or SIGTERM on a wave or on `verify --gate`, including during `gate.install`, now kills the local ssh in progress before the host cleanup, so a cleanup that fails no longer leaves it running.
+- Remote gate (L507, [docs/remote-gate.md](docs/remote-gate.md) « Timeout, Ctrl-C, signals »): Ctrl-C or SIGTERM on a wave or on `verify --gate`, including during the host probe and `gate.install`, now kills the local ssh in progress before the host cleanup, so a cleanup that fails no longer leaves it running.
 
 ## [1.51.0] - 2026-11-04
 

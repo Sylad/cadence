@@ -86,7 +86,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       bStatusWhileAHolds = `${store.readLot('b', 'L1')!.status}/${store.readLot('a', 'L1')!.status}`;
     });
     // a et b sont frères : b est un dépôt tiers de la session de a au départ ; ses commits, une fois le lot ajouté, ne sont pas un incident
-    expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
     expect(said).toMatch(/b:L1 : ajout déposé/);
     expect(bStatusWhileAHolds).toMatch(/^ready\/(?!ready)/);
     const store = RunStore.last(parent)!;
@@ -105,7 +105,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       err = r.err.join('\n');
       expect(err).toContain(`cadence orchestrate --add a:L2 --wave ${store.id}`);
     });
-    expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
     expect(err).toMatch(/une orchestration y est déjà en cours/);
   });
 
@@ -116,7 +116,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       await new Promise((r) => setTimeout(r, 150));
       expect(store.readLot('a', 'L2')?.status ?? 'queued').not.toBe('ready');
     });
-    expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
     expect(s.maxIn.get('a')).toBe(1);
     const store = RunStore.last(parent)!;
     expect(store.readLot('a', 'L2')!.status).toBe('ready');
@@ -136,7 +136,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       expect(await orchestrate(['--add', 'a:L2'], io(parent).io, s.d)).toBe(0);
       await wait(() => store.readLot('a', 'L2')?.status === 'ready');
     });
-    expect(await orchestrate(['b:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(await orchestrate(['b:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
     expect(err).toMatch(/a:L2 : dépendance\(s\) ni terminée\(s\) ni plus tôt dans la vague : L1/);
     expect(s.played.filter((p) => p.startsWith('a:'))).toEqual(['a:L1', 'a:L2']);
   });
@@ -157,7 +157,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       errs.push(dup.err.join('\n'));
       await wait(() => store.addQueue().length === 0);
     });
-    await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d);
+    await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d);
     expect(errs[0]).toMatch(/b:L9 : lot inconnu/);
     expect(errs[1]).toMatch(/z:L1 : dossier .* introuvable/);
     expect(errs[2]).toMatch(/a:L1 : lot déjà dans la vague/);
@@ -184,7 +184,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       writeFileSync(join(store.dir, 'tool', 'dist', 'orchestrate', 'state.js'), "join(this.dir, 'adds.log')\n");
       expect(waveReadsAdds(store.dir)).toBe(true);
     });
-    await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d);
+    await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d);
     expect(seen).toMatchObject({ code: 2, queued: 0 });
     expect(seen!.err).toMatch(/ne lit pas la file d'ajouts/);
   });
@@ -199,7 +199,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       store.requestAdd({ project: 'b', lot: 'L9' });
       await wait(() => store.addQueue().length === 0);
     });
-    expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
     const store = RunStore.last(parent)!;
     expect(readFileSync(join(store.dir, 'journal.log'), 'utf8')).toMatch(/b:L9 : ajout écarté \(.*lot inconnu/);
     expect(store.readWave()!.lots).toEqual(['a:L1']);
@@ -211,7 +211,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       expect(await orchestrate(['--stop-after-current'], io(parent).io, s.d)).toBe(0);
       expect(await orchestrate(['--add', 'b:L1'], io(parent).io, s.d)).toBe(0);
     });
-    await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d);
+    await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d);
     const store = RunStore.last(parent)!;
     expect(store.addQueue()).toEqual([]);
     expect(readFileSync(join(store.dir, 'journal.log'), 'utf8')).toMatch(/b:L1 : ajout écarté \(la vague s'arrête/);
@@ -259,7 +259,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       }
       await wait(() => store.readLot('b', 'L1')?.status === 'ready');
     });
-    expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
   });
 
   it("R13 — le budget restant de la vague doit tenir celui du lot ajouté : refusé (code 2), rien déposé", async () => {
@@ -271,7 +271,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       err = r.err.join('\n');
       expect(store.addQueue()).toEqual([]);
     });
-    await orchestrate(['a:L1', '--budget', '500k', '--max-sessions', '2'], io(parent).io, s.d);
+    await orchestrate(['a:L1', '--no-fill', '--budget', '500k', '--max-sessions', '2'], io(parent).io, s.d);
     expect(err).toMatch(/b:L1 : le budget restant de la vague \(500000 tokens\) ne tient pas le budget du lot \(\d+\)/);
   });
 
@@ -298,7 +298,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
         releaseLock(lock, process.ppid);
       }
     });
-    expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
     const store = RunStore.last(parent)!;
     expect(readFileSync(join(store.dir, 'journal.log'), 'utf8')).toMatch(/b:L1 : ajout écarté \(b : une orchestration y est déjà en cours \(autre/);
     expect(store.readWave()!.lots).toEqual(['a:L1']);
@@ -330,7 +330,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       return claudeOut(workReport({ commits: [commitFile(o.cwd, `f-${lot}.txt`, `feat(${lot}): travail`)] }));
     };
     const d: OrchestrateDeps = { claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR, slotPollMs: 20 };
-    const code = await orchestrate(['L1', '--max-sessions', '2'], io(repo).io, d);
+    const code = await orchestrate(['L1', '--no-fill', '--max-sessions', '2'], io(repo).io, d);
     expect(codeL3).toBe(2);
     expect(hint).toMatch(/pour y ajouter ce lot : cadence orchestrate --add \S+:L3 --wave/);
     expect(seen[0]).toMatchObject({ code: 2 });
@@ -351,7 +351,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       expect(await orchestrate(['--stop-after-current'], io(parent).io, s.d)).toBe(0);
     });
     // L'arrêt suspend aussi a:L1 avant sa revue (sémantique de --stop-after-current) : la vague est « interrupted » pour lui seul ; a:L2 n'y est pour rien.
-    await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d);
+    await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d);
     const store = RunStore.last(parent)!;
     const journal = readFileSync(join(store.dir, 'journal.log'), 'utf8');
     expect(journal).toMatch(/a:L2 : ajout écarté \(la vague s'arrête\)/);
@@ -373,7 +373,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       plan.save();
       git(repo, 'commit', '-q', '-m', 'plan: L2 fini à la main', '--', '.cadence/raf.yaml');
     });
-    await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d);
+    await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d);
     const store = RunStore.last(parent)!;
     const journal = readFileSync(join(store.dir, 'journal.log'), 'utf8');
     expect(journal).toMatch(/a:L2 : ajout écarté \(le lot est done\)/);
@@ -399,7 +399,7 @@ describe('L421 — ajouter un lot à une vague vivante', () => {
       raw.usage.input_tokens = 900_000;
       return { ...out, stdout: JSON.stringify(raw) };
     };
-    await orchestrate(['a:L1', '--budget', '1600k', '--max-sessions', '2'], io(parent).io, { ...s.d, claude });
+    await orchestrate(['a:L1', '--no-fill', '--budget', '1600k', '--max-sessions', '2'], io(parent).io, { ...s.d, claude });
     expect(added).toBe(0);
     const store = RunStore.last(parent)!;
     const journal = readFileSync(join(store.dir, 'journal.log'), 'utf8');

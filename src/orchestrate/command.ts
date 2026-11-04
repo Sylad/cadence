@@ -6,7 +6,7 @@ import { isDay, toDay, type Day } from '../dates.js';
 import { RafError } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { readWaits, renderWaits } from './waits.js';
-import { parseUntil } from './continue.js';
+import { fillsFreeSlots, parseUntil } from './continue.js';
 import { snapshot } from './guard.js';
 import { claudeConfigDir, realClaude, type ClaudeFn } from './launch.js';
 import { addNotAlone } from './ajout.js';
@@ -106,7 +106,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
 
   if ((args.until !== undefined || args.priority !== undefined) && !args.continue) throw new RafError('--until et --priority s\'utilisent avec --continue');
   if (args.until !== undefined) args.untilAt = parseUntil(args.until, io.now()); // heure invalide ou passée : refus avant d'agir
-  if (args.continue) priorityOf(args, launch); // une clé priority: illisible du cadence.yaml : refus avant d'agir, lots donnés ou non
+  if (fillsFreeSlots(args)) priorityOf(args, launch); // une clé priority: illisible du cadence.yaml : refus avant d'agir, lots donnés ou non
   if (args.watch && args.status === undefined) throw new RafError('--watch s\'utilise avec --status');
   if (args.detail !== undefined && args.status === undefined) throw new RafError('--detail s\'utilise avec --status');
   if (args.detail !== undefined && args.watch) throw new RafError('--detail ne se combine pas avec --watch (il donne le détail d\'un lot, pas le tableau)');
@@ -143,7 +143,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.drop.length || args.stopAfterCurrent) return control(args, io);
   if (args.answers.length) return answerOnly(args, io);
 
-  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --add projet:lot [--wave vague] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
+  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--no-fill] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --add projet:lot [--wave vague] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);

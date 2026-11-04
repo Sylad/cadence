@@ -31,6 +31,8 @@ export interface Args {
   wave?: string;
   /** `--continue` (L147) : la vague tire elle-même le prochain lot prêt du plan quand ceux en cours sont finis. */
   continue: boolean;
+  /** `--no-fill` (L587) : le créneau libre n'est pas rempli en cours de vague ; seul le tirage entre deux tours (`--continue`) reste. */
+  noFill: boolean;
   /** `--until HH:MM` : plus aucun lot n'est tiré à partir de cette heure. */
   until?: string;
   /** `until` en date, lue une fois au lancement (`orchestrate`). */
@@ -92,8 +94,19 @@ function lotBudgetArg(text: string): Args['lotBudgets'][number] {
   return { project: target.project, lot: target.lot, raise, text: m[2] };
 }
 
+/** Les options sans valeur, et le champ de `Args` qu'elles lèvent. */
+const BOOLEAN_FLAGS: Record<string, 'dryRun' | 'waits' | 'watch' | 'stopAfterCurrent' | 'abandonCommits' | 'continue' | 'noFill'> = {
+  '--dry-run': 'dryRun',
+  '--waits': 'waits',
+  '--watch': 'watch',
+  '--stop-after-current': 'stopAfterCurrent',
+  '--abandon-commits': 'abandonCommits',
+  '--continue': 'continue',
+  '--no-fill': 'noFill',
+};
+
 export function parseOrchestrateArgs(argv: string[]): Args {
-  const a: Args = { lots: [], lotBudgets: [], dryRun: false, waits: false, watch: false, continue: false, answers: [], drop: [], stopAfterCurrent: false, add: [], integrate: [], abandonCommits: false };
+  const a: Args = { lots: [], lotBudgets: [], dryRun: false, waits: false, watch: false, continue: false, noFill: false, answers: [], drop: [], stopAfterCurrent: false, add: [], integrate: [], abandonCommits: false };
   const optional = (i: number) => (argv[i + 1] !== undefined && !argv[i + 1].startsWith('-') && !LOT_LIKE.test(argv[i + 1]) ? argv[i + 1] : undefined);
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
@@ -101,17 +114,15 @@ export function parseOrchestrateArgs(argv: string[]): Args {
       if (argv[i + 1] === undefined) throw new RafError(`${flag} attend une valeur`);
       return argv[++i];
     };
-    if (t === '--dry-run') a.dryRun = true;
+    if (Object.hasOwn(BOOLEAN_FLAGS, t)) a[BOOLEAN_FLAGS[t]] = true;
     else if (t === '--status' || t === '--resume') {
       const v = optional(i);
       if (v !== undefined) i++;
       a[t === '--status' ? 'status' : 'resume'] = v ?? true;
-    } else if (t === '--waits') a.waits = true;
-    else if (t === '--since') {
+    } else if (t === '--since') {
       a.since = value(t);
       if (!isDay(a.since)) throw new RafError(`--since invalide : ${a.since} (AAAA-MM-JJ)`);
     } else if (t === '--detail') a.detail = value(t);
-    else if (t === '--watch') a.watch = true;
     else if (t === '--interval') a.interval = parseMaxSessions(value(t), '--interval');
     else if (t === '--budget') {
       const v = value(t);
@@ -127,13 +138,10 @@ export function parseOrchestrateArgs(argv: string[]): Args {
       if (a.goal === '') throw new RafError('--goal attend un texte non vide');
     } else if (t === '--wave') a.wave = value(t);
     else if (t === '--drop') a.drop.push(lotArg(value(t)));
-    else if (t === '--stop-after-current') a.stopAfterCurrent = true;
     else if (t === '--add') a.add.push(lotArg(value(t)));
     else if (t === '--integrate') a.integrate.push(lotArg(value(t)));
     else if (t === '--replay') a.integrate.push({ ...lotArg(value(t)), replay: true });
     else if (t === '--remove-worktree') a.removeWorktree = lotArg(value(t));
-    else if (t === '--abandon-commits') a.abandonCommits = true;
-    else if (t === '--continue') a.continue = true;
     else if (t === '--until') a.until = value(t);
     else if (t === '--priority') a.priority = parsePriority(value(t));
     else if (t === '--answer') {
@@ -147,5 +155,7 @@ export function parseOrchestrateArgs(argv: string[]): Args {
     if (a.resume === true) a.resume = a.wave;
     else if (a.resume !== a.wave) throw new RafError(`--resume ${a.resume} et --wave ${a.wave} désignent deux vagues : une seule (${resumeCommand('<vague>')})`);
   }
+  // L587 : sans lot à jouer ni --continue il n'y a aucun créneau à remplir ou à garder vide.
+  if (a.noFill && !a.continue && a.lots.length === 0) throw new RafError("--no-fill s'utilise avec des lots donnés ou avec --continue");
   return a;
 }

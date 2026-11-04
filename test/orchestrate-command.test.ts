@@ -895,7 +895,7 @@ describe("identifiant de vague réservé atomiquement (L71/t1)", () => {
 
   it('deux vagues lancées ensemble du même dossier, à la même minute : deux identifiants, deux dossiers', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }], b: [{ title: 'deux' }] });
-    const [x, y] = await Promise.all([run(parent, ['a:L1']), run(parent, ['b:L1'])]);
+    const [x, y] = await Promise.all([run(parent, ['a:L1', '--no-fill']), run(parent, ['b:L1', '--no-fill'])]);
     expect([x.code, y.code]).toEqual([0, 0]);
     expect(readdirSync(join(parent, '.cadence/runs')).sort()).toEqual(['2026-10-04-1412', '2026-10-04-1412-2']);
     // L'ordre de réservation entre deux run() parallèles n'est pas promis : on vérifie l'ensemble.
@@ -1788,7 +1788,7 @@ describe('--continue (L147)', () => {
     const code = await orchestrate(['--continue', '--priority', 'b,a', '--max-sessions', '1'], o.io, f.deps);
     expect(code).toBe(0);
     expect(doneBy(f.calls)).toEqual(['b', 'b', 'a']);
-    expect(o.out.join('\n')).toMatch(/continue : tire b:L2 \(créneau libre\)\n/); // L527 : le créneau libéré par b:L1 est rempli dans le pool
+    expect(o.out.join('\n')).toMatch(/créneau libre rempli par b:L2\n/); // L527 : le créneau libéré par b:L1 est rempli dans le pool
     expect(o.out.join('\n')).toMatch(/continue : arrêt — plus aucun lot prêt/);
     expect(o.out.find((l) => l.startsWith('prêts, ressources libres : '))).toBe('prêts, ressources libres : a:L1 a un · b:L2 b deux'); // au départ de la vague réelle, hors le lot du premier tirage
     const store = RunStore.last(parent)!;
@@ -1925,7 +1925,7 @@ describe('--continue (L147)', () => {
     expect(await orchestrate(['a:L1'], io(parent).io, f.deps)).toBe(1);
     const o = io(parent);
     expect(await orchestrate(['--resume', '--answer', 'a:L1', 'SQLite', '--continue', '--max-sessions', '1'], o.io, f.deps)).toBe(0);
-    expect(o.out.join('\n')).toMatch(/continue : tire a:L2 \(créneau libre\)\n/);
+    expect(o.out.join('\n')).toMatch(/créneau libre rempli par a:L2\n/);
     expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1', 'a:L2']);
     expect(f.calls.filter((c) => c.kind === 'implement')).toHaveLength(3); // L1, L1 repris, L2
     expect(RunStore.last(parent)!.readWave()!.status).toBe('done');
@@ -1947,7 +1947,7 @@ describe('--continue (L147)', () => {
     const o = io(parent);
     await orchestrate(['a:L1', '--continue', '--budget', '1M', '--max-sessions', '2'], o.io, f.deps);
     expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1', 'a:L2', 'a:L3']);
-    expect(o.out.join('\n')).toMatch(/continue : tire a:L2 \(créneau libre\)\n[\s\S]*continue : tire a:L3 \(créneau libre\)\n/);
+    expect(o.out.join('\n')).toMatch(/créneau libre rempli par a:L2\n[\s\S]*créneau libre rempli par a:L3\n/);
   });
 
   it('au premier tour sans lot donné, un lot sauté dit sa cause : sur la sortie d\'erreur et dans le journal de la vague', async () => {
@@ -1985,7 +1985,7 @@ describe('--continue (L147)', () => {
     const lots = RunStore.last(parent)!.readWave()!.lots;
     expect(lots.slice(0, 2)).toEqual(['b:L1', 'a:L1']); // premier tirage : un lot par dépôt, b d'abord
     expect(lots.slice(2)).toEqual(['b:L2', 'b:L3', 'a:L2', 'a:L3']); // remplissage : b tant qu'il a des lots prêts, puis a — un remplissage qui ignorerait --priority tirerait a:L2 avant b:L2
-    expect(o.out.filter((l) => l.startsWith('continue : tire ')).map((l) => l.replace(/ \(créneau libre\)$/, ''))).toEqual(['continue : tire b:L2', 'continue : tire b:L3', 'continue : tire a:L2', 'continue : tire a:L3']);
+    expect(o.out.filter((l) => l.startsWith('créneau libre rempli par '))).toEqual(['créneau libre rempli par b:L2', 'créneau libre rempli par b:L3', 'créneau libre rempli par a:L2', 'créneau libre rempli par a:L3']);
   });
 });
 

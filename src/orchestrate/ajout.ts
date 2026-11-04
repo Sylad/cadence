@@ -398,7 +398,7 @@ export class AddFeed {
       this.say(`continue : lot sauté — ${key} : ${refused}`);
       return false;
     }
-    this.e.wctx.log(`continue : tire ${key} (créneau libre)`);
+    this.e.wctx.log(`créneau libre rempli par ${key}`);
     this.admit(null, c);
     return true;
   }

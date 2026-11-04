@@ -78,7 +78,7 @@ function scene(parent: string, holder: string, hold: (store: RunStore) => Promis
 const drawnTogether = (parent: string): number => {
   const lines = journal(parent).split('\n');
   const firstReady = lines.findIndex((l) => l.includes('→ ready'));
-  return lines.slice(0, firstReady).filter((l) => l.includes('(créneau libre)')).length;
+  return lines.slice(0, firstReady).filter((l) => l.includes('créneau libre rempli par')).length;
 };
 
 const journal = (parent: string) => readFileSync(join(RunStore.last(parent)!.dir, 'journal.log'), 'utf8');
@@ -95,12 +95,12 @@ describe('L527 — --continue remplit seul les créneaux libres', () => {
     expect(cWhileAHolds).not.toBe('ready');
     expect(s.maxAll()).toBeLessThanOrEqual(2);
     expect(s.played.sort()).toEqual(['a:L1', 'b:L1', 'c:L1']);
-    expect(journal(parent)).toMatch(/continue : tire c:L1 \(créneau libre\)/);
+    expect(journal(parent)).toMatch(/créneau libre rempli par c:L1/);
     expect(journal(parent)).toMatch(/c:L1 : ajouté à la vague/);
     expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1', 'b:L1', 'c:L1']);
   });
 
-  it('R2 — sans --continue, un lot donné à la main ne tire rien : le créneau libre reste vide', async () => {
+  it('R2 — avec --no-fill, un lot donné à la main ne tire rien : le créneau libre reste vide', async () => {
     const parent = parentWith(['a', 'b', 'c']);
     let cStatus = '';
     const s = scene(parent, 'a:L1', async (store) => {
@@ -108,7 +108,7 @@ describe('L527 — --continue remplit seul les créneaux libres', () => {
       await new Promise((r) => setTimeout(r, 150));
       cStatus = store.readLot('c', 'L1')?.status ?? 'absent';
     });
-    expect(await orchestrate(['a:L1', 'b:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(await orchestrate(['a:L1', 'b:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
     expect(cStatus).toBe('absent');
     expect(s.played.sort()).toEqual(['a:L1', 'b:L1']);
   });
@@ -262,7 +262,7 @@ describe('L527 — --continue remplit seul les créneaux libres', () => {
     expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['a:L1', 'b:L1', 'a:L2', 'a:L3']);
   });
 
-  it("R11 — sans --continue, dans un dépôt en worktrees et un plafond > 1, le lot donné seul joue dans son worktree et un lot apporté par --add joue en parallèle dès qu'un créneau est libre", async () => {
+  it("R11 — avec --no-fill, dans un dépôt en worktrees et un plafond > 1, le lot donné seul joue dans son worktree et un lot apporté par --add joue en parallèle dès qu'un créneau est libre", async () => {
     const parent = parentWith(['a'], { a: 2 });
     const dir = join(parent, 'a');
     worktreesOn(dir);
@@ -274,7 +274,7 @@ describe('L527 — --continue remplit seul les créneaux libres', () => {
         l1WhileL2Ready = store.readLot('a', 'L1')!.status;
       },
     });
-    expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(await orchestrate(['a:L1', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
     expect(l1WhileL2Ready).toBe('implementing');
     expect(s.maxIn.get('a')).toBe(2);
     expect(journal(parent)).toMatch(/a:L1 · worktree créé/);
@@ -287,5 +287,57 @@ describe('L527 — --continue remplit seul les créneaux libres', () => {
     const s = sessions(parent, {});
     expect(await orchestrate(['a:L1', '--max-sessions', '1'], io(parent).io, s.d)).toBe(0);
     expect(journal(parent)).not.toMatch(/worktree créé/);
+  });
+});
+
+describe('L587 — une vague de lots nommés remplit ses créneaux libres', () => {
+  it('R1 — sans --continue, le créneau libéré par un lot nommé est rempli par le lot prêt suivant du plan, et la ligne du journal le dit', async () => {
+    const parent = parentWith(['a', 'b', 'c']);
+    let cWhileAHolds = '';
+    const s = scene(parent, 'a:L1', async (store) => {
+      await wait(() => store.readLot('c', 'L1')?.status === 'ready');
+      cWhileAHolds = store.readLot('a', 'L1')!.status;
+    });
+    expect(await orchestrate(['a:L1', 'b:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
+    expect(cWhileAHolds).not.toBe('ready');
+    expect(s.played.sort()).toEqual(['a:L1', 'b:L1', 'c:L1']);
+    expect(journal(parent)).toMatch(/créneau libre rempli par c:L1/);
+  });
+
+  it('R2 — le remplissage garde le budget : un lot trop gros pour le reste après les lots nommés n\'est pas tiré', async () => {
+    const parent = parentWith(['a', 'b', 'c'], {}, {}, '', { c: 2 });
+    let cStatus = '';
+    const s = scene(parent, 'a:L1', async (store) => {
+      await wait(() => store.readLot('b', 'L1')?.status === 'ready');
+      await new Promise((r) => setTimeout(r, 200));
+      cStatus = store.readLot('c', 'L1')?.status ?? 'absent';
+    });
+    await orchestrate(['a:L1', 'b:L1', '--max-sessions', '2', '--budget', String(2 * lotBudget(1) + 1)], io(parent).io, s.d);
+    expect(cStatus).toBe('absent');
+  });
+
+  it("R3 — --no-fill avec --continue : le créneau libre n'est pas rempli en cours de tour", async () => {
+    const parent = parentWith(['a', 'b', 'c']);
+    let cStatus = '';
+    const s = scene(parent, 'a:L1', async (store) => {
+      await wait(() => store.readLot('b', 'L1')?.status === 'ready');
+      await new Promise((r) => setTimeout(r, 200));
+      cStatus = store.readLot('c', 'L1')?.status ?? 'absent';
+    });
+    await orchestrate(['--continue', '--no-fill', '--max-sessions', '2'], io(parent).io, s.d);
+    expect(cStatus).toBe('absent');
+    expect(journal(parent)).not.toMatch(/créneau libre rempli par/);
+  });
+
+  it("R4 — une clé priority: illisible du cadence.yaml parent refuse la vague de lots nommés avant d'agir ; --no-fill ne la lit pas", async () => {
+    const parent = parentWith(['a', 'b']);
+    writeFileSync(join(parent, 'cadence.yaml'), 'priority: nope\n');
+    await expect(orchestrate(['a:L1'], io(parent).io, scene(parent, 'a:L1', async () => {}).d)).rejects.toThrow(/priority/);
+    expect(await orchestrate(['a:L1', '--no-fill'], io(parent).io, scene(parent, 'a:L1', async () => {}).d)).toBe(0);
+  });
+
+  it("R5 — --no-fill sans lot ni --continue est refusé", async () => {
+    const parent = parentWith(['a']);
+    await expect(orchestrate(['--no-fill'], io(parent).io, scene(parent, 'a:L1', async () => {}).d)).rejects.toThrow(/--no-fill/);
   });
 });

@@ -10,7 +10,7 @@ import { isOpen } from '../plan.js';
 import { sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, registerWave, updateWaveRepos } from './registry.js';
 import { loadTemplates } from './briefs.js';
-import { fillTargets, handedBackStreak, stopReason } from './continue.js';
+import { fillsFreeSlots, fillTargets, handedBackStreak, stopReason } from './continue.js';
 import { Budget, DROPPED, STOP_REQUESTED, countInterrupted, handBackDroppedQuestions, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { installPrePush } from './guard.js';
 import { killSessions, type ClaudeFn } from './launch.js';
@@ -275,9 +275,9 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
     release();
   });
   const finished = lotFinished;
-  /** L527 : les lots prêts du plan que le créneau libre peut recevoir (rien sans `--continue`) ; `adds.fill` les contrôle et les prend. */
+  /** L527 : les lots prêts du plan que le créneau libre peut recevoir (rien avec `--no-fill`, L587) ; `adds.fill` les contrôle et les prend. */
   const refill = async (canRun: (c: LotCtx) => boolean, free: number): Promise<LotCtx[]> =>
-    args.continue && free > 0 ? adds.fill(fillTargets({ args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }), free, canRun) : [];
+    fillsFreeSlots(args) && free > 0 ? adds.fill(fillTargets({ args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }), free, canRun) : [];
   try {
     await runPool(ctxs, cap, all, (c) => {
       // Un lot rendu ou en échec garde son worktree et sa branche (R12) : le journal en donne le chemin.

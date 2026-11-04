@@ -189,6 +189,9 @@ export interface FillPlan {
   room: number;
 }
 
+/** L587 : une vague remplit ses créneaux libres quand elle a des lots à jouer (donnés ou tirés par `--continue`) et que `--no-fill` n'est pas passé. */
+export const fillsFreeSlots = (args: Pick<Args, 'continue' | 'lots' | 'noFill'>): boolean => !args.noFill && (args.continue || args.lots.length > 0);
+
 export interface FillFacts {
   args: Pick<Args, 'priority' | 'untilAt'>;
   io: Pick<OrchestrateIo, 'env' | 'now'>;

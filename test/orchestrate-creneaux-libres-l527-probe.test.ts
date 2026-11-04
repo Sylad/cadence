@@ -81,7 +81,7 @@ describe('L527 probe — bords du remplissage des créneaux libres', () => {
     expect(cDuringHold).not.toBe('ready');
     expect(RunStore.last(parent)!.readLot('b', 'L1')!.status).toBe('handed-back');
     expect(s.played.some((p) => p.endsWith(':L1') && p.includes('c'))).toBe(true);
-    expect(count(journal(parent), /continue : tire c:L1/g)).toBe(1);
+    expect(count(journal(parent), /créneau libre rempli par c:L1/g)).toBe(1);
   });
 
   it('--max-sessions 1 : chaque lot est joué une seule fois, jamais deux sessions à la fois', async () => {

@@ -1903,10 +1903,11 @@ lots:
     created: 2026-11-03
   - id: L563
     title: "--add (ou --replay) d'un lot rendu par la vague vivante après un correctif du lead dans son worktree conservé : reprendre le worktree et repartir à l'étape que choisirait la reprise (correction avec les derniers constats, ou la revue), au lieu de « lot déjà dans la vague » (issue #31 : un lot corrigé est resté une heure à l'arrêt avec des créneaux libres)"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-11-03
+    started: 2026-11-04
   - id: L564
     title: "Parité porte ↔ CI : faux positif quand la porte joue le même test via npm test (issue #32) — résoudre npm test / npm run <x> par les scripts de package.json avant de comparer, et comparer sans le préfixe npx"
     status: done

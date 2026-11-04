@@ -1,0 +1,140 @@
+sujet:
+  id: add-lot-rendu-corrige
+  titre: "orchestrate --add d'un lot rendu par la vague vivante après un correctif du lead : reprise du worktree conservé"
+  lot: L563
+  perimetre:
+    modules: [src/orchestrate/ajout.ts, src/orchestrate/preflight.ts, src/orchestrate/execute.ts, src/orchestrate/geste.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "--replay sur une vague vivante : refusé « la vague tourne encore » comme aujourd'hui (geste : à la fin de la vague) ; seul --add gagne le chemin (issue #31 propose l'un OU l'autre)"
+      - "le lot rendu à l'intégration (next: integrate), qui garde --resume --integrate (déposé tout de suite, L532), et le lot rendu sur budget, qui garde --budget projet:lot=+N (L223)"
+      - "le lot retiré par --drop (nouvelle vague, L554) et l'écart docs.sync : inchangés"
+      - "le format de LotState, de adds.log et du plan : aucun champ nouveau"
+      - "la reprise d'une branche d'une VAGUE PASSÉE (recoverTree, L311) : inchangée"
+
+cas:
+  - id: C1
+    titre: "Le lead ajoute à la vague vivante un lot qu'elle a rendu, après l'avoir corrigé dans son worktree"
+    acteur: le lead
+    declencheur: commande cadence orchestrate --add <projet>:<lot> --wave <vague>
+    preconditions:
+      - "la vague est vivante et lit la file d'ajouts (L421)"
+      - "le lot est dans la vague, status handed-back, rendu hors intégration (next différent de integrate), hors budget, hors --drop, hors écart docs.sync, hors écriture de plan refusée"
+      - "le worktree conservé du lot existe, sa branche est celle de la vague, son arbre n'a aucun fichier suivi modifié (le correctif du lead est commité)"
+    nominal:
+      - "Le contrôle préalable de --add reconnaît le lot comme un lot rendu à reprendre au lieu de répondre « lot déjà dans la vague »."
+      - "La demande est déposée dans adds.log et la ligne « ajout déposé » est imprimée comme pour un lot neuf."
+      - "Entre deux étapes, la vague prend la demande ; quand un créneau et le dépôt sont libres, le lot retrouve son worktree et sa branche sans les recréer, reprend les constats de sa dernière revue et sa clé existe déjà dans la vague (non dupliquée)."
+      - "Le lot repart à l'étape que choisit la reprise de branche (L311) : correction avec les derniers constats de revue, revue s'il a déjà passé une revue sans constat, écriture s'il n'a jamais été revu."
+      - "Le cycle normal enchaîne (revue, passes, intégration) ; la vague journalise « ajouté à la vague »."
+    alternatives:
+      - { si: "les constats de la dernière revue sont vides et le lot a déjà passé une revue", alors: "il repart à la revue (firstReview), pas à une correction sans constat", regles: [R2] }
+      - { si: "le lot n'a jamais passé de revue (rendu avant la première)", alors: "il repart à l'écriture (firstWrite)", regles: [R2] }
+      - { si: "les seuls constats sont ceux de tests rouges (source tests)", alors: "ils ne comptent pas comme une revue (L318) : il repart à l'écriture", regles: [R2] }
+      - { si: "le lot est dans la vague et n'est pas rendu (en cours, en file, suspendu, en question, prêt, échoué)", alors: "refus inchangé « lot déjà dans la vague »", regles: [R1] }
+      - { si: "le lot est rendu à l'intégration, sur budget, sur écriture de plan refusée, retiré ou en écart docs.sync", alors: "refus « lot déjà dans la vague » suivi du geste propre à son cas", regles: [R3] }
+      - { si: "le worktree ou la branche du lot a disparu, ou l'arbre a des fichiers suivis modifiés", alors: "refus avant d'agir, code 2, la cause dite", regles: [R4] }
+      - { si: "le même lot est déjà en file d'ajout, ou visé deux fois dans la commande", alors: "refus inchangé « lot déjà en file d'ajout dans la vague »", regles: [R1] }
+      - { si: "le budget restant de la vague ne tient pas le budget du lot", alors: "refus inchangé (budgetRefusals)", regles: [R6] }
+      - { si: "la vague a fini entre le contrôle et le dépôt, ou finit avant que la demande soit prise", alors: "demande retirée/écartée et dite, lot inchangé", regles: [R7] }
+      - { si: "le dépôt est tenu par un lot qui joue", alors: "la demande attend un créneau puis est prise", regles: [R5] }
+    resultat: "Un lot corrigé à la main repart dans la vague vivante dès qu'un créneau est libre, sans attendre sa fin ni une nouvelle vague."
+  - id: C2
+    titre: "Le lead lit le geste d'un lot rendu sur une vague vivante"
+    acteur: le lead
+    declencheur: commande cadence orchestrate --status (colonne geste) et refus d'une autre option sur ce lot
+    preconditions:
+      - "une vague vivante porte un lot rendu hors intégration, hors budget, hors retrait, hors écriture de plan refusée"
+    nominal:
+      - "La colonne geste du lot affiche la commande --add exacte à jouer tout de suite, sans « à la fin de la vague »."
+    alternatives: []
+    sans_alternative: "les autres gestes (intégration, replay, retrait, docs.sync) sont ceux de L554 et ne changent pas ; la vague terminée garde le geste actuel (aucun, ou la nouvelle vague)"
+    resultat: "Le lead n'a plus à deviner qu'un lot rendu se rajoute à la vague en cours."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "Un lot de la vague qui n'est pas rendu (queued, running, ready, suspended, question, failed, done…), ou déjà en file d'ajout, reste refusé par --add avec « <projet:lot> : lot déjà dans la vague <id> » (ou « déjà en file d'ajout dans »), code 2, rien déposé."
+    statut: sourcee
+    source: "src/orchestrate/preflight.ts:103 ; test/orchestrate-ajout-vivante-l421.test.ts:144 (R5 de L421)"
+    tests: ["R1 — lot en cours ou prêt de la vague : « lot déjà dans la vague », code 2", "R1 — lot déjà en file d'ajout : refus inchangé"]
+  - id: R2
+    cas: [C1]
+    enonce: "Le lot rendu repris par --add repart à l'étape que choisit la reprise de branche conservée (L311) : correction des constats de sa dernière revue de code quand il en a, revue (firstReview) quand il a passé une revue sans constat, écriture (firstWrite) sinon ; des constats de tests rouges seuls ne font pas une revue. Le lot ne repasse pas par le contrôle préalable de lot neuf (precheck) ni par un raf start."
+    statut: sourcee
+    source: "demande du lot (« l'étape que choisirait la reprise (correction avec les derniers constats, ou la revue) ») ; src/orchestrate/cycle.ts:111-114 ; src/orchestrate/execute.ts:106-110"
+    tests: ["R2 — constats de revue présents : le lot repart à la correction (fix) avec ces constats", "R2 — revue passée sans constat : le lot repart à la revue", "R2 — jamais revu ou constats de tests seuls : le lot repart à l'écriture"]
+  - id: R3
+    cas: [C1]
+    enonce: "Le refus « lot déjà dans la vague » reste le même, avec son geste, pour un lot rendu à l'intégration (--resume --integrate), sur budget (--budget projet:lot=+N), sur écriture de plan refusée (--replay, à la fin de la vague), retiré par --drop ou en écart docs.sync (nouvelle vague) ; seul le rendu « hors intégration, hors budget, hors plan » devient ajoutable."
+    statut: sourcee
+    source: "src/orchestrate/geste.ts:36-47,61-64 ; src/orchestrate/cycle/budget.ts:54-59 ; docs/specs/orchestrate-worktree-par-lot R27 (--integrate garde l'intégration seule) ; docs/specs/orchestrate-reprise-lot-budget (le rendu sur budget garde --budget)"
+    tests: ["R3 — lot rendu à l'intégration : refus inchangé avec le geste --integrate", "R3 — lot rendu sur budget : refus inchangé avec le geste --budget", "R3 — lot retiré par --drop : refus inchangé, nouvelle vague"]
+  - id: R4
+    cas: [C1]
+    enonce: "Un lot rendu dont le worktree conservé ou la branche de vague a disparu, ou dont l'arbre a un fichier suivi modifié (correctif non commité), est refusé par --add avant toute écriture, code 2, avec la cause ; le lot reste rendu et inchangé."
+    statut: hypothese
+    si_faux: "Si le lead voulait que le programme commite ou jette l'arbre sale lui-même, ce serait un geste destructif à demander ; ici le refus est le plus sûr et se corrige en commitant le correctif."
+    tests: ["R4 — arbre du worktree sale : code 2, la cause nommée, état du lot inchangé", "R4 — worktree disparu : code 2, lot toujours rendu"]
+  - id: R5
+    cas: [C1]
+    enonce: "Le lot rendu admis attend, dans la file d'ajouts, un créneau libre et un dépôt libre comme tout ajout ; il est pris entre deux étapes, reprend le worktree et la branche existants (jamais recréés ni basés sur un autre sha), garde sa clé unique dans wave.lots (non dupliquée) et repasse de handed-back à queued avec outcome vidé."
+    statut: sourcee
+    source: "src/orchestrate/ajout.ts:AddFeed.take / admit (créneau et dépôt) ; docs/specs/orchestrate-worktree-par-lot R11 (un lot déjà commencé retrouve son worktree)"
+    tests: ["R5 — lot rendu ajouté : même worktree, mêmes commits, une seule clé dans wave.lots", "R5 — dépôt tenu par un lot qui joue : le lot attend puis est pris"]
+  - id: R6
+    cas: [C1]
+    enonce: "Le budget du lot repris est celui d'un lot neuf (budget par défaut du lot) et ses passes repartent à zéro : le correctif du lead ouvre un nouveau départ ; il doit tenir dans le budget restant de la vague, sinon refus inchangé « le budget restant de la vague … ne tient pas le budget du lot »."
+    statut: hypothese
+    si_faux: "Si le lot devait garder ses tokens et passes déjà comptés, un lot rendu pour 2 passes non conformes (ou presque au budget) serait rendu de nouveau tout de suite ; seul le compteur change, aucune donnée persistante au-delà de l'état du lot."
+    tests: ["R6 — lot repris : passes à 0 et budget du lot neuf", "R6 — budget restant de la vague insuffisant : refus inchangé, code 2"]
+  - id: R7
+    cas: [C1]
+    enonce: "Une demande d'ajout d'un lot rendu que la vague ne peut plus prendre (vague finie, arrêt demandé, lot devenu non rendu ou fini entre-temps) est écartée et dite (journal, ou « la vague … vient de finir, lot non ajouté »), le lot restant rendu comme avant."
+    statut: sourcee
+    source: "src/orchestrate/ajout.ts:93-100 (addToLive), AddFeed.recheck / discard ; test/orchestrate-ajout-vivante-l421.test.ts"
+    tests: ["R7 — la vague finit avant la prise : demande écartée, lot toujours handed-back"]
+  - id: R8
+    cas: [C2]
+    enonce: "Sur une vague vivante, la colonne geste d'un lot rendu ajoutable (R3 exclu) est « cadence orchestrate --add <projet>:<lot> --wave <vague> » (forme .:<lot> quand le projet est le dossier de lancement), sans « à la fin de la vague » ; vague terminée : geste inchangé."
+    statut: hypothese
+    si_faux: "Si le geste restait vide, la fonctionnalité serait là mais introuvable ; seul le texte de la colonne change."
+    tests: ["R8 — vague vivante, lot rendu à corriger : la colonne geste porte la commande --add", "R8 — vague terminée : geste inchangé"]
+  - id: R9
+    cas: [C1]
+    enonce: "L'ajout d'un lot rendu journalise « <projet:lot> : ajouté à la vague <id> » et une ligne disant l'étape de reprise choisie (correction, revue ou écriture) et le worktree repris."
+    statut: hypothese
+    si_faux: "Si la ligne manquait, seul le journal serait moins lisible ; aucun comportement ne change."
+    tests: ["R9 — le journal dit l'étape de reprise choisie"]
+  - id: R10
+    cas: [C1]
+    enonce: "--replay sur une vague vivante reste refusé « la vague <id> tourne encore (pid …) : à la fin de la vague : … » ; seul --add reprend le lot rendu."
+    statut: sourcee
+    source: "src/orchestrate/geste.ts:56-59 (stillRunningRefusal) ; test/orchestrate-geste-suivant-l554.test.ts"
+    tests: ["R10 — --replay sur vague vivante : refus inchangé"]
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate --add <projet>:<lot> --wave <vague>
+    entree: "un lot rendu de la vague vivante (hors intégration, budget, plan refusé, retrait, écart docs.sync)"
+    sortie: "« <projet:lot> : ajout déposé — la vague <id> le prend entre deux étapes et le joue dès qu'un créneau est libre », code 0 ; chaque refus ci-dessous sort en code 2 avant d'agir ; le lot repart de son worktree à l'étape de R2"
+    erreurs:
+      - { code: log error, message: "orchestrate : <projet:lot> : lot déjà dans la vague <id>" }
+      - { code: log error, message: "orchestrate : <projet:lot> : lot déjà en file d'ajout dans la vague <id>" }
+      - { code: log error, message: "orchestrate : <projet:lot> : worktree du lot introuvable ou arbre sale : <cause>" }
+      - { code: log error, message: "orchestrate : <projet:lot> : le budget restant de la vague (<N> tokens) ne tient pas le budget du lot (<B>)" }
+      - { code: log error, message: "orchestrate : <projet:lot> : la vague <id> vient de finir, lot non ajouté : le lancer dans une nouvelle vague" }
+    regles: [R1, R2, R3, R4, R5, R6, R7, R10]
+  - id: A2
+    appel: commande cadence orchestrate --status
+    entree: "une vague vivante portant un lot rendu"
+    sortie: "la colonne geste porte la commande --add du lot ajoutable"
+    erreurs: []
+    sans_erreur: "lecture seule de l'état de la vague ; un état illisible suit les chemins déjà couverts de --status"
+    regles: [R8, R9]
+
+donnees:
+  - { id: D1, objet: "LotState (lots/<projet>/<lot>.json) du lot rendu : status, next, outcome, pass, constats, steps", existant: true, modification: aucune, note: "les champs existants sont remis à l'état d'un lot repris (status queued, outcome null, passes 0) sans champ ni format nouveau ; les constats de la dernière revue sont gardés" }
+  - { id: D2, objet: "adds.log (file d'ajouts de la vague)", existant: true, modification: aucune, note: "même entrée { id, project, lot, model } qu'un lot neuf ; le lot rendu se reconnaît à son état dans la vague" }
+  - { id: D3, objet: "worktree et branche du lot (wave/<id>/<projet>/<lot>)", existant: true, modification: aucune, note: "repris tels quels avec le correctif commité du lead ; jamais recréés" }

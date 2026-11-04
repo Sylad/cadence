@@ -2137,9 +2137,10 @@ lots:
     started: 2026-11-04
   - id: L581
     title: "Nouvelle vague et branche gardée sous l'ancien nom du projet (issue #38) : cadence/<vague>/<repo>--<lot> est retrouvée comme cadence/<vague>/<org>__<repo>--<lot> (les deux formes, la plus récente d'abord) ; à défaut le --dry-run dit qu'une branche ancienne du lot existe et n'est pas reprise — 5 commits de travail ignorés le 04-11 au compte pro"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-04
+    started: 2026-11-04
   - id: L582
     title: "Plans riches — format de journal d'événements déclaratif (plan.journal ou équivalent) : --to-config réécrit aussi journal.ndjson au format déclaré (M10 de l'étude maritime-atlas docs/plan/etude, §152) ; reste un préalable à la bascule de maritime (§125) ; séparé de L472 par décision du lead du 04-11"
     status: todo

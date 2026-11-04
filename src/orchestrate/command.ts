@@ -22,7 +22,7 @@ export { preflight, projectEnv, resolveTargets, type Target } from './preflight.
 import { continueDryRun, dryRun } from './dry-run.js';
 import { draw, priorityOf } from './draw.js';
 
-import { followCommand } from './follow.js';
+import { checkFollowFlags, followCommand } from './follow.js';
 import { answerOnly, control, freeLines, maxSessions, onceAuth, statusCommand, waveExists } from './status.js';
 export { configuredCap, expiredHoldLines, liveLines, slotsLine } from './status.js';
 
@@ -108,11 +108,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if ((args.until !== undefined || args.priority !== undefined) && !args.continue) throw new RafError('--until et --priority s\'utilisent avec --continue');
   if (args.until !== undefined) args.untilAt = parseUntil(args.until, io.now()); // heure invalide ou passée : refus avant d'agir
   if (readsPriority(args)) priorityOf(args, launch); // une clé priority: illisible du cadence.yaml : refus avant d'agir, lots donnés ou non
-  if (args.watch && args.status === undefined) throw new RafError('--watch s\'utilise avec --status');
-  if (args.detail !== undefined && args.status === undefined) throw new RafError('--detail s\'utilise avec --status');
-  if (args.detail !== undefined && args.watch) throw new RafError('--detail ne se combine pas avec --watch (il donne le détail d\'un lot, pas le tableau)');
-  if (args.follow && (args.lots.length || args.status !== undefined || args.watch || args.resume !== undefined || args.continue || args.dryRun || args.waits || args.drop.length || args.add.length || args.stopAfterCurrent || args.integrate.length || args.removeWorktree || args.goal !== undefined || args.answers.length || args.lotBudgets.length || args.budget !== undefined)) throw new RafError('--follow ne se combine qu\'avec --wave et --interval (il suit le journal d\'une vague, il n\'en pilote pas)');
-  if (args.interval !== undefined && !args.watch && !args.follow) throw new RafError('--interval s\'utilise avec --status --watch ou --follow');
+  checkFollowFlags(args);
   // --drop / --stop-after-current (L79) pilotent une vague VIVANTE : ni avec --status (rien à piloter), ni --stop-after-current avec --resume (il le contredit). --resume --drop retire le lot avant de rejouer la vague arrêtée.
   if (args.status !== undefined && (args.drop.length || args.stopAfterCurrent)) throw new RafError('--status ne se combine pas avec --drop / --stop-after-current');
   if (args.resume !== undefined && args.stopAfterCurrent) throw new RafError('--resume ne se combine pas avec --stop-after-current (il reprend la vague, il ne l\'arrête pas)');

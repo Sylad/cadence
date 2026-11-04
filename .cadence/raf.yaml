@@ -1166,9 +1166,10 @@ lots:
     created: 2026-10-31
   - id: L502
     title: "Hook du plugin contre le pipe qui masque le code de sortie (inventaire des pertes du 31-10 (17→31-10) : 4 récidives du lead malgré la règle, L423 L434 ouverts à tort) : PreToolUse Bash qui refuse une commande de porte, de test, de push ou de livraison (cadence, raf, git push, npm test, vitest…) suivie de | tail/head/grep sans set -o pipefail ni PIPESTATUS, avec le message qui dit quoi écrire"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-10-31
+    started: 2026-11-04
   - id: L503
     title: "Faux incident sur le commit gitops d'une livraison tolérée (31-10 : livraison de warhammer L221 pendant sa vague → deliver commite le bump dans developpeur-gitops avec un message qui cite L221 → le contrôle des dépôts voisins (L456/L458) rend L220 pour « commit sur la branche principale d'un autre dépôt ») : un commit d'un dépôt voisin posé par cadence deliver --sha d'un lot prêt de la vague (journal des livraisons, sha livré) est toléré comme le push du lead, avec une ligne au journal"
     status: todo

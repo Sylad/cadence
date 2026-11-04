@@ -2090,6 +2090,7 @@ lots:
     estimate: 0.25
     created: 2026-11-04
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "compliant — orchestré (vague 2026-11-04-1310-cad, 0 passe(s) de correction)", commit: 206550e381efb139ad2daeb377a7e41515ede6f9, reporte: { de: aa1f2c29404a83d4df23376a270b82e73e452722, vers: 206550e381efb139ad2daeb377a7e41515ede6f9, patchId: aa86affca04c69faa596721f7f4706296faec64a } }
   - id: L577
     title: "Tests instables sous charge stabilisés : 20 rouges dans la suite, verts rejoués seuls, sur les vagues du 01 au 04-11 (orchestrate-creneaux-libres-l527-probe ×6, porte-deportee ×3, deliver ×3, verify ×2, orchestrate-worktree-plan-writes ×2, orchestrate-app ×2, probe-L539-bords, orchestrate-worktree-integration) : pour chacun, la cause (attente à durée fixe, verrou, horloge, port) et un correctif qui attend l'événement au lieu d'un délai ; mesure avant/après par les lignes « instable(s) sous charge » des journaux"
     status: doing

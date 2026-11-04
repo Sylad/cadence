@@ -372,7 +372,7 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     expect(c.lot.status).toBe('ready');
   });
 
-  it('L458 — vague lancée APRÈS le début de la session, commit qui cite son lot : passe (registre non relu)', async () => {
+  it('R17 — vague lancée APRÈS le début de la session, commit qui cite son lot : passe (registre non relu)', async () => {
     const parent = tempDir();
     const gitops = sibling(parent, 'gitops');
     const h = harness({ parent, script: { implement: [impl(gitops, (t) => {
@@ -386,7 +386,7 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     expect(c.lot.status).toBe('ready');
   });
 
-  it('L458 — deux vagues vivantes avec chacune un L1 : ses commits ne sont pas pris pour les nôtres', async () => {
+  it('R17 — deux vagues vivantes avec chacune un L1 : ses commits ne sont pas pris pour les nôtres', async () => {
     const parent = tempDir();
     const sibRepo = sibling(parent, 'frere');
     const h = harness({ parent, script: { implement: [impl(sibRepo, commitOnMain)], review: [ok] } });
@@ -399,13 +399,13 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     writeFileSync(join(autre.dir, 'wave.json'), JSON.stringify({ id: 'w2', created: '2026-10-30', cwd: h.launch, budget: 1, consumed: 0, cacheRead: 0, status: 'done', pid: process.pid, lots: ['frere:L1'] }));
   });
 
-  it('L458 — livraison (bump de tag de deploy.sh) : aucun lot cité, pas de constat', async () => {
+  it('R17 — livraison (bump de tag de deploy.sh) : aucun lot cité, pas de constat', async () => {
     const { c } = world((t) => commitFile(t, 'values.yaml', 'warhammer40k: frontend→sha-6c555fe'));
     await runLot(c);
     expect(c.lot.status).toBe('ready');
   });
 
-  it('L458 — commits du lead « plan: L462… » qui ne touchent que le plan, ou aussi un autre fichier : pas de constat', async () => {
+  it('R17 — commits du lead « plan: L462… » qui ne touchent que le plan, ou aussi un autre fichier : pas de constat', async () => {
     const { c } = world((t) => {
       mkdirSync(join(t, '.cadence'), { recursive: true });
       commitFile(t, '.cadence/raf.yaml', 'plan: L462 démarré');
@@ -415,7 +415,7 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     expect(c.lot.status).toBe('ready');
   });
 
-  it('L458 — commit qui cite un lot de la vague (cluster-sante L1) : constat, mais le commit sans lot à côté n\'est pas nommé', async () => {
+  it('R17 — commit qui cite un lot de la vague (cluster-sante L1) : constat, mais le commit sans lot à côté n\'est pas nommé', async () => {
     const { c } = world((t) => {
       commitFile(t, 'values.yaml', 'warhammer40k: frontend→sha-6c555fe');
       commitFile(t, 'chart.yaml', 'feat(L1): chart cluster-sante');
@@ -426,7 +426,7 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
     expect(c.lot.outcome).not.toContain('sha-6c555fe');
   });
 
-  it('L458 — « L10 » ne cite pas L1, « L1.2 » non plus ; un lot d\'un autre projet de la vague compte', async () => {
+  it('R17 — « L10 » ne cite pas L1, « L1.2 » non plus ; un lot d\'un autre projet de la vague compte', async () => {
     const { c } = world((t) => {
       commitFile(t, 'a.yaml', 'feat(L10): autre lot');
       commitFile(t, 'b.yaml', 'fix(L1.2): sous-numéro');

@@ -48,27 +48,15 @@ describe('L574 — gabarit fiche.yaml', () => {
 });
 
 describe('L574 — fiches réelles du dépôt', () => {
-  // Fiches invalides antérieures au lot, chacune avec sa faute : à corriger par L576.
-  // Une fiche de la liste qui redevient valide fait rougir le test (la retirer d'ici).
-  const INVALIDES_AVANT_LOT = [
-    'autocontrole-avant-revue', // A3 : code « exit 2 » invalide — à corriger par L576
-    'orchestrate-reprise-lot-budget', // A1 : code « warning » invalide — à corriger par L576
-    'rejeu-porte-composee', // R3 : test nommé « R6 — … » au lieu de « R3 — … » — à corriger par L576
-    'session-sans-commit-sur-depot-tiers', // règle n° 15 d'id R17 (trou dans la suite) — à corriger par L576
-  ];
-  it('toutes les fiches de docs/specs passent checkFiche (forme réelle), sauf les invalides d’avant le lot', () => {
+  it('toutes les fiches de docs/specs passent checkFiche (forme réelle)', () => {
     const bad: string[] = [];
-    const devenuesValides: string[] = [];
     for (const d of readdirSync(join(root, 'docs/specs'))) {
       const f = join(root, 'docs/specs', d, 'fiche.yaml');
       if (!existsSync(f)) continue;
       const e = checkFiche(parse(readFileSync(f, 'utf8')));
-      const connue = INVALIDES_AVANT_LOT.includes(d);
-      if (e.length && !connue) bad.push(`${d}: ${e[0]}`);
-      if (!e.length && connue) devenuesValides.push(d);
+      if (e.length) bad.push(`${d}: ${e[0]}`);
     }
     expect(bad).toEqual([]);
-    expect(devenuesValides, 'fiche redevenue valide : la retirer de INVALIDES_AVANT_LOT').toEqual([]);
   });
   it('une fiche valide, une règle supprimée du milieu (trou R1, R3) est refusée', () => {
     const doc = parse(read('templates/fiche.yaml')) as any;

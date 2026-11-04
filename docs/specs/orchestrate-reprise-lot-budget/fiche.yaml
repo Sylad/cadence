@@ -170,7 +170,7 @@ contrats:
       - { code: log error, message: "orchestrate : <dépôt> : arbre sale, <n> fichier(s) suivi(s) modifié(s) : <fichiers>" }
       - { code: log error, message: "orchestrate : <dépôt> : une orchestration y est déjà en cours (<vague>, pid <pid>)" }
       - { code: log error, message: "orchestrate : la vague <vague> est terminée" }
-      - { code: warning, message: "orchestrate : vague <vague> : son instantané ne connaît pas --budget projet:lot=+N (antérieur à L223) : reprise avec le dist/ et les gabarits courants" }
+      - { code: log warn, message: "orchestrate : vague <vague> : son instantané ne connaît pas --budget projet:lot=+N (antérieur à L223) : reprise avec le dist/ et les gabarits courants" }
     regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14]
 
 donnees:

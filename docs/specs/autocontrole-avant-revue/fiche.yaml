@@ -130,7 +130,7 @@ contrats:
     entree: "[dossier] [--until date] [--since date] [--cache fichier] ; --since est la seule option ajoutée"
     sortie: "les tables existantes, sur les lots des vagues créées après --since ; le lead consigne les passes par lot avant/après dans docs/mesures/"
     erreurs:
-      - { code: "exit 2", message: "--since invalide : <valeur> (une date ISO, ex. 2026-10-10T18:31Z)" }
+      - { code: "log error", message: "--since invalide : <valeur> (une date ISO, ex. 2026-10-10T18:31Z)" }
     regles: [R9]
 
 donnees:

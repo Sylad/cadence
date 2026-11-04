@@ -2019,11 +2019,12 @@ lots:
     finished: 2026-11-04
   - id: L572
     title: "La revue de fiche converge (04-11 : L558 deux fois et L563 rendus « fiche non conforme après 2 revues » avec UN seul majeur précis, 0 bloquant, chaque fois corrigé en une ligne par le lead) : une 3e passe de fiche quand la revue converge (bloquants + majeurs en baisse d'une revue à l'autre et un seul restant, comme la règle des corrections de code), et le verdict rendu dit « un seul majeur, corrigeable par le lead : <fichier:ligne> » ; mesurer avant/après sur les vagues du 27-10 au 04-11 (fiches rendues, passes)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "conforme — orchestré (vague 2026-11-04-1015-cad, 1 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main n'a changé que l'endroit où l'entrée du CHANGELOG s'insère, le code, les tests et la documentation du lot sont identiques", commit: 4b09cda96245622e9765c158f9d4c70fdeba3ffe }
+    finished: 2026-11-04
   - id: L573
     title: "Étape spec, fiche avec maquette ET maquette_ecran (issue #34) : un champ ou un état dessiné dans la page maquette_ecran mais absent de l'index maquette ne fait plus échouer trois passes — le programme complète l'index (entrée data-testid, section etat-…) et copie les captures maquette-<état>-<largeur>.png à partir de la fiche et de maquette_ecran, ou à défaut le brief spec nomme le fichier d'index et la forme exacte de l'entrée ; le constat dit « présent dans maquette_ecran, absent de l'index »"
     status: doing

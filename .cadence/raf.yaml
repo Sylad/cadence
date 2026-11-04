@@ -1179,11 +1179,12 @@ lots:
     finished: 2026-11-04
   - id: L503
     title: "Faux incident sur le commit gitops d'une livraison tolérée (31-10 : livraison de warhammer L221 pendant sa vague → deliver commite le bump dans developpeur-gitops avec un message qui cite L221 → le contrôle des dépôts voisins (L456/L458) rend L220 pour « commit sur la branche principale d'un autre dépôt ») : un commit d'un dépôt voisin posé par cadence deliver --sha d'un lot prêt de la vague (journal des livraisons, sha livré) est toléré comme le push du lead, avec une ligne au journal"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-31
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "compliant (0 bloquant, 0 majeur ; 1 note mineure : fenêtre avant l'écriture de deliveries.log, documentée) — orchestré (vague 2026-11-04-1015-cad, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant (1 minor : collision d'identifiant de lot entre projets dans la tolérance, à noter)", commit: 99b8c951db563c9fffccee1abf0e98cc33e04a56 }
+    finished: 2026-11-04
   - id: L504
     title: "Clé de config posée avant sa mise en service (31-10 : L497 active orchestrate.probe dans le cadence.yaml du dépôt de cadence ; la copie en service la refuse → toute commande cadence sur le dépôt casse, intégration de L480 morte en route) : la revue ou la porte refuse un lot qui pose dans le cadence.yaml de cadence une clé inconnue de la copie en service (la clé s'active après npm run service) ; et une reprise --integrate qui meurt sur une erreur de config laisse le lot « suspended » dans une vague « done » sans issue (--integrate, --replay et --resume refusent) : remettre le lot rendu à l'intégration, ou accepter --integrate sur ce cas"
     status: doing

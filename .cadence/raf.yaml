@@ -1383,11 +1383,12 @@ lots:
     finished: 2026-11-03
   - id: L521
     title: "Livraison pendant une vague dans un dépôt SANS worktrees : raf done et la note de deliver --sha écrivent le plan dans l'arbre où la vague travaille, et la vague rend le lot suivant « dépôt sale après implement » (01-11, avatar L57 après la livraison de L56) ; raf done pendant une vague de l'arbre partagé diffère son écriture (ou l'écrit hors de l'arbre) jusqu'à la fin de l'étape, et le skill lead dit l'ordre sûr"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-01
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "conforme (3 mineurs : le livreur et le délai d'attente non documentés, `--now` absent de la ligne de commande de docs/raf.md, option `--now` acceptée par toutes les commandes) — orchestré (vague 2026-11-04-1310-cad, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme", commit: 336c5ae3b76b8a06932f42b38aa4c61fe2cfe6d4 }
+    finished: 2026-11-04
   - id: L522
     title: "Pas de passe de correction sans constat, et rouge isolé rejoué avant d'ouvrir une passe (étude L517 : 73 passes « sans-constat », 13 % des 580 passes classées ; 48 des 73 passes sur tests rouges finies sans commit) : la vague n'ouvre pas de passe fix quand la revue ne laisse aucun constat bloquant ou majeur actionnable ; un test rouge de la porte est rejoué seul avant d'ouvrir une passe, et un rouge qui passe seul est noté instable (lot proposé), pas corrigé par la session ; mesure avant/après par scripts/temps-d-un-lot.mjs"
     status: done

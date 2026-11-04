@@ -4,7 +4,7 @@ import { gitRoot } from './git.js';
 import { RafError, setPlanNotice } from './plan.js';
 import { cmdAdd, cmdArchive, cmdDid, cmdDocsOk, cmdEstimate, cmdIgnore, cmdMove, cmdNote, cmdPublic, cmdScreen, cmdSetStatus, cmdStatus, cmdTitle, cmdTodo, cmdUses, cmdVisible } from './cli/lot-commands.js';
 import { cmdPlan } from './cli/plan-commands.js';
-import { cmdCheck, cmdCommits, cmdGantt, cmdList, cmdNews, cmdNow, cmdQuickwins, cmdRef, cmdShow } from './cli/read-commands.js';
+import { cmdCheck, cmdCommits, cmdEvents, cmdExport, cmdGantt, cmdList, cmdNews, cmdNow, cmdQuickwins, cmdRef, cmdShow } from './cli/read-commands.js';
 import { cmdGate, cmdHook } from './cli/gates.js';
 import { cmdInit, cmdMigrate, cmdSkills } from './cli/setup-commands.js';
 import { cmdSpec, cmdSpecChecks } from './cli/spec-commands.js';
@@ -51,6 +51,8 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf now               ce qui est en cours, la suite, les derniers terminés
   raf quickwins [--by champ] [--max j]   les gains rapides prêts (estimation ≤ 0,25 j, ou ⚡), groupés par un champ d'extension déclaré (plan.extras) ; à part, les prêts sans estimation
   raf list [--status todo|doing|done|dropped] [--json]   les lots, une ligne chacun ; --json : un tableau JSON des lots (clés du fichier du plan, champs d'extension sous extras)
+  raf export [--json]   le plan entier en un document JSON stable (schema, project, prefix, lots avec champs d'extension, archivés compris), sans date de génération
+  raf events [--since AAAA-MM-JJ] [--json]   les événements du plan : cree, demarre, termine, abandonne, livre, note (dates et notes des lots), etat (changements de state: dans l'historique git du plan) et commit (un par lot cité) ; --json : { schema, project, events }
   raf check [--since date] [--idle 7]   (défaut : date « since » du plan) code 1 s'il y a des écarts
   raf ignore <sha> | "<sujet exact>" [--reason texte]   acquitte un commit sans lot, citant un id inconnu ou des lots sans y travailler, sans réécrire l'historique ; raf check --ignored les liste
   raf docs-ok <lot> --reason texte   acquitte l'écart docs.sync d'un lot (documentation en retard) avec la raison pour laquelle la documentation reste telle quelle (plan en lecture seule : .cadence/docs-ok.yaml, le plan n'est pas touché) ; lu par raf check et par orchestrate, qui ne rend jamais prêt un lot avec un écart ouvert
@@ -169,6 +171,8 @@ const WITH_PLAN: Record<string, (c: Ctx) => number | Promise<number>> = {
   commits: cmdCommits,
   show: cmdShow,
   list: cmdList,
+  export: cmdExport,
+  events: cmdEvents,
   now: cmdNow,
   quickwins: cmdQuickwins,
   ignore: cmdIgnore,

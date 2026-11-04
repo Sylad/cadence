@@ -8,7 +8,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 **Guaranteed**
 
 - **Commands and options** of `raf` and `cadence` (`cadence raf …` is `raf …`): `init`, `add`, `start`, `done`, `drop`,
-  `note`, `did`, `public`, `screen`, `spec`, `visible`, `ux`, `review`, `commits`, `show`, `list`, `now`, `ignore`, `check`, `gantt`, `hook`;
+  `note`, `did`, `public`, `screen`, `spec`, `visible`, `ux`, `review`, `commits`, `show`, `list`, `export`, `events`, `now`, `ignore`, `check`, `gantt`, `hook`;
   `cadence news`, `session` (`start`, `close`, `next`, `context`), `lead tour`, `corrections`, `deliver`, `verify`, `orchestrate`,
   `skills`, `spec` (`cadence spec <lot> on|off` is `raf spec`; `check`, `qa`: exit **0** when the sheet is valid and the section is printed, **1** with violations, **2** on a missing or unreadable file or a wrong usage);
   their options and exit codes as the pages [raf](raf.md), [orchestrate](orchestrate.md), [deliver](deliver.md), [spec](spec.md), [news](news.md), [session](session.md), [lead](lead.md), [corrections](corrections.md) and [skills](skills.md) document them. A new command or option is a minor change.
@@ -23,7 +23,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 **Not guaranteed** (may change in any release)
 
 - The **text of the outputs**: wording, layout, order of the lines and columns of every report, table and message
-  (the `--json` outputs and the exit codes are part of the commands above). In a `--json` output a new field is a
+  (the `--json` outputs and the exit codes are part of the commands above; `raf export` and `raf events` carry a `schema` number, 1 today, that only a removed or renamed field changes). In a `--json` output a new field is a
   minor change, so consumers must tolerate unknown fields; removing or renaming a field is a major change.
 - The **`precheck-reader`**, **`spec-writer`** and **`acceptance-writer`** agents, and the mockup and conformity modes of **`ux-reviewer`**: internal to `cadence orchestrate`, not meant to be called by hand.
 - The **`cadence-hud` band**: its segments, colours and layout; it is versioned on its own.

@@ -195,7 +195,7 @@ describe('R16 — une seule application lancée à la fois dans le dépôt', () 
     let active = 0;
     let peak = 0;
     const launchesSeen: number[] = [];
-    let l2NextSeen: string | undefined;
+    let l2NextSeen: string | null | undefined;
     const { f, parent } = await uxWave(
       [{ title: 'un', estimate: 1, visible: true }, { title: 'deux', estimate: 1, visible: true }],
       (parent) => async () => {

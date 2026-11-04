@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.50.0] - 2026-11-04
+
 ### Added
 
 - A config key set before its service install no longer breaks the repository (L504, [docs/orchestrate.md](docs/orchestrate.md)): on 31-10 L497 turned on `orchestrate.probe` in cadence's own `cadence.yaml` while the installed copy refused it, so every cadence command on the repository failed and L480's integration died on the way. The wave's gate (after a writing session and at the rebased tip) now reads the `cadence.yaml` a lot modified with the installed copy's loaders; a key or value it refuses goes to correction (`cadence.yaml refusé par la copie en service de cadence`, the key is set in a lot that follows `npm run service`). A `cadence.yaml` the lot did not touch is not its fault. `--resume --integrate` (and `--replay`) now refuses (exit 2) a lot whose repository `cadence.yaml` is unreadable before writing anything, and `--integrate` takes back a lot that an earlier resume left `suspended` at the integration step in a finished wave.

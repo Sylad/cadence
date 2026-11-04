@@ -155,7 +155,7 @@ export function nodeTestFiles(output: string): Map<string, string> {
   const files = new Map<string, string>();
   const ambiguous = new Set<string>();
   let title: string | null = null;
-  for (const raw of stripAnsi(output).split('\n')) {
+  for (const raw of stripAnsi(output).split(/\r?\n/)) {
     if (TAP_LINE.test(raw)) {
       const m = TAP_NOT_OK.exec(raw);
       title = m ? clean(m[1]) || null : null;
@@ -173,7 +173,7 @@ export function nodeTestFiles(output: string): Map<string, string> {
 
 /** Le test `title` a-t-il tourné et réussi dans cette sortie node --test (TAP) : une ligne « ok N - titre » exacte, ni sautée (# SKIP) ni à faire (# TODO). Un test vert n'imprime pas son fichier : c'est la seule preuve (L514). */
 export function nodeTestRan(output: string, title: string): boolean {
-  return stripAnsi(output).split('\n').some((l) => {
+  return stripAnsi(output).split(/\r?\n/).some((l) => {
     const m = /^\s*ok\s+\d+\s*-\s*(.+)$/.exec(l);
     return !!m && clean(m[1]) === title;
   });

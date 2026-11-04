@@ -1949,6 +1949,16 @@ lots:
     started: 2026-11-03
     review: { date: 2026-11-03, verdict: "conforme : 0 bloquant, 0 majeur, 2 mineurs (un lot absent de la branche du dépôt, même non touché par le commit, rend encore le lot ; une note ajoutée des deux côtés se dédouble) — orchestré (vague 2026-11-03-2100-cad, 0 passe(s) de correction)", commit: af8e2b9202c88a3a8723a9a00f3de24418bc3def, reporte: { de: 45db0e85f74378f00ee845ca6843953930b1a305, vers: af8e2b9202c88a3a8723a9a00f3de24418bc3def, patchId: 143529eb8836d6cba4ef9eeb77635f50bf90f3b7 } }
     finished: 2026-11-04
+  - id: L570
+    title: "news check et raf check sur une fiche d'écran partagée (issue #33) : la section « Hypothèses » attendue ne liste que les règles hypothèse que le lot ajoute ou modifie (clé regles de acceptation-<lot>.json, sinon les règles touchées par ses commits spec/docs sur la fiche, comme accept en 1.46 et les briefs en L559) ; la fiche entière seulement quand rien ne la restreint"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-04
+  - id: L571
+    title: "Lots en service non publiés signalés : cadence lead tour, cadence session close et l'orchestrate --status disent ⚠ N lots done depuis le dernier tag v<x.y.z> (dépôt qui publie : package.json + tag), avec la commande cadence release à jouer ; session close le met en tête des trois lignes — 04-11 : 18 lots en service la veille, compte pro lancé le matin sur 1.46.0"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-04
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

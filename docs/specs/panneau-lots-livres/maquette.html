@@ -66,14 +66,16 @@
     .cadre.haut { width: 100%; }
     .cmd { max-width: 100%; }
   }
-  /* L592 : la colonne id garde la largeur de l'id le plus long, jamais tronquée ; c'est le titre qui cède. */
-  :root { --id-w: 8ch; }
+  /* L592 : la colonne id a la largeur de l'id le plus long affiché (--id-w, posée par panneau, en colonnes : retrait ├ compris) ; jamais tronquée, c'est le titre qui cède. */
   .lot .id { flex: 0 0 var(--id-w); min-width: var(--id-w); overflow: visible; white-space: nowrap; }
-  ul.sous .id { flex-basis: var(--id-w); min-width: var(--id-w); }
-  .e-livre { color: var(--subtle); }
-  .livres { display: flex; gap: 0 1ch; color: var(--subtle); margin: 2px 0 0; }
-  .livres .id { flex: 0 0 var(--id-w); }
-  .livres b { font-weight: normal; }
+  .e-livre, .e-clos { color: var(--subtle); }
+  /* La ligne repliée est un bouton sur toute la largeur, ▸/▾ compris (comme « + N lots » et le pli du projet). */
+  button.livres { display: flex; gap: 0 1ch; width: 100%; margin: 2px 0 0; padding: 0; border: 0; background: none; color: var(--subtle); font: inherit; text-align: left; cursor: pointer; align-items: baseline; }
+  button.livres .id { flex: 0 0 var(--id-w); min-width: var(--id-w); }
+  button.livres:hover { color: var(--texte); }
+  button.livres:focus-visible { outline: 2px solid var(--claude); outline-offset: 1px; }
+  .lot .id.mark { color: var(--texte); }
+  .lot-sous { padding-left: 0; }
 </style>
 </head>
 <body>
@@ -110,29 +112,52 @@
 </section>
 
 <section class="etat" id="etat-charge">
-  <h2 class="etat-nom">État : chargé — 3 lots jouent, 2 sont libres, 14 sont livrés (vague 1310-cad)</h2>
-  <p class="var">Livrés repliés (par défaut) : une ligne « livrés : 14 » sous les lots qui jouent, au lieu de 14 lignes « prêt ».</p>
+  <h2 class="etat-nom">État : chargé — 5 lots non clos (3 jouent, 2 libres), 11 livrés et 3 clos non livrés de la vague (vague 1310-cad)</h2>
+  <p class="var">① Repliés (par défaut) : deux lignes sous les lots, au lieu de 14 lignes « prêt ». Colonne id de 8 colonnes : « ├ L594/2 » (retrait et branche compris) est le plus long id affiché ; le titre du sous-lot cède par « … ».</p>
   <div class="terminal"><div class="conversation">conversation (61 colonnes)</div><div class="cadre">
-  <div class="pane" role="region" aria-label="Lots">
+  <div class="pane" role="region" aria-label="Lots" style="--id-w:8ch">
     <div class="entete"><h1>Lots</h1><span class="dim">lecture seule</span><span class="dim">lu à 15:52</span></div>
     <div class="projet">
         <div class="projet-tete"><span>cadence</span><span class="dim">5 lots non clos</span></div>
-        <ul><li class="lot"><span class="id" data-testid="lot-id">L588</span><span class="titre" data-testid="lot-titre">Incident : commit d’un plan sur la branche principale</span><span class="etat-lot e-vague" data-testid="lot-etat">⟳ implémente</span></li><li class="lot"><span class="id" >L589</span><span class="titre" >Reprise d’un lot au budget épuisé</span><span class="etat-lot e-vague" >⟳ relit</span></li><li class="lot"><span class="id" >L592</span><span class="titre" >Panneau des lots : livrés repliés</span><span class="etat-lot e-vague" >⟳ implémente</span></li><li class="lot"><span class="id" >L593</span><span class="titre" >Incident : commit de plan du lead</span><span class="etat-lot e-libre" >○ libre</span></li><li class="lot"><span class="id" >L594</span><span class="titre" >Étude d’ensemble de cadence</span><span class="etat-lot e-libre" >○ libre</span></li></ul>
-        <p class="livres"><span class="id">▸</span><b data-testid="ligne-livres">livrés : 14</b></p>
-      </div>
-    <div class="pied"><span>/hud lots pour fermer</span> · ▶ en cours · ○ libre · ✔ livré</div>
+        <ul><li class="lot"><span class="id" data-testid="lot-id">L588</span><span class="titre" data-testid="lot-titre">Incident : commit d’un plan sur la branche principale</span><span class="etat-lot e-vague" data-testid="lot-etat">⟳ implémente</span></li><li class="lot"><span class="id">L589</span><span class="titre">Reprise d’un lot au budget épuisé</span><span class="etat-lot e-vague">⟳ relit</span></li><li class="lot"><span class="id">L592</span><span class="titre">Panneau des lots : livrés repliés</span><span class="etat-lot e-vague">⟳ implémente</span></li><li class="lot"><span class="id">L593</span><span class="titre">Incident : commit de plan du lead</span><span class="etat-lot e-libre">○ libre</span></li><li class="lot"><span class="id">▾L594</span><span class="titre">Étude d’ensemble de cadence</span><span class="etat-lot e-libre">○ libre</span></li><li class="lot lot-sous"><span class="id" data-testid="lot-id-sous">├ L594/2</span><span class="titre">Cartographier les écarts entre le plan, la vague et les captures de la bande</span><span class="etat-lot e-libre">○ à faire</span></li></ul>
+        <button type="button" class="livres" aria-expanded="false"><span class="id">▸</span><b data-testid="ligne-livres">livrés : 11</b></button><button type="button" class="livres" aria-expanded="false"><span class="id">▸</span><b data-testid="ligne-clos">clos non livrés : 3</b></button>
+    </div>
+    <div class="pied"><span>/hud lots pour fermer</span> · ▶ en cours · ○ libre · ✔ livré · ✔ clos</div>
   </div></div></div>
-  <p class="var">Livrés dépliés (clic sur la ligne) : chaque lot porte « ✔ livré » ; la colonne id n’est jamais tronquée (L584, L401/2), c’est le titre qui cède.</p>
+  <p class="var">② Dépliés (clic ou Entrée sur chaque ligne) : un lot par ligne, « ✔ livré » ou « ✔ clos » ; sans sous-lot affiché la colonne id retombe à 4 colonnes (« L584 » entier). Le titre de L574 est vide dans la vague : sa cellule reste vide.</p>
   <div class="terminal"><div class="conversation">conversation (61 colonnes)</div><div class="cadre">
-  <div class="pane" role="region" aria-label="Lots">
+  <div class="pane" role="region" aria-label="Lots" style="--id-w:4ch">
     <div class="entete"><h1>Lots</h1><span class="dim">lecture seule</span><span class="dim">lu à 15:52</span></div>
     <div class="projet">
         <div class="projet-tete"><span>cadence</span><span class="dim">5 lots non clos</span></div>
-        <ul><li class="lot"><span class="id" data-testid="lot-id">L588</span><span class="titre" data-testid="lot-titre">Incident : commit d’un plan sur la branche principale</span><span class="etat-lot e-vague" data-testid="lot-etat">⟳ implémente</span></li><li class="lot"><span class="id" data-testid="lot-id">L589</span><span class="titre" data-testid="lot-titre">Reprise d’un lot au budget épuisé</span><span class="etat-lot e-vague" data-testid="lot-etat">⟳ relit</span></li><li class="lot"><span class="id" data-testid="lot-id">L592</span><span class="titre" data-testid="lot-titre">Panneau des lots : livrés repliés</span><span class="etat-lot e-vague" data-testid="lot-etat">⟳ implémente</span></li><li class="lot"><span class="id" data-testid="lot-id">L593</span><span class="titre" data-testid="lot-titre">Incident : commit de plan du lead</span><span class="etat-lot e-libre" data-testid="lot-etat">○ libre</span></li><li class="lot"><span class="id" data-testid="lot-id">L594</span><span class="titre" data-testid="lot-titre">Étude d’ensemble de cadence</span><span class="etat-lot e-libre" data-testid="lot-etat">○ libre</span></li></ul>
-        <p class="livres"><span class="id">▾</span><b>livrés : 14</b></p>
-        <ul><li class="lot"><span class="id" data-testid="lot-id-livre">L572</span><span class="titre" >Perf : tableau de bord</span><span class="etat-lot e-livre" data-testid="lot-etat-livre">✔ livré</span></li><li class="lot"><span class="id" >L573</span><span class="titre" >Index mémoire : seuil</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L574</span><span class="titre" >Porte déportée</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L575</span><span class="titre" >Brief d’implémentation enrichi</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L576</span><span class="titre" >Base du cliquet d’intégration</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L577</span><span class="titre" >Livreur délégué</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L578</span><span class="titre" >Plan en dossier cache</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L580</span><span class="titre" >Rejeu de la porte composée</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L581</span><span class="titre" >Accept : règles du lot</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L582</span><span class="titre" >Condition de tirage</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L583</span><span class="titre" >Jeu des pires cas</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L584</span><span class="titre" >Autocontrôle avant revue</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L585</span><span class="titre" >Hook de retour de geste</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L587</span><span class="titre" >Ressources par chemins</span><span class="etat-lot e-livre" >✔ livré</span></li></ul>
-      </div>
-    <div class="pied"><span>/hud lots pour fermer</span> · ▶ en cours · ○ libre · ✔ livré</div>
+        <ul><li class="lot"><span class="id">L588</span><span class="titre">Incident : commit d’un plan sur la branche principale</span><span class="etat-lot e-vague">⟳ implémente</span></li><li class="lot"><span class="id">L589</span><span class="titre">Reprise d’un lot au budget épuisé</span><span class="etat-lot e-vague">⟳ relit</span></li><li class="lot"><span class="id">L592</span><span class="titre">Panneau des lots : livrés repliés</span><span class="etat-lot e-vague">⟳ implémente</span></li><li class="lot"><span class="id">L593</span><span class="titre">Incident : commit de plan du lead</span><span class="etat-lot e-libre">○ libre</span></li><li class="lot"><span class="id">L594</span><span class="titre">Étude d’ensemble de cadence</span><span class="etat-lot e-libre">○ libre</span></li></ul>
+        <button type="button" class="livres" aria-expanded="true"><span class="id">▾</span><b>livrés : 11</b></button><ul><li class="lot"><span class="id" data-testid="lot-id-livre">L572</span><span class="titre" data-testid="lot-titre-livre">Perf : tableau de bord</span><span class="etat-lot e-livre" data-testid="lot-etat-livre">✔ livré</span></li><li class="lot"><span class="id">L573</span><span class="titre">Index mémoire : seuil</span><span class="etat-lot e-livre">✔ livré</span></li><li class="lot"><span class="id">L574</span><span class="titre"></span><span class="etat-lot e-livre">✔ livré</span></li><li class="lot"><span class="id">L575</span><span class="titre">Brief d’implémentation enrichi</span><span class="etat-lot e-livre">✔ livré</span></li><li class="lot"><span class="id">L576</span><span class="titre">Base du cliquet d’intégration</span><span class="etat-lot e-livre">✔ livré</span></li><li class="lot"><span class="id">L577</span><span class="titre">Livreur délégué</span><span class="etat-lot e-livre">✔ livré</span></li><li class="lot"><span class="id">L578</span><span class="titre">Plan en dossier cache</span><span class="etat-lot e-livre">✔ livré</span></li><li class="lot"><span class="id">L580</span><span class="titre">Rejeu de la porte composée</span><span class="etat-lot e-livre">✔ livré</span></li><li class="lot"><span class="id">L581</span><span class="titre">Accept : règles du lot</span><span class="etat-lot e-livre">✔ livré</span></li><li class="lot"><span class="id">L582</span><span class="titre">Condition de tirage</span><span class="etat-lot e-livre">✔ livré</span></li><li class="lot"><span class="id">L583</span><span class="titre">Jeu des pires cas</span><span class="etat-lot e-livre">✔ livré</span></li></ul><button type="button" class="livres" aria-expanded="true"><span class="id">▾</span><b>clos non livrés : 3</b></button><ul><li class="lot"><span class="id">L584</span><span class="titre">Autocontrôle avant revue</span><span class="etat-lot e-clos" data-testid="lot-etat-clos">✔ clos</span></li><li class="lot"><span class="id">L585</span><span class="titre">Hook de retour de geste</span><span class="etat-lot e-clos">✔ clos</span></li><li class="lot"><span class="id">L587</span><span class="titre">Ressources par chemins</span><span class="etat-lot e-clos">✔ clos</span></li></ul>
+    </div>
+    <div class="pied"><span>/hud lots pour fermer</span> · ▶ en cours · ○ libre · ✔ livré · ✔ clos</div>
+  </div></div></div>
+  <p class="var">③ Hauteur courte (panneau de 10 lignes), repliés : le projet, ses lots et les deux lignes tiennent, rien n’est coupé.</p>
+  <div class="terminal"><div class="conversation">conversation (61 colonnes)</div><div class="cadre">
+  <div class="pane" role="region" aria-label="Lots" style="--id-w:4ch">
+    <div class="entete"><h1>Lots</h1><span class="dim">lecture seule</span><span class="dim">lu à 15:52</span></div>
+    <div class="projet">
+        <div class="projet-tete"><span>cadence</span><span class="dim">5 lots non clos</span></div>
+        <ul><li class="lot"><span class="id">L588</span><span class="titre">Incident : commit d’un plan sur la branche principale</span><span class="etat-lot e-vague">⟳ implémente</span></li><li class="lot"><span class="id">L589</span><span class="titre">Reprise d’un lot au budget épuisé</span><span class="etat-lot e-vague">⟳ relit</span></li><li class="lot"><span class="id">L592</span><span class="titre">Panneau des lots : livrés repliés</span><span class="etat-lot e-vague">⟳ implémente</span></li><li class="lot"><span class="id">L593</span><span class="titre">Incident : commit de plan du lead</span><span class="etat-lot e-libre">○ libre</span></li><li class="lot"><span class="id">L594</span><span class="titre">Étude d’ensemble de cadence</span><span class="etat-lot e-libre">○ libre</span></li></ul>
+        <button type="button" class="livres" aria-expanded="false"><span class="id">▸</span><b>livrés : 11</b></button><button type="button" class="livres" aria-expanded="false"><span class="id">▸</span><b>clos non livrés : 3</b></button>
+    </div>
+    <div class="pied"><span>/hud lots pour fermer</span> · ▶ en cours · ○ libre · ✔ livré · ✔ clos</div>
+  </div></div></div>
+  <p class="var">④ Hauteur courte, livrés dépliés : les lignes qui ne tiennent pas sont coupées avec les lots ; les deux lignes de repli gardent leur place avant « … +N lots de plus », et N compte le lot libre et les 11 livrés coupés (aucune ligne ne disparaît sans décompte).</p>
+  <div class="terminal"><div class="conversation">conversation (61 colonnes)</div><div class="cadre">
+  <div class="pane" role="region" aria-label="Lots" style="--id-w:4ch">
+    <div class="entete"><h1>Lots</h1><span class="dim">lecture seule</span><span class="dim">lu à 15:52</span></div>
+    <div class="projet">
+        <div class="projet-tete"><span>cadence</span><span class="dim">5 lots non clos</span></div>
+        <ul><li class="lot"><span class="id">L588</span><span class="titre">Incident : commit d’un plan sur la branche principale</span><span class="etat-lot e-vague">⟳ implémente</span></li><li class="lot"><span class="id">L589</span><span class="titre">Reprise d’un lot au budget épuisé</span><span class="etat-lot e-vague">⟳ relit</span></li><li class="lot"><span class="id">L592</span><span class="titre">Panneau des lots : livrés repliés</span><span class="etat-lot e-vague">⟳ implémente</span></li><li class="lot"><span class="id">L593</span><span class="titre">Incident : commit de plan du lead</span><span class="etat-lot e-libre">○ libre</span></li></ul>
+        <button type="button" class="livres" aria-expanded="true"><span class="id">▾</span><b>livrés : 11</b></button>
+        <button type="button" class="livres" aria-expanded="false"><span class="id">▸</span><b>clos non livrés : 3</b></button>
+        <p class="dim" style="margin:2px 0 0">… +12 lots de plus</p>
+    </div>
+    <div class="pied"><span>/hud lots pour fermer</span> · ▶ en cours · ○ libre · ✔ livré · ✔ clos</div>
   </div></div></div>
 </section>
 </body>

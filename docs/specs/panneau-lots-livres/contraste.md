@@ -2,7 +2,7 @@
 
 ## Jetons créés
 
-Aucun : le lot n'ajoute aucune couleur. « livré » prend le jeton `subtle` existant (rôle : lot sans suite à décider) ; aucun jeton ni `on-*` dupliqué.
+Aucun : le lot n'ajoute aucune couleur. « ✔ livré », « ✔ clos » et les deux lignes repliées prennent le jeton `subtle` existant (rôle : lot sans suite à décider) ; le focus du bouton prend `claude` (contour de 2 px, élément non textuel, 3:1 requis) ; aucun jeton ni `on-*` dupliqué.
 
 ## Paires existantes mesurées (texte sur `--fond` #1b1b1f)
 
@@ -12,3 +12,4 @@ Aucun : le lot n'ajoute aucune couleur. « livré » prend le jeton `subtle` exi
 - `--success` #6fcf7f sur `--fond` #1b1b1f : 8.92:1 — ok
 - `--error` #f0707a sur `--fond` #1b1b1f : 5.97:1 — ok
 - `--warning` #f0b25a sur `--fond` #1b1b1f : 9.17:1 — ok
+- `--claude` #d9825b (contour de focus) sur `--fond` #1b1b1f : 5.96:1 — ok (seuil non textuel 3:1)

@@ -70,6 +70,12 @@ anything, and the ratchet closes them:
   `node_modules` and `.git` are not walked; an untracked one that another `.gitignore` rule already ignores, such as the `types/.gitignore` Claude Code generates, is not counted, while one that ignores itself with `*` is, and so is one that a
   negation pattern such as `!.gitignore` keeps un-ignored), and in `package.json` the keys `scripts`, `main`, `bin` and `exports` next to
   `knip` and `jscpd` (knip finds its entry points there).
+  **A config lot** (L586): a lot that the lead declares with `config: true` in the plan (by hand, under the lot) may change
+  those files, otherwise a threshold or `vitest.workspace.ts` could never be delivered. The declaration is read from the plan
+  **at the start of the lot** (`.cadence/raf.yaml`, else `docs/plan/raf.yaml`; the lot is found from its branch
+  `cadence/<wave>/<project>--<lot>`), so a lot cannot exempt itself, and it applies to that lot only. In exchange the lot
+  touches only config files, tests (`test/`, `*.test.*`, `*.spec.*`) and the usual bookkeeping (`qualite-baseline.json`,
+  `CHANGELOG.md`, `docs/`, `.cadence/`); any other file is refused by name. Every other measure of the ratchet (findings, directives, the baseline that cannot go up) still judges it.
 - **A hidden path**: `.git/info/exclude` is not versioned, so it cannot be compared to the start of the lot. When it holds
   a pattern (a line that is neither blank nor a comment) the command adds a warning to its output, success or refusal,
   naming the first three patterns. It does not fail: that file legitimately holds local paths.

@@ -191,8 +191,40 @@ export function lireRef(racine, ref) {
   const existe = (chemin) => git('cat-file', '-e', `${sha}:${chemin}`).status === 0;
   const config = (chemin) => { const r = git('show', `${sha}:${chemin}`); return r.status === 0 ? r.stdout : null; };
   const fichiers = () => git('ls-tree', '-r', '-z', '--name-only', sha).stdout.split('\0').filter(Boolean);
-  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, config, fichiers };
+  // ce que le lot a touché depuis son départ : commits, modifications suivies et fichiers neufs non ignorés
+  const touches = () => [...new Set([
+    ...git('diff', '--name-only', '-z', sha).stdout.split('\0'),
+    ...git('ls-files', '-z', '--others', '--exclude-standard').stdout.split('\0'),
+  ].filter(Boolean))];
+  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, config, fichiers, touches, lotConfig: lotDeConfig(git('branch', '--show-current').stdout.trim(), config) };
 }
+
+// Les plans que cadence lit par défaut (un plan tenu par un autre outil, `plan:` de cadence.yaml, n'est pas cherché : le lot n'y est pas de config).
+const PLANS = ['.cadence/raf.yaml', 'docs/plan/raf.yaml'];
+
+/**
+ * Vrai si le plan du point de départ déclare `config: true` pour le lot de cette branche (`cadence/<vague>/<projet>--<lot>`, le « / » de l'id
+ * y devient « __ »). Lu au départ, pas dans l'arbre : un lot ne se déclare pas lui-même exempté. Faux sans branche de lot, sans plan, ou si le lot n'y est pas.
+ */
+function lotDeConfig(branche, config) {
+  const slug = /--([^/]+)$/.exec(branche)?.[1];
+  if (!slug) return false;
+  const texte = PLANS.map((f) => config(f)).find((t) => t !== null);
+  if (!texte) return false;
+  // le bloc d'un lot : de sa ligne « - id: » à la suivante ; ses clés sont indentées de 4 espaces
+  let courant = null;
+  for (const l of texte.split('\n')) {
+    const id = /^  - id:\s*["']?([^"'\s#]+)["']?\s*(#.*)?$/.exec(l);
+    if (id) courant = id[1].split('/').join('__') === slug;
+    else if (courant && /^    config:\s*true\s*(#.*)?$/.test(l)) return true;
+  }
+  return false;
+}
+
+// Ce qu'un lot de config peut toucher : les configs comparées, leurs tests, et ce que tout lot touche (base du cliquet, plan, CHANGELOG, docs)
+const estConfig = (f) => CONFIGS.includes(f) || f === 'package.json' || basename(f) === '.gitignore';
+const estTest = (f) => /^tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);
+const estComptabilite = (f) => f === BASELINE || f === 'CHANGELOG.md' || f.startsWith('.cadence/') || f.startsWith('docs/');
 
 // Les seuils et les exclusions des trois outils : les relever ferait baisser la mesure sans corriger le code. Tout ce que les
 // outils lisent est comparé, pas seulement le fichier que ce dépôt utilise : ESLint 9 charge eslint.config.js AVANT .mjs, knip
@@ -256,6 +288,11 @@ function clesPackageChangees(racine, ref) {
 function configChangee(racine, ref) {
   // sans base au départ, rien n'est encore jugé par ces configs : le lot qui adopte les outils les introduit librement
   if (!ref?.config || !ref.base) return null;
+  // un lot déclaré de config au plan (L586) peut changer les configs, à condition de ne rien toucher d'autre ; les autres mesures le jugent toujours
+  if (ref.lotConfig) {
+    const hors = (ref.touches?.() ?? []).filter((f) => !estConfig(f) && !estTest(f) && !estComptabilite(f));
+    return hors.length ? { code: 1, texte: `${hors.join(', ')} : un lot déclaré « config: true » au plan ne touche que les fichiers de config et leurs tests (le reste est du code : un autre lot).` } : null;
+  }
   const changees = [...fichiersChanges(racine, ref), ...clesPackageChangees(racine, ref)];
   if (!changees.length) return null;
   return { code: 1, texte: `${changees.join(', ')} diffère(nt) de ${ref.nom} : un seuil ou une exclusion ne se change pas dans un lot qui est jugé par eux (corriger le code ; changer une config est une décision du plan, livrée seule).` };

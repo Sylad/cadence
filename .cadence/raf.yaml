@@ -889,7 +889,7 @@ lots:
     uses: [ plan-coeur ]
     created: 2026-10-30
     started: 2026-11-04
-    review: { date: 2026-11-04, verdict: "conforme : revue fraîche du correctif caa1bb0f (lead, 04-11) — --to-config refuse deux entrées au même identifiant par la fonction partagée claimId (code 2, rien écrit), prouvé par R40 rouge avant / vert après ; le message de --from-config passe toujours R9 ; doc docs/raf.md ajoutée (8eda4e5e)", commit: 8eda4e5e5bc5a11e0aa360f764f1ac1a182ceba7 }
+    review: { date: 2026-11-04, verdict: "conforme : revue fraîche du correctif caa1bb0f (lead, 04-11) — --to-config refuse deux entrées au même identifiant par la fonction partagée claimId (code 2, rien écrit), prouvé par R40 rouge avant / vert après ; le message de --from-config passe toujours R9 ; doc docs/raf.md ajoutée (8eda4e5e) ; revue courte du diff rebasé (patch-id différent) : conforme : rebase sans effet sur le code du lot (range-diff 10/10 patchs identiques, main ne touche aucun fichier source du lot), entrée CHANGELOG correctement replacée sous [Unreleased]", commit: ba50e2859c28e46ba6bdd634ca95ce75d7192bf0 }
   - id: L473
     title: "Plans riches — signal « lot dont toutes les sous-tâches sont fermées » (raf now, session start) (manque M11 de l'étude maritime-atlas docs/plan/etude-migration-cadence.md, Q-MIG1 du 30-10 : lire sa ligne pour le contenu minimal ; générique, sans rien de propre à Aether)"
     status: todo

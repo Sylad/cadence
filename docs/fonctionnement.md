@@ -37,7 +37,7 @@ to the lead; « partial » passes what exists to the implementation. Then:
   no **accept**; the `ux` pass after the code checks conformity to the mockup. Other lots take the ordinary
   path (`orchestrate.maquette: false` brings it back for these too).
 - `spec: true` (a lot with a behaviour to pin down and no screen): **back-end spec** (cases, rules,
-  contracts), **sheet review** (`code-reviewer` in sheet mode, two passes at most), then **accept**.
+  contracts), **sheet review** (`code-reviewer` in sheet mode, two passes at most, a third when the review converges: blocking + major findings down and only one left), then **accept**.
   A mixed lot (a page whose sheet has a `sujet` block) gets both reviews and a single second spec pass.
 - **accept** writes the acceptance tests from the sheet, committed red and locked, when the project
   declares `orchestrate.accept`.

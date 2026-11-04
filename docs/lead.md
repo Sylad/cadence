@@ -34,8 +34,8 @@ picture, not its source.
    - **spec**: the `spec-writer` agent draws a static mockup to the project's own style and writes the
      screen sheet (`fiche.yaml`: fields, states, numbered rules), rendered at 1440 and 390 px;
    - **fiche** (a lot with a back-end part: `spec: true`, or a screen lot whose sheet has a `sujet` block):
-     the `code-reviewer` agent in sheet mode reviews the back-end sheet (two passes at most, then the lot
-     is handed back) unless `orchestrate.fiche: false`; a mixed lot has both reviews, and their findings
+     the `code-reviewer` agent in sheet mode reviews the back-end sheet (two passes at most, a third when the review converges — blocking + major
+     findings down and only one left —, then the lot is handed back) unless `orchestrate.fiche: false`; a mixed lot has both reviews, and their findings
      go together to a single second `spec` pass. A lot without a screen has no News entry: the
      hypotheses of its final sheet become one note of the lot each, and the end-of-wave table lists them
      as `hypothèse de la fiche : …` — the lead relays them to the human;

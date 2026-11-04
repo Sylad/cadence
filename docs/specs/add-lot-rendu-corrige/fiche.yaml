@@ -73,10 +73,10 @@ regles:
     tests: ["R3 — lot rendu à l'intégration : refus inchangé avec le geste --integrate", "R3 — lot rendu sur budget : refus inchangé avec le geste --budget", "R3 — lot retiré par --drop : refus inchangé, nouvelle vague"]
   - id: R4
     cas: [C1]
-    enonce: "Un lot rendu dont le worktree conservé ou la branche de vague a disparu, ou dont l'arbre a un fichier suivi modifié (correctif non commité), est refusé par --add avant toute écriture, code 2, avec la cause ; le lot reste rendu et inchangé."
-    statut: hypothese
-    si_faux: "Si le lead voulait que le programme commite ou jette l'arbre sale lui-même, ce serait un geste destructif à demander ; ici le refus est le plus sûr et se corrige en commitant le correctif."
-    tests: ["R4 — arbre du worktree sale : code 2, la cause nommée, état du lot inchangé", "R4 — worktree disparu : code 2, lot toujours rendu"]
+    enonce: "Un lot rendu dont le worktree conservé ou la branche de vague a disparu, ou dont l'arbre a un fichier suivi modifié (correctif non commité), est refusé par --add avant toute écriture, code 2, avec la cause ; pour un arbre sale, le refus nomme les fichiers non commités et la commande à rejouer après le commit ; le programme ne commite ni ne jette jamais l'arbre du lead ; le lot reste rendu et inchangé."
+    statut: sourcee
+    source: "réponse du lead (décision du 04-11)"
+    tests: ["R4 — arbre du worktree sale : code 2, fichiers non commités et commande à rejouer nommés, état du lot inchangé", "R4 — worktree disparu : code 2, lot toujours rendu"]
   - id: R5
     cas: [C1]
     enonce: "Le lot rendu admis attend, dans la file d'ajouts, un créneau libre et un dépôt libre comme tout ajout ; il est pris entre deux étapes, reprend le worktree et la branche existants (jamais recréés ni basés sur un autre sha), garde sa clé unique dans wave.lots (non dupliquée) et repasse de handed-back à queued avec outcome vidé."

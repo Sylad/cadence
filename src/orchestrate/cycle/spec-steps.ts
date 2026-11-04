@@ -1,4 +1,4 @@
-import { type LotCtx, hasSpecStage, workDir as wd, histPlan, stop, transition, save } from './ctx.js';
+import { type LotCtx, propose, hasSpecStage, workDir as wd, histPlan, stop, transition, save } from './ctx.js';
 import { type SessionKind } from '../launch.js';
 import { findFiche, ficheReady, lightLot, answerAltersRule, sourceRules, LEAD_SOURCE, checkSpec, costlyHypotheses, hypothesisLines } from '../spec.js';
 import { partsOf, ficheOf, specBudget } from './brief.js';
@@ -13,7 +13,7 @@ import { leadAnswerMessage } from '../../plan-commit.js';
 import { planTemplate, noteHypotheses, noteMinors } from './plan-writes.js';
 import { session, badReport } from './session.js';
 import { type SpecReport, checkShape, SPEC_SCHEMA, type ReviewReport, REVIEW_SCHEMA, summarize } from '../schemas.js';
-import { takeReport, dirtAfter, addProposals, blockingConstats } from './shared.js';
+import { takeReport, dirtAfter, addProposals, blockingConstats, setAsideUnchanged, asideVerdict } from './shared.js';
 import { parse } from 'yaml';
 import { lotKey } from '../state.js';
 import { bulletLines } from '../maquette.js';
@@ -232,6 +232,12 @@ const FICHE_REVIEW: SpecReview = { kind: 'fiche', label: 'fiche', source: 'code'
 
 const MAQUETTE_REVIEW: SpecReview = { kind: 'maquette', label: 'maquette', source: 'ux', after: afterMaquette, retry: () => 'spec' };
 
+/** Revue de maquette de rang 2 ou plus : un bloquant ou un majeur marqué strictement `inchange: true` est une ligne « défaut de revue » du journal de la vague (jamais dans `l.warnings`). Lu sur le rapport complet : `counted` n'a plus les majeurs marqués. */
+function logUnchangedDefects(c: LotCtx, rep: ReviewReport, passes: number): void {
+  if (passes < 2) return;
+  for (const k of rep.constats) if ((k.gravite === 'bloquant' || k.gravite === 'majeur') && k.inchange === true) c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · défaut de revue : maquette, revue ${passes}, majeur sur un point inchangé absent de la revue ${passes - 1} : ${k.texte}`);
+}
+
 /**
  * Revue de la spec (fiche ou maquette) : une session de lecture seule. Un bloquant ou un majeur renvoie à la spec (avec les constats ; pour un lot mixte, ceux des deux revues ensemble), puis la spec est relue : deux revues pour la fiche,
  * `orchestrate.maquetteReviews` pour la maquette, dans le plafond de sessions spec du lot (`specBudget`) ; ce qui reste à la dernière revue est rendu au lead.
@@ -255,18 +261,18 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
     badReport(c, done.step, e);
     return;
   }
-  const summary = summarize(rep, done.after.head ?? '');
   const passes = (l[r.kind]?.passes ?? 0) + 1;
+  // Maquette, revue 2 ou plus : un majeur marqué `inchange` va au tableau en suite pour le lead et ne compte plus (L562).
+  const { rep: counted, aside } = setAsideUnchanged(rep, r.kind === 'maquette' ? passes : 1);
+  const summary = summarize(counted, done.after.head ?? '');
+  for (const a of aside) propose(c, a.line);
   // Fiche : les mineurs sont des notes du lot (design § 4). Maquette : inchangé (propositions du tableau final).
   addProposals(c, rep, r.kind, summary.head, r.kind !== 'fiche');
   // Un lot rendu sur le refus d'écrire ses notes (R26) rejoue cette revue à la reprise : le compte des passes n'est posé qu'une fois les notes écrites.
   if (r.kind === 'fiche' && (await noteMinors(c, rep, `la ${r.label}`))) return;
-  l[r.kind] = { passes, conforme: summary.conforme, verdict: summary.verdict };
-  const constats = blockingConstats(rep, r.source);
-  if (r.kind === 'maquette' && passes >= 2) {
-    // Lu sur rep.constats : blockingConstats ne garde pas `inchange`. Seul le booléen vrai est une marque (checkShape ne descend pas dans constats[]).
-    for (const k of rep.constats) if ((k.gravite === 'bloquant' || k.gravite === 'majeur') && k.inchange === true) c.wave.log(`${lotKey(l.project, l.lot)} · défaut de revue : maquette, revue ${passes}, majeur sur un point inchangé absent de la revue ${passes - 1} : ${k.texte}`);
-  }
+  l[r.kind] = { passes, conforme: summary.conforme, verdict: summary.conforme ? asideVerdict(summary.verdict, aside) : summary.verdict };
+  const constats = blockingConstats(counted, r.source);
+  if (r.kind === 'maquette') logUnchangedDefects(c, rep, passes);
   const key = r.kind === 'fiche' ? 'ficheConstats' : 'maquetteConstats';
   if (summary.conforme) {
     l[key] = undefined;

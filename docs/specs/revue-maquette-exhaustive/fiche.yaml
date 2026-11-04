@@ -140,14 +140,14 @@ regles:
       - "R6 — lot back sans écran, maquetteReviews 3 : la revue de la fiche rend le lot dès 2 sessions"
   - id: R7
     cas: [C4]
-    enonce: "Quand une revue de maquette de rang 2 ou plus rend un constat bloquant ou majeur marqué inchange: true (strictement le booléen vrai, R8), le programme écrit dans le journal de la vague, par c.wave.log (LotCtx.wave.log, cycle.ts:82, qui ajoute la ligne à .cadence/runs/<vague>/journal.log préfixée de l'horodatage ISO, state.ts:318), une ligne « <projet>:<lot> · défaut de revue : maquette, revue <n>, majeur sur un point inchangé absent de la revue <n-1> : <texte> » (lotKey(projet, lot) de state.ts:189, séparateur « · » comme les lignes de cycle.ts:625 et 774) ; la ligne n'est pas ajoutée à l.warnings ; rien n'est écrit en revue 1, pour un mineur ou un constat non marqué ; le verdict, l'état du lot et la boucle sont inchangés."
+    enonce: "Quand une revue de maquette de rang 2 ou plus rend un constat bloquant ou majeur marqué inchange: true (strictement le booléen vrai, R8), le programme écrit dans le journal de la vague, par c.wave.log (LotCtx.wave.log, cycle.ts:82, qui ajoute la ligne à .cadence/runs/<vague>/journal.log préfixée de l'horodatage ISO, state.ts:318), une ligne « <projet>:<lot> · défaut de revue : maquette, revue <n>, majeur sur un point inchangé absent de la revue <n-1> : <texte> » (lotKey(projet, lot) de state.ts:189, séparateur « · » comme les lignes de cycle.ts:625 et 774) ; la ligne n'est pas ajoutée à l.warnings ; rien n'est écrit en revue 1, pour un mineur ou un constat non marqué ; (la partie « le verdict, l'état du lot et la boucle sont inchangés » est remplacée par L562, fiche revue-maquette-suite-inchange R1 à R4 : un majeur marqué rend la revue conforme dès la revue 2)."
     statut: sourcee
     source: "demande du lot : « une revue 2 qui trouve un majeur absent de la revue 1 sur un point inchangé est comptée comme défaut de revue (journal) »"
     tests:
       - "R7 — revue 2 : majeur marqué inchange : c.wave.log reçoit exactement une ligne « <projet>:<lot> · défaut de revue : maquette, revue 2, … » (et l.warnings est inchangé)"
       - "R7 — revue 1 avec inchange: true : c.wave.log ne reçoit aucune ligne « défaut de revue »"
       - "R7 — revue 2 : mineur marqué inchange, ou majeur non marqué (inchange absent, false, texte ou null) : aucune ligne"
-      - "R7 — l'état du lot après la ligne est identique à celui sans marque"
+      - "R7 — revue 2, majeur marqué : l'état du lot diffère de celui d'un majeur non marqué (remplace « l'état du lot après la ligne est identique à celui sans marque », L562)"
   - id: R8
     cas: [C4]
     enonce: "Le constat du rapport de revue accepte un champ facultatif inchange (booléen), décrit dans REVIEW_SCHEMA (constats[].items.properties) et dans le type ReviewReport. Le programme ne valide pas ce champ : checkShape (schemas.ts:117-127) ne contrôle que les champs requis du premier niveau et ne descend pas dans constats[], et il n'est pas modifié. Seul inchange === true est une marque ; un champ absent, ou d'un autre type (texte, null, nombre), est lu comme faux : le constat se traite comme avant, sans ligne de journal et sans refus du rapport."

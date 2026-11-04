@@ -32,6 +32,23 @@ export function blockingConstats(rep: ReviewReport, source: 'code' | 'ux'): Cons
   return rep.constats.filter((k) => k.gravite === 'bloquant' || k.gravite === 'majeur').map((k) => ({ source, gravite: k.gravite, fichier: k.fichier, ligne: k.ligne, texte: k.texte }));
 }
 
+/**
+ * Revue de maquette de rang 2 ou plus (L562) : les majeurs marqués strictement `inchange: true` ne comptent pas pour la non-conformité.
+ * Rend le rapport sans eux (constats et total annoncé de majeurs) et leurs lignes pour le tableau en suite du lead ; en revue 1 le rapport est rendu tel quel.
+ */
+export function setAsideUnchanged(rep: ReviewReport, rank: number): { rep: ReviewReport; aside: { line: string; texte: string }[] } {
+  const marked = (k: ReviewReport['constats'][number]) => rank >= 2 && k.gravite === 'majeur' && k.inchange === true;
+  const aside = rep.constats.filter(marked).map((k) => ({ line: `[suite ux] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`, texte: k.texte }));
+  if (!aside.length) return { rep, aside };
+  return { rep: { ...rep, majeurs: Math.max(0, rep.majeurs - aside.length), constats: rep.constats.filter((k) => !marked(k)) }, aside };
+}
+
+/** Verdict gardé d'une revue conforme (R3) : celui de l'agent, suivi des majeurs laissés en suite pour le lead quand il y en a. */
+export function asideVerdict(verdict: string, aside: { texte: string }[]): string {
+  if (!aside.length) return verdict;
+  return `${verdict} — conforme, ${aside.length} majeur${aside.length > 1 ? 's' : ''} sur un point inchangé en suite pour le lead : ${aside.map((a) => a.texte).join(' ; ')}`;
+}
+
 /** Chemins salis par une session : suivis modifiés, nouveaux fichiers non suivis, et ceux des dépôts voisins. */
 export function dirtAfter(done: Done): string[] {
   return [...dirtBetween(done.before, done.after), ...done.others.flatMap((o) => dirtBetween(o.before, o.after).map((f) => `${o.repo.rel}: ${f}`))];

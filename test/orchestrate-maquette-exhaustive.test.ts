@@ -206,12 +206,14 @@ describe('R7/R8 — défaut de revue au journal', () => {
   it('R7 — revue 2 : mineur marqué inchange, ou majeur non marqué (inchange absent, false, texte ou null) : aucune ligne', async () => {
     for (const second of [minor({ inchange: true }), major('x'), major('x', { inchange: false }), major('x', { inchange: 'true' }), major('x', { inchange: null }), major('x', { inchange: 1 })]) expect((await run(second)).defauts).toEqual([]);
   });
-  it("R7 — l'état du lot après la ligne est identique à celui sans marque", async () => {
+  it("R7 — revue 2, majeur marqué : l'état du lot diffère de celui d'un majeur non marqué (kinds sans session spec, maquette.conforme vrai) — remplace l'ancien test « état identique » (L562)", async () => {
     const marked = await run(major('panneaux étirés', { inchange: true }));
     const plain = await run(major('panneaux étirés'));
-    expect(kinds(marked.h)).toEqual(kinds(plain.h));
-    expect(marked.c.lot.status).toBe(plain.c.lot.status);
-    expect(marked.c.lot.maquette).toEqual(plain.c.lot.maquette);
+    expect(kinds(marked.h).filter((k) => k === 'spec')).toHaveLength(2);
+    expect(kinds(plain.h).filter((k) => k === 'spec')).toHaveLength(3);
+    expect(marked.c.lot.maquette).toMatchObject({ passes: 2, conforme: true });
+    expect(plain.c.lot.maquette).toMatchObject({ passes: 3, conforme: true });
+    expect(marked.c.lot.status).toBe('ready');
     expect(marked.c.lot.warnings).toEqual(plain.c.lot.warnings);
   });
   it('R8 — inchange absent ou non booléen (texte, null) : lu comme faux, aucune ligne de journal, rapport accepté', async () => {

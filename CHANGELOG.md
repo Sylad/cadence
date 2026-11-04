@@ -85,6 +85,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - Lots in service but not published are flagged (L571, [docs/lead.md](docs/lead.md), [docs/orchestrate.md](docs/orchestrate.md), [docs/session.md](docs/session.md)): `cadence lead tour`, `cadence session close` and `cadence orchestrate --status` say `⚠ N lots done depuis le dernier tag v<x.y.z> (…) — en service, non publiés : cadence release patch|minor|major` for a repository that publishes (`package.json` with a `version` and a `v<x.y.z>` tag reachable from `HEAD`); `session close` prints it right under its title and the `session-close` skill puts it first of the three lines for next time; `lead tour --json` carries it as `unpublished: { tag, lots }`. Only `done` lots with a work commit after the tag count (plan upkeep commits do not). On 2026-11-04, 18 lots were in service the day before and the professional account started that morning on 1.46.0.
 
+### Changed
+
+- The mockup review converges (issue #30): from review 2, a major marked `inchange: true` no longer counts for non-conformity — it goes to the lot's proposals as `[suite ux] <file>:<line> — <text>` for the lead, and a lot that passes with such findings says so in its verdict (`— conforme, N majeur(s) sur un point inchangé en suite pour le lead : …`). Review 1 sweeps every size the sheet gives, and the review 2 brief says what does not block (L562, `docs/orchestrate.md`).
+
 ### Fixed
 
 - `cadence news check` and `raf check`: on a screen sheet shared by several lots, the expected `## Hypothèses` section lists only the hypothesis rules the lot adds or modifies (the `regles` key of `acceptation-<lot>.json`, else the rules its `spec`/`docs` commits touch), the whole sheet only when nothing restricts it (L570, issue #33).

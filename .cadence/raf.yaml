@@ -2023,6 +2023,7 @@ lots:
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "conforme — orchestré (vague 2026-11-04-1015-cad, 1 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main n'a changé que l'endroit où l'entrée du CHANGELOG s'insère, le code, les tests et la documentation du lot sont identiques", commit: 4b09cda96245622e9765c158f9d4c70fdeba3ffe }
   - id: L573
     title: "Étape spec, fiche avec maquette ET maquette_ecran (issue #34) : un champ ou un état dessiné dans la page maquette_ecran mais absent de l'index maquette ne fait plus échouer trois passes — le programme complète l'index (entrée data-testid, section etat-…) et copie les captures maquette-<état>-<largeur>.png à partir de la fiche et de maquette_ecran, ou à défaut le brief spec nomme le fichier d'index et la forme exacte de l'entrée ; le constat dit « présent dans maquette_ecran, absent de l'index »"
     status: doing

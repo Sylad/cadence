@@ -88,11 +88,14 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - `raf now` and `cadence session start` list the open lots whose sub-tasks are all closed (`done` or `dropped`) under « Sous-tâches toutes fermées », each with the command to close the lot (`raf done <id>`, or « the project's tool » on a plan kept by another tool). Recurring lots, closed lots and lots without sub-tasks are not listed (L473, `docs/raf.md`, `docs/session.md`).
 - A wave of named lots fills its free slots by itself (L587, [docs/orchestrate.md](docs/orchestrate.md), « A wave of named lots fills its free slots too »): when a slot is free and its queue is empty, it draws the next ready lot of the plan like `--continue` does (`priority:`, free `uses:` resources, mature lots, L390 filter), until the budget is spent. `--no-fill` keeps the old behaviour. Each draw is a journal line, `créneau libre rempli par <project>:<lot>` (it was `continue : tire <project>:<lot> (créneau libre)`). A `priority:` key that becomes unreadable while the wave plays skips that look's draw (journal line `remplissage : tirage passé`) instead of stopping the wave.
 
+### Fixed
+
+- A plan commit in a neighbouring repository is no longer a false incident (L593, [docs/orchestrate.md](docs/orchestrate.md)): a commit that touches only the plan files of that repository (`plan.path`, `plan.files` of its own `cadence.yaml`) is tolerated even when its subject cites a lot of the wave, and the journal says so (04-11: three `plan: add Q-MIG2..4` commits of the lead in maritime-atlas handed L589 back). A commit that also touches another file is still a finding.
+
 ## [1.53.1] - 2026-11-04
 
 ### Fixed
 
-- A plan commit in a neighbouring repository is no longer a false incident (L593, [docs/orchestrate.md](docs/orchestrate.md)): a commit that touches only the plan files of that repository (`plan.path`, `plan.files` of its own `cadence.yaml`) is tolerated even when its subject cites a lot of the wave, and the journal says so (04-11: three `plan: add Q-MIG2..4` commits of the lead in maritime-atlas handed L589 back). A commit that also touches another file is still a finding.
 - `raf done` is refused (exit 2, `done différé`, plan untouched) while a session of a live wave works in the main tree of a repository without worktrees (L521, `docs/raf.md`, skill `lead`): the plan it wrote stayed a modified file there and the next lot was handed back as « dépôt sale après implement » (avatar L57 after L56, 01-11). The message gives the safe order — wait for the end of that step, then run `raf done` again — and `--now` writes at once. `raf add` and `raf note` still only warn; `cadence deliver --sha` already commits its plan (L388).
 
 ## [1.53.0] - 2026-11-04

@@ -1,8 +1,8 @@
-/** Percentile de rang le plus proche (`p` dans ]0, 1]) ; null sans valeur. */
+/** Percentile de rang le plus proche (`p` dans [0, 1], 0 donne le minimum) ; null sans valeur. */
 export const percentile = (xs: number[], p: number): number | null => {
   if (xs.length === 0) return null;
   const s = [...xs].sort((a, b) => a - b);
-  return s[Math.ceil(p * s.length) - 1]!;
+  return s[Math.max(0, Math.ceil(p * s.length) - 1)]!;
 };
 
 /** Médiane ; null sans valeur. */

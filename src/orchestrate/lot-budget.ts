@@ -57,6 +57,7 @@ function resolveBudget(estimate: number, stage?: SpecStage, measured?: MeasuredB
   if (!measured) return { budget: fixed, state: 'statique' };
   const m = measured.get(classKey(estimate, stage));
   if (!m || m.lots < MEASURE_MIN_LOTS) return { budget: fixed, ...(m ? { m } : {}), state: 'court' };
+  if (!Number.isFinite(m.p90)) return { budget: fixed, state: 'statique' };
   const rounded = Math.ceil(m.p90 / MEASURE_STEP) * MEASURE_STEP;
   const ceiling = fixed * MEASURE_CEILING;
   if (rounded < fixed) return { budget: fixed, m, rounded, state: 'plancher' };

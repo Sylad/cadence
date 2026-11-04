@@ -109,15 +109,14 @@ For a single lot whose title is stale, add `--goal "<what done looks like>"` (re
 **Make the wave visible to the human.** Name the background task after what it runs — « vague `<id>` :
 `<project>:<lot>`, … » (its `description`), so the task list says which projects and lots, not just « a task
 is running » — and pass `--wave <id>` (e.g. `2026-10-08-1030`) so its state folder is known in advance. Right after
-starting it, arm **one follow-up** (the Monitor tool) on the wave's journal, which holds one line per transition (lot → new
-state, question, ready, handed back). The final table is not in the journal: it arrives with the background task's end notification, at which point stop the follow-up (it never ends by itself; a later `--resume` writes to the same journal):
+starting it, arm **one follow-up** (the Monitor tool) on the wave: `cadence orchestrate --follow --wave <id>` reads its journal and prints only the lines that ask for a gesture of yours (a lot ready, handed back or failed, a question, budget or quota reached, a lot integrated), not the implementing / reviewing / fixing transitions (on 04-11 `tail -F` pushed 453 lines into the lead's context, 91 of them useful). The final table is not in the journal: it arrives with the background task's end notification. The follow-up ends by itself with « fin de vague <id> : <status> » (a later `--resume` needs a new `--follow`):
 
 ```sh
-tail -n +1 -F .cadence/runs/<id>/journal.log     # from the folder the wave was launched in
+cadence orchestrate --follow --wave <id>     # from the folder the wave was launched in
 ```
 
 Each line it prints reaches this conversation as it happens: relay it to the human in one short sentence, and
-bring a question back at once (`--resume --wave <wave> --answer`, the command printed under the question). That follow-up replaces any waiting loop: still no polling,
+bring a question back at once (`--resume --wave <wave> --answer`, the command printed under the question). That follow-up replaces any waiting loop (and `tail -F` on the journal): still no polling,
 no `sleep`. The human can also watch from a terminal with `cadence orchestrate --status --watch` (table refreshed
 every 10 s, `--interval <s>` to change it; it stops by itself when no wave is running).
 

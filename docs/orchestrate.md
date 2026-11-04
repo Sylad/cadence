@@ -22,6 +22,7 @@ cadence orchestrate --continue [--until 18:00] [--priority cadence,maritime]   #
 cadence orchestrate --waits [--since 2026-10-12]   # time spent waiting for a session slot, per day and per wave (below)
 cadence orchestrate --status [<wave> | --wave <wave>]   # the live waves and the repositories they hold, then the table (default: the last wave of this folder)
 cadence orchestrate --status [<wave>] --detail <project:lot>   # the detail of one lot that the compact table leaves out: given goal, UX note and captures, tests already red at the start, choices made, hypotheses of the sheet, proposals, UX verdict (read from the wave's state; the bare `<lot>` is enough when unique in the wave; not with `--watch`)
+cadence orchestrate --follow [--wave <id>] [--interval 5]   # follows a wave's journal and prints only the lines that ask the lead for a gesture (L588); ends by itself with « fin de vague »
 cadence orchestrate --status [<wave>] --watch [--interval 10]   # the same, redrawn every 10 s (--interval in seconds); stops by itself when no wave is running (with an explicit `<wave>`: when that wave is no longer running)
 cadence orchestrate --resume [--wave <wave> | <wave>] [--budget 1M] [--answer ol-companion:L22 "reply"] [--drop ccc:L29]
 cadence orchestrate --resume --wave <wave> --budget maritime:B26.4=+300k   # replay a lot handed back for its budget, with the budget raised (below)
@@ -180,9 +181,10 @@ in the background and read `--status`: it prints one line per transition and the
 **Following a wave (L49)**: `--status --watch` clears the screen and redraws the live waves and the table every
 `--interval` seconds (default 10), then stops by itself, leaving the last render, as soon as no wave is running
 (exit code 0, like `--status`; a wave already finished gives a single render). The `cadence-lead` skill names the background
-task « vague `<id>` : `<project>:<lot>`, … », starts the wave with `--wave <id>` and arms a follow-up on
-`.cadence/runs/<id>/journal.log` that pushes each transition (lot → state, question, ready, handed back) into the conversation.
+task « vague `<id>` : `<project>:<lot>`, … », starts the wave with `--wave <id>` and arms `cadence orchestrate --follow --wave <id>` as its follow-up.
 The Claude Code status band is the `cadence-hud` plugin.
+
+**`--follow` (L588)**: reads `.cadence/runs/<id>/journal.log` from its start (`--wave <id>`, else the last wave of the folder) every `--interval` seconds (default 5) and prints, with their timestamp, only the lines that ask the lead for a gesture: a lot `ready`, `handed-back` or `failed`, a `question`, a stop on `budget atteint` or `quota atteint`, `intégré : <sha>..<sha>`, and « rendu à l'intégration ». The transitions `implementing`, `reviewing` and `fixing`, the sessions, the worktrees and the control requests stay in the journal (on 04-11, 453 events reached the lead over 3 waves, 91 of them useful: the other 80 % cost 300–400 k tokens of its context). When the wave stops running it prints one last line, `fin de vague <id> : <status>` (`done`, `suspended-budget`, `suspended-quota`, `interrupted` — an incident ends in `interrupted`; its text is in the final table), then exits 0. A `--wave` that has not written its state yet is awaited for 30 polls before « vague inconnue »; without `--wave`, no wave in the folder is refused at once. `--follow` combines with nothing but `--wave` and `--interval`. The journal itself is unchanged: `tail -F` still shows everything.
 
 **Cycle of a lot**: preconditions (clean tracked files, lot `todo` or `doing`, dependencies met) →
 `raf start` (committed alone) → implementation → **code review** → compliant (no blocking, no

@@ -1187,11 +1187,12 @@ lots:
     finished: 2026-11-04
   - id: L504
     title: "Clé de config posée avant sa mise en service (31-10 : L497 active orchestrate.probe dans le cadence.yaml du dépôt de cadence ; la copie en service la refuse → toute commande cadence sur le dépôt casse, intégration de L480 morte en route) : la revue ou la porte refuse un lot qui pose dans le cadence.yaml de cadence une clé inconnue de la copie en service (la clé s'active après npm run service) ; et une reprise --integrate qui meurt sur une erreur de config laisse le lot « suspended » dans une vague « done » sans issue (--integrate, --replay et --resume refusent) : remettre le lot rendu à l'intégration, ou accepter --integrate sur ce cas"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-10-31
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "conforme (4 notes mineures : --replay partage la reprise d'un lot suspended sans test ni doc ; section resume de la doc sans renvoi à l'exception L504 ; garde au fichier et non à la clé ; ligne de journal « tests rouges » pour un constat de config) — orchestré (vague 2026-11-04-1015-cad, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme (1 note mineure : ligne vide en trop laissée dans la section publiée [1.49.0] du CHANGELOG)", commit: b2069dd47cd4e32f080e3fc1f7e1fda8933ae741 }
+    finished: 2026-11-04
   - id: L505
     title: "Tests SIGHUP instables : test/orchestrate-e2e.test.ts:368 (process.kill(pid,0) ne lève pas encore) et test/verify.test.ts:443, rouges 1 fois sur 7 chacun sur mini-blue (diagnostic L480 du 31-10) — attendre un signal observable au lieu d'un délai"
     status: done

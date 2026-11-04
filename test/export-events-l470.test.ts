@@ -161,6 +161,7 @@ describe('L470 — raf events', () => {
     expect(r.code).toBe(2);
     expect(r.out).toBe('');
     expect(r.err).toMatch(/--since/);
+    expect(raf(dir, 'events', '--since', '2026-02-30').code).toBe(2);
   });
   it('R12 — ordre stable : par jour, puis type, puis lot ; deux appels donnent la même sortie', () => {
     const dir = project();

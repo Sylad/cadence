@@ -6,7 +6,7 @@ import { repoSections } from '../repos.js';
 import { lotJson, lotLines } from '../lot-lines.js';
 import { audit, gateWaiting, hypothesesOf, lotWork, nextUp, planCommits, workByLot } from '../audit.js';
 import { short } from '../check.js';
-import { type Day, isDay, toDay } from '../dates.js';
+import { type Day, isCalendarDay, toDay } from '../dates.js';
 import { ganttData, renderGantt } from '../gantt.js';
 import { linkCommits } from '../link.js';
 import { EXPORT_SCHEMA, eventLine, exportPlan, planEvents } from '../plan-events.js';
@@ -174,7 +174,7 @@ export function cmdExport(c: Ctx): number {
 /** raf events [--since J] [--json] : les événements du plan, dérivés des dates, des notes, de l'historique git du plan et des commits (L470, M8). */
 export function cmdEvents(c: Ctx): number {
   const { values, io, root, planPath, loadPlan } = c;
-  if (values.since !== undefined && !isDay(values.since)) throw new RafError(`--since invalide : ${values.since} (attendu AAAA-MM-JJ)`);
+  if (values.since !== undefined && !isCalendarDay(values.since)) throw new RafError(`--since invalide : ${values.since} (attendu AAAA-MM-JJ)`);
   const plan = loadPlan();
   const events = planEvents(plan, root, planFileIn(root, planPath), planCommits(plan, root), { since: values.since, warn: io.err });
   if (values.json) io.out(JSON.stringify({ schema: EXPORT_SCHEMA, project: plan.project, events }, null, 2));

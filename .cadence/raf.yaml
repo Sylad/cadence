@@ -2236,9 +2236,10 @@ lots:
     started: 2026-11-04
   - id: L593
     title: "Incident « commit sur la branche principale d'un autre dépôt » : un commit qui ne touche que les fichiers du plan (plan.path, plan.files du cadence.yaml de ce dépôt) n'est pas un incident, comme un commit de plan du lead dans le dépôt du lot — 04-11, vague 1310-cad : L589 rendu en pleine implémentation pour 3 commits « plan: add Q-MIG2..4 » du lead dans maritime-atlas (raf.py commite lui-même), dépôt que L589 ne touche pas"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-04
+    started: 2026-11-04
   - id: L594
     title: "Étude d'ensemble de cadence, en lecture seule, par un relecteur neuf en Fable : construit lot après lot sans plan global, l'ensemble est-il cohérent ? Carte des concepts (lot, vague, porte, revue, livraison, plan natif ou lu, lead, bande, ref, spec, news, perf) et de leurs couches, recouvrements (deux mécanismes pour une même chose), noms incohérents, commandes, options et clés de cadence.yaml (surface vue par un nouvel utilisateur, le compte pro), chemins morts, règles qui se contredisent entre docs et code ; livrable docs/etudes/ensemble-2026-11.md : verdict, architecture cible en une page, écarts classés par gain et risque, chaque correction proposée en lot ≤ 0,5 j ; rien n'est changé — demande de Sylvain le 04-11 (« voir si notre tas de briques fait un joli palais ») ; L461 n'a audité que le code (morts, doublons, gros fichiers)"
     status: todo

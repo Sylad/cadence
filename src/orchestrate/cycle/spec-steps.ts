@@ -6,10 +6,10 @@ import { acceptationProof, NO_ACCEPT, lotAcceptation, listed } from './accept-st
 import { redSha, parseAcceptation } from '../accept.js';
 import { git } from '../worktree.js';
 import { posix, join, relative, resolve, isAbsolute } from 'node:path';
-import { readCommits, changedFiles } from '../../git.js';
+import { readCommits, changedFiles, restoreWorktree, tryGit } from '../../git.js';
 import { readFileSync } from 'node:fs';
 import { lotWork } from '../../audit.js';
-import { leadAnswerMessage } from '../../plan-commit.js';
+import { leadAnswerMessage, indexCompletedMessage } from '../../plan-commit.js';
 import { planTemplate, noteHypotheses, noteMinors } from './plan-writes.js';
 import { session, badReport } from './session.js';
 import { type SpecReport, checkShape, SPEC_SCHEMA, type ReviewReport, REVIEW_SCHEMA, summarize } from '../schemas.js';
@@ -113,14 +113,18 @@ function sourceAnsweredRules(c: LotCtx): boolean {
  * ne fait plus échouer de passe. Rend les écarts à renvoyer à la session (écriture ou commit refusé), vide quand tout va bien.
  */
 function completeAndCommit(c: LotCtx, fiche: string): string[] {
+  let files: string[] = [];
   try {
-    const files = completeIndex(wd(c), fiche);
+    files = completeIndex(wd(c), fiche);
     if (files.length) {
       git(wd(c), 'add', '--', ...files);
-      git(wd(c), 'commit', '-q', '-m', `spec(${c.lot.lot}): index de la maquette complété depuis maquette_ecran (${files.length} fichier${files.length > 1 ? 's' : ''})`, '--', ...files);
+      git(wd(c), 'commit', '-q', '-m', indexCompletedMessage(planTemplate(c), c.lot.lot, c.wave.id), '--', ...files);
     }
     return [];
   } catch (e) {
+    // Écriture ou commit refusé (hook commit-msg, index verrouillé, capture ignorée…) : l'index et les captures ne restent ni indexés ni modifiés, la session ne voit pas un dépôt sale ; le constat de `checkSpec` reprend ce qui manque.
+    tryGit(wd(c), ['restore', '--staged', '--', ...files]);
+    restoreWorktree(wd(c), files);
     return [`${fiche} : index de la maquette non complété depuis maquette_ecran (${(e as Error).message.split('\n')[0]})`];
   }
 }

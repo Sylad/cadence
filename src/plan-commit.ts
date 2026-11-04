@@ -40,6 +40,8 @@ export const PLAN_ACTIONS = {
   specGreenScelle: 'empreintes de l\'acceptation posées par cadence spec green',
   /** `spec reseal` (L546) : jamais les chemins des tests, ils sont dans le commit du rescellé et en note du lot (header-max-length de commitlint). */
   resealed: 'test d\'acceptation rescellé',
+  /** L'index de la maquette que cadence complète depuis `ecran.maquette_ecran` (L573) : commité avec le gabarit, jamais sous un type maison. */
+  indexCompleted: 'index de la maquette complété depuis maquette_ecran',
   /** En minuscule : `subject-case` de config-conventional refuse une majuscule initiale (L343). */
   leadAnswer: (ids: string[]) => `${ids.length > 1 ? 'règles' : 'règle'} ${ids.join(', ')} ${ids.length > 1 ? 'sourcées' : 'sourcée'} par la réponse du lead`,
 };
@@ -47,6 +49,11 @@ export const PLAN_ACTIONS = {
 /** Le message du commit de la fiche sourcée par la réponse du lead : le gabarit `plan.commit` du projet comme tout commit écrit par cadence, à défaut `docs(<lot>): …` (L343). */
 export function leadAnswerMessage(template: string | undefined, lot: string, ids: string[], wave: string): string {
   return planCommitMessage(template ?? LEAD_ANSWER_COMMIT, { lot, action: PLAN_ACTIONS.leadAnswer(ids), wave });
+}
+
+/** Le message du commit de l'index de la maquette complété par cadence (L573) : le gabarit `plan.commit` du projet, à défaut `docs(<lot>): …` comme la fiche sourcée. */
+export function indexCompletedMessage(template: string | undefined, lot: string, wave: string): string {
+  return planCommitMessage(template ?? LEAD_ANSWER_COMMIT, { lot, action: PLAN_ACTIONS.indexCompleted, wave });
 }
 
 /** Valide le gabarit `plan.commit` ; rend la raison du refus, null s'il est bon. */

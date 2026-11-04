@@ -208,6 +208,40 @@ describe('la passe spec complète l\'index avant de contrôler (L573)', () => {
   });
 });
 
+describe('le commit de l\'index complété passe par le gabarit des commits de cadence (L573)', () => {
+  const hook = (cwd: string, body: string) => {
+    const dir = join(cwd, '..', `hooks-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'commit-msg'), `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+    git(cwd, 'config', 'core.hooksPath', dir);
+  };
+  const lancer = async (corps: string) => {
+    const h0: Handler = (call) => {
+      const { fiche } = depotDans(call.opts.cwd);
+      hook(call.opts.cwd, corps);
+      return claudeOut(specReport({ fiche }));
+    };
+    const h = harness({ lots: [{ title: 'Une page', screen: 'page' as const }], script: { spec: [h0, h0], maquette: [() => claudeOut(reviewReport())] } });
+    await runLot(h.lot('L1', { visible: true, screen: 'page' }, { maquette: true }));
+    return h;
+  };
+
+  it('un hook commit-msg de type config-conventional : le commit de l\'index a un sujet conventionnel, le lot va à la revue', async () => {
+    const h = await lancer('grep -qE "^(docs|feat|fix|test|chore)\\(L[0-9]+\\): " "$1" || { echo "refusé : type non conventionnel" >&2; exit 1; }');
+    expect(h.calls.slice(0, 2).map((c) => c.kind)).toEqual(['spec', 'maquette']);
+    const wd = h.calls[0].opts.cwd;
+    expect(git(wd, 'log', '--format=%s', '-n', '1', '--', `${DOSSIER}/maquette.html`)).toMatch(/^docs\(L1\): /);
+    expect(git(wd, 'status', '--porcelain', '--', DOSSIER).trim()).toBe('');
+  });
+
+  it('un commit refusé : l\'index et les captures ne restent ni modifiés ni indexés, le brief ne parle pas d\'un dépôt sale', async () => {
+    const h = await lancer('echo refusé >&2; exit 1');
+    const wd = h.calls[0].opts.cwd;
+    expect(git(wd, 'status', '--porcelain', '--', DOSSIER).trim()).toBe('');
+    expect(h.calls[1].kind).toBe('spec');
+  });
+});
+
 /** Ce que fait l'agent spec dans le dépôt de travail du lot : comme `depot`, sur un dépôt existant. */
 function depotDans(cwd: string) {
   const fiche = ecrit(cwd, { sansTestid: 'score', sansSection: 'erreur', sansCapture: ['maquette-erreur-1440.png', 'maquette-erreur-390.png'], fiche: (d) => (d.ecran.maquette_ecran = PAGE) });

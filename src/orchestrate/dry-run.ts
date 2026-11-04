@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { readPlanConfig } from '../config.js';
-import { PLAN_ACTIONS, commitMsgHook, leadAnswerMessage, commitMsgRefusal, planCommitMessage } from '../plan-commit.js';
+import { PLAN_ACTIONS, commitMsgHook, leadAnswerMessage, indexCompletedMessage, commitMsgRefusal, planCommitMessage } from '../plan-commit.js';
 import { decisionsText, humanDecisions } from './decisions.js';
 import { headline, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
 import { acceptationFile, acceptText, redAcceptations } from './accept.js';
@@ -63,8 +63,9 @@ function planMessageLines(repo: string, l: LotState, wave: string, dir: string):
     if (l.specLot && !l.screen) actions.push(PLAN_ACTIONS.hypotheses(measure.sujet));
     actions.push(PLAN_ACTIONS.minors('la fiche'));
   }
+  const indexMessage = l.screen ? [indexCompletedMessage(template, l.lot, wave)] : [];
   const planMessages = actions.map((action) => planCommitMessage(template, { lot: l.lot, action, wave }));
-  const messages = [...new Set(measure?.regles.length ? planMessages.concat(leadAnswerMessage(template, l.lot, measure.regles, wave)) : planMessages)];
+  const messages = [...new Set((measure?.regles.length ? planMessages.concat(leadAnswerMessage(template, l.lot, measure.regles, wave)) : planMessages).concat(indexMessage))];
   const hook = commitMsgHook(repo);
   if (!hook) return template ? [`  messages de plan : « ${messages[0]} » (gabarit plan.commit ; aucun hook commit-msg dans ce dépôt)`] : [];
   const refused = messages.map((m) => ({ m, why: commitMsgRefusal(repo, m) })).filter((r) => r.why !== null);

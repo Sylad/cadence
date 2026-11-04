@@ -65,8 +65,8 @@ regles:
     enonce: "La ligne « livrés : N » est repliée par défaut ; un clic (ou Entrée) la déplie : chaque lot livré y a sa ligne (id, titre, « ✔ livré »), sous la ligne ; un second clic la replie. Le choix se garde comme celui de « + N lots »."
     message: ~
     champs: [ligne-livres, lot-id-livre, lot-etat-livre]
-    statut: hypothese
-    si_faux: "Si les livrés ne devaient jamais se déplier (simple compte), seule la bascule disparaît ; le choix gardé réutilise la clé `lotsViews` du $.store (aucun nouveau stockage)."
+    statut: sourcee
+    source: réponse du lead, 2026-11-04, vague 2026-11-04-1310-cad
     tests: ["R6 — ligne repliée par défaut", "R6 — clic : les lots livrés s'affichent avec « ✔ livré »", "R6 — second clic : la ligne se replie"]
   - id: R7
     etat: charge

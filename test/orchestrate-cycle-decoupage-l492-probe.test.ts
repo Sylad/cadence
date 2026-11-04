@@ -17,6 +17,7 @@ const loaders: Record<string, () => Promise<unknown>> = {
   'ctx': () => import('../src/orchestrate/cycle/ctx.js'),
   'depot-partage': () => import('../src/orchestrate/cycle/depot-partage.js'),
   'integrate-lot': () => import('../src/orchestrate/cycle/integrate-lot.js'),
+  'partage-step': () => import('../src/orchestrate/cycle/partage-step.js'),
   'plan-writes': () => import('../src/orchestrate/cycle/plan-writes.js'),
   'precheck-step': () => import('../src/orchestrate/cycle/precheck-step.js'),
   'questions': () => import('../src/orchestrate/cycle/questions.js'),

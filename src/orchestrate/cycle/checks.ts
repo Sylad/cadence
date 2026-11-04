@@ -7,14 +7,42 @@ import { runGate, gateLabel, gateReplayable, redCandidates, replayGate } from '.
 import { type VsBase, againstBaseline, redAtStart } from './baseline-run.js';
 import { type TightTest } from '../workers.js';
 import { noteUnstable, noteTight } from '../gate-notes.js';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { validateConfig } from '../../config-set.js';
+import { RafError } from '../../plan.js';
 /** Un contrôle lancé par le programme : sa commande, son code, et les tests rouges qui l'étaient déjà au sha de départ (L213). */
 export type CheckRun = NonNullable<LotState['checks']>['runs'][number];
+
+/**
+ * L504 : le cadence.yaml que le lot a modifié est relu avec les chargeurs de la copie EN SERVICE (celle qui joue cette vague). Une clé que seul le code du lot connaît (31-10 : `orchestrate.probe` posé par L497)
+ * fait refuser toute commande cadence sur le dépôt dès l'intégration, jusqu'à `npm run service` : le lot la pose dans un lot qui suit la mise en service. Un cadence.yaml que le lot n'a pas touché n'est pas son défaut.
+ */
+function configRefusee(c: LotCtx): Constat | null {
+  const dir = wd(c);
+  const start = startSha(c);
+  const file = join(dir, 'cadence.yaml');
+  if (!start || !tryGit(dir, ['diff', '--name-only', start, 'HEAD', '--', 'cadence.yaml']) || !existsSync(file)) return null;
+  try {
+    validateConfig(file, dir);
+  } catch (e) {
+    if (!(e instanceof RafError)) throw e;
+    const motif = e.message.split('\n')[0]!.replaceAll(file, 'cadence.yaml');
+    return { source: 'code', gravite: 'bloquant', fichier: 'cadence.yaml', texte: `cadence.yaml refusé par la copie en service de cadence (${motif}) : une clé posée avant sa mise en service casse toute commande cadence sur le dépôt. Retirer la clé (ou corriger la valeur) ; elle se pose dans un lot qui suit \`npm run service\`.` };
+  }
+  return null;
+}
 
 /**
  * Les contrôles du programme (`orchestrate.build` puis `orchestrate.test`, L333 : les tests e2e lisent le `dist` que seul le build produit), joués dans `wd(c)` : chaque résultat est ajouté à `runs`, chaque rouge NOUVEAU à `red`
  * (un test déjà rouge au sha de départ n'en est pas un, L213). S'arrête au premier rouge : un build rouge rend le lot sans lancer les tests. Après une écriture (work) et, au sommet rebasé, avant l'avance de la branche du dépôt (R7).
  */
 export async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promise<void> {
+  const config = configRefusee(c);
+  if (config) {
+    red.push(config);
+    return;
+  }
   try {
     // Sur l'hôte `gate.host` (L403) quand il y en a un : le HEAD du worktree du lot, s'il est propre ; sinon, ou sans hôte, en local.
     await withPlace({ config: c.config, repo: c.lot.repo, sha: tryGit(wd(c), ['rev-parse', 'HEAD']), dir: wd(c), needClean: true, label: `porte du lot ${c.lot.lot}`, local: (cmd) => sh(c, cmd), say: (line) => c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · ${line}`) }, (place) => runChecks(c, red, runs, place));

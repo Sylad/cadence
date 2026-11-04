@@ -14,7 +14,8 @@ import { trackedDirty } from './depot.js';
 import { adoptLeadReview, depositIntegrations, depositsOnly, integrationText, runsElsewhere } from './integration-vivante.js';
 import { mainTreeWorkers } from './main-tree.js';
 import { baseBranchOf, keptLines, lotBranch, lotTreeDir } from './worktree.js';
-import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState } from './state.js';
+import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState, type WaveState } from './state.js';
+import { projectEnv } from './preflight.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { launchPrices, renderTable } from './table.js';
 import { gestureSuffix, stillRunningRefusal, withReplayHint } from './geste.js';
@@ -156,7 +157,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
       if (r) leadReviewed.set(l, r);
       return r;
     })()) integ.push(l);
-    else if (l.status !== 'handed-back' || (l.next !== 'integrate' && !(t.replay && planNoteHandBack(l)))) refusals.push(`${opt} ${key} : le lot n'est pas rendu ${t.replay ? "à l'étape d'intégration ni sur une écriture de plan refusée" : "à l'étape d'intégration"} (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})${gestureSuffix(wave, l)}`);
+    else if (!stuckAtIntegration(wave, l) && notHandedBack(l, t.replay)) refusals.push(`${opt} ${key} : le lot n'est pas rendu ${t.replay ? "à l'étape d'intégration ni sur une écriture de plan refusée" : "à l'étape d'intégration"} (${l.status}, étape ${l.next ?? 'aucune'} : ${l.outcome ?? 'sans cause'})${gestureSuffix(wave, l)}`);
     else integ.push(l);
   }
   // Un lot retiré ne jouera rien : il ne subit ni le verrou du dépôt, ni le .nvmrc, ni l'arbre sale — un refus pour LUI ne doit pas faire échouer la reprise des autres.
@@ -253,6 +254,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
       const d = await trackedDirty(dir);
       if (d.length) refusals.push(`${basename(dir)} : arbre sale, ${d.length} fichier(s) suivi(s) modifié(s) : ${d.join(', ')}`);
     }
+    refusals.push(...configRefusals(live));
     if (refusals.length) {
       for (const r of withReplayHint(refusals, wave.id, argv)) io.err(`orchestrate : ${r}`);
       return 2;
@@ -272,17 +274,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
     wave.consumed += recovered.consumed;
     wave.cacheRead += recovered.cacheRead;
     if (recovered.consumed || recovered.cacheRead) store.writeWave(wave);
-    for (const [l, r] of raised) {
-      const k = lotKey(l.project, l.lot);
-      const text = `budget relevé de ${r.from} à ${r.to} (--resume --budget)`;
-      l.budget = r.to;
-      l.status = 'suspended';
-      l.next = r.step;
-      l.outcome = null;
-      l.warnings.push(text);
-      store.journal(`${k} → suspended — ${text}`);
-      io.out(`${k} → suspended — ${text}`);
-    }
+    for (const [l, r] of raised) raiseBudget(l, r, store, io);
     for (const l of integ) resumeIntegration(l, leadReviewed.get(l), store, io);
     for (const l of live) {
       if (l.status === 'implementing' || l.status === 'reviewing' || l.status === 'fixing') l.status = 'suspended';
@@ -308,6 +300,43 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
   } finally {
     if (!played) for (const f of taken) releaseLock(f, process.pid);
   }
+}
+
+/** Un lot rendu sur budget repart suspendu à son étape d'écriture, avec son budget relevé (`--resume --budget projet:lot=+N`, L223). */
+function raiseBudget(l: LotState, r: { from: number; to: number; step: SessionKind }, store: RunStore, io: OrchestrateIo): void {
+  const k = lotKey(l.project, l.lot);
+  const text = `budget relevé de ${r.from} à ${r.to} (--resume --budget)`;
+  l.budget = r.to;
+  l.status = 'suspended';
+  l.next = r.step;
+  l.outcome = null;
+  l.warnings.push(text);
+  store.journal(`${k} → suspended — ${text}`);
+  io.out(`${k} → suspended — ${text}`);
+}
+
+/** Le lot n'est pas rendu à l'étape d'intégration (ni, pour `--replay`, sur une écriture de plan refusée). */
+const notHandedBack = (l: LotState, replay: boolean | undefined): boolean => l.status !== 'handed-back' || (l.next !== 'integrate' && !(replay && planNoteHandBack(l)));
+
+/** L504 : une config illisible (clé posée avant sa mise en service) fait mourir `execute` APRÈS l'écriture des lots remis en jeu : lue ici, elle refuse la reprise avant toute écriture. */
+function configRefusals(live: LotState[]): string[] {
+  return live.flatMap((l) => {
+    try {
+      projectEnv(l.repo);
+      return [];
+    } catch (e) {
+      if (!(e instanceof RafError)) throw e;
+      return [`${lotKey(l.project, l.lot)} : ${e.message}`];
+    }
+  });
+}
+
+/**
+ * L504 : un lot resté `suspended` à l'étape d'intégration dans une vague terminée — l'état que laissait une reprise `--integrate` morte sur une erreur de config, après avoir remis le lot en jeu —
+ * n'a plus personne pour le jouer et `--resume` refuse la vague : `--integrate` le reprend comme un lot rendu à l'intégration.
+ */
+function stuckAtIntegration(wave: WaveState, l: LotState): boolean {
+  return wave.status === 'done' && l.status === 'suspended' && l.next === 'integrate' && !l.steps.some((s) => s.status === 'running');
 }
 
 /** Un lot retiré par `--drop` : la demande est déposée, le lot est rendu au lead sans être rejoué ; son worktree et sa branche restent (R12). */

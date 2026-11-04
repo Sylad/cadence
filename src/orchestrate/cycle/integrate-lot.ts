@@ -13,6 +13,9 @@ import { sh, shEscape } from './sh.js';
 import { integratedChecks, redExcerpt } from './checks.js';
 import { session } from './session.js';
 import { lateRefusal } from './depot-partage.js';
+import { awaitOlder } from './integrate-wait.js';
+import { conflictNotes } from '../lot-diff.js';
+import { declaredFor } from '../../resources.js';
 import { checkShape, type ReviewReport, REVIEW_SCHEMA } from '../schemas.js';
 /** Trace d'un verdict reporté après un rebase (R9) : le sha relu, le sha intégré qui le remplace, et le patch-id (le même des deux côtés) qui le garantit. */
 export interface Reporte {
@@ -123,7 +126,8 @@ const SHORT_REVIEW_TRACE = ' ; revue courte du diff rebasé (patch-id différent
 const minutesText = (ms: number): string => (ms % 60_000 === 0 ? `${ms / 60_000} minute${ms === 60_000 ? '' : 's'}` : `${Math.round(ms / 1000)} s`);
 
 /**
- * Intégration d'un lot en worktree à la branche du dépôt (L279, C2), AVANT sa transition à ready (R22). Sous le verrou d'intégration : branche du dépôt encore
+ * Intégration d'un lot en worktree à la branche du dépôt (L279, C2), AVANT sa transition à ready (R22). D'abord, hors verrou, l'attente d'un lot plus ancien de la
+ * vague qui travaille sur une ressource à chemins que le lot touche aussi (L558, `awaitOlder`). Puis sous le verrou d'intégration : branche du dépôt encore
  * celle de départ (R24), aucun fichier suivi modifié (R8), rebase sur le sommet courant (conflit : abandonné, rendu au lead, R6), contrôles rejoués au sommet
  * rebasé (R7), report du verdict si le patch-id est le même (R9) ou revue courte du diff rebasé sinon (R17), avance en fast-forward, puis écriture du plan dans le
  * dépôt du projet (R23). Tout rendu garde `next: integrate` et le worktree : seul `--resume --integrate` le rejoue (R14, R27).
@@ -145,6 +149,8 @@ export async function integrateLot(c: LotCtx): Promise<void> {
   const t = c.tree;
   const kept = `worktree conservé : ${t.dir}`;
   const waitMs = c.wave.integrate?.waitMs ?? INTEGRATE_WAIT_MS;
+  // L558 (R8) : avant le verrou, le lot attend la fin d'un lot plus ancien de la vague qui travaille déjà sur un chemin d'une ressource que son diff touche.
+  await awaitOlder(c);
   const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, c.wave.integrate);
   if (!grant.ok) return refuse(`intégration refusée : verrou d'intégration tenu par ${grant.holder.wave} (pid ${grant.holder.pid}) depuis plus de ${minutesText(waitMs)} ; ${kept}`);
   // Un refus tardif garde `l.verdict` avec la trace de la revue courte déjà jouée : reprise, elle est rejouée et remplace l'ancienne trace au lieu de s'y ajouter.
@@ -165,7 +171,9 @@ export async function integrateLot(c: LotCtx): Promise<void> {
         reporte = undefined;
         const rebased = rebaseOnto(t.dir, t.base);
         if (rebased.kind === 'conflict') {
-          return refuse(`intégration impossible : conflit en rebasant ${t.branch} sur ${t.base}${rebased.files.length ? ` (fichiers : ${rebased.files.join(', ')})` : ` (${rebased.detail})`} ; ${kept}`);
+          // L558 (R11) : pour chaque ressource à chemins qu'un fichier en conflit couvre, les commits de la base qui l'ont modifié depuis le départ du lot.
+          const notes = conflictNotes(t.dir, t.base, rebased.files, declaredFor(l.repo));
+          return refuse(`intégration impossible : conflit en rebasant ${t.branch} sur ${t.base}${rebased.files.length ? ` (fichiers : ${rebased.files.join(', ')})` : ` (${rebased.detail})`}${notes} ; ${kept}`);
         }
         if (rebased.kind === 'rebased') rebaseNotes(rebased, key).forEach((note) => c.wave.log(note));
         const tip = git(t.dir, 'rev-parse', 'HEAD');

@@ -168,10 +168,9 @@ describe('orchestrate --dry-run dit d’où vient le budget (L501)', () => {
   });
 
   it('R9 — sans mesure, le budget affiché est le statique et la base ne parle pas de mesure du p90', async () => {
-    const { dir, runs } = folder([1000]);
+    const { dir } = folder([1000]);
     withLot99(dir);
     const text = await dryRun(dir);
-    expect(runs).toBeTruthy();
     expect(text).toContain('budget du lot : 600000 tokens comptés (base : ');
     expect(text).toContain('1 lot(s) mesuré(s) sur 14 jours, il en faut 5');
   });

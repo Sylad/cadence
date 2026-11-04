@@ -160,7 +160,8 @@ proposé** (≤ 0,5 j).
 
 `lead tour` et `orchestrate --status` passent tous deux par `slotsLine` (`src/orchestrate/status.ts:42`) : là, une
 seule formule. Le doublon est **registre ↔ bande**. L591 (un lot en attente d'intégration rend son créneau) change
-encore la définition côté registre : la bande divergera de nouveau tant qu'elle recalcule.
+encore la définition côté registre : la bande divergera de nouveau tant qu'aucun test ne joue les deux formules sur
+le même registre.
 
 Deux voies ont été écartées, parce qu'elles rompraient une règle documentée ou déplaceraient la divergence :
 
@@ -170,7 +171,8 @@ Deux voies ont été écartées, parce qu'elles rompraient une règle documenté
   `node` à chaque rafraîchissement (5 s, README du plugin).
 - **le registre publie un fichier** (`slots.json` écrit à chaque changement). Les deux lecteurs jugent la vivacité **à la
   lecture**, pas à l'écriture : `liveWaves` teste `holderAlive(pid)` (`registry.ts:62`), le collecteur de la bande teste
-  `alive(pid)` (`collect.ts:122`), `liveHolds` compare l'échéance à `now` (`format.ts:458`, `lead-hold`). Une vague tuée
+  `alive(pid)` (`collect.ts:122`), `liveHolds` compare l'échéance à `now` (`format.ts:458`, la règle de `cadence lead
+  hold`). Une vague tuée
   (`kill -9`) ou un hold échu laisserait le fichier faux jusqu'à la prochaine écriture, alors que la bande actuelle est
   juste sur ces deux cas.
 

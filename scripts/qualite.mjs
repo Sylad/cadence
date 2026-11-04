@@ -2,7 +2,7 @@
 // Le cliquet compare la mesure à qualite-baseline.json : l'existant passe, rien ne peut empirer, ce qui baisse se fige.
 // Lancé par `npm run qualite` (porte orchestrate.build et CI) ; la recette est dans docs/qualite.md.
 import { spawnSync } from 'node:child_process';
-import { existsSync, globSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, globSync, lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -191,11 +191,13 @@ export function lireRef(racine, ref) {
   const existe = (chemin) => git('cat-file', '-e', `${sha}:${chemin}`).status === 0;
   const config = (chemin) => { const r = git('show', `${sha}:${chemin}`); return r.status === 0 ? r.stdout : null; };
   const fichiers = () => git('ls-tree', '-r', '-z', '--name-only', sha).stdout.split('\0').filter(Boolean);
-  // ce que le lot a touché depuis son départ : commits, modifications suivies et fichiers neufs non ignorés
+  // ce que le lot a touché depuis son départ : commits, modifications suivies (sans détection de renommage : un renommage src → test remonte ses deux chemins)
+  // et fichiers neufs non ignorés — hors liens symboliques non suivis, que la vague orchestrate pose elle-même dans un worktree (evals/results, plugins/…/types)
+  const nonSymbolique = (f) => !lstatSync(join(racine, f)).isSymbolicLink();
   const touches = () => [...new Set([
-    ...git('diff', '--name-only', '-z', sha).stdout.split('\0'),
-    ...git('ls-files', '-z', '--others', '--exclude-standard').stdout.split('\0'),
-  ].filter(Boolean))];
+    ...git('diff', '--name-only', '--no-renames', '-z', sha).stdout.split('\0').filter(Boolean),
+    ...git('ls-files', '-z', '--others', '--exclude-standard').stdout.split('\0').filter(Boolean).filter(nonSymbolique),
+  ])];
   return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, config, fichiers, touches, lotConfig: lotDeConfig(git('branch', '--show-current').stdout.trim(), config) };
 }
 

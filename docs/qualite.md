@@ -75,7 +75,8 @@ anything, and the ratchet closes them:
   **at the start of the lot** (`.cadence/raf.yaml`, else `docs/plan/raf.yaml`; the lot is found from its branch
   `cadence/<wave>/<project>--<lot>`), so a lot cannot exempt itself, and it applies to that lot only. In exchange the lot
   touches only config files, tests (`test/`, `*.test.*`, `*.spec.*`) and the usual bookkeeping (`qualite-baseline.json`,
-  `CHANGELOG.md`, `docs/`, `.cadence/`); any other file is refused by name. Every other measure of the ratchet (findings, directives, the baseline that cannot go up) still judges it.
+  `CHANGELOG.md`, `docs/`, `.cadence/`); any other file is refused by name — committed, modified or new and not ignored,
+  a rename counted on both of its paths; the untracked symbolic links a wave lays in its worktree are not counted. Every other measure of the ratchet (findings, directives, the baseline that cannot go up) still judges it.
 - **A hidden path**: `.git/info/exclude` is not versioned, so it cannot be compared to the start of the lot. When it holds
   a pattern (a line that is neither blank nor a comment) the command adds a warning to its output, success or refusal,
   naming the first three patterns. It does not fail: that file legitimately holds local paths.

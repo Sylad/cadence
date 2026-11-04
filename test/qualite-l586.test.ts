@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { appliquer, BASELINE, lireRef } from '../scripts/qualite.mjs';
@@ -64,6 +64,32 @@ describe('L586 — un lot de config déclaré (config: true) échappe au refus d
     ecrire('src/code.ts', 'x');
     git('add', 'src/code.ts');
     git('commit', '-qm', 'code');
+    expect(verifier().texte).toContain('src/code.ts');
+  });
+
+  it('R3 — un renommage de code vers test/ remonte le chemin de code supprimé (--no-renames) : refusé', () => {
+    const { dir, verifier, ecrire, git } = depot('    config: true\n');
+    git('checkout', '-q', 'main');
+    ecrire('src/code.ts', 'export const a = 1;\n');
+    git('add', 'src/code.ts');
+    git('commit', '-qm', 'code au depart');
+    git('checkout', '-q', 'cadence/v/p--L1');
+    git('merge', '-q', 'main');
+    mkdirSync(join(dir, 'test'), { recursive: true });
+    git('mv', 'src/code.ts', 'test/code.test.ts');
+    git('commit', '-qm', 'renomme');
+    const r = verifier();
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain('src/code.ts');
+  });
+
+  it('R3 — un lien symbolique non suivi posé par la vague dans le worktree (evals/results → dépôt principal) ne compte pas comme fichier touché ; un fichier ordinaire non suivi compte toujours', () => {
+    const { dir, verifier, ecrire } = depot('    config: true\n');
+    ecrire('vitest.workspace.ts', 'b');
+    mkdirSync(join(dir, 'evals'));
+    symlinkSync(dir, join(dir, 'evals/results'));
+    expect(verifier().code).toBe(0);
+    ecrire('src/code.ts', 'x');
     expect(verifier().texte).toContain('src/code.ts');
   });
 

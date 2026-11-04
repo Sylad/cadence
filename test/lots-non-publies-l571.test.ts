@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { orchestrate, type OrchestrateIo } from '../src/orchestrate/command.js';
@@ -84,6 +84,24 @@ describe('L571 — lots en service non publiés', () => {
     const io: OrchestrateIo = { cwd: dir, env: { CADENCE_HOME: home }, out: (x) => out.push(x), err: (x) => out.push(x), now: () => new Date(`${TODAY}T18:30:00`) } as OrchestrateIo;
     await orchestrate(['--status'], io, {} as never);
     expect(out.join('\n')).toMatch(LINE);
+  });
+
+  it('R3b — orchestrate --status lancé depuis un dossier parent : une ligne ⚠ par projet, préfixée de son nom', async () => {
+    const parent = tempDir();
+    for (const name of ['alpha', 'beta']) renameSync(await publishing(), join(parent, name));
+    const home = tempDir();
+    process.env.CADENCE_HOME = home;
+    const wave: WaveState = { id: 'w1', created: '2026-11-04T10:00:00Z', cwd: parent, budget: 1, consumed: 0, cacheRead: 0, status: 'done', pid: 1, lots: ['demo:L2'] };
+    const store = new RunStore(parent, 'w1');
+    store.writeWave(wave);
+    store.writeLot(newLot({ project: 'demo', repo: join(parent, 'alpha'), lot: 'L2', title: 'Deux', visible: false, small: false, model: 'sonnet', readOnlyPlan: false }));
+    const out: string[] = [];
+    const io: OrchestrateIo = { cwd: parent, env: { CADENCE_HOME: home }, out: (x) => out.push(x), err: (x) => out.push(x), now: () => new Date(`${TODAY}T18:30:00`) } as OrchestrateIo;
+    await orchestrate(['--status'], io, {} as never);
+    const lines = out.join('\n').split('\n').filter((l) => l.includes('depuis le dernier tag'));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/^alpha · ⚠ 2 lots done depuis le dernier tag v1\.46\.0 \(L2, L3\)/);
+    expect(lines[1]).toMatch(/^beta · ⚠ 2 lots done/);
   });
 
   it('R4 — sans tag de version : aucune ligne', async () => {

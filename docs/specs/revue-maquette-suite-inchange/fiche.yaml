@@ -1,0 +1,154 @@
+sujet:
+  id: revue-maquette-suite-inchange
+  titre: "Revue de maquette qui converge : un majeur sur un point inchangé va au tableau en suite, la revue 1 balaie les tailles"
+  lot: L562
+  perimetre:
+    modules:
+      - src/orchestrate/cycle/spec-steps.ts
+      - src/orchestrate/cycle/shared.ts
+      - src/orchestrate/maquette.ts
+      - src/orchestrate/schemas.ts
+      - templates/orchestrate/maquette.md
+      - agents/ux-reviewer.md
+    endpoints: []
+    jobs: ["étape maquette d'orchestrate (revue de la maquette par ux-reviewer, mode maquette)"]
+    hors_perimetre:
+      - "la revue de la fiche back (étape fiche, code-reviewer) : elle ne lit pas inchange"
+      - "la revue de conformité UX après le code (mode conformité, étape ux)"
+      - "le schéma de l'état d'un lot (src/orchestrate/state.ts) : aucun champ ajouté"
+      - "la détection du point inchangé par le programme : elle reste déclarée par l'agent (champ inchange, L230)"
+
+cas:
+  - id: C1
+    titre: "La revue 2 ou suivante ne trouve plus que des majeurs sur des points inchangés"
+    acteur: le programme (orchestrate)
+    declencheur: job maquette (revue de rang 2 ou plus)
+    preconditions:
+      - "la revue précédente a renvoyé la maquette à la spec"
+      - "le rapport ne contient, comme bloquants et majeurs, que des majeurs marqués inchange: true"
+    nominal:
+      - "Le programme lit les constats du rapport."
+      - "Les majeurs marqués inchange: true sont mis de côté : ils ne comptent ni dans les totaux de la revue ni dans les constats renvoyés à la spec."
+      - "Chacun est ajouté au tableau en suite pour le lead (propositions du lot), avec son fichier, sa ligne et son texte."
+      - "La revue est conforme : le lot passe à l'étape suivante (accept ou implement) sans nouvelle session spec."
+      - "Le verdict gardé pour la maquette dit que le lot est conforme avec ces majeurs en suite pour le lead."
+    alternatives:
+      - { si: "le rapport contient aussi un bloquant, ou un majeur non marqué (marque absente, fausse, non booléenne)", alors: "ceux-là comptent comme avant : revue non conforme, renvoi à la spec ou rendu au lead ; les majeurs marqués vont tout de même au tableau en suite", regles: [R1, R2, R4] }
+      - { si: "la revue est la première", alors: "inchange: true est sans effet : tous les majeurs comptent", regles: [R1] }
+      - { si: "un bloquant est marqué inchange: true", alors: "il compte comme avant (seuls les majeurs sont mis de côté)", regles: [R1] }
+      - { si: "un mineur est marqué inchange: true", alors: "il suit la voie des mineurs de la maquette, sans changement", regles: [R1] }
+      - { si: "le même majeur revient à une revue suivante", alors: "il n'est pas écrit deux fois dans le tableau", regles: [R2] }
+    resultat: "La boucle converge : un point inchangé que la revue 1 avait manqué n'arrête plus le lot, et le lead le retrouve au tableau en suite."
+  - id: C2
+    titre: "Le lot est rendu ou continue avec seulement de tels constats et le dit dans son verdict"
+    acteur: le lead
+    declencheur: lecture du verdict de la revue de la maquette (état du lot, rapport final)
+    preconditions:
+      - "la revue de la maquette est conforme parce que ses seuls majeurs étaient marqués inchange: true"
+    nominal:
+      - "Le verdict de la revue de maquette gardé pour le lot reprend celui de l'agent."
+      - "Il y ajoute « conforme, N majeur(s) sur un point inchangé en suite pour le lead : <textes> »."
+    alternatives:
+      - { si: "la revue est conforme sans aucun majeur mis de côté", alors: "le verdict est celui de l'agent, sans ajout", regles: [R3] }
+      - { si: "la revue est non conforme", alors: "le verdict de rendu est celui du constat qui compte, sans les majeurs mis de côté dans la liste des constats", regles: [R3, R4] }
+    resultat: "Le lead sait, sans ouvrir le rapport, que le lot a passé la revue avec des majeurs laissés en suite."
+  - id: C3
+    titre: "La revue 1 balaie les tailles déclarées par la fiche"
+    acteur: l'agent ux-reviewer (mode maquette)
+    declencheur: job maquette (première revue du lot)
+    preconditions:
+      - "une fiche et une maquette valides ont été écrites par l'étape spec"
+    nominal:
+      - "Le brief maquette.md et l'agent exigent de relever, dès la revue 1, chaque taille que la fiche donne (tailles de texte, hauteur et largeur des cibles, largeurs, espacements)."
+      - "Chaque taille est comparée à la maquette rendue (valeur mesurée) et à son jeton de CSS du produit."
+      - "Un écart est un constat de la revue 1, avec ses autres constats ; une taille non mesurable va dans nonVerifie."
+    alternatives:
+      - { si: "la fiche ne donne aucune taille", alors: "la ligne de la liste à cocher le dit et il n'y a rien à comparer", regles: [R5] }
+    resultat: "Les écarts de taille sont tous dans le premier rapport, avant que la boucle ne s'ouvre."
+  - id: C4
+    titre: "Le brief des revues suivantes dit ce qui ne bloque plus"
+    acteur: le programme (orchestrate)
+    declencheur: job maquette (brief d'une revue de rang 2 ou plus)
+    preconditions:
+      - "la revue précédente a renvoyé la maquette à la spec"
+    nominal:
+      - "Le brief dit que le majeur marqué inchange: true ne bloque pas et va au lead."
+      - "Il garde la consigne de ne marquer que les points que la spec writer n'a pas changés et que la revue précédente n'avait pas relevés."
+    alternatives:
+      - { si: "la revue est la première", alors: "le brief ne parle pas du marquage", regles: [R6] }
+    resultat: "L'agent sait que le marquage est la voie d'un majeur tardif vers le lead."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "À partir de la revue 2 d'une maquette, un constat de gravité majeur marqué strictement inchange: true ne compte pas pour la non-conformité : il est retiré des totaux (bloquants, majeurs) de la revue, de sa conformité et de la liste des constats renvoyés à la spec ou rendus au lead. Un bloquant marqué compte comme avant ; un majeur non marqué, ou dont la marque n'est pas le booléen vrai, compte comme avant ; en revue 1 la marque est sans effet ; les totaux annoncés par l'agent ne servent pas à les remettre dans le compte."
+    statut: sourcee
+    source: "demande du lot L562 : « dès la revue 2, un majeur sur un point inchangé et absent de la revue précédente ne compte plus pour la non-conformité » ; marque inchange déjà lue en src/orchestrate/cycle/spec-steps.ts:266-269 et schemas.ts:50, lue comme faux hors booléen (docs/specs/revue-maquette-exhaustive R8)"
+    tests:
+      - "R1 — revue 2, un seul majeur marqué inchange: true : la revue est conforme, le lot passe à l'étape suivante sans session spec"
+      - "R1 — revue 2, majeur marqué et totaux annoncés majeurs: 1 : conforme quand même"
+      - "R1 — revue 2, un majeur marqué et un majeur non marqué : non conforme, seul le non marqué est renvoyé à la spec"
+      - "R1 — revue 2, bloquant marqué inchange: true : non conforme"
+      - "R1 — revue 1, majeur marqué inchange: true : non conforme comme avant"
+      - "R1 — revue 2, majeur avec inchange 'true' (texte) ou null : non conforme"
+      - "R1 — revue de la fiche, majeur marqué inchange: true : non conforme (la fiche ne lit pas la marque)"
+  - id: R2
+    cas: [C1]
+    enonce: "Chaque majeur mis de côté par R1 est ajouté une fois aux propositions du lot (le tableau en suite pour le lead, celui où vont déjà les mineurs de la maquette) sous la forme « [suite ux] <fichier>:<ligne> — <texte> » (« <fichier> — » absent quand le constat n'a pas de fichier, « :<ligne> » absent sans ligne) ; il y va aussi quand la revue reste non conforme pour une autre cause ; le même texte redit à une revue suivante n'est pas ajouté deux fois."
+    statut: hypothese
+    si_faux: "Si le lead voulait un autre intitulé ou un champ à part dans l'état du lot, seul le préfixe du texte change ; un champ de plus dans l'état (state.ts) serait un modèle stocké : à poser au lead, non retenu ici."
+    tests:
+      - "R2 — revue 2, majeur marqué : lot.proposals contient « [suite ux] fichier:ligne — texte »"
+      - "R2 — revue 2, majeur marqué sans fichier : la ligne est « [suite ux] <texte> »"
+      - "R2 — revue 2 non conforme pour un autre majeur : le majeur marqué est quand même dans lot.proposals"
+      - "R2 — le même majeur marqué redit en revue 3 : une seule entrée dans lot.proposals"
+      - "R2 — revue 1, majeur marqué : rien dans lot.proposals au titre de « [suite ux] »"
+  - id: R3
+    cas: [C2]
+    enonce: "Quand la revue de la maquette est conforme et que R1 a mis de côté N ≥ 1 majeurs, le verdict gardé dans l.maquette.verdict est le verdict de l'agent suivi de « — conforme, N majeur(s) sur un point inchangé en suite pour le lead : <textes séparés par « ; »> » (« majeur » au singulier quand N vaut 1, « majeurs » sinon) ; sans majeur mis de côté, le verdict est celui de l'agent, sans ajout."
+    statut: sourcee
+    source: "demande du lot L562 : « un lot rendu avec seulement de tels constats le dit dans son verdict » ; verdict gardé : src/orchestrate/cycle/spec-steps.ts:262"
+    tests:
+      - "R3 — un majeur mis de côté : l.maquette.verdict se termine par « — conforme, 1 majeur sur un point inchangé en suite pour le lead : <texte> »"
+      - "R3 — deux majeurs mis de côté : « 2 majeurs », textes séparés par « ; »"
+      - "R3 — aucun majeur mis de côté : l.maquette.verdict égale le verdict de l'agent"
+  - id: R4
+    cas: [C1, C2]
+    enonce: "Les messages de rendu et de renvoi de la revue de maquette (« maquette non conforme après <n> revues : <verdict> », « … et la spec a déjà joué <n> sessions : … ») et la consigne de la session spec ne listent que les constats qui comptent (R1) ; leur texte et la limite de revues de L230 sont inchangés."
+    statut: sourcee
+    source: "src/orchestrate/cycle/spec-steps.ts:277-289 (liste des constats retenus) ; demande du lot : ne plus compter ces majeurs pour la non-conformité"
+    tests:
+      - "R4 — revue 3 non conforme avec un majeur marqué et un non marqué : le rendu liste le non marqué seul"
+      - "R4 — revue 2 non conforme : maquetteConstats ne contient pas le majeur marqué"
+  - id: R5
+    cas: [C3]
+    enonce: "Le brief maquette.md et le mode maquette de l'agent ux-reviewer exigent, dès la revue 1, de balayer les tailles que la fiche donne (tailles de texte, cibles, largeurs, espacements) : chacune est comparée à la valeur mesurée dans la maquette et à un jeton du produit, comme une ligne de la liste à cocher ; une taille non mesurable va dans nonVerifie."
+    statut: hypothese
+    si_faux: "Si « tailles de la fiche » visait un autre objet (par exemple le poids de la fiche), seul le texte du brief et de l'agent change (aucune donnée)."
+    tests:
+      - "R5 — le brief maquette.md rendu mentionne les tailles de la fiche dans le balayage de la revue 1"
+      - "R5 — agents/ux-reviewer.md (mode maquette) a la ligne « tailles » dans la liste à cocher de la première revue"
+  - id: R6
+    cas: [C4]
+    enonce: "Le brief d'une revue de rang 2 ou plus dit qu'un majeur marqué inchange: true ne bloque pas et va au lead ; le brief de la revue 1 ne parle pas de ce marquage comme voie de sortie. L'agent ux-reviewer et la description de inchange dans REVIEW_SCHEMA disent la même chose."
+    statut: hypothese
+    si_faux: "Si le brief devait rester muet, l'agent marquerait sans savoir l'effet ; seul le texte change (aucune donnée, schéma inchangé hors description)."
+    tests:
+      - "R6 — brief de la revue 2 : « ne bloque pas » et « lead » présents près de inchange"
+      - "R6 — brief de la revue 1 : aucune consigne sur ce qui ne bloque pas"
+      - "R6 — rapport sans inchange ou avec inchange non booléen : accepté, comme avant"
+
+contrats:
+  - id: A1
+    appel: job maquette
+    entree: "la fiche, la maquette, le rang de la revue, le rapport de revue (constats avec inchange facultatif)"
+    sortie: "revue conforme (majeurs marqués au tableau en suite, verdict complété) ou non conforme ; suite : accept, implement, spec ou rendu au lead"
+    erreurs:
+      - { code: log error, message: "maquette non conforme après <n> revues : <verdict>" }
+      - { code: log error, message: "maquette non conforme et la spec a déjà joué <n> sessions : <verdict>" }
+    regles: [R1, R2, R3, R4, R5, R6]
+
+donnees:
+  - { id: D1, objet: "l.proposals de l'état du lot (state.ts)", existant: true, modification: aucune, note: "des lignes de texte de plus « [suite ux] … » ; format de la liste inchangé" }
+  - { id: D2, objet: "l.maquette.verdict de l'état du lot", existant: true, modification: aucune, note: "même champ texte, texte plus long ; aucun champ ajouté" }
+  - { id: D3, objet: "REVIEW_SCHEMA constats[].inchange (schemas.ts:50)", existant: true, modification: aucune, note: "champ facultatif existant ; seule sa description change, validation inchangée" }

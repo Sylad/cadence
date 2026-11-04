@@ -1307,12 +1307,13 @@ lots:
     finished: 2026-11-01
   - id: L514
     title: "Rejeu isolé des tests rouges pour une porte node --test (evatosorus) : lire le titre → fichier dans la sortie (location:) et prouver l'exécution d'un test vert sans fichier imprimé, sans changer failedTests pour les autres lanceurs — suite de L512 (décision de Sylvain du 01-11), faux rouge evatosorus L45"
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L512 ]
     created: 2026-11-01
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "conforme : les deux notes mineures sont corrigées (import join inutilisé retiré, TAP_NOT_OK défini une seule fois et partagé par MARKERS et nodeTestFiles), sans régression. J'ai vérifié les commits 0408543, fc630ce, b4f08d1, e1ef700, d560b39, e34edb2 et 96d8ee2 : les tests L514 passent (27/27), les tests L510, L512 et baseline aussi (93/93), et eslint ne trouve aucune erreur sur les 4 fichiers changés. — orchestré (vague 2026-11-04-1310-cad, 3 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : rebase sans effet sur le code du lot, 1 mineur (ligne vide parasite CHANGELOG.md:101 dans la section 1.53.0)", commit: edd5389a67fd4a2833d5d70b91426b17b7e5e791 }
+    finished: 2026-11-04
   - id: L515
     title: "CI « tests » rouge sur main depuis le 31-10 par construction : l'étape « Suite sous npm publish --dry-run » échoue « You cannot publish over the previously published versions » dès que package.json porte une version déjà publiée (tout commit hors release) — tolérer ce seul refus comme publish.yml (grep EPUBLISHCONFLICT/previously published), sans masquer un vrai rouge de la suite ; + test instable sous Node 24 : porte-deportee.test.ts R17 « deux remplissages simultanés de même empreinte » (run 41322154515)"
     status: done

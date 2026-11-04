@@ -130,13 +130,13 @@ describe('L470 — correctifs de la revue', () => {
     expect(r.err).toMatch(/illisible/);
     expect(JSON.parse(r.out).events.filter((e: { type: string }) => e.type === 'etat')).toEqual([{ day: '2026-10-12', type: 'etat', lot: 'L1', from: null, to: 'code', sha: c }]);
   });
-  it('coût — blobs lit plusieurs blobs en un seul git cat-file --batch, découpés à l\'octet (UTF-8), un id inconnu est absent', () => {
+  it('coût — blobs lit plusieurs blobs en un seul git cat-file --batch, découpés à l\'octet (UTF-8) ; un id inconnu ou un objet qui n\'est pas un blob est absent sans décaler la lecture', () => {
     const dir = project();
     writeFileSync(join(dir, 'a.txt'), 'é à ü\n');
     writeFileSync(join(dir, 'b.txt'), 'second\n');
     commit(dir, '2026-10-11T09:00:00', 'feat(L1): deux fichiers', 'a.txt', 'b.txt');
     const [a, b] = ['a.txt', 'b.txt'].map((f) => git(dir, 'rev-parse', `HEAD:${f}`));
-    const got = blobs(dir, [a, '0'.repeat(40), b]);
+    const got = blobs(dir, [a, '0'.repeat(40), git(dir, 'rev-parse', 'HEAD^{tree}'), b]);
     expect([...got.entries()]).toEqual([
       [a, 'é à ü\n'],
       [b, 'second\n'],

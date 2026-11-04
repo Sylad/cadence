@@ -182,9 +182,10 @@ export function blobs(cwd: string, ids: string[]): Map<string, string> {
     if (nl < 0) break;
     const [id, kind, size] = buf.subarray(pos, nl).toString('utf8').split(' ');
     pos = nl + 1;
-    if (kind !== 'blob') continue;
+    if (kind === 'missing') continue;
+    // Un objet d'un autre type (arbre, commit) a lui aussi un contenu à enjamber : seul un blob est retenu.
     const n = Number(size);
-    out.set(id, buf.subarray(pos, pos + n).toString('utf8'));
+    if (kind === 'blob') out.set(id, buf.subarray(pos, pos + n).toString('utf8'));
     pos += n + 1;
   }
   return out;

@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- Tests unstable under load (L577, [docs/mesures/instables-sous-charge-2026-11-04.md](docs/mesures/instables-sous-charge-2026-11-04.md)): four tests that slept at the wall now wait for the event — `deliver` (f) waits until the tracker has adopted the descendant; the empty-lock test of `orchestrate-app` runs on a simulated clock (the lock's age is no longer the real time elapsed under load); the remaining-delay test applies its clock jump when the probe obtains the lock, not 100 ms at the wall; the two R16 tests of `orchestrate-worktree-plan-writes` wait for L2 to reach its UX step (or `ready`) instead of 4.5 s and 800 ms. The program's code does not change. The measure document gives, for each of the 12 tests seen unstable from 01 to 04-11, its cause and its state.
+
 ### Added
 
 - `plan.onWrite.onFailure: refuse | warn` (L471, [docs/raf.md](docs/raf.md) « Regenerate the published copy »): with `warn`, a failing `plan.onWrite` command (an unreachable external mirror) no longer refuses the write — the plan is written, the exit code stays 0 and stderr warns; the default `refuse` is unchanged.

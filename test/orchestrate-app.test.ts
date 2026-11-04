@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { basename, delimiter, dirname, join } from 'node:path';
 import { chmodSync, mkdirSync as mk } from 'node:fs';
@@ -244,15 +244,25 @@ describe('verrou par hôte:port de l\'URL (L60)', () => {
   it('verrou vide (pose en cours) : respecté tant qu\'il est récent, volé au bout de 5 s', async () => {
     const t = await fakeApp(0);
     const lock = uxLockFile(t.url);
-    writeFileSync(lock, '');
-    const waiting = await startApp({ ...opts(t), timeoutMs: 600 });
-    expect(waiting.state.kind === 'unverified' && waiting.state.cause).toContain('url tenue par une autre vague');
-    expect(existsSync(join(t.dir, 'pid'))).toBe(false);
-    const old = new Date(Date.now() - 6_000);
-    utimesSync(lock, old, old);
-    const app = await startApp(opts(t));
-    expect(app.state).toEqual({ kind: 'ready' });
-    await app.stop();
+    // L577 : `takeUrlLock` mesure l'âge du verrou vide à l'horloge réelle (mtime contre Date.now) ; le test l'écrivait puis attendait au mur :
+    // plus de 5 s sous charge entre l'écriture et la première sonde, et le verrou « récent » était volé (ready au lieu de « url tenue »).
+    // L'horloge de l'orchestrateur est simulée (comme pour « délai restant ») : reculée de 25 s, le verrou reste récent pendant tout le
+    // test (30 s de délai) quelle que soit la charge, le délai de 600 ms étant compté sur la même horloge ; avancée de 6 s, il a plus de 5 s.
+    const real = Date.now.bind(Date);
+    let skew = -25_000;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => real() + skew);
+    try {
+      writeFileSync(lock, '');
+      const waiting = await startApp({ ...opts(t), timeoutMs: 600 });
+      expect(waiting.state.kind === 'unverified' && waiting.state.cause).toContain('url tenue par une autre vague');
+      expect(existsSync(join(t.dir, 'pid'))).toBe(false);
+      skew = 6_000;
+      const app = await startApp(opts(t));
+      expect(app.state).toEqual({ kind: 'ready' });
+      await app.stop();
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('verrou obtenu après le délai : rien n\'est lancé, verrou rendu, « url tenue par une autre vague »', async () => {
@@ -279,11 +289,22 @@ describe('verrou par hôte:port de l\'URL (L60)', () => {
     // L528/L540 : la sonde du verrou dort 500 ms puis reprend ; si ce réveil, sous charge, arrive après le reste (délai moins le saut),
     // le verrou est « obtenu après le délai » et le message devient « url tenue par une autre vague ». Le reste est donc de 5 s (délai 25 s,
     // saut 20 s, attendues au mur par la sonde) : il faut un réveil en retard de plus de 5 s pour que le test rougisse (2 s avec 30 s et 28 s : rouge dans la suite de L539).
+    // L577 : le saut n'est plus appliqué au mur (à la restitution du verrou) mais à l'événement : la première lecture de l'horloge qui suit la
+    // restitution est celle de la sonde qui obtient le verrou, et elle lit `t0 + 20 s` quel que soit le retard de son réveil. Le reste est donc
+    // fixe (5 s) sous n'importe quelle charge ; la marge de L540 n'est plus ce qui tient le test.
     const real = Date.now.bind(Date);
     let skew = 0;
-    const clock = vi.spyOn(Date, 'now').mockImplementation(() => real() + skew);
+    let jumpTo: number | undefined;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => {
+      if (jumpTo !== undefined) {
+        skew = jumpTo - real();
+        jumpTo = undefined;
+      }
+      return real() + skew;
+    });
+    const t0 = Date.now();
     const timer = setTimeout(() => {
-      skew = 20_000;
+      jumpTo = t0 + 20_000;
       rmSync(lock, { force: true });
     }, 100);
     try {

@@ -4,8 +4,9 @@ import { join } from 'node:path';
 import { tourRow } from '../src/lead.js';
 import { readPlanConfig } from '../src/config.js';
 import { gitRepo } from './helpers.js';
-import { deliveriesOf } from '../plugins/cadence-hud/hooks/deliveries.js';
-import { parseLotsBoard } from '../plugins/cadence-hud/hooks/lots.js';
+
+const { deliveriesOf } = (await import(new URL('../plugins/cadence-hud/hooks/deliveries.ts', import.meta.url).href)) as { deliveriesOf: (last: never[], board: unknown, at: number) => { undelivered: string[] }[] };
+const { parseLotsBoard } = (await import(new URL('../plugins/cadence-hud/hooks/lots.ts', import.meta.url).href)) as { parseLotsBoard: (stdout: string) => unknown };
 
 const foreign = (fields: string, entries: string): string => {
   const dir = gitRepo();

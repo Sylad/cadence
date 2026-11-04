@@ -1,4 +1,4 @@
-import { isDay, type Day } from './dates.js';
+import { isCalendarDay, type Day } from './dates.js';
 import { FIELDS, RafError, STATUSES, type Field, type Lot, type PlanFormat } from './plan.js';
 import { normalizeLot } from './plan-read.js';
 
@@ -12,7 +12,7 @@ interface ForeignEntry {
 /** Le jour d'une valeur : un jour AAAA-MM-JJ, ou un horodatage qui vaut pour le sien ; tout autre chose n'en est pas un. */
 const dayOnly = (v: unknown): Day | undefined => {
   const d = typeof v === 'string' ? v.slice(0, 10) : '';
-  return typeof v === 'string' && (v.length === 10 || /^\d{4}-\d{2}-\d{2}T/.test(v)) && isDay(d) ? d : undefined;
+  return typeof v === 'string' && (v.length === 10 || /^\d{4}-\d{2}-\d{2}T/.test(v)) && isCalendarDay(d) ? d : undefined;
 };
 
 /** Livré hors de `cadence deliver` (L530) : le jour que l'outil du projet écrit sous une clé de `plan.fields.delivered` (la première qui en porte un) ; le sha n'est pas connu. */

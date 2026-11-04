@@ -331,7 +331,7 @@ describe('L472 — bords de l\'import', () => {
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/archivés/);
   });
-  it('R30 — le retour garde les clés propres au natif (planned, delivered, tasks) telles quelles : rien ne se perd après raf plan', () => {
+  it('R30 — le retour garde les clés propres au natif (planned, delivered) telles quelles : rien ne se perd après raf plan', () => {
     const dir = project();
     raf(dir, 'import', '--from-config', '--out', '.cadence/raf.yaml');
     const origin = switched(dir);
@@ -340,6 +340,24 @@ describe('L472 — bords de l\'import', () => {
     const back = (parse(readFileSync(join(dir, 'tmp/retour.yaml'), 'utf8')) as { taches: Record<string, unknown>[] }).taches;
     expect(back.find((t) => t.ident === 'AB-2')!.planned).toEqual({ from: '2026-11-05', to: '2026-11-06' });
   });
+  it('R38 — une sous-tâche créée dans le natif (raf add --parent) revient en sous-lot à plat du format d\'origine, juste après son lot, et le lecteur en lecture seule la voit', () => {
+    const dir = project();
+    raf(dir, 'import', '--from-config', '--out', '.cadence/raf.yaml');
+    const origin = switched(dir);
+    expect(raf(dir, 'add', 'Sous-tâche native', '--parent', 'AB-1').code).toBe(0);
+    expect(nativeOf(dir, '.cadence/raf.yaml').lots[0]).toHaveProperty('tasks');
+    expect(raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...origin).code).toBe(0);
+    const back = (parse(readFileSync(join(dir, 'tmp/retour.yaml'), 'utf8')) as { taches: Record<string, unknown>[] }).taches;
+    expect(back.map((t) => t.ident)).toEqual(['AB-1', 'AB-1/t1', 'AB-1/t1-fusion', 'AB-2']);
+    expect(back[0]).not.toHaveProperty('tasks');
+    expect(back[1]).toEqual({ ident: 'AB-1/t1', titre: 'Sous-tâche native', etat: 'a_faire', parent: 'AB-1' });
+    const list = raf(dir, 'list', '--json', '--file', 'tmp/retour.yaml', ...origin);
+    expect(list.code).toBe(0);
+    const read = (JSON.parse(list.out) as { id: string; tasks: { id: string; title: string; status: string }[] }[]).find((l) => l.id === 'AB-1')!;
+    // Le lecteur replie aussi le sous-lot à plat d'origine (AB-1/t1-fusion) : la sous-tâche native est à côté de lui.
+    expect(read.tasks).toContainEqual({ id: 't1', title: 'Sous-tâche native', status: 'todo' });
+  });
+});
 });
 
 describe('L472 — la comparaison de --verify voit une perte', () => {

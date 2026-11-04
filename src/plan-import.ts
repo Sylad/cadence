@@ -16,8 +16,8 @@ const RESERVED = new Set<string>([...FIELDS, 'state', 'state_before', 'delivered
 /** Les champs recopiés tels quels (la valeur du fichier d'origine fait foi). */
 const VERBATIM: Field[] = ['quickwin', 'visible', 'screen', 'spec', 'public', 'every', 'repos', 'gate', 'goal'];
 const DAYS: Field[] = ['last', 'created', 'started', 'finished'];
-/** Ce que le natif tient sous ses clés propres : le reste d'une entrée native est rendu tel quel au format d'origine. */
-const NATIVE_OWN = new Set<string>([...FIELDS, 'state', 'estimate_label', ORIGIN]);
+/** Ce que le natif tient sous ses clés propres (`tasks:` compris, rendu en entrées à plat) : le reste d'une entrée native est rendu tel quel au format d'origine. */
+const NATIVE_OWN = new Set<string>([...FIELDS, 'state', 'estimate_label', 'tasks', ORIGIN]);
 /** Les champs d'une entrée native que le retour écrit, dans l'ordre. */
 const BACK_FIELDS = ['id', 'title', 'status', 'estimate', ...VERBATIM, ...DAYS, 'after', 'notes', 'parent'] as Field[];
 type Origin = Partial<Record<Field, { key: string; value?: unknown; native?: unknown }>>;
@@ -155,11 +155,27 @@ function foreignEntry(n: Entry, format: PlanFormat, back: Record<string, string>
   return e;
 }
 
-/** Des entrées natives, au format d'origine (l'écriture inverse). `raf done` et les autres écritures du natif ne laissent pas toujours `state:` d'accord avec `status:` : `stateOf` en tient compte. */
+/** Les sous-tâches d'une entrée native (`tasks:`, raf add --parent), en sous-lots à plat du format d'origine (M10) : `<lot>/<tâche>` sous la clé `parent`, que le lecteur en lecture seule replie en sous-tâches (foreignLots) ; le natif n'écrit `tasks:` nulle part ailleurs que sous ses propres clés. */
+function taskEntries(n: Entry, format: PlanFormat, problems: string[]): Entry[] {
+  if (!Array.isArray(n.tasks)) return [];
+  return n.tasks.map((t: Entry) => {
+    const id = `${String(n.id)}/${String(t.id)}`;
+    const e: Entry = { [keyOf(format, 'id')]: id };
+    if (t.title !== undefined) e[keyOf(format, 'title')] = t.title;
+    const status = t.status ?? 'todo';
+    const state = stateOf({ status }, format);
+    if (state === undefined) problems.push(`${id} : le statut « ${String(status)} » n'est porté par aucun état du plan d'origine (plan.statuses)`);
+    else e[keyOf(format, 'status')] = state;
+    e[keyOf(format, 'parent')] = n.id;
+    return e;
+  });
+}
+
+/** Des entrées natives, au format d'origine (l'écriture inverse) : chaque lot, puis ses sous-tâches en entrées à plat. `raf done` et les autres écritures du natif ne laissent pas toujours `state:` d'accord avec `status:` : `stateOf` en tient compte. */
 export function foreignEntries(native: Entry[], format: PlanFormat, renames: Renames): Entry[] {
   const problems: string[] = [];
   const back = Object.fromEntries(Object.entries(renames).map(([from, to]) => [to, from]));
-  const out = native.map((n) => foreignEntry(n, format, back, problems));
+  const out = native.flatMap((n) => [foreignEntry(n, format, back, problems), ...taskEntries(n, format, problems)]);
   if (problems.length > 0) refuse(problems);
   return out;
 }

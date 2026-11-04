@@ -20,31 +20,41 @@ function killGroup(pgid: number, sig: NodeJS.Signals): void {
  * TOUT le groupe est tué (aucun enfant orphelin) ; un signal reçu par cadence lui est relayé. Asynchrone :
  * les vérifications tournent en parallèle. Réservé aux vérifications (verify, session start) — jamais
  * aux commandes de deliver, qui gardent le groupe de premier plan et le tty.
+ * `opts.quiet` : sortie des commandes non relayée ; `opts.spawnFn` : le lanceur, remplaçable par le test qui vérifie l'ordre d'inscription du relais.
  */
-function execGroup(root: string, cmd: string, env: Record<string, string>, timeoutMs: number, quiet: boolean): Promise<number> {
+export function execGroup(root: string, cmd: string, env: Record<string, string>, timeoutMs: number, opts: { quiet: boolean; spawnFn?: typeof spawn }): Promise<number> {
+  const { quiet, spawnFn = spawn } = opts;
   return new Promise((resolve) => {
-    const child = spawn('sh', ['-c', cmd], {
+    // L579 : le relais (Ctrl-C, SIGTERM ou raccrochage reçu par cadence, relayé au groupe avant de sortir) est inscrit AVANT le
+    // lancement. Inscrit après, un signal arrivé entre le fork et l'inscription — le fils tourne déjà, cadence attend encore son
+    // tour de processeur — tuait cadence par le signal, sans relais : la vérification survivait, orpheline (16 fois sur 200 sous
+    // 64 boucles actives, jamais à vide). Le gestionnaire ne court qu'après ce bloc synchrone : le groupe est alors connu.
+    let pgid: number | undefined;
+    const forget = onTermination((sig) => {
+      if (pgid !== undefined) killGroup(pgid, sig);
+    });
+    const child = spawnFn('sh', ['-c', cmd], {
       cwd: root,
       env: { ...process.env, ...env },
       stdio: quiet ? 'ignore' : ['ignore', 'inherit', 'inherit'],
       detached: true,
     });
-    const pgid = child.pid;
-    if (pgid === undefined) {
+    const pid = child.pid;
+    if (pid === undefined) {
+      forget();
       child.once('error', () => resolve(127));
       return;
     }
-    // Ctrl-C, SIGTERM ou raccrochage reçu par cadence : relayé au groupe avant de sortir.
-    const forget = onTermination((sig) => killGroup(pgid, sig));
+    pgid = pid;
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      killGroup(pgid, 'SIGKILL');
+      killGroup(pid, 'SIGKILL');
     }, timeoutMs);
     child.once('exit', (code, signal) => {
       clearTimeout(timer);
       forget();
-      if (timedOut) killGroup(pgid, 'SIGKILL'); // sh mort avant ses enfants : le groupe est vidé quand même
+      if (timedOut) killGroup(pid, 'SIGKILL'); // sh mort avant ses enfants : le groupe est vidé quand même
       resolve(timedOut ? TIMED_OUT : signal ? 128 + (constants.signals[signal] ?? 0) : (code ?? 1));
     });
   });
@@ -53,7 +63,7 @@ function execGroup(root: string, cmd: string, env: Record<string, string>, timeo
 /** Dépendances réelles des vérifications. `quiet` : sortie des commandes non relayée (rapport de session start). */
 export function realCheckDeps(root: string, opts: { quiet?: boolean } = {}): CheckDeps {
   const { fetch, sleep, now } = realDeps(root);
-  return { fetch, sleep, now, exec: (cmd, env, timeoutMs) => execGroup(root, cmd, env, timeoutMs, !!opts.quiet) };
+  return { fetch, sleep, now, exec: (cmd, env, timeoutMs) => execGroup(root, cmd, env, timeoutMs, { quiet: !!opts.quiet }) };
 }
 
 interface VerifyResult {

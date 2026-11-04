@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, type SpawnOptions } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { parseDeliverConfig, TIMED_OUT, type CheckDeps } from '../src/deliver.js';
 import { sharedStateDir, appendDelivery } from '../src/state.js';
-import { realCheckDeps, replayChecks, resultLine, summaryLine, verifyCommand } from '../src/verify.js';
+import { execGroup, realCheckDeps, replayChecks, resultLine, summaryLine, verifyCommand } from '../src/verify.js';
 import { commit, gitRepo, isRunning, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
@@ -396,6 +396,20 @@ describe('realCheckDeps.exec : vérifications en groupe détaché (verify, sessi
     const survived = !(await until(() => !alive(pid), 2_000));
     if (survived) process.kill(pid, 'SIGKILL');
     expect(survived).toBe(false);
+  });
+
+  // L579 : cause du rouge sous charge « SIGINT relayé » (16 fois sur 200 sous 64 boucles actives) : le relais était inscrit après le spawn,
+  // et un signal reçu entre le fork et l'inscription tuait cadence par sa disposition par défaut, la vérification survivant orpheline.
+  it("le relais d'un signal est inscrit avant le lancement de la vérification (un signal reçu pendant son démarrage la tue aussi), et retiré après", async () => {
+    const before = process.listenerCount('SIGINT');
+    const seen: number[] = [];
+    const spy = ((cmd: string, args: string[], opts: SpawnOptions) => {
+      seen.push(process.listenerCount('SIGINT'));
+      return spawn(cmd, args, opts);
+    }) as typeof spawn;
+    expect(await execGroup(tempDir(), 'true', {}, 5_000, { quiet: true, spawnFn: spy })).toBe(0);
+    expect(seen).toEqual([before + 1]); // au moment du spawn, le relais est déjà là
+    expect(process.listenerCount('SIGINT')).toBe(before); // et il est retiré à la sortie
   });
 
   it('quiet coupe réellement la sortie des commandes (stdout du processus capturé)', () => {

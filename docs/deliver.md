@@ -362,7 +362,12 @@ Each `command` check of `verify` (and of `session start`) runs in a process grou
 of its own, detached from the terminal (no `/dev/tty`: a check must not prompt).
 At its time limit the whole group is killed, so no child survives it; Ctrl-C,
 `SIGTERM` or a closed terminal is passed on to the running checks before cadence
-exits. As the checks run together, the output of their commands may interleave;
+exits. The relay is armed **before** the check is spawned (L579): a signal received
+while the check is still starting is passed on too. Armed after the spawn, a signal
+landing between the fork and the registration (the check already running, cadence
+still waiting for its turn on the CPU) killed cadence by the signal's default action
+and left the check running, orphaned: 16 times out of 200 under 64 busy loops, never
+on an idle machine. As the checks run together, the output of their commands may interleave;
 the result lines come after it, in order.
 
 Make `verify` count: a health endpoint stays green while the data is wrong (a

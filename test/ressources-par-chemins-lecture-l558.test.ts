@@ -230,4 +230,15 @@ describe('R4 — une table mal formée est une erreur de lecture', () => {
     expect(c.code).toBe(1);
     expect(c.out).toContain(`${join(parent, 'cadence.yaml')} : resources.a : chemin invalide « ../x » (relatif au dépôt, sans « .. », « \\ » ni joker)`);
   });
+
+  it('R4 — clé « path: » sans aucun lot « uses: » : raf check signale quand même la table (jamais une ressource sans chemin silencieuse)', () => {
+    const parent = tempDir();
+    const dir = gitRepo(parent);
+    raf(dir, 'init', '--project', 'demo', '--no-hook');
+    writeFileSync(join(parent, 'cadence.yaml'), 'resources:\n  cycle-ts: { path: [src/x.ts] }\n');
+    raf(dir, 'add', 'A');
+    const c = raf(dir, 'check');
+    expect(c.code).toBe(1);
+    expect(c.out).toContain(`✗ ${join(parent, 'cadence.yaml')} : resources.cycle-ts : clé inconnue « path » (seule paths est connue)`);
+  });
 });

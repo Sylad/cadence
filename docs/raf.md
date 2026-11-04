@@ -147,7 +147,8 @@ holds it (the `--continue` draw, the `prêts, ressources libres` line and, insid
   fail the history. A `uses:` that is not a list of valid names is a gap of the lot (`✗ L3 : uses doit être une liste de noms de ressources`);
   an unreadable `cadence.yaml`, or a `resources:` that is not a list of valid names, is a gap naming the file
   (`<file> : resources doit être une liste de noms de ressources`), never an empty list. A plan where no open lot carries `uses:` gets the same
-  `raf check` as before.
+  `raf check` as before, except for a malformed `resources:` table (L558, below): it is reported even with no `uses:` anywhere, since a resource
+  held by its paths needs none and nothing else would read the file.
 - **Inside a wave (L551).** Two lots named at launch (or added, or drawn) that carry the same resource play one after the other, even in different repositories:
   the pool does not start a queue while a queue that plays holds one of its lots' resources, and starts it as soon as that queue has finished. Lots with no
   common resource, and lots with no `uses:`, are not held. (The `--continue` draw and the `prêts, ressources libres` line already counted the resources.)
@@ -165,7 +166,7 @@ holds it (the `--continue` draw, the `prêts, ressources libres` line and, insid
   A path is relative to the root of the lot's repository and covers the file of that name and everything under it, segment by segment (`src/a` does not cover `src/ab.ts`).
   It is normalised before any use: `.` segments removed (`./src/x.ts`, `src/./x`), `//` reduced, trailing `/` removed (`src/orchestrate/cycle/` and `src/orchestrate/cycle` are
   the same), duplicates of one resource dropped. The same path, or the same file, may sit under two resources: a diff that touches it holds both.
-  A malformed table is a reading error naming the file and the resource, never a silent resource without paths (`raf check` prints it, exit code 1):
+  A malformed table is a reading error naming the file and the resource, never a silent resource without paths (`raf check` prints it, exit code 1, even when no open lot carries `uses:`):
   `<file> : resources mêle des noms et des tables : écrire soit une liste de noms, soit une table nom: { paths: [...] }`;
   `<file> : resources.<nom> : nom de ressource invalide (lettres minuscules, chiffres, - et _)`;
   `<file> : resources.<nom> : paths doit être une liste de chemins` (a string, a number, a list with a non-string, an entry that is neither empty nor a table);

@@ -13,6 +13,12 @@ export interface Resources {
   paths: Map<string, string[]>;
 }
 
+/**
+ * Une table `resources:` mal formée (R4) : liste mêlée, nom hors RESOURCE_NAME, entrée ou chemin invalide. Distincte de la `RafError` d'un fichier
+ * illisible ou d'une liste de noms invalide (L251) : `raf check` la signale même quand aucun lot ouvert ne porte `uses:` (A1), les autres non.
+ */
+class ResourcesTableError extends RafError {}
+
 const MIXED = 'mêle des noms et des tables : écrire soit une liste de noms, soit une table nom: { paths: [...] }';
 const BAD_NAME = 'nom de ressource invalide (lettres minuscules, chiffres, - et _)';
 const BAD_PATHS = 'paths doit être une liste de chemins';
@@ -52,7 +58,7 @@ export function resourcesTouching(r: Resources, files: Iterable<string>): Map<st
 /** Les chemins d'une entrée de la table (R3, R4) : validés, normalisés, dédoublonnés dans l'ordre. */
 function readPaths(file: string, name: string, entry: unknown): string[] {
   const fail = (cause: string): never => {
-    throw new RafError(`${file} : resources.${name} : ${cause}`);
+    throw new ResourcesTableError(`${file} : resources.${name} : ${cause}`);
   };
   if (entry == null) return [];
   if (typeof entry !== 'object' || Array.isArray(entry)) return fail(BAD_PATHS);
@@ -73,7 +79,7 @@ function readPaths(file: string, name: string, entry: unknown): string[] {
 /** La clé `resources:` lue (R1, R2, R4) : liste de noms (L251) ou table « nom: { paths: [...] } » (L558), jamais une liste mêlée. */
 function parseResources(file: string, list: unknown): Pick<Resources, 'names' | 'paths'> {
   if (Array.isArray(list)) {
-    if (list.some((n) => n != null && typeof n === 'object')) throw new RafError(`${file} : resources ${MIXED}`);
+    if (list.some((n) => n != null && typeof n === 'object')) throw new ResourcesTableError(`${file} : resources ${MIXED}`);
     if (!list.every((n) => typeof n === 'string' && RESOURCE_NAME.test(n))) throw new RafError(`${file} : resources ${RESOURCES_BAD_LIST}`);
     const names = [...new Set(list as string[])];
     return { names, paths: new Map(names.map((n) => [n, []])) };
@@ -81,7 +87,7 @@ function parseResources(file: string, list: unknown): Pick<Resources, 'names' | 
   if (list === null || typeof list !== 'object') throw new RafError(`${file} : resources ${RESOURCES_BAD_LIST}`);
   const paths = new Map<string, string[]>();
   for (const [name, entry] of Object.entries(list)) {
-    if (!RESOURCE_NAME.test(name)) throw new RafError(`${file} : resources.${name} : ${BAD_NAME}`);
+    if (!RESOURCE_NAME.test(name)) throw new ResourcesTableError(`${file} : resources.${name} : ${BAD_NAME}`);
     paths.set(name, readPaths(file, name, entry));
   }
   return { names: [...paths.keys()], paths };
@@ -106,7 +112,10 @@ export function readResources(root: string): Resources {
   }
 }
 
-/** Les ressources déclarées pour le dépôt `repo`, ou aucune (sans chemin) quand le cadence.yaml est illisible ou mal formé : sa ligne de tour ou `raf check` le dit déjà (R4, A3). */
+/**
+ * Les ressources déclarées pour le dépôt `repo`, ou aucune (sans chemin) quand le cadence.yaml est illisible ou mal formé : rien n'est journalisé ici,
+ * `raf check` et la ligne de tour du projet signalent une table mal formée même sans `uses:` (R4, A1), un fichier illisible dès qu'un lot porte `uses:` (L251).
+ */
 export function declaredFor(repo: string): Resources {
   try {
     return readResources(repo);
@@ -117,18 +126,18 @@ export function declaredFor(repo: string): Resources {
 }
 
 /**
- * Un écart par ressource d'un lot ouvert que le cadence.yaml des dossiers parents ne déclare pas. Le fichier n'est lu que si un lot ouvert
- * porte `uses:` : un plan qui n'en porte pas donne le contrôle d'avant, quel que soit l'état du dossier parent.
+ * Un écart par ressource d'un lot ouvert que le cadence.yaml des dossiers parents ne déclare pas, et un écart pour une table `resources:` mal formée
+ * (R4, A1), que des lots portent `uses:` ou non : une ressource tenue par ses chemins n'a pas de `uses:` et personne d'autre ne lirait le fichier.
+ * Sans lot ouvert portant `uses:`, un fichier illisible ou une liste de noms invalide donne le contrôle d'avant (L251), quel que soit le dossier parent.
  */
 export function resourceIssues(lots: Lot[], root: string): { message: string }[] {
   const using = lots.filter((l) => isOpen(l.status) && l.uses?.length);
-  if (using.length === 0) return [];
   let declared: Resources;
   try {
     declared = readResources(root);
   } catch (e) {
-    if (e instanceof RafError) return [{ message: e.message }];
-    throw e;
+    if (!(e instanceof RafError)) throw e;
+    return e instanceof ResourcesTableError || using.length > 0 ? [{ message: e.message }] : [];
   }
   return using.flatMap((l) => l.uses!.filter((n) => !declared.names.includes(n)).map((n) => ({ message: `${l.id} utilise la ressource « ${n} », non déclarée dans ${declared.file} (resources:)` })));
 }

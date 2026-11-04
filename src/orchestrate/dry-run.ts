@@ -24,7 +24,7 @@ import type { OrchestrateDeps, OrchestrateIo } from './command.js';
 import type { Args } from './command-args.js';
 import { draw, priorityOf } from './draw.js';
 import { agentsOf } from './preflight.js';
-import { lotBudgetBasis } from './lot-budget.js';
+import { lotBudgetBasis, type MeasuredBudgets } from './lot-budget.js';
 
 /**
  * Ce avec quoi le dry-run mesure les messages de la fiche d'un lot à étape spec (L343) : la fiche du lot quand elle est déjà écrite (son sujet pour les hypothèses
@@ -104,7 +104,7 @@ function repoNotices(repo: string, io: OrchestrateIo, said: RepoSaid, specDir: s
 }
 
 /** `wave` : la vague simulée — son identifiant, son budget et si elle a plus d'un créneau (L527 : tout lot d'un dépôt en worktrees y joue alors dans le sien). */
-export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, { budget, id, multiSlot }: { budget: number; id: string; multiSlot: boolean }): void {
+export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, { budget, id, multiSlot, measured }: { budget: number; id: string; multiSlot: boolean; measured?: MeasuredBudgets }): void {
   const tmp = mkdtempSync(join(tmpdir(), 'cadence-orchestrate-'));
   const agents = agentsOf(deps);
   io.out(`vague ${id} — simulation, rien n'est lancé (budget ${budget} tokens comptés)`);
@@ -118,7 +118,7 @@ export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDep
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
     if (l.goal) io.out(`  objectif donné : ${l.goal} (à la place du titre dans les briefs)`);
-    io.out(`  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, budgetStage(lot, l.screen, env.config.maquette, l.repo, env.config.spec.dir), l.escalationReserve ? env.config.escalation?.model : undefined)})`);
+    io.out(`  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, budgetStage(lot, l.screen, env.config.maquette, l.repo, env.config.spec.dir), l.escalationReserve ? env.config.escalation?.model : undefined, measured)})`);
     const mine = lots.filter((o) => o.repo === l.repo);
     const together = env.config.worktrees && (mine.length > 1 || multiSlot) && !mine.some((o) => o.repos?.length) && !!repoBranch(l.repo);
     io.out(together ? `  file ${basename(l.repo)} · en parallèle des autres lots du dépôt, dans son worktree (cadence/${id}/${lotSlug(l.project, l.lot)}, créé à la prise du créneau)` : `  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);

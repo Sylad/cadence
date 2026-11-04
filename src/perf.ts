@@ -4,6 +4,7 @@ import { euros, stepEuros } from './cost.js';
 import { bugCodeOf, CAUSES, isReview as isReviewKind, sousCausesRanked, type BugCode, type Cause, type Classification, type Journal, type JournalPass, type JournalStep, type SousClassification } from './corrections.js';
 import { addDays, diffDays, isDay, toDay, type Day } from './dates.js';
 import { gitCommonDir } from './git.js';
+import { median, percentile } from './percentile.js';
 import { findProjects } from './lead.js';
 import type { Lot } from './plan.js';
 import { FAIL_CLASSES, readDeliveries, readFailedEntries, type FailClass, type FailedDelivery } from './state.js';
@@ -100,8 +101,8 @@ interface Carrier {
 
 /** Les indicateurs de L226 : tokens par lot, délais, durées de mur. */
 export interface TokensBlock {
-  /** Par valeur exacte de l'estimate du plan (« 0.5 », « 1 »…) : médiane des tokens comptés par journal rendu ; `lots` = journaux. `carrier` : l'étape qui porte la hausse (L312). */
-  byEstimate: Record<string, Indicator & { carrier: Carrier | null }>;
+  /** Par valeur exacte de l'estimate du plan (« 0.5 », « 1 »…) : médiane des tokens comptés par journal rendu ; `lots` = journaux. `carrier` : l'étape qui porte la hausse (L312). `p90` : p90 (rang le plus proche) des tokens des lots rendus des deux fenêtres ensemble, soit 14 jours glissants, sur `p90Lots` lots ; null sans lot (L501, le budget par défaut d'un lot de `cadence orchestrate` en part). */
+  byEstimate: Record<string, Indicator & { carrier: Carrier | null; p90: number | null; p90Lots: number }>;
   reviewShare: Indicator;
 }
 export interface DelaysBlock {
@@ -248,13 +249,6 @@ function planLot(plans: Plans, project: string, lot: string): PlanLot | undefine
 /** Rang d'affichage d'une sorte d'étape : l'ordre du cycle, les sortes inconnues après. */
 const KIND_ORDER = ['spec', 'maquette', 'fiche', 'precheck', 'implement', 'probe', 'review', 'review-small', 'ux', 'fix', 'accept'];
 const kindRank = (kind: string) => (KIND_ORDER.includes(kind) ? KIND_ORDER.indexOf(kind) : KIND_ORDER.length);
-
-const median = (xs: number[]): number | null => {
-  if (xs.length === 0) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const mid = s.length >> 1;
-  return s.length % 2 ? s[mid]! : (s[mid - 1]! + s[mid]!) / 2;
-};
 
 /** Ce qu'on lit d'une note de plan : sans le préfixe de date « JJ-MM », « JJ-MM hh:mm » et le séparateur « : ». */
 const NOTE_PREFIX = /^\s*\d{1,2}-\d{1,2}(?:\s+\d{1,2}:\d{2})?\s*:?\s*/;
@@ -480,7 +474,7 @@ export function computePerf(input: PerfInput): PerfResult {
   for (const key of classKeys) {
     const lotsOfClass = both(windows, (w) => (w === windows.current ? byClass.current : byClass.previous).get(key) ?? []);
     const vals = both(windows, (w) => median((w === windows.current ? lotsOfClass.current : lotsOfClass.previous).map((l) => l.total)));
-    byEstimate[key] = { ...mk(vals, { current: lotsOfClass.current.length, previous: lotsOfClass.previous.length }, 'up', twinFirstTime), carrier: carrierOf(lotsOfClass.current.map((l) => l.kinds), lotsOfClass.previous.map((l) => l.kinds)) };
+    byEstimate[key] = { ...mk(vals, { current: lotsOfClass.current.length, previous: lotsOfClass.previous.length }, 'up', twinFirstTime), carrier: carrierOf(lotsOfClass.current.map((l) => l.kinds), lotsOfClass.previous.map((l) => l.kinds)), p90: percentile([...lotsOfClass.current, ...lotsOfClass.previous].map((l) => l.total), 0.9), p90Lots: lotsOfClass.current.length + lotsOfClass.previous.length };
   }
   // Durée de mur d'un lot rendu par classe d'estimate (L414) : la même clé que les tokens ; un journal sans début ni fin lisibles, ou à fin avant début, n'est pas compté
   const minutesByClass = (w: Window): Map<string, number[]> => {

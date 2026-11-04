@@ -10,6 +10,8 @@ import { readyFree } from '../ready-free.js';
 import { lotFinished, lotKey, type LotState, type RunStore } from './state.js';
 import type { Budget } from './cycle.js';
 import { budgetStage, stageScreen } from './spec.js';
+import { measuredBudgetsAt } from './budget-mesure.js';
+import type { MeasuredBudgets } from './lot-budget.js';
 import { STOP_REQUESTED } from './cycle.js';
 
 /** `--until 18:00` : l'heure d'aujourd'hui (date de `now`) à partir de laquelle la vague ne tire plus de lot. */
@@ -76,6 +78,8 @@ export interface DrawOpts {
   remaining: number;
   /** Reçoit une ligne par lot prêt écarté par le réglage de tirage du projet (L390), pour que le dry-run le dise. */
   skipped?: string[];
+  /** La mesure du budget d'un lot (L501) : sans elle, `candidates` compte le budget statique de chaque lot, comme avant. */
+  measured?: MeasuredBudgets;
 }
 
 /**
@@ -114,7 +118,7 @@ export function candidates(launch: string, o: DrawOpts): Candidate[] {
         o.skipped?.push(`${project}:${lot.id} écarté du tirage : ${why}`);
         continue;
       }
-      if (lotBudget(lot.estimate, budgetStage(lot, stageScreen(dir, specDir, lot, maquette), maquette, dir, specDir), escalating) > o.remaining) continue;
+      if (lotBudget(lot.estimate, budgetStage(lot, stageScreen(dir, specDir, lot, maquette), maquette, dir, specDir), escalating, o.measured) > o.remaining) continue;
       out.push({ project, dir, lot });
     }
   }
@@ -187,7 +191,7 @@ export interface FillPlan {
 
 export interface FillFacts {
   args: Pick<Args, 'priority' | 'untilAt'>;
-  io: Pick<OrchestrateIo, 'now'>;
+  io: Pick<OrchestrateIo, 'env' | 'now'>;
   launch: string;
   home: string;
   store: Pick<RunStore, 'control'>;
@@ -211,7 +215,7 @@ export function fillTargets(f: FillFacts): FillPlan {
   const dirs = isProject(f.launch) ? [f.launch] : findProjects(f.launch);
   const libres = readyFree(dirs, f.home);
   const exclude = new Set(f.all.map((l) => lotKey(l.project, l.lot)));
-  const targets = candidates(f.launch, { priority: f.args.priority ?? readPriority(f.launch), exclude, remaining }).flatMap((c) => {
+  const targets = candidates(f.launch, { priority: f.args.priority ?? readPriority(f.launch), exclude, remaining, measured: measuredBudgetsAt(f.launch, f.io) }).flatMap((c) => {
     const repo = gitRoot(c.dir);
     return repo && libres.get(c.dir)?.some((l) => l.id === c.lot.id) ? [{ project: c.project, projectDir: c.dir, repo, lot: c.lot.id, model: 'sonnet' as const, uses: c.lot.uses ?? [] }] : [];
   });

@@ -31,10 +31,55 @@ export const SPEC_STAGE_ALLOCATION = 450_000;
 /** `light` : maquette légère (L459), un lot visible sans `screen: page` qui passe par spec et maquette sans accept ; son budget est celui d'un lot `spec`. */
 export type SpecStage = 'screen' | 'spec' | 'light';
 
-/** Base mesurée d'un budget, pour `--dry-run` : l'estimate (et l'étape spec) d'où il sort. */
-export function lotBudgetBasis(estimate: number, stage?: SpecStage, escalationModel?: string): string {
-  const base = ordinaryBasis(estimate, stage);
+/** Tokens d'une classe de lots rendus, tels que `cadence perf` les mesure (`tokens.byEstimate[<classe>].p90`, 14 jours glissants) ; la clé est la classe de taille de perf : l'estimate, « +spec » pour un lot passé par la chaîne spec. */
+export interface MeasuredTokens {
+  p90: number;
+  lots: number;
+}
+export type MeasuredBudgets = ReadonlyMap<string, MeasuredTokens>;
+
+/** Sous ce nombre de lots rendus dans la classe, la mesure ne dit rien : le budget statique reste (le seuil de tendance de `cadence perf`). */
+export const MEASURE_MIN_LOTS = 5;
+/** Jours que couvre la mesure : les deux fenêtres de 7 jours de `cadence perf`. */
+export const MEASURE_DAYS = 14;
+/** Le budget mesuré est arrondi au multiple supérieur de ce pas. */
+const MEASURE_STEP = 50_000;
+/** Plafond du budget mesuré : ce multiple du budget statique de la classe. Les lots rendus pour budget s'arrêtent au budget (le p90 les compte tronqués) : la mesure monte par paliers, jamais d'un coup. */
+const MEASURE_CEILING = 2;
+
+const classKey = (estimate: number, stage?: SpecStage): string => `${estimate}${stage ? '+spec' : ''}`;
+
+type Resolved = { budget: number; m?: MeasuredTokens; rounded?: number; state: 'statique' | 'court' | 'mesure' | 'plancher' | 'plafond' };
+
+/** Le budget (hors escalade) d'un lot : le statique, relevé au p90 mesuré de sa classe quand `measured` en porte assez, borné entre le statique et son double. */
+function resolveBudget(estimate: number, stage?: SpecStage, measured?: MeasuredBudgets): Resolved {
+  const fixed = lotBaseBudget(estimate, stage);
+  if (!measured) return { budget: fixed, state: 'statique' };
+  const m = measured.get(classKey(estimate, stage));
+  if (!m || m.lots < MEASURE_MIN_LOTS) return { budget: fixed, ...(m ? { m } : {}), state: 'court' };
+  const rounded = Math.ceil(m.p90 / MEASURE_STEP) * MEASURE_STEP;
+  const ceiling = fixed * MEASURE_CEILING;
+  if (rounded < fixed) return { budget: fixed, m, rounded, state: 'plancher' };
+  if (rounded > ceiling) return { budget: ceiling, m, rounded, state: 'plafond' };
+  return { budget: rounded, m, rounded, state: 'mesure' };
+}
+
+/** Base d'un budget, pour `--dry-run` : la mesure d'où il sort (p90, nombre de lots, fenêtre, arrondi, bornes) ou, à défaut, l'estimate (et l'étape spec). */
+export function lotBudgetBasis(estimate: number, stage?: SpecStage, escalationModel?: string, measured?: MeasuredBudgets): string {
+  const base = measuredBasis(estimate, stage, measured);
   return escalationModel ? `${base}, plus ${ESCALATION_RESERVE} réservés à l'escalade ${escalationModel}` : base;
+}
+
+function measuredBasis(estimate: number, stage?: SpecStage, measured?: MeasuredBudgets): string {
+  const r = resolveBudget(estimate, stage, measured);
+  const fixed = lotBaseBudget(estimate, stage);
+  const derived = ordinaryBasis(estimate, stage);
+  if (r.state === 'statique') return derived;
+  if (r.state === 'court') return `${r.m?.lots ?? 0} lot(s) mesuré(s) sur ${MEASURE_DAYS} jours, il en faut ${MEASURE_MIN_LOTS} : budget statique ${fixed} (${derived})`;
+  const seen = `p90 mesuré ${r.m!.p90} sur ${r.m!.lots} lots (classe ${classKey(estimate, stage)}, ${MEASURE_DAYS} derniers jours), arrondi à ${r.rounded}`;
+  if (r.state === 'plancher') return `${seen}, sous le budget statique ${fixed} : budget statique gardé (${derived})`;
+  if (r.state === 'plafond') return `${seen}, plafonné à ${r.budget} (${MEASURE_CEILING} × le budget statique ${fixed})`;
+  return `${seen}, borné à ${fixed}–${fixed * MEASURE_CEILING}`;
 }
 
 function ordinaryBasis(estimate: number, stage?: SpecStage): string {
@@ -45,8 +90,8 @@ function ordinaryBasis(estimate: number, stage?: SpecStage): string {
   return `${ordinary} dérivés de l'estimate (${basis}), plus ${SPEC_STAGE_ALLOCATION} pour ${stage === 'light' ? 'les étapes spec et maquette' : `les étapes spec, ${stage === 'screen' ? 'maquette' : 'fiche'} et accept`}`;
 }
 
-/** Budget d'un lot, dérivé de son estimate et de sa catégorie : empêche quelques lots d'avaler le budget de la vague au détriment des autres. Un lot à `screen:` vaut le total mesuré d'un lot à écran (L194) ; un lot à `spec: true` y ajoute l'allocation de son étape (L191) ; `escalation` (orchestrate.escalation déclarée) y ajoute la part de l'escalade (L349). */
-export const lotBudget = (estimate: number, stage?: SpecStage, escalation = false): number => lotBaseBudget(estimate, stage) + (escalation ? ESCALATION_RESERVE : 0);
+/** Budget d'un lot, dérivé de son estimate et de sa catégorie : empêche quelques lots d'avaler le budget de la vague au détriment des autres. Un lot à `screen:` vaut le total mesuré d'un lot à écran (L194) ; un lot à `spec: true` y ajoute l'allocation de son étape (L191) ; `measured` (L501, le p90 de `cadence perf`) le relève au p90 de sa classe, borné ; `escalation` (orchestrate.escalation déclarée) y ajoute la part de l'escalade (L349). */
+export const lotBudget = (estimate: number, stage?: SpecStage, escalation = false, measured?: MeasuredBudgets): number => resolveBudget(estimate, stage, measured).budget + (escalation ? ESCALATION_RESERVE : 0);
 
 const lotBaseBudget = (estimate: number, stage?: SpecStage): number => {
   const ordinary = estimate <= 0.5 ? LOT_BUDGET_FLOOR : Math.max(LOT_BUDGET_ONE_DAY, Math.round(estimate * LOT_BUDGET_PER_DAY));

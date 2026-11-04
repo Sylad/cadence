@@ -18,6 +18,7 @@ import { isExpress } from './express.js';
 import { nvmVersionsDir, resolveNode } from './node-env.js';
 import type { OrchestrateDeps, OrchestrateIo } from './command.js';
 import type { Args } from './command-args.js';
+import { measuredBudgetsAt } from './budget-mesure.js';
 import { lotBudget } from './lot-budget.js';
 import { readAgents, type AgentDef } from './launch.js';
 
@@ -171,7 +172,7 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
     if (isExpress({ estimate: lot.estimate, screen, specLot: state.specLot })) state.express = true;
     state.light = lot.estimate <= env.config.review.threshold;
     const escalating = !!env.config.escalation;
-    state.budget = lotBudget(lot.estimate, budgetStage(lot, screen, env.config.maquette, t.repo, env.config.spec.dir), escalating);
+    state.budget = lotBudget(lot.estimate, budgetStage(lot, screen, env.config.maquette, t.repo, env.config.spec.dir), escalating, measuredBudgetsAt(launch, io));
     if (escalating) state.escalationReserve = ESCALATION_RESERVE;
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
     if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin, ...(node.skipped ? { skipped: node.skipped } : {}) };

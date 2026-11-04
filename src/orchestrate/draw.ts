@@ -1,6 +1,7 @@
 import { gitRoot } from '../git.js';
 import { candidates, readPriority, type Candidate } from './continue.js';
 import { lotKey, lotRepoPaths, type LotState } from './state.js';
+import { measuredBudgetsAt } from './budget-mesure.js';
 import { preflight } from './preflight.js';
 import type { OrchestrateDeps, OrchestrateIo } from './command.js';
 import type { Args } from './command-args.js';
@@ -44,7 +45,7 @@ export async function draw(args: Args, io: OrchestrateIo, deps: OrchestrateDeps,
     lots.push(lot);
     for (const r of lotRepoPaths(lot)) used.add(r);
   };
-  for (const c of candidates(launch, { priority: priorityOf(args, launch), exclude, remaining })) {
+  for (const c of candidates(launch, { priority: priorityOf(args, launch), exclude, remaining, measured: measuredBudgetsAt(launch, io) })) {
     if (lots.length >= n) break;
     const repo = gitRoot(c.dir);
     if (repo) await attempt(c, repo, true);

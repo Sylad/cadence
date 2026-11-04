@@ -13,7 +13,7 @@ import { localOverdueLines } from '../local-task.js';
 import { configuredCap, expiredHoldLines, slotsLine } from '../orchestrate/command.js';
 import { addHold, cadenceHome, releaseHold } from '../orchestrate/registry.js';
 import { perfHeader } from '../perf.js';
-import { readPerf } from './stats-commands.js';
+import { readPerf } from '../perf-read.js';
 import { type EarlyCtx, type Io } from './context.js';
 
 /** Les dossiers des projets du tour (la clé `depth:` du dossier, un seul niveau si elle est illisible : le tour a déjà sa ligne d'erreur). */

@@ -72,8 +72,9 @@ export interface OrchestrateDeps {
 
 export const DEFAULT_BUDGET = 2_000_000;
 
-export { lotBudget, lotBudgetBasis, SPEC_STAGE_ALLOCATION, type SpecStage } from './lot-budget.js';
+export { lotBudget, lotBudgetBasis, SPEC_STAGE_ALLOCATION, type MeasuredBudgets, type SpecStage } from './lot-budget.js';
 import { lotBudget, lotBudgetBasis, type SpecStage } from './lot-budget.js';
+import { measuredBudgetsAt } from './budget-mesure.js';
 
 export { DEFAULT_MAX_SESSIONS, parseBudget, parseMaxSessions, parseOrchestrateArgs, type Args } from './command-args.js';
 import { DEFAULT_MAX_SESSIONS, parseBudget, parseMaxSessions, parseOrchestrateArgs, type Args } from './command-args.js';
@@ -164,7 +165,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.dryRun) {
     const id = waveId(io, args.wave, launch);
     if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) return waveExists(args.wave, io);
-    dryRun(pre.lots, io, deps, { budget, id, multiSlot: maxSessions(args, io) > 1 });
+    dryRun(pre.lots, io, deps, { budget, id, multiSlot: maxSessions(args, io) > 1, measured: measuredBudgetsAt(launch, io) });
     for (const l of [...estimateLines(pre.lots, launch, (w) => io.err(`orchestrate : ${w}`)), ...(args.continue ? freeLines(launch, pre.lots) : [])]) io.out(l);
     if (args.continue) await continueDryRun(args, io, deps, launch, pre.lots, budget, firstSkipped);
     return 0;

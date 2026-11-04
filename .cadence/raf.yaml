@@ -1980,6 +1980,7 @@ lots:
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "conforme : les correctifs de la revue précédente sont faits et chacun a un test qui échoue sans lui ; rien n'est cassé et aucun nouveau défaut n'est apparu — orchestré (vague 2026-11-04-0900-cad, 2 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (L571) ne touche aucun fichier de code du lot ; CHANGELOG et docs/orchestrate.md sont bien fusionnés, l'empreinte de src/spec.ts est à jour", commit: 95aaf01967896445fd51723140c69d9c04cee7d4 }
   - id: L571
     title: "Lots en service non publiés signalés : cadence lead tour, cadence session close et l'orchestrate --status disent ⚠ N lots done depuis le dernier tag v<x.y.z> (dépôt qui publie : package.json + tag), avec la commande cadence release à jouer ; session close le met en tête des trois lignes — 04-11 : 18 lots en service la veille, compte pro lancé le matin sur 1.46.0"
     status: done

@@ -46,7 +46,7 @@ captures:
 |---|---|
 | `cadence news new <lot…> [--title t]` | entry skeleton, dated and timed now (`date`, `created`), titled after the lot's public title (`public`), else its title; `--title` wins |
 | `cadence news list` | entries, newest first (see *Order* below) |
-| `cadence news check` | visible lots done without entry, unknown lots, missing or undeclared screenshots, entries without creation time, bad headers, a lot whose screen sheet has hypotheses and whose entry lacks the `## Hypothèses` section (or a line for one of them) |
+| `cadence news check` | visible lots done without entry, unknown lots, missing or undeclared screenshots, entries without creation time, bad headers, a lot whose screen sheet has hypotheses and whose entry lacks the `## Hypothèses` section (or a line for one of them; on a sheet shared by several lots, only the hypotheses the lot adds or modifies, L570) |
 | `cadence news stamp` | migration: writes `created:` into entries without one (or with an empty one), from the author date of the commit that added the file under its current name (now if not committed yet) |
 | `cadence news build [-o dir]` | `nouveautes.json` + `index.html` + screenshots (default `docs/nouveautes/site`) |
 

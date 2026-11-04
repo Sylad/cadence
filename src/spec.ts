@@ -1,6 +1,6 @@
 import { parse } from 'yaml';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { RafError } from './plan.js';
 
 /** Les largeurs de rendu d'une fiche (L170, spec etape-spec S2). */
@@ -327,12 +327,14 @@ export function deriveQa(doc: unknown): string {
 /**
  * Les règles `hypothese` des fiches du dossier des specs (`<dir>/<écran>/fiche.yaml`), par lot (`ecran.lot`) — L174.
  * Un lot sans hypothèse n'y figure pas ; un dossier absent ou une fiche illisible ne donnent rien (le contrôle des fiches est `cadence spec check`).
+ * `restreint(lot, fiche)` (L570) : les seules règles du lot sur une fiche partagée, ou null quand rien ne la restreint (la fiche entière).
  */
-export function ficheHypotheses(root: string, dir: string): Map<string, string[]> {
+export function ficheHypotheses(root: string, dir: string, restreint: (lot: string, fiche: string) => Set<string> | null = () => null): Map<string, string[]> {
   const out = new Map<string, string[]>();
-  for (const { doc } of fichesDuDossier(root, dir)) {
+  for (const { name, doc } of fichesDuDossier(root, dir)) {
     if (!isObj(doc.ecran) || !texte(doc.ecran.lot)) continue;
-    const ids = (Array.isArray(doc.regles) ? doc.regles : []).filter(isObj).filter((r) => r.statut === 'hypothese' && texte(r.id)).map((r) => String(r.id));
+    const sien = restreint(doc.ecran.lot, posix.join(dir, name, 'fiche.yaml'));
+    const ids = (Array.isArray(doc.regles) ? doc.regles : []).filter(isObj).filter((r) => r.statut === 'hypothese' && texte(r.id) && (!sien || sien.has(String(r.id)))).map((r) => String(r.id));
     if (ids.length) out.set(doc.ecran.lot, [...(out.get(doc.ecran.lot) ?? []), ...ids]);
   }
   return out;

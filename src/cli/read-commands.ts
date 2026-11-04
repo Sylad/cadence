@@ -217,7 +217,7 @@ export function cmdQuickwins(c: Ctx): number {
 /** raf news … : les entrées Nouveautés. */
 export function cmdNews(c: Ctx): number {
   const { rest, values, io, today, root, configPath, loadPlan, newsDir, refuseLongTitle } = c;
-  return news(rest, loadPlan(), newsDir, today, values, io, refuseLongTitle, () => hypothesesOf(root, configPath));
+  return news(rest, loadPlan(), newsDir, today, values, io, refuseLongTitle, () => hypothesesOf(root, configPath, loadPlan().refs));
 }
 
 /** cadence ref coverage lit le plan (les lots faits qui citent les éléments) : il passe après le choix du plan, les autres ref n'y touchent pas (L367). */

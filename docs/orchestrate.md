@@ -471,7 +471,7 @@ Once the sheet exists, the steps after it all read it (L174, `src/orchestrate/av
   - R3 — erreur de chargement : message « Impossible de charger le prochain match. » et bouton Réessayer. À confirmer ; sinon seul ce bloc change.
   ```
 
-  **`cadence news check`** (not `build`) flags a lot whose sheet has hypotheses — found under `orchestrate.spec.dir` (default `docs/specs`), by `ecran.lot` — when none of its entries has the section, or when the section lacks a `- Rn` line for one of the rules (`L7 : la fiche a des hypothèses (R3, R4) mais l'entrée … n'a pas la section « ## Hypothèses »`). A lot without hypothesis needs no section.
+  **`cadence news check`** (not `build`) flags a lot whose sheet has hypotheses — found under `orchestrate.spec.dir` (default `docs/specs`), by `ecran.lot` — when none of its entries has the section, or when the section lacks a `- Rn` line for one of the rules — on a sheet shared with other lots (L570, issue #33), only for the hypotheses the lot adds or modifies: the `regles` key of its `acceptation-<lot>.json`, else the rules its `spec`/`docs` commits touch on the sheet (as `accept` and the briefs do), the whole sheet only when nothing restricts it (`L7 : la fiche a des hypothèses (R3, R4) mais l'entrée … n'a pas la section « ## Hypothèses »`). A lot without hypothesis needs no section.
 
 **Production access of the sessions** (L168): a session of a wave (`implement`, `fix`, `precheck`, `spec`, `review`, `ux`) is
 started with no *default* access to the production cluster (a guard against the ordinary path, not a barrier). What a session inherits was measured on the dev machine: `KUBECONFIG` (pointing at

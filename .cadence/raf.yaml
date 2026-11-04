@@ -2202,12 +2202,13 @@ lots:
     created: 2026-11-04
     started: 2026-11-04
   - id: L589
-    title: "Bande et panneau des lots cadence-hud, en mode worktree : (1) créneaux libres faux — freeSlots (plugins/cadence-hud/hooks/format.ts) retire min(plafond, dépôts tenus) par vague alors qu'une vague à un worktree par lot occupe un créneau par lot actif : afficher le même chiffre que cadence orchestrate --status et nommer les lots en porte (« créneaux libres : 0 sur 3 · 2 en porte ») ; (2) panneau des lots : un lot de la vague déjà done au plan (livré) s'affiche « livré » et se replie dans une ligne « livrés : N » sous les lots actifs, au lieu de 14 lignes « prêt » qui noient les lots qui jouent ; (3) colonne id : jamais tronquée (« L5… » vu pour L584) — 04-11 : bande « 2 libres » pendant que --status disait 0 sur 3 (L587 en porte build, L588 en porte tests), 14 lots prêts/livrés listés au-dessus des 3 lots en cours, Sylvain : « elle me montre beaucoup de lots »"
+    title: "Bande cadence-hud, créneaux libres faux en mode worktree : freeSlots (plugins/cadence-hud/hooks/format.ts) retire min(plafond, dépôts tenus) par vague, alors qu'une vague à un worktree par lot occupe un créneau par lot actif (session claude OU porte de tests/build) — la bande doit afficher le même chiffre que cadence orchestrate --status, et nommer les lots en porte (« créneaux libres : 0 sur 3 · 3 en porte ») — 04-11 : bande « 2 libres » pendant que --status disait 0 sur 3 (L514 L473 en porte tests, L586 en porte build), Sylvain a cru à des créneaux vides"
     status: todo
-    estimate: 0.5
+    estimate: 0.25
     created: 2026-11-04
     notes:
       - { date: 2026-11-04, text: "titre remplacé : « Bande cadence-hud, créneaux libres faux en mode worktree : freeSlots (plugins/cadence-hud/hooks/format.ts) retire min(plafond, dépôts tenus) par vague, alors qu'une vague à un worktree par lot occupe un créneau par lot actif (session claude OU porte de tests/build) — la bande doit afficher le même chiffre que cadence orchestrate --status, et nommer les lots en porte (« créneaux libres : 0 sur 3 · 3 en porte ») — 04-11 : bande « 2 libres » pendant que --status disait 0 sur 3 (L514 L473 en porte tests, L586 en porte build), Sylvain a cru à des créneaux vides »" }
+      - { date: 2026-11-04, text: "titre remplacé : « Bande et panneau des lots cadence-hud, en mode worktree : (1) créneaux libres faux — freeSlots (plugins/cadence-hud/hooks/format.ts) retire min(plafond, dépôts tenus) par vague alors qu'une vague à un worktree par lot occupe un créneau par lot actif : afficher le même chiffre que cadence orchestrate --status et nommer les lots en porte (« créneaux libres : 0 sur 3 · 2 en porte ») ; (2) panneau des lots : un lot de la vague déjà done au plan (livré) s'affiche « livré » et se replie dans une ligne « livrés : N » sous les lots actifs, au lieu de 14 lignes « prêt » qui noient les lots qui jouent ; (3) colonne id : jamais tronquée (« L5… » vu pour L584) — 04-11 : bande « 2 libres » pendant que --status disait 0 sur 3 (L587 en porte build, L588 en porte tests), 14 lots prêts/livrés listés au-dessus des 3 lots en cours, Sylvain : « elle me montre beaucoup de lots » »" }
   - id: L590
     title: "Portes intermédiaires ciblées : après implement et après chaque fix, la porte de la vague joue seulement les tests liés aux fichiers du lot (vitest related sur le diff depuis startedSha, ou orchestrate.testRelated déclaré dans cadence.yaml) ; la suite complète une seule fois, à la porte d'intégration ; une porte ciblée sans test lié joue la suite complète ; chaque porte enregistre sa durée et son périmètre dans suiteRuns (aujourd'hui un simple compteur) — 04-11 : 61 lots cadence des 03 et 04-11, 271 suites (4,4 par lot), 2 119 min entre sessions contre 1 469 min de sessions (59 %, borne haute : inclut l'attente de créneau), Sylvain : « 5 minutes de tests, j'espère que ça se lance pas trop souvent »"
     status: todo
@@ -2218,6 +2219,12 @@ lots:
     title: "Un lot qui attend son tour d'intégration (une autre intégration du même dépôt en cours) rend son créneau : la file en attente démarre pendant ce temps, et le lot reprend l'intégration à son tour sans redemander de créneau (une intégration ne lance qu'une revue courte) — 04-11, vague 1310-cad : L514, L586 et L473 arrivés ensemble à l'intégration, L530 L587 L588 en file depuis 19:50 n'ont démarré qu'à 20:15:37, après la dernière intégration ; ~9 min à 2 créneaux vides (20:06 → 20:15)"
     status: todo
     estimate: 0.5
+    created: 2026-11-04
+  - id: L592
+    title: "Panneau des lots cadence-hud : un lot de la vague déjà done au plan (livré) s'affiche « livré » et se replie dans une ligne « livrés : N » sous les lots qui jouent, au lieu d'une ligne « prêt » chacun ; la colonne id n'est jamais tronquée (« L5… » vu pour L584) — 04-11, vague 1310-cad : 14 lots prêts ou déjà livrés listés au-dessus des 3 lots en cours, Sylvain : « elle me montre beaucoup de lots »"
+    status: todo
+    estimate: 0.25
+    visible: true
     created: 2026-11-04
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

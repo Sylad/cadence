@@ -1959,7 +1959,7 @@ lots:
   - id: L563
     goal: "Fiche de L563 corrigée puis code. Majeur de la 2e revue de fiche (04-11) à écrire dans R2 et R11 : le bloc de départ de cycle.ts (l.next === null && l.steps.length === 0) est sauté pour un lot rendu, qui garde ses steps (R6) ; c'est donc la PRISE du lot rendu (--add / --replay sur la vague vivante) qui pose `next` elle-même : toFix quand le lot a des derniers constats de revue non conformes, sinon firstReview (la revue du correctif du lead) ; citer la fonction qui la pose et la tester (un test par cas). R4 confirmée par le lead le 04-11 : un worktree sale est refusé, le refus nomme les fichiers et la commande à rejouer après le commit. Traiter aussi les 2 mineurs de la revue de fiche."
     title: "--add (ou --replay) d'un lot rendu par la vague vivante après un correctif du lead dans son worktree conservé : reprendre le worktree et repartir à l'étape que choisirait la reprise (correction avec les derniers constats, ou la revue), au lieu de « lot déjà dans la vague » (issue #31 : un lot corrigé est resté une heure à l'arrêt avec des créneaux libres)"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-11-03
@@ -1989,7 +1989,9 @@ lots:
       - { date: 2026-11-04, text: "Hypothèses (fiche add-lot-rendu-corrige) — R11 : Le chemin recoverTree (execute.ts:100-110) ne se déclenche pas pour ce lot : sa condition `!baseBranchOf(repo, lotBr)` est fausse puisque la branche de la vagu… ; si faux : Si resumedFrom devait rester vide, le lot ne serait plus reconnu comme repris (R2 violée) ; si la formule de resumedReviewed différait, ou si les compteurs de…" }
       - { date: 2026-11-04, text: "Hypothèses (fiche add-lot-rendu-corrige) — R12 : À la prise (AddFeed.prepare puis recheck, ajout.ts:160-175), le lot rendu est exclu de `known` (les ctxs de la vague le contiennent déjà ; sinon le préflight l… ; si faux : Le code re-contrôle déjà à la prise (ajout.ts:160-175) mais pas l'état de l'arbre : sans ce re-contrôle, un correctif défait ou un worktree nettoyé entre le dé…" }
       - { date: 2026-11-04, text: "Hypothèses (fiche add-lot-rendu-corrige) — R13 : LISTE BLANCHE des rendus ajoutables, un préfixe par ligne, tous écrits par toFix au plafond de passes (cycle/review.ts:77 `<what> après <N> passe(s) de correct… ; si faux : Si d'autres rendus devaient être ajoutables, la liste de la constante s'allonge sans autre effet, R4 protégeant l'arbre ; si un rendu d'étape spec ou accept l'…" }
+      - { date: 2026-11-04, text: "Mineur de la revue du correctif (04-11) : un @modèle passé à --add d'un lot rendu est ignoré sans message (R2 garde le modèle de l'ancien LotState). Si on veut pouvoir réajouter un lot sur un autre modèle (Fable), l'écrire dans la fiche et le dire à l'ajout." }
     review: { date: 2026-11-04, verdict: "conforme : revue fraîche du correctif 0113b811 (lead, 04-11) — majeur R2 corrigé (resumeNext reprend l'ancien LotState), prouvé par deux tests qui échouent sans lui ; mineur noté : un @modèle passé à --add d'un lot rendu est ignoré sans message ; revue courte du diff rebasé (patch-id différent) : compliant (2 minors: plan reformatted by the rebase conflict resolution, sheet line references shifted)", commit: 6a89f6793a8ac6b9477b834239445321fd2eaf45 }
+    finished: 2026-11-04
   - id: L564
     title: "Parité porte ↔ CI : faux positif quand la porte joue le même test via npm test (issue #32) — résoudre npm test / npm run <x> par les scripts de package.json avant de comparer, et comparer sans le préfixe npx"
     status: done

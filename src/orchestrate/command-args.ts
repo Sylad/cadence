@@ -95,6 +95,9 @@ function lotBudgetArg(text: string): Args['lotBudgets'][number] {
 }
 
 /** Les options sans valeur, et le champ de `Args` qu'elles lèvent. */
+const asksAnotherAction = (a: Args): boolean =>
+  a.resume !== undefined || a.status !== undefined || a.waits || a.add.length > 0 || a.drop.length > 0 || a.stopAfterCurrent || a.answers.length > 0 || a.removeWorktree !== undefined;
+
 const BOOLEAN_FLAGS: Record<string, 'dryRun' | 'waits' | 'watch' | 'stopAfterCurrent' | 'abandonCommits' | 'continue' | 'noFill'> = {
   '--dry-run': 'dryRun',
   '--waits': 'waits',
@@ -155,7 +158,7 @@ export function parseOrchestrateArgs(argv: string[]): Args {
     if (a.resume === true) a.resume = a.wave;
     else if (a.resume !== a.wave) throw new RafError(`--resume ${a.resume} et --wave ${a.wave} désignent deux vagues : une seule (${resumeCommand('<vague>')})`);
   }
-  // L587 : sans lot à jouer ni --continue il n'y a aucun créneau à remplir ou à garder vide.
-  if (a.noFill && !a.continue && a.lots.length === 0) throw new RafError("--no-fill s'utilise avec des lots donnés ou avec --continue");
+  // L587 : sans lot à jouer ni --continue il n'y a aucun créneau à remplir ou à garder vide ; les autres actions (--resume, --add, --status, …) ne lancent pas de vague : --no-fill y est sans effet.
+  if (a.noFill && !a.continue && a.lots.length === 0 && !asksAnotherAction(a)) throw new RafError("--no-fill s'utilise avec des lots donnés ou avec --continue");
   return a;
 }

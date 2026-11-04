@@ -86,7 +86,7 @@ describe('L587 probe — --no-fill et fillsFreeSlots', () => {
     expect(() => parseOrchestrateArgs(['--resume', '--no-fill'])).not.toThrow();
   });
 
-  it('--no-fill avec --add seul : refusé par le parseur (aucun lot donné) — message clair attendu', () => {
+  it('--no-fill avec --add seul : sans effet, pas refusé par le parseur', () => {
     expect(() => parseOrchestrateArgs(['--add', 'a:L2', '--no-fill'])).not.toThrow();
   });
 

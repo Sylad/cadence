@@ -125,12 +125,15 @@ describe('L460 — limites de docs/concepts.md', () => {
     }
   })
 
-  it('le tirage d\u2019un lot du plan dans un créneau libre est lié à --continue (texte et figures)', () => {
-    expect(read('docs/concepts.md')).toMatch(/with `--continue`, a freed slot/)
+  it('le tirage d\u2019un lot du plan dans un créneau libre vaut pour toute vague et --no-fill l\u2019arrête (texte et figures, L587)', () => {
+    const md = read('docs/concepts.md')
+    expect(md).toMatch(/a freed slot is also filled at once by the next ready lot of the plan/)
+    expect(md).toMatch(/`--no-fill` stops it/)
+    expect(md).not.toMatch(/with `--continue`, a freed slot/)
     for (const f of svgs.filter((n) => n.startsWith('concepts-vague-'))) {
       const svg = read(`docs/${f}`)
-      expect(svg, f).toContain('with --continue')
-      expect(svg, f).not.toMatch(/drawn at once|takes it\./)
+      expect(svg, f).toContain('--no-fill: not')
+      expect(svg, f).not.toMatch(/with --continue|drawn at once|takes it\./)
     }
   })
 

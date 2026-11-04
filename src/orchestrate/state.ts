@@ -6,6 +6,7 @@ import { gitCommonDir, gitRoot } from '../git.js';
 import { pidAlive } from '../state.js';
 import type { AnyModel, SessionKind, StepKind, StepModel } from './launch.js';
 import type { Screen } from '../plan.js';
+import type { Partage } from './partage.js';
 import type { Tokens } from './result.js';
 
 export type WaveStatus = 'running' | 'suspended-budget' | 'suspended-quota' | 'done' | 'interrupted';
@@ -195,6 +196,8 @@ export interface LotState {
   precheckVerdict?: 'oui' | 'partiel' | 'non';
   /** Ce que le contrôle préalable a lu (fichiers, code voisin, tests), rogné et borné (L523) ; joint au brief de la première implémentation, jamais à une reprise ni à une correction. Absent : pas de lecture. */
   precheckLu?: string;
+  /** Précheck de partage (L500) : tests scellés d'autres lots et fichiers que touche aussi un autre lot, lus dans git au départ du lot ; joint au brief de l'implémentation et dit au tableau. Absent : rien de partagé, ou lot repris. */
+  partage?: Partage;
   /** Réponse de l'humain à une question, jointe au brief de la prochaine session puis effacée. */
   pendingAnswer?: string | null;
   verdict: string | null;

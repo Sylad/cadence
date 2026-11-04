@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- Pre-check of shared files and sealed tests (L500, [docs/orchestrate.md](docs/orchestrate.md)): before the first implementation, `cadence orchestrate` reads git (no model) and lists, for the files the lot's text cites, the sealed acceptance tests of OTHER lots (`acceptation-<lot>.json` with fingerprints) and the files that another lot of the wave or a kept worktree also modifies. The list goes into the implement brief (do not touch or reseal a sealed test; keep edits to a shared file small) and into the table, one `⚠` line per test and per file.
+
 ## [1.48.0] - 2026-11-04
 
 ### Added

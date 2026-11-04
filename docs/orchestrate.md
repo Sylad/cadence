@@ -615,6 +615,26 @@ With a `perf.prices` grid in the `cadence.yaml` of the launch folder (the one `c
 
 Without `perf.prices` nothing changes: no estimate, no column, no total. A malformed grid does not stop a simulation, a wave or the table (a wave already paid must still print its table): the command prints `orchestrate : coût en euros n/d : …` on stderr (`--status`: a `⚠` line) and goes on without euros.
 
+## Sealed tests and shared files: the pre-check of what a lot may collide with (L500)
+
+On 17 → 31 October, 19 of the 43 questions of the sessions were about a sealed acceptance test of another lot (median block: 56 min) and 16 of the 28 refused integrations were conflicts. Both are known before the first line of code, so the program reads them from git, with no model and no key to set.
+
+**When.** Once, at the start of a lot that is not resumed from a kept branch (`resumedFrom`), whether or not the model pre-check (`orchestrate.precheck`) plays.
+
+**What it reads.** The files the lot may touch are the tracked files its text cites: title, `goal`, notes and sub-tasks. A path is matched exactly (`src/x.ts`, with `:line`, a final punctuation mark or a leading `./` ignored); a bare file name is matched only when one tracked file has that name. A directory or a glob names nothing. From those files:
+
+- **Sealed tests of another lot**: every `acceptation-<lot>.json` under `spec.dir`, of another lot and with fingerprints (`empreintes`, so sealed), whose test files or sheet (`fiche`) are among them. The lot's own acceptation is never listed.
+- **Shared files**: the files that the branch of another lot with a worktree (a wave still alive, this one included, or a worktree kept after a wave, `cadence orchestrate --status`) modified since its start (`base...branch`, unintegrated commits only). The lot's own branch of a past wave is left out.
+
+**Where it shows.** In the `partage` field of the lot's state; in the brief of the implement step (first and later passes): the sealed tests to leave alone, with the lot that seals them and the instruction to stop and ask the lead if the lot's own tests contradict one, then the shared files with the lot that touches them; and in the table (`--status`, end of wave), one line per test and per file:
+
+```
+demo:L500 — ⚠ test scellé de L10 que le lot risque de toucher : test/a.test.ts (docs/specs/ecran/acceptation-L10.json)
+demo:L500 — ⚠ fichier que touche aussi demo:L1 (vague en cours) : src/x.ts
+```
+
+**Limits.** It lists what the lot's text names: a lot that cites no file gets no line, and a file it will touch without naming it is not seen. Only the lot's own repository is read (not the neighbouring ones of `repos:`), and a lot of the wave that has not started has no branch to read yet. An unreadable repository is the warning `précheck de partage : lecture impossible (…)`; the lot goes on.
+
 ## The edge-case probe (`orchestrate.probe`, L497)
 
 Code bugs are the first cause of correction passes, and an edge case is the first sub-cause of those (64 % of the `bug-code` passes since the instruction of L447, 69 % before: writing it in the brief changed nothing). `orchestrate.probe: true` adds a step between the writing and the review: a **fresh Sonnet session** (`probe`, brief `templates/orchestrate/probe.md`, `effort.probe` medium, the delay of a write step `timeouts.work`) that has not written the code, reads the lot's diff, and tries to break it with tests at the edges: empty, absent, twice, wrong type, refused, the real shape of the data, the other callers. The diff is given as a command (`git diff <start sha>..HEAD`), never pasted; the sheet of the lot is named when there is one. Like `implement` and `fix`, the brief gives the program's exact gate (L399: the probe commits tests the gate replays, `tsc` and the quality script included) and the session's machine share (L350). The session writes its tests in new files and commits them all, the passing and the failing, with `probe(L<n>): …`; it does not touch the application code nor the sealed acceptance tests.

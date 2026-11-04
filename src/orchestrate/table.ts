@@ -6,6 +6,7 @@ export { estimateLines, launchPrices } from './cout.js';
 export { resumeCommand } from './geste.js';
 import { gitRoot, isAncestor } from '../git.js';
 import { repoWork } from '../repos.js';
+import { partageLines } from './partage.js';
 import { quotaReset } from './result.js';
 import { gestureColumn, resumeCommand } from './geste.js';
 import { proposalLine, touchedReader, type TouchedSince } from './deja-traitee.js';
@@ -213,6 +214,7 @@ export function resumeAnswerHint(waveId: string, l: Pick<LotState, 'project' | '
 function signalLines(l: LotState): string[] {
   const out: string[] = [];
   if (l.escalation) out.push(`${l.project}:${l.lot} — escalade ${l.escalation.model} : ${escalationText(l)}`);
+  out.push(...partageLines(l.partage, `${l.project}:${l.lot}`));
   for (const w of l.warnings) out.push(`${l.project}:${l.lot} — ⚠ ${w}`);
   return out;
 }

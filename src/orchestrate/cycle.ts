@@ -12,6 +12,7 @@ import { snapshot, cleanPlaywrightOutput } from './guard.js';
 import { toFix, firstReview, review } from './cycle/review.js';
 import { firstWrite, settleHypotheses, specStep, ficheStep, maquetteStep } from './cycle/spec-steps.js';
 import { precheckOrSkip, precheck } from './cycle/precheck-step.js';
+import { notePartage } from './cycle/partage-step.js';
 import { acceptStep } from './cycle/accept-step.js';
 import { work, probeIo } from './cycle/work.js';
 import { probeStep } from './probe.js';
@@ -110,6 +111,7 @@ export async function runLot(c: LotCtx): Promise<void> {
       // La correction de départ est une passe comme les autres (toFix : l.pass, verdict, tableau, MAX_PASSES bornent le total, reprise comprise).
       if (l.resumedFrom && l.constats.length) toFix(c, l.constats, 'reprise de la branche');
       else {
+        notePartage(c);
         l.next = l.resumedFrom ? (l.resumedReviewed ? firstReview(c) : firstWrite(c)) : precheckOrSkip(c) ? 'precheck' : firstWrite(c);
         save(c);
       }

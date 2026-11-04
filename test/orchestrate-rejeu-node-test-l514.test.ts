@@ -90,13 +90,13 @@ describe('L514 — le rejeu au sha de départ ne rejoue pas le fichier du lot', 
   it('L514 — redAlone avec root : le location: absolu du worktree du lot est rejoué relatif, dans le dossier du rejeu', async () => {
     const cmds: string[] = [];
     const failing = async (c: string) => { cmds.push(c); return { code: 1, output: `${red(1, 'rouge un', '/lot/scripts/a.test.mjs:2:1')}\n` }; };
-    expect(await redAlone(failing, 'node --test {files}', ['rouge un'], `${red(1, 'rouge un', '/lot/scripts/a.test.mjs:2:1')}\n`, '/lot')).toEqual(['rouge un']);
+    expect(await redAlone(failing, 'node --test {files}', ['rouge un'], `${red(1, 'rouge un', '/lot/scripts/a.test.mjs:2:1')}\n`, { root: '/lot' })).toEqual(['rouge un']);
     expect(cmds[0]).toBe('node --test scripts/a.test.mjs');
   });
   it('L514 — redAlone avec root : un fichier hors du dossier de la porte (hôte distant) ne désigne rien à rejouer, jamais « déjà rouge »', async () => {
     let n = 0;
     const failing = async () => { n++; return { code: 1, output: `${red(1, 'rouge un', '/hote/scripts/a.test.mjs:2:1')}\n` }; };
-    expect(await redAlone(failing, 'node --test {files}', ['rouge un'], `${red(1, 'rouge un', '/hote/scripts/a.test.mjs:2:1')}\n`, '/lot')).toEqual([]);
+    expect(await redAlone(failing, 'node --test {files}', ['rouge un'], `${red(1, 'rouge un', '/hote/scripts/a.test.mjs:2:1')}\n`, { root: '/lot' })).toEqual([]);
     expect(n).toBe(0);
   });
   it('L514 — redAloneGate en parties : le fichier est relatif au dossier de la partie, rejoué après « cd dir »', async () => {
@@ -106,5 +106,20 @@ describe('L514 — le rejeu au sha de départ ne rejoue pas le fichier du lot', 
     const failing = async (c: string) => { cmds.push(c); return { code: 1, output: out }; };
     expect(await redAloneGate(failing, undefined, ['rouge un'], ran, '/lot')).toEqual(['rouge un']);
     expect(cmds[0]).toBe('cd frontend && node --test scripts/a.test.mjs');
+  });
+  it('L514 — redAloneGate en parties, fichier hors du dossier de la partie mais dans le worktree (evatosorus : porte depuis frontend/, tests dans scripts/) : rejoué par « ../ », et « déjà rouge »', async () => {
+    const out = `${red(1, 'drawer', '/lot/scripts/drawer-keyboard.e2e.test.mjs:2:1')}\n`;
+    const ran: GateRan = { code: 1, output: out, parts: [{ part: { dir: 'frontend', run: 'npm run test:scripts', replay: 'node --test {files}' }, code: 1, output: out }] };
+    const cmds: string[] = [];
+    const failing = async (c: string) => { cmds.push(c); return { code: 1, output: out }; };
+    expect(await redAloneGate(failing, undefined, ['drawer'], ran, '/lot')).toEqual(['drawer']);
+    expect(cmds).toEqual(['cd frontend && node --test ../scripts/drawer-keyboard.e2e.test.mjs', 'cd frontend && node --test ../scripts/drawer-keyboard.e2e.test.mjs']);
+  });
+  it('L514 — redAloneGate en parties : un fichier hors du worktree du lot (hôte distant) ne désigne toujours rien, même relatif au dossier de la partie', async () => {
+    const out = `${red(1, 'drawer', '/hote/scripts/drawer.test.mjs:2:1')}\n`;
+    const ran: GateRan = { code: 1, output: out, parts: [{ part: { dir: 'frontend', run: 'npm test', replay: 'node --test {files}' }, code: 1, output: out }] };
+    let n = 0;
+    expect(await redAloneGate(async () => { n++; return { code: 1, output: out }; }, undefined, ['drawer'], ran, '/lot')).toEqual([]);
+    expect(n).toBe(0);
   });
 });

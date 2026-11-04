@@ -153,9 +153,12 @@ export async function replayGate(run: Runner, replay: string | undefined, names:
   return { red: [...new Set(names)].filter((n) => !unstable.includes(n)), unstable, tight };
 }
 
-/** Rouges seuls au sha de départ (L510, R6) : forme chaîne, `redAlone` tel quel ; parties, un nom n'est « déjà rouge » que si chaque partie qui l'a imprimé rouge dans le lot le nomme encore en échec à ses rejeux au départ. `root` : le dossier du lot où la porte a tourné (L514). */
+/**
+ * Rouges seuls au sha de départ (L510, R6) : forme chaîne, `redAlone` tel quel ; parties, un nom n'est « déjà rouge » que si chaque partie qui l'a imprimé rouge dans le lot le nomme encore en échec à ses rejeux au départ.
+ * `root` : le worktree du lot où la porte a tourné (L514) ; en parties, un fichier node --test de ce worktree est rejoué relatif au dossier de la partie, même hors de ce dossier (evatosorus : `frontend/` rejoue `../scripts/x.test.mjs`).
+ */
 export async function redAloneGate(run: Runner, replay: string | undefined, names: string[], ran: GateRan, root?: string): Promise<string[]> {
-  if (!ran.parts) return redAlone(run, replay!, names, ran.output, root);
-  const judged = await perPart(ran.parts, names, (p, own) => redAlone((c) => run(partCommand(p.part, c)), p.part.replay!, own, p.output, root === undefined ? undefined : join(root, p.part.dir)));
+  if (!ran.parts) return redAlone(run, replay!, names, ran.output, root === undefined ? undefined : { root });
+  const judged = await perPart(ran.parts, names, (p, own) => redAlone((c) => run(partCommand(p.part, c)), p.part.replay!, own, p.output, root === undefined ? undefined : { root, dir: p.part.dir }));
   return everyPart(judged, names, (v, n) => v.includes(n));
 }

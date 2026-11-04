@@ -1,6 +1,6 @@
 // Part de la machine de chaque session (L350) : le 26-10, 32 cœurs et 4 sessions, vitest à 31 workers par suite, et des tests qui passaient seuls rougissaient ensemble.
 
-import { isAbsolute, relative } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import { failedTests, jestTestFiles, nodeTestFiles, nodeTestRan, stripAnsi, testDurationMs, timeoutLimits } from './baseline.js';
 
 /** Variable posée dans l'environnement des sessions et de la porte : le nombre de workers que leurs lanceurs de tests ont le droit d'ouvrir. */
@@ -41,16 +41,23 @@ export function replayFile(test: string): string | null {
  * Le fichier à rejouer pour chaque nom rouge de `output` : le « location: » de node --test d'abord (L514 : un titre libre n'est pas un chemin, même s'il n'a pas d'espace), puis le nom (vitest, pytest), puis le fichier FAIL de jest.
  * `nodeTitles` dit si le nom est un titre node --test : son rejeu vert ne s'imprime pas avec son fichier, il se prouve par sa ligne « ok N - titre » (`nodeTestRan`).
  */
-function fileResolver(output: string, root?: string): { (n: string): string | null; nodeTitles: Map<string, string> } {
+function fileResolver(output: string, at?: ReplayPlace): { (n: string): string | null; nodeTitles: Map<string, string> } {
   const jest = jestTestFiles(output);
   const nodeTitles = nodeTestFiles(output);
-  // `root` : le dossier où `output` a tourné, quand le rejeu a lieu ailleurs (L514). Le location: de node --test est un chemin absolu de ce dossier : rejoué tel quel dans un autre worktree, il y rejouerait le fichier d'ici. Relatif à `root`, il se résout dans le dossier du rejeu ; hors de `root` (porte jouée sur un hôte), il ne désigne aucun fichier du rejeu.
+  // `at` : le worktree du lot où `output` a tourné, quand le rejeu a lieu ailleurs (L514). Le location: de node --test est un chemin absolu de ce worktree : rejoué tel quel dans un autre, il y rejouerait le fichier d'ici. Dans `at.root`, il se résout relatif à `at.dir`, le dossier de la partie où le rejeu se lance
+  // (evatosorus : porte depuis `frontend/`, tests dans `scripts/`, donc `../scripts/x.test.mjs`) ; hors de `at.root` (porte jouée sur un hôte), il ne désigne aucun fichier du rejeu.
   const place = (f: string): string | null => {
-    if (root === undefined || !isAbsolute(f)) return f;
-    const rel = relative(root, f);
-    return rel && !rel.startsWith('..') && !isAbsolute(rel) ? rel : null;
+    if (at === undefined || !isAbsolute(f)) return f;
+    const inRoot = relative(at.root, f);
+    return inRoot && !inRoot.startsWith('..') && !isAbsolute(inRoot) ? relative(join(at.root, at.dir ?? ''), f) : null;
   };
   return Object.assign((n: string): string | null => (nodeTitles.has(n) ? place(nodeTitles.get(n)!) : (replayFile(n) ?? jest.get(n) ?? null)), { nodeTitles });
+}
+
+/** Où la porte d'un lot a tourné, pour un rejeu ailleurs (L514) : `root` son worktree, `dir` le dossier de la partie relatif à `root` (absent : la racine). */
+export interface ReplayPlace {
+  root: string;
+  dir?: string;
 }
 
 /** Un argument de commande sans risque pour `sh -c` : tel quel s'il est simple, entre apostrophes sinon. */
@@ -98,10 +105,11 @@ const REPLAYS = 2;
 
 /**
  * Parmi `names`, les tests rouges SEULS (L510) : `run` rejoue la commande `template` avec leurs fichiers, au plus `REPLAYS` fois ; un test reste s'il est nommé en échec par chaque rejeu, qui sort en échec. C'est une preuve positive : un rejeu qui échoue pour une autre raison
- * (build cassé, fichier introuvable) ne nomme pas le test et ne l'excuse pas. Un test sans fichier désignable n'est pas rejoué, donc n'est jamais retenu. `root` : le dossier où `output` a tourné, si le rejeu se fait dans un autre (les fichiers node --test, chemins absolus, y sont relativisés). Sert à savoir si un rouge du lot était déjà rouge au sha de départ.
+ * (build cassé, fichier introuvable) ne nomme pas le test et ne l'excuse pas. Un test sans fichier désignable n'est pas rejoué, donc n'est jamais retenu. `at` : le worktree où `output` a tourné, si le rejeu se fait dans un autre, et le dossier de la partie d'où le rejeu se lance
+ * (les fichiers node --test, chemins absolus du worktree, sont relativisés à ce dossier). Sert à savoir si un rouge du lot était déjà rouge au sha de départ.
  */
-export async function redAlone(run: (command: string) => Promise<{ code: number; output: string }>, template: string, names: string[], output: string, root?: string): Promise<string[]> {
-  const fileOf = fileResolver(output, root);
+export async function redAlone(run: (command: string) => Promise<{ code: number; output: string }>, template: string, names: string[], output: string, at?: ReplayPlace): Promise<string[]> {
+  const fileOf = fileResolver(output, at);
   let still = [...new Set(names)].filter((n) => fileOf(n));
   for (let i = 0; i < REPLAYS && still.length; i++) {
     const files = [...new Set(still.map((n) => fileOf(n)!))];

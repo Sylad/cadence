@@ -152,6 +152,27 @@ describe('L588 — cadence orchestrate --follow', () => {
     expect(r.out).toEqual([`${TS} cadence:L1 → question — Quel format ?`, `fin de vague ${WAVE} : done`]);
   });
 
+  it('R5 — vague reprise : état déjà écrit (suspended-budget), inscription au registre en retard — le suivi attend la reprise au lieu de finir', async () => {
+    const { parent, store } = await waveWith(['cadence:L1 → ready — prêt à livrer']);
+    store.writeWave({ ...store.readWave()!, status: 'suspended-budget' });
+    const r = io(parent);
+    const d = deps();
+    const log = join(store.dir, 'journal.log');
+    let n = 0;
+    d.watchSleep = async () => {
+      n++;
+      if (n === 2) registerWave(cadenceHome(), { pid: process.ppid, wave: WAVE, started: TS, cwd: parent, repos: ['/x/a'], cap: 2 });
+      if (n === 3) appendFileSync(log, `${TS} cadence:L1 → question — Quel format ?\n`);
+      if (n === 4) {
+        store.writeWave({ ...store.readWave()!, status: 'done' });
+        unregisterWave(cadenceHome(), process.ppid);
+      }
+    };
+    expect(await orchestrate(['--follow', '--wave', WAVE], r.io, d)).toBe(0);
+    expect(n).toBeGreaterThanOrEqual(4);
+    expect(r.out).toEqual([`${TS} cadence:L1 → ready — prêt à livrer`, `${TS} cadence:L1 → question — Quel format ?`, `fin de vague ${WAVE} : done`]);
+  });
+
   it('R6 — vague inconnue : refus après quelques relevés ; sans --wave, la dernière vague du dossier ; aucun journal : fin sans ligne', async () => {
     const { parent, store } = await waveWith(['cadence:L1 → ready — prêt à livrer']);
     const d = deps();

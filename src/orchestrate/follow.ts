@@ -10,6 +10,8 @@ import type { Args } from './command-args.js';
 const DEFAULT_FOLLOW_INTERVAL = 5;
 /** Relevés accordés à une vague nommée d'avance (`--wave`) pour écrire son état avant qu'elle soit déclarée inconnue. */
 const STATE_WAIT_POLLS = 30;
+/** Relevés accordés à une vague dont l'état est écrit mais qui n'est pas finie (reprise) pour s'inscrire au registre des vagues vivantes : `--resume` ne s'y inscrit qu'après l'instantané, les verrous et les gardes de push. */
+const REGISTER_WAIT_POLLS = 6;
 
 /** Le texte d'une ligne du journal, sans l'horodatage ISO qui la précède. */
 function body(line: string): string {
@@ -52,8 +54,11 @@ export async function followCommand(args: Args, io: OrchestrateIo, deps: Orchest
   const ms = (args.interval ?? DEFAULT_FOLLOW_INTERVAL) * 1000;
   const store = await waveStore(args.wave, launch, () => sleep(ms));
   const reader = journalReader(join(store.dir, 'journal.log'));
+  const live = () => liveWaves(cadenceHome()).some((w) => w.wave === store.id);
+  // Une vague arrêtée (suspended-*, interrupted) peut être en train d'être reprise : son statut d'avant la reprise n'est pas sa fin.
+  for (let polls = 0; polls < REGISTER_WAIT_POLLS && store.readWave()?.status !== 'done' && !live(); polls++) await sleep(ms);
   for (;;) {
-    const running = liveWaves(cadenceHome()).some((w) => w.wave === store.id);
+    const running = live();
     for (const line of reader()) io.out(line);
     if (!running) {
       io.out(`fin de vague ${store.id} : ${store.readWave()?.status ?? 'illisible'}`);

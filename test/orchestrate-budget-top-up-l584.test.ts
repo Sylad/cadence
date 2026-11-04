@@ -112,6 +112,16 @@ describe("budget de lot : prélèvement à la dernière passe (L584)", () => {
     expect(c.lot.budgetTopUp).toBeUndefined();
   });
 
+  it("R11 — un lot dont la revue converge mais qui a déjà dépassé son budget reçoit aussi le prélèvement (le dépassement n'écarte pas la règle)", async () => {
+    const h = harness({ script: converging() });
+    const spent = { n: 1, kind: 'implement', model: 'sonnet', status: 'done', tokens: { counted: 200_000 } } as never;
+    const c = h.lot('L1', { budget: 150_000, pass: 3, next: 'fix', reviewCounts: [2, 1], steps: [spent], constats: [{ source: 'code', gravite: 'majeur', texte: 'reste' }] });
+    await runLot(c);
+    expect(kinds(h)[0]).toBe('fix');
+    expect(c.lot.budgetTopUp).toBe(200_000 + REVIEW_RESERVE + 1 - 150_000);
+    expect(c.lot.outcome ?? '').not.toContain('correction non jouée (budget)');
+  });
+
   it("R10 — orchestrate.budgetTopUp : 300000 par défaut, un entier ≥ 0, refusé sinon", () => {
     const read = (yaml: string) => {
       const f = join(tempDir(), 'cadence.yaml');

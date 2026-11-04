@@ -53,7 +53,8 @@ export async function session(c: LotCtx, kind: SessionKind, local = false): Prom
   if (halt) return suspend(c, halt);
   const write = kind === 'probe' || WRITE_STEPS.includes(kind); // la sonde écrit (ses tests) mais le budget ne la borne pas : il est vérifié avant de la décider
   // Le budget du lot borne l'écriture, jamais la revue (L145) : une revue est jouée dès que le code est à relire (sauf tests rouges après une écriture, cf. REVIEW_RESERVE), la passe fix réserve son coût.
-  if (WRITE_STEPS.includes(kind) && (lotOver(l) || fixRefused(c, kind))) return overBudget(c, kind === 'fix' && !lotOver(l));
+  // La passe fix tente le prélèvement avant de lire le dépassement : un lot dont la revue converge mais qui a dépassé son budget n'a pas non plus de quoi payer « correction + revue courte » (L584).
+  if (WRITE_STEPS.includes(kind) && (kind === 'fix' ? fixRefused(c, kind) || lotOver(l) : lotOver(l))) return overBudget(c, kind === 'fix' && !lotOver(l));
 
   const model: StepModel = ['spec', 'accept', 'fiche', 'probe'].includes(kind) ? 'sonnet' : write ? (kind === 'fix' && l.escalation?.stage === 'fix' ? l.escalation.model : l.model) : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const effort = c.config.effort[effortKey(kind)];

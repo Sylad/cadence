@@ -83,13 +83,14 @@ export function resourceLock(running: Map<Promise<void>, LotCtx[]>, live: Set<Lo
   const warned = new WeakMap<LotCtx, string>();
   const heldBy = (c: LotCtx): string[] => {
     if (!c.tree) return usesOf(c);
-    let cause: string | null = null;
-    const deduced = deducedResources(c.lot.repo, c.tree.branch, declaredFor(c.lot.repo), (why) => (cause = why));
-    if (cause !== null && warned.get(c) !== cause) {
+    const causes: string[] = [];
+    const deduced = deducedResources(c.lot.repo, c.tree.branch, declaredFor(c.lot.repo), (why) => causes.push(why));
+    const cause = causes[0];
+    if (cause === undefined) warned.delete(c);
+    else if (warned.get(c) !== cause) {
       warned.set(c, cause);
       warn(c, cause);
     }
-    if (cause === null) warned.delete(c);
     return [...usesOf(c), ...deduced];
   };
   return {

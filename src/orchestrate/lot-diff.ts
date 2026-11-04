@@ -7,7 +7,8 @@ export interface LotDiff {
   failure: string | null;
 }
 
-const NONE: LotDiff = { files: [], failure: null };
+/** Un diff vide sans cause, neuf à chaque appel (les appelants peuvent garder la liste). */
+const none = (): LotDiff => ({ files: [], failure: null });
 
 /**
  * Les fichiers des COMMITS de la branche d'un lot depuis le point de départ de sa base (R6) : `git diff --name-only --no-renames <merge-base>..<branche>`,
@@ -15,9 +16,9 @@ const NONE: LotDiff = { files: [], failure: null };
  * sans cause. Git qui échoue (base disparue ou renommée, merge-base vide, dépôt illisible) : diff vide avec la cause (R12), jamais une exception.
  */
 export function lotDiff(repo: string, branch: string): LotDiff {
-  if (!branchExists(repo, branch)) return NONE;
+  if (!branchExists(repo, branch)) return none();
   const base = baseBranchOf(repo, branch);
-  if (base === null) return NONE;
+  if (base === null) return none();
   try {
     const start = git(repo, 'merge-base', `refs/heads/${branch}`, `refs/heads/${base}`);
     if (!start) return { files: [], failure: 'git merge-base ne rend rien' };

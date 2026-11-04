@@ -38,6 +38,7 @@ export function blockingOlder(c: LotCtx, declared: Resources, warn: Warn, diff: 
   const touched = resourcesTouching(declared, mine.files);
   if (touched.size === 0) return null;
   const all = c.wave.store.lots();
+  // Les lots avant le tardif dans l'ordre de la vague ; un tardif absent de la liste (état non écrit) n'a aucun ancien.
   const me = all.findIndex((l) => l.project === c.lot.project && l.lot === c.lot.lot);
   for (const o of all.slice(0, Math.max(me, 0)).filter((l) => l.repo === c.lot.repo && works(l))) {
     const d = diff(o.repo, lotBranch(c.wave.id, o.project, o.lot));

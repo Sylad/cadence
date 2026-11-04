@@ -898,6 +898,7 @@ lots:
     uses: [ plan-coeur ]
     created: 2026-10-30
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "conforme : le signal M11 est livré, générique et testé (19 tests verts). Une seule note mineure sur l'ordre des sections dans `raf now`. — orchestré (vague 2026-11-04-1310-cad, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: be1638c7e85ca8ddc008959a4db64ae66fb4ff3c }
   - id: L474
     title: "cadence deliver --sha refuse aussi HORS vague un intervalle origin..sha qui contient des commits d'un lot ni done ni ready (aujourd'hui seulement pendant une vague du dépôt) ; --dry-run liste les lots de l'intervalle avec leur état — cas du 30-10 : codex 09217b0 « L49 seul » a livré L50 et L51 non relus, dont les commits étaient SOUS L49"
     status: done

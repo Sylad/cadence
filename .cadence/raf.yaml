@@ -1982,11 +1982,12 @@ lots:
     started: 2026-11-04
   - id: L571
     title: "Lots en service non publiés signalés : cadence lead tour, cadence session close et l'orchestrate --status disent ⚠ N lots done depuis le dernier tag v<x.y.z> (dépôt qui publie : package.json + tag), avec la commande cadence release à jouer ; session close le met en tête des trois lignes — 04-11 : 18 lots en service la veille, compte pro lancé le matin sur 1.46.0"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "conforme : les 2 constats mineurs de la revue précédente sont corrigés (clause isRecurring sans effet retirée, documentation et test ajoutés ; test R3b de orchestrate --status lancé depuis un dossier parent), sans régression — orchestré (vague 2026-11-04-0900-cad, 1 passe(s) de correction + passe des mineurs)", commit: 46fa28ab7dab61fec0cac52134253a51be3ec8a7, reporte: { de: 6d33c4b85a840bb0b0f5d9e777a306878f698f19, vers: 46fa28ab7dab61fec0cac52134253a51be3ec8a7, patchId: c155ac856c476b0733c9ca3d865c9d39d8fae4df } }
+    finished: 2026-11-04
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

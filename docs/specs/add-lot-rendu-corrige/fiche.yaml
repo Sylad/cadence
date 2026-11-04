@@ -70,7 +70,7 @@ regles:
     tests: ["R2 — constats de revue présents : après la prise, next vaut 'fix' (toFix appelée avec ces constats), quel que soit le next du lot rendu", "R2 — revue passée sans constat : après la prise, next vaut la valeur de firstReview (revue du correctif du lead), pas 'fix'", "R2 — jamais revu : après la prise, next vaut la valeur de firstWrite", "R2 — constats de tests rouges seuls : après la prise, next vaut la valeur de firstWrite (pas 'fix', pas de revue)", "R2 — lot rendu à next null ou terminal : next écrasé par la prise, le lot joue l'étape choisie dans le cycle"]
   - id: R3
     cas: [C1]
-    enonce: "Le refus « lot déjà dans la vague » reste le même, avec son geste, pour un lot rendu à l'intégration (--resume --integrate), sur budget (--budget projet:lot=+N), sur écriture de plan refusée (--replay, à la fin de la vague), retiré par --drop ou en écart docs.sync (nouvelle vague) ; seul le rendu « hors intégration, hors budget, hors plan » devient ajoutable."
+    enonce: "Le refus « lot déjà dans la vague » reste le même, avec son geste, pour un lot rendu à l'intégration (--resume --integrate), sur budget (--budget projet:lot=+N), sur écriture de plan refusée (--replay, à la fin de la vague), retiré par --drop ou en écart docs.sync (nouvelle vague) ; seul le rendu « hors intégration, hors budget, hors plan » devient ajoutable. Ajoutable = addableHandBack(l) (R13)."
     statut: sourcee
     source: "src/orchestrate/geste.ts:36-47,61-64 ; src/orchestrate/cycle/budget.ts:54-59 ; docs/specs/orchestrate-worktree-par-lot R27 (--integrate garde l'intégration seule) ; docs/specs/orchestrate-reprise-lot-budget (le rendu sur budget garde --budget)"
     tests: ["R3 — lot rendu à l'intégration : refus inchangé avec le geste --integrate", "R3 — lot rendu sur budget : refus inchangé avec le geste --budget", "R3 — lot retiré par --drop : refus inchangé, nouvelle vague"]
@@ -100,7 +100,7 @@ regles:
     tests: ["R7 — la vague finit avant la prise : demande écartée, lot toujours handed-back"]
   - id: R8
     cas: [C2]
-    enonce: "Sur une vague vivante, la colonne geste d'un lot rendu ajoutable (R3 exclu) est « cadence orchestrate --add <projet>:<lot> --wave <vague> » (forme .:<lot> quand le projet est le dossier de lancement), sans « à la fin de la vague » ; vague terminée : geste inchangé."
+    enonce: "Sur une vague vivante, la colonne geste d'un lot rendu ajoutable (addableHandBack(l), R13 ; R3 exclu) est « cadence orchestrate --add <projet>:<lot> --wave <vague> » (forme .:<lot> quand le projet est le dossier de lancement), sans « à la fin de la vague » ; vague terminée : geste inchangé."
     statut: hypothese
     si_faux: "Si le geste restait vide, la fonctionnalité serait là mais introuvable ; seul le texte de la colonne change."
     tests: ["R8 — vague vivante, lot rendu à corriger : la colonne geste vaut exactement « cadence orchestrate --add <projet>:<lot> --wave <vague> », sans « à la fin de la vague »", "R8 — vague terminée : geste inchangé (texte exact de L554, sans --add)"]
@@ -131,10 +131,10 @@ regles:
     tests: ["R12 — arbre rendu sale après le dépôt de la demande : demande écartée et dite, aucune session lancée, lot toujours handed-back", "R12 — worktree supprimé après le dépôt : demande écartée, lot inchangé", "R12 — lot rendu absent de known à la prise : pas de refus « lot déjà dans la vague »"]
   - id: R13
     cas: [C1]
-    enonce: "Un lot rendu par un incident (outcome « HEAD déplacé », commit sur la branche principale d'un autre dépôt, dépendance non prête, worktree impossible, plan modifié par la session) n'est pas ajoutable : --add garde le refus « lot déjà dans la vague » ; seul un rendu de fin de cycle (constats non conformes après les passes, session sans suite) l'est, avec R3 exclu."
+    enonce: "Un lot rendu par un incident (outcome « HEAD déplacé », commit sur la branche principale d'un autre dépôt, dépendance non prête, worktree impossible, plan modifié par la session) n'est pas ajoutable : --add garde le refus « lot déjà dans la vague » ; seul un rendu de fin de cycle (constats non conformes après les passes, session sans suite) l'est, avec R3 exclu. Le prédicat est UNE fonction, addableHandBack(l) exportée par src/orchestrate/geste.ts, lue à la fois par le préflight de --add (R13, R3) et par lotGesture (R8) : vraie seulement si status = handed-back, next ≠ integrate, et outcome commence par l'un des préfixes des rendus de fin de cycle (constats non conformes après les passes, session sans suite), préfixes exportés en constantes à côté de DROPPED et DOCS_GAP par le code qui écrit ces outcomes. LISTE BLANCHE : tout autre outcome (incident listé ou non, DROPPED, DOCS_GAP, budget, plan refusé) rend faux ; un nouvel incident n'est jamais ajoutable sans qu'on l'ait décidé (décision du lead du 04-11)."
     statut: hypothese
     si_faux: "Si ces rendus devaient être ajoutables, la reprise partirait d'un état dont la sûreté n'est pas établie (HEAD ou branche d'un autre dépôt déplacés) ; seule la liste des rendus acceptés change, R4 protégeant déjà l'arbre."
-    tests: ["R13 — lot rendu « HEAD déplacé » : refus « lot déjà dans la vague », code 2", "R13 — lot rendu « dépendance non prête » : refus inchangé", "R13 — lot rendu par plan modifié par la session : refus inchangé"]
+    tests: ["R13 — lot rendu « HEAD déplacé » : refus « lot déjà dans la vague », code 2", "R13 — lot rendu « dépendance non prête » : refus inchangé", "R13 — lot rendu par plan modifié par la session : refus inchangé", "R13 — même LotState, deux lectures : addableHandBack faux (incident HEAD déplacé, outcome inconnu) → --add refusé ET geste sans --add ; vrai (fin de cycle non conforme) → --add accepté ET geste --add"]
 
 contrats:
   - id: A1

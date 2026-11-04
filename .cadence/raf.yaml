@@ -2053,6 +2053,7 @@ lots:
     estimate: 0.25
     created: 2026-11-04
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "compliant : aucun bloquant ni majeur, 1 note mineure (sous-causes avec Ollama éteint : code 0, décision documentée de l'auteur) — orchestré (vague 2026-11-04-1015-cad, 1 passe(s) de correction)", commit: f822d94d8f0df2ae4f49f2e097784109bf4a3c99, reporte: { de: 7ad9f3df94d9067951cb497ef8df3f38c21d2662, vers: f822d94d8f0df2ae4f49f2e097784109bf4a3c99, patchId: f5a0aa4a9c386c4e13aa99127f3408227c2227be } }
   - id: L576
     title: Corriger les 4 fiches invalides antérieures (autocontrole-avant-revue A3 code « exit 2 », orchestrate-reprise-lot-budget A1 code « warning », rejeu-porte-composee R3 test nommé R6, session-sans-commit-sur-depot-tiers id R17 au lieu de R15) pour qu'elles passent checkFiche, puis vider la liste d'exceptions du test de comportement posé par L574
     status: todo

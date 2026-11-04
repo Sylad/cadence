@@ -94,10 +94,11 @@ function lotBudgetArg(text: string): Args['lotBudgets'][number] {
   return { project: target.project, lot: target.lot, raise, text: m[2] };
 }
 
-/** Les options sans valeur, et le champ de `Args` qu'elles lèvent. */
+/** Vrai quand la ligne de commande demande une autre action que de lancer une vague. */
 const asksAnotherAction = (a: Args): boolean =>
   a.resume !== undefined || a.status !== undefined || a.waits || a.add.length > 0 || a.drop.length > 0 || a.stopAfterCurrent || a.answers.length > 0 || a.removeWorktree !== undefined;
 
+/** Les options sans valeur, et le champ de `Args` qu'elles lèvent. */
 const BOOLEAN_FLAGS: Record<string, 'dryRun' | 'waits' | 'watch' | 'stopAfterCurrent' | 'abandonCommits' | 'continue' | 'noFill'> = {
   '--dry-run': 'dryRun',
   '--waits': 'waits',

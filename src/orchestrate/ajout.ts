@@ -354,7 +354,7 @@ export class AddFeed {
       // Un refus propre au lot l'écarte pour la vague ; celui du dépôt (arbre sale, orchestration en cours) est passager : le lot est relu à la lecture suivante.
       if (built.refusals.some((r) => r.startsWith(`${key} : `))) this.refused.add(key);
       else badRepos.add(t.repo); // les autres lots de ce dépôt buteraient sur la même cause, ce tour-ci
-      for (const r of built.refusals) this.say(`continue : lot sauté — ${r}`);
+      for (const r of built.refusals) this.say(`lot sauté — ${r}`);
       return null;
     }
     return built.ctx.lot.budget! <= Math.min(e.budgetLeft(), room) ? built.ctx : null;
@@ -395,7 +395,7 @@ export class AddFeed {
     this.drawn.delete(key);
     const refused = this.holdAll(c);
     if (refused) {
-      this.say(`continue : lot sauté — ${key} : ${refused}`);
+      this.say(`lot sauté — ${key} : ${refused}`);
       return false;
     }
     this.e.wctx.log(`créneau libre rempli par ${key}`);

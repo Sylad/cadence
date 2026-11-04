@@ -1916,6 +1916,17 @@ describe('--continue (L147)', () => {
     expect(RunStore.last(parent)!.readWave()!.lots).toEqual(['b:L1', 'b:L2', 'a:L1', 'a:L2', 'a:L3']);
   });
 
+  it('L587 — le remplissage d\'une vague sans --continue dit « lot sauté — … » sans le préfixe « continue : » qu\'elle n\'a pas demandé', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }, { title: 'b deux' }] });
+    writeFileSync(join(dirs.a, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n# sale\n');
+    const f = fakeDeps();
+    const o = io(parent);
+    await orchestrate(['b:L1', '--max-sessions', '1'], o.io, f.deps);
+    const journal = readFileSync(join(RunStore.last(parent)!.dir, 'journal.log'), 'utf8');
+    expect(journal).toMatch(/lot sauté — a : arbre sale/);
+    expect(journal).not.toMatch(/continue : lot sauté/);
+  });
+
   it('--resume --answer … --continue : la vague reprise tire la suite du plan, sans rejouer les lots repris', async () => {
     const { parent } = parentWith({ a: [{ title: 'un' }, { title: 'deux' }] });
     let n = 0;

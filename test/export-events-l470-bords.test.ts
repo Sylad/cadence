@@ -51,6 +51,32 @@ describe('L470 bords — raf events', () => {
     const etats = evs(dir, '--since', '2026-10-15').filter((e) => e.type === 'etat');
     expect(etats).toMatchObject([{ day: '2026-10-15', from: null, to: 'code', sha: c }]);
   });
+  it('un plan déplacé (raf migrate, git mv) garde son historique d\'état et ne reçoit pas de faux etat au jour du déplacement', () => {
+    const dir = project();
+    raf(dir, 'add', 'A');
+    const legacy = 'docs/plan/raf.yaml';
+    execFileSync('mkdir', ['-p', join(dir, 'docs/plan')]);
+    commit(dir, '2026-09-30T10:00:00', 'plan', PLAN, 'cadence.yaml');
+    git(dir, 'mv', PLAN, legacy);
+    process.env.TEST_DAY = '2026-10-01T10:00:00';
+    git(dir, 'commit', '-q', '-m', 'plan ancien chemin');
+    const edit = (line: string) => writeFileSync(join(dir, legacy), readFileSync(join(dir, legacy), 'utf8').replace(/\n    state:.*/g, '').replace(/(id: L1\n)/, `$1    ${line}\n`));
+    edit('state: code');
+    const a = commit(dir, '2026-10-02T10:00:00', 'plan: code', legacy);
+    edit('state: teste');
+    const b = commit(dir, '2026-10-03T10:00:00', 'plan: teste', legacy);
+    git(dir, 'mv', legacy, PLAN);
+    process.env.TEST_DAY = '2026-10-20T10:00:00';
+    git(dir, 'commit', '-q', '-m', 'chore: raf migrate');
+    const etats = evs(dir).filter((e) => e.type === 'etat');
+    expect(etats).toMatchObject([
+      { day: '2026-10-02', from: null, to: 'code', sha: a },
+      { day: '2026-10-03', from: 'code', to: 'teste', sha: b },
+    ]);
+    expect(etats.map((e) => e.day)).not.toContain('2026-10-20');
+    // --since après le déplacement : la version d'avant, au chemin d'avant, sert de point de départ.
+    expect(evs(dir, '--since', '2026-10-20').filter((e) => e.type === 'etat')).toEqual([]);
+  });
   it('state: null (valeur YAML vide) n\'est pas un état « null »', () => {
     const dir = project();
     raf(dir, 'add', 'A');

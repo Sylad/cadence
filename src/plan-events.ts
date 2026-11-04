@@ -67,19 +67,29 @@ function stateChanges(before: Map<string, string>, after: Map<string, string>, d
 }
 
 /**
- * Les changements d'état de l'historique git du fichier du plan (première parenté : un merge se compare à la branche où il est fait), au jour et au sha du commit. `since` borne le parcours : la version qui
+ * Les changements d'état de l'historique git du fichier du plan (première parenté : un merge se compare à la branche où il est fait ; le fichier est suivi à travers ses déplacements), au jour et au sha du commit. `since` borne le parcours : la version qui
  * précède le premier commit retenu sert de point de départ. Un plan que git ne suit pas n'a pas d'historique : aucun événement.
  * Une version illisible est sautée et signalée par `warn`.
  */
 function stateEvents(root: string, planFile: string, since: Day | undefined, warn: (line: string) => void): PlanEvent[] {
-  const log = tryGit(root, ['log', '--first-parent', '--reverse', '--format=%H %cs', ...(since ? [`--since=${since}T00:00:00`] : []), '--', planFile]);
+  // `--follow` suit le fichier à travers ses déplacements (raf migrate, `plan:` changé) : git ne combine pas `--follow` et `--reverse` (l'historique s'arrête au déplacement) : l'ordre est inversé ici ; chaque version se lit au chemin qu'il avait à ce commit, et un déplacement pur ne change aucun état.
+  const log = tryGit(root, ['log', '--first-parent', '--follow', '--name-status', '--format=%x01%H %cs', ...(since ? [`--since=${since}T00:00:00`] : []), '--', planFile]);
   if (!log) return [];
-  const versions = log.split('\n').map((l) => l.split(' ') as [string, Day]);
-  const parent = since ? fileAt(root, `${versions[0][0]}^`, planFile) : null;
+  const versions = log
+    .split('\x01')
+    .filter(Boolean)
+    .reverse()
+    .map((block) => {
+      const [head, ...files] = block.trim().split('\n');
+      const [sha, day] = head.split(' ') as [string, Day];
+      const cols = files.find((f) => f.trim())?.split('\t') ?? [];
+      return { sha, day, path: cols[cols.length - 1] ?? planFile, parentPath: cols.length > 2 ? cols[1] : (cols[cols.length - 1] ?? planFile) };
+    });
+  const parent = since ? fileAt(root, `${versions[0].sha}^`, versions[0].parentPath) : null;
   let before: Map<string, string> | null = parent === null ? new Map() : statesOf(parent);
   const out: PlanEvent[] = [];
-  for (const [sha, day] of versions) {
-    const text = fileAt(root, sha, planFile);
+  for (const { sha, day, path } of versions) {
+    const text = fileAt(root, sha, path);
     const after = text === null ? null : statesOf(text);
     if (after === null) {
       if (text !== null) warn(`historique du plan illisible au commit ${sha.slice(0, 7)} : ses changements d'état sont sautés`);

@@ -34,8 +34,7 @@ export function cmdSetStatus(c: Ctx): number | Promise<number> {
   const { rest, values, io, today, root, configPath, planConfig, loadPlan, newsDir, refuseLongTitle, need, command } = c;
   need(1, `${command} <id>`);
   const plan = loadPlan();
-  // Un lot que le plan ne connaît pas n'a rien à différer : setStatus dit « lot inconnu » plutôt que de conseiller de relancer une commande qui échouera.
-  if (rest[0].includes('/') || plan.lots().some((l) => l.id === rest[0])) refuseDoneInMainTree(root, io.env, { command, lot: rest[0], now: values.now });
+  refuseDoneInMainTree(root, io.env, { command, lot: rest[0], now: values.now, known: plan.lots().map((l) => l.id) });
   const status: Status = command === 'start' ? 'doing' : command === 'done' ? 'done' : 'dropped';
   // Le titre public part au site : un titre au-delà de la limite déclarée y ferait échouer le build.
   if (status === 'done' && !rest[0].includes('/')) {

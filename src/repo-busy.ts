@@ -51,8 +51,9 @@ function mainTreeHeld(root: string, env: Record<string, string | undefined>): { 
  * `raf done` différé (L521) : dans un dépôt sans worktrees, écrire le plan pendant qu'une session travaille dans l'arbre principal le lui laisse modifié
  * (le lot suivant est rendu « dépôt sale après implement », avatar L57 le 01-11). Refuse sans rien écrire et dit l'ordre sûr ; `--now` passe outre.
  */
-export function refuseDoneInMainTree(root: string, env: Record<string, string | undefined>, a: { command: string; lot: string; now?: boolean }): void {
-  if (a.command !== 'done' || a.now) return;
+export function refuseDoneInMainTree(root: string, env: Record<string, string | undefined>, a: { command: string; lot: string; now?: boolean; known: string[] }): void {
+  // Un lot que le plan ne connaît pas (hors sous-élément « lot/… ») n'a rien à différer : setStatus dit « lot inconnu » plutôt que de conseiller de relancer une commande qui échouera.
+  if (a.command !== 'done' || a.now || !(a.lot.includes('/') || a.known.includes(a.lot))) return;
   const held = mainTreeHeld(root, env);
   if (held) throw new RafError(`done différé : ${held.where} — écrire le plan maintenant lui laisserait un arbre modifié (le lot suivant serait rendu « dépôt sale après implement »). Ordre sûr : attendre la fin de leur étape (cadence orchestrate --status), puis relancer \`raf done ${a.lot}\` ; ou \`--now\` pour écrire tout de suite et accepter que ces lots soient rendus`);
 }

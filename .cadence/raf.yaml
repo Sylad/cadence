@@ -2143,6 +2143,7 @@ lots:
     estimate: 0.25
     created: 2026-11-04
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "conforme : revue fraîche du correctif 13787198 (lead, 04-11) — le --dry-run applique les refus de recoverTree par la fonction partagée recoveryRefusal (worktree sale, plan touché), un test par cause ; rebasé sur main sans conflit", commit: 13787198109456782e6dd2a8399839d0ec8ad38f }
   - id: L582
     title: "Plans riches — format de journal d'événements déclaratif (plan.journal ou équivalent) : --to-config réécrit aussi journal.ndjson au format déclaré (M10 de l'étude maritime-atlas docs/plan/etude, §152) ; reste un préalable à la bascule de maritime (§125) ; séparé de L472 par décision du lead du 04-11"
     status: todo

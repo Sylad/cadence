@@ -9,6 +9,7 @@ import type { Lot, Plan } from './plan.js';
 import { staleNoteLines, staleNotes, staleText } from './stale-notes.js';
 import { windowLines } from './plan-window.js';
 import { quickwinLines, quickwins } from './quickwins.js';
+import { unpublished, unpublishedLine } from './unpublished.js';
 import { lockAlive, readLock, readNext, readSessionMark, writeSessionMark } from './state.js';
 
 export interface SessionCtx {
@@ -197,6 +198,9 @@ export function sessionClose(ctx: SessionCtx, opts: { since?: string }): number 
   // Mesuré avant tout rapport : une clé memory.indexMaxBytes invalide arrête la clôture sans rien imprimer.
   const memory = memoryLines(ctx);
   out(`${plan.project} — clôture du ${today}`);
+  // En tête (L571) : de ce que la clôture rapporte, c'est ce que le lead oublie le plus ; le skill le met en premier des trois lignes de demain.
+  const pending = unpublished(plan, ctx.root);
+  if (pending) out(unpublishedLine(pending));
 
   const window = closeWindow(ctx, opts.since);
   const recent = period(ctx, window.since);

@@ -8,7 +8,7 @@ cadence session start              # notes from the last close, lots in progress
                                    # the planned windows (late lots, lots that should have started, deadlines of the next 7 days; L466, docs/raf.md),
                                    # work done since yesterday by lot, drift, repo state, 3 proposals
 cadence session start --since "3 days ago" --idle 2
-cadence session close              # commits by lot since the last `session start`,
+cadence session close              # first line, when lots are in service but not published (L571): ⚠ N lots done since the last tag v<x.y.z>, cadence release to play; then commits by lot since the last `session start`,
                                    # commits without a lot, lots in progress with no commit in that window,
                                    # drift, uncommitted / unpushed work; exit 1 while something is still open
 cadence session close --since "2 days ago"   # --since overrides the window

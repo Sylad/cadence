@@ -3,6 +3,7 @@ import { gitRoot } from '../git.js';
 import { localOverdueLines } from '../local-task.js';
 import { RafError } from '../plan.js';
 import { findProjects, isProject as isLeadProject } from '../lead.js';
+import { unpublishedAt, unpublishedLine } from '../unpublished.js';
 import { freeLine, readyFree } from '../ready-free.js';
 import { cadenceHome, expiredHolds, freeSlots, liveHolds, liveSlots, liveWaves } from './registry.js';
 import { longDuration } from './guard.js';
@@ -95,7 +96,12 @@ function statusView(args: Args, launch: string, cap: number, now: Date): { live:
       throw new RafError((e as Error).message);
     }
   }
-  return { live, table: [...renderTable(store.readWave()!, lots, { compact: true, prices: launchPrices(launch, (w) => live.push(`⚠ ${w}`)) }), ...keptLines(lots.map((l) => l.repo), now.getTime())], running };
+  const dirs = isLeadProject(launch) ? [launch] : findProjects(launch);
+  const pending = dirs.flatMap((d) => {
+    const u = unpublishedAt(d);
+    return u ? [`${dirs.length > 1 ? `${basename(d)} · ` : ''}${unpublishedLine(u)}`] : [];
+  });
+  return { live, table: [...renderTable(store.readWave()!, lots, { compact: true, prices: launchPrices(launch, (w) => live.push(`⚠ ${w}`)) }), ...keptLines(lots.map((l) => l.repo), now.getTime()), ...pending], running };
 }
 
 /** La vague que `--status` suit (L395) : `--status <id>` ou `--status --wave <id>` ; aucune : la dernière du dossier. Deux ids différents : refus. */

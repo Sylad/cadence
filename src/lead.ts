@@ -17,6 +17,7 @@ import { cadenceHome } from './orchestrate/registry.js';
 import { staleNotes, staleText } from './stale-notes.js';
 import { ciGapsField, ciParityText, type CiGap } from './orchestrate/ci-parity.js';
 import { noTestGate, noTestText, type NoTestGate } from './orchestrate/no-test.js';
+import { unpublishedField, unpublishedLine, type Unpublished } from './unpublished.js';
 import { KEPT_TITLE, keptLine, keptTrees, type KeptTree } from './orchestrate/worktree.js';
 
 /** Le bloc `lead:` du cadence.yaml du dossier parent (absent = `undefined`) ; un `lead` qui n'est pas une table est refusé en nommant `key`. */
@@ -129,6 +130,8 @@ export interface TourRow {
   noTest?: NoTestGate;
   /** Commandes de test des workflows CI que la porte ne joue pas (L499) ; absent quand il n'y en a aucune. */
   ciGaps?: CiGap[];
+  /** Lots `done` dont le travail est postérieur au dernier tag de version (L571) ; absent quand le dépôt ne publie pas ou que rien n'attend. */
+  unpublished?: Unpublished;
 }
 
 const empty = (project: string): TourRow => ({ project, doing: [], drift: [], notes: [], next: null, progress: { done: 0, doing: 0, todo: 0, added7: 0 }, repo: [] });
@@ -225,6 +228,7 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     const noTest = noTestGate(root);
     if (noTest) row.noTest = noTest;
     Object.assign(row, ciGapsField(root));
+    Object.assign(row, unpublishedField(plan, root));
   } catch (e) {
     return { ...empty(row.project), error: (e instanceof Error ? e.message : String(e)).split('\n')[0]! };
   }
@@ -285,6 +289,11 @@ export function tourNoTestLines(rows: TourRow[]): string[] {
 /** Une ligne par projet et par commande de test de la CI que la porte ne joue pas (L499) ; rien quand la porte couvre la CI. */
 export function tourCiLines(rows: TourRow[]): string[] {
   return rows.flatMap((r) => (r.ciGaps ?? []).map((g) => `${r.project} · ${ciParityText(g)}`));
+}
+
+/** Une ligne ⚠ par projet qui a des lots en service non publiés (L571) ; rien quand tout est publié. */
+export function tourUnpublishedLines(rows: TourRow[]): string[] {
+  return rows.filter((r) => r.unpublished).map((r) => `${r.project} · ${unpublishedLine(r.unpublished!)}`);
 }
 
 const DRIFT_SHOWN = 2;

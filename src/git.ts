@@ -371,6 +371,16 @@ export function tagExists(cwd: string, tag: string): boolean {
   return git(cwd, ['tag', '--list', tag]).trim() !== '';
 }
 
+/** Le plus récent tag `v<x.y.z>` (ordre des versions) atteignable depuis HEAD ; null sans tag de ce nom ou hors dépôt. */
+export function latestVersionTag(cwd: string): string | null {
+  try {
+    const tags = git(cwd, ['tag', '--merged', 'HEAD', '--list', 'v*', '--sort=-v:refname']).split('\n');
+    return tags.find((t) => /^v\d+\.\d+\.\d+$/.test(t)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Branche courante, ou null sur un HEAD détaché. */
 export function currentBranch(cwd: string): string | null {
   const name = git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();

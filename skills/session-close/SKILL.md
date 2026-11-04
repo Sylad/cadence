@@ -73,7 +73,7 @@ With no project named, run `cadence session close --all` from the parent folder,
    these steps say `raf`.
 6. **Clean state**: everything committed and pushed, no delivery running. If the command still exits 1,
    say what remains and do NOT say the session is closed.
-7. **Three lines for next time**: `cadence session next "…" "…" "…"` — the next `session-start` shows them. The command prints the lines as recorded: report them from that output, do not run `session start` again.
+7. **Three lines for next time**: if the report opens with `⚠ N lots done depuis le dernier tag v<x.y.z>` (lots in service, not published), that goes FIRST, with the `cadence release` command it names; then `cadence session next "…" "…" "…"` — the next `session-start` shows them. The command prints the lines as recorded: report them from that output, do not run `session start` again.
    If the report has a "Notes de la dernière clôture à réécrire" section, those notes quote a lot already
    finished (`⚠ note périmée`): propose their rewrite in the lines below, never carry them over as they are.
    The lines replace the previous notes. Without a line the command refuses and keeps them; erase

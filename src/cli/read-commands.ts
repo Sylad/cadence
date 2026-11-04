@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { readOrchestrateConfig } from '../config.js';
 import { repoSections } from '../repos.js';
 import { lotJson, lotLines } from '../lot-lines.js';
-import { audit, gateWaiting, hypothesesOf, lotWork, nextUp, planCommits, workByLot } from '../audit.js';
+import { audit, closableLines, gateWaiting, hypothesesOf, lotWork, nextUp, planCommits, workByLot } from '../audit.js';
 import { short } from '../check.js';
 import { type Day, isCalendarDay, toDay } from '../dates.js';
 import { ganttData, renderGantt } from '../gantt.js';
@@ -45,6 +45,9 @@ function now(plan: Plan, root: string, newsDir: string, today: Day, io: Io): num
   const byDeps = blocked.filter((l) => !gated.some((g) => g.lot === l));
   if (byDeps.length) io.out(`  en attente de dépendances : ${byDeps.map((l) => l.id).join(', ')}`);
   if (gated.length) io.out(`  en attente de condition de tirage : ${gated.map((g) => `${g.lot.id} (${g.text})`).join(', ')}`);
+
+  const closable = closableLines(lots, plan.readonly);
+  if (closable.length) io.out(`\nSous-tâches toutes fermées\n${closable.map((l) => `  ${l}`).join('\n')}`);
 
   const recurring = recurringByDue(lots, today);
   if (recurring.length) {

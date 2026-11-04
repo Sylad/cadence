@@ -3,7 +3,7 @@
 # session
 
 ```sh
-cadence session start              # notes from the last close, lots in progress (work commit count, `0 commit` included — plan commits are not counted, as in `raf commits` — and last activity; silent ones flagged),
+cadence session start              # notes from the last close, lots in progress (work commit count, `0 commit` included — plan commits are not counted, as in `raf commits` — and last activity; silent ones flagged; then, L473, the open lots whose sub-tasks are all closed, with the command to close the lot),
                                    # the quick wins (ready small lots, `raf quickwins`; L467, docs/raf.md),
                                    # the planned windows (late lots, lots that should have started, deadlines of the next 7 days; L466, docs/raf.md),
                                    # work done since yesterday by lot, drift, repo state, 3 proposals

@@ -439,6 +439,16 @@ export function gateWaiting(all: Lot[], blocked: Lot[]): { lot: Lot; text: strin
   });
 }
 
+/** Lignes « lot ouvert dont toutes les sous-tâches sont done ou dropped » (L473) : `raf done` refuse les sous-tâches ouvertes mais ne propose pas de fermer le lot. Ni lot clos, ni récurrent, ni lot sans sous-tâche. */
+export function closableLines(all: Lot[], readonly: boolean): string[] {
+  return all
+    .filter((l) => isOpen(l.status) && !isRecurring(l) && l.tasks.length > 0 && l.tasks.every((t) => !isOpen(t.status)))
+    .map((l) => {
+      const n = l.tasks.length;
+      return `${l.id}  ${l.title} — ${n} sous-tâche${n > 1 ? 's' : ''} fermée${n > 1 ? 's' : ''} : ${readonly ? "le fermer avec l'outil du projet" : `raf done ${l.id}`}`;
+    });
+}
+
 /** Ce qui vient ensuite : lots en cours, puis lots prêts (dépendances closes), gains rapides d'abord. */
 export function nextUp(all: Lot[]): { doing: Lot[]; ready: Lot[]; blocked: Lot[] } {
   // Les lots récurrents ont leur propre section (raf now) : ils ne sont ni « en cours » ni « à suivre ».

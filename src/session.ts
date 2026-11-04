@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { CLEAN_DAYS, scanStale } from './clean.js';
 import { dueLine, isRecurring, recurringByDue } from './recurring.js';
-import { audit, exemptPlanOnly, gateWaiting, nextUp, planCommits, workByLot } from './audit.js';
+import { audit, closableLines, exemptPlanOnly, gateWaiting, nextUp, planCommits, workByLot } from './audit.js';
 import { diffDays, maxDay, type Day } from './dates.js';
 import { repoStatus, type Commit } from './git.js';
 import { linkCommits, type Linked } from './link.js';
@@ -151,6 +151,8 @@ export function sessionStart(ctx: SessionCtx, opts: { since: string; idle: numbe
     const state = last ? `dernière activité ${last}${idle > opts.idle ? `, silencieux depuis ${idle} j` : ''}` : 'aucune activité';
     out(`  ${l.id}  ${l.title}  (${commitCount(work.get(l.id)?.length ?? 0)}, ${state})`);
   }
+
+  section(out, 'Sous-tâches toutes fermées', closableLines(lots, plan.readonly));
 
   section(out, 'En attente', gateWaiting(lots, blocked).map(({ lot, text }) => `${lot.id}  ${lot.title}  (${text})`));
 

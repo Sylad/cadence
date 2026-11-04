@@ -145,6 +145,12 @@ describe('R5 — la revue 1 balaie les tailles de la fiche', () => {
     expect(brief).toContain('every size the sheet gives');
     expect(brief).toContain('nonVerifie');
   });
+  it('R5 — le brief des revues 2 et 3 ne se contredit pas sur le rang : la phrase des tailles ne dit pas « first review »', async () => {
+    const { h } = await run(first);
+    const [, second] = h.calls.filter((x) => x.kind === 'maquette').map((x) => x.brief);
+    expect(second).toContain('every size the sheet gives');
+    expect(second).not.toContain('this first review');
+  });
   it('R5 — agents/ux-reviewer.md (mode maquette) a la ligne « tailles » dans la liste à cocher de la première revue', () => {
     const prompt = readAgents(AGENTS_DIR)['ux-reviewer'].prompt;
     const mockup = prompt.slice(prompt.indexOf('## Mockup mode'), prompt.indexOf('## Conformity mode'));

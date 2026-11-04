@@ -123,7 +123,7 @@ second one would leave a session idle — and is completed with the same reposit
 `--priority cadence,maritime`, or a `priority: [cadence, maritime]` list in the `cadence.yaml` of the folder you launch from
 (the parent of the projects); a name also covers `name-…` (`maritime` → `maritime-atlas`), the other projects come after, in
 alphabetical order. Launched from inside a project, only that project is drawn. A `priority:` key that cannot be read is refused before anything
-starts, lots given or not (`--no-fill` avoids that refusal only without `--continue`); if it becomes unreadable while the wave plays, the draw of that look is skipped, with a journal line `remplissage : priority: illisible, tirage passé`. A candidate that preflight refuses (dirty tree, Node missing…) is skipped with its cause in the
+starts, lots given or not (`--no-fill` avoids that refusal only without `--continue`); if it becomes unreadable while the wave plays, the draw of that look is skipped, with a journal line `remplissage : tirage passé`. A candidate that preflight refuses (dirty tree, Node missing…) is skipped with its cause in the
 journal (`continue : lot sauté — <cause>`; for the first draw also on the error output). Drawing stops — `continue : arrêt — <reason>` — at: the budget, the
 time window (`--until HH:MM`, today's clock: nothing new is drawn from then on, a running lot is not cut), the usage limit (« usage limit reached », « rate limit », « You've hit your weekly limit »),
 a question asked (the wave stays resumable with `--answer`), two lots handed back in a row, an interrupted wave, a `--stop-after-current` request (`arrêt demandé`, even when the last running

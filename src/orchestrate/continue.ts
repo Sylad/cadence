@@ -229,7 +229,7 @@ export function fillTargets(f: FillFacts): FillPlan {
 }
 
 /**
- * `fillTargets` pendant la vague : un `priority:` devenu illisible passe le tirage de ce regard (rien à tirer, une ligne de journal par cause) au lieu de lever dans le pool et de perdre les sessions en cours.
+ * `fillTargets` pendant la vague : une erreur de lecture (`priority:` devenu illisible) passe le tirage de ce regard (rien à tirer, une ligne de journal par cause) au lieu de lever dans le pool et de perdre les sessions en cours.
  * La dernière cause dite est gardée par vague (`f.store`).
  */
 const lastFault = new WeakMap<object, string>();
@@ -238,7 +238,7 @@ export function fillTargetsSafe(f: FillFacts, log: (line: string) => void): Fill
     return fillTargets(f);
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e);
-    if (why !== lastFault.get(f.store)) log(`remplissage : priority: illisible, tirage passé — ${why}`);
+    if (why !== lastFault.get(f.store)) log(`remplissage : tirage passé — ${why}`);
     lastFault.set(f.store, why);
     return { targets: [], room: 0 };
   }

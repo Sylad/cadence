@@ -67,7 +67,7 @@ describe('L587 — correctifs de la revue', () => {
     });
     expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, s.d)).toBe(0);
     expect(RunStore.last(parent)!.readWave()!.status).not.toBe('interrupted');
-    expect(journal(parent)).toMatch(/remplissage : priority: illisible, tirage passé/);
+    expect(journal(parent)).toMatch(/remplissage : tirage passé/);
   });
 
   it("R7 — --continue --no-fill refuse avant d'agir une clé priority: illisible", async () => {

@@ -1540,11 +1540,12 @@ lots:
     finished: 2026-11-02
   - id: L530
     title: "Panneau des lots, « Dernière livraison par projet » : sur un plan tenu par un autre outil (maritime, raf.py), les lots passés « deploye » hors de cadence deliver (livrer.sh, bump gitops à la main) restent comptés « clos non livrés » — 02-11 : 12 lots E-GL5 en prod affichés non livrés ; lire le statut livré du plan (plan.fields) en plus de deliveries.log"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-02
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "conforme : 2 mineurs en note (sha vide de `delivered` sur plan étranger ; `deliveredStatuses` accepte un état non `done`), mécanisme vérifié sur le plan maritime réel — orchestré (vague 2026-11-04-1310-cad, 3 passe(s) de correction)", commit: 9eb063b1c60ed32dd6dc546a6267ae9c494e4fc3, reporte: { de: c253b5c30101d297d35ca154cdfcac4e70b64240, vers: 9eb063b1c60ed32dd6dc546a6267ae9c494e4fc3, patchId: 60682e3b14cadcec4d2f4949bf9a8c06e6bed9cd } }
+    finished: 2026-11-04
   - id: L531
     title: "Équité entre vagues : un créneau qui se libère va d'abord à la session qui attend déjà dans une autre vague (étape suivante d'un lot en cours), avant tout nouveau tirage de --continue — 02-11 : la revue de maritime E-GL5.13 attendait (3/3 pris par la vague --continue) pendant que le remplissage pouvait tirer un lot d'app de rang inférieur ; respecter aussi l'ordre de priority: entre les vagues"
     status: done

@@ -2,6 +2,7 @@
 import { parse } from 'yaml';
 import { type Day } from './dates.js';
 import { fileAt, type Commit, tryGit } from './git.js';
+import { workCommits } from './audit.js';
 import { linkCommits } from './link.js';
 import { lotJson } from './lot-lines.js';
 import type { Plan } from './plan.js';
@@ -34,10 +35,10 @@ function lotEvents(plan: Plan): PlanEvent[] {
   return out;
 }
 
-/** Un événement commit par lot que cite le commit (la règle de rattachement de `raf commits`). */
-function commitEvents(plan: Plan, commits: Commit[]): PlanEvent[] {
+/** Un événement commit par lot que cite le commit de travail : le rattachement et le filtre de `raf commits` (ni plan seul, ni acquitté, ni release, ni d'avant l'adoption). */
+function commitEvents(plan: Plan, root: string, commits: Commit[]): PlanEvent[] {
   const { byLot } = linkCommits(plan.lots(), commits, plan.refs);
-  return [...byLot].flatMap(([lot, list]) => list.map((c): PlanEvent => ({ day: c.day, type: 'commit', lot, sha: c.sha, subject: c.subject })));
+  return [...byLot].flatMap(([lot, list]) => workCommits(plan, root, list).map((c): PlanEvent => ({ day: c.day, type: 'commit', lot, sha: c.sha, subject: c.subject })));
 }
 
 /** L'état détaillé (`state:`) de chaque lot d'une version du fichier du plan ; null quand le texte n'est pas un plan lisible. */
@@ -66,12 +67,12 @@ function stateChanges(before: Map<string, string>, after: Map<string, string>, d
 }
 
 /**
- * Les changements d'état de l'historique git du fichier du plan, au jour et au sha du commit. `since` borne le parcours : la version qui
+ * Les changements d'état de l'historique git du fichier du plan (première parenté : un merge se compare à la branche où il est fait), au jour et au sha du commit. `since` borne le parcours : la version qui
  * précède le premier commit retenu sert de point de départ. Un plan que git ne suit pas n'a pas d'historique : aucun événement.
  * Une version illisible est sautée et signalée par `warn`.
  */
 function stateEvents(root: string, planFile: string, since: Day | undefined, warn: (line: string) => void): PlanEvent[] {
-  const log = tryGit(root, ['log', '--reverse', '--format=%H %cs', ...(since ? [`--since=${since}T00:00:00`] : []), '--', planFile]);
+  const log = tryGit(root, ['log', '--first-parent', '--reverse', '--format=%H %cs', ...(since ? [`--since=${since}T00:00:00`] : []), '--', planFile]);
   if (!log) return [];
   const versions = log.split('\n').map((l) => l.split(' ') as [string, Day]);
   const parent = since ? fileAt(root, `${versions[0][0]}^`, planFile) : null;
@@ -107,12 +108,13 @@ function detail(e: PlanEvent): string {
   }
 }
 
-/** `raf events` : les événements du plan, du plus ancien au plus récent, ordre total stable (jour, type, lot, détail). */
+/** `raf events` : les événements du plan, du plus ancien au plus récent, ordre stable (jour, type, lot, détail ; les changements d'état d'un lot le même jour dans l'ordre de l'historique git). */
 export function planEvents(plan: Plan, root: string, planFile: string, commits: Commit[], opts: { since?: Day; warn: (line: string) => void }): PlanEvent[] {
   const native = !plan.readonly;
-  const all = [...lotEvents(plan), ...commitEvents(plan, commits), ...(native ? stateEvents(root, planFile, opts.since, opts.warn) : [])];
+  const all = [...lotEvents(plan), ...commitEvents(plan, root, commits), ...(native ? stateEvents(root, planFile, opts.since, opts.warn) : [])];
   const kept = opts.since ? all.filter((e) => e.day >= opts.since!) : all;
-  const key = (e: PlanEvent) => `${e.day}\0${String(RANK.indexOf(e.type)).padStart(2, '0')}\0${e.lot}\0${detail(e)}`;
+  // Les `etat` d'un même lot et d'un même jour gardent l'ordre de l'historique git (le tri est stable) : le détail commence par `from → to`, l'alphabet n'est pas l'ordre des commits.
+  const key = (e: PlanEvent) => `${e.day}\0${String(RANK.indexOf(e.type)).padStart(2, '0')}\0${e.lot}\0${e.type === 'etat' ? '' : detail(e)}`;
   return kept.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 }
 

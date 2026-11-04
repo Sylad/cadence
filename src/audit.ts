@@ -261,7 +261,7 @@ function docSyncIssues(plan: Plan, root: string, byLot: Map<string, Commit[]>): 
 }
 
 /** Commits qui portent du travail sur un lot : ni antérieurs à l'adoption du plan, ni acquittés (`raf ignore`), ni réduits au plan, ni une simple version. */
-function workCommits(plan: Plan, root: string, commits: Commit[]): Commit[] {
+export function workCommits(plan: Plan, root: string, commits: Commit[]): Commit[] {
   const adopted = plan.since;
   // Les fichiers de tous ces commits d'un seul `git log` : le filtre ci-dessous les lit un à un (L394, un `git diff-tree` par commit coûtait 89 % de `raf check`).
   preloadChangedFiles(root, commits.map((c) => c.sha));

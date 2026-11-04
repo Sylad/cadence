@@ -83,7 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- `raf export` and `raf events` (L470, [docs/raf.md](docs/raf.md), [docs/stabilite.md](docs/stabilite.md)): the plan as one stable JSON document (`schema`, `project`, `prefix`, every lot with its extension fields, archived ones included, no generation date) and the stream of its events (`cree`, `demarre`, `termine`, `abandonne`, `livre`, `note`, `etat` from the git history of the plan file, `commit`), `--since` to bound it, `--json` for `{ schema, project, events }`. A dashboard or an external mirror no longer reads the YAML by hand.
+- `raf export` and `raf events` (L470, [docs/raf.md](docs/raf.md), [docs/stabilite.md](docs/stabilite.md)): the plan as one stable JSON document (`schema`, `project`, `prefix`, every lot with its extension fields, archived ones included, no generation date) and the stream of its events (`cree`, `demarre`, `termine`, `abandonne`, `livre`, `note`, `etat` from the git history of the plan file, `commit`: work commits only, as `raf commits`; state changes in git order, merges compared to their first parent), `--since` to bound it, `--json` for `{ schema, project, events }`. A dashboard or an external mirror no longer reads the YAML by hand.
 
 ## [1.50.0] - 2026-11-04
 

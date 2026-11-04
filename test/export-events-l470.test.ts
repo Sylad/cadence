@@ -34,6 +34,8 @@ function project() {
   const dir = gitRepo();
   writeFileSync(join(dir, 'cadence.yaml'), CONFIG);
   raf(dir, 'init', '--project', 'demo', '--no-hook');
+  // Adoption avant les jours des commits d'essai : sinon `raf commits` les écarte comme antérieurs au plan.
+  writeFileSync(join(dir, PLAN), readFileSync(join(dir, PLAN), 'utf8').replace(/^since: \S+/m, 'since: 2026-10-01'));
   return dir;
 }
 const events = (dir: string, ...args: string[]) => JSON.parse(raf(dir, 'events', '--json', ...args).out) as { schema: number; project: string; events: Record<string, unknown>[] };

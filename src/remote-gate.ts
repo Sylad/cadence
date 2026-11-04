@@ -94,6 +94,9 @@ function killGroup(pgid: number): void {
   }
 }
 
+/** Les groupes des ssh locaux en cours : un signal reçu par cadence les tue (R10), y compris pendant gate.install. */
+const liveSsh = new Set<number>();
+
 /** Un appel ssh non interactif (jamais de mot de passe : BatchMode). Le délai tue le ssh local et son groupe ; 255 est une connexion perdue (`lost`), 124 un délai. */
 function ssh(c: SshCall): Promise<Ran> {
   return new Promise((resolveRan) => {
@@ -101,6 +104,7 @@ function ssh(c: SshCall): Promise<Ran> {
     child.once('error', (e) => resolveRan({ code: 127, output: e.message }));
     const pgid = child.pid;
     if (pgid === undefined) return;
+    liveSsh.add(pgid);
     c.stdin?.pipe(child.stdin!).on('error', () => {});
     let output = '';
     for (const s of [child.stdout!, child.stderr!]) s.on('data', (d: Buffer) => (output += d.toString()));
@@ -110,12 +114,14 @@ function ssh(c: SshCall): Promise<Ran> {
     const timer = c.timeoutMs
       ? setTimeout(() => {
           killGroup(pgid);
+          liveSsh.delete(pgid);
           resolveRan({ code: 124, output: `${text()}\ndélai dépassé (${Math.round((c.timeoutMs ?? 0) / 60_000)} min)` });
         }, c.timeoutMs)
       : undefined;
     child.once('close', (code) => {
       clearTimeout(timer);
       killGroup(pgid);
+      liveSsh.delete(pgid);
       resolveRan({ code: code ?? 1, output: text(), lost: code === 255 });
     });
   });
@@ -165,6 +171,8 @@ export async function openRemoteGate(o: OpenOpts): Promise<Opened> {
   try {
     const opened = await prepare(o, (w) => {
       forget = onTermination(() => {
+        // Le ssh local d'abord (gate.install, commande de la porte), puis l'hôte : un nettoyage qui échoue ne laisse pas le ssh tourner.
+        for (const pgid of liveSsh) killGroup(pgid);
         cleanupHost(o, w);
       });
     });

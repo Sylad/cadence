@@ -56,4 +56,30 @@ describe('L403 — signal pendant la porte déportée (R10, R19)', () => {
     expect(existsSync(wt) ? readdirSync(wt) : []).toEqual([]);
     expect(registered.size).toBe(0);
   }, 90_000);
+
+  it('R10 — vague, signal pendant la porte d\'un lot : le ssh local est tué même quand le nettoyage de l\'hôte échoue', async () => {
+    const remote = fakeRemote();
+    // le nettoyage de l'hôte est coupé (255) : seul le gestionnaire de signal peut encore arrêter le ssh local
+    remote.lose('for i in');
+    const h = harness();
+    const env = { ...process.env, ...remote.env };
+    const marker = `sleep 31338.${process.pid}`;
+    const localSsh = `bin/ssh .*${marker.replace('.', '\\.')}'`;
+    const remoteCmd = `sleep 31338\\.${process.pid}$`;
+    const run = withPlace({ config: { gate: { host: 'machine' }, test: marker } as OrchestrateConfig, repo: h.repo, sha: hgit(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: false, label: 'porte du lot L1', local: async () => ({ code: 0, output: '' }), say: () => {}, env }, async (place) => {
+      await place.run(marker);
+    });
+    for (let i = 0; i < 300 && !alive(localSsh); i++) await new Promise((r) => setTimeout(r, 100));
+    expect(alive(localSsh)).toBe(true);
+    await Promise.all([...registered].map((f) => f('SIGTERM')));
+    for (let t = 0; t < 10_000 && alive(localSsh); t += 100) await new Promise((r) => setTimeout(r, 100));
+    expect(alive(localSsh)).toBe(false);
+    // la commande « distante » (sa propre session) n'est pas l'affaire du ssh local : on la retire à la main
+    try {
+      execFileSync('pkill', ['-f', remoteCmd], { stdio: 'ignore' });
+    } catch {
+      // déjà arrêtée
+    }
+    await run;
+  }, 90_000);
 });

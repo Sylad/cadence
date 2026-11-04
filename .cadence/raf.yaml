@@ -1217,11 +1217,12 @@ lots:
     finished: 2026-11-04
   - id: L507
     title: "Porte déportée : au Ctrl-C/SIGTERM d'une vague (gate-place) et pendant gate.install de verify --gate, tuer le ssh local et fermer côté hôte (R10/R19, mineur de la revue de L403)"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-01
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "conforme : les 2 mineurs de la revue précédente sont corrigés (titre du test ramené à ce qu'il vérifie ; git push détaché et inscrit dans liveSsh, tué au signal, avec un test qui échoue sans le correctif), rien n'est cassé, aucun nouveau constat — orchestré (vague 2026-11-04-1310-cad, 2 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme après rebase : la fusion avec L506 garde le comportement du lot (signal → ssh locaux et git push tués, puis nettoyage de l'hôte de tous les fichiers pid), l'entrée du CHANGELOG est sous [Unreleased] et la doc fusionne les deux phrases ; aucun constat", commit: 40dbfcc84217e24e1a6b8111e74403e2343441dc }
+    finished: 2026-11-04
   - id: L508
     title: "Release : la porte et le clone de « cadence release » tournent avec un tag local provisoire v<version> posé (retiré si rouge), pour que les tests qui lisent le dernier tag (test/changelog.test.ts) voient la version publiée — 31-10 : v1.34.0 taguée verte, publication rouge"
     status: done

@@ -19,7 +19,7 @@ picture, not its source.
    It proposes three items: finish what is in progress, then drift that blocks a delivery, then ready
    quick wins. It stops and waits: the human picks the lots and the order (`--priority`, or the
    `priority:` list of the parent folder's `cadence.yaml`).
-2. **Wave.** The lead starts `cadence orchestrate <project>:<lot> … --wave <id>` in the background.
+2. **Wave.** The lead starts `cadence orchestrate <project>:<lot> … --wave <id>` in the background. The wave also fills its free slots with the next ready lots of the plan until the budget is spent (L587); `--no-fill` limits it to the lots the human chose.
    When a lot's title is stale, the lead does not delegate by hand: it passes `--goal "…"` (one lot per launch), or writes a `goal:` key on the lots in the plan (several lots at once) — in the native plan as `goal:`, in a plan kept by another tool (read-only) by mapping its key with `plan.fields: { goal: <their key> }` in `cadence.yaml` — which replaces the title as the objective of the briefs (L258, [orchestrate](orchestrate.md)).
    For each lot the program runs, in fresh sessions and in this order: `precheck → spec → maquette →
    accept → implement → review → ux`. The **precheck** applies to a lot without a commit yet whose title cites a finding (`constat`, `revue`, `review`, `audit`) or another lot (unless

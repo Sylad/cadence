@@ -113,12 +113,12 @@ Detail: [lead.md](lead.md), [skills.md](skills.md).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="concepts-vague-dark.svg">
-  <img alt="A queue of lots feeds the slots of a wave: two sessions running, a slot held by a fix the lead started by hand, a free slot that `--continue` fills from the plan; the wave's table goes to the lead" src="concepts-vague-light.svg">
+  <img alt="A queue of lots feeds the slots of a wave: two sessions running, a slot held by a fix the lead started by hand, a free slot that the wave fills from the plan; the wave's table goes to the lead" src="concepts-vague-light.svg">
 </picture>
 
 The machine and your quota are shared, so at most **N sessions run at once**: N is the cap (`CADENCE_MAX_SESSIONS` or `--max-sessions`, 2 by default;
 the lead never raises it itself). Each running session occupies a **slot**; a lot waits in the queue until one is free, and a freed slot goes to the next
-lot of the wave's queue; with `--continue`, a freed slot is also filled at once by the next ready lot of the plan; without it, nothing is drawn from the plan. A session the lead starts by hand (a fix, a QA pass) is invisible to the waves, so
+lot of the wave's queue; a freed slot is also filled at once by the next ready lot of the plan (always with `--continue`; a wave of named lots does it too since L587, and `--no-fill` stops it: only the lots given are played). A session the lead starts by hand (a fix, a QA pass) is invisible to the waves, so
 the lead declares it with `cadence lead hold <label>` and lifts it with `cadence lead release <label>`: a **hold** takes a slot, and
 the waves wait for it instead of overtaking it. `cadence orchestrate --status` prints `créneaux libres : 1 sur 3`. Detail: [lead.md](lead.md#lead-hold-and-release), [orchestrate.md](orchestrate.md#orchestrate).
 

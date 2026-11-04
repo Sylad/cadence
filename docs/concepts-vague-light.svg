@@ -24,7 +24,7 @@
 <polyline points="190,164 268,198" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
 <rect x="270" y="236" width="380" height="52" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5" stroke-dasharray="6 4"/>
 <text x="460" y="258" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">slot 4 · free</text>
-<text x="460" y="275" text-anchor="middle" font-size="11.5" fill="#57606a">with --continue, the next ready lot is drawn</text>
+<text x="460" y="275" text-anchor="middle" font-size="11.5" fill="#57606a">the next ready lot of the plan is drawn</text>
 <polyline points="190,164 268,262" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
 <rect x="740" y="44" width="200" height="80" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
 <text x="840" y="80" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Table of the wave</text>
@@ -35,5 +35,5 @@
 <text x="840" y="223" text-anchor="middle" font-size="11.5" fill="#57606a">relays, re-checks, delivers</text>
 <polyline points="840,124 840,168" fill="none" stroke="#57606a" stroke-width="1.5" marker-end="url(#arr)"/>
 <text x="550" y="330" text-anchor="middle" font-size="11.5" fill="#57606a">A hold (cadence lead hold) counts against the cap like a running session: the wave waits for it instead of overtaking it.</text>
-<text x="550" y="352" text-anchor="middle" font-size="11.5" fill="#57606a">A freed slot goes to the wave queue; with --continue it also draws the next ready lot of the plan.</text>
+<text x="550" y="352" text-anchor="middle" font-size="11.5" fill="#57606a">A freed slot goes to the wave queue; it also draws the next ready lot of the plan (--no-fill: not).</text>
 </svg>

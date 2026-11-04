@@ -6,7 +6,7 @@ import { isDay, toDay, type Day } from '../dates.js';
 import { RafError } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { readWaits, renderWaits } from './waits.js';
-import { fillsFreeSlots, parseUntil } from './continue.js';
+import { parseUntil, readsPriority } from './continue.js';
 import { snapshot } from './guard.js';
 import { claudeConfigDir, realClaude, type ClaudeFn } from './launch.js';
 import { addNotAlone } from './ajout.js';
@@ -106,7 +106,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
 
   if ((args.until !== undefined || args.priority !== undefined) && !args.continue) throw new RafError('--until et --priority s\'utilisent avec --continue');
   if (args.until !== undefined) args.untilAt = parseUntil(args.until, io.now()); // heure invalide ou passée : refus avant d'agir
-  if (args.continue || fillsFreeSlots(args)) priorityOf(args, launch); // une clé priority: illisible du cadence.yaml : refus avant d'agir, lots donnés ou non ; --no-fill ne l'évite que sans --continue (le tirage entre deux tours la lit)
+  if (readsPriority(args)) priorityOf(args, launch); // une clé priority: illisible du cadence.yaml : refus avant d'agir, lots donnés ou non
   if (args.watch && args.status === undefined) throw new RafError('--watch s\'utilise avec --status');
   if (args.detail !== undefined && args.status === undefined) throw new RafError('--detail s\'utilise avec --status');
   if (args.detail !== undefined && args.watch) throw new RafError('--detail ne se combine pas avec --watch (il donne le détail d\'un lot, pas le tableau)');

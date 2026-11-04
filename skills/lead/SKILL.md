@@ -99,8 +99,10 @@ Once the human has chosen the lots, the lead runs, **in the background** (it is 
 silent wait, no polling loop — `cadence orchestrate --status` shows where the wave is, and the follow-up below pushes each transition):
 
 ```sh
-cadence orchestrate <project>:<lot> <project>:<lot>@haiku … --wave <id> [--budget 2M]
+cadence orchestrate <project>:<lot> <project>:<lot>@haiku … --wave <id> [--budget 2M] [--no-fill]
 ```
+
+Since L587 the wave **also draws** the next ready lots of the plan (same draw as `--continue`) into its free slots until the budget is spent, and those lots appear in the final table and the exit code (a drawn lot handed back gives 1). For a wave strictly limited to the lots the human chose, pass `--no-fill`.
 
 For a single lot whose title is stale, add `--goal "<what done looks like>"` (refused with two lots, `--continue` or `--resume`); for several lots, a `goal:` key per lot in the plan (mapped by `plan.fields.goal` on a plan kept by another tool).
 

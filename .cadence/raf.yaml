@@ -2204,7 +2204,7 @@ lots:
   - id: L589
     title: "Bande et panneau des lots cadence-hud, en mode worktree : (1) créneaux libres faux — freeSlots (plugins/cadence-hud/hooks/format.ts) retire min(plafond, dépôts tenus) par vague alors qu'une vague à un worktree par lot occupe un créneau par lot actif : afficher le même chiffre que cadence orchestrate --status et nommer les lots en porte (« créneaux libres : 0 sur 3 · 2 en porte ») ; (2) panneau des lots : un lot de la vague déjà done au plan (livré) s'affiche « livré » et se replie dans une ligne « livrés : N » sous les lots actifs, au lieu de 14 lignes « prêt » qui noient les lots qui jouent ; (3) colonne id : jamais tronquée (« L5… » vu pour L584) — 04-11 : bande « 2 libres » pendant que --status disait 0 sur 3 (L587 en porte build, L588 en porte tests), 14 lots prêts/livrés listés au-dessus des 3 lots en cours, Sylvain : « elle me montre beaucoup de lots »"
     status: todo
-    estimate: 0.25
+    estimate: 0.5
     created: 2026-11-04
     notes:
       - { date: 2026-11-04, text: "titre remplacé : « Bande cadence-hud, créneaux libres faux en mode worktree : freeSlots (plugins/cadence-hud/hooks/format.ts) retire min(plafond, dépôts tenus) par vague, alors qu'une vague à un worktree par lot occupe un créneau par lot actif (session claude OU porte de tests/build) — la bande doit afficher le même chiffre que cadence orchestrate --status, et nommer les lots en porte (« créneaux libres : 0 sur 3 · 3 en porte ») — 04-11 : bande « 2 libres » pendant que --status disait 0 sur 3 (L514 L473 en porte tests, L586 en porte build), Sylvain a cru à des créneaux vides »" }

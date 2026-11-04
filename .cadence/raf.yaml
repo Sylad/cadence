@@ -2163,6 +2163,7 @@ lots:
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "conforme — orchestré (vague 2026-11-04-1310-cad, 2 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme (revue d'intégration : le rebase ne change que le CHANGELOG, et l'entrée L584 est bien sous [Unreleased] / Added, sans perte)", commit: fad69ab182f585c76557e75187c93da94adffc79 }
   - id: L585
     title: "Un lot rendu par la revue courte du diff rebasé (intégration refusée : N constat(s) bloquant(s) ou majeur(s)) porte ses constats dans l'état du lot (constats) et une ligne par constat au journal, comme une revue complète — 04-11 L581 : le majeur n'était que dans <lot>/5-review-small.json, introuvable par --status et le journal"
     status: todo

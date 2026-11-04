@@ -20,9 +20,9 @@ function hasWaitLoop(command: string): boolean {
   return false;
 }
 
-/** Les morceaux d'une commande : un texte entre guillemets, un caractère échappé, un séparateur (&& || ; | retour à la ligne) ou du texte courant. */
-const SHELL_TOKEN = /"(?:\\[\s\S]|[^"\\])*"?|'[^']*'?|\\[\s\S]|&&|\|\||[;|\n]|[^"'\\;|&\n]+|&/g;
-const SEPARATOR = /^(?:&&|\|\||[;|\n])$/;
+/** Les morceaux d'une commande : un texte entre guillemets, un caractère échappé, un séparateur (&& || ; | |& retour à la ligne) ou du texte courant. */
+const SHELL_TOKEN = /"(?:\\[\s\S]|[^"\\])*"?|'[^']*'?|\\[\s\S]|&&|\|\||\|&|[;|\n]|[^"'\\;|&\n]+|&/g;
+const SEPARATOR = /^(?:&&|\|\||\|&|[;|\n])$/;
 
 /** Découpe la commande aux séparateurs du shell hors guillemets : le premier mot de chaque segment est la commande jouée. */
 function splitSegments(command: string): string[] {
@@ -34,15 +34,18 @@ function splitSegments(command: string): string[] {
   return segments;
 }
 
-/** Les mots d'un segment après d'éventuelles affectations NOM=valeur et `npx`. */
+/** Ce qui précède la commande jouée et ne la change pas : affectation NOM=valeur ou `NOM=$(`, ouvreur de groupe ou de sous-shell, `!`, mot-clé (if, then, time…), `env`/`command`/`exec`, `npx` et `npm|pnpm|yarn exec|dlx` avec leurs options. */
+const COMMAND_PREFIX = /^(?:[A-Za-z_]\w*=\$\(|[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|[^\s"'])*\s+|[({!]+\s*|(?:if|then|elif|else|do|while|until|time|command|exec|sudo|nohup|env|npx|(?:npm|pnpm|yarn)\s+(?:exec|dlx))\s+(?:-[-\w=]*\s+)*)/;
+
+/** Les mots d'un segment après ses préfixes (COMMAND_PREFIX), sans les `)` et `}` fermants collés au dernier mot. */
 function commandWords(segment: string): string[] {
   let rest = segment.trim();
   for (;;) {
-    const next = rest.replace(/^(?:[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|[^\s"'])*|npx)\s+/, '');
+    const next = rest.replace(COMMAND_PREFIX, '');
     if (next === rest) break;
     rest = next;
   }
-  return rest.split(/\s+/);
+  return rest.split(/\s+/).map((w) => w.replace(/[)}]+$/, ''));
 }
 
 /** Un segment cadence/raf : le premier mot est cadence ou raf (avec ou sans chemin). Rend le programme (cadence ou raf) suivi de ses mots, ou null. */
@@ -96,50 +99,76 @@ function returnGestures(data: Record<string, unknown>, command: string): string[
   return killed(data) && gestures.length < MAX_GESTURES ? [...gestures, killedGestureOf(segments)] : gestures;
 }
 
-/** Les étages `a | b` de chaque pipeline de la commande (`&&`, `||`, `;`, retour à la ligne les séparent), hors guillemets. */
+/** Les étages `a | b` (ou `a |& b`) de chaque pipeline de la commande (`&&`, `||`, `;`, retour à la ligne les séparent), hors guillemets. Un retour à la ligne ou un `\\` en fin de ligne après le `|` ne coupe pas le pipeline. */
 function pipelines(command: string): string[][] {
   const result: string[][] = [['']];
   for (const [token] of command.matchAll(SHELL_TOKEN)) {
-    if (token === '|') result[result.length - 1]!.push('');
+    const stages = result[result.length - 1]!;
+    if (token === '|' || token === '|&') stages.push('');
+    else if (token === '\n' && stages.length > 1 && !stages[stages.length - 1]!.trim()) continue;
     else if (SEPARATOR.test(token)) result.push(['']);
-    else {
-      const stages = result[result.length - 1]!;
-      stages[stages.length - 1] += token;
-    }
+    else stages[stages.length - 1] += token === '\\\n' ? ' ' : token;
   }
   return result;
 }
 
 /** Les filtres dont le code de sortie remplace celui de la commande placée avant eux dans un pipe. */
-const FILTERS = new Set(['tail', 'head', 'grep']);
+const FILTERS = new Set(['tail', 'head', 'grep', 'egrep', 'fgrep', 'rg']);
 
 /** La commande de test ou de push d'un segment hors cadence/raf, telle qu'écrite : git push, npm|pnpm|yarn test (ou run test), vitest, jest, pytest, tsc ; sinon null. */
 function testGate(words: string[]): string | null {
   const [first = '', second, third] = words;
   const base = first.replace(/^.*\//, '');
   if (base === 'git') {
-    const at = second === '-C' ? 3 : 1;
+    let at = 1;
+    while (words[at] === '-C' || words[at] === '-c') at += 2;
     return words[at] === 'push' ? words.slice(0, at + 1).join(' ') : null;
   }
   if (['npm', 'pnpm', 'yarn'].includes(base)) {
     if (second === 'test' || second === 't') return `${base} ${second}`;
-    return second === 'run' && third === 'test' ? `${base} run test` : null;
+    return second === 'run' && /^test(?::|$)/.test(third ?? '') ? `${base} run ${third}` : null;
   }
   return ['vitest', 'jest', 'pytest', 'tsc'].includes(base) ? words.slice(0, 2).join(' ') : null;
 }
 
-/** La première commande de porte, de test, de push ou de livraison (cadence/raf qui peut refuser, ou testGate) suivie d'un filtre tail/head/grep dans le même pipe, quand la commande n'écrit ni pipefail ni PIPESTATUS ; sinon null. */
+/** Le nom du filtre d'un étage (sans chemin), ou ''. */
+const filterOf = (stage: string): string => commandWords(stage)[0]!.replace(/^.*\//, '');
+
+/** Met à jour l'état de pipefail d'après un étage `set` : `-o pipefail` (ou `-eo pipefail`) l'arme, `+o pipefail` le désarme. */
+function pipefailAfter(armed: boolean, stage: string): boolean {
+  const words = commandWords(stage);
+  if (words[0] !== 'set') return armed;
+  let state = armed;
+  words.forEach((w, i) => {
+    if (/^[-+]\w*o$/.test(w) && words[i + 1] === 'pipefail') state = w[0] === '-';
+  });
+  return state;
+}
+
+/** La première commande de porte, de test, de push ou de livraison (cadence/raf qui peut refuser, ou testGate) des étages placés avant un filtre tail/head/grep, ou null s'il n'y a pas de filtre. */
+function gateBeforeFilter(stages: string[]): string | null {
+  const filterAt = stages.findIndex((stage, i) => i > 0 && FILTERS.has(filterOf(stage)));
+  for (const stage of filterAt < 0 ? [] : stages.slice(0, filterAt)) {
+    const cadence = cadenceArgs(stage);
+    if (cadence && canRefuse(cadence)) return cadence.slice(0, 3).join(' ');
+    const gate = testGate(commandWords(stage));
+    if (gate) return gate;
+  }
+  return null;
+}
+
+/** La première porte, test, push ou livraison suivie d'un filtre dans le même pipe, quand pipefail n'est pas armé par un `set -o pipefail` joué avant (le mot cité, en commentaire ou dans un `set +o`, n'arme rien) et que la commande ne lit pas PIPESTATUS ; sinon null. Un `)` ou un `}` qui ouvre le pipeline le rattache au groupe ouvert avant. */
 function maskedGate(command: string): string | null {
-  if (/pipefail|PIPESTATUS/.test(command)) return null;
+  if (/PIPESTATUS/.test(command)) return null;
+  let armed = false;
+  let group: string[] = [];
   for (const stages of pipelines(command)) {
-    const filterAt = stages.findIndex((stage, i) => i > 0 && FILTERS.has(commandWords(stage)[0]!));
-    if (filterAt < 0) continue;
-    for (const stage of stages.slice(0, filterAt)) {
-      const cadence = cadenceArgs(stage);
-      if (cadence && canRefuse(cadence)) return cadence.slice(0, 3).join(' ');
-      const gate = testGate(commandWords(stage));
-      if (gate) return gate;
-    }
+    group = /^\s*[({]/.test(stages[0]!) ? [] : group;
+    const closing = /^\s*[)}]/.test(stages[0]!);
+    for (const stage of stages) armed = pipefailAfter(armed, stage);
+    const gate = armed ? null : gateBeforeFilter(closing ? [...group, ...stages] : stages);
+    if (gate) return gate;
+    group.push(...stages);
   }
   return null;
 }

@@ -56,6 +56,7 @@ cas:
       - { si: "le lot n'a aucun commit, ou sa branche ou sa clé cadence-base n'existe plus", alors: "aucune ressource déduite (seuls ses uses: tiennent)", regles: [R6] }
       - { si: "aucune ressource déclarée ne porte de chemin", alors: "comportement de L251 / L551 inchangé", regles: [R1, R5] }
       - { si: "le lot est fini (ready, failed, handed-back, intégré)", alors: "il ne tient plus rien, comme pour uses:", regles: [R5] }
+      - { si: "git échoue en lisant le diff (branche de base notée dans cadence-base supprimée ou renommée, merge-base vide, dépôt illisible)", alors: "diff vide, sans erreur ni exception : la vague et le tour du lead continuent", regles: [R12] }
     resultat: "Un lot qui touche cycle.ts tient cycle-ts sans uses: posé à la main, aussi loin que le code le voit (R7)."
   - id: C3
     titre: Un lot fini en premier attend l'ancien qui touche la même ressource
@@ -74,6 +75,7 @@ cas:
       - { si: "l'ancien touche la ressource après le contrôle", alors: "pas d'attente ; si le rebase en conflit, le message de C4 nomme la ressource", regles: [R11] }
       - { si: "l'ancien est lui aussi à l'étape integrate, ou déjà rendu ou en échec", alors: "pas d'attente (le verrou d'intégration les ordonne ; attendre un rendu ne mène à rien)", regles: [R9] }
       - { si: "l'ancien est supprimé : branche absente ou sans cadence-base", alors: "il ne touche rien, pas d'attente", regles: [R6] }
+      - { si: "git échoue en lisant le diff de l'ancien ou celui du tardif (base disparue, merge-base vide)", alors: "diff vide pour ce lot, pas d'attente, aucune exception : le lot s'intègre, R11 reste le filet", regles: [R12] }
       - { si: "l'ancien met longtemps à finir", alors: "le tardif attend sans borne de durée et sans tenir le verrou d'intégration du dépôt ; l'attente cesse dès que l'ancien est fini, rendu ou en échec", regles: [R9] }
       - { si: "aucune ressource à chemins n'est déclarée, ou le diff du tardif n'en touche aucune", alors: "comportement d'aujourd'hui", regles: [R1, R8] }
     resultat: "L520 (fini avant L492) ne s'intègre pas par-dessus un cycle.ts que L492 découpe déjà : il attend, puis s'intègre."
@@ -126,7 +128,7 @@ regles:
     tests: ["R5 — lot sans uses: dont le diff touche cycle.ts : readyFree n'offre pas un lot prêt « uses: [cycle-ts] »", "R5 — lot « uses: [banc] » sans diff : banc reste tenu", "R5 — fichier sous deux ressources : les deux sont tenues", "R5 — lot fini : plus aucune ressource tenue"]
   - id: R6
     cas: [C2, C3]
-    enonce: "Le diff d'un lot est la liste des fichiers des COMMITS de sa branche depuis le point de départ de sa base (« git diff --name-only --no-renames <merge-base>..<branche> » : un renommage compte l'ancien et le nouveau chemin). La branche se recalcule par lotBranch (worktree.ts:38) et la base par baseBranchOf (worktree.ts:75), le LotState ne portant ni l'une ni l'autre ; une branche absente ou sans clé cadence-base donne un diff vide. Les fichiers non commités ne comptent pas."
+    enonce: "Le diff d'un lot est la liste des fichiers des COMMITS de sa branche depuis le point de départ de sa base (« git diff --name-only --no-renames <merge-base>..<branche> » : un renommage compte l'ancien et le nouveau chemin). La branche se recalcule par lotBranch (worktree.ts:38) et la base par baseBranchOf (worktree.ts:75), le LotState ne portant ni l'une ni l'autre ; une branche absente ou sans clé cadence-base donne un diff vide, de même un échec de git (R12). Les fichiers non commités ne comptent pas."
     statut: sourcee
     source: "src/orchestrate/worktree.ts:38 et :75 ; src/orchestrate/state.ts:82+ (LotState sans base ni branche) ; note du lead 03-11 (lecture du diff partiel : base..tête)"
     tests: ["R6 — deux commits : les fichiers des deux sont dans le diff", "R6 — renommage de cycle.ts : l'ancien et le nouveau chemin comptent", "R6 — fichier modifié non commité : absent du diff", "R6 — branche supprimée ou sans cadence-base : diff vide, aucune erreur"]
@@ -161,6 +163,13 @@ regles:
     si_faux: "Si le message devait nommer le lot auteur, il faudrait que l'intégration garde la liste des fichiers de chaque lot (aujourd'hui rebaseOnto ne rend que les fichiers en conflit) : plus de code, aucune donnée de plus."
     tests: ["R11 — conflit sur cycle.ts : le message garde le texte d'avant et nomme cycle-ts, le fichier et le commit de base", "R11 — deux commits de base sur le fichier : les deux sont listés", "R11 — quatre commits : trois puis « +1 autre »", "R11 — conflit sur un fichier hors ressource : message identique à celui d'avant", "R11 — conflit sans liste de fichiers : message identique à celui d'avant"]
 
+  - id: R12
+    cas: [C2, C3]
+    enonce: "Toute lecture du diff d'un lot (R6) qui échoue côté git, sans que la branche soit absente, rend un diff VIDE sans lever d'erreur, comme une branche absente : branche de base notée dans cadence-base supprimée ou renommée, « git merge-base » qui ne rend rien, « git diff » qui sort en erreur, dépôt illisible. Le calcul est enveloppé là où il est appelé de façon synchrone : resourceLock (pool.ts), readyFree (ready-free.ts, dont les try/catch ne couvrent aujourd'hui que la lecture du plan) et la lecture de l'étape integrate (R8, diff complet du tardif et diff partiel de chaque ancien). Le lot dont le diff est illisible ne tient alors que ses uses: posés à la main et ne fait attendre personne ; la vague et le tour du lead ne tombent pas. L'échec est journalisé en un avertissement par lot et par passage (pas d'erreur, pas de lot rendu)."
+    statut: hypothese
+    si_faux: "Si un diff illisible devait arrêter la vague ou rendre le lot, seul le traitement de l'échec change (un catch de moins ou un rendu de plus) ; aucune donnée ni contrat publié n'est en jeu. Le risque accepté : une ressource non tenue faute de diff, rattrapée par le message de R11 au conflit."
+    tests: ["R12 — branche de base notée dans cadence-base supprimée : resourceLock rend les uses: seuls, sans exception", "R12 — branche de base renommée : readyFree offre le lot voisin et le tour du lead ne plante pas", "R12 — git merge-base ne rend rien : diff vide, aucune erreur", "R12 — étape integrate, base de l'ancien disparue : le tardif s'intègre sans attendre, sans exception", "R12 — étape integrate, base du tardif disparue : pas d'attente, le lot s'intègre", "R12 — diff illisible : un avertissement journalisé, pas de ligne d'erreur"]
+
 contrats:
   - id: A1
     appel: commande raf check
@@ -178,15 +187,16 @@ contrats:
     entree: "étape integrate d'un lot en worktree, avec une ressource à chemins déclarée"
     sortie: "le lot s'intègre comme avant, après avoir attendu au besoin l'ancien qui touche la même ressource (ligne de journal « <projet:lot> intégration différée : <projet:lot ancien> touche la ressource « <nom> » (<chemin>) »)"
     erreurs:
+      - { code: log warn, message: "<projet:lot> diff illisible (git : <cause>) : aucune ressource déduite" }
       - { code: log error, message: "intégration impossible : conflit en rebasant <branche> sur <base> (fichiers : <liste>) ; ressource « <nom> » : <fichier> modifié dans <base> depuis le départ du lot par <sha7> <sujet> ; worktree conservé : <dossier>" }
-    regles: [R6, R8, R9, R11, R10]
+    regles: [R6, R8, R9, R11, R10, R12]
   - id: A3
     appel: commande lead tour
     entree: "options existantes inchangées ; ressources à chemins déclarées, lots en jeu avec worktree"
     sortie: "la ligne des lots prêts libres (freeLine) sans ceux dont les uses: sont tenus par un lot dont le diff touche les chemins de la ressource ; sans chemin déclaré, la sortie d'avant"
     erreurs: []
-    sans_erreur: "le tour n'a pas de nouvelle branche d'échec : un cadence.yaml mal formé est déjà signalé par sa ligne de tour (R4) et ne tient aucune ressource, comme aujourd'hui"
-    regles: [R1, R5, R6, R7]
+    sans_erreur: "le tour n'a pas de nouvelle branche d'échec (un diff illisible vaut diff vide, R12, avec l'avertissement de A2 dans le journal de la vague) : un cadence.yaml mal formé est déjà signalé par sa ligne de tour (R4) et ne tient aucune ressource, comme aujourd'hui"
+    regles: [R1, R5, R6, R7, R12]
 
 donnees:
   - { id: D1, objet: "cadence.yaml du dossier parent : clé resources (liste de noms, ou table nom: { paths: [chemins] })", existant: true, modification: ajout, decision: "demande du lot L558 : « resources: { cycle-ts: { paths: [src/orchestrate/cycle.ts, src/orchestrate/cycle/] } } » ; la liste de noms de L251 reste valide et lue pareil ; risque connu : une version plus ancienne de raf/cadence qui lit le même cadence.yaml refuse la table (src/resources.ts:22 exige une liste de textes), d'où la règle R2 : on ne passe un fichier à la table que pour y poser des chemins" , note: "ajout de forme ; readResources garde names et ajoute les chemins par ressource" }

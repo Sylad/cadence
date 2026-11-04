@@ -2107,13 +2107,14 @@ lots:
     finished: 2026-11-04
   - id: L577
     title: "Tests instables sous charge, première série (L577) : mesure des 12 tests des vagues du 01 au 04-11 (docs/mesures/instables-sous-charge-2026-11-04.md) et 5 tests corrigés par une attente d'événement (deliver (f), orchestrate-app verrou vide et délai restant, orchestrate-worktree-plan-writes R16 ×2) ; les 4 restants vont à L579"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
     notes:
       - { date: 2026-11-04, text: "titre remplacé : « Tests instables sous charge stabilisés : 20 rouges dans la suite, verts rejoués seuls, sur les vagues du 01 au 04-11 (orchestrate-creneaux-libres-l527-probe ×6, porte-deportee ×3, deliver ×3, verify ×2, orchestrate-worktree-plan-writes ×2, orchestrate-app ×2, probe-L539-bords, orchestrate-worktree-integration) : pour chacun, la cause (attente à durée fixe, verrou, horloge, port) et un correctif qui attend l'événement au lieu d'un délai ; mesure avant/après par les lignes « instable(s) sous charge » des journaux »" }
     review: { date: 2026-11-04, verdict: "conforme : arbitrage du lead (04-11) — revue Fable de la vague 2026-11-04-1310-cad : code des 4 correctifs vérifié, tests rejoués seuls verts ; le seul majeur était de périmètre (4 tests sur 12 sans correctif), le lot est ramené par raf title à ce qu'il livre et les 4 restants passent à L579 ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que le contexte du CHANGELOG (entrée L471 venue de main) et ajouté l'arbitrage du lead au plan ; aucun constat", commit: ef11919ce119b4c3f94666ac57f17c40a9c1f794 }
+    finished: 2026-11-04
   - id: L578
     title: "perf.prices accepte tout nom de modèle (issue #36) : mêmes noms que escalation.model et @<modèle> (fable compris), une étape est chiffrée par le modèle que son journal enregistre ; une étape d'un modèle sans prix est comptée à part et nommée, jamais silencieusement hors coût ; perf.currency optionnel (défaut sans symbole imposé) au lieu d'un « € » fixe pour une grille saisie en dollars"
     status: done

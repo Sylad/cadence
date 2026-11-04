@@ -1192,11 +1192,37 @@ describe('deliver : suivi continu des descendants, verrou tenu jusqu’à l’ar
   }, 120_000);
 
   it('(f) sans signal, un descendant resté vivant après la racine ne retient la commande que le temps d\'attente d\'un signal en attente (L329)', async () => {
-    const t0 = Date.now();
-    const code = await realDeps(tempDir(), readProcs, 2_000, 600).exec('sleep 6 & sleep 0.6; exit 0', {}, 20_000); // 0,6 s : le suivi a relevé le sleep
-    expect(code).toBe(0);
-    expect(Date.now() - t0).toBeGreaterThanOrEqual(1_000); // 0,6 s de commande + 0,6 s d'attente, moins la marge des horloges
-    expect(Date.now() - t0).toBeLessThan(4_500); // l'attente est bornée : sans l'échéance, elle durerait jusqu'à la mort de `sleep 6` (marge large pour la charge)
+    // L577 : la commande attend l'événement (le suivi a adopté le descendant) au lieu de dormir 0,6 s, et le test borne par l'état du descendant,
+    // pas par une durée au mur : sous charge, ni le relevé tardif ni un exec lent ne le font rougir.
+    const logs = tempDir();
+    let seenAt = 0;
+    let reads = 0;
+    const read: typeof readProcs = () => {
+      const procs = readProcs();
+      const file = join(logs, 'bg');
+      const pid = existsSync(file) ? Number(readFileSync(file, 'utf8').trim()) : 0;
+      // le premier relevé qui voit le descendant est celui du constructeur du suivi, qui ne l'adopte pas : c'est le relevé périodique suivant qui l'adopte
+      if (!seenAt && pid > 1 && procs?.has(pid) && ++reads === 2) {
+        seenAt = Date.now();
+        writeFileSync(join(logs, 'seen'), '');
+      }
+      return procs;
+    };
+    const code = await realDeps(logs, read, 2_000, 600).exec(`sleep 30 & echo $! > bg; while [ ! -f seen ]; do sleep 0.05; done; exit 0`, {}, 60_000);
+    const returnedAt = Date.now();
+    const bg = Number(readFileSync(join(logs, 'bg'), 'utf8').trim());
+    try {
+      expect(code).toBe(0);
+      expect(seenAt).toBeGreaterThan(0);
+      expect(returnedAt - seenAt).toBeGreaterThanOrEqual(500); // l'attente du signal en attente (600 ms) a eu lieu après le relevé
+      expect(() => process.kill(bg, 0)).not.toThrow(); // l'attente est bornée : la commande rend la main alors que `sleep 30` vit encore
+    } finally {
+      try {
+        process.kill(bg, 'SIGKILL');
+      } catch {
+        /* déjà mort */
+      }
+    }
   });
 
   it('(g) Ctrl-C reçu après la sortie d\'une racine morte du signal, plus aucun processus suivi vivant : cadence meurt du signal, il n\'est pas jeté (L329)', async () => {

@@ -10,7 +10,8 @@ import { relative } from 'node:path';
 import { RafError } from '../../plan.js';
 import { PLAN_ACTIONS } from '../../plan-commit.js';
 import { sh, shEscape } from './sh.js';
-import { integratedChecks, redExcerpt } from './checks.js';
+import { redExcerpt } from './checks.js';
+import { integrationChecks } from './integration-porte.js';
 import { session } from './session.js';
 import { lateRefusal } from './depot-partage.js';
 import { awaitOlder } from './integrate-wait.js';
@@ -181,12 +182,10 @@ export async function integrateLot(c: LotCtx): Promise<void> {
         if (rebased.kind === 'conflict') return refuse(`${conflictRefusal(l.repo, t, rebased)} ; ${kept}`);
         if (rebased.kind === 'rebased') rebaseNotes(rebased, key).forEach((note) => c.wave.log(note));
         const tip = git(t.dir, 'rev-parse', 'HEAD');
+        // Tests et build joués au sommet (L590, R5 : la suite complète, une fois par sommet), avant que la branche du dépôt ne bouge (R7).
+        const red = await integrationChecks(c, key, t.dir, tip, reviewed);
+        if (red.length) return refuse(`intégration refusée : tests rouges au sommet intégré (${red.map(redExcerpt).join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
         if (tip !== reviewed) {
-          // Le rebase a changé les commits : tests et build rejoués au sommet rebasé, avant que la branche du dépôt ne bouge (R7).
-          const { red, runs } = await integratedChecks(c, key);
-          l.checks = runs.length ? { head: tip, tree: git(t.dir, 'rev-parse', 'HEAD^{tree}'), runs } : undefined;
-          save(c);
-          if (red.length) return refuse(`intégration refusée : tests rouges au sommet intégré (${red.map(redExcerpt).join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
           const before = patchId(t.dir, mergeBase(t.dir, reviewed, t.base), reviewed);
           const after = patchId(t.dir, t.base, 'HEAD');
           if (before !== '' && before === after) {

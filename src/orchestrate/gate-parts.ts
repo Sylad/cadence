@@ -78,6 +78,30 @@ export function checkTestReplay(test: GateTest | undefined, replay: string | und
   if (test && isComposedGate(test)) throw bad('testReplay : refusé quand orchestrate.test est une porte composée (&&, ||, sous-shell) : le rejeu seul ne vaut que pour un lanceur unique');
 }
 
+/** `orchestrate.testRelated` face à `orchestrate.test` (L590) : `{files}` exigé ; refusé avec une liste de parties (les fichiers n'atteindraient qu'une partie) ; accepté avec une porte composée, la commande liée étant alors la seule jouée en ciblé. */
+export function checkTestRelated(test: GateTest | undefined, related: string | undefined, bad: (what: string) => Error): void {
+  if (!related) return;
+  if (!related.includes('{files}')) throw bad('testRelated : la commande doit contenir {files} (remplacé par les fichiers modifiés du lot)');
+  if (isParts(test)) throw bad('testRelated : refusé quand orchestrate.test est une liste de parties : le lot ne joue alors que la suite complète');
+}
+
+/** `[npx ]vitest run[ options]` : l'unique forme dont la commande liée se dérive (L590, R13) ; les options n'ont ni `;`, `|`, `&`, redirection ni accent grave (`isComposedGate` écarte déjà `&&`, `||` et les parenthèses). */
+const VITEST_RUN = /^(npx\s+)?vitest\s+run(?:\s+([^\s;|&<>`][^;|&<>`\n]*))?$/;
+
+/**
+ * La commande des tests liés aux fichiers modifiés (L590) : `orchestrate.testRelated` s'il est déclaré ; sinon, dérivée d'une `orchestrate.test` en chaîne simple `[npx ]vitest run[ options]`
+ * (`[npx ]vitest related --run[ options] {files}`) ; null pour toute autre forme (parties, composée, `npm test`…) : la porte joue alors la suite complète. `{files}` reste à remplacer (`withFiles`).
+ */
+export function relatedCommand(test: GateTest | undefined, related: string | undefined): string | null {
+  if (related) return related;
+  if (test === undefined || isParts(test) || isComposedGate(test)) return null;
+  const m = VITEST_RUN.exec(test);
+  return m ? `${m[1] ?? ''}vitest related --run${m[2] ? ` ${m[2]}` : ''} {files}` : null;
+}
+
+/** La commande liée avec ses fichiers : chacun protégé pour le shell, séparés par des espaces. */
+export const withFiles = (template: string, files: string[]): string => template.replaceAll('{files}', () => files.map(shellArg).join(' '));
+
 /** Le libellé d'une porte (R9 b) : la chaîne telle quelle ; les parties « dir : run » jointes par « ; ». Sert aux messages, aux briefs, au CheckRun et à la clé de cache de la ligne de base. */
 export const gateLabel = (t: GateTest): string => (isParts(t) ? t.map((p) => `${p.dir} : ${p.run}`).join(' ; ') : t);
 

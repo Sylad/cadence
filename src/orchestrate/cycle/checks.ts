@@ -3,7 +3,8 @@ import { type LotCtx, workDir as wd, setGate, startSha } from './ctx.js';
 import { withPlace, type Place } from '../gate-place.js';
 import { tryGit } from '../../git.js';
 import { sh } from './sh.js';
-import { runGate, gateLabel, gateReplayable, redCandidates, replayGate } from '../gate-parts.js';
+import { gateLabel, gateReplayable, redCandidates, replayGate } from '../gate-parts.js';
+import { playTests, type Portee } from './porte-ciblee.js';
 import { type VsBase, againstBaseline, redAtStart } from './baseline-run.js';
 import { type TightTest } from '../workers.js';
 import { noteUnstable, noteTight } from '../gate-notes.js';
@@ -36,8 +37,9 @@ function configRefusee(c: LotCtx): Constat | null {
 /**
  * Les contrôles du programme (`orchestrate.build` puis `orchestrate.test`, L333 : les tests e2e lisent le `dist` que seul le build produit), joués dans `wd(c)` : chaque résultat est ajouté à `runs`, chaque rouge NOUVEAU à `red`
  * (un test déjà rouge au sha de départ n'en est pas un, L213). S'arrête au premier rouge : un build rouge rend le lot sans lancer les tests. Après une écriture (work) et, au sommet rebasé, avant l'avance de la branche du dépôt (R7).
+ * `portee` (L590) : `ciblee` (défaut, après une écriture) ne joue que les tests liés aux fichiers du lot, la suite complète quand il n'y en a pas ; `complete` (intégration) joue toujours la suite entière.
  */
-export async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[]): Promise<void> {
+export async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[], portee: Portee = 'ciblee'): Promise<void> {
   const config = configRefusee(c);
   if (config) {
     red.push(config);
@@ -45,21 +47,20 @@ export async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[])
   }
   try {
     // Sur l'hôte `gate.host` (L403) quand il y en a un : le HEAD du worktree du lot, s'il est propre ; sinon, ou sans hôte, en local.
-    await withPlace({ config: c.config, repo: c.lot.repo, sha: tryGit(wd(c), ['rev-parse', 'HEAD']), dir: wd(c), needClean: true, label: `porte du lot ${c.lot.lot}`, local: (cmd) => sh(c, cmd), say: (line) => c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · ${line}`) }, (place) => runChecks(c, red, runs, place));
+    await withPlace({ config: c.config, repo: c.lot.repo, sha: tryGit(wd(c), ['rev-parse', 'HEAD']), dir: wd(c), needClean: true, label: `porte du lot ${c.lot.lot}`, local: (cmd) => sh(c, cmd), say: (line) => c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · ${line}`) }, (place) => runChecks(c, red, runs, place, portee));
   } finally {
     // L395 : la porte se lit dans l'état du lot tant qu'une commande (ou le rejeu qui la suit) tourne, jamais après.
     setGate(c, undefined);
   }
 }
 
-async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Place): Promise<void> {
+async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Place, portee: Portee): Promise<void> {
   const l = c.lot;
   for (const [label, command] of [['build', c.config.build], ['tests', c.config.test]] as const) {
     if (!command) continue;
-    if (label === 'tests') l.suiteRuns = (l.suiteRuns ?? 0) + 1;
     setGate(c, { label, started: new Date().toISOString() });
-    const r = await runGate(place.run, command); // porte en parties (L512) : toutes jouées, chacune dans son dossier ; le CheckRun porte le libellé « dir : run ; … »
-    const run: CheckRun = { label, command: gateLabel(command), code: r.code, ...place.stamp() };
+    // Tests : ciblés sur les fichiers du lot ou suite complète (L590) ; build et suite complète comme avant. `settle` : le rouge de charge que le rejeu seul a absous passe à 0 dans le CheckRun et dans la liste des portes.
+    const { r, run, settle } = await playTests(c, place, label, command, portee);
     runs.push(run);
     if (r.code === 0) continue;
     const vs: VsBase = label === 'tests' ? await againstBaseline(c, command, r) : { kind: 'unknown' };
@@ -83,7 +84,7 @@ async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Pla
     }
     if (unstable.length && !still.length) {
       if (vs.kind === 'new' && vs.existants) run.dejaRouges = vs.existants;
-      else run.code = 0;
+      else settle();
       continue;
     }
     // L510 : un rouge qui reste rouge seul dans le lot mais que la suite entière du départ avait vu vert (ordre, charge) peut être rouge seul au départ aussi : déjà rouge, ni correction ni escalade.
@@ -117,12 +118,12 @@ async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Pla
 export async function integratedChecks(c: LotCtx, key: string): Promise<{ red: Constat[]; runs: CheckRun[] }> {
   const first: Constat[] = [];
   let runs: CheckRun[] = [];
-  await programChecks(c, first, runs);
+  await programChecks(c, first, runs, 'complete');
   if (!first.length) return { red: first, runs };
   c.wave.log(`${key} tests rouges au sommet intégré, relancés une fois (${first.map(redExcerpt).join(' ; ')})`);
   const red: Constat[] = [];
   runs = [];
-  await programChecks(c, red, runs);
+  await programChecks(c, red, runs, 'complete');
   if (!red.length) c.lot.warnings.push(`rouge au sommet intégré, vert à la relance (charge de la machine ?) : ${first.map(redExcerpt).join(' ; ')}`);
   return { red, runs };
 }

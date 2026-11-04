@@ -11,7 +11,7 @@ export interface RecordedGate {
   tree: string;
   /** Le sha que les contrôles ont tourné (celui demandé, ou le sous lequel ne reposent que des commits de plan, L444). */
   checked: string;
-  runs: { label: 'build' | 'tests'; command: string; code: number; instables?: string[] }[];
+  runs: { label: 'build' | 'tests'; command: string; code: number; instables?: string[]; portee?: 'ciblee' }[];
 }
 
 const realOrSelf = (p: string): string => {
@@ -92,7 +92,7 @@ export function recordedGate(launchDirs: string[], repo: string, sha: string, st
           continue;
         }
         const label = (name: string) => (name === 'build' ? 'build' : 'tests');
-        const missing = steps.filter((s) => !checks.runs.some((r) => r.label === label(s.name) && r.command === s.cmd && r.code === 0));
+        const missing = steps.filter((s) => !checks.runs.some((r) => r.label === label(s.name) && r.command === s.cmd && r.portee !== 'ciblee' && r.code === 0));
         if (missing.length) {
           reason = `l'enregistrement (${where}) ne couvre pas en vert ${missing.map((s) => `${s.name} (${s.cmd})`).join(', ')}`;
           continue;

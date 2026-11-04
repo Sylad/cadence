@@ -72,7 +72,8 @@ function checksText(c: LotCtx): string {
   const runs = k.runs.map((r) => {
     const alone = r.instables?.length ? `${r.instables.length} test(s) red under load in the whole suite, green when replayed alone, not defects: ${r.instables.join(' ; ')}` : '';
     const state = r.code === 0 ? 'green' : r.dejaRouges ? `RED, exit code ${r.code}, but every failing test (${r.dejaRouges}) was already red at the start sha${c.lot.baseline?.sha ? ` ${c.lot.baseline.sha.slice(0, 7)}` : ''}: not a defect of this lot, do not report them as findings` : `RED, exit code ${r.code}`;
-    return `- \`${r.command}\` (${r.label}): ${state}${alone ? `${r.code === 0 ? ';' : '. Also'} ${alone}` : ''}`;
+    const targeted = r.portee === 'ciblee' ? '. This gate is targeted: only the tests related to the files of the lot were played, not the whole suite; the full suite will be played by the program at integration' : '';
+    return `- \`${r.command}\` (${r.label}): ${state}${alone ? `${r.code === 0 ? ';' : '. Also'} ${alone}` : ''}${targeted}`;
   });
   const ran = [`The program already ran these checks at HEAD ${k.head.slice(0, 7)}, just before this review:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
   return declared ? `${ran}\n${declared}` : ran;

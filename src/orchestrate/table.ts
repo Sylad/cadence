@@ -1,4 +1,5 @@
 import { lotWork } from '../audit.js';
+import { porteLines } from './portes-table.js';
 import { planLoader } from '../config.js';
 import type { PriceGrid } from '../perf-config.js';
 import { costView } from './cout.js';
@@ -233,6 +234,7 @@ function detailLines(l: LotState, touched: TouchedSince): string[] {
     for (const t of base.failures.slice(0, BASELINE_LISTED)) out.push(`${l.project}:${l.lot} — déjà rouge au départ${where} : ${t}`);
     if (base.failures.length > BASELINE_LISTED) out.push(`${l.project}:${l.lot} — déjà rouge au départ${where} : … et ${base.failures.length - BASELINE_LISTED} autre(s)`);
   }
+  out.push(...porteLines(l)); // coût des portes de tests (L590) ; la colonne « suites » ne garde que le nombre de suites complètes
   for (const x of l.choix ?? []) out.push(`${l.project}:${l.lot} — choix fait : ${x}`);
   for (const h of l.hypotheses ?? []) out.push(`${l.project}:${l.lot} — hypothèse de la fiche : ${h}`);
   for (const p of l.proposals) out.push(`${l.project}:${l.lot} — proposé : ${proposalLine(l, p, touched)}`);

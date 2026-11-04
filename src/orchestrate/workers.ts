@@ -98,7 +98,7 @@ export function replayRanFile(output: string, file: string): boolean {
 }
 
 /** Sortie d'un lanceur qui n'a trouvé aucun test à rejouer : la ligne de fin du lanceur (vitest « No test files found, exiting with code », jest « No tests found, exiting with code », pytest « no tests ran in »), en début de ligne — pas ces mots cités dans le titre ou la sortie d'un test. */
-const NO_TEST_RAN = /^\W*(?:no test files? found, exiting with code|no tests? found, exiting with code|no tests ran in)\b/im;
+export const NO_TEST_RAN = /^\W*(?:no test files? found, exiting with code|no tests? found, exiting with code|no tests ran in)\b/im;
 
 /** Rejeux d'un test rouge de la porte, seul (L354) : rouge aux deux, il est compté. */
 const REPLAYS = 2;

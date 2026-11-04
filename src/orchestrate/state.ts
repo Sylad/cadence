@@ -171,6 +171,8 @@ export interface LotState {
   gate?: { label: 'build' | 'tests'; started: string };
   /** Fois où le programme a joué la suite complète de la porte pour ce lot (L518) : une par passe d'écriture, hors rejeux seuls des rouges. Absent tant que la porte n'a pas joué de tests ; colonne « suites » du tableau. */
   suiteRuns?: number;
+  /** Chaque porte de tests jouée pour ce lot, ciblée ou complète (L590) : sa portée, les fichiers du diff qu'elle visait (vide pour une suite complète), son code, sa durée en secondes et, pour une suite complète jouée à la place d'une porte ciblée, le motif. Absent d'un état écrit avant L590 : se lit comme une liste vide. */
+  portes?: { portee: 'ciblee' | 'complete'; fichiers: string[]; code: number; duree: number; motif?: string }[];
   /** Prochaine étape à jouer ; null = cycle terminé. Relue à la reprise. */
   next: StepKind | null;
   startedSha?: string;
@@ -181,7 +183,7 @@ export interface LotState {
   ux?: ReviewSummary;
   uxNote?: string;
   /** Contrôles lancés par le programme (tests, build) au `head` indiqué, passés au relecteur tant que HEAD n'a pas bougé. */
-  checks?: { head: string; /** Arbre git de `head` (L397) : `cadence verify --gate` ne reprend ces résultats que pour un sha dont l'arbre est celui-ci. */ tree?: string; runs: { label: 'tests' | 'build'; command: string; code: number; /** Tests rouges dans la suite entière mais verts rejoués seuls (L354) : écartés par la porte ; code 0 si rien d’autre ne reste rouge, « déjà rouges » si la ligne de base porte le reste, sinon le lot repart en correction avec les seuls tests restés rouges. */ instables?: string[]; /** Tests rouges dont tous les échecs l'étaient déjà au sha de départ (L213) : nombre d'échecs, pas un défaut du lot. */ dejaRouges?: number; /** Où la commande a tourné quand ce n'est pas ici (L403) : hôte, sha et cache de `orchestrate.gate.host`, ou « local » après une connexion perdue. Absent : en local, comme avant. */ lieu?: string }[] };
+  checks?: { head: string; /** Arbre git de `head` (L397) : `cadence verify --gate` ne reprend ces résultats que pour un sha dont l'arbre est celui-ci. */ tree?: string; runs: { label: 'tests' | 'build'; command: string; code: number; /** Porte ciblée (L590) : les tests liés aux fichiers du lot seulement, `command` est alors la commande liée avec `{files}` ; jamais reprise comme verdict de la suite. Absent : suite complète. */ portee?: 'ciblee'; /** Tests rouges dans la suite entière mais verts rejoués seuls (L354) : écartés par la porte ; code 0 si rien d’autre ne reste rouge, « déjà rouges » si la ligne de base porte le reste, sinon le lot repart en correction avec les seuls tests restés rouges. */ instables?: string[]; /** Tests rouges dont tous les échecs l'étaient déjà au sha de départ (L213) : nombre d'échecs, pas un défaut du lot. */ dejaRouges?: number; /** Où la commande a tourné quand ce n'est pas ici (L403) : hôte, sha et cache de `orchestrate.gate.host`, ou « local » après une connexion perdue. Absent : en local, comme avant. */ lieu?: string }[] };
   /** Ligne de base des tests (L213) : échecs déjà présents au sha de départ du lot, listés à part dans le tableau de fin de vague. `verified` : rejoués par le programme à ce sha ; sinon annoncés par la session, non vérifiés. */
   /** Tests « instables sous charge » (L354) : rouges dans la suite de la porte, verts rejoués seuls ; jamais comptés, jamais corrigés. Journal du lot et `cadence perf`. */
   instables?: string[];

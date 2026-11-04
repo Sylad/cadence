@@ -11,7 +11,7 @@ import { readQaSettings } from './qa-keys.js';
 import { planCommitProblem } from './plan-commit.js';
 import { readOnWrite } from './config-onwrite.js';
 import { parseStates } from './plan-states.js';
-import { checkTestReplay, readGateTest, type GateTest } from './orchestrate/gate-parts.js';
+import { checkTestRelated, checkTestReplay, readGateTest, type GateTest } from './orchestrate/gate-parts.js';
 import { booleanKey, isObject, list, readYamlFile, readYamlKey } from './yaml-keys.js';
 import { FIELDS, Plan, RafError, readIdPattern, STATUSES, type Field, type PlanFormat, type PlanSettings, type Status } from './plan.js';
 
@@ -198,6 +198,11 @@ export interface OrchestrateConfig {
    * et rien n'est tenu pour instable (cadence ne devine pas comment rejouer un fichier sur le lanceur du projet, une porte composée comprise).
    */
   testReplay?: string;
+  /**
+   * Commande des tests liés aux fichiers modifiés du lot (L590), où `{files}` est remplacé par ces fichiers : jouée à la place de `orchestrate.test` après chaque écriture (implement, fix, sonde) ;
+   * la suite complète n'est jouée qu'à l'intégration. Absente : dérivée de `orchestrate.test` quand c'est `[npx ]vitest run[ options]`, sinon la suite complète est jouée à chaque porte, comme avant.
+   */
+  testRelated?: string;
   /** Commande de build du projet, lancée par l'orchestrateur après les tests, et dont le résultat est passé au relecteur. */
   build?: string;
   /**
@@ -321,7 +326,7 @@ export function readVerifyConfig(file: string): VerifyConfig {
 
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'testReplay', 'build', 'worktreeDeps', 'gate', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'probe', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'budgetTopUp', 'continue', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'testReplay', 'testRelated', 'build', 'worktreeDeps', 'gate', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'probe', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'budgetTopUp', 'continue', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
 
 /** Un entier d'au moins `min`, sinon l'erreur donnée. */
 const integerAtLeast = (v: unknown, min: number, error: RafError): number => {
@@ -349,13 +354,14 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     config.accept = o.accept.map((x: string) => x.trim());
   }
   if (o.test != null) config.test = readGateTest(o.test, bad);
-  for (const k of ['start', 'verdict', 'testReplay', 'build', 'accept'] as const) {
+  for (const k of ['start', 'verdict', 'testReplay', 'testRelated', 'build', 'accept'] as const) {
     if (k === 'accept' && Array.isArray(o.accept)) continue;
     if (o[k] == null) continue;
     if (typeof o[k] !== 'string' || !(o[k] as string).trim()) throw bad(`${k} : commande non vide attendue`);
     config[k] = (o[k] as string).trim();
   }
   checkTestReplay(config.test, config.testReplay, bad);
+  checkTestRelated(config.test, config.testRelated, bad);
   if (o.worktreeDeps != null) {
     const deps = o.worktreeDeps;
     if (!Array.isArray(deps) || !deps.length || deps.some((x) => typeof x !== 'string' || !x.trim() || isAbsolute(x) || x.split(/[\\/]/).includes('..'))) throw bad('worktreeDeps : liste de chemins relatifs au dépôt, sans « .. » (node_modules, .venv…)');

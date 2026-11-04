@@ -101,6 +101,24 @@ export function resourceLock(running: Map<Promise<void>, LotCtx[]>, live: Set<Lo
   };
 }
 
+/** Les files qui tiennent un créneau (L591) : celle dont le lot attend son tour d'intégration n'en occupe pas ; il le reprend sans le redemander (les files en cours peuvent alors dépasser `slots` le temps de sa revue courte). */
+const holdingSlots = (running: Map<Promise<void>, LotCtx[]>): number => [...running.values()].filter((q) => !q.some((c) => c.waitsTurn)).length;
+
+/** Réveille l'ordonnanceur quand un lot entre dans l'attente de son tour d'intégration ou en sort (L591) : `arm` à chaque tour, avant de compter les files, `poked` pour l'attendre. */
+function turnWatch(): { hear: (c: LotCtx) => void; arm: () => void; poked: () => Promise<void> } {
+  let poke = () => {};
+  let poked = Promise.resolve();
+  return {
+    hear: (c) => {
+      c.turnChanged = () => poke();
+    },
+    arm: () => {
+      poked = new Promise<void>((res) => (poke = res));
+    },
+    poked: () => poked,
+  };
+}
+
 export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] = [], onSettled: (c: LotCtx) => void = () => {}, parallel: (lots: LotCtx[]) => boolean = () => false, answers?: AnswerFeed): Promise<void> {
   const pending = groupLots(ctxs).flatMap((g) => (parallel(g) ? g.map((c) => [c]) : [g]));
   // Les lots pas encore finis de jouer (en file ou en cours) : un lot ne part pas tant que l'un d'eux est sa dépendance.
@@ -160,17 +178,20 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
   const sameRepo = (a: LotCtx, b: LotCtx) => lotRepoPaths(a.lot).some((r) => lotRepoPaths(b.lot).includes(r));
   const canRun = (c: LotCtx) => {
     if (c.tree) return true;
-    if ([...running.values(), ...pending].some((q) => q.some((o) => sameRepo(c, o))) || admitted.some((o) => sameRepo(c, o))) return false;
-    admitted.push(c);
-    return true;
+    const taken = [...running.values(), ...pending].some((q) => q.some((o) => sameRepo(c, o))) || admitted.some((o) => sameRepo(c, o));
+    return !taken && admitted.push(c) > 0;
   };
+  const turns = turnWatch();
+  ctxs.forEach(turns.hear);
   for (;;) {
     admitted.length = 0;
-    for (const c of (await answers?.take(canRun, Math.max(0, slots - running.size - pending.filter((q) => !blocked(q)).length))) ?? []) {
+    for (const c of (await answers?.take(canRun, Math.max(0, slots - holdingSlots(running) - pending.filter((q) => !blocked(q)).length))) ?? []) {
       live.add(c);
+      turns.hear(c);
       pending.push([c]);
     }
-    while (running.size < slots) {
+    turns.arm();
+    while (holdingSlots(running) < slots) {
       const next = pending.findIndex((q) => !blocked(q));
       if (next < 0) break;
       start(pending.splice(next, 1)[0]!);
@@ -181,10 +202,10 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
       start(pending.shift()!);
       continue;
     }
-    if (!answers) await Promise.race(running.keys());
+    if (!answers) await Promise.race([...running.keys(), turns.poked()]);
     else {
       let timer: NodeJS.Timeout | undefined;
-      await Promise.race([...running.keys(), new Promise<void>((res) => (timer = setTimeout(res, answers.pollMs)))]);
+      await Promise.race([...running.keys(), turns.poked(), new Promise<void>((res) => (timer = setTimeout(res, answers.pollMs)))]);
       clearTimeout(timer);
     }
   }

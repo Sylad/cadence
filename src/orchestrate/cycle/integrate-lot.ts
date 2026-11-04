@@ -1,4 +1,4 @@
-import { type LotCtx, type LotTree, histPlan, workDir as wd, stop, save, transition, propose } from './ctx.js';
+import { type LotCtx, type LotTree, histPlan, workDir as wd, stop, save, transition, propose, setWaitsTurn } from './ctx.js';
 import { type ReviewSummary, lotKey } from '../state.js';
 import { repoShas, repoWork } from '../../repos.js';
 import { lotWork, coveredTasks } from '../../audit.js';
@@ -160,7 +160,8 @@ export async function integrateLot(c: LotCtx): Promise<void> {
   const kept = `worktree conservé : ${t.dir}`;
   const waitMs = c.wave.integrate?.waitMs ?? INTEGRATE_WAIT_MS;
   await awaitOlder(c); // L558 (R8) : avant le verrou, la fin d'un lot plus ancien de la vague qui travaille déjà sur une ressource à chemins que le diff touche
-  const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, c.wave.integrate);
+  // L591 : le lot qui attend son tour rend son créneau (pool et registre) ; il le reprend sans le redemander, l'intégration ne lançant qu'une revue courte.
+  const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, { ...c.wave.integrate, onWait: () => setWaitsTurn(c, true), onTurn: () => setWaitsTurn(c, false) });
   if (!grant.ok) return refuse(`intégration refusée : verrou d'intégration tenu par ${grant.holder.wave} (pid ${grant.holder.pid}) depuis plus de ${minutesText(waitMs)} ; ${kept}`);
   // Un refus tardif garde `l.verdict` avec la trace de la revue courte déjà jouée : reprise, elle est rejouée et remplace l'ancienne trace au lieu de s'y ajouter.
   let verdict = (l.verdict ?? '').split(SHORT_REVIEW_TRACE)[0];

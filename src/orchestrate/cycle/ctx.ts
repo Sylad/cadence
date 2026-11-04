@@ -101,6 +101,10 @@ export interface LotCtx {
   tree?: LotTree;
   /** Posé le temps de la revue courte du diff rebasé (R17) : le brief le dit à la session. */
   integration?: { base: string };
+  /** L591 : le lot attend son tour d'intégration (un autre lot du dépôt intègre) : il ne tient ni file du pool ni créneau annoncé au registre. Posé par `setWaitsTurn`. */
+  waitsTurn?: boolean;
+  /** Posé par le pool : l'ordonnanceur est réveillé quand `waitsTurn` change, pour faire partir la file suivante. */
+  turnChanged?: () => void;
 }
 
 /**
@@ -124,6 +128,13 @@ export function setGate(c: LotCtx, gate: LotState['gate']): void {
   c.lot.gate = gate;
   save(c);
   c.wave.slotsChanged?.();
+}
+
+/** Le lot entre dans l'attente de son tour d'intégration ou en sort (L591) : le registre recompte ses créneaux et le pool, ses files. */
+export function setWaitsTurn(c: LotCtx, waits: boolean): void {
+  c.waitsTurn = waits;
+  c.wave.slotsChanged?.();
+  c.turnChanged?.();
 }
 
 export function transition(c: LotCtx, status: LotState['status'], outcome?: string): void {

@@ -27,18 +27,31 @@ export type Grant = { ok: true; release: () => void } | { ok: false; holder: { w
  * vague partagent un pid, `takeLock` rendrait chacun déjà porteur), puis le verrou fichier, qui ne départage que les autres processus. La file en mémoire
  * s'attend sans borne (L425) : son porteur est un lot de ce processus, qui libère toujours, et une intégration (rebase rejoué + porte) dure plus que la borne.
  * L'attente du verrou fichier d'un autre processus est bornée par `waitMs` (R25), comptée à partir du tour ; au-delà, le porteur est rendu et rien n'est pris.
- * Une attente ne retient aucun créneau de session : ce verrou n'a rien à voir avec eux.
+ * Une attente ne retient aucun créneau de session : ce verrou n'a rien à voir avec eux. L591 : `onWait` est appelé une fois quand le tour n'est pas immédiat (file en mémoire tenue, ou
+ * verrou fichier d'un autre processus), pour que l'appelant rende son créneau ; `onTurn` quand l'attente finit, par le tour ou par le refus. Aucun des deux si le tour est immédiat.
  */
-export async function takeRepoWrite(repo: string, who: { wave: string }, o: { waitMs?: number; pollMs?: number } = {}): Promise<Grant> {
+export async function takeRepoWrite(repo: string, who: { wave: string }, o: { waitMs?: number; pollMs?: number; onWait?: () => void; onTurn?: () => void } = {}): Promise<Grant> {
   const waitMs = o.waitMs ?? INTEGRATE_WAIT_MS;
   const pollMs = o.pollMs ?? INTEGRATE_POLL_MS;
   const file = join(sharedStateDir(repo), INTEGRATION_LOCK);
-  const turn = (await mutexFor(`integrate:${gitCommonDir(repo)}`).acquire())!;
+  const queue = mutexFor(`integrate:${gitCommonDir(repo)}`);
+  let waiting = false;
+  const wait = () => {
+    if (waiting) return;
+    waiting = true;
+    o.onWait?.();
+  };
+  const settle = () => {
+    if (waiting) o.onTurn?.();
+  };
+  if (queue.busy) wait();
+  const turn = (await queue.acquire())!;
   const deadline = Date.now() + waitMs;
   for (;;) {
     const lock: OLock = { pid: process.pid, wave: who.wave, started: new Date().toISOString() };
     const got = takeLock(file, lock);
     if (got.ok) {
+      settle();
       return {
         ok: true,
         release: () => {
@@ -49,8 +62,10 @@ export async function takeRepoWrite(repo: string, who: { wave: string }, o: { wa
     }
     if (Date.now() >= deadline) {
       turn();
+      settle();
       return { ok: false, holder: { wave: got.held.wave, pid: got.held.pid } };
     }
+    wait();
     await sleep(pollMs);
   }
 }

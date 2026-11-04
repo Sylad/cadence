@@ -58,11 +58,12 @@ function statesOf(text: string): Map<string, string> | null {
   return states;
 }
 
-/** Un événement `etat` par lot dont `state:` diffère entre deux versions du plan ; un lot absent d'avant n'avait pas d'état. */
-function stateChanges(before: Map<string, string>, after: Map<string, string>, day: Day, sha: string): PlanEvent[] {
+/** Un événement `etat` par lot dont `state:` diffère entre deux versions du plan ; un lot absent d'avant reprend le dernier état vu dans `known` (lot archivé puis rouvert), à défaut n'avait pas d'état. */
+function stateChanges(before: Map<string, string>, after: Map<string, string>, day: Day, sha: string, known: Map<string, string>): PlanEvent[] {
   const out: PlanEvent[] = [];
   for (const [lot, to] of after) {
-    const from = before.get(lot) ?? '';
+    // Un lot archivé quitte le fichier du plan avec son `state:` : rouvert, il revient de l'état qu'on lui a vu en dernier, pas de rien.
+    const from = before.get(lot) ?? known.get(lot) ?? '';
     if (from !== to) out.push({ day, type: 'etat', lot, from: from || null, to: to || null, sha });
   }
   return out;
@@ -103,13 +104,18 @@ function stateEvents(root: string, planFile: string, since: Day | undefined, war
   };
   const out: PlanEvent[] = [];
   let lastGood = new Map<string, string>();
+  // Le dernier état vu de chaque lot, y compris ceux qui ont quitté le fichier (archivés) : l'archive n'est pas parcourue.
+  const known = new Map<string, string>();
   for (const { sha, day, parent, blob } of versions) {
     const after = statesAt(blob);
     if (after === null) {
       if (texts.has(blob)) warn(`historique du plan illisible au commit ${sha.slice(0, 7)} : ses changements d'état sont sautés`);
       continue;
     }
-    out.push(...stateChanges(statesAt(parent) ?? lastGood, after, day, sha));
+    const before = statesAt(parent) ?? lastGood;
+    for (const [lot, state] of before) known.set(lot, state);
+    out.push(...stateChanges(before, after, day, sha, known));
+    for (const [lot, state] of after) known.set(lot, state);
     lastGood = after;
   }
   return out;

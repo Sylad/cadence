@@ -94,7 +94,7 @@ describe('L470 bords — raf events', () => {
     commit(dir, '2026-10-11T10:00:00', 'plan: 1', PLAN);
     expect(evs(dir).filter((e) => e.type === 'etat')).toMatchObject([{ lot: 'L1', from: null, to: '1' }]);
   });
-  it('un lot qui quitte le plan (état effacé) donne to: null, pas un événement pour un lot disparu', () => {
+  it('un lot qui quitte le plan (lots: []) ne donne aucun événement etat', () => {
     const dir = project();
     raf(dir, 'add', 'A');
     setState(dir, 'state: code');
@@ -172,5 +172,49 @@ describe('L470 bords — raf export', () => {
     raf(dir, 'start', 'L1');
     const list = JSON.parse(raf(dir, 'list', '--json').out);
     expect(JSON.parse(raf(dir, 'export').out).lots).toEqual(list);
+  });
+});
+
+describe('L470 bords — passe mineure', () => {
+  it('un lot archivé puis rouvert garde son état d\'avant : termine → a_faire, pas ∅ → a_faire', () => {
+    const dir = project();
+    raf(dir, 'add', 'A');
+    raf(dir, 'status', 'L1', 'code');
+    commit(dir, '2026-10-10T10:00:00', 'plan', PLAN, 'cadence.yaml');
+    raf(dir, 'done', 'L1', '--force');
+    commit(dir, '2026-10-11T10:00:00', 'plan: termine', PLAN);
+    expect(raf(dir, 'archive').code).toBe(0);
+    commit(dir, '2026-10-12T10:00:00', 'plan: archive', PLAN, '.cadence/archive');
+    raf(dir, 'todo', 'L1');
+    const c = commit(dir, '2026-10-13T10:00:00', 'plan: rouvert', PLAN, '.cadence/archive');
+    expect(evs(dir).filter((e) => e.type === 'etat' && e.day === '2026-10-13')).toMatchObject([{ lot: 'L1', from: 'termine', to: 'a_faire', sha: c }]);
+  });
+  it('un lot présent dont le state: est effacé donne to: null', () => {
+    const dir = project();
+    raf(dir, 'add', 'A');
+    setState(dir, 'state: code');
+    commit(dir, '2026-10-10T10:00:00', 'plan', PLAN, 'cadence.yaml');
+    setState(dir, null);
+    const c = commit(dir, '2026-10-11T10:00:00', 'plan: état effacé', PLAN);
+    expect(evs(dir).filter((e) => e.type === 'etat' && e.day === '2026-10-11')).toMatchObject([{ lot: 'L1', from: 'code', to: null, sha: c }]);
+  });
+  it('un plan d\'un autre outil (plan: au format étranger) : export et events répondent, sans événement etat', () => {
+    const dir = gitRepo();
+    execFileSync('mkdir', ['-p', join(dir, 'tracker')]);
+    writeFileSync(join(dir, 'tracker/tickets.yaml'), 'tickets:\n  - { id: ENG-12, titre: Un, etat: en_cours }\n');
+    writeFileSync(
+      join(dir, 'cadence.yaml'),
+      `plan:\n  path: tracker/tickets.yaml\n  lots: tickets\n  fields: { title: [titre], status: [etat] }\n  statuses: { doing: en_cours }\n`,
+    );
+    commit(dir, '2026-10-10T10:00:00', 'plan', 'tracker/tickets.yaml', 'cadence.yaml');
+    writeFileSync(join(dir, 'tracker/tickets.yaml'), 'tickets:\n  - { id: ENG-12, titre: Deux, etat: en_cours }\n');
+    commit(dir, '2026-10-11T10:00:00', 'plan: teste', 'tracker/tickets.yaml');
+    const ex = raf(dir, 'export', '--json');
+    expect(ex.err).toBe('');
+    expect(ex.code).toBe(0);
+    expect(JSON.parse(ex.out).lots.map((l: { id: string }) => l.id)).toEqual(['ENG-12']);
+    const ev = raf(dir, 'events', '--json');
+    expect(ev.code).toBe(0);
+    expect((JSON.parse(ev.out).events as { type: string }[]).filter((e) => e.type === 'etat')).toEqual([]);
   });
 });

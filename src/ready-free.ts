@@ -5,9 +5,11 @@ import { gitRoot } from './git.js';
 import { findProjects, readDepth } from './lead.js';
 import type { Lot } from './plan.js';
 import { decisionPending } from './orchestrate/continue.js';
+import { deducedResources } from './orchestrate/lot-diff.js';
 import { liveWaves } from './orchestrate/registry.js';
-import { readResources } from './resources.js';
+import { declaredFor, readResources } from './resources.js';
 import { lotFinished, RunStore, type LotState } from './orchestrate/state.js';
+import { lotBranch } from './orchestrate/worktree.js';
 
 /** Un lot prêt dont aucune ressource n'est prise (L252) ; `uses` n'est écrit que si le lot en porte. */
 export interface FreeLot {
@@ -48,7 +50,8 @@ type Held = Pick<LotState, 'repo' | 'lot'>;
 
 /**
  * Les ressources prises à cet instant : celles des lots `doing` des projets `dirs` et de ceux qui partagent leurs ressources (`sharingProjects` : lancé depuis l'un d'eux,
- * on voit aussi les autres), celles des lots non finis des vagues vivantes (un lot de vague n'est `doing` dans le plan qu'une fois sa session partie)
+ * on voit aussi les autres), celles des lots non finis des vagues vivantes (un lot de vague n'est `doing` dans le plan qu'une fois sa session partie ; avec, L558 R5,
+ * celles que le diff de leur branche de worktree déduit des ressources à chemins, relu à chaque appel, un diff illisible ne déduisant rien, R12)
  * et celles des lots `held` (le tirage d'une vague qui part). Avec leurs lots (`dépôt:lot`, voir `lotAt`), qui ne sont pas à proposer.
  */
 function taken(dirs: string[], home: string, held: Held[]): { resources: Set<string>; running: Set<string> } {
@@ -69,6 +72,13 @@ function taken(dirs: string[], home: string, held: Held[]): { resources: Set<str
       continue; // état de vague illisible : la vague ne tient aucune ressource connue
     }
     held = [...held, ...live];
+    for (const l of live) {
+      try {
+        for (const r of deducedResources(l.repo, lotBranch(w.wave, l.project, l.lot), declaredFor(l.repo))) resources.add(r);
+      } catch {
+        // cadence.yaml du dépôt illisible : aucune ressource déduite (sa ligne de tour le dit)
+      }
+    }
   }
   for (const s of held) {
     running.add(lotAt(repoOf(s.repo), s.lot));

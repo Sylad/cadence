@@ -1,4 +1,6 @@
 import { runLot, type LotCtx } from './cycle.js';
+import { deducedResources } from './lot-diff.js';
+import { declaredFor } from '../resources.js';
 import { lotKey, lotRepoPaths, type LotState } from './state.js';
 
 /** Valeur de repli de `runPool` quand l'appelant ne donne pas de plafond ; le réglage réel est DEFAULT_MAX_SESSIONS, `--max-sessions` ou CADENCE_MAX_SESSIONS (command-args.ts). */
@@ -67,18 +69,32 @@ function waitsDependency(queue: LotCtx[], ctxs: LotCtx[], live: Set<LotCtx>): bo
 }
 
 /**
- * Les ressources `uses:` (L551) tenues par les files qui jouent : les lots non finis de ces files les tiennent, `wants(queue)` dit si un lot de la file en veut une.
- * Les `uses:` d'un lot sont lus du plan une fois.
+ * Les ressources tenues par les files qui jouent (L551) : les `uses:` des lots non finis de ces files, lus du plan une fois, plus celles que le diff de leur
+ * worktree déduit (L558, R5 : ressources à chemins déclarées dans le cadence.yaml parent), relu à chaque appel sans cache (R7 : le diff change à chaque commit).
+ * `wants(queue)` dit si un lot de la file veut par ses `uses:` une ressource tenue. `warn(c, cause)` reçoit un diff que git n'a pas pu lire (R12) : le lot ne
+ * tient alors que ses `uses:` ; la même cause n'est redite pour un lot que si elle a changé. Exporté pour ses tests ; `runPool` en est le seul appelant.
  */
-function resourceLock(running: Map<Promise<void>, LotCtx[]>, live: Set<LotCtx>): { wants: (queue: LotCtx[]) => boolean } {
+export function resourceLock(running: Map<Promise<void>, LotCtx[]>, live: Set<LotCtx>, warn: (c: LotCtx, cause: string) => void = () => {}): { wants: (queue: LotCtx[]) => boolean } {
   const cache = new WeakMap<LotCtx, string[]>();
   const usesOf = (c: LotCtx): string[] => {
     if (!cache.has(c)) cache.set(c, c.loadPlan().lots().find((l) => l.id === c.lot.lot)?.uses ?? []);
     return cache.get(c)!;
   };
+  const warned = new WeakMap<LotCtx, string>();
+  const heldBy = (c: LotCtx): string[] => {
+    if (!c.tree) return usesOf(c);
+    let cause: string | null = null;
+    const deduced = deducedResources(c.lot.repo, c.tree.branch, declaredFor(c.lot.repo), (why) => (cause = why));
+    if (cause !== null && warned.get(c) !== cause) {
+      warned.set(c, cause);
+      warn(c, cause);
+    }
+    if (cause === null) warned.delete(c);
+    return [...usesOf(c), ...deduced];
+  };
   return {
     wants: (queue) => {
-      const held = new Set([...running.values()].flatMap((q) => q.filter((o) => live.has(o)).flatMap(usesOf)));
+      const held = new Set([...running.values()].flatMap((q) => q.filter((o) => live.has(o)).flatMap(heldBy)));
       return held.size > 0 && queue.some((c) => usesOf(c).some((r) => held.has(r)));
     },
   };
@@ -129,7 +145,7 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
   };
 
   const running = new Map<Promise<void>, LotCtx[]>();
-  const resources = resourceLock(running, live);
+  const resources = resourceLock(running, live, (c, cause) => c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} diff illisible (git : ${cause}) : aucune ressource déduite`));
 
   /** La file qui ne part pas : celle d'un lot seul (groupe en parallèle) dont une dépendance joue encore, ou celle dont un lot veut une ressource qu'une file qui joue tient (L551). */
   const blocked = (queue: LotCtx[]) => waitsDependency(queue, ctxs, live) || resources.wants(queue);

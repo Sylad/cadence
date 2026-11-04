@@ -254,7 +254,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
       const d = await trackedDirty(dir);
       if (d.length) refusals.push(`${basename(dir)} : arbre sale, ${d.length} fichier(s) suivi(s) modifié(s) : ${d.join(', ')}`);
     }
-    refusals.push(...configRefusals(live));
+    refusals.push(...configRefusals(live.filter((l) => integ.includes(l))));
     if (refusals.length) {
       for (const r of withReplayHint(refusals, wave.id, argv)) io.err(`orchestrate : ${r}`);
       return 2;
@@ -318,7 +318,7 @@ function raiseBudget(l: LotState, r: { from: number; to: number; step: SessionKi
 /** Le lot n'est pas rendu à l'étape d'intégration (ni, pour `--replay`, sur une écriture de plan refusée). */
 const notHandedBack = (l: LotState, replay: boolean | undefined): boolean => l.status !== 'handed-back' || (l.next !== 'integrate' && !(replay && planNoteHandBack(l)));
 
-/** L504 : une config illisible (clé posée avant sa mise en service) fait mourir `execute` APRÈS l'écriture des lots remis en jeu : lue ici, elle refuse la reprise avant toute écriture. */
+/** L504 : une config illisible (clé posée avant sa mise en service) fait mourir `execute` APRÈS l'écriture des lots remis à l'intégration : lue ici pour ces lots, elle refuse la reprise avant toute écriture. Les autres lots repris gardent l'erreur levée par `execute` (L3/t13). */
 function configRefusals(live: LotState[]): string[] {
   return live.flatMap((l) => {
     try {

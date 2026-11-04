@@ -5,7 +5,7 @@ import { lotWork, coveredTasks } from '../../audit.js';
 import { openDocGap } from './brief.js';
 import { git, trackedDirty, lotBranch, branchExists, integrated, gitFailure, removeTree } from '../worktree.js';
 import { foreignDirty, planBefore, commitPlan, planMessage, leadMoved } from './plan-writes.js';
-import { repoBranch, INTEGRATE_WAIT_MS, takeRepoWrite, rebaseOnto, rebaseNotes, patchId, mergeBase, advance, baseMoved, MAX_REPLAYS, type Rebase } from '../integrate.js';
+import { repoBranch, INTEGRATE_WAIT_MS, takeRepoWrite, rebaseOnto, rebaseNotes, patchId, mergeBase, advance, baseMoved, MAX_REPLAYS, type Grant, type Rebase } from '../integrate.js';
 import { relative } from 'node:path';
 import { RafError } from '../../plan.js';
 import { PLAN_ACTIONS } from '../../plan-commit.js';
@@ -136,6 +136,18 @@ function conflictRefusal(repo: string, t: LotTree, rebased: Extract<Rebase, { ki
 }
 
 /**
+ * Le tour d'intégration du lot (L591) : le lot qui attend son tour rend son créneau (pool et registre, `waitsTurn`) ; à son tour il compte de nouveau et reprend sans
+ * redemander de créneau (`tookTurn`, lu par la fonction `claude` d'execute.ts, le temps de l'intégration : la relâche du tour le retire), l'intégration ne lançant qu'une revue courte.
+ */
+async function awaitTurn(c: LotCtx): Promise<Grant> {
+  let waited = false;
+  const grant = await takeRepoWrite(c.lot.repo, { wave: c.wave.id }, { ...c.wave.integrate, onWait: () => { waited = true; setWaitsTurn(c, true); }, onTurn: () => setWaitsTurn(c, false) });
+  if (!grant.ok) return grant;
+  c.tookTurn = waited;
+  return { ok: true, release: () => { c.tookTurn = false; grant.release(); } };
+}
+
+/**
  * Intégration d'un lot en worktree à la branche du dépôt (L279, C2), AVANT sa transition à ready (R22). D'abord, hors verrou, l'attente d'un lot plus ancien de la
  * vague qui travaille sur une ressource à chemins que le lot touche aussi (L558, `awaitOlder`). Puis sous le verrou d'intégration : branche du dépôt encore
  * celle de départ (R24), aucun fichier suivi modifié (R8), rebase sur le sommet courant (conflit : abandonné, rendu au lead, R6), contrôles joués au sommet
@@ -160,8 +172,7 @@ export async function integrateLot(c: LotCtx): Promise<void> {
   const kept = `worktree conservé : ${t.dir}`;
   const waitMs = c.wave.integrate?.waitMs ?? INTEGRATE_WAIT_MS;
   await awaitOlder(c); // L558 (R8) : avant le verrou, la fin d'un lot plus ancien de la vague qui travaille déjà sur une ressource à chemins que le diff touche
-  // L591 : le lot qui attend son tour rend son créneau (pool et registre) ; il le reprend sans le redemander, l'intégration ne lançant qu'une revue courte.
-  const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, { ...c.wave.integrate, onWait: () => setWaitsTurn(c, true), onTurn: () => setWaitsTurn(c, false) });
+  const grant = await awaitTurn(c);
   if (!grant.ok) return refuse(`intégration refusée : verrou d'intégration tenu par ${grant.holder.wave} (pid ${grant.holder.pid}) depuis plus de ${minutesText(waitMs)} ; ${kept}`);
   // Un refus tardif garde `l.verdict` avec la trace de la revue courte déjà jouée : reprise, elle est rejouée et remplace l'ancienne trace au lieu de s'y ajouter.
   let verdict = (l.verdict ?? '').split(SHORT_REVIEW_TRACE)[0];

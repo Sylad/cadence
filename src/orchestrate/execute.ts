@@ -124,6 +124,16 @@ export function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (l
   }
 }
 
+/**
+ * L591 : la session d'un lot repris à son tour d'intégration (`tookTurn`, posé par `integrateLot`) part sans redemander de créneau : il a rendu le sien en attendant, une autre file l'a
+ * pris ; le temps de sa revue courte, plus de lots que le plafond peuvent jouer. Le journal le dit.
+ */
+function resumesTurn(ctxs: LotCtx[], lot: string | undefined, log: (line: string) => void): boolean {
+  const resumed = lot !== undefined && ctxs.some((c) => c.tookTurn && lotKey(c.lot.project, c.lot.lot) === lot);
+  if (resumed) log(`${lot} · reprend son tour d'intégration sans redemander de créneau`);
+  return resumed;
+}
+
 /** Pose les verrous et les hooks, joue la vague, range l'état, rend le tableau et le code de sortie. */
 export async function execute(wave: WaveState, lots: LotState[], store: RunStore, io: OrchestrateIo, deps: OrchestrateDeps, today: Day, args: Args, all: LotState[] = lots): Promise<number> {
   const cap = maxSessions(args, io);
@@ -174,9 +184,9 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
     throw e;
   }
 
-  // Plafond de sessions simultanées, toutes vagues confondues : chaque session attend un créneau libre avant de partir.
+  // Plafond de sessions simultanées, toutes vagues confondues : chaque session attend un créneau libre avant de partir (L591 : sauf celle d'un lot repris à son tour d'intégration, `resumesTurn`).
   const claude: ClaudeFn = async (argv, o) => {
-    const free = await acquireSlot(home, cap, { wave: wave.id, ...slotPlace(all, launch, args.priority, o.lot), // L531 : place dans la file des créneaux, commune aux vagues
+    const free = resumesTurn(ctxs, o.lot, wctx.log) ? () => {} : await acquireSlot(home, cap, { wave: wave.id, ...slotPlace(all, launch, args.priority, o.lot), // L531 : place dans la file des créneaux, commune aux vagues
       pollMs: deps.slotPollMs,
       // L332 : une demande écrite pendant l'attente (`--drop` de ce lot, `--stop-after-current`) l'interrompt ; la session ne part pas.
       abandon: () => {

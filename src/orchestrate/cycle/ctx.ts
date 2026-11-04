@@ -105,6 +105,8 @@ export interface LotCtx {
   waitsTurn?: boolean;
   /** Posé par le pool : l'ordonnanceur est réveillé quand `waitsTurn` change, pour faire partir la file suivante. */
   turnChanged?: () => void;
+  /** L591 : le lot a attendu son tour d'intégration et l'a pris : il a rendu son créneau en attendant, ses sessions (la revue courte du diff rebasé) partent sans en redemander (execute.ts). Posé par `integrateLot` le temps de l'intégration. */
+  tookTurn?: boolean;
 }
 
 /**

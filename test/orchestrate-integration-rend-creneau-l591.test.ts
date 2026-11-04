@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gitCommonDir } from '../src/git.js';
 import { cadenceHome, liveWaves } from '../src/orchestrate/registry.js';
@@ -10,6 +10,7 @@ import type { LotCtx } from '../src/orchestrate/cycle.js';
 import { claudeOut, commitFile, git, harness, kindOf, reviewReport, workReport } from './orchestrate-harness.js';
 import { fake, run, setup } from './orchestrate-worktree-harness.js';
 import { gitRepo, tempDir } from './helpers.js';
+import { Plan } from '../src/plan.js';
 import { sharedStateDir } from '../src/state.js';
 
 // L591 — un lot qui attend son tour d'intégration rend son créneau (pool et registre) et reprend à son tour.
@@ -184,5 +185,111 @@ describe("L591 — le registre ne compte plus le lot qui attend son tour d'inté
     const planL3 = log.findIndex((m) => m.startsWith('plan:') && m.includes('L3') && m.includes('démarré'));
     expect(planL3).toBeGreaterThan(-1);
     expect(planL3).toBeLessThan(log.findIndex((m) => m.includes('feat(L1)'))); // le plan de L3 est écrit avant l'intégration de L1, en file depuis plus longtemps
+  });
+});
+
+describe("L591 — le lot repris à son tour ne redemande pas de créneau, et compte de nouveau", () => {
+  const lines = (n: number) => Array.from({ length: n }, (_, i) => `l${i}`).join('\n') + '\n';
+  /** Change la ligne `n` de f.txt dans `cwd` et commite ; deux lignes voisines (l4, l7) se rebasent sans conflit mais le contexte de l'une contient l'autre : le patch-id change (R17, revue courte). */
+  const edit = (cwd: string, n: number, who: string) => {
+    writeFileSync(join(cwd, 'f.txt'), lines(12).replace(`l${n}\n`, `l${n} par ${who}\n`));
+    git(cwd, 'add', '--', 'f.txt');
+    git(cwd, 'commit', '-q', '-m', `feat(${who}): travail`);
+    return { sha: git(cwd, 'rev-parse', 'HEAD'), sujet: `feat(${who}): travail` };
+  };
+  /** Un second projet `b`, un lot, sans worktree : juste de quoi tenir un créneau. */
+  const projectB = (parent: string) => {
+    const dir = join(parent, 'b');
+    mkdirSync(dir);
+    git(dir, 'init', '-q', '-b', 'main');
+    git(dir, 'config', 'user.email', 't@example.com');
+    git(dir, 'config', 'user.name', 'T');
+    git(dir, 'config', 'commit.gpgsign', 'false');
+    const plan = Plan.create(join(dir, '.cadence/raf.yaml'), 'b', 'L', '2026-09-01');
+    plan.add('lot', '2026-10-01', { estimate: 0.5 });
+    plan.save();
+    writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
+    git(dir, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
+    git(dir, 'commit', '-q', '-m', 'chore: plan');
+  };
+  const until = async (cond: () => boolean) => {
+    for (let i = 0; i < 250 && !cond(); i++) await sleep(20);
+  };
+
+  it("R6 — a:L1 reprend son tour alors que a:L2 et b:L1 tiennent les 2 créneaux : sa revue courte part sans attendre un créneau", async () => {
+    const { parent } = setup([{ title: 'un' }, { title: 'deux' }], 'worktrees: true', { 'f.txt': lines(12) });
+    projectB(parent);
+    const repoA = join(parent, 'a');
+    const queue = mutexFor(`integrate:${gitCommonDir(repoA)}`);
+    let turn: (() => void) | undefined;
+    let l2Started = false;
+    const holding = new Set<string>();
+    let smallSaw: string[] | undefined;
+    const f = fake({
+      implement: async (cwd, brief) => {
+        const lot = /on lot `([^`]+)`/.exec(brief)![1];
+        const project = /on project `([^`]+)`/.exec(brief)?.[1] ?? (cwd.includes('/b') && !cwd.includes('/a') ? 'b' : 'a');
+        if (project === 'a' && lot === 'L1') {
+          await wait(() => l2Started); // les écritures de plan de a sont passées : la file d'intégration peut être tenue
+          turn = (await queue.acquire())!; // « une autre intégration de a est en cours »
+          edit(repoA, 7, 'voisin'); // main avance : le rebase change le contexte du diff de L1, une revue courte sera jouée
+          return claudeOut(workReport({ commits: [edit(cwd, 4, 'L1')] }));
+        }
+        const key = `${project}:${lot}`;
+        if (key === 'a:L2') l2Started = true;
+        holding.add(key);
+        if (key === 'b:L1') {
+          await sleep(100); // b:L1 est parti sur le créneau rendu par a:L1 ; les deux créneaux sont tenus
+          turn?.(); // le tour de a:L1 vient
+        }
+        await until(() => smallSaw !== undefined); // les deux porteurs gardent leur créneau jusqu'à la revue courte de a:L1 (ou 5 s)
+        holding.delete(key);
+        return claudeOut(workReport({ commits: [commitFile(cwd, `${key.replace(':', '-')}.txt`, `feat(${lot}): travail`)] }));
+      },
+      'review-small': async () => {
+        smallSaw = [...holding].sort();
+        return claudeOut(reviewReport());
+      },
+    });
+    const r = await run(parent, ['a:L1', 'a:L2', 'b:L1', '--max-sessions', '2'], f, { slotPollMs: 20 });
+    expect(r.code).toBe(0);
+    expect(smallSaw).toEqual(['a:L2', 'b:L1']); // la revue courte a joué pendant que les deux créneaux étaient tenus : aucun n'a été redemandé
+    expect(r.out).toMatch(/a:L1 · reprend son tour d'intégration sans redemander de créneau/);
+    expect(r.out).not.toMatch(/a:L1 · en attente d'un créneau de session/);
+  });
+
+  it("R7 — à son tour, integrateLot recompte le lot : pendant sa revue courte, le registre annonce de nouveau sa file (2 avec L2), plus 1", async () => {
+    const { parent } = setup([{ title: 'un' }, { title: 'deux' }], 'worktrees: true', { 'f.txt': lines(12) });
+    const repoA = join(parent, 'a');
+    const queue = mutexFor(`integrate:${gitCommonDir(repoA)}`);
+    let turn: (() => void) | undefined;
+    let l2Started = false;
+    let lanesDuringSmall: number | undefined;
+    let waitsTurnSeen = false;
+    const f = fake({
+      implement: async (cwd, brief) => {
+        const lot = /on lot `([^`]+)`/.exec(brief)![1];
+        if (lot === 'L1') {
+          await wait(() => l2Started);
+          turn = (await queue.acquire())!;
+          edit(repoA, 7, 'voisin');
+          return claudeOut(workReport({ commits: [edit(cwd, 4, 'L1')] }));
+        }
+        l2Started = true;
+        await wait(() => liveWaves(cadenceHome())[0]?.lanes === 1); // L1 attend son tour : il ne compte plus
+        waitsTurnSeen = true;
+        turn?.();
+        await until(() => lanesDuringSmall !== undefined); // L2 reste en session pendant la revue courte de L1
+        return claudeOut(workReport({ commits: [commitFile(cwd, 'L2.txt', 'feat(L2): travail')] }));
+      },
+      'review-small': async () => {
+        lanesDuringSmall = liveWaves(cadenceHome())[0]?.lanes;
+        return claudeOut(reviewReport());
+      },
+    });
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '3'], f, { slotPollMs: 20 });
+    expect(r.code).toBe(0);
+    expect(waitsTurnSeen).toBe(true);
+    expect(lanesDuringSmall).toBe(2); // L1 repris et L2 : le lot repris a repris sa place
   });
 });

@@ -3,7 +3,7 @@
 // cadence lance chaque partie séparément, dans son dossier, et attribue chaque rouge à la partie qui l'a imprimé ; une partie sans `replay` garde ses rouges comptés ; la forme chaîne reste telle quelle.
 // Ce module ne change que le lieu du lancement et l'attribution des noms : les règles de verdict (deux rejeux, fichier vu dans la sortie, délai trop juste) restent celles de workers.ts.
 
-import { isAbsolute, posix } from 'node:path';
+import { isAbsolute, join, posix } from 'node:path';
 import { failedTests, hasUnnamedFailure } from './baseline.js';
 import { isComposedGate, redAlone, replayRed, shellArg, type TightTest } from './workers.js';
 
@@ -153,9 +153,9 @@ export async function replayGate(run: Runner, replay: string | undefined, names:
   return { red: [...new Set(names)].filter((n) => !unstable.includes(n)), unstable, tight };
 }
 
-/** Rouges seuls au sha de départ (L510, R6) : forme chaîne, `redAlone` tel quel ; parties, un nom n'est « déjà rouge » que si chaque partie qui l'a imprimé rouge dans le lot le nomme encore en échec à ses rejeux au départ. */
-export async function redAloneGate(run: Runner, replay: string | undefined, names: string[], ran: GateRan): Promise<string[]> {
-  if (!ran.parts) return redAlone(run, replay!, names, ran.output);
-  const judged = await perPart(ran.parts, names, (p, own) => redAlone((c) => run(partCommand(p.part, c)), p.part.replay!, own, p.output));
+/** Rouges seuls au sha de départ (L510, R6) : forme chaîne, `redAlone` tel quel ; parties, un nom n'est « déjà rouge » que si chaque partie qui l'a imprimé rouge dans le lot le nomme encore en échec à ses rejeux au départ. `root` : le dossier du lot où la porte a tourné (L514). */
+export async function redAloneGate(run: Runner, replay: string | undefined, names: string[], ran: GateRan, root?: string): Promise<string[]> {
+  if (!ran.parts) return redAlone(run, replay!, names, ran.output, root);
+  const judged = await perPart(ran.parts, names, (p, own) => redAlone((c) => run(partCommand(p.part, c)), p.part.replay!, own, p.output, root === undefined ? undefined : join(root, p.part.dir)));
   return everyPart(judged, names, (v, n) => v.includes(n));
 }

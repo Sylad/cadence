@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { failedTests, nodeTestFiles, nodeTestRan } from '../src/orchestrate/baseline.js';
+import { redAloneGate, type GateRan } from '../src/orchestrate/gate-parts.js';
 import { redAlone, replayRed } from '../src/orchestrate/workers.js';
 
 const red = (n: number, title: string, loc: string | null, indent = ''): string =>
@@ -82,5 +83,28 @@ describe('L514 — replayRed et redAlone rejouent un test node --test par son fi
     expect(await redAlone(failing, 'node --test {files}', ['rouge un'], SUITE)).toEqual(['rouge un']);
     expect(files[0]).toBe('node --test /w/scripts/a.test.mjs');
     expect(await redAlone(run(GREEN_AFTER), 'node --test {files}', ['rouge un'], SUITE)).toEqual([]);
+  });
+});
+
+describe('L514 — le rejeu au sha de départ ne rejoue pas le fichier du lot', () => {
+  it('L514 — redAlone avec root : le location: absolu du worktree du lot est rejoué relatif, dans le dossier du rejeu', async () => {
+    const cmds: string[] = [];
+    const failing = async (c: string) => { cmds.push(c); return { code: 1, output: `${red(1, 'rouge un', '/lot/scripts/a.test.mjs:2:1')}\n` }; };
+    expect(await redAlone(failing, 'node --test {files}', ['rouge un'], `${red(1, 'rouge un', '/lot/scripts/a.test.mjs:2:1')}\n`, '/lot')).toEqual(['rouge un']);
+    expect(cmds[0]).toBe('node --test scripts/a.test.mjs');
+  });
+  it('L514 — redAlone avec root : un fichier hors du dossier de la porte (hôte distant) ne désigne rien à rejouer, jamais « déjà rouge »', async () => {
+    let n = 0;
+    const failing = async () => { n++; return { code: 1, output: `${red(1, 'rouge un', '/hote/scripts/a.test.mjs:2:1')}\n` }; };
+    expect(await redAlone(failing, 'node --test {files}', ['rouge un'], `${red(1, 'rouge un', '/hote/scripts/a.test.mjs:2:1')}\n`, '/lot')).toEqual([]);
+    expect(n).toBe(0);
+  });
+  it('L514 — redAloneGate en parties : le fichier est relatif au dossier de la partie, rejoué après « cd dir »', async () => {
+    const out = `${red(1, 'rouge un', '/lot/frontend/scripts/a.test.mjs:2:1')}\n`;
+    const ran: GateRan = { code: 1, output: out, parts: [{ part: { dir: 'frontend', run: 'npm test', replay: 'node --test {files}' }, code: 1, output: out }] };
+    const cmds: string[] = [];
+    const failing = async (c: string) => { cmds.push(c); return { code: 1, output: out }; };
+    expect(await redAloneGate(failing, undefined, ['rouge un'], ran, '/lot')).toEqual(['rouge un']);
+    expect(cmds[0]).toBe('cd frontend && node --test scripts/a.test.mjs');
   });
 });

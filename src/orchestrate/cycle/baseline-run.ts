@@ -1,4 +1,4 @@
-import { type LotCtx, startSha, save } from './ctx.js';
+import { type LotCtx, startSha, save, workDir } from './ctx.js';
 import { type GateTest, gateLabel, runGate, gateReplayable, baselineCandidates, replayGate, type GateRan, redAloneGate, gateUnnamed } from '../gate-parts.js';
 import { failedTests, compareBaseline } from '../baseline.js';
 import { lotKey } from '../state.js';
@@ -38,7 +38,7 @@ async function baselineFailures(c: LotCtx, test: GateTest): Promise<string[] | n
 /** Parmi les tests rouges `names` du lot, ceux rouges SEULS aussi au sha de départ (L510) : la suite entière du départ a pu les voir verts (ordre, charge), ils n'en sont pas moins déjà rouges avant le lot. Vide sans `testReplay`, sans sha de départ, build du départ rouge ou worktree non monté. */
 export async function redAtStart(c: LotCtx, names: string[], ran: GateRan): Promise<string[]> {
   const sha = startSha(c);
-  return !sha || !gateReplayable(c.config.test, c.config.testReplay) || !names.length ? [] : (await atStartSha(c, sha, (place) => redAloneGate(place.run, c.config.testReplay, names, ran))) ?? [];
+  return !sha || !gateReplayable(c.config.test, c.config.testReplay) || !names.length ? [] : (await atStartSha(c, sha, (place) => redAloneGate(place.run, c.config.testReplay, names, ran, workDir(c)))) ?? [];
 }
 
 /** Joue `fn` dans un worktree jetable du sha de départ (ligne de base L213, rouges au départ L510), liens vers les dossiers ignorés posés puis retirés avec lui. Null si le worktree ne se monte pas, si le build du départ est rouge ou si `fn` lève. */

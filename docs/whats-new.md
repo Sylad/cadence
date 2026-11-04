@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.48.0**: lots in service but not published are flagged by the tour, the close and `--status`; the mockup review converges (unchanged-point majors go to the lead); `news check` asks a lot only for its own hypotheses.
 - **1.47.0**: delivered ≠ finished (`delivered:` on lots, `deliver --block`); the exact next gesture after every refusal, plus a lead hook; plan conflicts settled at integration; no more `spawn E2BIG`.
 - **1.46.0**: worst-case data set for screen lots (`qa.worstData`); accept checks only the lot's rules on a shared sheet; `uses:` held inside a wave.
 - **1.45.0**: safe plan writes between sessions; GitHub issues followed by the tour and the release; `spec reseal` of several tests; panel bars follow `priority:`.
@@ -76,6 +77,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.48.0**: lots in service but not yet published are flagged (L571): `cadence lead tour`, `cadence session close` and `cadence orchestrate --status` print `⚠ N lot(s) done depuis le dernier tag v<x.y.z>` with the `cadence release` command to run, so a version is no longer left unpublished overnight. The mockup review converges (L562, GitHub issue #30): from review 2 on, a major on a point the spec writer did not change and that the previous review had not raised (`inchange: true`) no longer counts for non-conformity — it goes to the lead as a follow-up — and review 1 sweeps the sizes the sheet names. `cadence news check` and `raf check` ask a lot on a shared screen sheet only for the hypotheses of the rules it adds or changes (L570, GitHub issue #33).
 
 **1.47.0**: a green delivery now marks the finished lots it carries as delivered (L469): `delivered: { date, sha }` on each lot, an optional `plan.deliveredState`, `raf show` prints `livré : <day> <sha7>`, and `deliver.blocks` with `cadence deliver --block <name>` delivers by paths. Every refusal of `cadence orchestrate` and every lot handed back prints the exact next gesture (L554), and the plugin ships a hook that adds that gesture to the lead's context after a refused `cadence`/`raf` command and warns on a `pgrep -f` wait loop (L556). Integration settles a rebase conflict that bears only on the plan, field by field (L569), and a commit touching both `CHANGELOG.md` and the quality baseline (L568); `CHANGELOG.md` is no longer `merge=union`, and `cadence release` refuses a doubled sub-section title. `verify --gate` under plan-only commits replays only the tests that read the plan (L566); a light lot keeps its short review after a pass that only fixed tests (L565); free slots count only lots that hold a session (L520). Fixed: `spawn E2BIG` on a big sheet or agent list (L559, L560, issues #27, #28), copied mockup captures caught after the spec step (L561, issue #29), `--resume --integrate` no longer waits for another live wave (L553) nor replays an applied `--drop` (L557, issue #26), gate ↔ CI parity ignores npm options (L564, issue #32). `orchestrate/cycle.ts` is split further, with no change of behaviour (L492).
 

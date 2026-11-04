@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.48.0] - 2026-11-04
+
 ### Added
 
 - Lots in service but not published are flagged (L571, [docs/lead.md](docs/lead.md), [docs/orchestrate.md](docs/orchestrate.md), [docs/session.md](docs/session.md)): `cadence lead tour`, `cadence session close` and `cadence orchestrate --status` say `⚠ N lots done depuis le dernier tag v<x.y.z> (…) — en service, non publiés : cadence release patch|minor|major` for a repository that publishes (`package.json` with a `version` and a `v<x.y.z>` tag reachable from `HEAD`); `session close` prints it right under its title and the `session-close` skill puts it first of the three lines for next time; `lead tour --json` carries it as `unpublished: { tag, lots }`. Only `done` lots with a work commit after the tag count (plan upkeep commits do not). On 2026-11-04, 18 lots were in service the day before and the professional account started that morning on 1.46.0.

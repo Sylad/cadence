@@ -468,7 +468,32 @@ The result is checked before anything is written, with or without `--verify`: ea
 
 Once the project has switched, `cadence.yaml` no longer describes the old plan; keep that description in a file of its own and name it for the way back: `raf import --to-config --config cadence-origine.yaml`.
 
-Not covered: the event journal of the other tool — `--to-config` leaves `journal.ndjson` as it is and says so (`journal.ndjson inchangé : format déclaratif à venir, L582`), since nothing in `plan.fields` describes a journal format; a declarative journal format and the rewriting of the journal are the separate lot L582, still a prerequisite of the switch — and a commit message that cites a flat sub-lot id with a slash (`AB-1/t1-fusion`), which still reads as a precision on `AB-1` (see `plan.idPattern`).
+#### The event journal (`plan.journal`, L582)
+
+The other tool may also keep an append-only event journal (one JSON object per line: `cree`, `demarre`, `etat`, `note`, `livre`, `ferme`…). `plan.journal` in `cadence.yaml` declares its format, and `--to-config` then brings it up to date in the same run as the plan:
+
+```yaml
+plan:
+  journal:
+    path: docs/plan/journal.ndjson        # from the repository root; default journal.ndjson
+    keys: { at: at, task: task, type: type, message: message, sha: sha }   # all optional; the names shown are the defaults, `sha` is written only when declared
+    types: { created: cree, started: demarre, state: etat, note: note, closed: ferme, delivered: livre }   # required; a fact with no type is not written
+    extra: { source: retour }              # constant keys added to every written line (e.g. `sha: null`)
+```
+
+`plan.journal` is read by `raf import --to-config` only (which already refuses a `cadence.yaml` without a plan of another format); a missing `types`, an unknown key or an unknown type is refused by name.
+
+The journal is append-only: `--to-config` keeps every existing line byte for byte and appends, after them, the facts of the raf-format plan the journal does not hold yet — never twice, so playing the command again adds nothing (`journal.ndjson : aucun événement à ajouter`):
+
+- `created` / `started` — a lot with a `created:` / `started:` day and no event of that type for it (message = the title / empty; dated at midnight UTC of that day);
+- `note` — each dated note whose text the journal does not hold for that lot (dated at its day);
+- `closed` — a `dropped` lot with no such event (dated now);
+- `delivered` — a lot with `delivered: { date, sha }` and no such event (with `keys.sha` declared, none carrying that sha), the sha under the declared key;
+- `state` — a lot whose state changed since the plan file being replaced (`--out`, `--force`): message = the new state, dated now. It needs that previous file; a lot that is new there, or a `dropped` one when `closed` is declared, gets no `state` event.
+
+Sub-tasks added in raf's format (`tasks:`) carry no date and write no event. The journal is read before anything is written: a line that is not JSON, or has no task or type, is refused with its number (`journal.ndjson : ligne 3 illisible`), and neither the plan nor the journal is written. `--dry-run` counts the events (`N événements à ajouter — rien n'est écrit`) and writes nothing; a missing journal is created with its folders. Without `plan.journal` the command leaves the journal as it is and says so (`journal.ndjson inchangé : plan.journal n'est pas déclaré`). `--from-config` never touches the journal.
+
+Not covered: a commit message that cites a flat sub-lot id with a slash (`AB-1/t1-fusion`), which still reads as a precision on `AB-1` (see `plan.idPattern`).
 
 ## Gantt scheduling
 

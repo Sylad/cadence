@@ -25,7 +25,7 @@ interface PlanConfig {
   settings: PlanSettings;
 }
 
-const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'deliveredStatuses', 'add', 'onWrite', 'commit', 'states', 'transitions', 'doneState', 'deliveredState', 'blockedState', 'extras', 'idPattern', 'requirePlanned'];
+const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'deliveredStatuses', 'add', 'onWrite', 'commit', 'states', 'transitions', 'doneState', 'deliveredState', 'blockedState', 'extras', 'idPattern', 'requirePlanned', 'journal'];
 const FORMAT_KEYS = ['lots', 'fields', 'statuses', 'estimates', 'deliveredStatuses'];
 
 

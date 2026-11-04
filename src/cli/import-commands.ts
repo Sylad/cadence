@@ -5,7 +5,9 @@ import { Document, parseDocument } from 'yaml';
 import { PLAN_DEFAULT } from '../config.js';
 import { initialContent } from '../plan-init.js';
 import { foreignEntries, nativeEntries, readingDiff, roundTripDiff, type Renames } from '../plan-import.js';
+import { appendEvents, missingEvents, readJournal, readJournalConfig, statesById } from '../plan-journal.js';
 import { Plan, RafError, type PlanFormat } from '../plan.js';
+import type { JournalFormat } from '../plan-journal.js';
 import type { Ctx } from './context.js';
 
 type Entry = Record<string, unknown>;
@@ -13,8 +15,6 @@ type Entry = Record<string, unknown>;
 const USAGE = 'usage : raf import --from-config [--out plan-natif.yaml] [--verify] [--rename ancien=nouveau]… [--force] [--dry-run] | raf import --to-config [--from plan-natif.yaml] [--out plan.yaml] [--rename ancien=nouveau]… [--force] [--dry-run]';
 /** Les écarts listés avant « … » : un plan entier mal mappé en dirait des milliers. */
 const SHOWN = 20;
-/** Le retour ne réécrit que le plan : le journal d'événements de l'autre outil n'a pas de format déclaré (plan.fields n'en décrit aucun), il reste tel qu'il est. */
-const JOURNAL_NOTE = 'journal.ndjson inchangé : format déclaratif à venir, L582';
 
 /** `--rename ancien=nouveau` (répétable) : un nom de clé du fichier d'origine pris en natif sous un autre nom. */
 function parseRenames(list: string[] | undefined): Renames {
@@ -88,13 +88,35 @@ function importTo(c: Ctx, format: PlanFormat, renames: Renames): number {
   const native = Plan.load(from, { config: c.configPath });
   if (native.archiveFiles().length > 0) throw new RafError(`${from} a des lots archivés (${native.archiveFiles().length} fichier(s) d'archive) : le retour ne les écrirait pas — les remettre dans le plan d'abord (raf todo)`);
   const entries = foreignEntries(native.rawEntries(), format, renames);
-  if (!values['dry-run']) {
+  const dryRun = !!values['dry-run'];
+  const journalConfig = readJournalConfig(c.configPath);
+  // Le journal se prépare (et se lit : une ligne illisible refuse) avant la moindre écriture : le plan et le journal s'écrivent ensemble ou pas du tout.
+  const journal = journalConfig && journalPlan(c, format, journalConfig, { native: native.rawEntries(), entries }, out);
+  if (!dryRun) {
     const doc = existsSync(out) ? parseDocument(readFileSync(out, 'utf8')) : new Document({});
     doc.set(format.lots, doc.createNode(entries));
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, doc.toString({ lineWidth: 0 }));
+    if (journal) appendEvents(journal.path, journal.events);
   }
-  io.out(values['dry-run'] ? `${entries.length} lots à écrire au format d'origine — rien n'est écrit (--dry-run)` : `${entries.length} lots écrits au format d'origine → ${out}`);
-  io.out(JOURNAL_NOTE);
+  io.out(dryRun ? `${entries.length} lots à écrire au format d'origine — rien n'est écrit (--dry-run)` : `${entries.length} lots écrits au format d'origine → ${out}`);
+  io.out(journal ? journalLine(journal, dryRun) : 'journal.ndjson inchangé : plan.journal n\'est pas déclaré (cadence.yaml)');
   return 0;
+}
+
+type JournalPlan = { path: string; shown: string; events: Entry[] };
+
+/** Ce que le retour dit du journal : le nombre d'événements ajoutés (ou à ajouter, en --dry-run), ou qu'il n'y en a aucun. */
+function journalLine(j: JournalPlan, dryRun: boolean): string {
+  const n = j.events.length;
+  if (n === 0) return `${j.shown} : aucun événement à ajouter`;
+  return `${j.shown} : ${n} événement${n > 1 ? 's' : ''} ${dryRun ? 'à ajouter — rien n\'est écrit (--dry-run)' : `ajouté${n > 1 ? 's' : ''}`}`;
+}
+
+/** Les événements que le journal déclaré n'a pas : le plan d'origine qu'on remplace (`out`, s'il existe) donne les changements d'état. */
+function journalPlan(c: Ctx, format: PlanFormat, journal: JournalFormat, lots: { native: Entry[]; entries: Entry[] }, out: string): JournalPlan {
+  const path = resolve(c.root, journal.path);
+  const previous = existsSync(out) ? (parseDocument(readFileSync(out, 'utf8')).toJSON() as Record<string, unknown> | null)?.[format.lots] : undefined;
+  const before = statesById(Array.isArray(previous) ? (previous as Entry[]) : [], format);
+  return { path, shown: journal.path, events: missingEvents(lots.native, readJournal(path, journal), journal, { before, after: statesById(lots.entries, format) }, c.io.now()) };
 }

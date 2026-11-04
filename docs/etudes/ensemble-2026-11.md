@@ -21,14 +21,22 @@ sont des **doublons de calcul ou de nom**, pas des doublons de mécanisme. Le pa
 Ce qui manque, ce sont les couloirs : un nouvel arrivant rencontre **trois noms pour « petit lot »**, **quatre sens
 du mot « hook »**, **deux sens de « prêt »**, **deux textes d'aide qui ne disent pas la même chose**, **deux formules
 pour les créneaux libres**, **quatre dossiers d'état** dont deux racines utilisateur, une page `orchestrate.md` de
-308 Ko dont 106 lignes dépassent 600 caractères, et une documentation en anglais pour une CLI, des clés et des noms de
-fichiers en français (`maquette`, `fiche`, `acceptation.json`, `docs/nouveautes/`). Aucun de ces écarts n'est un bug
-de fond ; ensemble ils expliquent les trois symptômes du 04-11 (L589, L591, L592 : trois affichages du même nombre
-qui divergent) et le coût d'entrée d'un lecteur neuf.
+308 Ko dont 106 lignes dépassent 600 caractères, une documentation en anglais et des messages en français autour de
+noms (commandes, options, clés, fichiers) anglais à quelques exceptions françaises près (`maquette`, `fiche`, `--quoi`,
+`acceptation.json`, `docs/nouveautes/`), et une liste de garanties qui tait 12 sous-commandes, 6 outils et 5 clés que
+le code lit. Aucun de ces écarts n'est un bug de fond ; ensemble ils expliquent le coût d'entrée d'un lecteur neuf et
+**un** des trois symptômes du 04-11 : L589 (la bande et `orchestrate --status` n'affichent pas le même nombre de
+créneaux libres) est le cas d'école de E1. Les deux autres ne sont pas des écarts de surface et aucun lot ci-dessous
+ne les règle : L591 est un comportement d'ordonnancement de la vague (un lot qui attend son tour d'intégration garde
+son créneau, ~9 min à deux créneaux vides le 04-11), un défaut de fond qui a son propre lot ; L592 est l'ergonomie du
+panneau des lots de la bande (lots livrés repliés, colonne id tronquée). E1 passe après L589 et L591 parce qu'ils
+changent la formule, pas parce qu'il les remplacerait.
 
-Les 16 écarts ci-dessous se corrigent en **13 lots ≤ 0,5 j**, dont 8 ne touchent que la documentation (risque nul) et
-aucun ne casse une garantie de [stabilite.md](../stabilite.md). Les trois de plus fort gain : un seul calcul des
-créneaux libres lu par tous (E1), une seule source pour l'aide (E2), le découpage de `orchestrate.md` (E12).
+Les 17 écarts ci-dessous se corrigent en **14 lots ≤ 0,5 j**, dont 8 sont des lots de documentation : 6 à risque nul,
+et 2 (E12, E8) à risque faible parce que des tests citent la prose ou le texte de sortie qu'ils déplacent. Aucun ne
+casse une garantie de [stabilite.md](../stabilite.md). Les trois de plus fort gain : un seul calcul des créneaux
+libres lu par tous (E1), une seule source pour l'aide (E2), le découpage de `orchestrate.md` (E12, qui emporte la mise
+à jour de 26 fichiers de test, de `files` de `package.json` et de `CHECKED` de `scripts/check-links.mjs`).
 
 ## Carte des concepts et de leurs couches
 
@@ -87,9 +95,11 @@ Ce que l'ensemble devrait être pour qu'un lecteur neuf le tienne en tête, sans
    registre) ; la bande, `lead tour` et le skill `lead` le **lisent**, ne le recalculent jamais (E1).
 4. **Une échelle de taille de lot, nommée.** `express` (≤ 0,1 j), `léger` (≤ `review.threshold`, 0,25 j), `petit`
    (≤ 0,5 j ou `quickwin`), `plein`. Les quatre mots dans `concepts.md`, les quatre seuils dans un seul module (E4).
-5. **Un vocabulaire, une langue par face.** La **documentation est en anglais**, la **CLI, les clés et les messages
-   sont en français** : c'est un choix, il est écrit dans `stabilite.md` et dans `concepts.md`, et aucun alias
-   anglais n'est ajouté (deux noms pour une clé serait un recouvrement de plus) (E9). Un mot, un sens : « hook » est
+5. **Un vocabulaire, une langue par face.** La **documentation et les noms** (commandes, options, clés, fichiers)
+   **sont en anglais**, les **messages** (sorties, briefs, agents, skills, commentaires) **sont en français** : c'est
+   l'état de fait, à quelques exceptions près (`maquette`, `fiche`, `maquetteReviews`, `--quoi`, `--largeur`,
+   `acceptation.json`) ; il est écrit dans `stabilite.md` et dans `concepts.md`, les exceptions garanties restent et
+   aucun alias n'est ajouté (deux noms pour une clé serait un recouvrement de plus) (E9). Un mot, un sens : « hook » est
    toujours qualifié (hook git, hook Claude Code, `plan.onWrite`), « prêt » ne désigne que l'état de vague `ready`,
    le lot du plan sans dépendance ouverte est « tirable » (E7, E8).
 6. **Une aide, une source.** `bin/cadence.js` imprime l'aide que `src/cli.ts` tient ; les deux textes ne divergent
@@ -99,7 +109,9 @@ Ce que l'ensemble devrait être pour qu'un lecteur neuf le tienne en tête, sans
    `perf`, `config`) → les `docs/mesures/` et `docs/specs/` comme archives datées. `overview.md` ne porte plus de
    chiffres (« four tools ») qui vieillissent (E11, E12, E13).
 
-Rien dans cette cible ne renomme une commande, une option ou une clé garantie : tout se fait en mineur.
+Rien dans cette cible ne renomme une commande, une option ou une clé garantie : tout se fait en mineur. La réserve
+est que la liste garantie est **incomplète** (E16) : tant que `stabilite.md` ne dit pas le statut de `raf quickwins`,
+de `cadence ref` ou de `verify.inPlace`, E5 et E17 peuvent déplacer une surface que le compte pro croit stable.
 
 ## Écarts classés par gain et risque
 
@@ -113,14 +125,15 @@ proposé** (≤ 0,5 j).
 |---|---|---|---|---|
 | E1 | Créneaux libres : deux formules (registre, bande) et un troisième « free » interne à la vague | fort | faible | 0,5 j code |
 | E2 | Deux textes d'aide tenus à la main, qui divergent sur 9 commandes | fort | faible | 0,25 j code |
-| E12 | `orchestrate.md` : 308 Ko, 106 lignes > 600 car., pas de sommaire | fort | nul | 0,5 j docs |
+| E12 | `orchestrate.md` : 308 Ko, 106 lignes > 600 car., pas de sommaire | fort | faible (26 fichiers de test citent la page) | 0,5 j docs + tests |
 | E4 | Trois seuils de « petit lot » sous trois noms (`express`, `light`, `small`) + `quickwin` | fort | nul (docs) / faible (code) | 0,25 j docs + 0,25 j code |
 | E5 | Plan natif et plan lu dans la même classe : 13 branches `settings.format` dans `plan.ts` | moyen | faible | 0,5 j code |
 | E6 | Quatre dossiers d'état, deux racines utilisateur (`~/.cadence`, `~/.local/share/cadence`) ; aucune page ne les liste | moyen | nul | 0,25 j docs |
 | E7 | « hook » désigne quatre choses | moyen | nul | 0,25 j docs |
-| E8 | « prêt / ready » et « done » ont deux sens chacun | moyen | nul (docs) / faible (code) | 0,25 j docs |
-| E9 | Docs en anglais, CLI/clés/fichiers en français, clés mélangées (`maquette`, `fiche` / `precheck`, `probe`) ; convention jamais écrite | moyen | nul | 0,25 j docs |
+| E8 | « prêt / ready » et « done » ont deux sens chacun | moyen | faible (texte de sortie cité par 7 fichiers de test) | 0,25 j docs + texte |
+| E9 | Noms en anglais sauf 3 clés `orchestrate` et 6 options françaises, messages en français ; convention jamais écrite | moyen | nul | 0,25 j docs |
 | E11 | `overview.md` et `stabilite.md` : « four tools », « four skills », « three reviewer agents » : 15 outils, 5 skills, 11 agents | moyen | nul | 0,25 j docs |
+| E16 | `stabilite.md` tait 12 sous-commandes `raf`, 6 outils `cadence` et 5 clés racine que le code lit | moyen | nul | 0,25 j docs |
 | E14 | Les portes se déclarent à trois endroits (plan, `cadence.yaml`, vague) ; aucun tableau ne les réunit | moyen | nul | avec E6 |
 | E3 | `cadence spec green` : documenté, implémenté, absent des deux aides | faible | nul | avec E2 |
 | E10 | `docs-ok` / `docs_ok` / `docsOk` : trois graphies d'une même notion | faible | nul | avec E7 |
@@ -254,24 +267,36 @@ prêts » (`ready-free.ts`, `nextUp`, `lead tour`, `--continue`) désigne un lot
 ni ressource prise, **avant** tout travail. Le tableau final d'une vague et la ligne « prêts, ressources libres » du
 tour emploient le même mot pour l'avant et l'après. De même `done` est un statut du plan et un `WaveStatus`.
 
-**Lot proposé (0,25 j, docs, risque nul).** `concepts.md` et le glossaire : « prêt (vague) » et « tirable (plan) » ;
-`lead tour` et `--continue` disent « tirables » (texte de sortie, non garanti). Le renommage de `FreeLot`/`readyFree`
-en `drawable*` est interne et peut suivre dans le même lot si le temps reste ; sinon il n'est pas nécessaire.
+**Lot proposé (0,25 j, docs + texte de sortie, risque faible).** `concepts.md` et le glossaire : « prêt (vague) » et
+« tirable (plan) » ; `lead tour` et `--continue` disent « tirables ». Ce texte n'est pas garanti, mais il est du
+**code** (`src/ready-free.ts:137` compose « prêts, ressources libres : … ») et 7 fichiers de test le citent
+(`test/ressources-libres.test.ts`, `test/lead-tour.test.ts`, `test/creneaux-visibles.test.ts`, `test/lead-hold.test.ts`,
+`test/lead-skill-ressources.test.ts`, `test/ressources-par-chemins-diff-l558.test.ts`, `test/orchestrate-command.test.ts`) :
+le lot les met à jour dans le même commit, et c'est ce qui le sort du « risque nul ». Le renommage de
+`FreeLot`/`readyFree` en `drawable*` est interne et peut suivre dans le même lot si le temps reste ; sinon il n'est pas
+nécessaire.
 
 ### E9. Deux langues, une convention jamais écrite
 
-**Preuve.** La documentation (`README`, `docs/*.md`) est en anglais ; la CLI (`raf add "titre" --estimate`), ses
-messages, les commentaires du code, le `CHANGELOG` des 0.x, les noms de fichiers (`acceptation.json`,
-`docs/nouveautes/`, `qualite-baseline.json`, `deliveries.log`, `holds/`), les agents et les skills sont en français.
-Les clés de `cadence.yaml` mélangent : `orchestrate.maquette`, `fiche`, `maquetteReviews` à côté de `precheck`,
-`probe`, `worktrees`, `budgetTopUp`, `testReplay`. Le plugin `cadence-hud` a un README en français et une page `docs/`
-en anglais (E13). Pour le compte pro, c'est la première chose vue, et aucune page ne dit que c'est voulu.
+**Preuve.** Les deux langues ne se partagent pas « docs contre CLI » mais **noms contre messages**. Les **noms** sont
+en anglais : les 34 sous-commandes `raf` (`add`, `start`, `done`, `drop`, `quickwins`, `docs-ok`…) ; les 11 clés racine
+garanties (`plan`, `news`, `hook`, `deliver`…) ; 23 des 26 clés de `ORCH_KEYS` (`src/config.ts:324`), les trois
+exceptions étant `maquette`, `maquetteReviews` et `fiche` ; 66 des 72 options de `src/cli/context.ts`, les six
+exceptions étant `--quoi`, `--largeur`, `--seuil`, `--porteur`, `--sans-rendu` et `--cache-sous-causes` ;
+`deliveries.log`, `holds/`, `slots/`, `hud-context/`. Les **messages** sont en français : sorties et refus, briefs,
+agents, skills, commentaires du code, `CHANGELOG`, plus quelques noms de fichiers (`acceptation.json`,
+`docs/nouveautes/`, `qualite-baseline.json`). La documentation (`README`, `docs/*.md`) est en anglais ; le plugin
+`cadence-hud` a un README en français et une page `docs/` en anglais (E13). Pour le compte pro, c'est la première chose
+vue, et aucune page ne dit que c'est voulu. Le constat juste est donc : **noms anglais avec quelques exceptions
+françaises, messages français**, pas « une CLI en français ».
 
 **Lot proposé (0,25 j, docs, risque nul).** Une phrase dans `README.md` et une section dans `stabilite.md` : « la
-documentation est en anglais, la CLI, ses clés et ses messages sont en français, et le resteront ; aucun alias n'est
-ajouté ». C'est le choix recommandé : un alias anglais (`orchestrate.mockup` = `maquette`) serait un recouvrement de
-plus et la garantie de stabilité interdit le renommage avant 2.0. Les nouvelles clés suivent la langue de leur
-famille (français pour `orchestrate`, où la majorité des mots métier le sont déjà).
+documentation et les noms (commandes, options, clés, fichiers) sont en anglais, les messages sont en français ; les
+quelques noms français (`maquette`, `maquetteReviews`, `fiche`, six options) sont garantis et restent ; aucun alias
+n'est ajouté ». Un alias anglais (`orchestrate.mockup` = `maquette`) serait un recouvrement de plus et la garantie de
+stabilité interdit le renommage avant 2.0. Les **nouveaux noms** sont en anglais, langue de 88 % de la famille
+`orchestrate` et de 100 % des commandes : nommer les clés nouvelles en français aggraverait le mélange que la règle
+veut résorber.
 
 ### E10. `docs-ok`, `docs_ok`, `docsOk`
 
@@ -292,6 +317,32 @@ README l'installe avec les autres. `docs/cadence-hud.md:8` dit « 2 agents ».
 main depuis l'aide (E2 le rendra vérifiable) ; `stabilite.md` ajoute `orchestrate` aux skills garantis (ajout, donc
 mineur) ou dit pourquoi il ne l'est pas.
 
+### E16. La surface vue par le compte pro, et ce que la garantie en dit
+
+**Preuve.** Le parcours d'entrée (`README.md` → `docs/quickstart.md` → `docs/with-your-tools.md` → `docs/stabilite.md`)
+est court et juste : chaque commande qu'il montre existe. Mais le nouvel utilisateur qui veut savoir **ce qui tiendra**
+lit `stabilite.md`, et sa liste, confrontée au code, est incomplète :
+
+| Surface | Dans le code | Garantie par `stabilite.md` | Hors liste (statut jamais dit) |
+|---|---|---|---|
+| Sous-commandes `raf` | 34 (tables de dispatch de `src/cli.ts`) | 23 (`init` … `hook`) | 12 : `archive`, `docs-ok`, `estimate`, `import`, `migrate`, `move`, `plan`, `quickwins`, `status`, `title`, `todo`, `uses` (`news` est garanti via `cadence news`) |
+| Outils `cadence` | 16 (`bin/cadence.js`, `raf` compris) | 10 : `raf`, `news`, `session`, `lead tour`, `corrections`, `deliver`, `verify`, `orchestrate`, `skills`, `spec` | 6 : `ref`, `perf`, `release`, `local`, `config`, `claude-hook` |
+| Options | 72 dans `OPTIONS` de `src/cli/context.ts` | « their options … as the pages document them » : garanties par renvoi, sans liste | celles d'une commande hors liste (`raf quickwins`, `cadence ref …`) ne sont garanties par rien |
+| Clés racine de `cadence.yaml` | les 11 garanties, plus 4 lues par `readYamlKey` (`src/config.ts`, `src/perf-config.ts`) et `resources` (`src/resources.ts`) | 11 : `plan`, `news`, `hook`, `session`, `deliver`, `orchestrate`, `docs`, `qa`, `priority`, `depth`, `lead` | 5 : `verify` (`inPlace`), `references`, `migrate`, `perf`, `resources` |
+| Skills et agents | 5 skills, 11 agents | 4 skills, 4 agents (+ 3 agents déclarés internes) | `orchestrate` (E11), `livreur`, `reference-analyst/-planner/-verifier` |
+
+Rien n'est faux dans la page : elle est **courte parce qu'elle tait**. Un nouvel utilisateur ne peut pas savoir si
+`raf quickwins` ou `verify.inPlace` survivront à la 1.54, et une correction interne (E5 sur le plan lu, E17 sur
+`config.ts`) peut déplacer ou redéfinir ces surfaces sans qu'aucune règle le lui interdise.
+
+**Lot proposé (0,25 j, docs, risque nul).** `stabilite.md` dit le statut de **chaque** surface que le code lit : la
+liste garantie complétée de ce qui est stable de fait (`archive`, `estimate`, `move`, `title`, `todo`, `status`,
+`import`, `migrate`, `verify`, `resources` : tous documentés dans leur page), et une liste **« expérimental »** pour ce
+qui peut encore changer (`ref`, `perf`, `local`, `release`, `config`, `references`, `quickwins`, `uses`, `plan`,
+`docs-ok`), avec la raison. Ajouter à la liste garantie est un changement mineur ; dire « expérimental » n'engage rien.
+Un test lit la liste garantie et la compare aux tables de dispatch, pour que le prochain outil ou la prochaine clé
+racine entre dans l'une des deux listes ou soit refusé (même méthode que le test d'aide de E2).
+
 ### E12. `orchestrate.md`, la page qu'on ne peut pas lire
 
 **Preuve.** 308 380 octets, 1 222 lignes, **106 lignes de plus de 600 caractères**, la plus longue 10 325 ; 17 titres
@@ -300,13 +351,24 @@ caractères. Chaque lot y a ajouté son paragraphe « (Lnnn) » là où il tomba
 `docs/raf.md` (86 Ko) et `deliver.md` (51 Ko) suivent le même chemin. C'est la page vers laquelle `concepts.md`
 renvoie le plus souvent (12 liens).
 
-**Lot proposé (0,5 j, docs, risque nul — `scripts/check-links.mjs` vérifie les ancres).** Découper **sans réécrire** :
-`orchestrate.md` garde l'ouverture, les commandes et un sommaire ; quatre pages reçoivent les sections telles qu'elles
-sont : `orchestrate-cycle.md` (étapes, budget, revue, correction, escalade, voie express), `orchestrate-gate.md`
-(porte, rouges de départ, rejeu seul, `readsPlan`, sonde), `orchestrate-spec.md` (spec, maquette, fiche, accept,
-briefs aval), `orchestrate-worktrees.md` (worktrees, intégration, voisins, dépôt tiers). Chaque ancre déplacée reçoit
-une ligne de renvoi dans l'ancienne page le temps d'une version. La réécriture des paragraphes-journaux en manuel est
-un **autre** lot, par page, après : il demande une relecture de fond, pas un déplacement.
+La page n'est pas libre pour autant : **26 fichiers de test** la citent (`grep -rlE "docs/orchestrate\.md|'orchestrate\.md'" test`),
+plusieurs avec un `toContain` sur sa prose ; `test/orchestrate-sonde-l497.test.ts:618-619` exige le titre
+``## The edge-case probe (`orchestrate.probe`, L497)`` **dans `docs/orchestrate.md`** et l'ancre correspondante dans le
+README. Une page n'est publiée que si `files` de `package.json` la liste, et `scripts/check-links.mjs` ne vérifie que
+les pages de `CHECKED` : une page nouvelle qui n'y entre pas n'est ni livrée ni contrôlée.
+
+**Lot proposé (0,5 j, docs + tests, risque faible).** Découper **sans réécrire** : `orchestrate.md` garde l'ouverture,
+les commandes et un sommaire ; quatre pages reçoivent les sections telles qu'elles sont : `orchestrate-cycle.md`
+(étapes, budget, revue, correction, escalade, voie express), `orchestrate-gate.md` (porte, rouges de départ, rejeu
+seul, `readsPlan`, sonde), `orchestrate-spec.md` (spec, maquette, fiche, accept, briefs aval),
+`orchestrate-worktrees.md` (worktrees, intégration, voisins, dépôt tiers). Dans le **même commit** : les quatre pages
+entrent dans `files` de `package.json` et dans `CHECKED` de `scripts/check-links.mjs` ; les 26 tests qui lisent la page
+pointent la nouvelle (le test de la sonde suit la section vers `orchestrate-gate.md`, avec l'ancre du README) ; chaque
+ancre déplacée reçoit une ligne de renvoi dans l'ancienne page le temps d'une version. Le gain pour le lecteur est
+inchangé, le coût tient dans 0,5 j parce que la mise à jour des tests est mécanique (un chemin, un titre) ; c'est le
+risque qui n'est pas nul : une porte rouge sur des dizaines d'assertions si un test est oublié. La réécriture des
+paragraphes-journaux en manuel est un **autre** lot, par page, après : il demande une relecture de fond, pas un
+déplacement.
 
 ### E13. Deux documentations de la bande
 
@@ -356,7 +418,8 @@ Relevé pour que la prochaine étude ne le rouvre pas :
   enchaîne : `fonctionnement.md` §3, le skill `lead`, le hook `claude-hook retour` et `lead hold` racontent la même
   histoire.
 - **Livré ≠ terminé** (L469) : deux faits, deux clés, une page. Un modèle de ce que E4 devrait devenir.
-- **La garantie de stabilité** est courte, lisible, et aucun écart ci-dessus ne demande de la rompre.
+- **La garantie de stabilité** est courte, lisible, et aucun écart ci-dessus ne demande de la rompre. Son seul défaut
+  est d'être incomplète (E16), ce qui se corrige par ajout, jamais par rupture.
 - **L461 a porté** : `cycle.ts` est découpé (dossier `cycle/`, 19 modules), `command.ts` passe de 1 768 à 270 lignes,
   `cli.ts` de 1 619 à 219 ; la base knip tombe de 153 à 2.
 
@@ -373,15 +436,19 @@ Relevé pour que la prochaine étude ne le rouvre pas :
 
 1. **E2 + E3** (0,25 j) : une aide, une source. Rend E11 vérifiable.
 2. **E1** (0,5 j), **après L589 et L591** : le chiffre lu, pas recalculé.
-3. **E12** (0,5 j) : `orchestrate.md` en cinq pages.
+3. **E12** (0,5 j) : `orchestrate.md` en cinq pages, avec les 26 tests, `files` et `CHECKED` mis à jour dans le même
+   commit (risque faible, pas nul).
 4. **E4a + E7 + E8 + E10** (0,5 j en tout, un seul lot docs « vocabulaire ») : `concepts.md` gagne la taille des lots,
-   les quatre hooks, prêt/tirable, `docs-ok`.
+   les quatre hooks, prêt/tirable, `docs-ok` ; E8 change aussi le texte de `ready-free.ts` et ses 7 tests.
 5. **E6 + E14** (0,25 j) : « où cadence écrit » et « les portes et où elles se déclarent ».
-6. **E9 + E11 + E13** (0,5 j en tout, un lot docs « surface pour le compte pro ») : la convention des langues, les
-   comptes retirés, la bande documentée une fois.
-7. **E5** (0,5 j) puis **E4b** (0,25 j) puis **E17** (0,5 j) : les trois lots de code, chacun avec sa mesure du cliquet.
+6. **E9 + E11 + E13** (0,5 j en tout, un lot docs « surface pour le compte pro ») : la convention des langues (noms
+   anglais, messages français), les comptes retirés, la bande documentée une fois.
+7. **E16** (0,25 j) : `stabilite.md` dit le statut de chaque surface que le code lit, avec son test ; **avant E5 et E17**,
+   qui touchent des surfaces dont le statut n'est pas dit.
+8. **E5** (0,5 j) puis **E4b** (0,25 j) puis **E17** (0,5 j) : les trois lots de code, chacun avec sa mesure du cliquet.
 
-Total : 3,75 j, dont 1,75 j de documentation seule. Le rituel L595 rejoue les mesures ci-dessous dans 14 jours.
+Total : 4 j, dont 2 j de lots de documentation (deux d'entre eux, E12 et E8, touchent aussi des tests ou un texte de
+sortie). Le rituel L595 rejoue les mesures ci-dessous dans 14 jours.
 
 ## Mesures à rejouer
 
@@ -409,8 +476,22 @@ grep -c "settings.format\|this.foreign\|readOnly()" src/plan.ts ; wc -l src/plan
 # E6 — les racines d'état
 grep -rn "'.cadence', 'runs'\|CADENCE_HOME ||\|XDG_DATA_HOME ||" src | cut -c1-140
 
+# E8 — tests qui citent le texte de sortie « ressources libres »
+grep -rl "ressources libres" test | wc -l
+
+# E9 — clés orchestrate (26) et options (72) : les noms français se lisent dans les deux listes
+grep -oE "'[a-zA-Z]+'" <(grep "^const ORCH_KEYS" src/config.ts) | wc -l
+awk '/^const OPTIONS = \{/,/^\}/' src/cli/context.ts | grep -oE "^\s*'?[a-zA-Z-]+'?:" | tr -d " ':" | wc -l
+
 # E11 — skills, agents, outils
 ls skills | wc -l ; ls agents | wc -l ; grep -cE "^  cadence [a-z]" bin/cadence.js
+
+# E16 — surfaces lues par le code (sous-commandes raf et outils cadence mêlés, puis clés racine), à confronter à stabilite.md
+grep -rhoE "^\s{2}'?[a-z-]+'?:" src/cli.ts | tr -d " ':" | sort -u | tr '\n' ' '
+grep -rhoE "readYamlKey\([a-zA-Z.]+, '[a-zA-Z]+'" src | grep -oE "'[a-zA-Z]+'" | sort -u | tr '\n' ' '
+
+# E12 — tests qui lisent la page
+grep -rlE "docs/orchestrate\.md|'orchestrate\.md'" test | wc -l
 
 # E12 — taille des pages
 wc -c docs/orchestrate.md docs/raf.md docs/deliver.md
@@ -422,4 +503,6 @@ node scripts/check-links.mjs
 
 Les chiffres de cette étude : `freeSlots` à 2 endroits + 1 `free` ; 9 commandes absentes de `bin/cadence.js` ;
 `spec green` 0/0/1 ; seuils 0,1 / 0,25 / 0,5 ; 13 branches, 1 141 et 93 lignes ; 4 racines ; 5 skills, 11 agents, 15
-outils ; 308 380 / 86 424 / 50 946 octets, 106 lignes longues.
+outils ; 308 380 / 86 424 / 50 946 octets, 106 lignes longues ; 26 fichiers de test citent `orchestrate.md`, 7 citent
+« ressources libres » ; 3 clés `orchestrate` sur 26 et 6 options sur 72 en français ; 12 sous-commandes, 6 outils et
+5 clés racine hors de la liste garantie.

@@ -139,6 +139,8 @@ export interface LotState {
   budget?: number;
   /** Part de `budget` réservée à l'escalade de modèle (L349, `ESCALATION_RESERVE`), posée au lancement quand `orchestrate.escalation` est déclarée. Les passes ordinaires ne la dépensent pas ; l'escalade engagée la libère. Absente : rien de réservé (lot d'une vague antérieure, ou sans escalade). */
   escalationReserve?: number;
+  /** Tokens comptés prélevés sur la vague pour relever `budget` à la dernière passe (L584, `orchestrate.budgetTopUp`), cumulés sur le lot : le plafond se lit contre eux. Absent : aucun prélèvement. */
+  budgetTopUp?: number;
   status: LotStatus;
   /** Passes de correction faites. */
   pass: number;

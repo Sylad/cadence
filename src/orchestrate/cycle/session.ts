@@ -18,7 +18,7 @@ import { lotKey, lotRepoPaths, neighbourDirs, type StepState } from '../state.js
 import { movedOutsideDeliveries, readTier, stillThird, takeTiers, tierRepos, wipBranch, type TierRead } from '../tiers.js';
 import { git, gitFailure, planFileSet } from '../worktree.js';
 import { type LotCtx, workDir as wd, save, transition, escalatedSession, stop, hasSpecStage } from './ctx.js';
-import { lotOver, WRITE_STEPS, fixAffordable, dropped, DROPPED, unplayedAnswer, halted, overBudget, suspend } from './budget.js';
+import { lotOver, WRITE_STEPS, fixRefused, dropped, DROPPED, unplayedAnswer, halted, overBudget, suspend } from './budget.js';
 import { trackedPaths } from './plan-writes.js';
 import { docsConfig, briefFor } from './brief.js';
 
@@ -53,7 +53,7 @@ export async function session(c: LotCtx, kind: SessionKind, local = false): Prom
   if (halt) return suspend(c, halt);
   const write = kind === 'probe' || WRITE_STEPS.includes(kind); // la sonde écrit (ses tests) mais le budget ne la borne pas : il est vérifié avant de la décider
   // Le budget du lot borne l'écriture, jamais la revue (L145) : une revue est jouée dès que le code est à relire (sauf tests rouges après une écriture, cf. REVIEW_RESERVE), la passe fix réserve son coût.
-  if (WRITE_STEPS.includes(kind) && (lotOver(l) || (kind === 'fix' && !fixAffordable(l)))) return overBudget(c, kind === 'fix' && !lotOver(l));
+  if (WRITE_STEPS.includes(kind) && (lotOver(l) || fixRefused(c, kind))) return overBudget(c, kind === 'fix' && !lotOver(l));
 
   const model: StepModel = ['spec', 'accept', 'fiche', 'probe'].includes(kind) ? 'sonnet' : write ? (kind === 'fix' && l.escalation?.stage === 'fix' ? l.escalation.model : l.model) : local ? 'local' : kind === 'precheck' ? 'sonnet' : reviewModel(c, kind); // le contrôle préalable ne fait que lire : pas d'Opus
   const effort = c.config.effort[effortKey(kind)];

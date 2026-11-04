@@ -94,6 +94,7 @@ The budget a wave gives a lot is derived from its estimate, measured on the runs
 | visible, above 0.1 day, `screen: component` or `journey` or none (light mockup, L459) | ordinary budget + 450 k |
 | fix pass and short review | 155 k reserved |
 | escalation (`orchestrate.escalation` declared, L349) | + 175 k reserved (estimate: one correction and one fresh review on the escalation model) |
+| last-pass top-up (L584) | a lot whose review converges (≤ 2 majors, falling) gets the shortfall of the 155 k, up to `orchestrate.budgetTopUp` (300 k by default), from the wave's budget |
 
 These figures are the floor of the budget (L501): when `cadence perf` has rendered at least 5 lots of the same class (estimate, `+spec` for the spec chain) in the last 14 days, the default budget is their p90 of counted tokens rounded up to 50 k, between the figure above and twice that; `--dry-run` says where the number comes from ([docs/orchestrate.md](orchestrate.md), « Budget set by the measure »).
 

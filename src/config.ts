@@ -274,6 +274,11 @@ export interface OrchestrateConfig {
    */
   escalation?: { model: string };
   /**
+   * Prélèvement de budget à la dernière passe (L584) : quand un lot dont la revue converge n'a plus de quoi payer « correction + revue courte », la vague relève son budget du manque,
+   * dans la limite de ce plafond (tokens comptés, cumulé sur le lot). `0` désactive : le lot est rendu « correction non jouée (budget) » comme avant (défaut : 300000).
+   */
+  budgetTopUp: number;
+  /**
    * Réglage du tirage de `--continue` pour ce projet (L390) : `maxEstimate` (en jours) écarte les lots dont l'estimate le dépasse, `exclude` écarte les lots listés (leurs numéros).
    * Ne touche que le tirage : un lot donné sur la ligne de commande se joue quoi qu'il en soit. Absent : tout lot prêt est tirable.
    */
@@ -313,11 +318,17 @@ export function readVerifyConfig(file: string): VerifyConfig {
 
 const REVIEW_KEYS = ['threshold', 'light', 'full'];
 
-const ORCH_KEYS = ['start', 'verdict', 'test', 'testReplay', 'build', 'worktreeDeps', 'gate', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'probe', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'continue', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+const ORCH_KEYS = ['start', 'verdict', 'test', 'testReplay', 'build', 'worktreeDeps', 'gate', 'accept', 'maquette', 'maquetteReviews', 'fiche', 'ux', 'precheck', 'probe', 'prodAccess', 'worktrees', 'testGate', 'spec', 'review', 'escalation', 'budgetTopUp', 'continue', 'effort', 'permissionMode', 'addDirs', 'timeouts'];
+
+/** Un entier d'au moins `min`, sinon l'erreur donnée. */
+const integerAtLeast = (v: unknown, min: number, error: RafError): number => {
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < min) throw error;
+  return v;
+};
 
 /** Clé `orchestrate:` de cadence.yaml. Absente : les défauts (auto, 45 min d'implémentation, 25 min de revue). */
 export function readOrchestrateConfig(file: string): OrchestrateConfig {
-  const config: OrchestrateConfig = { precheck: true, maquette: true, maquetteReviews: 3, fiche: true, precheckLocal: false, prodAccess: false, worktrees: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', fiche: 'medium', accept: 'medium', implement: 'medium', probe: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
+  const config: OrchestrateConfig = { precheck: true, maquette: true, maquetteReviews: 3, budgetTopUp: 300_000, fiche: true, precheckLocal: false, prodAccess: false, worktrees: false, spec: { dir: 'docs/specs' }, review: { threshold: 0.25, light: 'sonnet', full: 'opus' }, effort: { precheck: 'low', spec: 'medium', maquette: 'high', fiche: 'medium', accept: 'medium', implement: 'medium', probe: 'medium', fix: 'medium', review: 'high', ux: 'high' }, permissionMode: 'auto', addDirs: [], timeouts: { work: 45 * 60_000, review: 25 * 60_000 } };
   const o = readYamlKey(file, 'orchestrate');
   if (o == null) return config;
   const bad = (what: string) => new RafError(`${file} : orchestrate.${what}`);
@@ -352,10 +363,8 @@ export function readOrchestrateConfig(file: string): OrchestrateConfig {
     if (typeof o.maquette !== 'boolean') throw bad('maquette : true ou false attendu');
     config.maquette = o.maquette;
   }
-  if (o.maquetteReviews != null) {
-    if (typeof o.maquetteReviews !== 'number' || !Number.isInteger(o.maquetteReviews) || o.maquetteReviews < 1) throw bad('maquetteReviews : entier supérieur ou égal à 1 attendu');
-    config.maquetteReviews = o.maquetteReviews;
-  }
+  if (o.maquetteReviews != null) config.maquetteReviews = integerAtLeast(o.maquetteReviews, 1, bad('maquetteReviews : entier supérieur ou égal à 1 attendu'));
+  if (o.budgetTopUp != null) config.budgetTopUp = integerAtLeast(o.budgetTopUp, 0, bad('budgetTopUp : entier de tokens supérieur ou égal à 0 attendu (0 désactive le prélèvement)'));
   for (const k of ['fiche', 'probe'] as const) if (o[k] != null) config[k] = booleanKey(o[k], bad(`${k} : true ou false attendu`));
   if (o.precheck != null) {
     if (typeof o.precheck !== 'boolean' && o.precheck !== 'local') throw bad('precheck : true, false ou local attendu');

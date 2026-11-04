@@ -61,6 +61,35 @@ export function budgetStep(l: LotState): SessionKind | null {
 /** Le budget du lot paie-t-il la passe de correction et la revue courte qui la suit ? Sans budget de lot : toujours. La part de l'escalade (L349) n'est pas à dépenser, sauf pour décider l'escalade elle-même (`escalating`). `extra` : le coût d'une étape de plus devant elles (la sonde, L497). */
 export const fixAffordable = (l: LotState, escalating = false, extra = 0): boolean => l.budget === undefined || lotSpent(l) + extra + REVIEW_RESERVE < l.budget - (escalating ? 0 : heldForEscalation(l));
 
+/** Combien de tokens manquent au lot pour que `fixAffordable` soit vrai (0 : la correction et sa revue sont payées). */
+const fixShortfall = (l: LotState): number => (l.budget === undefined ? 0 : Math.max(0, lotSpent(l) + REVIEW_RESERVE + heldForEscalation(l) + 1 - l.budget));
+
+/** La revue qui vient de se rendre converge-t-elle (L584) ? Ses constats sont tous des majeurs de code (1 ou 2), après une baisse d'une revue à l'autre : ni bloquant, ni tests rouges, ni passe des mineurs. */
+const converging = (l: LotState): boolean => {
+  const counts = l.reviewCounts ?? [];
+  return l.constats.length >= 1 && l.constats.length <= 2 && l.constats.every((k) => k.source === 'code' && k.gravite === 'majeur') && counts.length >= 2 && counts[counts.length - 1] < counts[counts.length - 2];
+};
+
+/**
+ * Prélèvement de la dernière passe (L584) : avant une passe fix que le budget du lot refuserait, un lot dont la revue converge reçoit le manque sur le budget restant de la vague
+ * (qui doit payer la réserve `REVIEW_RESERVE`), dans la limite de `orchestrate.budgetTopUp` cumulé sur le lot. Le lot est rendu « correction non jouée (budget) » sinon, comme avant. Vrai si le budget a été relevé.
+ */
+function topUpBudget(c: LotCtx): boolean {
+  const l = c.lot;
+  const shortfall = fixShortfall(l);
+  const taken = l.budgetTopUp ?? 0;
+  const w = c.wave.budget;
+  if (!shortfall || l.budget === undefined || !converging(l) || taken + shortfall > c.config.budgetTopUp || w.limit - w.consumed < REVIEW_RESERVE) return false;
+  l.budget += shortfall;
+  l.budgetTopUp = taken + shortfall;
+  l.warnings.push(`budget du lot relevé de ${shortfall} token(s) à la dernière passe (la revue converge : ${l.constats.length} majeur(s) restant(s)), ${l.budgetTopUp} / ${c.config.budgetTopUp} prélevés sur la vague`);
+  c.wave.log(`${lotKey(l.project, l.lot)} · budget relevé de ${shortfall} token(s) pour la correction et la revue courte (${l.budgetTopUp} / ${c.config.budgetTopUp} prélevés)`);
+  return true;
+}
+
+/** La passe fix que le budget du lot refuse, après le prélèvement de la dernière passe (L584) : toute autre étape n'est pas concernée. */
+export const fixRefused = (c: LotCtx, kind: SessionKind): boolean => kind === 'fix' && !fixAffordable(c.lot) && !topUpBudget(c);
+
 /** Cause d'une suspension demandée par `--stop-after-current` (L79). */
 export const STOP_REQUESTED = 'arrêt demandé (--stop-after-current)';
 

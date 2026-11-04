@@ -2091,9 +2091,10 @@ lots:
     started: 2026-11-04
   - id: L577
     title: "Tests instables sous charge stabilisés : 20 rouges dans la suite, verts rejoués seuls, sur les vagues du 01 au 04-11 (orchestrate-creneaux-libres-l527-probe ×6, porte-deportee ×3, deliver ×3, verify ×2, orchestrate-worktree-plan-writes ×2, orchestrate-app ×2, probe-L539-bords, orchestrate-worktree-integration) : pour chacun, la cause (attente à durée fixe, verrou, horloge, port) et un correctif qui attend l'événement au lieu d'un délai ; mesure avant/après par les lignes « instable(s) sous charge » des journaux"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-04
+    started: 2026-11-04
   - id: L578
     title: "perf.prices accepte tout nom de modèle (issue #36) : mêmes noms que escalation.model et @<modèle> (fable compris), une étape est chiffrée par le modèle que son journal enregistre ; une étape d'un modèle sans prix est comptée à part et nommée, jamais silencieusement hors coût ; perf.currency optionnel (défaut sans symbole imposé) au lieu d'un « € » fixe pour une grille saisie en dollars"
     status: todo

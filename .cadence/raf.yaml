@@ -2230,6 +2230,11 @@ lots:
     estimate: 0.25
     visible: true
     created: 2026-11-04
+  - id: L593
+    title: "Incident « commit sur la branche principale d'un autre dépôt » : un commit qui ne touche que les fichiers du plan (plan.path, plan.files du cadence.yaml de ce dépôt) n'est pas un incident, comme un commit de plan du lead dans le dépôt du lot — 04-11, vague 1310-cad : L589 rendu en pleine implémentation pour 3 commits « plan: add Q-MIG2..4 » du lead dans maritime-atlas (raf.py commite lui-même), dépôt que L589 ne touche pas"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-04
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

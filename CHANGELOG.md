@@ -141,6 +141,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- The four tests L577 left unstable under load (L579, [docs/mesures/instables-sous-charge-2026-11-04.md](docs/mesures/instables-sous-charge-2026-11-04.md)): the two tests bounded by their own work no longer carry a 180 s timeout — `probe-L539-bords` plays one wave per test (six tests) and `mise-en-service` one `tsc` per test (three tests), each under the default timeout; the `porte-deportee` R17 test no longer relies on `sleep 1` to make two fills overlap (each install signals its arrival and waits for the other's); the `verify` and `verify-gate` signal tests count a zombie as a dead process instead of waiting for its parent to reap it. The program's code does not change.
 - Tests unstable under load (L577, [docs/mesures/instables-sous-charge-2026-11-04.md](docs/mesures/instables-sous-charge-2026-11-04.md)): four tests that slept at the wall now wait for the event — `deliver` (f) waits until the tracker has adopted the descendant; the empty-lock test of `orchestrate-app` runs on a simulated clock (the lock's age is no longer the real time elapsed under load); the remaining-delay test applies its clock jump when the probe obtains the lock, not 100 ms at the wall; the two R16 tests of `orchestrate-worktree-plan-writes` wait for L2 to reach its UX step (or `ready`) instead of 4.5 s and 800 ms. The program's code does not change. The measure document gives, for each of the 12 tests seen unstable from 01 to 04-11, its cause and its state.
 
 ### Added

@@ -81,13 +81,17 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- `cadence corrections --classify` no longer reports « 53/53 », exit 0 and an empty `{}` when Ollama is not reachable (L575, issue #35, [docs/corrections.md](docs/corrections.md)): it prints at once `Ollama injoignable sur <OLLAMA_HOST> : rien n'est classé`, exits 1 and writes nothing. When the model answers only in part, a line gives the count of passes left unclassified and the reasons (`classement : 2 passes non classées sur 3 (réponse HTTP 500 ×2)`); the classified ones are kept, the exit code stays 0. `corrections.json` is only written when a pass entered it (a missing file is still created empty when there is nothing to classify).
+- A config key set before its service install no longer breaks the repository (L504, [docs/orchestrate.md](docs/orchestrate.md)): on 31-10 L497 turned on `orchestrate.probe` in cadence's own `cadence.yaml` while the installed copy refused it, so every cadence command on the repository failed and L480's integration died on the way. The wave's gate (after a writing session and at the rebased tip) now reads the `cadence.yaml` a lot modified with the installed copy's loaders; a key or value it refuses goes to correction (`cadence.yaml refusé par la copie en service de cadence`, the key is set in a lot that follows `npm run service`). A `cadence.yaml` the lot did not touch is not its fault. `--resume --integrate` (and `--replay`) now refuses (exit 2) a lot whose repository `cadence.yaml` is unreadable before writing anything, and `--integrate` takes back a lot that an earlier resume left `suspended` at the integration step in a finished wave.
 
 ### Changed
 
 - A delivery's commit in a neighbouring repository is no longer a false incident (L503, [docs/orchestrate.md](docs/orchestrate.md)): the tag bump that `deploy.sh` commits in the GitOps repository during `cadence deliver --sha` of a ready lot of the wave cites that lot, and used to hand the lot being written back (31-10: warhammer L221 delivered while L220 played). A commit that cites only ready lots found in `deliveries.log` is tolerated and the journal says so; one that also cites the lot in progress or an undelivered lot of the wave still hands it back.
+
+### Fixed
+
+- `cadence corrections --classify` no longer reports « 53/53 », exit 0 and an empty `{}` when Ollama is not reachable (L575, issue #35, [docs/corrections.md](docs/corrections.md)): it prints at once `Ollama injoignable sur <OLLAMA_HOST> : rien n'est classé`, exits 1 and writes nothing. When the model answers only in part, a line gives the count of passes left unclassified and the reasons (`classement : 2 passes non classées sur 3 (réponse HTTP 500 ×2)`); the classified ones are kept, the exit code stays 0. `corrections.json` is only written when a pass entered it (a missing file is still created empty when there is nothing to classify).
 
 ## [1.49.0] - 2026-11-04
 
@@ -98,7 +102,6 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - The plugin refuses a gate, test, push or delivery command piped into `tail`/`head`/`grep` without `pipefail` or `PIPESTATUS` (L502, [docs/lead.md](docs/lead.md)): `hooks/hooks.json` runs `cadence claude-hook pipe` before every Bash command; the refusal says what to write (`set -o pipefail; …`, `${PIPESTATUS[0]}`, or a redirect to a file). It also reads `|&`, groups, `time`/`env`/`npx -y`/`pnpm exec`, a pipe split over two lines, a filter with a path, `npm run test:*`, and counts only a `set -o pipefail` actually played before the gate.
 - Spec step, a sheet with both `ecran.maquette` and `ecran.maquette_ecran` (L573, issue #34, [docs/spec.md](docs/spec.md)): a field or a state drawn in the `maquette_ecran` page but missing from the mockup index no longer fails three passes — before the check, the program adds the `<p data-testid="<id>">` entry and the `<section id="etat-<état>">` to the index, copies the `maquette-<état>-<largeur>.png` captures held beside the page, and commits them with the `plan.commit` template (a refused commit puts the index and the captures back, nothing is left modified or staged); what the page does not draw stays a finding (« présent dans maquette_ecran, absent de l'index » when only the index misses it), and the spec brief names the index file and the exact entry shape.
 
-- A config key set before its service install no longer breaks the repository (L504, [docs/orchestrate.md](docs/orchestrate.md)): on 31-10 L497 turned on `orchestrate.probe` in cadence's own `cadence.yaml` while the installed copy refused it, so every cadence command on the repository failed and L480's integration died on the way. The wave's gate (after a writing session and at the rebased tip) now reads the `cadence.yaml` a lot modified with the installed copy's loaders; a key or value it refuses goes to correction (`cadence.yaml refusé par la copie en service de cadence`, the key is set in a lot that follows `npm run service`). A `cadence.yaml` the lot did not touch is not its fault. `--resume --integrate` (and `--replay`) now refuses (exit 2) a lot whose repository `cadence.yaml` is unreadable before writing anything, and `--integrate` takes back a lot that an earlier resume left `suspended` at the integration step in a finished wave.
 
 ### Changed
 

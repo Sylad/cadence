@@ -1897,7 +1897,7 @@ lots:
     finished: 2026-11-03
   - id: L562
     title: "Boucle de revue maquette qui ne converge pas (issue #30) : dès la revue 2, un majeur sur un point inchangé et absent de la revue précédente ne compte plus pour la non-conformité (il va au tableau en suite pour le lead) ; la revue 1 balaie les tailles de la fiche ; un lot rendu avec seulement de tels constats le dit dans son verdict"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-11-03
@@ -1912,6 +1912,7 @@ lots:
       - { date: 2026-11-04, text: "Hypothèses (fiche revue-maquette-suite-inchange) — R5 : Le brief maquette.md et le mode maquette de l'agent ux-reviewer exigent, dès la revue 1, de balayer les tailles que la fiche donne (tailles de texte, cibles, l… ; si faux : Si « tailles de la fiche » visait un autre objet (par exemple le poids de la fiche), seul le texte du brief et de l'agent change (aucune donnée)" }
       - { date: 2026-11-04, text: "Hypothèses (fiche revue-maquette-suite-inchange) — R6 : Le brief d'une revue de rang 2 ou plus dit qu'un majeur marqué inchange: true ne bloque pas et va au lead ; le brief de la revue 1 ne parle pas de ce marquage… ; si faux : Si le brief devait rester muet, l'agent marquerait sans savoir l'effet ; seul le texte change (aucune donnée, schéma inchangé hors description)" }
     review: { date: 2026-11-04, verdict: "conforme : les correctifs de la passe tiennent (fc64f08 : le brief des revues 2+ ne dit plus « first review », un test le vérifie et pouvait échouer ; docs/orchestrate.md est cohérent, avec « previous bullet » et l'exception L562 aux totaux) ; 1 mineur reste en note, la clé de déduplication [suite ux] avec la ligne, à trancher par le lead — orchestré (vague 2026-11-04-0900-cad, 1 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que le contexte du CHANGELOG, conflit bien résolu, aucun constat", commit: 9abad7d256583df100ad1e1388e246189d16bd16 }
+    finished: 2026-11-04
   - id: L563
     title: "--add (ou --replay) d'un lot rendu par la vague vivante après un correctif du lead dans son worktree conservé : reprendre le worktree et repartir à l'étape que choisirait la reprise (correction avec les derniers constats, ou la revue), au lieu de « lot déjà dans la vague » (issue #31 : un lot corrigé est resté une heure à l'arrêt avec des créneaux libres)"
     status: doing

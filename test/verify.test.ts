@@ -7,7 +7,7 @@ import { run } from '../src/cli.js';
 import { parseDeliverConfig, TIMED_OUT, type CheckDeps } from '../src/deliver.js';
 import { sharedStateDir, appendDelivery } from '../src/state.js';
 import { realCheckDeps, replayChecks, resultLine, summaryLine, verifyCommand } from '../src/verify.js';
-import { commit, gitRepo, tempDir } from './helpers.js';
+import { commit, gitRepo, isRunning, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
 
@@ -373,14 +373,7 @@ describe('cadence session start : effets', () => {
 });
 
 describe('realCheckDeps.exec : vérifications en groupe détaché (verify, session start)', () => {
-  const alive = (pid: number) => {
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch {
-      return false;
-    }
-  };
+  const alive = isRunning;
   const until = async (ok: () => boolean, ms: number) => {
     for (let t = 0; t < ms && !ok(); t += 50) await new Promise((r) => setTimeout(r, 50));
     return ok();

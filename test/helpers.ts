@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { addDays, toDay } from '../src/dates.js';
+import { readStat } from '../src/proc.js';
 import { assertInside, removeTree } from './tmp-hygiene.js';
 
 const created: string[] = [];
@@ -102,4 +103,17 @@ export function testPackage(): string {
 export function readJsonLines<T = any>(path: string): T[] {
   const text = readFileSync(path, 'utf8');
   return text.slice(0, text.lastIndexOf('\n') + 1).split('\n').filter(Boolean).map((l) => JSON.parse(l) as T);
+}
+
+/**
+ * Le processus tourne-t-il encore ? Un zombie (mort, pas encore recueilli par son parent) répond à `kill(pid, 0)` : le prendre pour vivant
+ * fait attendre le recueil par un parent lent (sous charge, ou orphelin d'un parent qui vient de mourir), pas la mort du processus.
+ */
+export function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+  } catch {
+    return false;
+  }
+  return readStat('/proc', pid)?.state !== 'Z';
 }

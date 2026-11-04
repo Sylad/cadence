@@ -9,7 +9,7 @@ import { copyDeps } from '../src/orchestrate/worktree.js';
 import { verifyGate } from '../src/verify-gate.js';
 import { REPO_LOCK } from '../src/orchestrate/lock.js';
 import { sharedStateDir } from '../src/state.js';
-import { cleanupTempDirs, gitRepo, tempDir } from './helpers.js';
+import { cleanupTempDirs, gitRepo, isRunning, tempDir } from './helpers.js';
 
 afterEach(cleanupTempDirs);
 
@@ -231,14 +231,7 @@ describe('verifyGate : délai, noms des suites, signal (L348)', () => {
       while (!ok() && Date.now() - t0 < ms) await new Promise((r) => setTimeout(r, 50));
       return ok();
     };
-    const alive = (pid: number) => {
-      try {
-        process.kill(pid, 0);
-        return true;
-      } catch {
-        return false;
-      }
-    };
+    const alive = isRunning;
     let cmdPid = 0;
     try {
       const pidFile = () => (inPlace ? [join(repo, 'pid.txt')] : readdirSync(tmpdir()).map((n) => join(tmpdir(), n, 'pid.txt')).filter((f) => f.includes('cadence-verify-'))).find((f) => existsSync(f));

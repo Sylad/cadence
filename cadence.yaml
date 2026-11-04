@@ -33,6 +33,8 @@ migrate:
   keep:
     - src/**
     - scripts/mise-en-service.mjs
+    - scripts/qualite.mjs                       # L586 : le plan d'un lot de config se cherche aussi à l'ancien emplacement
+    - docs/qualite.md
     - templates/**
     - agents/**
     - skills/**

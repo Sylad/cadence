@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- Remote gate (L507, [docs/remote-gate.md](docs/remote-gate.md) « Timeout, Ctrl-C, signals »): Ctrl-C or SIGTERM on a wave or on `verify --gate`, including during the host probe and `gate.install`, now kills the local ssh in progress before the host cleanup, so a cleanup that fails no longer leaves it running.
+
 ## [1.52.0] - 2026-11-04
 
 ### Fixed
@@ -94,10 +98,6 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Changed
 
 - `perf.prices` takes any model name and `perf.currency` names the money (GitHub issue #36, L578, [docs/perf.md](docs/perf.md), [docs/orchestrate.md](docs/orchestrate.md)): the grid is no longer closed to `sonnet`, `opus` and `haiku`, it takes the names `orchestrate.escalation.model` and `@<model>` take (`fable` included), and a step is priced by the model its journal records. A step on a model with no price is still counted apart and now named everywhere: the orchestrate table total reads `(n/d pour N lots, modèle sans prix : fable)` and `cadence perf` keeps its warning. The grid is no longer in euros by definition: with `perf.currency` (`€`, `$`, `USD`…) every amount is followed by it, and the cost column takes its name; without it no symbol is printed (`4,80` where it used to read `4,80 €`, column `coût`), so declare `currency: "€"` to keep the old output. The warning without a grid now reads `coût n/d`, not `coût en euros n/d`.
-
-### Fixed
-
-- Remote gate (L507, [docs/remote-gate.md](docs/remote-gate.md) « Timeout, Ctrl-C, signals »): Ctrl-C or SIGTERM on a wave or on `verify --gate`, including during the host probe and `gate.install`, now kills the local ssh in progress before the host cleanup, so a cleanup that fails no longer leaves it running.
 
 ## [1.51.0] - 2026-11-04
 

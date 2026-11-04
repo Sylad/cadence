@@ -481,17 +481,17 @@ plan:
     extra: { source: retour }              # constant keys added to every written line (e.g. `sha: null`)
 ```
 
-`plan.journal` is read by `raf import --to-config` only (which already refuses a `cadence.yaml` without a plan of another format); a missing `types`, an unknown key or an unknown type is refused by name.
+`plan.journal` is read by `raf import --to-config` only (which already refuses a `cadence.yaml` without a plan of another format); a missing `types`, an unknown key, an unknown type, a `path` that is not a path, or an `extra` constant named like a base key (`at`, `task`, `type`, `message`, and `sha` when declared — it would overwrite it on every line) is refused by name.
 
 The journal is append-only: `--to-config` keeps every existing line byte for byte and appends, after them, the facts of the raf-format plan the journal does not hold yet — never twice, so playing the command again adds nothing (`journal.ndjson : aucun événement à ajouter`):
 
 - `created` / `started` — a lot with a `created:` / `started:` day and no event of that type for it (message = the title / empty; dated at midnight UTC of that day);
 - `note` — each dated note whose text the journal does not hold for that lot (dated at its day);
-- `closed` — a `dropped` lot with no such event (dated now);
+- `closed` — a `dropped` lot with no such event (dated at its `finished:` day, now when it has none);
 - `delivered` — a lot with `delivered: { date, sha }` and no such event (with `keys.sha` declared, none carrying that sha), the sha under the declared key;
-- `state` — a lot whose state changed since the plan file being replaced (`--out`, `--force`): message = the new state, dated now. It needs that previous file; a lot that is new there, or a `dropped` one when `closed` is declared, gets no `state` event.
+- `state` — a lot whose state changed since the plan file being replaced (`--out`, `--force`): message = the new state, dated now, unless the journal's last `state` event for that lot already says it (a state that comes back is written again). It needs that previous file; a lot that is new there, or a `dropped` one when `closed` is declared, gets no `state` event.
 
-Sub-tasks added in raf's format (`tasks:`) carry no date and write no event. The journal is read before anything is written: a line that is not JSON, or has no task or type, is refused with its number (`journal.ndjson : ligne 3 illisible`), and neither the plan nor the journal is written. `--dry-run` counts the events (`N événements à ajouter — rien n'est écrit`) and writes nothing; a missing journal is created with its folders. Without `plan.journal` the command leaves the journal as it is and says so (`journal.ndjson inchangé : plan.journal n'est pas déclaré`). `--from-config` never touches the journal.
+Sub-tasks added in raf's format (`tasks:`) carry no date and write no event. The journal is read before anything is written: a line that is not JSON, or has no task or type, is refused with its number (`journal.ndjson : ligne 3 illisible`), and neither the plan nor the journal is written. `--dry-run` counts the events (`N événements à ajouter — rien n'est écrit`) and writes nothing; a missing journal is created with its folders. The journal is the project's, not the plan's: it is appended to whatever `--out` is, so a scratch `--out` run without `--dry-run` writes the real journal (the facts it holds are then never written twice). Without `plan.journal` the command leaves the journal as it is and says so (`journal.ndjson inchangé : plan.journal n'est pas déclaré`). `--from-config` never touches the journal.
 
 Not covered: a commit message that cites a flat sub-lot id with a slash (`AB-1/t1-fusion`), which still reads as a precision on `AB-1` (see `plan.idPattern`).
 

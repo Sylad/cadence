@@ -94,7 +94,7 @@ describe('L582 — raf import --to-config réécrit le journal', () => {
     expect(added).toContainEqual({ at: '2026-11-02T00:00:00+00:00', task: 'AB-1', type: 'demarre', message: '', source: 'retour' });
     expect(added).toContainEqual({ at: '2026-11-02T00:00:00+00:00', task: 'AB-1', type: 'note', message: 'première note', source: 'retour' });
     expect(added).toContainEqual({ at: '2026-11-04T00:00:00+00:00', task: 'AB-2', type: 'note', message: 'dit côté natif', source: 'retour' });
-    expect(added).toContainEqual({ at: '2026-11-04T09:00:00+00:00', task: 'AB-2', type: 'ferme', message: '', source: 'retour' });
+    expect(added).toContainEqual({ at: '2026-11-04T00:00:00+00:00', task: 'AB-2', type: 'ferme', message: '', source: 'retour' });
     expect(added.find((e) => e.type === 'cree' && e.message === 'Lot neuf')).toMatchObject({ at: '2026-11-04T00:00:00+00:00', source: 'retour' });
     expect(added.some((e) => e.type === 'cree' && e.task === 'AB-1')).toBe(false);
     expect(r.out).toMatch(/journal\.ndjson : \d+ événements? ajoutés?/);
@@ -171,5 +171,94 @@ describe('L582 — raf import --to-config réécrit le journal', () => {
     expect(delivered).toEqual([{ at: '2026-11-03T00:00:00+00:00', task: 'AB-1', type: 'livre', message: '', source: 'retour', sha: 'abc1234' }]);
     expect(raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', '--force', ...origin).code).toBe(0);
     expect(events(dir).filter((e) => e.type === 'livre')).toHaveLength(1);
+  });
+});
+
+describe('L582 — le journal, les noms déclarés et les règles de dédoublonnage', () => {
+  it('R10 — la fermeture d\'un lot abandonné prend sa date propre (finished) ; sans date, l\'heure de now', () => {
+    const dir = project();
+    const origin = switched(dir);
+    const plan = join(dir, '.cadence/raf.yaml');
+    writeFileSync(plan, readFileSync(plan, 'utf8').replace('    status: todo\n', '    status: dropped\n    finished: 2026-09-09\n'));
+    expect(raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...origin).code).toBe(0);
+    expect(events(dir).find((e) => e.type === 'ferme')).toMatchObject({ task: 'AB-2', at: '2026-09-09T00:00:00+00:00' });
+    const bare = project();
+    const originBare = switched(bare);
+    const planBare = join(bare, '.cadence/raf.yaml');
+    writeFileSync(planBare, readFileSync(planBare, 'utf8').replace('    status: todo\n', '    status: dropped\n'));
+    expect(raf(bare, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...originBare).code).toBe(0);
+    expect(events(bare).find((e) => e.type === 'ferme')).toMatchObject({ task: 'AB-2', at: '2026-11-04T09:00:00+00:00' });
+  });
+  it('R11 — un changement d\'état n\'est écrit qu\'une fois au journal, même relu contre un autre plan (--out différent)', () => {
+    const dir = project();
+    const origin = switched(dir);
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    writeFileSync(join(dir, 'tmp-apercu.yaml'), readFileSync(join(dir, 'docs/plan/taches.yaml'), 'utf8'));
+    expect(raf(dir, 'start', 'AB-2').code).toBe(0);
+    expect(raf(dir, 'import', '--to-config', '--out', 'tmp-apercu.yaml', '--force', ...origin).code).toBe(0);
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    expect(events(dir).filter((e) => e.type === 'etat' && e.task === 'AB-2')).toHaveLength(1);
+  });
+  it('R12 — plan.journal.keys : chaque donnée se lit, s\'écrit et se dédoublonne sous le nom déclaré, différent du défaut', () => {
+    const cfg = CONFIG.replace('    extra:', '    keys: { at: quand, task: lot, type: genre, message: texte, sha: commit }\n    extra:');
+    const seed = `${JSON.stringify({ quand: '2026-11-01T00:00:00+00:00', lot: 'AB-1', genre: 'cree', texte: 'Premier lot' })}\n`;
+    const dir = project(cfg, seed);
+    const origin = switched(dir, cfg);
+    const plan = join(dir, '.cadence/raf.yaml');
+    writeFileSync(plan, readFileSync(plan, 'utf8').replace('    status: doing\n', '    status: done\n    delivered: { date: 2026-11-03, sha: abc1234 }\n'));
+    expect(raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...origin).code).toBe(0);
+    const added = events(dir).slice(1);
+    expect(added).toContainEqual({ quand: '2026-11-03T00:00:00+00:00', lot: 'AB-1', genre: 'livre', texte: '', source: 'retour', commit: 'abc1234' });
+    expect(added.every((e) => e.at === undefined && e.task === undefined && e.type === undefined)).toBe(true);
+    expect(added.some((e) => e.genre === 'cree' && e.lot === 'AB-1')).toBe(false);
+    const once = readFileSync(join(dir, 'docs/plan/journal.ndjson'), 'utf8');
+    expect(raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', '--force', ...origin).code).toBe(0);
+    expect(readFileSync(join(dir, 'docs/plan/journal.ndjson'), 'utf8')).toBe(once);
+  });
+  it('R13 — un plan.journal invalide est refusé en le nommant : clé de keys inconnue, path qui n\'est pas un chemin, constante d\'extra qui porte le nom d\'une clé de base', () => {
+    for (const [bad, what] of [
+      ['    types: { created: cree }\n    keys: { lot: x }\n', /journal\.keys\.lot/],
+      ['    types: { created: cree }\n    path: 3\n', /journal\.path/],
+      ['    types: { created: cree }\n    extra: { task: PIRATE }\n', /journal\.extra\.task/],
+      ['    types: { created: cree }\n    keys: { task: lot }\n    extra: { lot: PIRATE }\n', /journal\.extra\.lot/],
+    ] as const) {
+      const dir = project(`${BASE}  journal:\n${bad}`);
+      expect(raf(dir, 'import', '--from-config', '--out', '.cadence/raf.yaml').code).toBe(0);
+      const r = raf(dir, 'import', '--to-config', '--force');
+      expect(r.code).toBe(2);
+      expect(r.err).toMatch(what);
+      expect(readFileSync(join(dir, 'docs/plan/journal.ndjson'), 'utf8')).toBe(SEED);
+    }
+  });
+  it('R14 — un lot abandonné écrit « ferme » et pas « état » ; un second sha livre de nouveau ; sans keys.sha, une livraison par lot seulement', () => {
+    const dir = project();
+    const origin = switched(dir);
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    expect(raf(dir, 'drop', 'AB-2').code).toBe(0);
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    expect(events(dir).filter((e) => e.task === 'AB-2' && e.type === 'ferme')).toHaveLength(1);
+    expect(events(dir).filter((e) => e.task === 'AB-2' && e.type === 'etat')).toHaveLength(0);
+
+    const keyed = CONFIG.replace('    extra:', '    keys: { sha: sha }\n    extra:');
+    const seen = `${SEED}${JSON.stringify({ at: '2026-11-02T00:00:00+00:00', task: 'AB-1', type: 'livre', message: '', sha: 'aaa1111' })}\n`;
+    const two = project(keyed, seen);
+    const originTwo = switched(two, keyed);
+    const planTwo = join(two, '.cadence/raf.yaml');
+    writeFileSync(planTwo, readFileSync(planTwo, 'utf8').replace('    status: doing\n', '    status: done\n    delivered: { date: 2026-11-03, sha: bbb2222 }\n'));
+    expect(raf(two, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...originTwo).code).toBe(0);
+    expect(events(two).filter((e) => e.type === 'livre').map((e) => e.sha)).toEqual(['aaa1111', 'bbb2222']);
+
+    const plain = project(CONFIG, `${SEED}${JSON.stringify({ at: '2026-11-02T00:00:00+00:00', task: 'AB-1', type: 'livre', message: '' })}\n`);
+    const originPlain = switched(plain);
+    const planPlain = join(plain, '.cadence/raf.yaml');
+    writeFileSync(planPlain, readFileSync(planPlain, 'utf8').replace('    status: doing\n', '    status: done\n    delivered: { date: 2026-11-03, sha: ccc3333 }\n'));
+    expect(raf(plain, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...originPlain).code).toBe(0);
+    expect(events(plain).filter((e) => e.type === 'livre')).toHaveLength(1);
+    const fresh = project(CONFIG);
+    const originFresh = switched(fresh);
+    const planFresh = join(fresh, '.cadence/raf.yaml');
+    writeFileSync(planFresh, readFileSync(planFresh, 'utf8').replace('    status: doing\n', '    status: done\n    delivered: { date: 2026-11-03, sha: ddd4444 }\n'));
+    expect(raf(fresh, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...originFresh).code).toBe(0);
+    expect(events(fresh).find((e) => e.type === 'livre')).toEqual({ at: '2026-11-03T00:00:00+00:00', task: 'AB-1', type: 'livre', message: '', source: 'retour' });
   });
 });

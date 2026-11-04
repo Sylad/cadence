@@ -20,7 +20,7 @@ export interface JournalFormat {
   keys: Partial<Record<KeyName, string>>;
   /** Fait du natif → type d'événement de l'autre outil. */
   types: Partial<Record<JournalKind, string>>;
-  /** Clés constantes ajoutées à chaque ligne écrite (`source`, `sha: null`…), après les quatre clés de base. */
+  /** Clés constantes ajoutées à chaque ligne écrite (`source`, `sha: null`…), après les quatre clés de base ; aucune ne porte le nom d'une clé de base (refusé à la lecture). */
   extra: Entry;
 }
 
@@ -45,6 +45,12 @@ export function readJournalConfig(file: string): JournalFormat | undefined {
   return readJournalFormat(raw, bad);
 }
 
+/** Une constante d'`extra` qui porte le nom d'une clé de base l'écraserait sur chaque ligne (et `known` ne retrouverait plus le lot). */
+function refuseBaseKeys(extra: Entry, keys: JournalFormat['keys'], bad: (what: string) => RafError): void {
+  const base = KEY_NAMES.filter((k) => k !== 'sha' || keys.sha !== undefined).map((k) => keys[k] ?? k);
+  for (const k of Object.keys(extra)) if (base.includes(k)) throw bad(`journal.extra.${k} est déjà une clé de base du journal (${base.join(', ')}) : une constante ne la remplace pas`);
+}
+
 function readJournalFormat(raw: unknown, bad: (what: string) => RafError): JournalFormat {
   if (!isObject(raw)) throw bad('journal doit être un objet');
   for (const k of Object.keys(raw)) if (!['path', 'keys', 'types', 'extra'].includes(k)) throw bad(`journal.${k} inconnu (attendu : path, keys, types, extra)`);
@@ -52,7 +58,10 @@ function readJournalFormat(raw: unknown, bad: (what: string) => RafError): Journ
   if (raw.extra != null && !isObject(raw.extra)) throw bad('journal.extra doit être un objet (clé → valeur constante)');
   const types = names(raw.types ?? {}, JOURNAL_KINDS, 'types', bad);
   if (Object.keys(types).length === 0) throw bad(`journal.types est requis : fait du plan → type d'événement (${JOURNAL_KINDS.join(', ')})`);
-  return { path: typeof raw.path === 'string' ? raw.path : 'journal.ndjson', keys: names(raw.keys ?? {}, KEY_NAMES, 'keys', bad), types, extra: (raw.extra ?? {}) as Entry };
+  const keys = names(raw.keys ?? {}, KEY_NAMES, 'keys', bad);
+  const extra = (raw.extra ?? {}) as Entry;
+  refuseBaseKeys(extra, keys, bad);
+  return { path: typeof raw.path === 'string' ? raw.path : 'journal.ndjson', keys, types, extra };
 }
 
 const keyOf = (j: JournalFormat, name: KeyName): string => j.keys[name] ?? name;
@@ -102,6 +111,13 @@ function known(n: Ctx, kind: JournalKind, task: string, sha?: string): boolean {
   return n.existing.some((e) => e[keyOf(j, 'task')] === task && e[keyOf(j, 'type')] === j.types[kind] && (sha === undefined || j.keys.sha === undefined || e[keyOf(j, 'sha')] === sha));
 }
 
+/** Le dernier événement « état » du lot au journal dit-il déjà cet état ? Un état revenu (teste → todo → teste) s'écrit de nouveau ; deux lectures du même plan, jamais deux fois. */
+function stateKnown(n: Ctx, task: string, state: string): boolean {
+  const j = n.journal;
+  const last = n.existing.filter((e) => e[keyOf(j, 'task')] === task && e[keyOf(j, 'type')] === j.types.state).at(-1);
+  return last !== undefined && last[keyOf(j, 'message')] === state;
+}
+
 /** Les notes datées du lot que le journal n'a pas (même texte pour ce lot, quel que soit le jour). */
 function noteEvents(n: Ctx, lot: Entry, task: string): Entry[] {
   const out: Entry[] = [];
@@ -113,22 +129,22 @@ function noteEvents(n: Ctx, lot: Entry, task: string): Entry[] {
   return out;
 }
 
-/** Fermeture d'un lot abandonné, livraison, changement d'état : les faits sans date propre (sauf la livraison) prennent l'heure de `now`. */
+/** Fermeture d'un lot abandonné (datée de son `finished`, sinon `now`), livraison, changement d'état (sans date propre : `now`). */
 function endEvents(n: Ctx, lot: Entry, task: string): Entry[] {
   // Un lot abandonné se ferme (si le format a ce type), il ne « change pas d'état » en plus.
   const closes = lot.status === 'dropped' && n.journal.types.closed !== undefined;
   const d = lot.delivered as { date: Day; sha: string } | undefined;
   const [was, is] = [n.states.before.get(task), n.states.after.get(task)];
   return [
-    ...(closes && !known(n, 'closed', task) ? event(n, 'closed', task, { at: atNow(n.now), message: '' }) : []),
+    ...(closes && !known(n, 'closed', task) ? event(n, 'closed', task, { at: lot.finished ? atDay(lot.finished as Day) : atNow(n.now), message: '' }) : []),
     ...(d && !known(n, 'delivered', task, d.sha) ? event(n, 'delivered', task, { at: atDay(d.date), message: '', sha: d.sha }) : []),
-    ...(!closes && was !== undefined && is !== undefined && was !== is ? event(n, 'state', task, { at: atNow(n.now), message: is }) : []),
+    ...(!closes && was !== undefined && is !== undefined && was !== is && !stateKnown(n, task, is) ? event(n, 'state', task, { at: atNow(n.now), message: is }) : []),
   ];
 }
 
 /**
  * Les événements que le journal n'a pas et que le plan natif dit : création, démarrage, notes, fermeture d'un lot abandonné, livraison (une ligne par fait, jamais deux fois)
- * et, pour un lot déjà dans `states.before` (le plan d'origine qu'on remplace), un changement d'état. Les sous-tâches (`tasks:`) n'ont ni date ni livraison : sans événement. Les faits datés prennent leur jour (minuit UTC) ; ceux sans date (état, fermeture) l'heure de `now`.
+ * et, pour un lot déjà dans `states.before` (le plan d'origine qu'on remplace), un changement d'état. Les sous-tâches (`tasks:`) n'ont ni date ni livraison : sans événement. Les faits datés prennent leur jour (minuit UTC) ; la fermeture d'un lot abandonné son `finished` ; ceux sans date (état, fermeture sans `finished`) l'heure de `now`.
  */
 export function missingEvents(native: Entry[], existing: Entry[], journal: JournalFormat, states: Ctx['states'], now: Date): Entry[] {
   const [taskKey, typeKey, messageKey] = [keyOf(journal, 'task'), keyOf(journal, 'type'), keyOf(journal, 'message')];

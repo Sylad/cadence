@@ -51,12 +51,11 @@ function target(c: Ctx, path: string, readFrom: string, label: string): string {
   return path;
 }
 
-/** Le plan natif tel qu'on le relirait (le fichier écrit, ou son texte sous --dry-run), comparé à l'original : lu pareil par raf, et rejoué dans l'autre sens. */
-function verifyWritten(raw: Entry[], written: { text: string; out: string; dryRun: boolean }, format: PlanFormat, renames: Renames): void {
-  const { text, out, dryRun } = written;
-  const reread = (parseDocument(dryRun ? text : readFileSync(out, 'utf8')).toJSON() as { lots: Entry[] }).lots;
+/** Le plan natif relu depuis son texte, comparé à l'original : lu pareil par raf (raf check n'y verrait rien que l'original n'ait), et rejoué dans l'autre sens. `what` nomme le texte relu dans le refus. */
+function verifyText(raw: Entry[], text: string, what: { refusal: string; subject: string }, format: PlanFormat, renames: Renames): void {
+  const reread = (parseDocument(text).toJSON() as { lots: Entry[] }).lots;
   const diffs = [...readingDiff(raw, reread, format), ...roundTripDiff(raw, foreignEntries(reread, format, renames), format)];
-  if (diffs.length > 0) throw new RafError(`vérification échouée : le plan natif ${dryRun ? 'qu\'on écrirait' : `écrit (${out})`} ne dit pas la même chose que l'original\n${shown(diffs)}`);
+  if (diffs.length > 0) throw new RafError(`${what.refusal} : le plan natif ${what.subject} ne dit pas la même chose que l'original\n${shown(diffs)}`);
 }
 
 function importFrom(c: Ctx, format: PlanFormat, renames: Renames): number {
@@ -69,12 +68,14 @@ function importFrom(c: Ctx, format: PlanFormat, renames: Renames): number {
   const doc = parseDocument(initialContent(planConfig?.settings.project ?? basename(root), 'L', planConfig?.settings.since ?? today));
   doc.set('lots', doc.createNode(entries));
   const text = doc.toString({ lineWidth: 0 });
+  // Toujours avant d'écrire : un natif que raf relirait autrement (ou avec un problème) n'est jamais écrit, --verify ou pas.
+  verifyText(raw, text, { refusal: 'import refusé', subject: 'qu\'on écrirait' }, format, renames);
   const dryRun = !!values['dry-run'];
   if (!dryRun) {
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, text);
+    if (values.verify) verifyText(raw, readFileSync(out, 'utf8'), { refusal: 'vérification échouée', subject: `écrit (${out})` }, format, renames);
   }
-  if (values.verify || dryRun) verifyWritten(raw, { text, out, dryRun }, format, renames);
   io.out(dryRun ? `${entries.length} lots vérifiés, sans perte — rien n'est écrit (--dry-run)` : `${entries.length} lots importés → ${out}${values.verify ? ' — relu et rejoué dans l\'autre sens : sans perte' : ' (--verify relit le fichier écrit et rejoue l\'écriture inverse)'}`);
   if (entries.some((e) => !/^L\d+$/.test(String(e.id)))) io.out('ids libres : déclarer plan.idPattern dans le cadence.yaml du plan natif pour que raf reconnaisse ces identifiants dans les messages de commit');
   return 0;

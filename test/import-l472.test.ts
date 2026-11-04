@@ -357,7 +357,16 @@ describe('L472 — bords de l\'import', () => {
     // Le lecteur replie aussi le sous-lot à plat d'origine (AB-1/t1-fusion) : la sous-tâche native est à côté de lui.
     expect(read.tasks).toContainEqual({ id: 't1', title: 'Sous-tâche native', status: 'todo' });
   });
-});
+  it('R39 — sans --verify, un plan natif que raf ne relirait pas pareil (spec mappé sur un chemin) est refusé avant toute écriture ; avec --verify aussi, rien n\'est écrit', () => {
+    const config = CONFIG.replace('    last: [dernier]\n', '    last: [dernier]\n    spec: [fiche]\n');
+    const dir = project(SOURCE.replace('    theme: infra\n', '    theme: infra\n    fiche: docs/x.md\n'), config);
+    const r = raf(dir, 'import', '--from-config', '--out', 'tmp/natif.yaml');
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/AB-1 : spec/);
+    expect(existsSync(join(dir, 'tmp/natif.yaml'))).toBe(false);
+    expect(raf(dir, 'import', '--from-config', '--verify', '--out', 'tmp/natif.yaml').code).toBe(2);
+    expect(existsSync(join(dir, 'tmp/natif.yaml'))).toBe(false);
+  });
 });
 
 describe('L472 — la comparaison de --verify voit une perte', () => {

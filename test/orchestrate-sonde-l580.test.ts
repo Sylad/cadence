@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { claudeOut, commitFile, git, harness, probeReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
@@ -55,5 +55,56 @@ describe("la sonde ne commite ni fichier rouge ni fichier hors porte (L580, issu
 
   it("R4 — la documentation de l'étape décrit « horsRegle »", () => {
     expect(readFileSync(join(root, 'docs/orchestrate.md'), 'utf8')).toContain('horsRegle');
+  });
+});
+
+describe("un fichier de sonde non commité ne reste pas dans le dépôt (L580, issue #37, correction)", () => {
+  const leaves = (file: string, over: Record<string, unknown> = {}): Handler => (call) => {
+    writeFileSync(join(call.opts.cwd, file), "it('hors règle', () => {});\n");
+    return claudeOut(probeReport(over));
+  };
+
+  it("R5 — le brief demande d'effacer le fichier qu'il ne commite pas, l'arbre de travail ne garde que les fichiers commités", () => {
+    const text = brief();
+    expect(text).toMatch(/otherwise do not commit it: delete it/i);
+    expect(text).toMatch(/not committed, red or skipped, and (its file is )?deleted/i);
+  });
+
+  it("R6 — une sonde qui répond et laisse un fichier NON SUIVI : le fichier est retiré, un warning le nomme, la revue part", async () => {
+    const h = harness({ script: { implement: [impl('a.ts')], probe: [leaves('hors.spec.ts')], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
+    expect(c.lot.status).toBe('ready');
+    expect(existsSync(join(h.repo, 'hors.spec.ts'))).toBe(false);
+    expect(git(h.repo, 'status', '--porcelain')).toBe('');
+    expect(c.lot.warnings).toContain('sonde de cas limites : fichiers non commités laissés par la session retirés (hors.spec.ts)');
+  });
+
+  it("R6 — le fichier non suivi laissé avec des attentes horsRegle : les warnings et la sous-tâche proposée sont gardés", async () => {
+    const h = harness({ script: { implement: [impl('a.ts')], probe: [leaves('hors.spec.ts', { horsRegle: ['hors.spec.ts — nom vide — refus'] })], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
+    expect(c.lot.warnings).toContain('sonde de cas limites : attente hors règle du lot, non commitée (à reprendre en constat de revue ou en sous-tâche) : hors.spec.ts — nom vide — refus');
+    expect(c.lot.proposals).toEqual(['[hors règle] hors.spec.ts — nom vide — refus']);
+  });
+
+  it("R6 — un fichier SUIVI modifié et non commité rend toujours le lot « dépôt sale après probe », et ses horsRegle sont quand même rendues au lead", async () => {
+    const dirty: Handler = (call) => {
+      writeFileSync(join(call.opts.cwd, 'a.ts'), '// modifié par la sonde, non commité\n');
+      return claudeOut(probeReport({ horsRegle: ['a — e — attendu'] }));
+    };
+    const h = harness({ script: { implement: [impl('a.ts')], probe: [dirty], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('dépôt sale après probe : a.ts');
+    expect(c.lot.proposals).toEqual(['[hors règle] a — e — attendu']);
+  });
+
+  it("R6 — la documentation de l'étape décrit le retrait du fichier non suivi laissé par la sonde", () => {
+    expect(readFileSync(join(root, 'docs/orchestrate.md'), 'utf8')).toContain('fichiers non commités laissés par la session retirés');
   });
 });

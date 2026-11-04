@@ -74,6 +74,10 @@ export interface ProbeIo<D extends ProbeDone> {
   sealed(head: string | undefined): string[];
   /** Fichiers laissés sales par la session. */
   dirt(done: D): string[];
+  /** Les fichiers NON SUIVIS que la session a laissés dans le dépôt du lot (apparus pendant la session, jamais commités). */
+  left(done: D): string[];
+  /** Retire ces fichiers de l'arbre de travail. */
+  remove(files: string[]): void;
   /** La porte du programme (build puis tests) : ajoute les rouges nouveaux à `red` et chaque contrôle à `runs`. */
   gate(red: Constat[], runs: CheckRun[]): Promise<void>;
   /** La passe de correction ordinaire, avec ces constats. */
@@ -94,7 +98,7 @@ export function horsRegleWarnings(rep: Pick<ProbeReport, 'horsRegle'> | undefine
   return list.filter((e): e is string => typeof e === 'string' && e.trim() !== '').map((e) => `${PROBE_FINDING}attente hors règle du lot, non commitée (à reprendre en constat de revue ou en sous-tâche) : ${e.trim()}`);
 }
 
-/** Les attentes hors règle, dites au lot : un warning (tableau du lead) et une sous-tâche proposée `[hors règle] …` (rendue au lead, sans doublon), comme la dette `[instable]` (L522). */
+/** Les attentes hors règle, dites au lot : un warning (tableau du lead) et une sous-tâche proposée `[hors règle] …` (rendue au lead, sans doublon), comme la dette `[instable]` (L522). Notées avant les contrôles qui rendent le lot : un rendu ne les perd pas. */
 function noteHorsRegle(l: LotState, rep: Pick<ProbeReport, 'horsRegle'> | undefined): void {
   l.warnings.push(...horsRegleWarnings(rep));
   for (const e of Array.isArray(rep?.horsRegle) ? (rep.horsRegle as unknown[]) : []) {
@@ -154,7 +158,6 @@ export async function probeStep<D extends ProbeDone>(io: ProbeIo<D>): Promise<vo
   const step = l.steps[l.steps.length - 1]!;
   const rep = done === PROBE_FAILED ? cutSession(io, step) : readSession(io, done, step);
   if (rep === 'rendu') return;
-  noteHorsRegle(l, rep);
   // La porte du programme après la sonde comme après toute écriture, mais seulement si elle a commité : sans nouveau commit il n'y a rien de neuf à rejouer.
   const red: Constat[] = [];
   const runs: CheckRun[] = [];
@@ -180,9 +183,20 @@ function cutSession<D extends ProbeDone>(io: ProbeIo<D>, step: StepState): undef
   return handedBack(io, [], step.headBefore) ? 'rendu' : undefined;
 }
 
-/** Le rapport d'une session qui a répondu : questions notées, verrou et dépôt contrôlés. `'rendu'` quand le lot est rendu. */
+/**
+ * Le rapport d'une session qui a répondu : questions notées, attentes hors règle rendues au lead (même si le lot est rendu ensuite), verrou et dépôt contrôlés. `'rendu'` quand le lot est rendu.
+ * Un fichier NON SUIVI laissé par la sonde (un test qu'elle n'a pas commité, par la règle « pas commité » du brief) n'est pas un dépôt sale : il est retiré et un warning le nomme, comme après une sonde coupée (session.ts).
+ * Un fichier suivi modifié reste un dépôt sale : la sonde ne touche pas au code ni aux tests existants.
+ */
 function readSession<D extends ProbeDone>(io: ProbeIo<D>, done: D, step: StepState): ProbeReport | undefined | 'rendu' {
   const rep = readReport(io.lot, done.report);
   for (const q of io.take(step, rep ?? { questions: [] })) io.lot.warnings.push(`sonde de cas limites : question sans réponse (la sonde ne bloque pas le lot) : « ${q.trim()} »`);
-  return handedBack(io, io.dirt(done), step.headBefore) ? 'rendu' : rep;
+  noteHorsRegle(io.lot, rep);
+  const left = io.left(done);
+  if (left.length) {
+    io.remove(left);
+    io.lot.warnings.push(`sonde de cas limites : fichiers non commités laissés par la session retirés (${left.join(', ')})`);
+  }
+  const dirt = io.dirt(done).filter((f) => !left.includes(f));
+  return handedBack(io, dirt, step.headBefore) ? 'rendu' : rep;
 }

@@ -10,7 +10,7 @@ import { longDuration } from './guard.js';
 import { keptLines } from './worktree.js';
 import { lotFinished, lotKey, RunStore, type LotState } from './state.js';
 import { namesLot } from './ajout.js';
-import { launchPrices, renderDetail, renderTable, resumeCommand } from './table.js';
+import { launchCost, renderDetail, renderTable, resumeCommand } from './table.js';
 import { waveReadsAnswerQueue, waveReadsControl } from './snapshot.js';
 import { preflight } from './preflight.js';
 import { dryRun } from './dry-run.js';
@@ -101,7 +101,7 @@ function statusView(args: Args, launch: string, cap: number, now: Date): { live:
     const u = unpublishedAt(d);
     return u ? [`${dirs.length > 1 ? `${basename(d)} · ` : ''}${unpublishedLine(u)}`] : [];
   });
-  return { live, table: [...renderTable(store.readWave()!, lots, { compact: true, prices: launchPrices(launch, (w) => live.push(`⚠ ${w}`)) }), ...keptLines(lots.map((l) => l.repo), now.getTime()), ...pending], running };
+  return { live, table: [...renderTable(store.readWave()!, lots, { compact: true, ...launchCost(launch, (w) => live.push(`⚠ ${w}`)) }), ...keptLines(lots.map((l) => l.repo), now.getTime()), ...pending], running };
 }
 
 /** La vague que `--status` suit (L395) : `--status <id>` ou `--status --wave <id>` ; aucune : la dernière du dossier. Deux ids différents : refus. */

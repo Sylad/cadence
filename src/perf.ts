@@ -1,5 +1,6 @@
 import { join, relative, sep } from 'node:path';
-import { planLoader, type PriceGrid } from './config.js';
+import { planLoader } from './config.js';
+import type { PriceGrid } from './perf-config.js';
 import { euros, stepEuros } from './cost.js';
 import { bugCodeOf, CAUSES, isReview as isReviewKind, sousCausesRanked, type BugCode, type Cause, type Classification, type Journal, type JournalPass, type JournalStep, type SousClassification } from './corrections.js';
 import { addDays, diffDays, isDay, toDay, type Day } from './dates.js';
@@ -111,12 +112,14 @@ export interface DelaysBlock {
 }
 
 export interface CostBlock {
-  /** Médiane du coût en euros des lots livrés de la fenêtre, étapes de tous leurs journaux ; `lots` = lots calculés. */
+  /** Médiane du coût des lots livrés de la fenêtre, étapes de tous leurs journaux ; `lots` = lots calculés. */
   perDelivered: Indicator;
   /** Modèle sans prix dans la grille (ou « inconnu ») → nombre de lots livrés écartés du coût, les deux fenêtres ensemble. */
   withoutPrice: Record<string, number>;
   /** Lots livrés sans aucun journal, écartés du coût. */
   withoutJournal: { current: number; previous: number };
+  /** Monnaie déclarée sous `perf.currency` (L578) ; absente, les montants s'impriment sans symbole. */
+  currency?: string;
 }
 
 /** Les livraisons rouges d'une fenêtre ventilées (L282) ; `inconnue` : une ligne sans classe écrite dont le libellé n'est pas reconnu (L331). */
@@ -215,6 +218,8 @@ interface PerfInput {
   failures?: Map<string, FailedDelivery[]>;
   /** La grille de prix de cadence.yaml ; absente : coût n/d (R7). */
   prices?: PriceGrid | null;
+  /** Monnaie de la grille (L578) ; absente, aucun symbole derrière un montant. */
+  currency?: string;
   windows: Windows;
   today: Day;
   since?: string;
@@ -592,7 +597,7 @@ export function computePerf(input: PerfInput): PerfResult {
   const cost: CostBlock = {
     perDelivered: mk({ current: median(costs.current.euros), previous: median(costs.previous.euros) }, { current: costs.current.euros.length, previous: costs.previous.euros.length }, 'up', twinFirstTime, prices ? planNote : 'aucune grille de prix'),
     withoutPrice,
-    withoutJournal: { current: costs.current.withoutJournal, previous: costs.previous.withoutJournal },
+    withoutJournal: { current: costs.current.withoutJournal, previous: costs.previous.withoutJournal }, currency: input.currency,
   };
 
   // Qualité de livraison (L227) : livraisons rouges (l'échantillon est celui des livraisons, vertes + rouges) et notes QA bloquantes
@@ -624,7 +629,7 @@ export function computePerf(input: PerfInput): PerfResult {
   };
   const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, precheck, escalations: both(windows, (w) => escalationCounts(rendered(w))), instables: both(windows, (w) => instableCounts(rendered(w))), tokens, lotMinutes, delays, durations, cost, quality, orphans, warnings: [] };
   const bottleneck = bottleneckOf(causes.current);
-  for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind)} → ${decisionOf(key, ind, result)}`);
+  for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind, result.cost.currency)} → ${decisionOf(key, ind, result)}`);
   if (bottleneck) result.warnings.push(bottleneck);
   return result;
 }
@@ -745,20 +750,20 @@ function indicatorLines(r: PerfResult): [Line, Indicator][] {
 
 const num = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1).replace('.', ','));
 const pct = (v: number) => `${Math.round(100 * v)} %`;
-function value(v: number | null, kind: Kind): string {
+function value(v: number | null, kind: Kind, currency?: string): string {
   if (v === null) return 'n/d';
   if (kind === 'share') return pct(v);
   if (kind === 'tokens') return `${num(v / 1000)} k`;
   if (kind === 'days') return `${num(v)} j`;
   if (kind === 'min') return `${num(v)} min`;
-  if (kind === 'eur') return euros(v);
+  if (kind === 'eur') return euros(v, currency);
   return num(v);
 }
 const signed = (c: number) => `${c >= 0 ? '+' : '−'}${Math.round(100 * Math.abs(c))} %`;
 
 /** « courante (précédente prev, variation) » d'un indicateur. */
-function describe(ind: Indicator, kind: Kind): string {
-  return `${value(ind.current, kind)} (précédente ${value(ind.previous, kind)}${ind.change === null ? '' : `, ${signed(ind.change)}`})`;
+function describe(ind: Indicator, kind: Kind, currency?: string): string {
+  return `${value(ind.current, kind, currency)} (précédente ${value(ind.previous, kind, currency)}${ind.change === null ? '' : `, ${signed(ind.change)}`})`;
 }
 
 /**
@@ -795,7 +800,7 @@ export function perfHeader(r: PerfResult): string[] {
   for (const [line, ind] of lines) {
     if (!ind.warn) continue;
     const twin = ind.twin ? byPath.get(ind.twin) : undefined;
-    header.push(`⚠ ${line.label} : ${describe(ind, line.kind)}${twin ? ` · ${twin[0].label} : ${describe(twin[1], twin[0].kind)}` : ''} → ${decisionOf(line, ind, r)}`);
+    header.push(`⚠ ${line.label} : ${describe(ind, line.kind, r.cost.currency)}${twin ? ` · ${twin[0].label} : ${describe(twin[1], twin[0].kind, r.cost.currency)}` : ''} → ${decisionOf(line, ind, r)}`);
   }
   header.push(...r.warnings.filter((w) => w.startsWith('⚠ goulot')));
   return header;
@@ -844,9 +849,9 @@ export function renderPerf(r: PerfResult): string[] {
   const row = ([line, ind]: [Line, Indicator]): string => {
     const twin = ind.twin ? byPath.get(ind.twin)! : null;
     const extra = quality.get(line.label);
-    const parts = [`${ind.warn || extra?.[1].warn ? '⚠' : ' '} ${line.label} : ${describe(ind, line.kind)}`];
-    if (twin) parts.push(`${twin[0].label} : ${describe(twin[1], twin[0].kind)}${twin[1].note && twin[1].current === null ? ` — ${twin[1].note}` : ''}`);
-    if (extra) parts.push(`${extra[0].label} : ${describe(extra[1], extra[0].kind)}${extra[1].note ? ` — ${extra[1].note}` : ''}`);
+    const parts = [`${ind.warn || extra?.[1].warn ? '⚠' : ' '} ${line.label} : ${describe(ind, line.kind, r.cost.currency)}`];
+    if (twin) parts.push(`${twin[0].label} : ${describe(twin[1], twin[0].kind, r.cost.currency)}${twin[1].note && twin[1].current === null ? ` — ${twin[1].note}` : ''}`);
+    if (extra) parts.push(`${extra[0].label} : ${describe(extra[1], extra[0].kind, r.cost.currency)}${extra[1].note ? ` — ${extra[1].note}` : ''}`);
     if (ind.note) parts.push(ind.note);
     if (ind.warn) parts.push(`→ ${decisionOf(line, ind, r)}`);
     if (extra?.[1].warn) parts.push(`→ ${DECISIONS[extra[0].decision]}`);

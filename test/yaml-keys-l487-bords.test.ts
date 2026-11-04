@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { readHookConfig, readMigrateConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readReferencesConfig, readSessionConfig, readVerifyConfig, readDocsConfig, readPlanConfig } from '../src/config.js';
+import { readHookConfig, readMigrateConfig, readNewsConfig, readOrchestrateConfig, readReferencesConfig, readSessionConfig, readVerifyConfig, readDocsConfig, readPlanConfig } from '../src/config.js';
+import { readPerfConfig } from '../src/perf-config.js';
 import { findLeadDir, readDepth } from '../src/lead.js';
 import { readPriority } from '../src/orchestrate/continue.js';
 import { readResources } from '../src/resources.js';

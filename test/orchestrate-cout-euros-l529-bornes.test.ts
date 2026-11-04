@@ -5,7 +5,7 @@ import { estimateLines, costView, launchPrices } from '../src/orchestrate/cout.j
 import { euros, stepEuros, sumEuros, waveEuros } from '../src/cost.js';
 import { renderTable } from '../src/orchestrate/table.js';
 import { newLot, type LotState, type StepState, type WaveState } from '../src/orchestrate/state.js';
-import type { PriceGrid } from '../src/config.js';
+import type { PriceGrid } from '../src/perf-config.js';
 import { tempDir } from './helpers.js';
 
 const GRID: PriceGrid = { sonnet: { input: 3, output: 15, cacheRead: 0.3 }, opus: { input: 15, output: 75, cacheRead: 1.5 } };
@@ -21,14 +21,14 @@ const st = (model: string, tokens?: unknown) => ({ n: 1, kind: 'implement', mode
 const full = (input: number, output = 0) => ({ input, cacheWrite: 0, cacheRead: 0, output, counted: input + output });
 
 describe('L529 bornes — estimation et coût', () => {
-  it('zéro lot : l\'estimation donne 0,00 € pour la vague, le tableau ne casse pas', () => {
+  it('zéro lot : l\'estimation donne 0,00 pour la vague, le tableau ne casse pas', () => {
     const lines = estimateLines([], tempDir(), () => {});
     // sans grille: vide ; avec grille: une ligne vague à 0
     const dir = tempDir();
     writeFileSync(join(dir, 'cadence.yaml'), 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n');
     expect(lines).toEqual([]);
-    expect(estimateLines([], dir, () => {})).toEqual([expect.stringContaining('estimation de la vague : 0,00 €')]);
-    expect(renderTable(wave, [], { prices: GRID }).join('\n')).toContain('0,00 €');
+    expect(estimateLines([], dir, () => {})).toEqual([expect.stringContaining('estimation de la vague : 0,00')]);
+    expect(renderTable(wave, [], { prices: GRID }).join('\n')).toContain('0,00');
   });
 
   it('deux lots sans prix : « n/d pour 2 lots » au pluriel', () => {
@@ -41,6 +41,36 @@ describe('L529 bornes — estimation et coût', () => {
     expect(costView([l], GRID).cells[0]).toEqual(['n/d']);
   });
 
+  it('L578 — un lot fable chiffré au prix fable de la grille ; sans ce prix, n/d et le modèle est nommé au tableau et à l\'estimation', () => {
+    const fable = { ...GRID, fable: { input: 5, output: 25, cacheRead: 0.5 } };
+    const l = mk('L1', 'fable', [st('fable', full(1e6))]);
+    expect(costView([l], fable).cells[0]).toEqual(['5,00']);
+    const unpriced = costView([l, mk('L2', 'sonnet', [st('sonnet', full(1e6)), st('gpt', full(1))])], GRID);
+    expect(unpriced.cells.map((c) => c[0])).toEqual(['n/d', 'n/d']);
+    expect(unpriced.total).toContain('n/d pour 2 lots, modèle sans prix : fable, gpt');
+    const dir = tempDir();
+    writeFileSync(join(dir, 'cadence.yaml'), 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n');
+    const txt = estimateLines([mk('L1', 'fable', [], 1e6)], dir, () => {}).join('\n');
+    expect(txt).toContain('n/d (fable sans prix dans perf.prices)');
+    expect(txt).toContain('modèle sans prix : fable');
+  });
+
+  it('L578 — perf.currency : colonne, cellules, total et estimation portent la monnaie ; sans elle, en-tête « coût » et aucun symbole', () => {
+    const l = mk('L1', 'sonnet', [st('sonnet', full(1e6))]);
+    const usd = costView([l], GRID, '$');
+    expect(usd.head).toEqual(['$']);
+    expect(usd.cells[0]).toEqual(['3,00 $']);
+    expect(usd.total).toBe(' — 3,00 $');
+    expect(costView([l], GRID).head).toEqual(['coût']);
+    expect(euros(3, 'USD')).toBe('3,00 USD');
+    const dir = tempDir();
+    writeFileSync(join(dir, 'cadence.yaml'), 'perf:\n  currency: $\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n');
+    const txt = estimateLines([mk('L1', 'sonnet', [], 1e6)], dir, () => {}).join('\n');
+    expect(txt).toMatch(/estimation du lot : 4,20 \$ /);
+    expect(txt).toContain('estimation de la vague : 4,20 $');
+    expect(launchPrices(dir, () => {})).toEqual({ sonnet: { input: 3, output: 15, cacheRead: 0.3 } });
+  });
+
   it('estimation d\'un lot sans budget (absent) : pas de NaN ni d\'undefined', () => {
     const dir = tempDir();
     writeFileSync(join(dir, 'cadence.yaml'), 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n');
@@ -48,17 +78,19 @@ describe('L529 bornes — estimation et coût', () => {
     expect(txt).not.toMatch(/NaN|undefined|Infinity/);
   });
 
-  it('estimation d\'un lot local : 0,00 €, pas « sans prix »', () => {
+  it('estimation d\'un lot local : 0,00, pas « sans prix »', () => {
     const dir = tempDir();
     writeFileSync(join(dir, 'cadence.yaml'), 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n');
     const txt = estimateLines([mk('L1', 'local', [], 500000)], dir, () => {}).join('\n');
-    expect(txt).toContain('0,00 €');
+    expect(txt).toContain('0,00');
     expect(txt).not.toContain('sans prix');
   });
 
-  it('modèle inconnu (ni sonnet, opus, haiku) : n/d, pas d\'exception', () => {
-    expect(stepEuros({ model: 'gpt' as never, counted: 10 }, GRID)).toEqual({ missing: 'inconnu' });
-    expect(sumEuros([{ model: 'gpt' as never, counted: 10 }], GRID)).toBeNull();
+  it('modèle absent de la grille : n/d nommé, pas d\'exception ; modèle illisible : « inconnu »', () => {
+    expect(stepEuros({ model: 'gpt', counted: 10 }, GRID)).toEqual({ missing: 'gpt' });
+    expect(sumEuros([{ model: 'gpt', counted: 10 }], GRID)).toBeNull();
+    expect(stepEuros({ model: undefined as never, counted: 10 }, GRID)).toEqual({ missing: 'inconnu' });
+    expect(stepEuros({ model: '' as never, counted: 10 }, GRID)).toEqual({ missing: 'inconnu' });
   });
 
   it('étape dont les jetons sont incomplets (cacheWrite absent, état ancien) : pas de NaN au tableau', () => {
@@ -70,26 +102,26 @@ describe('L529 bornes — estimation et coût', () => {
   it('jetons stockés en chaînes (état corrompu) : pas de concaténation absurde', () => {
     const l = mk('L1', 'sonnet', [st('sonnet', { input: '1000000', cacheWrite: '0', cacheRead: 0, output: 0, counted: 1e6 })]);
     const out = costView([l], GRID).cells[0]![0]!;
-    expect(out).toBe('3,00 €');
+    expect(out).toBe('3,00');
   });
 
-  it('une grille à prix nuls : 0,00 € et non n/d', () => {
+  it('une grille à prix nuls : 0,00 et non n/d', () => {
     const z: PriceGrid = { sonnet: { input: 0, output: 0, cacheRead: 0 } };
-    expect(costView([mk('L1', 'sonnet', [st('sonnet', full(1e6))])], z).cells[0]).toEqual(['0,00 €']);
+    expect(costView([mk('L1', 'sonnet', [st('sonnet', full(1e6))])], z).cells[0]).toEqual(['0,00']);
   });
 
   it('euros : arrondi et signe zéro', () => {
-    expect(euros(0)).toBe('0,00 €');
-    expect(euros(1234.5)).toBe('1234,50 €');
-    expect(euros(-0)).toBe('0,00 €');
+    expect(euros(0)).toBe('0,00');
+    expect(euros(1234.5)).toBe('1234,50');
+    expect(euros(-0)).toBe('0,00');
   });
 
   it('waveEuros : liste vide', () => {
     expect(waveEuros([])).toEqual({ total: 0, unknown: 0 });
   });
 
-  it('la colonne € est alignée avec un montant plus large que son en-tête', () => {
-    const out = renderTable(wave, [mk('L1', 'sonnet', [st('sonnet', full(5e9))]), mk('L2', 'sonnet', [st('sonnet', full(1e6))])], { prices: GRID, lotCommits: () => [], isAncestor: () => false });
+  it('la colonne de coût (monnaie « € ») est alignée avec un montant plus large que son en-tête', () => {
+    const out = renderTable(wave, [mk('L1', 'sonnet', [st('sonnet', full(5e9))]), mk('L2', 'sonnet', [st('sonnet', full(1e6))])], { prices: GRID, lotCommits: () => [], isAncestor: () => false, currency: '€' });
     const col = out[0]!.indexOf('€');
     expect(col).toBeGreaterThan(0);
     // chaque ligne de lot a son montant se terminant avant la colonne « suites »

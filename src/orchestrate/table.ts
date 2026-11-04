@@ -1,8 +1,9 @@
 import { lotWork } from '../audit.js';
-import { planLoader, type PriceGrid } from '../config.js';
+import { planLoader } from '../config.js';
+import type { PriceGrid } from '../perf-config.js';
 import { costView } from './cout.js';
 
-export { estimateLines, launchPrices } from './cout.js';
+export { estimateLines, launchCost, launchPrices } from './cout.js';
 export { resumeCommand } from './geste.js';
 import { gitRoot, isAncestor } from '../git.js';
 import { repoWork } from '../repos.js';
@@ -267,8 +268,8 @@ function perLotLines(lots: LotState[], out: string[], deps: { touchedSince?: Tou
 }
 
 /** Le tableau de fin de vague (ou de `--status`), une ligne par lot puis le total et les questions. `compact` (L441, `--status`) : sans le détail des lots, une seule ligne renvoie à `--status --detail`. */
-export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[]; /** Fichier modifié par un commit du lot après la revue (L422) ; par défaut git, sur `lotCommits`. */ touchedSince?: TouchedSince; now?: number; compact?: boolean; /** Grille `perf.prices` (L529) : sans elle, ni colonne ni total en euros. */ prices?: PriceGrid | null } = {}): string[] {
-  const cost = costView(lots, deps.prices);
+export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncestor?: (repo: string, a: string, b: string) => boolean; lotCommits?: (l: LotState) => string[]; /** Fichier modifié par un commit du lot après la revue (L422) ; par défaut git, sur `lotCommits`. */ touchedSince?: TouchedSince; now?: number; compact?: boolean; /** Grille `perf.prices` (L529) : sans elle, ni colonne ni total en euros. */ prices?: PriceGrid | null; /** Monnaie de la grille (L578) : absente, aucun symbole derrière les montants. */ currency?: string } = {}): string[] {
+  const cost = costView(lots, deps.prices, deps.currency);
   // L554 : une colonne « geste » (LE geste suivant exact d'un lot rendu) quand au moins un lot en a un.
   const geste = gestureColumn(wave, lots);
   const rows = lots.map((l, i) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`, ...cost.cells[i]!, String(l.suiteRuns ?? '—'), ...geste.cells[i]!]);

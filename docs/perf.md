@@ -57,9 +57,9 @@ quality twin (the share of lots right the first time) on the same line. A rise i
 | delay created → done | median of `finished − created` (calendar days) of the plan lots `done` with `finished` in the window and both dates readable | is the queue growing? |
 | delay done → delivery | median of the days between `finished` and the first line of the repository's `deliveries.log` on or after it (`<git common dir>/cadence/`, one repository per project, worktrees included; read without creating anything); `n/d` for a project that is not a git repository, has no log or no later line | deliver in smaller batches? |
 | wall time per step kind | median of `ended − started` in minutes of the `ok` steps with both bounds readable, ranked in the window by the local day of `ended`; one line per kind seen | which step is slow? timeouts, effort or model |
-| cost per delivered lot | median in euros of the sum, over every step of every journal of the lot (all waves), of the step cost; lots `done` in the window with at least one journal | is the model chosen for each step right? |
+| cost per delivered lot | median of the sum, over every step of every journal of the lot (all waves), of the step cost; lots `done` in the window with at least one journal | is the model chosen for each step right? |
 
-**Price grid.** Declared in the `cadence.yaml` of the folder, euros per million tokens, the three prices mandatory for a declared model:
+**Price grid.** Declared in the `cadence.yaml` of the folder, per million tokens, in the money of your choice, the three prices mandatory for a declared model. The key is any model name, the ones `orchestrate.escalation.model` and `@<model>` take (`sonnet`, `fable`, a full identifier…), and a step is priced by the model its journal records, by exact name:
 
 ```yaml
 perf:
@@ -67,9 +67,13 @@ perf:
     sonnet: { input: 3, output: 15, cacheRead: 0.3 }
     opus: { input: 15, output: 75, cacheRead: 1.5 }
     haiku: { input: 1, output: 5, cacheRead: 0.1 }
+    fable: { input: 5, output: 25, cacheRead: 0.5 }
+  currency: "€"   # optional
 ```
 
-An unknown key (under `perf`, under a model, or a model other than `sonnet`, `opus`, `haiku`), a negative or non-numeric price, or an unreadable file refuses the command before any journal is read (`raf: …`, exit 1, no output).
+`perf.currency` (optional, a non-empty text such as `€`, `$` or `USD`) is written after every amount (`4,50 €`, and in the JSON as `cost.currency`); without it no symbol is imposed and the amounts print bare (`4,50`), the cost column of the orchestrate table being named `coût`. A grid entered in dollars is thus no longer shown as euros.
+
+An unknown key (under `perf` other than `prices` and `currency`, or under a model), an empty or non-text `currency`, a negative or non-numeric price, or an unreadable file refuses the command before any journal is read (`raf: …`, exit 1, no output).
 Without `perf.prices` (absent or empty) the cost is `n/d` and a warning says where to declare it; the other indicators are served.
 
 The same grid prices the waves (L529, [orchestrate](orchestrate.md#cost-in-euros-before-and-after-a-wave-l529)): `orchestrate --dry-run` announces an estimate in euros per lot and for the wave, the final table and `--status` print the real cost.
@@ -77,7 +81,7 @@ The same grid prices the waves (L529, [orchestrate](orchestrate.md#cost-in-euros
 **Cost of a step** = (`input` + `cacheWrite`) × input price + `output` × output price + `cacheRead` × cacheRead price, per million tokens, at the price of the step's own model. Assumptions written in the sheet (`docs/specs/perf-tokens-delais-cout/fiche.yaml`, R8):
 cache writes are billed at the input price (the grid has no write price, so the cost is slightly underestimated if they are billed more); a step that only carries `counted` (an old journal) is split 90 % input, 10 % output, no cache read;
 a step without any readable token costs 0 € (the lot stays in the population); a `local` step costs 0 € whatever its counters (outside quota and budget) and needs no price.
-A lot with a step of a model that has no price in the grid (or no readable `model`, named `inconnu`) is left out of the cost and a warning on the error output names the model and the number of lots; delivered lots without any journal are counted aside (`N lot(s) livré(s) sans journal`). No `⚠` on a cost that is `n/d`.
+A lot with a step of a model that has no price in the grid (or no readable `model`, named `inconnu`) is never priced without it: it is left out of the cost, counted apart, and a warning on the error output names the model and the number of lots; delivered lots without any journal are counted aside (`N lot(s) livré(s) sans journal`). No `⚠` on a cost that is `n/d`.
 
 **Usual wall time of a lot** (L414). `--json` only: `lotMinutes` is the median wall time of a rendered lot, in minutes (start of its first step to end of its last, journals without a readable start or end left out), per size class under the same keys as `tokens.byEstimate` (`0.5`, `1`, `0.5+spec`…), in the Indicator format, with `warn` always false and `twin` null (a duration has no direction of its own and no quality twin). It is printed in no line and raises no `⚠`: the lots panel of the HUD (`/hud lots`, `docs/cadence-hud.md`) reads it as « the usual time of a lot of this size » and compares it with the elapsed time of each lot in progress.
 

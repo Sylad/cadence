@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { orchestrate, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { renderTable } from '../src/orchestrate/table.js';
 import { RunStore, newLot, type LotState, type StepState, type WaveState } from '../src/orchestrate/state.js';
-import type { PriceGrid } from '../src/config.js';
+import type { PriceGrid } from '../src/perf-config.js';
 import { Plan } from '../src/plan.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { git } from './orchestrate-harness.js';
@@ -25,19 +25,19 @@ const tableOf = (lots: LotState[], prices?: PriceGrid | null) => renderTable(wav
 
 describe('L529 — coût réel en euros au tableau de fin de vague et de --status', () => {
   it('R1 — une colonne € donne le coût de chaque lot (entrée + écriture × prix d\'entrée, sortie, lecture de cache) au prix du modèle de chaque étape', () => {
-    // sonnet : (1 M + 0) × 3 + 0,1 M × 15 + 1 M × 0,3 = 4,80 € ; opus : 0,2 M × 15 = 3,00 €
+    // sonnet : (1 M + 0) × 3 + 0,1 M × 15 + 1 M × 0,3 = 4,80 ; opus : 0,2 M × 15 = 3,00
     const l1 = lot('L1', [step('sonnet', { input: 1e6, cacheWrite: 0, cacheRead: 1e6, output: 1e5 })]);
     const l2 = lot('L2', [step('opus', { input: 2e5, cacheWrite: 0, cacheRead: 0, output: 0 })]);
     const out = tableOf([l1, l2], GRID);
-    expect(out[0]).toMatch(/\s€\s|\s€$/);
-    expect(out.find((x) => x.startsWith('demo:L1'))).toContain('4,80 €');
-    expect(out.find((x) => x.startsWith('demo:L2'))).toContain('3,00 €');
+    expect(out[0]).toMatch(/\scoût\s/);
+    expect(out.find((x) => x.startsWith('demo:L1'))).toContain('4,80');
+    expect(out.find((x) => x.startsWith('demo:L2'))).toContain('3,00');
   });
 
   it('R2 — la ligne de la vague donne le total en euros, somme des lots', () => {
     const l1 = lot('L1', [step('sonnet', { input: 1e6, cacheWrite: 0, cacheRead: 1e6, output: 1e5 })]);
     const l2 = lot('L2', [step('opus', { input: 2e5, cacheWrite: 0, cacheRead: 0, output: 0 })]);
-    expect(tableOf([l1, l2], GRID).find((x) => x.startsWith('vague w1'))).toContain('7,80 €');
+    expect(tableOf([l1, l2], GRID).find((x) => x.startsWith('vague w1'))).toContain('7,80');
   });
 
   it('R3 — sans grille de prix : ni colonne ni total, le tableau est celui d\'avant', () => {
@@ -49,12 +49,12 @@ describe('L529 — coût réel en euros au tableau de fin de vague et de --statu
   });
 
   it('R4 — un modèle sans prix dans la grille donne « n/d » pour son lot, et le total le dit sans l\'additionner', () => {
-    const l1 = lot('L1', [step('sonnet', { input: 1e6, cacheWrite: 0, cacheRead: 0, output: 0 })]); // 3,00 €
+    const l1 = lot('L1', [step('sonnet', { input: 1e6, cacheWrite: 0, cacheRead: 0, output: 0 })]); // 3,00
     const l2 = lot('L2', [step('haiku', { input: 1e6, cacheWrite: 0, cacheRead: 0, output: 0 })]); // haiku absent de la grille
     const out = tableOf([l1, l2], GRID);
     expect(out.find((x) => x.startsWith('demo:L2'))).toContain('n/d');
     const total = out.find((x) => x.startsWith('vague w1'))!;
-    expect(total).toContain('3,00 €');
+    expect(total).toContain('3,00');
     expect(total).toMatch(/n\/d pour 1 lot/);
   });
 
@@ -62,14 +62,14 @@ describe('L529 — coût réel en euros au tableau de fin de vague et de --statu
     const l1 = lot('L1', [step('local', { input: 5e6, cacheWrite: 0, cacheRead: 0, output: 5e6 })]);
     const l2 = lot('L2', []);
     const out = tableOf([l1, l2], GRID);
-    expect(out.find((x) => x.startsWith('demo:L1'))).toContain('0,00 €');
-    expect(out.find((x) => x.startsWith('demo:L2'))).toContain('0,00 €');
-    expect(out.find((x) => x.startsWith('vague w1'))).toContain('0,00 €');
+    expect(out.find((x) => x.startsWith('demo:L1'))).toContain('0,00');
+    expect(out.find((x) => x.startsWith('demo:L2'))).toContain('0,00');
+    expect(out.find((x) => x.startsWith('vague w1'))).toContain('0,00');
   });
 
   it('R5 bis — un lot qui n\'a pas encore de jetons (étape en cours) ne casse pas la somme', () => {
     const l1 = lot('L1', [step('sonnet')]);
-    expect(tableOf([l1], GRID).find((x) => x.startsWith('vague w1'))).toContain('0,00 €');
+    expect(tableOf([l1], GRID).find((x) => x.startsWith('vague w1'))).toContain('0,00');
   });
 });
 
@@ -107,11 +107,11 @@ describe('L529 — estimation en euros du --dry-run', () => {
   it('R6 — --dry-run annonce, à côté du budget du lot, son estimation en euros, et le total de la vague', async () => {
     const r = await dry(world(PRICED), ['a:L1', 'a:L2', '--dry-run']);
     try {
-      // L1 : 750 000 comptés × (0,9 × 3 + 0,1 × 15) / 1 M = 3,15 € ; L2 : 600 000 → 2,52 € ; total 5,67 €
+      // L1 : 750 000 comptés × (0,9 × 3 + 0,1 × 15) / 1 M = 3,15 ; L2 : 600 000 → 2,52 ; total 5,67
       expect(r.text).toContain('budget du lot : 750000 tokens comptés');
-      expect(r.text).toMatch(/estimation du lot : 3,15 €/);
-      expect(r.text).toMatch(/estimation du lot : 2,52 €/);
-      expect(r.text).toMatch(/estimation de la vague : 5,67 €/);
+      expect(r.text).toMatch(/estimation du lot : 3,15/);
+      expect(r.text).toMatch(/estimation du lot : 2,52/);
+      expect(r.text).toMatch(/estimation de la vague : 5,67/);
     } finally {
       removeDryRunBriefs(r.text);
     }
@@ -159,8 +159,8 @@ describe('L529 — --status', () => {
     process.env.CADENCE_HOME = tempDir();
     await orchestrate(['--status'], i, {} as never);
     const text = out.join('\n');
-    expect(text).toContain('3,00 €');
-    expect(text.split('\n').find((x) => x.startsWith('vague w1'))).toContain('3,00 €');
+    expect(text).toContain('3,00');
+    expect(text.split('\n').find((x) => x.startsWith('vague w1'))).toContain('3,00');
   });
 
   it('R11 — une grille mal formée n\'interdit pas --status : un ⚠ et le tableau sans euros', async () => {
@@ -174,7 +174,7 @@ describe('L529 — --status', () => {
     process.env.CADENCE_HOME = tempDir();
     await orchestrate(['--status'], i, {} as never);
     const text = out.join('\n');
-    expect(text).toMatch(/⚠ coût en euros n\/d : .*perf\.prices/);
+    expect(text).toMatch(/⚠ coût n\/d : .*perf\.prices/);
     expect(text).toContain('demo:L1');
     expect(text).not.toContain(' €');
   });

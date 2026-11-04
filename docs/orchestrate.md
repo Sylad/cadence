@@ -613,12 +613,14 @@ A lot above 0.1 day, or with a screen or a spec sheet, keeps the full cycle. The
 
 ## Cost in euros, before and after a wave (L529)
 
+The grid's money is the `perf.currency` of the `cadence.yaml` (L578); `€` below stands for it, and without it the amounts print with no symbol.
+
 With a `perf.prices` grid in the `cadence.yaml` of the launch folder (the one `cadence perf` reads, see [perf](perf.md)), the wave is priced twice:
 
 - **before**: `--dry-run` prints, after the simulation of the lots (their `budget du lot` lines), one line per lot `a:L1 — estimation du lot : 3,15 € (budget de 750000 tokens au prix sonnet, 90 % en entrée)` and then `estimation de la vague : …`. The estimate is the lot's token budget (the p90 measured for the budget, see **Budget** below) priced at the model of the lot's writing step, split 90 % input, 10 % output (the split of a journal that only carries `counted`). The budget counts input, cache writes and output: **cache reads and the steps of another model (reviews) are not in the estimate**, so the real cost, which counts them, can exceed it.
-- **after**: the final table and `--status` gain a `€` column, the real cost of each lot (every step at the price of its own model, the four counters of the step, as `cadence perf`), and the `vague …` line ends its token count with the total in euros. A lot with a step on a model without price in the grid reads `n/d`; the wave total then adds only the priced lots and says `(n/d pour N lots, modèle sans prix)`. A `local` step costs 0 €.
+- **after**: the final table and `--status` gain a cost column (named after `perf.currency`, `coût` without it), the real cost of each lot (every step at the price of its own model, the four counters of the step, as `cadence perf`), and the `vague …` line ends its token count with the total in euros. A lot with a step on a model without price in the grid reads `n/d`; the wave total then adds only the priced lots and says `(n/d pour N lots, modèle sans prix : fable)`, the models named; any model name the grid declares is priced, `fable` included. A `local` step costs 0 €.
 
-Without `perf.prices` nothing changes: no estimate, no column, no total. A malformed grid does not stop a simulation, a wave or the table (a wave already paid must still print its table): the command prints `orchestrate : coût en euros n/d : …` on stderr (`--status`: a `⚠` line) and goes on without euros.
+Without `perf.prices` nothing changes: no estimate, no column, no total. A malformed grid does not stop a simulation, a wave or the table (a wave already paid must still print its table): the command prints `orchestrate : coût n/d : …` on stderr (`--status`: a `⚠` line) and goes on without euros.
 
 ## Sealed tests and shared files: the pre-check of what a lot may collide with (L500)
 

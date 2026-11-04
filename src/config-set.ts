@@ -3,7 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { isNode, isScalar, parse, parseDocument, type Document } from 'yaml';
-import { defaultPlan, readDocsConfig, readHookConfig, readMigrateConfig, readNewsConfig, readOrchestrateConfig, readPerfConfig, readPlanConfig, readReferencesConfig, readSessionConfig } from './config.js';
+import { defaultPlan, readDocsConfig, readHookConfig, readMigrateConfig, readNewsConfig, readOrchestrateConfig, readPlanConfig, readReferencesConfig, readSessionConfig } from './config.js';
+import { readPerfConfig } from './perf-config.js';
 import type { Day } from './dates.js';
 import { parseDeliverConfig } from './deliver.js';
 import { commitPaths, dirtyPaths, gitRoot, restorePaths } from './git.js';

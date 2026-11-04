@@ -4,7 +4,9 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { run } from '../src/cli.js';
-import { planLoader, readPerfConfig } from '../src/config.js';
+import { planLoader } from '../src/config.js';
+import { readPerfConfig, readPerfSettings } from '../src/perf-config.js';
+import { stepEuros } from '../src/cost.js';
 import { measure, readCache, readJournals, readRuns, type Classification } from '../src/corrections.js';
 import { computePerf, isQaDefectNote, perfWindows, readPlans } from '../src/perf.js';
 import { tempDir } from './helpers.js';
@@ -1472,14 +1474,34 @@ describe('cadence perf — grille de prix (R7)', () => {
     expect(r.err[0]).toMatch(message);
   }
 
-  it('R7 — modèle hors sonnet/opus/haiku : refus nommé, code 1', () => refused('perf:\n  prices:\n    gpt: { input: 1, output: 1, cacheRead: 1 }\n', /^raf: .*cadence\.yaml : perf\.prices\.gpt inconnu \(attendu : sonnet, opus, haiku\)$/));
+  it('L578 — tout nom de modèle est accepté dans la grille (fable, un nom libre, un identifiant complet)', () => {
+    const c = withGrid('perf:\n  prices:\n    fable: { input: 5, output: 25, cacheRead: 0.5 }\n    claude-opus-4-7: { input: 15, output: 75, cacheRead: 1.5 }\n');
+    expect(readPerfConfig(join(c.root, 'cadence.yaml'))).toEqual({ fable: { input: 5, output: 25, cacheRead: 0.5 }, 'claude-opus-4-7': { input: 15, output: 75, cacheRead: 1.5 } });
+  });
+
+  it('L578 — un modèle libre dont le prix est incomplet reste refusé, nommé', () => refused('perf:\n  prices:\n    fable: { input: 1, output: 1 }\n', /perf\.prices\.fable\.cacheRead : nombre ≥ 0 attendu \(par million de tokens\)$/));
+
+  it('L578 — perf.currency : lue, rognée ; absente, aucune monnaie ; vide ou non texte, refus nommé', async () => {
+    const ok = withGrid('perf:\n  currency: " $ "\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n');
+    expect(readPerfSettings(join(ok.root, 'cadence.yaml'))).toEqual({ prices: { sonnet: { input: 3, output: 15, cacheRead: 0.3 } }, currency: '$' });
+    expect(readPerfSettings(join(withGrid(GRID).root, 'cadence.yaml')).currency).toBeUndefined();
+    expect(readPerfSettings(join(withGrid('perf:\n  currency: USD\n').root, 'cadence.yaml'))).toEqual({ prices: null, currency: 'USD' });
+    await refused('perf:\n  currency: ""\n  prices:\n    sonnet: { input: 1, output: 1, cacheRead: 1 }\n', /perf\.currency : texte non vide attendu/);
+    await refused('perf:\n  currency: 5\n', /perf\.currency : texte non vide attendu/);
+  });
+
+  it('L578 — un nom de modèle qui est une clé d\'objet (constructor, __proto__) n\'a pas de prix par héritage', () => {
+    expect(stepEuros({ model: 'constructor', counted: 10 }, { sonnet: { input: 1, output: 1, cacheRead: 1 } })).toEqual({ missing: 'constructor' });
+    const c = withGrid('perf:\n  prices:\n    "__proto__": { input: 1, output: 1, cacheRead: 1 }\n');
+    expect(stepEuros({ model: '__proto__', counted: 10 }, readPerfConfig(join(c.root, 'cadence.yaml'))!)).toBeTypeOf('number');
+  });
   it('R7 — prix négatif ou texte : refus nommé', async () => {
-    await refused('perf:\n  prices:\n    sonnet: { input: -1, output: 1, cacheRead: 1 }\n', /perf\.prices\.sonnet\.input : nombre ≥ 0 attendu \(€ par million de tokens\)$/);
+    await refused('perf:\n  prices:\n    sonnet: { input: -1, output: 1, cacheRead: 1 }\n', /perf\.prices\.sonnet\.input : nombre ≥ 0 attendu \(par million de tokens\)$/);
     await refused('perf:\n  prices:\n    sonnet: { input: 1, output: "cher", cacheRead: 1 }\n', /perf\.prices\.sonnet\.output : nombre ≥ 0 attendu/);
   });
   it('R7 — modèle sans cacheRead : refus nommé', () => refused('perf:\n  prices:\n    opus: { input: 1, output: 1 }\n', /perf\.prices\.opus\.cacheRead : nombre ≥ 0 attendu/));
   it('R7 — clé inconnue sous un modèle : refus nommé', () => refused('perf:\n  prices:\n    opus: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 }\n', /perf\.prices\.opus\.cacheWrite inconnu \(attendu : input, output, cacheRead\)$/));
-  it('R7 — clé perf.xxx inconnue : refus nommé', () => refused('perf:\n  xxx: 1\n', /perf\.xxx inconnu \(attendu : prices\)$/));
+  it('R7 — clé perf.xxx inconnue : refus nommé', () => refused('perf:\n  xxx: 1\n', /perf\.xxx inconnu \(attendu : prices, currency\)$/));
   it('R7 — cadence.yaml illisible : refus avec l\'erreur du fichier, aucune sortie', () => refused('perf: [pas du yaml', /^raf: .*cadence\.yaml illisible : /));
 
   it('R15 — une grille mal formée : « raf: … » sur la sortie d\'erreur, code 1', () => refused('perf:\n  prices: 5\n', /^raf: .*cadence\.yaml : perf\.prices doit être un objet/));
@@ -1508,7 +1530,7 @@ describe('cadence perf — coût par lot livré (R8, R9, R10, R12)', () => {
   it('R8 — 1 M en entrée à 3 €, 100 k en sortie à 15 € : 3 + 1,5 = 4,5 €', async () => {
     const { data, plain: text } = await cost({ A0: [impl(usage(M, 100_000))] });
     expect(data.cost.perDelivered.current).toBeCloseTo(4.5, 9);
-    expect(text).toContain('coût par lot livré : 4,50 €');
+    expect(text).toContain('coût par lot livré : 4,50');
   });
 
   it('R8 — cacheWrite facturé au prix input', async () => {
@@ -1592,7 +1614,7 @@ describe('cadence perf — coût par lot livré (R8, R9, R10, R12)', () => {
   it('R10 — sans grille : coût n/d, avertissement, autres indicateurs servis', async () => {
     const { data, err } = await cost({ A0: [impl(usage(M))] }, null);
     expect(data.cost.perDelivered.current).toBeNull();
-    expect(err).toContain('perf : aucune grille de prix (cadence.yaml perf.prices), coût en euros n/d');
+    expect(err).toContain('perf : aucune grille de prix (cadence.yaml perf.prices), coût n/d');
     expect(data.tokens.byEstimate['1'].current).toBe(M);
   });
 
@@ -1645,8 +1667,47 @@ describe('cadence perf — coût par lot livré (R8, R9, R10, R12)', () => {
     const { c, data } = await fiveAndFive(3, 6);
     expect(data.cost.perDelivered.warn).toBe(true);
     const line = (await cad(c.root)).out.find((l) => l.startsWith('⚠ coût par lot livré'))!;
-    expect(line).toMatch(/6,00 € \(précédente 3,00 €, \+100 %\)/);
+    expect(line).toMatch(/6,00 \(précédente 3,00, \+100 %\)/);
     expect(line).toMatch(/→ le modèle ou l'effort d'une étape est-il juste \? changer le modèle de cette étape$/);
+  });
+
+  it('L578 — une étape fable est chiffrée au prix fable de la grille, celui du modèle que son journal enregistre', async () => {
+    const grid = 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n    fable: { input: 5, output: 25, cacheRead: 0.5 }\n';
+    const { data, err } = await cost({ A0: [impl(usage(M)), impl(usage(M), 'fable')] }, grid);
+    expect(data.cost.perDelivered.current).toBeCloseTo(8, 9);
+    expect(data.cost.withoutPrice).toEqual({});
+    expect(err.join('\n')).not.toContain('modèle sans prix');
+  });
+
+  it('L578 — une étape fable sans prix fable : lot compté à part et nommé, pas chiffré sans elle', async () => {
+    const { data, err } = await cost({ A0: [impl(usage(M)), impl(usage(M), 'fable')], A1: [impl(usage(M))] });
+    expect(data.cost.perDelivered.current).toBeCloseTo(3, 9);
+    expect(data.cost.perDelivered.lots.current).toBe(1);
+    expect(data.cost.withoutPrice).toEqual({ fable: 1 });
+    expect(err).toContain('perf : modèle sans prix dans perf.prices : fable, coût n/d pour 1 lot(s)');
+  });
+
+  it('L578 — perf.currency : montants du tableau et du ⚠ suivis de la monnaie, exposée dans le JSON ; sans elle, aucun symbole', async () => {
+    const withCurrency = async (currency: string) => {
+      const c = ctx();
+      plan(c.root, 'alpha', [...many(5, (i) => ({ id: `P${i}`, created: '2026-10-01', finished: PREV })), ...many(5, (i) => ({ id: `C${i}`, created: '2026-10-01', finished: CUR }))]);
+      for (let i = 0; i < 5; i++) {
+        lotJournal(c, PREV, `P${i}`, { steps: [{ ...impl(usage(M)), ended: at(PREV) }] });
+        lotJournal(c, CUR, `C${i}`, { steps: [{ ...impl(usage(2 * M)), ended: at(CUR) }] });
+      }
+      writeFileSync(join(c.root, 'cadence.yaml'), GRID.replace('perf:\n', currency));
+      return { c, ...(await json(c.root)) };
+    };
+    const usd = await withCurrency('perf:\n  currency: $\n');
+    expect(usd.data.cost.currency).toBe('$');
+    const out = (await cad(usd.c.root)).out;
+    expect(out.find((l) => l.startsWith('⚠ coût par lot livré'))).toMatch(/6,00 \$ \(précédente 3,00 \$, \+100 %\)/);
+    const rows = out.filter((l) => l.includes('coût par lot livré'));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) expect(r).toContain('6,00 $');
+    const plain = await withCurrency('perf:\n');
+    expect(plain.data.cost.currency).toBeUndefined();
+    expect((await cad(plain.c.root)).out.join('\n')).not.toMatch(/€|\$/);
   });
 
   it('R14 — le JSON porte cost { perDelivered, withoutPrice, withoutJournal } avec le jumeau corrections.firstTime', async () => {

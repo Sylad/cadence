@@ -6,7 +6,7 @@ import { fake, meeting, run, setup, WAVE, writes } from './orchestrate-worktree-
 import { tempDir } from './helpers.js';
 
 // L529 — le tableau imprimé à la fin d'une vague lancée, puis à la fin d'une reprise, porte la colonne € et le total, lus dans le cadence.yaml du dossier de lancement.
-const PRICES = 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n    opus: { input: 15, output: 75, cacheRead: 1.5 }\n    haiku: { input: 1, output: 5, cacheRead: 0.1 }\n';
+const PRICES = 'perf:\n  currency: "€"\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n    opus: { input: 15, output: 75, cacheRead: 1.5 }\n    haiku: { input: 1, output: 5, cacheRead: 0.1 }\n';
 const fileHome = process.env.CADENCE_HOME;
 beforeEach(() => {
   process.env.CADENCE_HOME = tempDir();

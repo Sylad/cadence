@@ -1,4 +1,3 @@
-import { isCalendarDay, type Day } from './dates.js';
 import { FIELDS, RafError, STATUSES, type Field, type Lot, type PlanFormat } from './plan.js';
 import { normalizeLot } from './plan-read.js';
 
@@ -9,17 +8,9 @@ interface ForeignEntry {
   used: Partial<Record<Field, string>>;
 }
 
-/** Le jour d'une valeur : un jour AAAA-MM-JJ, ou un horodatage qui vaut pour le sien ; tout autre chose n'en est pas un. */
-const dayOnly = (v: unknown): Day | undefined => {
-  const d = typeof v === 'string' ? v.slice(0, 10) : '';
-  return typeof v === 'string' && (v.length === 10 || /^\d{4}-\d{2}-\d{2}T/.test(v)) && isCalendarDay(d) ? d : undefined;
-};
-
-/** Livré hors de `cadence deliver` (L530) : le jour que l'outil du projet écrit sous une clé de `plan.fields.delivered` (la première qui en porte un) ; le sha n'est pas connu. */
-const deliveredBy = (r: Record<string, unknown>, format: PlanFormat): Pick<Lot, 'delivered'> => {
-  const date = (format.fields.delivered ?? []).map((k) => dayOnly(r[k])).find((d) => d !== undefined);
-  return date ? { delivered: { date, sha: '' } } : {};
-};
+/** Livré hors de `cadence deliver` (L530) : l'état du plan, lu avant sa traduction en `done`, est un de `deliveredStatuses` ; le jour est celui de la clôture, le sha n'est pas connu. */
+const deliveredBy = (lot: Lot, theirs: unknown, format: PlanFormat): Pick<Lot, 'delivered'> =>
+  lot.finished !== undefined && theirs != null && format.deliveredStatuses?.includes(String(theirs)) ? { delivered: { date: lot.finished, sha: '' } } : {};
 
 /** Lit une entrée écrite dans un autre format ; `i` n'est que son rang, pour les messages. */
 export function readForeignEntry(r: Record<string, unknown>, i: number, format: PlanFormat): ForeignEntry {
@@ -80,7 +71,7 @@ export function readForeignEntry(r: Record<string, unknown>, i: number, format: 
     problems,
   );
   const parent = pick('parent');
-  Object.assign(lot, deliveredBy(r, format));
+  Object.assign(lot, deliveredBy(lot, theirs, format));
   return { lot, parent: parent == null ? undefined : String(parent), used };
 }
 

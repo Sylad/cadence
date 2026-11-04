@@ -121,7 +121,7 @@ export interface TourRow {
   /** Lots non clos hors récurrents, sous-tâches ouvertes de ces lots comprises (L401) ; absent d'une ligne en erreur. */
   lots?: TourLot[];
   /** Lots clos (`done`, hors lots à échéance `every`) avec leur jour de clôture (L415) : le panneau des lots en tire les lots clos non livrés ; absent sans lot clos daté. */
-  closed?: { id: string; finished: Day; /** Le plan dit le lot livré (`delivered:`, ou `plan.fields.delivered` d'un plan tenu par un autre outil, L530) ; absent sinon. */ delivered?: true }[];
+  closed?: { id: string; finished: Day; /** Le plan dit le lot livré (`delivered:`, ou un état de `plan.deliveredStatuses` d'un plan tenu par un autre outil, L530) ; absent sinon. */ delivered?: true }[];
   /** « non commité », « non poussé », « livraison en cours » ; vide quand le dépôt est propre. */
   repo: string[];
   /** Worktrees de lot conservés par une vague (L279, R19) ; absent quand il n'y en a aucun. */

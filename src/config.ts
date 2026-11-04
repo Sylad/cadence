@@ -25,8 +25,8 @@ interface PlanConfig {
   settings: PlanSettings;
 }
 
-const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'add', 'onWrite', 'commit', 'states', 'transitions', 'doneState', 'deliveredState', 'blockedState', 'extras', 'idPattern', 'requirePlanned'];
-const FORMAT_KEYS = ['lots', 'fields', 'statuses', 'estimates'];
+const KEYS = ['path', 'project', 'since', 'ignore', 'files', 'lots', 'fields', 'statuses', 'estimates', 'deliveredStatuses', 'add', 'onWrite', 'commit', 'states', 'transitions', 'doneState', 'deliveredState', 'blockedState', 'extras', 'idPattern', 'requirePlanned'];
+const FORMAT_KEYS = ['lots', 'fields', 'statuses', 'estimates', 'deliveredStatuses'];
 
 
 /**
@@ -96,8 +96,8 @@ function parseFormat(p: Record<string, unknown>, bad: (what: string) => RafError
   for (const key of ['fields', 'statuses', 'estimates']) if (p[key] != null && !isObject(p[key])) throw bad(`${key} doit être un objet`);
 
   for (const [field, keys] of Object.entries((p.fields ?? {}) as Record<string, unknown>)) {
-    if (field !== 'delivered' && !FIELDS.includes(field as Field)) throw bad(`fields.${field} inconnu (attendu : ${[...FIELDS, 'delivered'].join(', ')})`);
-    format.fields[field as Field | 'delivered'] = list(keys);
+    if (!FIELDS.includes(field as Field)) throw bad(`fields.${field} inconnu (attendu : ${FIELDS.join(', ')})`);
+    format.fields[field as Field] = list(keys);
   }
   for (const [status, theirs] of Object.entries((p.statuses ?? {}) as Record<string, unknown>)) {
     if (!STATUSES.includes(status as Status)) throw bad(`statuses.${status} inconnu (attendu : ${STATUSES.join(', ')})`);
@@ -110,6 +110,9 @@ function parseFormat(p: Record<string, unknown>, bad: (what: string) => RafError
     if (typeof days !== 'number' || !(days > 0)) throw bad(`estimates.${label} doit être un nombre de jours positif`);
     format.estimates[label] = days;
   }
+  const delivered = list(p.deliveredStatuses);
+  for (const s of delivered) if (!Object.hasOwn(format.statuses, s)) throw bad(`deliveredStatuses : « ${s} » n'est pas un état de plan.statuses`);
+  if (delivered.length) format.deliveredStatuses = delivered;
   return format;
 }
 

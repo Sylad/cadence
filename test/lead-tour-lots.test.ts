@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { readPlanConfig } from '../src/config.js';
 import { leadTour, tourRow } from '../src/lead.js';
 import { gitRepo } from './helpers.js';
 
@@ -118,27 +119,32 @@ describe('champ closed de cadence lead tour --json (L415)', () => {
   });
 
   describe('R1 — lot livré hors de cadence deliver, lu dans le plan (L530)', () => {
-    const foreign = (fields: string, entries: string): string => {
+    const foreign = (extra: string, entries: string): string => {
       const dir = gitRepo();
       mkdirSync(join(dir, 'suivi'));
-      writeFileSync(join(dir, 'cadence.yaml'), `plan:\n  path: suivi/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, finished: livre_le${fields} }\n  statuses: { todo: prevu, done: [deploye, valide] }\n`);
+      writeFileSync(join(dir, 'cadence.yaml'), `plan:\n  path: suivi/taches.yaml\n  lots: taches\n  fields: { title: titre, status: etat, finished: livre_le }\n  statuses: { todo: prevu, done: [deploye, valide] }${extra}\n`);
       writeFileSync(join(dir, 'suivi/taches.yaml'), `taches:\n${entries}`);
       return dir;
     };
+    const two = '  - { id: T1, titre: A, etat: deploye, livre_le: 2026-10-20 }\n  - { id: T2, titre: B, etat: valide, livre_le: 2026-10-22 }\n';
 
-    it('R1 — plan.fields.delivered : un lot dont la clé mappée porte un jour est marqué delivered dans closed, les autres non', () => {
-      const dir = foreign(', delivered: deploye_le', '  - { id: T1, titre: A, etat: deploye, livre_le: 2026-10-20, deploye_le: 2026-10-21 }\n  - { id: T2, titre: B, etat: valide, livre_le: 2026-10-22 }\n');
-      expect(tourRow(dir, '2026-10-30').closed).toEqual([{ id: 'T1', finished: '2026-10-20', delivered: true }, { id: 'T2', finished: '2026-10-22' }]);
+    it('R1 — plan.deliveredStatuses : un lot dans un de ces états du plan est marqué delivered dans closed, un autre état clos non', () => {
+      expect(tourRow(foreign('\n  deliveredStatuses: deploye', two), '2026-10-30').closed).toEqual([{ id: 'T1', finished: '2026-10-20', delivered: true }, { id: 'T2', finished: '2026-10-22' }]);
     });
 
-    it('R1 — un horodatage vaut son jour ; une valeur qui n’est pas un jour (vide, texte, false) ne livre rien', () => {
-      const dir = foreign(', delivered: deploye_le', '  - { id: T1, titre: A, etat: deploye, livre_le: 2026-10-20, deploye_le: "2026-10-21T08:00:00Z" }\n  - { id: T2, titre: B, etat: deploye, livre_le: 2026-10-20, deploye_le: "bientôt" }\n  - { id: T3, titre: C, etat: deploye, livre_le: 2026-10-20, deploye_le: false }\n');
-      expect(tourRow(dir, '2026-10-30').closed).toEqual([{ id: 'T1', finished: '2026-10-20', delivered: true }, { id: 'T2', finished: '2026-10-20' }, { id: 'T3', finished: '2026-10-20' }]);
+    it('R1 — une liste d’états livre chacun d’eux ; sans plan.deliveredStatuses rien n’est marqué', () => {
+      expect(tourRow(foreign('\n  deliveredStatuses: [deploye, valide]', two), '2026-10-30').closed).toEqual([{ id: 'T1', finished: '2026-10-20', delivered: true }, { id: 'T2', finished: '2026-10-22', delivered: true }]);
+      expect(tourRow(foreign('', two), '2026-10-30').closed).toEqual([{ id: 'T1', finished: '2026-10-20' }, { id: 'T2', finished: '2026-10-22' }]);
     });
 
-    it('R1 — sans plan.fields.delivered, rien n’est marqué ; plan natif : delivered: { date, sha } marque le lot', () => {
-      const dir = foreign('', '  - { id: T1, titre: A, etat: deploye, livre_le: 2026-10-20, deploye_le: 2026-10-21 }\n');
-      expect(tourRow(dir, '2026-10-30').closed).toEqual([{ id: 'T1', finished: '2026-10-20' }]);
+    it('R1 — un état livré qui n’est pas un état de plan.statuses est refusé par la lecture de cadence.yaml', () => {
+      const dir = foreign('\n  deliveredStatuses: inconnu', two);
+      expect(() => readPlanConfig(join(dir, 'cadence.yaml'), dir)).toThrow(/deliveredStatuses.*inconnu/);
+    });
+
+    it('R1 — un lot livré non clos (état prevu) n’entre pas dans closed ; plan natif : delivered: { date, sha } marque le lot', () => {
+      const dir = foreign('\n  deliveredStatuses: [prevu, deploye]', '  - { id: T1, titre: A, etat: prevu }\n');
+      expect(tourRow(dir, '2026-10-30').closed).toBeUndefined();
       const natif = nativeProject(done('L1', '2026-10-20', '    delivered: { date: 2026-10-21, sha: abcdef1 }\n') + done('L2', '2026-10-22'));
       expect(tourRow(natif, '2026-10-30').closed).toEqual([{ id: 'L1', finished: '2026-10-20', delivered: true }, { id: 'L2', finished: '2026-10-22' }]);
     });

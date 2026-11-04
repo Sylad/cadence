@@ -2038,9 +2038,10 @@ lots:
     finished: 2026-11-04
   - id: L574
     title: "Empreintes figées des tests de garde (test/revue-maquette-criteres.test.ts R11, test/agents-design-jetons-grille-tics.test.ts R13…) : remplacées par des tests de comportement (une fiche valide d'avant passe toujours cadence spec check ; le gabarit garde ses clés), plus d'empreinte de fichier — 04-11 : trois lots (L570, L562, L573) arrêtés en question pour une simple mise à jour d'empreinte"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-04
+    started: 2026-11-04
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

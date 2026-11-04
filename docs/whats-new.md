@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.49.0**: lot budgets follow the measure; a pre-check of shared files and sealed tests; the sheet review converges (3rd pass); the mockup index is completed from `maquette_ecran`; piped gate commands refused.
 - **1.48.0**: lots in service but not published are flagged by the tour, the close and `--status`; the mockup review converges (unchanged-point majors go to the lead); `news check` asks a lot only for its own hypotheses.
 - **1.47.0**: delivered ≠ finished (`delivered:` on lots, `deliver --block`); the exact next gesture after every refusal, plus a lead hook; plan conflicts settled at integration; no more `spawn E2BIG`.
 - **1.46.0**: worst-case data set for screen lots (`qa.worstData`); accept checks only the lot's rules on a shared sheet; `uses:` held inside a wave.
@@ -77,6 +78,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.49.0**: the default budget of a lot follows the measure (L501): the lots handed back for budget in the 31-10 inventory set the new floor, so a lot no longer stops one correction short of done. Before the first implementation, `cadence orchestrate` reads git (no model) and lists the files the lot will share with lots running or recently integrated and the sealed acceptance tests of other lots it may touch (L500), which used to cost a question and about an hour each time. The sheet review converges (L572): a third pass is played when the second review has fewer blocking + major findings than the first and only one is left, and a lot handed back with a single major says so with its `file:line`. On a sheet with both `maquette` and `maquette_ecran`, a field or state drawn only in `maquette_ecran` is added to the mockup index with its captures instead of failing three passes (L573, GitHub issue #34). The plugin refuses a gate, test, push or delivery command piped into `tail`, `head` or `grep` without `pipefail` or `PIPESTATUS`, which hid a red exit code four times (L502).
 
 **1.48.0**: lots in service but not yet published are flagged (L571): `cadence lead tour`, `cadence session close` and `cadence orchestrate --status` print `⚠ N lot(s) done depuis le dernier tag v<x.y.z>` with the `cadence release` command to run, so a version is no longer left unpublished overnight. The mockup review converges (L562, GitHub issue #30): from review 2 on, a major on a point the spec writer did not change and that the previous review had not raised (`inchange: true`) no longer counts for non-conformity — it goes to the lead as a follow-up — and review 1 sweeps the sizes the sheet names. `cadence news check` and `raf check` ask a lot on a shared screen sheet only for the hypotheses of the rules it adds or changes (L570, GitHub issue #33).
 

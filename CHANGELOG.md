@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.49.0] - 2026-11-04
+
 ### Added
 
 - The default budget of a lot follows the measure (L501, [docs/orchestrate.md](docs/orchestrate.md), [docs/perf.md](docs/perf.md)): the inventory of 2026-10-31 counted 34 lots handed back for budget (about 800 min, 11 M tokens). `cadence orchestrate` now raises the fixed budget of a lot to the p90 of the counted tokens of the lots rendered in its class over a sliding 14 days (`cadence perf --json`: `tokens.byEstimate.<class>.p90`, `p90Lots`), rounded up to 50 k and bounded between the fixed budget and twice that; under 5 lots in the class, the fixed budget stays. `--dry-run` says where the figure comes from (p90, number of lots, rounding, bounds, or why the measure was not used).

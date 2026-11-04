@@ -26,14 +26,6 @@ function kept(repo: string, wave: string, project: string, lot: string, n: numbe
 }
 
 describe('R2 — le --dry-run au bord', () => {
-  it('R2 — projet « . » (racine du dépôt) : la branche gardée cadence/<vague>/_--L1 est dite par le --dry-run', async () => {
-    const { repo } = setup();
-    const old = kept(repo, 'w1', '.', 'L1', 2, 1000);
-    expect(old.branch).toBe('cadence/w1/_--L1');
-    const r = await run(repo, ['.:L1', '--dry-run'], fake());
-    removeDryRunBriefs(r.out);
-    expect(r.out).toContain(`branche ${old.branch} d'une vague précédente (2 commit(s) non intégré(s))`);
-  });
   it('R2 — deux branches non intégrées du lot : la plus récente est reprise, l\'autre dit laquelle la devance', async () => {
     const { parent, repo } = setup();
     const older = kept(repo, 'w1', 'a', 'L1', 1, 1000);

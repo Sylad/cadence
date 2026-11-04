@@ -305,11 +305,12 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
 
 /**
  * Les branches gardées d'une vague passée qui portent le travail du lot sous l'une de ses formes (`slugs`) et ne sont pas intégrées (L581) : ce que le `--dry-run` dit d'une reprise.
- * Ne touche à rien. La plus récente d'abord.
+ * Ne touche à rien. La plus récente d'abord. Les formes sont des `lotSlug` : le point initial du projet « . » y est lu comme `_`, ainsi que `lotBranch` le nomme dans la branche.
  */
 export function keptBranchesOfLot(repo: string, branch: string, slugs: readonly string[]): KeptTree[] {
+  const named = slugs.map((s) => s.replace(/^\./, '_'));
   return keptTrees(repo)
-    .filter((t) => t.branch !== branch && slugs.includes(t.branch.split('/').slice(2).join('/')) && t.unintegrated > 0)
+    .filter((t) => t.branch !== branch && named.includes(t.branch.split('/').slice(2).join('/')) && t.unintegrated > 0)
     .sort((a, b) => b.created - a.created || (a.branch < b.branch ? 1 : -1));
 }
 

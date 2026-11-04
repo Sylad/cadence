@@ -2241,6 +2241,7 @@ lots:
     estimate: 0.25
     created: 2026-11-04
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "compliant (1 minor note: planFiles du voisin évalué à chaque étape même sans mouvement) — orchestré (vague 2026-11-04-1310-cad, 1 passe(s) de correction)", commit: 5f7e468b0413a0d138e83d9e96bbd9273bc67b54, reporte: { de: 86afe1205f04d2ed7706f7735091f521366c20e4, vers: 5f7e468b0413a0d138e83d9e96bbd9273bc67b54, patchId: 23a67ffa91ee4d0b46ef8084160134af49f95815 } }
   - id: L594
     title: "Étude d'ensemble de cadence, en lecture seule, par un relecteur neuf en Fable : construit lot après lot sans plan global, l'ensemble est-il cohérent ? Carte des concepts (lot, vague, porte, revue, livraison, plan natif ou lu, lead, bande, ref, spec, news, perf) et de leurs couches, recouvrements (deux mécanismes pour une même chose), noms incohérents, commandes, options et clés de cadence.yaml (surface vue par un nouvel utilisateur, le compte pro), chemins morts, règles qui se contredisent entre docs et code ; livrable docs/etudes/ensemble-2026-11.md : verdict, architecture cible en une page, écarts classés par gain et risque, chaque correction proposée en lot ≤ 0,5 j ; rien n'est changé — demande de Sylvain le 04-11 (« voir si notre tas de briques fait un joli palais ») ; L461 n'a audité que le code (morts, doublons, gros fichiers)"
     status: todo

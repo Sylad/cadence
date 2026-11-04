@@ -467,7 +467,7 @@ The result is replayed before anything is written: each native entry is translat
 
 Once the project has switched, `cadence.yaml` no longer describes the old plan; keep that description in a file of its own and name it for the way back: `raf import --to-config --config cadence-origine.yaml`.
 
-Not covered: the event journal of the other tool (nothing in `plan.fields` describes it), and a commit message that cites a flat sub-lot id with a slash (`AB-1/t1-fusion`), which still reads as a precision on `AB-1` (see `plan.idPattern`).
+Not covered: the event journal of the other tool — `--to-config` leaves `journal.ndjson` as it is and says so (`journal.ndjson inchangé : format déclaratif à venir, L582`), since nothing in `plan.fields` describes a journal format; a declarative journal format and the rewriting of the journal are the separate lot L582, still a prerequisite of the switch — and a commit message that cites a flat sub-lot id with a slash (`AB-1/t1-fusion`), which still reads as a precision on `AB-1` (see `plan.idPattern`).
 
 ## Gantt scheduling
 

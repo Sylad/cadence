@@ -233,6 +233,14 @@ describe('L472 — raf import --to-config', () => {
     expect(r.err).toMatch(/L1.*dropped/);
     expect(existsSync(join(dir, 'tmp/retour.yaml'))).toBe(false);
   });
+  it('R37 — --to-config laisse journal.ndjson tel quel et le dit en une ligne (format déclaratif à venir, L582)', () => {
+    const dir = project();
+    raf(dir, 'import', '--from-config', '--out', '.cadence/raf.yaml');
+    const r = raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml');
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('journal.ndjson inchangé : format déclaratif à venir, L582');
+    expect(raf(dir, 'import', '--to-config', '--dry-run', '--out', 'tmp/autre.yaml').out).toContain('journal.ndjson inchangé : format déclaratif à venir, L582');
+  });
   it('R19 — sans plan natif à lire, --to-config le dit', () => {
     const dir = project();
     const r = raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml');

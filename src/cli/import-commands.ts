@@ -13,6 +13,8 @@ type Entry = Record<string, unknown>;
 const USAGE = 'usage : raf import --from-config [--out plan-natif.yaml] [--verify] [--rename ancien=nouveau]… [--force] [--dry-run] | raf import --to-config [--from plan-natif.yaml] [--out plan.yaml] [--rename ancien=nouveau]… [--force] [--dry-run]';
 /** Les écarts listés avant « … » : un plan entier mal mappé en dirait des milliers. */
 const SHOWN = 20;
+/** Le retour ne réécrit que le plan : le journal d'événements de l'autre outil n'a pas de format déclaré (plan.fields n'en décrit aucun), il reste tel qu'il est. */
+const JOURNAL_NOTE = 'journal.ndjson inchangé : format déclaratif à venir, L582';
 
 /** `--rename ancien=nouveau` (répétable) : un nom de clé du fichier d'origine pris en natif sous un autre nom. */
 function parseRenames(list: string[] | undefined): Renames {
@@ -92,5 +94,6 @@ function importTo(c: Ctx, format: PlanFormat, renames: Renames): number {
     writeFileSync(out, doc.toString({ lineWidth: 0 }));
   }
   io.out(values['dry-run'] ? `${entries.length} lots à écrire au format d'origine — rien n'est écrit (--dry-run)` : `${entries.length} lots écrits au format d'origine → ${out}`);
+  io.out(JOURNAL_NOTE);
   return 0;
 }

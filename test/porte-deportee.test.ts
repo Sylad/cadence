@@ -379,9 +379,14 @@ describe('L403 — cache par copie des dépendances locales (R15, R16)', () => {
 
 describe('L403 — cache sûr en concurrence (R17)', () => {
   it('R17 — deux remplissages simultanés de même empreinte : un seul cache publié, les deux portes lisent un cache complet', async () => {
-    const p = project(`  test: test -f node_modules/p/i.js\n  gate:\n    host: machine\n    install: sleep 1; mkdir -p node_modules/p && echo hi > node_modules/p/i.js\n`);
+    // L579 : `sleep 1` pour que les deux remplissages se chevauchent était un délai de travail, pas une attente : sous charge une porte pouvait
+    // finir avant que l'autre commence, et le cas disputé n'était pas joué. Chaque installation signale son arrivée et attend celle de l'autre :
+    // les deux publient ensuite, quelle que soit la charge (bornée à 20 s : un échec visible, pas une boucle perdue).
+    const arrivees = join(tempDir(), 'arrivees');
+    const p = project(`  test: test -f node_modules/p/i.js\n  gate:\n    host: machine\n    install: mkdir -p ${arrivees} && touch ${arrivees}/$$ && n=0 && while [ $(ls ${arrivees} | wc -l) -lt 2 ]; do n=$((n+1)); [ $n -lt 400 ] || exit 9; sleep 0.05; done; mkdir -p node_modules/p && echo hi > node_modules/p/i.js\n`);
     const [a, b] = await Promise.all([gate(p), gate(p)]);
     expect([a.code, b.code]).toEqual([0, 0]);
+    expect(readdirSync(arrivees)).toHaveLength(2); // les deux ont rempli : le cas disputé a bien eu lieu
     expect(caches(p)).toHaveLength(1);
     expect(readdirSync(join(p.work, 'deps', caches(p)[0])).sort()).toEqual(['.paths', 'node_modules']);
   });

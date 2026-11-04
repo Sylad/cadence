@@ -157,6 +157,74 @@ describe('étape spec back : revue de la fiche, deux passes au plus', () => {
     expect(c.lot.outcome).toContain('R5 : toujours pas sourcée');
   });
 
+  const two = () => claudeOut(reviewReport({ majeurs: 2, constats: [{ gravite: 'majeur', fichier: 'lineup.service.ts', ligne: 42, texte: 'R5 : sans source' }, { gravite: 'majeur', fichier: 'lineup.service.ts', ligne: 50, texte: 'R6 : sans test' }], verdict: 'non conforme' }));
+
+  it('L572 R1 — la revue converge (2 puis 1 bloquant+majeur) : une 3ᵉ passe de fiche, le lot continue quand elle est conforme', async () => {
+    const h = harness({ lots, script: { spec: [spec, spec, spec], fiche: [two, () => major(), ok], implement: [impl], review: [ok] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'spec', 'fiche', 'spec', 'fiche', 'implement', 'review']);
+    expect(h.calls[4].brief).toMatch(/spec session 3 of 3/);
+    expect(h.calls[5].brief).toMatch(/third and last review/);
+    expect(c.lot.fiche).toMatchObject({ passes: 3, conforme: true });
+    expect(c.lot.specRuns).toBe(3);
+  });
+
+  it('L572 R1 — la 3ᵉ revue de fiche non conforme rend le lot : « après 3 revues », jamais une 4ᵉ', async () => {
+    const h = harness({ lots, script: { spec: [spec, spec, spec], fiche: [two, () => major(), () => major('R5 : toujours')] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'spec', 'fiche', 'spec', 'fiche']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toContain('fiche non conforme après 3 revues');
+  });
+
+  it('L572 R1 — pas de convergence (1 puis 1) : rendu après 2 revues, comme avant', async () => {
+    const h = harness({ lots, script: { spec: [spec, spec], fiche: [() => major(), () => major('R5 : toujours')] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'spec', 'fiche']);
+    expect(c.lot.outcome).toContain('fiche non conforme après 2 revues');
+  });
+
+  it('L572 R1 — la baisse ne finit pas à un seul (3 puis 2) : rendu après 2 revues', async () => {
+    const three = () => claudeOut(reviewReport({ majeurs: 3, constats: [1, 2, 3].map((n) => ({ gravite: 'majeur', fichier: 'f.ts', ligne: n, texte: `R${n}` })), verdict: 'non conforme' }));
+    const h = harness({ lots, script: { spec: [spec, spec], fiche: [three, two] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(kinds(h)).toEqual(['spec', 'fiche', 'spec', 'fiche']);
+    expect(c.lot.outcome).toContain('fiche non conforme après 2 revues');
+    expect(c.lot.outcome).not.toContain('un seul majeur');
+  });
+
+  it('L572 R2 — un seul majeur reste, sans bloquant : le verdict rendu dit « un seul majeur, corrigeable par le lead : <fichier:ligne> »', async () => {
+    const h = harness({ lots, script: { spec: [spec, spec], fiche: [() => major(), () => major('R5 : toujours pas sourcée')] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(c.lot.outcome).toContain('un seul majeur, corrigeable par le lead : lineup.service.ts:42');
+    expect(c.lot.outcome).toContain('R5 : toujours pas sourcée');
+  });
+
+  it('L572 R2 — deux majeurs, ou un bloquant : pas de « un seul majeur »', async () => {
+    const blocking = () => claudeOut(reviewReport({ bloquants: 1, constats: [{ gravite: 'bloquant', fichier: 'f.ts', ligne: 3, texte: 'R1 : contradiction' }], verdict: 'non conforme' }));
+    const h1 = harness({ lots, script: { spec: [spec, spec], fiche: [two, two] } });
+    const c1 = h1.lot('L1', back, config);
+    await runLot(c1);
+    expect(c1.lot.outcome).toContain('fiche non conforme après 2 revues');
+    expect(c1.lot.outcome).not.toContain('un seul majeur');
+    const h2 = harness({ lots, script: { spec: [spec, spec], fiche: [blocking, blocking] } });
+    const c2 = h2.lot('L1', back, config);
+    await runLot(c2);
+    expect(c2.lot.outcome).not.toContain('un seul majeur');
+  });
+
+  it('L572 R2 — un majeur sans fichier : « un seul majeur, corrigeable par le lead » avec le texte seul', async () => {
+    const h = harness({ lots, script: { spec: [spec, spec], fiche: [() => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', texte: 'R5 : sans source' }], verdict: 'non conforme' })), () => claudeOut(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', texte: 'R5 : sans source' }], verdict: 'non conforme' }))] } });
+    const c = h.lot('L1', back, config);
+    await runLot(c);
+    expect(c.lot.outcome).toContain('un seul majeur, corrigeable par le lead : R5 : sans source');
+  });
+
   it('les mineurs vont en notes du lot, sans renvoyer à la spec ni devenir des propositions du tableau final', async () => {
     const minor = () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', fichier: 'x.ts', ligne: 3, texte: 'un test au nom vague' }] }));
     const h = harness({ lots, script: { spec: [spec], fiche: [minor], implement: [impl], review: [ok] } });

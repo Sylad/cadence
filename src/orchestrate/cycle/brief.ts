@@ -206,7 +206,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     const reviewed = [...(l.ficheConstats ?? []), ...(l.maquetteConstats ?? [])];
     const written = ficheOf(c);
     const back = partsOf(c, written).back;
-    const session = { run: (l.specRuns ?? 0) + 1, max: specBudget(c) };
+    const session = { run: (l.specRuns ?? 0) + 1, max: specMax(c) };
     vars.spec = specText({
       dir: c.config.spec.dir,
       render: c.config.spec.render,
@@ -269,3 +269,12 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
 
 /** Plafond de sessions `spec` du lot (L230) : les revues de maquette d'un lot à écran, sinon deux. Fiche et maquette partagent `l.specRuns`. */
 export const specBudget = (c: LotCtx): number => (c.lot.screen && c.config.maquette ? c.config.maquetteReviews : 2);
+
+/** Revue de fiche qui converge (L572) : une 3ᵉ revue de plus quand la 2ᵉ revue compte moins de constats bloquants+majeurs que la 1ʳᵉ et qu'un seul reste. */
+export const ficheConverging = (l: LotCtx['lot']): boolean => {
+  const n = l.ficheCounts ?? [];
+  return n.length >= 2 && n[1] === 1 && n[1] < n[0]; // lu sur les deux premières revues : la 3ᵉ ne change pas le plafond qu'elle a elle-même obtenu
+};
+
+/** Sessions spec permises : le budget du lot, relevé à 3 quand la revue de fiche converge (la 3ᵉ revue suit une 3ᵉ passe spec). */
+export const specMax = (c: LotCtx): number => (ficheConverging(c.lot) ? Math.max(specBudget(c), 3) : specBudget(c));

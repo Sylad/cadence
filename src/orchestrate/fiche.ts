@@ -8,11 +8,13 @@ export function ficheReviewText(o: { fiche: string; passes: number; previous?: C
   const second = o.passes >= 1;
   const lines = [
     `Sheet mode: review the sheet \`${o.fiche}\` (back part: \`sujet\`, \`cas\`, \`regles\`, \`contrats\`, \`donnees\`). It is a document, not code: read it, then open the code, the tests and the sources it cites.`,
-    second
-      ? 'This is the second and last review: the spec writer fixed the points of the first one (below). Check them first, then review the whole sheet again.'
-      : 'This is the first review of this sheet.',
+    o.passes >= 2
+      ? 'This is the third and last review: the previous review was down to a single blocking or major point and the spec writer fixed it (below). Check it first, then review the whole sheet again.'
+      : second
+        ? 'This is the second and last review: the spec writer fixed the points of the first one (below). Check them first, then review the whole sheet again.'
+        : 'This is the first review of this sheet.',
   ];
-  if (second && o.previous?.length) lines.push('', 'Points of the first review that the spec writer had to fix:', ...bulletLines(o.previous));
+  if (second && o.previous?.length) lines.push('', `Points of the ${o.passes >= 2 ? 'previous' : 'first'} review that the spec writer had to fix:`, ...bulletLines(o.previous));
   return lines.join('\n');
 }
 

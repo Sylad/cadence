@@ -107,6 +107,8 @@ export interface LotState {
   fiche?: { passes: number; conforme: boolean; verdict: string };
   /** Constats bloquants et majeurs de la revue de fiche, rendus à la seconde passe `spec` (une seule, avec ceux de la maquette d'un lot mixte). */
   ficheConstats?: Constat[];
+  /** Bloquants+majeurs de chaque revue de fiche non conforme, dans l'ordre : une 3ᵉ revue si ça baisse jusqu'à un seul (L572). */
+  ficheCounts?: number[];
   /** Hypothèses de la fiche d'un lot sans écran, une ligne chacune (`R3 : … ; sinon …`) : posées en note du lot, reprises par le tableau de fin de vague (L188). */
   hypotheses?: string[];
   /** Écarts de l'étape accept relevés par le programme, rendus à la seconde passe `accept` (une seule). */

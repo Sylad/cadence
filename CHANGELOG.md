@@ -86,6 +86,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - Pre-check of shared files and sealed tests (L500, [docs/orchestrate.md](docs/orchestrate.md)): before the first implementation, `cadence orchestrate` reads git (no model) and lists, for the files the lot's text cites, the sealed acceptance tests of OTHER lots (`acceptation-<lot>.json` with fingerprints) and the files that another lot of the wave or a kept worktree also modifies. The list goes into the implement brief (do not touch or reseal a sealed test; keep edits to a shared file small) and into the table, one `⚠` line per test and per file.
 - The plugin refuses a gate, test, push or delivery command piped into `tail`/`head`/`grep` without `pipefail` or `PIPESTATUS` (L502, [docs/lead.md](docs/lead.md)): `hooks/hooks.json` runs `cadence claude-hook pipe` before every Bash command; the refusal says what to write (`set -o pipefail; …`, `${PIPESTATUS[0]}`, or a redirect to a file). It also reads `|&`, groups, `time`/`env`/`npx -y`/`pnpm exec`, a pipe split over two lines, a filter with a path, `npm run test:*`, and counts only a `set -o pipefail` actually played before the gate.
 
+### Changed
+
+- The sheet review converges (L572, [docs/orchestrate.md](docs/orchestrate.md), [measure](docs/mesures/fiche-converge-2026-11-04.md)): when the second review counts fewer blocking + major findings than the first and exactly one is left, a third `spec` session and a third review are played (`fiche non conforme après 3 revues` if it still fails), like the code-correction rule. A sheet handed back with one single major and no blocking one says `un seul majeur, corrigeable par le lead : <file:line> — <text>`.
+
 ## [1.48.0] - 2026-11-04
 
 ### Added

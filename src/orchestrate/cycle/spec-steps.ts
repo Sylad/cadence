@@ -1,7 +1,7 @@
 import { type LotCtx, propose, hasSpecStage, workDir as wd, histPlan, stop, transition, save } from './ctx.js';
 import { type SessionKind } from '../launch.js';
 import { findFiche, ficheReady, lightLot, answerAltersRule, sourceRules, LEAD_SOURCE, checkSpec, costlyHypotheses, hypothesisLines } from '../spec.js';
-import { partsOf, ficheOf, specBudget } from './brief.js';
+import { partsOf, ficheOf, specBudget, specMax, ficheConverging } from './brief.js';
 import { acceptationProof, NO_ACCEPT, lotAcceptation, listed } from './accept-step.js';
 import { redSha, parseAcceptation } from '../accept.js';
 import { git } from '../worktree.js';
@@ -15,7 +15,7 @@ import { session, badReport } from './session.js';
 import { type SpecReport, checkShape, SPEC_SCHEMA, type ReviewReport, REVIEW_SCHEMA, summarize } from '../schemas.js';
 import { takeReport, dirtAfter, addProposals, blockingConstats, setAsideUnchanged, asideVerdict } from './shared.js';
 import { parse } from 'yaml';
-import { lotKey } from '../state.js';
+import { lotKey, type Constat } from '../state.js';
 import { bulletLines } from '../maquette.js';
 /** Première session d'écriture d'un lot : la spec quand il déclare `screen:` ou `spec: true` et qu'aucune fiche n'est écrite, sinon l'implémentation. */
 export function firstWrite(c: LotCtx): SessionKind {
@@ -238,8 +238,34 @@ function logUnchangedDefects(c: LotCtx, rep: ReviewReport, passes: number): void
   for (const k of rep.constats) if ((k.gravite === 'bloquant' || k.gravite === 'majeur') && k.inchange === true) c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · défaut de revue : maquette, revue ${passes}, majeur sur un point inchangé absent de la revue ${passes - 1} : ${k.texte}`);
 }
 
+/** Un seul constat bloquant ou majeur, et c'est un majeur (L572) : le lead le corrige en une ligne, le verdict le dit avec son fichier:ligne. Rien sinon, le verdict de l'agent reste. */
+function onlyMajor(constats: Constat[]): string | undefined {
+  const [k] = constats;
+  if (constats.length !== 1 || k.gravite !== 'majeur') return undefined;
+  const at = k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : '';
+  return `un seul majeur, corrigeable par le lead : ${at}${k.texte}`;
+}
+
+/** Le lot est rendu au lead : revues épuisées (deux pour la fiche, trois si elle converge — L572 —, `maquetteReviews` pour la maquette), ou plus de session spec pour la passe suivante. Vrai quand il l'a été. */
+function handBack(c: LotCtx, r: SpecReview, passes: number, constats: Constat[], agentVerdict: string): boolean {
+  const l = c.lot;
+  if (r.kind === 'fiche') (l.ficheCounts ??= []).push(constats.length);
+  const reviews = r.kind === 'maquette' ? c.config.maquetteReviews : ficheConverging(l) ? 3 : 2;
+  const verdict = (r.kind === 'fiche' ? onlyMajor(constats) : undefined) ?? agentVerdict;
+  const left = `${verdict}\n${bulletLines(constats).join('\n')}`;
+  if (passes >= reviews) {
+    stop(c, 'handed-back', `${r.label} non conforme après ${reviews} revue${reviews > 1 ? 's' : ''} : ${left}`);
+    return true;
+  }
+  // Le budget de sessions spec est épuisé (écarts du programme compris) : un renvoi à la spec serait une session de trop.
+  const budget = r.kind === 'fiche' ? specMax(c) : specBudget(c);
+  if ((l.specRuns ?? 0) < budget) return false;
+  stop(c, 'handed-back', `${r.label} non conforme et la spec a déjà joué ${budget} sessions : ${left}`);
+  return true;
+}
+
 /**
- * Revue de la spec (fiche ou maquette) : une session de lecture seule. Un bloquant ou un majeur renvoie à la spec (avec les constats ; pour un lot mixte, ceux des deux revues ensemble), puis la spec est relue : deux revues pour la fiche,
+ * Revue de la spec (fiche ou maquette) : une session de lecture seule. Un bloquant ou un majeur renvoie à la spec (avec les constats ; pour un lot mixte, ceux des deux revues ensemble), puis la spec est relue : deux revues pour la fiche (trois quand elle converge, L572),
  * `orchestrate.maquetteReviews` pour la maquette, dans le plafond de sessions spec du lot (`specBudget`) ; ce qui reste à la dernière revue est rendu au lead.
  * Les mineurs de la fiche vont en notes du lot (ceux de la maquette restent des propositions). Ce verdict n'est pas `raf review` ni `raf ux` : la revue après code garde ce rôle.
  */
@@ -280,16 +306,7 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
     save(c);
     return;
   }
-  const reviews = r.kind === 'maquette' ? c.config.maquetteReviews : 2;
-  if (passes >= reviews) {
-    stop(c, 'handed-back', `${r.label} non conforme après ${reviews} revue${reviews > 1 ? 's' : ''} : ${summary.verdict}\n${bulletLines(constats).join('\n')}`);
-    return;
-  }
-  // Le budget de sessions spec est épuisé (écarts du programme compris) : un renvoi à la spec serait une session de trop.
-  if ((l.specRuns ?? 0) >= specBudget(c)) {
-    stop(c, 'handed-back', `${r.label} non conforme et la spec a déjà joué ${specBudget(c)} sessions : ${summary.verdict}\n${bulletLines(constats).join('\n')}`);
-    return;
-  }
+  if (handBack(c, r, passes, constats, summary.verdict)) return;
   l[key] = constats.length ? constats : [{ source: r.source, gravite: 'majeur', texte: summary.verdict }];
   l.next = r.retry(c, fiche);
   save(c);

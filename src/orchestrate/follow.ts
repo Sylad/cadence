@@ -85,16 +85,27 @@ async function waveStore(wave: string | undefined, launch: string, wait: () => P
   return store;
 }
 
-/** Relève le journal : à chaque appel, les lignes de geste écrites depuis le précédent (depuis l'armement au premier) ; une ligne non terminée attend sa fin. Un journal absent est un journal vide. */
+/** La ligne porte-t-elle l'horodatage ISO qui ouvre chaque entrée du journal ? Sinon c'est une ligne de suite : `store.journal()` écrit le texte brut d'une entrée, sauts de ligne compris. */
+const TIMESTAMPED = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z /;
+
+/**
+ * Relève le journal : à chaque appel, les lignes de geste écrites depuis le précédent (depuis l'armement au premier) ; une ligne non terminée attend sa fin. Un journal absent est un journal vide.
+ * Une ligne sans horodatage appartient à l'entrée précédente et suit son sort (une question « 3 fichiers diffèrent : » suivie de 3 lignes « — … » sort entière, 67 lignes de suite dans les journaux d'oct.-nov.),
+ * même quand la suite arrive dans un relevé plus tard que sa première ligne.
+ */
 function journalReader(file: string): () => string[] {
   const read = () => (existsSync(file) ? readFileSync(file, 'utf8') : '');
   const endOf = (text: string) => text.lastIndexOf('\n') + 1;
   let done = endOf(read()); // caractères déjà traités
+  let emitting = false; // la dernière entrée relevée était-elle une ligne de geste ?
   return () => {
     const text = read();
     const end = endOf(text);
     if (end <= done) return [];
-    const lines = text.slice(done, end).split('\n').filter(leadLine);
+    const lines = text.slice(done, end - 1).split('\n').filter((line) => {
+      if (TIMESTAMPED.test(line)) emitting = leadLine(line);
+      return emitting;
+    });
     done = end;
     return lines;
   };

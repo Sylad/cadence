@@ -181,6 +181,22 @@ describe('L588 — cadence orchestrate --follow', () => {
     expect(f.out).toEqual([`${TS} cadence:L1 → question — Quel format ?`, `fin de vague ${WAVE} : done`]);
   });
 
+  it('R5 — entrée multi-ligne (journal réel 2026-10-06 warhammer40k:L74) : les lignes de suite sans horodatage suivent le sort de leur entrée, même arrivées dans un relevé plus tard ; celles d\'une transition de travail sont écartées', async () => {
+    const { parent, store } = await waveWith(['warhammer40k:L74 → implementing']);
+    register(parent);
+    const log = join(store.dir, 'journal.log');
+    const question = `${TS} warhammer40k:L74 → question — STOP, étape 2 du lot. 3 fichiers « contenu » de la prod diffèrent du dépôt : units.json (1 unité sur 133), timeline-events.json (5 sources) et primarchs.json (1 fiche). Détail de chaque écart ci-dessous.`;
+    const suite = ['— units.json, sm-primaris-intercessor. La prod garde l\'ancien texte : role « Infanterie de ligne ».', '— timeline-events.json, 5 URL de sources[1]. Fall_of_the_Eldar → Fall_of_the_Aeldari.', '— primarchs.json, fiche Mortarion. La prod a encore « typhus » dans relatedPrimarchIds.'];
+    const f = follow(parent, {
+      1: () => appendFileSync(log, `${question}\n${suite[0]}\n`),
+      2: () => appendFileSync(log, `${suite[1]}\n${suite[2]}\n${TS} warhammer40k:L75 → implementing\n— détail d\'une transition de travail : écarté\n`),
+      3: () => appendFileSync(log, `${TS} warhammer40k:L75 → handed-back — fiche non conforme après 2 revues :\n— 1 majeur (datasheet manquante)\n`),
+      4: unregister,
+    });
+    expect(await f.run()).toBe(0);
+    expect(f.out).toEqual([question, ...suite, `${TS} warhammer40k:L75 → handed-back — fiche non conforme après 2 revues :`, '— 1 majeur (datasheet manquante)', `fin de vague ${WAVE} : done`]);
+  });
+
   it('R5 — vague reprise : état déjà écrit (suspended-budget ou done), inscription au registre en retard — le suivi attend la reprise au lieu de finir', async () => {
     for (const status of ['suspended-budget', 'done'] as const) {
       const { parent, store } = await waveWith(['cadence:L1 → ready — prêt à livrer']);

@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- The gate of a wave plays only the tests related to the lot's files after each write, and the full suite once at integration (L590, [docs/orchestrate.md](docs/orchestrate.md), « Targeted gates after a write »): `orchestrate.testRelated` (a command with `{files}`) or, from `orchestrate.test: npx vitest run`, `npx vitest related --run <files>`; no related test, no derivable command or no start sha plays the full suite as before; `cadence verify --gate` never takes a targeted run for the suite's verdict; each gate records its scope, files, code and duration in `portes` of the lot (`--status --detail`), the `suites` column still counts the full suites. On 04-11, 271 suites for 61 lots (4.4 per lot) weighed 59 % of the time between sessions.
+
 ## [1.54.0] - 2026-11-05
 
 ### Added

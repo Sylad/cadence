@@ -1,6 +1,7 @@
 import { lstatSync, readdirSync, realpathSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
-import { git, gitFailure, tryGit } from './worktree.js';
+import { basename, dirname, join, relative, resolve } from 'node:path';
+import { git, gitFailure, planFileSet, tryGit } from './worktree.js';
+import { defaultPlan, planLoader, readPlanConfig } from '../config.js';
 import { lotKey, lotRepoPaths, type LotState } from './state.js';
 import { isAncestor } from '../git.js';
 import { readDeliveryLines, sharedStateDir } from '../state.js';
@@ -100,13 +101,38 @@ export function citesLot(subject: string, lots: string[]): boolean {
   return lots.some((id) => new RegExp(`(?<![\\w.-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`).test(subject));
 }
 
+/** Le commit ne touche que des fichiers de `planFiles` (relatifs au dépôt) ? Un commit sans fichier (fusion, vide) ne l'est pas. */
+function onlyPlanFiles(repo: string, sha: string, planFiles: ReadonlySet<string>): boolean {
+  const files = (tryGit(repo, 'diff-tree', '--no-commit-id', '--name-only', '-r', '--root', sha) ?? '').split('\n').filter(Boolean);
+  return files.length > 0 && files.every((f) => planFiles.has(f));
+}
+
+/**
+ * Les fichiers du plan du dépôt tiers : `planFileSet` quand son plan se lit ; sinon (plan absent ou en cours d'écriture, donc illisible) ceux que son cadence.yaml nomme
+ * (plan.path ou le plan par défaut, la page Gantt, plan.files). Vide quand son cadence.yaml est illisible : rien n'est alors toléré.
+ */
+function tierPlanFiles(repo: string): ReadonlySet<string> {
+  try {
+    return planFileSet(planLoader(repo)(), repo);
+  } catch {
+    // le plan n'est pas lisible : on retombe sur la configuration seule
+  }
+  try {
+    const config = readPlanConfig(join(repo, 'cadence.yaml'), repo);
+    const rel = relative(repo, config?.path ? resolve(repo, config.path) : defaultPlan(repo).path);
+    return new Set([rel, join(dirname(rel), 'gantt.html'), ...(config?.settings.files ?? [])]);
+  } catch {
+    return new Set();
+  }
+}
+
 /**
  * Première branche principale dont le sha a bougé entre deux relevés, avec ce qu'il faut en dire : les commits ajoutés (sha court et sujet), ou la branche créée,
  * supprimée ou déplacée sans commit nouveau. Seuls comptent les commits dont le sujet cite un lot de la vague (`wave.lots`, L458) : une livraison (bump de tag de deploy.sh), un commit du lead
  * ou d'une autre vague ne citent aucun d'eux et passent. Passe aussi le commit dont tous les lots cités sont des lots livrés (`wave.delivered`, L503 : le bump de tag que deploy.sh
- * commite pendant `deliver --sha` d'un lot prêt) ; il est rendu à `wave.onDelivered` (sha court et sujet) pour que le journal le dise. Une branche absente d'un seul côté a bougé (créée ou supprimée pendant la session). Null : rien n'a bougé.
+ * commite pendant `deliver --sha` d'un lot prêt) ; il est rendu à `wave.onDelivered` (sha court et sujet) pour que le journal le dise. Passe de même (L593) le commit qui ne touche que les fichiers du plan du dépôt (`wave.planFiles` : plan.path, plan.files de son cadence.yaml), comme le commit de plan du lead ; rendu à `wave.onPlan`. Une branche absente d'un seul côté a bougé (créée ou supprimée pendant la session). Null : rien n'a bougé.
  */
-export function tierMoved(repo: string, before: TierRead, after: TierRead, wave: { lots: string[]; delivered?: string[]; onDelivered?: (line: string) => void }): { branch: string; detail: string } | null {
+export function tierMoved(repo: string, before: TierRead, after: TierRead, wave: { lots: string[]; delivered?: string[]; onDelivered?: (line: string) => void; planFiles?: ReadonlySet<string>; onPlan?: (line: string) => void }): { branch: string; detail: string } | null {
   for (const branch of [...new Set([...Object.keys(before.mains), ...Object.keys(after.mains)])].sort()) {
     const b = before.mains[branch];
     const a = after.mains[branch];
@@ -115,12 +141,16 @@ export function tierMoved(repo: string, before: TierRead, after: TierRead, wave:
     // branche créée : seuls comptent les commits que aucune branche principale d'avant ne portait déjà
     const range = b ? [`${b}..${a}`] : [a, '--not', ...Object.values(before.mains)];
     const all = (tryGit(repo, 'log', '--abbrev=7', '--format=%h %s', ...range) ?? '').split('\n').filter(Boolean);
-    const { lots, delivered = [], onDelivered } = wave;
+    const { lots, delivered = [], onDelivered, planFiles, onPlan } = wave;
     const lines = all.filter((l) => {
       const subject = l.slice(l.indexOf(' ') + 1);
       const cited = lots.filter((id) => citesLot(subject, [id]));
       if (cited.length > 0 && cited.every((id) => delivered.includes(id))) {
         onDelivered?.(l);
+        return false;
+      }
+      if (cited.length > 0 && planFiles && onlyPlanFiles(repo, l.slice(0, l.indexOf(' ')), planFiles)) {
+        onPlan?.(l);
         return false;
       }
       return cited.length > 0;
@@ -163,7 +193,9 @@ function deliveredLots(lots: LotState[], mine: string): string[] {
 export function movedOutsideDeliveries(repo: string, before: TierRead, after: TierRead, wave: { lots: LotState[]; mine: string; log: (line: string) => void }): ReturnType<typeof tierMoved> {
   const delivered = deliveredLots(wave.lots, wave.mine);
   const tolerated: string[] = [];
-  const moved = tierMoved(repo, before, after, { lots: wave.lots.map((x) => x.lot), delivered, onDelivered: (line) => tolerated.push(line) });
+  const plans: string[] = [];
+  const moved = tierMoved(repo, before, after, { lots: wave.lots.map((x) => x.lot), delivered, onDelivered: (line) => tolerated.push(line), planFiles: tierPlanFiles(repo), onPlan: (line) => plans.push(line) });
+  if (plans.length) wave.log(`commit de plan toléré dans ${basename(repo)} : ${plans.join(' | ')}`);
   if (tolerated.length) wave.log(`commit de livraison (${wave.lots.filter((x) => delivered.includes(x.lot) && tolerated.some((line) => citesLot(line.slice(line.indexOf(' ') + 1), [x.lot]))).map((x) => `${x.project}:${x.lot}`).join(', ')}) toléré dans ${basename(repo)} : ${tolerated.join(' | ')}`);
   return moved;
 }

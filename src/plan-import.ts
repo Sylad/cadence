@@ -155,7 +155,7 @@ function foreignEntry(n: Entry, format: PlanFormat, back: Record<string, string>
   return e;
 }
 
-/** Les sous-tâches d'une entrée native (`tasks:`, raf add --parent), en sous-lots à plat du format d'origine (M10) : `<lot>/<tâche>` sous la clé `parent`, que le lecteur en lecture seule replie en sous-tâches (foreignLots) ; le natif n'écrit `tasks:` nulle part ailleurs que sous ses propres clés. */
+/** Les sous-tâches d'une entrée native (`tasks:`, raf add --parent), en sous-lots à plat du format d'origine (M10) : `<lot>/<tâche>` sous la clé `parent`, que le lecteur en lecture seule replie en sous-tâches (foreignLots). `tasks:` est une clé propre au natif (NATIVE_OWN) : elle n'est jamais recopiée telle quelle. */
 function taskEntries(n: Entry, format: PlanFormat, problems: string[]): Entry[] {
   if (!Array.isArray(n.tasks)) return [];
   return n.tasks.map((t: Entry) => {

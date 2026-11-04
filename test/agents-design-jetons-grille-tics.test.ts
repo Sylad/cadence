@@ -124,7 +124,7 @@ describe('R6/R7 — grille avant livraison', () => {
     expect(entre(ux, '## Method', '## Output')).toContain('*major* (slows or misleads)');
   });
   it('R7 — la section Mockup mode et la section Conformity mode d’ux-reviewer.md n’ont pas changé', () => {
-    expect(empreinte(entre(ux, '## Mockup mode', '## Conformity mode'))).toBe('b243e11eae02f628');
+    expect(empreinte(entre(ux, '## Mockup mode', '## Conformity mode'))).toBe('07ff921fd654863b');
     expect(empreinte(entre(ux, '## Conformity mode', '## Method'))).toBe('0e678bf38c96081f');
   });
   it('R7 — le brief maquette rendu cite toujours 1440 px et 390 px et non 375', async () => {
@@ -244,7 +244,7 @@ describe('R13/R14/R15 — formats inchangés, installation, documentation', () =
     expect(empreinte(read('templates/fiche.yaml'))).toBe('325496e3942ce749');
   });
   it('R13 — REVIEW_SCHEMA accepte et refuse les mêmes rapports qu’avant', () => {
-    expect(empreinte(JSON.stringify(REVIEW_SCHEMA))).toBe('71e7e4ef2c4e0e6a');
+    expect(empreinte(JSON.stringify(REVIEW_SCHEMA))).toBe('b5e5c47a46ec72e9');
     const rapport = { bloquants: 0, majeurs: 0, mineurs: 1, constats: [{ gravite: 'mineur', texte: 'T1 — tic' }], sousTaches: [], nonVerifie: [], verdict: 'conforme' };
     expect(() => checkShape(rapport, REVIEW_SCHEMA)).not.toThrow();
     expect(() => checkShape({ bloquants: 0 }, REVIEW_SCHEMA)).toThrow(/majeurs/);

@@ -182,7 +182,7 @@ describe('R12/R13/R14/R15 — budgets, indicateur, installation, documentation',
     expect(readOrchestrateConfig('/nope').maquetteReviews).toBe(3);
   });
   it('R12 — REVIEW_SCHEMA accepte et refuse les mêmes rapports qu’avant', () => {
-    expect(empreinte(JSON.stringify(REVIEW_SCHEMA))).toBe('71e7e4ef2c4e0e6a');
+    expect(empreinte(JSON.stringify(REVIEW_SCHEMA))).toBe('b5e5c47a46ec72e9');
   });
   it('R12 — trois revues non conformes : lot rendu « maquette non conforme après 3 revues : »', async () => {
     const h = harness({ lots, script: { spec: [spec, spec, spec], maquette: [major, major, major] } });

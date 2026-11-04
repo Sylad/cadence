@@ -108,8 +108,10 @@ export function readJsonLines<T = any>(path: string): T[] {
 /**
  * Le processus tourne-t-il encore ? Un zombie (mort, pas encore recueilli par son parent) répond à `kill(pid, 0)` : le prendre pour vivant
  * fait attendre le recueil par un parent lent (sous charge, ou orphelin d'un parent qui vient de mourir), pas la mort du processus.
+ * Un pid qui n'est pas un entier strictement positif n'est pas un processus : `kill(0, 0)` et `kill(-n, 0)` visent un groupe.
  */
 export function isRunning(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
   } catch {

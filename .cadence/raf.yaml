@@ -2227,10 +2227,11 @@ lots:
     started: 2026-11-04
   - id: L592
     title: "Panneau des lots cadence-hud : un lot de la vague déjà done au plan (livré) s'affiche « livré » et se replie dans une ligne « livrés : N » sous les lots qui jouent, au lieu d'une ligne « prêt » chacun ; la colonne id n'est jamais tronquée (« L5… » vu pour L584) — 04-11, vague 1310-cad : 14 lots prêts ou déjà livrés listés au-dessus des 3 lots en cours, Sylvain : « elle me montre beaucoup de lots »"
-    status: todo
+    status: doing
     estimate: 0.25
     visible: true
     created: 2026-11-04
+    started: 2026-11-04
   - id: L593
     title: "Incident « commit sur la branche principale d'un autre dépôt » : un commit qui ne touche que les fichiers du plan (plan.path, plan.files du cadence.yaml de ce dépôt) n'est pas un incident, comme un commit de plan du lead dans le dépôt du lot — 04-11, vague 1310-cad : L589 rendu en pleine implémentation pour 3 commits « plan: add Q-MIG2..4 » du lead dans maritime-atlas (raf.py commite lui-même), dépôt que L589 ne touche pas"
     status: todo

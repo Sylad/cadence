@@ -51,7 +51,7 @@ function statesOf(text: string): Map<string, string> | null {
   const lots = (doc as { lots?: unknown } | null)?.lots;
   if (!Array.isArray(lots)) return null;
   const states = new Map<string, string>();
-  for (const l of lots as { id?: unknown; state?: unknown }[]) if (l && l.id !== undefined) states.set(String(l.id), l.state === undefined ? '' : String(l.state));
+  for (const l of lots as { id?: unknown; state?: unknown }[]) if (l && l.id !== undefined) states.set(String(l.id), l.state === undefined || l.state === null ? '' : String(l.state));
   return states;
 }
 
@@ -71,7 +71,7 @@ function stateChanges(before: Map<string, string>, after: Map<string, string>, d
  * Une version illisible est sautée et signalée par `warn`.
  */
 function stateEvents(root: string, planFile: string, since: Day | undefined, warn: (line: string) => void): PlanEvent[] {
-  const log = tryGit(root, ['log', '--reverse', '--format=%H %cs', ...(since ? [`--since=${since}`] : []), '--', planFile]);
+  const log = tryGit(root, ['log', '--reverse', '--format=%H %cs', ...(since ? [`--since=${since}T00:00:00`] : []), '--', planFile]);
   if (!log) return [];
   const versions = log.split('\n').map((l) => l.split(' ') as [string, Day]);
   const parent = since ? fileAt(root, `${versions[0][0]}^`, planFile) : null;

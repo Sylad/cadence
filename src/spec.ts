@@ -2,6 +2,7 @@ import { parse } from 'yaml';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import { RafError } from './plan.js';
+import { maquetteEcranProblems } from './orchestrate/maquette-ecran.js';
 
 /** Les largeurs de rendu d'une fiche (L170, spec etape-spec S2). */
 export const LARGEURS = [1440, 390];
@@ -46,7 +47,7 @@ export function checkFiche(doc: unknown): string[] {
   const ecran = isObj(doc.ecran) ? doc.ecran : {};
   if (ecranPart) {
     if (!isObj(doc.ecran)) p.push('ecran : bloc manquant');
-    for (const k of ['id', 'titre', 'route', 'lot', 'maquette']) if (!texte(ecran[k])) p.push(`ecran.${k} : texte attendu`);
+    for (const k of ['id', 'titre', 'route', 'lot', 'maquette']) if (!texte(ecran[k])) p.push(`ecran.${k} : texte attendu`); p.push(...maquetteEcranProblems(ecran));
     if (texte(ecran.route) && !ecran.route.startsWith('/')) p.push(`ecran.route : « ${ecran.route} » doit commencer par /`);
     if (!Array.isArray(ecran.largeurs) || LARGEURS.some((w) => !(ecran.largeurs as unknown[]).includes(w))) p.push(`ecran.largeurs : [${LARGEURS.join(', ')}] attendu`);
   }

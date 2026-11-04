@@ -8,6 +8,7 @@ ecran:
   lot: L0                      # le lot d'implémentation
   largeurs: [1440, 390]        # largeurs de rendu : toujours ces deux-là
   maquette: docs/specs/mon-ecran/maquette.html
+  # maquette_ecran: docs/specs/mon-ecran/ecran/page.html   # (optionnel) la page qui dessine les états, si ce n'est pas l'index ci-dessus
 etats: [vide, chargement, erreur, charge]   # au moins vide, chargement, erreur
 
 champs:                        # id unique en kebab-case : c'est aussi le data-testid de la maquette

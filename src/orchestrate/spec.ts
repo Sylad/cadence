@@ -8,6 +8,8 @@ import { acceptationFile } from './accept.js';
 import { checkFiche, fichesDuDossier, LARGEURS } from '../spec.js';
 import { EXPRESS_MAX_ESTIMATE } from './express.js';
 import { worstSpecLines } from './pires-cas.js';
+import { indexProblems } from './maquette-ecran.js';
+export { completeIndex } from './maquette-ecran.js';
 import type { SpecStage } from './lot-budget.js';
 
 // Étape spec d'orchestrate (L171, spec etape-spec S3) : ce que le programme sait de la sortie de la session `spec`.
@@ -271,10 +273,7 @@ export function checkSpec(repo: string, fiche: string, lot: string, parts: Fiche
   need(maquette, 'maquette');
   const html = existsSync(join(repo, maquette)) ? readFileSync(join(repo, maquette), 'utf8') : '';
   const etats = Array.isArray(doc.etats) ? doc.etats.filter((e): e is string => typeof e === 'string' && e.trim() !== '') : [];
-  if (html) {
-    for (const e of etats) if (!new RegExp(`\\bid=["']etat-${e}["']`).test(html)) problems.push(`maquette.html : section id="etat-${e}" absente`);
-    for (const c of list(doc.champs)) if (typeof c.id === 'string' && !new RegExp(`data-testid=["']${c.id}["']`).test(html)) problems.push(`maquette.html : data-testid="${c.id}" absent (chaque champ de la fiche le porte)`);
-  }
+  problems.push(...indexProblems(repo, doc, maquette, html, etats));
   for (const e of etats) for (const w of LARGEURS) need(`${folder}/maquette-${e}-${w}.png`, 'capture');
   problems.push(...copiedCaptures(repo, folder, etats));
   return problems;
@@ -338,11 +337,18 @@ const renderLine = (render: string | undefined, use: string): string =>
     ? `The project declares how to render mockups (\`orchestrate.spec.render\`): \`${render}\` (from the repository root). ${use}; fall back on Playwright only if it cannot run, and say so under "nonVerifie".`
     : 'No render command is declared (`orchestrate.spec.render`): render with Playwright (open `maquette.html` as a local file, resize to each width, open each `#etat-<état>`).';
 
+/** L'index de la maquette que le programme contrôle (L573, issue #34) : son fichier, la forme exacte de l'entrée, et ce que fait `ecran.maquette_ecran`. */
+const indexLines = (dir: string): string[] => [
+  `The program checks the mockup index \`${dir}/<écran>/maquette.html\` (\`ecran.maquette\`), not any other page: every field of the sheet is an entry \`<p data-testid="<id du champ>">…</p>\` of that file and every state a \`<section id="etat-<état>">…</section>\`, with the captures \`maquette-<état>-<largeur>.png\` beside it.`,
+  'If you draw the states in another page, declare it in the sheet as `ecran.maquette_ecran` (path from the repository root): the program then adds to the index the fields and states that page draws and the index lacks, and copies the captures it holds beside it into the folder of the sheet. What that page does not draw stays a finding, and the finding then reads « présent dans maquette_ecran, absent de l\'index » when only the index misses it.',
+];
+
 /** Consigne de la maquette d'un lot `screen: page` (ou déjà entré dans la chaîne complète). */
 const pageLines = (o: { dir: string; render?: string; screen?: string }): string[] => [
     `The lot declares \`screen: ${o.screen}\`. The specs of this project live in \`${o.dir}/<écran>/\` (one folder per screen, \`<écran>\` = the kebab-case \`ecran.id\` of the sheet).`,
     `Render each state of the mockup at ${LARGEURS.map((w) => `${w}`).join(' and ')} px width: one capture per state and per width, named \`maquette-<état>-<largeur>.png\` (e.g. \`maquette-vide-1440.png\`). Each capture is rendered from its own state: the program compares the files and sends back two states of one width with the same fingerprint, and a dark capture (\`maquette-<état>-sombre-<largeur>.png\`) identical to its light one.`,
 
+  ...indexLines(o.dir),
   renderLine(o.render, 'Use it'),
 ];
 
@@ -354,6 +360,7 @@ const lightLines = (o: { dir: string; render?: string }): string[] => [
     'If the current screen cannot be captured (the application does not start, the page is protected), say so under "nonVerifie" and base the mockup on the code: never invent a capture of the current screen.',
     'Each touched state is a section `id="etat-<état>"` of `maquette.html`, and each touched field carries a `data-testid`.',
 
+  ...indexLines(o.dir),
   renderLine(o.render, 'Use it for the target'),
 ];
 

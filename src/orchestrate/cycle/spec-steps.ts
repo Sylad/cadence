@@ -1,6 +1,6 @@
 import { type LotCtx, propose, hasSpecStage, workDir as wd, histPlan, stop, transition, save } from './ctx.js';
 import { type SessionKind } from '../launch.js';
-import { findFiche, ficheReady, lightLot, answerAltersRule, sourceRules, LEAD_SOURCE, checkSpec, costlyHypotheses, hypothesisLines } from '../spec.js';
+import { findFiche, ficheReady, lightLot, answerAltersRule, sourceRules, LEAD_SOURCE, checkSpec, completeIndex, costlyHypotheses, hypothesisLines } from '../spec.js';
 import { partsOf, ficheOf, specBudget, specMax, ficheConverging } from './brief.js';
 import { acceptationProof, NO_ACCEPT, lotAcceptation, listed } from './accept-step.js';
 import { redSha, parseAcceptation } from '../accept.js';
@@ -109,6 +109,23 @@ function sourceAnsweredRules(c: LotCtx): boolean {
 }
 
 /**
+ * L'index de la maquette complété depuis `ecran.maquette_ecran` (L573, issue #34), commité avant le contrôle : ce que la page dessine et que l'index n'a pas
+ * ne fait plus échouer de passe. Rend les écarts à renvoyer à la session (écriture ou commit refusé), vide quand tout va bien.
+ */
+function completeAndCommit(c: LotCtx, fiche: string): string[] {
+  try {
+    const files = completeIndex(wd(c), fiche);
+    if (files.length) {
+      git(wd(c), 'add', '--', ...files);
+      git(wd(c), 'commit', '-q', '-m', `spec(${c.lot.lot}): index de la maquette complété depuis maquette_ecran (${files.length} fichier${files.length > 1 ? 's' : ''})`, '--', ...files);
+    }
+    return [];
+  } catch (e) {
+    return [`${fiche} : index de la maquette non complété depuis maquette_ecran (${(e as Error).message.split('\n')[0]})`];
+  }
+}
+
+/**
  * Étape spec (L171, spec etape-spec S3) : la session écrit maquette, captures et fiche dans `<spec.dir>/<écran>/`, le programme
  * en relève les écarts (une seconde passe, puis le lot est rendu), une hypothèse coûteuse à défaire devient une question au lead,
  * et une sortie sous le seuil (le lot ne change aucun écran) rend le lot au chemin actuel.
@@ -159,7 +176,7 @@ export async function specStep(c: LotCtx): Promise<void> {
   const fiche = outside ? '' : asked || findFiche(wd(c), c.config.spec.dir, l.lot) || '';
   const what = l.screen ? '<écran>' : '<sujet>';
   const inDir = fiche === '' || fiche.startsWith(`${c.config.spec.dir.replace(/\/+$/, '')}/`);
-  const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/${what}/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/${what}/fiche.yaml)`] : fiche ? checkSpec(wd(c), fiche, l.lot, partsOf(c, fiche)) : [`aucune fiche écrite : ${c.config.spec.dir}/${what}/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change ${l.screen ? 'aucun écran' : 'aucun comportement'})`];
+  const problems = !outside && fiche && !inDir ? [`${fiche} : fiche hors de ${c.config.spec.dir} (la spec vit dans ${c.config.spec.dir}/${what}/fiche.yaml, où l'étape la retrouve)`] : outside ? [`${reported} : fiche hors du dépôt (le chemin de « fiche » est relatif au dépôt : ${c.config.spec.dir}/${what}/fiche.yaml)`] : fiche ? [...completeAndCommit(c, fiche), ...checkSpec(wd(c), fiche, l.lot, partsOf(c, fiche))] : [`aucune fiche écrite : ${c.config.spec.dir}/${what}/fiche.yaml est attendue (ou une raison dans « sousSeuil » si le lot ne change ${l.screen ? 'aucun écran' : 'aucun comportement'})`];
   if (problems.length) {
     if ((l.specRuns ?? 0) >= specMax(c)) {
       stop(c, 'handed-back', `spec non conforme après ${l.specRuns} passes : ${problems.join(' ; ')}`);

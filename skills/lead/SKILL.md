@@ -40,7 +40,7 @@ commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.
   lead. Launch one `livreur` at a time: never two deliveries in parallel, and each `livreur` counts in the cap of subagents. Only another
   `livreur` or another subagent blocks a new one; the sessions of a running wave do not (a ready lot is delivered while the wave runs,
   section 2b). Never launch a `livreur` while the wave integrates a lot (`cadence lead tour` shows it): `raf done` would write the plan
-  of the main tree, which that integration refuses as modified. Brief: the absolute project folder, the lot, the sha to deliver
+  of the main tree, which that integration refuses as modified. Likewise, in a repository **without worktrees** `raf done` is refused (exit 2, `done différé`) while a session of the wave works in the main tree: the plan it would write is a modified file that hands the next lot back (« dépôt sale après implement »). Safe order: wait for the end of that step (`cadence orchestrate --status`), then `raf done <lot>`; `--now` writes at once and accepts the lots being handed back. Brief: the absolute project folder, the lot, the sha to deliver
   (« livrable jusqu'à »), the value of `lead.ux`, the base URL of the delivered app (the `deliver` configuration of `cadence.yaml`),
   and for a visible lot with `lead.ux: lead` the `ux-reviewer`'s report and the folder of its captures. It hands back one line
   (`L84 livré 3d6edf4, QA à lancer <url>`) or one `Question : …`; the lead itself launches the `qa-reviewer` with the URL of the line

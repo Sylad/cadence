@@ -48,7 +48,7 @@ function vague(status: LotState['status'], opts: { worktree?: boolean; alive?: b
 }
 
 const WARN = /vague w9 .*travaille dans l'arbre principal.*demo:L1/s;
-const WRITES: string[][] = [['add', 'deux'], ['note', 'L1', 'x'], ['done', 'L1', '--force']];
+const WRITES: string[][] = [['add', 'deux'], ['note', 'L1', 'x'], ['done', 'L1', '--force', '--now']];
 
 describe('raf add / note / done pendant qu\'une session de vague tient l\'arbre principal (L475)', () => {
   it('R1 — lot en implémentation sans worktree : add, note et done avertissent sur stderr et écrivent', () => {

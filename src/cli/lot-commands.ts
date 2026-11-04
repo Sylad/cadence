@@ -13,7 +13,7 @@ import { resolveCommit } from '../git.js';
 import { loadEntries } from '../news.js';
 import { addLot } from '../cli-add.js';
 import { type Lot, RafError, type Screen, SCREENS, type Status } from '../plan.js';
-import { warnIntegrating, warnWaveWorking, waveHolding } from '../repo-busy.js';
+import { refuseDoneInMainTree, warnIntegrating, warnWaveWorking, waveHolding } from '../repo-busy.js';
 import { type Ctx, knownLot, touchedLot } from './context.js';
 
 /** raf add "titre" : ajoute un lot ou une sous-tâche. */
@@ -33,6 +33,7 @@ export function cmdAdd(c: Ctx): number | Promise<number> {
 export function cmdSetStatus(c: Ctx): number | Promise<number> {
   const { rest, values, io, today, root, configPath, planConfig, loadPlan, newsDir, refuseLongTitle, need, command } = c;
   need(1, `${command} <id>`);
+  refuseDoneInMainTree(root, io.env, { command, lot: rest[0], now: values.now });
   const plan = loadPlan();
   const status: Status = command === 'start' ? 'doing' : command === 'done' ? 'done' : 'dropped';
   // Le titre public part au site : un titre au-delà de la limite déclarée y ferait échouer le build.

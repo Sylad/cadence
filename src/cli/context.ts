@@ -50,6 +50,7 @@ const OPTIONS = {
     id: { type: 'string' },
     under: { type: 'string' },
     force: { type: 'boolean' },
+    now: { type: 'boolean' },
     back: { type: 'boolean' },
     reason: { type: 'string' },
     porteur: { type: 'string' },

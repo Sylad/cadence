@@ -94,6 +94,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `raf done` is refused (exit 2, `done différé`, plan untouched) while a session of a live wave works in the main tree of a repository without worktrees (L521, `docs/raf.md`, skill `lead`): the plan it wrote stayed a modified file there and the next lot was handed back as « dépôt sale après implement » (avatar L57 after L56, 01-11). The message gives the safe order — wait for the end of that step, then run `raf done` again — and `--now` writes at once. `raf add` and `raf note` still only warn; `cadence deliver --sha` already commits its plan (L388).
 - Remote gate (L507, [docs/remote-gate.md](docs/remote-gate.md) « Timeout, Ctrl-C, signals »): Ctrl-C or SIGTERM on a wave or on `verify --gate`, including during the host probe and `gate.install`, now kills the local ssh in progress before the host cleanup, so a cleanup that fails no longer leaves it running.
 - A new wave finds a lot's kept branch under the project's former name (L581, GitHub issue #38, [docs/orchestrate.md](docs/orchestrate.md)): `cadence/<wave>/<repo>--<lot>` is recovered as `cadence/<wave>/<org>__<repo>--<lot>` (both forms looked up, the most recent first); on 04-11 five commits of work were ignored and the lot restarted from `main`. `cadence orchestrate --dry-run` now lists, per lot, each unintegrated kept branch of a past wave and says whether it is recovered or not and why (`n'est pas reprise, elle est partie de develop et le dépôt est sur main`).
 

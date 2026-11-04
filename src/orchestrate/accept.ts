@@ -126,12 +126,12 @@ export function resealedRouge(repo: string, path: string, anchor: string, bySess
   return journal(now) > journal(anchor) ? now : null;
 }
 
-/** Chemin (relatif au dépôt) de l'`acceptation.json` du lot sous `dir`, ou null. */
-export function findAcceptation(repo: string, dir: string, lot: string): string | null {
+/** Chemin (relatif au dépôt) de l'`acceptation.json` du lot sous `dir`, ou null. Avec `fiche` (L570), seule une acceptation qui vise cette fiche compte. */
+export function findAcceptation(repo: string, dir: string, lot: string, fiche?: string): string | null {
   for (const path of listAcceptations(repo, dir).sort()) {
     try {
       const a = parseAcceptation(readFileSync(join(repo, path), 'utf8'));
-      if (typeof a !== 'string' && a.lot === lot) return path;
+      if (typeof a !== 'string' && a.lot === lot && (!fiche || posix.normalize(a.fiche) === posix.normalize(fiche))) return path;
     } catch {
       // illisible : pas celui du lot
     }

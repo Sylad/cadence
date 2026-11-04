@@ -333,8 +333,10 @@ export function ficheHypotheses(root: string, dir: string, restreint: (lot: stri
   const out = new Map<string, string[]>();
   for (const { name, doc } of fichesDuDossier(root, dir)) {
     if (!isObj(doc.ecran) || !texte(doc.ecran.lot)) continue;
-    const sien = restreint(doc.ecran.lot, posix.join(dir, name, 'fiche.yaml'));
-    const ids = (Array.isArray(doc.regles) ? doc.regles : []).filter(isObj).filter((r) => r.statut === 'hypothese' && texte(r.id) && (!sien || sien.has(String(r.id)))).map((r) => String(r.id));
+    const hyp = (Array.isArray(doc.regles) ? doc.regles : []).filter(isObj).filter((r) => r.statut === 'hypothese' && texte(r.id)).map((r) => String(r.id));
+    // La restriction (git ls-tree, git log…) ne se calcule que pour une fiche qui a une hypothèse.
+    const sien = hyp.length ? restreint(doc.ecran.lot, posix.join(dir, name, 'fiche.yaml')) : null;
+    const ids = sien ? hyp.filter((i) => sien.has(i)) : hyp;
     if (ids.length) out.set(doc.ecran.lot, [...(out.get(doc.ecran.lot) ?? []), ...ids]);
   }
   return out;

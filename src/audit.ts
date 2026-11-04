@@ -240,7 +240,7 @@ export function hypothesesOf(root: string, configFile: string, refsOf?: (text: s
     // dossier par défaut
   }
   const restreint = refsOf
-    ? (lot: string, fiche: string) => reglesDuLotPourBrief({ repo: root, lot, fiche, acceptation: findAcceptation(root, dir, lot) ?? undefined, partage: { dir, refsOf } })
+    ? (lot: string, fiche: string) => reglesDuLotPourBrief({ repo: root, lot, fiche, acceptation: findAcceptation(root, dir, lot, fiche) ?? undefined, partage: { dir, refsOf } })
     : undefined;
   return ficheHypotheses(root, dir, restreint);
 }

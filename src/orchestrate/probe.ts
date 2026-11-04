@@ -94,6 +94,15 @@ export function horsRegleWarnings(rep: Pick<ProbeReport, 'horsRegle'> | undefine
   return list.filter((e): e is string => typeof e === 'string' && e.trim() !== '').map((e) => `${PROBE_FINDING}attente hors règle du lot, non commitée (à reprendre en constat de revue ou en sous-tâche) : ${e.trim()}`);
 }
 
+/** Les attentes hors règle, dites au lot : un warning (tableau du lead) et une sous-tâche proposée `[hors règle] …` (rendue au lead, sans doublon), comme la dette `[instable]` (L522). */
+function noteHorsRegle(l: LotState, rep: Pick<ProbeReport, 'horsRegle'> | undefined): void {
+  l.warnings.push(...horsRegleWarnings(rep));
+  for (const e of Array.isArray(rep?.horsRegle) ? (rep.horsRegle as unknown[]) : []) {
+    const proposal = typeof e === 'string' && e.trim() ? `[hors règle] ${e.trim()}` : '';
+    if (proposal && !l.proposals.includes(proposal)) l.proposals.push(proposal);
+  }
+}
+
 /** Le rapport de la session, ou un warning « non jouée » quand il est illisible (la revue part quand même). */
 function readReport(l: LotState, report: unknown): ProbeReport | undefined {
   try {
@@ -145,7 +154,7 @@ export async function probeStep<D extends ProbeDone>(io: ProbeIo<D>): Promise<vo
   const step = l.steps[l.steps.length - 1]!;
   const rep = done === PROBE_FAILED ? cutSession(io, step) : readSession(io, done, step);
   if (rep === 'rendu') return;
-  l.warnings.push(...horsRegleWarnings(rep));
+  noteHorsRegle(l, rep);
   // La porte du programme après la sonde comme après toute écriture, mais seulement si elle a commité : sans nouveau commit il n'y a rien de neuf à rejouer.
   const red: Constat[] = [];
   const runs: CheckRun[] = [];

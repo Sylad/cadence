@@ -86,6 +86,15 @@ describe('sonde L580 — par le cycle réel', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
     expect(c.lot.warnings).toContain(`${PREFIX}t — e — a`);
+    expect(c.lot.proposals).toEqual(['[hors règle] t — e — a']);
+  });
+
+  it('horsRegle : une sous-tâche proposée par entrée, sans doublon', async () => {
+    const quiet: Handler = () => claudeOut(probeReport({ horsRegle: ['x — nom vide — refus', ' x — nom vide — refus ', 'y — e — a'] }));
+    const h = harness({ script: { implement: [impl('a.ts')], probe: [quiet], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true });
+    await runLot(c);
+    expect(c.lot.proposals).toEqual(['[hors règle] x — nom vide — refus', '[hors règle] y — e — a']);
   });
 
   it('horsRegle avec echecs annoncés (tests rouges) : le warning est écrit sans empêcher le constat', async () => {

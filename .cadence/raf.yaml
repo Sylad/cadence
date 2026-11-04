@@ -2041,11 +2041,12 @@ lots:
     finished: 2026-11-04
   - id: L574
     title: "Empreintes figées des tests de garde (test/revue-maquette-criteres.test.ts R11, test/agents-design-jetons-grille-tics.test.ts R13…) : remplacées par des tests de comportement (une fiche valide d'avant passe toujours cadence spec check ; le gabarit garde ses clés), plus d'empreinte de fichier — 04-11 : trois lots (L570, L562, L573) arrêtés en question pour une simple mise à jour d'empreinte"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-04
     started: 2026-11-04
     review: { date: 2026-11-04, verdict: "compliant: 2 minor notes (L576 referenced but absent from the plan; probe kept in test/) — orchestré (vague 2026-11-04-1015-cad, 1 passe(s) de correction)", commit: 0793a6065a98f7347ce27987a50093733db833ce, reporte: { de: b30c11c315ad66c5d7d1b8fe61f63443726fca04, vers: 0793a6065a98f7347ce27987a50093733db833ce, patchId: 71c983242107dbcf3f1591d305c93c1809d25410 } }
+    finished: 2026-11-04
   - id: L575
     title: "cadence corrections --classify sans Ollama joignable (issue #35) : une ligne dès le départ « Ollama injoignable sur <OLLAMA_HOST> : rien n'est classé » et un code de sortie non nul, au lieu de « 53/53 », exit 0 et {} écrit ; si le modèle répond en partie, le compte des passes non classées et la raison ; corrections.json n'est pas écrasé par un résultat vide"
     status: doing
@@ -2056,6 +2057,11 @@ lots:
     title: Corriger les 4 fiches invalides antérieures (autocontrole-avant-revue A3 code « exit 2 », orchestrate-reprise-lot-budget A1 code « warning », rejeu-porte-composee R3 test nommé R6, session-sans-commit-sur-depot-tiers id R17 au lieu de R15) pour qu'elles passent checkFiche, puis vider la liste d'exceptions du test de comportement posé par L574
     status: todo
     estimate: 0.25
+    created: 2026-11-04
+  - id: L577
+    title: "Tests instables sous charge stabilisés : 20 rouges dans la suite, verts rejoués seuls, sur les vagues du 01 au 04-11 (orchestrate-creneaux-libres-l527-probe ×6, porte-deportee ×3, deliver ×3, verify ×2, orchestrate-worktree-plan-writes ×2, orchestrate-app ×2, probe-L539-bords, orchestrate-worktree-integration) : pour chacun, la cause (attente à durée fixe, verrou, horloge, port) et un correctif qui attend l'événement au lieu d'un délai ; mesure avant/après par les lignes « instable(s) sous charge » des journaux"
+    status: todo
+    estimate: 0.5
     created: 2026-11-04
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

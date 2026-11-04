@@ -1,6 +1,6 @@
 // Part de la machine de chaque session (L350) : le 26-10, 32 cœurs et 4 sessions, vitest à 31 workers par suite, et des tests qui passaient seuls rougissaient ensemble.
 
-import { failedTests, jestTestFiles, stripAnsi, testDurationMs, timeoutLimits } from './baseline.js';
+import { failedTests, jestTestFiles, nodeTestFiles, nodeTestRan, stripAnsi, testDurationMs, timeoutLimits } from './baseline.js';
 
 /** Variable posée dans l'environnement des sessions et de la porte : le nombre de workers que leurs lanceurs de tests ont le droit d'ouvrir. */
 export const TEST_WORKERS_ENV = 'CADENCE_TEST_WORKERS';
@@ -34,6 +34,16 @@ export function replayFile(test: string): string | null {
   const head = seps.length ? test.slice(0, Math.min(...seps)) : /^\S+$/.test(test.trim()) ? test : '';
   const file = head.trim().replace(/^\|[^|\s]*\|\s+/, ''); // espace de travail vitest : « |paquet|  src/a.test.ts »
   return /^\S.*\.\w+$/.test(file) ? file : null;
+}
+
+/**
+ * Le fichier à rejouer pour chaque nom rouge de `output` : le « location: » de node --test d'abord (L514 : un titre libre n'est pas un chemin, même s'il n'a pas d'espace), puis le nom (vitest, pytest), puis le fichier FAIL de jest.
+ * `nodeTitles` dit si le nom est un titre node --test : son rejeu vert ne s'imprime pas avec son fichier, il se prouve par sa ligne « ok N - titre » (`nodeTestRan`).
+ */
+function fileResolver(output: string): { (n: string): string | null; nodeTitles: Map<string, string> } {
+  const jest = jestTestFiles(output);
+  const nodeTitles = nodeTestFiles(output);
+  return Object.assign((n: string): string | null => nodeTitles.get(n) ?? replayFile(n) ?? jest.get(n) ?? null, { nodeTitles });
 }
 
 /** Un argument de commande sans risque pour `sh -c` : tel quel s'il est simple, entre apostrophes sinon. */
@@ -84,8 +94,7 @@ const REPLAYS = 2;
  * (build cassé, fichier introuvable) ne nomme pas le test et ne l'excuse pas. Un test sans fichier désignable n'est pas rejoué, donc n'est jamais retenu. Sert à savoir si un rouge du lot était déjà rouge au sha de départ.
  */
 export async function redAlone(run: (command: string) => Promise<{ code: number; output: string }>, template: string, names: string[], output: string): Promise<string[]> {
-  const jest = jestTestFiles(output);
-  const fileOf = (n: string): string | null => replayFile(n) ?? jest.get(n) ?? null;
+  const fileOf = fileResolver(output);
   let still = [...new Set(names)].filter((n) => fileOf(n));
   for (let i = 0; i < REPLAYS && still.length; i++) {
     const files = [...new Set(still.map((n) => fileOf(n)!))];
@@ -111,8 +120,7 @@ export interface TightTest {
  * Un test vert à un rejeu est `unstable` (et `tight` quand sa durée seul est près de son délai, L510) ; rouge aux `REPLAYS` rejeux, ou sans fichier désignable (rien à rejouer seul), il reste dans `red`.
  */
 export async function replayRed(run: (command: string) => Promise<{ code: number; output: string }>, template: string, names: string[], output: string): Promise<{ red: string[]; unstable: string[]; tight: TightTest[] }> {
-  const jest = jestTestFiles(output);
-  const fileOf = (n: string): string | null => replayFile(n) ?? jest.get(n) ?? null;
+  const fileOf = fileResolver(output);
   let red = [...new Set(names)];
   const unstable: string[] = [];
   const tight: TightTest[] = [];
@@ -122,9 +130,9 @@ export async function replayRed(run: (command: string) => Promise<{ code: number
     const files = [...new Set(replayable.map((n) => fileOf(n)!))];
     if (!files.length) break;
     const r = await run(template.replaceAll('{files}', () => files.map(shellArg).join(' ')));
-    // Seul un rejeu qui sort en 0 en ayant exécuté le FICHIER du test vaut vert. Un rejeu en échec ne conclut rien pour un test qu'il ne nomme pas : sur une porte composée (`a && b`) les fichiers n'atteignent que le dernier lanceur, un premier lanceur qui rougit coupe avant lui. Un rejeu sans test exécuté (filtre sans fichier, `passWithNoTests`) sort en 0 sans rien prouver, et un lanceur qui ignore sans rien dire un fichier qu'il ne trouve pas (vitest d'un autre espace de travail) sort en 0 sans l'avoir joué : le fichier doit figurer, chemin entier, sur une ligne du lanceur de la sortie du rejeu, hors écho de la commande par npm/pnpm/yarn (`replayRanFile`).
+    // Seul un rejeu qui sort en 0 en ayant exécuté le FICHIER du test vaut vert. Un rejeu en échec ne conclut rien pour un test qu'il ne nomme pas : sur une porte composée (`a && b`) les fichiers n'atteignent que le dernier lanceur, un premier lanceur qui rougit coupe avant lui. Un rejeu sans test exécuté (filtre sans fichier, `passWithNoTests`) sort en 0 sans rien prouver, et un lanceur qui ignore sans rien dire un fichier qu'il ne trouve pas (vitest d'un autre espace de travail) sort en 0 sans l'avoir joué : le fichier doit figurer, chemin entier, sur une ligne du lanceur de la sortie du rejeu, hors écho de la commande par npm/pnpm/yarn (`replayRanFile`). Un test node --test vert n'imprime pas son fichier : sa preuve est sa ligne « ok N - titre » (`nodeTestRan`, L514).
     const ran = r.code === 0 && !NO_TEST_RAN.test(r.output);
-    const passed = ran ? replayable.filter((n) => replayRanFile(r.output, fileOf(n)!)) : [];
+    const passed = ran ? replayable.filter((n) => (fileOf.nodeTitles.has(n) ? nodeTestRan(r.output, n) : replayRanFile(r.output, fileOf(n)!))) : [];
     unstable.push(...passed);
     // L510 : vert seul mais expiré dans la suite, et la durée du rejeu est près du délai : le test est trop juste, pas bugué. Sans délai lu dans la suite ou sans durée lisible au rejeu, rien n'est dit.
     for (const n of passed) {

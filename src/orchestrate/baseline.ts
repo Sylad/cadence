@@ -144,6 +144,41 @@ export function jestTestFiles(output: string): Map<string, string> {
   return files;
 }
 
+const TAP_NOT_OK = /^\s*not ok\s+\d*\s*-?\s*(.+)$/;
+const TAP_LINE = /^\s*(?:not ok|ok)\b|^\s*# Subtest\b/;
+
+/**
+ * node --test (TAP) : le fichier de chaque test rouge, lu dans le « location: '/chemin/fichier.mjs:ligne:colonne' » du bloc YAML qui suit sa ligne « not ok N - titre » (L514). Le lanceur nomme un test par son titre, jamais par son fichier.
+ * Le bloc finit à la ligne TAP suivante : un rouge sans location: (Node ancien) n'a pas de fichier, il ne prend pas celui d'un test suivant. Un titre rouge dans deux fichiers différents est ambigu et sans fichier : le rejeu d'un fichier ne dirait rien de l'autre.
+ */
+export function nodeTestFiles(output: string): Map<string, string> {
+  const files = new Map<string, string>();
+  const ambiguous = new Set<string>();
+  let title: string | null = null;
+  for (const raw of stripAnsi(output).split('\n')) {
+    if (TAP_LINE.test(raw)) {
+      const m = TAP_NOT_OK.exec(raw);
+      title = m ? clean(m[1]) || null : null;
+      continue;
+    }
+    const loc = title ? /^\s*location:\s*'(.+?):\d+:\d+'\s*$/.exec(raw) : null;
+    if (!loc || !title) continue;
+    if (files.has(title) && files.get(title) !== loc[1]) ambiguous.add(title);
+    files.set(title, loc[1]);
+    title = null;
+  }
+  for (const t of ambiguous) files.delete(t);
+  return files;
+}
+
+/** Le test `title` a-t-il tourné et réussi dans cette sortie node --test (TAP) : une ligne « ok N - titre » exacte, ni sautée (# SKIP) ni à faire (# TODO). Un test vert n'imprime pas son fichier : c'est la seule preuve (L514). */
+export function nodeTestRan(output: string, title: string): boolean {
+  return stripAnsi(output).split('\n').some((l) => {
+    const m = /^\s*ok\s+\d+\s*-\s*(.+)$/.exec(l);
+    return !!m && clean(m[1]) === title;
+  });
+}
+
 /** Échecs d'après le lot qui n'étaient pas rouges au départ (`nouveaux`) et ceux qui l'étaient déjà (`existants`). */
 export function compareBaseline(now: string[], base: string[]): { nouveaux: string[]; existants: string[] } {
   const was = new Set(base);

@@ -3,8 +3,11 @@
 /* eslint-disable-next-line no-control-regex */
 const ANSI = /\u001b\[[0-9;]*m/g;
 
+/** Ligne TAP « not ok N - titre » : partagée par failedTests (MARKERS) et nodeTestFiles, qui doivent nettoyer le titre de la même façon. */
+const TAP_NOT_OK = /^\s*not ok\s+\d*\s*-?\s*(.+)$/;
+
 /** Marqueurs d'échec des lanceurs courants : vitest/jest (FAIL, ●), pytest (FAILED, ERROR), go (--- FAIL:), TAP (not ok). */
-const MARKERS: RegExp[] = [/^\s*FAIL(?:ED)?\s+(.+)$/, /^\s*ERROR\s+(\S+::.+)$/, /^\s*--- FAIL:\s+(\S+)/, /^\s*not ok\s+\d*\s*-?\s*(.+)$/, /^\s*●\s+(.+)$/];
+const MARKERS: RegExp[] = [/^\s*FAIL(?:ED)?\s+(.+)$/, /^\s*ERROR\s+(\S+::.+)$/, /^\s*--- FAIL:\s+(\S+)/, TAP_NOT_OK, /^\s*●\s+(.+)$/];
 
 /** Identifiant pytest « chemin::test[param] » : coupe le message (« - assert … ») au premier « - » hors crochets. */
 function pytestId(s: string): string {
@@ -144,7 +147,6 @@ export function jestTestFiles(output: string): Map<string, string> {
   return files;
 }
 
-const TAP_NOT_OK = /^\s*not ok\s+\d*\s*-?\s*(.+)$/;
 const TAP_LINE = /^\s*(?:not ok|ok)\b|^\s*# Subtest\b/;
 
 /**

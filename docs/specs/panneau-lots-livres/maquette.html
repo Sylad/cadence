@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panneau des lots — cadence-hud — livrés repliés (maquette L592)</title>
+<style>
+  /* Charte : celle de la bande cadence-hud (cellules de terminal, clés de thème success / error / warning / subtle / claude). */
+  :root {
+    --fond: #1b1b1f; --texte: #d8d8dc; --subtle: #8b8b94; --success: #6fcf7f; --error: #f0707a;
+    --warning: #f0b25a; --claude: #d9825b; --bord: #34343b;
+    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: #101013; color: var(--texte); font: 14px/1.5 var(--mono); }
+  h2.etat-nom { font-size: 12px; color: var(--subtle); font-weight: normal; margin: 0 0 6px; }
+  section.etat { display: none; margin: 0 0 24px; }
+  /* Pane ancré à côté de la conversation : environ 70 colonnes (au plus 45 % d'un terminal de 1440 px) ; les largeurs se comptent en colonnes (ch). */
+  .terminal { display: flex; gap: 12px; align-items: flex-start; }
+  .conversation { flex: 1 1 0; color: var(--subtle); border: 1px dashed var(--bord); border-radius: 6px; padding: 10px 14px; min-height: 120px; }
+  .cadre { flex: 0 0 70ch; max-width: 100%; container-type: inline-size; }
+  .cadre.haut { max-height: 14.5em; overflow: hidden; }
+  .var { margin: 6px 0 4px; color: var(--subtle); font-size: 12px; }
+  section.etat:target { display: block; }
+  body:not(:has(:target)) section.etat { display: block; }
+  .pane { background: var(--fond); border: 1px solid var(--bord); border-radius: 6px; padding: 10px 14px 12px; }
+  .entete { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; border-bottom: 1px solid var(--bord); padding-bottom: 6px; margin-bottom: 8px; }
+  .entete h1 { font-size: 14px; margin: 0; color: var(--claude); }
+  .dim { color: var(--subtle); }
+  .projet { margin: 0 0 10px; }
+  .projet-tete { display: flex; flex-wrap: wrap; gap: 0 12px; font-weight: bold; }
+  .projet-tete .dim { font-weight: normal; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  ul ul { padding-left: 2ch; }
+  .lot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 1ch; min-width: 0; }
+  .lot .branche { color: var(--subtle); }
+  .lot .id { color: var(--subtle); min-width: 4ch; }
+  .lot .titre { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lot .etat-lot { flex: 0 0 auto; min-width: 13ch; font-weight: bold; }
+  .lot .after { flex: 0 0 auto; color: var(--subtle); margin-right: 1ch; }
+  .e-encours { color: var(--claude); } .e-libre { color: var(--texte); } .e-vague { color: var(--claude); }
+  .e-pret2 { color: var(--success); } .e-rendu { color: var(--error); } .e-susp { color: var(--warning); } .e-attente { color: var(--subtle); } .e-question { color: var(--warning); } .e-bloque { color: var(--subtle); }
+  .erreur-projet { color: var(--error); }
+  .msg { padding: 14px 0 6px; }
+  .msg.err { color: var(--error); }
+  .pied { margin-top: 6px; border-top: 1px solid var(--bord); padding-top: 6px; color: var(--subtle); font-size: 12px; }
+  ul.sous { flex: 1 1 100%; padding-left: 2ch; }
+  ul.sous .id { min-width: 6ch; }
+  .cmd { padding: 8px 14px; background: var(--fond); border: 1px solid var(--bord); border-radius: 6px; max-width: 70ch; }
+  .cmd .err { color: var(--error); }
+  .after s, .after .clos { text-decoration: line-through; }
+  .lot .etat-lot { min-width: 15ch; }
+  /* Repli sous 60 colonnes de corps (R15) */
+  @container (max-width: 60ch) {
+    .lot .after { order: 5; flex-basis: 100%; padding-left: 5ch; }
+    .lot .etat-lot { min-width: 0; }
+  }
+  /* Étroit : terminal de 110 colonnes réduit ; panneau de 49 colonnes (45 %), conversation en bandeau. */
+  .reduit { display: none; }
+  @media (max-width: 800px) {
+    body { padding: 8px; font-size: 11.5px; }
+    .reduit { display: block; color: var(--subtle); font-size: 11px; margin: 0 0 6px; }
+    .terminal { flex-direction: column; gap: 6px; }
+    .conversation { min-height: 0; padding: 4px 8px; width: 100%; }
+    .cadre { flex: 0 0 auto; width: 49ch; }
+    .cadre.haut { width: 100%; }
+    .cmd { max-width: 100%; }
+  }
+  /* L592 : la colonne id garde la largeur de l'id le plus long, jamais tronquée ; c'est le titre qui cède. */
+  :root { --id-w: 8ch; }
+  .lot .id { flex: 0 0 var(--id-w); min-width: var(--id-w); overflow: visible; white-space: nowrap; }
+  ul.sous .id { flex-basis: var(--id-w); min-width: var(--id-w); }
+  .e-livre { color: var(--subtle); }
+  .livres { display: flex; gap: 0 1ch; color: var(--subtle); margin: 2px 0 0; }
+  .livres .id { flex: 0 0 var(--id-w); }
+  .livres b { font-weight: normal; }
+</style>
+</head>
+<body>
+<p class="reduit">Rendu réduit : terminal de 110 colonnes, panneau latéral de 49 colonnes (45 %), conversation en bandeau.</p>
+
+<section class="etat" id="etat-chargement">
+  <h2 class="etat-nom">État : chargement — inchangé par le lot (textes déjà en production)</h2>
+  <div class="terminal"><div class="conversation">conversation (61 colonnes)</div><div class="cadre">
+  <div class="pane" role="region" aria-label="Lots">
+    <div class="entete"><h1>Lots</h1><span class="dim">lecture seule</span></div>
+    <p class="msg dim" data-testid="message-chargement">Lecture des plans…</p>
+    <div class="pied"><span>/hud lots pour fermer</span></div>
+  </div></div></div>
+</section>
+
+<section class="etat" id="etat-vide">
+  <h2 class="etat-nom">État : vide — inchangé par le lot (textes déjà en production)</h2>
+  <div class="terminal"><div class="conversation">conversation (61 colonnes)</div><div class="cadre">
+  <div class="pane" role="region" aria-label="Lots">
+    <div class="entete"><h1>Lots</h1><span class="dim">lecture seule</span><span class="dim">lu à 15:52</span></div>
+    <p class="msg dim" data-testid="message-vide">Aucun lot non clos dans les projets de ce dossier.</p>
+    <div class="pied"><span>/hud lots pour fermer</span></div>
+  </div></div></div>
+</section>
+
+<section class="etat" id="etat-erreur">
+  <h2 class="etat-nom">État : erreur — inchangé par le lot (textes déjà en production)</h2>
+  <div class="terminal"><div class="conversation">conversation (61 colonnes)</div><div class="cadre">
+  <div class="pane" role="region" aria-label="Lots">
+    <div class="entete"><h1>Lots</h1><span class="dim">lecture seule</span></div>
+    <p class="msg err" role="alert" data-testid="message-erreur">Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute.</p>
+    <div class="pied"><span>/hud lots pour fermer</span></div>
+  </div></div></div>
+</section>
+
+<section class="etat" id="etat-charge">
+  <h2 class="etat-nom">État : chargé — 3 lots jouent, 2 sont libres, 14 sont livrés (vague 1310-cad)</h2>
+  <p class="var">Livrés repliés (par défaut) : une ligne « livrés : 14 » sous les lots qui jouent, au lieu de 14 lignes « prêt ».</p>
+  <div class="terminal"><div class="conversation">conversation (61 colonnes)</div><div class="cadre">
+  <div class="pane" role="region" aria-label="Lots">
+    <div class="entete"><h1>Lots</h1><span class="dim">lecture seule</span><span class="dim">lu à 15:52</span></div>
+    <div class="projet">
+        <div class="projet-tete"><span>cadence</span><span class="dim">5 lots non clos</span></div>
+        <ul><li class="lot"><span class="id" data-testid="lot-id">L588</span><span class="titre" data-testid="lot-titre">Incident : commit d’un plan sur la branche principale</span><span class="etat-lot e-vague" data-testid="lot-etat">⟳ implémente</span></li><li class="lot"><span class="id" >L589</span><span class="titre" >Reprise d’un lot au budget épuisé</span><span class="etat-lot e-vague" >⟳ relit</span></li><li class="lot"><span class="id" >L592</span><span class="titre" >Panneau des lots : livrés repliés</span><span class="etat-lot e-vague" >⟳ implémente</span></li><li class="lot"><span class="id" >L593</span><span class="titre" >Incident : commit de plan du lead</span><span class="etat-lot e-libre" >○ libre</span></li><li class="lot"><span class="id" >L594</span><span class="titre" >Étude d’ensemble de cadence</span><span class="etat-lot e-libre" >○ libre</span></li></ul>
+        <p class="livres"><span class="id">▸</span><b data-testid="ligne-livres">livrés : 14</b></p>
+      </div>
+    <div class="pied"><span>/hud lots pour fermer</span> · ▶ en cours · ○ libre · ✔ livré</div>
+  </div></div></div>
+  <p class="var">Livrés dépliés (clic sur la ligne) : chaque lot porte « ✔ livré » ; la colonne id n’est jamais tronquée (L584, L401/2), c’est le titre qui cède.</p>
+  <div class="terminal"><div class="conversation">conversation (61 colonnes)</div><div class="cadre">
+  <div class="pane" role="region" aria-label="Lots">
+    <div class="entete"><h1>Lots</h1><span class="dim">lecture seule</span><span class="dim">lu à 15:52</span></div>
+    <div class="projet">
+        <div class="projet-tete"><span>cadence</span><span class="dim">5 lots non clos</span></div>
+        <ul><li class="lot"><span class="id" data-testid="lot-id">L588</span><span class="titre" data-testid="lot-titre">Incident : commit d’un plan sur la branche principale</span><span class="etat-lot e-vague" data-testid="lot-etat">⟳ implémente</span></li><li class="lot"><span class="id" data-testid="lot-id">L589</span><span class="titre" data-testid="lot-titre">Reprise d’un lot au budget épuisé</span><span class="etat-lot e-vague" data-testid="lot-etat">⟳ relit</span></li><li class="lot"><span class="id" data-testid="lot-id">L592</span><span class="titre" data-testid="lot-titre">Panneau des lots : livrés repliés</span><span class="etat-lot e-vague" data-testid="lot-etat">⟳ implémente</span></li><li class="lot"><span class="id" data-testid="lot-id">L593</span><span class="titre" data-testid="lot-titre">Incident : commit de plan du lead</span><span class="etat-lot e-libre" data-testid="lot-etat">○ libre</span></li><li class="lot"><span class="id" data-testid="lot-id">L594</span><span class="titre" data-testid="lot-titre">Étude d’ensemble de cadence</span><span class="etat-lot e-libre" data-testid="lot-etat">○ libre</span></li></ul>
+        <p class="livres"><span class="id">▾</span><b>livrés : 14</b></p>
+        <ul><li class="lot"><span class="id" data-testid="lot-id-livre">L572</span><span class="titre" >Perf : tableau de bord</span><span class="etat-lot e-livre" data-testid="lot-etat-livre">✔ livré</span></li><li class="lot"><span class="id" >L573</span><span class="titre" >Index mémoire : seuil</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L574</span><span class="titre" >Porte déportée</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L575</span><span class="titre" >Brief d’implémentation enrichi</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L576</span><span class="titre" >Base du cliquet d’intégration</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L577</span><span class="titre" >Livreur délégué</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L578</span><span class="titre" >Plan en dossier cache</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L580</span><span class="titre" >Rejeu de la porte composée</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L581</span><span class="titre" >Accept : règles du lot</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L582</span><span class="titre" >Condition de tirage</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L583</span><span class="titre" >Jeu des pires cas</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L584</span><span class="titre" >Autocontrôle avant revue</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L585</span><span class="titre" >Hook de retour de geste</span><span class="etat-lot e-livre" >✔ livré</span></li><li class="lot"><span class="id" >L587</span><span class="titre" >Ressources par chemins</span><span class="etat-lot e-livre" >✔ livré</span></li></ul>
+      </div>
+    <div class="pied"><span>/hud lots pour fermer</span> · ▶ en cours · ○ libre · ✔ livré</div>
+  </div></div></div>
+</section>
+</body>
+</html>

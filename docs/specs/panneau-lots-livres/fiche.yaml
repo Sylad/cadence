@@ -1,0 +1,124 @@
+# Maquette légère du lot L592 : seul l'état « chargé » du panneau des lots (fiche mère : docs/specs/panneau-lots/) est touché.
+# Charte : celle de la bande cadence-hud (clés de thème du terminal) ; aucun jeton ajouté, voir contraste.md.
+ecran:
+  id: panneau-lots-livres
+  titre: Panneau des lots — lots livrés repliés
+  route: /hud lots
+  lot: L592
+  largeurs: [1440, 390]
+  maquette: docs/specs/panneau-lots-livres/maquette.html
+etats: [vide, chargement, erreur, charge]
+champs:
+  - { id: message-vide, libelle: Message d'état vide (inchangé), type: texte, source: statique, obligatoire: false }
+  - { id: message-chargement, libelle: Message de première lecture (inchangé), type: texte, source: statique, obligatoire: false }
+  - { id: message-erreur, libelle: Message d'erreur de lecture (inchangé), type: texte, source: statique, obligatoire: false }
+  - { id: lot-id, libelle: Identifiant du lot (jamais tronqué), type: texte, source: "tour → lots[].id", obligatoire: true }
+  - { id: lot-titre, libelle: Titre du lot (tronqué par … avant l'id), type: texte, source: "tour → lots[].title", obligatoire: true }
+  - { id: lot-etat, libelle: État d'un lot qui joue ou qui attend, type: texte, source: "état de la vague, sinon du plan", obligatoire: true }
+  - { id: ligne-livres, libelle: "Ligne « livrés : N » qui replie les lots livrés", type: bouton, source: "tour → closed[] des lots de la vague (id, delivered)", obligatoire: false }
+  - { id: lot-id-livre, libelle: Identifiant d'un lot livré (ligne dépliée), type: texte, source: "tour → closed[].id", obligatoire: false }
+  - { id: lot-etat-livre, libelle: État « ✔ livré » d'un lot livré (ligne dépliée), type: texte, source: statique, obligatoire: false }
+regles:
+  - id: R1
+    etat: vide
+    enonce: "Inchangé par le lot : sans lot non clos le panneau garde son message d'état vide (fiche mère panneau-lots R1). Les lots livrés ne sont pas des lots non clos : un projet qui n'a que des livrés reste vide."
+    message: "Aucun lot non clos dans les projets de ce dossier."
+    champs: [message-vide]
+    statut: sourcee
+    source: "docs/specs/panneau-lots/fiche.yaml R1 (message déjà en production)"
+    tests: ["R1 — seuls des lots livrés : message d'état vide"]
+  - id: R2
+    etat: chargement
+    enonce: "Inchangé par le lot : avant la première lecture le panneau dit « Lecture des plans… » (fiche mère R2)."
+    message: "Lecture des plans…"
+    champs: [message-chargement]
+    statut: sourcee
+    source: "docs/specs/panneau-lots/fiche.yaml R2 (message déjà en production)"
+    tests: ["R2 — avant la première lecture : message de lecture"]
+  - id: R3
+    etat: erreur
+    enonce: "Inchangé par le lot : si cadence ne répond pas et qu'aucun tableau n'a été lu, le panneau affiche l'erreur de la fiche mère (R3)."
+    message: "Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute."
+    champs: [message-erreur]
+    statut: sourcee
+    source: "docs/specs/panneau-lots/fiche.yaml R3 (message déjà en production)"
+    tests: ["R3 — cadence muet : message d'erreur"]
+  - id: R4
+    etat: charge
+    cas: [C1]
+    enonce: "Un lot de la vague que le plan dit déjà done (ligne `closed` du tour) porte l'état « ✔ livré » (couleur subtle) et non plus « ✔ prêt » : « prêt » reste celui d'un lot de la vague pas encore clos au plan."
+    message: "✔ livré"
+    champs: [lot-etat-livre]
+    statut: hypothese
+    si_faux: "La demande dit « done au plan (livré) » mais le produit distingue terminé et livré (plan.ts:68, `delivered:`). Si seuls les lots `delivered` du plan (ou livrés par une livraison verte) doivent s'appeler « livré », un lot done non livré garde une autre ligne (ex. « ✔ terminé ») ; seul le critère du repli change."
+    tests: ["R4 — lot de la vague done au plan : « ✔ livré », pas « ✔ prêt »", "R4 — lot de la vague prêt mais non clos : « ✔ prêt » inchangé"]
+  - id: R5
+    etat: charge
+    enonce: "Les lots livrés d'un projet ne sont pas chacun une ligne : ils se replient en une seule ligne « livrés : N » (N = leur nombre), placée sous les lots qui jouent et les lots libres du projet ; sans lot livré, la ligne n'existe pas."
+    message: "livrés : 14"
+    champs: [ligne-livres]
+    statut: sourcee
+    source: "demande du lot L592 : « s'affiche « livré » et se replie dans une ligne « livrés : N » sous les lots qui jouent, au lieu d'une ligne « prêt » chacun »"
+    tests: ["R5 — 14 lots livrés : une ligne « livrés : 14 » sous les lots en cours, aucune ligne par lot livré", "R5 — aucun lot livré : pas de ligne « livrés »"]
+  - id: R6
+    etat: charge
+    enonce: "La ligne « livrés : N » est repliée par défaut ; un clic (ou Entrée) la déplie : chaque lot livré y a sa ligne (id, titre, « ✔ livré »), sous la ligne ; un second clic la replie. Le choix se garde comme celui de « + N lots »."
+    message: ~
+    champs: [ligne-livres, lot-id-livre, lot-etat-livre]
+    statut: hypothese
+    si_faux: "Si les livrés ne devaient jamais se déplier (simple compte), seule la bascule disparaît ; le choix gardé réutilise la clé `lotsViews` du $.store (aucun nouveau stockage)."
+    tests: ["R6 — ligne repliée par défaut", "R6 — clic : les lots livrés s'affichent avec « ✔ livré »", "R6 — second clic : la ligne se replie"]
+  - id: R7
+    etat: charge
+    enonce: "La colonne id n'est jamais tronquée : sa largeur est celle de l'id le plus long affiché (retrait et ├/└ compris, livrés dépliés compris, ex. « L584 », « L401/2 ») ; sous un corps étroit c'est le titre qui est tronqué par « … », jamais l'id."
+    message: ~
+    champs: [lot-id, lot-titre]
+    statut: sourcee
+    source: "demande du lot L592 : « la colonne id n'est jamais tronquée (« L5… » vu pour L584) » ; fiche mère panneau-lots R15 (jamais l'id ni l'état)"
+    tests: ["R7 — id de 4 caractères dans un corps étroit : « L584 » entier", "R7 — sous-lot « L401/2 » : id entier, titre tronqué"]
+  - id: R8
+    etat: charge
+    enonce: "Les lots livrés ne comptent pas dans « N lots non clos » du projet ; la ligne « livrés : N » compte pour une ligne de hauteur et, quand la hauteur manque, garde sa place comme le bouton « + N lots » au lieu d'être coupée avec les lots (« … +N lots de plus » ne les compte pas)."
+    message: ~
+    champs: [ligne-livres]
+    statut: hypothese
+    si_faux: "Si le compte devait inclure les livrés ou la ligne pouvait être coupée, seul le calcul du compte et de la coupure change (aucune donnée en jeu)."
+    tests: ["R8 — compte du projet : livrés exclus", "R8 — hauteur courte : la ligne « livrés : N » reste affichée"]
+actions:
+  - { id: A2, declencheur: ~, contrat: A1, regles: [R1, R2, R3, R4, R5, R7, R8] }
+sujet:
+  id: panneau-lots-livres
+  titre: Lecture des lots livrés par le panneau des lots
+  lot: L592
+  perimetre:
+    modules: [plugins/cadence-hud/hooks/lots.ts, plugins/cadence-hud/hooks/lot-row.tsx]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "le format de `cadence lead tour --json` : `closed` existe déjà (src/lead.ts:124), aucun champ ajouté"
+      - "la bascule de la ligne « livrés » (R6) est un geste local du panneau, sans appel"
+cas:
+  - id: C1
+    titre: Le lead lit le panneau pendant une vague dont des lots sont déjà livrés
+    acteur: le lead, dans une session Claude Code
+    declencheur: commande /hud lots
+    preconditions:
+      - une vague porte des lots que le plan dit done
+    nominal:
+      - Le mod lit cadence lead tour --json (lots et closed).
+      - "Les lots de la vague clos au plan passent dans la ligne « livrés : N »."
+      - "Le panneau dessine les lots qui jouent, puis les libres, puis la ligne « livrés : N »."
+    alternatives:
+      - { si: la personne déplie la ligne, alors: chaque lot livré a sa ligne « ✔ livré », regles: [R6] }
+      - { si: aucun lot de la vague n'est clos au plan, alors: pas de ligne « livrés », regles: [R5] }
+    resultat: Les lots qui jouent restent en tête, sans une ligne « prêt » par lot livré.
+contrats:
+  - id: A1
+    appel: commande lead-tour
+    entree: "<dossier> --json"
+    sortie: "lignes de projet, inchangées : lots (non clos) et closed ({ id, finished, delivered? }[], déjà émis) ; le panneau croise closed avec les lots de la vague"
+    erreurs: []
+    sans_erreur: "aucun cas d'échec nouveau : une lecture en échec est celle de la fiche mère panneau-lots (R9, dernier tableau gardé, ou erreur R3 ci-dessus)"
+    regles: [R4, R5, R7, R8]
+donnees:
+  - { id: D1, objet: "lotsViews ($.store du mod) : une clé de dépliage de la ligne livrés par projet", existant: true, modification: aucune, note: "même magasin et même forme (booléens par clé) que « + N lots » ; seule une clé de plus est écrite" }

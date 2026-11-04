@@ -276,8 +276,19 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   });
   const finished = lotFinished;
   /** L527 : les lots prêts du plan que le créneau libre peut recevoir (rien avec `--no-fill`, L587) ; `adds.fill` les contrôle et les prend. */
-  const refill = async (canRun: (c: LotCtx) => boolean, free: number): Promise<LotCtx[]> =>
-    fillsFreeSlots(args) && free > 0 ? adds.fill(fillTargets({ args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }), free, canRun) : [];
+  let fillFault = '';
+  const refill = async (canRun: (c: LotCtx) => boolean, free: number): Promise<LotCtx[]> => {
+    if (!fillsFreeSlots(args) || free <= 0) return [];
+    try {
+      return await adds.fill(fillTargets({ args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }), free, canRun);
+    } catch (e) {
+      // priority: devenue illisible en cours de vague : le tirage de ce regard est passé, les lots qui jouent ne le paient pas (dit une fois par cause).
+      const why = e instanceof Error ? e.message : String(e);
+      if (why !== fillFault) wctx.log(`remplissage : priority: illisible, tirage passé — ${why}`);
+      fillFault = why;
+      return [];
+    }
+  };
   try {
     await runPool(ctxs, cap, all, (c) => {
       // Un lot rendu ou en échec garde son worktree et sa branche (R12) : le journal en donne le chemin.

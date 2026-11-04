@@ -1,5 +1,5 @@
 // plan.journal (L582, M10) : le journal d'événements d'un plan tenu par un autre outil (ndjson, une ligne par fait), lu dans cadence.yaml et réécrit par `raf import --to-config`.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Day } from './dates.js';
 import { RafError, type PlanFormat } from './plan.js';
@@ -161,10 +161,28 @@ export function missingEvents(native: Entry[], existing: Entry[], journal: Journ
   });
 }
 
-/** Ajoute les lignes en fin de fichier (créé, dossiers compris, s'il manque) ; une dernière ligne sans saut de ligne en reçoit un d'abord. */
+/** Le fichier existe, n'est pas vide et sa dernière ligne n'a pas de saut de ligne (lu sur l'octet, sans décoder le fichier). */
+function lacksFinalNewline(path: string): boolean {
+  if (!existsSync(path)) return false;
+  const fd = openSync(path, 'r');
+  try {
+    const size = fstatSync(fd).size;
+    if (size === 0) return false;
+    const last = Buffer.alloc(1);
+    readSync(fd, last, 0, 1, size - 1);
+    return last[0] !== 0x0a;
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/** Ajoute les lignes en fin de fichier (créé, dossiers compris, s'il manque), sans relire ni réécrire les lignes existantes (gardées octet pour octet) ; une dernière ligne sans saut de ligne en reçoit un d'abord. Un fichier qu'on ne peut pas écrire refuse en le nommant. */
 export function appendEvents(path: string, events: Entry[]): void {
   if (events.length === 0) return;
-  mkdirSync(dirname(path), { recursive: true });
-  const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
-  writeFileSync(path, `${current}${current !== '' && !current.endsWith('\n') ? '\n' : ''}${events.map((e) => JSON.stringify(e)).join('\n')}\n`);
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(path, `${lacksFinalNewline(path) ? '\n' : ''}${events.map((e) => JSON.stringify(e)).join('\n')}\n`);
+  } catch (e) {
+    throw new RafError(`${path} : impossible d'écrire le journal (${(e as Error).message}) — le plan n'a pas été réécrit`);
+  }
 }

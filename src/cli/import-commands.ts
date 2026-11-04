@@ -90,14 +90,16 @@ function importTo(c: Ctx, format: PlanFormat, renames: Renames): number {
   const entries = foreignEntries(native.rawEntries(), format, renames);
   const dryRun = !!values['dry-run'];
   const journalConfig = readJournalConfig(c.configPath);
-  // Le journal se prépare (et se lit : une ligne illisible refuse) avant la moindre écriture : le plan et le journal s'écrivent ensemble ou pas du tout.
+  // Le journal se prépare (et se lit : une ligne illisible refuse) avant la moindre écriture, et s'écrit AVANT le plan : si le journal
+  // refuse (lecture seule, disque plein), le plan d'origine reste tel quel et le rejeu retrouve les mêmes changements d'état (les événements
+  // qu'il porte déjà ne s'écrivent jamais deux fois). L'ordre inverse perdrait les événements « état », lus dans le plan qu'on remplace.
   const journal = journalConfig && journalPlan(c, format, journalConfig, { native: native.rawEntries(), entries }, out);
   if (!dryRun) {
     const doc = existsSync(out) ? parseDocument(readFileSync(out, 'utf8')) : new Document({});
     doc.set(format.lots, doc.createNode(entries));
+    if (journal) appendEvents(journal.path, journal.events);
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, doc.toString({ lineWidth: 0 }));
-    if (journal) appendEvents(journal.path, journal.events);
   }
   io.out(dryRun ? `${entries.length} lots à écrire au format d'origine — rien n'est écrit (--dry-run)` : `${entries.length} lots écrits au format d'origine → ${out}`);
   io.out(journal ? journalLine(journal, dryRun) : 'journal.ndjson inchangé : plan.journal n\'est pas déclaré (cadence.yaml)');

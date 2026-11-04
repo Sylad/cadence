@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { gitRepo } from './helpers.js';
@@ -260,5 +260,85 @@ describe('L582 — le journal, les noms déclarés et les règles de dédoublonn
     writeFileSync(planFresh, readFileSync(planFresh, 'utf8').replace('    status: doing\n', '    status: done\n    delivered: { date: 2026-11-03, sha: ddd4444 }\n'));
     expect(raf(fresh, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...originFresh).code).toBe(0);
     expect(events(fresh).find((e) => e.type === 'livre')).toEqual({ at: '2026-11-03T00:00:00+00:00', task: 'AB-1', type: 'livre', message: '', source: 'retour' });
+  });
+});
+
+describe('L582 — ordre d\'écriture, octets du journal et règles de dédoublonnage restantes', () => {
+  it('R15 — le journal s\'écrit avant le plan : un journal qu\'on ne peut pas écrire refuse la commande en le nommant (code 2), le plan d\'origine n\'est pas réécrit, et le rejeu écrit l\'état une fois les droits rétablis', () => {
+    const dir = project();
+    const origin = switched(dir);
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    const once = readFileSync(join(dir, 'docs/plan/taches.yaml'), 'utf8');
+    expect(raf(dir, 'start', 'AB-2').code).toBe(0);
+    const journal = join(dir, 'docs/plan/journal.ndjson');
+    chmodSync(journal, 0o444);
+    try {
+      const r = raf(dir, 'import', '--to-config', '--force', ...origin);
+      expect(r.code).toBe(2);
+      expect(r.err).toMatch(/journal\.ndjson.*(écrire|écriture)/);
+      expect(readFileSync(join(dir, 'docs/plan/taches.yaml'), 'utf8')).toBe(once);
+      expect(events(dir).filter((e) => e.type === 'etat')).toHaveLength(0);
+    } finally {
+      chmodSync(journal, 0o644);
+    }
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    expect(events(dir).filter((e) => e.type === 'etat').map((e) => [e.task, e.message])).toEqual([['AB-2', 'code']]);
+    expect(readFileSync(join(dir, 'docs/plan/taches.yaml'), 'utf8')).toContain('etat: code');
+  });
+  it('R16 — les lignes existantes sont gardées octet pour octet : un octet qui n\'est pas de l\'UTF-8 (caf\\xe9) reste tel quel, les nouveaux événements s\'ajoutent après', () => {
+    const seed = Buffer.concat([Buffer.from('{"at":"2026-11-01T00:00:00+00:00","task":"AB-1","type":"cree","message":"caf'), Buffer.from([0xe9]), Buffer.from('"}\n')]);
+    const dir = project(CONFIG, null);
+    writeFileSync(join(dir, 'docs/plan/journal.ndjson'), seed);
+    expect(raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...switched(dir)).code).toBe(0);
+    const after = readFileSync(join(dir, 'docs/plan/journal.ndjson'));
+    expect(after.subarray(0, seed.length).equals(seed)).toBe(true);
+    expect(after.length).toBeGreaterThan(seed.length);
+    expect(after.includes(Buffer.from([0xef, 0xbf, 0xbd]))).toBe(false);
+  });
+  it('R17 — un état revenu (code → a_faire → code) s\'écrit de nouveau : seul le dernier événement « état » du lot compte, pas tout état antérieur', () => {
+    const dir = project();
+    const origin = switched(dir);
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    expect(raf(dir, 'start', 'AB-2').code).toBe(0);
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    expect(raf(dir, 'todo', 'AB-2').code).toBe(0);
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    expect(raf(dir, 'start', 'AB-2').code).toBe(0);
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    expect(events(dir).filter((e) => e.type === 'etat' && e.task === 'AB-2').map((e) => e.message)).toEqual(['code', 'a_faire', 'code']);
+  });
+  it('R18 — sans plan.journal.path, le journal est journal.ndjson à la racine du dépôt', () => {
+    const cfg = CONFIG.replace('    path: docs/plan/journal.ndjson\n', '');
+    const dir = project(cfg, null);
+    const r = raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...switched(dir, cfg));
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/^journal\.ndjson : \d+ événements? ajoutés?$/m);
+    expect(existsSync(join(dir, 'docs/plan/journal.ndjson'))).toBe(false);
+    const root = readFileSync(join(dir, 'journal.ndjson'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(root.some((e) => e.type === 'demarre' && e.task === 'AB-1')).toBe(true);
+  });
+  it('R19 — un lot abandonné dont le format n\'a pas de type closed change d\'état comme les autres : un événement « état » nommant l\'état d\'origine (caduc)', () => {
+    const cfg = CONFIG.replace(', closed: ferme', '');
+    const dir = project(cfg);
+    const origin = switched(dir, cfg);
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    expect(raf(dir, 'drop', 'AB-2').code).toBe(0);
+    expect(raf(dir, 'import', '--to-config', '--force', ...origin).code).toBe(0);
+    expect(events(dir).filter((e) => e.task === 'AB-2' && e.type === 'etat').map((e) => e.message)).toEqual(['caduc']);
+    expect(events(dir).some((e) => e.type === 'ferme')).toBe(false);
+  });
+  it('R20 — une note se dédoublonne par (lot, texte), quel que soit le jour : le même texte noté un autre jour n\'est pas réécrit', () => {
+    const seed = `${SEED}${JSON.stringify({ at: '2026-10-20T00:00:00+00:00', task: 'AB-1', type: 'note', message: 'première note' })}\n`;
+    const dir = project(CONFIG, seed);
+    expect(raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...switched(dir)).code).toBe(0);
+    expect(events(dir).filter((e) => e.type === 'note' && e.task === 'AB-1' && e.message === 'première note')).toHaveLength(1);
+  });
+  it('R21 — extra: { sha: null } sans keys.sha est permis (sha n\'est pas une clé de base tant qu\'il n\'est pas déclaré) et s\'écrit sur chaque ligne ajoutée', () => {
+    const cfg = CONFIG.replace('    extra: { source: retour }\n', '    extra: { source: retour, sha: null }\n');
+    const dir = project(cfg);
+    expect(raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...switched(dir, cfg)).code).toBe(0);
+    const added = events(dir).slice(1);
+    expect(added.length).toBeGreaterThan(0);
+    expect(added.every((e) => Object.hasOwn(e, 'sha') && e.sha === null && e.source === 'retour')).toBe(true);
   });
 });

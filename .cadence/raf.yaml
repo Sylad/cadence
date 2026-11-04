@@ -2247,6 +2247,7 @@ lots:
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
+    review: { date: 2026-11-05, verdict: "conforme : rebasé sur main, conflit docs/orchestrate.md résolu en gardant les deux textes (paragraphe L527/L587 de main + incise L591 sur le créneau rendu pendant l'attente d'intégration) ; vitest orchestrate-integration-rend-creneau-l591 9/9, tsc --noEmit OK, qualite --contre main : rien n'empire", commit: 8670d964ba0424fbb923f9ea3157b8601075f989 }
   - id: L592
     title: "Panneau des lots cadence-hud : un lot de la vague déjà done au plan (livré) s'affiche « livré » et se replie dans une ligne « livrés : N » sous les lots qui jouent, au lieu d'une ligne « prêt » chacun ; la colonne id n'est jamais tronquée (« L5… » vu pour L584) — 04-11, vague 1310-cad : 14 lots prêts ou déjà livrés listés au-dessus des 3 lots en cours, Sylvain : « elle me montre beaucoup de lots »"
     public: "Panneau des lots : lots livrés repliés, identifiant jamais coupé"

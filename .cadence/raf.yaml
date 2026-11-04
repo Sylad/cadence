@@ -1951,9 +1951,10 @@ lots:
     finished: 2026-11-04
   - id: L570
     title: "news check et raf check sur une fiche d'écran partagée (issue #33) : la section « Hypothèses » attendue ne liste que les règles hypothèse que le lot ajoute ou modifie (clé regles de acceptation-<lot>.json, sinon les règles touchées par ses commits spec/docs sur la fiche, comme accept en 1.46 et les briefs en L559) ; la fiche entière seulement quand rien ne la restreint"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-04
+    started: 2026-11-04
   - id: L571
     title: "Lots en service non publiés signalés : cadence lead tour, cadence session close et l'orchestrate --status disent ⚠ N lots done depuis le dernier tag v<x.y.z> (dépôt qui publie : package.json + tag), avec la commande cadence release à jouer ; session close le met en tête des trois lignes — 04-11 : 18 lots en service la veille, compte pro lancé le matin sur 1.46.0"
     status: todo

@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.53.1] - 2026-11-04
+
 ### Fixed
 
 - `raf done` is refused (exit 2, `done différé`, plan untouched) while a session of a live wave works in the main tree of a repository without worktrees (L521, `docs/raf.md`, skill `lead`): the plan it wrote stayed a modified file there and the next lot was handed back as « dépôt sale après implement » (avatar L57 after L56, 01-11). The message gives the safe order — wait for the end of that step, then run `raf done` again — and `--now` writes at once. `raf add` and `raf note` still only warn; `cadence deliver --sha` already commits its plan (L388).

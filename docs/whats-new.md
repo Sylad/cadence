@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.53.1**: `raf done` waits (`done différé`) while a session of a live wave works in the main tree of a repository without worktrees.
 - **1.53.0**: `raf import --from-config` / `--to-config`; a last-pass budget top-up; the probe no longer commits a red file; kept branches found under a former project name.
 - **1.52.0**: `perf.prices` takes any model name (Fable included) and `perf.currency`; `plan.onWrite.onFailure: refuse | warn`; tests unstable under load wait for events.
 - **1.51.0**: resources carry paths (held for any lot whose diff touches them); `--add` takes back a lot the live wave handed back; `raf export` and `raf events`.
@@ -82,6 +83,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.53.1**: `raf done` is refused with exit 2 and `done différé`, leaving the plan untouched, while a session of a live wave works in the main tree of a repository without worktrees, so a delivery during a wave no longer writes a plan the session is about to commit over (L521).
 
 **1.53.0**: `raf import --from-config` brings a plan kept in another format into the native plan and `--to-config` writes it back, refusing two entries with the same identifier in both directions (L472). When a lot can no longer pay its last correction and short review while its review converges, the wave tops its budget up from its own remainder, within `orchestrate.budgetTopUp` (L584). The edge-case probe no longer leaves a red or unwired test file in the lot: a probe file is either run by the gate and green, or not committed, and paths with spaces or accents are cleaned for real (L580, GitHub issue #37). A new wave finds a lot's kept branch under the project's former name, and its dry run says when a kept branch is not taken and why (L581, GitHub issue #38). Ctrl-C or SIGTERM on a wave kills the ssh and the push of the remote gate (L507).
 

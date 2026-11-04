@@ -2221,9 +2221,10 @@ lots:
     started: 2026-11-04
   - id: L591
     title: "Un lot qui attend son tour d'intégration (une autre intégration du même dépôt en cours) rend son créneau : la file en attente démarre pendant ce temps, et le lot reprend l'intégration à son tour sans redemander de créneau (une intégration ne lance qu'une revue courte) — 04-11, vague 1310-cad : L514, L586 et L473 arrivés ensemble à l'intégration, L530 L587 L588 en file depuis 19:50 n'ont démarré qu'à 20:15:37, après la dernière intégration ; ~9 min à 2 créneaux vides (20:06 → 20:15)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-04
+    started: 2026-11-04
   - id: L592
     title: "Panneau des lots cadence-hud : un lot de la vague déjà done au plan (livré) s'affiche « livré » et se replie dans une ligne « livrés : N » sous les lots qui jouent, au lieu d'une ligne « prêt » chacun ; la colonne id n'est jamais tronquée (« L5… » vu pour L584) — 04-11, vague 1310-cad : 14 lots prêts ou déjà livrés listés au-dessus des 3 lots en cours, Sylvain : « elle me montre beaucoup de lots »"
     status: todo

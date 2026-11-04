@@ -88,6 +88,12 @@ export interface ProbeIo<D extends ProbeDone> {
 
 const unplayed = (l: LotState, why: string): number => l.warnings.push(`sonde de cas limites non jouée : ${why}`);
 
+/** Les attentes « hors règle du lot » du rapport (L580, issue #37) : une ligne par entrée texte non vide ; absent, vide ou mal typé, rien. */
+export function horsRegleWarnings(rep: Pick<ProbeReport, 'horsRegle'> | undefined): string[] {
+  const list = Array.isArray(rep?.horsRegle) ? (rep.horsRegle as unknown[]) : [];
+  return list.filter((e): e is string => typeof e === 'string' && e.trim() !== '').map((e) => `${PROBE_FINDING}attente hors règle du lot, non commitée (à reprendre en constat de revue ou en sous-tâche) : ${e.trim()}`);
+}
+
 /** Le rapport de la session, ou un warning « non jouée » quand il est illisible (la revue part quand même). */
 function readReport(l: LotState, report: unknown): ProbeReport | undefined {
   try {
@@ -139,6 +145,7 @@ export async function probeStep<D extends ProbeDone>(io: ProbeIo<D>): Promise<vo
   const step = l.steps[l.steps.length - 1]!;
   const rep = done === PROBE_FAILED ? cutSession(io, step) : readSession(io, done, step);
   if (rep === 'rendu') return;
+  l.warnings.push(...horsRegleWarnings(rep));
   // La porte du programme après la sonde comme après toute écriture, mais seulement si elle a commité : sans nouveau commit il n'y a rien de neuf à rejouer.
   const red: Constat[] = [];
   const runs: CheckRun[] = [];

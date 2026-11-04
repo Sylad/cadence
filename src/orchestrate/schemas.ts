@@ -62,10 +62,10 @@ export const PRECHECK_SCHEMA = {
   required: ['dejaPresent', 'preuves', 'resume'],
 } as const;
 
-/** Sortie de la sonde de cas limites (L497) : les tests commités, et `echecs` les tests qu'elle annonce rouges (« test — borne — attendu », un par entrée). */
+/** Sortie de la sonde de cas limites (L497) : les tests commités, `echecs` les tests commités qu'elle annonce rouges (« test — borne — attendu », un par entrée), et `horsRegle` (facultatif, L580) les attentes qui ne sont pas des règles du lot, non commitées. */
 export const PROBE_SCHEMA = {
   type: 'object',
-  properties: { commits: WORK_SCHEMA.properties.commits, echecs: strings, nonVerifie: strings, questions: strings, choix: strings, resume: str },
+  properties: { commits: WORK_SCHEMA.properties.commits, echecs: strings, horsRegle: strings, nonVerifie: strings, questions: strings, choix: strings, resume: str },
   required: ['commits', 'echecs', 'nonVerifie', 'questions', 'resume'],
 } as const;
 
@@ -127,6 +127,8 @@ export interface AcceptReport {
 export interface ProbeReport {
   commits: { sha: string; sujet: string }[];
   echecs: string[];
+  /** Facultatif, pas contrôlé par `checkShape` (hors `required`) : le type n'est pas garanti, `horsRegleWarnings` le vérifie. */
+  horsRegle?: unknown;
   nonVerifie: string[];
   questions: string[];
   choix?: string[];

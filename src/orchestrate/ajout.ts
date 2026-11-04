@@ -82,8 +82,8 @@ export function resumeRefusal(store: RunStore, l: Pick<LotState, 'project' | 'lo
   return dirty.length ? `fichiers non commités dans ${dir} : ${dirty.join(', ')} ; les commiter, puis rejouer : ${addGesture(store.id, lotKey(l.project, l.lot), launch)}` : null;
 }
 
-/** Ce que la demande d'ajout (`@<modèle>`) et le plan relu fixent : le ctx neuf les garde, la copie de l'ancien état ne les écrase pas. */
-const DEMANDE_NEUVE = ['model', 'small', 'visible', 'light', 'express', 'repos', 'goal'] as const;
+/** Choix optionnels du lot (R2) : absents de l'ancien lot, ils le restent après la reprise, même si le ctx neuf du préflight les porte. */
+const CHOIX_DU_LOT = ['goal', 'light', 'express', 'repos'] as const;
 
 /**
  * La prise d'un lot rendu (L563) : le ctx neuf (`c`, de `e.build` : steps vides, sans constats) reçoit une COPIE de l'état de l'ancien ctx de la vague (`old`), puis, dans cet ordre (R6) :
@@ -94,9 +94,11 @@ const DEMANDE_NEUVE = ['model', 'small', 'visible', 'light', 'express', 'repos',
 export function resumeNext(c: LotCtx, old: LotCtx): 'correction' | 'revue' | 'écriture' {
   const l = c.lot;
   const { budget, escalationReserve, node } = l;
-  const neuf = Object.fromEntries(DEMANDE_NEUVE.map((k) => [k, l[k]]));
-  Object.assign(l, structuredClone(old.lot), neuf);
-  for (const k of DEMANDE_NEUVE) if (neuf[k] === undefined) delete l[k];
+  // R2 : c.lot reçoit une copie de old.lot, model, visible, small, light, express, repos et goal compris (le lot repris garde ce que la vague lui avait donné, constat de revue L563) ;
+  // seuls config, tree et plan du ctx neuf restent, et les valeurs que R6 pose ci-dessous. Le ctx neuf ne comble que les champs de structure absents d'un vieil état (constats…),
+  // jamais un choix optionnel que l'ancien lot n'avait pas.
+  Object.assign(l, structuredClone(old.lot));
+  for (const k of CHOIX_DU_LOT) if (old.lot[k] === undefined) delete l[k];
   l.node = node;
   l.escalationReserve = escalationReserve;
   l.pass = 0;

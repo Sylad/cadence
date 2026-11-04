@@ -190,14 +190,23 @@ describe("L563 — resumeNext : l'état du lot rendu et l'étape où il repart",
     expect(lotOver(fresh.lot)).toBe(false);
     expect(fresh.lot.steps).toEqual(old.lot.steps);
   });
-  it("R2 — la demande d'ajout (@modèle) et le plan relu l'emportent : model, small, visible, light, express, repos, goal restent ceux du ctx neuf", () => {
-    const { fresh, old } = pair({ model: 'sonnet', small: false, visible: false, light: true, express: true, goal: 'ancien', repos: [{ rel: '../b', path: '/x/b' }], constats: [constat('code')] } as Partial<LotState>);
-    Object.assign(fresh.lot, { model: 'opus', small: true, visible: true, goal: 'neuf' });
+  it("R2 — copie de old.lot : model, small, visible, light, express, repos, goal restent ceux de l'ancien lot, même quand le ctx neuf en porte d'autres", () => {
+    const { fresh, old } = pair({ model: 'opus', small: true, visible: true, light: true, express: true, goal: 'ancien', repos: [{ rel: '../b', path: '/x/b' }], constats: [constat('code')] } as Partial<LotState>);
+    // le ctx neuf du préflight : visible relu du plan principal (false), model par défaut (sonnet), sans light/express/repos
+    Object.assign(fresh.lot, { model: 'sonnet', small: false, visible: false, goal: 'neuf' });
     delete fresh.lot.light;
     delete fresh.lot.express;
     delete fresh.lot.repos;
     resumeNext(fresh, old);
-    expect(fresh.lot).toMatchObject({ model: 'opus', small: true, visible: true, goal: 'neuf' });
+    expect(fresh.lot).toMatchObject({ model: 'opus', small: true, visible: true, light: true, express: true, goal: 'ancien', repos: [{ rel: '../b', path: '/x/b' }] });
+    expect(fresh.lot.repos).not.toBe(old.lot.repos);
+  });
+  it("R2 — un champ absent de l'ancien lot n'est pas repris du ctx neuf (goal, light, express, repos)", () => {
+    const { fresh, old } = pair({ model: 'sonnet', visible: false, constats: [constat('code')] } as Partial<LotState>);
+    Object.assign(fresh.lot, { model: 'opus', visible: true, light: true, express: true, goal: 'neuf', repos: [{ rel: '../c', path: '/x/c' }] });
+    resumeNext(fresh, old);
+    expect(fresh.lot).toMatchObject({ model: 'sonnet', visible: false });
+    expect(fresh.lot.goal).toBeUndefined();
     expect(fresh.lot.light).toBeUndefined();
     expect(fresh.lot.express).toBeUndefined();
     expect(fresh.lot.repos).toBeUndefined();

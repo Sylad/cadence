@@ -190,9 +190,9 @@ describe('L472 — raf import --to-config', () => {
     expect(back.taches).toHaveLength(3);
     expect(back.taches[0]).toEqual(origin.taches[0]);
     expect(back.taches[1]).toMatchObject({ ident: 'AB-1/t1-fusion', parent: 'AB-1', etat: 'termine', effort: 0.75 });
-    // Le texte seul d'une note devient une note datée (le natif n'a pas de note sans date) ; le jour d'un horodatage est le seul reste.
-    expect(back.taches[1]!.note).toEqual([{ date: '2026-11-04', text: 'un seul texte' }]);
-    expect(back.taches[2]).toMatchObject({ ident: 'AB-2', etat: 'a_faire', dernier: '2026-10-30' });
+    // Le texte seul d'une note (daté du jour de l'import en natif) et l'horodatage complet reviennent tels qu'à l'origine.
+    expect(back.taches[1]!.note).toEqual('un seul texte');
+    expect(back.taches[2]).toMatchObject({ ident: 'AB-2', etat: 'a_faire', dernier: '2026-10-30T08:15:00' });
   });
   it('R16 — après des écritures dans le natif (raf done, raf note, raf add), le retour tient : états du format d\'origine, effort en libellé, lot ajouté', () => {
     const dir = project();
@@ -265,7 +265,7 @@ describe('L472 — bords de l\'import', () => {
     expect(raf(dir, 'import', '--from-config', '--verify', '--out', 'tmp/natif.yaml').out).toMatch(/0 lots/);
     expect(lotsOf(dir)).toEqual([]);
   });
-  it('R23 — second alias d\'un champ : l\'entrée qui n\'écrit que lui revient sous le premier alias ; quand les deux sont écrits la clé non retenue est refusée (nom du natif), puis gardée avec --rename', () => {
+  it('R23 — second alias d\'un champ : l\'entrée qui n\'écrit que lui revient sous ce même alias ; quand les deux sont écrits la clé non retenue est refusée (nom du natif), puis gardée avec --rename', () => {
     const config = CONFIG.replace('id: [ident]', 'id: [ident, id]');
     const dir = project(`taches:\n  - id: X1\n    titre: Seul le second alias\n  - ident: X2\n    id: autre\n    titre: Les deux\n`, config);
     const refused = raf(dir, 'import', '--from-config', '--out', 'tmp/natif.yaml');
@@ -277,7 +277,8 @@ describe('L472 — bords de l\'import', () => {
     const origin = switched(dir, config);
     expect(raf(dir, 'import', '--to-config', '--rename', 'id=autre_id', '--out', 'tmp/retour.yaml', ...origin).code).toBe(0);
     const back = (parse(readFileSync(join(dir, 'tmp/retour.yaml'), 'utf8')) as { taches: Record<string, unknown>[] }).taches;
-    expect(back[0]).toMatchObject({ ident: 'X1' });
+    expect(back[0]).toMatchObject({ id: 'X1' });
+    expect(back[0]).not.toHaveProperty('ident');
     expect(back[1]).toMatchObject({ ident: 'X2', id: 'autre' });
   });
   it('R24 — une clé à valeur nulle, un identifiant numérique et un horodatage complet passent l\'aller-retour', () => {
@@ -358,5 +359,62 @@ describe('L472 — la comparaison de --verify voit une perte', () => {
     expect(diffs).toMatch(/A : title/);
     const broken = native().map((e) => ({ ...e, last: 'hier' }));
     expect(readingDiff(raw, broken, fmt).join('\n')).toMatch(/A : last « hier » n'est pas une date.*\(en natif\)/);
+  });
+});
+
+describe('L472 — le retour rend la clé et la valeur du format d\'origine', () => {
+  const config = CONFIG.replace('last: [dernier]', 'last: [dernier]\n    finished: [livre_le, ferme_le]\n    created: [cree_le]\n    after: [apres]');
+  const source = `taches:
+  - ident: 5
+    titre: A
+    etat: termine
+    ferme_le: 2026-10-13
+    cree_le: 2026-10-13T12:43:54+00:00
+    note: un texte
+    apres: 4
+  - ident: 6
+    titre: B
+    etat: termine
+    livre_le: 2026-10-14
+    note: [{ date: 2026-10-01, text: liste }]
+`;
+  const backOf = (dir: string, extra: string[] = []) => {
+    const origin = switched(dir, config);
+    expect(raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...extra, ...origin).code).toBe(0);
+    return (parse(readFileSync(join(dir, 'tmp/retour.yaml'), 'utf8')) as { taches: Record<string, unknown>[] }).taches;
+  };
+  it('R33 — un lot qui n\'avait que le second alias le retrouve au retour, et un lot qui avait le premier aussi', () => {
+    const dir = project(source, config);
+    raf(dir, 'import', '--from-config', '--out', '.cadence/raf.yaml');
+    const back = backOf(dir);
+    expect(back[0]).toHaveProperty('ferme_le');
+    expect(back[0]).not.toHaveProperty('livre_le');
+    expect(back[1]).toHaveProperty('livre_le');
+    expect(back[1]).not.toHaveProperty('ferme_le');
+  });
+  it('R34 — horodatage complet, note en texte, identifiant et dépendance scalaires reviennent tels qu\'ils étaient', () => {
+    const dir = project(source, config);
+    raf(dir, 'import', '--from-config', '--out', '.cadence/raf.yaml');
+    const back = backOf(dir);
+    expect(back[0]).toMatchObject({ ident: 5, apres: 4, note: 'un texte' });
+    expect(String(back[0].cree_le)).toBe('2026-10-13T12:43:54+00:00');
+    expect(back[1].note).toEqual([{ date: '2026-10-01', text: 'liste' }]);
+  });
+  it('R35 — une valeur changée dans le natif est rendue au format déclaré, pas l\'ancienne ; la clé d\'origine reste', () => {
+    const dir = project(source, config);
+    raf(dir, 'import', '--from-config', '--out', '.cadence/raf.yaml');
+    const origin = switched(dir, config);
+    expect(raf(dir, 'note', '5', 'nouvelle').code).toBe(0);
+    expect(raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...origin).code).toBe(0);
+    const back = (parse(readFileSync(join(dir, 'tmp/retour.yaml'), 'utf8')) as { taches: Record<string, unknown>[] }).taches;
+    expect(back[0].note).toEqual(expect.arrayContaining([expect.objectContaining({ text: 'nouvelle' })]));
+  });
+  it('R36 — --verify ne dit pas « sans perte » quand la forme d\'une valeur change (la comparaison est stricte)', () => {
+    const fmt = { lots: 'taches', fields: { id: ['ident'], finished: ['livre_le', 'ferme_le'], notes: ['note'] }, statuses: {}, estimates: {} } as never;
+    const rawLots = [{ ident: 'A', ferme_le: '2026-10-13T12:00:00+00:00', note: 'x' }];
+    const cut = [{ ident: 'A', livre_le: '2026-10-13', note: [{ date: '2026-11-04', text: 'x' }] }];
+    const d = roundTripDiff(rawLots, cut, fmt).join('\n');
+    expect(d).toMatch(/A : finished/);
+    expect(d).toMatch(/A : notes/);
   });
 });

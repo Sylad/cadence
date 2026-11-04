@@ -10,12 +10,17 @@ import { normalizeLot } from './plan-read.js';
 type Entry = Record<string, unknown>;
 
 /** Les clés qu'un lot natif lit ou écrit : une clé du fichier d'origine qui les porte sans être mappée dessus changerait de sens (ou serait lue de travers), l'import la refuse. */
-const RESERVED = new Set<string>([...FIELDS, 'state', 'state_before', 'delivered', 'uses', 'planned', 'local', 'ux', 'review', 'docs_ok', 'tasks', PLACE_KEY, 'estimate_label']);
+/** La clé où l'import note, par champ, la clé et la forme que le fichier d'origine lui donnait quand le retour ne les retrouverait pas seul (second alias, horodatage, texte de note, nombre). */
+const ORIGIN = 'origin';
+const RESERVED = new Set<string>([...FIELDS, 'state', 'state_before', 'delivered', 'uses', 'planned', 'local', 'ux', 'review', 'docs_ok', 'tasks', PLACE_KEY, 'estimate_label', ORIGIN]);
 /** Les champs recopiés tels quels (la valeur du fichier d'origine fait foi). */
 const VERBATIM: Field[] = ['quickwin', 'visible', 'screen', 'spec', 'public', 'every', 'repos', 'gate', 'goal'];
 const DAYS: Field[] = ['last', 'created', 'started', 'finished'];
 /** Ce que le natif tient sous ses clés propres : le reste d'une entrée native est rendu tel quel au format d'origine. */
-const NATIVE_OWN = new Set<string>([...FIELDS, 'state', 'estimate_label']);
+const NATIVE_OWN = new Set<string>([...FIELDS, 'state', 'estimate_label', ORIGIN]);
+/** Les champs d'une entrée native que le retour écrit, dans l'ordre. */
+const BACK_FIELDS = ['id', 'title', 'status', 'estimate', ...VERBATIM, ...DAYS, 'after', 'notes', 'parent'] as Field[];
+type Origin = Partial<Record<Field, { key: string; value?: unknown; native?: unknown }>>;
 
 /** Les clés renommées : `--rename ancien=nouveau`, l'ancien nom du fichier d'origine et le nom qu'il prend en natif. */
 export type Renames = Record<string, string>;
@@ -54,6 +59,21 @@ function putExtras(entry: Entry, r: Entry, consumed: Set<string>, renames: Renam
   }
 }
 
+/** Les notes d'une entrée : un texte seul devient une note datée du jour de l'import (le natif n'a pas de note sans date). */
+const nativeNotes = (notes: unknown, today: Day): unknown => (typeof notes === 'string' ? [{ date: today, text: notes }] : notes);
+
+/** Ce que le retour ne retrouverait pas seul : la clé d'un champ quand ce n'est pas le premier alias, et la valeur d'origine (avec celle du natif, pour savoir si elle a changé depuis) quand l'écriture inverse la rendrait autrement. Les valeurs sont copiées : yaml écrirait sinon des ancres (&a1) là où elles sont partagées avec l'entrée. */
+function originOf(entry: Entry, r: Entry, used: Partial<Record<Field, string>>, format: PlanFormat): Origin {
+  const origin: Origin = {};
+  for (const f of BACK_FIELDS) {
+    const key = used[f];
+    if (key === undefined || entry[f] === undefined) continue;
+    const different = !isDeepStrictEqual(backValue(entry, f, format), r[key]);
+    if (key !== keyOf(format, f) || different) origin[f] = different ? { key, value: structuredClone(r[key]), native: structuredClone(entry[f]) } : { key };
+  }
+  return origin;
+}
+
 /** Une entrée du fichier d'origine, en natif : clés de raf, `state:` = l'état d'origine, `estimate_label:` = le libellé d'effort d'origine. */
 function nativeEntry(r: Entry, i: number, how: { format: PlanFormat; renames: Renames; today: Day }, seen: Set<string>, problems: string[]): Entry {
   const { format, renames, today } = how;
@@ -72,12 +92,11 @@ function nativeEntry(r: Entry, i: number, how: { format: PlanFormat; renames: Re
   for (const f of VERBATIM) if (used[f]) entry[f] = take(f);
   for (const f of DAYS) if (used[f]) entry[f] = day(take(f));
   if (used.after) entry.after = [take('after')].flat().map(String);
-  if (used.notes) {
-    const notes = take('notes');
-    entry.notes = typeof notes === 'string' ? [{ date: today, text: notes }] : notes;
-  }
+  if (used.notes) entry.notes = nativeNotes(take('notes'), today);
   if (used.parent) entry.parent = e.parent;
   putExtras(entry, r, new Set(Object.values(used)), renames, fail);
+  const origin = originOf(entry, r, used, format);
+  if (Object.keys(origin).length > 0) entry[ORIGIN] = origin;
   return entry;
 }
 
@@ -103,21 +122,29 @@ function labelFor(n: Entry, format: PlanFormat): string | undefined {
   return typeof n.estimate_label === 'string' && format.estimates[n.estimate_label] === days ? n.estimate_label : labelOf(format, days);
 }
 
+/** La valeur d'un champ d'une entrée native au format d'origine, quand rien d'autre n'en dit la forme : l'état, le libellé d'effort, sinon la valeur du natif. */
+function backValue(n: Entry, f: Field, format: PlanFormat): unknown {
+  if (f === 'status') return stateOf(n, format);
+  if (f === 'estimate') return labelFor(n, format) ?? n.estimate;
+  return n[f];
+}
+
+/** Un champ d'une entrée native, écrit sous la clé d'origine et, tant que la valeur du natif n'a pas changé, dans la forme d'origine. */
+function putBack(e: Entry, n: Entry, f: Field, how: { format: PlanFormat; origin: Origin[Field]; fail: (what: string) => void }): void {
+  const { format, origin: o, fail } = how;
+  const kept = o !== undefined && 'value' in o && isDeepStrictEqual(o.native, n[f]);
+  const value = kept ? o.value : backValue(n, f, format);
+  if (f === 'status' && value === undefined) fail(`le statut « ${String(n.status)} » n'est porté par aucun état du plan d'origine (plan.statuses)`);
+  else e[o?.key ?? keyOf(format, f)] = value;
+}
+
 /** Une entrée native, au format d'origine. */
 function foreignEntry(n: Entry, format: PlanFormat, back: Record<string, string>, problems: string[]): Entry {
   const id = String(n.id);
   const fail = (what: string) => void problems.push(`${id} : ${what}`);
   const e: Entry = {};
-  const put = (field: Field, value: unknown) => void (e[keyOf(format, field)] = value);
-  put('id', n.id);
-  if (n.title !== undefined) put('title', n.title);
-  if (n.status !== undefined) {
-    const state = stateOf(n, format);
-    if (state === undefined) fail(`le statut « ${String(n.status)} » n'est porté par aucun état du plan d'origine (plan.statuses)`);
-    else put('status', state);
-  }
-  if (n.estimate !== undefined) put('estimate', labelFor(n, format) ?? n.estimate);
-  for (const f of [...VERBATIM, ...DAYS, 'after', 'notes', 'parent'] as Field[]) if (n[f] !== undefined) put(f, n[f]);
+  const origin = (typeof n[ORIGIN] === 'object' && n[ORIGIN] !== null ? n[ORIGIN] : {}) as Origin;
+  for (const f of BACK_FIELDS) if (n[f] !== undefined) putBack(e, n, f, { format, origin: origin[f], fail });
   for (const [key, value] of Object.entries(n)) {
     if (NATIVE_OWN.has(key)) continue;
     const name = back[key] ?? key;
@@ -137,38 +164,27 @@ export function foreignEntries(native: Entry[], format: PlanFormat, renames: Ren
   return out;
 }
 
-/** Ce qu'une entrée dit, pour être comparée à une autre : par champ de raf la valeur normalisée, et les clés que le format ne mappe pas. */
-function view(r: Entry, format: PlanFormat): { fields: Partial<Record<Field, unknown>>; extras: Entry } {
-  const fields: Partial<Record<Field, unknown>> = {};
+/** Ce qu'une entrée dit, pour être comparée à une autre : par champ de raf la clé qui le porte et sa valeur telle quelle, et les clés que le format ne mappe pas. */
+function view(r: Entry, format: PlanFormat): { fields: Partial<Record<Field, { key: string; value: unknown }>>; extras: Entry } {
+  const fields: Partial<Record<Field, { key: string; value: unknown }>> = {};
   const consumed = new Set<string>();
   for (const f of FIELDS) {
     const key = (format.fields[f] ?? [f]).find((k) => r[k] != null);
     if (key === undefined) continue;
     consumed.add(key);
-    const v = r[key];
-    const canon = (): unknown => {
-      if (f === 'id' || f === 'parent' || f === 'title' || f === 'status') return String(v);
-      if (DAYS.includes(f)) return day(v);
-      if (f === 'after') return [v].flat().map(String);
-      if (f === 'estimate') return typeof v === 'string' ? format.estimates[v] : v;
-      if (f === 'notes') return typeof v === 'string' ? [{ text: v }] : v;
-      return v;
-    };
-    const c = canon();
-    // Ce qui ne dit rien (faux, liste vide) vaut l'absence : le natif ne l'écrit pas.
-    if (c === false || (Array.isArray(c) && c.length === 0)) continue;
-    fields[f] = c;
+    fields[f] = { key, value: r[key] };
   }
   return { fields, extras: Object.fromEntries(Object.entries(r).filter(([k]) => !consumed.has(k))) };
 }
 
-const same = (f: Field, a: unknown, b: unknown): boolean => {
-  if (f !== 'notes' || !Array.isArray(a) || !Array.isArray(b)) return isDeepStrictEqual(a, b);
-  // Un texte sans date est devenu une note datée du jour de l'import : seul le texte se compare.
-  return a.length === b.length && a.every((n: Entry, i) => n.text === (b[i] as Entry).text && (n.date === undefined || n.date === (b[i] as Entry).date));
-};
+type Seen = { key: string; value: unknown } | undefined;
+/** L'écart d'un champ entre l'origine et le retour (vide : identique) : la clé qui le porte, sinon sa valeur. */
+function fieldDiff(x: Seen, y: Seen): string[] {
+  if (x?.key !== y?.key) return [`se lisait sous « ${x?.key} » et revient sous « ${y?.key} »`];
+  return isDeepStrictEqual(x?.value, y?.value) ? [] : [`« ${JSON.stringify(x?.value)} » devient « ${JSON.stringify(y?.value)} »`];
+}
 
-/** Les écarts entre les entrées d'origine et leur aller-retour (natif puis écriture inverse) : une ligne par champ qui diffère. Vide : sans perte. */
+/** Les écarts entre les entrées d'origine et leur aller-retour (natif puis écriture inverse) : une ligne par champ qui diffère, clé et valeur comparées à l'identique. Vide : sans perte. */
 export function roundTripDiff(raw: Entry[], back: Entry[], format: PlanFormat): string[] {
   const diffs: string[] = [];
   if (raw.length !== back.length) diffs.push(`${raw.length} entrées à l'origine, ${back.length} au retour`);
@@ -176,8 +192,8 @@ export function roundTripDiff(raw: Entry[], back: Entry[], format: PlanFormat): 
     const b = back[i];
     if (!b) return;
     const [a, c] = [view(r, format), view(b, format)];
-    const id = String(a.fields.id ?? `n° ${i + 1}`);
-    for (const f of FIELDS) if (!same(f, a.fields[f], c.fields[f])) diffs.push(`${id} : ${f} « ${JSON.stringify(a.fields[f])} » devient « ${JSON.stringify(c.fields[f])} »`);
+    const id = String(a.fields.id?.value ?? `n° ${i + 1}`);
+    for (const f of FIELDS) fieldDiff(a.fields[f], c.fields[f]).forEach((d) => diffs.push(`${id} : ${f} ${d}`));
     for (const k of new Set([...Object.keys(a.extras), ...Object.keys(c.extras)])) {
       if (!isDeepStrictEqual(a.extras[k], c.extras[k])) diffs.push(`${id} : la clé « ${k} » n'est pas revenue à l'identique`);
     }

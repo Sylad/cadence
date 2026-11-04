@@ -29,7 +29,7 @@ cas:
       - { si: un projet est illisible, alors: sa ligne dit l'erreur, les autres projets restent, regles: [R7] }
       - { si: les lignes du tour n'ont pas de champ lots (cadence plus ancien que le mod), alors: le panneau affiche l'erreur « cadence trop ancien », pas l'état vide, regles: [R14] }
       - { si: l'argument de /hud n'est pas connu, alors: la commande répond par un texte et ne bascule rien, regles: [R16] }
-      - { si: Claude ne place pas le panneau demandé, alors: la commande répond « panneau des lots non placé : <raison> » et n'ouvre rien, regles: [R19] }
+      - { si: Claude ne place pas le panneau demandé, alors: "la commande répond « panneau des lots non placé : <raison> » et n'ouvre rien", regles: [R19] }
       - { si: l'arbre dépasse la hauteur du panneau, alors: il est tronqué avec le nombre de lots masqués, regles: [R17] }
     resultat: Un arbre de lots par projet, sans aucune action d'écriture.
   - id: C2

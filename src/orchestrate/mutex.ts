@@ -1,29 +1,50 @@
 /** File d'attente en mémoire : un seul porteur à la fois, dans l'ordre des demandes (les lots d'une vague partagent un processus, donc un pid : un verrou fichier ne les départagerait pas, L279). */
 export class Mutex {
-  private tail: Promise<void> = Promise.resolve();
-  private queued = 0;
+  private held = false;
+  private urgent: (() => void)[] = [];
+  private waiters: (() => void)[] = [];
 
-  /** Vrai quand un porteur ou un demandeur précède le prochain : sa demande ne sera pas servie tout de suite. */
+  /** Vrai quand un porteur tient le mutex : une demande ne sera pas servie tout de suite. */
   get busy(): boolean {
-    return this.queued > 0;
+    return this.held;
   }
 
-  /** Rend la libération quand c'est le tour du demandeur, ou null si `timeoutMs` s'écoule avant. Un demandeur qui renonce laisse passer son tour. */
-  async acquire(timeoutMs = Infinity): Promise<(() => void) | null> {
-    const prev = this.tail;
-    let release!: () => void;
-    this.queued++;
-    const mine = new Promise<void>((r) => (release = () => (this.queued--, r())));
-    this.tail = prev.then(() => mine);
+  private pass(): void {
+    const next = this.urgent.shift() ?? this.waiters.shift();
+    if (next) next();
+    else this.held = false;
+  }
+
+  /**
+   * Rend la libération quand c'est le tour du demandeur, ou null si `timeoutMs` s'écoule avant. Un demandeur qui renonce laisse passer son tour.
+   * `first` (L591) : la demande passe devant celles déjà en file (jamais devant le porteur) ; les demandes `first` se servent entre elles dans l'ordre.
+   */
+  async acquire(timeoutMs = Infinity, first = false): Promise<(() => void) | null> {
+    let done = false;
+    const release = () => {
+      if (done) return;
+      done = true;
+      this.pass();
+    };
+    if (!this.held) {
+      this.held = true;
+      return release;
+    }
+    const line = first ? this.urgent : this.waiters;
     let timer: NodeJS.Timeout | undefined;
-    const late = new Promise<false>((r) => {
-      if (timeoutMs !== Infinity) timer = setTimeout(() => r(false), timeoutMs);
+    const turn = await new Promise<boolean>((resolve) => {
+      const mine = () => resolve(true);
+      line.push(mine);
+      if (timeoutMs !== Infinity)
+        timer = setTimeout(() => {
+          const at = line.indexOf(mine);
+          if (at < 0) return; // son tour est déjà venu
+          line.splice(at, 1);
+          resolve(false);
+        }, timeoutMs);
     });
-    const turn = await Promise.race([prev.then(() => true as const), late]);
     clearTimeout(timer);
-    if (turn) return release;
-    void prev.then(release);
-    return null;
+    return turn ? release : null;
   }
 }
 

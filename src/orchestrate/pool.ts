@@ -30,7 +30,7 @@ export function groupLots(ctxs: LotCtx[]): LotCtx[][] {
 }
 
 /**
- * Ordonnanceur : une file par dépôt, les lots d'un dépôt l'un après l'autre dans l'ordre donné, `slots` files au plus en parallèle. Deux lots qui partagent un dépôt
+ * Ordonnanceur : une file par dépôt, les lots d'un dépôt l'un après l'autre dans l'ordre donné, `slots` files au plus qui tiennent un créneau en parallèle (L591 : une file dont le lot attend son tour d'intégration n'en tient pas, `holdingSlots`). Deux lots qui partagent un dépôt
  * sont dans la même file : jamais deux sessions dans un même dépôt (le plafond global des sessions de toutes les vagues est tenu par execute.ts).
  * `parallel(groupe)` (L279) : les lots de ce groupe sont chacun leur propre file — ils jouent ensemble, chacun dans son worktree, dans la limite de `slots` ;
  * un lot qui dépend d'un lot du groupe attend qu'il soit fini (ready après son intégration) avant de partir, et le lot en attente d'une place n'est pas commencé

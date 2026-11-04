@@ -184,7 +184,8 @@ export async function planWrite(c: LotCtx, doWrite: () => Promise<string | null>
   const write = () => refusal(doWrite);
   if (!c.tree) return write();
   const l = c.lot;
-  const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, c.wave.integrate);
+  // L591 : l'écriture de plan, courte, passe devant les intégrations en file (elle n'attend que celle qui tient le dépôt) : un lot neuf ne reste pas sans session derrière toute la file, alors qu'il tient un créneau.
+  const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, { ...c.wave.integrate, first: true });
   if (!grant.ok) return `écriture du plan refusée : verrou tenu par ${grant.holder.wave} (pid ${grant.holder.pid})`;
   try {
     const cur = repoBranch(l.repo);

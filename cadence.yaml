@@ -50,6 +50,7 @@ migrate:
     - docs/superpowers/**
     - docs/mesures/**
     - docs/perf/**
+    - docs/etudes/**
     - test/migrate.test.ts
     - test/plan-dossier-cache.test.ts
     - test/orchestrate-precheck-l322.test.ts

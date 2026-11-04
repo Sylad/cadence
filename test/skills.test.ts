@@ -436,12 +436,12 @@ describe('skills install', () => {
     const lead = skillText('lead');
     expect(lead).toContain('« vague `<id>` : `<project>:<lot>`, … »');
     expect(lead).toContain('--wave <id>');
-    expect(lead).toContain('tail -n +1 -F .cadence/runs/<id>/journal.log');
+    expect(lead).toContain('cadence orchestrate --follow --wave <id>');
     expect(lead).toContain('Monitor');
     expect(lead).toContain('cadence orchestrate --status --watch');
     expect(lead).not.toContain('handed back, final table');
     expect(lead).toContain('The final table is not in the journal');
-    expect(lead).toContain('stop the follow-up');
+    expect(lead).toContain('The follow-up ends by itself with « fin de vague <id> : <status> »');
     const readme = flat(docText());
     expect(readme).toContain('--status [<wave>] --watch [--interval 10]');
     expect(readme).toContain('.cadence/runs/<id>/journal.log');

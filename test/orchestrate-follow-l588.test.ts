@@ -6,6 +6,7 @@ import { leadLine } from '../src/orchestrate/follow.js';
 import { cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
+import { PLAN_DEFAULT } from '../src/config.js';
 import { Plan } from '../src/plan.js';
 import { claudeOut, commitFile, git, kindOf, precheckReport, reviewReport, workReport } from './orchestrate-harness.js';
 import { tempDir } from './helpers.js';
@@ -29,11 +30,11 @@ function project() {
   git(dir, 'config', 'user.email', 't@example.com');
   git(dir, 'config', 'user.name', 'T');
   git(dir, 'config', 'commit.gpgsign', 'false');
-  const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), 'a', 'L', '2026-09-01');
+  const plan = Plan.create(join(dir, PLAN_DEFAULT), 'a', 'L', '2026-09-01');
   plan.add('un', '2026-10-01', { estimate: 1 });
   plan.save();
   writeFileSync(join(dir, 'cadence.yaml'), 'orchestrate:\n  precheck: false\n');
-  git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+  git(dir, 'add', '--', PLAN_DEFAULT, 'cadence.yaml');
   git(dir, 'commit', '-q', '-m', 'chore: plan');
   return { parent, dir };
 }

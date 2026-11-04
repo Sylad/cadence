@@ -1167,6 +1167,7 @@ lots:
     estimate: 0.25
     created: 2026-10-31
     started: 2026-11-04
+    review: { date: 2026-11-04, verdict: "compliant after 2 minor notes (measure re-read per lot in preflight, read failure silent in --dry-run) — orchestré (vague 2026-11-04-1015-cad, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant (1 minor note: the measure is re-read for each lot in preflight)", commit: 88deed38c464579643c4733bfd8d19d2b0ed97c5 }
   - id: L502
     title: "Hook du plugin contre le pipe qui masque le code de sortie (inventaire des pertes du 31-10 (17→31-10) : 4 récidives du lead malgré la règle, L423 L434 ouverts à tort) : PreToolUse Bash qui refuse une commande de porte, de test, de push ou de livraison (cadence, raf, git push, npm test, vitest…) suivie de | tail/head/grep sans set -o pipefail ni PIPESTATUS, avec le message qui dit quoi écrire"
     status: done

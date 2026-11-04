@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { latestVersionTag } from '../src/git.js';
 import { unpublished, unpublishedAt, unpublishedLine } from '../src/unpublished.js';
+import { planLoader } from '../src/config.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 const TODAY = '2026-11-04';
@@ -43,6 +44,15 @@ async function repo(pkg: string | null = '{"name":"d","version":"1.0.0"}', tag: 
 }
 
 describe('L571 limites — lots non publiés', () => {
+  it('un lot récurrent arrêté (done, every présent) est compté comme un lot clos', async () => {
+    const dir = await repo();
+    const plan = join(dir, '.cadence/raf.yaml');
+    const text = readFileSync(plan, 'utf8');
+    const i = text.indexOf('id: L2\n');
+    writeFileSync(plan, text.slice(0, i) + text.slice(i).replace('status: done', 'status: done\n    every: 7'));
+    expect(unpublished(planLoader(dir)(), dir)?.lots).toEqual(['L2']);
+  });
+
   it('tag posé sur HEAD : aucun commit depuis, aucune ligne', async () => {
     const dir = await repo();
     git(dir, 'tag', 'v1.0.1');

@@ -5,7 +5,6 @@ import { linkCommits } from './link.js';
 import { planLoader } from './config.js';
 import { gitRoot, latestVersionTag } from './git.js';
 import type { Plan } from './plan.js';
-import { isRecurring } from './recurring.js';
 
 /** Les lots clos (`done`) dont le travail est postérieur au dernier tag de version (L571) : en service, mais pas publiés. */
 export interface Unpublished {
@@ -27,7 +26,7 @@ function publishes(root: string): boolean {
 }
 
 /**
- * Les lots `done` (hors récurrents) que cite au moins un commit de travail depuis le dernier tag `v<x.y.z>` ; null quand le dépôt ne publie pas
+ * Les lots `done` que cite au moins un commit de travail depuis le dernier tag `v<x.y.z>` ; null quand le dépôt ne publie pas
  * (pas de `package.json` avec version, ou aucun tag de version) ou que rien n'est en attente. Les commits d'entretien du plan (« plan : L1 terminé ») ne comptent pas :
  * un lot dont le travail précède le tag n'est pas « non publié » parce que son statut a changé après.
  */
@@ -36,7 +35,7 @@ export function unpublished(plan: Plan, root: string): Unpublished | null {
   const tag = latestVersionTag(root);
   if (!tag) return null;
   const lots = plan.lots();
-  const done = lots.filter((l) => l.status === 'done' && !isRecurring(l));
+  const done = lots.filter((l) => l.status === 'done');
   if (done.length === 0) return null;
   const linked = linkCommits(lots, planCommits(plan, root, { range: `${tag}..HEAD` }), plan.refs);
   const work = workByLot(plan, root, linked, done.map((l) => l.id));

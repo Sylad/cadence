@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.51.0**: resources carry paths (held for any lot whose diff touches them); `--add` takes back a lot the live wave handed back; `raf export` and `raf events`.
 - **1.50.0**: `corrections --classify` says when Ollama is unreachable; a config key set before its service install no longer breaks a repository; no false incident on a delivery's gitops commit.
 - **1.49.0**: lot budgets follow the measure; a pre-check of shared files and sealed tests; the sheet review converges (3rd pass); the mockup index is completed from `maquette_ecran`; piped gate commands refused.
 - **1.48.0**: lots in service but not published are flagged by the tour, the close and `--status`; the mockup review converges (unchanged-point majors go to the lead); `news check` asks a lot only for its own hypotheses.
@@ -79,6 +80,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.51.0**: a shared resource declared in the parent `cadence.yaml` can carry paths (L558): the wave holds it for any lot whose diff touches them, with no `uses:` set by hand; at integration a later lot waits for an older lot of the same wave only while that lot is really working on the resource, and a rebase conflict on a resource's file names the resource and the commits that touched it. `cadence orchestrate --add <project:lot>` takes back a lot the live wave handed back at the end of its cycle, once the lead has fixed and reviewed it in its kept worktree, instead of answering « lot déjà dans la vague » (L563, GitHub issue #31); one predicate decides which hand-backs can be added, an unknown incident never can. `raf export` gives the plan as one stable JSON document and `raf events` its stream of events (L470). Four older screen sheets now pass `cadence spec check` (L576).
 
 **1.50.0**: `cadence corrections --classify` says at once when Ollama is not reachable (« Ollama injoignable sur … : rien n'est classé »), exits non-zero and leaves `corrections.json` untouched, instead of printing « 53/53 » and writing an empty result; a partial run counts the passes left unclassified (L575, GitHub issue #35). A config key set in `cadence.yaml` before the version that reads it is in service no longer breaks the repository (L504). The tag bump that a delivery script commits in a neighbouring repository is no longer raised as an incident by a running wave (L503). The guard tests that froze file fingerprints are replaced by behaviour tests, so a lot no longer stops on a question to update a fingerprint (L574).
 

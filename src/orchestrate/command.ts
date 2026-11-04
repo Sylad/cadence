@@ -22,6 +22,7 @@ export { preflight, projectEnv, resolveTargets, type Target } from './preflight.
 import { continueDryRun, dryRun } from './dry-run.js';
 import { draw, priorityOf } from './draw.js';
 
+import { followCommand } from './follow.js';
 import { answerOnly, control, freeLines, maxSessions, onceAuth, statusCommand, waveExists } from './status.js';
 export { configuredCap, expiredHoldLines, liveLines, slotsLine } from './status.js';
 
@@ -110,7 +111,8 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.watch && args.status === undefined) throw new RafError('--watch s\'utilise avec --status');
   if (args.detail !== undefined && args.status === undefined) throw new RafError('--detail s\'utilise avec --status');
   if (args.detail !== undefined && args.watch) throw new RafError('--detail ne se combine pas avec --watch (il donne le détail d\'un lot, pas le tableau)');
-  if (args.interval !== undefined && !args.watch) throw new RafError('--interval s\'utilise avec --status --watch');
+  if (args.follow && (args.lots.length || args.status !== undefined || args.watch || args.resume !== undefined || args.continue || args.dryRun || args.waits || args.drop.length || args.add.length || args.stopAfterCurrent || args.integrate.length || args.removeWorktree || args.goal !== undefined || args.answers.length || args.lotBudgets.length || args.budget !== undefined)) throw new RafError('--follow ne se combine qu\'avec --wave et --interval (il suit le journal d\'une vague, il n\'en pilote pas)');
+  if (args.interval !== undefined && !args.watch && !args.follow) throw new RafError('--interval s\'utilise avec --status --watch ou --follow');
   // --drop / --stop-after-current (L79) pilotent une vague VIVANTE : ni avec --status (rien à piloter), ni --stop-after-current avec --resume (il le contredit). --resume --drop retire le lot avant de rejouer la vague arrêtée.
   if (args.status !== undefined && (args.drop.length || args.stopAfterCurrent)) throw new RafError('--status ne se combine pas avec --drop / --stop-after-current');
   if (args.resume !== undefined && args.stopAfterCurrent) throw new RafError('--resume ne se combine pas avec --stop-after-current (il reprend la vague, il ne l\'arrête pas)');
@@ -136,6 +138,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     for (const line of renderWaits(readWaits(launch, args.since))) io.out(line);
     return 0;
   }
+  if (args.follow) return followCommand(args, io, deps, launch);
   if (args.status !== undefined) return statusCommand(args, io, deps, launch);
   if (args.removeWorktree) return removeWorktree(args, io);
   if (args.resume !== undefined) return resume(args, argv, io, deps, launch, today);
@@ -143,7 +146,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.drop.length || args.stopAfterCurrent) return control(args, io);
   if (args.answers.length) return answerOnly(args, io);
 
-  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--no-fill] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --add projet:lot [--wave vague] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
+  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--no-fill] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --follow [--wave vague] [--interval 5] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --add projet:lot [--wave vague] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);

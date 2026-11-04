@@ -17,9 +17,11 @@ export interface Args {
   waits: boolean;
   since?: string;
   watch: boolean;
+  /** `--follow` (L588) : suit le journal d'une vague (`--wave`, sinon la dernière du dossier) et n'imprime que les lignes qui demandent un geste du lead. */
+  follow: boolean;
   /** `--status --detail projet:lot` (L441) : le détail d'un lot (choix, propositions, captures…) que le tableau compact de `--status` n'imprime pas. */
   detail?: string;
-  /** Secondes entre deux rendus de `--status --watch`. */
+  /** Secondes entre deux rendus de `--status --watch`, ou deux relevés du journal de `--follow`. */
   interval?: number;
   resume?: string | true;
   budget?: number;
@@ -96,13 +98,14 @@ function lotBudgetArg(text: string): Args['lotBudgets'][number] {
 
 /** Vrai quand la ligne de commande demande une autre action que de lancer une vague. */
 const asksAnotherAction = (a: Args): boolean =>
-  a.resume !== undefined || a.status !== undefined || a.waits || a.add.length > 0 || a.drop.length > 0 || a.stopAfterCurrent || a.answers.length > 0 || a.removeWorktree !== undefined;
+  a.resume !== undefined || a.status !== undefined || a.waits || a.follow || a.add.length > 0 || a.drop.length > 0 || a.stopAfterCurrent || a.answers.length > 0 || a.removeWorktree !== undefined;
 
 /** Les options sans valeur, et le champ de `Args` qu'elles lèvent. */
-const BOOLEAN_FLAGS: Record<string, 'dryRun' | 'waits' | 'watch' | 'stopAfterCurrent' | 'abandonCommits' | 'continue' | 'noFill'> = {
+const BOOLEAN_FLAGS: Record<string, 'dryRun' | 'waits' | 'watch' | 'follow' | 'stopAfterCurrent' | 'abandonCommits' | 'continue' | 'noFill'> = {
   '--dry-run': 'dryRun',
   '--waits': 'waits',
   '--watch': 'watch',
+  '--follow': 'follow',
   '--stop-after-current': 'stopAfterCurrent',
   '--abandon-commits': 'abandonCommits',
   '--continue': 'continue',
@@ -110,7 +113,7 @@ const BOOLEAN_FLAGS: Record<string, 'dryRun' | 'waits' | 'watch' | 'stopAfterCur
 };
 
 export function parseOrchestrateArgs(argv: string[]): Args {
-  const a: Args = { lots: [], lotBudgets: [], dryRun: false, waits: false, watch: false, continue: false, noFill: false, answers: [], drop: [], stopAfterCurrent: false, add: [], integrate: [], abandonCommits: false };
+  const a: Args = { lots: [], lotBudgets: [], dryRun: false, waits: false, watch: false, follow: false, continue: false, noFill: false, answers: [], drop: [], stopAfterCurrent: false, add: [], integrate: [], abandonCommits: false };
   const optional = (i: number) => (argv[i + 1] !== undefined && !argv[i + 1].startsWith('-') && !LOT_LIKE.test(argv[i + 1]) ? argv[i + 1] : undefined);
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];

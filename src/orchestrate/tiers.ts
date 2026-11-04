@@ -2,6 +2,9 @@ import { lstatSync, readdirSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { git, gitFailure, tryGit } from './worktree.js';
 import { lotKey, lotRepoPaths, type LotState } from './state.js';
+import { isAncestor } from '../git.js';
+import { readDeliveryLines, sharedStateDir } from '../state.js';
+import { gitCommitsIn } from './table.js';
 
 /** Voie prévue pour un travail qui doit toucher un dépôt tiers (L456) : une branche à part, jamais la branche principale. */
 export const wipBranch = (project: string, lot: string): string => `wip/${project}-${lot}`;
@@ -99,10 +102,11 @@ export function citesLot(subject: string, lots: string[]): boolean {
 
 /**
  * Première branche principale dont le sha a bougé entre deux relevés, avec ce qu'il faut en dire : les commits ajoutés (sha court et sujet), ou la branche créée,
- * supprimée ou déplacée sans commit nouveau. Seuls comptent les commits dont le sujet cite un lot de la vague (`lots`, L458) : une livraison (bump de tag de deploy.sh), un commit du lead
- * ou d'une autre vague ne citent aucun d'eux et passent. Une branche absente d'un seul côté a bougé (créée ou supprimée pendant la session). Null : rien n'a bougé.
+ * supprimée ou déplacée sans commit nouveau. Seuls comptent les commits dont le sujet cite un lot de la vague (`wave.lots`, L458) : une livraison (bump de tag de deploy.sh), un commit du lead
+ * ou d'une autre vague ne citent aucun d'eux et passent. Passe aussi le commit dont tous les lots cités sont des lots livrés (`wave.delivered`, L503 : le bump de tag que deploy.sh
+ * commite pendant `deliver --sha` d'un lot prêt) ; il est rendu à `wave.onDelivered` (sha court et sujet) pour que le journal le dise. Une branche absente d'un seul côté a bougé (créée ou supprimée pendant la session). Null : rien n'a bougé.
  */
-export function tierMoved(repo: string, before: TierRead, after: TierRead, lots: string[]): { branch: string; detail: string } | null {
+export function tierMoved(repo: string, before: TierRead, after: TierRead, wave: { lots: string[]; delivered?: string[]; onDelivered?: (line: string) => void }): { branch: string; detail: string } | null {
   for (const branch of [...new Set([...Object.keys(before.mains), ...Object.keys(after.mains)])].sort()) {
     const b = before.mains[branch];
     const a = after.mains[branch];
@@ -111,7 +115,16 @@ export function tierMoved(repo: string, before: TierRead, after: TierRead, lots:
     // branche créée : seuls comptent les commits que aucune branche principale d'avant ne portait déjà
     const range = b ? [`${b}..${a}`] : [a, '--not', ...Object.values(before.mains)];
     const all = (tryGit(repo, 'log', '--abbrev=7', '--format=%h %s', ...range) ?? '').split('\n').filter(Boolean);
-    const lines = all.filter((l) => citesLot(l.slice(l.indexOf(' ') + 1), lots));
+    const { lots, delivered = [], onDelivered } = wave;
+    const lines = all.filter((l) => {
+      const subject = l.slice(l.indexOf(' ') + 1);
+      const cited = lots.filter((id) => citesLot(subject, [id]));
+      if (cited.length > 0 && cited.every((id) => delivered.includes(id))) {
+        onDelivered?.(l);
+        return false;
+      }
+      return cited.length > 0;
+    });
     if (all.length && !lines.length) continue; // aucun commit ne cite un lot de la vague
     if (!lines.length && !b) return { branch, detail: `branche créée (${a.slice(0, 7)})` };
     if (!lines.length) return { branch, detail: `branche déplacée de ${b.slice(0, 7)} à ${a.slice(0, 7)}` };
@@ -128,4 +141,29 @@ export function tierMoved(repo: string, before: TierRead, after: TierRead, lots:
 export function stillThird(before: Map<string, TierRead>, wave: Pick<LotState, 'project' | 'lot' | 'repo' | 'repos'>[], mine: string): [string, TierRead][] {
   const ofOthers = new Set(wave.filter((x) => lotKey(x.project, x.lot) !== mine).flatMap(lotRepoPaths));
   return [...before].filter(([repo]) => !ofOthers.has(repo));
+}
+
+/**
+ * Les lots prêts de la vague, autres que `mine`, dont un commit est dans un sha du journal des livraisons de leur dépôt (L503) : `cadence deliver --sha` les a livrés,
+ * et le bump de tag que deploy.sh commite alors dans le dépôt voisin cite ces lots sans être un commit du lot en cours. Un lot illisible n'est pas compté.
+ */
+function deliveredLots(lots: LotState[], mine: string): string[] {
+  return lots.flatMap((x) => {
+    if (x.status !== 'ready' || lotKey(x.project, x.lot) === mine) return [];
+    try {
+      const shas = readDeliveryLines(sharedStateDir(x.repo)).map((d) => d.sha);
+      return gitCommitsIn(x, x.repo).some((k) => shas.some((s) => isAncestor(x.repo, k, s))) ? [x.lot] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** `tierMoved` du dépôt tiers `repo`, sans les commits de livraison d'un lot prêt de la vague (L503) : `log` dit ceux qu'il a laissé passer. */
+export function movedOutsideDeliveries(repo: string, before: TierRead, after: TierRead, wave: { lots: LotState[]; mine: string; log: (line: string) => void }): ReturnType<typeof tierMoved> {
+  const delivered = deliveredLots(wave.lots, wave.mine);
+  const tolerated: string[] = [];
+  const moved = tierMoved(repo, before, after, { lots: wave.lots.map((x) => x.lot), delivered, onDelivered: (line) => tolerated.push(line) });
+  if (tolerated.length) wave.log(`commit de livraison (${wave.lots.filter((x) => delivered.includes(x.lot)).map((x) => `${x.project}:${x.lot}`).join(', ')}) toléré dans ${basename(repo)} : ${tolerated.join(' | ')}`);
+  return moved;
 }

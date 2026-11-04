@@ -1160,6 +1160,8 @@ is on the branch, not on `HEAD`: a commit made then left with `HEAD` elsewhere i
 the branch): it states and hands back, the lead decides. The check also runs when the session ends in failure, at the time limit or at the quota, not only on a
 successful one: otherwise the next attempt would take the moved sha as its reference and the commit would never be named.
 
+**A delivery of a ready lot (L503).** A commit that cites only lots that are `ready` in the wave and whose work is in a sha of `deliveries.log` (the delivery journal of their repository) is tolerated like the lead's push: it is the tag bump that `deploy.sh` commits in the GitOps repository during `cadence deliver --sha <sha>` of a ready lot while the wave plays (2026-10-31: the delivery of warhammer L221 handed L220 back). The journal says `<project>:<lot> · <step> : commit de livraison (<project>:<lot>) toléré dans <repository> : <short sha> <subject>`. A commit that also cites the lot being written or any lot of the wave that is not ready and delivered stays a finding, and only that commit is named; a ready lot that is not yet in `deliveries.log` (the journal line is written once the delivery ends) does not count.
+
 **What is watched.** The repositories that are a **direct child** of the folder that holds the lot's repository (the parent of the repository's path, not of a worktree).
 That makes every sibling repository, cited by the lot or not.
 

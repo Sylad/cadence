@@ -92,6 +92,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
+- A delivery's commit in a neighbouring repository is no longer a false incident (L503, [docs/orchestrate.md](docs/orchestrate.md)): the tag bump that `deploy.sh` commits in the GitOps repository during `cadence deliver --sha` of a ready lot of the wave cites that lot, and used to hand the lot being written back (31-10: warhammer L221 delivered while L220 played). A commit that cites only ready lots found in `deliveries.log` is tolerated and the journal says so; one that also cites the lot in progress or an undelivered lot of the wave still hands it back.
 - The sheet review converges (L572, [docs/orchestrate.md](docs/orchestrate.md), [measure](docs/mesures/fiche-converge-2026-11-04.md)): when the second review counts fewer blocking + major findings than the first and exactly one is left, a third `spec` session and a third review are played (`fiche non conforme après 3 revues` if it still fails), like the code-correction rule. A sheet handed back with one single major and no blocking one says `un seul majeur, corrigeable par le lead : <file:line> — <text>`.
 
 ## [1.48.0] - 2026-11-04

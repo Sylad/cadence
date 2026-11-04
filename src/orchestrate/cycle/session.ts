@@ -15,7 +15,7 @@ import { sumTokens, type Tokens } from '../result.js';
 import { cutReport, EXTENSION_MS, MAX_EXTENSIONS, workTimeoutMs } from '../timeouts.js';
 import { checkShape, effortKey, REVIEW_SCHEMA, schemaFor, summarize, stepAgent, type ReviewReport } from '../schemas.js';
 import { lotKey, lotRepoPaths, neighbourDirs, type StepState } from '../state.js';
-import { readTier, stillThird, takeTiers, tierMoved, tierRepos, wipBranch, type TierRead } from '../tiers.js';
+import { movedOutsideDeliveries, readTier, stillThird, takeTiers, tierRepos, wipBranch, type TierRead } from '../tiers.js';
 import { git, gitFailure, planFileSet } from '../worktree.js';
 import { type LotCtx, workDir as wd, save, transition, escalatedSession, stop, hasSpecStage } from './ctx.js';
 import { lotOver, WRITE_STEPS, fixAffordable, dropped, DROPPED, unplayedAnswer, halted, overBudget, suspend } from './budget.js';
@@ -425,7 +425,7 @@ function checkTiers(c: LotCtx, kind: SessionKind, step: StepState, before: Map<s
     if (!Object.keys(b.mains).length && !Object.keys(a.mains).length) {
       w.log(`${key} · dépôt tiers ${name} ignoré : aucune branche principale`);
     } else {
-      const moved = tierMoved(repo, b, a, w.store.lots().map((x) => x.lot));
+      const moved = movedOutsideDeliveries(repo, b, a, { lots: w.store.lots(), mine: key, log: (line) => w.log(`${key} · ${kind} : ${line}`) });
       if (moved) {
         step.status = 'failed';
         step.cause = `commit sur la branche principale d'un autre dépôt (${name}, ${moved.branch})`;

@@ -32,8 +32,9 @@ son créneau, ~9 min à deux créneaux vides le 04-11), un défaut de fond qui a
 panneau des lots de la bande (lots livrés repliés, colonne id tronquée). E1 passe après L589 et L591 parce qu'ils
 changent la formule, pas parce qu'il les remplacerait.
 
-Les 17 écarts ci-dessous se corrigent en **14 lots ≤ 0,5 j**, dont 8 sont des lots de documentation : 6 à risque nul,
-et 2 (E12, E8) à risque faible parce que des tests citent la prose ou le texte de sortie qu'ils déplacent. Aucun ne
+Les 17 écarts ci-dessous se corrigent en **14 lots ≤ 0,5 j** (4,5 j en tout ; l'[ordre proposé](#ordre-proposé) en
+fusionne deux paires et en pose 12), dont 9 sont des lots de documentation (2,5 j) : 7 à risque nul, et 2 (E12, E8) à
+risque faible parce que des tests citent la prose ou le texte de sortie qu'ils déplacent. Aucun ne
 casse une garantie de [stabilite.md](../stabilite.md). Les trois de plus fort gain : un seul calcul des créneaux
 libres lu par tous (E1), une seule source pour l'aide (E2), le découpage de `orchestrate.md` (E12, qui emporte la mise
 à jour de 26 fichiers de test, de `files` de `package.json` et de `CHECKED` de `scripts/check-links.mjs`).
@@ -46,9 +47,9 @@ Les couches, du dépôt vers la machine :
 | Couche | Où l'état est écrit | Versionné ? | Lu par |
 |---|---|---|---|
 | **A. Plan** | `.cadence/raf.yaml` (ou `plan:` de `cadence.yaml`, ou `docs/plan/raf.yaml` hérité), `.cadence/archive/<année>.yaml`, `.cadence/notes/`, `.cadence/docs-ok.yaml` | oui | `raf`, `session`, `news`, `deliver`, `lead tour`, la bande |
-| **B. Configuration** | `cadence.yaml` du projet (`plan`, `news`, `hook`, `session`, `deliver`, `verify`, `orchestrate`, `docs`, `qa`, `references`, `migrate`, `repos`) ; `cadence.yaml` du dossier parent (`lead`, `priority`, `resources`, `depth`, `perf`) | oui | tout |
-| **C. Vague** | `<dossier de lancement>/.cadence/runs/<vague>/` : état par lot (`<projet>--<lot>.json`), journal, briefs, rapports ; `.cadence/corrections.json` | non (`.git/info/exclude`) | `orchestrate --status`, `perf`, `corrections`, `--waits`, la bande |
-| **D. Registre machine** | `~/.cadence/orchestrate/` (`CADENCE_HOME`) : `waves/`, `slots/`, `holds/`, `hud-context/`, `worktrees/` | hors dépôt | `orchestrate`, `lead tour`, `lead hold`, la bande |
+| **B. Configuration** | `cadence.yaml` du projet (`plan`, `news`, `hook`, `session`, `deliver`, `verify`, `orchestrate`, `docs`, `qa`, `references`, `migrate` ; `repos` est une clé **du lot**, pas du projet) ; `cadence.yaml` du dossier parent (`lead`, `priority`, `resources`, `depth`, `perf`) | oui | tout |
+| **C. Vague** | `<dossier de lancement>/.cadence/runs/<vague>/` : état par lot (`<projet>--<lot>.json`), journal, briefs, rapports, et `worktrees/<projet>--<lot>` (le worktree du lot, `worktree.ts:56`) ; `.cadence/corrections.json` | non (`.git/info/exclude`) | `orchestrate --status`, `perf`, `corrections`, `--waits`, la bande |
+| **D. Registre machine** | `~/.cadence/orchestrate/` (`CADENCE_HOME`) : `waves/`, `slots/`, `holds/`, `waiters/`, `hud-context/` ; et `worktrees/<vague>-<empreinte>/` **seulement** quand la vague est lancée depuis la racine du dépôt (son dossier de vague est alors dans le dépôt, `worktree.ts:55`, `orchestrate.md` « Names, nothing stored ») | hors dépôt | `orchestrate`, `lead tour`, `lead hold`, la bande |
 | **E. Données utilisateur** | `~/.local/share/cadence/` : copies en service (`npm run service`) ; `$XDG_DATA_HOME/cadence/references/` : documents `ref add` | hors dépôt | `cadence` du `PATH`, `ref` |
 | **F. Dépôt git** | commits (`feat(L12): …`), hooks `pre-commit`/`post-commit`/`pre-push`, branches `cadence/<vague>/<projet>--<lot>`, `wip/cadence-<lot>` | oui | `raf check`, `commits`, `deliver --sha`, l'intégration |
 
@@ -90,9 +91,12 @@ Ce que l'ensemble devrait être pour qu'un lecteur neuf le tienne en tête, sans
    Chaque clé est lue par le module de la notion qu'elle règle (`perf-config.ts` et `gate-config.ts` le font déjà ;
    `config.ts` garde plan, news, hook, session, orchestrate, verify, docs, references — E17). Une page `docs/config.md`
    liste **toutes** les clés, en un tableau, avec leur défaut et leur page de détail (E6, E14).
-3. **Une vague, un état, un chiffre par fait.** Chaque nombre affiché (créneaux libres, lots prêts, budget restant)
-   est calculé **une fois**, par le programme, et **publié** (sortie `--json` de `orchestrate --status`, ou fichier du
-   registre) ; la bande, `lead tour` et le skill `lead` le **lisent**, ne le recalculent jamais (E1).
+3. **Une vague, un état, une formule par fait.** Chaque nombre affiché (créneaux libres, lots prêts, budget restant)
+   a **une** définition, écrite une fois dans `concepts.md`, et chaque lecteur qui la recalcule (le registre pour
+   `orchestrate --status` et `lead tour`, la bande qui doit rester indépendante de la CLI, `overview.md:58`) est tenu
+   par un **test de contrat** qui joue les deux sur le même registre. Rien n'est publié dans un fichier ou une sortie :
+   la vivacité (vague tuée, hold échu) se juge à la lecture, et un chiffre écrit serait faux jusqu'à la prochaine
+   écriture (E1).
 4. **Une échelle de taille de lot, nommée.** `express` (≤ 0,1 j), `léger` (≤ `review.threshold`, 0,25 j), `petit`
    (≤ 0,5 j ou `quickwin`), `plein`. Les quatre mots dans `concepts.md`, les quatre seuils dans un seul module (E4).
 5. **Un vocabulaire, une langue par face.** La **documentation et les noms** (commandes, options, clés, fichiers)
@@ -158,12 +162,31 @@ proposé** (≤ 0,5 j).
 seule formule. Le doublon est **registre ↔ bande**. L591 (un lot en attente d'intégration rend son créneau) change
 encore la définition côté registre : la bande divergera de nouveau tant qu'elle recalcule.
 
-**Lot proposé (0,5 j, code, risque faible).** La bande **lit** le nombre, elle ne le calcule plus : `orchestrate
---status --json` (ou un fichier `~/.cadence/orchestrate/slots.json` écrit par le registre à chaque changement) publie
-`{ cap, free, held: [...], lanes: [...] }` ; `format.ts` supprime `freeSlots` et affiche ce qu'il lit ; un test de
-contrat compare la sortie de `slotsLine` et le segment de la bande sur le même registre. `pool.ts` renomme son `free`
-en `vacantLanes` (créneaux de la vague) pour que le mot cesse de faire croire au même nombre. À faire **après** L589 et
-L591, qui changent la formule : sinon le même chiffre est corrigé deux fois.
+Deux voies ont été écartées, parce qu'elles rompraient une règle documentée ou déplaceraient la divergence :
+
+- **la bande lit la sortie de la CLI.** `orchestrate --status` n'a pas d'option `--json` (aucune dans
+  `src/orchestrate/command*.ts` ni dans `HELP` ; seul `lead tour --json` existe), et `docs/overview.md:58` garantit que
+  « `cadence-hud` works without the CLI » : la bande dépendrait de la CLI pour un chiffre vivant, avec un processus
+  `node` à chaque rafraîchissement (5 s, README du plugin).
+- **le registre publie un fichier** (`slots.json` écrit à chaque changement). Les deux lecteurs jugent la vivacité **à la
+  lecture**, pas à l'écriture : `liveWaves` teste `holderAlive(pid)` (`registry.ts:62`), le collecteur de la bande teste
+  `alive(pid)` (`collect.ts:122`), `liveHolds` compare l'échéance à `now` (`format.ts:458`, `lead-hold`). Une vague tuée
+  (`kill -9`) ou un hold échu laisserait le fichier faux jusqu'à la prochaine écriture, alors que la bande actuelle est
+  juste sur ces deux cas.
+
+**Lot proposé (0,5 j, code, risque faible).** **Une formule, deux implémentations tenues par un contrat.** Les fichiers
+`waves/<pid>.json` portent déjà `cap` et `lanes` (`registry.ts:42-43`, `updateWaveRepos`) ; le collecteur de la bande
+lit `cap` et ignore `lanes` (`collect.ts:127`). Le lot : (1) `collect.ts` lit `lanes` ; (2) `format.ts` applique la
+formule du registre, `commonCap` compris (`min(plafond commun, lanes ?? repos)` par vague vivante, moins les sessions
+du lead), en gardant sa vivacité à la lecture ; (3) la formule est écrite **une fois** en mots dans `concepts.md`
+(« créneau / hold ») et les deux docstrings y renvoient ; (4) un **test de contrat** dans la suite de cadence (à côté de
+`test/creneaux-visibles.test.ts`, qui joue déjà `lead tour` sur un `CADENCE_HOME` temporaire) inscrit des vagues avec
+`cap`, `lanes` et `repos` différents, un hold, une vague au pid mort, et compare le `free` de `slotsLine`
+(`status.ts:42`) au `freeSlots` de la bande nourri par son propre collecteur sur le même registre : la bande reste sans
+CLI, le chiffre se juge vivant, et la prochaine divergence est une porte rouge. `pool.ts` renomme son `free` en
+`vacantLanes` (créneaux de la vague) pour que le mot cesse de faire croire au même nombre. À faire **après** L589 et
+L591, qui changent la formule : sinon le même chiffre est corrigé deux fois, et le contrat devra alors être le premier
+fichier touché.
 
 ### E2. Deux textes d'aide tenus à la main
 
@@ -236,7 +259,8 @@ toucher aucun import de test (méthode de L461 C). Mesure : `plan.ts` sous 1 000
 
 **Preuve.** cadence écrit dans : le dépôt (`.cadence/`, versionné sauf `runs/` et `corrections.json`) ; le dossier de
 lancement (`.cadence/runs/<vague>/`, `state.ts:279`) ; `~/.cadence/orchestrate/` (`CADENCE_HOME`, `registry.ts:18` :
-vagues, créneaux, holds, `hud-context/`, `worktrees/`) ; `~/.local/share/cadence/` (copies en service,
+vagues, créneaux, holds, `waiters/`, `hud-context/`, et `worktrees/` pour les seules vagues lancées depuis la racine
+du dépôt ; les autres worktrees sont sous le dossier de la vague) ; `~/.local/share/cadence/` (copies en service,
 `fonctionnement.md` §4) et `$XDG_DATA_HOME/cadence/references/` (`ref/store.ts:45`). Deux racines utilisateur
 (`~/.cadence` et `~/.local/share/cadence`) pour un même outil ; `CADENCE_HOME` ne couvre que la première. L'information
 est juste mais éparpillée sur cinq pages ; aucune ne la réunit, et `concepts.md` ne nomme ni `CADENCE_HOME` ni le
@@ -438,17 +462,23 @@ Relevé pour que la prochaine étude ne le rouvre pas :
 2. **E1** (0,5 j), **après L589 et L591** : le chiffre lu, pas recalculé.
 3. **E12** (0,5 j) : `orchestrate.md` en cinq pages, avec les 26 tests, `files` et `CHECKED` mis à jour dans le même
    commit (risque faible, pas nul).
-4. **E4a + E7 + E8 + E10** (0,5 j en tout, un seul lot docs « vocabulaire ») : `concepts.md` gagne la taille des lots,
-   les quatre hooks, prêt/tirable, `docs-ok` ; E8 change aussi le texte de `ready-free.ts` et ses 7 tests.
-5. **E6 + E14** (0,25 j) : « où cadence écrit » et « les portes et où elles se déclarent ».
-6. **E9 + E11 + E13** (0,5 j en tout, un lot docs « surface pour le compte pro ») : la convention des langues (noms
-   anglais, messages français), les comptes retirés, la bande documentée une fois.
-7. **E16** (0,25 j) : `stabilite.md` dit le statut de chaque surface que le code lit, avec son test ; **avant E5 et E17**,
+4. **E4a + E7 + E10** (0,25 + 0,25 = 0,5 j, un seul lot docs « vocabulaire », risque nul) : `concepts.md` gagne la
+   taille des lots, les quatre hooks, `docs-ok`.
+5. **E8** (0,25 j, à part : il change le texte de `ready-free.ts` et ses 7 tests, risque faible, et un lot docs à
+   risque nul ne doit pas porter une porte rouge) : prêt (vague) / tirable (plan).
+6. **E6 + E14** (0,25 j) : « où cadence écrit » (le tableau des couches corrigé ci-dessus) et « les portes et où elles
+   se déclarent ».
+7. **E9 + E11** (0,25 + 0,25 = 0,5 j, un lot docs « surface pour le compte pro ») : la convention des langues (noms
+   anglais, messages français) et les comptes retirés.
+8. **E13** (0,25 j) : la bande documentée une fois.
+9. **E16** (0,25 j) : `stabilite.md` dit le statut de chaque surface que le code lit, avec son test ; **avant E5 et E17**,
    qui touchent des surfaces dont le statut n'est pas dit.
-8. **E5** (0,5 j) puis **E4b** (0,25 j) puis **E17** (0,5 j) : les trois lots de code, chacun avec sa mesure du cliquet.
+10. **E5** (0,5 j) puis **E4b** (0,25 j) puis **E17** (0,5 j) : les trois lots de code, chacun avec sa mesure du cliquet.
 
-Total : 4 j, dont 2 j de lots de documentation (deux d'entre eux, E12 et E8, touchent aussi des tests ou un texte de
-sortie). Le rituel L595 rejoue les mesures ci-dessous dans 14 jours.
+Aucun lot de l'ordre ne dépasse 0,5 j : les deux fusions (étapes 4 et 7) additionnent deux lots de 0,25 j, rien de
+plus. Total : **4,5 j, 12 lots** (les 14 du tableau moins les deux fusions), dont 2,5 j en 9 lots de documentation
+(deux d'entre eux, E12 et E8, touchent aussi des tests ou un texte de sortie ; les 7 autres sont à risque nul). Le
+rituel L595 rejoue les mesures ci-dessous dans 14 jours.
 
 ## Mesures à rejouer
 

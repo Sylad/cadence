@@ -2592,11 +2592,12 @@ lots:
       - { date: 2026-11-05, text: "indicateurs ajoutés le 05-11 : début et fin de chaque porte, minutes après la première revue, niveau de détection de chaque erreur (écriture, commit, porte, intégration), reprises à la main par cause" }
   - id: L628
     title: "Un lot light ou small qui change un comportement livré joue quand même le précheck des tests scellés (L500) : la vague liste dès le départ les tests qui figent ce qu'il touche, la session s'arrête avec le geste de rescellement, au lieu d'être rendue au commit ; L246 et L248 du 05-11 ; mesure : 0 rendu pour verrou en 7 jours"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "compliant — orchestré (vague 2026-11-05-2210-cad, 1 passe(s) de correction)", commit: 38318d850c29c69c26d2bc365bdc4652a1d3226b, reporte: { de: 366b4fbddb41a5ef6a1a5b5b202a778590dd69bf, vers: 38318d850c29c69c26d2bc365bdc4652a1d3226b, patchId: ce93c90621cf30687891f672d0b924913aff7c9a } }
+    finished: 2026-11-06
   - id: L629
     title: "Déclarer dans cadence.yaml les ressources par chemins docs/orchestrate*.md, README.md et CHANGELOG.md, et uses: sur tout lot qui les réorganise, pour qu'un découpage de page ne se fasse pas pendant que d'autres y écrivent ; L599, 3 conflits en 2 vagues ; mesure : 0 conflit hors CHANGELOG par vague"
     status: todo
@@ -2609,19 +2610,21 @@ lots:
     created: 2026-11-05
   - id: L631
     title: "Refus « tests rouges au sommet intégré » : le journal et l'état du lot citent toujours le fichier et le nom du test, jamais seulement « Expected ; false » ; L602, L617, L622 du 05-11 ont coûté une suite complète chacun pour retrouver le nom ; mesure : 0 refus sans nom"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-05-2210-cad, 1 passe(s) de correction)", commit: a3e6194c150f151bf21a37f7852b4869bad849ef, reporte: { de: 0cff6b942219df0fc7b41e6026141faf9c802b58, vers: a3e6194c150f151bf21a37f7852b4869bad849ef, patchId: 1b6ff60ce8d122cdc653f354a35c2547bc1875f7 } }
+    finished: 2026-11-06
   - id: L632
     title: "Issue #42 : un lot dont l'objectif n'a pas pu être vérifié ne ressort pas « prêt » en silence. Si la session déclare tests.vert faux, ou le critère de l'objectif non joué (accès absent, KUBECONFIG=/dev/null), la vague le rend avec la raison et le geste, et le tableau le dit ; la revue ne le classe plus conforme"
     goal: "Trois points de l'issue #42. Un : au lancement et en --dry-run, si orchestrate.prodAccess est faux et que le titre ou l'objectif du lot nomme kubectl, port-forward, KUBECONFIG, un cluster ou une URL de banc, une alerte dit que les sessions démarrent sans accès cluster et le geste à faire. Deux : la ligne du tableau, la note raf review et orchestrate --follow portent « objectif non vérifié : <première ligne> » quand le rapport d'implémentation dit tests.vert faux avec une commande que la porte ne couvre pas, ou quand nonVerifie de la dernière revue nomme l'objectif ; un tel lot ne ressort pas en simple « prêt ». Trois : chaque brief dit en une ligne que la session n'a pas d'accès cluster et qu'un objectif qui en demande un est une question au lead."
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "compliant — 0 blocking, 0 major, 1 minor (gateCovers : sous-chaîne brute pour une porte très courte) — orchestré (vague 2026-11-05-2210-cad, 2 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant : rebase sans régression, 0 bloquant, 0 majeur ; 1 mineur déjà connu (gateCovers par sous-chaîne), en note", commit: 9ac904f5cfec09e2c7391802614fff084c5ac056 }
+    finished: 2026-11-06
   - id: L633
     title: "Issue #43 : la chaîne de maquette légère ne joue plus pour un correctif de quelques propriétés sur un écran existant. Un lot visible sans screen: et sans écran neuf passe par implement, capture avant et après, et une revue UX du seul diff ; maquette et états forcés restent pour un écran neuf ou une mise en page changée. Cas mesuré : 33 min et 5,75 $ pour 11 lignes de SCSS. Mesure : coût médian d'un petit lot visible"
     status: doing

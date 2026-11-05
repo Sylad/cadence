@@ -1,4 +1,4 @@
-# Maquette légère du lot L609 : seul l'état « chargé » de la bande cadence-hud (lignes de vague, register.tsx:596-660) est touché ; vide, chargement, erreur : comportement inchangé, dessiné pour fixer qu'aucun compteur n'y paraît.
+# Maquette légère du lot L609 : seul l'état « chargé » de la bande cadence-hud (lignes de vague, register.tsx:576-670) est touché ; vide, chargement, erreur : comportement inchangé, dessiné pour fixer qu'aucun compteur n'y paraît.
 # Charte : celle de la bande cadence-hud (clés de thème du terminal) ; aucun jeton ajouté, voir contraste.md.
 ecran:
   id: bande-lots-clos
@@ -9,9 +9,6 @@ ecran:
   maquette: docs/specs/bande-lots-clos/maquette.html
 etats: [vide, chargement, erreur, charge]
 champs:
-  - { id: note-vide, libelle: Bande sans lot clos au plan (inchangée, sans compteur), type: texte, source: statique, obligatoire: false }
-  - { id: note-chargement, libelle: Bande avant la première lecture du plan (tout listé), type: texte, source: statique, obligatoire: false }
-  - { id: note-erreur, libelle: Bande quand le plan est illisible (tout listé), type: texte, source: statique, obligatoire: false }
   - { id: lot-id-bande, libelle: Identifiant d'un lot de la vague encore ouvert au plan (jamais tronqué), type: texte, source: "vague → lots[].lot", obligatoire: true }
   - { id: lot-etat-bande, libelle: État d'un lot de la vague encore ouvert au plan, type: texte, source: "vague → lots[].status", obligatoire: true }
   - { id: compteur-livres, libelle: "Compteur « livrés : N » des lots de la vague clos au plan avec delivered", type: texte, source: "tour → closed[] (delivered: true) croisé avec les lots de la vague", obligatoire: false }
@@ -21,31 +18,31 @@ regles:
     etat: vide
     enonce: "Une vague dont aucun lot n'est clos au plan s'affiche comme avant : une ligne par lot, aucune ligne compteur (une ligne de zéro n'existe pas)."
     message: ~
-    champs: [note-vide, lot-id-bande, lot-etat-bande]
+    champs: [lot-id-bande, lot-etat-bande]
     masque: [compteur-livres, compteur-clos]
     statut: sourcee
-    source: "docs/specs/panneau-lots-livres/fiche.yaml R5 (« Une ligne sans lot n'existe pas ») ; register.tsx:596-640 (lignes actuelles)"
+    source: "docs/specs/panneau-lots-livres/fiche.yaml R5 (« Une ligne sans lot n'existe pas ») ; register.tsx:576-670 (lignes actuelles)"
     tests: ["R1 — aucun lot de la vague dans closed : chaque lot a sa ligne, pas de compteur"]
   - id: R2
     etat: chargement
     enonce: "Tant que cadence lead tour n'a rien répondu, la bande ne sait pas quels lots sont clos : elle liste tous les lots comme aujourd'hui, sans compteur ; le compteur vient à la première lecture."
     message: ~
-    champs: [note-chargement, lot-id-bande, lot-etat-bande]
+    champs: [lot-id-bande, lot-etat-bande]
     statut: hypothese
     si_faux: "Si la bande devait masquer ses lots jusqu'à la première lecture, un état de chargement s'ajoute à ses lignes (rendu seul, aucune donnée en jeu)."
     tests: ["R2 — avant la première lecture du tour : tous les lots listés, aucun compteur"]
   - id: R3
     etat: erreur
-    enonce: "Si le tour est illisible (cadence muet, code non nul) et qu'aucun tableau n'a été lu, la bande liste tous les lots comme aujourd'hui, sans compteur ni message d'erreur propre : l'erreur reste celle du panneau des lots (« Lots illisibles… ») ; un tableau déjà lu est gardé (panneau des lots, R10)."
+    enonce: "Si le tour est illisible (cadence muet, code non nul) et qu'aucun tableau n'a été lu, la bande liste tous les lots comme aujourd'hui, sans compteur et sans message propre à la bande (le texte de l'état erreur de la maquette est une légende hors bande) : l'erreur reste celle du panneau des lots (« Lots illisibles… ») ; un tableau déjà lu est gardé (panneau des lots, R10)."
     message: ~
-    champs: [note-erreur, lot-id-bande, lot-etat-bande]
+    champs: [lot-id-bande, lot-etat-bande]
     statut: hypothese
     si_faux: "Si la bande doit dire elle-même que le plan est illisible, un message s'ajoute à la bande (rendu seul, aucune donnée en jeu) ; le texte serait à écrire (quoi, pourquoi, que faire)."
     tests: ["R3 — tour en échec, aucun tableau lu : tous les lots listés, aucun compteur", "R3 — tour en échec après une lecture : dernier tableau gardé"]
   - id: R4
     etat: charge
     cas: [C1]
-    enonce: "Un lot d'une vague affichée dont l'id figure dans `closed` du même projet du tour (lead.ts:215) n'est plus une ligne de la bande, quel que soit son statut de vague (ready, handed-back…) : le plan l'emporte sur la vague (même critère que restGroups, lots.ts:303-312, fonction partagée et non recopiée). Un lot encore ouvert au plan reste une ligne, y compris « prêt ». Un lot en attente (queued) clos au plan est aussi retiré de la ligne « en attente »."
+    enonce: "Un lot d'une vague affichée dont l'id figure dans `closed` du même projet du tour (lead.ts:215) n'est plus une ligne de la bande, quel que soit son statut de vague (ready, handed-back…) : le plan l'emporte sur la vague (même critère que restGroups, lots.ts:303-312 : un lot est clos si une ligne `closed` du projet porte son id ; restGroups, non exportée et travaillant par projet sur toutes les vagues, n'est pas réutilisée telle quelle : on en extrait une fonction pure exportée `estClos(closed, id)`, appelée par restGroups et par la bande, qui partitionne vague par vague). Un lot de projet absent du tableau lu (aucune ligne `closed`) reste listé. Un lot encore ouvert au plan reste une ligne, y compris « prêt ». Un lot en attente (queued) clos au plan est aussi retiré de la ligne « en attente »."
     message: ~
     champs: [lot-id-bande, lot-etat-bande]
     statut: sourcee
@@ -54,7 +51,7 @@ regles:
   - id: R5
     etat: charge
     cas: [C1]
-    enonce: "Les lots retirés se comptent sur une ligne unique sous les lots ouverts de la vague, au retrait de la colonne id : « livrés : N » (clos avec delivered: true), suivi de « · clos non livrés : M » seulement si M > 0 ; N à zéro, la ligne ne garde que « clos non livrés : M ». Mots du panneau des lots (L592 R5, deliveries.ts:62) : un mot par notion, aucun lot dit « livré » que le bloc de livraison dit « clos non livré ». La ligne est du texte `subtle`, sans bouton ni dépliage (la bande est en lecture seule, le détail est dans /hud lots)."
+    enonce: "Les lots retirés se comptent sur une ligne unique sous les lots ouverts de la vague, avec un retrait de 2 colonnes (2ch, comme le bouton « livrés » du panneau L592, sous le L des id) : « livrés : N » (clos avec delivered: true), suivi de « · clos non livrés : M » seulement si M > 0 ; N à zéro, la ligne ne garde que « clos non livrés : M ». Mots du panneau des lots (L592 R5, deliveries.ts:62) : un mot par notion, aucun lot dit « livré » que le bloc de livraison dit « clos non livré ». La ligne est du texte `subtle`, sans bouton ni dépliage (la bande est en lecture seule, le détail est dans /hud lots)."
     message: "livrés : 14 · clos non livrés : 3"
     champs: [compteur-livres, compteur-clos]
     statut: hypothese
@@ -69,8 +66,17 @@ regles:
     statut: hypothese
     si_faux: "Si la ligne d'une vague finie devait aussi porter « livrés : N », seule cette ligne de texte change (rendu seul)."
     tests: ["R6 — vague finie : ligne inchangée"]
+  - id: R7
+    etat: erreur
+    cas: [C1]
+    enonce: "Si cadence est trop ancien (tableau `board.outdated`, lots.ts:16-30 : aucune ligne du tour ne porte `lots`), le tour réussit mais ne dit pas quels lots sont clos : la bande ne lit pas `closed`, elle liste tous les lots comme aujourd'hui, sans compteur. L'indication « Lots indisponibles » reste celle du panneau des lots (register.tsx:~894), la bande n'ajoute aucun message."
+    message: ~
+    champs: [lot-id-bande, lot-etat-bande]
+    statut: sourcee
+    source: "lots.ts:16-30 (board.outdated) ; register.tsx:~894 (« Lots indisponibles ») ; note de revue du 2026-11-05"
+    tests: ["R7 — tableau outdated : tous les lots listés, aucun compteur", "R7 — tableau outdated : aucun message ajouté à la bande"]
 actions:
-  - { id: A2, declencheur: ~, contrat: A1, regles: [R1, R2, R3, R4, R5, R6] }
+  - { id: A2, declencheur: ~, contrat: A1, regles: [R1, R2, R3, R4, R5, R6, R7] }
 sujet:
   id: bande-lots-clos
   titre: Lots clos au plan repliés dans la bande cadence-hud
@@ -97,14 +103,15 @@ cas:
       - { si: aucun lot de la vague n'est clos au plan, alors: bande inchangée sans compteur, regles: [R1] }
       - { si: le tour n'a pas encore répondu, alors: tous les lots listés, regles: [R2] }
       - { si: le tour échoue, alors: tous les lots listés ou dernier tableau gardé, regles: [R3] }
+      - { si: cadence trop ancien (tableau outdated), alors: tous les lots listés sans compteur, regles: [R7] }
     resultat: Les lots qui demandent un geste sont en tête ; les lots déjà clos tiennent dans une ligne.
 contrats:
   - id: A1
     appel: commande lead-tour
     entree: "<dossier> --json"
     sortie: "lignes de projet, inchangées : closed ({ id, finished, delivered? }[], déjà émis) ; la bande les croise avec les lots des vagues vivantes"
-    erreurs: []
-    sans_erreur: "aucun cas d'échec nouveau : une lecture en échec est celle du panneau des lots (dernier tableau gardé, ou tout listé, R3)"
-    regles: [R4, R5]
+    erreurs:
+      - { code: "log error", message: "Lots indisponibles : cadence est trop ancien, mettez-le à jour." }
+    regles: [R3, R4, R5, R7]
 donnees:
   - { id: D1, objet: "closed du tour (lead.ts:215) lu par la bande, déjà lu par le panneau", existant: true, modification: aucune, note: "aucun stockage, aucun format ajouté" }

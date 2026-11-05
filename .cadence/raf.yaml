@@ -2319,9 +2319,10 @@ lots:
     finished: 2026-11-05
   - id: L597
     title: "Une seule aide (E2 + E3 de l'étude docs/etudes/ensemble-2026-11.md) : les deux textes d'aide de cadence et raf, tenus à la main et divergents sur 9 commandes, viennent d'une seule source ; cadence spec green y figure"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-05
+    started: 2026-11-05
   - id: L598
     title: "Un seul calcul des créneaux libres (E1 de docs/etudes/ensemble-2026-11.md) : registre, bande et vague lisent le même chiffre, publié une fois, au lieu de deux formules et d'un compte interne"
     status: done

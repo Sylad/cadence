@@ -344,13 +344,35 @@ describe('L590 R5 — un lot sans worktree n\'a pas d\'intégration', () => {
   });
 });
 
-describe('L590 R6 — une annonce de tests rouges par la session', () => {
-  it('R6 — tests annoncés rouges, porte ciblée verte : l\'annonce n\'est pas démentie, le lot repart en correction', async () => {
+describe('L590 R1 — une annonce de tests rouges par la session', () => {
+  it("R1 — tests annoncés rouges (L213, L522) : la porte joue la suite complète, l'annonce non démentie n'est pas crue sans test rouge", async () => {
+    const log = logFile();
+    const h = harness({ script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }))], review: [ok] } });
+    const c = tl(h, gates(log));
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']); // porte complète verte : pas de correction
+    expect(lines(log)).toEqual(['FULL']);
+    expect(c.lot.portes![0]).toMatchObject({ portee: 'complete' });
+    expect(c.lot.warnings.some((w) => w.includes("l'annonce n'est pas crue"))).toBe(true);
+  });
+  it("R1 — tests annoncés rouges, suite complète rouge sur ce test : le lot repart en correction", async () => {
     const h = harness({ script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }))], fix: [impl('b.txt', 'fix(L1): b')], review: [ok] } });
-    const c = tl(h, { ...gates(logFile(), { full: 'exit 1' }) });
+    const c = tl(h, gates(logFile(), { full: '[ -f a.txt ] && [ ! -f b.txt ] && { echo " FAIL  test/a.test.ts > rouge"; exit 1; }; true' }));
     await runLot(c);
     expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
-    expect(c.lot.warnings.some((w) => w.includes("l'annonce n'est pas crue"))).toBe(false);
+  });
+});
+
+describe('L590 R5 — le lot express en repli sur la suite complète', () => {
+  it("R5 — express, repli « aucun test lié » : la suite complète de la porte est reprise à l'intégration, une seule suite", async () => {
+    const log = logFile();
+    const { parent } = setup([{ title: 'un', estimate: 0.1 }, { title: 'deux', estimate: 0.1 }], 'worktrees: true\ntest: sh check.sh\ntestRelated: sh related.sh {files}\n', { 'check.sh': `echo FULL >> ${log}\n`, 'related.sh': 'echo "No test files found, exiting with code 0"\n' });
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '1'], fake());
+    expect(r.code).toBe(0);
+    const l1 = store(parent).readLot('a', 'L1')!;
+    expect(l1.express).toBe(true);
+    expect(l1.suiteRuns).toBe(1);
+    expect(l1.portes!.map((p) => p.portee)).toEqual(['complete']);
   });
 });
 

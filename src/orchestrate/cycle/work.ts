@@ -13,6 +13,7 @@ import { conclude } from './integrate-lot.js';
 import { openDocGap, docGaps } from './brief.js';
 import { type Constat, expressSummary } from '../state.js';
 import { type CheckRun, programChecks } from './checks.js';
+import { porteApresEcriture } from './porte-ciblee.js';
 import { acceptGreen } from './accept-step.js';
 import { gateLabel } from '../gate-parts.js';
 import { filesOf, gapMessage } from '../../docsync.js';
@@ -145,7 +146,7 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
   else if (made === 0) l.warnings.push(kind === 'fix' ? 'fix sans nouveau commit : revue lancée sur les commits du lot, avec la raison de la session (choix)' : `${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
 
   const red: Constat[] = [];
-  // Tests annoncés rouges (L213) : avec orchestrate.test, le programme rejoue et compare à la ligne de base, la session n'est crue que si les tests y sont rouges autrement que par des échecs de départ, et jamais quand sa porte est verte (L522, quels que soient echecsDeBase et nouveauxEchecs) ; sans, la liste des échecs de base de la session, non vérifiée.
+  // Tests annoncés rouges (L213) : avec orchestrate.test, le programme rejoue et compare à la ligne de base, la session n'est crue que si les tests y sont rouges autrement que par des échecs de départ, et jamais quand sa porte, jouée en suite complète, est verte (L522, quels que soient echecsDeBase et nouveauxEchecs) ; sans, la liste des échecs de base de la session, non vérifiée.
   const claimed: Constat = { source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` };
   let deferred = false;
   const declared = (rep.echecsDeBase ?? []).map((t) => t.trim()).filter(Boolean);
@@ -168,8 +169,9 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
     const green = await acceptGreen(c);
     if (green) red.push(green);
   }
-  if (red.length === 0) await programChecks(c, red, runs);
-  if (deferred && red.length === 0 && runs.some((r) => r.label === 'tests' && r.code === 0 && r.portee !== 'ciblee' && !r.instables?.length)) l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${gateLabel(c.config.test ?? '')}, code 0) : l'annonce n'est pas crue, pas de correction`);
+  // Une annonce de tests rouges (L590) ne se juge que sur la suite complète : la porte ciblée ne joue pas le test annoncé, elle n'a ni ligne de base ni verdict à opposer à l'annonce (L213, L522).
+  if (red.length === 0) await programChecks(c, red, runs, porteApresEcriture(deferred));
+  if (deferred && red.length === 0 && runs.some((r) => r.label === 'tests' && r.code === 0 && !r.instables?.length)) l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${gateLabel(c.config.test ?? '')}, code 0) : l'annonce n'est pas crue, pas de correction`);
   else if (deferred && red.length === 0 && !runs.some((r) => r.label === 'tests' && (r.dejaRouges || r.instables?.length))) red.push(claimed);
   if (red.length) {
     toFix(c, red, 'tests rouges');
@@ -222,9 +224,10 @@ async function toReview(c: LotCtx, runs: CheckRun[], minorsPass: boolean): Promi
     }
   }
   l.constats = [];
+  // Les contrôles du HEAD que la porte vient de jouer restent au lot, express ou non : l'intégration n'y rejoue pas une suite complète verte pour cet arbre (L590, R5).
+  l.checks = runs.length ? { head: git(wd(c), 'rev-parse', 'HEAD'), tree: git(wd(c), 'rev-parse', 'HEAD^{tree}'), runs } : undefined;
   // Voie express (L519) : pas de revue séparée, le lead lit le diff ; le lot conclut sur le HEAD que la porte du programme vient de jouer.
   if (l.express) return conclude(c, expressSummary(git(wd(c), 'rev-parse', 'HEAD')));
-  l.checks = runs.length ? { head: git(wd(c), 'rev-parse', 'HEAD'), tree: git(wd(c), 'rev-parse', 'HEAD^{tree}'), runs } : undefined;
   l.next = firstReview(c);
   save(c);
 }

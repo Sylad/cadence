@@ -2516,6 +2516,12 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-11-05
+  - id: L621
+    title: "Issue #40 : un --goal ou goal: qui rétrécit un lot aux commits déjà intégrés saute la maquette sauf si l'objectif change la mise en page, et les revues jugent le diff de l'objectif contre l'objectif ; un constat hors objectif revient en suite proposée, sans passe de correction (74 min et 1,28 M pour un commit de quatre correctifs)"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-11-05
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

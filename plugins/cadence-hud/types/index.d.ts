@@ -75,7 +75,7 @@ export type Wave = {
   id: string
   pid: number
   cwd: string
-  cap?: number
+  cap?: number | null
   started: string
   status?: string
   budget?: number

@@ -2545,9 +2545,10 @@ lots:
     started: 2026-11-05
   - id: L624
     title: "Une porte jouée sur un hôte distant (orchestrate.gate.host) rend son créneau de session : elle n'occupe aucune session claude ni le processeur local, et trois portes y bloquent la file (05-11, vague 1810-cad : 0 session pendant 30 min, portes de 16 min sur mini-blue, L622 en attente) ; le nombre de portes simultanées sur l'hôte a sa propre borne ; mesure : minutes à créneau vide avant et après"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-05
+    started: 2026-11-05
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

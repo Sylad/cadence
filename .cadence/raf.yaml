@@ -2615,9 +2615,10 @@ lots:
     started: 2026-11-05
   - id: L633
     title: "Issue #43 : la chaîne de maquette légère ne joue plus pour un correctif de quelques propriétés sur un écran existant. Un lot visible sans screen: et sans écran neuf passe par implement, capture avant et après, et une revue UX du seul diff ; maquette et états forcés restent pour un écran neuf ou une mise en page changée. Cas mesuré : 33 min et 5,75 $ pour 11 lignes de SCSS. Mesure : coût médian d'un petit lot visible"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-05
+    started: 2026-11-05
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -2429,7 +2429,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
-    review: { date: 2026-11-05, verdict: "conforme : verdict de la vague tenu ; seule l'entrée du CHANGELOG replacée sous [Unreleased] (test/changelog vert)", commit: 23f8906c82ee801c7b225d89cdf4d003529201a9 }
+    review: { date: 2026-11-05, verdict: "compliant : 0 bloquant, 0 majeur, 1 note mineure (le scope du sujet de commit peut citer un lot de config) — orchestré (vague 2026-11-05-1055-cad, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le lot de config passe la porte d'intégration, reconnu au scope de ses commits, et un lot de code reste refusé, avec 1 réserve mineure : une config modifiée sans commit après un commit de config passe, alors que docs/qualite.md dit qu'elle reste refusée.", commit: 0e25d0e250562939287c64aad44afe52074422cf }
   - id: L614
     title: "Issue #39 : un fichier de sonde rouge reste indexé dans le worktree du lot depuis 1.53.0 (#37), la vague rend le lot en « dépôt sale après probe » et ses constats sont perdus ; le programme retire le fichier de l'index et le supprime, et ses cas rouges reviennent comme constats à la passe de correction"
     status: done

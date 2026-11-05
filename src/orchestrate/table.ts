@@ -82,6 +82,12 @@ const stateText = (l: LotState, wave: WaveState, now: number): string => {
 
 const minutes = (l: LotState) => Math.round(l.steps.reduce((n, s) => n + (s.ended ? Date.parse(s.ended) - Date.parse(s.started) : 0), 0) / 60_000);
 
+/** Les minutes des étapes jouées après la première revue de code du lot (L625, issue #41), « — » tant qu'il n'en a pas : ce que coûtent la correction et les revues qui suivent. */
+const afterReview = (l: LotState): string => {
+  const i = l.steps.findIndex((s) => s.kind === 'review' || s.kind === 'review-small');
+  return i < 0 ? '—' : `${Math.round(l.steps.slice(i + 1).reduce((n, s) => n + (s.ended ? Date.parse(s.ended) - Date.parse(s.started) : 0), 0) / 60_000)} min`;
+};
+
 /** Sha abrégés (7, comme `short` du cycle) des commits que git attribue au lot dans son dépôt, du plus ancien au plus récent (illisible ou sans plan : aucun). */
 function gitCommitsOf(l: LotState): string[] {
   try {
@@ -275,8 +281,8 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
   const cost = costView(lots, deps.prices, deps.currency);
   // L554 : une colonne « geste » (LE geste suivant exact d'un lot rendu) quand au moins un lot en a un.
   const geste = gestureColumn(wave, lots);
-  const rows = lots.map((l, i) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`, ...cost.cells[i]!, String(l.suiteRuns ?? '—'), ...geste.cells[i]!]);
-  const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée', ...cost.head, 'suites', ...geste.head];
+  const rows = lots.map((l, i) => [`${l.project}:${l.lot}`, stateText(l, wave, deps.now ?? Date.now()), String(l.pass), review(l), ux(l), String(commits(l)), k(counted(l)), `${minutes(l)} min`, afterReview(l), ...cost.cells[i]!, String(l.suiteRuns ?? '—'), ...geste.cells[i]!]);
+  const head = ['lot', 'état', 'passes', 'revue', 'UX', 'commits', 'tokens', 'durée', 'après revue', ...cost.head, 'suites', ...geste.head];
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
   const line = (r: string[]) => r.map((c, i) => c.padEnd(widths[i])).join('  ').trimEnd();
   const out = [line(head), ...rows.map(line)];

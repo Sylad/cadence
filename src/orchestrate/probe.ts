@@ -19,6 +19,8 @@ export const PROBE_RESERVE = 65_000;
 
 /** Préfixe du texte d'un constat de la sonde : il distingue, dans le journal, la passe de correction qu'elle déclenche. */
 const PROBE_FINDING = 'sonde de cas limites : ';
+/** Préfixe de la sous-tâche proposée pour une attente hors règle du lot (lu par la revue de code, cycle/converge.ts). */
+export const HORS_REGLE = '[hors règle] ';
 
 /** Ce que le cycle sait du moment : la sonde ne joue pas pendant la passe des mineurs ni sans commit (`skip`), ni quand une passe est déjà faite (`late`) ou que le budget ne paie pas la suite (`pays`). */
 interface ProbeMoment {
@@ -102,7 +104,7 @@ export function horsRegleWarnings(rep: Pick<ProbeReport, 'horsRegle'> | undefine
 function noteHorsRegle(l: LotState, rep: Pick<ProbeReport, 'horsRegle'> | undefined): void {
   l.warnings.push(...horsRegleWarnings(rep));
   for (const e of Array.isArray(rep?.horsRegle) ? (rep.horsRegle as unknown[]) : []) {
-    const proposal = typeof e === 'string' && e.trim() ? `[hors règle] ${e.trim()}` : '';
+    const proposal = typeof e === 'string' && e.trim() ? `${HORS_REGLE}${e.trim()}` : '';
     if (proposal && !l.proposals.includes(proposal)) l.proposals.push(proposal);
   }
 }

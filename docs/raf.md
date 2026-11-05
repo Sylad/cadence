@@ -485,9 +485,9 @@ plan:
 
 The journal is append-only: `--to-config` never reads the existing lines back to rewrite them (a line holding a byte that is not UTF-8 stays as it is) and appends to the end of the file, after them, the facts of the raf-format plan the journal does not hold yet — never twice, so playing the command again adds nothing (`journal.ndjson : aucun événement à ajouter`):
 
-- `created` / `started` — a lot with a `created:` / `started:` day and no event of that type for it (message = the title / empty; dated at midnight UTC of that day);
+- `created` / `started` — a lot with a `created:` / `started:` day and no event of that type for it (message = the title / empty; dated with the exact timestamp the original plan file held (`origin.<field>.value`, same day, native value unchanged) and at midnight UTC of that day without it);
 - `note` — each dated note whose text the journal does not hold for that lot (dated at its day);
-- `closed` — a `dropped` lot with no such event (dated at its `finished:` day, now when it has none);
+- `closed` — a `dropped` lot with no such event (dated with the original timestamp of its `finished:` day when the plan holds one, at midnight UTC of that day without it, now when it has no `finished:`);
 - `delivered` — a lot with `delivered: { date, sha }` and no such event (with `keys.sha` declared, none carrying that sha), the sha under the declared key;
 - `state` — a lot whose state changed since the plan file being replaced (`--out`, `--force`): message = the new state, dated now, unless the journal's last `state` event for that lot already says it (a state that comes back is written again). It needs that previous file; a lot that is new there, or a `dropped` one when `closed` is declared, gets no `state` event.
 

@@ -2536,6 +2536,9 @@ lots:
     spec: true
     created: 2026-11-05
     started: 2026-11-05
+    notes:
+      - { date: 2026-11-05, text: "Revue de la fiche — mineur : docs/specs/goal-lot-retreci/fiche.yaml — R7 test 3 « un majeur marqué déjà signalé par la revue précédente compte » : en rang 1 il n'existe pas de revue précédente (l.codeConstats vide) et falseMark exige rank >= 2 (converge.ts:~58). Le test ne peut pas se jouer en rang 1 ; le préciser (rang 2 d'un lot rétréci) ou dire que la règle de fausse marque est à étendre." }
+      - { date: 2026-11-05, text: "Revue de la fiche — mineur : docs/specs/goal-lot-retreci/fiche.yaml — R1 lit les commits du lot par lotWork (audit.ts:288, dépôt du projet seul) alors que hasWork (shared.ts:14) compte aussi les dépôts voisins ; un lot dont les commits intégrés sont seulement dans un dépôt voisin n'est jamais rétréci. Dire le choix. R2 : le nombre N du journal vient du même lotWork ; vérifier qu'il est compté avant la première session." }
   - id: L622
     title: "Issue #41 : les revues convergent. Après la première revue d'un lot, un constat absent de la revue précédente et hors de l'objectif du lot ou des lignes qu'il change revient en suite proposée et n'achète plus de passe de correction ; un bloquant (perte de données, sécurité, suite rouge) en achète toujours une. Plafond de mur par lot, deux fois la durée attendue de son estimate : au-delà, le lot est rendu avec ses constats au lieu de lancer une passe. Mesure : part conforme du premier coup et passes par lot avant et après"
     status: done

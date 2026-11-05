@@ -39,6 +39,8 @@ describe('L626 — niveau 1 : CLAUDE.md à la racine du dépôt', () => {
     const of = (f: string) => bounds.find((b) => b.paths.includes(f));
     expect(of('README.md')).toMatchObject({ lines: 64, columns: 160 });
     expect(of('docs/concepts.md')).toMatchObject({ chars: 15 * 1024 });
+    expect(of('docs/concepts.md')?.tests).toContain('test/pret-tirable-l601.test.ts');
+    expect(readFileSync(join(root, 'test/pret-tirable-l601.test.ts'), 'utf8')).toContain('15 * 1024');
     for (const f of ['README.md', 'docs/concepts.md']) expect(violations(root, f, bounds), f).toEqual([]);
   });
 });
@@ -71,8 +73,14 @@ describe('L626 — mesure d’un fichier', () => {
   const mesure = (texte: string, b: Bound) => violations(projet('', { 'f.md': texte }), 'f.md', [{ ...b, paths: ['f.md'] }]);
 
   it('R3 — lignes : à la limite c’est bon, une de plus et le message donne la ligne et la limite', () => {
-    expect(mesure('a\nb\nc\n', README)).toEqual([]);
-    expect(mesure('a\nb\nc\nd\n', README)).toEqual(['f.md : 4 lignes, limite 3']);
+    expect(mesure('a\nb\nc', README)).toEqual([]);
+    expect(mesure('a\nb\nc\nd', README)).toEqual(['f.md : 4 lignes, limite 3']);
+  });
+
+  it('R3 — la ligne vide après le retour final compte, comme le split(\'\\n\') de readme-accueil R10 : 64 lignes wc -l dépassent la limite 64', () => {
+    const limite: Bound = { ...README, lines: 64 };
+    expect(mesure('x\n'.repeat(63), limite)).toEqual([]);
+    expect(mesure('x\n'.repeat(64), limite)).toEqual(['f.md : 65 lignes, limite 64']);
   });
 
   it('R3 — fichier sans retour final : la dernière ligne compte ; fichier vide : 0 ligne', () => {
@@ -93,7 +101,7 @@ describe('L626 — mesure d’un fichier', () => {
   });
 
   it('R3 — plusieurs limites dépassées : un message chacune ; fichier hors des paths ou absent : rien', () => {
-    expect(mesure('a\nb\nc\n0123456789abc\n', README)).toEqual(['f.md : 4 lignes, limite 3', 'f.md : ligne 4 de 13 colonnes, limite 10']);
+    expect(mesure('a\nb\nc\n0123456789abc\n', README)).toEqual(['f.md : 5 lignes, limite 3', 'f.md : ligne 4 de 13 colonnes, limite 10']);
     const d = projet('', { 'g.md': 'x\n'.repeat(9) });
     expect(violations(d, 'g.md', [README])).toEqual([]);
     expect(violations(d, 'absent.md', [{ ...README, paths: ['absent.md'] }])).toEqual([]);
@@ -101,7 +109,7 @@ describe('L626 — mesure d’un fichier', () => {
 
   it('R3 — un motif de paths joue comme docs.sync (docs/*.md)', () => {
     const d = projet('', { 'docs/a.md': 'x\n'.repeat(9) });
-    expect(violations(d, 'docs/a.md', [{ ...README, paths: ['docs/*.md'] }])).toEqual(['docs/a.md : 9 lignes, limite 3']);
+    expect(violations(d, 'docs/a.md', [{ ...README, paths: ['docs/*.md'] }])).toEqual(['docs/a.md : 10 lignes, limite 3']);
   });
 });
 
@@ -136,7 +144,7 @@ describe('L626 — niveau 3 : le hook après écriture et la porte', () => {
     const d = projet(yaml, { 'README.md': 'a\nb\nc\nd\ne\n' });
     const said = claudeHookContext('bornes', ecrit(d, 'README.md'));
     expect(said?.event).toBe('PostToolUse');
-    expect(said?.text).toContain('README.md : 5 lignes, limite 3');
+    expect(said?.text).toContain('README.md : 6 lignes, limite 3');
     expect(said?.deny).toBeUndefined();
   });
 
@@ -153,7 +161,7 @@ describe('L626 — niveau 3 : le hook après écriture et la porte', () => {
 
   it('R5 — le dossier du dépôt se lit depuis le fichier écrit, pas du cwd (cwd dans un sous-dossier)', () => {
     const d = projet(yaml, { 'README.md': 'a\nb\nc\nd\n', 'src/x.ts': '' });
-    expect(claudeHookContext('bornes', { ...ecrit(d, 'README.md'), cwd: join(d, 'src') })?.text).toContain('README.md : 4 lignes');
+    expect(claudeHookContext('bornes', { ...ecrit(d, 'README.md'), cwd: join(d, 'src') })?.text).toContain('README.md : 5 lignes');
   });
 
   it('R5 — hooks.json branche le hook sur Write, Edit et MultiEdit après écriture', () => {

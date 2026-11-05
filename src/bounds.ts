@@ -50,8 +50,8 @@ export function readBounds(file: string): Bound[] {
 
 /** Les dépassements de `text` pour une borne, un message par limite : « f.md : 4 lignes, limite 3 ». */
 function measure(file: string, text: string, b: Bound): string[] {
+  // Lignes comptées comme le test R10 de readme-accueil : `split('\n')`, la ligne vide après le retour final comprise (un README de 64 lignes `wc -l` en compte 65).
   const lines = text.split('\n');
-  if (lines[lines.length - 1] === '') lines.pop();
   const out: string[] = [];
   if (b.lines !== undefined && lines.length > b.lines) out.push(`${file} : ${lines.length} lignes, limite ${b.lines}`);
   if (b.columns !== undefined) {

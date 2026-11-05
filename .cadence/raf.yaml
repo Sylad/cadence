@@ -2285,6 +2285,70 @@ lots:
     started: 2026-11-05
     notes:
       - { date: 2026-11-05, text: "05-11 02 h 45 (correctif Fable, non commité) : non reproduit dans 6 environnements (env -i, conteneur ubuntu 24.04 + git 2.56 + Node 22, cpus 1.5, suite complète ×2) ; rouge en CI seulement sur Node 22 (3/3) et le publish Node 24 (1/1), tests(24) vert 3/3, 1970 ms en CI contre ~550 ms ailleurs. Hypothèse mesurée : dépôt solo posé à la racine temporaire PARTAGÉE de la suite → readyFree/sharingProjects scanne ses frères (centaines de dépôts d'autres tests en parallèle). Correctif proposé côté test : repo = join(tempDir(), 'solo'). Preuve à obtenir par une branche diag/** qui imprime le journal de la vague quand le code ≠ 0. Image Docker cadence-ci-repro en cache." }
+  - id: L597
+    title: "Une seule aide (E2 + E3 de l'étude docs/etudes/ensemble-2026-11.md) : les deux textes d'aide de cadence et raf, tenus à la main et divergents sur 9 commandes, viennent d'une seule source ; cadence spec green y figure"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-05
+  - id: L598
+    title: "Un seul calcul des créneaux libres (E1 de docs/etudes/ensemble-2026-11.md) : registre, bande et vague lisent le même chiffre, publié une fois, au lieu de deux formules et d'un compte interne"
+    status: todo
+    estimate: 0.5
+    after: [ L589, L591 ]
+    created: 2026-11-05
+  - id: L599
+    title: "orchestrate.md en cinq pages (E12 de docs/etudes/ensemble-2026-11.md) : 308 Ko sans sommaire découpés, avec dans le même commit les 26 tests qui citent la page, files de package.json et CHECKED de scripts/check-links.mjs"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-05
+  - id: L600
+    title: "Vocabulaire (E4a + E7 + E10 de docs/etudes/ensemble-2026-11.md) : concepts.md explique les tailles de lot (express, light, small, quickwin), les quatre sens de hook et docs-ok"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-05
+  - id: L601
+    title: "« prêt » de la vague contre « tirable » du plan (E8 de docs/etudes/ensemble-2026-11.md) : un mot par sens, texte de ready-free.ts et ses 7 tests mis à jour ; « done » précisé"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-05
+  - id: L602
+    title: "Où cadence écrit, et les portes (E6 + E14 de docs/etudes/ensemble-2026-11.md) : une page liste les quatre dossiers d'état, un tableau réunit les trois endroits où une porte se déclare"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-05
+  - id: L603
+    title: "Surface pour le compte pro (E9 + E11 de docs/etudes/ensemble-2026-11.md) : convention des langues écrite (noms anglais, messages français), comptes périmés d'overview.md et stabilite.md retirés"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-05
+  - id: L604
+    title: "Une seule documentation de la bande (E13 de docs/etudes/ensemble-2026-11.md) : README du plugin et docs/cadence-hud.md ne font plus qu'un"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-05
+  - id: L605
+    title: "stabilite.md complet (E16 de docs/etudes/ensemble-2026-11.md) : le statut de chaque surface que le code lit (12 sous-commandes raf, 6 outils cadence, 5 clés racine) est dit, avec son test"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-05
+  - id: L606
+    title: "Plan natif et plan lu séparés (E5 de docs/etudes/ensemble-2026-11.md) : les 13 branches settings.format de plan.ts deviennent deux implémentations d'un même contrat, cliquet de qualité à l'appui"
+    status: todo
+    estimate: 0.5
+    after: [ L605 ]
+    created: 2026-11-05
+  - id: L607
+    title: "Un seul seuil de petit lot dans le code (E4b de docs/etudes/ensemble-2026-11.md) : express, light et small lisent une même définition, cliquet de qualité à l'appui"
+    status: todo
+    estimate: 0.25
+    after: [ L606 ]
+    created: 2026-11-05
+  - id: L608
+    title: "config.ts découpé (E17 de docs/etudes/ensemble-2026-11.md) : les 8 familles de clés qu'il lit rejoignent leurs modules, cliquet de qualité à l'appui"
+    status: todo
+    estimate: 0.5
+    after: [ L605, L602 ]
+    created: 2026-11-05
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

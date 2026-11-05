@@ -1,6 +1,7 @@
 // plan.journal (L582, M10) : le journal d'événements d'un plan tenu par un autre outil (ndjson, une ligne par fait), lu dans cadence.yaml et réécrit par `raf import --to-config`.
 import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import type { Day } from './dates.js';
 import { RafError, type PlanFormat } from './plan.js';
 import { isObject, readYamlKey } from './yaml-keys.js';
@@ -94,6 +95,15 @@ export function statesById(entries: Entry[], format: PlanFormat): Map<string, st
 
 const atDay = (day: Day): string => `${day}T00:00:00+00:00`;
 const atNow = (now: Date): string => `${now.toISOString().slice(0, 19)}+00:00`;
+/**
+ * L'instant d'un fait daté du lot : l'horodatage exact que le fichier d'origine tenait (`origin.<champ>.value`, gardé par l'import quand le natif ne garde que le jour),
+ * tant que le natif n'a pas changé depuis (même règle que le retour du plan) ; sinon le jour à minuit UTC. Le plan réécrit et le journal disent ainsi le même instant.
+ */
+function atOf(lot: Entry, field: string, day: Day): string {
+  const origin = isObject(lot.origin) ? lot.origin[field] : undefined;
+  if (isObject(origin) && typeof origin.value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(origin.value) && origin.value.startsWith(day) && isDeepStrictEqual(origin.native, lot[field])) return origin.value;
+  return atDay(day);
+}
 
 interface Ctx { journal: JournalFormat; existing: Entry[]; now: Date; noteSeen: Set<string>; states: { before: Map<string, string>; after: Map<string, string> } }
 
@@ -136,15 +146,15 @@ function endEvents(n: Ctx, lot: Entry, task: string): Entry[] {
   const d = lot.delivered as { date: Day; sha: string } | undefined;
   const [was, is] = [n.states.before.get(task), n.states.after.get(task)];
   return [
-    ...(closes && !known(n, 'closed', task) ? event(n, 'closed', task, { at: lot.finished ? atDay(lot.finished as Day) : atNow(n.now), message: '' }) : []),
-    ...(d && !known(n, 'delivered', task, d.sha) ? event(n, 'delivered', task, { at: atDay(d.date), message: '', sha: d.sha }) : []),
+    ...(closes && !known(n, 'closed', task) ? event(n, 'closed', task, { at: lot.finished ? atOf(lot, 'finished', lot.finished as Day) : atNow(n.now), message: '' }) : []),
+    ...(d && !known(n, 'delivered', task, d.sha) ? event(n, 'delivered', task, { at: atOf(lot, 'delivered', d.date), message: '', sha: d.sha }) : []),
     ...(!closes && was !== undefined && is !== undefined && was !== is && !stateKnown(n, task, is) ? event(n, 'state', task, { at: atNow(n.now), message: is }) : []),
   ];
 }
 
 /**
  * Les événements que le journal n'a pas et que le plan natif dit : création, démarrage, notes, fermeture d'un lot abandonné, livraison (une ligne par fait, jamais deux fois)
- * et, pour un lot déjà dans `states.before` (le plan d'origine qu'on remplace), un changement d'état. Les sous-tâches (`tasks:`) n'ont ni date ni livraison : sans événement. Les faits datés prennent leur jour (minuit UTC) ; la fermeture d'un lot abandonné son `finished` ; ceux sans date (état, fermeture sans `finished`) l'heure de `now`.
+ * et, pour un lot déjà dans `states.before` (le plan d'origine qu'on remplace), un changement d'état. Les sous-tâches (`tasks:`) n'ont ni date ni livraison : sans événement. Les faits datés prennent l'horodatage exact du fichier d'origine (`origin.<champ>.value`) quand le plan le tient, leur jour (minuit UTC) sinon ; la fermeture d'un lot abandonné son `finished` ; ceux sans date (état, fermeture sans `finished`) l'heure de `now`.
  */
 export function missingEvents(native: Entry[], existing: Entry[], journal: JournalFormat, states: Ctx['states'], now: Date): Entry[] {
   const [taskKey, typeKey, messageKey] = [keyOf(journal, 'task'), keyOf(journal, 'type'), keyOf(journal, 'message')];
@@ -153,8 +163,8 @@ export function missingEvents(native: Entry[], existing: Entry[], journal: Journ
   return native.flatMap((lot) => {
     const task = String(lot.id);
     return [
-      ...(typeof lot.created === 'string' && !known(n, 'created', task) ? event(n, 'created', task, { at: atDay(lot.created), message: String(lot.title) }) : []),
-      ...(typeof lot.started === 'string' && !known(n, 'started', task) ? event(n, 'started', task, { at: atDay(lot.started), message: '' }) : []),
+      ...(typeof lot.created === 'string' && !known(n, 'created', task) ? event(n, 'created', task, { at: atOf(lot, 'created', lot.created as Day), message: String(lot.title) }) : []),
+      ...(typeof lot.started === 'string' && !known(n, 'started', task) ? event(n, 'started', task, { at: atOf(lot, 'started', lot.started as Day), message: '' }) : []),
       ...noteEvents(n, lot, task),
       ...endEvents(n, lot, task),
     ];

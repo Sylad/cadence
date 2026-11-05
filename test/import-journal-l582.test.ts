@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parse } from 'yaml';
 import { run } from '../src/cli.js';
+import { missingEvents, type JournalFormat } from '../src/plan-journal.js';
 import { gitRepo } from './helpers.js';
 
 // L582 (M10, §152) — `plan.journal` : le format du journal d'événements de l'autre outil, que `raf import --to-config` réécrit avec le plan.
@@ -340,5 +342,68 @@ describe('L582 — ordre d\'écriture, octets du journal et règles de dédoublo
     const added = events(dir).slice(1);
     expect(added.length).toBeGreaterThan(0);
     expect(added.every((e) => Object.hasOwn(e, 'sha') && e.sha === null && e.source === 'retour')).toBe(true);
+  });
+});
+
+describe('L582 — l\'instant des faits datés : l\'horodatage d\'origine quand le plan le tient, le jour à minuit sinon', () => {
+  const TIMED_CONFIG = BASE.replace('    started: [demarre_le]\n', '    started: [demarre_le]\n    finished: [ferme_le]\n') + JOURNAL;
+  const TIMED_SOURCE = `taches:
+  - ident: AB-1
+    titre: Premier lot
+    etat: code
+    cree_le: '2026-11-01T08:15:00+00:00'
+    demarre_le: '2026-11-02T12:48:16+00:00'
+  - ident: AB-2
+    titre: Abandonné
+    etat: caduc
+    cree_le: 2026-11-01
+    ferme_le: '2026-11-03T17:05:00+00:00'
+  - ident: AB-3
+    titre: Sans heure
+    etat: code
+    cree_le: 2026-11-01
+    demarre_le: 2026-11-02
+`;
+  it('R22 — created, started et closed prennent origin.<champ>.value (heure exacte) quand il existe, le jour à minuit UTC sinon ; le plan réécrit et le journal disent le même instant', () => {
+    const dir = project(TIMED_CONFIG, null);
+    writeFileSync(join(dir, 'docs/plan/taches.yaml'), TIMED_SOURCE);
+    const origin = switched(dir, TIMED_CONFIG);
+    expect(raf(dir, 'import', '--to-config', '--out', 'tmp/retour.yaml', ...origin).code).toBe(0);
+    const at = (task: string, type: string) => events(dir).find((e) => e.task === task && e.type === type)?.at;
+    expect(at('AB-1', 'cree')).toBe('2026-11-01T08:15:00+00:00');
+    expect(at('AB-1', 'demarre')).toBe('2026-11-02T12:48:16+00:00');
+    expect(at('AB-2', 'ferme')).toBe('2026-11-03T17:05:00+00:00');
+    expect(at('AB-2', 'cree')).toBe('2026-11-01T00:00:00+00:00');
+    expect(at('AB-3', 'cree')).toBe('2026-11-01T00:00:00+00:00');
+    expect(at('AB-3', 'demarre')).toBe('2026-11-02T00:00:00+00:00');
+    // Le même fait, le même instant : ce que taches.yaml réécrit dit, le journal le dit.
+    const back = (parse(readFileSync(join(dir, 'tmp/retour.yaml'), 'utf8')) as { taches: Record<string, string>[] }).taches;
+    const lot = (id: string) => back.find((t) => t.ident === id)!;
+    expect(lot('AB-1').cree_le).toBe(at('AB-1', 'cree'));
+    expect(lot('AB-1').demarre_le).toBe(at('AB-1', 'demarre'));
+    expect(lot('AB-2').ferme_le).toBe(at('AB-2', 'ferme'));
+    expect(lot('AB-3').demarre_le).toBe('2026-11-02');
+  });
+  it('R23 — missingEvents : les quatre faits (created, started, closed, delivered) lisent origin.<champ>.value ; un natif changé depuis l\'import ou sans origin reprend le jour à minuit', () => {
+    const journal: JournalFormat = { path: 'j.ndjson', keys: { sha: 'sha' }, types: { created: 'cree', started: 'demarre', closed: 'ferme', delivered: 'livre' }, extra: {} };
+    const states = { before: new Map<string, string>(), after: new Map<string, string>() };
+    const now = new Date('2026-11-04T09:00:00Z');
+    const timed = {
+      id: 'T1', title: 'Horodaté', status: 'dropped', created: '2026-11-01', started: '2026-11-02', finished: '2026-11-03', delivered: { date: '2026-11-03', sha: 'abc1234' },
+      origin: {
+        created: { key: 'cree_le', value: '2026-11-01T08:15:00+00:00', native: '2026-11-01' },
+        started: { key: 'demarre_le', value: '2026-11-02T12:48:16+00:00', native: '2026-11-02' },
+        finished: { key: 'ferme_le', value: '2026-11-03T17:05:00+00:00', native: '2026-11-03' },
+        delivered: { key: 'livre_le', value: '2026-11-03T18:30:00+00:00', native: { date: '2026-11-03', sha: 'abc1234' } },
+      },
+    };
+    const byType = (evs: Record<string, unknown>[]) => Object.fromEntries(evs.map((e) => [e.type, e.at]));
+    expect(byType(missingEvents([timed], [], journal, states, now))).toEqual({ cree: '2026-11-01T08:15:00+00:00', demarre: '2026-11-02T12:48:16+00:00', ferme: '2026-11-03T17:05:00+00:00', livre: '2026-11-03T18:30:00+00:00' });
+    // Natif changé depuis l'import (started redaté, livraison d'un autre sha) : l'horodatage d'origine ne vaut plus, le jour à minuit reprend.
+    const moved = { ...timed, started: '2026-11-05', delivered: { date: '2026-11-03', sha: 'def5678' } };
+    expect(byType(missingEvents([moved], [], journal, states, now))).toMatchObject({ demarre: '2026-11-05T00:00:00+00:00', livre: '2026-11-03T00:00:00+00:00', cree: '2026-11-01T08:15:00+00:00' });
+    // Sans origin : minuit UTC, comme avant.
+    const bare = { id: 'T2', title: 'Nu', status: 'dropped', created: '2026-11-01', started: '2026-11-02', finished: '2026-11-03', delivered: { date: '2026-11-03', sha: 'abc1234' } };
+    expect(byType(missingEvents([bare], [], journal, states, now))).toEqual({ cree: '2026-11-01T00:00:00+00:00', demarre: '2026-11-02T00:00:00+00:00', ferme: '2026-11-03T00:00:00+00:00', livre: '2026-11-03T00:00:00+00:00' });
   });
 });

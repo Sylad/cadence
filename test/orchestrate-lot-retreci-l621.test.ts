@@ -374,6 +374,15 @@ describe('R12 — le rétrécissement est relu dans git, sans champ d\'état', (
     c.tree.base = 'cadence/w1/a--L1';
     expect(readShrunk(c)).toBeDefined();
   });
+  it('R12 — branche reprise (L311) avec un commit dans la base : la plage à juger commence à la base réelle, le travail non intégré reste jugé', () => {
+    const { h, c } = shrunk({});
+    const merged = git(h.repo, 'rev-parse', 'HEAD');
+    git(h.repo, 'checkout', '-q', '-b', 'cadence/w1/a--L1');
+    commitFile(h.repo, 'kept.txt', 'feat(L1): vague passée, non intégré');
+    c.lot.steps.push(step(1, git(h.repo, 'rev-parse', 'HEAD')));
+    c.tree = { dir: h.repo, branch: 'cadence/w1/a--L1', base: 'main', active: false };
+    expect(readShrunk(c)).toEqual({ goal: GOAL, from: merged });
+  });
   it('R12 — première étape sans headBefore : lu non rétréci', () => {
     const { c } = shrunk({});
     c.lot.steps.push(step(1));

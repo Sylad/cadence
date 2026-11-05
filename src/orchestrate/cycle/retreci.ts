@@ -64,12 +64,12 @@ function isAncestor(dir: string, sha: string, from: string): boolean {
 
 /**
  * Le lot est-il rétréci ? Relu dans git à chaque besoin, sans champ d'état (R12) : l'état garde un objectif et au moins un commit de `lotWork` est antérieur à la tête
- * avant la première étape (`steps[0].headBefore`). Les commits écrits par la vague lui sont postérieurs : ils ne rendent jamais un lot rétréci après coup.
+ * avant la première étape (`steps[0].headBefore`, ramenée à la base réelle du lot pour une branche reprise). Les commits écrits par la vague lui sont postérieurs : ils ne rendent jamais un lot rétréci après coup.
  * Sans objectif, sans `headBefore`, ou si git ne répond pas : undefined (chemin ordinaire).
  */
 export function readShrunk(c: LotCtx): Shrunk | undefined {
   const goal = c.lot.goal;
-  const from = c.lot.steps[0]?.headBefore;
+  let from = c.lot.steps[0]?.headBefore;
   if (!goal || !from) return undefined;
   const dir = wd(c);
   let commits;
@@ -78,7 +78,12 @@ export function readShrunk(c: LotCtx): Shrunk | undefined {
   } catch {
     return undefined; // lecture impossible : lot non rétréci (R12)
   }
-  // Intégré = dans la base réelle du lot (R1) : sur une branche reprise (L311), les commits non intégrés d'une vague passée sont des ancêtres de `from` sans être dans la base.
+  // Branche reprise (L311) : `from` est la pointe de la branche, dont les commits non intégrés d'une vague passée ne sont pas du contexte mais du travail à juger. La plage commence donc à la base réelle du lot (merge-base avec `tree.base`).
   const base = c.tree?.base;
-  return commits.some((k) => isAncestor(dir, k.sha, from) && (!base || isAncestor(dir, k.sha, base))) ? { goal, from } : undefined;
+  if (base) {
+    const mb = spawnSync('git', ['merge-base', from, base], { cwd: dir, encoding: 'utf8' });
+    if (mb.status !== 0 || !mb.stdout.trim()) return undefined;
+    from = mb.stdout.trim();
+  }
+  return commits.some((k) => isAncestor(dir, k.sha, from)) ? { goal, from } : undefined;
 }

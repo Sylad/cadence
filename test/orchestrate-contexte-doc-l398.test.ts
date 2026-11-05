@@ -6,7 +6,7 @@ import { join } from 'node:path';
 const root = join(import.meta.dirname, '..');
 const lire = (p: string) => readFileSync(join(root, p), 'utf8');
 const mesure = () => lire('docs/mesures/contexte-session-2026-10-28.md');
-const paragraphe = () => /\*\*Context of a session \(L398\)\*\*[^\n]*/.exec(lire('docs/orchestrate.md'))?.[0] ?? '';
+const paragraphe = () => /\*\*Context of a session \(L398\)\*\*[^\n]*/.exec(lire('docs/orchestrate-cycle.md'))?.[0] ?? '';
 const ligne = () => lire('CHANGELOG.md').split('\n').find((l) => l.includes('(L398)')) ?? '';
 
 describe('L398 — la mesure, la doc et le CHANGELOG décrivent la désactivation des plugins', () => {

@@ -268,22 +268,22 @@ describe('L512 R3 — une partie rouge sans test nommé garde la porte rouge (bl
   });
 });
 
-describe('L512 R7 — warhammer40k, docs/orchestrate.md et evatosorus', () => {
+describe('L512 R7 — warhammer40k, docs/orchestrate-cycle.md, orchestrate-gate.md et evatosorus', () => {
   it('R7 — le YAML des deux parties de warhammer40k, tel que rendu au lead, est relu sans erreur par cadence', () => {
     const c = read(`orchestrate:\n  test:\n    - { dir: backend, run: npm test }\n    - { dir: frontend, run: "npx vitest run --exclude '**/*.e2e.spec.ts'", replay: "npx vitest run --minWorkers=1 --maxWorkers=$CADENCE_TEST_WORKERS {files}" }\n  build: (cd backend && npm run build) && (cd frontend && npm run build)\n`);
     expect(c.test).toEqual([{ dir: 'backend', run: 'npm test' }, { dir: 'frontend', run: "npx vitest run --exclude '**/*.e2e.spec.ts'", replay: 'npx vitest run --minWorkers=1 --maxWorkers=$CADENCE_TEST_WORKERS {files}' }]);
     expect(gateLabel(c.test!)).toBe("backend : npm test ; frontend : npx vitest run --exclude '**/*.e2e.spec.ts'");
     expect(partCommand((c.test as GatePart[])[1])).toBe("cd frontend && npx vitest run --exclude '**/*.e2e.spec.ts'");
   });
-  const doc = () => readFileSync(new URL('../docs/orchestrate.md', import.meta.url), 'utf8');
-  it('R7 — docs/orchestrate.md décrit la forme liste et la forme chaîne conservée', () => {
+  const doc = () => readFileSync(new URL('../docs/orchestrate-cycle.md', import.meta.url), 'utf8');
+  it('R7 — docs/orchestrate-cycle.md décrit la forme liste et la forme chaîne conservée', () => {
     const d = doc();
     expect(d).toContain('**A gate declared in parts: each part runs in its folder, each red is replayed by the part that printed it (L512)**');
     expect(d).toContain('`[{ dir, run, replay? }]`');
     expect(d).toContain('The string form of `orchestrate.test` is accepted unchanged');
     expect(d).toMatch(/^  test:\s+# or a LIST of parts \(L512/m);
   });
-  it('R7 — docs/orchestrate.md indique qu\'evatosorus attend le lot L514', () => {
+  it('R7 — docs/orchestrate-gate.md indique qu\'evatosorus attend le lot L514', () => {
     expect(doc()).toMatch(/`node --test` \(evatosorus\)[^\n]*L514/);
   });
 });

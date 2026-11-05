@@ -54,7 +54,7 @@ describe("la sonde ne commite ni fichier rouge ni fichier hors porte (L580, issu
   });
 
   it("R4 — la documentation de l'étape décrit « horsRegle »", () => {
-    expect(readFileSync(join(root, 'docs/orchestrate.md'), 'utf8')).toContain('horsRegle');
+    expect(readFileSync(join(root, 'docs/orchestrate-gate.md'), 'utf8')).toContain('horsRegle');
   });
 });
 
@@ -124,6 +124,6 @@ describe("un fichier de sonde non commité ne reste pas dans le dépôt (L580, i
   });
 
   it("R6 — la documentation de l'étape décrit le retrait du fichier non suivi laissé par la sonde", () => {
-    expect(readFileSync(join(root, 'docs/orchestrate.md'), 'utf8')).toContain('fichiers non commités laissés par la session retirés');
+    expect(readFileSync(join(root, 'docs/orchestrate-gate.md'), 'utf8')).toContain('fichiers non commités laissés par la session retirés');
   });
 });

@@ -316,9 +316,9 @@ describe('orchestrate --dry-run : l\'acceptation rouge d\'un lot clos (L366)', (
 describe('documentation de L366', () => {
   const lire = (f: string) => readFileSync(join(import.meta.dirname, '..', f), 'utf8');
 
-  it('R16 — le README de l\'usage (docs/orchestrate.md), docs/raf.md et le CHANGELOG décrivent spec green, le refus de done et la ligne du dry-run', () => {
-    expect(lire('docs/orchestrate.md')).toContain('cadence spec green');
-    expect(lire('docs/orchestrate.md')).toContain('acceptation rouge');
+  it('R16 — le README de l\'usage (docs/orchestrate-spec.md), docs/raf.md et le CHANGELOG décrivent spec green, le refus de done et la ligne du dry-run', () => {
+    expect(lire('docs/orchestrate-spec.md')).toContain('cadence spec green');
+    expect(lire('docs/orchestrate-spec.md')).toContain('acceptation rouge');
     expect(lire('docs/raf.md')).toContain('cadence spec green');
     const changelog = lire('CHANGELOG.md');
     expect(changelog).toContain('L366');

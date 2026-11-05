@@ -215,8 +215,8 @@ describe('L522 R10 — la mesure lit la ligne sans-constat, classification incha
     const m = measure(data, new Map());
     expect(m.byCause['sans-constat']).toBe(1);
   });
-  it('R10 — docs/orchestrate.md cite la mesure de départ 73 sur 580', () => {
-    const doc = readFileSync(join(TEMPLATES_DIR, '..', '..', 'docs', 'orchestrate.md'), 'utf8');
+  it('R10 — docs/orchestrate-gate.md cite la mesure de départ 73 sur 580', () => {
+    const doc = readFileSync(join(TEMPLATES_DIR, '..', '..', 'docs', 'orchestrate-gate.md'), 'utf8');
     expect(doc).toMatch(/73 passes (out of|sur) 580/);
     expect(doc).toMatch(/48 of (those|these) 73/);
   });
@@ -272,8 +272,8 @@ describe('L522 R11 — la porte du programme verte l\'emporte sur l\'annonce de 
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
   });
-  it('R11 — docs/orchestrate.md ne dit plus que l\'annonce sans les deux champs déclenche la correction quand la porte est verte', () => {
-    const doc = readFileSync(join(TEMPLATES_DIR, '..', '..', 'docs', 'orchestrate.md'), 'utf8');
+  it('R11 — docs/orchestrate-gate.md ne dit plus que l\'annonce sans les deux champs déclenche la correction quand la porte est verte', () => {
+    const doc = readFileSync(join(TEMPLATES_DIR, '..', '..', 'docs', 'orchestrate-gate.md'), 'utf8');
     expect(doc).not.toContain('without those two fields the claim of red tests still triggers the correction');
     expect(doc).toMatch(/own gate is green[^]*never believed/);
   });

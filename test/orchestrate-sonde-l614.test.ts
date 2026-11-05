@@ -90,7 +90,7 @@ describe("un fichier de sonde indexé et non commité est retiré de l'index et 
   });
 
   it("R4 — la documentation décrit le fichier indexé retiré et ses cas rouges repris en constats", () => {
-    expect(readFileSync(join(root, 'docs/orchestrate.md'), 'utf8')).toContain('issue #39');
+    expect(readFileSync(join(root, 'docs/orchestrate-gate.md'), 'utf8')).toContain('issue #39');
     expect(readFileSync(join(root, 'CHANGELOG.md'), 'utf8')).toContain('#39');
   });
 });

@@ -41,7 +41,7 @@ describe('captures Playwright des étapes (L249)', () => {
   });
 
   it('R4 — la documentation d\'orchestrate décrit la liste d\'auto-contrôle avec « a file name » et la règle du paragraphe Playwright, plus « with a relative file name »', () => {
-    const doc = readFileSync(join(TEMPLATES_DIR, '..', '..', 'docs', 'orchestrate.md'), 'utf8');
+    const doc = readFileSync(join(TEMPLATES_DIR, '..', '..', 'docs', 'orchestrate-spec.md'), 'utf8');
     expect(doc).not.toMatch(/at 1440 and 390 px with a relative file name/);
     expect(doc).toMatch(/at 1440 and 390 px with a file name \(where it goes is the Playwright paragraph's rule\)/);
   });

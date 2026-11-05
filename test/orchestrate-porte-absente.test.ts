@@ -130,8 +130,8 @@ describe('porte de tests absente : signalée par le tour et le dry-run (L327)', 
     }
   });
 
-  it('R10 — docs/orchestrate.md, docs/lead.md et le CHANGELOG décrivent la ligne', () => {
-    for (const f of ['docs/orchestrate.md', 'docs/lead.md', 'CHANGELOG.md']) {
+  it('R10 — docs/orchestrate-gate.md, docs/lead.md et le CHANGELOG décrivent la ligne', () => {
+    for (const f of ['docs/orchestrate-gate.md', 'docs/lead.md', 'CHANGELOG.md']) {
       const text = readFileSync(join(import.meta.dirname, '..', f), 'utf8');
       expect(text, f).toContain('porte de tests absente');
       expect(text, f).toContain('L327');

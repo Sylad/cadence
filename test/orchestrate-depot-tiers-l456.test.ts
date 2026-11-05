@@ -262,7 +262,7 @@ describe('L456 C1 — commit sur la branche principale d\'un dépôt tiers', () 
   });
 
   it('R10 — la doc d\'orchestrate cite l\'interdiction, wip/<projet>-<lot> et les dépôts non surveillés', () => {
-    const doc = readFileSync(new URL('../docs/orchestrate.md', import.meta.url), 'utf8');
+    const doc = readFileSync(new URL('../docs/orchestrate-worktrees.md', import.meta.url), 'utf8');
     const at = doc.indexOf('## A session never commits on another repository');
     expect(at).toBeGreaterThan(-1);
     const section = doc.slice(at, doc.indexOf('\n## ', at + 5));

@@ -367,7 +367,7 @@ describe('L523 — la mesure et la documentation (R10, R11)', () => {
   it('R11 — le README décrit la grille du brief implement et la lecture transmise par le précheck', () => {
     expect(readme).toMatch(/grid of the code-reviewer/i);
     expect(readme).toMatch(/pre-check.{0,60}reading|reading.{0,60}pre-check/i);
-    const doc = read('../docs/orchestrate.md');
+    const doc = read('../docs/orchestrate-spec.md');
     expect(doc).toContain(GRILLE);
     expect(doc).toContain('precheckLu');
     expect(doc).toMatch(/`lu`/);

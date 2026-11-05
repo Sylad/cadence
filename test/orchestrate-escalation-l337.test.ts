@@ -222,8 +222,8 @@ describe('escalade de modèle avant de rendre un lot (L337)', () => {
 describe('L337 R11 — la documentation suit', () => {
   const read = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 
-  it('R11 — docs/orchestrate.md, docs/perf.md, le skill lead et le CHANGELOG décrivent l\'escalade', () => {
-    expect(read('docs/orchestrate.md')).toMatch(/orchestrate\.escalation[\s\S]*claude --model/);
+  it('R11 — docs/orchestrate-cycle.md, docs/perf.md, le skill lead et le CHANGELOG décrivent l\'escalade', () => {
+    expect(read('docs/orchestrate-cycle.md')).toMatch(/orchestrate\.escalation[\s\S]*claude --model/);
     expect(read('docs/perf.md')).toContain('escalades de modèle');
     expect(read('skills/lead/SKILL.md')).toMatch(/rendu malgré l'escalade[\s\S]*arbitration/);
     expect(read('CHANGELOG.md').split('## [1.11.0]')[0]).toContain('orchestrate.escalation');

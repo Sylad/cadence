@@ -251,8 +251,8 @@ describe('R12/R13/R14/R15 — budgets, indicateur, installation, documentation',
     for (const f of FAMILLES) expect(s.toLowerCase(), f).toContain(f);
     for (const x of ['knowledge-work-plugins', 'design-critique', 'Anthropic']) expect(s).not.toContain(x);
   });
-  it('R15 — docs/orchestrate.md décrit les critères de l’étape maquette', () => {
-    const d = entre(read('docs/orchestrate.md'), '- **The session**: the `ux-reviewer` agent in **mockup mode**', '- **The loop,');
+  it('R15 — docs/orchestrate-spec.md décrit les critères de l’étape maquette', () => {
+    const d = entre(read('docs/orchestrate-spec.md'), '- **The session**: the `ux-reviewer` agent in **mockup mode**', '- **The loop,');
     expect(d).toContain('L448');
     for (const f of FAMILLES) expect(d.toLowerCase(), f).toContain(f);
     for (const x of ['knowledge-work-plugins', 'design-critique', 'Anthropic']) expect(d).not.toContain(x);

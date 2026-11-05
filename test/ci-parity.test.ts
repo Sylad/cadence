@@ -169,7 +169,7 @@ describe('parité porte ↔ CI (L499)', () => {
   });
 
   it('R16 — README/docs et CHANGELOG décrivent la parité porte ↔ CI', () => {
-    for (const f of ['docs/orchestrate.md', 'docs/lead.md', 'docs/deliver.md', 'CHANGELOG.md']) {
+    for (const f of ['docs/orchestrate-gate.md', 'docs/lead.md', 'docs/deliver.md', 'CHANGELOG.md']) {
       const text = readFileSync(join(import.meta.dirname, '..', f), 'utf8');
       expect(text, f).toContain('L499');
     }

@@ -59,7 +59,7 @@ describe('agent bibliothécaire (agents/doc-keeper.md, L306)', () => {
     const doc = docText();
     expect(doc).toContain('doc-keeper');
     expect(doc).not.toContain('describedBy');
-    expect(readFileSync(join(root, 'docs', 'orchestrate.md'), 'utf8')).toContain('docs.articles');
+    expect(readFileSync(join(root, 'docs', 'orchestrate-cycle.md'), 'utf8')).toContain('docs.articles');
     expect(readFileSync(join(root, 'CHANGELOG.md'), 'utf8')).toContain('L306');
   });
 });

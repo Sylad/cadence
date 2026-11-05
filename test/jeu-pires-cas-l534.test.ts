@@ -152,7 +152,7 @@ describe('L534 — gabarit templates/jeu-pires-cas.md et documentation', () => {
     expect(g()).toMatch(/regression test[^.]*loads the set[^.]*fails when a family is missing/);
   });
   it('R11 — la clé qa.worstData figure dans docs/', () => {
-    expect(flat('docs/orchestrate.md')).toContain('qa.worstData');
+    expect(flat('docs/orchestrate-spec.md')).toContain('qa.worstData');
     expect(flat('docs/spec.md')).toContain('templates/jeu-pires-cas.md');
     expect(flat('README.md')).toContain('docs/orchestrate.md');
   });

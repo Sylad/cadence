@@ -19,8 +19,8 @@ describe('livrer au fil de l\'eau — skill lead et documentation (L277)', () =>
     expect(wave).toMatch(/Without `--sha`.*refused/s)
   })
 
-  it('R9 — docs/deliver.md, docs/orchestrate.md et docs/lead.md décrivent la livraison pendant une vague', () => {
-    for (const f of ['docs/deliver.md', 'docs/orchestrate.md', 'docs/lead.md']) expect(read(f), f).toMatch(/while (the|a) wave (is )?runs?/)
+  it('R9 — docs/deliver.md, docs/orchestrate-cycle.md et docs/lead.md décrivent la livraison pendant une vague', () => {
+    for (const f of ['docs/deliver.md', 'docs/orchestrate-cycle.md', 'docs/lead.md']) expect(read(f), f).toMatch(/while (the|a) wave (is )?runs?/)
   })
 
   it('R9 — le README mentionne la livraison pendant la vague', () => {

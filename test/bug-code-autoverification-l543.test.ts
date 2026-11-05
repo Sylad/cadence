@@ -193,8 +193,8 @@ describe('R5 — le protocole de mesure sur deux fenêtres', () => {
 });
 
 describe('R6 — la documentation suit', () => {
-  it('R6 — docs/orchestrate.md cite [L543] et le chemin du document de mesure, qui existe', () => {
-    const doc = read('../docs/orchestrate.md');
+  it('R6 — docs/orchestrate-spec.md cite [L543] et le chemin du document de mesure, qui existe', () => {
+    const doc = read('../docs/orchestrate-spec.md');
     const ligne = doc.split('\n').find((l) => l.includes(MARQUEUR));
     expect(ligne).toBeDefined();
     expect(ligne).toContain('mesures/bug-code-2026-11-03.md');

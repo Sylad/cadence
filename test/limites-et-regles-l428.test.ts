@@ -61,14 +61,14 @@ describe('cas limites et fiche (L428, correction)', () => {
 
 describe('documentation du point « cas limites » (L428, correction)', () => {
   const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), 'utf8');
-  it('R6 — docs/orchestrate.md, la page de mesure et le CHANGELOG disent qu\'avec une fiche un cas limite qu\'elle ne couvre pas n\'est ni codé ni testé', () => {
-    const orch = read('../docs/orchestrate.md');
+  it('R6 — docs/orchestrate-spec.md, la page de mesure et le CHANGELOG disent qu\'avec une fiche un cas limite qu\'elle ne couvre pas n\'est ni codé ni testé', () => {
+    const orch = read('../docs/orchestrate-spec.md');
     const l428 = orch.split('\n').find((l) => l.includes('Limits and rules before the walkthrough (L428)'));
-    expect(l428, 'puce L428 de docs/orchestrate.md').toBeDefined();
+    expect(l428, 'puce L428 de docs/orchestrate-spec.md').toBeDefined();
     expect(l428).toContain('neither coded nor tested');
     expect(l428).toMatch(/except .*the fiche does not cover/);
     const regle = orch.split('\n').find((l) => l.includes('a case the sheet does not cover is written in the report'));
-    expect(regle, 'règle « does not invent a rule » de docs/orchestrate.md').toBeDefined();
+    expect(regle, 'règle « does not invent a rule » de docs/orchestrate-spec.md').toBeDefined();
     expect(regle).toContain('not coded nor tested');
     const mesure = read('../docs/mesures/bug-code-2026-10-29.md');
     expect(mesure).toContain('ni codé ni testé');

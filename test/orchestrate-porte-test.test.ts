@@ -183,7 +183,7 @@ describe('porte « code modifié sans test » (L287)', () => {
     expect(kinds(avec)).toEqual(['implement', 'review']);
   });
 
-  it('R12 — docs/orchestrate.md et le README décrivent la porte et sa clé', () => {
+  it('R12 — les pages orchestrate et le README décrivent la porte et sa clé', () => {
     const doc = docText();
     expect(doc).toContain('testGate');
     expect(doc).toMatch(/code changed without a test/);

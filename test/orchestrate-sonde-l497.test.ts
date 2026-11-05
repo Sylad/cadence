@@ -612,11 +612,11 @@ describe('sonde de cas limites (L497)', () => {
     expect(c.lot.outcome).toMatch(/verrou des tests d'acceptation/);
   });
 
-  it('R10 — docs/orchestrate.md et README.md citent orchestrate.probe', () => {
-    expect(readFileSync(join(root, 'docs/orchestrate.md'), 'utf8')).toContain('orchestrate.probe');
+  it('R10 — docs/orchestrate-gate.md et README.md citent orchestrate.probe', () => {
+    expect(readFileSync(join(root, 'docs/orchestrate-gate.md'), 'utf8')).toContain('orchestrate.probe');
     // le README est une page d'accueil sans clé de configuration (test L232) : il renvoie à la section de la page docs/ qui la décrit
-    expect(readFileSync(join(root, 'README.md'), 'utf8')).toContain('docs/orchestrate.md#the-edge-case-probe-orchestrateprobe-l497');
-    expect(readFileSync(join(root, 'docs/orchestrate.md'), 'utf8')).toContain('## The edge-case probe (`orchestrate.probe`, L497)');
+    expect(readFileSync(join(root, 'README.md'), 'utf8')).toContain('docs/orchestrate-gate.md#the-edge-case-probe-orchestrateprobe-l497');
+    expect(readFileSync(join(root, 'docs/orchestrate-gate.md'), 'utf8')).toContain('## The edge-case probe (`orchestrate.probe`, L497)');
     expect(readFileSync(join(root, 'CHANGELOG.md'), 'utf8')).toContain('orchestrate.probe');
     expect(docText()).toContain('L430');
   });

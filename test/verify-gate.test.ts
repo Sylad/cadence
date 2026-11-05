@@ -65,8 +65,8 @@ describe('verifyGate : la porte rejouée au sha dans un worktree jetable (L348)'
     expect(ligne).toContain('neither copied nor linked');
   });
 
-  it('L455 — la référence de config (docs/orchestrate.md) ne dit plus que les autres dossiers ignorés sont reliés', () => {
-    const ligne = readFileSync(join(__dirname, '..', 'docs', 'orchestrate.md'), 'utf8').split('\n').find((l) => l.includes('worktreeDeps: ['));
+  it('L455 — la référence de config (docs/orchestrate-cycle.md) ne dit plus que les autres dossiers ignorés sont reliés', () => {
+    const ligne = readFileSync(join(__dirname, '..', 'docs', 'orchestrate-cycle.md'), 'utf8').split('\n').find((l) => l.includes('worktreeDeps: ['));
     expect(ligne).toContain('neither copied nor linked');
     expect(ligne).not.toContain('are linked');
   });

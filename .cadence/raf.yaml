@@ -2343,11 +2343,12 @@ lots:
     finished: 2026-11-05
   - id: L599
     title: "orchestrate.md en cinq pages (E12 de docs/etudes/ensemble-2026-11.md) : 308 Ko sans sommaire découpés, avec dans le même commit les 26 tests qui citent la page, files de package.json et CHECKED de scripts/check-links.mjs"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "conforme : verdict de la vague tenu ; rebase final, ajouts de L619 L622 L623 L624 reportés dans les pages découpées, liens et tests verts", commit: 94087299b5e005ca9f6c5800c3796ee1c5048670 }
+    finished: 2026-11-05
   - id: L600
     title: "Vocabulaire (E4a + E7 + E10 de docs/etudes/ensemble-2026-11.md) : concepts.md explique les tailles de lot (express, light, small, quickwin), les quatre sens de hook et docs-ok"
     status: done
@@ -2566,6 +2567,7 @@ lots:
     created: 2026-11-05
   - id: L626
     title: "Contrôles rapides avant toute porte : un lot qui touche README.md, CHANGELOG.md, docs/ ou package.json joue en quelques secondes les tests qui lisent ces fichiers (readme-accueil, changelog, bornes de pages, files du paquet), dès la porte d'écriture et avant la suite complète d'intégration ; 05-11 : L602 et L622 refusés pour une ligne de README après 25 min de porte, L601 pour concepts.md, à compléter par une liste déclarée, faute de lien d'import"
+    goal: "Trois niveaux, génériques pour tous les projets et le compte pro. Un : un fichier CLAUDE.md à la racine du dépôt cadence donne les bornes de ses fichiers (README 64 lignes et 160 colonnes au plus, docs/concepts.md 15 Ko au plus, entrées du CHANGELOG sous [Unreleased] sans titre dupliqué, toute nouvelle page de docs dans files de package.json). Deux : le brief d'implémentation reçoit les bornes des fichiers que le lot touche, lues d'une clé de cadence.yaml. Trois : un hook après écriture et les portes jouent les tests qui lisent ces fichiers (liste déclarée, faute de lien d'import) en quelques secondes, avant la suite complète."
     status: todo
     estimate: 0.25
     created: 2026-11-05
@@ -2601,6 +2603,7 @@ lots:
     created: 2026-11-05
   - id: L632
     title: "Issue #42 : un lot dont l'objectif n'a pas pu être vérifié ne ressort pas « prêt » en silence. Si la session déclare tests.vert faux, ou le critère de l'objectif non joué (accès absent, KUBECONFIG=/dev/null), la vague le rend avec la raison et le geste, et le tableau le dit ; la revue ne le classe plus conforme"
+    goal: "Trois points de l'issue #42. Un : au lancement et en --dry-run, si orchestrate.prodAccess est faux et que le titre ou l'objectif du lot nomme kubectl, port-forward, KUBECONFIG, un cluster ou une URL de banc, une alerte dit que les sessions démarrent sans accès cluster et le geste à faire. Deux : la ligne du tableau, la note raf review et orchestrate --follow portent « objectif non vérifié : <première ligne> » quand le rapport d'implémentation dit tests.vert faux avec une commande que la porte ne couvre pas, ou quand nonVerifie de la dernière revue nomme l'objectif ; un tel lot ne ressort pas en simple « prêt ». Trois : chaque brief dit en une ligne que la session n'a pas d'accès cluster et qu'un objectif qui en demande un est une question au lead."
     status: todo
     estimate: 0.25
     created: 2026-11-05

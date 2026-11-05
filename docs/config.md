@@ -28,8 +28,30 @@ A gate is a check that sends a lot back instead of letting it through. It is dec
 | Code without a test | `orchestrate.testGate` | cadence.yaml | code files changed with no test file touched: a correction pass before the review |
 | Documentation | `docs.sync` (with `docs.since`) | cadence.yaml | a lot that changes code without touching the documents the rule names; acknowledged by `raf docs-ok <lot> --reason` ([news](news.md)) |
 | Edge-case probe | `orchestrate.probe` | cadence.yaml | a lot whose diff a fresh session breaks with a red edge-case test ([orchestrate](orchestrate-gate.md#the-edge-case-probe-orchestrateprobe-l497)) |
+| File bounds | `bounds` | cadence.yaml | nothing refuses on its own: the writer is told the limit ([below](#file-bounds-bounds)); a file over its bound is caught by the test the entry declares, in the targeted gate |
 | Pre-check | `orchestrate.precheck` (on by default) | cadence.yaml | a lot whose deliverable is already in the repository: it is not implemented again |
 | Mockup | `orchestrate.maquette` (on by default) | cadence.yaml | a lot with a screen whose mockup fails its UX review, before any code ([orchestrate](orchestrate-spec.md#the-mockup-review-before-any-code)) |
 | Back-end sheet | `orchestrate.fiche` (on by default) | cadence.yaml | a lot with `spec: true` whose sheet fails its review, before any test is written |
 
 Two keys do not add a gate, they say **where the gate is played**: `orchestrate.gate.host` (and `gate.install`, `gate.refs`, `gate.maxParallel`) plays the build and the tests on another machine through ssh ([remote gate](remote-gate.md)); `verify.inPlace` chooses, for `cadence verify --gate`, between the main tree and a throwaway copy ([deliver](deliver.md)).
+
+## File bounds (`bounds`)
+
+A document that grows past a bound used to be found by a test at the gate, after a whole session. `bounds` in `cadence.yaml` gives the same bound to the writer, at three levels, for any project:
+
+```yaml
+bounds:
+  - paths: [README.md]            # patterns of `docs.sync`
+    lines: 64                     # at most 64 lines
+    columns: 160                  # no line of text over 160 columns (lines starting with `<` are skipped)
+    tests: [test/readme.test.ts]  # tests that read these files
+  - paths: [docs/concepts.md]
+    chars: 15360                  # at most 15360 characters (an accent counts for one)
+```
+
+1. **The repository says it.** A `CLAUDE.md` at the root of the project lists the bounds in words, for the sessions that read it (cadence's own does).
+2. **The brief of the writing session carries it.** The implementation and fix briefs end with one line per bound whose literal path the lot, its notes or the pre-check reading cite. A pattern (`docs/*.md`) or an entry with tests only adds no line.
+3. **A hook measures after each write.** `cadence claude-hook bornes` (PostToolUse on Write, Edit and MultiEdit, in `hooks/hooks.json`) measures the written file against the `cadence.yaml` nearest above it and answers `borne dépassée : README.md : 70 lignes, limite 64` at once; it says nothing within the bound, and never refuses the write.
+4. **The targeted gate plays the declared tests.** When a lot touches a file matched by `paths`, the gate after a writing session adds the `tests` of that entry to the files given to `testRelated`, before the full suite of the integration. A test that nothing imports (it reads the file) is not found by `vitest related`; declaring it is the only way it runs in seconds. A declared test missing from the repository is left out.
+
+`bounds` is a list; an unknown key, a limit that is not a positive integer or a test path with `..` is refused, like any key of `cadence.yaml` (the gate validates `cadence.yaml` after a lot that changed it).

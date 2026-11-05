@@ -9,6 +9,7 @@ import { probeVars } from '../probe.js';
 import { repoWork } from '../../repos.js';
 import { testWorkersText } from '../workers.js';
 import { withClusterLine } from '../objectif.js';
+import { readBounds, boundsText } from '../../bounds.js';
 import { capturesText, EXPRESS_BRIEF, expressNewsText, gateText, headline, integrationText, localReading, precheckBrief, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars } from '../briefs.js';
 import { mcpServersFor, playwrightDir, type SessionKind } from '../launch.js';
 import { acceptationFile, acceptText, findAcceptation } from '../accept.js';
@@ -187,6 +188,17 @@ const writesCode = (kind: SessionKind): boolean => kind === 'implement' || kind 
 /** Consigne de la part de machine de la session (L350) ; vide quand la vague n'en a pas calculé. */
 const workersText = (c: LotCtx): string => (c.wave.testWorkers ? testWorkersText(c.wave.testWorkers) : '');
 
+/** Les bornes de fichiers (L626, `boundsText` de la clé `bounds` du cadence.yaml du lot) ajoutées au brief des sessions qui écrivent le code du lot (implement, fix), de même que les dépôts tiers : sans passer par un gabarit. Rien quand le cadence.yaml manque ou ne se lit pas (la porte le refuse déjà, `configRefusee` : un brief ne s'arrête pas pour lui). */
+function withBounds(brief: string, c: LotCtx, kind: SessionKind, vars: BriefVars): string {
+  if (kind !== 'implement' && kind !== 'fix') return brief;
+  try {
+    const text = boundsText(readBounds(join(wd(c), 'cadence.yaml')), [vars.objectif, vars.commits].join('\n'));
+    return text ? `${brief}\n${text}\n` : brief;
+  } catch {
+    return brief;
+  }
+}
+
 export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   const plan = c.loadPlan();
   const l = c.lot;
@@ -267,7 +279,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   }
   const brief = renderBrief(briefName(l, kind, !!c.integration), vars, c.wave.templates);
   // Les dépôts tiers (L456) : la consigne s'ajoute à tout brief d'écriture, sans passer par un gabarit (un gabarit modifié change l'empreinte que d'autres tests gardent).
-  return withClusterLine(['implement', 'fix', 'spec', 'accept', 'probe'].includes(kind) ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief, c.config.prodAccess);
+  return withClusterLine(withBounds(['implement', 'fix', 'spec', 'accept', 'probe'].includes(kind) ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief, c, kind, vars), c.config.prodAccess);
 }
 
 /** Plafond de sessions `spec` du lot (L230) : les revues de maquette d'un lot à écran, sinon deux. Fiche et maquette partagent `l.specRuns`. */

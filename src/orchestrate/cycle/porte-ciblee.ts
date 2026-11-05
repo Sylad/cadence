@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { type LotCtx, workDir as wd, startSha } from './ctx.js';
 import { type Place } from '../gate-place.js';
 import { tryGit } from '../../git.js';
+import { declaredTests, readBounds } from '../../bounds.js';
 import { lotKey } from '../state.js';
 import { gateLabel, relatedCommand, runGate, withFiles, type GateRan, type GateTest } from '../gate-parts.js';
 import { NO_TEST_RAN } from '../workers.js';
@@ -24,10 +25,20 @@ function lotFiles(c: LotCtx): string[] {
 /** Le test du journal (L616) : aucun test n'importe `CHANGELOG.md` (il le lit), `vitest related` ne le joue donc jamais ; trois refus du 05-11 (L582, L591, L613) pour une entrée écrite sous la version publiée au lieu de `[Unreleased]`, vus au seul sommet intégré. */
 const CHANGELOG_TEST = 'test/changelog.test.ts';
 
-/** Les fichiers de la porte ciblée : ceux du diff, plus le test du journal quand le lot touche `CHANGELOG.md` et que le dépôt le porte (L616) ; une seule fois s'il est déjà dans le diff. */
+/** Les tests que le dépôt déclare pour les fichiers du lot (L626, clé `bounds` de cadence.yaml : faute de lien d'import, `vitest related` ne les joue pas) ; vide sans clé, et un cadence.yaml illisible ne ferme pas la porte. */
+function declaredFor(c: LotCtx, files: string[]): string[] {
+  const file = join(wd(c), 'cadence.yaml');
+  try {
+    return declaredTests(readBounds(file), files).filter((t) => existsSync(join(wd(c), t)));
+  } catch {
+    return [];
+  }
+}
+
+/** Les fichiers de la porte ciblée : ceux du diff, plus le test du journal quand le lot touche `CHANGELOG.md` et que le dépôt le porte (L616), plus les tests déclarés par `bounds` pour les fichiers du lot (L626) ; chacun une seule fois. */
 function withChangelogTest(c: LotCtx, files: string[]): string[] {
-  const wanted = files.includes('CHANGELOG.md') && !files.includes(CHANGELOG_TEST) && existsSync(join(wd(c), CHANGELOG_TEST));
-  return wanted ? [...files, CHANGELOG_TEST] : files;
+  const changelog = files.includes('CHANGELOG.md') && existsSync(join(wd(c), CHANGELOG_TEST)) ? [CHANGELOG_TEST] : [];
+  return [...new Set([...files, ...changelog, ...declaredFor(c, files)])];
 }
 
 /** La porte ciblée d'une écriture : la commande liée (avec `{files}`) et les fichiers du diff ; null quand il n'y a pas de commande liée possible ou de fichier à viser, la suite complète est alors jouée (R4). */

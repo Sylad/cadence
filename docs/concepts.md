@@ -58,7 +58,7 @@ A lot's **size** is read from its estimate, in days, and decides its ceremony. F
 | **small** | estimate ≤ 0.5 day, **or** the lot is flagged `quickwin` | a single review, no separate UX pass: `review-small` (code and ergonomics) for a `visible` lot, a code `review` otherwise; a minor finding still gets one fix and a second review, unless also light |
 | **full** | anything bigger | the whole cycle of [the steps above](#the-steps-of-a-lot) |
 
-With the default threshold the words nest: express is also light and small, light is also small. `quickwin` (⚡, `raf add --quickwin`) is « small, said by hand », whatever the estimate; `raf quickwins` lists lots of ≤ 0.25 day or flagged ⚡. Detail: [orchestrate.md](orchestrate.md#orchestrate).
+With the default threshold the words nest: express is also light and small, light is also small. `quickwin` (⚡, `raf add --quickwin`) is « small, said by hand », whatever the estimate; `raf quickwins` lists lots of ≤ 0.25 day or flagged ⚡. Detail: « Review sized to the lot » in [orchestrate-cycle.md](orchestrate-cycle.md).
 
 ## The test gate
 
@@ -138,7 +138,7 @@ A wave with no cap is bounded by M. A dead wave (pid and start time both match) 
 A lot still not compliant after its correction passes would be handed back. A project can ask for one more try
 on a stronger model: `orchestrate.escalation: { model: fable }` plays one correction and one fresh review on it first
 (absent, nothing changes; it costs part of the lot's budget). If that is not enough, the lot is **handed back** to the lead,
-who fixes it, answers, or brings it to you: the question always reaches a human, never a session. Detail: [orchestrate.md](orchestrate.md#orchestrate).
+who fixes it, answers, or brings it to you: the question always reaches a human, never a session. Detail: « Review sized to the lot » in [orchestrate-cycle.md](orchestrate-cycle.md).
 
 ## Putting into service and release
 

@@ -131,4 +131,17 @@ describe('L599 — orchestrate.md en cinq pages', () => {
     expect(tpl).toContain('docs/orchestrate-spec.md');
     expect(tpl).not.toContain('docs/orchestrate.md');
   });
+
+  it('R12 — la maquette légère, concepts.md et stabilite.md citent la page qui porte la voie express, les tailles de lot et les codes de sortie', () => {
+    const spec = read('docs/orchestrate-spec.md');
+    expect(spec).not.toContain('(the express lane, below, stays one session)');
+    expect(spec).toContain('[the express lane](orchestrate-cycle.md#express-lane-l519)');
+    const concepts = read('docs/concepts.md');
+    expect(concepts).not.toContain('Detail: [orchestrate.md](orchestrate.md#orchestrate).');
+    expect(concepts).toContain('Detail: « Review sized to the lot » in [orchestrate-cycle.md](orchestrate-cycle.md)');
+    const stab = read('docs/stabilite.md');
+    expect(stab).toContain('[orchestrate](orchestrate.md)');
+    for (const p of SUITE) expect(stab, p).toContain(`](${p})`);
+    expect(checkLinks(root, ['docs/orchestrate-spec.md', 'docs/concepts.md', 'docs/stabilite.md'])).toEqual([]);
+  });
 });

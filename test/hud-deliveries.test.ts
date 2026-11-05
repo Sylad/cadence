@@ -57,8 +57,9 @@ it('L412 R12 — le collecteur rend les vagues finies du dossier dans `ended` m�
     // la vague vivante a aussi son wave.json, et c'est TOUJOURS le plus récent du dossier : orchestrate y réécrit `consumed` en continu
     writeFileSync(join(runs('vivant'), 'wave.json'), JSON.stringify({ id: 'vivant', status: 'implementing', consumed: 1 }))
     writeFileSync(join(runs('vivant'), 'ol--L6.json'), JSON.stringify({ project: 'ol', lot: 'L6', status: 'implementing' }))
-    const older = new Date('2026-10-29T10:00:00Z')
-    const newer = new Date('2026-10-29T11:00:00Z')
+    // relatif à maintenant : le collecteur borne les vagues finies à une fenêtre glissante (ENDED_DAYS)
+    const older = new Date(Date.now() - 2 * 3600_000)
+    const newer = new Date(Date.now() - 1 * 3600_000)
     utimesSync(join(runs('fini'), 'wave.json'), older, older)
     utimesSync(join(runs('vivant'), 'wave.json'), newer, newer)
     writeFileSync(join(home, 'waves', `${process.pid}.json`), JSON.stringify({ wave: 'vivant', pid: process.pid, cwd }))

@@ -45,7 +45,7 @@ ctx ▰▰▰▰▱▱▱▱▱▱  42 % 84k/200k  │  5h  23 % ↻ 2 h 10  │
   lot, statut coloré (prêt = vert, question / suspendu = orange, échec / rendu = rouge), détail de l'étape
   (`+N` = sessions claude filles, `✝` = étape marquée en cours mais processus mort, `pN` = passe), puis le
   début du titre du lot sur la largeur restante — et une seule
-  ligne grise `en attente` listant les lots qui n'ont pas démarré. Les lots de projets différents gardent le
+  ligne grise `en attente` listant les lots qui n'ont pas démarré. Un lot que le plan a déjà clos (`closed` du tour, même critère que le panneau des lots) n'a plus sa ligne : une ligne grise, retrait de 2 colonnes, les compte (`livrés : N · clos non livrés : M`, `clos non livrés` seulement si M > 0, rien si aucun lot n'est clos) ; tant que le tour n'est pas lu, ou avec un cadence trop ancien, tous les lots restent listés sans compteur. Les lots de projets différents gardent le
   préfixe `projet:` ;
 - les **sessions du lead** (L276) : celles que le lead a lancées à la main et inscrites par `cadence lead hold <étiquette>`
   (`<home>/holds/<étiquette>.json`, home = `CADENCE_HOME`, sinon `~/.cadence/orchestrate`). Une ligne grise reprend la ligne

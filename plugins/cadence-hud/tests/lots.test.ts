@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { buildPanel, flattenTree, foldKey, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, planMove, priorityArgv, projectDetail, projectDir, projectProgress, projectsOf, readTime, refusalReason, waveLotsOf } from '../hooks/lots'
+import { buildPanel, flattenTree, foldKey, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, planMove, priorityArgv, projectDetail, projectDir, projectProgress, projectsOf, readTime, refusalReason, waveLotsOf, estClos, foldWave } from '../hooks/lots'
 import type { LotsRow, TourLot } from '../types'
 
 const lot = (id: string, status: 'todo' | 'doing' = 'todo', extra: Partial<TourLot> = {}): TourLot => ({ id, title: `Titre ${id}`, status, after: [], ...extra })
@@ -957,4 +957,64 @@ test('R10 — un lot dans deux vagues : une seule place dans la ligne repliée, 
   const p = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: delivered('L9') }], waves: [inWave('L9', 'ready', 'vivante'), inWave('L9', 'ready', 'ancienne')], views: { 'livres:p': true } })
   expect(texts(p)).toEqual(['livrés : 1'])
   expect(foldedRows(p).map(r => r.title)).toEqual(['vivante'])
+})
+
+// ── L609 : la bande replie les lots clos au plan, avec la fonction du panneau ───────────────────────────────────────
+
+const wl = (id: string, status = 'ready', project = 'p') => ({ project, lot: id, status })
+const boardOf = (closed: LotsRow['closed'], project = 'p', outdated = false) => ({ rows: [{ project, lots: [], ...(closed ? { closed } : {}) }], outdated })
+
+test('R4 — estClos : un lot est clos si une ligne closed porte son id ; closed absent, aucun clos', () => {
+  expect(estClos(closedOf('L1'), 'L1')).toBe(true)
+  expect(estClos(closedOf('L1'), 'L2')).toBe(false)
+  expect(estClos(undefined, 'L1')).toBe(false)
+  expect(estClos([], 'L1')).toBe(false)
+})
+
+test('R1 — aucun lot de la vague dans closed : chaque lot a sa ligne, pas de compteur', () => {
+  const lots = [wl('L1'), wl('L2', 'queued')]
+  expect(foldWave(boardOf(closedOf('L9')), lots)).toEqual({ open: lots, livres: 0, clos: 0 })
+  expect(foldWave(boardOf(undefined), lots)).toEqual({ open: lots, livres: 0, clos: 0 })
+})
+
+test('R2 — avant la première lecture du tour (board nul) : tous les lots listés, aucun compteur', () => {
+  const lots = [wl('L1'), wl('L2')]
+  expect(foldWave(null, lots)).toEqual({ open: lots, livres: 0, clos: 0 })
+})
+
+test('R4 — lot de la vague dans closed : retiré, quel que soit son statut de vague (ready, handed-back, queued) ; un lot ouvert au plan reste', () => {
+  const lots = [wl('L1', 'ready'), wl('L2', 'handed-back'), wl('L3', 'queued'), wl('L4', 'ready')]
+  const f = foldWave(boardOf([...delivered('L1', 'L3'), ...closedOf('L2')]), lots)
+  expect(f.open.map(l => l.lot)).toEqual(['L4'])
+  expect(f).toMatchObject({ livres: 2, clos: 1 })
+})
+
+test('R4 — le critère est celui du projet du lot : un id clos dans un autre projet ne retire rien, un projet absent du tableau garde ses lots', () => {
+  const lots = [wl('L1', 'ready', 'a'), wl('L1', 'ready', 'b'), wl('L1', 'ready', 'c')]
+  const board = { rows: [{ project: 'a', closed: closedOf('L1') }, { project: 'b' }], outdated: false }
+  expect(foldWave(board, lots).open.map(l => l.project)).toEqual(['b', 'c'])
+  // le projet de la vague est le dossier du projet du tour (« apps/ol » ↔ « ol »), comme pour le panneau
+  expect(foldWave({ rows: [{ project: 'apps/ol', closed: closedOf('L1') }], outdated: false }, [wl('L1', 'ready', 'ol')]).open).toEqual([])
+})
+
+test('R4 — la bande et le panneau appellent la même fonction : un lot clos pour l’un l’est pour l’autre', () => {
+  const closed = [...delivered('L1'), ...closedOf('L2')]
+  const rows: LotsRow[] = [{ project: 'p', lots: [lot('L3')], closed }]
+  const waves = [inWave('L1', 'ready'), inWave('L2', 'handed-back'), inWave('L3', 'ready')]
+  const panel = L592({ rows, waves, views: { [foldKey('clos', 'p')]: true, [foldKey('livres', 'p')]: true } })
+  const inPanel = foldedRows(panel).map(r => r.id).sort()
+  const inBand = waves.filter(w => !foldWave({ rows, outdated: false }, [w]).open.length).map(w => w.lot).sort()
+  expect(inBand).toEqual(inPanel)
+  expect(inBand).toEqual(['L1', 'L2'])
+})
+
+test('R5 — livrés et clos non livrés comptés à part ; un lot présent deux fois dans closed compte une fois', () => {
+  const lots = [wl('L1'), wl('L2'), wl('L3')]
+  expect(foldWave(boardOf([...delivered('L1'), ...closedOf('L2', 'L3')]), lots)).toMatchObject({ livres: 1, clos: 2 })
+  expect(foldWave(boardOf([...delivered('L1'), ...delivered('L1')]), [wl('L1')])).toMatchObject({ livres: 1, clos: 0 })
+})
+
+test('R7 — tableau outdated : tous les lots listés, closed n’est pas lu', () => {
+  const lots = [wl('L1'), wl('L2')]
+  expect(foldWave(boardOf(delivered('L1'), 'p', true), lots)).toEqual({ open: lots, livres: 0, clos: 0 })
 })

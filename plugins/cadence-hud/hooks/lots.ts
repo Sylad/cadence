@@ -296,6 +296,9 @@ export const rankerOf = (row: LotsRow, waves: readonly PanelWaveLot[]): ((lot: T
 /** Le retrait de la ligne d'un lot d'une ligne repliée dépliée : celui d'un lot du premier niveau. */
 const REST_LEAD = '  '
 
+/** Un lot est clos au plan si une ligne `closed` de son projet porte son id (L609) : le critère du panneau (restGroups) et de la bande (foldWave), un seul. */
+export const estClos = (closed: LotsRow['closed'], id: string): boolean => (closed ?? []).some(c => c.id === id)
+
 type RestGroup = { group: FoldGroup; items: { id: string; title: string }[] }
 
 /**
@@ -308,10 +311,27 @@ const restGroups = (r: LotsRow, waves: readonly PanelWaveLot[]): RestGroup[] => 
   const prets = open.filter(l => !isTask(l) && l.parent === undefined && waveOf(l.id)?.status === 'ready' && !open.some(o => o.parent === l.id)).map(l => ({ id: l.id, title: l.title }))
   const shut = new Map((r.closed ?? []).map(c => [c.id, c.delivered === true]))
   // un même lot peut figurer dans deux vagues : la première (les vivantes d'abord, waveLotsOf) donne le titre
-  const closed = waves.filter((w, i) => sameProject(r.project, w.project) && shut.has(w.lot) && waves.findIndex(o => o.lot === w.lot && sameProject(r.project, o.project)) === i)
+  const closed = waves.filter((w, i) => sameProject(r.project, w.project) && estClos(r.closed, w.lot) && waves.findIndex(o => o.lot === w.lot && sameProject(r.project, o.project)) === i)
   const of = (delivered: boolean) => closed.filter(w => shut.get(w.lot) === delivered).map(w => ({ id: w.lot, title: w.title ?? '' }))
   const groups: Record<FoldGroup, RestGroup['items']> = { prets, livres: of(true), clos: of(false) }
   return FOLD_ORDER.filter(g => groups[g].length > 0).map(g => ({ group: g, items: groups[g] }))
+}
+
+/**
+ * Les lots d'une vague vivante pour la bande (L609) : `open`, ceux que le plan ne dit pas clos, dans l'ordre de la vague ; `livres` et `clos`, le compte de ceux qu'il dit clos avec et sans `delivered`.
+ * Sans tableau lu (`null`) ou d'un cadence trop ancien (`outdated`, `closed` n'y dit rien des lots), tous les lots restent ouverts ; un projet absent du tableau garde les siens.
+ */
+export const foldWave = <T extends { project: string; lot: string }>(board: LotsBoard | null, lots: readonly T[]): { open: T[]; livres: number; clos: number } => {
+  const open: T[] = []
+  let livres = 0
+  let clos = 0
+  for (const l of lots) {
+    const closed = board && !board.outdated ? board.rows.find(r => !r.error && sameProject(r.project, l.project))?.closed : undefined
+    if (!estClos(closed, l.lot)) open.push(l)
+    else if (closed?.some(c => c.id === l.lot && c.delivered === true)) livres++
+    else clos++
+  }
+  return { open, livres, clos }
 }
 
 /**

@@ -9,7 +9,7 @@ import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
-import { buildPanel, ellipsize, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
+import { buildPanel, ellipsize, foldWave, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
@@ -419,7 +419,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, cap] = await Promise.all([
+    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, cap, board] = await Promise.all([
       read($, usage),
       read($, agents),
       read($, commands),
@@ -432,6 +432,7 @@ export const register: Register = on => {
       read($, projectsFolded),
       read($, leadHolds),
       read($, slotCap),
+      read($, lotsBoard),
     ])
     const w = allWaves.filter(wave => isWaveShown(wave, at))
     const shownProjects = activeProjects(allProjects)
@@ -593,8 +594,10 @@ export const register: Register = on => {
       const sessions = waveSessions(wave)
       const project = commonProject(wave)
       const label = (lot: WaveLot) => (project ? lot.lot : `${lot.project}:${lot.lot}`)
-      const active = wave.lots.filter(l => l.status !== 'queued')
-      const queued = wave.lots.filter(l => l.status === 'queued')
+      // L609 : le plan l'emporte sur la vague (même critère que le panneau des lots) : un lot clos au plan n'est plus une ligne, il se compte
+      const { open, livres, clos } = foldWave(board, wave.lots)
+      const active = open.filter(l => l.status !== 'queued')
+      const queued = open.filter(l => l.status === 'queued')
       const cells = active.map(lot => {
         const c = lotCells(lot, at)
         return { lot, label: label(lot), status: c.status, detail: c.detail }
@@ -669,6 +672,13 @@ export const register: Register = on => {
                   {queued.map(label).join(' · ')}
                 </Text>
               </Box>
+            </Box>
+          )}
+          {livres + clos > 0 && (
+            <Box paddingLeft={2}>
+              <Text wrap="truncate-end" color="subtle">
+                {[livres > 0 ? `livrés : ${livres}` : '', clos > 0 ? `clos non livrés : ${clos}` : ''].filter(Boolean).join(' · ')}
+              </Text>
             </Box>
           )}
         </Box>

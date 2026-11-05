@@ -14,7 +14,7 @@ Context of the session (green / orange / red at 50 and 75 %), the 5-hour and 7-d
 windows with the time to their reset, the cost of the session and its split per model, the
 subagents of this session, the background commands in progress (`2 cmd`: Bash run in the background and Monitor, subagents' included, as the app's "background commands" card counts them), and every live `cadence orchestrate` wave: budget, sessions, one
 aligned line per active lot (status, step, model, elapsed, start of the title; `porte@tests 3 min` while the program's build or test gate runs with no session, L395), the lots still
-waiting. When no wave is running, the last finished one stays on a grey line for 30 minutes
+waiting. A lot the plan already closed (`closed` of `cadence lead tour --json`, the criterion of the lots panel, `estClos`) is no longer a line (L609, whatever its wave status): one grey line under the open lots, indented by 2 columns, counts them, `livrés : N` (closed with `delivered`) then `· clos non livrés : M` only if M > 0, and does not exist when none is closed; it is read-only, the detail is in `/hud lots`. Until the tour has been read, with a `cadence` too old to say which lots are closed, or when the tour failed before any read, every lot stays listed and no counter shows. When no wave is running, the last finished one stays on a grey line for 30 minutes
 after it ended, then disappears. A background command counted for more than an hour, or with no
 record of when it started, is no longer shown as running: it moves to a grey `N cmd sans fin
 vue` ("end never seen") right after `N cmd`, because its end notification may never have reached

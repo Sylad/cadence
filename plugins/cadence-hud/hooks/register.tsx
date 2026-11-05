@@ -626,20 +626,23 @@ export const register: Register = on => {
               {wave.cap ? `/${wave.cap}` : ''}
             </Text>
           </Text>
+          {/* L592 (R8) : les colonnes id, état et détail ont une largeur MINIMALE (minWidth), celle du plus long texte en cellules, jamais une largeur fixe : la Box est mesurée en cellules
+              de la métrique monospace de la surface, or la police de l'app de bureau est proportionnelle — « L584 » y débordait de ses 4 cellules et truncate-end le rendait « L5… »
+              (capture de Sylvain du 04-11). Avec un minimum, la Box grandit de la fraction qui manque au lieu de couper l'id ; sur le terminal (monospace) rien ne change */}
           {cells.map(c => (
             <Box key={`${c.lot.project}:${c.lot.lot}`} flexDirection="row">
-              <Box width={2 + lotWidth} paddingLeft={2} flexShrink={0}>
+              <Box minWidth={2 + lotWidth} paddingLeft={2} flexShrink={0}>
                 <Text wrap="truncate-end" bold color={c.lot.status === 'question' || c.lot.status === 'failed' ? colorOfLot(c.lot.status) : 'text'}>
                   {c.label}
                 </Text>
               </Box>
-              <Box width={2 + statusWidth} paddingLeft={2} flexShrink={0}>
+              <Box minWidth={2 + statusWidth} paddingLeft={2} flexShrink={0}>
                 <Text wrap="truncate-end" color={colorOfLot(c.lot.status)} bold={c.lot.status === 'question'}>
                   {c.status}
                 </Text>
               </Box>
               {detailWidth > 0 && (
-                <Box width={2 + detailWidth} paddingLeft={2} flexShrink={0}>
+                <Box minWidth={2 + detailWidth} paddingLeft={2} flexShrink={0}>
                   <Text wrap="truncate-end" dimColor={c.lot.status !== 'question'} color={c.lot.status === 'question' ? 'warning' : undefined}>
                     {c.detail}
                   </Text>
@@ -655,7 +658,7 @@ export const register: Register = on => {
           {queued.length > 0 && (
             <Box flexDirection="row">
               <Box width={2 + lotWidth} flexShrink={0} />
-              <Box width={2 + statusWidth} paddingLeft={2} flexShrink={0}>
+              <Box minWidth={2 + statusWidth} paddingLeft={2} flexShrink={0}>
                 <Text wrap="truncate-end" color="subtle">
                   en attente
                 </Text>

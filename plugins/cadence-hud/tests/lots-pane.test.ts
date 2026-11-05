@@ -1561,46 +1561,78 @@ test('L495 — le nom de chaque projet est dans une boîte de largeur fixe, cell
 /** Les lots d'un projet « cadence » : L584 (id de 4, colonne id de 6) et douze autres ids plus courts ; aucun n'est travaillé dans une vague. */
 const FOURTEEN = [lot('L584'), ...Array.from({ length: 13 }, (_, i) => lot(`L${10 + i}`))]
 
-test('R8 — rendu monté à 49 colonnes, 14 lots dont L584 : le texte de la ligne de L584 contient « L584 » entier, jamais « L5… »', async ($, on) => {
+/**
+ * La cause de « L5… » (R8) n'est pas une largeur de colonne : idWidth est déjà le maximum. La colonne id était une Box de largeur FIXE de `idWidth` cellules de la métrique monospace de la surface,
+ * et son Text est en police proportionnelle dans l'app de bureau (celle des captures de Sylvain, cf. L495, L134) : « L584 » y déborde de ses quatre cellules et `truncate-end` le rend « L5… ».
+ * Le harnais ne dessine pas de police : il lit la mécanique qui l'empêche — une largeur MINIMALE (`minWidth`, la Box grandit de la fraction au lieu de couper) et aucune largeur fixe. Rouge avec `width`.
+ */
+const ID_TEXT = /^[\s▸▾├└]*L\d+(\/\d+)*$/
+
+/** Les colonnes id et état du projet « cadence » : la Box (largeur minimale, aucune largeur fixe, jamais rétrécie) et le Text qu'elle porte (son texte entier, son repli). */
+const idColumns = async ($: Parameters<TestBody>[0], bodyColumns: number, surface: 'terminal' | 'desktop' = 'desktop') => {
+  const ui = (await $.ui.mount({ plugin: PLUGIN, surface, component: 'Pane', requestId: 'lots', props: { title: 'Lots', isFocused: false, bodyColumns, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} } } as never)) as Mounted<'desktop' | 'terminal', 'Pane'>
+  await ui.drawn()
+  // les lots qui jouent sont dans la région Client du projet ; les lots d'une ligne repliée dépliée (L592) sont des lignes de l'arbre du mod lui-même : on lit les deux
+  const region = (await ui.findAll({ type: 'Client' })).find(c => c.key === 'lots:cadence')
+  const found = async <P,>(type: string) => [...(await ui.findAll({ type })), ...(region ? await ui.findAll({ type, in: region.key } as never) : [])] as unknown as { props?: P; text?: string }[]
+  const boxes = await found<{ width?: unknown; minWidth?: unknown; flexShrink?: unknown }>('Box')
+  const texts = await found<{ wrap?: unknown }>('Text')
+  await ui.unmount()
+  const column = (b: (typeof boxes)[number]) => ({ text: b.text ?? '', minWidth: b.props?.minWidth, width: b.props?.width, flexShrink: b.props?.flexShrink })
+  const STATE = /^(○ (à faire|libre)|▶ en cours|⊘ bloqué|✔ (prêt|livré|clos))$/
+  return {
+    boxes: boxes.filter(b => ID_TEXT.test(b.text ?? '')).map(column),
+    states: boxes.filter(b => STATE.test(b.text ?? '')).map(column),
+    ids: texts.filter(t => ID_TEXT.test(t.text ?? '')).map(t => ({ text: t.text ?? '', wrap: t.props?.wrap })),
+  }
+}
+
+test('R8 — rendu monté (bureau) à 49 colonnes, 14 lots dont L584 (le reste déplié) : chaque colonne id est une Box de largeur minimale 6 (retrait 2 + id 4), sans largeur fixe, jamais rétrécie — une largeur fixe de 6 cellules tronquait « L584 » en « L5… » dans l’app de bureau', async ($, on) => {
+  const s = await session($, on, { kv: [['lotsViews', { 'more:cadence': true }]], tour: () => ({ exitCode: 0, stdout: JSON.stringify([row('cadence', FOURTEEN)]) }) })
+  await s.hud('lots')
+  const { boxes, ids, states } = await idColumns($, 49)
+  expect(boxes).toHaveLength(14)
+  expect(boxes.map(b => b.text)).toContain('  L584')
+  // la mécanique anti-troncature : un minimum de 6 cellules monospace, aucune largeur fixe (la Box grandit si la police rend le texte plus large), et la Box ne cède rien à la ligne
+  expect(boxes.filter(b => b.minWidth !== 6 || b.width !== undefined || b.flexShrink !== 0).map(b => b.text)).toEqual([])
+  expect(ids).toHaveLength(14)
+  expect(ids.every(t => t.wrap === 'truncate-end')).toBe(true) // ce qui dépasserait serait tronqué par « … » : c'est bien ce Text qui a rendu « L5… »
+  // la colonne d'état (fiche mère R15 : jamais tronquée non plus) est mesurée de la même façon : « ○ libre » (7) + 2
+  expect(states).toHaveLength(14)
+  expect(states.filter(b => b.minWidth !== 9 || b.width !== undefined || b.flexShrink !== 0)).toEqual([])
+})
+
+test('R8 — rendu monté (terminal) : la même colonne, le terminal étant monospace, garde « L584 » entier dans son minimum de 6', async ($, on) => {
   const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify([row('cadence', FOURTEEN)]) }) })
   await s.hud('lots')
+  const { boxes } = await idColumns($, 49, 'terminal')
+  expect(boxes.find(b => b.text.includes('L584'))).toEqual({ text: '  L584', minWidth: 6, width: undefined, flexShrink: 0 })
   const d = await s.draw(49, 60, 'terminal')
-  const line = d.texts.find(t => t.includes('L58'))
-  expect(line).toBeDefined()
-  expect(line).toContain('L584')
+  expect(d.texts.find(t => t.includes('L58'))).toContain('L584')
   expect(d.text).not.toContain('L5…')
 })
 
-/** Les boîtes de colonne id du projet « cadence » (largeur fixe, jamais rétrécies) avec le texte qu'elles portent, lues dans sa région Client. */
-const idBoxes = async ($: Parameters<TestBody>[0], bodyColumns: number) => {
-  const ui = (await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'Pane', requestId: 'lots', props: { title: 'Lots', isFocused: false, bodyColumns, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} } } as never)) as Mounted<'desktop' | 'terminal', 'Pane'>
-  await ui.drawn()
-  const region = (await ui.findAll({ type: 'Client' })).find(c => c.key === 'lots:cadence')
-  const boxes = (await ui.findAll({ type: 'Box', in: region?.key } as never)) as unknown as { props?: { width?: unknown; flexShrink?: unknown }; text?: string }[]
-  await ui.unmount()
-  return boxes.filter(b => b.props?.flexShrink === 0 && typeof b.props.width === 'number' && /^[\s▸▾├└]*L\d/.test(b.text ?? '')).map(b => ({ text: b.text ?? '', width: b.props!.width as number }))
-}
-
-test('R8 — rendu monté, L584 : sa colonne id est de 6 (retrait 2 + id 4), fixe, et porte « L584 » entier', async ($, on) => {
-  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify([row('cadence', FOURTEEN)]) }) })
-  await s.hud('lots')
-  const boxes = await idBoxes($, 49)
-  const mine = boxes.find(b => b.text.includes('L584'))
-  expect(mine?.width).toBe(6)
-  expect(boxes.every(b => b.width === 6)).toBe(true)
-})
-
-test('R8 — rendu monté, sous-lot ├ L594/2 : colonne id de 10, id entier, titre tronqué par « … »', async ($, on) => {
+test('R8 — rendu monté (bureau), sous-lot ├ L594/2 : colonne id de largeur minimale 10, « ├ L594/2 » entier, titre tronqué par « … »', async ($, on) => {
   const long = 'Un titre bien trop long pour tenir sur un corps de quarante-neuf colonnes'
   const lots = [lot('L594', 'doing', { title: long }), lot('L594/2', 'doing', { parent: 'L594', title: long }), lot('L594/1', 'todo', { parent: 'L594' })]
   const s = await session($, on, { kv: [['lotsViews', { 'open:cadence#L594': true }]], tour: () => ({ exitCode: 0, stdout: JSON.stringify([row('cadence', lots)]) }) })
   await s.hud('lots')
-  const boxes = await idBoxes($, 49)
-  expect(boxes.find(b => b.text.includes('L594/2'))?.width).toBe(10)
-  const d = await s.draw(49, 60, 'terminal')
-  expect(d.texts.some(t => t.includes('L594/2'))).toBe(true)
+  const { boxes } = await idColumns($, 49)
+  expect(boxes.find(b => b.text.includes('L594/2'))).toEqual({ text: '  ├ L594/2', minWidth: 10, width: undefined, flexShrink: 0 })
+  expect(boxes.filter(b => b.minWidth !== 10 || b.width !== undefined)).toEqual([])
+  const d = await s.draw(49, 60, 'desktop')
   expect(d.texts.some(t => t.includes('├') && t.includes('L594/2'))).toBe(true)
   expect(d.texts.find(t => t.includes('Un titre bien'))).toMatch(/…$/)
+})
+
+test('R8 — rendu monté (bureau), lignes « livrés » et « clos » dépliées : les ids des lots livrés ont la même colonne (minimum, sans largeur fixe) que les lots qui jouent, l’état aussi', async ($, on) => {
+  const s = await session($, on, { kv: [['lotsViews', { 'livres:cadence': true, 'clos:cadence': true }]], tour: CLOSED_TOUR, waves: [CLOSED_WAVE] })
+  await s.hud('lots')
+  const { boxes, states } = await idColumns($, 49)
+  expect(boxes.map(b => b.text).sort()).toEqual(['  L1', '  L8', '  L9'])
+  expect(boxes.filter(b => b.minWidth !== 4 || b.width !== undefined || b.flexShrink !== 0)).toEqual([])
+  expect(states.map(b => b.text).sort()).toEqual(['○ libre', '✔ clos', '✔ livré'])
+  expect(states.filter(b => b.minWidth !== 9 || b.width !== undefined || b.flexShrink !== 0)).toEqual([])
 })
 
 const waveOf = (...lots: [string, string, string][]): Wave => ({ ...WAVE, lots: lots.map(([id, status, title]) => ({ project: 'cadence', repo: '/p', lot: id, title, status, pass: 0, model: 'sonnet', next: null, steps: 1, step: null })) })

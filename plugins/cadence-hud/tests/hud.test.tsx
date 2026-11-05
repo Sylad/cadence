@@ -148,14 +148,28 @@ test('la bande dessine le contexte et la vague sur chaque surface', async ($, on
   }
 })
 
-test('R8 — L592 : la colonne id des lignes de vague de la bande a la largeur de l’id le plus long (retrait 2 + « L584 » : 6), jamais rétrécie', async ($, on) => {
+test('R8 — L592 : dans la bande, la colonne id des lignes de vague est une Box de largeur MINIMALE (retrait 2 + « L584 » : 6), sans largeur fixe, jamais rétrécie — fixée à 6 cellules, l’app de bureau (police proportionnelle) tronquait « L584 » en « L5… » ; l’état et le détail de même', async ($, on) => {
   const lots = [{ ...WAVE.lots[0]!, lot: 'L584' }, { ...WAVE.lots[0]!, lot: 'L75' }]
   seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [{ ...WAVE, lots }], now: Date.parse('2026-10-07T19:14:11.066Z') })
-  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
-  const idBoxes = (await ui.findAll({ type: 'Box' })).filter(b => /^L\d+$/.test(b.text ?? '') && b.props.flexShrink === 0)
-  expect(idBoxes.map(b => b.text)).toEqual(['L584', 'L75'])
-  expect(idBoxes.every(b => b.props.width === 6)).toBe(true)
-  await ui.unmount()
+  for (const surface of ['desktop', 'terminal'] as const) {
+    const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
+    const boxes = await ui.findAll({ type: 'Box' })
+    const shape = (b: (typeof boxes)[number]) => ({ text: b.text, minWidth: b.props.minWidth, width: b.props.width, flexShrink: b.props.flexShrink })
+    // la Box est mesurée en cellules de la métrique monospace de la surface : un minimum laisse la Box grandir de la fraction que la police ajoute, une largeur fixe coupait l'id
+    expect(boxes.filter(b => /^L\d+$/.test(b.text ?? '')).map(shape)).toEqual([
+      { text: 'L584', minWidth: 6, width: undefined, flexShrink: 0 },
+      { text: 'L75', minWidth: 6, width: undefined, flexShrink: 0 },
+    ])
+    expect(boxes.filter(b => /^(corrige|fix@sonnet 3 min)$/.test(b.text ?? '')).map(shape)).toEqual([
+      { text: 'corrige', minWidth: 9, width: undefined, flexShrink: 0 },
+      { text: 'fix@sonnet 3 min', minWidth: 18, width: undefined, flexShrink: 0 },
+      { text: 'corrige', minWidth: 9, width: undefined, flexShrink: 0 },
+      { text: 'fix@sonnet 3 min', minWidth: 18, width: undefined, flexShrink: 0 },
+    ])
+    const ids = (await ui.findAll({ type: 'Text' })).filter(t => /^L\d+$/.test(t.text ?? ''))
+    expect(ids.map(t => [t.text, t.props.wrap])).toEqual([['L584', 'truncate-end'], ['L75', 'truncate-end']])
+    await ui.unmount()
+  }
 })
 
 test('les lots d’une vague sont alignés par des Box à largeur fixe, sans espaces de remplissage', async ($, on) => {
@@ -163,10 +177,11 @@ test('les lots d’une vague sont alignés par des Box à largeur fixe, sans esp
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
     const boxes = await ui.findAll({ type: 'Box' })
-    const fixed = boxes.filter(b => b.props.flexShrink === 0 && typeof b.props.width === 'number' && b.props.paddingLeft === 2)
-    // colonne des lots : « L75 » (3) + 2 ; colonne des états : « en attente » (10) + 2, sur la ligne du lot et sur celle des lots en attente
-    expect(fixed.some(b => b.props.width === 5)).toBe(true)
-    expect(fixed.filter(b => b.props.width === 12)).toHaveLength(2)
+    const fixed = boxes.filter(b => b.props.flexShrink === 0 && typeof b.props.minWidth === 'number' && b.props.paddingLeft === 2)
+    // colonne des lots : « L75 » (3) + 2 ; colonne des états : « en attente » (10) + 2, sur la ligne du lot et sur celle des lots en attente — des minimums (L592 R8), jamais une largeur fixe
+    expect(fixed.some(b => b.props.minWidth === 5)).toBe(true)
+    expect(fixed.filter(b => b.props.minWidth === 12)).toHaveLength(2)
+    expect(fixed.every(b => b.props.width === undefined)).toBe(true)
     // le titre prend la largeur restante et se tronque
     expect(boxes.filter(b => b.props.flexGrow === 1 && b.props.flexShrink === 1)).toHaveLength(2)
     // aucun texte n'est rembourré d'espaces : l'alignement ne dépend pas de leur rendu

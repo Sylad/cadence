@@ -41,7 +41,10 @@ export const lotRow = ({ Box, Text, Button }: Pick<ClientElements, 'Box' | 'Text
   return (
     <Box key={key} flexDirection="column">
       <Box flexDirection="row">
-        <Box width={line.idWidth} flexShrink={0}>
+        {/* L592 (R8) : les colonnes id et état ont une largeur MINIMALE (minWidth), celle du plus long texte en cellules, jamais une largeur fixe : la Box est mesurée en cellules de la métrique
+            monospace de la surface, or la police de l'app de bureau est proportionnelle — « L584 » y débordait de ses 4 cellules et truncate-end le rendait « L5… » (capture du 04-11). Avec un
+            minimum, la Box grandit de la fraction qui manque au lieu de couper l'id ; sur le terminal (monospace) le texte tient dans le minimum et l'alignement est le même qu'avec width */}
+        <Box minWidth={line.idWidth} flexShrink={0}>
           {line.subs && onToggle ? (
             <Button key={line.subs.key} plain onPress={onToggle}>
               {`${line.lead}${line.id}`}
@@ -62,7 +65,7 @@ export const lotRow = ({ Box, Text, Button }: Pick<ClientElements, 'Box' | 'Text
             {!line.afterOwnLine && after}
           </Text>
         </Box>
-        <Box paddingLeft={2} width={line.stateWidth + 2} flexShrink={0}>
+        <Box paddingLeft={2} minWidth={line.stateWidth + 2} flexShrink={0}>
           <Text wrap="truncate-end" color={line.state.color}>
             {line.state.text}
           </Text>

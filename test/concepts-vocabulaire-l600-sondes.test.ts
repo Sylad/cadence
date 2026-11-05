@@ -22,4 +22,19 @@ describe('L600 sondes — exactitude du vocabulaire', () => {
     const ligne = md.slice(i, md.indexOf('\n', i))
     expect(ligne).toMatch(/screen|écran|spec/i)
   })
+
+  it('« git hook » dit que la vague laisse un hook de la porte quand une porte est déclarée (keepGateGuard)', () => {
+    const l = entree('git hook')
+    expect(l).toMatch(/gate/i)
+    expect(l).toMatch(/leaves|left|stays|remains|permanent/i)
+  })
+
+  it('la ligne small distingue review-small (lot visible) et review de code (sinon), comme firstReview', () => {
+    const i = md.indexOf('| **small** |')
+    expect(i).toBeGreaterThan(-1)
+    const ligne = md.slice(i, md.indexOf('\n', i))
+    expect(ligne).toMatch(/visible/)
+    expect(ligne).toMatch(/`review`/)
+    expect(ligne).not.toMatch(/one single `review-small` pass/)
+  })
 })

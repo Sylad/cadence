@@ -59,7 +59,7 @@ A lot's **size** is read from its estimate, in days, and decides how much ceremo
 |---|---|---|
 | **express** | estimate > 0 and ≤ 0.1 day (`EXPRESS_MAX_ESTIMATE`), no screen and not a spec lot | one session; no precheck, no probe, no separate review |
 | **light** | estimate ≤ `orchestrate.review.threshold` (0.25 day by default) | the review runs on the light model (Sonnet by default), minor findings become notes |
-| **small** | estimate ≤ 0.5 day, **or** the lot is flagged `quickwin` | one single `review-small` pass (code and ergonomics together), no separate UX pass |
+| **small** | estimate ≤ 0.5 day, **or** the lot is flagged `quickwin` | one review pass: `review-small` (code and ergonomics) for a `visible` lot, a code `review` otherwise; no separate UX pass |
 | **full** | anything bigger | the whole cycle of [the steps above](#the-steps-of-a-lot) |
 
 The words nest: an express lot is also light and small, a light lot is also small. `quickwin` (the ⚡ flag, `raf add --quickwin`) is « small, said by hand »: it makes a lot small whatever its estimate, and `raf quickwins` lists the lots with an estimate of 0.25 day or less, or flagged ⚡. Detail: [orchestrate.md](orchestrate.md#orchestrate), [fonctionnement.md](fonctionnement.md#2-a-lot-inside-a-wave).
@@ -176,7 +176,7 @@ files and the changelog, then prints the steps the lead plays (tag, gate, push, 
 - **small**: estimate ≤ 0.5 day or `quickwin`: one single review pass, no separate UX pass.
 - **full**: any lot bigger than small: the whole cycle of steps.
 - **quickwin**: the ⚡ flag of a lot, set by hand, that makes it small whatever its estimate; `raf quickwins` lists them.
-- **git hook**: a script git runs (`pre-commit`, `post-commit`, `pre-push`), `raf hook install` installs `post-commit` and `pre-commit` (`hook.autostart` configures the pre-commit one); `pre-push` is temporary, put in place by `cadence orchestrate` during a wave. See [raf.md](raf.md).
+- **git hook**: a script git runs (`pre-commit`, `post-commit`, `pre-push`), `raf hook install` installs `post-commit` and `pre-commit` (`hook.autostart` configures the pre-commit one); `cadence orchestrate` puts a temporary `pre-push` in place during a wave and, when the project declares a gate, leaves behind a permanent gate-only `pre-push` (it refuses a push with no green `cadence verify --gate`): do not delete it. See [raf.md](raf.md).
 - **Claude Code hook**: a command Claude Code runs around a tool call, declared in the plugin's `hooks/hooks.json` and played by `cadence claude-hook retour|attente|pipe`. See [lead.md](lead.md).
 - **plan.onWrite**: not a hook of git nor of Claude Code: the command of `cadence.yaml` that cadence runs after each write of the plan, to refresh the files derived from it. See [raf.md](raf.md).
 - **mod hook**: a function hook of the `cadence-hud` mod (`plugins/cadence-hud/hooks/`), in Claude Code's plugin vocabulary; it draws the band. See [cadence-hud.md](cadence-hud.md).

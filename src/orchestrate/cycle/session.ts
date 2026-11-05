@@ -8,7 +8,7 @@ import { changedFiles, isAncestor, readCommits, restoreWorktree, tryGit, unquote
 import { blockingLots, gitCommitsIn } from '../table.js';
 import { type LotRepo } from '../../repos.js';
 import { SlotAbandoned } from '../registry.js';
-import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, writeMcpConfig, enabledPlugins, settingsFiles, type AnyModel, type SessionKind, type StepModel } from '../launch.js';
+import { journalTokens, peakContext, mcpServersFor, playwrightDir, runSession, writeMcpConfig, enabledPlugins, settingsFiles, BOUNDS_HOOK_STEPS, type AnyModel, type SessionKind, type StepModel } from '../launch.js';
 import { pushed, remoteAdvances, snapshot, type Snapshot } from '../guard.js';
 import { guardLost } from './depot-partage.js';
 import { sumTokens, type Tokens } from '../result.js';
@@ -129,6 +129,7 @@ export async function session(c: LotCtx, kind: SessionKind, local = false): Prom
       mcpConfig,
       playwright,
       disablePlugins: enabledPlugins(settingsFiles(w.claudeHome, wd(c))),
+      boundsHook: BOUNDS_HOOK_STEPS.includes(kind),
       timeoutMs: delay,
       extend,
     },

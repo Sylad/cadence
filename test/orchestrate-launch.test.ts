@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chmodSync } from 'node:fs';
 import { parseSession, isQuotaMessage } from '../src/orchestrate/result.js';
-import { buildArgs, buildLocalArgs, buildRetryArgs, killSessions, realClaude, mcpServersFor, writeMcpConfig, claudeConfigDir, enabledPlugins, settingsFiles, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
+import { BOUNDS_HOOK, buildArgs, buildLocalArgs, buildRetryArgs, killSessions, realClaude, mcpServersFor, writeMcpConfig, claudeConfigDir, enabledPlugins, settingsFiles, peakContext, projectLogDir, readAgents, runSession, type StepSpec } from '../src/orchestrate/launch.js';
 import { realOrchestrateDeps } from '../src/orchestrate/command.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { tempDir } from './helpers.js';
@@ -117,6 +117,20 @@ describe('buildArgs', () => {
       expect(JSON.parse(args[args.indexOf('--settings') + 1]!)).toEqual({ enabledPlugins: { 'superpowers@claude-plugins-official': false, 'cadence@cadence': false } });
       expect(args).not.toContain('--setting-sources');
     }
+  });
+
+  it('L626 — boundsHook joint le hook de bornes (PostToolUse Write|Edit|MultiEdit, cadence claude-hook bornes) au --settings, avec ou sans plugin coupé, relance comprise ; absent sans boundsHook', () => {
+    const agents = { 'code-reviewer': { description: 'd', prompt: 'p' } };
+    const hooks = { PostToolUse: [{ matcher: 'Write|Edit|MultiEdit', hooks: [{ type: 'command', command: 'command -v cadence >/dev/null 2>&1 && cadence claude-hook bornes || true' }] }] };
+    expect(BOUNDS_HOOK).toEqual(hooks.PostToolUse[0]);
+    for (const args of [buildArgs({ ...spec, boundsHook: true }, agents), buildRetryArgs({ ...spec, boundsHook: true }, 'sid', agents)]) {
+      expect(args.filter((a) => a === '--settings')).toHaveLength(1);
+      expect(JSON.parse(args[args.indexOf('--settings') + 1]!)).toEqual({ hooks });
+    }
+    const both = buildArgs({ ...spec, boundsHook: true, disablePlugins: ['cadence@cadence'] }, agents);
+    expect(JSON.parse(both[both.indexOf('--settings') + 1]!)).toEqual({ enabledPlugins: { 'cadence@cadence': false }, hooks });
+    const none = buildArgs({ ...spec, boundsHook: false, disablePlugins: ['cadence@cadence'] }, agents);
+    expect(JSON.parse(none[none.indexOf('--settings') + 1]!)).toEqual({ enabledPlugins: { 'cadence@cadence': false } });
   });
 
   it('L398 — sans plugin activé, aucun drapeau : ni --settings ni --setting-sources, relance et claude-local compris', () => {

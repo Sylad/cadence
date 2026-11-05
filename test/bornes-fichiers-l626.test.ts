@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { boundsText, declaredTests, readBounds, violations, type Bound } from '../src/bounds.js';
 import { claudeHookContext } from '../src/claude-hook.js';
+import { BOUNDS_HOOK } from '../src/orchestrate/launch.js';
 import { RafError } from '../src/plan.js';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
@@ -164,10 +165,11 @@ describe('L626 — niveau 3 : le hook après écriture et la porte', () => {
     expect(claudeHookContext('bornes', { ...ecrit(d, 'README.md'), cwd: join(d, 'src') })?.text).toContain('README.md : 5 lignes');
   });
 
-  it('R5 — hooks.json branche le hook sur Write, Edit et MultiEdit après écriture', () => {
+  it('R5 — hooks.json branche le hook sur Write, Edit et MultiEdit après écriture, et c’est l’entrée que les sessions de vague reçoivent par --settings (BOUNDS_HOOK)', () => {
     const hooks = JSON.parse(lire('hooks/hooks.json')).hooks.PostToolUse as { matcher: string; hooks: { command: string }[] }[];
     const h = hooks.find((x) => x.hooks.some((y) => y.command.includes('claude-hook bornes')));
     expect(h?.matcher).toBe('Write|Edit|MultiEdit');
+    expect(h).toEqual(BOUNDS_HOOK);
   });
 
   it('R6 — la porte joue les tests déclarés pour les fichiers touchés, une fois chacun, sans en ajouter pour un fichier non lié', () => {

@@ -58,6 +58,8 @@ export interface StepSpec {
   playwright?: boolean;
   /** Plugins (`enabledPlugins`) de l'utilisateur et du projet désactivés dans la session (L398) : leurs hooks et leurs skills ne chargent plus son contexte ; ses autres réglages restent. Absent ou vide : pas de `--settings`. */
   disablePlugins?: readonly string[];
+  /** Le hook de bornes (L626) joint au `--settings` de la session : `cadence claude-hook bornes` après Write, Edit et MultiEdit. Les plugins étant coupés (L398), celui de `hooks/hooks.json` ne se charge pas ; les étapes qui écrivent les fichiers du lot (implement, fix) le reçoivent ainsi. */
+  boundsHook?: boolean;
   /** Étape lancée par `claude-local` (modèle Ollama de Big-Blue, hors quota) : arguments de `buildLocalArgs`, jamais de relance `--resume` (L146). */
   local?: boolean;
   /** Dossier temporaire de la session (L242) : exporté en `TMPDIR`, hors du dépôt, pour que ses journaux et dumps n'y salissent pas l'arbre de travail. */
@@ -195,14 +197,26 @@ export function enabledPlugins(files: string[]): string[] {
   return [...ids];
 }
 
+/** L'entrée PostToolUse du hook de bornes (L626), la même que dans `hooks/hooks.json` (test `bornes-fichiers-l626`) : jointe au `--settings` des sessions implement et fix, où le plugin `cadence` est coupé avec les autres (L398). `cadence` est celui de `tool/bin` de la vague, en tête du PATH de la session. */
+/** Les étapes qui reçoivent le hook de bornes (L626) : celles qui écrivent les fichiers du lot. La sonde n'écrit que des tests, spec et accept une fiche et un oracle. */
+export const BOUNDS_HOOK_STEPS: readonly SessionKind[] = ['implement', 'fix'];
+
+export const BOUNDS_HOOK = { matcher: 'Write|Edit|MultiEdit', hooks: [{ type: 'command', command: 'command -v cadence >/dev/null 2>&1 && cadence claude-hook bornes || true' }] };
+
 /**
- * `--settings` d'une session (L398) : un JSON qui ne porte que les plugins de l'utilisateur et du projet à `false`. Un plugin désactivé n'enregistre
+ * `--settings` d'une session (L398) : un JSON qui ne porte que les plugins de l'utilisateur et du projet à `false` et, pour une étape qui écrit les fichiers du lot, le hook de bornes (`BOUNDS_HOOK`, L626). Un plugin désactivé n'enregistre
  * ni ses hooks (celui de démarrage de superpowers injectait 3,4 ko) ni ses skills : le contexte qu'une session, qui n'en appelle aucun, ne paie plus
  * (mesure : `docs/mesures/contexte-session-2026-10-28.md`). Rien d'autre n'est touché ni relayé : les réglages de l'utilisateur et du projet
  * s'appliquent avec leur précédence normale (`--settings` l'emporte sur un projet qui active le plugin, vérifié le 2026-10-28), ses hooks compris.
  * En argument, pas dans un fichier : des identifiants seulement (`nom@marketplace`, aucun secret), 1 000 plugins pèsent 50 ko sous la limite d'un argument Linux (128 ko).
  */
-const settingsArgs = (spec: StepSpec): string[] => (spec.disablePlugins?.length ? ['--settings', JSON.stringify({ enabledPlugins: Object.fromEntries(spec.disablePlugins.map((id) => [id, false])) })] : []);
+const settingsArgs = (spec: StepSpec): string[] => {
+  const settings: Record<string, unknown> = {};
+  if (spec.disablePlugins?.length) settings.enabledPlugins = Object.fromEntries(spec.disablePlugins.map((id) => [id, false]));
+  if (spec.boundsHook) settings.hooks = { PostToolUse: [BOUNDS_HOOK] };
+  return Object.keys(settings).length ? ['--settings', JSON.stringify(settings)] : [];
+};
+
 
 /** Le corps commun d'une session `claude -p` et de sa relance : prompt, schéma, modèle, effort, agent restreint, puis (après `session`) mode de permission, dossiers, plugins désactivés, interdits et MCP. `session` : `--session-id <id>` ou `--resume <id>`. */
 function claudeArgs(spec: StepSpec, agents: Record<string, AgentDef>, prompt: string, session: ['--session-id' | '--resume', string]): string[] {

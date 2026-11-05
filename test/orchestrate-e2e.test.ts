@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { orchestrate, realOrchestrateDeps } from '../src/orchestrate/command.js';
 import { spawnReexec } from '../src/orchestrate/snapshot.js';
 import { cadenceHome, liveWaves } from '../src/orchestrate/registry.js';
-import { projectLogDir } from '../src/orchestrate/launch.js';
+import { BOUNDS_HOOK, projectLogDir } from '../src/orchestrate/launch.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { Plan } from '../src/plan.js';
 import { fakeApp } from './fake-app.js';
@@ -102,8 +102,9 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
       const argv: string[] = c.argv;
       expect(argv.filter((a) => a === '--settings'), c.kind).toHaveLength(1);
       const settings = argv[argv.indexOf('--settings') + 1]!;
-      expect(JSON.parse(settings)).toEqual({ enabledPlugins: { 'superpowers@m': false, 'projet@m': false } });
-      expect(settings).not.toMatch(/SECRET|KUBECONFIG|permissions|hooks/);
+      // L626 : la session implement reçoit en plus le hook de bornes (le plugin cadence étant coupé) ; la revue, qui n'écrit pas, non.
+      expect(JSON.parse(settings), c.kind).toEqual({ enabledPlugins: { 'superpowers@m': false, 'projet@m': false }, ...(c.kind === 'implement' ? { hooks: { PostToolUse: [BOUNDS_HOOK] } } : {}) });
+      expect(settings).not.toMatch(/SECRET|KUBECONFIG|permissions|PreToolUse/);
       expect(argv).not.toContain('--setting-sources');
       expect(argv).toEqual(expect.arrayContaining(['--strict-mcp-config', '--mcp-config']));
     }
@@ -112,13 +113,15 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
     expect(calls[0].kubeconfig).toBe('/dev/null');
   });
 
-  it('L398 — sans plugin activé, aucune session ne reçoit --settings ni --setting-sources', async () => {
+  it('L398/L626 — sans plugin activé, la revue ne reçoit ni --settings ni --setting-sources ; la session implement reçoit --settings avec le seul hook de bornes', async () => {
     const s = setup({ implement: [impl], review: [{}] });
     expect((await s.cli('proj:L1')).code).toBe(0);
-    for (const c of s.calls()) {
-      expect(c.argv).not.toContain('--settings');
-      expect(c.argv).not.toContain('--setting-sources');
-    }
+    const calls = s.calls();
+    expect(calls.map((c) => c.kind)).toEqual(['implement', 'review']);
+    for (const c of calls) expect(c.argv).not.toContain('--setting-sources');
+    expect(calls[1].argv).not.toContain('--settings');
+    const argv: string[] = calls[0].argv;
+    expect(JSON.parse(argv[argv.indexOf('--settings') + 1]!)).toEqual({ hooks: { PostToolUse: [BOUNDS_HOOK] } });
   });
 
   it('(L61/t1) variables de relance héritées d\'une autre vague : ignorées, et aucune session ne les voit', async () => {

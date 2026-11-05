@@ -20,8 +20,7 @@ commands (its CLAUDE.md names them), never with `raf start|done|note|ux|review`.
   orchestrate sessions plus subagents never exceed the cap. A wave already caps itself; before starting a
   subagent, check `cadence orchestrate --status`, and while a wave runs, start none beyond the free slots. Read the cap and the
   free slots, do not compute them: `cadence orchestrate --status` and `cadence lead tour` print
-  `créneaux libres : N sur M` (M is the configured cap; the registry subtracts, for each live wave, min(cap,
-  repositories it still holds) and one slot per lead session (below) from the M slots; `lead tour` always prints it, so `3 sur 3` means all M are free). `lead release` prints the line again after handing the session back, with the ready lots that can fill the slot and a `⚠ N créneau(x) libre(s)` while a slot is empty: start a lot then, do not leave the slot empty.
+  `créneaux libres : N sur M` (M is the configured cap; the registry subtracts, for each live wave, the smaller of the common cap and what it holds, and one slot per lead session (below), from the M slots — the formula is written once in docs/concepts.md#slots-and-holds; `lead tour` always prints it, so `3 sur 3` means all M are free). `lead release` prints the line again after handing the session back, with the ready lots that can fill the slot and a `⚠ N créneau(x) libre(s)` while a slot is empty: start a lot then, do not leave the slot empty.
   **A session you start by hand counts too** (a fix subagent, a review, a QA pass launched outside a wave): the registry does not
   see it, so declare it. Right before starting it, `cadence lead hold <label> [--ttl minutes]` (60 minutes by default,
   the label names the session: `correctif-L12`); as soon as it comes back, `cadence lead release <label>`. While it is held, both

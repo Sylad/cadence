@@ -2556,6 +2556,11 @@ lots:
     estimate: 0.25
     after: [ L622 ]
     created: 2026-11-05
+  - id: L626
+    title: "Contrôles rapides avant toute porte : un lot qui touche README.md, CHANGELOG.md, docs/ ou package.json joue en quelques secondes les tests qui lisent ces fichiers (readme-accueil, changelog, bornes de pages, files du paquet), dès la porte d'écriture et avant la suite complète d'intégration ; 05-11 : L602 et L622 refusés pour une ligne de README après 25 min de porte, L601 pour concepts.md, à compléter par une liste déclarée, faute de lien d'import"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-05
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -2366,6 +2366,7 @@ lots:
     estimate: 0.5
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "conforme : corrections vérifiées, rien de cassé, 3 constats mineurs en notes du lot — orchestré (vague 2026-11-05-1425-cad, 1 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : compliant : le rebase n'a déplacé que l'entrée CHANGELOG de L603 ; rien de cassé (commits relus : a23e588, 963d615, b2a95cd, 736dcef, 302f7cd)", commit: 302f7cd10d74f0c468cbaad84e2338d5db8981a4 }
   - id: L604
     title: "Une seule documentation de la bande (E13 de docs/etudes/ensemble-2026-11.md) : README du plugin et docs/cadence-hud.md ne font plus qu'un"
     status: doing

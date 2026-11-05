@@ -48,7 +48,7 @@ Details: [docs/skills.md](docs/skills.md) and [docs/cadence-hud.md](docs/cadence
 ## Where to read more
 
 - [docs/raf.md](docs/raf.md): the plan, its commands, its file, and [a lot of the lead](docs/raf.md#a-lot-of-the-lead-local-l519).
-- [Waves](docs/orchestrate.md): [probe](docs/orchestrate.md#the-edge-case-probe-orchestrateprobe-l497), [express](docs/orchestrate.md#express-lane-l519), [reviews that converge](docs/orchestrate.md#reviews-converge-follow-ups-and-a-wall-cap-l622) (follow-ups instead of passes, wall cap per lot).
+- [Waves](docs/orchestrate.md): [probe](docs/orchestrate.md#the-edge-case-probe-orchestrateprobe-l497), [express](docs/orchestrate.md#express-lane-l519).
 - [Brief grid and pre-check reading](docs/mesures/brief-implementation-enrichi-avant-apres.md): grid of the code-reviewer in the `implement` brief (L523).
 - [docs/deliver.md](docs/deliver.md): CI, deploy, verify, mark lots delivered (delivered ≠ finished); [remote gate](docs/remote-gate.md).
 - [docs/spec.md](docs/spec.md): screen and back-end sheets.

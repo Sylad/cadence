@@ -2459,6 +2459,7 @@ lots:
     estimate: 0.1
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-05-1425-cad, 0 passe(s) de correction)", commit: c2a808939dcef8cbfe4ccb5f9c283e79b3cc2345, reporte: { de: 2310ab857f4eb571bc32cf2448dd76e36f98f04d, vers: c2a808939dcef8cbfe4ccb5f9c283e79b3cc2345, patchId: b73c4c9d42b5a97eb2114ec5c4bce16942b1ae6a } }
   - id: L617
     title: "Porte déportée sur mini-blue pour cadence (orchestrate.gate.host, docs/remote-gate.md) : préparer WSL de mini-blue (node, git, clé), déclarer l'hôte, jouer la porte des lots là-bas ; mesurer avant et après sur trois lots réels, durée de porte et charge de Big-Blue (05-11 : 8 à 13 min sous charge 43, environ 4 min seule) ; avec repli local si l'hôte ne répond pas"
     status: doing

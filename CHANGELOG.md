@@ -94,6 +94,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - A lot that touches `CHANGELOG.md` plays `test/changelog.test.ts` in its targeted gate (L616, [docs/orchestrate.md](docs/orchestrate.md), « Targeted gates after a write »): no test imports the changelog, so the targeted run never saw an entry written under the last published version instead of `[Unreleased]` (L582, L591, L613 on 05-11, refused only at the integrated tip). The implementation brief names the rule.
 - `cadence orchestrate --integrate`: the plan written after resolving a plan-only rebase conflict keeps the plan's style like `Plan.save` (L611, `lineWidth: 0`, and the `-` of the lots in the parent key's column when the repository's plan has them there): a rebase turned `.cadence/raf.yaml` from 2 399 to 9 320 lines, content intact, and the short review then handed the lot back (05-11, L592). A test measures the size of the plan after the resolution.
 
+### Added
+
+- [docs/config.md](docs/config.md) (L602): one page lists the four folders cadence writes to (`.cadence/`, `.cadence/runs/<wave>/`, `~/.cadence/orchestrate`, `~/.local/share/cadence`) with what each holds, whether it is versioned and the variable that moves it (`CADENCE_HOME` does not move `~/.local/share/cadence`), and one table of the ten gates says where each is declared (the plan or `cadence.yaml`) and what it refuses. Linked from the README, `docs/overview.md` and `docs/fonctionnement.md`.
+
 ## [1.55.0] - 2026-11-05
 
 ### Added

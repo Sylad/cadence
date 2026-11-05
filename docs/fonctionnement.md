@@ -68,6 +68,8 @@ slightest doubt. The step-by-step version, with its three lanes, is in [lead.md]
 
 ## 4. Putting cadence itself in service
 
+Every folder cadence writes to, this one included, is listed in [config.md](config.md#where-cadence-writes).
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="fonctionnement-service-dark.svg">
   <img alt="The cadence code on the PATH is a separate worktree, updated only by npm run service on a reviewed sha" src="fonctionnement-service-light.svg">

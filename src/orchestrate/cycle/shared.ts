@@ -33,12 +33,13 @@ export function blockingConstats(rep: ReviewReport, source: 'code' | 'ux'): Cons
 }
 
 /**
- * Revue de maquette de rang 2 ou plus (L562) : les majeurs marqués strictement `inchange: true` ne comptent pas pour la non-conformité.
- * Rend le rapport sans eux (constats et total annoncé de majeurs) et leurs lignes pour le tableau en suite du lead ; en revue 1 le rapport est rendu tel quel.
+ * Revue de rang 2 ou plus, de maquette (L562) ou de code (L622) : les majeurs marqués strictement `inchange: true` ne comptent pas pour la non-conformité.
+ * Rend le rapport sans eux (constats et total annoncé de majeurs) et leurs lignes `[suite <source>]` pour le tableau en suite du lead ; en revue 1 le rapport est rendu tel quel.
+ * Un bloquant marqué compte toujours : seul un majeur se met de côté.
  */
-export function setAsideUnchanged(rep: ReviewReport, rank: number): { rep: ReviewReport; aside: { line: string; texte: string }[] } {
+export function setAsideUnchanged(rep: ReviewReport, rank: number, source: 'ux' | 'code' = 'ux'): { rep: ReviewReport; aside: { line: string; texte: string }[] } {
   const marked = (k: ReviewReport['constats'][number]) => rank >= 2 && k.gravite === 'majeur' && k.inchange === true;
-  const aside = rep.constats.filter(marked).map((k) => ({ line: `[suite ux] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`, texte: k.texte }));
+  const aside = rep.constats.filter(marked).map((k) => ({ line: `[suite ${source}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`, texte: k.texte }));
   if (!aside.length) return { rep, aside };
   return { rep: { ...rep, majeurs: Math.max(0, rep.majeurs - aside.length), constats: rep.constats.filter((k) => !marked(k)) }, aside };
 }

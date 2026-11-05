@@ -1,6 +1,6 @@
 import { type LotState, lotKey, type Constat } from '../state.js';
 import { type SessionKind } from '../launch.js';
-import { type LotCtx, workDir as wd, MAX_PASSES_CONVERGING, MAX_PASSES, stop, save } from './ctx.js';
+import { type LotCtx, workDir as wd, MAX_PASSES_CONVERGING, MAX_PASSES, stop, save, propose } from './ctx.js';
 import { planLoader } from '../../config.js';
 import { fixAffordable, lotSpent, halted, suspend } from './budget.js';
 import { type AppState, startApp, APP_TIMEOUT_S } from '../app.js';
@@ -10,8 +10,10 @@ import { gitCommonDir } from '../../git.js';
 import { join } from 'node:path';
 import { conclude } from './integrate-lot.js';
 import { session, badReport } from './session.js';
-import { type ReviewReport, checkShape, REVIEW_SCHEMA, summarize } from '../schemas.js';
-import { addProposals, blockingConstats, minorConstats, withoutLine, minorLine } from './shared.js';
+import { type ReviewReport, checkShape, REVIEW_SCHEMA } from '../schemas.js';
+import { addProposals, blockingConstats, minorConstats, minorLine } from './shared.js';
+import { settleMinorProposals } from './minor-proposals.js';
+import { countReview, wallReason } from './converge.js';
 import { handBackWithoutFinding } from '../no-finding.js';
 /** Mention « sans commit » du verdict quand la passe des mineurs n'a rien commité (l'UX finale conclut alors à la place de la passe). */
 const noCommitNote = (l: LotState): string => (l.warnings.some((w) => w.startsWith('passe des mineurs sans commit')) ? ' sans commit' : '');
@@ -82,6 +84,12 @@ export function toFix(c: LotCtx, constats: Constat[], what: string): void {
   const counts = l.reviewCounts ?? [];
   const converging = what === 'revue non conforme' && counts.length >= 2 && counts[counts.length - 1] === 1 && counts[counts.length - 1] < counts[counts.length - 2];
   const cap = converging ? MAX_PASSES_CONVERGING : MAX_PASSES;
+  // Plafond de mur (L622) : deux fois la durée attendue de l'estimate ; au-delà, le lot est rendu avec ses constats (l.constats, posés plus haut), même pour un bloquant.
+  const overWall = wallReason(c, Date.now());
+  if (overWall) {
+    stop(c, 'handed-back', `${finDeCycleOutcome(what, l.pass)} ; ${overWall}`);
+    return;
+  }
   if (l.pass >= cap) {
     const text = finDeCycleOutcome(what, l.pass);
     const esc = c.config.escalation;
@@ -188,7 +196,8 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     badReport(c, done.step, e);
     return;
   }
-  const summary = summarize(rep, done.after.head ?? '', done.others.length ? Object.fromEntries(done.others.map((o) => [o.repo.rel, o.after.head ?? ''])) : undefined);
+  // Revue de code de rang 2 ou plus (L622) : un majeur marqué `inchange: true` va en suite pour le lead et ne compte plus ; un bloquant compte toujours. Le rang est celui de la revue de code (l'UX n'a pas de marque).
+  const { counted, summary, aside } = countReview(rep, kind, l, done.after.head ?? '', done.others.length ? Object.fromEntries(done.others.map((o) => [o.repo.rel, o.after.head ?? ''])) : undefined);
   if (kind === 'ux') {
     l.ux = summary;
     addProposals(c, rep, 'ux', summary.head);
@@ -202,6 +211,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     return;
   }
   l.code = summary;
+  for (const a of aside) propose(c, a.line);
   const w = c.wave;
   if (l.escalation?.stage === 'fix') {
     // La revue neuve de l'escalade (L337) est lue : conforme, le lot reprend sa fin ordinaire ; sinon toFix le rend.
@@ -224,22 +234,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   const noBudget = wanted && (w.budget.exhausted || !fixAffordable(l)) && !w.incident && !w.quota.hit;
   const minorPass = wanted && !noBudget;
   if (noBudget) l.warnings.push(`${w.budget.exhausted ? 'budget atteint' : 'budget du lot trop juste pour payer la correction et la revue courte qui la suivrait'} : la passe des mineurs n'a pas eu lieu, mineurs rendus en propositions`);
-  // Les mineurs confiés à la passe ont pu être proposés par une revue non conforme antérieure : si la revue qui la suit est
-  // conforme, ils sont traités et ne restent pas en propositions (ceux que cette revue signale encore sont ajoutés juste après).
-  if (l.minorPass && !minorPass && summary.conforme && l.minorLines?.length) {
-    // Chaque mineur confié retire UNE proposition : la même ligne d'abord, sinon une de même fichier et même texte (le correctif a pu décaler la ligne).
-    // Un autre mineur de même fichier et même texte, à une autre ligne, reste donc proposé. Limite connue : un texte reformulé n'est pas reconnu et reste proposé.
-    const left = [...l.proposals];
-    const take = (match: (p: string) => boolean) => {
-      const i = left.findIndex(match);
-      if (i >= 0) left.splice(i, 1);
-      return i >= 0;
-    };
-    const rest = l.minorLines.filter((m) => !take((p) => p === m));
-    for (const m of rest) take((p) => withoutLine(p) === withoutLine(m));
-    l.proposals = left;
-    l.minorLines = [];
-  }
+  settleMinorProposals(l, minorPass, summary.conforme);
   addProposals(c, rep, 'code', summary.head, !minorPass);
   if (summary.conforme) (l.reviewCounts ??= []).push(0); // une revue conforme compte pour 0 dans la comparaison de la convergence (L205)
   if (minorPass) {
@@ -259,7 +254,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     } else return () => conclude(c, summary);
     return;
   }
-  const constats = blockingConstats(rep, 'code');
+  const constats = blockingConstats(counted, 'code');
   if (handBackWithoutFinding(c, constats, summary, stop)) return;
   (l.reviewCounts ??= []).push(constats.length);
   toFix(c, constats, 'revue non conforme');

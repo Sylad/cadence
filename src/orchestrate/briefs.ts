@@ -22,6 +22,8 @@ export interface BriefVars {
   choix: string;
   /** Résultat des tests et du build lancés par le programme au HEAD relu (vide : le relecteur les lance lui-même). */
   checks: string;
+  /** Revue de code de rang 2 ou plus (L622) : la consigne `inchange` de `convergeText()` ; vide en revue 1 et ailleurs. */
+  converge?: string;
   /** Consigne de l'entrée Nouveautés : `newsText(lot)` pour un lot `visible` (avec le dossier Playwright de la vague quand une session orchestrée l'a), vide sinon. */
   news: string;
   /** Dossier de sortie Playwright de la vague (fix et fix-minors d'un lot `visible`, pour retrouver une capture) ; vide sinon. */
@@ -197,7 +199,7 @@ const FILES: Record<BriefName, string> = {
 };
 
 /** Les variables dont l'absence se rend par un texte vide : le brief d'une étape qui n'en a pas l'usage ne les fournit pas. */
-const BLANK_WHEN_ABSENT = ['repos', 'integration', 'docs', 'elsewhere', 'ack', 'spec', 'decisions', 'accept', 'maquette', 'tmp', 'workers', 'gate', 'shots', 'fiche', 'express'] as const;
+const BLANK_WHEN_ABSENT = ['repos', 'integration', 'docs', 'elsewhere', 'ack', 'spec', 'decisions', 'accept', 'maquette', 'tmp', 'workers', 'gate', 'shots', 'fiche', 'express', 'converge'] as const;
 
 /** Texte des gabarits, lu une fois : une vague rend tous ses briefs depuis le même instantané. */
 export type Templates = Record<BriefName, string>;

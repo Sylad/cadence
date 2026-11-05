@@ -8,6 +8,7 @@ Goal of the lot (it takes precedence over the title in the plan): {{objectif}}
 {{fiche}}
 {{ux}}
 {{checks}}
+{{converge}}
 {{docs}}
 {{choix}}
 A lot with a sealed acceptation (an `acceptation-<lot>.json` next to its spec file): re-read each assertion of its sealed tests against the sentence of the rule it cites. An assertion with no cited sentence, or that asserts more than that sentence, is a *major* finding ("sealed test stronger than its rule"): only the lead corrects it (`cadence spec reseal`), never the session.

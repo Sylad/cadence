@@ -125,10 +125,19 @@ export const EXPRESS_BRIEF = [
  * Consigne du correctif visible (L633, issue #43), sans maquette : `implement` prend la capture avant son changement puis après, la revue UX
  * (`review-small` ou `ux`) ne relit que le diff et compare ces captures. `captureDir` : le dossier de sortie Playwright de la vague.
  */
-export function visibleFixText(step: 'implement' | 'review', captureDir: string): string {
-  if (step === 'implement')
-    return `Visible fix (L633): this lot changes a few properties of an existing screen, so there is no mockup. Capture the screen before your change, then again after it, at 1440 and 390 px width, in the same state, each named with its full path (\`${captureDir}/avant-<state>-<width>px.png\`, \`${captureDir}/apres-<state>-<width>px.png\`). The UX review compares the two.`;
-  return `Visible fix (L633): this lot changes a few properties of an existing screen, with no mockup. Review the diff only: the lines the commits of the lot change, judged on the captures before and after (\`${captureDir}/avant-*\`, \`${captureDir}/apres-*\`; re-capture a state yourself when one is missing). Do not audit the rest of the screen, which the lot does not touch.`;
+export function visibleFixText(step: 'implement' | 'review', captureDir: string, ux?: { url?: string; command?: string }): string {
+  if (step === 'implement') {
+    const app = [
+      ux?.url ? `The running app is at ${ux.url}.` : '',
+      ux?.command ? `Start the app with: ${ux.command} (from the repository root), and stop it when you are done.` : '',
+    ].filter(Boolean);
+    return [
+      `Visible fix (L633): this lot changes a few properties of an existing screen, so there is no mockup. Capture the screen before your change, then again after it, at 1440 and 390 px width, in the same state, each named with its full path (\`${captureDir}/avant-<state>-<width>px.png\`, \`${captureDir}/apres-<state>-<width>px.png\`). The UX review compares the two.`,
+      ...app,
+      'Take the before capture first: once the change is committed it can no longer be taken. If the screen cannot be captured (the application does not start, the page is protected, no way to run it is declared), say so under "nonVerifie" and never invent a capture.',
+    ].join(' ');
+  }
+  return `Visible fix (L633): this lot changes a few properties of an existing screen, with no mockup. Review the diff only: the lines the commits of the lot change, judged on the captures before and after (\`${captureDir}/avant-*\`, \`${captureDir}/apres-*\`; re-capture an after state yourself when one is missing; a missing before capture cannot be retaken on a tree that already carries the change: list it under "nonVerifie"). Do not audit the rest of the screen, which the lot does not touch.`;
 }
 
 /** Consigne `{{news}}` d'un lot express `visible` : pas d'entrée Nouveautés par lot, la capture seule (le lead regroupe les entrées à la livraison). */

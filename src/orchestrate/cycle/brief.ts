@@ -62,9 +62,9 @@ function uxText(c: LotCtx): string {
 }
 
 /** Correctif visible (L633) : capture avant et après dans le brief `implement` (`news`), revue du seul diff dans celui de `ux` et de `review-small` (`ux`) ; rien pour les autres lots et étapes. */
-function visibleFixVars(kind: SessionKind, l: LotCtx['lot'], lot: { screen?: Screen }, captureDir: string, vars: Pick<BriefVars, 'news' | 'ux'>): Partial<Pick<BriefVars, 'news' | 'ux'>> {
-  if (!visibleFix(l, lot)) return {};
-  if (kind === 'implement') return { news: [vars.news, visibleFixText('implement', captureDir)].join('\n') };
+function visibleFixVars(kind: SessionKind, fix: boolean, captureDir: string, vars: Pick<BriefVars, 'news' | 'ux'>, ux?: { url?: string; command?: string }): Partial<Pick<BriefVars, 'news' | 'ux'>> {
+  if (!fix) return {};
+  if (kind === 'implement') return { news: [vars.news, visibleFixText('implement', captureDir, ux)].join('\n') };
   if (kind === 'ux' || kind === 'review-small') return { ux: [vars.ux, visibleFixText('review', captureDir)].filter(Boolean).join('\n') };
   return {};
 }
@@ -218,7 +218,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = l.express ? expressNewsText(pwDir) : newsText(l.lot, pwDir);
     vars.captures = capturesText(pwDir);
-    Object.assign(vars, visibleFixVars(kind, l, lot, pwDir, vars));
+    Object.assign(vars, visibleFixVars(kind, visibleFix(l, lot), pwDir, vars, c.config.ux));
   }
   if (mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright) vars.shots = shotsText(playwrightDir(c.wave.store.lotDir(l.project, l.lot)));
   vars.fiche = hasSpecStage(l) ? avalOf(c, kind) : '';

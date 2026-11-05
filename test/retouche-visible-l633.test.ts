@@ -86,6 +86,25 @@ describe('R2 — le correctif : capture avant et après, revue du seul diff', ()
     expect(b).toContain('390');
   });
 
+  it('R2 — le brief implement donne l\'URL et la commande de orchestrate.ux, et le repli nonVerifie sans capture avant', async () => {
+    const h = await cycle({ title: 'un correctif', estimate: 0.3, visible: true }, { ux: { url: 'http://localhost:4200', command: './run-ux.sh' } });
+    const b = brief(h, 'implement');
+    expect(b).toContain('http://localhost:4200');
+    expect(b).toContain('./run-ux.sh');
+    expect(b).toMatch(/cannot be captured.*nonVerifie.*never invent/s);
+  });
+
+  it('R2 — sans orchestrate.ux, le brief implement du correctif dit de lister la capture manquante sous nonVerifie', async () => {
+    const h = await cycle({ title: 'un correctif', estimate: 0.3, visible: true }, { ux: undefined });
+    expect(brief(h, 'implement')).toMatch(/cannot be captured.*nonVerifie/s);
+  });
+
+  it('R2 — la revue signale une capture avant absente sous nonVerifie au lieu de la refaire sur l\'arbre modifié', async () => {
+    const h = await cycle({ title: 'un correctif', estimate: 0.3, visible: true });
+    const b = brief(h, 'review-small');
+    expect(b).toMatch(/avant-\*.*nonVerifie/s);
+  });
+
   it('R2 — la revue UX (review-small d\'un petit lot) ne relit que le diff', async () => {
     const h = await cycle({ title: 'un correctif', estimate: 0.3, visible: true });
     const b = brief(h, 'review-small');

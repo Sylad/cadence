@@ -2,22 +2,22 @@
 
 # Overview: the tools and the skills
 
-The longer introduction the README used to open with, and everything the README handed over to keep itself a short home page (L326): the introduction in full, the start in detail, the plugin installation, the map of the documentation and the four tools in short.
+The longer introduction the README used to open with, and everything the README handed over to keep itself a short home page (L326): the introduction in full, the start in detail, the plugin installation, the map of the documentation and the tools in short.
 
 A small working method that lives in your repository. Solo developers and
 AI-assisted sessions lose track of *what is left to do* and *what each commit
 was for*; cadence keeps both in plain files next to the code.
 
-Four tools:
+The tools:
 
 - **raf** (French *reste à faire*, "what is left to do"): the plan, linked to your commits;
 - **news**: a user-facing changelog with screenshots, tied to the plan;
 - **session**: the facts to start and to close a work session;
 - **deliver**: wait for the CI of the pushed commit, deploy, then **verify the effect**.
 
-And four [Claude Code](https://claude.com/claude-code) skills that turn them
-into rituals — `session-start`, `session-close`, `deliver`, and `lead` to pilot
-several projects through subagents — plus three reviewer agents: `ux-reviewer`
+And [Claude Code](https://claude.com/claude-code) skills that turn them
+into rituals — `session-start`, `session-close`, `deliver`, `lead` to pilot
+several projects through subagents, and `orchestrate` — plus the reviewer agents: `ux-reviewer`
 (no user-facing change is done before its usability review) and `code-reviewer`
 (no lot with commits is done before its code review), each behind an opt-in
 gate, and `qa-reviewer`, which walks the delivered app in a real browser and
@@ -32,7 +32,7 @@ A small working method that lives in your repository: a versioned plan linked to
 Solo developers and AI-assisted sessions lose track of *what is left to do* and *what each commit was for*; cadence keeps both in plain files next to the code.
 **raf** is the plan, **news** the changelog with screenshots, **session** the facts to open and close a day, **deliver** waits for the CI, deploys, then checks the effect.
 **orchestrate** runs a lot through spec, review, code and UX passes, each in its own session (with a short `TMPDIR` of its own, `<os tmpdir>/cadence-<hash>`, outside the repository and the wave's state folder, removed at the end of each pass of the lot; short because Chrome's Unix sockets live there and are limited to 107 characters); the **lead** decides, re-verifies and delivers. The **worktree mode** (`orchestrate.worktrees: true` in `cadence.yaml`: independent lots of one repository in parallel, each in its own git worktree) is on in cadence's own `cadence.yaml` since 2026-10-25 (L320, after the trials L310 and L316: −45 % and −22 % of wall time, three automatic integrations without incident); a project that does not set the key keeps one lot at a time in the repository ([docs/orchestrate.md](orchestrate.md#one-worktree-per-lot-orchestrateworktrees-l279)).
-Four [Claude Code](https://claude.com/claude-code) skills, three reviewer agents and a status-band plugin (`cadence-hud`) turn it into rituals.
+[Claude Code](https://claude.com/claude-code) skills, reviewer agents and a status-band plugin (`cadence-hud`) turn it into rituals.
 
 ## Start
 
@@ -51,7 +51,7 @@ The repository is its own [Claude Code](https://claude.com/claude-code) plugin m
 
 ```
 /plugin marketplace add Sylad/cadence
-/plugin install cadence@cadence        # skills /cadence:session-start, session-close, deliver, lead, orchestrate + the three reviewer agents
+/plugin install cadence@cadence        # skills /cadence:session-start, session-close, deliver, lead, orchestrate + the reviewer agents
 /plugin install cadence-hud@cadence    # the status band above the prompt
 ```
 
@@ -77,7 +77,7 @@ The two plugins are independent. `cadence@cadence` carries the rituals, which ca
 Also: [news](news.md) (changelog, UX, code and QA reviews, documentation that follows the code), [quality](qualite.md), [session](session.md), [corrections](corrections.md), [perf](perf.md), [skills and agents](skills.md), [cadence-hud](cadence-hud.md), [releasing](releasing.md), [overview](overview.md), [the notions, for a human](concepts.md), [how it all works](fonctionnement.md) (four figures), [the study of the whole, November 2026](etudes/ensemble-2026-11.md) (L594: verdict, map of the notions, target architecture, ranked gaps).
 
 <details>
-<summary>The four tools in short</summary>
+<summary>The tools in short</summary>
 
 - **raf** (French *reste à faire*, "what is left to do"): the plan, linked to your commits by the lot id in the message, computed from `git log` and never stored.
 - **news**: a user-facing changelog with screenshots, tied to the plan; a lot is not done until its entry is written.

@@ -18,7 +18,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 - **The plan file** (`.cadence/raf.yaml`, or the legacy `docs/plan/raf.yaml`): `project`, `prefix`, `since`, `ignore`, `lots` (with their
   fields, `tasks`, `notes`, `repos`) and `acknowledged`, and the plan formats `plan:` in `cadence.yaml` can read.
   The `version` key is kept in the file but ignored (`src/plan.ts` does not read it): it is not a schema version.
-- **The names of the skills** (`session-start`, `session-close`, `deliver`, `lead`) **and of the agents**
+- **The names of the skills** (`session-start`, `session-close`, `deliver`, `lead`, `orchestrate`) **and of the agents**
   (`ux-reviewer`, `code-reviewer`, `qa-reviewer`, `doc-keeper`).
 
 **Experimental** (documented, read by the code, but the contract is not frozen: a release may change or replace it, announced under *Changed* in the [CHANGELOG](../CHANGELOG.md))
@@ -44,3 +44,11 @@ Promoting one of these to *Guaranteed* is a minor change, and calling a surface 
 
 There is no schema version and no migration: a file written by an earlier release keeps working, and a key a
 release adds is optional.
+
+## Languages
+
+The documentation (`README`, `docs/*.md`) and the **names** — commands, options, keys, files and folders — are in English; the **messages** (outputs, refusals, briefs, agents, skills, code comments, the CHANGELOG) are in French. The tool is not a French CLI: it speaks French and is named in English.
+
+A few names are French and are guaranteed like any other: the keys `maquette`, `maquetteReviews` and `fiche` under `orchestrate` in `cadence.yaml`, and the options `--quoi`, `--largeur`, `--seuil`, `--porteur`, `--sans-rendu` and `--cache-sous-causes`. They keep their names until a major version, and no alias is added: two names for one key would be one more overlap. The files `acceptation.json`, `qualite-baseline.json` and the folder `docs/nouveautes/` are French too.
+
+A new name is in English: it is the language of almost every command and key, and naming new ones in French would deepen the mix.

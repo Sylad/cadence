@@ -2357,7 +2357,7 @@ lots:
     notes:
       - { date: 2026-11-05, text: "à traiter aussi : la bande dit « 9 prêts » pour des lots déjà clos au plan, le panneau dit « clos » (capture de Sylvain du 05-11)" }
     started: 2026-11-05
-    review: { date: 2026-11-05, verdict: "conforme : verdict de la vague tenu ; concepts.md resserré sous 15 Ko (cible de l'étude, §7), notions et figures gardées, 46 tests ciblés verts", commit: 5afa2e7d81fbd276ae6c3a742921ac2030934871 }
+    review: { date: 2026-11-05, verdict: "compliant (2 minor notes: L609 sheet R6 now stale, plan-sense « lot prêt » left in a few messages) — orchestré (vague 2026-11-05-1425-cad, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le code et les tests du lot tiennent. Le remplacement de R6 de L609 est justifié : ce test fixait le comportement que la note du lot demande de corriger. 2 mineurs en notes : des textes de sortie et des docs disent encore « lot prêt » pour le plan.", commit: a59177a76ff46823a1ffbbd34beef77fc91b9b4f }
   - id: L602
     title: "Où cadence écrit, et les portes (E6 + E14 de docs/etudes/ensemble-2026-11.md) : une page liste les quatre dossiers d'état, un tableau réunit les trois endroits où une porte se déclare"
     status: doing

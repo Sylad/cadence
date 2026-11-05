@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { isNode, isScalar, parse, parseDocument, type Document } from 'yaml';
 import { defaultPlan, readDocsConfig, readHookConfig, readMigrateConfig, readNewsConfig, readOrchestrateConfig, readPlanConfig, readReferencesConfig, readSessionConfig } from './config.js';
+import { readBounds } from './bounds.js';
 import { readPerfConfig } from './perf-config.js';
 import type { Day } from './dates.js';
 import { parseDeliverConfig } from './deliver.js';
@@ -36,6 +37,7 @@ export function validateConfig(file: string, root: string): void {
   readSessionConfig(file);
   readOrchestrateConfig(file);
   readDocsConfig(file);
+  readBounds(file);
   readReferencesConfig(file);
   readMigrateConfig(file);
   readMemoryIndexMax(file);

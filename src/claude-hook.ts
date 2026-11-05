@@ -1,3 +1,4 @@
+import { writeReport } from './bounds.js';
 import { killedGesture, MAX_GESTURES, refusalGestures } from './orchestrate/geste.js';
 
 /** Le rappel de la commande `attente` (L556) : une boucle d'attente sur un processus ne remplace ni la notification de fin ni le journal de la vague. */
@@ -178,10 +179,20 @@ function pipeReason(gate: string): string {
   return `refusé : « ${gate} » est suivi de | tail/head/grep, et le code de sortie du pipe est celui du filtre : un échec de la commande passe pour un succès. Écrire « set -o pipefail; <commande> | tail », ou lire « \${PIPESTATUS[0]} » juste après le pipe, ou rediriger vers un fichier de $TMPDIR (« > $TMPDIR/sortie.txt 2>&1 ») puis lire le fichier.`;
 }
 
+/** La réponse du hook `bornes` (L626) après Write, Edit ou MultiEdit : les bornes que le fichier écrit dépasse, sinon null. */
+function boundsContext(data: Record<string, unknown> | null): { event: string; text: string } | null {
+  const file = (data?.tool_input as { file_path?: unknown } | undefined)?.file_path;
+  if (typeof file !== 'string' || !file) return null;
+  const text = writeReport(file, typeof data?.cwd === 'string' ? data.cwd : process.cwd());
+  return text ? { event: 'PostToolUse', text } : null;
+}
+
 /** Le texte que le lead doit lire, ou null : `retour` (geste d'un refus de cadence/raf, ou du code 137), `attente` (rappel contre la boucle d'attente) et `pipe` (refus du pipe qui masque le code de sortie). Toujours null pour un sous-agent (agent_id). */
 export function claudeHookContext(name: string, input: unknown): { event: string; text: string; deny?: true } | null {
   const data = input as Record<string, unknown> | null;
   const command = (data?.tool_input as { command?: unknown } | undefined)?.command;
+  // `bornes` (L626) : l'écrivain, sous-agent compris, est celui qui doit lire la limite.
+  if (name === 'bornes') return boundsContext(data);
   if (!data || data.agent_id || typeof command !== 'string') return null;
   if (name === 'pipe') {
     const gate = maskedGate(command);
@@ -193,9 +204,9 @@ export function claudeHookContext(name: string, input: unknown): { event: string
   return { event: data.hook_event_name === 'PostToolUseFailure' ? 'PostToolUseFailure' : 'PostToolUse', text: ['retour → geste :', ...gestures].join('\n') };
 }
 
-/** `cadence claude-hook retour|attente|pipe` : l'entrée standard est le JSON de Claude Code ; la sortie, le JSON additionalContext (pour `pipe` : permissionDecision deny) ou rien. Sort toujours en 0, sans rien dire d'une entrée illisible. */
+/** `cadence claude-hook retour|attente|pipe|bornes` : l'entrée standard est le JSON de Claude Code ; la sortie, le JSON additionalContext (pour `pipe` : permissionDecision deny) ou rien. Sort toujours en 0, sans rien dire d'une entrée illisible. */
 export function claudeHook(name: string | undefined, readInput: () => string, out: (line: string) => void): number {
-  if (name !== 'retour' && name !== 'attente' && name !== 'pipe') return 0;
+  if (name !== 'retour' && name !== 'attente' && name !== 'pipe' && name !== 'bornes') return 0;
   try {
     const said = claudeHookContext(name, JSON.parse(readInput()));
     if (said) out(JSON.stringify({ hookSpecificOutput: { hookEventName: said.event, ...(said.deny ? { permissionDecision: 'deny', permissionDecisionReason: said.text } : { additionalContext: said.text }) } }));

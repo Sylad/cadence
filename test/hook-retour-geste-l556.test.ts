@@ -336,17 +336,19 @@ describe('L556 — hooks/hooks.json du plugin (R10)', () => {
   it('R10 — hooks/hooks.json est un JSON valide, déclare les trois événements sur le matcher Bash et leurs commandes cadence claude-hook retour / attente', () => {
     expect(Object.keys(file.hooks).sort()).toEqual(['PostToolUse', 'PostToolUseFailure', 'PreToolUse']);
     for (const event of Object.keys(file.hooks)) {
-      expect(file.hooks[event]).toHaveLength(1);
+      // L626 : PostToolUse porte en plus la ligne `bornes` (Write|Edit|MultiEdit) ; les lignes Bash restent une par événement, la première.
+      expect(file.hooks[event]!.filter((h) => h.matcher === 'Bash')).toHaveLength(1);
       expect(file.hooks[event]![0]!.matcher).toBe('Bash');
       expect(file.hooks[event]![0]!.hooks[0]!.type).toBe('command');
     }
+    expect(file.hooks.PostToolUse!.map((h) => h.matcher)).toEqual(['Bash', 'Write|Edit|MultiEdit']);
     expect(commandOf('PostToolUse')).toContain('cadence claude-hook retour');
     expect(commandOf('PostToolUseFailure')).toContain('cadence claude-hook retour');
     expect(commandOf('PreToolUse')).toContain('cadence claude-hook attente');
   });
   it('R10 — la commande de chaque ligne sort en 0 sans texte quand cadence est absent du PATH', () => {
-    for (const event of Object.keys(file.hooks)) {
-      const out = execFileSync('/bin/sh', ['-c', commandOf(event)], { env: { PATH: '/nonexistent' }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    for (const command of Object.values(file.hooks).flatMap((entries) => entries.map((h) => h.hooks[0]!.command))) {
+      const out = execFileSync('/bin/sh', ['-c', command], { env: { PATH: '/nonexistent' }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
       expect(out).toBe('');
     }
   });

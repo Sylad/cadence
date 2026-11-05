@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { convergeBrief } from '../src/orchestrate/cycle/converge.js';
+import { isNonConformingVerdict } from '../src/audit.js';
 import { renderTable } from '../src/orchestrate/table.js';
 import { newLot, type LotState, type StepState, type WaveState } from '../src/orchestrate/state.js';
 import { claudeOut, commitFile, harness, probeReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
@@ -40,6 +41,8 @@ describe('R2 — la revue suivante ne la transforme pas en majeur', () => {
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
     expect(c.lot.code?.conforme).toBe(true);
+    expect(c.lot.code?.verdict).toMatch(/^conforme/);
+    expect(isNonConformingVerdict(c.lot.code?.verdict ?? '')).toBe(false);
     expect(c.lot.pass).toBe(0);
     expect(c.lot.warnings.join('\n')).toContain('reprend une attente hors règle de la sonde');
     expect(c.lot.proposals).toEqual([`[hors règle] ${HORS}`]);

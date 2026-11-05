@@ -1684,10 +1684,13 @@ lots:
     finished: 2026-11-03
   - id: L544
     title: "Panneau des lots, commande repliée : un mot coupé ne se recolle pas avec le retrait de 3 espaces des lignes suivantes (30–36 colonnes : maritime-atlas:Q4/accueil + -4-ux12 ; id de vague coupé à 18 colonnes) ; R25 colle sans le retrait, contrairement à son titre — ex L412 t1, mineur de la 3e revue (29-10)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-03
     started: 2026-11-05
+    notes:
+      - { date: 2026-11-05, text: "livrable déjà présent, porté par 78397d00 (L412) ; seule la largeur 30 du créneau 30-36 est testée" }
+    finished: 2026-11-05
   - id: L545
     title: "Panneau des lots, ce qui attend une décision : un lot retiré d'une vague par le lead (--drop) n'est pas une décision en attente — maritime-atlas:B6 et DI1 (retirés le 27-10) remontaient depuis la lecture des vagues finies de 7 jours (vu par Sylvain le 29-10) — ex L412 t2"
     status: done
@@ -2195,11 +2198,12 @@ lots:
     finished: 2026-11-04
   - id: L585
     title: "Un lot rendu par la revue courte du diff rebasé (intégration refusée : N constat(s) bloquant(s) ou majeur(s)) porte ses constats dans l'état du lot (constats) et une ligne par constat au journal, comme une revue complète — 04-11 L581 : le majeur n'était que dans <lot>/5-review-small.json, introuvable par --status et le journal"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-04
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "conforme : 0 bloquant, 0 majeur, 6 mineurs (constats périmés sur un lot prêt après report du verdict, constats vidés par un rapport illisible, totaux sans constat, texte multiligne au journal, mineurs et sous-tâches restés dans 5-review-small.json, doc inexacte) — orchestré (vague 2026-11-05-1425-cad, 2 passe(s) de correction)", commit: f359fe2a0703fb015468f6985a04e28cbcc6cef1, reporte: { de: 0244bab26c5ea08b428c708abc48e50483999627, vers: f359fe2a0703fb015468f6985a04e28cbcc6cef1, patchId: 1cc86f9d858684b1aba49a02e39ffdf5d7f885e7 } }
+    finished: 2026-11-05
   - id: L586
     title: "Lot de config déclaré par le lead (clé config: true au plan, posée à la main ou par raf) : scripts/qualite.mjs n'applique pas le refus « une config ne se change pas dans un lot » (configChangee) à un tel lot, et seulement à lui ; les autres mesures du cliquet restent jugées ; un lot de config ne touche que les fichiers de config et leurs tests — 04-11 : L583 (vitest.workspace.ts) ne pouvait être vert par construction, sans voie prévue"
     status: done
@@ -2322,11 +2326,12 @@ lots:
     finished: 2026-11-05
   - id: L597
     title: "Une seule aide (E2 + E3 de l'étude docs/etudes/ensemble-2026-11.md) : les deux textes d'aide de cadence et raf, tenus à la main et divergents sur 9 commandes, viennent d'une seule source ; cadence spec green y figure"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "compliant after 1 minor fix: --max-sessions / CADENCE_MAX_SESSIONS dropped from the single help (src/cli.ts), the other choices of the lot hold — orchestré (vague 2026-11-05-1425-cad, 2 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 97e92fb438bd90b3ed1d90b998126d773d1bd136 }
+    finished: 2026-11-05
   - id: L598
     title: "Un seul calcul des créneaux libres (E1 de docs/etudes/ensemble-2026-11.md) : registre, bande et vague lisent le même chiffre, publié une fois, au lieu de deux formules et d'un compte interne"
     status: done
@@ -2344,48 +2349,54 @@ lots:
     started: 2026-11-05
   - id: L600
     title: "Vocabulaire (E4a + E7 + E10 de docs/etudes/ensemble-2026-11.md) : concepts.md explique les tailles de lot (express, light, small, quickwin), les quatre sens de hook et docs-ok"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "compliant, 3 minor notes (glossaire `small` sans la seconde revue, page à 18 Ko, relecture E7 des 17 pages à arbitrer par le lead) — orchestré (vague 2026-11-05-1425-cad, 2 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 582d5139d1a75902a7d97c75e96e07f63f8a65a0 }
+    finished: 2026-11-05
   - id: L601
     title: "« prêt » de la vague contre « tirable » du plan (E8 de docs/etudes/ensemble-2026-11.md) : un mot par sens, texte de ready-free.ts et ses 7 tests mis à jour ; « done » précisé"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     notes:
       - { date: 2026-11-05, text: "à traiter aussi : la bande dit « 9 prêts » pour des lots déjà clos au plan, le panneau dit « clos » (capture de Sylvain du 05-11)" }
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "compliant (2 minor notes: L609 sheet R6 now stale, plan-sense « lot prêt » left in a few messages) — orchestré (vague 2026-11-05-1425-cad, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le code et les tests du lot tiennent. Le remplacement de R6 de L609 est justifié : ce test fixait le comportement que la note du lot demande de corriger. 2 mineurs en notes : des textes de sortie et des docs disent encore « lot prêt » pour le plan.", commit: a59177a76ff46823a1ffbbd34beef77fc91b9b4f }
+    finished: 2026-11-05
   - id: L602
     title: "Où cadence écrit, et les portes (E6 + E14 de docs/etudes/ensemble-2026-11.md) : une page liste les quatre dossiers d'état, un tableau réunit les trois endroits où une porte se déclare"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "conforme : verdict de la vague tenu ; rebase sur main, lien du README replié, docs/config.md dans files, tests ciblés verts", commit: 7660d1fb33e3c579eebc1bc030cce0e44b968b40 }
+    finished: 2026-11-05
   - id: L603
     title: "Surface pour le compte pro (E9 + E11 de docs/etudes/ensemble-2026-11.md) : convention des langues écrite (noms anglais, messages français), comptes périmés d'overview.md et stabilite.md retirés"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "conforme : corrections vérifiées, rien de cassé, 3 constats mineurs en notes du lot — orchestré (vague 2026-11-05-1425-cad, 1 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : compliant : le rebase n'a déplacé que l'entrée CHANGELOG de L603 ; rien de cassé (commits relus : a23e588, 963d615, b2a95cd, 736dcef, 302f7cd)", commit: 302f7cd10d74f0c468cbaad84e2338d5db8981a4 }
+    finished: 2026-11-05
   - id: L604
     title: "Une seule documentation de la bande (E13 de docs/etudes/ensemble-2026-11.md) : README du plugin et docs/cadence-hud.md ne font plus qu'un"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "compliant (3 notes mineures : « (fait foi) » inutile pour le test R3, lien de docs/lead.md:225 vers la fiche au lieu de la page, commandes « Work on it » en double) — commits 082c402, 14627ad, 8defbef — orchestré (vague 2026-11-05-1425-cad, 1 passe(s) de correction)", commit: 8defbef0e113b49cc1f07a92e94d5bc1f45bb828 }
+    finished: 2026-11-05
   - id: L605
     title: "stabilite.md complet (E16 de docs/etudes/ensemble-2026-11.md) : le statut de chaque surface que le code lit (12 sous-commandes raf, 6 outils cadence, 5 clés racine) est dit, avec son test"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "compliant (2 notes mineures, aucune action requise) — orchestré (vague 2026-11-05-1425-cad, 0 passe(s) de correction)", commit: 022fb9d92e754b659b492cf0ef879a0f14c881b6, reporte: { de: e588631d11f7a287252a823fccef64096ad3f8c3, vers: 022fb9d92e754b659b492cf0ef879a0f14c881b6, patchId: e656fafaa021e3013c5c00c5cb1dd691fcdfafc6 } }
+    finished: 2026-11-05
   - id: L606
     title: "Plan natif et plan lu séparés (E5 de docs/etudes/ensemble-2026-11.md) : les 13 branches settings.format de plan.ts deviennent deux implémentations d'un même contrat, cliquet de qualité à l'appui"
     status: todo
@@ -2434,12 +2445,13 @@ lots:
     finished: 2026-11-05
   - id: L611
     title: "orchestrate : la résolution d'un conflit de plan (src/orchestrate/integrate.ts:182) écrit ours.doc.toString() sans lineWidth: 0 ni indentSeq, contrairement à plan.ts:323 : un rebase fait passer .cadence/raf.yaml de 2 399 à 9 320 lignes, contenu intact, et la revue courte rend le lot — 05-11, L592 ; test sur la taille du plan après résolution"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     docs_ok: { date: 2026-11-05, reason: "correctif interne : le plan garde son format après résolution d'un conflit, aucun comportement documenté ne change" }
     review: { date: 2026-11-05, verdict: "conforme — orchestré (vague 2026-11-05-1425-cad, 2 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant : revue courte du diff rebasé (4 commits, 398bd95..e65100b) : seul le contexte du CHANGELOG a changé, l'entrée L611 est sous [Unreleased], le plan réel fait 2 481 lignes après aller-retour (9 607 avec l'ancienne écriture), 0 constat", commit: e65100bb8be1c8ed958c970fc8179367b5cba4d6 }
+    finished: 2026-11-05
   - id: L612
     title: "Sessions de vague : Playwright sans fenêtre (--headless sur le serveur MCP des sessions orchestrate, revues de maquette et UX) ; 05-11 : le Chrome ouvert par la revue de L609 a pris le focus de Sylvain, un message destiné à Claude est parti dans sa barre d'adresse ; une session ne doit jamais ouvrir de fenêtre sur le poste, sauf réglage explicite"
     status: done
@@ -2474,17 +2486,36 @@ lots:
     finished: 2026-11-05
   - id: L616
     title: "Porte ciblée : tout lot qui touche CHANGELOG.md joue test/changelog.test.ts dès la porte d'écriture ; trois refus le 05-11 (L582, L591, L613) pour une entrée écrite sous la dernière version publiée au lieu de [Unreleased], vus seulement au sommet intégré, et le brief d'implémentation le dit"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-05-1425-cad, 0 passe(s) de correction)", commit: c2a808939dcef8cbfe4ccb5f9c283e79b3cc2345, reporte: { de: 2310ab857f4eb571bc32cf2448dd76e36f98f04d, vers: c2a808939dcef8cbfe4ccb5f9c283e79b3cc2345, patchId: b73c4c9d42b5a97eb2114ec5c4bce16942b1ae6a } }
+    finished: 2026-11-05
   - id: L617
-    title: "Porte déportée sur mini-blue pour cadence (orchestrate.gate.host, docs/remote-gate.md) : préparer WSL de mini-blue (node, git, clé), déclarer l'hôte, jouer la porte des lots là-bas ; mesurer avant et après sur trois lots réels, durée de porte et charge de Big-Blue (05-11 : 8 à 13 min sous charge 43, environ 4 min seule) ; avec repli local si l'hôte ne répond pas"
+    title: "Porte déportée : orchestrate.gate.refs (références poussées avec le sha) et hôte WSL préparé sur mini-blue, avec tâche Windows qui garde WSL vivant ; activation et mesure par L618"
     status: doing
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    notes:
+      - { date: 2026-11-05, text: "titre remplacé : « Porte déportée sur mini-blue pour cadence (orchestrate.gate.host, docs/remote-gate.md) : préparer WSL de mini-blue (node, git, clé), déclarer l'hôte, jouer la porte des lots là-bas ; mesurer avant et après sur trois lots réels, durée de porte et charge de Big-Blue (05-11 : 8 à 13 min sous charge 43, environ 4 min seule) ; avec repli local si l'hôte ne répond pas »" }
+  - id: L618
+    title: "Activer la porte déportée dans cadence.yaml (orchestrate.gate: host mini-blue-wsl, install npm ci, refs main et origin/main, test de la config sauvé par L617), une fois L617 en service ; mesurer sur trois lots réels en vague la durée de porte et la charge de Big-Blue, avant et après (8 à 13 min sous charge 43 le 05-11)"
+    status: todo
+    estimate: 0.1
+    after: [ L617 ]
+    created: 2026-11-05
+  - id: L619
+    title: "Fusion du CHANGELOG à l'intégration : l'union d'un conflit ou un rebase ne laisse ni titre dupliqué, ni entrée dupliquée, ni entrée sous une version publiée, et toutes les entrées d'un lot restent sous [Unreleased] ; 05-11 : 7 reprises à la main (L582 L591 L613 L583 L614 L617 ×2), le contrôle vient avant la porte complète"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-05
+  - id: L620
+    title: "Une intégration déposée (--integrate sur une vague vivante) passe avant les lots en file : 05-11, L602 suspendu 65 min derrière la file alors que sa revue était faite"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-05
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -2509,6 +2509,7 @@ lots:
     after: [ L617 ]
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-05-1750-cad, 0 passe(s) de correction)", commit: 50c26e73e590e57578abc5297b8d629c22006845 }
   - id: L619
     title: "Fusion du CHANGELOG à l'intégration : l'union d'un conflit ou un rebase ne laisse ni titre dupliqué, ni entrée dupliquée, ni entrée sous une version publiée, et toutes les entrées d'un lot restent sous [Unreleased] ; 05-11 : 7 reprises à la main (L582 L591 L613 L583 L614 L617 ×2), le contrôle vient avant la porte complète"
     status: todo

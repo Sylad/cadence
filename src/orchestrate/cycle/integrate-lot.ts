@@ -1,5 +1,5 @@
 import { type LotCtx, type LotTree, histPlan, workDir as wd, stop, save, transition, propose, setWaitsTurn } from './ctx.js';
-import { type ReviewSummary, lotKey } from '../state.js';
+import { type ReviewSummary, type Constat, lotKey } from '../state.js';
 import { repoShas, repoWork } from '../../repos.js';
 import { lotWork, coveredTasks } from '../../audit.js';
 import { openDocGap } from './brief.js';
@@ -13,6 +13,7 @@ import { sh, shEscape } from './sh.js';
 import { redExcerpt } from './checks.js';
 import { integrationChecks } from './integration-porte.js';
 import { session } from './session.js';
+import { blockingConstats } from './shared.js';
 import { lateRefusal } from './depot-partage.js';
 import { awaitOlder } from './integrate-wait.js';
 import { conflictNotes } from '../lot-diff.js';
@@ -207,7 +208,7 @@ export async function integrateLot(c: LotCtx): Promise<void> {
             // Le diff du lot n'est plus celui qui a été relu (contexte modifié, conflit résolu) : une revue courte du diff rebasé avant l'avance (R17).
             const short = await shortReview(c);
             if (short === null) return;
-            if (short.refused) return refuse(`intégration refusée : revue courte du diff rebasé : ${short.refused} ; branche du dépôt inchangée, ${kept}`);
+            if (short.refused) return refuse(shortRefusal(c, short, kept));
             verdict = `${verdict}${SHORT_REVIEW_TRACE}${short.verdict}`;
             l.verdict = verdict;
           }
@@ -248,18 +249,26 @@ export async function integrateLot(c: LotCtx): Promise<void> {
   transition(c, 'ready', 'prêt à livrer');
 }
 
+/** Le refus de la revue courte (L585) : ses constats entrent dans l'état du lot (`--status`) et au journal, une ligne chacun, comme ceux d'une revue complète ; rend le motif du refus. */
+function shortRefusal(c: LotCtx, short: { refused: string; constats?: Constat[] }, kept: string): string {
+  const l = c.lot;
+  l.constats = short.constats ?? [];
+  for (const k of l.constats) c.wave.log(`${lotKey(l.project, l.lot)} · revue courte : ${k.gravite} ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`);
+  return `intégration refusée : revue courte du diff rebasé : ${short.refused} ; branche du dépôt inchangée, ${kept}`;
+}
+
 /**
  * Revue courte (`review-small`) du diff rebasé (R17), jouée sous le verrou d'intégration. `refused` : le nombre de constats bloquants ou majeurs, dit en clair ;
  * `null` : la session n'a pas eu lieu (budget, quota, arrêt) et le lot est suspendu ou rendu par `session`.
  */
-async function shortReview(c: LotCtx): Promise<{ verdict: string; refused?: undefined } | { refused: string; verdict?: undefined } | null> {
+async function shortReview(c: LotCtx): Promise<{ verdict: string; refused?: undefined; constats?: undefined } | { refused: string; constats?: Constat[]; verdict?: undefined } | null> {
   c.integration = { base: c.tree!.base };
   try {
     const done = await session(c, 'review-small');
     if (!done) return null;
     const rep = checkShape<ReviewReport>(done.report, REVIEW_SCHEMA);
     const n = rep.bloquants + rep.majeurs;
-    if (n > 0) return { refused: `${n} constat(s) bloquant(s) ou majeur(s)` };
+    if (n > 0) return { refused: `${n} constat(s) bloquant(s) ou majeur(s)`, constats: blockingConstats(rep, 'code') };
     return { verdict: rep.verdict };
   } catch (e) {
     return { refused: `rapport illisible (${(e as Error).message})` };

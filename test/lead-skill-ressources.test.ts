@@ -2,15 +2,15 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// L253 (issue #13, 3/3) : le skill lead relit la liste « prêts, ressources libres » avant d'attendre.
+// L253 (issue #13, 3/3) : le skill lead relit la liste « tirables, ressources libres » avant d'attendre.
 const root = join(import.meta.dirname, '..')
 const skill = readFileSync(join(root, 'skills/lead/SKILL.md'), 'utf8')
 const section = skill.split('\n').find((l) => l.startsWith('**Free resources')) ?? ''
 
 describe('skills/lead/SKILL.md — ressources libres (L253)', () => {
-  it('R1 — le skill a un paragraphe « Free resources » qui nomme la ligne « prêts, ressources libres » et la commande qui l\'imprime', () => {
+  it('R1 — le skill a un paragraphe « Free resources » qui nomme la ligne « tirables, ressources libres » et la commande qui l\'imprime', () => {
     expect(section).not.toBe('')
-    expect(section).toContain('prêts, ressources libres')
+    expect(section).toContain('tirables, ressources libres')
     expect(section).toContain('cadence lead tour')
     expect(section).toContain('cadence orchestrate --continue')
   })

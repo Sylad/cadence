@@ -132,7 +132,7 @@ the date. `cadence raf …` is the same as `raf …`.
 
 Some projects of a folder share one thing that only one lot at a time can use (a test bench, a gateway, a
 device). L251 (GitHub issue #13, 1/3) lets the plan **declare** it; `raf start` ignores it, `cadence orchestrate`
-holds it (the `--continue` draw, the `prêts, ressources libres` line and, inside a wave, the pool: see the last point).
+holds it (the `--continue` draw, the `tirables, ressources libres` line and, inside a wave, the pool: see the last point).
 
 - The folder that holds the projects lists the resources in its `cadence.yaml`, next to `depth:` and `priority:`:
   `resources: [banc, passerelle]`. A name is a word of lowercase letters, digits, `-` and `_`.
@@ -153,7 +153,7 @@ holds it (the `--continue` draw, the `prêts, ressources libres` line and, insid
   held by its paths needs none and nothing else would read the file.
 - **Inside a wave (L551).** Two lots named at launch (or added, or drawn) that carry the same resource play one after the other, even in different repositories:
   the pool does not start a queue while a queue that plays holds one of its lots' resources, and starts it as soon as that queue has finished. Lots with no
-  common resource, and lots with no `uses:`, are not held. (The `--continue` draw and the `prêts, ressources libres` line already counted the resources.)
+  common resource, and lots with no `uses:`, are not held. (The `--continue` draw and the `tirables, ressources libres` line already counted the resources.)
 - **A resource with paths (L558).** A resource can name the files it stands for, so a lot that touches them holds it without a hand-written `uses:`
   (on 2026-11-03 a lot modified `cycle.ts` without `uses: [cycle-ts]` while another was splitting it: conflict at integration, lot handed back).
   The key is then a table instead of a list:

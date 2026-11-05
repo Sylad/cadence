@@ -160,17 +160,17 @@ describe('cadence lead hold / release (L255)', () => {
     expect((await cad(root, {}, minutes(1), 'lead', 'tour')).out).toContain('vagues en cours : 0 · sessions en cours : 0 · sessions du lead : 1 (qa) · créneaux libres : 1 sur 2');
   });
 
-  it('R17 — sans vague ni session du lead, la ligne « prêts, ressources libres » s\'imprime aussi (L416 R2) ; une session du lead la laisse', async () => {
+  it('R17 — sans vague ni session du lead, la ligne « tirables, ressources libres » s\'imprime aussi (L416 R2) ; une session du lead la laisse', async () => {
     const root = await project();
     execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root, stdio: 'ignore' }); // le tour lit le dépôt de chaque projet
     const plan = Plan.load(join(root, '.cadence/raf.yaml'));
     plan.add('Premier lot', '2026-10-23', { estimate: 1 });
     plan.save();
-    expect((await cad(root, {}, T0, 'lead', 'tour')).out).toMatch(/prêts, ressources libres : .*L\d+ Premier lot/);
+    expect((await cad(root, {}, T0, 'lead', 'tour')).out).toMatch(/tirables, ressources libres : .*L\d+ Premier lot/);
     await cad(root, {}, T0, 'lead', 'hold', 'qa');
     const tour = (await cad(root, {}, minutes(1), 'lead', 'tour')).out;
     expect(tour).toContain('créneaux libres : 1 sur 2');
-    expect(tour).toMatch(/prêts, ressources libres : .*L\d+ Premier lot/);
+    expect(tour).toMatch(/tirables, ressources libres : .*L\d+ Premier lot/);
   });
 
   it('R12 — orchestrate --status affiche la même ligne, TTL passé écarté', async () => {

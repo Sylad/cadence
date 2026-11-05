@@ -297,7 +297,7 @@ describe('R5 / A3 — la ligne des lots prêts libres voit le diff des lots d\'u
       const out: string[] = [];
       const code = await run(['lead', 'tour'], { cwd: parent, env: { RAF_TODAY: '2026-11-04' }, out: (l) => out.push(l), err: (l) => out.push(l), now: () => new Date('2026-11-04T09:00:00') });
       expect(code).toBe(0);
-      expect(out.join('\n')).toContain('prêts, ressources libres : beta:L1 Un (cycle-ts)');
+      expect(out.join('\n')).toContain('tirables, ressources libres : beta:L1 Un (cycle-ts)');
     } finally {
       unregisterWave(cadenceHome(), process.ppid);
     }

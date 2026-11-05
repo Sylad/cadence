@@ -54,7 +54,7 @@ async function parent() {
 }
 
 /** Les lignes de projet du tour : sans la ligne des créneaux ni celle des lots prêts, qui s'impriment toujours (L416). */
-const projectLines = (out: string): string[] => out.split('\n').filter((l) => !l.startsWith('vagues en cours') && !l.startsWith('prêts, ressources libres'));
+const projectLines = (out: string): string[] => out.split('\n').filter((l) => !l.startsWith('vagues en cours') && !l.startsWith('tirables, ressources libres'));
 
 describe('cadence lead tour', () => {
   it('imprime une ligne par projet, plan raf et plan en lecture seule, sans toucher au plan', async () => {

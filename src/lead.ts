@@ -270,7 +270,7 @@ function withFree(rows: { dir: string; row: TourRow }[]): TourRow[] {
   return rows.map((x) => x.row);
 }
 
-/** La ligne « prêts, ressources libres » du tour, ou null quand aucun lot prêt n'est libre. */
+/** La ligne « tirables, ressources libres » du tour, ou null quand aucun lot tirable n'est libre. */
 export function tourFreeLine(rows: TourRow[]): string | null {
   return freeLine(rows.filter((r) => r.free).map((r) => ({ project: r.project, free: r.free! })), TITLE_MAX);
 }

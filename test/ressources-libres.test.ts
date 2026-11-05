@@ -69,7 +69,7 @@ async function tour(dir: string, ...extra: string[]) {
   return { code, out: out.join('\n') };
 }
 
-const FREE = 'prêts, ressources libres : ';
+const FREE = 'tirables, ressources libres : ';
 
 describe('L252 — lead tour : les lots prêts dont les ressources sont libres', () => {
   it('R1 — un lot doing qui tient banc écarte les prêts qui l\'utilisent, dans tous les projets', async () => {

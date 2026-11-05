@@ -11,7 +11,7 @@ import { declaredFor, readResources } from './resources.js';
 import { lotFinished, RunStore, type LotState } from './orchestrate/state.js';
 import { lotBranch } from './orchestrate/worktree.js';
 
-/** Un lot prêt dont aucune ressource n'est prise (L252) ; `uses` n'est écrit que si le lot en porte. */
+/** Un lot tirable (à faire, sans dépendance ouverte : « prêt » est l'état d'un lot de vague, L601) dont aucune ressource n'est prise (L252) ; `uses` n'est écrit que si le lot en porte. */
 export interface FreeLot {
   id: string;
   title: string;
@@ -102,7 +102,7 @@ function taken(dirs: string[], home: string, held: Held[]): { resources: Set<str
 }
 
 /**
- * Pour chaque dossier de projet de `dirs`, ses lots prêts (comme `nextUp`, hors « à décider » et hors lots d'une vague vivante) dont aucune ressource
+ * Pour chaque dossier de projet de `dirs`, ses lots tirables (comme `nextUp`, hors « à décider » et hors lots d'une vague vivante) dont aucune ressource
  * n'est prise par un lot `doing` d'un des projets (ou de ceux qui partagent leurs ressources, voir `sharingProjects`) ni par une vague vivante de `home` ni par les lots `held` d'une vague qui part. Un lot sans `uses:` n'en tient aucune : il est libre.
  * Les projets sans lot libre n'ont pas d'entrée (clé : le dossier) ; un plan illisible est sauté.
  */
@@ -128,11 +128,11 @@ export function readyFree(dirs: string[], home: string, held: Held[] = []): Map<
 /** Lots listés par projet dans la ligne ; au-delà, « projet +K » (le --json donne tout). */
 const FREE_SHOWN = 3;
 
-/** « prêts, ressources libres : projet:L3 titre (banc) · … », au plus FREE_SHOWN lots par projet puis « projet +K », ou null quand aucun lot prêt n'est libre. */
+/** « tirables, ressources libres : projet:L3 titre (banc) · … », au plus FREE_SHOWN lots par projet puis « projet +K », ou null quand aucun lot tirable n'est libre. */
 export function freeLine(entries: { project: string; free: FreeLot[] }[], titleMax: number): string | null {
   const items = entries.flatMap((e) => [
     ...e.free.slice(0, FREE_SHOWN).map((l) => `${e.project}:${l.id} ${l.title.length <= titleMax ? l.title : `${l.title.slice(0, titleMax - 1)}…`}${l.uses?.length ? ` (${l.uses.join(', ')})` : ''}`),
     ...(e.free.length > FREE_SHOWN ? [`${e.project} +${e.free.length - FREE_SHOWN}`] : []),
   ]);
-  return items.length ? `prêts, ressources libres : ${items.join(' · ')}` : null;
+  return items.length ? `tirables, ressources libres : ${items.join(' · ')}` : null;
 }

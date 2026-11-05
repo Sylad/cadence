@@ -167,6 +167,9 @@ files and the changelog, then prints the steps the lead plays (tag, gate, push, 
 - **readsPlan**: `orchestrate.gate` key declaring that a test reads the plan, so plan-only commits are not crossed.
 - **worktree**: a second checkout of the repository on its own branch, one per lot, so lots play at the same time.
 - **integration**: rebasing a lot on the tip of `main`, replaying the checks and fast-forwarding, one lot at a time, before `ready`.
+- **ready**: a *wave* word: a lot whose cycle is finished (and integrated) in a wave.
+- **tirable**: a *plan* word: a `todo` lot with no open `after` and no shared resource taken (`lead tour`, `--continue`).
+- **done**: a *plan* status (`raf done`) or, apart, a *wave* that ran to its end; neither means delivered (`cadence deliver`).
 - **handed back**: a lot the wave could not finish and returns to the lead with its cause.
 - **deliverable up to**: the sha up to which a delivery is safe, below the first lot that is not ready.
 - **lead**: the session that drives the waves, re-verifies and delivers; it never codes.

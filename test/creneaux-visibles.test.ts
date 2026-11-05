@@ -44,9 +44,9 @@ describe('L416 — créneaux toujours visibles', () => {
     expect(Array.isArray(JSON.parse((await cad(root, {}, 'lead', 'tour', '--json')).out))).toBe(true);
   });
 
-  it('R2 — lead tour affiche « prêts, ressources libres » sans vague ni session du lead', async () => {
+  it('R2 — lead tour affiche « tirables, ressources libres » sans vague ni session du lead', async () => {
     const root = await project(1);
-    expect((await cad(root, {}, 'lead', 'tour')).out).toMatch(/prêts, ressources libres : .*L\d+ Lot prêt 1/);
+    expect((await cad(root, {}, 'lead', 'tour')).out).toMatch(/tirables, ressources libres : .*L\d+ Lot prêt 1/);
   });
 
   it('R3 — lead release affiche les créneaux libres après la libération, avec la ligne des lots prêts et un ⚠ quand un créneau reste libre', async () => {
@@ -57,7 +57,7 @@ describe('L416 — créneaux toujours visibles', () => {
     expect(r.code).toBe(0);
     expect(lines[0]).toBe('session « qa » rendue');
     expect(lines[1]).toBe('vagues en cours : 0 · sessions en cours : 0 · créneaux libres : 3 sur 3');
-    expect(lines[2]).toMatch(/^prêts, ressources libres : .*L\d+ Lot prêt 1/);
+    expect(lines[2]).toMatch(/^tirables, ressources libres : .*L\d+ Lot prêt 1/);
     expect(lines[3]).toBe('⚠ 3 créneaux libres sur 3 : lancer un lot prêt ou une session, un créneau vide ne sert à rien');
   });
 

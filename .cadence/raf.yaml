@@ -2147,6 +2147,7 @@ lots:
     started: 2026-11-04
     notes:
       - { date: 2026-11-05, text: "titre remplacé : « Les 4 tests instables laissés par L577 (docs/mesures/instables-sous-charge-2026-11-04.md) : porte-deportee R17 deux remplissages et verify SIGINT relayé (cause NON établie : la trouver d'abord, en rejouant le test sous charge mesurée, avant tout correctif), probe-L539-bords et mise-en-service L195 (délai qui borne le travail lui-même : le scinder ou le sortir de la suite parallèle) ; un correctif qui attend l'événement, jamais un délai élargi »" }
+    review: { date: 2026-11-05, verdict: "conforme, 1 note mineure (mesure : trois passages de L577 disent encore verify SIGINT sans cause) — orchestré (vague 2026-11-05-1055-cad, 3 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : compliant : le rebase ne change que la place de l'entrée CHANGELOG, 1 note mineure (« pending L613 » périmé)", commit: ff5a7ab09ddf3b9ad918043bb5e8952627d9d800 }
   - id: L580
     title: "Étape probe (issue #37) : un fichier de sonde n'est jamais commité rouge ni hors porte — soit il est joué par la porte du projet et vert au dernier commit du lot, soit il n'est pas commité ; ses attentes qui ne sont pas des règles du lot reviennent en constats de revue ou en sous-tâches proposées ; le fichier respecte les linters du dépôt (shellcheck vu rouge sur main après une livraison, 3 lots en un jour)"
     status: done

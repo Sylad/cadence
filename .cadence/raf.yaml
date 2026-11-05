@@ -2537,7 +2537,7 @@ lots:
     estimate: 0.5
     created: 2026-11-05
     started: 2026-11-05
-    review: { date: 2026-11-05, verdict: "conforme : verdict tenu ; rebase sur main, ligne du README ramenée à celle de main, test readme-accueil vert", commit: 5f1c973fa69492de7a51522675aacaa03c9e96f6 }
+    review: { date: 2026-11-05, verdict: "conforme : dernier majeur réglé, plafond de mur et escalade rendent par le même chemin ; test rouge puis vert, 149 tests ciblés et cliquet verts ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main ne change que la place de l'entrée du CHANGELOG, aucun constat", commit: 11c46ae7cb9cfe15a33c7e96304787a604133e67 }
   - id: L623
     title: "Une vague reprise (--resume, --integrate) lit le cadence.yaml du dépôt avec sa copie figée : une clé ajoutée depuis la refuse (05-11, L599 après L618, orchestrate.gate.refs inconnu) ; la reprise avance sa copie sur celle en service, ou ignore les clés qu'elle ne connaît pas en le disant"
     status: doing

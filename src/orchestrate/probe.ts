@@ -139,13 +139,19 @@ function handedBack<D extends ProbeDone>(io: ProbeIo<D>, dirt: string[], headBef
  * Les constats de la sonde (R4, R5) : les rouges NOUVEAUX de la porte du programme (jamais un échec déjà rouge au départ), en gravité majeure, avec ce que la session annonce
  * (« test — borne — attendu ») pour que la correction voie la borne. Sans `orchestrate.test`, les échecs annoncés tels quels, dits non vérifiés par le programme.
  */
-function findings(l: LotState, red: Constat[], claimed: string[], gated: boolean): Constat[] {
+function findings(l: LotState, red: Constat[], claimed: string[], gated: boolean, removed: string[]): Constat[] {
   const said = claimed.length ? `\nLa sonde annonce : ${claimed.join(' ; ')}` : '';
   const out = red.map((k): Constat => ({ ...k, gravite: 'majeur', texte: `${PROBE_FINDING}${k.texte}${said}` }));
-  if (gated || !claimed.length) return out;
+  if (!claimed.length) return out;
+  // Un fichier rouge que la session n'a pas commité est retiré (L614) : la porte ne le voit plus, ses cas annoncés reviennent comme constats, même avec `orchestrate.test`.
+  if (removed.length && gated) return [...out, ...claimed.map((e): Constat => ({ source: 'tests', gravite: 'majeur', texte: `${PROBE_FINDING}${e} (fichier non commité, retiré par le programme : ${removed.join(', ')})` }))];
+  if (gated) return out;
   l.warnings.push('sonde de cas limites : échecs annoncés par la session, non vérifié par le programme (orchestrate.test absent)');
   return [...out, ...claimed.map((e): Constat => ({ source: 'tests', gravite: 'majeur', texte: `${PROBE_FINDING}${e}` }))];
 }
+
+/** Les tests que la session annonce rouges (`echecs` du rapport), sans les entrées vides. */
+const claimedBy = (rep: ProbeReport | undefined): string[] => (rep?.echecs ?? []).map((e) => e.trim()).filter(Boolean);
 
 /**
  * Joue la sonde (R3 à R9). Elle ne bloque jamais le lot : échec, coupure, délai ou rapport illisible sont un warning et la revue part. Seuls un quota (suspension : la reprise rejoue la sonde),
@@ -156,14 +162,15 @@ export async function probeStep<D extends ProbeDone>(io: ProbeIo<D>): Promise<vo
   const done = await io.play();
   if (!done) return;
   const step = l.steps[l.steps.length - 1]!;
-  const rep = done === PROBE_FAILED ? cutSession(io, step) : readSession(io, done, step);
-  if (rep === 'rendu') return;
+  const read = done === PROBE_FAILED ? (cutSession(io, step) === 'rendu' ? 'rendu' : { rep: undefined, removed: [] }) : readSession(io, done, step);
+  if (read === 'rendu') return;
+  const { rep, removed } = read;
   // La porte du programme après la sonde comme après toute écriture, mais seulement si elle a commité : sans nouveau commit il n'y a rien de neuf à rejouer.
   const red: Constat[] = [];
   const runs: CheckRun[] = [];
   const moved = !!step.headBefore && io.head() !== step.headBefore;
   if (moved) await io.gate(red, runs);
-  const found = moved ? findings(l, red, (rep?.echecs ?? []).map((e) => e.trim()).filter(Boolean), !!io.config.test) : [];
+  const found = moved || removed.length ? findings(l, red, claimedBy(rep), !!io.config.test, removed) : [];
   if (found.length) {
     // Une correction que le budget ne paie plus n'est pas sautée : l'étape fix refuse et le lot revient au lead sans revue, tests rouges (L145, cycle.ts overBudget).
     if (io.pays()) l.warnings.push(`${PROBE_FINDING}${found.length} constat(s), passe de correction avant la revue`);
@@ -190,10 +197,10 @@ export function noteRemoved(lot: LotState, removed: string[]): void {
 
 /**
  * Le rapport d'une session qui a répondu : questions notées, attentes hors règle rendues au lead (même si le lot est rendu ensuite), verrou et dépôt contrôlés. `'rendu'` quand le lot est rendu.
- * Un fichier NON SUIVI laissé par la sonde (un test qu'elle n'a pas commité, par la règle « pas commité » du brief) n'est pas un dépôt sale : il est retiré et un warning le nomme, comme après une sonde coupée (session.ts).
+ * Un fichier NON SUIVI ou INDEXÉ-NEUF (`git add` sans commit, L614) laissé par la sonde (un test qu'elle n'a pas commité, par la règle « pas commité » du brief) n'est pas un dépôt sale : il est retiré de l'index et supprimé, un warning le nomme, comme après une sonde coupée (session.ts) ; `removed` rend ceux retirés pour que leurs cas annoncés rouges reviennent en constats.
  * Un fichier suivi modifié reste un dépôt sale : la sonde ne touche pas au code ni aux tests existants.
  */
-function readSession<D extends ProbeDone>(io: ProbeIo<D>, done: D, step: StepState): ProbeReport | undefined | 'rendu' {
+function readSession<D extends ProbeDone>(io: ProbeIo<D>, done: D, step: StepState): { rep: ProbeReport | undefined; removed: string[] } | 'rendu' {
   const rep = readReport(io.lot, done.report);
   for (const q of io.take(step, rep ?? { questions: [] })) io.lot.warnings.push(`sonde de cas limites : question sans réponse (la sonde ne bloque pas le lot) : « ${q.trim()} »`);
   noteHorsRegle(io.lot, rep);
@@ -202,5 +209,5 @@ function readSession<D extends ProbeDone>(io: ProbeIo<D>, done: D, step: StepSta
   const removed = left.length ? io.remove(left) : [];
   noteRemoved(io.lot, removed);
   const dirt = io.dirt(done).filter((f) => !removed.includes(unquotePath(f)));
-  return handedBack(io, dirt, step.headBefore) ? 'rendu' : rep;
+  return handedBack(io, dirt, step.headBefore) ? 'rendu' : { rep, removed };
 }

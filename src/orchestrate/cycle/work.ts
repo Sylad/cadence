@@ -3,7 +3,7 @@ import { lockViolations, lotStartHead } from '../accept.js';
 import { lotWork, lotCommits, isPlanOnly } from '../../audit.js';
 import { session, badReport, type Done } from './session.js';
 import { type WorkReport, checkShape, WORK_SCHEMA } from '../schemas.js';
-import { type Commit, readCommits, resolveCommit, restoreWorktree, unquotePath } from '../../git.js';
+import { type Commit, readCommits, resolveCommit, restoreWorktree, tryGit, unquotePath } from '../../git.js';
 import { citedRefs } from '../../link.js';
 import { isNonQuestion } from './questions.js';
 import { dirtAfter, minorLine, hasWork, takeReport } from './shared.js';
@@ -232,8 +232,14 @@ async function toReview(c: LotCtx, runs: CheckRun[], minorsPass: boolean): Promi
   save(c);
 }
 
+/** Retire de l'index, un fichier à la fois (un chemin inconnu de l'index fait refuser toute la commande), puis de l'arbre de travail : un fichier que HEAD ne connaît pas est supprimé (L614, issue #39). */
+function unstageAndRemove(root: string, files: string[]): string[] {
+  for (const f of files) tryGit(root, ['restore', '--staged', '--', f]);
+  return restoreWorktree(root, files);
+}
+
 /** Ce que la sonde (probe.ts) emprunte au cycle. */
 export const probeIo = (c: LotCtx): ProbeIo<Done> => ({
-  lot: c.lot, config: c.config, cwd: wd(c), play: () => session(c, 'probe'), take: (step, rep) => takeReport(c, { step }, rep), sealed: (head) => sealedViolations(c, head), dirt: dirtAfter, left: (done) => done.after.untracked.filter((f) => !done.before.untracked.includes(f)).map(unquotePath), remove: (files) => restoreWorktree(wd(c), files), gate: (red, runs) => programChecks(c, red, runs),
+  lot: c.lot, config: c.config, cwd: wd(c), play: () => session(c, 'probe'), take: (step, rep) => takeReport(c, { step }, rep), sealed: (head) => sealedViolations(c, head), dirt: dirtAfter, left: (done) => [...done.after.untracked.filter((f) => !done.before.untracked.includes(f)), ...done.after.tracked.filter((l) => l.startsWith('A') && !done.before.tracked.includes(l)).map((l) => l.slice(3))].map(unquotePath), remove: (files) => unstageAndRemove(wd(c), files), gate: (red, runs) => programChecks(c, red, runs),
   fix: (constats) => toFix(c, constats, 'sonde de cas limites'), review: (runs) => toReview(c, runs, false), handBack: (why) => void stop(c, 'handed-back', why), pays: () => fixAffordable(c.lot), head: () => git(wd(c), 'rev-parse', 'HEAD').trim(),
 });

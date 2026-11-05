@@ -3,7 +3,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { lotWork } from '../../audit.js';
 import { readPlanConfig } from '../../config.js';
 import { PLAN_ACTIONS, planCommitMessage } from '../../plan-commit.js';
-import { dirtyPaths, restoreWorktree, tryGit } from '../../git.js';
+import { dirtyPaths, restoreWorktree, tryGit, unquotePath } from '../../git.js';
 import { RafError, type Plan } from '../../plan.js';
 import { snapshot, type Snapshot } from '../guard.js';
 import { type ReviewReport } from '../schemas.js';
@@ -14,9 +14,9 @@ import { repoBranch, takeRepoWrite } from '../integrate.js';
 import { git, trackedDirty } from '../worktree.js';
 import { type LotCtx, transition, stop, propose } from './ctx.js';
 
-/** Fichiers suivis modifiés (chemins), d'après `git status --porcelain`. */
+/** Fichiers suivis modifiés (chemins décodés), d'après `git status --porcelain` : un nom accentué ou à espace y est cité en C-quoting, il en sort tel que le disque le nomme (L614). */
 export function trackedPaths(s: Snapshot): string[] {
-  return s.tracked.map((l) => l.slice(3).replace(/^.* -> /, '').replace(/^"|"$/g, ''));
+  return s.tracked.map((l) => unquotePath(l.slice(3).replace(/^.* -> /, '')));
 }
 
 /** Le gabarit `plan.commit` du projet (L343), undefined sans. */

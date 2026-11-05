@@ -83,7 +83,7 @@ const toggleFold = async ($: EngineInterface, project: string): Promise<boolean 
   return folded
 }
 
-/** Déplie ce qui est replié et inversement (clé de moreKey ou openKey) ; le choix est gardé. */
+/** Déplie ce qui est replié et inversement (clé de moreKey, openKey ou foldKey) ; le choix est gardé. */
 const toggleView = async ($: EngineInterface, key: string): Promise<void> => {
   const current = await read($, lotsViews)
   const next = { ...current, [key]: !current[key] }
@@ -938,6 +938,21 @@ export const register: Register = on => {
                 </Button>
               </Box>,
             )
+            return
+          }
+          // les lignes repliées (L592) : un Button sur toute la ligne, comme « + N lots » ; la clé est celle que le panneau a construite (foldKey), elle ne passe pas par parseToggleAsk
+          if (line.kind === 'fold') {
+            rows.push(
+              <Box key={`f${i}`} paddingLeft={2}>
+                <Button key={line.key} plain onPress={() => void toggleView($, line.key)}>
+                  {`${line.expanded ? '▾' : '▸'} ${line.text}`}
+                </Button>
+              </Box>,
+            )
+            return
+          }
+          if (line.kind === 'folded') {
+            rows.push(lotRow(table, line.row, `d${i}`))
             return
           }
           runProject = line.name

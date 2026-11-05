@@ -1555,3 +1555,111 @@ test('L495 — le nom de chaque projet est dans une boîte de largeur fixe, cell
   expect(found.map(b => b.width)).toEqual(['jobmail-assistant'.length, 'jobmail-assistant'.length, 'jobmail-assistant'.length])
   expect(found.every(b => b.flexShrink === 0)).toBe(true)
 })
+
+// ── L592 : lots prêts, livrés et clos repliés ; colonne id jamais tronquée ─────────────────────────────────────────
+
+/** Les lots d'un projet « cadence » : L584 (id de 4, colonne id de 6) et douze autres ids plus courts ; aucun n'est travaillé dans une vague. */
+const FOURTEEN = [lot('L584'), ...Array.from({ length: 13 }, (_, i) => lot(`L${10 + i}`))]
+
+test('R8 — rendu monté à 49 colonnes, 14 lots dont L584 : le texte de la ligne de L584 contient « L584 » entier, jamais « L5… »', async ($, on) => {
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify([row('cadence', FOURTEEN)]) }) })
+  await s.hud('lots')
+  const d = await s.draw(49, 60, 'terminal')
+  const line = d.texts.find(t => t.includes('L58'))
+  expect(line).toBeDefined()
+  expect(line).toContain('L584')
+  expect(d.text).not.toContain('L5…')
+})
+
+/** Les boîtes de colonne id du projet « cadence » (largeur fixe, jamais rétrécies) avec le texte qu'elles portent, lues dans sa région Client. */
+const idBoxes = async ($: Parameters<TestBody>[0], bodyColumns: number) => {
+  const ui = (await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'Pane', requestId: 'lots', props: { title: 'Lots', isFocused: false, bodyColumns, placement: 'dock', scroll: { offset: 0, bodyRows: 60 }, view: {} } } as never)) as Mounted<'desktop' | 'terminal', 'Pane'>
+  await ui.drawn()
+  const region = (await ui.findAll({ type: 'Client' })).find(c => c.key === 'lots:cadence')
+  const boxes = (await ui.findAll({ type: 'Box', in: region?.key } as never)) as unknown as { props?: { width?: unknown; flexShrink?: unknown }; text?: string }[]
+  await ui.unmount()
+  return boxes.filter(b => b.props?.flexShrink === 0 && typeof b.props.width === 'number' && /^[\s▸▾├└]*L\d/.test(b.text ?? '')).map(b => ({ text: b.text ?? '', width: b.props!.width as number }))
+}
+
+test('R8 — rendu monté, L584 : sa colonne id est de 6 (retrait 2 + id 4), fixe, et porte « L584 » entier', async ($, on) => {
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify([row('cadence', FOURTEEN)]) }) })
+  await s.hud('lots')
+  const boxes = await idBoxes($, 49)
+  const mine = boxes.find(b => b.text.includes('L584'))
+  expect(mine?.width).toBe(6)
+  expect(boxes.every(b => b.width === 6)).toBe(true)
+})
+
+test('R8 — rendu monté, sous-lot ├ L594/2 : colonne id de 10, id entier, titre tronqué par « … »', async ($, on) => {
+  const long = 'Un titre bien trop long pour tenir sur un corps de quarante-neuf colonnes'
+  const lots = [lot('L594', 'doing', { title: long }), lot('L594/2', 'doing', { parent: 'L594', title: long }), lot('L594/1', 'todo', { parent: 'L594' })]
+  const s = await session($, on, { kv: [['lotsViews', { 'open:cadence#L594': true }]], tour: () => ({ exitCode: 0, stdout: JSON.stringify([row('cadence', lots)]) }) })
+  await s.hud('lots')
+  const boxes = await idBoxes($, 49)
+  expect(boxes.find(b => b.text.includes('L594/2'))?.width).toBe(10)
+  const d = await s.draw(49, 60, 'terminal')
+  expect(d.texts.some(t => t.includes('L594/2'))).toBe(true)
+  expect(d.texts.some(t => t.includes('├') && t.includes('L594/2'))).toBe(true)
+  expect(d.texts.find(t => t.includes('Un titre bien'))).toMatch(/…$/)
+})
+
+const waveOf = (...lots: [string, string, string][]): Wave => ({ ...WAVE, lots: lots.map(([id, status, title]) => ({ project: 'cadence', repo: '/p', lot: id, title, status, pass: 0, model: 'sonnet', next: null, steps: 1, step: null })) })
+const CLOSED_TOUR = () => ({ exitCode: 0, stdout: JSON.stringify([{ ...row('cadence', [lot('L1'), lot('L2')]), closed: [{ id: 'L9', finished: '2026-11-04', delivered: true }, { id: 'L8', finished: '2026-11-04' }] }]) })
+const CLOSED_WAVE = waveOf(['L2', 'ready', 'v2'], ['L9', 'ready', 'Livré en vague'], ['L8', 'ready', ''])
+
+test('R1 — seuls des lots livrés : message d’état vide', async ($, on) => {
+  const only = () => ({ exitCode: 0, stdout: JSON.stringify([{ ...row('cadence', []), closed: [{ id: 'L9', finished: '2026-11-04', delivered: true }] }]) })
+  const s = await session($, on, { tour: only, waves: [waveOf(['L9', 'ready', 'x'])] })
+  await s.hud('lots')
+  expect((await s.draw()).text).toContain('Aucun lot non clos dans les projets de ce dossier.')
+})
+
+test('R7 — la ligne est un Button focalisable sur toute la ligne, ▸ compris ; repliée par défaut : aucune ligne de lot livré', async ($, on) => {
+  const s = await session($, on, { tour: CLOSED_TOUR, waves: [CLOSED_WAVE] })
+  await s.hud('lots')
+  const d = await s.draw()
+  expect(d.buttons.map(b => b.text)).toEqual(['▾ cadence', '▸ prêts : 1', '▸ livrés : 1', '▸ clos non livrés : 1'])
+  expect(d.text).not.toContain('Livré en vague')
+  expect(d.text).not.toContain('✔ livré')
+})
+
+test('R7 — activation : un lot par ligne avec « ✔ livré » ; seconde activation : repliée ; clés prets:/livres:/clos:<projet> dans lotsViews, aucune autre clé de stockage', async ($, on) => {
+  const s = await session($, on, { tour: CLOSED_TOUR, waves: [CLOSED_WAVE] })
+  await s.hud('lots')
+  await s.pressKey('livres:cadence')
+  const open = await s.draw()
+  expect(open.buttons.map(b => b.text)).toContain('▾ livrés : 1')
+  expect(open.texts.some(t => t.includes('L9'))).toBe(true)
+  expect(open.text).toContain('Livré en vague')
+  expect(open.text).toContain('✔ livré')
+  await s.pressKey('livres:cadence')
+  expect((await s.draw()).text).not.toContain('✔ livré')
+  await s.pressKey('prets:cadence')
+  await s.pressKey('clos:cadence')
+  const draw = await s.draw()
+  expect(draw.text).toContain('✔ prêt')
+  expect(draw.text).toContain('✔ clos')
+  expect(s.kv.get('lotsViews')).toEqual({ 'livres:cadence': false, 'prets:cadence': true, 'clos:cadence': true })
+  expect([...s.kv.keys()]).toEqual(['lotsViews'])
+})
+
+test('R7 — titre vide dans la vague : id et « ✔ clos » seuls', async ($, on) => {
+  const s = await session($, on, { tour: CLOSED_TOUR, waves: [CLOSED_WAVE], kv: [['lotsViews', { 'clos:cadence': true }]] })
+  await s.hud('lots')
+  const line = (await s.draw()).texts.find(t => t.includes('L8'))
+  expect(line?.replace(/\s+/g, ' ').trim()).toBe('L8')
+  expect((await s.draw()).text).toContain('✔ clos')
+})
+
+test('R10 — le panneau garde le dernier tableau entre deux relectures : lot « prêt » avant, « livré » après la relecture', async ($, on) => {
+  const closed = { current: false }
+  const tour = () => ({ exitCode: 0, stdout: JSON.stringify([{ ...row('cadence', closed.current ? [lot('L1')] : [lot('L1'), lot('L9')]), closed: closed.current ? [{ id: 'L9', finished: '2026-11-04', delivered: true }] : [] }]) })
+  const s = await session($, on, { tour, waves: [waveOf(['L9', 'ready', 'Vague L9'])] })
+  await s.hud('lots')
+  expect((await s.draw()).buttons.map(b => b.text)).toContain('▸ prêts : 1')
+  closed.current = true
+  await s.advance(60_000)
+  const after = await s.draw()
+  expect(after.buttons.map(b => b.text)).toContain('▸ livrés : 1')
+  expect(after.buttons.map(b => b.text)).not.toContain('▸ prêts : 1')
+})

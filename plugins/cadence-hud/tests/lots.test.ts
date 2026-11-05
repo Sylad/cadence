@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { buildPanel, flattenTree, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, planMove, priorityArgv, projectDetail, projectDir, projectProgress, projectsOf, readTime, refusalReason } from '../hooks/lots'
+import { buildPanel, flattenTree, foldKey, groupOf, isTask, lotState, lotTree, moreKey, openCount, openKey, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, planMove, priorityArgv, projectDetail, projectDir, projectProgress, projectsOf, readTime, refusalReason, waveLotsOf } from '../hooks/lots'
 import type { LotsRow, TourLot } from '../types'
 
 const lot = (id: string, status: 'todo' | 'doing' = 'todo', extra: Partial<TourLot> = {}): TourLot => ({ id, title: `Titre ${id}`, status, after: [], ...extra })
@@ -296,8 +296,8 @@ test('L410 — en vague : implémentation, revue, correction, question, rendu co
   expect(order([{ project: 'p', lots }], waves)).toEqual(['L2', 'L3', 'L4', 'L5', 'L6', 'L1', 'L7'])
 })
 
-test('L410 — une vague prête (ready) compte comme en cours', () => {
-  expect(order([{ project: 'p', lots: [lot('L1'), lot('L2')] }], [{ project: 'p', lot: 'L2', status: 'ready' }])).toEqual(['L2', 'L1'])
+test('L410 — une vague prête (ready) compte comme en cours (un lot prêt sans sous-lot est replié en « prêts : K », L592 R11 : celui-ci a un sous-lot)', () => {
+  expect(order([{ project: 'p', lots: [lot('L1'), lot('L2'), lot('L3', 'todo', { parent: 'L2' })] }], [{ project: 'p', lot: 'L2', status: 'ready' }])).toEqual(['L2', 'L3', 'L1'])
 })
 
 test('L410 — une vague en échec ou suspendue ne compte pas comme en cours : le lot suit le plan, avec les prêts s’il est libre', () => {
@@ -717,4 +717,244 @@ test('L481 — un progress mal formé (champ manquant ou texte) est écarté à 
   expect(progressRow({ done: 1, doing: 'x', todo: 0, added7: 0 }).progress).toBeUndefined()
   expect(progressRow({ done: 1 }).progress).toBeUndefined()
   expect(progressRow({ done: 0, doing: 1, todo: 0, added7: 0 }, { doing: [{ id: 'L1' }, { x: 1 }, null] }).doing).toEqual([{ id: 'L1' }])
+})
+
+// ── L592 : lots prêts, livrés et clos repliés en trois lignes ──────────────────────────────────────────────────────
+
+type WaveIn = Parameters<typeof buildPanel>[0]['waves'][number]
+const inWave = (id: string, status: string, title = `Vague ${id}`, project = 'p'): WaveIn => ({ project, lot: id, status, title })
+const closedOf = (...ids: string[]): NonNullable<LotsRow['closed']> => ids.map(id => ({ id, finished: '2026-11-04' }))
+const delivered = (...ids: string[]): NonNullable<LotsRow['closed']> => ids.map(id => ({ id, finished: '2026-11-04', delivered: true as const }))
+const ids2 = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => `${prefix}${i + 1}`)
+const folds = (p: ReturnType<typeof buildPanel>) => p.lines.flatMap(l => (l.kind === 'fold' ? [l] : []))
+const foldedRows = (p: ReturnType<typeof buildPanel>) => p.lines.flatMap(l => (l.kind === 'folded' ? [l.row] : []))
+const texts = (p: ReturnType<typeof buildPanel>) => folds(p).map(f => f.text)
+const kinds = (p: ReturnType<typeof buildPanel>) => p.lines.map(l => l.kind)
+const L592 = (over: Partial<Parameters<typeof buildPanel>[0]> & { rows: LotsRow[] }) => buildPanel({ columns: 70, height: 60, waves: [], ...over })
+
+test('R4 — lot de la vague présent dans closed : aucune ligne de lot pour lui, seulement sa place dans une ligne repliée', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: delivered('L9') }], waves: [inWave('L9', 'ready')] })
+  expect(lotIds(p)).toEqual(['L1'])
+  expect(texts(p)).toEqual(['livrés : 1'])
+  expect(foldedRows(p)).toEqual([]) // replié : pas de ligne par lot
+})
+
+test('R4 — lot de la vague au statut handed-back mais clos au plan : replié, pas listé comme lot qui joue', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: closedOf('L9') }], waves: [inWave('L9', 'handed-back')], views: { [foldKey('clos', 'p')]: true } })
+  expect(lotIds(p)).toEqual(['L1'])
+  expect(texts(p)).toEqual(['clos non livrés : 1'])
+  expect(foldedRows(p).map(r => r.id)).toEqual(['L9'])
+})
+
+test('R4 — lot clos hors de toute vague : non listé', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: delivered('L9') }], waves: [inWave('L7', 'ready')] })
+  expect(folds(p)).toEqual([])
+  // le même id dans la vague d'un autre projet ne le range pas non plus
+  const other = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: delivered('L9') }], waves: [inWave('L9', 'ready', 'x', 'autre')] })
+  expect(folds(other)).toEqual([])
+})
+
+test('R4 — lot done sans finished : ni ligne ni décompte', () => {
+  // `closed` ne le porte pas (lead.ts) : le lot de la vague n'est ni dans lots ni dans closed
+  const rows = parseLotsBoard(JSON.stringify([{ project: 'p', lots: [lot('L1')], closed: [{ id: 'L9' }, { id: 'L8', finished: 5 }] }])).rows
+  expect(rows[0]!.closed).toEqual([])
+  const p = L592({ rows, waves: [inWave('L9', 'ready'), inWave('L8', 'ready')] })
+  expect(folds(p)).toEqual([])
+  expect(lotIds(p)).toEqual(['L1'])
+})
+
+test('R5 — closed avec delivered: true : « ✔ livré », ligne « livrés : N »', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: delivered('L9', 'L8') }], waves: [inWave('L9', 'ready'), inWave('L8', 'ready')], views: { [foldKey('livres', 'p')]: true } })
+  expect(texts(p)).toEqual(['livrés : 2'])
+  expect(foldedRows(p).map(r => r.state.text)).toEqual(['✔ livré', '✔ livré'])
+})
+
+test('R5 — closed sans delivered : « ✔ clos », ligne « clos non livrés : N »', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: closedOf('L9') }], waves: [inWave('L9', 'ready')], views: { [foldKey('clos', 'p')]: true } })
+  expect(texts(p)).toEqual(['clos non livrés : 1'])
+  expect(foldedRows(p).map(r => r.state.text)).toEqual(['✔ clos'])
+})
+
+test('R5 — aucun clos : ni l’une ni l’autre des deux lignes', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: [] }], waves: [inWave('L1', 'implementing')] })
+  expect(folds(p)).toEqual([])
+  expect(folds(L592({ rows: [{ project: 'p', lots: [lot('L1')] }] }))).toEqual([]) // cadence plus ancien : pas de closed
+})
+
+/** 3 lots qui jouent (L588, L589, L592), 2 libres (L593, L594 et son sous-lot), 4 prêts, 11 livrés, 3 clos. */
+const BUSY = (): { rows: LotsRow[]; waves: WaveIn[] } => {
+  const playing = ['L588', 'L589', 'L592']
+  const ready = ids2('R', 4)
+  const done = ids2('D', 11)
+  const shut = ids2('C', 3)
+  return {
+    rows: [{ project: 'p', lots: [...playing.map(id => lot(id)), lot('L593'), lot('L594'), task('L594', 1), ...ready.map(id => lot(id))], closed: [...delivered(...done), ...closedOf(...shut)] }],
+    waves: [...playing.map(id => inWave(id, 'implementing')), ...ready.map(id => inWave(id, 'ready')), ...done.map(id => inWave(id, 'ready')), ...shut.map(id => inWave(id, 'ready'))],
+  }
+}
+
+test('R6 — 4 prêts, 11 livrés et 3 clos : trois lignes sous les lots en cours, aucune ligne par lot', () => {
+  const p = L592({ ...BUSY() })
+  expect(lotIds(p)).toEqual(['L588', 'L589', 'L592', 'L593', 'L594'])
+  expect(texts(p)).toEqual(['prêts : 4', 'livrés : 11', 'clos non livrés : 3'])
+  expect(kinds(p)).toEqual(['project', 'lot', 'lot', 'lot', 'lot', 'lot', 'fold', 'fold', 'fold']) // le sous-lot de L594 est replié
+  expect(foldedRows(p)).toEqual([])
+})
+
+test('R6 — compte du projet : livrés et clos exclus de « N lots non clos », prêts inclus', () => {
+  const p = L592({ ...BUSY() })
+  expect(p.lines[0]).toMatchObject({ kind: 'project', count: 3 + 2 + 4 })
+})
+
+test('R6 — après le bouton « + N lots » : prêts, livrés, clos viennent sous lui', () => {
+  const lots = [...ids2('L', 7).map(id => lot(id)), lot('R1')]
+  const p = L592({ rows: [{ project: 'p', lots, closed: delivered('D1') }], waves: [inWave('R1', 'ready'), inWave('D1', 'ready')] })
+  expect(kinds(p).slice(-3)).toEqual(['more', 'fold', 'fold'])
+})
+
+test('R7 — repliée par défaut : expanded faux, aucune ligne de lot livré ; la clé est livres:<projet>', () => {
+  const [prets, livres, clos] = folds(L592({ ...BUSY() }))
+  expect([prets!.expanded, livres!.expanded, clos!.expanded]).toEqual([false, false, false])
+  expect([prets!.key, livres!.key, clos!.key]).toEqual(['prets:p', 'livres:p', 'clos:p'])
+})
+
+test('R7 — dépliée : un lot par ligne (id, titre, « ✔ livré »), sous sa ligne, sans frise ; replier d’une ligne laisse les autres', () => {
+  const p = L592({ ...BUSY(), views: { 'livres:p': true } })
+  const at = p.lines.findIndex(l => l.kind === 'fold' && l.group === 'livres')
+  expect(p.lines.slice(at + 1, at + 12).every(l => l.kind === 'folded')).toBe(true)
+  expect(p.lines[at + 12]).toMatchObject({ kind: 'fold', group: 'clos' })
+  const rows = foldedRows(p)
+  expect(rows.map(r => r.id)).toEqual(ids2('D', 11))
+  expect(rows[0]).toMatchObject({ title: 'Vague D1' })
+  expect(rows.some(r => r.cycle !== undefined)).toBe(false)
+  expect(rows.every(r => r.state.text === '✔ livré')).toBe(true)
+  expect(folds(p).map(f => f.expanded)).toEqual([false, true, false])
+})
+
+test('R7 — titre vide : id et « ✔ livré » seuls', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: delivered('L9') }], waves: [inWave('L9', 'ready', '')], views: { 'livres:p': true } })
+  expect(foldedRows(p)[0]).toMatchObject({ id: 'L9', title: '', state: { text: '✔ livré' } })
+})
+
+test('R7 — prêts dépliée : lots du plan, titre du plan, « ✔ prêt »', () => {
+  const p = L592({ ...BUSY(), views: { 'prets:p': true } })
+  expect(foldedRows(p).map(r => [r.id, r.title, r.state.text])).toEqual(ids2('R', 4).map(id => [id, `Titre ${id}`, '✔ prêt']))
+})
+
+test('R8 — buildPanel : idWidth couvre les lignes livrées dépliées', () => {
+  const rows: LotsRow[] = [{ project: 'p', lots: [lot('L1')], closed: delivered('L58412') }]
+  const waves = [inWave('L58412', 'ready')]
+  const folded = L592({ rows, waves })
+  expect(folded.lines.find(l => l.kind === 'lot')).toMatchObject({ idWidth: 2 + 2 }) // « ␣␣L1 »
+  const open = L592({ rows, waves, views: { 'livres:p': true } })
+  expect(open.lines.find(l => l.kind === 'lot')).toMatchObject({ idWidth: 2 + 6 })
+  expect(foldedRows(open)[0]).toMatchObject({ idWidth: 8, lead: '  ' })
+})
+
+test('R9 — hauteur 16 (14 de corps), repliés : tout tient (12 rangées), aucune coupure', () => {
+  const p = L592({ ...BUSY(), height: 16 })
+  expect(p.more).toBe(0)
+  expect(folds(p)).toHaveLength(3)
+})
+
+test('R9 — hauteur 10, repliés : projet, L588 et sa frise, les trois lignes, « … +5 lots de plus »', () => {
+  const p = L592({ ...BUSY(), height: 10, now: 0 })
+  expect(kinds(p)).toEqual(['project', 'lot', 'fold', 'fold', 'fold'])
+  expect(lotIds(p)).toEqual(['L588'])
+  expect(p.more).toBe(5) // L589, L592, L593, L594 et le sous-lot de L594
+})
+
+test('R9 — hauteur 10, 11 livrés dépliés : mêmes lignes, « … +16 lots de plus »', () => {
+  const p = L592({ ...BUSY(), height: 10, now: 0, views: { 'livres:p': true } })
+  expect(kinds(p)).toEqual(['project', 'lot', 'fold', 'fold', 'fold'])
+  expect(p.more).toBe(16) // 5 + les 11 lots livrés, coupés avec les lots
+})
+
+test('R9 — la coupure traverse les lots : les trois lignes restent avant « … +N lots de plus »', () => {
+  const p = L592({ ...BUSY(), height: 12, now: 0 })
+  expect(kinds(p)).toEqual(['project', 'lot', 'lot', 'fold', 'fold', 'fold'])
+  expect(p.more).toBe(4) // L592, L593, L594 et son sous-lot
+})
+
+test('R9 — un projet sans lot qui joue : ses trois lignes gardent leur place, le nom du projet aussi', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('R1')], closed: delivered('D1') }], waves: [inWave('R1', 'ready'), inWave('D1', 'ready')], height: 6 })
+  expect(kinds(p)).toEqual(['project', 'fold', 'fold'])
+  expect(p.more).toBe(0)
+})
+
+test('R9 — une ligne coupée avec son projet entre dans le compte « … +N lots de plus »', () => {
+  const rows: LotsRow[] = [
+    { project: 'a', lots: ids2('A', 6).map(id => lot(id)) },
+    { project: 'b', lots: [lot('R1')], closed: delivered('D1', 'D2') },
+  ]
+  const p = L592({ rows, waves: [inWave('R1', 'ready', 'x', 'b'), inWave('D1', 'ready', 'x', 'b'), inWave('D2', 'ready', 'x', 'b')], height: 7 })
+  // 5 lignes de corps : le projet a, A1, A2 et le bouton « + 1 lot » ; coupés et comptés : A3 à A5 (3), puis le projet b : son prêt (1) et ses 2 livrés
+  expect(kinds(p)).toEqual(['project', 'lot', 'lot', 'more'])
+  expect(p.more).toBe(3 + 1 + 2)
+})
+
+test('R10 — avant la relecture : lot dans « prêts » ; après : dans « livrés » ou « clos non livrés »', () => {
+  const waves = [inWave('L9', 'ready')]
+  const before = L592({ rows: [{ project: 'p', lots: [lot('L1'), lot('L9')], closed: [] }], waves })
+  expect(texts(before)).toEqual(['prêts : 1'])
+  const after = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: delivered('L9') }], waves })
+  expect(texts(after)).toEqual(['livrés : 1'])
+  const undelivered = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: closedOf('L9') }], waves })
+  expect(texts(undelivered)).toEqual(['clos non livrés : 1'])
+})
+
+test('R10 — titre repris de la vague, \'\' donne une cellule vide', () => {
+  const wave = (title?: string) => ({ id: 'w', pid: 1, cwd: '/p', cap: 1, started: '2026-11-04T10:00:00Z', status: 'running', live: true, budget: 1, consumed: 0, lots: [{ project: 'p', repo: '/p', lot: 'L9', ...(title === undefined ? {} : { title }), status: 'ready', pass: 0, model: 'sonnet', next: null, steps: 0, step: null }] }) as never
+  const at = Date.parse('2026-11-04T10:05:00Z')
+  expect(waveLotsOf([wave('Panneau')], at)[0]).toMatchObject({ lot: 'L9', title: 'Panneau' })
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: delivered('L9') }], waves: waveLotsOf([wave('')], at), views: { 'livres:p': true } })
+  expect(foldedRows(p)[0]).toMatchObject({ id: 'L9', title: '' })
+})
+
+test('R11 — lot ouvert, vague ready, sans sous-lot : aucune ligne de lot, il est compté dans « prêts : K »', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1'), lot('L2')] }], waves: [inWave('L2', 'ready')] })
+  expect(lotIds(p)).toEqual(['L1'])
+  expect(texts(p)).toEqual(['prêts : 1'])
+})
+
+test('R11 — 14 lots ouverts à la vague ready et 3 qui jouent : les 3 en tête, une ligne « prêts : 14 », 14 lignes « ✔ prêt » seulement après dépliage', () => {
+  const ready = ids2('R', 14)
+  const playing = ['L1', 'L2', 'L3']
+  const rows: LotsRow[] = [{ project: 'p', lots: [...ready.map(id => lot(id)), ...playing.map(id => lot(id))] }]
+  const waves = [...ready.map(id => inWave(id, 'ready')), ...playing.map(id => inWave(id, 'implementing'))]
+  const folded = L592({ rows, waves })
+  expect(lotIds(folded)).toEqual(playing)
+  expect(texts(folded)).toEqual(['prêts : 14'])
+  expect(foldedRows(folded)).toEqual([])
+  const open = L592({ rows, waves, views: { 'prets:p': true } })
+  expect(foldedRows(open).filter(r => r.state.text === '✔ prêt')).toHaveLength(14)
+})
+
+test('R11 — lot ready à sous-lots : reste une ligne de lot', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1'), lot('L1/1', 'todo', { parent: 'L1' }), lot('L2', 'todo', { parent: 'L1' })] }], waves: [inWave('L1', 'ready')] })
+  expect(lotIds(p)).toEqual(['L1'])
+  expect(p.lines.find(l => l.kind === 'lot')).toMatchObject({ state: { text: '✔ prêt' } })
+  expect(folds(p)).toEqual([])
+})
+
+test('R11 — « prêts : K » compté dans « N lots non clos »', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1'), lot('L2'), lot('L3')] }], waves: [inWave('L2', 'ready'), inWave('L3', 'ready')] })
+  expect(p.lines[0]).toMatchObject({ kind: 'project', count: 3 })
+})
+
+test('R11 — lot ouvert à statut de vague handed-back : reste une ligne de lot', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1')] }], waves: [inWave('L1', 'handed-back')] })
+  expect(lotIds(p)).toEqual(['L1'])
+  expect(folds(p)).toEqual([])
+})
+
+test('R1 — seuls des lots livrés : message d’état vide (aucun bloc de projet)', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [], closed: delivered('L9') }], waves: [inWave('L9', 'ready')] })
+  expect(p.lines).toEqual([])
+})
+
+test('R10 — un lot dans deux vagues : une seule place dans la ligne repliée, titre de la première (la vivante)', () => {
+  const p = L592({ rows: [{ project: 'p', lots: [lot('L1')], closed: delivered('L9') }], waves: [inWave('L9', 'ready', 'vivante'), inWave('L9', 'ready', 'ancienne')], views: { 'livres:p': true } })
+  expect(texts(p)).toEqual(['livrés : 1'])
+  expect(foldedRows(p).map(r => r.title)).toEqual(['vivante'])
 })

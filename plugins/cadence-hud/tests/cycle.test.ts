@@ -193,6 +193,6 @@ test('L413 R14 — la frise tient dans la largeur du corps moins le retrait du t
 
 test('L413 R15 — waveLotsOf donne au panneau les pas, la porte, la passe et la prochaine étape du lot ; un lot sans trail (collecteur plus ancien) a une liste vide', () => {
   const w = (trail?: WaveLot['trail']): Wave => ({ id: 'w', pid: 1, cwd: '/p', started: at(0), live: true, lots: [{ project: 'ol', lot: 'L1', title: 't', status: 'fixing', pass: 2, model: 'sonnet', next: 'review', steps: 1, step: null, gate: { label: 'build', started: at(1) }, ...(trail ? { trail } : {}) }] })
-  expect(waveLotsOf([w([step('fix', 0, 1)])], NOW)).toEqual([{ project: 'ol', lot: 'L1', status: 'fixing', pass: 2, next: 'review', gate: { label: 'build', started: at(1) }, trail: [step('fix', 0, 1)] }])
+  expect(waveLotsOf([w([step('fix', 0, 1)])], NOW)).toEqual([{ project: 'ol', lot: 'L1', title: 't', status: 'fixing', pass: 2, next: 'review', gate: { label: 'build', started: at(1) }, trail: [step('fix', 0, 1)] }])
   expect(waveLotsOf([w()], NOW)[0]!.trail).toEqual([])
 })

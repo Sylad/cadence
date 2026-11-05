@@ -148,6 +148,16 @@ test('la bande dessine le contexte et la vague sur chaque surface', async ($, on
   }
 })
 
+test('R8 — L592 : la colonne id des lignes de vague de la bande a la largeur de l’id le plus long (retrait 2 + « L584 » : 6), jamais rétrécie', async ($, on) => {
+  const lots = [{ ...WAVE.lots[0]!, lot: 'L584' }, { ...WAVE.lots[0]!, lot: 'L75' }]
+  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [{ ...WAVE, lots }], now: Date.parse('2026-10-07T19:14:11.066Z') })
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
+  const idBoxes = (await ui.findAll({ type: 'Box' })).filter(b => /^L\d+$/.test(b.text ?? '') && b.props.flexShrink === 0)
+  expect(idBoxes.map(b => b.text)).toEqual(['L584', 'L75'])
+  expect(idBoxes.every(b => b.props.width === 6)).toBe(true)
+  await ui.unmount()
+})
+
 test('les lots d’une vague sont alignés par des Box à largeur fixe, sans espaces de remplissage', async ($, on) => {
   seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [WAVE], now: Date.parse('2026-10-07T19:14:11.066Z') })
   for (const surface of ['terminal', 'desktop'] as const) {

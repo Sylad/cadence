@@ -2523,6 +2523,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "compliant — orchestré (vague 2026-11-05-1810-cad, 0 passe(s) de correction)", commit: cf461558a94a428f516b4a0944c07995775ea917, reporte: { de: 3f60b106aa431da075ab5110f5218b3f5e3ac904, vers: cf461558a94a428f516b4a0944c07995775ea917, patchId: dc66694ab60f6e5a95b1f960a22c00766cdd5073 } }
   - id: L621
     title: "Issue #40 : un --goal ou goal: qui rétrécit un lot aux commits déjà intégrés saute la maquette sauf si l'objectif change la mise en page, et les revues jugent le diff de l'objectif contre l'objectif ; un constat hors objectif revient en suite proposée, sans passe de correction (74 min et 1,28 M pour un commit de quatre correctifs)"
     status: todo

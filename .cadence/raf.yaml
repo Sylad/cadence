@@ -2531,10 +2531,11 @@ lots:
     finished: 2026-11-05
   - id: L621
     title: "Issue #40 : un --goal ou goal: qui rétrécit un lot aux commits déjà intégrés saute la maquette sauf si l'objectif change la mise en page, et les revues jugent le diff de l'objectif contre l'objectif ; un constat hors objectif revient en suite proposée, sans passe de correction (74 min et 1,28 M pour un commit de quatre correctifs)"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-11-05
+    started: 2026-11-05
   - id: L622
     title: "Issue #41 : les revues convergent. Après la première revue d'un lot, un constat absent de la revue précédente et hors de l'objectif du lot ou des lignes qu'il change revient en suite proposée et n'achète plus de passe de correction ; un bloquant (perte de données, sécurité, suite rouge) en achète toujours une. Plafond de mur par lot, deux fois la durée attendue de son estimate : au-delà, le lot est rendu avec ses constats au lieu de lancer une passe. Mesure : part conforme du premier coup et passes par lot avant et après"
     status: done

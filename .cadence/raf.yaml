@@ -2325,6 +2325,7 @@ lots:
     after: [ L589, L591 ]
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "compliant : findings traités confirmés (cap null, montage partagé, formule dite une fois), 2 notes mineures (titre d'un test de bord, CHANGELOG muet sur le chiffre de la bande) — orchestré (vague 2026-11-05-1055-cad, 2 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : rebase sans effet sur le lot (8 commits à patch identique, aucun fichier commun avec ce qui a bougé sur main), 0 constat", commit: 9b35c6335c9549e29c65102e56a6b43c6022209c }
   - id: L599
     title: "orchestrate.md en cinq pages (E12 de docs/etudes/ensemble-2026-11.md) : 308 Ko sans sommaire découpés, avec dans le même commit les 26 tests qui citent la page, files de package.json et CHECKED de scripts/check-links.mjs"
     status: todo

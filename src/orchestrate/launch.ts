@@ -68,16 +68,21 @@ export interface StepSpec {
 
 export type McpServers = Record<string, { command: string; args: string[] }>;
 
+/** `--headless` (L612), sauf `CADENCE_PLAYWRIGHT_HEADED=1` dans l'environnement de l'orchestrateur. */
+function headlessArg(): string[] {
+  return process.env.CADENCE_PLAYWRIGHT_HEADED === '1' ? [] : ['--headless'];
+}
+
 /**
  * Serveurs MCP d'une étape : Playwright pour `ux` et `maquette` (revue des captures et du HTML local, L172) et, sur un lot `visible`, pour `spec` quand il a un écran `screen:` (rendu 1440/390 de la maquette, L171), `implement` et `fix` (fix-minors compris) ;
  * et `review-small` d'un petit lot visible (sa seule revue d'ergonomie) ; rien pour `review`, ni pour un lot sans écran.
- * Sorties dans `outputDir`, hors du dépôt.
+ * Sorties dans `outputDir`, hors du dépôt. Toujours `--headless` (L612) : une session ne doit jamais ouvrir de fenêtre sur le poste (le Chrome de la revue de L609 a pris le focus de Sylvain) ; seul `CADENCE_PLAYWRIGHT_HEADED=1` dans l'environnement de l'orchestrateur le retire.
  */
 export function mcpServersFor(kind: SessionKind, visible: boolean, outputDir: string, small = false, screen = true): McpServers {
   if (!(kind === 'ux' || kind === 'maquette' || (visible && ((kind === 'spec' && screen) || kind === 'implement' || kind === 'fix' || (kind === 'review-small' && small))))) return {};
   // La maquette est un fichier local : sans cette option le serveur bloque toute URL file:// (« Access to "file:" protocol is blocked »).
   const files = kind === 'maquette' || kind === 'spec' ? ['--allow-unrestricted-file-access'] : [];
-  return { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', ...files, '--output-dir', outputDir] } };
+  return { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', ...headlessArg(), ...files, '--output-dir', outputDir] } };
 }
 
 /** Dossier de sortie du Playwright MCP d'un lot : `<lotDir>/playwright`, chemin absolu. */

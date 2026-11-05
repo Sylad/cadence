@@ -200,10 +200,10 @@ describe('buildArgs', () => {
 
 describe('MCP minimaux par étape', () => {
   it('Playwright pour ux, et pour implement/fix d\'un lot visible (même dossier de captures) ; rien pour review, review-small, ni pour un lot sans écran (L74)', () => {
-    const pw = { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--output-dir', '/run/p--L1/playwright'] } };
+    const pw = { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--headless', '--output-dir', '/run/p--L1/playwright'] } };
     for (const k of ['implement', 'fix', 'ux'] as const) expect(mcpServersFor(k, true, '/run/p--L1/playwright'), k).toEqual(pw);
     // maquette.html et son rendu sont des fichiers locaux : le serveur bloque file:// sans cette option (mesuré sur @playwright/mcp 0.0.83, L172)
-    const pwFile = { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--allow-unrestricted-file-access', '--output-dir', '/run/p--L1/playwright'] } };
+    const pwFile = { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--headless', '--allow-unrestricted-file-access', '--output-dir', '/run/p--L1/playwright'] } };
     expect(mcpServersFor('maquette', false, '/run/p--L1/playwright'), 'maquette').toEqual(pwFile);
     expect(mcpServersFor('spec', true, '/run/p--L1/playwright'), 'spec visible').toEqual(pwFile);
     expect(mcpServersFor('spec', true, '/run/p--L1/playwright', false, false), 'spec visible sans écran (spec: true)').toEqual({});
@@ -214,6 +214,24 @@ describe('MCP minimaux par étape', () => {
     expect(mcpServersFor('review-small', true, '/run/p--L1/playwright'), 'review-small visible hors petit lot (passe des mineurs)').toEqual({});
     expect(mcpServersFor('review-small', false, '/run/p--L1/playwright', true), 'review-small petit sans écran').toEqual({});
     expect(mcpServersFor('review-small', true, '/run/p--L1/playwright', true), 'review-small petit visible : seule revue d\'ergonomie du lot (L74/t4)').toEqual(pw);
+  });
+
+  it('L612 — Playwright sans fenêtre : --headless sauf CADENCE_PLAYWRIGHT_HEADED=1', () => {
+    const prev = process.env.CADENCE_PLAYWRIGHT_HEADED;
+    const args = (v: string | undefined) => {
+      if (v === undefined) delete process.env.CADENCE_PLAYWRIGHT_HEADED; else process.env.CADENCE_PLAYWRIGHT_HEADED = v;
+      return mcpServersFor('ux', true, '/o').playwright.args;
+    };
+    try {
+      expect(args(undefined)).toContain('--headless');
+      expect(args('0')).toContain('--headless');
+      expect(args('')).toContain('--headless');
+      expect(args('1')).not.toContain('--headless');
+      delete process.env.CADENCE_PLAYWRIGHT_HEADED;
+      expect(mcpServersFor('maquette', false, '/o').playwright.args).toContain('--headless');
+    } finally {
+      if (prev === undefined) delete process.env.CADENCE_PLAYWRIGHT_HEADED; else process.env.CADENCE_PLAYWRIGHT_HEADED = prev;
+    }
   });
 
   it('writeMcpConfig écrit {"mcpServers":…} dans le dossier du lot et rend son chemin absolu ; le dossier playwright/ n\'existe que si le serveur est chargé', () => {

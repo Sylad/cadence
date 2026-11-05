@@ -23,6 +23,12 @@ orchestrate:
   worktrees: true
   # Précheck sur Sonnet (L328, 25-10) : le local (claude-local) plantait sur ~1 lot sur 3 et disait « oui » à tort ; Sonnet tranche en ~16 s.
   precheck: true
+  # Porte déportée (L403, L617, activée par L618) : build et tests joués par ssh sur le WSL de mini-blue, au sha poussé, avec cache de dépendances (docs/remote-gate.md).
+  # « mini-blue-wsl » est un alias du ~/.ssh/config de la machine qui lance cadence : sans lui (un clone), l'hôte ne répond pas et la porte retombe sur la porte locale, en le disant.
+  gate:
+    host: mini-blue-wsl
+    install: npm ci
+    refs: [main, origin/main]
   testGate:
     code: [src/**, 'bin/*.js', '!**/*.test.ts']
     tests: ['test/**']

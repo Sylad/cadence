@@ -362,19 +362,19 @@ export class AddFeed {
   }
 
   /**
-   * L527 : remplit au plus `free` créneaux libres avec les lots prêts du plan (`plan.targets`, déjà dans l'ordre de priorité et filtrés sur les ressources libres), chacun contrôlé comme un lot ajouté.
+   * L527 : remplit au plus `vacantLanes` créneaux de la vague avec les lots prêts du plan (`plan.targets`, déjà dans l'ordre de priorité et filtrés sur les ressources libres), chacun contrôlé comme un lot ajouté.
    * Ce qu'un lot pris engage est décompté avant le suivant : son budget du `plan.room`, ses ressources `uses` (un lot qui veut une ressource que ce remplissage vient de prendre attend la lecture suivante).
    * Un lot dont le dépôt est pris par un lot qui joue (`canRun`) est gardé pour la lecture suivante, le lot d'un autre dépôt passe devant ; un lot refusé est sauté pour la vague, dit au journal ;
    * un lot que le budget restant ne tient pas n'est ni pris ni écarté (un moins cher peut passer, ou le tour suivant).
    */
-  async fill(plan: FillPlan, free: number, canRun: (c: LotCtx) => boolean): Promise<LotCtx[]> {
+  async fill(plan: FillPlan, vacantLanes: number, canRun: (c: LotCtx) => boolean): Promise<LotCtx[]> {
     const e = this.e;
     const added: LotCtx[] = [];
     const badRepos = new Set<string>();
     const taken = new Set<string>();
     let room = plan.room;
     for (const t of plan.targets) {
-      if (added.length >= free || e.stopCause()) break;
+      if (added.length >= vacantLanes || e.stopCause()) break;
       const key = lotKey(t.project, t.lot);
       if (this.refused.has(key) || badRepos.has(t.repo) || t.uses.some((r) => taken.has(r))) continue;
       const c = await this.control(t, key, badRepos, room);

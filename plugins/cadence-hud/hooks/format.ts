@@ -465,6 +465,8 @@ export const expiredHolds = (holds: readonly LeadHold[], now: number): LeadHold[
  * vague vivante, le plus petit du plafond commun (le plus bas des plafonds connus, `cap` sinon) et de ce qu'elle tient — un créneau par lot
  * qui tient une session claude en mode worktree (`lanes` : ni un lot réglé, ni un lot en attente, ni un lot en porte), un par dépôt tenu sans `lanes` —, moins les sessions du lead.
  * Une vague sans plafond connu compte pour `cap`.
+ * C'est la formule du registre (`freeSlots` de src/orchestrate/registry.ts, dite en mots dans docs/concepts.md, « Slots and holds »), réécrite ici parce que la bande
+ * ne dépend pas de la CLI ; test/creneaux-libres-contrat-l598.test.ts les joue sur le même registre. Modifier l'une, c'est modifier l'autre.
  */
 export const freeSlots = (waves: readonly Wave[], cap: number, leadSessions: number): number => {
   const live = waves.filter(w => w.live)

@@ -79,6 +79,8 @@ export function commonCap(waves: LiveWave[], fallback: number): number {
  * plus petit du plafond commun (`commonCap`) et du nombre de lots qu'elle joue à la fois — un par dépôt qu'elle tient encore, un par lot pour des lots en worktrees (ses pas prennent un créneau et le
  * rendent entre deux étapes : les sessions vivantes à l'instant ne disent pas ce que la vague va reprendre).
  * Une vague sans plafond connu compte pour `total`.
+ * LA formule, dite en mots dans docs/concepts.md (« Slots and holds ») : la bande du lead (`freeSlots` de plugins/cadence-hud/hooks/format.ts) en
+ * est la seconde implémentation, sans la CLI, et test/creneaux-libres-contrat-l598.test.ts les joue sur le même registre. Modifier l'une, c'est modifier l'autre.
  */
 export function freeSlots(waves: LiveWave[], total: number, leadSessions = 0): number {
   const common = commonCap(waves, total);

@@ -122,6 +122,12 @@ lot of the wave's queue; a freed slot is also filled at once by the next ready l
 the lead declares it with `cadence lead hold <label>` and lifts it with `cadence lead release <label>`: a **hold** takes a slot, and
 the waves wait for it instead of overtaking it. `cadence orchestrate --status` prints `créneaux libres : 1 sur 3`. Detail: [lead.md](lead.md#lead-hold-and-release), [orchestrate.md](orchestrate.md#orchestrate).
 
+**Free slots, one formula.** The `créneaux libres : N sur M` figure of `orchestrate --status`, `lead tour` and the `cadence-hud` band is, with M the cap:
+
+> M, minus, for each live wave, the smaller of the **common cap** (the lowest cap declared by any live wave, M if none) and what the wave holds — one slot per lot that holds a claude session when the lots play in worktrees (`lanes`), one per repository held otherwise —, minus the sessions the lead declared with `lead hold` whose time limit has not run out; never below 0.
+
+A wave that declares no cap counts for M. A wave whose process is dead, and a hold past its limit, count for nothing: liveness is judged when the figure is read, never when it was written. The registry (`freeSlots` of `src/orchestrate/registry.ts`) and the band (`freeSlots` of `plugins/cadence-hud/hooks/format.ts`, which works without the CLI) are two implementations of this one formula, and `test/creneaux-libres-contrat-l598.test.ts` plays both on the same registry. Not to be confused with the *vacant lanes* of a wave (`vacantLanes` in `pool.ts`): the places of that wave that no queue holds, which it fills from the plan (L527).
+
 ## Escalation
 
 A lot that is still not compliant after its correction passes would normally be handed back. A project can ask for one more try

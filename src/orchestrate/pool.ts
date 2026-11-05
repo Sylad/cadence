@@ -37,12 +37,12 @@ export function groupLots(ctxs: LotCtx[]): LotCtx[][] {
  * (son worktree n'existe pas encore, R3). Les lots qui portent la même ressource `uses:` (L551) jouent l'un après l'autre : la file qui en veut une que tient une file qui joue attend qu'elle ait fini (les dépôts différents ne s'en préoccupent pas, la ressource est un verrou de plus). `answers` (L407) : à chaque tour, et au plus tard après `pollMs`, les lots en question dont le lead a déposé la réponse repartent comme une file de plus (un créneau libre ; sans worktree, jamais en même temps qu'un autre lot du même dépôt). `onSettled` est appelé quand un lot a fini de jouer (L132 : execute.ts libère alors les dépôts que plus aucun lot ne tient). Le budget, le quota et les incidents sont vérifiés par le cycle avant chaque session.
  */
 /**
- * La file des demandes du lead à une vague vivante (L407 : réponses, L421 : lots ajoutés) : `take(canRun, free)` applique les réponses déposées aux lots en question que `canRun` accepte et ajoute les lots demandés,
- * et rend ces lots, prêts à être joués ; `free` (L527) est le nombre de créneaux que ni une file qui joue ni une file en attente n'occupe, de quoi tirer le lot prêt suivant du plan ;
+ * La file des demandes du lead à une vague vivante (L407 : réponses, L421 : lots ajoutés) : `take(canRun, vacantLanes)` applique les réponses déposées aux lots en question que `canRun` accepte et ajoute les lots demandés,
+ * et rend ces lots, prêts à être joués ; `vacantLanes` (L527) est le nombre de créneaux DE LA VAGUE que ni une file qui joue ni une file en attente n'occupe, de quoi tirer le lot prêt suivant du plan — pas les « créneaux libres » de la machine (`freeSlots` du registre, plafond commun à toutes les vagues : voir docs/concepts.md, « Slots and holds ») ;
  * `pollMs` est l'attente entre deux lectures quand aucune file ne finit.
  */
 export interface AnswerFeed {
-  take: (canRun: (c: LotCtx) => boolean, free: number) => LotCtx[] | Promise<LotCtx[]>;
+  take: (canRun: (c: LotCtx) => boolean, vacantLanes: number) => LotCtx[] | Promise<LotCtx[]>;
   pollMs: number;
 }
 

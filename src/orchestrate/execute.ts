@@ -291,8 +291,8 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   });
   const finished = lotFinished;
   /** L527 : les lots prêts du plan que le créneau libre peut recevoir (rien avec `--no-fill`, L587) ; `adds.fill` les contrôle et les prend. */
-  const refill = async (canRun: (c: LotCtx) => boolean, free: number): Promise<LotCtx[]> =>
-    fillsFreeSlots(args) && free > 0 ? adds.fill(fillTargetsSafe({ args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }, wctx.log), free, canRun) : [];
+  const refill = async (canRun: (c: LotCtx) => boolean, vacantLanes: number): Promise<LotCtx[]> =>
+    fillsFreeSlots(args) && vacantLanes > 0 ? adds.fill(fillTargetsSafe({ args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }, wctx.log), vacantLanes, canRun) : [];
   try {
     await runPool(ctxs, cap, all, (c) => {
       // Un lot rendu ou en échec garde son worktree et sa branche (R12) : le journal en donne le chemin.
@@ -309,7 +309,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
     }, (lots) => lots.every((c) => c.tree), {
       pollMs: deps.slotPollMs ?? ANSWER_POLL_MS,
       // L407 : les réponses déposées par `--answer` pendant la vague sont prises entre deux étapes ; un lot qui n'est plus en question ne rejoue rien.
-      take: async (canRun, free) => {
+      take: async (canRun, vacantLanes) => {
         const taken: LotCtx[] = [];
         for (const e of store.answerQueue()) {
           const c = ctxs.find((x) => lotKey(x.lot.project, x.lot.lot) === e.lot);
@@ -339,7 +339,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
           }
         }
         const added = await adds.take(canRun);
-        return [...taken, ...added, ...(await refill(canRun, free - taken.length - added.length))];
+        return [...taken, ...added, ...(await refill(canRun, vacantLanes - taken.length - added.length))];
       },
     });
     // L421 : un ajout encore en file quand plus rien ne joue ne sera plus lu : écarté et dit.

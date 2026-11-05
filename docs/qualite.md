@@ -77,6 +77,11 @@ anything, and the ratchet closes them:
   touches only config files, tests (`test/`, `*.test.*`, `*.spec.*`) and the usual bookkeeping (`qualite-baseline.json`,
   `CHANGELOG.md`, `docs/`, `.cadence/`); any other file is refused by name — committed, modified or new and not ignored,
   a rename counted on both of its paths; the untracked symbolic links a wave lays in its worktree are not counted. Every other measure of the ratchet (findings, directives, the baseline that cannot go up) still judges it.
+  **At the integration gate** (L613) the branch carries no lot name, so the config lots are recognised by their commits instead:
+  a changed config is accepted when every commit since the start that touches it cites, in its scope (`feat(L586): …`,
+  `feat(L1,L2): …`), only lots the plan at the start declares `config: true`. A config that one commit of a code lot (or of an
+  unknown lot, or with no scope) also touches, or that is modified without a commit, stays refused; a commit of a config lot that touches
+  code is refused by file name, like on the lot's own branch.
 - **A hidden path**: `.git/info/exclude` is not versioned, so it cannot be compared to the start of the lot. When it holds
   a pattern (a line that is neither blank nor a comment) the command adds a warning to its output, success or refusal,
   naming the first three patterns. It does not fail: that file legitimately holds local paths.

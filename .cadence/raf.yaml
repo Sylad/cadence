@@ -2346,6 +2346,8 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-11-05
+    notes:
+      - { date: 2026-11-05, text: "à traiter aussi : la bande dit « 9 prêts » pour des lots déjà clos au plan, le panneau dit « clos » (capture de Sylvain du 05-11)" }
   - id: L602
     title: "Où cadence écrit, et les portes (E6 + E14 de docs/etudes/ensemble-2026-11.md) : une page liste les quatre dossiers d'état, un tableau réunit les trois endroits où une porte se déclare"
     status: todo
@@ -2455,6 +2457,11 @@ lots:
     title: "Porte ciblée : tout lot qui touche CHANGELOG.md joue test/changelog.test.ts dès la porte d'écriture ; trois refus le 05-11 (L582, L591, L613) pour une entrée écrite sous la dernière version publiée au lieu de [Unreleased], vus seulement au sommet intégré, et le brief d'implémentation le dit"
     status: todo
     estimate: 0.1
+    created: 2026-11-05
+  - id: L617
+    title: "Porte déportée sur mini-blue pour cadence (orchestrate.gate.host, docs/remote-gate.md) : préparer WSL de mini-blue (node, git, clé), déclarer l'hôte, jouer la porte des lots là-bas ; mesurer avant et après sur trois lots réels, durée de porte et charge de Big-Blue (05-11 : 8 à 13 min sous charge 43, environ 4 min seule) ; avec repli local si l'hôte ne répond pas"
+    status: todo
+    estimate: 0.25
     created: 2026-11-05
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

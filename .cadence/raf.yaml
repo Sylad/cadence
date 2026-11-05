@@ -2359,9 +2359,10 @@ lots:
     started: 2026-11-05
   - id: L603
     title: "Surface pour le compte pro (E9 + E11 de docs/etudes/ensemble-2026-11.md) : convention des langues écrite (noms anglais, messages français), comptes périmés d'overview.md et stabilite.md retirés"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-05
+    started: 2026-11-05
   - id: L604
     title: "Une seule documentation de la bande (E13 de docs/etudes/ensemble-2026-11.md) : README du plugin et docs/cadence-hud.md ne font plus qu'un"
     status: todo

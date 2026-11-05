@@ -89,8 +89,6 @@ export interface LotState {
   title: string;
   /** Objectif donné au lancement (`--goal`, ou clé `goal:` du lot, L258) : remplace le titre dans les briefs, rendu au tableau. Absent : le titre. */
   goal?: string;
-  /** Nombre de commits du lot déjà intégrés quand le lancement a sauté la maquette (L621) : sert à la ligne du journal au premier départ du lot. */
-  maquetteSautee?: number;
   visible: boolean;
   small: boolean;
   /** Estimate du plan, en jours (L298) : le délai des étapes d'écriture en est proportionné. Absent (état antérieur) : le délai de base. */
@@ -245,7 +243,6 @@ export interface NewLot {
   lot: string;
   title: string;
   goal?: string;
-  maquetteSautee?: number;
   visible: boolean;
   small: boolean;
   screen?: Screen;

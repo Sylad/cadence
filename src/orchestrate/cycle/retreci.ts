@@ -23,19 +23,29 @@ const changesLayout = (goal: string): boolean => LAYOUT_WORDS.some((w) => plain(
 
 /**
  * Étape spec du lancement (`screen` de l'état) : celle de `stageScreen`, sauf pour un lot rétréci dont l'objectif ne change pas la mise en page (R2) : `screen` absent et `skipped` = le nombre de commits
- * du lot déjà dans la base (`lotWork`, lu avant toute session, N du journal). Un lot `spec: true` et un lot à acceptation scellée gardent leur chaîne (R4, R5) ; sans maquette à jouer il n'y a rien à sauter.
+ * du lot déjà dans la base (`lotWork`, lu avant toute session, N du journal). Un lot à acceptation scellée garde sa chaîne (R4) ; un lot `spec: true` sans écran n'a pas de maquette à sauter (R5), un `spec: true` avec écran la saute comme les autres (R2).
  */
 export function launchScreen(plan: Plan, repo: string, config: Pick<OrchestrateConfig, 'spec' | 'maquette'>, lot: Parameters<typeof stageScreen>[2], goal: string | undefined): { screen?: Screen; skipped?: number } {
   const ordinary = stageScreen(repo, config.spec.dir, lot, config.maquette);
   const merged = ordinary && goal ? lotWork(plan, repo, lot.id).length : 0;
-  const skip = merged > 0 && !changesLayout(goal!) && !lot.spec && !sealedAcceptation(repo, config.spec.dir, lot.id);
+  const skip = merged > 0 && !changesLayout(goal!) && !sealedAcceptation(repo, config.spec.dir, lot.id);
   return skip ? { skipped: merged } : { screen: ordinary };
 }
 
-/** Ligne du journal de la vague au premier départ d'un lot dont le lancement a sauté la maquette (R2) ; rien sinon. */
+/** Le lot tel que son budget le lit : maquette sautée, un lot `spec: true` avec écran ne paie plus l'étape spec (R2). */
+export const budgetLot = <L extends { spec?: boolean }>(lot: L, skipped: number | undefined): L => (skipped ? { ...lot, spec: false } : lot);
+
+/**
+ * Ligne du journal de la vague au premier départ d'un lot dont le lancement a sauté la maquette (R2) ; rien sinon. Aucun champ d'état (D1) : la décision du lancement est refaite
+ * par `launchScreen` (même plan, mêmes commits intégrés), seulement pour un lot sans étape ni écran ; un lot déjà démarré ne reparle pas.
+ */
 export function noteMaquetteSautee(c: LotCtx): void {
   const l = c.lot;
-  if (l.maquetteSautee) c.wave.log(`${lotKey(l.project, l.lot)} · maquette sautée : l'objectif rétrécit le lot à ${l.maquetteSautee} commit(s) déjà intégré(s) et ne change pas la mise en page`);
+  if (!l.goal || l.screen || l.steps.length) return;
+  const plan = c.loadPlan();
+  const planLot = plan.lots().find((x) => x.id === l.lot);
+  const skipped = planLot ? launchScreen(plan, l.repo, c.config, planLot, l.goal).skipped : undefined;
+  if (skipped) c.wave.log(`${lotKey(l.project, l.lot)} · maquette sautée : l'objectif rétrécit le lot à ${skipped} commit(s) déjà intégré(s) et ne change pas la mise en page`);
 }
 
 /** `{{converge}}` d'une session : la consigne de `convergeBrief`, avec le rétrécissement du lot relu dans git pour les revues de code seulement. */
@@ -68,5 +78,7 @@ export function readShrunk(c: LotCtx): Shrunk | undefined {
   } catch {
     return undefined; // lecture impossible : lot non rétréci (R12)
   }
-  return commits.some((k) => isAncestor(dir, k.sha, from)) ? { goal, from } : undefined;
+  // Intégré = dans la base réelle du lot (R1) : sur une branche reprise (L311), les commits non intégrés d'une vague passée sont des ancêtres de `from` sans être dans la base.
+  const base = c.tree?.base;
+  return commits.some((k) => isAncestor(dir, k.sha, from) && (!base || isAncestor(dir, k.sha, base))) ? { goal, from } : undefined;
 }

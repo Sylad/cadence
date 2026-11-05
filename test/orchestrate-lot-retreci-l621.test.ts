@@ -90,32 +90,29 @@ describe('R1 — un lot est rétréci par un objectif et un commit déjà intég
   it('R1 — objectif donné et un commit du lot dans la base : lot rétréci', async () => {
     const { dir } = project([visible], { commits: 1 });
     const s = await launch(dir, GOAL);
-    expect(s.maquetteSautee).toBe(1);
+    expect(s.screen).toBeUndefined();
     expect(s.goal).toBe(GOAL);
   });
   it('R1 — goal: du plan sans --goal : même résultat', async () => {
     const { dir } = project([{ ...visible, goal: GOAL }], { commits: 1 });
     const s = await launch(dir);
-    expect(s.maquetteSautee).toBe(1);
     expect(s.screen).toBeUndefined();
   });
   it('R1 — objectif sans aucun commit du lot : lot non rétréci', async () => {
     const { dir } = project([visible]);
     const s = await launch(dir, GOAL);
-    expect(s.maquetteSautee).toBeUndefined();
     expect(s.screen).toBe('component');
   });
   it('R1 — commits intégrés seulement dans un dépôt voisin : lot non rétréci', async () => {
     const { dir } = project([visible], { neighbour: true });
     const s = await launch(dir, GOAL);
     expect(s.repos?.length).toBe(1);
-    expect(s.maquetteSautee).toBeUndefined();
     expect(s.screen).toBe('component');
   });
   it('R1 — N du journal compté avant la première session', async () => {
     const { dir } = project([visible], { commits: 3 });
     const s = await launch(dir, GOAL);
-    expect(s.maquetteSautee).toBe(3);
+    expect(s.screen).toBeUndefined();
     expect(s.steps).toEqual([]);
   });
   it('R1 — lot non visible avec objectif et commit intégré : rétréci (revue R7 applicable), sans étape spec dans les deux cas', async () => {
@@ -140,7 +137,9 @@ describe('R2 — un lot rétréci sans mise en page est lancé sans spec ni maqu
     expect(kinds(h)).not.toContain('maquette');
   });
   it('R2 — la ligne « maquette sautée » est au journal avec le nombre de commits intégrés', async () => {
-    const { h, c } = shrunk({ implement: [impl], review: [ok] }, { maquetteSautee: 2 });
+    const h = harness({ script: { implement: [impl], review: [ok] }, lots: [{ title: 'x', visible: true, estimate: 0.6 }] });
+    for (let i = 0; i < 2; i++) commitFile(h.repo, `old${i}.txt`, 'feat(L1): déjà intégré');
+    const c = h.lot('L1', { goal: GOAL, visible: true }, { maquette: true });
     const lines: string[] = [];
     h.wave.log = (l) => lines.push(l);
     await runLot(c);
@@ -168,7 +167,6 @@ describe('R3 — l\'objectif qui change la mise en page garde la maquette', () =
     const { dir } = project([visible], { commits: 1 });
     const s = await launch(dir, 'changer la disposition de la liste');
     expect(s.screen).toBe('component');
-    expect(s.maquetteSautee).toBeUndefined();
   });
   it('R3 — objectif « corriger quatre erreurs de calcul » : maquette sautée', async () => {
     const { dir } = project([visible], { commits: 1 });
@@ -191,7 +189,6 @@ describe('R4 — une acceptation scellée garde la chaîne complète', () => {
     git(dir, 'commit', '-qm', 'test(L1): acceptation');
     const s = await launch(dir, GOAL);
     expect(s.screen).toBe('component');
-    expect(s.maquetteSautee).toBeUndefined();
   });
 });
 
@@ -200,13 +197,20 @@ describe('R5 — sans objectif, sans commit intégré ou lot spec: true, le choi
     const { dir } = project([visible], { commits: 1 });
     const s = await launch(dir);
     expect(s.screen).toBe('component');
-    expect(s.maquetteSautee).toBeUndefined();
   });
   it('R5 — lot spec: true rétréci : session spec de la fiche back conservée', async () => {
     const { dir } = project([{ title: 'Fiche back', estimate: 0.6, visible: true, spec: true }], { commits: 1 });
     const s = await launch(dir, GOAL);
     expect(s.specLot).toBe(true);
-    expect(s.maquetteSautee).toBeUndefined();
+  });
+});
+
+describe('R2 — un lot spec: true avec écran suit R2', () => {
+  it('R2 — lot spec: true avec écran rétréci, objectif sans mise en page : maquette sautée', async () => {
+    const { dir } = project([{ title: 'Page mixte', estimate: 0.6, screen: 'page', spec: true }], { commits: 1 });
+    const s = await launch(dir, GOAL);
+    expect(s.screen).toBeUndefined();
+    expect(s.budget).toBe(lotBudget(0.6, undefined, false, undefined));
   });
 });
 
@@ -358,6 +362,16 @@ describe('R12 — le rétrécissement est relu dans git, sans champ d\'état', (
     commitFile(b.h.repo, 'w1.txt', 'feat(L1): écrit par la vague');
     commitFile(b.h.repo, 'w2.txt', 'feat(L1): écrit par la vague');
     expect(readShrunk(b.c)).toBeUndefined();
+  });
+  it('R12 — branche reprise (L311) : des commits non intégrés, ancêtres de headBefore, ne rendent pas le lot rétréci', () => {
+    const { h, c } = shrunk({}, {}, { old: 0 });
+    git(h.repo, 'checkout', '-q', '-b', 'cadence/w1/a--L1');
+    commitFile(h.repo, 'kept.txt', 'feat(L1): vague passée, non intégré');
+    c.lot.steps.push(step(1, git(h.repo, 'rev-parse', 'HEAD')));
+    c.tree = { dir: h.repo, branch: 'cadence/w1/a--L1', base: 'main', active: false };
+    expect(readShrunk(c)).toBeUndefined();
+    c.tree.base = 'cadence/w1/a--L1';
+    expect(readShrunk(c)).toBeDefined();
   });
   it('R12 — première étape sans headBefore : lu non rétréci', () => {
     const { c } = shrunk({});

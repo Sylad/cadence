@@ -2430,6 +2430,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "compliant : 0 blocking, 0 major, 1 minor (note) — orchestré (vague 2026-11-05-1055-cad, 0 passe(s) de correction)", commit: 05eec39ce4068d0e7f3a02608e31954db8a3892d, reporte: { de: d1d06ba435aaf4107a5f0f96810d647bdd0a0963, vers: 05eec39ce4068d0e7f3a02608e31954db8a3892d, patchId: 96c1023b8699e4dd5da3cd9be6e047ce843314ab } }
   - id: L615
     title: "Test à retardement : test/hud-deliveries.test.ts L412 R12 pose des mtime en dur au 2026-10-29, sortis de la fenêtre ENDED_DAYS du collecteur le 05-11 à 10:00 UTC : main rouge en CI et à toutes les portes ; dater relativement à maintenant, et chercher dans test/ les autres utimesSync ou mtime en dur comparés à une fenêtre glissante"
     status: doing

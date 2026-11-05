@@ -6,6 +6,8 @@ import { runPool } from '../src/orchestrate/pool.js';
 import type { LotCtx } from '../src/orchestrate/cycle.js';
 import { setGate } from '../src/orchestrate/cycle/ctx.js';
 import { withPlace } from '../src/orchestrate/gate-place.js';
+import { newLot, type LotState, type WaveState } from '../src/orchestrate/state.js';
+import { renderTable } from '../src/orchestrate/table.js';
 import { GATE_HOST_DEFAULT, hostGates } from '../src/orchestrate/gate-host-slots.js';
 import type { OrchestrateConfig } from '../src/config.js';
 import { runLot } from '../src/orchestrate/cycle.js';
@@ -210,10 +212,10 @@ describe('L624 — la ligne de base ne reprend pas le tour que la porte du lot t
     expect(other).toBe(true);
   });
 
-  it('R3 — la connexion perdue prévient le lot (onLost) avant que la commande ne soit rejouée en local', async () => {
+  it('R3 — la connexion perdue prévient le lot (onLocal) avant que la commande ne soit rejouée en local', async () => {
     const h = harness();
     const events: string[] = [];
-    const o = { config: { test: 'true', gate: { host: 'machine-lost' } } as OrchestrateConfig, repo: h.repo, sha: git(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: true, label: 'porte du lot L1', local: async () => (events.push('local'), { code: 0, output: '' }), say: () => {}, onLost: () => events.push('perdue') };
+    const o = { config: { test: 'true', gate: { host: 'machine-lost' } } as OrchestrateConfig, repo: h.repo, sha: git(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: true, label: 'porte du lot L1', local: async () => (events.push('local'), { code: 0, output: '' }), say: () => {}, onLocal: () => events.push('perdue') };
     await withPlace(o, async (p) => {
       remote.lose('PERDUE');
       await p.run('echo PERDUE');
@@ -256,5 +258,85 @@ describe('L624 — le cycle pose la porte du lot « sur l\'hôte » pendant la c
     remote.lose('PERDUE');
     await runLot(ctx);
     expect(gates.slice(0, 2)).toEqual([true, undefined]);
+  });
+});
+
+describe('L624 — une porte qui attend son créneau sur l\'hôte rend aussi le créneau de session (pool réel)', () => {
+  let saved: NodeJS.ProcessEnv;
+  beforeEach(() => {
+    saved = { ...process.env };
+    const fake = fakeRemote();
+    for (const k of ['FAKE_DIR', 'FAKE_REAL_PATH', 'PATH']) process.env[k] = fake.env[k];
+  });
+  afterEach(() => {
+    process.env = saved;
+  });
+
+  it('R1 — un créneau, borne 1 sur l\'hôte : le troisième lot part pendant que le deuxième attend l\'hôte, et son état dit l\'attente', async () => {
+    const hs = [harness(), harness(), harness()];
+    const ctxs: LotCtx[] = [];
+    const gatesAtStart: ({ remote?: true; waiting?: true } | undefined)[][] = [];
+    const claude = async (args: string[], o: { cwd: string }) => {
+      const lot = /on lot `(L\d)`/.exec(args[1] ?? '')?.[1];
+      if (!lot) return claudeOut(reviewReport());
+      gatesAtStart.push(ctxs.map((c) => (c.lot.repo === o.cwd ? undefined : c.lot.gate && { ...(c.lot.gate.remote ? { remote: true as const } : {}), ...(c.lot.gate.waiting ? { waiting: true as const } : {}) })));
+      return claudeOut(workReport({ commits: [commitFile(o.cwd, `${lot}-${Math.random()}.txt`, `feat(${lot}): x`)] }));
+    };
+    const wave = { ...hs[0].wave, claude: claude as never };
+    const config = { test: 'sleep 1.5', gate: { host: 'machine-pool-r1', maxParallel: 1 } };
+    ctxs.push(...hs.map((h, i) => ({ ...h.lot('L1', {}, config), wave })));
+    ctxs[1].lot.project = 'b';
+    ctxs[2].lot.project = 'c';
+    await runPool(ctxs, 1);
+    // Trois implémentations : au départ de la troisième, la porte du lot a tourne sur l'hôte et celle du lot b attend son créneau — aucune session n'est tenue par eux.
+    expect(gatesAtStart).toHaveLength(3);
+    expect(gatesAtStart[2]).toEqual([{ remote: true }, { remote: true, waiting: true }, undefined]);
+  });
+
+  it('R1 — le tableau de --status dit « porte en attente de l\'hôte », pas « implémentation » ni « porte tests »', () => {
+    const wave: WaveState = { id: 'w1', created: '2026-11-05T08:30:00Z', cwd: '/x', budget: 2_000_000, consumed: 0, cacheRead: 0, status: 'running', pid: 1, lots: ['demo:L1'] };
+    const l: LotState = newLot({ project: 'demo', repo: '/r', lot: 'L1', title: 't', visible: false, small: false, model: 'sonnet', readOnlyPlan: false });
+    l.status = 'implementing';
+    l.next = 'review';
+    l.gate = { label: 'tests', started: new Date(Date.now() - 3 * 60_000).toISOString(), remote: true, waiting: true };
+    const row = renderTable(wave, [l])[1];
+    expect(row).toMatch(/porte en attente de l'hôte \(3 min\)/);
+    expect(row).not.toContain('implémentation');
+    expect(row).not.toContain('porte tests');
+  });
+});
+
+describe('L624 — la ligne de base d\'un lot rouge sur l\'hôte, dans le cycle', () => {
+  let saved: NodeJS.ProcessEnv;
+  beforeEach(() => {
+    saved = { ...process.env };
+    const fake = fakeRemote();
+    for (const k of ['FAKE_DIR', 'FAKE_REAL_PATH', 'PATH']) process.env[k] = fake.env[k];
+  });
+  afterEach(() => {
+    process.env = saved;
+  });
+  const lot = (h: ReturnType<typeof harness>, test: string) => h.lot('L1', {}, { test, gate: { host: 'machine-cycle-lb', maxParallel: 1 } });
+  const scripted = () => harness({ script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')] }))], review: [() => claudeOut(reviewReport())] } });
+
+  it('R5 — avec maxParallel 1, la ligne de base jouée pendant la porte du lot ne l\'attend pas : le lot finit, le rouge déjà rouge au départ est listé à part', async () => {
+    const h = scripted();
+    const ctx = lot(h, "echo ' FAIL  test/a.test.ts > tiroir'; exit 1");
+    const done = await Promise.race([runLot(ctx).then(() => true), new Promise<false>((r) => setTimeout(() => r(false), 20_000))]);
+    expect(done).toBe(true);
+    expect(ctx.lot.status).not.toBe('implementing');
+    expect(ctx.lot.warnings.some((w) => w.includes('déjà rouge(s) au sha de départ'))).toBe(true);
+    expect(h.calls.map((c) => c.kind)).toEqual(['implement', 'review']);
+  });
+
+  it('R3 — hôte tombé avant la ligne de base : repliée en local, elle retire « sur l\'hôte » de la porte du lot, puis le rend quand elle est finie', async () => {
+    const h = scripted();
+    // La commande de la porte coupe l'hôte derrière elle : la ligne de base qui suit ne peut plus l'ouvrir.
+    const ctx = lot(h, `touch "$FAKE_DIR/down"; echo ' FAIL  test/a.test.ts > tiroir'; exit 1`);
+    const gates: (boolean | undefined)[] = [];
+    h.wave.slotsChanged = () => ctx.lot.gate && gates.push(ctx.lot.gate.remote);
+    await runLot(ctx);
+    expect(gates).toEqual([true, undefined, true]);
+    expect(ctx.lot.warnings.some((w) => w.includes('déjà rouge(s) au sha de départ'))).toBe(true);
   });
 });

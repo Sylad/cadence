@@ -38,8 +38,10 @@ export interface PlaceOpts {
   env?: Record<string, string | undefined>;
   /** Le lot dont c'est la porte (L624) : un lieu ouvert pour un lot dont une porte tient déjà un tour de l'hôte (ligne de base jouée pendant la porte) ne reprend pas de tour, il attendrait la porte qui l'attend. Absent : tour propre. */
   owner?: object;
-  /** Dit au lot que la connexion est perdue, avant que la commande ne soit rejouée en local (L624) : la porte n'est plus sur l'hôte. */
-  onLost?: () => void;
+  /** Dit au lot que la porte attend un créneau de porte sur l'hôte (L624, `gate.maxParallel`) : il n'occupe alors ni session ni processeur local, et le note dans son état. Appelé une fois, seulement quand il faut attendre. */
+  onWait?: () => void;
+  /** Dit au lot que les commandes de ce lieu tournent ici et non sur l'hôte alors qu'il pouvait l'en croire (L624) : repli à l'ouverture (hôte injoignable, cache impossible) ou connexion perdue, avant le rejeu local. Pas appelé pour une porte locale d'emblée (sans hôte, arbre non validé). */
+  onLocal?: () => void;
 }
 
 const localPlace = (local: PlaceOpts['local']): Place => ({ run: local, stamp: () => ({}), remote: () => false, close: () => {} });
@@ -48,13 +50,13 @@ const localPlace = (local: PlaceOpts['local']): Place => ({ run: local, stamp: (
 /** Les lots dont une porte tient un tour de l'hôte : leurs lieux ouverts pendant ce temps (ligne de base) passent sans tour. */
 const holding = new WeakSet<object>();
 
-/** L624 : l'hôte a sa borne de portes simultanées ; la porte qui attend son tour le dit. Rend la libération du tour, que la porte d'un lot tient pour ses lieux imbriqués (`owner`). */
+/** L624 : l'hôte a sa borne de portes simultanées ; la porte qui attend son tour le dit (journal et `onWait`). Rend la libération du tour, que la porte d'un lot tient pour ses lieux imbriqués (`owner`). */
 async function takeHostTurn(o: PlaceOpts, host: string): Promise<() => void> {
   if (o.owner && holding.has(o.owner)) return () => {};
   const limit = o.config.gate?.maxParallel ?? GATE_HOST_DEFAULT;
   const turn = hostGates(host).acquire(limit);
   // `turn` déjà tenue (créneau libre) gagne la course contre le null résolu : seul un vrai tour d'attente se dit.
-  const free = (await Promise.race([turn, Promise.resolve(null)])) ?? (o.say(`${o.label} : en attente d'un créneau de porte sur ${host} (${limit} porte(s) simultanée(s) au plus)`), await turn);
+  const free = (await Promise.race([turn, Promise.resolve(null)])) ?? (o.say(`${o.label} : en attente d'un créneau de porte sur ${host} (${limit} porte(s) simultanée(s) au plus)`), o.onWait?.(), await turn);
   const owner = o.owner;
   if (owner) holding.add(owner);
   return () => {
@@ -87,6 +89,7 @@ async function openPlace(o: PlaceOpts): Promise<Place> {
   const opened = await openRemoteGate({ host, install: o.config.gate?.install, refs: o.config.gate?.refs, repo: o.repo, sha: o.sha, depsFrom: o.repo, worktreeDeps: o.config.worktreeDeps, env, timeoutMs: GATE_TIMEOUT_MS, workers: (cores) => testWorkersFrom(env, cores, configuredCap(env)) });
   if (!opened.ok) {
     release();
+    o.onLocal?.(); // la ligne de base d'une porte sur l'hôte tourne alors ici : le lot reprend sa file du pool le temps qu'elle dure
     o.say(opened.stage === 'host' ? `${o.label} : porte déportée indisponible sur ${host} (${opened.cause}) — jouée en local` : `${o.label} : cache de dépendances impossible sur ${host} (${opened.cause}) — jouée en local`);
     return localPlace(o.local);
   }
@@ -101,7 +104,7 @@ async function openPlace(o: PlaceOpts): Promise<Place> {
       if (!r.lost) return r;
       lost = true;
       release(); // la commande rejouée ici ne pèse plus sur l'hôte
-      o.onLost?.(); // ni « sur l'hôte » pour le pool : elle pèse sur la machine
+      o.onLocal?.(); // ni « sur l'hôte » pour le pool : elle pèse sur la machine
       o.say(`${o.label} : connexion perdue avec ${host} pendant la porte — rejouée en local${o.detail ? ` ${o.detail}` : ''}`);
       return o.local(command);
     },

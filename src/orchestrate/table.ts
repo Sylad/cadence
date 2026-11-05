@@ -72,11 +72,11 @@ function ux(l: LotState): string {
 
 const commits = (l: LotState) => new Set(l.steps.flatMap((s: StepState) => s.commits ?? [])).size;
 const counted = (l: LotState) => l.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
-/** L'état d'un lot (L395) : « porte tests (3 min) » tant que la commande de la porte du programme tourne dans une vague vivante, sinon l'étiquette de son statut. Une porte restée dans l'état d'une vague arrêtée (processus tué) ne tourne plus. */
+/** L'état d'un lot (L395) : « porte tests (3 min) » tant que la commande de la porte du programme tourne dans une vague vivante, « porte en attente de l'hôte (3 min) » tant qu'elle attend un créneau de porte sur `gate.host` (L624), sinon l'étiquette de son statut. Une porte restée dans l'état d'une vague arrêtée (processus tué) ne tourne plus. */
 const stateText = (l: LotState, wave: WaveState, now: number): string => {
   if (!l.gate || wave.status !== 'running') return LABEL[l.status];
   const since = Date.parse(l.gate.started);
-  return `porte ${l.gate.label}${Number.isFinite(since) ? ` (${Math.max(0, Math.floor((now - since) / 60_000))} min)` : ''}`;
+  return `porte ${l.gate.waiting ? "en attente de l'hôte" : l.gate.label}${Number.isFinite(since) ? ` (${Math.max(0, Math.floor((now - since) / 60_000))} min)` : ''}`;
 };
 
 const minutes = (l: LotState) => Math.round(l.steps.reduce((n, s) => n + (s.ended ? Date.parse(s.ended) - Date.parse(s.started) : 0), 0) / 60_000);

@@ -46,11 +46,14 @@ async function atStartSha<T>(c: LotCtx, sha: string, fn: (place: Place) => Promi
   const l = c.lot;
   const dir = mkdtempSync(join(tmpdir(), 'cadence-baseline-'));
   const links: string[] = [];
+  // La porte du lot telle qu'elle est pendant la ligne de base (L624) : « sur l'hôte » ou non. Une ligne de base repliée en local (hôte tombé, cache impossible, connexion perdue) pèse sur la machine :
+  // le lot reprend sa file du pool le temps qu'elle dure (`onLocal`), puis la porte du lot, toujours sur l'hôte, est redite telle quelle.
+  const gate = l.gate;
   try {
     git(l.repo, 'worktree', 'add', '--detach', '-f', dir, sha);
     links.push(...linkIgnored(l.repo, dir));
     // Sur l'hôte `gate.host` quand il y en a un (L403) ; le worktree local reste le lieu du rejeu si la connexion tombe.
-    return await withPlace({ config: c.config, repo: l.repo, sha, dir, needClean: false, label: `porte du lot ${l.lot}`, detail: `(ligne de base ${sha.slice(0, 7)})`, local: (cmd) => sh(c, cmd, 30 * 60_000, {}, dir), say: (line) => c.wave.log(`${lotKey(l.project, l.lot)} · ${line}`), owner: l, onLost: () => l.gate && setGate(c, { label: l.gate.label, started: l.gate.started }) }, async (place) => {
+    return await withPlace({ config: c.config, repo: l.repo, sha, dir, needClean: false, label: `porte du lot ${l.lot}`, detail: `(ligne de base ${sha.slice(0, 7)})`, local: (cmd) => sh(c, cmd, 30 * 60_000, {}, dir), say: (line) => c.wave.log(`${lotKey(l.project, l.lot)} · ${line}`), owner: l, onLocal: () => gate?.remote && setGate(c, { label: gate.label, started: gate.started }) }, async (place) => {
       // Le build d'abord, comme dans la porte (L333) : les tests lisent ce qu'il produit (`dist`), le départ sans lui rougirait tout. Un build rouge au départ
       // ne dit rien des tests : rien à rendre, l'appelant garde les tests pour rouges.
       if (c.config.build && (await place.run(c.config.build)).code !== 0) return null;
@@ -59,6 +62,7 @@ async function atStartSha<T>(c: LotCtx, sha: string, fn: (place: Place) => Promi
   } catch {
     return null;
   } finally {
+    if (gate?.remote && l.gate && !l.gate.remote) setGate(c, gate);
     for (const k of links) if (lstatSync(k, { throwIfNoEntry: false })?.isSymbolicLink()) unlinkSync(k);
     try {
       git(l.repo, 'worktree', 'remove', '--force', dir);

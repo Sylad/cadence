@@ -47,10 +47,10 @@ A gate played on the host runs no claude session and no process on the machine o
 three lots in their gate left no queue to start: on 05-11 (wave 1810-cad) the wave ran **0 session for 30 minutes**, gates of 16 minutes on mini-blue, L622 waiting.
 Now the lot whose gate runs on the host (`gate.remote` in its state, set when the command starts) holds no slot: the next queue starts at once, and the lot takes its place back when the gate ends,
 as a lot waiting its turn to integrate does (L591: the queues played may then exceed the cap for the length of its short review). A gate played locally — no `host`, host down, dirty worktree — keeps its slot, since it weighs on the machine. When the connection is lost the gate drops `gate.remote` before the command is replayed here,
-so the lot takes its slot back for the replay too.
+so the lot takes its slot back for the replay too. The same goes for the baseline (the tests of the start sha, played during a red gate): when it falls back to the local machine — host down since the gate started, cache impossible at the start sha, connection lost — the lot drops `gate.remote` for as long as it runs, then says the gate on the host again.
 
 The host has its own bound: `gate.maxParallel` gates at the same time (2 by default, per host name, whatever the number of lots). The next gate waits for one to end and says so in the journal
-(`porte du lot L12 : en attente d'un créneau de porte sur build-box (2 porte(s) simultanée(s) au plus)`); a gate that waits holds its slot as before, since it is not on the host yet. The host slot is given back when the gate closes
+(`porte du lot L12 : en attente d'un créneau de porte sur build-box (2 porte(s) simultanée(s) au plus)`). A gate that waits runs no session and no process on the machine either: the lot's state carries `gate.waiting` with `gate.remote`, it holds no slot (pool and registry alike), and `--status` prints `porte en attente de l'hôte (3 min)` instead of `implémentation`; otherwise, with the cap at 3 and the bound at 2, three waiting gates would hold three slots and leave the wave with 0 session again. The host slot is given back when the gate closes
 or when the connection is lost (the replayed command is local). The baseline played for the lot (red tests compared with the start sha) runs during its gate and reuses the slot the gate holds: it never waits for it. Measure: [docs/mesures/porte-deportee-creneau-2026-11-05.md](mesures/porte-deportee-creneau-2026-11-05.md).
 
 ## References the gate reads (L617)

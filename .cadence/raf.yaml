@@ -2494,13 +2494,14 @@ lots:
     finished: 2026-11-05
   - id: L617
     title: "Porte déportée : orchestrate.gate.refs (références poussées avec le sha) et hôte WSL préparé sur mini-blue, avec tâche Windows qui garde WSL vivant ; activation et mesure par L618"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     notes:
       - { date: 2026-11-05, text: "titre remplacé : « Porte déportée sur mini-blue pour cadence (orchestrate.gate.host, docs/remote-gate.md) : préparer WSL de mini-blue (node, git, clé), déclarer l'hôte, jouer la porte des lots là-bas ; mesurer avant et après sur trois lots réels, durée de porte et charge de Big-Blue (05-11 : 8 à 13 min sous charge 43, environ 4 min seule) ; avec repli local si l'hôte ne répond pas »" }
     review: { date: 2026-11-05, verdict: "conforme : revue Opus, un seul correctif appliqué (test de gate.refs sur la route de vague, mutation rouge) ; mesure sur trois lots réels à faire après mise en service, relevée au lot ; revue courte du diff rebasé (patch-id différent) : compliant (0 blocking, 0 major, 2 minor notes: gate.refs absent from docs/config.md and docs/overview.md; refspec `HEAD` not refused)", commit: b8975c14df44bd43b8e0aeed782bf640002cbee4 }
+    finished: 2026-11-05
   - id: L618
     title: "Activer la porte déportée dans cadence.yaml (orchestrate.gate: host mini-blue-wsl, install npm ci, refs main et origin/main, test de la config sauvé par L617), une fois L617 en service ; mesurer sur trois lots réels en vague la durée de porte et la charge de Big-Blue, avant et après (8 à 13 min sous charge 43 le 05-11)"
     status: todo

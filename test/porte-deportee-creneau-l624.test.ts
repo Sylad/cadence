@@ -173,11 +173,61 @@ describe('L624 — le lieu de la porte dit au lot si elle est sur l\'hôte', () 
   });
 });
 
-describe('L624 — le cycle pose la porte du lot « sur l\'hôte » pendant la commande', () => {
+describe('L624 — la ligne de base ne reprend pas le tour que la porte du lot tient', () => {
   let saved: NodeJS.ProcessEnv;
+  let remote: FakeRemote;
   beforeEach(() => {
     saved = { ...process.env };
-    const remote = fakeRemote();
+    remote = fakeRemote();
+    for (const k of ['FAKE_DIR', 'FAKE_REAL_PATH', 'PATH']) process.env[k] = remote.env[k];
+  });
+  afterEach(() => {
+    process.env = saved;
+  });
+
+  it('R5 — une porte ouverte pour le même lot pendant que sa porte tient le tour (ligne de base) n\'attend pas, même avec maxParallel 1', async () => {
+    const h = harness();
+    const owner = {};
+    const o = { config: { test: 'true', gate: { host: 'machine-lb', maxParallel: 1 } } as OrchestrateConfig, repo: h.repo, sha: git(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: true, label: 'porte du lot L1', local: async () => ({ code: 0, output: '' }), say: () => {}, owner };
+    let nested = false;
+    const run = withPlace(o, async () => {
+      await withPlace(o, async () => void (nested = true));
+    });
+    await Promise.race([run, new Promise((r) => setTimeout(r, 3000))]);
+    expect(nested).toBe(true);
+  });
+
+  it('R5 — un autre lot, lui, attend le tour tenu', async () => {
+    const h = harness();
+    const base = { config: { test: 'true', gate: { host: 'machine-lb2', maxParallel: 1 } } as OrchestrateConfig, repo: h.repo, sha: git(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: true, label: 'porte du lot L1', local: async () => ({ code: 0, output: '' }), say: () => {} };
+    let other = false;
+    await withPlace({ ...base, owner: {} }, async () => {
+      void withPlace({ ...base, owner: {} }, async () => void (other = true));
+      await new Promise((r) => setTimeout(r, 300));
+      expect(other).toBe(false);
+    });
+    await new Promise((r) => setTimeout(r, 500));
+    expect(other).toBe(true);
+  });
+
+  it('R3 — la connexion perdue prévient le lot (onLost) avant que la commande ne soit rejouée en local', async () => {
+    const h = harness();
+    const events: string[] = [];
+    const o = { config: { test: 'true', gate: { host: 'machine-lost' } } as OrchestrateConfig, repo: h.repo, sha: git(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: true, label: 'porte du lot L1', local: async () => (events.push('local'), { code: 0, output: '' }), say: () => {}, onLost: () => events.push('perdue') };
+    await withPlace(o, async (p) => {
+      remote.lose('PERDUE');
+      await p.run('echo PERDUE');
+    });
+    expect(events).toEqual(['perdue', 'local']);
+  });
+});
+
+describe('L624 — le cycle pose la porte du lot « sur l\'hôte » pendant la commande', () => {
+  let saved: NodeJS.ProcessEnv;
+  let remote: FakeRemote;
+  beforeEach(() => {
+    saved = { ...process.env };
+    remote = fakeRemote();
     for (const k of ['FAKE_DIR', 'FAKE_REAL_PATH', 'PATH']) process.env[k] = remote.env[k];
   });
   afterEach(() => {
@@ -196,5 +246,15 @@ describe('L624 — le cycle pose la porte du lot « sur l\'hôte » pendant la c
   it('R3 — avec gate.host, la porte du lot est posée remote ; sans hôte, elle ne l\'est pas', async () => {
     expect(await seen({ gate: { host: 'machine' } })).toEqual([true]);
     expect(await seen({})).toEqual([undefined]);
+  });
+
+  it('R3 — la connexion perdue retire « sur l\'hôte » de la porte du lot avant le rejeu local', async () => {
+    const h = harness({ script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')] }))], review: [() => claudeOut(reviewReport())] } });
+    const ctx = h.lot('L1', {}, { test: 'echo PERDUE', gate: { host: 'machine' } });
+    const gates: (boolean | undefined)[] = [];
+    h.wave.slotsChanged = () => ctx.lot.gate && gates.push(ctx.lot.gate.remote);
+    remote.lose('PERDUE');
+    await runLot(ctx);
+    expect(gates.slice(0, 2)).toEqual([true, undefined]);
   });
 });

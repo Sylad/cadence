@@ -46,12 +46,12 @@ changes. Otherwise the gate is local and the journal says `worktree non validé,
 A gate played on the host runs no claude session and no process on the machine of the wave. Until L624 the pool still counted the lot's queue as a played one, so with the cap at 3,
 three lots in their gate left no queue to start: on 05-11 (wave 1810-cad) the wave ran **0 session for 30 minutes**, gates of 16 minutes on mini-blue, L622 waiting.
 Now the lot whose gate runs on the host (`gate.remote` in its state, set when the command starts) holds no slot: the next queue starts at once, and the lot takes its place back when the gate ends,
-as a lot waiting its turn to integrate does (L591: the queues played may then exceed the cap for the length of its short review). A gate played locally — no `host`, host down, dirty worktree, connection lost —
-keeps its slot, since it weighs on the machine.
+as a lot waiting its turn to integrate does (L591: the queues played may then exceed the cap for the length of its short review). A gate played locally — no `host`, host down, dirty worktree — keeps its slot, since it weighs on the machine. When the connection is lost the gate drops `gate.remote` before the command is replayed here,
+so the lot takes its slot back for the replay too.
 
 The host has its own bound: `gate.maxParallel` gates at the same time (2 by default, per host name, whatever the number of lots). The next gate waits for one to end and says so in the journal
 (`porte du lot L12 : en attente d'un créneau de porte sur build-box (2 porte(s) simultanée(s) au plus)`); a gate that waits holds its slot as before, since it is not on the host yet. The host slot is given back when the gate closes
-or when the connection is lost (the replayed command is local). Measure: [docs/mesures/porte-deportee-creneau-2026-11-05.md](mesures/porte-deportee-creneau-2026-11-05.md).
+or when the connection is lost (the replayed command is local). The baseline played for the lot (red tests compared with the start sha) runs during its gate and reuses the slot the gate holds: it never waits for it. Measure: [docs/mesures/porte-deportee-creneau-2026-11-05.md](mesures/porte-deportee-creneau-2026-11-05.md).
 
 ## References the gate reads (L617)
 

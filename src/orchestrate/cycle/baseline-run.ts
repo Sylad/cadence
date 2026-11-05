@@ -1,4 +1,4 @@
-import { type LotCtx, startSha, save, workDir } from './ctx.js';
+import { type LotCtx, startSha, save, workDir, setGate } from './ctx.js';
 import { type GateTest, gateLabel, runGate, gateReplayable, baselineCandidates, replayGate, type GateRan, redAloneGate, gateUnnamed } from '../gate-parts.js';
 import { failedTests, compareBaseline } from '../baseline.js';
 import { lotKey } from '../state.js';
@@ -50,7 +50,7 @@ async function atStartSha<T>(c: LotCtx, sha: string, fn: (place: Place) => Promi
     git(l.repo, 'worktree', 'add', '--detach', '-f', dir, sha);
     links.push(...linkIgnored(l.repo, dir));
     // Sur l'hôte `gate.host` quand il y en a un (L403) ; le worktree local reste le lieu du rejeu si la connexion tombe.
-    return await withPlace({ config: c.config, repo: l.repo, sha, dir, needClean: false, label: `porte du lot ${l.lot}`, detail: `(ligne de base ${sha.slice(0, 7)})`, local: (cmd) => sh(c, cmd, 30 * 60_000, {}, dir), say: (line) => c.wave.log(`${lotKey(l.project, l.lot)} · ${line}`) }, async (place) => {
+    return await withPlace({ config: c.config, repo: l.repo, sha, dir, needClean: false, label: `porte du lot ${l.lot}`, detail: `(ligne de base ${sha.slice(0, 7)})`, local: (cmd) => sh(c, cmd, 30 * 60_000, {}, dir), say: (line) => c.wave.log(`${lotKey(l.project, l.lot)} · ${line}`), owner: l, onLost: () => l.gate && setGate(c, { label: l.gate.label, started: l.gate.started }) }, async (place) => {
       // Le build d'abord, comme dans la porte (L333) : les tests lisent ce qu'il produit (`dist`), le départ sans lui rougirait tout. Un build rouge au départ
       // ne dit rien des tests : rien à rendre, l'appelant garde les tests pour rouges.
       if (c.config.build && (await place.run(c.config.build)).code !== 0) return null;

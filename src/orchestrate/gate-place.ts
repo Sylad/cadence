@@ -36,20 +36,31 @@ export interface PlaceOpts {
   /** Dit une ligne dans la sortie et le journal de la vague. */
   say: (line: string) => void;
   env?: Record<string, string | undefined>;
+  /** Le lot dont c'est la porte (L624) : un lieu ouvert pour un lot dont une porte tient déjà un tour de l'hôte (ligne de base jouée pendant la porte) ne reprend pas de tour, il attendrait la porte qui l'attend. Absent : tour propre. */
+  owner?: object;
+  /** Dit au lot que la connexion est perdue, avant que la commande ne soit rejouée en local (L624) : la porte n'est plus sur l'hôte. */
+  onLost?: () => void;
 }
 
 const localPlace = (local: PlaceOpts['local']): Place => ({ run: local, stamp: () => ({}), remote: () => false, close: () => {} });
 
 
-/** L624 : l'hôte a sa borne de portes simultanées ; la porte qui attend son tour le dit. Rend la libération du créneau de l'hôte. */
+/** Les lots dont une porte tient un tour de l'hôte : leurs lieux ouverts pendant ce temps (ligne de base) passent sans tour. */
+const holding = new WeakSet<object>();
+
+/** L624 : l'hôte a sa borne de portes simultanées ; la porte qui attend son tour le dit. Rend la libération du tour, que la porte d'un lot tient pour ses lieux imbriqués (`owner`). */
 async function takeHostTurn(o: PlaceOpts, host: string): Promise<() => void> {
+  if (o.owner && holding.has(o.owner)) return () => {};
   const limit = o.config.gate?.maxParallel ?? GATE_HOST_DEFAULT;
   const turn = hostGates(host).acquire(limit);
   // `turn` déjà tenue (créneau libre) gagne la course contre le null résolu : seul un vrai tour d'attente se dit.
-  const free = await Promise.race([turn, Promise.resolve(null)]);
-  if (free) return free;
-  o.say(`${o.label} : en attente d'un créneau de porte sur ${host} (${limit} porte(s) simultanée(s) au plus)`);
-  return turn;
+  const free = (await Promise.race([turn, Promise.resolve(null)])) ?? (o.say(`${o.label} : en attente d'un créneau de porte sur ${host} (${limit} porte(s) simultanée(s) au plus)`), await turn);
+  const owner = o.owner;
+  if (owner) holding.add(owner);
+  return () => {
+    if (owner) holding.delete(owner);
+    free();
+  };
 }
 
 /**
@@ -90,6 +101,7 @@ async function openPlace(o: PlaceOpts): Promise<Place> {
       if (!r.lost) return r;
       lost = true;
       release(); // la commande rejouée ici ne pèse plus sur l'hôte
+      o.onLost?.(); // ni « sur l'hôte » pour le pool : elle pèse sur la machine
       o.say(`${o.label} : connexion perdue avec ${host} pendant la porte — rejouée en local${o.detail ? ` ${o.detail}` : ''}`);
       return o.local(command);
     },

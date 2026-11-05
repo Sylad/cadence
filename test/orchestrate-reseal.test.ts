@@ -649,8 +649,10 @@ describe('rescellé atomique et interdit aux sessions', () => {
 });
 
 describe('aide de cadence', () => {
-  it('liste cadence spec reseal, le seul chemin de correction d’un test scellé faux', () => {
-    expect(readFileSync(join(__dirname, '..', 'bin', 'cadence.js'), 'utf8')).toContain('cadence spec reseal <lot> <test>… --reason');
+  it('liste cadence spec reseal, le seul chemin de correction d’un test scellé faux', async () => {
+    const out: string[] = [];
+    await run(['help'], { cwd: process.cwd(), env: {}, out: (l) => out.push(l), err: () => {}, now: () => new Date() });
+    expect(out.join('\n')).toContain('cadence spec reseal <lot> <test>… --reason');
   });
 });
 

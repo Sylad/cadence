@@ -799,7 +799,7 @@ nothing below applies and the wave behaves as before; any other value is refused
   4. the patch-id of the lot's diff (`git patch-id --stable`, work commits only) is compared before and after the rebase. **Same patch-id**: the
      reviewed diff is the integrated diff, the verdict is **carried over** to the integrated sha, with a `reporte: { de, vers, patchId }` trace in the plan
      (and in the journal: `<project>:<lot> verdict reporté : <old sha> → <new sha> (patch-id identique)`); no new review. **Different patch-id** (context
-     changed): a short review (`review-small`) of the rebased diff is played before the branch moves, a blocking or major finding hands the lot back. A lot handed back after that short review (late refusal) and resumed with
+     changed): a short review (`review-small`) of the rebased diff is played before the branch moves, a blocking or major finding hands the lot back, and those findings are carried in the lot's state (`constats`, read by `--status`) with one journal line per finding, `<lot> · revue courte : <severity> <file:line> — <text>` (L585, as for a full review: nothing is left only in `5-review-small.json`; a short review that passes on resume clears them). A lot handed back after that short review (late refusal) and resumed with
      `--resume --integrate` plays it again, and the new verdict replaces the old trace in the lot's verdict instead of being added to it (L303);
   5. the repository's branch advances by `git merge --ff-only` (`<project>:<lot> intégré : <from>..<to>`), then the program writes the verdict and closes the
      covered sub-tasks in a plan-only commit, on the tip. The verdict's `commit` is the last work commit integrated (`vers`), so the `raf done` gate,

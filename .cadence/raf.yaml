@@ -2371,6 +2371,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "compliant (2 notes mineures, aucune action requise) — orchestré (vague 2026-11-05-1425-cad, 0 passe(s) de correction)", commit: 022fb9d92e754b659b492cf0ef879a0f14c881b6, reporte: { de: e588631d11f7a287252a823fccef64096ad3f8c3, vers: 022fb9d92e754b659b492cf0ef879a0f14c881b6, patchId: e656fafaa021e3013c5c00c5cb1dd691fcdfafc6 } }
   - id: L606
     title: "Plan natif et plan lu séparés (E5 de docs/etudes/ensemble-2026-11.md) : les 13 branches settings.format de plan.ts deviennent deux implémentations d'un même contrat, cliquet de qualité à l'appui"
     status: todo

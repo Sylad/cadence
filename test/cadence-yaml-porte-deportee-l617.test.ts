@@ -10,6 +10,10 @@ describe('L617 — la porte de cadence se joue sur mini-blue', () => {
     expect(readOrchestrateConfig(yaml).gate?.host).toBe('mini-blue-wsl');
   });
 
+  it('R3 — gate.install remplit le cache de dépendances sur l\'hôte (sans lui, le lockfile local d\'un autre sha oblige au repli local)', () => {
+    expect(readOrchestrateConfig(yaml).gate?.install).toBe('npm ci');
+  });
+
   it('R2 — la porte déclarée garde les commandes de main (la déportation ne change que le lieu)', () => {
     const o = readOrchestrateConfig(yaml);
     expect(o.test).toBe('npx vitest run');

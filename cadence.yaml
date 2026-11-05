@@ -26,6 +26,7 @@ orchestrate:
   # Porte déportée (L617) : build et tests jouent sur le WSL de mini-blue (alias ssh mini-blue-wsl, sshd du WSL sur 2222, docs/remote-gate.md), pas sur Big-Blue que les sessions de la vague saturent (charge 43 le 05-11) ; repli local si l'hôte ne répond pas.
   gate:
     host: mini-blue-wsl
+    install: npm ci
   testGate:
     code: [src/**, 'bin/*.js', '!**/*.test.ts']
     tests: ['test/**']

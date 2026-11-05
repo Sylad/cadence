@@ -2163,11 +2163,12 @@ lots:
     finished: 2026-11-04
   - id: L582
     title: "Plans riches — format de journal d'événements déclaratif (plan.journal ou équivalent) : --to-config réécrit aussi journal.ndjson au format déclaré (M10 de l'étude maritime-atlas docs/plan/etude, §152) ; reste un préalable à la bascule de maritime (§125) ; séparé de L472 par décision du lead du 04-11"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-04
     started: 2026-11-04
     review: { date: 2026-11-05, verdict: "conforme : verdict précédent tenu, seule l'entrée du CHANGELOG replacée sous [Unreleased] après le rebase (test/changelog.test.ts vert)", commit: d710620d07b9b9738d6998f90cf939358fe344fa }
+    finished: 2026-11-05
   - id: L583
     title: "Config des tests, livrée seule : vitest.workspace.ts à deux projets, le projet « lourds » (probe-L539-bords, mise-en-service L195) joué après les autres dans un seul fork — mesuré par L579 : 2 à 3 s seuls, 12 à 13 s sous une charge moyenne de 127 ; la porte, le clone et la CI jouent les deux projets ; décision du lead du 04-11 (changer une config est une décision du plan, livrée seule)"
     config: true
@@ -2384,6 +2385,11 @@ lots:
     created: 2026-11-05
   - id: L610
     title: "orchestrate --integrate déposé dans une vague reprise pour un lot rendu que cette reprise ne joue pas : la demande rend 0 (« intégration déposée »), puis la vague l'écarte en « lot inconnu » sans rien dire de plus — 05-11, L582 ; le lot doit être accepté, ou la commande refusée sur-le-champ avec le geste à faire"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-05
+  - id: L611
+    title: "orchestrate : la résolution d'un conflit de plan (src/orchestrate/integrate.ts:182) écrit ours.doc.toString() sans lineWidth: 0 ni indentSeq, contrairement à plan.ts:323 : un rebase fait passer .cadence/raf.yaml de 2 399 à 9 320 lignes, contenu intact, et la revue courte rend le lot — 05-11, L592 ; test sur la taille du plan après résolution"
     status: todo
     estimate: 0.25
     created: 2026-11-05

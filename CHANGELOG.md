@@ -87,6 +87,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - [docs/config.md](docs/config.md) (L602): one page lists the four folders cadence writes to (`.cadence/`, `.cadence/runs/<wave>/`, `~/.cadence/orchestrate`, `~/.local/share/cadence`) with what each holds, whether it is versioned and the variable that moves it (`CADENCE_HOME` does not move `~/.local/share/cadence`), and one table of the ten gates says where each is declared (the plan or `cadence.yaml`) and what it refuses. Linked from the README, `docs/overview.md` and `docs/fonctionnement.md`.
 - `orchestrate.gate.refs` (L617, [docs/remote-gate.md](docs/remote-gate.md)): the references listed there (`main`, `origin/main`) are pushed to the host with the sha, so a build that runs `git merge-base HEAD main` or a test that reads `origin/main` finds them in the host's worktree instead of going red on « référence introuvable »; a reference missing locally falls back to the local gate, said. The same page now describes a host behind WSL (ssh server of the WSL, mirrored network, alias in `~/.ssh/config`), the idle stop of the WSL VM that makes the gate fall back to local, and the scheduled task of the Windows host that keeps it up.
 
+### Fixed
+
+- `orchestrate --resume` / `--integrate` no longer fail on a `cadence.yaml` key added since the wave started (L623, `docs/orchestrate.md`): the frozen copy of the tool refused it as unknown (05-11, L599 resumed after L618: `orchestrate.gate.refs` unknown). When the frozen copy refuses the repository's `cadence.yaml` and the copy in service accepts it, the snapshot is advanced to the copy in service, and the resume says so (error output and `journal.log`); a file both refuse advances nothing.
+
 ### Changed
 
 - A lot handed back by the short review of the rebased diff (« intégration refusée : N constat(s) bloquant(s) ou majeur(s) ») now carries its findings in the lot state (`constats`, read by `--status`) and one journal line per finding (`<lot> · revue courte : <gravité> <fichier:ligne> — <texte>`), like a full review; before, they were only in `<lot>/5-review-small.json` (L585).

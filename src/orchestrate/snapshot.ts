@@ -3,7 +3,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readlinkSync, r
 import { createRequire } from 'node:module';
 import { dirname, join, sep } from 'node:path';
 import { createInterface } from 'node:readline';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 /** Racine du paquet en cours d'exécution (dist/orchestrate/ ou src/orchestrate/ → deux niveaux au-dessus). */
 export const PACKAGE_ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -120,6 +120,45 @@ export function repairSnapshotModules(waveDir: string, packageRoot: string): str
   rmSync(link, { recursive: true, force: true });
   symlinkSync(modules, link, 'dir');
   return `instantané : node_modules (${was}) ne se résolvait plus, la copie qui l'avait lancé a été retirée de la mise en service ; relié à ${modules}`;
+}
+
+/**
+ * L623 : la copie figée lit le `cadence.yaml` du dépôt, que la copie en service a pu enrichir depuis (une clé ajoutée par un lot livré) : elle la refuserait.
+ * Rend le message de son refus, ou undefined si elle accepte le fichier ou si elle ne se laisse pas interroger (pas de `dist/config.js` lisible : on ne devine rien).
+ */
+export async function frozenConfigRefusal(waveDir: string, configFile: string): Promise<string | undefined> {
+  let read: (file: string) => unknown;
+  try {
+    ({ readOrchestrateConfig: read } = await import(pathToFileURL(join(toolDirOf(waveDir), 'dist', 'config.js')).href));
+    if (typeof read !== 'function') return undefined;
+  } catch {
+    return undefined;
+  }
+  try {
+    read(configFile);
+    return undefined;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
+/** L623 : remplace le code, les gabarits et les agents de la copie figée par ceux du paquet en service ; `node_modules` (lien) reste. */
+export function advanceSnapshot(waveDir: string, packageRoot: string): void {
+  const tool = toolDirOf(waveDir);
+  for (const name of COPIED) {
+    const from = join(packageRoot, name);
+    if (!existsSync(from)) continue;
+    rmSync(join(tool, name), { recursive: true, force: true });
+    mkdirSync(dirname(join(tool, name)), { recursive: true });
+    cpSync(from, join(tool, name), { recursive: true });
+  }
+  for (const [name, target] of Object.entries(BIN_ENTRIES)) {
+    const js = join(tool, 'bin', target);
+    if (!existsSync(js)) continue;
+    chmodSync(js, 0o755);
+    rmSync(join(tool, 'bin', name), { force: true });
+    symlinkSync(target, join(tool, 'bin', name));
+  }
 }
 
 export const snapshotExists = (waveDir: string) => existsSync(join(toolDirOf(waveDir), 'bin', 'cadence.js'));

@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { planLoader } from '../config.js';
+import { planLoader, readOrchestrateConfig } from '../config.js';
 import { type Day } from '../dates.js';
 import { heldRefusal, localLotOf } from '../local-task.js';
 import { RafError } from '../plan.js';
@@ -19,7 +19,7 @@ import { projectEnv } from './preflight.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { launchCost, renderTable } from './table.js';
 import { gestureSuffix, stillRunningRefusal, withReplayHint } from './geste.js';
-import { SnapshotRefusal, repairSnapshotModules, snapshotExists, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, toolDirOf } from './snapshot.js';
+import { SnapshotRefusal, advanceSnapshot, frozenConfigRefusal, repairSnapshotModules, snapshotExists, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, toolDirOf } from './snapshot.js';
 import { answerLive, control, singleUnfinished } from './status.js';
 import { continueRounds, execute } from './execute.js';
 import type { OrchestrateDeps, OrchestrateIo } from './command.js';
@@ -48,6 +48,22 @@ export function resumeArgv(argv: string[], id: string): string[] {
   return out;
 }
 
+/** L623 : une clé ajoutée à cadence.yaml depuis le lancement de la vague serait refusée par la copie figée : on avance la copie sur celle en service, en le disant. Un fichier que la copie en service refuse aussi n'avance rien : l'erreur est celle du fichier. */
+async function advanceStaleSnapshot(store: RunStore, launch: string, packageRoot: string, io: OrchestrateIo): Promise<void> {
+  const configFile = join(launch, 'cadence.yaml');
+  const refused = await frozenConfigRefusal(store.dir, configFile);
+  if (refused === undefined) return;
+  try {
+    readOrchestrateConfig(configFile);
+  } catch {
+    return;
+  }
+  advanceSnapshot(store.dir, packageRoot);
+  const note = `instantané avancé sur la copie en service : sa copie figée refusait le cadence.yaml du dépôt (${refused})`;
+  store.journal(note);
+  io.err(`orchestrate : vague ${store.id} : ${note}`);
+}
+
 export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, today: Day): Promise<number> {
   const store = typeof args.resume === 'string' ? RunStore.find(launch, args.resume) : singleUnfinished(launch);
   if (!store) throw new RafError(`vague inconnue : ${args.resume}`);
@@ -73,6 +89,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
           io.err(`orchestrate : vague ${store.id} : ${e.message}`);
           return 2;
         }
+        await advanceStaleSnapshot(store, launch, deps.snapshot.packageRoot, io);
         return deps.snapshot.reexec(toolDirOf(store.dir), resumeArgv(argv, store.id), io.env, io);
       }
       io.err(`orchestrate : vague ${store.id} : son instantané ne connaît pas ${args.lotBudgets.length && !waveReadsLotBudget(store.dir) ? '--budget projet:lot=+N (antérieur à L223)' : `${args.integrate.some((t) => t.replay) && waveReadsIntegrate(store.dir) ? '--replay' : '--integrate'} (antérieur à L279)`} : reprise avec le dist/ et les gabarits courants`);

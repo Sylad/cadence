@@ -5,7 +5,7 @@ import { PROBE_SCHEMA, checkShape, type ProbeReport } from '../src/orchestrate/s
 import { runLot } from '../src/orchestrate/cycle.js';
 import { claudeOut, commitFile, harness, probeReport, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 
-const PREFIX = 'sonde de cas limites : attente hors règle du lot, non commitée (à reprendre en constat de revue ou en sous-tâche) : ';
+const PREFIX = 'sonde de cas limites : attente hors règle du lot, non commitée (sous-tâche proposée au lead, hors des constats de revue) : ';
 const impl = (...files: string[]): Handler => (call) => claudeOut(workReport({ commits: files.map((f) => commitFile(call.opts.cwd, f, `feat(L1): ${f}`)) }));
 const ok: Handler = () => claudeOut(reviewReport());
 const kinds = (h: ReturnType<typeof harness>) => h.calls.map((c) => c.kind);

@@ -97,7 +97,7 @@ const unplayed = (l: LotState, why: string): number => l.warnings.push(`sonde de
 /** Les attentes « hors règle du lot » du rapport (L580, issue #37) : une ligne par entrée texte non vide ; absent, vide ou mal typé, rien. */
 export function horsRegleWarnings(rep: Pick<ProbeReport, 'horsRegle'> | undefined): string[] {
   const list = Array.isArray(rep?.horsRegle) ? (rep.horsRegle as unknown[]) : [];
-  return list.filter((e): e is string => typeof e === 'string' && e.trim() !== '').map((e) => `${PROBE_FINDING}attente hors règle du lot, non commitée (à reprendre en constat de revue ou en sous-tâche) : ${e.trim()}`);
+  return list.filter((e): e is string => typeof e === 'string' && e.trim() !== '').map((e) => `${PROBE_FINDING}attente hors règle du lot, non commitée (sous-tâche proposée au lead, hors des constats de revue) : ${e.trim()}`);
 }
 
 /** Les attentes hors règle, dites au lot : un warning (tableau du lead) et une sous-tâche proposée `[hors règle] …` (rendue au lead, sans doublon), comme la dette `[instable]` (L522). Notées avant les contrôles qui rendent le lot : un rendu ne les perd pas. */

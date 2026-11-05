@@ -38,7 +38,7 @@ describe("la sonde ne commite ni fichier rouge ni fichier hors porte (L580, issu
     const c = h.lot('L1', {}, { probe: true });
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
-    expect(c.lot.warnings).toContain(`sonde de cas limites : attente hors règle du lot, non commitée (à reprendre en constat de revue ou en sous-tâche) : ${HORS}`);
+    expect(c.lot.warnings).toContain(`sonde de cas limites : attente hors règle du lot, non commitée (sous-tâche proposée au lead, hors des constats de revue) : ${HORS}`);
     expect(c.lot.warnings.filter((w) => w.includes('hors règle du lot'))).toHaveLength(2);
     expect(git(h.repo, 'log', '--format=%s')).toContain('probe(L1): p.spec.ts');
   });
@@ -105,7 +105,7 @@ describe("un fichier de sonde non commité ne reste pas dans le dépôt (L580, i
     const c = h.lot('L1', {}, { probe: true });
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
-    expect(c.lot.warnings).toContain('sonde de cas limites : attente hors règle du lot, non commitée (à reprendre en constat de revue ou en sous-tâche) : hors.spec.ts — nom vide — refus');
+    expect(c.lot.warnings).toContain('sonde de cas limites : attente hors règle du lot, non commitée (sous-tâche proposée au lead, hors des constats de revue) : hors.spec.ts — nom vide — refus');
     expect(c.lot.proposals).toEqual(['[hors règle] hors.spec.ts — nom vide — refus']);
   });
 

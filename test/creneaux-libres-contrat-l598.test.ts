@@ -87,6 +87,8 @@ describe('L598 — le même chiffre de créneaux libres, du registre et de la ba
 
   it('R4 — le plafond commun fait loi : une vague à 4 à côté d\'une vague à 3 compte au plus 3 chacune', () => {
     expect(both(4, [{ cap: 4, lanes: 4, repos: 1 }, { cap: 3, lanes: 1, repos: 1 }])).toEqual({ registre: 0, bande: 0 });
+    // Sur 5, la vague à 4 tient 4 et celle à 3 tient 1 : 5-(4+1) = 0 au plafond propre de chaque vague, 5-(3+1) = 1 au plafond commun (le plus petit, 3).
+    expect(both(5, [{ cap: 4, lanes: 4, repos: 1 }, { cap: 3, lanes: 1, repos: 1 }])).toEqual({ registre: 1, bande: 1 });
   });
 
   it('R5 — une vague sans plafond connu compte pour le plafond de la machine', () => {

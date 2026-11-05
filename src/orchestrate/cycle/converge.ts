@@ -28,7 +28,7 @@ const reviewRank = (kind: SessionKind, l: LotState): number => (kind === 'ux' ? 
 
 /**
  * `{{converge}}` d'une revue de code : à partir du rang 2 la consigne, les constats de la revue précédente et les suites déjà mises de côté ; à tout rang (la sonde joue avant la revue 1)
- * les attentes hors règle de la sonde (L625, issue #41), à ne pas rapporter en majeur. Vide pour les autres sessions.
+ * les attentes hors règle de la sonde (L625, issue #41), à ne pas rapporter du tout. Vide pour les autres sessions.
  */
 export function convergeBrief(kind: SessionKind, l: LotState): string {
   if (!(kind === 'review' || kind === 'review-small')) return '';
@@ -40,7 +40,7 @@ export function convergeBrief(kind: SessionKind, l: LotState): string {
     if (aside.length) lines.push('', 'Majors of earlier reviews already set aside as follow-ups for the lead (do not report them again):', ...aside.map((p) => `- ${p.slice(SUITE_CODE.length)}`));
   }
   const hors = horsRegleOf(l);
-  if (hors.length) lines.push(...(lines.length ? [''] : []), 'Expectations the edge-case probe found OUTSIDE the rules of the lot (already follow-ups for the lead, no correction pass): do not report them as a blocking or major finding; at most a minor.', ...hors.map((e) => `- ${e}`));
+  if (hors.length) lines.push(...(lines.length ? [''] : []), 'Expectations the edge-case probe found OUTSIDE the rules of the lot (already follow-ups for the lead, no correction pass): do not report them at all, neither as a blocking, a major nor a minor finding; they are not findings of this lot.', ...hors.map((e) => `- ${e}`));
   return lines.join('\n');
 }
 
@@ -55,23 +55,28 @@ const repeats = (previous: Constat[], k: { fichier?: string; texte: string }): b
 const convergedVerdict = (verdict: string, aside: { texte: string }[]): string => (aside.length && isNonConformingVerdict(verdict) ? asideNote(aside) : asideVerdict(verdict, aside));
 
 /**
- * Un majeur de la revue qui reprend mot pour mot (son texte contient l'entrée) une attente hors règle de la sonde ne compte pas (L625, issue #41) : elle est déjà une sous-tâche `[hors règle]` du lead
- * et n'achète pas de passe, à aucun rang. Un bloquant compte toujours ; un mineur n'achète rien. Limite connue : un texte reformulé n'est pas reconnu (le brief le demande au relecteur).
+ * Un majeur ou un mineur de la revue qui reprend mot pour mot (son texte contient l'entrée) une attente hors règle de la sonde ne compte pas (L625, issue #41) : elle est déjà une sous-tâche `[hors règle]` du lead
+ * et n'achète pas de passe, à aucun rang — ni une correction (majeur), ni la passe des mineurs (mineur). Un bloquant compte toujours. `dropped` ne porte que les majeurs écartés (la note du verdict).
+ * Limite connue : un texte reformulé n'est pas reconnu (le brief demande au relecteur de ne pas les rapporter).
  */
 function setAsideHorsRegle(rep: ReviewReport, kind: SessionKind, l: LotState): { rep: ReviewReport; dropped: string[] } {
   const hors = kind === 'review' || kind === 'review-small' ? horsRegleOf(l) : [];
-  const known = (k: ReviewReport['constats'][number]) => k.gravite === 'majeur' && hors.some((e) => k.texte.includes(e));
-  const dropped = rep.constats.filter(known);
-  if (!dropped.length) return { rep, dropped: [] };
-  for (const k of dropped) l.warnings.push(`majeur qui reprend une attente hors règle de la sonde, non compté (déjà proposée au lead) : ${k.texte}`);
-  return { rep: { ...rep, majeurs: Math.max(0, rep.majeurs - dropped.length), constats: rep.constats.filter((k) => !known(k)) }, dropped: dropped.map((k) => k.texte) };
+  const known = (k: ReviewReport['constats'][number]) => (k.gravite === 'majeur' || k.gravite === 'mineur') && hors.some((e) => k.texte.includes(e));
+  const out = rep.constats.filter(known);
+  if (!out.length) return { rep, dropped: [] };
+  for (const k of out) l.warnings.push(`${k.gravite} qui reprend une attente hors règle de la sonde, non compté (déjà proposée au lead) : ${k.texte}`);
+  const majors = out.filter((k) => k.gravite === 'majeur');
+  return {
+    rep: { ...rep, majeurs: Math.max(0, rep.majeurs - majors.length), mineurs: Math.max(0, rep.mineurs - (out.length - majors.length)), constats: rep.constats.filter((k) => !known(k)) },
+    dropped: majors.map((k) => k.texte),
+  };
 }
 
 /** Note d'une revue rendue conforme par les majeurs hors règle écartés : le verdict « non conforme » de l'agent, qui les comptait, ne doit pas rester au plan (même raison que `convergedVerdict`). */
 const horsRegleNote = (dropped: string[]): string => `conforme, ${dropped.length} majeur${dropped.length > 1 ? 's' : ''} qui reprend${dropped.length > 1 ? 'nent' : ''} une attente hors règle de la sonde, déjà proposée au lead : ${dropped.join(' ; ')}`;
 
 /**
- * Ce que la revue de code compte : le rapport sans les majeurs mis de côté (L622), son résumé (verdict suivi des suites quand il est conforme) et les lignes `[suite code]` à proposer.
+ * Ce que la revue de code compte : le rapport sans les majeurs mis de côté (L622) ni les constats qui reprennent une attente hors règle (L625), son résumé (verdict suivi des suites quand il est conforme) et les lignes `[suite code]` à proposer.
  * Un majeur marqué `inchange: true` que la revue précédente avait déjà signalé (`codeConstats`) porte une marque fausse : il compte, et le lot en garde l'avertissement.
  */
 export function countReview(rep: ReviewReport, kind: SessionKind, l: LotState, head: string, repoHeads?: Record<string, string>) {

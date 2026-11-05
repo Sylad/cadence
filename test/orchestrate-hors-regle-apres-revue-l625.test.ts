@@ -34,6 +34,28 @@ describe('R1 — une attente hors règle n\'achète jamais de passe', () => {
   });
 });
 
+describe('R1 — une attente hors règle n\'achète jamais de passe', () => {
+  it('R1 — un mineur qui reprend l\'attente n\'ouvre pas la passe des mineurs (lot non léger) ; un autre mineur l\'ouvre', async () => {
+    const minor = (texte: string): Handler => () => claudeOut(reviewReport({ mineurs: 1, constats: [{ gravite: 'mineur', texte }], verdict: 'conforme' }));
+    const h = harness({ lots: [{ title: 't', estimate: 1 }], script: { implement: [impl], probe: [probe({ horsRegle: [HORS] })], review: [minor(`Cas non couvert : ${HORS}`)], fix: [fix] } });
+    const c = h.lot('L1', {}, { probe: true });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
+    expect(c.lot.minorPass).toBeFalsy();
+    expect(c.lot.code?.conforme).toBe(true);
+    expect(c.lot.warnings.join('\n')).toContain('mineur qui reprend une attente hors règle de la sonde');
+    expect(c.lot.proposals).toEqual([`[hors règle] ${HORS}`]);
+    const other = harness({ lots: [{ title: 't', estimate: 1 }], script: { implement: [impl], probe: [probe({ horsRegle: [HORS] })], review: [minor('autre mineur')], fix: [fix], 'review-small': [() => claudeOut(reviewReport())] } });
+    await runLot(other.lot('L1', {}, { probe: true }));
+    expect(kinds(other)).toEqual(['implement', 'probe', 'review', 'fix', 'review-small']);
+  });
+  it('R1 — le brief demande de ne pas rapporter l\'attente du tout, pas « au plus un mineur »', () => {
+    const brief = convergeBrief('review', lotWith([`[hors règle] ${HORS}`]));
+    expect(brief).toContain('do not report them at all');
+    expect(brief).not.toContain('at most a minor');
+  });
+});
+
 describe('R2 — la revue suivante ne la transforme pas en majeur', () => {
   it('R2 — revue 1 : un majeur qui reprend l\'attente hors règle ne compte pas, aucune passe, un warning le dit', async () => {
     const h = harness({ script: { implement: [impl], probe: [probe({ horsRegle: [HORS] })], review: [rev([{ gravite: 'majeur', texte: `Cas non couvert : ${HORS}` }])], fix: [fix] } });

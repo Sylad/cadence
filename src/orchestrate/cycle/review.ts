@@ -231,7 +231,8 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     l.ux = summary;
     l.uxVerdict = summary.verdict;
   }
-  const minors = minorConstats(rep);
+  // Les mineurs comptés (`counted`) : un mineur qui reprend une attente hors règle de la sonde n'ouvre pas la passe des mineurs (L625).
+  const minors = minorConstats(counted);
   // Revue conforme avec mineurs : une seule passe de correction des mineurs, avant de conclure (rien sous le tapis).
   // Budget épuisé : la passe n'aurait aucune session pour la jouer, les mineurs sont rendus en propositions ; la revue conforme conclut le lot,
   // sauf un lot visible avec orchestrate.ux, qui passe à next = 'ux' puis reste suspendu tant que le budget de la vague l'est.
@@ -240,12 +241,12 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   const minorPass = wanted && !noBudget;
   if (noBudget) l.warnings.push(`${w.budget.exhausted ? 'budget atteint' : 'budget du lot trop juste pour payer la correction et la revue courte qui la suivrait'} : la passe des mineurs n'a pas eu lieu, mineurs rendus en propositions`);
   settleMinorProposals(l, minorPass, summary.conforme);
-  addProposals(c, rep, 'code', summary.head, !minorPass);
+  addProposals(c, counted, 'code', summary.head, !minorPass);
   if (summary.conforme) (l.reviewCounts ??= []).push(0); // une revue conforme compte pour 0 dans la comparaison de la convergence (L205)
   if (minorPass) {
     l.minorPass = true;
     l.minorPassAt = l.pass;
-    l.minorLines = rep.constats.filter((k) => k.gravite === 'mineur').map((k) => minorLine('code', k));
+    l.minorLines = counted.constats.filter((k) => k.gravite === 'mineur').map((k) => minorLine('code', k));
     l.minorFix = true;
     l.constats = minors;
     l.next = 'fix';

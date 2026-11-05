@@ -51,4 +51,31 @@ describe('L599 — orchestrate.md en cinq pages', () => {
   it('R6 — aucun lien relatif cassé dans les cinq pages (ancres comprises)', () => {
     expect(checkLinks(root, ['docs/orchestrate.md', ...SUITE.map((p) => `docs/${p}`)])).toEqual([]);
   });
+
+  it('R7 — le sommaire est du markdown rendu : aucune ligne du sommaire ne tombe dans un bloc de code', () => {
+    let inFence = false;
+    const inside: number[] = [];
+    read('docs/orchestrate.md').split('\n').forEach((line, i) => {
+      if (/^```/.test(line)) inFence = !inFence;
+      else if (inFence && (line.startsWith('## The five pages') || /^- \[orchestrate-[a-z]+\.md\]/.test(line))) inside.push(i + 1);
+    });
+    expect(inside).toEqual([]);
+  });
+
+  it('R8 — une page d\'usage qui cite « docs/orchestrate*.md, « Titre » » ou une clé nommée pointe la page qui porte le paragraphe', () => {
+    const pages = Object.fromEntries(['orchestrate.md', ...SUITE].map((p) => [p, read(`docs/${p}`)]));
+    const where = (needle: string): string[] => Object.keys(pages).filter((p) => pages[p].includes(needle));
+    for (const [usage, cited, needle] of [
+      ['deliver.md', 'orchestrate-gate.md', 'A red test is replayed alone'],
+      ['deliver.md', 'orchestrate-gate.md', 'A gate declared in parts'],
+      ['perf.md', 'orchestrate-cycle.md', 'Budget set by the measure'],
+      ['fonctionnement.md', 'orchestrate-cycle.md', 'Budget set by the measure'],
+    ]) {
+      expect(where(needle), needle).toContain(cited);
+      expect(read(`docs/${usage}`), `${usage} → ${cited}`).toMatch(new RegExp(`${cited.replace('.', '\\.')}[^«]{0,30}« ${needle} »`));
+    }
+    for (const usage of ['deliver.md', 'perf.md', 'fonctionnement.md']) {
+      expect(read(`docs/${usage}`), usage).not.toMatch(/docs\/orchestrate\.md[^«]{0,30}« (A red test is replayed alone|A gate declared in parts|Budget set by the measure) »/);
+    }
+  });
 });

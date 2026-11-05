@@ -26,7 +26,7 @@ Nothing in cadence names a machine: the host comes from this key, and the work f
 ## What runs where
 
 Played on the host, at the sha, in a throwaway worktree: `orchestrate.build` then `orchestrate.test` of `cadence verify --gate`
-(`docs/deliver.md`), and, in a wave (`docs/orchestrate.md`), the program's gate of a lot after a work step, the baseline of the starting sha
+(`docs/deliver.md`), and, in a wave (`docs/orchestrate-gate.md`), the program's gate of a lot after a work step, the baseline of the starting sha
 and the replay alone of the red tests (`orchestrate.testReplay`, or the `replay` of each part of a gate declared as a list, L512: each part and its replay run in their `dir` of the host's worktree). The commands are those of `cadence.yaml`, unchanged; the verdict is read as a local one
 (0 green, 1 red with the tests named, baseline, recording of the checks), and the verdict of a sha is noted in the local shared state as before.
 The other commands of a wave (claude sessions, acceptance, start, verdict) stay local.

@@ -8,7 +8,6 @@ files and moves on. The lead session keeps only the decision (which lots), the f
 questions. Nothing is resumed: a correction is a new session, never the author's reopened. The one
 exception is a **formatting retry** (below).
 
-```sh
 
 ## The five pages
 
@@ -18,6 +17,8 @@ This page keeps the opening, the commands and the options of a running wave. The
 - [orchestrate-gate.md](orchestrate-gate.md): the program's gate (build, tests, tests already red, replay alone, gate declared in parts, shares of the machine), the pre-check of sealed tests and shared files, the edge-case probe.
 - [orchestrate-spec.md](orchestrate-spec.md): the spec step (`screen:`, `spec: true`), the light mockup, the mockup review, the accept step and its lock, the downstream briefs.
 - [orchestrate-worktrees.md](orchestrate-worktrees.md): one worktree per lot, integration, a lot whose work is in a neighbouring repository, a session never commits on another repository.
+
+```sh
 
 cadence orchestrate finance-tracker:L41 ol-companion:L22 cadence:L18@haiku
 cadence orchestrate L18                      # from inside a project

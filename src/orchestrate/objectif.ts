@@ -50,7 +50,8 @@ export function gateCovers(gate: GateTest | undefined, command: string): boolean
   return runs.some((r) => squeeze(r) !== '' && claimed.includes(squeeze(r)));
 }
 
-const firstLine = (text: string): string => text.split('\n').find((x) => x.trim())?.trim() ?? '';
+/** Un état écrit avant ce lot peut ne porter ni objectif ni titre : rien à lire, chaîne vide. */
+const firstLine = (text: string | undefined): string => (text ?? '').split('\n').find((x) => x.trim())?.trim() ?? '';
 
 /** Une ligne de `nonVerifie` de la revue nomme-t-elle l'objectif : le mot (« objectif », « objective », « goal ») ou la première ligne de l'objectif. */
 function namesGoal(entry: string, goal: string): boolean {

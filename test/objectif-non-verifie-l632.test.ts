@@ -125,6 +125,12 @@ describe('L632 R2 — objectif non vérifié : couverture de la porte', () => {
     delete l.goal;
     expect(unverifiedGoal(l)).toBe('objectif non vérifié : Titre');
   });
+
+  it('un état sans objectif ni titre (écrit avant ce lot) ne plante pas', () => {
+    const l = { testsHorsPorte: 'kubectl get pods' } as never;
+    expect(unverifiedGoal(l)).toBe('objectif non vérifié : ');
+    expect(unverifiedGoal({} as never)).toBeNull();
+  });
 });
 
 const impl = (over: Record<string, unknown> = {}): Handler => (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')], ...over }));

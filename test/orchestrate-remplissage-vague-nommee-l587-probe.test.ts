@@ -37,8 +37,9 @@ function parentWith(names: string[], lotsOf: Record<string, number> = {}) {
 
 function io(cwd: string) {
   const out: string[] = [];
-  const i: OrchestrateIo = { cwd, env: { RAF_TODAY: '2026-10-04' }, out: (l) => out.push(l), err: () => {}, now: () => new Date('2026-10-04T14:12:00') };
-  return { io: i, out };
+  const err: string[] = [];
+  const i: OrchestrateIo = { cwd, env: { RAF_TODAY: '2026-10-04' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-10-04T14:12:00') };
+  return { io: i, out, err };
 }
 
 function scene() {
@@ -104,12 +105,18 @@ describe('L587 probe — --no-fill et fillsFreeSlots', () => {
 
 describe('L587 probe — vague de lots nommés', () => {
   it('dépôt seul sans cadence.yaml parent : une vague de lot nommé ne plante pas à la lecture de priority:', async () => {
-    // sous-dossier d'un parent à soi : à la racine temporaire partagée, le dépôt aurait pour frères
-    // les dépôts des autres tests joués en parallèle (readyFree / sharingProjects les scanne)
+    // Sous-dossier d'un parent à soi, à titre de précaution : à la racine temporaire partagée, le dépôt aurait pour frères les dépôts des autres tests
+    // joués en parallèle (readyFree / sharingProjects les scanne : 30 s au lieu de 1 s avec 300 frères, mais code 0). La cause du code 1 vu sur le runner
+    // GitHub n'est pas établie (non reproduite avec HOME vide, sans config git globale, CI=true) : si ce test rougit encore, le message porte la vague.
     const repo = join(tempDir(), 'solo');
     repoAt(repo, 'solo', 2);
     const s = scene();
-    expect(await orchestrate(['L1', '--max-sessions', '2'], io(repo).io, s.d)).toBe(0);
+    const run = io(repo);
+    const code = await orchestrate(['L1', '--max-sessions', '2'], run.io, s.d);
+    const vague = () => {
+      try { return readFileSync(join(RunStore.last(repo)!.dir, 'journal.log'), 'utf8'); } catch { return '(pas de journal)'; }
+    };
+    expect(code, code === 0 ? '' : `sortie :\n${run.out.join('\n')}\nerreurs :\n${run.err.join('\n')}\njournal :\n${vague()}\njoués : ${s.played.join(', ')}`).toBe(0);
     expect(s.played.some((p) => p.endsWith(':L1'))).toBe(true);
   });
 

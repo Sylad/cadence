@@ -2422,6 +2422,7 @@ lots:
     created: 2026-11-05
     started: 2026-11-05
     docs_ok: { date: 2026-11-05, reason: "correctif interne : le plan garde son format après résolution d'un conflit, aucun comportement documenté ne change" }
+    review: { date: 2026-11-05, verdict: "conforme — orchestré (vague 2026-11-05-1425-cad, 2 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant : revue courte du diff rebasé (4 commits, 398bd95..e65100b) : seul le contexte du CHANGELOG a changé, l'entrée L611 est sous [Unreleased], le plan réel fait 2 481 lignes après aller-retour (9 607 avec l'ancienne écriture), 0 constat", commit: e65100bb8be1c8ed958c970fc8179367b5cba4d6 }
   - id: L612
     title: "Sessions de vague : Playwright sans fenêtre (--headless sur le serveur MCP des sessions orchestrate, revues de maquette et UX) ; 05-11 : le Chrome ouvert par la revue de L609 a pris le focus de Sylvain, un message destiné à Claude est parti dans sa barre d'adresse ; une session ne doit jamais ouvrir de fenêtre sur le poste, sauf réglage explicite"
     status: done

@@ -8,6 +8,7 @@ import { hasSpecStage } from './ctx.js';
 import { bulletLines } from '../maquette.js';
 import { isNonConformingVerdict } from '../../audit.js';
 import { HORS_REGLE } from '../probe.js';
+import { type Shrunk } from './retreci.js';
 
 /**
  * Consigne `{{converge}}` (L622, issue #41) d'une revue de code de rang 2 ou plus : le relecteur marque `inchange: true` un majeur qui n'était pas dans la revue précédente
@@ -27,18 +28,28 @@ const horsRegleOf = (l: LotState): string[] => (l.proposals ?? []).filter((p) =>
 const reviewRank = (kind: SessionKind, l: LotState): number => (kind === 'ux' ? 1 : (l.reviewCounts?.length ?? 0) + 1);
 
 /**
- * `{{converge}}` d'une revue de code : à partir du rang 2 la consigne, les constats de la revue précédente et les suites déjà mises de côté ; à tout rang (la sonde joue avant la revue 1)
+ * Consigne `{{converge}}` d'une revue de code d'un lot rétréci (L621) : (a) juger le diff des commits postérieurs à la tête de lancement contre l'objectif, les commits déjà intégrés n'étant que du contexte ;
+ * (b) marquer `inchange: true` un majeur hors objectif et hors lignes changées, dès la revue 1 (à partir de la revue 2 c'est `CONVERGE_BRIEF` qui le dit, une seule fois).
+ */
+const shrunkJudge = (s: Shrunk): string =>
+  `The goal of this lot narrowed it to commits that are already merged into the base branch. Judge ONLY the diff of the commits written after the launch head (\`git log ${s.from}..HEAD\`, \`git diff ${s.from}..HEAD\`) against the goal: « ${s.goal} ». The commits before ${s.from} are context, not under review.`;
+
+const SHRUNK_MARK =
+  'Mark `inchange: true` on every major finding that is outside the goal and outside the lines changed by that diff: a major marked `inchange: true` does not block the lot (the program sends it to the lead as a follow-up item and buys no correction pass). A blocking finding (data loss, security, red test suite) always blocks and always buys a correction pass, marked or not.';
+
+/**
+ * `{{converge}}` d'une revue de code : la consigne du lot rétréci dès la revue 1 (L621) ; à partir du rang 2 la consigne de convergence, les constats de la revue précédente et les suites déjà mises de côté ; à tout rang (la sonde joue avant la revue 1)
  * les attentes hors règle de la sonde (L625, issue #41), à ne pas rapporter du tout. Vide pour les autres sessions.
  */
-export function convergeBrief(kind: SessionKind, l: LotState): string {
+export function convergeBrief(kind: SessionKind, l: LotState, shrunk?: Shrunk): string {
   if (!(kind === 'review' || kind === 'review-small')) return '';
-  const lines: string[] = [];
+  const lines: string[] = shrunk ? [shrunkJudge(shrunk), ''] : [];
   if (reviewRank(kind, l) > 1) {
     lines.push(CONVERGE_BRIEF);
     if (l.codeConstats?.length) lines.push('', 'Findings of the previous review that the author had to fix:', ...bulletLines(l.codeConstats));
     const aside = (l.proposals ?? []).filter((p) => p.startsWith(SUITE_CODE));
     if (aside.length) lines.push('', 'Majors of earlier reviews already set aside as follow-ups for the lead (do not report them again):', ...aside.map((p) => `- ${p.slice(SUITE_CODE.length)}`));
-  }
+  } else if (shrunk) lines.push(SHRUNK_MARK);
   const hors = horsRegleOf(l);
   if (hors.length) lines.push(...(lines.length ? [''] : []), 'Expectations the edge-case probe found OUTSIDE the rules of the lot (already follow-ups for the lead, no correction pass): do not report them at all, neither as a blocking, a major nor a minor finding; they are not findings of this lot.', ...hors.map((e) => `- ${e}`));
   return lines.join('\n');
@@ -77,9 +88,9 @@ const horsRegleNote = (dropped: string[]): string => `conforme, ${dropped.length
 
 /**
  * Ce que la revue de code compte : le rapport sans les majeurs mis de côté (L622) ni les constats qui reprennent une attente hors règle (L625), son résumé (verdict suivi des suites quand il est conforme) et les lignes `[suite code]` à proposer.
- * Un majeur marqué `inchange: true` que la revue précédente avait déjà signalé (`codeConstats`) porte une marque fausse : il compte, et le lot en garde l'avertissement.
+ * Un lot rétréci (`shrunk`, L621) compte la marque dès la revue 1. Un majeur marqué `inchange: true` que la revue précédente avait déjà signalé (`codeConstats`) porte une marque fausse : il compte, et le lot en garde l'avertissement.
  */
-export function countReview(rep: ReviewReport, kind: SessionKind, l: LotState, head: string, repoHeads?: Record<string, string>) {
+export function countReview(rep: ReviewReport, kind: SessionKind, l: LotState, head: string, { repoHeads, shrunk }: { repoHeads?: Record<string, string>; shrunk?: Shrunk } = {}) {
   const rank = reviewRank(kind, l);
   const previous = l.codeConstats ?? [];
   const falseMark = (k: ReviewReport['constats'][number]) => rank >= 2 && k.gravite === 'majeur' && k.inchange === true && repeats(previous, k);
@@ -90,7 +101,8 @@ export function countReview(rep: ReviewReport, kind: SessionKind, l: LotState, h
   }
   const horsRegle = setAsideHorsRegle(checked, kind, l);
   checked = horsRegle.rep;
-  const { rep: counted, aside } = setAsideUnchanged(checked, rank, 'code');
+  // Un lot rétréci (L621) met de côté dès la revue de code 1 ; l'UX n'a pas de marque.
+  const { rep: counted, aside } = setAsideUnchanged(checked, shrunk && kind !== 'ux' ? Math.max(rank, 2) : rank, 'code');
   const counting = summarize(counted, head, repoHeads);
   const verdict = counting.conforme ? convergedVerdict(counting.verdict, aside) : counting.verdict;
   const summary = counting.conforme ? { ...counting, verdict: horsRegle.dropped.length && isNonConformingVerdict(verdict) ? horsRegleNote(horsRegle.dropped) : verdict } : counting;

@@ -6,7 +6,8 @@ import { PLAN_DEFAULT, PLAN_LEGACY, planLoader, readOrchestrateConfig, type Orch
 import { gitRoot } from '../git.js';
 import { localLotRefusal } from '../local-task.js';
 import { Plan, isOpen } from '../plan.js';
-import { budgetStage, stageScreen } from './spec.js';
+import { budgetStage } from './spec.js';
+import { launchScreen } from './cycle/retreci.js';
 import { ESCALATION_RESERVE } from './cycle.js';
 import { addableHandBack, droppedAddSuffix } from './geste.js';
 import { type AnyModel } from './launch.js';
@@ -166,8 +167,8 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
     }
     const small = lot.estimate <= 0.5 || lot.quickwin;
     const goal = args.goal ?? lot.goal;
-    const screen = stageScreen(t.repo, env.config.spec.dir, lot, env.config.maquette);
-    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, ...(goal ? { goal } : {}), visible: lot.visible, small, ...(screen ? { screen } : {}), ...(lot.spec && !screen ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly });
+    const { screen, skipped } = launchScreen(plan, t.repo, env.config, lot, goal);
+    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, ...(goal ? { goal } : {}), visible: lot.visible, small, ...(screen ? { screen } : {}), ...(lot.spec && !screen ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly, maquetteSautee: skipped });
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.estimate = lot.estimate;
     if (isExpress({ estimate: lot.estimate, screen, specLot: state.specLot })) state.express = true;

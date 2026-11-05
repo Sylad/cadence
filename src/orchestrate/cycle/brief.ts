@@ -24,7 +24,7 @@ import { decisionsText, humanDecisions } from '../decisions.js';
 import { type Constat, type LotState } from '../state.js';
 import { git } from '../worktree.js';
 import { DOCS_GAP } from '../geste.js';
-import { convergeBrief } from './converge.js';
+import { convergeText } from './retreci.js';
 import { type LotCtx, workDir as wd, histPlan, short, startSha, hasSpecStage } from './ctx.js';
 
 function lotCommitLines(c: LotCtx): string {
@@ -204,7 +204,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   const l = c.lot;
   const lot = plan.lot(l.lot);
   const tmpDir = c.wave.store.tmpDir(l.project, l.lot);
-  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', express: kind === 'implement' && l.express ? EXPRESS_BRIEF : '', tmp: tmpText(tmpDir), workers: writesCode(kind) ? workersText(c) : '', gate: writesCode(kind) ? gateText(c.config) : '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '', converge: convergeBrief(kind, l) };
+  const vars: BriefVars = { chemin: wd(c), lot: l.lot, titre: headline(lot, l.goal), objectif: objective(lot, l.goal), commits: '', reponse: '', constats: '', spec: '', ux: uxText(c), choix: choixText(c.lot.choix ?? []), checks: kind === 'review' || kind === 'review-small' ? checksText(c) : '', docs: kind === 'review' || kind === 'review-small' ? docsText(c) : '', news: '', captures: '', express: kind === 'implement' && l.express ? EXPRESS_BRIEF : '', tmp: tmpText(tmpDir), workers: writesCode(kind) ? workersText(c) : '', gate: writesCode(kind) ? gateText(c.config) : '', repos: reposText(kind === 'implement' || kind === 'fix' ? 'write' : 'read', l.lot, l.repos ?? []), integration: c.integration ? integrationText(c.integration.base) : '', converge: convergeText(c, kind) };
   if (l.visible) {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = l.express ? expressNewsText(pwDir) : newsText(l.lot, pwDir);

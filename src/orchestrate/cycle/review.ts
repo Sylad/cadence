@@ -14,6 +14,7 @@ import { type ReviewReport, checkShape, REVIEW_SCHEMA } from '../schemas.js';
 import { addProposals, blockingConstats, minorConstats, minorLine } from './shared.js';
 import { settleMinorProposals } from './minor-proposals.js';
 import { countReview, wallReason } from './converge.js';
+import { readShrunk } from './retreci.js';
 import { handBackWithoutFinding } from '../no-finding.js';
 /** Mention « sans commit » du verdict quand la passe des mineurs n'a rien commité (l'UX finale conclut alors à la place de la passe). */
 const noCommitNote = (l: LotState): string => (l.warnings.some((w) => w.startsWith('passe des mineurs sans commit')) ? ' sans commit' : '');
@@ -200,7 +201,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     return;
   }
   // Revue de code de rang 2 ou plus (L622) : un majeur marqué `inchange: true` va en suite pour le lead et ne compte plus ; un bloquant compte toujours. Le rang est celui de la revue de code (l'UX n'a pas de marque).
-  const { counted, summary, aside } = countReview(rep, kind, l, done.after.head ?? '', done.others.length ? Object.fromEntries(done.others.map((o) => [o.repo.rel, o.after.head ?? ''])) : undefined);
+  const { counted, summary, aside } = countReview(rep, kind, l, done.after.head ?? '', { repoHeads: done.others.length ? Object.fromEntries(done.others.map((o) => [o.repo.rel, o.after.head ?? ''])) : undefined, shrunk: kind === 'ux' ? undefined : readShrunk(c) });
   if (kind === 'ux') {
     l.ux = summary;
     addProposals(c, rep, 'ux', summary.head);

@@ -102,6 +102,7 @@ a `goal:` added or changed in the plan since is not read (to change it: `--resum
 `objectif donné : …` under the lot, and the table of the wave repeats it (`<project>:<lot> — objectif donné : …`) so the lead sees which
 objective the sessions worked from.
 The review and UX briefs carry it too, on a line `Goal of the lot (it takes precedence over the title in the plan): …`, and `code-reviewer` / `qa-reviewer` measure the commits against it, not against the stale title still in a read-only plan.
+A goal that narrows a lot to commits already merged skips the mockup and lets the reviews judge only the diff of the goal (L621, [docs/orchestrate-cycle.md](orchestrate-cycle.md#a-goal-that-narrows-a-lot-to-commits-already-merged-l621)).
 
 **`--resume --budget <project>:<lot>=+N` — replaying a lot handed back for its budget (L223)**: a lot handed back with
 `correction non jouée (budget)` or `budget du lot atteint` kept its findings but not its budget, and a plain `--resume` does not replay a

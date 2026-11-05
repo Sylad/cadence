@@ -59,10 +59,10 @@ A lot's **size** is read from its estimate, in days, and decides how much ceremo
 |---|---|---|
 | **express** | estimate > 0 and ≤ 0.1 day (`EXPRESS_MAX_ESTIMATE`), no screen and not a spec lot | one session; no precheck, no probe, no separate review |
 | **light** | estimate ≤ `orchestrate.review.threshold` (0.25 day by default) | the review runs on the light model (Sonnet by default), minor findings become notes |
-| **small** | estimate ≤ 0.5 day, **or** the lot is flagged `quickwin` | one review pass: `review-small` (code and ergonomics) for a `visible` lot, a code `review` otherwise; no separate UX pass |
+| **small** | estimate ≤ 0.5 day, **or** the lot is flagged `quickwin` | a single review, no separate UX pass: `review-small` (code and ergonomics) for a `visible` lot, a code `review` otherwise; a minor finding still gets one fix, then a second review, unless the lot is also light |
 | **full** | anything bigger | the whole cycle of [the steps above](#the-steps-of-a-lot) |
 
-The words nest: an express lot is also light and small, a light lot is also small. `quickwin` (the ⚡ flag, `raf add --quickwin`) is « small, said by hand »: it makes a lot small whatever its estimate, and `raf quickwins` lists the lots with an estimate of 0.25 day or less, or flagged ⚡. Detail: [orchestrate.md](orchestrate.md#orchestrate), [fonctionnement.md](fonctionnement.md#2-a-lot-inside-a-wave).
+With the default threshold the words nest: an express lot is also light and small, a light lot is also small. `quickwin` (the ⚡ flag, `raf add --quickwin`) is « small, said by hand »: it makes a lot small whatever its estimate, and `raf quickwins` lists the lots with an estimate of 0.25 day or less, or flagged ⚡. Detail: [orchestrate.md](orchestrate.md#orchestrate), [fonctionnement.md](fonctionnement.md#2-a-lot-inside-a-wave).
 
 ## The test gate
 
@@ -173,7 +173,7 @@ files and the changelog, then prints the steps the lead plays (tag, gate, push, 
 - **delivery agent**: the `livreur` subagent that delivers one ready lot and reports in one line.
 - **express**: the smallest [size of a lot](#the-size-of-a-lot), estimate > 0 and ≤ 0.1 day, no screen and not a spec lot: one session, no precheck, no separate review.
 - **light**: estimate ≤ 0.25 day by default (`orchestrate.review.threshold`): the review runs on the light model.
-- **small**: estimate ≤ 0.5 day or `quickwin`: one single review pass, no separate UX pass.
+- **small**: estimate ≤ 0.5 day or `quickwin`: a single review and no separate UX pass.
 - **full**: any lot bigger than small: the whole cycle of steps.
 - **quickwin**: the ⚡ flag of a lot, set by hand, that makes it small whatever its estimate; `raf quickwins` lists them.
 - **git hook**: a script git runs (`pre-commit`, `post-commit`, `pre-push`), `raf hook install` installs `post-commit` and `pre-commit` (`hook.autostart` configures the pre-commit one); `cadence orchestrate` puts a temporary `pre-push` in place during a wave and, when the project declares a gate, leaves behind a permanent gate-only `pre-push` (it refuses a push with no green `cadence verify --gate`): do not delete it. See [raf.md](raf.md).

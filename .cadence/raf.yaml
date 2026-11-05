@@ -2599,9 +2599,10 @@ lots:
     created: 2026-11-05
   - id: L631
     title: "Refus « tests rouges au sommet intégré » : le journal et l'état du lot citent toujours le fichier et le nom du test, jamais seulement « Expected ; false » ; L602, L617, L622 du 05-11 ont coûté une suite complète chacun pour retrouver le nom ; mesure : 0 refus sans nom"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-11-05
+    started: 2026-11-05
   - id: L632
     title: "Issue #42 : un lot dont l'objectif n'a pas pu être vérifié ne ressort pas « prêt » en silence. Si la session déclare tests.vert faux, ou le critère de l'objectif non joué (accès absent, KUBECONFIG=/dev/null), la vague le rend avec la raison et le geste, et le tableau le dit ; la revue ne le classe plus conforme"
     goal: "Trois points de l'issue #42. Un : au lancement et en --dry-run, si orchestrate.prodAccess est faux et que le titre ou l'objectif du lot nomme kubectl, port-forward, KUBECONFIG, un cluster ou une URL de banc, une alerte dit que les sessions démarrent sans accès cluster et le geste à faire. Deux : la ligne du tableau, la note raf review et orchestrate --follow portent « objectif non vérifié : <première ligne> » quand le rapport d'implémentation dit tests.vert faux avec une commande que la porte ne couvre pas, ou quand nonVerifie de la dernière revue nomme l'objectif ; un tel lot ne ressort pas en simple « prêt ». Trois : chaque brief dit en une ligne que la session n'a pas d'accès cluster et qu'un objectif qui en demande un est une question au lead."

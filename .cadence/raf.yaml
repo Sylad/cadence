@@ -2339,9 +2339,10 @@ lots:
     created: 2026-11-05
   - id: L600
     title: "Vocabulaire (E4a + E7 + E10 de docs/etudes/ensemble-2026-11.md) : concepts.md explique les tailles de lot (express, light, small, quickwin), les quatre sens de hook et docs-ok"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-05
+    started: 2026-11-05
   - id: L601
     title: "« prêt » de la vague contre « tirable » du plan (E8 de docs/etudes/ensemble-2026-11.md) : un mot par sens, texte de ready-free.ts et ses 7 tests mis à jour ; « done » précisé"
     status: todo

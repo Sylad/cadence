@@ -144,7 +144,7 @@ files and the changelog, then prints the steps the lead plays (tag, gate, push, 
 - **session**: one fresh Claude Code run with a brief and one job.
 - **wave**: a `cadence orchestrate` run that plays several lots and prints a table of what is ready and what is handed back.
 - **sheet**: the written spec of a screen or a behaviour, with numbered rules, each tested.
-- **gate**: the build and the tests the program plays after each session, with the already-red baseline and the replay alone.
+- **gate**: the build and the tests the program plays after each session (the related ones only, in a worktree, since L590; the full suite at integration), with the already-red baseline and the replay alone.
 - **readsPlan**: `orchestrate.gate` key declaring that a test reads the plan, so plan-only commits are not crossed.
 - **worktree**: a second checkout of the repository on its own branch, one per lot, so lots play at the same time.
 - **integration**: rebasing a lot on the tip of `main`, replaying the checks and fast-forwarding, one lot at a time, before `ready`.

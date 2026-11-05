@@ -169,7 +169,7 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
     if (green) red.push(green);
   }
   if (red.length === 0) await programChecks(c, red, runs);
-  if (deferred && red.length === 0 && runs.some((r) => r.label === 'tests' && r.code === 0 && !r.instables?.length)) l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${gateLabel(c.config.test ?? '')}, code 0) : l'annonce n'est pas crue, pas de correction`);
+  if (deferred && red.length === 0 && runs.some((r) => r.label === 'tests' && r.code === 0 && r.portee !== 'ciblee' && !r.instables?.length)) l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${gateLabel(c.config.test ?? '')}, code 0) : l'annonce n'est pas crue, pas de correction`);
   else if (deferred && red.length === 0 && !runs.some((r) => r.label === 'tests' && (r.dejaRouges || r.instables?.length))) red.push(claimed);
   if (red.length) {
     toFix(c, red, 'tests rouges');

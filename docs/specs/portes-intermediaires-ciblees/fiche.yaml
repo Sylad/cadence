@@ -12,7 +12,7 @@ sujet:
       - "cadence verify --gate (L397) : il ne reprend que le verdict d'une suite complète, jamais celui d'une porte ciblée"
       - "les tests que les sessions jouent elles-mêmes (L518) : inchangés"
       - "un diff qui ne touche que des fichiers qu'aucun test n'importe (docs, cadence.yaml, gabarits) : il tombe en repli complet par R3, sans gain, c'est le cas du lot de doc"
-      - "un lot multi-dépôts (l.repos) : la porte ciblée ne lit que le diff du dépôt principal ; les fichiers des dépôts voisins ne sont pas visés, leur couverture reste celle de la suite complète d'intégration"
+      - "un lot sans worktree (orchestrate.worktrees faux, lot seul, lot à repos:) : aucune intégration ne jouera la suite complète, la porte la joue donc à chaque écriture comme avant L590, jamais ciblée"
       - "la voie express (L519) conclut sur la porte du programme : elle conclura sur une porte ciblée, le lead lisant le diff ; aucun changement de code prévu"
       - "le calcul d'un graphe de dépendances propre à cadence : le lien fichier → test est celui de vitest related ou de la commande testRelated"
 

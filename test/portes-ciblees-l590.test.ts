@@ -2,6 +2,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'n
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { runLot } from '../src/orchestrate/cycle.js';
+import type { LotCtx } from '../src/orchestrate/cycle/ctx.js';
 import { probeIo } from '../src/orchestrate/cycle/work.js';
 import { integratedChecks, programChecks } from '../src/orchestrate/cycle/checks.js';
 import { readOrchestrateConfig } from '../src/config.js';
@@ -10,7 +11,7 @@ import { renderTable } from '../src/orchestrate/table.js';
 import { recordedGate } from '../src/gate-record.js';
 import { newLot, RunStore, type LotState, type WaveState } from '../src/orchestrate/state.js';
 import { claudeOut, commitFile, git, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
-import { fake, meeting, run, setup, store, writes } from './orchestrate-worktree-harness.js';
+import { fake, lotOf, meeting, run, setup, store, writes } from './orchestrate-worktree-harness.js';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
 // L590 (fiche docs/specs/portes-intermediaires-ciblees) : la porte d'une écriture joue les tests liés au diff, la suite complète une fois à l'intégration.
@@ -40,15 +41,25 @@ const gates = (log: string, over: { full?: string; related?: string } = {}) => (
   test: `echo "FULL $PWD" >> ${log}; ${over.full ?? 'true'}`,
   testRelated: `echo "REL {files}" >> ${log}; ${over.related ?? 'true'}`,
 });
+/** Un lot à worktree actif (une intégration suivra) : seul celui-là joue des portes ciblées ; le worktree est le dépôt du harnais, la fin du cycle n'est pas celle d'une vraie intégration. */
+const tl = (h: ReturnType<typeof harness>, config: Parameters<ReturnType<typeof harness>['lot']>[2]) => Object.assign(h.lot('L1', {}, config), { tree: { dir: h.repo, branch: 'cadence/x', base: 'main', active: true } });
+/** Une écriture du lot (un commit citant L1) puis la porte du programme, sans le cycle : le constat rouge et les CheckRun sont rendus. */
+async function gateAfter(h: ReturnType<typeof harness>, c: LotCtx, file = 'a.txt', msg = 'feat(L1): a') {
+  commitFile(h.repo, file, msg);
+  const red: Awaited<ReturnType<typeof integratedChecks>>['red'] = [];
+  const runs: Awaited<ReturnType<typeof integratedChecks>>['runs'] = [];
+  await programChecks(c, red, runs);
+  return { red, runs };
+}
 const logFile = () => join(tempDir(), 'portes.log');
 
 describe('L590 R1 — après une écriture, seuls les tests liés au diff sont joués', () => {
   it('R1 — implement puis fix : chaque porte joue la commande liée sur les fichiers du diff et jamais orchestrate.test', async () => {
     const log = logFile();
-    const h = harness({ script: { implement: [impl()], fix: [impl('b.txt', 'fix(L1): b')], review: [ok] } });
-    const c = h.lot('L1', {}, gates(log, { related: '[ -f b.txt ] || { echo "FAIL  test/a.test.ts > lié"; exit 1; }' }));
-    await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
+    const h = harness();
+    const c = tl(h, gates(log, { related: '[ -f b.txt ] || { echo "FAIL  test/a.test.ts > lié"; exit 1; }' }));
+    expect((await gateAfter(h, c)).red).toHaveLength(1);
+    expect((await gateAfter(h, c, 'b.txt', 'fix(L1): b')).red).toEqual([]);
     expect(lines(log).filter((x) => x !== 'BASE')).toEqual(['REL a.txt', 'REL a.txt b.txt']);
     expect(c.lot.suiteRuns ?? 0).toBe(0);
   });
@@ -63,8 +74,8 @@ describe('L590 R2 — orchestrate.testRelated', () => {
   it('R2 — testRelated avec {files} : la commande jouée porte les fichiers du diff', async () => {
     expect(read('orchestrate:\n  test: "npm test"\n  testRelated: "npm test -- {files}"\n').testRelated).toBe('npm test -- {files}');
     const log = logFile();
-    const h = harness({ script: { implement: [impl('un fichier.txt')], review: [ok] } });
-    await runLot(h.lot('L1', {}, gates(log)));
+    const h = harness();
+    await gateAfter(h, tl(h, gates(log)), 'un fichier.txt');
     expect(lines(log)).toEqual(["REL 'un fichier.txt'"]);
   });
   it('R2 — testRelated sans {files} : cadence.yaml refusé avec le motif exact', () => {
@@ -79,50 +90,50 @@ describe('L590 R2 — orchestrate.testRelated', () => {
 describe('L590 R3 / R4 / R12 — repli sur la suite complète', () => {
   it('R3 — diff sans test lié : la suite complète est jouée et l\'entrée porte le motif « aucun test lié »', async () => {
     const log = logFile();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const c = h.lot('L1', {}, gates(log, { related: 'echo " No test files found, exiting with code 0"' }));
-    await runLot(c);
+    const h = harness();
+    const said: string[] = [];
+    h.wave.log = (line: string) => said.push(line);
+    const c = tl(h, gates(log, { related: 'echo " No test files found, exiting with code 0"' }));
+    const { runs } = await gateAfter(h, c);
     expect(lines(log)).toEqual(['REL a.txt', 'FULL']);
     expect(c.lot.suiteRuns).toBe(1);
     expect(c.lot.portes).toHaveLength(1);
     expect(c.lot.portes![0]).toMatchObject({ portee: 'complete', code: 0, motif: 'aucun test lié' });
-    expect(c.lot.checks!.runs.find((r) => r.label === 'tests')).toMatchObject({ command: c.config.test });
+    expect(runs.find((r) => r.label === 'tests')).toMatchObject({ command: c.config.test });
+    expect(said.some((x) => x.includes('porte ciblée sans test lié : suite complète jouée'))).toBe(true); // contrat A1
   });
   it('R12 — sortie « No test files found, exiting with code 0 » : repli sur la suite complète', async () => {
     const log = logFile();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const c = h.lot('L1', {}, gates(log, { related: 'echo "No test files found, exiting with code 0"' }));
-    await runLot(c);
+    const h = harness();
+    await gateAfter(h, tl(h, gates(log, { related: 'echo "No test files found, exiting with code 0"' })));
     expect(lines(log)).toEqual(['REL a.txt', 'FULL']);
   });
   it('R12 — vraie sortie rouge : pas de repli', async () => {
     const log = logFile();
-    const h = harness({ script: { implement: [impl()], fix: [impl('b.txt', 'fix(L1): b')], review: [ok] } });
-    const c = h.lot('L1', {}, gates(log, { related: '[ -f b.txt ] || { echo "FAIL  test/a.test.ts > lié"; exit 1; }' }));
-    await runLot(c);
+    const h = harness();
+    const { red } = await gateAfter(h, tl(h, gates(log, { related: 'echo "FAIL  test/a.test.ts > lié"; exit 1' })));
+    expect(red).toHaveLength(1);
     expect(lines(log)).not.toContain('FULL');
-    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
   });
   it('R12 — mots « no test files found » cités dans le titre d\'un test : pas de repli', async () => {
     const log = logFile();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const c = h.lot('L1', {}, gates(log, { related: 'echo " ✓ test/a.test.ts > no test files found, exiting with code 0 est reconnu"' }));
-    await runLot(c);
+    const h = harness();
+    const c = tl(h, gates(log, { related: 'echo " ✓ test/a.test.ts > no test files found, exiting with code 0 est reconnu"' }));
+    await gateAfter(h, c);
     expect(lines(log)).toEqual(['REL a.txt']);
     expect(c.lot.portes![0]!.portee).toBe('ciblee');
   });
   it('R12 — « aucun test » avec un code de sortie non nul : pas de repli, la porte est rouge', async () => {
     const log = logFile();
-    const h = harness({ script: { implement: [impl()], fix: [impl('b.txt', 'fix(L1): b')], review: [ok] } });
-    const c = h.lot('L1', {}, gates(log, { related: '[ -f b.txt ] || { echo "No test files found, exiting with code 1"; exit 1; }' }));
-    await runLot(c);
+    const h = harness();
+    const { red } = await gateAfter(h, tl(h, gates(log, { related: 'echo "No test files found, exiting with code 1"; exit 1' })));
+    expect(red).toHaveLength(1);
     expect(lines(log)).not.toContain('FULL');
-    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
   });
   it('R4 — test non vitest sans testRelated : suite complète jouée', async () => {
     const log = logFile();
     const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const c = h.lot('L1', {}, { test: `echo "FULL $PWD" >> ${log}` });
+    const c = tl(h, { test: `echo "FULL $PWD" >> ${log}` });
     await runLot(c);
     expect(lines(log)).toEqual(['FULL']);
     expect(c.lot.portes![0]).toMatchObject({ portee: 'complete' });
@@ -130,7 +141,7 @@ describe('L590 R3 / R4 / R12 — repli sur la suite complète', () => {
   it('R4 — startedSha absent : suite complète jouée', async () => {
     const log = logFile();
     const h = harness();
-    const c = h.lot('L1', {}, gates(log));
+    const c = tl(h, gates(log));
     commitFile(h.repo, 'a.txt', 'chore: sans lot');
     await programChecks(c, [], []);
     expect(lines(log)).toEqual(['FULL']);
@@ -175,9 +186,9 @@ describe('L590 R13 — la commande liée dérive de vitest run', () => {
       process.env.PATH = saved;
     });
     it('R13 — vitest run --reporter=dot : la porte d\'une écriture joue vitest related --run avec options et fichiers', async () => {
-      const h = harness({ script: { implement: [impl()], review: [ok] } });
-      const c = h.lot('L1', {}, { test: 'vitest run --reporter=dot' });
-      await runLot(c);
+      const h = harness();
+      const c = tl(h, { test: 'vitest run --reporter=dot' });
+      await gateAfter(h, c);
       expect(lines(process.env.VITEST_LOG!)).toEqual(['related --run --reporter=dot a.txt']);
       expect(c.lot.portes![0]).toMatchObject({ portee: 'ciblee', fichiers: ['a.txt'] });
     });
@@ -187,29 +198,39 @@ describe('L590 R13 — la commande liée dérive de vitest run', () => {
 describe('L590 R6 — un rouge ciblé suit le chemin d\'un rouge complet', () => {
   it('R6 — test lié rouge : le lot repart en correction avec le nom du test', async () => {
     const log = logFile();
-    const h = harness({ script: { implement: [impl()], fix: [impl('b.txt', 'fix(L1): b')], review: [ok] } });
-    const c = h.lot('L1', {}, gates(log, { related: '[ -f b.txt ] || { echo " FAIL  test/a.test.ts > le lié"; exit 1; }' }));
-    await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
-    expect(h.calls[1]!.brief).toContain('test/a.test.ts > le lié');
+    const h = harness();
+    const c = tl(h, gates(log, { related: '[ -f b.txt ] || { echo " FAIL  test/a.test.ts > le lié"; exit 1; }' }));
+    const { red } = await gateAfter(h, c);
+    expect(red).toHaveLength(1);
+    expect(red[0]!.texte).toContain('test/a.test.ts > le lié');
+    expect((await gateAfter(h, c, 'b.txt', 'fix(L1): b')).red).toEqual([]);
     expect(c.lot.portes!.map((p) => p.code)).toEqual([1, 0]);
+  });
+  it('R6 — test lié rouge rejoué seul et vert : instable, pas de correction, la porte enregistrée est absoute', async () => {
+    const log = logFile();
+    const h = harness();
+    const c = tl(h, { ...gates(log, { related: 'echo " FAIL  test/a.test.ts > le lié"; exit 1' }), testReplay: 'echo " ✓ {files} > le lié"' });
+    const { red, runs } = await gateAfter(h, c);
+    expect(red).toEqual([]);
+    expect(runs.find((r) => r.label === 'tests')).toMatchObject({ code: 0, portee: 'ciblee', instables: ['test/a.test.ts > le lié'] });
+    expect(c.lot.portes![0]).toMatchObject({ portee: 'ciblee', code: 0 });
   });
   it('R6 — test lié rouge déjà rouge au sha de départ : pas de correction', async () => {
     const log = logFile();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const h = harness();
     const red = 'echo " FAIL  test/a.test.ts > déjà rouge"; exit 1';
-    const c = h.lot('L1', {}, { test: `echo "FULL $PWD" >> ${log}; ${red}`, testRelated: `echo "REL {files}" >> ${log}; ${red}` });
-    await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'review']);
-    expect(c.lot.checks!.runs.find((r) => r.label === 'tests')).toMatchObject({ dejaRouges: 1, portee: 'ciblee' });
+    const c = tl(h, { test: `echo "FULL $PWD" >> ${log}; ${red}`, testRelated: `echo "REL {files}" >> ${log}; ${red}` });
+    const { red: constats, runs } = await gateAfter(h, c);
+    expect(constats).toEqual([]);
+    expect(runs.find((r) => r.label === 'tests')).toMatchObject({ dejaRouges: 1, portee: 'ciblee' });
   });
 });
 
 describe('L590 R8 / R9 — portes et suiteRuns', () => {
   it('R8 — porte ciblée : portes reçoit portee, fichiers, code et duree, suiteRuns inchangé', async () => {
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const c = h.lot('L1', {}, gates(logFile()));
-    await runLot(c);
+    const h = harness();
+    const c = tl(h, gates(logFile()));
+    await gateAfter(h, c);
     expect(c.lot.suiteRuns ?? 0).toBe(0);
     expect(c.lot.portes).toHaveLength(1);
     expect(c.lot.portes![0]).toMatchObject({ portee: 'ciblee', fichiers: ['a.txt'], code: 0 });
@@ -280,10 +301,10 @@ describe('L590 R10 — le tableau et le détail', () => {
 
 describe('L590 R11 — verify --gate ne reprend jamais une porte ciblée', () => {
   it('R11 — CheckRun ciblé : command différente de orchestrate.test et portee \'ciblee\'', async () => {
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const c = h.lot('L1', {}, gates(logFile()));
-    await runLot(c);
-    const r = c.lot.checks!.runs.find((x) => x.label === 'tests')!;
+    const h = harness();
+    const c = tl(h, gates(logFile()));
+    const { runs } = await gateAfter(h, c);
+    const r = runs.find((x) => x.label === 'tests')!;
     expect(r.portee).toBe('ciblee');
     expect(r.command).not.toBe(c.config.test);
     expect(r.command).toContain('{files}');
@@ -311,23 +332,44 @@ describe('L590 R11 — verify --gate ne reprend jamais une porte ciblée', () =>
   });
 });
 
+describe('L590 R5 — un lot sans worktree n\'a pas d\'intégration', () => {
+  it('R5 — lot sans worktree : aucune intégration ne joue la suite, la porte joue la suite complète à la place du ciblé', async () => {
+    const log = logFile();
+    const h = harness({ script: { implement: [impl()], review: [ok] } });
+    const c = h.lot('L1', {}, gates(log, { full: '[ -f a.txt ] && { echo " FAIL  test/a.test.ts > rouge"; exit 1; }; true' }));
+    const { red } = await gateAfter(h, c);
+    expect(red).toHaveLength(1);
+    expect(lines(log).filter((x) => x !== 'BASE')).toEqual(['FULL']);
+    expect(c.lot.portes![0]).toMatchObject({ portee: 'complete', fichiers: [] });
+  });
+});
+
+describe('L590 R6 — une annonce de tests rouges par la session', () => {
+  it('R6 — tests annoncés rouges, porte ciblée verte : l\'annonce n\'est pas démentie, le lot repart en correction', async () => {
+    const h = harness({ script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }))], fix: [impl('b.txt', 'fix(L1): b')], review: [ok] } });
+    const c = tl(h, { ...gates(logFile(), { full: 'exit 1' }) });
+    await runLot(c);
+    expect(kinds(h).slice(0, 2)).toEqual(['implement', 'fix']);
+    expect(c.lot.warnings.some((w) => w.includes("l'annonce n'est pas crue"))).toBe(false);
+  });
+});
+
 describe('L590 R14 — la sonde joue une porte ciblée', () => {
   it('R14 — sonde : porte ciblée', async () => {
     const log = logFile();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const c = h.lot('L1', {}, gates(log));
-    await runLot(c);
-    const red: never[] = [];
-    await probeIo(c).gate(red, []);
+    const h = harness();
+    const c = tl(h, gates(log));
+    await gateAfter(h, c);
+    await probeIo(c).gate([], []);
     expect(lines(log)).toHaveLength(2);
     expect(lines(log)[1]).toMatch(/^REL .*a\.txt$/);
     expect(c.lot.portes!.map((p) => p.portee)).toEqual(['ciblee', 'ciblee']);
   });
   it('R14 — integratedChecks : la suite complète est jouée même si les portes précédentes étaient ciblées', async () => {
     const log = logFile();
-    const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const c = h.lot('L1', {}, gates(log));
-    await runLot(c);
+    const h = harness();
+    const c = tl(h, gates(log));
+    await gateAfter(h, c);
     const { red, runs } = await integratedChecks(c, 'p:L1');
     expect(red).toEqual([]);
     expect(lines(log)).toEqual(['REL a.txt', 'FULL']);
@@ -338,7 +380,7 @@ describe('L590 R14 — la sonde joue une porte ciblée', () => {
   it('R14 — integratedChecks rouge : relancé en complet, jamais en ciblé', async () => {
     const log = logFile();
     const h = harness({ script: { implement: [impl()], review: [ok] } });
-    const c = h.lot('L1', {}, gates(log, { full: 'echo " FAIL  test/a.test.ts > rouge"; exit 1' }));
+    const c = tl(h, gates(log, { full: 'echo " FAIL  test/a.test.ts > rouge"; exit 1' }));
     const { red } = await integratedChecks(c, 'p:L1');
     expect(red.length).toBeGreaterThan(0);
     expect(lines(log)).toEqual(['FULL', 'FULL']);
@@ -348,7 +390,7 @@ describe('L590 R14 — la sonde joue une porte ciblée', () => {
 describe('L590 R15 — le brief de revue dit qu\'une porte est ciblée', () => {
   it('R15 — brief d\'un lot à porte ciblée : le texte dit « targeted »', async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });
-    await runLot(h.lot('L1', {}, gates(logFile())));
+    await runLot(tl(h, gates(logFile())));
     const brief = h.calls.find((x) => x.kind === 'review')!.brief;
     expect(brief).toMatch(/gate is targeted/);
     expect(brief).toMatch(/full suite will be played by the program at integration/);
@@ -356,7 +398,7 @@ describe('L590 R15 — le brief de revue dit qu\'une porte est ciblée', () => {
   });
   it('R15 — brief d\'une suite complète : texte inchangé', async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });
-    await runLot(h.lot('L1', {}, { test: 'true' }));
+    await runLot(tl(h, { test: 'true' }));
     const brief = h.calls.find((x) => x.kind === 'review')!.brief;
     expect(brief).not.toMatch(/gate is targeted/);
     expect(brief).toContain('(tests): green');
@@ -390,16 +432,35 @@ describe('L590 R5 / R7 — la suite complète à l\'intégration, une fois par s
   });
   it('R5 — rebase rejoué : le nouveau sommet rejoue la suite complète', async () => {
     const log = logFile();
-    const { parent } = setup(undefined, yaml, files(log));
-    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], fake({ implement: writes(meeting(2)) }));
+    const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], yaml, { ...files(log), 'f.txt': Array.from({ length: 12 }, (_, i) => `l${i}`).join('\n') + '\n' });
+    let moved = false;
+    const f = fake({
+      implement: async (cwd, brief) => {
+        await meeting(2)();
+        const lot = lotOf(brief);
+        const n = lot === 'L1' ? 4 : 7; // deux lots sur le même fichier, lignes distinctes : le second intégré est rebasé (L364)
+        writeFileSync(join(cwd, 'f.txt'), Array.from({ length: 12 }, (_, i) => (i === n ? `l${i} par ${lot}` : `l${i}`)).join('\n') + '\n');
+        git(cwd, 'add', '--', 'f.txt');
+        git(cwd, 'commit', '-q', '-m', `feat(${lot}): travail`);
+        return claudeOut(workReport({ commits: [{ sha: git(cwd, 'rev-parse', 'HEAD'), sujet: `feat(${lot}): travail` }] }));
+      },
+      'review-small': async () => {
+        // le lead avance main pendant la revue du second lot : le rebase et les contrôles sont rejoués au nouveau sommet (L364)
+        if (!moved) {
+          moved = true;
+          writeFileSync(join(repo, 'lead.txt'), 'x\n');
+          git(repo, 'add', '--', 'lead.txt');
+          git(repo, 'commit', '-q', '-m', 'plan: commit du lead');
+        }
+        return claudeOut(reviewReport());
+      },
+    });
+    const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
     expect(r.code).toBe(0);
-    // les deux lots travaillent ensemble : le second intégré est rebasé sur le premier, c'est un autre sommet, donc un autre arbre
-    const rebased = ['L1', 'L2'].map((id) => store(parent).readLot('a', id)!).filter((l) => l.code!.head !== l.checks!.head);
-    expect(rebased.length).toBeGreaterThanOrEqual(1);
-    for (const l of rebased) {
-      expect(l.portes!.map((p) => p.portee)).toEqual(['ciblee', 'complete']);
-      expect(l.suiteRuns).toBe(1);
-    }
+    expect(r.out).toContain("main a avancé pendant l'intégration, rebase rejoué");
+    const replayed = ['L1', 'L2'].map((id) => store(parent).readLot('a', id)!).find((l) => l.suiteRuns === 2)!;
+    expect(replayed.portes!.map((p) => p.portee)).toEqual(['ciblee', 'complete', 'complete']); // une suite par sommet : celui d'avant le rebase, puis le rebasé
+    expect(raw(log).filter((x) => x === 'FULL')).toHaveLength(3); // 2 lots, dont un rejoué
   });
   it('R5 — seule une porte ciblée verte enregistrée : suite complète jouée', async () => {
     const log = logFile();

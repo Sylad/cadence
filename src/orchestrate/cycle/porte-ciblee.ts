@@ -25,9 +25,9 @@ function targetOf(c: LotCtx): { template: string; files: string[] } | null {
 
 type Target = NonNullable<ReturnType<typeof targetOf>>;
 
-/** Joue les tests liés quand la porte est ciblée et en a (R1) ; `{ motif }` quand ils ne trouvent aucun test (R3 : la détection de workers.ts, ligne de fin du lanceur avec le code 0) ; `{}` sinon, la suite complète est jouée (R4). */
+/** Joue les tests liés quand la porte est ciblée, que le lot a un worktree (sans lui, aucune intégration ne jouera la suite complète : la porte la joue) et qu'il en a (R1) ; `{ motif }` quand ils ne trouvent aucun test (R3 : la détection de workers.ts, ligne de fin du lanceur avec le code 0) ; `{}` sinon, la suite complète est jouée (R4). */
 async function playRelated(c: LotCtx, place: Place, label: 'build' | 'tests', portee: Portee): Promise<{ target: Target; r: GateRan } | { motif?: string }> {
-  const target = label === 'tests' && portee === 'ciblee' ? targetOf(c) : null;
+  const target = label === 'tests' && portee === 'ciblee' && c.tree?.active ? targetOf(c) : null;
   if (!target) return {};
   const r = await place.run(withFiles(target.template, target.files));
   if (r.code !== 0 || !NO_TEST_RAN.test(r.output)) return { target, r };

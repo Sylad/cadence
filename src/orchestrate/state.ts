@@ -169,7 +169,7 @@ export interface LotState {
   minorLines?: string[];
   /** Porte du programme en cours (L395) : sa commande tourne, sans session claude. Posée au départ de chaque commande (build, puis tests), retirée à sa fin ; lue par `--status` et la bande pour ne pas dire « implémentation » d'un lot qui attend sa suite. */
   gate?: { label: 'build' | 'tests'; started: string };
-  /** Fois où le programme a joué la suite complète de la porte pour ce lot (L518) : une par passe d'écriture, hors rejeux seuls des rouges. Absent tant que la porte n'a pas joué de tests ; colonne « suites » du tableau. */
+  /** Fois où le programme a joué la suite complète de la porte pour ce lot (L518) : une par suite complète jouée (après une écriture hors worktree, à l'intégration en worktree), hors rejeux seuls des rouges. Absent tant que la porte n'a pas joué de tests ; colonne « suites » du tableau. */
   suiteRuns?: number;
   /** Chaque porte de tests jouée pour ce lot, ciblée ou complète (L590) : sa portée, les fichiers du diff qu'elle visait (vide pour une suite complète), son code, sa durée en secondes et, pour une suite complète jouée à la place d'une porte ciblée, le motif. Absent d'un état écrit avant L590 : se lit comme une liste vide. */
   portes?: { portee: 'ciblee' | 'complete'; fichiers: string[]; code: number; duree: number; motif?: string }[];

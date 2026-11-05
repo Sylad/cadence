@@ -15,7 +15,7 @@ describe('L518 R1 — la session ne joue que les tests ciblés, la porte complè
   it('R1 — gateText : le programme joue la suite une fois, la session joue les tests du code touché une fois avant de commiter', () => {
     const text = gateText({ test: 'npx vitest run', build: 'npx tsc --noEmit' });
     expect(text).toContain('`npx vitest run`');
-    expect(text).toMatch(/played once by the program/);
+    expect(text).toMatch(/played by the program/);
     expect(text).toMatch(/only the tests of the code you touch/);
     expect(text).toMatch(/once, before committing/);
   });
@@ -59,7 +59,7 @@ describe('L518 R1 — la session ne joue que les tests ciblés, la porte complè
   it('R1 — le brief réel d\'une session d\'écriture porte la consigne avec la porte du lot', async () => {
     const h = harness({ script: { implement: [impl()], review: [ok] } });
     await runLot(h.lot('L1', {}, { test: 'true', build: 'true' }));
-    expect(h.calls[0].brief).toMatch(/played once by the program/);
+    expect(h.calls[0].brief).toMatch(/played by the program/);
   });
 });
 

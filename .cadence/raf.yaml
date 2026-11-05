@@ -2561,10 +2561,11 @@ lots:
     finished: 2026-11-05
   - id: L625
     title: "Issue #41, propositions 3 et 5 : une attente hors règle de la sonde de cas limites n'achète jamais de passe et la revue suivante ne la transforme pas en majeur ; le tableau de vague imprime pour chaque lot les minutes passées après sa première revue"
-    status: todo
+    status: doing
     estimate: 0.25
     after: [ L622 ]
     created: 2026-11-05
+    started: 2026-11-05
   - id: L626
     title: "Contrôles rapides avant toute porte : un lot qui touche README.md, CHANGELOG.md, docs/ ou package.json joue en quelques secondes les tests qui lisent ces fichiers (readme-accueil, changelog, bornes de pages, files du paquet), dès la porte d'écriture et avant la suite complète d'intégration ; 05-11 : L602 et L622 refusés pour une ligne de README après 25 min de porte, L601 pour concepts.md, à compléter par une liste déclarée, faute de lien d'import"
     goal: "Trois niveaux, génériques pour tous les projets et le compte pro. Un : un fichier CLAUDE.md à la racine du dépôt cadence donne les bornes de ses fichiers (README 64 lignes et 160 colonnes au plus, docs/concepts.md 15 Ko au plus, entrées du CHANGELOG sous [Unreleased] sans titre dupliqué, toute nouvelle page de docs dans files de package.json). Deux : le brief d'implémentation reçoit les bornes des fichiers que le lot touche, lues d'une clé de cadence.yaml. Trois : un hook après écriture et les portes jouent les tests qui lisent ces fichiers (liste déclarée, faute de lien d'import) en quelques secondes, avant la suite complète."

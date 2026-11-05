@@ -137,7 +137,7 @@ describe('auto-contrôle avant revue (L222)', () => {
     expect(await run(['help'], io)).toBe(0);
     const aide = sortie.join('\n').split('\n').find((l) => /^\s*cadence corrections \[dossier\]/.test(l));
     expect(aide, 'ligne d\'aide trouvée').toContain('--since date');
-    // le binaire `cadence` garde sa propre aide (bin/cadence.js), celle de `cadence --help` et de `cadence help`
+    // le binaire `cadence` imprime la même aide (L597), celle de `cadence --help` et de `cadence help`
     for (const arg of ['--help', 'help']) {
       const binAide = execFileSync(process.execPath, [join(testPackage(), 'bin/cadence.js'), arg], { encoding: 'utf8' }).split('\n').find((l) => /^\s*cadence corrections \[dossier\]/.test(l));
       expect(binAide, `ligne d'aide de bin/cadence.js ${arg}`).toContain('--since date');

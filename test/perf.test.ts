@@ -888,8 +888,8 @@ describe('cadence perf — sortie, erreurs, lecture seule', () => {
     const out: string[] = [];
     await run(['help'], { cwd: tempDir(), env: {}, out: (l) => out.push(l), err: () => {}, now: () => new Date() });
     expect(out.join('\n')).toContain('cadence perf [dossier] [--since date] [--json]');
+    // bin/cadence.js ne tient plus d'aide (L597) : il route « perf » vers le CLI, qui porte l'aide
     const bin = readFileSync(new URL('../bin/cadence.js', import.meta.url), 'utf8');
-    expect(bin).toContain('cadence perf [dossier] [--since date] [--json]');
     expect(bin).toContain("'perf'");
   });
 });

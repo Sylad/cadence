@@ -376,10 +376,12 @@ describe('lead tour — commits des lots en cours (L245)', () => {
 });
 
 describe('point d\'entrée', () => {
-  it('bin/cadence.js route « lead » vers le CLI et le liste dans son aide', () => {
+  it('bin/cadence.js route « lead » vers le CLI, dont l\'aide le liste', async () => {
     const bin = readFileSync(new URL('../bin/cadence.js', import.meta.url), 'utf8');
     expect(bin).toMatch(/\[[^\]]*'lead'[^\]]*\]\.includes\(tool\)/);
-    expect(bin).toContain('cadence lead tour [dossier]');
+    const out: string[] = [];
+    await run(['help'], { cwd: process.cwd(), env: {}, out: (l) => out.push(l), err: () => {}, now: () => new Date() });
+    expect(out.join('\n')).toContain('cadence lead tour [dossier]');
   });
   describe('lead.ux du cadence.yaml du dossier (L197)', () => {
     it('défaut human : aucune ligne de plus, rien ne change', async () => {

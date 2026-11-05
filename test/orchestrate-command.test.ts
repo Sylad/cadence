@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { run } from '../src/cli.js';
 import { lotSlug } from '../src/orchestrate/state.js';
 import { ESCALATION_RESERVE } from '../src/orchestrate/cycle.js';
 import { lotBudget, lotBudgetBasis, orchestrate, parseBudget, parseOrchestrateArgs, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
@@ -1292,10 +1293,12 @@ describe('une vague', () => {
 });
 
 describe('point d\'entrée', () => {
-  it('bin/cadence.js route « orchestrate » vers le CLI et le liste dans son aide', () => {
+  it('bin/cadence.js route « orchestrate » vers le CLI, dont l\'aide le liste', async () => {
     const bin = readFileSync(new URL('../bin/cadence.js', import.meta.url), 'utf8');
     expect(bin).toMatch(/\[[^\]]*'orchestrate'[^\]]*\]\.includes\(tool\)/);
-    expect(bin).toContain('cadence orchestrate <projet>:<lot>');
+    const out: string[] = [];
+    await run(['help'], { cwd: process.cwd(), env: {}, out: (l) => out.push(l), err: () => {}, now: () => new Date() });
+    expect(out.join('\n')).toContain('cadence orchestrate <projet>:<lot>');
   });
 });
 

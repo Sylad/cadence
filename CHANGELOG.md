@@ -100,6 +100,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `cadence orchestrate --resume --integrate` on a live wave: the integration it queued is played ahead of the lots already waiting for a slot (L620, [docs/orchestrate.md](docs/orchestrate.md)): on 5 November L602, reviewed, stayed suspended 65 minutes behind the queue. Answers and added lots keep their place at the back.
 - A lot that touches `CHANGELOG.md` plays `test/changelog.test.ts` in its targeted gate (L616, [docs/orchestrate.md](docs/orchestrate.md), « Targeted gates after a write »): no test imports the changelog, so the targeted run never saw an entry written under the last published version instead of `[Unreleased]` (L582, L591, L613 on 05-11, refused only at the integrated tip). The implementation brief names the rule.
 - `cadence orchestrate --integrate`: the plan written after resolving a plan-only rebase conflict keeps the plan's style like `Plan.save` (L611, `lineWidth: 0`, and the `-` of the lots in the parent key's column when the repository's plan has them there): a rebase turned `.cadence/raf.yaml` from 2 399 to 9 320 lines, content intact, and the short review then handed the lot back (05-11, L592). A test measures the size of the plan after the resolution.
 

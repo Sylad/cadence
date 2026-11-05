@@ -78,6 +78,35 @@ describe('ordonnanceur', () => {
     expect(seen.every((n) => n >= 0 && n <= 3)).toBe(true);
   });
 
+  it("L620 — R1 : un lot que la file des demandes reprend à l'étape d'intégration (intégration déposée) part avant les lots déjà en file", async () => {
+    const s = setup();
+    const extra = harness();
+    const late: LotCtx = { ...extra.lot('L1'), wave: s.wave };
+    late.lot.project = 'late';
+    late.lot.next = 'integrate';
+    let given = false;
+    // un seul créneau : l'ordre de départ est l'ordre de la file
+    const settled: LotCtx[] = [];
+    await runPool(s.ctxs, 1, [], (c) => settled.push(c), () => false, {
+      pollMs: 5,
+      take: () => (given ? [] : ((given = true), [late])),
+    });
+    expect(settled[0]).toBe(late);
+    expect(settled).toHaveLength(s.ctxs.length + 1);
+  });
+
+  it("L620 — R2 : un lot pris qui ne reprend pas à l'intégration (réponse, ajout) reste derrière les lots en file", async () => {
+    const s = setup();
+    const extra = harness();
+    const late: LotCtx = { ...extra.lot('L1'), wave: s.wave };
+    late.lot.project = 'late';
+    let given = false;
+    const settled: LotCtx[] = [];
+    await runPool(s.ctxs, 1, [], (c) => settled.push(c), () => false, { pollMs: 5, take: () => (given ? [] : ((given = true), [late])) });
+    expect(settled[0]).not.toBe(late);
+    expect(settled).toContain(late);
+  });
+
   it('le budget atteint : les lots suivants sont suspendus, aucune nouvelle session', async () => {
     const s = setup(2000);
     await runPool(s.ctxs);

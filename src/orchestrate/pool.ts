@@ -119,6 +119,17 @@ function turnWatch(): { hear: (c: LotCtx) => void; arm: () => void; poked: () =>
   };
 }
 
+/** Place les lots pris à ce tour (L620) : une intégration reprise (`next: integrate`, déposée par le lead : sa revue est faite) passe devant les files en attente, dans l'ordre où elle est prise ; réponses et lots ajoutés se placent derrière. */
+function enqueueTaken(pending: LotCtx[][], taken: LotCtx[], live: Set<LotCtx>, hear: (c: LotCtx) => void): void {
+  const front: LotCtx[][] = [];
+  for (const c of taken) {
+    live.add(c);
+    hear(c);
+    (c.lot.next === 'integrate' ? front : pending).push([c]);
+  }
+  pending.unshift(...front);
+}
+
 export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] = [], onSettled: (c: LotCtx) => void = () => {}, parallel: (lots: LotCtx[]) => boolean = () => false, answers?: AnswerFeed): Promise<void> {
   const pending = groupLots(ctxs).flatMap((g) => (parallel(g) ? g.map((c) => [c]) : [g]));
   // Les lots pas encore finis de jouer (en file ou en cours) : un lot ne part pas tant que l'un d'eux est sa dépendance.
@@ -185,11 +196,7 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
   ctxs.forEach(turns.hear);
   for (;;) {
     admitted.length = 0;
-    for (const c of (await answers?.take(canRun, Math.max(0, slots - holdingSlots(running) - pending.filter((q) => !blocked(q)).length))) ?? []) {
-      live.add(c);
-      turns.hear(c);
-      pending.push([c]);
-    }
+    enqueueTaken(pending, (await answers?.take(canRun, Math.max(0, slots - holdingSlots(running) - pending.filter((q) => !blocked(q)).length))) ?? [], live, turns.hear);
     turns.arm();
     while (holdingSlots(running) < slots) {
       const next = pending.findIndex((q) => !blocked(q));

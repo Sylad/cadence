@@ -2320,12 +2320,13 @@ lots:
     created: 2026-11-05
   - id: L598
     title: "Un seul calcul des créneaux libres (E1 de docs/etudes/ensemble-2026-11.md) : registre, bande et vague lisent le même chiffre, publié une fois, au lieu de deux formules et d'un compte interne"
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L589, L591 ]
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "compliant : findings traités confirmés (cap null, montage partagé, formule dite une fois), 2 notes mineures (titre d'un test de bord, CHANGELOG muet sur le chiffre de la bande) — orchestré (vague 2026-11-05-1055-cad, 2 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : conforme : rebase sans effet sur le lot (8 commits à patch identique, aucun fichier commun avec ce qui a bougé sur main), 0 constat", commit: 9b35c6335c9549e29c65102e56a6b43c6022209c }
+    finished: 2026-11-05
   - id: L599
     title: "orchestrate.md en cinq pages (E12 de docs/etudes/ensemble-2026-11.md) : 308 Ko sans sommaire découpés, avec dans le même commit les 26 tests qui citent la page, files de package.json et CHECKED de scripts/check-links.mjs"
     status: todo
@@ -2386,7 +2387,7 @@ lots:
   - id: L609
     title: "Bande cadence-hud : les lots d'une vague déjà clos au plan ne sont plus listés, un compteur « livrés : N » les remplace, avec la même fonction que le panneau des lots (L592) ; Sylvain le 05-11, capture de la vague 1310-cad reprise : 21 lignes « prêt » de lots déjà livrés au-dessus de tout"
     public: La bande ne liste plus les lots déjà clos, seulement leur nombre
-    status: doing
+    status: done
     estimate: 0.25
     visible: true
     screen: component
@@ -2397,13 +2398,16 @@ lots:
       - { date: 2026-11-05, text: "Revue de la fiche — mineur : docs/specs/bande-lots-clos/fiche.yaml:1 — Références de lignes périmées : l'en-tête et R1 citent register.tsx:596-660 et 596-640, or les lignes de vague sont à register.tsx:576-670 (waveRows 576, cellules 602, « en attente » 669). La source de R1 reste vérifiable, mais les numéros sont faux." }
       - { date: 2026-11-05, text: "Revue de la fiche — mineur : docs/specs/bande-lots-clos/fiche.yaml:47 — R4 demande une « fonction partagée » avec restGroups, mais restGroups (lots.ts:305) n'est pas exportée et travaille par projet sur toutes les vagues (dédoublonnage par première vague, groupes prêts/livrés/clos), alors que la bande partitionne vague par vague. La fiche ne dit pas quelle fonction est extraite. Un lot de projet absent du tableau lu (aucune ligne `closed`) n'a pas non plus de règle explicite : il resterait listé, ce que R1 couvre sans le nommer." }
     review: { date: 2026-11-05, verdict: "compliant : 0 bloquant, 0 majeur (3 notes mineures) — orchestré (vague 2026-11-05-1055-cad, 0 passe(s) de correction)", commit: 9a3e6a6ee1200b21d48ae9a27af48ce89717eace, reporte: { de: f8dda110a4efe882034fa3dcc25e4e66e9f9ea28, vers: 9a3e6a6ee1200b21d48ae9a27af48ce89717eace, patchId: 5bf08bd4e239abb4248f04e8ef20bd01d20bdd0b } }
+    ux: { date: 2026-11-05, verdict: "conforme : revue UX de la maquette sans réserve, 0 bloquant 0 majeur ; rendu réel à confirmer à l'œil par Sylvain après mise en service" }
+    finished: 2026-11-05
   - id: L610
     title: "orchestrate --integrate déposé dans une vague reprise pour un lot rendu que cette reprise ne joue pas : la demande rend 0 (« intégration déposée »), puis la vague l'écarte en « lot inconnu » sans rien dire de plus — 05-11, L582 ; le lot doit être accepté, ou la commande refusée sur-le-champ avec le geste à faire"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "compliant — 0 blocking, 0 major, 1 minor (ponctuation d'une phrase de docs/orchestrate.md). Revue de af6004f et ab7c315, tests L610 verts (9/9). — orchestré (vague 2026-11-05-1055-cad, 0 passe(s) de correction)", commit: 2ba72ce59001840ce23d2e50a59e3f13207bbe88, reporte: { de: ab7c315da84fbc9e56e95ce4dbfec9f0d19f19df, vers: 2ba72ce59001840ce23d2e50a59e3f13207bbe88, patchId: f78c87076551cf04cc5c16b1fac4886c171292d3 } }
+    finished: 2026-11-05
   - id: L611
     title: "orchestrate : la résolution d'un conflit de plan (src/orchestrate/integrate.ts:182) écrit ours.doc.toString() sans lineWidth: 0 ni indentSeq, contrairement à plan.ts:323 : un rebase fait passer .cadence/raf.yaml de 2 399 à 9 320 lignes, contenu intact, et la revue courte rend le lot — 05-11, L592 ; test sur la taille du plan après résolution"
     status: doing
@@ -2413,11 +2417,12 @@ lots:
     docs_ok: { date: 2026-11-05, reason: "correctif interne : le plan garde son format après résolution d'un conflit, aucun comportement documenté ne change" }
   - id: L612
     title: "Sessions de vague : Playwright sans fenêtre (--headless sur le serveur MCP des sessions orchestrate, revues de maquette et UX) ; 05-11 : le Chrome ouvert par la revue de L609 a pris le focus de Sylvain, un message destiné à Claude est parti dans sa barre d'adresse ; une session ne doit jamais ouvrir de fenêtre sur le poste, sauf réglage explicite"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "compliant — orchestré (vague 2026-11-05-1055-cad, 0 passe(s) de correction)", commit: 87e8dee1d9f9cd21313aa27de782471b356672e4, reporte: { de: 87f3d461809e7a24beadc199b1702c0048b26ae7, vers: 87e8dee1d9f9cd21313aa27de782471b356672e4, patchId: d57c7d64c2b96d2f2bc863b5d783401519ac5a44 } }
+    finished: 2026-11-05
   - id: L613
     title: "Lot config: true (L586) rouge au sommet intégré : scripts/qualite.mjs reconnaît le lot de config au nom de sa branche (cadence/<vague>/<projet>--<lot>), que la porte d'intégration ne porte pas ; --contre origin/main y voit la config comme neuve et test/probe-L539-bords rougit — 05-11, L583 ; le lot doit passer la porte d'intégration, un lot de code restant refusé (test sur les deux cas)"
     status: doing
@@ -2426,18 +2431,25 @@ lots:
     started: 2026-11-05
   - id: L614
     title: "Issue #39 : un fichier de sonde rouge reste indexé dans le worktree du lot depuis 1.53.0 (#37), la vague rend le lot en « dépôt sale après probe » et ses constats sont perdus ; le programme retire le fichier de l'index et le supprime, et ses cas rouges reviennent comme constats à la passe de correction"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "compliant : 0 blocking, 0 major, 1 minor (note) — orchestré (vague 2026-11-05-1055-cad, 0 passe(s) de correction)", commit: 05eec39ce4068d0e7f3a02608e31954db8a3892d, reporte: { de: d1d06ba435aaf4107a5f0f96810d647bdd0a0963, vers: 05eec39ce4068d0e7f3a02608e31954db8a3892d, patchId: 96c1023b8699e4dd5da3cd9be6e047ce843314ab } }
+    finished: 2026-11-05
   - id: L615
     title: "Test à retardement : test/hud-deliveries.test.ts L412 R12 pose des mtime en dur au 2026-10-29, sortis de la fenêtre ENDED_DAYS du collecteur le 05-11 à 10:00 UTC : main rouge en CI et à toutes les portes ; dater relativement à maintenant, et chercher dans test/ les autres utimesSync ou mtime en dur comparés à une fenêtre glissante"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-05-1055-cad, 0 passe(s) de correction)", commit: f24049533b1d2dfb793421a137ee9b578cfa0f20, reporte: { de: 855027827f9d440b8bcc428fe53600dbbf4f9f0d, vers: f24049533b1d2dfb793421a137ee9b578cfa0f20, patchId: 32a39e822374d8610f5600369a7b81a9bbab0c1e } }
+    finished: 2026-11-05
+  - id: L616
+    title: "Porte ciblée : tout lot qui touche CHANGELOG.md joue test/changelog.test.ts dès la porte d'écriture ; trois refus le 05-11 (L582, L591, L613) pour une entrée écrite sous la dernière version publiée au lieu de [Unreleased], vus seulement au sommet intégré, et le brief d'implémentation le dit"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-05
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

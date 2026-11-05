@@ -413,7 +413,7 @@ plan:
   fields:                       # raf field: key in the file (a list = first one present)
     title: titre
     public: titre_public        # the lot's title for the public; read when it is text, else ignored
-    screen: ecran               # page, component or journey; only on a visible lot (only `page` enters the full spec step; the others, if visible and above 0.1 day, the light mockup)
+    screen: ecran               # page, component or journey; only on a visible lot (only `page` enters the full spec step; `component` and `journey`, if visible and above 0.1 day, the light mockup; no `screen:` on a visible lot: a fix, implemented with before/after captures and a UX review of the diff only, L633)
     spec: fiche                 # true or false: the lot changes a behaviour
     status: etat
     estimate: effort

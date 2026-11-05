@@ -11,6 +11,7 @@ import { testWorkersText } from '../workers.js';
 import { withClusterLine } from '../objectif.js';
 import { readBounds, boundsText } from '../../bounds.js';
 import { capturesText, EXPRESS_BRIEF, expressNewsText, gateText, headline, integrationText, localReading, precheckBrief, newsText, objective, renderBrief, reposText, shotsText, visibleFixText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars } from '../briefs.js';
+import type { Screen } from '../../plan.js';
 import { mcpServersFor, playwrightDir, type SessionKind } from '../launch.js';
 import { acceptationFile, acceptText, findAcceptation } from '../accept.js';
 import { lotIds, referenceIdsText } from '../../ref/coverage.js';
@@ -58,6 +59,14 @@ function uxText(c: LotCtx): string {
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+/** Correctif visible (L633) : capture avant et après dans le brief `implement` (`news`), revue du seul diff dans celui de `ux` et de `review-small` (`ux`) ; rien pour les autres lots et étapes. */
+function visibleFixVars(kind: SessionKind, l: LotCtx['lot'], lot: { screen?: Screen }, captureDir: string, vars: Pick<BriefVars, 'news' | 'ux'>): Partial<Pick<BriefVars, 'news' | 'ux'>> {
+  if (!visibleFix(l, lot)) return {};
+  if (kind === 'implement') return { news: [vars.news, visibleFixText('implement', captureDir)].join('\n') };
+  if (kind === 'ux' || kind === 'review-small') return { ux: [vars.ux, visibleFixText('review', captureDir)].filter(Boolean).join('\n') };
+  return {};
 }
 
 function choixText(choix: string[]): string {
@@ -209,11 +218,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     const pwDir = playwrightDir(c.wave.store.lotDir(l.project, l.lot));
     vars.news = l.express ? expressNewsText(pwDir) : newsText(l.lot, pwDir);
     vars.captures = capturesText(pwDir);
-    // Correctif visible (L633) : capture avant et après à l'implémentation, revue du seul diff ensuite.
-    if (visibleFix(l, lot)) {
-      if (kind === 'implement') vars.news = [vars.news, visibleFixText('implement', pwDir)].join('\n');
-      else if (kind === 'ux' || kind === 'review-small') vars.ux = [vars.ux, visibleFixText('review', pwDir)].filter(Boolean).join('\n');
-    }
+    Object.assign(vars, visibleFixVars(kind, l, lot, pwDir, vars));
   }
   if (mcpServersFor(kind, l.visible, '', l.small, !!l.screen).playwright) vars.shots = shotsText(playwrightDir(c.wave.store.lotDir(l.project, l.lot)));
   vars.fiche = hasSpecStage(l) ? avalOf(c, kind) : '';

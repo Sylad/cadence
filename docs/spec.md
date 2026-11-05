@@ -57,7 +57,7 @@ or *hypothesis*, actions → API calls). The `ux-reviewer` agent reads the mocku
 acceptance tests are written from the sheet, red, by a session other than the implementer's; the
 implementation gets the sheet, the code review checks rule → test → green, the hypotheses go into the
 lot's news entry, and a human is asked only about a choice that is costly to undo. A visible lot above 0.1 day
-with `screen: component`, `journey` or no `screen:` (and no `spec: true`) plays a lighter version since L459: spec → mockup
+with `screen: component` or `journey` (and no `spec: true`) plays a lighter version since L459: spec → mockup
 of the touched states only (current screen and target), mockup review, then the code, with no `accept` and a budget of
 ordinary plus 450 k (1.05 M for a lot up to half a day), see [The light mockup](orchestrate.md#the-light-mockup-l459). The design is in
 `docs/superpowers/specs/2026-10-10-etape-spec-design.md` (with an example sheet and the plan of the

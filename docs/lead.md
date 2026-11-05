@@ -27,7 +27,7 @@ picture, not its source.
    a `screen:` of `page` (a visible lot that creates or changes a whole screen) or `spec: true` (a lot without a screen
    that still has a behaviour to pin down: `precheck → spec → fiche → accept → implement → review`);
    spec, sheet review and accept apply to `screen: page` and to `spec: true` alike. A visible lot above
-   0.1 day with `screen: component`, `screen: journey` or no `screen:` (and no `spec: true`) plays the
+   0.1 day with `screen: component` or `screen: journey` (and no `spec: true`) plays the
    **light mockup** instead (L459): `precheck → spec → maquette → implement → review → ux`, no accept, and
    the `ux` pass checks conformity to the mockup. The other lots go straight from the precheck (when it
    applies) to the implementation:

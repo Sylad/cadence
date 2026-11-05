@@ -32,10 +32,13 @@ to the lead; « partial » passes what exists to the implementation. Then:
 
 - `screen: page` only: **spec** (mockup and screen sheet), **mockup review** (`ux-reviewer`, two
   passes at most), then **accept**.
-- a visible lot above 0.1 day with `screen: component`, `screen: journey` or no `screen:` (L459): **light
+- a visible lot above 0.1 day with `screen: component` or `screen: journey`, a new screen or a changed layout (L459): **light
   mockup**, a `spec` session (current screen and target for the touched states) and the same mockup review,
   no **accept**; the `ux` pass after the code checks conformity to the mockup. Other lots take the ordinary
   path (`orchestrate.maquette: false` brings it back for these too).
+- a visible lot with no `screen:` (L633, issue #43), a fix of a few properties of an existing screen: no
+  mockup; `implement` captures the screen before and after the change (1440 and 390 px) and the UX review
+  reads the diff only.
 - `spec: true` (a lot with a behaviour to pin down and no screen): **back-end spec** (cases, rules,
   contracts), **sheet review** (`code-reviewer` in sheet mode, two passes at most, a third when the review converges: blocking + major findings down and only one left), then **accept**.
   A mixed lot (a page whose sheet has a `sujet` block) gets both reviews and a single second spec pass.
@@ -93,7 +96,7 @@ The budget a wave gives a lot is derived from its estimate, measured on the runs
 | beyond | 570 k per day, 750 k at least |
 | `screen: page` | 1.3 M at least, or the ordinary budget + 450 k if that is more |
 | `spec: true` | ordinary budget + 450 k |
-| visible, above 0.1 day, `screen: component` or `journey` or none (light mockup, L459) | ordinary budget + 450 k |
+| visible, above 0.1 day, `screen: component` or `journey` (light mockup, L459) | ordinary budget + 450 k |
 | fix pass and short review | 155 k reserved |
 | escalation (`orchestrate.escalation` declared, L349) | + 175 k reserved (estimate: one correction and one fresh review on the escalation model) |
 | last-pass top-up (L584) | a lot whose review converges (≤ 2 majors, falling) gets the shortfall of the 155 k, up to `orchestrate.budgetTopUp` (300 k by default), from the wave's budget |
@@ -101,8 +104,8 @@ The budget a wave gives a lot is derived from its estimate, measured on the runs
 These figures are the floor of the budget (L501): when `cadence perf` has rendered at least 5 lots of the same class (estimate, `+spec` for the spec chain) in the last 14 days, the default budget is their p90 of counted tokens rounded up to 50 k, between the figure above and twice that; `--dry-run` says where the number comes from ([docs/orchestrate-cycle.md](orchestrate-cycle.md), « Budget set by the measure »).
 
 The final review is always played; the budget bounds the writing passes. A non-visible lot, or one of
-0.1 day or less, with `screen: component`, `screen: journey` or none takes the ordinary budget; a visible one
-above 0.1 day gets the light mockup budget of the table.
+0.1 day or less, or one with no `screen:`, takes the ordinary budget; a visible one with `screen: component` or
+`screen: journey` above 0.1 day gets the light mockup budget of the table.
 
 ## Permanent rules
 

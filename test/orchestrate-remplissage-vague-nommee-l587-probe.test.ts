@@ -105,9 +105,8 @@ describe('L587 probe — --no-fill et fillsFreeSlots', () => {
 
 describe('L587 probe — vague de lots nommés', () => {
   it('dépôt seul sans cadence.yaml parent : une vague de lot nommé ne plante pas à la lecture de priority:', async () => {
-    // Sous-dossier d'un parent à soi, à titre de précaution : à la racine temporaire partagée, le dépôt aurait pour frères les dépôts des autres tests
-    // joués en parallèle (readyFree / sharingProjects les scanne : 30 s au lieu de 1 s avec 300 frères, mais code 0). La cause du code 1 vu sur le runner
-    // GitHub n'est pas établie (non reproduite avec HOME vide, sans config git globale, CI=true) : si ce test rougit encore, le message porte la vague.
+    // Sous-dossier d'un parent à soi : à la racine temporaire partagée, le dépôt aurait pour dépôts tiers (tierRepos) tous les dépôts git des autres tests joués en parallèle,
+    // et un commit citant L1 sur la branche principale de l'un d'eux pendant la session rend le lot handed-back, donc le code 1 (test suivant).
     const repo = join(tempDir(), 'solo');
     repoAt(repo, 'solo', 2);
     const s = scene();
@@ -118,6 +117,23 @@ describe('L587 probe — vague de lots nommés', () => {
     };
     expect(code, code === 0 ? '' : `sortie :\n${run.out.join('\n')}\nerreurs :\n${run.err.join('\n')}\njournal :\n${vague()}\njoués : ${s.played.join(', ')}`).toBe(0);
     expect(s.played.some((p) => p.endsWith(':L1'))).toBe(true);
+  });
+
+  it('dépôt posé à côté d\'un frère git dont la branche principale reçoit un commit citant L1 pendant la session : lot rendu (handed-back), code 1', async () => {
+    const parent = tempDir();
+    const repo = join(parent, 'solo');
+    const voisin = join(parent, 'voisin');
+    repoAt(repo, 'solo', 1);
+    repoAt(voisin, 'voisin', 1);
+    const s = scene();
+    const run = io(repo);
+    const claude: ClaudeFn = async (args, o) => {
+      if (kindOf(args) === 'implement') git(voisin, 'commit', '-q', '--allow-empty', '-m', 'feat(L1): travail du voisin');
+      return s.d.claude!(args, o);
+    };
+    const code = await orchestrate(['L1', '--max-sessions', '1'], run.io, { ...s.d, claude });
+    expect(code).toBe(1);
+    expect(journal(repo)).toMatch(/handed-back — incident : commit sur la branche principale d'un autre dépôt \(voisin/);
   });
 
   it('priority: illisible + --dry-run + lots nommés : refus (même contrat que --continue)', async () => {

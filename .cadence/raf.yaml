@@ -2396,6 +2396,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "compliant — 0 blocking, 0 major, 1 minor (ponctuation d'une phrase de docs/orchestrate.md). Revue de af6004f et ab7c315, tests L610 verts (9/9). — orchestré (vague 2026-11-05-1055-cad, 0 passe(s) de correction)", commit: 2ba72ce59001840ce23d2e50a59e3f13207bbe88, reporte: { de: ab7c315da84fbc9e56e95ce4dbfec9f0d19f19df, vers: 2ba72ce59001840ce23d2e50a59e3f13207bbe88, patchId: f78c87076551cf04cc5c16b1fac4886c171292d3 } }
   - id: L611
     title: "orchestrate : la résolution d'un conflit de plan (src/orchestrate/integrate.ts:182) écrit ours.doc.toString() sans lineWidth: 0 ni indentSeq, contrairement à plan.ts:323 : un rebase fait passer .cadence/raf.yaml de 2 399 à 9 320 lignes, contenu intact, et la revue courte rend le lot — 05-11, L592 ; test sur la taille du plan après résolution"
     status: doing

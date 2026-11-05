@@ -729,7 +729,7 @@ nothing below applies and the wave behaves as before; any other value is refused
   project's own checkout**, one after the other under the repository's integration lock, each as a plan-only commit with explicit paths. A
   read-only plan (`plan:` in `cadence.yaml`) gets `orchestrate.start` and `orchestrate.verdict` run in that checkout, never in the worktree; a plan
   outside the repository is read and written in place, without a commit. The lots' branches carry work commits only (the acceptance seal and
-  `vert: true` are work of the lot), so a plan conflict at the rebase cannot happen. A session that modifies the plan file, a file generated with it
+  `vert: true` are work of the lot), so a plan conflict at the rebase cannot happen. When one happens anyway on the plan alone (L569), the integration merges the repository's plan with the lot's own writes (review, notes, state) and writes the result the way `Plan.save` does (L611): `lineWidth: 0` (no re-folding of long lines: a rebase once turned a 2 399-line `.cadence/raf.yaml` into 9 320 lines, content intact) and the `-` of the lots in the parent key's column when the repository's plan has them there. A session that modifies the plan file, a file generated with it
   (`plan.files`, the files of `plan.onWrite`, the Gantt page) in its worktree — committed or not — gets its lot handed back, naming the file and the commit.
   Before each of these writes the program checks that the repository is still on the branch the lots started from, that no tracked file other than the
   plan is modified in the project's checkout, and takes the lock; a refusal hands the lot back with the cause

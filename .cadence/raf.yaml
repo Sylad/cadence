@@ -2621,6 +2621,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "compliant — 0 blocking, 0 major, 1 minor (gateCovers : sous-chaîne brute pour une porte très courte) — orchestré (vague 2026-11-05-2210-cad, 2 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant : rebase sans régression, 0 bloquant, 0 majeur ; 1 mineur déjà connu (gateCovers par sous-chaîne), en note", commit: 9ac904f5cfec09e2c7391802614fff084c5ac056 }
   - id: L633
     title: "Issue #43 : la chaîne de maquette légère ne joue plus pour un correctif de quelques propriétés sur un écran existant. Un lot visible sans screen: et sans écran neuf passe par implement, capture avant et après, et une revue UX du seul diff ; maquette et états forcés restent pour un écran neuf ou une mise en page changée. Cas mesuré : 33 min et 5,75 $ pour 11 lignes de SCSS. Mesure : coût médian d'un petit lot visible"
     status: doing

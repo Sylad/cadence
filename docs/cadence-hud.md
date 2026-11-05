@@ -59,9 +59,73 @@ Install it as a plugin from the same marketplace:
 ```
 
 `/hud` hides or shows the band. `/hud cmd` lists the background commands being counted (id, tool,
-origin `session` or `agent <id>`, age, name; `(sans fin vue)` on the ones above). Any other argument
-`/hud projets` folds the project list to one line, and opens it again. Any other argument
+origin `session` or `agent <id>`, age, name; `(sans fin vue)` on the ones above). `/hud projets` folds the
+project list to one line (`▸ projets (2)`) and opens it again. `/hud lots` opens or closes the lots panel;
+`/hud lots <project>` folds or unfolds that project in the panel. Any other argument
 answers `argument inconnu : … (attendu : cmd, projets, lots)` and leaves the band as it is.
+
+### The cells of the band
+
+**Thresholds and colours.** `ctx` is green below 50 %, orange up to 75 %, red beyond. `5h` and `7j` change colour at 60 % and 85 % of
+the quota window, and the reset time is given in days beyond 24 h. The progress bar of a project is coloured by the share of lots
+done (L152): full cells red below 33 %, orange below 66 %, green beyond, empty cells grey; its thresholds are its own, not those of the
+consumption.
+
+**`fable 410k sonnet 85k`.** The consumption **per model** of the session, the dearest first: tokens processed (input + output + cache),
+on 40 characters at most (the rest is cut with `...`). It is fed at the end of every turn (main loop and subagents): the tokens are those
+the API reported for the model that answered; the order comes from the cost share of each model (what the total of `/cost` gained since
+the previous end of turn; approximate when two turns end together), which is not displayed. The quota windows stay those the API returns,
+which publishes none per model.
+
+**`2 cmd`.** The **background commands** of the session, the ones of the window's "background commands" card: Bash started in the
+background (`run_in_background`, Ctrl+B, timeout reached) and Monitor, subagents' included (bar the case below). The mod follows them from
+their launch (the result of the tool call) and removes them at the task's end notification (completed, failed, stopped, or the expiry of a
+Monitor, `[Monitor expired …]`) or at a `TaskStop`; it shows nothing at zero, and it drops with the agent counter when the window is narrow. A
+command started by a subagent is removed when that subagent ends (its own end notification goes to the subagent, never to the session). The
+session, and a hot reload of the mod, start from zero commands: a command started before the mod was loaded, or whose notification never
+arrives, is not seen, since the counter only goes up at the launches it saw. A command started by a synchronous subagent
+(`backgroundEndsWithFinalResponse: true` in the result) is not counted either: it ends with the subagent's final response, not at a
+notification. Three safety nets complete the ends it saw: an owning subagent that `$.agent.list()` gives as finished (or no longer lists)
+takes its commands with it even when its end notice did not go through the session (the list is read after the collector, so that a subagent
+started during the wait is not taken for a vanished one); a `TaskStop` removes the task even when its result does not name it (the
+`task_id` / `shell_id` of the call is the fallback); a command with no end seen for **more than an hour** (or whose record is missing, so
+its age is unknown) is no longer counted as running (orange): the band writes it apart, in grey, right after `N cmd`: `1 cmd sans fin vue`.
+
+**Wave table.** Per live wave: a header (project when every lot is the same one's, identifier, status, budget used / cap, sessions
+running / cap), then a **table of the active lots** with aligned columns: lot, coloured status (ready = green, question / suspended =
+orange, failed / handed back = red), the detail of the step (`+N` = child claude sessions, `✝` = step marked in progress but its process is
+dead, `pN` = pass), then the start of the title on the width left; and one grey `en attente` line listing the lots that have not started.
+Lots of different projects keep their project as a prefix. With no live wave, the **last finished wave** of the current folder stays on a
+grey line with its status (`terminée` / `interrompue il y a 12 min`) and the balance of its lots (`3 prêts · 1 échec · 3 suspendus`),
+**without budget** (it has no object once the wave is over); it **disappears 30 min after its end**, or earlier when a new wave starts.
+
+**A narrow window.** The first line does not wrap: its segments drop by priority until it fits the width — first the agents' names, then
+the reset times, then the per-model consumption, the cost, the agent and command counters, and the quota windows go last; the context always
+stays. Once the line fits, the dropped segments that fit in the room left come back, the most useful first: a big segment (the models) that
+does not fit does not deprive the line of the small ones that do (the reset times). The width is measured in terminal cells, by default for
+the worst case: `▰ ▱ ⚙ │ ↻` (ambiguous width) count for 2, so the line also fits a terminal set to *ambiguous width = 2*, at the price of
+dropping a segment a little sooner in a width-1 terminal such as the desktop app (the gauge and the separators count 14 cells less there). To
+measure at your terminal's width, set `CADENCE_HUD_AMBIGUOUS=1` (or `2`, the default; any other value means 2) in Claude Code's environment,
+for instance in the `env` block of `~/.claude/settings.json`; the mod does not detect the terminal. These are the only non-ASCII
+characters of that line: the separators (` | `), the ellipses (`...`), the unknown values (`-`) and the spending-limit label (`EUR`, not
+`€`) are ASCII, with no width table to maintain. Only the agents' and models' names, taken as they are, can still bring in an ambiguous
+character. The wave headers are cut at the end of the line.
+
+**Where the data comes from, and the file the band writes.** The waves are read from disk (`~/.cadence/orchestrate/waves/<pid>.json`, then
+`<cwd>/.cadence/runs/<wave>/`) by the Python script of `hooks/collect.ts`; no cadence command is run for them. Only the progress of the
+plans calls `cadence lead tour --json` (the `@sylad/cadence` CLI on the PATH, optional); a `cadence` that is absent or fails keeps the last
+table read, with no error message in the band.
+
+The band also **writes a file**, so it is not read-only: at every refresh, that is every 5 s, a `python3` writes the context of the session to
+`~/.cadence/orchestrate/hud-context/<session id>.json` (`session`, `cwd` = the session's folder, `percent`, `tokens`, `window`, `at`; atomic
+write, one file PER session). It is what `cadence session context` reads: the lead session does not see the band, which is only a
+rendering, and the `lead` skill compares this context with its token threshold (`lead.contextThreshold`) to chain on without the human. The
+command reads by default the file of ITS session, the one the `CLAUDE_CODE_SESSION_ID` variable names (set by Claude Code in the environment
+of its Bash commands, same value as the file name); `--session <id>` wins. The current folder is only used when the variable is absent AND a
+single session publishes for that folder; with two sessions in the same folder (they alternate, "the latest" would sometimes be the other's),
+it exits with code 2 and asks for `--session`. With no band loaded in that session, or with a figure older than 2 min, the command exits with
+code 2 and the lead does not chain on: **disabling or changing this mod therefore cuts the lead's chaining**. Files older than 24 h are
+ignored and deleted when the command reads.
 
 ### The lots panel (`/hud lots`, L401)
 
@@ -106,7 +170,7 @@ Before the first reading the panel says `Lecture des plans…`; if `cadence lead
 The data is the `lots` field of `cadence lead tour --json` ([lead tour](lead.md#lead-tour)), read together with the band's `progress` (same call, same folder). While the panel is open, the modification date of each plan (`.cadence/raf.yaml` and `cadence.yaml` of the folder and of its direct sub-folders) is read every 5 s, one `stat` each: a changed plan, like a wave transition, triggers a new reading before the minute is over. Cost of the `lots` field (R18, measured on 2026-10-28 with `cadence lead tour --json` on the parent folder of ten projects, three passes each): before L401 (cadence 1.19.1, no `lots`) 8.0 / 9.1 / 7.3 s and 86 KB of output; after (the L401 code) 7.5 / 7.0 / 8.4 s and 188 KB (192,503 bytes). The output more than doubles in size but the duration stays in the same order, under the 20 s refresh delay of the band, so the rule holds.
 
 The source lives in [`plugins/cadence-hud`](../plugins/cadence-hud/README.md)
-(its own README has the details of every cell); it is not part of the npm package. To work on it:
+(its README is the short card; this page is the single description of the band and makes the reference); it is not part of the npm package. To work on it:
 `claude plugin validate plugins/cadence-hud`, `claude plugin test plugins/cadence-hud`, and
 `tsc -p plugins/cadence-hud` once Claude Code has loaded the plugin at least once (it generates
 the `.claude-plugin/types` the tsconfig extends).

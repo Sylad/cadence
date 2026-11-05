@@ -32,8 +32,8 @@ export function launchScreen(plan: Plan, repo: string, config: Pick<OrchestrateC
   return skip ? { skipped: merged } : { screen: ordinary };
 }
 
-/** Le lot tel que son budget le lit : maquette sautée, un lot `spec: true` avec écran ne paie plus l'étape spec (R2). */
-export const budgetLot = <L extends { spec?: boolean }>(lot: L, skipped: number | undefined): L => (skipped ? { ...lot, spec: false } : lot);
+/** Le lot tel que le lancement le lit : maquette sautée, un lot `spec: true` avec écran n'a plus d'étape spec, ni dans son état ni dans son budget (R2). */
+export const launchedLot = <L extends { spec?: boolean }>(lot: L, skipped: number | undefined): L => (skipped ? { ...lot, spec: false } : lot);
 
 /**
  * Ligne du journal de la vague au premier départ d'un lot dont le lancement a sauté la maquette (R2) ; rien sinon. Aucun champ d'état (D1) : la décision du lancement est refaite

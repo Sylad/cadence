@@ -210,6 +210,7 @@ describe('R2 — un lot spec: true avec écran suit R2', () => {
     const { dir } = project([{ title: 'Page mixte', estimate: 0.6, screen: 'page', spec: true }], { commits: 1 });
     const s = await launch(dir, GOAL);
     expect(s.screen).toBeUndefined();
+    expect(s.specLot).toBeUndefined();
     expect(s.budget).toBe(lotBudget(0.6, undefined, false, undefined));
   });
 });

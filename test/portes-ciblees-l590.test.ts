@@ -336,8 +336,8 @@ describe('L590 R11 — verify --gate ne reprend jamais une porte ciblée', () =>
   });
 });
 
-describe('L590 R5 — un lot sans worktree n\'a pas d\'intégration', () => {
-  it('R5 — lot sans worktree : aucune intégration ne joue la suite, la porte joue la suite complète à la place du ciblé', async () => {
+describe('L590 R17 — un lot sans worktree n\'a pas d\'intégration', () => {
+  it('R17 — lot sans worktree : aucune intégration ne joue la suite, la porte joue la suite complète à la place du ciblé', async () => {
     const log = logFile();
     const h = harness({ script: { implement: [impl()], review: [ok] } });
     const c = h.lot('L1', {}, gates(log, { full: '[ -f a.txt ] && { echo " FAIL  test/a.test.ts > rouge"; exit 1; }; true' }));

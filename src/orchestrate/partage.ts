@@ -1,7 +1,7 @@
 // Précheck des fichiers partagés (L500) : avant l'implémentation, ce que le lot risque de heurter chez les autres, lu dans git, sans modèle. Inventaire des pertes du
 // 31-10 : 19 questions sur 43 portaient sur un test scellé d'un autre lot, 16 des 28 intégrations refusées étaient des conflits.
 import { posix } from 'node:path';
-import { listAcceptations, parseAcceptation } from './accept.js';
+import { type Acceptation, listAcceptations, parseAcceptation } from './accept.js';
 import { git, keptTrees, tryGit } from './worktree.js';
 
 /** Un fichier de test scellé par un autre lot que le lot risque de toucher, et le fichier d'acceptation qui le scelle. */
@@ -9,6 +9,8 @@ export interface SealedRisk {
   fichier: string;
   lot: string;
   acceptation: string;
+  /** Le fichier de code cité que ce test importe (L628) ; absent quand le test, ou la fiche, est cité lui-même. */
+  via?: string;
 }
 
 /** Un fichier que le lot risque de toucher et que touche aussi `avec` (« projet:lot (vague en cours) » ou « projet:lot (worktree conservé) »). */
@@ -50,9 +52,30 @@ export function citedFiles(text: string, tracked: readonly string[]): string[] {
   return [...out];
 }
 
+const IMPORT_SPEC = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)['"](\.{1,2}\/[^'"]*)['"]/g;
+
+/** Les fichiers de code suivis que `text` (un fichier de test) importe par un chemin relatif, résolus depuis `from` ; l'extension (`.js`, `.ts`) ne compte pas. */
+function importedCode(text: string, from: string, cited: readonly string[]): string[] {
+  const stem = (f: string) => f.replace(/\.(?:[cm]?[jt]sx?)$/, '');
+  const targets = new Set<string>();
+  for (const m of text.matchAll(IMPORT_SPEC)) targets.add(stem(posix.join(posix.dirname(from), m[1]!)));
+  return cited.filter((f) => targets.has(stem(f)));
+}
+
+/** Les tests (et la fiche) d'une acceptation scellée que `cited` touche : cités eux-mêmes, ou important un fichier de code cité. */
+function risksOf(repo: string, rev: string, a: Acceptation, acceptation: string, cited: readonly string[]): SealedRisk[] {
+  const tests = a.fichiers.map((x) => posix.normalize(x));
+  return [...tests, posix.normalize(a.fiche)].flatMap((f): SealedRisk[] => {
+    if (cited.includes(f)) return [{ fichier: f, lot: a.lot, acceptation }];
+    const via = tests.includes(f) ? importedCode(tryGit(repo, 'show', `${rev}:${f}`) ?? '', f, cited)[0] : undefined;
+    return via ? [{ fichier: f, lot: a.lot, acceptation, via }] : [];
+  });
+}
+
 /**
- * Les tests scellés d'un AUTRE lot (`acceptation-<lot>.json` à `rev`, avec empreintes) que `cited` touche : un de ses fichiers de tests, ou sa fiche, est cité.
- * Un fichier d'acceptation illisible ou sans empreinte (pas scellé) n'est pas listé ; celui du lot lui-même non plus.
+ * Les tests scellés d'un AUTRE lot (`acceptation-<lot>.json` à `rev`, avec empreintes) que `cited` touche : un de ses fichiers de tests, ou sa fiche, est cité, ou
+ * l'un de ses tests importe un fichier de code cité (L628 : un lot qui change un comportement livré cite le code, rarement le test qui le fige).
+ * Un fichier d'acceptation illisible ou sans empreinte (pas scellé) n'est pas listé ; celui du lot lui-même non plus ; un test une seule fois.
  */
 export function sealedAtRisk(repo: string, dir: string, lot: string, cited: readonly string[], rev = 'HEAD'): SealedRisk[] {
   const out: SealedRisk[] = [];
@@ -65,9 +88,7 @@ export function sealedAtRisk(repo: string, dir: string, lot: string, cited: read
     }
     const a = parseAcceptation(text);
     if (typeof a === 'string' || a.lot === lot || !a.empreintes || Object.keys(a.empreintes).length === 0) continue;
-    for (const f of [...a.fichiers.map((x) => posix.normalize(x)), posix.normalize(a.fiche)]) {
-      if (cited.includes(f)) out.push({ fichier: f, lot: a.lot, acceptation: path });
-    }
+    out.push(...risksOf(repo, rev, a, path, cited));
   }
   return out;
 }
@@ -110,8 +131,13 @@ export function partageBrief(p: Partage | undefined): string {
   if (p.scelles.length) {
     lines.push(
       'Sealed acceptance tests of OTHER lots that this lot may touch (the program compares their fingerprints at the end of the session and hands the lot back, naming the first offending commit): do not modify, rewrite or reseal them. If your own sealed tests contradict one, stop and put the question to the lead naming both tests.',
-      ...p.scelles.map((s) => `- ${s.fichier} (sealed by ${s.lot}, ${s.acceptation})`),
+      ...p.scelles.map((s) => `- ${s.fichier} (sealed by ${s.lot}, ${s.acceptation}${s.via ? `; it imports ${s.via}` : ''})`),
     );
+    if (p.scelles.some((s) => s.via)) {
+      lines.push(
+        'A test marked "it imports" freezes code this lot cites: if your change breaks it, do not edit it and do not commit around it. Stop there and put under "questions" the reseal gesture for the lead: the test (file and name), the rule of this lot that changes its expectation, and `cadence spec reseal <lot> <test>… --reason "<why>" --porteur <this lot>`.',
+      );
+    }
   }
   if (p.fichiers.length) {
     lines.push(
@@ -126,7 +152,7 @@ export function partageBrief(p: Partage | undefined): string {
 export function partageLines(p: Partage | undefined, who: string): string[] {
   if (!p) return [];
   return [
-    ...p.scelles.map((s) => `${who} — ⚠ test scellé de ${s.lot} que le lot risque de toucher : ${s.fichier} (${s.acceptation})`),
+    ...p.scelles.map((s) => `${who} — ⚠ test scellé de ${s.lot} que le lot risque de toucher : ${s.fichier} (${s.acceptation})${s.via ? `, il importe ${s.via}` : ''}`),
     ...p.fichiers.map((f) => `${who} — ⚠ fichier que touche aussi ${f.avec} : ${f.fichier}`),
   ];
 }

@@ -53,17 +53,18 @@ orchestrate:
 
 On 17 → 31 October, 19 of the 43 questions of the sessions were about a sealed acceptance test of another lot (median block: 56 min) and 16 of the 28 refused integrations were conflicts. Both are known before the first line of code, so the program reads them from git, with no model and no key to set.
 
-**When.** Once, at the start of a lot that is not resumed from a kept branch (`resumedFrom`), whether or not the model pre-check (`orchestrate.precheck`) plays.
+**When.** Once, at the start of a lot that is not resumed from a kept branch (`resumedFrom`), whether or not the model pre-check (`orchestrate.precheck`) plays, and whatever the size of the lot (`light` and `small` lots play it too, L628: it reads git and costs nothing).
 
 **What it reads.** The files the lot may touch are the tracked files its text cites: title, `goal`, notes and sub-tasks. A path is matched exactly (`src/x.ts`, with `:line`, a final punctuation mark or a leading `./` ignored); a bare file name is matched only when one tracked file has that name. A directory or a glob names nothing. From those files:
 
-- **Sealed tests of another lot**: every `acceptation-<lot>.json` under `spec.dir`, of another lot and with fingerprints (`empreintes`, so sealed), whose test files or sheet (`fiche`) are among them. The lot's own acceptation is never listed.
+- **Sealed tests of another lot**: every `acceptation-<lot>.json` under `spec.dir`, of another lot and with fingerprints (`empreintes`, so sealed), whose test files or sheet (`fiche`) are among them, **or whose test files import one of them** (L628: a lot that changes a delivered behaviour cites the code, rarely the test that freezes it; the import is read in the test at `HEAD`, relative specifiers only, `.js`/`.ts` ignored, one line per test with the first cited file in `via`). The lot's own acceptation is never listed.
 - **Shared files**: the files that the branch of another lot with a worktree (a wave still alive, this one included, or a worktree kept after a wave, `cadence orchestrate --status`) modified since its start (`base...branch`, unintegrated commits only). The lot's own branch of a past wave is left out.
 
-**Where it shows.** In the `partage` field of the lot's state; in the brief of the implement step (first and later passes): the sealed tests to leave alone, with the lot that seals them and the instruction to stop and ask the lead if the lot's own tests contradict one, then the shared files with the lot that touches them; and in the table (`--status`, end of wave), one line per test and per file:
+**Where it shows.** In the `partage` field of the lot's state; in the brief of the implement step (first and later passes): the sealed tests to leave alone, with the lot that seals them and the instruction to stop and ask the lead if the lot's own tests contradict one (for a test that only imports cited code: stop, and put under `questions` the reseal gesture, `cadence spec reseal <lot> <test>… --reason … --porteur <lot>`, instead of editing the test and being handed back at the commit), then the shared files with the lot that touches them; and in the table (`--status`, end of wave), one line per test and per file:
 
 ```
 demo:L500 — ⚠ test scellé de L10 que le lot risque de toucher : test/a.test.ts (docs/specs/ecran/acceptation-L10.json)
+demo:L500 — ⚠ test scellé de L10 que le lot risque de toucher : test/b.test.ts (docs/specs/ecran/acceptation-L10.json), il importe src/x.ts
 demo:L500 — ⚠ fichier que touche aussi demo:L1 (vague en cours) : src/x.ts
 ```
 

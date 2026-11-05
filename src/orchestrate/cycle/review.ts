@@ -76,6 +76,20 @@ export const FIN_DE_CYCLE_WHATS = ['revue non conforme', 'tests rouges', 'code s
 /** Le début de l'outcome d'un lot rendu au plafond de passes (`<what> après <N> passe(s) de correction`) : `toFix` l'écrit, `addableHandBack` le reconnaît par `<what> après `. */
 export const finDeCycleOutcome = (what: string, pass: number): string => `${what} après ${pass} passe(s) de correction`;
 
+/**
+ * Lot rendu alors que l'escalade est engagée (plafond de passes, ou plafond de mur L622) : la revue neuve a jugé, l'issue « rendu » et sa ligne de journal sont
+ * posées une fois, comme sans plafond — `table.ts` et `perf.ts` les lisent (sinon « le modèle ne l'a pas jugé » alors qu'il a jugé). Une escalade déjà conforme garde son issue.
+ */
+function handBackEscalated(c: LotCtx, text: string): void {
+  const l = c.lot;
+  const e = l.escalation!;
+  if (!e.issue) {
+    e.issue = 'rendu';
+    c.wave.log(`${lotKey(l.project, l.lot)} · escalade ${e.model} : lot rendu malgré l'escalade`);
+  }
+  stop(c, 'handed-back', `${text} ; ${e.issue === 'conforme' ? `escalade ${e.model} déjà jouée` : `rendu malgré l'escalade ${e.model}`}`);
+}
+
 /** Une passe de correction de plus, ou la main rendue au lead quand les deux sont faites. */
 export function toFix(c: LotCtx, constats: Constat[], what: string): void {
   const l = c.lot;
@@ -86,23 +100,12 @@ export function toFix(c: LotCtx, constats: Constat[], what: string): void {
   const cap = converging ? MAX_PASSES_CONVERGING : MAX_PASSES;
   // Plafond de mur (L622) : deux fois la durée attendue de l'estimate ; au-delà, le lot est rendu avec ses constats (l.constats, posés plus haut), même pour un bloquant.
   const overWall = wallReason(c, Date.now());
-  if (overWall) {
-    stop(c, 'handed-back', `${finDeCycleOutcome(what, l.pass)} ; ${overWall}`);
-    return;
-  }
-  if (l.pass >= cap) {
-    const text = finDeCycleOutcome(what, l.pass);
+  if (overWall || l.pass >= cap) {
+    const text = overWall ? `${finDeCycleOutcome(what, l.pass)} ; ${overWall}` : finDeCycleOutcome(what, l.pass);
     const esc = c.config.escalation;
-    // Escalade (L337) : une seule fois, pour une revue de code non conforme ou des tests rouges (l'UX garde sa règle) ; déjà engagée, le lot est rendu.
-    if (l.escalation) {
-      if (!l.escalation.issue) {
-        l.escalation.issue = 'rendu';
-        c.wave.log(`${lotKey(l.project, l.lot)} · escalade ${l.escalation.model} : lot rendu malgré l'escalade`);
-      }
-      stop(c, 'handed-back', `${text} ; ${l.escalation.issue === 'conforme' ? `escalade ${l.escalation.model} déjà jouée` : `rendu malgré l'escalade ${l.escalation.model}`}`);
-      return;
-    }
-    if (!esc || (what !== 'revue non conforme' && what !== 'tests rouges')) {
+    // Escalade (L337) : une seule fois, pour une revue de code non conforme ou des tests rouges (l'UX garde sa règle) ; déjà engagée, le lot est rendu — au plafond de mur aussi.
+    if (l.escalation) return handBackEscalated(c, text);
+    if (overWall || !esc || (what !== 'revue non conforme' && what !== 'tests rouges')) {
       stop(c, 'handed-back', text);
       return;
     }

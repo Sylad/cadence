@@ -202,6 +202,27 @@ describe('R4 — plafond de mur : deux fois la durée attendue de l\'estimate', 
     expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
     expect(c.lot.status).not.toBe('handed-back');
   });
+  it("R4 — la revue neuve de l'escalade non conforme ET le plafond dépassé : le lot est rendu avec l'issue d'escalade « rendu » et la ligne de journal, comme sans plafond (le modèle a jugé)", async () => {
+    // lot de 1 j (plafond 360 min) : deux passes puis escalade (L337) ; la revue neuve de l'escalade arrive à 400 min de mur et dit non conforme
+    const slowReview: Handler = (call) => {
+      const c = cOf.current!;
+      c.lot.steps[c.lot.steps.length - 1]!.started = new Date(Date.now() - 400 * 60_000).toISOString();
+      return first(call);
+    };
+    const h = harness({ script: { implement: [impl], review: [first, first, first, slowReview], fix: [fix('b.txt'), fix('c.txt'), fix('d.txt')] } });
+    const logs: string[] = [];
+    h.wave.log = (line: string) => logs.push(line);
+    const c = h.lot('L1', { estimate: 1 }, { escalation: { model: 'fable' } });
+    cOf.current = c;
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review', 'fix', 'review']);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.escalation).toMatchObject({ model: 'fable', issue: 'rendu' });
+    expect(c.lot.outcome).toMatch(/^revue non conforme après 3 passe\(s\) de correction ; plafond de mur : 4\d\d min sur 360/);
+    expect(c.lot.outcome).toContain("rendu malgré l'escalade fable");
+    expect(logs).toContainEqual("demo:L1 · escalade fable : lot rendu malgré l'escalade");
+    expect(c.lot.constats.map((k) => k.texte)).toEqual(['premier défaut']);
+  });
   it("R4 — un bloquant passé le plafond est rendu aussi : le plafond borne le mur, la passe d'un bloquant n'y échappe pas", async () => {
     const h = harness({ script: { implement: [slow(400)], review: [rev([{ gravite: 'bloquant', texte: 'sécurité' }])], fix: [fix('b.txt')] } });
     const c = h.lot('L1', { estimate: 1 });

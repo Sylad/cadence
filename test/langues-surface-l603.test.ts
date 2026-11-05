@@ -14,7 +14,7 @@ const overview = read('docs/overview.md');
 const langues = stabilite.slice(stabilite.indexOf('## Languages'), stabilite.indexOf('\n## ', stabilite.indexOf('## Languages') + 1) === -1 ? undefined : stabilite.indexOf('\n## ', stabilite.indexOf('## Languages') + 1));
 
 describe('la surface du compte pro : langues et comptes (L603)', () => {
-  it('R1 — le README dit en une phrase : noms et documentation en anglais, messages en français, et renvoie à stabilite.md', () => {
+  it('R1 — le README dit en une ligne : noms en anglais, messages en français, et renvoie à stabilite.md', () => {
     const ligne = readme.split('\n').find((l) => /English/.test(l) && /French/.test(l));
     expect(ligne, 'une ligne du README nomme l’anglais et le français').toBeDefined();
     expect(ligne).toContain('docs/stabilite.md#languages');
@@ -74,6 +74,14 @@ describe('la surface du compte pro : langues et comptes (L603)', () => {
     const ligneRef = langues.split('\n').find((l) => /--quoi/.test(l)) ?? '';
     expect(ligneRef).toMatch(/`cadence ref`/);
     expect(ligneRef).toMatch(/experimental/i);
-    expect(langues).not.toMatch(/guaranteed like any other[^.]*--quoi/);
+    const garantie = langues.split('\n').find((l) => /guaranteed surfaces/.test(l)) ?? '';
+    expect(garantie).toContain('`--porteur`');
+    expect(garantie).toContain('`--cache-sous-causes`');
+    for (const o of ['--quoi', '--largeur', '--seuil', '--sans-rendu']) expect(garantie.split('guaranteed surfaces')[0], o).not.toContain(o);
+    expect(ligneRef).not.toMatch(/guaranteed like any other/);
+  });
+
+  it('R11 — les prompts tenus dans le code sont rangés en français, pas parmi les textes anglais des modèles', () => {
+    expect(langues).toMatch(/prompts[^.]*(in the code|held in the code)[^.]*French/i);
   });
 });

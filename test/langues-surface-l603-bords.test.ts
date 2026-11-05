@@ -12,12 +12,23 @@ const langues = stabilite.slice(debut);
 describe('langues-surface L603 — bords', () => {
   it('B1 — la section Languages est la dernière et existe une seule fois', () => {
     expect(stabilite.split('## Languages').length).toBe(2);
+    expect(stabilite.slice(debut + 1)).not.toMatch(/^## /m);
   });
 
   it('B2 — les fichiers et dossiers français cités existent', () => {
-    for (const [nom, chemin] of [['acceptation.json', null], ['qualite-baseline.json', 'qualite-baseline.json'], ['docs/nouveautes/', 'docs/nouveautes']] as const) {
+    for (const [nom, chemin] of [['acceptation-<lot>.json', null], ['acceptation.json', null], ['qualite-baseline.json', 'qualite-baseline.json'], ['docs/nouveautes/', 'docs/nouveautes']] as const) {
       expect(langues, nom).toContain('`' + nom + '`');
       if (chemin) expect(existsSync(join(root, chemin)), chemin).toBe(true);
+    }
+    expect(read('src/orchestrate/accept.ts')).toContain('acceptation-<lot>.json');
+    for (const f of ['templates/fiche.yaml', 'templates/fiche-back.yaml', 'templates/inventaire.json']) {
+      expect(existsSync(join(root, f)), f).toBe(true);
+      expect(langues, f).toContain(f.split('/')[1]);
+    }
+    for (const cle of ['sujet', 'cas', 'ecran', 'regles']) expect(langues, cle).toContain('`' + cle + '`');
+    expect(langues).toContain('claude-hook');
+    for (const sous of ['retour', 'attente']) {
+      expect(read('hooks/hooks.json'), sous).toContain('claude-hook ' + sous);
     }
   });
 
@@ -26,8 +37,11 @@ describe('langues-surface L603 — bords', () => {
     const cles = [...(m?.[1] ?? '').matchAll(/'([^']+)'/g)].map((x) => x[1]);
     expect(cles.length).toBeGreaterThan(20);
     for (const k of ['maquette', 'maquetteReviews', 'fiche']) expect(cles).toContain(k);
-    const francais = cles.filter((k) => /maquette|fiche|quoi|largeur|seuil|porteur|rendu/i.test(k));
-    for (const k of francais) expect(langues, k).toContain('`' + k + '`');
+    const anglais = new Set(cles.filter((k) => !/maquette|fiche/i.test(k)));
+    const attendu = cles.filter((k) => /maquette|fiche/i.test(k)).sort();
+    expect(attendu).toEqual(['fiche', 'maquette', 'maquetteReviews']);
+    expect(anglais.size + attendu.length).toBe(cles.length);
+    for (const k of attendu) expect(langues, k).toContain('`' + k + '`');
   });
 
   it('B4 — les options françaises listées sont déclarées comme options du CLI, pas seulement citées', () => {

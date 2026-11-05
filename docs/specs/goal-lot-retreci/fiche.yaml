@@ -73,10 +73,10 @@ cas:
 regles:
   - id: R1
     cas: [C1, C2]
-    enonce: "Un lot est rétréci quand un objectif est donné (--goal, sinon clé goal: du plan) et qu'au moins un commit de travail du lot est déjà dans la branche de base au lancement (commits du lot lus par le plan, lotWork)."
+    enonce: "Un lot est rétréci quand un objectif est donné (--goal, sinon clé goal: du plan) et qu'au moins un commit de travail du lot est déjà dans la branche de base au lancement. « Rétréci » se définit par cela seul (R1), sans condition de visibilité, d'écran ni d'étape spec : un lot rétréci peut garder son étape spec (R3, R4) et un lot non visible ou de retouche peut être rétréci ; seule la maquette sautée dépend en plus de R2. Les commits du lot sont lus par lotWork, dépôt du projet seul : un lot dont les commits intégrés sont seulement dans un dépôt voisin (hasWork, shared.ts:14) n'est jamais rétréci (choix prudent : la maquette et la revue gardent le chemin ordinaire). Le nombre N du journal (R2) vient du même lotWork, compté avant la première session."
     statut: sourcee
-    source: "demande du lot : « un --goal ou goal: qui rétrécit un lot aux commits déjà intégrés » ; objectif choisi preflight.ts:168 (args.goal ?? lot.goal) ; commits du lot audit.ts:288 (lotWork)"
-    tests: ["R1 — objectif donné et un commit du lot dans la base : lot rétréci", "R1 — goal: du plan sans --goal : même résultat", "R1 — objectif sans aucun commit du lot : lot non rétréci"]
+    source: "demande du lot : « un --goal ou goal: qui rétrécit un lot aux commits déjà intégrés » ; objectif choisi preflight.ts:168 (args.goal ?? lot.goal) ; commits du lot src/audit.ts (lotWork)"
+    tests: ["R1 — objectif donné et un commit du lot dans la base : lot rétréci", "R1 — goal: du plan sans --goal : même résultat", "R1 — objectif sans aucun commit du lot : lot non rétréci", "R1 — lot non visible avec objectif et commit intégré : rétréci (revue R7 applicable), sans étape spec dans les deux cas", "R1 — commits intégrés seulement dans un dépôt voisin : lot non rétréci", "R1 — N du journal compté avant la première session"]
   - id: R2
     cas: [C1]
     enonce: "Un lot rétréci dont l'objectif ne change pas la mise en page est lancé sans étape spec ni maquette : aucun screen dans son état, première session implement, budget de l'implémentation seule ; le journal de la vague dit « maquette sautée : l'objectif rétrécit le lot à N commit(s) déjà intégré(s) et ne change pas la mise en page »."
@@ -103,16 +103,16 @@ regles:
     tests: ["R5 — lot visible sans objectif : maquette jouée comme avant", "R5 — lot spec: true rétréci : session spec de la fiche back conservée"]
   - id: R6
     cas: [C2]
-    enonce: "Le brief des revues de code d'un lot rétréci porte une consigne : juger le diff des commits postérieurs à la tête de lancement contre l'objectif, ne pas juger les commits déjà intégrés (contexte seulement) ; la consigne nomme le diff (la plage de commits) et l'objectif."
-    statut: hypothese
-    si_faux: "Si le texte est jugé insuffisant, seule la formulation du gabarit change ; le programme n'en dépend pas pour compter."
-    tests: ["R6 — brief review d'un lot rétréci : consigne, plage de commits et objectif présents", "R6 — brief review-small d'un lot rétréci : même consigne", "R6 — brief d'un lot non rétréci : aucune consigne ajoutée"]
+    enonce: "Le brief des revues de code d'un lot rétréci, dès le rang 1, porte deux consignes : (a) juger le diff des commits postérieurs à la tête de lancement contre l'objectif, les commits déjà intégrés n'étant que du contexte ; la consigne nomme la plage de commits et l'objectif ; (b) marquer inchange: true tout majeur hors objectif et hors lignes changées. Sans (b) le relecteur ne pose jamais la marque et R7 reste sans effet : le programme en dépend."
+    statut: sourcee
+    source: "convergeBrief renvoie '' au rang 1 (src/orchestrate/cycle/converge.ts:~40, reviewRank <= 1) et CONVERGE_BRIEF n'existe que pour le rang >= 2 ; revue de la fiche du 2026-11-05 (note du lot)"
+    tests: ["R6 — brief review de rang 1 d'un lot rétréci : plage de commits, objectif et consigne de marquer inchange: true présents", "R6 — brief review-small de rang 1 d'un lot rétréci : même consigne", "R6 — brief d'un lot non rétréci au rang 1 : aucune consigne (reste vide)", "R6 — brief de rang 2 d'un lot rétréci : consigne de marquage de L622 conservée, sans doublon"]
   - id: R7
     cas: [C2]
     enonce: "Pour un lot rétréci, la marque inchange: true d'un majeur hors objectif et hors lignes changées vaut dès la revue de code de rang 1 (elle ne valait qu'à partir du rang 2) : le majeur marqué ne compte pas pour la conformité."
     statut: sourcee
     source: "demande du lot : « un constat hors objectif revient en suite proposée, sans passe de correction » ; règle codée shared.ts:36-41 (rank >= 2) et converge.ts:11-17 (L622), étendue ici au rang 1 du lot rétréci"
-    tests: ["R7 — lot rétréci, revue 1 avec un majeur inchange: true : lot conforme, aucune passe de correction", "R7 — lot rétréci, majeur sans marque : il compte et ouvre la passe", "R7 — lot rétréci : un majeur marqué déjà signalé par la revue précédente compte (fausse marque, converge.ts:47)"]
+    tests: ["R7 — lot rétréci, revue 1 avec un majeur inchange: true : lot conforme, aucune passe de correction", "R7 — lot rétréci, majeur sans marque : il compte et ouvre la passe", "R7 — lot rétréci, revue de rang 2 : un majeur marqué déjà signalé par la revue 1 compte (fausse marque, converge.ts:~58 exige un rang >= 2 : elle ne se joue pas au rang 1, où il n'y a pas de revue précédente)"]
   - id: R8
     cas: [C2]
     enonce: "Un bloquant achète toujours une passe de correction, marqué inchange ou non, rétréci ou non."
@@ -138,11 +138,11 @@ regles:
     source: "src/orchestrate/command-args.ts:143-145 et src/orchestrate/command.ts:130"
     tests: ["R11 — --goal sans texte : « --goal attend un texte non vide »", "R11 — --goal suivi d'une option : « --goal attend un texte, pas l'option … »", "R11 — --goal avec deux lots : refus « --goal s'applique à un seul lot lancé … »"]
   - id: R12
-    cas: [C1]
-    enonce: "Le rétrécissement est décidé une fois, au lancement, et se lit sans nouveau champ : l'objectif gardé dans l'état du lot (LotState.goal), l'absence d'étape spec dans cet état et la tête avant la première étape (steps[].headBefore). Une reprise (--resume) ne le rejoue pas : les commits écrits par la vague ne rendent jamais un lot rétréci après coup, et n'enlèvent pas l'état rétréci."
+    cas: [C1, C2]
+    enonce: "Le rétrécissement est celui de R1, relu à chaque besoin sans nouveau champ d'état : un lot est lu rétréci pour la revue quand son état garde un objectif (LotState.goal) et qu'au moins un commit de lotWork est antérieur à la tête avant sa première étape (steps[0].headBefore, quelle que soit l'étape : spec ou implement), lu dans git. Cette lecture ne dépend pas de l'étape spec. Sans headBefore (champ facultatif, state.ts:49), le lot est lu non rétréci (chemin ordinaire). Une reprise (--resume) ne rejoue pas la décision de maquette du lancement, et les commits écrits par la vague, postérieurs à headBefore, ne rendent jamais un lot rétréci après coup ni ne lui retirent cet état."
     statut: hypothese
-    si_faux: "Si la lecture sans champ est impossible, un champ optionnel du fichier d'état de la vague est ajouté ; les anciens fichiers, sans le champ, se lisent « non rétréci » (R5, R10) : aucune migration, la forme de l'état d'une vague en cours est inchangée."
-    tests: ["R12 — reprise d'une vague : un lot rétréci le reste, un lot non rétréci ne le devient pas avec les commits de la vague", "R12 — état d'une vague écrite avant ce lot : lu non rétréci, comportement inchangé"]
+    si_faux: "Si la lecture par git est trop fragile, le lead tranchera un champ ajouté à l'état de la vague (un stockage : question au lead, non une hypothèse) ; en attendant, seule change la décision rétréci/non rétréci d'une revue (repli sûr : non rétréci, comportement actuel), aucune donnée écrite."
+    tests: ["R12 — lot visible rétréci avec objectif de mise en page (étape spec gardée) : lu rétréci, revue de rang 1 avec marque valable", "R12 — lot non visible avec goal: et vieux commits : lu rétréci comme par R1", "R12 — lot avec goal: sans commit antérieur à headBefore : non rétréci", "R12 — reprise d'une vague : un lot rétréci le reste, un lot non rétréci ne le devient pas avec les commits de la vague", "R12 — première étape sans headBefore : lu non rétréci"]
 
 contrats:
   - id: A1
@@ -164,5 +164,5 @@ contrats:
     regles: [R6, R7, R8, R9, R10]
 
 donnees:
-  - { id: D1, objet: "état du lot de la vague (goal, screen, steps[].headBefore ; .cadence/runs/<vague>/…json)", existant: true, modification: aucune, note: "champs relus, aucun champ ajouté (R12) ; sans screen, le lot n'a pas d'étape spec" }
+  - { id: D1, objet: "état du lot de la vague (goal, screen, steps[].headBefore ; .cadence/runs/<vague>/…json)", existant: true, modification: aucune, note: "champs relus (goal, steps[0].headBefore), aucun champ ajouté (R12) ; commits intégrés relus dans git" }
   - { id: D2, objet: "propositions du lot (proposals) et journal de la vague", existant: true, modification: aucune, note: "tableau de textes existant ; entrées « [suite code] … » et une ligne « maquette sautée » de plus, format inchangé" }

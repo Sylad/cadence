@@ -86,7 +86,7 @@ By default a wave plays a repository's lots one after the other. With `orchestra
 time**, each in its own **worktree** (a second checkout, in its own folder) on a branch
 `cadence/<wave>/<project>--<lot>`, so sessions never edit the same files. When a lot's cycle ends, the program **integrates** it: one
 lot at a time under a lock, it rebases the branch on `main`, replays the checks, and fast-forwards `main`. Only then is the
-lot `ready`. If `main` moved meanwhile the rebase is replayed, twice at most, then the lot is handed back. The program writes the plan, not the sessions; a session never commits on another repository's `main` (it uses a `wip/` branch). Detail: [orchestrate.md](orchestrate.md#one-worktree-per-lot-orchestrateworktrees-l279).
+lot `ready`. If `main` moved meanwhile the rebase is replayed, twice at most, then the lot is handed back. The program writes the plan, not the sessions; a session never commits on another repository's `main` (it uses a `wip/` branch). Detail: [worktrees](orchestrate-worktrees.md#one-worktree-per-lot-orchestrateworktrees-l279).
 
 ## Deliverable up to a sha
 

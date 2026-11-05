@@ -13,7 +13,7 @@ Four folders, on two user-level roots.
 | `~/.cadence/orchestrate/` | what every live wave of the user shares: `waves/`, `slots/` (session slots), `holds/` (sessions started by hand), `waiters/`, `hud-context/`, and `worktrees/` for the waves launched from a repository root only | no, outside any repository | `CADENCE_HOME` (replaces the whole folder) |
 | `~/.local/share/cadence/` | the copies of cadence in service (`npm run service`, [how it works](fonctionnement.md#4-putting-cadence-itself-in-service)) and, under `$XDG_DATA_HOME/cadence/references/`, the reference documents of `cadence ref add` | no | `XDG_DATA_HOME` for the reference documents; `references.dir` in `cadence.yaml` for their folder ([ref](ref.md)) |
 
-`CADENCE_HOME` does not move `~/.local/share/cadence`: the two roots are independent. The copies in service are cleaned by `npm run service` itself (it keeps the copy in service and the 3 before it, [orchestrate](orchestrate.md)); a lot's worktree is removed with `cadence orchestrate --remove-worktree`. `session.clean` ([session](session.md)) lists working files of *your* project; it is not a list of cadence's state.
+`CADENCE_HOME` does not move `~/.local/share/cadence`: the two roots are independent. The copies in service are cleaned by `npm run service` itself (it keeps the copy in service and the 3 before it, [orchestrate](orchestrate-cycle.md)); a lot's worktree is removed with `cadence orchestrate --remove-worktree`. `session.clean` ([session](session.md)) lists working files of *your* project; it is not a list of cadence's state.
 
 ## Where a gate is declared
 
@@ -23,13 +23,13 @@ A gate is a check that sends a lot back instead of letting it through. It is dec
 |---|---|---|---|
 | Code review | `reviewSince`, written by `raf review enable` | plan | `raf done` on a lot with commits whose review is not recorded ([raf](raf.md)) |
 | UX review | `uxSince`, written by `raf ux enable` | plan | `raf done` on a `--visible` lot with no UX review ([news](news.md)) |
-| Tests | `orchestrate.test` (with `testReplay`, `testRelated`) | cadence.yaml | a lot whose suite is red after a write step: it goes to a correction pass ([orchestrate](orchestrate.md)) |
+| Tests | `orchestrate.test` (with `testReplay`, `testRelated`) | cadence.yaml | a lot whose suite is red after a write step: it goes to a correction pass ([orchestrate](orchestrate-cycle.md)) |
 | Build | `orchestrate.build` | cadence.yaml | a lot whose build or typecheck is red, played before the tests |
 | Code without a test | `orchestrate.testGate` | cadence.yaml | code files changed with no test file touched: a correction pass before the review |
 | Documentation | `docs.sync` (with `docs.since`) | cadence.yaml | a lot that changes code without touching the documents the rule names; acknowledged by `raf docs-ok <lot> --reason` ([news](news.md)) |
-| Edge-case probe | `orchestrate.probe` | cadence.yaml | a lot whose diff a fresh session breaks with a red edge-case test ([orchestrate](orchestrate.md#the-edge-case-probe-orchestrateprobe-l497)) |
+| Edge-case probe | `orchestrate.probe` | cadence.yaml | a lot whose diff a fresh session breaks with a red edge-case test ([orchestrate](orchestrate-gate.md#the-edge-case-probe-orchestrateprobe-l497)) |
 | Pre-check | `orchestrate.precheck` (on by default) | cadence.yaml | a lot whose deliverable is already in the repository: it is not implemented again |
-| Mockup | `orchestrate.maquette` (on by default) | cadence.yaml | a lot with a screen whose mockup fails its UX review, before any code ([orchestrate](orchestrate.md#the-mockup-review-before-any-code)) |
+| Mockup | `orchestrate.maquette` (on by default) | cadence.yaml | a lot with a screen whose mockup fails its UX review, before any code ([orchestrate](orchestrate-spec.md#the-mockup-review-before-any-code)) |
 | Back-end sheet | `orchestrate.fiche` (on by default) | cadence.yaml | a lot with `spec: true` whose sheet fails its review, before any test is written |
 
 Two keys do not add a gate, they say **where the gate is played**: `orchestrate.gate.host` (and `gate.install`, `gate.refs`, `gate.maxParallel`) plays the build and the tests on another machine through ssh ([remote gate](remote-gate.md)); `verify.inPlace` chooses, for `cadence verify --gate`, between the main tree and a throwaway copy ([deliver](deliver.md)).

@@ -23,7 +23,7 @@ describe('L601 — « prêt » est le mot de la vague, « tirable » celui du pl
   });
 
   it('R2 — plus aucun texte livré ne cite l\'ancienne ligne « prêts, ressources libres » (code, skills, docs hors études et CHANGELOG)', () => {
-    const lus = [...files('src', ['.ts']), ...files('skills', ['.md']), ...files('agents', ['.md']), ...files('plugins', ['.ts', '.tsx', '.md']), ...['README.md', 'docs/raf.md', 'docs/lead.md', 'docs/orchestrate.md', 'docs/concepts.md']];
+    const lus = [...files('src', ['.ts']), ...files('skills', ['.md']), ...files('agents', ['.md']), ...files('plugins', ['.ts', '.tsx', '.md']), ...['README.md', 'docs/raf.md', 'docs/lead.md', 'docs/orchestrate.md', 'docs/orchestrate-cycle.md', 'docs/orchestrate-gate.md', 'docs/orchestrate-spec.md', 'docs/orchestrate-worktrees.md', 'docs/concepts.md']];
     const restes = lus.filter((f) => read(f).includes('prêts, ressources libres'));
     expect(restes).toEqual([]);
   });

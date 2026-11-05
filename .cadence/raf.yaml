@@ -2347,6 +2347,7 @@ lots:
     estimate: 0.5
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "conforme : verdict de la vague tenu ; rebase final, ajouts de L619 L622 L623 L624 reportés dans les pages découpées, liens et tests verts", commit: 94087299b5e005ca9f6c5800c3796ee1c5048670 }
   - id: L600
     title: "Vocabulaire (E4a + E7 + E10 de docs/etudes/ensemble-2026-11.md) : concepts.md explique les tailles de lot (express, light, small, quickwin), les quatre sens de hook et docs-ok"
     status: done

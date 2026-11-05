@@ -18,4 +18,4 @@ Reference on Big-Blue, measured on 2026-11-05: about 4 min alone, 8 to 13 min un
 
 **Red of run 1.** Two causes. The ratchet was a real red of the lot, not of the host: `src/verify-gate-remote.ts` at complexity 16, fixed in 4c35a36. `test/verify.test.ts`, « SIGINT reçu par cadence », went red once in the full suite; it passed 6 times out of 6 alone on the host, with and without a tty, and in runs 2 and 3. Its cause is not established.
 
-**Not measured yet.** The three real lots of the goal of L617 come next: these are three plays of one lot's sha, outside a wave, not a before and after.
+**Not measured yet.** The measure on three real lots, which the goal of L617 asks for, has not been done. The table above is three plays of one lot's sha (L617's own), outside a wave, not a before and after: it shows the host runs the gate, not what it saves on real lots. The gain under load is expected, not measured. To do: play three real lots of a wave with `orchestrate.gate.host` set, then the same lots without, and compare duration and Big-Blue load.

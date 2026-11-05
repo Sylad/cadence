@@ -95,6 +95,23 @@ describe('L403 — la porte d\'un lot sur l\'hôte (C2)', () => {
   });
 });
 
+describe('L617 — gate.refs sur la route de la vague', () => {
+  it('les références de gate.refs arrivent sur l\'hôte : la porte du lot lit « main » dans le worktree distant', async () => {
+    const h = harness();
+    const branche = git(h.repo, 'rev-parse', '--abbrev-ref', 'HEAD');
+    const jouer = async (gate: OrchestrateConfig['gate']) => {
+      const ran: number[] = [];
+      await withPlace({ config: { gate, test: 'npm test' } as OrchestrateConfig, repo: h.repo, sha: git(h.repo, 'rev-parse', 'HEAD'), dir: h.repo, needClean: false, label: 'porte du lot L1', local: async () => ({ code: 0, output: '' }), say: () => {} }, async (place) => {
+        ran.push((await place.run(`git rev-parse --verify ${branche}`)).code);
+      });
+      return ran[0];
+    };
+    // Sans refs, seul le sha arrive : la branche reste introuvable sur l'hôte (joué en premier : le dépôt nu de l'hôte garde ce qu'on y pousse).
+    expect(await jouer(gateHost)).not.toBe(0);
+    expect(await jouer({ host: 'machine', refs: [branche] } as OrchestrateConfig['gate'])).toBe(0);
+  });
+});
+
 describe('L403 — connexion perdue pendant la porte d\'une vague (R6, C2)', () => {
   it('R6 — vague, 255 sur la commande de porte du lot : rejeu local, dit dans la sortie et le journal de la vague, aucun rouge compté', async () => {
     remote.lose('export CADENCE_TEST_WORKERS');

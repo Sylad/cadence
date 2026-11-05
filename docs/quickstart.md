@@ -81,7 +81,7 @@ with its `orchestrate.test` line included; a code file in it would make it a `co
 `orchestrate.test` line is the minimum the wave needs, and without it the tour warns `porte de tests absente`.
 The folder is empty, so the gate here is `test -f hello.txt`, which the toy lot satisfies. On a project that already exists,
 put its own test command there (`npm test`, `pytest`, `go test ./...`): `npm test` in a folder without `package.json` fails.
-The reference for every other key is [orchestrate](orchestrate.md) and [deliver](deliver.md).
+The reference for every other key is « The `orchestrate` keys of `cadence.yaml` (reference) » in [orchestrate-cycle](orchestrate-cycle.md#the-orchestrate-keys-of-cadenceyaml-reference) and [deliver](deliver.md).
 
 Then, from the parent folder:
 
@@ -117,7 +117,7 @@ sessions: implement, then review, and hands the lot back to you. From inside a p
 `alpha:L1` (the project is a sub-folder of the current folder, so `alpha:L1` from inside `alpha` finds nothing).
 
 The sessions of a wave never push and never deliver. You read the table, answer the questions it brings back, then
-`/cadence:deliver` ships one project at a time ([deliver](deliver.md)). How waves, budgets and reviews work: [orchestrate](orchestrate.md).
+`/cadence:deliver` ships one project at a time ([deliver](deliver.md)). How waves work: [orchestrate](orchestrate.md) (commands and options, with the table of its five pages); budgets and reviews: [orchestrate-cycle](orchestrate-cycle.md); the gate: [orchestrate-gate](orchestrate-gate.md).
 
 ## If it stops
 

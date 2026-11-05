@@ -11,9 +11,9 @@ exception is a **formatting retry** (below).
 
 ## The five pages
 
-This page keeps the opening, the commands and the options of a running wave. The rest of the former single page moved, unchanged, to four pages:
+This page keeps the opening, the commands and the options of a running wave. The reference of every key of `cadence.yaml` under `orchestrate:` (`test`, `build`, `testReplay`, `worktreeDeps`, `budgetTopUp`, …), one commented line each, is [« The `orchestrate` keys of `cadence.yaml` (reference) »](orchestrate-cycle.md#the-orchestrate-keys-of-cadenceyaml-reference). The rest of the former single page moved, unchanged, to four pages:
 
-- [orchestrate-cycle.md](orchestrate-cycle.md): cycle of a lot, review and its sizing, escalation, librarian, effort, pre-check, minors, frozen copy, express lane, cost, plan commits, budget, retries, `orchestrate.ux`, per-step MCP servers, `plan.onWrite`.
+- [orchestrate-cycle.md](orchestrate-cycle.md): cycle of a lot, review and its sizing, escalation, librarian, effort, pre-check, minors, frozen copy, express lane, cost, plan commits, the reference of the `orchestrate` keys of `cadence.yaml`, budget, retries, `orchestrate.ux`, per-step MCP servers, `plan.onWrite`.
 - [orchestrate-gate.md](orchestrate-gate.md): the program's gate (build, tests, tests already red, replay alone, gate declared in parts, shares of the machine), the pre-check of sealed tests and shared files, the edge-case probe.
 - [orchestrate-spec.md](orchestrate-spec.md): the spec step (`screen:`, `spec: true`), the light mockup, the mockup review, the accept step and its lock, the downstream briefs.
 - [orchestrate-worktrees.md](orchestrate-worktrees.md): one worktree per lot, integration, a lot whose work is in a neighbouring repository, a session never commits on another repository.
@@ -199,6 +199,10 @@ The Claude Code status band is the `cadence-hud` plugin.
 ## Moved sections
 
 The anchors of the sections that moved, kept for one version so that an old link still lands on a line that says where to go.
+
+### The `orchestrate` keys of `cadence.yaml` (reference)
+
+Moved to [orchestrate-cycle.md](orchestrate-cycle.md#the-orchestrate-keys-of-cadenceyaml-reference).
 
 ### The spec step of a lot with `screen:`
 

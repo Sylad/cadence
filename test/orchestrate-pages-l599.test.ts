@@ -78,4 +78,40 @@ describe('L599 — orchestrate.md en cinq pages', () => {
       expect(read(`docs/${usage}`), usage).not.toMatch(/docs\/orchestrate\.md[^«]{0,30}« (A red test is replayed alone|A gate declared in parts|Budget set by the measure) »/);
     }
   });
+
+  it('R9 — la référence des clés `orchestrate.*` de cadence.yaml a son titre sur orchestrate-cycle.md ; le sommaire et les pages d\'usage y mènent', () => {
+    const title = 'The `orchestrate` keys of `cadence.yaml` (reference)';
+    const anchor = 'orchestrate-cycle.md#the-orchestrate-keys-of-cadenceyaml-reference';
+    const cycle = read('docs/orchestrate-cycle.md');
+    expect(cycle).toContain(`\n## ${title}\n`);
+    const section = cycle.slice(cycle.indexOf(`\n## ${title}\n`));
+    for (const key of ['worktreeDeps', 'testReplay', 'testRelated', 'gate: { host']) expect(section, key).toContain(`  ${key}`);
+    expect(cycle).toContain('`orchestrate.budgetTopUp`');
+    expect(read('docs/orchestrate.md')).not.toContain('worktreeDeps:');
+    const main = read('docs/orchestrate.md');
+    const sommaire = main.slice(main.indexOf('## The five pages'), main.indexOf('```sh'));
+    expect(sommaire).toContain(`](${anchor})`);
+    expect(sommaire).toContain('`worktreeDeps`');
+    for (const usage of ['quickstart.md', 'overview.md']) expect(read(`docs/${usage}`), usage).toContain(`](${anchor})`);
+    expect(read('docs/quickstart.md')).not.toMatch(/The reference for every other key is \[orchestrate\]\(orchestrate\.md\)/);
+    expect(read('docs/quickstart.md')).not.toMatch(/How waves, budgets and reviews work: \[orchestrate\]\(orchestrate\.md\)\./);
+    for (const p of SUITE) expect(read('docs/overview.md'), p).toContain(`](${p})`);
+  });
+
+  it('R10 — un renvoi sans titre vers orchestrate.md qui cite un paragraphe, une clé ou une commande déplacés vise la page qui les porte (news, qualite, raf)', () => {
+    const pages = Object.fromEntries(['orchestrate.md', ...SUITE].map((p) => [p, read(`docs/${p}`)]));
+    const where = (needle: string): string[] => Object.keys(pages).filter((p) => pages[p].includes(needle));
+    for (const [usage, cited, needle, stale] of [
+      ['news.md', 'orchestrate-cycle.md', '**Librarian before the review', /« Librarian before the review » in \[orchestrate\]\(orchestrate\.md\)/],
+      ['qualite.md', 'orchestrate-gate.md', '**The build is played before the tests (L333)**', /build runs before the tests \(\[orchestrate\.md\]\(orchestrate\.md\)\)/],
+      ['raf.md', 'orchestrate-spec.md', '`cadence spec green <lot>`', /unfinished wave keeps a lot of the repository open; see \[orchestrate\]\(orchestrate\.md\)/],
+      ['raf.md', 'orchestrate-worktrees.md', 'Resources deduced from the diff', /\(orchestrate\.md#[a-z0-9-]+\) \(« Resources deduced from the diff »\)/],
+    ] as const) {
+      expect(where(needle), needle).toEqual([cited]);
+      const t = read(`docs/${usage}`);
+      expect(t, `${usage} → ${cited}`).toContain(`](${cited}`);
+      expect(t, `${usage} stale`).not.toMatch(stale);
+    }
+    expect(checkLinks(root, ['docs/news.md', 'docs/qualite.md', 'docs/raf.md', 'docs/quickstart.md', 'docs/overview.md'])).toEqual([]);
+  });
 });

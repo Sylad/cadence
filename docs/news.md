@@ -173,7 +173,7 @@ The README is a short home page: it receives only a link to that page, never the
 The test `readme-accueil` holds the README to that (size, short lines, no detailed option).
 
 `cadence orchestrate` calls it by itself when `docs.sync` reports a document behind the commits of the lot, **before the
-review** (see « Librarian before the review » in [orchestrate](orchestrate.md)); the lead calls it by hand otherwise
+review** (see « Librarian before the review » in [orchestrate-cycle](orchestrate-cycle.md)); the lead calls it by hand otherwise
 ([lead](lead.md)).
 
 A document **outside the repository** is the librarian's only when the configuration names it, with the key that already

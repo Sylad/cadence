@@ -2351,9 +2351,10 @@ lots:
       - { date: 2026-11-05, text: "à traiter aussi : la bande dit « 9 prêts » pour des lots déjà clos au plan, le panneau dit « clos » (capture de Sylvain du 05-11)" }
   - id: L602
     title: "Où cadence écrit, et les portes (E6 + E14 de docs/etudes/ensemble-2026-11.md) : une page liste les quatre dossiers d'état, un tableau réunit les trois endroits où une porte se déclare"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-05
+    started: 2026-11-05
   - id: L603
     title: "Surface pour le compte pro (E9 + E11 de docs/etudes/ensemble-2026-11.md) : convention des langues écrite (noms anglais, messages français), comptes périmés d'overview.md et stabilite.md retirés"
     status: todo

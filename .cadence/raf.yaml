@@ -2504,10 +2504,11 @@ lots:
     finished: 2026-11-05
   - id: L618
     title: "Activer la porte déportée dans cadence.yaml (orchestrate.gate: host mini-blue-wsl, install npm ci, refs main et origin/main, test de la config sauvé par L617), une fois L617 en service ; mesurer sur trois lots réels en vague la durée de porte et la charge de Big-Blue, avant et après (8 à 13 min sous charge 43 le 05-11)"
-    status: todo
+    status: doing
     estimate: 0.1
     after: [ L617 ]
     created: 2026-11-05
+    started: 2026-11-05
   - id: L619
     title: "Fusion du CHANGELOG à l'intégration : l'union d'un conflit ou un rebase ne laisse ni titre dupliqué, ni entrée dupliquée, ni entrée sous une version publiée, et toutes les entrées d'un lot restent sous [Unreleased] ; 05-11 : 7 reprises à la main (L582 L591 L613 L583 L614 L617 ×2), le contrôle vient avant la porte complète"
     status: todo

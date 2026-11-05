@@ -2543,6 +2543,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "conforme — 0 bloquant, 0 majeur, 2 mineurs (notes : refus « session encore en vie » non anticipé avant l'avance de l'instantané ; liens bin/raf et bin/cadence recréés par advanceSnapshot sans assertion) — orchestré (vague 2026-11-05-1810-cad, 3 passe(s) de correction)", commit: fb673583f9084c9e05185819a65b02c19da16474, reporte: { de: 00e97b9622c9b389eec9babcb18640db157cd6f2, vers: fb673583f9084c9e05185819a65b02c19da16474, patchId: ae4916fc5b354649d0460abecb816d1c33742d35 } }
   - id: L624
     title: "Une porte jouée sur un hôte distant (orchestrate.gate.host) rend son créneau de session : elle n'occupe aucune session claude ni le processeur local, et trois portes y bloquent la file (05-11, vague 1810-cad : 0 session pendant 30 min, portes de 16 min sur mini-blue, L622 en attente) ; le nombre de portes simultanées sur l'hôte a sa propre borne ; mesure : minutes à créneau vide avant et après"
     status: doing

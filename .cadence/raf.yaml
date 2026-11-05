@@ -2455,9 +2455,10 @@ lots:
     finished: 2026-11-05
   - id: L616
     title: "Porte ciblée : tout lot qui touche CHANGELOG.md joue test/changelog.test.ts dès la porte d'écriture ; trois refus le 05-11 (L582, L591, L613) pour une entrée écrite sous la dernière version publiée au lieu de [Unreleased], vus seulement au sommet intégré, et le brief d'implémentation le dit"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-11-05
+    started: 2026-11-05
   - id: L617
     title: "Porte déportée sur mini-blue pour cadence (orchestrate.gate.host, docs/remote-gate.md) : préparer WSL de mini-blue (node, git, clé), déclarer l'hôte, jouer la porte des lots là-bas ; mesurer avant et après sur trois lots réels, durée de porte et charge de Big-Blue (05-11 : 8 à 13 min sous charge 43, environ 4 min seule) ; avec repli local si l'hôte ne répond pas"
     status: todo

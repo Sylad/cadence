@@ -58,7 +58,7 @@ A lot's **size** is read from its estimate, in days, and decides its ceremony. F
 | **small** | estimate ≤ 0.5 day, **or** the lot is flagged `quickwin` | a single review, no separate UX pass: `review-small` (code and ergonomics) for a `visible` lot, a code `review` otherwise; a minor finding still gets one fix and a second review, unless also light |
 | **full** | anything bigger | the whole cycle of [the steps above](#the-steps-of-a-lot) |
 
-With the default threshold the words nest: express is also light and small, light is also small. `quickwin` (⚡, `raf add --quickwin`) is « small, said by hand », whatever the estimate; `raf quickwins` lists lots of ≤ 0.25 day or flagged ⚡. Detail: [orchestrate-cycle.md](orchestrate-cycle.md).
+With the default threshold the words nest: express is also light and small, light is also small. `quickwin` (⚡, `raf add --quickwin`) is « small, said by hand », whatever the estimate; `raf quickwins` lists lots of ≤ 0.25 day or flagged ⚡. Detail: « Review sized to the lot » in [orchestrate-cycle.md](orchestrate-cycle.md).
 
 ## The test gate
 

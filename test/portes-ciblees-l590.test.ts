@@ -163,6 +163,10 @@ describe('L590 R13 — la commande liée dérive de vitest run', () => {
   it('R13 — build && vitest run : aucune dérivation, suite complète', () => {
     for (const t of ['npm run build && npx vitest run', '(cd a && vitest run)', 'vitest run || true', 'vitest run; x', 'vitest run | tee x']) expect(relatedCommand(t, undefined), t).toBeNull();
   });
+  it('R13 — vitest run test/unit : un filtre positionnel n\'est pas une option, aucune dérivation, suite complète', () => {
+    // Dérivé, `test/unit` deviendrait un fichier « lié » de plus et la porte jouerait des tests que `vitest run test/unit` écarte (revue du 05-11).
+    for (const t of ['npx vitest run test/unit', 'vitest run a.test.ts', 'vitest run --reporter=dot test/unit', 'vitest run --reporter dot']) expect(relatedCommand(t, undefined), t).toBeNull();
+  });
   it('R13 — npm test : aucune dérivation, suite complète', () => {
     for (const t of ['npm test', 'pnpm -r test', 'vitest', 'vitest watch', 'npx vitest runner']) expect(relatedCommand(t, undefined), t).toBeNull();
   });

@@ -85,18 +85,24 @@ export function checkTestRelated(test: GateTest | undefined, related: string | u
   if (isParts(test)) throw bad('testRelated : refusé quand orchestrate.test est une liste de parties : le lot ne joue alors que la suite complète');
 }
 
-/** `[npx ]vitest run[ options]` : l'unique forme dont la commande liée se dérive (L590, R13) ; les options n'ont ni `;`, `|`, `&`, redirection ni accent grave (`isComposedGate` écarte déjà `&&`, `||` et les parenthèses). */
-const VITEST_RUN = /^(npx\s+)?vitest\s+run(?:\s+([^\s;|&<>`][^;|&<>`\n]*))?$/;
+/**
+ * `[npx ]vitest run[ options]` : l'unique forme dont la commande liée se dérive (L590, R13). Chaque option commence par `-` (`--reporter=dot`, `--maxWorkers=$N`) et n'a ni `;`, `|`, `&`, redirection ni accent grave
+ * (`isComposedGate` écarte déjà `&&`, `||` et les parenthèses). Un mot sans tiret (`vitest run test/unit`, `--reporter dot`) est un filtre positionnel ou en passe pour un : rien n'est dérivé, car repris dans
+ * `vitest related --run … {files}` il deviendrait un fichier « lié » de plus et la porte jouerait des tests que `orchestrate.test` écarte, absents de la ligne de base (revue du 05-11).
+ */
+const VITEST_RUN = /^(npx\s+)?vitest\s+run((?:\s+-[^\s;|&<>`]+)*)$/;
 
 /**
- * La commande des tests liés aux fichiers modifiés (L590) : `orchestrate.testRelated` s'il est déclaré ; sinon, dérivée d'une `orchestrate.test` en chaîne simple `[npx ]vitest run[ options]`
- * (`[npx ]vitest related --run[ options] {files}`) ; null pour toute autre forme (parties, composée, `npm test`…) : la porte joue alors la suite complète. `{files}` reste à remplacer (`withFiles`).
+ * La commande des tests liés aux fichiers modifiés (L590) : `orchestrate.testRelated` s'il est déclaré ; sinon, dérivée d'une `orchestrate.test` en chaîne simple `[npx ]vitest run[ options]` (options à tiret seulement)
+ * (`[npx ]vitest related --run[ options] {files}`) ; null pour toute autre forme (parties, composée, `npm test`, un filtre positionnel `vitest run test/unit`…) : la porte joue alors la suite complète. `{files}` reste à remplacer (`withFiles`).
  */
 export function relatedCommand(test: GateTest | undefined, related: string | undefined): string | null {
   if (related) return related;
   if (test === undefined || isParts(test) || isComposedGate(test)) return null;
   const m = VITEST_RUN.exec(test);
-  return m ? `${m[1] ?? ''}vitest related --run${m[2] ? ` ${m[2]}` : ''} {files}` : null;
+  if (!m) return null;
+  const options = m[2]!.trim();
+  return `${m[1] ?? ''}vitest related --run${options ? ` ${options}` : ''} {files}`;
 }
 
 /** La commande liée avec ses fichiers : chacun protégé pour le shell, séparés par des espaces. */

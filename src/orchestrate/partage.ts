@@ -52,7 +52,7 @@ export function citedFiles(text: string, tracked: readonly string[]): string[] {
   return [...out];
 }
 
-const IMPORT_SPEC = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)['"](\.{1,2}\/[^'"]*)['"]/g;
+const IMPORT_SPEC = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"](\.{1,2}\/[^'"]*)['"]/g;
 
 /** Les fichiers de code suivis que `text` (un fichier de test) importe par un chemin relatif, résolus depuis `from` ; l'extension (`.js`, `.ts`) ne compte pas. */
 function importedCode(text: string, from: string, cited: readonly string[]): string[] {
@@ -64,7 +64,7 @@ function importedCode(text: string, from: string, cited: readonly string[]): str
 
 /** Les tests (et la fiche) d'une acceptation scellée que `cited` touche : cités eux-mêmes, ou important un fichier de code cité. */
 function risksOf(repo: string, rev: string, a: Acceptation, acceptation: string, cited: readonly string[]): SealedRisk[] {
-  const tests = a.fichiers.map((x) => posix.normalize(x));
+  const tests = [...new Set(a.fichiers.map((x) => posix.normalize(x)))];
   return [...tests, posix.normalize(a.fiche)].flatMap((f): SealedRisk[] => {
     if (cited.includes(f)) return [{ fichier: f, lot: a.lot, acceptation }];
     const via = tests.includes(f) ? importedCode(tryGit(repo, 'show', `${rev}:${f}`) ?? '', f, cited)[0] : undefined;

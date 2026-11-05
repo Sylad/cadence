@@ -26,6 +26,7 @@ const loaders: Record<string, () => Promise<unknown>> = {
   'porte-ciblee': () => import('../src/orchestrate/cycle/porte-ciblee.js'),
   'precheck-step': () => import('../src/orchestrate/cycle/precheck-step.js'),
   'questions': () => import('../src/orchestrate/cycle/questions.js'),
+  'retreci': () => import('../src/orchestrate/cycle/retreci.js'),
   'review': () => import('../src/orchestrate/cycle/review.js'),
   'session': () => import('../src/orchestrate/cycle/session.js'),
   'sh': () => import('../src/orchestrate/cycle/sh.js'),

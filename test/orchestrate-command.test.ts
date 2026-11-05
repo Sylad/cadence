@@ -1125,7 +1125,8 @@ describe('une vague', () => {
     expect(await orchestrate(['--resume', '--budget', '1M'], io(parent).io, f.deps)).toBe(0);
     expect(reviews).toHaveLength(2);
     expect(reviews[0]).toContain('Review lot `L1`');
-    expect(reviews[1]).toBe('GABARIT RELU L2\n');
+    // La ligne cluster (L632) s'ajoute à tout brief, gabarit modifié compris : le gabarit relu reste en tête.
+    expect(reviews[1]).toMatch(/^GABARIT RELU L2\n\nThis session has no cluster access/);
   });
 
   it('question puis --answer : le lot reprend, la vague aboutit', async () => {

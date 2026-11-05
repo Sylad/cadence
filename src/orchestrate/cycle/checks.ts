@@ -141,7 +141,8 @@ const EXCERPT_LINES = 10;
  * les dix dernières lignes (`redExcerpt`) : sans les noms en tête, L602, L617 et L622 du 05-11 ne citaient que « Expected ; false » et ont coûté une suite complète chacun pour retrouver le test.
  */
 export function redTestsText(command: string, code: number, output: string): string {
-  const names = failedTests(output);
+  // Seul un identifiant « fichier > test » (vitest, jest) ou « fichier::test » (pytest) est cité en tête : un « FAIL message » libre reste dans la fin de la sortie, où le motif du refus le lit tel quel.
+  const names = failedTests(output).filter((n) => n.includes(' > ') || n.includes('::'));
   const tail = output.trim().split('\n').slice(-40).join('\n');
   return `${command} en échec (code ${code}) :${names.length ? `\n${names.map((t) => `- ${t}`).join('\n')}` : ''}\n${tail}`;
 }

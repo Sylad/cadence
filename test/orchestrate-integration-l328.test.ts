@@ -54,4 +54,8 @@ describe('L631 — le constat de la suite entière nomme le fichier et le test, 
   it('sans nom lisible dans la sortie : la fin de la sortie, comme avant', () => {
     expect(redTestsText('cmd', 2, 'a\nb')).toBe('cmd en échec (code 2) :\na\nb');
   });
+  it('un « FAIL message » libre, sans « fichier > test », reste dans la fin de la sortie que le motif lit', () => {
+    const texte = redTestsText('sh check.sh', 1, 'FAIL combo-des-deux-lots');
+    expect(redExcerpt({ source: 'tests', gravite: 'bloquant', texte })).toContain('FAIL combo-des-deux-lots');
+  });
 });

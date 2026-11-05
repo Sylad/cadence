@@ -22,7 +22,9 @@ import { buildCtx, parseCli, type Ctx, type EarlyCtx, type Io } from './cli/cont
 export type { Io } from './cli/context.js';
 export { ensureGitignore } from './cli/setup-commands.js';
 
-const HELP = `raf — plan « reste à faire » versionné dans le dépôt, relié aux commits
+const HELP = `cadence — une méthode de travail qui vit dans le dépôt ; raf — son plan « reste à faire » versionné, relié aux commits
+
+Une seule aide : « raf --help », « cadence --help » et « cadence help » impriment ce texte. « cadence raf … » est « raf … ».
 
   raf init [--project nom] [--prefix L] [--no-hook]
   raf add "titre" [--estimate j] [--quickwin] [--visible [--screen page|component|journey]] [--spec] [--local] [--public "titre public"] [--every jours] [--after L2,L4] [--uses banc,passerelle] [--planned AAAA-MM-JJ..AAAA-MM-JJ] [--set champ=valeur]… [--parent L3] [--id AB-1.2 [--under AB-1]]
@@ -35,6 +37,16 @@ const HELP = `raf — plan « reste à faire » versionné dans le dépôt, reli
   raf uses <lot> [<ressource>…]   remplace les ressources partagées du lot (uses:, déclarées par resources: dans le cadence.yaml du dossier parent ; raf check refuse un nom non déclaré) ; sans nom, retire la clé
   raf plan <lot> AAAA-MM-JJ..AAAA-MM-JJ | <lot> --clear   pose, remplace ou retire la fenêtre prévue d'un lot (planned: from..to ; un seul jour vaut une fenêtre d'un jour) ; un sous-lot sans fenêtre propre hérite de celle de son parent ; lue par session start (retards, échéances), raf show et le Gantt
   raf plan --propose [--per-day n] [--from AAAA-MM-JJ] [--apply]   propose une fenêtre par lot à faire sans fenêtre (jours ouvrés à partir de --from, aujourd'hui par défaut ; n jours d'estimation par jour ouvré, 1 par défaut ; lots prêts d'abord) ; --apply les écrit d'un coup et dit la commande du commit ; plan.requirePlanned: true (cadence.yaml) fait refuser raf add sans --planned
+  cadence session start [--since "24 hours ago"] [--idle 2] | session close [--since …]   faits de reprise (notes de la veille, en cours, fait depuis, écarts, propositions) ou de clôture (code 1 tant que ce n'est pas fermé) ; --all [--depth 1] depuis un dossier non dépôt : une section par projet des sous-dossiers
+  cadence session next "ligne" … | session next --clear   notes pour la prochaine session (remplacent les précédentes) ; sans ligne ni --clear, la commande refuse
+  cadence session context [--session <id>]   contexte de la session (variable CLAUDE_CODE_SESSION_ID, sinon la seule du dossier) publié par la bande cadence-hud ; code 2 sans chiffre frais
+  cadence deliver [--block nom] [--dry-run] [--sha rév] [--config cadence.yaml] [-- arguments du script du projet]   CI du sha poussé → déploiement → vérifications de l'effet, ou le script de livraison du projet (deliver.script), sous verrou et journal ; --block nom : ne livre que les lots dont un commit touche les chemins du bloc (deliver.blocks)
+  cadence spec check <fiche.yaml>   les invariants d'une fiche d'écran, back ou mixte (gabarits templates/fiche.yaml, fiche-back.yaml) ; code 1 si un écart, 2 si illisible
+  cadence spec qa <fiche.yaml>   la section de docs/qa/expectations.md dérivée de la fiche (shows, never, api), sur la sortie standard
+  cadence spec reseal <lot> <test>… --reason "pourquoi" [--porteur <lot en cours>]   le chemin du lead quand un test d'acceptation scellé du lot en cours contredit la fiche : tests corrigés, empreinte des seuls tests nommés refaite (un commit, tout ou rien), raison dans acceptation.json et en note du lot ; hors vague orchestrée ; lot livré (vert: true) : --porteur nomme le lot en cours qui porte la correction
+  cadence spec green <lot>   remet au vert un lot clos à la main (raf done) dont acceptation-<lot>.json est resté à vert: false : rejoue la commande d'acceptation (orchestrate.accept) et, verte, pose vert: true, scelle les tests affinés depuis le commit rouge et commite le fichier seul ; rouge, code 1 et rien ne change ; refusé pendant une vague du dépôt ou depuis une session
+  cadence skills install [--dir .claude] [--force]   installe dans .claude tous les skills (dossiers de skills/) et tous les agents (agents/) du paquet ; sans --force, un conflit est refusé avant toute écriture
+  cadence claude-hook retour|attente|pipe   hook Bash du plugin (hooks/hooks.json) : lit le JSON de Claude Code sur l'entrée standard ; retour imprime le geste d'un refus connu, attente le rappel contre la boucle d'attente, pipe le refus du pipe qui masque le code de sortie ; sort toujours en 0
   cadence local start <lot> [--ttl minutes] | local done <lot> | local abort <lot>   tâche locale du lead (lot posé par raf add --local) : start verrouille le dépôt comme une vague (aucune vague n'y démarre, --add y est refusé) et passe le lot à doing, refusé si une orchestration ou un autre lot du dépôt est en cours ; le verrou est déclaré (60 min par défaut), tenu sans processus jusqu'à done ou abort, signalé en ⚠ par lead tour et orchestrate --status au-delà du délai ; done joue la porte du projet UNE fois, libère le dépôt si elle est verte (la capture, la revue du diff, cadence deliver et raf done restent au lead) et le garde verrouillé sinon ; abort libère sans porte
   raf start <id>        raf done <id> [--force] [--now]        raf drop <id> [--reason texte]
   raf status [<id> <état> ["message"] | <id> --back ["message"]]   états détaillés du projet (cadence.yaml : plan.states) : pose l'état d'un lot sous la garde de plan.transitions et note le message ; --back sort de l'état bloqué vers l'état d'avant ; sans argument, liste les états. start / done / drop / todo posent eux-mêmes l'état de leur statut
@@ -192,6 +204,9 @@ const WITH_PLAN: Record<string, (c: Ctx) => number | Promise<number>> = {
   news: cmdNews,
   ref: cmdRef,
 };
+
+/** Les commandes que `run` dispatche (orchestrate a sa propre branche) : le test d'aide (L597) vérifie qu'elles figurent toutes dans `HELP`. */
+export const COMMAND_TABLES = [...new Set([...Object.keys(BEFORE_PLAN), ...Object.keys(WITH_PLAN), 'orchestrate'])];
 
 // Une session d'orchestration ne ferme pas un lot, n'enregistre pas de verdict à la place du lead et ne livre pas.
 const LEAD_ONLY = new Set(['done', 'ux', 'review', 'deliver']);

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Plan } from '../src/plan.js';
 import { run } from '../src/cli.js';
 import { orchestrate, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { addHold, cadenceHome, expiredHolds, freeSlots, liveHolds, registerWave, releaseHold, unregisterWave } from '../src/orchestrate/registry.js';
-import { tempDir } from './helpers.js';
+import { tempDir, testPackage } from './helpers.js';
 
 // L255 : les sessions lancées à la main par le lead comptent dans les créneaux libres (23-10 : 4 sessions pour un plafond de 3).
 // un registre neuf par test : les réservations d'un test ne comptent pas dans le suivant
@@ -229,8 +229,9 @@ describe('aide (L255)', () => {
     expect(r.out + r.err).toContain('lead release <étiquette>');
   });
 
-  it('R16 — l\'aide de bin/cadence.js nomme aussi lead hold', () => {
-    expect(readFileSync(join(import.meta.dirname, '../bin/cadence.js'), 'utf8')).toContain('cadence lead hold <étiquette>');
+  it('R16 — « cadence » sans outil imprime la même aide, qui nomme lead hold (bin/cadence.js n\'en tient plus)', () => {
+    const r = spawnSync(process.execPath, [join(testPackage(), 'bin/cadence.js')], { encoding: 'utf8' });
+    expect(r.stdout).toContain('cadence lead hold <étiquette>');
   });
 });
 

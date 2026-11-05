@@ -5,6 +5,7 @@
 - The plan is a YAML file in the repo, edited by the CLI: `.cadence/raf.yaml` by default (versioned by git, never published with `docs/`),
   with its notes in `.cadence/notes/`. Your comments and hand edits are preserved. A project that still has `docs/plan/raf.yaml` keeps it:
   see [Where the plan is](#where-the-plan-is).
+- One help text lists every command of both tools (L597): `raf --help`, `cadence --help`, `cadence help` and `cadence` alone print it. It lives in `src/cli.ts`; `bin/cadence.js` only calls it, and a test checks that each command and sub-command of the dispatch is in it.
 - A commit belongs to a lot when its message cites the id: `feat(L3): …`,
   `fix: L3/t1 …`. The link is **computed from `git log`**, never stored, so
   committing never dirties the plan. The id is read as a whole word: `XL3`,

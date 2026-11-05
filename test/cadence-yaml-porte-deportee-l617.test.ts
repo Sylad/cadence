@@ -14,6 +14,10 @@ describe('L617 — la porte de cadence se joue sur mini-blue', () => {
     expect(readOrchestrateConfig(yaml).gate?.install).toBe('npm ci');
   });
 
+  it('R4 — gate.refs pousse main et origin/main, que le build (qualite --contre main) et probe-L539 lisent', () => {
+    expect(readOrchestrateConfig(yaml).gate?.refs).toEqual(['main', 'origin/main']);
+  });
+
   it('R2 — la porte déclarée garde les commandes de main (la déportation ne change que le lieu)', () => {
     const o = readOrchestrateConfig(yaml);
     expect(o.test).toBe('npx vitest run');

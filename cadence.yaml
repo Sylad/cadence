@@ -27,6 +27,7 @@ orchestrate:
   gate:
     host: mini-blue-wsl
     install: npm ci
+    refs: [main, origin/main]   # le build lit main (qualite --contre main), un test lit origin/main : sans elles, « référence introuvable » sur l'hôte
   testGate:
     code: [src/**, 'bin/*.js', '!**/*.test.ts']
     tests: ['test/**']

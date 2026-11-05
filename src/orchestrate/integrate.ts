@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { gitCommonDir } from '../git.js';
 import { sharedStateDir } from '../state.js';
 import { activeLock, releaseLock, takeLock, type OLock } from './lock.js';
-import { mergeUnreleased, moveToUnreleased, settleLotEntries, unreleasedSections } from './changelog-merge.js';
+import { changelogShapeProblems, mergeUnreleased, moveToUnreleased, settleLotEntries, unreleasedSections } from './changelog-merge.js';
 import { mutexFor } from './mutex.js';
 import { isMap, isNode, isSeq, parseDocument, type YAMLMap, type YAMLSeq } from 'yaml';
 import { indentedSeq } from '../plan-ids.js';
@@ -294,6 +294,13 @@ function settleBaseline(work: string, base: string, before: string): boolean {
   } catch {
     return false; // une version absente ou illisible : la base de git est gardée, la porte la contrôlera
   }
+}
+
+/** Défauts de forme du CHANGELOG du worktree contre celui de la branche `base` (L619) ; aucun quand l'un des deux fichiers manque. */
+export function changelogShapeOf(work: string, base: string): string[] {
+  const main = tryGit(work, 'show', `refs/heads/${base}:${CHANGELOG}`);
+  if (main === null || !existsSync(join(work, CHANGELOG))) return [];
+  return changelogShapeProblems(readFileSync(join(work, CHANGELOG), 'utf8'), main);
 }
 
 /**

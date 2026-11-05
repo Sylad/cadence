@@ -5,7 +5,7 @@ import { lotWork, coveredTasks } from '../../audit.js';
 import { openDocGap } from './brief.js';
 import { git, trackedDirty, lotBranch, branchExists, integrated, gitFailure, removeTree } from '../worktree.js';
 import { foreignDirty, planBefore, commitPlan, planMessage, leadMoved } from './plan-writes.js';
-import { repoBranch, INTEGRATE_WAIT_MS, takeRepoWrite, rebaseOnto, rebaseNotes, patchId, mergeBase, advance, baseMoved, MAX_REPLAYS, type Grant, type Rebase } from '../integrate.js';
+import { repoBranch, INTEGRATE_WAIT_MS, takeRepoWrite, rebaseOnto, rebaseNotes, changelogShapeOf, patchId, mergeBase, advance, baseMoved, MAX_REPLAYS, type Grant, type Rebase } from '../integrate.js';
 import { relative } from 'node:path';
 import { RafError } from '../../plan.js';
 import { PLAN_ACTIONS } from '../../plan-commit.js';
@@ -195,6 +195,9 @@ export async function integrateLot(c: LotCtx): Promise<void> {
         if (rebased.kind === 'conflict') return refuse(`${conflictRefusal(l.repo, t, rebased)} ; ${kept}`);
         if (rebased.kind === 'rebased') rebaseNotes(rebased, key).forEach((note) => c.wave.log(note));
         const tip = git(t.dir, 'rev-parse', 'HEAD');
+        // Le contrôle de forme du CHANGELOG (L619) coûte une lecture : il passe avant la porte complète, qui ne le ferait voir qu'après cinq minutes.
+        const shape = changelogShapeOf(t.dir, t.base);
+        if (shape.length) return refuse(`intégration refusée : CHANGELOG.md mal formé au sommet intégré (${shape.join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
         // Tests et build joués au sommet (L590, R5 : la suite complète, une fois par sommet), avant que la branche du dépôt ne bouge (R7).
         const red = await integrationChecks(c, key, t.dir, tip, reviewed);
         if (red.length) return refuse(`intégration refusée : tests rouges au sommet intégré (${red.map(redExcerpt).join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);

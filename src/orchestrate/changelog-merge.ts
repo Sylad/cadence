@@ -207,3 +207,45 @@ export function settleLotEntries(rebased: string, lotTip: string, start: string,
   const body = titles.map((title) => `### ${title}\n\n${(now.get(title) ?? []).join('\n')}\n`);
   return `${r.head}\n\n${body.join('\n')}\n${tail}`;
 }
+
+/** Entrées d'un morceau de CHANGELOG hors `[Unreleased]` : une ligne `- ` et ses lignes de suite directes, jusqu'à la ligne vide ou au titre suivant. */
+function publishedEntries(tail: string): string[] {
+  const out: string[] = [];
+  let open = false;
+  for (const line of tail.split('\n')) {
+    if (line.startsWith('- ')) {
+      out.push(line);
+      open = true;
+    } else if (open && line.trim() !== '' && !line.startsWith('#')) {
+      out[out.length - 1] += `\n${line}`;
+    } else {
+      open = false;
+    }
+  }
+  return out;
+}
+
+/** Combien de fois chaque valeur apparaît, et un message par valeur répétée. */
+function repeated(values: string[], say: (v: string, n: number) => string): string[] {
+  const counts = new Map<string, number>();
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return [...counts].filter(([, n]) => n > 1).map(([v, n]) => say(v, n));
+}
+
+/**
+ * Contrôle de forme du CHANGELOG intégré (L619), avant la porte complète : un titre `###` répété sous `[Unreleased]`, une entrée répétée sous `[Unreleased]`
+ * (sous un même titre ou deux), une entrée de la partie publiée que `main` n'a pas (le lot l'a écrite ou modifiée sous une version). Un message par défaut ;
+ * aucun sans bloc `[Unreleased]` ou sans CHANGELOG de `main` lisible, où il n'y a rien à comparer.
+ */
+export function changelogShapeProblems(text: string, main: string): string[] {
+  const [s, m] = [split(text), split(main)];
+  if (!s || !m) return [];
+  const titles = s.block.flatMap((line) => /^### (.+?)\s*$/.exec(line)?.[1] ?? []);
+  const entries = [...(sections(s.block, true)?.values() ?? [])].flat();
+  const known = new Set(publishedEntries(m.tail));
+  return [
+    ...repeated(titles, (t, n) => `titre « ### ${t} » ${n} fois sous [Unreleased]`),
+    ...repeated(entries, (e, n) => `entrée ${n} fois sous [Unreleased] : ${e.split('\n')[0]}`),
+    ...publishedEntries(s.tail).filter((e) => !known.has(e)).map((e) => `entrée sous une version publiée, absente de la partie publiée de la branche : ${e.split('\n')[0]}`),
+  ];
+}

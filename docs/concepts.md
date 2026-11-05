@@ -49,7 +49,20 @@ Inside a wave, a lot goes through these steps, each in a fresh session. Dashed b
 | **ready** | In worktree mode the lot is integrated (see [below](#one-worktree-per-lot-and-integration)); without worktree (the default) it is ready as soon as its review is compliant; the lead re-checks it, records `raf done`, delivers it | the lead |
 
 Before all that, a lot whose title cites a finding or another lot gets a **precheck**: « is it already done? ». Small lots (half a day or
-less) get a single review pass. Detail: [fonctionnement.md](fonctionnement.md#2-a-lot-inside-a-wave), [spec.md](spec.md).
+less, [see their size](#the-size-of-a-lot)) get a single review pass. Detail: [fonctionnement.md](fonctionnement.md#2-a-lot-inside-a-wave), [spec.md](spec.md).
+
+## The size of a lot
+
+A lot's **size** is read from its estimate, in days, and decides how much ceremony it gets. There are four words, from the smallest:
+
+| Word | When | Effect |
+|---|---|---|
+| **express** | estimate ≤ 0.1 day (`EXPRESS_MAX_ESTIMATE`) | one session; no precheck, no probe, no separate review |
+| **light** | estimate ≤ `orchestrate.review.threshold` (0.25 day by default) | the review runs on the light model (Sonnet by default), minor findings become notes |
+| **small** | estimate ≤ 0.5 day, **or** the lot is flagged `quickwin` | one single `review-small` pass (code and ergonomics together), no separate UX pass |
+| **full** | anything bigger | the whole cycle of [the steps above](#the-steps-of-a-lot) |
+
+The words nest: an express lot is also light and small, a light lot is also small. `quickwin` (the ⚡ flag, `raf add --quickwin`) is « small, said by hand »: it makes a lot small whatever its estimate, and `raf quickwins` lists the lots with an estimate of 0.25 day or less, or flagged ⚡. Detail: [orchestrate.md](orchestrate.md#orchestrate), [fonctionnement.md](fonctionnement.md#2-a-lot-inside-a-wave).
 
 ## The test gate
 
@@ -158,6 +171,16 @@ files and the changelog, then prints the steps the lead plays (tag, gate, push, 
 - **deliverable up to**: the sha up to which a delivery is safe, below the first lot that is not ready.
 - **lead**: the session that drives the waves, re-verifies and delivers; it never codes.
 - **delivery agent**: the `livreur` subagent that delivers one ready lot and reports in one line.
+- **express**: the smallest [size of a lot](#the-size-of-a-lot), estimate ≤ 0.1 day: one session, no precheck, no separate review.
+- **light**: estimate ≤ 0.25 day by default (`orchestrate.review.threshold`): the review runs on the light model.
+- **small**: estimate ≤ 0.5 day or `quickwin`: one single review pass, no separate UX pass.
+- **full**: any lot bigger than small: the whole cycle of steps.
+- **quickwin**: the ⚡ flag of a lot, set by hand, that makes it small whatever its estimate; `raf quickwins` lists them.
+- **git hook**: a script git runs (`pre-commit`, `post-commit`, `pre-push`), installed by `raf hook install`; `hook.autostart` configures the pre-commit one. See [raf.md](raf.md).
+- **Claude Code hook**: a command Claude Code runs around a tool call, declared in the plugin's `hooks/hooks.json` and played by `cadence claude-hook retour|attente|pipe`. See [lead.md](lead.md).
+- **plan.onWrite**: not a hook of git nor of Claude Code: the command of `cadence.yaml` that cadence runs after each write of the plan, to refresh the files derived from it. See [raf.md](raf.md).
+- **mod hook**: a function hook of the `cadence-hud` mod (`plugins/cadence-hud/hooks/`), in Claude Code's plugin vocabulary; it draws the band. See [cadence-hud.md](cadence-hud.md).
+- **docs-ok**: one notion, three spellings: the command `raf docs-ok`, the key `docs_ok` of a lot in the plan (and the file `.cadence/docs-ok.yaml` when the plan is read-only), and the field `docsOk` in the TypeScript code. It acknowledges a documentation gap that is not one. See [raf.md](raf.md).
 - **slot**: one place under the cap of simultaneous sessions.
 - **hold**: a slot kept by a session the lead started by hand, so waves do not overtake it.
 - **escalation**: one more correction and review on a stronger model before a lot is handed back.

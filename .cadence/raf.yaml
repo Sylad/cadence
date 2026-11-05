@@ -2369,6 +2369,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "compliant (3 notes mineures : « (fait foi) » inutile pour le test R3, lien de docs/lead.md:225 vers la fiche au lieu de la page, commandes « Work on it » en double) — commits 082c402, 14627ad, 8defbef — orchestré (vague 2026-11-05-1425-cad, 1 passe(s) de correction)", commit: 8defbef0e113b49cc1f07a92e94d5bc1f45bb828 }
   - id: L605
     title: "stabilite.md complet (E16 de docs/etudes/ensemble-2026-11.md) : le statut de chaque surface que le code lit (12 sous-commandes raf, 6 outils cadence, 5 clés racine) est dit, avec son test"
     status: doing

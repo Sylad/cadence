@@ -275,13 +275,14 @@ describe('L512 R7 — warhammer40k, docs/orchestrate-cycle.md, orchestrate-gate.
     expect(gateLabel(c.test!)).toBe("backend : npm test ; frontend : npx vitest run --exclude '**/*.e2e.spec.ts'");
     expect(partCommand((c.test as GatePart[])[1])).toBe("cd frontend && npx vitest run --exclude '**/*.e2e.spec.ts'");
   });
-  const doc = () => readFileSync(new URL('../docs/orchestrate-cycle.md', import.meta.url), 'utf8');
+  const page = (n: string) => readFileSync(new URL(`../docs/${n}`, import.meta.url), 'utf8');
+  const doc = () => page('orchestrate-gate.md');
   it('R7 — docs/orchestrate-cycle.md décrit la forme liste et la forme chaîne conservée', () => {
     const d = doc();
     expect(d).toContain('**A gate declared in parts: each part runs in its folder, each red is replayed by the part that printed it (L512)**');
     expect(d).toContain('`[{ dir, run, replay? }]`');
     expect(d).toContain('The string form of `orchestrate.test` is accepted unchanged');
-    expect(d).toMatch(/^  test:\s+# or a LIST of parts \(L512/m);
+    expect(page('orchestrate-cycle.md')).toMatch(/^  test:\s+# or a LIST of parts \(L512/m);
   });
   it('R7 — docs/orchestrate-gate.md indique qu\'evatosorus attend le lot L514', () => {
     expect(doc()).toMatch(/`node --test` \(evatosorus\)[^\n]*L514/);

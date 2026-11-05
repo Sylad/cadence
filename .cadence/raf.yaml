@@ -2357,6 +2357,7 @@ lots:
     notes:
       - { date: 2026-11-05, text: "à traiter aussi : la bande dit « 9 prêts » pour des lots déjà clos au plan, le panneau dit « clos » (capture de Sylvain du 05-11)" }
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "conforme : verdict de la vague tenu ; concepts.md resserré sous 15 Ko (cible de l'étude, §7), notions et figures gardées, 46 tests ciblés verts", commit: 5afa2e7d81fbd276ae6c3a742921ac2030934871 }
   - id: L602
     title: "Où cadence écrit, et les portes (E6 + E14 de docs/etudes/ensemble-2026-11.md) : une page liste les quatre dossiers d'état, un tableau réunit les trois endroits où une porte se déclare"
     status: doing

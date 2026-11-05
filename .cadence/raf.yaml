@@ -2538,9 +2538,10 @@ lots:
     started: 2026-11-05
   - id: L623
     title: "Une vague reprise (--resume, --integrate) lit le cadence.yaml du dépôt avec sa copie figée : une clé ajoutée depuis la refuse (05-11, L599 après L618, orchestrate.gate.refs inconnu) ; la reprise avance sa copie sur celle en service, ou ignore les clés qu'elle ne connaît pas en le disant"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-05
+    started: 2026-11-05
   - id: L624
     title: "Une porte jouée sur un hôte distant (orchestrate.gate.host) rend son créneau de session : elle n'occupe aucune session claude ni le processeur local, et trois portes y bloquent la file (05-11, vague 1810-cad : 0 session pendant 30 min, portes de 16 min sur mini-blue, L622 en attente) ; le nombre de portes simultanées sur l'hôte a sa propre borne ; mesure : minutes à créneau vide avant et après"
     status: todo

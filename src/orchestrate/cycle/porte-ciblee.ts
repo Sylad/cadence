@@ -9,7 +9,7 @@ import type { CheckRun } from './checks.js';
 /** Ce que joue une porte de tests (L590, R14) : `ciblee` les tests liés aux fichiers du lot (après une écriture), `complete` la suite entière (à l'intégration). */
 export type Portee = 'ciblee' | 'complete';
 
-/** Portée de la porte d'une écriture : la suite complète quand la session annonce des tests rouges (L213, L522 : l'annonce ne se juge que sur la suite entière), ciblée sinon. */
+/** Portée de la porte d'une écriture (R16, exception à R1) : la suite complète quand la session annonce des tests rouges (L213, L522 : l'annonce ne se juge que sur la suite entière), ciblée sinon. */
 export const porteApresEcriture = (annonceRouge: boolean): Portee => (annonceRouge ? 'complete' : 'ciblee');
 
 /** Les fichiers modifiés du lot entre son sha de départ et HEAD, supprimés exclus ; vide sans sha de départ, sans diff ou si git ne le lit pas (R4). Le dépôt du lot seulement, pas ses dépôts voisins. */

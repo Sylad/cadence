@@ -348,8 +348,8 @@ describe('L590 R5 — un lot sans worktree n\'a pas d\'intégration', () => {
   });
 });
 
-describe('L590 R1 — une annonce de tests rouges par la session', () => {
-  it("R1 — tests annoncés rouges (L213, L522) : la porte joue la suite complète, l'annonce non démentie n'est pas crue sans test rouge", async () => {
+describe('L590 R16 — une annonce de tests rouges par la session : la suite complète, exception à R1', () => {
+  it("R16 — tests annoncés rouges (L213, L522) : la porte joue la suite complète, l'annonce non démentie n'est pas crue sans test rouge", async () => {
     const log = logFile();
     const h = harness({ script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }))], review: [ok] } });
     const c = tl(h, gates(log));
@@ -359,7 +359,7 @@ describe('L590 R1 — une annonce de tests rouges par la session', () => {
     expect(c.lot.portes![0]).toMatchObject({ portee: 'complete' });
     expect(c.lot.warnings.some((w) => w.includes("l'annonce n'est pas crue"))).toBe(true);
   });
-  it("R1 — tests annoncés rouges, suite complète rouge sur ce test : le lot repart en correction", async () => {
+  it("R16 — tests annoncés rouges, suite complète rouge sur ce test : le lot repart en correction", async () => {
     const h = harness({ script: { implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.txt', 'feat(L1): a')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }))], fix: [impl('b.txt', 'fix(L1): b')], review: [ok] } });
     const c = tl(h, gates(logFile(), { full: '[ -f a.txt ] && [ ! -f b.txt ] && { echo " FAIL  test/a.test.ts > rouge"; exit 1; }; true' }));
     await runLot(c);

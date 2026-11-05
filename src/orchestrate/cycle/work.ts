@@ -169,7 +169,7 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
     const green = await acceptGreen(c);
     if (green) red.push(green);
   }
-  // Une annonce de tests rouges (L590) ne se juge que sur la suite complète : la porte ciblée ne joue pas le test annoncé, elle n'a ni ligne de base ni verdict à opposer à l'annonce (L213, L522).
+  // Une annonce de tests rouges (L590, R16) ne se juge que sur la suite complète : la porte ciblée ne joue pas le test annoncé, elle n'a ni ligne de base ni verdict à opposer à l'annonce (L213, L522).
   if (red.length === 0) await programChecks(c, red, runs, porteApresEcriture(deferred));
   if (deferred && red.length === 0 && runs.some((r) => r.label === 'tests' && r.code === 0 && !r.instables?.length)) l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${gateLabel(c.config.test ?? '')}, code 0) : l'annonce n'est pas crue, pas de correction`);
   else if (deferred && red.length === 0 && !runs.some((r) => r.label === 'tests' && (r.dejaRouges || r.instables?.length))) red.push(claimed);

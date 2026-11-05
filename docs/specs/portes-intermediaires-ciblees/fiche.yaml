@@ -34,6 +34,7 @@ cas:
       - { si: "les tests liés sont rouges", alors: "même traitement qu'une suite rouge : ligne de base, rejeu seul, puis constat et correction", regles: [R6] }
       - { si: "aucun test n'est lié aux fichiers du diff", alors: "la suite complète est jouée à la place, portée complète, motif enregistré", regles: [R3] }
       - { si: "ni testRelated ni vitest dans orchestrate.test, ou orchestrate.test en parties, ou startedSha absent, ou diff vide ou illisible", alors: "la suite complète est jouée comme avant", regles: [R4] }
+      - { si: "la session annonce des tests rouges (tests.vert faux)", alors: "la suite complète est jouée à la place de la porte ciblée : l'annonce ne se juge que sur la suite entière", regles: [R16] }
       - { si: "orchestrate.test est absent", alors: "aucune suite jouée, suiteRuns et portes absents, comme avant", regles: [R9] }
     resultat: "Une porte courte après chaque écriture, sans suite complète."
   - id: C2
@@ -67,7 +68,7 @@ cas:
 regles:
   - id: R1
     cas: [C1]
-    enonce: "Après une écriture (implement, fix, probe), la porte ne joue que les tests liés aux fichiers du diff entre startedSha et HEAD ; la suite complète n'est pas jouée."
+    enonce: "Après une écriture (implement, fix, probe), la porte ne joue que les tests liés aux fichiers du diff entre startedSha et HEAD ; la suite complète n'est pas jouée, sauf quand la session annonce des tests rouges (R16)."
     statut: sourcee
     source: "demande du lot L590 : « après implement et après chaque fix, la porte de la vague joue seulement les tests liés aux fichiers du lot (vitest related sur le diff depuis startedSha) » ; état actuel : src/orchestrate/cycle/checks.ts:58-60"
     tests: ["R1 — implement puis fix : chaque porte joue la commande liée sur les fichiers du diff et jamais orchestrate.test"]
@@ -156,6 +157,13 @@ regles:
     si_faux: "Si le brief reste muet, le relecteur croit à une suite complète verte ; seul le texte du brief change."
     tests: ["R15 — brief d'un lot à porte ciblée : le texte dit « targeted »", "R15 — brief d'une suite complète : texte inchangé"]
 
+  - id: R16
+    cas: [C1]
+    enonce: "Exception à R1 : quand la session annonce des tests rouges (tests.vert faux dans son rapport), la porte de l'écriture joue la suite complète, jamais la porte ciblée (porteApresEcriture, src/orchestrate/cycle/porte-ciblee.ts:13, appelée en src/orchestrate/cycle/work.ts:171-175). Une porte ciblée ne joue pas forcément le test annoncé : elle n'aurait ni ligne de base ni verdict à opposer à l'annonce. L213 et L522 restent tenus : suite complète verte, l'annonce n'est pas crue (warning « l'annonce n'est pas crue ») ; suite complète rouge sur le test annoncé, le lot repart en correction."
+    statut: sourcee
+    source: "règles codées L213 (ligne de base) et L522 (une annonce rouge n'est pas crue quand la porte du programme est verte), src/orchestrate/cycle/work.ts:171-175 ; revue du 05-11 : la branche existait sans règle écrite ; validée par le lead le 05-11"
+    tests: ["R16 — tests annoncés rouges (L213, L522) : la porte joue la suite complète, l'annonce non démentie n'est pas crue sans test rouge", "R16 — tests annoncés rouges, suite complète rouge sur ce test : le lot repart en correction"]
+
 contrats:
   - id: A1
     appel: job porte-apres-ecriture
@@ -163,7 +171,7 @@ contrats:
     sortie: "build et tests liés joués ; entrée ajoutée à portes ; constat si rouge"
     erreurs:
       - { code: log warn, message: "porte ciblée sans test lié : suite complète jouée" }
-    regles: [R1, R3, R4, R6, R8, R11, R12, R13, R14, R15]
+    regles: [R1, R3, R4, R6, R8, R11, R12, R13, R14, R15, R16]
   - id: A2
     appel: job porte-integration
     entree: "sommet du lot, suiteRuns"

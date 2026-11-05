@@ -2316,10 +2316,11 @@ lots:
     created: 2026-11-05
   - id: L598
     title: "Un seul calcul des créneaux libres (E1 de docs/etudes/ensemble-2026-11.md) : registre, bande et vague lisent le même chiffre, publié une fois, au lieu de deux formules et d'un compte interne"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L589, L591 ]
     created: 2026-11-05
+    started: 2026-11-05
   - id: L599
     title: "orchestrate.md en cinq pages (E12 de docs/etudes/ensemble-2026-11.md) : 308 Ko sans sommaire découpés, avec dans le même commit les 26 tests qui citent la page, files de package.json et CHECKED de scripts/check-links.mjs"
     status: todo

@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { type LotCtx, workDir as wd, startSha } from './ctx.js';
 import { type Place } from '../gate-place.js';
 import { tryGit } from '../../git.js';
@@ -19,10 +21,19 @@ function lotFiles(c: LotCtx): string[] {
   return out ? out.split('\0').filter(Boolean) : [];
 }
 
+/** Le test du journal (L616) : aucun test n'importe `CHANGELOG.md` (il le lit), `vitest related` ne le joue donc jamais ; trois refus du 05-11 (L582, L591, L613) pour une entrée écrite sous la version publiée au lieu de `[Unreleased]`, vus au seul sommet intégré. */
+const CHANGELOG_TEST = 'test/changelog.test.ts';
+
+/** Les fichiers de la porte ciblée : ceux du diff, plus le test du journal quand le lot touche `CHANGELOG.md` et que le dépôt le porte (L616) ; une seule fois s'il est déjà dans le diff. */
+function withChangelogTest(c: LotCtx, files: string[]): string[] {
+  const wanted = files.includes('CHANGELOG.md') && !files.includes(CHANGELOG_TEST) && existsSync(join(wd(c), CHANGELOG_TEST));
+  return wanted ? [...files, CHANGELOG_TEST] : files;
+}
+
 /** La porte ciblée d'une écriture : la commande liée (avec `{files}`) et les fichiers du diff ; null quand il n'y a pas de commande liée possible ou de fichier à viser, la suite complète est alors jouée (R4). */
 function targetOf(c: LotCtx): { template: string; files: string[] } | null {
   const template = relatedCommand(c.config.test, c.config.testRelated);
-  const files = template ? lotFiles(c) : [];
+  const files = template ? withChangelogTest(c, lotFiles(c)) : [];
   return template && files.length ? { template, files } : null;
 }
 

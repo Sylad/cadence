@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- A lot that touches `CHANGELOG.md` plays `test/changelog.test.ts` in its targeted gate (L616, [docs/orchestrate.md](docs/orchestrate.md), « Targeted gates after a write »): no test imports the changelog, so the targeted run never saw an entry written under the last published version instead of `[Unreleased]` (L582, L591, L613 on 05-11, refused only at the integrated tip). The implementation brief names the rule.
+
 ## [1.55.0] - 2026-11-05
 
 ### Added

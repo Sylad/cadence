@@ -29,9 +29,8 @@ describe('L600 sondes — exactitude du vocabulaire', () => {
   })
 
   it('« les mots s’emboîtent » est dit avec le seuil par défaut (light est calculé à part)', () => {
-    const i = md.indexOf('the words nest')
-    expect(i).toBeGreaterThan(-1)
-    expect(md.slice(i, md.indexOf('\n', i))).toMatch(/default threshold/)
+    const ligne = md.split('\n').find((l) => /the words nest/.test(l)) ?? ''
+    expect(ligne).toMatch(/default threshold[^.]*the words nest/)
   })
 
   it('« git hook » dit que la vague laisse un hook de la porte quand une porte est déclarée (keepGateGuard)', () => {

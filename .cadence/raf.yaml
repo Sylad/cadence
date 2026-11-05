@@ -2169,6 +2169,7 @@ lots:
     started: 2026-11-04
   - id: L583
     title: "Config des tests, livrée seule : vitest.workspace.ts à deux projets, le projet « lourds » (probe-L539-bords, mise-en-service L195) joué après les autres dans un seul fork — mesuré par L579 : 2 à 3 s seuls, 12 à 13 s sous une charge moyenne de 127 ; la porte, le clone et la CI jouent les deux projets ; décision du lead du 04-11 (changer une config est une décision du plan, livrée seule)"
+    config: true
     status: doing
     estimate: 0.25
     created: 2026-11-04
@@ -2210,7 +2211,7 @@ lots:
     started: 2026-11-04
   - id: L589
     title: "Bande cadence-hud, créneaux libres faux en mode worktree : freeSlots (plugins/cadence-hud/hooks/format.ts) retire min(plafond, dépôts tenus) par vague, alors qu'une vague à un worktree par lot occupe un créneau par lot actif (session claude OU porte de tests/build) — la bande doit afficher le même chiffre que cadence orchestrate --status, et nommer les lots en porte (« créneaux libres : 0 sur 3 · 3 en porte ») — 04-11 : bande « 2 libres » pendant que --status disait 0 sur 3 (L514 L473 en porte tests, L586 en porte build), Sylvain a cru à des créneaux vides"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-04
     notes:
@@ -2218,9 +2219,10 @@ lots:
       - { date: 2026-11-04, text: "titre remplacé : « Bande et panneau des lots cadence-hud, en mode worktree : (1) créneaux libres faux — freeSlots (plugins/cadence-hud/hooks/format.ts) retire min(plafond, dépôts tenus) par vague alors qu'une vague à un worktree par lot occupe un créneau par lot actif : afficher le même chiffre que cadence orchestrate --status et nommer les lots en porte (« créneaux libres : 0 sur 3 · 2 en porte ») ; (2) panneau des lots : un lot de la vague déjà done au plan (livré) s'affiche « livré » et se replie dans une ligne « livrés : N » sous les lots actifs, au lieu de 14 lignes « prêt » qui noient les lots qui jouent ; (3) colonne id : jamais tronquée (« L5… » vu pour L584) — 04-11 : bande « 2 libres » pendant que --status disait 0 sur 3 (L587 en porte build, L588 en porte tests), 14 lots prêts/livrés listés au-dessus des 3 lots en cours, Sylvain : « elle me montre beaucoup de lots » »" }
     started: 2026-11-04
     review: { date: 2026-11-05, verdict: "conforme : 0 bloquant, 0 majeur, 1 mineur (cap null borné par le plafond commun, cas d'un registre d'un cadence plus ancien) — bande alignée sur --status, lots en porte nommés, lien registre→collecteur testé — orchestré (vague 2026-11-05-0755-cad, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : rebase sans effet sur le lot (diff identique hors une ligne de contexte CHANGELOG), aucun constat", commit: 20983407a313f2bf31790a41ca59d79d436cbab1 }
+    finished: 2026-11-05
   - id: L590
     title: "Portes intermédiaires ciblées : après implement et après chaque fix, la porte de la vague joue seulement les tests liés aux fichiers du lot (vitest related sur le diff depuis startedSha, ou orchestrate.testRelated déclaré dans cadence.yaml) ; la suite complète une seule fois, à la porte d'intégration ; une porte ciblée sans test lié joue la suite complète ; chaque porte enregistre sa durée et son périmètre dans suiteRuns (aujourd'hui un simple compteur) — 04-11 : 61 lots cadence des 03 et 04-11, 271 suites (4,4 par lot), 2 119 min entre sessions contre 1 469 min de sessions (59 %, borne haute : inclut l'attente de créneau), Sylvain : « 5 minutes de tests, j'espère que ça se lance pas trop souvent »"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-11-04
@@ -2237,6 +2239,7 @@ lots:
       - { date: 2026-11-04, text: "Hypothèses (fiche portes-intermediaires-ciblees) — R13 : Sans testRelated, la commande liée dérive de orchestrate.test seulement si c'est une chaîne simple (isComposedGate faux, pas de parties) qui vaut `[npx ]vitest… ; si faux : Si une forme plus large doit se dériver, le lead déclare testRelated ; seul le repli change, aucune donnée en jeu" }
       - { date: 2026-11-04, text: "Hypothèses (fiche portes-intermediaires-ciblees) — R15 : Le brief de revue (src/orchestrate/cycle/brief.ts:70-78) dit, pour un CheckRun ciblé, que seuls les tests liés aux fichiers du lot ont été joués et que la suit… ; si faux : Si le brief reste muet, le relecteur croit à une suite complète verte ; seul le texte du brief change" }
     review: { date: 2026-11-05, verdict: "conforme : dernier majeur réglé par R17 (fiche), test renommé ; relu par le lead, 46 tests ciblés verts, aucun code de production touché depuis la revue Fable ; revue courte du diff rebasé (patch-id différent) : compliant : rebase sans effet sur le code du lot (range-diff limité au CHANGELOG, 17 règles couvertes) ; 1 mineur : le rebase reformate .cadence/raf.yaml (+7722/−866, contenu identique hors revue L590)", commit: 758640733f52db50b11a1e30d89f89830f509bf3 }
+    finished: 2026-11-05
   - id: L591
     title: "Un lot qui attend son tour d'intégration (une autre intégration du même dépôt en cours) rend son créneau : la file en attente démarre pendant ce temps, et le lot reprend l'intégration à son tour sans redemander de créneau (une intégration ne lance qu'une revue courte) — 04-11, vague 1310-cad : L514, L586 et L473 arrivés ensemble à l'intégration, L530 L587 L588 en file depuis 19:50 n'ont démarré qu'à 20:15:37, après la dernière intégration ; ~9 min à 2 créneaux vides (20:06 → 20:15)"
     status: doing
@@ -2245,7 +2248,7 @@ lots:
     started: 2026-11-04
   - id: L592
     title: "Panneau des lots cadence-hud : un lot de la vague déjà done au plan (livré) s'affiche « livré » et se replie dans une ligne « livrés : N » sous les lots qui jouent, au lieu d'une ligne « prêt » chacun ; la colonne id n'est jamais tronquée (« L5… » vu pour L584) — 04-11, vague 1310-cad : 14 lots prêts ou déjà livrés listés au-dessus des 3 lots en cours, Sylvain : « elle me montre beaucoup de lots »"
-    public: Le panneau des lots replie les lots livrés sous ceux qui jouent, et l'identifiant d'un lot n'est plus jamais coupé
+    public: "Panneau des lots : lots livrés repliés, identifiant jamais coupé"
     status: doing
     estimate: 0.25
     visible: true
@@ -2288,13 +2291,15 @@ lots:
     created: 2026-11-04
   - id: L596
     title: "CI rouge depuis L587 : test/orchestrate-remplissage-vague-nommee-l587-probe.test.ts « dépôt seul sans cadence.yaml parent » rend 1 au lieu de 0 sur le runner GitHub (tests.yml rouge à bff9f5d, e1f2dbf, def1682 ; publish de v1.54.0 rouge, run 41940681499), vert en local et dans un git clone neuf : reproduire dans un environnement de runner (HOME vide, sans config git globale, CI=true), trouver la cause, corriger le code ou le test selon le contrat de L587 — 05-11 01 h 45"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     notes:
       - { date: 2026-11-05, text: "05-11 02 h 45 (correctif Fable, non commité) : non reproduit dans 6 environnements (env -i, conteneur ubuntu 24.04 + git 2.56 + Node 22, cpus 1.5, suite complète ×2) ; rouge en CI seulement sur Node 22 (3/3) et le publish Node 24 (1/1), tests(24) vert 3/3, 1970 ms en CI contre ~550 ms ailleurs. Hypothèse mesurée : dépôt solo posé à la racine temporaire PARTAGÉE de la suite → readyFree/sharingProjects scanne ses frères (centaines de dépôts d'autres tests en parallèle). Correctif proposé côté test : repo = join(tempDir(), 'solo'). Preuve à obtenir par une branche diag/** qui imprime le journal de la vague quand le code ≠ 0. Image Docker cadence-ci-repro en cache." }
+      - { date: 2026-11-05, text: "CI verte sur Node 22 et 24 au sha 2324703 (run 41991224022), rouge 3/3 en Node 22 avant le correctif ; cause : frère git commitant sur main à la racine partagée (tierRepos/tierMoved). Mineurs laissés : repoAt en 3 copies, sonde l596 qui ne pose pas de frère git." }
     review: { date: 2026-11-05, verdict: "compliant : 0 bloquant, 0 majeur, 2 mineurs (notes) — cause reproduite en revue (frère git à la racine partagée de la suite commitant feat(L1) → tierRepos/tierMoved → handed-back, code 1), correctif côté test confirmé vert sous le même bruit ; reste à voir le run CI à l'intégration — orchestré (vague 2026-11-05-0755-cad, 3 passe(s) de correction)", commit: 162154df22eb981e16b7832e862eb4eff7837cac, reporte: { de: db78da801c3329f248fd68719febfe3b35902e7f, vers: 162154df22eb981e16b7832e862eb4eff7837cac, patchId: d1292fbc00288c2bbc12030e7c3c0a1c46dbb9f0 } }
+    finished: 2026-11-05
   - id: L597
     title: "Une seule aide (E2 + E3 de l'étude docs/etudes/ensemble-2026-11.md) : les deux textes d'aide de cadence et raf, tenus à la main et divergents sur 9 commandes, viennent d'une seule source ; cadence spec green y figure"
     status: todo
@@ -2347,18 +2352,22 @@ lots:
     estimate: 0.5
     after: [ L605 ]
     created: 2026-11-05
+    notes:
+      - { date: 2026-11-05, text: "non tirable jusqu'à Q-MIG4 de maritime : la réversibilité de la bascule (raf.py gardé deux semaines) repose sur le plan lu ; décision de Sylvain du 05-11" }
   - id: L607
     title: "Un seul seuil de petit lot dans le code (E4b de docs/etudes/ensemble-2026-11.md) : express, light et small lisent une même définition, cliquet de qualité à l'appui"
     status: todo
     estimate: 0.25
-    after: [ L606 ]
+    after: [ L605 ]
     created: 2026-11-05
   - id: L608
     title: "config.ts découpé (E17 de docs/etudes/ensemble-2026-11.md) : les 8 familles de clés qu'il lit rejoignent leurs modules, cliquet de qualité à l'appui"
     status: todo
     estimate: 0.5
-    after: [ L605, L602 ]
+    after: [ L605, L602, L607 ]
     created: 2026-11-05
+    notes:
+      - { date: 2026-11-05, text: "non tirable jusqu'à Q-MIG4 de maritime : config.ts porte les interdits du plan lu ; décision de Sylvain du 05-11" }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

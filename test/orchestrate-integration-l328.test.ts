@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { redExcerpt } from '../src/orchestrate/cycle.js';
+import { redTestsText } from '../src/orchestrate/cycle/checks.js';
 import { readOrchestrateConfig } from '../src/config.js';
 import { fileURLToPath } from 'node:url';
 
@@ -34,5 +35,23 @@ describe('L328 R3 — redExcerpt nomme les tests rouges', () => {
     expect(out).toContain('- t9');
     expect(out).not.toContain('- t10');
     expect(out).toContain('… (+3)');
+  });
+});
+
+describe('L631 — le constat de la suite entière nomme le fichier et le test, jamais seulement « Expected ; false »', () => {
+  const sortie = [
+    ' FAIL  test/a.test.ts > R1 — un',
+    'AssertionError: expected true to be false',
+    ...Array.from({ length: 15 }, (_, i) => `    at frame${i}`),
+    '- Expected',
+    '+ Received',
+    '  false',
+  ].join('\n');
+  it('le texte du constat liste les tests rouges nommés puis la fin de la sortie ; redExcerpt les cite', () => {
+    const texte = redTestsText('npx vitest run', 1, sortie);
+    expect(redExcerpt({ source: 'tests', gravite: 'bloquant', texte })).toContain('test/a.test.ts > R1 — un');
+  });
+  it('sans nom lisible dans la sortie : la fin de la sortie, comme avant', () => {
+    expect(redTestsText('cmd', 2, 'a\nb')).toBe('cmd en échec (code 2) :\na\nb');
   });
 });

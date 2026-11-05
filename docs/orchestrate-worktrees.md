@@ -109,7 +109,7 @@ nothing below applies and the wave behaves as before; any other value is refused
      tests). Green the second time: the lot goes on, the journal says `<project>:<lot> tests rouges au sommet intégré, relancés une fois (…)` and the lot
      gets a warning `rouge au sommet intégré, vert à la relance`. Red twice: handed back with the result of the second run. **The refusal names the red
      tests** (up to ten, then `… (+n)`), or the end of the output when the runner's output names none; it used to quote only `npx vitest run en échec
-     (code 1) :`;
+     (code 1) :`. When the whole suite is quoted without a baseline comparison (no replay), the red tests the output names (`file > test`) come first, before the tail of the output (L631: L602, L617 and L622 of 2026-11-05 were handed back with only `Expected ; false`);
   4. the patch-id of the lot's diff (`git patch-id --stable`, work commits only) is compared before and after the rebase. **Same patch-id**: the
      reviewed diff is the integrated diff, the verdict is **carried over** to the integrated sha, with a `reporte: { de, vers, patchId }` trace in the plan
      (and in the journal: `<project>:<lot> verdict reporté : <old sha> → <new sha> (patch-id identique)`); no new review. **Different patch-id** (context

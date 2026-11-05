@@ -6,6 +6,7 @@ import { sh } from './sh.js';
 import { gateLabel, gateReplayable, redCandidates, replayGate } from '../gate-parts.js';
 import { playTests, type Portee } from './porte-ciblee.js';
 import { type VsBase, againstBaseline, redAtStart } from './baseline-run.js';
+import { failedTests } from '../baseline.js';
 import { type TightTest } from '../workers.js';
 import { noteUnstable, noteTight } from '../gate-notes.js';
 import { existsSync } from 'node:fs';
@@ -107,8 +108,11 @@ async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Pla
       return;
     }
     // Des instables sont écartés : la sortie de la suite entière les montre encore en FAIL, le constat ne nomme que ceux qui restent rouges.
-    const shown = unstable.length || atStart.length ? `${fresh.length} test(s) rouge(s) après rejeu seul :\n${fresh.map((t) => `- ${t}`).join('\n')}` : r.output.trim().split('\n').slice(-40).join('\n');
-    red.push({ source: 'tests', gravite: 'bloquant', texte: `${run.command} en échec (code ${r.code}) :\n${shown}${alone}` });
+    if (unstable.length || atStart.length) {
+      red.push({ source: 'tests', gravite: 'bloquant', texte: `${run.command} en échec (code ${r.code}) :\n${fresh.length} test(s) rouge(s) après rejeu seul :\n${fresh.map((t) => `- ${t}`).join('\n')}${alone}` });
+      return;
+    }
+    red.push({ source: 'tests', gravite: 'bloquant', texte: redTestsText(run.command, r.code, r.output) + alone });
     return;
   }
 }
@@ -131,6 +135,16 @@ export async function integratedChecks(c: LotCtx, key: string): Promise<{ red: C
 }
 
 const EXCERPT_LINES = 10;
+
+/**
+ * Le constat d'une suite rouge sans comparaison à la ligne de base (L631) : les tests rouges que la sortie nomme (« - fichier > test »), puis la fin de la sortie. Le motif d'un refus ne garde que
+ * les dix dernières lignes (`redExcerpt`) : sans les noms en tête, L602, L617 et L622 du 05-11 ne citaient que « Expected ; false » et ont coûté une suite complète chacun pour retrouver le test.
+ */
+export function redTestsText(command: string, code: number, output: string): string {
+  const names = failedTests(output);
+  const tail = output.trim().split('\n').slice(-40).join('\n');
+  return `${command} en échec (code ${code}) :${names.length ? `\n${names.map((t) => `- ${t}`).join('\n')}` : ''}\n${tail}`;
+}
 
 /**
  * Le constat rouge d'un contrôle, en une ligne pour le motif d'un refus (L328) : la commande, puis les tests rouges nommés quand le constat les liste (« - nom »),

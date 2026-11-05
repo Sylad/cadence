@@ -70,7 +70,7 @@ migrate:
     - test/import-l472.test.ts                  # le plan d'un autre outil, taches.yaml (plan: path)
     - test/import-journal-l582.test.ts          # le plan et le journal d'un autre outil (plan: path, plan.journal)
 
-# Bornes de fichiers (L626) : le brief d'écriture donne les limites des fichiers que le lot cite, le hook « cadence claude-hook bornes » (joint au --settings des sessions implement et fix, le plugin étant coupé) mesure le fichier après chaque écriture,
+# Bornes de fichiers (L626) : le brief d'écriture donne toutes les limites chiffrées, le hook « cadence claude-hook bornes » (joint au --settings des sessions implement et fix, le plugin étant coupé) mesure le fichier après chaque écriture,
 # et la porte ciblée joue les tests déclarés (faute de lien d'import, vitest related ne les trouve pas) dès qu'un lot touche l'un des fichiers. Lignes comptées comme le split('\\n') des tests (ligne vide finale comprise), colonnes et tailles en caractères (concepts.md : 15 Ko = 15 * 1024).
 bounds:
   - paths: [README.md]
@@ -83,4 +83,4 @@ bounds:
   - paths: [CHANGELOG.md]
     tests: [test/changelog.test.ts, test/changelog-unreleased-titres-l568.test.ts]
   - paths: [package.json, 'docs/*.md']
-    tests: [test/avec-vos-outils.test.ts]
+    tests: [test/docs-publiees-l626.test.ts]

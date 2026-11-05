@@ -65,10 +65,10 @@ describe('L626 — la porte ciblée joue les tests déclarés', () => {
 });
 
 describe('L626 — le brief d’implémentation reçoit les bornes', () => {
-  it('R4 — implement et fix citent les bornes d’un fichier cité par le lot ; la revue non', () => {
+  it('R4 — implement et fix reçoivent les bornes chiffrées du dépôt, que le lot cite le fichier ou non ; la revue non', () => {
     const { h, c } = lot(YAML);
     briefOf(h, c);
-    c.lot.goal = 'mettre à jour README.md';
+    c.lot.goal = 'mettre à jour la page de configuration';
     for (const kind of ['implement', 'fix'] as const) {
       const brief = briefFor(c, kind);
       expect(brief, kind).toContain('`README.md`: 64 lines, 160 columns');
@@ -76,15 +76,12 @@ describe('L626 — le brief d’implémentation reçoit les bornes', () => {
     expect(briefFor(c, 'review')).not.toContain('64 lines');
   });
 
-  it('R4 — lot qui ne cite aucun fichier borné, ou dépôt sans bounds : pas de ligne de bornes', () => {
-    const la = lot(YAML);
+  it('R4 — dépôt sans bounds, ou bornes sans limite chiffrée : pas de ligne de bornes', () => {
+    const la = lot('bounds:\n  - paths: [CHANGELOG.md]\n    tests: [test/readme.test.ts]\n');
     briefOf(la.h, la.c);
-    const a = la.c;
-    expect(briefFor(a, 'implement')).not.toContain('Size bounds');
+    expect(briefFor(la.c, 'implement')).not.toContain('Size bounds');
     const lb = lot(null);
     briefOf(lb.h, lb.c);
-    const b = lb.c;
-    b.lot.goal = 'mettre à jour README.md';
-    expect(briefFor(b, 'implement')).not.toContain('Size bounds');
+    expect(briefFor(lb.c, 'implement')).not.toContain('Size bounds');
   });
 });

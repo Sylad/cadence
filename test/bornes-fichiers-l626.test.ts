@@ -115,25 +115,18 @@ describe('L626 — mesure d’un fichier', () => {
 });
 
 describe('L626 — niveau 2 : le brief d’implémentation', () => {
-  it('R4 — les bornes des fichiers que le lot cite, une ligne par fichier, avec limites', () => {
-    const t = boundsText([README, CONCEPTS, CHANGELOG], 'Mettre à jour README.md et docs/concepts.md');
-    expect(t).toContain('README.md');
-    expect(t).toContain('3 lines');
-    expect(t).toContain('10 columns');
-    expect(t).toContain('docs/concepts.md');
-    expect(t).toContain('20 characters');
+  it('R4 — toutes les bornes chiffrées du dépôt, une ligne par motif avec ses limites, que le lot cite le fichier ou non', () => {
+    const t = boundsText([README, CONCEPTS, CHANGELOG, { paths: ['docs/*.md'], lines: 200, tests: [] }]);
+    expect(t).toContain('- `README.md`: 3 lines, 10 columns');
+    expect(t).toContain('- `docs/concepts.md`: 20 characters');
+    expect(t).toContain('- `docs/*.md`: 200 lines');
     expect(t).not.toContain('CHANGELOG.md');
+    expect(t).toContain('A hook measures the file after each write');
   });
 
-  it('R4 — aucun fichier cité, ou aucune limite chiffrée (tests seuls) : brief inchangé, texte vide', () => {
-    expect(boundsText([README], 'rien à voir')).toBe('');
-    expect(boundsText([], 'README.md')).toBe('');
-    expect(boundsText([CHANGELOG], 'CHANGELOG.md package.json')).toBe('');
-  });
-
-  it('R4 — un nom plus long qui contient le chemin ne compte pas (MON-README.md)', () => {
-    expect(boundsText([README], 'voir OLD/MON-README.md.bak')).toBe('');
-    expect(boundsText([README], 'voir (README.md).')).toContain('README.md');
+  it('R4 — aucune borne, ou aucune limite chiffrée (tests seuls) : brief inchangé, texte vide', () => {
+    expect(boundsText([])).toBe('');
+    expect(boundsText([CHANGELOG])).toBe('');
   });
 });
 

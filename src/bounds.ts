@@ -94,17 +94,14 @@ export function writeReport(file: string, cwd: string): string | null {
   }
 }
 
-/** Le chemin cité tel quel dans `text` : pas collé à un autre nom de fichier avant (`MON-README.md`) ni après (`README.md.bak`), un point final de phrase restant permis. */
-const cites = (text: string, path: string): boolean => new RegExp(`(?<![\\w./-])${path.replace(/[.+^${}()|[\]\\]/g, '\\$&')}(?![\\w/-]|\\.\\w)`).test(text);
-
 /** Phrase des limites d'une borne : « 64 lines, 160 columns ». */
 const limitsOf = (b: Bound): string => [b.lines && `${b.lines} lines`, b.columns && `${b.columns} columns`, b.chars && `${b.chars} characters`].filter(Boolean).join(', ');
 
-/** La consigne du brief d'écriture (L626) : les bornes des fichiers que `text` (le lot et la lecture du précheck) cite par leur chemin, ou '' sans fichier cité ni limite chiffrée. */
-export function boundsText(bounds: Bound[], text: string): string {
-  const lines = bounds.flatMap((b) => (limitsOf(b) ? b.paths.filter((p) => !/[*?!]/.test(p) && cites(text, p)).map((p) => `- \`${p}\`: ${limitsOf(b)}`) : []));
+/** La consigne du brief d'écriture (L626) : toutes les bornes chiffrées du dépôt, une ligne par motif (le fichier qu'un lot touche n'est connu qu'après l'écriture, et le texte d'un lot cite rarement un README), ou '' sans limite chiffrée. */
+export function boundsText(bounds: Bound[]): string {
+  const lines = bounds.flatMap((b) => (limitsOf(b) ? b.paths.map((p) => `- \`${p}\`: ${limitsOf(b)}`) : []));
   if (!lines.length) return '';
-  return `Size bounds of the files this lot touches (cadence.yaml \`bounds\`): stay within them as you write, a file over its bound costs a gate pass. A hook measures the file after each write and answers the line and the limit.\n${lines.join('\n')}`;
+  return `Size bounds of the files of this repository (cadence.yaml \`bounds\`): stay within them as you write, a file over its bound costs a gate pass. A hook measures the file after each write and answers the line and the limit.\n${lines.join('\n')}`;
 }
 
 /** Les tests déclarés par les entrées dont un fichier touché correspond aux `paths`, sans doublon, dans l'ordre des entrées. */

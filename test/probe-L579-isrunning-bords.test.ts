@@ -1,5 +1,9 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { chmodSync, copyFileSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { readStat } from '../src/proc.js';
 import { isRunning } from './helpers.js';
 
 describe('L579 — isRunning, bords', () => {
@@ -24,13 +28,22 @@ describe('L579 — isRunning, bords', () => {
     expect(isRunning(4_194_300)).toBe(false);
   });
   it('commande dont le nom contient « ) » et des espaces : vivant, pas confondu avec un zombie', async () => {
-    const child = spawn('bash', ['-c', 'exec -a "x) Z 1 (y" sleep 5'], { stdio: 'ignore' });
+    // `exec -a` ne change que argv[0] : le champ comm de /proc/<pid>/stat reste le nom de l'exécutable. On copie donc le binaire sous ce nom.
+    const dir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), 'l579-comm-'));
+    const exe = join(dir, 'x) Z 1 (y');
+    copyFileSync(realpathSync(execFileSync('which', ['sleep'], { encoding: 'utf8' }).trim()), exe);
+    chmodSync(exe, 0o755);
+    const child = spawn(exe, ['5'], { stdio: 'ignore' });
     try {
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => child.once('spawn', r));
+      // Attente d'événement : le comm bascule sur le nom du binaire une fois l'exec fait.
+      for (let i = 0; i < 200 && readStat('/proc', child.pid!)?.name !== 'x) Z 1 (y'; i++) await new Promise((r) => setTimeout(r, 10));
+      expect(readStat('/proc', child.pid!)?.name).toBe('x) Z 1 (y'); // témoin : le comm contient bien « ) »
       expect(isRunning(child.pid!)).toBe(true);
     } finally {
       child.kill('SIGKILL');
       await new Promise((r) => child.once('exit', r));
+      rmSync(dir, { recursive: true, force: true });
     }
   });
   it('deux appels de suite : même réponse', () => {

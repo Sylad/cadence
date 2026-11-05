@@ -128,7 +128,9 @@ describe('R611 — la taille du plan après résolution', () => {
     const r = await integrate(parent);
     expect(r.err).toBe('');
     expect(store(parent).readLot('a', 'L1')!.status).toBe('ready');
-    const texte = readFileSync(file, 'utf8');
+    // le plan est mesuré dans le commit résolu : le commit suivant (revue enregistrée) passe par Plan.save et remet les lignes à plat
+    const sha = git(repo, 'log', '-1', '--format=%H', '--grep=^plan: revue du lead L1$');
+    const texte = git(repo, 'show', `${sha}:.cadence/raf.yaml`);
     expect(texte.split('\n').filter((l) => l.includes('mot mot mot mot')).length).toBe(2);
     expect(texte.split('\n').length - avant).toBeLessThan(15);
     expect(texte).toMatch(/^lots:\n- id: L1/m);

@@ -50,7 +50,9 @@ async function conflict(flush: boolean) {
   git(repo, 'add', '--', '.cadence/raf.yaml');
   git(repo, 'commit', '-q', '-m', 'plan: écriture du lead sur main');
   const r = await run(parent, ['--resume', WAVE, '--integrate', 'a:L1'], fake());
-  return { r, repo, mf };
+  // le plan tel que le commit résolu l'a écrit : le commit suivant (revue enregistrée) passe par Plan.save et remet les lignes à plat
+  const sha = git(repo, 'log', '-1', '--format=%H', '--grep=^plan: revue du lead L1$');
+  return { r, resolved: git(repo, 'show', `${sha}:.cadence/raf.yaml`) };
 }
 
 describe('R1 — la taille du plan après résolution', () => {
@@ -62,29 +64,28 @@ describe('R1 — la taille du plan après résolution', () => {
     expect(indentedSeq('a: 1\n')).toBe(true);
   });
   it('R1 — une note longue (> 80 colonnes) : la ligne reste sur une ligne après résolution, pas de repliement', async () => {
-    const { r, mf } = await conflict(false);
+    const { r, resolved: text } = await conflict(false);
     expect(r.err).toBe('');
-    const text = readFileSync(mf, 'utf8');
     expect(text).toContain(LONG);
     expect(text.split('\n').filter((l) => l.includes('mot mot')).length).toBe(1);
   });
   it('R1 — plan de main aux « - » en colonne : la résolution les garde en colonne', async () => {
-    const { r, mf } = await conflict(true);
+    const { r, resolved: text } = await conflict(true);
     expect(r.err).toBe('');
-    const text = readFileSync(mf, 'utf8');
     expect(text).toMatch(/^lots:\n- id: L1/m);
     expect(text).toContain(LONG);
   });
   it('R1 — plan de main aux « - » indentés : la résolution les garde indentés', async () => {
-    const { r, mf } = await conflict(false);
+    const { r, resolved } = await conflict(false);
     expect(r.err).toBe('');
-    expect(readFileSync(mf, 'utf8')).toMatch(/^lots:\n {2}- id: L1/m);
+    expect(resolved).toMatch(/^lots:\n {2}- id: L1/m);
   });
   it('R1 — le plan résolu est identique octet pour octet à ce que Plan.save réécrit', async () => {
-    const { r, mf } = await conflict(false);
+    const { r, resolved } = await conflict(false);
     expect(r.err).toBe('');
-    const before = readFileSync(mf, 'utf8');
-    Plan.load(mf).save();
-    expect(readFileSync(mf, 'utf8')).toBe(before);
+    const f = join(tempDir(), 'raf.yaml');
+    writeFileSync(f, resolved + '\n'); // git() rogne le saut de ligne final
+    Plan.load(f).save();
+    expect(readFileSync(f, 'utf8')).toBe(resolved + '\n');
   });
 });

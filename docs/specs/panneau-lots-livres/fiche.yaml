@@ -18,9 +18,11 @@ champs:
   - { id: lot-id-sous, libelle: Identifiant d'un sous-lot (retrait et branche compris, jamais tronqué), type: texte, source: "tour → lots[].id (sous-lot, parent renseigné)", obligatoire: false }
   - { id: ligne-livres, libelle: "Ligne « livrés : N » qui replie les lots livrés", type: bouton, source: "tour → closed[] (delivered: true) croisé avec les lots de la vague", obligatoire: false }
   - { id: ligne-clos, libelle: "Ligne « clos non livrés : N » qui replie les lots clos au plan sans livraison", type: bouton, source: "tour → closed[] (sans delivered) croisé avec les lots de la vague", obligatoire: false }
-  - { id: lot-id-livre, libelle: Identifiant d'un lot replié (ligne dépliée), type: texte, source: "tour → closed[].id", obligatoire: false }
-  - { id: lot-titre-livre, libelle: "Titre d'un lot replié (vide si la vague n'en donne pas)", type: texte, source: "vague → lots[].title (collect.ts:109, peut valoir '')", obligatoire: false }
+  - { id: ligne-prets, libelle: "Ligne « prêts : N » qui replie les lots ouverts au plan dont la vague a fini le travail", type: bouton, source: "tour → lots[] (non clos) croisé avec l'état de la vague = ready", obligatoire: false }
+  - { id: lot-id-livre, libelle: "Identifiant d'un lot replié (prêt, livré ou clos ; ligne dépliée)", type: texte, source: "tour → lots[].id (prêt) ou closed[].id", obligatoire: false }
+  - { id: lot-titre-livre, libelle: "Titre d'un lot replié (vide si la vague n'en donne pas)", type: texte, source: "plan → lots[].title (prêt) ; vague → lots[].title (livré, clos : collect.ts:109, peut valoir '')", obligatoire: false }
   - { id: lot-etat-livre, libelle: État « ✔ livré » d'un lot livré (ligne dépliée), type: texte, source: statique, obligatoire: false }
+  - { id: lot-etat-pret, libelle: État « ✔ prêt » d'un lot prêt (ligne dépliée), type: texte, source: statique, obligatoire: false }
   - { id: lot-etat-clos, libelle: État « ✔ clos » d'un lot clos non livré (ligne dépliée), type: texte, source: statique, obligatoire: false }
 regles:
   - id: R1
@@ -50,12 +52,12 @@ regles:
   - id: R4
     etat: charge
     cas: [C1]
-    enonce: "Un lot « de la vague et déjà clos au plan » est un lot d'une vague affichée (waveLotsOf, lots.ts:271) dont l'id figure dans `closed` du même projet du tour (lead.ts:215 : id, finished, delivered?). Il n'est jamais dans `lots` (lead.ts:140, lots non clos seulement) : le panneau ne le dessinait donc pas comme une ligne de lot ; il n'a ni ligne « prêt » ni ligne propre, seulement sa place dans une ligne repliée (R6). Le plan l'emporte sur la vague, quel que soit le statut de la vague (ready, handed-back, failed…) : un lot clos au plan n'est plus un lot qui joue. Un lot de la vague encore ouvert au plan (dans `lots`) garde « ✔ prêt » ou l'état de sa vague, inchangé. Un lot clos hors de toute vague affichée n'est pas listé."
+    enonce: "Un lot « de la vague et déjà clos au plan » est un lot d'une vague affichée (waveLotsOf, lots.ts:271) dont l'id figure dans `closed` du même projet du tour (lead.ts:215 : id, finished, delivered?). Constat sur le code : `row.lots = openLots(lots)` (lead.ts:140) ne garde que les lots ouverts et buildPanel ne dessine que `row.lots` (lots.ts:298-342) : un lot clos n'a aujourd'hui aucune ligne, ni « prêt » ni autre. Ce que la cible ajoute pour eux est une ligne repliée (R6), pas un retrait de lignes : les lignes « prêt » dont Sylvain se plaint sont celles des lots encore ouverts au plan (R11). Le plan l'emporte sur la vague, quel que soit le statut de la vague (ready, handed-back, failed…) : un lot clos au plan n'est plus un lot qui joue. Un lot clos hors de toute vague affichée n'est pas listé. Un lot `done` sans `finished`, ou à échéance `every`, n'est ni dans `lots` ni dans `closed` (lead.ts:215) : il reste sans ligne ni décompte, comme aujourd'hui."
     message: ~
     champs: [ligne-livres, ligne-clos]
     statut: sourcee
-    source: "src/lead.ts:140 et :215 ; plugins/cadence-hud/hooks/lots.ts:189-193 et :271-274 ; demande du lot : « un lot de la vague déjà done au plan »"
-    tests: ["R4 — lot de la vague présent dans closed : aucune ligne « prêt » pour lui", "R4 — lot de la vague, statut ready, encore dans lots : « ✔ prêt » inchangé", "R4 — lot de la vague au statut handed-back mais clos au plan : replié, pas listé comme lot qui joue", "R4 — lot clos hors de toute vague : non listé"]
+    source: "src/lead.ts:140 et :215 ; plugins/cadence-hud/hooks/lots.ts:189-193, :271-274 et :298-342 ; demande du lot : « un lot de la vague déjà done au plan »"
+    tests: ["R4 — lot de la vague présent dans closed : aucune ligne de lot pour lui, seulement sa place dans une ligne repliée", "R4 — lot de la vague au statut handed-back mais clos au plan : replié, pas listé comme lot qui joue", "R4 — lot clos hors de toute vague : non listé", "R4 — lot done sans finished : ni ligne ni décompte"]
   - id: R5
     etat: charge
     cas: [C1]
@@ -68,50 +70,59 @@ regles:
   - id: R6
     etat: charge
     cas: [C1]
-    enonce: "Les lots livrés d'un projet ne sont pas chacun une ligne : une seule ligne « livrés : N » (N = leur nombre), puis, s'il y en a, une seule ligne « clos non livrés : M ». Elles se placent sous les lots qui jouent et les lots libres du projet, après le bouton « + N lots » s'il y en a un. Elles ne comptent pas dans « N lots non clos » du projet."
+    enonce: "Les lots livrés d'un projet ne sont pas chacun une ligne : une seule ligne « livrés : N » (N = leur nombre), puis, s'il y en a, une seule ligne « clos non livrés : M ». Avec la ligne « prêts : K » (R11), jusqu'à trois lignes, dans l'ordre prêts, livrés, clos non livrés ; elles se placent sous les lots qui jouent et les lots libres du projet, après le bouton « + N lots » s'il y en a un. Les livrés et les clos ne comptent pas dans « N lots non clos » du projet (ils sont clos) ; les prêts y comptent (le plan les tient ouverts)."
     message: "livrés : 11"
-    champs: [ligne-livres, ligne-clos]
+    champs: [ligne-prets, ligne-livres, ligne-clos]
     statut: sourcee
     source: "demande du lot L592 : « se replie dans une ligne « livrés : N » sous les lots qui jouent, au lieu d'une ligne « prêt » chacun »"
-    tests: ["R6 — 11 livrés et 3 clos : deux lignes sous les lots en cours, aucune ligne par lot", "R6 — compte du projet : livrés et clos exclus de « N lots non clos »"]
+    tests: ["R6 — 4 prêts, 11 livrés et 3 clos : trois lignes sous les lots en cours, aucune ligne par lot", "R6 — compte du projet : livrés et clos exclus de « N lots non clos », prêts inclus"]
   - id: R7
     etat: charge
     cas: [C2]
-    enonce: "Chaque ligne repliée est un bouton sur toute la ligne, ▸/▾ compris (un Button comme « + N lots » et le pli du projet, register.tsx), atteint au clavier, Entrée l'active ; il est replié par défaut (▸), un geste le déplie (▾) : un lot par ligne (id, titre, « ✔ livré » ou « ✔ clos »), sous la ligne ; un second geste la replie. Un titre que la vague ne donne pas reste une cellule vide. Le choix se garde dans la clé lotsViews existante du $.store, sous les clés `livres:<projet>` et `clos:<projet>` ; ces clés ne passent pas par parseToggleAsk (lots.ts:387, réservé aux sous-lots de la région Client) : le Button de register.tsx appelle toggleView avec une clé que le panneau a construite lui-même."
+    enonce: "Chaque ligne repliée (prêts, livrés, clos non livrés) est un bouton sur toute la ligne, ▸/▾ compris (un Button comme « + N lots » et le pli du projet, register.tsx), atteint au clavier, Entrée l'active ; il est replié par défaut (▸), un geste le déplie (▾) : un lot par ligne (id, titre, « ✔ prêt », « ✔ livré » ou « ✔ clos »), sans frise, sous la ligne ; un second geste la replie. Un titre que la vague ne donne pas reste une cellule vide. Le choix se garde dans la clé lotsViews existante du $.store, sous les clés `prets:<projet>`, `livres:<projet>` et `clos:<projet>` ; ces clés ne passent pas par parseToggleAsk (lots.ts:387, réservé aux sous-lots de la région Client) : le Button de register.tsx appelle toggleView avec une clé que le panneau a construite lui-même."
     message: ~
-    champs: [ligne-livres, ligne-clos, lot-id-livre, lot-titre-livre, lot-etat-livre, lot-etat-clos]
+    champs: [ligne-prets, ligne-livres, ligne-clos, lot-id-livre, lot-titre-livre, lot-etat-pret, lot-etat-livre, lot-etat-clos]
     statut: sourcee
     source: réponse du lead, 2026-11-04, vague 2026-11-04-1310-cad (état gardé dans lotsViews du $.store)
-    tests: ["R7 — repliée par défaut : aria-expanded faux, aucune ligne de lot livré", "R7 — activation (clic ou Entrée) : un lot par ligne avec « ✔ livré » ; seconde activation : repliée", "R7 — la ligne est un Button focalisable sur toute la ligne, ▸ compris", "R7 — titre vide : id et « ✔ livré » seuls", "R7 — clé livres:<projet> écrite dans lotsViews, aucune autre clé de stockage"]
+    tests: ["R7 — repliée par défaut : aria-expanded faux, aucune ligne de lot livré", "R7 — activation (clic ou Entrée) : un lot par ligne avec « ✔ livré » ; seconde activation : repliée", "R7 — la ligne est un Button focalisable sur toute la ligne, ▸ compris", "R7 — titre vide : id et « ✔ livré » seuls", "R7 — clés prets:/livres:/clos:<projet> écrites dans lotsViews, aucune autre clé de stockage"]
   - id: R8
     etat: charge
     cas: [C1, C2]
-    enonce: "Aucun id n'est tronqué : dans le panneau des lots, chaque colonne id (lot-row.tsx:45 `Box width={idWidth} flexShrink={0}`, idWidth = id le plus long, retrait et ▸/├ compris, lots.ts:322) a la largeur de l'id le plus long affiché (« L584 » : 4 ; « ├ L594/2 » : 8), livrés dépliés compris ; sous un corps étroit le titre est tronqué par « … », jamais l'id. La cause de « L5… » n'est pas lisible dans le code : idWidth est déjà le maximum calculé ; la coupure ne peut venir que du rendu (Text wrap=truncate-end dans la Box, retrait en Text imbriqué, ▸ dans un Button, largeur d'un glyphe) ou de l'autre colonne id du produit, celle des lignes de vague de la bande (register.tsx:624, `Box width={2 + lotWidth}`). Le premier travail du lot est de reproduire « L5… » par le test monté ci-dessous, rouge sur le code actuel, puis de corriger la ligne que ce test désigne."
+    enonce: "Aucun id n'est tronqué : dans le panneau des lots, chaque colonne id (lot-row.tsx:45 `Box width={idWidth} flexShrink={0}`, idWidth = id le plus long, retrait et ▸/├ compris, lots.ts:322) a la largeur de l'id le plus long affiché, retrait compris (baseLead, lots.ts:~323 : 2 cellules au premier niveau, 4 au sous-lot ; « L584 » : 2 + 4 = 6 ; sous-lot « ├ L594/2 » : 4 + 6 = 10), lignes dépliées (prêts, livrés, clos) comprises ; deux cellules séparent la colonne id du titre (`paddingLeft={2}`, lot-row.tsx) ; sous un corps étroit le titre est tronqué par « … », jamais l'id. La cause de « L5… » n'est pas lisible dans le code : idWidth est déjà le maximum calculé ; la coupure ne peut venir que du rendu (Text wrap=truncate-end dans la Box, retrait en Text imbriqué, ▸ dans un Button, largeur d'un glyphe) ou de l'autre colonne id du produit, celle des lignes de vague de la bande (register.tsx:624, `Box width={2 + lotWidth}`). Le premier travail du lot est de reproduire « L5… » par le test monté ci-dessous, rouge sur le code actuel, puis de corriger la ligne que ce test désigne. Si ce test est vert sur le code actuel, la cause est dans la bande : le même test s'écrit alors sur ses lignes de vague (register.tsx:624, dans le périmètre du lot) et c'est lui qui est rouge."
     message: ~
     champs: [lot-id, lot-id-sous, lot-titre]
     statut: sourcee
     source: "demande du lot L592 : « la colonne id n'est jamais tronquée (« L5… » vu pour L584) » ; fiche mère panneau-lots R15 (jamais l'id ni l'état) ; lots.ts:322, lot-row.tsx:45"
-    tests: ["R8 — rendu monté (session de lots-pane.test.ts) à 49 colonnes, 14 lots dont L584 : le texte de la ligne de L584 contient « L584 » entier, jamais « L5… » ; écrit en premier, il échoue sur le code actuel (sinon la cause est dans la bande : même test sur ses lignes de vague)", "R8 — rendu monté, sous-lot ├ L594/2 : id entier, titre tronqué par « … »", "R8 — buildPanel : idWidth couvre les lignes livrées dépliées"]
+    tests: ["R8 — rendu monté (session de lots-pane.test.ts) à 49 colonnes, 14 lots dont L584 (colonne id de 6) : le texte de la ligne de L584 contient « L584 » entier, jamais « L5… » ; écrit en premier, il échoue sur le code actuel (sinon la cause est dans la bande : même test sur ses lignes de vague)", "R8 — rendu monté, sous-lot ├ L594/2 : colonne id de 10, id entier, titre tronqué par « … »", "R8 — buildPanel : idWidth couvre les lignes livrées dépliées"]
   - id: R9
     etat: charge
     cas: [C1, C2]
-    enonce: "Quand la hauteur manque, les deux lignes repliées sont gardées comme le bouton « + N lots » : elles se placent juste après la dernière ligne de lot gardée, avant « … +N lots de plus » (si la coupure traverse les lots du projet, elles passent devant les lots coupés). Les lignes d'un repli déplié qui ne tiennent pas sont coupées avec les lots et comptées dans « … +N lots de plus » : aucune ligne ne disparaît sans décompte ; pour les voir, la personne agrandit le panneau comme pour tout lot coupé. Exemple fixé : 10 lignes de panneau (8 de corps), 5 lots non clos, 11 livrés dépliés et 3 clos repliés : le projet, 4 lots, « ▾ livrés : 11 », « ▸ clos non livrés : 3 », « … +12 lots de plus »."
-    message: "… +12 lots de plus"
-    champs: [ligne-livres, ligne-clos]
+    enonce: "Quand la hauteur manque, les lignes repliées (prêts, livrés, clos non livrés) sont gardées comme le bouton « + N lots » : leur place est réservée avant celle des lots, elles se mettent juste après la dernière ligne de lot gardée, avant « … +N lots de plus » (si la coupure traverse les lots du projet, elles passent devant les lots coupés). Chaque lot de vague prend deux rangées (le lot et sa frise, L413 : lots.ts `height`, lot-row.tsx:75). Les lignes d'un repli déplié ne sont pas gardées : elles sont coupées avec les lots et comptées dans « … +N lots de plus » : aucune ligne ne disparaît sans décompte ; pour les voir, la personne agrandit le panneau comme pour tout lot coupé. Exemple fixé (10 lignes de panneau, 8 de corps, coupure à 7 rangées pour garder celle de « … +N ») : projet de 3 lots qui jouent (2 rangées chacun), L593, L594 (▸, 1 sous-lot), 4 prêts, 11 livrés, 3 clos. Repliés : le projet (1), L588 et sa frise (2), les trois lignes (3), « … +5 lots de plus » (L589, L592, L593, L594 et son sous-lot). Livrés dépliés : mêmes lignes, « … +16 lots de plus » (5 + 11)."
+    message: "… +5 lots de plus"
+    champs: [ligne-prets, ligne-livres, ligne-clos]
     statut: hypothese
-    si_faux: "Si les lignes dépliées devaient rester visibles, la coupure ou un défilement du panneau change (calcul de buildPanel seul, aucune donnée en jeu) ; l'état replié et ses deux lignes ne changent pas."
-    tests: ["R9 — hauteur 10, repliés : tout tient, aucune coupure", "R9 — hauteur 10, 11 livrés dépliés : 4 lots, les deux lignes, « … +12 lots de plus »", "R9 — la coupure traverse les lots : les deux lignes restent avant « … +N lots de plus »"]
+    si_faux: "Si les lignes dépliées devaient rester visibles, la coupure ou un défilement du panneau change (calcul de buildPanel seul, aucune donnée en jeu) ; l'état replié et ses trois lignes ne changent pas."
+    tests: ["R9 — hauteur 16 (14 de corps), repliés : tout tient (12 rangées), aucune coupure", "R9 — hauteur 10, repliés : projet, L588 et sa frise, les trois lignes, « … +5 lots de plus »", "R9 — hauteur 10, 11 livrés dépliés : mêmes lignes, « … +16 lots de plus »", "R9 — la coupure traverse les lots : les trois lignes restent avant « … +N lots de plus »"]
   - id: R10
     etat: charge
     cas: [C1]
-    enonce: "Entre deux relectures du tableau (une minute au plus, et à chaque transition de vague) le panneau garde le dernier tableau : un lot que la vague dit prêt et que le plan vient de clore reste « ✔ prêt » jusqu'à la relecture, puis passe dans le repli ; le titre d'un lot replié est celui de la vague (le tour n'en porte pas pour `closed`), que waveLotsOf garde désormais."
+    enonce: "Entre deux relectures du tableau (une minute au plus, et à chaque transition de vague) le panneau garde le dernier tableau : un lot que la vague dit prêt et que le plan vient de clore reste dans la ligne « prêts » jusqu'à la relecture, puis passe dans « livrés » ou « clos non livrés » ; le titre d'un lot livré ou clos est celui de la vague (le tour n'en porte pas pour `closed`), que waveLotsOf garde désormais."
     message: ~
     champs: [lot-titre-livre]
     statut: hypothese
     si_faux: "Si le titre devait venir du plan, `closed` du tour porterait un champ de plus (contrat de cadence lead tour : une question) ; sinon seul le texte d'une cellule change."
-    tests: ["R10 — avant la relecture : « ✔ prêt » gardé ; après : replié", "R10 — titre repris de la vague, '' donne une cellule vide"]
+    tests: ["R10 — avant la relecture : lot dans « prêts » ; après : dans « livrés » ou « clos non livrés »", "R10 — titre repris de la vague, '' donne une cellule vide"]
+  - id: R11
+    etat: charge
+    cas: [C1]
+    enonce: "Un lot ouvert au plan (dans `lots`) dont la vague dit « prêt » (ready : la vague a fini son travail, il n'attend plus que l'intégration du lead) n'est plus une ligne de lot : il se replie dans une ligne « prêts : K », sous les lots qui jouent et libres, avant « livrés ». Critère : statut de vague ready, lot sans sous-lot au plan, hors sous-tâche ; un lot ready qui a des sous-lots reste une ligne de lot (« ✔ prêt »). Dépliée, la ligne montre un lot par ligne : id, titre du plan, « ✔ prêt » ; les lots restent ouverts au plan, donc comptés dans « N lots non clos ». Mesure sur la vague 2026-11-04-1310-cad (états des lots de la vague, plan du 04-11 22:30) : 29 lots, 21 au statut ready, 5 handed-back, 3 suspended ; 17 des 21 ready sont aujourd'hui `done` au plan (finished 2026-11-04), 4 encore ouverts. Un lot clos n'est jamais dans `lots` (lead.ts:140) : les 14 lignes « prêt » vues le 04-11 étaient donc des lots ready encore ouverts au plan (rang 0 : WORKED_IN_WAVE, lots.ts:150, chacun avec sa frise sur deux rangées), pas des clos. Le tour de cet instant n'est pas conservé : le nombre exact de 14 n'est pas relu."
+    message: "prêts : 4"
+    champs: [ligne-prets, lot-id-livre, lot-titre-livre, lot-etat-pret]
+    statut: hypothese
+    si_faux: "La demande dit « done au plan » : si le lead ne veut replier que les lots clos, R11 disparaît, les lots ready reviennent en lignes « ✔ prêt » et les 14 lignes de la plainte restent ; seul le calcul de buildPanel change (aucune donnée en jeu). Si le critère doit inclure les lots ready à sous-lots, seul ce critère change."
+    tests: ["R11 — lot ouvert, vague ready, sans sous-lot : aucune ligne de lot, il est compté dans « prêts : K »", "R11 — 14 lots ouverts à la vague ready et 3 qui jouent : les 3 en tête, une ligne « prêts : 14 », 14 lignes « ✔ prêt » seulement après dépliage", "R11 — lot ready à sous-lots : reste une ligne de lot", "R11 — « prêts : K » compté dans « N lots non clos »", "R11 — lot ouvert à statut de vague handed-back : reste une ligne de lot"]
 actions:
-  - { id: A2, declencheur: ~, contrat: A1, regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10] }
+  - { id: A2, declencheur: ~, contrat: A1, regles: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11] }
 sujet:
   id: panneau-lots-livres
   titre: Lecture des lots livrés par le panneau des lots
@@ -133,13 +144,14 @@ cas:
       - une vague porte des lots que le plan dit done
     nominal:
       - Le mod lit cadence lead tour --json (lots et closed) et les lots des vagues affichées.
+      - "Les lots ouverts dont la vague dit prêt passent dans « prêts : K »."
       - "Les lots de la vague dont l'id est dans closed passent dans « livrés : N » (delivered) ou « clos non livrés : N »."
-      - Le panneau dessine les lots qui jouent, puis les libres, puis les deux lignes.
+      - Le panneau dessine les lots qui jouent, puis les libres, puis les trois lignes.
     alternatives:
-      - { si: aucun lot de la vague n'est clos au plan, alors: pas de ligne repliée, regles: [R6] }
-      - { si: la hauteur manque, alors: les deux lignes gardent leur place avant « … +N lots de plus », regles: [R9] }
+      - { si: aucun lot de la vague n'est prêt ni clos au plan, alors: pas de ligne repliée, regles: [R6, R11] }
+      - { si: la hauteur manque, alors: les trois lignes gardent leur place avant « … +N lots de plus », regles: [R9] }
       - { si: le plan vient de clore un lot que la vague dit prêt, alors: il reste « ✔ prêt » jusqu'à la relecture, regles: [R10] }
-    resultat: Les lots qui jouent restent en tête, sans une ligne « prêt » par lot clos.
+    resultat: Les lots qui jouent restent en tête ; les lots prêts, livrés et clos tiennent chacun dans une ligne repliée au lieu d'une ligne « prêt » (et sa frise) par lot.
   - id: C2
     titre: Le lead déplie une ligne repliée
     acteur: le lead, dans une session Claude Code
@@ -159,7 +171,7 @@ contrats:
     sortie: "lignes de projet, inchangées : lots (non clos) et closed ({ id, finished, delivered? }[], déjà émis) ; le panneau croise closed avec les lots des vagues affichées (id, statut, titre)"
     erreurs: []
     sans_erreur: "aucun cas d'échec nouveau : une lecture en échec est celle de la fiche mère panneau-lots (R9, dernier tableau gardé, ou erreur R3 ci-dessus)"
-    regles: [R4, R5, R6, R8, R10]
+    regles: [R4, R5, R6, R8, R10, R11]
 donnees:
-  - { id: D1, objet: "lotsViews ($.store du mod) : deux clés de dépliage par projet, livres:<projet> et clos:<projet>", existant: true, modification: ajout, decision: "réponse du lead, 2026-11-04 (vague 2026-11-04-1310-cad) : l'état se garde dans lotsViews du $.store, sans nouveau stockage", note: "même magasin et même forme (booléens par clé) que « + N lots » ; deux clés de plus" }
+  - { id: D1, objet: "lotsViews ($.store du mod) : trois clés de dépliage par projet, prets:<projet>, livres:<projet> et clos:<projet>", existant: true, modification: ajout, decision: "réponse du lead, 2026-11-04 (vague 2026-11-04-1310-cad) : l'état se garde dans lotsViews du $.store, sans nouveau stockage", note: "même magasin et même forme (booléens par clé) que « + N lots » ; trois clés de plus" }
   - { id: D2, objet: "PanelWaveLot (lots.ts, mémoire) : champ title lu de la vague (collect.ts:109)", existant: true, modification: ajout, decision: "aucun stockage : champ en mémoire du mod, lu de ce que la vague porte déjà ; ne touche ni le format de la vague ni celui du tour", note: "peut valoir '' (R10)" }

@@ -2414,6 +2414,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "compliant — orchestré (vague 2026-11-05-1055-cad, 0 passe(s) de correction)", commit: 87e8dee1d9f9cd21313aa27de782471b356672e4, reporte: { de: 87f3d461809e7a24beadc199b1702c0048b26ae7, vers: 87e8dee1d9f9cd21313aa27de782471b356672e4, patchId: d57c7d64c2b96d2f2bc863b5d783401519ac5a44 } }
   - id: L613
     title: "Lot config: true (L586) rouge au sommet intégré : scripts/qualite.mjs reconnaît le lot de config au nom de sa branche (cadence/<vague>/<projet>--<lot>), que la porte d'intégration ne porte pas ; --contre origin/main y voit la config comme neuve et test/probe-L539-bords rougit — 05-11, L583 ; le lot doit passer la porte d'intégration, un lot de code restant refusé (test sur les deux cas)"
     status: todo

@@ -55,7 +55,7 @@ Details: [docs/skills.md](docs/skills.md) and [docs/cadence-hud.md](docs/cadence
 - [docs/ref.md](docs/ref.md): reference documents (specs, norms, mock-ups) and the coverage of their elements by the lots.
 - [docs/lead.md](docs/lead.md): the lead workflow, the `livreur` agent, and [the memory index warning](docs/session.md#memory-index-size-l442) (L442).
 - [docs/overview.md](docs/overview.md): the longer introduction and the map of every page; [docs/fonctionnement.md](docs/fonctionnement.md): how it works.
-- [docs/stabilite.md](docs/stabilite.md): what is guaranteed, [English names, French messages](docs/stabilite.md#languages); [docs/qualite.md](docs/qualite.md): quality.
+- [docs/stabilite.md](docs/stabilite.md): guaranteed, [English names, French messages](docs/stabilite.md#languages); [docs/qualite.md](docs/qualite.md).
 - [docs/whats-new.md](docs/whats-new.md) and [CHANGELOG.md](CHANGELOG.md): what changed.
 
 ## License

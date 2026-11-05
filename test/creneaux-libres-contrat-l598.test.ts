@@ -44,6 +44,8 @@ interface Spec {
   lanes?: number;
   repos: number;
   pid?: number;
+  /** Heure de démarrage inscrite au registre, quand elle diffère de celle du processus vivant (pid repris). */
+  start?: string;
 }
 
 /** Inscrit les vagues et les sessions du lead par le registre lui-même, rend le `free` des deux lecteurs sur le plafond `total`. */
@@ -55,7 +57,7 @@ function both(total: number, waves: Spec[], holds: { label: string; ttlMinutes: 
   waves.forEach((w, i) => {
     const pid = w.pid ?? living();
     const repos = Array.from({ length: w.repos }, (_, k) => join(cwd, `r${i}-${k}`));
-    registerWave(home, { pid, wave: `vague-${i}`, started: `2026-11-05T09:0${i}:00.000Z`, cwd, repos, cap: w.cap });
+    registerWave(home, { pid, wave: `vague-${i}`, started: `2026-11-05T09:0${i}:00.000Z`, cwd, repos, cap: w.cap, start: w.start });
     updateWaveRepos(home, pid, repos, w.lanes);
   });
   for (const h of holds) addHold(home, h.label, h.ttlMinutes, NOW);
@@ -97,6 +99,10 @@ describe('L598 — le même chiffre de créneaux libres, du registre et de la ba
 
   it('R6 — une vague au pid mort ne tient aucun créneau, des deux côtés', () => {
     expect(both(3, [{ cap: 3, lanes: 2, repos: 1, pid: dead() }])).toEqual({ registre: 3, bande: 3 });
+  });
+
+  it('R6b — un pid repris (vivant, mais d\'une autre heure de démarrage que celle inscrite) est un porteur mort, des deux côtés', () => {
+    expect(both(3, [{ cap: 3, lanes: 2, repos: 1, start: '1' }])).toEqual({ registre: 3, bande: 3 });
   });
 
   it('R7 — une session du lead prend un créneau, sauf échue : à l\'échéance elle le rend', () => {

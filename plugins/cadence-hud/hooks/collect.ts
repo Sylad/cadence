@@ -32,6 +32,24 @@ def alive(pid):
     except Exception:
         return False
 
+def started(pid):
+    # heure de démarrage (champ 22 de stat), l'identité d'un processus : un pid se réutilise ; None si illisible
+    try:
+        with open('/proc/%d/stat' % int(pid)) as f:
+            s = f.read()
+        return s[s.rindex(')') + 2:].split()[19]
+    except Exception:
+        return None
+
+def holder_alive(pid, start):
+    # comme holderAlive du registre : le pid existe ET, l'heure de démarrage connue des deux côtés, c'est la même (un pid repris est un porteur mort)
+    if not alive(pid):
+        return False
+    if start is None:
+        return True
+    now = started(pid)
+    return now is None or now == str(start)
+
 def children():
     tree = {}
     for d in os.listdir('/proc'):
@@ -119,7 +137,7 @@ for f in sorted(glob.glob(os.path.join(home, 'waves', '*.json'))):
     if r is None:
         continue
     pid = int(r.get('pid') or 0)
-    if not pid or not alive(pid):
+    if not pid or not holder_alive(pid, r.get('start')):
         continue
     d = os.path.join(r['cwd'], '.cadence', 'runs', r['wave'])
     w = load(os.path.join(d, 'wave.json')) or {}

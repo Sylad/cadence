@@ -87,6 +87,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - `cadence-hud`: the free slots of the band are those of `cadence orchestrate --status` for a wave in worktree mode (L589, [docs/cadence-hud.md](docs/cadence-hud.md)): one slot per lot that holds a claude session (`lanes` of the registry: a lot in the tests/build gate holds none), not per repository held — the band said « 2 libres » while `--status` said 0 on 3 — and the lots in a gate are named (`créneaux libres : 2 sur 3 · 2 en porte : L514 L473`). The real Python collector is played against a registry written by `registry.ts` itself (`test/hud-lanes-l589.test.ts`): a renamed key or a dropped field turns cadence's own gate red, not only the band.
 - `cadence orchestrate --follow [--wave <id>] [--interval 5]` follows a wave's journal and prints only the lines that ask the lead for a gesture (lot ready, handed back, failed, question, budget or quota reached, incident — push detected, repository dirtied or HEAD moved —, integrated; not the suspensions that are the lead's own `--stop-after-current` or `--resume`), written after it was armed (a follow-up re-armed after `--resume` does not replay the lines already relayed), then « fin de vague <id> : <status> » once the wave has been out of the registry for 6 polls (a wave being resumed, a `done` one included, registers late; a `--continue` wave leaves it between two rounds) (L588, [docs/orchestrate.md](docs/orchestrate.md), skill `lead`, which arms it in place of `tail -F`): on 04-11, 453 events reached the lead over 3 waves, 91 of them useful, 300–400 k tokens of context for nothing.
 
+### Fixed
+
+- A lot that waits for its integration turn (another integration of the repository is running) gives back its slot (L591, [docs/orchestrate.md](docs/orchestrate.md), « Integration, before `ready` »): the pool no longer counts its queue, and the registry no longer counts its lane, so the lots waiting for a slot start meanwhile; the lot then takes its turn without asking for a slot again: its short review starts even when every slot is taken (journal `… reprend son tour d'intégration sans redemander de créneau`; an integration launches one short review). The plan write of a new lot (`raf start` and its commit) goes ahead of the integrations queued on the repository, so a lot started on the freed slot is not stuck behind them without a session. On 04-11 (wave 1310-cad) L514, L586 and L473 arrived together, L530 L587 L588 started only after the last integration, ~9 minutes with two empty slots.
+
 ## [1.54.0] - 2026-11-05
 
 ### Added
@@ -101,10 +105,6 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Fixed
 
 - A plan commit in a neighbouring repository is no longer a false incident (L593, [docs/orchestrate.md](docs/orchestrate.md)): a commit that touches only the plan files of that repository (`plan.path`, `plan.files` of its own `cadence.yaml`) is tolerated even when its subject cites a lot of the wave, and the journal says so (04-11: three `plan: add Q-MIG2..4` commits of the lead in maritime-atlas handed L589 back). A commit that also touches another file is still a finding.
-
-### Fixed
-
-- A lot that waits for its integration turn (another integration of the repository is running) gives back its slot (L591, [docs/orchestrate.md](docs/orchestrate.md), « Integration, before `ready` »): the pool no longer counts its queue, and the registry no longer counts its lane, so the lots waiting for a slot start meanwhile; the lot then takes its turn without asking for a slot again: its short review starts even when every slot is taken (journal `… reprend son tour d'intégration sans redemander de créneau`; an integration launches one short review). The plan write of a new lot (`raf start` and its commit) goes ahead of the integrations queued on the repository, so a lot started on the freed slot is not stuck behind them without a session. On 04-11 (wave 1310-cad) L514, L586 and L473 arrived together, L530 L587 L588 started only after the last integration, ~9 minutes with two empty slots.
 
 ## [1.53.1] - 2026-11-04
 

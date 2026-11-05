@@ -47,8 +47,8 @@ release adds is optional.
 
 ## Languages
 
-The documentation (`README`, `docs/*.md`) and the **names** — commands, options, keys, files and folders — are in English; the **messages** (outputs, refusals, briefs, agents, skills, code comments, the CHANGELOG) are in French. The tool is not a French CLI: it speaks French and is named in English.
+The documentation (`README`, `docs/*.md`), the **names** — commands, options, keys, files and folders — and the text the tool gives to the models (the agents, the skills, the brief templates under `templates/orchestrate/`) and to its readers (the CHANGELOG) are in English; the **messages** the tool prints (outputs, refusals) and the code comments are in French. The tool is not a French CLI: it speaks French and is named in English.
 
-A few names are French and are guaranteed like any other: the keys `maquette`, `maquetteReviews` and `fiche` under `orchestrate` in `cadence.yaml`, and the options `--quoi`, `--largeur`, `--seuil`, `--porteur`, `--sans-rendu` and `--cache-sous-causes`. They keep their names until a major version, and no alias is added: two names for one key would be one more overlap. The files `acceptation.json`, `qualite-baseline.json` and the folder `docs/nouveautes/` are French too.
+A few names are French. The keys `maquette`, `maquetteReviews` and `fiche` under `orchestrate` in `cadence.yaml`, and the options `--porteur` (of `spec reseal`) and `--cache-sous-causes` (of `corrections`), are on guaranteed surfaces: they keep their names until a major version, and no alias is added: two names for one key would be one more overlap. The options `--quoi`, `--largeur`, `--seuil` and `--sans-rendu` exist only under `cadence ref`, which is experimental: they follow its status, not a guarantee. The files `acceptation.json`, `qualite-baseline.json` and the folder `docs/nouveautes/` are French too.
 
 A new name is in English: it is the language of almost every command and key, and naming new ones in French would deepen the mix.

@@ -63,4 +63,17 @@ describe('la surface du compte pro : langues et comptes (L603)', () => {
     for (const n of ['session-start', 'session-close', 'deliver', 'lead', 'orchestrate', 'ux-reviewer', 'code-reviewer', 'qa-reviewer', 'cadence-hud']) expect(overview, n).toContain(n);
     expect(checkLinks(root, ['docs/overview.md', 'docs/stabilite.md'])).toEqual([]);
   });
+
+  it('R9 — la section ne range pas en français des surfaces écrites en anglais (agents, skills, CHANGELOG, gabarits de briefs)', () => {
+    expect(langues).not.toMatch(/messages \([^)]*(briefs|agents|skills|CHANGELOG)/i);
+    expect(langues).toMatch(/agents[^.]*English/i);
+    expect(langues).toMatch(/CHANGELOG[^.]*English/i);
+  });
+
+  it('R10 — les options françaises de `ref` suivent son statut expérimental, seules --porteur et --cache-sous-causes sont garanties', () => {
+    const ligneRef = langues.split('\n').find((l) => /--quoi/.test(l)) ?? '';
+    expect(ligneRef).toMatch(/`cadence ref`/);
+    expect(ligneRef).toMatch(/experimental/i);
+    expect(langues).not.toMatch(/guaranteed like any other[^.]*--quoi/);
+  });
 });

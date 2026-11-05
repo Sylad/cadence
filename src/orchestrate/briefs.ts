@@ -121,6 +121,16 @@ export const EXPRESS_BRIEF = [
   'No new test for a purely visual change (the existing suite runs and must stay green); a change of behaviour still gets its test first. The full suite and the build run once, at the end.',
 ].join('\n');
 
+/**
+ * Consigne du correctif visible (L633, issue #43), sans maquette : `implement` prend la capture avant son changement puis après, la revue UX
+ * (`review-small` ou `ux`) ne relit que le diff et compare ces captures. `captureDir` : le dossier de sortie Playwright de la vague.
+ */
+export function visibleFixText(step: 'implement' | 'review', captureDir: string): string {
+  if (step === 'implement')
+    return `Visible fix (L633): this lot changes a few properties of an existing screen, so there is no mockup. Capture the screen before your change, then again after it, at 1440 and 390 px width, in the same state, each named with its full path (\`${captureDir}/avant-<state>-<width>px.png\`, \`${captureDir}/apres-<state>-<width>px.png\`). The UX review compares the two.`;
+  return `Visible fix (L633): this lot changes a few properties of an existing screen, with no mockup. Review the diff only: the lines the commits of the lot change, judged on the captures before and after (\`${captureDir}/avant-*\`, \`${captureDir}/apres-*\`; re-capture a state yourself when one is missing). Do not audit the rest of the screen, which the lot does not touch.`;
+}
+
 /** Consigne `{{news}}` d'un lot express `visible` : pas d'entrée Nouveautés par lot, la capture seule (le lead regroupe les entrées à la livraison). */
 export function expressNewsText(captureDir: string): string {
   return `No News entry for this lot (express lane): the lead groups the entries at delivery. Do not run \`cadence news new\`. Take a capture of the result (it lands in the wave's output directory, \`${captureDir}\`): the lead looks at it instead of a separate review.`;

@@ -40,16 +40,6 @@ describe('R1 — quels lots entrent dans la chaîne légère', () => {
     }
   });
 
-  it('R1 — lot visible sans screen d\'estimate 0,3 : même chaîne', async () => {
-    const { parent } = parentWith([{ title: 'une retouche', estimate: 0.3, visible: true }]);
-    const r = await dry(parent, ['a:L1']);
-    try {
-      expect(r.line).toMatch(/étapes : spec \(sonnet\) → maquette \(opus\) → implement \(\w+\)(?: → probe \(\w+\))? → review-small/);
-    } finally {
-      removeDryRunBriefs(r.text);
-    }
-  });
-
   it('R1 — lot visible d\'estimate 0,1 (express) : aucune étape spec ni maquette', async () => {
     const { parent } = parentWith([{ title: 'une retouche', estimate: 0.1, visible: true }, { title: 'un composant express', estimate: 0.1, screen: 'component' }]);
     const r = await dry(parent, ['a:L1', 'a:L2']);
@@ -104,10 +94,10 @@ describe('R1 — quels lots entrent dans la chaîne légère', () => {
     expect(kinds(h)).toEqual(['spec', 'maquette', 'implement', 'review']);
   });
 
-  it('R1 — lightMaquette : les bords du classement (page, journey, estimate absent ou nul, non visible)', () => {
+  it('R1 — lightMaquette : les bords du classement (page, journey, sans screen, estimate absent ou nul, non visible)', () => {
     const base = { visible: true, estimate: 0.3 };
     expect(lightMaquette({ ...base, screen: 'journey' }, true)).toBe(true);
-    expect(lightMaquette({ ...base }, true)).toBe(true);
+    expect(lightMaquette({ ...base }, true)).toBe(false); // sans screen : correctif visible (L633)
     expect(lightMaquette({ ...base, screen: 'page' }, true)).toBe(false);
     expect(lightMaquette({ ...base, estimate: 0.1 }, true)).toBe(false);
     expect(lightMaquette({ ...base, estimate: 0 }, true)).toBe(false);
@@ -283,8 +273,8 @@ describe('R6 — la boucle de revue de la maquette légère', () => {
     expect(c.lot.outcome).toContain('maquette non conforme après 1 revue : ');
   });
 
-  it('R6 — lot sans screen dans le plan : la boucle va aussi jusqu\'à maquetteReviews revues, pas le plafond de 2', async () => {
-    const h = harness({ lots: [{ title: 'Une retouche', visible: true, estimate: 0.6 }], script: { spec: [spec, spec, spec], maquette: [major, major, major] } });
+  it('R6 — lot component : la boucle va aussi jusqu\'à maquetteReviews revues, pas le plafond de 2', async () => {
+    const h = harness({ lots: [{ title: 'Une retouche', screen: 'component', estimate: 0.6 }], script: { spec: [spec, spec, spec], maquette: [major, major, major] } });
     const c = h.lot('L1', light, cfg);
     await runLot(c);
     expect(kinds(h)).toHaveLength(6);

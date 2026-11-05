@@ -38,12 +38,13 @@ export function specScreen(repo: string, dir: string, lot: { id: string; screen?
 }
 
 /**
- * Maquette légère (L459) : un lot visible, sans `spec: true`, d'estimate au-dessus de la retouche (voie express), dont le `screen:` du plan n'est pas `page`
- * (`component`, `journey` ou absent) passe par spec → maquette avant le code, sans accept. Se déduit du plan à chaque appel, sans champ d'état :
+ * Maquette légère (L459) : un lot visible, sans `spec: true`, d'estimate au-dessus de la retouche (voie express), dont le `screen:` du plan est `component` ou `journey`
+ * (un écran neuf ou une mise en page changée) passe par spec → maquette avant le code, sans accept. Sans `screen:` (L633, issue #43), c'est un correctif
+ * de quelques propriétés d'un écran existant : voie `visibleFix`, sans maquette. Se déduit du plan à chaque appel, sans champ d'état :
  * `orchestrate.maquette: false` la retire (la maquette légère est la revue de maquette, sans elle rien n'est à valider).
  */
 export function lightMaquette(lot: { visible?: boolean; spec?: boolean; estimate?: number; screen?: Screen }, maquette: boolean): boolean {
-  return maquette && !!lot.visible && !lot.spec && typeof lot.estimate === 'number' && lot.estimate > EXPRESS_MAX_ESTIMATE && lot.screen !== 'page';
+  return maquette && !!lot.visible && !lot.spec && typeof lot.estimate === 'number' && lot.estimate > EXPRESS_MAX_ESTIMATE && !!lot.screen && lot.screen !== 'page';
 }
 
 /**
@@ -59,9 +60,15 @@ export function sealedAcceptation(repo: string, dir: string, lot: string): boole
 export const lightLot = (state: { screen?: Screen }, lot: Parameters<typeof lightMaquette>[0] & { id: string }, maquette: boolean, repo: string, dir: string): boolean =>
   !!state.screen && lightMaquette(lot, maquette) && !sealedAcceptation(repo, dir, lot.id);
 
-/** `screen` de l'état d'un lot à étape spec : celui de `specScreen`, ou, pour une maquette légère, celui du plan (`component` quand le plan n'en déclare pas : l'état ne sert alors qu'à dire « ce lot a une étape spec »). */
+/**
+ * Correctif visible (L633, issue #43) : un lot visible sans `screen:` au plan, ni express ni `spec: true`. Il passe par implement, avec une capture avant et après,
+ * et une revue UX du seul diff ; la maquette et les états forcés restent pour un écran neuf ou une mise en page changée (`lightMaquette`, `screen: page`).
+ */
+export const visibleFix = (state: { visible?: boolean; express?: boolean; specLot?: boolean }, lot: { screen?: Screen }): boolean => !!state.visible && !state.express && !state.specLot && !lot.screen;
+
+/** `screen` de l'état d'un lot à étape spec : celui de `specScreen`, ou, pour une maquette légère, celui du plan. */
 export function stageScreen(repo: string, dir: string, lot: { id: string; visible?: boolean; spec?: boolean; estimate?: number; screen?: Screen }, maquette: boolean): Screen | undefined {
-  return specScreen(repo, dir, lot) ?? (lightMaquette(lot, maquette) ? (lot.screen ?? 'component') : undefined);
+  return specScreen(repo, dir, lot) ?? (lightMaquette(lot, maquette) ? lot.screen : undefined);
 }
 
 /** Catégorie de budget d'un lot (`lotBudget`) : `screen` pour un écran page, `light` pour une maquette légère, `spec` pour un lot `spec: true` sans écran. */

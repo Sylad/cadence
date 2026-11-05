@@ -94,7 +94,7 @@ describe('README en page d’accueil (L232)', () => {
     expect(cli).not.toMatch(/correspondance des champs, voir le README/);
     expect(cli).toContain('docs/raf.md');
     for (const f of ['fiche.yaml', 'fiche-back.yaml']) expect(read(`templates/${f}`), f).toContain('docs/spec.md');
-    expect(read('templates/acceptation-runner.mjs')).toContain('docs/orchestrate.md');
+    expect(read('templates/acceptation-runner.mjs')).toContain('docs/orchestrate-spec.md');
     for (const f of ['fiche.yaml', 'fiche-back.yaml', 'acceptation-runner.mjs']) expect(read(`templates/${f}`), f).not.toMatch(/du README de cadence|dans le README de cadence/);
   });
 

@@ -114,4 +114,21 @@ describe('L599 — orchestrate.md en cinq pages', () => {
     }
     expect(checkLinks(root, ['docs/news.md', 'docs/qualite.md', 'docs/raf.md', 'docs/quickstart.md', 'docs/overview.md'])).toEqual([]);
   });
+  it('R11 — les renvois « below » de la page d\'entrée, les ancres ### déplacées, le gabarit accept et l\'index du README suivent les paragraphes', () => {
+    const main = read('docs/orchestrate.md');
+    expect(main).not.toMatch(/\*\*formatting retry\*\* \(below\)/);
+    expect(main).toContain('« Formatting retry » in [orchestrate-cycle.md](orchestrate-cycle.md)');
+    expect(main).not.toMatch(/except the light review below/);
+    expect(main).toContain('« Review sized to the lot » in [orchestrate-cycle.md](orchestrate-cycle.md)');
+    for (const [title, anchor] of [
+      ['`plan.onWrite`: the published plan follows every write (L346)', 'planonwrite-the-published-plan-follows-every-write-l346'],
+      ['Time limit of a write step (L298)', 'time-limit-of-a-write-step-l298'],
+    ]) {
+      expect(read('docs/orchestrate-cycle.md'), title).toContain(`\n### ${title}\n`);
+      expect(main, title).toContain(`### ${title}\n\nMoved to [orchestrate-cycle.md](orchestrate-cycle.md#${anchor})`);
+    }
+    const tpl = read('templates/acceptation-runner.mjs');
+    expect(tpl).toContain('docs/orchestrate-spec.md');
+    expect(tpl).not.toContain('docs/orchestrate.md');
+  });
 });

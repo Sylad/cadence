@@ -6,7 +6,7 @@
 a **fresh** `claude -p` session per step with a short brief, reads the result, writes the state in
 files and moves on. The lead session keeps only the decision (which lots), the final table and the
 questions. Nothing is resumed: a correction is a new session, never the author's reopened. The one
-exception is a **formatting retry** (below).
+exception is a **formatting retry** (« Formatting retry » in [orchestrate-cycle.md](orchestrate-cycle.md)).
 
 
 ## The five pages
@@ -185,7 +185,7 @@ same for the lot folder and the dry-run briefs); ids without `/` are unchanged.
 
 You choose the lots; the order is the order given (one queue per repository, as many repositories at the
 same time as the session cap allows — 2 by default; the `orchestrate.worktrees: true` mode (on in cadence's own `cadence.yaml`, off where the key is absent) plays the lots of one repository in parallel, each in its own worktree — « One worktree per lot »). `@<model>` sets the model of the implementation and corrections of that
-lot (`@haiku`, `@sonnet`, `@opus`, or any other name, passed as it stands to `claude --model` like `orchestrate.escalation.model`: `@fable`, `@claude-fable-5-1` — L345; the dry-run warns, without refusing, for a name outside the three aliases; default Sonnet; reviews are Opus, except the light review below; Haiku only when you write it, for a mechanical lot). Run it
+lot (`@haiku`, `@sonnet`, `@opus`, or any other name, passed as it stands to `claude --model` like `orchestrate.escalation.model`: `@fable`, `@claude-fable-5-1` — L345; the dry-run warns, without refusing, for a name outside the three aliases; default Sonnet; reviews are Opus, except the light review (« Review sized to the lot » in [orchestrate-cycle.md](orchestrate-cycle.md)); Haiku only when you write it, for a mechanical lot). Run it
 in the background and read `--status`: it prints one line per transition and the final table.
 
 **Following a wave (L49)**: `--status --watch` clears the screen and redraws the live waves and the table every
@@ -271,3 +271,11 @@ Moved to [orchestrate-worktrees.md](orchestrate-worktrees.md#a-lot-whose-work-is
 ### A session never commits on another repository (L456)
 
 Moved to [orchestrate-worktrees.md](orchestrate-worktrees.md#a-session-never-commits-on-another-repository-l456).
+
+### `plan.onWrite`: the published plan follows every write (L346)
+
+Moved to [orchestrate-cycle.md](orchestrate-cycle.md#planonwrite-the-published-plan-follows-every-write-l346).
+
+### Time limit of a write step (L298)
+
+Moved to [orchestrate-cycle.md](orchestrate-cycle.md#time-limit-of-a-write-step-l298).

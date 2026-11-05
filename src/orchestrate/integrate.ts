@@ -7,6 +7,7 @@ import { activeLock, releaseLock, takeLock, type OLock } from './lock.js';
 import { mergeUnreleased, moveToUnreleased, settleLotEntries, unreleasedSections } from './changelog-merge.js';
 import { mutexFor } from './mutex.js';
 import { isMap, isNode, isSeq, parseDocument, type YAMLMap, type YAMLSeq } from 'yaml';
+import { indentedSeq } from '../plan-ids.js';
 import { git, gitFailure, tryGit } from './worktree.js';
 import { BASELINE, comparerMigration, serialiser, type Mesure } from '../../scripts/qualite.mjs';
 
@@ -110,7 +111,8 @@ const LOT_WRITES = ['review', 'ux', 'notes', 'tasks', 'status', 'state', 'state_
 
 /** Les lots d'un plan lu à une étape du conflit : leur carte YAML, par identifiant, plus la tête du plan (tout sauf `lots`). */
 function planStage(work: string, file: string, n: number) {
-  const doc = parseDocument(run(work, 'show', `:${n}:${file}`));
+  const text = run(work, 'show', `:${n}:${file}`);
+  const doc = parseDocument(text);
   const lots = doc.get('lots');
   if (doc.errors.length || !isSeq(lots)) throw new Error(`${file} (étape ${n}) : plan illisible`);
   const byId = new Map<string, YAMLMap>();
@@ -118,7 +120,7 @@ function planStage(work: string, file: string, n: number) {
     if (!isMap(item) || byId.has(String(item.get('id')))) throw new Error(`${file} (étape ${n}) : lot sans identifiant ou en double`);
     byId.set(String(item.get('id')), item);
   }
-  return { doc, byId, head: JSON.stringify({ ...(doc.toJSON() as Record<string, unknown>), lots: undefined }) };
+  return { doc, text, byId, head: JSON.stringify({ ...(doc.toJSON() as Record<string, unknown>), lots: undefined }) };
 }
 
 const keyName = (p: { key: unknown }) => String((p.key as { value?: unknown }).value ?? p.key);
@@ -179,7 +181,7 @@ function resolvePlan(work: string): boolean {
     }
     if (!writes.length) return false; // aucune écriture du lot à reprendre : le conflit vient d'ailleurs
     for (const w of writes) w();
-    writeFileSync(join(work, file), ours.doc.toString());
+    writeFileSync(join(work, file), ours.doc.toString({ lineWidth: 0, indentSeq: indentedSeq(ours.text) }));
     run(work, 'add', '--', file);
     return true;
   } catch {

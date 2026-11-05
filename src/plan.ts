@@ -13,7 +13,7 @@ import { currentState, defaultState, rebase, stateProblems, transitionProblem, t
 import { DOCS_OK_FILE, readDocsOkFile } from './docs-ok-file.js';
 import { checkedExtras, withExtras, type ExtraDecls } from './plan-extras.js';
 import { lotRef, putFlowKey, putPlanned, refuseUnplanned, type PlannedWindow } from './plan-window.js';
-import { DOTTED, escapeRe, extractRefs, idRefs, pickId, type Ref } from './plan-ids.js';
+import { DOTTED, escapeRe, extractRefs, idRefs, indentedSeq, pickId, type Ref } from './plan-ids.js';
 import { ARCHIVE_DIR, PLACE_KEY, archiveFiles, archiveLots, archiveYear, mergeArchived, newArchiveDoc, readArchive, reopenArchived, selectArchivable, type Kept } from './archive.js';
 
 /** Où va un avertissement de `save()` (la commande a réussi mais quelque chose cloche) : stderr, ou le `err` du CLI qui a lancé l'écriture. */
@@ -267,7 +267,7 @@ export class Plan {
     const lots = doc.get('lots');
     if (!isSeq(lots)) doc.set('lots', doc.createNode([]));
     else lots.flow = false; // « lots: [] » écrit par init : passer en style bloc
-    return new Plan(path, doc, !/^lots:[^\n]*\n(?:#[^\n]*\n)*- /m.test(text), settings, text);
+    return new Plan(path, doc, indentedSeq(text), settings, text);
   }
 
   /** Le plan tel qu'il est maintenant sur le disque (un script a pu l'écrire depuis la lecture), mêmes réglages. */

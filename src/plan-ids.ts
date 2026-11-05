@@ -92,3 +92,6 @@ export function readIdPattern(raw: unknown, bad: (what: string) => Error): { idP
   if (problem) throw bad(`idPattern ${problem}`);
   return { idPattern: raw };
 }
+
+/** false quand le plan écrit à la main met les « - » des lots en colonne de la clé parente : la réécriture (`save`, résolution d'un conflit de plan) le garde. */
+export const indentedSeq = (text: string): boolean => !/^lots:[^\n]*\n(?:#[^\n]*\n)*- /m.test(text);

@@ -111,3 +111,26 @@ describe('R2 — ce que le lot n\'écrit pas ne se fusionne pas', () => {
     expect(r.out).toContain('conflit en rebasant');
   });
 });
+
+// L611 — la résolution réécrit le plan comme `Plan.save` : lignes non repliées, « - » des lots en colonne 0 quand le plan du dépôt les y met.
+describe('R611 — la taille du plan après résolution', () => {
+  it('R611 — une note longue des deux côtés : le plan résolu garde une ligne par note et ses « - » en colonne 0, sans gonfler', async () => {
+    const { parent, repo, dir } = await handedBack();
+    const longue = (m: string) => `${m} ${'mot '.repeat(60)}fin`;
+    leadReviews(dir, (p) => p.note('L1', longue('du lot'), '2026-10-27'));
+    mainPlan(repo, (p) => p.note('L1', longue('de main'), '2026-10-27'));
+    const file = join(repo, '.cadence/raf.yaml');
+    const [tete, lots] = readFileSync(file, 'utf8').split(/^lots:\n/m);
+    writeFileSync(file, `${tete}lots:\n${lots.replace(/^ {2}/gm, '')}`); // le plan du dépôt met ses « - » en colonne 0
+    git(repo, 'add', '--', '.cadence/raf.yaml');
+    git(repo, 'commit', '-q', '-m', 'plan: « - » en colonne 0');
+    const avant = readFileSync(file, 'utf8').split('\n').length;
+    const r = await integrate(parent);
+    expect(r.err).toBe('');
+    expect(store(parent).readLot('a', 'L1')!.status).toBe('ready');
+    const texte = readFileSync(file, 'utf8');
+    expect(texte.split('\n').filter((l) => l.includes('mot mot mot mot')).length).toBe(2);
+    expect(texte.split('\n').length - avant).toBeLessThan(15);
+    expect(texte).toMatch(/^lots:\n- id: L1/m);
+  });
+});

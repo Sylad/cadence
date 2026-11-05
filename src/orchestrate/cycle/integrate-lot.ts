@@ -208,6 +208,7 @@ export async function integrateLot(c: LotCtx): Promise<void> {
             // Le diff du lot n'est plus celui qui a été relu (contexte modifié, conflit résolu) : une revue courte du diff rebasé avant l'avance (R17).
             const short = await shortReview(c);
             if (short === null) return;
+            l.constats = [];
             if (short.refused) return refuse(shortRefusal(c, short, kept));
             verdict = `${verdict}${SHORT_REVIEW_TRACE}${short.verdict}`;
             l.verdict = verdict;

@@ -2387,6 +2387,9 @@ lots:
     after: [ L592 ]
     created: 2026-11-05
     started: 2026-11-05
+    notes:
+      - { date: 2026-11-05, text: "Revue de la fiche — mineur : docs/specs/bande-lots-clos/fiche.yaml:1 — Références de lignes périmées : l'en-tête et R1 citent register.tsx:596-660 et 596-640, or les lignes de vague sont à register.tsx:576-670 (waveRows 576, cellules 602, « en attente » 669). La source de R1 reste vérifiable, mais les numéros sont faux." }
+      - { date: 2026-11-05, text: "Revue de la fiche — mineur : docs/specs/bande-lots-clos/fiche.yaml:47 — R4 demande une « fonction partagée » avec restGroups, mais restGroups (lots.ts:305) n'est pas exportée et travaille par projet sur toutes les vagues (dédoublonnage par première vague, groupes prêts/livrés/clos), alors que la bande partitionne vague par vague. La fiche ne dit pas quelle fonction est extraite. Un lot de projet absent du tableau lu (aucune ligne `closed`) n'a pas non plus de règle explicite : il resterait listé, ce que R1 couvre sans le nommer." }
   - id: L610
     title: "orchestrate --integrate déposé dans une vague reprise pour un lot rendu que cette reprise ne joue pas : la demande rend 0 (« intégration déposée »), puis la vague l'écarte en « lot inconnu » sans rien dire de plus — 05-11, L582 ; le lot doit être accepté, ou la commande refusée sur-le-champ avec le geste à faire"
     status: doing

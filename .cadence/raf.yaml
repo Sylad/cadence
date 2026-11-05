@@ -2335,9 +2335,10 @@ lots:
     finished: 2026-11-05
   - id: L599
     title: "orchestrate.md en cinq pages (E12 de docs/etudes/ensemble-2026-11.md) : 308 Ko sans sommaire découpés, avec dans le même commit les 26 tests qui citent la page, files de package.json et CHECKED de scripts/check-links.mjs"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-05
+    started: 2026-11-05
   - id: L600
     title: "Vocabulaire (E4a + E7 + E10 de docs/etudes/ensemble-2026-11.md) : concepts.md explique les tailles de lot (express, light, small, quickwin), les quatre sens de hook et docs-ok"
     status: doing

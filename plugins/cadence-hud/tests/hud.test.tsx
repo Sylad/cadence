@@ -1676,12 +1676,34 @@ test('R5 — aucun clos : aucune ligne', async ($, on) => {
   expect(texts.filter(t => /livrés/.test(t))).toEqual([])
 })
 
-test('R6 — vague finie : ligne inchangée, aucun compteur', async ($, on) => {
-  const ended = { ...WAVE, live: false, ended: '2026-10-07T19:00:00.000Z', status: 'done', lots: [lotOf('L1', 'ready')] }
-  const { texts } = await (await bandTexts({ waves: [ended], lotsBoard: { rows: [closedRow([], ['L1'])], outdated: false } }))($, on)
+// ── L601 : la ligne d'une vague finie ne dit « prêt » que pour le sens de la vague (le lot clos au plan se compte « livrés » / « clos non livrés ») ──
+
+const endedOf = (lots: ReturnType<typeof lotOf>[]) => ({ ...WAVE, live: false, ended: '2026-10-07T19:00:00.000Z', status: 'done', lots })
+/** Le bilan d'une vague finie : ce qui suit le séparateur de sa ligne (`undefined` sans bilan). */
+const endedLine = (texts: string[]) => texts.find(t => /terminée/.test(t))?.split('│  ')[1]
+
+test('L601 R1 — vague finie dont les lots sont clos au plan : plus de « prêts », le compteur « livrés » comme le panneau', async ($, on) => {
+  const ended = endedOf([lotOf('L1', 'ready'), lotOf('L2', 'ready'), lotOf('L3', 'ready')])
+  const { texts } = await (await bandTexts({ waves: [ended], lotsBoard: { rows: [closedRow(['L2'], ['L1', 'L3'])], outdated: false } }))($, on)
   expect(texts.some(t => /terminée/.test(t))).toBe(true)
-  expect(texts.filter(t => /livrés/.test(t))).toEqual([])
+  expect(texts.filter(t => /prêt/.test(t))).toEqual([])
+  expect(endedLine(texts)).toBe('livrés : 2 · clos non livrés : 1')
 })
+
+test('L601 R2 — vague finie dont un lot reste ouvert au plan : son bilan ne compte que les lots ouverts, puis le compteur', async ($, on) => {
+  const ended = endedOf([lotOf('L1', 'ready'), lotOf('L2', 'ready'), lotOf('L3', 'failed')])
+  const { texts } = await (await bandTexts({ waves: [ended], lotsBoard: { rows: [closedRow([], ['L1'])], outdated: false } }))($, on)
+  expect(endedLine(texts)).toBe('1 prêt · 1 échec · livrés : 1')
+})
+
+const unfolded = (name: string, lotsBoard: unknown) =>
+  test(`L601 R3 — vague finie, ${name} : bilan inchangé, aucun compteur`, async ($, on) => {
+    const { texts } = await (await bandTexts({ waves: [endedOf([lotOf('L1', 'ready'), lotOf('L2', 'ready')])], lotsBoard }))($, on)
+    expect(endedLine(texts)).toBe('2 prêts')
+  })
+unfolded('sans tableau lu', null)
+unfolded('tableau d’un cadence trop ancien', { rows: [closedRow([], ['L1'])], outdated: true })
+unfolded('aucun de ses lots dans le tableau', { rows: [closedRow(['L9'], [])], outdated: false })
 
 test('R7 — tableau outdated : tous les lots listés, aucun compteur, aucun message ajouté à la bande', async ($, on) => {
   const { texts } = await (await bandTexts({ waves: [{ ...WAVE, lots: [lotOf('L1', 'ready'), lotOf('L2', 'ready')] }], lotsBoard: { rows: [closedRow([], ['L1'])], outdated: true } }))($, on)

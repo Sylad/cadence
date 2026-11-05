@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- [docs/config.md](docs/config.md) (L602): one page lists the four folders cadence writes to (`.cadence/`, `.cadence/runs/<wave>/`, `~/.cadence/orchestrate`, `~/.local/share/cadence`) with what each holds, whether it is versioned and the variable that moves it (`CADENCE_HOME` does not move `~/.local/share/cadence`), and one table of the ten gates says where each is declared (the plan or `cadence.yaml`) and what it refuses. Linked from the README, `docs/overview.md` and `docs/fonctionnement.md`.
+
 ### Changed
 
 - A lot handed back by the short review of the rebased diff (« intégration refusée : N constat(s) bloquant(s) ou majeur(s) ») now carries its findings in the lot state (`constats`, read by `--status`) and one journal line per finding (`<lot> · revue courte : <gravité> <fichier:ligne> — <texte>`), like a full review; before, they were only in `<lot>/5-review-small.json` (L585).
@@ -89,15 +93,12 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - One help text (L597): `raf --help`, `cadence --help`, `cadence help` and `cadence` without a tool print the same text, kept in `src/cli.ts`; `bin/cadence.js` no longer holds a copy. It now lists what only one of the two texts had (`cadence spec green`, `spec check|qa|reseal`, `session`, `deliver`, `skills install`, `claude-hook retour|attente|pipe`, `lead priority`, `verify --gate`, `ref check|eval|diff|analyse|coverage|corpus`, `orchestrate --goal|--no-fill`, `local abort`), and `cadence skills install` no longer names a fixed list of skills. An unknown tool (`cadence bogus`) is refused on the error output with exit 2 instead of printing the help. A test checks that every command of the dispatch tables and every sub-command is in the help.
 - [docs/concepts.md](docs/concepts.md) explains the sizes of a lot (`express`, `light`, `small`, `full`, and `quickwin`), the four meanings of « hook » and the three spellings of `docs-ok` (L600).
 - The language convention is written (L603, [docs/stabilite.md](docs/stabilite.md#languages), one line in the README): documentation, names, agents, skills and the CHANGELOG in English, printed messages and code comments in French, the few French names on guaranteed surfaces (`maquette`, `maquetteReviews`, `fiche`, `--porteur`, `--cache-sous-causes`) guaranteed, the four options of `cadence ref` following its experimental status, no alias, new names in English. `orchestrate` joins the guaranteed skills of `stabilite.md`; `docs/overview.md` no longer counts tools, skills or agents.
+- The band's grey line of a finished wave no longer says `9 prêts` for lots the plan already closed (L601): it counts the lots still open by their wave state and the closed ones as `livrés : N · clos non livrés : M`, as under a live wave and in the lots panel.
 
 ### Fixed
 
 - A lot that touches `CHANGELOG.md` plays `test/changelog.test.ts` in its targeted gate (L616, [docs/orchestrate.md](docs/orchestrate.md), « Targeted gates after a write »): no test imports the changelog, so the targeted run never saw an entry written under the last published version instead of `[Unreleased]` (L582, L591, L613 on 05-11, refused only at the integrated tip). The implementation brief names the rule.
 - `cadence orchestrate --integrate`: the plan written after resolving a plan-only rebase conflict keeps the plan's style like `Plan.save` (L611, `lineWidth: 0`, and the `-` of the lots in the parent key's column when the repository's plan has them there): a rebase turned `.cadence/raf.yaml` from 2 399 to 9 320 lines, content intact, and the short review then handed the lot back (05-11, L592). A test measures the size of the plan after the resolution.
-
-### Added
-
-- [docs/config.md](docs/config.md) (L602): one page lists the four folders cadence writes to (`.cadence/`, `.cadence/runs/<wave>/`, `~/.cadence/orchestrate`, `~/.local/share/cadence`) with what each holds, whether it is versioned and the variable that moves it (`CADENCE_HOME` does not move `~/.local/share/cadence`), and one table of the ten gates says where each is declared (the plan or `cadence.yaml`) and what it refuses. Linked from the README, `docs/overview.md` and `docs/fonctionnement.md`.
 
 ## [1.55.0] - 2026-11-05
 

@@ -317,6 +317,10 @@ const restGroups = (r: LotsRow, waves: readonly PanelWaveLot[]): RestGroup[] => 
   return FOLD_ORDER.filter(g => groups[g].length > 0).map(g => ({ group: g, items: groups[g] }))
 }
 
+/** Le compteur des lots clos au plan d'une vague, sous la bande ou au bout de sa ligne finie (L601) : « livrés : 3 · clos non livrés : 1 » ; vide quand aucun lot n'est clos. */
+export const foldText = (livres: number, clos: number): string =>
+  [livres > 0 ? `livrés : ${livres}` : '', clos > 0 ? `clos non livrés : ${clos}` : ''].filter(Boolean).join(' · ')
+
 /**
  * Les lots d'une vague vivante pour la bande (L609) : `open`, ceux que le plan ne dit pas clos, dans l'ordre de la vague ; `livres` et `clos`, le compte de ceux qu'il dit clos avec et sans `delivered`.
  * Sans tableau lu (`null`) ou d'un cadence trop ancien (`outdated`, `closed` n'y dit rien des lots), tous les lots restent ouverts ; un projet absent du tableau garde les siens.

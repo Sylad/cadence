@@ -96,7 +96,7 @@ running / cap), then a **table of the active lots** with aligned columns: lot, c
 orange, failed / handed back = red), the detail of the step (`+N` = child claude sessions, `✝` = step marked in progress but its process is
 dead, `pN` = pass), then the start of the title on the width left; and one grey `en attente` line listing the lots that have not started.
 Lots of different projects keep their project as a prefix. With no live wave, the **last finished wave** of the current folder stays on a
-grey line with its status (`terminée` / `interrompue il y a 12 min`) and the balance of its lots (`3 prêts · 1 échec · 3 suspendus`),
+grey line with its status (`terminée` / `interrompue il y a 12 min`) and the balance of its lots (`3 prêts · 1 échec · 3 suspendus`: `prêt` is the wave's word for a lot whose cycle is finished and integrated; a lot the plan already closed is left out of the balance and counted as under a live wave, `livrés : 2 · clos non livrés : 1`, L601),
 **without budget** (it has no object once the wave is over); it **disappears 30 min after its end**, or earlier when a new wave starts.
 
 **A narrow window.** The first line does not wrap: its segments drop by priority until it fits the width — first the agents' names, then

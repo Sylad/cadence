@@ -9,7 +9,7 @@ import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
-import { buildPanel, ellipsize, foldWave, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
+import { buildPanel, ellipsize, foldText, foldWave, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
@@ -578,14 +578,17 @@ export const register: Register = on => {
       const percent = wavePercent(wave)
       if (!wave.live) {
         const project = commonProject(wave)
+        // L601 : « prêt » est l'état de la vague ; un lot que le plan dit clos se compte comme dans la vague vivante et le panneau (L609), pas « prêt »
+        const { open, livres, clos } = foldWave(board, wave.lots)
+        const summary = [open.length > 0 ? lotCounts({ ...wave, lots: open }) : '', foldText(livres, clos)].filter(Boolean).join(' · ')
         return (
           <Text key={`wave-${wave.id}`} color="subtle" wrap="truncate-end">
             ⟳ {project ? `${project} · ` : ''}
             {wave.id} {waveStatusFr(wave.status)} {ago(wave.ended, at)}
-            {wave.lots.length > 0 && (
+            {summary && (
               <Text color="subtle">
                 {sep}
-                {lotCounts(wave)}
+                {summary}
               </Text>
             )}
           </Text>
@@ -677,7 +680,7 @@ export const register: Register = on => {
           {livres + clos > 0 && (
             <Box paddingLeft={2}>
               <Text wrap="truncate-end" color="subtle">
-                {[livres > 0 ? `livrés : ${livres}` : '', clos > 0 ? `clos non livrés : ${clos}` : ''].filter(Boolean).join(' · ')}
+                {foldText(livres, clos)}
               </Text>
             </Box>
           )}

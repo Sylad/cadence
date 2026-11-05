@@ -1445,7 +1445,7 @@ test('L589 — en mode worktree, une vague occupe un créneau par lot actif (lan
 })
 
 test('L589 — la ligne nomme les lots en porte : « créneaux libres : 0 sur 3 · 2 en porte : L514 L473 »', () => {
-  const lot = (id: string, gate: boolean) => ({ ...WAVE.lots[1], lot: id, status: 'ready', gate: gate ? { label: 'tests', started: '2026-10-07T19:11:11.066Z' } : null })
+  const lot = (id: string, gate: boolean) => ({ ...WAVE.lots[1]!, lot: id, status: 'ready', gate: gate ? { label: 'tests', started: '2026-10-07T19:11:11.066Z' } : null })
   const wave = { ...WAVE, cap: 3, repos: 1, lanes: 3, lots: [lot('L514', true), lot('L473', true), lot('L586', false)] }
   expect(slotsLine([wave], [], 3)).toBe('créneaux libres : 0 sur 3 · 2 en porte : L514 L473')
   // aucune porte : la ligne reste celle de --status

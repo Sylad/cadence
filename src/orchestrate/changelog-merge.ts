@@ -208,7 +208,7 @@ export function settleLotEntries(rebased: string, lotTip: string, start: string,
   return `${r.head}\n\n${body.join('\n')}\n${tail}`;
 }
 
-/** Entrées d'un morceau de CHANGELOG hors `[Unreleased]` : une ligne `- ` et ses lignes de suite directes, jusqu'à la ligne vide ou au titre suivant. */
+/** Entrées d'un morceau de CHANGELOG (partie publiée, ou bloc `[Unreleased]` malgré du texte libre) : une ligne `- ` et ses lignes de suite directes, jusqu'à la ligne vide ou au titre suivant. */
 function publishedEntries(tail: string): string[] {
   const out: string[] = [];
   let open = false;
@@ -241,7 +241,7 @@ export function changelogShapeProblems(text: string, main: string): string[] {
   const [s, m] = [split(text), split(main)];
   if (!s || !m) return [];
   const titles = s.block.flatMap((line) => /^### (.+?)\s*$/.exec(line)?.[1] ?? []);
-  const entries = [...(sections(s.block, true)?.values() ?? [])].flat();
+  const entries = publishedEntries(s.block.join('\n'));
   const known = new Set(publishedEntries(m.tail));
   return [
     ...repeated(titles, (t, n) => `titre « ### ${t} » ${n} fois sous [Unreleased]`),

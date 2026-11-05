@@ -12,11 +12,13 @@ orchestrate:
   gate:
     host: build-box            # an ssh destination: `machine`, `user@machine`
     install: npm ci            # optional: installs the dependencies on the host to fill a cache
+    refs: [main, origin/main]  # optional: git references pushed with the sha (L617)
 ```
 
 `host` is a non-empty string without space, not starting with `-` (ssh would read it as an option);
 anything else refuses `cadence.yaml` with `orchestrate.gate.host : destination ssh attendue …`. `install` is a non-empty command.
-`install` without `host` does nothing (the gate stays local). Any other key of `gate` is refused as unknown (`readsPlan`, `host`, `install` are the three). Declaring `host` alone is **not** `readsPlan`:
+`refs` is a non-empty list of git reference names (no space, not starting with `-`); anything else refuses `cadence.yaml` with `orchestrate.gate.refs : liste de références git attendue …`.
+`install` or `refs` without `host` does nothing (the gate stays local). Any other key of `gate` is refused as unknown (`readsPlan`, `host`, `install`, `refs` are the four). Declaring `host` alone is **not** `readsPlan`:
 the plan-only commits are still crossed (L444) and the `readsPlan` message does not appear.
 Nothing in cadence names a machine: the host comes from this key, and the work folder on it is derived.
 
@@ -38,11 +40,39 @@ The first line of the gate says where it ran:
 A wave plays the gate on the host only when the lot's worktree is **clean and at the commit pushed**: the host would not see uncommitted
 changes. Otherwise the gate is local and the journal says `worktree non validé, jouée en local`.
 
+## References the gate reads (L617)
+
+Only the sha is pushed to the host. A build or a test that reads another reference of the repository (`git merge-base HEAD main`, `qualite --contre origin/main`) then finds
+nothing there and goes red with « référence introuvable » — a red of the setup, not of the sha. `gate.refs` lists the references pushed with the sha: each is resolved locally
+(`git rev-parse`) and pushed under its full name (`refs/heads/main`, `refs/remotes/origin/main`, forced: `main` moves), so the host's worktree resolves the same short names.
+A reference missing locally is a fallback to the local gate, said (`porte déportée indisponible sur <host> (référence « x » introuvable en local) — repli sur la porte locale`), never a red.
+
 ## The work folder on the host
 
 Relative to the ssh login directory: `.cadence-gate/<folder name of the local project>/` with `repo.git` (bare repository where the sha is pushed,
 `git push --no-verify`, created at first use), `deps/<fingerprint>` (the dependency caches) and `wt/<unique id>` (the throwaway worktrees).
 The host needs `ssh` access without password (`BatchMode`), `git`, `tar` and the tools of the project. Installing the machine is the lead's job.
+
+## A host behind WSL (L617)
+
+ssh to a Windows machine lands in the Windows shell, not in WSL, so the commands of the gate (`sh`, `git`, `tar`) would not run. The host declared is the ssh server of the WSL itself:
+`openssh-server` in the distribution, `Port 2222` and `PasswordAuthentication no` in `/etc/ssh/sshd_config.d/`, the key of the machine that runs cadence in `~/.ssh/authorized_keys`,
+`networkingMode=mirrored` in `%USERPROFILE%\.wslconfig` (the WSL answers on the LAN address of Windows) and an inbound firewall rule for the port. On the machine that runs cadence, one alias in `~/.ssh/config`
+(`Host build-box-wsl`, `HostName`, `User`, `Port 2222`, `StrictHostKeyChecking accept-new`) is the `host` of `cadence.yaml`: cadence never names a machine.
+
+**WSL stops when no process runs in it**: between two ssh sessions the VM is stopped and port 2222 times out. cadence then falls back to the local gate and says so, so a host left to idle costs
+a warning, not a wave. To keep it up, hold one process in it with a scheduled task of the Windows host, started at boot and running whether a user is logged on or not (`S4U` logon, no stored password). In an elevated PowerShell of the host:
+
+```powershell
+$a = New-ScheduledTaskAction -Execute 'wsl.exe' -Argument '-d <distribution> -e sleep infinity'
+$t = New-ScheduledTaskTrigger -AtStartup
+$p = New-ScheduledTaskPrincipal -UserId '<windows-user>' -LogonType S4U
+$s = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
+Register-ScheduledTask -TaskName Keep-WSL-alive -Action $a -Trigger $t -Principal $p -Settings $s
+Start-ScheduledTask -TaskName Keep-WSL-alive
+```
+
+`-ExecutionTimeLimit 0` matters: the default limit of a task (three days) would stop the process, and WSL with it. A persistent change of the host, so the lead's call; the sshd of the distribution must start with it (`systemctl enable ssh`).
 
 ## The dependency cache
 

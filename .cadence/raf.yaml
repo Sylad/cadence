@@ -2380,12 +2380,13 @@ lots:
   - id: L609
     title: "Bande cadence-hud : les lots d'une vague déjà clos au plan ne sont plus listés, un compteur « livrés : N » les remplace, avec la même fonction que le panneau des lots (L592) ; Sylvain le 05-11, capture de la vague 1310-cad reprise : 21 lignes « prêt » de lots déjà livrés au-dessus de tout"
     public: La bande ne liste plus les lots déjà clos, seulement leur nombre
-    status: todo
+    status: doing
     estimate: 0.25
     visible: true
     screen: component
     after: [ L592 ]
     created: 2026-11-05
+    started: 2026-11-05
   - id: L610
     title: "orchestrate --integrate déposé dans une vague reprise pour un lot rendu que cette reprise ne joue pas : la demande rend 0 (« intégration déposée »), puis la vague l'écarte en « lot inconnu » sans rien dire de plus — 05-11, L582 ; le lot doit être accepté, ou la commande refusée sur-le-champ avec le geste à faire"
     status: todo

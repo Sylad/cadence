@@ -2243,6 +2243,7 @@ lots:
     started: 2026-11-04
   - id: L592
     title: "Panneau des lots cadence-hud : un lot de la vague déjà done au plan (livré) s'affiche « livré » et se replie dans une ligne « livrés : N » sous les lots qui jouent, au lieu d'une ligne « prêt » chacun ; la colonne id n'est jamais tronquée (« L5… » vu pour L584) — 04-11, vague 1310-cad : 14 lots prêts ou déjà livrés listés au-dessus des 3 lots en cours, Sylvain : « elle me montre beaucoup de lots »"
+    public: Le panneau des lots replie les lots livrés sous ceux qui jouent, et l'identifiant d'un lot n'est plus jamais coupé
     status: doing
     estimate: 0.25
     visible: true

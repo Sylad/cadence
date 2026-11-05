@@ -20,6 +20,7 @@ import { filesOf, gapMessage } from '../../docsync.js';
 import { repoWork } from '../../repos.js';
 import { testGateMissing } from '../../testgate.js';
 import { fixAffordable, budgetCount } from './budget.js';
+import { redAnnounced } from '../objectif.js';
 import { scheduleProbe, PROBE_RESERVE, type ProbeIo } from '../probe.js';
 /** Violations du verrou des tests d'acceptation (L173) par les commits faits depuis `head` ; aucune sans HEAD de départ. */
 const sealedViolations = (c: LotCtx, head: string | undefined): string[] => (head ? lockViolations(wd(c), c.config.spec.dir, head, { rouge: c.lot.accept?.rouge ? { [c.lot.accept.acceptation]: c.lot.accept.rouge } : {}, lot: c.lot.lot, lotBase: c.lot.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(wd(c), lotWork(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha)), lotCommits: lotCommits(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha) }) : []);
@@ -155,7 +156,8 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
     l.baseline = { sha: startSha(c) ?? '', failures: declared, verified: false };
     l.warnings.push(`échecs déjà présents au sha de départ selon la session (${declared.length}) : non vérifié par le programme (orchestrate.test absent)`);
   }
-  if (!rep.tests.vert) {
+  // L632 : `redAnnounced` garde aussi, au lot, l'annonce rouge que la porte ne joue pas (la dernière écriture fait foi).
+  if (redAnnounced(l, rep, c.config.test)) {
     if (c.config.test) deferred = true;
     // Sans orchestrate.test (L215) : champ structuré, pas de lecture de la prose. vert:false + echecsDeBase + nouveauxEchecs présent et vide → pas de correction (non vérifié, signalé à la revue) ; nouveauxEchecs non vide → correction.
     else if (declared.length && newFailures && !newFailures.length) l.warnings.push(`tests annoncés rouges par la session, aucun nouvel échec déclaré (nouveauxEchecs vide) : les échecs sont ceux de la base qu'elle déclare (${declared.length}) ; pas de correction, non vérifié par le programme (orchestrate.test absent)`);

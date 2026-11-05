@@ -5,6 +5,7 @@ import { readPlanConfig } from '../config.js';
 import { PLAN_ACTIONS, commitMsgHook, leadAnswerMessage, indexCompletedMessage, commitMsgRefusal, planCommitMessage } from '../plan-commit.js';
 import { decisionsText, humanDecisions } from './decisions.js';
 import { headline, newsText, objective, renderBrief, type BriefVars } from './briefs.js';
+import { clusterAlertLines, withClusterLine } from './objectif.js';
 import { acceptationFile, acceptText, redAcceptations } from './accept.js';
 import type { Plan } from '../plan.js';
 import { reportCiParity } from './ci-parity.js';
@@ -179,7 +180,7 @@ export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDep
     for (const m of new Set(steps.map((s) => s.model))) {
       if (m !== 'local' && !MODEL_ALIASES.includes(m)) io.out(`  ⚠ modèle « ${m} » hors des alias ${MODEL_ALIASES.join(', ')} : passé tel quel à claude --model (un nom que le compte ne connaît pas fait échouer la session)`);
     }
-    for (const line of [...keptBranchLines(l, id, env.config.worktrees, planFileSet(env.loadPlan(), l.repo)), ...planMessageLines(l.repo, l, id, env.config.spec.dir)]) io.out(line);
+    for (const line of [...keptBranchLines(l, id, env.config.worktrees, planFileSet(env.loadPlan(), l.repo)), ...planMessageLines(l.repo, l, id, env.config.spec.dir), ...clusterAlertLines(l, env.config.prodAccess)]) io.out(line);
     repoNotices(l.repo, io, said, env.config.spec.dir, env.loadPlan);
     io.out(`  corrections : ${MAX_PASSES} passe(s) au plus (${MAX_PASSES_CONVERGING} si la revue converge), en session neuve`);
     io.out(l.light ? '  revue conforme avec mineurs : pas de passe des mineurs, ils sont rendus en notes' : '  revue conforme avec mineurs : une passe de correction des mineurs (session neuve), puis une revue courte ; les mineurs refusés sont rendus en « choix »');
@@ -196,7 +197,7 @@ export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDep
     }
     for (const s of steps) {
       const file = join(tmp, `${lotSlug(l.project, l.lot)}--${s.kind}.md`);
-      writeFileSync(file, renderBrief(briefName(l, s.kind), s.kind === 'fiche' || vars.fiche === undefined ? vars : { ...vars, fiche: '' }, deps.templatesDir)); // la consigne de revue de fiche ne sert qu'au brief de la fiche : implement et review en sont la base d'une délégation à la main
+      writeFileSync(file, withClusterLine(renderBrief(briefName(l, s.kind), s.kind === 'fiche' || vars.fiche === undefined ? vars : { ...vars, fiche: '' }, deps.templatesDir), env.config.prodAccess)); // la consigne de revue de fiche ne sert qu'au brief de la fiche : implement et review en sont la base d'une délégation à la main
       const playwright = !!mcpServersFor(s.kind, l.visible, '', l.small, !!l.screen).playwright;
       const local = s.model === 'local';
       const args = (local ? buildLocalArgs : buildArgs)(

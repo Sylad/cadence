@@ -18,6 +18,7 @@ import { lateRefusal } from './depot-partage.js';
 import { awaitOlder } from './integrate-wait.js';
 import { conflictNotes } from '../lot-diff.js';
 import { declaredFor } from '../../resources.js';
+import { readyOutcome, withUnverifiedGoal } from '../objectif.js';
 import { checkShape, type ReviewReport, REVIEW_SCHEMA } from '../schemas.js';
 /** Trace d'un verdict reporté après un rebase (R9) : le sha relu, le sha intégré qui le remplace, et le patch-id (le même des deux côtés) qui le garantit. */
 export interface Reporte {
@@ -38,7 +39,7 @@ export async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): 
   const neighbours = l.repos ?? [];
   const shas = repoShas(plan, neighbours, l.lot);
   const read = neighbours.length ? ` ; dépôts relus : ${neighbours.map((r) => `${r.rel}@${shas[r.rel]?.slice(0, 7) ?? 'aucun commit du lot'}`).join(', ')}` : '';
-  const verdict = `${code.verdict} — orchestré (vague ${c.wave.id}, ${l.pass} passe(s) de correction${l.minorPass ? ` + passe des mineurs${minorNote}` : ''}${read})`;
+  const verdict = withUnverifiedGoal(`${code.verdict} — orchestré (vague ${c.wave.id}, ${l.pass} passe(s) de correction${l.minorPass ? ` + passe des mineurs${minorNote}` : ''}${read})`, l);
   l.verdict = verdict;
   const newer = lotWork(plan, wd(c), l.lot)[0]?.sha ?? null;
   // L317 : la porte du bibliothécaire peut ne pas avoir été jouée (passes ou budget épuisés) ; un écart docs.sync ouvert ne finit jamais prêt.
@@ -67,7 +68,7 @@ export async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): 
     return;
   }
   l.next = null;
-  transition(c, 'ready', 'prêt à livrer');
+  transition(c, 'ready', readyOutcome(l));
 }
 
 /**
@@ -250,7 +251,7 @@ export async function integrateLot(c: LotCtx): Promise<void> {
   if (!removed.ok) c.wave.log(`orchestrate : ${key} : worktree conservé : ${t.dir} (branche ${t.branch})`);
   else t.active = false;
   l.next = null;
-  transition(c, 'ready', 'prêt à livrer');
+  transition(c, 'ready', readyOutcome(l));
 }
 
 /** Le refus de la revue courte (L585) : ses constats entrent dans l'état du lot (`--status`) et au journal, une ligne chacun, comme ceux d'une revue complète ; rend le motif du refus. */

@@ -1,3 +1,4 @@
+import { announceLaunch } from './objectif.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
@@ -199,7 +200,8 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     }
   }
   const id = store.id;
-  if (args.continue) for (const l of freeLines(launch, pre.lots)) io.out(l);
+  // L632 : les lots qui demandent un cluster que leurs sessions n'auront pas sont dits avant le départ.
+  announceLaunch(io, (line) => store.journal(line), pre.lots.map((l) => ({ ...l, prodAccess: projectEnv(l.repo).config.prodAccess })), args.continue ? freeLines(launch, pre.lots) : []);
   // Les candidats refusés au premier tirage : leur cause dit pourquoi ils ne jouent pas (même ligne que celles des tirages suivants).
   for (const s of firstSkipped) {
     io.err(`orchestrate : lot sauté — ${s}`);

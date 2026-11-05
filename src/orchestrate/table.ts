@@ -2,6 +2,7 @@ import { lotWork } from '../audit.js';
 import { porteLines } from './portes-table.js';
 import { planLoader } from '../config.js';
 import type { PriceGrid } from '../perf-config.js';
+import { readySuffix, unverifiedSuffix } from './objectif.js';
 import { costView } from './cout.js';
 
 export { estimateLines, launchCost, launchPrices } from './cout.js';
@@ -74,7 +75,7 @@ const commits = (l: LotState) => new Set(l.steps.flatMap((s: StepState) => s.com
 const counted = (l: LotState) => l.steps.reduce((n, s) => n + (s.tokens?.counted ?? 0), 0);
 /** L'état d'un lot (L395) : « porte tests (3 min) » tant que la commande de la porte du programme tourne dans une vague vivante, « porte en attente de l'hôte (3 min) » tant qu'elle attend un créneau de porte sur `gate.host` (L624), sinon l'étiquette de son statut. Une porte restée dans l'état d'une vague arrêtée (processus tué) ne tourne plus. */
 const stateText = (l: LotState, wave: WaveState, now: number): string => {
-  if (!l.gate || wave.status !== 'running') return LABEL[l.status];
+  if (!l.gate || wave.status !== 'running') return `${LABEL[l.status]}${readySuffix(l)}`;
   const since = Date.parse(l.gate.started);
   return `porte ${l.gate.waiting ? "en attente de l'hôte" : l.gate.label}${Number.isFinite(since) ? ` (${Math.max(0, Math.floor((now - since) / 60_000))} min)` : ''}`;
 };
@@ -280,7 +281,7 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
   const line = (r: string[]) => r.map((c, i) => c.padEnd(widths[i])).join('  ').trimEnd();
   const out = [line(head), ...rows.map(line)];
   const by = (s: LotState['status']) => lots.filter((l) => l.status === s).length;
-  const tail = [`${by('ready')} prêt(s)`, by('question') ? `${by('question')} question(s)` : '', by('handed-back') + by('failed') ? `${by('handed-back') + by('failed')} rendu(s) au lead` : '', by('suspended') ? `${by('suspended')} suspendu(s)` : ''].filter(Boolean);
+  const tail = [`${by('ready')} prêt(s)${unverifiedSuffix(lots)}`, by('question') ? `${by('question')} question(s)` : '', by('handed-back') + by('failed') ? `${by('handed-back') + by('failed')} rendu(s) au lead` : '', by('suspended') ? `${by('suspended')} suspendu(s)` : ''].filter(Boolean);
   out.push(`vague ${wave.id} : ${k(wave.consumed)} / ${m(wave.budget)} comptés (lecture de cache ${m(wave.cacheRead)})${cost.total} — ${tail.join(', ')} — ${wave.status}`);
   for (const l of lots.filter((x) => x.status === 'question')) {
     out.push(`question : ${l.project}:${l.lot} — « ${l.questions.join(' / ')} » (${resumeAnswerHint(wave.id, l)})`);

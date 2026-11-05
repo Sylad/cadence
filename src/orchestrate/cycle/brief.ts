@@ -8,6 +8,7 @@ import { partageBrief } from '../partage.js';
 import { probeVars } from '../probe.js';
 import { repoWork } from '../../repos.js';
 import { testWorkersText } from '../workers.js';
+import { withClusterLine } from '../objectif.js';
 import { capturesText, EXPRESS_BRIEF, expressNewsText, gateText, headline, integrationText, localReading, precheckBrief, newsText, objective, renderBrief, reposText, shotsText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars } from '../briefs.js';
 import { mcpServersFor, playwrightDir, type SessionKind } from '../launch.js';
 import { acceptationFile, acceptText, findAcceptation } from '../accept.js';
@@ -266,7 +267,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   }
   const brief = renderBrief(briefName(l, kind, !!c.integration), vars, c.wave.templates);
   // Les dépôts tiers (L456) : la consigne s'ajoute à tout brief d'écriture, sans passer par un gabarit (un gabarit modifié change l'empreinte que d'autres tests gardent).
-  return ['implement', 'fix', 'spec', 'accept', 'probe'].includes(kind) ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief;
+  return withClusterLine(['implement', 'fix', 'spec', 'accept', 'probe'].includes(kind) ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief, c.config.prodAccess);
 }
 
 /** Plafond de sessions `spec` du lot (L230) : les revues de maquette d'un lot à écran, sinon deux. Fiche et maquette partagent `l.specRuns`. */

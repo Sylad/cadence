@@ -123,6 +123,8 @@ export interface LotState {
   specAsked?: string[];
   /** Ids des règles `hypothese` dont `specAsked` pose la question : la réponse du lead les passe en `sourcee` (L297). */
   specAskedRules?: string[];
+  /** L632 : la commande de tests que la session a annoncée rouge (`tests.vert` faux) alors que la porte du programme ne la joue pas ; posée et levée à chaque rapport d'écriture. Le lot qui la porte ne ressort pas en simple « prêt » (`unverifiedGoal`). */
+  testsHorsPorte?: string;
   /** Lot léger (estimate ≤ orchestrate.review.threshold, L108) : une revue légère, pas de passe des mineurs. Absent : lot ordinaire. */
   light?: boolean;
   /** Passes de correction nées d'un contrôle du programme (tests rouges, code sans test, documentation en retard), comptées dans `pass` : la revue d'un lot léger passe à la revue complète dès que `pass` dépasse ce compte (L565). Absent : aucune. */

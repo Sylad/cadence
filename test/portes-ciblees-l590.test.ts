@@ -292,7 +292,7 @@ describe('L590 R10 — le tableau et le détail', () => {
   it('R10 — l\'en-tête et la largeur de la table sont ceux d\'avant', () => {
     const avec = renderTable(wave, [bare({ suiteRuns: 1, portes })], { lotCommits: () => [] });
     const sans = renderTable(wave, [bare({ suiteRuns: 1 })], { lotCommits: () => [] });
-    expect(avec[0]).toMatch(/durée +suites$/);
+    expect(avec[0]).toMatch(/durée +après revue +suites$/);
     expect(avec[0]).toBe(sans[0]);
     expect(avec[1]).toBe(sans[1]);
   });

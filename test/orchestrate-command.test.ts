@@ -1017,7 +1017,7 @@ describe('une vague', () => {
     const code = await orchestrate(['a:L1', 'b:L1'], r.io, f.deps);
     expect(code).toBe(0);
     const out = r.out.join('\n');
-    expect(out).toMatch(/lot +état +passes +revue +UX +commits +tokens +durée +suites/);
+    expect(out).toMatch(/lot +état +passes +revue +UX +commits +tokens +durée +après revue +suites/);
     expect(out).toMatch(/a:L1 +prêt à livrer +0 +conforme +— +1 /);
     expect(out).toContain('vague 2026-10-04-1412 : ');
     expect(out).toContain('2 prêt(s)');

@@ -70,7 +70,7 @@ describe('L518 R2 — la vague mesure les rejeux de la suite par lot', () => {
     await runLot(c);
     expect(c.lot.suiteRuns).toBe(1);
     const t = renderTable(wave, [c.lot]);
-    expect(t[0]).toMatch(/durée +suites$/);
+    expect(t[0]).toMatch(/durée +après revue +suites$/);
     expect(t[1]).toMatch(/ +1$/);
   });
 

@@ -1,0 +1,168 @@
+sujet:
+  id: goal-lot-retreci
+  titre: "orchestrate : un objectif qui rétrécit un lot aux commits déjà intégrés saute la maquette, et les revues jugent le diff de l'objectif"
+  lot: L621
+  perimetre:
+    modules: [src/orchestrate/preflight.ts, src/orchestrate/spec.ts, src/orchestrate/cycle/converge.ts, src/orchestrate/cycle/shared.ts, src/orchestrate/cycle/review.ts, src/orchestrate/cycle/brief.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "la revue UX (kind ux) : elle n'a pas de marque inchange (converge.ts:30), inchangée"
+      - "la passe des mineurs et leurs propositions (review.ts, fix-minors) : inchangées"
+      - "un lot spec: true sans écran (fiche back) : son étape spec n'est pas une maquette, inchangée"
+      - "la syntaxe de --goal et de la clé goal: du plan : inchangée (command-args.ts:140-145)"
+
+# Constat de l'issue #40 : un lot déjà en grande partie intégré, relancé avec --goal « les quatre correctifs restants »,
+# repasse par spec → maquette (lot visible, spec.ts:45 lightMaquette) alors que l'objectif ne touche pas la mise en page ;
+# ses revues jugent tous les commits du lot (review.md : « read the diff from the commits that cite the lot ») et un constat
+# hors objectif achète une passe de correction au rang 1 (setAsideUnchanged ne met de côté qu'à partir du rang 2, shared.ts:41).
+# Résultat mesuré : 74 min et 1,28 M pour un commit de quatre correctifs.
+# Déjà codé et conservé : L258 (goal gardé dans l'état du lot, briefs.ts:251-255), L622 (marque inchange de rang 2 ou plus,
+# converge.ts:11-17, shared.ts:36-41), L459 (maquette légère, spec.ts:45).
+
+cas:
+  - id: C1
+    titre: "Le lead lance un lot visible avec un --goal qui le rétrécit aux commits déjà intégrés"
+    acteur: le lead
+    declencheur: commande cadence orchestrate <projet>:<lot> --goal "…" (préflight, preflight.ts:168-170)
+    preconditions:
+      - "le lot est visible et répondrait à une étape spec → maquette (maquette légère ou écran)"
+      - "au moins un commit du lot est déjà dans la branche de base au lancement"
+      - "un objectif est donné (--goal, ou clé goal: du plan)"
+    nominal:
+      - "Le programme constate que le lot a des commits déjà intégrés et un objectif."
+      - "Il lit l'objectif : aucun mot de mise en page."
+      - "Il lance le lot sans étape spec ni maquette : la première session est l'implémentation."
+      - "Il écrit une ligne dans le journal de la vague qui dit pourquoi la maquette est sautée."
+    alternatives:
+      - { si: "l'objectif dit changer la mise en page (disposition, écran, affichage, layout…)", alors: "la maquette est jouée comme avant", regles: [R3] }
+      - { si: "aucun commit du lot n'est intégré, ou aucun objectif n'est donné", alors: "le lot suit le chemin ordinaire, maquette comprise", regles: [R1, R5] }
+      - { si: "le lot a une acceptation scellée (entré dans la chaîne complète)", alors: "il garde sa chaîne et son verrou, maquette comprise", regles: [R4] }
+      - { si: "le lot est spec: true sans écran", alors: "son étape spec (fiche back) est inchangée", regles: [R5] }
+      - { si: "la vague est reprise (--resume)", alors: "la décision du lancement n'est pas rejouée ni inversée", regles: [R12] }
+    resultat: "Un lot rétréci à des correctifs ne paie pas une maquette ; l'objectif qui change la mise en page la garde."
+  - id: C2
+    titre: "La revue de code d'un lot rétréci juge le diff de l'objectif contre l'objectif"
+    acteur: la vague (programme orchestrate), puis la session de revue
+    declencheur: commande cadence orchestrate (fin de l'implémentation d'un lot rétréci, brief review ou review-small)
+    preconditions:
+      - "le lot a été rétréci au lancement (R1)"
+      - "la session d'écriture a commité"
+    nominal:
+      - "Le brief de revue nomme le diff à juger (les commits depuis la tête de lancement) et l'objectif, et dit que les commits déjà intégrés ne sont pas jugés."
+      - "La revue, dès son rang 1, marque inchange: true un majeur hors objectif et hors lignes changées."
+      - "Le programme met ce majeur de côté : proposition « [suite code] … » pour le lead."
+      - "Le lot est conforme sans passe de correction."
+    alternatives:
+      - { si: "le constat est un bloquant (perte de données, sécurité, suite rouge)", alors: "il bloque et achète une passe, marqué ou non", regles: [R8] }
+      - { si: "le majeur est dans l'objectif ou dans une ligne changée", alors: "il compte et ouvre la passe de correction comme avant", regles: [R7, R9] }
+      - { si: "le lot n'est pas rétréci", alors: "la revue de rang 1 n'a aucune marque, rien ne change", regles: [R10] }
+    resultat: "Un constat hors objectif revient en suite proposée au lead, sans passe de correction."
+  - id: C3
+    titre: "Le lead donne un --goal mal formé"
+    acteur: le lead
+    declencheur: commande cadence orchestrate <projet>:<lot> --goal
+    preconditions:
+      - "--goal sans texte, suivi d'une option, ou avec plusieurs lots"
+    nominal:
+      - "Le programme refuse avant toute session payante, avec le message déjà codé."
+    alternatives: []
+    sans_alternative: "refus codé de L258 (command-args.ts:140-145, command.ts:130), conservé tel quel ; il n'y a pas d'autre branche"
+    resultat: "Aucune vague lancée, la cause et la correction sont dites."
+
+regles:
+  - id: R1
+    cas: [C1, C2]
+    enonce: "Un lot est rétréci quand un objectif est donné (--goal, sinon clé goal: du plan) et qu'au moins un commit de travail du lot est déjà dans la branche de base au lancement (commits du lot lus par le plan, lotWork)."
+    statut: sourcee
+    source: "demande du lot : « un --goal ou goal: qui rétrécit un lot aux commits déjà intégrés » ; objectif choisi preflight.ts:168 (args.goal ?? lot.goal) ; commits du lot audit.ts:288 (lotWork)"
+    tests: ["R1 — objectif donné et un commit du lot dans la base : lot rétréci", "R1 — goal: du plan sans --goal : même résultat", "R1 — objectif sans aucun commit du lot : lot non rétréci"]
+  - id: R2
+    cas: [C1]
+    enonce: "Un lot rétréci dont l'objectif ne change pas la mise en page est lancé sans étape spec ni maquette : aucun screen dans son état, première session implement, budget de l'implémentation seule ; le journal de la vague dit « maquette sautée : l'objectif rétrécit le lot à N commit(s) déjà intégré(s) et ne change pas la mise en page »."
+    statut: sourcee
+    source: "demande du lot : « saute la maquette sauf si l'objectif change la mise en page » ; étape spec décidée par stageScreen (spec.ts:63) et firstWrite (cycle/spec-steps.ts:44-48)"
+    tests: ["R2 — lot visible rétréci, objectif sans mise en page : aucune session spec ni maquette, première session implement", "R2 — la ligne « maquette sautée » est au journal avec le nombre de commits intégrés", "R2 — le budget du lot est celui d'un lot sans étape spec"]
+  - id: R3
+    cas: [C1]
+    enonce: "L'objectif change la mise en page quand son texte, sans accents ni majuscules, contient un de ces mots : mise en page, layout, disposition, maquette, ecran, affichage, colonne, grille, responsive. Alors la maquette est jouée comme avant."
+    statut: hypothese
+    si_faux: "Si la liste est trop large ou trop courte, seul le choix de jouer ou sauter la maquette change (un mot à ajouter ou à retirer, comme la liste COSTLY de spec.ts:81) ; aucune donnée en jeu."
+    tests: ["R3 — objectif « changer la disposition de la liste » : maquette jouée", "R3 — objectif « corriger quatre erreurs de calcul » : maquette sautée", "R3 — mot de mise en page avec accent ou majuscule (« Écran », « Mise en page ») reconnu"]
+  - id: R4
+    cas: [C1]
+    enonce: "Un lot qui a une acceptation scellée garde sa chaîne complète (spec, maquette, accept) même rétréci."
+    statut: sourcee
+    source: "spec.ts:49-56 (sealedAcceptation : entré dans la chaîne, « la garde ») et spec.ts:59 (lightLot)"
+    tests: ["R4 — lot rétréci avec acceptation scellée : étape spec conservée"]
+  - id: R5
+    cas: [C1]
+    enonce: "Sans objectif, sans commit intégré, ou pour un lot spec: true sans écran, le choix de l'étape spec est celui d'aujourd'hui, inchangé."
+    statut: sourcee
+    source: "comportement codé spec.ts:63-65 (stageScreen), preflight.ts:170 (specLot) et tests de maquette-legere-lots-visibles"
+    tests: ["R5 — lot visible sans objectif : maquette jouée comme avant", "R5 — lot spec: true rétréci : session spec de la fiche back conservée"]
+  - id: R6
+    cas: [C2]
+    enonce: "Le brief des revues de code d'un lot rétréci porte une consigne : juger le diff des commits postérieurs à la tête de lancement contre l'objectif, ne pas juger les commits déjà intégrés (contexte seulement) ; la consigne nomme le diff (la plage de commits) et l'objectif."
+    statut: hypothese
+    si_faux: "Si le texte est jugé insuffisant, seule la formulation du gabarit change ; le programme n'en dépend pas pour compter."
+    tests: ["R6 — brief review d'un lot rétréci : consigne, plage de commits et objectif présents", "R6 — brief review-small d'un lot rétréci : même consigne", "R6 — brief d'un lot non rétréci : aucune consigne ajoutée"]
+  - id: R7
+    cas: [C2]
+    enonce: "Pour un lot rétréci, la marque inchange: true d'un majeur hors objectif et hors lignes changées vaut dès la revue de code de rang 1 (elle ne valait qu'à partir du rang 2) : le majeur marqué ne compte pas pour la conformité."
+    statut: sourcee
+    source: "demande du lot : « un constat hors objectif revient en suite proposée, sans passe de correction » ; règle codée shared.ts:36-41 (rank >= 2) et converge.ts:11-17 (L622), étendue ici au rang 1 du lot rétréci"
+    tests: ["R7 — lot rétréci, revue 1 avec un majeur inchange: true : lot conforme, aucune passe de correction", "R7 — lot rétréci, majeur sans marque : il compte et ouvre la passe", "R7 — lot rétréci : un majeur marqué déjà signalé par la revue précédente compte (fausse marque, converge.ts:47)"]
+  - id: R8
+    cas: [C2]
+    enonce: "Un bloquant achète toujours une passe de correction, marqué inchange ou non, rétréci ou non."
+    statut: sourcee
+    source: "converge.ts:17 et shared.ts:41 (seul un majeur se met de côté) ; L622"
+    tests: ["R8 — lot rétréci, bloquant marqué inchange: true : la passe de correction s'ouvre"]
+  - id: R9
+    cas: [C2]
+    enonce: "Un majeur mis de côté devient une proposition « [suite code] <fichier:ligne — texte> » et une note dans le verdict conforme (« conforme, N majeur(s) sur un point inchangé en suite pour le lead : … ») ; un majeur dans l'objectif ou dans les lignes changées compte comme avant."
+    statut: sourcee
+    source: "shared.ts:44-56 (asideNote), converge.ts:23 (préfixe [suite code]) et converge.ts:60-70"
+    tests: ["R9 — majeur mis de côté d'un lot rétréci : proposition « [suite code] … » et verdict conforme avec la note", "R9 — majeur dans l'objectif : il compte"]
+  - id: R10
+    cas: [C2]
+    enonce: "Un lot non rétréci garde le comportement de L622 : aucune marque en revue de rang 1, marque valable à partir du rang 2."
+    statut: sourcee
+    source: "shared.ts:41 (rank >= 2), converge.ts:30 (reviewRank) et tests de L622"
+    tests: ["R10 — lot non rétréci, revue 1 avec un majeur inchange: true : il compte", "R10 — lot non rétréci, revue 2 : marque valable comme avant"]
+  - id: R11
+    cas: [C3]
+    enonce: "Les refus de --goal restent ceux de L258, aux mêmes messages (contrat A1)."
+    statut: sourcee
+    source: "src/orchestrate/command-args.ts:143-145 et src/orchestrate/command.ts:130"
+    tests: ["R11 — --goal sans texte : « --goal attend un texte non vide »", "R11 — --goal suivi d'une option : « --goal attend un texte, pas l'option … »", "R11 — --goal avec deux lots : refus « --goal s'applique à un seul lot lancé … »"]
+  - id: R12
+    cas: [C1]
+    enonce: "Le rétrécissement est décidé une fois, au lancement, et se lit sans nouveau champ : l'objectif gardé dans l'état du lot (LotState.goal), l'absence d'étape spec dans cet état et la tête avant la première étape (steps[].headBefore). Une reprise (--resume) ne le rejoue pas : les commits écrits par la vague ne rendent jamais un lot rétréci après coup, et n'enlèvent pas l'état rétréci."
+    statut: hypothese
+    si_faux: "Si la lecture sans champ est impossible, un champ optionnel du fichier d'état de la vague est ajouté ; les anciens fichiers, sans le champ, se lisent « non rétréci » (R5, R10) : aucune migration, la forme de l'état d'une vague en cours est inchangée."
+    tests: ["R12 — reprise d'une vague : un lot rétréci le reste, un lot non rétréci ne le devient pas avec les commits de la vague", "R12 — état d'une vague écrite avant ce lot : lu non rétréci, comportement inchangé"]
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate <projet>:<lot> --goal "…"
+    entree: "un lot, un objectif (--goal, ou goal: du plan)"
+    sortie: "lot rétréci sans mise en page : lancé sans spec ni maquette, ligne au journal ; sinon lancé comme avant"
+    erreurs:
+      - { code: log error, message: "--goal attend un texte non vide" }
+      - { code: log error, message: "--goal attend un texte, pas l'option <option>" }
+      - { code: log error, message: "--goal s'applique à un seul lot lancé : <projet>:<lot> --goal \"…\" (plusieurs lots : la clé goal: de chacun)" }
+      - { code: log info, message: "maquette sautée : l'objectif rétrécit le lot à N commit(s) déjà intégré(s) et ne change pas la mise en page" }
+    regles: [R1, R2, R3, R4, R5, R11, R12]
+  - id: A2
+    appel: commande cadence orchestrate (revue de code d'un lot rétréci)
+    entree: "le rapport de revue (constats avec gravité et marque inchange)"
+    sortie: "majeurs hors objectif mis de côté en propositions « [suite code] … », lot conforme sans passe ; bloquant et majeur dans l'objectif : passe comme avant"
+    erreurs: []
+    sans_erreur: "un rapport illisible est refusé par le chemin existant (badReport, review.ts) ; ce lot n'ajoute aucun échec"
+    regles: [R6, R7, R8, R9, R10]
+
+donnees:
+  - { id: D1, objet: "état du lot de la vague (goal, screen, steps[].headBefore ; .cadence/runs/<vague>/…json)", existant: true, modification: aucune, note: "champs relus, aucun champ ajouté (R12) ; sans screen, le lot n'a pas d'étape spec" }
+  - { id: D2, objet: "propositions du lot (proposals) et journal de la vague", existant: true, modification: aucune, note: "tableau de textes existant ; entrées « [suite code] … » et une ligne « maquette sautée » de plus, format inchangé" }

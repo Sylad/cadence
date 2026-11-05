@@ -2283,6 +2283,8 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    notes:
+      - { date: 2026-11-05, text: "05-11 02 h 45 (correctif Fable, non commité) : non reproduit dans 6 environnements (env -i, conteneur ubuntu 24.04 + git 2.56 + Node 22, cpus 1.5, suite complète ×2) ; rouge en CI seulement sur Node 22 (3/3) et le publish Node 24 (1/1), tests(24) vert 3/3, 1970 ms en CI contre ~550 ms ailleurs. Hypothèse mesurée : dépôt solo posé à la racine temporaire PARTAGÉE de la suite → readyFree/sharingProjects scanne ses frères (centaines de dépôts d'autres tests en parallèle). Correctif proposé côté test : repo = join(tempDir(), 'solo'). Preuve à obtenir par une branche diag/** qui imprime le journal de la vague quand le code ≠ 0. Image Docker cadence-ci-repro en cache." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

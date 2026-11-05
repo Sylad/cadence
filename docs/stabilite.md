@@ -8,17 +8,26 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 **Guaranteed**
 
 - **Commands and options** of `raf` and `cadence` (`cadence raf …` is `raf …`): `init`, `add`, `start`, `done`, `drop`,
-  `note`, `did`, `public`, `screen`, `spec`, `visible`, `ux`, `review`, `commits`, `show`, `list`, `export`, `events`, `now`, `ignore`, `check`, `gantt`, `hook`;
+  `archive`, `status`, `todo`, `note`, `did`, `title`, `import`, `migrate`, `move`, `estimate`, `public`, `screen`, `spec`, `visible`, `ux`, `review`, `commits`, `show`, `list`, `export`, `events`, `now`, `ignore`, `check`, `gantt`, `hook`;
   `cadence news`, `session` (`start`, `close`, `next`, `context`), `lead tour`, `corrections`, `deliver`, `verify`, `orchestrate`,
   `skills`, `spec` (`cadence spec <lot> on|off` is `raf spec`; `check`, `qa`: exit **0** when the sheet is valid and the section is printed, **1** with violations, **2** on a missing or unreadable file or a wrong usage);
   their options and exit codes as the pages [raf](raf.md), [orchestrate](orchestrate.md), [deliver](deliver.md), [spec](spec.md), [news](news.md), [session](session.md), [lead](lead.md), [corrections](corrections.md) and [skills](skills.md) document them. A new command or option is a minor change.
-- **The keys of `cadence.yaml`**: `plan`, `news`, `hook`, `session`, `deliver`, `orchestrate`, `docs`, `qa`, `priority`, `depth`, `lead` (`lead.ux`)
+- **The keys of `cadence.yaml`**: `plan`, `news`, `hook`, `session`, `deliver`, `orchestrate`, `docs`, `qa`, `priority`, `depth`, `lead` (`lead.ux`),
+  `verify` (`inPlace`, [deliver](deliver.md)), `migrate` and `resources` ([raf](raf.md))
   and the keys each of them takes (`docs`: `sync`, `since`, `articles`; `docs.articles` names both the article refreshed after a delivery and the outside documents the `doc-keeper` agent proposes lots for). A key is not renamed nor removed, nor does its meaning change; a new key is a minor change.
 - **The plan file** (`.cadence/raf.yaml`, or the legacy `docs/plan/raf.yaml`): `project`, `prefix`, `since`, `ignore`, `lots` (with their
   fields, `tasks`, `notes`, `repos`) and `acknowledged`, and the plan formats `plan:` in `cadence.yaml` can read.
   The `version` key is kept in the file but ignored (`src/plan.ts` does not read it): it is not a schema version.
 - **The names of the skills** (`session-start`, `session-close`, `deliver`, `lead`) **and of the agents**
   (`ux-reviewer`, `code-reviewer`, `qa-reviewer`, `doc-keeper`).
+
+**Experimental** (documented, read by the code, but the contract is not frozen: a release may change or replace it, announced under *Changed* in the [CHANGELOG](../CHANGELOG.md))
+
+- **Subcommands of `raf`**: `quickwins` (the threshold of a « small lot » is read under three names, `express`, `light` and `small`, that are to become one), `uses` (follows the `resources` table it checks against), `plan` (the plan file location and format it reports follow the plan reader, which is to be split from the native plan) and `docs-ok` (the same notion is spelled three ways, `docs-ok`, `docs_ok` and `docsOk`).
+- **Tools of `cadence`**: `ref` (reference documents: its options still grow with the documents studied, and it needs outside programs), `perf` (a dashboard whose measures and thresholds are tuned), `local`, `release` and `config` (the lead's own tools, shaped by how the lead works, not by a project's scripts), and `claude-hook` (the Bash hook of the plugin, called by `hooks/hooks.json`, not by hand: its output follows the refusals it recognises).
+- **Keys of `cadence.yaml`**: `references` (the setting of `cadence ref`) and `perf` (the setting of `cadence perf`): each follows its tool.
+
+Promoting one of these to *Guaranteed* is a minor change, and calling a surface experimental commits cadence to nothing.
 
 **Not guaranteed** (may change in any release)
 

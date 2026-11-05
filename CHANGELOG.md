@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- [docs/stabilite.md](docs/stabilite.md) says the status of every surface the code reads (L605): the guaranteed list gains `archive`, `status`, `todo`, `title`, `import`, `migrate`, `move`, `estimate` and the `verify` (`inPlace`), `migrate` and `resources` keys of `cadence.yaml`; a new *Experimental* list names `quickwins`, `uses`, `plan`, `docs-ok`, `ref`, `perf`, `local`, `release`, `config`, `claude-hook` and the `references` and `perf` keys, each with its reason. Nothing guaranteed changes; a test compares the page with the dispatch tables of `src/cli.ts`, `bin/cadence.js` and the root keys read, so a new tool, subcommand or key must take a place in one of the two lists.
+
 ### Fixed
 
 - A lot that touches `CHANGELOG.md` plays `test/changelog.test.ts` in its targeted gate (L616, [docs/orchestrate.md](docs/orchestrate.md), « Targeted gates after a write »): no test imports the changelog, so the targeted run never saw an entry written under the last published version instead of `[Unreleased]` (L582, L591, L613 on 05-11, refused only at the integrated tip). The implementation brief names the rule.

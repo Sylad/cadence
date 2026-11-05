@@ -2,7 +2,7 @@
 
 # Reviews that converge: first-time compliance and passes per lot (L622, issue #41)
 
-What the lot changes is described in [docs/orchestrate.md](../orchestrate.md#reviews-converge-follow-ups-and-a-wall-cap-l622): from the second code review a major on a point the lot did not touch goes to the follow-ups (`[suite code]`) instead of buying a correction pass, and a lot above twice its expected wall is handed back with its findings instead of a new pass.
+What the lot changes is described in [docs/orchestrate-cycle.md](../orchestrate-cycle.md#reviews-converge-follow-ups-and-a-wall-cap-l622): from the second code review a major on a point the lot did not touch goes to the follow-ups (`[suite code]`) instead of buying a correction pass, and a lot above twice its expected wall is handed back with its findings instead of a new pass.
 
 ## Two indicators
 

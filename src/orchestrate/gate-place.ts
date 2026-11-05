@@ -4,6 +4,7 @@
 import type { OrchestrateConfig } from '../config.js';
 import { GATE_TIMEOUT_MS, isSha, openRemoteGate, type Ran, type RemoteGate } from '../remote-gate.js';
 import { configuredCap } from './command.js';
+import { GATE_HOST_DEFAULT, hostGates } from './gate-host-slots.js';
 import { testWorkersFrom } from './workers.js';
 import { trackedDirty, untrackedFiles } from './worktree.js';
 
@@ -12,6 +13,8 @@ export interface Place {
   run(command: string): Promise<Ran>;
   /** Le lieu à inscrire avec le résultat d'un contrôle (hôte, sha court, cache) ; vide pour une porte locale, donc rien de plus dans l'état qu'avant. */
   stamp(): { lieu?: string };
+  /** Vrai tant que les commandes tournent sur l'hôte (L624) : faux pour une porte locale et, une fois la connexion perdue, pour la commande rejouée ici. */
+  remote(): boolean;
   close(): void;
 }
 
@@ -35,8 +38,19 @@ export interface PlaceOpts {
   env?: Record<string, string | undefined>;
 }
 
-const localPlace = (local: PlaceOpts['local']): Place => ({ run: local, stamp: () => ({}), close: () => {} });
+const localPlace = (local: PlaceOpts['local']): Place => ({ run: local, stamp: () => ({}), remote: () => false, close: () => {} });
 
+
+/** L624 : l'hôte a sa borne de portes simultanées ; la porte qui attend son tour le dit. Rend la libération du créneau de l'hôte. */
+async function takeHostTurn(o: PlaceOpts, host: string): Promise<() => void> {
+  const limit = o.config.gate?.maxParallel ?? GATE_HOST_DEFAULT;
+  const turn = hostGates(host).acquire(limit);
+  // `turn` déjà tenue (créneau libre) gagne la course contre le null résolu : seul un vrai tour d'attente se dit.
+  const free = await Promise.race([turn, Promise.resolve(null)]);
+  if (free) return free;
+  o.say(`${o.label} : en attente d'un créneau de porte sur ${host} (${limit} porte(s) simultanée(s) au plus)`);
+  return turn;
+}
 
 /**
  * Ouvre le lieu de la porte. Sans `gate.host`, ou quand l'hôte ne peut pas porter la porte (arbre non validé R7, hôte injoignable, push ou cache impossible R4/R5), la porte est locale et la ligne dit pourquoi.
@@ -57,9 +71,11 @@ async function openPlace(o: PlaceOpts): Promise<Place> {
     o.say(`${o.label} : sha invalide pour la porte déportée (hexadécimal attendu), jouée en local`);
     return localPlace(o.local);
   }
+  const release = await takeHostTurn(o, host);
   const env = o.env ?? process.env;
   const opened = await openRemoteGate({ host, install: o.config.gate?.install, refs: o.config.gate?.refs, repo: o.repo, sha: o.sha, depsFrom: o.repo, worktreeDeps: o.config.worktreeDeps, env, timeoutMs: GATE_TIMEOUT_MS, workers: (cores) => testWorkersFrom(env, cores, configuredCap(env)) });
   if (!opened.ok) {
+    release();
     o.say(opened.stage === 'host' ? `${o.label} : porte déportée indisponible sur ${host} (${opened.cause}) — jouée en local` : `${o.label} : cache de dépendances impossible sur ${host} (${opened.cause}) — jouée en local`);
     return localPlace(o.local);
   }
@@ -73,11 +89,14 @@ async function openPlace(o: PlaceOpts): Promise<Place> {
       const r = await gate.run(command, GATE_TIMEOUT_MS);
       if (!r.lost) return r;
       lost = true;
+      release(); // la commande rejouée ici ne pèse plus sur l'hôte
       o.say(`${o.label} : connexion perdue avec ${host} pendant la porte — rejouée en local${o.detail ? ` ${o.detail}` : ''}`);
       return o.local(command);
     },
     stamp: () => ({ lieu: lost ? `local (connexion perdue avec ${host})` : where }),
+    remote: () => !lost,
     close: () => {
+      release();
       const orphan = gate.close();
       if (orphan) o.say(`${o.label} : nettoyage de l'hôte ${host} en échec (${orphan}) — le worktree orphelin y sera retiré au prochain appel`);
     },

@@ -130,6 +130,7 @@ export function setGate(c: LotCtx, gate: LotState['gate']): void {
   c.lot.gate = gate;
   save(c);
   c.wave.slotsChanged?.();
+  c.turnChanged?.(); // L624 : la file du pool se recompte, une porte sur l'hôte rend le créneau du lot
 }
 
 /** Le lot entre dans l'attente de son tour d'intégration ou en sort (L591) : le registre recompte ses créneaux et le pool, ses files. */

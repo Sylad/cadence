@@ -101,8 +101,11 @@ export function resourceLock(running: Map<Promise<void>, LotCtx[]>, live: Set<Lo
   };
 }
 
-/** Les files qui tiennent un créneau (L591) : celle dont le lot attend son tour d'intégration n'en occupe pas ; il le reprend sans le redemander (les files en cours peuvent alors dépasser `slots` le temps de sa revue courte). */
-const holdingSlots = (running: Map<Promise<void>, LotCtx[]>): number => [...running.values()].filter((q) => !q.some((c) => c.waitsTurn)).length;
+/**
+ * Les files qui tiennent un créneau (L591) : celle dont le lot attend son tour d'intégration n'en occupe pas ; il le reprend sans le redemander (les files en cours peuvent alors dépasser `slots` le temps de sa revue courte).
+ * L624 : celle dont le lot joue sa porte sur l'hôte `gate.host` non plus (aucune session claude, aucun processeur local) ; la porte finie, le lot reprend sa place pour la suite, comme à l'intégration.
+ */
+const holdingSlots = (running: Map<Promise<void>, LotCtx[]>): number => [...running.values()].filter((q) => !q.some((c) => c.waitsTurn || c.lot.gate?.remote)).length;
 
 /** Réveille l'ordonnanceur quand un lot entre dans l'attente de son tour d'intégration ou en sort (L591) : `arm` à chaque tour, avant de compter les files, `poked` pour l'attendre. */
 function turnWatch(): { hear: (c: LotCtx) => void; arm: () => void; poked: () => Promise<void> } {

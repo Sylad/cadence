@@ -58,7 +58,7 @@ async function runChecks(c: LotCtx, red: Constat[], runs: CheckRun[], place: Pla
   const l = c.lot;
   for (const [label, command] of [['build', c.config.build], ['tests', c.config.test]] as const) {
     if (!command) continue;
-    setGate(c, { label, started: new Date().toISOString() });
+    setGate(c, { label, started: new Date().toISOString(), ...(place.remote() ? { remote: true as const } : {}) });
     // Tests : ciblés sur les fichiers du lot ou suite complète (L590) ; build et suite complète comme avant. `settle` : le rouge de charge que le rejeu seul a absous passe à 0 dans le CheckRun et dans la liste des portes.
     const { r, run, settle } = await playTests(c, place, label, command, portee);
     runs.push(run);

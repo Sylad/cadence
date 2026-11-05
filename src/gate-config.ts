@@ -36,21 +36,28 @@ function refsOf(v: unknown, bad: Bad): string[] {
   return v.map((x: string) => x.trim());
 }
 
+/** `gate.maxParallel` (L624) : un entier positif. */
+function maxParallelOf(v: unknown, bad: Bad): number {
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < 1) throw bad('gate.maxParallel : entier positif attendu (portes simultanées au plus sur l\'hôte)');
+  return v;
+}
+
 /**
- * Clé `orchestrate.gate` de cadence.yaml : `readsPlan` (L450), `host`, `install` (L403) et `refs` (L617). Rend undefined quand elle ne déclare rien d'actif (`readsPlan: false` seul) ;
+ * Clé `orchestrate.gate` de cadence.yaml : `readsPlan` (L450), `host`, `install` (L403), `refs` (L617) et `maxParallel` (L624). Rend undefined quand elle ne déclare rien d'actif (`readsPlan: false` seul) ;
  * `host` ou `install` seuls posent la clé sans `readsPlan` : déclarer l'hôte ne vaut pas déclarer que des tests lisent le plan (R11).
  * `bad` fabrique l'erreur de config préfixée (`cadence.yaml : orchestrate.<what>`).
  */
 export function readGate(raw: unknown, bad: Bad): Gate | undefined {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw bad('gate : objet attendu (gate: { readsPlan: true })');
   const o = raw as Record<string, unknown>;
-  for (const k of Object.keys(o)) if (!['readsPlan', 'host', 'install', 'refs'].includes(k)) throw bad(`gate.${k} inconnu (attendu : readsPlan, host, install, refs)`);
-  const readsPlan = readsPlanOf(o.readsPlan, bad, o.host != null || o.install != null || o.refs != null);
+  for (const k of Object.keys(o)) if (!['readsPlan', 'host', 'install', 'refs', 'maxParallel'].includes(k)) throw bad(`gate.${k} inconnu (attendu : readsPlan, host, install, refs, maxParallel)`);
+  const readsPlan = readsPlanOf(o.readsPlan, bad, o.host != null || o.install != null || o.refs != null || o.maxParallel != null);
   const gate: Gate = {
     ...(readsPlan ? { readsPlan } : {}),
     ...(o.host != null ? { host: hostOf(o.host, bad) } : {}),
     ...(o.install != null ? { install: installOf(o.install, bad) } : {}),
     ...(o.refs != null ? { refs: refsOf(o.refs, bad) } : {}),
+    ...(o.maxParallel != null ? { maxParallel: maxParallelOf(o.maxParallel, bad) } : {}),
   };
   return Object.keys(gate).length ? gate : undefined;
 }

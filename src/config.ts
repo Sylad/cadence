@@ -225,6 +225,8 @@ export interface OrchestrateConfig {
     install?: string;
     /** `gate.refs` (L617) : références git (`main`, `origin/main`…) poussées avec le sha, pour qu'une commande de la porte qui les lit (merge-base, diff contre main) les trouve sur l'hôte. */
     refs?: string[];
+    /** `gate.maxParallel` (L624) : portes simultanées au plus sur l'hôte (entier positif ; défaut 2) ; la suivante attend qu'une porte libère l'hôte. Sans effet sans `host`. */
+    maxParallel?: number;
   };
   /**
    * Commande dédiée de l'étape accept (L173, spec etape-spec S5) : ne lance QUE les tests d'acceptation du lot (config du lanceur

@@ -25,7 +25,7 @@ const lot = (over: Partial<LotState> = {}): LotState =>
 const step = (kind: string, counted: number) => ({ kind, status: 'done', tokens: { counted, cacheRead: 0 } }) as unknown as LotState['steps'][number];
 const constat = (source: 'code' | 'tests' | 'ux') => ({ source, gravite: 'bloquant', fichier: 'f.ts', ligne: 1, texte: 'à corriger' }) as unknown as LotState['constats'][number];
 const ctxOf = (l: LotState): LotCtx =>
-  ({ wave: { id: 'W2', store: { writeLot: () => {} }, log: () => {} }, lot: l, config: {}, loadPlan: () => ({ lot: () => ({ visible: false }) }) }) as unknown as LotCtx;
+  ({ wave: { id: 'W2', store: { writeLot: () => {} }, log: () => {} }, lot: l, config: { timeouts: { work: 45 * 60_000 } }, loadPlan: () => ({ lot: () => ({ visible: false }) }) }) as unknown as LotCtx;
 const pair = (old: Partial<LotState>) => ({ fresh: ctxOf(lot({ status: 'queued', next: null, outcome: null, pass: 0, steps: [], constats: [], budget: 100 })), old: ctxOf(lot(old)) });
 
 describe('L563 sonde — R13 addableHandBack aux bords', () => {

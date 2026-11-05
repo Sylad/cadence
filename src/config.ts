@@ -223,6 +223,8 @@ export interface OrchestrateConfig {
     host?: string;
     /** `gate.install` (L403) : commande qui installe les dépendances, jouée sur l'hôte dans un worktree au sha pour remplir le cache de l'empreinte des lockfiles. */
     install?: string;
+    /** `gate.refs` (L617) : références git (`main`, `origin/main`…) poussées avec le sha, pour qu'une commande de la porte qui les lit (merge-base, diff contre main) les trouve sur l'hôte. */
+    refs?: string[];
   };
   /**
    * Commande dédiée de l'étape accept (L173, spec etape-spec S5) : ne lance QUE les tests d'acceptation du lot (config du lanceur

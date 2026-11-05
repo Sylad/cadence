@@ -28,9 +28,14 @@ describe('L403 — orchestrate.gate.host et gate.install (C3)', () => {
     expect(cfg('    host: user@machine\n')().gate?.host).toBe('user@machine');
   });
 
-  it('R14 — gate: {dir: x} refusé comme clé inconnue, les clés acceptées sont readsPlan, host et install', () => {
-    expect(cfg('    dir: x\n')).toThrow(/gate\.dir inconnu \(attendu : readsPlan, host, install\)/);
-    expect(cfg('    host: m\n    install: npm ci\n    readsPlan: true\n')().gate).toEqual({ host: 'm', install: 'npm ci', readsPlan: true });
+  it('R14 — gate: {dir: x} refusé comme clé inconnue, les clés acceptées sont readsPlan, host, install et refs', () => {
+    expect(cfg('    dir: x\n')).toThrow(/gate\.dir inconnu \(attendu : readsPlan, host, install, refs\)/);
+    expect(cfg('    host: m\n    install: npm ci\n    readsPlan: true\n    refs: [main]\n')().gate).toEqual({ host: 'm', install: 'npm ci', readsPlan: true, refs: ['main'] });
+  });
+
+  it('L617 R4 — gate.refs : une liste non vide de noms de référence sans espace ni « - » initial, sinon refusée', () => {
+    for (const v of ['[]', '""', '[""]', '["a b"]', '["-x"]', '[1]', 'main']) expect(cfg(`    host: m\n    refs: ${v}\n`), v).toThrow(/orchestrate\.gate\.refs : liste de références git attendue/);
+    expect(cfg('    host: m\n    refs: [main, origin/main]\n')().gate?.refs).toEqual(['main', 'origin/main']);
   });
 
   it('R15 — gate.install vide refusé', () => {

@@ -30,20 +30,27 @@ function installOf(v: unknown, bad: Bad): string {
   return v.trim();
 }
 
+/** `gate.refs` (L617) : une liste non vide de noms de référence git, chacun sans espace ni « - » initial (git push l'y lirait comme une option). */
+function refsOf(v: unknown, bad: Bad): string[] {
+  if (!Array.isArray(v) || !v.length || !v.every((x) => typeof x === 'string' && !!x.trim() && !/\s/.test(x.trim()) && !x.trim().startsWith('-'))) throw bad('gate.refs : liste de références git attendue (des noms sans espace, ne commençant pas par « - », comme main ou origin/main)');
+  return v.map((x: string) => x.trim());
+}
+
 /**
- * Clé `orchestrate.gate` de cadence.yaml : `readsPlan` (L450), `host` et `install` (L403). Rend undefined quand elle ne déclare rien d'actif (`readsPlan: false` seul) ;
+ * Clé `orchestrate.gate` de cadence.yaml : `readsPlan` (L450), `host`, `install` (L403) et `refs` (L617). Rend undefined quand elle ne déclare rien d'actif (`readsPlan: false` seul) ;
  * `host` ou `install` seuls posent la clé sans `readsPlan` : déclarer l'hôte ne vaut pas déclarer que des tests lisent le plan (R11).
  * `bad` fabrique l'erreur de config préfixée (`cadence.yaml : orchestrate.<what>`).
  */
 export function readGate(raw: unknown, bad: Bad): Gate | undefined {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw bad('gate : objet attendu (gate: { readsPlan: true })');
   const o = raw as Record<string, unknown>;
-  for (const k of Object.keys(o)) if (!['readsPlan', 'host', 'install'].includes(k)) throw bad(`gate.${k} inconnu (attendu : readsPlan, host, install)`);
-  const readsPlan = readsPlanOf(o.readsPlan, bad, o.host != null || o.install != null);
+  for (const k of Object.keys(o)) if (!['readsPlan', 'host', 'install', 'refs'].includes(k)) throw bad(`gate.${k} inconnu (attendu : readsPlan, host, install, refs)`);
+  const readsPlan = readsPlanOf(o.readsPlan, bad, o.host != null || o.install != null || o.refs != null);
   const gate: Gate = {
     ...(readsPlan ? { readsPlan } : {}),
     ...(o.host != null ? { host: hostOf(o.host, bad) } : {}),
     ...(o.install != null ? { install: installOf(o.install, bad) } : {}),
+    ...(o.refs != null ? { refs: refsOf(o.refs, bad) } : {}),
   };
   return Object.keys(gate).length ? gate : undefined;
 }

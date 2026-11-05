@@ -134,6 +134,8 @@ interface OpenOpts {
   host: string;
   /** `orchestrate.gate.install` : remplit un cache absent, sur l'hôte (R15). */
   install?: string;
+  /** `orchestrate.gate.refs` : références locales poussées avec le sha (L617). */
+  refs?: string[];
   /** Dépôt local qui porte le sha. */
   repo: string;
   sha: string;
@@ -213,9 +215,27 @@ async function probeHost(o: OpenOpts): Promise<{ platform: string; cores: number
   return { platform: `${os.toLowerCase()}-${archOf(arch)}`, cores: Number.isFinite(nproc) && nproc >= 1 ? nproc : 1 };
 }
 
+/**
+ * Les références de `gate.refs` en refspecs `+<sha>:<nom complet>` (`refs/heads/main`, `refs/remotes/origin/main`) : le nom complet garde le sens d'`origin/main` côté hôte ;
+ * rend la cause d'une référence introuvable en local (L617).
+ */
+function refspecsOf(o: OpenOpts): string[] | string {
+  const out: string[] = [];
+  for (const name of o.refs ?? []) {
+    const git = (...args: string[]) => spawnSync('git', ['rev-parse', '--verify', '--quiet', ...args], { cwd: o.repo, env: o.env, encoding: 'utf8' });
+    const sha = git(`${name}^{commit}`);
+    const full = git('--symbolic-full-name', name);
+    if (sha.status !== 0 || !sha.stdout.trim() || !full.stdout.trim()) return `référence « ${name} » introuvable en local`;
+    out.push(`+${sha.stdout.trim()}:${full.stdout.trim()}`);
+  }
+  return out;
+}
+
 /** Crée le dossier de travail de l'hôte (dépôt nu créé à part puis renommé : deux portes simultanées ne s'y disputent pas, orphelins retirés même si le renommage échoue, R17, R19) et y pousse le sha (R5) ; rend la cause d'un échec. */
 async function pushSha(o: OpenOpts, w: Work): Promise<string | null> {
   const { host, env } = o;
+  const refspecs = refspecsOf(o);
+  if (typeof refspecs === 'string') return refspecs;
   const { head, bare, root } = w;
   const init = await ssh({
     host,
@@ -226,7 +246,7 @@ async function pushSha(o: OpenOpts, w: Work): Promise<string | null> {
   });
   if (init.code !== 0) return `dépôt de travail impossible : ${causeOf(init)}`;
   const push = await new Promise<Ran>((res) => {
-    const child = spawn('git', ['push', '-q', '--no-verify', `${host}:${root}/repo.git`, `${o.sha}:refs/cadence-gate/${o.sha}`], { cwd: o.repo, env: { ...env, GIT_SSH_COMMAND: `ssh -o BatchMode=yes -o ConnectTimeout=${CONNECT_S}`, GIT_TERMINAL_PROMPT: '0' }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const child = spawn('git', ['push', '-q', '--no-verify', `${host}:${root}/repo.git`, `${o.sha}:refs/cadence-gate/${o.sha}`, ...refspecs], { cwd: o.repo, env: { ...env, GIT_SSH_COMMAND: `ssh -o BatchMode=yes -o ConnectTimeout=${CONNECT_S}`, GIT_TERMINAL_PROMPT: '0' }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     // Le groupe du push (git et son ssh) est inscrit comme un ssh local : un SIGTERM ou SIGHUP reçu par cadence seul le tue aussi.
     const pgid = child.pid;
     if (pgid !== undefined) liveSsh.add(pgid);

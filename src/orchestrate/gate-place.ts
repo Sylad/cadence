@@ -58,7 +58,7 @@ async function openPlace(o: PlaceOpts): Promise<Place> {
     return localPlace(o.local);
   }
   const env = o.env ?? process.env;
-  const opened = await openRemoteGate({ host, install: o.config.gate?.install, repo: o.repo, sha: o.sha, depsFrom: o.repo, worktreeDeps: o.config.worktreeDeps, env, timeoutMs: GATE_TIMEOUT_MS, workers: (cores) => testWorkersFrom(env, cores, configuredCap(env)) });
+  const opened = await openRemoteGate({ host, install: o.config.gate?.install, refs: o.config.gate?.refs, repo: o.repo, sha: o.sha, depsFrom: o.repo, worktreeDeps: o.config.worktreeDeps, env, timeoutMs: GATE_TIMEOUT_MS, workers: (cores) => testWorkersFrom(env, cores, configuredCap(env)) });
   if (!opened.ok) {
     o.say(opened.stage === 'host' ? `${o.label} : porte déportée indisponible sur ${host} (${opened.cause}) — jouée en local` : `${o.label} : cache de dépendances impossible sur ${host} (${opened.cause}) — jouée en local`);
     return localPlace(o.local);

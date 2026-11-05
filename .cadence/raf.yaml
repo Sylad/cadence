@@ -2345,6 +2345,7 @@ lots:
     estimate: 0.5
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "compliant, 3 minor notes (glossaire `small` sans la seconde revue, page à 18 Ko, relecture E7 des 17 pages à arbitrer par le lead) — orchestré (vague 2026-11-05-1425-cad, 2 passe(s) de correction + passe des mineurs) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 582d5139d1a75902a7d97c75e96e07f63f8a65a0 }
   - id: L601
     title: "« prêt » de la vague contre « tirable » du plan (E8 de docs/etudes/ensemble-2026-11.md) : un mot par sens, texte de ready-free.ts et ses 7 tests mis à jour ; « done » précisé"
     status: doing

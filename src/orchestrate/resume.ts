@@ -49,20 +49,43 @@ export function resumeArgv(argv: string[], id: string): string[] {
   return out;
 }
 
-/** L623 : une clé ajoutée à cadence.yaml depuis le lancement de la vague serait refusée par la copie figée : on avance la copie sur celle en service, en le disant. La copie figée est interrogée avec tous les chargeurs de cadence.yaml (ceux de `validateConfig`), pas seulement celui d'orchestrate. Un fichier que la copie en service refuse aussi n'avance rien : l'erreur est celle du fichier. */
-async function advanceStaleSnapshot(store: RunStore, launch: string, packageRoot: string, io: OrchestrateIo): Promise<void> {
-  const configFile = join(launch, 'cadence.yaml');
-  const refused = await frozenConfigRefusal(store.dir, configFile, launch);
-  if (refused === undefined) return;
-  try {
-    validateConfig(configFile, launch);
-  } catch {
+/**
+ * L623 : une clé ajoutée à cadence.yaml depuis le lancement de la vague serait refusée par la copie figée : on avance la copie sur celle en service, en le disant.
+ * Les fichiers interrogés sont ceux que le fils figé lira : le `cadence.yaml` de chaque dépôt des lots de la vague (`projectEnv(l.repo)`, `execute`) et celui du dossier de lancement ; lancée depuis le dossier parent des projets, une vague lit celui du dépôt, pas celui du parent.
+ * La copie figée est interrogée avec tous les chargeurs de cadence.yaml (ceux de `validateConfig`), pas seulement celui d'orchestrate. Un fichier que la copie en service refuse aussi n'avance rien : l'erreur est celle du fichier.
+ * L'instantané n'avance que si la reprise va jouer la vague : un refus ou un dépôt que le parent connaît déjà (`refusedBeforeCode`) le laisse intact.
+ */
+async function advanceStaleSnapshot(args: Args, store: RunStore, launch: string, packageRoot: string, io: OrchestrateIo): Promise<void> {
+  const wave = store.readWave();
+  const lots = store.lots();
+  if (!wave || refusedBeforeCode(args, wave, lots, launch)) return;
+  for (const root of new Set([launch, ...lots.map((l) => l.repo)])) {
+    const configFile = join(root, 'cadence.yaml');
+    if (!existsSync(configFile)) continue;
+    const refused = await frozenConfigRefusal(store.dir, configFile, root);
+    if (refused === undefined) continue;
+    try {
+      validateConfig(configFile, root);
+    } catch {
+      continue;
+    }
+    advanceSnapshot(store.dir, packageRoot);
+    const note = `instantané avancé sur la copie en service : sa copie figée refusait ${configFile} (${refused})`;
+    store.journal(note);
+    io.err(`orchestrate : vague ${store.id} : ${note}`);
     return;
   }
-  advanceSnapshot(store.dir, packageRoot);
-  const note = `instantané avancé sur la copie en service : sa copie figée refusait le cadence.yaml du dépôt (${refused})`;
-  store.journal(note);
-  io.err(`orchestrate : vague ${store.id} : ${note}`);
+}
+
+/**
+ * L623 : les refus (et dépôts) de la reprise que le parent connaît sans le code de la vague : vague encore vivante (refus « tourne encore », ou dépôt d'une réponse dans sa file),
+ * vague terminée que rien ne rejoue, lot inconnu ou ambigu parmi ceux que nomment --answer, --drop, --budget, --integrate et --replay. Le fils les redira ; l'instantané d'une vague
+ * qui ne va pas être jouée ne bouge pas : ses sessions ont `<vague>/tool/bin` en tête de PATH, et une commande refusée ne modifie rien (`takeSnapshot`).
+ */
+function refusedBeforeCode(args: Args, wave: WaveState, lots: LotState[], launch: string): boolean {
+  if (liveWaves(cadenceHome()).some((w) => w.wave === wave.id && w.cwd === launch && w.pid !== process.pid)) return true;
+  if (wave.status === 'done' && !args.lotBudgets.length && !args.integrate.length) return true;
+  return [...args.answers, ...args.drop, ...args.lotBudgets, ...args.integrate].some((t) => lots.filter((x) => namesLot(launch, t, x)).length !== 1);
 }
 
 export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, today: Day): Promise<number> {
@@ -90,7 +113,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
           io.err(`orchestrate : vague ${store.id} : ${e.message}`);
           return 2;
         }
-        await advanceStaleSnapshot(store, launch, deps.snapshot.packageRoot, io);
+        await advanceStaleSnapshot(args, store, launch, deps.snapshot.packageRoot, io);
         return deps.snapshot.reexec(toolDirOf(store.dir), resumeArgv(argv, store.id), io.env, io);
       }
       io.err(`orchestrate : vague ${store.id} : son instantané ne connaît pas ${args.lotBudgets.length && !waveReadsLotBudget(store.dir) ? '--budget projet:lot=+N (antérieur à L223)' : `${args.integrate.some((t) => t.replay) && waveReadsIntegrate(store.dir) ? '--replay' : '--integrate'} (antérieur à L279)`} : reprise avec le dist/ et les gabarits courants`);

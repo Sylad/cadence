@@ -2532,9 +2532,10 @@ lots:
     created: 2026-11-05
   - id: L622
     title: "Issue #41 : les revues convergent. Après la première revue d'un lot, un constat absent de la revue précédente et hors de l'objectif du lot ou des lignes qu'il change revient en suite proposée et n'achète plus de passe de correction ; un bloquant (perte de données, sécurité, suite rouge) en achète toujours une. Plafond de mur par lot, deux fois la durée attendue de son estimate : au-delà, le lot est rendu avec ses constats au lieu de lancer une passe. Mesure : part conforme du premier coup et passes par lot avant et après"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-05
+    started: 2026-11-05
   - id: L623
     title: "Une vague reprise (--resume, --integrate) lit le cadence.yaml du dépôt avec sa copie figée : une clé ajoutée depuis la refuse (05-11, L599 après L618, orchestrate.gate.refs inconnu) ; la reprise avance sa copie sur celle en service, ou ignore les clés qu'elle ne connaît pas en le disant"
     status: todo

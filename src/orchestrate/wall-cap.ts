@@ -11,15 +11,16 @@ const WALL_CAP_FACTOR = 2;
 export const wallCapMs = (baseMs: number, estimate: number | undefined, fiche: boolean): number => WALL_CAP_FACTOR * workTimeoutMs(baseMs, estimate, fiche);
 
 /**
- * Mur d'un lot : la somme des durées de ses étapes (`ended − started`, une étape en cours compte jusqu'à `now`). Les pauses entre deux étapes
+ * Mur d'un lot : la somme des durées de ses étapes (`ended − started`, une étape en cours, `status === 'running'`, compte jusqu'à `now`). Les pauses entre deux étapes
  * (attente de créneau, lot suspendu sur le budget de la vague, reprise le lendemain) n'en font pas partie : elles ne sont pas du travail du lot.
- * Une date illisible ou une durée négative compte pour 0.
+ * Une étape interrompue (Ctrl-C, SIGTERM, reprise après un crash : `status === 'interrupted'`, jamais d'`ended`) compte pour 0, comme dans le tableau
+ * de fin de vague : la nuit entre la coupure et `--resume` n'est pas du mur. Une date illisible ou une durée négative compte pour 0.
  */
-export function lotWallMs(steps: readonly Pick<StepState, 'started' | 'ended'>[], now: number): number {
+export function lotWallMs(steps: readonly Pick<StepState, 'started' | 'ended' | 'status'>[], now: number): number {
   let total = 0;
   for (const s of steps) {
     const from = Date.parse(s.started);
-    const to = s.ended ? Date.parse(s.ended) : now;
+    const to = s.ended ? Date.parse(s.ended) : s.status === 'running' ? now : NaN;
     if (Number.isFinite(from) && Number.isFinite(to) && to > from) total += to - from;
   }
   return total;

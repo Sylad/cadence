@@ -44,10 +44,13 @@ export function setAsideUnchanged(rep: ReviewReport, rank: number, source: 'ux' 
   return { rep: { ...rep, majeurs: Math.max(0, rep.majeurs - aside.length), constats: rep.constats.filter((k) => !marked(k)) }, aside };
 }
 
+/** La note des majeurs laissés en suite pour le lead : « conforme, N majeur(s) sur un point inchangé en suite pour le lead : … ». */
+export const asideNote = (aside: { texte: string }[]): string => `conforme, ${aside.length} majeur${aside.length > 1 ? 's' : ''} sur un point inchangé en suite pour le lead : ${aside.map((a) => a.texte).join(' ; ')}`;
+
 /** Verdict gardé d'une revue conforme (R3) : celui de l'agent, suivi des majeurs laissés en suite pour le lead quand il y en a. */
 export function asideVerdict(verdict: string, aside: { texte: string }[]): string {
   if (!aside.length) return verdict;
-  return `${verdict} — conforme, ${aside.length} majeur${aside.length > 1 ? 's' : ''} sur un point inchangé en suite pour le lead : ${aside.map((a) => a.texte).join(' ; ')}`;
+  return `${verdict} — ${asideNote(aside)}`;
 }
 
 /** Chemins salis par une session : suivis modifiés, nouveaux fichiers non suivis, et ceux des dépôts voisins. */

@@ -87,7 +87,7 @@ const CHOIX_DU_LOT = ['goal', 'light', 'express', 'repos'] as const;
 
 /**
  * La prise d'un lot rendu (L563) : le ctx neuf (`c`, de `e.build` : steps vides, sans constats) reçoit une COPIE de l'état de l'ancien ctx de la vague (`old`), puis, dans cet ordre (R6) :
- * pass 0, escalade vidée, budget = dépensé + budget d'un lot neuf, steps gardés, queued sans outcome ; l'état de reprise (R11 : `resumedFrom` = la vague, `resumedReviewed`, comme execute.ts:planTrees) ;
+ * pass 0, escalade vidée, budget = dépensé + budget d'un lot neuf, steps gardés mais le plafond de mur repart de zéro (`wallFrom`, L622 : sinon un lot rendu au plafond serait rendu de nouveau par le `toFix` ci-dessous, sans jouer de session), queued sans outcome ; l'état de reprise (R11 : `resumedFrom` = la vague, `resumedReviewed`, comme execute.ts:planTrees) ;
  * ENFIN `next`, car `runLot` ne passe pas par son bloc de départ pour un lot qui garde ses steps : `toFix` sur les constats de revue de code (pass déjà à 0), sinon `firstReview` (la revue du correctif
  * du lead) quand le lot a passé une revue, sinon `firstWrite`. Rend l'étape choisie, pour le journal.
  */
@@ -102,6 +102,7 @@ export function resumeNext(c: LotCtx, old: LotCtx): 'correction' | 'revue' | 'é
   l.node = node;
   l.escalationReserve = escalationReserve;
   l.pass = 0;
+  l.wallFrom = l.steps.length;
   delete l.escalation;
   l.budget = lotSpent(old.lot) + budget!;
   l.status = 'queued';

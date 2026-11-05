@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { lotWallMs, wallCapMs } from '../src/orchestrate/wall-cap.js';
+import { convergeBrief, wallReason } from '../src/orchestrate/cycle/converge.js';
+import { resumeNext } from '../src/orchestrate/ajout.js';
+import { isNonConformingVerdict } from '../src/audit.js';
+import { loadTemplates } from '../src/orchestrate/briefs.js';
 import { claudeOut, commitFile, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
-import { type StepState } from '../src/orchestrate/state.js';
+import { type LotState, type StepState } from '../src/orchestrate/state.js';
+import type { LotCtx } from '../src/orchestrate/cycle.js';
 
 // L622 (issue #41) : les revues convergent. Dès la revue de code 2, un majeur marqué `inchange: true` (absent de la revue précédente, hors de l'objectif du lot et des lignes qu'il change)
 // va en suite proposée et n'achète pas de passe ; un bloquant en achète toujours une. Un lot qui a passé deux fois sa durée attendue est rendu avec ses constats au lieu d'une passe de plus.
@@ -54,6 +59,22 @@ describe('R1 — un majeur marqué ne compte plus à partir de la revue de code 
     expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
     expect(suiteCode(c)).toEqual([]);
   });
+  it('R1 — revue 2, verdict rédigé « non conforme : 1 majeur » avec le seul majeur marqué : le verdict enregistré ne dit plus « non conforme » (raf done et l\'audit le lisent conforme)', async () => {
+    const { c } = await run(() => claudeOut(reviewReport({ majeurs: 1, constats: [maj('hors lot', { fichier: 'z.txt', ligne: 3, inchange: true })], verdict: 'non conforme : 1 majeur' })));
+    expect(c.lot.code?.conforme).toBe(true);
+    expect(isNonConformingVerdict(c.lot.code!.verdict)).toBe(false);
+    expect(c.lot.code?.verdict).toMatch(/^conforme, 1 majeur sur un point inchangé en suite pour le lead : hors lot/);
+  });
+  it('R1 — revue 2, verdict de l\'agent conforme avec le majeur marqué : le verdict de l\'agent est gardé, suivi de la suite', async () => {
+    const { c } = await run(() => claudeOut(reviewReport({ constats: [maj('hors lot', { inchange: true })], verdict: 'conforme : un point hors lot en suite' })));
+    expect(c.lot.code?.verdict).toBe('conforme : un point hors lot en suite — conforme, 1 majeur sur un point inchangé en suite pour le lead : hors lot');
+  });
+  it('R1 — revue 2, majeur marqué qui répète un constat de la revue 1 (même fichier, même texte) : la marque est fausse, il compte, une passe suit, pas de suite', async () => {
+    const { h, c } = await run(rev([maj('premier défaut', { fichier: 'a.txt', ligne: 1, inchange: true })]), [ok]);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review']);
+    expect(suiteCode(c)).toEqual([]);
+    expect(c.lot.warnings.some((w) => w.includes('premier défaut') && w.includes('revue précédente'))).toBe(true);
+  });
   it("R1 — revue 2, majeur avec inchange 'true' (texte), null ou 1 : il compte", async () => {
     for (const inchange of ['true', null, 1]) {
       const { h, c } = await run(rev([maj('x', { inchange })]), [ok]);
@@ -80,6 +101,38 @@ describe('R3 — le brief de la revue 2 demande la marque, celui de la revue 1 n
     expect(reviews[1].brief).toContain('inchange: true');
     expect(reviews[1].brief).toMatch(/blocking finding.*data loss.*security.*red test suite.*always/is);
   });
+  it('R3 — la revue 2 reçoit les constats de la revue précédente (le relecteur peut juger « absent de la revue précédente ») et les suites déjà mises de côté', async () => {
+    const { h } = await run(rev([maj('autre fichier', { fichier: 'z.txt', ligne: 9, inchange: true }), maj('non marqué', { fichier: 'b.txt', ligne: 2 })]), [ok]);
+    const reviews = h.calls.filter((x) => x.kind === 'review');
+    expect(reviews[0].brief).not.toContain('previous review');
+    expect(reviews[1].brief).toContain('Findings of the previous review that the author had to fix:');
+    expect(reviews[1].brief).toContain('- [majeur] a.txt:1 — premier défaut');
+    expect(reviews[2].brief).toContain('- [majeur] b.txt:2 — non marqué');
+    expect(reviews[2].brief).not.toContain('- [majeur] a.txt:1 — premier défaut');
+    expect(reviews[2].brief).toContain('already set aside as follow-ups for the lead');
+    expect(reviews[2].brief).toContain('z.txt:9 — autre fichier');
+  });
+  it('R3 — convergeBrief : revue courte de rang 2 (une revue conforme compte, reviewCounts [0]) : consigne ; revue 1 et UX : vide', () => {
+    const l = (reviewCounts?: number[]) => ({ reviewCounts, constats: [], proposals: [] }) as unknown as LotState;
+    expect(convergeBrief('review-small', l([0]))).toContain('inchange: true');
+    expect(convergeBrief('review', l([0]))).toContain('inchange: true');
+    expect(convergeBrief('review', l([]))).toBe('');
+    expect(convergeBrief('review', l())).toBe('');
+    expect(convergeBrief('ux', l([1]))).toBe('');
+  });
+  it('R3 — les trois gabarits de revue de code portent {{converge}} ; la revue courte après la passe des mineurs (review-recheck) demande la marque et montre les mineurs confiés', async () => {
+    const t = loadTemplates();
+    for (const k of ['review', 'review-small', 'review-recheck'] as const) expect(t[k], k).toContain('{{converge}}');
+    const minor = { gravite: 'mineur', texte: 'nommage', fichier: 'a.txt', ligne: 1 };
+    const h = harness({ script: { implement: [impl], review: [() => claudeOut(reviewReport({ mineurs: 1, constats: [minor] }))], fix: [fix('b.txt')], 'review-small': [ok] } });
+    const c = h.lot('L1');
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review-small']);
+    const small = h.calls.find((x) => x.kind === 'review-small')!.brief;
+    expect(small).toContain('short re-review');
+    expect(small).toContain('inchange: true');
+    expect(small).toContain('- [mineur] a.txt:1 — nommage');
+  });
 });
 
 describe('R4 — plafond de mur : deux fois la durée attendue de l\'estimate', () => {
@@ -98,6 +151,30 @@ describe('R4 — plafond de mur : deux fois la durée attendue de l\'estimate', 
     expect(lotWallMs([step(at(0), at(10)), step(at(20))], t0 + 25 * 60_000)).toBe(15 * 60_000);
     expect(lotWallMs([], t0)).toBe(0);
     expect(lotWallMs([step('pas une date', at(5))], t0)).toBe(0);
+  });
+  it('R4 — une étape interrompue (Ctrl-C, reprise après crash : sans fin, status interrupted) compte pour 0, comme dans le tableau : la nuit avant --resume n\'est pas du mur', () => {
+    const interrupted = { ...step(at(0)), status: 'interrupted' } as StepState;
+    expect(lotWallMs([interrupted], t0 + 12 * 60 * 60_000)).toBe(0);
+    expect(lotWallMs([interrupted, step(at(0), at(10))], t0 + 12 * 60 * 60_000)).toBe(10 * 60_000);
+  });
+
+  const ctxOf = (over: Partial<LotState>): LotCtx =>
+    ({ wave: { id: 'W2', store: { writeLot: () => {} }, log: () => {} }, lot: { project: 'a', lot: 'L1', repo: '/x/a', status: 'handed-back', next: 'fix', pass: 2, steps: [], answers: [], questions: [], warnings: [], constats: [], proposals: [], budget: 100, estimate: 0.25, ...over }, config: { timeouts: { work: 45 * 60_000 } }, loadPlan: () => ({ lot: () => ({ visible: false }) }) }) as unknown as LotCtx;
+  it('R4 — un lot rendu au plafond de mur (110 min sur 90) repris par --add : le mur repart de zéro comme les passes, la correction est jouée au lieu d\'un second rendu', () => {
+    const code = { source: 'code', gravite: 'majeur', fichier: 'f.ts', ligne: 1, texte: 'à corriger' } as const;
+    const old = ctxOf({ steps: [step(at(0), at(60)), step(at(70), at(120))], constats: [code], outcome: 'revue non conforme après 0 passe(s) de correction ; plafond de mur : 110 min sur 90 (2 × la durée attendue de l\'estimate), le lot est rendu avec ses constats au lieu d\'une passe de plus' });
+    expect(wallReason(old, t0 + 130 * 60_000)).toMatch(/^plafond de mur : 110 min sur 90/);
+    const fresh = ctxOf({ status: 'queued', next: null, outcome: null, pass: 0 });
+    expect(resumeNext(fresh, old)).toBe('correction');
+    expect(fresh.lot.status).toBe('queued');
+    expect(fresh.lot.next).toBe('fix');
+    expect(fresh.lot.outcome).toBeNull();
+    expect(fresh.lot.pass).toBe(1);
+    expect(fresh.lot.steps).toHaveLength(2);
+    expect(wallReason(fresh, t0 + 130 * 60_000)).toBeUndefined();
+    // les étapes de la reprise comptent, elles : 100 min de plus et le plafond joue de nouveau
+    fresh.lot.steps.push(step(at(200), at(300)));
+    expect(wallReason(fresh, t0 + 310 * 60_000)).toMatch(/^plafond de mur : 100 min sur 90/);
   });
 
   const slow = (minutes: number): Handler => (call) => {

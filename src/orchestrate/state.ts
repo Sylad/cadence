@@ -182,6 +182,8 @@ export interface LotState {
   /** Constats à corriger par la prochaine session `fix`. */
   constats: Constat[];
   code?: ReviewSummary;
+  /** Constats (toutes gravités) de la dernière revue de code lue, les majeurs mis de côté exclus (L622) : montrés à la revue de code suivante, qui juge « absent de la revue précédente » avec, et comparés aux majeurs qu'elle marque `inchange: true`. */
+  codeConstats?: Constat[];
   ux?: ReviewSummary;
   uxNote?: string;
   /** Contrôles lancés par le programme (tests, build) au `head` indiqué, passés au relecteur tant que HEAD n'a pas bougé. */
@@ -198,6 +200,8 @@ export interface LotState {
   resumedFrom?: string;
   /** Avec `resumedFrom` : le lot avait déjà été revu dans cette vague. Il repart alors à la correction des constats de sa dernière revue (ou à la revue s'il n'en a pas) ; sinon à l'écriture. */
   resumedReviewed?: boolean;
+  /** Reprise d'un lot rendu par `--add` (L563, L622) : index de la première étape que le plafond de mur compte. Les étapes d'avant la reprise ne comptent plus, comme ses passes (pass repart à 0). Absent : toutes les étapes comptent. */
+  wallFrom?: number;
   /** Constat du contrôle préalable (livrable en partie présent), joint au brief de la première implémentation. */
   precheck?: string;
   /** Verdict du contrôle préalable une fois lu (« oui » sans preuve = « partiel »), gardé au journal pour mesurer la part de « oui » (L288). Absent : pas de contrôle. */

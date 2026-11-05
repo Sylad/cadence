@@ -2517,6 +2517,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "compliant (0 blocking, 0 major, 2 minor notes) — orchestré (vague 2026-11-05-1810-cad, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant — 0 blocking, 0 major, 1 minor note (CRLF test with a no-op `.replace`); the choices placed on the integration side (check after `rebaseOnto` for both `rebased` and `forwarded`) hold against the code and the lot's goal", commit: e174d9d54c5950dee4ede7510e5ae4efe0506e4e }
   - id: L620
     title: "Une intégration déposée (--integrate sur une vague vivante) passe avant les lots en file : 05-11, L602 suspendu 65 min derrière la file alors que sa revue était faite"
     status: doing

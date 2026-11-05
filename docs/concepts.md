@@ -57,7 +57,7 @@ A lot's **size** is read from its estimate, in days, and decides how much ceremo
 
 | Word | When | Effect |
 |---|---|---|
-| **express** | estimate ≤ 0.1 day (`EXPRESS_MAX_ESTIMATE`) | one session; no precheck, no probe, no separate review |
+| **express** | estimate > 0 and ≤ 0.1 day (`EXPRESS_MAX_ESTIMATE`), no screen and not a spec lot | one session; no precheck, no probe, no separate review |
 | **light** | estimate ≤ `orchestrate.review.threshold` (0.25 day by default) | the review runs on the light model (Sonnet by default), minor findings become notes |
 | **small** | estimate ≤ 0.5 day, **or** the lot is flagged `quickwin` | one single `review-small` pass (code and ergonomics together), no separate UX pass |
 | **full** | anything bigger | the whole cycle of [the steps above](#the-steps-of-a-lot) |
@@ -171,12 +171,12 @@ files and the changelog, then prints the steps the lead plays (tag, gate, push, 
 - **deliverable up to**: the sha up to which a delivery is safe, below the first lot that is not ready.
 - **lead**: the session that drives the waves, re-verifies and delivers; it never codes.
 - **delivery agent**: the `livreur` subagent that delivers one ready lot and reports in one line.
-- **express**: the smallest [size of a lot](#the-size-of-a-lot), estimate ≤ 0.1 day: one session, no precheck, no separate review.
+- **express**: the smallest [size of a lot](#the-size-of-a-lot), estimate > 0 and ≤ 0.1 day, no screen and not a spec lot: one session, no precheck, no separate review.
 - **light**: estimate ≤ 0.25 day by default (`orchestrate.review.threshold`): the review runs on the light model.
 - **small**: estimate ≤ 0.5 day or `quickwin`: one single review pass, no separate UX pass.
 - **full**: any lot bigger than small: the whole cycle of steps.
 - **quickwin**: the ⚡ flag of a lot, set by hand, that makes it small whatever its estimate; `raf quickwins` lists them.
-- **git hook**: a script git runs (`pre-commit`, `post-commit`, `pre-push`), installed by `raf hook install`; `hook.autostart` configures the pre-commit one. See [raf.md](raf.md).
+- **git hook**: a script git runs (`pre-commit`, `post-commit`, `pre-push`), `raf hook install` installs `post-commit` and `pre-commit` (`hook.autostart` configures the pre-commit one); `pre-push` is temporary, put in place by `cadence orchestrate` during a wave. See [raf.md](raf.md).
 - **Claude Code hook**: a command Claude Code runs around a tool call, declared in the plugin's `hooks/hooks.json` and played by `cadence claude-hook retour|attente|pipe`. See [lead.md](lead.md).
 - **plan.onWrite**: not a hook of git nor of Claude Code: the command of `cadence.yaml` that cadence runs after each write of the plan, to refresh the files derived from it. See [raf.md](raf.md).
 - **mod hook**: a function hook of the `cadence-hud` mod (`plugins/cadence-hud/hooks/`), in Claude Code's plugin vocabulary; it draws the band. See [cadence-hud.md](cadence-hud.md).

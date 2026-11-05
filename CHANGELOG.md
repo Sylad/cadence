@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.55.0] - 2026-11-05
+
 ### Added
 
 - The Playwright server of the wave's sessions is started with `--headless` (L612, [docs/orchestrate.md](docs/orchestrate.md), « Minimal MCP servers per step »): a session no longer opens a window on the desktop (and takes its focus); `CADENCE_PLAYWRIGHT_HEADED=1` in the orchestrator's environment lifts it.

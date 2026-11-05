@@ -104,7 +104,9 @@ describe('L587 probe — --no-fill et fillsFreeSlots', () => {
 
 describe('L587 probe — vague de lots nommés', () => {
   it('dépôt seul sans cadence.yaml parent : une vague de lot nommé ne plante pas à la lecture de priority:', async () => {
-    const repo = tempDir();
+    // sous-dossier d'un parent à soi : à la racine temporaire partagée, le dépôt aurait pour frères
+    // les dépôts des autres tests joués en parallèle (readyFree / sharingProjects les scanne)
+    const repo = join(tempDir(), 'solo');
     repoAt(repo, 'solo', 2);
     const s = scene();
     expect(await orchestrate(['L1', '--max-sessions', '2'], io(repo).io, s.d)).toBe(0);

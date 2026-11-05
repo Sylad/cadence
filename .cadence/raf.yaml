@@ -2537,6 +2537,7 @@ lots:
     estimate: 0.5
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "conforme : dernier majeur réglé, plafond de mur et escalade rendent par le même chemin ; test rouge puis vert, 149 tests ciblés et cliquet verts", commit: d12b8175ba7f9008d8f8aefdaf8f3873f0758ef1 }
   - id: L623
     title: "Une vague reprise (--resume, --integrate) lit le cadence.yaml du dépôt avec sa copie figée : une clé ajoutée depuis la refuse (05-11, L599 après L618, orchestrate.gate.refs inconnu) ; la reprise avance sa copie sur celle en service, ou ignore les clés qu'elle ne connaît pas en le disant"
     status: doing

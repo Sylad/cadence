@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.54.0] - 2026-11-05
+
 ### Added
 
 - Study of the whole of cadence (L594, [docs/etudes/ensemble-2026-11.md](docs/etudes/ensemble-2026-11.md)): read-only, by a fresh reviewer; verdict, the map of the notions and their layers, the target architecture in one page, 17 gaps ranked by gain and risk (two formulas for the free slots, two help texts, three « small lot » thresholds, native and read plan in one class, four state folders, `orchestrate.md` at 308 KB, a stability list that omits 12 `raf` sub-commands, 6 `cadence` tools and 5 root keys the code reads…), each with a lot of 0.5 day at most; nothing was changed. The L595 ritual replays its measures every 14 days.

@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.54.0**: a wave of named lots fills its free slots from the plan (`--no-fill` opts out); `raf now` flags lots whose sub-tasks are all closed; a declared config lot; a first whole-package study.
 - **1.53.1**: `raf done` waits (`done différé`) while a session of a live wave works in the main tree of a repository without worktrees.
 - **1.53.0**: `raf import --from-config` / `--to-config`; a last-pass budget top-up; the probe no longer commits a red file; kept branches found under a former project name.
 - **1.52.0**: `perf.prices` takes any model name (Fable included) and `perf.currency`; `plan.onWrite.onFailure: refuse | warn`; tests unstable under load wait for events.
@@ -83,6 +84,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.54.0**: A wave started on named lots now draws the next ready lot of the plan whenever a slot frees and its queue is empty, with the same draw as `--continue` (`priority:`, free `uses:` resources, mature lots only); `--no-fill` keeps the previous behaviour and each draw is a journal line (L587). `raf now` and `session start` list the open lots whose sub-tasks are all closed, with the command to close them (L473). A gate running `node --test` replays its red tests one by one at the starting sha, so a test already red before the lot is told apart from one the lot broke (L514). The « last delivery per project » panel reads the delivered status of a plan kept by another tool (`plan.deliveredStatuses`), not only the delivery log (L530). A lot declared `config: true` in the plan may change a test configuration without the quality ratchet refusing it, as long as it touches only configurations and their tests (L586). A commit that touches only the plan of a neighbouring repository during a session is no longer an incident (L593). `docs/etudes/ensemble-2026-11.md` is a first read-only study of the whole package: concepts, overlaps, names and the surface a new user meets, with the corrections it proposes (L594).
 
 **1.53.1**: `raf done` is refused with exit 2 and `done différé`, leaving the plan untouched, while a session of a live wave works in the main tree of a repository without worktrees, so a delivery during a wave no longer writes a plan the session is about to commit over (L521).
 

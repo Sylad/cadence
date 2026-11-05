@@ -33,7 +33,7 @@ const constat = (source: 'code' | 'tests' | 'ux') => ({ source, gravite: 'bloqua
 
 /** Un ctx à la main : la vague écrit dans `written`, le plan n'a aucun écran (firstWrite = implement). */
 function ctxOf(l: LotState, saved: LotState[] = []): LotCtx {
-  return { wave: { id: 'W2', store: { writeLot: (x: LotState) => saved.push(structuredClone(x)) }, log: () => {} }, lot: l, config: {}, loadPlan: () => ({ lot: () => ({ visible: false }) }) } as unknown as LotCtx;
+  return { wave: { id: 'W2', store: { writeLot: (x: LotState) => saved.push(structuredClone(x)) }, log: () => {} }, lot: l, config: { timeouts: { work: 45 * 60_000 } }, loadPlan: () => ({ lot: () => ({ visible: false }) }) } as unknown as LotCtx;
 }
 
 const live = { id: 'W', status: 'running', cwd: '/x/a' } as const;

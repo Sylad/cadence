@@ -37,10 +37,11 @@ sessions du lead : 1 · créneaux libres : 2 sur 3
 ```
 
 With a live wave and no held session the line reads `créneaux libres : 1 sur 2`; with neither, nothing. A wave whose lots
-play in their own worktrees takes one slot per lot it plays (a session, or a tests/build gate: `lanes` of the wave registry),
-not one per repository it holds, exactly as `cadence orchestrate --status` counts them (L589: the band said « 2 libres »
-while `--status` said 0 on 3). The lots in a gate are named, so that a « 0 libre » is not read as empty slots:
-`créneaux libres : 0 sur 3 · 3 en porte : L514 L473 L586` (the segment is left out when no lot is in a gate). A session whose
+play in their own worktrees takes one slot per lot that holds a claude session (`lanes` of the wave registry: a lot settled,
+waiting for a dependency or in the tests/build gate, which has no session, holds none), not one per repository it holds,
+exactly as `cadence orchestrate --status` counts them (L589: the band said « 2 libres » while `--status` said 0 on 3). The lots
+in a gate are named, so that the free slots are not read as idle machine while the program's build or tests are running:
+`créneaux libres : 2 sur 3 · 2 en porte : L514 L473` (the segment is left out when no lot is in a gate). A session whose
 time limit has run out stops counting in the slots but is not dropped (L278): a row `⚠ session du lead échue : correctif-B28  échue depuis 2 h 10` stays under the others (in red) until `cadence lead release <label>` or a renewed `lead hold`, since nothing stops the session itself. They are read from disk (`holds/` of the cadence home), like the waves.
 
 The bar is lots done over lots done + in progress + to do (dropped and recurring lots left out); the count of lots in progress is followed by their ids (`2 en cours : L149 L153`), cut to three then `…` (`5 en cours : L1 L2 L3 …`), the count alone at zero;

@@ -463,7 +463,7 @@ export const expiredHolds = (holds: readonly LeadHold[], now: number): LeadHold[
 /**
  * Les créneaux que le lead peut encore donner, comme `cadence orchestrate --status` (`freeSlots` du registre) : le plafond moins, pour chaque
  * vague vivante, le plus petit du plafond commun (le plus bas des plafonds connus, `cap` sinon) et de ce qu'elle tient — un créneau par lot
- * qu'elle joue à la fois en mode worktree (`lanes`, session ou porte de tests/build), un par dépôt tenu sans `lanes` —, moins les sessions du lead.
+ * qui tient une session claude en mode worktree (`lanes` : ni un lot réglé, ni un lot en attente, ni un lot en porte), un par dépôt tenu sans `lanes` —, moins les sessions du lead.
  * Une vague sans plafond connu compte pour `cap`.
  */
 export const freeSlots = (waves: readonly Wave[], cap: number, leadSessions: number): number => {
@@ -473,10 +473,10 @@ export const freeSlots = (waves: readonly Wave[], cap: number, leadSessions: num
   return Math.max(0, cap - live.reduce((n, w) => n + Math.min(w.cap !== undefined ? common : cap, w.lanes ?? w.repos ?? 0), 0) - leadSessions)
 }
 
-/** Les lots des vagues vivantes en porte de tests ou de build : ils tiennent un créneau sans session claude, la bande les nomme pour qu'un « 0 libre » ne se lise pas comme des créneaux vides. */
+/** Les lots des vagues vivantes en porte de tests ou de build : aucune session claude, donc aucun créneau (`lanes` les écarte) ; la bande les nomme pour que les créneaux libres ne se lisent pas comme une machine au repos pendant que le programme joue build et tests. */
 export const gatedLots = (waves: readonly Wave[]): string[] => waves.filter(w => w.live).flatMap(w => w.lots.filter(l => l.gate).map(l => l.lot))
 
-/** « sessions du lead : 1 · créneaux libres : 0 sur 3 · 2 en porte : L514 L473 » (sans le premier segment à zéro, sans le dernier sans lot en porte) ; null sans vague vivante ni session du lead : rien à dire. */
+/** « sessions du lead : 1 · créneaux libres : 1 sur 3 · 2 en porte : L514 L473 » (sans le premier segment à zéro, sans le dernier sans lot en porte) ; null sans vague vivante ni session du lead : rien à dire. */
 export const slotsLine = (waves: readonly Wave[], holds: readonly LeadHold[], cap: number): string | null => {
   if (!waves.some(w => w.live) && holds.length === 0) return null
   const lead = holds.length > 0 ? `sessions du lead : ${holds.length} · ` : ''

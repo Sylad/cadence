@@ -1,10 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { boundsText, declaredTests, readBounds, violations, type Bound } from '../src/bounds.js';
 import { claudeHookContext } from '../src/claude-hook.js';
 import { RafError } from '../src/plan.js';
-import { tempDir } from './helpers.js';
+import { cleanupTempDirs, tempDir } from './helpers.js';
+
+afterEach(cleanupTempDirs);
 
 const root = join(import.meta.dirname, '..');
 const lire = (f: string) => readFileSync(join(root, f), 'utf8');

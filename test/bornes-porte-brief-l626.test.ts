@@ -17,6 +17,15 @@ afterEach(() => {
   process.env.CADENCE_HOME = fileHome;
 });
 
+// briefFor crée le dossier temporaire du lot (state.tmpDir) hors de tempDir() : on le retire à la fin de chaque test.
+const briefed: Array<() => void> = [];
+afterEach(() => {
+  for (const f of briefed.splice(0)) f();
+});
+function briefOf(h: ReturnType<typeof harness>, c: ReturnType<typeof lot>['c']): void {
+  briefed.push(() => h.store.removeTmpDir(c.lot.project, c.lot.lot));
+}
+
 const YAML = 'bounds:\n  - paths: [README.md]\n    lines: 64\n    columns: 160\n    tests: [test/readme.test.ts, test/absent.test.ts]\n';
 
 function lot(yaml: string | null) {
@@ -57,7 +66,8 @@ describe('L626 — la porte ciblée joue les tests déclarés', () => {
 
 describe('L626 — le brief d’implémentation reçoit les bornes', () => {
   it('R4 — implement et fix citent les bornes d’un fichier cité par le lot ; la revue non', () => {
-    const { c } = lot(YAML);
+    const { h, c } = lot(YAML);
+    briefOf(h, c);
     c.lot.goal = 'mettre à jour README.md';
     for (const kind of ['implement', 'fix'] as const) {
       const brief = briefFor(c, kind);
@@ -67,9 +77,13 @@ describe('L626 — le brief d’implémentation reçoit les bornes', () => {
   });
 
   it('R4 — lot qui ne cite aucun fichier borné, ou dépôt sans bounds : pas de ligne de bornes', () => {
-    const a = lot(YAML).c;
+    const la = lot(YAML);
+    briefOf(la.h, la.c);
+    const a = la.c;
     expect(briefFor(a, 'implement')).not.toContain('Size bounds');
-    const b = lot(null).c;
+    const lb = lot(null);
+    briefOf(lb.h, lb.c);
+    const b = lb.c;
     b.lot.goal = 'mettre à jour README.md';
     expect(briefFor(b, 'implement')).not.toContain('Size bounds');
   });

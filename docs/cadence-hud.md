@@ -41,7 +41,8 @@ play in their own worktrees takes one slot per lot that holds a claude session (
 waiting for a dependency or in the tests/build gate, which has no session, holds none), not one per repository it holds,
 exactly as `cadence orchestrate --status` counts them (L589: the band said « 2 libres » while `--status` said 0 on 3). The lots
 in a gate are named, so that the free slots are not read as idle machine while the program's build or tests are running:
-`créneaux libres : 2 sur 3 · 2 en porte : L514 L473` (the segment is left out when no lot is in a gate). A session whose
+`créneaux libres : 2 sur 3 · 2 en porte : L514 L473` (the segment is left out when no lot is in a gate). The `lanes` field the
+collector reads from the registry is tested by `test/hud-lanes-l589.test.ts`, the real Python collector on a registry written by `registry.ts`. A session whose
 time limit has run out stops counting in the slots but is not dropped (L278): a row `⚠ session du lead échue : correctif-B28  échue depuis 2 h 10` stays under the others (in red) until `cadence lead release <label>` or a renewed `lead hold`, since nothing stops the session itself. They are read from disk (`holds/` of the cadence home), like the waves.
 
 The bar is lots done over lots done + in progress + to do (dropped and recurring lots left out); the count of lots in progress is followed by their ids (`2 en cours : L149 L153`), cut to three then `…` (`5 en cours : L1 L2 L3 …`), the count alone at zero;

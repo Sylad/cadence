@@ -2362,7 +2362,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
-    review: { date: 2026-11-05, verdict: "conforme : verdict de la vague tenu ; seul le lien du README replié sur une ligne existante (limite de 64 lignes), tests ciblés verts", commit: 1f2f2f75ec7af39b6a7dad0eaae9349f0d6c7048 }
+    review: { date: 2026-11-05, verdict: "conforme : verdict de la vague tenu ; lien du README replié, docs/config.md ajouté aux files du paquet, tests readme-accueil et L602 verts", commit: 89349a0d9dbc19427917c8c28c1a546dbbeaebc6 }
   - id: L603
     title: "Surface pour le compte pro (E9 + E11 de docs/etudes/ensemble-2026-11.md) : convention des langues écrite (noms anglais, messages français), comptes périmés d'overview.md et stabilite.md retirés"
     status: doing

@@ -2323,6 +2323,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-05, verdict: "compliant after 1 minor fix: --max-sessions / CADENCE_MAX_SESSIONS dropped from the single help (src/cli.ts), the other choices of the lot hold — orchestré (vague 2026-11-05-1425-cad, 2 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 97e92fb438bd90b3ed1d90b998126d773d1bd136 }
   - id: L598
     title: "Un seul calcul des créneaux libres (E1 de docs/etudes/ensemble-2026-11.md) : registre, bande et vague lisent le même chiffre, publié une fois, au lieu de deux formules et d'un compte interne"
     status: done

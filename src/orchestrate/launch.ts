@@ -197,10 +197,10 @@ export function enabledPlugins(files: string[]): string[] {
   return [...ids];
 }
 
-/** L'entrée PostToolUse du hook de bornes (L626), la même que dans `hooks/hooks.json` (test `bornes-fichiers-l626`) : jointe au `--settings` des sessions implement et fix, où le plugin `cadence` est coupé avec les autres (L398). `cadence` est celui de `tool/bin` de la vague, en tête du PATH de la session. */
 /** Les étapes qui reçoivent le hook de bornes (L626) : celles qui écrivent les fichiers du lot. La sonde n'écrit que des tests, spec et accept une fiche et un oracle. */
 export const BOUNDS_HOOK_STEPS: readonly SessionKind[] = ['implement', 'fix'];
 
+/** L'entrée PostToolUse du hook de bornes (L626), la même que dans `hooks/hooks.json` (test `bornes-fichiers-l626`) : jointe au `--settings` des sessions implement et fix, où le plugin `cadence` est coupé avec les autres (L398). `cadence` est celui de `tool/bin` de la vague, en tête du PATH de la session. */
 export const BOUNDS_HOOK = { matcher: 'Write|Edit|MultiEdit', hooks: [{ type: 'command', command: 'command -v cadence >/dev/null 2>&1 && cadence claude-hook bornes || true' }] };
 
 /**
@@ -216,7 +216,6 @@ const settingsArgs = (spec: StepSpec): string[] => {
   if (spec.boundsHook) settings.hooks = { PostToolUse: [BOUNDS_HOOK] };
   return Object.keys(settings).length ? ['--settings', JSON.stringify(settings)] : [];
 };
-
 
 /** Le corps commun d'une session `claude -p` et de sa relance : prompt, schéma, modèle, effort, agent restreint, puis (après `session`) mode de permission, dossiers, plugins désactivés, interdits et MCP. `session` : `--session-id <id>` ou `--resume <id>`. */
 function claudeArgs(spec: StepSpec, agents: Record<string, AgentDef>, prompt: string, session: ['--session-id' | '--resume', string]): string[] {

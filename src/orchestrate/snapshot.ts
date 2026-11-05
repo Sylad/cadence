@@ -124,12 +124,19 @@ export function repairSnapshotModules(waveDir: string, packageRoot: string): str
 
 /**
  * L623 : la copie figée lit le `cadence.yaml` du dépôt, que la copie en service a pu enrichir depuis (une clé ajoutée par un lot livré) : elle la refuserait.
+ * Elle relit le fichier avec le même ensemble de chargeurs que `validateConfig` (`dist/config-set.js`), pas seulement celui d'orchestrate : une clé ajoutée sous `docs:` ou `session:` serait refusée par le fils figé aussi. Une copie sans `config-set.js` ne se laisse interroger que par `readOrchestrateConfig`.
  * Rend le message de son refus, ou undefined si elle accepte le fichier ou si elle ne se laisse pas interroger (pas de `dist/config.js` lisible : on ne devine rien).
  */
-export async function frozenConfigRefusal(waveDir: string, configFile: string): Promise<string | undefined> {
+export async function frozenConfigRefusal(waveDir: string, configFile: string, root: string): Promise<string | undefined> {
+  const dist = join(toolDirOf(waveDir), 'dist');
   let read: (file: string) => unknown;
   try {
-    ({ readOrchestrateConfig: read } = await import(pathToFileURL(join(toolDirOf(waveDir), 'dist', 'config.js')).href));
+    if (existsSync(join(dist, 'config-set.js'))) {
+      const { validateConfig } = await import(pathToFileURL(join(dist, 'config-set.js')).href);
+      read = (file) => validateConfig(file, root);
+    } else {
+      ({ readOrchestrateConfig: read } = await import(pathToFileURL(join(dist, 'config.js')).href));
+    }
     if (typeof read !== 'function') return undefined;
   } catch {
     return undefined;

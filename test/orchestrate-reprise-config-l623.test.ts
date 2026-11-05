@@ -10,7 +10,7 @@ import { tempDir } from './helpers.js';
 const THROWS = "export function readOrchestrateConfig() { throw new Error('orchestrate.gate.refs inconnu'); }\n";
 const ACCEPTS = 'export function readOrchestrateConfig() { return {}; }\n';
 
-function setup(frozenConfig: string | null, yaml: string) {
+function setup(frozenConfig: string | null, yaml: string, frozenConfigSet?: string) {
   const launch = tempDir();
   writeFileSync(join(launch, 'cadence.yaml'), yaml);
   const store = new RunStore(launch, 'vague-x');
@@ -23,6 +23,7 @@ function setup(frozenConfig: string | null, yaml: string) {
   mkdirSync(join(tool, 'node_modules', 'yaml'), { recursive: true });
   writeFileSync(join(tool, 'node_modules', 'yaml', 'package.json'), '{}');
   if (frozenConfig !== null) writeFileSync(join(tool, 'dist', 'config.js'), frozenConfig);
+  if (frozenConfigSet !== undefined) writeFileSync(join(tool, 'dist', 'config-set.js'), frozenConfigSet);
   // Le paquet en service : sa copie à jour du code.
   const pkg = tempDir();
   mkdirSync(join(pkg, 'dist'), { recursive: true });
@@ -66,6 +67,14 @@ describe('L623 — la reprise ne refuse pas une clé de cadence.yaml ajoutée de
     const s = setup(null, VALID);
     await orchestrate(['--resume', 'vague-x'], s.io, s.deps);
     expect(s.err.join('\n')).not.toContain('avancé');
+    expect(s.reexec).toEqual([s.tool]);
+  });
+
+  it("R5 — la copie figée refuse une clé hors orchestrate: (docs:) par un autre chargeur : la copie avance aussi", async () => {
+    const s = setup(ACCEPTS, 'docs:\n  sync: []\n', "export function validateConfig() { throw new Error('docs.sync inconnu'); }\n");
+    expect(await orchestrate(['--resume', 'vague-x'], s.io, s.deps)).toBe(0);
+    expect(readFileSync(join(s.tool, 'dist', 'config.js'), 'utf8')).toBe(ACCEPTS);
+    expect(s.err.join('\n')).toMatch(/instantané avancé[^]*docs\.sync inconnu/);
     expect(s.reexec).toEqual([s.tool]);
   });
 });

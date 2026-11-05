@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { planLoader, readOrchestrateConfig } from '../config.js';
+import { planLoader } from '../config.js';
+import { validateConfig } from '../config-set.js';
 import { type Day } from '../dates.js';
 import { heldRefusal, localLotOf } from '../local-task.js';
 import { RafError } from '../plan.js';
@@ -48,13 +49,13 @@ export function resumeArgv(argv: string[], id: string): string[] {
   return out;
 }
 
-/** L623 : une clé ajoutée à cadence.yaml depuis le lancement de la vague serait refusée par la copie figée : on avance la copie sur celle en service, en le disant. Un fichier que la copie en service refuse aussi n'avance rien : l'erreur est celle du fichier. */
+/** L623 : une clé ajoutée à cadence.yaml depuis le lancement de la vague serait refusée par la copie figée : on avance la copie sur celle en service, en le disant. La copie figée est interrogée avec tous les chargeurs de cadence.yaml (ceux de `validateConfig`), pas seulement celui d'orchestrate. Un fichier que la copie en service refuse aussi n'avance rien : l'erreur est celle du fichier. */
 async function advanceStaleSnapshot(store: RunStore, launch: string, packageRoot: string, io: OrchestrateIo): Promise<void> {
   const configFile = join(launch, 'cadence.yaml');
-  const refused = await frozenConfigRefusal(store.dir, configFile);
+  const refused = await frozenConfigRefusal(store.dir, configFile, launch);
   if (refused === undefined) return;
   try {
-    readOrchestrateConfig(configFile);
+    validateConfig(configFile, launch);
   } catch {
     return;
   }

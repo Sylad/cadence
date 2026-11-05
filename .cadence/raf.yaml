@@ -2519,9 +2519,10 @@ lots:
     started: 2026-11-05
   - id: L620
     title: "Une intégration déposée (--integrate sur une vague vivante) passe avant les lots en file : 05-11, L602 suspendu 65 min derrière la file alors que sa revue était faite"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-05
+    started: 2026-11-05
   - id: L621
     title: "Issue #40 : un --goal ou goal: qui rétrécit un lot aux commits déjà intégrés saute la maquette sauf si l'objectif change la mise en page, et les revues jugent le diff de l'objectif contre l'objectif ; un constat hors objectif revient en suite proposée, sans passe de correction (74 min et 1,28 M pour un commit de quatre correctifs)"
     status: todo

@@ -91,6 +91,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `orchestrate --resume --integrate <lot>` on a live wave that was resumed without that handed-back lot is refused at once (exit 2, « la vague … ne joue pas ce lot », with the command to run when the wave ends) instead of printing « intégration déposée » and discarding the request as « lot inconnu » (L610, [docs/orchestrate.md](docs/orchestrate.md)).
 - A lot that waits for its integration turn (another integration of the repository is running) gives back its slot (L591, [docs/orchestrate.md](docs/orchestrate.md), « Integration, before `ready` »): the pool no longer counts its queue, and the registry no longer counts its lane, so the lots waiting for a slot start meanwhile; the lot then takes its turn without asking for a slot again: its short review starts even when every slot is taken (journal `… reprend son tour d'intégration sans redemander de créneau`; an integration launches one short review). The plan write of a new lot (`raf start` and its commit) goes ahead of the integrations queued on the repository, so a lot started on the freed slot is not stuck behind them without a session. On 04-11 (wave 1310-cad) L514, L586 and L473 arrived together, L530 L587 L588 started only after the last integration, ~9 minutes with two empty slots.
 
 ## [1.54.0] - 2026-11-05

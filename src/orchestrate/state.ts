@@ -27,6 +27,8 @@ export interface WaveState {
   pid: number;
   /** "projet:lot", dans l'ordre donné. */
   lots: string[];
+  /** "projet:lot" des lots que le processus de la vague joue (L610) : une reprise ne joue que ceux qu'elle a repris, `lots` garde tous ceux de la vague ; absent d'une vague d'avant L610. */
+  playing?: string[];
   /** Part de la machine de chaque session (L350) : CADENCE_TEST_WORKERS, cœurs ÷ plafond de sessions ; absent d'une vague d'avant L350. */
   testWorkers?: number;
 }

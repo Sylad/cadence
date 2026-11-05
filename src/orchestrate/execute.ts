@@ -77,7 +77,12 @@ export async function continueRounds(first: number, wave: WaveState, all: LotSta
   }
 }
 
-export function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[], wctx: WaveCtx): LotCtx[] {
+export function contexts(lots: LotState[], envs: ReturnType<typeof projectEnv>[], wctx: WaveCtx, wave?: WaveState): LotCtx[] {
+  // L610 : la vague dit quels lots elle joue (une reprise ne joue que ceux qu'elle a repris), `--integrate` le lit pour refuser sur-le-champ un lot absent.
+  if (wave) {
+    wave.playing = lots.map((l) => lotKey(l.project, l.lot));
+    wctx.saveWave();
+  }
   return lots.map((lot, i) => ({ wave: wctx, lot, config: envs[i].config, loadPlan: envs[i].loadPlan }));
 }
 
@@ -241,7 +246,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   wave.status = 'running';
   wave.pid = process.pid;
   saveWave();
-  const ctxs = contexts(lots, envs, wctx);
+  const ctxs = contexts(lots, envs, wctx, wave);
   planTrees(ctxs, store, wave.id, wctx.log, cap > 1);
   updateWaveReposSafe(home, repos, lanes());
 

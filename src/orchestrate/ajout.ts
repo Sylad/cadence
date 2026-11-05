@@ -301,6 +301,7 @@ export class AddFeed {
     put(e.all, (x) => x === old?.lot, c.lot);
     if (e.lots !== e.all) put(e.lots, (x) => x === old?.lot, c.lot);
     if (!e.wave.lots.includes(key)) e.wave.lots.push(key);
+    e.wave.playing = e.ctxs.map((x) => lotKey(x.lot.project, x.lot.lot));
     e.store.writeLot(c.lot);
     e.saveWave();
     if (entry) {

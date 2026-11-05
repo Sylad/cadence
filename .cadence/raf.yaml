@@ -2182,6 +2182,7 @@ lots:
     started: 2026-11-04
     notes:
       - { date: 2026-11-05, text: "rendu à l'intégration le 05-11 : qualite --contre origin/main rouge au sommet intégré, le lot de config n'y est pas reconnu (L613) ; hud-deliveries L412 R12 rouge aussi, à relire. Reprendre par --resume --wave 2026-11-05-1055-cad --integrate cadence:L583 après L613." }
+    review: { date: 2026-11-05, verdict: "conforme : verdict de la vague tenu ; rebase sur main, entrée CHANGELOG par union, config de tests seule", commit: 9396240f1a49d3dc0477956ce73dd119852ce659 }
   - id: L584
     title: "Budget de lot à la dernière passe : quand un lot n'a plus de quoi payer « correction + revue courte » alors que sa revue converge (0 bloquant, majeurs en baisse, au plus 2 restants), la vague prélève cette réserve sur son propre budget restant (plafond orchestrate.budgetTopUp, défaut 300k) au lieu de rendre le lot — 04-11 : L470, L563 et L579 rendus pour budget à une passe de la fin, chacun repris à la main ; mesure avant/après par les « correction non jouée (budget) » des journaux"
     status: done

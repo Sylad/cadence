@@ -106,7 +106,10 @@ describe('L587 probe — --no-fill et fillsFreeSlots', () => {
 describe('L587 probe — vague de lots nommés', () => {
   it('dépôt seul sans cadence.yaml parent : une vague de lot nommé ne plante pas à la lecture de priority:', async () => {
     // Sous-dossier d'un parent à soi : à la racine temporaire partagée, le dépôt aurait pour dépôts tiers (tierRepos) tous les dépôts git des autres tests joués en parallèle,
-    // et un commit citant L1 sur la branche principale de l'un d'eux pendant la session rend le lot handed-back, donc le code 1 (test suivant).
+    // et un commit citant L1 sur la branche principale de l'un d'eux pendant la session rend le lot handed-back, donc le code 1 (mécanisme rejoué par le test suivant).
+    // Que ce soit la cause du code 1 vu sur le runner GitHub (tests.yml rouge à bff9f5d, e1f2dbf, def1682) reste une HYPOTHÈSE : non reproduit en local ni dans une image
+    // de runner (HOME vide, sans config git globale, CI=true), aucun run CI du correctif, et la répartition Node 22 rouge 3/3 / Node 24 vert 3/3 n'est pas expliquée.
+    // Si ce test rougit encore, son message d'échec porte la sortie, les erreurs et le journal de la vague : c'est là que la preuve se lit.
     const repo = join(tempDir(), 'solo');
     repoAt(repo, 'solo', 2);
     const s = scene();

@@ -2500,6 +2500,7 @@ lots:
     started: 2026-11-05
     notes:
       - { date: 2026-11-05, text: "titre remplacé : « Porte déportée sur mini-blue pour cadence (orchestrate.gate.host, docs/remote-gate.md) : préparer WSL de mini-blue (node, git, clé), déclarer l'hôte, jouer la porte des lots là-bas ; mesurer avant et après sur trois lots réels, durée de porte et charge de Big-Blue (05-11 : 8 à 13 min sous charge 43, environ 4 min seule) ; avec repli local si l'hôte ne répond pas »" }
+    review: { date: 2026-11-05, verdict: "conforme : majeur tranché par le lead, le titre ramène le lot au code et à l'hôte, activation et mesure confiées à L618 ; doublon du CHANGELOG retiré", commit: 22f98ffddcc54d8c230d72ed5698f4159d2fb740 }
   - id: L618
     title: "Activer la porte déportée dans cadence.yaml (orchestrate.gate: host mini-blue-wsl, install npm ci, refs main et origin/main, test de la config sauvé par L617), une fois L617 en service ; mesurer sur trois lots réels en vague la durée de porte et la charge de Big-Blue, avant et après (8 à 13 min sous charge 43 le 05-11)"
     status: todo

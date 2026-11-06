@@ -2783,6 +2783,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme : les 2 majeurs de la revue précédente sont corrigés (rejeu mesuré : 0 refus sur les 80 derniers fix( touchant src/, 0 citation périmée sur le diff du lot ; le brief fix nomme les identifiants et garde la consigne même sans ligne non touchée) ; 1 mineur nouveau (optionPresent compte un commentaire de src/ comme présence d'une option) — orchestré (vague 2026-11-06-1559, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant: 0 blocking, 0 major — le rebase ne change que le contexte du CHANGELOG (range-diff identique pour le code, les tests et docs/raf.md) ; 5 mineurs déjà notés restent ouverts (docs-ok vide, commentaire dans optionPresent, portée des options dans docs/raf.md, test R10 provisoire, hook.docs à poser dans ce dépôt)", commit: dec4cd5e3d20ea54cd71449e76aa422e336983a1 }
   - id: L649
     title: "constats écartés L622 : la règle inchange compare aussi par fichier et ligne (ou classe) un constat repris reformulé ; niveau : source (le brief de revue reçoit les mineurs notés, déjà livré par L646 une fois en service) puis correction (écart à la lecture) ; niveau le plus tôt : source ; mesure : taux d'écartés lu par cadence perf sur 3 vagues > 0 quand un mineur est relisté, 0 mineur relisté plus de 1 fois"
     status: doing

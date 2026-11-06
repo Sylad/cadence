@@ -278,15 +278,16 @@ export function prepareTree(t: TreeSpec): { ok: true; reused: boolean } | { ok: 
  * (git emporte la config de cadence) et son worktree déplacé vers `dir` : le reste de l'orchestration, qui ne connaît que les noms de la vague, la voit
  * comme la sienne. Rend la branche reprise, ou null (rien à reprendre). Jamais la branche d'une vague vivante.
  * Une branche que la reprise ne pourrait pas mener à l'intégration est refusée sans y toucher (`refused` dit pourquoi) : son worktree porte un fichier suivi modifié
- * (R11 : comme `--resume`, la session n'y démarre pas), ou un de ses commits touche un fichier du plan (`opts.planFiles`, relatifs au dépôt : le plan n'est écrit que par le programme). Un `git worktree move` ou `git branch -m` qui échoue est refusé de même, avec la cause de git (le déplacement est défait).
+ * (R11 : comme `--resume`, la session n'y démarre pas), un de ses commits touche un fichier du plan (`opts.planFiles`, relatifs au dépôt : le plan n'est écrit que par le programme), ou elle est périmée (L665 : `branchStaleness`). Un `git worktree move` ou `git branch -m` qui échoue est refusé de même, avec la cause de git (le déplacement est défait).
  */
-export function recoverTree(repo: string, branch: string, dir: string, base: string, opts: { planFiles: ReadonlySet<string>; alsoSlugs: readonly string[] } = { planFiles: new Set(), alsoSlugs: [] }): { from: string; unintegrated: number } | { from: string; refused: string } | null {
+export function recoverTree(repo: string, branch: string, dir: string, base: string, opts: { planFiles: ReadonlySet<string>; alsoSlugs: readonly string[] } = { planFiles: new Set(), alsoSlugs: [] }): { from: string; unintegrated: number; behind: number; conflicts: string[] } | { from: string; refused: string } | null {
   const { planFiles, alsoSlugs } = opts;
   const found = keptBranchesOfLot(repo, branch, [branch.split('/').slice(2).join('/'), ...alsoSlugs]).find((t) => t.base === base);
   if (!found || branchSha(repo, branch) !== null) return null;
   tryGit(repo, 'worktree', 'prune');
   const moved = found.dir !== null && existsSync(found.dir);
-  const refused = recoveryRefusal(repo, found, base, planFiles);
+  const age = branchStaleness(repo, found.branch, base);
+  const refused = recoveryRefusal(repo, found, base, planFiles, age);
   if (refused) return { from: found.branch, refused };
   try {
     if (moved) {
@@ -298,18 +299,46 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
     if (moved && existsSync(dir) && !existsSync(found.dir as string)) tryGit(repo, 'worktree', 'move', dir, found.dir as string);
     return { from: found.branch, refused: `déplacement ou renommage de la branche refusé par git (${gitFailure(e)}), rien n'a bougé` };
   }
-  return { from: found.branch, unintegrated: found.unintegrated };
+  return { from: found.branch, unintegrated: found.unintegrated, behind: age.behind, conflicts: age.conflicts };
+}
+
+/** Au-delà de ce nombre de commits de la branche du dépôt absents de la branche gardée, la reprise est refusée (L665 : 68,2 min de mur perdues sur une branche à 6 conflits connus). */
+export const STALE_BASE_COMMITS = 100;
+
+/**
+ * L'âge d'une branche gardée par rapport à la branche du dépôt (L665) : `behind`, les commits de `base` qu'elle n'a pas, et `conflicts`, les fichiers que
+ * `git merge-tree --write-tree` (fusion à blanc, rien n'est écrit dans l'arbre ni dans les branches) donne en conflit en la fusionnant dans `base`.
+ * Un `merge-tree` illisible (git sans `--write-tree`, branche inconnue) ne donne aucun conflit : la reprise n'est pas refusée sur une mesure absente.
+ */
+export function branchStaleness(repo: string, branch: string, base: string): { behind: number; conflicts: string[] } {
+  const behind = Number(tryGit(repo, 'rev-list', '--count', `refs/heads/${base}`, '--not', `refs/heads/${branch}`) ?? 0);
+  try {
+    execFileSync('git', ['merge-tree', '--write-tree', '--name-only', '--no-messages', `refs/heads/${base}`, `refs/heads/${branch}`], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return { behind, conflicts: [] };
+  } catch (e) {
+    const { status, stdout } = e as { status?: number; stdout?: unknown };
+    // sortie sous `--name-only --no-messages` : le sha de l'arbre, puis un fichier en conflit par ligne
+    return { behind, conflicts: status === 1 && typeof stdout === 'string' ? [...new Set(stdout.split('\n').slice(1).filter(Boolean))] : [] };
+  }
+}
+
+/** Les conflits ou l'âge d'une branche, dits pour le journal : « main a N commit(s) d'avance et K conflit(s) (fichiers) ». */
+export function stalenessText(age: { behind: number; conflicts: string[] }): string {
+  return `main a ${age.behind} commit(s) d'avance et ${age.conflicts.length} conflit(s)${age.conflicts.length ? ` (${age.conflicts.join(', ')})` : ''}`;
 }
 
 /**
- * Pourquoi la reprise refuserait cette branche gardée sans y toucher, ou null : son worktree porte un fichier suivi modifié (R11), ou un de ses commits
- * touche un fichier du plan (`planFiles`, relatifs au dépôt). Ne touche à rien : `recoverTree` et le `--dry-run` (L581) appliquent ainsi les mêmes refus.
+ * Pourquoi la reprise refuserait cette branche gardée sans y toucher, ou null : son worktree porte un fichier suivi modifié (R11), un de ses commits
+ * touche un fichier du plan (`planFiles`, relatifs au dépôt), ou elle est périmée (L665 : plus de `STALE_BASE_COMMITS` commits de `base` d'avance, ou des conflits
+ * à la fusion à blanc ; `age` évite de la mesurer deux fois). Ne touche à rien : `recoverTree` et le `--dry-run` (L581) appliquent ainsi les mêmes refus.
  */
-export function recoveryRefusal(repo: string, found: KeptTree, base: string, planFiles: ReadonlySet<string>): string | null {
+export function recoveryRefusal(repo: string, found: KeptTree, base: string, planFiles: ReadonlySet<string>, age = branchStaleness(repo, found.branch, base)): string | null {
   const dirty = found.dir !== null && existsSync(join(found.dir, '.git')) ? trackedDirty(found.dir) : [];
   if (dirty.length) return `son worktree porte des fichiers suivis modifiés (${dirty.join(', ')})`;
   const touched = (tryGit(repo, 'log', '--name-only', '--format=', `refs/heads/${found.branch}`, '--not', `refs/heads/${base}`) ?? '').split('\n').find((f) => planFiles.has(f));
-  return touched ? `un de ses commits modifie le plan (${touched})` : null;
+  if (touched) return `un de ses commits modifie le plan (${touched})`;
+  if (age.behind > STALE_BASE_COMMITS) return `${stalenessText(age)}, plus de ${STALE_BASE_COMMITS} commits d'avance : branche périmée`;
+  return age.conflicts.length ? `${stalenessText(age)} : branche périmée` : null;
 }
 
 /**

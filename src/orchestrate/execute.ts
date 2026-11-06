@@ -20,7 +20,7 @@ import { slotPlace } from './attente.js';
 import { AddFeed, addToLive, openInRepo, type AddAsk, type KnownLot, type LaunchChecks } from './ajout.js';
 import { takeIntegrations } from './integration-vivante.js';
 import { repoBranch } from './integrate.js';
-import { baseBranchOf, keptLines, legacyLotSlug, lotBranch, lotTreeDir, planFileSet, recoverTree } from './worktree.js';
+import { baseBranchOf, keptLines, legacyLotSlug, lotBranch, lotTreeDir, planFileSet, recoverTree, stalenessText } from './worktree.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin } from './node-env.js';
 import { endOfWaveLines } from '../inspect-read.js';
@@ -114,7 +114,7 @@ export function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (l
       const recovered = !baseBranchOf(repo, lotBr) && c.lot.next !== 'integrate' && branch && c.config.worktrees ? recoverTree(repo, lotBr, dir, branch, { planFiles: planFileSet(c.loadPlan(), repo), alsoSlugs: oldSlugs(c.lot.project, c.lot.lot) }) : null;
       if (recovered && 'refused' in recovered) log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente non reprise : ${recovered.refused} ; le lot repart de zéro (à nettoyer à la main, ou intégration à la main documentée)`);
       else if (recovered) {
-        log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente reprise (${recovered.unintegrated} commit(s) non intégré(s)) : le lot repart de son travail`);
+        log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente reprise (${recovered.unintegrated} commit(s) non intégré(s), ${stalenessText(recovered)}) : le lot repart de son travail`);
         // L311 : le lot repris ne repasse pas par le contrôle préalable. Il reprend les constats de sa dernière revue (état de la vague qui l'a rendu) et repart à leur correction, ou à la revue quand il en a déjà passé une sans constat ; rendu avant sa première revue (ou état illisible ; les constats `tests` d'un lot rendu pour tests rouges ne font pas une revue, L318), il repart à l'écriture.
         const old = new RunStore(store.launchDir, recovered.from.split('/')[1]).readLot(c.lot.project, c.lot.lot);
         c.lot.resumedFrom = recovered.from.split('/')[1];

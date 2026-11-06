@@ -1,0 +1,185 @@
+sujet:
+  id: migration-cliquet-regles
+  titre: Contrat de --migrer et de la porte du cliquet de qualité (correction, découpage, déplacement, migrations successives)
+  lot: L477
+  perimetre:
+    modules: [scripts/qualite.mjs, src/orchestrate/integrate.ts]
+    endpoints: []
+    jobs: ["étape d'intégration de orchestrate (resolveBaseline et settleBaseline, qui appellent comparerMigration)"]
+    hors_perimetre:
+      - "le calcul de la mesure (ESLint, knip, jscpd, directives) et le format de qualite-baseline.json : inchangés"
+      - "la garde de configuration (configChangee), le retard de origine/main, --init : inchangés"
+      - "la résolution des conflits de base à l'intégration (fiche base-cliquet-integration, L538) : seul son contrôle par comparerMigration est touché (R13)"
+
+cas:
+  - id: C1
+    titre: Un fichier trop gros est découpé en morceaux et la base est migrée
+    acteur: une session de lot (ou le lead)
+    declencheur: commande node scripts/qualite.mjs --migrer --contre main
+    preconditions:
+      - la base du lot existe et la porte vient de l'accepter (elle ne dépasse pas celle du départ du lot)
+      - un fichier du départ du lot a été coupé en plusieurs fichiers neufs, ou renommé, ou une de ses fonctions a été déplacée dans un fichier neuf
+    nominal:
+      - La commande mesure le code, puis lit la base du lot et la base du point de départ (merge-base avec la référence).
+      - Elle vérifie qu'aucune clé d'un fichier qui existait au départ ne monte et que le total de chaque mesure ne monte pas.
+      - Pour chaque outil et règle, elle somme les mesures des fichiers neufs et la compare à ce que les fichiers sources ont perdu sur cette règle.
+      - La somme est strictement plus petite que la perte (un découpage), ou égale quand la source garde un défaut de la règle (une fonction déplacée entière).
+      - Elle réécrit la base avec la mesure et répond « migrée » en code 0.
+    alternatives:
+      - { si: un fichier existant monte sur une clé, ou un total monte, alors: refus code 1, base intacte, regles: [R2, R12] }
+      - { si: un défaut neuf est ajouté dans un fichier neuf et payé par une correction ailleurs (un fichier qui n'est ni supprimé ni source d'un défaut restant), alors: refus code 1 de ce fichier neuf, base intacte, regles: [R3, R6, R12] }
+      - { si: un vrai morceau et un fichier neuf compensé par un gain ailleurs sont présentés ensemble, alors: leur somme dépasse la perte des sources, tous deux refusés, regles: [R3, R12] }
+      - { si: le fichier source est renommé sans rien perdre (morceau égal à la perte), alors: refus, un renommage n'est pas un découpage, regles: [R4] }
+      - { si: une fonction est déplacée entière vers un fichier neuf et la source garde un défaut de la règle, alors: acceptée si la somme est au plus la perte, regles: [R5] }
+      - { si: un fichier neuf a une mesure à 0, alors: ignoré, regles: [R7] }
+      - { si: la commande est lancée sans --contre, alors: sortie 2, rien n'est écrit, regles: [R8] }
+      - { si: un second --migrer suit un premier (avec ou sans --ecrire entre les deux), alors: les morceaux déjà acceptés consomment le crédit de leur règle et ne sont pas refusés pour autant, regles: [R9, R10] }
+    resultat: La base porte les fichiers neufs sans qu'un défaut neuf ait été admis.
+  - id: C2
+    titre: Un lot corrige un fichier, sans découper, puis fige le gain
+    acteur: une session de lot
+    declencheur: commande node scripts/qualite.mjs --ecrire (puis la porte avec --contre main)
+    preconditions:
+      - un fichier du départ du lot a maigri ou n'a plus de défaut, sans fichier neuf qui le porte
+    nominal:
+      - La commande compare la mesure à la base.
+      - Rien n'empire, la base est baissée et la porte reste verte.
+    alternatives:
+      - { si: la correction fait en même temps apparaître un fichier neuf avec un défaut, alors: --migrer n'accepte pas ce fichier neuf comme un morceau, car la source corrigée ne crédite rien, regles: [R6] }
+      - { si: une fonction grossit sans dépasser la pire de son fichier, alors: la somme des chiffres monte et le cliquet refuse, regles: [R1] }
+    resultat: Une correction se fige ; elle ne sert pas à payer un défaut neuf.
+  - id: C3
+    titre: La porte rejoue la base du lot contre le départ du lot
+    acteur: la porte orchestrate.build et la CI
+    declencheur: commande node scripts/qualite.mjs --contre main
+    preconditions:
+      - la base du lot a pu être migrée, puis sa source corrigée et le gain figé
+    nominal:
+      - La porte applique la comparaison de comparerMigration à la base du lot contre la base du départ.
+      - Elle crédite aussi le gain d'une source corrigée jusqu'à zéro, parce qu'elle rejoue une base déjà acceptée.
+      - Elle répond code 0 si la base ne remonte pas.
+    alternatives:
+      - { si: la base du lot est éditée à la main avec un fichier existant ou un total en hausse, alors: refus code 1, regles: [R2, R12] }
+      - { si: la base éditée donne à un fichier neuf une mesure supérieure à ce que les sources ont perdu, alors: refus code 1, regles: [R3, R11] }
+    resultat: Migrer, corriger le reste, --ecrire puis la porte reste vert ; une base truquée est refusée.
+  - id: C4
+    titre: L'intégration de orchestrate contrôle un commit du lot qui découpe un fichier
+    acteur: l'étape d'intégration de orchestrate
+    declencheur: job orchestrate-integration
+    preconditions:
+      - la base du lot a changé depuis le départ du lot, et main a aussi bougé
+    nominal:
+      - Le contrôle appelle comparerMigration avec le départ du commit, le commit et la présence des fichiers dans l'arbre de ce commit.
+      - Un découpage passe selon les mêmes règles que --migrer, la base est recomposée.
+    alternatives:
+      - { si: le commit ajoute un défaut neuf compensé ailleurs, alors: la base n'est pas recomposée, le rebase est abandonné comme aujourd'hui, regles: [R3, R13] }
+    resultat: Le découpage légitime passe l'intégration, le défaut compensé non.
+
+regles:
+  - id: R1
+    cas: [C2]
+    enonce: "Pour ESLint, chaque clé fichier-règle porte le nombre de dépassements et la somme des chiffres mesurés (|total) ; une fonction qui grossit sous la pire du fichier fait donc monter le total, et la comparaison ordinaire du cliquet la refuse."
+    statut: sourcee
+    source: "scripts/qualite.mjs:31-44 (lireEslint, « la somme, pas le pire ») ; test/qualite-l462.test.ts:29 ; demande du lot (« une fonction qui grossit sous le pire chiffre de son fichier passe »)"
+    tests: ["R1 — trois fonctions de complexité 463, 20 et 18 dont la troisième passe à 400 : le total monte et la comparaison refuse", "R1 — une fonction qui grossit de 18 à 19 sous la pire du fichier est refusée par la porte sur un dépôt réel"]
+  - id: R2
+    cas: [C1, C3]
+    enonce: "Une migration ne fait monter ni une clé d'un fichier qui existait au départ du lot, ni le total d'une mesure (par outil et règle) sur tous les fichiers."
+    statut: sourcee
+    source: "scripts/qualite.mjs:133-146 (comparerMigration) ; docs/qualite.md:44-51 ; test/qualite-l462.test.ts:227 (« une migration ne cache pas une hausse »)"
+    tests: ["R2 — le total qui monte est refusé et nomme « … (total, tous fichiers) »", "R2 — une clé d'un fichier qui existait qui monte est refusée même si le total baisse"]
+  - id: R3
+    cas: [C1, C3, C4]
+    enonce: "Pour chaque outil et règle, la somme des mesures des fichiers neufs ne dépasse pas ce que les fichiers sources ont perdu sur cette règle : un défaut neuf est refusé même quand un gain ailleurs fait baisser le total, et un morceau légitime présenté avec un tel défaut est refusé avec lui, puisque leur somme dépasse la perte."
+    statut: sourcee
+    source: "demande du lot : « compter la somme des excès par fichier et par règle, refuser un défaut neuf même compensé » ; cas mesurés par la revue (défaut neuf d'un fichier neuf compensé par un gain ailleurs)"
+    tests: ["R3 — fichier neuf de 650 lignes et fichier ancien de 700 corrigé à 0 sans découpe : le fichier neuf est refusé alors que le total baisse", "R3 — un morceau de 400 et un fichier neuf compensé de 600 pour une source qui a perdu 1000 : les deux sont refusés", "R3 — découper 3047 lignes en trois de 1000 passe toujours (test R10 existant)"]
+  - id: R4
+    cas: [C1]
+    enonce: "Une source est un fichier du départ qui n'est plus dans l'arbre de travail (coupé ou renommé) : le morceau neuf doit être strictement plus petit que sa perte, donc un renommage pur est refusé."
+    statut: hypothese
+    si_faux: "Si un renommage doit passer, il faut admettre un morceau égal à la perte pour un fichier disparu ; seule la comparaison change (stricte ou large), aucune donnée stockée."
+    tests: ["R4 — un fichier de 1000 lignes renommé à l'identique : refusé", "R4 — un fichier coupé en deux morceaux de 600 et 300 : accepté"]
+  - id: R5
+    cas: [C1]
+    enonce: "Une source encore présente qui garde un défaut de la règle (une fonction déplacée entière dans un fichier neuf) autorise une somme neuve égale à sa perte, car une fonction ne se coupe pas."
+    statut: hypothese
+    si_faux: "Si la somme devait être strictement plus petite, déplacer une fonction entière serait refusé et il faudrait la réduire au passage ; seule l'inégalité change."
+    tests: ["R5 — fonction de complexité 30 déplacée entière, la source garde une autre fonction en défaut : acceptée", "R5 — le même déplacement avec une fonction qui a grossi au passage (31 pour 30 perdus) : refusé"]
+  - id: R6
+    cas: [C1, C2]
+    enonce: "À --migrer, un fichier du départ encore présent dont la règle n'a plus aucun défaut est une correction : son gain ne crédite aucun fichier neuf."
+    statut: hypothese
+    si_faux: "Si ce cas est un découpage (cli.ts 1000 → 350 plus cli-plan.ts 650, le cas le plus courant), il est refusé à tort : voir la question du rapport sur la manière de distinguer une coupe d'une correction."
+    tests: ["R6 — fichier de 700 lignes ramené à 350 (plus de défaut) et fichier neuf de 650 : le fichier neuf est refusé tant que la question n'est pas tranchée", "R6 — fichier corrigé sans fichier neuf : --ecrire fige le gain"]
+  - id: R7
+    cas: [C1]
+    enonce: "Une mesure à 0 d'un fichier neuf n'ajoute aucun défaut ; les clés de comptage (nombre de dépassements, blocs jscpd) ne sont pas sommées, seules les clés qui portent un chiffre."
+    statut: sourcee
+    source: "scripts/qualite.mjs:109-123 (estCompteur et totaux : « les autres portent le chiffre à additionner »)"
+    tests: ["R7 — un fichier neuf à 0 n'est pas refusé et n'entre pas dans la somme", "R7 — le nombre de dépassements d'un fichier neuf n'est pas ajouté à la somme des chiffres"]
+  - id: R8
+    cas: [C1]
+    enonce: "--migrer sans --contre sort en code 2 et n'écrit rien."
+    statut: sourcee
+    source: "scripts/qualite.mjs:365 ; test/qualite-l462.test.ts:235"
+    tests: ["R8 — --migrer sans --contre : code 2, base intacte"]
+  - id: R9
+    cas: [C1]
+    enonce: "--migrer ne fait jamais remonter la base du lot : les fichiers existants et les totaux sont jugés contre la base du lot, que la porte vient d'accepter, de sorte qu'un gain figé par --ecrire n'est pas repris par un --migrer suivant."
+    statut: hypothese
+    si_faux: "Si --migrer jugeait contre la base du départ du lot, un gain figé pourrait servir à payer un défaut neuf après coup ; seule la base de comparaison change."
+    tests: ["R9 — gain figé par --ecrire puis fichier neuf du même montant : --migrer refuse", "R9 — la base écrite par --migrer n'a aucune clé au-dessus de la base du lot avant l'appel"]
+  - id: R10
+    cas: [C1]
+    enonce: "Un morceau déjà accepté (la base du lot le porte à sa mesure courante au moins) n'est pas refusé de nouveau, même si sa source a été corrigée depuis ; il consomme le crédit de sa règle à sa mesure courante, de sorte que deux --migrer ne permettent jamais plus qu'un seul."
+    statut: hypothese
+    si_faux: "Si un morceau accepté devait être rejugé, un second découpage après --ecrire serait refusé (cas des passes 5 à 7 du 02-11) ; si les morceaux ne consommaient pas le crédit, deux --migrer admettraient deux fois le même défaut."
+    tests: ["R10 — premier --migrer accepté, source corrigée, --ecrire, second --migrer : le morceau est gardé", "R10 — deux --migrer successifs de morceaux dont la somme dépasse la perte de la source : le second est refusé"]
+  - id: R11
+    cas: [C3]
+    enonce: "La porte (--contre) applique la même comparaison à la base du lot mais crédite aussi le gain d'une source corrigée jusqu'à zéro, parce qu'elle rejoue une base acceptée ; la stricte interdiction d'un défaut compensé tient donc à --migrer, et une base éditée à la main qui donne à un fichier neuf au plus le gain d'un fichier corrigé passe la porte."
+    statut: hypothese
+    si_faux: "Si la porte devait être aussi stricte, migrer, corriger le reste puis --ecrire rougirait la porte ; si cette faille d'une base éditée à la main est inacceptable, c'est la question du rapport."
+    tests: ["R11 — migrer, corriger la source, --ecrire : la porte reste verte", "R11 — base éditée à la main avec un fichier neuf plus grand que la perte de tous les fichiers : la porte refuse"]
+  - id: R12
+    cas: [C1, C3]
+    enonce: "Un refus rend le code 1, laisse la base intacte et nomme chaque mesure en cause ; un fichier neuf refusé porte la mention « fichier neuf : pas plus petit que ce que les fichiers existants ont perdu »."
+    statut: hypothese
+    si_faux: "Seul le texte du message change (le code de sortie et la base intacte sont déjà ceux de scripts/qualite.mjs:367)."
+    tests: ["R12 — fichier neuf refusé : le texte nomme la clé, « 0 → n » et la mention, la base est inchangée"]
+  - id: R13
+    cas: [C4]
+    enonce: "Les deux appels de l'intégration à comparerMigration (integrate.ts:226 et :287) fournissent la présence des fichiers dans l'arbre du commit contrôlé (resp. du sommet du lot), pour qu'un découpage légitime reste accepté comme à L538 ; sans cette information aucune source n'existe et tout fichier neuf serait refusé."
+    statut: hypothese
+    si_faux: "Si l'intégration ne recevait pas la présence, tout lot qui découpe un fichier verrait son rebase abandonné ; seuls les appelants changent."
+    tests: ["R13 — commit qui coupe un fichier en deux : base recomposée à l'intégration", "R13 — commit qui ajoute un défaut neuf payé par une correction : rebase abandonné"]
+
+contrats:
+  - id: A1
+    appel: commande node scripts/qualite.mjs --migrer --contre <ref>
+    entree: "la mesure du code courant, qualite-baseline.json du lot, la base et la liste des fichiers du merge-base de HEAD et de <ref>"
+    sortie: "code 0 : « qualite-baseline.json migrée : N mesures, aucun total en hausse. » et la base réécrite ; code 1 : refus, base intacte ; code 2 : usage ou outil en échec"
+    erreurs:
+      - { code: log error, message: "--migrer exige --contre <ref> : les fichiers « qui existaient » sont ceux du point de départ du lot." }
+      - { code: log error, message: "Qualité : la migration empire N mesure(s) (ni un fichier qui existait ni le total ne peuvent monter) :" }
+      - { code: log error, message: "usage : node scripts/qualite.mjs [--init | --ecrire | --migrer] [--contre <ref>]" }
+      - { code: log error, message: "qualite-baseline.json absente : lancer « node scripts/qualite.mjs --init » une fois, puis la versionner." }
+    regles: [R2, R3, R4, R5, R6, R7, R8, R9, R10, R12]
+  - id: A2
+    appel: commande node scripts/qualite.mjs --contre <ref>
+    entree: "la base du lot et celle du merge-base avec <ref>"
+    sortie: "code 0 si la base du lot ne remonte pas et que rien n'empire, sinon code 1"
+    erreurs:
+      - { code: log error, message: "qualite-baseline.json remonte par rapport à N (elle ne peut que baisser : corriger le code, pas la base) :" }
+    regles: [R1, R2, R3, R11, R12]
+  - id: A3
+    appel: job orchestrate-integration
+    entree: "comparerMigration (resolveBaseline, settleBaseline) : départ du commit, commit, existence et présence des fichiers dans l'arbre des commits"
+    sortie: "la base recomposée ou, si le contrôle refuse, aucune résolution (rebase abandonné)"
+    erreurs: []
+    sans_erreur: "le job ne répond à aucun appelant ; un refus du contrôle abandonne le rebase comme aujourd'hui (fiche base-cliquet-integration, R3)"
+    regles: [R3, R13]
+
+donnees:
+  - { id: D1, objet: "qualite-baseline.json (carte plate clé → nombre, clés eslint|fichier|règle, …|total, knip|, jscpd|, directive|)", existant: true, modification: aucune, note: "format, clés et écriture inchangés ; la somme des excès par fichier et par règle est déjà la clé …|total" }

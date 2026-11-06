@@ -2837,6 +2837,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "compliant — orchestré (vague 2026-11-06-1805, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 7c5a94df561feba96e46243a0b0646e6c2189aac }
   - id: L656
     title: "Issue #46 : des majeurs de maquette écartés comme inchangés sont dans l'objectif du lot et reviennent en majeurs de revue de code ; un écart ne s'applique pas à un point de l'objectif ; mesure : 0 majeur écarté à la maquette et repris en revue de code"
     status: doing

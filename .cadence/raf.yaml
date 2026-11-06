@@ -2771,9 +2771,10 @@ lots:
     finished: 2026-11-06
   - id: L647
     title: "raf done refuse un lot rendu par une vague et dont les commits de travail ne sont pas sur la branche principale (06-11 : L646 clos par le lead alors que son intégration venait d'être refusée, avec une porte verte qui ne portait pas son code) ; --integrate rend un code de sortie non nul quand le lot est rendu ; mesure : 0 lot clos sans son code"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-11-06
+    started: 2026-11-06
   - id: L648
     title: "doc périmée par un correctif : le brief fix liste les lignes de docs/ et de l'aide qui citent les identifiants que le diff du fix change, et exige leur mise à jour dans le même commit ; hook de commit refuse un commit fix( touchant src/ si une ligne de doc citant un identifiant retiré ou ajouté n'est pas touchée (sauf docs-ok motivé) ; niveau : source (brief), commit (hook) ; niveau le plus tôt : source ; on ne peut pas prévenir plus tôt car le correctif naît après la rédaction de la doc ; mesure : 0 constat de revue « documentation ne suit pas le correctif » par vague, 0 rendu pour une phrase de doc"
     status: todo

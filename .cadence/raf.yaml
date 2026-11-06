@@ -2590,12 +2590,13 @@ lots:
     finished: 2026-11-06
   - id: L627
     title: "cadence inspect : à la fin de chaque vague, le programme mesure le temps par étape de chaque lot et classe les pertes par cause (refus d'intégration, reprise du lead, attente de créneau, conflit), repère une cause déjà vue et propose le lot qui la supprime, sans modèle ; le lead n'a plus à s'en souvenir ; base : l'agent inspecteur-travaux du 05-11 ; tableau imprimé en fin de vague et résumé au tour"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-05
     notes:
       - { date: 2026-11-05, text: "périmètre ajouté par l'inspection du 05-11 : le journal note le début et la fin de chaque porte, pour isoler portes, file et sessions ; 35 à 70 % du temps actif n'est pas de la session claude et n'est pas mesurable aujourd'hui" }
       - { date: 2026-11-05, text: "indicateurs ajoutés le 05-11 : début et fin de chaque porte, minutes après la première revue, niveau de détection de chaque erreur (écriture, commit, porte, intégration), reprises à la main par cause" }
+    started: 2026-11-06
   - id: L628
     title: "Un lot light ou small qui change un comportement livré joue quand même le précheck des tests scellés (L500) : la vague liste dès le départ les tests qui figent ce qu'il touche, la session s'arrête avec le geste de rescellement, au lieu d'être rendue au commit ; L246 et L248 du 05-11 ; mesure : 0 rendu pour verrou en 7 jours"
     status: done

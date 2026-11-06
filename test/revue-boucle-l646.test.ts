@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -60,8 +60,15 @@ describe('R1 — le brief de fix donne les constats par classe et exige la corre
 });
 
 describe('R1 — la consigne de classe n’est que du gabarit fix', () => {
+  // briefFor crée le TMPDIR de session du lot (state.tmpDir) hors de tempDir(), que seul runLot retire : on le retire à la fin de chaque test.
+  const briefed: Array<() => void> = [];
+  afterEach(() => {
+    for (const f of briefed.splice(0)) f();
+  });
   const brief = (over: Partial<LotState>) => {
-    const c = harness({ script: {} }).lot('L1', { constats: [k('un constat', { classe: 'documentation' })], ...over });
+    const h = harness({ script: {} });
+    const c = h.lot('L1', { constats: [k('un constat', { classe: 'documentation' })], ...over });
+    briefed.push(() => h.store.removeTmpDir(c.lot.project, c.lot.lot));
     return briefFor(c, 'fix');
   };
   it('R1 — le gabarit fix donne la consigne de classe', () => {

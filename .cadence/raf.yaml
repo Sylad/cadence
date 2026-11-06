@@ -2811,9 +2811,10 @@ lots:
     finished: 2026-11-06
   - id: L652
     title: "Issue #45 : verify --gate rejoue la suite au sha qu'une vague a enregistré en accusant readsPlan, quand la vague est lancée deux niveaux au-dessus du dépôt ; aussi vu ici le 06-11 (« verdict rejoué … readsPlan ») ; mesure : verdict repris à ce sha sans rejeu"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-06
+    started: 2026-11-06
   - id: L653
     title: "Issue #48 : un merge de la branche de base dans le worktree d'un lot le fait rendre pour « session a modifié le plan », et les questions de la session sont perdues ; mesure : merge accepté, questions conservées"
     status: todo

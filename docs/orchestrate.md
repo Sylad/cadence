@@ -217,6 +217,10 @@ Moved to [orchestrate-spec.md](orchestrate-spec.md#the-spec-step-of-a-lot-with-s
 
 Moved to [orchestrate-spec.md](orchestrate-spec.md#the-light-mockup-l459).
 
+### The visible fix (L633, issue #43)
+
+Moved to [orchestrate-spec.md](orchestrate-spec.md#the-visible-fix-l633-issue-43).
+
 ### The spec step of a lot with `spec: true`
 
 Moved to [orchestrate-spec.md](orchestrate-spec.md#the-spec-step-of-a-lot-with-spec-true).

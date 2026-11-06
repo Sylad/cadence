@@ -2689,6 +2689,7 @@ lots:
     estimate: 0.2
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "compliant — orchestré (vague 2026-11-06-1124, 0 passe(s) de correction)", commit: 7f9bddd110604cf38d10868f2e46de0386fbb96a, reporte: { de: 4304c1c533e4ba50c97ee0957cdaf6d3051d9eaa, vers: 7f9bddd110604cf38d10868f2e46de0386fbb96a, patchId: 0f494ef04937fe23d56e428153493baf6c9307fb } }
   - id: L639
     title: "La porte joue sur la machine libre : Big-Blue d'abord, mini-blue en débordement, décision d'hôte prise une fois par lot (préflight ssh ConnectTimeout 3), hôte injoignable = repli local sans timeout répété ; mesures du 05-11 : mini-blue 7 min 24 seule, jusqu'à 42 min à plusieurs, Big-Blue ~4 min seule, 50 lignes de repli sur 4 lots ; mesure : 0 « porte déportée indisponible » répété par lot"
     status: doing

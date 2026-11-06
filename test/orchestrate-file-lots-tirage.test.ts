@@ -521,4 +521,103 @@ describe('L498 — tirage de la file approuvée', () => {
       unregisterWave(cadenceHome(), process.ppid);
     }
   });
+
+  it('R7 — un lot de la file n\'est joué qu\'une fois, deux lots du même dépôt en file et trois créneaux', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }, { title: 'a deux' }], z: [{ title: 'z un' }] });
+    await queueAdd(parent, 'a:L1', 'a:L2');
+    const f = fakeDeps();
+    expect(await orchestrate(['z:L1', '--continue', '--max-sessions', '3'], io(parent).io, f.deps)).toBe(0);
+    expect(f.played).toEqual(['z:L1', 'a:L1', 'a:L2']);
+    expect(wavesLots(parent)).toEqual(['z:L1', 'a:L1', 'a:L2']);
+    expect(await show(parent)).toEqual([expect.stringMatching(/tiré par la vague/), expect.stringMatching(/tiré par la vague/)]);
+    expect(journalOf(parent).split('\n').filter((l) => l.includes('file : tire ')).length).toBe(2);
+  });
+
+  it('R7 — un lot de la file n\'est jamais joué comme lot du plan : il attend son créneau et passe à « tiré »', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }], z: [{ title: 'z un' }] });
+    await queueAdd(parent, 'a:L1', 'b:L1');
+    addHold(cadenceHome(), 'sous-agent', 180, new Date('2026-11-06T09:00:00')); // un créneau sur deux pris par le lead
+    const f = fakeDeps();
+    const o = io(parent);
+    expect(await orchestrate(['z:L1', '--continue', '--max-sessions', '2'], o.io, f.deps)).toBe(0);
+    expect(f.played).toEqual(['z:L1', 'a:L1', 'b:L1']);
+    expect(o.out.filter((l) => l.startsWith('continue : tire'))).toEqual([]);
+    expect(o.out.filter((l) => l.startsWith('file : tire'))).toEqual(['file : tire a:L1 (position 1)', 'file : tire b:L1 (position 2)']);
+    expect((await show(parent)).every((l) => /tiré par la vague/.test(l))).toBe(true);
+  });
+
+  it('R19 — deux lots de la file et un lot du plan, deux créneaux : les deux lots de la file passent avant le plan', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }, { title: 'a deux' }], b: [{ title: 'b un' }] });
+    await queueAdd(parent, 'a:L1', 'a:L2');
+    const f = fakeDeps();
+    expect(await orchestrate(['--continue', '--max-sessions', '2'], io(parent).io, f.deps)).toBe(0);
+    expect(f.played).toEqual(['a:L1', 'a:L2', 'b:L1']);
+  });
+
+  it('R7 — lancé depuis un projet, la clé `.:L1` et le lot du plan `a:L1` sont le même lot : joué une fois', async () => {
+    const { dirs } = parentWith({ a: [{ title: 'a un' }, { title: 'a deux' }] });
+    await orchestrate(['queue', 'add', '.:L1'], io(dirs.a).io, fakeDeps().deps);
+    const f = fakeDeps();
+    expect(await orchestrate(['--continue', '--max-sessions', '2'], io(dirs.a).io, f.deps)).toBe(0);
+    expect(f.played).toEqual(['a:L1', 'a:L2']);
+    expect(wavesLots(dirs.a)).toEqual(['a:L1', 'a:L2']);
+    expect((await show(dirs.a))[0]).toMatch(/^1\. \.:L1 — a un — tiré par la vague /);
+    expect(journalOf(dirs.a)).toContain('file : tire .:L1 (position 1)');
+  });
+
+  it('R16 — queue.json corrompu avec --continue : le plan n\'est pas tiré à ce créneau, la file passe avant', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
+    mkdirSync(cadenceHome(), { recursive: true });
+    writeFileSync(queuePath(cadenceHome()), '{ corrompu');
+    const f = fakeDeps();
+    const o = io(parent);
+    expect(await orchestrate(['a:L1', '--continue', '--max-sessions', '1'], o.io, f.deps)).toBe(0);
+    expect(f.played).toEqual(['a:L1']);
+    expect(o.err).toContain("file : illisible ou verrouillée, rien n'est tiré à ce créneau");
+    expect(journalOf(parent)).not.toContain('continue : tire');
+    const alone = io(parent);
+    expect(await orchestrate(['--continue'], alone.io, fakeDeps().deps)).toBe(2); // premier tirage : rien n'est tiré, ni de la file ni du plan
+    expect(alone.err).toContain("file : illisible ou verrouillée, rien n'est tiré à ce créneau");
+  });
+
+  it('R7 — le lancement lève : le lot est rendu à la file (en attente), drop l\'accepte', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }] });
+    await queueAdd(parent, 'a:L1');
+    writeFileSync(join(cadenceHome(), 'waves'), 'pas un dossier'); // le registre des vagues est inutilisable : execute lève
+    const f = fakeDeps();
+    await expect(orchestrate(['--queue'], io(parent).io, f.deps)).rejects.toThrow();
+    expect(f.played).toEqual([]);
+    expect((await show(parent))[0]).toMatch(/en attente$/);
+    const o = io(parent);
+    expect(await orchestrate(['queue', 'drop', 'a:L1'], o.io, fakeDeps().deps)).toBe(0);
+  });
+
+  it('R11 — lots donnés et --queue avec deux créneaux : la file complète le créneau restant dès le premier tour', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
+    await queueAdd(parent, 'b:L1');
+    let during = '';
+    const f = fakeDeps({
+      implement: async (cwd, brief) => {
+        if (/on lot `L1`/.test(brief) && basename(cwd).includes('a')) during = (await show(parent))[0];
+        return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+      },
+    });
+    expect(await orchestrate(['a:L1', '--queue', '--max-sessions', '2'], io(parent).io, f.deps)).toBe(0);
+    expect(during).toMatch(/tiré par la vague/); // b:L1 est tiré avant la fin du tour de a:L1, pas après
+    expect(wavesLots(parent)).toEqual(['a:L1', 'b:L1']);
+  });
+
+  it('R9 — aucune vague vivante ne tient le dépôt : une vague neuve est lancée sur ce lot (--no-fill : le plan de b, dépôt d\'une autre vague, reste hors jeu)', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
+    await queueAdd(parent, 'a:L1');
+    registerWave(cadenceHome(), { pid: process.ppid, wave: 'autre', started: '2026-11-06T09:00:00Z', cwd: parent, repos: [gitRoot(dirs.b)!], cap: 3 });
+    try {
+      const f = fakeDeps();
+      expect(await orchestrate(['--queue', '--no-fill'], io(parent).io, f.deps)).toBe(0);
+      expect(f.played).toEqual(['a:L1']);
+      expect(RunStore.last(parent)!.id).not.toBe('autre');
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
+  });
 });

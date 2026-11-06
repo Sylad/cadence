@@ -148,7 +148,7 @@ export function resolveQueueLot(launch: string, key: string): { project: string;
     return { cause: 'plan illisible' };
   }
   const lot = lots.find((l) => l.id === m[2]);
-  return lot ? { project: m[1], dir, lot, lots } : { cause: 'introuvable' };
+  return lot ? { project: basename(dir), dir, lot, lots } : { cause: 'introuvable' };
 }
 
 /** Un lot de la file mûr pour le tirage (`candidate`), ou la cause qui le fait sauter (`title` : son titre quand le lot existe). */

@@ -1,7 +1,7 @@
 import { relative } from 'node:path';
 import { gitRoot } from '../git.js';
 import type { OrchestrateDeps, OrchestrateIo } from './command.js';
-import { fillRoom, fillStop, queueVerdict, type FillFacts, type FillPlan } from './continue.js';
+import { fillRoom, fillStop, queueVerdict, resolveQueueLot, type FillFacts, type FillPlan } from './continue.js';
 import type { LotCtx } from './cycle.js';
 import { measuredBudgetsAt } from './budget-mesure.js';
 import { effectiveState, QueueError, QueueSession, SkipLog, type Queued, type QueueEntry } from './queue.js';
@@ -253,9 +253,11 @@ export async function queueFill(q: QueueRun, f: QueueFillFacts, vacant: number, 
     q.note({ line: QUEUE_DOWN, warn: true });
     return { ...none, down: true };
   }
+  // Les lots qui attendent dans la file, même quand aucun créneau ne leur est libre : le plan ne les tire pas (R19, R7).
+  const waiting = new Set(pending.flatMap((p) => { const ref = resolveQueueLot(f.launch, p.entry.key); return 'lot' in ref ? [lotKey(ref.project, ref.lot.id)] : []; }));
   const slots = Math.min(vacant, freeSlots(liveWaves(f.home), f.cap, liveHolds(f.home, f.io.now()).length));
-  if (!pending.length || slots <= 0) return none;
-  const s: Scan = { remaining, held: f.all.filter((l) => !lotFinished(l)), measured: measuredBudgetsAt(f.launch, f.io), others: liveWaves(f.home).filter((w) => w.pid !== process.pid), inWave: new Set(f.all.map((l) => lotKey(l.project, l.lot))), waiting: new Set(), targets: [], skipped: 0, pushed: 0 };
+  if (!pending.length || slots <= 0) return { ...none, waiting };
+  const s: Scan = { remaining, held: f.all.filter((l) => !lotFinished(l)), measured: measuredBudgetsAt(f.launch, f.io), others: liveWaves(f.home).filter((w) => w.pid !== process.pid), inWave: new Set(f.all.map((l) => lotKey(l.project, l.lot))), waiting, targets: [], skipped: 0, pushed: 0 };
   for (const p of pending) await scanEntry(q, f, p, s, g.push);
   const added = s.targets.length ? await g.fill({ targets: s.targets, room: remaining }, slots, g.canRun) : [];
   if (!added.length && !s.pushed) q.note({ line: `file : aucun lot mûr (${s.skipped} sauté(s))`, skip: { key: '', cause: `aucun lot mûr (${s.skipped})` } });

@@ -2767,6 +2767,7 @@ lots:
     started: 2026-11-06
     notes:
       - { date: 2026-11-06, text: "06-11 : clos à tort par le lead, l'intégration avait été refusée (exit 0 de la commande, résultat non lu avant raf done) ; rouvert, son code n'est pas sur main." }
+    review: { date: 2026-11-06, verdict: "conforme : escalade Fable conforme, dernier constat (doc de remise en état) corrigé en 554a6dc, relu par le lead", commit: 554a6dcb9904b95d938fbabf09570e46e7d89a03 }
   - id: L647
     title: "raf done refuse un lot rendu par une vague et dont les commits de travail ne sont pas sur la branche principale (06-11 : L646 clos par le lead alors que son intégration venait d'être refusée, avec une porte verte qui ne portait pas son code) ; --integrate rend un code de sortie non nul quand le lot est rendu ; mesure : 0 lot clos sans son code"
     status: todo

@@ -29,14 +29,22 @@ interface ProbeMoment {
   pays: boolean;
   reached: boolean;
   count: string;
+  /** Le diff du lot touche `src/orchestrate/cycle/` (L663) : un lot express qui y touche garde la sonde. */
+  cycle: boolean;
 }
+
+/** Le dossier du cycle d'un lot : ses étapes écrivent l'état que d'autres lots lisent (L654 : `handBack` rendait avant d'écrire `maquetteConstats`). */
+const CYCLE_DIR = 'src/orchestrate/cycle/';
+
+/** Le diff du lot touche-t-il le cycle (L663) ? */
+export const touchesCycle = (files: ReadonlySet<string>): boolean => [...files].some((f) => f.startsWith(CYCLE_DIR));
 
 /**
  * Décide la sonde d'un lot (R3, R6) : vrai quand elle est la prochaine étape. Décidée une seule fois par lot (`l.probe`), jouée ou écartée avec un warning qui dit pourquoi.
- * Sans la clé `orchestrate.probe`, rien : ni champ ni warning.
+ * Sans la clé `orchestrate.probe`, rien : ni champ ni warning. Un lot express n'a pas de sonde, sauf quand son diff touche `src/orchestrate/cycle/` (L663).
  */
 export function scheduleProbe(config: Pick<OrchestrateConfig, 'probe'>, l: LotState, o: ProbeMoment): boolean {
-  if (!config.probe || l.probe || o.skip || l.express) return false;
+  if (!config.probe || l.probe || o.skip || (l.express && !o.cycle)) return false;
   l.probe = true;
   if (!o.reached) {
     l.warnings.push("sonde de cas limites non jouée : le diff du lot ne touche aucun fichier de code que la porte (orchestrate.testGate.code) atteint");

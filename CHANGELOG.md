@@ -83,6 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
+- A test that builds by hand the state a step of the cycle writes no longer passes the lot (L663, [docs/orchestrate-cycle.md](docs/orchestrate-cycle.md#express-lane-l519)): the implementation brief requires a lot that reads a state written by a step of the cycle to call the real step in its test (L654: `handBack` returned before writing `maquetteConstats`, 75.4 min of refusals from ready), and an express lot whose diff touches `src/orchestrate/cycle/` keeps the edge-case probe. Target: 0 integration refusals for a state not written before a hand-back over 3 waves.
 - cadence's own `cadence.yaml` plays its gate on the free machine (L661, `orchestrate.gate.overflow: mini-blue-wsl`, [docs/remote-gate.md](docs/remote-gate.md#the-free-machine-first-gateoverflow-l639)): local first, mini-blue when a local gate already holds the machine; target: gates hold < 20 % of the slots on the next wave (44 % in wave 1805).
 
 ### Fixed

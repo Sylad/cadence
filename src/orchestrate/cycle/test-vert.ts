@@ -10,6 +10,7 @@ import { testsVertsSansCode } from '../../test-sans-code.js';
 import { fixAffordable, budgetCount } from './budget.js';
 import { toFix } from './review.js';
 import { sh } from './sh.js';
+import { touchesCycle } from '../probe.js';
 
 /**
  * Porte « test vert sans le code du lot » (L646), jouée au plus une fois par lot, sur le dépôt du lot seul, après une écriture aux portes vertes et après la porte « code sans test » : un test ajouté par le lot qui reste vert
@@ -47,6 +48,9 @@ function lotTouched(c: LotCtx, plan: Plan): Set<string> {
     ...(c.lot.repos ?? []).flatMap((r) => [...filesOf(r.path, repoWork(plan, r, c.lot.lot), { withoutDeleted: true })]),
   ]);
 }
+
+/** Le diff du lot touche-t-il `src/orchestrate/cycle/` (L663) ? Décide la sonde d'un lot express. */
+export const lotTouchesCycle = (c: LotCtx, plan: Plan): boolean => touchesCycle(lotTouched(c, plan));
 
 /** La porte du projet atteint-elle le diff du lot (L655) ? Sans `orchestrate.testGate`, rien ne le dit : vrai. */
 export function gateReachesLot(c: LotCtx, plan: Plan): boolean {

@@ -17,7 +17,7 @@ import { porteApresEcriture } from './porte-ciblee.js';
 import { acceptGreen } from './accept-step.js';
 import { gateLabel } from '../gate-parts.js';
 import { gapMessage } from '../../docsync.js';
-import { gateReachesLot, testGates } from './test-vert.js';
+import { gateReachesLot, lotTouchesCycle, testGates } from './test-vert.js';
 import { fixAffordable, budgetCount } from './budget.js';
 import { redAnnounced } from '../objectif.js';
 import { scheduleProbe, PROBE_RESERVE, type ProbeIo } from '../probe.js';
@@ -181,7 +181,7 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
   // Porte « code modifié sans test » (L287) : le diff du lot (son dépôt et ses voisins, fichiers supprimés exclus), toutes sessions comprises, touche du code sans fichier de test → correction directe, sans session de revue. Une seule fois par lot, jamais pendant la passe des mineurs, ni quand la correction prendrait la dernière passe (la revue n'en aurait plus), ni quand le budget du lot ne paie plus la correction (la revue, elle, part toujours).
   if (await testGates(c, plan, minorsPass)) return;
   // Sonde de cas limites (L497) : une fois par lot, après la porte « code sans test », avant le bibliothécaire et la revue.
-  if (scheduleProbe(c.config, l, { skip: minorsPass || !alreadyDone, late: l.pass >= MAX_PASSES - 1, pays: fixAffordable(l, false, PROBE_RESERVE), count: budgetCount(l), reached: !c.config.probe || gateReachesLot(c, plan) })) {
+  if (scheduleProbe(c.config, l, { skip: minorsPass || !alreadyDone, late: l.pass >= MAX_PASSES - 1, pays: fixAffordable(l, false, PROBE_RESERVE), count: budgetCount(l), reached: !c.config.probe || gateReachesLot(c, plan), cycle: !!c.config.probe && !!l.express && lotTouchesCycle(c, plan) })) {
     // Les contrôles de la porte restent au lot pendant la sonde : sans nouveau commit de sa part, la revue les reprend pour ce HEAD.
     l.checks = runs.length ? { head: git(wd(c), 'rev-parse', 'HEAD'), tree: git(wd(c), 'rev-parse', 'HEAD^{tree}'), runs } : undefined;
     return save(c);

@@ -117,7 +117,7 @@ export function newsText(lot: string, captureDir?: string): string {
 
 /** Consigne `{{express}}` du brief d'implémentation d'un lot express ; vide ailleurs. */
 export const EXPRESS_BRIEF = [
-  'Express lane (touch-up of at most 0.1 day): this is the only session of the lot. There is no precheck, no edge-case probe and no separate code review: the lead reads the diff and looks at the capture. So name the file and the scope you touched in your report, keep the diff to what the goal says, and do not widen it.',
+  'Express lane (touch-up of at most 0.1 day): this is the only session of the lot. There is no precheck and no separate code review, and no edge-case probe unless the lot touches src/orchestrate/cycle/ (then the probe plays once after the gate of the program): the lead reads the diff and looks at the capture. So name the file and the scope you touched in your report, keep the diff to what the goal says, and do not widen it.',
   'No new test for a purely visual change (the existing suite runs and must stay green); a change of behaviour still gets its test first. The full suite and the build run once, at the end.',
 ].join('\n');
 

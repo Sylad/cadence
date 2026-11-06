@@ -78,6 +78,7 @@ export function precheckNothingToFind(plan: Plan, root: string, lot: string, rep
 /** Taille permise de la lecture du précheck rangée dans l'état du lot, marqueur compris (L523). */
 export const PRECHECK_LU_MAX = 4000;
 const PRECHECK_LU_CUT = '[…tronqué]';
+const PRECHECK_EDGE_CASES = 'Edge cases of the rule:';
 
 /** Ligne du journal quand Sonnet a relu un « oui » du modèle local (L146) : il le confirme ou le contredit. */
 export function localYesNote(verdict: 'oui' | 'partiel' | 'non'): string {
@@ -88,7 +89,7 @@ export function localYesNote(verdict: 'oui' | 'partiel' | 'non'): string {
 
 /**
  * Range la lecture du précheck (`lu` du rapport, facultatif : `checkShape` ne le contrôle pas) dans `precheckLu` du lot : rognée de ses
- * espaces, coupée à `PRECHECK_LU_MAX` caractères marqueur compris (au plus : un caractère hors plan de base n'est pas coupé en deux). Elle remplace toute lecture rangée plus tôt. Rien n'est rangé quand `lu` est absent, vide ou d'espaces ; un `lu`
+ * espaces, coupée à `PRECHECK_LU_MAX` caractères marqueur compris (au plus : un caractère hors plan de base n'est pas coupé en deux) ; la section « Edge cases of the rule: » de fin de `lu` est gardée, c'est le début qui est coupé. Elle remplace toute lecture rangée plus tôt. Rien n'est rangé quand `lu` est absent, vide ou d'espaces ; un `lu`
  * qui n'est pas une chaîne est écarté avec un avertissement.
  */
 export function keepPrecheckReading(lot: { precheckLu?: string; warnings: string[] }, lu: unknown): void {
@@ -104,7 +105,14 @@ export function keepPrecheckReading(lot: { precheckLu?: string; warnings: string
     lot.precheckLu = text;
     return;
   }
-  let end = PRECHECK_LU_MAX - PRECHECK_LU_CUT.length;
-  if (/[\uD800-\uDBFF]/.test(text[end - 1])) end -= 1; // ne pas couper une paire de substitution en deux
-  lot.precheckLu = `${text.slice(0, end)}${PRECHECK_LU_CUT}`;
+  const room = PRECHECK_LU_MAX - PRECHECK_LU_CUT.length;
+  const clip = (s: string, end: number): string => (/[\uD800-\uDBFF]/.test(s[end - 1] ?? '') ? s.slice(0, end - 1) : s.slice(0, end)); // pas de paire de substitution coupée en deux
+  const at = text.lastIndexOf(PRECHECK_EDGE_CASES);
+  if (at < 0) {
+    lot.precheckLu = `${clip(text, room)}${PRECHECK_LU_CUT}`;
+    return;
+  }
+  // Les cas limites de la règle sont en fin de `lu` (L666) : c'est la tête qui est coupée, la section est gardée.
+  const tail = text.slice(at);
+  lot.precheckLu = tail.length > room ? `${clip(tail, room)}${PRECHECK_LU_CUT}` : `${clip(text, room - 1 - tail.length)}${PRECHECK_LU_CUT}\n${tail}`;
 }

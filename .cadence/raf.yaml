@@ -2819,11 +2819,12 @@ lots:
     finished: 2026-11-06
   - id: L653
     title: "Issue #48 : un merge de la branche de base dans le worktree d'un lot le fait rendre pour « session a modifié le plan », et les questions de la session sont perdues ; mesure : merge accepté, questions conservées"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
     review: { date: 2026-11-06, verdict: "compliant (0 blocking, 0 major, 1 minor: qualifier la base en `refs/heads/` dans planTouched) — orchestré (vague 2026-11-06-1805, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant after 1 minor fix: qualify the base as refs/heads/<base> in the `git log --not` of planTouched (session.ts:466)", commit: cc39ff227ac9572462fe35ae467e8e0513e149bd }
+    finished: 2026-11-06
   - id: L654
     title: "Issue #47 : vague suspendue ou lot retiré après une revue de maquette non conforme : le tableau dit « revue — » et ne liste que les mineurs ; il doit donner le verdict et les majeurs"
     status: doing

@@ -2937,6 +2937,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "compliant after 2 minor notes: aucun bloquant ni majeur ; le brief `fix` ordinaire reçoit les mineurs ouverts, les gabarits fix-minors et fix-docs gardent leur périmètre, et le CHANGELOG et docs/orchestrate-cycle.md suivent le changement — orchestré (vague 2026-11-06-2055, 1 passe(s) de correction)", commit: c85e758c1ee4fc7fbad2f802ef04dc8a4037a219, reporte: { de: 32f4bff47335ed19f4e3848dec53dbd039871244, vers: c85e758c1ee4fc7fbad2f802ef04dc8a4037a219, patchId: f8a5cda62616263e5cc9e3a8d50c3dc85b4733fe } }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

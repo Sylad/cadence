@@ -40,9 +40,9 @@ const live = { id: 'W', status: 'running', cwd: '/x/a' } as const;
 const stopped = { id: 'W', status: 'suspended' } as const;
 
 describe('L563 — R13 liste blanche des rendus ajoutables', () => {
-  const OUTCOMES = ['revue non conforme', 'tests rouges', 'code sans test', 'documentation en retard', 'sonde de cas limites', 'UX non conforme'];
+  const OUTCOMES = ['revue non conforme', 'tests rouges', 'code sans test', 'documentation en retard', 'sonde de cas limites', 'test vert sans le code', 'UX non conforme'];
 
-  it('R13 — la constante FIN_DE_CYCLE_WHATS : toFix au plafond écrit un outcome que addableHandBack accepte pour chacun des six what', () => {
+  it('R13 — la constante FIN_DE_CYCLE_WHATS : toFix au plafond écrit un outcome que addableHandBack accepte pour chacun des sept what', () => {
     expect([...FIN_DE_CYCLE_WHATS]).toEqual(OUTCOMES);
     for (const what of FIN_DE_CYCLE_WHATS) {
       const c = ctxOf(lot({ status: 'implementing', next: 'fix', outcome: null, pass: MAX_PASSES }));

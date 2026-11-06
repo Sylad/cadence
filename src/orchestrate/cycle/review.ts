@@ -13,7 +13,7 @@ import { session, badReport } from './session.js';
 import { type ReviewReport, checkShape, REVIEW_SCHEMA } from '../schemas.js';
 import { addProposals, blockingConstats, minorConstats, minorLine } from './shared.js';
 import { settleMinorProposals } from './minor-proposals.js';
-import { countReview, wallReason } from './converge.js';
+import { carriedNoted, countReview, wallReason } from './converge.js';
 import { readShrunk } from './retreci.js';
 import { handBackWithoutFinding } from '../no-finding.js';
 /** Mention « sans commit » du verdict quand la passe des mineurs n'a rien commité (l'UX finale conclut alors à la place de la passe). */
@@ -62,17 +62,17 @@ export function firstReview(c: LotCtx): SessionKind {
 export const uxAfterReview = (c: LotCtx): boolean => !c.lot.small && c.lot.visible && !!c.config.ux;
 
 /** Les passes que déclenche un contrôle du programme, sans revue : elles ne font pas passer la revue d'un lot léger à Opus (L565). */
-const PROGRAM_FIXES: ReadonlySet<string> = new Set(['tests rouges', 'code sans test', 'documentation en retard', 'sonde de cas limites']);
+const PROGRAM_FIXES: ReadonlySet<string> = new Set(['tests rouges', 'code sans test', 'documentation en retard', 'sonde de cas limites', 'test vert sans le code']);
 
 const countProgramFix = (l: LotState, what: string): void => {
   if (PROGRAM_FIXES.has(what)) l.programFixes = (l.programFixes ?? 0) + 1;
 };
 
 /**
- * LISTE BLANCHE des rendus que le lead peut reprendre par `--add` après un correctif (L563) : les six `what` de `toFix` au plafond de passes. `finDeCycleOutcome` écrit l'outcome
+ * LISTE BLANCHE des rendus que le lead peut reprendre par `--add` après un correctif (L563) : les sept `what` de `toFix` au plafond de passes. `finDeCycleOutcome` écrit l'outcome
  * avec elle, `addableHandBack` (geste.ts) la lit : la liste de l'écrivain et celle du lecteur sont la même. Un outcome qui n'en commence pas par l'un n'est jamais ajoutable.
  */
-export const FIN_DE_CYCLE_WHATS = ['revue non conforme', 'tests rouges', 'code sans test', 'documentation en retard', 'sonde de cas limites', 'UX non conforme'] as const;
+export const FIN_DE_CYCLE_WHATS = ['revue non conforme', 'tests rouges', 'code sans test', 'documentation en retard', 'sonde de cas limites', 'test vert sans le code', 'UX non conforme'] as const;
 
 /** Le début de l'outcome d'un lot rendu au plafond de passes (`<what> après <N> passe(s) de correction`) : `toFix` l'écrit, `addableHandBack` le reconnaît par `<what> après `. */
 export const finDeCycleOutcome = (what: string, pass: number): string => `${what} après ${pass} passe(s) de correction`;
@@ -217,7 +217,8 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   }
   l.code = summary;
   // Les constats de cette revue (sans les majeurs mis de côté) attendent la revue de code suivante (L622) : son brief les montre, et une marque `inchange` sur l'un d'eux est fausse.
-  l.codeConstats = [...blockingConstats(counted, 'code'), ...minorConstats(counted)];
+  const countedMinors = minorConstats(counted);
+  l.codeConstats = [...blockingConstats(counted, 'code'), ...countedMinors, ...carriedNoted(kind, l, countedMinors)];
   for (const a of aside) propose(c, a.line);
   const w = c.wave;
   if (l.escalation?.stage === 'fix') {

@@ -9,8 +9,12 @@ import { convergeBrief, countReview } from '../src/orchestrate/cycle/converge.js
 import { REVIEW_SCHEMA } from '../src/orchestrate/schemas.js';
 import { testsVertsSansCode } from '../src/test-sans-code.js';
 import { runLot } from '../src/orchestrate/cycle.js';
+import { briefFor } from '../src/orchestrate/cycle/brief.js';
+import { addableHandBack } from '../src/orchestrate/geste.js';
+import { FIN_DE_CYCLE_WHATS, toFix } from '../src/orchestrate/cycle/review.js';
+import { MAX_PASSES } from '../src/orchestrate/cycle/ctx.js';
 import { claudeOut, commitFile, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
-import type { Constat } from '../src/orchestrate/state.js';
+import type { Constat, LotState } from '../src/orchestrate/state.js';
 
 // L646 : revue en boucle. R1 le brief de fix donne les constats par classe et exige la correction de la classe ; R2 un test ajouté vert avec et sans le code du lot est refusé ;
 // R3 la revue suivante ne relit pas un mineur déjà noté.
@@ -52,6 +56,26 @@ describe('R1 — le brief de fix donne les constats par classe et exige la corre
     expect(REVIEW_SCHEMA.properties.constats.items.properties.classe.enum).toContain('bug-code');
     const rep = reviewReport({ constats: [{ gravite: 'majeur', texte: 'x', classe: 'test' }, { gravite: 'majeur', texte: 'y', classe: 'faux' }] as never });
     expect(blockingConstats(rep, 'code').map((c) => c.classe)).toEqual(['test', undefined]);
+  });
+});
+
+describe('R1 — la consigne de classe n’est que du gabarit fix', () => {
+  const brief = (over: Partial<LotState>) => {
+    const c = harness({ script: {} }).lot('L1', { constats: [k('un constat', { classe: 'documentation' })], ...over });
+    return briefFor(c, 'fix');
+  };
+  it('R1 — le gabarit fix donne la consigne de classe', () => {
+    expect(brief({})).toMatch(/every other instance of the class/);
+  });
+  it('R1 — la passe du bibliothécaire (fix-docs) garde son « rien d’autre que la documentation » : pas de consigne de classe, ni de test par instance', () => {
+    const b = brief({ docsFix: true });
+    expect(b).toContain('un constat');
+    expect(b).not.toMatch(/every other instance of the class/);
+  });
+  it('R1 — la passe des mineurs (fix-minors) ne reçoit pas l’ordre d’étendre un mineur à une classe', () => {
+    const b = brief({ minorFix: true });
+    expect(b).toContain('un constat');
+    expect(b).not.toMatch(/every other instance of the class/);
   });
 });
 
@@ -99,6 +123,44 @@ describe('R3 — la revue suivante ne relit pas un mineur déjà noté', () => {
     l.codeConstats = [k('texte', { gravite: 'mineur' })];
     const { decisions } = countReview(JSON.parse(JSON.stringify(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', texte: 'texte' }], verdict: 'non conforme' }))), 'review', l, 'abc');
     expect(decisions.map((d) => d.decision)).toEqual(['compte']);
+  });
+  it('R3 — le brief de la revue courte garde le mineur noté sous « had to fix » : le relecteur le relit, il n’a pas l’ordre de le taire', () => {
+    const l = lot();
+    l.reviewCounts = [1] as never;
+    l.codeConstats = [k('un mineur', { gravite: 'mineur', fichier: 'a.ts', ligne: 2 })];
+    const b = convergeBrief('review-small', l);
+    expect(b).toContain('had to fix');
+    expect(b).toContain('a.ts:2 — un mineur');
+    expect(b).not.toContain('already noted');
+    expect(b).not.toMatch(/do not report them again, reworded/);
+  });
+  it('R3 — la revue courte qui redit le mineur noté le compte (il part au lead), seule la revue complète l’écarte', () => {
+    const l = lot();
+    l.reviewCounts = [1] as never;
+    l.codeConstats = [k('même mineur', { gravite: 'mineur', fichier: 'a.ts' })];
+    const { decisions } = countReview(rapport([{ gravite: 'mineur', texte: 'même mineur', fichier: 'a.ts' }]), 'review-small', l, 'abc');
+    expect(decisions.map((d) => d.decision)).toEqual(['compte']);
+  });
+  it('R3 — le mineur noté survit à une revue qui ne le compte pas : trois revues complètes, il est encore dans le brief de la troisième et ne compte pas', async () => {
+    const X = { gravite: 'mineur', texte: 'nommage', fichier: 'a.ts' };
+    const h = harness({
+      script: {
+        implement: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.ts', 'feat(L1): a')] }))],
+        fix: [(call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'b.ts', 'fix(L1): b')] })), (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'c.ts', 'fix(L1): c')] }))],
+        review: [
+          () => claudeOut(reviewReport({ majeurs: 1, mineurs: 1, verdict: 'non conforme', constats: [{ gravite: 'majeur', texte: 'bug un', fichier: 'a.ts' }, X] as never })),
+          () => claudeOut(reviewReport({ majeurs: 1, verdict: 'non conforme', constats: [{ gravite: 'majeur', texte: 'bug deux', fichier: 'b.ts' }] as never })),
+          () => claudeOut(reviewReport({ mineurs: 1, verdict: 'conforme', constats: [X] as never })),
+        ],
+      },
+    });
+    const c = h.lot('L1', {}, {});
+    await runLot(c);
+    const reviews = h.calls.filter((x) => x.kind === 'review');
+    expect(reviews).toHaveLength(3);
+    expect(reviews[2].brief).toContain('a.ts — nommage');
+    expect(c.lot.minorPass).toBeFalsy();
+    expect(h.calls.map((x) => x.kind)).not.toContain('review-small');
   });
   it('R3 — revue 1 (rien de noté avant) : aucun mineur écarté', () => {
     const { decisions } = countReview(rapport([{ gravite: 'mineur', texte: 'x' }]), 'review', lot(), 'abc');
@@ -254,6 +316,12 @@ describe('R2 — la porte du cycle : un test ajouté vert sans le code repart en
     expect(h.calls[1].brief).toContain('Class « test »');
     expect(c.lot.testVert).toBe(true);
   });
+  it('R2 — la passe née de la porte est une passe du programme : elle ne fait pas passer la revue d’un lot léger à Opus (L565)', async () => {
+    const h = harness({ script: { implement: [impl], fix: [fix], review: [ok] } });
+    const c = h.lot('L1', {}, cfg('true {files}'));
+    await runLot(c);
+    expect(c.lot.programFixes).toBe(1);
+  });
   it('R2 — rejeu rouge sans le code : le test garde quelque chose, la revue part', async () => {
     const h = harness({ script: { implement: [impl], review: [ok] } });
     await runLot(h.lot('L1', {}, cfg('false {files}')));
@@ -276,5 +344,40 @@ describe('R2 — la porte du cycle : un test ajouté vert sans le code repart en
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
     expect(c.lot.warnings.join('\n')).toContain('porte « test vert sans le code »');
+  });
+  it('R2 — voie express : la porte ne joue pas', async () => {
+    const h = harness({ script: { implement: [impl], review: [ok] } });
+    const c = h.lot('L1', { express: true }, cfg('true {files}'));
+    await runLot(c);
+    expect(kinds(h)).not.toContain('fix');
+    expect(c.lot.testVert).toBeFalsy();
+  });
+  it('R2 — passe des mineurs : la porte ne joue pas', async () => {
+    const h = harness({ script: { fix: [fix], review: [ok] } });
+    const c = h.lot('L1', { minorFix: true, minorPass: true, next: 'fix', constats: [k('un mineur', { gravite: 'mineur' })] }, cfg('true {files}'));
+    await runLot(c);
+    expect(c.lot.testVert).toBeFalsy();
+    expect(kinds(h).filter((x) => x === 'fix')).toHaveLength(1);
+  });
+  it('R2 — plafond de passes : la correction prendrait la dernière, la porte l’écrit en avertissement et la revue part', async () => {
+    const h = harness({ script: { implement: [impl], review: [ok] } });
+    const c = h.lot('L1', { pass: MAX_PASSES - 1 }, cfg('true {files}'));
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(c.lot.warnings.join('\n')).toMatch(/porte « test vert sans le code » non jouée en correction : \d+ passe\(s\) déjà faite\(s\)/);
+  });
+  it('R2 — au-delà de la borne de tests ajoutés, l’avertissement « non joué(s) » est écrit', async () => {
+    const many: Handler = (call) => claudeOut(workReport({ commits: ['a.ts', ...Array.from({ length: 11 }, (_, i) => `t${i}.spec.ts`)].map((f) => commitFile(call.opts.cwd, f, `feat(L1): ${f}`)) }));
+    const h = harness({ script: { implement: [many], review: [ok] } });
+    const c = h.lot('L1', {}, cfg('false {files}'));
+    await runLot(c);
+    expect(c.lot.warnings.join('\n')).toMatch(/test\(s\) ajouté\(s\) non joué\(s\), au-delà de la borne/);
+  });
+  it('R2 — un lot rendu au plafond de mur par cette porte est ajoutable (`--add`) : le what est dans FIN_DE_CYCLE_WHATS', () => {
+    expect([...FIN_DE_CYCLE_WHATS]).toContain('test vert sans le code');
+    const c = harness({ script: {} }).lot('L1', { pass: MAX_PASSES });
+    toFix(c, [k('x')], 'test vert sans le code');
+    expect(c.lot.outcome).toBe(`test vert sans le code après ${MAX_PASSES} passe(s) de correction`);
+    expect(addableHandBack({ status: 'handed-back', next: c.lot.next, outcome: c.lot.outcome })).toBe(true);
   });
 });

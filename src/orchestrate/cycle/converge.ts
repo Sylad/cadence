@@ -48,9 +48,11 @@ export function convergeBrief(kind: SessionKind, l: LotState, shrunk?: Shrunk): 
   const lines: string[] = shrunk ? [shrunkJudge(shrunk, l), ''] : [];
   if (reviewRank(kind, l) > 1) {
     lines.push(CONVERGE_BRIEF);
-    // Les mineurs notés (L646) ne sont pas à corriger par l'auteur : les relire les ferait compter deux fois, la revue ne les rapporte pas.
-    const toFix = (l.codeConstats ?? []).filter((k) => k.gravite !== 'mineur');
-    const noted = (l.codeConstats ?? []).filter((k) => k.gravite === 'mineur');
+    // Les mineurs notés (L646) ne sont pas à corriger par l'auteur : la revue complète ne les rapporte pas, ce qui lui évite de les compter deux fois. La revue courte, elle, les relit
+    // avec le reste (« had to fix ») : elle rend au lead ceux que la passe des mineurs n'a pas corrigés, et `setAsideNoted` ne les écarte pas.
+    const full = kind === 'review';
+    const toFix = (l.codeConstats ?? []).filter((k) => !full || k.gravite !== 'mineur');
+    const noted = full ? (l.codeConstats ?? []).filter((k) => k.gravite === 'mineur') : [];
     if (toFix.length) lines.push('', 'Findings of the previous review that the author had to fix:', ...bulletLines(toFix));
     if (noted.length) lines.push('', 'Minor findings of the previous review, already noted (do not report them again, reworded or not; a minor is only worth a line if it is new):', ...bulletLines(noted));
     const aside = (l.proposals ?? []).filter((p) => p.startsWith(SUITE_CODE));
@@ -70,6 +72,13 @@ const repeats = (previous: Constat[], k: { fichier?: string; texte: string }): b
  * `raf done` et par l'audit de livraison (`isNonConformingVerdict`), et le lot prêt pour la vague ne le serait pas pour raf.
  */
 const convergedVerdict = (verdict: string, aside: { texte: string }[]): string => (aside.length && isNonConformingVerdict(verdict) ? asideNote(aside) : asideVerdict(verdict, aside));
+
+/**
+ * Les mineurs notés que la revue complète ne rapporte plus (le brief le lui demande, ou `setAsideNoted` les a écartés) restent notés : sans eux `codeConstats` les perdrait à la revue suivante,
+ * dont le brief ne les montrerait plus et qui les compterait de nouveau. Seule la revue complète les garde ; la revue courte les relit et n'écarte rien.
+ */
+export const carriedNoted = (kind: SessionKind, l: LotState, counted: Constat[]): Constat[] =>
+  kind === 'review' ? (l.codeConstats ?? []).filter((k) => k.gravite === 'mineur' && !repeats(counted, k)) : [];
 
 /**
  * Un majeur ou un mineur de la revue qui reprend mot pour mot (son texte contient l'entrée) une attente hors règle de la sonde ne compte pas (L625, issue #41) : elle est déjà une sous-tâche `[hors règle]` du lead

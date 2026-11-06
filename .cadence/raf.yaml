@@ -2837,9 +2837,10 @@ lots:
     started: 2026-11-06
   - id: L656
     title: "Issue #46 : des majeurs de maquette écartés comme inchangés sont dans l'objectif du lot et reviennent en majeurs de revue de code ; un écart ne s'applique pas à un point de l'objectif ; mesure : 0 majeur écarté à la maquette et repris en revue de code"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-06
+    started: 2026-11-06
   - id: L657
     title: "Issue #44 : objectif et budget d'un lot figés au lancement : --add sans --goal ni --budget, --resume ignore un objectif changé, la relance rejoue spec et maquette ; donner ces réglages à --add et faire lire l'objectif changé à --resume"
     status: todo

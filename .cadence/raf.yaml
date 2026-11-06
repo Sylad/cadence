@@ -2923,9 +2923,10 @@ lots:
     finished: 2026-11-06
   - id: L662
     title: "Moins de portes par lot : (1) la sonde joue avant la première porte, une seule porte entre implement et revue (33,2 min sur 5 lots en 1805) ; (2) après « main a avancé », la porte d'intégration n'est rejouée que si le delta de main touche un fichier ou un test lié au diff du lot (26,3 min sur 4 lots, 4 reprises) ; niveau : source (ordre des étapes), puis intégration ; niveau le plus tôt : source ; on ne peut pas prévenir le déplacement de main, seulement son effet ; mesure : <= 3 portes par lot en moyenne sur 3 vagues (4,1 en 1805)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-06
+    started: 2026-11-06
   - id: L663
     title: "Test qui fabrique l'état à la main : le brief d'un lot qui lit un état écrit par une étape du cycle exige que le test appelle l'étape réelle (L654 : handBack rend avant d'écrire maquetteConstats, 75,4 min de refus à prêt), et la sonde joue aussi sur un lot express qui touche src/orchestrate/cycle/ ; niveau : source (brief) puis sonde ; niveau le plus tôt : source ; mesure : 0 refus d'intégration pour un état non écrit avant une remise sur 3 vagues"
     status: todo

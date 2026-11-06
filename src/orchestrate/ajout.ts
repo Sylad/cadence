@@ -139,7 +139,8 @@ function goalBudgetRefusals(args: Args, launch: string, store: RunStore, inWave:
   for (const a of args.add) {
     const key = addKey(launch, a);
     const rendu = inWave.find((l) => lotKey(l.project, l.lot) === key);
-    if (rendu && addableHandBack(rendu)) out.push(`${key} : lot rendu repris : il garde son objectif et son budget, --goal et --budget lui sont refusés`);
+    const vise = args.goal !== undefined || args.lotBudgets.some((b) => addKey(launch, b) === key);
+    if (vise && rendu && addableHandBack(rendu)) out.push(`${key} : lot rendu repris : il garde son objectif et son budget, --goal et --budget lui sont refusés`);
   }
   return out;
 }

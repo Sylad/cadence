@@ -209,10 +209,10 @@ describe('R5 — le budget du lot ajouté', () => {
 
 describe('R6 — lot rendu repris par --add', () => {
   const rendu = { project: 'a', lot: 'L1', repo: '/x/a', status: 'handed-back', next: 'fix', outcome: 'revue non conforme après 2 passe(s) de correction', steps: [], goal: 'objectif de la vague', budget: 100 } as unknown as LotState;
-  const asked = async (argv: string[]) => {
+  const asked = async (argv: string[], lotsAjoutes = ['L1']) => {
     const requested: unknown[] = [];
     const store = { id: 'W', dir: tempDir(), lots: () => [rendu], addQueue: () => [], readWave: () => ({ budget: 1e6, consumed: 0, addsGoalBudget: true }), requestAdd: (t: unknown) => (requested.push(t), 1), markAddTaken: () => {}, journal: () => {} } as unknown as RunStore;
-    const checks: LaunchChecks = { resolveTargets: () => [{ project: 'a', projectDir: '/x/a', repo: '/x/a', lot: 'L1', model: 'sonnet' }], preflight: async () => ({ refusals: [], lots: [] }) };
+    const checks: LaunchChecks = { resolveTargets: () => lotsAjoutes.map((lot) => ({ project: 'a', projectDir: '/x/a', repo: '/x/a', lot, model: 'sonnet' })), preflight: async () => ({ refusals: [], lots: [] }) };
     const e = io('/x');
     const code = await addToLive(parseOrchestrateArgs(argv), { io: e.io, deps: {} as OrchestrateDeps, launch: '/x' }, store, checks);
     return { code, err: e.err.join('\n'), requested };
@@ -229,6 +229,10 @@ describe('R6 — lot rendu repris par --add', () => {
     expect(r.code).toBe(2);
     expect(r.err).toContain('lot rendu repris : il garde son objectif et son budget');
     expect(r.requested).toEqual([]);
+  });
+  it('R6 — lot rendu repris sans --goal ni --budget qui le vise : le --budget d\'un autre lot ajouté ne le fait pas refuser', async () => {
+    const r = await asked(['--add', 'a:L1', '--add', 'a:L2', '--budget', 'a:L2=+300k'], ['L1', 'L2']);
+    expect(r.err).not.toContain('il garde son objectif et son budget');
   });
 });
 
@@ -395,6 +399,17 @@ describe('R9 — le dernier geste explicite gagne', () => {
 });
 
 describe('R10 — plan sans le lot ou illisible', () => {
+  it("R10 — lot absent du plan : --resume n'est pas refusé à l'entrée, goal d'état gardé et aucune ligne « objectif changé »", async () => {
+    const w = await stopped({ goals: { L1: 'objectif Y' } });
+    const file = join(w.dirs.a!, '.cadence/raf.yaml');
+    writeFileSync(file, readFileSync(file, 'utf8').replace('- id: L1\n', '- id: L9\n'));
+    git(w.dirs.a!, 'add', '--', '.cadence/raf.yaml');
+    git(w.dirs.a!, 'commit', '-q', '-m', 'plan: renommé');
+    const r = await w.resumed();
+    expect(r.rc).not.toBe(2);
+    expect(w.store.readLot('a', 'L1')!.goal).toBe('objectif Y');
+    expect(r.journal + r.out).not.toContain('objectif changé');
+  });
   it("R10 — lot absent du plan : reprise sans refus, goal d'état gardé", async () => {
     const w = await stopped({ goals: { L1: 'objectif Y' } });
     const l = w.store.readLot('a', 'L1')!;

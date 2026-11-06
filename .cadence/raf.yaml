@@ -2531,7 +2531,7 @@ lots:
     finished: 2026-11-05
   - id: L621
     title: "Issue #40 : un --goal ou goal: qui rétrécit un lot aux commits déjà intégrés saute la maquette sauf si l'objectif change la mise en page, et les revues jugent le diff de l'objectif contre l'objectif ; un constat hors objectif revient en suite proposée, sans passe de correction (74 min et 1,28 M pour un commit de quatre correctifs)"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-11-05
@@ -2543,6 +2543,7 @@ lots:
       - { date: 2026-11-05, text: "Revue de la fiche — mineur : docs/specs/goal-lot-retreci/fiche.yaml — R12 : le lot est lu rétréci quand un commit de lotWork est antérieur à steps[0].headBefore. state.ts:49 montre que steps peut garder des étapes d'une vague précédente (wallFrom, reprise par --add). Dans ce cas steps[0].headBefore date de la première vague, et des commits écrits par cette vague passeraient pour « déjà intégrés ». Cela contredit la phrase de R12 sur les commits de la vague. La fiche ne couvre pas ce cas et n'a aucun test dessus." }
       - { date: 2026-11-05, text: "Hypothèses (fiche goal-lot-retreci) — R3 : L'objectif change la mise en page quand son texte, sans accents ni majuscules, contient un de ces mots : mise en page, layout, disposition, maquette, ecran, af… ; si faux : Si la liste est trop large ou trop courte, seul le choix de jouer ou sauter la maquette change (un mot à ajouter ou à retirer, comme la liste COSTLY de spec.ts…" }
     review: { date: 2026-11-06, verdict: "conforme, 7 mineurs : le majeur de la revue précédente est corrigé (plage au merge-base avec tree.base), les 5 mineurs de la revue précédente restent ouverts et 2 s'ajoutent (brief à dépôts voisins, doc de la plage) — orchestré (vague 2026-11-05-2210-cad, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main ne casse rien (fusion L621 × L625 de convergeBrief et countReview jouée, CHANGELOG sous [Unreleased], aucune ligne de main perdue) ; les 7 mineurs de la revue précédente restent ouverts, déjà proposés au lead", commit: 2792dac75fb4d1ee45e57f3716d8179e652fefcd }
+    finished: 2026-11-06
   - id: L622
     title: "Issue #41 : les revues convergent. Après la première revue d'un lot, un constat absent de la revue précédente et hors de l'objectif du lot ou des lignes qu'il change revient en suite proposée et n'achète plus de passe de correction ; un bloquant (perte de données, sécurité, suite rouge) en achète toujours une. Plafond de mur par lot, deux fois la durée attendue de son estimate : au-delà, le lot est rendu avec ses constats au lieu de lancer une passe. Mesure : part conforme du premier coup et passes par lot avant et après"
     status: done
@@ -2636,6 +2637,11 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+  - id: L634
+    title: "Suites de L621, lot rétréci : isExpress lit le screen du plan et le lot screen: page d'estimate ≤ 0,1 quitte la voie express (preflight.ts:174) ; la revue d'intégration reçoit from..HEAD qui contredit integrationText (retreci.ts:52) ; Judge ONLY inclut les commits des dépôts voisins (converge.ts:30) ; le dry-run n'applique pas launchedLot à la base du budget (dry-run.ts:145) ; test versionné du croisement rétréci × hors règle (L625) aux rangs 1 et 2"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-06
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

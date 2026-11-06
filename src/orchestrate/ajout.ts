@@ -2,6 +2,8 @@ import { existsSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import type { Args, OrchestrateDeps, OrchestrateIo, Target } from './command.js';
 import type { FillPlan } from './continue.js';
+import type { Queued } from './queue.js';
+import type { QueueHooks } from './queue-draw.js';
 import type { LotCtx, WaveCtx } from './cycle.js';
 import { lotFinished, lotKey, lotRepoPaths, type LotState, type RunStore, type WaveState } from './state.js';
 import { cadenceHome, liveWaves } from './registry.js';
@@ -224,6 +226,8 @@ export interface AddEnv {
   checks: LaunchChecks;
   /** Résout, contrôle et prépare un lot : son contexte, ou les refus. */
   build: (target: Target, known: KnownLot[], ask?: AddAsk) => Promise<{ ctx: LotCtx } | { refusals: string[] }>;
+  /** La file approuvée (L498) : ses gestes pour un lot que le remplissage tire d'elle (`FillPlan.targets[].queued`). */
+  queue?: QueueHooks;
 }
 
 /**
@@ -342,6 +346,15 @@ export class AddFeed {
     if (resumed) e.wctx.log(`${key} : reprise du lot rendu à ${resumed === 'correction' ? 'la correction' : resumed === 'revue' ? 'la revue' : "l'écriture"}, worktree ${c.tree?.dir ?? c.lot.repo}`);
   }
 
+  /** Les causes qui font sauter un lot du remplissage : un lot du plan dans les mots du remplissage, un lot de la file approuvée (L498, R10) dans ceux de la file, sa clé en tête retirée ; il reste en file. */
+  private skipped(t: FillPlan['targets'][number], key: string, refusals: string[]): void {
+    const own = (r: string) => (r.startsWith(`${key} : `) ? r.slice(key.length + 3) : r);
+    for (const r of refusals) {
+      if (t.queued) this.e.queue?.skip(t.queued.entry, own(r));
+      else this.say(`lot sauté — ${r}`);
+    }
+  }
+
   /** Les lots ajoutés à ce tour, prêts à être joués ; `canRun` dit si le dépôt du lot est libre (jamais deux sessions dans un même dépôt hors worktree). */
   async take(canRun: (c: LotCtx) => boolean): Promise<LotCtx[]> {
     const added: LotCtx[] = [];
@@ -370,8 +383,8 @@ export class AddFeed {
     this.e.wctx.log(line);
   }
 
-  /** Le contexte d'un lot tiré du plan : celui gardé (recontrôlé : arrêt, budget, lot fini) ou celui que le contrôle préalable construit ; null quand il est refusé ou ne tient pas (L527). */
-  private async control(t: Target, key: string, badRepos: Set<string>, room: number): Promise<LotCtx | null> {
+  /** Le contexte d'un lot tiré du plan ou de la file : celui gardé (recontrôlé : arrêt, budget, lot fini) ou celui que le contrôle préalable construit ; null quand il est refusé ou ne tient pas (L527). */
+  private async control(t: FillPlan['targets'][number], key: string, badRepos: Set<string>, room: number): Promise<LotCtx | null> {
     const e = this.e;
     const kept = this.drawn.get(key);
     if (kept) {
@@ -385,7 +398,7 @@ export class AddFeed {
       // Un refus propre au lot l'écarte pour la vague ; celui du dépôt (arbre sale, orchestration en cours) est passager : le lot est relu à la lecture suivante.
       if (built.refusals.some((r) => r.startsWith(`${key} : `))) this.refused.add(key);
       else badRepos.add(t.repo); // les autres lots de ce dépôt buteraient sur la même cause, ce tour-ci
-      for (const r of built.refusals) this.say(`lot sauté — ${r}`);
+      this.skipped(t, key, built.refusals);
       return null;
     }
     return built.ctx.lot.budget! <= Math.min(e.budgetLeft(), room) ? built.ctx : null;
@@ -408,7 +421,7 @@ export class AddFeed {
       const key = lotKey(t.project, t.lot);
       if (this.refused.has(key) || badRepos.has(t.repo) || t.uses.some((r) => taken.has(r))) continue;
       const c = await this.control(t, key, badRepos, room);
-      if (!c || !this.start(key, c, canRun)) continue;
+      if (!c || !this.start(key, c, canRun, t.queued)) continue;
       added.push(c);
       room -= c.lot.budget!;
       for (const r of t.uses) taken.add(r);
@@ -417,20 +430,26 @@ export class AddFeed {
     return added;
   }
 
-  /** Prend le lot contrôlé `c` : faux quand le dépôt est pris (gardé pour la lecture suivante) ou que la prise est refusée (sauté, dit au journal). */
-  private start(key: string, c: LotCtx, canRun: (c: LotCtx) => boolean): boolean {
+  /**
+   * Prend le lot contrôlé `c` : faux quand le dépôt est pris (gardé pour la lecture suivante) ou que la prise est refusée (sauté, dit au journal).
+   * Un lot de la file approuvée (`queued`, L498) est réservé dans la file avant d'être pris (R7 : faux quand une autre vague l'a pris, ou que la file est illisible), passe à « tiré » une fois admis (R13) et le journal dit « file : tire … » ; une prise refusée le rend à la file.
+   */
+  private start(key: string, c: LotCtx, canRun: (c: LotCtx) => boolean, queued?: Queued): boolean {
     if (!canRun(c)) {
       this.drawn.set(key, c);
       return false;
     }
     this.drawn.delete(key);
+    if (queued && !this.e.queue?.claim(queued.entry)) return false;
     const refused = this.holdAll(c);
     if (refused) {
-      this.say(`lot sauté — ${key} : ${refused}`);
+      if (queued) this.e.queue?.release(queued.entry);
+      this.skipped({ queued } as FillPlan['targets'][number], key, [`${key} : ${refused}`]);
       return false;
     }
-    this.e.wctx.log(`créneau libre rempli par ${key}`);
+    this.e.wctx.log(queued ? `file : tire ${queued.entry} (position ${queued.position})` : `créneau libre rempli par ${key}`);
     this.admit(null, c);
+    if (queued) this.e.queue?.drawn(queued.entry);
     return true;
   }
 

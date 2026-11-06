@@ -23,6 +23,12 @@ export interface QueueEntry {
   start?: string;
 }
 
+/** Un lot tiré de la file : sa clé dans la file (`.:L1` depuis un projet — le lot de la vague porte, lui, le nom de son dossier, `a:L1`) et sa position. */
+export interface Queued {
+  entry: string;
+  position: number;
+}
+
 /** `unreadable` : JSON invalide ; `locked` : verrou d'écriture tenu au-delà du délai. */
 export class QueueError extends Error {
   constructor(readonly kind: 'unreadable' | 'locked', message: string) {
@@ -168,6 +174,30 @@ export class QueueSession {
       (entries) => {
         const e = entries.find((x) => same(x, key, this.dir));
         if (e?.state === 'reserved' && e.pid === process.pid) Object.assign(e, { state: 'drawn', wave: this.wave(), pid: undefined, start: undefined });
+      },
+      this.waitMs,
+    );
+  }
+
+  /** Le lot a été poussé par `--add` dans la vague vivante `wave` qui tient son dépôt (R9) : « tiré par la vague <wave> », il reste en file. */
+  drawnBy(key: string, wave: string): void {
+    this.reserved.delete(key);
+    updateQueue(
+      this.home,
+      (entries) => {
+        const e = entries.find((x) => same(x, key, this.dir));
+        if (e?.state === 'reserved' && e.pid === process.pid) Object.assign(e, { state: 'drawn', wave, pid: undefined, start: undefined });
+      },
+      this.waitMs,
+    );
+  }
+
+  /** Le lancement a été refusé après le « tiré » : ces lots, tirés par cette vague, redeviennent en attente. */
+  undraw(keys: string[]): void {
+    updateQueue(
+      this.home,
+      (entries) => {
+        for (const e of entries) if (e.dir === this.dir && keys.includes(e.key) && e.state === 'drawn' && e.wave === this.wave()) Object.assign(e, { state: 'pending', wave: undefined });
       },
       this.waitMs,
     );

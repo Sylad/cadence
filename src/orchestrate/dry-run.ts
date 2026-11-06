@@ -252,7 +252,7 @@ export async function continueDryRun(args: Args, io: OrchestrateIo, deps: Orches
   let remaining = budget - given.reduce((sum, l) => sum + (l.budget ?? 0), 0);
   const next: string[] = [];
   while (next.length < DRY_RUN_LOTS && remaining > 0) {
-    const drawn = await draw(args, io, deps, launch, exclude, remaining, 1);
+    const drawn = await draw({ args, io, deps, launch }, exclude, remaining, 1);
     skip(drawn.skipped);
     const lot = drawn.lots[0];
     if (!lot) break;

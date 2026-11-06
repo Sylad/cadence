@@ -33,8 +33,10 @@ export interface Args {
   wave?: string;
   /** `--continue` (L147) : la vague tire elle-même le prochain lot prêt du plan quand ceux en cours sont finis. */
   continue: boolean;
-  /** `--no-fill` (L587) : le créneau libre n'est pas rempli en cours de vague ; seul le tirage entre deux tours (`--continue`) reste. */
+  /** `--no-fill` (L587) : le créneau libre n'est pas rempli par le plan en cours de vague ; seul le tirage entre deux tours (`--continue`) reste. La file approuvée (L498), elle, est tirée par toute vague vivante, sans option. */
   noFill: boolean;
+  /** `--queue` (L498) : démarre une vague sur la file approuvée (`orchestrate queue add`), sans lot donné ; les lots donnés, eux, passent d'abord. Toute vague vivante tire de la file, avec ou sans cette option. */
+  queue: boolean;
   /** `--until HH:MM` : plus aucun lot n'est tiré à partir de cette heure. */
   until?: string;
   /** `until` en date, lue une fois au lancement (`orchestrate`). */
@@ -104,7 +106,7 @@ const asksAnotherAction = (a: Args): boolean =>
 /** `--since` de `--follow` (L668) : un horodatage ISO du journal (`2026-11-06T22:00:39Z`, millisecondes permises) ou un numéro de ligne. */
 const SINCE_FOLLOW = /^(?:\d+|\d{4}-\d{2}-\d{2}T[\d:.]+Z)$/;
 
-const BOOLEAN_FLAGS: Record<string, 'dryRun' | 'waits' | 'watch' | 'follow' | 'stopAfterCurrent' | 'abandonCommits' | 'continue' | 'noFill'> = {
+const BOOLEAN_FLAGS: Record<string, 'dryRun' | 'waits' | 'watch' | 'follow' | 'stopAfterCurrent' | 'abandonCommits' | 'continue' | 'noFill' | 'queue'> = {
   '--dry-run': 'dryRun',
   '--waits': 'waits',
   '--watch': 'watch',
@@ -113,10 +115,11 @@ const BOOLEAN_FLAGS: Record<string, 'dryRun' | 'waits' | 'watch' | 'follow' | 's
   '--abandon-commits': 'abandonCommits',
   '--continue': 'continue',
   '--no-fill': 'noFill',
+  '--queue': 'queue',
 };
 
 export function parseOrchestrateArgs(argv: string[]): Args {
-  const a: Args = { lots: [], lotBudgets: [], dryRun: false, waits: false, watch: false, follow: false, continue: false, noFill: false, answers: [], drop: [], stopAfterCurrent: false, add: [], integrate: [], abandonCommits: false };
+  const a: Args = { lots: [], lotBudgets: [], dryRun: false, waits: false, watch: false, follow: false, continue: false, noFill: false, queue: false, answers: [], drop: [], stopAfterCurrent: false, add: [], integrate: [], abandonCommits: false };
   const optional = (i: number) => (argv[i + 1] !== undefined && !argv[i + 1].startsWith('-') && !LOT_LIKE.test(argv[i + 1]) ? argv[i + 1] : undefined);
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
@@ -165,7 +168,7 @@ export function parseOrchestrateArgs(argv: string[]): Args {
     if (a.resume === true) a.resume = a.wave;
     else if (a.resume !== a.wave) throw new RafError(`--resume ${a.resume} et --wave ${a.wave} désignent deux vagues : une seule (${resumeCommand('<vague>')})`);
   }
-  // L587 : sans lot à jouer ni --continue il n'y a aucun créneau à remplir ou à garder vide ; les autres actions (--resume, --add, --status, …) ne lancent pas de vague : --no-fill y est sans effet.
-  if (a.noFill && !a.continue && a.lots.length === 0 && !asksAnotherAction(a)) throw new RafError("--no-fill s'utilise avec des lots donnés ou avec --continue");
+  // L587 : sans lot à jouer, --continue ni --queue (L498) il n'y a aucun créneau à remplir ou à garder vide ; les autres actions (--resume, --add, --status, …) ne lancent pas de vague : --no-fill y est sans effet.
+  if (a.noFill && !a.continue && !a.queue && a.lots.length === 0 && !asksAnotherAction(a)) throw new RafError("--no-fill s'utilise avec des lots donnés ou avec --continue");
   return a;
 }

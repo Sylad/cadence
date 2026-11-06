@@ -9,6 +9,7 @@ import { readYamlKey } from '../yaml-keys.js';
 import { lotBudget, projectEnv, type Args, type OrchestrateIo, type Target } from './command.js';
 import { lotHold, readyFree, type Held } from '../ready-free.js';
 import { lotFinished, lotKey, type LotState, type RunStore } from './state.js';
+import type { Queued } from './queue.js';
 import type { Budget } from './cycle.js';
 import { budgetStage, stageScreen } from './spec.js';
 import { measuredBudgetsAt } from './budget-mesure.js';
@@ -236,17 +237,17 @@ export function handedBackStreak(all: LotState[]): number {
   return n;
 }
 
-/** Les lots que le créneau libre peut recevoir, leurs ressources, et le budget qui leur reste une fois celui des lots qui jouent réservé. */
+/** Les lots que le créneau libre peut recevoir, leurs ressources, et le budget qui leur reste une fois celui des lots qui jouent réservé ; `queued` : la place du lot dans la file approuvée (L498), absente pour un lot du plan. */
 export interface FillPlan {
-  targets: Array<Target & { uses: string[] }>;
+  targets: Array<Target & { uses: string[]; queued?: Queued }>;
   room: number;
 }
 
-/** L587 : une vague remplit ses créneaux libres quand elle a des lots à jouer (donnés ou tirés par `--continue`) et que `--no-fill` n'est pas passé. */
-export const fillsFreeSlots = (args: Pick<Args, 'continue' | 'lots' | 'noFill'>): boolean => !args.noFill && (args.continue || args.lots.length > 0);
+/** L587 : une vague remplit ses créneaux libres avec le plan quand elle a des lots à jouer (donnés, tirés par `--continue` ou de la file approuvée, `--queue`, L498) et que `--no-fill` n'est pas passé ; la file approuvée, elle, est tirée sans option (R11). */
+export const fillsFreeSlots = (args: Pick<Args, 'continue' | 'lots' | 'noFill'> & { queue?: boolean }): boolean => !args.noFill && (args.continue || !!args.queue || args.lots.length > 0);
 
 /** `--no-fill` n'évite la lecture de `priority:` que sans `--continue` : le tirage entre deux tours la lit. */
-export const readsPriority = (args: Pick<Args, 'continue' | 'lots' | 'noFill'>): boolean => args.continue || fillsFreeSlots(args);
+export const readsPriority = (args: Pick<Args, 'continue' | 'lots' | 'noFill'> & { queue?: boolean }): boolean => args.continue || fillsFreeSlots(args);
 
 export interface FillFacts {
   args: Pick<Args, 'priority' | 'untilAt'>;
@@ -259,6 +260,19 @@ export interface FillFacts {
   budget: Budget;
   quotaHit: boolean;
   incident: boolean;
+  /** Clés `projet:lot` que le plan ne tire pas en plus de celles de la vague (L498 : les lots qui attendent dans la file approuvée, jamais joués comme lots du plan). */
+  exclude?: Iterable<string>;
+}
+
+/** Le budget que le remplissage peut donner : celui de la vague moins ce que les lots qui jouent encore n'ont pas dépensé (réservé). */
+export function fillRoom(f: Pick<FillFacts, 'all' | 'budget'>): number {
+  const reserved = f.all.filter((l) => !lotFinished(l)).reduce((n, l) => n + Math.max(0, (l.budget ?? 0) - l.steps.reduce((t, s) => t + (s.tokens?.counted ?? 0), 0)), 0);
+  return f.budget.limit - f.budget.consumed - reserved;
+}
+
+/** Pourquoi le remplissage ne tire rien à cet instant (`stopReason` : arrêt demandé, limite d'usage, question, deux lots rendus de suite, `--until`, budget), ou null. */
+export function fillStop(f: Omit<FillFacts, 'budget' | 'exclude'>, remaining: number): string | null {
+  return stopReason({ now: f.io.now(), until: f.args.untilAt, quotaHit: f.quotaHit, questions: f.all.filter((l) => l.status === 'question').length, streak: handedBackStreak(f.all), interrupted: f.incident, stopRequested: f.store.control().stopAfterCurrent, remaining });
 }
 
 /**
@@ -267,13 +281,11 @@ export interface FillFacts {
  * Le budget que les lots qui jouent encore n'ont pas dépensé reste réservé : le lot suivant doit tenir dans le reste (`room`, que `AddFeed.fill` décompte de chaque lot qu'il prend, comme les ressources `uses`).
  */
 export function fillTargets(f: FillFacts): FillPlan {
-  const reserved = f.all.filter((l) => !lotFinished(l)).reduce((n, l) => n + Math.max(0, (l.budget ?? 0) - l.steps.reduce((t, s) => t + (s.tokens?.counted ?? 0), 0)), 0);
-  const remaining = f.budget.limit - f.budget.consumed - reserved;
-  const why = stopReason({ now: f.io.now(), until: f.args.untilAt, quotaHit: f.quotaHit, questions: f.all.filter((l) => l.status === 'question').length, streak: handedBackStreak(f.all), interrupted: f.incident, stopRequested: f.store.control().stopAfterCurrent, remaining });
-  if (why) return { targets: [], room: 0 };
+  const remaining = fillRoom(f);
+  if (fillStop(f, remaining)) return { targets: [], room: 0 };
   const dirs = isProject(f.launch) ? [f.launch] : findProjects(f.launch);
   const libres = readyFree(dirs, f.home);
-  const exclude = new Set(f.all.map((l) => lotKey(l.project, l.lot)));
+  const exclude = new Set([...f.all.map((l) => lotKey(l.project, l.lot)), ...(f.exclude ?? [])]);
   const targets = candidates(f.launch, { priority: f.args.priority ?? readPriority(f.launch), exclude, remaining, measured: measuredBudgetsAt(f.launch, f.io) }).flatMap((c) => {
     const repo = gitRoot(c.dir);
     return repo && libres.get(c.dir)?.some((l) => l.id === c.lot.id) ? [{ project: c.project, projectDir: c.dir, repo, lot: c.lot.id, model: 'sonnet' as const, uses: c.lot.uses ?? [] }] : [];

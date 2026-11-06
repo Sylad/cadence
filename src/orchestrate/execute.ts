@@ -10,7 +10,9 @@ import { isOpen } from '../plan.js';
 import { sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, registerWave, updateWaveRepos } from './registry.js';
 import { loadTemplates } from './briefs.js';
-import { fillsFreeSlots, fillTargetsSafe, handedBackStreak, stopReason } from './continue.js';
+import { fillsFreeSlots, fillTargetsSafe, handedBackStreak, stopReason, type FillFacts } from './continue.js';
+import { launchWithQueue, queueFill, QueueRun, sayTo, type PushToWave } from './queue-draw.js';
+import { parseOrchestrateArgs } from './command-args.js';
 import { Budget, DROPPED, STOP_REQUESTED, countInterrupted, handBackDroppedQuestions, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { installPrePush } from './guard.js';
 import { killSessions, type ClaudeFn } from './launch.js';
@@ -29,7 +31,7 @@ import { agentsOf, preflight, projectEnv, resolveTargets, type Target } from './
 import { dryRun } from './dry-run.js';
 import { repoHolds, updateWaveReposSafe } from './cycle/depot-partage.js';
 import { noteTakenAnswers } from './cycle/plan-writes.js';
-import { draw } from './draw.js';
+import { draw, type Drawn } from './draw.js';
 import { control, duration, liveStore, maxSessions } from './status.js';
 import type { OrchestrateDeps, OrchestrateIo } from './command.js';
 import type { Args } from './command-args.js';
@@ -37,44 +39,63 @@ import type { Args } from './command-args.js';
 /** Attente (ms) entre deux lectures de la file de réponses d'une vague vivante (L407) quand aucune file de lots ne finit. */
 const ANSWER_POLL_MS = 2000;
 
+/** La vague a-t-elle encore des tours à tirer : le plan avec `--continue`, ou des lots en attente dans la file approuvée (L498, toute vague vivante). */
+const roundsAhead = (args: Args, queue: QueueRun): boolean => args.continue || queue.mayDraw();
+
+/** Les lots d'un tour tiré entrent dans l'état de la vague (leur lien Node posé) ; le journal nomme ceux du plan (« continue : tire … »), ceux de la file le sont par `launchWithQueue`. */
+function registerRound(drawn: Drawn, r: { wave: WaveState; all: LotState[]; store: RunStore; deps: OrchestrateDeps }, say: (line: string) => void): void {
+  for (const l of drawn.lots) {
+    if (l.node) l.node.link = (r.deps.linkNode ?? linkNodeBin)(r.store.dir, l.node.version, l.node.bin);
+    r.store.writeLot(l);
+    r.wave.lots.push(lotKey(l.project, l.lot));
+  }
+  r.store.writeWave(r.wave);
+  r.all.push(...drawn.lots);
+  const fromPlan = drawn.lots.filter((l) => !drawn.queued.has(lotKey(l.project, l.lot)));
+  if (fromPlan.length) say(`continue : tire ${fromPlan.map((l) => lotKey(l.project, l.lot)).join(', ')}`);
+}
+
+/** Pourquoi la vague ne tire plus de lot entre deux tours, ou null (`stopReason` : budget, `--until`, limite d'usage, question posée, deux lots rendus de suite, vague interrompue, arrêt demandé). */
+function roundStop(wave: WaveState, all: LotState[], store: RunStore, io: OrchestrateIo, args: Args): { why: string | null; remaining: number } {
+  const questions = all.filter((l) => l.status === 'question').length;
+  const remaining = wave.status === 'suspended-budget' ? 0 : wave.budget - wave.consumed;
+  const why = stopReason({ now: io.now(), until: args.untilAt, quotaHit: wave.status === 'suspended-quota', questions, streak: handedBackStreak(all), interrupted: wave.status === 'interrupted' && questions === 0, stopRequested: store.control().stopAfterCurrent, remaining });
+  return { why, remaining };
+}
+
 /**
  * `--continue` (L147) : tant qu'aucune borne ne joue, tire jusqu'à `cap` lots prêts du plan et les joue dans la même vague
- * (même budget, même dossier d'état). Sans `--continue`, rend le code tel quel. Bornes : budget, `--until`, limite d'usage,
+ * (même budget, même dossier d'état). Bornes : budget, `--until`, limite d'usage,
  * question posée, deux lots rendus de suite, vague interrompue, plus de lot prêt dont l'estimation tient dans le budget restant.
+ * L498 : toute vague vivante tire d'abord de la file approuvée (R19), avec ou sans `--continue` ; sans lot en attente dans la file et sans `--continue`, rend le code tel quel.
+ * Une vague sans `--continue` ne tire que de la file : elle s'arrête sans le dire.
  */
 export async function continueRounds(first: number, wave: WaveState, all: LotState[], store: RunStore, io: OrchestrateIo, deps: OrchestrateDeps, today: Day, args: Args, launch: string): Promise<number> {
-  if (!args.continue || first === 2) return first; // 2 : refus au verrou, rien n'a tourné
-  const say = (line: string) => {
-    io.out(line);
-    store.journal(line);
-  };
+  if (first === 2) return first; // 2 : refus au verrou, rien n'a tourné
+  const queue = QueueRun.of(wave, launch, deps);
+  if (!roundsAhead(args, queue)) return first;
+  const say = sayTo(io, store);
+  const stopSaying = args.continue ? say : () => undefined;
   const exclude = new Set(all.map((l) => lotKey(l.project, l.lot)));
   const cap = maxSessions(args, io);
   let code = first;
   for (;;) {
     for (const l of all) exclude.add(lotKey(l.project, l.lot)); // L421 : les lots ajoutés à la main pendant la vague ne sont pas tirés une seconde fois
-    const questions = all.filter((l) => l.status === 'question').length;
-    const remaining = wave.status === 'suspended-budget' ? 0 : wave.budget - wave.consumed;
-    const why = stopReason({ now: io.now(), until: args.untilAt, quotaHit: wave.status === 'suspended-quota', questions, streak: handedBackStreak(all), interrupted: wave.status === 'interrupted' && questions === 0, stopRequested: store.control().stopAfterCurrent, remaining });
+    const { why, remaining } = roundStop(wave, all, store, io, args);
     if (why) {
-      say(`continue : arrêt — ${why}`);
+      stopSaying(`continue : arrêt — ${why}`);
       return code;
     }
-    const drawn = await draw(args, io, deps, launch, exclude, remaining, cap);
+    const drawn = await draw({ args, io, deps, launch }, exclude, remaining, cap, { run: queue, reserve: true, cap });
+    queue.emit(say);
     for (const s of drawn.skipped) say(`continue : lot sauté — ${s}`);
     if (drawn.lots.length === 0) {
-      say("continue : arrêt — plus aucun lot prêt dont l'estimation tient dans le budget restant");
+      stopSaying("continue : arrêt — plus aucun lot prêt dont l'estimation tient dans le budget restant");
       return code;
     }
-    for (const l of drawn.lots) {
-      if (l.node) l.node.link = (deps.linkNode ?? linkNodeBin)(store.dir, l.node.version, l.node.bin);
-      store.writeLot(l);
-      wave.lots.push(lotKey(l.project, l.lot));
-    }
-    store.writeWave(wave);
-    all.push(...drawn.lots);
-    say(`continue : tire ${drawn.lots.map((l) => lotKey(l.project, l.lot)).join(', ')}`);
-    code = await execute(wave, drawn.lots, store, io, deps, today, args, all);
+    registerRound(drawn, { wave, all, store, deps }, say);
+    // Les lots sont dans l'état de la vague (c'est leur acceptation) : ceux de la file passent à « tiré », un lancement refusé les rend (R7).
+    code = await launchWithQueue(queue, drawn.queued, say, () => execute(wave, drawn.lots, store, io, deps, today, args, all));
     if (code === 2) return code;
   }
 }
@@ -192,27 +213,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   }
 
   // Plafond de sessions simultanées, toutes vagues confondues : chaque session attend un créneau libre avant de partir (L591 : sauf celle d'un lot repris à son tour d'intégration, `resumesTurn`).
-  const claude: ClaudeFn = async (argv, o) => {
-    const free = resumesTurn(ctxs, o.lot, wctx.log) ? () => {} : await acquireSlot(home, cap, { wave: wave.id, ...slotPlace(all, launch, args.priority, o.lot), // L531 : place dans la file des créneaux, commune aux vagues
-      pollMs: deps.slotPollMs,
-      // L332 : une demande écrite pendant l'attente (`--drop` de ce lot, `--stop-after-current`) l'interrompt ; la session ne part pas.
-      abandon: () => {
-        const ctl = store.control();
-        if (o.lot && ctl.drops.includes(o.lot)) return DROPPED;
-        return ctl.stopAfterCurrent ? STOP_REQUESTED : null;
-      },
-      onWait: (h, ms, limit, lead) => {
-        const who = [...new Set(h.map((x) => x.wave)), ...lead.map((x) => `session du lead ${x.label}`)];
-        wctx.log(`${o.lot ? `${o.lot} · ` : ''}en attente d'un créneau de session depuis ${duration(ms)} (${h.length + lead.length}/${limit} en cours : ${who.join(', ')})`);
-      },
-      onGot: (ms) => wctx.log(`${o.lot ? `${o.lot} · ` : ''}créneau de session obtenu après ${duration(ms)} d'attente`),
-    });
-    try {
-      return await deps.claude(argv, o);
-    } finally {
-      free();
-    }
-  };
+  const claude: ClaudeFn = (argv, o) => slotGuarded({ home, cap, wave, all, launch, args, deps, store, ctxs: () => ctxs, log: (line) => wctx.log(line) }, argv, o);
   const budget = new Budget(wave.budget);
   budget.consumed = wave.consumed;
   budget.cacheRead = wave.cacheRead;
@@ -252,20 +253,15 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   planTrees(ctxs, store, wave.id, wctx.log, cap > 1);
   updateWaveReposSafe(home, repos, lanes());
 
+  const queue = QueueRun.of(wave, launch, deps);
   const adds = new AddFeed({
     store, wave, wctx, io, deps, launch, ctxs, all, lots, held, freed, repos, freeRepo, saveWave, checks: LAUNCH_CHECKS,
-    stopCause: () => (wctx.incident ? 'incident' : wctx.quota.hit ? "limite d'usage atteinte" : budget.exhausted ? 'budget de la vague épuisé' : store.control().stopAfterCurrent ? "la vague s'arrête" : null),
+    stopCause: () => stopCauseOf(wctx, budget, store),
     budgetLeft: () => budget.limit - budget.consumed,
-    planState: (c) => {
-      try {
-        const lot = projectEnv(c.lot.repo).loadPlan().lots().find((l) => l.id === c.lot.lot);
-        return !lot ? 'lot inconnu' : !isOpen(lot.status) ? `le lot est ${lot.status}` : null;
-      } catch (e) {
-        return (e as Error).message;
-      }
-    },
+    planState: planStateOf,
     announce: () => updateWaveReposSafe(home, repos.filter((x) => !freed.has(x)), lanes()),
     build: (t, known, ask) => buildAdd(t, known, ask, { wave: wave.id, ctxs, wctx, store, io, deps, launch, multiSlot: cap > 1 }),
+    queue: queue.hooks(wctx.log),
   });
 
   // Ctrl-C, SIGTERM : les sessions sont tuées en bloc, les étapes marquées interrompues, les verrous et hooks libérés.
@@ -292,9 +288,8 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
     release();
   });
   const finished = lotFinished;
-  /** L527 : les lots prêts du plan que le créneau libre peut recevoir (rien avec `--no-fill`, L587) ; `adds.fill` les contrôle et les prend. */
-  const refill = async (canRun: (c: LotCtx) => boolean, vacantLanes: number): Promise<LotCtx[]> =>
-    fillsFreeSlots(args) && vacantLanes > 0 ? adds.fill(fillTargetsSafe({ args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }, wctx.log), vacantLanes, canRun) : [];
+  /** Les lots que le créneau libre peut recevoir : la file approuvée (L498), puis les lots prêts du plan (L527, rien avec `--no-fill`, L587). */
+  const refill = (canRun: (c: LotCtx) => boolean, vacantLanes: number): Promise<LotCtx[]> => refillFreeLanes({ facts: { args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }, args, io, cap, queue, adds, deps, log: wctx.log }, canRun, vacantLanes);
   try {
     await runPool(ctxs, cap, all, (c) => {
       // Un lot rendu ou en échec garde son worktree et sa branche (R12) : le journal en donne le chemin.
@@ -361,6 +356,93 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   if (wave.status === 'suspended-budget' || wave.status === 'suspended-quota') return 3;
   return all.every((l) => l.status === 'ready') ? 0 : 1;
 }
+
+/** Ce dont le remplissage d'un créneau libre a besoin de la vague en cours (`refillFreeLanes`). */
+interface RefillScene {
+  facts: FillFacts;
+  args: Args;
+  io: OrchestrateIo;
+  cap: number;
+  queue: QueueRun;
+  adds: AddFeed;
+  deps: OrchestrateDeps;
+  log: (line: string) => void;
+}
+
+/**
+ * Un créneau libéré en cours de vague : la file approuvée d'abord (L498, R19, toute vague vivante, sans option ; `queueFill`), puis les lots prêts du plan (L527, L587 : rien avec `--no-fill`) ;
+ * `adds.fill` les contrôle et les prend. Un lot qui attend dans la file n'est pas tiré du plan ; une file illisible ne laisse pas le plan passer devant elle à ce créneau (R16).
+ */
+async function refillFreeLanes(r: RefillScene, canRun: (c: LotCtx) => boolean, vacantLanes: number): Promise<LotCtx[]> {
+  if (vacantLanes <= 0) return [];
+  const first = await queueFill(r.queue, { ...r.facts, cap: r.cap }, vacantLanes, { fill: (plan, lanes, can) => r.adds.fill(plan, lanes, can), canRun, push: pushToWaveWith(r.deps, r.io) });
+  r.queue.emit(r.log);
+  const left = vacantLanes - first.added.length;
+  if (left <= 0 || first.down || !fillsFreeSlots(r.args)) return first.added;
+  return [...first.added, ...(await r.adds.fill(fillTargetsSafe({ ...r.facts, exclude: first.waiting }, r.log), left, canRun))];
+}
+
+/** Pourquoi la vague ne prend plus de lot (incident, limite d'usage, budget épuisé, arrêt demandé), ou null. */
+const stopCauseOf = (wctx: WaveCtx, budget: Budget, store: RunStore): string | null => (wctx.incident ? 'incident' : wctx.quota.hit ? "limite d'usage atteinte" : budget.exhausted ? 'budget de la vague épuisé' : store.control().stopAfterCurrent ? "la vague s'arrête" : null);
+
+/** Pourquoi le lot ne se joue plus d'après son plan (fini entre-temps, disparu, plan illisible), ou null. */
+function planStateOf(c: LotCtx): string | null {
+  try {
+    const lot = projectEnv(c.lot.repo).loadPlan().lots().find((l) => l.id === c.lot.lot);
+    return !lot ? 'lot inconnu' : !isOpen(lot.status) ? `le lot est ${lot.status}` : null;
+  } catch (e) {
+    return (e as Error).message;
+  }
+}
+
+/** Ce que l'attente d'un créneau de session a besoin de la vague (`slotGuarded`). */
+interface SlotScene {
+  home: string;
+  cap: number;
+  wave: WaveState;
+  all: LotState[];
+  launch: string;
+  args: Args;
+  deps: OrchestrateDeps;
+  store: RunStore;
+  ctxs: () => LotCtx[];
+  log: (line: string) => void;
+}
+
+/** La session attend un créneau libre avant de partir (plafond commun à toutes les vagues), sauf celle d'un lot repris à son tour d'intégration (L591) ; une demande d'arrêt ou de retrait écrite pendant l'attente l'interrompt (L332). */
+async function slotGuarded(s: SlotScene, argv: string[], o: Parameters<ClaudeFn>[1]): ReturnType<ClaudeFn> {
+  const free = resumesTurn(s.ctxs(), o.lot, s.log) ? () => {} : await acquireSlot(s.home, s.cap, { wave: s.wave.id, ...slotPlace(s.all, s.launch, s.args.priority, o.lot), // L531 : place dans la file des créneaux, commune aux vagues
+    pollMs: s.deps.slotPollMs,
+    abandon: () => {
+      const ctl = s.store.control();
+      if (o.lot && ctl.drops.includes(o.lot)) return DROPPED;
+      return ctl.stopAfterCurrent ? STOP_REQUESTED : null;
+    },
+    onWait: (h, ms, limit, lead) => {
+      const who = [...new Set(h.map((x) => x.wave)), ...lead.map((x) => `session du lead ${x.label}`)];
+      s.log(`${o.lot ? `${o.lot} · ` : ''}en attente d'un créneau de session depuis ${duration(ms)} (${h.length + lead.length}/${limit} en cours : ${who.join(', ')})`);
+    },
+    onGot: (ms) => s.log(`${o.lot ? `${o.lot} · ` : ''}créneau de session obtenu après ${duration(ms)} d'attente`),
+  });
+  try {
+    return await s.deps.claude(argv, o);
+  } finally {
+    free();
+  }
+}
+
+/**
+ * L498 (R9) : la poussée d'un lot de la file dans la vague vivante `holder` qui tient son dépôt, par le mécanisme de `--add` (L421, `addToLive`) : même contrôle préalable qu'un `--add` tapé depuis le dossier de lancement
+ * de cette vague, même dépôt dans sa file d'ajouts ; rien d'autre n'écrit dans son état (R18). Les refus sont rendus à l'appelant, pas imprimés.
+ */
+const pushToWaveWith = (deps: OrchestrateDeps, io: OrchestrateIo): PushToWave => async (t, holder) => {
+  const store = RunStore.find(holder.cwd, holder.wave);
+  if (!store) return { ok: false, refusals: [`dossier d'état de la vague ${holder.wave} introuvable`] };
+  const refusals: string[] = [];
+  const quiet: OrchestrateIo = { ...io, cwd: holder.cwd, out: () => {}, err: (line) => refusals.push(line.replace(/^orchestrate : /, '')) };
+  const code = await addToLive({ ...parseOrchestrateArgs([]), add: [{ project: t.project, lot: t.lot }] }, { io: quiet, deps, launch: holder.cwd }, store, LAUNCH_CHECKS);
+  return { ok: code === 0, refusals };
+};
 
 const LAUNCH_CHECKS: LaunchChecks = { resolveTargets, preflight: (targets, run, addTo, ask) => preflight({ dryRun: false, goal: ask?.goal }, targets, run.io, run.deps, run.launch, { addTo, raises: ask?.raises }) };
 

@@ -7,23 +7,23 @@ import { isDay, toDay, type Day } from '../dates.js';
 import { RafError } from '../plan.js';
 import { AGENTS_DIR } from '../skills.js';
 import { readWaits, renderWaits } from './waits.js';
-import { parseUntil, readsPriority } from './continue.js';
 import { snapshot } from './guard.js';
 import { claudeConfigDir, realClaude, type ClaudeFn } from './launch.js';
-import { addNotAlone } from './ajout.js';
 import { removeWorktree } from './retrait.js';
 import { lotKey, RunStore, type WaveState } from './state.js';
 import { linkNodeBin } from './node-env.js';
-import { estimateLines, resumeCommand } from './table.js';
+import { estimateLines } from './table.js';
+import { checkCombinations } from './command-checks.js';
+import { launchWithQueue, QueueRun, sayTo } from './queue-draw.js';
 import { PACKAGE_ROOT, RESERVED_ENV, SnapshotRefusal, isSnapshotChild, resolveModulesDir, withoutLaunchVars, spawnReexec, takeSnapshot, type SnapshotDeps } from './snapshot.js';
 
 import { preflight, projectEnv, resolveTargets, type Target } from './preflight.js';
 export { preflight, projectEnv, resolveTargets, type Target } from './preflight.js';
 
 import { continueDryRun, dryRun } from './dry-run.js';
-import { draw, priorityOf } from './draw.js';
+import { claimFirstDraw, firstDraw } from './draw.js';
 
-import { checkFollowFlags, followCommand } from './follow.js';
+import { followCommand } from './follow.js';
 import { answerOnly, control, freeLines, maxSessions, onceAuth, statusCommand, waveExists } from './status.js';
 export { configuredCap, expiredHoldLines, liveLines, slotsLine } from './status.js';
 
@@ -108,37 +108,9 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   deps = onceAuth(deps);
   const args = parseOrchestrateArgs(argv);
   const launch = io.cwd;
-  if (args.add.length && addNotAlone(args)) throw new RafError('--add ne se combine avec aucune autre action (seuls --wave, qui désigne la vague qui reçoit les lots, --goal et --budget projet:lot=+N peuvent l’accompagner)');
   const today: Day = io.env.RAF_TODAY && isDay(io.env.RAF_TODAY) ? io.env.RAF_TODAY : toDay(io.now());
-
-  if ((args.until !== undefined || args.priority !== undefined) && !args.continue) throw new RafError('--until et --priority s\'utilisent avec --continue');
-  if (args.until !== undefined) args.untilAt = parseUntil(args.until, io.now()); // heure invalide ou passée : refus avant d'agir
-  if (readsPriority(args)) priorityOf(args, launch); // une clé priority: illisible du cadence.yaml : refus avant d'agir, lots donnés ou non
-  checkFollowFlags(args);
-  // --drop / --stop-after-current (L79) pilotent une vague VIVANTE : ni avec --status (rien à piloter), ni --stop-after-current avec --resume (il le contredit). --resume --drop retire le lot avant de rejouer la vague arrêtée.
-  if (args.status !== undefined && (args.drop.length || args.stopAfterCurrent)) throw new RafError('--status ne se combine pas avec --drop / --stop-after-current');
-  if (args.resume !== undefined && args.stopAfterCurrent) throw new RafError('--resume ne se combine pas avec --stop-after-current (il reprend la vague, il ne l\'arrête pas)');
-  // L228 : la reprise n'a pas de simulation — elle relève le budget, réécrit wave.json et relance les sessions. Refusée ici, avant le réexec de l'instantané (une vague ancienne ne connaît pas ce refus).
-  // L309 : la reprise rejoue les lots de la vague ; des lots à lancer seraient ignorés en silence (--continue, lui, tire la suite du plan après la reprise : L147).
-  if (args.resume !== undefined && args.lots.length) {
-    // Un id de vague qui ressemble à un lot (`--resume suite2`) est lu comme un lot à lancer : le refus donne la forme qui le désigne comme vague.
-    const asWave = args.lots.find((l) => l.project === undefined && l.model === undefined && RunStore.find(launch, l.lot));
-    const hint = asWave ? `« ${asWave.lot} » est une vague de ce dossier : ${resumeCommand(asWave.lot)}` : `pour désigner la vague : ${resumeCommand('<vague>')}`;
-    throw new RafError(`--resume ne se combine pas avec des lots à lancer (il reprend les lots de la vague ; --answer, --drop, --integrate, --replay et --budget projet:lot=+N nomment ceux qu'ils visent) ; ${hint}`);
-  }
-  if (args.resume !== undefined && args.dryRun) throw new RafError('--resume ne se combine pas avec --dry-run (la reprise écrit l\'état de la vague et relance les sessions, elle ne se simule pas)');
-  if (args.lotBudgets.length && args.resume === undefined && !args.add.length) throw new RafError("--budget projet:lot=+N ne vaut qu'avec --resume ou --add (--add <projet>:<lot> --budget <projet>:<lot>=+N)");
-  // L279 : --integrate rejoue une intégration rendue, donc une vague arrêtée ; --abandon-commits ne vaut qu'avec --remove-worktree.
-  if (args.integrate.length && args.resume === undefined) throw new RafError(`${args.integrate.some((t) => !t.replay) ? '--integrate' : '--replay'} ne vaut qu'avec --resume`);
-  if (args.abandonCommits && !args.removeWorktree) throw new RafError("--abandon-commits ne vaut qu'avec --remove-worktree");
-  if (args.removeWorktree && (args.lots.length || args.resume !== undefined || args.status !== undefined || args.continue || args.dryRun || args.drop.length || args.stopAfterCurrent || args.waits)) throw new RafError("--remove-worktree ne se combine avec aucune autre action");
-  // L258 : l'objectif donné ne vaut que pour UN lot lancé (la clé goal: du lot sert quand plusieurs partent ; --continue tire ses lots lui-même).
-  // L657 : avec --add, le lot est celui de l'unique --add.
-  if (args.goal !== undefined && ((args.add.length ? args.add.length !== 1 : args.lots.length !== 1) || args.continue || args.resume !== undefined || args.status !== undefined || args.waits || args.drop.length || args.stopAfterCurrent)) throw new RafError("--goal s'applique à un seul lot lancé : <projet>:<lot> --goal \"…\" (plusieurs lots : la clé goal: de chacun)");
-  if (args.since !== undefined && !args.waits && !args.follow) throw new RafError('--since s\'utilise avec --waits ou --follow');
-  if (args.since !== undefined && args.waits && !isDay(args.since)) throw new RafError(`--since ${args.since} : un horodatage ou un numéro de ligne ne s'utilise qu'avec --follow (--waits : AAAA-MM-JJ)`);
+  checkCombinations(args, io, launch); // les combinaisons d'options refusées avant d'agir ; pose args.untilAt
   if (args.waits) {
-    if (args.lots.length || args.status !== undefined || args.resume !== undefined || args.watch || args.drop.length || args.stopAfterCurrent || args.continue || args.dryRun) throw new RafError('--waits ne se combine avec aucune autre action');
     for (const line of renderWaits(readWaits(launch, args.since))) io.out(line);
     return 0;
   }
@@ -150,7 +122,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.drop.length || args.stopAfterCurrent) return control(args, io);
   if (args.answers.length) return answerOnly(args, io);
 
-  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--no-fill] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --follow [--wave vague] [--interval 5] [--since horodatage|ligne] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --add projet:lot [--goal "…"] [--budget projet:lot=+N] [--wave vague] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
+  if (args.lots.length === 0 && !args.continue && !args.queue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--no-fill] [--continue [--until 18:00] [--priority a,b]] | --queue [<projet>:<lot>…] [--until 18:00] | queue add|show|drop <projet>:<lot>… | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --follow [--wave vague] [--interval 5] [--since horodatage|ligne] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --add projet:lot [--goal "…"] [--budget projet:lot=+N] [--wave vague] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);
@@ -158,11 +130,11 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   const budget = args.budget ?? DEFAULT_BUDGET;
   const firstSkipped: string[] = [];
   // --continue sans lot donné : le premier tour est tiré du plan ; rien de prêt, ou tout refusé, vaut un refus avant d'agir.
-  if (args.continue && args.lots.length === 0 && refusals.length === 0) {
-    const first = await draw(args, io, deps, launch, new Set(), budget, maxSessions(args, io));
-    pre.lots.push(...first.lots);
-    firstSkipped.push(...first.skipped);
-    refusals.push(...(first.lots.length ? [] : first.skipped.length ? first.skipped : ['--continue : aucun lot prêt dont l\'estimation tient dans le budget']));
+  // L498 : --queue de même, sur la file approuvée, qui passe avant le plan (R19). La vague n'existe pas encore : le tirage choisit les lots, ils sont réservés une fois la vague réservée (claimFirstDraw).
+  const queue = new QueueRun(launch, deps);
+  if ((args.queue || (args.continue && args.lots.length === 0)) && refusals.length === 0) {
+    const refused = await firstDraw({ args, io, deps, launch }, budget, { pre, skipped: firstSkipped, refusals }, queue);
+    if (refused !== undefined) return refused;
   }
   if (refusals.length) {
     for (const r of refusals) io.err(`orchestrate : ${r}`);
@@ -173,6 +145,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     const id = waveId(io, args.wave, launch);
     if (args.wave && existsSync(join(RunStore.runsDir(launch), id))) return waveExists(args.wave, io);
     dryRun(pre.lots, io, deps, { budget, id, multiSlot: maxSessions(args, io) > 1, measured: measuredBudgetsAt(launch, io) });
+    queue.emit((line) => io.out(line)); // rien n'est réservé : la simulation dit seulement ce que la file aurait donné
     for (const l of [...estimateLines(pre.lots, launch, (w) => io.err(`orchestrate : ${w}`)), ...(args.continue ? freeLines(launch, pre.lots) : [])]) io.out(l);
     if (args.continue) await continueDryRun(args, io, deps, launch, pre.lots, budget, firstSkipped);
     return 0;
@@ -207,6 +180,8 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     }
   }
   const id = store.id;
+  queue.wave = id;
+  if (!claimFirstDraw(pre, queue, store, io)) return 2; // les lots tirés dans la file sont réservés maintenant que la vague existe (R7)
   // L632 : les lots qui demandent un cluster que leurs sessions n'auront pas sont dits avant le départ.
   announceLaunch(io, (line) => store.journal(line), pre.lots.map((l) => ({ ...l, prodAccess: projectEnv(l.repo).config.prodAccess })), args.continue ? freeLines(launch, pre.lots) : []);
   // Les candidats refusés au premier tirage : leur cause dit pourquoi ils ne jouent pas (même ligne que celles des tirages suivants).
@@ -215,6 +190,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     store.journal(`continue : lot sauté — ${s}`);
   }
   const wave: WaveState = { id, created: io.now().toISOString(), cwd: launch, budget, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: pre.lots.map((l) => lotKey(l.project, l.lot)), addsGoalBudget: true };
+  queue.bind(wave);
   // Une vague qui n'a pas atteint `wave.json` (refus au verrou, démarrage en échec) ne laisse pas son dossier réservé :
   // le même `--wave` se relance, et `reserve` ne le prend pas pour une vague existante.
   const abandon = () => {
@@ -226,10 +202,13 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
       if (l.node) l.node.link = (deps.linkNode ?? linkNodeBin)(store.dir, l.node.version, l.node.bin);
       store.writeLot(l);
     }
-    const code = await continueRounds(await execute(wave, pre.lots, store, io, deps, today, args), wave, pre.lots, store, io, deps, today, args, launch);
+    const say = sayTo(io, store);
+    queue.emit(say);
+    const code = await continueRounds(await launchWithQueue(queue, queue.queued, say, () => execute(wave, pre.lots, store, io, deps, today, args)), wave, pre.lots, store, io, deps, today, args, launch);
     abandon();
     return code;
   } catch (e) {
+    queue.session.releaseAll();
     abandon();
     throw e;
   }

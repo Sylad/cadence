@@ -17,10 +17,10 @@ function readsPlanOf(r: unknown, bad: Bad, others: boolean): Gate['readsPlan'] {
   throw bad('gate.readsPlan : true, false ou liste de chemins de tests relatifs au dépôt, sans « .. »');
 }
 
-/** `gate.host` : une destination ssh, sans espace ; une qui commencerait par « - » serait lue par ssh comme une option (-oProxyCommand=…). */
-function hostOf(v: unknown, bad: Bad): string {
+/** `gate.host` et `gate.overflow` (`key`) : une destination ssh, sans espace ; une qui commencerait par « - » serait lue par ssh comme une option (-oProxyCommand=…). */
+function hostOf(v: unknown, bad: Bad, key: 'host' | 'overflow' = 'host'): string {
   const h = typeof v === 'string' ? v.trim() : '';
-  if (!h || /\s/.test(h) || h.startsWith('-')) throw bad('gate.host : destination ssh attendue (une chaîne sans espace, ne commençant pas par « - »)');
+  if (!h || /\s/.test(h) || h.startsWith('-')) throw bad(`gate.${key} : destination ssh attendue (une chaîne sans espace, ne commençant pas par « - »)`);
   return h;
 }
 
@@ -43,18 +43,20 @@ function maxParallelOf(v: unknown, bad: Bad): number {
 }
 
 /**
- * Clé `orchestrate.gate` de cadence.yaml : `readsPlan` (L450), `host`, `install` (L403), `refs` (L617) et `maxParallel` (L624). Rend undefined quand elle ne déclare rien d'actif (`readsPlan: false` seul) ;
- * `host` ou `install` seuls posent la clé sans `readsPlan` : déclarer l'hôte ne vaut pas déclarer que des tests lisent le plan (R11).
+ * Clé `orchestrate.gate` de cadence.yaml : `readsPlan` (L450), `host`, `overflow` (L639), `install` (L403), `refs` (L617) et `maxParallel` (L624). Rend undefined quand elle ne déclare rien d'actif (`readsPlan: false` seul) ;
+ * `host`, `overflow` ou `install` seuls posent la clé sans `readsPlan` : déclarer l'hôte ne vaut pas déclarer que des tests lisent le plan (R11).
  * `bad` fabrique l'erreur de config préfixée (`cadence.yaml : orchestrate.<what>`).
  */
 export function readGate(raw: unknown, bad: Bad): Gate | undefined {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw bad('gate : objet attendu (gate: { readsPlan: true })');
   const o = raw as Record<string, unknown>;
-  for (const k of Object.keys(o)) if (!['readsPlan', 'host', 'install', 'refs', 'maxParallel'].includes(k)) throw bad(`gate.${k} inconnu (attendu : readsPlan, host, install, refs, maxParallel)`);
-  const readsPlan = readsPlanOf(o.readsPlan, bad, o.host != null || o.install != null || o.refs != null || o.maxParallel != null);
+  for (const k of Object.keys(o)) if (!['readsPlan', 'host', 'overflow', 'install', 'refs', 'maxParallel'].includes(k)) throw bad(`gate.${k} inconnu (attendu : readsPlan, host, overflow, install, refs, maxParallel)`);
+  if (o.host != null && o.overflow != null) throw bad('gate.overflow et gate.host déclarés ensemble : garder host (la porte se joue sur l\'hôte) ou overflow (la porte joue en local, puis déborde sur l\'hôte)');
+  const readsPlan = readsPlanOf(o.readsPlan, bad, o.host != null || o.overflow != null || o.install != null || o.refs != null || o.maxParallel != null);
   const gate: Gate = {
     ...(readsPlan ? { readsPlan } : {}),
     ...(o.host != null ? { host: hostOf(o.host, bad) } : {}),
+    ...(o.overflow != null ? { overflow: hostOf(o.overflow, bad, 'overflow') } : {}),
     ...(o.install != null ? { install: installOf(o.install, bad) } : {}),
     ...(o.refs != null ? { refs: refsOf(o.refs, bad) } : {}),
     ...(o.maxParallel != null ? { maxParallel: maxParallelOf(o.maxParallel, bad) } : {}),

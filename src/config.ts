@@ -221,11 +221,16 @@ export interface OrchestrateConfig {
      * Le déclarer seul ne vaut pas `readsPlan`.
      */
     host?: string;
+    /**
+     * `gate.overflow` (L639) : destination ssh de l'hôte de débordement. La porte joue d'abord en local quand aucune porte locale ne tient la machine, sinon sur cet hôte s'il répond
+     * (décision prise une fois par lot, sonde ConnectTimeout 3) ; injoignable, elle attend le tour local. Refusée avec `host` : l'une ou l'autre.
+     */
+    overflow?: string;
     /** `gate.install` (L403) : commande qui installe les dépendances, jouée sur l'hôte dans un worktree au sha pour remplir le cache de l'empreinte des lockfiles. */
     install?: string;
     /** `gate.refs` (L617) : références git (`main`, `origin/main`…) poussées avec le sha, pour qu'une commande de la porte qui les lit (merge-base, diff contre main) les trouve sur l'hôte. */
     refs?: string[];
-    /** `gate.maxParallel` (L624) : portes simultanées au plus sur l'hôte (entier positif ; défaut 2) ; la suivante attend qu'une porte libère l'hôte. Sans effet sans `host`. */
+    /** `gate.maxParallel` (L624) : portes simultanées au plus sur l'hôte (entier positif ; défaut 2) ; la suivante attend qu'une porte libère l'hôte. Sans effet sans `host` ni `overflow` (L639 : borne alors les portes de l'hôte de débordement). */
     maxParallel?: number;
   };
   /**

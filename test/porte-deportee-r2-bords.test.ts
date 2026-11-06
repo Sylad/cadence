@@ -33,7 +33,7 @@ describe('L403 probe — R2/R14/R15/R11 : bords de la lecture de orchestrate.gat
   });
 
   it('R14 — gate.dir refusé avec le message des clés connues, même à côté de host', () => {
-    expect(cfg('    host: m\n    dir: x\n')).toThrow('orchestrate.gate.dir inconnu (attendu : readsPlan, host, install, refs, maxParallel)');
+    expect(cfg('    host: m\n    dir: x\n')).toThrow('orchestrate.gate.dir inconnu (attendu : readsPlan, host, overflow, install, refs, maxParallel)');
   });
 
   it('R11 — gate: {install} seul : config.gate posé sans readsPlan ni host', () => {

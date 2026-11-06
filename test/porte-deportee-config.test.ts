@@ -29,7 +29,7 @@ describe('L403 — orchestrate.gate.host et gate.install (C3)', () => {
   });
 
   it('R14 — gate: {dir: x} refusé comme clé inconnue, les clés acceptées sont readsPlan, host, install et refs', () => {
-    expect(cfg('    dir: x\n')).toThrow(/gate\.dir inconnu \(attendu : readsPlan, host, install, refs, maxParallel\)/);
+    expect(cfg('    dir: x\n')).toThrow(/gate\.dir inconnu \(attendu : readsPlan, host, overflow, install, refs, maxParallel\)/);
     expect(cfg('    host: m\n    install: npm ci\n    readsPlan: true\n    refs: [main]\n')().gate).toEqual({ host: 'm', install: 'npm ci', readsPlan: true, refs: ['main'] });
   });
 

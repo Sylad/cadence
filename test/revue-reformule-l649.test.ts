@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { carriedNoted, countReview } from '../src/orchestrate/cycle/converge.js';
 import { minorConstats } from '../src/orchestrate/cycle/shared.js';
@@ -87,5 +88,13 @@ describe('R3 — le mineur noté reformulé n’est pas gardé à côté du cons
     l.reviewCounts = [1, 1] as never;
     l.codeConstats = [k('ancien', { gravite: 'majeur', fichier: 'a.ts', ligne: 4 })];
     expect(decisions(l, [{ gravite: 'majeur', texte: 'reformulé', fichier: 'a.ts', ligne: 4, inchange: true }], 1)).toEqual(['compte']);
+  });
+});
+
+describe('R4 — la page du cycle dit la règle élargie', () => {
+  it('R4 — la fausse marque inchange est reconnue par fichier et ligne ou classe, plus « texte reformulé non reconnu »', () => {
+    const page = readFileSync(new URL('../docs/orchestrate-cycle.md', import.meta.url), 'utf8');
+    expect(page).not.toContain('a reworded text is not recognised');
+    expect(page).toContain('same file and line, or same file and class');
   });
 });

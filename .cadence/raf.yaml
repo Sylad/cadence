@@ -2583,7 +2583,7 @@ lots:
     notes:
       - { date: 2026-11-05, text: "à livrer aussi : les bornes de fichiers vont à l'écrivain. Le brief d'implémentation reçoit les bornes des fichiers qu'il touche, lues de la config, et un hook après écriture mesure le fichier et répond la ligne et la limite, sans attendre le commit. Génériques, valables pour tous les projets et le compte pro ; 05-11, demande de Sylvain : plus d'erreur de borne qui coûte une porte." }
     started: 2026-11-05
-    review: { date: 2026-11-06, verdict: "conforme : verdict tenu ; statut de la clé bounds ajouté à stabilite.md, suite complète jouée une fois avec ce seul rouge", commit: 422765b01b3c31f2e0b6dd0e2f68d7509e07e504 }
+    review: { date: 2026-11-05, verdict: "conforme : 3 mineurs (deux reconduits de la revue 1, un passage de docs incomplet), aucune sous-tâche — orchestré (vague 2026-11-05-2210-cad, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé aucun patch du lot (range-diff 10/10 identiques) ; 3 mineurs de la revue précédente restent ouverts (doc et docstrings)", commit: 8047a2576a94f726b2a7d0ff010acf2e4aa94a12 }
   - id: L627
     title: "cadence inspect : à la fin de chaque vague, le programme mesure le temps par étape de chaque lot et classe les pertes par cause (refus d'intégration, reprise du lead, attente de créneau, conflit), repère une cause déjà vue et propose le lot qui la supprime, sans modèle ; le lead n'a plus à s'en souvenir ; base : l'agent inspecteur-travaux du 05-11 ; tableau imprimé en fin de vague et résumé au tour"
     status: todo

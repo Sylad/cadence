@@ -26,7 +26,7 @@ export function addProposals(c: LotCtx, rep: ReviewReport, source: string, head:
 }
 
 export function minorConstats(rep: ReviewReport): Constat[] {
-  return rep.constats.filter((k) => k.gravite === 'mineur').map((k) => ({ source: 'code', gravite: k.gravite, fichier: k.fichier, ligne: k.ligne, texte: k.texte }));
+  return rep.constats.filter((k) => k.gravite === 'mineur').map((k) => ({ source: 'code', gravite: k.gravite, fichier: k.fichier, ligne: k.ligne, texte: k.texte, classe: classeOf(k.classe) }));
 }
 
 export function blockingConstats(rep: ReviewReport, source: 'code' | 'ux'): Constat[] {

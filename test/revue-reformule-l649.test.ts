@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { carriedNoted, countReview } from '../src/orchestrate/cycle/converge.js';
+import { minorConstats } from '../src/orchestrate/cycle/shared.js';
 import { harness, reviewReport } from './orchestrate-harness.js';
 import type { Constat } from '../src/orchestrate/state.js';
 
@@ -51,6 +52,19 @@ describe('R2 — la classe rapproche aussi un constat reformulé du même fichie
     const l = lot();
     l.codeConstats = [k('nom', { fichier: 'a.ts', ligne: 4 })];
     expect(decisions(l, [{ gravite: 'majeur', texte: 'reformulé', fichier: 'a.ts', ligne: 4 }], 1)).toEqual(['compte']);
+  });
+});
+
+describe('R2 — la classe du mineur noté survit au cycle (minorConstats), pas seulement à une codeConstats écrite à la main', () => {
+  it('R2 — un mineur noté par la revue 1 (classe documentation) repris reformulé, autre ligne, même classe : « ecarte-deja-note »', () => {
+    const l = lot();
+    l.codeConstats = minorConstats(rapport([{ gravite: 'mineur', texte: 'doc périmée', fichier: 'README.md', ligne: 3, classe: 'documentation' }]));
+    expect(l.codeConstats[0]!.classe).toBe('documentation');
+    expect(decisions(l, [{ gravite: 'mineur', texte: 'le README ne dit plus la vérité', fichier: 'README.md', ligne: 40, classe: 'documentation' }])).toEqual(['ecarte-deja-note']);
+  });
+  it('R2 — une classe inconnue du mineur n’est pas persistée (classeOf), comme pour un majeur', () => {
+    const [m] = minorConstats(rapport([{ gravite: 'mineur', texte: 't', fichier: 'a.ts', classe: 'inventée' }]));
+    expect(m!.classe).toBeUndefined();
   });
 });
 

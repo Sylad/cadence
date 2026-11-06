@@ -2282,25 +2282,25 @@ describe("--goal et clé goal: du lot (L258) : l'objectif remplace le titre dans
     return { briefs, table: r.out.join('\n') };
   }
 
-  it("R4 — une clé goal: ajoutée au plan après le lancement n'atteint ni les briefs ni le tableau de la reprise : un seul objectif, celui du lancement", async () => {
+  it("R8 — une clé goal: ajoutée au plan après le lancement atteint les briefs et le tableau de la reprise : le plan, vide au lancement, est changé", async () => {
     const { briefs, table } = await resumeAfterPlanGoal(undefined, 'Clé ajoutée après le lancement');
     for (const b of briefs) {
-      expect(b).toContain(STALE);
-      expect(b).not.toContain('Clé ajoutée après le lancement');
-    }
-    expect(table).not.toContain('objectif donné');
-    expect(table).not.toContain('Clé ajoutée après le lancement');
-  });
-
-  it("R4 — une clé goal: changée après le lancement : la reprise garde l'objectif du lancement dans les briefs ET dans le tableau", async () => {
-    const { briefs, table } = await resumeAfterPlanGoal('Clé au lancement', 'Clé changée depuis');
-    for (const b of briefs) {
-      expect(b).toContain('Clé au lancement');
-      expect(b).not.toContain('Clé changée depuis');
+      expect(b).toContain('Clé ajoutée après le lancement');
       expect(b).not.toContain(STALE);
     }
-    expect(table).toContain('a:L1 — objectif donné : Clé au lancement');
-    expect(table).not.toContain('Clé changée depuis');
+    expect(table).toContain('a:L1 — objectif donné : Clé ajoutée après le lancement');
+  });
+
+  it("R9 — une clé goal: changée après le lancement : la reprise cite le nouvel objectif du plan dans les briefs ET dans le tableau", async () => {
+    const { briefs, table } = await resumeAfterPlanGoal('Clé au lancement', 'Clé changée depuis');
+    for (const b of briefs) {
+      expect(b).toContain('Clé changée depuis');
+      expect(b).not.toContain('Clé au lancement');
+      expect(b).not.toContain(STALE);
+    }
+    expect(table).toContain('a:L1 — objectif donné : Clé changée depuis');
+    expect(table).not.toContain('objectif donné : Clé au lancement');
+    expect(table).toContain('objectif changé : « Clé au lancement » → « Clé changée depuis »');
   });
 });
 

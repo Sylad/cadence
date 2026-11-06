@@ -2757,6 +2757,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "compliant — orchestré (vague 2026-11-06-1338, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: fcb0f419daa67c7e91da791a81a10816c0d83b0f }
   - id: L646
     title: "revue en boucle : le brief de fix donne les constats de la passe précédente par classe et exige la correction de la classe, un contrôle au commit refuse un test ajouté qui est vert avec et sans le code du lot, la revue suivante ne relit pas un mineur déjà noté ; niveau : source (classe dans le brief), commit (contrôle) ; niveau le plus tôt : source ; mesure : 0 passe de revue sans constat neuf bloquant ou majeur, taux d'écartés lu par cadence perf une fois L638 en service"
     status: doing

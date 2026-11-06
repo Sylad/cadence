@@ -944,6 +944,7 @@ lots:
       - { date: 2026-11-06, text: "Revue de la fiche — mineur : docs/specs/migration-cliquet-regles/fiche.yaml:177 — R16 annonce un coût « borné : un git show par source candidate » alors que les sources candidates sont tous les fichiers de la base du départ à chaque exécution de la porte ; le test « aucun git show lancé » ne couvre que le cas sans fichier neuf. Préciser (lecture paresseuse) ou retirer « borné ». Notes déjà relevées : R9 test 2 ambigu (l.138) ; R1 test 1 dupliqué du test existant l462:29 (l.90)." }
       - { date: 2026-11-06, text: "Revue de la fiche — mineur : docs/specs/migration-cliquet-regles/fiche.yaml:223 — A3 décrit l'appel comparerMigration(avant, apres, existe, lien). R13 (l.162) fixe la signature comparerMigration(avant, apres, existe, lien, depart = avant). Le contrat et la règle divergent : l'implémenteur de l'intégration peut oublier depart. À aligner." }
       - { date: 2026-11-06, text: "Revue de la fiche — mineur : docs/specs/migration-cliquet-regles/fiche.yaml:169 — R14 est une hypothèse dont le seuil de 50 % n'a aucune mesure sur des découpages réels. Le si_faux nomme la conséquence et le remède, la perte réelle de R5 borne le crédit, et rien n'est stocké. Pas bloquant, mais à noter au lead comme choix de paramètre." }
+      - { date: 2026-11-06, text: "Décision du lead 06-11 : le lien coupe/source est le calcul par lignes (non vides, 50 % du fichier neuf présentes à la source au départ et parties depuis, git show), pas git -C, dont le score refuserait le déplacement d'une petite fonction." }
   - id: L478
     title: "Cliquet (suite de L462) : la base ne doit pas remonter (rm + --init ou édition à la main passent en porte et en CI : comparer à la base du sha de départ) et le découpage d'un fichier de la base doit avoir une voie admise (transfert documenté, mesure comparée au total) — cas L461"
     status: dropped
@@ -2964,6 +2965,11 @@ lots:
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
+  - id: L668
+    title: "orchestrate --follow perd une ligne entre deux suivis : 06-11, la question de L477 (22:00:39Z) n'a pas été remontée au réarmement du suivi et a attendu 33 min ; --follow --since <horodatage ou ligne> rejoue les lignes manquées, et une question ouverte se relit au démarrage du suivi ; mesure : 0 ligne de geste perdue au réarmement"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-06
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

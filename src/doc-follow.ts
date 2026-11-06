@@ -14,11 +14,11 @@ interface Citation {
   text: string;
 }
 
-const DECLARATION = /\b(?:function|const|let|var|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g;
+const DECLARATION = /\bexport\s+(?:(?:default|declare|abstract|async)\s+)*(?:function\*?|const|let|var|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g;
 const FLAG = /(?<![\w-])--[a-z][a-z0-9-]*/g;
 const MIN_LENGTH = 4;
 
-/** Les identifiants cités par ces lignes de code : noms déclarés (function, const, class, type…) d'au moins 4 caractères et options `--x`. */
+/** Les identifiants cités par ces lignes de code : noms déclarés ET exportés (export function, const, class, type…) d'au moins 4 caractères (une variable locale n'est pas un identifiant de la doc) et options `--x`. */
 function identifiersOf(lines: string[]): Set<string> {
   const ids = new Set<string>();
   for (const l of lines) {
@@ -118,7 +118,7 @@ export function staleDocCitations(root: string, from?: string): Citation[] {
   const { removed, added } = sourceChange(view);
   const ids = changedIdentifiers(removed, added);
   if (ids.length === 0) return [];
-  const docs = git(root, ['ls-files', '-z', '--', 'README.md', 'docs']).split('\0').filter((f) => f.endsWith('.md'));
+  const docs = git(root, ['ls-files', '-z', '--', 'README.md', 'docs']).split('\0').filter((f) => f === 'README.md' || /^docs\/[^/]+\.md$/.test(f));
   const out: Citation[] = [];
   for (const file of docs) {
     const lines = contentOf(view, file);

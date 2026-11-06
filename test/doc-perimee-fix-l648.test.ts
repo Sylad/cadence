@@ -43,11 +43,15 @@ describe('L648 — identifiants changés par un diff', () => {
   it('R1 — retiré ou ajouté : une déclaration d’un seul côté, une option d’un seul côté ; déplacée ou au corps changé, rien', () => {
     expect(changedIdentifiers(['export function oldName(a) {', 'const same = 1;'], ['export function newName(a) {', 'const same = 2;'])).toEqual(['newName', 'oldName']);
     expect(changedIdentifiers(["'--old-flag'"], ["'--new-flag'"])).toEqual(['--new-flag', '--old-flag']);
-    expect(changedIdentifiers(['function moved() {'], ['function moved() {'])).toEqual([]);
+    expect(changedIdentifiers(['export function moved() {'], ['export function moved() {'])).toEqual([]);
     expect(changedIdentifiers([], [])).toEqual([]);
   });
   it('R1 — un nom de moins de 4 caractères n’est pas un identifiant (bruit)', () => {
-    expect(changedIdentifiers(['const a = 1;', 'let id = 2;'], [])).toEqual([]);
+    expect(changedIdentifiers(['export const a = 1;', 'export let id = 2;'], [])).toEqual([]);
+  });
+  it('R1 — une variable locale (const start, let after) n’est pas un identifiant : seules les déclarations exportées comptent', () => {
+    expect(changedIdentifiers(['  const start = 1;', '  let after = 2;', 'function helper() {', 'type Local = 1;'], ['  const range = 3;'])).toEqual([]);
+    expect(changedIdentifiers([], ['export async function fetchAll() {', 'export default class Widget {', 'export declare type Shape = 1;', 'export interface Opts {', 'export enum Kind {'])).toEqual(['Kind', 'Opts', 'Shape', 'Widget', 'fetchAll']);
   });
   it('R2 — touchedLines lit les hunks -U0 : ajout, remplacement, suppression pure (aucune ligne nouvelle)', () => {
     const diff = '@@ -3 +3 @@ x\n-a\n+b\n@@ -10,0 +11,2 @@\n+c\n+d\n@@ -20,2 +22,0 @@\n-e\n-f\n';
@@ -131,6 +135,28 @@ describe('L648 — hook pre-commit : fix( touchant src/', () => {
   });
   it('R10 — le cadence.yaml du dépôt ne pose pas hook.docs avant la mise en service (la copie en service le refuse)', () => {
     expect(readHookConfig(join(import.meta.dirname, '..', 'cadence.yaml')).docs).toBeUndefined();
+  });
+  it('R1 — une variable locale changée par le fix ne fait refuser aucune ligne de doc qui la cite entre accents graves', () => {
+    const dir = project('refuse');
+    writeFileSync(join(dir, 'README.md'), '# Titre\n\nVoir `start` et `oldName`.\n');
+    writeFileSync(join(dir, 'src/lib.ts'), 'export function oldName(a: number): number {\n  const start = a;\n  return start;\n}\n');
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-qm', 'chore: local');
+    writeFileSync(join(dir, 'src/lib.ts'), 'export function oldName(a: number): number {\n  const after = a;\n  return after;\n}\n');
+    git(dir, 'add', 'src/lib.ts');
+    expect(preCommit(dir, 'fix(L1): variable locale')).toEqual({ code: 0, err: '' });
+  });
+  it('R1 — les pages datées de sous-dossiers de docs/ ne sont pas lues : docs/*.md seulement', () => {
+    const dir = project('refuse');
+    mkdirSync(join(dir, 'docs/etudes'));
+    writeFileSync(join(dir, 'docs/etudes/vieux.md'), 'Étude : `oldName` à l’époque.\n');
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-qm', 'chore: etude');
+    rename(dir);
+    const r = preCommit(dir, 'fix(L1): rename');
+    expect(r.code).toBe(3);
+    expect(r.err).toContain('README.md:3');
+    expect(r.err).not.toContain('docs/etudes');
   });
   it('R9 — sans identifiant changé (corps seul) : rien', () => {
     const dir = project('refuse');

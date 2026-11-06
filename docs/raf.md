@@ -125,8 +125,8 @@ hook:
 ```
 
 For a commit whose subject starts with `fix(` and that stages a `src/**.ts` file, the hook takes the identifiers the
-diff of `src/` removes or adds (a declared name of 4 characters or more: `function`, `const`, `class`, `type`…; an
-`--option`), and looks for the lines that cite them: a name between backticks in `README.md` and `docs/*.md`, an
+diff of `src/` removes or adds (an exported declared name of 4 characters or more: `export function`, `const`, `class`, `type`… (a local variable is not one); an
+`--option`), and looks for the lines that cite them: a name between backticks in `README.md` and `docs/*.md` (not the dated pages of the sub-folders of `docs/`), an
 `--option` in the help. A citing line the commit does not touch is listed (`file:line`) and, with `refuse`, the commit
 fails (exit code 3, `--no-verify` bypasses it); `warn` lists and lets it through. A `docs-ok: <reason>` line in the
 message (the reason is required) says the lines stay true. Other commits (`feat(`, `chore(`…) and a message the hook cannot read are not concerned. In a wave, the `fix` brief

@@ -2597,6 +2597,7 @@ lots:
       - { date: 2026-11-05, text: "périmètre ajouté par l'inspection du 05-11 : le journal note le début et la fin de chaque porte, pour isoler portes, file et sessions ; 35 à 70 % du temps actif n'est pas de la session claude et n'est pas mesurable aujourd'hui" }
       - { date: 2026-11-05, text: "indicateurs ajoutés le 05-11 : début et fin de chaque porte, minutes après la première revue, niveau de détection de chaque erreur (écriture, commit, porte, intégration), reprises à la main par cause" }
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme : 0 bloquant, 0 majeur, 6 mineurs (dont 5 constats mineurs de la revue précédente toujours non corrigés ; les 2 bloquants et 2 majeurs précédents sont corrigés et testés) — orchestré (vague 2026-11-06-0915, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant : le rebase ne change que le contexte du CHANGELOG (entrée sous [Unreleased], rien de perdu, aucun titre dupliqué) ; 0 bloquant, 0 majeur, 6 mineurs de la revue précédente restent non corrigés", commit: 06cd0332e5b765951ed376038bbbe6ba04061754 }
   - id: L628
     title: "Un lot light ou small qui change un comportement livré joue quand même le précheck des tests scellés (L500) : la vague liste dès le départ les tests qui figent ce qu'il touche, la session s'arrête avec le geste de rescellement, au lieu d'être rendue au commit ; L246 et L248 du 05-11 ; mesure : 0 rendu pour verrou en 7 jours"
     status: done

@@ -2633,11 +2633,12 @@ lots:
     finished: 2026-11-06
   - id: L633
     title: "Issue #43 : la chaîne de maquette légère ne joue plus pour un correctif de quelques propriétés sur un écran existant. Un lot visible sans screen: et sans écran neuf passe par implement, capture avant et après, et une revue UX du seul diff ; maquette et états forcés restent pour un écran neuf ou une mise en page changée. Cas mesuré : 33 min et 5,75 $ pour 11 lignes de SCSS. Mesure : coût médian d'un petit lot visible"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-06, verdict: "conforme : le majeur précédent (capture avant) est corrigé ; 0 bloquant, 0 majeur, 10 mineurs en notes du lot — orchestré (vague 2026-11-05-2210-cad, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : rebase sans effet sur le lot (8 commits identiques, main n'a bougé que du plan) ; les 10 mineurs de la revue précédente restent ouverts en notes, non re-signalés", commit: 0d249453feb038f73808f9ba14727c5eee89e4ba }
+    finished: 2026-11-06
   - id: L634
     title: "Suites de L621, lot rétréci : isExpress lit le screen du plan et le lot screen: page d'estimate ≤ 0,1 quitte la voie express (preflight.ts:174) ; la revue d'intégration reçoit from..HEAD qui contredit integrationText (retreci.ts:52) ; Judge ONLY inclut les commits des dépôts voisins (converge.ts:30) ; le dry-run n'applique pas launchedLot à la base du budget (dry-run.ts:145) ; test versionné du croisement rétréci × hors règle (L625) aux rangs 1 et 2"
     status: todo
@@ -2645,6 +2646,11 @@ lots:
     created: 2026-11-06
   - id: L635
     title: "R5 de test/orchestrate-pages-l599.test.ts exige un renvoi pour toute section d'une page de la suite, même neuve et jamais déplacée (L621 puis L633 refusés à la porte, 2 occurrences) : limiter R5 aux sections réellement déplacées (liste figée) et retirer les renvois factices de L621 et L633"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-06
+  - id: L636
+    title: "Docs : aligner orchestrate-cycle.md:307, orchestrate.md:130 et raf.md:56 sur L633 (un lot visible sans screen: n'est plus une maquette légère, budget ordinaire)"
     status: todo
     estimate: 0.1
     created: 2026-11-06

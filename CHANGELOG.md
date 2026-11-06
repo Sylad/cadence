@@ -83,6 +83,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `cadence-hud` lots panel: a lot `doing` in the plan with no wave session now reads `◌ en sommeil` (muted) instead of `▶ en cours`, so a lot nothing is working on no longer looks active (L659, [docs/cadence-hud.md](docs/cadence-hud.md)). A lot in a wave keeps the wave's state.
+
 - `cadence verify --gate` finds the state of a wave launched two or more levels above the repository (L652, [docs/deliver.md](docs/deliver.md)): it looks in the current folder, the repository root and all their ancestors, not only the folder and its parent, so the recorded verdict is taken over instead of replayed with « aucune porte de vague enregistrée pour ce sha » (issue #45).
 
 ## [1.59.0] - 2026-11-06

@@ -70,8 +70,12 @@ test('R5 — un lot de chaque statut de vague : mot, glyphe et couleur de la tab
   for (const [status, [text, color]] of Object.entries(GLYPHS)) expect(lotState(lot('L1'), new Set(['L1']), status)).toEqual({ text, color })
 })
 
-test('R5 — lot doing : « ▶ en cours »', () => {
-  expect(lotState(lot('L1', 'doing'), new Set(['L1']))).toEqual({ text: '▶ en cours', color: 'claude' })
+test('R5 — lot doing sans session de vague : « ◌ en sommeil », discret, jamais « ▶ en cours »', () => {
+  expect(lotState(lot('L1', 'doing'), new Set(['L1']))).toEqual({ text: '◌ en sommeil', color: 'subtle' })
+})
+
+test('R5 — lot doing avec une session de vague : l\'état de la vague, pas « en sommeil »', () => {
+  expect(lotState(lot('L1', 'doing'), new Set(['L1']), 'implementing')).toEqual({ text: '⟳ implémente', color: 'claude' })
 })
 
 test('R5 — lot todo sans after: ouvert : « ○ libre »', () => {

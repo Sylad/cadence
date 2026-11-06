@@ -290,7 +290,7 @@ test('R4 — le panneau dessine un bloc par projet, ses lots en arbre et les aft
   expect(d.text).toContain('└')
   expect(d.text).toContain('after: L400 L401')
   expect(d.text).toContain('L401/1')
-  expect(d.text).toContain('▶ en cours')
+  expect(d.text).toContain('◌ en sommeil')
   expect(d.text).toContain(CLOSE_HELP)
 })
 
@@ -1579,7 +1579,7 @@ const idColumns = async ($: Parameters<TestBody>[0], bodyColumns: number, surfac
   const texts = await found<{ wrap?: unknown }>('Text')
   await ui.unmount()
   const column = (b: (typeof boxes)[number]) => ({ text: b.text ?? '', minWidth: b.props?.minWidth, width: b.props?.width, flexShrink: b.props?.flexShrink })
-  const STATE = /^(○ (à faire|libre)|▶ en cours|⊘ bloqué|✔ (prêt|livré|clos))$/
+  const STATE = /^(○ (à faire|libre)|▶ en cours|◌ en sommeil|⊘ bloqué|✔ (prêt|livré|clos))$/
   return {
     boxes: boxes.filter(b => ID_TEXT.test(b.text ?? '')).map(column),
     states: boxes.filter(b => STATE.test(b.text ?? '')).map(column),

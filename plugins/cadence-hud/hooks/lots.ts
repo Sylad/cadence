@@ -185,11 +185,12 @@ const WAVE_GLYPH: Record<string, string> = { queued: '…', question: '?', ready
 
 export type LotState = { text: string; color: ThemeKey }
 
-/** L'état d'un lot en mots, glyphe et couleur : celui de la vague s'il y en a un (mots et couleurs de la bande), sinon celui du plan. Une sous-tâche n'a que son statut. `openIds` : les lots non clos du projet. */
+/** L'état d'un lot en mots, glyphe et couleur : celui de la vague s'il y en a un (mots et couleurs de la bande), sinon celui du plan (un lot doing sans vague est « en sommeil »). Une sous-tâche n'a que son statut. `openIds` : les lots non clos du projet. */
 export const lotState = (lot: TourLot, openIds: ReadonlySet<string>, waveStatus?: string): LotState => {
   if (isTask(lot)) return lot.status === 'doing' ? { text: '▶ en cours', color: 'claude' } : { text: '○ à faire', color: 'text' }
   if (waveStatus !== undefined) return { text: `${WAVE_GLYPH[waveStatus] ?? '⟳'} ${lotStatusFr(waveStatus)}`, color: colorOfLot(waveStatus) }
-  if (lot.status === 'doing') return { text: '▶ en cours', color: 'claude' }
+  // doing au plan sans session de vague : rien ne tourne (L659), « en cours » serait faux
+  if (lot.status === 'doing') return { text: '◌ en sommeil', color: 'subtle' }
   return lot.after.some(id => openIds.has(id)) ? { text: '⊘ bloqué', color: 'subtle' } : { text: '○ libre', color: 'text' }
 }
 

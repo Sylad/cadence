@@ -122,7 +122,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     throw new RafError(`--resume ne se combine pas avec des lots à lancer (il reprend les lots de la vague ; --answer, --drop, --integrate, --replay et --budget projet:lot=+N nomment ceux qu'ils visent) ; ${hint}`);
   }
   if (args.resume !== undefined && args.dryRun) throw new RafError('--resume ne se combine pas avec --dry-run (la reprise écrit l\'état de la vague et relance les sessions, elle ne se simule pas)');
-  if (args.lotBudgets.length && args.resume === undefined && !args.add.length) throw new RafError("--budget projet:lot=+N ne vaut qu'avec --resume");
+  if (args.lotBudgets.length && args.resume === undefined && !args.add.length) throw new RafError("--budget projet:lot=+N ne vaut qu'avec --resume ou --add (--add <projet>:<lot> --budget <projet>:<lot>=+N)");
   // L279 : --integrate rejoue une intégration rendue, donc une vague arrêtée ; --abandon-commits ne vaut qu'avec --remove-worktree.
   if (args.integrate.length && args.resume === undefined) throw new RafError(`${args.integrate.some((t) => !t.replay) ? '--integrate' : '--replay'} ne vaut qu'avec --resume`);
   if (args.abandonCommits && !args.removeWorktree) throw new RafError("--abandon-commits ne vaut qu'avec --remove-worktree");

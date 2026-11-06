@@ -7,6 +7,8 @@ import { ESCALATION_RESERVE } from '../src/orchestrate/cycle/budget.js';
 import type { ClaudeFn } from '../src/orchestrate/launch.js';
 import { preflight } from '../src/orchestrate/preflight.js';
 import { relitObjectif } from '../src/orchestrate/reprise-objectif.js';
+import { registerWave, unregisterWave, cadenceHome } from '../src/orchestrate/registry.js';
+import { lotBranch, lotTreeDir } from '../src/orchestrate/worktree.js';
 import { RunStore, type LotState, type StepState } from '../src/orchestrate/state.js';
 import { Plan } from '../src/plan.js';
 import { AGENTS_DIR } from '../src/skills.js';
@@ -161,7 +163,7 @@ describe('R4 — --budget avec --add', () => {
     const { parent } = parentWith({ a: {}, b: {} });
     const r = await addDuring(parent, ['b:L1', '--budget', 'b:L1=+300k'], { waitFor: 'b:L1' });
     expect(r.code).toBe(0);
-    await expect(orchestrate(['b:L1', '--budget', 'b:L1=+300k'], io(parent).io, scene(parent, null).d)).rejects.toThrow("--budget projet:lot=+N ne vaut qu'avec --resume");
+    await expect(orchestrate(['b:L1', '--budget', 'b:L1=+300k'], io(parent).io, scene(parent, null).d)).rejects.toThrow("--budget projet:lot=+N ne vaut qu'avec --resume ou --add");
   });
   it("R4 — --budget d'un lot absent des --add : refus", async () => {
     const { parent } = parentWith({ a: {}, b: { lots: 2 } });
@@ -209,20 +211,38 @@ describe('R5 — le budget du lot ajouté', () => {
 
 describe('R6 — lot rendu repris par --add', () => {
   const rendu = { project: 'a', lot: 'L1', repo: '/x/a', status: 'handed-back', next: 'fix', outcome: 'revue non conforme après 2 passe(s) de correction', steps: [], goal: 'objectif de la vague', budget: 100 } as unknown as LotState;
-  const asked = async (argv: string[], lotsAjoutes = ['L1']) => {
+  /** `vivante` : un dépôt réel avec la branche et le worktree du lot rendu (resumeRefusal passe) et la vague inscrite au registre (le dépôt n'est pas retiré). */
+  const asked = async (argv: string[], lotsAjoutes = ['L1'], vivante = false) => {
     const requested: unknown[] = [];
-    const store = { id: 'W', dir: tempDir(), lots: () => [rendu], addQueue: () => [], readWave: () => ({ budget: 1e6, consumed: 0, addsGoalBudget: true }), requestAdd: (t: unknown) => (requested.push(t), 1), markAddTaken: () => {}, journal: () => {} } as unknown as RunStore;
-    const checks: LaunchChecks = { resolveTargets: () => lotsAjoutes.map((lot) => ({ project: 'a', projectDir: '/x/a', repo: '/x/a', lot, model: 'sonnet' })), preflight: async () => ({ refusals: [], lots: [] }) };
+    const dir = tempDir();
+    const repo = vivante ? tempDir() : '/x/a';
+    const lot = { ...rendu, repo } as LotState;
+    if (vivante) {
+      git(repo, 'init', '-q', '-b', 'main');
+      git(repo, 'config', 'user.email', 't@example.com');
+      git(repo, 'config', 'user.name', 'T');
+      git(repo, 'config', 'commit.gpgsign', 'false');
+      commitFile(repo, 'base.txt', 'chore: base');
+      git(repo, 'worktree', 'add', '-q', '-b', lotBranch('W', 'a', 'L1'), lotTreeDir(dir, 'a', 'L1', repo));
+      git(repo, 'config', '--local', `branch.${lotBranch('W', 'a', 'L1')}.cadence-base`, 'main');
+      registerWave(cadenceHome(), { pid: process.pid, wave: 'W', started: 'x', cwd: '/x', repos: [] });
+    }
+    const store = { id: 'W', dir, lots: () => [lot], addQueue: () => [], readWave: () => ({ budget: 1e6, consumed: 0, addsGoalBudget: true }), requestAdd: (t: unknown) => (requested.push(t), 1), markAddTaken: () => {}, journal: () => {} } as unknown as RunStore;
+    const checks: LaunchChecks = { resolveTargets: () => lotsAjoutes.map((l) => ({ project: 'a', projectDir: '/x/a', repo, lot: l, model: 'sonnet' })), preflight: async () => ({ refusals: [], lots: [] }) };
     const e = io('/x');
-    const code = await addToLive(parseOrchestrateArgs(argv), { io: e.io, deps: {} as OrchestrateDeps, launch: '/x' }, store, checks);
-    return { code, err: e.err.join('\n'), requested };
+    try {
+      const code = await addToLive(parseOrchestrateArgs(argv), { io: e.io, deps: {} as OrchestrateDeps, launch: '/x' }, store, checks);
+      return { code, err: e.err.join('\n'), requested, lot };
+    } finally {
+      if (vivante) unregisterWave(cadenceHome(), process.pid);
+    }
   };
   it('R6 — lot rendu repris avec --goal : refus et goal d\'état inchangé', async () => {
     const r = await asked(['--add', 'a:L1', '--goal', 'un autre']);
     expect(r.code).toBe(2);
     expect(r.err).toContain('a:L1 : lot rendu repris : il garde son objectif et son budget, --goal et --budget lui sont refusés');
     expect(r.requested).toEqual([]);
-    expect(rendu.goal).toBe('objectif de la vague');
+    expect(r.lot.goal).toBe('objectif de la vague');
   });
   it('R6 — lot rendu repris avec --budget : refusé de même', async () => {
     const r = await asked(['--add', 'a:L1', '--budget', 'a:L1=+300k']);
@@ -230,9 +250,12 @@ describe('R6 — lot rendu repris par --add', () => {
     expect(r.err).toContain('lot rendu repris : il garde son objectif et son budget');
     expect(r.requested).toEqual([]);
   });
-  it('R6 — lot rendu repris sans --goal ni --budget qui le vise : le --budget d\'un autre lot ajouté ne le fait pas refuser', async () => {
-    const r = await asked(['--add', 'a:L1', '--add', 'a:L2', '--budget', 'a:L2=+300k'], ['L1', 'L2']);
-    expect(r.err).not.toContain('il garde son objectif et son budget');
+  it('R6 — lot rendu repris sans --goal ni --budget qui le vise : le --budget d\'un autre lot ajouté ne le fait pas refuser, les deux lots sont déposés', async () => {
+    const r = await asked(['--add', 'a:L1', '--add', 'a:L2', '--budget', 'a:L2=+300k'], ['L1', 'L2'], true);
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(r.requested).toHaveLength(2);
+    expect(r.lot.goal).toBe('objectif de la vague');
   });
 });
 
@@ -312,6 +335,16 @@ describe('R8 — un objectif changé du plan est relu à la reprise', () => {
     expect(w.store.readLot('a', 'L1')!.goal).toBe('nouvel objectif du plan');
     expect(r.briefs.join('\n')).toContain('nouvel objectif du plan');
     expect(r.journal).toMatch(/a:L1 : objectif changé : « ancien objectif » → « nouvel objectif du plan »/);
+  });
+  it('R8 — lot sans étape (a:L2 jamais commencé) : --resume le rejoue avec le nouvel objectif', async () => {
+    const w = await stopped({ goals: { L1: 'objectif L1', L2: 'ancien objectif L2' }, two: true });
+    expect(w.store.readLot('a', 'L2')!.steps).toEqual([]);
+    setPlanGoal(w.dirs.a!, 'L2', 'nouvel objectif L2');
+    const r = await w.resumed();
+    expect(r.rc).toBe(0);
+    expect(w.store.readLot('a', 'L2')!.goal).toBe('nouvel objectif L2');
+    expect(r.journal).toMatch(/a:L2 : objectif changé : « ancien objectif L2 » → « nouvel objectif L2 »/);
+    expect(r.briefs.join('\n')).toContain('nouvel objectif L2');
   });
   it('R8 — lot sans étape et objectif qui rétrécit : maquette sautée à la reprise', async () => {
     const dir = mono({ screen: 'component' }, 1);

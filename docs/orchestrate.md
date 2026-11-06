@@ -122,7 +122,7 @@ its budget never had a compliant review. The reserve rule is unchanged: a `fix` 
 so N of at most 155 000 on a `fix` is refused, and a budget still too small hands the lot back again with the same text. The wave's own budget
 and quota still apply (exhausted: the lot stays suspended, exit 3). A wave that is `done` is resumed this way when a lot is named; without the
 option it is still refused. The named lot undergoes the checks of a live lot (dirty tree, repository held by another orchestration, `.nvmrc`
-Node). Refused with exit 2, before anything is written: a malformed `projet:lot=+N` or an option without `--resume`, an unknown or
+Node). Refused with exit 2, before anything is written: a malformed `projet:lot=+N` or an option without `--resume` or `--add`, an unknown or
 ambiguous lot (`projet:lot` is then asked), a lot that is not handed back for its budget with a write step to replay, a lot named twice
 (`p:L` then `L` counts) or also named by `--drop` or `--answer`.
 A wave runs on its own snapshot of the tool, but one launched before L223 would refuse `projet:lot=+N` as an invalid budget:

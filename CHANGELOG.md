@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.57.0] - 2026-11-06
+
 ### Added
 
 - A `--goal` (or `goal:`) that narrows a lot to commits already merged skips the mockup unless the goal changes the layout, and the reviews judge the diff of the goal (L621, issue #40, [docs/orchestrate-gate.md](docs/orchestrate-gate.md#a-goal-that-narrows-a-lot-to-commits-already-merged-l621)): a lot with a goal and at least one work commit already in the base branch is launched without a spec step or mockup (journal `maquette sautée : l'objectif rétrécit le lot à N commit(s) déjà intégré(s) …`), unless the goal contains a layout word (`mise en page`, `layout`, `disposition`, `maquette`, `ecran`, `affichage`, `colonne`, `grille`, `responsive`), the lot has a sealed acceptation (a `spec: true` lot without a screen keeps its spec session). Its code-review brief names the commits after the launch head and the goal, and asks to mark `inchange: true` a major outside the goal; that mark now counts from review 1 for such a lot (`[suite code]` proposal, compliant verdict, no correction pass), a blocking finding still buys a pass. The narrowing is read from git at each review, no new state field to decide it. Measured on 05-11: 74 min and 1.28 M for a commit of four fixes.

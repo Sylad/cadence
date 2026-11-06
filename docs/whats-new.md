@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.57.0**: a `--goal` that narrows a lot to merged commits skips the mockup and the reviews judge the goal's diff; a visible lot with no `screen:` plays no mockup and captures the screen before and after.
 - **1.56.0**: code reviews converge (out-of-rule findings no longer block); a remote gate frees its session slot; file `bounds` reach the writer; a goal needing cluster access is flagged; one help text; `tirables` wording.
 - **1.55.0**: a wave's gate plays only the tests related to the lot after each write; `orchestrate --follow` relays only what needs the lead; Playwright sessions run headless; the HUD folds ready and delivered lots.
 - **1.54.0**: a wave of named lots fills its free slots from the plan (`--no-fill` opts out); `raf now` flags lots whose sub-tasks are all closed; a declared config lot; a first whole-package study.
@@ -86,6 +87,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.57.0**: A `--goal` (or `goal:`) that narrows a lot to commits already merged skips the mockup unless the goal changes the layout, and the reviews judge the diff of the goal (L621, issue #40). A visible lot with no `screen:` above 0.1 day no longer plays the light mockup: `implement` captures the screen before and after at 1440 and 390 px, and the UX review reads the diff only, at the ordinary budget (L633, issue #43).
 
 **1.56.0**: Code reviews converge: from the second review, a major on a point the previous review had not raised, outside the lot's goal and changed lines, goes to the lot's proposals instead of counting as non-conformity, and an out-of-rule expectation of the edge-case probe never buys a pass (L622, L625). A gate played on `orchestrate.gate.host` gives back the lot's session slot (L624), `orchestrate.gate.refs` pushes `main` and `origin/main` to the host with the sha (L617), and cadence's own gate now plays on the WSL of mini-blue, falling back to local without the alias (L618). The `bounds` key of `cadence.yaml` gives a file its limits, listed in the implementation and fix briefs and enforced by the new `cadence claude-hook bornes` (L626). The sealed-tests pre-check also lists the sealed tests of another lot that import a code file the lot cites (L628). A lot whose goal needs cluster access is flagged at launch and `--dry-run` when `orchestrate.prodAccess` is false (L632), and a refusal for red tests at the integrated tip always names the red test (L631). `orchestrate --resume`/`--integrate` no longer fail on a `cadence.yaml` key added since the wave started (L623), and an integration queued on a live wave is played ahead of the lots waiting (L620). `raf --help`, `cadence --help` and `cadence help` print one same text (L597), the lines of the tour read `tirables, ressources libres` (L601), and the documentation is reorganised: `docs/orchestrate.md` in five pages, one page for `cadence-hud`, `docs/config.md`, a stability status for every surface and a written language convention (L599, L602, L603, L604, L605).
 

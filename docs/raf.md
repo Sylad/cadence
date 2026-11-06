@@ -126,11 +126,13 @@ hook:
 
 For a commit whose subject starts with `fix(` and that stages a `src/**.ts` file, the hook takes the identifiers the
 diff of `src/` removes or adds (an exported declared name of 4 characters or more: `export function`, `const`, `class`, `type`… (a local variable is not one); an
-`--option`), and looks for the lines that cite them: a name between backticks in `README.md` and `docs/*.md` (not the dated pages of the sub-folders of `docs/`), an
+`--option` that really appears in or disappears from the code of `src/`, outside the help: present in the tree on one side only, so a comment, a message or an argument passed
+to git that cite an option the code already reads change nothing), and looks for the lines that cite them: a name between backticks in `README.md` and `docs/*.md` (not the dated pages of the sub-folders of `docs/`), an
 `--option` in the help. A citing line the commit does not touch is listed (`file:line`) and, with `refuse`, the commit
 fails (exit code 3, `--no-verify` bypasses it); `warn` lists and lets it through. A `docs-ok: <reason>` line in the
-message (the reason is required) says the lines stay true. Other commits (`feat(`, `chore(`…) and a message the hook cannot read are not concerned. In a wave, the `fix` brief
-already lists the citing lines of the identifiers the lot's commits change, so the writer updates them in the same commit.
+message (the reason is required) says the lines stay true. Other commits (`feat(`, `chore(`…) and a message the hook cannot read are not concerned. In a wave, as soon as the lot's
+commits remove or add an identifier, the `fix` brief names those identifiers and lists every line that cites them, the ones the lot has not touched first, then the ones it
+updated (the fix most often bears on what the lot just wrote), and asks the writer to re-list the lines for the identifiers its own diff changes and update them in the same commit.
 
 Global options: `--file path` or `RAF_FILE`; `RAF_TODAY=YYYY-MM-DD` to freeze
 the date. `cadence raf …` is the same as `raf …`.

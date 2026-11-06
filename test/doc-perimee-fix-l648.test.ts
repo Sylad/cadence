@@ -11,9 +11,9 @@ import { gitRepo, tempDir } from './helpers.js';
 
 const git = (dir: string, ...args: string[]) => spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
 
-const HELP_CLI = ['import x from "y";', 'const HELP = `cadence', '  cadence deliver [--dry-run] [--block nom]   la CI', '  raf start <id>', '`;', 'export const other = 1;'].join('\n');
+const HELP_CLI = ['import x from "y";', 'const HELP = `cadence', '  cadence deliver [--dry-run] [--block nom]   la CI', '  raf start <id>', '`;', 'export const other = process.argv.includes("--block");'].join('\n');
 
-/** Un dépôt avec src/lib.ts, README.md, docs/page.md et src/cli.ts (aide), commités ; `hook.docs` écrit dans cadence.yaml. */
+/** Un dépôt avec src/lib.ts, README.md, docs/page.md et src/cli.ts (aide, et le code qui lit `--block` ; `--dry-run` n'est que dans l'aide), commités ; `hook.docs` écrit dans cadence.yaml. */
 function project(docs?: string): string {
   const dir = gitRepo();
   mkdirSync(join(dir, 'src'));
@@ -45,6 +45,10 @@ describe('L648 — identifiants changés par un diff', () => {
     expect(changedIdentifiers(["'--old-flag'"], ["'--new-flag'"])).toEqual(['--new-flag', '--old-flag']);
     expect(changedIdentifiers(['export function moved() {'], ['export function moved() {'])).toEqual([]);
     expect(changedIdentifiers([], [])).toEqual([]);
+  });
+  it('R1 — une option citée par un commentaire (ligne //, bloc *, queue // d’une ligne de code) n’est pas un identifiant du diff', () => {
+    expect(changedIdentifiers([], ['  // L1 : --resume la relit', ' * --add en bloc', '/* --status */', 'const a = 1; // --drop aussi'])).toEqual([]);
+    expect(changedIdentifiers([], ['const a = argv.includes("--drop"); // lu'])).toEqual(['--drop']);
   });
   it('R1 — un nom de moins de 4 caractères n’est pas un identifiant (bruit)', () => {
     expect(changedIdentifiers(['export const a = 1;', 'export let id = 2;'], [])).toEqual([]);
@@ -105,7 +109,7 @@ describe('L648 — hook pre-commit : fix( touchant src/', () => {
     git(dir, 'add', 'README.md');
     expect(preCommit(dir, 'fix(L1): doc').code).toBe(0);
   });
-  it('R7 — l’aide : une option retirée citée par HELP et non touchée est refusée ; touchée, elle passe', () => {
+  it('R7 — l’aide : une option ajoutée au code, que seule HELP citait, et non touchée est refusée ; touchée, elle passe', () => {
     const dir = project('refuse');
     writeFileSync(join(dir, 'src/lib.ts'), 'export function oldName(a: number): number {\n  return a + Number(process.argv.includes("--dry-run"));\n}\n');
     git(dir, 'add', 'src/lib.ts');
@@ -157,6 +161,24 @@ describe('L648 — hook pre-commit : fix( touchant src/', () => {
     expect(r.code).toBe(3);
     expect(r.err).toContain('README.md:3');
     expect(r.err).not.toContain('docs/etudes');
+  });
+  it('R7 — une option déjà lue par src/ avant et après (un commentaire, un message, un argument passé à git la citent) n’est ni retirée ni ajoutée : rien', () => {
+    const dir = project('refuse');
+    writeFileSync(join(dir, 'src/lib.ts'), 'export function oldName(a: number): number {\n  // L1 : lu par cli.ts avec --block\n  return a;\n}\n');
+    git(dir, 'add', 'src/lib.ts');
+    expect(preCommit(dir, 'fix(L1): commentaire')).toEqual({ code: 0, err: '' });
+  });
+  it('R7 — une option que le fix retire de src/ (sa dernière occurrence) reste comptée : l’aide qui la cite est refusée', () => {
+    const dir = project('refuse');
+    writeFileSync(join(dir, 'src/lib.ts'), 'export function oldName(a: number): number {\n  return a + Number(process.argv.includes("--block"));\n}\n');
+    writeFileSync(join(dir, 'src/cli.ts'), HELP_CLI.replace(' [--block nom]', '').replace('process.argv.includes("--block")', 'false'));
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-qm', 'chore: option lue');
+    writeFileSync(join(dir, 'src/lib.ts'), 'export function oldName(a: number): number {\n  return a;\n}\n');
+    git(dir, 'add', 'src/lib.ts');
+    const r = preCommit(dir, 'fix(L1): option retirée');
+    expect(r.code).toBe(3);
+    expect(r.err).toContain('docs/page.md:3');
   });
   it('R9 — sans identifiant changé (corps seul) : rien', () => {
     const dir = project('refuse');

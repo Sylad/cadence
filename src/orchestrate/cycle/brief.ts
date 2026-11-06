@@ -204,7 +204,7 @@ function withBounds(brief: string, c: LotCtx, kind: SessionKind): string {
   }
 }
 
-/** Les lignes de doc et d'aide que le travail du lot laisse périmées (L648, `docsFollowText`), ajoutées au brief fix : sans gabarit, comme les bornes. Rien sans commit du lot ou sans parent lisible. */
+/** Les identifiants que le travail du lot change et les lignes de doc et d'aide qui les citent, touchées ou non (L648, `docsFollowText`), ajoutés au brief fix : sans gabarit, comme les bornes. Rien sans commit du lot, sans parent lisible ou sans identifiant changé. */
 function withDocsFollow(brief: string, c: LotCtx, kind: SessionKind): string {
   if (kind !== 'fix') return brief;
   try {

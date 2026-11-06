@@ -2845,10 +2845,11 @@ lots:
     started: 2026-11-06
   - id: L657
     title: "Issue #44 : objectif et budget d'un lot figés au lancement : --add sans --goal ni --budget, --resume ignore un objectif changé, la relance rejoue spec et maquette ; donner ces réglages à --add et faire lire l'objectif changé à --resume"
-    status: todo
+    status: doing
     estimate: 0.5
     spec: true
     created: 2026-11-06
+    started: 2026-11-06
   - id: L658
     title: "Test d'un autre lot qui lit une page déplacée (L651 refusé par R14 de lead-hold) : le brief d'un lot qui vide une page reçoit la liste des tests qui lisent cette page, et un contrôle au commit les joue ; mesure : 0 refus d'intégration pour une page de doc déplacée"
     status: doing

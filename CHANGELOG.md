@@ -89,6 +89,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - The `bounds` entry of `docs/*.md` also declares `test/orchestrate-pages-l599.test.ts` (L637): a lot that touches a docs page plays the link, navigation and size checks of the orchestrate pages in the targeted gate, before the full suite, instead of being refused at integration.
 
+### Fixed
+
+- Follow-ups of the narrowed lot (L634, [docs/orchestrate-gate.md](docs/orchestrate-gate.md#a-goal-that-narrows-a-lot-to-commits-already-merged-l621)): a `screen: page` lot of 0.1 day or less leaves the express lane when its mockup is skipped, the integration re-review no longer receives the `<sha>..HEAD` range that contradicts its own diff, the narrowed-lot brief says the range covers the project repository only (neighbouring repositories: every commit citing the lot), `--dry-run` computes the budget basis from the lot as launched, and the narrowed × out-of-rule crossing is covered by a test at reviews 1 and 2.
+
 ## [1.57.0] - 2026-11-06
 
 ### Added

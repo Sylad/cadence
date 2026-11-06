@@ -2855,6 +2855,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "compliant (1 note mineure : docs/orchestrate-gate.md ne décrit pas la nouvelle règle de la porte ciblée) — orchestré (vague 2026-11-06-1805, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant (1 minor note: docs/orchestrate-gate.md:52 not updated for L658)", commit: 3cc91569a69e84206263c7743d32608ca1f3af85 }
   - id: L659
     title: "Panneau des lots (cadence-hud) : distinguer un lot en cours avec une session active d'un lot doing en sommeil, sans session ; 06-11 : panneau à 2 lots en cours, barre à zéro, rien ne tournait ; mesure : un lot sans session ne s'affiche plus comme actif"
     status: done

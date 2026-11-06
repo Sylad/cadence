@@ -70,6 +70,22 @@ describe('L662 R4 — deltaTouchesLot : le delta de main est-il lié au diff du 
     const s = scene(['src/a/x.ts'], ['docs/x.md']);
     expect(deltaTouchesLot(s.repo, 'f'.repeat(40), s.to, s.lot)).toBe(true);
   });
+  it('R4 — le delta est le CHANGELOG.md d\'un autre lot et le lot touche CHANGELOG.md : non lié (tous les lots le touchent)', () => {
+    const s = scene(['src/a/x.ts', 'CHANGELOG.md'], ['CHANGELOG.md']);
+    expect(deltaTouchesLot(s.repo, s.from, s.to, s.lot)).toBe(false);
+  });
+  it('R4 — un lot qui touche CHANGELOG.md ne lie pas un fichier de la racine (package.json) par voisinage : non lié', () => {
+    const s = scene(['src/a/x.ts', 'CHANGELOG.md'], ['package.json']);
+    expect(deltaTouchesLot(s.repo, s.from, s.to, s.lot)).toBe(false);
+  });
+  it('R4 — un lot dont un fichier est à la racine ne lie pas un autre fichier de la racine : non lié', () => {
+    const s = scene(['README.md'], ['cadence.yaml.bak']);
+    expect(deltaTouchesLot(s.repo, s.from, s.to, s.lot)).toBe(false);
+  });
+  it('R4 — le delta touche un fichier racine du lot lui-même (package.json) : lié', () => {
+    const s = scene(['package.json', 'CHANGELOG.md'], ['package.json']);
+    expect(deltaTouchesLot(s.repo, s.from, s.to, s.lot)).toBe(true);
+  });
   it('R4 — un diff de lot vide : le delta de main ne peut lier que par `bounds`, donc non lié', () => {
     const s = scene([], ['src/a/x.ts']);
     expect(deltaTouchesLot(s.repo, s.from, s.to, s.lot)).toBe(false);
@@ -77,18 +93,19 @@ describe('L662 R4 — deltaTouchesLot : le delta de main est-il lié au diff du 
 });
 
 const lines = (n: number) => Array.from({ length: n }, (_, i) => `l${i}`).join('\n') + '\n';
-/** Deux lots modifient `f.txt` (à la racine) ; pendant la revue courte du second, le lead commite `leadFile` sur main (une fois) : le rebase est rejoué. Rend les suites complètes jouées au sommet de L2 et le journal. */
+/** Deux lots modifient `src/f.txt` ; pendant la revue courte du second, le lead commite `leadFile` sur main (une fois) : le rebase est rejoué. Rend les suites complètes jouées au sommet de L2 et le journal. */
 async function scenario(leadFile: string) {
   const log = join(tempDir(), 'portes.log');
-  const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], `worktrees: true\ntest: echo "FULL $PWD" >> ${log}`, { 'f.txt': lines(12) });
+  const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], `worktrees: true\ntest: echo "FULL $PWD" >> ${log}`, {});
+  put(repo, 'src/f.txt', lines(12));
   let moved = 0;
   const f = fake({
     implement: async (cwd, brief) => {
       await meeting(2)();
       const lot = lotOf(brief);
       const n = lot === 'L1' ? 4 : 7;
-      writeFileSync(join(cwd, 'f.txt'), lines(12).replace(`l${n}\n`, `l${n} par ${lot}\n`));
-      git(cwd, 'add', '--', 'f.txt');
+      writeFileSync(join(cwd, 'src/f.txt'), lines(12).replace(`l${n}\n`, `l${n} par ${lot}\n`));
+      git(cwd, 'add', '--', 'src/f.txt');
       git(cwd, 'commit', '-q', '-m', `feat(${lot}): travail`);
       return claudeOut(workReport({ commits: [{ sha: git(cwd, 'rev-parse', 'HEAD'), sujet: `feat(${lot}): travail` }] }));
     },
@@ -104,7 +121,7 @@ async function scenario(leadFile: string) {
 
 describe('L662 R5 — la porte d\'intégration rejouée après « main a avancé » seulement si le delta est lié', () => {
   it('R5 — le lead commite un fichier sans lien avec le lot : le rebase est rejoué, la suite complète du sommet ne l\'est pas', async () => {
-    const lié = await scenario('g.txt');
+    const lié = await scenario('src/g.txt');
     const sansLien = await scenario('docs/lead.txt');
     expect(sansLien.r.code).toBe(0);
     expect(sansLien.r.out).toContain("main a avancé pendant l'intégration, rebase rejoué");
@@ -112,7 +129,7 @@ describe('L662 R5 — la porte d\'intégration rejouée après « main a avancé
     expect(sansLien.suites).toHaveLength(lié.suites.length - 1);
   });
   it('R5 — le lead commite un voisin du fichier du lot : la porte est rejouée, aucune ligne « non rejouée »', async () => {
-    const { r, parent } = await scenario('g.txt');
+    const { r, parent } = await scenario('src/g.txt');
     expect(r.code).toBe(0);
     expect(r.out).toContain("main a avancé pendant l'intégration, rebase rejoué");
     expect(r.out).not.toContain("porte d'intégration non rejouée");

@@ -458,15 +458,19 @@ describe('L590 R5 / R7 — la suite complète à l\'intégration, une fois par s
   });
   it('R5 — rebase rejoué : le nouveau sommet rejoue la suite complète', async () => {
     const log = logFile();
-    const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], yaml, { ...files(log), 'f.txt': Array.from({ length: 12 }, (_, i) => `l${i}`).join('\n') + '\n' });
+    const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], yaml, { ...files(log) });
+    mkdirSync(join(repo, 'src'));
+    writeFileSync(join(repo, 'src/f.txt'), Array.from({ length: 12 }, (_, i) => `l${i}`).join('\n') + '\n'); // dans un dossier : la racine n'est pas un voisinage (L662), le lead y commite un voisin du fichier du lot
+    git(repo, 'add', '--', 'src/f.txt');
+    git(repo, 'commit', '-q', '-m', 'chore: f.txt');
     let moved = false;
     const f = fake({
       implement: async (cwd, brief) => {
         await meeting(2)();
         const lot = lotOf(brief);
         const n = lot === 'L1' ? 4 : 7; // deux lots sur le même fichier, lignes distinctes : le second intégré est rebasé (L364)
-        writeFileSync(join(cwd, 'f.txt'), Array.from({ length: 12 }, (_, i) => (i === n ? `l${i} par ${lot}` : `l${i}`)).join('\n') + '\n');
-        git(cwd, 'add', '--', 'f.txt');
+        writeFileSync(join(cwd, 'src/f.txt'), Array.from({ length: 12 }, (_, i) => (i === n ? `l${i} par ${lot}` : `l${i}`)).join('\n') + '\n');
+        git(cwd, 'add', '--', 'src/f.txt');
         git(cwd, 'commit', '-q', '-m', `feat(${lot}): travail`);
         return claudeOut(workReport({ commits: [{ sha: git(cwd, 'rev-parse', 'HEAD'), sujet: `feat(${lot}): travail` }] }));
       },
@@ -474,8 +478,8 @@ describe('L590 R5 / R7 — la suite complète à l\'intégration, une fois par s
         // le lead avance main pendant la revue du second lot : le rebase et les contrôles sont rejoués au nouveau sommet (L364)
         if (!moved) {
           moved = true;
-          writeFileSync(join(repo, 'lead.txt'), 'x\n');
-          git(repo, 'add', '--', 'lead.txt');
+          writeFileSync(join(repo, 'src/lead.txt'), 'x\n');
+          git(repo, 'add', '--', 'src/lead.txt');
           git(repo, 'commit', '-q', '-m', 'plan: commit du lead');
         }
         return claudeOut(reviewReport());

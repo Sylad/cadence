@@ -45,17 +45,21 @@ function declaredFor(dir: string, files: string[]): string[] {
   }
 }
 
+/** Les fichiers que tous les lots touchent (`docs.sync` impose une entrée sous `[Unreleased]`) : ils ne disent rien du lien entre un delta et un lot, sa forme est déjà rejouée à part (test/changelog.test.ts). */
+const EVERY_LOT = ['CHANGELOG.md'];
+
 /**
  * Le delta de main `from..to` (ce que la branche du dépôt a gagné depuis le dernier rebase) est-il lié au diff du lot (L662) ? Lié : il touche un fichier du lot, un voisin de code du lot (même dossier : faute de graphe d'import,
- * c'est ce qui approche « le fichier qu'il importe »), ou un test que `bounds` déclare pour les fichiers du lot. Les dossiers des tests du lot ne comptent pas comme voisinage (le dossier `test/` de tous les lots les lierait tous).
+ * c'est ce qui approche « le fichier qu'il importe »), ou un test que `bounds` déclare pour les fichiers du lot. Ni `CHANGELOG.md` (tous les lots le touchent) ni la racine du dépôt comme voisinage (tout fichier racine lierait) ne comptent. Les dossiers des tests du lot ne comptent pas comme voisinage (le dossier `test/` de tous les lots les lierait tous).
  * Un delta vide n'est pas lié ; un delta que git ne lit pas l'est (le doute rejoue la porte).
  */
 export function deltaTouchesLot(dir: string, from: string, to: string, lotFiles: string[]): boolean {
   const delta = changedBetween(dir, from, to);
   if (delta === null) return true;
   const isTest = docSyncSet(DEFAULT_TEST_PATTERNS);
-  const dirs = new Set(lotFiles.filter((f) => !isTest(f)).map((f) => dirname(f)));
-  const related = new Set([...lotFiles, ...declaredFor(dir, lotFiles)]);
+  const own = lotFiles.filter((f) => !EVERY_LOT.includes(f));
+  const dirs = new Set(own.filter((f) => !isTest(f)).map((f) => dirname(f)).filter((d) => d !== '.'));
+  const related = new Set([...own, ...declaredFor(dir, own)]);
   return delta.some((f) => related.has(f) || dirs.has(dirname(f)));
 }
 

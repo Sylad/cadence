@@ -7,6 +7,8 @@ import { renderTestsSansCode, testsSansCode } from '../corrections-sans-code.js'
 import { bugCodeOf, bugCodePasses, measure, readCache, readJournals, readRuns, readSousCache, renderReport, sampleKeys } from '../corrections.js';
 import { classify } from './classify-run.js';
 import { renderPerf } from '../perf.js';
+import { renderInspection } from '../inspect.js';
+import { inspectFolder } from '../inspect-read.js';
 import { readPerf } from '../perf-read.js';
 import { type Io } from './context.js';
 
@@ -69,6 +71,21 @@ export function perf(rest: string[], values: { since?: string; json?: boolean },
     const result = readPerf(parent, today, values.since, io.err);
     if (values.json) io.out(JSON.stringify(result, null, 2));
     else for (const l of renderPerf(result)) io.out(l);
+    return 0;
+  } catch (e) {
+    if (!(e instanceof RafError)) throw e;
+    io.err(`raf: ${e.message}`);
+    return 1;
+  }
+}
+
+/** `cadence inspect` (L627) : l'inspection des travaux de la dernière vague (ou de `--wave`), sans modèle ni écriture ; la même sortie que le tableau de fin de vague. */
+export function inspect(rest: string[], values: { wave?: string; json?: boolean }, io: Io): number {
+  try {
+    if (rest.length > 1) throw new RafError('usage : cadence inspect [dossier] [--wave vague] [--json]');
+    const result = inspectFolder(resolve(io.cwd, rest[0] ?? '.'), values.wave);
+    if (values.json) io.out(JSON.stringify(result, null, 2));
+    else for (const l of renderInspection(result)) io.out(l);
     return 0;
   } catch (e) {
     if (!(e instanceof RafError)) throw e;

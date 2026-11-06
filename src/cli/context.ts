@@ -79,6 +79,7 @@ const OPTIONS = {
     json: { type: 'boolean' },
     verbose: { type: 'boolean' },
     classify: { type: 'boolean' },
+    wave: { type: 'string' },
     model: { type: 'string' },
     cache: { type: 'string' },
     'cache-sous-causes': { type: 'string' },

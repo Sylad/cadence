@@ -18,6 +18,7 @@ import { baseBranchOf, keptLines, lotBranch, lotTreeDir } from './worktree.js';
 import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState, type WaveState } from './state.js';
 import { projectEnv } from './preflight.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
+import { endOfWaveLines } from '../inspect-read.js';
 import { launchCost, renderTable } from './table.js';
 import { gestureSuffix, stillRunningRefusal, withReplayHint } from './geste.js';
 import { SnapshotRefusal, advanceSnapshot, frozenConfigRefusal, repairSnapshotModules, snapshotExists, waveReadsIntegrate, waveReadsLotBudget, waveReadsReplay, toolDirOf } from './snapshot.js';
@@ -333,7 +334,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
         store.writeWave(wave);
       }
       for (const line of renderTable(wave, lots, { ...launchCost(launch, (w) => io.err(`orchestrate : ${w}`)) })) io.out(line);
-      for (const line of keptLines(lots.map((l) => l.repo))) io.out(line);
+      for (const line of [...keptLines(lots.map((l) => l.repo)), ...endOfWaveLines(store.dir, io.err)]) io.out(line);
       return removed.length && !lots.every((l) => l.status === 'ready') ? 1 : 0;
     }
     played = true;

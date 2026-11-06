@@ -23,6 +23,7 @@ import { repoBranch } from './integrate.js';
 import { baseBranchOf, keptLines, legacyLotSlug, lotBranch, lotTreeDir, planFileSet, recoverTree } from './worktree.js';
 import { excludeState, lotFinished, lotKey, lotRepoPaths, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin } from './node-env.js';
+import { endOfWaveLines } from '../inspect-read.js';
 import { launchCost, quotaText, renderTable, resumeCommand } from './table.js';
 import { agentsOf, preflight, projectEnv, resolveTargets, type Target } from './preflight.js';
 import { dryRun } from './dry-run.js';
@@ -355,7 +356,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   if (wctx.incident) io.err(`orchestrate : incident — ${wctx.incident}`);
   if (wctx.quota.hit) io.err(`orchestrate : quota atteint — ${quotaText(wctx.quota.message ?? '')}`.trim());
   for (const line of renderTable(wave, all, { ...launchCost(launch, (w) => io.err(`orchestrate : ${w}`)) })) io.out(line);
-  for (const line of keptLines(all.map((l) => l.repo))) io.out(line); // les worktrees conservés, avec leur chemin (R19)
+  for (const line of [...keptLines(all.map((l) => l.repo)), ...endOfWaveLines(store.dir, io.err)]) io.out(line); // les worktrees conservés, avec leur chemin (R19), puis l'inspection des travaux de la vague (L627)
   if (wave.status === 'suspended-budget' || wave.status === 'suspended-quota') return 3;
   return all.every((l) => l.status === 'ready') ? 0 : 1;
 }

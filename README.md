@@ -51,7 +51,7 @@ Details: [docs/skills.md](docs/skills.md) and [docs/cadence-hud.md](docs/cadence
 - [Waves](docs/orchestrate.md): [cycle](docs/orchestrate-cycle.md), [probe](docs/orchestrate-gate.md#the-edge-case-probe-orchestrateprobe-l497).
 - [Brief grid and pre-check reading](docs/mesures/brief-implementation-enrichi-avant-apres.md): grid of the code-reviewer in the `implement` brief (L523).
 - [docs/deliver.md](docs/deliver.md): CI, deploy, verify, mark lots delivered (delivered ≠ finished); [remote gate](docs/remote-gate.md).
-- [docs/spec.md](docs/spec.md): screen and back-end sheets.
+- [docs/spec.md](docs/spec.md): screen and back-end sheets; [`cadence inspect`](docs/perf.md#inspection-of-a-wave-l627): where a wave's time went.
 - [docs/ref.md](docs/ref.md): reference documents (specs, norms, mock-ups) and the coverage of their elements by the lots.
 - [docs/lead.md](docs/lead.md): the lead workflow, the `livreur` agent, and [the memory index warning](docs/session.md#memory-index-size-l442) (L442).
 - [docs/overview.md](docs/overview.md): the longer introduction and the map of every page; [docs/fonctionnement.md](docs/fonctionnement.md): how it works.

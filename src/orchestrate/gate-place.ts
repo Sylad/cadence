@@ -42,6 +42,8 @@ export interface PlaceOpts {
   onWait?: () => void;
   /** Dit au lot que les commandes de ce lieu tournent ici et non sur l'hôte alors qu'il pouvait l'en croire (L624) : repli à l'ouverture (hôte injoignable, cache impossible) ou connexion perdue, avant le rejeu local. Pas appelé pour une porte locale d'emblée (sans hôte, arbre non validé). */
   onLocal?: () => void;
+  /** Journal du temps de porte (L627) : « porte : début » et « porte : fin », à part de `say` (une porte locale n'y dit rien d'autre). Absent : rien n'est écrit. */
+  trace?: (line: string) => void;
 }
 
 const localPlace = (local: PlaceOpts['local']): Place => ({ run: local, stamp: () => ({}), remote: () => false, close: () => {} });
@@ -120,10 +122,16 @@ async function openPlace(o: PlaceOpts): Promise<Place> {
 
 /** Joue `fn` dans le lieu de la porte et retire le worktree de l'hôte quoi qu'il arrive (R10). */
 export async function withPlace<T>(o: PlaceOpts, fn: (place: Place) => Promise<T>): Promise<T> {
-  const place = await openPlace(o);
+  // L627 : le début et la fin de chaque porte au journal, pour que `cadence inspect` isole le temps de porte de celui des sessions et de la file.
+  o.trace?.(`porte : début${o.detail ? ` ${o.detail}` : ''}`);
   try {
-    return await fn(place);
+    const place = await openPlace(o);
+    try {
+      return await fn(place);
+    } finally {
+      place.close();
+    }
   } finally {
-    place.close();
+    o.trace?.(`porte : fin${o.detail ? ` ${o.detail}` : ''}`);
   }
 }

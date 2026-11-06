@@ -50,7 +50,7 @@ export async function programChecks(c: LotCtx, red: Constat[], runs: CheckRun[],
   const onWait = () => setGate(c, { label: c.config.build ? 'build' : 'tests', started: new Date().toISOString(), remote: true, waiting: true });
   try {
     // Sur l'hôte `gate.host` (L403) quand il y en a un : le HEAD du worktree du lot, s'il est propre ; sinon, ou sans hôte, en local.
-    await withPlace({ config: c.config, repo: c.lot.repo, sha: tryGit(wd(c), ['rev-parse', 'HEAD']), dir: wd(c), needClean: true, label: `porte du lot ${c.lot.lot}`, local: (cmd) => sh(c, cmd), say: (line) => c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · ${line}`), owner: c.lot, onWait, onLocal: () => c.lot.gate && setGate(c, { label: c.lot.gate.label, started: c.lot.gate.started }) }, (place) => runChecks(c, red, runs, place, portee));
+    await withPlace({ config: c.config, repo: c.lot.repo, sha: tryGit(wd(c), ['rev-parse', 'HEAD']), dir: wd(c), needClean: true, label: `porte du lot ${c.lot.lot}`, local: (cmd) => sh(c, cmd), say: (line) => c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · ${line}`), trace: (line) => c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · ${line}`), owner: c.lot, onWait, onLocal: () => c.lot.gate && setGate(c, { label: c.lot.gate.label, started: c.lot.gate.started }) }, (place) => runChecks(c, red, runs, place, portee));
   } finally {
     // L395 : la porte se lit dans l'état du lot tant qu'une commande (ou le rejeu qui la suit) tourne, jamais après.
     setGate(c, undefined);

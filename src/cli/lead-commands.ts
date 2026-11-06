@@ -13,6 +13,7 @@ import { localOverdueLines } from '../local-task.js';
 import { configuredCap, expiredHoldLines, slotsLine } from '../orchestrate/command.js';
 import { addHold, cadenceHome, releaseHold } from '../orchestrate/registry.js';
 import { perfHeader } from '../perf.js';
+import { tourInspectLines } from '../inspect-read.js';
 import { readPerf } from '../perf-read.js';
 import { type EarlyCtx, type Io } from './context.js';
 
@@ -123,7 +124,8 @@ export function cmdLead(c: EarlyCtx): number {
     // les lots en service que la publication n'a pas encore pris (L571) : le lead joue cadence release, le tour n'en publie aucun
     // … puis les worktrees de lot que des vagues ont conservés : aucun n'est oublié en silence (L279, R19)
     // … puis l'index MEMORY.md du dossier, s'il pèse trop (L442) : le lead propose le regroupement, rien n'est écrit
-    for (const l of [...tourUnpublishedLines(rows), ...tourWorktreeLines(rows, io.now().getTime()), ...tourMemoryLines(io.env, parent)]) io.out(l);
+    // … puis l'inspection de la dernière vague (L627) : sa première récidive et le lot qui la supprime, une ligne
+    for (const l of [...tourUnpublishedLines(rows), ...tourWorktreeLines(rows, io.now().getTime()), ...tourMemoryLines(io.env, parent), ...tourInspectLines(parent)]) io.out(l);
     // un projet sans orchestrate.test : la vague ne lancera pas la suite (L327) ; puis ce que la CI joue et que la porte ne joue pas (L499)
     // … puis les issues GitHub ouvertes qu'aucun lot ne cite, ou dont le lot est publié (L548) : le lead les ferme, le tour n'en ferme aucune
     for (const l of [...tourNoTestLines(rows), ...tourCiLines(rows), ...tourIssueLines(parent, depth, io.env)]) io.out(l);

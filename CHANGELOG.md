@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- `cadence inspect` (L627, [docs/perf.md](docs/perf.md#inspection-of-a-wave-l627)): at the end of each wave the program measures each lot's minutes per state, per gate (the journal now writes `porte : début` and `porte : fin` around every gate, local or on the host) and after the first review, ranks the losses by cause (refused integration, the lead taking over, waiting for a slot, conflict), spots a cause already seen in a previous wave (`RÉCIDIVE`) and gives the plan lot that treats it, or the `raf add` command that would remove it, with no model. The table is printed at the end of the wave and by `cadence inspect [folder] [--wave id] [--json]`, and `cadence lead tour` prints one line for the last wave's recurrence. Base: the `inspecteur-travaux` agent of 05-11.
+
 ### Changed
 
 - The `bounds` entry of `docs/*.md` also declares `test/orchestrate-pages-l599.test.ts` (L637): a lot that touches a docs page plays the link, navigation and size checks of the orchestrate pages in the targeted gate, before the full suite, instead of being refused at integration.

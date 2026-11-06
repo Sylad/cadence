@@ -2919,6 +2919,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "compliant — orchestré (vague 2026-11-06-2055, 0 passe(s) de correction)", commit: 286d0f0fd4dd0694955979975285c51e85d16324, reporte: { de: 6464ce3e7af874b478c21a206375c183325253ae, vers: 286d0f0fd4dd0694955979975285c51e85d16324, patchId: f125f91f69fad0b1f674c35b67407e29c526789d } }
   - id: L662
     title: "Moins de portes par lot : (1) la sonde joue avant la première porte, une seule porte entre implement et revue (33,2 min sur 5 lots en 1805) ; (2) après « main a avancé », la porte d'intégration n'est rejouée que si le delta de main touche un fichier ou un test lié au diff du lot (26,3 min sur 4 lots, 4 reprises) ; niveau : source (ordre des étapes), puis intégration ; niveau le plus tôt : source ; on ne peut pas prévenir le déplacement de main, seulement son effet ; mesure : <= 3 portes par lot en moyenne sur 3 vagues (4,1 en 1805)"
     status: todo

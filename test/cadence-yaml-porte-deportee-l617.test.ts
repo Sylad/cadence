@@ -5,9 +5,13 @@ import { readOrchestrateConfig } from '../src/config.js';
 
 const yaml = join(dirname(fileURLToPath(import.meta.url)), '..', 'cadence.yaml');
 
-describe('L640 — la porte de cadence revient en local (orchestrate.gate absent de cadence.yaml)', () => {
-  it('R1 — cadence.yaml ne déclare pas orchestrate.gate, et la configuration se lit sans refus', () => {
-    expect(readOrchestrateConfig(yaml).gate).toBeUndefined();
+describe('L661 — la porte de cadence joue en local d\'abord, mini-blue en débordement (orchestrate.gate.overflow)', () => {
+  it('R1 — cadence.yaml déclare gate.overflow sur l\'alias mini-blue-wsl, avec install et refs, sans host', () => {
+    const gate = readOrchestrateConfig(yaml).gate;
+    expect(gate?.overflow).toBe('mini-blue-wsl');
+    expect(gate?.install).toBe('npm ci');
+    expect(gate?.refs).toEqual(['main', 'origin/main']);
+    expect(gate?.host).toBeUndefined();
   });
 
   it('R2 — les commandes de porte de main restent inchangées (test et build)', () => {

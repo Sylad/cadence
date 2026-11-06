@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- cadence's own `cadence.yaml` plays its gate on the free machine (L661, `orchestrate.gate.overflow: mini-blue-wsl`, [docs/remote-gate.md](docs/remote-gate.md#the-free-machine-first-gateoverflow-l639)): local first, mini-blue when a local gate already holds the machine; target: gates hold < 20 % of the slots on the next wave (44 % in wave 1805).
+
 ### Fixed
 
 - `raf done` and the delivery audit read « non conforme » / « not compliant » only at the start of a review verdict: a compliant verdict that quotes the phrase further on is no longer refused (L660).

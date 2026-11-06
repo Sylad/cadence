@@ -23,6 +23,13 @@ orchestrate:
   worktrees: true
   # Précheck sur Sonnet (L328, 25-10) : le local (claude-local) plantait sur ~1 lot sur 3 et disait « oui » à tort ; Sonnet tranche en ~16 s.
   precheck: true
+  # Porte sur la machine libre (L639, activée par L661) : Big-Blue d'abord, mini-blue en débordement quand une porte locale tient déjà la machine (docs/remote-gate.md).
+  # Mesure du 06-11 (vague 1805) : les portes locales tenaient 216,9 min sur 369,7 actives, 44 % des créneaux ; cible < 20 % sur la vague suivante.
+  # « mini-blue-wsl » est un alias du ~/.ssh/config de la machine qui lance cadence : sans lui (un clone), l'hôte ne répond pas et la porte joue en local, en le disant une fois par lot.
+  gate:
+    overflow: mini-blue-wsl
+    install: npm ci
+    refs: [main, origin/main]
   testGate:
     code: [src/**, 'bin/*.js', '!**/*.test.ts']
     tests: ['test/**']

@@ -6,8 +6,10 @@ import { run } from '../src/cli.js';
 import { installPrePush, removePrePush } from '../src/orchestrate/guard.js';
 import { REPO_LOCK } from '../src/orchestrate/lock.js';
 import { registerWave } from '../src/orchestrate/registry.js';
+import { blockingLots } from '../src/orchestrate/table.js';
 import { newLot, RunStore, type LotState } from '../src/orchestrate/state.js';
 import { sharedStateDir } from '../src/state.js';
+import { planLoader } from '../src/config.js';
 import { commit, gitRepo, tempDir } from './helpers.js';
 
 const ZERO = '0'.repeat(40);
@@ -100,6 +102,21 @@ describe('hook pre-push posé par la vague : un push qui emporte un lot pas prê
     expect(r.err).toContain('ici:L2');
     expect(r.err).toContain('aucun commit livrable');
     expect(r.err).not.toContain('git push origin');
+  });
+
+  it('R13 (L643) — un commit de plan seul noté par une étape d\'un lot pas prêt (« plan: L2 démarré ») ne bloque pas le push ; le code du même lot le bloque encore', async () => {
+    const { dir, shas } = await avec({ 'ici:L1': 'ready', 'ici:L2': 'implementing' });
+    const planFile = planLoader(dir)().path;
+    writeFileSync(planFile, `${readFileSync(planFile, 'utf8')}\n# L2 démarré\n`);
+    execFileSync('git', ['add', planFile], { cwd: dir });
+    commit(dir, 'plan: L2 démarré', '2026-10-28T10:00:00');
+    const planOnly = sha(dir, 'HEAD');
+    // ce que `shared.ts` note à la fin d'une session : tous les commits de sa plage, plan compris
+    const lot = (commits: string[]): LotState => ({ ...newLot({ project: 'ici', repo: dir, lot: 'L2', title: 't', visible: false, small: false, model: 'sonnet' as never, readOnlyPlan: false }), status: 'implementing', steps: [{ commits } as never] });
+    const none = () => [];
+    expect(blockingLots([lot([`${planOnly.slice(0, 7)} plan: L2 démarré`])], dir, planOnly, undefined, none).blocking).toEqual([]);
+    // le code de L2 (B), lui, bloque toujours
+    expect(blockingLots([lot([`${shas.B.slice(0, 7)} feat(L2): B`])], dir, planOnly, undefined, none).blocking.map((l) => l.lot)).toEqual(['L2']);
   });
 
   it('R6 — la suppression d\'une branche (sha local nul) n\'emporte aucun commit : acceptée', async () => {

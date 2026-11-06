@@ -1,4 +1,4 @@
-import { lotWork } from '../audit.js';
+import { isPlanOnly, lotWork } from '../audit.js';
 import { porteLines } from './portes-table.js';
 import { planLoader } from '../config.js';
 import type { PriceGrid } from '../perf-config.js';
@@ -177,6 +177,18 @@ function stepCommits(l: LotState, repo: string): string[] {
   return entries.flatMap((c) => prefixes.filter((p) => c.startsWith(p)).map((p) => c.slice(p.length).split(' ')[0]));
 }
 
+/**
+ * Un commit noté par une étape qui ne change que le plan du lot (« plan: L639 démarré », L643) n'est pas du code : git ne l'attribue pas au lot (`workCommits`),
+ * la garde de livraison ne le compte pas non plus. Un plan illisible ou un sha inconnu ne l'écarte pas : le commit reste bloquant.
+ */
+function planOnlyCommit(l: LotState, repo: string, sha: string): boolean {
+  try {
+    return isPlanOnly(sha, planLoader(l.repo)(), repo);
+  } catch {
+    return false;
+  }
+}
+
 /** Ce que la garde de `deliver --sha` a établi sur les lots de la vague : ceux qui empêchent de livrer, et ceux dont on n'a pu vérifier les commits. */
 export interface WaveGuard {
   blocking: LotState[];
@@ -205,7 +217,7 @@ export function blockingLots(lots: LotState[], repo: string, sha: string, ancest
     } catch {
       readable = false;
     }
-    if ([...found, ...stepCommits(l, repo)].some((c) => ancestor(repo, c, sha))) guard.blocking.push(l);
+    if ([...found, ...stepCommits(l, repo).filter((c) => !planOnlyCommit(l, repo, c))].some((c) => ancestor(repo, c, sha))) guard.blocking.push(l);
     else if (!readable) guard.unreadable.push(l);
   }
   return guard;

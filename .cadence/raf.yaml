@@ -2795,6 +2795,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme : 0 bloquant, 0 majeur, 3 mineurs (ligne `--dry-run` obsolète pour un lot de revue, deux commentaires JSDoc déplacés, page orchestrate-spec muette sur `spec: revue`) — orchestré (vague 2026-11-06-1559, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant after 0 fixes required: 0 blocking, 0 major, 3 minor notes (dry-run:193 text, 2 misplaced JSDoc, orchestrate-spec.md link)", commit: 9ac25d81dbd9f7e7161d2a2f0e1a29464d4c8def }
   - id: L651
     title: "docs/orchestrate-cycle.md est à 109 995 octets pour un plafond de 110 000 (test/orchestrate-pages-l599.test.ts) : déplacer une section sur une page de la suite ; la prochaine ligne ajoutée rougit la porte et les ajouts se font déjà en abrégé ; mesure : au moins 10 ko de marge"
     status: doing

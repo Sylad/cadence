@@ -22,11 +22,12 @@ const PROBE_FINDING = 'sonde de cas limites : ';
 /** Préfixe de la sous-tâche proposée pour une attente hors règle du lot (lu par la revue de code, cycle/converge.ts). */
 export const HORS_REGLE = '[hors règle] ';
 
-/** Ce que le cycle sait du moment : la sonde ne joue pas pendant la passe des mineurs ni sans commit (`skip`), ni quand une passe est déjà faite (`late`) ou que le budget ne paie pas la suite (`pays`). */
+/** Ce que le cycle sait du moment : la sonde ne joue pas pendant la passe des mineurs ni sans commit (`skip`), ni quand le diff n'est pas atteint par la porte du projet (`reached`, L655), ni quand une passe est déjà faite (`late`) ou que le budget ne paie pas la suite (`pays`). */
 interface ProbeMoment {
   skip: boolean;
   late: boolean;
   pays: boolean;
+  reached: boolean;
   count: string;
 }
 
@@ -37,6 +38,10 @@ interface ProbeMoment {
 export function scheduleProbe(config: Pick<OrchestrateConfig, 'probe'>, l: LotState, o: ProbeMoment): boolean {
   if (!config.probe || l.probe || o.skip || l.express) return false;
   l.probe = true;
+  if (!o.reached) {
+    l.warnings.push("sonde de cas limites non jouée : le diff du lot ne touche aucun fichier de code que la porte (orchestrate.testGate.code) atteint");
+    return false;
+  }
   if (!o.late && o.pays) {
     l.next = 'probe';
     return true;

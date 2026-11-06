@@ -3,7 +3,7 @@ import { type Plan } from '../../plan.js';
 import { lotWork } from '../../audit.js';
 import { filesOf } from '../../docsync.js';
 import { repoWork } from '../../repos.js';
-import { testGateMissing } from '../../testgate.js';
+import { gateReaches, testGateMissing } from '../../testgate.js';
 import { docSyncSet } from '../../docsync.js';
 import { isParts } from '../gate-parts.js';
 import { testsVertsSansCode } from '../../test-sans-code.js';
@@ -40,16 +40,25 @@ async function testVertGate(c: LotCtx, minorsPass: boolean): Promise<boolean> {
   return false;
 }
 
+/** Le diff du lot : son dépôt et ses dépôts voisins (comme hasWork), sans les fichiers que le lot supprime (du code mort supprimé n'a pas de test à écrire). */
+function lotTouched(c: LotCtx, plan: Plan): Set<string> {
+  return new Set([
+    ...filesOf(wd(c), lotWork(plan, wd(c), c.lot.lot), { withoutDeleted: true }),
+    ...(c.lot.repos ?? []).flatMap((r) => [...filesOf(r.path, repoWork(plan, r, c.lot.lot), { withoutDeleted: true })]),
+  ]);
+}
+
+/** La porte du projet atteint-elle le diff du lot (L655) ? Sans `orchestrate.testGate`, rien ne le dit : vrai. */
+export function gateReachesLot(c: LotCtx, plan: Plan): boolean {
+  return !c.config.testGate || gateReaches(c.config.testGate, lotTouched(c, plan));
+}
+
 /** Porte « code modifié sans test » (L287) : le diff du lot touche du code sans fichier de test → correction directe. Rend vrai quand le lot part en correction. Déclenchée une fois par lot. */
 async function codeSansTestGate(c: LotCtx, plan: Plan, minorsPass: boolean): Promise<boolean> {
   const l = c.lot;
   const gate = c.config.testGate;
   if (gate && !l.testGate && !minorsPass && !l.express) {
-    // Le diff du lot : son dépôt et ses dépôts voisins (comme hasWork), sans les fichiers que le lot supprime (du code mort supprimé n'a pas de test à écrire).
-    const touched = new Set([
-      ...filesOf(wd(c), lotWork(plan, wd(c), l.lot), { withoutDeleted: true }),
-      ...(l.repos ?? []).flatMap((r) => [...filesOf(r.path, repoWork(plan, r, l.lot), { withoutDeleted: true })]),
-    ]);
+    const touched = lotTouched(c, plan);
     const missing = testGateMissing(gate, touched);
     if (missing.length) {
       l.testGate = true;

@@ -26,3 +26,11 @@ export function testGateMissing(gate: TestGateConfig, files: Set<string>): strin
   const code = [...files].filter((f) => isCode(f) && !isException(f)).sort();
   return code.length >= gate.threshold ? code : [];
 }
+
+/** Le diff touche-t-il du code que la porte atteint (L655) : un fichier de `code`, hors `except`, et jamais un fichier de test. Du CSS seul ou un banc seul, hors des motifs, n'est pas atteint. */
+export function gateReaches(gate: TestGateConfig, files: Set<string>): boolean {
+  const isTest = docSyncSet(gate.tests);
+  const isCode = docSyncSet(gate.code);
+  const isException = gate.except.length ? docSyncSet(gate.except) : () => false;
+  return [...files].some((f) => isCode(f) && !isException(f) && !isTest(f));
+}

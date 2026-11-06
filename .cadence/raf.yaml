@@ -2817,9 +2817,10 @@ lots:
     started: 2026-11-06
   - id: L653
     title: "Issue #48 : un merge de la branche de base dans le worktree d'un lot le fait rendre pour « session a modifié le plan », et les questions de la session sont perdues ; mesure : merge accepté, questions conservées"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-06
+    started: 2026-11-06
   - id: L654
     title: "Issue #47 : vague suspendue ou lot retiré après une revue de maquette non conforme : le tableau dit « revue — » et ne liste que les mineurs ; il doit donner le verdict et les majeurs"
     status: todo

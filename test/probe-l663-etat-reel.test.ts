@@ -18,6 +18,10 @@ describe('L663 — le brief exige un test qui appelle l’étape réelle', () =>
     expect(text).toMatch(/\[L663\][^\n]*(written by|state)[^\n]*step[^\n]*real step/i);
     expect(text).toMatch(/never (build|forge|hand-write)[^\n]*state/i);
   });
+  it('R1 — la ligne L663 de implement.md ne cite pas « maquette » : le brief d’un lot sans écran n’en parle pas', () => {
+    const ligne = text.split('\n').find((l) => l.includes('[L663]'))!;
+    expect(ligne).not.toMatch(/maquette|mockup/i);
+  });
 });
 
 describe('L663 — la sonde joue aussi sur un lot express qui touche src/orchestrate/cycle/', () => {

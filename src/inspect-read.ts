@@ -19,10 +19,10 @@ function planLotsOf(parent: string): PlanLot[] {
   return out;
 }
 
-/** La dernière vague qui a un journal (l'ordre des noms est l'ordre des dates : AAAA-MM-JJ-HHMM). */
+/** La dernière vague datée (AAAA-MM-JJ-HHMM[-suffixe], l'ordre des noms est celui des dates) qui a un journal ; un dossier à nom libre n'est jamais « la dernière ». */
 function lastWave(runsDir: string): string | null {
   if (!existsSync(runsDir)) return null;
-  const waves = readdirSync(runsDir).filter((w) => existsSync(join(runsDir, w, 'journal.log'))).sort();
+  const waves = readdirSync(runsDir).filter((w) => /^\d{4}-\d{2}-\d{2}-\d{4}/.test(w) && existsSync(join(runsDir, w, 'journal.log'))).sort();
   return waves[waves.length - 1] ?? null;
 }
 

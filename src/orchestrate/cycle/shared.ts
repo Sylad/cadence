@@ -4,6 +4,7 @@ import { lotWork } from '../../audit.js';
 import { repoWork } from '../../repos.js';
 import { type LotCtx, propose, workDir as wd, short, save } from './ctx.js';
 import { type ReviewReport } from '../schemas.js';
+import { classeOf } from '../constat-classes.js';
 import { type Done, dirtBetween } from './session.js';
 import { type Commit, readCommits } from '../../git.js';
 import { citedRefs } from '../../link.js';
@@ -29,7 +30,7 @@ export function minorConstats(rep: ReviewReport): Constat[] {
 }
 
 export function blockingConstats(rep: ReviewReport, source: 'code' | 'ux'): Constat[] {
-  return rep.constats.filter((k) => k.gravite === 'bloquant' || k.gravite === 'majeur').map((k) => ({ source, gravite: k.gravite, fichier: k.fichier, ligne: k.ligne, texte: k.texte }));
+  return rep.constats.filter((k) => k.gravite === 'bloquant' || k.gravite === 'majeur').map((k) => ({ source, gravite: k.gravite, fichier: k.fichier, ligne: k.ligne, texte: k.texte, classe: classeOf(k.classe) }));
 }
 
 /**

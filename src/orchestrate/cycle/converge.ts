@@ -48,7 +48,11 @@ export function convergeBrief(kind: SessionKind, l: LotState, shrunk?: Shrunk): 
   const lines: string[] = shrunk ? [shrunkJudge(shrunk, l), ''] : [];
   if (reviewRank(kind, l) > 1) {
     lines.push(CONVERGE_BRIEF);
-    if (l.codeConstats?.length) lines.push('', 'Findings of the previous review that the author had to fix:', ...bulletLines(l.codeConstats));
+    // Les mineurs notés (L646) ne sont pas à corriger par l'auteur : les relire les ferait compter deux fois, la revue ne les rapporte pas.
+    const toFix = (l.codeConstats ?? []).filter((k) => k.gravite !== 'mineur');
+    const noted = (l.codeConstats ?? []).filter((k) => k.gravite === 'mineur');
+    if (toFix.length) lines.push('', 'Findings of the previous review that the author had to fix:', ...bulletLines(toFix));
+    if (noted.length) lines.push('', 'Minor findings of the previous review, already noted (do not report them again, reworded or not; a minor is only worth a line if it is new):', ...bulletLines(noted));
     const aside = (l.proposals ?? []).filter((p) => p.startsWith(SUITE_CODE));
     if (aside.length) lines.push('', 'Majors of earlier reviews already set aside as follow-ups for the lead (do not report them again):', ...aside.map((p) => `- ${p.slice(SUITE_CODE.length)}`));
   } else if (shrunk) lines.push(SHRUNK_MARK);
@@ -85,6 +89,19 @@ function setAsideHorsRegle(rep: ReviewReport, kind: SessionKind, l: LotState): {
   };
 }
 
+/**
+ * Un mineur de la revue de code qui reprend un mineur déjà noté par la revue précédente (même fichier ou aucun des deux, même texte : `repeats`) ne compte pas (L646) : la passe des mineurs l'a vu ou le lead l'a en note.
+ * Seul un mineur est écarté (un majeur ou un bloquant de même texte compte). Limite connue : un texte reformulé n'est pas reconnu (le brief demande au relecteur de ne pas les rapporter).
+ */
+function setAsideNoted(rep: ReviewReport, kind: SessionKind, l: LotState): { rep: ReviewReport } {
+  const noted = kind === 'review' || kind === 'review-small' ? (l.codeConstats ?? []).filter((k) => k.gravite === 'mineur') : [];
+  const known = (k: ReviewReport['constats'][number]) => k.gravite === 'mineur' && repeats(noted, k);
+  const out = rep.constats.filter(known);
+  if (!out.length) return { rep };
+  for (const k of out) l.warnings.push(`mineur déjà noté par la revue précédente, non compté : ${k.texte}`);
+  return { rep: { ...rep, mineurs: Math.max(0, rep.mineurs - out.length), constats: rep.constats.filter((k) => !known(k)) } };
+}
+
 /** Note d'une revue rendue conforme par les majeurs hors règle écartés : le verdict « non conforme » de l'agent, qui les comptait, ne doit pas rester au plan (même raison que `convergedVerdict`). */
 const horsRegleNote = (dropped: string[]): string => `conforme, ${dropped.length} majeur${dropped.length > 1 ? 's' : ''} qui reprend${dropped.length > 1 ? 'nent' : ''} une attente hors règle de la sonde, déjà proposée au lead : ${dropped.join(' ; ')}`;
 
@@ -106,15 +123,19 @@ export function countReview(rep: ReviewReport, kind: SessionKind, l: LotState, h
   }
   const horsRegle = setAsideHorsRegle(checked, kind, l);
   checked = horsRegle.rep;
+  const afterHors = new Set(checked.constats);
+  // Un mineur que la revue précédente avait noté, redit, ne compte pas (L646) : il ne rouvre pas la passe des mineurs.
+  const known = setAsideNoted(checked, kind, l);
+  checked = known.rep;
   // Un lot rétréci (L621) met de côté dès la revue de code 1 ; l'UX n'a pas de marque.
   const markRank = shrunk && kind !== 'ux' ? Math.max(rank, 2) : rank;
   const { rep: counted, aside } = setAsideUnchanged(checked, markRank, 'code');
   const counting = summarize(counted, head, repoHeads);
   const verdict = counting.conforme ? convergedVerdict(counting.verdict, aside) : counting.verdict;
   const summary = counting.conforme ? { ...counting, verdict: horsRegle.dropped.length && isNonConformingVerdict(verdict) ? horsRegleNote(horsRegle.dropped) : verdict } : counting;
-  const afterHors = new Set(checked.constats);
   const kept = new Set(counted.constats);
-  const decisions: ConstatRevue[] = rep.constats.map((k, i): ConstatRevue => ({ texte: k.texte, gravite: k.gravite, rang: markRank, decision: !afterHors.has(current[i]) ? 'ecarte-hors-regle' : !kept.has(current[i]) ? 'ecarte-inchange' : 'compte' }));
+  const afterNoted = new Set(known.rep.constats);
+  const decisions: ConstatRevue[] = rep.constats.map((k, i): ConstatRevue => ({ texte: k.texte, gravite: k.gravite, rang: markRank, decision: !afterHors.has(current[i]) ? 'ecarte-hors-regle' : !afterNoted.has(current[i]) ? 'ecarte-deja-note' : !kept.has(current[i]) ? 'ecarte-inchange' : 'compte' }));
   return { counted, summary, aside, decisions };
 }
 

@@ -26,6 +26,7 @@ import { type Constat, type LotState } from '../state.js';
 import { git } from '../worktree.js';
 import { DOCS_GAP } from '../geste.js';
 import { convergeText } from './retreci.js';
+import { fixConstatsText } from '../constat-classes.js';
 import { type LotCtx, workDir as wd, histPlan, short, startSha, hasSpecStage } from './ctx.js';
 
 function lotCommitLines(c: LotCtx): string {
@@ -33,12 +34,6 @@ function lotCommitLines(c: LotCtx): string {
   const mine = lotWork(plan, wd(c), c.lot.lot).reverse().map((k) => `- ${short(k)}`);
   const theirs = (c.lot.repos ?? []).flatMap((r) => repoWork(plan, r, c.lot.lot).reverse().map((k) => `- [${r.rel}] ${short(k)}`));
   return [...mine, ...theirs].join('\n');
-}
-
-function constatLines(constats: Constat[]): string {
-  return constats
-    .map((k) => `- [${k.gravite}${k.source === 'code' ? '' : ` / ${k.source}`}] ${k.fichier ? `${k.fichier}${k.ligne ? `:${k.ligne}` : ''} — ` : ''}${k.texte}`)
-    .join('\n');
 }
 
 /** Consigne de captures : `uxText` n'alimente que `ux` et `review-small` d'un petit lot visible, deux étapes qui chargent toujours le serveur Playwright de la vague. */
@@ -267,7 +262,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     const interrupted = [...l.steps].reverse().find((s) => s.kind === kind && s.status === 'interrupted');
     if (kind === 'fix') {
       vars.commits = lotCommitLines(c);
-      vars.constats = constatLines(l.constats);
+      vars.constats = fixConstatsText(l.constats);
       if (l.docsFix) {
         vars.elsewhere = articlesBrief(l.repo, docsConfig(c).articles ?? []);
         vars.ack = wd(c) === l.repo && histPlan(c).readonly

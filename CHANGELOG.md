@@ -85,6 +85,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - `cadence inspect` counts the wait for a deferred integration (L644, [docs/perf.md](docs/perf.md#inspection-of-a-wave-l627)): a lot's `intégration différée` line, until its next state line or its `intégré`, is a loss `attente de ressource · ressource « <nom> »` that names the lot holding the resource (`tenue par …`), and its minutes leave the review and the active minutes of the wave (05-11, L634: about an hour classed as review while it waited for L627).
 
+### Changed
+
+- The review loop stops reopening the same defect (L646, [docs/orchestrate-gate.md](docs/orchestrate-gate.md), « The review loop »): the fix brief gives the findings of the previous review by class (`classe` in the review schema) and requires every instance of the class to be fixed, a test added by a lot that is green with and without the lot's code goes back to correction (checked by the program in a throwaway worktree with `orchestrate.testReplay`), and the next review neither re-reads nor counts a minor already noted.
+
 ### Fixed
 
 - The delivery push during a wave no longer counts a plan-only commit of a lot that is not ready (« plan: L639 démarré ») as code (L643): the commits a step noted that change only the plan are left out of the wave guard (`blockingLots`), as git already leaves them out of the lot's work, so `7f9bddd` is no longer refused and `origin/main` no longer falls behind.

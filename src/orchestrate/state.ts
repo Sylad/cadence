@@ -63,7 +63,7 @@ export interface StepState {
 }
 
 /** Décision d'une revue sur un constat : compté, écarté comme majeur « inchangé » (L622), ou écarté comme attente hors règle de la sonde (L625). */
-export type DecisionConstat = 'compte' | 'ecarte-inchange' | 'ecarte-hors-regle';
+export type DecisionConstat = 'compte' | 'ecarte-inchange' | 'ecarte-hors-regle' | 'ecarte-deja-note';
 
 /** Un constat d'une revue tel que le pas le garde (L638) : `rang` est celui avec lequel L622 a lu la marque (un lot rétréci compte la marque dès le rang 2). */
 export interface ConstatRevue {
@@ -79,6 +79,8 @@ export interface Constat {
   fichier?: string;
   ligne?: number;
   texte: string;
+  /** Classe de défaut rangée par le relecteur (L646), montrée par classe au brief de fix. */
+  classe?: string;
 }
 
 export interface ReviewSummary {
@@ -170,6 +172,8 @@ export interface LotState {
   reviewCounts?: number[];
   /** Vrai une fois la porte « code modifié sans test » jouée (L287) : elle ne se rejoue pas, que la correction ait ajouté un test ou non. */
   testGate?: boolean;
+  /** La porte « test vert sans le code du lot » (L646) a été jouée : une fois par lot. */
+  testVert?: boolean;
   /** Vrai une fois la sonde de cas limites décidée (L497, `orchestrate.probe`) : jouée, ou écartée faute de passe ou de budget ; elle ne se rejoue pas. Absent sans la clé. */
   probe?: boolean;
   /** Vrai une fois le bibliothécaire appelé avant la revue (L306), ou écarté faute de passe ou de budget : il ne se rappelle pas. */

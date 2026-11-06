@@ -22,7 +22,7 @@ export interface EcarteCounts {
   vagues: { wave: string; constats: number; ecartes: number; taux: number }[];
 }
 
-const DECISIONS: readonly unknown[] = ['compte', 'ecarte-inchange', 'ecarte-hors-regle'] satisfies DecisionConstat[];
+const DECISIONS: readonly unknown[] = ['compte', 'ecarte-inchange', 'ecarte-hors-regle', 'ecarte-deja-note'] satisfies DecisionConstat[];
 
 /** Les décisions lisibles des `constatsRevue` des pas d'un journal (L638) ; une entrée sans décision connue est ignorée. */
 export function decisionsOf(steps: { constatsRevue?: unknown }[]): DecisionConstat[] {

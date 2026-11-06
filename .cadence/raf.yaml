@@ -2616,6 +2616,7 @@ lots:
     finished: 2026-11-06
   - id: L630
     title: "Tests de signal de verify et verify-gate, plus test/porte-deportee-creneau-l624.test.ts (instable sur 3 lots le 05-11) : toute la famille passe dans le projet « lourds » de L583 et 200 rejeux sous charge prouvent la stabilité, au lieu d'un correctif par test (L505 L528 L540 L550 L555 L567 L579) ; mesure : 0 instable de signal par vague"
+    config: true
     status: doing
     estimate: 0.25
     created: 2026-11-05

@@ -1,6 +1,6 @@
 // Les commandes qui écrivent le plan, un lot à la fois (L488, sorti de cli.ts).
 import { relative, resolve } from 'node:path';
-import { refuseRedAcceptation } from '../raf-close-checks.js';
+import { refuseHandedBackWithoutCode, refuseRedAcceptation } from '../raf-close-checks.js';
 import { statusCommand } from '../raf-status.js';
 import { PLAN_LEGACY } from '../config.js';
 import { audit, isNonConformingVerdict, lotWork, planCommits, unreviewedWork } from '../audit.js';
@@ -43,8 +43,11 @@ export function cmdSetStatus(c: Ctx): number | Promise<number> {
     const pub = lot?.public ?? (lot?.visible ? loadEntries(newsDir).find((e) => e.lots.includes(lot.id))?.title : undefined);
     if (pub) refuseLongTitle(pub, lot?.public ? '' : ' — titre de la Nouveauté reprise par le site : corriger l\'entrée ou poser raf public');
   }
+  if (status === 'done' && !rest[0].includes('/')) {
+    refuseRedAcceptation(root, configPath, rest[0], !!values.force, io.err);
+    refuseHandedBackWithoutCode(root, rest[0], !!values.force, io.err);
+  }
   // Le plan ne lit pas git : lui dire combien de commits du lot sa revue ne couvre pas quand elle est exigée.
-  if (status === 'done' && !rest[0].includes('/')) refuseRedAcceptation(root, configPath, rest[0], !!values.force, io.err);
   const unreviewed = status === 'done' && plan.reviewSince && !plan.readonly && !values.force ? unreviewedWork(plan, root, rest[0]) : 0;
   const verdict = status === 'done' && !rest[0].includes('/') ? plan.lots().find((l) => l.id === rest[0])?.review?.verdict : undefined;
   const nonConforming = verdict !== undefined && isNonConformingVerdict(verdict);

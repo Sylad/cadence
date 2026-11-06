@@ -83,6 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- `raf done` refuses a lot a wave handed back whose work commits are not on the main branch (L647, [docs/raf.md](docs/raf.md)): the wave's branch still holds commits (compared by patch) that HEAD lacks, exit 2 naming the branch and the `--integrate` command, `--force` only warns (06-11: L646 closed right after its integration was refused, with a green gate that did not carry its code).
 - `cadence inspect` counts the wait for a deferred integration (L644, [docs/perf.md](docs/perf.md#inspection-of-a-wave-l627)): a lot's `intégration différée` line, until its next state line or its `intégré`, is a loss `attente de ressource · ressource « <nom> »` that names the lot holding the resource (`tenue par …`), and its minutes leave the review and the active minutes of the wave (05-11, L634: about an hour classed as review while it waited for L627).
 
 ### Changed

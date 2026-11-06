@@ -3,7 +3,7 @@ sujet:
   titre: "orchestrate : --add reçoit --goal et --budget du lot, --resume relit l'objectif changé du plan (issue #44)"
   lot: L657
   perimetre:
-    modules: [src/orchestrate/command-args.ts, src/orchestrate/command.ts, src/orchestrate/ajout.ts, src/orchestrate/preflight.ts, src/orchestrate/resume.ts, src/orchestrate/cycle/retreci.ts]
+    modules: [src/orchestrate/command-args.ts, src/orchestrate/command.ts, src/orchestrate/ajout.ts, src/orchestrate/preflight.ts, src/orchestrate/resume.ts, src/orchestrate/cycle/retreci.ts, src/orchestrate/snapshot.ts, src/orchestrate/state.ts]
     endpoints: []
     jobs: []
     hors_perimetre:
@@ -40,15 +40,15 @@ cas:
     declencheur: commande cadence orchestrate --resume [<vague>]
     preconditions:
       - "la vague est arrêtée, reprenable"
-      - "la clé goal: d'un lot à rejouer a changé dans le plan depuis le lancement (ou a été ajoutée)"
+      - "la clé goal: du plan d'un lot à rejouer est non vide et diffère du goal de l'état du lot (changée ou ajoutée depuis le lancement)"
     nominal:
       - "Pour chaque lot rejoué, la reprise relit l'objectif actuel du plan (clé goal:) au lieu de garder celui figé au lancement."
       - "Un objectif changé remplace goal dans l'état du lot ; les briefs suivants le citent ; la reprise journalise l'ancien et le nouvel objectif."
       - "Un lot qui n'a encore lancé aucune étape voit sa spec et sa maquette décidées avec le nouvel objectif (maquette sautée si le lot est rétréci)."
     alternatives:
-      - { si: "l'objectif du plan est inchangé, ou le lot n'a pas de clé goal:", alors: "l'objectif de l'état reste tel quel, aucune ligne", regles: [R7] }
+      - { si: "l'objectif du plan est identique au goal de l'état, ou le lot n'a pas de clé goal: (ou elle est vide)", alors: "l'objectif de l'état reste tel quel, aucune ligne", regles: [R7] }
       - { si: "le lot a déjà des étapes jouées", alors: "l'objectif change pour les briefs suivants ; ses étapes spec et maquette ne sont ni ajoutées ni retirées", regles: [R8] }
-      - { si: "le lot a été lancé avec --goal en ligne de commande, et le plan ne donne rien de neuf", alors: "le --goal du lancement est gardé (le plan n'efface pas un --goal)", regles: [R9] }
+      - { si: "le lot a été lancé (ou ajouté) avec --goal en ligne de commande, et le plan ne porte pas de clé goal:", alors: "le --goal est gardé ; si le plan porte une clé goal: différente, elle l'emporte (l'état ne mémorise pas l'origine du goal)", regles: [R9] }
       - { si: "le plan est illisible ou le lot a disparu du plan", alors: "l'objectif de l'état est gardé, reprise sans refus", regles: [R10] }
     resultat: "La reprise travaille sur l'objectif en vigueur du plan, pas celui du premier lancement."
 
@@ -76,7 +76,7 @@ regles:
     enonce: "Avec --add, --budget n'accepte que la forme projet:lot=+N visant un lot des --add de la même commande, une seule fois par lot ; le budget de vague (--budget N) reste refusé avec --add."
     statut: hypothese
     si_faux: "Si le lead veut aussi relever le budget de la vague en ajoutant, seule la liste ALONE d'ajout.ts:40 change ; aucune donnée en jeu."
-    tests: ["R4 — --budget d'un lot absent des --add : refus", "R4 — --budget 2M avec --add : refus inchangé"]
+    tests: ["R4 — --budget d'un lot absent des --add : refus", "R4 — --budget 2M avec --add : refus inchangé", "R4 — --budget p:L=+N répété sur le même lot : refus", "R4 — command.ts:126 adapté : --budget p:lot=+N accepté avec --add, et son test orchestrate-reprise-lot-budget.test.ts:417,425 mis à jour"]
   - id: R5
     cas: [C1]
     enonce: "Le budget donné à un lot ajouté est N, la marge des passes ordinaires, plus la part d'escalade quand la vague en réserve une ; il doit tenir dans le budget restant de la vague, sinon l'ajout est refusé par le message de budgetRefusals."
@@ -97,16 +97,16 @@ regles:
     tests: ["R7 — objectif du plan inchangé : goal d'état identique, aucune ligne « objectif changé »"]
   - id: R8
     cas: [C2]
-    enonce: "Un objectif du plan changé depuis le lancement remplace goal dans l'état des lots rejoués ; les briefs suivants le citent ; la reprise journalise « objectif changé » avec l'ancien et le nouveau. Un lot sans étape jouée décide sa spec et sa maquette avec le nouvel objectif (launchScreen) ; un lot déjà démarré ne gagne ni ne perd d'étape."
+    enonce: "Un objectif du plan, non vide et différent du goal de l'état, remplace goal dans l'état des lots rejoués ; les briefs suivants le citent ; la reprise journalise « objectif changé » avec l'ancien et le nouveau. Un lot sans étape jouée décide sa spec et sa maquette avec le nouvel objectif (launchScreen) ; un lot déjà démarré ne gagne ni ne perd d'étape."
     statut: sourcee
     source: "demande du lot (issue #44) : « faire lire l'objectif changé à --resume », « la relance rejoue spec et maquette » ; décision de maquette : src/orchestrate/cycle/retreci.ts:28"
-    tests: ["R8 — plan goal changé : le brief de la reprise cite le nouvel objectif", "R8 — lot sans étape et objectif qui rétrécit : maquette sautée à la reprise", "R8 — lot déjà démarré : steps et screen inchangés"]
+    tests: ["R8 — plan goal différent de l'état : le brief de la reprise cite le nouvel objectif", "R8 — lot sans étape et objectif qui rétrécit : maquette sautée à la reprise", "R8 — lot déjà démarré : steps et screen inchangés"]
   - id: R9
     cas: [C2]
-    enonce: "Le goal posé au lancement par --goal en ligne de commande n'est jamais effacé par une reprise quand le plan ne porte pas de clé goal: ; une clé goal: du plan changée l'emporte sur lui."
+    enonce: "Priorité à la reprise, sans champ d'état nouveau : la reprise compare la clé goal: du plan au seul goal de l'état. Plan sans clé goal: (ou vide) : le goal de l'état, y compris un --goal de lancement ou d'--add, est gardé. Plan avec une clé goal: non vide et différente : elle l'emporte, même sur un --goal de lancement dont l'état ne mémorise pas l'origine."
     statut: hypothese
-    si_faux: "Si le --goal de lancement doit toujours l'emporter, la reprise ne relit rien pour ce lot ; seul l'ordre de priorité change."
-    tests: ["R9 — --goal de lancement et plan sans goal: : goal gardé", "R9 — plan avec goal: changé : le plan l'emporte"]
+    si_faux: "Si un --goal de ligne de commande doit toujours l'emporter sur un plan qui porte déjà un goal:, il faut mémoriser l'origine ou le goal du plan au lancement dans LotState (changement de modèle d'état, question du lead) ; sans cela seul l'ordre de priorité change."
+    tests: ["R9 — --goal de lancement et plan sans goal: : goal gardé", "R9 — --goal de lancement et plan avec goal: différent : le plan l'emporte", "R9 — --add --goal et plan sans goal: : goal gardé à la reprise"]
   - id: R10
     cas: [C2]
     enonce: "Un plan illisible ou sans le lot n'empêche pas la reprise : l'objectif de l'état est gardé."
@@ -115,10 +115,10 @@ regles:
     tests: ["R10 — lot absent du plan : reprise sans refus, goal d'état gardé"]
   - id: R11
     cas: [C1]
-    enonce: "Une vague écrit dans son état, au lancement, qu'elle lit les champs goal et budget de adds.log. --add avec --goal ou --budget est refusé (code 2, rien déposé) sur une vague dont l'état n'a pas cette marque, sans silence ; --add sans ces options reste accepté sur toute vague, marquée ou non."
+    enonce: "Une vague écrit dans son état, au lancement, qu'elle lit les champs goal et budget de adds.log. --add avec --goal ou --budget est refusé (code 2, rien déposé) sur une vague dont l'état n'a pas cette marque, sans silence ; --add sans ces options reste accepté sur toute vague, marquée ou non. Une vague sans instantané ni marque compte comme non marquée (refus), contrairement à waveReadsAdds (snapshot.ts:213) qui suppose « oui » : la marque d'état ne se déduit pas d'un instantané absent."
     statut: sourcee
     source: "réponse du lead à la question de la passe précédente : « pas de silence… --add avec --goal ou --budget est refusé, avec un message clair, sur une vague qui ne l'a pas écrit. --add sans ces options reste accepté partout » ; précédent de détection : src/orchestrate/snapshot.ts:211"
-    tests: ["R11 — vague sans marque et --add --goal : refus, adds.log vide", "R11 — vague sans marque et --add seul : accepté", "R11 — vague lancée par le code du lot : la marque est dans l'état"]
+    tests: ["R11 — vague sans marque et --add --goal : refus, adds.log vide", "R11 — vague sans marque et --add seul : accepté", "R11 — vague lancée par le code du lot : la marque est dans l'état", "R11 — vague sans instantané ni marque et --add --budget : refus"]
 
 contrats:
   - id: A1

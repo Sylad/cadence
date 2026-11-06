@@ -2761,15 +2761,36 @@ lots:
     finished: 2026-11-06
   - id: L646
     title: "revue en boucle : le brief de fix donne les constats de la passe précédente par classe et exige la correction de la classe, un contrôle au commit refuse un test ajouté qui est vert avec et sans le code du lot, la revue suivante ne relit pas un mineur déjà noté ; niveau : source (classe dans le brief), commit (contrôle) ; niveau le plus tôt : source ; mesure : 0 passe de revue sans constat neuf bloquant ou majeur, taux d'écartés lu par cadence perf une fois L638 en service"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-06
     started: 2026-11-06
     notes:
       - { date: 2026-11-06, text: "06-11 : clos à tort par le lead, l'intégration avait été refusée (exit 0 de la commande, résultat non lu avant raf done) ; rouvert, son code n'est pas sur main." }
     review: { date: 2026-11-06, verdict: "conforme : escalade Fable conforme, dernier constat (doc de remise en état) corrigé en 554a6dc, relu par le lead ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase ne change aucun commit de code (range-diff identique, main n'a bougé que par le plan), le majeur de documentation est corrigé (8a0602b : commentaires et docs seuls), 2 mineurs précédents restent ouverts sans bloquer", commit: 8a0602b563f1afab2d1ce11a42f47cfd1da4c624 }
+    finished: 2026-11-06
   - id: L647
     title: "raf done refuse un lot rendu par une vague et dont les commits de travail ne sont pas sur la branche principale (06-11 : L646 clos par le lead alors que son intégration venait d'être refusée, avec une porte verte qui ne portait pas son code) ; --integrate rend un code de sortie non nul quand le lot est rendu ; mesure : 0 lot clos sans son code"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-06
+  - id: L648
+    title: "doc périmée par un correctif : le brief fix liste les lignes de docs/ et de l'aide qui citent les identifiants que le diff du fix change, et exige leur mise à jour dans le même commit ; hook de commit refuse un commit fix( touchant src/ si une ligne de doc citant un identifiant retiré ou ajouté n'est pas touchée (sauf docs-ok motivé) ; niveau : source (brief), commit (hook) ; niveau le plus tôt : source ; on ne peut pas prévenir plus tôt car le correctif naît après la rédaction de la doc ; mesure : 0 constat de revue « documentation ne suit pas le correctif » par vague, 0 rendu pour une phrase de doc"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-06
+  - id: L649
+    title: "constats écartés L622 : la règle inchange compare aussi par fichier et ligne (ou classe) un constat repris reformulé ; niveau : source (le brief de revue reçoit les mineurs notés, déjà livré par L646 une fois en service) puis correction (écart à la lecture) ; niveau le plus tôt : source ; mesure : taux d'écartés lu par cadence perf sur 3 vagues > 0 quand un mineur est relisté, 0 mineur relisté plus de 1 fois"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-06
+  - id: L650
+    title: "boucle de fix d'un lot dont le sujet est la revue : un lot qui change le gabarit ou la règle de revue est relu avec la revue actuelle, l'amorce de passes de fix reste bornée à 2 ; niveau : source (le lot déclare spec: revue, la vague plafonne les passes et rend au lead avant la 3e) ; niveau le plus tôt : source ; mesure : 0 lot sur la revue avec plus de 2 passes de fix"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-06
+  - id: L651
+    title: "docs/orchestrate-cycle.md est à 109 995 octets pour un plafond de 110 000 (test/orchestrate-pages-l599.test.ts) : déplacer une section sur une page de la suite ; la prochaine ligne ajoutée rougit la porte et les ajouts se font déjà en abrégé ; mesure : au moins 10 ko de marge"
     status: todo
     estimate: 0.1
     created: 2026-11-06

@@ -206,8 +206,8 @@ export interface OrchestrateConfig {
   /** Commande de build du projet, lancée par l'orchestrateur après les tests, et dont le résultat est passé au relecteur. */
   build?: string;
   /**
-   * Dépendances non suivies à copier dans le worktree jetable de `cadence verify --gate` (L348, L389), chemins relatifs au dépôt (`node_modules`, `.venv`, `front/node_modules`…).
-   * Absente : les `node_modules` de tout niveau et le `.venv` sont copiés ; les autres dossiers ignorés sont reliés, comme pour les worktrees de vague.
+   * Dépendances non suivies à copier dans le worktree jetable de `cadence verify --gate` (L348, L389) et à lier dans l'arbre d'essai de la porte « test vert sans le code » (L646, `testsVertsSansCode`), chemins relatifs au dépôt (`node_modules`, `.venv`, `front/node_modules`…).
+   * Absente : pour `verify --gate`, les `node_modules` de tout niveau et le `.venv` sont copiés ; les autres dossiers ignorés sont reliés, comme pour les worktrees de vague. Pour l'arbre d'essai, seul le `node_modules` de la racine est lié.
    */
   worktreeDeps?: string[];
   /**

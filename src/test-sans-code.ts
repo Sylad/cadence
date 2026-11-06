@@ -11,17 +11,17 @@ const MAX_TESTS_SANS_CODE = 10;
 const git = (cwd: string, args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
 interface TestsVertsSansCode {
-  /** Les tests ajoutés par le lot qui sont verts même avec le code du lot retiré : ils ne peuvent pas échouer. */
+  /** Les tests ajoutés par le lot qui restent verts une fois retiré tout ce que le lot a changé hors tests : ils ne gardent rien de ce changement. */
   refuses: string[];
   /** Les tests ajoutés au-delà de la borne, non joués. */
   ignores: string[];
 }
 
 /**
- * Contrôle au commit (L646) : un test AJOUTÉ par les commits du lot qui est vert avec le code du lot (la porte l'a joué) et vert aussi sans lui ne prouve rien.
- * « Sans le code » : un arbre d'essai (worktree détaché au HEAD) où chaque fichier de code (`isCode`, hors tests) que le lot a modifié ou supprimé revient à son état de `start`
- * et chaque fichier de code qu'il a ajouté est retiré. Chaque test ajouté y est rejoué seul (`replay`, `{files}` remplacé) ; code 0 = refusé.
- * Un code 127 (commande introuvable) n'est pas un vert : rien n'est refusé pour lui. Sans test ajouté ou sans fichier de code changé, rien à comparer : le lot n'est pas refusé.
+ * Contrôle d'après écriture (L646) : un test AJOUTÉ par le lot (fichier de test ajouté au diff `start`..HEAD : un test déplacé en est un, un test modifié non) qui reste vert sans ce que le lot a changé hors tests ne garde rien de ce changement.
+ * « Sans le code » : un arbre d'essai (worktree détaché au HEAD) où chaque fichier du diff qui n'est pas un test (`isTest`), du code ou non, revient à son état de `start` si le lot l'a modifié ou supprimé
+ * et est retiré si le lot l'a ajouté ; les fichiers de test y restent ceux de HEAD. Les `max` premiers tests ajoutés y sont rejoués chacun seul (`replay`, `{files}` remplacé), les suivants rendus dans `ignores` ; code 0 = refusé.
+ * Tout autre code n'est pas un vert, 127 (commande introuvable) ou dépendance absente de l'arbre compris : rien n'est refusé pour lui. Sans test ajouté ou sans fichier de code (`isCode`, hors tests) au diff, rien à comparer : rien n'est joué, le lot n'est pas refusé.
  */
 export async function testsVertsSansCode(o: {
   dir: string;

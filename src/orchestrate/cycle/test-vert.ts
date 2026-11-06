@@ -12,9 +12,10 @@ import { toFix } from './review.js';
 import { sh } from './sh.js';
 
 /**
- * Porte « test vert sans le code du lot » (L646), une fois par lot, après la porte « code sans test » : un test ajouté par les commits du lot qui est vert aussi avec le code du lot retiré
- * (`testsVertsSansCode`) ne peut pas échouer ; il repart en correction directe, sans session de revue. Jouée seulement avec `orchestrate.testGate` (ses motifs disent code et tests)
- * et `orchestrate.testReplay` en chaîne (sa commande rejoue un fichier seul) ; ni en voie express, ni à la passe des mineurs, ni quand la correction ne serait pas payée (mêmes conditions que la porte « code sans test »).
+ * Porte « test vert sans le code du lot » (L646), jouée au plus une fois par lot, sur le dépôt du lot seul, après une écriture aux portes vertes et après la porte « code sans test » : un test ajouté par le lot qui reste vert
+ * sans ce que le lot a changé hors tests (`testsVertsSansCode`) ne garde rien de ce changement ; le lot repart en correction directe, sans session de revue. Jouée seulement avec `orchestrate.testGate` (ses motifs disent code et tests),
+ * `orchestrate.testReplay` (sa commande rejoue un fichier seul), un `orchestrate.test` qui n'est pas une liste de parties et un sha de départ ; ni en voie express, ni à la passe des mineurs.
+ * Jouée alors que la correction ne serait pas payée (dernière passe prise ou budget, mêmes conditions que la porte « code sans test »), elle n'envoie rien en correction : un avertissement nomme les tests.
  * Rend vrai quand le lot part en correction.
  */
 async function testVertGate(c: LotCtx, minorsPass: boolean): Promise<boolean> {
@@ -39,7 +40,7 @@ async function testVertGate(c: LotCtx, minorsPass: boolean): Promise<boolean> {
   return false;
 }
 
-/** Porte « code modifié sans test » (L287) : le diff du lot touche du code sans fichier de test → correction directe. Rend vrai quand le lot part en correction. Une fois par lot. */
+/** Porte « code modifié sans test » (L287) : le diff du lot touche du code sans fichier de test → correction directe. Rend vrai quand le lot part en correction. Déclenchée une fois par lot. */
 async function codeSansTestGate(c: LotCtx, plan: Plan, minorsPass: boolean): Promise<boolean> {
   const l = c.lot;
   const gate = c.config.testGate;

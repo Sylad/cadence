@@ -31,6 +31,7 @@ import { addOnlyLive, continueRounds, execute } from './execute.js';
 
 import { resume } from './resume.js';
 export { resumeArgv } from './resume.js';
+import { queueCommand } from './queue-command.js';
 
 export interface OrchestrateIo {
   cwd: string;
@@ -70,6 +71,8 @@ export interface OrchestrateDeps {
   integrate?: { waitMs?: number; pollMs?: number; slowMs?: number };
   /** Attente, par `--resume --integrate`/`--replay`, du verrou de dépôt tenu par une autre vague vivante (L443) : défauts 3 heures et 5 s ; réglable pour les tests. */
   repoWait?: { waitMs?: number; pollMs?: number };
+  /** Attente (ms) du verrou d'écriture de la file approuvée (L498, R16) : défaut 10 s ; réglable pour les tests. */
+  queueLockMs?: number;
 }
 
 export const DEFAULT_BUDGET = 2_000_000;
@@ -100,6 +103,8 @@ function waveId(io: OrchestrateIo, requested: string | undefined, launch: string
 
 /** Point d'entrée de `cadence orchestrate`. 0 prêts · 1 rendus au lead · 2 refus avant d'agir · 3 suspendue (budget, quota). */
 export async function orchestrate(argv: string[], io: OrchestrateIo, deps: OrchestrateDeps): Promise<number> {
+  // L498 (R17) : `queue` en premier jeton est la file approuvée, aiguillée avant que l'analyse des lots le lise comme un lot ; un lot d'un projet nommé queue se donne `queue:<lot>`.
+  if (argv[0] === 'queue') return queueCommand(argv.slice(1), { cwd: io.cwd, out: io.out, err: io.err, lockMs: deps.queueLockMs });
   deps = onceAuth(deps);
   const args = parseOrchestrateArgs(argv);
   const launch = io.cwd;

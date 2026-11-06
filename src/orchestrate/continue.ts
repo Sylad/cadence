@@ -1,12 +1,13 @@
-import { basename, join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
 import { nextUp } from '../audit.js';
 import { planLoader, type OrchestrateConfig } from '../config.js';
 import { gitRoot } from '../git.js';
 import { findProjects, isProject } from '../lead.js';
-import { RafError, type Lot } from '../plan.js';
+import { isOpen, RafError, type Lot } from '../plan.js';
 import { readYamlKey } from '../yaml-keys.js';
 import { lotBudget, projectEnv, type Args, type OrchestrateIo, type Target } from './command.js';
-import { readyFree } from '../ready-free.js';
+import { lotHold, readyFree, type Held } from '../ready-free.js';
 import { lotFinished, lotKey, type LotState, type RunStore } from './state.js';
 import type { Budget } from './cycle.js';
 import { budgetStage, stageScreen } from './spec.js';
@@ -64,6 +65,21 @@ export function drawFilter(lot: Pick<Lot, 'id' | 'title' | 'notes' | 'estimate'>
   return null;
 }
 
+/** Ce que la configuration d'un projet règle du tirage : dossier des fiches, escalade, maquette, réglage `orchestrate.continue` ; les défauts quand elle est illisible. */
+function drawEnv(dir: string): { specDir: string; escalating: boolean; maquette: boolean; setting: OrchestrateConfig['continue'] } {
+  try {
+    const config = projectEnv(dir).config;
+    return { specDir: config.spec.dir, escalating: !!config.escalation, maquette: config.maquette, setting: config.continue };
+  } catch {
+    return { specDir: 'docs/specs', escalating: false, maquette: true, setting: undefined }; // configuration illisible : le dossier par défaut
+  }
+}
+
+/** Le budget d'un lot tel que le tirage le compte (estimation, étape spec d'un lot à écran ou à fiche, escalade, mesure L501). */
+function drawBudget(dir: string, lot: Lot, env: ReturnType<typeof drawEnv>, measured?: MeasuredBudgets): number {
+  return lotBudget(lot.estimate, budgetStage(lot, stageScreen(dir, env.specDir, lot, env.maquette), env.maquette, dir, env.specDir), env.escalating, measured);
+}
+
 export interface Candidate {
   project: string;
   dir: string;
@@ -98,31 +114,68 @@ export function candidates(launch: string, o: DrawOpts): Candidate[] {
     } catch {
       continue;
     }
-    let specDir = 'docs/specs';
-    let escalating = false;
-    let maquette = true;
-    let setting: OrchestrateConfig['continue'];
-    try {
-      const config = projectEnv(dir).config;
-      specDir = config.spec.dir;
-      escalating = !!config.escalation;
-      maquette = config.maquette;
-      setting = config.continue;
-    } catch {
-      // configuration illisible : le dossier par défaut
-    }
+    const env = drawEnv(dir);
     for (const lot of ready) {
       if (o.exclude.has(`${project}:${lot.id}`) || decisionPending(lot)) continue;
-      const why = drawFilter(lot, setting);
+      const why = drawFilter(lot, env.setting);
       if (why) {
         o.skipped?.push(`${project}:${lot.id} écarté du tirage : ${why}`);
         continue;
       }
-      if (lotBudget(lot.estimate, budgetStage(lot, stageScreen(dir, specDir, lot, maquette), maquette, dir, specDir), escalating, o.measured) > o.remaining) continue;
+      if (drawBudget(dir, lot, env, o.measured) > o.remaining) continue;
       out.push({ project, dir, lot });
     }
   }
   return out;
+}
+
+/** Une clé de la file : `projet:lot`, le projet pouvant être un chemin depuis le dossier de lancement (`groupe/gamma:L1`) ; ni `@modèle` ni espace. */
+export const QUEUE_KEY = /^([\w.-]+(?:\/[\w.-]+)*):([\w.-][\w./-]*)$/;
+
+/** Le lot qu'une clé de la file nomme depuis le dossier de lancement, ou pourquoi il est introuvable (projet ou dossier disparu, lot supprimé, plan illisible : R15). */
+export function resolveQueueLot(launch: string, key: string): { project: string; dir: string; lot: Lot; lots: Lot[] } | { cause: 'introuvable' | 'plan illisible' } {
+  const m = QUEUE_KEY.exec(key);
+  if (!m) return { cause: 'introuvable' };
+  const dir = resolve(launch, m[1]);
+  if (!existsSync(dir) || !isProject(dir)) return { cause: 'introuvable' };
+  let lots: Lot[];
+  try {
+    lots = planLoader(gitRoot(dir) ?? dir)().lots();
+  } catch {
+    return { cause: 'plan illisible' };
+  }
+  const lot = lots.find((l) => l.id === m[2]);
+  return lot ? { project: m[1], dir, lot, lots } : { cause: 'introuvable' };
+}
+
+/** Un lot de la file mûr pour le tirage (`candidate`), ou la cause qui le fait sauter (`title` : son titre quand le lot existe). */
+export type QueueVerdict = { candidate: Candidate; title: string } | { cause: string; title?: string };
+
+/**
+ * Le lot `key` de la file est-il mûr à cet instant (R5, R8, R12, R15) ? Prêt au sens du tirage existant (à faire, `after` levé, ni récurrent ni en cours), aucune question
+ * (« à décider »), aucune ressource `uses:` tenue (`home` : les vagues vivantes ; `held` : les lots que la vague vient de prendre), ni écarté par le réglage de tirage du projet
+ * ou « non tirable » (R12), et son budget tient dans `remaining`. Sinon la cause, dans les mots du journal.
+ */
+export function queueVerdict(key: string, launch: string, o: { home: string; remaining: number; held?: Held[]; measured?: MeasuredBudgets }): QueueVerdict {
+  const ref = resolveQueueLot(launch, key);
+  if ('cause' in ref) return { cause: ref.cause };
+  const { project, dir, lot, lots } = ref;
+  const title = lot.title;
+  if (lot.status === 'done' || lot.status === 'dropped') return { cause: 'déjà terminé', title };
+  if (lot.status === 'doing') return { cause: 'déjà en cours', title };
+  if (!nextUp(lots).ready.some((l) => l.id === lot.id)) {
+    const open = lot.after.filter((d) => lots.some((x) => x.id === d && isOpen(x.status)));
+    return { cause: open.length ? `after non clos (${open.join(', ')})` : 'non prêt (condition de tirage ou lot récurrent)', title };
+  }
+  if (decisionPending(lot)) return { cause: 'question posée', title };
+  const hold = lotHold(dir, lot, o.home, o.held);
+  if (hold.running) return { cause: 'déjà en cours', title };
+  if (hold.resource) return { cause: `ressource tenue (${hold.resource})`, title };
+  const env = drawEnv(dir);
+  const why = drawFilter(lot, env.setting);
+  if (why) return { cause: `écarté du tirage : ${why}`, title };
+  if (drawBudget(dir, lot, env, o.measured) > o.remaining) return { cause: 'budget restant insuffisant', title };
+  return { candidate: { project, dir, lot }, title };
 }
 
 /**

@@ -46,7 +46,7 @@ function sharingProjects(dir: string): string[] {
 const plansOf = (dir: string): Lot[] => planLoader(repoOf(dir))().lots();
 
 /** Un lot qu'une vague tient : son dépôt et son id suffisent à le reconnaître et à retrouver ses `uses:`. */
-type Held = Pick<LotState, 'repo' | 'lot'>;
+export type Held = Pick<LotState, 'repo' | 'lot'>;
 
 /** Les lots non finis de chaque vague vivante de `home` ; une vague à l'état illisible n'en tient aucun (elle ne tient alors aucune ressource connue). */
 function liveLots(home: string): { wave: string; lots: LotState[] }[] {
@@ -99,6 +99,17 @@ function taken(dirs: string[], home: string, held: Held[]): { resources: Set<str
     }
   }
   return { resources, running };
+}
+
+/**
+ * Pourquoi ce lot du projet `dir` ne peut pas partir (L498) : une vague vivante le joue déjà (`running`), ou une de ses ressources `uses:` est tenue (`resource`, la première) ; `{}` quand rien ne le retient.
+ * Même lecture des ressources prises que `readyFree` ; `held` : les lots que la vague qui tire vient déjà de prendre.
+ */
+export function lotHold(dir: string, lot: Pick<Lot, 'id' | 'uses'>, home: string, held: Held[] = []): { running?: true; resource?: string } {
+  const { resources, running } = taken([dir], home, held);
+  if (running.has(lotAt(repoOf(dir), lot.id))) return { running: true };
+  const resource = (lot.uses ?? []).find((r) => resources.has(r));
+  return resource ? { resource } : {};
 }
 
 /**

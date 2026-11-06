@@ -2977,6 +2977,7 @@ lots:
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-06-2230, 0 passe(s) de correction)", commit: 1796dc86e24bab0e540e7ace676678e9888761fe, reporte: { de: fe858b14761d364f9f1050100f85fcfa8e669fd9, vers: 1796dc86e24bab0e540e7ace676678e9888761fe, patchId: 7f665b7a711d108eba74294d0f330820d4283696 } }
   - id: L668
     title: "orchestrate --follow perd une ligne entre deux suivis : 06-11, la question de L477 (22:00:39Z) n'a pas été remontée au réarmement du suivi et a attendu 33 min ; --follow --since <horodatage ou ligne> rejoue les lignes manquées, et une question ouverte se relit au démarrage du suivi ; mesure : 0 ligne de geste perdue au réarmement"
     status: todo

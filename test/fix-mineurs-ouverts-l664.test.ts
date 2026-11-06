@@ -44,3 +44,15 @@ describe('L664 — le brief fix liste les mineurs ouverts', () => {
     expect(fixBrief([major], [minor(2)], { docsFix: true })).not.toContain('Open minor findings');
   });
 });
+
+describe('L667 — seuls les mineurs de la dernière revue sont redonnés', () => {
+  it('R1 — un mineur gardé d’une revue antérieure (non redit par la dernière) n’est pas redonné au fix', () => {
+    const carried: Constat = { ...minor(2), reporte: true };
+    const brief = fixBrief([major], [major, minor(1), carried]);
+    expect(brief).toContain('mineur 1');
+    expect(brief).not.toContain('mineur 2');
+  });
+  it('R2 — que des mineurs gardés : pas de section', () => {
+    expect(fixBrief([major], [major, { ...minor(2), reporte: true }])).not.toContain('Open minor findings');
+  });
+});

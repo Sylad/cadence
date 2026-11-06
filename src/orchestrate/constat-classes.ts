@@ -30,10 +30,10 @@ export function fixConstatsText(constats: Constat[], template = 'fix', codeConst
 
 /**
  * Les mineurs ouverts de la dernière revue de code (L664) que la passe de fix ordinaire reçoit en plus de ses constats : sans eux la revue suivante les relit, ils restent « non corrigés » et se comptent de nouveau (L657, revue 3 : 3 mineurs sur 12 constats).
- * Un mineur déjà dans les constats à corriger, ou déjà listé (même texte et même fichier), n'est pas redit ; aucun mineur ouvert : vide. Un mineur faux ou qui ne vaut pas son changement se range sous « choix » du rapport, comme à la passe des mineurs.
+ * Un mineur gardé d'une revue antérieure (`reporte`, L667) n'est pas redonné : la dernière revue ne le redit plus, il a pu être corrigé. Un mineur déjà dans les constats à corriger, ou déjà listé (même texte et même fichier), n'est pas redit ; aucun mineur ouvert : vide. Un mineur faux ou qui ne vaut pas son changement se range sous « choix » du rapport, comme à la passe des mineurs.
  */
 function openMinorsText(codeConstats: Constat[], constats: Constat[]): string {
-  const open = codeConstats.filter((k) => k.gravite === 'mineur' && !constats.some((c) => c.gravite === 'mineur' && c.texte === k.texte && c.fichier === k.fichier))
+  const open = codeConstats.filter((k) => k.gravite === 'mineur' && !k.reporte && !constats.some((c) => c.gravite === 'mineur' && c.texte === k.texte && c.fichier === k.fichier))
     .filter((k, i, all) => all.findIndex((o) => o.texte === k.texte && o.fichier === k.fichier) === i);
   if (!open.length) return '';
   return ['', 'Open minor findings of the last code review (L664): fix each one that is right in this same pass, since the next review reads them again and counts them if they stay. A finding that is wrong, or not worth its change, is not fixed: list it under "choix" with the reason.', ...open.map(line)].join('\n');

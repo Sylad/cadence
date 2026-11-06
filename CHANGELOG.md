@@ -89,6 +89,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- The correction pass no longer gets a fixed minor back as « open » (L667, [docs/orchestrate-cycle.md](docs/orchestrate-cycle.md)): the « Open minor findings » section lists only the minors the last code review reported; a minor kept from an earlier review that the last one no longer repeats (it may have been fixed) is left out.
 - `raf done` and the delivery audit read « non conforme » / « not compliant » only at the start of a review verdict: a compliant verdict that quotes the phrase further on is no longer refused (L660).
 - The correction pass receives the open minors of the last code review (L664, [docs/orchestrate-cycle.md](docs/orchestrate-cycle.md)): its brief gets an « Open minor findings » section and the pass fixes the ones that are right or lists the others under « choix », so the next review no longer reads them again as « non corrigé » and counts them (L657, review 3: 3 of 12).
 

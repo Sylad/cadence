@@ -83,6 +83,8 @@ export interface Constat {
   texte: string;
   /** Classe de défaut rangée par le relecteur (L646), montrée par classe au brief de fix. */
   classe?: string;
+  /** Mineur gardé d'une revue antérieure que la dernière ne rapporte plus (L667) : peut-être déjà corrigé, le brief de fix ne le redonne pas. */
+  reporte?: true;
 }
 
 export interface ReviewSummary {

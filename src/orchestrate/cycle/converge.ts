@@ -87,10 +87,11 @@ const convergedVerdict = (verdict: string, aside: { texte: string }[]): string =
 /**
  * Les mineurs notés que la revue complète ne rapporte plus (le brief le lui demande, ou `setAsideNoted` les a écartés) restent notés : sans eux `codeConstats` les perdrait à la revue suivante,
  * dont le brief ne les montrerait plus et qui les compterait de nouveau. Seule la revue complète les garde ; la revue courte les relit et n'écarte rien.
+ * Ils sont marqués `reporte` : le brief de fix ne redonne que les mineurs de la dernière revue (L667), un mineur que la revue ne redit plus pouvant avoir été corrigé.
  * Un mineur que la revue redit à un autre rang (majeur ou bloquant compté) n'est pas gardé : le brief suivant le donnerait à corriger et à taire à la fois.
  */
 export const carriedNoted = (kind: SessionKind, l: LotState, counted: ReviewReport): Constat[] =>
-  kind === 'review' ? (l.codeConstats ?? []).filter((k) => k.gravite === 'mineur' && !repeats(counted.constats, k)) : [];
+  kind === 'review' ? (l.codeConstats ?? []).filter((k) => k.gravite === 'mineur' && !repeats(counted.constats, k)).map((k) => ({ ...k, reporte: true as const })) : [];
 
 /**
  * Un majeur ou un mineur de la revue qui reprend mot pour mot (son texte contient l'entrée) une attente hors règle de la sonde ne compte pas (L625, issue #41) : elle est déjà une sous-tâche `[hors règle]` du lead

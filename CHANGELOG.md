@@ -89,6 +89,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
+- The section on several waves at once (repository lock, session slots, `--status`, `--waits`) moves from `docs/orchestrate-cycle.md` to [docs/orchestrate-worktrees.md](docs/orchestrate-worktrees.md#several-waves-at-once-the-repository-lock-and-the-session-slots) (L651): the cycle page falls from 109 995 to 99 162 bytes, 10 Ko under its 110 000 cap.
 - The review loop stops reopening the same defect (L646, [docs/orchestrate-gate.md](docs/orchestrate-gate.md), « The review loop »): the fix brief gives the findings of the previous review by class (`classe` in the review schema) and requires every instance of the class to be fixed, a test added by a lot that stays green once everything the lot changed outside its tests is undone goes back to correction (checked by the program in a throwaway worktree, with `orchestrate.testGate` and `orchestrate.testReplay`), and the next full review neither re-reads nor counts a minor already noted, however many reviews pass (the short review after the minors pass still reads it), and the librarian and minors passes get no class instruction.
 
 ### Fixed

@@ -2626,6 +2626,7 @@ lots:
     notes:
       - { date: 2026-11-06, text: "titre remplacé : « Tests de signal de verify et verify-gate : toute la famille passe dans le projet « lourds » de L583 et 200 rejeux sous charge prouvent la stabilité, au lieu d'un correctif par test (L505 L528 L540 L550 L555 L567 L579) ; mesure : 0 instable de signal par vague »" }
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme : famille de 13 fichiers dans « lourds », 275 tests verts ; 200 rejeux renvoyés à L642 par le lead, 3 mineurs en note dont process.env remplacé par porte-deportee-creneau-l624 dans le fork partagé — orchestré (vague 2026-11-06-1124, 1 passe(s) de correction)", commit: c3b3950960628d34d83252d5a970f309efc5d4f8, reporte: { de: cbf0f2e97936f43ef5b4ef15968cc05e050c2ff9, vers: c3b3950960628d34d83252d5a970f309efc5d4f8, patchId: 26a92424324a4cad69c48c5150c25d262680e654 } }
   - id: L631
     title: "Refus « tests rouges au sommet intégré » : le journal et l'état du lot citent toujours le fichier et le nom du test, jamais seulement « Expected ; false » ; L602, L617, L622 du 05-11 ont coûté une suite complète chacun pour retrouver le nom ; mesure : 0 refus sans nom"
     status: done

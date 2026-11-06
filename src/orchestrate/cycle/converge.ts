@@ -31,8 +31,10 @@ const reviewRank = (kind: SessionKind, l: LotState): number => (kind === 'ux' ? 
  * Consigne `{{converge}}` d'une revue de code d'un lot rétréci (L621) : (a) juger le diff des commits postérieurs à la tête de lancement contre l'objectif, les commits déjà intégrés n'étant que du contexte ;
  * (b) marquer `inchange: true` un majeur hors objectif et hors lignes changées, dès la revue 1 (à partir de la revue 2 c'est `CONVERGE_BRIEF` qui le dit, une seule fois).
  */
-const shrunkJudge = (s: Shrunk): string =>
-  `The goal of this lot narrowed it to commits that are already merged into the base branch. Judge ONLY the diff of the commits written after the launch head (\`git log ${s.from}..HEAD\`, \`git diff ${s.from}..HEAD\`) against the goal: « ${s.goal} ». The commits before ${s.from} are context, not under review.`;
+const shrunkJudge = (s: Shrunk, l: LotState): string =>
+  `The goal of this lot narrowed it to commits that are already merged into the base branch. Judge ONLY the diff of the commits written after the launch head (\`git log ${s.from}..HEAD\`, \`git diff ${s.from}..HEAD\`) against the goal: « ${s.goal} ». The commits before ${s.from} are context, not under review.${
+    l.repos?.length ? ' That range is the project repository only: in the neighbouring repositories every commit that cites the lot is under review, whatever its date.' : ''
+  }`;
 
 const SHRUNK_MARK =
   'Mark `inchange: true` on every major finding that is outside the goal and outside the lines changed by that diff: a major marked `inchange: true` does not block the lot (the program sends it to the lead as a follow-up item and buys no correction pass). A blocking finding (data loss, security, red test suite) always blocks and always buys a correction pass, marked or not.';
@@ -43,7 +45,7 @@ const SHRUNK_MARK =
  */
 export function convergeBrief(kind: SessionKind, l: LotState, shrunk?: Shrunk): string {
   if (!(kind === 'review' || kind === 'review-small')) return '';
-  const lines: string[] = shrunk ? [shrunkJudge(shrunk), ''] : [];
+  const lines: string[] = shrunk ? [shrunkJudge(shrunk, l), ''] : [];
   if (reviewRank(kind, l) > 1) {
     lines.push(CONVERGE_BRIEF);
     if (l.codeConstats?.length) lines.push('', 'Findings of the previous review that the author had to fix:', ...bulletLines(l.codeConstats));

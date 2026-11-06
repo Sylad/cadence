@@ -18,6 +18,7 @@ import { drawSettingsReport } from './continue.js';
 import { precheckNothingToFind, MAX_PASSES, MAX_PASSES_CONVERGING, briefName, needsPrecheck } from './cycle.js';
 import { buildArgs, buildLocalArgs, MODEL_ALIASES, mcpServersFor, enabledPlugins, settingsFiles, type StepModel } from './launch.js';
 import { repoBranch } from './integrate.js';
+import { launchScreen, launchedLot } from './cycle/retreci.js';
 import { keptBranchesOfLot, legacyLotSlug, lotBranch, planFileSet, recoveryRefusal, type KeptTree } from './worktree.js';
 import { effortKey, schemaFor, stepAgent } from './schemas.js';
 import { lotKey, lotSlug, neighbourDirs, RunStore, type LotState } from './state.js';
@@ -128,6 +129,13 @@ function notTakenCause(t: KeptTree, branch: string | null, worktrees: boolean, f
   return refused ? `n'est pas reprise, seule la plus récente du lot (${first?.branch}) est examinée, et elle est refusée` : `n'est pas reprise, une branche plus récente du lot (${first?.branch}) l'est`;
 }
 
+/** La ligne « budget du lot » : la base se lit sur le lot tel que lancé (maquette sautée d'un lot rétréci : `launchedLot`), comme le budget de l'état. */
+function budgetLine(l: LotState, lot: ReturnType<Plan['lot']>, env: ReturnType<typeof projectEnv>, measured?: MeasuredBudgets): string {
+  const launched = launchedLot(lot, l.goal ? launchScreen(env.loadPlan(), l.repo, env.config, lot, l.goal).skipped : undefined);
+  const stage = budgetStage(launched, l.screen, env.config.maquette, l.repo, env.config.spec.dir);
+  return `  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, stage, l.escalationReserve ? env.config.escalation?.model : undefined, measured)})`;
+}
+
 /** `wave` : la vague simulée — son identifiant, son budget et si elle a plus d'un créneau (L527 : tout lot d'un dépôt en worktrees y joue alors dans le sien). */
 export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, { budget, id, multiSlot, measured }: { budget: number; id: string; multiSlot: boolean; measured?: MeasuredBudgets }): void {
   const tmp = mkdtempSync(join(tmpdir(), 'cadence-orchestrate-'));
@@ -143,7 +151,7 @@ export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDep
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
     if (l.goal) io.out(`  objectif donné : ${l.goal} (à la place du titre dans les briefs)`);
-    io.out(`  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, budgetStage(lot, l.screen, env.config.maquette, l.repo, env.config.spec.dir), l.escalationReserve ? env.config.escalation?.model : undefined, measured)})`);
+    io.out(budgetLine(l, lot, env, measured));
     const mine = lots.filter((o) => o.repo === l.repo);
     const together = env.config.worktrees && (mine.length > 1 || multiSlot) && !mine.some((o) => o.repos?.length) && !!repoBranch(l.repo);
     io.out(together ? `  file ${basename(l.repo)} · en parallèle des autres lots du dépôt, dans son worktree (cadence/${id}/${lotSlug(l.project, l.lot)}, créé à la prise du créneau)` : `  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);

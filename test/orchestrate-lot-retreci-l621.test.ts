@@ -3,7 +3,10 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { countReview } from '../src/orchestrate/cycle/converge.js';
-import { readShrunk } from '../src/orchestrate/cycle/retreci.js';
+import { convergeText, readShrunk } from '../src/orchestrate/cycle/retreci.js';
+import { convergeBrief } from '../src/orchestrate/cycle/converge.js';
+import { dryRun } from '../src/orchestrate/dry-run.js';
+import { lotBudgetBasis } from '../src/orchestrate/lot-budget.js';
 import { orchestrate, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { parseOrchestrateArgs } from '../src/orchestrate/command-args.js';
 import { preflight } from '../src/orchestrate/preflight.js';
@@ -13,7 +16,7 @@ import { Plan } from '../src/plan.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { claudeOut, commitFile, git, harness, reviewReport, workReport, type Handler } from './orchestrate-harness.js';
 import { ecritAcceptation } from './accept-helpers.js';
-import { tempDir } from './helpers.js';
+import { removeDryRunBriefs, tempDir } from './helpers.js';
 import type { StepState } from '../src/orchestrate/state.js';
 
 // L621 (issue #40, spec goal-lot-retreci) : un objectif qui rétrécit un lot aux commits déjà intégrés saute la maquette sauf mise en page,
@@ -398,5 +401,73 @@ describe('R12 — le rétrécissement est relu dans git, sans champ d\'état', (
     const { h, c } = shrunk({}, {}, { goal: null });
     c.lot.steps.push(step(1, git(h.repo, 'rev-parse', 'HEAD')));
     expect(readShrunk(c)).toBeUndefined();
+  });
+});
+
+// ——— Suites de L621 (L634) ———
+
+describe('L634 — voie express : le screen du plan, pas celui de l\'état', () => {
+  it('L634 — lot screen: page d\'estimate 0,1 rétréci (maquette sautée, screen de l\'état absent) : pas de voie express', async () => {
+    const { dir } = project([{ title: 'Une page', estimate: 0.1, screen: 'page' }], { commits: 1 });
+    const s = await launch(dir, GOAL);
+    expect(s.screen).toBeUndefined();
+    expect(s.express).toBeUndefined();
+  });
+  it('L634 — lot sans screen: d\'estimate 0,1 rétréci : toujours express', async () => {
+    const { dir } = project([{ title: 'Une retouche', estimate: 0.1 }], { commits: 1 });
+    expect((await launch(dir, GOAL)).express).toBe(true);
+  });
+  it('L634 — lot screen: page d\'estimate 0,1 non rétréci : pas de voie express (inchangé)', async () => {
+    const { dir } = project([{ title: 'Une page', estimate: 0.1, screen: 'page' }]);
+    expect((await launch(dir)).express).toBeUndefined();
+  });
+});
+
+describe('L634 — la revue d\'intégration ne reçoit pas la plage du lot rétréci', () => {
+  it('L634 — c.integration posé : le brief ne contient ni from..HEAD ni « Judge ONLY » (integrationText porte la plage base...HEAD) ; sans lui, il les contient', async () => {
+    const { c } = shrunk({ implement: [impl], review: [ok] });
+    await runLot(c);
+    const from = c.lot.steps[0]!.headBefore!;
+    expect(convergeText(c, 'review-small')).toContain(`${from}..HEAD`);
+    c.integration = { base: 'main' };
+    const text = convergeText(c, 'review-small');
+    expect(text).not.toContain('..HEAD');
+    expect(text).not.toContain('Judge ONLY');
+  });
+});
+
+describe('L634 — Judge ONLY et les dépôts voisins', () => {
+  const lotOf = (repos: { rel: string; path: string }[]) => {
+    const { c } = shrunk({});
+    c.lot.repos = repos;
+    return c.lot;
+  };
+  const range = { goal: GOAL, from: 'abc1234' };
+  it('L634 — lot à dépôt voisin : la consigne dit que les commits du voisin citant le lot sont tous à juger (la plage ne les coupe pas)', () => {
+    const text = convergeBrief('review', lotOf([{ rel: '../b', path: '/x/b' }]), range);
+    expect(text).toContain('Judge ONLY the diff of the commits written after the launch head');
+    expect(text).toMatch(/neighbouring repositor(y|ies).*every commit that cites the lot/s);
+  });
+  it('L634 — lot sans dépôt voisin : la consigne ne parle pas de voisins', () => {
+    expect(convergeBrief('review', lotOf([]), range)).not.toMatch(/neighbouring/);
+  });
+});
+
+describe('L634 — dry-run : la base du budget suit le lot tel que lancé', () => {
+  it('L634 — lot spec: true rétréci : la base annoncée est celle d\'un lot sans étape spec, comme le budget', async () => {
+    const { dir } = project([{ title: 'Page mixte', estimate: 0.6, screen: 'page', spec: true }], { commits: 1 });
+    const state = await launch(dir, GOAL);
+    expect(state.screen).toBeUndefined();
+    const out: string[] = [];
+    const io: OrchestrateIo = { cwd: dir, env: { RAF_TODAY: '2026-10-04', CADENCE_HOME: tempDir() }, out: (l) => out.push(l), err: () => {}, now: () => new Date('2026-10-04T14:12:00') };
+    const deps: OrchestrateDeps = { claude: async () => { throw new Error('pas de session'); }, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR };
+    try {
+      dryRun([state], io, deps, { budget: 5_000_000, id: 'w1', multiSlot: false });
+    } finally {
+      removeDryRunBriefs(out.join('\n'));
+    }
+    const line = out.find((l) => l.includes('budget du lot'))!;
+    expect(line).toContain(`${state.budget} tokens comptés`);
+    expect(line).toContain(`base : ${lotBudgetBasis(0.6, undefined, undefined, undefined)})`);
   });
 });

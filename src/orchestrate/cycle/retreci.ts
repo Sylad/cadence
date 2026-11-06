@@ -48,8 +48,11 @@ export function noteMaquetteSautee(c: LotCtx): void {
   if (skipped) c.wave.log(`${lotKey(l.project, l.lot)} · maquette sautée : l'objectif rétrécit le lot à ${skipped} commit(s) déjà intégré(s) et ne change pas la mise en page`);
 }
 
-/** `{{converge}}` d'une session : la consigne de `convergeBrief`, avec le rétrécissement du lot relu dans git pour les revues de code seulement. */
-export const convergeText = (c: LotCtx, kind: SessionKind): string => convergeBrief(kind, c.lot, kind === 'review' || kind === 'review-small' ? readShrunk(c) : undefined);
+/**
+ * `{{converge}}` d'une session : la consigne de `convergeBrief`, avec le rétrécissement du lot relu dans git pour les revues de code seulement. La revue d'intégration (`c.integration`) juge le diff rebasé
+ * que lui donne `integrationText` (`base...HEAD`) : la plage `from..HEAD` du lot rétréci la contredirait, elle n'en reçoit pas.
+ */
+export const convergeText = (c: LotCtx, kind: SessionKind): string => convergeBrief(kind, c.lot, (kind === 'review' || kind === 'review-small') && !c.integration ? readShrunk(c) : undefined);
 
 /** Un lot lu rétréci pour la revue : son objectif et la tête de lancement (`headBefore` de sa première étape), au-delà de laquelle commence le diff à juger. */
 export interface Shrunk {

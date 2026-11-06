@@ -2637,6 +2637,7 @@ lots:
     estimate: 0.25
     created: 2026-11-05
     started: 2026-11-05
+    review: { date: 2026-11-06, verdict: "conforme : le majeur précédent (capture avant) est corrigé ; 0 bloquant, 0 majeur, 10 mineurs en notes du lot — orchestré (vague 2026-11-05-2210-cad, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : rebase sans effet sur le lot (8 commits identiques, main n'a bougé que du plan) ; les 10 mineurs de la revue précédente restent ouverts en notes, non re-signalés", commit: 0d249453feb038f73808f9ba14727c5eee89e4ba }
   - id: L634
     title: "Suites de L621, lot rétréci : isExpress lit le screen du plan et le lot screen: page d'estimate ≤ 0,1 quitte la voie express (preflight.ts:174) ; la revue d'intégration reçoit from..HEAD qui contredit integrationText (retreci.ts:52) ; Judge ONLY inclut les commits des dépôts voisins (converge.ts:30) ; le dry-run n'applique pas launchedLot à la base du budget (dry-run.ts:145) ; test versionné du croisement rétréci × hors règle (L625) aux rangs 1 et 2"
     status: todo

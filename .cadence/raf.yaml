@@ -2693,7 +2693,7 @@ lots:
     finished: 2026-11-06
   - id: L639
     title: "La porte joue sur la machine libre : Big-Blue d'abord, mini-blue en débordement, décision d'hôte prise une fois par lot (préflight ssh ConnectTimeout 3), hôte injoignable = repli local sans timeout répété ; mesures du 05-11 : mini-blue 7 min 24 seule, jusqu'à 42 min à plusieurs, Big-Blue ~4 min seule, 50 lignes de repli sur 4 lots ; mesure : 0 « porte déportée indisponible » répété par lot"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-11-06
@@ -2711,6 +2711,7 @@ lots:
       - { date: 2026-11-06, text: "Hypothèses (fiche porte-machine-libre) — R10 : Une décision d'hôte vaut pour le lot en cours seulement ; le lot suivant, ou une nouvelle vague, refait son préflight (un hôte revenu est retrouvé) ; si faux : Si l'hôte indisponible doit l'être pour toute la vague, la mémoire passe du lot à la vague : un préflight de moins, rien d'autre ne change ; la mesure « 0 lign…" }
       - { date: 2026-11-06, text: "Hypothèses (fiche porte-machine-libre) — R13 : gate.overflow suit la forme de gate.host : une chaîne sans espace ne commençant pas par « - » ; la clé est ajoutée à la liste des clés connues, et gate.maxPara… ; si faux : Si maxParallel ne doit pas borner le débordement, une clé propre est ajoutée plus tard ; la clé overflow est neuve, aucun projet ne la porte encore" }
     review: { date: 2026-11-06, verdict: "conforme : les 3 majeurs de la revue 2 sont corrigés (chaque test R5/R7/R8 rougit sous son mutant), 8 mineurs déjà connus restent en notes — orchestré (vague 2026-11-06-1124, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant : le rebase ne déplace que l'entrée CHANGELOG du lot (toujours sous [Unreleased]/Added, sans doublon) ; main n'a touché aucun autre fichier du lot, aucun constat.", commit: 54ecf92f70b9e911a139209169857400156a498e }
+    finished: 2026-11-06
   - id: L640
     title: "Retirer orchestrate.gate de cadence.yaml : la porte de cadence revient en local en attendant L639 (décision du 05-11 : mini-blue seule pour tous les lots n'a pas tenu la charge)"
     status: done

@@ -122,16 +122,13 @@ async function openPlace(o: PlaceOpts): Promise<Place> {
 
 /** Joue `fn` dans le lieu de la porte et retire le worktree de l'hôte quoi qu'il arrive (R10). */
 export async function withPlace<T>(o: PlaceOpts, fn: (place: Place) => Promise<T>): Promise<T> {
-  // L627 : le début et la fin de chaque porte au journal, pour que `cadence inspect` isole le temps de porte de celui des sessions et de la file.
+  const place = await openPlace(o); // attend le tour de l'hôte : la file n'est pas du temps de porte
+  // L627 : le début (une fois le tour obtenu) et la fin de chaque porte au journal, pour que `cadence inspect` isole le temps de porte de celui des sessions et de la file.
   o.trace?.(`porte : début${o.detail ? ` ${o.detail}` : ''}`);
   try {
-    const place = await openPlace(o);
-    try {
-      return await fn(place);
-    } finally {
-      place.close();
-    }
+    return await fn(place);
   } finally {
+    place.close();
     o.trace?.(`porte : fin${o.detail ? ` ${o.detail}` : ''}`);
   }
 }

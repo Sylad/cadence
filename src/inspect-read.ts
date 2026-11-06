@@ -3,15 +3,17 @@ import { existsSync, readdirSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
 import { inspectWave, renderInspection, tourSummary, type Inspection, type PlanLot } from './inspect.js';
 import { planLoader } from './config.js';
-import { findProjects } from './lead.js';
+import { findProjects, isProject } from './lead.js';
 import { RafError } from './plan.js';
 
 /** Les lots des plans du dossier ; un plan illisible n'ôte rien au reste (la proposition le saura moins bien). */
 function planLotsOf(parent: string): PlanLot[] {
   const out: PlanLot[] = [];
-  for (const dir of findProjects(parent, 2)) {
+  const dirs = findProjects(parent, 2);
+  // Lancé depuis un projet (`cadence orchestrate L18` de l'intérieur) : aucun sous-dossier n'est un projet, le dossier l'est lui-même, comme pour `lead tour`.
+  for (const dir of dirs.length === 0 && isProject(parent) ? [parent] : dirs) {
     try {
-      for (const l of planLoader(dir)().lots()) out.push({ project: relative(parent, dir).split(sep).join('/'), id: l.id, title: l.title, status: l.status });
+      for (const l of planLoader(dir)().lots()) out.push({ project: dir === parent ? basename(parent) : relative(parent, dir).split(sep).join('/'), id: l.id, title: l.title, status: l.status });
     } catch {
       // plan illisible : ses lots ne comptent pas parmi ceux qui traitent une cause
     }

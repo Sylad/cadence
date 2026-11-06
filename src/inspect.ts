@@ -4,8 +4,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 type Category = 'refus d\'intégration' | 'reprise du lead' | 'attente de créneau' | 'conflit';
-/** Où l'erreur a été détectée (L627, indicateur du 05-11) ; l'attente de créneau n'est pas une erreur. */
-type Level = 'intégration' | 'porte' | null;
+/** Où l'erreur a été détectée (L627, indicateur du 05-11) ; null : l'attente de créneau n'est pas une erreur, et une revue non conforme ou un budget atteint ne sont détectés à aucun de ces quatre niveaux. */
+type Level = 'écriture' | 'commit' | 'porte' | 'intégration' | null;
 
 interface Loss {
   lot: string;
@@ -70,7 +70,7 @@ interface Entry {
 const LINE = /^(\d{4}-\d\d-\d\dT[\d:.]+Z) (.*)$/;
 const LOT_PREFIX = /^([^\s:]+:[A-Za-z0-9._-]+) (?:· |→ |: |intégré|verdict|tests|CHANGELOG)/;
 const TRANSITION = /^→ ([a-z-]+)(?: — (.*))?$/;
-/** Les états où le lot travaille : l'attente du lead (handed-back, question, suspended) est une perte, pas du temps actif. */
+/** Les états où le lot travaille : l'attente du lead (handed-back, question, suspended) n'est pas du temps actif. */
 const WORK_STATES = ['implementing', 'reviewing', 'fixing'];
 const FINAL_STATES = new Set(['ready', 'failed']);
 
@@ -108,12 +108,27 @@ interface Result {
   end: number;
 }
 
-/** La perte que laisse un lot dans un état de `min` minutes : un refus ou un conflit rendu au lead, une intégration reprise, une question ; sinon aucune. */
+/** L'étiquette d'un lot rendu au lead hors intégration : le motif sans ses détails (« revue non conforme après 3 passe(s) de correction ; … » → « revue non conforme »). */
+function handedBackLabel(reason: string): string {
+  const head = reason.split(/ \(|;| :/)[0]!.replace(/ après \d+ passe\(s\) de correction/, '').trim();
+  return head === '' ? 'rendu sans motif' : head.slice(0, 60);
+}
+
+/** Le niveau où un lot rendu au lead a été détecté, d'après son motif : le commit manquant, le verrou des tests écrits, la porte (tests rouges, correction non jouée) ; sinon aucun des quatre. */
+function handedBackLevel(reason: string): Level {
+  if (/^implement sans commit/.test(reason)) return 'commit';
+  if (/^verrou des tests d'acceptation/.test(reason)) return 'écriture';
+  if (/^(tests rouges|correction non jouée)/.test(reason)) return 'porte';
+  return null;
+}
+
+/** La perte que laisse un lot dans un état de `min` minutes : un refus ou un conflit d'intégration, un lot rendu au lead (hors retrait `--drop`, le geste du lead), une intégration reprise, une question ; sinon aucune. */
 function lossOfState(lot: string, state: string, reason: string, min: number): Loss | null {
   if (state === 'handed-back' && /^intégration (refusée|impossible)/.test(reason)) {
     const conflit = /conflit/.test(reason);
     return { lot, category: conflit ? 'conflit' : 'refus d\'intégration', cause: conflit ? 'conflit de rebase' : refusLabel(reason), minutes: min, level: 'intégration' };
   }
+  if (state === 'handed-back' && !/^retiré de la vague/.test(reason)) return { lot, category: 'reprise du lead', cause: handedBackLabel(reason), minutes: min, level: handedBackLevel(reason) };
   if (state === 'suspended' && /intégration reprise/.test(reason)) return { lot, category: 'reprise du lead', cause: 'intégration reprise par le lead', minutes: min, level: 'intégration' };
   if (state === 'question') return { lot, category: 'reprise du lead', cause: 'réponse du lead à une question', minutes: min, level: null };
   return null;
@@ -184,7 +199,7 @@ export function measureWave(entries: Entry[]): Result {
     const { states, losses: stateLosses, firstReview } = stateTimes(lot, es, end);
     const { gateMs, gates } = gateTimes(es);
     losses.push(...stateLosses, ...slotWaits(lot, es));
-    lots.push({ lot, states, gateMinutes: minutesOf(gateMs), gates, afterFirstReview: firstReview === null ? null : minutesOf(end - firstReview), sessions: es.filter((e) => /^session \d+ /.test(e.text)).length });
+    lots.push({ lot, states, gateMinutes: minutesOf(gateMs), gates, afterFirstReview: firstReview === null ? null : minutesOf(es.reduce((m, e) => Math.max(m, e.at), firstReview) - firstReview), sessions: es.filter((e) => /^session \d+ /.test(e.text)).length });
   }
   return { lots, losses, end };
 }
@@ -239,9 +254,12 @@ export function inspectWave(runsDir: string, wave: string, plan: PlanLot[]): Ins
   const file = join(runsDir, wave, 'journal.log');
   const { lots, losses } = measureWave(parseJournal(existsSync(file) ? readFileSync(file, 'utf8') : ''));
   const earlier = previousWaves(runsDir, wave).map((w) => ({ wave: w, causes: groupCauses(measureWave(parseJournal(readFileSync(join(runsDir, w, 'journal.log'), 'utf8'))).losses) }));
+  // Le plan qui traite une cause est celui du projet de la vague : les lots des autres projets du dossier n'en disent rien.
+  const projects = new Set(lots.map((l) => l.lot.split(':')[0]!));
+  const ownPlan = plan.filter((p) => projects.has(p.project) || projects.has(p.project.split('/').pop()!));
   const causes: Cause[] = groupCauses(losses).map((c) => {
     const seenIn = earlier.filter((e) => e.causes.some((x) => x.category === c.category && x.cause === c.cause)).map((e) => e.wave);
-    const planLot = planLotFor(c, plan);
+    const planLot = planLotFor(c, ownPlan);
     const recidive = seenIn.length > 0;
     return { ...c, seenIn, planLot: planLot ? { id: `${planLot.project}:${planLot.id}`, status: planLot.status } : null, recidive, proposal: planLot && planLot.status !== 'done' ? null : proposalFor(c) };
   });
@@ -258,8 +276,8 @@ function causeLines(c: Cause): string[] {
   const seen = c.seenIn.length > 0 ? ` · RÉCIDIVE (déjà vue : ${c.seenIn.slice(0, 3).join(', ')}${more})` : '';
   const level = c.level ? ` · détectée à : ${c.level}` : '';
   const head = `${c.recidive ? '⚠' : '-'} ${c.category} · ${c.cause} : ${c.minutes} min, ${c.count} fois, ${c.lots.length} lot(s)${level}${seen}`;
-  if (c.proposal) return [head, `    ${c.planLot ? `lot ${c.planLot.id} (${c.planLot.status}) n'a pas supprimé la cause ; ` : ''}proposition : ${c.proposal}`];
-  return c.planLot ? [head, `    traitée au plan : ${c.planLot.id} (${c.planLot.status})`] : [head];
+  if (c.proposal) return [head, `    ${c.planLot ? `lot du plan à relire : ${c.planLot.id} (${c.planLot.status}) ; ` : ''}proposition : ${c.proposal}`];
+  return c.planLot ? [head, `    au plan : ${c.planLot.id} (${c.planLot.status})`] : [head];
 }
 
 /** Le tableau imprimé en fin de vague et par `cadence inspect`. */
@@ -276,5 +294,5 @@ export function renderInspection(i: Inspection): string[] {
 export function tourSummary(i: Inspection): string | null {
   const c = i.causes.find((x) => x.recidive);
   if (!c) return null;
-  return `⚠ inspect ${i.wave} : récidive « ${c.cause} » (${c.category}, ${c.minutes} min, déjà vue dans ${c.seenIn.length} vague(s)) · ${c.proposal ?? `traitée par ${c.planLot?.id} (${c.planLot?.status})`}`;
+  return `⚠ inspect ${i.wave} : récidive « ${c.cause} » (${c.category}, ${c.minutes} min, déjà vue dans ${c.seenIn.length} vague(s)) · ${c.proposal ?? `au plan : ${c.planLot?.id} (${c.planLot?.status})`}`;
 }

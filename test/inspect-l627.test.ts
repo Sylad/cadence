@@ -31,7 +31,8 @@ describe('cadence inspect (L627)', () => {
     const l1 = lots.find((l) => l.lot === 'cadence:L1')!;
     expect(l1.states).toEqual({ implementing: 10, reviewing: 25, fixing: 5 });
     expect(l1.sessions).toBe(1);
-    expect(l1.afterFirstReview).toBe(40);
+    // de la première revue (10) à la dernière ligne du lot (ready à 40), pas à celle de la vague (L2 écrit à 50)
+    expect(l1.afterFirstReview).toBe(30);
     // L2, dernier lot : son état court jusqu'à la dernière ligne du journal (0 ici).
     expect(lots.find((l) => l.lot === 'cadence:L2')!.states).toEqual({ implementing: 0 });
   });

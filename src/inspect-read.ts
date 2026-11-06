@@ -1,24 +1,40 @@
 // Lecture du dossier pour `cadence inspect` (L627) : la dernière vague (ou celle nommée) et les lots des plans du dossier.
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
-import { inspectWave, renderInspection, tourSummary, type Inspection, type PlanLot } from './inspect.js';
+import { inspectWave, parseRetakes, renderInspection, tourSummary, type Inspection, type PlanLot, type Retake } from './inspect.js';
 import { planLoader } from './config.js';
 import { findProjects, isProject } from './lead.js';
 import { RafError } from './plan.js';
 
-/** Les lots des plans du dossier ; un plan illisible n'ôte rien au reste (la proposition le saura moins bien). */
-function planLotsOf(parent: string): PlanLot[] {
-  const out: PlanLot[] = [];
+/** Les projets du dossier (nom tel que le journal le cite, dossier). Lancé depuis un projet (`cadence orchestrate L18` de l'intérieur) : aucun sous-dossier n'est un projet, le dossier l'est lui-même, comme pour `lead tour`. */
+function projectsOf(parent: string): Array<{ name: string; dir: string }> {
   const dirs = findProjects(parent, 2);
-  // Lancé depuis un projet (`cadence orchestrate L18` de l'intérieur) : aucun sous-dossier n'est un projet, le dossier l'est lui-même, comme pour `lead tour`.
-  for (const dir of dirs.length === 0 && isProject(parent) ? [parent] : dirs) {
+  return (dirs.length === 0 && isProject(parent) ? [parent] : dirs).map((dir) => ({ dir, name: dir === parent ? basename(parent) : relative(parent, dir).split(sep).join('/') }));
+}
+
+/** Les lots des plans du dossier ; un plan illisible n'ôte rien au reste (la proposition le saura moins bien). */
+function planLotsOf(projects: Array<{ name: string; dir: string }>): PlanLot[] {
+  const out: PlanLot[] = [];
+  for (const { name, dir } of projects) {
     try {
-      for (const l of planLoader(dir)().lots()) out.push({ project: dir === parent ? basename(parent) : relative(parent, dir).split(sep).join('/'), id: l.id, title: l.title, status: l.status });
+      for (const l of planLoader(dir)().lots()) out.push({ project: name, id: l.id, title: l.title, status: l.status });
     } catch {
       // plan illisible : ses lots ne comptent pas parmi ceux qui traitent une cause
     }
   }
   return out;
+}
+
+/** Les reprises à la main du lead, lues dans le git de chaque projet (commits « correctif du lead », « rebase du lead ») ; un dossier sans git, ou un git qui refuse, n'en donne aucune. */
+function retakesOf(projects: Array<{ name: string; dir: string }>): Retake[] {
+  return projects.flatMap(({ name, dir }) => {
+    try {
+      return parseRetakes(execFileSync('git', ['log', '--format=%aI %s', '--grep=correctif du lead', '--grep=rebase du lead'], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }), name);
+    } catch {
+      return [];
+    }
+  });
 }
 
 /** La dernière vague datée (AAAA-MM-JJ-HHMM[-suffixe], l'ordre des noms est celui des dates) qui a un journal ; un dossier à nom libre n'est jamais « la dernière ». */
@@ -34,7 +50,8 @@ export function inspectFolder(parent: string, wave?: string): Inspection {
   const name = wave ?? lastWave(runsDir);
   if (name === null) throw new RafError(`inspect : aucune vague avec un journal dans ${runsDir}`);
   if (!existsSync(join(runsDir, name, 'journal.log'))) throw new RafError(`inspect : la vague ${name} n'a pas de journal dans ${runsDir}`);
-  return inspectWave(runsDir, name, planLotsOf(parent));
+  const projects = projectsOf(parent);
+  return inspectWave(runsDir, name, planLotsOf(projects), retakesOf(projects));
 }
 
 /**

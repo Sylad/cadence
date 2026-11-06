@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { inspectWave, measureWave, parseJournal, renderInspection, tourSummary } from '../src/inspect.js';
+import { inspectWave, measureWave, parseJournal, parseRetakes, renderInspection, tourSummary } from '../src/inspect.js';
 import { inspectFolder } from '../src/inspect-read.js';
 import { Plan } from '../src/plan.js';
 import { withPlace } from '../src/orchestrate/gate-place.js';
@@ -109,5 +110,72 @@ describe('cadence inspect (L627) — corrections de la revue', () => {
     } finally {
       process.env = saved;
     }
+  });
+});
+
+describe('cadence inspect (L627) — seconde revue', () => {
+  it('R1 — un lot dont l\'id contient « / » (sous-tâche, maritime-atlas:Q4/donnees-12) est reconnu : son temps et ses pertes comptent', () => {
+    const { lots, losses } = measure(journal(
+      at(0, 'maritime-atlas:Q4/donnees-12 → implementing'), at(0, 'maritime-atlas:Q4/donnees-12 · session 1 implement (sonnet)'),
+      at(10, 'maritime-atlas:Q4/donnees-12 → handed-back — intégration impossible : conflit en rebasant a sur b'), at(14, 'maritime-atlas:Q4/donnees-12 → ready — prêt'),
+    ));
+    expect(lots.map((l) => [l.lot, l.states.implementing, l.sessions])).toEqual([['maritime-atlas:Q4/donnees-12', 10, 1]]);
+    expect(losses.map((l) => [l.lot, l.category, l.minutes])).toEqual([['maritime-atlas:Q4/donnees-12', 'conflit', 4]]);
+  });
+
+  it('R3 — chaque correction a son niveau de détection : « porte » après une porte finie sans revue entre les deux, « revue » après une revue, sinon aucun', () => {
+    const { lots } = measure(journal(
+      at(0, 'cadence:L1 → implementing'), at(5, 'cadence:L1 · porte : début'), at(6, 'cadence:L1 · porte : fin'), at(6, 'cadence:L1 → fixing'),
+      at(10, 'cadence:L1 · porte : début'), at(11, 'cadence:L1 · porte : fin'), at(11, 'cadence:L1 → reviewing'), at(20, 'cadence:L1 → fixing'),
+      at(25, 'cadence:L1 → reviewing'), at(30, 'cadence:L1 → fixing'), at(35, 'cadence:L1 → ready — prêt'),
+      at(0, 'cadence:L2 → implementing'), at(8, 'cadence:L2 → fixing'), at(9, 'cadence:L2 → ready — prêt'),
+    ));
+    expect(lots.find((l) => l.lot === 'cadence:L1')!.fixes).toEqual({ porte: 1, revue: 2, autre: 0 });
+    expect(lots.find((l) => l.lot === 'cadence:L2')!.fixes).toEqual({ porte: 0, revue: 0, autre: 1 });
+    const i = { wave: 'w', lots, causes: [], totalMinutes: 0, lostMinutes: 0 };
+    expect(renderInspection(i)).toContain('corrections : 4, détectées à la porte : 1, à la revue : 2, sans niveau : 1');
+    expect(renderInspection({ ...i, lots: [] }).join('\n')).not.toContain('corrections :');
+  });
+
+  it('R3 — les reprises à la main du lead (commits « correctif du lead », « rebase du lead ») comptent en reprise du lead dans la vague où elles tombent, et en récidive', () => {
+    const log = [
+      '2026-11-06T09:30:00+00:00 plan: L626 revue de code enregistrée (rebase du lead)',
+      '2026-11-06T09:40:00+00:00 plan: L625 revue de code enregistrée (correctif du lead)',
+      '2026-11-06T09:41:00+00:00 fix(L625): autre commit',
+      '2026-11-05T09:10:00+00:00 plan: L580 revue de code enregistrée après le correctif du lead',
+      '2026-11-07T09:10:00+00:00 plan: L580 revue de code enregistrée (correctif du lead)',
+    ].join('\n');
+    const retakes = parseRetakes(log, 'cadence');
+    expect(retakes.map((r) => [r.lot, r.cause])).toEqual([['cadence:L626', 'rebase du lead'], ['cadence:L625', 'correctif du lead'], ['cadence:L580', 'correctif du lead'], ['cadence:L580', 'correctif du lead']]);
+    const t = journal(at(0, 'cadence:L1 → implementing'), at(50, 'cadence:L1 → ready — prêt'));
+    const dir = runsIn(tempDir(), { '2026-11-05-0900': t.replace(/2026-11-06/g, '2026-11-05'), '2026-11-06-0900': t, '2026-11-07-0900': t.replace(/2026-11-06/g, '2026-11-07') });
+    const i = inspectWave(dir, '2026-11-06-0900', [], retakes);
+    expect(i.causes.map((c) => [c.category, c.cause, c.count, c.lots, c.recidive])).toEqual([
+      ['reprise du lead', 'correctif du lead', 1, ['cadence:L625'], true],
+      ['reprise du lead', 'rebase du lead', 1, ['cadence:L626'], false],
+    ]);
+    expect(renderInspection(i).join('\n')).toContain('reprise du lead · correctif du lead : durée dans git, non mesurée, 1 fois, 1 lot(s) · RÉCIDIVE (déjà vue : 2026-11-05-0900)');
+  });
+
+  it('R3 — inspectFolder lit les reprises du lead dans le git du projet de la vague', () => {
+    const root = tempDir();
+    const proj = join(root, 'solo');
+    const plan = Plan.create(join(proj, '.cadence', 'raf.yaml'), 'solo', 'L', '2026-09-01');
+    plan.save();
+    const g = (...args: string[]) => execFileSync('git', args, { cwd: proj, encoding: 'utf8', env: { ...process.env, GIT_AUTHOR_DATE: '2026-11-06T09:30:00Z', GIT_COMMITTER_DATE: '2026-11-06T09:30:00Z', GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } });
+    g('init', '-q');
+    g('add', '.cadence/raf.yaml');
+    g('commit', '-q', '-m', 'plan: L4 revue de code enregistrée (correctif du lead)');
+    runsIn(proj, { '2026-11-06-0900': journal(at(0, 'solo:L4 → implementing'), at(50, 'solo:L4 → ready — prêt')) });
+    expect(inspectFolder(proj).causes.map((c) => [c.cause, c.lots])).toEqual([['correctif du lead', ['solo:L4']]]);
+  });
+});
+
+describe('cadence inspect (L627) — tableau', () => {
+  it('R6 — la colonne du lot s\'élargit au plus long id : une sous-tâche garde ses colonnes alignées', () => {
+    const { lots } = measure(journal(at(0, 'maritime-atlas:Q4/toggle-time-brut → implementing'), at(3, 'maritime-atlas:Q4/toggle-time-brut → ready — prêt')));
+    const [head, row] = renderInspection({ wave: 'w', lots, causes: [], totalMinutes: 3, lostMinutes: 0 }).slice(1);
+    expect(row).toMatch(/^maritime-atlas:Q4\/toggle-time-brut {2}3 /);
+    expect(row!.indexOf('3 ')).toBe(head!.indexOf('écriture'));
   });
 });

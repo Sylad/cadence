@@ -4,8 +4,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 type Category = 'refus d\'intégration' | 'reprise du lead' | 'attente de créneau' | 'conflit';
-/** Où l'erreur a été détectée (L627, indicateur du 05-11) ; null : l'attente de créneau n'est pas une erreur, et une revue non conforme ou un budget atteint ne sont détectés à aucun de ces quatre niveaux. */
-type Level = 'écriture' | 'commit' | 'porte' | 'intégration' | null;
+/** Où l'erreur a été détectée (L627, indicateur du 05-11, plus « revue » pour une correction demandée par la revue de code) ; null : l'attente de créneau n'est pas une erreur, une reprise lue dans git ne dit pas son niveau, et une revue non conforme ou un budget atteint ne sont détectés à aucun de ces niveaux. */
+type Level = 'écriture' | 'commit' | 'porte' | 'revue' | 'intégration' | null;
 
 interface Loss {
   lot: string;
@@ -27,6 +27,15 @@ export interface LotTime {
   afterFirstReview: number | null;
   /** Sessions lancées (lignes « session N <genre> »). */
   sessions: number;
+  /** Passages en correction (`→ fixing`) par niveau de détection : la porte (une « porte : fin » du lot le précède, sans revue entre les deux), la revue (une `→ reviewing` le précède), sinon aucun des deux. */
+  fixes: { porte: number; revue: number; autre: number };
+}
+
+/** Une reprise à la main du lead, lue dans git (L627) : un commit « correctif du lead » ou « rebase du lead » d'un lot, à sa date. */
+export interface Retake {
+  lot: string;
+  cause: 'correctif du lead' | 'rebase du lead';
+  at: number;
 }
 
 export interface Cause {
@@ -68,7 +77,8 @@ interface Entry {
 }
 
 const LINE = /^(\d{4}-\d\d-\d\dT[\d:.]+Z) (.*)$/;
-const LOT_PREFIX = /^([^\s:]+:[A-Za-z0-9._-]+) (?:· |→ |: |intégré|verdict|tests|CHANGELOG)/;
+// L'id d'un lot peut porter un « / » : une sous-tâche (`maritime-atlas:Q4/accueil-4-ux12`, src/orchestrate/state.ts).
+const LOT_PREFIX = /^([^\s:]+:[A-Za-z0-9._/-]+) (?:· |→ |: |intégré|verdict|tests|CHANGELOG)/;
 const TRANSITION = /^→ ([a-z-]+)(?: — (.*))?$/;
 /** Les états où le lot travaille : l'attente du lead (handed-back, question, suspended) n'est pas du temps actif. */
 const WORK_STATES = ['implementing', 'reviewing', 'fixing'];
@@ -90,6 +100,18 @@ export function parseJournal(text: string): Entry[] {
 
 const minutesOf = (ms: number) => Math.round((ms / 60_000) * 10) / 10;
 
+/** Les reprises du lead dans un `git log --format='%aI %s'` d'un projet : le sujet d'un commit de plan « plan: <lot> … » qui dit « correctif du lead » ou « rebase du lead » ; tout autre commit est ignoré. */
+export function parseRetakes(log: string, project: string): Retake[] {
+  const out: Retake[] = [];
+  for (const line of log.split('\n')) {
+    const m = /^(\S+) plan: (\S+) .*\b(correctif du lead|rebase du lead)\b/.exec(line);
+    if (!m) continue;
+    const at = Date.parse(m[1]!);
+    if (!Number.isNaN(at)) out.push({ lot: `${project}:${m[2]!}`, cause: m[3] as Retake['cause'], at });
+  }
+  return out;
+}
+
 /** « 2 min 5 s », « 40 s » → minutes. */
 function waited(min: string | undefined, sec: string | undefined): number {
   return Number(min ?? 0) + Number(sec ?? 0) / 60;
@@ -105,6 +127,7 @@ function refusLabel(reason: string): string {
 interface Result {
   lots: LotTime[];
   losses: Loss[];
+  start: number;
   end: number;
 }
 
@@ -134,15 +157,26 @@ function lossOfState(lot: string, state: string, reason: string, min: number): L
   return null;
 }
 
-/** Les minutes de chaque état d'un lot (de sa transition à la suivante, la dernière jusqu'à `end`), ses pertes d'état et l'instant de sa première revue. */
-function stateTimes(lot: string, es: Entry[], end: number): { states: Record<string, number>; losses: Loss[]; firstReview: number | null } {
+/** Le niveau où une correction a été demandée : la dernière ligne « porte : fin » ou `→ reviewing` du lot avant son `→ fixing` (à l'index `index` des entrées). */
+function fixLevel(es: Entry[], index: number): keyof LotTime['fixes'] {
+  for (let j = index - 1; j >= 0; j--) {
+    if (/^porte : fin/.test(es[j]!.text)) return 'porte';
+    if (TRANSITION.exec(es[j]!.text)?.[1] === 'reviewing') return 'revue';
+  }
+  return 'autre';
+}
+
+/** Les minutes de chaque état d'un lot (de sa transition à la suivante, la dernière jusqu'à `end`), ses pertes d'état, ses corrections par niveau et l'instant de sa première revue. */
+function stateTimes(lot: string, es: Entry[], end: number): { states: Record<string, number>; losses: Loss[]; fixes: LotTime['fixes']; firstReview: number | null } {
   const states: Record<string, number> = {};
   const losses: Loss[] = [];
-  const transitions = es.flatMap((e) => {
+  const fixes: LotTime['fixes'] = { porte: 0, revue: 0, autre: 0 };
+  const transitions = es.flatMap((e, index) => {
     const t = TRANSITION.exec(e.text);
-    return t ? [{ state: t[1]!, reason: t[2] ?? '', at: e.at }] : [];
+    return t ? [{ state: t[1]!, reason: t[2] ?? '', at: e.at, index }] : [];
   });
   transitions.forEach((cur, i) => {
+    if (cur.state === 'fixing') fixes[fixLevel(es, cur.index)]++;
     // Un refus rendu sans suite (dernière transition) n'a pas de fin mesurable : 0 minute, mais il est compté.
     const to = transitions[i + 1]?.at ?? (cur.state === 'handed-back' ? cur.at : end);
     const min = minutesOf(to - cur.at);
@@ -150,7 +184,7 @@ function stateTimes(lot: string, es: Entry[], end: number): { states: Record<str
     const loss = lossOfState(lot, cur.state, cur.reason, min);
     if (loss) losses.push(loss);
   });
-  return { states, losses, firstReview: transitions.find((t) => t.state === 'reviewing')?.at ?? null };
+  return { states, losses, fixes, firstReview: transitions.find((t) => t.state === 'reviewing')?.at ?? null };
 }
 
 /** Le temps de porte d'un lot : de « porte : début » à « porte : fin », les portes imbriquées comptées une fois ; un début sans fin, une fin sans début ne comptent pas. */
@@ -188,20 +222,35 @@ function slotWaits(lot: string, es: Entry[]): Loss[] {
   return losses.filter((l) => l.minutes > 0);
 }
 
-/** Le temps par état, la porte et les pertes de chaque lot, lus dans le journal d'une vague. */
-export function measureWave(entries: Entry[]): Result {
+/** Le temps par état, la porte et les pertes de chaque lot, lus dans le journal d'une vague ; `retakes` : les reprises du lead tombées dans la vague, une perte chacune (durée non mesurée : git ne la dit pas). */
+export function measureWave(entries: Entry[], retakes: Retake[] = []): Result {
   const end = entries.reduce((m, e) => Math.max(m, e.at), 0);
+  const start = entries.reduce((m, e) => Math.min(m, e.at), Number.POSITIVE_INFINITY);
   const byLot = new Map<string, Entry[]>();
   for (const e of entries) if (e.lot) byLot.set(e.lot, [...(byLot.get(e.lot) ?? []), e]);
   const lots: LotTime[] = [];
   const losses: Loss[] = [];
   for (const [lot, es] of byLot) {
-    const { states, losses: stateLosses, firstReview } = stateTimes(lot, es, end);
+    const { states, losses: stateLosses, fixes, firstReview } = stateTimes(lot, es, end);
     const { gateMs, gates } = gateTimes(es);
     losses.push(...stateLosses, ...slotWaits(lot, es));
-    lots.push({ lot, states, gateMinutes: minutesOf(gateMs), gates, afterFirstReview: firstReview === null ? null : minutesOf(es.reduce((m, e) => Math.max(m, e.at), firstReview) - firstReview), sessions: es.filter((e) => /^session \d+ /.test(e.text)).length });
+    lots.push({ lot, states, gateMinutes: minutesOf(gateMs), gates, afterFirstReview: firstReview === null ? null : minutesOf(es.reduce((m, e) => Math.max(m, e.at), firstReview) - firstReview), sessions: es.filter((e) => /^session \d+ /.test(e.text)).length, fixes });
   }
-  return { lots, losses, end };
+  for (const r of retakes) losses.push({ lot: r.lot, category: 'reprise du lead', cause: r.cause, minutes: 0, level: null });
+  return { lots, losses, start, end };
+}
+
+/** Les reprises tombées dans la fenêtre d'une vague : de sa première ligne de journal à la première ligne de la vague suivante (sans suivante : sans fin). */
+function retakesBetween(retakes: Retake[], start: number, next: number | null): Retake[] {
+  return retakes.filter((r) => r.at >= start && (next === null || r.at < next));
+}
+
+/** La première ligne du journal d'une vague, ou null (journal absent ou vide). */
+function waveStart(runsDir: string, wave: string): number | null {
+  const file = join(runsDir, wave, 'journal.log');
+  if (!existsSync(file)) return null;
+  const start = parseJournal(readFileSync(file, 'utf8')).reduce((m, e) => Math.min(m, e.at), Number.POSITIVE_INFINITY);
+  return Number.isFinite(start) ? start : null;
 }
 
 /** Les causes de plus de zéro occurrence, regroupées par catégorie et étiquette. */
@@ -250,12 +299,26 @@ function previousWaves(runsDir: string, wave: string, limit = 30): string[] {
   return readdirSync(runsDir).filter((w) => w < wave && existsSync(join(runsDir, w, 'journal.log'))).sort().reverse().slice(0, limit);
 }
 
-export function inspectWave(runsDir: string, wave: string, plan: PlanLot[]): Inspection {
+/** Les vagues datées du dossier qui ont un journal, par nom (l'ordre des dates) : les fenêtres des reprises. */
+function datedWaves(runsDir: string): string[] {
+  if (!existsSync(runsDir)) return [];
+  return readdirSync(runsDir).filter((w) => /^\d{4}-\d{2}-\d{2}-\d{4}/.test(w) && existsSync(join(runsDir, w, 'journal.log'))).sort();
+}
+
+export function inspectWave(runsDir: string, wave: string, plan: PlanLot[], retakes: Retake[] = []): Inspection {
   const file = join(runsDir, wave, 'journal.log');
-  const { lots, losses } = measureWave(parseJournal(existsSync(file) ? readFileSync(file, 'utf8') : ''));
-  const earlier = previousWaves(runsDir, wave).map((w) => ({ wave: w, causes: groupCauses(measureWave(parseJournal(readFileSync(join(runsDir, w, 'journal.log'), 'utf8'))).losses) }));
+  const dated = datedWaves(runsDir);
+  // Les reprises d'une vague : celles tombées entre sa première ligne de journal et celle de la vague datée suivante.
+  const retakesOf = (w: string): Retake[] => {
+    const start = waveStart(runsDir, w);
+    if (start === null) return [];
+    const next = dated.find((d) => d > w);
+    return retakesBetween(retakes, start, next === undefined ? null : waveStart(runsDir, next));
+  };
+  const { lots, losses } = measureWave(parseJournal(existsSync(file) ? readFileSync(file, 'utf8') : ''), retakesOf(wave));
+  const earlier = previousWaves(runsDir, wave).map((w) => ({ wave: w, causes: groupCauses(measureWave(parseJournal(readFileSync(join(runsDir, w, 'journal.log'), 'utf8')), retakesOf(w)).losses) }));
   // Le plan qui traite une cause est celui du projet de la vague : les lots des autres projets du dossier n'en disent rien.
-  const projects = new Set(lots.map((l) => l.lot.split(':')[0]!));
+  const projects = new Set([...lots.map((l) => l.lot), ...losses.map((l) => l.lot)].map((l) => l.split(':')[0]!));
   const ownPlan = plan.filter((p) => projects.has(p.project) || projects.has(p.project.split('/').pop()!));
   const causes: Cause[] = groupCauses(losses).map((c) => {
     const seenIn = earlier.filter((e) => e.causes.some((x) => x.category === c.category && x.cause === c.cause)).map((e) => e.wave);
@@ -269,13 +332,15 @@ export function inspectWave(runsDir: string, wave: string, plan: PlanLot[]): Ins
 }
 
 const pad = (s: string | number, n: number) => String(s).padEnd(n);
+const RETAKE_CAUSES: ReadonlySet<string> = new Set<Retake['cause']>(['correctif du lead', 'rebase du lead']);
 
 /** La ligne d'une cause, et la suite qu'elle appelle (lot du plan ou commande proposée). */
 function causeLines(c: Cause): string[] {
   const more = c.seenIn.length > 3 ? `, +${c.seenIn.length - 3}` : '';
   const seen = c.seenIn.length > 0 ? ` · RÉCIDIVE (déjà vue : ${c.seenIn.slice(0, 3).join(', ')}${more})` : '';
   const level = c.level ? ` · détectée à : ${c.level}` : '';
-  const head = `${c.recidive ? '⚠' : '-'} ${c.category} · ${c.cause} : ${c.minutes} min, ${c.count} fois, ${c.lots.length} lot(s)${level}${seen}`;
+  const minutes = RETAKE_CAUSES.has(c.cause) ? 'durée dans git, non mesurée' : `${c.minutes} min`;
+  const head = `${c.recidive ? '⚠' : '-'} ${c.category} · ${c.cause} : ${minutes}, ${c.count} fois, ${c.lots.length} lot(s)${level}${seen}`;
   if (c.proposal) return [head, `    ${c.planLot ? `lot du plan à relire : ${c.planLot.id} (${c.planLot.status}) ; ` : ''}proposition : ${c.proposal}`];
   return c.planLot ? [head, `    au plan : ${c.planLot.id} (${c.planLot.status})`] : [head];
 }
@@ -283,10 +348,15 @@ function causeLines(c: Cause): string[] {
 /** Le tableau imprimé en fin de vague et par `cadence inspect`. */
 export function renderInspection(i: Inspection): string[] {
   const out = [`inspection de la vague ${i.wave} : ${i.lots.length} lot(s), ${i.totalMinutes} min actives, ${i.lostMinutes} min perdues`];
-  out.push(`${pad('lot', 16)}${pad('écriture', 10)}${pad('revue', 8)}${pad('correction', 12)}${pad('porte', 8)}${pad('après revue', 12)}sessions`);
+  // La colonne du lot s'élargit au plus long id (une sous-tâche « projet:Q4/… » dépasse 16 caractères).
+  const width = Math.max(16, ...i.lots.map((l) => l.lot.length + 2));
+  out.push(`${pad('lot', width)}${pad('écriture', 10)}${pad('revue', 8)}${pad('correction', 12)}${pad('porte', 8)}${pad('après revue', 12)}sessions`);
   for (const l of i.lots) {
-    out.push(`${pad(l.lot, 16)}${pad(l.states.implementing ?? 0, 10)}${pad(l.states.reviewing ?? 0, 8)}${pad(l.states.fixing ?? 0, 12)}${pad(l.gateMinutes, 8)}${pad(l.afterFirstReview ?? '—', 12)}${l.sessions}`);
+    out.push(`${pad(l.lot, width)}${pad(l.states.implementing ?? 0, 10)}${pad(l.states.reviewing ?? 0, 8)}${pad(l.states.fixing ?? 0, 12)}${pad(l.gateMinutes, 8)}${pad(l.afterFirstReview ?? '—', 12)}${l.sessions}`);
   }
+  const fixes = i.lots.reduce((s, l) => ({ porte: s.porte + l.fixes.porte, revue: s.revue + l.fixes.revue, autre: s.autre + l.fixes.autre }), { porte: 0, revue: 0, autre: 0 });
+  const total = fixes.porte + fixes.revue + fixes.autre;
+  if (total > 0) out.push(`corrections : ${total}, détectées à la porte : ${fixes.porte}, à la revue : ${fixes.revue}, sans niveau : ${fixes.autre}`);
   return [...out, ...(i.causes.length === 0 ? ['aucune perte mesurée'] : i.causes.flatMap(causeLines))];
 }
 

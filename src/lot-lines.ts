@@ -32,7 +32,7 @@ function flagLines(lot: Lot): string[] {
   if (lot.visible) lines.push('visible : oui');
   if (lot.screen) lines.push(`screen : ${lot.screen}`);
   if (lot.visible) lines.push(lot.ux ? `ux : ${lot.ux.verdict}` : 'ux : absent');
-  if (lot.spec) lines.push('spec : true');
+  if (lot.spec) lines.push(lot.revue ? 'spec : revue' : 'spec : true');
   if (lot.uses) lines.push(`uses : ${lot.uses.join(', ')}`);
   for (const [name, value] of Object.entries(lot.extras ?? {})) lines.push(`${name} : ${value}`);
   return lines;

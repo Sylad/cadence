@@ -76,7 +76,7 @@ export interface Lot {
   /** Écran que le lot crée ou change (L169, étape spec) : exige `visible`. Absent = pas d'étape spec. */
   screen?: Screen;
   /** Le lot change un comportement (étape spec back) : posé à la planification, jamais déduit du titre. Absent = pas de spec. */
-  spec?: true;
+  spec?: true; revue?: true; // revue : `spec: revue` (L650), spec vraie d'un lot dont le sujet est la revue ; la vague borne ses passes de fix à MAX_PASSES
   local?: true; // lot du lead (L519, `raf add --local`) : fait à la main, `cadence local start` verrouille le dépôt comme une vague ; absent = lot de vague
   /** Titre public du lot, en langage du public (pages Nouveautés et Plan) ; absent = pas de titre public. */
   public?: string;
@@ -1097,7 +1097,7 @@ export class Plan {
       return true;
     }
     if (node.has('spec')) {
-      node.set('spec', true);
+      if (!this.lot(ref).revue) node.set('spec', true);
       return true;
     }
     const keys = node.items.map((p) => String((p.key as { value?: unknown })?.value ?? p.key));

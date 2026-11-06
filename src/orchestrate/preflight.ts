@@ -84,6 +84,9 @@ export function notLoggedIn(deps: OrchestrateDeps): string | null {
 }
 
 /** Préconditions : tout ce qui peut être refusé l'est ici, avant d'agir, sans verrou ni écriture. */
+/** Les marqueurs d'état que le plan pose sur un lot : `specLot` (spec back sans écran), `revueLot` (L650, passes de fix bornées). */
+const specFlags = (launched: { spec?: boolean }, screen: unknown, revue: boolean | undefined): { specLot?: true; revueLot?: true } => ({ ...(launched.spec && !screen ? { specLot: true as const } : {}), ...(revue ? { revueLot: true as const } : {}) });
+
 export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Target[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, opts: { resume?: boolean; addTo?: { wave: string; lots: KnownLot[] } } = {}): Promise<{ refusals: string[]; lots: LotState[] }> {
   const refusals: string[] = [];
   if (io.env.CADENCE_ORCHESTRATED) refusals.push(`orchestrate ne se lance pas depuis une session orchestrée (vague ${io.env.CADENCE_ORCHESTRATED})`);
@@ -168,7 +171,7 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
     const small = lot.estimate <= 0.5 || lot.quickwin;
     const goal = args.goal ?? lot.goal;
     const { screen, skipped } = launchScreen(plan, t.repo, env.config, lot, goal), launched = launchedLot(lot, skipped);
-    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, ...(goal ? { goal } : {}), visible: lot.visible, small, ...(screen ? { screen } : {}), ...(launched.spec && !screen ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly });
+    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, ...(goal ? { goal } : {}), visible: lot.visible, small, ...(screen ? { screen } : {}), ...specFlags(launched, screen, lot.revue), model: t.model, readOnlyPlan: plan.readonly });
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.estimate = lot.estimate;
     if (isExpress({ estimate: lot.estimate, screen, planScreen: lot.screen, specLot: state.specLot })) state.express = true;

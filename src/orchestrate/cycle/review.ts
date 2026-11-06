@@ -91,6 +91,9 @@ function handBackEscalated(c: LotCtx, text: string): void {
   stop(c, 'handed-back', `${text} ; ${e.issue === 'conforme' ? `escalade ${e.model} déjà jouée` : `rendu malgré l'escalade ${e.model}`}`);
 }
 
+/** Le plafond de passes : MAX_PASSES, un de plus pour une revue qui converge — sauf un lot dont le sujet est la revue (L650), borné à MAX_PASSES : le lead reprend avant la 3e. */
+const passCap = (l: LotState, converging: boolean): number => (converging && !l.revueLot ? MAX_PASSES_CONVERGING : MAX_PASSES);
+
 /** Une passe de correction de plus, ou la main rendue au lead quand les deux sont faites. */
 export function toFix(c: LotCtx, constats: Constat[], what: string): void {
   const l = c.lot;
@@ -98,7 +101,7 @@ export function toFix(c: LotCtx, constats: Constat[], what: string): void {
   // Revue qui converge (L205) : un seul constat bloquant ou majeur reste, après une baisse d'une revue à l'autre → une passe de plus (budget : fixAffordable, à l'entrée de la session).
   const counts = l.reviewCounts ?? [];
   const converging = what === 'revue non conforme' && counts.length >= 2 && counts[counts.length - 1] === 1 && counts[counts.length - 1] < counts[counts.length - 2];
-  const cap = converging ? MAX_PASSES_CONVERGING : MAX_PASSES;
+  const cap = passCap(l, converging);
   // Plafond de mur (L622) : deux fois la durée attendue de l'estimate ; au-delà, le lot est rendu avec ses constats (l.constats, posés plus haut), même pour un bloquant.
   const overWall = wallReason(c, Date.now());
   if (overWall || l.pass >= cap) {
@@ -106,7 +109,7 @@ export function toFix(c: LotCtx, constats: Constat[], what: string): void {
     const esc = c.config.escalation;
     // Escalade (L337) : une seule fois, pour une revue de code non conforme ou des tests rouges (l'UX garde sa règle) ; déjà engagée, le lot est rendu — au plafond de mur aussi.
     if (l.escalation) return handBackEscalated(c, text);
-    if (overWall || !esc || (what !== 'revue non conforme' && what !== 'tests rouges')) {
+    if (overWall || l.revueLot || !esc || (what !== 'revue non conforme' && what !== 'tests rouges')) {
       stop(c, 'handed-back', text);
       return;
     }

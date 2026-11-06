@@ -112,6 +112,8 @@ export interface LotState {
   screen?: Screen;
   /** Lot à `spec: true` sans écran (L188) : il passe par `spec` avant `implement`, sa fiche est back seule. Jamais posé sur un lot à `screen:` : un lot mixte est un lot à écran dont la fiche a un bloc `sujet` (le cycle lit la fiche). */
   specLot?: true;
+  /** Lot à `spec: revue` (L650) : son sujet est la revue ; ses passes de fix restent à MAX_PASSES (toFix : pas de passe de convergence, pas d'escalade). */
+  revueLot?: true;
   /** Issue de l'étape spec : la fiche écrite (et le nombre de ses hypothèses), ou la raison d'une sortie sous le seuil. */
   spec?: { fiche: string; hypotheses: number } | { sousSeuil: string };
   /** Issue de l'étape accept (L173) : l'acceptation.json du lot (chemin relatif au dépôt) et le commit rouge scellé par le programme, rangé ici et dans git, jamais dans le fichier. */
@@ -264,6 +266,7 @@ export interface NewLot {
   small: boolean;
   screen?: Screen;
   specLot?: true;
+  revueLot?: true;
   express?: true;
   model: AnyModel;
   readOnlyPlan: boolean;

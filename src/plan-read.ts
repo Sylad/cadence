@@ -33,6 +33,15 @@ function readDelivered(raw: unknown): Pick<Lot, 'delivered'> {
 }
 
 /** L'estimation d'un lot : celle du plan, ou 1 jour par défaut avec la marque `unestimated` (L467). */
+/** `spec:` d'un lot : `true`, `false`, ou `revue` (L650, spec vraie d'un lot dont le sujet est la revue) ; autre chose est un problème. */
+function readSpec(raw: unknown, problems: string[]): { spec?: true; revue?: true } {
+  if (raw == null || raw === false) return {};
+  if (raw === true) return { spec: true };
+  if (raw === 'revue') return { spec: true, revue: true };
+  problems.push(`spec : true ou false attendu, ou revue (reçu « ${String(raw)} »)`);
+  return {};
+}
+
 function readEstimate(v: unknown): { estimate: number; unestimated?: true } {
   return typeof v === 'number' && v > 0 ? { estimate: v } : { estimate: 1, unestimated: true };
 }
@@ -59,11 +68,7 @@ export function normalizeLot(raw: Record<string, unknown>, problems: string[] = 
     else problems.push(`screen « ${String(raw.screen)} » inconnu (${SCREENS.join(', ')})`);
     if (screen && raw.visible !== true) problems.push(`screen « ${screen} » sans visible : un écran est un changement visible`);
   }
-  let spec: true | undefined;
-  if (raw.spec != null) {
-    if (raw.spec === true) spec = true;
-    else if (raw.spec !== false) problems.push(`spec : true ou false attendu (reçu « ${String(raw.spec)} »)`);
-  }
+  const { spec, revue } = readSpec(raw.spec, problems);
   checkStateNames(raw, problems);
   const gate = readGate(raw.gate, problems);
   const okRaw = raw.docs_ok as Record<string, unknown> | undefined;
@@ -80,7 +85,7 @@ export function normalizeLot(raw: Record<string, unknown>, problems: string[] = 
     quickwin: raw.quickwin === true,
     visible: raw.visible === true,
     ...(screen ? { screen } : {}),
-    ...(spec ? { spec } : {}), ...(raw.local === true ? { local: true as const } : {}),
+    ...(spec ? { spec } : {}), ...(revue ? { revue } : {}), ...(raw.local === true ? { local: true as const } : {}),
     ...(gate ? { gate } : {}),
     ...(typeof raw.public === 'string' && raw.public.trim() !== '' ? { public: raw.public.trim() } : {}),
     ...(typeof raw.goal === 'string' && raw.goal.trim() !== '' ? { goal: raw.goal.trim() } : {}),

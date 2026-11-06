@@ -5,6 +5,8 @@ import { CHECKED, checkLinks } from '../scripts/check-links.mjs';
 
 const root = join(import.meta.dirname, '..');
 const read = (f: string): string => readFileSync(join(root, f), 'utf8');
+// Sections nées après le déplacement (L621, L633) : jamais vécues sur orchestrate.md, donc sans renvoi.
+const NEUVES = ['A goal that narrows a lot to commits already merged (L621)', 'The visible fix (L633, issue #43)'];
 const SUITE = ['orchestrate-cycle.md', 'orchestrate-gate.md', 'orchestrate-spec.md', 'orchestrate-worktrees.md'];
 
 describe('L599 — orchestrate.md en cinq pages', () => {
@@ -37,11 +39,15 @@ describe('L599 — orchestrate.md en cinq pages', () => {
     expect(read('docs/orchestrate.md')).not.toMatch(/^## The edge-case probe/m);
   });
 
-  it('R5 — une section déplacée ne vit que sur une page ; l\'ancienne page garde son ancre avec une ligne de renvoi', () => {
+  it('R5 — une section réellement déplacée ne vit que sur une page ; l\'ancienne page garde son ancre avec une ligne de renvoi (les sections neuves n\'en ont pas)', () => {
     const main = read('docs/orchestrate.md');
     for (const p of SUITE) {
       for (const m of read(`docs/${p}`).matchAll(/^## (.+)$/gm)) {
         const title = m[1]!;
+        if (NEUVES.includes(title)) {
+          expect(main, `pas de renvoi factice ${title}`).not.toMatch(new RegExp(`^### ${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
+          continue;
+        }
         expect(main, `renvoi ${title}`).toMatch(new RegExp(`^### ${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n\\nMoved to \\[${p}\\]\\(${p}#`, 'm'));
         expect(main, `titre ${title}`).not.toMatch(new RegExp(`^## ${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
       }

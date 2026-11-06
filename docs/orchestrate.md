@@ -217,10 +217,6 @@ Moved to [orchestrate-spec.md](orchestrate-spec.md#the-spec-step-of-a-lot-with-s
 
 Moved to [orchestrate-spec.md](orchestrate-spec.md#the-light-mockup-l459).
 
-### The visible fix (L633, issue #43)
-
-Moved to [orchestrate-spec.md](orchestrate-spec.md#the-visible-fix-l633-issue-43).
-
 ### The spec step of a lot with `spec: true`
 
 Moved to [orchestrate-spec.md](orchestrate-spec.md#the-spec-step-of-a-lot-with-spec-true).
@@ -252,10 +248,6 @@ Moved to [orchestrate-cycle.md](orchestrate-cycle.md#proposals-the-lots-own-comm
 ### Reviews converge: follow-ups and a wall cap (L622)
 
 Moved to [orchestrate-cycle.md](orchestrate-cycle.md#reviews-converge-follow-ups-and-a-wall-cap-l622).
-
-### A goal that narrows a lot to commits already merged (L621)
-
-Moved to [orchestrate-gate.md](orchestrate-gate.md#a-goal-that-narrows-a-lot-to-commits-already-merged-l621).
 
 ### Express lane (L519)
 

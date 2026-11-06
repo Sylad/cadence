@@ -370,6 +370,45 @@ describe('R21 — le plan n\'est jamais écrit dans un worktree de lot', () => {
     expect(store(parent).readLot('a', 'L2')!.status).toBe('ready');
     expect(r.code).toBe(1);
   });
+  it('L653 — une session fusionne la branche de base (qui porte un commit de plan du programme) dans son worktree : fusion acceptée, lot prêt', async () => {
+    const { parent, repo } = setup();
+    const f = fake({
+      implement: async (cwd, brief) => {
+        const lot = lotOf(brief);
+        if (lot !== 'L1') return claudeOut(workReport({ commits: [commitFile(cwd, `${lot}.txt`, `feat(${lot}): travail`)] }));
+        const commit = commitFile(cwd, 'L1.txt', 'feat(L1): travail');
+        const p = Plan.load(join(repo, PLAN));
+        p.note('L1', 'une note du programme', '2026-10-04');
+        p.save();
+        git(repo, 'add', '--', PLAN);
+        git(repo, 'commit', '-q', '-m', 'plan: L1 une note');
+        git(cwd, 'merge', '--no-edit', '-q', 'main');
+        return claudeOut(workReport({ commits: [commit] }));
+      },
+    });
+    await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
+    const l1 = store(parent).readLot('a', 'L1')!;
+    expect(l1.outcome ?? '').not.toContain('modifié le plan');
+    expect(l1.status).toBe('ready');
+  });
+  it('L653 — une session qui commite le plan et pose une question : lot rendu, la question gardée sur le lot et dans le constat', async () => {
+    const { parent } = setup();
+    const f = fake({
+      implement: async (cwd, brief) => {
+        const lot = lotOf(brief);
+        if (lot !== 'L1') return claudeOut(workReport({ commits: [commitFile(cwd, `${lot}.txt`, `feat(${lot}): travail`)] }));
+        appendFileSync(join(cwd, PLAN), '# note de la session\n');
+        git(cwd, 'add', '--', PLAN);
+        git(cwd, 'commit', '-q', '-m', 'feat(L1): touche le plan');
+        return claudeOut(workReport({ commits: [{ sha: git(cwd, 'rev-parse', 'HEAD'), sujet: 'feat(L1): touche le plan' }], questions: ['Faut-il garder le champ ?'] }));
+      },
+    });
+    await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
+    const l1 = store(parent).readLot('a', 'L1')!;
+    expect(l1.status).toBe('handed-back');
+    expect(l1.questions).toEqual(['Faut-il garder le champ ?']);
+    expect(l1.outcome).toContain('questions de la session : « Faut-il garder le champ ? »');
+  });
   it('R21 — une session modifie le plan sans le commiter : lot rendu de même', async () => {
     const { parent } = setup();
     const f = fake({

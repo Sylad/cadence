@@ -20,6 +20,7 @@ import { git, gitFailure, planFileSet } from '../worktree.js';
 import { type LotCtx, workDir as wd, save, transition, escalatedSession, stop, hasSpecStage } from './ctx.js';
 import { lotOver, WRITE_STEPS, fixRefused, dropped, DROPPED, unplayedAnswer, halted, overBudget, suspend } from './budget.js';
 import { trackedPaths } from './plan-writes.js';
+import { isNonQuestion } from './questions.js';
 import { docsConfig, briefFor } from './brief.js';
 
 /** Ce qu'une session rend : son étape, son rapport, le dépôt du lot et ses dépôts voisins (`others`) vus avant et après. */
@@ -386,15 +387,24 @@ export async function session(c: LotCtx, kind: SessionKind, local = false): Prom
       return handBack(c, kind, res.structured, step, where, path, b, a);
     }
   }
-  const touched = write && c.tree?.active ? planTouched(c, before.head, after) : null;
+  const touched = write && c.tree?.active ? planTouched(c, before.head, after, c.tree.base) : null;
   if (touched) {
     step.status = 'failed';
     step.cause = touched;
-    return stop(c, 'handed-back', `la session a modifié le plan dans son worktree ${touched} : le plan n'est écrit que par le programme ; worktree conservé : ${wd(c)}`);
+    return stop(c, 'handed-back', `la session a modifié le plan dans son worktree ${touched} : le plan n'est écrit que par le programme ; worktree conservé : ${wd(c)}${keepQuestions(c, res.structured)}`);
   }
   step.status = 'ok';
   save(c);
   return { step, report: res.structured, before, after, others };
+}
+
+/** Les questions du rapport d'une session rendue au lead avant d'être lues (L653) : gardées sur le lot, rendues en suffixe du constat (vide sans question). */
+function keepQuestions(c: LotCtx, report: unknown): string {
+  const asked = (report as { questions?: unknown } | undefined)?.questions;
+  const questions = (Array.isArray(asked) ? asked : []).filter((q): q is string => typeof q === 'string' && q.trim() !== '' && !isNonQuestion(q));
+  if (!questions.length) return '';
+  c.lot.questions = questions;
+  return ` ; questions de la session : ${questions.map((q) => `« ${q} »`).join(' / ')}`;
 }
 
 /** Les dépôts tiers d'un lot (L456) : frères du dépôt du lot, hors voisins déclarés et dépôts des autres lots de la vague (leur branche principale bouge légitimement, R14). Une vague lancée après ce relevé, comme le lead ou une livraison, n'est pas dans la liste : seuls les commits qui citent un lot de cette vague sont constatés (L458) ; exclure les vagues vivantes déjà connues évite qu'un identifiant de lot commun (deux projets, chacun son L1) fasse passer leurs commits pour les nôtres. */
@@ -447,12 +457,13 @@ function checkTiers(c: LotCtx, kind: SessionKind, step: StepState, before: Map<s
 /**
  * Une session d'écriture a-t-elle touché, dans son worktree, le fichier de plan ou un fichier généré avec lui (plan.files, la page Gantt) ? (R21) Le plan n'est
  * écrit que par le programme, dans le dépôt du projet : un commit de plan sur la branche du lot reviendrait en conflit au rebase. Rend « (fichier, commit sha) »
- * ou « (fichier, non commité) », null sinon.
+ * ou « (fichier, non commité) », null sinon. Les commits déjà dans `base` (ramenés par un merge de la base) ne comptent pas.
  */
-function planTouched(c: LotCtx, headBefore: string | null, after: Snapshot): string | null {
+function planTouched(c: LotCtx, headBefore: string | null, after: Snapshot, base: string): string | null {
   const files = planFileSet(c.loadPlan(), c.lot.repo);
   if (headBefore && after.head && headBefore !== after.head) {
-    for (const sha of git(wd(c), 'log', '--format=%H', `${headBefore}..${after.head}`).split('\n').filter(Boolean)) {
+    // Hors de la branche de base (L653) : un merge de la base dans le worktree y ramène les commits de plan du programme, qui ne sont pas ceux de la session.
+    for (const sha of git(wd(c), 'log', '--format=%H', `${headBefore}..${after.head}`, '--not', base).split('\n').filter(Boolean)) {
       const hit = changedFiles(wd(c), sha).find((f) => files.has(f));
       if (hit) return `(${hit}, commit ${sha.slice(0, 7)})`;
     }

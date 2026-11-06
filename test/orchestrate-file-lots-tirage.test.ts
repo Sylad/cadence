@@ -36,14 +36,14 @@ function parentWith(projects: Record<string, Lots>, yaml = ''): { parent: string
     git(dir, 'config', 'user.email', 't@example.com');
     git(dir, 'config', 'user.name', 'T');
     git(dir, 'config', 'commit.gpgsign', 'false');
-    const plan = Plan.create(join(dir, 'docs/plan/raf.yaml'), name, 'L', '2026-09-01');
+    const plan = Plan.create(join(dir, '.cadence/raf.yaml'), name, 'L', '2026-09-01');
     for (const l of lots) {
       const id = plan.add(l.title, '2026-10-01', { estimate: l.estimate ?? 1, after: l.after, uses: l.uses });
       if (l.status === 'doing') plan.setStatus(id, 'doing', '2026-10-01');
     }
     plan.save();
     writeFileSync(join(dir, 'cadence.yaml'), `orchestrate:\n  precheck: false\n${yaml}`);
-    git(dir, 'add', '--', 'docs/plan/raf.yaml', 'cadence.yaml');
+    git(dir, 'add', '--', '.cadence/raf.yaml', 'cadence.yaml');
     git(dir, 'commit', '-q', '-m', 'chore: plan');
     dirs[name] = dir;
   }
@@ -370,7 +370,7 @@ describe('L498 — tirage de la file approuvée', () => {
   it('R15 — lot terminé par un autre chemin : sauté « déjà terminé », show le dit, reste en file', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'a un' }, { title: 'a deux' }] });
     await queueAdd(parent, 'a:L1', 'a:L2');
-    const plan = Plan.load(join(dirs.a, 'docs/plan/raf.yaml'));
+    const plan = Plan.load(join(dirs.a, '.cadence/raf.yaml'));
     plan.setStatus('L1', 'done', '2026-11-06');
     plan.save();
     expect(await show(parent)).toEqual(['1. a:L1 — a un — sauté : déjà terminé', '2. a:L2 — a deux — en attente']);
@@ -379,8 +379,8 @@ describe('L498 — tirage de la file approuvée', () => {
   it('R15 — lot supprimé du plan : sauté « introuvable » ; plan illisible : sauté « plan illisible », les autres lots sont tirés', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }], c: [{ title: 'c un' }] });
     await queueAdd(parent, 'a:L1', 'b:L1', 'c:L1');
-    rmSync(join(dirs.a, 'docs/plan/raf.yaml'));
-    writeFileSync(join(dirs.b, 'docs/plan/raf.yaml'), 'lots: [ {');
+    rmSync(join(dirs.a, '.cadence/raf.yaml'));
+    writeFileSync(join(dirs.b, '.cadence/raf.yaml'), 'lots: [ {');
     expect(await show(parent)).toEqual(['1. a:L1 — lot introuvable — sauté : introuvable', '2. b:L1 — lot introuvable — sauté : plan illisible', '3. c:L1 — c un — en attente']);
     const verdict = (key: string) => queueVerdict(key, parent, { home: cadenceHome(), remaining: Infinity });
     expect(verdict('zzz:L1')).toEqual({ cause: 'introuvable' });
@@ -503,5 +503,22 @@ describe('L498 — tirage de la file approuvée', () => {
     expect(await orchestrate(['--queue'], o.io, f.deps)).toBe(2);
     expect(f.played).toEqual([]);
     expect(readFileSync(queuePath(cadenceHome()), 'utf8')).toBe(before);
+  });
+  it('R20 — créneaux pris par une autre vague : le second passage du tour ne dépasse pas les créneaux libres', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }, { title: 'a deux' }, { title: 'a trois' }], b: [{ title: 'b un' }] });
+    await queueAdd(parent, 'a:L1', 'a:L2', 'a:L3');
+    registerWave(cadenceHome(), { pid: process.ppid, wave: 'autre', started: '2026-11-06T09:00:00Z', cwd: parent, repos: [gitRoot(dirs.b)!], cap: 3 }); // un créneau pris : 2 libres sur 3
+    try {
+      const o = io(parent);
+      const code = await orchestrate(['--queue', '--max-sessions', '3', '--budget', '10M', '--dry-run'], o.io, fakeDeps().deps);
+      try {
+        expect(code).toBe(0);
+        expect(plannedLots(o.out)).toEqual(['a:L1', 'a:L2']);
+      } finally {
+        removeDryRunBriefs(o.out.join('\n'));
+      }
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
   });
 });

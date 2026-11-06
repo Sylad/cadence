@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { withPlace, type PlaceOpts } from '../src/orchestrate/gate-place.js';
 import { hostGates, localGates } from '../src/orchestrate/gate-host-slots.js';
+import { acquireSlot, liveSlots } from '../src/orchestrate/registry.js';
 import type { OrchestrateConfig } from '../src/config.js';
 import { commitFile, git, harness } from './orchestrate-harness.js';
 import { fakeRemote, type FakeRemote } from './fake-ssh.js';
@@ -105,11 +106,14 @@ describe('L639 — la porte joue sur la machine libre : le local d\'abord', () =
   });
 
   it('R3 — une session claude active ne rend pas le local occupé : seule une porte de la machine locale compte', async () => {
-    // Une porte sans overflow (locale d\'emblée) ne prend aucun tour local : la suivante joue en local, sans ssh.
-    await withPlace(opts({ overflow: undefined }, {}, { gate: undefined }), async () => {
-      await withPlace(opts(), async (p) => expect(p.remote()).toBe(false));
-    });
+    const home = tempDir();
+    held.push(await acquireSlot(home, 1, { wave: 'w' })); // le seul créneau de session est pris
+    expect(liveSlots(home)).toHaveLength(1);
+    let ran = false;
+    await withPlace(opts({}, { owner: {} }), async (p) => ((ran = true), expect(p.remote()).toBe(false)));
+    expect(ran).toBe(true);
     expect(sshCalls()).toBe(0);
+    expect(count('jouée en local, machine locale libre')).toBe(1);
   });
 });
 
@@ -217,7 +221,8 @@ describe('L639 — la décision d\'hôte, une fois par lot (R5, R6, R7, R8, R10)
     const before = sshCalls();
     await withPlace(opts({}, { owner }), async (p) => expect(p.remote()).toBe(false));
     expect(sshCalls()).toBe(before);
-    expect(count('porte déportée indisponible sur box (push du sha impossible')).toBe(1);
+    expect(count('cache de dépendances impossible sur box (push du sha impossible')).toBe(1);
+    expect(count('porte déportée indisponible')).toBe(0);
   });
 
   it('R5 — porte locale libre puis ligne de base avec local occupé : décision prise à ce moment', async () => {
@@ -322,6 +327,16 @@ describe('L639 — la décision d\'hôte, une fois par lot (R5, R6, R7, R8, R10)
     expect(count('porte déportée indisponible')).toBe(0);
   });
 
+  it('R7 — échec de push : la ligne de repli est « cache de dépendances impossible », pas « porte déportée indisponible »', async () => {
+    await occupyLocal();
+    remote.lose('git-receive-pack');
+    const first = withPlace(opts({}, { owner: {} }), async () => {});
+    await wait(1500);
+    held.pop()!();
+    await first;
+    expect(said.filter((l) => l.includes('impossible'))).toEqual([expect.stringMatching(/^porte du lot L1 : cache de dépendances impossible sur box \(push du sha impossible.*\) — jouée en local$/)]);
+  });
+
   it('R8 — connexion perdue en cours de porte : rejeu local et ligne dite une fois', async () => {
     await occupyLocal();
     const replayed: string[] = [];
@@ -331,6 +346,25 @@ describe('L639 — la décision d\'hôte, une fois par lot (R5, R6, R7, R8, R10)
       await p.run('echo PERDUE');
     });
     expect(replayed).toEqual(['echo PERDUE', 'echo PERDUE']);
+    expect(count('connexion perdue avec box pendant la porte — rejouée en local')).toBe(1);
+  });
+
+  it('R8 — connexion perdue pendant la ligne de base imbriquée : la porte du lot ne retente pas l\'hôte', async () => {
+    await occupyLocal();
+    const owner = {};
+    const replayed: string[] = [];
+    const local = async (c: string) => (replayed.push(c), { code: 0, output: '' });
+    await withPlace(opts({}, { owner, local }), async (outer) => {
+      await withPlace(opts({}, { owner, local }), async (nested) => {
+        remote.lose('PERDUE');
+        await nested.run('echo PERDUE');
+      });
+      const before = sshCalls();
+      await outer.run('echo SUITE');
+      expect(sshCalls()).toBe(before);
+      expect(outer.remote()).toBe(false);
+    });
+    expect(replayed).toEqual(['echo PERDUE', 'echo SUITE']);
     expect(count('connexion perdue avec box pendant la porte — rejouée en local')).toBe(1);
   });
 

@@ -24,7 +24,7 @@ export async function tryRemote(ctx: GateCtx, short: string, replayReason: strin
   const timeout = ctx.timeoutMs ?? GATE_TIMEOUT_MS;
   const opened = await openRemoteGate({ host, install, refs, repo, sha, depsFrom: repo, worktreeDeps: config.worktreeDeps, env: base, timeoutMs: timeout, workers: (cores) => testWorkersFrom(base, cores, configuredCap(base)) });
   if (!opened.ok) {
-    out(opened.stage === 'host' ? `verify --gate : porte déportée indisponible sur ${host} (${opened.cause}) — repli sur la porte locale` : `verify --gate : cache de dépendances impossible sur ${host} (${opened.cause}) — repli sur la porte locale`);
+    out(opened.stage !== 'cache' ? `verify --gate : porte déportée indisponible sur ${host} (${opened.cause}) — repli sur la porte locale` : `verify --gate : cache de dépendances impossible sur ${host} (${opened.cause}) — repli sur la porte locale`);
     return null;
   }
   const gate = opened.gate;

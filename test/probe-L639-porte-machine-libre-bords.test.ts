@@ -64,7 +64,7 @@ describe('L639 — bords de la porte sur la machine libre (R3, R4, R8, R12, R13)
     await Promise.all([a, b]);
   });
 
-  it('R5 — échec de cache : le créneau de l\'hôte est rendu, une autre porte (autre lot) y joue ensuite', async () => {
+  it('R5 — échec de push : le créneau de l\'hôte est rendu, une autre porte (autre lot) y joue ensuite', async () => {
     await occupyLocal();
     remote.lose('git-receive-pack');
     const a = withPlace(opts({ maxParallel: 1 }, { owner: {} }), async () => {});

@@ -128,7 +128,8 @@ async function openHost(o: PlaceOpts, host: string, d: HostDecision | null, rele
   if (!opened.ok) {
     release();
     const down = d ?? { up: false, said: false };
-    markDown(down, opened.stage, opened.cause);
+    // R7 : avec overflow, un échec de push garde la ligne du cache ; gate.host garde sa ligne « porte déportée indisponible ».
+    markDown(down, opened.stage === 'push' ? (d ? 'cache' : 'host') : opened.stage, opened.cause);
     sayDown(o, host, down);
     return null;
   }
@@ -138,6 +139,12 @@ async function openHost(o: PlaceOpts, host: string, d: HostDecision | null, rele
   o.say(`${o.label} : porte jouée sur l'hôte ${host} (sha ${o.sha!.slice(0, 7)}, ${gate.cache})`);
   return {
     run: async (command) => {
+      if (!lost && d && !d.up) {
+        // R8 : une ligne de base imbriquée a perdu la connexion (elle a dit la ligne) : la porte du lot ne retente pas l'hôte.
+        lost = true;
+        release();
+        o.onLocal?.();
+      }
       if (lost) return o.local(command);
       const r = await gate.run(command, GATE_TIMEOUT_MS);
       if (!r.lost) return r;

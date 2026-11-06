@@ -171,7 +171,7 @@ export interface RemoteGate {
   close(): string | null;
 }
 
-type Opened = { ok: true; gate: RemoteGate } | { ok: false; stage: 'host' | 'cache'; cause: string };
+type Opened = { ok: true; gate: RemoteGate } | { ok: false; stage: 'host' | 'push' | 'cache'; cause: string };
 
 /**
  * Sonde l'hôte, y pousse le sha, prépare le cache de dépendances et le worktree (R3-R5, R15-R18). Un échec avant la première commande de la porte rend `ok: false`
@@ -327,7 +327,7 @@ async function prepare(o: OpenOpts, onWork: (w: Work) => void): Promise<Opened> 
   const w: Work = { id, root, head: `R="$PWD"/${shq(root)}; `, bare: '"$R/repo.git"', wt: `"$R/wt/${id}"` };
   onWork(w);
   const pushed = await pushSha(o, w);
-  if (pushed) return { ok: false, stage: 'host', cause: pushed };
+  if (pushed) return { ok: false, stage: 'push', cause: pushed };
   const fail = (cause: string, stage: 'host' | 'cache'): Opened => {
     cleanupHost(o, w);
     return { ok: false, stage, cause };

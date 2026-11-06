@@ -2656,6 +2656,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme, 2 mineurs en note : titre de test plus fort que ses assertions (probe-L634-bords.test.ts:56), orchestrate-cycle.md:253 contredit par orchestrate-gate.md:105 sur component/journey — orchestré (vague 2026-11-06-0915, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme, le rebase ne change que l'union CHANGELOG (git range-diff : 4 commits sur 5 identiques) ; 2 mineurs déjà en note restent ouverts : titre de test plus fort que ses assertions (probe-L634-bords.test.ts:56), orchestrate-cycle.md:253 contredit par orchestrate-gate.md:105 sur component/journey", commit: aa4ea8c778fc3eefa76e0c0605f18097c0de0a82 }
   - id: L635
     title: "R5 de test/orchestrate-pages-l599.test.ts exige un renvoi pour toute section d'une page de la suite, même neuve et jamais déplacée (L621 puis L633 refusés à la porte, 2 occurrences) : limiter R5 aux sections réellement déplacées (liste figée) et retirer les renvois factices de L621 et L633"
     status: done

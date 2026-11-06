@@ -2736,6 +2736,7 @@ lots:
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-06-1338, 1 passe(s) de correction)", commit: dc44ed0b7d5f1deac46eadef4b83803de662f370, reporte: { de: c6f865441d4b4b5fa9975ddae574f76480f8fb64, vers: dc44ed0b7d5f1deac46eadef4b83803de662f370, patchId: 160a55cee61aff27e56675350ea5ef28f299db72 } }
   - id: L642
     title: "Mesure hors session : 200 rejeux sous charge de la famille verify* et de porte-deportee-creneau-l624 sur mini-blue, après l'intégration de L630 ; preuve de stabilité que L630 ne pouvait pas porter (décision du lead du 06-11) ; mesure : 0 rouge sur 200"
     status: todo

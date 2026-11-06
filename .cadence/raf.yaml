@@ -2953,6 +2953,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "compliant — orchestré (vague 2026-11-06-2230, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant (1 minor: commentaire de keptBranchLines dans dry-run.ts toujours périmé)", commit: 871118b7ee9d92b4a3747a2f0ed8cc4e04ed9996 }
   - id: L666
     title: "Contrat de réponse du lead non écrit : precheck liste les cas limites de la règle avant la spec (base absente, copie sans perte côté source) et une réponse du lead à une question de contrat devient une règle avec son si_faux avant la spec ; L477 : 2 majeurs après la réponse « le contenu vient de cette source », 10,8 min ; niveau : source (precheck puis brief de spec), niveau le plus tôt : source ; mesure : 0 majeur de fiche issu d'une réponse du lead sur 3 vagues"
     status: doing

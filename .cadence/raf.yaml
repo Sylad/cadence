@@ -2669,11 +2669,12 @@ lots:
     started: 2026-11-06
   - id: L637
     title: "Contrôles rapides de L626 : la famille test/orchestrate-pages-*.test.ts se joue au commit ; inspection du 06-11 : 4 refus d'intégration pour une borne de doc ou un renvoi ; mesure : 0 refus d'intégration pour une page de doc"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
     review: { date: 2026-11-06, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-06-0915, 0 passe(s) de correction)", commit: c0c7a33162b801dbb3499334653f53636c678970, reporte: { de: 8e6f585238c45e8018c1598ea307cd7885351819, vers: c0c7a33162b801dbb3499334653f53636c678970, patchId: c90c06be48d1ad372a47e085b89ac0e101626b6f } }
+    finished: 2026-11-06
   - id: L638
     title: "Garder dans l'état de lot le texte, le rang et la décision L622 de chaque constat de revue ; aujourd'hui constats vides, on ne peut pas dire ce que L622 écarte ; mesure : taux de constats écartés par vague"
     status: todo

@@ -237,9 +237,11 @@ function recompose(start: Mesure, ours: Mesure, theirs: Mesure): Mesure {
  * est dans un `try`, le rebase est abandonné.
  */
 function controlMigration(work: string, start: Mesure, theirs: Mesure, depart: string, commit: string): { cle: string }[] {
-  const at = (rev: string, chemin: string): string | null => (tryGit(work, 'cat-file', '-e', `${rev}:${chemin}`) === null ? null : run(work, 'show', `${rev}:${chemin}`));
+  // présent dans l'arbre : `ls-tree` ne lit pas le blob, un blob perdu fait échouer `git show` (le rebase est abandonné) au lieu de passer pour un fichier absent
+  const inTree = (rev: string, chemin: string): boolean => run(work, 'ls-tree', '-z', rev, '--', chemin) !== '';
+  const at = (rev: string, chemin: string): string | null => (inTree(rev, chemin) ? run(work, 'show', `${rev}:${chemin}`) : null);
   const lien = creerLien(start, { depart: (c) => at(depart, c), courant: (c) => at(commit, c), neuf: (c) => at(commit, c) });
-  return comparerMigration(start, theirs, (chemin) => tryGit(work, 'cat-file', '-e', `${depart}:${chemin}`) !== null, lien, start);
+  return comparerMigration(start, theirs, (chemin) => inTree(depart, chemin), lien, start);
 }
 
 /**

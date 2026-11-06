@@ -186,10 +186,12 @@ function groupesDeNeufs(apres, existe, lien) {
     if (!liens.has(fichier)) liens.set(fichier, lien ? lien(fichier) : null);
     const source = liens.get(fichier);
     const regle = regleDeCle(cle);
-    const groupe = groupes.get(`${source}\0${regle}`) ?? { source, regle, cles: [], somme: 0 };
+    // la clé distingue « aucune source » (null) d'un fichier du départ qui s'appellerait « null »
+    const id = `${source === null ? '-' : `+${source}`}\0${regle}`;
+    const groupe = groupes.get(id) ?? { source, regle, cles: [], somme: 0 };
     groupe.cles.push([cle, n]);
     groupe.somme += n;
-    groupes.set(`${source}\0${regle}`, groupe);
+    groupes.set(id, groupe);
   }
   return [...groupes.values()];
 }
@@ -267,15 +269,17 @@ export function lireRef(racine, ref) {
   if (mb.status !== 0) throw new Error(`référence « ${ref} » introuvable (git merge-base HEAD ${ref}) : ${mb.stderr.trim() || 'pas de dépôt git ?'}`);
   const sha = mb.stdout.trim();
   const show = git('show', `${sha}:${BASELINE}`);
-  const existe = (chemin) => git('cat-file', '-e', `${sha}:${chemin}`).status === 0;
+  // présent dans l'arbre du départ : `ls-tree` lit l'arbre, pas le blob — un blob perdu (clone partiel) ne passe pas pour un fichier absent
+  const dansArbre = (chemin, opts = {}) => { const r = spawnSync('git', ['ls-tree', '-z', sha, '--', chemin], { cwd: racine, encoding: 'utf8', ...opts }); return r.error || r.status !== 0 ? undefined : r.stdout !== ''; };
+  const existe = (chemin) => dansArbre(chemin) === true;
   const config = (chemin) => { const r = git('show', `${sha}:${chemin}`); return r.status === 0 ? r.stdout : null; };
   // le contenu d'un fichier du départ : null s'il n'y était pas, une erreur (code 2) si git ne le rend pas — jamais un faux « pas de lien »
   const illisible = (chemin) => new Error(`Qualité : le contenu de ${chemin} au point de départ ${ref} est illisible (git show a échoué) : le lien des fichiers neufs ne peut pas être établi.`);
   const contenu = (chemin) => {
     const opts = { timeout: 60000, maxBuffer: 64 * 1024 * 1024 };
-    const present = spawnSync('git', ['cat-file', '-e', `${sha}:${chemin}`], { cwd: racine, encoding: 'utf8', ...opts });
-    if (present.error) throw illisible(chemin);
-    if (present.status !== 0) return null;
+    const present = dansArbre(chemin, opts);
+    if (present === undefined) throw illisible(chemin);
+    if (!present) return null;
     const r = spawnSync('git', ['show', `${sha}:${chemin}`], { cwd: racine, encoding: 'utf8', ...opts });
     if (r.error || r.status !== 0) throw illisible(chemin);
     return r.stdout;

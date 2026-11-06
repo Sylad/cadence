@@ -2831,6 +2831,7 @@ lots:
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-06-1805, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le tableau donne le verdict de la revue de maquette (`maquette non conforme (N bloquant, M majeur)`) et liste ses bloquants et majeurs pour un lot suspendu, retiré ou échoué ; aucun constat.", commit: 9d6ca26d723580312d1b2a351d3ac0bb9d8c9677 }
   - id: L655
     title: "Issue #49 : la sonde de cas limites joue sur des lots dont la porte n'atteint pas le diff (CSS seul, banc seul) et commite des contrôles de texte sans constat ; ne plus la jouer sur ces lots ; mesure : 0 sonde sur un diff hors porte"
     status: done

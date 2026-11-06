@@ -2685,9 +2685,10 @@ lots:
     finished: 2026-11-06
   - id: L638
     title: "Garder dans l'état de lot le texte, le rang et la décision L622 de chaque constat de revue ; aujourd'hui constats vides, on ne peut pas dire ce que L622 écarte ; mesure : taux de constats écartés par vague"
-    status: todo
+    status: doing
     estimate: 0.2
     created: 2026-11-06
+    started: 2026-11-06
   - id: L639
     title: "La porte joue sur la machine libre : Big-Blue d'abord, mini-blue en débordement, décision d'hôte prise une fois par lot (préflight ssh ConnectTimeout 3), hôte injoignable = repli local sans timeout répété ; mesures du 05-11 : mini-blue 7 min 24 seule, jusqu'à 42 min à plusieurs, Big-Blue ~4 min seule, 50 lignes de repli sur 4 lots ; mesure : 0 « porte déportée indisponible » répété par lot"
     status: todo

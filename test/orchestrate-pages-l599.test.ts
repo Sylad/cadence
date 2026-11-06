@@ -5,8 +5,29 @@ import { CHECKED, checkLinks } from '../scripts/check-links.mjs';
 
 const root = join(import.meta.dirname, '..');
 const read = (f: string): string => readFileSync(join(root, f), 'utf8');
-// Sections nées après le déplacement (L621, L633) : jamais vécues sur orchestrate.md, donc sans renvoi.
-const NEUVES = ['A goal that narrows a lot to commits already merged (L621)', 'The visible fix (L633, issue #43)'];
+// Liste figée des sections (## sur leur page) que L599 a réellement déplacées d'orchestrate.md, titre + page.
+// Une section absente de cette liste (neuve ou future) n'exige aucun renvoi. Les ### déplacées sont couvertes par R11.
+const DEPLACEES: Array<[string, string]> = [
+  ['The `orchestrate` keys of `cadence.yaml` (reference)', 'orchestrate-cycle.md'],
+  ['The spec step of a lot with `screen:`', 'orchestrate-spec.md'],
+  ['The light mockup (L459)', 'orchestrate-spec.md'],
+  ['The spec step of a lot with `spec: true`', 'orchestrate-spec.md'],
+  ['The mockup review: before any code', 'orchestrate-spec.md'],
+  ['Brief size (L559)', 'orchestrate-spec.md'],
+  ['The accept step: red acceptance tests and their lock', 'orchestrate-spec.md'],
+  ['Elements of a reference document in the briefs (L367)', 'orchestrate-spec.md'],
+  ['The downstream briefs: sheet, rule → test → green, conformity, Hypothèses', 'orchestrate-spec.md'],
+  ['Proposals the lot\'s own commits may have treated (L422)', 'orchestrate-cycle.md'],
+  ['Reviews converge: follow-ups and a wall cap (L622)', 'orchestrate-cycle.md'],
+  ['Express lane (L519)', 'orchestrate-cycle.md'],
+  ['Cost in euros, before and after a wave (L529)', 'orchestrate-cycle.md'],
+  ['Sealed tests and shared files: the pre-check of what a lot may collide with (L500)', 'orchestrate-gate.md'],
+  ['The edge-case probe (`orchestrate.probe`, L497)', 'orchestrate-gate.md'],
+  ['The subject of the plan commits (`plan.commit`, L343)', 'orchestrate-cycle.md'],
+  ['One worktree per lot (`orchestrate.worktrees`, L279)', 'orchestrate-worktrees.md'],
+  ['A lot whose work is in a neighbouring repository', 'orchestrate-worktrees.md'],
+  ['A session never commits on another repository (L456)', 'orchestrate-worktrees.md'],
+];
 const SUITE = ['orchestrate-cycle.md', 'orchestrate-gate.md', 'orchestrate-spec.md', 'orchestrate-worktrees.md'];
 
 describe('L599 — orchestrate.md en cinq pages', () => {
@@ -39,18 +60,13 @@ describe('L599 — orchestrate.md en cinq pages', () => {
     expect(read('docs/orchestrate.md')).not.toMatch(/^## The edge-case probe/m);
   });
 
-  it('R5 — une section réellement déplacée ne vit que sur une page ; l\'ancienne page garde son ancre avec une ligne de renvoi (les sections neuves n\'en ont pas)', () => {
+  it('R5 — chaque section de la liste figée des sections déplacées par L599 vit sur sa page ; orchestrate.md garde son ancre avec une ligne de renvoi, sans le titre ## (une section hors liste n\'exige rien)', () => {
     const main = read('docs/orchestrate.md');
-    for (const p of SUITE) {
-      for (const m of read(`docs/${p}`).matchAll(/^## (.+)$/gm)) {
-        const title = m[1]!;
-        if (NEUVES.includes(title)) {
-          expect(main, `pas de renvoi factice ${title}`).not.toMatch(new RegExp(`^### ${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
-          continue;
-        }
-        expect(main, `renvoi ${title}`).toMatch(new RegExp(`^### ${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n\\nMoved to \\[${p}\\]\\(${p}#`, 'm'));
-        expect(main, `titre ${title}`).not.toMatch(new RegExp(`^## ${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
-      }
+    const esc = (t: string): string => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    for (const [title, p] of DEPLACEES) {
+      expect(main, `renvoi ${title}`).toMatch(new RegExp(`^### ${esc(title)}\\n\\nMoved to \\[${p}\\]\\(${p}#`, 'm'));
+      expect(main, `titre ${title}`).not.toMatch(new RegExp(`^## ${esc(title)}$`, 'm'));
+      expect(read(`docs/${p}`), `section ${title} sur ${p}`).toMatch(new RegExp(`^## ${esc(title)}$`, 'm'));
     }
   });
 

@@ -123,3 +123,30 @@ describe('R3 — le tableau imprime les minutes passées après la première rev
     expect(after(row([st('implement', 0, 10), st('review-small', 10, 12), st('fix', 12, 15)]))).toBe('3 min');
   });
 });
+
+describe('L634 — lot rétréci (L621) × attente hors règle (L625), rangs 1 et 2', () => {
+  const range = { goal: 'corriger quatre erreurs de calcul', from: 'abc1234' };
+  const hors = `[hors règle] ${HORS}`;
+  const MARK = 'Mark `inchange: true` on every major';
+  it('L634 — rang 1 : la plage du lot, la marque inchange: true et l\'attente hors règle, dans cet ordre', () => {
+    const text = convergeBrief('review', lotWith([hors]), range);
+    expect(text).toContain('abc1234..HEAD');
+    expect(text).toContain(MARK);
+    expect(text).toContain(`- ${HORS}`);
+    expect(text).not.toContain('not the first code review');
+    expect(text.indexOf('abc1234..HEAD')).toBeLessThan(text.indexOf(MARK));
+    expect(text.indexOf(MARK)).toBeLessThan(text.indexOf(`- ${HORS}`));
+  });
+  it('L634 — rang 2 : la plage, la consigne de convergence (qui porte la marque une seule fois) et l\'attente hors règle', () => {
+    const text = convergeBrief('review', lotWith([hors], 1), range);
+    expect(text).toContain('abc1234..HEAD');
+    expect(text).toContain('not the first code review');
+    expect(text.split(MARK).length - 1).toBe(1);
+    expect(text).toContain(`- ${HORS}`);
+    expect(text.indexOf('not the first code review')).toBeLessThan(text.indexOf(`- ${HORS}`));
+  });
+  it('L634 — lot rétréci sans attente hors règle : ni la section hors règle, à aucun rang', () => {
+    expect(convergeBrief('review', lotWith([]), range)).not.toContain('OUTSIDE the rules');
+    expect(convergeBrief('review', lotWith([], 1), range)).not.toContain('OUTSIDE the rules');
+  });
+});

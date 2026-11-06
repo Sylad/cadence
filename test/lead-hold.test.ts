@@ -248,7 +248,7 @@ describe('documentation (L255)', () => {
 
   it('R14 — docs/lead.md, le README et le CHANGELOG décrivent la commande', () => {
     expect(read('docs/lead.md')).toContain('cadence lead hold');
-    expect(read('docs/orchestrate-cycle.md')).toContain('sessions du lead');
+    expect(read('docs/orchestrate-worktrees.md')).toContain('sessions du lead'); // moved from orchestrate-cycle.md (L651)
     expect(read('docs/overview.md')).toContain('lead hold'); // le détail est parti du README (L326)
     // whole changelog: the entry stays found after a release renames [Unreleased]
     expect(read('CHANGELOG.md')).toContain('L255');

@@ -2743,9 +2743,10 @@ lots:
     created: 2026-11-06
   - id: L644
     title: "attente d'intégration différée : cadence inspect compte l'état « attente de ressource » (ligne « intégration différée » jusqu'à reprise ou intégré), la retranche de revue et d'actives, l'affiche en cause avec le lot qui tient la ressource ; niveau : source (le lancement pose uses: d'après les chemins du cadence.yaml parent) ; niveau le plus tôt : source ; mesure : 0 min d'attente de ressource classée en revue, 0 attente de plus de 10 min sans ligne dans le tableau"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-06
+    started: 2026-11-06
   - id: L645
     title: "cliquet contre origin/main : le test et la porte comparent à la ligne de base du départ du lot (ou refusent « origin/main est en retard de N commits sur main » avant de jouer 6 min de suite), et le journal garde les 20 premières lignes du test rouge ; niveau : source ; mesure : 0 refus d'intégration dû à un origin/main en retard, texte du refus présent dans 100 % des refus"
     status: doing

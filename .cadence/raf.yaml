@@ -2815,6 +2815,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "compliant — orchestré (vague 2026-11-06-1805, 0 passe(s) de correction)", commit: e6885e31d2e13fb867e4b56110b9f761b3fbb62d, reporte: { de: 0b5c7be9099ec035076585ef0965653b03c8bfd8, vers: e6885e31d2e13fb867e4b56110b9f761b3fbb62d, patchId: 6742a13673259d29284ef6d0c5ae307f3a216cd8 } }
   - id: L653
     title: "Issue #48 : un merge de la branche de base dans le worktree d'un lot le fait rendre pour « session a modifié le plan », et les questions de la session sont perdues ; mesure : merge accepté, questions conservées"
     status: doing

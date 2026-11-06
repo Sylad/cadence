@@ -72,15 +72,25 @@ describe('R2 — cadence perf donne le taux de constats écartés par vague', ()
   });
   it('R2 — le rapport lisible le dit ; rien sans constat gardé (journal d’avant L638)', async () => {
     const text = (await perf(ctx())).join('\n');
-    expect(text).toMatch(/constats de revue écartés par L622 : 2 sur 5 \(40 % ; précédente n\/d\)/);
+    expect(text).toMatch(/constats de revue écartés par L622 et L646 : 2 sur 5 \(40 % ; précédente n\/d\)/);
     expect(text).toMatch(/w1 : 2 sur 4 \(50 %\)/);
     const root = tempDir();
     mkdirSync(join(root, '.cadence', 'runs'), { recursive: true });
     writeWave(join(root, '.cadence', 'runs'), 'w1', '2026-10-01T08:00:00');
     writeJournal(join(root, '.cadence', 'runs'), 'w1', 'alpha', 'L1', { steps: [step({})] });
     const none = (await perf(root)).join('\n');
-    expect(none).not.toContain('écartés par L622');
+    expect(none).not.toContain('constats de revue écartés');
     expect(JSON.parse((await perf(root, '--json')).join('\n')).ecartes.current).toEqual({ constats: 0, ecartes: 0, taux: null, vagues: [] });
+  });
+  it('R2 — le libellé n’attribue pas à L622 seul un taux fait de mineurs repris écartés (ecarte-deja-note)', async () => {
+    const root = tempDir();
+    const runs = join(root, '.cadence', 'runs');
+    mkdirSync(runs, { recursive: true });
+    writeWave(runs, 'w1', '2026-10-01T08:00:00');
+    writeJournal(runs, 'w1', 'alpha', 'L1', { steps: [step({ constatsRevue: [{ texte: 't', gravite: 'mineur', rang: 2, decision: 'ecarte-deja-note' }, { texte: 'u', gravite: 'majeur', rang: 2, decision: 'compte' }] })] });
+    const text = (await perf(root)).join('\n');
+    expect(text).toContain('constats de revue écartés par L622 et L646 : 1 sur 2 (50 %');
+    expect(text).not.toMatch(/écartés par L622 :/);
   });
   it('R2 — des constatsRevue illisibles (null, texte, décision inconnue, pas un tableau) sont ignorés sans faire échouer perf', async () => {
     const root = tempDir();

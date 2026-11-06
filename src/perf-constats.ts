@@ -50,5 +50,5 @@ export function ecarteCounts(set: { j: { wave: string; decisions?: DecisionConst
 export function ecarteLines(cur: EcarteCounts, previous: EcarteCounts, pct: (v: number) => string): string[] {
   if (cur.constats === 0) return [];
   const before = previous.taux === null ? 'n/d' : pct(previous.taux);
-  return ['', 'Revues : constats écartés', `  constats de revue écartés par L622 : ${cur.ecartes} sur ${cur.constats} (${pct(cur.taux!)} ; précédente ${before})`, ...cur.vagues.map((v) => `    ${v.wave} : ${v.ecartes} sur ${v.constats} (${pct(v.taux)})`)];
+  return ['', 'Revues : constats écartés', `  constats de revue écartés par L622 et L646 : ${cur.ecartes} sur ${cur.constats} (${pct(cur.taux!)} ; précédente ${before})`, ...cur.vagues.map((v) => `    ${v.wave} : ${v.ecartes} sur ${v.constats} (${pct(v.taux)})`)];
 }

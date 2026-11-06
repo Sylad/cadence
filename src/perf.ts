@@ -184,7 +184,7 @@ export interface PerfResult {
   escalations: { current: EscalationCounts; previous: EscalationCounts };
   /** Tests rouges dans la suite de la porte, verts rejoués seuls (L354) : ni comptés ni corrigés. Une hausse dit que la machine est trop chargée pour la suite (`CADENCE_TEST_WORKERS`). */
   instables: { current: InstableCounts; previous: InstableCounts };
-  /** Part des constats de revue que L622 écarte (majeur « inchangé » mis en suite) au lieu de les compter (L638). */
+  /** Part des constats de revue que L622 (majeur « inchangé » mis en suite) et L646 (mineur déjà noté repris, L649 : même reformulé) écartent au lieu de les compter (L638). */
   ecartes: { current: EcarteCounts; previous: EcarteCounts };
   tokens: TokensBlock;
   /** Médiane de la durée de mur d'un lot rendu, en minutes (début de sa première étape → fin de sa dernière), par classe d'estimate comme `tokens.byEstimate` (L414) : le temps habituel que le panneau des lots compare à celui d'un lot en cours. */

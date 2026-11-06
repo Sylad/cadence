@@ -15,7 +15,8 @@ sujet:
     endpoints: []
     jobs: ["commande orchestrate (lecture de cadence.yaml, portes de lot et de ligne de base)"]
     tests_a_reprendre:
-      - "test/porte-deportee.test.ts et test/porte-deportee-{creneau-l624,vague,r6-bords,signal}.test.ts : AUCUN ne change (gate.host garde son sens, R11) ; ils restent verts tels quels et prouvent que l'ancien chemin est inchangé"
+      - "test/porte-deportee.test.ts et test/porte-deportee-{creneau-l624,vague,r6-bords,signal}.test.ts : aucun ne change pour le comportement (gate.host garde son sens, R11) ; ils restent verts tels quels et prouvent que l'ancien chemin est inchangé. Seule exception : test/porte-deportee-r2-bords.test.ts, ligne 36, dont l'attente du message « inconnu » suit le nouveau message (A3), voir la ligne suivante"
+      - "test/porte-deportee-r2-bords.test.ts:36 (test « R14 — gate.dir refusé ») : son toThrow sur la chaîne complète devient « orchestrate.gate.dir inconnu (attendu : readsPlan, host, overflow, install, refs, maxParallel) » (A3) ; c'est le seul changement de ce fichier"
       - "test/porte-deportee-config.test.ts : reçoit les cas de la nouvelle clé overflow (R12, R13) ; le test qui liste les clés attendues dans le message « inconnu » suit le nouveau message (A3)"
       - "test/cadence-yaml-porte-deportee-l617.test.ts : relu, inchangé"
     docs_a_reprendre:

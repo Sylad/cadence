@@ -77,4 +77,4 @@ bounds:
   - paths: [CHANGELOG.md]
     tests: [test/changelog.test.ts, test/changelog-unreleased-titres-l568.test.ts]
   - paths: [package.json, 'docs/*.md']
-    tests: [test/docs-publiees-l626.test.ts]
+    tests: [test/docs-publiees-l626.test.ts, test/orchestrate-pages-l599.test.ts]

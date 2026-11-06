@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- The `bounds` entry of `docs/*.md` also declares `test/orchestrate-pages-l599.test.ts` (L637): a lot that touches a docs page plays the link, navigation and size checks of the orchestrate pages in the targeted gate, before the full suite, instead of being refused at integration.
+
 ## [1.57.0] - 2026-11-06
 
 ### Added

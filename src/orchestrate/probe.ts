@@ -105,7 +105,7 @@ export interface ProbeIo<D extends ProbeDone> {
   head(): string;
 }
 
-const unplayed = (l: LotState, why: string): number => l.warnings.push(`sonde de cas limites non jouée : ${why}`);
+export const unplayed = (l: LotState, why: string): number => l.warnings.push(`sonde de cas limites non jouée : ${why}`);
 
 /** Les attentes « hors règle du lot » du rapport (L580, issue #37) : une ligne par entrée texte non vide ; absent, vide ou mal typé, rien. */
 export function horsRegleWarnings(rep: Pick<ProbeReport, 'horsRegle'> | undefined): string[] {
@@ -183,19 +183,24 @@ export async function probeStep<D extends ProbeDone>(io: ProbeIo<D>): Promise<vo
   const red: Constat[] = [];
   const runs: CheckRun[] = [];
   await io.gate(red, runs);
-  if (correction(io, step, red, claimedBy(rep), removed)) return;
+  if (correction(io, step, { red, runs }, { claimed: claimedBy(rep), removed })) return;
   await io.review(runs);
 }
 
 /**
  * Après la porte du programme (L662 : la seule entre l'écriture et la revue, jouée après la sonde, sur les commits de l'écriture et de la sonde) : envoie le lot en correction quand il y a un constat, vrai alors.
- * Un rouge de la porte quand la sonde n'a rien commité n'est pas celui de la sonde : il repart en correction sous son propre motif, sans le préfixe « sonde de cas limites ».
+ * Un rouge de la porte quand la sonde n'a rien commité, ou un rouge du build ou de l'acceptation (la porte joue aussi les commits de l'écriture), n'est pas celui de la sonde : il repart en correction sous son propre motif, sans le préfixe « sonde de cas limites ».
  */
-function correction<D extends ProbeDone>(io: ProbeIo<D>, step: StepState, red: Constat[], claimed: string[], removed: string[]): boolean {
+function correction<D extends ProbeDone>(io: ProbeIo<D>, step: StepState, gate: { red: Constat[]; runs: CheckRun[] }, said: { claimed: string[]; removed: string[] }): boolean {
   const l = io.lot;
+  const { red, runs } = gate;
+  const { claimed, removed } = said;
   const moved = !!step.headBefore && io.head() !== step.headBefore;
-  const found = moved || removed.length ? findings(l, moved ? red : [], claimed, !!io.config.test, removed) : [];
-  const own = moved ? [] : red;
+  // La porte joue aussi les commits de l'écriture : un rouge du build ou de l'acceptation n'est pas celui d'un test de la sonde, il garde sa gravité et son motif.
+  const builds = runs.filter((r) => r.label === 'build' && r.code !== 0).map((r) => r.command);
+  const writing = (k: Constat): boolean => k.source !== 'tests' || builds.some((b) => k.texte.startsWith(b));
+  const found = moved || removed.length ? findings(l, moved ? red.filter((k) => !writing(k)) : [], claimed, !!io.config.test, removed) : [];
+  const own = moved ? red.filter(writing) : red;
   if (!found.length && !own.length) return false;
   // Une correction que le budget ne paie plus n'est pas sautée : l'étape fix refuse et le lot revient au lead sans revue, tests rouges (L145, cycle.ts overBudget).
   if (found.length && io.pays()) l.warnings.push(`${PROBE_FINDING}${found.length} constat(s), passe de correction avant la revue`);

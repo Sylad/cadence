@@ -244,6 +244,28 @@ describe('sonde de cas limites (L497)', () => {
     expect(readFileSync(count2, 'utf8').trim().split('\n')).toHaveLength(1);
   });
 
+  it("R3 — une annonce de tests rouges que la porte ne croit pas : la sonde, qui n'a pas joué, le dit au lot (L662)", async () => {
+    const red: Handler = (call) => claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'a.ts', 'feat(L1): a')], tests: { commande: 'npm test', resultat: '1 failed', vert: false } }));
+    const h = harness({ script: { implement: [red], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true, test: 'true' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review']);
+    expect(warnings(c)).toContain("sonde de cas limites non jouée : tests annoncés rouges par la session, la porte ne les a pas confirmés (pas d'écriture après la porte pour la jouer)");
+  });
+
+  it("R4 — un build rouge dû à l'écriture, la sonde ayant commité : bloquant, au motif des tests rouges, et non attribué à la sonde (L662)", async () => {
+    const build = 'if [ -f a.ts ] && [ ! -f fixed.flag ]; then echo BUILD-CASSE; exit 1; fi';
+    const h = harness({ script: { implement: [impl('a.ts')], probe: [probe('q.spec.ts')], fix: [fix('fixed.flag')], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true, build, test: 'true' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe', 'fix', 'review']);
+    const brief = h.calls[2].brief;
+    expect(brief).toContain('BUILD-CASSE');
+    expect(brief).toContain('[bloquant / tests]');
+    expect(brief).not.toContain('sonde de cas limites : ');
+    expect(warnings(c)).not.toContain('sonde de cas limites : 1 constat(s), passe de correction avant la revue');
+  });
+
   it('R4 — la passe de correction déclenchée par la sonde laisse une trace au journal du lot', async () => {
     const h = harness({ script: { implement: [impl('a.ts')], probe: [probe()], fix: [fix('fixed.flag')], review: [ok] } });
     const c = h.lot('L1', {}, { probe: true, test: REDGATE });

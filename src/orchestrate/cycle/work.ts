@@ -20,7 +20,7 @@ import { gapMessage } from '../../docsync.js';
 import { gateReachesLot, lotTouchesCycle, testGates } from './test-vert.js';
 import { fixAffordable, budgetCount } from './budget.js';
 import { redAnnounced } from '../objectif.js';
-import { scheduleProbe, PROBE_RESERVE, type ProbeIo } from '../probe.js';
+import { scheduleProbe, unplayed, PROBE_RESERVE, type ProbeIo } from '../probe.js';
 /** Violations du verrou des tests d'acceptation (L173) par les commits faits depuis `head` ; aucune sans HEAD de départ. */
 const sealedViolations = (c: LotCtx, head: string | undefined): string[] => (head ? lockViolations(wd(c), c.config.spec.dir, head, { rouge: c.lot.accept?.rouge ? { [c.lot.accept.acceptation]: c.lot.accept.rouge } : {}, lot: c.lot.lot, lotBase: c.lot.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(wd(c), lotWork(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha)), lotCommits: lotCommits(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha) }) : []);
 
@@ -178,8 +178,10 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
   }
   // Une annonce de tests rouges (L590, R16) ne se juge que sur la suite complète : la porte ciblée ne joue pas le test annoncé, elle n'a ni ligne de base ni verdict à opposer à l'annonce (L213, L522).
   if (red.length === 0) await programChecks(c, red, runs, porteApresEcriture(deferred));
-  if (deferred && red.length === 0 && runs.some((r) => r.label === 'tests' && r.code === 0 && !r.instables?.length)) l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${gateLabel(c.config.test ?? '')}, code 0) : l'annonce n'est pas crue, pas de correction`);
-  else if (deferred && red.length === 0 && !runs.some((r) => r.label === 'tests' && (r.dejaRouges || r.instables?.length))) red.push(claimed);
+  if (deferred && red.length === 0 && runs.some((r) => r.label === 'tests' && r.code === 0 && !r.instables?.length)) {
+    l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${gateLabel(c.config.test ?? '')}, code 0) : l'annonce n'est pas crue, pas de correction`)
+    if (c.config.probe && !l.probe && !l.express && !minorsPass && alreadyDone) unplayed(l, "tests annoncés rouges par la session, la porte ne les a pas confirmés (pas d'écriture après la porte pour la jouer)");
+  } else if (deferred && red.length === 0 && !runs.some((r) => r.label === 'tests' && (r.dejaRouges || r.instables?.length))) red.push(claimed);
   if (red.length) {
     toFix(c, red, 'tests rouges');
     return;

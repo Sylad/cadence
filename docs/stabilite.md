@@ -25,7 +25,7 @@ From 1.0.0 cadence follows [semantic versioning](https://semver.org): what is li
 
 - **Subcommands of `raf`**: `quickwins` (the threshold of a « small lot » is read under three names, `express`, `light` and `small`, that are to become one), `uses` (follows the `resources` table it checks against), `plan` (the plan file location and format it reports follow the plan reader, which is to be split from the native plan) and `docs-ok` (the same notion is spelled three ways, `docs-ok`, `docs_ok` and `docsOk`).
 - **Tools of `cadence`**: `ref` (reference documents: its options still grow with the documents studied, and it needs outside programs), `perf` (a dashboard whose measures and thresholds are tuned), `local`, `release` and `config` (the lead's own tools, shaped by how the lead works, not by a project's scripts), and `claude-hook` (the Bash hook of the plugin, called by `hooks/hooks.json`, not by hand: its output follows the refusals it recognises).
-- **Keys of `cadence.yaml`**: `references` (the setting of `cadence ref`) and `perf` (the setting of `cadence perf`): each follows its tool.
+- **Keys of `cadence.yaml`**: `references` (the setting of `cadence ref`), `perf` (the setting of `cadence perf`) and `bounds` (the file limits given to the writer, L626): each follows its tool.
 
 Promoting one of these to *Guaranteed* is a minor change, and calling a surface experimental commits cadence to nothing.
 

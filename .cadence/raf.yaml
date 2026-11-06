@@ -2803,7 +2803,7 @@ lots:
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
-    review: { date: 2026-11-06, verdict: "conforme : section Several waves at once déplacée, marge rétablie, R14 de lead-hold lit la nouvelle page, relu par le lead", commit: 6a7c27dc91d4bc03ae9785ff00833d4a8322fb53 }
+    review: { date: 2026-11-06, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-06-1559, 0 passe(s) de correction)", commit: 4764a2c27d555f85d6c18dd79502f598b925d0d6, reporte: { de: 2018b6006c4bcb98f66e811e47edffaa2ea4a34d, vers: 4764a2c27d555f85d6c18dd79502f598b925d0d6, patchId: e5fc91428185c076715168d97b58a8ab85c5888a } }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -63,8 +63,19 @@ export function convergeBrief(kind: SessionKind, l: LotState, shrunk?: Shrunk): 
   return lines.join('\n');
 }
 
-/** Un constat de revue répète un constat de la revue précédente : même fichier (ou aucun des deux) et même texte. Limite connue : un texte reformulé n'est pas reconnu. */
-const repeats = (previous: { fichier?: string; texte: string }[], k: { fichier?: string; texte: string }): boolean => previous.some((p) => (p.fichier ?? '') === (k.fichier ?? '') && p.texte.trim() === k.texte.trim());
+type Repris = { fichier?: string; ligne?: number; classe?: string; texte: string };
+
+/**
+ * Un constat de revue répète un constat de la revue précédente : même fichier (ou aucun des deux) et même texte, ou (L649) un texte reformulé sur le même fichier et la même ligne, ou la même classe de défaut.
+ * Sans fichier, seul le texte compare (une ligne ou une classe seules rapprocheraient des constats sans rapport). Limite connue : un texte reformulé à une autre ligne et sans classe commune n'est pas reconnu.
+ */
+const repeats = (previous: Repris[], k: Repris): boolean =>
+  previous.some((p) => {
+    const fichier = p.fichier ?? '';
+    if (fichier !== (k.fichier ?? '')) return false;
+    if (p.texte.trim() === k.texte.trim()) return true;
+    return fichier !== '' && ((p.ligne !== undefined && p.ligne === k.ligne) || (p.classe !== undefined && p.classe === k.classe));
+  });
 
 /**
  * Verdict d'une revue de code conforme une fois les majeurs mis de côté : celui de l'agent suivi de la note des suites (`asideVerdict`, comme la maquette L562).

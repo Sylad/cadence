@@ -423,15 +423,6 @@ describe('L477 — --migrer et la porte', () => {
     writeFileSync(join(dir, BASELINE), JSON.stringify({ a: 5 }));
     expect(appliquer(dir, 'verifier', { a: 5 }, { nom: 'main (abc1234)', base: null }).code).toBe(0);
   });
-
-  it('R16 — git show en échec pour une source : code 2, message nommant le fichier et la référence, base intacte', () => {
-    const dir = tempDir();
-    coupe(dir);
-    writeFileSync(join(dir, BASELINE), JSON.stringify(depart));
-    const casse = { ...ref, contenu: () => { throw new Error('Qualité : le contenu de src/cli.ts au point de départ main est illisible (git show a échoué) : le lien des fichiers neufs ne peut pas être établi.'); } };
-    expect(() => appliquer(dir, 'migrer', apresCoupe, casse)).toThrow(/src\/cli\.ts au point de départ main est illisible/);
-    expect(lire(dir)).toBe(JSON.stringify(depart));
-  });
 });
 
 /** Un dépôt git réel : tout ce qui touche git (lireRef, git show, fichier non suivi, renommage, CLI). */
@@ -541,12 +532,48 @@ describe('L477 — dépôt réel', () => {
     expect(lire(dir)).toBe(avant);
   });
 
-  it('R16 — git absent ou délai dépassé : code 2, aucun fichier neuf refusé', () => {
+  /** Un `git` qui échoue (code 1) quand ses arguments contiennent `motif`, et délègue au vrai sinon : l'échec de git au milieu d'une commande, sans toucher au dépôt. */
+  function gitQuiEchoue(motif: string) {
+    const bin = join(tempDir(), 'bin');
+    mkdirSync(bin);
+    const vrai = spawnSync('which', ['git'], { encoding: 'utf8' }).stdout.trim();
+    writeFileSync(join(bin, 'git'), `#!/bin/sh\ncase "$*" in *'${motif}'*) echo 'échec simulé' >&2; exit 1;; esac\nexec ${vrai} "$@"\n`, { mode: 0o755 });
+    return { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+  }
+  const migrerAvec = (dir: string, env: NodeJS.ProcessEnv) => spawnSync(process.execPath, [join(REPO, 'scripts/qualite.mjs'), '--migrer', '--contre', 'main'], { cwd: dir, encoding: 'utf8', env });
+
+  it('R16 — git show en échec pour une source : code 2, message nommant le fichier et la référence, base intacte', () => {
     const { dir } = projet();
     decoupe(dir);
-    const r = spawnSync(process.execPath, [join(REPO, 'scripts/qualite.mjs'), '--migrer', '--contre', 'main'], { cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: '/nonexistent' } });
+    const avant = lire(dir);
+    const r = migrerAvec(dir, gitQuiEchoue(':src/'));
     expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/le contenu de src\/\S+ au point de départ main est illisible/);
     expect(r.stderr).not.toContain('fichier neuf');
+    expect(lire(dir)).toBe(avant);
+  });
+
+  it('R16 — l\'arbre du départ illisible (ls-tree en échec) : code 2 nommant le fichier et la référence, jamais un fichier du départ pris pour neuf', () => {
+    const { dir } = projet();
+    decoupe(dir);
+    const avant = lire(dir);
+    const r = migrerAvec(dir, gitQuiEchoue('ls-tree -z'));
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/src\/\S+ au point de départ main est illisible/);
+    expect(r.stderr).not.toContain('fichier neuf');
+    expect(lire(dir)).toBe(avant);
+  });
+
+  it('R16 — git absent : code 2, message qui nomme la référence, aucun fichier neuf refusé', () => {
+    const { dir } = projet();
+    decoupe(dir);
+    const avant = lire(dir);
+    const r = migrerAvec(dir, { ...process.env, PATH: '/nonexistent' });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('« main »');
+    expect(r.stderr).not.toContain('Cannot read properties');
+    expect(r.stderr).not.toContain('fichier neuf');
+    expect(lire(dir)).toBe(avant);
   });
 
   it('R17 — --migrer sans qualite-baseline.json au départ (lot qui amorce la base avec --init) : code 1, la base n\'est pas touchée', () => {

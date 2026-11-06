@@ -262,19 +262,20 @@ export function mesurer(racine) {
   }
 }
 
-/** Le point de départ du lot : au merge-base de HEAD et de `ref`, la ligne de base (null si elle n'y existait pas encore), `existe(chemin)` (vrai pour un fichier qui y était), `contenu(chemin)` (son contenu, null s'il n'y était pas, erreur si git échoue) et `config(chemin)` (son contenu, null s'il n'y était pas). */
+/** Le point de départ du lot : au merge-base de HEAD et de `ref`, la ligne de base (null si elle n'y existait pas encore), `existe(chemin)` (vrai pour un fichier qui y était, erreur si git ne rend pas l'arbre), `contenu(chemin)` (son contenu, null s'il n'y était pas, erreur si git échoue) et `config(chemin)` (son contenu, null s'il n'y était pas). */
 export function lireRef(racine, ref) {
   const git = (...args) => spawnSync('git', args, { cwd: racine, encoding: 'utf8' });
   const mb = git('merge-base', 'HEAD', ref);
-  if (mb.status !== 0) throw new Error(`référence « ${ref} » introuvable (git merge-base HEAD ${ref}) : ${mb.stderr.trim() || 'pas de dépôt git ?'}`);
+  if (mb.status !== 0) throw new Error(`référence « ${ref} » introuvable (git merge-base HEAD ${ref}) : ${mb.stderr?.trim() || mb.error?.message || 'pas de dépôt git ?'}`);
   const sha = mb.stdout.trim();
   const show = git('show', `${sha}:${BASELINE}`);
   // présent dans l'arbre du départ : `ls-tree` lit l'arbre, pas le blob — un blob perdu (clone partiel) ne passe pas pour un fichier absent
   const dansArbre = (chemin, opts = {}) => { const r = spawnSync('git', ['ls-tree', '-z', sha, '--', chemin], { cwd: racine, encoding: 'utf8', ...opts }); return r.error || r.status !== 0 ? undefined : r.stdout !== ''; };
-  const existe = (chemin) => dansArbre(chemin) === true;
   const config = (chemin) => { const r = git('show', `${sha}:${chemin}`); return r.status === 0 ? r.stdout : null; };
   // le contenu d'un fichier du départ : null s'il n'y était pas, une erreur (code 2) si git ne le rend pas — jamais un faux « pas de lien »
   const illisible = (chemin) => new Error(`Qualité : le contenu de ${chemin} au point de départ ${ref} est illisible (git show a échoué) : le lien des fichiers neufs ne peut pas être établi.`);
+  // l'arbre du départ illisible n'est pas « fichier absent » : un fichier du départ passerait pour neuf, et son refus serait celui de git
+  const existe = (chemin) => { const present = dansArbre(chemin); if (present === undefined) throw illisible(chemin); return present; };
   const contenu = (chemin) => {
     const opts = { timeout: 60000, maxBuffer: 64 * 1024 * 1024 };
     const present = dansArbre(chemin, opts);

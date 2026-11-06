@@ -41,6 +41,21 @@ describe('L477 R16 — git ne rend pas un contenu du départ', () => {
     const blob = git(dir, 'rev-parse', 'main:src/s.ts').stdout.trim();
     rmSync(join(dir, '.git/objects', blob.slice(0, 2), blob.slice(2)), { force: true });
     expect(git(dir, 'cat-file', '-e', blob).status).not.toBe(0);
-    expect(() => lireRef(dir, 'main').contenu!('src/s.ts')).toThrow(/illisible/);
+    expect(() => lireRef(dir, 'main').contenu!('src/s.ts')).toThrow(/le contenu de src\/s\.ts au point de départ main est illisible/);
+  });
+
+  it('R16 — l\'arbre du départ illisible : existe lève au lieu de rendre faux (un fichier du départ ne passe pas pour neuf)', () => {
+    const dir = tempDir();
+    mkdirSync(join(dir, 'src'));
+    writeFileSync(join(dir, 'src/s.ts'), `${lignes(5)}\n`);
+    git(dir, 'init', '-q', '-b', 'main');
+    git(dir, 'add', '.');
+    git(dir, 'commit', '-q', '-m', 'départ');
+    const ref = lireRef(dir, 'main');
+    expect(ref.existe!('src/s.ts')).toBe(true);
+    // l'arbre racine du départ perdu : ls-tree échoue
+    const arbre = git(dir, 'rev-parse', 'main^{tree}').stdout.trim();
+    rmSync(join(dir, '.git/objects', arbre.slice(0, 2), arbre.slice(2)), { force: true });
+    expect(() => ref.existe!('src/s.ts')).toThrow(/src\/s\.ts au point de départ main est illisible/);
   });
 });

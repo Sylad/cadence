@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.58.0] - 2026-11-06
+
 ### Added
 
 - The state of a lot keeps what each code review said and what L622 did with it (L638, [docs/perf.md](docs/perf.md)): every review step writes `constatsRevue`, the `texte`, `gravite`, `rang` and `decision` (`compte`, `ecarte-inchange`, `ecarte-hors-regle`) of each finding, and `cadence perf` prints the share of findings L622 sets aside, in total and per wave (`ecartes` in `--json`), so what L622 drops can be told instead of guessed.

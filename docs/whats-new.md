@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.58.0**: `cadence inspect` measures each wave's minutes and losses; `orchestrate.gate.overflow` plays the gate on the free machine; a lot's state keeps every review finding; the verify test family joins « lourds ».
 - **1.57.0**: a `--goal` that narrows a lot to merged commits skips the mockup and the reviews judge the goal's diff; a visible lot with no `screen:` plays no mockup and captures the screen before and after.
 - **1.56.0**: code reviews converge (out-of-rule findings no longer block); a remote gate frees its session slot; file `bounds` reach the writer; a goal needing cluster access is flagged; one help text; `tirables` wording.
 - **1.55.0**: a wave's gate plays only the tests related to the lot after each write; `orchestrate --follow` relays only what needs the lead; Playwright sessions run headless; the HUD folds ready and delivered lots.
@@ -87,6 +88,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.58.0**: `cadence inspect` measures each lot's minutes per state and classes a wave's losses by cause, recurrences included (L627). `orchestrate.gate.overflow` plays the gate on the free machine: local first, the overflow host when a local gate already holds it; `gate.host` keeps its meaning (L639). The state of a lot keeps the text, rank and L622 decision of each review finding (L638). The `verify` and `verify-gate` tests join the « lourds » project (L630), a page of docs plays the orchestrate-pages checks at the commit (L637), and a `screen: page` lot of 0.1 day or less leaves the express lane (L634).
 
 **1.57.0**: A `--goal` (or `goal:`) that narrows a lot to commits already merged skips the mockup unless the goal changes the layout, and the reviews judge the diff of the goal (L621, issue #40). A visible lot with no `screen:` above 0.1 day no longer plays the light mockup: `implement` captures the screen before and after at 1440 and 390 px, and the UX review reads the diff only, at the ordinary budget (L633, issue #43).
 

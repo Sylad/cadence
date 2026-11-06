@@ -66,10 +66,6 @@ migrate:
 
 # Bornes de fichiers (L626) : le brief d'écriture donne toutes les limites chiffrées, le hook « cadence claude-hook bornes » (joint au --settings des sessions implement et fix, le plugin étant coupé) mesure le fichier après chaque écriture,
 # et la porte ciblée joue les tests déclarés (faute de lien d'import, vitest related ne les trouve pas) dès qu'un lot touche l'un des fichiers. Lignes comptées comme le split('\\n') des tests (ligne vide finale comprise), colonnes et tailles en caractères (concepts.md : 15 Ko = 15 * 1024).
-# Documentation qui suit le correctif (L648) : un commit fix( qui change un identifiant de src/ cité par une ligne de doc ou d'aide non touchée est refusé (docs-ok: <raison> dans le message pour passer).
-hook:
-  docs: refuse
-
 bounds:
   - paths: [README.md]
     lines: 64

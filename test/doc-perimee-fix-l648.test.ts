@@ -129,6 +129,9 @@ describe('L648 — hook pre-commit : fix( touchant src/', () => {
     writeFileSync(file, 'hook:\n  docs: non\n');
     expect(() => readHookConfig(file)).toThrow(/hook\.docs/);
   });
+  it('R10 — le cadence.yaml du dépôt ne pose pas hook.docs avant la mise en service (la copie en service le refuse)', () => {
+    expect(readHookConfig(join(import.meta.dirname, '..', 'cadence.yaml')).docs).toBeUndefined();
+  });
   it('R9 — sans identifiant changé (corps seul) : rien', () => {
     const dir = project('refuse');
     writeFileSync(join(dir, 'src/lib.ts'), 'export function oldName(a: number): number {\n  return a + 1;\n}\n');

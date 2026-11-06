@@ -31,6 +31,11 @@ describe('L666 — cas limites de la règle et réponse du lead', () => {
   it('R2 — la lecture du precheck (cas limites compris) arrive dans le brief de la spec', async () => {
     expect(await specBrief('Edge cases of the rule: LECTURE-L666')).toContain('LECTURE-L666');
   });
+  it('R2 — le brief de la spec ne porte pas la consigne d\'implémentation (modifier, relire les lignes éditées)', async () => {
+    const b = await specBrief('Edge cases of the rule: LECTURE-L666');
+    expect(b).toContain('Pre-check reading');
+    expect(b).not.toContain('reopen a file only to modify it');
+  });
   it('R2 — sans lecture du precheck, le brief de la spec n\'en porte pas l\'en-tête', async () => {
     expect(await specBrief(undefined)).not.toContain('Pre-check reading');
   });

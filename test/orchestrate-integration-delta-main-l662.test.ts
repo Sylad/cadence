@@ -1,7 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { deltaTouchesLot } from '../src/orchestrate/cycle/integration-porte.js';
+import { run as cli } from '../src/cli.js';
+import { recordedGate } from '../src/gate-record.js';
+import { deltaTouchesLot, fullSuiteGreen } from '../src/orchestrate/cycle/integration-porte.js';
 import { claudeOut, git, reviewReport, workReport } from './orchestrate-harness.js';
 import { fake, lotOf, meeting, run, setup, store } from './orchestrate-worktree-harness.js';
 import { cleanupTempDirs, tempDir } from './helpers.js';
@@ -94,11 +96,12 @@ describe('L662 R4 — deltaTouchesLot : le delta de main est-il lié au diff du 
 
 const lines = (n: number) => Array.from({ length: n }, (_, i) => `l${i}`).join('\n') + '\n';
 /** Deux lots modifient `src/f.txt` ; pendant la revue courte du second, le lead commite `leadFile` sur main (une fois) : le rebase est rejoué. Rend les suites complètes jouées au sommet de L2 et le journal. */
-async function scenario(leadFile: string) {
+async function scenario(leadFile: string, yaml = '', leadText?: (repo: string) => string) {
   const log = join(tempDir(), 'portes.log');
-  const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], `worktrees: true\ntest: echo "FULL $PWD" >> ${log}`, {});
+  const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], `worktrees: true\ntest: echo "FULL $PWD" >> ${log}\n${yaml}`, {});
   put(repo, 'src/f.txt', lines(12));
   let moved = 0;
+  const shortBriefs: string[] = [];
   const f = fake({
     implement: async (cwd, brief) => {
       await meeting(2)();
@@ -109,14 +112,15 @@ async function scenario(leadFile: string) {
       git(cwd, 'commit', '-q', '-m', `feat(${lot}): travail`);
       return claudeOut(workReport({ commits: [{ sha: git(cwd, 'rev-parse', 'HEAD'), sujet: `feat(${lot}): travail` }] }));
     },
-    'review-small': async () => {
-      if (!moved++) put(repo, leadFile);
+    'review-small': async (_cwd, brief) => {
+      shortBriefs.push(brief);
+      if (!moved++) put(repo, leadFile, leadText?.(repo));
       return claudeOut(reviewReport({ verdict: 'rebase sans dégât' }));
     },
   });
   const r = await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f);
   const suites = readFileSync(log, 'utf8').trim().split('\n').filter((x) => x.includes('/worktrees/') && !x.includes('baseline'));
-  return { r, parent, suites, repo };
+  return { r, parent, suites, repo, log, shortBriefs };
 }
 
 describe('L662 R5 — la porte d\'intégration rejouée après « main a avancé » seulement si le delta est lié', () => {
@@ -134,5 +138,90 @@ describe('L662 R5 — la porte d\'intégration rejouée après « main a avancé
     expect(r.out).toContain("main a avancé pendant l'intégration, rebase rejoué");
     expect(r.out).not.toContain("porte d'intégration non rejouée");
     expect(store(parent).readLot('a', 'L2')!.status).toBe('ready');
+  });
+});
+
+const portes = (log: string) => readFileSync(log, 'utf8').trim().split('\n').length;
+const verify = async (repo: string, sha: string) => {
+  const lines: string[] = [];
+  const code = await cli(['verify', '--gate', '--sha', sha], { cwd: repo, env: {}, out: (x: string) => lines.push(x), err: (x: string) => lines.push(x), now: () => new Date('2026-11-06T12:00:00') });
+  return { code, text: lines.join('\n') };
+};
+const lotTip = (repo: string) => git(repo, 'log', '--format=%H', '--grep=feat(L2)', '--fixed-strings', '-1', 'main');
+
+describe('L662 R5 — la porte sautée reste reconnue au sha rebasé, et dit d\'où elle vient', () => {
+  it('R5 — verify --gate --sha <sha rebasé> : rien n\'est rejoué, la sortie nomme le sha d\'origine et le delta jugé sans lien', async () => {
+    const s = await scenario('docs/lead.txt');
+    expect(s.r.out).toContain('porte d\'intégration non rejouée');
+    const sha = lotTip(s.repo);
+    const before = portes(s.log);
+    const v = await verify(s.repo, sha);
+    expect(v.code).toBe(0);
+    expect(portes(s.log)).toBe(before);
+    const k = store(s.parent).readLot('a', 'L2')!.checks!;
+    expect(k.head).toBe(sha);
+    expect(k.tree).toBe(git(s.repo, 'rev-parse', `${sha}^{tree}`));
+    expect(k.reprise!.head).not.toBe(sha);
+    expect(v.text).toContain('verdict repris');
+    expect(v.text).toContain(k.reprise!.head.slice(0, 7));
+    expect(v.text).toContain(`${k.reprise!.from.slice(0, 7)}..${k.reprise!.to.slice(0, 7)}`);
+    expect(v.text).toContain('sans lien avec le lot');
+  });
+  it('R5 — le sommet de main, sous lequel ne reposent que des commits de plan, reprend aussi la porte sautée', async () => {
+    const s = await scenario('docs/lead.txt');
+    const before = portes(s.log);
+    const v = await verify(s.repo, git(s.repo, 'rev-parse', 'main'));
+    expect(v.code).toBe(0);
+    expect(portes(s.log)).toBe(before);
+    expect(v.text).toContain('sans lien avec le lot');
+  });
+  it('R5 — un delta qui touche le lot : la porte joue au sommet, l\'enregistrement n\'est pas une reprise', async () => {
+    const s = await scenario('src/g.txt');
+    const k = store(s.parent).readLot('a', 'L2')!.checks!;
+    expect(k.head).toBe(lotTip(s.repo));
+    expect(k.reprise).toBeUndefined();
+  });
+  it('R5 — un fichier changé après la reprise : l\'arbre n\'est plus celui enregistré, verify --gate rejoue', async () => {
+    const s = await scenario('docs/lead.txt');
+    const sha = put(s.repo, 'docs/apres.txt');
+    const before = portes(s.log);
+    const v = await verify(s.repo, sha);
+    expect(v.text).toContain('verdict rejoué');
+    expect(portes(s.log)).toBeGreaterThan(before);
+  });
+  it('R5 — `orchestrate.gate.readsPlan` déclaré : un delta de plan a un effet sur un test, la porte joue au sommet', async () => {
+    const plan = (repo: string) => `${readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')}# note du lead\n`;
+    const s = await scenario('.cadence/raf.yaml', 'gate: { readsPlan: true }', plan);
+    expect(s.r.code).toBe(0);
+    expect(s.r.out).toContain("main a avancé pendant l'intégration, rebase rejoué");
+    expect(s.r.out).not.toContain("porte d'intégration non rejouée");
+    expect(store(s.parent).readLot('a', 'L2')!.checks!.reprise).toBeUndefined();
+  });
+  it('R5 — sans déclaration, le même delta de plan reste sans lien (la porte n\'est pas rejouée)', async () => {
+    const plan = (repo: string) => `${readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')}# note du lead\n`;
+    const s = await scenario('.cadence/raf.yaml', '', plan);
+    expect(s.r.out).toContain("porte d'intégration non rejouée");
+    expect(store(s.parent).readLot('a', 'L2')!.checks!.reprise).toBeDefined();
+  });
+  it('R5 — la revue courte après une reprise ne lit pas « contrôles joués à HEAD » : le brief dit le sha d\'origine', async () => {
+    const s = await scenario('docs/lead.txt');
+    const k = store(s.parent).readLot('a', 'L2')!.checks!;
+    expect(s.shortBriefs.length).toBeGreaterThan(1);
+    const last = s.shortBriefs.at(-1)!;
+    expect(last).toContain(`at ${k.reprise!.head.slice(0, 7)}, before the rebase`);
+    expect(last).not.toContain(`at HEAD ${k.head.slice(0, 7)}, just before this review`);
+  });
+  it('R5 — une reprise n\'est pas une suite jouée à cet arbre : une nouvelle intégration la rejoue', () => {
+    const runs = [{ label: 'tests' as const, command: 'npm test', code: 0 }];
+    const c = (reprise?: { head: string; tree?: string; from: string; to: string }) => ({ lot: { checks: { head: 'b', tree: 'T', runs, ...(reprise ? { reprise } : {}) } }, config: { test: 'npm test' } }) as never;
+    expect(fullSuiteGreen(c(), 'T')).toBe(true);
+    expect(fullSuiteGreen(c({ head: 'a', tree: 'S', from: 'x', to: 'y' }), 'T')).toBe(false);
+  });
+  it('R5 — recordedGate rend l\'origine du verdict repris', async () => {
+    const s = await scenario('docs/lead.txt');
+    const sha = lotTip(s.repo);
+    const found = recordedGate([s.parent], s.repo, sha, [{ name: 'tests', cmd: `echo "FULL $PWD" >> ${s.log}` }]);
+    expect(found).toHaveProperty('found');
+    expect('found' in found && found.found.reprise?.head).toBe(store(s.parent).readLot('a', 'L2')!.checks!.reprise!.head);
   });
 });

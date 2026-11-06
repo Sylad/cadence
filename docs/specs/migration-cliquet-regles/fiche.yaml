@@ -3,13 +3,13 @@ sujet:
   titre: Contrat de --migrer et de la porte du cliquet de qualité (correction, découpage, déplacement, migrations successives)
   lot: L477
   perimetre:
-    modules: [scripts/qualite.mjs, src/orchestrate/integrate.ts]
+    modules: [scripts/qualite.mjs, scripts/qualite.d.mts, src/orchestrate/integrate.ts, docs/qualite.md, test/qualite-l462.test.ts]
     endpoints: []
     jobs: ["étape d'intégration de orchestrate (resolveBaseline et settleBaseline, qui appellent comparerMigration)"]
     hors_perimetre:
       - "le calcul de la mesure (ESLint, knip, jscpd, directives) et le format de qualite-baseline.json : inchangés"
       - "la garde de configuration (configChangee), le retard de origine/main, --init : inchangés"
-      - "la résolution des conflits de base à l'intégration (fiche base-cliquet-integration, L538) : seul son contrôle par comparerMigration est touché (R13)"
+      - "la résolution des conflits de base à l'intégration (fiche base-cliquet-integration, L538) : seul son contrôle par comparerMigration est touché (R13) ; docs/qualite.md (« Moving or splitting a file ») est mis à jour pour le lien de contenu, et les tests « R10 — … » de test/qualite-l462.test.ts:222-256 (cartes synthétiques sans contenu, qui attendent qu'un chemin neuf parte libre) sont réécrits dans test/qualite-l477.test.ts avec des contenus liés, leurs ids ne sont pas repris"
 
 cas:
   - id: C1
@@ -18,24 +18,25 @@ cas:
     declencheur: commande node scripts/qualite.mjs --migrer --contre main
     preconditions:
       - la base du lot existe et la porte vient de l'accepter (elle ne dépasse pas celle du départ du lot)
-      - un fichier du départ du lot a été coupé en plusieurs fichiers neufs, ou renommé, ou une de ses fonctions a été déplacée dans un fichier neuf
+      - un fichier du départ du lot a été coupé en plusieurs fichiers neufs, ou renommé, ou une de ses fonctions a été déplacée dans un fichier neuf (suivi par git ou non, le contenu est lu dans l'arbre de travail)
     nominal:
       - La commande mesure le code, puis lit la base du lot et la base du point de départ (merge-base avec la référence).
-      - Elle vérifie qu'aucune clé d'un fichier qui existait au départ ne monte et que le total de chaque mesure ne monte pas.
-      - Pour chaque outil et règle, elle somme les mesures des fichiers neufs et la compare à ce que les fichiers sources ont perdu sur cette règle.
-      - La somme est strictement plus petite que la perte (un découpage), ou égale quand la source garde un défaut de la règle (une fonction déplacée entière).
-      - Elle réécrit la base avec la mesure et répond « migrée » en code 0.
+      - Elle vérifie qu'aucune clé d'un fichier qui existait au départ ne monte au-dessus de la base du lot et que le total de chaque mesure ne monte pas.
+      - Elle relie chaque fichier neuf qui porte un chiffre à la source du départ dont il reprend le plus de lignes (R6, R14).
+      - Pour chaque source et chaque outil-règle, elle somme les mesures des fichiers neufs liés et la compare à ce que la source a perdu depuis le départ ; un fichier neuf sans source n'a aucun crédit (R3, R4, R5).
+      - Toutes les sommes sont au plus égales à la perte, elle réécrit la base avec la mesure et répond « migrée » en code 0.
     alternatives:
-      - { si: un fichier existant monte sur une clé, ou un total monte, alors: refus code 1, base intacte, regles: [R2, R12] }
-      - { si: un défaut neuf est ajouté dans un fichier neuf et payé par une correction ailleurs (un fichier dont git ne montre pas que le fichier neuf vient de lui), alors: refus code 1 de ce fichier neuf, avec un message qui nomme le fichier neuf et le fichier source, base intacte, regles: [R3, R6, R12] }
-      - { si: un fichier est coupé en deux (cli.ts 1000 → 350 plus cli-plan.ts 650 dont git montre que le contenu vient de cli.ts), alors: le gain de cli.ts crédite cli-plan.ts, accepté, regles: [R6] }
-      - { si: le fichier neuf réécrit le code au lieu de le couper (git ne lui trouve pas 50 % de lignes venues de la source), alors: pas une coupe, il paie son défaut et est refusé, regles: [R6, R12] }
-      - { si: un vrai morceau et un fichier neuf compensé par un gain ailleurs sont présentés ensemble, alors: leur somme dépasse la perte des sources, tous deux refusés, regles: [R3, R12] }
-      - { si: le fichier source est renommé sans rien perdre (morceau égal à la perte), alors: refus, un renommage n'est pas un découpage, regles: [R4] }
-      - { si: une fonction est déplacée entière vers un fichier neuf et la source garde un défaut de la règle, alors: acceptée si la somme est au plus la perte, regles: [R5] }
+      - { si: un fichier existant monte sur une clé, ou un total monte, alors: refus code 1, base intacte, regles: [R2, R9, R12] }
+      - { si: un défaut neuf est ajouté dans un fichier neuf et payé par une correction ailleurs (aucune source liée), alors: refus code 1 de ce fichier neuf, avec un message qui nomme le fichier neuf et « aucune source » ou la source la plus proche, base intacte, regles: [R3, R6, R12, R15] }
+      - { si: un fichier est coupé en deux (cli.ts 1000 → 350 plus cli-plan.ts 650 dont les lignes viennent de cli.ts), alors: la perte de cli.ts (650) crédite cli-plan.ts, accepté, regles: [R3, R4, R6] }
+      - { si: le fichier neuf réécrit le code au lieu de le couper (moins de 50 % de ses lignes significatives sont dans une source), alors: pas de lien, il paie son défaut et est refusé, regles: [R6, R14] }
+      - { si: un vrai morceau et un fichier neuf compensé par un gain ailleurs sont présentés ensemble, alors: la somme des morceaux liés à la source dépasse sa perte ou le fichier neuf n'a pas de lien, refusés, regles: [R3, R12] }
+      - { si: le fichier source est renommé sans rien perdre (morceau égal à la perte), alors: accepté, un renommage n'ajoute aucun défaut, regles: [R4] }
+      - { si: une fonction est déplacée entière vers un fichier neuf et la source garde un défaut de la règle, alors: acceptée si la somme liée est au plus la perte de la source, regles: [R4, R5] }
       - { si: un fichier neuf a une mesure à 0, alors: ignoré, regles: [R7] }
       - { si: la commande est lancée sans --contre, alors: sortie 2, rien n'est écrit, regles: [R8] }
-      - { si: un second --migrer suit un premier (avec ou sans --ecrire entre les deux), alors: les morceaux déjà acceptés consomment le crédit de leur règle et ne sont pas refusés pour autant, regles: [R9, R10] }
+      - { si: git ne rend pas le contenu d'un fichier du départ (clone superficiel, référence absente, git absent), alors: sortie 2, rien n'est écrit, aucun fichier neuf n'est refusé à tort, regles: [R16] }
+      - { si: un second --migrer suit un premier (avec ou sans --ecrire entre les deux), alors: le crédit est recalculé depuis le départ sur la mesure courante, les morceaux déjà acceptés passent encore et ne consomment rien de plus, regles: [R9, R10] }
     resultat: La base porte les fichiers neufs sans qu'un défaut neuf ait été admis.
   - id: C2
     titre: Un lot corrige un fichier, sans découper, puis fige le gain
@@ -47,7 +48,7 @@ cas:
       - La commande compare la mesure à la base.
       - Rien n'empire, la base est baissée et la porte reste verte.
     alternatives:
-      - { si: la correction fait en même temps apparaître un fichier neuf avec un défaut dont le contenu ne vient pas de la source corrigée, alors: --migrer refuse ce fichier neuf, car la source corrigée ne lui crédite rien sans lien de contenu, regles: [R6] }
+      - { si: la correction fait en même temps apparaître un fichier neuf avec un défaut dont le contenu ne vient pas de la source corrigée, alors: --migrer refuse ce fichier neuf, car la source corrigée ne lui crédite rien sans lien de contenu, regles: [R3, R6] }
       - { si: une fonction grossit sans dépasser la pire de son fichier, alors: la somme des chiffres monte et le cliquet refuse, regles: [R1] }
     resultat: Une correction se fige ; elle ne sert pas à payer un défaut neuf.
   - id: C3
@@ -57,12 +58,13 @@ cas:
     preconditions:
       - la base du lot a pu être migrée, puis sa source corrigée et le gain figé
     nominal:
-      - La porte applique la comparaison de comparerMigration à la base du lot contre la base du départ.
-      - Elle crédite aussi le gain d'une source corrigée jusqu'à zéro, parce qu'elle rejoue une base déjà acceptée.
+      - La porte applique la comparaison de comparerMigration à la base du lot contre la base du départ, avec les mêmes liens de contenu que --migrer (le contenu du départ par git, celui des fichiers neufs dans l'arbre de travail).
+      - La perte d'une source corrigée depuis la migration n'a fait que grandir, donc la base migrée reste couverte.
       - Elle répond code 0 si la base ne remonte pas.
     alternatives:
       - { si: la base du lot est éditée à la main avec un fichier existant ou un total en hausse, alors: refus code 1, regles: [R2, R12] }
-      - { si: la base éditée donne à un fichier neuf une mesure supérieure à ce que les sources ont perdu, alors: refus code 1, regles: [R3, R11] }
+      - { si: la base éditée donne à un fichier neuf une mesure supérieure à ce que sa source a perdu, ou à un fichier neuf sans lien, alors: refus code 1, aussi strict que --migrer, regles: [R3, R11] }
+      - { si: git ne rend pas le contenu du départ, alors: sortie 2, regles: [R16] }
     resultat: Migrer, corriger le reste, --ecrire puis la porte reste vert ; une base truquée est refusée.
   - id: C4
     titre: L'intégration de orchestrate contrôle un commit du lot qui découpe un fichier
@@ -71,10 +73,12 @@ cas:
     preconditions:
       - la base du lot a changé depuis le départ du lot, et main a aussi bougé
     nominal:
-      - Le contrôle appelle comparerMigration avec le départ du commit, le commit et la présence des fichiers dans l'arbre de ce commit.
+      - Le contrôle lit le contenu des sources dans le départ du commit (git show) et celui des fichiers neufs dans le commit contrôlé, sans arbre de travail, pour établir les liens.
+      - Il appelle comparerMigration avec le départ du commit, le commit, l'existence au départ et ces liens.
       - Un découpage passe selon les mêmes règles que --migrer, la base est recomposée.
     alternatives:
       - { si: le commit ajoute un défaut neuf compensé ailleurs, alors: la base n'est pas recomposée, le rebase est abandonné comme aujourd'hui, regles: [R3, R13] }
+      - { si: git ne rend pas un contenu, alors: aucun lien, le contrôle est faux et le rebase abandonné comme aujourd'hui, regles: [R13] }
     resultat: Le découpage légitime passe l'intégration, le défaut compensé non.
 
 regles:
@@ -91,29 +95,29 @@ regles:
     source: "scripts/qualite.mjs:133-146 (comparerMigration) ; docs/qualite.md:44-51 ; test/qualite-l462.test.ts:227 (« une migration ne cache pas une hausse »)"
     tests: ["R2 — le total qui monte est refusé et nomme « … (total, tous fichiers) »", "R2 — une clé d'un fichier qui existait qui monte est refusée même si le total baisse"]
   - id: R3
-    cas: [C1, C3, C4]
-    enonce: "Pour chaque outil et règle, la somme des mesures des fichiers neufs ne dépasse pas ce que les fichiers sources ont perdu sur cette règle : un défaut neuf est refusé même quand un gain ailleurs fait baisser le total, et un morceau légitime présenté avec un tel défaut est refusé avec lui, puisque leur somme dépasse la perte."
+    cas: [C1, C2, C3, C4]
+    enonce: "Pour chaque fichier source du départ et chaque outil-règle (clé sans le chemin, comme les totaux de scripts/qualite.mjs:111-117), la somme des mesures des fichiers neufs liés à cette source (R6) ne dépasse pas la perte de la source sur cette règle (R5). Un fichier neuf sans source liée n'a aucun crédit : toute mesure positive y est refusée, même quand un gain ailleurs fait baisser le total. Un morceau légitime présenté avec un tel défaut ne le sauve pas, et ne passe que si la somme de ses frères liés à la même source reste dans la perte."
     statut: sourcee
     source: "demande du lot : « compter la somme des excès par fichier et par règle, refuser un défaut neuf même compensé » ; cas mesurés par la revue (défaut neuf d'un fichier neuf compensé par un gain ailleurs)"
-    tests: ["R3 — fichier neuf de 650 lignes et fichier ancien de 700 corrigé à 0 sans découpe : le fichier neuf est refusé alors que le total baisse", "R3 — un morceau de 400 et un fichier neuf compensé de 600 pour une source qui a perdu 1000 : les deux sont refusés", "R3 — découper 3047 lignes en trois de 1000 passe toujours (test R10 existant)"]
+    tests: ["R3 — fichier neuf de 650 lignes sans parenté et fichier ancien de 700 corrigé à 0 : le fichier neuf est refusé alors que le total baisse", "R3 — un morceau lié de 400 et un fichier neuf sans lien de 600 pour une source qui a perdu 1000 : le fichier sans lien est refusé", "R3 — deux morceaux liés à la même source dont la somme (700) dépasse sa perte (650) : refusés", "R3 — découper 3047 lignes en trois de 1000 liés à la source passe toujours (le test « R10 » de test/qualite-l462.test.ts:222, réécrit avec des contenus)"]
   - id: R4
     cas: [C1]
-    enonce: "Une source est un fichier du départ qui n'est plus dans l'arbre de travail (coupé ou renommé) et dont git lie le contenu à un fichier neuf (R6) : le morceau neuf doit être strictement plus petit que sa perte, donc un renommage pur est refusé."
-    statut: hypothese
-    si_faux: "Si un renommage doit passer, il faut admettre un morceau égal à la perte pour un fichier disparu ; seule la comparaison change (stricte ou large), aucune donnée stockée."
-    tests: ["R4 — un fichier de 1000 lignes renommé à l'identique : refusé", "R4 — un fichier coupé en deux morceaux de 600 et 300 : accepté"]
+    enonce: "La comparaison de R3 est large : une somme égale à la perte passe. Un renommage pur (git mv, un fichier neuf lié qui reprend tout ce que la source a perdu) et une fonction déplacée entière passent donc, car ils n'ajoutent aucun défaut ; une somme d'un chiffre au-dessus de la perte est refusée."
+    statut: sourcee
+    source: "docs/qualite.md:44-51 (« Moving or splitting a file … the one legitimate way », condition (b) : le total ne monte pas, donc l'égalité passe) ; scripts/qualite.mjs:133-146 (total égal accepté)"
+    tests: ["R4 — un fichier de 1000 lignes renommé à l'identique (git mv) : accepté", "R4 — un fichier coupé en deux morceaux de 600 et 300 : accepté", "R4 — un morceau d'un chiffre au-dessus de la perte (601 pour 600) : refusé"]
   - id: R5
     cas: [C1]
-    enonce: "Une source encore présente qui garde un défaut de la règle (une fonction déplacée entière dans un fichier neuf) autorise une somme neuve égale à sa perte, car une fonction ne se coupe pas."
+    enonce: "La perte d'une source sur un outil-règle est la somme, sur ses clés qui portent un chiffre (R7), de max(0, valeur de la base du départ moins valeur de la mesure courante) ; elle compte pour une source disparue comme pour une source encore présente qui garde un défaut (une fonction déplacée entière dans un fichier neuf). Les sources candidates sont les fichiers de la base du départ ; elle est toujours calculée contre la base du départ, jamais contre celle du lot."
     statut: hypothese
-    si_faux: "Si la somme devait être strictement plus petite, déplacer une fonction entière serait refusé et il faudrait la réduire au passage ; seule l'inégalité change."
-    tests: ["R5 — fonction de complexité 30 déplacée entière, la source garde une autre fonction en défaut : acceptée", "R5 — le même déplacement avec une fonction qui a grossi au passage (31 pour 30 perdus) : refusé"]
+    si_faux: "Si seule une source disparue créditait, déplacer une fonction vers un fichier neuf serait refusé ; si la perte se comptait contre la base du lot, un gain figé par --ecrire disparaîtrait du crédit et un second découpage serait refusé. Seul le calcul change, aucune donnée stockée."
+    tests: ["R5 — fonction de complexité 30 déplacée entière, la source garde une autre fonction en défaut : acceptée", "R5 — le même déplacement avec une fonction qui a grossi au passage (31 pour 30 perdus) : refusé", "R5 — source corrigée et figée par --ecrire avant le découpage : sa perte depuis le départ crédite encore le morceau lié"]
   - id: R6
-    cas: [C1, C2]
-    enonce: "À --migrer, la perte d'un fichier source n'est créditée qu'au fichier neuf dont git montre que le contenu vient de cette source : le lien est établi par la détection de copie de git (git diff -M -C entre le départ du lot et l'arbre de travail, copies cherchées dans tous les fichiers du départ), et il vaut quand au moins 50 % des lignes du fichier neuf sont attribuées à la source. Sans ce lien (code réécrit, fichier sans parenté, source simplement corrigée), le fichier neuf ne reçoit aucun crédit et paie son défaut : refus, avec un message qui nomme les deux fichiers (le fichier neuf et la source la plus proche, ou « aucune source »). Aucune option ni déclaration ne remplace ce lien, pour qu'une session ne puisse pas s'exempter du cliquet. La commande et ses options ne changent pas."
+    cas: [C1, C2, C3, C4]
+    enonce: "Un fichier neuf (absent du départ du lot) qui porte un chiffre n'est crédité que par la source du départ dont son contenu vient (le fichier de la base du départ qui lui prête le plus de lignes, R14) ; sans ce lien (code réécrit, fichier sans parenté, source simplement corrigée), il ne reçoit aucun crédit et paie son défaut. Aucune option ni déclaration ne remplace ce lien, pour qu'une session ne puisse pas s'exempter du cliquet. La commande et ses options ne changent pas."
     statut: sourcee
-    source: "réponse du lead à la question de L477 : option (b), lien de contenu par git (détection de copie -C), sans nouvelle option ; ni (a) (c'est le défaut compensé que le lot refuse) ni (c) (une déclaration laisserait une session s'exempter) ; une coupe qui réécrit le code n'est pas une coupe. Le seuil de 50 % est le choix de la fiche (valeur par défaut de git pour -M et -C) : voir R14."
-    tests: ["R6 — cli.ts de 1000 lignes ramené à 350 et cli-plan.ts de 650 lignes copiées de cli.ts : accepté, le crédit de cli.ts va à cli-plan.ts", "R6 — le même découpage où cli-plan.ts réécrit le code (moins de 50 % de lignes venues de cli.ts) : refusé, le message nomme cli-plan.ts et cli.ts", "R6 — fichier de 700 lignes corrigé à 0 et fichier neuf de 650 lignes sans parenté : refusé, le message nomme le fichier neuf et « aucune source »", "R6 — fichier corrigé sans fichier neuf : --ecrire fige le gain"]
+    source: "réponse du lead à la question de L477 : option (b), lien de contenu, sans nouvelle option ; ni (a) (c'est le défaut compensé que le lot refuse) ni (c) (une déclaration laisserait une session s'exempter) ; une coupe qui réécrit le code n'est pas une coupe. Le mécanisme exact est un choix de la fiche (R14), la revue ayant montré que git diff -M -C ne mesure pas ce lien."
+    tests: ["R6 — cli.ts de 1000 lignes ramené à 350 et cli-plan.ts de 650 lignes copiées de cli.ts : accepté, la perte de cli.ts crédite cli-plan.ts", "R6 — le même découpage où cli-plan.ts réécrit le code (moins de 50 % de lignes venues de cli.ts) : refusé, le message nomme cli-plan.ts et cli.ts", "R6 — fichier de 700 lignes corrigé à 0 et fichier neuf de 650 lignes sans parenté : refusé, le message nomme le fichier neuf et « aucune source »", "R6 — fichier corrigé sans fichier neuf : --ecrire fige le gain"]
   - id: R7
     cas: [C1]
     enonce: "Une mesure à 0 d'un fichier neuf n'ajoute aucun défaut ; les clés de comptage (nombre de dépassements, blocs jscpd) ne sont pas sommées, seules les clés qui portent un chiffre."
@@ -128,66 +132,82 @@ regles:
     tests: ["R8 — --migrer sans --contre : code 2, base intacte"]
   - id: R9
     cas: [C1]
-    enonce: "--migrer ne fait jamais remonter la base du lot : les fichiers existants et les totaux sont jugés contre la base du lot, que la porte vient d'accepter, de sorte qu'un gain figé par --ecrire n'est pas repris par un --migrer suivant."
+    enonce: "--migrer ne fait jamais remonter la base du lot : les clés des fichiers existants et les totaux sont jugés contre la base du lot, que la porte vient d'accepter, de sorte qu'un gain figé par --ecrire n'est pas repris par un --migrer suivant ; seul le crédit des fichiers neufs (R5) se calcule contre le départ."
     statut: hypothese
-    si_faux: "Si --migrer jugeait contre la base du départ du lot, un gain figé pourrait servir à payer un défaut neuf après coup ; seule la base de comparaison change."
-    tests: ["R9 — gain figé par --ecrire puis fichier neuf du même montant : --migrer refuse", "R9 — la base écrite par --migrer n'a aucune clé au-dessus de la base du lot avant l'appel"]
+    si_faux: "Si --migrer jugeait aussi les clés et les totaux contre la base du départ, un gain figé pourrait servir à payer un défaut neuf après coup ; seule la base de comparaison change."
+    tests: ["R9 — gain figé par --ecrire puis fichier neuf sans lien du même montant : --migrer refuse", "R9 — gain figé par --ecrire puis fichier neuf lié à une autre source : --migrer refuse car le total monte au-dessus de la base du lot", "R9 — la base écrite par --migrer n'a aucune clé au-dessus de la base du lot avant l'appel"]
   - id: R10
     cas: [C1]
-    enonce: "Un morceau déjà accepté (la base du lot le porte à sa mesure courante au moins) n'est pas refusé de nouveau, même si sa source a été corrigée depuis ; il consomme le crédit de sa règle à sa mesure courante, de sorte que deux --migrer ne permettent jamais plus qu'un seul."
+    enonce: "Le crédit n'est jamais consommé ni stocké : à chaque appel il est recalculé depuis la base du départ, les liens (R6) et la mesure courante, sur tous les fichiers neufs, ceux déjà acceptés comme ceux d'un nouveau découpage. Un morceau déjà accepté passe donc de nouveau tant que sa mesure ne grossit pas, même si sa source a été corrigée depuis ; deux --migrer de morceaux dont la somme dépasse la perte de la source sont refusés au second, parce que la somme porte sur tous les morceaux présents."
     statut: hypothese
-    si_faux: "Si un morceau accepté devait être rejugé, un second découpage après --ecrire serait refusé (cas des passes 5 à 7 du 02-11) ; si les morceaux ne consommaient pas le crédit, deux --migrer admettraient deux fois le même défaut."
-    tests: ["R10 — premier --migrer accepté, source corrigée, --ecrire, second --migrer : le morceau est gardé", "R10 — deux --migrer successifs de morceaux dont la somme dépasse la perte de la source : le second est refusé"]
+    si_faux: "Si le crédit était gardé dans la base ou consommé, il faudrait un nouveau format de qualite-baseline.json (question au lead) ; sans calcul depuis le départ, un second découpage après --ecrire serait refusé (cas des passes 5 à 7 du 02-11) ou deux --migrer admettraient deux fois le même défaut."
+    tests: ["R10 — premier --migrer accepté, source corrigée, --ecrire, second --migrer : le morceau est gardé", "R10 — cli-plan.ts coupé de nouveau en deux après un premier --migrer et --ecrire (sources du départ : cli.ts) : accepté, la somme des morceaux reste dans la perte de cli.ts", "R10 — deux --migrer successifs de morceaux dont la somme dépasse la perte de la source : le second est refusé"]
   - id: R11
     cas: [C3]
-    enonce: "La porte (--contre) applique la même comparaison à la base du lot mais crédite aussi le gain d'une source corrigée jusqu'à zéro, parce qu'elle rejoue une base acceptée ; la stricte interdiction d'un défaut compensé tient donc à --migrer, et une base éditée à la main qui donne à un fichier neuf au plus le gain d'un fichier corrigé passe la porte."
-    statut: hypothese
-    si_faux: "Si la porte devait être aussi stricte, migrer, corriger le reste puis --ecrire rougirait la porte ; si cette faille d'une base éditée à la main est inacceptable, c'est la question du rapport."
-    tests: ["R11 — migrer, corriger la source, --ecrire : la porte reste verte", "R11 — base éditée à la main avec un fichier neuf plus grand que la perte de tous les fichiers : la porte refuse"]
+    enonce: "La porte (--contre) applique la même comparaison que --migrer à la base du lot contre celle du départ, avec les mêmes liens de contenu : un fichier neuf d'une base éditée à la main passe seulement si son contenu est lié à une source qui a perdu au moins autant. Migrer, corriger le reste puis --ecrire laisse la porte verte, parce que la perte d'une source ne fait que grandir avec les corrections."
+    statut: sourcee
+    source: "docs/qualite.md:44-51 (« The same rule is what --contre applies to the baseline of the lot, so a migrated baseline passes the gate and the CI, and a hand-edited one does not ») ; scripts/qualite.mjs:357-361 (baseRemonte appelle comparerMigration)"
+    tests: ["R11 — migrer, corriger la source, --ecrire : la porte reste verte", "R11 — base éditée à la main avec un fichier neuf sans lien et un fichier corrigé de même montant : la porte refuse", "R11 — base éditée à la main avec un fichier neuf lié mais plus grand que la perte de sa source : la porte refuse"]
   - id: R12
     cas: [C1, C3]
-    enonce: "Un refus rend le code 1, laisse la base intacte et nomme chaque mesure en cause ; un fichier neuf refusé porte la mention « fichier neuf : pas plus petit que ce que les fichiers existants ont perdu » et nomme le fichier source le plus proche trouvé par git (R6), ou « aucune source »."
-    statut: hypothese
-    si_faux: "Seul le texte du message change (le code de sortie et la base intacte sont déjà ceux de scripts/qualite.mjs:367)."
-    tests: ["R12 — fichier neuf refusé : le texte nomme la clé, « 0 → n » et la mention, la base est inchangée"]
+    enonce: "Un refus rend le code 1, laisse la base intacte et nomme chaque mesure en cause."
+    statut: sourcee
+    source: "scripts/qualite.mjs:367 (« Qualité : la migration empire N mesure(s) … ») ; scripts/qualite.mjs:360 ; test/qualite-l462.test.ts:235-244 (code 1 et base intacte)"
+    tests: ["R12 — migration refusée : code 1, base inchangée, chaque clé en cause nommée avec « avant → après »"]
   - id: R13
     cas: [C4]
-    enonce: "Les deux appels de l'intégration à comparerMigration (integrate.ts:226 et :287) fournissent la présence des fichiers dans l'arbre du commit contrôlé (resp. du sommet du lot), pour qu'un découpage légitime reste accepté comme à L538 ; sans cette information aucune source n'existe et tout fichier neuf serait refusé."
+    enonce: "Les deux appels de l'intégration à comparerMigration (integrate.ts:226 et :287) fournissent, en plus de l'existence au départ (cat-file -e déjà présent), les liens de contenu : comparerMigration(avant, apres, existe, lien, depart = avant), où lien(cheminNeuf) rend la source ou null et se calcule par une fonction exportée de scripts/qualite.mjs (R14) avec lireDepart = git show <parent ou point>:<chemin> et lireNeuf = git show <REBASE_HEAD ou before>:<chemin>, sans arbre de travail. Le paramètre depart (la base du départ, utilisée pour le crédit R5) vaut avant pour la porte et l'intégration, et la base du départ pour --migrer. Un git show qui échoue ne crée aucun lien : le contrôle rend faux, le rebase est abandonné comme aujourd'hui."
     statut: hypothese
-    si_faux: "Si l'intégration ne recevait pas la présence, tout lot qui découpe un fichier verrait son rebase abandonné ; seuls les appelants changent."
-    tests: ["R13 — commit qui coupe un fichier en deux : base recomposée à l'intégration", "R13 — commit qui ajoute un défaut neuf payé par une correction : rebase abandonné"]
+    si_faux: "Si l'intégration ne fournissait pas de lien, tout lot qui découpe un fichier verrait son rebase abandonné ; si la signature change, seuls les trois appelants (scripts/qualite.mjs:358 et :366, integrate.ts:226 et :287) et scripts/qualite.d.mts changent."
+    tests: ["R13 — commit qui coupe un fichier en deux : base recomposée à l'intégration", "R13 — commit qui ajoute un défaut neuf payé par une correction : rebase abandonné", "R13 — contenu illisible dans git : rebase abandonné, rien n'est écrit"]
   - id: R14
-    cas: [C1]
-    enonce: "Le seuil de similarité du lien de contenu est de 50 % des lignes du fichier neuf, mesuré sur ce fichier neuf (et non sur le plus grand des deux), pour qu'une fonction déplacée entière dans un petit fichier neuf soit rattachée à sa source ; le calcul reste un contrôle sur la sortie de git, sans état stocké."
+    cas: [C1, C3, C4]
+    enonce: "Le lien se calcule sans le diff de git, par comparaison de lignes : une ligne significative est une ligne dont le texte sans espaces de bord a au moins 4 caractères ; pour un fichier neuf et une source, les lignes en commun sont comptées par multiensemble (somme sur chaque texte du minimum des occurrences) ; la source liée est celle qui a le plus de lignes en commun (à égalité l'ordre alphabétique du chemin), à condition qu'elles fassent au moins 50 % des lignes significatives du fichier neuf (mesuré sur le fichier neuf, non sur le plus grand des deux, pour qu'une fonction de 30 lignes déplacée dans un fichier de 30 lignes soit liée à une source de 1000 lignes). Le contenu des sources vient de git show <départ>:<chemin> ; celui d'un fichier neuf de l'arbre de travail (suivi ou non par git) ou, à l'intégration, du commit contrôlé. Seuls les fichiers neufs qui portent un chiffre positif sont lus, et seuls les fichiers de la base du départ sont sources."
     statut: hypothese
-    si_faux: "Si le seuil était trop haut, un découpage légitime en petits morceaux serait refusé (baisser le seuil, par exemple à 30 %) ; trop bas, un fichier neuf qui reprend quelques lignes d'une source passerait (le relever). Seule la constante change, aucune donnée stockée."
-    tests: ["R14 — fichier neuf dont 50 % des lignes viennent de la source : lié ; 49 % : non lié, refusé", "R14 — fonction de 30 lignes déplacée entière dans un fichier neuf de 30 lignes depuis une source de 1000 lignes : liée"]
+    si_faux: "Si le seuil était trop haut, un découpage légitime en petits morceaux serait refusé (baisser, par exemple à 30 %) ; trop bas, un fichier neuf qui reprend quelques lignes d'une source passerait (relever). Si git blame -C ou git diff -C devait servir, le fichier neuf doit être suivi ou ajouté à l'index et le seuil ne se mesure pas sur le fichier neuf. Le lot ne donne pas de crédit au-delà de la perte de la source : un fichier lié qui ajoute un défaut dans la limite de cette perte est une coupe admise. Seule la fonction de lien change, aucune donnée stockée."
+    tests: ["R14 — fichier neuf dont 50 % des lignes significatives viennent de la source : lié ; 49 % : non lié, refusé", "R14 — fonction de 30 lignes déplacée entière dans un fichier neuf de 30 lignes depuis une source de 1000 lignes : liée", "R14 — fichier neuf non suivi par git : lu dans l'arbre de travail et lié", "R14 — lignes de moins de 4 caractères (« } », « }); ») seules en commun : aucun lien", "R14 — fichier neuf copié depuis deux sources : lié à celle qui a le plus de lignes en commun"]
+  - id: R15
+    cas: [C1, C3]
+    enonce: "Le refus d'un fichier neuf garde la forme du refus existant (R12) et ajoute la mention « fichier neuf : au-delà de ce que sa source a perdu » suivie de « source la plus proche : <fichier> » ou « aucune source ». Le message du refus est décrit dans docs/qualite.md."
+    statut: hypothese
+    si_faux: "Seul le texte du message change (le code de sortie et la base intacte sont ceux de R12)."
+    tests: ["R15 — fichier neuf refusé : le texte nomme la clé, « 0 → n », la mention et la source la plus proche ou « aucune source »", "R15 — le test de message existant (test/qualite-l462.test.ts:235-244) reste vrai sur le préfixe du refus"]
+  - id: R16
+    cas: [C1, C3]
+    enonce: "Quand git ne rend pas le contenu d'un fichier du départ (clone superficiel, référence sans merge-base, git absent ou en échec), --migrer et la porte sortent en code 2 avec un message qui nomme le fichier et la référence ; un refus de fichier neuf pour une cause de git serait un faux refus. Un fichier de la base du départ absent de l'arbre du départ n'est pas une source. Le coût est borné : un git show par source candidate, pour les seuls fichiers neufs qui portent un chiffre."
+    statut: sourcee
+    source: "docs/qualite.md:38-39 (règle 4 : un outil qui échoue fait échouer la commande, code 2, jamais « zéro défaut ») ; scripts/qualite.mjs:185 (lireRef)"
+    tests: ["R16 — git show en échec pour une source : code 2, message nommant le fichier et la référence, base intacte", "R16 — dépôt sans fichier neuf à porter un chiffre : aucun git show lancé"]
 
 contrats:
   - id: A1
     appel: commande node scripts/qualite.mjs --migrer --contre <ref>
-    entree: "la mesure du code courant, qualite-baseline.json du lot, la base et la liste des fichiers du merge-base de HEAD et de <ref>"
-    sortie: "code 0 : « qualite-baseline.json migrée : N mesures, aucun total en hausse. » et la base réécrite ; code 1 : refus, base intacte ; code 2 : usage ou outil en échec"
+    entree: "la mesure du code courant, qualite-baseline.json du lot, la base du merge-base de HEAD et de <ref>, le contenu des fichiers de cette base au merge-base (git show) et celui des fichiers neufs dans l'arbre de travail"
+    sortie: "code 0 : « qualite-baseline.json migrée : N mesures, aucun total en hausse. » et la base réécrite ; code 1 : refus, base intacte ; code 2 : usage, outil ou git en échec"
     erreurs:
       - { code: log error, message: "--migrer exige --contre <ref> : les fichiers « qui existaient » sont ceux du point de départ du lot." }
       - { code: log error, message: "Qualité : la migration empire N mesure(s) (ni un fichier qui existait ni le total ne peuvent monter) :" }
+      - { code: log error, message: "fichier neuf : au-delà de ce que sa source a perdu" }
+      - { code: log error, message: "Qualité : le contenu de <fichier> au point de départ <ref> est illisible (git show a échoué) : le lien des fichiers neufs ne peut pas être établi." }
       - { code: log error, message: "usage : node scripts/qualite.mjs [--init | --ecrire | --migrer] [--contre <ref>]" }
       - { code: log error, message: "qualite-baseline.json absente : lancer « node scripts/qualite.mjs --init » une fois, puis la versionner." }
-    regles: [R2, R3, R4, R5, R6, R7, R8, R9, R10, R12, R14]
+    regles: [R2, R3, R4, R5, R6, R7, R8, R9, R10, R12, R14, R15, R16]
   - id: A2
     appel: commande node scripts/qualite.mjs --contre <ref>
-    entree: "la base du lot et celle du merge-base avec <ref>"
-    sortie: "code 0 si la base du lot ne remonte pas et que rien n'empire, sinon code 1"
+    entree: "la base du lot, celle du merge-base avec <ref>, le contenu au merge-base des fichiers de cette base et celui des fichiers neufs de la base du lot"
+    sortie: "code 0 si la base du lot ne remonte pas et que rien n'empire, sinon code 1 ; code 2 si git échoue"
     erreurs:
       - { code: log error, message: "qualite-baseline.json remonte par rapport à N (elle ne peut que baisser : corriger le code, pas la base) :" }
-    regles: [R1, R2, R3, R11, R12]
+      - { code: log error, message: "fichier neuf : au-delà de ce que sa source a perdu" }
+      - { code: log error, message: "Qualité : le contenu de <fichier> au point de départ <ref> est illisible (git show a échoué) : le lien des fichiers neufs ne peut pas être établi." }
+    regles: [R1, R2, R3, R11, R12, R14, R15, R16]
   - id: A3
     appel: job orchestrate-integration
-    entree: "comparerMigration (resolveBaseline, settleBaseline) : départ du commit, commit, existence et présence des fichiers dans l'arbre des commits"
+    entree: "comparerMigration(avant, apres, existe, lien) (resolveBaseline, settleBaseline) : départ du commit, commit, existence au départ et lien de contenu lu par git show"
     sortie: "la base recomposée ou, si le contrôle refuse, aucune résolution (rebase abandonné)"
     erreurs: []
-    sans_erreur: "le job ne répond à aucun appelant ; un refus du contrôle abandonne le rebase comme aujourd'hui (fiche base-cliquet-integration, R3)"
+    sans_erreur: "le job ne répond à aucun appelant ; un refus du contrôle, ou un git show en échec, abandonne le rebase comme aujourd'hui (fiche base-cliquet-integration, R3)"
     regles: [R3, R13]
 
 donnees:
-  - { id: D1, objet: "qualite-baseline.json (carte plate clé → nombre, clés eslint|fichier|règle, …|total, knip|, jscpd|, directive|)", existant: true, modification: aucune, note: "format, clés et écriture inchangés ; la somme des excès par fichier et par règle est déjà la clé …|total" }
+  - { id: D1, objet: "qualite-baseline.json (carte plate clé → nombre, clés eslint|fichier|règle, …|total, knip|, jscpd|, directive|)", existant: true, modification: aucune, note: "format, clés et écriture inchangés ; le crédit et les liens se recalculent à chaque appel (R10), rien n'est stocké" }

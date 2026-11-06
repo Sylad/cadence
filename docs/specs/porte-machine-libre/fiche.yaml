@@ -1,9 +1,11 @@
 sujet:
   id: porte-machine-libre
-  titre: La porte joue sur la machine libre, l'hôte est décidé une fois par lot
+  titre: La porte joue sur la machine libre (clé gate.overflow), l'hôte est décidé une fois par lot
   lot: L639
   perimetre:
     modules:
+      - src/gate-config.ts
+      - src/config.ts
       - src/orchestrate/gate-place.ts
       - src/orchestrate/gate-host-slots.ts
       - src/remote-gate.ts
@@ -11,16 +13,17 @@ sujet:
       - src/orchestrate/cycle/checks.ts
       - src/orchestrate/cycle/baseline-run.ts
     endpoints: []
-    jobs: ["commande orchestrate (portes de lot et de ligne de base)"]
+    jobs: ["commande orchestrate (lecture de cadence.yaml, portes de lot et de ligne de base)"]
     tests_a_reprendre:
-      - "test/porte-deportee.test.ts et test/porte-deportee-{creneau-l624,vague,r6-bords,signal}.test.ts : ils attendent la ligne « porte jouée sur l'hôte » avec une seule porte ; ils deviennent « seule : locale ; deuxième simultanée : sur l'hôte » (R11)"
-      - "test/porte-deportee-config.test.ts et test/cadence-yaml-porte-deportee-l617.test.ts : relus, à adapter seulement s'ils attendent l'hôte pour une porte seule"
+      - "test/porte-deportee.test.ts et test/porte-deportee-{creneau-l624,vague,r6-bords,signal}.test.ts : AUCUN ne change (gate.host garde son sens, R11) ; ils restent verts tels quels et prouvent que l'ancien chemin est inchangé"
+      - "test/porte-deportee-config.test.ts : reçoit les cas de la nouvelle clé overflow (R12, R13) ; le test qui liste les clés attendues dans le message « inconnu » suit le nouveau message (A3)"
+      - "test/cadence-yaml-porte-deportee-l617.test.ts : relu, inchangé"
     docs_a_reprendre:
-      - "docs/remote-gate.md:52, docs/orchestrate-gate.md:17, docs/config.md:36 : « la porte se joue sur l'hôte » devient « la porte se joue en local d'abord, sur l'hôte en débordement » (R11)"
+      - "docs/remote-gate.md, docs/orchestrate-gate.md, docs/config.md : la phrase « la porte se joue sur l'hôte » (remote-gate.md:52, orchestrate-gate.md:17, config.md:36) reste vraie pour gate.host ; chaque page ajoute un paragraphe sur gate.overflow (local d'abord, débordement) et sur son refus avec host (R11)"
     hors_perimetre:
-      - "la valeur de gate.host dans le cadence.yaml d'un projet (L640 l'a retirée de celui de cadence ; la remettre est un réglage du lead)"
-      - "tout changement de clé de cadence.yaml : aucune clé n'est ajoutée ni renommée"
+      - "la valeur de gate.host dans le cadence.yaml d'un projet, et le choix d'un projet de passer de host à overflow (un réglage du lead)"
       - "le verdict, la ligne de base et le rejeu de la porte (inchangés)"
+      - "toute modification de la sémantique de gate.host, de install, refs et readsPlan"
 
 cas:
   - id: C1
@@ -28,32 +31,33 @@ cas:
     acteur: la vague orchestrate
     declencheur: commande orchestrate (porte d'un lot, withPlace)
     preconditions:
-      - gate.host est déclaré (mini-blue) et une commande build ou test existe
+      - gate.overflow est déclaré (mini-blue), gate.host ne l'est pas, et une commande build ou test existe
       - aucune porte locale ne tient la machine (seules les portes comptent, pas les sessions claude ni le pool)
     nominal:
       - La porte prend le tour local (une porte locale à la fois).
       - Elle se joue en local (Big-Blue), sans aucun appel ssh ni décision d'hôte gardée.
       - "La ligne « porte du lot L1 : jouée en local, machine locale libre » est écrite une fois."
     alternatives:
-      - { si: une porte locale tient la machine et l'hôte est joignable avec un créneau libre, alors: la porte déborde sur l'hôte (mini-blue), regles: [R2, R3] }
+      - { si: une porte locale tient la machine et l'hôte de débordement est joignable avec un créneau libre, alors: la porte déborde sur l'hôte (mini-blue), regles: [R2, R3] }
       - { si: une porte locale tient la machine et l'hôte est occupé (gate.maxParallel atteint), alors: la porte attend la première machine libérée, dans l'ordre des demandes, regles: [R4] }
-      - { si: gate.host est absent, alors: porte locale comme avant, sans ligne nouvelle, regles: [R9] }
+      - { si: ni gate.overflow ni gate.host n'est déclaré, alors: porte locale comme avant, sans ligne nouvelle, regles: [R9] }
+      - { si: gate.host est déclaré (sans overflow), alors: la porte se joue sur l'hôte comme avant, aucun changement, regles: [R11] }
     resultat: Une porte seule joue sur Big-Blue (~4 min mesurées) et non sur mini-blue (7 min 24).
   - id: C2
     titre: Le débordement vise un hôte injoignable ou inutilisable
     acteur: la vague orchestrate
-    declencheur: commande orchestrate (porte d'un lot, local occupé)
+    declencheur: commande orchestrate (porte d'un lot, local occupé, gate.overflow déclaré)
     preconditions:
-      - gate.host est déclaré mais ne répond pas (éteint, réseau coupé, sonde bloquée) ou son push ou son cache échoue
+      - gate.overflow est déclaré mais ne répond pas (éteint, réseau coupé, sonde bloquée) ou son push ou son cache échoue
       - la machine locale est occupée
     nominal:
-      - "Le préflight (sonde ssh, ConnectTimeout 3, durée totale bornée) est lancé avant le tour de l'hôte, une seule fois par lot même si plusieurs lieux du lot le demandent en même temps."
+      - "Le préflight (sonde ssh, ConnectTimeout 3, durée totale bornée) est lancé avant le tour de l'hôte et avant l'attente, une seule fois par lot même si plusieurs lieux du lot le demandent en même temps."
       - Il échoue.
       - "La ligne « porte du lot L1 : porte déportée indisponible sur H (cause) — jouée en local » est écrite une fois."
       - La décision « hôte indisponible » est gardée pour tout le lot.
       - La porte attend le tour local (elle ne prend aucun tour de l'hôte) puis joue en local ; les lieux suivants du lot jouent en local sans ssh ni délai.
     alternatives:
-      - { si: la porte locale libère sa place pendant le préflight ou l'attente, alors: la porte joue en local sans attendre l'hôte, regles: [R4] }
+      - { si: la porte locale libère sa place pendant le préflight, alors: la porte joue en local sans attendre l'hôte, regles: [R4] }
       - { si: la sonde se connecte puis se bloque, alors: elle est coupée à sa durée totale bornée et rend la décision « indisponible », regles: [R6] }
       - { si: l'échec vient du push ou du cache et non de la sonde, alors: même repli, décision « indisponible » gardée, une ligne « cache de dépendances impossible » par lot, regles: [R5, R7] }
       - { si: deux lots préflightent en même temps, alors: chacun sonde l'hôte une fois (aucun partage entre lots), regles: [R5, R10] }
@@ -61,7 +65,7 @@ cas:
   - id: C3
     titre: La ligne de base et le rejeu d'un même lot suivent la décision d'hôte déjà prise
     acteur: la vague orchestrate
-    declencheur: commande orchestrate (ligne de base, rejeu, nouvelle porte du même lot)
+    declencheur: commande orchestrate (ligne de base, rejeu, nouvelle porte du même lot, gate.overflow déclaré)
     preconditions:
       - le lot a déjà préflighté son hôte (décision « joignable » ou « indisponible » gardée)
     nominal:
@@ -70,64 +74,78 @@ cas:
     alternatives:
       - { si: la porte locale du lot jouée plus tôt n'a rien gardé (local était libre) et le local est occupé quand la ligne de base s'ouvre, alors: le préflight a lieu à ce moment, une fois, puis la décision est gardée, regles: [R5] }
       - { si: la décision était « joignable » et la connexion est perdue en cours de porte, alors: rejeu local de cette commande et suites locales, comme avant, regles: [R8] }
-      - { si: le lot a une ligne de base jouée pendant sa porte (le lot tient déjà un tour, local ou hôte), alors: elle ne reprend pas de tour, regles: [R3, R5] }
+      - { si: le lot tient déjà un tour (local ou hôte) pendant sa porte, alors: la ligne de base ne reprend pas de tour, regles: [R3, R5] }
     resultat: Une décision d'hôte par lot (joignable ou indisponible), relue par chaque lieu ouvert du lot ; la machine, elle, suit la machine libre.
+  - id: C4
+    titre: Un projet déclare gate.overflow, seul ou avec gate.host
+    acteur: le lead qui écrit cadence.yaml
+    declencheur: commande orchestrate (lecture de cadence.yaml)
+    preconditions:
+      - cadence.yaml porte orchestrate.gate
+    nominal:
+      - "La lecture accepte gate.overflow : un alias ssh, sans espace, sans « - » initial (même forme que gate.host)."
+      - La porte prend alors le chemin « local d'abord, hôte en débordement » (C1 à C3).
+    alternatives:
+      - { si: gate.overflow et gate.host sont déclarés ensemble, alors: la lecture refuse la config avec un message clair qui dit quoi choisir, regles: [R12] }
+      - { si: gate.overflow est vide, contient un espace ou commence par « - », alors: la lecture refuse la config, regles: [R13] }
+      - { si: gate.overflow est absent, alors: aucun changement pour le projet, regles: [R9, R11] }
+    resultat: Une config sans ambiguïté sur la machine où la porte se joue.
 
 regles:
   - id: R1
     cas: [C1]
-    enonce: "Avec gate.host, une porte joue d'abord en local quand aucune porte locale ne tient la machine ; elle n'ouvre alors ni ssh ni worktree sur l'hôte et ne garde aucune décision d'hôte."
+    enonce: "Avec gate.overflow, une porte joue d'abord en local quand aucune porte locale ne tient la machine ; elle n'ouvre alors ni ssh ni worktree sur l'hôte et ne garde aucune décision d'hôte."
     statut: sourcee
-    source: "demande du lot L639 : « Big-Blue d'abord, mini-blue en débordement » ; mesures du 05-11 : Big-Blue ~4 min seule, mini-blue 7 min 24"
-    tests: ["R1 — local libre : la porte joue en local et aucun appel ssh n'est fait", "R1 — local libre : une seule ligne de lieu est écrite", "R1 — porte locale libre puis ligne de base du même lot avec local occupé : le préflight a lieu alors, une fois"]
+    source: "décision de Sylvain : nouvelle clé orchestrate.gate.overflow, « la porte joue en local tant qu'elle est seule » ; mesures du 05-11 : Big-Blue ~4 min seule, mini-blue 7 min 24"
+    tests: ["R1 — overflow, local libre : la porte joue en local et aucun appel ssh n'est fait", "R1 — overflow, local libre : une seule ligne de lieu est écrite", "R1 — porte locale libre puis ligne de base du même lot avec local occupé : le préflight a lieu alors, une fois"]
   - id: R2
     cas: [C1]
-    enonce: "Quand une porte locale tient déjà la machine, la porte suivante déborde sur l'hôte si son préflight réussit et si un créneau est libre ; la ligne de lieu existante « porte jouée sur l'hôte H (sha, cache) » est inchangée."
+    enonce: "Avec gate.overflow, quand une porte locale tient déjà la machine, la porte suivante déborde sur l'hôte si son préflight réussit et si un créneau est libre ; la ligne de lieu existante « porte jouée sur l'hôte H (sha, cache) » est inchangée."
     statut: sourcee
-    source: "demande du lot L639 : « mini-blue en débordement » ; message codé src/orchestrate/gate-place.ts:101"
-    tests: ["R2 — local occupé, hôte joignable : la porte joue sur l'hôte avec la ligne existante"]
+    source: "décision de Sylvain : « déborde sur cet hôte quand une porte locale tourne déjà » ; message codé src/orchestrate/gate-place.ts:101"
+    tests: ["R2 — overflow, local occupé, hôte joignable : la porte joue sur l'hôte avec la ligne existante"]
   - id: R3
-    cas: [C1]
-    enonce: "Le nombre de portes locales simultanées vaut 1 (constante, sans clé de configuration) : la machine locale est « libre » quand aucune porte ne la tient, les sessions claude et le pool local ne comptent pas ; un lot qui tient déjà un tour (local ou hôte) n'en reprend pas pour ses lieux imbriqués (ligne de base pendant la porte)."
-    statut: sourcee
-    source: "demande du lot L639 : « La porte joue sur la machine libre » ; mesures du 05-11 : « jusqu'à 42 min à plusieurs » (la machine qui porte plusieurs portes est lente) ; l'imbrication reprend gate-place.ts:56-57 (WeakSet holding)"
-    tests: ["R3 — deux portes simultanées avec hôte joignable : une locale, une sur l'hôte", "R3 — la ligne de base d'un lot qui tient la machine locale ne s'attend pas elle-même", "R3 — une session claude active ne rend pas le local occupé"]
+    cas: [C1, C3]
+    enonce: "Avec gate.overflow, la machine locale porte une porte à la fois : elle est « libre » quand aucune porte ne la tient ; les sessions claude et le pool local ne comptent pas. Un lot qui tient déjà un tour (local ou hôte) n'en reprend pas pour ses lieux imbriqués (ligne de base pendant la porte). La borne vaut 1 en constante, sans clé de configuration : elle ne s'applique qu'à la nouvelle clé overflow, donc ne change le comportement d'aucun projet existant."
+    statut: hypothese
+    si_faux: "Si la machine locale doit porter 2 portes, la constante devient une clé (par exemple gate.localMaxParallel) ajoutée à overflow ; le défaut actuel de gate.host n'est pas touché. Le lot cite « jusqu'à 42 min à plusieurs » comme raison de ne pas en mettre plus d'une."
+    tests: ["R3 — overflow, deux portes simultanées avec hôte joignable : une locale, une sur l'hôte", "R3 — la ligne de base d'un lot qui tient la machine locale ne s'attend pas elle-même", "R3 — une session claude active ne rend pas le local occupé"]
   - id: R4
     cas: [C1, C2]
-    enonce: "Quand la machine locale et l'hôte sont tous deux pris (ou l'hôte indisponible), la porte attend la première machine libérée disponible, dans l'ordre des demandes, et le dit une fois (ligne existante « en attente d'un créneau de porte », onWait)."
+    enonce: "Avec gate.overflow, quand la machine locale et l'hôte sont tous deux pris (ou l'hôte indisponible), la porte attend la première machine libérée disponible, dans l'ordre des demandes, et le dit une fois (ligne existante « en attente d'un créneau de porte », onWait)."
     statut: sourcee
     source: "src/orchestrate/gate-place.ts:56-68 (attente d'un créneau, L624) et src/orchestrate/gate-host-slots.ts:9 (ordre des demandes)"
     tests: ["R4 — deux machines occupées : la porte attend et la ligne d'attente est écrite une fois", "R4 — la première machine libérée prend la porte en attente", "R4 — hôte indisponible : la porte attend le tour local sans tour de l'hôte"]
   - id: R5
     cas: [C2, C3]
-    enonce: "La décision gardée par lot (clé : le lot, `owner`) est seulement l'état de l'hôte : joignable (sonde, push et cache réussis) ou indisponible (sonde, push ou cache échoué, avec sa cause). Elle ne fixe pas la machine : chaque lieu ouvert choisit la machine libre. Elle est prise au premier lieu du lot qui doit sonder (local occupé), une seule promesse par lot même pour des demandes simultanées ; elle est relue sans nouveau préflight, ni nouvelle tentative de push ou de cache. Sans `owner`, rien n'est gardé."
+    enonce: "La décision gardée par lot (clé : le lot, `owner`, fourni par porte-ciblee.ts, checks.ts et baseline-run.ts) est seulement l'état de l'hôte de débordement : joignable (sonde, push et cache réussis) ou indisponible (sonde, push ou cache échoué, avec sa cause). Elle ne fixe pas la machine : chaque lieu ouvert choisit la machine libre. Elle est prise au premier lieu du lot qui doit sonder (local occupé), avant le tour de l'hôte et avant l'attente, par une seule promesse par lot même pour des demandes simultanées ; elle est relue sans nouveau préflight ni nouvelle tentative de push ou de cache. Deux lots différents sondent chacun l'hôte (pas de partage entre lots). Sans `owner`, rien n'est gardé."
     statut: sourcee
     source: "demande du lot L639 : « décision d'hôte prise une fois par lot » ; mesure : 0 « porte déportée indisponible » répété par lot"
     tests: ["R5 — porte puis ligne de base d'un même lot, local occupé : un seul préflight", "R5 — deux lots : un préflight chacun", "R5 — sans owner : aucune décision gardée", "R5 — deux lieux du même lot demandés en même temps : un préflight", "R5 — échec de push : la ligne de base ne retente ni push ni cache", "R5 — porte locale libre puis ligne de base avec local occupé : décision prise à ce moment"]
   - id: R6
     cas: [C2]
-    enonce: "Le préflight est une sonde ssh non interactive avec ConnectTimeout 3 (3 s, contre 5 aujourd'hui) et une durée totale bornée à 10 s (contre 30 s aujourd'hui) ; un échec (code non nul, délai, 255) rend la décision « indisponible » du lot."
+    enonce: "Avec gate.overflow, le préflight est une sonde ssh non interactive avec ConnectTimeout 3 et une durée totale bornée à 10 s ; un échec (code non nul, délai, 255) rend la décision « indisponible » du lot. Le chemin de gate.host garde sa sonde actuelle (ConnectTimeout 5, 30 s : remote-gate.ts:21 et :210)."
     statut: hypothese
     si_faux: "ConnectTimeout 3 est demandé par le lot ; seule la borne totale de 10 s est choisie. Si 10 s coupe une sonde lente mais saine, la valeur monte (constante dans remote-gate.ts), sans effet sur les données."
-    tests: ["R6 — l'appel ssh du préflight passe exactement ConnectTimeout=3 (échoue à 5)", "R6 — hôte injoignable : la décision du lot est indisponible", "R6 — sonde connectée puis bloquée : coupée à la borne totale, décision indisponible"]
+    tests: ["R6 — l'appel ssh du préflight d'overflow passe exactement ConnectTimeout=3 (échoue à 5)", "R6 — hôte injoignable : la décision du lot est indisponible", "R6 — sonde connectée puis bloquée : coupée à la borne totale, décision indisponible", "R6 — gate.host : la sonde garde ConnectTimeout=5"]
   - id: R7
     cas: [C2]
-    enonce: "Hôte indisponible, la porte se replie en local avec une seule ligne par lot (« porte déportée indisponible sur H (cause) — jouée en local ») ; les lieux suivants du lot ne réécrivent pas la ligne et n'attendent aucun délai ssh. Un échec de push ou de cache garde sa ligne « cache de dépendances impossible », aussi une fois par lot."
+    enonce: "Hôte de débordement indisponible, la porte se replie en local avec une seule ligne par lot (« porte déportée indisponible sur H (cause) — jouée en local ») ; les lieux suivants du lot ne réécrivent pas la ligne et n'attendent aucun délai ssh. Un échec de push ou de cache garde sa ligne « cache de dépendances impossible », aussi une fois par lot."
     statut: sourcee
     source: "demande du lot L639 : « hôte injoignable = repli local sans timeout répété » ; texte déjà codé src/orchestrate/gate-place.ts:95"
     tests: ["R7 — hôte injoignable, porte et ligne de base : une seule ligne « porte déportée indisponible »", "R7 — lieux suivants du lot : aucun appel ssh", "R7 — échec de cache : une seule ligne « cache de dépendances impossible » par lot"]
   - id: R8
     cas: [C3]
-    enonce: "Une connexion perdue (ssh 255) pendant une commande sur l'hôte reste rejouée en local avec sa ligne, comme avant ; la décision du lot devient « indisponible » : le reste du lot ne retente pas l'hôte."
+    enonce: "Avec gate.overflow, une connexion perdue (ssh 255) pendant une commande sur l'hôte reste rejouée en local avec sa ligne, comme avant ; la décision du lot devient « indisponible » : le reste du lot ne retente pas l'hôte."
     statut: sourcee
-    source: "src/orchestrate/gate-place.ts:110 (rejeu après connexion perdue, R6 de porte-deportee) ; le passage à « indisponible » est la suite de la demande « sans timeout répété »"
+    source: "src/orchestrate/gate-place.ts:110 (rejeu après connexion perdue) ; le passage à « indisponible » est la suite de la demande « sans timeout répété »"
     tests: ["R8 — connexion perdue en cours de porte : rejeu local et ligne dite une fois", "R8 — après connexion perdue, la ligne de base du lot ne sonde plus l'hôte"]
   - id: R9
-    cas: [C1]
-    enonce: "Sans gate.host, ou sans commande build ni test, ou avec un worktree non validé, ou un sha invalide, la porte est locale avec les mêmes lignes qu'avant ; aucun préflight, aucune décision gardée."
+    cas: [C1, C4]
+    enonce: "Sans gate.overflow ni gate.host, ou sans commande build ni test, ou avec un worktree non validé, ou un sha invalide, la porte est locale avec les mêmes lignes qu'avant ; aucun préflight, aucune décision gardée."
     statut: sourcee
     source: "src/orchestrate/gate-place.ts:74-88 (cas locaux d'emblée)"
-    tests: ["R9 — sans gate.host : aucune ligne nouvelle et aucun ssh", "R9 — worktree non validé : même ligne qu'avant"]
+    tests: ["R9 — sans overflow ni host : aucune ligne nouvelle et aucun ssh", "R9 — overflow, worktree non validé : même ligne qu'avant"]
   - id: R10
     cas: [C2]
     enonce: "Une décision d'hôte vaut pour le lot en cours seulement ; le lot suivant, ou une nouvelle vague, refait son préflight (un hôte revenu est retrouvé). Les lots ne partagent pas leur sonde."
@@ -135,17 +153,29 @@ regles:
     si_faux: "Si l'hôte indisponible doit l'être pour toute la vague, la mémoire passe du lot à la vague : un préflight de moins, rien d'autre ne change ; la mesure « 0 ligne répétée par lot » reste vraie."
     tests: ["R10 — lot A voit l'hôte tomber, lot B démarré après : nouveau préflight"]
   - id: R11
-    cas: [C1]
-    enonce: "L'inversion de gate.host (local d'abord, hôte en débordement) est livrée avec ses tests et sa doc : les tests listés en périmètre sont repris pour la nouvelle sémantique (porte seule : locale ; porte simultanée : sur l'hôte) et les trois pages de doc décrivent le débordement ; aucun test existant n'est supprimé sans équivalent."
+    cas: [C1, C4]
+    enonce: "gate.host garde son sens publié : la porte se joue sur cet hôte, avec ses lignes, sa sonde et son attente actuelles ; un projet qui ne déclare que host n'observe aucun changement. Les tests existants de la porte déportée restent verts sans modification, et les trois pages de doc décrivent overflow en plus."
     statut: sourcee
-    source: "demande du lot L639 ; docs/remote-gate.md:52, docs/orchestrate-gate.md:17, docs/config.md:36 (sémantique actuelle « jouée sur l'hôte ») ; test/porte-deportee.test.ts (lignes « porte jouée sur l'hôte »)"
-    tests: ["R11 — porte-deportee : une porte seule joue en local, la ligne « porte jouée sur l'hôte » vient de la seconde", "R11 — les pages docs/remote-gate.md, orchestrate-gate.md et config.md disent « débordement » et plus « se joue sur l'hôte » seul"]
+    source: "décision de Sylvain : « gate.host garde son sens publié (la porte se joue sur cet hôte), aucun changement pour les projets qui le déclarent » ; docs/remote-gate.md:52, docs/orchestrate-gate.md:17, docs/config.md:36"
+    tests: ["R11 — host seul : une porte seule joue sur l'hôte avec la ligne « porte jouée sur l'hôte » (test existant inchangé)", "R11 — les pages docs/remote-gate.md, orchestrate-gate.md et config.md mentionnent gate.overflow et gardent « se joue sur l'hôte » pour host"]
+  - id: R12
+    cas: [C4]
+    enonce: "gate.overflow et gate.host déclarés ensemble sont refusés à la lecture de la config, avec un message qui nomme les deux clés et dit de garder l'une ou l'autre."
+    statut: sourcee
+    source: "décision de Sylvain : « overflow et host déclarés ensemble sont refusés à la lecture de la config avec un message clair » ; forme d'erreur existante src/gate-config.ts:53"
+    tests: ["R12 — host et overflow ensemble : la lecture lève le message exact", "R12 — overflow seul : la lecture réussit et rend overflow", "R12 — host seul : la lecture est inchangée"]
+  - id: R13
+    cas: [C4]
+    enonce: "gate.overflow suit la forme de gate.host : une chaîne sans espace ne commençant pas par « - » ; la clé est ajoutée à la liste des clés connues, et gate.maxParallel et gate.install, refs s'appliquent à l'hôte de débordement comme à host. Une gate qui ne porte que overflow ne déclare pas de readsPlan."
+    statut: hypothese
+    si_faux: "Si maxParallel ne doit pas borner le débordement, une clé propre est ajoutée plus tard ; la clé overflow est neuve, aucun projet ne la porte encore. Si overflow seul devait imposer readsPlan, seule la lecture de readsPlan change."
+    tests: ["R13 — overflow vide, avec espace ou commençant par « - » : refusé avec le message exact", "R13 — overflow seul : gate posée sans readsPlan", "R13 — maxParallel borne les portes simultanées sur l'hôte de débordement"]
 
 contrats:
   - id: A1
     appel: commande orchestrate
-    entree: "cadence.yaml orchestrate.gate.host (clé inchangée, sémantique : hôte de débordement), build et test ; aucune clé ajoutée"
-    sortie: "porte jouée sur la machine libre : local d'abord, hôte en débordement, verdict inchangé, lignes de lieu existantes inchangées plus une ligne « jouée en local, machine locale libre »"
+    entree: "cadence.yaml orchestrate.gate.overflow (clé neuve : alias ssh de l'hôte de débordement), build et test ; gate.host inchangé"
+    sortie: "avec overflow : porte jouée sur la machine libre, local d'abord, hôte en débordement, verdict inchangé, lignes de lieu existantes inchangées plus une ligne « jouée en local, machine locale libre » ; avec host seul ou sans les deux : comportement actuel"
     erreurs:
       - { code: log info, message: "porte du lot L1 : jouée en local, machine locale libre" }
       - { code: log info, message: "porte du lot L1 : porte déportée indisponible sur H (cause) — jouée en local" }
@@ -154,13 +184,22 @@ contrats:
       - { code: log info, message: "porte du lot L1 : connexion perdue avec H pendant la porte — rejouée en local" }
     regles: [R1, R2, R3, R4, R5, R7, R8, R9, R10, R11]
   - id: A2
-    appel: commande orchestrate (préflight de l'hôte)
+    appel: commande orchestrate (préflight de l'hôte de débordement)
     entree: "ssh -o BatchMode=yes -o ConnectTimeout=3 H, script « uname -s; uname -m; nproc … » (remote-gate.ts:210), durée totale 10 s"
     sortie: "plateforme et cœurs de l'hôte, ou la cause de son silence ; résultat gardé pour le lot"
     erreurs:
       - { code: log info, message: "porte du lot L1 : porte déportée indisponible sur H (cause) — jouée en local" }
     regles: [R5, R6, R7]
+  - id: A3
+    appel: commande orchestrate (lecture de cadence.yaml, clé orchestrate.gate)
+    entree: "orchestrate.gate.overflow : chaîne ; avec ou sans host"
+    sortie: "la gate lue, avec overflow quand il est valide et seul"
+    erreurs:
+      - { code: log error, message: "cadence.yaml : orchestrate.gate.overflow et gate.host déclarés ensemble : garder host (la porte se joue sur l'hôte) ou overflow (la porte joue en local, puis déborde sur l'hôte)" }
+      - { code: log error, message: "cadence.yaml : orchestrate.gate.overflow : destination ssh attendue (une chaîne sans espace, ne commençant pas par « - »)" }
+      - { code: log error, message: "cadence.yaml : orchestrate.gate.${k} inconnu (attendu : readsPlan, host, overflow, install, refs, maxParallel)" }
+    regles: [R9, R11, R12, R13]
 
 donnees:
   - { id: D1, objet: "décision d'hôte du lot (mémoire du processus, clé = le lot : joignable ou indisponible + cause)", existant: false, modification: ajout, note: "jamais écrite sur disque ; perdue à la fin de la vague" }
-  - { id: D2, objet: "cadence.yaml orchestrate.gate (host, install, refs, maxParallel)", existant: true, modification: aucune, note: "clés et schéma inchangés ; seule leur lecture change : l'hôte devient le débordement" }
+  - { id: D2, objet: "cadence.yaml orchestrate.gate (host, install, refs, maxParallel, readsPlan)", existant: true, modification: ajout, decision: "Sylvain : nouvelle clé orchestrate.gate.overflow, distincte de host ; host inchangé ; overflow et host ensemble refusés à la lecture ; sans overflow rien ne change", note: "une clé optionnelle ajoutée ; les clés existantes gardent schéma et sens" }

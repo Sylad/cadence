@@ -2855,11 +2855,12 @@ lots:
     started: 2026-11-06
   - id: L659
     title: "Panneau des lots (cadence-hud) : distinguer un lot en cours avec une session active d'un lot doing en sommeil, sans session ; 06-11 : panneau à 2 lots en cours, barre à zéro, rien ne tournait ; mesure : un lot sans session ne s'affiche plus comme actif"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
     review: { date: 2026-11-06, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-06-1805, 0 passe(s) de correction)", commit: 2bb864d564a3eb1c5b6b8770389c55092ccfa71c, reporte: { de: 2df5a9e3c3952ac9ea15c7ecc0bf0a7a6ac6ed67, vers: 2bb864d564a3eb1c5b6b8770389c55092ccfa71c, patchId: bff9ae17bc54d58246a4ef62a4bfbd850452522f } }
+    finished: 2026-11-06
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

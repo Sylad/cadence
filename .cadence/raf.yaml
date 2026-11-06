@@ -2846,9 +2846,10 @@ lots:
     created: 2026-11-06
   - id: L658
     title: "Test d'un autre lot qui lit une page déplacée (L651 refusé par R14 de lead-hold) : le brief d'un lot qui vide une page reçoit la liste des tests qui lisent cette page, et un contrôle au commit les joue ; mesure : 0 refus d'intégration pour une page de doc déplacée"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-06
+    started: 2026-11-06
   - id: L659
     title: "Panneau des lots (cadence-hud) : distinguer un lot en cours avec une session active d'un lot doing en sommeil, sans session ; 06-11 : panneau à 2 lots en cours, barre à zéro, rien ne tournait ; mesure : un lot sans session ne s'affiche plus comme actif"
     status: todo

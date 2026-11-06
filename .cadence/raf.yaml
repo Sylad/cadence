@@ -2789,9 +2789,10 @@ lots:
     started: 2026-11-06
   - id: L650
     title: "boucle de fix d'un lot dont le sujet est la revue : un lot qui change le gabarit ou la règle de revue est relu avec la revue actuelle, l'amorce de passes de fix reste bornée à 2 ; niveau : source (le lot déclare spec: revue, la vague plafonne les passes et rend au lead avant la 3e) ; niveau le plus tôt : source ; mesure : 0 lot sur la revue avec plus de 2 passes de fix"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-06
+    started: 2026-11-06
   - id: L651
     title: "docs/orchestrate-cycle.md est à 109 995 octets pour un plafond de 110 000 (test/orchestrate-pages-l599.test.ts) : déplacer une section sur une page de la suite ; la prochaine ligne ajoutée rougit la porte et les ajouts se font déjà en abrégé ; mesure : au moins 10 ko de marge"
     status: doing

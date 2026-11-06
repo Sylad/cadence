@@ -32,6 +32,7 @@ cas:
       - { si: "--budget projet:lot=+N vise un lot qui n'est pas dans les --add, ou une forme sans « = » (budget de vague)", alors: "refus, code 2, rien déposé", regles: [R4] }
       - { si: "le budget demandé dépasse le budget restant de la vague", alors: "refus existant du budget restant, avec le budget demandé", regles: [R5] }
       - { si: "le lot est un lot rendu de la vague (reprise L563)", alors: "--goal et --budget refusés : le lot garde ceux de la vague", regles: [R6] }
+      - { si: "la vague a été lancée avec un code qui ne lit pas goal et budget dans adds.log (état sans la marque écrite au lancement)", alors: "--add avec --goal ou --budget refusé, code 2, message clair, rien déposé ; --add sans ces options reste accepté", regles: [R11] }
     resultat: "Le lot est ajouté avec l'objectif et le budget donnés ; l'état du lot porte goal et budget comme au lancement."
   - id: C2
     titre: "Le lead reprend une vague après avoir changé l'objectif du lot dans le plan"
@@ -112,6 +113,12 @@ regles:
     statut: hypothese
     si_faux: "Si le lead préfère un refus quand le plan est illisible, la reprise refuse (code 2) au lieu de continuer ; aucune donnée en jeu."
     tests: ["R10 — lot absent du plan : reprise sans refus, goal d'état gardé"]
+  - id: R11
+    cas: [C1]
+    enonce: "Une vague écrit dans son état, au lancement, qu'elle lit les champs goal et budget de adds.log. --add avec --goal ou --budget est refusé (code 2, rien déposé) sur une vague dont l'état n'a pas cette marque, sans silence ; --add sans ces options reste accepté sur toute vague, marquée ou non."
+    statut: sourcee
+    source: "réponse du lead à la question de la passe précédente : « pas de silence… --add avec --goal ou --budget est refusé, avec un message clair, sur une vague qui ne l'a pas écrit. --add sans ces options reste accepté partout » ; précédent de détection : src/orchestrate/snapshot.ts:211"
+    tests: ["R11 — vague sans marque et --add --goal : refus, adds.log vide", "R11 — vague sans marque et --add seul : accepté", "R11 — vague lancée par le code du lot : la marque est dans l'état"]
 
 contrats:
   - id: A1
@@ -122,7 +129,8 @@ contrats:
       - { code: "log error", message: "--goal s'applique à un seul lot lancé : <projet>:<lot> --goal \"…\" (plusieurs lots : la clé goal: de chacun)" }
       - { code: "log error", message: "--goal attend un texte non vide" }
       - { code: "log error", message: "--budget invalide : <texte> (projet:lot=+500k)" }
-    regles: [R1, R2, R3, R4, R5, R6]
+      - { code: "log error", message: "cette vague a été lancée avant L657 : elle ignore --goal et --budget d'un ajout ; ajoutez le lot sans ces options, ou relancez la vague" }
+    regles: [R1, R2, R3, R4, R5, R6, R11]
   - id: A2
     appel: commande cadence orchestrate --resume [<vague>]
     entree: "vague arrêtée ; clé goal: du plan des lots rejoués"
@@ -132,5 +140,6 @@ contrats:
     regles: [R7, R8, R9, R10]
 
 donnees:
-  - { id: D1, objet: "adds.log (une ligne JSON par demande d'ajout)", existant: true, modification: ajout, note: "champs facultatifs goal et budget ajoutés à la ligne ; une ligne sans eux se lit comme avant (R1) ; une vague lancée avant L657 ignorerait ces champs", decision: "en attente : question posée au lead dans le rapport de la passe" }
-  - { id: D2, objet: "LotState.goal et LotState.budget dans l'état de la vague", existant: true, modification: aucune, note: "champs déjà présents (state.ts:106, :160) ; seule leur valeur à l'ajout et à la reprise change" }
+  - { id: D1, objet: "adds.log (une ligne JSON par demande d'ajout)", existant: true, modification: ajout, note: "champs facultatifs goal et budget ajoutés à la ligne ; une ligne sans eux se lit comme avant (R1) ; une vague lancée avant L657 ignorerait ces champs", decision: "accordée par le lead : deux champs facultatifs goal et budget, fichier d'état local d'une vague et non contrat publié ; une ligne sans eux se lit comme avant" }
+  - { id: D3, objet: "LotState.goal et LotState.budget dans l'état de la vague", existant: true, modification: aucune, note: "champs déjà présents (state.ts:106, :160) ; seule leur valeur à l'ajout et à la reprise change" }
+  - { id: D2, objet: "état de la vague : marque posée au lancement disant que la vague lit goal et budget dans adds.log", existant: true, modification: ajout, note: "champ facultatif de l'état ; absent sur une vague antérieure, ce qui fait refuser --add --goal/--budget (R11) ; nom du champ laissé à l'implémentation", decision: "accordée par le lead : la vague l'écrit dans son état au lancement" }

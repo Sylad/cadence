@@ -2809,6 +2809,47 @@ lots:
     started: 2026-11-06
     review: { date: 2026-11-06, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-06-1559, 0 passe(s) de correction)", commit: 4764a2c27d555f85d6c18dd79502f598b925d0d6, reporte: { de: 2018b6006c4bcb98f66e811e47edffaa2ea4a34d, vers: 4764a2c27d555f85d6c18dd79502f598b925d0d6, patchId: e5fc91428185c076715168d97b58a8ab85c5888a } }
     finished: 2026-11-06
+  - id: L652
+    title: "Issue #45 : verify --gate rejoue la suite au sha qu'une vague a enregistré en accusant readsPlan, quand la vague est lancée deux niveaux au-dessus du dépôt ; aussi vu ici le 06-11 (« verdict rejoué … readsPlan ») ; mesure : verdict repris à ce sha sans rejeu"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-06
+  - id: L653
+    title: "Issue #48 : un merge de la branche de base dans le worktree d'un lot le fait rendre pour « session a modifié le plan », et les questions de la session sont perdues ; mesure : merge accepté, questions conservées"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-06
+  - id: L654
+    title: "Issue #47 : vague suspendue ou lot retiré après une revue de maquette non conforme : le tableau dit « revue — » et ne liste que les mineurs ; il doit donner le verdict et les majeurs"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-06
+  - id: L655
+    title: "Issue #49 : la sonde de cas limites joue sur des lots dont la porte n'atteint pas le diff (CSS seul, banc seul) et commite des contrôles de texte sans constat ; ne plus la jouer sur ces lots ; mesure : 0 sonde sur un diff hors porte"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-06
+  - id: L656
+    title: "Issue #46 : des majeurs de maquette écartés comme inchangés sont dans l'objectif du lot et reviennent en majeurs de revue de code ; un écart ne s'applique pas à un point de l'objectif ; mesure : 0 majeur écarté à la maquette et repris en revue de code"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-06
+  - id: L657
+    title: "Issue #44 : objectif et budget d'un lot figés au lancement : --add sans --goal ni --budget, --resume ignore un objectif changé, la relance rejoue spec et maquette ; donner ces réglages à --add et faire lire l'objectif changé à --resume"
+    status: todo
+    estimate: 0.5
+    spec: true
+    created: 2026-11-06
+  - id: L658
+    title: "Test d'un autre lot qui lit une page déplacée (L651 refusé par R14 de lead-hold) : le brief d'un lot qui vide une page reçoit la liste des tests qui lisent cette page, et un contrôle au commit les joue ; mesure : 0 refus d'intégration pour une page de doc déplacée"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-06
+  - id: L659
+    title: "Panneau des lots (cadence-hud) : distinguer un lot en cours avec une session active d'un lot doing en sommeil, sans session ; 06-11 : panneau à 2 lots en cours, barre à zéro, rien ne tournait ; mesure : un lot sans session ne s'affiche plus comme actif"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-06
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -132,7 +132,7 @@ describe('R2 — un test ajouté vert avec et sans le code du lot est refusé', 
   }
   // Le « test » d'essai : un fichier test/*.txt dont le contenu dit ce que le code doit être ; vert si src/a.txt vaut « new ».
   const run = async (command: string, cwd: string) => {
-    const file = command.replace('check ', '');
+    const file = command.replace('check ', '').replace(/^'(.*)'$/, '$1');
     const want = readFileSync(join(cwd, file), 'utf8').trim();
     const have = readFileSync(join(cwd, 'src/a.txt'), 'utf8').trim();
     return { code: want === 'always' || want === have ? 0 : 1, output: '' };

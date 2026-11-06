@@ -313,12 +313,12 @@ export const STALE_BASE_COMMITS = 100;
 export function branchStaleness(repo: string, branch: string, base: string): { behind: number; conflicts: string[] } {
   const behind = Number(tryGit(repo, 'rev-list', '--count', `refs/heads/${base}`, '--not', `refs/heads/${branch}`) ?? 0);
   try {
-    execFileSync('git', ['merge-tree', '--write-tree', '--name-only', '--no-messages', `refs/heads/${base}`, `refs/heads/${branch}`], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    execFileSync('git', ['merge-tree', '--write-tree', '--name-only', '--no-messages', '-z', `refs/heads/${base}`, `refs/heads/${branch}`], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     return { behind, conflicts: [] };
   } catch (e) {
     const { status, stdout } = e as { status?: number; stdout?: unknown };
-    // sortie sous `--name-only --no-messages` : le sha de l'arbre, puis un fichier en conflit par ligne
-    return { behind, conflicts: status === 1 && typeof stdout === 'string' ? [...new Set(stdout.split('\n').slice(1).filter(Boolean))] : [] };
+    // sortie sous `--name-only --no-messages -z` : le sha de l'arbre, puis un fichier en conflit par NUL (noms bruts, sans guillemets ni octal)
+    return { behind, conflicts: status === 1 && typeof stdout === 'string' ? [...new Set(stdout.split('\0').slice(1).filter(Boolean))] : [] };
   }
 }
 
@@ -335,7 +335,7 @@ export function stalenessText(age: { behind: number; conflicts: string[] }): str
 export function recoveryRefusal(repo: string, found: KeptTree, base: string, planFiles: ReadonlySet<string>, age = branchStaleness(repo, found.branch, base)): string | null {
   const dirty = found.dir !== null && existsSync(join(found.dir, '.git')) ? trackedDirty(found.dir) : [];
   if (dirty.length) return `son worktree porte des fichiers suivis modifiés (${dirty.join(', ')})`;
-  const touched = (tryGit(repo, 'log', '--name-only', '--format=', `refs/heads/${found.branch}`, '--not', `refs/heads/${base}`) ?? '').split('\n').find((f) => planFiles.has(f));
+  const touched = (tryGit(repo, 'log', '--name-only', '-z', '--format=', `refs/heads/${found.branch}`, '--not', `refs/heads/${base}`) ?? '').split('\0').find((f) => planFiles.has(f));
   if (touched) return `un de ses commits modifie le plan (${touched})`;
   if (age.behind > STALE_BASE_COMMITS) return `${stalenessText(age)}, plus de ${STALE_BASE_COMMITS} commits d'avance : branche périmée`;
   return age.conflicts.length ? `${stalenessText(age)} : branche périmée` : null;

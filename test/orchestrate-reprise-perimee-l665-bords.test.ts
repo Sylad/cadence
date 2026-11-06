@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { branchStaleness, lotBranch, lotTreeDir, prepareTree, recoverTree } from '../src/orchestrate/worktree.js';
+import { branchStaleness, lotBranch, lotTreeDir, prepareTree, recoverTree, recoveryRefusal } from '../src/orchestrate/worktree.js';
 import { commitFile, git } from './orchestrate-harness.js';
 import { fake, run, setup } from './orchestrate-worktree-harness.js';
 import { removeDryRunBriefs, tempDir } from './helpers.js';
@@ -58,6 +58,12 @@ describe('R3 — les conflits au bord', () => {
     const old = oldBranch(repo, { 'été.txt': 'lot\n' });
     mainWrites(repo, { 'été.txt': 'main\n' });
     expect(branchStaleness(repo, old.branch, 'main').conflicts).toEqual(['été.txt']);
+  });
+  it('R3 — fichier accentué du plan touché par la branche : le refus le nomme tel quel', () => {
+    const { repo } = setup();
+    const old = oldBranch(repo, { 'plan-é.md': 'lot\n' });
+    const found = { branch: old.branch, dir: null } as Parameters<typeof recoveryRefusal>[1];
+    expect(recoveryRefusal(repo, found, 'main', new Set(['plan-é.md']))).toBe('un de ses commits modifie le plan (plan-é.md)');
   });
   it('R3 — conflit modify/delete (main supprime ce que le lot modifie) : refusé', () => {
     const { repo, parent } = setup();

@@ -2667,6 +2667,7 @@ lots:
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-06-0915, 0 passe(s) de correction)", commit: 85f09a1f383cd9a749df47c7d3b0c4ae14621aba, reporte: { de: 63e694285f11fc477444c81f64c97b86f5fe7ed3, vers: 85f09a1f383cd9a749df47c7d3b0c4ae14621aba, patchId: 9fde31fe986a82fcebba9f1afdc80a211dadd282 } }
   - id: L637
     title: "Contrôles rapides de L626 : la famille test/orchestrate-pages-*.test.ts se joue au commit ; inspection du 06-11 : 4 refus d'intégration pour une borne de doc ou un renvoi ; mesure : 0 refus d'intégration pour une page de doc"
     status: done

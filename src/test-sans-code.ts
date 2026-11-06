@@ -32,7 +32,7 @@ export async function testsVertsSansCode(o: {
   run: (command: string, cwd: string) => Promise<{ code: number; output: string }>;
   max?: number;
 }): Promise<TestsVertsSansCode> {
-  const changed = git(o.dir, ['diff', '--name-status', '--no-renames', o.start, 'HEAD'])
+  const changed = git(o.dir, ['-c', 'core.quotepath=off', 'diff', '--name-status', '--no-renames', o.start, 'HEAD'])
     .split('\n')
     .filter(Boolean)
     .map((l) => ({ status: l[0]!, file: l.slice(1).trim() }));

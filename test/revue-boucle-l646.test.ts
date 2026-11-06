@@ -173,6 +173,14 @@ describe('R2 — un test ajouté vert avec et sans le code du lot est refusé', 
       rmSync(d, { recursive: true, force: true });
     }
   });
+  it('R2 — un test au nom accentué (git le citerait entre guillemets sans core.quotepath=off) est joué', async () => {
+    const { d, start } = repo({ 'test/vidé.test.txt': 'always' });
+    try {
+      expect((await play(d, start)).refuses).toEqual(['test/vidé.test.txt']);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
   it('R2 — aucun test ajouté (seulement modifié) : rien à jouer, la commande n’est pas lancée', async () => {
     const { d, start } = repo({ 'test/ancien.test.txt': 'modifié' });
     let called = 0;

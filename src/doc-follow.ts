@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { git } from './git.js';
 
 // L648 : une doc périmée par un correctif. Les identifiants que le diff d'un `fix(` change (déclarations exportées retirées ou ajoutées ;
-// options `--x` qui apparaissent ou disparaissent de l'arbre src/, pas celles qu'un commentaire ou un message cite alors qu'elles existent déjà)
+// options `--x` qui apparaissent ou disparaissent du code de src/, hors aide HELP et hors commentaire : pas celles qu'un commentaire ou un message cite alors que le code les lit déjà)
 // sont cherchés dans la documentation (README.md, docs/*.md : entre accents graves ; l'aide `HELP` de src/cli.ts : les options) ;
 // une ligne qui les cite et que le diff ne touche pas est une doc qui ne suit pas le correctif.
 

@@ -21,8 +21,8 @@ afterEach(() => {
   for (const f of briefed.splice(0)) f();
 });
 
-/** Un dépôt avec une doc qui cite `oldName` et une option `--block` (lue par src/cli.ts), puis un commit du lot L1 qui renomme `oldName` ; `docTouched` : le lot met aussi la doc à jour ; `commentOnly` : le lot ajoute seulement un commentaire citant `--block`. */
-function lot(docTouched: boolean, commentOnly = false) {
+/** Un dépôt avec une doc qui cite `oldName` et une option `--block` (lue par src/cli.ts), puis un commit du lot L1 qui renomme `oldName` ; `docTouched` : le lot met aussi la doc à jour ; `commentOnly` : le lot ajoute seulement un commentaire citant `--block` ; `noDoc` : aucune doc ne cite `oldName`. */
+function lot(docTouched: boolean, commentOnly = false, noDoc = false) {
   const h = harness();
   const c = Object.assign(h.lot('L1', {}, { test: 'true' }), { tree: { dir: h.repo, branch: 'cadence/x', base: 'main', active: true } });
   briefed.push(() => h.store.removeTmpDir(c.lot.project, c.lot.lot));
@@ -30,7 +30,7 @@ function lot(docTouched: boolean, commentOnly = false) {
   mkdirSync(join(h.repo, 'docs'));
   writeFileSync(join(h.repo, 'src/lib.ts'), 'export function oldName(): number {\n  return 1;\n}\n');
   writeFileSync(join(h.repo, 'src/cli.ts'), 'const block = process.argv.includes("--block");\nexport const main = (): boolean => block;\n');
-  writeFileSync(join(h.repo, 'docs/page.md'), 'Voir `oldName` pour le détail.\nUne autre ligne.\nL’option --block bloque.\n');
+  writeFileSync(join(h.repo, 'docs/page.md'), noDoc ? 'Une autre ligne.\n' : 'Voir `oldName` pour le détail.\nUne autre ligne.\nL’option --block bloque.\n');
   git(h.repo, 'add', '--', 'src/lib.ts', 'src/cli.ts', 'docs/page.md');
   git(h.repo, 'commit', '-q', '-m', 'chore: base', '--', 'src/lib.ts', 'src/cli.ts', 'docs/page.md');
   writeFileSync(join(h.repo, 'src/lib.ts'), commentOnly ? 'export function oldName(): number {\n  // L1 : voir --block dans cli.ts\n  return 1;\n}\n' : 'export function newName(): number {\n  return 1;\n}\n');
@@ -62,6 +62,13 @@ describe('L648 — le brief fix liste la doc qui cite les identifiants changés'
     expect(brief).toContain('git grep');
     expect(brief).toContain('same commit');
     expect(brief).not.toContain('not touched by the lot');
+  });
+  it('R10 — un lot qui change un identifiant qu’aucune doc ne cite reçoit quand même les identifiants et la consigne', () => {
+    const { c } = lot(false, false, true);
+    const brief = briefFor(c, 'fix');
+    expect(brief).toContain('removes or adds (L648): `newName`, `oldName`');
+    expect(brief).toContain('cites them yet');
+    expect(brief).not.toContain('cites `');
   });
   it('R10 — un lot dont le diff ne cite une option que dans un commentaire (présente dans src/ avant et après) ne la liste pas', () => {
     const { c } = lot(false, true);

@@ -43,4 +43,22 @@ describe('L658 bords — porte ciblée', () => {
     expect(existsSync(log)).toBe(true);
     expect(readFileSync(log, 'utf8')).toContain('test/lit.test.ts');
   });
+
+  it('R4 — un lot qui déplace la page lue par le test d’un autre lot joue ce test (l’ancien nom compte)', async () => {
+    const log = join(tempDir(), 'portes.log');
+    const h = harness();
+    const config = { test: 'true', testRelated: `echo "REL {files}" >> ${log}; true` };
+    const c = Object.assign(h.lot('L1', {}, config), { tree: { dir: h.repo, branch: 'cadence/x', base: 'main', active: true } });
+    mkdirSync(join(h.repo, 'docs'));
+    mkdirSync(join(h.repo, 'test'));
+    writeFileSync(join(h.repo, 'test/lit.test.ts'), "read('docs/ancienne.md')\n");
+    commitFile(h.repo, 'docs/ancienne.md', 'docs: ancienne');
+    git(h.repo, 'add', '--', 'test/lit.test.ts');
+    git(h.repo, 'commit', '-q', '-m', 'test: lit', '--', 'test/lit.test.ts');
+    commitFile(h.repo, 'a.txt', 'feat(L1): x');
+    git(h.repo, 'mv', 'docs/ancienne.md', 'docs/nouvelle.md');
+    git(h.repo, 'commit', '-q', '-m', 'feat(L1): déplacer la page', '--', 'docs/ancienne.md', 'docs/nouvelle.md');
+    await programChecks(c, [], []);
+    expect(readFileSync(log, 'utf8')).toContain('test/lit.test.ts');
+  });
 });

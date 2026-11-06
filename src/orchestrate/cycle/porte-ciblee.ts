@@ -16,10 +16,10 @@ export type Portee = 'ciblee' | 'complete';
 /** Portée de la porte d'une écriture (R16, exception à R1) : la suite complète quand la session annonce des tests rouges (L213, L522 : l'annonce ne se juge que sur la suite entière), ciblée sinon. */
 export const porteApresEcriture = (annonceRouge: boolean): Portee => (annonceRouge ? 'complete' : 'ciblee');
 
-/** Les fichiers modifiés du lot entre son sha de départ et HEAD, supprimés exclus ; vide sans sha de départ, sans diff ou si git ne le lit pas (R4). Le dépôt du lot seulement, pas ses dépôts voisins. */
-function lotFiles(c: LotCtx): string[] {
+/** Les fichiers modifiés du lot entre son sha de départ et HEAD, supprimés exclus (`withDeleted` : supprimés inclus, et l'ancien nom d'un fichier déplacé, pour les pages que des tests lisent, L658) ; vide sans sha de départ, sans diff ou si git ne le lit pas (R4). Le dépôt du lot seulement, pas ses dépôts voisins. */
+function lotFiles(c: LotCtx, withDeleted = false): string[] {
   const start = startSha(c);
-  const out = start ? tryGit(wd(c), ['diff', '--name-only', '-z', '--diff-filter=d', start, 'HEAD']) : null;
+  const out = start ? tryGit(wd(c), ['diff', '--name-only', '-z', ...(withDeleted ? ['--no-renames'] : ['--diff-filter=d']), start, 'HEAD']) : null;
   return out ? out.split('\0').filter(Boolean) : [];
 }
 
@@ -36,7 +36,7 @@ function declaredFor(c: LotCtx, files: string[]): string[] {
   }
 }
 
-/** Les tests qui lisent une page `.md` que le lot touche (L658) : une section vidée ou déplacée casse le test d'un autre lot, que `vitest related` ne lie pas ; illisible, rien. */
+/** Les tests qui lisent une page `.md` que le lot touche, supprimée ou déplacée comprise (L658) : une section vidée ou déplacée casse le test d'un autre lot, que `vitest related` ne lie pas ; illisible, rien. */
 function readersFor(c: LotCtx, files: string[]): string[] {
   try {
     return readersOf(wd(c), files.filter((f) => f.endsWith('.md')));
@@ -46,15 +46,15 @@ function readersFor(c: LotCtx, files: string[]): string[] {
 }
 
 /** Les fichiers de la porte ciblée : ceux du diff, plus le test du journal quand le lot touche `CHANGELOG.md` et que le dépôt le porte (L616), plus les tests déclarés par `bounds` pour les fichiers du lot (L626), plus les tests qui lisent une page `.md` du lot (L658) ; chacun une seule fois. */
-function withChangelogTest(c: LotCtx, files: string[]): string[] {
+function withChangelogTest(c: LotCtx, files: string[], touched: string[]): string[] {
   const changelog = files.includes('CHANGELOG.md') && existsSync(join(wd(c), CHANGELOG_TEST)) ? [CHANGELOG_TEST] : [];
-  return [...new Set([...files, ...changelog, ...declaredFor(c, files), ...readersFor(c, files)])];
+  return [...new Set([...files, ...changelog, ...declaredFor(c, files), ...readersFor(c, touched)])];
 }
 
 /** La porte ciblée d'une écriture : la commande liée (avec `{files}`) et les fichiers du diff ; null quand il n'y a pas de commande liée possible ou de fichier à viser, la suite complète est alors jouée (R4). */
 function targetOf(c: LotCtx): { template: string; files: string[] } | null {
   const template = relatedCommand(c.config.test, c.config.testRelated);
-  const files = template ? withChangelogTest(c, lotFiles(c)) : [];
+  const files = template ? withChangelogTest(c, lotFiles(c), lotFiles(c, true)) : [];
   return template && files.length ? { template, files } : null;
 }
 

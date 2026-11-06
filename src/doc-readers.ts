@@ -15,6 +15,12 @@ function testFiles(root: string, dir = TEST_DIR): string[] {
   return readdirSync(abs, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? (e.name === 'node_modules' ? [] : testFiles(root, `${dir}/${e.name}`)) : TEST_FILE.test(e.name) ? [`${dir}/${e.name}`] : []));
 }
 
+/** Le texte cite ce nom de page en entier : le caractère qui le précède n'est pas un bout de nom (« orchestrate-spec.md » ne cite pas « spec.md »). */
+function cites(text: string, name: string): boolean {
+  for (let i = text.indexOf(name); i !== -1; i = text.indexOf(name, i + 1)) if (i === 0 || !/[\w.-]/.test(text[i - 1])) return true;
+  return false;
+}
+
 /** Les tests dont le texte cite le nom de chaque page (« orchestrate-cycle.md »), par page (clé : le chemin relatif donné) ; une page sans lecteur n'a pas de clé. Un test illisible est ignoré. */
 export function testsReading(root: string, pages: string[]): Map<string, string[]> {
   const out = new Map<string, string[]>();
@@ -26,7 +32,7 @@ export function testsReading(root: string, pages: string[]): Map<string, string[
     } catch {
       continue;
     }
-    for (const p of pages) if (text.includes(basename(p))) out.set(p, [...(out.get(p) ?? []), t]);
+    for (const p of pages) if (cites(text, basename(p))) out.set(p, [...(out.get(p) ?? []), t]);
   }
   return out;
 }

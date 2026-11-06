@@ -2642,6 +2642,11 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-11-06
+  - id: L635
+    title: "R5 de test/orchestrate-pages-l599.test.ts exige un renvoi pour toute section d'une page de la suite, même neuve et jamais déplacée (L621 puis L633 refusés à la porte, 2 occurrences) : limiter R5 aux sections réellement déplacées (liste figée) et retirer les renvois factices de L621 et L633"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-06
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -12,7 +12,7 @@ const io = {
 
 if (tool === 'raf') {
   process.exitCode = await run(args, io);
-} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'spec', 'ref', 'config', 'release', 'local', 'claude-hook'].includes(tool)) {
+} else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'inspect', 'spec', 'ref', 'config', 'release', 'local', 'claude-hook'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);
 } else if (tool === '--version' || tool === '-v') {
   process.exitCode = await run([tool], io);

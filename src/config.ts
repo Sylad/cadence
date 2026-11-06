@@ -135,20 +135,24 @@ export function readNewsConfig(file: string): NewsConfig {
 interface HookConfig {
   /** Que faire d'un commit qui cite un lot encore todo : l'avertir (défaut), le refuser, ou démarrer le lot dans le commit. */
   autostart?: 'warn' | 'refuse' | 'start';
+  /** Que faire d'un commit `fix(` qui change un identifiant de src/ cité par une ligne de doc ou d'aide qu'il ne touche pas (L648) : l'avertir ou le refuser ; absent, rien. */
+  docs?: 'warn' | 'refuse';
 }
 
 const AUTOSTART = ['warn', 'refuse', 'start'];
+const HOOK_DOCS = ['warn', 'refuse'];
 
 /** Clé `hook:` de cadence.yaml. */
 export function readHookConfig(file: string): HookConfig {
   const h = readYamlKey(file, 'hook');
   if (h == null) return {};
-  if (!isObject(h)) throw new RafError(`${file} : hook doit être un objet { autostart }`);
-  for (const k of Object.keys(h)) if (k !== 'autostart') throw new RafError(`${file} : hook.${k} inconnu (attendu : autostart)`);
+  if (!isObject(h)) throw new RafError(`${file} : hook doit être un objet { autostart, docs }`);
+  for (const k of Object.keys(h)) if (k !== 'autostart' && k !== 'docs') throw new RafError(`${file} : hook.${k} inconnu (attendu : autostart, docs)`);
   const a = h.autostart;
-  if (a == null) return {};
-  if (typeof a !== 'string' || !AUTOSTART.includes(a)) throw new RafError(`${file} : hook.autostart : ${AUTOSTART.join(', ')} attendu`);
-  return { autostart: a as HookConfig['autostart'] };
+  const d = h.docs;
+  if (a != null && (typeof a !== 'string' || !AUTOSTART.includes(a))) throw new RafError(`${file} : hook.autostart : ${AUTOSTART.join(', ')} attendu`);
+  if (d != null && (typeof d !== 'string' || !HOOK_DOCS.includes(d))) throw new RafError(`${file} : hook.docs : ${HOOK_DOCS.join(', ')} attendu`);
+  return { ...(a != null ? { autostart: a as HookConfig['autostart'] } : {}), ...(d != null ? { docs: d as HookConfig['docs'] } : {}) };
 }
 
 interface SessionConfig {

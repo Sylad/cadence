@@ -10,6 +10,7 @@ import { repoWork } from '../../repos.js';
 import { testWorkersText } from '../workers.js';
 import { withClusterLine } from '../objectif.js';
 import { readBounds, boundsText } from '../../bounds.js';
+import { docsFollowText } from '../../doc-follow.js';
 import { capturesText, EXPRESS_BRIEF, expressNewsText, gateText, headline, integrationText, localReading, precheckBrief, newsText, objective, renderBrief, reposText, shotsText, visibleFixText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars } from '../briefs.js';
 import type { Screen } from '../../plan.js';
 import { mcpServersFor, playwrightDir, type SessionKind } from '../launch.js';
@@ -203,6 +204,18 @@ function withBounds(brief: string, c: LotCtx, kind: SessionKind): string {
   }
 }
 
+/** Les lignes de doc et d'aide que le travail du lot laisse périmées (L648, `docsFollowText`), ajoutées au brief fix : sans gabarit, comme les bornes. Rien sans commit du lot ou sans parent lisible. */
+function withDocsFollow(brief: string, c: LotCtx, kind: SessionKind): string {
+  if (kind !== 'fix') return brief;
+  try {
+    const oldest = lotWork(histPlan(c), wd(c), c.lot.lot).at(-1);
+    const text = oldest ? docsFollowText(wd(c), `${oldest.sha}^`) : '';
+    return text ? `${brief}\n${text}\n` : brief;
+  } catch {
+    return brief;
+  }
+}
+
 export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   const plan = c.loadPlan();
   const l = c.lot;
@@ -284,7 +297,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   }
   const brief = renderBrief(briefName(l, kind, !!c.integration), vars, c.wave.templates);
   // Les dépôts tiers (L456) : la consigne s'ajoute à tout brief d'écriture, sans passer par un gabarit (un gabarit modifié change l'empreinte que d'autres tests gardent).
-  return withClusterLine(withBounds(['implement', 'fix', 'spec', 'accept', 'probe'].includes(kind) ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief, c, kind), c.config.prodAccess);
+  return withClusterLine(withDocsFollow(withBounds(['implement', 'fix', 'spec', 'accept', 'probe'].includes(kind) ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief, c, kind), c, kind), c.config.prodAccess);
 }
 
 /** Plafond de sessions `spec` du lot (L230) : les revues de maquette d'un lot à écran, sinon deux. Fiche et maquette partagent `l.specRuns`. */

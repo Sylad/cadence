@@ -113,6 +113,25 @@ The pre-commit hook reads the message from the command line of the `git commit` 
 (editor, `--amend`) it does nothing and the post-commit warning stays. Run `raf hook install` again to add the
 pre-commit block to an existing repository. A read-only plan is never started by the hook. Only a refusal (exit code 3 of `raf hook pre-commit`) stops a commit: an older or broken `raf` lets it through.
 
+### A `fix(` commit and the documentation that cites what it changes (L648)
+
+A fix is born after the documentation was written, so a fix that renames a function or drops an option leaves
+`README.md`, `docs/*.md` and the help (`HELP` in `src/cli.ts`) citing what is gone. The `hook.docs` key of
+`cadence.yaml` makes the **pre-commit** hook check it:
+
+```yaml
+hook:
+  docs: refuse   # absent (default: nothing) | warn | refuse
+```
+
+For a commit whose subject starts with `fix(` and that stages a `src/**.ts` file, the hook takes the identifiers the
+diff of `src/` removes or adds (a declared name of 4 characters or more: `function`, `const`, `class`, `type`…; an
+`--option`), and looks for the lines that cite them: a name between backticks in `README.md` and `docs/*.md`, an
+`--option` in the help. A citing line the commit does not touch is listed (`file:line`) and, with `refuse`, the commit
+fails (exit code 3, `--no-verify` bypasses it); `warn` lists and lets it through. A `docs-ok: <reason>` line in the
+message (the reason is required) says the lines stay true. Other commits (`feat(`, `chore(`…) and a message the hook cannot read are not concerned. In a wave, the `fix` brief
+already lists the citing lines of the identifiers the lot's commits change, so the writer updates them in the same commit.
+
 Global options: `--file path` or `RAF_FILE`; `RAF_TODAY=YYYY-MM-DD` to freeze
 the date. `cadence raf …` is the same as `raf …`.
 

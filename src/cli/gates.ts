@@ -7,6 +7,7 @@ import { exemptPlanOnly, isPlanOnly, lotWork, ownFiles } from '../audit.js';
 import { type Day } from '../dates.js';
 import { PLAN_ACTIONS } from '../plan-commit.js';
 import { printUncommittedPlan } from '../plan-uncommitted.js';
+import { isFixCommit, docsOkReason, staleDocCitations, touchesSource } from '../doc-follow.js';
 import { matchesHead, readCommits, stage, stagedFiles, syncIndexWithHead } from '../git.js';
 import { installHook, pendingCommitMessage, REFUSED } from '../hook.js';
 import { gateRefusal, pushRefusal, UNGATED_ENV } from '../push-guard.js';
@@ -111,6 +112,26 @@ function preCommit(load: (() => Plan) | null, mode: 'warn' | 'refuse' | 'start' 
   return 0;
 }
 
+/**
+ * Pre-commit `hook.docs` (L648) : un `fix(` qui touche src/ et change un identifiant (déclaration, option) cité par une ligne de doc ou d'aide
+ * que le commit ne touche pas est refusé (`refuse`, code 3) ou signalé (`warn`), sauf `docs-ok: <raison>` dans le message.
+ * Comme le reste du hook : sans message lisible ou en cas de panne, le commit passe.
+ */
+function docsFollow(mode: 'warn' | 'refuse' | undefined, root: string, io: Io): number {
+  if (!mode) return 0;
+  try {
+    const message = pendingCommitMessage(io.env);
+    if (message === null || !isFixCommit(message) || !touchesSource(stagedFiles(root)) || docsOkReason(message)) return 0;
+    const stale = staleDocCitations(root);
+    if (stale.length === 0) return 0;
+    for (const c of stale) io.err(`raf: ${c.file}:${c.line} cite ${c.id} que ce correctif change : ${c.text.slice(0, 100)}`);
+    io.err(`raf: documentation qui ne suit pas le correctif${mode === 'refuse' ? ' — commit refusé (hook.docs: refuse)' : ''} : mettre ces lignes à jour dans ce commit, ou « docs-ok: <raison> » dans le message si elles restent vraies${mode === 'refuse' ? ' (--no-verify pour passer outre)' : ''}`);
+    return mode === 'refuse' ? REFUSED : 0;
+  } catch {
+    return 0;
+  }
+}
+
 function postCommit(load: (() => Plan) | null, newsDir: string, root: string, today: Day, io: Io, mode?: 'warn' | 'refuse' | 'start', verbose?: boolean): number {
   if (!load) return 0;
   try {
@@ -199,7 +220,10 @@ export function cmdHook(c: Ctx): number | Promise<number> {
     return 0;
   }
   if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, today, io, readHookConfig(configPath).autostart, !!values.verbose);
-  if (rest[0] === 'pre-commit') return preCommit(existsSync(planPath) ? loadPlan : null, readHookConfig(configPath).autostart, root, today, io);
+  if (rest[0] === 'pre-commit') {
+    const config = readHookConfig(configPath);
+    return docsFollow(config.docs, root, io) || preCommit(existsSync(planPath) ? loadPlan : null, config.autostart, root, today, io);
+  }
   if (rest[0] === 'pre-push') return prePush(root, io, rest[1], configPath, planFileIn(root, planPath));
   throw new RafError('usage : raf hook install|pre-commit|post-commit|pre-push');
 }

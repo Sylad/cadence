@@ -2777,9 +2777,10 @@ lots:
     started: 2026-11-06
   - id: L648
     title: "doc périmée par un correctif : le brief fix liste les lignes de docs/ et de l'aide qui citent les identifiants que le diff du fix change, et exige leur mise à jour dans le même commit ; hook de commit refuse un commit fix( touchant src/ si une ligne de doc citant un identifiant retiré ou ajouté n'est pas touchée (sauf docs-ok motivé) ; niveau : source (brief), commit (hook) ; niveau le plus tôt : source ; on ne peut pas prévenir plus tôt car le correctif naît après la rédaction de la doc ; mesure : 0 constat de revue « documentation ne suit pas le correctif » par vague, 0 rendu pour une phrase de doc"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-06
+    started: 2026-11-06
   - id: L649
     title: "constats écartés L622 : la règle inchange compare aussi par fichier et ligne (ou classe) un constat repris reformulé ; niveau : source (le brief de revue reçoit les mineurs notés, déjà livré par L646 une fois en service) puis correction (écart à la lecture) ; niveau le plus tôt : source ; mesure : taux d'écartés lu par cadence perf sur 3 vagues > 0 quand un mineur est relisté, 0 mineur relisté plus de 1 fois"
     status: todo

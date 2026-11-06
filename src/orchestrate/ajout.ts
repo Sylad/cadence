@@ -18,7 +18,10 @@ import { waveReadsAdds } from './snapshot.js';
 import type { AnyModel } from './launch.js';
 
 /** Une demande de la file d'ajouts (`adds.log`). */
-export type AddEntry = { id: number; project?: string; lot: string; model?: string };
+export type AddEntry = { id: number; project?: string; lot: string; model?: string; /** L657 : l'objectif du lot (`--goal`) et la marge `+N` de son budget (`--budget projet:lot=+N`). */ goal?: string; budget?: number };
+
+/** Ce qu'un ajout demande au contrôle préalable (L657) : l'objectif du lot, et la marge de budget de chaque lot par `projet:lot`. */
+export interface AddAsk { goal?: string; raises?: ReadonlyMap<string, number> }
 
 /** Un lot de la vague (ou déjà en file d'ajout) vu par le contrôle préalable d'un ajout. */
 export type KnownLot = { project: string; lot: string; queued?: boolean; /** État du lot de la vague (absent d'un lot en file) : un lot retiré par --drop se relance dans une nouvelle vague (L554). */ status?: LotState['status']; outcome?: string | null; /** L'étape où le lot a été rendu : `integrate` n'est jamais ajoutable (L563). */ next?: LotState['next'] };
@@ -34,12 +37,12 @@ export interface RunEnv {
 export interface LaunchChecks {
   resolveTargets: (args: Pick<Args, 'lots'>, io: OrchestrateIo, refusals: string[]) => Target[];
   /** Le contrôle préalable d'un lot de lancement, pour des lots ajoutés à la vague `addTo.wave` (qui porte déjà `addTo.lots`). */
-  preflight: (targets: Target[], run: RunEnv, addTo: { wave: string; lots: KnownLot[] }) => Promise<{ refusals: string[]; lots: LotState[] }>;
+  preflight: (targets: Target[], run: RunEnv, addTo: { wave: string; lots: KnownLot[] }, ask?: AddAsk) => Promise<{ refusals: string[]; lots: LotState[] }>;
 }
 
-const ALONE: (keyof Args)[] = ['lots', 'resume', 'status', 'drop', 'stopAfterCurrent', 'budget', 'lotBudgets', 'dryRun', 'continue', 'answers', 'integrate', 'removeWorktree', 'waits', 'goal', 'maxSessions'];
+const ALONE: (keyof Args)[] = ['lots', 'resume', 'status', 'drop', 'stopAfterCurrent', 'budget', 'dryRun', 'continue', 'answers', 'integrate', 'removeWorktree', 'waits', 'maxSessions'];
 
-/** `--add` ne se combine avec rien d'autre que `--wave` (L421) : vrai quand une autre action est donnée. */
+/** `--add` ne se combine avec rien d'autre que `--wave`, `--goal` et `--budget projet:lot=+N` (L421, L657) : vrai quand une autre action est donnée. */
 export const addNotAlone = (args: Args): boolean => ALONE.some((k) => (Array.isArray(args[k]) ? (args[k] as unknown[]).length > 0 : !!args[k] || args[k] === 0));
 
 /**
@@ -118,6 +121,29 @@ export function resumeNext(c: LotCtx, old: LotCtx): 'correction' | 'revue' | 'é
   return l.resumedReviewed ? 'revue' : 'écriture';
 }
 
+/**
+ * L657 : les refus de `--goal` et `--budget projet:lot=+N` d'un `--add`. Une vague d'avant L657 (sans la marque `addsGoalBudget` de son état) les ignorerait en silence : refus. Chaque `--budget` vise un lot des `--add`, une fois ;
+ * un lot rendu repris (L563) garde l'objectif et le budget que la vague lui avait donnés. Sans `--goal` ni `--budget`, rien n'est refusé ici : l'ajout reste accepté sur toute vague.
+ */
+function goalBudgetRefusals(args: Args, launch: string, store: RunStore, inWave: LotState[]): string[] {
+  if (args.goal === undefined && !args.lotBudgets.length) return [];
+  const out: string[] = [];
+  if (!store.readWave()?.addsGoalBudget) out.push(`cette vague a été lancée avant L657 : elle ignore --goal et --budget d'un ajout ; ajoutez le lot sans ces options, ou relancez la vague`);
+  const seen = new Set<string>();
+  for (const b of args.lotBudgets) {
+    const key = addKey(launch, b);
+    if (!args.add.some((a) => addKey(launch, a) === key)) out.push(`--budget ${key} : lot absent des --add de la commande`);
+    else if (seen.has(key)) out.push(`--budget ${key} : lot visé deux fois`);
+    seen.add(key);
+  }
+  for (const a of args.add) {
+    const key = addKey(launch, a);
+    const rendu = inWave.find((l) => lotKey(l.project, l.lot) === key);
+    if (rendu && addableHandBack(rendu)) out.push(`${key} : lot rendu repris : il garde son objectif et son budget, --goal et --budget lui sont refusés`);
+  }
+  return out;
+}
+
 /** Refus d'un ajout (code 2) ou rien : les lots déjà dans la vague ou en file ne sont pas rejoués, le budget restant doit tenir celui de chaque lot ajouté. */
 function budgetRefusals(lots: LotState[], wave: WaveState | null): string[] {
   let remaining = wave ? wave.budget - wave.consumed : Infinity;
@@ -145,8 +171,10 @@ export async function addToLive(args: Args, run: RunEnv, store: RunStore, checks
     const why = rendu && addableHandBack(rendu) ? resumeRefusal(store, rendu, launch) : null;
     if (why) refusals.push(`${lotKey(rendu!.project, rendu!.lot)} : worktree du lot introuvable ou arbre sale : ${why}`);
   }
+  const ask: AddAsk = { goal: args.goal, raises: new Map(args.lotBudgets.map((b) => [addKey(launch, b), b.raise])) };
+  refusals.push(...goalBudgetRefusals(args, launch, store, inWave));
   const queued = store.addQueue().map((e) => ({ project: projectName(launch, e.project), lot: e.lot, queued: true }));
-  const pre = refusals.length ? { refusals: [] as string[], lots: [] as LotState[] } : await checks.preflight(targets, run, { wave: store.id, lots: [...inWave, ...queued] });
+  const pre = refusals.length ? { refusals: [] as string[], lots: [] as LotState[] } : await checks.preflight(targets, run, { wave: store.id, lots: [...inWave, ...queued] }, ask);
   refusals.push(...pre.refusals, ...budgetRefusals(pre.lots, store.readWave()));
   if (refusals.length) {
     for (const r of refusals) io.err(`orchestrate : ${r}`);
@@ -154,7 +182,7 @@ export async function addToLive(args: Args, run: RunEnv, store: RunStore, checks
   }
   for (const a of args.add) {
     const key = addKey(launch, a);
-    const id = store.requestAdd({ project: a.project, lot: a.lot, model: a.model });
+    const id = store.requestAdd({ project: a.project, lot: a.lot, model: a.model, goal: args.goal, budget: args.lotBudgets.find((b) => addKey(launch, b) === key)?.raise });
     // La vague a pu finir entre le contrôle et le dépôt : sa file ne sera plus lue, la demande est retirée.
     if (!liveWaves(cadenceHome()).some((w) => w.wave === store.id)) {
       store.markAddTaken(id);
@@ -194,7 +222,7 @@ export interface AddEnv {
   announce: () => void;
   checks: LaunchChecks;
   /** Résout, contrôle et prépare un lot : son contexte, ou les refus. */
-  build: (target: Target, known: KnownLot[]) => Promise<{ ctx: LotCtx } | { refusals: string[] }>;
+  build: (target: Target, known: KnownLot[], ask?: AddAsk) => Promise<{ ctx: LotCtx } | { refusals: string[] }>;
 }
 
 /**
@@ -233,7 +261,7 @@ export class AddFeed {
     const cut = resumable ? this.treeRefusal(resumable.lot) : null;
     if (cut) return this.discard(entry, cut, `orchestrate : ${key} : ajout écarté à la prise : ${cut}`);
     const known = [...e.ctxs.filter((c) => c !== resumable), ...this.waiting.values()].map((c) => ({ project: c.lot.project, lot: c.lot.lot }));
-    const built = refusals.length ? { refusals } : await e.build(targets[0]!, known);
+    const built = refusals.length ? { refusals } : await e.build(targets[0]!, known, { goal: entry.goal, raises: entry.budget ? new Map([[key, entry.budget]]) : undefined });
     if ('refusals' in built) return this.discard(entry, built.refusals.map((r) => (r.startsWith(`${key} : `) ? r.slice(key.length + 3) : r)).join(' ; '));
     if (built.ctx.lot.budget! > e.budgetLeft()) return this.discard(entry, `le budget restant de la vague ne tient pas le budget du lot (${built.ctx.lot.budget})`);
     return built.ctx;

@@ -21,6 +21,7 @@ import type { OrchestrateDeps, OrchestrateIo } from './command.js';
 import type { Args } from './command-args.js';
 import { measuredBudgetsAt } from './budget-mesure.js';
 import { lotBudget } from './lot-budget.js';
+import { askedBudget, planGoalOf } from './reglages-lot.js';
 import { readAgents, type AgentDef } from './launch.js';
 
 export interface Target {
@@ -85,9 +86,9 @@ export function notLoggedIn(deps: OrchestrateDeps): string | null {
 
 /** Préconditions : tout ce qui peut être refusé l'est ici, avant d'agir, sans verrou ni écriture. */
 /** Les marqueurs d'état que le plan pose sur un lot : `specLot` (spec back sans écran), `revueLot` (L650, passes de fix bornées). */
-const specFlags = (launched: { spec?: boolean }, screen: unknown, revue: boolean | undefined): { specLot?: true; revueLot?: true } => ({ ...(launched.spec && !screen ? { specLot: true as const } : {}), ...(revue ? { revueLot: true as const } : {}) });
+export const specFlags = (launched: { spec?: boolean }, screen: unknown, revue: boolean | undefined): { specLot?: true; revueLot?: true } => ({ ...(launched.spec && !screen ? { specLot: true as const } : {}), ...(revue ? { revueLot: true as const } : {}) });
 
-export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Target[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, opts: { resume?: boolean; addTo?: { wave: string; lots: KnownLot[] } } = {}): Promise<{ refusals: string[]; lots: LotState[] }> {
+export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Target[], io: OrchestrateIo, deps: OrchestrateDeps, launch: string, opts: { resume?: boolean; addTo?: { wave: string; lots: KnownLot[] }; /** L657 : la marge `+N` du budget de chaque lot ajouté par `--add --budget`, par `projet:lot`. */ raises?: ReadonlyMap<string, number> } = {}): Promise<{ refusals: string[]; lots: LotState[] }> {
   const refusals: string[] = [];
   if (io.env.CADENCE_ORCHESTRATED) refusals.push(`orchestrate ne se lance pas depuis une session orchestrée (vague ${io.env.CADENCE_ORCHESTRATED})`);
   const info = deps.claudeInfo();
@@ -171,13 +172,13 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
     const small = lot.estimate <= 0.5 || lot.quickwin;
     const goal = args.goal ?? lot.goal;
     const { screen, skipped } = launchScreen(plan, t.repo, env.config, lot, goal), launched = launchedLot(lot, skipped);
-    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, ...(goal ? { goal } : {}), visible: lot.visible, small, ...(screen ? { screen } : {}), ...specFlags(launched, screen, lot.revue), model: t.model, readOnlyPlan: plan.readonly });
+    const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, ...(goal ? { goal } : {}), planGoal: planGoalOf(lot), visible: lot.visible, small, ...(screen ? { screen } : {}), ...specFlags(launched, screen, lot.revue), model: t.model, readOnlyPlan: plan.readonly });
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.estimate = lot.estimate;
     if (isExpress({ estimate: lot.estimate, screen, planScreen: lot.screen, specLot: state.specLot })) state.express = true;
     state.light = lot.estimate <= env.config.review.threshold;
     const escalating = !!env.config.escalation;
-    state.budget = lotBudget(lot.estimate, budgetStage(launched, screen, env.config.maquette, t.repo, env.config.spec.dir), escalating, measuredBudgetsAt(launch, io));
+    state.budget = askedBudget(opts.raises, key, escalating, lotBudget(lot.estimate, budgetStage(launched, screen, env.config.maquette, t.repo, env.config.spec.dir), escalating, measuredBudgetsAt(launch, io)));
     if (escalating) state.escalationReserve = ESCALATION_RESERVE;
     state.dependsOn = lot.after.filter((d) => earlier.includes(d));
     if (node.kind === 'ok') state.node = { version: node.version, wanted: node.wanted, bin: node.bin, ...(node.skipped ? { skipped: node.skipped } : {}) };

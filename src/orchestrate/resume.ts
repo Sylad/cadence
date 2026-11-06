@@ -17,6 +17,7 @@ import { mainTreeWorkers } from './main-tree.js';
 import { baseBranchOf, keptLines, lotBranch, lotTreeDir } from './worktree.js';
 import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState, type WaveState } from './state.js';
 import { projectEnv } from './preflight.js';
+import { relitObjectifs } from './reprise-objectif.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
 import { endOfWaveLines } from '../inspect-read.js';
 import { launchCost, renderTable } from './table.js';
@@ -318,6 +319,8 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
     if (recovered.consumed || recovered.cacheRead) store.writeWave(wave);
     for (const [l, r] of raised) raiseBudget(l, r, store, io);
     for (const l of integ) resumeIntegration(l, leadReviewed.get(l), store, io);
+    // L657 : l'objectif du plan, relu pour les lots que la reprise rejoue (ceux qui ne font que s'intégrer gardent le leur).
+    relitObjectifs(live.filter((l) => !integ.includes(l)), (line) => (store.journal(line), io.out(line)));
     for (const l of live) {
       if (l.status === 'implementing' || l.status === 'reviewing' || l.status === 'fixing') l.status = 'suspended';
       store.writeLot(l);

@@ -103,7 +103,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   deps = onceAuth(deps);
   const args = parseOrchestrateArgs(argv);
   const launch = io.cwd;
-  if (args.add.length && addNotAlone(args)) throw new RafError('--add ne se combine avec aucune autre action (seul --wave désigne la vague qui reçoit les lots)');
+  if (args.add.length && addNotAlone(args)) throw new RafError('--add ne se combine avec aucune autre action (seuls --wave, qui désigne la vague qui reçoit les lots, --goal et --budget projet:lot=+N peuvent l’accompagner)');
   const today: Day = io.env.RAF_TODAY && isDay(io.env.RAF_TODAY) ? io.env.RAF_TODAY : toDay(io.now());
 
   if ((args.until !== undefined || args.priority !== undefined) && !args.continue) throw new RafError('--until et --priority s\'utilisent avec --continue');
@@ -122,13 +122,14 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     throw new RafError(`--resume ne se combine pas avec des lots à lancer (il reprend les lots de la vague ; --answer, --drop, --integrate, --replay et --budget projet:lot=+N nomment ceux qu'ils visent) ; ${hint}`);
   }
   if (args.resume !== undefined && args.dryRun) throw new RafError('--resume ne se combine pas avec --dry-run (la reprise écrit l\'état de la vague et relance les sessions, elle ne se simule pas)');
-  if (args.lotBudgets.length && args.resume === undefined) throw new RafError("--budget projet:lot=+N ne vaut qu'avec --resume");
+  if (args.lotBudgets.length && args.resume === undefined && !args.add.length) throw new RafError("--budget projet:lot=+N ne vaut qu'avec --resume");
   // L279 : --integrate rejoue une intégration rendue, donc une vague arrêtée ; --abandon-commits ne vaut qu'avec --remove-worktree.
   if (args.integrate.length && args.resume === undefined) throw new RafError(`${args.integrate.some((t) => !t.replay) ? '--integrate' : '--replay'} ne vaut qu'avec --resume`);
   if (args.abandonCommits && !args.removeWorktree) throw new RafError("--abandon-commits ne vaut qu'avec --remove-worktree");
   if (args.removeWorktree && (args.lots.length || args.resume !== undefined || args.status !== undefined || args.continue || args.dryRun || args.drop.length || args.stopAfterCurrent || args.waits)) throw new RafError("--remove-worktree ne se combine avec aucune autre action");
   // L258 : l'objectif donné ne vaut que pour UN lot lancé (la clé goal: du lot sert quand plusieurs partent ; --continue tire ses lots lui-même).
-  if (args.goal !== undefined && (args.lots.length !== 1 || args.continue || args.resume !== undefined || args.status !== undefined || args.waits || args.drop.length || args.stopAfterCurrent)) throw new RafError("--goal s'applique à un seul lot lancé : <projet>:<lot> --goal \"…\" (plusieurs lots : la clé goal: de chacun)");
+  // L657 : avec --add, le lot est celui de l'unique --add.
+  if (args.goal !== undefined && ((args.add.length ? args.add.length !== 1 : args.lots.length !== 1) || args.continue || args.resume !== undefined || args.status !== undefined || args.waits || args.drop.length || args.stopAfterCurrent)) throw new RafError("--goal s'applique à un seul lot lancé : <projet>:<lot> --goal \"…\" (plusieurs lots : la clé goal: de chacun)");
   if (args.since !== undefined && !args.waits) throw new RafError('--since s\'utilise avec --waits');
   if (args.waits) {
     if (args.lots.length || args.status !== undefined || args.resume !== undefined || args.watch || args.drop.length || args.stopAfterCurrent || args.continue || args.dryRun) throw new RafError('--waits ne se combine avec aucune autre action');
@@ -143,7 +144,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.drop.length || args.stopAfterCurrent) return control(args, io);
   if (args.answers.length) return answerOnly(args, io);
 
-  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--no-fill] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --follow [--wave vague] [--interval 5] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --add projet:lot [--wave vague] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
+  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--no-fill] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --follow [--wave vague] [--interval 5] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --add projet:lot [--goal "…"] [--budget projet:lot=+N] [--wave vague] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);
@@ -207,7 +208,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
     io.err(`orchestrate : lot sauté — ${s}`);
     store.journal(`continue : lot sauté — ${s}`);
   }
-  const wave: WaveState = { id, created: io.now().toISOString(), cwd: launch, budget, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: pre.lots.map((l) => lotKey(l.project, l.lot)) };
+  const wave: WaveState = { id, created: io.now().toISOString(), cwd: launch, budget, consumed: 0, cacheRead: 0, status: 'running', pid: process.pid, lots: pre.lots.map((l) => lotKey(l.project, l.lot)), addsGoalBudget: true };
   // Une vague qui n'a pas atteint `wave.json` (refus au verrou, démarrage en échec) ne laisse pas son dossier réservé :
   // le même `--wave` se relance, et `reserve` ne le prend pas pour une vague existante.
   const abandon = () => {

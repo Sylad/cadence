@@ -17,7 +17,7 @@ import { killSessions, type ClaudeFn } from './launch.js';
 import { REPO_LOCK, releaseLock, takeLock } from './lock.js';
 import { awaitsDependency, groupLots, runPool } from './pool.js';
 import { slotPlace } from './attente.js';
-import { AddFeed, addToLive, openInRepo, type KnownLot, type LaunchChecks } from './ajout.js';
+import { AddFeed, addToLive, openInRepo, type AddAsk, type KnownLot, type LaunchChecks } from './ajout.js';
 import { takeIntegrations } from './integration-vivante.js';
 import { repoBranch } from './integrate.js';
 import { baseBranchOf, keptLines, legacyLotSlug, lotBranch, lotTreeDir, planFileSet, recoverTree } from './worktree.js';
@@ -264,7 +264,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
       }
     },
     announce: () => updateWaveReposSafe(home, repos.filter((x) => !freed.has(x)), lanes()),
-    build: (t, known) => buildAdd(t, known, { wave: wave.id, ctxs, wctx, store, io, deps, launch, multiSlot: cap > 1 }),
+    build: (t, known, ask) => buildAdd(t, known, ask, { wave: wave.id, ctxs, wctx, store, io, deps, launch, multiSlot: cap > 1 }),
   });
 
   // Ctrl-C, SIGTERM : les sessions sont tuées en bloc, les étapes marquées interrompues, les verrous et hooks libérés.
@@ -361,7 +361,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   return all.every((l) => l.status === 'ready') ? 0 : 1;
 }
 
-const LAUNCH_CHECKS: LaunchChecks = { resolveTargets, preflight: (targets, run, addTo) => preflight({ dryRun: false }, targets, run.io, run.deps, run.launch, { addTo }) };
+const LAUNCH_CHECKS: LaunchChecks = { resolveTargets, preflight: (targets, run, addTo, ask) => preflight({ dryRun: false, goal: ask?.goal }, targets, run.io, run.deps, run.launch, { addTo, raises: ask?.raises }) };
 
 /** `--add` (L421) : la vague vivante de ce dossier reçoit les lots (le travail est dans `ajout.ts`). */
 export async function addOnlyLive(args: Args, io: OrchestrateIo, deps: OrchestrateDeps, launch: string): Promise<number> {
@@ -373,8 +373,8 @@ export async function addOnlyLive(args: Args, io: OrchestrateIo, deps: Orchestra
  * Le contexte d'un lot ajouté en cours de vague (L421) ou tiré par le remplissage d'un créneau libre (L527) : le contrôle préalable d'un lot de lancement (les lots de la vague comptent pour les dépendances), le lien du Node,
  * puis un worktree si son dépôt est en `worktrees: true` et la vague a plus d'un créneau (`multiSlot`), ou si tous les lots encore à jouer de son dépôt y sont ; sinon il attend la fin de ceux qui jouent dans l'arbre du dépôt.
  */
-async function buildAdd(t: Target, known: KnownLot[], w: { wave: string; ctxs: LotCtx[]; wctx: WaveCtx; store: RunStore; io: OrchestrateIo; deps: OrchestrateDeps; launch: string; multiSlot: boolean }): Promise<{ ctx: LotCtx } | { refusals: string[] }> {
-  const pre = await LAUNCH_CHECKS.preflight([t], w, { wave: w.wave, lots: known });
+async function buildAdd(t: Target, known: KnownLot[], ask: AddAsk | undefined, w: { wave: string; ctxs: LotCtx[]; wctx: WaveCtx; store: RunStore; io: OrchestrateIo; deps: OrchestrateDeps; launch: string; multiSlot: boolean }): Promise<{ ctx: LotCtx } | { refusals: string[] }> {
+  const pre = await LAUNCH_CHECKS.preflight([t], w, { wave: w.wave, lots: known }, ask);
   const lot = pre.lots[0];
   if (pre.refusals.length || !lot) return { refusals: pre.refusals };
   if (lot.node) lot.node.link = (w.deps.linkNode ?? linkNodeBin)(w.store.dir, lot.node.version, lot.node.bin);

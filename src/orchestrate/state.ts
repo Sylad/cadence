@@ -31,6 +31,8 @@ export interface WaveState {
   playing?: string[];
   /** Part de la machine de chaque session (L350) : CADENCE_TEST_WORKERS, cœurs ÷ plafond de sessions ; absent d'une vague d'avant L350. */
   testWorkers?: number;
+  /** Posée au lancement (L657) : la vague lit les champs `goal` et `budget` des lignes d'`adds.log`. Absente d'une vague d'avant L657, qui les ignorerait : `--add --goal/--budget` y est refusé. */
+  addsGoalBudget?: true;
 }
 
 export interface StepState {
@@ -104,6 +106,8 @@ export interface LotState {
   title: string;
   /** Objectif donné au lancement (`--goal`, ou clé `goal:` du lot, L258) : remplace le titre dans les briefs, rendu au tableau. Absent : le titre. */
   goal?: string;
+  /** La clé `goal:` du plan au lancement ou à l'ajout du lot (L657), vide si le plan n'en portait pas : la reprise la compare à celle du plan pour savoir si le plan a changé depuis. Absent d'un état d'avant L657. */
+  planGoal?: string;
   visible: boolean;
   small: boolean;
   /** Estimate du plan, en jours (L298) : le délai des étapes d'écriture en est proportionné. Absent (état antérieur) : le délai de base. */
@@ -262,6 +266,7 @@ export interface NewLot {
   lot: string;
   title: string;
   goal?: string;
+  planGoal?: string;
   visible: boolean;
   small: boolean;
   screen?: Screen;
@@ -533,17 +538,17 @@ export class RunStore {
   }
 
   /**
-   * File des lots à ajouter à une vague vivante (L421, `--add`) : `adds.log`, une ligne JSON par demande (`{id, lot, project?, model?}`), le projet étant écrit comme le lead l'a donné
+   * File des lots à ajouter à une vague vivante (L421, `--add`) : `adds.log`, une ligne JSON par demande (`{id, lot, project?, model?, goal?, budget?}`, L657 : l'objectif du lot et la marge `+N` de son budget), le projet étant écrit comme le lead l'a donné
    * (nom de dossier depuis le dossier de lancement). La vague la relit entre deux étapes, comme celle des réponses.
    */
-  addQueue(): { id: number; project?: string; lot: string; model?: string }[] {
-    return this.queue('adds.log', (o) => (typeof o.lot === 'string' ? { lot: o.lot, ...(typeof o.project === 'string' ? { project: o.project } : {}), ...(typeof o.model === 'string' ? { model: o.model } : {}) } : null));
+  addQueue(): { id: number; project?: string; lot: string; model?: string; goal?: string; budget?: number }[] {
+    return this.queue('adds.log', (o) => (typeof o.lot === 'string' ? { lot: o.lot, ...(typeof o.project === 'string' ? { project: o.project } : {}), ...(typeof o.model === 'string' ? { model: o.model } : {}), ...(typeof o.goal === 'string' ? { goal: o.goal } : {}), ...(typeof o.budget === 'number' ? { budget: o.budget } : {}) } : null));
   }
 
   /** Dépose un lot à ajouter ; rend son numéro. */
-  requestAdd(t: { project?: string; lot: string; model?: string }): number {
+  requestAdd(t: { project?: string; lot: string; model?: string; goal?: string; budget?: number }): number {
     const id = this.nextId('adds.log');
-    this.appendAddLine({ id, lot: t.lot, ...(t.project ? { project: t.project } : {}), ...(t.model ? { model: t.model } : {}) });
+    this.appendAddLine({ id, lot: t.lot, ...(t.project ? { project: t.project } : {}), ...(t.model ? { model: t.model } : {}), ...(t.goal ? { goal: t.goal } : {}), ...(t.budget ? { budget: t.budget } : {}) });
     return id;
   }
 

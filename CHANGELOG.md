@@ -83,6 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
+- `cadence orchestrate --add` takes `--goal "…"` and `--budget <project>:<lot>=+N`, and `--resume` rereads the objective changed in the plan (L657, issue #44, [docs/orchestrate.md](docs/orchestrate.md)): a lot added to a live wave carries its objective and its budget as a lot launched does (a lot taken back after a hand-back keeps its own, and a wave started before this version refuses the two options), and a resume replays each lot with the `goal:` of the plan when it changed since the launch or the add (the last explicit gesture wins, the journal says `objectif changé`, a lot with no session yet decides its spec and mock-up again).
 - A page of docs that a lot empties or moves no longer breaks the test of another lot at the integration (L658, [docs/config.md](docs/config.md#file-bounds-bounds)): the implementation and fix briefs list the tests that read a page the lot's title or goal names (`test/lead-hold.test.ts` reading the section L651 moved), and the targeted gate plays the tests that read any `.md` page the lot touches, found by the page name in `test/**/*.test.*` (no import links them, so `vitest related` missed them: L651 was refused by R14 of lead-hold).
 
 ### Fixed

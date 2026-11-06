@@ -2749,6 +2749,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "compliant : 0 blocking, 0 major, 1 minor (aide `cadence inspect` de src/cli.ts:86 sans la catégorie `attente de ressource`) — orchestré (vague 2026-11-06-1338, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant (1 mineur : l'aide de `cadence inspect` dans src/cli.ts:86 n'énumère pas encore `attente de ressource`)", commit: 10606c841f0bcfa00617400f1247909eca98b9c4 }
   - id: L645
     title: "cliquet contre origin/main : le test et la porte comparent à la ligne de base du départ du lot (ou refusent « origin/main est en retard de N commits sur main » avant de jouer 6 min de suite), et le journal garde les 20 premières lignes du test rouge ; niveau : source ; mesure : 0 refus d'intégration dû à un origin/main en retard, texte du refus présent dans 100 % des refus"
     status: doing

@@ -276,7 +276,8 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     });
     vars.spec = [vars.spec, referenceIdsText('spec', lotIds({ ...lot, goal: l.goal ?? lot.goal }))].filter(Boolean).join('\n\n');
     const mine = lotCommitLines(c);
-    if (mine) vars.commits = `Commits of the lot already present (do not redo them; fix or complete the spec from them):\n${mine}`;
+    // La lecture du précheck porte les cas limites de la règle (L666) : la spec les reçoit avant d'écrire.
+    vars.commits = precheckBrief(mine ? `Commits of the lot already present (do not redo them; fix or complete the spec from them):\n${mine}` : vars.commits, undefined, l.precheckLu);
     if (l.pendingAnswer) vars.reponse = l.specAsked?.length ? answeredText(l.specAsked, l.pendingAnswer, ruleIdsSourcedByLead(wd(c), ficheOf(c) ?? '', l.specAskedRules ?? [])) : `Answer from the human to your earlier question: ${l.pendingAnswer}`;
   }
   if (kind === 'fiche') {

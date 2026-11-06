@@ -214,6 +214,7 @@ export function answeredText(asked: string[], answer: string, sourced: string[] 
     'The program asked the lead about expensive-to-undo hypotheses of your sheet:',
     ...asked.map((q) => `- ${q}`),
     `Answer from the lead: ${answer}`,
+    'An answer to a contract question is a rule before anything else (L666): also list the edge cases of the answer (the absent base, the lossless copy on the source side, the empty, the twice), each as its own rule with its test and, when the answer does not settle it, its `hypothese` and `si_faux`.',
     sourced.length
       ? `The program already set ${sourced.join(', ')} to \`statut: sourcee\` with the lead's answer as its \`source\` (no \`si_faux\`). Touch the sheet only if the lead corrected a rule: rewrite its \`enonce\` as they say and keep the \`sourcee\` status and the \`source\`. Do not turn it back into a \`hypothese\`.`
       : 'Apply it to the sheet: a rule the lead confirms becomes `statut: sourcee` with `source: réponse du lead` (no `si_faux`); a rule the lead corrects is rewritten as they say (`sourcee`, same source). Do not leave it as `hypothese`, or the program asks the same question again.',

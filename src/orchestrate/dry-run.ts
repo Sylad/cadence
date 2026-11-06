@@ -15,7 +15,7 @@ import { maquetteText } from './maquette.js';
 import { budgetStage, costlyHypotheses, lightLot, specText } from './spec.js';
 import { fichesDuDossier } from '../spec.js';
 import { drawSettingsReport } from './continue.js';
-import { precheckNothingToFind, MAX_PASSES, MAX_PASSES_CONVERGING, briefName, needsPrecheck } from './cycle.js';
+import { precheckSkipReason, MAX_PASSES, MAX_PASSES_CONVERGING, briefName, needsPrecheck } from './cycle.js';
 import { buildArgs, buildLocalArgs, MODEL_ALIASES, mcpServersFor, enabledPlugins, settingsFiles, type StepModel } from './launch.js';
 import { repoBranch } from './integrate.js';
 import { launchScreen, launchedLot } from './cycle/retreci.js';
@@ -170,8 +170,8 @@ export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDep
     if (l.screen && env.config.maquette) steps.unshift({ kind: 'maquette', model: env.config.review.full });
     if (l.specLot && env.config.fiche) steps.unshift({ kind: 'fiche', model: 'sonnet' });
     if (specStage) steps.unshift({ kind: 'spec', model: 'sonnet' });
-    if (!l.express && needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, l.repos, l.goal)) {
-      const nothingToFind = precheckNothingToFind(env.loadPlan(), l.repo, l.lot, l.repos, l.goal);
+    if (!l.express && needsPrecheck(env.config, env.loadPlan(), l.repo, l.lot, { repos: l.repos, goal: l.goal, specStage })) {
+      const nothingToFind = precheckSkipReason(env.loadPlan(), l.repo, l.lot, { repos: l.repos, goal: l.goal, specStage }); // L666 : un lot à spec garde son contrôle
       if (nothingToFind) io.out(`  contrôle préalable sauté : ${nothingToFind}`);
       else steps.unshift({ kind: 'precheck', model: env.config.precheckLocal ? 'local' : 'sonnet' });
     }

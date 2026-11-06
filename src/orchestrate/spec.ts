@@ -205,6 +205,13 @@ export function ruleIdsSourcedByLead(repo: string, fiche: string, ids: string[])
 /** Début de la source d'une règle tranchée par le lead : `réponse du lead, <date>, vague <id>`. */
 export const LEAD_SOURCE = 'réponse du lead';
 
+/** Consigne jointe à toute réponse du lead reçue par une session de spec (L666) : la réponse est une règle, ses cas limites en sont d'autres. */
+export const ANSWER_IS_A_RULE =
+  'An answer to a contract question is a rule before anything else (L666): also list the edge cases of the answer (the absent base, the lossless copy on the source side, the empty, the twice), each as its own rule with its test and, when the answer does not settle it, its `hypothese` and `si_faux`.';
+
+/** Reprise de la spec après la réponse du lead à une question posée par la session elle-même (`specAsked` vide) : la réponse, puis la consigne L666. */
+export const sessionAnswerText = (answer: string): string => `Answer from the human to your earlier question: ${answer}\n${ANSWER_IS_A_RULE}`;
+
 /**
  * Consigne de reprise après la réponse du lead à des hypothèses coûteuses. Les règles que le programme a déjà passées en `sourcee` (`sourced`) ne sont plus à
  * réécrire que si le lead les a corrigées ; les autres, l'agent les passe lui-même.
@@ -214,7 +221,7 @@ export function answeredText(asked: string[], answer: string, sourced: string[] 
     'The program asked the lead about expensive-to-undo hypotheses of your sheet:',
     ...asked.map((q) => `- ${q}`),
     `Answer from the lead: ${answer}`,
-    'An answer to a contract question is a rule before anything else (L666): also list the edge cases of the answer (the absent base, the lossless copy on the source side, the empty, the twice), each as its own rule with its test and, when the answer does not settle it, its `hypothese` and `si_faux`.',
+    ANSWER_IS_A_RULE,
     sourced.length
       ? `The program already set ${sourced.join(', ')} to \`statut: sourcee\` with the lead's answer as its \`source\` (no \`si_faux\`). Touch the sheet only if the lead corrected a rule: rewrite its \`enonce\` as they say and keep the \`sourcee\` status and the \`source\`. Do not turn it back into a \`hypothese\`.`
       : 'Apply it to the sheet: a rule the lead confirms becomes `statut: sourcee` with `source: réponse du lead` (no `si_faux`); a rule the lead corrects is rewritten as they say (`sourcee`, same source). Do not leave it as `hypothese`, or the program asks the same question again.',

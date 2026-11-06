@@ -22,7 +22,7 @@ import { avalFicheText, ficheContracts, ficheRules, hasScreenPart } from '../ava
 import { ficheReviewText, reviewedSheetText } from '../fiche.js';
 import { maquetteText, reviewedText } from '../maquette.js';
 import { worstUxText } from '../pires-cas.js';
-import { answeredText, ficheHasBack, findFiche, lightLot, ruleIdsSourcedByLead, specText, visibleFix, type FicheParts } from '../spec.js';
+import { answeredText, ficheHasBack, findFiche, lightLot, ruleIdsSourcedByLead, sessionAnswerText, specText, visibleFix, type FicheParts } from '../spec.js';
 import { decisionsText, humanDecisions } from '../decisions.js';
 import { type Constat, type LotState } from '../state.js';
 import { git } from '../worktree.js';
@@ -278,7 +278,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     const mine = lotCommitLines(c);
     // La lecture du précheck porte les cas limites de la règle (L666) : la spec les reçoit avant d'écrire.
     vars.commits = precheckBrief(mine ? `Commits of the lot already present (do not redo them; fix or complete the spec from them):\n${mine}` : vars.commits, undefined, l.precheckLu, 'spec');
-    if (l.pendingAnswer) vars.reponse = l.specAsked?.length ? answeredText(l.specAsked, l.pendingAnswer, ruleIdsSourcedByLead(wd(c), ficheOf(c) ?? '', l.specAskedRules ?? [])) : `Answer from the human to your earlier question: ${l.pendingAnswer}`;
+    if (l.pendingAnswer) vars.reponse = l.specAsked?.length ? answeredText(l.specAsked, l.pendingAnswer, ruleIdsSourcedByLead(wd(c), ficheOf(c) ?? '', l.specAskedRules ?? [])) : sessionAnswerText(l.pendingAnswer); // L666 : la consigne part aussi avec la réponse à une question de la session
   }
   if (kind === 'fiche') {
     vars.fiche = ficheReviewText({ fiche: ficheOf(c) ?? '', passes: l.fiche?.passes ?? 0, previous: l.ficheConstats });

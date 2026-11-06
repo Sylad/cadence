@@ -2,7 +2,7 @@ import { type Plan } from '../../plan.js';
 import { type LotRepo } from '../../repos.js';
 import { hasWork } from './shared.js';
 import { citesPriorWork, localYesNote, keepPrecheckReading, precheckNothingToFind } from '../precheck.js';
-import { type LotCtx, save, stop, histPlan, workDir as wd } from './ctx.js';
+import { type LotCtx, save, stop, histPlan, workDir as wd, hasSpecStage } from './ctx.js';
 import { type PrecheckReport, checkShape, PRECHECK_SCHEMA } from '../schemas.js';
 import { session, LOCAL_FAILED, benchLocal } from './session.js';
 import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE } from '../state.js';
@@ -12,14 +12,28 @@ import { firstWrite } from './spec-steps.js';
  * titre ou le goal (clé `goal:` du plan, ou `goal` donné au lancement) cite un constat ou un autre lot (L288, L292) : sans cela
  * rien ne laisse croire qu'un autre lot l'a déjà livré, et le contrôle coûtait 7 % des tokens pour 10 « oui » sur 30 mesurés
  * (audit du 24-10). Sur le modèle local (`precheck: local`, L296) le critère tombe : le titre faisait perdre 7 des 17 « oui »
- * réels, et le contrôle ne coûte plus rien au quota (seul un « oui » est confirmé par Sonnet).
+ * réels, et le contrôle ne coûte plus rien au quota (seul un « oui » est confirmé par Sonnet). Un lot à étape de spec (`screen:`
+ * ou `spec: true` du plan, ou `specStage` posé au lancement) passe aussi par le contrôle (L666) : sa lecture liste les cas limites
+ * de la règle que la spec reçoit avant d'être écrite ; sans elle, un tiers des lots à fiche (13 sur 38 au 06-11) partait en spec à froid.
  */
-export function needsPrecheck(config: { precheck: boolean; precheckLocal?: boolean }, plan: Plan, repo: string, lot: string, repos: LotRepo[] = [], goal?: string): boolean {
-  if (!config.precheck || hasWork(plan, repo, { repos, lot })) return false;
+export function needsPrecheck(config: { precheck: boolean; precheckLocal?: boolean }, plan: Plan, repo: string, lot: string, opts: PrecheckOpts = {}): boolean {
+  if (!config.precheck || hasWork(plan, repo, { repos: opts.repos ?? [], lot })) return false;
   if (config.precheckLocal) return true;
   const l = plan.lot(lot);
-  const text = [l.title, l.goal, goal].filter(Boolean).join('\n');
+  if (opts.specStage || l.screen || l.spec) return true;
+  const text = [l.title, l.goal, opts.goal].filter(Boolean).join('\n');
   return citesPriorWork(text, lot, plan.lots().map((x) => x.id));
+}
+
+/** Ce que le lancement ajoute au plan pour décider du contrôle : dépôts voisins, goal donné au lancement, étape de spec posée au lancement (`--screen`). */
+export interface PrecheckOpts { repos?: LotRepo[]; goal?: string; specStage?: boolean }
+
+/**
+ * Raison de sauter le contrôle d'un lot qui le mérite, ou null : un lot qui n'a rien à retrouver (L322) ; jamais un lot à étape
+ * de spec (L666), dont le contrôle a aussi les cas limites de la règle à lister pour la spec.
+ */
+export function precheckSkipReason(plan: Plan, root: string, lot: string, opts: PrecheckOpts = {}): string | null {
+  return opts.specStage ? null : precheckNothingToFind(plan, root, lot, opts.repos, opts.goal);
 }
 
 /**
@@ -47,7 +61,7 @@ export async function precheck(c: LotCtx): Promise<void> {
       if (rep?.dejaPresent === 'oui') {
         localYes = true;
         rep = null;
-      } else if (rep) rep.lu = undefined; // « non » ou « partiel » du local, accepté sans relecture par Sonnet : sa lecture n'est pas gardée (L523)
+      } else if (rep) rep.lu = undefined; // « non » ou « partiel » du local, accepté sans relecture par Sonnet : sa lecture n'est pas gardée (L523), cas limites d'un lot à spec compris (L666)
     }
   }
   if (!rep) {
@@ -81,11 +95,11 @@ export async function precheck(c: LotCtx): Promise<void> {
   save(c);
 }
 
-/** Le lot passe-t-il par le contrôle préalable ? Un lot qui n'a rien à retrouver (L322) saute l'étape, et le journal du lot le dit. */
+/** Le lot passe-t-il par le contrôle préalable ? Un lot qui n'a rien à retrouver (L322, sauf à étape de spec, L666) saute l'étape, et le journal du lot le dit. */
 export function precheckOrSkip(c: LotCtx): boolean {
-  const plan = c.loadPlan();
-  if (c.lot.express || !needsPrecheck(c.config, plan, c.lot.repo, c.lot.lot, c.lot.repos, c.lot.goal)) return false;
-  const nothing = precheckNothingToFind(histPlan(c), wd(c), c.lot.lot, c.lot.repos, c.lot.goal);
+  const opts: PrecheckOpts = { repos: c.lot.repos, goal: c.lot.goal, specStage: hasSpecStage(c.lot) };
+  if (c.lot.express || !needsPrecheck(c.config, c.loadPlan(), c.lot.repo, c.lot.lot, opts)) return false;
+  const nothing = precheckSkipReason(histPlan(c), wd(c), c.lot.lot, opts);
   if (nothing) c.lot.warnings.push(`contrôle préalable sauté : ${nothing}`);
   return !nothing;
 }

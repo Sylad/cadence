@@ -45,7 +45,7 @@ Inside a wave, a lot goes through these steps, each in a fresh session. Dashed b
 | **UX** | For a visible lot: the screen is opened in a real browser, in each state, captured at 1440 and 390 px | the `ux-reviewer` agent reports; the verdict is **the human's**, or the lead's with `lead.ux: lead` |
 | **ready** | In worktree mode the lot is [integrated](#one-worktree-per-lot-and-integration); otherwise (the default) it is ready once its review is compliant; the lead re-checks it, records `raf done`, delivers it | the lead |
 
-Before all that, a lot whose title cites a finding or another lot gets a **precheck** (« already done? »). Small lots ([size](#the-size-of-a-lot)) get a single review pass. Detail: [fonctionnement.md](fonctionnement.md#2-a-lot-inside-a-wave), [spec.md](spec.md).
+Before that, a lot that cites a finding or another lot, or has a spec step, gets a **precheck** (« already done? »). Small lots ([size](#the-size-of-a-lot)): one review pass. Detail: [fonctionnement.md](fonctionnement.md#2-a-lot-inside-a-wave), [spec.md](spec.md).
 
 ## The size of a lot
 

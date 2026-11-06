@@ -255,7 +255,7 @@ export interface OrchestrateConfig {
    * test (`tests`) → une passe de correction directe, sans session de revue. Une seule fois par lot. Absente : pas de porte.
    */
   testGate?: TestGateConfig;
-  /** Contrôle préalable « livrable déjà présent ? » avant la première implémentation d'un lot sans commit (défaut : vrai). */
+  /** Contrôle préalable « livrable déjà présent ? » avant la première écriture d'un lot sans commit qui cite un constat ou un lot, ou a une étape de spec (L666) (défaut : vrai). */
   precheck: boolean;
   /** Revue UX de la maquette (L172, spec etape-spec S4) entre spec et accept ; `maquette: false` la saute (défaut : vrai). */
   maquette: boolean;

@@ -26,7 +26,7 @@ export { lotSpent, ESCALATION_RESERVE, heldForEscalation, REVIEW_RESERVE, budget
 export { HYPOTHESES_HANDBACK, planNoteHandBack, leadReviewedHandBack } from './cycle/plan-writes.js';
 export { briefName } from './cycle/brief.js';
 export { precheckNothingToFind } from './precheck.js';
-export { needsPrecheck } from './cycle/precheck-step.js';
+export { needsPrecheck, precheckSkipReason } from './cycle/precheck-step.js';
 export { redExcerpt } from './cycle/checks.js';
 export type { Reporte } from './cycle/integrate-lot.js';
 export { isNonQuestion, handBackDroppedQuestions } from './cycle/questions.js';

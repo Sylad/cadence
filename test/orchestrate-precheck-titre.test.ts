@@ -107,7 +107,7 @@ describe('orchestrate — précheck conditionnel au titre du lot (L288)', () => 
     const { repo, plan } = planOf([{ id: 'L1', title: 'Premier' }, { id: 'L2', title: 'Titre périmé', goal: 'Suite de L1 : la mesure' }, { id: 'L3', title: 'Autre' }]);
     expect(needsPrecheck({ precheck: true }, plan, repo, 'L2')).toBe(true);
     expect(needsPrecheck({ precheck: true }, plan, repo, 'L3')).toBe(false);
-    expect(needsPrecheck({ precheck: true }, plan, repo, 'L3', [], 'Corriger le constat')).toBe(true);
+    expect(needsPrecheck({ precheck: true }, plan, repo, 'L3', { goal: 'Corriger le constat' })).toBe(true);
   });
 
   it('R20 — « review » compte comme mot, pas dans qa-reviewer ni review-small ; revues, audits, constats comptent', () => {

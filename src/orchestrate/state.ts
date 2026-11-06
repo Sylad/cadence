@@ -229,11 +229,11 @@ export interface LotState {
   resumedReviewed?: boolean;
   /** Reprise d'un lot rendu par `--add` (L563, L622) : index de la première étape que le plafond de mur compte. Les étapes d'avant la reprise ne comptent plus, comme ses passes (pass repart à 0). Absent : toutes les étapes comptent. */
   wallFrom?: number;
-  /** Constat du contrôle préalable (livrable en partie présent), joint au brief de la première implémentation. */
+  /** Constat du contrôle préalable (livrable en partie présent), joint au brief de chaque passe implement (pas à la spec ni à une correction). */
   precheck?: string;
   /** Verdict du contrôle préalable une fois lu (« oui » sans preuve = « partiel »), gardé au journal pour mesurer la part de « oui » (L288). Absent : pas de contrôle. */
   precheckVerdict?: 'oui' | 'partiel' | 'non';
-  /** Ce que le contrôle préalable a lu (fichiers, code voisin, tests), rogné et borné (L523) ; joint au brief de la première implémentation, jamais à une reprise ni à une correction. Absent : pas de lecture. */
+  /** Ce que le contrôle préalable a lu (fichiers, code voisin, tests), rogné et borné (L523) ; joint au brief de la première passe implement (pas à une passe implement reprise ni à une correction) et, pour un lot à étape de spec, à chaque passe de spec (L666 : la lecture finit par les cas limites de la règle). Absent : pas de lecture. */
   precheckLu?: string;
   /** Précheck de partage (L500) : tests scellés d'autres lots et fichiers que touche aussi un autre lot, lus dans git au départ du lot ; joint au brief de l'implémentation et dit au tableau. Absent : rien de partagé, ou lot repris. */
   partage?: Partage;

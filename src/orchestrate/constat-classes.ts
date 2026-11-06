@@ -14,15 +14,26 @@ const CLASS_RULE =
 
 /**
  * `{{constats}}` du brief de fix (L646, gabarit `fix` seul : un autre gabarit reçoit la liste plate) : les constats de la revue précédente groupés par classe (sans classe : « other »), puis l'exigence de corriger la classe entière.
- * Aucun constat classé : la liste reste plate (la revue d'UX et la porte n'ont pas de classe). Aucun constat : vide.
+ * Aucun constat classé : la liste reste plate (la revue d'UX et la porte n'ont pas de classe). Aucun constat : vide. Gabarit `fix` seul : les mineurs ouverts de `codeConstats` suivent (L664).
  */
-export function fixConstatsText(constats: Constat[], template = 'fix'): string {
+export function fixConstatsText(constats: Constat[], template = 'fix', codeConstats: Constat[] = []): string {
   if (!constats.length) return '';
   // `fix-docs` et `fix-minors` ont leur propre périmètre (« la documentation et rien d'autre », « chaque mineur qui est juste ») que la consigne de classe contredirait : liste plate, sans consigne.
   if (template !== 'fix') return constats.map(line).join('\n');
-  if (!constats.some((k) => k.classe)) return [...constats.map(line), '', CLASS_RULE].join('\n');
+  const minors = openMinorsText(codeConstats, constats);
+  if (!constats.some((k) => k.classe)) return [...constats.map(line), '', CLASS_RULE].join('\n') + minors;
   const groups = new Map<string, Constat[]>();
   for (const k of constats) groups.set(k.classe ?? 'other', [...(groups.get(k.classe ?? 'other') ?? []), k]);
   const out = [...groups].flatMap(([name, list]) => [`Class « ${name} » (${list.length} finding${list.length > 1 ? 's' : ''}):`, ...list.map(line)]);
-  return [...out, '', CLASS_RULE].join('\n');
+  return [...out, '', CLASS_RULE].join('\n') + minors;
+}
+
+/**
+ * Les mineurs ouverts de la dernière revue de code (L664) que la passe de fix ordinaire reçoit en plus de ses constats : sans eux la revue suivante les relit, ils restent « non corrigés » et se comptent de nouveau (L657, revue 3 : 3 mineurs sur 12 constats).
+ * Un mineur déjà dans les constats à corriger n'est pas redit ; aucun mineur ouvert : vide. Un mineur faux ou qui ne vaut pas son changement se range sous « choix » du rapport, comme à la passe des mineurs.
+ */
+function openMinorsText(codeConstats: Constat[], constats: Constat[]): string {
+  const open = codeConstats.filter((k) => k.gravite === 'mineur' && !constats.some((c) => c.gravite === 'mineur' && c.texte === k.texte && c.fichier === k.fichier));
+  if (!open.length) return '';
+  return ['', 'Open minor findings of the last code review (L664): fix each one that is right in this same pass, since the next review reads them again and counts them if they stay. A finding that is wrong, or not worth its change, is not fixed: list it under "choix" with the reason.', ...open.map(line)].join('\n');
 }

@@ -162,6 +162,8 @@ the same commits and return the same findings, so the lot is handed back as `fix
 la revue aurait relu les mêmes commits` and the pass is not counted (measured over the wave states of 2026-10-28 and before: 68 `fix` sessions without commit, 5 with an empty `choix` — about 7 %; the two L401 passes of 2026-10-28 gave a reason and stay counted, the test gate relaunched them, not a review). With no commit on the lot at all it is handed back as
 `fix sans commit`.
 
+**Open minors in a correction pass** (L664): a non-compliant review that also lists minors no longer leaves them to the next review. The brief of the ordinary `fix` pass (not the minors pass, not the documentation pass) adds an « Open minor findings » section with the minors of the last code review that are not already among its findings; the pass fixes each one that is right and lists the others under « choix ». Without it the next review read them again as « non corrigé » and counted them (L657, review 3: 3 of 12 findings); the measure is `cadence perf` (0 minor re-listed and counted on a review of rank 3).
+
 **Compliant with minor findings**: the minors are not left for a follow-up lot. One **minors pass** runs
 before concluding: a new Sonnet session with its own brief (`fix-minors.md`) fixes the minors that are right
 and lists in `choix`, with the reason, the ones it rejects (it never stops to ask); it does not count among the

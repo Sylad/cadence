@@ -288,7 +288,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
     const interrupted = [...l.steps].reverse().find((s) => s.kind === kind && s.status === 'interrupted');
     if (kind === 'fix') {
       vars.commits = lotCommitLines(c);
-      vars.constats = fixConstatsText(l.constats, briefName(l, 'fix'));
+      vars.constats = fixConstatsText(l.constats, briefName(l, 'fix'), l.codeConstats);
       if (l.docsFix) {
         vars.elsewhere = articlesBrief(l.repo, docsConfig(c).articles ?? []);
         vars.ack = wd(c) === l.repo && histPlan(c).readonly

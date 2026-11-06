@@ -84,7 +84,7 @@ async function launch(dir: string, goal?: string) {
   expect(r.refusals).toEqual([]);
   return r.lots[0]!;
 }
-const visible: Lot = { title: 'Un composant, suite du constat de revue', estimate: 0.6, visible: true };
+const visible: Lot = { title: 'Un composant, suite du constat de revue', estimate: 0.6, visible: true, screen: 'component' };
 
 describe('R1 — un lot est rétréci par un objectif et un commit déjà intégré', () => {
   it('R1 — objectif donné et un commit du lot dans la base : lot rétréci', async () => {
@@ -130,14 +130,14 @@ describe('R2 — un lot rétréci sans mise en page est lancé sans spec ni maqu
     const { dir } = project([visible], { commits: 1 });
     const s = await launch(dir, GOAL);
     expect(s.screen).toBeUndefined();
-    const { h, c } = shrunk({ implement: [impl], 'review-small': [ok], review: [ok] }, { visible: true, small: true }, { lots: [{ title: 'x', visible: true, estimate: 0.6 }] });
+    const { h, c } = shrunk({ implement: [impl], 'review-small': [ok], review: [ok] }, { visible: true, small: true }, { lots: [{ title: 'x', visible: true, screen: 'component', estimate: 0.6 }] });
     await runLot(c);
     expect(kinds(h)[0]).toBe('implement');
     expect(kinds(h)).not.toContain('spec');
     expect(kinds(h)).not.toContain('maquette');
   });
   it('R2 — la ligne « maquette sautée » est au journal avec le nombre de commits intégrés', async () => {
-    const h = harness({ script: { implement: [impl], review: [ok] }, lots: [{ title: 'x', visible: true, estimate: 0.6 }] });
+    const h = harness({ script: { implement: [impl], review: [ok] }, lots: [{ title: 'x', visible: true, screen: 'component', estimate: 0.6 }] });
     for (let i = 0; i < 2; i++) commitFile(h.repo, `old${i}.txt`, 'feat(L1): déjà intégré');
     const c = h.lot('L1', { goal: GOAL, visible: true }, { maquette: true });
     const lines: string[] = [];

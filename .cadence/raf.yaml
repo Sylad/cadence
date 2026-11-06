@@ -2663,9 +2663,10 @@ lots:
     started: 2026-11-06
   - id: L636
     title: "Docs : aligner orchestrate-cycle.md:307, orchestrate.md:130 et raf.md:56 sur L633 (un lot visible sans screen: n'est plus une maquette légère, budget ordinaire)"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-11-06
+    started: 2026-11-06
   - id: L637
     title: "Contrôles rapides de L626 : la famille test/orchestrate-pages-*.test.ts se joue au commit ; inspection du 06-11 : 4 refus d'intégration pour une borne de doc ou un renvoi ; mesure : 0 refus d'intégration pour une page de doc"
     status: doing

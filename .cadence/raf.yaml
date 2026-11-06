@@ -2831,9 +2831,10 @@ lots:
     started: 2026-11-06
   - id: L655
     title: "Issue #49 : la sonde de cas limites joue sur des lots dont la porte n'atteint pas le diff (CSS seul, banc seul) et commite des contrôles de texte sans constat ; ne plus la jouer sur ces lots ; mesure : 0 sonde sur un diff hors porte"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-06
+    started: 2026-11-06
   - id: L656
     title: "Issue #46 : des majeurs de maquette écartés comme inchangés sont dans l'objectif du lot et reviennent en majeurs de revue de code ; un écart ne s'applique pas à un point de l'objectif ; mesure : 0 majeur écarté à la maquette et repris en revue de code"
     status: todo

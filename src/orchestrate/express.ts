@@ -5,9 +5,9 @@ export const EXPRESS_MAX_ESTIMATE = 0.1;
 
 /**
  * Voie express (L519) : une retouche (estimate ≤ 0,1 j) sans écran ni spec se joue en une seule session d'écriture, sans contrôle préalable, sans sonde
- * ni revue séparée (le lead lit le diff), sans porte « code sans test » ni entrée Nouveautés par lot. Une estimation absente, nulle ou illisible n'en est pas une.
+ * ni revue séparée (le lead lit le diff), sans porte « code sans test » ni entrée Nouveautés par lot. Un lot `screen: page` du plan n'en est pas une même quand sa maquette est sautée (`planScreen`, L634) ; `component` et `journey` restent express. Une estimation absente, nulle ou illisible n'en est pas une.
  */
-export function isExpress(lot: { estimate?: number; screen?: Screen; specLot?: boolean }): boolean {
+export function isExpress(lot: { estimate?: number; screen?: Screen; planScreen?: Screen; specLot?: boolean }): boolean {
   const e = lot.estimate;
-  return typeof e === 'number' && e > 0 && e <= EXPRESS_MAX_ESTIMATE && !lot.screen && !lot.specLot;
+  return typeof e === 'number' && e > 0 && e <= EXPRESS_MAX_ESTIMATE && !lot.screen && lot.planScreen !== 'page' && !lot.specLot;
 }

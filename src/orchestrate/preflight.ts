@@ -171,7 +171,7 @@ export async function preflight(args: Pick<Args, 'dryRun' | 'goal'>, targets: Ta
     const state = newLot({ project: t.project, repo: t.repo, lot: t.lot, title: lot.title, ...(goal ? { goal } : {}), visible: lot.visible, small, ...(screen ? { screen } : {}), ...(launched.spec && !screen ? { specLot: true as const } : {}), model: t.model, readOnlyPlan: plan.readonly });
     if (neighbours.repos.length) state.repos = neighbours.repos;
     state.estimate = lot.estimate;
-    if (isExpress({ estimate: lot.estimate, screen: lot.screen, specLot: state.specLot })) state.express = true;
+    if (isExpress({ estimate: lot.estimate, screen, planScreen: lot.screen, specLot: state.specLot })) state.express = true;
     state.light = lot.estimate <= env.config.review.threshold;
     const escalating = !!env.config.escalation;
     state.budget = lotBudget(lot.estimate, budgetStage(launched, screen, env.config.maquette, t.repo, env.config.spec.dir), escalating, measuredBudgetsAt(launch, io));

@@ -41,10 +41,10 @@ async function launch(dir: string) {
 
 describe('L634 — express lit le screen du plan', () => {
   for (const screen of ['component', 'journey'] as const) {
-    it(`L634 — screen: ${screen} d'estimate 0,1 rétréci : pas de voie express`, async () => {
+    it(`L634 — screen: ${screen} d'estimate 0,1 rétréci : reste en voie express (seule la page la quitte)`, async () => {
       const s = await launch(project(screen, 0.1, 1));
       expect(s.screen).toBeUndefined();
-      expect(s.express).toBeUndefined();
+      expect(s.express).toBe(true);
     });
   }
   it('L634 — screen: page d\'estimate 0,05 rétréci : pas de voie express', async () => {

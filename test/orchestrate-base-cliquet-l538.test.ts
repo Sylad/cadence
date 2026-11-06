@@ -82,7 +82,8 @@ describe('R3 — le contrôle de la porte sur chaque commit du lot', () => {
   });
   it('R3 — le lot découpe un fichier (clés neuves, total non en hausse) : rebase réussi, base de main plus la différence du commit', () => {
     const [ta, tb, tn] = [key('src/a.ts', 'r|total'), key('src/b.ts', 'r|total'), key('src/new.ts', 'r|total')];
-    const s = scene({ start: { [ta]: 10, [tb]: 5 }, main: { [ta]: 10, [tb]: 4 }, lot: [{ [ta]: 6, [tb]: 5, [tn]: 4 }] });
+    // L477 : le fichier neuf n'est crédité que par la source dont il reprend les lignes (a.ts les perd)
+    const s = scene({ start: { [ta]: 10, [tb]: 5 }, main: { [ta]: 10, [tb]: 4 }, startFiles: { 'src/a.ts': 'l1\nl2\nl3\nl4\n' }, lot: [{ 'src/a.ts': 'l1\nl2\n', 'src/new.ts': 'l3\nl4\n', [BASE]: bl({ [ta]: 6, [tb]: 5, [tn]: 4 }) }] });
     expect(rebaseOnto(s.t.dir, 'main')).toMatchObject({ kind: 'rebased', baseline: 1 });
     expect(JSON.parse(s.read())).toEqual({ [ta]: 6, [tb]: 4, [tn]: 4 });
   });
@@ -103,7 +104,7 @@ describe('R3 — le contrôle de la porte sur chaque commit du lot', () => {
     // src/new.ts est créé par main : un lot qui monte sa clé neuve (et baisse a) y est refusé s'il existe à l'arbre de main, accepté s'il n'existe qu'au parent.
     const tn = key('src/new.ts', 'r|total');
     const ta = key('src/a.ts', 'r|total');
-    const s = scene({ start: { [ta]: 10, [B]: 5 }, main: { 'src/new.ts': 'n\n', [BASE]: bl({ [ta]: 10, [B]: 4 }) }, lot: [{ [ta]: 6, [B]: 5, [tn]: 4 }] });
+    const s = scene({ start: { [ta]: 10, [B]: 5 }, main: { 'src/new.ts': 'l3\nl4\n', [BASE]: bl({ [ta]: 10, [B]: 4 }) }, startFiles: { 'src/a.ts': 'l1\nl2\nl3\nl4\n' }, lot: [{ 'src/a.ts': 'l1\nl2\n', 'src/new.ts': 'l3\nl4\n', [BASE]: bl({ [ta]: 6, [B]: 5, [tn]: 4 }) }] });
     expect(rebaseOnto(s.t.dir, 'main')).toMatchObject({ kind: 'rebased', baseline: 1 });
     expect(JSON.parse(s.read())).toEqual({ [ta]: 6, [B]: 4, [tn]: 4 });
   });

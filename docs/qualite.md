@@ -44,11 +44,23 @@ Counts, not line numbers, are compared: moving code inside a file does not move 
 **Moving or splitting a file** (a 3000-line file cut into three modules, a function moved to its own file) is the one
 legitimate way to get new paths in the baseline, and it has its own command: `node scripts/qualite.mjs --migrer --contre
 main`. It measures, and rewrites the baseline only if (a) no key of a file that **existed at the start of the lot** went
-up, and (b) the total of every measure over all files (sum of the `…|total`, `…|lignes` and knip counts per tool and
-rule) did not go up. A new path starts free — its own `max-lines` finding is fine when the file it was cut from lost
-more — but a defect cannot be moved into an existing file, nor added. The same rule is what `--contre` applies to the
-baseline of the lot, so a migrated baseline passes the gate and the CI, and a hand-edited one does not. It needs
-`--contre` (the files that « existed » are those of the start of the lot) and exits 2 without it.
+up, (b) the total of every measure over all files (sum of the `…|total`, `…|lignes` and knip counts per tool and rule)
+did not go up, and (c) every **new file** that carries a figure is credited by a source (L477). A new file's source is the
+file of the start of the lot whose content it takes: at least 50 % of the new file's non-empty lines (edge spaces
+trimmed) were in that file at the start (`git show`) **and have left it since**; the source with the most such lines
+wins. For each source and each tool-rule, the sum of its new files must not exceed what the source lost since the start
+(the sum over its keys of the start's value minus the current one, floored at 0): an equal sum passes, so a pure rename
+or a function moved whole passes, one figure more does not. A new file with no source (rewritten code, no kinship, a
+copy that leaves its source intact, a source merely fixed) gets no credit and pays its defect: the refusal names it, says
+« fichier neuf : au-delà de ce que sa source a perdu » and gives the nearest source or « aucune source ». No option
+replaces this link. The credit is recomputed from the start of the lot at each call and never stored, so a piece already
+accepted stays accepted while it does not grow, and two successive `--migrer` whose pieces exceed the loss are refused at
+the second. The same rule is what `--contre` applies to the baseline of the lot, so a migrated baseline passes the gate
+and the CI, and a hand-edited one does not. It needs `--contre` (the files that « existed » are those of the start of the
+lot) and exits 2 without it. Without a `qualite-baseline.json` at the start (the lot that adopts the tools with `--init`),
+`--migrer` refuses (exit 1) and says so; the gate compares nothing, as before. When git cannot give a file of the start
+(shallow clone, no merge-base, git missing or too slow), both exit 2 naming the file and the reference: never a false
+refusal. Git is read only when a new file carries a positive figure, one `git show` per file of the start at most, cached.
 The way out of a finding is to fix it and lock the gain. Two other ways would also lower the measure without fixing
 anything, and the ratchet closes them:
 
@@ -99,7 +111,7 @@ that command.
 
 **Integration of a lot that lowers the baseline** (L538): when `cadence orchestrate` rebases the lot on a `main` that changed the baseline too, the
 conflict on `qualite-baseline.json` is resolved by the program, commit by commit, as `main`'s baseline plus the lot's own difference (never below 0),
-after applying the rule above to the commit (`--migrer`'s: no existing file's key up, no total up). No manual rebase is needed; the details are in
+after applying the rule above to the commit (`--migrer`'s: no existing file's key up, no total up, every new file credited by its source, read from the commits with `git show`). No manual rebase is needed; the details are in
 [orchestrate.md](orchestrate.md#one-worktree-per-lot-orchestrateworktrees-l279).
 
 The baseline is also the project's list of cleanups: each cleanup lot is measured by what it removes from it.

@@ -9,7 +9,7 @@ import { mutexFor } from './mutex.js';
 import { isMap, isNode, isSeq, parseDocument, type YAMLMap, type YAMLSeq } from 'yaml';
 import { indentedSeq } from '../plan-ids.js';
 import { git, gitFailure, tryGit } from './git.js';
-import { BASELINE, comparerMigration, serialiser, type Mesure } from '../../scripts/qualite.mjs';
+import { BASELINE, comparerMigration, creerLien, serialiser, type Mesure } from '../../scripts/qualite.mjs';
 
 /** Verrou d'intégration d'un dépôt (L279, R10) : dans l'état commun aux worktrees, au format du verrou d'orchestration, sous un autre nom. */
 export const INTEGRATION_LOCK = 'orchestrate-integration.lock';
@@ -232,6 +232,17 @@ function recompose(start: Mesure, ours: Mesure, theirs: Mesure): Mesure {
 }
 
 /**
+ * Le contrôle de la porte sur un commit (`comparerMigration`, R13) : un fichier « existe » s'il est dans `depart`, et les fichiers neufs sont reliés à leurs sources
+ * par leur contenu lu dans `depart` et dans `commit` (`git show`, sans arbre de travail). Un `git show` qui échoue sur un fichier présent lève : le contrôle appelant
+ * est dans un `try`, le rebase est abandonné.
+ */
+function controlMigration(work: string, start: Mesure, theirs: Mesure, depart: string, commit: string): { cle: string }[] {
+  const at = (rev: string, chemin: string): string | null => (tryGit(work, 'cat-file', '-e', `${rev}:${chemin}`) === null ? null : run(work, 'show', `${rev}:${chemin}`));
+  const lien = creerLien(start, { depart: (c) => at(depart, c), courant: (c) => at(commit, c), neuf: (c) => at(commit, c) });
+  return comparerMigration(start, theirs, (chemin) => tryGit(work, 'cat-file', '-e', `${depart}:${chemin}`) !== null, lien, start);
+}
+
+/**
  * Résout le conflit en cours quand c'est `qualite-baseline.json` (seul, ou avec le CHANGELOG que `resolveChangelog` résout d'abord, L568) (L538) : chaque clé vaut la valeur de la branche du dépôt plus la différence signée du
  * commit rejoué (son départ moins lui), bornée à 0, une clé à 0 retirée — la base de main moins les baisses propres au commit. Le commit est d'abord contrôlé
  * comme la porte (`comparerMigration`, départ du commit contre commit ; un fichier « existe » s'il est dans le parent du commit rejoué, `REBASE_HEAD^`) :
@@ -244,8 +255,7 @@ function resolveBaseline(work: string): boolean {
     // Pendant un rebase, l'étape 1 est le parent du commit rejoué, l'étape 2 la branche du dépôt (« ours »), l'étape 3 le commit du lot (« theirs »).
     const [start, ours, theirs] = [baselineStage(work, 1), baselineStage(work, 2), baselineStage(work, 3)];
     const parent = run(work, 'rev-parse', '--verify', 'REBASE_HEAD^').trim(); // sans parent lisible, aucun fichier ne compterait comme existant : le contrôle serait levé
-    const existe = (chemin: string) => tryGit(work, 'cat-file', '-e', `${parent}:${chemin}`) !== null;
-    if (comparerMigration(start, theirs, existe).length) return false;
+    if (controlMigration(work, start, theirs, parent, 'REBASE_HEAD').length) return false;
     const merged = recompose(start, ours, theirs);
     writeFileSync(join(work, BASELINE), serialiser(merged));
     run(work, 'add', '--', BASELINE);
@@ -306,7 +316,7 @@ function settleBaseline(work: string, base: string, before: string): boolean {
     const point = mergeBase(work, before, base);
     const [start, theirs, ours] = [`${point}:${BASELINE}`, `${before}:${BASELINE}`, `refs/heads/${base}:${BASELINE}`].map((rev) => parseBaseline(run(work, 'show', rev), rev));
     if (serialiser(start) === serialiser(theirs)) return false;
-    if (comparerMigration(start, theirs, (chemin) => tryGit(work, 'cat-file', '-e', `${point}:${chemin}`) !== null).length) return false;
+    if (controlMigration(work, start, theirs, point, before).length) return false;
     const text = serialiser(recompose(start, ours, theirs));
     if (!existsSync(join(work, BASELINE)) || readFileSync(join(work, BASELINE), 'utf8') === text) return false;
     writeFileSync(join(work, BASELINE), text);

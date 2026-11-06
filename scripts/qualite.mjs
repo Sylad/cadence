@@ -124,17 +124,96 @@ function totaux(mesure) {
   return t;
 }
 
+/** Les lignes non vides d'un texte (espaces de bord retirés), comptées par multiensemble. */
+function lignesDe(texte) {
+  const m = new Map();
+  for (const l of texte.split('\n')) { const t = l.trim(); if (t) m.set(t, (m.get(t) ?? 0) + 1); }
+  return m;
+}
+
 /**
- * Le passage de `avant` à `apres` quand des fichiers ont été déplacés ou découpés : une clé d'un fichier qui existait
- * (`existe(chemin)`) ne peut pas monter, un chemin neuf part libre, mais le total de chaque mesure sur tous les fichiers
- * ne peut pas monter. Rend ce qui empire. Découper un fichier de 3000 lignes en trois de 1000 passe ; en déplacer
- * le défaut dans un fichier qui existait, ou en ajouter, non.
+ * Le lien d'un fichier neuf à sa source (R14, R18) : `lien(chemin)` rend, parmi les fichiers de `base` (la base du point de départ), la
+ * source dont le fichier neuf tient le plus de lignes que la source avait au départ ET a perdues depuis, à condition qu'elles fassent 50 %
+ * des lignes non vides du fichier neuf ; null sinon. `lecture` : `depart(chemin)` (contenu au point de départ, null si le fichier n'y
+ * était pas, lève si git échoue), `courant(chemin)` (la source aujourd'hui, null si elle a disparu : elle a tout perdu) et `neuf(chemin)`.
+ * Le contenu d'une source se lit une fois (cache), au premier fichier neuf qui en a besoin, jamais sans fichier neuf à relier.
  */
-export function comparerMigration(avant, apres, existe) {
+export function creerLien(base, lecture) {
+  const sources = [...new Set(Object.keys(base).map(cheminDeCle))].sort();
+  const pertes = new Map(); // source → ses lignes perdues depuis le départ (ligne → nombre)
+  const perdues = (source) => {
+    if (!pertes.has(source)) {
+      const avant = lecture.depart(source);
+      if (avant === null) pertes.set(source, null); // absente de l'arbre du départ : pas une source
+      else {
+        const apres = lignesDe(lecture.courant(source) ?? '');
+        const perte = new Map();
+        for (const [l, n] of lignesDe(avant)) if (n > (apres.get(l) ?? 0)) perte.set(l, n - (apres.get(l) ?? 0));
+        pertes.set(source, perte);
+      }
+    }
+    return pertes.get(source);
+  };
+  return (neuf) => {
+    const contenu = lecture.neuf(neuf);
+    if (contenu === null) return null;
+    const lignes = lignesDe(contenu);
+    const total = [...lignes.values()].reduce((a, n) => a + n, 0);
+    let meilleure = null;
+    let meilleures = 0;
+    for (const source of sources) {
+      const perte = perdues(source);
+      if (!perte) continue;
+      let liees = 0;
+      for (const [l, n] of lignes) liees += Math.min(n, perte.get(l) ?? 0);
+      if (liees > meilleures) { meilleure = source; meilleures = liees; }
+      if (liees === total) break; // aucune autre source ne peut en lier davantage
+    }
+    return meilleures > 0 && meilleures * 2 >= total ? meilleure : null;
+  };
+}
+
+const regleDeCle = (cle) => { const p = cle.split('|'); return [p[0], ...p.slice(2)].join('|'); };
+const MENTION = 'fichier neuf : au-delà de ce que sa source a perdu';
+
+/** Les fichiers neufs qui portent un chiffre positif, groupés par source (null : aucune) et par outil-règle, avec la somme de leurs mesures. */
+function groupesDeNeufs(apres, existe, lien) {
+  const groupes = new Map();
+  const liens = new Map();
+  for (const [cle, n] of Object.entries(apres)) {
+    const fichier = cheminDeCle(cle);
+    if (estCompteur(cle) || n <= 0 || existe(fichier)) continue;
+    if (!liens.has(fichier)) liens.set(fichier, lien ? lien(fichier) : null);
+    const source = liens.get(fichier);
+    const regle = regleDeCle(cle);
+    const groupe = groupes.get(`${source}\0${regle}`) ?? { source, regle, cles: [], somme: 0 };
+    groupe.cles.push([cle, n]);
+    groupe.somme += n;
+    groupes.set(`${source}\0${regle}`, groupe);
+  }
+  return [...groupes.values()];
+}
+
+/** Ce que `source` a perdu sur `regle` depuis `depart` : la somme, sur ses clés qui portent un chiffre, de la valeur du départ moins la mesure courante, bornée à 0. */
+const perteDeSource = (depart, apres, source, regle) => Object.entries(depart).reduce((t, [k, v]) => (!estCompteur(k) && cheminDeCle(k) === source && regleDeCle(k) === regle ? t + Math.max(0, v - (apres[k] ?? 0)) : t), 0);
+
+/**
+ * Le passage de `avant` (la base du lot) à `apres` quand des fichiers ont été déplacés ou découpés : une clé d'un fichier qui existait
+ * (`existe(chemin)`) ne peut pas monter, le total de chaque mesure sur tous les fichiers non plus, et un fichier neuf qui porte un chiffre
+ * n'est crédité que par la source du départ dont `lien(chemin)` le dit issu : pour chaque source et chaque outil-règle, la somme de ses
+ * fichiers neufs est au plus ce que la source a perdu depuis `depart` (la base du départ du lot, `avant` pour la porte). Un fichier neuf
+ * sans source ne reçoit aucun crédit. Rend ce qui empire.
+ */
+export function comparerMigration(avant, apres, existe, lien, depart = avant) {
   const pires = comparer(avant, Object.fromEntries(Object.entries(apres).filter(([cle]) => existe(cheminDeCle(cle))))).pires;
   const ta = totaux(avant);
   const tb = totaux(apres);
   for (const cle of Object.keys(tb)) if (tb[cle] > (ta[cle] ?? 0)) pires.push({ cle: `${cle} (total, tous fichiers)`, avant: ta[cle] ?? 0, apres: tb[cle] });
+  for (const { source, regle, cles, somme } of groupesDeNeufs(apres, existe, lien)) {
+    if (source !== null && somme <= perteDeSource(depart, apres, source, regle)) continue;
+    const note = `${MENTION} (${source === null ? 'aucune source' : `source la plus proche : ${source}`})`;
+    for (const [cle, n] of cles) pires.push({ cle, avant: 0, apres: n, note });
+  }
   return pires;
 }
 
@@ -181,7 +260,7 @@ export function mesurer(racine) {
   }
 }
 
-/** Le point de départ du lot : au merge-base de HEAD et de `ref`, la ligne de base (null si elle n'y existait pas encore), `existe(chemin)` (vrai pour un fichier qui y était) et `config(chemin)` (son contenu, null s'il n'y était pas). */
+/** Le point de départ du lot : au merge-base de HEAD et de `ref`, la ligne de base (null si elle n'y existait pas encore), `existe(chemin)` (vrai pour un fichier qui y était), `contenu(chemin)` (son contenu, null s'il n'y était pas, erreur si git échoue) et `config(chemin)` (son contenu, null s'il n'y était pas). */
 export function lireRef(racine, ref) {
   const git = (...args) => spawnSync('git', args, { cwd: racine, encoding: 'utf8' });
   const mb = git('merge-base', 'HEAD', ref);
@@ -190,6 +269,17 @@ export function lireRef(racine, ref) {
   const show = git('show', `${sha}:${BASELINE}`);
   const existe = (chemin) => git('cat-file', '-e', `${sha}:${chemin}`).status === 0;
   const config = (chemin) => { const r = git('show', `${sha}:${chemin}`); return r.status === 0 ? r.stdout : null; };
+  // le contenu d'un fichier du départ : null s'il n'y était pas, une erreur (code 2) si git ne le rend pas — jamais un faux « pas de lien »
+  const illisible = (chemin) => new Error(`Qualité : le contenu de ${chemin} au point de départ ${ref} est illisible (git show a échoué) : le lien des fichiers neufs ne peut pas être établi.`);
+  const contenu = (chemin) => {
+    const opts = { timeout: 60000, maxBuffer: 64 * 1024 * 1024 };
+    const present = spawnSync('git', ['cat-file', '-e', `${sha}:${chemin}`], { cwd: racine, encoding: 'utf8', ...opts });
+    if (present.error) throw illisible(chemin);
+    if (present.status !== 0) return null;
+    const r = spawnSync('git', ['show', `${sha}:${chemin}`], { cwd: racine, encoding: 'utf8', ...opts });
+    if (r.error || r.status !== 0) throw illisible(chemin);
+    return r.stdout;
+  };
   const fichiers = () => git('ls-tree', '-r', '-z', '--name-only', sha).stdout.split('\0').filter(Boolean);
   // ce que le lot a touché depuis son départ : commits, modifications suivies (sans détection de renommage : un renommage src → test remonte ses deux chemins)
   // et fichiers neufs non ignorés — hors liens symboliques non suivis, que la vague orchestrate pose elle-même dans un worktree (evals/results, plugins/…/types)
@@ -205,7 +295,7 @@ export function lireRef(racine, ref) {
   });
   const lots = lotsDeConfig(config);
   const slug = /--([^/]+)$/.exec(git('branch', '--show-current').stdout.trim())?.[1];
-  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, config, fichiers, touches, commits, lotsConfig: lots, lotConfig: !!slug && [...lots].some((id) => id.split('/').join('__') === slug) };
+  return { nom: `${ref} (${sha.slice(0, 7)})`, base: show.status === 0 ? JSON.parse(show.stdout) : null, existe, contenu, config, fichiers, touches, commits, lotsConfig: lots, lotConfig: !!slug && [...lots].some((id) => id.split('/').join('__') === slug) };
 }
 
 // Les plans que cadence lit par défaut (un plan tenu par un autre outil, `plan:` de cadence.yaml, n'est pas cherché : le lot n'y est pas de config).
@@ -331,9 +421,15 @@ function exclusLocaux(racine) {
   return readFileSync(chemin, 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
 }
 
-const ligne = ({ cle, avant, apres }) => `  ${cle} : ${avant} → ${apres}`;
+const ligne = ({ cle, avant, apres, note }) => `  ${cle} : ${avant} → ${apres}${note ? ` — ${note}` : ''}`;
 
 const existeAuDepart = (ref) => ref.existe ?? (() => true);
+
+// le contenu d'un fichier de l'arbre de travail (suivi ou non par git), null s'il n'y est pas
+const lireLocal = (racine, chemin) => { const f = join(racine, chemin); return existsSync(f) && lstatSync(f).isFile() ? readFileSync(f, 'utf8') : null; };
+
+/** Le lien des fichiers neufs à leurs sources du départ (creerLien) ; sans moyen de lire le départ (`ref.contenu`), aucun lien : un fichier neuf paie son défaut. */
+const lienDe = (racine, ref) => (ref?.base && ref.contenu ? creerLien(ref.base, { depart: ref.contenu, courant: (c) => lireLocal(racine, c), neuf: (c) => lireLocal(racine, c) }) : () => null);
 
 /**
  * Refus (code 1) quand `ref` est `origin/<b>` et que la branche locale `<b>` a des commits que `origin/<b>` n'a pas (L645) : le départ du lot vient de `<b>`,
@@ -354,8 +450,8 @@ export function retardSurBranche(racine, ref) {
 export const refDepartLot = (racine, branche = 'main') => (retardSurBranche(racine, `origin/${branche}`) ? branche : `origin/${branche}`);
 
 /** La base du lot contre celle du départ : refus (code 1) si elle monte, null sinon. */
-function baseRemonte(base, ref) {
-  const remonte = ref?.base ? comparerMigration(ref.base, base, existeAuDepart(ref)) : [];
+function baseRemonte(racine, base, ref) {
+  const remonte = ref?.base ? comparerMigration(ref.base, base, existeAuDepart(ref), lienDe(racine, ref)) : [];
   if (!remonte.length) return null;
   return { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${remonte.map(ligne).join('\n')}` };
 }
@@ -363,7 +459,9 @@ function baseRemonte(base, ref) {
 /** `--migrer` : réécrit la base pour une mesure où des fichiers ont été déplacés ou découpés. */
 function migrer(racine, base, mesure, ref) {
   if (!ref) return { code: 2, texte: '--migrer exige --contre <ref> : les fichiers « qui existaient » sont ceux du point de départ du lot.' };
-  const empire = comparerMigration(base, mesure, existeAuDepart(ref));
+  // sans base au départ, aucun crédit ne se calcule : le lot qui amorce la base n'a rien à découper
+  if (!ref.base) return { code: 1, texte: `Qualité : ${ref.nom} n'a pas de ${BASELINE} au point de départ : --migrer n'a aucun crédit à calculer. Versionner la base avec « node scripts/qualite.mjs --init » avant de découper.` };
+  const empire = comparerMigration(base, mesure, existeAuDepart(ref), lienDe(racine, ref), ref.base);
   if (empire.length) return { code: 1, texte: `Qualité : la migration empire ${empire.length} mesure(s) (ni un fichier qui existait ni le total ne peuvent monter) :\n${empire.map(ligne).join('\n')}` };
   ecrireBase(racine, mesure);
   return { code: 0, texte: `${BASELINE} migrée : ${Object.keys(mesure).length} mesures, aucun total en hausse.` };
@@ -401,7 +499,7 @@ function decider(racine, mode, mesure, ref) {
   }
   if (!existe) return { code: 2, texte: `${BASELINE} absente : lancer « node scripts/qualite.mjs --init » une fois, puis la versionner.` };
   const base = lireBase(racine);
-  const refus = baseRemonte(base, ref);
+  const refus = baseRemonte(racine, base, ref);
   if (refus) return refus;
   if (mode === 'migrer') return migrer(racine, base, mesure, ref);
   const { pires, mieux } = comparer(base, mesure);

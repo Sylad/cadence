@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.56.0] - 2026-11-06
+
 ### Added
 
 - The sealed-tests pre-check (L500) also lists the sealed tests of another lot that **import** a code file the lot's text cites (L628, [docs/orchestrate-gate.md](docs/orchestrate-gate.md)), `light` and `small` lots included: the lot of 05-11 that changed a delivered behaviour cited `src/…`, not the test that froze it, and was handed back at the commit for the lock. The brief names the code file (`it imports src/x.ts`) and tells the session to stop with the reseal gesture for the lead (`cadence spec reseal … --porteur <lot>`) under `questions`; the table line says it too.

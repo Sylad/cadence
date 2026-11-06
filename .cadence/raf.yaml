@@ -2732,9 +2732,10 @@ lots:
       - { date: 2026-11-06, text: "abandonné : cadence résout déjà les conflits d'ajout pur du CHANGELOG par union (vu dans la vague 0915), lot inutile" }
   - id: L643
     title: "Le push de livraison pendant une vague compte les commits plan-seul d'un lot pas prêt (« plan: L639 démarré ») comme du code et refuse 7f9bddd ; effet indirect : origin/main en retard, le cliquet contre origin/main d'un lot config voit le code de L638 et rend L630 rouge. Les commits qui ne touchent que le plan ne bloquent plus le push ; mesure : 0 refus de push pour un commit de plan"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-11-06
+    started: 2026-11-06
   - id: L642
     title: "Mesure hors session : 200 rejeux sous charge de la famille verify* et de porte-deportee-creneau-l624 sur mini-blue, après l'intégration de L630 ; preuve de stabilité que L630 ne pouvait pas porter (décision du lead du 06-11) ; mesure : 0 rouge sur 200"
     status: todo

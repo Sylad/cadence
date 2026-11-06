@@ -2932,11 +2932,12 @@ lots:
     started: 2026-11-06
   - id: L663
     title: "Test qui fabrique l'état à la main : le brief d'un lot qui lit un état écrit par une étape du cycle exige que le test appelle l'étape réelle (L654 : handBack rend avant d'écrire maquetteConstats, 75,4 min de refus à prêt), et la sonde joue aussi sur un lot express qui touche src/orchestrate/cycle/ ; niveau : source (brief) puis sonde ; niveau le plus tôt : source ; mesure : 0 refus d'intégration pour un état non écrit avant une remise sur 3 vagues"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
     review: { date: 2026-11-06, verdict: "compliant (2 notes mineures, aucun sous-tâche : concepts.md:56 à aligner sur l'exception L663) — orchestré (vague 2026-11-06-2230, 1 passe(s) de correction)", commit: b4eae4ab5c389b52dec7797a8d51869355472f30, reporte: { de: f1327a8e12cb8172a7bc05d04858ed8c18fad583, vers: b4eae4ab5c389b52dec7797a8d51869355472f30, patchId: 0359f9e8aa2356aaa13170f62e6dfbf2e4b8ec93 } }
+    finished: 2026-11-06
   - id: L664
     title: "Mineur non corrigé relisté compté à chaque passe : la revue 3 de L657 remet 3 mineurs « non corrigé » comptés (1 écart sur 12) ; la passe de fix reçoit la liste des mineurs ouverts et les traite, ou la vague rend au lead avec la liste ; niveau : source (brief de fix) ; mesure : 0 mineur relisté compté sur une revue de rang 3, mesuré par cadence perf (écartés L649 sur 3 vagues)"
     status: done

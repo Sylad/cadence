@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- A page of docs that a lot empties or moves no longer breaks the test of another lot at the integration (L658, [docs/config.md](docs/config.md#file-bounds-bounds)): the implementation and fix briefs list the tests that read a page the lot's title or goal names (`test/lead-hold.test.ts` reading the section L651 moved), and the targeted gate plays the tests that read any `.md` page the lot touches, found by the page name in `test/**/*.test.*` (no import links them, so `vitest related` missed them: L651 was refused by R14 of lead-hold).
+
 ### Fixed
 
 - `cadence-hud` lots panel: a lot `doing` in the plan with no wave session now reads `◌ en sommeil` (muted) instead of `▶ en cours`, so a lot nothing is working on no longer looks active (L659, [docs/cadence-hud.md](docs/cadence-hud.md)). A lot in a wave keeps the wave's state.

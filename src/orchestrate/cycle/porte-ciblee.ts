@@ -4,6 +4,7 @@ import { type LotCtx, workDir as wd, startSha } from './ctx.js';
 import { type Place } from '../gate-place.js';
 import { tryGit } from '../../git.js';
 import { declaredTests, readBounds } from '../../bounds.js';
+import { readersOf } from '../../doc-readers.js';
 import { lotKey } from '../state.js';
 import { gateLabel, relatedCommand, runGate, withFiles, type GateRan, type GateTest } from '../gate-parts.js';
 import { NO_TEST_RAN } from '../workers.js';
@@ -35,10 +36,19 @@ function declaredFor(c: LotCtx, files: string[]): string[] {
   }
 }
 
-/** Les fichiers de la porte ciblée : ceux du diff, plus le test du journal quand le lot touche `CHANGELOG.md` et que le dépôt le porte (L616), plus les tests déclarés par `bounds` pour les fichiers du lot (L626) ; chacun une seule fois. */
+/** Les tests qui lisent une page `.md` que le lot touche (L658) : une section vidée ou déplacée casse le test d'un autre lot, que `vitest related` ne lie pas ; illisible, rien. */
+function readersFor(c: LotCtx, files: string[]): string[] {
+  try {
+    return readersOf(wd(c), files.filter((f) => f.endsWith('.md')));
+  } catch {
+    return [];
+  }
+}
+
+/** Les fichiers de la porte ciblée : ceux du diff, plus le test du journal quand le lot touche `CHANGELOG.md` et que le dépôt le porte (L616), plus les tests déclarés par `bounds` pour les fichiers du lot (L626), plus les tests qui lisent une page `.md` du lot (L658) ; chacun une seule fois. */
 function withChangelogTest(c: LotCtx, files: string[]): string[] {
   const changelog = files.includes('CHANGELOG.md') && existsSync(join(wd(c), CHANGELOG_TEST)) ? [CHANGELOG_TEST] : [];
-  return [...new Set([...files, ...changelog, ...declaredFor(c, files)])];
+  return [...new Set([...files, ...changelog, ...declaredFor(c, files), ...readersFor(c, files)])];
 }
 
 /** La porte ciblée d'une écriture : la commande liée (avec `{files}`) et les fichiers du diff ; null quand il n'y a pas de commande liée possible ou de fichier à viser, la suite complète est alors jouée (R4). */

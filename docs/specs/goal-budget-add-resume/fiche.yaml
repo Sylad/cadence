@@ -1,0 +1,136 @@
+sujet:
+  id: goal-budget-add-resume
+  titre: "orchestrate : --add reçoit --goal et --budget du lot, --resume relit l'objectif changé du plan (issue #44)"
+  lot: L657
+  perimetre:
+    modules: [src/orchestrate/command-args.ts, src/orchestrate/command.ts, src/orchestrate/ajout.ts, src/orchestrate/preflight.ts, src/orchestrate/resume.ts, src/orchestrate/cycle/retreci.ts]
+    endpoints: []
+    jobs: []
+    hors_perimetre:
+      - "--goal avec --resume : la forme reste refusée (command.ts:131) ; l'objectif d'une reprise vient de la clé goal: du plan, pas de la ligne de commande"
+      - "le budget d'un lot rendu sur budget : il garde --resume --budget projet:lot=+N (L223), inchangé"
+      - "le lot rendu repris par --add (L563) : il garde son goal et son budget (ajout.ts:97), --goal et --budget lui sont refusés"
+      - "le budget de la vague (--budget N sans « = ») : inchangé, et toujours refusé avec --add"
+
+cas:
+  - id: C1
+    titre: "Le lead ajoute un lot neuf à la vague vivante avec son objectif et son budget"
+    acteur: le lead
+    declencheur: commande cadence orchestrate --add <projet>:<lot> --goal "…" --budget <projet>:<lot>=+N [--wave <vague>]
+    preconditions:
+      - "une vague vivante lit la file d'ajouts (L421)"
+      - "le lot est connu du plan, ouvert, absent de la vague"
+    nominal:
+      - "La ligne de commande est lue : --goal est le texte, --budget projet:lot=+N la marge du lot ajouté."
+      - "Le contrôle préalable traite le lot comme un lot de lancement : objectif = --goal, sinon clé goal: du plan, sinon titre ; budget du lot = N (+ la réserve d'escalade si la vague en réserve), sinon le budget dérivé de l'estimate."
+      - "L'étape spec/maquette est décidée avec cet objectif (lot rétréci : maquette sautée)."
+      - "Le budget restant de la vague doit tenir le budget du lot ; l'ajout est déposé dans adds.log comme avant."
+    alternatives:
+      - { si: "--add sans --goal ni --budget", alors: "comportement d'avant : objectif de la clé goal: du plan ou titre, budget dérivé de l'estimate", regles: [R1] }
+      - { si: "--goal donné avec plusieurs --add", alors: "refus, code 2, rien déposé : l'objectif ne vaut que pour un lot", regles: [R2] }
+      - { si: "--goal vide ou suivi d'une option", alors: "refus de lecture comme au lancement", regles: [R3] }
+      - { si: "--budget projet:lot=+N vise un lot qui n'est pas dans les --add, ou une forme sans « = » (budget de vague)", alors: "refus, code 2, rien déposé", regles: [R4] }
+      - { si: "le budget demandé dépasse le budget restant de la vague", alors: "refus existant du budget restant, avec le budget demandé", regles: [R5] }
+      - { si: "le lot est un lot rendu de la vague (reprise L563)", alors: "--goal et --budget refusés : le lot garde ceux de la vague", regles: [R6] }
+    resultat: "Le lot est ajouté avec l'objectif et le budget donnés ; l'état du lot porte goal et budget comme au lancement."
+  - id: C2
+    titre: "Le lead reprend une vague après avoir changé l'objectif du lot dans le plan"
+    acteur: le lead
+    declencheur: commande cadence orchestrate --resume [<vague>]
+    preconditions:
+      - "la vague est arrêtée, reprenable"
+      - "la clé goal: d'un lot à rejouer a changé dans le plan depuis le lancement (ou a été ajoutée)"
+    nominal:
+      - "Pour chaque lot rejoué, la reprise relit l'objectif actuel du plan (clé goal:) au lieu de garder celui figé au lancement."
+      - "Un objectif changé remplace goal dans l'état du lot ; les briefs suivants le citent ; la reprise journalise l'ancien et le nouvel objectif."
+      - "Un lot qui n'a encore lancé aucune étape voit sa spec et sa maquette décidées avec le nouvel objectif (maquette sautée si le lot est rétréci)."
+    alternatives:
+      - { si: "l'objectif du plan est inchangé, ou le lot n'a pas de clé goal:", alors: "l'objectif de l'état reste tel quel, aucune ligne", regles: [R7] }
+      - { si: "le lot a déjà des étapes jouées", alors: "l'objectif change pour les briefs suivants ; ses étapes spec et maquette ne sont ni ajoutées ni retirées", regles: [R8] }
+      - { si: "le lot a été lancé avec --goal en ligne de commande, et le plan ne donne rien de neuf", alors: "le --goal du lancement est gardé (le plan n'efface pas un --goal)", regles: [R9] }
+      - { si: "le plan est illisible ou le lot a disparu du plan", alors: "l'objectif de l'état est gardé, reprise sans refus", regles: [R10] }
+    resultat: "La reprise travaille sur l'objectif en vigueur du plan, pas celui du premier lancement."
+
+regles:
+  - id: R1
+    cas: [C1]
+    enonce: "--add sans --goal ni --budget de lot se comporte comme avant L657 : même objectif, même budget, même ligne « ajout déposé »."
+    statut: sourcee
+    source: "src/orchestrate/preflight.ts:172 (goal = args.goal ?? lot.goal) et :180 (lotBudget dérivé de l'estimate) ; test orchestrate-ajout-vivante-l421.test.ts"
+    tests: ["R1 — --add seul : goal et budget du lot identiques à ceux d'avant"]
+  - id: R2
+    cas: [C1]
+    enonce: "--goal avec --add ne vaut que pour un seul lot ajouté : plusieurs --add, ou --goal sans --add, sont refusés (code 2, rien écrit) avec le message d'exemple."
+    statut: sourcee
+    source: "même règle qu'au lancement : src/orchestrate/command.ts:131 (L258, « UN lot lancé »)"
+    tests: ["R2 — deux --add et un --goal : refus, adds.log vide", "R2 — --add avec un seul lot et --goal : accepté"]
+  - id: R3
+    cas: [C1]
+    enonce: "Un --goal d'un --add vide ou qui avale l'option suivante est refusé comme au lancement."
+    statut: sourcee
+    source: "src/orchestrate/command-args.ts:140-145"
+    tests: ["R3 — --add p:L --goal --wave w : refus « --goal attend un texte »"]
+  - id: R4
+    cas: [C1]
+    enonce: "Avec --add, --budget n'accepte que la forme projet:lot=+N visant un lot des --add de la même commande, une seule fois par lot ; le budget de vague (--budget N) reste refusé avec --add."
+    statut: hypothese
+    si_faux: "Si le lead veut aussi relever le budget de la vague en ajoutant, seule la liste ALONE d'ajout.ts:40 change ; aucune donnée en jeu."
+    tests: ["R4 — --budget d'un lot absent des --add : refus", "R4 — --budget 2M avec --add : refus inchangé"]
+  - id: R5
+    cas: [C1]
+    enonce: "Le budget donné à un lot ajouté est N, la marge des passes ordinaires, plus la part d'escalade quand la vague en réserve une ; il doit tenir dans le budget restant de la vague, sinon l'ajout est refusé par le message de budgetRefusals."
+    statut: sourcee
+    source: "sens de N : src/orchestrate/resume.ts:156 (« N reste la marge des passes ordinaires, la part d'escalade s'y ajoute ») ; refus du budget restant : src/orchestrate/ajout.ts budgetRefusals"
+    tests: ["R5 — --budget p:L=+300k : état du lot budget = 300k + réserve d'escalade", "R5 — budget supérieur au restant : refus nommant le lot"]
+  - id: R6
+    cas: [C1]
+    enonce: "Sur un lot rendu repris par --add (L563), --goal et --budget sont refusés (code 2) : le lot garde son goal et son budget."
+    statut: sourcee
+    source: "src/orchestrate/ajout.ts:97 (le lot repris garde ce que la vague lui avait donné) et :106 (budget = dépensé + budget d'un lot neuf)"
+    tests: ["R6 — lot rendu repris avec --goal : refus et goal d'état inchangé"]
+  - id: R7
+    cas: [C2]
+    enonce: "À la reprise, un lot rejoué dont le plan donne le même objectif que l'état, ou n'en donne pas, garde son goal sans ligne de journal."
+    statut: hypothese
+    si_faux: "Si le lead attend une ligne à chaque reprise, seul le journal change."
+    tests: ["R7 — objectif du plan inchangé : goal d'état identique, aucune ligne « objectif changé »"]
+  - id: R8
+    cas: [C2]
+    enonce: "Un objectif du plan changé depuis le lancement remplace goal dans l'état des lots rejoués ; les briefs suivants le citent ; la reprise journalise « objectif changé » avec l'ancien et le nouveau. Un lot sans étape jouée décide sa spec et sa maquette avec le nouvel objectif (launchScreen) ; un lot déjà démarré ne gagne ni ne perd d'étape."
+    statut: sourcee
+    source: "demande du lot (issue #44) : « faire lire l'objectif changé à --resume », « la relance rejoue spec et maquette » ; décision de maquette : src/orchestrate/cycle/retreci.ts:28"
+    tests: ["R8 — plan goal changé : le brief de la reprise cite le nouvel objectif", "R8 — lot sans étape et objectif qui rétrécit : maquette sautée à la reprise", "R8 — lot déjà démarré : steps et screen inchangés"]
+  - id: R9
+    cas: [C2]
+    enonce: "Le goal posé au lancement par --goal en ligne de commande n'est jamais effacé par une reprise quand le plan ne porte pas de clé goal: ; une clé goal: du plan changée l'emporte sur lui."
+    statut: hypothese
+    si_faux: "Si le --goal de lancement doit toujours l'emporter, la reprise ne relit rien pour ce lot ; seul l'ordre de priorité change."
+    tests: ["R9 — --goal de lancement et plan sans goal: : goal gardé", "R9 — plan avec goal: changé : le plan l'emporte"]
+  - id: R10
+    cas: [C2]
+    enonce: "Un plan illisible ou sans le lot n'empêche pas la reprise : l'objectif de l'état est gardé."
+    statut: hypothese
+    si_faux: "Si le lead préfère un refus quand le plan est illisible, la reprise refuse (code 2) au lieu de continuer ; aucune donnée en jeu."
+    tests: ["R10 — lot absent du plan : reprise sans refus, goal d'état gardé"]
+
+contrats:
+  - id: A1
+    appel: commande cadence orchestrate --add <projet>:<lot> [--goal "<texte>"] [--budget <projet>:<lot>=+<N>] [--wave <vague>]
+    entree: "--add une ou plusieurs fois ; --goal pour un seul lot ; --budget projet:lot=+N (N : 1500000, 1.5M, 800k) par lot ajouté"
+    sortie: "<lot> : ajout déposé (sortie 0) ; goal et budget sont portés par la ligne de adds.log puis par l'état du lot"
+    erreurs:
+      - { code: "log error", message: "--goal s'applique à un seul lot lancé : <projet>:<lot> --goal \"…\" (plusieurs lots : la clé goal: de chacun)" }
+      - { code: "log error", message: "--goal attend un texte non vide" }
+      - { code: "log error", message: "--budget invalide : <texte> (projet:lot=+500k)" }
+    regles: [R1, R2, R3, R4, R5, R6]
+  - id: A2
+    appel: commande cadence orchestrate --resume [<vague>]
+    entree: "vague arrêtée ; clé goal: du plan des lots rejoués"
+    sortie: "lots repris avec l'objectif en vigueur du plan ; une ligne de journal « objectif changé » par lot concerné"
+    erreurs: []
+    sans_erreur: "aucun refus nouveau : un plan illisible ou un lot absent du plan garde l'objectif de l'état (R10) ; les refus de la reprise sont ceux d'avant"
+    regles: [R7, R8, R9, R10]
+
+donnees:
+  - { id: D1, objet: "adds.log (une ligne JSON par demande d'ajout)", existant: true, modification: ajout, note: "champs facultatifs goal et budget ajoutés à la ligne ; une ligne sans eux se lit comme avant (R1) ; une vague lancée avant L657 ignorerait ces champs", decision: "en attente : question posée au lead dans le rapport de la passe" }
+  - { id: D2, objet: "LotState.goal et LotState.budget dans l'état de la vague", existant: true, modification: aucune, note: "champs déjà présents (state.ts:106, :160) ; seule leur valeur à l'ajout et à la reprise change" }

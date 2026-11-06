@@ -2606,12 +2606,14 @@ lots:
     finished: 2026-11-06
   - id: L629
     title: "Déclarer dans cadence.yaml les ressources par chemins docs/orchestrate*.md, README.md, CHANGELOG.md, src/orchestrate/cycle/brief.ts et src/orchestrate/cycle/converge.ts, et uses: sur tout lot qui les réorganise ; inspection du 06-11 : 4 conflits sur 3 lots de la vague 2210-cad ; mesure : 0 conflit hors CHANGELOG par vague"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-05
     notes:
       - { date: 2026-11-06, text: "titre remplacé : « Déclarer dans cadence.yaml les ressources par chemins docs/orchestrate*.md, README.md et CHANGELOG.md, et uses: sur tout lot qui les réorganise, pour qu'un découpage de page ne se fasse pas pendant que d'autres y écrivent ; L599, 3 conflits en 2 vagues ; mesure : 0 conflit hors CHANGELOG par vague »" }
+      - { date: 2026-11-06, text: "Fait hors dépôt dans le cadence.yaml du dossier parent (ressources docs-orchestrate, readme, changelog, brief-ts, converge-ts ; cycle-ts avec chemins), rien à commiter ici. Effet à relire à la prochaine inspection : changelog fait attendre l'intégration d'un lot derrière les plus anciens de la vague." }
     started: 2026-11-06
+    finished: 2026-11-06
   - id: L630
     title: "Tests de signal de verify et verify-gate, plus test/porte-deportee-creneau-l624.test.ts (instable sur 3 lots le 05-11) : toute la famille passe dans le projet « lourds » de L583 et 200 rejeux sous charge prouvent la stabilité, au lieu d'un correctif par test (L505 L528 L540 L550 L555 L567 L579) ; mesure : 0 instable de signal par vague"
     status: doing

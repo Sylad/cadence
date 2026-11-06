@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { classeOf, fixConstatsText } from '../src/orchestrate/constat-classes.js';
 import { blockingConstats } from '../src/orchestrate/cycle/shared.js';
-import { convergeBrief, countReview } from '../src/orchestrate/cycle/converge.js';
+import { carriedNoted, convergeBrief, countReview } from '../src/orchestrate/cycle/converge.js';
 import { REVIEW_SCHEMA } from '../src/orchestrate/schemas.js';
 import { testsVertsSansCode } from '../src/test-sans-code.js';
 import { runLot } from '../src/orchestrate/cycle.js';
@@ -131,6 +131,13 @@ describe('R3 — la revue suivante ne relit pas un mineur déjà noté', () => {
     const { decisions } = countReview(JSON.parse(JSON.stringify(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', texte: 'texte' }], verdict: 'non conforme' }))), 'review', l, 'abc');
     expect(decisions.map((d) => d.decision)).toEqual(['compte']);
   });
+  it('R3 — un mineur noté que la revue suivante relève en majeur (même fichier, même texte) n’est pas gardé en mineur noté à côté du majeur compté', () => {
+    const l = lot();
+    l.reviewCounts = [1] as never;
+    l.codeConstats = [k('nommage', { gravite: 'mineur', fichier: 'a.ts' }), k('autre mineur', { gravite: 'mineur', fichier: 'b.ts' })];
+    const rep = JSON.parse(JSON.stringify(reviewReport({ majeurs: 1, constats: [{ gravite: 'majeur', texte: 'nommage', fichier: 'a.ts' }], verdict: 'non conforme' })));
+    expect(carriedNoted('review', l, rep).map((c) => c.texte)).toEqual(['autre mineur']);
+  });
   it('R3 — le brief de la revue courte garde le mineur noté sous « had to fix » : le relecteur le relit, il n’a pas l’ordre de le taire', () => {
     const l = lot();
     l.reviewCounts = [1] as never;
@@ -246,6 +253,32 @@ describe('R2 — un test ajouté vert avec et sans le code du lot est refusé', 
     const { d, start } = repo({ 'test/vidé.test.txt': 'always' });
     try {
       expect((await play(d, start)).refuses).toEqual(['test/vidé.test.txt']);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+  it('R2 — un test qui garde un fichier du lot hors code (gabarit) est rouge sans lui : le gabarit revient aussi à son état de départ, le test n’est pas refusé', async () => {
+    const { d, start } = repo({ 'test/gabarit.test.txt': 'gabarit-neuf' }, (dir) => write(dir, 'tpl/g.txt', 'gabarit-neuf'));
+    const run3 = async (command: string, cwd: string) => ({ code: existsSync(join(cwd, 'tpl/g.txt')) ? 0 : 1, output: command });
+    try {
+      expect((await play(d, start, { run: run3 })).refuses).toEqual([]);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+  it('R2 — les dépendances de orchestrate.worktreeDeps sont liées dans l’arbre d’essai (node_modules de la racine par défaut)', async () => {
+    const { d, start } = repo({ 'test/vide.test.txt': 'always' });
+    mkdirSync(join(d, 'frontend/node_modules'), { recursive: true });
+    mkdirSync(join(d, 'node_modules'), { recursive: true });
+    const seen: string[] = [];
+    const run4 = async (command: string, cwd: string) => {
+      seen.push(`${existsSync(join(cwd, 'frontend/node_modules'))}/${existsSync(join(cwd, 'node_modules'))}`);
+      return { code: 1, output: command };
+    };
+    try {
+      await play(d, start, { run: run4 });
+      await play(d, start, { run: run4, deps: ['frontend/node_modules'] });
+      expect(seen).toEqual(['false/true', 'true/false']);
     } finally {
       rmSync(d, { recursive: true, force: true });
     }

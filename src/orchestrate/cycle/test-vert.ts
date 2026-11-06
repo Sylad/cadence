@@ -27,7 +27,7 @@ async function testVertGate(c: LotCtx, minorsPass: boolean): Promise<boolean> {
   const isTest = docSyncSet(gate.tests);
   const isCode = docSyncSet(gate.code);
   const isException = gate.except.length ? docSyncSet(gate.except) : () => false;
-  const { refuses, ignores } = await testsVertsSansCode({ dir: wd(c), start, isTest, isCode: (f) => isCode(f) && !isException(f), replay, run: (command, cwd) => sh(c, command, 5 * 60_000, {}, cwd) });
+  const { refuses, ignores } = await testsVertsSansCode({ dir: wd(c), start, isTest, isCode: (f) => isCode(f) && !isException(f), replay, deps: c.config.worktreeDeps, run: (command, cwd) => sh(c, command, 5 * 60_000, {}, cwd) });
   if (ignores.length) l.warnings.push(`porte « test vert sans le code » : ${ignores.length} test(s) ajouté(s) non joué(s), au-delà de la borne (${ignores.join(', ')})`);
   if (!refuses.length) return false;
   if (l.pass >= MAX_PASSES - 1) l.warnings.push(`porte « test vert sans le code » non jouée en correction : ${l.pass} passe(s) déjà faite(s), la revue arriverait sans passe pour ses majeurs (${refuses.join(', ')})`);

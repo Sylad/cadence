@@ -64,7 +64,7 @@ export function convergeBrief(kind: SessionKind, l: LotState, shrunk?: Shrunk): 
 }
 
 /** Un constat de revue répète un constat de la revue précédente : même fichier (ou aucun des deux) et même texte. Limite connue : un texte reformulé n'est pas reconnu. */
-const repeats = (previous: Constat[], k: { fichier?: string; texte: string }): boolean => previous.some((p) => (p.fichier ?? '') === (k.fichier ?? '') && p.texte.trim() === k.texte.trim());
+const repeats = (previous: { fichier?: string; texte: string }[], k: { fichier?: string; texte: string }): boolean => previous.some((p) => (p.fichier ?? '') === (k.fichier ?? '') && p.texte.trim() === k.texte.trim());
 
 /**
  * Verdict d'une revue de code conforme une fois les majeurs mis de côté : celui de l'agent suivi de la note des suites (`asideVerdict`, comme la maquette L562).
@@ -76,9 +76,10 @@ const convergedVerdict = (verdict: string, aside: { texte: string }[]): string =
 /**
  * Les mineurs notés que la revue complète ne rapporte plus (le brief le lui demande, ou `setAsideNoted` les a écartés) restent notés : sans eux `codeConstats` les perdrait à la revue suivante,
  * dont le brief ne les montrerait plus et qui les compterait de nouveau. Seule la revue complète les garde ; la revue courte les relit et n'écarte rien.
+ * Un mineur que la revue redit à un autre rang (majeur ou bloquant compté) n'est pas gardé : le brief suivant le donnerait à corriger et à taire à la fois.
  */
-export const carriedNoted = (kind: SessionKind, l: LotState, counted: Constat[]): Constat[] =>
-  kind === 'review' ? (l.codeConstats ?? []).filter((k) => k.gravite === 'mineur' && !repeats(counted, k)) : [];
+export const carriedNoted = (kind: SessionKind, l: LotState, counted: ReviewReport): Constat[] =>
+  kind === 'review' ? (l.codeConstats ?? []).filter((k) => k.gravite === 'mineur' && !repeats(counted.constats, k)) : [];
 
 /**
  * Un majeur ou un mineur de la revue qui reprend mot pour mot (son texte contient l'entrée) une attente hors règle de la sonde ne compte pas (L625, issue #41) : elle est déjà une sous-tâche `[hors règle]` du lead

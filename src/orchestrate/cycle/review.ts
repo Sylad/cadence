@@ -218,7 +218,7 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
   l.code = summary;
   // Les constats de cette revue (sans les majeurs mis de côté) attendent la revue de code suivante (L622) : son brief les montre, et une marque `inchange` sur l'un d'eux est fausse.
   const countedMinors = minorConstats(counted);
-  l.codeConstats = [...blockingConstats(counted, 'code'), ...countedMinors, ...carriedNoted(kind, l, countedMinors)];
+  l.codeConstats = [...blockingConstats(counted, 'code'), ...countedMinors, ...carriedNoted(kind, l, counted)];
   for (const a of aside) propose(c, a.line);
   const w = c.wave;
   if (l.escalation?.stage === 'fix') {

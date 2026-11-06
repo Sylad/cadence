@@ -1,6 +1,6 @@
-import { existsSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { tryGit } from './git.js';
 import { withFiles } from './orchestrate/gate-parts.js';
@@ -29,6 +29,8 @@ export async function testsVertsSansCode(o: {
   isCode: (file: string) => boolean;
   isTest: (file: string) => boolean;
   replay: string;
+  /** `orchestrate.worktreeDeps` : les dossiers de dépendances à lier dans l'arbre d'essai ; absent, le `node_modules` de la racine. */
+  deps?: string[];
   run: (command: string, cwd: string) => Promise<{ code: number; output: string }>;
   max?: number;
 }): Promise<TestsVertsSansCode> {
@@ -38,6 +40,8 @@ export async function testsVertsSansCode(o: {
     .map((l) => ({ status: l[0]!, file: l.slice(1).trim() }));
   const added = changed.filter((c) => c.status === 'A' && o.isTest(c.file)).map((c) => c.file);
   const code = changed.filter((c) => o.isCode(c.file) && !o.isTest(c.file));
+  // Un test ajouté peut garder un fichier du lot qui n'est pas du code (gabarit, doc, package.json) : « sans le lot » les remet aussi à leur état de départ, sinon un test sur ce gabarit sortirait vert à tort.
+  const others = changed.filter((c) => !o.isTest(c.file));
   const empty: TestsVertsSansCode = { refuses: [], ignores: [] };
   if (!added.length || !code.length) return empty;
   const max = o.max ?? MAX_TESTS_SANS_CODE;
@@ -45,12 +49,16 @@ export async function testsVertsSansCode(o: {
   const tree = join(mkdtempSync(join(tmpdir(), 'cadence-sans-code-')), 'tree');
   try {
     git(o.dir, ['worktree', 'add', '--detach', tree, 'HEAD']);
-    for (const c of code) {
+    for (const c of others) {
       if (c.status === 'A') rmSync(join(tree, c.file), { force: true });
       else git(tree, ['checkout', o.start, '--', c.file]);
     }
     // Les dépendances du lot : le worktree d'essai n'a que les fichiers suivis.
-    if (existsSync(join(o.dir, 'node_modules')) && !existsSync(join(tree, 'node_modules'))) symlinkSync(join(o.dir, 'node_modules'), join(tree, 'node_modules'), 'dir');
+    for (const dep of o.deps ?? ['node_modules']) {
+      if (!existsSync(join(o.dir, dep)) || existsSync(join(tree, dep))) continue;
+      mkdirSync(dirname(join(tree, dep)), { recursive: true });
+      symlinkSync(join(o.dir, dep), join(tree, dep), 'dir');
+    }
     const refuses: string[] = [];
     for (const f of played) if ((await o.run(withFiles(o.replay, [f]), tree)).code === 0) refuses.push(f);
     return { refuses, ignores: added.slice(max) };

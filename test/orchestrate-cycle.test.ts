@@ -2003,36 +2003,36 @@ describe('passe des mineurs interrompue puis reprise (L38/t6)', () => {
 describe('propositions : seul ce qui reste non traité (L38/t7)', () => {
   const stillMinor = { gravite: 'mineur', fichier: 'a.txt', ligne: 1, texte: 'nommage' };
 
-  it('mineur d\'une revue non conforme, corrigé ensuite par la passe des mineurs : il ne reste pas en proposition', async () => {
+  it('mineur d\'une revue non conforme, redit mot pour mot par la revue conforme (L646) : non compté, pas de passe des mineurs, il reste en proposition', async () => {
     const review1: Handler = () => claudeOut(reviewReport({ majeurs: 1, mineurs: 1, verdict: 'non conforme', constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }, stillMinor] }));
-    const h = harness({ script: { implement: [impl()], review: [review1, minorReview()], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
+    const h = harness({ script: { implement: [impl()], review: [review1, minorReview()], fix: [fix('b.txt')] } });
     const c = h.lot('L1');
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review-small']);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
     expect(c.lot.status).toBe('ready');
-    expect(c.lot.proposals).toEqual([]);
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
   });
 
-  it('mineur proposé par la revue non conforme, repris par la revue conforme à une autre ligne : traité par la passe, il ne reste pas en proposition', async () => {
+  it('mineur de la revue non conforme redit par la revue conforme à une autre ligne (L646) : même mineur, non compté, il reste en proposition à sa ligne', async () => {
     const review1: Handler = () => claudeOut(reviewReport({ majeurs: 1, mineurs: 1, verdict: 'non conforme', constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }, stillMinor] }));
     const shifted: Handler = () => claudeOut(reviewReport({ mineurs: 1, verdict: 'conforme avec mineurs', constats: [{ ...stillMinor, ligne: 7 }] }));
-    const h = harness({ script: { implement: [impl()], review: [review1, shifted], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
+    const h = harness({ script: { implement: [impl()], review: [review1, shifted], fix: [fix('b.txt')] } });
     const c = h.lot('L1');
     await runLot(c);
-    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review-small']);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
     expect(c.lot.status).toBe('ready');
-    expect(c.lot.proposals).toEqual([]);
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage']);
   });
 
-  it('deux mineurs de même fichier et même texte à deux lignes : le traité ne retire pas l\'autre, qui reste en proposition', async () => {
+  it('deux mineurs de même fichier et même texte à deux lignes, la revue conforme en redit un (L646) : les deux restent en proposition, sans passe des mineurs', async () => {
     const review1: Handler = () => claudeOut(reviewReport({ majeurs: 1, mineurs: 2, verdict: 'non conforme', constats: [{ gravite: 'majeur', fichier: 'a.txt', ligne: 3, texte: 'bug nommé' }, { ...stillMinor, ligne: 1 }, { ...stillMinor, ligne: 9 }] }));
-    // La revue conforme ne signale plus que celui de la ligne 1 : celui de la ligne 9 n'est pas confié à la passe.
     const only1: Handler = () => claudeOut(reviewReport({ mineurs: 1, verdict: 'conforme avec mineurs', constats: [{ ...stillMinor, ligne: 1 }] }));
-    const h = harness({ script: { implement: [impl()], review: [review1, only1], fix: [fix('b.txt'), fix('c.txt')], 'review-small': [ok] } });
+    const h = harness({ script: { implement: [impl()], review: [review1, only1], fix: [fix('b.txt')] } });
     const c = h.lot('L1');
     await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
     expect(c.lot.status).toBe('ready');
-    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:9 — nommage']);
+    expect(c.lot.proposals).toEqual(['[mineur code] a.txt:1 — nommage', '[mineur code] a.txt:9 — nommage']);
   });
 
   it('mineur reformulé par la revue conforme : non reconnu, il reste en proposition (limite connue, côté prudent)', async () => {

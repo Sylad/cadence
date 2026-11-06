@@ -91,10 +91,10 @@ function setAsideHorsRegle(rep: ReviewReport, kind: SessionKind, l: LotState): {
 
 /**
  * Un mineur de la revue de code qui reprend un mineur déjà noté par la revue précédente (même fichier ou aucun des deux, même texte : `repeats`) ne compte pas (L646) : la passe des mineurs l'a vu ou le lead l'a en note.
- * Seul un mineur est écarté (un majeur ou un bloquant de même texte compte). Limite connue : un texte reformulé n'est pas reconnu (le brief demande au relecteur de ne pas les rapporter).
+ * Seul un mineur est écarté (un majeur ou un bloquant de même texte compte), et seulement à la revue complète : la revue courte qui suit la passe des mineurs rend au lead ceux que la passe n'a pas corrigés, les écarter les perdrait. Limite connue : un texte reformulé n'est pas reconnu (le brief demande au relecteur de ne pas les rapporter).
  */
 function setAsideNoted(rep: ReviewReport, kind: SessionKind, l: LotState): { rep: ReviewReport } {
-  const noted = kind === 'review' || kind === 'review-small' ? (l.codeConstats ?? []).filter((k) => k.gravite === 'mineur') : [];
+  const noted = kind === 'review' ? (l.codeConstats ?? []).filter((k) => k.gravite === 'mineur') : [];
   const known = (k: ReviewReport['constats'][number]) => k.gravite === 'mineur' && repeats(noted, k);
   const out = rep.constats.filter(known);
   if (!out.length) return { rep };

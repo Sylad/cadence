@@ -32,6 +32,7 @@ const loaders: Record<string, () => Promise<unknown>> = {
   'sh': () => import('../src/orchestrate/cycle/sh.js'),
   'shared': () => import('../src/orchestrate/cycle/shared.js'),
   'spec-steps': () => import('../src/orchestrate/cycle/spec-steps.js'),
+  'test-vert': () => import('../src/orchestrate/cycle/test-vert.js'),
   'work': () => import('../src/orchestrate/cycle/work.js'),
 };
 // L567 : après vi.resetModules() chaque import retransforme tout le graphe du cycle ; le délai par défaut de la suite (30 s, vitest.config.ts) est porté à 60 s pour ne pas tomber sur ce travail sous charge, pas sur un cycle d'import qui bloquerait ; cause déduite, aucun échec reproduit

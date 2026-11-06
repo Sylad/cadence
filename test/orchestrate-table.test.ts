@@ -312,3 +312,25 @@ describe('renderTable : objectif donné (L258)', () => {
     expect(renderTable(wave, [l])).toContain('demo:L1 — objectif donné : Livrer B28.6 seul');
   });
 });
+
+describe('renderTable : lot arrêté sur une revue de maquette non conforme (issue #47, L654)', () => {
+  const stoppedOnMaquette = (status: LotState['status']) => {
+    const l = lot();
+    l.status = status;
+    l.maquette = { passes: 1, conforme: false, verdict: 'maquette non conforme : 1 majeur, 1 mineur' };
+    l.maquetteConstats = [{ source: 'ux', gravite: 'majeur', fichier: 'maquette.html', texte: 'le bouton sort du cadre' }];
+    return renderTable(wave, [l]);
+  };
+  it('la colonne « revue » donne le verdict de la maquette, pas « — »', () => {
+    const row = stoppedOnMaquette('suspended')[1]!;
+    expect(row).toContain('maquette non conforme (0 bloquant, 1 majeur)');
+  });
+  it('les majeurs de la maquette sont listés sous le tableau d\'un lot suspendu', () => {
+    expect(stoppedOnMaquette('suspended')).toContain('    · [majeur] maquette.html — le bouton sort du cadre');
+  });
+  it('un lot sans revue de maquette garde « — »', () => {
+    const l = lot();
+    l.status = 'suspended';
+    expect(renderTable(wave, [l])[1]).not.toContain('maquette');
+  });
+});

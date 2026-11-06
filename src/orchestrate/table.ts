@@ -51,8 +51,17 @@ function escalationText(l: LotState): string {
   return 'revue neuve conforme, le lot poursuit sa fin ordinaire';
 }
 
+/** Arrêté sur la revue de maquette (L654) : pas de revue de code, la colonne donne le verdict de la maquette et ses comptes. */
+function maquetteReview(l: LotState): string {
+  const n = (g: string) => (l.maquetteConstats ?? []).filter((c) => c.gravite === g).length;
+  return l.maquette && !l.maquette.conforme ? `maquette non conforme (${n('bloquant')} bloquant, ${n('majeur')} majeur)` : '—';
+}
+
+/** Les constats listés sous le tableau : ceux de la revue de code d'un lot rendu ; sans revue de code, ceux de la revue de maquette (L654). */
+const listedConstats = (l: LotState) => (l.status === 'handed-back' ? l.constats : l.code ? [] : (l.maquetteConstats ?? []));
+
 function review(l: LotState): string {
-  if (!l.code) return '—';
+  if (!l.code) return maquetteReview(l);
   const fixes = l.pass === 0 ? '' : ` après ${l.pass} correction${l.pass > 1 ? 's' : ''}`;
   if (l.status === 'ready') return `conforme${fixes}`;
   const verdict = l.code.conforme ? 'conforme' : `non conforme (${l.code.bloquants} bloquant, ${l.code.majeurs} majeur)`;
@@ -306,7 +315,7 @@ export function renderTable(wave: WaveState, lots: LotState[], deps: { isAncesto
   }
   for (const l of lots.filter((x) => x.status === 'handed-back' || x.status === 'failed' || x.status === 'suspended')) {
     out.push(`${l.project}:${l.lot} — ${l.outcome ?? LABEL[l.status]}`);
-    for (const c of l.status === 'handed-back' ? l.constats : []) out.push(`    · [${c.gravite}] ${c.fichier ? `${c.fichier}${c.ligne ? `:${c.ligne}` : ''} — ` : ''}${c.texte.split('\n')[0]}`);
+    for (const c of listedConstats(l)) out.push(`    · [${c.gravite}] ${c.fichier ? `${c.fichier}${c.ligne ? `:${c.ligne}` : ''} — ` : ''}${c.texte.split('\n')[0]}`);
   }
   for (const d of deliverable(lots, deps.isAncestor ?? isAncestor, deps.lotCommits ?? gitCommitsOf)) {
     out.push(`${d.ready.project}:${d.ready.lot} — livrable jusqu'à ${d.sha} (dernier commit de ${d.ready.lot}, sous ${d.under.lot} ${d.under.status === 'handed-back' || d.under.status === 'failed' ? 'rendu' : LABEL[d.under.status]}) : git push origin ${d.sha}:main && cadence deliver --sha ${d.sha}`);

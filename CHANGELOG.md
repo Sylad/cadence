@@ -92,6 +92,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 - `cadence verify --gate` finds the state of a wave launched two or more levels above the repository (L652, [docs/deliver.md](docs/deliver.md)): it looks in the current folder, the repository root and all their ancestors, not only the folder and its parent, so the recorded verdict is taken over instead of replayed with « aucune porte de vague enregistrée pour ce sha » (issue #45).
 - A merge of the base branch into a lot's worktree no longer hands the lot back as « la session a modifié le plan » (L653, issue #48): the plan commits the merge brings in are already on the base branch and are not the session's; and when a session does touch the plan, its questions are kept on the lot and named in the outcome instead of being lost.
 - The mockup review no longer sets aside as « unchanged » a major on a point of the lot's goal (L656, issue #46, [docs/orchestrate-spec.md](docs/orchestrate-spec.md)): the brief of review 2 or later and the schema of `inchange` say the mark is never for a point of the goal, which the code review would raise again as a major.
+- A lot stopped on a non-conforming mockup review shows its verdict in the `revue` column of the table (`maquette non conforme (0 bloquant, 1 majeur)`, no longer `revue —`) and a suspended lot lists the blocking and major findings of that review under the table, not only the minor proposals (L654, issue #47).
 
 ## [1.59.0] - 2026-11-06
 

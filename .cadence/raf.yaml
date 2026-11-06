@@ -2661,6 +2661,7 @@ lots:
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme : relu par le lead, R5 lit la liste figée DEPLACEES (19 sections), une section neuve n'exige rien, preuve par essai, renvois factices de L621 et L633 retirés", commit: 9b57291069231c41d1ce1592e48eb7a0c92b85a2 }
   - id: L636
     title: "Docs : aligner orchestrate-cycle.md:307, orchestrate.md:130 et raf.md:56 sur L633 (un lot visible sans screen: n'est plus une maquette légère, budget ordinaire)"
     status: done

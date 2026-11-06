@@ -2851,6 +2851,10 @@ lots:
     spec: true
     created: 2026-11-06
     started: 2026-11-06
+    notes:
+      - { date: 2026-11-06, text: "Revue de la fiche — mineur : docs/specs/goal-budget-add-resume/fiche.yaml:5 — Le périmètre omet snapshot.ts (waveReadsAdds, :213, précédent cité par R11) et state.ts (champ de marque D3) alors que R11/D3 y imposent des modifications ; à ajouter à sujet.perimetre.modules." }
+      - { date: 2026-11-06, text: "Revue de la fiche — mineur : docs/specs/goal-budget-add-resume/fiche.yaml:47 — R4 dit « une seule fois par lot » mais aucun test n'est prévu pour un --budget p:L=+N répété sur le même lot ; de plus command.ts:126 (« --budget projet:lot=+N ne vaut qu'avec --resume ») et ses tests (orchestrate-reprise-lot-budget.test.ts:417,425) devront être adaptés pour --add : à noter dans les tests de R4." }
+      - { date: 2026-11-06, text: "Revue de la fiche — mineur : docs/specs/goal-budget-add-resume/fiche.yaml:105 — Le refus « cette vague a été lancée avant L657 » (A1) n'a pas de cas pour l'absence d'instantané : waveReadsAdds (snapshot.ts:213) suppose « oui » sans instantané ; la marque D3 doit dire de même ou l'inverse, à trancher pour R11." }
   - id: L658
     title: "Test d'un autre lot qui lit une page déplacée (L651 refusé par R14 de lead-hold) : le brief d'un lot qui vide une page reçoit la liste des tests qui lisent cette page, et un contrôle au commit les joue ; mesure : 0 refus d'intégration pour une page de doc déplacée"
     status: done

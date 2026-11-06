@@ -2651,9 +2651,10 @@ lots:
     created: 2026-11-06
   - id: L635
     title: "R5 de test/orchestrate-pages-l599.test.ts exige un renvoi pour toute section d'une page de la suite, même neuve et jamais déplacée (L621 puis L633 refusés à la porte, 2 occurrences) : limiter R5 aux sections réellement déplacées (liste figée) et retirer les renvois factices de L621 et L633"
-    status: todo
+    status: doing
     estimate: 0.1
     created: 2026-11-06
+    started: 2026-11-06
   - id: L636
     title: "Docs : aligner orchestrate-cycle.md:307, orchestrate.md:130 et raf.md:56 sur L633 (un lot visible sans screen: n'est plus une maquette légère, budget ordinaire)"
     status: todo

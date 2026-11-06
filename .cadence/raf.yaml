@@ -2730,15 +2730,30 @@ lots:
     finished: 2026-11-06
     notes:
       - { date: 2026-11-06, text: "abandonné : cadence résout déjà les conflits d'ajout pur du CHANGELOG par union (vu dans la vague 0915), lot inutile" }
+  - id: L643
+    title: "Le push de livraison pendant une vague compte les commits plan-seul d'un lot pas prêt (« plan: L639 démarré ») comme du code et refuse 7f9bddd ; effet indirect : origin/main en retard, le cliquet contre origin/main d'un lot config voit le code de L638 et rend L630 rouge. Les commits qui ne touchent que le plan ne bloquent plus le push ; mesure : 0 refus de push pour un commit de plan"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-06
   - id: L642
     title: "Mesure hors session : 200 rejeux sous charge de la famille verify* et de porte-deportee-creneau-l624 sur mini-blue, après l'intégration de L630 ; preuve de stabilité que L630 ne pouvait pas porter (décision du lead du 06-11) ; mesure : 0 rouge sur 200"
     status: todo
     estimate: 0.05
     created: 2026-11-06
-  - id: L643
-    title: "Le push de livraison pendant une vague compte les commits plan-seul d'un lot pas prêt (« plan: L639 démarré ») comme du code et refuse 7f9bddd ; effet indirect : origin/main en retard, le cliquet contre origin/main d'un lot config voit le code de L638 et rend L630 rouge. Les commits qui ne touchent que le plan ne bloquent plus le push ; mesure : 0 refus de push pour un commit de plan"
+  - id: L644
+    title: "attente d'intégration différée : cadence inspect compte l'état « attente de ressource » (ligne « intégration différée » jusqu'à reprise ou intégré), la retranche de revue et d'actives, l'affiche en cause avec le lot qui tient la ressource ; niveau : source (le lancement pose uses: d'après les chemins du cadence.yaml parent) ; niveau le plus tôt : source ; mesure : 0 min d'attente de ressource classée en revue, 0 attente de plus de 10 min sans ligne dans le tableau"
     status: todo
-    estimate: 0.1
+    estimate: 0.25
+    created: 2026-11-06
+  - id: L645
+    title: "cliquet contre origin/main : le test et la porte comparent à la ligne de base du départ du lot (ou refusent « origin/main est en retard de N commits sur main » avant de jouer 6 min de suite), et le journal garde les 20 premières lignes du test rouge ; niveau : source ; mesure : 0 refus d'intégration dû à un origin/main en retard, texte du refus présent dans 100 % des refus"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-06
+  - id: L646
+    title: "revue en boucle : le brief de fix donne les constats de la passe précédente par classe et exige la correction de la classe, un contrôle au commit refuse un test ajouté qui est vert avec et sans le code du lot, la revue suivante ne relit pas un mineur déjà noté ; niveau : source (classe dans le brief), commit (contrôle) ; niveau le plus tôt : source ; mesure : 0 passe de revue sans constat neuf bloquant ou majeur, taux d'écartés lu par cadence perf une fois L638 en service"
+    status: todo
+    estimate: 0.5
     created: 2026-11-06
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

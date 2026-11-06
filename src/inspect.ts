@@ -127,7 +127,6 @@ function refusLabel(reason: string): string {
 interface Result {
   lots: LotTime[];
   losses: Loss[];
-  start: number;
   end: number;
 }
 
@@ -225,7 +224,6 @@ function slotWaits(lot: string, es: Entry[]): Loss[] {
 /** Le temps par état, la porte et les pertes de chaque lot, lus dans le journal d'une vague ; `retakes` : les reprises du lead tombées dans la vague, une perte chacune (durée non mesurée : git ne la dit pas). */
 export function measureWave(entries: Entry[], retakes: Retake[] = []): Result {
   const end = entries.reduce((m, e) => Math.max(m, e.at), 0);
-  const start = entries.reduce((m, e) => Math.min(m, e.at), Number.POSITIVE_INFINITY);
   const byLot = new Map<string, Entry[]>();
   for (const e of entries) if (e.lot) byLot.set(e.lot, [...(byLot.get(e.lot) ?? []), e]);
   const lots: LotTime[] = [];
@@ -237,7 +235,7 @@ export function measureWave(entries: Entry[], retakes: Retake[] = []): Result {
     lots.push({ lot, states, gateMinutes: minutesOf(gateMs), gates, afterFirstReview: firstReview === null ? null : minutesOf(es.reduce((m, e) => Math.max(m, e.at), firstReview) - firstReview), sessions: es.filter((e) => /^session \d+ /.test(e.text)).length, fixes });
   }
   for (const r of retakes) losses.push({ lot: r.lot, category: 'reprise du lead', cause: r.cause, minutes: 0, level: null });
-  return { lots, losses, start, end };
+  return { lots, losses, end };
 }
 
 /** Les reprises tombées dans la fenêtre d'une vague : de sa première ligne de journal à la première ligne de la vague suivante (sans suivante : sans fin). */
@@ -308,9 +306,9 @@ function datedWaves(runsDir: string): string[] {
 export function inspectWave(runsDir: string, wave: string, plan: PlanLot[], retakes: Retake[] = []): Inspection {
   const file = join(runsDir, wave, 'journal.log');
   const dated = datedWaves(runsDir);
-  // Les reprises d'une vague : celles tombées entre sa première ligne de journal et celle de la vague datée suivante.
+  // Les reprises d'une vague : celles tombées entre sa première ligne de journal et celle de la vague datée suivante ; une vague à nom libre n'a pas de fenêtre.
   const retakesOf = (w: string): Retake[] => {
-    const start = waveStart(runsDir, w);
+    const start = dated.includes(w) ? waveStart(runsDir, w) : null;
     if (start === null) return [];
     const next = dated.find((d) => d > w);
     return retakesBetween(retakes, start, next === undefined ? null : waveStart(runsDir, next));

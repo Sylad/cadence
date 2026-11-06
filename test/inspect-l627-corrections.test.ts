@@ -155,6 +155,9 @@ describe('cadence inspect (L627) — seconde revue', () => {
       ['reprise du lead', 'rebase du lead', 1, ['cadence:L626'], false],
     ]);
     expect(renderInspection(i).join('\n')).toContain('reprise du lead · correctif du lead : durée dans git, non mesurée, 1 fois, 1 lot(s) · RÉCIDIVE (déjà vue : 2026-11-05-0900)');
+    // Une vague à nom libre n'a pas de fenêtre : les reprises d'après la dernière vague datée ne lui vont pas, et elle ne fait pas récidive.
+    const libre = runsIn(tempDir(), { 'cadence-l122': t.replace(/2026-11-06/g, '2026-11-05'), '2026-11-06-0900': t });
+    expect(inspectWave(libre, '2026-11-06-0900', [], retakes).causes.map((c) => [c.cause, c.recidive]).sort()).toEqual([['correctif du lead', false], ['rebase du lead', false]]);
   });
 
   it('R3 — inspectFolder lit les reprises du lead dans le git du projet de la vague', () => {

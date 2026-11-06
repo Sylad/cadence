@@ -58,6 +58,19 @@ export interface StepState {
   formatRetry?: boolean;
   /** Étape `probe` : textes (« sonde de cas limites : … ») des constats qu'elle a envoyés en correction ; `cadence corrections` les rattache à la passe fix qui suit. */
   constats?: string[];
+  /** Étape de revue (L638) : chaque constat du rapport avec son rang et ce que L622 en a fait ; absent d'un pas d'avant L638. */
+  constatsRevue?: ConstatRevue[];
+}
+
+/** Décision d'une revue sur un constat : compté, écarté comme majeur « inchangé » (L622), ou écarté comme attente hors règle de la sonde (L625). */
+export type DecisionConstat = 'compte' | 'ecarte-inchange' | 'ecarte-hors-regle';
+
+/** Un constat d'une revue tel que le pas le garde (L638) : `rang` est celui avec lequel L622 a lu la marque (un lot rétréci compte la marque dès le rang 2). */
+export interface ConstatRevue {
+  texte: string;
+  gravite: string;
+  rang: number;
+  decision: DecisionConstat;
 }
 
 export interface Constat {

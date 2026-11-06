@@ -1,4 +1,4 @@
-import { type LotState, type Constat } from '../state.js';
+import { type LotState, type Constat, type ConstatRevue } from '../state.js';
 import { type SessionKind } from '../launch.js';
 import { type ReviewReport, summarize } from '../schemas.js';
 import { type LotCtx } from './ctx.js';
@@ -96,19 +96,26 @@ export function countReview(rep: ReviewReport, kind: SessionKind, l: LotState, h
   const rank = reviewRank(kind, l);
   const previous = l.codeConstats ?? [];
   const falseMark = (k: ReviewReport['constats'][number]) => rank >= 2 && k.gravite === 'majeur' && k.inchange === true && repeats(previous, k);
+  // `current[i]` : le constat i du rapport tel que les étapes suivantes le voient (copié quand sa marque est fausse) ; les filtres gardent l'identité, d'où la décision de chaque constat (L638).
+  let current = rep.constats;
   let checked = rep;
   if (rep.constats.some(falseMark)) {
     for (const k of rep.constats.filter(falseMark)) l.warnings.push(`majeur marqué inchange: true déjà signalé par la revue précédente, compté comme un majeur : ${k.texte}`);
-    checked = { ...rep, constats: rep.constats.map((k) => (falseMark(k) ? { ...k, inchange: undefined } : k)) };
+    current = rep.constats.map((k) => (falseMark(k) ? { ...k, inchange: undefined } : k));
+    checked = { ...rep, constats: current };
   }
   const horsRegle = setAsideHorsRegle(checked, kind, l);
   checked = horsRegle.rep;
   // Un lot rétréci (L621) met de côté dès la revue de code 1 ; l'UX n'a pas de marque.
-  const { rep: counted, aside } = setAsideUnchanged(checked, shrunk && kind !== 'ux' ? Math.max(rank, 2) : rank, 'code');
+  const markRank = shrunk && kind !== 'ux' ? Math.max(rank, 2) : rank;
+  const { rep: counted, aside } = setAsideUnchanged(checked, markRank, 'code');
   const counting = summarize(counted, head, repoHeads);
   const verdict = counting.conforme ? convergedVerdict(counting.verdict, aside) : counting.verdict;
   const summary = counting.conforme ? { ...counting, verdict: horsRegle.dropped.length && isNonConformingVerdict(verdict) ? horsRegleNote(horsRegle.dropped) : verdict } : counting;
-  return { counted, summary, aside };
+  const afterHors = new Set(checked.constats);
+  const kept = new Set(counted.constats);
+  const decisions: ConstatRevue[] = rep.constats.map((k, i): ConstatRevue => ({ texte: k.texte, gravite: k.gravite, rang: markRank, decision: !afterHors.has(current[i]) ? 'ecarte-hors-regle' : !kept.has(current[i]) ? 'ecarte-inchange' : 'compte' }));
+  return { counted, summary, aside, decisions };
 }
 
 /** Plafond de mur (L622) : la raison du refus d'une passe de plus quand le mur du lot passe deux fois sa durée attendue, sinon undefined. Un lot repris par `--add` ne compte que les étapes depuis la reprise (`wallFrom`). */

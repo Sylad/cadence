@@ -201,7 +201,8 @@ async function reviewStep(c: LotCtx, kind: 'ux' | 'review' | 'review-small'): Pr
     return;
   }
   // Revue de code de rang 2 ou plus (L622) : un majeur marqué `inchange: true` va en suite pour le lead et ne compte plus ; un bloquant compte toujours. Le rang est celui de la revue de code (l'UX n'a pas de marque).
-  const { counted, summary, aside } = countReview(rep, kind, l, done.after.head ?? '', { repoHeads: done.others.length ? Object.fromEntries(done.others.map((o) => [o.repo.rel, o.after.head ?? ''])) : undefined, shrunk: kind === 'ux' ? undefined : readShrunk(c) });
+  const { counted, summary, aside, decisions } = countReview(rep, kind, l, done.after.head ?? '', { repoHeads: done.others.length ? Object.fromEntries(done.others.map((o) => [o.repo.rel, o.after.head ?? ''])) : undefined, shrunk: kind === 'ux' ? undefined : readShrunk(c) });
+  done.step.constatsRevue = decisions; // L638 : texte, rang et décision L622 de chaque constat, relus par `cadence perf` (écrit par les `save` qui suivent)
   if (kind === 'ux') {
     l.ux = summary;
     addProposals(c, rep, 'ux', summary.head);

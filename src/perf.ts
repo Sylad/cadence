@@ -9,6 +9,7 @@ import { median, percentile } from './percentile.js';
 import { findProjects } from './lead.js';
 import type { Lot } from './plan.js';
 import { FAIL_CLASSES, readDeliveries, readFailedEntries, type FailClass, type FailedDelivery } from './state.js';
+import { ecarteCounts, ecarteLines, instableCounts, type EcarteCounts, type InstableCounts } from './perf-constats.js';
 
 /** Le lot d'un plan tel que `cadence perf` le lit. */
 type PlanLot = Pick<Lot, 'id' | 'status' | 'created' | 'finished' | 'estimate' | 'notes'>;
@@ -165,12 +166,6 @@ export interface EscalationCounts {
   echec: number;
 }
 
-/** Tests « instables sous charge » des lots rendus d'une fenêtre (L354) : lots qui en portent et tests distincts par lot, additionnés. */
-export interface InstableCounts {
-  lots: number;
-  tests: number;
-}
-
 export interface PerfResult {
   since: string | null;
   today: Day;
@@ -189,6 +184,8 @@ export interface PerfResult {
   escalations: { current: EscalationCounts; previous: EscalationCounts };
   /** Tests rouges dans la suite de la porte, verts rejoués seuls (L354) : ni comptés ni corrigés. Une hausse dit que la machine est trop chargée pour la suite (`CADENCE_TEST_WORKERS`). */
   instables: { current: InstableCounts; previous: InstableCounts };
+  /** Part des constats de revue que L622 écarte (majeur « inchangé » mis en suite) au lieu de les compter (L638). */
+  ecartes: { current: EcarteCounts; previous: EcarteCounts };
   tokens: TokensBlock;
   /** Médiane de la durée de mur d'un lot rendu, en minutes (début de sa première étape → fin de sa dernière), par classe d'estimate comme `tokens.byEstimate` (L414) : le temps habituel que le panneau des lots compare à celui d'un lot en cours. */
   lotMinutes: Record<string, Indicator>;
@@ -627,7 +624,7 @@ export function computePerf(input: PerfInput): PerfResult {
     redDeliveries: mk(reds, deliveriesOf, 'up', 'throughput.delivered'),
     qaBlocking: mk(both(windows, blockingOf), both(windows, deliveredCount), 'up', twinEscaped, escapedNote),
   };
-  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, precheck, escalations: both(windows, (w) => escalationCounts(rendered(w))), instables: both(windows, (w) => instableCounts(rendered(w))), tokens, lotMinutes, delays, durations, cost, quality, orphans, warnings: [] };
+  const result: PerfResult = { since: input.since ?? null, today, windows, throughput, corrections: correctionsInd, interventions, precheck, escalations: both(windows, (w) => escalationCounts(rendered(w))), instables: both(windows, (w) => instableCounts(rendered(w))), ecartes: both(windows, (w) => ecarteCounts(rendered(w))), tokens, lotMinutes, delays, durations, cost, quality, orphans, warnings: [] };
   const bottleneck = bottleneckOf(causes.current);
   for (const [key, ind] of indicatorLines(result)) if (ind.warn) result.warnings.push(`⚠ ${key.label} : ${describe(ind, key.kind, result.cost.currency)} → ${decisionOf(key, ind, result)}`);
   if (bottleneck) result.warnings.push(bottleneck);
@@ -639,12 +636,6 @@ function escalationCounts(set: Dated[]): EscalationCounts {
   const escalated = set.filter((d) => d.j.escalation);
   const by = (issue: 'conforme' | 'rendu' | 'non jouée' | 'échec') => escalated.filter((d) => d.j.escalation!.issue === issue).length;
   return { lots: escalated.length, conforme: by('conforme'), rendu: by('rendu'), nonJouee: by('non jouée'), echec: by('échec') };
-}
-
-/** Les tests instables sous charge des lots donnés (L354). */
-function instableCounts(set: Dated[]): InstableCounts {
-  const withTests = set.filter((d) => (d.j.instables?.length ?? 0) > 0);
-  return { lots: withTests.length, tests: withTests.reduce((n, d) => n + d.j.instables!.length, 0) };
 }
 
 const minutesOf = (s: JournalStep): number => {
@@ -879,6 +870,7 @@ export function renderPerf(r: PerfResult): string[] {
   if (e.lots > 0) out.push('', 'Escalade de modèle', `  escalades de modèle : ${plural(e.lots, 'lot', 'lots')} · ${e.conforme} conforme · ${e.rendu} rendu malgré l'escalade · ${e.nonJouee} non jouée · ${e.echec} en échec`);
   const ins = r.instables.current;
   if (ins.lots > 0) out.push('', 'Porte de tests sous charge', `  tests instables sous charge : ${plural(ins.tests, 'test', 'tests')} dans ${plural(ins.lots, 'lot', 'lots')} (rouges dans la suite, verts rejoués seuls ; précédente ${r.instables.previous.tests})`);
+  out.push(...ecarteLines(r.ecartes.current, r.ecartes.previous, pct));
   out.push('', 'Tokens, délais et durées (médianes par lot ou par étape)');
   for (const l of lines.slice(LEGACY_LINES)) out.push(row(l));
   for (const wr of r.warnings.filter((x) => x.startsWith('⚠ goulot'))) out.push('', wr);

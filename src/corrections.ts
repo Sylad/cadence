@@ -3,6 +3,8 @@ import { basename, join } from 'node:path';
 import { LOCAL_PRECHECK_UNREADABLE, PRECHECK_UNREADABLE } from './orchestrate/state.js';
 import { RafError } from './plan.js';
 import { failIfNull, ollamaChat, type OllamaOpts } from './ollama.js';
+import { decisionsOf } from './perf-constats.js';
+import type { DecisionConstat } from './orchestrate/state.js';
 
 /** Les causes d'une passe de correction (L165), dans l'ordre où le rapport les liste. */
 export const CAUSES = ['spec-floue', 'regle-inventee', 'derive-architecture', 'donnees-sql', 'bug-code', 'test-manquant', 'faux-constat'] as const;
@@ -59,6 +61,7 @@ interface RawStep {
   status: string;
   report?: string;
   constats?: unknown; // étape `probe` : textes des constats envoyés en correction
+  constatsRevue?: unknown; // étape de revue (L638)
   commits?: string[];
   ended?: string;
   started?: string;
@@ -131,6 +134,8 @@ export interface Journal {
   waveCreated?: string;
   /** Faux quand le wave.json de la vague est absent ou illisible : `cadence perf` écarte alors la vague (R17), `readRuns` la lit comme avant. */
   waveReadable: boolean;
+  /** Décision (L622) de chaque constat gardé par les pas de revue du lot (L638) ; vide d'un journal d'avant L638. */
+  decisions?: DecisionConstat[];
   project: string;
   lot: string;
   visible: boolean;
@@ -211,6 +216,7 @@ export function readJournals(runsDir: string, until?: string, since?: string): J
         wave,
         ...(waveCreated ? { waveCreated } : {}),
         waveReadable,
+        decisions: decisionsOf(steps),
         project: rec.project,
         lot: rec.lot,
         visible: !!rec.visible,

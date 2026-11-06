@@ -2775,6 +2775,7 @@ lots:
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-06-1559, 0 passe(s) de correction)", commit: 849705cc804eec2cc452cab9979d2c039e70b421, reporte: { de: 92293d173e66bae38693a11da018d7db312efcd6, vers: 849705cc804eec2cc452cab9979d2c039e70b421, patchId: e9abfbe3c795f909c08252f4afc09de3199266f9 } }
   - id: L648
     title: "doc périmée par un correctif : le brief fix liste les lignes de docs/ et de l'aide qui citent les identifiants que le diff du fix change, et exige leur mise à jour dans le même commit ; hook de commit refuse un commit fix( touchant src/ si une ligne de doc citant un identifiant retiré ou ajouté n'est pas touchée (sauf docs-ok motivé) ; niveau : source (brief), commit (hook) ; niveau le plus tôt : source ; on ne peut pas prévenir plus tôt car le correctif naît après la rédaction de la doc ; mesure : 0 constat de revue « documentation ne suit pas le correctif » par vague, 0 rendu pour une phrase de doc"
     status: doing

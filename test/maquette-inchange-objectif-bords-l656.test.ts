@@ -17,7 +17,7 @@ describe('L656 — bords de la consigne inchange / objectif', () => {
     expect(maquetteText({ fiche, passes: 9, max: 3 })).toMatch(never);
   });
   it('L656 — revue légère avec constats précédents : la consigne reste', () => {
-    const t = maquetteText({ fiche, passes: 2, max: 3, light: true, previous: [{ gravite: 'majeur', texte: 'x' }] });
+    const t = maquetteText({ fiche, passes: 2, max: 3, light: true, previous: [{ source: 'ux', gravite: 'majeur', texte: 'x' }] });
     expect(t).toMatch(never);
   });
   it('L656 — la consigne n’est dite qu’une fois (pas de doublon)', () => {

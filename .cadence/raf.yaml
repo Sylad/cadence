@@ -2910,6 +2910,7 @@ lots:
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-06-2055, 1 passe(s) de correction)", commit: d37cb1911f435fbd8c77c62939585ca178e21b68, reporte: { de: 43398d2b7b5cf174f1d7e317da113d7c79dde06b, vers: d37cb1911f435fbd8c77c62939585ca178e21b68, patchId: 93a33becbd109d6f2b0516c4c0e339db3a5775a1 } }
   - id: L661
     title: "Activer L639 dans cadence.yaml (orchestrate.gate : Big-Blue d'abord, mini-blue en débordement) : les portes locales tiennent 216,9 min sur 369,7 actives et 44 % des créneaux de la vague 1805 (33 portes pour 8 lots, 5,1 min seule, 7 à 9 à trois) ; niveau : porte, niveau le plus tôt : porte (la suite complète est requise avant main, on ne peut pas la sauter à la source, on peut seulement la rendre sans créneau et sans contention) ; mesure : minutes de créneau tenues par une porte < 20 % des créneaux sur la vague suivante"
     status: todo

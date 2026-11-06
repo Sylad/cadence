@@ -2827,11 +2827,12 @@ lots:
     finished: 2026-11-06
   - id: L654
     title: "Issue #47 : vague suspendue ou lot retiré après une revue de maquette non conforme : le tableau dit « revue — » et ne liste que les mineurs ; il doit donner le verdict et les majeurs"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-06
     review: { date: 2026-11-06, verdict: "conforme : revue courte du diff rebasé sans constat, porte verte à 9d6ca26 ; verdict réécrit par le lead, l'ancien citait la formule du tableau et raf done le lisait comme un refus", commit: 9d6ca26d723580312d1b2a351d3ac0bb9d8c9677 }
+    finished: 2026-11-06
   - id: L655
     title: "Issue #49 : la sonde de cas limites joue sur des lots dont la porte n'atteint pas le diff (CSS seul, banc seul) et commite des contrôles de texte sans constat ; ne plus la jouer sur ces lots ; mesure : 0 sonde sur un diff hors porte"
     status: done

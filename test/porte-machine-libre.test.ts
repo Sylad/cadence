@@ -110,7 +110,7 @@ describe('L639 — la porte joue sur la machine libre : le local d\'abord', () =
     held.push(await acquireSlot(home, 1, { wave: 'w' })); // le seul créneau de session est pris
     expect(liveSlots(home)).toHaveLength(1);
     let ran = false;
-    await withPlace(opts({}, { owner: {} }), async (p) => ((ran = true), expect(p.remote()).toBe(false)));
+    await withPlace(opts({}, { owner: {}, env: { ...remote.env, CADENCE_HOME: home } }), async (p) => ((ran = true), expect(p.remote()).toBe(false)));
     expect(ran).toBe(true);
     expect(sshCalls()).toBe(0);
     expect(count('jouée en local, machine locale libre')).toBe(1);

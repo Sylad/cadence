@@ -42,6 +42,15 @@ function maxParallelOf(v: unknown, bad: Bad): number {
   return v;
 }
 
+/** Les clés de `gate` autres que `readsPlan`, avec leur lecture. */
+const READERS: Record<string, (v: unknown, bad: Bad) => unknown> = {
+  host: (v, bad) => hostOf(v, bad),
+  overflow: (v, bad) => hostOf(v, bad, 'overflow'),
+  install: installOf,
+  refs: refsOf,
+  maxParallel: maxParallelOf,
+};
+
 /**
  * Clé `orchestrate.gate` de cadence.yaml : `readsPlan` (L450), `host`, `overflow` (L639), `install` (L403), `refs` (L617) et `maxParallel` (L624). Rend undefined quand elle ne déclare rien d'actif (`readsPlan: false` seul) ;
  * `host`, `overflow` ou `install` seuls posent la clé sans `readsPlan` : déclarer l'hôte ne vaut pas déclarer que des tests lisent le plan (R11).
@@ -52,14 +61,8 @@ export function readGate(raw: unknown, bad: Bad): Gate | undefined {
   const o = raw as Record<string, unknown>;
   for (const k of Object.keys(o)) if (!['readsPlan', 'host', 'overflow', 'install', 'refs', 'maxParallel'].includes(k)) throw bad(`gate.${k} inconnu (attendu : readsPlan, host, overflow, install, refs, maxParallel)`);
   if (o.host != null && o.overflow != null) throw bad('gate.overflow et gate.host déclarés ensemble : garder host (la porte se joue sur l\'hôte) ou overflow (la porte joue en local, puis déborde sur l\'hôte)');
-  const readsPlan = readsPlanOf(o.readsPlan, bad, o.host != null || o.overflow != null || o.install != null || o.refs != null || o.maxParallel != null);
-  const gate: Gate = {
-    ...(readsPlan ? { readsPlan } : {}),
-    ...(o.host != null ? { host: hostOf(o.host, bad) } : {}),
-    ...(o.overflow != null ? { overflow: hostOf(o.overflow, bad, 'overflow') } : {}),
-    ...(o.install != null ? { install: installOf(o.install, bad) } : {}),
-    ...(o.refs != null ? { refs: refsOf(o.refs, bad) } : {}),
-    ...(o.maxParallel != null ? { maxParallel: maxParallelOf(o.maxParallel, bad) } : {}),
-  };
+  const readsPlan = readsPlanOf(o.readsPlan, bad, Object.keys(READERS).some((k) => o[k] != null));
+  const gate: Gate = readsPlan ? { readsPlan } : {};
+  for (const [k, read] of Object.entries(READERS)) if (o[k] != null) Object.assign(gate, { [k]: read(o[k], bad) });
   return Object.keys(gate).length ? gate : undefined;
 }

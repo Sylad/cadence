@@ -19,6 +19,9 @@ export const GATE_TIMEOUT_MS = 30 * 60_000;
 
 /** Délai de connexion de la sonde (R4) puis des autres appels ssh. */
 const PROBE_CONNECT_S = 5;
+/** Préflight de l'hôte de débordement (L639) : délai de connexion et durée totale, plus courts que la sonde de `gate.host` (un hôte éteint ne coûte que quelques secondes à chaque lot). */
+const PREFLIGHT_CONNECT_S = 3;
+const PREFLIGHT_TOTAL_MS = 10_000;
 const CONNECT_S = 10;
 
 /** Un nom de commit sûr à insérer dans une commande : hexadécimal de 4 à 64 caractères (R18). */
@@ -115,7 +118,7 @@ function ssh(c: SshCall): Promise<Ran> {
       ? setTimeout(() => {
           killGroup(pgid);
           liveSsh.delete(pgid);
-          resolveRan({ code: 124, output: `${text()}\ndélai dépassé (${Math.round((c.timeoutMs ?? 0) / 60_000)} min)` });
+          resolveRan({ code: 124, output: `${text()}\ndélai dépassé (${(c.timeoutMs ?? 0) < 60_000 ? `${Math.round((c.timeoutMs ?? 0) / 1000)} s` : `${Math.round((c.timeoutMs ?? 0) / 60_000)} min`})` });
         }, c.timeoutMs)
       : undefined;
     child.once('close', (code) => {
@@ -148,6 +151,14 @@ interface OpenOpts {
   timeoutMs: number;
   /** CADENCE_TEST_WORKERS d'une commande de la porte, d'après les cœurs de l'hôte (R13). */
   workers: (hostCores: number) => number;
+  /** Sonde déjà faite (préflight d'un lot, L639) : l'ouverture ne sonde pas une seconde fois. */
+  probed?: HostProbe;
+}
+
+/** Ce que la sonde apprend de l'hôte. */
+export interface HostProbe {
+  platform: string;
+  cores: number;
 }
 
 export interface RemoteGate {
@@ -205,9 +216,12 @@ interface Work {
   wt: string;
 }
 
+/** Préflight de l'hôte de débordement (L639, R6) : la même sonde que `gate.host`, ConnectTimeout 3 et 10 s au total ; rend la plateforme et les cœurs, ou la cause du silence. */
+export const preflightHost = (host: string, env: Env): Promise<HostProbe | string> => probeHost(host, env, PREFLIGHT_CONNECT_S, PREFLIGHT_TOTAL_MS);
+
 /** Sonde l'hôte (R4) : sa plateforme et ses cœurs, ou la cause de son silence. */
-async function probeHost(o: OpenOpts): Promise<{ platform: string; cores: number } | string> {
-  const probe = await ssh({ host: o.host, env: o.env, connectS: PROBE_CONNECT_S, timeoutMs: 30_000, script: 'uname -s; uname -m; nproc 2>/dev/null || getconf _NPROCESSORS_ONLN' });
+async function probeHost(host: string, env: Env, connectS: number, timeoutMs: number): Promise<HostProbe | string> {
+  const probe = await ssh({ host, env, connectS, timeoutMs, script: 'uname -s; uname -m; nproc 2>/dev/null || getconf _NPROCESSORS_ONLN' });
   if (probe.code !== 0) return causeOf(probe);
   // Une bannière de connexion (motd, .bashrc bavard) précède la sortie : les trois dernières lignes sont celles de la sonde.
   const [os = '', arch = '', cores = ''] = probe.output.trim().split('\n').map((l) => l.trim()).slice(-3);
@@ -306,7 +320,7 @@ async function prepareCache(o: OpenOpts, w: Work, hostPlatform: string): Promise
 
 async function prepare(o: OpenOpts, onWork: (w: Work) => void): Promise<Opened> {
   const { host, env } = o;
-  const probe = await probeHost(o);
+  const probe = o.probed ?? (await probeHost(host, env, PROBE_CONNECT_S, 30_000));
   if (typeof probe === 'string') return { ok: false, stage: 'host', cause: probe };
   const id = `${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
   const root = `.cadence-gate/${basename(resolve(o.repo))}`;

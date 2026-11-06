@@ -33,7 +33,7 @@ A gate is a check that sends a lot back instead of letting it through. It is dec
 | Mockup | `orchestrate.maquette` (on by default) | cadence.yaml | a lot with a screen whose mockup fails its UX review, before any code ([orchestrate](orchestrate-spec.md#the-mockup-review-before-any-code)) |
 | Back-end sheet | `orchestrate.fiche` (on by default) | cadence.yaml | a lot with `spec: true` whose sheet fails its review, before any test is written |
 
-Two keys do not add a gate, they say **where the gate is played**: `orchestrate.gate.host` (and `gate.install`, `gate.refs`, `gate.maxParallel`) plays the build and the tests on another machine through ssh ([remote gate](remote-gate.md)); `verify.inPlace` chooses, for `cadence verify --gate`, between the main tree and a throwaway copy ([deliver](deliver.md)).
+Two keys do not add a gate, they say **where the gate is played**: `orchestrate.gate.host` (and `gate.install`, `gate.refs`, `gate.maxParallel`) plays the build and the tests on another machine through ssh ([remote gate](remote-gate.md)); `verify.inPlace` chooses, for `cadence verify --gate`, between the main tree and a throwaway copy ([deliver](deliver.md)). `orchestrate.gate.overflow` (L639, instead of `host`, never with it) keeps `gate.host` meaning « the gate is played on the host » for the projects that declare it, and plays the gate on the free machine: local first, the overflow host when the local machine is busy, one decision per lot ([remote gate](remote-gate.md#the-free-machine-first-gateoverflow-l639)).
 
 ## File bounds (`bounds`)
 

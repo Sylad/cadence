@@ -27,4 +27,18 @@ describe('L666 — bord : lecture du precheck longue', () => {
     expect(lot.precheckLu!.length).toBeLessThanOrEqual(PRECHECK_LU_MAX);
     expect(lot.precheckLu!.endsWith('Edge cases of the rule:\n- empty: not decided')).toBe(true);
   });
+
+  // Frontière : room = PRECHECK_LU_MAX − marqueur (3990) ; une section de room − 1, room ou room + 1 caractères ne doit jamais dépasser la borne.
+  for (const delta of [-2, -1, 0, 1]) {
+    it(`R2 — une section finale de room ${delta >= 0 ? '+' : '−'} ${Math.abs(delta)} caractères derrière une tête de 5000 tient dans PRECHECK_LU_MAX`, () => {
+      const room = PRECHECK_LU_MAX - '[…tronqué]'.length;
+      const label = 'Edge cases of the rule:\n';
+      const tail = `${label}${'y'.repeat(room + delta - label.length)}`;
+      expect(tail.length).toBe(room + delta);
+      const lot = { warnings: [] as string[], precheckLu: undefined as string | undefined };
+      keepPrecheckReading(lot, `${'x'.repeat(5000)}\n${tail}`);
+      expect(lot.precheckLu!.length).toBeLessThanOrEqual(PRECHECK_LU_MAX);
+      expect(lot.precheckLu).toContain('Edge cases of the rule:');
+    });
+  }
 });

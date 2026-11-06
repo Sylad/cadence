@@ -114,5 +114,6 @@ export function keepPrecheckReading(lot: { precheckLu?: string; warnings: string
   }
   // Les cas limites de la règle sont en fin de `lu` (L666) : c'est la tête qui est coupée, la section est gardée.
   const tail = text.slice(at);
-  lot.precheckLu = tail.length > room ? `${clip(tail, room)}${PRECHECK_LU_CUT}` : `${clip(text, room - 1 - tail.length)}${PRECHECK_LU_CUT}\n${tail}`;
+  const headRoom = room - 1 - tail.length; // place laissée à la tête une fois la section et le saut de ligne posés
+  lot.precheckLu = headRoom < 0 ? `${clip(tail, room)}${PRECHECK_LU_CUT}` : `${clip(text, headRoom)}${PRECHECK_LU_CUT}\n${tail}`;
 }

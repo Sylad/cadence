@@ -135,6 +135,22 @@ export async function integratedChecks(c: LotCtx, key: string): Promise<{ red: C
 }
 
 const EXCERPT_LINES = 10;
+/** Lignes du premier test rouge que le constat garde en tête (L645) : le message d'un refus (« origin/main est en retard… ») est au début de son bloc, pas dans la fin de la sortie. */
+const RED_HEAD_LINES = 20;
+const RED_HEAD = /^> (\d+) premières lignes de « .* » :$/;
+
+/** Les premières lignes du bloc du premier test rouge nommé (« FAIL fichier > test »), jusqu'au test rouge suivant ; null sans test nommé. */
+function redHead(output: string): { name: string; lines: string[] } | null {
+  const all = output.replace(/\u001b\[[0-9;]*m/g, '').split('\n');
+  const at = all.findIndex((l) => /^\s*FAIL\s+.* > /.test(l));
+  if (at < 0) return null;
+  const lines: string[] = [];
+  for (const l of all.slice(at + 1)) {
+    if (/^\s*FAIL\s/.test(l) || lines.length >= RED_HEAD_LINES) break;
+    if (l.trim()) lines.push(l.trim());
+  }
+  return lines.length ? { name: all[at].replace(/^\s*FAIL\s+(?:\|[^|]*\|\s+)?/, '').trim(), lines } : null;
+}
 
 /**
  * Le constat d'une suite rouge sans comparaison à la ligne de base (L631) : les tests rouges que la sortie nomme (« - fichier > test »), puis la fin de la sortie. Le motif d'un refus ne garde que
@@ -144,7 +160,9 @@ export function redTestsText(command: string, code: number, output: string): str
   // Seul un identifiant « fichier > test » (vitest, jest) ou « fichier::test » (pytest) est cité en tête : un « FAIL message » libre reste dans la fin de la sortie, où le motif du refus le lit tel quel.
   const names = failedTests(output).filter((n) => n.includes(' > ') || n.includes('::'));
   const tail = output.trim().split('\n').slice(-40).join('\n');
-  return `${command} en échec (code ${code}) :${names.length ? `\n${names.map((t) => `- ${t}`).join('\n')}` : ''}\n${tail}`;
+  const head = names.length ? redHead(output) : null;
+  const start = head ? `\n> ${head.lines.length} premières lignes de « ${head.name} » :\n${head.lines.join('\n')}` : '';
+  return `${command} en échec (code ${code}) :${names.length ? `\n${names.map((t) => `- ${t}`).join('\n')}` : ''}${start}\n${tail}`;
 }
 
 /**
@@ -152,10 +170,14 @@ export function redTestsText(command: string, code: number, output: string): str
  * sinon la fin de la sortie. La première ligne seule laissait « npx vitest run en échec (code 1) : » sans un nom de test.
  */
 export function redExcerpt(k: Constat): string {
-  const [head, ...rest] = k.texte.split('\n');
+  const [head, ...all] = k.texte.split('\n');
+  const mark = all.findIndex((x) => RED_HEAD.test(x));
+  const count = mark < 0 ? 0 : Number(RED_HEAD.exec(all[mark])![1]);
+  const start = mark < 0 ? [] : all.slice(mark + 1, mark + 1 + count).map((x) => x.trim());
+  const rest = mark < 0 ? all : [...all.slice(0, mark), ...all.slice(mark + 1 + count)];
   const lines = rest.map((x) => x.trim()).filter(Boolean);
   const named = lines.filter((x) => x.startsWith('- '));
   const shown = named.length ? named.slice(0, EXCERPT_LINES) : lines.slice(-EXCERPT_LINES);
   const more = named.length > EXCERPT_LINES ? [`… (+${named.length - EXCERPT_LINES})`] : [];
-  return [head.replace(/\s*:$/, ''), ...shown, ...more].join(' ; ');
+  return [head.replace(/\s*:$/, ''), ...shown, ...more, ...start].join(' ; ');
 }

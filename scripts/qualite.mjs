@@ -335,6 +335,24 @@ const ligne = ({ cle, avant, apres }) => `  ${cle} : ${avant} → ${apres}`;
 
 const existeAuDepart = (ref) => ref.existe ?? (() => true);
 
+/**
+ * Refus (code 1) quand `ref` est `origin/<b>` et que la branche locale `<b>` a des commits que `origin/<b>` n'a pas (L645) : le départ du lot vient de `<b>`,
+ * le merge-base avec un `origin/<b>` en retard est plus ancien, et le cliquet refuserait alors des configs et des mesures que le lot n'a pas touchées, après
+ * six minutes de suite. Null sans branche locale du même nom (clone de la CI), sans la référence ou pour une autre forme de référence.
+ */
+export function retardSurBranche(racine, ref) {
+  const local = /^origin\/(.+)$/.exec(ref)?.[1];
+  if (!local) return null;
+  const git = (...args) => spawnSync('git', args, { cwd: racine, encoding: 'utf8' });
+  if (git('rev-parse', '--verify', '--quiet', `refs/heads/${local}`).status !== 0) return null;
+  const n = Number(git('rev-list', '--count', `${ref}..refs/heads/${local}`).stdout);
+  if (!n) return null;
+  return { code: 1, texte: `${ref} est en retard de ${n} commit${n > 1 ? 's' : ''} sur ${local} : le cliquet le comparerait à un départ plus ancien que celui du lot (faux refus). Pousser ${local} (git push origin ${local}), ou comparer au départ du lot : node scripts/qualite.mjs --contre ${local}.` };
+}
+
+/** La référence à laquelle un test compare le lot : `origin/main` (comme la CI) quand il est à jour, sinon `main`, le départ du lot (comme la porte). */
+export const refDepartLot = (racine, branche = 'main') => (retardSurBranche(racine, `origin/${branche}`) ? branche : `origin/${branche}`);
+
 /** La base du lot contre celle du départ : refus (code 1) si elle monte, null sinon. */
 function baseRemonte(base, ref) {
   const remonte = ref?.base ? comparerMigration(ref.base, base, existeAuDepart(ref)) : [];
@@ -404,6 +422,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const mode = { '--init': 'init', '--ecrire': 'ecrire', '--migrer': 'migrer' }[arg ?? ''];
   if ((arg && !mode) || args.length > 1 || (i >= 0 && !ref)) { console.error('usage : node scripts/qualite.mjs [--init | --ecrire | --migrer] [--contre <ref>]'); process.exit(2); }
   try {
+    const retard = ref ? retardSurBranche(process.cwd(), ref) : null;
+    if (retard) { console.error(retard.texte); process.exit(retard.code); }
     const { code, texte } = appliquer(process.cwd(), mode ?? 'verifier', undefined, ref ? lireRef(process.cwd(), ref) : null);
     (code ? console.error : console.log)(texte);
     process.exit(code);

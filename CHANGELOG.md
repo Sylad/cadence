@@ -88,6 +88,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 ### Fixed
 
 - The delivery push during a wave no longer counts a plan-only commit of a lot that is not ready (« plan: L639 démarré ») as code (L643): the commits a step noted that change only the plan are left out of the wave guard (`blockingLots`), as git already leaves them out of the lot's work, so `7f9bddd` is no longer refused and `origin/main` no longer falls behind.
+- `node scripts/qualite.mjs --contre origin/main` refuses an `origin/main` that is behind the local `main` before measuring (L645, [docs/qualite.md](docs/qualite.md)): « origin/main est en retard de N commits sur main », instead of a false refusal after the six minutes of the suite. The « cliquet contre origin/main » test compares to `main`, the start of the lot, when `origin/main` is behind. The integration log keeps the first 20 lines of the first red test (the message of a refusal sits there, not in the last lines).
 
 ## [1.58.0] - 2026-11-06
 

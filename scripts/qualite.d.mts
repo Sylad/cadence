@@ -13,3 +13,5 @@ export type Ref = { nom: string; base: Mesure | null; existe?: (chemin: string) 
 export function comparerMigration(avant: Mesure, apres: Mesure, existe: (chemin: string) => boolean): { cle: string; avant: number; apres: number }[];
 export function lireRef(racine: string, ref: string): Ref;
 export function appliquer(racine: string, mode: 'verifier' | 'init' | 'ecrire' | 'migrer', mesure?: Mesure, ref?: Ref | null): { code: number; texte: string };
+export function retardSurBranche(racine: string, ref: string): { code: number; texte: string } | null;
+export function refDepartLot(racine: string, branche?: string): string;

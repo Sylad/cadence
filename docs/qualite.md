@@ -110,6 +110,7 @@ The baseline is also the project's list of cleanups: each cleanup lot is measure
   build runs before the tests ([orchestrate-gate.md](orchestrate-gate.md)); a worse measure hands the lot back as a « build » finding,
   and the session is told the exact command.
 - **The CI**: `.github/workflows/tests.yml` runs `npm run qualite -- --contre origin/main` after the typecheck (the checkout is full-depth), and `prepublishOnly` runs it too.
+- **A stale `origin/main`** (L645): `--contre origin/<branch>` refuses with « origin/main est en retard de N commits sur main » when the local branch has commits `origin/<branch>` lacks, before measuring: the merge-base would be older than the start of the lot. Without a local branch of that name (the CI) nothing is checked. The « cliquet contre origin/main » test (`probe-L539-bords`) then compares to `main`, as the gate does (`refDepartLot`).
 
 ## Recipe for another project
 

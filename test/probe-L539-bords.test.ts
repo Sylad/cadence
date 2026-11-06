@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { refDepartLot } from '../scripts/qualite.mjs';
 import { orchestrate, type OrchestrateDeps, type OrchestrateIo } from '../src/orchestrate/command.js';
 import { RunStore } from '../src/orchestrate/state.js';
 import { AGENTS_DIR } from '../src/skills.js';
@@ -113,7 +114,8 @@ describe('L539 — versions de la 1.42.1 alignées', () => {
 
 describe('L539 — cliquet contre origin/main', () => {
   it('node scripts/qualite.mjs --contre origin/main passe (comme tests.yml)', () => {
-    const r = execFileSync('node', ['scripts/qualite.mjs', '--contre', 'origin/main'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    // L645 : origin/main en retard sur main (vague en cours) donnerait un faux refus ; le départ du lot est alors main
+    const r = execFileSync('node', ['scripts/qualite.mjs', '--contre', refDepartLot(process.cwd())], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     expect(r).toBeTypeOf('string');
   }, 300000);
 });

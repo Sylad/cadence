@@ -2696,6 +2696,10 @@ lots:
     spec: true
     created: 2026-11-06
     started: 2026-11-06
+    notes:
+      - { date: 2026-11-06, text: "Revue de la fiche — mineur : docs/specs/porte-machine-libre/fiche.yaml:120 — Références de lignes périmées : R4 cite gate-place.ts:76 (c'est le commentaire « Aucune commande… » ; l'attente est aux lignes 56-68), R2 cite :103 (message réel :101), R7 :99 (réel :95), R8 :114 (réel :110), R9 :71-86 (réel :74-88). Les sources existent mais pointent la mauvaise ligne." }
+      - { date: 2026-11-06, text: "Revue de la fiche — mineur : docs/specs/porte-machine-libre/fiche.yaml:170 — A2 écrit « ssh … H uname/nproc » ; le script réel est `uname -s; uname -m; nproc …` (remote-gate.ts:210). Libellé approximatif." }
+      - { date: 2026-11-06, text: "Revue de la fiche — mineur : docs/specs/porte-machine-libre/fiche.yaml:87 — R6 test « l'appel ssh du préflight passe ConnectTimeout=3 » : un test existant (porte-deportee.test.ts:234) n'asserte que le préfixe ConnectTimeout= ; le nouveau test doit comparer la valeur exacte 3 pour pouvoir échouer à 5. Le périmètre omet aussi porte-ciblee.ts/checks.ts/baseline-run.ts qui fournissent `owner`." }
   - id: L640
     title: "Retirer orchestrate.gate de cadence.yaml : la porte de cadence revient en local en attendant L639 (décision du 05-11 : mini-blue seule pour tous les lots n'a pas tenu la charge)"
     status: done

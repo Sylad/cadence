@@ -3,7 +3,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-type Category = 'refus d\'intégration' | 'reprise du lead' | 'attente de créneau' | 'conflit';
+type Category = 'refus d\'intégration' | 'reprise du lead' | 'attente de créneau' | 'attente de ressource' | 'conflit';
 /** Où l'erreur a été détectée (L627, indicateur du 05-11, plus « revue » pour une correction demandée par la revue de code) ; null : l'attente de créneau n'est pas une erreur, une reprise lue dans git ne dit pas son niveau, et une revue non conforme ou un budget atteint ne sont détectés à aucun de ces niveaux. */
 type Level = 'écriture' | 'commit' | 'porte' | 'revue' | 'intégration' | null;
 
@@ -14,6 +14,8 @@ interface Loss {
   cause: string;
   minutes: number;
   level: Level;
+  /** Les lots qui tiennent la ressource attendue (L644) ; absent hors attente de ressource. */
+  holders?: string[];
 }
 
 export interface LotTime {
@@ -45,6 +47,8 @@ export interface Cause {
   lots: string[];
   count: number;
   level: Level;
+  /** Les lots qui tenaient la ressource (L644), vide hors attente de ressource. */
+  holders: string[];
   /** Vagues d'avant où la même cause est déjà passée (les plus récentes d'abord). */
   seenIn: string[];
   /** Un lot du plan qui la traite, ou rien. */
@@ -78,10 +82,13 @@ interface Entry {
 
 const LINE = /^(\d{4}-\d\d-\d\dT[\d:.]+Z) (.*)$/;
 // L'id d'un lot peut porter un « / » : une sous-tâche (`maritime-atlas:Q4/accueil-4-ux12`, src/orchestrate/state.ts).
-const LOT_PREFIX = /^([^\s:]+:[A-Za-z0-9._/-]+) (?:· |→ |: |intégré|verdict|tests|CHANGELOG)/;
+const LOT_PREFIX = /^([^\s:]+:[A-Za-z0-9._/-]+) (?:· |→ |: |intégré|intégration différée|verdict|tests|CHANGELOG)/;
 const TRANSITION = /^→ ([a-z-]+)(?: — (.*))?$/;
 /** Les états où le lot travaille : l'attente du lead (handed-back, question, suspended) n'est pas du temps actif. */
 const WORK_STATES = ['implementing', 'reviewing', 'fixing'];
+/** L'état où l'on compte l'attente d'un lot avant son intégration, parce qu'un lot plus ancien de la vague tient une ressource qu'il touche (L558, L644) ; pas un état du journal, une mesure. */
+const RESOURCE_WAIT = 'attente de ressource';
+const DEFERRED = /^intégration différée : (\S+) touche la ressource « (.+?) » \(/;
 const FINAL_STATES = new Set(['ready', 'failed']);
 
 export function parseJournal(text: string): Entry[] {
@@ -183,7 +190,37 @@ function stateTimes(lot: string, es: Entry[], end: number): { states: Record<str
     const loss = lossOfState(lot, cur.state, cur.reason, min);
     if (loss) losses.push(loss);
   });
+  for (const w of resourceWaits(lot, es, end)) {
+    const cur = transitions.filter((t) => t.at <= w.start).pop();
+    if (cur && !FINAL_STATES.has(cur.state)) states[cur.state] = Math.max(0, Math.round(((states[cur.state] ?? 0) - w.loss.minutes) * 10) / 10);
+    states[RESOURCE_WAIT] = Math.round(((states[RESOURCE_WAIT] ?? 0) + w.loss.minutes) * 10) / 10;
+    losses.push(w.loss);
+  }
   return { states, losses, fixes, firstReview: transitions.find((t) => t.state === 'reviewing')?.at ?? null };
+}
+
+/**
+ * Les attentes d'intégration différée d'un lot (L644) : de la première ligne « intégration différée » à la reprise du lot (transition) ou à son « intégré », ou à la fin du journal ;
+ * les lignes différées suivantes (un autre lot qui tient) restent dans la même attente. Une attente de zéro minute n'est pas une perte.
+ */
+function resourceWaits(lot: string, es: Entry[], end: number): Array<{ start: number; loss: Loss }> {
+  const out: Array<{ start: number; loss: Loss }> = [];
+  let open: { start: number; resource: string; holders: string[] } | null = null;
+  const close = (at: number): void => {
+    if (!open) return;
+    const minutes = minutesOf(at - open.start);
+    if (minutes > 0) out.push({ start: open.start, loss: { lot, category: 'attente de ressource', cause: `ressource « ${open.resource} »`, minutes, level: null, holders: open.holders } });
+    open = null;
+  };
+  for (const e of es) {
+    const d = DEFERRED.exec(e.text);
+    if (d) {
+      if (!open) open = { start: e.at, resource: d[2]!, holders: [] };
+      if (!open.holders.includes(d[1]!)) open.holders.push(d[1]!);
+    } else if (TRANSITION.test(e.text) || /^intégré : /.test(e.text)) close(e.at);
+  }
+  close(end);
+  return out;
 }
 
 /** Le temps de porte d'un lot : de « porte : début » à « porte : fin », les portes imbriquées comptées une fois ; un début sans fin, une fin sans début ne comptent pas. */
@@ -252,7 +289,7 @@ function waveStart(runsDir: string, wave: string): number | null {
 }
 
 /** Les causes de plus de zéro occurrence, regroupées par catégorie et étiquette. */
-function groupCauses(losses: Loss[]): Array<Pick<Cause, 'category' | 'cause' | 'minutes' | 'lots' | 'count' | 'level'>> {
+function groupCauses(losses: Loss[]): Array<Pick<Cause, 'category' | 'cause' | 'minutes' | 'lots' | 'count' | 'level' | 'holders'>> {
   const map = new Map<string, Loss[]>();
   for (const l of losses) map.set(`${l.category}\u0000${l.cause}`, [...(map.get(`${l.category}\u0000${l.cause}`) ?? []), l]);
   return [...map.values()].map((ls) => ({
@@ -262,6 +299,7 @@ function groupCauses(losses: Loss[]): Array<Pick<Cause, 'category' | 'cause' | '
     lots: [...new Set(ls.map((l) => l.lot))],
     count: ls.length,
     level: ls[0]!.level,
+    holders: [...new Set(ls.flatMap((l) => l.holders ?? []))],
   }));
 }
 
@@ -269,6 +307,7 @@ function groupCauses(losses: Loss[]): Array<Pick<Cause, 'category' | 'cause' | '
 function keywords(c: { category: Category; cause: string }): RegExp[] {
   if (c.cause === 'créneau de porte') return [/créneau de porte/i, /maxparallel/i];
   if (c.cause === 'créneau de session') return [/créneau de session/i];
+  if (c.category === 'attente de ressource') return [/attente de ressource/i, /intégration différée/i];
   if (c.cause === 'conflit de rebase') return [/conflits? (de|d'|sur|en|entre)\b/i];
   return [new RegExp(c.cause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')];
 }
@@ -277,6 +316,7 @@ const MECHANISM: Record<Category, string> = {
   'refus d\'intégration': 'le brief donne au lot, dès le départ, ce que l\'intégration refuse (niveau : source)',
   'reprise du lead': 'la vague fait elle-même le geste que le lead reprend à la main (niveau : source)',
   'attente de créneau': 'le plafond ou l\'ordre de lancement évite que des lots attendent (niveau : source)',
+  'attente de ressource': 'les lots qui touchent la même ressource ne sont plus lancés ensemble, ou le plus ancien intègre avant que l\'autre soit relu (niveau : source)',
   conflit: 'les fichiers en conflit sont déclarés en ressource, deux lots n\'y écrivent plus ensemble (niveau : source)',
 };
 
@@ -337,8 +377,9 @@ function causeLines(c: Cause): string[] {
   const more = c.seenIn.length > 3 ? `, +${c.seenIn.length - 3}` : '';
   const seen = c.seenIn.length > 0 ? ` · RÉCIDIVE (déjà vue : ${c.seenIn.slice(0, 3).join(', ')}${more})` : '';
   const level = c.level ? ` · détectée à : ${c.level}` : '';
+  const holders = c.holders.length > 0 ? ` · tenue par ${c.holders.join(', ')}` : '';
   const minutes = RETAKE_CAUSES.has(c.cause) ? 'durée dans git, non mesurée' : `${c.minutes} min`;
-  const head = `${c.recidive ? '⚠' : '-'} ${c.category} · ${c.cause} : ${minutes}, ${c.count} fois, ${c.lots.length} lot(s)${level}${seen}`;
+  const head = `${c.recidive ? '⚠' : '-'} ${c.category} · ${c.cause} : ${minutes}, ${c.count} fois, ${c.lots.length} lot(s)${holders}${level}${seen}`;
   if (c.proposal) return [head, `    ${c.planLot ? `lot du plan à relire : ${c.planLot.id} (${c.planLot.status}) ; ` : ''}proposition : ${c.proposal}`];
   return c.planLot ? [head, `    au plan : ${c.planLot.id} (${c.planLot.status})`] : [head];
 }

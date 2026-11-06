@@ -89,7 +89,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
-- The test-suite family of `verify` and `verify-gate` signals (L630, `vitest.workspace.ts`): the 13 files `test/verify*.test.ts` and `test/porte-deportee-creneau-l624.test.ts` join the « lourds » project of L583, run after the others in a single fork, instead of one fix per unstable test (L505 L528 L540 L550 L555 L567 L579). Replayed 9 times under 16 busy loops: 9 green runs of 230 tests; the 200-replay proof is not played (about 30 s per replay).
+- The test-suite family of `verify` and `verify-gate` signals (L630, `vitest.workspace.ts`): the 13 files `test/verify*.test.ts` and `test/porte-deportee-creneau-l624.test.ts` join the « lourds » project of L583, run after the others in a single fork, instead of one fix per unstable test (L505 L528 L540 L550 L555 L567 L579). Replayed 9 times under 16 busy loops: 9 green runs of 230 tests. This is not a proof of stability: 9 replays cannot tell 0 % from a few %, and the 200-replay proof the lot asks for is not played (about 30 s per replay, no script replays it); the lead decides whether to accept the reduced scope or open a replay lot.
 - The `bounds` entry of `docs/*.md` also declares `test/orchestrate-pages-l599.test.ts` (L637): a lot that touches a docs page plays the link, navigation and size checks of the orchestrate pages in the targeted gate, before the full suite, instead of being refused at integration.
 
 ### Fixed

@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { loadConfigFromFile } from 'vite';
 import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 
 type Projet = { test: Record<string, any> };
 
 // L583 : deux projets vitest. « lourds » (probe-L539-bords, mise-en-service L195) mesurés par L579 : 2 à 3 s seuls, 12 à 13 s sous une charge
 // moyenne de 127 ; joués après les autres dans un seul fork, ils ne se disputent plus la machine avec le reste de la suite.
 const LOURDS = ['test/probe-L539-bords.test.ts', 'test/mise-en-service.test.ts'];
+// L630 : la famille des tests de signal de verify et verify-gate les rejoint.
+const SIGNAL = readdirSync(join(process.cwd(), 'test')).filter((f) => /^verify.*\.test\.ts$/.test(f)).concat('porte-deportee-creneau-l624.test.ts').map((f) => `test/${f}`);
+const TOUS = [...LOURDS, ...SIGNAL];
 
 async function projets(): Promise<Projet[]> {
   return (await import('../vitest.workspace.js')).default as unknown as Projet[];
@@ -19,9 +22,10 @@ describe('L583 — vitest.workspace.ts : deux projets, les lourds joués après 
     expect((await projets()).map(nom)).toEqual(['principal', 'lourds']);
   });
 
-  it('R2 — « lourds » joue exactement probe-L539-bords et mise-en-service', async () => {
+  it('R2 — « lourds » joue exactement probe-L539-bords, mise-en-service et la famille verify* (L630)', async () => {
     const lourds = (await projets()).find((p) => nom(p) === 'lourds')!;
-    expect([...lourds.test.include].sort()).toEqual([...LOURDS].sort());
+    expect([...lourds.test.include].sort()).toEqual([...TOUS].sort());
+    expect(SIGNAL).toHaveLength(13);
   });
 
   it('R3 — « lourds » tourne dans un seul fork, après les autres projets', async () => {
@@ -34,12 +38,12 @@ describe('L583 — vitest.workspace.ts : deux projets, les lourds joués après 
 
   it('R4 — « principal » ne joue pas les lourds, et chaque test de la suite est joué par un projet et un seul', async () => {
     const [principal, lourds] = (await projets()) as Projet[];
-    for (const f of LOURDS) {
+    for (const f of TOUS) {
       expect(principal.test.exclude).toContain(f);
       expect(existsSync(join(process.cwd(), f))).toBe(true); // le fichier existe : un renommage ne vide pas « lourds » en silence
     }
     expect(principal.test.exclude).toEqual(expect.arrayContaining(['plugins/**', '**/node_modules/**']));
-    expect(lourds.test.include.filter((f: string) => principal.test.exclude.includes(f))).toHaveLength(LOURDS.length);
+    expect(lourds.test.include.filter((f: string) => principal.test.exclude.includes(f))).toHaveLength(TOUS.length);
   });
 
   it('R5 — chaque projet reprend le réglage de vitest.config.ts (tsconfigRaw, délais, setup, workers) sans le globalSetup, porté une seule fois par la racine', async () => {

@@ -1,4 +1,4 @@
-// Sonde de cas limites (L497, `orchestrate.probe`) : entre l'écriture du lot et sa revue, une session Sonnet neuve cherche à casser le diff par des tests aux bornes.
+// Sonde de cas limites (L497, `orchestrate.probe`) : entre l'écriture du lot et sa revue (L662 : avant la porte du programme, qui ne joue qu'une fois, après elle), une session Sonnet neuve cherche à casser le diff par des tests aux bornes.
 // Le cycle (cycle.ts) lui prête ses mécanismes par `ProbeIo` : budget, session, porte du programme, passe de correction, revue.
 import type { OrchestrateConfig } from '../config.js';
 import { docSyncSet, filesOf } from '../docsync.js';
@@ -93,11 +93,11 @@ export interface ProbeIo<D extends ProbeDone> {
   left(done: D): string[];
   /** Retire ces fichiers de l'arbre de travail ; rend ceux qui l'ont vraiment été. */
   remove(files: string[]): string[];
-  /** La porte du programme (build puis tests) : ajoute les rouges nouveaux à `red` et chaque contrôle à `runs`. */
+  /** La porte du programme après l'écriture (acceptation, build puis tests ciblés) : ajoute les rouges nouveaux à `red` et chaque contrôle à `runs`. */
   gate(red: Constat[], runs: CheckRun[]): Promise<void>;
-  /** La passe de correction ordinaire, avec ces constats. */
-  fix(constats: Constat[]): void;
-  /** La suite du cycle quand rien ne reste à corriger : bibliothécaire, puis revue. */
+  /** La passe de correction ordinaire, avec ces constats et le motif du journal. */
+  fix(constats: Constat[], why: string): void;
+  /** La suite du cycle quand la porte est verte et que rien ne reste à corriger : porte « code sans test », bibliothécaire, puis revue. */
   review(runs: CheckRun[]): Promise<void>;
   handBack(why: string): void;
   /** Le budget paie-t-il la correction et la revue qui la suit ? */
@@ -180,21 +180,28 @@ export async function probeStep<D extends ProbeDone>(io: ProbeIo<D>): Promise<vo
   const read = done === PROBE_FAILED ? (cutSession(io, step) === 'rendu' ? 'rendu' : { rep: undefined, removed: [] }) : readSession(io, done, step);
   if (read === 'rendu') return;
   const { rep, removed } = read;
-  // La porte du programme après la sonde comme après toute écriture, mais seulement si elle a commité : sans nouveau commit il n'y a rien de neuf à rejouer.
   const red: Constat[] = [];
   const runs: CheckRun[] = [];
+  await io.gate(red, runs);
+  if (correction(io, step, red, claimedBy(rep), removed)) return;
+  await io.review(runs);
+}
+
+/**
+ * Après la porte du programme (L662 : la seule entre l'écriture et la revue, jouée après la sonde, sur les commits de l'écriture et de la sonde) : envoie le lot en correction quand il y a un constat, vrai alors.
+ * Un rouge de la porte quand la sonde n'a rien commité n'est pas celui de la sonde : il repart en correction sous son propre motif, sans le préfixe « sonde de cas limites ».
+ */
+function correction<D extends ProbeDone>(io: ProbeIo<D>, step: StepState, red: Constat[], claimed: string[], removed: string[]): boolean {
+  const l = io.lot;
   const moved = !!step.headBefore && io.head() !== step.headBefore;
-  if (moved) await io.gate(red, runs);
-  const found = moved || removed.length ? findings(l, red, claimedBy(rep), !!io.config.test, removed) : [];
-  if (found.length) {
-    // Une correction que le budget ne paie plus n'est pas sautée : l'étape fix refuse et le lot revient au lead sans revue, tests rouges (L145, cycle.ts overBudget).
-    if (io.pays()) l.warnings.push(`${PROBE_FINDING}${found.length} constat(s), passe de correction avant la revue`);
-    step.constats = found.map((k) => k.texte);
-    io.fix(found);
-    return;
-  }
-  // Sans nouveau commit, les contrôles de la porte jouée après l'écriture valent toujours pour ce HEAD : la revue les garde (sinon elle relance la suite et le build).
-  await io.review(moved ? runs : [...(l.checks?.runs ?? [])]);
+  const found = moved || removed.length ? findings(l, moved ? red : [], claimed, !!io.config.test, removed) : [];
+  const own = moved ? [] : red;
+  if (!found.length && !own.length) return false;
+  // Une correction que le budget ne paie plus n'est pas sautée : l'étape fix refuse et le lot revient au lead sans revue, tests rouges (L145, cycle.ts overBudget).
+  if (found.length && io.pays()) l.warnings.push(`${PROBE_FINDING}${found.length} constat(s), passe de correction avant la revue`);
+  step.constats = found.map((k) => k.texte);
+  io.fix([...own, ...found], own.length ? 'tests rouges' : 'sonde de cas limites');
+  return true;
 }
 
 /** La session n'a rien donné (échec, coupure, délai) : un warning, pas de rapport. Ce qu'elle a commité avant d'être coupée passe les mêmes contrôles qu'après un rapport (commits au journal, verrou, fichiers hors tests) ; le dépôt a déjà été remis propre. */

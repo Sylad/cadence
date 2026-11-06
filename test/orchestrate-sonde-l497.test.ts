@@ -89,17 +89,18 @@ describe('sonde de cas limites (L497)', () => {
     expect(h2.calls.filter((c) => c.kind === 'probe')).toHaveLength(1);
   });
 
-  it('R3 — la sonde joue après la porte « code sans test » et avant la revue', async () => {
+  it('R3 — la sonde joue avant la porte (L662) : la porte « code sans test » lit ses tests, puis la revue', async () => {
     const h = harness({ script: { implement: [impl('a.ts', 'a.spec.ts')], probe: [probe()], review: [ok] } });
     const c = h.lot('L1', {}, { probe: true, testGate: GATE });
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
     expect(c.lot.probe).toBe(true);
-    // la porte passe avant : du code sans test part en correction, la sonde ne joue pas sur cette passe
-    const h2 = harness({ script: { implement: [impl('a.ts')], fix: [fix('a.spec.ts')], review: [ok] } });
+    // la sonde passe avant la porte : du code sans test que la sonde ne couvre pas part ensuite en correction
+    const none: Handler = () => claudeOut(probeReport());
+    const h2 = harness({ script: { implement: [impl('a.ts')], probe: [none], fix: [fix('a.spec.ts')], review: [ok] } });
     const c2 = h2.lot('L1', {}, { probe: true, testGate: GATE });
     await runLot(c2);
-    expect(kinds(h2)).toEqual(['implement', 'fix', 'review']);
+    expect(kinds(h2)).toEqual(['implement', 'probe', 'fix', 'review']);
   });
 
   it('R3 — un lot sans commit ou en passe des mineurs ne joue pas la sonde', async () => {
@@ -229,7 +230,7 @@ describe('sonde de cas limites (L497)', () => {
     expect(warnings(c)).toContain('bibliothécaire non appelé : 1 passe(s) de correction déjà faite(s)');
   });
 
-  it('R4 — une sonde qui ne commite rien ne rejoue pas la porte du programme ; avec un commit, elle la rejoue', async () => {
+  it('R4 — la porte du programme joue une fois après la sonde, qu\'elle ait commité ou non (L662)', async () => {
     const count = join(tempDir(), 'runs.txt');
     const gate = `echo x >> ${count}`;
     const none: Handler = () => claudeOut(probeReport());
@@ -240,7 +241,7 @@ describe('sonde de cas limites (L497)', () => {
     const count2 = join(tempDir(), 'runs.txt');
     const h2 = harness({ script: { implement: [impl('a.ts')], probe: [probe('q.spec.ts')], review: [ok] } });
     await runLot(h2.lot('L1', {}, { probe: true, test: `echo x >> ${count2}` }));
-    expect(readFileSync(count2, 'utf8').trim().split('\n')).toHaveLength(2);
+    expect(readFileSync(count2, 'utf8').trim().split('\n')).toHaveLength(1);
   });
 
   it('R4 — la passe de correction déclenchée par la sonde laisse une trace au journal du lot', async () => {

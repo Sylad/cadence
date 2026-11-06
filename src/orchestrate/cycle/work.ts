@@ -145,6 +145,12 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
   if (headMoved) l.warnings.push(`${minorsPass ? 'passe des mineurs' : 'correction'} reprise sans nouveau commit : un commit d'une session précédente est relu par la revue`);
   else if (made === 0) l.warnings.push(kind === 'fix' ? 'fix sans nouveau commit : revue lancée sur les commits du lot, avec la raison de la session (choix)' : `${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
 
+  // L662 : la sonde joue AVANT la première porte du programme : une seule porte entre l'écriture et la revue, jouée sur les commits de l'écriture et de la sonde. Une session qui annonce du rouge (tests ou build) passe d'abord la porte,
+  // qui juge l'annonce (L213, L522) : la sonde attend alors la prochaine écriture aux portes vertes.
+  const redTests = redAnnounced(l, rep, c.config.test);
+  const announcedRed = redTests || !rep.build.vert;
+  if (scheduleProbe(c.config, l, { skip: minorsPass || !alreadyDone || announcedRed, late: l.pass >= MAX_PASSES - 1, pays: fixAffordable(l, false, PROBE_RESERVE), count: budgetCount(l), reached: !c.config.probe || gateReachesLot(c, plan), cycle: !!c.config.probe && !!l.express && lotTouchesCycle(c, plan) })) return save(c);
+
   const red: Constat[] = [];
   // Tests annoncés rouges (L213) : avec orchestrate.test, le programme rejoue et compare à la ligne de base, la session n'est crue que si les tests y sont rouges autrement que par des échecs de départ, et jamais quand sa porte, jouée en suite complète, est verte (L522, quels que soient echecsDeBase et nouveauxEchecs) ; sans, la liste des échecs de base de la session, non vérifiée.
   const claimed: Constat = { source: 'tests', gravite: 'bloquant', texte: `tests annoncés rouges par la session : ${rep.tests.commande} — ${rep.tests.resultat}` };
@@ -156,7 +162,7 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
     l.warnings.push(`échecs déjà présents au sha de départ selon la session (${declared.length}) : non vérifié par le programme (orchestrate.test absent)`);
   }
   // L632 : `redAnnounced` garde aussi, au lot, l'annonce rouge que la porte ne joue pas (la dernière écriture fait foi).
-  if (redAnnounced(l, rep, c.config.test)) {
+  if (redTests) {
     if (c.config.test) deferred = true;
     // Sans orchestrate.test (L215) : champ structuré, pas de lecture de la prose. vert:false + echecsDeBase + nouveauxEchecs présent et vide → pas de correction (non vérifié, signalé à la revue) ; nouveauxEchecs non vide → correction.
     else if (declared.length && newFailures && !newFailures.length) l.warnings.push(`tests annoncés rouges par la session, aucun nouvel échec déclaré (nouveauxEchecs vide) : les échecs sont ceux de la base qu'elle déclare (${declared.length}) ; pas de correction, non vérifié par le programme (orchestrate.test absent)`);
@@ -180,16 +186,10 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
   }
   // Porte « code modifié sans test » (L287) : le diff du lot (son dépôt et ses voisins, fichiers supprimés exclus), toutes sessions comprises, touche du code sans fichier de test → correction directe, sans session de revue. Une seule fois par lot, jamais pendant la passe des mineurs, ni quand la correction prendrait la dernière passe (la revue n'en aurait plus), ni quand le budget du lot ne paie plus la correction (la revue, elle, part toujours).
   if (await testGates(c, plan, minorsPass)) return;
-  // Sonde de cas limites (L497) : une fois par lot, après la porte « code sans test », avant le bibliothécaire et la revue.
-  if (scheduleProbe(c.config, l, { skip: minorsPass || !alreadyDone, late: l.pass >= MAX_PASSES - 1, pays: fixAffordable(l, false, PROBE_RESERVE), count: budgetCount(l), reached: !c.config.probe || gateReachesLot(c, plan), cycle: !!c.config.probe && !!l.express && lotTouchesCycle(c, plan) })) {
-    // Les contrôles de la porte restent au lot pendant la sonde : sans nouveau commit de sa part, la revue les reprend pour ce HEAD.
-    l.checks = runs.length ? { head: git(wd(c), 'rev-parse', 'HEAD'), tree: git(wd(c), 'rev-parse', 'HEAD^{tree}'), runs } : undefined;
-    return save(c);
-  }
   await toReview(c, runs, minorsPass);
 }
 
-/** Fin d'une écriture dont les portes sont passées : le bibliothécaire (L306), puis la première revue. Aussi la suite d'une sonde (L497) qui n'a rien à corriger. */
+/** Fin d'une écriture dont les portes sont passées : le bibliothécaire (L306), puis la première revue. Aussi la suite d'une sonde (L497) dont la porte est verte. */
 async function toReview(c: LotCtx, runs: CheckRun[], minorsPass: boolean): Promise<void> {
   const l = c.lot;
   // Bibliothécaire (L306) : docs.sync signale un document en retard sur les commits du lot → une passe doc-keeper avant la revue, une seule fois par lot, aux mêmes conditions de passe et de budget que la porte « code sans test ». Si elle ne touche pas le document, la revue part et porte l'écart (brief docs.sync, constat majeur).
@@ -224,6 +224,13 @@ function unstageAndRemove(root: string, files: string[]): string[] {
 
 /** Ce que la sonde (probe.ts) emprunte au cycle. */
 export const probeIo = (c: LotCtx): ProbeIo<Done> => ({
-  lot: c.lot, config: c.config, cwd: wd(c), play: () => session(c, 'probe'), take: (step, rep) => takeReport(c, { step }, rep), sealed: (head) => sealedViolations(c, head), dirt: dirtAfter, left: (done) => [...done.after.untracked.filter((f) => !done.before.untracked.includes(f)), ...done.after.tracked.filter((l) => l.startsWith('A') && !done.before.tracked.includes(l)).map((l) => l.slice(3))].map(unquotePath), remove: (files) => unstageAndRemove(wd(c), files), gate: (red, runs) => programChecks(c, red, runs),
-  fix: (constats) => toFix(c, constats, 'sonde de cas limites'), review: (runs) => toReview(c, runs, false), handBack: (why) => void stop(c, 'handed-back', why), pays: () => fixAffordable(c.lot), head: () => git(wd(c), 'rev-parse', 'HEAD').trim(),
+  lot: c.lot, config: c.config, cwd: wd(c), play: () => session(c, 'probe'), take: (step, rep) => takeReport(c, { step }, rep), sealed: (head) => sealedViolations(c, head), dirt: dirtAfter, left: (done) => [...done.after.untracked.filter((f) => !done.before.untracked.includes(f)), ...done.after.tracked.filter((l) => l.startsWith('A') && !done.before.tracked.includes(l)).map((l) => l.slice(3))].map(unquotePath), remove: (files) => unstageAndRemove(wd(c), files), gate: async (red, runs) => {
+    const green = await acceptGreen(c);
+    if (green) red.push(green);
+    else await programChecks(c, red, runs);
+  },
+  fix: (constats, why) => toFix(c, constats, why),
+  review: async (runs) => {
+    if (!(await testGates(c, histPlan(c), false))) await toReview(c, runs, false);
+  }, handBack: (why) => void stop(c, 'handed-back', why), pays: () => fixAffordable(c.lot), head: () => git(wd(c), 'rev-parse', 'HEAD').trim(),
 });

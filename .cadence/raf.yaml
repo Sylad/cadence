@@ -2845,6 +2845,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
+    review: { date: 2026-11-06, verdict: "compliant — orchestré (vague 2026-11-06-1805, 1 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 9d88a615afb944faf0f851d3a6eb9933525c8750 }
   - id: L657
     title: "Issue #44 : objectif et budget d'un lot figés au lancement : --add sans --goal ni --budget, --resume ignore un objectif changé, la relance rejoue spec et maquette ; donner ces réglages à --add et faire lire l'objectif changé à --resume"
     status: doing

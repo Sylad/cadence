@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, realpathSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { changedFiles, tryGit } from './git.js';
 import { git } from './orchestrate/worktree.js';
 import { RunStore } from './orchestrate/state.js';
@@ -43,8 +43,18 @@ function planChain(repo: string, sha: string, planFile: string | undefined): str
 }
 
 /**
+ * Les dossiers où chercher l'état d'une vague de `repo` (L652) : le dossier courant, la racine du dépôt, puis chacun de leurs ancêtres jusqu'à la racine du disque.
+ * Une vague range son état sous le dossier d'où elle a été lancée, parfois plusieurs niveaux au-dessus du dépôt (le dossier des projets, ou son parent).
+ */
+export function waveLaunchDirs(cwd: string, repo: string): string[] {
+  const dirs = new Set<string>();
+  for (const start of [cwd, repo]) for (let d = resolve(start); !dirs.has(d); d = dirname(d)) dirs.add(d);
+  return [...dirs];
+}
+
+/**
  * La porte que le programme a déjà jouée pour `sha` (L397), pour que `verify --gate` la lise au lieu de la rejouer (≈ 5 min par lot prêt).
- * Une vague range l'état de ses lots sous `<dossier de lancement>/.cadence/runs/<vague>` : `launchDirs` sont ceux à regarder (dossier courant, racine du dépôt, son parent), les vagues les plus récentes d'abord.
+ * Une vague range l'état de ses lots sous `<dossier de lancement>/.cadence/runs/<vague>` : `launchDirs` sont ceux à regarder (`waveLaunchDirs` : dossier courant, racine du dépôt et leurs ancêtres), les vagues les plus récentes d'abord.
  * Un enregistrement est repris quand ses contrôles ont tourné AU sha (même commit), que l'arbre de ce commit est celui enregistré, et qu'il couvre chaque étape de `steps`
  * (même étiquette, même commande, code 0 : une étape rouge, absente ou rejouée avec une autre commande ne prouve rien). `planFile` : les commits qui ne changent que le plan au-dessus de `sha` sont traversés (`planBase`, L444). Sinon `reason` dit pourquoi la porte est rejouée.
  */

@@ -139,6 +139,24 @@ describe('L397 — verify --gate reprend la porte enregistrée par la vague', ()
     expect(code).toBe(0);
     expect(lines.join('\n')).toContain('verdict repris');
   });
+
+  it('R8b (L652) — une vague lancée deux niveaux au-dessus du dépôt est lue : verdict repris, rien rejoué', async () => {
+    const launch = tempDir();
+    const mid = join(launch, 'projets');
+    mkdirSync(mid);
+    const repo = gitRepo(mid);
+    mark = join(tempDir(), 'ran.log');
+    writeFileSync(join(repo, 'cadence.yaml'), `orchestrate:\n  build: ${BUILD()}\n  test: ${TESTS()}\nverify:\n  inPlace: false\n`);
+    git(repo, 'add', '.');
+    git(repo, 'commit', '-q', '-m', 'init');
+    const sha = git(repo, 'rev-parse', 'HEAD');
+    wave(launch, repo, { head: sha, tree: treeOf(repo, sha), runs: green() });
+    const lines: string[] = [];
+    const code = await run(['verify', '--gate', '--sha', sha], { cwd: repo, env: {}, out: (l: string) => lines.push(l), err: (l: string) => lines.push(l), now: () => new Date('2026-10-28T12:00:00') });
+    expect(code).toBe(0);
+    expect(lines.join('\n')).toContain('verdict repris');
+    expect(ran()).toBe(false);
+  });
 });
 
 describe('L444 — le commit de plan au-dessus du sha contrôlé reprend la porte de ce sha', () => {

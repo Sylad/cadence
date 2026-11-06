@@ -1,11 +1,12 @@
 // deliver, verify (et sa porte --gate) et local : la livraison du projet (L488, sorti de cli.ts).
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { defaultPlan, readDocsConfig, readOrchestrateConfig, readPlanConfig, readVerifyConfig } from '../config.js';
 import { type Day } from '../dates.js';
 import { blockProblem } from '../deliver-blocks.js';
 import { deliver, type DeliveredCtx, parseDeliverConfig, realDeps } from '../deliver.js';
 import { defaultTarget, realCheckDeps, verifyCommand } from '../verify.js';
+import { waveLaunchDirs } from '../gate-record.js';
 import { verifyGate } from '../verify-gate.js';
 import { gitRoot, resolveCommit } from '../git.js';
 import { loadEntries } from '../news.js';
@@ -48,7 +49,7 @@ async function verifyGateCommand(values: { sha?: string; project?: string; retry
   } catch {
     planFile = undefined;
   }
-  return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), verify: readVerifyConfig(configPath), launchDirs: [io.cwd, top, dirname(top)], planFile, now: io.now, out: io.out });
+  return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), verify: readVerifyConfig(configPath), launchDirs: waveLaunchDirs(io.cwd, top), planFile, now: io.now, out: io.out });
 }
 
 /** cadence deliver : refusé pendant une vague sauf un sha livrable, puis la livraison du projet. */

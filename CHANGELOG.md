@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `raf done` and the delivery audit read « non conforme » / « not compliant » only at the start of a review verdict: a compliant verdict that quotes the phrase further on is no longer refused (L660).
+
 ## [1.60.0] - 2026-11-06
 
 ### Added

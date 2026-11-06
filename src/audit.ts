@@ -329,9 +329,9 @@ function unreviewed(plan: Plan, root: string, review: Verdict | undefined, linke
   return workCommits(plan, root, at < 0 ? linked : linked.slice(0, at));
 }
 
-/** Un texte de verdict de revue dit « non conforme » / « not compliant » (le mot « conforme » dedans ne compte pas) ; « conforme après 1 correction » reste conforme. */
+/** Un texte de verdict de revue COMMENCE par « non conforme » / « not compliant » (ponctuation et guillemets d'ouverture admis ; le mot « conforme » dedans ne compte pas) ; « conforme après 1 correction » reste conforme, même s'il cite la formule plus loin (L660). */
 export function isNonConformingVerdict(text: string): boolean {
-  return /\bnon[\s-]*conforme|\bnot\s+compliant|\bnon[\s-]*compliant/i.test(text);
+  return /^[^\p{L}\p{N}]*(?:non[\s-]*conforme|not\s+compliant|non[\s-]*compliant)/iu.test(text);
 }
 
 /** Un lot dont l'intervalle à livrer porte des commits de travail, avec ce qui décide s'il se livre (L474). */

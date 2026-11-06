@@ -134,6 +134,11 @@ describe('deliver --sha hors vague : lots ni done ni prêts (L474)', () => {
     expect(d.out.join('\n')).not.toMatch(/prêt/);
   });
 
+  it('R1 — isNonConformingVerdict ne lit que le début : un verdict conforme qui cite « non conforme » plus loin n\'est pas refusé (L660)', () => {
+    for (const t of ['conforme : la formule « non conforme » est citée dans le brief', 'conforme, 0 bloquant (le verdict « non conforme » de la passe 1 est corrigé)', 'conforme — not compliant n\'apparaît qu\'en citation']) expect(isNonConformingVerdict(t), t).toBe(false);
+    for (const t of ['  non conforme : 1 bloquant', '« Non conforme »', '— not compliant']) expect(isNonConformingVerdict(t), t).toBe(true);
+  });
+
   it('R13 — isNonConformingVerdict : FR et EN, « conforme » dans « non conforme » ne compte pas', () => {
     for (const t of ['non conforme : 1 bloquant', 'Non conforme', 'non-conforme', 'not compliant', 'Non-compliant (2 majeurs)']) expect(isNonConformingVerdict(t), t).toBe(true);
     for (const t of ['conforme', 'conforme après 1 correction', 'Conforme — 0 bloquant', 'compliant', 'compliant after 1 fix']) expect(isNonConformingVerdict(t), t).toBe(false);

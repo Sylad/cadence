@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.59.0] - 2026-11-06
+
 ### Added
 
 - `raf done` refuses a lot a wave handed back whose work commits are not on the main branch (L647, [docs/raf.md](docs/raf.md)): the wave's branch still holds commits (compared by patch) that HEAD lacks, exit 2 naming the branch and the `--integrate` command, `--force` only warns (06-11: L646 closed right after its integration was refused, with a green gate that did not carry its code).

@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.60.0**: `--add` takes `--goal` and `--budget`, `--resume` rereads a changed goal; the probe skips diffs the gate cannot reach; `verify --gate` finds waves launched higher up; the lots panel shows sleeping lots.
 - **1.59.0**: the review loop stops reopening the same defect and a repeated finding is recognised by its place; `raf done` refuses a handed-back lot whose code is not on main; a fix no longer leaves its documentation behind.
 - **1.58.0**: `cadence inspect` measures each wave's minutes and losses; `orchestrate.gate.overflow` plays the gate on the free machine; a lot's state keeps every review finding; the verify test family joins « lourds ».
 - **1.57.0**: a `--goal` that narrows a lot to merged commits skips the mockup and the reviews judge the goal's diff; a visible lot with no `screen:` plays no mockup and captures the screen before and after.
@@ -89,6 +90,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.60.0**: `cadence orchestrate --add` takes `--goal` and `--budget`, and `--resume` rereads an objective changed in the plan while keeping a `--goal` the plan did not change (L657, issue #44). The edge-case probe no longer plays on a diff the gate does not reach (L655, issue #49). `verify --gate` finds the state of a wave launched two or more levels above the repository (L652, issue #45). A merge of the base branch into a lot's worktree no longer hands the lot back (L653, issue #48). The mockup review no longer sets aside a major on a point of the goal (L656, issue #46), a lot stopped on its mockup review shows its verdict and majors (L654, issue #47), a page a lot moves no longer breaks another lot's test at integration (L658), and the lots panel shows a lot with no session as `en sommeil` (L659).
 
 **1.59.0**: The fix brief gives a review's findings by class, a test added by the lot that stays green without the lot's code goes back to correction, and a minor already noted is not read again (L646). A finding repeated in other words is recognised by its place, and `cadence perf` prints the share of findings set aside (L649). `raf done` refuses a lot a wave handed back whose work commits are not on the main branch (L647). A fix no longer leaves the documentation behind (L648). A lot whose subject is the review declares `spec: revue` (L650). `cadence inspect` counts the wait for a deferred integration (L644); a delivery push ignores plan-only commits (L643); the ratchet refuses an `origin/main` behind `main` before measuring (L645).
 

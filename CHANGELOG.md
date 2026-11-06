@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.60.0] - 2026-11-06
+
 ### Added
 
 - `cadence orchestrate --add` takes `--goal "…"` and `--budget <project>:<lot>=+N`, and `--resume` rereads the objective changed in the plan (L657, issue #44, [docs/orchestrate.md](docs/orchestrate.md)): a lot added to a live wave carries its objective and its budget as a lot launched does (a lot taken back after a hand-back keeps its own, and a wave started before this version refuses the two options), and a resume replays each lot with the `goal:` of the plan when it changed since the launch or the add (the last explicit gesture wins, the journal says `objectif changé`, a lot with no session yet decides its spec and mock-up again).

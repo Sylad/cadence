@@ -2761,11 +2761,17 @@ lots:
     finished: 2026-11-06
   - id: L646
     title: "revue en boucle : le brief de fix donne les constats de la passe précédente par classe et exige la correction de la classe, un contrôle au commit refuse un test ajouté qui est vert avec et sans le code du lot, la revue suivante ne relit pas un mineur déjà noté ; niveau : source (classe dans le brief), commit (contrôle) ; niveau le plus tôt : source ; mesure : 0 passe de revue sans constat neuf bloquant ou majeur, taux d'écartés lu par cadence perf une fois L638 en service"
-    status: done
+    status: doing
     estimate: 0.5
     created: 2026-11-06
     started: 2026-11-06
-    finished: 2026-11-06
+    notes:
+      - { date: 2026-11-06, text: "06-11 : clos à tort par le lead, l'intégration avait été refusée (exit 0 de la commande, résultat non lu avant raf done) ; rouvert, son code n'est pas sur main." }
+  - id: L647
+    title: "raf done refuse un lot rendu par une vague et dont les commits de travail ne sont pas sur la branche principale (06-11 : L646 clos par le lead alors que son intégration venait d'être refusée, avec une porte verte qui ne portait pas son code) ; --integrate rend un code de sortie non nul quand le lot est rendu ; mesure : 0 lot clos sans son code"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-06
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -155,6 +155,28 @@ describe('L498 — bords de la file approuvée', () => {
     expect(r.out[0]).toMatch(/file approuvée vide/);
   });
 
+  it('R17 — une option à valeur avant le mot (--max-sessions 2 queue show) : aiguillé vers la file', async () => {
+    const parent = parentWith({ a: ['un'] });
+    const r = await run(parent, '--max-sessions', '2', 'queue', 'show');
+    expect(r.code).toBe(0);
+    expect(r.out[0]).toMatch(/file approuvée vide/);
+  });
+
+  it('R17 — queue comme valeur d\'une option (--until queue) : pas aiguillé vers la file', async () => {
+    const parent = parentWith({ a: ['un'] });
+    await expect(run(parent, '--until', 'queue')).rejects.toThrow(/--until s'utilise avec/);
+    expect(existsSync(queueFile())).toBe(false);
+  });
+
+  it('C1 — un projet absolu ou remontant par un sous-dossier (a/../../b:L1, /…/b:L1) est un projet inconnu : refus, rien écrit', async () => {
+    const parent = parentWith({ a: ['un'], b: ['deux'] });
+    for (const key of ['a/../../b:L1', `${join(parent, 'b')}:L1`]) {
+      const r = await run(join(parent, 'a'), 'queue', 'add', key);
+      expect(r.code, key).toBe(1);
+      expect(existsSync(queueFile()), key).toBe(false);
+    }
+  });
+
   it('R17 — queue SHOW (casse) : sous-mot inconnu refusé (code 1)', async () => {
     const parent = parentWith({ a: ['un'] });
     const r = await run(parent, 'queue', 'SHOW');

@@ -31,7 +31,7 @@ import { addOnlyLive, continueRounds, execute } from './execute.js';
 
 import { resume } from './resume.js';
 export { resumeArgv } from './resume.js';
-import { queueCommand } from './queue-command.js';
+import { queueArgv, queueCommand } from './queue-command.js';
 
 export interface OrchestrateIo {
   cwd: string;
@@ -103,8 +103,9 @@ function waveId(io: OrchestrateIo, requested: string | undefined, launch: string
 
 /** Point d'entrée de `cadence orchestrate`. 0 prêts · 1 rendus au lead · 2 refus avant d'agir · 3 suspendue (budget, quota). */
 export async function orchestrate(argv: string[], io: OrchestrateIo, deps: OrchestrateDeps): Promise<number> {
-  // L498 (R17) : `queue` en premier jeton est la file approuvée, aiguillée avant que l'analyse des lots le lise comme un lot ; un lot d'un projet nommé queue se donne `queue:<lot>`.
-  if (argv[0] === 'queue') return queueCommand(argv.slice(1), { cwd: io.cwd, out: io.out, err: io.err, lockMs: deps.queueLockMs });
+  // L498 (R17) : `queue` en premier jeton positionnel (les options et leurs valeurs ne comptent pas) est la file approuvée, aiguillée avant que l'analyse des lots le lise comme un lot ; un lot d'un projet nommé queue se donne `queue:<lot>`.
+  const queueArgs = queueArgv(argv);
+  if (queueArgs) return queueCommand(queueArgs, { cwd: io.cwd, out: io.out, err: io.err, lockMs: deps.queueLockMs });
   deps = onceAuth(deps);
   const args = parseOrchestrateArgs(argv);
   const launch = io.cwd;

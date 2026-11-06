@@ -1,3 +1,4 @@
+import { LOT_LIKE } from './command-args.js';
 import { QUEUE_KEY, queueVerdict, resolveQueueLot } from './continue.js';
 import { cadenceHome } from './registry.js';
 import { effectiveState, entriesOf, orphaned, QueueError, readQueue, updateQueue, type QueueEntry } from './queue.js';
@@ -106,4 +107,26 @@ export function queueCommand(argv: string[], io: QueueIo): number {
     }
     throw e;
   }
+}
+
+/** Les options qui consomment la valeur suivante, comme `parseOrchestrateArgs` les lit (`--answer` en consomme deux). */
+const VALUE_FLAGS = new Set(['--since', '--detail', '--interval', '--budget', '--max-sessions', '--goal', '--wave', '--drop', '--add', '--integrate', '--replay', '--remove-worktree', '--until', '--priority']);
+
+/** L'indice du premier jeton positionnel de `argv` : les options et leurs valeurs (comme `parseOrchestrateArgs` les consomme) ne comptent pas ; -1 s'il n'y en a pas. */
+function firstPositional(argv: string[]): number {
+  for (let i = 0; i < argv.length; i++) {
+    const t = argv[i];
+    if (VALUE_FLAGS.has(t)) i++;
+    else if (t === '--answer') i += 2;
+    else if (t === '--status' || t === '--resume') {
+      if (argv[i + 1] !== undefined && !argv[i + 1].startsWith('-') && !LOT_LIKE.test(argv[i + 1]) && argv[i + 1] !== 'queue') i++;
+    } else if (!t.startsWith('-')) return i;
+  }
+  return -1;
+}
+
+/** Les arguments qui suivent le mot `queue` quand il est le premier jeton positionnel de `argv` (R17), sinon undefined : la file est aiguillée avant que l'analyse des lots lise `queue` comme un lot ; un lot d'un projet nommé queue se donne `queue:<lot>`. */
+export function queueArgv(argv: string[]): string[] | undefined {
+  const first = firstPositional(argv);
+  return first >= 0 && argv[first] === 'queue' ? argv.slice(first + 1) : undefined;
 }

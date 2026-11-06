@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { nextUp } from '../audit.js';
 import { planLoader, type OrchestrateConfig } from '../config.js';
 import { gitRoot } from '../git.js';
@@ -138,6 +138,8 @@ export function resolveQueueLot(launch: string, key: string): { project: string;
   const m = QUEUE_KEY.exec(key);
   if (!m) return { cause: 'introuvable' };
   const dir = resolve(launch, m[1]);
+  const inside = relative(launch, dir);
+  if (inside === '..' || inside.startsWith('..' + sep) || isAbsolute(inside)) return { cause: 'introuvable' };
   if (!existsSync(dir) || !isProject(dir)) return { cause: 'introuvable' };
   let lots: Lot[];
   try {

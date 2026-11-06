@@ -2568,22 +2568,24 @@ lots:
     finished: 2026-11-05
   - id: L625
     title: "Issue #41, propositions 3 et 5 : une attente hors règle de la sonde de cas limites n'achète jamais de passe et la revue suivante ne la transforme pas en majeur ; le tableau de vague imprime pour chaque lot les minutes passées après sa première revue"
-    status: doing
+    status: done
     estimate: 0.25
     after: [ L622 ]
     created: 2026-11-05
     started: 2026-11-05
     review: { date: 2026-11-06, verdict: "conforme : verdict de la vague tenu ; rebase sur main, conflits résolus, tests ciblés et cliquet verts", commit: d86cf5913a582b232eb07ef4a5c25ca273228d1f }
+    finished: 2026-11-06
   - id: L626
     title: "Contrôles rapides avant toute porte : un lot qui touche README.md, CHANGELOG.md, docs/ ou package.json joue en quelques secondes les tests qui lisent ces fichiers (readme-accueil, changelog, bornes de pages, files du paquet), dès la porte d'écriture et avant la suite complète d'intégration ; 05-11 : L602 et L622 refusés pour une ligne de README après 25 min de porte, L601 pour concepts.md, à compléter par une liste déclarée, faute de lien d'import"
     goal: "Trois niveaux, génériques pour tous les projets et le compte pro. Un : un fichier CLAUDE.md à la racine du dépôt cadence donne les bornes de ses fichiers (README 64 lignes et 160 colonnes au plus, docs/concepts.md 15 Ko au plus, entrées du CHANGELOG sous [Unreleased] sans titre dupliqué, toute nouvelle page de docs dans files de package.json). Deux : le brief d'implémentation reçoit les bornes des fichiers que le lot touche, lues d'une clé de cadence.yaml. Trois : un hook après écriture et les portes jouent les tests qui lisent ces fichiers (liste déclarée, faute de lien d'import) en quelques secondes, avant la suite complète."
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-05
     notes:
       - { date: 2026-11-05, text: "à livrer aussi : les bornes de fichiers vont à l'écrivain. Le brief d'implémentation reçoit les bornes des fichiers qu'il touche, lues de la config, et un hook après écriture mesure le fichier et répond la ligne et la limite, sans attendre le commit. Génériques, valables pour tous les projets et le compte pro ; 05-11, demande de Sylvain : plus d'erreur de borne qui coûte une porte." }
     started: 2026-11-05
     review: { date: 2026-11-05, verdict: "conforme : 3 mineurs (deux reconduits de la revue 1, un passage de docs incomplet), aucune sous-tâche — orchestré (vague 2026-11-05-2210-cad, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé aucun patch du lot (range-diff 10/10 identiques) ; 3 mineurs de la revue précédente restent ouverts (doc et docstrings)", commit: 8047a2576a94f726b2a7d0ff010acf2e4aa94a12 }
+    finished: 2026-11-06
   - id: L627
     title: "cadence inspect : à la fin de chaque vague, le programme mesure le temps par étape de chaque lot et classe les pertes par cause (refus d'intégration, reprise du lead, attente de créneau, conflit), repère une cause déjà vue et propose le lot qui la supprime, sans modèle ; le lead n'a plus à s'en souvenir ; base : l'agent inspecteur-travaux du 05-11 ; tableau imprimé en fin de vague et résumé au tour"
     status: todo

@@ -13,7 +13,7 @@ import { partageLines } from './partage.js';
 import { quotaReset } from './result.js';
 import { gestureColumn, resumeCommand } from './geste.js';
 import { proposalLine, touchedReader, type TouchedSince } from './deja-traitee.js';
-import type { LotState, StepState, WaveState } from './state.js';
+import type { Constat, LotState, StepState, WaveState } from './state.js';
 
 const k = (n: number) => `${Math.round(n / 1000)} k`;
 const m = (n: number) => `${(n / 1_000_000).toFixed(1).replace('.', ',')} M`;
@@ -57,8 +57,11 @@ function maquetteReview(l: LotState): string {
   return l.maquette && !l.maquette.conforme ? `maquette non conforme (${n('bloquant')} bloquant, ${n('majeur')} majeur)` : '—';
 }
 
-/** Les constats listés sous le tableau : ceux de la revue de code d'un lot rendu ; sans revue de code, ceux de la revue de maquette (L654). */
-const listedConstats = (l: LotState) => (l.status === 'handed-back' ? l.constats : l.code ? [] : (l.maquetteConstats ?? []));
+/** Les constats listés sous le tableau : ceux de la revue de code d'un lot rendu ; sans revue de code, ceux de la revue de maquette (L654), sauf ceux que la sortie du lot donne déjà (remise après la dernière revue). */
+function listedConstats(l: LotState): Constat[] {
+  const own = l.status === 'handed-back' ? l.constats : [];
+  return l.code ? own : [...own, ...(l.maquetteConstats ?? []).filter((k) => !l.outcome?.includes(k.texte))];
+}
 
 function review(l: LotState): string {
   if (!l.code) return maquetteReview(l);

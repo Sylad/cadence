@@ -328,8 +328,9 @@ async function reviewSpecStep(c: LotCtx, r: SpecReview): Promise<void> {
     save(c);
     return;
   }
-  if (handBack(c, r, passes, constats, summary)) return;
+  // Écrits avant la remise (L654) : un lot rendu garde les constats de sa dernière revue, pas ceux de la précédente.
   l[key] = constats.length ? constats : [{ source: r.source, gravite: 'majeur', texte: summary.verdict }];
+  if (handBack(c, r, passes, constats, summary)) return;
   l.next = r.retry(c, fiche);
   save(c);
 }

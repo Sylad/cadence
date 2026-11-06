@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readOrchestrateConfig } from '../src/config.js';
-import { runLot } from '../src/orchestrate/cycle.js';
+import { DROPPED, runLot } from '../src/orchestrate/cycle.js';
 import { checkShape, REVIEW_SCHEMA, type ReviewReport } from '../src/orchestrate/schemas.js';
+import type { WaveState } from '../src/orchestrate/state.js';
 import { readAgents } from '../src/orchestrate/launch.js';
+import { SlotAbandoned } from '../src/orchestrate/registry.js';
+import { renderTable } from '../src/orchestrate/table.js';
 import { AGENTS_DIR } from '../src/skills.js';
 import { claudeOut, commitFile, harness, reviewReport, specReport, workReport, type Handler } from './orchestrate-harness.js';
 import { ecrit, ecritBack } from './spec-helpers.js';
@@ -96,6 +99,60 @@ describe('R3/R4/R10 — le balayage complet dès la première revue', () => {
     expect(kinds(h)).toEqual(['spec', 'maquette']);
     expect(c.lot.outcome).toContain('maquette non conforme après 1 revue : ');
     expect(c.lot.outcome).not.toContain('après 1 revues');
+  });
+});
+
+describe('L654 — le tableau d\'un lot arrêté sur la maquette, par le vrai chemin de la revue', () => {
+  const waveState: WaveState = { id: 'w1', created: '2026-10-04T10:00:00Z', cwd: '/x', budget: 2_000_000, consumed: 0, cacheRead: 0, status: 'done', pid: 1, lots: ['demo:L1'] };
+  const counted = (texte: string, n: number) => () => claudeOut(reviewReport({ bloquants: n, majeurs: 1, constats: [...Array.from({ length: n }, (_, i) => ({ gravite: 'bloquant', texte: `${texte} bloquant ${i}` })), { gravite: 'majeur', texte: `${texte} majeur` }], verdict: `non conforme : ${n} bloquant, 1 majeur` }));
+  const abandon = (why: string): Handler => () => { throw new SlotAbandoned(why); };
+  const times = (out: string[], texte: string) => out.join('\n').split(texte).length - 1;
+
+  it('maquetteReviews 1 : les comptes de la colonne « revue » sont ceux de l\'unique revue, ses constats écrits avant la remise', async () => {
+    const h = harness({ lots, script: { spec: [spec], maquette: [major('contraste')] } });
+    const c = h.lot('L1', screen, cfg(1));
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.maquetteConstats?.map((k) => k.texte)).toEqual(['contraste']);
+    const out = renderTable(waveState, [c.lot]);
+    expect(out[1]).toContain('maquette non conforme (0 bloquant, 1 majeur)');
+    expect(times(out, 'contraste')).toBe(1); // déjà dans la sortie du lot : pas répété sous le tableau
+  });
+  it('maquetteReviews 3 : les comptes sont ceux de la revue 3, pas de la revue 2', async () => {
+    const h = harness({ lots, script: { spec: [spec, spec, spec], maquette: [counted('r1', 0), counted('r2', 0), counted('r3', 2)] } });
+    const c = h.lot('L1', screen, cfg(3));
+    await runLot(c);
+    expect(c.lot.outcome).toContain('après 3 revues');
+    expect(c.lot.maquetteConstats?.map((k) => k.texte)).toEqual(['r3 bloquant 0', 'r3 bloquant 1', 'r3 majeur']);
+    const out = renderTable(waveState, [c.lot]);
+    expect(out[1]).toContain('maquette non conforme (2 bloquant, 1 majeur)');
+    expect(out.join('\n')).not.toContain('r2 majeur');
+  });
+  it('plus de session spec pour la passe suivante : la remise garde aussi les constats de sa revue', async () => {
+    const h = harness({ lots, script: { spec: [spec], maquette: [counted('r1', 1)] } });
+    const c = h.lot('L1', { ...screen, specRuns: 2 }, cfg(3));
+    await runLot(c);
+    expect(c.lot.outcome).toContain('la spec a déjà joué');
+    expect(renderTable(waveState, [c.lot])[1]).toContain('maquette non conforme (1 bloquant, 1 majeur)');
+  });
+  it('lot retiré (--drop) après une revue non conforme : le tableau donne le verdict et liste les majeurs, absents de sa sortie', async () => {
+    const h = harness({ lots, script: { spec: [spec, abandon(DROPPED)], maquette: [major('contraste')] } });
+    const c = h.lot('L1', screen, cfg(3));
+    await runLot(c);
+    expect(c.lot.status).toBe('handed-back');
+    expect(c.lot.outcome).toBe(DROPPED);
+    const out = renderTable(waveState, [c.lot]);
+    expect(out[1]).toContain('maquette non conforme (0 bloquant, 1 majeur)');
+    expect(out).toContain('    · [majeur] contraste');
+  });
+  it('vague suspendue après une revue non conforme : le tableau donne le verdict et liste les majeurs', async () => {
+    const h = harness({ lots, script: { spec: [spec, abandon('arrêt demandé (--stop-after-current)')], maquette: [major('contraste')] } });
+    const c = h.lot('L1', screen, cfg(3));
+    await runLot(c);
+    expect(c.lot.status).toBe('suspended');
+    const out = renderTable(waveState, [c.lot]);
+    expect(out[1]).toContain('maquette non conforme (0 bloquant, 1 majeur)');
+    expect(out).toContain('    · [majeur] contraste');
   });
 });
 

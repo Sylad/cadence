@@ -2767,7 +2767,7 @@ lots:
     started: 2026-11-06
     notes:
       - { date: 2026-11-06, text: "06-11 : clos à tort par le lead, l'intégration avait été refusée (exit 0 de la commande, résultat non lu avant raf done) ; rouvert, son code n'est pas sur main." }
-    review: { date: 2026-11-06, verdict: "conforme : descriptions de la remise en état et de worktreeDeps alignées sur le code en 7326d3a (commentaires et docs seuls, relu par le lead)", commit: 7326d3a32ba73b07978857f8cd5579d74210b029 }
+    review: { date: 2026-11-06, verdict: "conforme : escalade Fable conforme, dernier constat (doc de remise en état) corrigé en 554a6dc, relu par le lead ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase ne change aucun commit de code (range-diff identique, main n'a bougé que par le plan), le majeur de documentation est corrigé (8a0602b : commentaires et docs seuls), 2 mineurs précédents restent ouverts sans bloquer", commit: 8a0602b563f1afab2d1ce11a42f47cfd1da4c624 }
   - id: L647
     title: "raf done refuse un lot rendu par une vague et dont les commits de travail ne sont pas sur la branche principale (06-11 : L646 clos par le lead alors que son intégration venait d'être refusée, avec une porte verte qui ne portait pas son code) ; --integrate rend un code de sortie non nul quand le lot est rendu ; mesure : 0 lot clos sans son code"
     status: todo

@@ -219,7 +219,12 @@ describe('L639 — la décision d\'hôte, une fois par lot (R5, R6, R7, R8, R10)
     held.pop()!(); // le tour local passe à la porte repliée
     await first;
     const before = sshCalls();
-    await withPlace(opts({}, { owner }), async (p) => expect(p.remote()).toBe(false));
+    await occupyLocal(); // le local est à nouveau pris : la ligne de base doit relire la décision, pas jouer en local d'emblée
+    const second = withPlace(opts({}, { owner }), async (p) => expect(p.remote()).toBe(false));
+    await wait(300);
+    expect(sshCalls()).toBe(before); // ni sonde, ni push, ni cache pendant l'attente du tour local
+    held.pop()!();
+    await second;
     expect(sshCalls()).toBe(before);
     expect(count('cache de dépendances impossible sur box (push du sha impossible')).toBe(1);
     expect(count('porte déportée indisponible')).toBe(0);
@@ -286,12 +291,16 @@ describe('L639 — la décision d\'hôte, une fois par lot (R5, R6, R7, R8, R10)
     remote.down();
     const owner = {};
     await occupyLocal();
-    const first = withPlace(opts({}, { owner }), async () => {
-      await withPlace(opts({}, { owner }), async () => {});
-    });
+    const first = withPlace(opts({}, { owner }), async () => {});
     await wait(800);
+    expect(count('porte déportée indisponible')).toBe(1);
     held.pop()!();
     await first;
+    await occupyLocal(); // second lieu du lot, local encore pris : la décision est relue, la ligne n'est pas redite
+    const second = withPlace(opts({}, { owner }), async (p) => expect(p.remote()).toBe(false));
+    await wait(300);
+    held.pop()!();
+    await second;
     expect(count('porte déportée indisponible')).toBe(1);
   });
 
@@ -317,12 +326,18 @@ describe('L639 — la décision d\'hôte, une fois par lot (R5, R6, R7, R8, R10)
     commitFile(h.repo, 'package-lock.json', 'chore: lock');
     await occupyLocal();
     const owner = {};
-    const first = withPlace(opts({ install: 'exit 1' }, { owner }), async () => {
-      await withPlace(opts({ install: 'exit 1' }, { owner }), async () => {});
-    });
+    const first = withPlace(opts({ install: 'exit 1' }, { owner }), async () => {});
     await wait(2500);
+    expect(count('cache de dépendances impossible sur box')).toBe(1);
     held.pop()!();
     await first;
+    const before = sshCalls();
+    await occupyLocal(); // second lieu du lot, local encore pris : ni nouveau cache ni seconde ligne
+    const second = withPlace(opts({ install: 'exit 1' }, { owner }), async (p) => expect(p.remote()).toBe(false));
+    await wait(300);
+    held.pop()!();
+    await second;
+    expect(sshCalls()).toBe(before);
     expect(count('cache de dépendances impossible sur box')).toBe(1);
     expect(count('porte déportée indisponible')).toBe(0);
   });
@@ -376,12 +391,17 @@ describe('L639 — la décision d\'hôte, une fois par lot (R5, R6, R7, R8, R10)
       remote.lose('PERDUE');
       await p.run('echo PERDUE');
       after = sshCalls();
-      held.pop()!(); // la machine locale se libère : la ligne de base du lot y joue sans toucher l'hôte
-      await withPlace(opts({}, { owner }), async (n) => expect(n.remote()).toBe(false));
+      // la machine locale reste prise : la ligne de base relit la décision du lot (indisponible), sans sonde ni tour de l'hôte, et attend le tour local
+      const nested = withPlace(opts({}, { owner }), async (n) => expect(n.remote()).toBe(false));
+      await wait(300);
+      expect(sshCalls()).toBe(after);
+      held.pop()!();
+      await nested;
       expect(sshCalls()).toBe(after);
     });
     expect(probes()).toBe(1);
-    expect(count('porte déportée indisponible')).toBe(0);
+    expect(count('connexion perdue avec box pendant la porte — rejouée en local')).toBe(1);
+    expect(count('porte déportée indisponible')).toBe(0); // la ligne « connexion perdue » tient lieu de ligne de repli
   });
 
   it('R10 — lot A voit l\'hôte tomber, lot B démarré après : nouveau préflight', async () => {

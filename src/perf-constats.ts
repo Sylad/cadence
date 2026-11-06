@@ -1,4 +1,4 @@
-// Comptes de `cadence perf` tirés des constats et des tests des lots rendus : tests instables sous charge (L354) et constats de revue écartés par L622 (L638).
+// Comptes de `cadence perf` tirés des constats et des tests des lots rendus : tests instables sous charge (L354) et constats de revue écartés par L622 et L646 (L638).
 
 import type { DecisionConstat } from './orchestrate/state.js';
 
@@ -14,7 +14,7 @@ export function instableCounts(set: { j: { instables?: string[] } }[]): Instable
   return { lots: withTests.length, tests: withTests.reduce((n, d) => n + d.j.instables!.length, 0) };
 }
 
-/** Constats de revue écartés par L622 (L638) : sur les lots rendus d'une fenêtre, ceux dont la décision a été gardée ; `taux` null sans constat gardé ; `vagues` : le même compte par vague. */
+/** Constats de revue écartés par L622 et L646 (L638) : sur les lots rendus d'une fenêtre, ceux dont la décision a été gardée ; `taux` null sans constat gardé ; `vagues` : le même compte par vague. */
 export interface EcarteCounts {
   constats: number;
   ecartes: number;
@@ -30,14 +30,14 @@ export function decisionsOf(steps: { constatsRevue?: unknown }[]): DecisionConst
   return kept.map((k) => k?.decision).filter((d): d is DecisionConstat => DECISIONS.includes(d));
 }
 
-/** Les constats de revue gardés des lots donnés et la part que L622 écarte (`ecarte-inchange`), au total et par vague. */
+/** Les constats de revue gardés des lots donnés et la part que les règles de L622 et L646 écartent (`ecarte-inchange`, `ecarte-deja-note`), au total et par vague. */
 export function ecarteCounts(set: { j: { wave: string; decisions?: DecisionConstat[] } }[]): EcarteCounts {
   const byWave = new Map<string, { constats: number; ecartes: number }>();
   for (const { j } of set) {
     if (!j.decisions?.length) continue;
     const w = byWave.get(j.wave) ?? { constats: 0, ecartes: 0 };
     w.constats += j.decisions.length;
-    w.ecartes += j.decisions.filter((x) => x === 'ecarte-inchange').length;
+    w.ecartes += j.decisions.filter((x) => x === 'ecarte-inchange' || x === 'ecarte-deja-note').length;
     byWave.set(j.wave, w);
   }
   const vagues = [...byWave].sort(([a], [b]) => a.localeCompare(b)).map(([wave, w]) => ({ wave, ...w, taux: w.ecartes / w.constats }));

@@ -58,6 +58,11 @@ describe('R2 — taux d’écartés par vague', () => {
   it('R2 — hors règle n’est pas compté écarté par L622', () => {
     expect(ecarteCounts([d('w1', ['ecarte-hors-regle', 'compte'])])).toMatchObject({ constats: 2, ecartes: 0 });
   });
+  it('R2 — un mineur repris écarté (ecarte-deja-note, L649) compte dans le taux, par vague aussi', () => {
+    const r = ecarteCounts([d('w1', ['ecarte-deja-note', 'compte']), d('w2', ['ecarte-deja-note', 'ecarte-inchange', 'compte'])]);
+    expect(r).toMatchObject({ constats: 5, ecartes: 3 });
+    expect(r.vagues).toEqual([{ wave: 'w1', constats: 2, ecartes: 1, taux: 0.5 }, { wave: 'w2', constats: 3, ecartes: 2, taux: 2 / 3 }]);
+  });
   it('R2 — decisionsOf : absent, vide, entrée null ou de mauvais type', () => {
     expect(decisionsOf([])).toEqual([]);
     expect(decisionsOf([{}, { constatsRevue: [] }, { constatsRevue: { decision: 'compte' } }, { constatsRevue: [null, 3, 'compte', { decision: 'constructor' }, { decision: 'compte' }] }])).toEqual(['compte']);

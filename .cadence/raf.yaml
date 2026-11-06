@@ -2731,6 +2731,11 @@ lots:
     status: todo
     estimate: 0.05
     created: 2026-11-06
+  - id: L643
+    title: "Le push de livraison pendant une vague compte les commits plan-seul d'un lot pas prêt (« plan: L639 démarré ») comme du code et refuse 7f9bddd ; effet indirect : origin/main en retard, le cliquet contre origin/main d'un lot config voit le code de L638 et rend L630 rouge. Les commits qui ne touchent que le plan ne bloquent plus le push ; mesure : 0 refus de push pour un commit de plan"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-06
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

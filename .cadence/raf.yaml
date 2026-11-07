@@ -3064,6 +3064,38 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-11-07
+  - id: L679
+    title: "CHANGELOG partagé : 7 conflits d'ajout pur et 13 rejeux de porte (80 min sur 970 en 0800, 26,3 min en 1805) ; chaque lot écrit changelog.d/L<id>.md, le release l'assemble, test/changelog.test.ts lit les fragments ; niveau : source ; niveau le plus tôt : source ; mesure : 0 rejeu de porte dû au seul CHANGELOG sur 3 vagues"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-07
+  - id: L680
+    title: "Ressource par fichier de src/ au lancement : en 0800 L671 (wants renommé wanted par L670, tsc rouge), L673 (conflit integrate-lot.ts, CHANGELOG.md) et L662 (work.ts) refusés à l'intégration, ~54 min plus les rejeux ; les fichiers de src/ cités par le titre ou lus par le precheck reçoivent uses: automatique (comme L671 pour docs) donc leurs lots passent l'un après l'autre ; niveau : source ; niveau le plus tôt : source ; mesure : 0 refus d'intégration pour main avancé sur 3 vagues"
+    status: todo
+    estimate: 0.5
+    after: [ L671 ]
+    created: 2026-11-07
+  - id: L681
+    title: "Porte de ligne de base inutile : 5 portes de base (33,2 min) en 0800 pour 4 tests instables différents rejoués verts seuls ; ne jouer la base que si un rouge reste rouge après rejeu seul ; niveau : porte ; niveau le plus tôt : porte, la charge n'est connue qu'à l'exécution ; mesure : 0 porte de base si tous les rouges repassent seuls"
+    status: todo
+    estimate: 0.25
+    after: [ L642 ]
+    created: 2026-11-07
+  - id: L682
+    title: "Budget : correction non jouée après revue finale non conforme (L676 : 559 676 / 600 000, 74 min en handed-back, majeurs sans correction) ; l'estimate d'un lot qui touche src/orchestrate/cycle/ est doublé à raf add et la réserve de la dernière correction est prise avant celle de l'escalade ; niveau : source ; niveau le plus tôt : source ; mesure : 0 lot rendu pour budget avec un majeur ouvert sur 3 vagues"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-07
+  - id: L683
+    title: "Créneaux tenus par les sessions du lead : 16,4 min d'attente sur 7 lots en 0800 (reprise-L498 3 min 09 s et 5 min 06 s pour L673), --integrate de L666 dit 29 min sans activité par le lead (non retrouvé au journal) ; le registre écrit l'âge et l'objet de la session du lead, et --integrate ne prend de créneau que pendant une session jouée ; niveau : source ; niveau le plus tôt : source ; mesure : 0 min d'attente de créneau due à une session du lead sans activité"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-07
+  - id: L684
+    title: "Constats de chaque passe de revue conservés au JSON du lot : L670 (11 sessions, 124 min) et L673 (9 sessions, 80 min) ont un constats vide après conformité, la cause des 2 escalades fable ne peut pas être classée ; garder la liste par passe (gravité, fichier, texte) ; niveau : source ; niveau le plus tôt : source ; mesure : 100 % des passes non conformes classables après la prochaine vague"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-07
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

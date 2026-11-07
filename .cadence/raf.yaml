@@ -3045,11 +3045,12 @@ lots:
     started: 2026-11-07
   - id: L677
     title: "Fuite GIT_DIR dans les tests lancés par un hook : test/changelog.test.ts (L669) crée un dépôt jetable, mais git exporte GIT_DIR et GIT_INDEX_FILE au hook pre-commit d'un worktree, donc « commit -m base » a remplacé le vrai message de deux commits (L671 bc97794e, L673 7644ca89) et seul le tag v1.0.0 déjà présent a arrêté la suite, dont un reset --hard HEAD~1 ; test/global-setup.ts retire GIT_DIR, GIT_INDEX_FILE, GIT_WORK_TREE avant tout test (hook local corrigé en attendant), plus un test qui lance un commit de dépôt jetable sous ces variables ; niveau : source (global-setup), niveau le plus tôt : source ; mesure : 0 commit de test dans un vrai dépôt"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-07
     started: 2026-11-07
     review: { date: 2026-11-07, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-07-0800, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 481d33c51d90d738f6cfc59e45362f55d5ca3814 }
+    finished: 2026-11-07
   - id: L678
     title: "Hypothèses écrites sans bloquer la reprise : avant une session accept ou implement d'un lot avec fiche, settleHypotheses puis noteHypotheses attendent le verrou du dépôt, donc une intégration longue retarde la session après « réponse prise, le lot repart » (L670 l'a rendu visible, 37,3 min vues le 06-11) ; supprimer l'attente sans perdre le rendu du lot sur écriture refusée (HYPOTHESES_HANDBACK) ; niveau : source, niveau le plus tôt : source ; mesure : 0 min d'attente de verrou entre réponse prise et session suivante"
     status: todo

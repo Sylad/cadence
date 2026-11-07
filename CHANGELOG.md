@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+- The `deliver` skill says what `cadence deliver` does without a `deliver:` key (L675): it refuses before any step and never runs a `./livrer.sh` by itself, so the script must be declared first (the `livrer-sh-sans-bloc` eval answered « the skill does not describe this case » in two runs of three on 1.61.0).
+
 ## [1.61.0] - 2026-11-07
 
 ### Changed

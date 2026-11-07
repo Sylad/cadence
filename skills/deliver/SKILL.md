@@ -27,6 +27,8 @@ deliver:
   script: ./scripts/ship.sh "$CADENCE_SHORT"
 ```
 
+Without a `deliver:` key in `cadence.yaml` (or without the file), `cadence deliver` refuses (« clé deliver absente »; « pas de configuration de livraison » when the file is missing) before any step: it never looks for or runs a `./livrer.sh` on its own, so declare it with `deliver: { script: … }` first.
+
 A script that deploys a commit other than `$CADENCE_SHA` (it committed a Nouveautés timestamp itself)
 writes that sha into the file named by `$CADENCE_DEPLOYED_FILE`: cadence logs it as delivered and never guesses
 (a content that is not a hexadecimal commit sha — `HEAD` or a branch name included — fails the delivery; empty during a wave, the log keeps `$CADENCE_SHA` and a warning

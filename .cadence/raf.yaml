@@ -3013,6 +3013,7 @@ lots:
     estimate: 0.25
     created: 2026-11-07
     started: 2026-11-07
+    review: { date: 2026-11-07, verdict: "compliant (0 bloquant, 0 majeur, 2 mineurs en notes ; hook d'écriture non livré, déclaré par l'auteur) — orchestré (vague 2026-11-07-0800, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant : 0 bloquant, 0 majeur ; 1 mineur de forme (ligne vide docs/config.md:58) et le niveau écriture hors périmètre, déclaré par l'auteur", commit: 52fb6767b19077fa3d2ff61b1d6556aca4431205 }
   - id: L673
     title: "Plan écrit pendant une intégration : l'intégration ne refuse que si un fichier modifié de l'arbre principal est dans le diff du lot, ou raf add/raf done pendant une vague commite le plan lui-même ; 07-11 : L667 refusé « arbre du dépôt modifié (.cadence/raf.yaml) », porte rejouée 8,8 min ; niveau : source (le refus ne naît plus), niveau le plus tôt : source ; mesure : 0 refus « arbre du dépôt modifié » pour .cadence/raf.yaml par vague"
     status: doing

@@ -300,12 +300,12 @@ export function rebaseRefusal(age: { behind: number; conflicts: string[] }, base
 /**
  * Rebase la branche de lot `branch` sur `base` (L676) par `rebaseOnto`, la règle de l'intégration : les conflits d'ajout pur du CHANGELOG, du plan et de la base du cliquet sont
  * résolus comme à l'intégration. Dans `dir`, son worktree, quand il existe ; sinon dans un worktree jetable, retiré ensuite. Une branche à jour (0 commit de retard) n'est pas touchée.
- * Rend `caughtUp` (les commits de `base` rattrapés) et les lignes de journal des résolutions (`rebaseNotes`, préfixées de `key`) ; ou la cause de l'échec, après
+ * Rend `caughtUp` (les commits de `base` rattrapés), les lignes de journal des résolutions (`rebaseNotes`, préfixées de `key`) et `tail`, le nombre de commits que `rebaseOnto` a ajoutés en queue de branche (`tailCommits`) ; ou la cause de l'échec, après
  * `git rebase --abort` : la branche garde ses commits et son sommet d'avant.
  */
-export function rebaseLotBranch(repo: string, branch: string, dir: string | null, base: string, key: string): { ok: true; caughtUp: number; notes: string[] } | { ok: false; cause: string } {
+export function rebaseLotBranch(repo: string, branch: string, dir: string | null, base: string, key: string): { ok: true; caughtUp: number; notes: string[]; tail: number } | { ok: false; cause: string } {
   const caughtUp = Number(tryGit(repo, 'rev-list', '--count', `refs/heads/${base}`, '--not', `refs/heads/${branch}`) ?? 0);
-  if (caughtUp === 0) return { ok: true, caughtUp, notes: [] };
+  if (caughtUp === 0) return { ok: true, caughtUp, notes: [], tail: 0 };
   const own = dir !== null && existsSync(join(dir, '.git'));
   const temp = own ? null : mkdtempSync(join(tmpdir(), 'cadence-rebase-'));
   const wd = own ? (dir as string) : join(temp as string, 'wt');
@@ -316,7 +316,7 @@ export function rebaseLotBranch(repo: string, branch: string, dir: string | null
     }
     const r = rebaseOnto(wd, base);
     if (r.kind === 'conflict') return { ok: false, cause: r.files.length ? `conflit sur ${r.files.join(', ')}` : r.detail.replace(/\r/g, ' ').slice(0, 160) };
-    return { ok: true, caughtUp, notes: r.kind === 'rebased' ? rebaseNotes(r, key) : [] };
+    return { ok: true, caughtUp, notes: r.kind === 'rebased' ? rebaseNotes(r, key) : [], tail: r.kind === 'rebased' ? tailCommits(r) : 0 };
   } catch (e) {
     if (existsSync(join(wd, '.git'))) tryGit(wd, 'rebase', '--abort');
     return { ok: false, cause: gitFailure(e).replace(/\r/g, ' ').slice(0, 160) };
@@ -328,6 +328,9 @@ export function rebaseLotBranch(repo: string, branch: string, dir: string | null
     }
   }
 }
+
+/** Les commits que `rebaseOnto` ajoute en queue après un rebase réussi, un par correction faite (L676) : entrées du lot replacées sous `[Unreleased]` après une publication (`moved`), une entrée finale par lot (`settled`), base du cliquet recomposée (`silent`). */
+const tailCommits = (r: { moved: number; settled: boolean; silent: boolean }): number => Number(r.moved > 0) + Number(r.settled) + Number(r.silent);
 
 /** Au-delà de ce nombre de commits de la branche du dépôt absents de la branche gardée, la reprise est refusée (L665 : 68,2 min de mur perdues sur une branche à 6 conflits connus). */
 export const STALE_BASE_COMMITS = 100;

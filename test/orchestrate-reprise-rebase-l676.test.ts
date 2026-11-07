@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { lotBranch, lotTreeDir, prepareTree } from '../src/orchestrate/worktree.js';
-import { rebaseOwnBranch } from '../src/orchestrate/reprise-rebase.js';
+import { rebaseOwnBranch, reviewedHead } from '../src/orchestrate/reprise-rebase.js';
 import { redSha } from '../src/orchestrate/accept.js';
 import type { LotCtx } from '../src/orchestrate/cycle.js';
 import { join } from 'node:path';
@@ -111,5 +111,34 @@ describe('R2 — le rebase de --resume reporte les shas que l\'état garde (revu
     expect(git(s.repo, 'rev-parse', s.branch)).toBe(s.head);
     expect(s.lot.code.head).toBe(s.head);
     expect(s.logs.join('\n')).toMatch(/remise à son sommet .*ne peuvent pas être reportées/);
+  });
+  it('R2 — publication pendant la branche : les commits que rebaseOnto ajoute en queue (CHANGELOG replacé) sont acceptés, la revue reste sur le dernier commit du lot et n\'est pas périmée', () => {
+    const doc = (unreleased: string, releases = '') => `# Changelog\n\nintro\n\n## [Unreleased]\n\n${unreleased}${releases}## [1.0.0] - 2026-01-01\n\n### Added\n\n- première version\n`;
+    const { parent, repo } = setup(undefined, undefined, { 'CHANGELOG.md': doc('### Fixed\n\n- entrée de main\n\n') });
+    const branch = lotBranch(WAVE, 'a', 'L1');
+    const dir = lotTreeDir(store(parent).dir, 'a', 'L1', repo);
+    const made = prepareTree({ repo, dir, branch, base: 'main', lot: 'a:L1' });
+    if (!made.ok) throw new Error(made.cause);
+    writeFileSync(join(dir, 'CHANGELOG.md'), doc('### Fixed\n\n- entrée de main\n- entrée du lot (L1)\n\n'));
+    writeFileSync(join(dir, 'L1.txt'), 'travail\n');
+    git(dir, 'add', '--', 'CHANGELOG.md', 'L1.txt');
+    git(dir, 'commit', '-q', '-m', 'feat(L1): travail', '--', 'CHANGELOG.md', 'L1.txt');
+    const head = git(dir, 'rev-parse', 'HEAD');
+    writeFileSync(join(repo, 'CHANGELOG.md'), doc('', '## [1.1.0] - 2026-11-06\n\n### Fixed\n\n- entrée de main\n\n'));
+    git(repo, 'commit', '-q', '-m', 'chore(release): 1.1.0', '--', 'CHANGELOG.md');
+    const logs: string[] = [];
+    const lot = { project: 'a', lot: 'L1', repo, status: 'suspended', next: 'fix', steps: [], constats: [], warnings: [], code: { conforme: true, bloquants: 0, majeurs: 0, mineurs: 1, verdict: 'conforme', sousTaches: [], nonVerifie: [], head } } as never as LotCtx['lot'];
+    const c = { lot, wave: { store: store(parent), log: (l: string) => logs.push(l) } } as never as LotCtx;
+    rebaseOwnBranch(c, { repo, branch, dir, base: 'main', recovered: false });
+    expect(logs.join('\n')).not.toContain('remise à son sommet');
+    expect(lot.status).toBe('suspended');
+    const lotTip = git(dir, 'log', '-1', '--format=%H', '--grep', 'feat(L1)');
+    expect(git(dir, 'rev-parse', 'HEAD')).not.toBe(lotTip); // un commit du programme en queue
+    expect(lot.code?.head).toBe(lotTip);
+    expect(lot.rebaseTail?.length).toBeGreaterThan(0);
+    expect(reviewedHead(dir, lot)).toBe(true);
+    expect(logs.join('\n')).toContain('la revue gardée reste sur le dernier commit du lot');
+    const changelog = git(dir, 'show', 'HEAD:CHANGELOG.md');
+    expect(changelog.indexOf('entrée du lot')).toBeLessThan(changelog.indexOf('## [1.1.0]'));
   });
 });

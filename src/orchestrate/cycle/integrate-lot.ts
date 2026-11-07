@@ -17,6 +17,7 @@ import { blockingConstats } from './shared.js';
 import { lateRefusal } from './depot-partage.js';
 import { awaitOlder } from './integrate-wait.js';
 import { conflictNotes } from '../lot-diff.js';
+import { reviewedHead } from '../reprise-rebase.js';
 import { declaredFor } from '../../resources.js';
 import { readyOutcome, withUnverifiedGoal } from '../objectif.js';
 import { checkShape, type ReviewReport, REVIEW_SCHEMA } from '../schemas.js';
@@ -48,7 +49,7 @@ export async function conclude(c: LotCtx, code: ReviewSummary, minorNote = ''): 
     stop(c, 'handed-back', gap);
     return;
   }
-  const moved = (code.head && newer !== null && git(wd(c), 'rev-parse', 'HEAD') !== code.head ? [''] : []).concat(
+  const moved = (code.head && newer !== null && !reviewedHead(wd(c), { code, rebaseTail: l.rebaseTail }) ? [''] : []).concat(
     neighbours.filter((r) => shas[r.rel] !== null && code.repoHeads?.[r.rel] && git(r.path, 'rev-parse', 'HEAD') !== code.repoHeads[r.rel]).map((r) => ` dans ${r.rel}`),
   );
   if (moved.length) {

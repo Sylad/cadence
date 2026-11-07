@@ -50,7 +50,7 @@ export function rebaseOwnBranch(c: LotCtx, t: { repo: string; branch: string; di
   const r = rebaseLotBranch(t.repo, t.branch, own, t.base, key);
   if (!r.ok) return handBackKept(c, `branche ${t.branch} de la vague non rebasée : ${rebaseRefusal(before, t.base, r.cause)}`);
   if (r.caughtUp === 0) return;
-  const carried = carryShas(c, old, lotRange(t.repo, t.base, t.branch));
+  const carried = carryShas(c, old, lotRange(t.repo, t.base, t.branch), r.tail);
   if (carried === null && tip) {
     // Report impossible (un commit du lot absorbé par la base, ou réordonné) : la branche revient à son sommet d'avant, rien n'est joué sur des shas que l'état ne connaît pas.
     if (own) tryGit(own, 'reset', '--hard', '--quiet', tip);
@@ -68,15 +68,16 @@ function lotRange(repo: string, base: string, branch: string): { sha: string; su
 }
 
 /**
- * L676 : reporte sur les commits rebasés les shas que l'état du lot garde (comme l'intégration, qui compare le diff et non le sha) : `code.head` et `ux.head` (la revue conforme gardée, que
- * `conclude` et l'étape UX comparent au HEAD) et `accept.rouge` (l'ancre du commit rouge des tests d'acceptation, que le verrou compare au dernier commit d'acceptation.json). Le rebase garde
- * l'ordre : quand les deux listes ont la même longueur et les mêmes sujets, le n-ième commit d'avant est le n-ième d'après. Rend les lignes de journal des reports, ou null quand un sha
- * gardé ne peut pas être reporté sûrement (listes différentes) ; un sha gardé hors des commits du lot (base) reste tel quel.
+ * L676 : reporte sur les commits rebasés les shas que l'état du lot garde : `code.head` et `ux.head` (la revue conforme gardée, que `conclude` et l'étape UX comparent au HEAD) et `accept.rouge`
+ * (l'ancre du commit rouge des tests d'acceptation, que le verrou compare au dernier commit d'acceptation.json). Le rebase garde l'ordre : quand les commits du lot ont même nombre et mêmes sujets,
+ * le n-ième d'avant est le n-ième d'après. Les `tail` derniers commits sont ceux que `rebaseOnto` a ajoutés (`tailCommits`) : aucun sha gardé n'y est reporté. Comme l'intégration, qui reporte
+ * un verdict sur le dernier commit de travail du lot (`lotWork`) et non sur ces commits, la revue reste sur le dernier commit du lot ; ces commits sont notés (`rebaseTail`), et `reviewedHead`
+ * ne les compte pas comme postérieurs à la revue. Rend les lignes de journal, ou null quand un sha gardé ne peut pas être reporté sûrement ; un sha gardé hors des commits du lot reste tel quel.
  */
-function carryShas(c: LotCtx, old: { sha: string; subject: string }[], now: { sha: string; subject: string }[]): string[] | null {
+function carryShas(c: LotCtx, old: { sha: string; subject: string }[], all: { sha: string; subject: string }[], tail: number): string[] | null {
   const kept = [c.lot.code, c.lot.ux].filter((s) => !!s?.head).map((s) => s!.head as string).concat(c.lot.accept?.rouge ?? []);
-  const inRange = kept.filter((sha) => old.some((o) => o.sha === sha));
-  if (!inRange.length) return [];
+  if (!kept.some((sha) => old.some((o) => o.sha === sha))) return [];
+  const now = all.slice(0, all.length - tail);
   if (old.length !== now.length || old.some((o, i) => o.subject !== now[i].subject)) return null;
   const map = new Map(old.map((o, i) => [o.sha, now[i].sha]));
   const lines: string[] = [];
@@ -89,6 +90,15 @@ function carryShas(c: LotCtx, old: { sha: string; subject: string }[], now: { sh
   if (c.lot.code?.head) c.lot.code.head = move('revue de code gardée', c.lot.code.head);
   if (c.lot.ux?.head) c.lot.ux.head = move('revue UX gardée', c.lot.ux.head);
   if (c.lot.accept?.rouge) c.lot.accept.rouge = move('ancre du commit rouge d\'acceptation', c.lot.accept.rouge);
+  c.lot.rebaseTail = all.slice(all.length - tail).map((x) => x.sha);
+  if (tail) lines.push(`${tail} commit(s) ajouté(s) en queue par le rebase (CHANGELOG, base du cliquet) : la revue gardée reste sur le dernier commit du lot, comme l'intégration reporte un verdict sur le dernier commit de travail et non sur ces commits`);
   c.wave.store.writeLot(c.lot);
   return lines;
+}
+
+/** Vrai quand HEAD est le sommet que la revue gardée a relu, ou ne s'en écarte que par les commits que le rebase de `--resume` a ajoutés en queue (`rebaseTail`, L676). */
+export function reviewedHead(dir: string, l: { code?: { head: string }; rebaseTail?: string[] }): boolean {
+  if (!l.code?.head) return false;
+  const after = (tryGit(dir, 'rev-list', `${l.code.head}..HEAD`) ?? '?').split('\n').filter(Boolean);
+  return after.every((sha) => l.rebaseTail?.includes(sha));
 }

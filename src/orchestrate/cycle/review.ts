@@ -16,6 +16,7 @@ import { settleMinorProposals } from './minor-proposals.js';
 import { carriedNoted, countReview, wallReason } from './converge.js';
 import { readShrunk } from './retreci.js';
 import { handBackWithoutFinding } from '../no-finding.js';
+import { reviewedHead } from '../reprise-rebase.js';
 /** Mention « sans commit » du verdict quand la passe des mineurs n'a rien commité (l'UX finale conclut alors à la place de la passe). */
 const noCommitNote = (l: LotState): string => (l.warnings.some((w) => w.startsWith('passe des mineurs sans commit')) ? ' sans commit' : '');
 
@@ -143,7 +144,7 @@ export async function review(c: LotCtx, kind: 'ux' | 'review' | 'review-small'):
   const l = c.lot;
   const ux = c.config.ux;
   // Un état repris, écrit avant L221, peut porter next = ux : l'UX ne part que sur une revue de code conforme du HEAD courant, sinon la revue de code passe d'abord (R9).
-  if (kind === 'ux' && !(l.code?.conforme && l.code.head === git(wd(c), 'rev-parse', 'HEAD'))) {
+  if (kind === 'ux' && !(l.code?.conforme && reviewedHead(wd(c), l))) {
     l.next = codeReview(l);
     if (l.status === 'suspended') l.status = 'reviewing'; // reprise d'un lot suspendu : la boucle de runLot enchaîne sur la revue de code au lieu de rendre la main
     save(c);

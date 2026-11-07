@@ -67,7 +67,8 @@ function verrouiller(racine: string): () => void {
 }
 
 type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string;
-  exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void };
+  exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void;
+  avantVerdict?: (res: ResultatBanc[]) => void };
 
 export function passage(o: OptPassage): Verdict {
   const liberer = verrouiller(o.racine);
@@ -121,8 +122,19 @@ function passageVerrouille(o: OptPassage): Verdict {
   writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultats: res }, null, 2));
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
     candidat: o.cand, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: res.filter((r) => r.frais).length })}\n`);
+  o.avantVerdict?.(res);
   o.out(`${v.vert ? 'VERT' : 'ROUGE'} — rapport : ${base}.md`);
   return v;
+}
+
+/** Banc éclair : deux contrôles rapides sur le banc 1 (temps ≤ 1,2 × A, aucune question du candidat). */
+export function controlesEclair(res: ResultatBanc[], ref: string, cand: string): { lignes: string[]; ok: boolean } {
+  const m = (b: string) => res.reduce((a, r) => ({ t: a.t + (r.mesures[b]?.duree_s ?? 0), q: a.q + (r.mesures[b]?.questions ?? 0) }), { t: 0, q: 0 });
+  const a = m(ref); const c = m(cand);
+  const tempsOk = c.t <= BARRE_SPEC.temps_max_retouche * a.t; const questionsOk = c.q === 0;
+  return { ok: tempsOk && questionsOk, lignes: [
+    `temps candidat ≤ ${BARRE_SPEC.temps_max_retouche.toString().replace('.', ',')} × A : ${tempsOk ? 'ok' : 'ROUGE'} (${c.t} s contre ${a.t} s)`,
+    `questions du candidat : 0 / ${c.q} ${questionsOk ? 'ok' : 'ROUGE'}`] };
 }
 
 function option(args: string[], nom: string): string | undefined {
@@ -159,8 +171,8 @@ export async function bench(args: string[], io: Io): Promise<number> {
       return 0;
     } catch (e) { io.err(`cadence2 bench ajouter : ${e instanceof Error ? e.message : String(e)}`); return 1; }
   }
-  const numeros = sous === 'court' ? COURT : sous === 'hebdo' ? undefined : sous === 'lancer' ? (option(reste, 'bancs')?.split(',') ?? null) : null;
-  if (numeros === null) { io.err('usage : cadence2 bench court|hebdo|lancer --bancs 1,3|statut|verifier-publication|ajouter [--candidat c] [--reference r]'); return 2; }
+  const numeros = sous === 'court' ? COURT : sous === 'hebdo' ? undefined : sous === 'eclair' ? ['1'] : sous === 'lancer' ? (option(reste, 'bancs')?.split(',') ?? null) : null;
+  if (numeros === null) { io.err('usage : cadence2 bench court|hebdo|eclair|lancer --bancs 1,3|statut|verifier-publication|ajouter [--candidat c] [--reference r]'); return 2; }
   const ref = option(reste, 'reference') ?? 'A'; const cand = option(reste, 'candidat') ?? 'equipe-legere';
   let refus: string | null;
   try {
@@ -169,8 +181,10 @@ export async function bench(args: string[], io: Io): Promise<number> {
       : pretAPasser(REPO, { [ref]: tous[ref], [cand]: tous[cand] }, racine);
   } catch (e) { refus = e instanceof Error ? e.message : String(e); }
   if (refus) { io.err(`bench refusé : ${refus}`); return 2; }
+  let eclair = true;
   const v = passage({ racine, numeros, ref, cand,
+    avantVerdict: sous === 'eclair' ? (res) => { const e = controlesEclair(res, ref, cand); eclair = e.ok; e.lignes.forEach((l) => io.out(l)); } : undefined,
     hebdo: sous === 'hebdo', juge: option(reste, 'juge') ?? 'opus', exec: executeurClaude, prep: preparer,
     maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out });
-  return v.vert ? 0 : 1;
+  return v.vert && eclair ? 0 : 1;
 }

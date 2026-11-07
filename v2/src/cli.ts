@@ -6,7 +6,7 @@ export const COMMANDES: Record<string, Commande> = {};
 COMMANDES.bench = bench;
 
 const AIDE = `cadence2 — noyau de cadence 2 (en construction)
-  cadence2 bench court|hebdo|lancer|statut|verifier-publication|ajouter   banc de mesure (docs/v2/)`;
+  cadence2 bench court|hebdo|eclair|lancer|statut|verifier-publication|ajouter   banc de mesure (docs/v2/)`;
 
 export async function run(args: string[], io: Io): Promise<number> {
   const [nom, ...reste] = args;

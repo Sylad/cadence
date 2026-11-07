@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
-import { empreinte, passage, pretAPasser } from '../src/bench/cli.js';
+import { controlesEclair, empreinte, passage, pretAPasser } from '../src/bench/cli.js';
+import { statut } from '../src/bench/verdict.js';
+import { run } from '../src/cli.js';
 import { creerExecuteur } from '../src/bench/bras.js';
 
 const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuees: 1, mutations_total: 1, attendu: 'oui', mutations: [] };
@@ -150,5 +152,45 @@ describe('executeur en groupe de processus', () => {
     const fin = Date.now() + 3000;
     while (spawnSync('pgrep', ['-f', 'sleep 20[.]456']).status === 0 && Date.now() < fin) spawnSync('sleep', ['0.2']);
     expect(spawnSync('pgrep', ['-f', 'sleep 20[.]456']).status).toBe(1);
+  });
+});
+
+describe('banc éclair', () => {
+  const mes = (bras: string, duree_s: number, questions = 0) => ({ bras, banc: '1-a', debut: '', fin: '', duree_s, tokens: 0, cout_usd: 0, questions, questions_texte: [], sessions: [], echec: null });
+  const res = (a: number, c: number, q = 0) => [{ banc: '1-a', taille: 'retouche', visible: false, reponses: false, frais: false, mesures: { A: mes('A', a), C: mes('C', c, q) }, jugement: null, fuites: {} }] as never;
+
+  it('contrôles : temps ≤ 1,2 × A et aucune question, affichés avec les chiffres', () => {
+    expect(controlesEclair(res(100, 120), 'A', 'C')).toEqual({ ok: true, lignes: ['temps candidat ≤ 1,2 × A : ok (120 s contre 100 s)', 'questions du candidat : 0 / 0 ok'] });
+    const lent = controlesEclair(res(100, 121), 'A', 'C');
+    expect(lent.ok).toBe(false); expect(lent.lignes[0]).toBe('temps candidat ≤ 1,2 × A : ROUGE (121 s contre 100 s)');
+    const bavard = controlesEclair(res(100, 90, 2), 'A', 'C');
+    expect(bavard.ok).toBe(false); expect(bavard.lignes[1]).toBe('questions du candidat : 0 / 2 ROUGE');
+  });
+
+  it('un seul banc joué, hebdo: false, contrôles imprimés avant le verdict', () => {
+    const r = racine(); const sortie: string[] = []; const cwds = new Set<string>();
+    const exec2: Executeur = (args, o) => { if (!/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) cwds.add(o.cwd.split('/').slice(-2)[0]); return exec(args, o); };
+    const v = passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: exec2, prep: prep as never,
+      maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: (l) => sortie.push(l),
+      avantVerdict: (rs) => controlesEclair(rs, 'A', 'C').lignes.forEach((l) => sortie.push(l)) });
+    expect(v.vert).toBe(true);
+    expect([...cwds]).toEqual(['1-a']);
+    const h = JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8').trim());
+    expect(h).toMatchObject({ bancs: ['1-a'], hebdo: false });
+    const i = sortie.findIndex((l) => l.startsWith('temps candidat'));
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(sortie[i + 1]).toMatch(/^questions du candidat/);
+    expect(sortie.findIndex((l) => l.startsWith('VERT'))).toBeGreaterThan(i + 1);
+  });
+
+  it('une ligne éclair verte n\'autorise pas la publication', () => {
+    const ligne = JSON.stringify({ date: '2026-11-08T10:00:00.000Z', empreinte: 'e1', candidat: 'C', bancs: ['1-a'], hebdo: false, frais: 0, vert: true, rouges: [] });
+    expect(statut([ligne], new Date('2026-11-09T10:00:00Z'), 'e1').publication_ok).toBe(false);
+  });
+
+  it('la sous-commande est dans l\'aide', async () => {
+    const sortie: string[] = [];
+    await run(['--help'], { cwd: '/', env: {}, now: () => new Date(), out: (l) => sortie.push(l), err: () => {} });
+    expect(sortie.join('\n')).toMatch(/bench court\|hebdo\|eclair\|/);
   });
 });

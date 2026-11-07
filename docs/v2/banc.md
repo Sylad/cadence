@@ -57,6 +57,10 @@ bash v2/systeme/installer.sh
 
 Le service lance `cadence2 bench hebdo` avec un `PATH` explicite (node de nvm, `~/.local/bin` pour `claude`) : pas de shell de connexion. Précondition, vérifiée au démarrage du service (échec net dans le journal sinon) : `cadence2` doit être lié au checkout principal, `~/projects/developpeur/cadence/v2` ; pour le corriger : `cd ~/projects/developpeur/cadence/v2 && npm run build && npm link` (l'installeur avertit si le lien pointe ailleurs). Le service vérifie aussi que `node` est sur son `PATH` : après une montée de version nvm, mettre à jour la ligne `Environment=PATH` du service puis relancer l'installeur. Ce checkout doit être propre (rien de non commité sous `v2/src` et `v2/briefs`) et construit (`npm run build` dans `v2`), sinon le passage est refusé. Journal : `~/bench-cadence/hebdo.log`.
 
+## Banc éclair
+
+`cadence2 bench eclair` joue le seul banc 1 (une retouche), A contre le candidat, avec les juges : environ 15 minutes, à lancer après tout changement de v2 pour vérifier que le flux n'est pas redevenu lent ni bavard. Même garde (checkout propre et construit) et même verrou qu'un passage ordinaire. Il affiche d'abord « temps candidat ≤ 1,2 × A » et « questions du candidat : 0 », et ne sort en 0 que si le verdict est vert et les deux contrôles tiennent. Il n'autorise jamais la publication : `statut` exige les bancs 1, 3 et 6, donc seul `bench court` compte.
+
 ## Rattrapage
 
 `Persistent=true` : un samedi manqué (WSL éteint) est rejoué au premier démarrage de WSL suivant.

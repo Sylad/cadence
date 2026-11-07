@@ -117,21 +117,48 @@ describe('L639 — la porte joue sur la machine libre : le local d\'abord', () =
   });
 });
 
-describe('L639 — deux machines occupées : l\'attente (R4, R13)', () => {
-  it('R4 — deux machines occupées : la porte attend et la ligne d\'attente est écrite une fois', async () => {
+describe('L639 — deux machines occupées : l\'attente (R4, R13) ; L674 : jamais de créneau d\'hôte attendu', () => {
+  it('L674 — deux machines occupées : la porte attend le tour local, sans ligne ni demande de créneau de l\'hôte', async () => {
     await occupyLocal();
-    held.push(await hostGates('box').acquire(1));
+    const hostFree = await hostGates('box').acquire(1);
     let waits = 0;
     let ran = false;
     const p = withPlace(opts({ maxParallel: 1 }, { owner: {}, onWait: () => waits++ }), async () => void (ran = true));
     await wait(1200);
     expect(ran).toBe(false);
-    expect(count(WAIT)).toBe(1);
-    expect(waits).toBe(1);
-    expect(said.find((l) => l.includes(WAIT))).toBe(`porte du lot L1 : ${WAIT} (1 porte(s) simultanée(s) au plus)`);
-    held.pop()!(); // l'hôte se libère : la porte part dessus
+    expect(count(WAIT)).toBe(0);
+    expect(waits).toBe(1); // le lot sait qu'il attend : ni session ni processeur local tenus
+    hostFree(); // l'hôte se libère : la porte n'y va pas, elle a renoncé à son créneau
+    await wait(300);
+    expect(ran).toBe(false);
+    held.pop()!(); // la machine locale se libère
     await p;
     expect(ran).toBe(true);
+    expect(count('jouée en local, machine locale libre')).toBe(1);
+  });
+
+  it('L674 — local occupé, hôte libre : la porte part sur l\'hôte sans attente (file de l\'hôte vide)', async () => {
+    await occupyLocal();
+    let waits = 0;
+    await withPlace(opts({ maxParallel: 1 }, { owner: {}, onWait: () => waits++ }), async (p) => expect(p.remote()).toBe(true));
+    expect(waits).toBe(0);
+    expect(count(WAIT)).toBe(0);
+  });
+
+  it('L674 — local occupé, hôte plein avec une porte en file : la porte n\'entre pas dans la file de l\'hôte', async () => {
+    await occupyLocal();
+    const hostFree = await hostGates('box').acquire(1);
+    const queued = hostGates('box').request(1); // la file de l\'hôte n\'est pas vide
+    let ran = false;
+    const p = withPlace(opts({ maxParallel: 1 }, { owner: {} }), async () => void (ran = true));
+    await wait(1200);
+    hostFree(); // c'est la porte en file qui prend le créneau libéré
+    expect(queued.started()).toBe(true);
+    queued.cancel();
+    held.pop()!();
+    await p;
+    expect(ran).toBe(true);
+    expect(count(WAIT)).toBe(0);
   });
 
   it('R4 — la première machine libérée prend la porte en attente', async () => {
@@ -162,20 +189,24 @@ describe('L639 — deux machines occupées : l\'attente (R4, R13)', () => {
     expect(ran).toBe(true);
   });
 
-  it('R13 — maxParallel borne les portes simultanées sur l\'hôte de débordement', async () => {
+  it('R13 — maxParallel borne les portes simultanées sur l\'hôte de débordement : la seconde attend le local, pas l\'hôte', async () => {
     await occupyLocal();
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
-    let second = false;
+    let second: boolean | undefined;
     const a = withPlace(opts({ maxParallel: 1 }, { owner: {} }), () => gate);
     await wait(1200);
-    const b = withPlace(opts({ maxParallel: 1 }, { owner: {} }), async () => void (second = true));
+    const b = withPlace(opts({ maxParallel: 1 }, { owner: {} }), async (p) => void (second = p.remote()));
     await wait(1500);
+    expect(second).toBeUndefined();
+    expect(count(WAIT)).toBe(0);
+    release(); // l'hôte se libère : b n'y va pas
+    await a;
+    await wait(300);
+    expect(second).toBeUndefined();
+    held.pop()!();
+    await b;
     expect(second).toBe(false);
-    expect(count(WAIT)).toBe(1);
-    release();
-    await Promise.all([a, b]);
-    expect(second).toBe(true);
   });
 });
 

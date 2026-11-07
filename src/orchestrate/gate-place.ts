@@ -169,7 +169,7 @@ async function openHost(o: PlaceOpts, host: string, d: HostDecision | null, rele
 }
 
 /**
- * La porte avec `gate.overflow` (L639) : la machine locale d'abord (une porte à la fois), l'hôte en débordement, l'état de l'hôte décidé une fois par lot.
+ * La porte avec `gate.overflow` (L639) : la machine locale d'abord (une porte à la fois), l'hôte en débordement seulement si son créneau est libre tout de suite (L674), l'état de l'hôte décidé une fois par lot.
  * Un lot qui tient déjà un tour garde sa machine pour ses lieux imbriqués (ligne de base) : le tour local sans nouveau tour, l'hôte sans nouveau tour ni nouvelle sonde.
  */
 async function openOverflow(o: PlaceOpts, host: string): Promise<Place> {
@@ -182,13 +182,16 @@ async function openOverflow(o: PlaceOpts, host: string): Promise<Place> {
     sayDown(o, host, d);
     return waitLocal(o, local);
   }
-  const limit = o.config.gate?.maxParallel ?? GATE_HOST_DEFAULT;
-  const remote = hostGates(host).request(limit);
-  if (!local.started() && !remote.started()) (o.say(waitingLine(o, host, limit)), o.onWait?.());
-  const won = await Promise.race([local.promise.then((free) => ({ local: true, free })), remote.promise.then((free) => ({ local: false, free }))]);
-  (won.local ? remote : local).cancel();
-  if (won.local) return playLocal(o, won.free);
-  const placed = await openHost(o, host, d, hold(o, 'host', won.free));
+  if (local.started()) return playLocal(o, await local.promise); // libéré pendant la sonde
+  // L674 : l'hôte n'est pris que si son créneau est libre tout de suite (file vide) ; sinon la porte attend le tour local, jamais un créneau de l'hôte.
+  const remote = hostGates(host).request(o.config.gate?.maxParallel ?? GATE_HOST_DEFAULT);
+  if (!remote.started()) {
+    remote.cancel();
+    o.onWait?.();
+    return playLocal(o, await local.promise);
+  }
+  local.cancel();
+  const placed = await openHost(o, host, d, hold(o, 'host', await remote.promise));
   return placed ?? waitLocal(o, localGates().request(GATE_LOCAL_LIMIT));
 }
 

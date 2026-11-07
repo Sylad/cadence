@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Banc } from './banc.js';
 
@@ -7,14 +7,19 @@ export class FuturVisible extends Error {}
 
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
 
-function shell(cmd: string, cwd: string, log: string): number {
-  const r = spawnSync('bash', ['-c', cmd], { cwd, encoding: 'utf8', maxBuffer: 256 << 20 });
-  writeFileSync(log, `${r.stdout ?? ''}${r.stderr ?? ''}`);
-  return r.status ?? 1;
+/** Commande du banc dans son propre groupe, sortie dans le journal ; au retour ou au délai, le groupe entier est tué. */
+function shell(quoi: string, cmd: string, cwd: string, log: string, delaiMs: number): number {
+  const fd = openSync(log, 'w');
+  try {
+    const r = spawnSync('setsid', ['bash', '-c', cmd], { cwd, stdio: ['ignore', fd, fd], timeout: delaiMs, killSignal: 'SIGKILL' });
+    if (r.pid) try { process.kill(-r.pid, 'SIGKILL'); } catch { /* groupe déjà vide */ } // jamais kill(0) : ce serait notre propre groupe
+    if (r.error || r.signal) throw new Error(`${quoi} : délai de ${delaiMs / 60_000} min dépassé, voir ${log}`);
+    return r.status ?? 1;
+  } finally { closeSync(fd); }
 }
 
 /** Clone de travail d'un bras : à la base, sans remote, sans rien de postérieur (tags, branches, reflog). */
-export function preparer(b: Banc, cible: string): { testsBase: number } {
+export function preparer(b: Banc, cible: string, delaiMs = 30 * 60_000): { testsBase: number } {
   rmSync(cible, { recursive: true, force: true });
   mkdirSync(dirname(cible), { recursive: true });
   execFileSync('git', ['clone', '-q', '--no-hardlinks', b.source, cible]);
@@ -28,6 +33,6 @@ export function preparer(b: Banc, cible: string): { testsBase: number } {
   git(cible, 'gc', '-q', '--prune=now');
   const futur = git(cible, 'rev-list', '--all', '--not', 'HEAD');
   if (futur) throw new FuturVisible(`banc ${b.id} : ${futur.split('\n').length} commit(s) postérieur(s) à la base restent joignables`);
-  shell(b.install, cible, `${cible}.install.log`);
-  return { testsBase: shell(b.tests, cible, `${cible}.tests-base.log`) };
+  if (shell('install', b.install, cible, `${cible}.install.log`, delaiMs) !== 0) throw new Error(`install : voir ${cible}.install.log`);
+  return { testsBase: shell('tests', b.tests, cible, `${cible}.tests-base.log`, delaiMs) };
 }

@@ -86,14 +86,14 @@ function passageVerrouille(o: OptPassage): Verdict {
   const jouer = (b: ReturnType<typeof listerBancs>[number], i: number, k: number): ResultatBanc => {
     const ordre = (i + k - 1) % 2 === 0 ? [o.ref, o.cand] : [o.cand, o.ref];
     const idBanc = N > 1 ? `${b.id}#${k}` : b.id; const sous = N > 1 ? join(b.id, `r${k}`) : b.id;
-    const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {};
+    const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {}; const suiteBase: Record<string, number> = {};
     const mapping: Record<string, string> = {}; // c1/c2 -> bras : écrit seulement après les juges (aveugle)
     let jugement: Jugement | null = null; let phase = 'préparation';
     try {
       ordre.forEach((n, j) => {
         const c = join(dirRun, sous, `c${j + 1}`);
         mapping[`c${j + 1}`] = n; clones[n] = c;
-        phase = 'préparation'; o.prep(b, c);
+        phase = 'préparation'; suiteBase[n] = o.prep(b, c).testsBase;
         o.out(`${idBanc} : bras ${n}…`);
         phase = `bras ${n}`; mesures[n] = { ...lancerBras(b, bras[n], c, o.exec), banc: idBanc };
         phase = 'fuites'; fuites[n] = fuitesDuBras(o.home, o.racine, b.id, c);
@@ -116,7 +116,7 @@ function passageVerrouille(o: OptPassage): Verdict {
     clonesParBanc.push(mapping);
     const r: ResultatBanc = { banc: idBanc, taille: b.taille, visible: b.visible, reponses: b.reponses, frais: b.frais, mesures, jugement, fuites };
     mkdirSync(join(dirRun, sous), { recursive: true });
-    writeFileSync(join(dirRun, sous, 'resultat.json'), JSON.stringify({ ...r, clones: mapping }, null, 2));
+    writeFileSync(join(dirRun, sous, 'resultat.json'), JSON.stringify({ ...r, clones: mapping, suite_base: suiteBase }, null, 2));
     return r;
   };
   const res: ResultatBanc[] = listerBancs(o.racine, o.numeros).flatMap((b, i) => Array.from({ length: N }, (_, k) => jouer(b, i, k + 1)));

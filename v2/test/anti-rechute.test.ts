@@ -141,6 +141,7 @@ function reglesC5(f: Fichiers): string[] {
   if (/\bc\('[^\n]*', [^\n]*, true(, (?:true|false))?\),/.test(t)) v.push('C5 : un critère a un ok constant (true)');
   if (!/vert: criteres\.every\(\(x\) => x\.ok \|\| !x\.bloquant\)/.test(t)) v.push('C5 : la formule du vert a changé');
   if (!/\['1', '3', '6'\]\.every/.test(t)) v.push('C5 : statut ne demande plus 1, 3 et 6');
+  if (!/m\.candidat !== m\.reference/.test(t)) v.push('C5 : la publication accepte un candidat égal à la référence (A contre A)');
   return v;
 }
 
@@ -183,6 +184,7 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C4', 'chemin options.json inexistant', 'options.json', remplace('"bench --juge": "docs/v2/2026-11-07-cadence-2-design.md"', '"bench --juge": "docs/v2/mesures/rien.md"')],
   ['C5', 'questions inutiles non bloquant', 'src/bench/verdict.ts', remplace('inutiles === 0)', 'inutiles === 0, false)')],
   ['C5', 'aucun bras en échec non bloquant', 'src/bench/verdict.ts', remplace('echecs.length === 0)', 'echecs.length === 0, false)')],
+  ['C5', 'publication sur A contre A', 'src/bench/verdict.ts', remplace('m.candidat !== m.reference', 'true')],
   ['C5', 'statut sans le banc 6', 'src/bench/verdict.ts', remplace("['1', '3', '6'].every", "['1', '3'].every")],
   // déguisements essayés par le relecteur Opus
   ['C5', 'critère neutralisé par || true', 'src/bench/verdict.ts', remplace('inutiles === 0)', 'inutiles === 0 || true)')],
@@ -239,15 +241,15 @@ describe('C5, comportement de verdict, rapport et historique', () => {
     const md = rapport([b], 'A', 'C', v, { date: '2026-11-07', empreinte: 'e1' });
     for (const c of v.criteres) expect(md, `critère « ${c.nom} » absent du rapport`).toContain(c.nom);
     expect(md).toContain('**ROUGE**');
-    const h = JSON.parse(ligneHistorique(v, { date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', bancs: ['b'], hebdo: false, frais: 0 }));
+    const h = JSON.parse(ligneHistorique(v, { date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['b'], hebdo: false, frais: 0 }));
     expect(h.vert).toBe(false);
     expect(h.rouges).toContain(nom);
   });
   it('statut refuse la publication sans passage couvrant 1, 3 et 6', () => {
-    const ligne = (bancs: string[]) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', vert: true, hebdo: false, frais: 0, bancs });
+    const ligne = (bancs: string[]) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', vert: true, hebdo: false, frais: 0, bancs });
     const now = new Date('2026-11-07T12:00:00Z');
-    expect(statut([ligne(['1-a', '3-b'])], now, 'e1').publication_ok).toBe(false);
-    expect(statut([ligne(['1-a', '3-b', '6-c'])], now, 'e1').publication_ok).toBe(true);
+    expect(statut([ligne(['1-a', '3-b'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(false);
+    expect(statut([ligne(['1-a', '3-b', '6-c'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(true);
   });
 });
 

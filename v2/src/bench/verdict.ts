@@ -79,7 +79,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
     ...(questions.length ? ['## Questions posées', '', ...questions, ''] : [])].join('\n');
 }
 
-export const ligneHistorique = (v: Verdict, e: { date: string; empreinte: string; candidat: string; bancs: string[]; hebdo: boolean; frais: number }) =>
+export const ligneHistorique = (v: Verdict, e: { date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; bancs: string[]; hebdo: boolean; frais: number }) =>
   JSON.stringify({ ...e, vert: v.vert, rouges: v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom) });
 
 const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' });
@@ -95,17 +95,26 @@ function samediCourant(d: Date): string {
   return new Date(Date.UTC(y, m - 1, j - ((sem + 1) % 7))).toISOString().slice(0, 10);
 }
 
-export function statut(historique: string[], maintenant: Date, empreinte: string) {
-  const h = historique.filter(Boolean).map((l) => JSON.parse(l) as { date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number; bancs?: string[] });
+type Ligne = { date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number; bancs?: string[]; candidat?: string; reference?: string; modele_candidat?: string; eclair_ok?: boolean };
+
+/** `modeles` : nom du bras -> modèle, lus dans le bras.yaml courant (le modèle n'est pas dans l'empreinte). */
+export function statut(historique: string[], maintenant: Date, empreinte: string, modeles: Record<string, string> = {}) {
+  const h = historique.filter(Boolean).map((l) => JSON.parse(l) as Ligne);
   const sam = samediCourant(maintenant);
   const enWeekend = [6, 0].includes(parisJour(maintenant).sem);
   const depuisSamedi = h.filter((x) => parisJour(new Date(x.date)).jour >= sam);
   const dernier = h.at(-1);
+  // Publication : le DERNIER passage de l'empreinte couvrant 1, 3 et 6 est vert, mesure un vrai candidat avec le modèle du bras.yaml
+  // courant, et aucun passage rouge de cette empreinte (éclair compris) ne le suit.
+  const miennes = h.filter((x) => x.empreinte === empreinte);
+  const i = miennes.map((x) => ['1', '3', '6'].every((n) => (x.bancs ?? []).some((id) => banBase(id).split('-')[0] === n))).lastIndexOf(true);
+  const m = miennes[i];
   return {
     dernier: dernier ? `${dernier.date} ${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
     banc_du_weekend: enWeekend || depuisSamedi.some((x) => x.hebdo),
-    publication_ok: empreinte !== 'inconnue' && h.some((x) => x.vert && x.empreinte === empreinte
-      && ['1', '3', '6'].every((n) => (x.bancs ?? []).some((id) => banBase(id).split('-')[0] === n))),
+    publication_ok: empreinte !== 'inconnue' && m !== undefined && typeof m.reference === 'string' && m.candidat !== m.reference
+      && typeof m.modele_candidat === 'string' && modeles[m.candidat ?? ''] === m.modele_candidat
+      && !miennes.slice(i).some((x) => !x.vert || x.eclair_ok === false),
     frais_semaine: somme(depuisSamedi.map((x) => x.frais ?? 0)),
   };
 }

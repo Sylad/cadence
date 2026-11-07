@@ -89,21 +89,21 @@ describe('rapport, historique, statut', () => {
     expect(md).toContain('- b/C : Quel format de date ?');
   });
   const h = (date: string, vert: boolean, empreinte = 'e1', hebdo = true) =>
-    ligneHistorique({ vert, criteres: [] }, { date, empreinte, candidat: 'C', bancs: ['1-a', '3-b', '6-c'], hebdo, frais: 0 });
+    ligneHistorique({ vert, criteres: [] }, { date, empreinte, candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a', '3-b', '6-c'], hebdo, frais: 0 });
   it('publication : un vert partiel (banc 1 seul) ne suffit pas, empreinte inconnue refusée', () => {
-    const partiel = ligneHistorique({ vert: true, criteres: [] }, { date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', bancs: ['1-a'], hebdo: false, frais: 0 });
-    expect(statut([partiel], new Date('2026-11-09T08:00:00Z'), 'e1').publication_ok).toBe(false);
-    expect(statut([h('2026-11-07T10:00:00Z', true, 'inconnue')], new Date('2026-11-09T08:00:00Z'), 'inconnue').publication_ok).toBe(false);
+    const partiel = ligneHistorique({ vert: true, criteres: [] }, { date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a'], hebdo: false, frais: 0 });
+    expect(statut([partiel], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(false);
+    expect(statut([h('2026-11-07T10:00:00Z', true, 'inconnue')], new Date('2026-11-09T08:00:00Z'), 'inconnue', { C: 'opus' }).publication_ok).toBe(false);
   });
   it('lundi sans passage depuis samedi : banc du weekend manquant', () => {
     const s = statut([h('2026-11-06T10:00:00Z', true)], new Date('2026-11-09T08:00:00Z'), 'e1');
     expect(s.banc_du_weekend).toBe(false);
   });
   it('passage samedi : banc du weekend fait ; publication seulement si vert sur la même empreinte', () => {
-    const s = statut([h('2026-11-07T10:00:00Z', true, 'e1')], new Date('2026-11-09T08:00:00Z'), 'e1');
+    const s = statut([h('2026-11-07T10:00:00Z', true, 'e1')], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' });
     expect(s).toMatchObject({ banc_du_weekend: true, publication_ok: true });
-    expect(statut([h('2026-11-07T10:00:00Z', true, 'e1')], new Date('2026-11-09T08:00:00Z'), 'e2').publication_ok).toBe(false);
-    expect(statut([h('2026-11-07T10:00:00Z', false, 'e1')], new Date('2026-11-09T08:00:00Z'), 'e1').publication_ok).toBe(false);
+    expect(statut([h('2026-11-07T10:00:00Z', true, 'e1')], new Date('2026-11-09T08:00:00Z'), 'e2', { C: 'opus' }).publication_ok).toBe(false);
+    expect(statut([h('2026-11-07T10:00:00Z', false, 'e1')], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(false);
   });
   it('un banc court le samedi ne compte pas comme banc du weekend', () => {
     expect(statut([h('2026-11-07T10:00:00Z', true, 'e1', false)], new Date('2026-11-09T08:00:00Z'), 'e1').banc_du_weekend).toBe(false);
@@ -148,8 +148,8 @@ describe('répétitions (R18)', () => {
     const md = rapport(rs, 'A', 'C', v, { date: '2026-11-08', empreinte: 'e1', repetitions: 2 });
     expect(md).toContain('Répétitions : 2'); expect(md).toContain('| 1-a#1 |'); expect(md).toContain('| 1-a#2 |');
     expect(rapport(rs, 'A', 'C', v, { date: 'd', empreinte: 'e' })).toContain('Répétitions : 1');
-    const ligne = JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', bancs: ['1-a#1', '1-a#2', '3-x#1', '3-x#2', '6-y#1', '6-y#2'], hebdo: true, frais: 0, vert: true, rouges: [] });
-    expect(statut([ligne], new Date('2026-11-09T08:00:00Z'), 'e1').publication_ok).toBe(true);
+    const ligne = JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a#1', '1-a#2', '3-x#1', '3-x#2', '6-y#1', '6-y#2'], hebdo: true, frais: 0, vert: true, rouges: [] });
+    expect(statut([ligne], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(true);
   });
   it('une répétition non jugée : le banc compte egal, jamais la préférence de l\'autre', () => {
     const v = verdict([rep('1-a#1', { pref: 'A', ui: 'A' }), rep('1-a#2', { nonJuge: true })], 'A', 'C', BARRE_SPEC);
@@ -159,5 +159,32 @@ describe('répétitions (R18)', () => {
   it('id à plusieurs # : groupé sur le dernier', () => {
     const v = verdict([rep('1-a#b#1', { pref: 'C' }), rep('1-a#b#2', { pref: 'C' })], 'A', 'C', BARRE_SPEC);
     expect(v.criteres.find((c) => c.nom === 'relecture aveugle')!.valeur).toContain('1/1 bancs de base');
+  });
+});
+
+describe('publication : la dernière mesure réelle de l\'empreinte (C-1, I-7)', () => {
+  const now = new Date('2026-11-09T08:00:00Z'); const modeles = { C: 'opus', A: 'opus' };
+  const l = (o: Record<string, unknown> = {}) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus',
+    bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, vert: true, rouges: [], ...o });
+  const ok = (h: string[], m: Record<string, string> = modeles) => statut(h, now, 'e1', m).publication_ok;
+  it('vert sur 1, 3, 6, candidat ≠ référence, modèle du bras.yaml courant : permise', () => expect(ok([l()])).toBe(true));
+  it('candidat = référence (A contre A) : refusée', () => expect(ok([l({ candidat: 'A' })])).toBe(false));
+  it('ligne sans référence (historique d\'avant) : refusée', () => expect(ok([l({ reference: undefined })])).toBe(false));
+  it('un vert suivi d\'un rouge de la même empreinte : refusée, même si le rouge est un éclair', () => {
+    expect(ok([l(), l({ vert: false })])).toBe(false);
+    expect(ok([l(), l({ vert: false, bancs: ['1-a'] })])).toBe(false);
+    expect(ok([l(), l({ bancs: ['1-a'], eclair_ok: false })])).toBe(false);
+  });
+  it('un rouge puis un vert : permise ; un rouge d\'une autre empreinte après le vert ne compte pas', () => {
+    expect(ok([l({ vert: false }), l()])).toBe(true);
+    expect(ok([l(), l({ vert: false, empreinte: 'e2' })])).toBe(true);
+  });
+  it('modèle du candidat différent de bras.yaml, ou bras.yaml illisible : refusée', () => {
+    expect(ok([l()], { C: 'fable' })).toBe(false);
+    expect(ok([l()], {})).toBe(false);
+  });
+  it('la ligne d\'historique porte la référence et le modèle du candidat', () => {
+    const h = JSON.parse(ligneHistorique({ vert: true, criteres: [] }, { date: 'd', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: [], hebdo: false, frais: 0 }));
+    expect(h).toMatchObject({ reference: 'A', modele_candidat: 'opus' });
   });
 });

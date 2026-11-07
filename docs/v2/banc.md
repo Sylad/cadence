@@ -32,7 +32,7 @@ Les chiffres absolus du 07-11 (304 tests cachés, 79 % de mutations) sont affich
 - Les juges travaillent dans `<racine>/eval/<passage>/<banc>`.
 - Un passage s'appelle `<date>-<HHMM>-<empreinte>` ; l'empreinte hache `v2/src` et `v2/briefs` à HEAD.
 - Refus (code 2) si `v2/src` ou `v2/briefs` a des changements non commités, ou si `v2/dist/cli.js` est absent ou plus ancien que les sources.
-- **Publication** : permise seulement si un passage vert couvre les bancs 1, 3 et 6 sur l'empreinte courante.
+- **Publication** : permise seulement si le **dernier** passage de l'empreinte courante qui couvre les bancs 1, 3 et 6 est vert, oppose un candidat à une référence distincte (`--candidat` égal à `--reference` est refusé, code 2), avec le modèle que le `bras.yaml` courant donne au candidat (le modèle est hors de l'empreinte : chaque ligne d'historique porte `reference` et `modele_candidat`), et si aucun passage rouge de cette empreinte, éclair compris, ne le suit.
 
 ## Commandes
 

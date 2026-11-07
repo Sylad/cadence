@@ -257,3 +257,17 @@ describe('répétitions (R18)', () => {
     expect(rap2.resultats.map((x: { mesures: Record<string, { banc: string }> }) => x.mesures.A.banc)).toEqual(['1-a#1', '1-a#2']);
   });
 });
+
+describe('garde de publication (C-1, I-7)', () => {
+  it('l\'historique porte la référence et le modèle du candidat lu dans bras.yaml', () => {
+    const r = racine(); writeFileSync(join(r, 'bras.yaml'), readFileSync(join(r, 'bras.yaml'), 'utf8').replace(/C:\n  modele: opus/, 'C:\n  modele: fable'));
+    passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec, prep: prep as never,
+      maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
+    expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8').trim())).toMatchObject({ candidat: 'C', reference: 'A', modele_candidat: 'fable' });
+  });
+  it('--candidat égal à --reference : refusé, code 2', async () => {
+    const err: string[] = [];
+    const rc = await run(['bench', 'court', '--candidat', 'A', '--reference', 'A'], { cwd: '/', env: { BENCH_ROOT: racine() }, now: () => new Date(), out: () => {}, err: (l) => err.push(l) });
+    expect(rc).toBe(2); expect(err.join('\n')).toMatch(/même bras/);
+  });
+});

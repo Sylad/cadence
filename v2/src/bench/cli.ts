@@ -126,7 +126,7 @@ function passageVerrouille(o: OptPassage): Verdict {
   writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N }));
   writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultats: res.map((r, i) => ({ ...r, clones: clonesParBanc[i] })) }, null, 2));
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
-    candidat: o.cand, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: new Set(res.filter((r) => r.frais).map((r) => banBase(r.banc))).size })}\n`);
+    candidat: o.cand, reference: o.ref, modele_candidat: bras[o.cand].modele, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: new Set(res.filter((r) => r.frais).map((r) => banBase(r.banc))).size })}\n`);
   o.avantVerdict?.(res);
   o.out(`${v.vert ? 'VERT' : 'ROUGE'} — rapport : ${base}.md`);
   return v;
@@ -162,15 +162,16 @@ export async function bench(args: string[], io: Io): Promise<number> {
   const racine = racineBanc(io.env);
   const hist = existsSync(join(racine, 'historique.jsonl')) ? readFileSync(join(racine, 'historique.jsonl'), 'utf8').split('\n') : [];
   const emp = empreinte(REPO);
+  const modeles = (): Record<string, string> => { try { return Object.fromEntries(Object.values(chargerBras(racine)).map((d) => [d.nom, d.modele])); } catch { return {}; } };
   if (sous === 'statut') {
-    const s = statut(hist, io.now(), emp);
+    const s = statut(hist, io.now(), emp, modeles());
     io.out(`banc : dernier passage ${s.dernier ?? 'aucun'} ; publication ${s.publication_ok ? 'permise' : 'refusée'} sur l'empreinte ${emp}`);
     if (!s.banc_du_weekend) io.out('⚠ BANC DU WEEKEND MANQUANT : lancer « cadence2 bench hebdo » avant toute publication');
     if (s.frais_semaine === 0) io.out('⚠ aucun banc frais cette semaine : en ajouter avec « cadence2 bench ajouter »');
     return s.banc_du_weekend ? 0 : 1;
   }
   if (sous === 'verifier-publication') {
-    const ok = statut(hist, io.now(), emp).publication_ok;
+    const ok = statut(hist, io.now(), emp, modeles()).publication_ok;
     io.out(ok ? `banc vert sur l'empreinte ${emp}` : `aucun banc vert sur l'empreinte ${emp} : lancer « cadence2 bench court »`);
     return ok ? 0 : 1;
   }
@@ -194,7 +195,7 @@ export async function bench(args: string[], io: Io): Promise<number> {
   let refus: string | null;
   try {
     const tous = chargerBras(racine);
-    refus = [ref, cand].find((n) => !tous[n]) ? `bras absent de ${racine}/bras.yaml` : emp === 'inconnue' ? 'empreinte inconnue (pas de dépôt git)'
+    refus = ref === cand ? `--candidat et --reference désignent le même bras (${ref})` : [ref, cand].find((n) => !tous[n]) ? `bras absent de ${racine}/bras.yaml` : emp === 'inconnue' ? 'empreinte inconnue (pas de dépôt git)'
       : pretAPasser(REPO, { [ref]: tous[ref], [cand]: tous[cand] }, racine);
   } catch (e) { refus = e instanceof Error ? e.message : String(e); }
   if (refus) { io.err(`bench refusé : ${refus}`); return 2; }

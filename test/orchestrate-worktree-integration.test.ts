@@ -11,6 +11,7 @@ import { RunStore } from '../src/orchestrate/state.js';
 import { cadenceHome, liveSlots, liveWaves, registerWave } from '../src/orchestrate/registry.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
 import { branches, conflictWave, fake, inWorktree, lotOf, meeting, planOf, run, setup, sharedFile, store, subjects, writes } from './orchestrate-worktree-harness.js';
+import { leadMoved, lotDiff } from '../src/orchestrate/cycle/plan-writes.js';
 import { parseOrchestrateArgs } from '../src/orchestrate/command.js';
 import { tempDir } from './helpers.js';
 
@@ -234,6 +235,51 @@ describe('R8 — l\'arbre du lead n\'est jamais écrasé', () => {
     expect(readFileSync(join(repo, 'base.txt'), 'utf8')).toBe('base\nédité par le lead\n');
     expect(git(repo, 'status', '--porcelain')).toBe('M base.txt');
     expect(subjects(repo).some((s) => s.startsWith('feat('))).toBe(false);
+  });
+});
+
+describe('L673 — le plan modifié du lead pendant l\'intégration ne la refuse pas', () => {
+  const leadWritesPlan = (touchesPlan: boolean) => {
+    const { parent, repo } = setup();
+    const meet = meeting(2);
+    const f = fake({
+      implement: async (cwd, brief) => {
+        await meet();
+        const lot = lotOf(brief);
+        // raf add du lead pendant la vague : le plan suivi de l'arbre principal est modifié, non commité
+        if (lot === 'L1') appendFileSync(join(repo, '.cadence/raf.yaml'), '# ajout du lead\n');
+        const commits = [commitFile(cwd, `${lot}.txt`, `feat(${lot}): travail`)];
+        if (touchesPlan && lot === 'L1') {
+          appendFileSync(join(cwd, '.cadence/raf.yaml'), '# écrit par le lot\n');
+          git(cwd, 'commit', '-q', '-am', 'feat(L1): plan');
+        }
+        return claudeOut(workReport({ commits }));
+      },
+    });
+    return run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f).then((r) => ({ r, parent, repo }));
+  };
+  it('L673 — plan modifié hors du diff du lot : pas de refus « arbre du dépôt modifié », les lots s\'intègrent', async () => {
+    const { parent, repo } = await leadWritesPlan(false);
+    for (const id of ['L1', 'L2']) {
+      const l = store(parent).readLot('a', id)!;
+      expect(l.outcome ?? '').not.toMatch(/arbre du dépôt modifié/);
+      expect(l.status).toBe('ready');
+    }
+    expect(subjects(repo).some((s) => s.startsWith('feat(L1)'))).toBe(true);
+  });
+  it('L673 — leadMoved : un fichier modifié toléré qui est dans le diff du lot reste un refus', () => {
+    const { repo } = setup();
+    git(repo, 'checkout', '-q', '-b', 'lot');
+    writeFileSync(join(repo, 'seal.json'), '{}\n');
+    git(repo, 'add', '--', 'seal.json');
+    git(repo, 'commit', '-q', '-m', 'feat(L1): scellé');
+    git(repo, 'checkout', '-q', 'main');
+    appendFileSync(join(repo, 'base.txt'), 'sale\n');
+    expect(lotDiff(repo, 'main', 'lot')).toEqual(new Set(['seal.json']));
+    expect(leadMoved(repo, 'main', (f) => f === 'base.txt' && !lotDiff(repo, 'main', 'lot').has(f))).toBeNull();
+    expect(leadMoved(repo, 'main', () => true)).toBeNull();
+    expect(leadMoved(repo, 'main', (f) => f !== 'base.txt')).toMatch(/arbre du dépôt modifié \(base\.txt\)/);
+    expect(leadMoved(repo, 'main')).toMatch(/arbre du dépôt modifié \(base\.txt\)/);
   });
 });
 

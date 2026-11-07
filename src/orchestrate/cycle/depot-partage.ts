@@ -103,8 +103,8 @@ export function guardLost(w: WaveCtx, repo: string, before: Snapshot, after: Sna
  * Refus juste avant l'avance de la branche du dépôt : le lead a changé de branche ou sali son arbre (R24, R8), ou (L553) un tiers a pris le dépôt que la vague porteuse a libéré pendant
  * l'intégration — une reprise qui intègre entre les étapes d'une autre vague n'avance la branche que si cette vague tient encore le dépôt, ou si la reprise l'a pris à sa libération. null : rien ne s'oppose à l'avance.
  */
-export function lateRefusal(w: WaveCtx, repo: string, base: string): string | null {
-  const moved = leadMoved(repo, base);
+export function lateRefusal(w: WaveCtx, repo: string, base: string, tolerated?: (f: string) => boolean): string | null {
+  const moved = leadMoved(repo, base, tolerated);
   if (moved) return moved;
   const claim = w.claimRepo?.(repo);
   return claim?.kind === 'taken' ? `le dépôt, libéré par la vague ${claim.freed.wave}, est tenu par ${claim.holder.wave} (pid ${claim.holder.pid})` : null;

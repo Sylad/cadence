@@ -4,7 +4,7 @@ import { repoShas, repoWork } from '../../repos.js';
 import { lotWork, coveredTasks } from '../../audit.js';
 import { openDocGap } from './brief.js';
 import { git, trackedDirty, lotBranch, branchExists, integrated, gitFailure, removeTree } from '../worktree.js';
-import { foreignDirty, planBefore, commitPlan, planMessage, leadMoved, slowWaitLog } from './plan-writes.js';
+import { foreignDirty, planBefore, commitPlan, planMessage, leadMoved, slowWaitLog, toleratedDirty } from './plan-writes.js';
 import { repoBranch, INTEGRATE_WAIT_MS, takeRepoWrite, rebaseOnto, rebaseNotes, changelogShapeOf, patchId, mergeBase, advance, baseMoved, MAX_REPLAYS, type Grant, type Rebase } from '../integrate.js';
 import { relative } from 'node:path';
 import { RafError } from '../../plan.js';
@@ -181,7 +181,7 @@ export async function integrateLot(c: LotCtx): Promise<void> {
   let reporte: Reporte | undefined;
   let start = '';
   try {
-    const moved = leadMoved(l.repo, t.base);
+    const moved = leadMoved(l.repo, t.base, toleratedDirty(c, t.branch));
     if (moved) return refuse(`intégration refusée : ${moved} ; branche conservée : ${t.branch}`);
     start = git(l.repo, 'rev-parse', `refs/heads/${t.base}`);
     // Une branche déjà contenue dans celle du dépôt (arrêt entre l'avance et l'écriture du verdict) : ni rebase ni avance, seul le plan reste à écrire (R23).
@@ -219,7 +219,7 @@ export async function integrateLot(c: LotCtx): Promise<void> {
           }
         }
         // Les contrôles rejoués et la revue courte ont pu durer : le lead a pu changer de branche ou salir son arbre depuis le contrôle du départ (R24, R8), ou un tiers a pu prendre le dépôt libéré par la vague porteuse (L553, `lateRefusal`).
-        const late = lateRefusal(c.wave, l.repo, t.base);
+        const late = lateRefusal(c.wave, l.repo, t.base, toleratedDirty(c, t.branch));
         if (late) return refuse(`intégration refusée : ${late} ; branche du dépôt inchangée, ${kept}`);
         try {
           advance(l.repo, t.branch);

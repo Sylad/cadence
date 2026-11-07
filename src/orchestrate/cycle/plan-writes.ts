@@ -226,11 +226,29 @@ export function foreignDirty(c: LotCtx): string[] {
   return trackedDirty(c.lot.repo).filter((f) => !ownFile(f));
 }
 
-/** Pourquoi le dépôt du lead n'est plus celui que l'intégration a vu au départ : branche changée ou HEAD détaché (R24), fichier suivi modifié (R8). Null s'il est intact. */
-export function leadMoved(repo: string, base: string): string | null {
+/** Les fichiers que la branche du lot change par rapport à sa base (depuis leur ancêtre commun) : le diff que l'avance apporterait au dépôt du lead. */
+export function lotDiff(repo: string, base: string, branch: string): Set<string> {
+  return new Set(git(repo, '-c', 'core.quotepath=off', 'diff', '--name-only', '-z', `${base}...${branch}`).split('\0').filter(Boolean));
+}
+
+/**
+ * Les fichiers modifiés du dépôt du lead que l'intégration du lot laisse passer (L673) : ceux du plan ou tenus avec lui (un `raf add` ou `raf done` du lead pendant la vague,
+ * que le commit du plan emporte avec lui), tant que le diff du lot ne les touche pas. Tout autre fichier modifié reste un refus (R26).
+ */
+export function toleratedDirty(c: LotCtx, branch: string): (f: string) => boolean {
+  const ownFile = planOwnFile(c, c.lot.repo);
+  const diff = lotDiff(c.lot.repo, c.tree!.base, branch);
+  return (f) => ownFile(f) && !diff.has(f);
+}
+
+/**
+ * Pourquoi le dépôt du lead n'est plus celui que l'intégration a vu au départ : branche changée ou HEAD détaché (R24), fichier suivi modifié (R8). Null s'il est intact.
+ * `tolerated` écarte les fichiers modifiés que l'intégration accepte (L673) ; sans lui, tout fichier suivi modifié refuse.
+ */
+export function leadMoved(repo: string, base: string, tolerated: (f: string) => boolean = () => false): string | null {
   const cur = repoBranch(repo);
   if (cur !== base) return `le dépôt est sur ${cur ?? 'HEAD détaché'} et non sur ${base}`;
-  const dirty = trackedDirty(repo);
+  const dirty = trackedDirty(repo).filter((f) => !tolerated(f));
   return dirty.length ? `arbre du dépôt modifié (${dirty.join(', ')})` : null;
 }
 

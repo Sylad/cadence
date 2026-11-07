@@ -1,4 +1,4 @@
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runLot } from '../src/orchestrate/cycle.js';
 import { lotBranch, lotTreeDir } from '../src/orchestrate/worktree.js';
@@ -24,7 +24,7 @@ export async function acceptWave() {
       implement: [green],
       review: [
         () => {
-          appendFileSync(join(h.repo, '.cadence/raf.yaml'), '# le lead édite son plan\n'); // fichier suivi modifié dans le dépôt du lead
+          appendFileSync(join(h.repo, 'base.txt'), 'le lead édite un fichier\n'); // fichier suivi modifié dans le dépôt du lead (hors plan : le plan modifié ne refuse plus, L673)
           return claudeOut(reviewReport());
         },
       ],
@@ -32,6 +32,9 @@ export async function acceptWave() {
     },
   });
   ecrit(h.repo);
+  writeFileSync(join(h.repo, 'base.txt'), 'base\n');
+  git(h.repo, 'add', '--', 'base.txt');
+  git(h.repo, 'commit', '-q', '-m', 'chore: base', '--', 'base.txt');
   const c = h.lot('L1', { visible: true, screen: 'page' }, { accept: 'test -f done.flag', test: 'true' });
   const waveDir = tempDir();
   c.tree = { dir: lotTreeDir(waveDir, 'demo', 'L1'), branch: lotBranch('w1', 'demo', 'L1'), base: 'main', active: false };

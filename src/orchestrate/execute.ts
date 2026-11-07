@@ -443,7 +443,8 @@ const pushToWaveWith = (deps: OrchestrateDeps, io: OrchestrateIo): PushToWave =>
   const refusals: string[] = [];
   const quiet: OrchestrateIo = { ...io, cwd: holder.cwd, out: () => {}, err: (line) => refusals.push(line.replace(/^orchestrate : /, '')) };
   const code = await addToLive({ ...parseOrchestrateArgs([]), add: [{ project: t.project, lot: t.lot }] }, { io: quiet, deps, launch: holder.cwd }, store, LAUNCH_CHECKS, from);
-  return { ok: code === 0, refusals };
+  const id = store.addQueue().find((e) => e.queue?.dir === from.dir && e.queue.key === from.key)?.id;
+  return code === 0 && id !== undefined ? { ok: true, store, id } : { ok: false, refusals: refusals.length ? refusals : ['demande introuvable dans la file d’ajouts de la vague'] };
 };
 
 const LAUNCH_CHECKS: LaunchChecks = { resolveTargets, preflight: (targets, run, addTo, ask) => preflight({ dryRun: false, goal: ask?.goal }, targets, run.io, run.deps, run.launch, { addTo, raises: ask?.raises }) };

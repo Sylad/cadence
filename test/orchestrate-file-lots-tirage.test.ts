@@ -878,7 +878,9 @@ describe('L498 — tirage de la file approuvée', () => {
   it('R9 — une poussée refusée n\'est pas rejouée tant que la même vague tient le dépôt : un seul contrôle préalable de --add pour tous les regards', async () => {
     const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
     await queueAdd(parent, 'b:L1');
-    registerWave(cadenceHome(), { pid: process.ppid, wave: 'autre', started: '2026-11-06T09:00:00Z', cwd: parent, repos: [gitRoot(dirs.b)!], cap: 3, lanes: 0 }); // sans dossier d'état : --add refusé
+    const other = otherWave(parent, gitRoot(dirs.b)!, ['b:L0'], { cap: 3, lanes: 0 });
+    // Le budget restant de la receveuse ne tient pas le lot : --add le refuse après son contrôle préalable (qui lit claude : claudeInfo).
+    other.store.writeWave({ ...other.store.readWave()!, budget: 1000 });
     try {
       const f = fakeDeps({
         implement: async (cwd) => {
@@ -893,11 +895,62 @@ describe('L498 — tirage de la file approuvée', () => {
       };
       const o = io(parent);
       expect(await orchestrate(['a:L1', '--max-sessions', '2', '--no-fill'], o.io, f.deps)).toBe(0);
-      expect(o.out.filter((l) => l.startsWith('file : --add refusé'))).toHaveLength(1);
-      expect(infos).toBe(1); // le lancement ; la poussée refusée (dossier d'état introuvable) n'atteint pas le contrôle, et n'est pas rejouée
-      expect((await show(parent))[0]).toBe('1. b:L1 — b un — en attente');
+      expect(o.out.filter((l) => l.startsWith('file : --add refusé — b:L1 : '))).toHaveLength(1);
+      expect(o.out.find((l) => l.startsWith('file : --add refusé — b:L1 : '))).toMatch(/le budget restant de la vague \(1000 tokens\) ne tient pas le budget du lot/);
+      expect(infos).toBe(2); // le lancement, puis UN contrôle préalable de --add : la poussée refusée n'est pas rejouée aux regards suivants
+      expect((await show(parent))[0]).toMatch(/^1\. b:L1 — b un — /);
     } finally {
-      unregisterWave(cadenceHome(), process.ppid);
+      other.done();
+    }
+  });
+
+  it('R20 — le créneau tenu par une poussée est libéré dès que la receveuse prend la demande (sa file d\'ajouts), ses voies au registre inchangées', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }], c: [{ title: 'c un' }] });
+    await queueAdd(parent, 'b:L1');
+    const other = otherWave(parent, gitRoot(dirs.b)!, ['b:L0'], { cap: 3, lanes: 0 }); // ses voies ne bougeront pas : seule sa file d'ajouts dit la prise
+    let cDuring: LotState | null | undefined;
+    try {
+      const f = fakeDeps({
+        implement: async (cwd) => {
+          if (basename(cwd) === 'a') {
+            await wait(() => other.store.addQueue().length === 1); // b:L1 poussé : le créneau est tenu
+            other.store.markAddTaken(other.store.addQueue()[0].id); // la receveuse prend la demande (ses voies au registre ne bougent pas)
+            await wait(() => ownStore(parent).readLot('c', 'L1') !== null); // le créneau libéré, le plan le remplit avant la fin de a:L1
+            cDuring = ownStore(parent).readLot('c', 'L1');
+          }
+          return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+        },
+      }, 20);
+      expect(await orchestrate(['a:L1', '--max-sessions', '2'], io(parent).io, f.deps)).toBe(0);
+      expect(cDuring).not.toBeNull();
+      expect(f.played).toEqual(['a:L1', 'c:L1']);
+    } finally {
+      other.done();
+    }
+  });
+
+  it('R7 — la receveuse meurt avant de prendre le lot poussé : le créneau est libéré, le lot rendu à la file (en attente), la demande marquée prise', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
+    await queueAdd(parent, 'b:L1');
+    const other = otherWave(parent, gitRoot(dirs.b)!, ['b:L0'], { cap: 3, lanes: 0 });
+    let gone = false;
+    try {
+      const f = fakeDeps({
+        implement: async (cwd) => {
+          await wait(() => other.store.addQueue().length === 1); // poussé
+          unregisterWave(cadenceHome(), process.ppid); // la receveuse meurt sans l'avoir pris
+          gone = true;
+          await wait(() => other.store.addQueue().length === 0); // la demande marquée prise par la vague qui a poussé
+          return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+        },
+      }, 20);
+      const o = io(parent);
+      expect(await orchestrate(['a:L1', '--max-sessions', '2', '--no-fill'], o.io, f.deps)).toBe(0);
+      expect(o.err).toContain('file : b:L1 rendu à la file (vague autre morte avant de le prendre)');
+      expect(await show(parent)).toEqual(['1. b:L1 — b un — en attente']);
+    } finally {
+      if (!gone) unregisterWave(cadenceHome(), process.ppid);
+      releaseLock(join(sharedStateDir(gitRoot(dirs.b)!), REPO_LOCK), process.ppid);
     }
   });
 });

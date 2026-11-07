@@ -76,4 +76,31 @@ describe('juges', () => {
     clones.cand = mkdtempSync(join(tmpdir(), 'pasgit-'));
     expect(juger(b, clones, dirEval, 'opus', fauxJuge([]), () => 0.2)).toBeNull();
   });
+  it('le juge aveugle voit des copies fraîches, sans les mutations du mécanique', () => {
+    const { b, clones, dirEval } = decor();
+    let n = 0;
+    const exec: Executeur = (args) => {
+      const m = /dans (\S+\.json)/.exec(args[args.indexOf('-p') + 1])!;
+      if (n++ === 0) { writeFileSync(join(dirEval, 'X', 'MUTATION'), 'm'); writeFileSync(m[1], JSON.stringify({ X: meca, Y: meca })); }
+      else { expect(existsSync(join(dirEval, 'X', 'MUTATION'))).toBe(false); writeFileSync(m[1], JSON.stringify(aveugle)); }
+      return { stdout: JSON.stringify({ session_id: `s${n}` }), code: 0 };
+    };
+    expect(juger(b, clones, dirEval, 'opus', exec, () => 0.2)).not.toBeNull();
+    expect(n).toBe(2);
+  });
+  it('tirage 0.8 : X = cand, Y = A', () => {
+    const { b, clones, dirEval } = decor();
+    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: { ...meca, caches_passes: 1 }, Y: meca }, aveugle]), () => 0.8);
+    expect(j!.meca.cand.caches_passes).toBe(1);
+    expect(j!.meca.A.caches_passes).toBe(2);
+    expect(j!.defauts.cand.majeurs).toBe(1);
+    expect(j!.defauts.A.mineurs).toBe(2);
+    expect(j!.prefere).toBe('A');
+  });
+  it('premier JSON invalide, relance valide : accepté', () => {
+    const { b, clones, dirEval } = decor();
+    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{}, { X: meca, Y: meca }, aveugle]), () => 0.2);
+    expect(j).not.toBeNull();
+    expect(j!.prefere).toBe('cand');
+  });
 });

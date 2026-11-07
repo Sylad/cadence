@@ -76,16 +76,22 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
   const anon = anonymiser(noms, tirage);
   rmSync(dirEval, { recursive: true, force: true }); mkdirSync(dirEval, { recursive: true });
   writeFileSync(join(dirEval, 'demande.md'), lireDemande(b));
-  for (const k of ['X', 'Y'] as const) {
-    try {
-      writeFileSync(join(dirEval, `${k}.patch`), execFileSync('git', ['diff', `${b.base}..HEAD`, '--', '.', ...HORS_DIFF], { cwd: clones[anon[k]], encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'ignore'] }));
-    } catch { return null; }
-    cpSync(clones[anon[k]], join(dirEval, k), { recursive: true });
-    rmSync(join(dirEval, k, '.git'), { recursive: true, force: true }); // la copie ne doit pas trahir le bras
-  }
+  const copier = (): boolean => {
+    for (const k of ['X', 'Y'] as const) {
+      try {
+        writeFileSync(join(dirEval, `${k}.patch`), execFileSync('git', ['diff', `${b.base}..HEAD`, '--', '.', ...HORS_DIFF], { cwd: clones[anon[k]], encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'ignore'] }));
+      } catch { return false; }
+      rmSync(join(dirEval, k), { recursive: true, force: true });
+      cpSync(clones[anon[k]], join(dirEval, k), { recursive: true });
+      rmSync(join(dirEval, k, '.git'), { recursive: true, force: true }); // la copie ne doit pas trahir le bras
+    }
+    return true;
+  };
+  if (!copier()) return null;
   const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests };
   const sMeca = join(dirEval, 'meca.json');
   const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca }), sMeca, validerMeca, dirEval, modele, exec) as Record<'X' | 'Y', Meca> | null;
+  if (!copier()) return null; // le juge à l'aveugle voit les livrables, pas les mutations
   const ecran = b.visible
     ? `Lance l'app de chaque copie, l'une après l'autre, comme le dit ${v.MESURE} (section Écran). Fais des captures à 1440 et à 390 px dans ${dirEval}/captures-X et captures-Y, et regarde-les. ui = la copie dont l'écran est le plus cohérent avec le reste de l'application.`
     : 'Pas d\'écran : ui = "na".';

@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
+import { ajouterBanc } from './ajouter.js';
 import { listerBancs, racineBanc } from './banc.js';
 import { chargerBras, executeurClaude, lancerBras, type DefBras, type Executeur, type Mesure } from './bras.js';
 import { fuitesDuBras } from './fuites.js';
@@ -141,6 +142,14 @@ export async function bench(args: string[], io: Io): Promise<number> {
     const ok = statut(hist, io.now(), emp).publication_ok;
     io.out(ok ? `banc vert sur l'empreinte ${emp}` : `aucun banc vert sur l'empreinte ${emp} : lancer « cadence2 bench court »`);
     return ok ? 0 : 1;
+  }
+  if (sous === 'ajouter') {
+    const [projetDir, lot, fichierDemande] = reste;
+    const taille = (option(reste, 'taille') ?? 'fonction') as 'retouche' | 'fonction' | 'grosse';
+    if (!projetDir || !lot || !fichierDemande) { io.err('usage : cadence2 bench ajouter <projet> <lot> <demande.md> --install c --tests c [--taille t] [--visible]'); return 2; }
+    io.out(`banc ajouté : ${ajouterBanc({ racine, projetDir, lot, demande: readFileSync(fichierDemande, 'utf8'),
+      install: option(reste, 'install') ?? 'true', tests: option(reste, 'tests') ?? 'true', taille, visible: reste.includes('--visible') })}`);
+    return 0;
   }
   const numeros = sous === 'court' ? COURT : sous === 'hebdo' ? undefined : sous === 'lancer' ? (option(reste, 'bancs')?.split(',') ?? null) : null;
   if (numeros === null) { io.err('usage : cadence2 bench court|hebdo|lancer --bancs 1,3|statut|verifier-publication|ajouter [--candidat c] [--reference r]'); return 2; }

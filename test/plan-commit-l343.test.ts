@@ -137,7 +137,9 @@ describe('R5 — un refus du hook ne laisse pas le plan indexé, et le message d
     expect(store(parent).readLot('a', 'L1')!.status).toBe('failed');
     expect(lead).toContain('note du lead pendant la session');
     expect(git(repo, 'diff', '--cached', '--name-only')).toBe('');
-    expect(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')).toBe(lead); // la note du lead est là, les notes d'hypothèses de cadence n'y sont plus
+    // la note du lead est là, les notes d'hypothèses de cadence n'y sont plus ; L2, intégré pendant la session (L673 : le plan modifié du lead ne refuse plus), y a écrit sa revue
+    const sansRevue = (t: string) => t.split('\n').filter((l) => !l.trimStart().startsWith('review:')).join('\n');
+    expect(sansRevue(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8'))).toBe(sansRevue(lead));
   });
   it('R5 — le sujet de la réponse du lead commence en minuscule, comme l\'exige subject-case de config-conventional', () => {
     expect(leadAnswerMessage(undefined, 'L1', ['R3'], 'w1')).toBe('docs(L1): règle R3 sourcée par la réponse du lead (orchestrate w1)');

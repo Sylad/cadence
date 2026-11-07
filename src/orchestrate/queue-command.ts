@@ -22,6 +22,12 @@ function titleOf(launch: string, key: string): string | undefined {
   return 'lot' in ref ? ref.lot.title : undefined;
 }
 
+/** L'identité d'une clé, par le lot qu'elle nomme (`a:L1` et `./a:L1` sont le même lot, R3) ; une clé qui ne résout pas vaut par son texte. */
+function identity(launch: string, key: string): string {
+  const ref = resolveQueueLot(launch, key);
+  return 'lot' in ref ? `${ref.dir}\u0000${ref.lot.id}` : key;
+}
+
 const listing = (launch: string, entries: QueueEntry[]): string[] => entriesOf(entries, launch).map((e, i) => `${i + 1}. ${e.key} — ${titleOf(launch, e.key) ?? 'lot introuvable'}`);
 
 function add(io: QueueIo, keys: string[], home: string): string[] {
@@ -39,8 +45,9 @@ function add(io: QueueIo, keys: string[], home: string): string[] {
     (all) => {
       for (const key of keys) {
         const mine = entriesOf(all, io.cwd);
-        const at = mine.findIndex((e) => e.key === key);
-        if (at >= 0) warnings.push(`queue add : ${key} : déjà en file (position ${at + 1})`);
+        const same = identity(io.cwd, key);
+        const at = mine.findIndex((e) => identity(io.cwd, e.key) === same);
+        if (at >= 0) warnings.push(`queue add : ${key} : déjà en file (position ${at + 1}${mine[at].key === key ? '' : `, sous la clé ${mine[at].key}`})`);
         else all.push({ key, dir: io.cwd, state: 'pending' });
       }
       return [...all];
@@ -75,12 +82,14 @@ function drop(io: QueueIo, keys: string[], home: string): string[] {
     (all) => {
       const mine = entriesOf(all, io.cwd);
       // refus en bloc : toutes les clés sont vérifiées avant de retirer la première
+      const gone = new Set<string>();
       for (const key of keys) {
-        const e = mine.find((x) => x.key === key);
+        const same = identity(io.cwd, key);
+        const e = mine.find((x) => identity(io.cwd, x.key) === same);
         if (!e) throw new QueueRefusal(`queue drop : ${key} : absent de la file`);
         if (effectiveState(e) !== 'pending') throw new QueueRefusal(`queue drop : ${key} : déjà tiré par la vague ${e.wave}`);
+        gone.add(e.key);
       }
-      const gone = new Set(keys);
       const rest = all.filter((e) => !(e.dir === io.cwd && gone.has(e.key)));
       all.splice(0, all.length, ...rest);
       return [...all];

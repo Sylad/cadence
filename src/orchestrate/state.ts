@@ -312,6 +312,12 @@ function atomicWrite(file: string, data: unknown): void {
 }
 
 /** `.cadence/runs/<vague>/` du dossier de lancement. */
+/** L'origine d'un lot de la file approuvée dans une ligne d'adds.log (L498), ou rien quand la ligne n'en porte pas. */
+function queueOrigin(raw: unknown): { queue?: { dir: string; key: string } } {
+  const q = raw as { dir?: unknown; key?: unknown } | undefined;
+  return typeof q?.dir === 'string' && typeof q.key === 'string' ? { queue: { dir: q.dir, key: q.key } } : {};
+}
+
 export class RunStore {
   readonly dir: string;
 
@@ -549,14 +555,14 @@ export class RunStore {
    * File des lots à ajouter à une vague vivante (L421, `--add`) : `adds.log`, une ligne JSON par demande (`{id, lot, project?, model?, goal?, budget?}`, L657 : l'objectif du lot et la marge `+N` de son budget), le projet étant écrit comme le lead l'a donné
    * (nom de dossier depuis le dossier de lancement). La vague la relit entre deux étapes, comme celle des réponses.
    */
-  addQueue(): { id: number; project?: string; lot: string; model?: string; goal?: string; budget?: number }[] {
-    return this.queue('adds.log', (o) => (typeof o.lot === 'string' ? { lot: o.lot, ...(typeof o.project === 'string' ? { project: o.project } : {}), ...(typeof o.model === 'string' ? { model: o.model } : {}), ...(typeof o.goal === 'string' ? { goal: o.goal } : {}), ...(typeof o.budget === 'number' ? { budget: o.budget } : {}) } : null));
+  addQueue(): { id: number; project?: string; lot: string; model?: string; goal?: string; budget?: number; queue?: { dir: string; key: string } }[] {
+    return this.queue('adds.log', (o) => (typeof o.lot === 'string' ? { lot: o.lot, ...(typeof o.project === 'string' ? { project: o.project } : {}), ...(typeof o.model === 'string' ? { model: o.model } : {}), ...(typeof o.goal === 'string' ? { goal: o.goal } : {}), ...(typeof o.budget === 'number' ? { budget: o.budget } : {}), ...queueOrigin(o.queue) } : null));
   }
 
-  /** Dépose un lot à ajouter ; rend son numéro. */
-  requestAdd(t: { project?: string; lot: string; model?: string; goal?: string; budget?: number }): number {
+  /** Dépose un lot à ajouter ; rend son numéro. `queue` (L498) : le lot vient de la file approuvée d'un dossier, poussé par une autre vague. */
+  requestAdd(t: { project?: string; lot: string; model?: string; goal?: string; budget?: number; queue?: { dir: string; key: string } }): number {
     const id = this.nextId('adds.log');
-    this.appendAddLine({ id, lot: t.lot, ...(t.project ? { project: t.project } : {}), ...(t.model ? { model: t.model } : {}), ...(t.goal ? { goal: t.goal } : {}), ...(t.budget ? { budget: t.budget } : {}) });
+    this.appendAddLine({ id, lot: t.lot, ...(t.project ? { project: t.project } : {}), ...(t.model ? { model: t.model } : {}), ...(t.goal ? { goal: t.goal } : {}), ...(t.budget ? { budget: t.budget } : {}), ...(t.queue ? { queue: t.queue } : {}) });
     return id;
   }
 

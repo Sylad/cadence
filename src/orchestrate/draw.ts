@@ -5,7 +5,7 @@ import { lotKey, lotRepoPaths, type LotState, type RunStore } from './state.js';
 import { measuredBudgetsAt } from './budget-mesure.js';
 import { preflight } from './preflight.js';
 import { QueueError, type Queued, type QueueEntry } from './queue.js';
-import { QUEUE_DOWN, skipNote, type QueueRun } from './queue-draw.js';
+import { downNote, skipNote, type QueueRun } from './queue-draw.js';
 import { cadenceHome, freeSlots, liveHolds, liveWaves, type LiveWave } from './registry.js';
 import { maxSessions } from './status.js';
 import type { OrchestrateDeps, OrchestrateIo } from './command.js';
@@ -148,15 +148,19 @@ class Tirage {
       pending = queue.run.pending();
     } catch (e) {
       if (!(e instanceof QueueError)) throw e;
-      queue.run.note({ line: QUEUE_DOWN, warn: true });
+      queue.run.note(downNote());
       this.down = true;
       return;
     }
     const home = cadenceHome();
-    const room = Math.min(this.n, freeSlots(liveWaves(home), queue.cap, liveHolds(home, this.x.io.now()).length));
+    const waves = liveWaves(home);
+    const holds = liveHolds(home, this.x.io.now()).length;
+    const room = Math.min(this.n, freeSlots(waves, queue.cap, holds));
     this.queueRoom = room;
     const inVague = this.noteWaiting(pending.map((p) => p.entry));
     const todo = room > 0 ? pending.filter((p) => !inVague.has(p.entry.key)) : [];
+    // Le plafond est plein (R8) : la cause est dite, sinon le lead chercherait un défaut dans sa file.
+    if (room <= 0 && pending.length) queue.run.note({ line: `file : aucun créneau libre pour la file (plafond ${queue.cap} : ${waves.length} vague(s) vivante(s), ${holds} session(s) du lead)`, skip: { key: '*slots*', cause: `plafond ${queue.cap} plein` } });
     const others = liveWaves(home).filter((w) => w.pid !== process.pid);
     let skipped = 0;
     for (const p of todo) {

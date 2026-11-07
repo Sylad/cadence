@@ -11,7 +11,7 @@ import { sharedStateDir } from '../state.js';
 import { acquireSlot, cadenceHome, registerWave, updateWaveRepos } from './registry.js';
 import { loadTemplates } from './briefs.js';
 import { fillsFreeSlots, fillTargetsSafe, handedBackStreak, stopReason, type FillFacts } from './continue.js';
-import { launchWithQueue, queueFill, QueueRun, sayTo, type PushToWave } from './queue-draw.js';
+import { launchWithQueue, queueFill, QueueRun, sayTo, type PushToWave, type Say } from './queue-draw.js';
 import { parseOrchestrateArgs } from './command-args.js';
 import { Budget, DROPPED, STOP_REQUESTED, countInterrupted, handBackDroppedQuestions, workDir, type LotCtx, type WaveCtx } from './cycle.js';
 import { installPrePush } from './guard.js';
@@ -289,7 +289,7 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   });
   const finished = lotFinished;
   /** Les lots que le créneau libre peut recevoir : la file approuvée (L498), puis les lots prêts du plan (L527, rien avec `--no-fill`, L587). */
-  const refill = (canRun: (c: LotCtx) => boolean, vacantLanes: number): Promise<LotCtx[]> => refillFreeLanes({ facts: { args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }, args, io, cap, queue, adds, deps, log: wctx.log }, canRun, vacantLanes);
+  const refill = (canRun: (c: LotCtx) => boolean, vacantLanes: number): Promise<LotCtx[]> => refillFreeLanes({ facts: { args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }, args, io, say: sayTo(io, store), cap, queue, adds, deps, log: wctx.log }, canRun, vacantLanes);
   try {
     await runPool(ctxs, cap, all, (c) => {
       // Un lot rendu ou en échec garde son worktree et sa branche (R12) : le journal en donne le chemin.
@@ -362,6 +362,8 @@ interface RefillScene {
   facts: FillFacts;
   args: Args;
   io: OrchestrateIo;
+  /** Les lignes de la file : sortie (d'erreur pour un avertissement) et journal. */
+  say: Say;
   cap: number;
   queue: QueueRun;
   adds: AddFeed;
@@ -376,8 +378,8 @@ interface RefillScene {
 async function refillFreeLanes(r: RefillScene, canRun: (c: LotCtx) => boolean, vacantLanes: number): Promise<LotCtx[]> {
   if (vacantLanes <= 0) return [];
   const first = await queueFill(r.queue, { ...r.facts, cap: r.cap }, vacantLanes, { fill: (plan, lanes, can) => r.adds.fill(plan, lanes, can), canRun, push: pushToWaveWith(r.deps, r.io) });
-  r.queue.emit(r.log);
-  const left = vacantLanes - first.added.length;
+  r.queue.emit(r.say);
+  const left = vacantLanes - first.added.length - first.pushed; // R20 : un lot poussé compte pour le créneau de ce regard
   if (left <= 0 || first.down || !fillsFreeSlots(r.args)) return first.added;
   return [...first.added, ...(await r.adds.fill(fillTargetsSafe({ ...r.facts, exclude: first.waiting }, r.log), left, canRun))];
 }
@@ -435,12 +437,12 @@ async function slotGuarded(s: SlotScene, argv: string[], o: Parameters<ClaudeFn>
  * L498 (R9) : la poussée d'un lot de la file dans la vague vivante `holder` qui tient son dépôt, par le mécanisme de `--add` (L421, `addToLive`) : même contrôle préalable qu'un `--add` tapé depuis le dossier de lancement
  * de cette vague, même dépôt dans sa file d'ajouts ; rien d'autre n'écrit dans son état (R18). Les refus sont rendus à l'appelant, pas imprimés.
  */
-const pushToWaveWith = (deps: OrchestrateDeps, io: OrchestrateIo): PushToWave => async (t, holder) => {
+const pushToWaveWith = (deps: OrchestrateDeps, io: OrchestrateIo): PushToWave => async (t, holder, from) => {
   const store = RunStore.find(holder.cwd, holder.wave);
   if (!store) return { ok: false, refusals: [`dossier d'état de la vague ${holder.wave} introuvable`] };
   const refusals: string[] = [];
   const quiet: OrchestrateIo = { ...io, cwd: holder.cwd, out: () => {}, err: (line) => refusals.push(line.replace(/^orchestrate : /, '')) };
-  const code = await addToLive({ ...parseOrchestrateArgs([]), add: [{ project: t.project, lot: t.lot }] }, { io: quiet, deps, launch: holder.cwd }, store, LAUNCH_CHECKS);
+  const code = await addToLive({ ...parseOrchestrateArgs([]), add: [{ project: t.project, lot: t.lot }] }, { io: quiet, deps, launch: holder.cwd }, store, LAUNCH_CHECKS, from);
   return { ok: code === 0, refusals };
 };
 

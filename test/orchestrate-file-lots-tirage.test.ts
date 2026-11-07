@@ -52,7 +52,7 @@ function parentWith(projects: Record<string, Lots>, yaml = ''): { parent: string
 
 type Over = Partial<Record<'implement' | 'review' | 'fix', (cwd: string, brief: string) => LaunchOutcome | Promise<LaunchOutcome>>>;
 
-function fakeDeps(over: Over = {}): { deps: OrchestrateDeps; played: string[] } {
+function fakeDeps(over: Over = {}, slotPollMs?: number): { deps: OrchestrateDeps; played: string[] } {
   const played: string[] = [];
   const claude: ClaudeFn = async (args, o) => {
     const kind = kindOf(args);
@@ -66,7 +66,29 @@ function fakeDeps(over: Over = {}): { deps: OrchestrateDeps; played: string[] } 
     }
     return claudeOut(reviewReport());
   };
-  return { deps: { claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR, queueLockMs: 150 }, played };
+  return { deps: { claude, claudeInfo: () => ({ version: '2.1.289', jsonSchema: true }), agentsDir: AGENTS_DIR, queueLockMs: 150, ...(slotPollMs ? { slotPollMs } : {}) }, played };
+}
+
+/** Attend que `until` soit vrai (5 s au plus), sinon le test échoue. */
+const wait = async (until: () => boolean) => {
+  for (let i = 0; i < 500 && !until(); i++) await new Promise((r) => setTimeout(r, 10));
+  expect(until()).toBe(true);
+};
+
+/** Une vague « autre » qui tient le dépôt `repo` comme une vraie vague (verrou, registre sous un autre processus vivant, dossier d'état) ; `lanes` : ses voies prises, `cap` son plafond. Rend ce qui la retire. */
+function otherWave(parent: string, repo: string, lots: string[], o: { cap: number; lanes?: number }): { store: RunStore; done: () => void } {
+  const store = RunStore.reserve(parent, 'autre', { exact: true })!;
+  store.writeWave({ id: 'autre', created: '2026-11-06T09:00:00Z', cwd: parent, budget: 2_000_000, consumed: 0, cacheRead: 0, status: 'running', pid: process.ppid, lots, addsGoalBudget: true });
+  const lock = join(sharedStateDir(repo), REPO_LOCK);
+  expect(takeLock(lock, { pid: process.ppid, wave: 'autre', started: '2026-11-06T09:00:00Z' }).ok).toBe(true);
+  registerWave(cadenceHome(), { pid: process.ppid, wave: 'autre', started: '2026-11-06T09:00:00Z', cwd: parent, repos: [repo], cap: o.cap, ...(o.lanes !== undefined ? { lanes: o.lanes } : {}) });
+  return {
+    store,
+    done: () => {
+      unregisterWave(cadenceHome(), process.ppid);
+      releaseLock(lock, process.ppid);
+    },
+  };
 }
 
 function io(cwd: string) {
@@ -619,5 +641,133 @@ describe('L498 — tirage de la file approuvée', () => {
     } finally {
       unregisterWave(cadenceHome(), process.ppid);
     }
+  });
+
+  it('R20 — créneau libre d\'une vague vivante : au plus un lot poussé par créneau libre de la receveuse, les autres attendent (file b:L1..L3, receveuse à 2 voies libres)', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }, { title: 'b deux' }, { title: 'b trois' }] });
+    await queueAdd(parent, 'b:L1', 'b:L2', 'b:L3');
+    const other = otherWave(parent, gitRoot(dirs.b)!, ['b:L0'], { cap: 3, lanes: 1 });
+    try {
+      const f = fakeDeps({}, 20);
+      const o = io(parent);
+      expect(await orchestrate(['a:L1', '--max-sessions', '3', '--no-fill'], o.io, f.deps)).toBe(0);
+      expect(f.played).toEqual(['a:L1']);
+      expect(other.store.addQueue().map((e) => `${e.project}:${e.lot}`)).toEqual(['b:L1', 'b:L2']); // deux voies libres chez elle, pas trois
+      expect(other.store.addQueue()[0].queue).toEqual({ dir: parent, key: 'b:L1' });
+      expect(o.out.filter((l) => l.startsWith('file : tire'))).toEqual(['file : tire b:L1 (position 1) — poussé par --add dans la vague autre', 'file : tire b:L2 (position 2) — poussé par --add dans la vague autre']);
+      expect(o.out).toContain('file : lot sauté — b:L3 : dépôt tenu par la vague autre, sans créneau libre');
+      expect(await show(parent)).toEqual(['1. b:L1 — b un — tiré par la vague autre', '2. b:L2 — b deux — tiré par la vague autre', '3. b:L3 — b trois — en attente']);
+    } finally {
+      other.done();
+    }
+  });
+
+  it('R7 — un lot poussé par --add puis écarté par la vague receveuse lui est rendu (en attente), drop l\'accepte', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
+    await queueAdd(parent, 'b:L1');
+    // b:L1 est déjà « tiré » (poussé par une autre vague) avant le départ : personne ne le tire de la file.
+    const drawnBy = (wave: string) => {
+      const file = JSON.parse(readFileSync(queuePath(cadenceHome()), 'utf8'));
+      file.entries[0] = { key: 'b:L1', dir: parent, state: 'drawn', wave };
+      writeFileSync(queuePath(cadenceHome()), JSON.stringify(file));
+    };
+    drawnBy('a-venir');
+    const f = fakeDeps({
+      implement: async (cwd) => {
+        const store = RunStore.last(parent)!;
+        // La file dit b:L1 « tiré par » cette vague, et sa file d'ajouts porte la demande avec son origine (ce que la poussée écrit) ; la vague s'arrête : la demande sera écartée à la lecture.
+        drawnBy(store.id);
+        store.requestStopAfterCurrent();
+        store.requestAdd({ project: 'b', lot: 'L1', queue: { dir: parent, key: 'b:L1' } });
+        await new Promise((r) => setTimeout(r, 150));
+        return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+      },
+    }, 20);
+    const o = io(parent);
+    await orchestrate(['a:L1', '--max-sessions', '2', '--no-fill'], o.io, f.deps); // a:L1 suspendu par l'arrêt demandé : le code n'est pas 0
+    expect(f.played).toEqual(['a:L1']);
+    expect(o.out.filter((l) => /b:L1 : ajout écarté/.test(l))).toEqual(["b:L1 : ajout écarté (la vague s'arrête)"]);
+    expect(o.out).toContain('file : b:L1 rendu à la file (ajout écarté)');
+    expect(await show(parent)).toEqual(['1. b:L1 — b un — en attente']);
+    const d = io(parent);
+    const code = await orchestrate(['queue', 'drop', 'b:L1'], d.io, fakeDeps().deps);
+    expect(d.err).toEqual([]);
+    expect(code).toBe(0);
+  });
+
+  it('R8 — créneau libre d\'une vague vivante avec un hold du lead : rien n\'est tiré tant que le plafond est plein, puis le lot part quand le créneau se libère', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
+    await queueAdd(parent, 'b:L1');
+    addHold(cadenceHome(), 'sous-agent', 180, new Date('2026-11-06T09:00:00'));
+    let during: string[] = [];
+    const f = fakeDeps({
+      implement: async (cwd) => {
+        await new Promise((r) => setTimeout(r, 200)); // dix regards de la vague : plafond 2 = a:L1 + le hold
+        if (basename(cwd) === 'a') during = await show(parent);
+        return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+      },
+    }, 20);
+    const o = io(parent);
+    expect(await orchestrate(['a:L1', '--max-sessions', '2', '--no-fill'], o.io, f.deps)).toBe(0);
+    expect(during.join(' | ')).toBe('1. b:L1 — b un — en attente');
+    expect(f.played).toEqual(['a:L1', 'b:L1']); // le créneau de a:L1 libéré : un seul libre, b:L1 le prend
+    expect(o.out).toContain('file : tire b:L1 (position 1)');
+  });
+
+  it('R8 — créneau libre d\'une vague vivante après --stop-after-current : rien n\'est tiré de la file', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
+    const f = fakeDeps({
+      implement: async (cwd) => {
+        RunStore.last(parent)!.requestStopAfterCurrent();
+        await queueAdd(parent, 'b:L1');
+        await new Promise((r) => setTimeout(r, 150));
+        return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+      },
+    }, 20);
+    const o = io(parent);
+    await orchestrate(['a:L1', '--max-sessions', '2', '--no-fill'], o.io, f.deps);
+    expect(f.played).toEqual(['a:L1']);
+    expect(o.out.filter((l) => l.startsWith('file : tire'))).toEqual([]);
+    expect(await show(parent)).toEqual(['1. b:L1 — b un — en attente']);
+  });
+
+  it('R11 — --no-fill écarte le plan du créneau libre, pas la file : le lot de la file est pris pendant que le lot donné joue', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }], c: [{ title: 'c un' }] });
+    await queueAdd(parent, 'b:L1');
+    const f = fakeDeps({
+      implement: async (cwd, brief) => {
+        if (/on lot `L1`/.test(brief) && basename(cwd) === 'a') await wait(() => RunStore.last(parent)!.readLot('b', 'L1')?.status === 'ready');
+        return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+      },
+    }, 20);
+    const o = io(parent);
+    expect(await orchestrate(['a:L1', '--max-sessions', '2', '--no-fill'], o.io, f.deps)).toBe(0);
+    expect(f.played).toEqual(['a:L1', 'b:L1']); // c:L1, prêt au plan, n'est pas tiré
+    expect(o.out).toContain('file : tire b:L1 (position 1)');
+    expect(o.out.some((l) => /^b:L1 : ajouté à la vague/.test(l))).toBe(true);
+  });
+
+  it('R16 — queue.json corrompu : l\'avertissement n\'est écrit qu\'une fois par vague, même relu à chaque regard', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }] });
+    mkdirSync(cadenceHome(), { recursive: true });
+    writeFileSync(queuePath(cadenceHome()), '{ corrompu');
+    const f = fakeDeps({
+      implement: async (cwd) => {
+        await new Promise((r) => setTimeout(r, 200));
+        return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+      },
+    }, 20);
+    const o = io(parent);
+    expect(await orchestrate(['a:L1', '--max-sessions', '2'], o.io, f.deps)).toBe(0);
+    expect(o.err.filter((l) => l === "file : illisible ou verrouillée, rien n'est tiré à ce créneau")).toHaveLength(1);
+  });
+
+  it('R8 — orchestrate --queue au plafond (hold du lead) : le refus dit que les créneaux sont pris, pas qu\'aucun lot n\'est mûr sans cause', async () => {
+    const { parent } = parentWith({ a: [{ title: 'a un' }] });
+    await queueAdd(parent, 'a:L1');
+    addHold(cadenceHome(), 'sous-agent', 180, new Date('2026-11-06T09:00:00'));
+    const o = io(parent);
+    expect(await orchestrate(['--queue', '--max-sessions', '1'], o.io, fakeDeps().deps)).toBe(2);
+    expect(o.err).toEqual(['file : aucun créneau libre pour la file (plafond 1 : 0 vague(s) vivante(s), 1 session(s) du lead)', 'orchestrate --queue : aucun lot mûr dans la file approuvée']);
   });
 });

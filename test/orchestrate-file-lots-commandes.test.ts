@@ -103,6 +103,16 @@ describe('L498 — file approuvée : orchestrate queue add / show / drop', () =>
     expect(r.err).toEqual(['queue add : a:L1 : déjà en file (position 1)']);
   });
 
+  it('R3 — la même clé sous un autre alias (a:L1 puis ./a:L1) : une seule occurrence, avertissement qui nomme la clé en file ; drop par l\'alias retire le lot', async () => {
+    const parent = parentWith({ a: [{ title: 'a un' }] });
+    const r = await run(parent, 'queue', 'add', 'a:L1', './a:L1');
+    expect(r.code).toBe(0);
+    expect(r.err).toEqual(['queue add : ./a:L1 : déjà en file (position 1, sous la clé a:L1)']);
+    expect(r.out).toEqual(['1. a:L1 — a un']);
+    expect((await run(parent, 'queue', 'drop', './a:L1')).code).toBe(0);
+    expect((await run(parent, 'queue', 'show')).out).toEqual(['file approuvée vide : approuver des lots avec orchestrate queue add <projet:lot>']);
+  });
+
   it('R3 — clé déjà en file : une seule occurrence, position inchangée, avertissement', async () => {
     const parent = parentWith({ a: [{ title: 'a un' }, { title: 'a deux' }], b: [{ title: 'b un' }] });
     await run(parent, 'queue', 'add', 'a:L1', 'b:L1');

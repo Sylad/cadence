@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import type { Args, OrchestrateDeps, OrchestrateIo, Target } from './command.js';
 import type { FillPlan } from './continue.js';
-import type { Queued } from './queue.js';
-import type { QueueHooks } from './queue-draw.js';
+import { QueueError, QueueSession, type Queued } from './queue.js';
+import type { QueueHooks, QueueOrigin } from './queue-draw.js';
 import type { LotCtx, WaveCtx } from './cycle.js';
 import { lotFinished, lotKey, lotRepoPaths, type LotState, type RunStore, type WaveState } from './state.js';
 import { cadenceHome, liveWaves } from './registry.js';
@@ -20,7 +20,7 @@ import { waveReadsAdds } from './snapshot.js';
 import type { AnyModel } from './launch.js';
 
 /** Une demande de la file d'ajouts (`adds.log`). */
-export type AddEntry = { id: number; project?: string; lot: string; model?: string; /** L657 : l'objectif du lot (`--goal`) et la marge `+N` de son budget (`--budget projet:lot=+N`). */ goal?: string; budget?: number };
+export type AddEntry = { id: number; project?: string; lot: string; model?: string; /** L657 : l'objectif du lot (`--goal`) et la marge `+N` de son budget (`--budget projet:lot=+N`). */ goal?: string; budget?: number; /** L498 (R7) : le lot vient de la file approuvée (poussé par une autre vague) ; écarté, il lui est rendu. */ queue?: QueueOrigin };
 
 /** Ce qu'un ajout demande au contrôle préalable (L657) : l'objectif du lot, et la marge de budget de chaque lot par `projet:lot`. */
 export interface AddAsk { goal?: string; raises?: ReadonlyMap<string, number> }
@@ -42,7 +42,7 @@ export interface LaunchChecks {
   preflight: (targets: Target[], run: RunEnv, addTo: { wave: string; lots: KnownLot[] }, ask?: AddAsk) => Promise<{ refusals: string[]; lots: LotState[] }>;
 }
 
-const ALONE: (keyof Args)[] = ['lots', 'resume', 'status', 'drop', 'stopAfterCurrent', 'budget', 'dryRun', 'continue', 'answers', 'integrate', 'removeWorktree', 'waits', 'maxSessions'];
+const ALONE: (keyof Args)[] = ['lots', 'resume', 'status', 'drop', 'stopAfterCurrent', 'budget', 'dryRun', 'continue', 'queue', 'answers', 'integrate', 'removeWorktree', 'waits', 'maxSessions'];
 
 /** `--add` ne se combine avec rien d'autre que `--wave`, `--goal` et `--budget projet:lot=+N` (L421, L657) : vrai quand une autre action est donnée. */
 export const addNotAlone = (args: Args): boolean => ALONE.some((k) => (Array.isArray(args[k]) ? (args[k] as unknown[]).length > 0 : !!args[k] || args[k] === 0));
@@ -162,7 +162,7 @@ function budgetRefusals(lots: LotState[], wave: WaveState | null): string[] {
  * `--add` sur une vague VIVANTE (L421) : chaque lot passe le contrôle préalable d'un lot donné au lancement (dépôt tenu par CETTE vague admis, dépendances comptées dans la vague), puis est déposé
  * dans la file d'ajouts que la vague prend entre deux étapes. Tout est refusé avant d'agir (code 2) dès qu'un lot l'est, comme `--answer`.
  */
-export async function addToLive(args: Args, run: RunEnv, store: RunStore, checks: LaunchChecks): Promise<number> {
+export async function addToLive(args: Args, run: RunEnv, store: RunStore, checks: LaunchChecks, from?: QueueOrigin): Promise<number> {
   const { io, launch } = run;
   const refusals: string[] = [];
   const targets = checks.resolveTargets({ lots: args.add }, io, refusals);
@@ -185,7 +185,7 @@ export async function addToLive(args: Args, run: RunEnv, store: RunStore, checks
   }
   for (const a of args.add) {
     const key = addKey(launch, a);
-    const id = store.requestAdd({ project: a.project, lot: a.lot, model: a.model, goal: args.goal, budget: args.lotBudgets.find((b) => addKey(launch, b) === key)?.raise });
+    const id = store.requestAdd({ project: a.project, lot: a.lot, model: a.model, goal: args.goal, budget: args.lotBudgets.find((b) => addKey(launch, b) === key)?.raise, queue: from });
     // La vague a pu finir entre le contrôle et le dépôt : sa file ne sera plus lue, la demande est retirée.
     if (!liveWaves(cadenceHome()).some((w) => w.wave === store.id)) {
       store.markAddTaken(id);
@@ -249,7 +249,19 @@ export class AddFeed {
     this.e.wctx.log(line);
     this.e.store.markAddTaken(entry.id);
     this.waiting.delete(entry.id);
+    if (entry.queue) this.giveBack(entry.queue);
     return null;
+  }
+
+  /** L498 (R7) : un lot poussé depuis la file approuvée que cette vague écarte lui est rendu (en attente), sinon il resterait « tiré » par une vague qui ne le joue pas, et `drop` le refuserait. */
+  private giveBack(from: QueueOrigin): void {
+    try {
+      new QueueSession(cadenceHome(), from.dir, () => this.e.wave.id, this.e.deps.queueLockMs).undraw([from.key]);
+      this.e.wctx.log(`file : ${from.key} rendu à la file (ajout écarté)`);
+    } catch (e) {
+      if (!(e instanceof QueueError)) throw e;
+      this.e.wctx.log(`file : ${from.key} : état « en attente » non écrit (${e.message})`);
+    }
   }
 
   /** Le contexte du lot demandé, contrôlé comme au lancement ; null quand il est écarté (dit au journal). */

@@ -102,6 +102,9 @@ function lotBudgetArg(text: string): Args['lotBudgets'][number] {
 const asksAnotherAction = (a: Args): boolean =>
   a.resume !== undefined || a.status !== undefined || a.waits || a.follow || a.add.length > 0 || a.drop.length > 0 || a.stopAfterCurrent || a.answers.length > 0 || a.removeWorktree !== undefined;
 
+/** Vrai quand la ligne de commande lance une vague qui a des créneaux à remplir : des lots donnés, `--continue` ou `--queue` (L498). */
+const launchesWave = (a: Args): boolean => a.continue || a.queue || a.lots.length > 0;
+
 /** Les options sans valeur, et le champ de `Args` qu'elles lèvent. */
 /** `--since` de `--follow` (L668) : un horodatage ISO du journal (`2026-11-06T22:00:39Z`, millisecondes permises) ou un numéro de ligne. */
 const SINCE_FOLLOW = /^(?:\d+|\d{4}-\d{2}-\d{2}T[\d:.]+Z)$/;
@@ -169,6 +172,6 @@ export function parseOrchestrateArgs(argv: string[]): Args {
     else if (a.resume !== a.wave) throw new RafError(`--resume ${a.resume} et --wave ${a.wave} désignent deux vagues : une seule (${resumeCommand('<vague>')})`);
   }
   // L587 : sans lot à jouer, --continue ni --queue (L498) il n'y a aucun créneau à remplir ou à garder vide ; les autres actions (--resume, --add, --status, …) ne lancent pas de vague : --no-fill y est sans effet.
-  if (a.noFill && !a.continue && !a.queue && a.lots.length === 0 && !asksAnotherAction(a)) throw new RafError("--no-fill s'utilise avec des lots donnés ou avec --continue");
+  if (a.noFill && !launchesWave(a) && !asksAnotherAction(a)) throw new RafError("--no-fill s'utilise avec des lots donnés ou avec --continue");
   return a;
 }

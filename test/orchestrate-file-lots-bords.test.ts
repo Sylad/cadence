@@ -177,6 +177,11 @@ describe('L498 — bords de la file approuvée', () => {
     }
   });
 
+  it('--add ne se combine pas avec --queue (refus avant d\'agir, rien d\'ajouté ni de démarré)', async () => {
+    const parent = parentWith({ a: ['a un'] });
+    await expect(run(parent, '--add', 'a:L1', '--queue')).rejects.toThrow(/--add ne se combine avec aucune autre action/);
+  });
+
   it('R17 — queue SHOW (casse) : sous-mot inconnu refusé (code 1)', async () => {
     const parent = parentWith({ a: ['un'] });
     const r = await run(parent, 'queue', 'SHOW');

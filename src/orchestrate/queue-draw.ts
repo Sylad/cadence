@@ -16,6 +16,9 @@ import { lotFinished, lotKey, type LotState, type RunStore, type WaveState } fro
 
 export const QUEUE_DOWN = "file : illisible ou verrouillée, rien n'est tiré à ce créneau";
 
+/** La file illisible ou verrouillée (R16) : dite une fois par vague tant que c'est le cas (un queue.json abîmé est relu à chaque regard, toutes les 2 s). */
+export const downNote = (): QueueNote => ({ line: QUEUE_DOWN, warn: true, skip: { key: '*file*', cause: 'illisible ou verrouillée' } });
+
 /** Ligne du journal de la file ; `skip` : le lot sauté et sa cause, pour n'écrire qu'une fois par cause (R6) ; `warn` : avertissement (sortie d'erreur). */
 export interface QueueNote {
   line: string;
@@ -44,6 +47,8 @@ export class QueueRun {
   readonly queued = new Map<string, Queued>();
   /** Les poussées par `--add` refusées (clé de la file → vague receveuse) : pas rejouées tant que la même vague tient le dépôt (une poussée relit le contrôle préalable). */
   readonly pushRefused = new Map<string, string>();
+  /** Ce que cette vague a poussé dans chaque vague receveuse depuis le dernier état de ses voies (`lanes` du registre) : R20, pas plus de lots que de créneaux libres chez elle tant qu'elle ne les a pas pris. */
+  readonly pushedTo = new Map<string, { lanes: number | undefined; n: number }>();
 
   constructor(
     readonly launch: string,
@@ -101,27 +106,42 @@ export class QueueRun {
       return 'ok';
     } catch (e) {
       if (!(e instanceof QueueError)) throw e;
-      this.note({ line: QUEUE_DOWN, warn: true });
+      this.note(downNote());
       return 'down';
     }
   }
 
   /** Ce que le remplissage d'un créneau libre (`AddFeed.fill`) demande à la file pour un lot qu'il tire : le réserver avant de le prendre, le dire tiré une fois admis, le rendre si la prise est refusée, dire pourquoi il le saute (une fois par cause, R6). */
   hooks(log: (line: string) => void): QueueHooks {
-    const safely = (what: string, entry: string, write: () => void): void => {
-      try {
-        write();
-      } catch (e) {
-        if (!(e instanceof QueueError)) throw e;
-        log(`file : ${entry} : état « ${what} » non écrit (${e.message})`);
-      }
-    };
     return {
       claim: (entry) => this.claim(entry) === 'ok',
-      drawn: (entry) => safely('tiré', entry, () => this.session.drawn(entry)),
-      release: (entry) => safely('en attente', entry, () => this.session.release(entry)),
+      drawn: (entry) => safely(log, 'tiré', entry, () => this.session.drawn(entry)),
+      release: (entry) => safely(log, 'en attente', entry, () => this.session.release(entry)),
       skip: (entry, cause) => this.note(skipNote(entry, cause)),
     };
+  }
+
+  /** Les créneaux que la vague receveuse `holder` a encore libres pour une poussée (R20) : ses voies vacantes (`cap - lanes` du registre) moins ce que cette vague y a déjà poussé depuis que ses voies ont ce compte. */
+  pushRoom(holder: LiveWave): number {
+    const vacant = (holder.cap ?? Infinity) - (holder.lanes ?? holder.repos.length);
+    const seen = this.pushedTo.get(holder.wave);
+    const n = seen && seen.lanes === holder.lanes ? seen.n : 0;
+    return Math.max(0, vacant - n);
+  }
+
+  pushed(holder: LiveWave): void {
+    const seen = this.pushedTo.get(holder.wave);
+    this.pushedTo.set(holder.wave, { lanes: holder.lanes, n: (seen && seen.lanes === holder.lanes ? seen.n : 0) + 1 });
+  }
+}
+
+/** Une écriture dans la file qui ne doit pas faire tomber la vague (R16) : une `QueueError` (illisible, verrouillée) est dite au journal, l'état reste à reprendre à la main. */
+function safely(log: (line: string) => void, what: string, entry: string, write: () => void): void {
+  try {
+    write();
+  } catch (e) {
+    if (!(e instanceof QueueError)) throw e;
+    log(`file : ${entry} : état « ${what} » non écrit (${e.message})`);
   }
 }
 
@@ -139,7 +159,7 @@ export interface QueueHooks {
  */
 export async function launchWithQueue(q: QueueRun, queued: Map<string, Queued>, say: Say, run: () => Promise<number>): Promise<number> {
   for (const from of queued.values()) {
-    q.session.drawn(from.entry);
+    safely((line) => say(line, true), 'tiré', from.entry, () => q.session.drawn(from.entry));
     say(`file : tire ${from.entry} (position ${from.position})`);
   }
   const give = () => {
@@ -160,20 +180,32 @@ export async function launchWithQueue(q: QueueRun, queued: Map<string, Queued>, 
   return code;
 }
 
-/** La poussée d'un lot de la file dans la vague vivante qui tient son dépôt (R9) : le mécanisme de `--add` (L421), joué par l'appelant ; `refusals` dit pourquoi quand elle est refusée. */
-export type PushToWave = (target: { project: string; lot: string }, holder: LiveWave) => Promise<{ ok: boolean; refusals: string[] }>;
+/** L'origine d'un lot poussé par `--add` depuis la file (R7) : la vague receveuse la garde dans sa file d'ajouts et rend le lot à la file si elle l'écarte. */
+export interface QueueOrigin {
+  dir: string;
+  key: string;
+}
 
-/** Pousse le lot dans la vague `holder` par `--add` : réservé d'abord (R7), « tiré par la vague <holder> » une fois la poussée acceptée (R13), rendu à la file et dit si elle est refusée. */
+/** La poussée d'un lot de la file dans la vague vivante qui tient son dépôt (R9) : le mécanisme de `--add` (L421), joué par l'appelant ; `refusals` dit pourquoi quand elle est refusée. */
+export type PushToWave = (target: { project: string; lot: string }, holder: LiveWave, from: QueueOrigin) => Promise<{ ok: boolean; refusals: string[] }>;
+
+/** Pousse le lot dans la vague `holder` par `--add` : réservé d'abord (R7), « tiré par la vague <holder> » une fois la poussée acceptée (R13), rendu à la file et dit si elle est refusée ; au plus un lot par créneau libre de la receveuse (R20). */
 async function pushTo(q: QueueRun, from: Queued, lot: { dir: string; id: string }, holder: LiveWave, push: PushToWave): Promise<boolean> {
   if (q.pushRefused.get(from.entry) === holder.wave) return false; // déjà refusée par cette vague : dite, pas rejouée
+  if (q.pushRoom(holder) <= 0) {
+    q.note(skipNote(from.entry, `dépôt tenu par la vague ${holder.wave}, sans créneau libre`));
+    return false;
+  }
   if (q.claim(from.entry) !== 'ok') return false;
-  const r = await push({ project: relative(holder.cwd, lot.dir) || '.', lot: lot.id }, holder);
+  const r = await push({ project: relative(holder.cwd, lot.dir) || '.', lot: lot.id }, holder, { dir: q.launch, key: from.entry });
+  const log = (line: string) => q.note({ line, warn: true });
   if (r.ok) {
-    q.session.drawnBy(from.entry, holder.wave);
+    q.pushed(holder);
+    safely(log, `tiré par la vague ${holder.wave}`, from.entry, () => q.session.drawnBy(from.entry, holder.wave));
     q.note({ line: `file : tire ${from.entry} (position ${from.position}) — poussé par --add dans la vague ${holder.wave}` });
     return true;
   }
-  q.session.release(from.entry);
+  safely(log, 'en attente', from.entry, () => q.session.release(from.entry));
   q.pushRefused.set(from.entry, holder.wave);
   const cause = `--add refusé : ${r.refusals.join(' ; ')}`;
   q.note({ line: `file : --add refusé — ${from.entry} : ${r.refusals.join(' ; ')}`, skip: { key: from.entry, cause } });
@@ -193,9 +225,10 @@ export interface QueueFillGestures {
   push: PushToWave;
 }
 
-/** Ce qu'un remplissage par la file rend : les lots pris, les clés des lots qui attendent dans la file (le plan ne les tire pas, R19) et si la file était illisible (le plan n'est pas tiré à ce créneau, R16). */
+/** Ce qu'un remplissage par la file rend : les lots pris, ceux poussés par `--add` dans une autre vague (ils comptent pour les créneaux de ce regard, R20), les clés des lots qui attendent dans la file (le plan ne les tire pas, R19) et si la file était illisible (le plan n'est pas tiré à ce créneau, R16). */
 export interface QueueFilled {
   added: LotCtx[];
+  pushed: number;
   waiting: Set<string>;
   down: boolean;
 }
@@ -242,7 +275,7 @@ async function scanEntry(q: QueueRun, f: QueueFillFacts, p: { entry: QueueEntry;
  * les créneaux des autres vagues et les sessions du lead déduits (R8), réservés avant d'être pris (R7). Les lignes du journal sont laissées à `q.emit`.
  */
 export async function queueFill(q: QueueRun, f: QueueFillFacts, vacant: number, g: QueueFillGestures): Promise<QueueFilled> {
-  const none: QueueFilled = { added: [], waiting: new Set(), down: false };
+  const none: QueueFilled = { added: [], pushed: 0, waiting: new Set(), down: false };
   const remaining = fillRoom(f);
   if (vacant <= 0 || fillStop(f, remaining)) return none;
   let pending: ReturnType<QueueRun['pending']>;
@@ -250,7 +283,7 @@ export async function queueFill(q: QueueRun, f: QueueFillFacts, vacant: number, 
     pending = q.pending();
   } catch (e) {
     if (!(e instanceof QueueError)) throw e;
-    q.note({ line: QUEUE_DOWN, warn: true });
+    q.note(downNote());
     return { ...none, down: true };
   }
   // Les lots qui attendent dans la file, même quand aucun créneau ne leur est libre : le plan ne les tire pas (R19, R7).
@@ -258,8 +291,12 @@ export async function queueFill(q: QueueRun, f: QueueFillFacts, vacant: number, 
   const slots = Math.min(vacant, freeSlots(liveWaves(f.home), f.cap, liveHolds(f.home, f.io.now()).length));
   if (!pending.length || slots <= 0) return { ...none, waiting };
   const s: Scan = { remaining, held: f.all.filter((l) => !lotFinished(l)), measured: measuredBudgetsAt(f.launch, f.io), others: liveWaves(f.home).filter((w) => w.pid !== process.pid), inWave: new Set(f.all.map((l) => lotKey(l.project, l.lot))), waiting, targets: [], skipped: 0, pushed: 0 };
-  for (const p of pending) await scanEntry(q, f, p, s, g.push);
-  const added = s.targets.length ? await g.fill({ targets: s.targets, room: remaining }, slots, g.canRun) : [];
+  // R20 : un lot par créneau libre à ce regard, poussé ou pris ; les lots d'après attendent le créneau suivant.
+  for (const p of pending) {
+    if (s.pushed + s.targets.length >= slots) break;
+    await scanEntry(q, f, p, s, g.push);
+  }
+  const added = s.targets.length ? await g.fill({ targets: s.targets, room: remaining }, slots - s.pushed, g.canRun) : [];
   if (!added.length && !s.pushed) q.note({ line: `file : aucun lot mûr (${s.skipped} sauté(s))`, skip: { key: '', cause: `aucun lot mûr (${s.skipped})` } });
-  return { added, waiting: s.waiting, down: false };
+  return { added, pushed: s.pushed, waiting: s.waiting, down: false };
 }

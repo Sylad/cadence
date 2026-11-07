@@ -266,6 +266,10 @@ describe('L673 — le plan modifié du lead pendant l\'intégration ne la refuse
       expect(l.status).toBe('ready');
     }
     expect(subjects(repo).some((s) => s.startsWith('feat(L1)'))).toBe(true);
+    // la ligne du lead est dans un commit de plan du programme, et l'arbre du lead est propre ensuite
+    expect(git(repo, 'status', '--porcelain')).toBe('');
+    expect(git(repo, 'log', '-S# ajout du lead', '--format=%s', '--', '.cadence/raf.yaml')).not.toBe('');
+    expect(readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')).toContain('# ajout du lead');
   });
   it('L673 — leadMoved : un fichier modifié toléré qui est dans le diff du lot reste un refus', () => {
     const { repo } = setup();

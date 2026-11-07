@@ -237,8 +237,9 @@ export function lotDiff(repo: string, base: string, branch: string): Set<string>
  */
 export function toleratedDirty(c: LotCtx, branch: string): (f: string) => boolean {
   const ownFile = planOwnFile(c, c.lot.repo);
-  const diff = lotDiff(c.lot.repo, c.tree!.base, branch);
-  return (f) => ownFile(f) && !diff.has(f);
+  // Le diff n'est lu qu'au premier fichier du plan trouvé sale : un dépôt propre, ou déjà sur une autre branche (refus nommé par `leadMoved`), n'en paie ni la lecture ni l'échec.
+  let diff: Set<string> | undefined;
+  return (f) => ownFile(f) && !(diff ??= lotDiff(c.lot.repo, c.tree!.base, branch)).has(f);
 }
 
 /**

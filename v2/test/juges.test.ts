@@ -32,7 +32,7 @@ function fauxJuge(sorties: object[], vus: string[][] = [], dirEvalVu = ''): Exec
     vus.push(args);
     expect(o.env.KUBECONFIG).toBe('/nonexistent');
     const p = args[args.indexOf('-p') + 1];
-    if (i === 0) { expect(existsSync(join(dirEvalVu, 'X', '.git'))).toBe(false); expect(existsSync(join(dirEvalVu, 'X.patch'))).toBe(true); }
+    if (i === 0 && dirEvalVu) { expect(existsSync(join(dirEvalVu, 'X', '.git'))).toBe(false); expect(existsSync(join(dirEvalVu, 'X.patch'))).toBe(true); }
     const m = /dans (\S+\.json)/.exec(p);
     writeFileSync(m![1], JSON.stringify(sorties[i++] ?? {}));
     return { stdout: JSON.stringify({ session_id: `j${i}`, total_cost_usd: 0, modelUsage: {} }), code: 0 };

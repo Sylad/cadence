@@ -26,11 +26,11 @@ function accolades(t: string): string[] {
 }
 
 // Chemin absolu du jeton (~, $HOME, absolu, ou relatif à cwd s'il contient « / » ou « .. »), sinon null.
-function resoudre(tok: string, cwd: string, home: string, cd = false): string | null {
+function resoudre(tok: string, cwd: string, home: string, rel: boolean, cd = false): string | null {
   const t = tok.replace(/(?<![./])\.+$/, '').replace(/[,:]+$/, '');
   if (/^(~|\$HOME)(\/|$)/.test(t)) return resolve(home, t.replace(/^(~|\$HOME)\/?/, ''));
   if (t.startsWith('/')) return resolve(t);
-  return cd || t.includes('/') || t === '..' ? resolve(cwd, t) : null;
+  return rel && (cd || t.includes('/') || t === '..') ? resolve(cwd, t) : null;
 }
 
 export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = ''): string[] {
@@ -38,18 +38,21 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
   const juger = (p: string | null) => { if (p && sous(p, r.interdits) && !sous(p, r.autorises)) vus.add(p); };
   const depart = cwd || r.autorises[0];
   for (const l of lignes) {
-    let d: { type?: string; message?: { content?: { type: string; input?: unknown }[] } };
+    let d: { type?: string; message?: { content?: { type: string; name?: string; input?: unknown }[] } };
     try { d = JSON.parse(l); } catch { continue; }
     if (d.type !== 'assistant') continue;
     for (const c of d.message?.content ?? []) {
       if (c.type !== 'tool_use') continue;
-      for (const texte of textes(c.input)) {
+      const cmd = (c.input as { command?: unknown } | undefined)?.command;
+      const sources: [string, boolean][] = [...[...textes(c.input)].map((t): [string, boolean] => [t, false]),
+        ...(c.name === 'Bash' && typeof cmd === 'string' ? [[cmd, true] as [string, boolean]] : [])];
+      for (const [texte, rel] of sources) {
         let dir = depart;
         for (const seg of texte.replace(/\$\{HOME\}/g, '$HOME').split(/&&|\|\||;|\n/)) {
           for (const v of accolades(seg)) {
-            const cd = /^\s*cd\s+(\S+)/.exec(v);
-            const cible = cd ? resoudre(cd[1].replace(/^['"]|['"]$/g, ''), dir, home, true) : null;
-            for (const tok of v.split(/[\s'"`|&<>(){}=]+/)) juger(resoudre(tok, dir, home));
+            const cd = rel ? /^\s*cd\s+(\S+)/.exec(v) : null;
+            const cible = cd ? resoudre(cd[1].replace(/^['"]|['"]$/g, ''), dir, home, true, true) : null;
+            for (const tok of v.split(/[\s'"`|&<>(){}=]+/)) juger(resoudre(tok, dir, home, rel));
             if (cible) dir = cible;
           }
         }

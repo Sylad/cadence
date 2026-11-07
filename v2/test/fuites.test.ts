@@ -8,6 +8,8 @@ const H = '/home/u';
 const appel = (input: object) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input }] } });
 const r = reglesDuBras(H, `${H}/bench-cadence`, '1-t', `${H}/bench-cadence/runs/r1/1-t/A`);
 
+const outil = (name: string, input: object) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name, input }] } });
+
 describe('fuites', () => {
   it('lire son clone, les pièces du banc et ses propres sorties : permis', () => {
     const l = [appel({ command: `cat ${H}/bench-cadence/runs/r1/1-t/A/src/x.ts` }),
@@ -42,6 +44,11 @@ describe('fuites', () => {
   });
   it('cd dans son clone puis « .. » restant dedans : permis', () => {
     expect(chercherFuites([appel({ command: 'cd frontend && cat ../package.json' })], r, H, C)).toEqual([]);
+  });
+  it('relatifs dans le contenu des fichiers : ignorés ; absolu ou ~ : fuite', () => {
+    expect(chercherFuites([outil('Write', { file_path: `${C}/frontend/src/a/b.ts`, content: "import x from '../../shared/y'" })], r, H, C)).toEqual([]);
+    expect(chercherFuites([outil('Edit', { file_path: `${C}/a.ts`, old_string: 'a', new_string: "'../../../util'" })], r, H, C)).toEqual([]);
+    expect(chercherFuites([outil('Write', { file_path: `${C}/n.md`, content: 'voir ~/bench-cadence/secrets/1-t/attendu.md' })], r, H, C)).toEqual([S]);
   });
   it('fuitesDuBras lit aussi les transcripts de sous-agents', () => {
     const home = mkdtempSync(join(tmpdir(), 'fu-'));

@@ -29,8 +29,15 @@ ligne() { local id=$1 projet=$2 base=$3 inst=$4 tst=$5 vis=$6 taille=$7
       | sed -E -e 's#(~|/home/[a-z_]+)/projects/developpeur/tmp/essai/[0-9]+-[A-Za-z0-9-]+/(A|B|X|Y|<X\|Y>)([/ ,.)]|$)#<copie X ou Y>\3#g' \
              -e 's#(~|/home/[a-z_]+)/projects/developpeur/tmp/essai/[0-9]+-[A-Za-z0-9-]+#<dossier d'"'"'évaluation>#g' \
              -e 's#(~|/home/[a-z_]+)/\.essai-cache-0711/[0-9]+-[A-Za-z0-9-]+#<dossier d'"'"'évaluation>#g' \
+             -e "s#^\./rendu-sld\.sh A captures-A/rendu #$s/rendu-sld.sh <copie X ou Y> captures-<X|Y>/rendu #" -e '/^\.\/rendu-sld\.sh B /d' -e 's#captures-A/rendu-europe#captures-<X|Y>/rendu-europe#g' \
              -e 's#\bA et B\b#X et Y#g' -e 's#\bA ou B\b#X ou Y#g' > "$s/$f"
   done
+  if [ -f "$E/$id/rendu-sld.sh" ]; then   # banc 8 : rendu GetMap (lecture seule) et rendus de référence
+    sed -E -e "s#$C/$id/rendus/#$s/rendus/#g" -e '/^cd "\$\(dirname/d' \
+      -e 's#^C=\$\{1:\?A ou B\}; O=\$\{2:-rendu-\$C\}#C=${1:?copie X ou Y (chemin)}; O=${2:-rendu-$(basename "$C")}#' \
+      -e 's#<clone A\|B>#<copie X ou Y>#' "$E/$id/rendu-sld.sh" > "$s/rendu-sld.sh"
+    chmod 755 "$s/rendu-sld.sh"; rm -rf "$s/rendus"; cp -a "$C/$id/rendus" "$s/rendus"
+  fi
   rm -rf "$s/tests-origine" && cp -a "$C/$id/tests-origine" "$s/tests-origine"
   cat > "$b/banc.yaml" <<EOF
 projet: $projet

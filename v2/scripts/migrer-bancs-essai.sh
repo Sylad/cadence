@@ -25,7 +25,11 @@ ligne() { local id=$1 projet=$2 base=$3 inst=$4 tst=$5 vis=$6 taille=$7
   sed -i "s#$E/$id/pieces#$b/pieces#g" "$b/demande.md"
   if [ -f "$C/$id/reponses-de-sylvain.md" ]; then cp "$C/$id/reponses-de-sylvain.md" "$b/reponses.md"; fi
   for f in mesure.md attendu.md; do
-    sed -e "s#$C/$id/#$s/#g" -e "s#$E/$id/<A|B>#<clone X ou Y>#g" -e "s#<A|B>#<X|Y>#g" "$C/$id/$f" > "$s/$f"
+    sed -e "s#$C/$id/#$s/#g" -e "s#$E/$id/<A|B>#<clone X ou Y>#g" -e "s#<A|B>#<X|Y>#g" "$C/$id/$f" \
+      | sed -E -e 's#(~|/home/[a-z_]+)/projects/developpeur/tmp/essai/[0-9]+-[A-Za-z0-9-]+/(A|B|X|Y|<X\|Y>)([/ ,.)]|$)#<copie X ou Y>\3#g' \
+             -e 's#(~|/home/[a-z_]+)/projects/developpeur/tmp/essai/[0-9]+-[A-Za-z0-9-]+#<dossier d'"'"'évaluation>#g' \
+             -e 's#(~|/home/[a-z_]+)/\.essai-cache-0711/[0-9]+-[A-Za-z0-9-]+#<dossier d'"'"'évaluation>#g' \
+             -e 's#\bA et B\b#X et Y#g' -e 's#\bA ou B\b#X ou Y#g' > "$s/$f"
   done
   rm -rf "$s/tests-origine" && cp -a "$C/$id/tests-origine" "$s/tests-origine"
   cat > "$b/banc.yaml" <<EOF

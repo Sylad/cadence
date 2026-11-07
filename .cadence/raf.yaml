@@ -3053,7 +3053,7 @@ lots:
     estimate: 0.5
     created: 2026-11-07
     started: 2026-11-07
-    review: { date: 2026-11-07, verdict: "conforme : revue 3 conforme ; rebasé sur main par le lead (conflit d'imports d'execute.ts résolu, b7cc1be7 ramène state.ts à 400 lignes) ; 138 tests ciblés verts, tsc et qualité verts", commit: b7cc1be750ff1963d930be03b7fb145f84efc73b }
+    review: { date: 2026-11-07, verdict: "conforme : repris par le lead le 07-11 ; 3 revues, 8 majeurs corrigés chacun par un test qui rougit sans le correctif (écriture du rendu, gestes du tour depuis le dossier parent, rebase par rebaseOnto, --resume rebasé, rebase toujours tenté, report de code.head et accept.rouge, commits de queue de rebaseOnto) ; 1 mineur noté (reviewedHead : ajouter merge-base --is-ancestor) ; tests ciblés, tsc et qualité verts ; revue courte du diff rebasé (patch-id différent) : conforme : rebase sur main (22 commits de L498) sans changement des patchs du lot (range-diff identique sur les 11 commits), aucun conflit sémantique avec la file approuvée ni avec buildAdd ; 1 mineur ancien laissé en note (worktree.ts:290, compte d'avant le rebase)", commit: 33f964800bb2deecdcfec26a360a2cbb6b24e403 }
     notes:
       - { date: 2026-11-07, text: "mineur de la revue 3 : reviewedHead accepte une tête en retard sur la revue (rattrapé à l'intégration par le patch-id) ; ajouter merge-base --is-ancestor code.head HEAD" }
       - { date: 2026-11-07, text: "07-11 : b7cc1be7 tient la borne de 400 lignes de state.ts en mettant deux champs sur une ligne : la borne est contournée, pas tenue ; state.ts est à découper" }

@@ -123,9 +123,8 @@ export interface LotState {
   /** Issue de l'étape spec : la fiche écrite (et le nombre de ses hypothèses), ou la raison d'une sortie sous le seuil. */
   spec?: { fiche: string; hypotheses: number } | { sousSeuil: string };
   /** Issue de l'étape accept (L173) : l'acceptation.json du lot (chemin relatif au dépôt) et le commit rouge scellé par le programme, rangé ici et dans git, jamais dans le fichier. */
-  accept?: { acceptation: string; rouge: string };
-  /** L676 : les commits que `rebaseOnto` a ajoutés en queue au rebase de `--resume` (CHANGELOG replacé après une publication, base du cliquet) ; la revue gardée (`code.head`) reste sur le dernier commit du lot, ces commits seuls entre elle et HEAD ne la périment pas (`reviewedHead`). */
-  rebaseTail?: string[];
+  /** `rebaseTail`, L676 : les commits que `rebaseOnto` a ajoutés en queue au rebase de `--resume` (CHANGELOG replacé après une publication, base du cliquet) ; la revue gardée (`code.head`) reste sur le dernier commit du lot, ces commits seuls entre elle et HEAD ne la périment pas (`reviewedHead`). */
+  accept?: { acceptation: string; rouge: string }; rebaseTail?: string[];
   /** Revue UX de la maquette (L172) : nombre de revues jouées (2 au plus), la dernière conforme ou non, son verdict. */
   maquette?: { passes: number; conforme: boolean; verdict: string };
   /** Constats bloquants et majeurs de la revue de maquette, rendus à la seconde passe `spec` (une seule). */

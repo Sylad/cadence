@@ -1,4 +1,4 @@
-import { type LotCtx, stop, workDir as wd, save, transition } from './cycle/ctx.js';
+import { type LotCtx, stop, workDir as wd, save, setWaitsTurn, transition } from './cycle/ctx.js';
 import { isOpen } from '../plan.js';
 import { sh } from './cycle/sh.js';
 import { commitPlan, takeAnswerNote, planMessage, planWrite, trackedPaths } from './cycle/plan-writes.js';
@@ -81,6 +81,7 @@ export async function runLot(c: LotCtx): Promise<void> {
       return;
     }
     if (l.status === 'question' && !l.pendingAnswer) return;
+    // L670 : la réponse du lead est notée à sa prise (execute.ts) ; une réponse arrivée autrement l'est ici, une note déjà en cours n'est pas relancée.
     await takeAnswerNote(c, true);
     // Un lot déjà commencé retrouve son worktree (R11) ; un lot neuf n'en a un qu'une fois son raf start fait, dans le dépôt du projet (R21).
     if ((l.next !== null || l.steps.length > 0) && !(await ensureTree(c))) return;
@@ -137,7 +138,14 @@ export async function runLot(c: LotCtx): Promise<void> {
     l.next = null;
     transition(c, 'failed', `erreur : ${(e as Error).message}`);
   } finally {
-    await c.answerNoted;
+    // L670 : la note de la réponse du lead peut encore attendre le dépôt (une intégration le tient) ; le passage finit une fois écrite, le créneau rendu pendant cette attente sans session (`waitsTurn`, comme une intégration, L591), et une réponse suivante aura sa propre note.
+    const note = c.answerNoted;
+    if (note && !note.done) {
+      setWaitsTurn(c, true);
+      await note.end;
+      setWaitsTurn(c, false);
+    }
+    c.answerNoted = undefined;
     // TMPDIR court des sessions (L243) : jetable, retiré à la fin de chaque passage du lot ; la session suivante (reprise, réponse) le recrée.
     try {
       c.wave.store.removeTmpDir(l.project, l.lot);

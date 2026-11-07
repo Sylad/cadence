@@ -147,15 +147,20 @@ export async function noteAnswer(c: LotCtx, answer: string): Promise<void> {
 }
 
 /**
- * La réponse du lead en attente est notée à la prise du lot (L670). Dans le dépôt lui-même, l'écriture est jouée avant la session (elle salirait l'arbre où la session écrit) ;
- * en worktree elle peut attendre le dépôt (une intégration le tient) : la session ne l'attend pas, et `runLot` attend `c.answerNoted` à la fin du passage.
+ * La réponse du lead en attente est notée à la prise du lot (L670) : execute.ts l'appelle quand la file des demandes prend la réponse (ou au départ de la vague, pour une réponse de `--resume --answer`),
+ * avant que le lot attende un créneau du pool ; `runLot` le rappelle au départ du passage, pour une réponse arrivée autrement, et une note déjà en cours (`c.answerNoted`) n'est pas relancée.
+ * Dans le dépôt lui-même, l'écriture est attendue (elle salirait l'arbre où la session écrit) ; en worktree elle peut attendre le dépôt (une intégration le tient) : la session ne l'attend pas,
+ * et `runLot` attend `c.answerNoted.end` à la fin du passage, le créneau du lot rendu si la note attend encore (`done`).
  */
 export async function takeAnswerNote(c: LotCtx, atTake = false): Promise<void> {
   // À la prise (`atTake`), un lot à l'étape accept n'est pas noté : le programme peut consommer la réponse lui-même (acceptation déjà verte, elle ne va ni au brief ni aux notes) ; l'étape accept la note quand elle la passe à une session.
-  if (!c.lot.pendingAnswer || (atTake && c.lot.next === 'accept')) return;
-  const end = noteAnswer(c, c.lot.pendingAnswer);
-  c.answerNoted = end;
-  if (!c.tree) await end;
+  if (!c.lot.pendingAnswer || c.answerNoted || (atTake && c.lot.next === 'accept')) return;
+  const note = { end: Promise.resolve(), done: false };
+  note.end = noteAnswer(c, c.lot.pendingAnswer).then(() => {
+    note.done = true;
+  });
+  c.answerNoted = note;
+  if (!c.tree) await note.end;
 }
 
 /**

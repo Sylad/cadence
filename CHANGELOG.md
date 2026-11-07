@@ -85,6 +85,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - The `deliver` skill says what `cadence deliver` does without a `deliver:` key (L675): it refuses before any step and never runs a `./livrer.sh` by itself, so the script must be declared first (the `livrer-sh-sans-bloc` eval answered « the skill does not describe this case » in two runs of three on 1.61.0).
 - `orchestrate --follow` no longer loses a line between two follow-ups (L668, [docs/orchestrate.md](docs/orchestrate.md)): at start it prints again the open questions (a lot whose last state is `question`), and `--since <ISO timestamp|line>` replays the gesture lines written from that instant or journal line (06-11: the question of L477 at 22:00:39Z waited 33 min after a re-arm).
+- A page of `docs/` that still says the old behaviour after a lot changed a sentence is caught earlier (L672, [docs/config.md](docs/config.md#file-bounds-bounds)): the implementation and fix briefs list the pages of `docs/` and the lines that contain a phrase the lot's title quotes (« … », “ … ”, "…" or backticks), to update in the same commit; L648 only covered identifiers.
 
 ## [1.61.0] - 2026-11-07
 

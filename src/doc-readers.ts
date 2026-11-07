@@ -64,3 +64,60 @@ export function readersText(root: string, lotText: string): string {
   const lines = [...readers].map(([page, tests]) => `- \`${page}\`: ${tests.map((t) => `\`${t}\``).join(', ')}`);
   return `Tests that read a page this lot names (emptying or moving a section of it breaks them, and the integration refuses the lot; update the assertion in the same commit, a sealed acceptance test of another lot excepted: put that one in your report; the targeted gate plays them):\n${lines.join('\n')}`;
 }
+
+// L672 : une doc d'usage périmée par une phrase de comportement (L662 : orchestrate-gate.md:114, L666 : fonctionnement.md:30 et lead.md:13, majeurs de doc rendus après deux revues).
+// L648 ne suit que les identifiants ; le titre d'un lot change aussi des phrases (« main a avancé »), qu'on cherche dans les pages de `docs/`.
+
+const QUOTED = /«\s*([^»]+?)\s*»|“\s*([^”]+?)\s*”|"([^"]+)"|`([^`]+)`/g;
+const MIN_PHRASE = 5;
+const MAX_PAGES = 12;
+const MAX_LINES = 3;
+const DOCS_DIR = 'docs';
+
+/** Les phrases citées par le titre (entre « », “ ”, "" ou accents graves) d'au moins 5 caractères, espaces réduits, sans doublon. */
+export function phrasesOf(title: string): string[] {
+  const out = new Set<string>();
+  for (const m of title.matchAll(QUOTED)) {
+    const phrase = (m[1] ?? m[2] ?? m[3] ?? m[4] ?? '').replace(/\s+/g, ' ').trim();
+    if (phrase.length >= MIN_PHRASE) out.add(phrase);
+  }
+  return [...out];
+}
+
+/** Les pages `.md` de `docs/`, récursivement (chemins relatifs, `/`) ; vide sans dossier `docs/`. */
+function docPages(root: string, dir = DOCS_DIR): string[] {
+  const abs = join(root, dir);
+  if (!existsSync(abs)) return [];
+  return readdirSync(abs, { withFileTypes: true })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((e) => (e.isDirectory() ? docPages(root, `${dir}/${e.name}`) : e.name.endsWith('.md') ? [`${dir}/${e.name}`] : []));
+}
+
+/** La consigne du brief d'écriture : les pages de `docs/` dont une ligne contient une phrase citée du titre (casse et espaces ignorés), avec leurs numéros de ligne, à relire et mettre à jour dans le même commit ; '' sans phrase citée ou sans page qui en contienne. */
+export function docsPhrasesText(root: string, title: string): string {
+  const phrases = phrasesOf(title).map((p) => ({ phrase: p, key: p.toLowerCase() }));
+  if (!phrases.length) return '';
+  const lines: string[] = [];
+  for (const page of docPages(root)) {
+    let text: string;
+    try {
+      text = readFileSync(join(root, page), 'utf8');
+    } catch {
+      continue;
+    }
+    const hits: string[] = [];
+    let total = 0;
+    text.split('\n').forEach((line, i) => {
+      const flat = line.replace(/\s+/g, ' ').toLowerCase();
+      const cited = phrases.filter((p) => flat.includes(p.key));
+      if (!cited.length) return;
+      total++;
+      if (hits.length < MAX_LINES) hits.push(`${i + 1} (${cited.map((p) => `« ${p.phrase} »`).join(', ')})`);
+    });
+    if (hits.length) lines.push(`- \`${page}\`: line ${hits.join(', ')}${total > hits.length ? `, and ${total - hits.length} more` : ''}`);
+  }
+  if (!lines.length) return '';
+  const shown = lines.slice(0, MAX_PAGES);
+  const rest = lines.length - shown.length;
+  return `Usage pages that contain a phrase the title of this lot quotes (the lot changes that behaviour: read each line, and update it in the same commit when it no longer says what the code does; a page that still says the old behaviour is a major finding of the review, which already cost a correction pass on L662 and L666):\n${shown.join('\n')}${rest ? `\n- … and ${rest} more page(s)` : ''}`;
+}

@@ -10,7 +10,7 @@ import { repoWork } from '../../repos.js';
 import { testWorkersText } from '../workers.js';
 import { withClusterLine } from '../objectif.js';
 import { readBounds, boundsText } from '../../bounds.js';
-import { readersText } from '../../doc-readers.js';
+import { docsPhrasesText, readersText } from '../../doc-readers.js';
 import { docsFollowText } from '../../doc-follow.js';
 import { capturesText, EXPRESS_BRIEF, expressNewsText, gateText, headline, integrationText, localReading, precheckBrief, newsText, objective, renderBrief, reposText, shotsText, visibleFixText, TEMPLATES_DIR, tiersText, tmpText, type BriefName, type BriefVars } from '../briefs.js';
 import type { Screen } from '../../plan.js';
@@ -217,6 +217,17 @@ function withReaders(brief: string, c: LotCtx, kind: SessionKind): string {
   }
 }
 
+/** Les pages de `docs/` qui contiennent une phrase citée du titre du lot (L672, `docsPhrasesText`), ajoutées au brief des sessions implement et fix : sans gabarit, comme les lecteurs. Rien sans phrase citée ou sans page qui la contienne, ni si le dépôt ne se lit pas. */
+function withDocsPhrases(brief: string, c: LotCtx, kind: SessionKind): string {
+  if (kind !== 'implement' && kind !== 'fix') return brief;
+  try {
+    const text = docsPhrasesText(wd(c), headline(c.loadPlan().lot(c.lot.lot), c.lot.goal));
+    return text ? `${brief}\n${text}\n` : brief;
+  } catch {
+    return brief;
+  }
+}
+
 /** Les identifiants que le travail du lot change et les lignes de doc et d'aide qui les citent, touchées ou non (L648, `docsFollowText`), ajoutés au brief fix : sans gabarit, comme les bornes. Rien sans commit du lot, sans parent lisible ou sans identifiant changé. */
 function withDocsFollow(brief: string, c: LotCtx, kind: SessionKind): string {
   if (kind !== 'fix') return brief;
@@ -310,7 +321,7 @@ export function briefFor(c: LotCtx, kind: SessionKind, local = false): string {
   }
   const brief = renderBrief(briefName(l, kind, !!c.integration), vars, c.wave.templates);
   // Les dépôts tiers (L456) : la consigne s'ajoute à tout brief d'écriture, sans passer par un gabarit (un gabarit modifié change l'empreinte que d'autres tests gardent).
-  return withClusterLine(withDocsFollow(withReaders(withBounds(['implement', 'fix', 'spec', 'accept', 'probe'].includes(kind) ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief, c, kind), c, kind), c, kind), c.config.prodAccess);
+  return withClusterLine(withDocsFollow(withDocsPhrases(withReaders(withBounds(['implement', 'fix', 'spec', 'accept', 'probe'].includes(kind) ? `${brief}\n${tiersText(l.project, l.lot)}\n` : brief, c, kind), c, kind), c, kind), c, kind), c.config.prodAccess);
 }
 
 /** Plafond de sessions `spec` du lot (L230) : les revues de maquette d'un lot à écran, sinon deux. Fiche et maquette partagent `l.specRuns`. */

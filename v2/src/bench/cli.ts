@@ -129,7 +129,14 @@ function passageVerrouille(o: OptPassage): Verdict {
 
 /** Banc éclair : deux contrôles rapides sur le banc 1 (temps ≤ 1,2 × A, aucune question du candidat). */
 export function controlesEclair(res: ResultatBanc[], ref: string, cand: string): { lignes: string[]; ok: boolean } {
-  const m = (b: string) => res.reduce((a, r) => ({ t: a.t + (r.mesures[b]?.duree_s ?? 0), q: a.q + (r.mesures[b]?.questions ?? 0) }), { t: 0, q: 0 });
+  const rouge = (cause: string) => ({ ok: false, lignes: [`temps candidat ≤ ${BARRE_SPEC.temps_max_retouche.toString().replace('.', ',')} × A : ROUGE (${cause})`, `questions du candidat : 0 / ? ROUGE (${cause})`] });
+  if (res.length === 0) return rouge('aucun banc joué');
+  for (const r of res) for (const b of [ref, cand]) {
+    const x = r.mesures[b];
+    if (!x) return rouge(`mesure absente : bras ${b}, banc ${r.banc}`);
+    if (x.echec !== null) return rouge(`bras en échec : ${b}, ${x.echec}`);
+  }
+  const m = (b: string) => res.reduce((a, r) => ({ t: a.t + r.mesures[b].duree_s, q: a.q + r.mesures[b].questions }), { t: 0, q: 0 });
   const a = m(ref); const c = m(cand);
   const tempsOk = c.t <= BARRE_SPEC.temps_max_retouche * a.t; const questionsOk = c.q === 0;
   return { ok: tempsOk && questionsOk, lignes: [

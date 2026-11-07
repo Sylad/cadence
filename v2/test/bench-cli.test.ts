@@ -167,6 +167,18 @@ describe('banc éclair', () => {
     expect(bavard.ok).toBe(false); expect(bavard.lignes[1]).toBe('questions du candidat : 0 / 2 ROUGE');
   });
 
+  it('ROUGE avec la cause : bras en échec, mesure absente, aucun banc', () => {
+    const base = res(100, 0)[0] as { mesures: Record<string, unknown> };
+    const echec = [{ ...base, mesures: { A: mes('A', 100), C: { ...mes('C', 0), echec: 'bras C : boum' } } }] as never;
+    const e = controlesEclair(echec, 'A', 'C');
+    expect(e.ok).toBe(false); expect(e.lignes).toHaveLength(2);
+    for (const l of e.lignes) expect(l).toMatch(/ROUGE \(bras en échec : C, bras C : boum\)/);
+    const absente = controlesEclair([{ ...base, mesures: { A: mes('A', 100) } }] as never, 'A', 'C');
+    expect(absente.ok).toBe(false); for (const l of absente.lignes) expect(l).toMatch(/ROUGE \(mesure absente : bras C, banc 1-a\)/);
+    const rien = controlesEclair([], 'A', 'C');
+    expect(rien.ok).toBe(false); for (const l of rien.lignes) expect(l).toMatch(/ROUGE \(aucun banc joué\)/);
+  });
+
   it('un seul banc joué, hebdo: false, contrôles imprimés avant le verdict', () => {
     const r = racine(); const sortie: string[] = []; const cwds = new Set<string>();
     const exec2: Executeur = (args, o) => { if (!/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) cwds.add(o.cwd.split('/').slice(-2)[0]); return exec(args, o); };

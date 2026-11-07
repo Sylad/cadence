@@ -287,8 +287,9 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
   if (rest.length !== 1 || !bump || !BUMPS.includes(bump)) throw new RafError('usage : cadence release patch|minor|major [--dry-run]');
   const p = plan(root, bump, today);
   gardeBancV2(p.version, () => {
-    const r = spawnSync('node', [join(root, 'v2', 'bin', 'cadence2.js'), 'bench', 'verifier-publication'], { cwd: root, encoding: 'utf8' });
-    return { code: r.status ?? 1, sortie: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+    const r = spawnSync('node', [join(root, 'v2', 'bin', 'cadence2.js'), 'bench', 'verifier-publication'], { cwd: root, encoding: 'utf8', timeout: 60_000 });
+    const delai = r.error || r.signal ? `cadence2 n'a pas répondu en 60 s (${r.error?.message ?? r.signal}) — ` : '';
+    return { code: r.status ?? 1, sortie: `${delai}${r.stdout ?? ''}${r.stderr ?? ''}` };
   });
 
   const whatsNewPath = join(root, WHATS_NEW);

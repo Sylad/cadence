@@ -52,6 +52,20 @@ test('banc — sorte du passage : hebdo, éclair, N bancs', () => {
   expect(sorte({ bancs: ['1-a', '3-b', '6-c', '7-d'] })).toBe('banc ✓ 08-11 4 bancs · eq-legere/A')
 })
 
+test('banc — répétitions (ids <banc>#k) : la sorte compte les bancs de base', () => {
+  const sorte = (bancs: string[]) => bancLine(parseBanc([hebdo, ligne({ bancs })]), LUNDI)?.text
+  expect(sorte(['1-a#1', '1-a#2', '3-b#1', '3-b#2', '6-c#1', '6-c#2'])).toBe('banc ✓ 08-11 court · eq-legere/A')
+  expect(sorte(['1-a#1', '1-a#2'])).toBe('banc ✓ 08-11 éclair · eq-legere/A')
+  expect(sorte(['1-a#1', '1-a#2', '2-b#1', '2-b#2'])).toBe('banc ✓ 08-11 2 bancs · eq-legere/A')
+})
+
+test('banc — contrôles éclair rouges (eclair_ok: false) : ✗ même si le verdict est vert', () => {
+  const eclair = ligne({ bancs: ['1-a'], eclair_ok: false })
+  expect(bancLine(parseBanc([hebdo, eclair]), LUNDI)).toEqual({ text: 'banc ✗ 08-11 : contrôles éclair', color: 'error' })
+  expect(bancDetail(parseBanc([eclair]))).toEqual(['08-11 10:00  éclair  ✗ rouge : contrôles éclair'])
+  expect(bancLine(parseBanc([hebdo, ligne({ bancs: ['1-a'], eclair_ok: true })]), LUNDI)?.color).toBe('success')
+})
+
 test('banc — lignes illisibles sautées, historique absent ou vide sans passage : aucune ligne', () => {
   expect(parseBanc(['', 'pas du json', '{"date":"x"}', '[1]', 'null', ligne()]).length).toBe(1)
   expect(bancLine(null, LUNDI)).toBeNull()

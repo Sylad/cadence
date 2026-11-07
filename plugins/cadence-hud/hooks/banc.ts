@@ -22,7 +22,9 @@ export const parseBanc = (lines: string[]): BancPassage[] =>
       if (typeof x !== 'object' || x === null || Array.isArray(x)) return []
       const o = x as Record<string, unknown>
       if (typeof o.date !== 'string' || Number.isNaN(Date.parse(o.date)) || typeof o.vert !== 'boolean') return []
-      return [{ date: o.date, candidat: typeof o.candidat === 'string' ? o.candidat : '?', bancs: strings(o.bancs), hebdo: o.hebdo === true, vert: o.vert, rouges: strings(o.rouges) }]
+      // contrôles éclair rouges (`eclair_ok: false`) : le passage s'affiche ✗, même sur un verdict vert
+      const eclairRouge = o.eclair_ok === false
+      return [{ date: o.date, candidat: typeof o.candidat === 'string' ? o.candidat : '?', bancs: strings(o.bancs), hebdo: o.hebdo === true, vert: o.vert && !eclairRouge, rouges: [...strings(o.rouges), ...(eclairRouge ? ['contrôles éclair'] : [])] }]
     } catch {
       return []
     }
@@ -48,13 +50,14 @@ const weekendManquant = (passages: BancPassage[], now: number): boolean => {
   return !passages.some(x => x.hebdo && parisJour(new Date(x.date)).jour >= sam)
 }
 
-/** La sorte d'un passage : les bancs 1, 3 et 6 exactement = court ; hebdo ; le banc 1 seul = éclair ; sinon le nombre de bancs. */
+/** La sorte d'un passage, sur les bancs de base (`<banc>#k` = répétition k) : 1, 3 et 6 exactement = court ; hebdo ; le banc 1 seul = éclair ; sinon le nombre de bancs. */
 export const sorte = (p: BancPassage): string => {
-  const n = [...new Set(p.bancs.map(id => id.split('-')[0]))].sort()
-  if (n.join(',') === '1,3,6' && p.bancs.length === 3) return 'court'
+  const base = [...new Set(p.bancs.map(id => id.replace(/#[^#]*$/, '')))]
+  const n = [...new Set(base.map(id => id.split('-')[0]))].sort()
+  if (n.join(',') === '1,3,6' && base.length === 3) return 'court'
   if (p.hebdo) return 'hebdo'
-  if (n.join(',') === '1' && p.bancs.length === 1) return 'éclair'
-  return `${p.bancs.length} banc${p.bancs.length > 1 ? 's' : ''}`
+  if (n.join(',') === '1' && base.length === 1) return 'éclair'
+  return `${base.length} banc${base.length > 1 ? 's' : ''}`
 }
 
 /** La ligne du banc dans la bande ; `null` sans historique (fichier absent) ou sans rien à dire. Rouge l'emporte sur orange, orange sur vert. */

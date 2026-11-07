@@ -2997,11 +2997,12 @@ lots:
     finished: 2026-11-07
   - id: L670
     title: "Attente silencieuse après réponse du lead : « réponse prise, le lot repart » puis 18,6 et 18,7 min sans ligne (L477, 21:31:37 à 21:50:16 et 22:33:36 à 22:52:18, 37,3 min) ; la reprise attend une ressource inconnue ; toute attente > 10 s écrit au journal ce qu'elle attend, puis supprimer la cause ; et le programme inscrit la réponse du lead dans les notes du lot à sa prise (la 2e question de L477, 32,9 min, venait de « aucune trace écrite dans les notes ») ; niveau : source (notes écrites à la prise), niveau le plus tôt : source ; mesure : 0 min entre réponse prise et session suivante hors créneau, 0 question sur une décision déjà répondue"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-07
     started: 2026-11-07
     review: { date: 2026-11-07, verdict: "compliant : 0 bloquant, 0 majeur, 1 mineur (déduplication de la note par texte complet) — orchestré (vague 2026-11-07-0800, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que le contexte du CHANGELOG, entrée L670 conservée sous [Unreleased] avant ### Fixed de L675 ; 1 mineur antérieur reste en note (dédoublonnage de la note sur le texte seul)", commit: d1b27bba02d4817055be7b3170464b2e069af8a5 }
+    finished: 2026-11-07
   - id: L671
     title: "docs-orchestrate au lancement : les lots dont le titre ou le diff cite docs/orchestrate*.md reçoivent uses: docs-orchestrate à raf add / --dry-run, donc L551 les joue l'un après l'autre ; 07-11 : 113,6 min d'attente d'intégration (L665 35,3, L667 ~78) pour deux lots tenus par L662 et L666, qui n'ont rien livré ; niveau : source (lancement), niveau le plus tôt : source ; mesure : 0 min d'attente de ressource par vague sans lot qui touche la ressource avant d'avoir intégré"
     status: doing

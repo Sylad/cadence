@@ -1,6 +1,6 @@
 Tu évalues deux réalisations anonymes, X et Y, de la même demande. Tu ne sais pas qui les a faites et tu ne dois pas chercher à le savoir.
 
-Demande : voir {{EVAL}}/demande.md. Critères et tests cachés : {{MESURE}} et {{SECRETS}}/tests-origine/. Copies jetables : {{EVAL}}/X et {{EVAL}}/Y (tu peux les modifier) ; diffs : {{EVAL}}/X.patch et {{EVAL}}/Y.patch.
+Demande : voir {{EVAL}}/demande.md. Critères et tests cachés : {{MESURE}} et {{SECRETS}}/tests-origine/. Copies jetables : {{EVAL}}/X et {{EVAL}}/Y (tu peux les modifier ; elles n'ont pas d'historique git : restaure chaque mutation en annulant ta modification à la main) ; diffs : {{EVAL}}/X.patch et {{EVAL}}/Y.patch.
 
 Pour CHAQUE copie, avec exactement la même méthode pour les deux :
 1. Suite du projet : `{{TESTS}}` ; suite_ok = code 0 (un test instable rejoué seul une fois, noté).

@@ -77,8 +77,11 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
   rmSync(dirEval, { recursive: true, force: true }); mkdirSync(dirEval, { recursive: true });
   writeFileSync(join(dirEval, 'demande.md'), lireDemande(b));
   for (const k of ['X', 'Y'] as const) {
+    try {
+      writeFileSync(join(dirEval, `${k}.patch`), execFileSync('git', ['diff', `${b.base}..HEAD`, '--', '.', ...HORS_DIFF], { cwd: clones[anon[k]], encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'ignore'] }));
+    } catch { return null; }
     cpSync(clones[anon[k]], join(dirEval, k), { recursive: true });
-    writeFileSync(join(dirEval, `${k}.patch`), execFileSync('git', ['diff', `${b.base}..HEAD`, '--', '.', ...HORS_DIFF], { cwd: clones[anon[k]], encoding: 'utf8', maxBuffer: 256 << 20 }));
+    rmSync(join(dirEval, k, '.git'), { recursive: true, force: true }); // la copie ne doit pas trahir le bras
   }
   const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests };
   const sMeca = join(dirEval, 'meca.json');

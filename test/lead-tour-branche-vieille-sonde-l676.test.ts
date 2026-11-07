@@ -4,14 +4,14 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RunStore } from '../src/orchestrate/state.js';
 import { tourRow, tourStaleBranchLines } from '../src/lead.js';
-import { gitRepo } from './helpers.js';
+import { gitRepo, tempDir } from './helpers.js';
 
 // Sonde L676 : la forme réelle des données (branche git de cadence réelle, lue par le tour), pas une fixture bâtie pour le code.
 const H = 3600_000;
 const git = (dir: string, ...a: string[]) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' }).trim();
 
-function repoWithBranch(opts: { lot?: string; createdMsAgo: number; commits: number }): string {
-  const dir = gitRepo();
+function repoWithBranch(opts: { lot?: string; createdMsAgo: number; commits: number; parent?: string }): string {
+  const dir = gitRepo(opts.parent);
   mkdirSync(join(dir, '.cadence'));
   writeFileSync(join(dir, '.cadence/raf.yaml'), 'version: 1\nproject: demo\nprefix: L\nlots:\n  - id: L1\n    title: "T"\n    status: todo\n    estimate: 1\n');
   git(dir, 'add', '.');
@@ -53,6 +53,15 @@ describe('lead tour — branche vieille, données réelles (L676)', () => {
     const store = new RunStore(dir, '2026-11-01-0800');
     store.writeLot({ project: 'demo', lot: 'L1', repo: dir, status: 'handed-back', next: 'integrate' } as never);
     const [line] = tourStaleBranchLines([tourRow(dir, '2026-11-07')], Date.now());
+    expect(line).toContain('intégrer : cadence orchestrate --resume --wave 2026-11-01-0800 --integrate demo:L1');
+  });
+  it('R2 — vague lancée du dossier parent (son état sous <parent>/.cadence/runs, pas sous le dépôt) : le ⚠ propose --integrate', () => {
+    const parent = tempDir();
+    const dir = repoWithBranch({ lot: 'demo:L1', createdMsAgo: 72 * H, commits: 1, parent });
+    new RunStore(parent, '2026-11-01-0800').writeLot({ project: 'demo', lot: 'L1', repo: dir, status: 'handed-back', next: 'integrate' } as never);
+    const row = tourRow(dir, '2026-11-07');
+    expect(row.branchGestures?.['cadence/2026-11-01-0800/demo--L1']?.integrable).toBe(true);
+    const [line] = tourStaleBranchLines([row], Date.now());
     expect(line).toContain('intégrer : cadence orchestrate --resume --wave 2026-11-01-0800 --integrate demo:L1');
   });
   it('R2 — une vraie branche à 3 j en conflit avec main : la ligne dit la péremption et que la reprise rebase puis rend le lot si le rebase échoue', () => {

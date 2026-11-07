@@ -192,6 +192,21 @@ export interface BranchGestures {
   stale: string | null;
 }
 
+/**
+ * Le dossier d'où la vague de la branche a été lancée (celui qui porte `.cadence/runs/<vague>`), ou null : une vague se lance du dépôt ou d'un dossier parent (L676). Le chemin du worktree
+ * le dit quand il vit sous `<lancement>/.cadence/runs/<vague>/` ; sinon le dépôt et ses dossiers parents, du plus proche au plus loin.
+ */
+function waveLaunchDir(root: string, t: Pick<KeptTree, 'wave' | 'dir'>): string | null {
+  const marker = `${sep}.cadence${sep}runs${sep}${t.wave}${sep}`;
+  const fromTree = t.dir && t.dir.includes(marker) ? [t.dir.slice(0, t.dir.indexOf(marker))] : [];
+  const up: string[] = [];
+  for (let d = root; up.length < 4; d = dirname(d)) {
+    up.push(d);
+    if (dirname(d) === d) break;
+  }
+  return [...fromTree, ...up].find((d) => existsSync(join(RunStore.runsDir(d), t.wave))) ?? null;
+}
+
 /** Les gestes de chaque branche gardée qui porte des commits non intégrés, lus sans rien écrire : l'état du lot dans sa vague, et l'âge de la branche (même seuil que `recoveryRefusal`). */
 function branchGestures(root: string, trees: KeptTree[]): { branchGestures?: Record<string, BranchGestures> } {
   const out: Record<string, BranchGestures> = {};
@@ -200,9 +215,10 @@ function branchGestures(root: string, trees: KeptTree[]): { branchGestures?: Rec
     const stale = staleRefusal(age);
     const [project, lot] = t.lot.split(':');
     let integrable = false;
-    if (lot && existsSync(join(RunStore.runsDir(root), t.wave))) {
+    const launch = waveLaunchDir(root, t);
+    if (lot && launch) {
       try {
-        const store = new RunStore(root, t.wave);
+        const store = new RunStore(launch, t.wave);
         const state = store.readLot(project, lot);
         integrable = !!state && !!integrationHandBack(store, state);
       } catch { /* état de vague illisible : aucun geste d'intégration proposé */ }

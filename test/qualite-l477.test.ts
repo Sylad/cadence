@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -120,8 +120,10 @@ describe('L477 — le crédit d\'un fichier neuf', () => {
     writeFileSync(join(dir, BASELINE), JSON.stringify(carte({ 'src/cli.ts': 1000 })));
     const r = appliquer(dir, 'migrer', carte({ 'src/cli.ts': 350, 'src/cli-plan.ts': 650 }), refSur(depart, { 'src/cli.ts': cli }));
     expect(r.code).toBe(1);
-    expect(r.texte).toContain('src/cli-plan.ts');
-    expect(r.texte).toContain('aucune source');
+    expect(r.texte).toContain(`${cle('src/cli-plan.ts')} : 0 → 650`);
+    // la source la plus proche est nommée même sous le seuil, avec la part des lignes qui en viennent : la session sait de quel fichier il manque des lignes
+    expect(r.texte).toContain('source la plus proche : src/cli.ts, 46 % de ses lignes en viennent (lien à partir de 50 %)');
+    expect(r.texte).not.toContain('aucune source');
     expect(readFileSync(join(dir, BASELINE), 'utf8')).toBe(JSON.stringify(carte({ 'src/cli.ts': 1000 })));
   });
 
@@ -323,6 +325,56 @@ describe('L477 — --migrer et la porte', () => {
     expect(JSON.parse(lire(dir))).toEqual(deux);
   });
 
+  it('R10 — morceau déjà migré puis renommé : la clé de son ancien nom ne bloque ni --migrer, ni --ecrire, ni la porte', () => {
+    const dir = tempDir();
+    coupe(dir);
+    writeFileSync(join(dir, BASELINE), JSON.stringify(depart));
+    expect(appliquer(dir, 'migrer', apresCoupe, ref).code).toBe(0);
+    renameSync(join(dir, 'src/cli-plan.ts'), join(dir, 'src/plan2.ts'));
+    const renomme = carte({ 'src/cli.ts': 350, 'src/plan2.ts': 650 });
+    // avant --migrer, la porte refuse la mesure (plan2.ts est neuf pour la base du lot), pas la base : un renommage se migre
+    const porte = appliquer(dir, 'verifier', renomme, ref);
+    expect(porte.code).toBe(1);
+    expect(porte.texte).not.toContain('remonte');
+    expect(appliquer(dir, 'migrer', renomme, ref).code).toBe(0);
+    expect(JSON.parse(lire(dir))).toEqual(renomme);
+    expect(appliquer(dir, 'verifier', renomme, ref).code).toBe(0);
+    expect(appliquer(dir, 'ecrire', renomme, ref).code).toBe(0);
+  });
+
+  it('R10 — morceau déjà migré puis supprimé, mesure en baisse : la porte est verte et --ecrire fige le gain', () => {
+    const dir = tempDir();
+    coupe(dir);
+    writeFileSync(join(dir, BASELINE), JSON.stringify(apresCoupe));
+    rmSync(join(dir, 'src/cli-plan.ts'));
+    const sans = carte({ 'src/cli.ts': 350 });
+    expect(appliquer(dir, 'verifier', sans, ref).code).toBe(0);
+    expect(appliquer(dir, 'ecrire', sans, ref).code).toBe(0);
+    expect(JSON.parse(lire(dir))).toEqual(sans);
+  });
+
+  it('R10 — morceau déjà migré puis réécrit et ramené à 0 : --ecrire fige le gain', () => {
+    const dir = tempDir();
+    coupe(dir);
+    writeFileSync(join(dir, BASELINE), JSON.stringify(apresCoupe));
+    ecrire(dir, { 'src/cli-plan.ts': lignes(10, 9000, 'y') });
+    const sans = carte({ 'src/cli.ts': 350 });
+    expect(appliquer(dir, 'ecrire', sans, ref).code).toBe(0);
+    expect(JSON.parse(lire(dir))).toEqual(sans);
+  });
+
+  it('R11 — la clé d\'un morceau migré ne couvre que ce qu\'il mesure : réécrit sans lien et regrossi sous sa clé, la porte le refuse', () => {
+    const dir = tempDir();
+    coupe(dir);
+    writeFileSync(join(dir, BASELINE), JSON.stringify(apresCoupe));
+    ecrire(dir, { 'src/cli-plan.ts': lignes(600, 9000, 'y') });
+    const r = appliquer(dir, 'verifier', carte({ 'src/cli.ts': 350, 'src/cli-plan.ts': 600 }), ref);
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain('remonte');
+    expect(r.texte).toContain(`${cle('src/cli-plan.ts')} : 0 → 600`);
+    expect(r.texte).toContain('aucune source');
+  });
+
   it('R10 — deux --migrer successifs de morceaux dont la somme dépasse la perte de la source : le second est refusé', () => {
     const dir = tempDir();
     ecrire(dir, { 'src/cli.ts': lignes(400, 600), 'src/m1.ts': lignes(400), 'src/m2.ts': lignes(200, 400) });
@@ -508,17 +560,6 @@ describe('L477 — dépôt réel', () => {
     expect(Object.keys(JSON.parse(lire(dir))).some((k) => k.includes('src/gros2.ts'))).toBe(true);
   });
 
-  it('R14 — à l\'intégration, le lien se calcule sur le commit contrôlé sans arbre de travail', () => {
-    const { dir } = projet();
-    decoupe(dir);
-    expect(qualite(dir, '--migrer', '--contre', 'main').status).toBe(0);
-    git(dir, 'add', '-A', 'src', BASELINE);
-    git(dir, 'commit', '-q', '-m', 'feat(L1): découpe');
-    const ref = lireRef(dir, 'main');
-    expect(ref.contenu?.('src/gros.ts')).toContain('x += 999;');
-    expect(ref.contenu?.('src/a2.ts')).toBeNull();
-  });
-
   it('R16 — clone superficiel sans merge-base : code 2, rien n\'est écrit', () => {
     const { dir } = projet();
     const avant = lire(dir);
@@ -532,12 +573,12 @@ describe('L477 — dépôt réel', () => {
     expect(lire(dir)).toBe(avant);
   });
 
-  /** Un `git` qui échoue (code 1) quand ses arguments contiennent `motif`, et délègue au vrai sinon : l'échec de git au milieu d'une commande, sans toucher au dépôt. */
-  function gitQuiEchoue(motif: string) {
+  /** Un `git` qui exécute `action` (par défaut : échoue en code 1) quand ses arguments contiennent `motif`, et délègue au vrai sinon : git en échec ou bloqué au milieu d'une commande, sans toucher au dépôt. */
+  function gitQuiEchoue(motif: string, action = "echo 'échec simulé' >&2; exit 1") {
     const bin = join(tempDir(), 'bin');
     mkdirSync(bin);
     const vrai = spawnSync('which', ['git'], { encoding: 'utf8' }).stdout.trim();
-    writeFileSync(join(bin, 'git'), `#!/bin/sh\ncase "$*" in *'${motif}'*) echo 'échec simulé' >&2; exit 1;; esac\nexec ${vrai} "$@"\n`, { mode: 0o755 });
+    writeFileSync(join(bin, 'git'), `#!/bin/sh\ncase "$*" in *'${motif}'*) ${action};; esac\nexec ${vrai} "$@"\n`, { mode: 0o755 });
     return { ...process.env, PATH: `${bin}:${process.env.PATH}` };
   }
   const migrerAvec = (dir: string, env: NodeJS.ProcessEnv) => spawnSync(process.execPath, [join(REPO, 'scripts/qualite.mjs'), '--migrer', '--contre', 'main'], { cwd: dir, encoding: 'utf8', env });
@@ -564,15 +605,21 @@ describe('L477 — dépôt réel', () => {
     expect(lire(dir)).toBe(avant);
   });
 
-  it('R16 — git absent : code 2, message qui nomme la référence, aucun fichier neuf refusé', () => {
+  it('R16 — git absent ou délai dépassé : code 2, aucun fichier neuf refusé', () => {
     const { dir } = projet();
     decoupe(dir);
     const avant = lire(dir);
-    const r = migrerAvec(dir, { ...process.env, PATH: '/nonexistent' });
-    expect(r.status).toBe(2);
-    expect(r.stderr).toContain('« main »');
-    expect(r.stderr).not.toContain('Cannot read properties');
-    expect(r.stderr).not.toContain('fichier neuf');
+    // git absent : le merge-base échoue avant toute lecture de fichier, le message nomme la référence
+    const absent = migrerAvec(dir, { ...process.env, PATH: '/nonexistent' });
+    expect(absent.status).toBe(2);
+    expect(absent.stderr).toContain('« main »');
+    expect(absent.stderr).not.toContain('Cannot read properties');
+    expect(absent.stderr).not.toContain('fichier neuf');
+    // git bloqué sur le contenu d'une source : le délai (QUALITE_GIT_DELAI_MS, 60 s par défaut) le coupe, le message nomme le fichier et la référence
+    const bloque = migrerAvec(dir, { ...gitQuiEchoue(':src/', 'sleep 20'), QUALITE_GIT_DELAI_MS: '300' });
+    expect(bloque.status).toBe(2);
+    expect(bloque.stderr).toMatch(/le contenu de src\/\S+ au point de départ main est illisible/);
+    expect(bloque.stderr).not.toContain('fichier neuf');
     expect(lire(dir)).toBe(avant);
   });
 

@@ -11,9 +11,11 @@ export function lireBase(racine: string): Mesure;
 export function mesurer(racine: string): Mesure;
 export type Ref = { nom: string; base: Mesure | null; existe?: (chemin: string) => boolean; contenu?: (chemin: string) => string | null; config?: (chemin: string) => string | null; fichiers?: () => string[]; touches?: () => string[]; commits?: () => { sujet: string; fichiers: string[] }[]; lotsConfig?: Set<string>; lotConfig?: boolean };
 export type Pire = { cle: string; avant: number; apres: number; note?: string };
+/** `lien(neuf)` : la source liée ou null ; `lien.proche(neuf)` : la source la plus proche même sous le seuil, avec la part des lignes du fichier neuf qui en viennent. */
+export type Lien = ((neuf: string) => string | null) & { proche?: (neuf: string) => { source: string; part: number } | null };
 /** `lecture` : le contenu d'un fichier au point de départ (null s'il n'y était pas ; lève si git échoue), de la source aujourd'hui (null si disparue) et du fichier neuf. */
-export function creerLien(base: Mesure, lecture: { depart: (chemin: string) => string | null; courant: (chemin: string) => string | null; neuf: (chemin: string) => string | null }): (neuf: string) => string | null;
-export function comparerMigration(avant: Mesure, apres: Mesure, existe: (chemin: string) => boolean, lien?: (neuf: string) => string | null, depart?: Mesure): Pire[];
+export function creerLien(base: Mesure, lecture: { depart: (chemin: string) => string | null; courant: (chemin: string) => string | null; neuf: (chemin: string) => string | null }): Lien;
+export function comparerMigration(avant: Mesure, apres: Mesure, existe: (chemin: string) => boolean, lien?: Lien, depart?: Mesure): Pire[];
 export function lireRef(racine: string, ref: string): Ref;
 export function appliquer(racine: string, mode: 'verifier' | 'init' | 'ecrire' | 'migrer', mesure?: Mesure, ref?: Ref | null): { code: number; texte: string };
 export function retardSurBranche(racine: string, ref: string): { code: number; texte: string } | null;

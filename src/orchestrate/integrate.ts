@@ -234,7 +234,7 @@ function recompose(start: Mesure, ours: Mesure, theirs: Mesure): Mesure {
 /**
  * Le contrôle de la porte sur un commit (`comparerMigration`, R13) : un fichier « existe » s'il est dans `depart`, et les fichiers neufs sont reliés à leurs sources
  * par leur contenu lu dans `depart` et dans `commit` (`git show`, sans arbre de travail). Un `git show` qui échoue sur un fichier présent lève : le contrôle appelant
- * est dans un `try`, le rebase est abandonné.
+ * est dans un `try`, le rebase est abandonné. Une clé dont le fichier n'est pas dans le commit n'a aucun lien et fait monter le total : elle n'est pas résolue (L538).
  */
 function controlMigration(work: string, start: Mesure, theirs: Mesure, depart: string, commit: string): { cle: string }[] {
   // présent dans l'arbre : `ls-tree` ne lit pas le blob, un blob perdu fait échouer `git show` (le rebase est abandonné) au lieu de passer pour un fichier absent

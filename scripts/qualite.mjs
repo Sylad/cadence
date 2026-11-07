@@ -110,6 +110,8 @@ export function comparer(base, courant) {
 }
 
 const cheminDeCle = (cle) => cle.split('|')[1];
+// le délai d'un `git show` du contenu d'une source (R16) : un git bloqué (clone partiel) sort en code 2 au lieu d'attendre sans fin ; QUALITE_GIT_DELAI_MS le règle (tests)
+const DELAI_GIT = Number(process.env.QUALITE_GIT_DELAI_MS) || 60000;
 // les clés `eslint|fichier|règle` et `jscpd|fichier` comptent des occurrences ; les autres portent le chiffre à additionner
 const estCompteur = (cle) => { const p = cle.split('|'); return (p[0] === 'eslint' && p.length === 3) || (p[0] === 'jscpd' && p.length === 2); };
 
@@ -134,9 +136,11 @@ function lignesDe(texte) {
 /**
  * Le lien d'un fichier neuf à sa source (R14, R18) : `lien(chemin)` rend, parmi les fichiers de `base` (la base du point de départ), la
  * source dont le fichier neuf tient le plus de lignes que la source avait au départ ET a perdues depuis, à condition qu'elles fassent 50 %
- * des lignes non vides du fichier neuf ; null sinon. `lecture` : `depart(chemin)` (contenu au point de départ, null si le fichier n'y
- * était pas, lève si git échoue), `courant(chemin)` (la source aujourd'hui, null si elle a disparu : elle a tout perdu) et `neuf(chemin)`.
- * Le contenu d'une source se lit une fois (cache), au premier fichier neuf qui en a besoin, jamais sans fichier neuf à relier.
+ * des lignes non vides du fichier neuf ; null sinon. `lien.proche(chemin)` rend cette source la plus proche même sous le seuil, avec la part
+ * des lignes du fichier neuf qui en viennent (`{ source, part }`, null si aucune source n'en a perdu une seule) : le refus la nomme (R15).
+ * `lecture` : `depart(chemin)` (contenu au point de départ, null si le fichier n'y était pas, lève si git échoue), `courant(chemin)` (la
+ * source aujourd'hui, null si elle a disparu : elle a tout perdu) et `neuf(chemin)`. Le contenu d'une source se lit une fois (cache), au
+ * premier fichier neuf qui en a besoin, jamais sans fichier neuf à relier ; le résultat d'un fichier neuf aussi.
  */
 export function creerLien(base, lecture) {
   const sources = [...new Set(Object.keys(base).map(cheminDeCle))].sort();
@@ -154,27 +158,34 @@ export function creerLien(base, lecture) {
     }
     return pertes.get(source);
   };
-  return (neuf) => {
-    const contenu = lecture.neuf(neuf);
-    if (contenu === null) return null;
-    const lignes = lignesDe(contenu);
+  const proches = new Map(); // fichier neuf → { source, part } ou null
+  const proche = (neuf) => {
+    if (proches.has(neuf)) return proches.get(neuf);
+    const lignes = lignesDe(lecture.neuf(neuf) ?? '');
     const total = [...lignes.values()].reduce((a, n) => a + n, 0);
-    let meilleure = null;
-    let meilleures = 0;
-    for (const source of sources) {
+    let meilleure = { source: null, part: 0 };
+    for (const source of total ? sources : []) { // rien à lire pour un fichier vide ou illisible
       const perte = perdues(source);
       if (!perte) continue;
       let liees = 0;
       for (const [l, n] of lignes) liees += Math.min(n, perte.get(l) ?? 0);
-      if (liees > meilleures) { meilleure = source; meilleures = liees; }
+      if (liees / total > meilleure.part) meilleure = { source, part: liees / total };
       if (liees === total) break; // aucune autre source ne peut en lier davantage
     }
-    return meilleures > 0 && meilleures * 2 >= total ? meilleure : null;
+    proches.set(neuf, meilleure.part > 0 ? meilleure : null);
+    return proches.get(neuf);
   };
+  const lien = (neuf) => { const p = proche(neuf); return p && p.part * 2 >= 1 ? p.source : null; };
+  return Object.assign(lien, { proche });
 }
 
 const regleDeCle = (cle) => { const p = cle.split('|'); return [p[0], ...p.slice(2)].join('|'); };
 const MENTION = 'fichier neuf : au-delà de ce que sa source a perdu';
+// ce que le refus dit de la source d'un fichier neuf : la source liée, sinon la plus proche et la part de ses lignes (sous les 50 % du lien), sinon aucune
+const sourceDuRefus = (source, fichier, lien) => {
+  const p = source === null ? lien?.proche?.(fichier) : null;
+  return source !== null ? `source la plus proche : ${source}` : p ? `source la plus proche : ${p.source}, ${Math.floor(p.part * 100)} % de ses lignes en viennent (lien à partir de 50 %)` : 'aucune source';
+};
 
 /** Les fichiers neufs qui portent un chiffre positif, groupés par source (null : aucune) et par outil-règle, avec la somme de leurs mesures. */
 function groupesDeNeufs(apres, existe, lien) {
@@ -213,11 +224,18 @@ export function comparerMigration(avant, apres, existe, lien, depart = avant) {
   for (const cle of Object.keys(tb)) if (tb[cle] > (ta[cle] ?? 0)) pires.push({ cle: `${cle} (total, tous fichiers)`, avant: ta[cle] ?? 0, apres: tb[cle] });
   for (const { source, regle, cles, somme } of groupesDeNeufs(apres, existe, lien)) {
     if (source !== null && somme <= perteDeSource(depart, apres, source, regle)) continue;
-    const note = `${MENTION} (${source === null ? 'aucune source' : `source la plus proche : ${source}`})`;
-    for (const [cle, n] of cles) pires.push({ cle, avant: 0, apres: n, note });
+    for (const [cle, n] of cles) pires.push({ cle, avant: 0, apres: n, note: `${MENTION} (${sourceDuRefus(source, cheminDeCle(cle), lien)})` });
   }
   return pires;
 }
+
+/**
+ * La base du lot telle que la porte la juge contre le départ : une clé d'un fichier neuf (absent du départ, `existe`) ne couvre que ce que le fichier
+ * mesure aujourd'hui (le plus petit de la base et de `mesure`). Un morceau migré puis renommé, supprimé ou réécrit laisse sa clé dans la base jusqu'au
+ * prochain --ecrire : elle ne donne rien à personne (un fichier qui reparaît sous ce nom est jugé par son contenu), et la refuser coincerait la base
+ * (R10, R11). Une clé au-dessus de sa mesure reste un gain non figé, que la porte rappelle.
+ */
+const baseJugee = (base, mesure, existe) => Object.fromEntries(Object.entries(base).map(([k, n]) => [k, existe(cheminDeCle(k)) ? n : Math.min(n, mesure[k] ?? 0)]).filter(([, v]) => v > 0));
 
 const trier = (mesure) => Object.fromEntries(Object.entries(mesure).sort(([a], [b]) => (a < b ? -1 : 1)));
 
@@ -277,7 +295,7 @@ export function lireRef(racine, ref) {
   // l'arbre du départ illisible n'est pas « fichier absent » : un fichier du départ passerait pour neuf, et son refus serait celui de git
   const existe = (chemin) => { const present = dansArbre(chemin); if (present === undefined) throw illisible(chemin); return present; };
   const contenu = (chemin) => {
-    const opts = { timeout: 60000, maxBuffer: 64 * 1024 * 1024 };
+    const opts = { timeout: DELAI_GIT, maxBuffer: 64 * 1024 * 1024 };
     const present = dansArbre(chemin, opts);
     if (present === undefined) throw illisible(chemin);
     if (!present) return null;
@@ -454,9 +472,12 @@ export function retardSurBranche(racine, ref) {
 /** La référence à laquelle un test compare le lot : `origin/main` (comme la CI) quand il est à jour, sinon `main`, le départ du lot (comme la porte). */
 export const refDepartLot = (racine, branche = 'main') => (retardSurBranche(racine, `origin/${branche}`) ? branche : `origin/${branche}`);
 
-/** La base du lot contre celle du départ : refus (code 1) si elle monte, null sinon. */
-function baseRemonte(racine, base, ref) {
-  const remonte = ref?.base ? comparerMigration(ref.base, base, existeAuDepart(ref), lienDe(racine, ref)) : [];
+/** La base du lot contre celle du départ : refus (code 1) si elle monte, null sinon. Une clé d'un fichier neuf n'est jugée que pour ce que le fichier mesure (`baseJugee`). */
+function baseRemonte(racine, base, mesure, ref) {
+  if (!ref?.base) return null;
+  const vus = new Map(); // un ls-tree par fichier, pas un par passage
+  const existe = (chemin) => vus.get(chemin) ?? (vus.set(chemin, existeAuDepart(ref)(chemin)), vus.get(chemin));
+  const remonte = comparerMigration(ref.base, baseJugee(base, mesure, existe), existe, lienDe(racine, ref));
   if (!remonte.length) return null;
   return { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${remonte.map(ligne).join('\n')}` };
 }
@@ -504,7 +525,7 @@ function decider(racine, mode, mesure, ref) {
   }
   if (!existe) return { code: 2, texte: `${BASELINE} absente : lancer « node scripts/qualite.mjs --init » une fois, puis la versionner.` };
   const base = lireBase(racine);
-  const refus = baseRemonte(racine, base, ref);
+  const refus = baseRemonte(racine, base, mesure, ref);
   if (refus) return refus;
   if (mode === 'migrer') return migrer(racine, base, mesure, ref);
   const { pires, mieux } = comparer(base, mesure);

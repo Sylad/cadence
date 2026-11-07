@@ -145,11 +145,15 @@ export async function bench(args: string[], io: Io): Promise<number> {
   }
   if (sous === 'ajouter') {
     const [projetDir, lot, fichierDemande] = reste;
-    const taille = (option(reste, 'taille') ?? 'fonction') as 'retouche' | 'fonction' | 'grosse';
-    if (!projetDir || !lot || !fichierDemande) { io.err('usage : cadence2 bench ajouter <projet> <lot> <demande.md> --install c --tests c [--taille t] [--visible]'); return 2; }
-    io.out(`banc ajouté : ${ajouterBanc({ racine, projetDir, lot, demande: readFileSync(fichierDemande, 'utf8'),
-      install: option(reste, 'install') ?? 'true', tests: option(reste, 'tests') ?? 'true', taille, visible: reste.includes('--visible') })}`);
-    return 0;
+    const taille = option(reste, 'taille') ?? 'fonction';
+    if (!projetDir || !lot || !fichierDemande || !['retouche', 'fonction', 'grosse'].includes(taille)) {
+      io.err('usage : cadence2 bench ajouter <projet> <lot> <demande.md> --install c --tests c [--taille retouche|fonction|grosse] [--visible]'); return 2;
+    }
+    try {
+      io.out(`banc ajouté : ${ajouterBanc({ racine, projetDir: resolve(io.cwd, projetDir), lot, demande: readFileSync(resolve(io.cwd, fichierDemande), 'utf8'),
+        install: option(reste, 'install') ?? 'true', tests: option(reste, 'tests') ?? 'true', taille: taille as 'retouche' | 'fonction' | 'grosse', visible: reste.includes('--visible') })}`);
+      return 0;
+    } catch (e) { io.err(`cadence2 bench ajouter : ${e instanceof Error ? e.message : String(e)}`); return 1; }
   }
   const numeros = sous === 'court' ? COURT : sous === 'hebdo' ? undefined : sous === 'lancer' ? (option(reste, 'bancs')?.split(',') ?? null) : null;
   if (numeros === null) { io.err('usage : cadence2 bench court|hebdo|lancer --bancs 1,3|statut|verifier-publication|ajouter [--candidat c] [--reference r]'); return 2; }

@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { bench } from '../src/bench/cli.js';
 import { ajouterBanc } from '../src/bench/ajouter.js';
 import { chargerBanc } from '../src/bench/banc.js';
 
@@ -42,5 +43,50 @@ describe('ajouterBanc', () => {
     git(p, 'commit', '-q', '--allow-empty', '-m', 'feat(LXA): autre');
     expect(() => ajouterBanc({ racine: mkdtempSync(join(tmpdir(), 'b-')), projetDir: p, lot: 'L.A', demande: 'd', install: 'true', tests: 'true', taille: 'fonction', visible: false }))
       .toThrow(/aucun commit/);
+  });
+  const depot = () => { const p = mkdtempSync(join(tmpdir(), 'proj-')); git(p, 'init', '-q', '-b', 'main'); return p; };
+  const base = (p: string, lot = 'L1') => ({ racine: mkdtempSync(join(tmpdir(), 'b-')), projetDir: p, lot, demande: 'd', install: 'true', tests: 'true', taille: 'fonction' as const, visible: false });
+  it('source absolue, bancs/<id> ne contient que banc.yaml et demande.md', () => {
+    const p = depot(); git(p, 'commit', '-q', '--allow-empty', '-m', 'x'); git(p, 'commit', '-q', '--allow-empty', '-m', 'feat(L1): a');
+    const o = base(p); const id = ajouterBanc({ ...o, projetDir: relative(process.cwd(), p) });
+    expect(chargerBanc(o.racine, id).source).toBe(p);
+    expect(readdirSync(join(o.racine, 'bancs', id)).sort()).toEqual(['banc.yaml', 'demande.md']);
+  });
+  it('premier commit du lot = racine : erreur claire', () => {
+    const p = depot(); git(p, 'commit', '-q', '--allow-empty', '-m', 'feat(L1): a');
+    expect(() => ajouterBanc(base(p))).toThrow(/racine du dépôt, pas de base possible/);
+  });
+  it('filtre des tests : latest.ts exclu, __tests__ et .spec. pris, docs/ exclu', () => {
+    const p = depot(); git(p, 'commit', '-q', '--allow-empty', '-m', 'x');
+    mkdirSync(join(p, '__tests__')); mkdirSync(join(p, 'docs'));
+    for (const f of ['latest.ts', '__tests__/b.ts', 'c.spec.ts', 'docs/d.test.ts']) writeFileSync(join(p, f), f);
+    git(p, 'add', '.'); git(p, 'commit', '-qm', 'feat(L1): a');
+    const o = base(p); const id = ajouterBanc(o); const t = join(o.racine, 'secrets', id, 'tests-origine');
+    expect(existsSync(join(t, '__tests__', 'b.ts')) && existsSync(join(t, 'c.spec.ts'))).toBe(true);
+    expect(existsSync(join(t, 'latest.ts')) || existsSync(join(t, 'docs'))).toBe(false);
+  });
+  it('fichier de test supprimé par le lot : ignoré', () => {
+    const p = depot(); writeFileSync(join(p, 'a.test.ts'), 't'); git(p, 'add', '.'); git(p, 'commit', '-qm', 'x');
+    git(p, 'rm', '-q', 'a.test.ts'); git(p, 'commit', '-qm', 'feat(L1): rm');
+    const o = base(p); const id = ajouterBanc(o);
+    expect(existsSync(join(o.racine, 'secrets', id, 'tests-origine', 'a.test.ts'))).toBe(false);
+  });
+  it('--visible : mesure.md a une section Écran ; sinon non', () => {
+    const p = depot(); git(p, 'commit', '-q', '--allow-empty', '-m', 'x'); git(p, 'commit', '-q', '--allow-empty', '-m', 'feat(L1): a');
+    const o = base(p); const v = ajouterBanc({ ...o, visible: true }); const n = ajouterBanc({ ...o, lot: 'L1' });
+    expect(readFileSync(join(o.racine, 'secrets', v, 'mesure.md'), 'utf8')).toMatch(/## Écran[\s\S]*1440 et 390/);
+    expect(readFileSync(join(o.racine, 'secrets', n, 'mesure.md'), 'utf8')).not.toMatch(/## Écran/);
+  });
+  it('CLI : erreur = message + rc 1 ; taille invalide = rc 2 ; chemin relatif résolu', async () => {
+    const p = depot(); git(p, 'commit', '-q', '--allow-empty', '-m', 'x'); git(p, 'commit', '-q', '--allow-empty', '-m', 'feat(L1): a');
+    const r = mkdtempSync(join(tmpdir(), 'b-')); const dem = join(r, 'dem.md'); writeFileSync(dem, 'fais');
+    const sorties: string[] = []; const erreurs: string[] = [];
+    const io = { cwd: dirname(p), env: { BENCH_ROOT: r }, out: (l: string) => sorties.push(l), err: (l: string) => erreurs.push(l), now: () => new Date() };
+    expect(await bench(['ajouter', p, 'L9', dem], io)).toBe(1);
+    expect(erreurs.join('\n')).toMatch(/^cadence2 bench ajouter : lot L9 : aucun commit/);
+    expect(await bench(['ajouter', p, 'L1', dem, '--taille', 'enorme'], io)).toBe(2);
+    expect(await bench(['ajouter', basename(p), 'L1', dem], io)).toBe(0);
+    expect(sorties.join()).toMatch(/banc ajouté : 1-/);
+    expect(chargerBanc(r, readdirSync(join(r, 'bancs'))[0]).source).toBe(p);
   });
 });

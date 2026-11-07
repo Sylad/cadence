@@ -5,7 +5,9 @@ import { orchestrate, type OrchestrateDeps, type OrchestrateIo } from '../src/or
 import { queueVerdict } from '../src/orchestrate/continue.js';
 import { addHold, cadenceHome, registerWave, unregisterWave } from '../src/orchestrate/registry.js';
 import { QueueSession, SkipLog, queuePath } from '../src/orchestrate/queue.js';
-import { RunStore } from '../src/orchestrate/state.js';
+import { RunStore, type LotState } from '../src/orchestrate/state.js';
+import { AddFeed, type AddEnv } from '../src/orchestrate/ajout.js';
+import type { LotCtx } from '../src/orchestrate/cycle.js';
 import { REPO_LOCK, releaseLock, takeLock } from '../src/orchestrate/lock.js';
 import { sharedStateDir } from '../src/state.js';
 import type { ClaudeFn, LaunchOutcome } from '../src/orchestrate/launch.js';
@@ -104,6 +106,8 @@ const show = async (parent: string) => {
   await orchestrate(['queue', 'show'], o.io, fakeDeps().deps);
   return o.out;
 };
+/** Le dossier d'état de la vague du test quand une vague « autre » (`otherWave`) partage le dossier : `RunStore.last` pourrait rendre celle-là. */
+const ownStore = (parent: string): RunStore => RunStore.unfinished(parent).find((x) => x.id !== 'autre')!;
 const journalOf = (parent: string) => readFileSync(join(RunStore.last(parent)!.dir, 'journal.log'), 'utf8');
 const wavesLots = (parent: string) => RunStore.last(parent)!.readWave()!.lots;
 const plannedLots = (out: string[]) => out.filter((l) => /^[\w/-]+:L\d+ — /.test(l)).map((l) => l.split(' — ')[0]);
@@ -769,5 +773,131 @@ describe('L498 — tirage de la file approuvée', () => {
     const o = io(parent);
     expect(await orchestrate(['--queue', '--max-sessions', '1'], o.io, fakeDeps().deps)).toBe(2);
     expect(o.err).toEqual(['file : aucun créneau libre pour la file (plafond 1 : 0 vague(s) vivante(s), 1 session(s) du lead)', 'orchestrate --queue : aucun lot mûr dans la file approuvée']);
+  });
+
+  it('R20 — le plan ne remplit pas le créneau qu\'une poussée vient de prendre : c:L1 (prêt au plan) attend la fin de a:L1', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }], c: [{ title: 'c un' }] });
+    await queueAdd(parent, 'b:L1');
+    const other = otherWave(parent, gitRoot(dirs.b)!, ['b:L0'], { cap: 3, lanes: 0 }); // une voie libre chez elle : la poussée passe
+    let cDuring: LotState | null | undefined;
+    try {
+      const f = fakeDeps({
+        implement: async (cwd) => {
+          if (basename(cwd) === 'a') {
+            await wait(() => other.store.addQueue().length === 1); // b:L1 poussé : le seul créneau libre de ce regard est pris
+            await new Promise((r) => setTimeout(r, 150)); // plusieurs regards : le plan ne doit pas prendre ce créneau tant que a:L1 joue
+            cDuring = ownStore(parent).readLot('c', 'L1');
+          }
+          return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+        },
+      }, 20);
+      const o = io(parent);
+      expect(await orchestrate(['a:L1', '--max-sessions', '2'], o.io, f.deps)).toBe(0);
+      expect(cDuring).toBeNull();
+      expect(f.played).toEqual(['a:L1', 'c:L1']); // c:L1 vient du plan, une fois le créneau de a:L1 libéré
+      expect(other.store.addQueue().map((e) => `${e.project}:${e.lot}`)).toEqual(['b:L1']);
+    } finally {
+      other.done();
+    }
+  });
+
+  it('R8 — créneau libre d\'une vague en question : ni pris ni poussé (dépôt libre d, dépôt tenu b)', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }], c: [{ title: 'c un' }], d: [{ title: 'd un' }] });
+    const other = otherWave(parent, gitRoot(dirs.b)!, ['b:L0'], { cap: 3, lanes: 0 });
+    try {
+      const f = fakeDeps({
+        implement: async (cwd) => {
+          if (basename(cwd) === 'c') return claudeOut(workReport({ questions: ['Quelle base ?'] }));
+          await wait(() => ownStore(parent).readLot('c', 'L1')?.status === 'question');
+          await queueAdd(parent, 'b:L1', 'd:L1');
+          await new Promise((r) => setTimeout(r, 150)); // des regards avec un créneau libre, la vague en question
+          return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+        },
+      }, 20);
+      const o = io(parent);
+      expect(await orchestrate(['c:L1', 'a:L1', '--max-sessions', '2', '--no-fill'], o.io, f.deps)).toBe(1);
+      expect(f.played.sort()).toEqual(['a:L1', 'c:L1']);
+      expect(other.store.addQueue()).toEqual([]);
+      expect(o.out.filter((l) => l.startsWith('file : tire'))).toEqual([]);
+      expect(await show(parent)).toEqual(['1. b:L1 — b un — en attente', '2. d:L1 — d un — en attente']);
+    } finally {
+      other.done();
+    }
+  });
+
+  it('R8 — créneau libre après --until : ni pris ni poussé', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }], d: [{ title: 'd un' }] });
+    const other = otherWave(parent, gitRoot(dirs.b)!, ['b:L0'], { cap: 3, lanes: 0 });
+    try {
+      let late = false;
+      const f = fakeDeps({
+        implement: async (cwd) => {
+          late = true; // 11 h : la fenêtre --until 10:30 est close
+          await queueAdd(parent, 'b:L1', 'd:L1');
+          await new Promise((r) => setTimeout(r, 150));
+          return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+        },
+      }, 20);
+      const out: string[] = [];
+      const i: OrchestrateIo = { cwd: parent, env: { RAF_TODAY: '2026-11-06' }, out: (l) => out.push(l), err: () => {}, now: () => new Date(late ? '2026-11-06T11:00:00' : '2026-11-06T10:00:00') };
+      expect(await orchestrate(['a:L1', '--queue', '--until', '10:30', '--max-sessions', '2', '--no-fill'], i, f.deps)).toBe(0);
+      expect(f.played).toEqual(['a:L1']);
+      expect(other.store.addQueue()).toEqual([]);
+      expect(out.filter((l) => l.startsWith('file : tire'))).toEqual([]);
+      expect(await show(parent)).toEqual(['1. b:L1 — b un — en attente', '2. d:L1 — d un — en attente']);
+    } finally {
+      other.done();
+    }
+  });
+
+  it('R7 — prise refusée au créneau libre (verrou du dépôt pris entre le contrôle et la prise) : la réservation est rendue et le lot sauté est dit', async () => {
+    const { parent, dirs } = parentWith({ b: [{ title: 'b un' }] });
+    const repo = gitRoot(dirs.b)!;
+    const lock = join(sharedStateDir(repo), REPO_LOCK);
+    expect(takeLock(lock, { pid: process.ppid, wave: 'autre', started: '2026-11-06T09:00:00Z' }).ok).toBe(true);
+    const gestures: string[] = [];
+    const lines: string[] = [];
+    const lot = { project: 'b', lot: 'L1', repo, budget: 1000, steps: [], status: 'queued', constats: [], answers: [], questions: [] } as unknown as LotState;
+    const ctx = { lot } as unknown as LotCtx;
+    const env = {
+      launch: parent, store: { markAddTaken: () => {}, addQueue: () => [], writeLot: () => {} }, wave: { id: 'w1', lots: [] }, wctx: { log: (l: string) => lines.push(l) }, ctxs: [], all: [], lots: [], held: [], freed: new Set(), repos: [],
+      freeRepo: () => {}, saveWave: () => {}, announce: () => {}, stopCause: () => null, budgetLeft: () => 1_000_000, planState: () => null,
+      build: async () => ({ ctx }),
+      queue: { claim: (e: string) => (gestures.push(`claim ${e}`), true), drawn: (e: string) => gestures.push(`drawn ${e}`), release: (e: string) => gestures.push(`release ${e}`), skip: (e: string, c: string) => gestures.push(`skip ${e} : ${c}`) },
+    } as unknown as AddEnv;
+    try {
+      const added = await new AddFeed(env).fill({ targets: [{ project: 'b', projectDir: dirs.b, repo, lot: 'L1', model: 'sonnet', uses: [], queued: { entry: 'b:L1', position: 1 } }], room: 1_000_000 }, 1, () => true);
+      expect(added).toEqual([]);
+      expect(gestures).toEqual(['claim b:L1', 'release b:L1', 'skip b:L1 : b : une orchestration y est déjà en cours (autre, pid ' + process.ppid + ')']);
+      expect(lines).toEqual([]);
+    } finally {
+      releaseLock(lock, process.ppid);
+    }
+  });
+
+  it('R9 — une poussée refusée n\'est pas rejouée tant que la même vague tient le dépôt : un seul contrôle préalable de --add pour tous les regards', async () => {
+    const { parent, dirs } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
+    await queueAdd(parent, 'b:L1');
+    registerWave(cadenceHome(), { pid: process.ppid, wave: 'autre', started: '2026-11-06T09:00:00Z', cwd: parent, repos: [gitRoot(dirs.b)!], cap: 3, lanes: 0 }); // sans dossier d'état : --add refusé
+    try {
+      const f = fakeDeps({
+        implement: async (cwd) => {
+          await new Promise((r) => setTimeout(r, 200)); // dix regards avec un créneau libre
+          return claudeOut(workReport({ commits: [commitFile(cwd, `x${Math.random()}.txt`, 'feat(L1): x')] }));
+        },
+      }, 20);
+      let infos = 0;
+      f.deps.claudeInfo = () => {
+        infos++;
+        return { version: '2.1.289', jsonSchema: true };
+      };
+      const o = io(parent);
+      expect(await orchestrate(['a:L1', '--max-sessions', '2', '--no-fill'], o.io, f.deps)).toBe(0);
+      expect(o.out.filter((l) => l.startsWith('file : --add refusé'))).toHaveLength(1);
+      expect(infos).toBe(1); // le lancement ; la poussée refusée (dossier d'état introuvable) n'atteint pas le contrôle, et n'est pas rejouée
+      expect((await show(parent))[0]).toBe('1. b:L1 — b un — en attente');
+    } finally {
+      unregisterWave(cadenceHome(), process.ppid);
+    }
   });
 });

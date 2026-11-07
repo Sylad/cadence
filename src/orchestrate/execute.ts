@@ -379,7 +379,7 @@ async function refillFreeLanes(r: RefillScene, canRun: (c: LotCtx) => boolean, v
   if (vacantLanes <= 0) return [];
   const first = await queueFill(r.queue, { ...r.facts, cap: r.cap }, vacantLanes, { fill: (plan, lanes, can) => r.adds.fill(plan, lanes, can), canRun, push: pushToWaveWith(r.deps, r.io) });
   r.queue.emit(r.say);
-  const left = vacantLanes - first.added.length - first.pushed; // R20 : un lot poussé compte pour le créneau de ce regard
+  const left = vacantLanes - first.added.length - first.pushed; // R20 : un lot poussé tient un créneau tant que la receveuse ne l'a pas pris
   if (left <= 0 || first.down || !fillsFreeSlots(r.args)) return first.added;
   return [...first.added, ...(await r.adds.fill(fillTargetsSafe({ ...r.facts, exclude: first.waiting }, r.log), left, canRun))];
 }

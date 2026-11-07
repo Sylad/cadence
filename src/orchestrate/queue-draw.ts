@@ -47,8 +47,8 @@ export class QueueRun {
   readonly queued = new Map<string, Queued>();
   /** Les poussées par `--add` refusées (clé de la file → vague receveuse) : pas rejouées tant que la même vague tient le dépôt (une poussée relit le contrôle préalable). */
   readonly pushRefused = new Map<string, string>();
-  /** Ce que cette vague a poussé dans chaque vague receveuse depuis le dernier état de ses voies (`lanes` du registre) : R20, pas plus de lots que de créneaux libres chez elle tant qu'elle ne les a pas pris. */
-  readonly pushedTo = new Map<string, { lanes: number | undefined; n: number }>();
+  /** Ce que cette vague a poussé dans chaque vague receveuse depuis le dernier état de ses voies (`lanes` du registre) : R20, pas plus de lots que de créneaux libres chez elle tant qu'elle ne les a pas pris, et chacun tient un créneau de cette vague jusque-là. */
+  readonly pushedTo = new Map<string, { lanes: number | undefined; entries: string[] }>();
 
   constructor(
     readonly launch: string,
@@ -84,8 +84,8 @@ export class QueueRun {
   }
 
   /** Les lots en attente de ce dossier (une réservation orpheline en est un, R14), avec leur position dans la file ; lève `QueueError` (R16). */
-  pending(): { entry: QueueEntry; position: number }[] {
-    return this.session.list().map((entry, i) => ({ entry, position: i + 1 })).filter((x) => effectiveState(x.entry) === 'pending');
+  pending(entries = this.session.list()): { entry: QueueEntry; position: number }[] {
+    return entries.map((entry, i) => ({ entry, position: i + 1 })).filter((x) => effectiveState(x.entry) === 'pending');
   }
 
   /** Des lots attendent dans la file (ou elle est illisible : le tirage le dira). */
@@ -121,17 +121,38 @@ export class QueueRun {
     };
   }
 
-  /** Les créneaux que la vague receveuse `holder` a encore libres pour une poussée (R20) : ses voies vacantes (`cap - lanes` du registre) moins ce que cette vague y a déjà poussé depuis que ses voies ont ce compte. */
-  pushRoom(holder: LiveWave): number {
-    const vacant = (holder.cap ?? Infinity) - (holder.lanes ?? holder.repos.length);
+  /** Les lots poussés dans `holder` qu'elle n'a pas encore pris : ses voies au registre sont celles de la poussée, et la file les dit toujours « tirés » par elle (rendus ou pris, ils ne comptent plus). */
+  private stillPushed(holder: LiveWave, entries: QueueEntry[]): string[] {
     const seen = this.pushedTo.get(holder.wave);
-    const n = seen && seen.lanes === holder.lanes ? seen.n : 0;
-    return Math.max(0, vacant - n);
+    if (!seen || seen.lanes !== holder.lanes) {
+      this.pushedTo.delete(holder.wave);
+      return [];
+    }
+    seen.entries = seen.entries.filter((k) => entries.some((e) => e.key === k && e.dir === this.launch && e.state === 'drawn' && e.wave === holder.wave));
+    return seen.entries;
   }
 
-  pushed(holder: LiveWave): void {
+  /** Les créneaux que la vague receveuse `holder` a encore libres pour une poussée (R20) : ses voies vacantes (`cap - lanes` du registre) moins les lots que cette vague y a poussés et qu'elle n'a pas encore pris. */
+  pushRoom(holder: LiveWave, entries: QueueEntry[]): number {
+    const vacant = (holder.cap ?? Infinity) - (holder.lanes ?? holder.repos.length);
+    return Math.max(0, vacant - this.stillPushed(holder, entries).length);
+  }
+
+  pushed(holder: LiveWave, entry: string): void {
     const seen = this.pushedTo.get(holder.wave);
-    this.pushedTo.set(holder.wave, { lanes: holder.lanes, n: (seen && seen.lanes === holder.lanes ? seen.n : 0) + 1 });
+    const entries = seen && seen.lanes === holder.lanes ? seen.entries : [];
+    this.pushedTo.set(holder.wave, { lanes: holder.lanes, entries: [...entries, entry] });
+  }
+
+  /** Les créneaux de cette vague que tiennent ses poussées non encore prises (R20 : un lot par créneau libéré, poussé compris) ; une receveuse morte libère les siens. */
+  heldByPushes(waves: LiveWave[], entries: QueueEntry[]): number {
+    let n = 0;
+    for (const wave of [...this.pushedTo.keys()]) {
+      const holder = waves.find((w) => w.wave === wave);
+      if (!holder) this.pushedTo.delete(wave);
+      else n += this.stillPushed(holder, entries).length;
+    }
+    return n;
   }
 }
 
@@ -190,17 +211,17 @@ export interface QueueOrigin {
 export type PushToWave = (target: { project: string; lot: string }, holder: LiveWave, from: QueueOrigin) => Promise<{ ok: boolean; refusals: string[] }>;
 
 /** Pousse le lot dans la vague `holder` par `--add` : réservé d'abord (R7), « tiré par la vague <holder> » une fois la poussée acceptée (R13), rendu à la file et dit si elle est refusée ; au plus un lot par créneau libre de la receveuse (R20). */
-async function pushTo(q: QueueRun, from: Queued, lot: { dir: string; id: string }, holder: LiveWave, push: PushToWave): Promise<boolean> {
+async function pushTo(q: QueueRun, from: Queued, lot: { dir: string; id: string }, holder: LiveWave, g: { push: PushToWave; entries: QueueEntry[] }): Promise<boolean> {
   if (q.pushRefused.get(from.entry) === holder.wave) return false; // déjà refusée par cette vague : dite, pas rejouée
-  if (q.pushRoom(holder) <= 0) {
+  if (q.pushRoom(holder, g.entries) <= 0) {
     q.note(skipNote(from.entry, `dépôt tenu par la vague ${holder.wave}, sans créneau libre`));
     return false;
   }
   if (q.claim(from.entry) !== 'ok') return false;
-  const r = await push({ project: relative(holder.cwd, lot.dir) || '.', lot: lot.id }, holder, { dir: q.launch, key: from.entry });
+  const r = await g.push({ project: relative(holder.cwd, lot.dir) || '.', lot: lot.id }, holder, { dir: q.launch, key: from.entry });
   const log = (line: string) => q.note({ line, warn: true });
   if (r.ok) {
-    q.pushed(holder);
+    q.pushed(holder, from.entry);
     safely(log, `tiré par la vague ${holder.wave}`, from.entry, () => q.session.drawnBy(from.entry, holder.wave));
     q.note({ line: `file : tire ${from.entry} (position ${from.position}) — poussé par --add dans la vague ${holder.wave}` });
     return true;
@@ -225,9 +246,10 @@ export interface QueueFillGestures {
   push: PushToWave;
 }
 
-/** Ce qu'un remplissage par la file rend : les lots pris, ceux poussés par `--add` dans une autre vague (ils comptent pour les créneaux de ce regard, R20), les clés des lots qui attendent dans la file (le plan ne les tire pas, R19) et si la file était illisible (le plan n'est pas tiré à ce créneau, R16). */
+/** Ce qu'un remplissage par la file rend : les lots pris, les créneaux que tiennent les poussées par `--add` dans une autre vague (celles de ce regard et celles pas encore prises, R20), les clés des lots qui attendent dans la file (le plan ne les tire pas, R19) et si la file était illisible (le plan n'est pas tiré à ce créneau, R16). */
 export interface QueueFilled {
   added: LotCtx[];
+  /** Créneaux de la vague que les poussées tiennent : le plan ne les remplit pas. */
   pushed: number;
   waiting: Set<string>;
   down: boolean;
@@ -235,6 +257,7 @@ export interface QueueFilled {
 
 /** Ce qu'un parcours de la file accumule : les lots mûrs à prendre, ceux qui attendent, les sautés et les poussés. */
 interface Scan {
+  entries: QueueEntry[];
   remaining: number;
   held: LotState[];
   measured: ReturnType<typeof measuredBudgetsAt>;
@@ -262,7 +285,7 @@ async function scanEntry(q: QueueRun, f: QueueFillFacts, p: { entry: QueueEntry;
   if (!repo) return skip('introuvable');
   const holder = s.others.find((w) => w.repos.includes(repo));
   if (holder) {
-    if (await pushTo(q, { entry: p.entry.key, position: p.position }, { dir, id: lot.id }, holder, push)) s.pushed++;
+    if (await pushTo(q, { entry: p.entry.key, position: p.position }, { dir, id: lot.id }, holder, { push, entries: s.entries })) s.pushed++;
     else s.skipped++;
     return;
   }
@@ -278,19 +301,23 @@ export async function queueFill(q: QueueRun, f: QueueFillFacts, vacant: number, 
   const none: QueueFilled = { added: [], pushed: 0, waiting: new Set(), down: false };
   const remaining = fillRoom(f);
   if (vacant <= 0 || fillStop(f, remaining)) return none;
-  let pending: ReturnType<QueueRun['pending']>;
+  let entries: QueueEntry[];
   try {
-    pending = q.pending();
+    entries = q.session.list();
   } catch (e) {
     if (!(e instanceof QueueError)) throw e;
     q.note(downNote());
     return { ...none, down: true };
   }
+  const waves = liveWaves(f.home);
+  // R20 : un lot poussé dans une autre vague tient un créneau de celle-ci jusqu'à ce que la receveuse le prenne (ou le rende) : le plan ne le remplit pas.
+  const blocked = q.heldByPushes(waves, entries);
+  const pending = q.pending(entries);
   // Les lots qui attendent dans la file, même quand aucun créneau ne leur est libre : le plan ne les tire pas (R19, R7).
   const waiting = new Set(pending.flatMap((p) => { const ref = resolveQueueLot(f.launch, p.entry.key); return 'lot' in ref ? [lotKey(ref.project, ref.lot.id)] : []; }));
-  const slots = Math.min(vacant, freeSlots(liveWaves(f.home), f.cap, liveHolds(f.home, f.io.now()).length));
-  if (!pending.length || slots <= 0) return { ...none, waiting };
-  const s: Scan = { remaining, held: f.all.filter((l) => !lotFinished(l)), measured: measuredBudgetsAt(f.launch, f.io), others: liveWaves(f.home).filter((w) => w.pid !== process.pid), inWave: new Set(f.all.map((l) => lotKey(l.project, l.lot))), waiting, targets: [], skipped: 0, pushed: 0 };
+  const slots = Math.min(vacant - blocked, freeSlots(waves, f.cap, liveHolds(f.home, f.io.now()).length));
+  if (!pending.length || slots <= 0) return { ...none, pushed: blocked, waiting };
+  const s: Scan = { entries, remaining, held: f.all.filter((l) => !lotFinished(l)), measured: measuredBudgetsAt(f.launch, f.io), others: waves.filter((w) => w.pid !== process.pid), inWave: new Set(f.all.map((l) => lotKey(l.project, l.lot))), waiting, targets: [], skipped: 0, pushed: 0 };
   // R20 : un lot par créneau libre à ce regard, poussé ou pris ; les lots d'après attendent le créneau suivant.
   for (const p of pending) {
     if (s.pushed + s.targets.length >= slots) break;
@@ -298,5 +325,5 @@ export async function queueFill(q: QueueRun, f: QueueFillFacts, vacant: number, 
   }
   const added = s.targets.length ? await g.fill({ targets: s.targets, room: remaining }, slots - s.pushed, g.canRun) : [];
   if (!added.length && !s.pushed) q.note({ line: `file : aucun lot mûr (${s.skipped} sauté(s))`, skip: { key: '', cause: `aucun lot mûr (${s.skipped})` } });
-  return { added, pushed: s.pushed, waiting: s.waiting, down: false };
+  return { added, pushed: blocked + s.pushed, waiting: s.waiting, down: false };
 }

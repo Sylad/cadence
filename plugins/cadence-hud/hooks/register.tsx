@@ -2,7 +2,8 @@ import { atom, read, update } from 'claude-code'
 import type { ClientProps, ElementConstructor, EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, CommandInfo, LeadHold, LotsNotice, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
-import { CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, DELIVERIES, LAST_DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
+import { BANC_READER, CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, DELIVERIES, LAST_DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
+import { bancDetail, bancLine, readBanc } from './banc'
 import { buildDecisions, decisionsOf, parseDeliveries } from './decisions'
 import { buildDeliveries, deliveriesHeight, deliveriesOf, parseLastDeliveries } from './deliveries'
 import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
@@ -47,6 +48,7 @@ const lotsLast = atom({ plugin: 'cadence-hud', key: 'lotsLast' } as const, [])
 const lotsTypical = atom({ plugin: 'cadence-hud', key: 'lotsTypical' } as const, {})
 const lotsAt = atom({ plugin: 'cadence-hud', key: 'lotsAt' } as const, 0)
 const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
+const banc = atom({ plugin: 'cadence-hud', key: 'banc' } as const, null)
 const isHidden = atom({ plugin: 'cadence-hud', key: 'isHidden' } as const, false)
 const now = atom({ plugin: 'cadence-hud', key: 'now' } as const, 0)
 
@@ -240,6 +242,14 @@ export const register: Register = on => {
         await update($, now, () => at)
         void refreshProjects(found, at)
         void refreshDeliveries(found)
+        // le banc de cadence 2 (Task 16) : un fichier lu, aucune commande cadence ; une sortie illisible garde les passages d'avant
+        const bench = await $.process.run(['python3', '-I', '-c', BANC_READER], { timeoutMs: 4_000 }).catch(() => undefined)
+        if (bench?.exitCode === 0) {
+          try {
+            const passages = readBanc(bench.stdout)
+            await update($, banc, () => passages)
+          } catch {}
+        }
       } finally {
         isRefreshing = false
       }
@@ -419,7 +429,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, cap, board] = await Promise.all([
+    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, cap, board, bench] = await Promise.all([
       read($, usage),
       read($, agents),
       read($, commands),
@@ -433,12 +443,14 @@ export const register: Register = on => {
       read($, leadHolds),
       read($, slotCap),
       read($, lotsBoard),
+      read($, banc),
     ])
+    const benchLine = bancLine(bench, at)
     const w = allWaves.filter(wave => isWaveShown(wave, at))
     const shownProjects = activeProjects(allProjects)
     const holds = liveHolds(allHolds, at)
     const lateHolds = expiredHolds(allHolds, at)
-    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0 && holds.length === 0 && lateHolds.length === 0) return next(e)
+    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0 && holds.length === 0 && lateHolds.length === 0 && !benchLine) return next(e)
 
     const ambiguous = parseAmbiguous(await $.env.get('CADENCE_HUD_AMBIGUOUS'))
     const { Box, Text } = $.ui.resolve(e)
@@ -755,6 +767,11 @@ export const register: Register = on => {
         {waveRows}
         {leadRows}
         {projectRows}
+        {benchLine && (
+          <Text key="banc" color={benchLine.color} wrap="truncate-end">
+            {benchLine.text}
+          </Text>
+        )}
         {problem && (
           <Text color="warning" dimColor>
             cadence-hud : {fit(problem, width - 14)}
@@ -838,7 +855,7 @@ export const register: Register = on => {
 
   // Le panneau des lots (L401) : lecture seule, l'arbre des lots non clos de chaque projet du dossier (lead tour --json).
   on('ui.render', { component: 'Pane', requestId: LOTS_PANE }, async ($, e) => {
-    const [board, failed, readAt, allWaves, ended, at, folds, views, notice, deliveries, typical, latest] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, endedWaves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries), read($, lotsTypical), read($, lotsLast)])
+    const [board, failed, readAt, allWaves, ended, at, folds, views, notice, deliveries, typical, latest, bench] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, endedWaves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries), read($, lotsTypical), read($, lotsLast), read($, banc)])
     const table = $.ui.resolve(e)
     const { Box, Text, Button } = table
     // les surfaces sans région Client (mobile, éditeur) dessinent les lots sans les réordonner
@@ -903,6 +920,18 @@ export const register: Register = on => {
       </Box>
     )
 
+    // les 5 derniers passages du banc de cadence 2 (Task 16), sous les livraisons ; rien sans historique
+    const benchLines = bench && bench.length > 0 ? [`Banc : ${Math.min(5, bench.length)} derniers passages`, ...bancDetail(bench)] : []
+    const benchBlock = benchLines.length > 0 && (
+      <Box key="banc" flexDirection="column">
+        {benchLines.map((l, i) => (
+          <Text key={`b${i}`} bold={i === 0} color={i > 0 && l.includes('✗') ? 'error' : undefined} wrap="truncate-end">
+            {l}
+          </Text>
+        ))}
+      </Box>
+    )
+
     let body: RenderChildren
     if (board?.outdated) {
       body = message('Lots indisponibles : cadence est trop ancien, mettez-le à jour.', 'error')
@@ -912,7 +941,7 @@ export const register: Register = on => {
       // l'ordre des projets (L449) : une région de plus, une ligne par projet (et son titre), quand il y a un ordre à ranger (deux projets au moins) ;
       // elle prend ses lignes sur l'arbre et ne vient que s'il lui reste de quoi montrer le nom de chaque projet et un lot (2 lignes par projet)
       const ranked = projectsOf(board.rows)
-      const room = e.props.scroll.bodyRows - decisions.lines.length - spend.lines.length - shipped.lines.length
+      const room = e.props.scroll.bodyRows - decisions.lines.length - spend.lines.length - shipped.lines.length - benchLines.length
       const showOrder = Client !== undefined && ranked.length >= 2 && room - (ranked.length + 1) >= 2 * ranked.length + 1
       const order = showOrder && (
         <Client key="projects" module="./projects-list.tsx" props={{ projects: ranked.map(r => ({ name: r.project, detail: projectDetail(r), ...projectProgress(r) })) }} width="100%" />
@@ -1029,6 +1058,7 @@ export const register: Register = on => {
         {decisionBlock}
         {spendBlock}
         {deliveriesBlock}
+        {benchBlock}
         {body}
         {footer}
       </Box>

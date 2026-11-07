@@ -14,6 +14,9 @@ export type CommandInfo = { tool: string; label: string; since: number }
 // dans `declare module 'claude-code'`, « CommandInfo » nommerait le type des commandes slash du module : un alias hors du bloc lève l'ambiguïté
 export type BackgroundCommandInfo = CommandInfo
 
+/** Un passage du banc de cadence 2, une ligne de `historique.jsonl` (ligneHistorique de v2/src/bench/verdict.ts). */
+export type BancPassage = { date: string; candidat: string; bancs: string[]; hebdo: boolean; vert: boolean; rouges: string[] }
+
 export type AgentsSummary = { running: number; names: string[] }
 
 /** Ce qu'un modèle a consommé sur la session : tokens (entrée + sortie + cache) et dollars qui lui sont attribués. */
@@ -126,6 +129,8 @@ export type LotsNotice = { text: string; kind: 'done' | 'unchanged' | 'refused' 
 declare module 'claude-code' {
   interface PluginState {
     'cadence-hud': {
+      /** Les passages du banc lus de `historique.jsonl` (Task 16, cadence 2) ; null quand le fichier n'existe pas. */
+      banc: BancPassage[] | null
       usage: Usage | null
       agents: AgentsSummary
       /** Identifiants des commandes d'arrière-plan (Bash, Monitor) en cours, sous-agents compris. */

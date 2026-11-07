@@ -366,3 +366,17 @@ for d in [folder] + [os.path.join(folder, n) for n in names]:
         out.append({'project': os.path.basename(d), 'day': green[0], 'sha': green[1], 'status': 'verte', 'green': green[0]})
 print(json.dumps(out))
 `
+
+/**
+ * Lit l'historique du banc de cadence 2 (Task 16) (python3 -I) : `$BENCH_ROOT/historique.jsonl`, sinon `~/bench-cadence/historique.jsonl`.
+ * Sortie : ses 500 dernières lignes non vides (JSON), ou `null` quand le fichier n'existe pas. Aucune commande cadence n'est lancée.
+ */
+export const BANC_READER = `
+import os, json
+root = os.environ.get('BENCH_ROOT') or os.path.join(os.path.expanduser('~'), 'bench-cadence')
+try:
+    with open(os.path.join(root, 'historique.jsonl'), encoding='utf-8') as f:
+        print(json.dumps([l for l in f.read().split('\\n') if l.strip()][-500:]))
+except OSError:
+    print('null')
+`

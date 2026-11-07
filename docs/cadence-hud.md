@@ -169,6 +169,22 @@ Before the first reading the panel says `Lecture des plans…`; if `cadence lead
 
 The data is the `lots` field of `cadence lead tour --json` ([lead tour](lead.md#lead-tour)), read together with the band's `progress` (same call, same folder). While the panel is open, the modification date of each plan (`.cadence/raf.yaml` and `cadence.yaml` of the folder and of its direct sub-folders) is read every 5 s, one `stat` each: a changed plan, like a wave transition, triggers a new reading before the minute is over. Cost of the `lots` field (R18, measured on 2026-10-28 with `cadence lead tour --json` on the parent folder of ten projects, three passes each): before L401 (cadence 1.19.1, no `lots`) 8.0 / 9.1 / 7.3 s and 86 KB of output; after (the L401 code) 7.5 / 7.0 / 8.4 s and 188 KB (192,503 bytes). The output more than doubles in size but the duration stays in the same order, under the 20 s refresh delay of the band, so the rule holds.
 
+### Banc (cadence 2)
+
+The state of the cadence 2 bench, one line at the bottom of the band, drawn only when `historique.jsonl` exists (`$BENCH_ROOT`, else
+`~/bench-cadence/`; one line per run, written by `ligneHistorique` of `v2/src/bench/verdict.ts`). The file is read every 5 s by the
+`BANC_READER` script (collect.ts, python3); no cadence command runs, and an unreadable line is skipped.
+
+- `banc ✓ 08-11 court · eq-legere/A` in green: the last run is green (Paris day, kind of run, candidate against A). The kind: `court` for
+  benches 1, 3 and 6 exactly, `hebdo` for a weekend run, `éclair` for bench 1 alone, else `N bancs`;
+- `banc ✗ 08-11 : temps total, relecture aveugle` in red: the last run is red, with its first three red criteria;
+- `banc ⚠ weekend manquant` in orange, Monday to Friday, when no `hebdo` run happened since Saturday 00:00 (Paris): the rule of `statut`
+  in `verdict.ts`, copied (the mod does not depend on v2). On Saturday and Sunday nothing is missing yet. A red last run keeps its line
+  and gets ` · ⚠ weekend manquant` appended.
+
+The lots panel (`/hud lots`) shows, under the last deliveries, `Banc : 5 derniers passages`, the newest first: Paris day and hour, kind,
+`✓ vert` or `✗ rouge : <red criteria>` (in red). Computed by `hooks/banc.ts`, tested by `tests/banc.test.ts`.
+
 The source lives in [`plugins/cadence-hud`](../plugins/cadence-hud/README.md) (its README is the short card; this page is the single description of the band and makes the reference); it is not part of the npm package. To work on it:
 `claude plugin validate plugins/cadence-hud`, `claude plugin test plugins/cadence-hud`, and
 `tsc -p plugins/cadence-hud` once Claude Code has loaded the plugin at least once (it generates

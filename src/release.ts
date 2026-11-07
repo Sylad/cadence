@@ -274,7 +274,6 @@ function steps(p: Planned, files: string[], branch: string): string[] {
   return out.map((s, i) => `  ${i + 1}. ${s}`);
 }
 
-/** `cadence release patch|minor|major [--dry-run]` : prépare le commit de version, sans rien publier. Rend le code de sortie. */
 /** Refonte du 07-11 : une version 2.x ne se prépare qu'avec un banc vert sur l'empreinte de v2 (cadence2 bench verifier-publication). */
 export function gardeBancV2(version: string, verifier: () => { code: number; sortie: string }): void {
   if (Number(version.split('.')[0]) < 2) return;
@@ -282,6 +281,7 @@ export function gardeBancV2(version: string, verifier: () => { code: number; sor
   if (r.code !== 0) throw new RafError(`release : ${version} demande un banc vert sur cette version de v2 — ${r.sortie.trim() || 'cadence2 introuvable'}`);
 }
 
+/** `cadence release patch|minor|major [--dry-run]` : prépare le commit de version, sans rien publier. Rend le code de sortie. */
 export function release(rest: string[], dryRun: boolean, root: string, today: Day, out: (l: string) => void): number {
   const bump = rest[0] as Bump | undefined;
   if (rest.length !== 1 || !bump || !BUMPS.includes(bump)) throw new RafError('usage : cadence release patch|minor|major [--dry-run]');

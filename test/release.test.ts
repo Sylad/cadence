@@ -85,6 +85,8 @@ function project(o: Opts = {}): string {
     mkdirSync(join(dir, file, '..'), { recursive: true });
     writeFileSync(join(dir, file), text);
   };
+  // Banc v2 factice et vert : la garde des 2.x (07-11) ne gêne pas les tests de préparation de version.
+  put('v2/bin/cadence2.js', "console.log(\"banc vert sur l'empreinte test\");\n");
   put('package.json', PACKAGE);
   put('package-lock.json', o.lock ?? LOCK);
   put('CHANGELOG.md', o.changelog ?? CHANGELOG);

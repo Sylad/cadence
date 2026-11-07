@@ -340,8 +340,10 @@ describe('L556 — hooks/hooks.json du plugin (R10)', () => {
   const file = JSON.parse(readFileSync(new URL('../hooks/hooks.json', import.meta.url), 'utf8')) as { hooks: Record<string, { matcher: string; hooks: { type: string; command: string }[] }[]> };
   const commandOf = (event: string): string => file.hooks[event]![0]!.hooks[0]!.command;
   it('R10 — hooks/hooks.json est un JSON valide, déclare les trois événements sur le matcher Bash et leurs commandes cadence claude-hook retour / attente', () => {
-    expect(Object.keys(file.hooks).sort()).toEqual(['PostToolUse', 'PostToolUseFailure', 'PreToolUse']);
-    for (const event of Object.keys(file.hooks)) {
+    // Refonte du 07-11 (rappel du banc) : SessionStart s'ajoute aux événements.
+    expect(Object.keys(file.hooks).sort()).toEqual(['PostToolUse', 'PostToolUseFailure', 'PreToolUse', 'SessionStart']);
+    // SessionStart n'a pas de matcher : il ne porte que le rappel du banc, sans geste.
+    for (const event of Object.keys(file.hooks).filter((e) => e !== 'SessionStart')) {
       // L626 : PostToolUse porte en plus la ligne `bornes` (Write|Edit|MultiEdit) ; les lignes Bash restent une par événement, la première.
       expect(file.hooks[event]!.filter((h) => h.matcher === 'Bash')).toHaveLength(1);
       expect(file.hooks[event]![0]!.matcher).toBe('Bash');

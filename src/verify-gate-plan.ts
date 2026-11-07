@@ -18,8 +18,8 @@ function planReaders(repo: string, sha: string, planFile: string | undefined): s
   }
 }
 
-/** Le plan dont les commits seuls sont traversés : aucun si un test le lit, déclaré (L450) ou deviné d'après le code qui cite son chemin sans que `gate.readsPlan` le dise (L482). */
-function crossablePlan(repo: string, sha: string, planFile: string | undefined, declared: unknown): string | undefined {
+/** Le plan dont les commits seuls sont traversés : aucun si un test le lit, déclaré (L450) ou deviné d'après le code qui cite son chemin sans que `gate.readsPlan` le dise (L482). La porte d'intégration sautée (L662) s'en sert aussi : un seul critère. */
+export function crossablePlan(repo: string, sha: string, planFile: string | undefined, declared: unknown): string | undefined {
   return declared || planReaders(repo, sha, planFile).length ? undefined : planFile;
 }
 

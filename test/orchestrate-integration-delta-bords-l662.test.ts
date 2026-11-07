@@ -1,13 +1,12 @@
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { deltaPlanOnly } from '../src/orchestrate/cycle/integration-porte.js';
-import { planFileSet } from '../src/orchestrate/worktree.js';
+import { deltaCrossable } from '../src/orchestrate/cycle/integration-porte.js';
 import { Plan } from '../src/plan.js';
 import { git } from './orchestrate-harness.js';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
-// L662 (2) : bords de `deltaPlanOnly` — suppression, déplacement, noms à espaces, plan réel (planFileSet), delta rejoué deux fois.
+// L662 (2) : bords de `deltaCrossable` — suppression, déplacement, fusion, plan réel (Plan.create), chaîne longue, delta rejoué deux fois.
 afterEach(cleanupTempDirs);
 
 function repoWith(files: string[]) {
@@ -26,59 +25,72 @@ function repoWith(files: string[]) {
   return repo;
 }
 const head = (repo: string) => git(repo, 'rev-parse', 'HEAD');
-const commit = (repo: string) => {
+const commit = (repo: string, msg = 'delta') => {
   git(repo, 'add', '-A');
-  git(repo, 'commit', '-q', '-m', 'delta');
+  git(repo, 'commit', '-q', '-m', msg);
   return head(repo);
 };
-const PLAN = new Set(['.cadence/raf.yaml', '.cadence/gantt.html']);
+const PLAN = '.cadence/raf.yaml';
+const note = (repo: string) => writeFileSync(join(repo, PLAN), '# note\n', { flag: 'a' });
 
-describe('L662 R4 — deltaPlanOnly aux bords', () => {
-  it('R4 — main supprime un fichier de code : pas plan seul', () => {
+describe('L662 R4 — deltaCrossable aux bords', () => {
+  it('R4 — main supprime un fichier de code : non traversable', () => {
     const repo = repoWith(['src/a/x.ts']);
     const from = head(repo);
     rmSync(join(repo, 'src/a/x.ts'));
-    expect(deltaPlanOnly(repo, from, commit(repo), PLAN)).toBe(false);
+    expect(deltaCrossable(repo, from, commit(repo), PLAN, undefined)).toBe(false);
   });
-  it('R4 — main déplace un fichier de code vers un autre dossier : pas plan seul (les deux noms comptent)', () => {
+  it('R4 — main déplace un fichier de code : non traversable', () => {
     const repo = repoWith(['src/a/x.ts']);
     const from = head(repo);
     mkdirSync(join(repo, 'ailleurs'));
     renameSync(join(repo, 'src/a/x.ts'), join(repo, 'ailleurs/x.ts'));
-    expect(deltaPlanOnly(repo, from, commit(repo), PLAN)).toBe(false);
+    expect(deltaCrossable(repo, from, commit(repo), PLAN, undefined)).toBe(false);
   });
-  it('R4 — une page dont le nom a des espaces et des accents : pas plan seul', () => {
-    const f = 'docs/page é avec espace.md';
-    const repo = repoWith([f]);
+  it('R4 — main supprime le fichier du plan : traversable par la règle de planChain (le seul fichier changé est le plan)', () => {
+    const repo = repoWith([PLAN]);
     const from = head(repo);
-    writeFileSync(join(repo, f), 'y\n');
-    expect(deltaPlanOnly(repo, from, commit(repo), PLAN)).toBe(false);
+    rmSync(join(repo, PLAN));
+    expect(deltaCrossable(repo, from, commit(repo), PLAN, undefined)).toBe(true);
   });
-  it('R4 — from égal à to (même sommet) : plan seul', () => {
+  it('R4 — from égal à to (même sommet) : traversable', () => {
     const repo = repoWith(['src/a/x.ts']);
-    expect(deltaPlanOnly(repo, head(repo), head(repo), PLAN)).toBe(true);
+    expect(deltaCrossable(repo, head(repo), head(repo), PLAN, undefined)).toBe(true);
   });
-  it('R4 — un plan réel (planFileSet) : une note ajoutée au plan est plan seul, la même note plus un fichier de code ne l\'est pas', () => {
+  it('R4 — un plan réel (Plan.create) : une note ajoutée est traversable ; la même note plus un fichier de code ne l\'est pas ; rejoué deux fois, même réponse', () => {
     const repo = repoWith([]);
-    const plan = Plan.create(join(repo, '.cadence/raf.yaml'), 'a', 'L', '2026-09-01');
-    const from = commit(repo);
-    const files = planFileSet(plan, repo);
-    expect(files.has('.cadence/raf.yaml')).toBe(true);
-    writeFileSync(join(repo, '.cadence/raf.yaml'), '# note\n', { flag: 'a' });
+    Plan.create(join(repo, PLAN), 'a', 'L', '2026-09-01');
+    const from = commit(repo, 'plan');
+    note(repo);
     const to = commit(repo);
-    expect(deltaPlanOnly(repo, from, to, files)).toBe(true);
+    expect(deltaCrossable(repo, from, to, PLAN, undefined)).toBe(true);
     writeFileSync(join(repo, 'src.ts'), 'x\n');
-    expect(deltaPlanOnly(repo, from, commit(repo), files)).toBe(false);
-    // rejoué deux fois : même réponse
-    expect(deltaPlanOnly(repo, from, to, files)).toBe(true);
+    expect(deltaCrossable(repo, from, commit(repo), PLAN, undefined)).toBe(false);
+    expect(deltaCrossable(repo, from, to, PLAN, undefined)).toBe(true);
   });
-  it('R4 — un fichier de plan sous un autre chemin (plan.path d\'un projet) : seul l\'ensemble donné compte', () => {
-    const repo = repoWith([]);
+  it('R4 — une fusion dont le résultat ne change que le plan : non traversable (planChain s\'arrête à deux parents)', () => {
+    const repo = repoWith([PLAN]);
     const from = head(repo);
-    mkdirSync(join(repo, 'docs/plan'), { recursive: true });
-    writeFileSync(join(repo, 'docs/plan/taches.yaml'), 'x\n');
-    const to = commit(repo);
-    expect(deltaPlanOnly(repo, from, to, PLAN)).toBe(false);
-    expect(deltaPlanOnly(repo, from, to, new Set(['docs/plan/taches.yaml']))).toBe(true);
+    git(repo, 'checkout', '-q', '-b', 'side');
+    note(repo);
+    commit(repo, 'side');
+    git(repo, 'checkout', '-q', 'main');
+    git(repo, 'merge', '-q', '--no-ff', '--no-edit', 'side');
+    expect(deltaCrossable(repo, from, head(repo), PLAN, undefined)).toBe(false);
+  });
+  it('R4 — plus de 50 commits de plan seul : la chaîne s\'arrête avant from, non traversable (le doute rejoue la porte)', () => {
+    const repo = repoWith([PLAN]);
+    const from = head(repo);
+    for (let i = 0; i < 51; i++) {
+      note(repo);
+      commit(repo, `plan ${i}`);
+    }
+    expect(deltaCrossable(repo, from, head(repo), PLAN, undefined)).toBe(false);
+  });
+  it('R4 — le lecteur du plan est jugé au sommet to : un lecteur ajouté par le delta lui-même compte (le delta n\'est alors plus de plan seul de toute façon)', () => {
+    const repo = repoWith([PLAN]);
+    const from = head(repo);
+    writeFileSync(join(repo, 'check.sh'), 'cat .cadence/raf.yaml\n');
+    expect(deltaCrossable(repo, from, commit(repo), PLAN, undefined)).toBe(false);
   });
 });

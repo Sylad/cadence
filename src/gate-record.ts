@@ -12,7 +12,7 @@ export interface RecordedGate {
   /** Le sha que les contrôles ont tourné (celui demandé, ou le sous lequel ne reposent que des commits de plan, L444). */
   checked: string;
   runs: { label: 'build' | 'tests'; command: string; code: number; instables?: string[]; portee?: 'ciblee' }[];
-  /** La porte n'a pas tourné à `checked` mais avant le rebase, le delta de la branche du dépôt étant jugé sans lien avec le lot (L662). */
+  /** La porte n'a pas tourné à `checked` mais avant le rebase, le delta de la branche du dépôt étant de plan seul, que `verify --gate` traverserait lui-même (L662). */
   reprise?: VerdictRepris;
 }
 
@@ -29,9 +29,9 @@ const PLAN_HOPS = 50;
 /**
  * Les shas dont la porte vaut pour `sha` : `sha` lui-même, puis, tant que le commit ne change que le plan (`planFile`, relatif à la racine du dépôt) et n'a qu'un parent, son parent, de proche en proche
  * (même règle que le hook pre-push, L432 : le commit de revue et celui de `raf done` posés au-dessus d'un lot intégré ne changent pas ce que la porte a contrôlé).
- * Une fusion, un commit racine, un commit qui touche autre chose que le plan ou qui ne touche rien est le dernier de la liste.
+ * Une fusion, un commit racine, un commit qui touche autre chose que le plan ou qui ne touche rien est le dernier de la liste. La porte d'intégration sautée (L662, `deltaCrossable`) applique la même règle au delta de la branche.
  */
-function planChain(repo: string, sha: string, planFile: string | undefined): string[] {
+export function planChain(repo: string, sha: string, planFile: string | undefined): string[] {
   const chain = [sha];
   if (planFile === undefined) return chain;
   for (let hop = 0; hop < PLAN_HOPS; hop++) {

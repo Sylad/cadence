@@ -3,12 +3,12 @@ import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { run as cli } from '../src/cli.js';
 import { recordedGate } from '../src/gate-record.js';
-import { deltaPlanOnly, fullSuiteGreen } from '../src/orchestrate/cycle/integration-porte.js';
+import { deltaCrossable, fullSuiteGreen } from '../src/orchestrate/cycle/integration-porte.js';
 import { claudeOut, git, reviewReport, workReport } from './orchestrate-harness.js';
 import { fake, lotOf, meeting, run, setup, store } from './orchestrate-worktree-harness.js';
 import { cleanupTempDirs, tempDir } from './helpers.js';
 
-// L662 (2) : après « main a avancé », la porte d'intégration n'est sautée que si le delta de main ne change que le plan (ni code, ni test, ni script, ni fichier racine, ni docs).
+// L662 (2) : après « main a avancé », la porte d'intégration n'est sautée que si le delta de main est celui que `verify --gate` traverserait : des commits du seul fichier du plan, qu'aucun test ne lit (crossablePlan, planChain).
 const fileHome = process.env.CADENCE_HOME;
 beforeEach(() => {
   process.env.CADENCE_HOME = tempDir();
@@ -25,65 +25,78 @@ const put = (repo: string, file: string, text = 'x\n') => {
   git(repo, 'commit', '-q', '-m', `chore: ${file}`);
   return git(repo, 'rev-parse', 'HEAD');
 };
-/** Un dépôt : un commit de base, puis un delta de main (les fichiers de `delta`). */
-function scene(delta: string[]) {
+/** Un dépôt : un commit de base (`files` déjà présents, pour un lecteur du plan), puis un commit de main par entrée de `delta` (une liste = un commit de plusieurs fichiers). */
+function scene(delta: (string | string[])[], files: Record<string, string> = {}) {
   const repo = tempDir();
   git(repo, 'init', '-q', '-b', 'main');
   git(repo, 'config', 'user.email', 't@example.com');
   git(repo, 'config', 'user.name', 'T');
   git(repo, 'config', 'commit.gpgsign', 'false');
+  for (const [f, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(repo, f)), { recursive: true });
+    writeFileSync(join(repo, f), text);
+    git(repo, 'add', '--', f);
+  }
   const from = put(repo, 'base.txt');
-  for (const f of delta) put(repo, f);
+  delta.forEach((d, i) => {
+    const fs = Array.isArray(d) ? d : [d];
+    for (const f of fs) {
+      mkdirSync(dirname(join(repo, f)), { recursive: true });
+      writeFileSync(join(repo, f), `${f} ${i}\n`);
+    }
+    git(repo, 'add', '--', ...fs);
+    git(repo, 'commit', '-q', '-m', `chore: ${fs.join(' ')}`);
+  });
   const to = git(repo, 'rev-parse', 'HEAD');
   return { repo, from, to };
 }
-/** Les fichiers du plan d'un projet (`planFileSet`) : le plan et sa page Gantt. */
-const PLAN = new Set(['.cadence/raf.yaml', '.cadence/gantt.html']);
+const PLAN = '.cadence/raf.yaml';
+const crossable = (s: { repo: string; from: string; to: string }, declared: unknown = undefined) => deltaCrossable(s.repo, s.from, s.to, PLAN, declared);
 
-describe('L662 R4 — deltaPlanOnly : le delta de main ne change-t-il que le plan ?', () => {
-  it('R4 — un delta sans fichier (rien n\'a bougé) : plan seul', () => {
-    const s = scene([]);
-    expect(deltaPlanOnly(s.repo, s.from, s.to, PLAN)).toBe(true);
+describe('L662 R4 — deltaCrossable : le delta de main est-il celui que verify --gate traverserait ?', () => {
+  it('R4 — un delta sans commit (rien n\'a bougé) : traversable', () => {
+    expect(crossable(scene([]))).toBe(true);
   });
-  it('R4 — un commit de plan (le fichier du plan) : plan seul, la porte est sautée', () => {
-    const s = scene(['.cadence/raf.yaml']);
-    expect(deltaPlanOnly(s.repo, s.from, s.to, PLAN)).toBe(true);
+  it('R4 — un commit du seul fichier du plan, sans lecteur : traversable, la porte est sautée', () => {
+    expect(crossable(scene([PLAN]))).toBe(true);
   });
-  it('R4 — le plan et sa page Gantt : plan seul', () => {
-    const s = scene(['.cadence/raf.yaml', '.cadence/gantt.html']);
-    expect(deltaPlanOnly(s.repo, s.from, s.to, PLAN)).toBe(true);
+  it('R4 — deux commits de plan seul à la suite : traversables (planChain remonte jusqu\'à from)', () => {
+    expect(crossable(scene([PLAN, PLAN]))).toBe(true);
   });
-  it('R4 — le plan et un fichier de code : pas plan seul', () => {
-    const s = scene(['.cadence/raf.yaml', 'src/a/x.ts']);
-    expect(deltaPlanOnly(s.repo, s.from, s.to, PLAN)).toBe(false);
+  it('R4 — le plan et sa page Gantt dans un même commit, ou la page Gantt seule : non traversable (verify --gate ne traverse que le fichier du plan)', () => {
+    expect(crossable(scene([[PLAN, '.cadence/gantt.html']]))).toBe(false);
+    expect(crossable(scene(['.cadence/gantt.html']))).toBe(false);
   });
-  it('R4 — un fichier de code hors du dossier du lot (lib/api.txt, le lot est dans app/) : pas plan seul, la porte rejoue (un import n\'est pas cherché)', () => {
-    const s = scene(['lib/api.txt']);
-    expect(deltaPlanOnly(s.repo, s.from, s.to, PLAN)).toBe(false);
+  it('R4 — cas A : un fichier de plan.files (news.json) seul, gate.readsPlan déclaré : non traversable', () => {
+    expect(crossable(scene(['news.json']), true)).toBe(false);
+    expect(crossable(scene(['news.json']))).toBe(false);
   });
-  it('R4 — un nouveau test de main : pas plan seul, la porte rejoue', () => {
-    const s = scene(['test/nouveau.test.ts']);
-    expect(deltaPlanOnly(s.repo, s.from, s.to, PLAN)).toBe(false);
+  it('R4 — le plan seul mais gate.readsPlan déclaré (true ou liste) : non traversable', () => {
+    expect(crossable(scene([PLAN]), true)).toBe(false);
+    expect(crossable(scene([PLAN]), ['test/plan.test.ts'])).toBe(false);
   });
-  it('R4 — une page de docs (des tests la lisent) : pas plan seul', () => {
-    const s = scene(['docs/x.md']);
-    expect(deltaPlanOnly(s.repo, s.from, s.to, PLAN)).toBe(false);
+  it('R4 — cas B : le plan seul, et un fichier du dépôt cite son chemin sans déclaration (lecteur deviné, L482) : non traversable', () => {
+    expect(crossable(scene([PLAN], { 'check.sh': 'cat .cadence/raf.yaml\n' }))).toBe(false);
   });
-  it('R4 — CHANGELOG.md (test/changelog.test.ts le lit) : pas plan seul', () => {
-    const s = scene(['CHANGELOG.md']);
-    expect(deltaPlanOnly(s.repo, s.from, s.to, PLAN)).toBe(false);
+  it('R4 — un lecteur dans docs/ ou dans un .md ne compte pas (L482 les exclut) : traversable', () => {
+    expect(crossable(scene([PLAN], { 'docs/plan.md': 'voir .cadence/raf.yaml\n', 'NOTES.md': '.cadence/raf.yaml\n' }))).toBe(true);
   });
-  it('R4 — un fichier racine que la porte exécute (package.json), un script (scripts/qualite.mjs) : pas plan seul', () => {
-    expect(deltaPlanOnly(...Object.values(scene(['package.json'])) as [string, string, string], PLAN)).toBe(false);
-    expect(deltaPlanOnly(...Object.values(scene(['scripts/qualite.mjs'])) as [string, string, string], PLAN)).toBe(false);
+  it('R4 — le plan et un fichier de code dans un même commit, ou un commit de plan puis un commit de code : non traversable', () => {
+    expect(crossable(scene([[PLAN, 'src/a/x.ts']]))).toBe(false);
+    expect(crossable(scene([PLAN, 'src/a/x.ts']))).toBe(false);
   });
-  it('R4 — un sha que git ne lit pas : pas plan seul (le doute rejoue la porte)', () => {
-    const s = scene(['.cadence/raf.yaml']);
-    expect(deltaPlanOnly(s.repo, 'f'.repeat(40), s.to, PLAN)).toBe(false);
+  it('R4 — un fichier de code hors du dossier du lot (lib/api.txt, le lot est dans app/), un nouveau test, une page de docs, CHANGELOG.md, package.json, un script : non traversable', () => {
+    for (const f of ['lib/api.txt', 'test/nouveau.test.ts', 'docs/x.md', 'CHANGELOG.md', 'package.json', 'scripts/qualite.mjs']) expect(crossable(scene([f])), f).toBe(false);
   });
-  it('R4 — aucun fichier de plan connu : seul un delta vide est plan seul', () => {
-    expect(deltaPlanOnly(...Object.values(scene(['.cadence/raf.yaml'])) as [string, string, string], new Set())).toBe(false);
-    expect(deltaPlanOnly(...Object.values(scene([])) as [string, string, string], new Set())).toBe(true);
+  it('R4 — un sha que git ne lit pas : non traversable (le doute rejoue la porte)', () => {
+    const s = scene([PLAN]);
+    expect(deltaCrossable(s.repo, 'f'.repeat(40), s.to, PLAN, undefined)).toBe(false);
+    expect(deltaCrossable(s.repo, s.from, 'f'.repeat(40), PLAN, undefined)).toBe(false);
+  });
+  it('R4 — le fichier de plan d\'un autre chemin (plan.path du projet) : seul ce chemin compte', () => {
+    const s = scene(['docs/plan/taches.yaml']);
+    expect(deltaCrossable(s.repo, s.from, s.to, 'docs/plan/taches.yaml', undefined)).toBe(true);
+    expect(crossable(s)).toBe(false);
   });
 });
 
@@ -92,10 +105,11 @@ const lines = (n: number) => Array.from({ length: n }, (_, i) => `l${i}`).join('
 const planNote = (repo: string) => `${readFileSync(join(repo, '.cadence/raf.yaml'), 'utf8')}# note du lead\n`;
 const planOnly = (yaml = '') => scenario('.cadence/raf.yaml', yaml, planNote);
 /** Deux lots modifient `src/f.txt` ; pendant la revue courte du second, le lead commite `leadFile` sur main (une fois) : le rebase est rejoué. Rend les suites complètes jouées au sommet de L2 et le journal. */
-async function scenario(leadFile: string, yaml = '', leadText?: (repo: string) => string) {
+async function scenario(leadFile: string, yaml = '', leadText?: (repo: string) => string, prepare?: (repo: string) => void) {
   const log = join(tempDir(), 'portes.log');
   const { parent, repo } = setup([{ title: 'un' }, { title: 'deux' }], `worktrees: true\ntest: echo "FULL $PWD" >> ${log}\n${yaml}`, {});
   put(repo, 'src/f.txt', lines(12));
+  prepare?.(repo);
   let moved = 0;
   const shortBriefs: string[] = [];
   const f = fake({
@@ -126,7 +140,7 @@ describe('L662 R5 — la porte d\'intégration rejouée après « main a avancé
     expect(plan.r.code).toBe(0);
     expect(plan.r.out).toContain("main a avancé pendant l'intégration, rebase rejoué");
     expect(plan.r.out).toContain('porte d\'intégration non rejouée');
-    expect(plan.r.out).toContain('ne change que le plan');
+    expect(plan.r.out).toContain('ne change que le plan (.cadence/raf.yaml seul');
     expect(plan.suites).toHaveLength(code.suites.length - 1);
   });
   it('R5 — le lead commite un voisin du fichier du lot : la porte est rejouée, aucune ligne « non rejouée »', async () => {
@@ -134,6 +148,30 @@ describe('L662 R5 — la porte d\'intégration rejouée après « main a avancé
     expect(r.code).toBe(0);
     expect(r.out).toContain("main a avancé pendant l'intégration, rebase rejoué");
     expect(r.out).not.toContain("porte d'intégration non rejouée");
+    expect(store(parent).readLot('a', 'L2')!.status).toBe('ready');
+  });
+  it('R5 — cas A : news.json, listé dans plan.files, seul dans le delta, gate.readsPlan déclaré : la porte est rejouée, pas de reprise', async () => {
+    const planFiles = (repo: string) => {
+      writeFileSync(join(repo, 'cadence.yaml'), `plan:\n  files: [news.json]\n${readFileSync(join(repo, 'cadence.yaml'), 'utf8')}`);
+      git(repo, 'add', '--', 'cadence.yaml');
+      git(repo, 'commit', '-q', '-m', 'chore: plan.files');
+      put(repo, 'news.json', '[]\n');
+    };
+    const { r, parent, suites } = await scenario('news.json', 'gate: { readsPlan: true }', () => '[1]\n', planFiles);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("main a avancé pendant l'intégration, rebase rejoué");
+    expect(r.out).not.toContain("porte d'intégration non rejouée");
+    expect(store(parent).readLot('a', 'L2')!.checks!.reprise).toBeUndefined();
+    expect(store(parent).readLot('a', 'L2')!.status).toBe('ready');
+    expect(suites.length).toBeGreaterThan(0);
+  });
+  it('R5 — cas B : le plan seul, cité par un fichier du dépôt sans gate.readsPlan (lecteur deviné, L482) : la porte est rejouée, pas de reprise', async () => {
+    const reader = (repo: string) => put(repo, 'check.sh', 'grep -c L2 .cadence/raf.yaml\n');
+    const { r, parent } = await scenario('.cadence/raf.yaml', '', planNote, reader);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("main a avancé pendant l'intégration, rebase rejoué");
+    expect(r.out).not.toContain("porte d'intégration non rejouée");
+    expect(store(parent).readLot('a', 'L2')!.checks!.reprise).toBeUndefined();
     expect(store(parent).readLot('a', 'L2')!.status).toBe('ready');
   });
   it('R5 — un fichier hors du dossier du lot (lib/api.txt, le lot est dans src/), un nouveau test, une page de docs : la porte est rejouée à chaque fois', async () => {
@@ -157,7 +195,7 @@ const verify = async (repo: string, sha: string) => {
 const lotTip = (repo: string) => git(repo, 'log', '--format=%H', '--grep=feat(L2)', '--fixed-strings', '-1', 'main');
 
 describe('L662 R5 — la porte sautée reste reconnue au sha rebasé, et dit d\'où elle vient', () => {
-  it('R5 — verify --gate --sha <sha rebasé> : rien n\'est rejoué, la sortie nomme le sha d\'origine et le delta jugé sans lien', async () => {
+  it('R5 — verify --gate --sha <sha rebasé> : rien n\'est rejoué, la sortie nomme le sha d\'origine et le delta de plan seul', async () => {
     const s = await planOnly();
     expect(s.r.out).toContain('porte d\'intégration non rejouée');
     const sha = lotTip(s.repo);
@@ -203,7 +241,7 @@ describe('L662 R5 — la porte sautée reste reconnue au sha rebasé, et dit d\'
     expect(s.r.out).not.toContain("porte d'intégration non rejouée");
     expect(store(s.parent).readLot('a', 'L2')!.checks!.reprise).toBeUndefined();
   });
-  it('R5 — sans déclaration, le même delta de plan seul saute la porte', async () => {
+  it('R5 — sans déclaration ni lecteur dans le dépôt, le même delta de plan seul saute la porte', async () => {
     const s = await planOnly();
     expect(s.r.out).toContain("porte d'intégration non rejouée");
     expect(store(s.parent).readLot('a', 'L2')!.checks!.reprise).toBeDefined();

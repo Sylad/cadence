@@ -67,8 +67,8 @@ function planReplay(repo: string, sha: string, planFile: string | undefined, dec
 
 const replayCommand = (testReplay: string, files: string[]): string => testReplay.replaceAll('{files}', () => files.map(shellArg).join(' '));
 
-/** Ce qu'une sortie de `verify --gate` ajoute quand le verdict est repris d'avant un rebase (L662) : le sha où la porte a joué et le delta jugé sans lien ; vide sinon. */
-export const repriseNote = (f: RecordedGate): string => (f.reprise ? `, porte jouée au sha ${f.reprise.head.slice(0, 7)} avant rebase, delta ${f.reprise.from.slice(0, 7)}..${f.reprise.to.slice(0, 7)} de la branche jugé sans lien avec le lot` : '');
+/** Ce qu'une sortie de `verify --gate` ajoute quand le verdict est repris d'avant un rebase (L662) : le sha où la porte a joué et le delta de plan seul ; vide sinon. */
+export const repriseNote = (f: RecordedGate): string => (f.reprise ? `, porte jouée au sha ${f.reprise.head.slice(0, 7)} avant rebase, delta ${f.reprise.from.slice(0, 7)}..${f.reprise.to.slice(0, 7)} de la branche : plan seul` : '');
 
 const listed = (xs: string[]): string => `${xs.slice(0, 3).join(', ')}${xs.length > 3 ? ', …' : ''}`;
 

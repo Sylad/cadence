@@ -1,14 +1,11 @@
 import { type Constat } from '../state.js';
 import { type LotCtx, save } from './ctx.js';
-import { git } from '../worktree.js';
+import { git, planFileSet } from '../worktree.js';
 import { gateLabel } from '../gate-parts.js';
 import { integratedChecks } from './checks.js';
-import { dirname, join, relative } from 'node:path';
+import { relative } from 'node:path';
 import { tryGit } from '../../git.js';
 import { mergeBase } from '../integrate.js';
-import { declaredTests, readBounds } from '../../bounds.js';
-import { docSyncSet } from '../../docsync.js';
-import { DEFAULT_TEST_PATTERNS } from '../../testgate.js';
 
 /** L.checks porte déjà une suite complète verte pour cet arbre (L590, R5) : même arbre, un run « tests » qui n'est pas ciblé, de la commande de la porte, code 0. Un verdict repris (L662) n'a pas tourné à cet arbre : une nouvelle intégration le rejoue. */
 export function fullSuiteGreen(c: Pick<LotCtx, 'lot' | 'config'>, tree: string): boolean {
@@ -36,31 +33,24 @@ const changedBetween = (dir: string, from: string, to: string): string[] | null 
   return out === null ? null : out.split('\0').filter(Boolean);
 };
 
-/** Les tests que `bounds` (cadence.yaml) déclare pour ces fichiers ; un cadence.yaml absent ou illisible n'en déclare aucun. */
-function declaredFor(dir: string, files: string[]): string[] {
-  try {
-    return declaredTests(readBounds(join(dir, 'cadence.yaml')), files);
-  } catch {
-    return [];
-  }
+/**
+ * Le delta de main `from..to` (ce que la branche du dépôt a gagné depuis le dernier rebase) ne change-t-il que le plan (L662) ? Vrai quand chaque fichier du delta est un fichier du plan (`planFileSet` : le plan, sa page Gantt,
+ * `plan.files`, ce que `plan.onWrite` produit, les fichiers d'année de l'archive), le commit de plan du lead ou d'une autre vague. Tout autre fichier rend faux : du code, un test, un script, un fichier racine que la porte exécute
+ * (package.json, tsconfig.json), une page de docs (des tests la lisent, test/pages-lues-par-des-tests-l658.test.ts), CHANGELOG.md (test/changelog.test.ts) : la porte seule dit si le lot reste vert dessus, un lien d'imports n'est pas cherché.
+ * Un delta vide ne change que le plan ; un delta que git ne lit pas est tenu pour du code (le doute rejoue la porte).
+ */
+export function deltaPlanOnly(dir: string, from: string, to: string, planFiles: ReadonlySet<string>): boolean {
+  const delta = changedBetween(dir, from, to);
+  return delta !== null && delta.every((f) => planFiles.has(f));
 }
 
-/** Les fichiers que tous les lots touchent (`docs.sync` impose une entrée sous `[Unreleased]`) : ils ne disent rien du lien entre un delta et un lot, sa forme est déjà rejouée à part (test/changelog.test.ts). */
-const EVERY_LOT = ['CHANGELOG.md'];
-
-/**
- * Le delta de main `from..to` (ce que la branche du dépôt a gagné depuis le dernier rebase) est-il lié au diff du lot (L662) ? Lié : il touche un fichier du lot, un voisin de code du lot (même dossier : faute de graphe d'import,
- * c'est ce qui approche « le fichier qu'il importe »), ou un test que `bounds` déclare pour les fichiers du lot. Ni `CHANGELOG.md` (tous les lots le touchent) ni la racine du dépôt comme voisinage (tout fichier racine lierait) ne comptent. Les dossiers des tests du lot ne comptent pas comme voisinage (le dossier `test/` de tous les lots les lierait tous).
- * Un delta vide n'est pas lié ; un delta que git ne lit pas l'est (le doute rejoue la porte).
- */
-export function deltaTouchesLot(dir: string, from: string, to: string, lotFiles: string[]): boolean {
-  const delta = changedBetween(dir, from, to);
-  if (delta === null) return true;
-  const isTest = docSyncSet(DEFAULT_TEST_PATTERNS);
-  const own = lotFiles.filter((f) => !EVERY_LOT.includes(f));
-  const dirs = new Set(own.filter((f) => !isTest(f)).map((f) => dirname(f)).filter((d) => d !== '.'));
-  const related = new Set([...own, ...declaredFor(dir, own)]);
-  return delta.some((f) => related.has(f) || dirs.has(dirname(f)));
+/** Les fichiers du plan du projet, relatifs à son dépôt ; null quand le plan ne se lit pas (la porte est alors rejouée). */
+function planFilesOf(c: LotCtx): ReadonlySet<string> | null {
+  try {
+    return planFileSet(c.loadPlan(), c.lot.repo);
+  } catch {
+    return null;
+  }
 }
 
 /** Le sommet de main sur lequel la porte d'intégration a été jouée verte au tour d'avant (L662) et l'arbre du lot à ce tour, gardés d'un tour à l'autre de la boucle de rebase. */
@@ -69,14 +59,14 @@ export interface GreenOnto {
   tree?: string;
 }
 
-/** Le delta `from..to` change le plan alors que `orchestrate.gate.readsPlan` déclare qu'un test le lit (L450) : il a un effet sur la porte, qu'il touche le lot ou non. `verify --gate` reprenant la porte sautée, personne d'autre ne rattraperait ce test. */
+/** Le delta `from..to` change le plan alors que `orchestrate.gate.readsPlan` déclare qu'un test le lit (L450) : il a un effet sur la porte, plan seul ou non. `verify --gate` reprenant la porte sautée, personne d'autre ne rattraperait ce test. */
 function planDeltaRead(c: LotCtx, dir: string, from: string, to: string): boolean {
   if (!c.config.gate?.readsPlan) return false;
   const delta = changedBetween(dir, from, to);
   return delta === null || delta.includes(relative(c.lot.repo, c.loadPlan().path).split('\\').join('/'));
 }
 
-/** La verte du tour d'avant vaut pour le sommet rebasé (L662) : l.checks est porté sur `tip` et son arbre, pour que `verify --gate` la retrouve au sha intégré, et garde ce qui a vraiment joué (le premier tour, si plusieurs tours de suite sautent la porte) et le delta jugé sans lien. */
+/** La verte du tour d'avant vaut pour le sommet rebasé (L662) : l.checks est porté sur `tip` et son arbre, pour que `verify --gate` la retrouve au sha intégré, et garde ce qui a vraiment joué (le premier tour, si plusieurs tours de suite sautent la porte) et le delta de plan seul. */
 function carryGreen(c: LotCtx, tip: string, tree: string, delta: { from: string; to: string }): void {
   const k = c.lot.checks!;
   const origin = k.reprise ?? { head: k.head, tree: k.tree, from: delta.from };
@@ -85,20 +75,21 @@ function carryGreen(c: LotCtx, tip: string, tree: string, delta: { from: string;
 }
 
 /**
- * La porte d'intégration d'un tour (L662) : un tour rejoué (main a avancé) ne rejoue la porte que si ce que main a gagné depuis le sommet où le tour d'avant l'a jouée verte (`green.onto`) est lié au diff du lot
- * (`deltaTouchesLot`, lu sur `onto..HEAD`), ou change un plan qu'un test déclaré lit (`planDeltaRead`), ou si l.checks n'est plus l'enregistrement du tour d'avant (`green.tree`) ; sinon la verte du tour d'avant reste celle de ce sommet (`carryGreen`), et le journal le dit. On ne peut pas prévenir que main avance, seulement son effet.
+ * La porte d'intégration d'un tour (L662) : un tour rejoué (main a avancé) ne saute la porte que si ce que main a gagné depuis le sommet où le tour d'avant l'a jouée verte (`green.onto`) ne change que le plan
+ * (`deltaPlanOnly`, lu sur `onto..HEAD` : ni code, ni test, ni script, ni fichier racine, ni docs), sans qu'un test déclaré le lise (`planDeltaRead`), et si l.checks est encore l'enregistrement du tour d'avant (`green.tree`) ;
+ * la verte du tour d'avant reste alors celle de ce sommet (`carryGreen`), et le journal le dit. Tout autre delta rejoue la porte. On ne peut pas prévenir que main avance, seulement son effet.
  * Rend les constats rouges ; `green` devient le sommet de main sur lequel le lot est rebasé et son arbre (un rouge rend le lot, la valeur ne sert alors plus).
  */
 export async function integrationGate(c: LotCtx, key: string, t: { dir: string; base: string }, at: { tip: string; reviewed: string; green: GreenOnto }): Promise<Constat[]> {
   const onto = mergeBase(t.dir, 'HEAD', t.base);
   const tree = git(t.dir, 'rev-parse', 'HEAD^{tree}');
   const { onto: before, tree: greenTree } = at.green;
-  const lot = before ? changedBetween(t.dir, onto, 'HEAD') : null;
+  const planFiles = before ? planFilesOf(c) : null;
   at.green.onto = onto;
   at.green.tree = tree;
-  if (before && lot && c.lot.checks?.tree === greenTree && !deltaTouchesLot(t.dir, before, onto, lot) && !planDeltaRead(c, t.dir, before, onto)) {
+  if (before && planFiles && c.lot.checks?.tree === greenTree && deltaPlanOnly(t.dir, before, onto, planFiles) && !planDeltaRead(c, t.dir, before, onto)) {
     carryGreen(c, at.tip, tree, { from: before, to: onto });
-    c.wave.log(`${key} porte d'intégration non rejouée : ce que ${t.base} a gagné depuis ${before.slice(0, 7)} ne touche ni un fichier ni un test liés au diff du lot`);
+    c.wave.log(`${key} porte d'intégration non rejouée : ce que ${t.base} a gagné depuis ${before.slice(0, 7)} ne change que le plan (ni code, ni test, ni script, ni fichier racine, ni docs)`);
     return [];
   }
   return integrationChecks(c, key, t.dir, at.tip, at.reviewed);

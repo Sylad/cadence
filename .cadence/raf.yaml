@@ -3010,9 +3010,10 @@ lots:
     created: 2026-11-07
   - id: L673
     title: "Plan écrit pendant une intégration : l'intégration ne refuse que si un fichier modifié de l'arbre principal est dans le diff du lot, ou raf add/raf done pendant une vague commite le plan lui-même ; 07-11 : L667 refusé « arbre du dépôt modifié (.cadence/raf.yaml) », porte rejouée 8,8 min ; niveau : source (le refus ne naît plus), niveau le plus tôt : source ; mesure : 0 refus « arbre du dépôt modifié » pour .cadence/raf.yaml par vague"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-07
+    started: 2026-11-07
   - id: L674
     title: "Porte déportée mini-blue : 59 % des minutes de porte, mais 8,8 min par porte contre 4,9 en local, plafond 2 et 10 à 19 min d'attente de créneau ; porte de 52,8 % du temps actif contre 44 % en 1805 ; envoyer sur mini-blue seulement quand la porte locale est occupée et que la file mini est vide (jamais attendre un créneau mini) ; niveau : source (placement), niveau le plus tôt : source ; mesure : 0 min d'attente de créneau de porte, minutes de porte par lot < 27"
     status: todo

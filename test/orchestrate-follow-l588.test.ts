@@ -148,7 +148,7 @@ describe('L588 — cadence orchestrate --follow', () => {
   });
 
   it('R4 — n\'imprime que les lignes de geste écrites APRÈS son armement, avec leur horodatage : un second suivi (après --resume) ne rejoue pas le journal', async () => {
-    const { parent, store } = await waveWith(['cadence:L1 → ready — prêt à livrer', 'cadence:L1 → question — Déjà répondue ?']);
+    const { parent, store } = await waveWith(['cadence:L1 → ready — prêt à livrer', 'cadence:L1 → question — Déjà répondue ?', 'cadence:L1 → implementing']);
     register(parent);
     const log = join(store.dir, 'journal.log');
     const f = follow(parent, {
@@ -268,5 +268,37 @@ describe('L588 — cadence orchestrate --follow', () => {
       throw new Error('ne doit pas attendre');
     };
     await expect(orchestrate(['--follow'], io(parent).io, d)).rejects.toThrow(/aucune vague dans ce dossier/);
+  });
+
+  it('L668 R1 — un suivi réarmé relit les questions ouvertes (dernier état du lot = question), pas les prêts relayés ni les questions répondues', async () => {
+    const { parent } = await waveWith([
+      'cadence:L1 → question — Déjà répondue ?', 'cadence:L1 → implementing', 'cadence:L2 → ready — prêt à livrer', 'cadence:L3 → question — Ouverte ?\n— suite de la question',
+    ]);
+    const f = follow(parent, {});
+    expect(await f.run()).toBe(0);
+    expect(f.out).toEqual([`${TS} cadence:L3 → question — Ouverte ?`, '— suite de la question', `fin de vague ${WAVE} : done`]);
+  });
+
+  it('L668 R2 — --since <horodatage> rejoue les lignes de geste écrites à cet instant ou après (millisecondes ou non), --since <n> à partir de la ligne n', async () => {
+    const { store, parent } = await waveWith([]);
+    const log = join(store.dir, 'journal.log');
+    writeFileSync(log, ['2026-11-06T22:00:38.900Z cadence:L1 → ready — avant', '2026-11-06T22:00:39.123Z cadence:L1 → question — la question', '2026-11-06T22:00:40Z cadence:L1 → implementing', '2026-11-06T22:01:00Z cadence:L2 → ready — après', ''].join('\n'));
+    const out = async (since: string) => {
+      const f = follow(parent, {}, ['--since', since]);
+      await f.run();
+      return f.out.slice(0, -1);
+    };
+    expect(await out('2026-11-06T22:00:39Z')).toEqual(['2026-11-06T22:00:39.123Z cadence:L1 → question — la question', '2026-11-06T22:01:00Z cadence:L2 → ready — après']);
+    expect(await out('3')).toEqual(['2026-11-06T22:01:00Z cadence:L2 → ready — après']);
+    expect(await out('2026-11-06')).toHaveLength(3);
+  });
+
+  it('L668 R3 — --since : horodatage, ligne ou jour valides ; invalide refusé ; un horodatage ou une ligne sans --follow est refusé avec --waits', async () => {
+    expect(parseOrchestrateArgs(['--follow', '--since', '2026-11-06T22:00:39Z']).since).toBe('2026-11-06T22:00:39Z');
+    expect(parseOrchestrateArgs(['--follow', '--since', '12']).since).toBe('12');
+    expect(parseOrchestrateArgs(['--waits', '--since', '2026-11-06']).since).toBe('2026-11-06');
+    expect(() => parseOrchestrateArgs(['--follow', '--since', 'hier'])).toThrow(/--since invalide/);
+    const { parent } = project();
+    await expect(orchestrate(['--waits', '--since', '12'], io(parent).io, deps())).rejects.toThrow(/--follow/);
   });
 });

@@ -130,7 +130,8 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   // L258 : l'objectif donné ne vaut que pour UN lot lancé (la clé goal: du lot sert quand plusieurs partent ; --continue tire ses lots lui-même).
   // L657 : avec --add, le lot est celui de l'unique --add.
   if (args.goal !== undefined && ((args.add.length ? args.add.length !== 1 : args.lots.length !== 1) || args.continue || args.resume !== undefined || args.status !== undefined || args.waits || args.drop.length || args.stopAfterCurrent)) throw new RafError("--goal s'applique à un seul lot lancé : <projet>:<lot> --goal \"…\" (plusieurs lots : la clé goal: de chacun)");
-  if (args.since !== undefined && !args.waits) throw new RafError('--since s\'utilise avec --waits');
+  if (args.since !== undefined && !args.waits && !args.follow) throw new RafError('--since s\'utilise avec --waits ou --follow');
+  if (args.since !== undefined && args.waits && !isDay(args.since)) throw new RafError(`--since ${args.since} : un horodatage ou un numéro de ligne ne s'utilise qu'avec --follow (--waits : AAAA-MM-JJ)`);
   if (args.waits) {
     if (args.lots.length || args.status !== undefined || args.resume !== undefined || args.watch || args.drop.length || args.stopAfterCurrent || args.continue || args.dryRun) throw new RafError('--waits ne se combine avec aucune autre action');
     for (const line of renderWaits(readWaits(launch, args.since))) io.out(line);
@@ -144,7 +145,7 @@ export async function orchestrate(argv: string[], io: OrchestrateIo, deps: Orche
   if (args.drop.length || args.stopAfterCurrent) return control(args, io);
   if (args.answers.length) return answerOnly(args, io);
 
-  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--no-fill] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --follow [--wave vague] [--interval 5] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --add projet:lot [--goal "…"] [--budget projet:lot=+N] [--wave vague] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
+  if (args.lots.length === 0 && !args.continue) throw new RafError('usage : cadence orchestrate <projet>:<lot>… [--budget 2M] [--max-sessions 2] [--dry-run] [--no-fill] [--continue [--until 18:00] [--priority a,b]] | --waits [--since AAAA-MM-JJ] | --status [vague] [--detail projet:lot | --watch [--interval 10]] | --follow [--wave vague] [--interval 5] [--since horodatage|ligne] | --resume [vague] [--answer projet:lot "réponse"] [--integrate projet:lot] [--replay projet:lot] | --add projet:lot [--goal "…"] [--budget projet:lot=+N] [--wave vague] | --drop projet:lot | --stop-after-current | --remove-worktree projet:lot [--abandon-commits]');
   const refusals: string[] = [];
   const targets = resolveTargets(args, io, refusals);
   const pre = await preflight(args, targets, io, deps, launch);

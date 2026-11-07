@@ -59,7 +59,7 @@ export async function followCommand(args: Args, io: OrchestrateIo, deps: Orchest
   const sleep = deps.watchSleep ?? ((ms: number) => new Promise<void>((res) => setTimeout(res, ms)));
   const ms = (args.interval ?? DEFAULT_FOLLOW_INTERVAL) * 1000;
   const store = await waveStore(args.wave, launch, () => sleep(ms));
-  const reader = journalReader(join(store.dir, 'journal.log'));
+  const reader = journalReader(join(store.dir, 'journal.log'), args.since);
   const live = () => liveWaves(cadenceHome()).some((w) => w.wave === store.id);
   let absent = 0;
   for (;;) {
@@ -88,25 +88,61 @@ async function waveStore(wave: string | undefined, launch: string, wait: () => P
 /** La ligne porte-t-elle l'horodatage ISO qui ouvre chaque entrée du journal ? Sinon c'est une ligne de suite : `store.journal()` écrit le texte brut d'une entrée, sauts de ligne compris. */
 const TIMESTAMPED = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z /;
 
+/** Une entrée du journal : sa première ligne, son rang (1 pour la première ligne du fichier) et ses lignes de suite. */
+interface Entry { rank: number; lines: string[] }
+
+function entriesOf(text: string): Entry[] {
+  const entries: Entry[] = [];
+  text.split('\n').forEach((line, i) => {
+    if (TIMESTAMPED.test(line) || entries.length === 0) entries.push({ rank: i + 1, lines: [line] });
+    else entries[entries.length - 1].lines.push(line);
+  });
+  return entries;
+}
+
 /**
- * Relève le journal : à chaque appel, les lignes de geste écrites depuis le précédent (depuis l'armement au premier) ; une ligne non terminée attend sa fin. Un journal absent est un journal vide.
+ * Les entrées de geste que le suivi rejoue à son armement (L668). Avec `--since` : celles écrites à cet horodatage ISO ou après (un jour AAAA-MM-JJ vaut minuit), ou à partir de cette ligne du journal
+ * (un entier : le numéro de la première ligne de l'entrée). Sans : les questions encore ouvertes, c'est-à-dire dont le lot n'a écrit aucun autre état depuis — un suivi réarmé les relit au lieu
+ * de les perdre (06-11, la question de L477 de 22:00:39Z a attendu 33 min). Les prêts déjà relayés, eux, ne sont pas rejoués.
+ */
+function replayed(entries: Entry[], since: string | undefined): Entry[] {
+  const lead = entries.filter((e) => leadLine(e.lines[0]));
+  if (since !== undefined) {
+    const from = /^\d+$/.test(since) ? Number(since) : undefined;
+    const at = Date.parse(since);
+    return lead.filter((e) => (from !== undefined ? e.rank >= from : Date.parse(/^\S+/.exec(e.lines[0])![0]) >= at));
+  }
+  const last = new Map<string, Entry>();
+  for (const e of entries) {
+    const lot = /^(?:\d{4}-\d{2}-\d{2}T[\d:.]+Z )?(\S+) → /.exec(e.lines[0])?.[1];
+    if (lot !== undefined) last.set(lot, e);
+  }
+  return lead.filter((e) => /^\S+ → question(?: — |$)/.test(body(e.lines[0])) && [...last.values()].includes(e));
+}
+
+/**
+ * Relève le journal : à chaque appel, les lignes de geste écrites depuis le précédent ; au premier, ce que `replayed` rejoue puis ce qui est écrit depuis. Une ligne non terminée attend sa fin. Un journal absent est un journal vide.
  * Une ligne sans horodatage appartient à l'entrée précédente et suit son sort (une question « 3 fichiers diffèrent : » suivie de 3 lignes « — … » sort entière, 67 lignes de suite dans les journaux d'oct.-nov.),
  * même quand la suite arrive dans un relevé plus tard que sa première ligne.
  */
-function journalReader(file: string): () => string[] {
+function journalReader(file: string, since: string | undefined): () => string[] {
   const read = () => (existsSync(file) ? readFileSync(file, 'utf8') : '');
   const endOf = (text: string) => text.lastIndexOf('\n') + 1;
-  let done = endOf(read()); // caractères déjà traités
+  const first = read();
+  let done = endOf(first); // caractères déjà traités
   let emitting = false; // la dernière entrée relevée était-elle une ligne de geste ?
+  let replay = replayed(entriesOf(first.slice(0, done === 0 ? 0 : done - 1)), since).flatMap((e) => e.lines);
   return () => {
     const text = read();
     const end = endOf(text);
-    if (end <= done) return [];
+    const past = replay;
+    replay = [];
+    if (end <= done) return past;
     const lines = text.slice(done, end - 1).split('\n').filter((line) => {
       if (TIMESTAMPED.test(line)) emitting = leadLine(line);
       return emitting;
     });
     done = end;
-    return lines;
+    return [...past, ...lines];
   };
 }

@@ -66,7 +66,7 @@ function verrouiller(racine: string): () => void {
   }
 }
 
-type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string;
+type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string; repetitions?: number;
   exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void;
   avantVerdict?: (res: ResultatBanc[]) => void };
 
@@ -82,45 +82,48 @@ function passageVerrouille(o: OptPassage): Verdict {
   const bras = chargerBras(o.racine);
   for (const n of [o.ref, o.cand]) if (!bras[n]) throw new Error(`bras « ${n} » absent de ${o.racine}/bras.yaml`);
   const clonesParBanc: Record<string, unknown>[] = [];
-  const res: ResultatBanc[] = listerBancs(o.racine, o.numeros).map((b, i) => {
-    const ordre = i % 2 === 0 ? [o.ref, o.cand] : [o.cand, o.ref];
+  const N = o.repetitions ?? 1;
+  const jouer = (b: ReturnType<typeof listerBancs>[number], i: number, k: number): ResultatBanc => {
+    const ordre = (i + k - 1) % 2 === 0 ? [o.ref, o.cand] : [o.cand, o.ref];
+    const idBanc = N > 1 ? `${b.id}#${k}` : b.id; const sous = N > 1 ? join(b.id, `r${k}`) : b.id;
     const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {};
     const mapping: Record<string, string> = {}; // c1/c2 -> bras : écrit seulement après les juges (aveugle)
     let jugement: Jugement | null = null; let phase = 'préparation';
     try {
-      ordre.forEach((n, k) => {
-        const c = join(dirRun, b.id, `c${k + 1}`);
-        mapping[`c${k + 1}`] = n; clones[n] = c;
+      ordre.forEach((n, j) => {
+        const c = join(dirRun, sous, `c${j + 1}`);
+        mapping[`c${j + 1}`] = n; clones[n] = c;
         phase = 'préparation'; o.prep(b, c);
-        o.out(`${b.id} : bras ${n}…`);
+        o.out(`${idBanc} : bras ${n}…`);
         phase = `bras ${n}`; mesures[n] = lancerBras(b, bras[n], c, o.exec);
         phase = 'fuites'; fuites[n] = fuitesDuBras(o.home, o.racine, b.id, c);
       });
-      if (ordre.some((n) => mesures[n].echec !== null)) o.out(`${b.id} : un bras en échec, juges sautés`);
+      if (ordre.some((n) => mesures[n].echec !== null)) o.out(`${idBanc} : un bras en échec, juges sautés`);
       else {
-        o.out(`${b.id} : juges…`);
+        o.out(`${idBanc} : juges…`);
         phase = 'juges';
-        jugement = juger(b, clones, join(o.racine, 'eval', id, b.id), o.juge, o.exec);
+        jugement = juger(b, clones, join(o.racine, 'eval', id, sous), o.juge, o.exec);
       }
     } catch (e) {
       const msg = `${phase} : ${e instanceof Error ? e.message : String(e)}`;
       for (const n of ordre) if (!mesures[n]) {
-        mesures[n] = { bras: n, banc: b.id, debut: o.maintenant.toISOString(), fin: o.maintenant.toISOString(), duree_s: 0, tokens: 0,
+        mesures[n] = { bras: n, banc: idBanc, debut: o.maintenant.toISOString(), fin: o.maintenant.toISOString(), duree_s: 0, tokens: 0,
           cout_usd: 0, questions: 0, questions_texte: [], sessions: [], echec: msg };
         fuites[n] = [];
       }
-      o.out(`${b.id} : ${msg}`);
+      o.out(`${idBanc} : ${msg}`);
     }
     clonesParBanc.push(mapping);
-    const r: ResultatBanc = { banc: b.id, taille: b.taille, visible: b.visible, reponses: b.reponses, frais: b.frais, mesures, jugement, fuites };
-    mkdirSync(join(dirRun, b.id), { recursive: true });
-    writeFileSync(join(dirRun, b.id, 'resultat.json'), JSON.stringify({ ...r, clones: mapping }, null, 2));
+    const r: ResultatBanc = { banc: idBanc, taille: b.taille, visible: b.visible, reponses: b.reponses, frais: b.frais, mesures, jugement, fuites };
+    mkdirSync(join(dirRun, sous), { recursive: true });
+    writeFileSync(join(dirRun, sous, 'resultat.json'), JSON.stringify({ ...r, clones: mapping }, null, 2));
     return r;
-  });
+  };
+  const res: ResultatBanc[] = listerBancs(o.racine, o.numeros).flatMap((b, i) => Array.from({ length: N }, (_, k) => jouer(b, i, k + 1)));
   const v = verdict(res, o.ref, o.cand, BARRE_SPEC);
   mkdirSync(join(o.racine, 'rapports'), { recursive: true });
   const base = join(o.racine, 'rapports', id);
-  writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte }));
+  writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N }));
   writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultats: res.map((r, i) => ({ ...r, clones: clonesParBanc[i] })) }, null, 2));
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
     candidat: o.cand, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: res.filter((r) => r.frais).length })}\n`);
@@ -145,6 +148,9 @@ export function controlesEclair(res: ResultatBanc[], ref: string, cand: string):
     `temps candidat ≤ ${BARRE_SPEC.temps_max_retouche.toString().replace('.', ',')} × A : ${tempsOk ? 'ok' : 'ROUGE'} (${c.t} s contre ${a.t} s)`,
     `questions du candidat : 0 / ${c.q} ${questionsOk ? 'ok' : 'ROUGE'}`] };
 }
+
+/** `--repetitions N` : entier ≥ 1 (défaut 1), null si la valeur est refusée. */
+const repetitions = (args: string[]): number | null => { const v = option(args, 'repetitions'); if (v === undefined) return 1; return /^[1-9]\d*$/.test(v) ? Number(v) : null; };
 
 function option(args: string[], nom: string): string | undefined {
   const i = args.indexOf(`--${nom}`);
@@ -182,6 +188,8 @@ export async function bench(args: string[], io: Io): Promise<number> {
   }
   const numeros = sous === 'court' ? COURT : sous === 'hebdo' ? undefined : sous === 'eclair' ? ['1'] : sous === 'lancer' ? (option(reste, 'bancs')?.split(',') ?? null) : null;
   if (numeros === null) { io.err('usage : cadence2 bench court|hebdo|eclair|lancer --bancs 1,3|statut|verifier-publication|ajouter [--candidat c] [--reference r]'); return 2; }
+  const rep = repetitions(reste);
+  if (rep === null) { io.err('usage : --repetitions N (entier ≥ 1) avec court|hebdo|eclair|lancer'); return 2; }
   const ref = option(reste, 'reference') ?? 'A'; const cand = option(reste, 'candidat') ?? 'equipe-legere';
   let refus: string | null;
   try {
@@ -193,7 +201,7 @@ export async function bench(args: string[], io: Io): Promise<number> {
   let eclair = true;
   const v = passage({ racine, numeros, ref, cand,
     avantVerdict: sous === 'eclair' ? (res) => { const e = controlesEclair(res, ref, cand); eclair = e.ok; e.lignes.forEach((l) => io.out(l)); } : undefined,
-    hebdo: sous === 'hebdo', juge: option(reste, 'juge') ?? 'opus', exec: executeurClaude, prep: preparer,
+    hebdo: sous === 'hebdo', repetitions: rep, juge: option(reste, 'juge') ?? 'opus', exec: executeurClaude, prep: preparer,
     maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out });
   return v.vert && eclair ? 0 : 1;
 }

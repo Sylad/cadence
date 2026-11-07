@@ -208,3 +208,41 @@ describe('banc éclair', () => {
     expect(sortie.join('\n')).toMatch(/bench court\|hebdo\|eclair\|/);
   });
 });
+
+describe('répétitions (R18)', () => {
+  const base = { ref: 'A', cand: 'C', hebdo: false, juge: 'opus', prep: prep as never, maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1' };
+  it('N = 2 : quatre bras par banc, ordre alterné par banc et par répétition, clones r1/r2, ids #k', () => {
+    const r = racine(); const ordre: string[] = [];
+    const exec2: Executeur = (args, o) => { if (!/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) ordre.push(o.cwd.split('/').slice(-3).join('/')); return exec(args, o); };
+    passage({ ...base, racine: r, repetitions: 2, exec: exec2, home: r, out: () => {} });
+    expect(ordre).toEqual(['1-a/r1/c1', '1-a/r1/c2', '1-a/r2/c1', '1-a/r2/c2', '2-b/r1/c1', '2-b/r1/c2', '2-b/r2/c1', '2-b/r2/c2']);
+    const run = join(r, 'runs', '2026-11-08-1000-e1');
+    const map = (id: string, k: number) => JSON.parse(readFileSync(join(run, id, `r${k}`, 'resultat.json'), 'utf8')).clones;
+    expect(map('1-a', 1)).toEqual({ c1: 'A', c2: 'C' }); expect(map('1-a', 2)).toEqual({ c1: 'C', c2: 'A' });
+    expect(map('2-b', 1)).toEqual({ c1: 'C', c2: 'A' }); expect(map('2-b', 2)).toEqual({ c1: 'A', c2: 'C' });
+    expect(existsSync(join(r, 'eval', '2026-11-08-1000-e1', '2-b', 'r2'))).toBe(true);
+    const rap = JSON.parse(readFileSync(join(r, 'rapports', '2026-11-08-1000-e1.json'), 'utf8'));
+    expect(rap.resultats.map((x: { banc: string }) => x.banc)).toEqual(['1-a#1', '1-a#2', '2-b#1', '2-b#2']);
+    expect(readFileSync(join(r, 'rapports', '2026-11-08-1000-e1.md'), 'utf8')).toContain('Répétitions : 2');
+  });
+  it('eclair avec N = 2 : deux répétitions du banc 1, contrôles sur la somme', () => {
+    const r = racine(); const sortie: string[] = [];
+    const v = passage({ ...base, racine: r, numeros: ['1'], repetitions: 2, exec, home: r, out: (l) => sortie.push(l),
+      avantVerdict: (rs) => { expect(rs).toHaveLength(2); controlesEclair(rs, 'A', 'C').lignes.forEach((l) => sortie.push(l)); } });
+    expect(v.vert).toBe(true);
+    expect(sortie.some((l) => l.startsWith('temps candidat'))).toBe(true);
+    expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8').trim()).bancs).toEqual(['1-a#1', '1-a#2']);
+  });
+  it('N = 1 : ids et dossiers inchangés', () => {
+    const r = racine();
+    passage({ ...base, racine: r, numeros: ['1'], exec, home: r, out: () => {} });
+    expect(existsSync(join(r, 'runs', '2026-11-08-1000-e1', '1-a', 'c1'))).toBe(true);
+  });
+  it('--repetitions 0, -1, 1.5, abc : usage et code 2, pour court, hebdo, lancer et eclair', async () => {
+    for (const sous of ['court', 'hebdo', 'eclair', 'lancer']) for (const v of ['0', '-1', '1.5', 'abc']) {
+      const err: string[] = [];
+      const rc = await run(['bench', sous, '--bancs', '1', '--repetitions', v], { cwd: '/', env: { BENCH_ROOT: racine() }, now: () => new Date(), out: () => {}, err: (l) => err.push(l) });
+      expect(rc).toBe(2); expect(err.join('\n')).toMatch(/--repetitions/);
+    }
+  });
+});

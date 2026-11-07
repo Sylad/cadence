@@ -115,3 +115,40 @@ describe('rapport, historique, statut', () => {
     expect(statut([], new Date('2026-11-08T08:00:00Z'), 'e1').banc_du_weekend).toBe(true);
   });
 });
+
+describe('répétitions (R18)', () => {
+  const rep = (id: string, o: Parameters<typeof banc>[0] = {}) => ({ ...banc(o), banc: id });
+  it('deux répétitions en désaccord : le banc compte egal ; d\'accord sur A : il compte pour A', () => {
+    // 1 désaccord (egal => sans préférence pour A) + 1 accord sur A => 1/2, pas > moitié
+    expect(rouges([rep('1-a#1', { pref: 'A' }), rep('1-a#2', { pref: 'C' }), rep('2-b#1', { pref: 'A' }), rep('2-b#2', { pref: 'A' })])).toEqual(['relecture aveugle']);
+    const v = verdict([rep('1-a#1', { pref: 'A' }), rep('1-a#2', { pref: 'C' }), rep('2-b#1', { pref: 'C' }), rep('2-b#2', { pref: 'C' })], 'A', 'C', BARRE_SPEC);
+    expect(v.criteres.find((c) => c.nom === 'relecture aveugle')).toMatchObject({ valeur: '2/2 sans préférence pour A', ok: true });
+  });
+  it('la majorité se compte par banc de base, pas par répétition', () => {
+    // A préféré sur 2 répétitions d'un banc, C sur 1 banc : 1/2 par banc (rouge) alors que 1/3 par répétition l'aurait été aussi ; contrôle inverse
+    const r = [rep('1-a#1', { pref: 'A' }), rep('1-a#2', { pref: 'A' }), rep('2-b#1', { pref: 'C' }), rep('3-c#1', { pref: 'C' }), rep('3-c#2', { pref: 'C' })];
+    const c = verdict(r, 'A', 'C', BARRE_SPEC).criteres.find((x) => x.nom === 'relecture aveugle')!;
+    expect(c).toMatchObject({ valeur: '2/3 sans préférence pour A', ok: true });
+  });
+  it('UI : accord requis aussi', () => {
+    expect(rouges([rep('1-a#1', { ui: 'A' }), rep('1-a#2', { ui: 'C' })])).toEqual([]);
+    expect(rouges([rep('1-a#1', { ui: 'A' }), rep('1-a#2', { ui: 'A' })])).toEqual(['cohérence UI']);
+  });
+  it('temps, tokens, cachés, mutations sommés sur toutes les répétitions ; tous jugés compte les répétitions', () => {
+    const v = verdict([rep('1-a#1', { dA: 100, dC: 150 }), rep('1-a#2', { dA: 100, dC: 150, cC: 9, mC: 9 })], 'A', 'C', BARRE_SPEC);
+    const val = (n: string) => v.criteres.find((c) => c.nom === n)!.valeur;
+    expect(val('temps total')).toBe('300 s contre 200 s');
+    expect(val('tests cachés')).toBe('17 contre 16');
+    expect(val('mutations tuées')).toBe('85 % contre 80 %');
+    expect(val('tous les bancs jugés')).toBe('2/2');
+    expect(verdict([rep('1-a#1'), rep('1-a#2', { nonJuge: true })], 'A', 'C', BARRE_SPEC).criteres.find((c) => c.nom === 'tous les bancs jugés')).toMatchObject({ valeur: '1/2', ok: false });
+  });
+  it('rapport : ligne Répétitions, une ligne par répétition ; statut accepte les ids #k', () => {
+    const rs = [rep('1-a#1'), rep('1-a#2')]; const v = verdict(rs, 'A', 'C', BARRE_SPEC);
+    const md = rapport(rs, 'A', 'C', v, { date: '2026-11-08', empreinte: 'e1', repetitions: 2 });
+    expect(md).toContain('Répétitions : 2'); expect(md).toContain('| 1-a#1 |'); expect(md).toContain('| 1-a#2 |');
+    expect(rapport(rs, 'A', 'C', v, { date: 'd', empreinte: 'e' })).toContain('Répétitions : 1');
+    const ligne = JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', bancs: ['1-a#1', '1-a#2', '3-x#1', '3-x#2', '6-y#1', '6-y#2'], hebdo: true, frais: 0, vert: true, rouges: [] });
+    expect(statut([ligne], new Date('2026-11-09T08:00:00Z'), 'e1').publication_ok).toBe(true);
+  });
+});

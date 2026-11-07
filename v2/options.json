@@ -4,6 +4,7 @@
     "bench --reference": "docs/v2/2026-11-07-cadence-2-design.md",
     "bench --juge": "docs/v2/2026-11-07-cadence-2-design.md",
     "bench --bancs": "docs/v2/2026-11-07-cadence-2-design.md",
+    "bench --repetitions": "docs/v2/2026-11-07-cadence-2-design.md",
     "bench --taille": "docs/v2/2026-11-07-cadence-2-design.md",
     "bench --install": "docs/v2/2026-11-07-cadence-2-design.md",
     "bench --tests": "docs/v2/2026-11-07-cadence-2-design.md",

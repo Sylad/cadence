@@ -13,6 +13,13 @@ export const BARRE_SPEC: Barre = { temps_max: 1.5, temps_max_retouche: 1.2, refe
 const somme = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const pct = (x: number) => `${Math.round(x * 100)} %`;
 
+/** Avis par banc de base : les répétitions (id `<banc>#k`) comptent une fois, et seulement si toutes s'accordent ; sinon « egal ». */
+function avisParBanc(res: ResultatBanc[], champ: 'prefere' | 'ui'): string[] {
+  const groupes = new Map<string, string[]>();
+  res.forEach((r, i) => { if (r.jugement) { const k = r.banc.includes('#') ? r.banc.split('#')[0] : `\0${i}`; groupes.set(k, [...(groupes.get(k) ?? []), r.jugement[champ]]); } });
+  return [...groupes.values()].map((a) => (a.every((x) => x === a[0]) ? a[0] : 'egal'));
+}
+
 export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: Barre): Verdict {
   const jug = res.filter((r) => r.jugement).map((r) => r.jugement!);
   const t = (rs: ResultatBanc[], b: string) => somme(rs.map((r) => r.mesures[b]?.duree_s ?? 0));
@@ -20,8 +27,9 @@ export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: B
   const caches = (b: string) => somme(jug.map((j) => j.meca[b].caches_passes));
   const mut = (b: string) => somme(jug.map((j) => j.meca[b].mutations_tuees)) / Math.max(1, somme(jug.map((j) => j.meca[b].mutations_total)));
   const def = (b: string) => somme(jug.map((j) => j.defauts[b].bloquants + j.defauts[b].majeurs));
-  const prefCand = jug.filter((j) => j.prefere !== ref).length;
-  const ui = (b: string) => jug.filter((j) => j.ui === b).length;
+  const prefs = avisParBanc(res, 'prefere'); const uis = avisParBanc(res, 'ui');
+  const prefCand = prefs.filter((p) => p !== ref).length;
+  const ui = (b: string) => uis.filter((u) => u === b).length;
   const inutiles = somme(res.filter((r) => !r.reponses).map((r) => r.mesures[cand]?.questions ?? 0));
   const fuites = res.flatMap((r) => Object.entries(r.fuites).flatMap(([b, ps]) => ps.map((p) => `${r.banc}/${b} : ${p}`)));
   const echecs = res.flatMap((r) => [ref, cand].flatMap((b) => { const e = r.mesures[b]?.echec; return e ? [`${r.banc}/${b} : ${e}`] : []; }));
@@ -35,7 +43,7 @@ export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: B
     c('tous les bancs jugés', `${jug.length}/${res.length}`, 'tous', jug.length === res.length),
     c('aucune fuite', fuites.length ? fuites.join(' ; ') : '0', '0', fuites.length === 0),
     c('aucun bras en échec', echecs.length ? echecs.join(' ; ') : '0', '0', echecs.length === 0),
-    c('relecture aveugle', `${prefCand}/${jug.length} sans préférence pour ${ref}`, '> la moitié', jug.length === 0 || prefCand * 2 > jug.length),
+    c('relecture aveugle', `${prefCand}/${prefs.length} sans préférence pour ${ref}`, '> la moitié', prefs.length === 0 || prefCand * 2 > prefs.length),
     c('tests cachés', `${caches(cand)} contre ${caches(ref)}`, `≥ ${ref}`, caches(cand) >= caches(ref)),
     c('mutations tuées', sansMutation ? 'aucune mutation jouée' : `${pct(mut(cand))} contre ${pct(mut(ref))}`, `≥ ${ref}`, !sansMutation && mut(cand) >= mut(ref)),
     c('défauts bloquants et majeurs', `${def(cand)} contre ${def(ref)}`, `≤ ${ref}`, def(cand) <= def(ref)),
@@ -49,13 +57,13 @@ export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: B
   return { vert: criteres.every((x) => x.ok || !x.bloquant), criteres };
 }
 
-export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string }): string {
+export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetitions?: number }): string {
   const lignes = res.map((r) => {
     const j = r.jugement; const m = (b: string) => r.mesures[b];
     return `| ${r.banc} | ${m(ref)?.duree_s ?? '–'} s | ${m(cand)?.duree_s ?? '–'} s | ${m(ref)?.tokens ?? '–'} | ${m(cand)?.tokens ?? '–'} | ${j?.prefere ?? 'non jugé'} | ${j ? `${j.meca[ref].caches_passes} · ${j.meca[cand].caches_passes}` : '–'} | ${j ? `${j.meca[ref].mutations_tuees}/${j.meca[ref].mutations_total} · ${j.meca[cand].mutations_tuees}/${j.meca[cand].mutations_total}` : '–'} |`;
   });
   const questions = res.flatMap((r) => [ref, cand].flatMap((b) => (r.mesures[b]?.questions_texte ?? []).map((q) => `- ${r.banc}/${b} : ${q.trim().replace(/\s*\n\s*/g, ' ')}`)));
-  return [`# Banc ${e.date} — ${cand} contre ${ref} — ${v.vert ? 'VERT' : 'ROUGE'}`, '', `Empreinte de v2 : ${e.empreinte}`, '',
+  return [`# Banc ${e.date} — ${cand} contre ${ref} — ${v.vert ? 'VERT' : 'ROUGE'}`, '', `Empreinte de v2 : ${e.empreinte}`, `Répétitions : ${e.repetitions ?? 1}`, '',
     `| Banc | Temps ${ref} | Temps ${cand} | Tokens ${ref} | Tokens ${cand} | Préféré | Cachés ${ref} · ${cand} | Mutations ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|', ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
     ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.bloquant ? '**ROUGE**' : 'en dessous (indicatif)'} |`), '',
@@ -88,7 +96,7 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
     dernier: dernier ? `${dernier.date} ${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
     banc_du_weekend: enWeekend || depuisSamedi.some((x) => x.hebdo),
     publication_ok: empreinte !== 'inconnue' && h.some((x) => x.vert && x.empreinte === empreinte
-      && ['1', '3', '6'].every((n) => (x.bancs ?? []).some((id) => id.split('-')[0] === n))),
+      && ['1', '3', '6'].every((n) => (x.bancs ?? []).some((id) => id.split('#')[0].split('-')[0] === n))),
     frais_semaine: somme(depuisSamedi.map((x) => x.frais ?? 0)),
   };
 }

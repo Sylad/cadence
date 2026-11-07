@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.61.0**: a stale kept branch is no longer recovered; `raf done` reads a verdict's start only; cadence's own gate overflows to a second machine; a fixed minor is no longer reopened; a test must not build a step's state by hand.
 - **1.60.0**: `--add` takes `--goal` and `--budget`, `--resume` rereads a changed goal; the probe skips diffs the gate cannot reach; `verify --gate` finds waves launched higher up; the lots panel shows sleeping lots.
 - **1.59.0**: the review loop stops reopening the same defect and a repeated finding is recognised by its place; `raf done` refuses a handed-back lot whose code is not on main; a fix no longer leaves its documentation behind.
 - **1.58.0**: `cadence inspect` measures each wave's minutes and losses; `orchestrate.gate.overflow` plays the gate on the free machine; a lot's state keeps every review finding; the verify test family joins « lourds ».
@@ -90,6 +91,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.61.0**: A kept branch of a past wave is no longer recovered when it has gone stale (L665). `raf done` reads only the start of a verdict, so a compliant verdict quoting « non conforme » passes (L660). A test that builds by hand the state a cycle step writes no longer passes the lot (L663), the correction pass receives the open minors of the last review (L664) and no longer gets a fixed minor back as open (L667). cadence's own gate plays on the free machine (L661).
 
 **1.60.0**: `cadence orchestrate --add` takes `--goal` and `--budget`, and `--resume` rereads an objective changed in the plan while keeping a `--goal` the plan did not change (L657, issue #44). The edge-case probe no longer plays on a diff the gate does not reach (L655, issue #49). `verify --gate` finds the state of a wave launched two or more levels above the repository (L652, issue #45). A merge of the base branch into a lot's worktree no longer hands the lot back (L653, issue #48). The mockup review no longer sets aside a major on a point of the goal (L656, issue #46), a lot stopped on its mockup review shows its verdict and majors (L654, issue #47), a page a lot moves no longer breaks another lot's test at integration (L658), and the lots panel shows a lot with no session as `en sommeil` (L659).
 

@@ -79,7 +79,7 @@ function samediCourant(d: Date): string {
 }
 
 export function statut(historique: string[], maintenant: Date, empreinte: string) {
-  const h = historique.filter(Boolean).map((l) => JSON.parse(l) as { date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number });
+  const h = historique.filter(Boolean).map((l) => JSON.parse(l) as { date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number; bancs?: string[] });
   const sam = samediCourant(maintenant);
   const enWeekend = [6, 0].includes(parisJour(maintenant).sem);
   const depuisSamedi = h.filter((x) => parisJour(new Date(x.date)).jour >= sam);
@@ -87,7 +87,8 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
   return {
     dernier: dernier ? `${dernier.date} ${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
     banc_du_weekend: enWeekend || depuisSamedi.some((x) => x.hebdo),
-    publication_ok: h.some((x) => x.vert && x.empreinte === empreinte),
+    publication_ok: empreinte !== 'inconnue' && h.some((x) => x.vert && x.empreinte === empreinte
+      && ['1', '3', '6'].every((n) => (x.bancs ?? []).some((id) => id.split('-')[0] === n))),
     frais_semaine: somme(depuisSamedi.map((x) => x.frais ?? 0)),
   };
 }

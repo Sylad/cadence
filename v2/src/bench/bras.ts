@@ -22,10 +22,13 @@ export function chargerBras(racine: string): Record<string, DefBras> {
 export const environnementNeutre = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
   ({ ...env, KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', GH_CONFIG_DIR: '/nonexistent', SSH_AUTH_SOCK: '', AETHERWX_URL: 'http://127.0.0.1:9' });
 
-export const executeurClaude: Executeur = (args, o) => {
-  const r = spawnSync('claude', args, { cwd: o.cwd, env: o.env, encoding: 'utf8', maxBuffer: 256 << 20, timeout: 4 * 3600_000 });
+/** Lance la commande dans son propre groupe de processus et tue le groupe au retour : rien ne survit au bras suivant. */
+export const creerExecuteur = (commande = 'claude'): Executeur => (args, o) => {
+  const sh = 'setsid "$0" "$@" & p=$!; wait $p; rc=$?; kill -TERM -- -$p 2>/dev/null; sleep 1; kill -KILL -- -$p 2>/dev/null; exit $rc';
+  const r = spawnSync('bash', ['-c', sh, commande, ...args], { cwd: o.cwd, env: o.env, encoding: 'utf8', maxBuffer: 256 << 20, timeout: 4 * 3600_000 });
   return { stdout: r.stdout ?? '', code: r.status ?? 1, erreur: r.error?.message ?? (r.signal ?? undefined) };
 };
+export const executeurClaude: Executeur = creerExecuteur();
 
 function lire(e: { stdout: string; code: number; erreur?: string }): { session: string; tokens: number; cout: number; echec: string | null } {
   let j: { session_id?: string; total_cost_usd?: number; is_error?: boolean; subtype?: string; modelUsage?: Record<string, Record<string, number>> };

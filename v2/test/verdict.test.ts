@@ -84,7 +84,12 @@ describe('rapport, historique, statut', () => {
     expect(md).toContain('- b/C : Quel format de date ?');
   });
   const h = (date: string, vert: boolean, empreinte = 'e1', hebdo = true) =>
-    ligneHistorique({ vert, criteres: [] }, { date, empreinte, candidat: 'C', bancs: ['1'], hebdo, frais: 0 });
+    ligneHistorique({ vert, criteres: [] }, { date, empreinte, candidat: 'C', bancs: ['1-a', '3-b', '6-c'], hebdo, frais: 0 });
+  it('publication : un vert partiel (banc 1 seul) ne suffit pas, empreinte inconnue refusée', () => {
+    const partiel = ligneHistorique({ vert: true, criteres: [] }, { date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', bancs: ['1-a'], hebdo: false, frais: 0 });
+    expect(statut([partiel], new Date('2026-11-09T08:00:00Z'), 'e1').publication_ok).toBe(false);
+    expect(statut([h('2026-11-07T10:00:00Z', true, 'inconnue')], new Date('2026-11-09T08:00:00Z'), 'inconnue').publication_ok).toBe(false);
+  });
   it('lundi sans passage depuis samedi : banc du weekend manquant', () => {
     const s = statut([h('2026-11-06T10:00:00Z', true)], new Date('2026-11-09T08:00:00Z'), 'e1');
     expect(s.banc_du_weekend).toBe(false);

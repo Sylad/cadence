@@ -1,10 +1,11 @@
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, utimesSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
-import { passage } from '../src/bench/cli.js';
+import { empreinte, passage, pretAPasser } from '../src/bench/cli.js';
+import { creerExecuteur } from '../src/bench/bras.js';
 
 const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuees: 1, mutations_total: 1, attendu: 'oui', mutations: [] };
 function racine(): string {
@@ -40,10 +41,10 @@ describe('passage du banc', () => {
       maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
     expect(v.vert).toBe(true);
     expect(ordre).toEqual(['1-a/c1', '1-a/c2', '2-b/c1', '2-b/c2']);
-    const map = (id: string) => JSON.parse(readFileSync(join(r, 'runs', '2026-11-08-e1', id, 'resultat.json'), 'utf8')).clones;
+    const map = (id: string) => JSON.parse(readFileSync(join(r, 'runs', '2026-11-08-1000-e1', id, 'resultat.json'), 'utf8')).clones;
     expect(map('1-a')).toEqual({ c1: 'A', c2: 'C' });
     expect(map('2-b')).toEqual({ c1: 'C', c2: 'A' });
-    expect(readdirSync(join(r, 'rapports')).sort()).toEqual(['2026-11-08-e1.json', '2026-11-08-e1.md']);
+    expect(readdirSync(join(r, 'rapports')).sort()).toEqual(['2026-11-08-1000-e1.json', '2026-11-08-1000-e1.md']);
     expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8').trim())).toMatchObject({ empreinte: 'e1', vert: true, hebdo: false });
   });
 
@@ -70,7 +71,65 @@ describe('passage du banc', () => {
     expect(cwds.length).toBe(2);
     expect(cwds.every((c) => c.includes('2-b'))).toBe(true);
     expect(v.vert).toBe(false);
-    const res = JSON.parse(readFileSync(join(r, 'runs', '2026-11-08-e1', '1-a', 'resultat.json'), 'utf8'));
+    const res = JSON.parse(readFileSync(join(r, 'runs', '2026-11-08-1000-e1', '1-a', 'resultat.json'), 'utf8'));
     expect(res.mesures.A.echec).toContain('préparation : futur visible');
+  });
+
+  const lancer = (r: string) => passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec, prep: prep as never,
+    maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
+  it('verrou : pid vivant refuse, pid mort est repris, libéré après', () => {
+    const r = racine();
+    writeFileSync(join(r, 'passage.lock'), `${process.pid} x`);
+    expect(() => lancer(r)).toThrow(/déjà en cours/);
+    writeFileSync(join(r, 'passage.lock'), '999999 x');
+    expect(lancer(r).vert).toBe(true);
+    expect(existsSync(join(r, 'passage.lock'))).toBe(false);
+  });
+  it('phase : un bras qui lève est étiqueté « bras X »', () => {
+    const r = racine();
+    const v = passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: () => { throw new Error('boum'); }, prep: prep as never,
+      maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
+    expect(v.vert).toBe(false);
+    const res = JSON.parse(readFileSync(join(r, 'runs', '2026-11-08-1000-e1', '1-a', 'resultat.json'), 'utf8'));
+    expect(res.mesures.A.echec).toBe('bras A : boum');
+  });
+});
+
+describe('pretAPasser et empreinte', () => {
+  function depot(): { repo: string; brief: string } {
+    const repo = mkdtempSync(join(tmpdir(), 'depot-'));
+    mkdirSync(join(repo, 'v2', 'src'), { recursive: true }); mkdirSync(join(repo, 'v2', 'briefs')); mkdirSync(join(repo, 'v2', 'dist'));
+    writeFileSync(join(repo, 'v2', 'src', 'a.ts'), 'x'); writeFileSync(join(repo, 'v2', 'briefs', 'b.md'), 'b'); writeFileSync(join(repo, 'v2', 'dist', 'cli.js'), 'j');
+    execFileSync('bash', ['-c', 'git init -q -b main && git add v2/src v2/briefs && git -c user.email=t@t -c user.name=t commit -q -m i'], { cwd: repo });
+    const t = new Date(Date.now() + 5000); utimesSync(join(repo, 'v2', 'dist', 'cli.js'), t, t);
+    return { repo, brief: join(repo, 'v2', 'briefs', 'b.md') };
+  }
+  it('prêt quand propre, construit et briefs dans le dépôt', () => {
+    const { repo, brief } = depot();
+    expect(pretAPasser(repo, { A: { nom: 'A', modele: 'm', brief } })).toBeNull();
+  });
+  it('refuse : changement non commité, dist périmé, brief hors dépôt', () => {
+    const { repo, brief } = depot(); const d = { A: { nom: 'A', modele: 'm', brief } };
+    writeFileSync(join(repo, 'v2', 'src', 'a.ts'), 'y');
+    expect(pretAPasser(repo, d)).toMatch(/non commités/);
+    execFileSync('git', ['checkout', 'v2/src/a.ts'], { cwd: repo });
+    const vieux = new Date(Date.now() - 100000); utimesSync(join(repo, 'v2', 'dist', 'cli.js'), vieux, vieux);
+    expect(pretAPasser(repo, d)).toMatch(/npm run build/);
+    const t = new Date(Date.now() + 5000); utimesSync(join(repo, 'v2', 'dist', 'cli.js'), t, t);
+    expect(pretAPasser(repo, { A: { nom: 'A', modele: 'm', brief: '/ailleurs/b.md' } })).toMatch(/hors de/);
+  });
+  it('empreinte inconnue sans dépôt git', () => {
+    expect(empreinte(mkdtempSync(join(tmpdir(), 'nogit-')))).toBe('inconnue');
+  });
+});
+
+describe('executeur en groupe de processus', () => {
+  it('tue les processus laissés en arrière-plan par la commande', () => {
+    const d = mkdtempSync(join(tmpdir(), 'ex-')); const cmd = join(d, 'faux.sh');
+    const marque = `300.${process.pid}`;
+    writeFileSync(cmd, `#!/bin/bash\nsleep ${marque} &\necho '{"ok":1}'\n`, { mode: 0o755 });
+    const r = creerExecuteur(cmd)([], { cwd: d, env: process.env });
+    expect(r.stdout).toContain('ok'); expect(r.code).toBe(0);
+    expect(spawnSync('pgrep', ['-f', `sleep ${marque}`]).status).toBe(1);
   });
 });

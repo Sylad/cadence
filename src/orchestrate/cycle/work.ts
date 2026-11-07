@@ -21,7 +21,7 @@ import { gapMessage } from '../../docsync.js';
 import { gateReachesLot, lotTouchesCycle, testGates } from './test-vert.js';
 import { fixAffordable, budgetCount } from './budget.js';
 import { redAnnounced } from '../objectif.js';
-import { scheduleProbe, unplayed, PROBE_RESERVE, type ProbeIo } from '../probe.js';
+import { scheduleProbe, PROBE_RESERVE, type ProbeIo } from '../probe.js';
 /** Violations du verrou des tests d'acceptation (L173) par les commits faits depuis `head` ; aucune sans HEAD de départ. */
 const sealedViolations = (c: LotCtx, head: string | undefined): string[] => (head ? lockViolations(wd(c), c.config.spec.dir, head, { rouge: c.lot.accept?.rouge ? { [c.lot.accept.acceptation]: c.lot.accept.rouge } : {}, lot: c.lot.lot, lotBase: c.lot.steps.find((s) => s.headBefore)?.headBefore, lotStart: lotStartHead(wd(c), lotWork(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha)), lotCommits: lotCommits(histPlan(c), wd(c), c.lot.lot).map((k) => k.sha) }) : []);
 
@@ -147,7 +147,7 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
   else if (made === 0) l.warnings.push(kind === 'fix' ? 'fix sans nouveau commit : revue lancée sur les commits du lot, avec la raison de la session (choix)' : `${kind} sans nouveau commit : revue lancée sur les commits déjà faits du lot`);
 
   // L662 : la sonde joue AVANT la première porte du programme : une seule porte entre l'écriture et la revue, jouée sur les commits de l'écriture et de la sonde. Une session qui annonce du rouge (tests ou build) passe d'abord la porte,
-  // qui juge l'annonce (L213, L522) : la sonde attend alors la prochaine écriture aux portes vertes.
+  // qui juge l'annonce (L213, L522) : crue, la sonde attend la prochaine écriture aux portes vertes ; non crue (suite verte), la sonde joue juste après cette porte (plus bas).
   const redTests = redAnnounced(l, rep, c.config.test);
   const announcedRed = redTests || !rep.build.vert;
   if (probeBeforeGate(c, plan, minorsPass || !alreadyDone || announcedRed)) return save(c);
@@ -180,8 +180,9 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
   // Une annonce de tests rouges (L590, R16) ne se juge que sur la suite complète : la porte ciblée ne joue pas le test annoncé, elle n'a ni ligne de base ni verdict à opposer à l'annonce (L213, L522).
   if (red.length === 0) await programChecks(c, red, runs, porteApresEcriture(deferred));
   if (deferred && red.length === 0 && runs.some((r) => r.label === 'tests' && r.code === 0 && !r.instables?.length)) {
-    l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${gateLabel(c.config.test ?? '')}, code 0) : l'annonce n'est pas crue, pas de correction`)
-    if (c.config.probe && !l.probe && !l.express && !minorsPass && alreadyDone) unplayed(l, "tests annoncés rouges par la session, la porte ne les a pas confirmés (pas d'écriture après la porte pour la jouer)");
+    l.warnings.push(`tests annoncés rouges par la session, mais la porte du programme verte (${gateLabel(c.config.test ?? '')}, code 0) : l'annonce n'est pas crue, pas de correction`);
+    // L662 : l'annonce rouge a fait passer la porte avant la sonde ; non crue, la sonde joue maintenant, après cette porte, pour tout lot qui en a une (un express qui touche le cycle compris, L663 : sans elle il finirait prêt sans sonde ni revue), et la porte rejoue sur ses commits.
+    if (probeBeforeGate(c, plan, minorsPass || !alreadyDone)) return save(c);
   } else if (deferred && red.length === 0 && !runs.some((r) => r.label === 'tests' && (r.dejaRouges || r.instables?.length))) red.push(claimed);
   if (red.length) {
     toFix(c, red, 'tests rouges');
@@ -192,7 +193,7 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
   await toReview(c, runs, minorsPass);
 }
 
-/** Sonde de cas limites (L497) avant la première porte (L662). Sans orchestrate.probe, scheduleProbe ne fait rien : le diff du lot (`reached`, `cycle` de L663) n'est lu que quand la sonde existe. */
+/** Sonde de cas limites (L497) avant la première porte (L662), ou juste après elle quand une annonce rouge l'a fait jouer d'abord sans la confirmer. Sans orchestrate.probe, scheduleProbe ne fait rien : le diff du lot (`reached`, `cycle` de L663) n'est lu que quand la sonde existe. */
 function probeBeforeGate(c: LotCtx, plan: Plan, skip: boolean): boolean {
   const l = c.lot;
   return !!c.config.probe && scheduleProbe(c.config, l, { skip, late: l.pass >= MAX_PASSES - 1, pays: fixAffordable(l, false, PROBE_RESERVE), count: budgetCount(l), reached: gateReachesLot(c, plan), cycle: !!l.express && lotTouchesCycle(c, plan) });

@@ -105,7 +105,7 @@ export interface ProbeIo<D extends ProbeDone> {
   head(): string;
 }
 
-export const unplayed = (l: LotState, why: string): number => l.warnings.push(`sonde de cas limites non jouée : ${why}`);
+const unplayed = (l: LotState, why: string): number => l.warnings.push(`sonde de cas limites non jouée : ${why}`);
 
 /** Les attentes « hors règle du lot » du rapport (L580, issue #37) : une ligne par entrée texte non vide ; absent, vide ou mal typé, rien. */
 export function horsRegleWarnings(rep: Pick<ProbeReport, 'horsRegle'> | undefined): string[] {

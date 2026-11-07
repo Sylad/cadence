@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runLot } from '../src/orchestrate/cycle.js';
@@ -73,6 +73,26 @@ describe('L662 R1 — la sonde joue avant la porte, une seule porte avant la rev
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'fix', 'review']);
     expect(c.lot.warnings.some((w) => w.startsWith('sonde de cas limites non jouée'))).toBe(true);
+  });
+
+  it('R2 — la session annonce des tests rouges que la porte trouve verts : l\'annonce n\'est pas crue, la sonde joue après cette porte, puis la revue', async () => {
+    const log = logOf();
+    const h = harness({ script: { implement: [impl(log, 'a.ts', { tests: { commande: 'npx vitest run', resultat: 'KO', vert: false } })], probe: [probe(log)], review: [ok] } });
+    const c = h.lot('L1', {}, { probe: true, test: gate(log) });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe', 'review']);
+    expect(c.lot.probe).toBe(true);
+    expect(c.lot.warnings.some((w) => w.includes("l'annonce n'est pas crue"))).toBe(true);
+    expect(c.lot.warnings.some((w) => w.startsWith('sonde de cas limites non jouée'))).toBe(false);
+  });
+
+  it('R2 — scénario de la revue : un lot express qui touche src/orchestrate/cycle/ et annonce des tests rouges, porte verte : implement, probe, puis prêt (L663 tenu)', async () => {
+    const h = harness({ lots: [{ title: 'un', estimate: 0.1 }], script: { implement: [(call) => (mkdirSync(join(call.opts.cwd, 'src/orchestrate/cycle'), { recursive: true }), claudeOut(workReport({ commits: [commitFile(call.opts.cwd, 'src/orchestrate/cycle/a.ts', 'feat(L1): a.ts')], tests: { commande: 'npx vitest run', resultat: 'KO', vert: false } })))], probe: [(): ReturnType<Handler> => claudeOut(probeReport({ commits: [] }))] } });
+    const c = h.lot('L1', { express: true }, { probe: true, test: 'true' });
+    await runLot(c);
+    expect(kinds(h)).toEqual(['implement', 'probe']);
+    expect(c.lot.probe).toBe(true);
+    expect(c.lot.status).toBe('ready');
   });
 
   it('R3 — voie express : pas de sonde, la porte puis la conclusion', async () => {

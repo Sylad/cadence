@@ -3011,6 +3011,7 @@ lots:
     estimate: 0.25
     created: 2026-11-07
     started: 2026-11-07
+    review: { date: 2026-11-07, verdict: "conforme : revue de vague conforme ; rebasé sur main par le lead, seul ajout fix(L671) qui passe le test à l'API wanted de main ; 128 tests ciblés verts, tsc et qualité verts", commit: 96937f15ae3e970ee9e51ca2e747740a5089f268 }
   - id: L672
     title: "Doc d'usage périmée par une phrase de comportement : L648 ne liste que les identifiants ; L662 (orchestrate-gate.md:114) et L666 (fonctionnement.md:30, lead.md:13) rendus avec un majeur de doc après opus et fable ; le brief d'implement et de fix liste les pages de docs/ qui contiennent les termes du critère que le titre du lot change (grep de ses phrases) ; niveau : source (brief), puis écriture (hook sur src/orchestrate) ; mesure : 0 majeur de doc d'usage à la revue sur 3 vagues ; L666 ≈ 22 min, L662 6,9 min"
     status: done

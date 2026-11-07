@@ -93,6 +93,12 @@ function otherWave(parent: string, repo: string, lots: string[], o: { cap: numbe
   };
 }
 
+/**
+ * Une session du lead qui tient un créneau pendant tout le test. Posée sur l'horloge réelle, pas sur la date fictive du test : `acquireSlot` (registry.ts) relit les holds
+ * avec `new Date()` et purge ceux échus depuis plus de 24 h — un hold daté du 2026-11-06 a disparu sous les tests le 2026-11-07 à midi, et le créneau « pris » se libérait.
+ */
+const leadHold = () => addHold(cadenceHome(), 'sous-agent', 180, new Date());
+
 function io(cwd: string) {
   const out: string[] = [];
   const err: string[] = [];
@@ -470,7 +476,7 @@ describe('L498 — tirage de la file approuvée', () => {
   it('R8 — plafond atteint avec un hold du lead : aucun tirage', async () => {
     const { parent } = parentWith({ a: [{ title: 'a un' }] });
     await queueAdd(parent, 'a:L1');
-    addHold(cadenceHome(), 'sous-agent', 180, new Date('2026-11-06T09:00:00'));
+    leadHold();
     const f = fakeDeps();
     expect(await orchestrate(['--queue', '--max-sessions', '1'], io(parent).io, f.deps)).toBe(2);
     expect(f.played).toEqual([]);
@@ -553,7 +559,10 @@ describe('L498 — tirage de la file approuvée', () => {
     await queueAdd(parent, 'a:L1', 'a:L2');
     const f = fakeDeps();
     expect(await orchestrate(['z:L1', '--continue', '--max-sessions', '3'], io(parent).io, f.deps)).toBe(0);
-    expect(f.played).toEqual(['z:L1', 'a:L1', 'a:L2']);
+    // z:L1 (donné) et a:L1 (file) partent au même tour, dans deux dépôts : lequel ouvre sa session le premier est une affaire d'horloge, pas de contrat.
+    // Le contrat : chaque lot joué une fois, a:L2 après a:L1 (même dépôt, un lot par dépôt et par tour), et l'ordre de la vague (lots donnés, puis la file).
+    expect([...f.played].sort()).toEqual(['a:L1', 'a:L2', 'z:L1']);
+    expect(f.played.indexOf('a:L1')).toBeLessThan(f.played.indexOf('a:L2'));
     expect(wavesLots(parent)).toEqual(['z:L1', 'a:L1', 'a:L2']);
     expect(await show(parent)).toEqual([expect.stringMatching(/tiré par la vague/), expect.stringMatching(/tiré par la vague/)]);
     expect(journalOf(parent).split('\n').filter((l) => l.includes('file : tire ')).length).toBe(2);
@@ -562,7 +571,7 @@ describe('L498 — tirage de la file approuvée', () => {
   it('R7 — un lot de la file n\'est jamais joué comme lot du plan : il attend son créneau et passe à « tiré »', async () => {
     const { parent } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }], z: [{ title: 'z un' }] });
     await queueAdd(parent, 'a:L1', 'b:L1');
-    addHold(cadenceHome(), 'sous-agent', 180, new Date('2026-11-06T09:00:00')); // un créneau sur deux pris par le lead
+    leadHold(); // un créneau sur deux pris par le lead
     const f = fakeDeps();
     const o = io(parent);
     expect(await orchestrate(['z:L1', '--continue', '--max-sessions', '2'], o.io, f.deps)).toBe(0);
@@ -702,7 +711,7 @@ describe('L498 — tirage de la file approuvée', () => {
   it('R8 — créneau libre d\'une vague vivante avec un hold du lead : rien n\'est tiré tant que le plafond est plein, puis le lot part quand le créneau se libère', async () => {
     const { parent } = parentWith({ a: [{ title: 'a un' }], b: [{ title: 'b un' }] });
     await queueAdd(parent, 'b:L1');
-    addHold(cadenceHome(), 'sous-agent', 180, new Date('2026-11-06T09:00:00'));
+    leadHold();
     let during: string[] = [];
     const f = fakeDeps({
       implement: async (cwd) => {
@@ -746,7 +755,8 @@ describe('L498 — tirage de la file approuvée', () => {
     }, 20);
     const o = io(parent);
     expect(await orchestrate(['a:L1', '--max-sessions', '2', '--no-fill'], o.io, f.deps)).toBe(0);
-    expect(f.played).toEqual(['a:L1', 'b:L1']); // c:L1, prêt au plan, n'est pas tiré
+    // b:L1 est pris pendant que a:L1 joue : les deux sessions s'ouvrent en parallèle, leur ordre d'ouverture est une affaire d'horloge. Le contrat : les deux joués une fois, c:L1 (prêt au plan) jamais.
+    expect([...f.played].sort()).toEqual(['a:L1', 'b:L1']);
     expect(o.out).toContain('file : tire b:L1 (position 1)');
     expect(o.out.some((l) => /^b:L1 : ajouté à la vague/.test(l))).toBe(true);
   });
@@ -769,7 +779,7 @@ describe('L498 — tirage de la file approuvée', () => {
   it('R8 — orchestrate --queue au plafond (hold du lead) : le refus dit que les créneaux sont pris, pas qu\'aucun lot n\'est mûr sans cause', async () => {
     const { parent } = parentWith({ a: [{ title: 'a un' }] });
     await queueAdd(parent, 'a:L1');
-    addHold(cadenceHome(), 'sous-agent', 180, new Date('2026-11-06T09:00:00'));
+    leadHold();
     const o = io(parent);
     expect(await orchestrate(['--queue', '--max-sessions', '1'], o.io, fakeDeps().deps)).toBe(2);
     expect(o.err).toEqual(['file : aucun créneau libre pour la file (plafond 1 : 0 vague(s) vivante(s), 1 session(s) du lead)', 'orchestrate --queue : aucun lot mûr dans la file approuvée']);

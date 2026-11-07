@@ -18,8 +18,8 @@ function planReaders(repo: string, sha: string, planFile: string | undefined): s
   }
 }
 
-/** Le plan dont les commits seuls sont traversés : aucun si un test le lit, déclaré (L450) ou deviné d'après le code qui cite son chemin sans que `gate.readsPlan` le dise (L482). La porte d'intégration sautée (L662) s'en sert aussi : un seul critère. */
-export function crossablePlan(repo: string, sha: string, planFile: string | undefined, declared: unknown): string | undefined {
+/** Le plan dont les commits seuls sont traversés : aucun si un test le lit, déclaré (L450) ou deviné d'après le code qui cite son chemin sans que `gate.readsPlan` le dise (L482). */
+function crossablePlan(repo: string, sha: string, planFile: string | undefined, declared: unknown): string | undefined {
   return declared || planReaders(repo, sha, planFile).length ? undefined : planFile;
 }
 
@@ -67,9 +67,6 @@ function planReplay(repo: string, sha: string, planFile: string | undefined, dec
 
 const replayCommand = (testReplay: string, files: string[]): string => testReplay.replaceAll('{files}', () => files.map(shellArg).join(' '));
 
-/** Ce qu'une sortie de `verify --gate` ajoute quand le verdict est repris d'avant un rebase (L662) : le sha où la porte a joué et le delta de plan seul ; vide sinon. */
-export const repriseNote = (f: RecordedGate): string => (f.reprise ? `, porte jouée au sha ${f.reprise.head.slice(0, 7)} avant rebase, delta ${f.reprise.from.slice(0, 7)}..${f.reprise.to.slice(0, 7)} de la branche : plan seul` : '');
-
 const listed = (xs: string[]): string => `${xs.slice(0, 3).join(', ')}${xs.length > 3 ? ', …' : ''}`;
 
 /** Ce que `verify --gate` fait d'un commit de plan seul au-dessus d'un sha dont des lecteurs du plan sont connus (L566) : `found` (verdict du dessous repris en entier), ou `steps` (seuls ces lecteurs rejoués, `note` dit pourquoi), `notice` : une ligne à écrire. */
@@ -95,7 +92,7 @@ function narrowedGate(ctx: { repo: string; sha: string; config: OrchestrateConfi
   if (narrow.files.length === 0) return { found: below.found, notice: `verify --gate ${sha.slice(0, 7)} : le code qui cite le plan n'est pas un test (${listed(narrow.scripts)}) : les commits de plan seuls sont traversés` };
   const cmd = replayCommand(config.testReplay!, narrow.files);
   const scripts = narrow.scripts.length ? ` ; ${listed(narrow.scripts)} cite(nt) le plan sans être un test : non rejoué(s)` : '';
-  const note = `verdict repris de la porte de la vague ${below.found.wave} (lot ${below.found.lot}) au sha ${below.found.checked.slice(0, 7)}${repriseNote(below.found)}, sous les seuls commits de plan de ${sha.slice(0, 7)}, pour le build et la suite complète ; seuls les lecteurs du plan sont rejoués : ${narrow.files.join(', ')}${scripts}`;
+  const note = `verdict repris de la porte de la vague ${below.found.wave} (lot ${below.found.lot}) au sha ${below.found.checked.slice(0, 7)}, sous les seuls commits de plan de ${sha.slice(0, 7)}, pour le build et la suite complète ; seuls les lecteurs du plan sont rejoués : ${narrow.files.join(', ')}${scripts}`;
   return { steps: [{ name: 'tests', cmd, gate: cmd }], note };
 }
 

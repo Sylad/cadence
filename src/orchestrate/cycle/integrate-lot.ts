@@ -11,7 +11,7 @@ import { RafError } from '../../plan.js';
 import { PLAN_ACTIONS } from '../../plan-commit.js';
 import { sh, shEscape } from './sh.js';
 import { redExcerpt } from './checks.js';
-import { integrationGate, type GreenOnto } from './integration-porte.js';
+import { integrationChecks } from './integration-porte.js';
 import { session } from './session.js';
 import { blockingConstats } from './shared.js';
 import { lateRefusal } from './depot-partage.js';
@@ -190,7 +190,7 @@ export async function integrateLot(c: LotCtx): Promise<void> {
       // Le verdict de départ et le commit relu servent à chaque tour : un rebase rejoué repart d'eux, pas des traces ni du sommet du tour précédent.
       const opening = verdict;
       const reviewed = l.code?.head ?? git(t.dir, 'rev-parse', 'HEAD');
-      for (let replays = 0, green: GreenOnto = {}; ; replays++) {
+      for (let replays = 0; ; replays++) {
         verdict = opening;
         reporte = undefined;
         const rebased = rebaseOnto(t.dir, t.base);
@@ -201,7 +201,7 @@ export async function integrateLot(c: LotCtx): Promise<void> {
         const shape = changelogShapeOf(t.dir, t.base);
         if (shape.length) return refuse(`intégration refusée : CHANGELOG.md mal formé au sommet intégré (${shape.join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
         // Tests et build joués au sommet (L590, R5 : la suite complète, une fois par sommet), avant que la branche du dépôt ne bouge (R7).
-        const red = await integrationGate(c, key, t, { tip, reviewed, green });
+        const red = await integrationChecks(c, key, t.dir, tip, reviewed);
         if (red.length) return refuse(`intégration refusée : tests rouges au sommet intégré (${red.map(redExcerpt).join(' ; ')}) ; branche du dépôt inchangée, ${kept}`);
         if (tip !== reviewed) {
           const before = patchId(t.dir, mergeBase(t.dir, reviewed, t.base), reviewed);

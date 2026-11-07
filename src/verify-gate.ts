@@ -15,7 +15,7 @@ import { gateLabel, gateReplayable, gateUnnamed, replayGate, runGate, type GateT
 import { copyDeps, git, gitFailure, ignoredDeps, isCopiedDep } from './orchestrate/worktree.js';
 import { reportCiParity } from './orchestrate/ci-parity.js';
 import { tryRemote } from './verify-gate-remote.js';
-import { gateBasis, repriseNote } from './verify-gate-plan.js';
+import { gateBasis } from './verify-gate-plan.js';
 import { GATE_TIMEOUT_MS, type Ran } from './remote-gate.js';
 
 /** Lignes de la fin de la sortie montrées quand aucun test n'est identifiable dans une sortie rouge. */
@@ -140,7 +140,7 @@ export async function verifyGate(ctx: GateCtx): Promise<number> {
 function reuseRecorded(f: RecordedGate, steps: { name: string; cmd: string }[], sha: string, out: (line: string) => void): number {
   const short = sha.slice(0, 7);
   const where = f.checked === sha ? 'au même sha' : `au sha ${f.checked.slice(0, 7)}, sous les seuls commits de plan de ${short}`;
-  out(`verify --gate ${short} : verdict repris de la porte de la vague ${f.wave} (lot ${f.lot} : contrôles du programme ${where}, arbre ${f.tree.slice(0, 7)} identique${repriseNote(f)}) — rien rejoué`);
+  out(`verify --gate ${short} : verdict repris de la porte de la vague ${f.wave} (lot ${f.lot} : contrôles du programme ${where}, arbre ${f.tree.slice(0, 7)} identique) — rien rejoué`);
   for (const step of steps) {
     const run = f.runs.find((r) => r.label === (step.name === 'build' ? 'build' : 'tests') && r.command === step.cmd)!;
     out(`✓ ${step.name} (${step.cmd}) — enregistré par la vague${run.instables?.length ? `, ${run.instables.length} test(s) instable(s) sous charge, verts rejoués seuls` : ''}`);

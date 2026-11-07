@@ -2,7 +2,7 @@ import { existsSync, readdirSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { changedFiles, tryGit } from './git.js';
 import { git } from './orchestrate/worktree.js';
-import { RunStore, type VerdictRepris } from './orchestrate/state.js';
+import { RunStore } from './orchestrate/state.js';
 
 /** Contrôles du programme que la porte d'une vague a enregistrés pour un lot (`LotState.checks`, L397). */
 export interface RecordedGate {
@@ -12,8 +12,6 @@ export interface RecordedGate {
   /** Le sha que les contrôles ont tourné (celui demandé, ou le sous lequel ne reposent que des commits de plan, L444). */
   checked: string;
   runs: { label: 'build' | 'tests'; command: string; code: number; instables?: string[]; portee?: 'ciblee' }[];
-  /** La porte n'a pas tourné à `checked` mais avant le rebase, le delta de la branche du dépôt étant de plan seul, que `verify --gate` traverserait lui-même (L662). */
-  reprise?: VerdictRepris;
 }
 
 const realOrSelf = (p: string): string => {
@@ -29,9 +27,9 @@ const PLAN_HOPS = 50;
 /**
  * Les shas dont la porte vaut pour `sha` : `sha` lui-même, puis, tant que le commit ne change que le plan (`planFile`, relatif à la racine du dépôt) et n'a qu'un parent, son parent, de proche en proche
  * (même règle que le hook pre-push, L432 : le commit de revue et celui de `raf done` posés au-dessus d'un lot intégré ne changent pas ce que la porte a contrôlé).
- * Une fusion, un commit racine, un commit qui touche autre chose que le plan ou qui ne touche rien est le dernier de la liste. La porte d'intégration sautée (L662, `deltaCrossable`) applique la même règle au delta de la branche.
+ * Une fusion, un commit racine, un commit qui touche autre chose que le plan ou qui ne touche rien est le dernier de la liste.
  */
-export function planChain(repo: string, sha: string, planFile: string | undefined): string[] {
+function planChain(repo: string, sha: string, planFile: string | undefined): string[] {
   const chain = [sha];
   if (planFile === undefined) return chain;
   for (let hop = 0; hop < PLAN_HOPS; hop++) {
@@ -58,7 +56,7 @@ export function waveLaunchDirs(cwd: string, repo: string): string[] {
  * La porte que le programme a déjà jouée pour `sha` (L397), pour que `verify --gate` la lise au lieu de la rejouer (≈ 5 min par lot prêt).
  * Une vague range l'état de ses lots sous `<dossier de lancement>/.cadence/runs/<vague>` : `launchDirs` sont ceux à regarder (`waveLaunchDirs` : dossier courant, racine du dépôt et leurs ancêtres), les vagues les plus récentes d'abord.
  * Un enregistrement est repris quand ses contrôles ont tourné AU sha (même commit), que l'arbre de ce commit est celui enregistré, et qu'il couvre chaque étape de `steps`
- * (même étiquette, même commande, code 0 : une étape rouge, absente ou rejouée avec une autre commande ne prouve rien). Un tour d'intégration qui saute la porte porte l'enregistrement sur le sommet rebasé en disant d'où il vient (`reprise`, L662). `planFile` : les commits qui ne changent que le plan au-dessus de `sha` sont traversés (`planBase`, L444). Sinon `reason` dit pourquoi la porte est rejouée.
+ * (même étiquette, même commande, code 0 : une étape rouge, absente ou rejouée avec une autre commande ne prouve rien). `planFile` : les commits qui ne changent que le plan au-dessus de `sha` sont traversés (`planBase`, L444). Sinon `reason` dit pourquoi la porte est rejouée.
  */
 export function recordedGate(launchDirs: string[], repo: string, sha: string, steps: { name: string; cmd: string }[], planFile?: string): { found: RecordedGate } | { reason: string } {
   const chain = planChain(repo, sha, planFile);
@@ -109,7 +107,7 @@ export function recordedGate(launchDirs: string[], repo: string, sha: string, st
           reason = `l'enregistrement (${where}) ne couvre pas en vert ${missing.map((s) => `${s.name} (${s.cmd})`).join(', ')}`;
           continue;
         }
-        return { found: { wave: store.id, lot: l.lot, tree, checked, runs: checks.runs, reprise: checks.reprise } };
+        return { found: { wave: store.id, lot: l.lot, tree, checked, runs: checks.runs } };
       }
     }
   }

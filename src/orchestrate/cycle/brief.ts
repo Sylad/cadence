@@ -84,8 +84,7 @@ function checksText(c: LotCtx): string {
     const targeted = r.portee === 'ciblee' ? '. This gate is targeted: only the tests related to the files of the lot were played, not the whole suite; the full suite will be played by the program at integration' : '';
     return `- \`${r.command}\` (${r.label}): ${state}${alone ? `${r.code === 0 ? ';' : '. Also'} ${alone}` : ''}${targeted}`;
   });
-  const where = k.reprise ? `at ${k.reprise.head.slice(0, 7)}, before the rebase (the program judged what the base gained, ${k.reprise.from.slice(0, 7)}..${k.reprise.to.slice(0, 7)}, unrelated to the lot and did not replay them at HEAD ${k.head.slice(0, 7)})` : `at HEAD ${k.head.slice(0, 7)}, just before this review`;
-  const ran = [`The program already ran these checks ${where}:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
+  const ran = [`The program already ran these checks at HEAD ${k.head.slice(0, 7)}, just before this review:`, ...runs, 'Take these results as given: do not rebuild, do not rerun the whole suite, and do not wait on them. Run only a check they do not cover (a targeted test of a case you doubt), and list under "nonVerifie" what neither they nor you verified.'].join('\n');
   return declared ? `${ran}\n${declared}` : ran;
 }
 

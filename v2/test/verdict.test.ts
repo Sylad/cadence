@@ -42,6 +42,25 @@ describe('verdict', () => {
   it('référence en échec : rouge aussi, comparaison sans sens', () => {
     expect(rouges([banc({ echecA: 'sortie illisible' })])).toEqual(['aucun bras en échec']);
   });
+  it('aucun banc : rouge', () => expect(rouges([])).toEqual(['au moins un banc']));
+  it('mesure manquante : rouge, cause listée', () => {
+    const b = banc(); delete b.mesures.C;
+    const v = verdict([b], 'A', 'C', BARRE_SPEC);
+    expect(v.criteres.find((c) => c.nom === 'mesures complètes')).toMatchObject({ ok: false, valeur: 'b/C' });
+    expect(v.vert).toBe(false);
+  });
+  it('aucune mutation jouée : rouge', () => {
+    const v = verdict([banc({ mA: 0, mC: 0 })], 'A', 'C', BARRE_SPEC);
+    const b = banc(); b.jugement!.meca.A.mutations_total = 0; b.jugement!.meca.C.mutations_total = 0;
+    expect(rouges([b])).toEqual(['mutations tuées']);
+    expect(verdict([b], 'A', 'C', BARRE_SPEC).criteres.find((c) => c.nom === 'mutations tuées')?.valeur).toBe('aucune mutation jouée');
+    expect(v.vert).toBe(true);
+  });
+  it('sans banc de retouche : critère non bloquant, valeur dite', () => {
+    const c = verdict([banc({ dC: 100 })], 'A', 'C', BARRE_SPEC).criteres.find((x) => x.nom === 'temps des retouches');
+    expect(c).toMatchObject({ bloquant: false, ok: true, valeur: 'aucun banc de retouche' });
+    expect(verdict([banc({ taille: 'retouche' })], 'A', 'C', BARRE_SPEC).criteres.find((x) => x.nom === 'temps des retouches')?.bloquant).toBe(true);
+  });
   it('les chiffres absolus du 07-11 sont affichés sans bloquer', () => {
     const v = verdict([banc()], 'A', 'C', BARRE_SPEC);
     expect(v.criteres.find((c) => c.nom === 'tests cachés (07-11 : 304)')).toMatchObject({ ok: false, bloquant: false });
@@ -78,6 +97,9 @@ describe('rapport, historique, statut', () => {
   });
   it('un banc court le samedi ne compte pas comme banc du weekend', () => {
     expect(statut([h('2026-11-07T10:00:00Z', true, 'e1', false)], new Date('2026-11-09T08:00:00Z'), 'e1').banc_du_weekend).toBe(false);
+  });
+  it('samedi 00 h 30 à Paris (vendredi 23 h 30 UTC) compte comme le weekend', () => {
+    expect(statut([h('2026-11-13T23:30:00Z', true)], new Date('2026-11-16T08:00:00Z'), 'e1').banc_du_weekend).toBe(true);
   });
   it('en plein weekend, avant le passage : pas encore manquant', () => {
     expect(statut([], new Date('2026-11-08T08:00:00Z'), 'e1').banc_du_weekend).toBe(true);

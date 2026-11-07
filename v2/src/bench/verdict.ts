@@ -25,18 +25,23 @@ export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: B
   const inutiles = somme(res.filter((r) => !r.reponses).map((r) => r.mesures[cand]?.questions ?? 0));
   const fuites = res.flatMap((r) => r.fuites[cand] ?? []);
   const echecs = res.flatMap((r) => [ref, cand].flatMap((b) => { const e = r.mesures[b]?.echec; return e ? [`${r.banc}/${b} : ${e}`] : []; }));
+  const manquants = res.flatMap((r) => [ref, cand].filter((b) => !r.mesures[b]).map((b) => `${r.banc}/${b}`));
+  const total = (b: string) => somme(jug.map((j) => j.meca[b].mutations_total));
+  const sansMutation = jug.length > 0 && (total(ref) === 0 || total(cand) === 0);
   const c = (nom: string, valeur: string, seuil: string, ok: boolean, bloquant = true): Critere => ({ nom, valeur, seuil, ok, bloquant });
   const criteres: Critere[] = [
+    c('au moins un banc', `${res.length}`, '≥ 1', res.length >= 1),
+    c('mesures complètes', manquants.length ? manquants.join(' ; ') : 'toutes', 'toutes', manquants.length === 0),
     c('tous les bancs jugés', `${jug.length}/${res.length}`, 'tous', jug.length === res.length),
     c('aucune fuite', `${fuites.length}`, '0', fuites.length === 0),
     c('aucun bras en échec', echecs.length ? echecs.join(' ; ') : '0', '0', echecs.length === 0),
     c('relecture aveugle', `${prefCand}/${jug.length} sans préférence pour ${ref}`, '> la moitié', jug.length === 0 || prefCand * 2 > jug.length),
     c('tests cachés', `${caches(cand)} contre ${caches(ref)}`, `≥ ${ref}`, caches(cand) >= caches(ref)),
-    c('mutations tuées', `${pct(mut(cand))} contre ${pct(mut(ref))}`, `≥ ${ref}`, mut(cand) >= mut(ref)),
+    c('mutations tuées', sansMutation ? 'aucune mutation jouée' : `${pct(mut(cand))} contre ${pct(mut(ref))}`, `≥ ${ref}`, !sansMutation && mut(cand) >= mut(ref)),
     c('défauts bloquants et majeurs', `${def(cand)} contre ${def(ref)}`, `≤ ${ref}`, def(cand) <= def(ref)),
     c('cohérence UI', `${ui(cand)} contre ${ui(ref)}`, `≥ ${ref}`, ui(cand) >= ui(ref)),
     c('temps total', `${t(res, cand)} s contre ${t(res, ref)} s`, `≤ ${barre.temps_max} × ${ref}`, t(res, cand) <= barre.temps_max * t(res, ref)),
-    c('temps des retouches', `${t(ret, cand)} s contre ${t(ret, ref)} s`, `≤ ${barre.temps_max_retouche} × ${ref}`, t(ret, cand) <= barre.temps_max_retouche * t(ret, ref)),
+    c('temps des retouches', ret.length ? `${t(ret, cand)} s contre ${t(ret, ref)} s` : 'aucun banc de retouche', `≤ ${barre.temps_max_retouche} × ${ref}`, !ret.length || t(ret, cand) <= barre.temps_max_retouche * t(ret, ref), ret.length > 0),
     c('questions inutiles', `${inutiles}`, '0', inutiles === 0),
     c(`tests cachés (07-11 : ${barre.reference_absolue.caches})`, `${caches(cand)}`, `≥ ${barre.reference_absolue.caches}`, caches(cand) >= barre.reference_absolue.caches, false),
     c(`mutations (07-11 : ${pct(barre.reference_absolue.mutations)})`, pct(mut(cand)), `≥ ${pct(barre.reference_absolue.mutations)}`, mut(cand) >= barre.reference_absolue.mutations, false),
@@ -60,18 +65,24 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
 export const ligneHistorique = (v: Verdict, e: { date: string; empreinte: string; candidat: string; bancs: string[]; hebdo: boolean; frais: number }) =>
   JSON.stringify({ ...e, vert: v.vert, rouges: v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom) });
 
-/** Samedi 00:00 UTC de la semaine du banc : le samedi passé, ou aujourd'hui si on est samedi. */
-function samediCourant(d: Date): Date {
-  const s = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  s.setUTCDate(s.getUTCDate() - ((s.getUTCDay() + 1) % 7));
-  return s;
+const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' });
+/** Jour civil (AAAA-MM-JJ) et jour de semaine (0 = dimanche) à Paris. */
+function parisJour(d: Date): { jour: string; sem: number } {
+  const p = Object.fromEntries(PARIS.formatToParts(d).map((x) => [x.type, x.value]));
+  return { jour: `${p.year}-${p.month}-${p.day}`, sem: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday) };
+}
+/** Jour civil parisien du samedi de la semaine du banc : le samedi passé, ou aujourd'hui si on est samedi. */
+function samediCourant(d: Date): string {
+  const { jour, sem } = parisJour(d);
+  const [y, m, j] = jour.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, j - ((sem + 1) % 7))).toISOString().slice(0, 10);
 }
 
 export function statut(historique: string[], maintenant: Date, empreinte: string) {
   const h = historique.filter(Boolean).map((l) => JSON.parse(l) as { date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number });
   const sam = samediCourant(maintenant);
-  const enWeekend = [6, 0].includes(maintenant.getUTCDay());
-  const depuisSamedi = h.filter((x) => new Date(x.date) >= sam);
+  const enWeekend = [6, 0].includes(parisJour(maintenant).sem);
+  const depuisSamedi = h.filter((x) => parisJour(new Date(x.date)).jour >= sam);
   const dernier = h.at(-1);
   return {
     dernier: dernier ? `${dernier.date} ${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,

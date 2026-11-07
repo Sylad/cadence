@@ -7,7 +7,7 @@ import { ajouterBanc } from './ajouter.js';
 import { listerBancs, racineBanc } from './banc.js';
 import { chargerBras, executeurClaude, lancerBras, type DefBras, type Executeur, type Mesure } from './bras.js';
 import { fuitesDuBras } from './fuites.js';
-import { juger, type Jugement } from './juges.js';
+import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
 import { BARRE_SPEC, banBase, ligneHistorique, rapport, statut, verdict, type ResultatBanc, type Verdict } from './verdict.js';
 
@@ -95,7 +95,9 @@ function passageVerrouille(o: OptPassage): Verdict {
         mapping[`c${j + 1}`] = n; clones[n] = c;
         phase = 'préparation'; suiteBase[n] = o.prep(b, c).testsBase;
         o.out(`${idBanc} : bras ${n}…`);
-        phase = `bras ${n}`; mesures[n] = { ...lancerBras(b, bras[n], c, o.exec), banc: idBanc };
+        const avant = etatGit(c);
+        phase = `bras ${n}`; const m = lancerBras(b, bras[n], c, o.exec);
+        mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)) };
         phase = 'fuites'; fuites[n] = fuitesDuBras(o.home, o.racine, b.id, c);
       });
       if (ordre.some((n) => mesures[n].echec !== null)) o.out(`${idBanc} : un bras en échec, juges sautés`);

@@ -12,6 +12,17 @@ export interface Jugement { meca: Record<string, Meca>; defauts: Record<string, 
 const BRIEFS = join(import.meta.dirname, '..', '..', 'briefs');
 const HORS_DIFF = [':(exclude).cadence', ':(exclude)docs/plan', ':(exclude)cadence.yaml'];
 
+/** HEAD et fichiers sales d'un clone, hors fichiers de cadence (les juges ne voient que base..HEAD). */
+export function etatGit(clone: string): { head: string; sale: string[] } {
+  const g = (...a: string[]) => execFileSync('git', a, { cwd: clone, encoding: 'utf8' });
+  return { head: g('rev-parse', 'HEAD').trim(), sale: g('status', '--porcelain', '--', '.', ...HORS_DIFF).split('\n').filter(Boolean) };
+}
+/** Un bras doit livrer par commit : un travail non commité ou l'absence de commit est un échec (le juge serait injuste). */
+export function travailNonLivre(avant: { head: string; sale: string[] }, apres: { head: string; sale: string[] }): string | null {
+  if (apres.sale.some((l) => !avant.sale.includes(l))) return 'travail non commité';
+  return apres.head === avant.head ? 'aucun commit' : null;
+}
+
 export const anonymiser = (bras: [string, string], tirage: () => number): Record<'X' | 'Y', string> =>
   tirage() < 0.5 ? { X: bras[0], Y: bras[1] } : { X: bras[1], Y: bras[0] };
 

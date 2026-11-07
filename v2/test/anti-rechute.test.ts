@@ -106,7 +106,7 @@ function reglesC3(f: Fichiers): string[] {
 // Flags des CLI claude et git, par fichier (liste exacte ; aucune autre valeur n'est tolérée).
 const FLAGS_CLI: Record<string, string[]> = {
   'src/bench/bras.ts': ['output-format', 'model', 'permission-mode', 'disallowedTools', 'resume'],
-  'src/bench/juges.ts': ['output-format', 'model', 'permission-mode', 'disallowedTools', 'resume'],
+  'src/bench/juges.ts': ['output-format', 'model', 'permission-mode', 'disallowedTools', 'resume', 'porcelain'], // + git status --porcelain
   'src/bench/preparer.ts': ['no-hardlinks', 'format', 'is-ancestor', 'all', 'expire', 'prune', 'not'],
   'src/bench/ajouter.ts': ['format', 'reverse', 'grep', 'verify', 'name-only'],
   'src/bench/cli.ts': ['porcelain'], // git status --porcelain

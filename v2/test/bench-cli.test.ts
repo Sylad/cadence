@@ -21,10 +21,12 @@ function racine(): string {
   writeFileSync(join(r, 'bras.yaml'), `A:\n  modele: opus\n  brief: ${brief}\nC:\n  modele: opus\n  brief: ${brief}\n`);
   return r;
 }
-/** Faux claude : un bras répond tout de suite ; un juge écrit un JSON valide dans le fichier demandé. */
-const exec: Executeur = (args) => {
+const commit = (cwd: string) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'bras'], { cwd });
+/** Faux claude : un bras commite tout de suite ; un juge écrit un JSON valide dans le fichier demandé. */
+const exec: Executeur = (args, o) => {
   const p = args[args.indexOf('-p') + 1];
   const m = /dans (\S+\.json)/.exec(p);
+  if (!m && existsSync(join(o.cwd, '.git'))) commit(o.cwd);
   if (m) writeFileSync(m[1], JSON.stringify(m[1].endsWith('meca.json') ? { X: meca, Y: meca }
     : { X: { bloquants: 0, majeurs: 0, mineurs: 0 }, Y: { bloquants: 0, majeurs: 0, mineurs: 0 }, prefere: 'egal', ui: 'na', raisons: '' }));
   return { stdout: JSON.stringify({ session_id: 's', total_cost_usd: 0, modelUsage: {} }), code: 0 };
@@ -270,5 +272,28 @@ describe('garde de publication (C-1, I-7)', () => {
     const err: string[] = [];
     const rc = await run(['bench', 'court', '--candidat', 'A', '--reference', 'A'], { cwd: '/', env: { BENCH_ROOT: racine() }, now: () => new Date(), out: () => {}, err: (l) => err.push(l) });
     expect(rc).toBe(2); expect(err.join('\n')).toMatch(/même bras/);
+  });
+});
+
+describe('travail du bras (I-2)', () => {
+  /** Banc 1-a : c1 = A (commite), c2 = C (fait `bras`). */
+  const jouer = (bras: (cwd: string) => void, prep2 = prep) => {
+    const r = racine(); let juges = 0;
+    const v = passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', prep: prep2 as never, garderClones: true,
+      exec: (args, o) => { if (/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) juges++; else if (o.cwd.endsWith('c2')) { bras(o.cwd); return { stdout: JSON.stringify({ session_id: 's', modelUsage: {} }), code: 0 }; } return exec(args, o); },
+      maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
+    return { v, juges, C: JSON.parse(readFileSync(join(r, 'runs', '2026-11-08-1000-e1', '1-a', 'resultat.json'), 'utf8')).mesures.C };
+  };
+  it('aucun commit : échec « aucun commit », juges sautés, rouge', () => {
+    const { v, juges, C } = jouer(() => {});
+    expect(C.echec).toBe('aucun commit'); expect(juges).toBe(0); expect(v.vert).toBe(false);
+  });
+  it('travail laissé hors commit (même après un commit) : échec « travail non commité »', () => {
+    expect(jouer((c) => { commit(c); writeFileSync(join(c, 'oubli.ts'), 'x'); }).C.echec).toBe('travail non commité');
+    expect(jouer((c) => writeFileSync(join(c, 'oubli.ts'), 'x')).C.echec).toBe('travail non commité');
+  });
+  it('un fichier non suivi laissé par l\'install avant le bras ne compte pas ; un commit propre passe', () => {
+    const prepSale = (b: unknown, cible: string) => { const x = prep(b, cible); writeFileSync(join(cible, 'artefact-install'), 'x'); return x; };
+    expect(jouer(commit, prepSale).C.echec).toBeNull();
   });
 });

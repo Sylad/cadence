@@ -10,7 +10,7 @@ summaries, decides with the human, and leaves the work to fresh short sessions r
   <img alt="The lead workflow in three lanes (human, lead session, orchestrate program and agents), from the tour of the projects to the close of the session" src="lead-workflow-light.svg">
 </picture>
 
-Dashed boxes are conditional steps: the precheck runs only for a lot without a commit yet whose title cites a finding (`constat`, `revue`, `review`, `audit`) or another lot (unless `orchestrate.precheck: false`), and the spec steps depend on the lot: a `screen: page` lot or a `spec: true` lot plays the full chain (spec, sheet review or mockup review, accept); a visible lot above 0.1 day without `screen: page` plays spec then the light mockup review, with no accept unless it already has a sealed acceptation (L459). The skill itself is `skills/lead/SKILL.md`; this page is its
+Dashed boxes are conditional steps: the precheck runs only for a lot without a commit yet that has a spec step (`screen:` or `spec: true`, whatever its title) or whose title cites a finding (`constat`, `revue`, `review`, `audit`) or another lot (unless `orchestrate.precheck: false`), and the spec steps depend on the lot: a `screen: page` lot or a `spec: true` lot plays the full chain (spec, sheet review or mockup review, accept); a visible lot above 0.1 day without `screen: page` plays spec then the light mockup review, with no accept unless it already has a sealed acceptation (L459). The skill itself is `skills/lead/SKILL.md`; this page is its
 picture, not its source.
 
 ## The steps
@@ -22,7 +22,7 @@ picture, not its source.
 2. **Wave.** The lead starts `cadence orchestrate <project>:<lot> … --wave <id>` in the background. The wave also fills its free slots with the next ready lots of the plan until the budget is spent (L587); `--no-fill` limits it to the lots the human chose.
    When a lot's title is stale, the lead does not delegate by hand: it passes `--goal "…"` (one lot per launch), or writes a `goal:` key on the lots in the plan (several lots at once) — in the native plan as `goal:`, in a plan kept by another tool (read-only) by mapping its key with `plan.fields: { goal: <their key> }` in `cadence.yaml` — which replaces the title as the objective of the briefs (L258, [orchestrate](orchestrate.md)).
    For each lot the program runs, in fresh sessions and in this order: `precheck → spec → maquette →
-   accept → implement → review → ux`. The **precheck** applies to a lot without a commit yet whose title cites a finding (`constat`, `revue`, `review`, `audit`) or another lot (unless
+   accept → implement → review → ux`. The **precheck** applies to a lot without a commit yet that has a spec step (`screen:` or `spec: true`, whatever its title) or whose title cites a finding (`constat`, `revue`, `review`, `audit`) or another lot (unless
    `orchestrate.precheck: false`; L288). The spec steps exist only for a lot that declares
    a `screen:` of `page` (a visible lot that creates or changes a whole screen) or `spec: true` (a lot without a screen
    that still has a behaviour to pin down: `precheck → spec → fiche → accept → implement → review`);

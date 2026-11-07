@@ -3053,6 +3053,9 @@ lots:
     estimate: 0.5
     created: 2026-11-07
     started: 2026-11-07
+    review: { date: 2026-11-07, verdict: "conforme : repris par le lead le 07-11 ; 3 revues, 8 majeurs corrigés chacun par un test qui rougit sans le correctif (écriture du rendu, gestes du tour depuis le dossier parent, rebase par rebaseOnto, --resume rebasé, rebase toujours tenté, report de code.head et accept.rouge, commits de queue de rebaseOnto) ; 1 mineur noté (reviewedHead : ajouter merge-base --is-ancestor) ; tests ciblés, tsc et qualité verts", commit: 0e2370b5eddc31e997f09775a8a83629e8003f42 }
+    notes:
+      - { date: 2026-11-07, text: "mineur de la revue 3 : reviewedHead accepte une tête en retard sur la revue (rattrapé à l'intégration par le patch-id) ; ajouter merge-base --is-ancestor code.head HEAD" }
   - id: L677
     title: "Fuite GIT_DIR dans les tests lancés par un hook : test/changelog.test.ts (L669) crée un dépôt jetable, mais git exporte GIT_DIR et GIT_INDEX_FILE au hook pre-commit d'un worktree, donc « commit -m base » a remplacé le vrai message de deux commits (L671 bc97794e, L673 7644ca89) et seul le tag v1.0.0 déjà présent a arrêté la suite, dont un reset --hard HEAD~1 ; test/global-setup.ts retire GIT_DIR, GIT_INDEX_FILE, GIT_WORK_TREE avant tout test (hook local corrigé en attendant), plus un test qui lance un commit de dépôt jetable sous ces variables ; niveau : source (global-setup), niveau le plus tôt : source ; mesure : 0 commit de test dans un vrai dépôt"
     status: done

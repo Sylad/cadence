@@ -55,14 +55,14 @@ describe('lead tour — branche vieille, données réelles (L676)', () => {
     const [line] = tourStaleBranchLines([tourRow(dir, '2026-11-07')], Date.now());
     expect(line).toContain('intégrer : cadence orchestrate --resume --wave 2026-11-01-0800 --integrate demo:L1');
   });
-  it('R2 — une vraie branche à 3 j en conflit avec main : la reprise est refusée, la ligne le dit au lieu de proposer « reprendre »', () => {
+  it('R2 — une vraie branche à 3 j en conflit avec main : la ligne dit la péremption et que la reprise rebase puis rend le lot si le rebase échoue', () => {
     const dir = repoWithBranch({ lot: 'demo:L1', createdMsAgo: 72 * H, commits: 1 });
     writeFileSync(join(dir, 'f0.txt'), 'main');
     git(dir, 'add', '.');
     git(dir, 'commit', '-q', '-m', 'main avance sur le même fichier');
     const [line] = tourStaleBranchLines([tourRow(dir, '2026-11-07')], Date.now());
-    expect(line).toContain('reprise refusée (main a 1 commit(s) d\'avance et 1 conflit(s) (f0.txt))');
-    expect(line).not.toContain('reprendre :');
+    expect(line).toContain('reprendre : cadence orchestrate demo:L1 (main a 1 commit(s) d\'avance et 1 conflit(s) (f0.txt) : branche périmée ;');
+    expect(line).toContain('rend le lot sans session s\'il échoue');
   });
   it('R2 — une vraie branche sans cadence-lot dans la config git : la ligne dit que le lot est inconnu, sans geste', () => {
     const dir = repoWithBranch({ createdMsAgo: 72 * H, commits: 1 });

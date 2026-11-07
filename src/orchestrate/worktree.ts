@@ -1,11 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, realpathSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { cp, readdir, realpath, rm, symlink } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 import type { Plan } from '../plan.js';
 import { lotSlug } from './state.js';
 import { cadenceHome, liveWaves } from './registry.js';
+import { git, gitFailure, tryGit } from './git.js';
 
 /** Un worktree par lot (L279) : nom du dossier de la vague où ils vivent, hors du dépôt du lead. */
 export const WORKTREES_DIR = 'worktrees';
@@ -13,26 +15,7 @@ export const WORKTREES_DIR = 'worktrees';
 /** Dossiers ignorés de sortie de build : jamais liés dans un worktree, une commande de tests qui y écrit toucherait le build du dépôt vivant. */
 const OUTPUT_DIRS = new Set(['dist', 'build', 'out', 'coverage', 'target', '.next', '.nuxt', '.output', '.angular', '.turbo', '.svelte-kit', '.parcel-cache']);
 
-/** Une commande git dans `cwd`, sa sortie sans les blancs de bord ; lève si elle échoue. Commune à l'orchestration (worktrees, intégration, cycle). */
-export function git(cwd: string, ...args: string[]): string {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-}
-
-/** Le message d'une commande git qui a échoué : sa sortie d'erreur (sur une ligne), à défaut le message de l'exception. */
-export function gitFailure(e: unknown): string {
-  const err = (e as { stderr?: unknown }).stderr;
-  const text = typeof err === 'string' && err.trim() ? err : e instanceof Error ? e.message : String(e);
-  return text.trim().replace(/\s*\n\s*/g, ' ');
-}
-
-/** Comme `git`, null quand la commande échoue. */
-export const tryGit = (cwd: string, ...args: string[]): string | null => {
-  try {
-    return git(cwd, ...args);
-  } catch {
-    return null;
-  }
-};
+export { git, gitFailure, tryGit } from './git.js';
 
 /** Branche du lot : `cadence/<vague>/<projet>--<lot>` (R14), le même nom à la reprise. Le projet d'une vague lancée à la racine du dépôt s'appelle `.` : git refuse un composant de branche qui commence par un point, il devient `_`. */
 export const lotBranch = (wave: string, project: string, lot: string): string => `cadence/${wave}/${lotSlug(project, lot).replace(/^\./, '_')}`;
@@ -278,7 +261,7 @@ export function prepareTree(t: TreeSpec): { ok: true; reused: boolean } | { ok: 
  * (git emporte la config de cadence) et son worktree déplacé vers `dir` : le reste de l'orchestration, qui ne connaît que les noms de la vague, la voit
  * comme la sienne. Rend la branche reprise, ou null (rien à reprendre). Jamais la branche d'une vague vivante.
  * Une branche que la reprise ne pourrait pas mener à l'intégration est refusée sans y toucher (`refused` dit pourquoi) : son worktree porte un fichier suivi modifié
- * (R11 : comme `--resume`, la session n'y démarre pas), un de ses commits touche un fichier du plan (`opts.planFiles`, relatifs au dépôt : le plan n'est écrit que par le programme), ou elle est périmée (L665 : `branchStaleness`). Un `git worktree move` ou `git branch -m` qui échoue est refusé de même, avec la cause de git (le déplacement est défait).
+ * (R11 : comme `--resume`, la session n'y démarre pas), un de ses commits touche un fichier du plan (`opts.planFiles`, relatifs au dépôt : le plan n'est écrit que par le programme), ou elle est périmée et son rebase sur `base` échoue (L665 : `branchStaleness`, L676 : `rebaseKept`). Un `git worktree move` ou `git branch -m` qui échoue est refusé de même, avec la cause de git (le déplacement est défait).
  */
 export function recoverTree(repo: string, branch: string, dir: string, base: string, opts: { planFiles: ReadonlySet<string>; alsoSlugs: readonly string[] } = { planFiles: new Set(), alsoSlugs: [] }): { from: string; unintegrated: number; behind: number; conflicts: string[] } | { from: string; refused: string } | null {
   const { planFiles, alsoSlugs } = opts;
@@ -286,8 +269,15 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
   if (!found || branchSha(repo, branch) !== null) return null;
   tryGit(repo, 'worktree', 'prune');
   const moved = found.dir !== null && existsSync(found.dir);
-  const age = branchStaleness(repo, found.branch, base);
-  const refused = recoveryRefusal(repo, found, base, planFiles, age);
+  let age = branchStaleness(repo, found.branch, base);
+  let refused = recoveryRefusal(repo, found, base, planFiles, age);
+  // L676 : une branche périmée n'est refusée qu'après un vrai rebase sur `base` ; réussi, le lot repart de ses commits, échoué (conflit), la branche reste intacte.
+  if (refused && refused === staleRefusal(age)) {
+    const failed = rebaseKept(repo, found, base);
+    if (failed) return { from: found.branch, refused: `${refused}, et le rebase sur ${base} a échoué (${failed}) : branche laissée intacte` };
+    age = branchStaleness(repo, found.branch, base);
+    refused = recoveryRefusal(repo, found, base, planFiles, age);
+  }
   if (refused) return { from: found.branch, refused };
   try {
     if (moved) {
@@ -300,6 +290,35 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
     return { from: found.branch, refused: `déplacement ou renommage de la branche refusé par git (${gitFailure(e)}), rien n'a bougé` };
   }
   return { from: found.branch, unintegrated: found.unintegrated, behind: age.behind, conflicts: age.conflicts };
+}
+
+/**
+ * Rebase la branche gardée sur `base` (L676), dans son worktree, ou dans un worktree jetable quand le sien a disparu. Rend null quand le rebase a réussi ; sinon la cause de git,
+ * après `git rebase --abort` : la branche garde ses commits et son sommet d'avant.
+ */
+function rebaseKept(repo: string, found: KeptTree, base: string): string | null {
+  const own = found.dir !== null && existsSync(join(found.dir, '.git'));
+  const temp = own ? null : mkdtempSync(join(tmpdir(), 'cadence-rebase-'));
+  const wd = own ? (found.dir as string) : join(temp as string, 'wt');
+  try {
+    if (!own) git(repo, 'worktree', 'add', wd, found.branch);
+    try {
+      git(wd, 'rebase', `refs/heads/${base}`);
+      return null;
+    } catch (e) {
+      const conflicts = (tryGit(wd, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
+      tryGit(wd, 'rebase', '--abort');
+      return conflicts.length ? `conflit sur ${conflicts.join(', ')}` : gitFailure(e).replace(/\r/g, ' ').slice(0, 160);
+    }
+  } catch (e) {
+    return gitFailure(e).replace(/\r/g, ' ').slice(0, 160);
+  } finally {
+    if (temp) {
+      tryGit(repo, 'worktree', 'remove', '--force', wd);
+      rmSync(temp, { recursive: true, force: true });
+      tryGit(repo, 'worktree', 'prune');
+    }
+  }
 }
 
 /** Au-delà de ce nombre de commits de la branche du dépôt absents de la branche gardée, la reprise est refusée (L665 : 68,2 min de mur perdues sur une branche à 6 conflits connus). */
@@ -337,6 +356,11 @@ export function recoveryRefusal(repo: string, found: KeptTree, base: string, pla
   if (dirty.length) return `son worktree porte des fichiers suivis modifiés (${dirty.join(', ')})`;
   const touched = (tryGit(repo, 'log', '--name-only', '-z', '--format=', `refs/heads/${found.branch}`, '--not', `refs/heads/${base}`) ?? '').split('\0').find((f) => planFiles.has(f));
   if (touched) return `un de ses commits modifie le plan (${touched})`;
+  return staleRefusal(age);
+}
+
+/** Le refus d'une branche périmée (L665 : plus de `STALE_BASE_COMMITS` commits de retard, ou des conflits à la fusion à blanc), ou null ; le même texte pour la reprise, le `--dry-run` et le tour du lead. */
+export function staleRefusal(age: { behind: number; conflicts: string[] }): string | null {
   if (age.behind > STALE_BASE_COMMITS) return `${stalenessText(age)}, plus de ${STALE_BASE_COMMITS} commits d'avance : branche périmée`;
   return age.conflicts.length ? `${stalenessText(age)} : branche périmée` : null;
 }

@@ -12,7 +12,7 @@ const withGestures = (branchGestures: TourRow['branchGestures'], ...worktrees: K
 describe('lead tour — branche de lot non intégrée depuis plus de 48 h (L676)', () => {
   it('R2 — une branche à 3 commits non intégrés créée il y a 50 h, intégrable et reprenable : ⚠ avec le lot, l\'âge, les commits et les deux gestes', () => {
     const t = tree({});
-    const [line, ...rest] = tourStaleBranchLines(withGestures({ [t.branch]: { integrable: true, resumeRefusal: null } }, t), NOW);
+    const [line, ...rest] = tourStaleBranchLines(withGestures({ [t.branch]: { integrable: true, stale: null } }, t), NOW);
     expect(rest).toEqual([]);
     expect(line).toMatch(/^⚠ maritime · maritime:B6 · /);
     expect(line).toContain('2 j');
@@ -25,20 +25,20 @@ describe('lead tour — branche de lot non intégrée depuis plus de 48 h (L676)
   });
   it('R2 — lot non rendu à l\'intégration (tests rouges, revue non conforme) : pas de geste intégrer, que --integrate refuserait', () => {
     const t = tree({});
-    const [line] = tourStaleBranchLines(withGestures({ [t.branch]: { integrable: false, resumeRefusal: null } }, t), NOW);
+    const [line] = tourStaleBranchLines(withGestures({ [t.branch]: { integrable: false, stale: null } }, t), NOW);
     expect(line).not.toContain('--integrate');
     expect(line).toContain('reprendre : cadence orchestrate maritime:B6');
   });
-  it('R2 — reprise refusée (branche périmée) : pas de « reprendre », le refus est dit avec rebaser à la main ou retirer', () => {
+  it('R2 — branche périmée : « reprendre » dit que la vague tente un rebase puis rend le lot sans session, avec rebaser à la main ou retirer', () => {
     const t = tree({});
-    const [line] = tourStaleBranchLines(withGestures({ [t.branch]: { integrable: false, resumeRefusal: 'main a 1617 commit(s) d\'avance et 0 conflit(s), plus de 100 commits d\'avance' } }, t), NOW);
-    expect(line).not.toContain('reprendre :');
-    expect(line).toContain('reprise refusée (main a 1617 commit(s) d\'avance');
+    const [line] = tourStaleBranchLines(withGestures({ [t.branch]: { integrable: false, stale: 'main a 1617 commit(s) d\'avance et 0 conflit(s), plus de 100 commits d\'avance : branche périmée' } }, t), NOW);
+    expect(line).toContain('reprendre : cadence orchestrate maritime:B6 (main a 1617 commit(s) d\'avance');
+    expect(line).toContain('tente d\'abord un rebase, et rend le lot sans session s\'il échoue');
     expect(line).toContain('--remove-worktree maritime:B6 --abandon-commits');
   });
   it('R2 — lot que la config git ne nomme pas (nom de branche à la place) : aucun geste sur un lot inexistant', () => {
     const t = tree({ lot: 'cadence/2026-11-01-0800/maritime--B6' });
-    const [line] = tourStaleBranchLines(withGestures({ [t.branch]: { integrable: true, resumeRefusal: null } }, t), NOW);
+    const [line] = tourStaleBranchLines(withGestures({ [t.branch]: { integrable: true, stale: null } }, t), NOW);
     expect(line).toContain('lot non identifié');
     expect(line).not.toContain('--integrate');
     expect(line).not.toContain('reprendre :');

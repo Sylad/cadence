@@ -48,16 +48,39 @@ describe('R1 — l\'âge de la branche : les commits de main qu\'elle n\'a pas',
   });
 });
 
-describe('R2 — plus de 100 commits de main d\'avance : la reprise est refusée sans toucher à la branche', () => {
-  it('R2 — 101 commits de main d\'avance : refusée, l\'âge est dans la cause, rien n\'est renommé ni déplacé', () => {
+describe('R2 — plus de 100 commits de main d\'avance : la reprise rebase d\'abord (L676)', () => {
+  it('R2 — 101 commits de main d\'avance sans conflit : le rebase réussit, la branche est reprise sur le sommet de main, ses commits gardés', () => {
     const { repo, parent } = setup();
     const old = oldBranch(repo);
     advanceMain(repo, 101);
     const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main');
-    expect(got).toEqual({ from: old.branch, refused: expect.stringMatching(/main a 101 commit\(s\) d'avance.*plus de 100/) });
+    expect(got).toEqual({ from: old.branch, unintegrated: 1, behind: 0, conflicts: [] });
+    expect(git(repo, 'rev-list', '--count', 'main..cadence/w2/a--L1')).toBe('1');
+    expect(git(repo, 'rev-list', '--count', 'cadence/w2/a--L1..main')).toBe('0');
+    expect(existsSync(newDir(parent))).toBe(true);
+  });
+  it('R2 — le rebase échoue (même fichier écrit des deux côtés, plus de 100 commits de retard) : refusée, la branche garde son sommet, sans rebase en cours', () => {
+    const { repo, parent } = setup();
+    const old = oldBranch(repo, 'partage.txt', 'version du lot\n');
+    const tip = git(repo, 'rev-parse', old.branch);
+    commitFile(repo, 'partage.txt', 'feat: partage');
+    advanceMain(repo, 100);
+    const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main');
+    expect(got).toEqual({ from: old.branch, refused: expect.stringMatching(/plus de 100.*le rebase sur main a échoué \(conflit sur partage\.txt\).*branche laissée intacte/) });
+    expect(git(repo, 'rev-parse', old.branch)).toBe(tip);
     expect(existsSync(old.dir)).toBe(true);
+    expect(git(old.dir, 'status', '--porcelain', '--untracked-files=no')).toBe('');
+    expect(existsSync(join(old.dir, '.git')) && git(old.dir, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe(old.branch);
     expect(existsSync(newDir(parent))).toBe(false);
-    expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim()).toBe(old.branch);
+  });
+  it('R2 — worktree disparu : le rebase se fait dans un worktree jetable, retiré ensuite', () => {
+    const { repo, parent } = setup();
+    const old = oldBranch(repo);
+    advanceMain(repo, 101);
+    git(repo, 'worktree', 'remove', '--force', old.dir);
+    const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main');
+    expect(got).toEqual({ from: old.branch, unintegrated: 1, behind: 0, conflicts: [] });
+    expect(git(repo, 'worktree', 'list')).not.toContain('cadence-rebase-');
   });
   it('R2 — 100 commits de main d\'avance (la borne) : reprise, l\'âge est rendu', () => {
     const { repo, parent } = setup();
@@ -67,7 +90,7 @@ describe('R2 — plus de 100 commits de main d\'avance : la reprise est refusée
   });
 });
 
-describe('R3 — merge-tree donne des conflits : la reprise est refusée et nomme les fichiers', () => {
+describe('R3 — merge-tree donne des conflits : le rebase échoue, la reprise est refusée et nomme les fichiers', () => {
   it('R3 — main a réécrit le fichier que le lot a écrit : refusée, le fichier en conflit est dans la cause, branche intacte', () => {
     const { repo, parent } = setup();
     const old = oldBranch(repo, 'partage.txt', 'version du lot\n');
@@ -110,13 +133,25 @@ describe('R4 — la ligne « branche reprise » du journal dit l\'âge et les co
     const r = await run(parent, ['a:L1'], fake({ fix: async (cwd) => claudeOut(workReport({ commits: [commitFile(cwd, 'L1-suite.txt', 'fix(L1): suite')] })) }));
     expect(r.out).toMatch(new RegExp(`branche cadence/${WAVE}/a--L1 d'une vague précédente reprise \\(\\d+ commit\\(s\\) non intégré\\(s\\), main a \\d+ commit\\(s\\) d'avance et 0 conflit\\(s\\)\\)`));
   });
-  it('R4 — refus : la ligne « non reprise » porte la cause (conflit) et le lot repart de zéro', async () => {
+  it('R4 — refus : la ligne « non reprise » porte la cause (conflit), le lot est rendu sans session et la branche reste', async () => {
     const { parent, repo } = await handedBack();
     const kept = git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim().split('\n')[0];
+    const tip = git(repo, 'rev-parse', kept);
     writeFileSync(join(repo, 'L1-implement.txt'), 'main a écrit le même fichier\n');
     git(repo, 'add', '--', 'L1-implement.txt');
     git(repo, 'commit', '-q', '-m', 'feat: même fichier', '--', 'L1-implement.txt');
-    const r = await run(parent, ['a:L1'], fake());
-    expect(r.out).toMatch(new RegExp(`branche ${kept.replace(/\//g, '\\/')} d'une vague précédente non reprise : main a \\d+ commit\\(s\\) d'avance et 1 conflit\\(s\\) \\(L1-implement\\.txt\\)`));
+    const f = fake();
+    const r = await run(parent, ['a:L1'], f);
+    expect(r.out).toMatch(new RegExp(`branche ${kept.replace(/\//g, '\\/')} d'une vague précédente non reprise : main a \\d+ commit\\(s\\) d'avance et 1 conflit\\(s\\) \\(L1-implement\\.txt\\).*le rebase sur main a échoué.*lot rendu sans session, branche intacte`));
+    expect(r.out).not.toContain('repart de zéro');
+    expect(f.calls).toEqual([]);
+    expect(git(repo, 'rev-parse', kept)).toBe(tip);
+    expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim().split('\n')).toEqual([kept]);
+  });
+  it('R4 — plus de 100 commits de retard sans conflit : le rebase réussit, la ligne dit la reprise et le lot repart de son travail', async () => {
+    const { parent, repo } = await handedBack();
+    advanceMain(repo, 101);
+    const r = await run(parent, ['a:L1'], fake({ fix: async (cwd) => claudeOut(workReport({ commits: [commitFile(cwd, 'L1-suite.txt', 'fix(L1): suite')] })) }));
+    expect(r.out).toMatch(/d'une vague précédente reprise \(\d+ commit\(s\) non intégré\(s\), main a 0 commit\(s\) d'avance et 0 conflit\(s\)\) : le lot repart de son travail/);
   });
 });

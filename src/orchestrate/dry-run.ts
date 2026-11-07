@@ -20,7 +20,7 @@ import { precheckSkipReason, MAX_PASSES, MAX_PASSES_CONVERGING, briefName, needs
 import { buildArgs, buildLocalArgs, MODEL_ALIASES, mcpServersFor, enabledPlugins, settingsFiles, type StepModel } from './launch.js';
 import { repoBranch } from './integrate.js';
 import { launchScreen, launchedLot } from './cycle/retreci.js';
-import { keptBranchesOfLot, legacyLotSlug, lotBranch, planFileSet, recoveryRefusal, type KeptTree } from './worktree.js';
+import { keptBranchesOfLot, legacyLotSlug, lotBranch, planFileSet, recoveryRefusal, staleRefusal, branchStaleness, type KeptTree } from './worktree.js';
 import { effortKey, schemaFor, stepAgent } from './schemas.js';
 import { lotKey, lotSlug, neighbourDirs, RunStore, type LotState } from './state.js';
 import { matchesNvmrc, notLoggedIn, pathNodeVersion, projectEnv } from './preflight.js';
@@ -118,8 +118,11 @@ function keptBranchLines(l: LotState, id: string, worktrees: boolean, planFiles:
   const legacy = legacyLotSlug(l.project, l.lot);
   const found = keptBranchesOfLot(l.repo, lotBranch(id, l.project, l.lot), [lotSlug(l.project, l.lot), ...(legacy ? [legacy] : [])]);
   const first = worktrees && branch ? found.find((t) => t.base === branch) : undefined;
-  const refused = first ? recoveryRefusal(l.repo, first, first.base, planFiles) : null;
-  return found.map((t) => `  branche ${t.branch} d'une vague précédente (${t.unintegrated} commit(s) non intégré(s)) : ${t !== first ? notTakenCause(t, branch, worktrees, first, refused) : refused ? `n'est pas reprise, ${refused}` : 'reprise par la vague (le lot repart de son travail)'}`);
+  const age = first ? branchStaleness(l.repo, first.branch, first.base) : undefined;
+  const refused = first ? recoveryRefusal(l.repo, first, first.base, planFiles, age) : null;
+  // L676 : une branche seulement périmée n'est refusée qu'après un rebase raté (`recoverTree`) ; le dry-run ne rebase pas, il dit les deux issues.
+  const rebase = refused && age && refused === staleRefusal(age) ? ` ; la vague tente d'abord un rebase sur ${first!.base} : réussi, le lot repart de son travail, échoué, le lot est rendu sans session et la branche reste intacte` : '';
+  return found.map((t) => `  branche ${t.branch} d'une vague précédente (${t.unintegrated} commit(s) non intégré(s)) : ${t !== first ? notTakenCause(t, branch, worktrees, first, refused) : refused ? `n'est pas reprise, ${refused}${rebase}` : 'reprise par la vague (le lot repart de son travail)'}`);
 }
 
 /** Pourquoi `recoverTree` ne prend pas cette branche gardée, quand ce n'est pas la plus récente partie de la branche du dépôt (L581). */

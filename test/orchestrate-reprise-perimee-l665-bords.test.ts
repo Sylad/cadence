@@ -84,9 +84,10 @@ describe('R3 — les conflits au bord', () => {
     git(repo, 'merge', '-q', '--no-edit', old.branch);
     expect(branchStaleness(repo, old.branch, 'main')).toEqual({ behind: 0, conflicts: [] });
   });
-  it('R2 — refus par l\'âge : la branche et son worktree restent, aucun worktree n\'apparaît au nouvel emplacement', () => {
+  it('R2 — refus par le rebase raté : la branche et son worktree restent, aucun worktree n\'apparaît au nouvel emplacement', () => {
     const { repo, parent } = setup();
     const old = oldBranch(repo, { 'x.txt': 'lot\n' });
+    commitFile(repo, 'x.txt', 'chore: x');
     for (let i = 0; i < 101; i++) commitFile(repo, `m-${i}.txt`, `chore: ${i}`);
     expect(recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main')).toHaveProperty('refused');
     expect(existsSync(old.dir)).toBe(true);
@@ -103,12 +104,12 @@ describe('R4 — le --dry-run applique le même refus', () => {
     removeDryRunBriefs(r.out);
     expect(r.out).toMatch(new RegExp(`branche ${old.branch.replace(/\//g, '\\/')} .*n'est pas reprise, main a 1 commit\\(s\\) d'avance et 1 conflit\\(s\\) \\(partage\\.txt\\)`));
   });
-  it('R4 — branche à plus de 100 commits : le dry-run dit qu\'elle n\'est pas reprise', async () => {
+  it('R4 — branche à plus de 100 commits : le dry-run dit qu\'elle n\'est pas reprise telle quelle et les deux issues du rebase', async () => {
     const { parent, repo } = setup();
     const old = oldBranch(repo, { 'x.txt': 'lot\n' });
     for (let i = 0; i < 101; i++) commitFile(repo, `m-${i}.txt`, `chore: ${i}`);
     const r = await run(parent, ['a:L1', '--dry-run'], fake());
     removeDryRunBriefs(r.out);
-    expect(r.out).toMatch(new RegExp(`branche ${old.branch.replace(/\//g, '\\/')} .*n'est pas reprise, main a 101 commit\\(s\\)`));
+    expect(r.out).toMatch(new RegExp(`branche ${old.branch.replace(/\//g, '\\/')} .*n'est pas reprise, main a 101 commit\\(s\\).*tente d'abord un rebase sur main : réussi, le lot repart de son travail, échoué, le lot est rendu sans session`));
   });
 });

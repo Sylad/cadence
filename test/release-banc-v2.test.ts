@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { gardeBancV2, release } from '../src/release.js';
@@ -20,24 +20,34 @@ describe('garde de publication 2.x', () => {
 });
 
 describe('release() de bout en bout', () => {
-  const fixture = (avecBanc: boolean): string => {
+  // Le faux cadence2 écrit ses arguments dans un marqueur : preuve que la garde l'a bien appelé.
+  const FAUX = "require('node:fs').writeFileSync('.banc-appele', process.argv.slice(2).join(' '));\nconsole.log(\"banc vert sur l'empreinte test\");\nprocess.exit(CODE);\n";
+  const fixture = (code: number | null): string => {
     const dir = gitRepo();
     writeFileSync(join(dir, 'package.json'), '{\n  "name": "acme",\n  "version": "1.2.3"\n}\n');
     writeFileSync(join(dir, 'CHANGELOG.md'), '# Changelog\n\n## [Unreleased]\n\n### Added\n\n- Une chose (L7).\n');
-    if (avecBanc) {
+    if (code !== null) {
       mkdirSync(join(dir, 'v2', 'bin'), { recursive: true });
-      writeFileSync(join(dir, 'v2', 'bin', 'cadence2.js'), "console.log(\"banc vert sur l'empreinte test\");\n");
+      writeFileSync(join(dir, 'v2', 'bin', 'cadence2.js'), FAUX.replace('CODE', String(code)));
     }
     execFileSync('git', ['add', '.'], { cwd: dir });
     commit(dir, 'chore: initial');
     return dir;
   };
   it('major sur un dépôt sans v2/bin/cadence2.js : refus qui parle du banc vert', () => {
-    expect(() => release(['major'], true, fixture(false), '2026-11-07' as Day, () => {})).toThrow(/banc vert/);
+    expect(() => release(['major'], true, fixture(null), '2026-11-07' as Day, () => {})).toThrow(/banc vert/);
   });
-  it('major avec un banc vert (cadence2 factice) : pas de refus du banc', () => {
-    let refus = '';
-    try { release(['major'], true, fixture(true), '2026-11-07' as Day, () => {}); } catch (e) { refus = String((e as Error).message); }
-    expect(refus).not.toMatch(/banc vert/);
+  it('major avec un cadence2 qui rend 1 : refus, et la garde a bien appelé le banc', () => {
+    const dir = fixture(1);
+    expect(() => release(['major'], true, dir, '2026-11-07' as Day, () => {})).toThrow(/banc vert/);
+    expect(readFileSync(join(dir, '.banc-appele'), 'utf8')).toContain('bench verifier-publication');
+  });
+  it('major avec un banc vert : le dry-run passe, le banc a été appelé, la ligne → 2.0.0 est sortie', () => {
+    const dir = fixture(0);
+    const out: string[] = [];
+    const code = release(['major'], true, dir, '2026-11-07' as Day, (l) => out.push(l));
+    expect(code).toBe(0);
+    expect(readFileSync(join(dir, '.banc-appele'), 'utf8')).toContain('bench verifier-publication');
+    expect(out.some((l) => l.includes('→ 2.0.0'))).toBe(true);
   });
 });

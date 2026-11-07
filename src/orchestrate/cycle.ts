@@ -1,7 +1,7 @@
 import { type LotCtx, stop, workDir as wd, save, transition } from './cycle/ctx.js';
 import { isOpen } from '../plan.js';
 import { sh } from './cycle/sh.js';
-import { commitPlan, planMessage, planWrite, trackedPaths } from './cycle/plan-writes.js';
+import { commitPlan, takeAnswerNote, planMessage, planWrite, trackedPaths } from './cycle/plan-writes.js';
 import { PLAN_ACTIONS } from '../plan-commit.js';
 import { lotKey } from './state.js';
 import { prepareTree } from './worktree.js';
@@ -73,6 +73,7 @@ async function ensureTree(c: LotCtx): Promise<boolean> {
 /** Joue le cycle d'un lot jusqu'à son terme, ou jusqu'à l'arrêt (question, budget, quota). Ne lève jamais. */
 export async function runLot(c: LotCtx): Promise<void> {
   const l = c.lot;
+  let noted: Promise<void> | undefined;
   try {
     if (TERMINAL.has(l.status)) return;
     if (l.status === 'question' && dropped(c)) {
@@ -81,6 +82,7 @@ export async function runLot(c: LotCtx): Promise<void> {
       return;
     }
     if (l.status === 'question' && !l.pendingAnswer) return;
+    noted = (await takeAnswerNote(c)).end;
     // Un lot déjà commencé retrouve son worktree (R11) ; un lot neuf n'en a un qu'une fois son raf start fait, dans le dépôt du projet (R21).
     if ((l.next !== null || l.steps.length > 0) && !(await ensureTree(c))) return;
     // Un test rescellé par le lead pendant la question (L200) a déplacé le commit rouge : l'ancre suit, le verrou garde le reste.
@@ -136,6 +138,7 @@ export async function runLot(c: LotCtx): Promise<void> {
     l.next = null;
     transition(c, 'failed', `erreur : ${(e as Error).message}`);
   } finally {
+    await noted;
     // TMPDIR court des sessions (L243) : jetable, retiré à la fin de chaque passage du lot ; la session suivante (reprise, réponse) le recrée.
     try {
       c.wave.store.removeTmpDir(l.project, l.lot);

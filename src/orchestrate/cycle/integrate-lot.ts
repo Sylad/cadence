@@ -4,7 +4,7 @@ import { repoShas, repoWork } from '../../repos.js';
 import { lotWork, coveredTasks } from '../../audit.js';
 import { openDocGap } from './brief.js';
 import { git, trackedDirty, lotBranch, branchExists, integrated, gitFailure, removeTree } from '../worktree.js';
-import { foreignDirty, planBefore, commitPlan, planMessage, leadMoved } from './plan-writes.js';
+import { foreignDirty, planBefore, commitPlan, planMessage, leadMoved, slowWaitLog } from './plan-writes.js';
 import { repoBranch, INTEGRATE_WAIT_MS, takeRepoWrite, rebaseOnto, rebaseNotes, changelogShapeOf, patchId, mergeBase, advance, baseMoved, MAX_REPLAYS, type Grant, type Rebase } from '../integrate.js';
 import { relative } from 'node:path';
 import { RafError } from '../../plan.js';
@@ -143,7 +143,7 @@ function conflictRefusal(repo: string, t: LotTree, rebased: Extract<Rebase, { ki
  */
 async function awaitTurn(c: LotCtx): Promise<Grant> {
   let waited = false;
-  const grant = await takeRepoWrite(c.lot.repo, { wave: c.wave.id }, { ...c.wave.integrate, onWait: () => { waited = true; setWaitsTurn(c, true); }, onTurn: () => setWaitsTurn(c, false) });
+  const grant = await takeRepoWrite(c.lot.repo, { wave: c.wave.id }, { ...c.wave.integrate, onWait: () => { waited = true; setWaitsTurn(c, true); }, onTurn: () => setWaitsTurn(c, false), onSlow: slowWaitLog(c, 'son intégration') });
   if (!grant.ok) return grant;
   c.tookTurn = waited;
   return { ok: true, release: () => { c.tookTurn = false; grant.release(); } };

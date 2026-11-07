@@ -17,6 +17,8 @@ const PLAN_COMMIT_FIELDS = ['lot', 'action', 'vague'] as const;
 /** Ce que cadence écrit dans un commit de plan, par action : une seule source pour la vague et pour le dry-run. */
 export const PLAN_ACTIONS = {
   started: 'démarré',
+  /** L670 : la réponse du lead à une question, notée sur le lot à sa prise. */
+  answerNoted: 'réponse du lead notée',
   hypotheses: (sujet: string) => `hypothèses de la fiche ${sujet} notées`,
   minors: (label: string) => `mineurs de la revue de ${label} notés`,
   /** `raf done` ne commite pas : l'action de la commande de commit qu'il propose (L371). */

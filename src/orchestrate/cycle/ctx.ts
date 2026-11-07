@@ -76,7 +76,7 @@ export interface WaveCtx {
   slotsChanged?: () => void;
   saveWave: () => void;
   /** Attente du verrou d'intégration du dépôt (L279, R25) : bornes par défaut INTEGRATE_WAIT_MS et INTEGRATE_POLL_MS ; réglables pour les tests. */
-  integrate?: { waitMs?: number; pollMs?: number };
+  integrate?: { waitMs?: number; pollMs?: number; slowMs?: number };
   /** L553 : où en est le dépôt d'une reprise qui intègre entre les étapes d'une autre vague (voir `RepoClaim`) ; prend le dépôt si cette vague l'a libéré. Absent (vague construite à la main) : tout dépôt est `kept`. */
   claimRepo?: (repo: string) => RepoClaim;
 }

@@ -9,8 +9,8 @@ import { snapshot, type Snapshot } from '../guard.js';
 import { type ReviewReport } from '../schemas.js';
 import { isAcceptationFile } from '../accept.js';
 import { hypothesisNote } from '../spec.js';
-import { type LotState } from '../state.js';
-import { repoBranch, takeRepoWrite } from '../integrate.js';
+import { type LotState, lotKey } from '../state.js';
+import { repoBranch, takeRepoWrite, WAIT_LOG_MS } from '../integrate.js';
 import { git, trackedDirty } from '../worktree.js';
 import { type LotCtx, transition, stop, propose } from './ctx.js';
 
@@ -116,6 +116,47 @@ export async function noteHypotheses(c: LotCtx, lines: string[], sujet: string):
 }
 
 /**
+ * La réponse du lead va en note du lot dès qu'elle est prise (L670) : la question suivante ne peut plus venir de « aucune trace écrite dans les notes » (L477).
+ * Une ligne, sans doublon à la reprise, commitée avec le plan. Un plan en lecture seule ne reçoit rien : la ligne devient une proposition `[note à poser]`.
+ * Ne rend jamais le lot : une écriture refusée est un avertissement du lot, la réponse reste dans le brief de la session.
+ */
+export async function noteAnswer(c: LotCtx, answer: string): Promise<void> {
+  const l = c.lot;
+  const text = `Réponse du lead (vague ${c.wave.id}, ${c.wave.today}) — ${answer.trim().replace(/\s+/g, ' ')}`;
+  try {
+    const dirty = await planWrite(
+      c,
+      async () => {
+        const plan = c.loadPlan();
+        if (plan.readonly) {
+          propose(c, `[note à poser] ${text}`);
+          return null;
+        }
+        if (plan.lot(l.lot).notes.some((n) => n.text === text)) return null;
+        const before = planBefore(c);
+        plan.note(l.lot, text, c.wave.today);
+        plan.save();
+        return commitPlan(c, planMessage(c, PLAN_ACTIONS.answerNoted), l.repo, before);
+      },
+      PLAN_ACTIONS.answerNoted,
+    );
+    if (dirty) l.warnings.push(`réponse du lead non notée : ${dirty}`);
+  } catch (e) {
+    l.warnings.push(`réponse du lead non notée : ${(e as Error).message.split('\n')[0]}`);
+  }
+}
+
+/**
+ * La réponse du lead en attente est notée à la prise du lot (L670). Dans le dépôt lui-même, l'écriture est jouée avant la session (elle salirait l'arbre où la session écrit) ;
+ * en worktree elle peut attendre le dépôt (une intégration le tient) : la session ne l'attend pas, et l'appelant attend `end` à la fin du passage.
+ */
+export async function takeAnswerNote(c: LotCtx): Promise<{ end: Promise<void> }> {
+  const end = c.lot.pendingAnswer ? noteAnswer(c, c.lot.pendingAnswer) : Promise.resolve();
+  if (!c.tree) await end;
+  return { end }; // enveloppée : `await` d'une promesse rendue nue attendrait aussi l'écriture en worktree
+}
+
+/**
  * Les mineurs de la revue de la fiche vont en notes du lot (spec etape-spec-back § 4), pas au tableau de fin de vague : une note par constat, sans doublon
  * à la reprise, commitée avec le plan. Un plan en lecture seule ne reçoit rien : la ligne devient une proposition `[note à poser]` rendue au lead.
  * Rend vrai quand le lot est rendu (arbre sale).
@@ -179,13 +220,16 @@ async function refusal(write: () => Promise<string | null>): Promise<string | nu
   }
 }
 
+/** L670 : la ligne de journal d'une attente du dépôt de plus de 10 s : quel lot attend, quoi, et ce qu'il écrit ensuite (`what`). */
+export const slowWaitLog = (c: LotCtx, what: string) => (waitingFor: string): void => c.wave.log(`${lotKey(c.lot.project, c.lot.lot)} · attend ${waitingFor} depuis plus de ${(c.wave.integrate?.slowMs ?? WAIT_LOG_MS) / 1000} s, pour : ${what}`);
+
 /** Une écriture de plan du programme (R21, R26) : sous la file et le verrou du dépôt, le dépôt encore sur la branche de départ, aucun fichier suivi modifié hors plan. Rend la cause du refus, null si l'écriture a eu lieu. Hors worktree, rien ne change. */
-export async function planWrite(c: LotCtx, doWrite: () => Promise<string | null>): Promise<string | null> {
+export async function planWrite(c: LotCtx, doWrite: () => Promise<string | null>, what = 'une écriture du plan'): Promise<string | null> {
   const write = () => refusal(doWrite);
   if (!c.tree) return write();
   const l = c.lot;
   // L591 : l'écriture de plan, courte, passe devant les intégrations en file (elle n'attend que celle qui tient le dépôt) : un lot neuf ne reste pas sans session derrière toute la file, alors qu'il tient un créneau.
-  const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, { ...c.wave.integrate, first: true });
+  const grant = await takeRepoWrite(l.repo, { wave: c.wave.id }, { ...c.wave.integrate, first: true, onSlow: slowWaitLog(c, what) });
   if (!grant.ok) return `écriture du plan refusée : verrou tenu par ${grant.holder.wave} (pid ${grant.holder.pid})`;
   try {
     const cur = repoBranch(l.repo);

@@ -16,6 +16,8 @@ export const INTEGRATION_LOCK = 'orchestrate-integration.lock';
 /** Attente du verrou d'intégration (R25) : une intégration dure un rebase et la relance des tests. */
 export const INTEGRATE_WAIT_MS = 10 * 60_000;
 export const INTEGRATE_POLL_MS = 1_000;
+/** L670 : une attente du dépôt plus longue que cela est dite au journal (`onSlow`), avec ce qu'elle attend. */
+export const WAIT_LOG_MS = 10_000;
 /** Rebases rejoués quand la branche du dépôt avance pendant l'intégration (L364) : au-delà, le lot est rendu. */
 export const MAX_REPLAYS = 2;
 
@@ -29,23 +31,35 @@ export type Grant = { ok: true; release: () => void } | { ok: false; holder: { w
  * s'attend sans borne (L425) : son porteur est un lot de ce processus, qui libère toujours, et une intégration (rebase rejoué + porte) dure plus que la borne.
  * L'attente du verrou fichier d'un autre processus est bornée par `waitMs` (R25), comptée à partir du tour ; au-delà, le porteur est rendu et rien n'est pris.
  * Une attente ne retient aucun créneau de session : ce verrou n'a rien à voir avec eux. L591 : `onWait` est appelé une fois quand le tour n'est pas immédiat (file en mémoire tenue, ou
- * verrou fichier d'un autre processus), pour que l'appelant rende son créneau ; `first` : la demande passe devant les intégrations en file, jamais devant celle qui tient le dépôt (écriture de plan d'un lot neuf, L591) ; `onTurn` quand l'attente finit, par le tour ou par le refus. Aucun des deux si le tour est immédiat.
+ * verrou fichier d'un autre processus), pour que l'appelant rende son créneau ; `slowMs`/`onSlow` (L670) : une attente de plus de `slowMs` (10 s) appelle `onSlow` une fois, avec ce qu'elle attend ; `first` : la demande passe devant les intégrations en file, jamais devant celle qui tient le dépôt (écriture de plan d'un lot neuf, L591) ; `onTurn` quand l'attente finit, par le tour ou par le refus. Aucun des deux si le tour est immédiat.
  */
-export async function takeRepoWrite(repo: string, who: { wave: string }, o: { waitMs?: number; pollMs?: number; onWait?: () => void; onTurn?: () => void; first?: boolean } = {}): Promise<Grant> {
+export async function takeRepoWrite(repo: string, who: { wave: string }, o: { waitMs?: number; pollMs?: number; slowMs?: number; onSlow?: (what: string) => void; onWait?: () => void; onTurn?: () => void; first?: boolean } = {}): Promise<Grant> {
   const waitMs = o.waitMs ?? INTEGRATE_WAIT_MS;
   const pollMs = o.pollMs ?? INTEGRATE_POLL_MS;
   const file = join(sharedStateDir(repo), INTEGRATION_LOCK);
   const queue = mutexFor(`integrate:${gitCommonDir(repo)}`);
   let waiting = false;
+  let waitingFor = '';
+  let slowTimer: NodeJS.Timeout | undefined;
+  // L670 : une attente qui dure plus de `slowMs` dit ce qu'elle attend, une seule fois ; une attente courte ne dit rien.
+  const startSlow = (what: string) => {
+    waitingFor = what;
+    if (slowTimer || !o.onSlow) return;
+    slowTimer = setTimeout(() => o.onSlow!(waitingFor), o.slowMs ?? WAIT_LOG_MS);
+  };
   const wait = () => {
     if (waiting) return;
     waiting = true;
     o.onWait?.();
   };
   const settle = () => {
+    clearTimeout(slowTimer);
     if (waiting) o.onTurn?.();
   };
-  if (queue.busy) wait();
+  if (queue.busy) {
+    wait();
+    startSlow("la file d'intégration du dépôt (un autre lot de la vague y écrit ou y intègre)");
+  }
   const turn = (await queue.acquire(Infinity, o.first))!;
   const deadline = Date.now() + waitMs;
   for (;;) {
@@ -67,6 +81,7 @@ export async function takeRepoWrite(repo: string, who: { wave: string }, o: { wa
       return { ok: false, holder: { wave: got.held.wave, pid: got.held.pid } };
     }
     wait();
+    startSlow(`le verrou du dépôt tenu par la vague ${got.held.wave} (pid ${got.held.pid})`);
     await sleep(pollMs);
   }
 }

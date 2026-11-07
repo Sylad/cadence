@@ -123,6 +123,38 @@ function turnWatch(): { hear: (c: LotCtx) => void; arm: () => void; poked: () =>
   };
 }
 
+/**
+ * L670 : une file encore en attente après `wave.integrate.slowMs` (WAIT_LOG_MS, 10 s) dit au journal ce qui la retient, une fois par attente (L477 : 18,6 min sans ligne derrière des files pleines) :
+ * la dépendance qui joue encore, la ressource `uses:` tenue, sinon les files qui tiennent les créneaux. `watch(queue)` arme le minuteur (idempotent), `unwatch` l'efface quand la file part (toute file part avant la fin du pool : rien ne reste armé).
+ */
+function pendingWatch(o: { pending: LotCtx[][]; running: Map<Promise<void>, LotCtx[]>; live: Set<LotCtx>; ctxs: LotCtx[]; slots: number; wanted: (queue: LotCtx[]) => string[] }): { watch: (queue: LotCtx[]) => void; unwatch: (queue: LotCtx[]) => void } {
+  const key = (c: LotCtx) => lotKey(c.lot.project, c.lot.lot);
+  const retains = (queue: LotCtx[]): string => {
+    const deps = playingDeps(queue, o.ctxs, o.live);
+    if (deps.length) return `la fin du lot ${deps.join(', ')} dont il dépend, qui joue encore`;
+    const wanted = o.wanted(queue);
+    if (wanted.length) return `la ressource ${wanted.join(', ')}, tenue par une file qui joue`;
+    const held = [...o.running.values()].filter(holdsSlot).map((q) => q.filter((c) => o.live.has(c)).map(key).join(' puis '));
+    return `un créneau de session (${o.slots} créneau${o.slots > 1 ? 'x' : ''}, tenu${o.slots > 1 ? 's' : ''} par ${held.length > 1 ? 'les files' : 'la file'} ${held.join(', ')})`;
+  };
+  const timers = new Map<LotCtx[], NodeJS.Timeout>();
+  return {
+    watch: (queue) => {
+      if (timers.has(queue)) return;
+      const c = queue.find((x) => o.live.has(x)) ?? queue[0]!;
+      const timer = setTimeout(() => {
+        if (o.pending.includes(queue)) slowWaitLog(c, 'sa session suivante')(retains(queue));
+      }, c.wave.integrate?.slowMs ?? WAIT_LOG_MS);
+      timer.unref?.();
+      timers.set(queue, timer);
+    },
+    unwatch: (queue) => {
+      clearTimeout(timers.get(queue));
+      timers.delete(queue);
+    },
+  };
+}
+
 /** Place les lots pris à ce tour (L620) : une intégration reprise (`next: integrate`, déposée par le lead : sa revue est faite) passe devant les files en attente, dans l'ordre où elle est prise ; réponses et lots ajoutés se placent derrière. */
 function enqueueTaken(pending: LotCtx[][], taken: LotCtx[], live: Set<LotCtx>, hear: (c: LotCtx) => void): void {
   const front: LotCtx[][] = [];
@@ -184,33 +216,10 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
   /** La file qui ne part pas : celle d'un lot seul (groupe en parallèle) dont une dépendance joue encore, ou celle dont un lot veut une ressource qu'une file qui joue tient (L551). */
   const blocked = (queue: LotCtx[]) => playingDeps(queue, ctxs, live).length > 0 || resources.wanted(queue).length > 0;
 
-  // L670 : une file encore en attente après `slowMs` (10 s) dit au journal ce qui la retient, une fois par attente (L477 : 18,6 min sans ligne derrière des files pleines) ; le minuteur est effacé quand la file part.
-  const key = (c: LotCtx) => lotKey(c.lot.project, c.lot.lot);
-  const retains = (queue: LotCtx[]): string => {
-    const deps = playingDeps(queue, ctxs, live);
-    if (deps.length) return `la fin du lot ${deps.join(', ')} dont il dépend, qui joue encore`;
-    const wanted = resources.wanted(queue);
-    if (wanted.length) return `la ressource ${wanted.join(', ')}, tenue par une file qui joue`;
-    const held = [...running.values()].filter(holdsSlot).map((q) => q.filter((c) => live.has(c)).map(key).join(' puis '));
-    return `un créneau de session (${slots} créneau${slots > 1 ? 'x' : ''}, tenu${slots > 1 ? 's' : ''} par ${held.length > 1 ? 'les files' : 'la file'} ${held.join(', ')})`;
-  };
-  const slowTimers = new Map<LotCtx[], NodeJS.Timeout>();
-  const watch = (queue: LotCtx[]) => {
-    if (slowTimers.has(queue)) return;
-    const c = queue.find((o) => live.has(o)) ?? queue[0]!;
-    const timer = setTimeout(() => {
-      if (pending.includes(queue)) slowWaitLog(c, 'sa session suivante')(retains(queue));
-    }, c.wave.integrate?.slowMs ?? WAIT_LOG_MS);
-    timer.unref?.();
-    slowTimers.set(queue, timer);
-  };
-  const unwatch = (queue: LotCtx[]) => {
-    clearTimeout(slowTimers.get(queue));
-    slowTimers.delete(queue);
-  };
+  const slow = pendingWatch({ pending, running, live, ctxs, slots, wanted: resources.wanted });
 
   const start = (queue: LotCtx[]) => {
-    unwatch(queue);
+    slow.unwatch(queue);
     const p = runQueue(queue).finally(() => running.delete(p));
     running.set(p, queue);
   };
@@ -224,31 +233,27 @@ export async function runPool(ctxs: LotCtx[], slots = SLOTS, known: LotState[] =
   };
   const turns = turnWatch();
   ctxs.forEach(turns.hear);
-  try {
-    for (;;) {
-      admitted.length = 0;
-      enqueueTaken(pending, (await answers?.take(canRun, Math.max(0, slots - holdingSlots(running) - pending.filter((q) => !blocked(q)).length))) ?? [], live, turns.hear);
-      turns.arm();
-      while (holdingSlots(running) < slots) {
-        const next = pending.findIndex((q) => !blocked(q));
-        if (next < 0) break;
-        start(pending.splice(next, 1)[0]!);
-      }
-      if (running.size === 0) {
-        // Plus rien ne joue et chaque file restante attend une autre : le départ forcé laisse `runQueue` rendre ou garder en attente, comme avant.
-        if (!pending.length) break;
-        start(pending.shift()!);
-        continue;
-      }
-      pending.forEach(watch);
-      if (!answers) await Promise.race([...running.keys(), turns.poked()]);
-      else {
-        let timer: NodeJS.Timeout | undefined;
-        await Promise.race([...running.keys(), turns.poked(), new Promise<void>((res) => (timer = setTimeout(res, answers.pollMs)))]);
-        clearTimeout(timer);
-      }
+  for (;;) {
+    admitted.length = 0;
+    enqueueTaken(pending, (await answers?.take(canRun, Math.max(0, slots - holdingSlots(running) - pending.filter((q) => !blocked(q)).length))) ?? [], live, turns.hear);
+    turns.arm();
+    while (holdingSlots(running) < slots) {
+      const next = pending.findIndex((q) => !blocked(q));
+      if (next < 0) break;
+      start(pending.splice(next, 1)[0]!);
     }
-  } finally {
-    slowTimers.forEach((t) => clearTimeout(t));
+    if (running.size === 0) {
+      // Plus rien ne joue et chaque file restante attend une autre : le départ forcé laisse `runQueue` rendre ou garder en attente, comme avant.
+      if (!pending.length) break;
+      start(pending.shift()!);
+      continue;
+    }
+    pending.forEach(slow.watch);
+    if (!answers) await Promise.race([...running.keys(), turns.poked()]);
+    else {
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([...running.keys(), turns.poked(), new Promise<void>((res) => (timer = setTimeout(res, answers.pollMs)))]);
+      clearTimeout(timer);
+    }
   }
 }

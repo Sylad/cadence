@@ -21,14 +21,14 @@ import { AddFeed, addToLive, openInRepo, type AddAsk, type KnownLot, type Launch
 import { takeIntegrations } from './integration-vivante.js';
 import { repoBranch } from './integrate.js';
 import { baseBranchOf, keptLines, legacyLotSlug, lotBranch, lotTreeDir, planFileSet, recoverTree, stalenessText } from './worktree.js';
-import { excludeState, lotFinished, lotKey, lotRepoPaths, RunStore, type LotState, type WaveState } from './state.js';
+import { applyAnswer, excludeState, lotFinished, lotKey, lotRepoPaths, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin } from './node-env.js';
 import { endOfWaveLines } from '../inspect-read.js';
 import { launchCost, quotaText, renderTable, resumeCommand } from './table.js';
 import { agentsOf, preflight, projectEnv, resolveTargets, type Target } from './preflight.js';
 import { dryRun } from './dry-run.js';
 import { repoHolds, updateWaveReposSafe } from './cycle/depot-partage.js';
-import { takeAnswerNote } from './cycle/plan-writes.js';
+import { noteTakenAnswers } from './cycle/plan-writes.js';
 import { draw } from './draw.js';
 import { control, duration, liveStore, maxSessions } from './status.js';
 import type { OrchestrateDeps, OrchestrateIo } from './command.js';
@@ -296,8 +296,6 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
   const refill = async (canRun: (c: LotCtx) => boolean, vacantLanes: number): Promise<LotCtx[]> =>
     fillsFreeSlots(args) && vacantLanes > 0 ? adds.fill(fillTargetsSafe({ args, io, launch, home, store, all, budget, quotaHit: wctx.quota.hit, incident: !!wctx.incident }, wctx.log), vacantLanes, canRun) : [];
   try {
-    // L670 : une réponse déposée par `--resume --answer` est notée sur le lot au départ de la vague, avant toute attente de créneau.
-    for (const c of ctxs) if (c.lot.pendingAnswer) await takeAnswerNote(c, true);
     await runPool(ctxs, cap, all, (c) => {
       // Un lot rendu ou en échec garde son worktree et sa branche (R12) : le journal en donne le chemin.
       if (c.tree?.active && c.lot.status !== 'ready') wctx.log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : worktree conservé : ${c.tree.dir} (branche ${c.tree.branch})`);
@@ -322,19 +320,17 @@ export async function execute(wave: WaveState, lots: LotState[], store: RunStore
             wctx.log(`${e.lot} : réponse écartée (${why})`);
             store.markAnswerTaken(e.id);
           } else if (c && canRun(c)) {
-            c.lot.pendingAnswer = e.text;
-            c.lot.answers.push(e.text);
-            c.lot.questions = [];
+            applyAnswer(c.lot, e.text);
             store.writeLot(c.lot);
             store.markAnswerTaken(e.id);
             wctx.log(`${e.lot} : réponse du lead prise, le lot repart`);
-            // L670 : la réponse est notée sur le lot maintenant, pas au départ de sa session suivante (qui peut attendre un créneau longtemps : L477, 18,6 min).
-            await takeAnswerNote(c, true);
             // Le lot avait fini de jouer à sa question (`settled`) : il rejoue, il tient de nouveau un créneau — sans cela `lanes()` le sous-compte et le registre annonce un créneau libre de trop (L433).
             settled.delete(c);
             taken.push(c);
           }
         }
+        // L670 : la réponse est notée sur le lot à ce tour (prise ici, ou déposée par --resume --answer), pas au départ de sa session suivante, qui peut attendre un créneau longtemps (L477 : 18,6 min).
+        await noteTakenAnswers(ctxs);
         // L532 : les intégrations déposées par `--resume --integrate` pendant la vague sont reprises de la même façon, au tour où le lot peut jouer.
         taken.push(...(await takeIntegrations({ store, ctxs, wctx, settled }, canRun)));
         if (taken.length) {

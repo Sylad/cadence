@@ -15,7 +15,7 @@ import { trackedDirty } from './depot.js';
 import { adoptLeadReview, depositIntegrations, depositsOnly, integrationText, runsElsewhere } from './integration-vivante.js';
 import { mainTreeWorkers } from './main-tree.js';
 import { baseBranchOf, keptLines, lotBranch, lotTreeDir } from './worktree.js';
-import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState, type WaveState } from './state.js';
+import { applyAnswer, lotFinished, lotKey, lotRepoPaths, RunStore, type LotState, type WaveState } from './state.js';
 import { projectEnv } from './preflight.js';
 import { relitObjectifs } from './reprise-objectif.js';
 import { linkNodeBin, nvmVersionsDir, resolveNode, type NodeChoice } from './node-env.js';
@@ -139,11 +139,7 @@ export async function resume(args: Args, argv: string[], io: OrchestrateIo, deps
     const l = lots.find((x) => namesLot(launch, a, x));
     if (!l) refusals.push(`--answer ${a.project ? `${a.project}:` : ''}${a.lot} : lot inconnu dans la vague ${wave.id}`);
     else if (l.status !== 'question') refusals.push(`--answer ${lotKey(l.project, l.lot)} : le lot n'attend pas de réponse (${l.status})`);
-    else {
-      l.pendingAnswer = a.text;
-      l.answers.push(a.text);
-      l.questions = [];
-    }
+    else applyAnswer(l, a.text);
   }
   // --resume --drop projet:lot (L79) : le lot est retiré avant d'être rejoué — le seul moyen de retirer un lot d'une vague arrêtée, --drop seul refusant une vague qui ne tourne plus.
   const drops: string[] = [];

@@ -292,6 +292,12 @@ export const lotRepoPaths = (l: Pick<LotState, 'repo' | 'repos'>): string[] => [
 /** Les dépôts voisins du lot, donnés en `--add-dir` à ses sessions. */
 export const neighbourDirs = (l: Pick<LotState, 'repos'>): string[] => (l.repos ?? []).map((r) => r.path);
 
+/** La réponse du lead appliquée au lot (L407, `--resume --answer`) : elle part dans le brief de sa session suivante, la question est close. */
+export function applyAnswer(l: LotState, text: string): void {
+  l.pendingAnswer = text;
+  l.answers.push(text);
+  l.questions = [];
+}
 export const lotKey = (project: string, lot: string) => `${project}:${lot}`;
 /** Nom de dossier d'un lot dans la vague : le « / » d'un id de sous-tâche (`Q4/accueil-4-ux12`) ou d'un projet imbriqué (`groupe/gamma`) devient « __ » ; sans « / » le nom est inchangé. */
 /** Racine des TMPDIR de session : `os.tmpdir()`, ou `/tmp` quand celui-ci est trop long pour laisser 60 caractères sous la limite de 107 des sockets Unix. */

@@ -12,7 +12,7 @@ import { hypothesisNote } from '../spec.js';
 import { type LotState, lotKey } from '../state.js';
 import { repoBranch, takeRepoWrite, WAIT_LOG_MS } from '../integrate.js';
 import { git, trackedDirty } from '../worktree.js';
-import { type LotCtx, transition, stop, propose } from './ctx.js';
+import { type LotCtx, transition, stop, propose, setWaitsTurn } from './ctx.js';
 
 /** Fichiers suivis modifiés (chemins décodés), d'après `git status --porcelain` : un nom accentué ou à espace y est cité en C-quoting, il en sort tel que le disque le nomme (L614). */
 export function trackedPaths(s: Snapshot): string[] {
@@ -147,20 +147,37 @@ export async function noteAnswer(c: LotCtx, answer: string): Promise<void> {
 }
 
 /**
- * La réponse du lead en attente est notée à la prise du lot (L670) : execute.ts l'appelle quand la file des demandes prend la réponse (ou au départ de la vague, pour une réponse de `--resume --answer`),
- * avant que le lot attende un créneau du pool ; `runLot` le rappelle au départ du passage, pour une réponse arrivée autrement, et une note déjà en cours (`c.answerNoted`) n'est pas relancée.
+ * La réponse du lead en attente est notée à la prise du lot (L670) : `noteTakenAnswers` l'appelle à chaque tour de la file des demandes (execute.ts), donc dès la prise, et au premier tour pour une réponse de
+ * `--resume --answer`, avant que le lot attende un créneau du pool ; `runLot` le rappelle au départ du passage, pour une réponse arrivée autrement. La même réponse déjà en note (`c.answerNoted.text`) n'est pas relancée.
  * Dans le dépôt lui-même, l'écriture est attendue (elle salirait l'arbre où la session écrit) ; en worktree elle peut attendre le dépôt (une intégration le tient) : la session ne l'attend pas,
- * et `runLot` attend `c.answerNoted.end` à la fin du passage, le créneau du lot rendu si la note attend encore (`done`).
+ * `awaitAnswerNote` l'attend à la fin du passage.
  */
 export async function takeAnswerNote(c: LotCtx, atTake = false): Promise<void> {
+  const answer = c.lot.pendingAnswer;
   // À la prise (`atTake`), un lot à l'étape accept n'est pas noté : le programme peut consommer la réponse lui-même (acceptation déjà verte, elle ne va ni au brief ni aux notes) ; l'étape accept la note quand elle la passe à une session.
-  if (!c.lot.pendingAnswer || c.answerNoted || (atTake && c.lot.next === 'accept')) return;
-  const note = { end: Promise.resolve(), done: false };
-  note.end = noteAnswer(c, c.lot.pendingAnswer).then(() => {
+  if (!answer || c.answerNoted?.text === answer || (atTake && c.lot.next === 'accept')) return;
+  const note = { text: answer, end: Promise.resolve(), done: false };
+  note.end = noteAnswer(c, answer).then(() => {
     note.done = true;
   });
   c.answerNoted = note;
   if (!c.tree) await note.end;
+}
+
+/** L670 : à chaque tour de la file des demandes, les lots dont une réponse du lead attend sont notés (prise à ce tour, ou déposée par `--resume --answer` au premier tour), avant toute attente de créneau. */
+export async function noteTakenAnswers(ctxs: LotCtx[]): Promise<void> {
+  for (const c of ctxs) await takeAnswerNote(c, true);
+}
+
+/** L670 : la fin du passage du lot attend sa note encore en cours ; le lot rend son créneau pendant cette attente sans session (`waitsTurn`, comme une intégration, L591). Une réponse suivante aura sa propre note. */
+export async function awaitAnswerNote(c: LotCtx): Promise<void> {
+  const note = c.answerNoted;
+  if (note && !note.done) {
+    setWaitsTurn(c, true);
+    await note.end;
+    setWaitsTurn(c, false);
+  }
+  c.answerNoted = undefined;
 }
 
 /**

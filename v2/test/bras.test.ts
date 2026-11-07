@@ -85,14 +85,12 @@ describe('lancerBras', () => {
     expect(lancerBras(b, d, clone, () => ({ stdout: '{}', code: 0 })).echec).toBe('session_id absent');
   });
 
-  it('sortie illisible : l erreur de l exécuteur figure dans le message', () => {
+  it('sortie illisible : pas d exception, echec avec la cause et la fin de la sortie', () => {
     const { b, clone } = bancTest();
-    expect(() => lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, () => ({ stdout: '', code: 1, erreur: 'SIGKILL' }))).toThrow(/SIGKILL/);
-  });
-
-  it('sortie illisible : erreur avec la fin de la sortie', () => {
-    const { b, clone } = bancTest();
-    expect(() => lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, () => ({ stdout: 'boum', code: 1 }))).toThrow(/boum/);
+    const d = { nom: 'A', modele: 'opus', brief };
+    const m = lancerBras(b, d, clone, () => ({ stdout: 'boum', code: 1 }));
+    expect(m).toMatchObject({ echec: 'sortie illisible (code 1) : boum', tokens: 0, cout_usd: 0, sessions: [] });
+    expect(lancerBras(b, d, clone, () => ({ stdout: '', code: 1, erreur: 'SIGKILL' })).echec).toBe('sortie illisible (SIGKILL) : ');
   });
 
   it('environnement neutre : pas de kube, pas de jeton, pas de prod maritime', () => {

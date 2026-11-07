@@ -32,7 +32,7 @@ function lire(e: { stdout: string; code: number; erreur?: string }): { session: 
   try {
     j = JSON.parse(e.stdout);
   } catch {
-    throw new Error(`sortie de claude illisible : ${e.stdout.slice(-400)}${e.erreur ? ` (${e.erreur})` : ''}`);
+    return { session: '', tokens: 0, cout: 0, echec: `sortie illisible (${e.erreur ?? `code ${e.code}`}) : ${e.stdout.slice(-200)}` };
   }
   const tokens = Object.values(j.modelUsage ?? {}).reduce((n, u) =>
     n + (u.inputTokens ?? 0) + (u.outputTokens ?? 0) + (u.cacheReadInputTokens ?? 0) + (u.cacheCreationInputTokens ?? 0), 0);

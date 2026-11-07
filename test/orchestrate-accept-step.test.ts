@@ -221,13 +221,14 @@ describe('étape accept : où elle s’insère', () => {
     expect(kinds(h)).toEqual(['implement', 'review']);
   });
 
-  it('L233 — la réponse du lead à une question d’accept (« ne réécris rien ») n’est pas reportée dans le brief d’implement', async () => {
+  it('L233 — la réponse du lead à une question d’accept (« ne réécris rien ») n’atteint le brief d’implement que par les notes du lot, une fois (L670), pas en bloc « Answer from the human »', async () => {
     const { h, c, vert } = verteEnQuestion();
     questionPosee(c, h, vert);
     expect(c.lot.pendingAnswer).toBe('ne réécris rien');
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
-    expect(h.calls[0].brief).not.toContain('ne réécris rien');
+    expect(h.calls[0].brief?.split('ne réécris rien').length).toBe(2);
+    expect(h.calls[0].brief).toContain('Réponse du lead (vague w1');
     expect(h.calls[0].brief).not.toContain('Answer from the human');
     expect(c.lot.pendingAnswer).toBeNull();
   });

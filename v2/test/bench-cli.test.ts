@@ -365,3 +365,19 @@ describe('banc invalide (I-5)', () => {
     expect(res('2-b').mesures.C.echec).toBeNull();
   });
 });
+
+describe('lecteur du HUD (BANC_READER)', () => {
+  const script = /BANC_READER = `\n([\s\S]*?)`/.exec(readFileSync(join(import.meta.dirname, '..', '..', 'plugins', 'cadence-hud', 'hooks', 'collect.ts'), 'utf8'))![1].replace(/\\\\n/g, '\\n');
+  const lire = (lock: string | null): string | null => {
+    const r = mkdtempSync(join(tmpdir(), 'banc-hud-'));
+    writeFileSync(join(r, 'en-cours.json'), '{"banc":"1-a"}');
+    if (lock !== null) writeFileSync(join(r, 'passage.lock'), lock);
+    return JSON.parse(execFileSync('python3', ['-I', '-c', script], { env: { ...process.env, BENCH_ROOT: r }, encoding: 'utf8' })).c;
+  };
+  it('en-cours.json n\'est rendu que si le verrou existe, son pid vit et le démarrage est le même', () => {
+    expect(lire(`${process.pid} 2026-11-09T09:00:00Z`)).toBe('{"banc":"1-a"}');
+    expect(lire('999999 2026-11-09T09:00:00Z')).toBeNull();
+    expect(lire(null)).toBeNull();
+    expect(lire(`${process.pid} 2026-11-09T09:00:00Z autre-demarrage`)).toBeNull();
+  });
+});

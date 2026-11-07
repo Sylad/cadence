@@ -40,7 +40,7 @@ export const duree = (ms: number): string => {
 export const enCoursLine = (e: EnCours | null, now: number): { text: string; color: ThemeKey } | null => {
   if (!e) return null
   const bloque = now - Date.parse(e.phase_debut) > SIX_HEURES
-  const text = `banc ⟳ ${e.termines + 1}/${e.bancs_total} bancs · ${e.banc} #${e.repetition} · ${e.phase} · ${duree(now - Date.parse(e.phase_debut))} (depuis ${duree(now - Date.parse(e.debut))})${bloque ? ' · bloqué ?' : ''}`
+  const text = `banc ⟳ ${Math.min(e.termines + 1, e.bancs_total)}/${e.bancs_total} bancs · ${e.banc} #${e.repetition} · ${e.phase} · ${duree(now - Date.parse(e.phase_debut))} (depuis ${duree(now - Date.parse(e.debut))})${bloque ? ' · bloqué ?' : ''}`
   return { text, color: bloque ? 'warning' : 'claude' }
 }
 

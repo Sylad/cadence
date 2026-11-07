@@ -381,9 +381,23 @@ try:
 except OSError:
     pass
 try:
+    # un en-cours.json sans passage vivant (SIGKILL, arrêt de WSL) n'est pas un passage en cours : le verrou doit exister, son pid vivre, son démarrage correspondre
+    with open(os.path.join(root, 'passage.lock'), encoding='utf-8') as f:
+        parts = f.read().split(' ')
+    os.kill(int(parts[0]), 0)
+    try:
+        with open('/proc/sys/kernel/random/boot_id', encoding='utf-8') as f:
+            boot = f.read().strip()
+    except OSError:
+        boot = ''
+    if len(parts) > 2 and parts[2].strip() and boot and parts[2].strip() != boot:
+        raise OSError('autre démarrage')
     with open(os.path.join(root, 'en-cours.json'), encoding='utf-8') as f:
         c = f.read()
-except OSError:
+except PermissionError:
+    with open(os.path.join(root, 'en-cours.json'), encoding='utf-8') as f:
+        c = f.read()
+except (OSError, ValueError, IndexError):
     pass
 print(json.dumps({'h': h, 'c': c}))
 `

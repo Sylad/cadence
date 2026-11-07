@@ -78,7 +78,7 @@ type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: strin
 
 export function passage(o: OptPassage): Verdict & { eclair_ok?: boolean } {
   const liberer = verrouiller(o.racine);
-  try { return passageVerrouille(o); } finally { rmSync(join(o.racine, 'en-cours.json'), { force: true }); liberer(); }
+  try { return passageVerrouille(o); } finally { try { rmSync(join(o.racine, 'en-cours.json'), { force: true }); } finally { liberer(); } }
 }
 
 function passageVerrouille(o: OptPassage): Verdict & { eclair_ok?: boolean } {

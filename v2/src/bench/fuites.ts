@@ -43,6 +43,7 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
     if (d.type !== 'assistant') continue;
     for (const c of d.message?.content ?? []) {
       if (c.type !== 'tool_use') continue;
+      if (c.name === 'Bash' && typeof d.cwd === 'string' && isAbsolute(d.cwd)) juger(resolve(d.cwd));
       const cmd = (c.input as { command?: unknown } | undefined)?.command;
       const sources: [string, boolean][] = [...[...textes(c.input)].map((t): [string, boolean] => [t, false]),
         ...(c.name === 'Bash' && typeof cmd === 'string' ? [[cmd, true] as [string, boolean]] : [])];

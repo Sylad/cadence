@@ -41,6 +41,12 @@ describe('fuites', () => {
   it('cwd persistant de la ligne : cat ../../../../secrets/... (cinq niveaux) depuis <clone>/frontend est une fuite', () => {
     expect(chercherFuites([avecCwd(`${C}/frontend`, { command: 'cat ../../../../../secrets/1-t/attendu.md' })], r, H, C)).toEqual([S]);
   });
+  it('cwd de la ligne dans un dossier interdit : fuite, même pour une lecture sans chemin', () => {
+    expect(chercherFuites([avecCwd(`${H}/bench-cadence/secrets/1-t`, { command: 'cat attendu.md' })], r, H, C)).toEqual([`${H}/bench-cadence/secrets/1-t`]);
+  });
+  it('cwd de la ligne dans le clone : pas de fuite', () => {
+    expect(chercherFuites([avecCwd(`${C}/frontend`, { command: 'ls' })], r, H, C)).toEqual([]);
+  });
   it('chemins relatifs, « .. », cd, ${HOME} et accolades', () => {
     expect(chercherFuites([appel({ command: 'cat ../../../../secrets/1-t/attendu.md' })], r, H, C)).toEqual([S]);
     expect(chercherFuites([appel({ file_path: `${C}/../A2/x` })], r, H, C)).toEqual([`${H}/bench-cadence/runs/r1/1-t/A2/x`]);

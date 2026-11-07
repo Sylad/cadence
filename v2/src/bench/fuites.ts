@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 export interface Regles { autorises: string[]; interdits: string[] }
 
@@ -18,20 +18,41 @@ function* textes(v: unknown): Generator<string> {
   else if (v && typeof v === 'object') for (const x of Object.values(v)) yield* textes(x);
 }
 
-const CHEMIN = /(?:~|\$HOME|\/home\/[^/\s'"`]+)(\/[^\s'"`;|&<>(){}]*)/g;
 const sous = (p: string, prefixes: string[]) => prefixes.some((x) => p === x || p.startsWith(`${x}/`));
 
-export function chercherFuites(lignes: string[], r: Regles, home: string): string[] {
+function accolades(t: string): string[] {
+  const m = /^(.*?)\{([^{}$]*,[^{}]*)\}(.*)$/s.exec(t);
+  return m ? m[2].split(',').flatMap((x) => accolades(m[1] + x + m[3])) : [t];
+}
+
+// Chemin absolu du jeton (~, $HOME, absolu, ou relatif à cwd s'il contient « / » ou « .. »), sinon null.
+function resoudre(tok: string, cwd: string, home: string, cd = false): string | null {
+  const t = tok.replace(/(?<![./])\.+$/, '').replace(/[,:]+$/, '');
+  if (/^(~|\$HOME)(\/|$)/.test(t)) return resolve(home, t.replace(/^(~|\$HOME)\/?/, ''));
+  if (t.startsWith('/')) return resolve(t);
+  return cd || t.includes('/') || t === '..' ? resolve(cwd, t) : null;
+}
+
+export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = ''): string[] {
   const vus = new Set<string>();
+  const juger = (p: string | null) => { if (p && sous(p, r.interdits) && !sous(p, r.autorises)) vus.add(p); };
+  const depart = cwd || r.autorises[0];
   for (const l of lignes) {
     let d: { type?: string; message?: { content?: { type: string; input?: unknown }[] } };
     try { d = JSON.parse(l); } catch { continue; }
     if (d.type !== 'assistant') continue;
     for (const c of d.message?.content ?? []) {
       if (c.type !== 'tool_use') continue;
-      for (const t of textes(c.input)) for (const m of t.matchAll(CHEMIN)) {
-        const p = (m[0].startsWith('/home/') ? m[0] : home + m[1]).replace(/[.,:]+$/, '');
-        if (sous(p, r.interdits) && !sous(p, r.autorises)) vus.add(p);
+      for (const texte of textes(c.input)) {
+        let dir = depart;
+        for (const seg of texte.replace(/\$\{HOME\}/g, '$HOME').split(/&&|\|\||;|\n/)) {
+          for (const v of accolades(seg)) {
+            const cd = /^\s*cd\s+(\S+)/.exec(v);
+            const cible = cd ? resoudre(cd[1].replace(/^['"]|['"]$/g, ''), dir, home, true) : null;
+            for (const tok of v.split(/[\s'"`|&<>(){}=]+/)) juger(resoudre(tok, dir, home));
+            if (cible) dir = cible;
+          }
+        }
       }
     }
   }
@@ -48,5 +69,5 @@ function jsonl(dir: string): string[] {
 
 export function fuitesDuBras(home: string, racine: string, banc: string, clone: string): string[] {
   const lignes = jsonl(dossierTranscripts(home, clone)).flatMap((f) => readFileSync(f, 'utf8').split('\n'));
-  return chercherFuites(lignes, reglesDuBras(home, racine, banc, clone), home);
+  return chercherFuites(lignes, reglesDuBras(home, racine, banc, clone), home, clone);
 }

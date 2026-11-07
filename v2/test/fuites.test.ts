@@ -1,5 +1,8 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { chercherFuites, dossierTranscripts, reglesDuBras } from '../src/bench/fuites.js';
+import { chercherFuites, fuitesDuBras, dossierTranscripts, reglesDuBras } from '../src/bench/fuites.js';
 
 const H = '/home/u';
 const appel = (input: object) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input }] } });
@@ -26,5 +29,26 @@ describe('fuites', () => {
   });
   it('nom du dossier de transcripts de Claude Code', () => {
     expect(dossierTranscripts('/h', '/h/bench-cadence/runs/r_1/A')).toBe('/h/.claude/projects/-h-bench-cadence-runs-r-1-A');
+  });
+  const C = `${H}/bench-cadence/runs/r1/1-t/A`;
+  const S = `${H}/bench-cadence/secrets/1-t/attendu.md`;
+  it('chemins relatifs, « .. », cd, ${HOME} et accolades', () => {
+    expect(chercherFuites([appel({ command: 'cat ../../../../secrets/1-t/attendu.md' })], r, H, C)).toEqual([S]);
+    expect(chercherFuites([appel({ file_path: `${C}/../A2/x` })], r, H, C)).toEqual([`${H}/bench-cadence/runs/r1/1-t/A2/x`]);
+    expect(chercherFuites([appel({ command: 'cd ~/bench-cadence && cat secrets/1-t/attendu.md' })], r, H, C)).toEqual([S]);
+    expect(chercherFuites([appel({ command: 'cat ${HOME}/bench-cadence/secrets/1-t/a' })], r, H, C)).toEqual([`${H}/bench-cadence/secrets/1-t/a`]);
+    expect(chercherFuites([appel({ command: 'ls ~/bench-cadence/{secrets,x}/f' })], r, H, C)).toEqual([`${H}/bench-cadence/secrets/f`]);
+    expect(chercherFuites([appel({ command: 'cd ../../../../secrets' })], r, H, C)).toEqual([`${H}/bench-cadence/secrets`]);
+  });
+  it('cd dans son clone puis « .. » restant dedans : permis', () => {
+    expect(chercherFuites([appel({ command: 'cd frontend && cat ../package.json' })], r, H, C)).toEqual([]);
+  });
+  it('fuitesDuBras lit aussi les transcripts de sous-agents', () => {
+    const home = mkdtempSync(join(tmpdir(), 'fu-'));
+    const clone = `${home}/bench-cadence/runs/r1/1-t/A`;
+    const dir = `${dossierTranscripts(home, clone)}/sess/subagents`;
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(`${dir}/agent-x.jsonl`, appel({ command: `cat ${home}/bench-cadence/secrets/1-t/a` }) + '\n');
+    expect(fuitesDuBras(home, `${home}/bench-cadence`, '1-t', clone)).toEqual([`${home}/bench-cadence/secrets/1-t/a`]);
   });
 });

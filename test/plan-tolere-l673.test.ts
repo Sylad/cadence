@@ -1,4 +1,4 @@
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { git, harness } from './orchestrate-harness.js';
@@ -54,5 +54,39 @@ describe('L673 — toleratedDirty', () => {
     const tolerated = toleratedDirty(c, 'lot');
     expect(leadMoved(h.repo, 'main', tolerated)).toBe('le dépôt est sur ailleurs et non sur main');
     expect(tolerated('autre.txt')).toBe(false);
+  });
+  it('L664 — le plan renommé par le lot (git mv) : l\'ancien chemin, modifié chez le lead, n\'est pas toléré (le diff compte les deux chemins)', () => {
+    const { h, c } = lotTree(false);
+    git(h.repo, 'checkout', '-q', 'lot');
+    git(h.repo, 'mv', PLAN, '.cadence/raf-ancien.yaml');
+    git(h.repo, 'commit', '-q', '-m', 'feat(L1): plan déplacé');
+    git(h.repo, 'checkout', '-q', 'main');
+    appendFileSync(join(h.repo, PLAN), '# ajout du lead\n');
+    const tolerated = toleratedDirty(c, 'lot');
+    expect(tolerated(PLAN)).toBe(false);
+    expect(leadMoved(h.repo, 'main', tolerated)).toMatch(/arbre du dépôt modifié \(\.cadence\/raf\.yaml\)/);
+  });
+  it('L664 — diff du lot illisible (base disparue) : rien n\'est toléré, le refus nomme le plan comme avant L673', () => {
+    const { h, c } = lotTree(false);
+    appendFileSync(join(h.repo, PLAN), '# ajout du lead\n');
+    const tolerated = toleratedDirty({ ...c, tree: { ...c.tree!, base: 'disparue' } }, 'lot');
+    expect(tolerated(PLAN)).toBe(false);
+    expect(leadMoved(h.repo, 'main', tolerated)).toMatch(/arbre du dépôt modifié \(\.cadence\/raf\.yaml\)/);
+  });
+  it('L664 — un fichier tenu avec le plan au nom accentué que le lot touche : refusé (le diff le nomme comme le disque, sans C-quoting)', () => {
+    const h = harness();
+    const kept = 'étapes.md';
+    writeFileSync(join(h.repo, kept), 'v1\n');
+    git(h.repo, 'add', '--', kept);
+    git(h.repo, 'commit', '-q', '-m', 'chore: fichier tenu');
+    git(h.repo, 'checkout', '-q', '-b', 'lot');
+    appendFileSync(join(h.repo, kept), 'par le lot\n');
+    git(h.repo, 'commit', '-q', '-am', 'feat(L1): étapes');
+    git(h.repo, 'checkout', '-q', 'main');
+    const c = Object.assign(h.lot('L1'), { tree: { dir: h.repo, branch: 'lot', base: 'main', active: true } });
+    const loadPlan = c.loadPlan;
+    c.loadPlan = () => Object.defineProperty(loadPlan(), 'maintained', { value: [kept] });
+    const tolerated = toleratedDirty(c, 'lot');
+    expect(tolerated(kept)).toBe(false);
   });
 });

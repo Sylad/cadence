@@ -11,7 +11,8 @@ import { RunStore } from '../src/orchestrate/state.js';
 import { cadenceHome, liveSlots, liveWaves, registerWave } from '../src/orchestrate/registry.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
 import { branches, conflictWave, fake, inWorktree, lotOf, meeting, planOf, run, setup, sharedFile, store, subjects, writes } from './orchestrate-worktree-harness.js';
-import { leadMoved, lotDiff } from '../src/orchestrate/cycle/plan-writes.js';
+import { leadMoved } from '../src/orchestrate/cycle/plan-writes.js';
+import { diffFiles } from '../src/orchestrate/lot-diff.js';
 import { parseOrchestrateArgs } from '../src/orchestrate/command.js';
 import { tempDir } from './helpers.js';
 
@@ -279,8 +280,8 @@ describe('L673 — le plan modifié du lead pendant l\'intégration ne la refuse
     git(repo, 'commit', '-q', '-m', 'feat(L1): scellé');
     git(repo, 'checkout', '-q', 'main');
     appendFileSync(join(repo, 'base.txt'), 'sale\n');
-    expect(lotDiff(repo, 'main', 'lot')).toEqual(new Set(['seal.json']));
-    expect(leadMoved(repo, 'main', (f) => f === 'base.txt' && !lotDiff(repo, 'main', 'lot').has(f))).toBeNull();
+    expect(diffFiles(repo, 'main', 'lot')).toEqual({ files: ['seal.json'], failure: null });
+    expect(leadMoved(repo, 'main', (f) => f === 'base.txt' && !diffFiles(repo, 'main', 'lot').files.includes(f))).toBeNull();
     expect(leadMoved(repo, 'main', () => true)).toBeNull();
     expect(leadMoved(repo, 'main', (f) => f !== 'base.txt')).toMatch(/arbre du dépôt modifié \(base\.txt\)/);
     expect(leadMoved(repo, 'main')).toMatch(/arbre du dépôt modifié \(base\.txt\)/);

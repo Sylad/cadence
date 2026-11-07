@@ -12,6 +12,7 @@ import { hypothesisNote } from '../spec.js';
 import { type LotState, lotKey } from '../state.js';
 import { repoBranch, takeRepoWrite, WAIT_LOG_MS } from '../integrate.js';
 import { git, trackedDirty } from '../worktree.js';
+import { diffFiles, type LotDiff } from '../lot-diff.js';
 import { type LotCtx, transition, stop, propose, setWaitsTurn } from './ctx.js';
 
 /** Fichiers suivis modifiés (chemins décodés), d'après `git status --porcelain` : un nom accentué ou à espace y est cité en C-quoting, il en sort tel que le disque le nomme (L614). */
@@ -226,20 +227,20 @@ export function foreignDirty(c: LotCtx): string[] {
   return trackedDirty(c.lot.repo).filter((f) => !ownFile(f));
 }
 
-/** Les fichiers que la branche du lot change par rapport à sa base (depuis leur ancêtre commun) : le diff que l'avance apporterait au dépôt du lead. */
-export function lotDiff(repo: string, base: string, branch: string): Set<string> {
-  return new Set(git(repo, '-c', 'core.quotepath=off', 'diff', '--name-only', '-z', `${base}...${branch}`).split('\0').filter(Boolean));
-}
-
 /**
  * Les fichiers modifiés du dépôt du lead que l'intégration du lot laisse passer (L673) : ceux du plan ou tenus avec lui (un `raf add` ou `raf done` du lead pendant la vague,
- * que le commit du plan emporte avec lui), tant que le diff du lot ne les touche pas. Tout autre fichier modifié reste un refus (R26).
+ * que le commit du plan emporte avec lui), tant que le diff du lot ne les touche pas. Tout autre fichier modifié reste un refus (R26). Le diff est celui de `lot-diff.ts`
+ * (`diffFiles`, renommages comptés sous les deux chemins) ; illisible, rien n'est toléré : le refus nomme le fichier, comme avant L673.
  */
 export function toleratedDirty(c: LotCtx, branch: string): (f: string) => boolean {
   const ownFile = planOwnFile(c, c.lot.repo);
   // Le diff n'est lu qu'au premier fichier du plan trouvé sale : un dépôt propre, ou déjà sur une autre branche (refus nommé par `leadMoved`), n'en paie ni la lecture ni l'échec.
-  let diff: Set<string> | undefined;
-  return (f) => ownFile(f) && !(diff ??= lotDiff(c.lot.repo, c.tree!.base, branch)).has(f);
+  let diff: LotDiff | undefined;
+  return (f) => {
+    if (!ownFile(f)) return false;
+    diff ??= diffFiles(c.lot.repo, c.tree!.base, branch);
+    return diff.failure === null && !diff.files.includes(f);
+  };
 }
 
 /**

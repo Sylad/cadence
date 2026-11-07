@@ -11,21 +11,30 @@ export interface LotDiff {
 const none = (): LotDiff => ({ files: [], failure: null });
 
 /**
- * Les fichiers des COMMITS de la branche d'un lot depuis le point de départ de sa base (R6) : `git diff --name-only --no-renames <merge-base>..<branche>`,
- * un renommage comptant l'ancien et le nouveau chemin ; rien de ce qui n'est pas commité. Branche absente ou sans clé `cadence-base` : diff vide,
- * sans cause. Git qui échoue (base disparue ou renommée, merge-base vide, dépôt illisible) : diff vide avec la cause (R12), jamais une exception.
+ * Les fichiers que la branche d'un lot change depuis le point de départ de sa base : `git diff --name-only --no-renames <merge-base>..<branche>`, un renommage
+ * comptant l'ancien et le nouveau chemin (un `git mv` du plan ou d'une acceptation sinon n'y laisserait que le nouveau, et `merge --ff-only` échouerait sur
+ * l'ancien, modifié chez le lead), chemins tels que le disque les nomme (`core.quotepath=off`, un nom accentué n'est pas cité). Git qui échoue (base disparue
+ * ou renommée, merge-base vide, dépôt illisible) : diff vide avec la cause (R12), jamais une exception. L673 : la lecture que `toleratedDirty` partage.
+ */
+export function diffFiles(repo: string, base: string, branch: string): LotDiff {
+  try {
+    const start = git(repo, 'merge-base', `refs/heads/${branch}`, `refs/heads/${base}`);
+    if (!start) return { files: [], failure: 'git merge-base ne rend rien' };
+    return { files: git(repo, '-c', 'core.quotepath=off', 'diff', '--name-only', '--no-renames', `${start}..refs/heads/${branch}`).split('\n').filter(Boolean), failure: null };
+  } catch (e) {
+    return { files: [], failure: gitFailure(e) };
+  }
+}
+
+/**
+ * Les fichiers des COMMITS de la branche d'un lot depuis le point de départ de sa base (R6, `diffFiles`) ; rien de ce qui n'est pas commité. Branche absente
+ * ou sans clé `cadence-base` : diff vide, sans cause.
  */
 export function lotDiff(repo: string, branch: string): LotDiff {
   if (!branchExists(repo, branch)) return none();
   const base = baseBranchOf(repo, branch);
   if (base === null) return none();
-  try {
-    const start = git(repo, 'merge-base', `refs/heads/${branch}`, `refs/heads/${base}`);
-    if (!start) return { files: [], failure: 'git merge-base ne rend rien' };
-    return { files: git(repo, 'diff', '--name-only', '--no-renames', `${start}..refs/heads/${branch}`).split('\n').filter(Boolean), failure: null };
-  } catch (e) {
-    return { files: [], failure: gitFailure(e) };
-  }
+  return diffFiles(repo, base, branch);
 }
 
 /**

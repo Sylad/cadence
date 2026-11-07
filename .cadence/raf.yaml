@@ -2987,11 +2987,12 @@ lots:
     started: 2026-11-07
   - id: L669
     title: "test/changelog.test.ts hermétique aux tags : le test lit `git tag --list v*` (global, changelog.test.ts:21,34) donc chaque tag du lead rougit tous les worktrees de vague ; ne lire que `git tag --merged HEAD` ; 07-11 : v1.61.0 posé à 00:11:40Z, L477 bloqué (≥ 10,8 min, session fable de 33,6 min sans commit) ; niveau : source (test), niveau le plus tôt : source ; mesure : 0 test de CHANGELOG rouge dans un worktree après un tag du lead"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-07
     started: 2026-11-07
     review: { date: 2026-11-07, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-07-0800, 0 passe(s) de correction)", commit: 10bf41cbd834eb99de61e43b8f77c21009e7ac5d, reporte: { de: c0f7ad7f3b522b323399d366a777c5d5a77c63d9, vers: 10bf41cbd834eb99de61e43b8f77c21009e7ac5d, patchId: 062a4ea93528eafb92bbc23841acd526a972ee41 } }
+    finished: 2026-11-07
   - id: L670
     title: "Attente silencieuse après réponse du lead : « réponse prise, le lot repart » puis 18,6 et 18,7 min sans ligne (L477, 21:31:37 à 21:50:16 et 22:33:36 à 22:52:18, 37,3 min) ; la reprise attend une ressource inconnue ; toute attente > 10 s écrit au journal ce qu'elle attend, puis supprimer la cause ; et le programme inscrit la réponse du lead dans les notes du lot à sa prise (la 2e question de L477, 32,9 min, venait de « aucune trace écrite dans les notes ») ; niveau : source (notes écrites à la prise), niveau le plus tôt : source ; mesure : 0 min entre réponse prise et session suivante hors créneau, 0 question sur une décision déjà répondue"
     status: doing

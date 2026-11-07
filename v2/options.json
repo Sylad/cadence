@@ -1,0 +1,12 @@
+{
+  "options": {
+    "bench --candidat": "docs/v2/2026-11-07-cadence-2-design.md",
+    "bench --reference": "docs/v2/2026-11-07-cadence-2-design.md",
+    "bench --juge": "docs/v2/2026-11-07-cadence-2-design.md",
+    "bench --bancs": "docs/v2/2026-11-07-cadence-2-design.md",
+    "bench --taille": "docs/v2/2026-11-07-cadence-2-design.md",
+    "bench --install": "docs/v2/2026-11-07-cadence-2-design.md",
+    "bench --tests": "docs/v2/2026-11-07-cadence-2-design.md",
+    "bench --visible": "docs/v2/2026-11-07-cadence-2-design.md"
+  }
+}

@@ -312,12 +312,6 @@ function atomicWrite(file: string, data: unknown): void {
 }
 
 /** `.cadence/runs/<vague>/` du dossier de lancement. */
-/** L'origine d'un lot de la file approuvée dans une ligne d'adds.log (L498), ou rien quand la ligne n'en porte pas. */
-function queueOrigin(raw: unknown): { queue?: { dir: string; key: string } } {
-  const q = raw as { dir?: unknown; key?: unknown } | undefined;
-  return typeof q?.dir === 'string' && typeof q.key === 'string' ? { queue: { dir: q.dir, key: q.key } } : {};
-}
-
 export class RunStore {
   readonly dir: string;
 
@@ -556,7 +550,7 @@ export class RunStore {
    * (nom de dossier depuis le dossier de lancement). La vague la relit entre deux étapes, comme celle des réponses.
    */
   addQueue(): { id: number; project?: string; lot: string; model?: string; goal?: string; budget?: number; queue?: { dir: string; key: string } }[] {
-    return this.queue('adds.log', (o) => (typeof o.lot === 'string' ? { lot: o.lot, ...(typeof o.project === 'string' ? { project: o.project } : {}), ...(typeof o.model === 'string' ? { model: o.model } : {}), ...(typeof o.goal === 'string' ? { goal: o.goal } : {}), ...(typeof o.budget === 'number' ? { budget: o.budget } : {}), ...queueOrigin(o.queue) } : null));
+    return this.queue('adds.log', (o) => (typeof o.lot === 'string' ? { lot: o.lot, ...(typeof o.project === 'string' ? { project: o.project } : {}), ...(typeof o.model === 'string' ? { model: o.model } : {}), ...(typeof o.goal === 'string' ? { goal: o.goal } : {}), ...(typeof o.budget === 'number' ? { budget: o.budget } : {}), ...((q: { dir?: unknown; key?: unknown } | undefined) => (typeof q?.dir === 'string' && typeof q.key === 'string' ? { queue: { dir: q.dir, key: q.key } } : {}))(o.queue as { dir?: unknown; key?: unknown } | undefined) } : null));
   }
 
   /** Dépose un lot à ajouter ; rend son numéro. `queue` (L498) : le lot vient de la file approuvée d'un dossier, poussé par une autre vague. */

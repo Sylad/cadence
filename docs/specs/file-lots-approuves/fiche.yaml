@@ -225,7 +225,7 @@ regles:
     tests: ["R19 — --continue avec un lot mûr en file et un lot prêt au plan : le lot de la file est tiré", "R19 — file sans lot mûr : le plan de --continue est tiré"]
   - id: R20
     cas: [C3, C4]
-    enonce: "Un seul lot de la file est tiré par créneau libéré ; deux créneaux libérés tirent deux lots, un chacun. Un lot poussé par --add compte pour le créneau du regard qui le pousse, et une vague ne pousse pas plus de lots dans une autre que celle-ci n'a de créneaux libres tant qu'elle ne les a pas pris."
+    enonce: "Un seul lot de la file est tiré par créneau libéré ; deux créneaux libérés tirent deux lots, un chacun. Un lot poussé par --add tient un créneau de la vague qui le pousse tant que la receveuse ne l'a pas pris (ses voies au registre inchangées) ni rendu — le plan ne remplit pas ce créneau —, et une vague ne pousse pas plus de lots dans une autre que celle-ci n'a de créneaux libres tant qu'elle ne les a pas pris."
     statut: sourcee
     source: "arbitrage du lead (01-11) : « un lot à la fois par créneau libéré »"
     tests: ["R20 — un créneau libéré, trois lots mûrs : un seul tiré", "R20 — deux créneaux libérés : deux lots tirés, un par créneau", "R20 — créneau libre d'une vague vivante, receveuse à deux voies libres, trois lots en file : deux poussés, le troisième attend"]

@@ -12,4 +12,5 @@ ExecStartPre=/bin/bash -c 'command -v node >/dev/null || { echo "cadence-banc : 
 ExecStartPre=/bin/bash -c 'c=$$(readlink -f "$$(command -v cadence2)"); case "$$c" in /home/sylvain_ladoire/projects/developpeur/cadence/v2/*) ;; *) echo "cadence-banc : cadence2 pointe sur « $$c » et non sur le checkout principal ; corriger : cd ~/projects/developpeur/cadence/v2 && npm run build && npm link" >&2; exit 1;; esac'
 ExecStartPre=/usr/bin/mkdir -p /home/sylvain_ladoire/bench-cadence
 ExecStart=/bin/bash -c 'cadence2 bench hebdo >> "$HOME/bench-cadence/hebdo.log" 2>&1'
-TimeoutStartSec=10h
+# Aucun délai global : 8 bancs et plus × N répétitions + juges dépassent 10 h ; chaque session de bras est bornée à 4 h, install et tests à 30 min (docs/v2/banc.md).
+TimeoutStartSec=infinity

@@ -2985,7 +2985,7 @@ lots:
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-07
-    review: { date: 2026-11-07, verdict: "conforme : le majeur de la revue courte (--since absent de docs/orchestrate.md:208 et de checkFollowFlags) est corrigé par 2d5a6e7c, relu par le lead ; test follow 16/16, tsc propre", commit: 2d5a6e7cabc4dfddfc823d756c8bf9663ca716c2 }
+    review: { date: 2026-11-07, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-07-0800, 0 passe(s) de correction)", commit: b9d440aa1cfa68bfef7671cad09b2419e240e751, reporte: { de: f8a66ed240a96c396526ab3580365f5f5f000638, vers: b9d440aa1cfa68bfef7671cad09b2419e240e751, patchId: 77e84f962e893d645e6e9876901eed861f62711f } }
   - id: L669
     title: "test/changelog.test.ts hermétique aux tags : le test lit `git tag --list v*` (global, changelog.test.ts:21,34) donc chaque tag du lead rougit tous les worktrees de vague ; ne lire que `git tag --merged HEAD` ; 07-11 : v1.61.0 posé à 00:11:40Z, L477 bloqué (≥ 10,8 min, session fable de 33,6 min sans commit) ; niveau : source (test), niveau le plus tôt : source ; mesure : 0 test de CHANGELOG rouge dans un worktree après un tag du lead"
     status: done

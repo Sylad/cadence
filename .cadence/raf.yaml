@@ -3027,6 +3027,7 @@ lots:
     estimate: 0.25
     created: 2026-11-07
     started: 2026-11-07
+    review: { date: 2026-11-07, verdict: "compliant: 0 blocking, 0 major. Les 5 interprétations de l'auteur tiennent face au lot et au code. Une note mineure : `--status` écrit « en attente de l'hôte » pour une attente locale. — orchestré (vague 2026-11-07-0800, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: 16ee9bdf0bf0f2a5ff5a52d81a9db33fa2bde98a }
   - id: L675
     title: "Skill deliver : dire ce que fait cadence deliver sans clé deliver: (07-11 : évaluation de la 1.61.0, cas livrer-sh-sans-bloc à 0,67, deux réponses sur trois écrivent « la skill ne décrit pas ce cas » et devinent) ; la skill le dit en une phrase, vérifiée sur le code réel ; mesure : livrer-sh-sans-bloc à 1,00 sur deux évaluations de suite"
     status: done

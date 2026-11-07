@@ -40,7 +40,7 @@ export function leadLine(line: string): boolean {
 export function checkFollowFlags(args: Args): void {
   const other = [args.lots.length > 0, args.status !== undefined, args.watch, args.resume !== undefined, args.continue, args.dryRun, args.waits, args.drop.length > 0, args.add.length > 0, args.stopAfterCurrent, args.integrate.length > 0, args.removeWorktree !== undefined, args.goal !== undefined, args.answers.length > 0, args.lotBudgets.length > 0, args.budget !== undefined];
   const refusals: [boolean, string][] = [
-    [args.follow && other.includes(true), "--follow ne se combine qu'avec --wave et --interval (il suit le journal d'une vague, il n'en pilote pas)"],
+    [args.follow && other.includes(true), "--follow ne se combine qu'avec --wave, --interval et --since (il suit le journal d'une vague, il n'en pilote pas)"],
     [args.watch && args.status === undefined, "--watch s'utilise avec --status"],
     [args.detail !== undefined && args.status === undefined, "--detail s'utilise avec --status"],
     [args.detail !== undefined && args.watch, "--detail ne se combine pas avec --watch (il donne le détail d'un lot, pas le tableau)"],

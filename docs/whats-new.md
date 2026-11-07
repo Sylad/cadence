@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.62.1**: republishes 1.62.0, whose npm publication failed on a wall-clock test (it carries the 1.62.0 content too); `citedResources` reads a title in linear time; two queue tests no longer depend on clock order.
 - **1.62.0**: `orchestrate queue` lets the lead approve an ordered list of lots once, drawn by any live wave; a wave resumed after days rebases its branch first; an integration tolerates a modified plan; `--follow` loses no line.
 - **1.61.0**: a stale kept branch is no longer recovered; `raf done` reads a verdict's start only; cadence's own gate overflows to a second machine; a fixed minor is no longer reopened; a test must not build a step's state by hand.
 - **1.60.0**: `--add` takes `--goal` and `--budget`, `--resume` rereads a changed goal; the probe skips diffs the gate cannot reach; `verify --gate` finds waves launched higher up; the lots panel shows sleeping lots.
@@ -92,6 +93,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.62.1**: republishes 1.62.0, whose npm publication failed on the runner (the tag exists but 1.62.0 never reached npm), so this version also carries everything 1.62.0 brings below. `citedResources` (`raf add`, resources cited by a title) reads a title in linear time instead of quadratic, and no upper bound on wall-clock duration is left in the suite (L686). The R7 and R11 tests of the approved queue no longer depend on the clock order between two repositories, and the test lead's holds follow the real clock (L685).
 
 **1.62.0**: `cadence orchestrate queue add|show|drop` and `--queue` let the lead approve an ordered list of lots once, and every live wave draws the next mature one as soon as a slot is free, without going through the lead (L498). A wave that finds a branch of the lot, including its own on `--resume`, rebases it onto the repository's branch before any session, and hands the lot back if that fails (L676). An integration no longer refuses its lot for a modified plan in the lead's tree (L673), and the warning of `raf add`, `raf note` and `raf done` says so (L425). The lead's answer is written in the lot's notes and every wait over 10 s says what it waits for (L670), and becomes a rule with its edge cases before the spec (L666). `orchestrate --follow` no longer loses a line between two follow-ups (L668), `cadence lead tour` marks stale kept branches with the gestures that hold, a lot that names a shared page gets it in its `uses:` (L671), the overflow gate never waits for a host slot (L674), and the `deliver` skill says what happens without a `deliver:` key (L675).
 

@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.62.1] - 2026-11-07
+
 ### Changed
 
 - Fewer gates per lot (L662, [docs/orchestrate-gate.md](docs/orchestrate-gate.md#the-edge-case-probe-orchestrateprobe-l497)): the edge-case probe now plays right after the write, before the program's gate, which is played once between the write and the review (a second gate after a probe that had committed cost 33.2 min over five lots in wave 1805; a session that announces red keeps the gate first, and when that gate does not confirm the announcement the probe plays right after it, for an express lot that touches the cycle too). After « main a avancé » the integration gate is still replayed at the new tip, as before: skipping it was measured to bring no gain on our repositories (only cadence integrates through worktrees, and its code reads the plan).

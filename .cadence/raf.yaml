@@ -3007,11 +3007,12 @@ lots:
     finished: 2026-11-07
   - id: L671
     title: "docs-orchestrate au lancement : les lots dont le titre ou le diff cite docs/orchestrate*.md reçoivent uses: docs-orchestrate à raf add / --dry-run, donc L551 les joue l'un après l'autre ; 07-11 : 113,6 min d'attente d'intégration (L665 35,3, L667 ~78) pour deux lots tenus par L662 et L666, qui n'ont rien livré ; niveau : source (lancement), niveau le plus tôt : source ; mesure : 0 min d'attente de ressource par vague sans lot qui touche la ressource avant d'avoir intégré"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-07
     started: 2026-11-07
     review: { date: 2026-11-07, verdict: "compliant — orchestré (vague 2026-11-07-0800, 0 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : compliant", commit: df9870437c5881305540c74b8614c91c73cae29d }
+    finished: 2026-11-07
   - id: L672
     title: "Doc d'usage périmée par une phrase de comportement : L648 ne liste que les identifiants ; L662 (orchestrate-gate.md:114) et L666 (fonctionnement.md:30, lead.md:13) rendus avec un majeur de doc après opus et fable ; le brief d'implement et de fix liste les pages de docs/ qui contiennent les termes du critère que le titre du lot change (grep de ses phrases) ; niveau : source (brief), puis écriture (hook sur src/orchestrate) ; mesure : 0 majeur de doc d'usage à la revue sur 3 vagues ; L666 ≈ 22 min, L662 6,9 min"
     status: done

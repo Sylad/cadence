@@ -8,7 +8,7 @@ import { changelogShapeProblems, mergeUnreleased, moveToUnreleased, settleLotEnt
 import { mutexFor } from './mutex.js';
 import { isMap, isNode, isSeq, parseDocument, type YAMLMap, type YAMLSeq } from 'yaml';
 import { indentedSeq } from '../plan-ids.js';
-import { git, gitFailure, tryGit } from './worktree.js';
+import { git, gitFailure, tryGit } from './git.js';
 import { BASELINE, comparerMigration, serialiser, type Mesure } from '../../scripts/qualite.mjs';
 
 /** Verrou d'intégration d'un dépôt (L279, R10) : dans l'état commun aux worktrees, au format du verrou d'orchestration, sous un autre nom. */

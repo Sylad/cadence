@@ -61,7 +61,7 @@ describe('R1 — recoverTree retrouve la branche la plus récente du lot', () =>
     const newer = oldBranch(repo, 'w2', 'L1', 2, 2000);
     const dir = lotTreeDir(join(parent, '.cadence', 'runs', 'w3'), 'a', 'L1');
     const branch = lotBranch('w3', 'a', 'L1');
-    expect(recoverTree(repo, branch, dir, 'main')).toEqual({ from: newer.branch, unintegrated: 2, behind: 0, conflicts: [] });
+    expect(recoverTree(repo, branch, dir, 'main')).toEqual({ from: newer.branch, unintegrated: 2, behind: 0, conflicts: [], caughtUp: 0, notes: [] });
     expect(baseBranchOf(repo, branch)).toBe('main');
     expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').split('\n').sort()).toEqual([older.branch, branch].sort());
     expect(existsSync(newer.dir)).toBe(false);

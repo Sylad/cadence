@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { branchStaleness, lotBranch, lotTreeDir, prepareTree, recoverTree } from '../src/orchestrate/worktree.js';
 import { claudeOut, commitFile, git, reviewReport, workReport } from './orchestrate-harness.js';
@@ -54,7 +54,7 @@ describe('R2 — plus de 100 commits de main d\'avance : la reprise rebase d\'ab
     const old = oldBranch(repo);
     advanceMain(repo, 101);
     const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main');
-    expect(got).toEqual({ from: old.branch, unintegrated: 1, behind: 0, conflicts: [] });
+    expect(got).toEqual({ from: old.branch, unintegrated: 1, behind: 0, conflicts: [], caughtUp: 101, notes: [] });
     expect(git(repo, 'rev-list', '--count', 'main..cadence/w2/a--L1')).toBe('1');
     expect(git(repo, 'rev-list', '--count', 'cadence/w2/a--L1..main')).toBe('0');
     expect(existsSync(newDir(parent))).toBe(true);
@@ -79,14 +79,39 @@ describe('R2 — plus de 100 commits de main d\'avance : la reprise rebase d\'ab
     advanceMain(repo, 101);
     git(repo, 'worktree', 'remove', '--force', old.dir);
     const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main');
-    expect(got).toEqual({ from: old.branch, unintegrated: 1, behind: 0, conflicts: [] });
+    expect(got).toEqual({ from: old.branch, unintegrated: 1, behind: 0, conflicts: [], caughtUp: 101, notes: [] });
     expect(git(repo, 'worktree', 'list')).not.toContain('cadence-rebase-');
   });
-  it('R2 — 100 commits de main d\'avance (la borne) : reprise, l\'âge est rendu', () => {
+  it('R2 — sous le seuil (5 commits de retard, sans conflit) : le rebase se tente aussi, la branche est reprise au sommet de main (L676 : le seuil ne décide pas du rebase)', () => {
     const { repo, parent } = setup();
     const old = oldBranch(repo);
-    advanceMain(repo, 100);
-    expect(recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main')).toEqual({ from: old.branch, unintegrated: 1, behind: 100, conflicts: [] });
+    advanceMain(repo, 5);
+    expect(recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main')).toEqual({ from: old.branch, unintegrated: 1, behind: 0, conflicts: [], caughtUp: 5, notes: [] });
+    expect(git(repo, 'rev-list', '--count', 'cadence/w2/a--L1..main')).toBe('0');
+  });
+  it('R2 — sous le seuil mais le rebase échoue : refusée sans la mention « plus de 100 », branche intacte', () => {
+    const { repo, parent } = setup();
+    const old = oldBranch(repo, 'partage.txt', 'version du lot\n');
+    const tip = git(repo, 'rev-parse', old.branch);
+    commitFile(repo, 'partage.txt', 'feat: partage');
+    const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main');
+    expect(got).toEqual({ from: old.branch, refused: expect.stringMatching(/main a 1 commit\(s\) d'avance.*le rebase sur main a échoué \(conflit sur partage\.txt\)/) });
+    expect(got && 'refused' in got && got.refused).not.toContain('plus de 100');
+    expect(git(repo, 'rev-parse', old.branch)).toBe(tip);
+  });
+  it('R2 — conflit d\'ajout pur sous [Unreleased] du CHANGELOG (chaque côté ajoute une entrée) : résolu comme à l\'intégration (rebaseOnto), la branche est reprise', () => {
+    const doc = (body: string) => `# Changelog\n\nintro\n\n## [Unreleased]\n\n### Fixed\n\n${body}\n## [1.0.0] - 2026-01-01\n\n### Added\n\n- première version\n`;
+    const { repo, parent } = setup(undefined, undefined, { 'CHANGELOG.md': doc('- base\n') });
+    const old = oldBranch(repo, 'CHANGELOG.md', doc('- entrée du lot\n- base\n'));
+    writeFileSync(join(repo, 'CHANGELOG.md'), doc('- entrée de main\n- base\n'));
+    git(repo, 'commit', '-q', '-m', 'docs: entrée de main', '--', 'CHANGELOG.md');
+    expect(branchStaleness(repo, old.branch, 'main').conflicts).toEqual(['CHANGELOG.md']);
+    const got = recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main');
+    expect(got).toMatchObject({ from: old.branch, unintegrated: 1, behind: 0, conflicts: [], caughtUp: 1 });
+    expect(got && 'notes' in got && got.notes.join('\n')).toContain("CHANGELOG.md : conflit d'ajout pur résolu");
+    const merged = git(repo, 'show', 'cadence/w2/a--L1:CHANGELOG.md');
+    expect(merged).toContain('- entrée du lot');
+    expect(merged).toContain('- entrée de main');
   });
 });
 
@@ -107,7 +132,7 @@ describe('R3 — merge-tree donne des conflits : le rebase échoue, la reprise e
     const { repo, parent } = setup();
     const old = oldBranch(repo, 'partage.txt', 'version du lot\n');
     commitFile(repo, 'autre.txt', 'feat: autre');
-    expect(recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main')).toEqual({ from: old.branch, unintegrated: 1, behind: 1, conflicts: [] });
+    expect(recoverTree(repo, lotBranch('w2', 'a', 'L1'), newDir(parent), 'main')).toEqual({ from: old.branch, unintegrated: 1, behind: 0, conflicts: [], caughtUp: 1, notes: [] });
   });
   it('R3 — le plan l\'emporte sur l\'âge : une branche périmée qui touche aussi le plan donne un seul refus, celui du plan', () => {
     const { repo, parent } = setup();
@@ -127,11 +152,14 @@ describe('R4 — la ligne « branche reprise » du journal dit l\'âge et les co
     await run(parent, ['a:L1', 'a:L2', '--max-sessions', '2'], f1);
     return { parent, repo };
   }
-  it('R4 — reprise : la ligne dit « main a N commit(s) d\'avance, 0 conflit »', async () => {
+  it('R4 — reprise sous le seuil : la branche est rebasée d\'abord, la session part au sommet de main', async () => {
     const { parent, repo } = await handedBack();
     commitFile(repo, 'depuis.txt', 'feat: depuis');
-    const r = await run(parent, ['a:L1'], fake({ fix: async (cwd) => claudeOut(workReport({ commits: [commitFile(cwd, 'L1-suite.txt', 'fix(L1): suite')] })) }));
-    expect(r.out).toMatch(new RegExp(`branche cadence/${WAVE}/a--L1 d'une vague précédente reprise \\(\\d+ commit\\(s\\) non intégré\\(s\\), main a \\d+ commit\\(s\\) d'avance et 0 conflit\\(s\\)\\)`));
+    const behindAtSession: string[] = [];
+    const r = await run(parent, ['a:L1'], fake({ fix: async (cwd) => { behindAtSession.push(git(cwd, 'rev-list', '--count', 'HEAD..main')); return claudeOut(workReport({ commits: [commitFile(cwd, 'L1-suite.txt', 'fix(L1): suite')] })); } }));
+    expect(r.out).toMatch(new RegExp(`branche cadence/${WAVE}/a--L1 d'une vague précédente reprise \\(\\d+ commit\\(s\\) non intégré\\(s\\), rebasée sur main : \\d+ commit\\(s\\) rattrapé\\(s\\), main a 0 commit\\(s\\) d'avance et 0 conflit\\(s\\)\\)`));
+    expect(behindAtSession.length).toBeGreaterThan(0);
+    expect(behindAtSession.every((n) => n === '0')).toBe(true);
   });
   it('R4 — refus : la ligne « non reprise » porte la cause (conflit), le lot est rendu sans session et la branche reste', async () => {
     const { parent, repo } = await handedBack();
@@ -147,11 +175,17 @@ describe('R4 — la ligne « branche reprise » du journal dit l\'âge et les co
     expect(f.calls).toEqual([]);
     expect(git(repo, 'rev-parse', kept)).toBe(tip);
     expect(git(repo, 'branch', '--list', '--format=%(refname:short)', 'cadence/*').trim().split('\n')).toEqual([kept]);
+    // L676 : le rendu est écrit sur disque (comme tout rendu) : la vague relue par --status ne montre pas un lot « en attente »
+    const waves = readdirSync(join(parent, '.cadence', 'runs')).filter((w) => w !== WAVE);
+    expect(waves).toHaveLength(1);
+    const onDisk = JSON.parse(readFileSync(join(parent, '.cadence', 'runs', waves[0], 'a--L1.json'), 'utf8'));
+    expect(onDisk.status).toBe('handed-back');
+    expect(onDisk.outcome).toMatch(/non reprise : .*le rebase sur main a échoué.*lot rendu sans session, branche intacte/);
   });
   it('R4 — plus de 100 commits de retard sans conflit : le rebase réussit, la ligne dit la reprise et le lot repart de son travail', async () => {
     const { parent, repo } = await handedBack();
     advanceMain(repo, 101);
     const r = await run(parent, ['a:L1'], fake({ fix: async (cwd) => claudeOut(workReport({ commits: [commitFile(cwd, 'L1-suite.txt', 'fix(L1): suite')] })) }));
-    expect(r.out).toMatch(/d'une vague précédente reprise \(\d+ commit\(s\) non intégré\(s\), main a 0 commit\(s\) d'avance et 0 conflit\(s\)\) : le lot repart de son travail/);
+    expect(r.out).toMatch(/d'une vague précédente reprise \(\d+ commit\(s\) non intégré\(s\), rebasée sur main : \d+ commit\(s\) rattrapé\(s\), main a 0 commit\(s\) d'avance et 0 conflit\(s\)\) : le lot repart de son travail/);
   });
 });

@@ -20,7 +20,7 @@ import { precheckSkipReason, MAX_PASSES, MAX_PASSES_CONVERGING, briefName, needs
 import { buildArgs, buildLocalArgs, MODEL_ALIASES, mcpServersFor, enabledPlugins, settingsFiles, type StepModel } from './launch.js';
 import { repoBranch } from './integrate.js';
 import { launchScreen, launchedLot } from './cycle/retreci.js';
-import { keptBranchesOfLot, legacyLotSlug, lotBranch, planFileSet, recoveryRefusal, staleRefusal, branchStaleness, type KeptTree } from './worktree.js';
+import { blockingRefusal, keptBranchesOfLot, legacyLotSlug, lotBranch, planFileSet, staleRefusal, stalenessText, branchStaleness, type KeptTree } from './worktree.js';
 import { effortKey, schemaFor, stepAgent } from './schemas.js';
 import { lotKey, lotSlug, neighbourDirs, RunStore, type LotState } from './state.js';
 import { matchesNvmrc, notLoggedIn, pathNodeVersion, projectEnv } from './preflight.js';
@@ -109,7 +109,7 @@ function repoNotices(repo: string, io: OrchestrateIo, said: RepoSaid, specDir: s
 
 /**
  * Ce que la vague ferait des branches gardées d'une vague passée qui portent le travail du lot (L581, issue #38), sous le nom actuel ou l'ancien (`<repo>--<lot>`) :
- * une ligne par branche non intégrée, qui dit si elle est reprise ou pas, et pourquoi, avec les refus mêmes de `recoverTree` (`recoveryRefusal` : worktree modifié, plan touché).
+ * une ligne par branche non intégrée, qui dit si elle est reprise ou pas, et pourquoi, avec les refus mêmes de `recoverTree` (`blockingRefusal` : worktree modifié, plan touché), et le rebase qu'elle tente d'abord (L676).
  * Le lot d'un dry-run est neuf (`next` à null) : la reprise à part d'un lot rendu à l'intégration (`next: integrate`, execute.ts) n'y est pas simulée.
  * Un `git worktree move` ou `git branch -m` refusé ne se voit qu'à la vraie vague.
  */
@@ -118,11 +118,11 @@ function keptBranchLines(l: LotState, id: string, worktrees: boolean, planFiles:
   const legacy = legacyLotSlug(l.project, l.lot);
   const found = keptBranchesOfLot(l.repo, lotBranch(id, l.project, l.lot), [lotSlug(l.project, l.lot), ...(legacy ? [legacy] : [])]);
   const first = worktrees && branch ? found.find((t) => t.base === branch) : undefined;
-  const age = first ? branchStaleness(l.repo, first.branch, first.base) : undefined;
-  const refused = first ? recoveryRefusal(l.repo, first, first.base, planFiles, age) : null;
-  // L676 : une branche seulement périmée n'est refusée qu'après un rebase raté (`recoverTree`) ; le dry-run ne rebase pas, il dit les deux issues.
-  const rebase = refused && age && refused === staleRefusal(age) ? ` ; la vague tente d'abord un rebase sur ${first!.base} : réussi, le lot repart de son travail, échoué, le lot est rendu sans session et la branche reste intacte` : '';
-  return found.map((t) => `  branche ${t.branch} d'une vague précédente (${t.unintegrated} commit(s) non intégré(s)) : ${t !== first ? notTakenCause(t, branch, worktrees, first, refused) : refused ? `n'est pas reprise, ${refused}${rebase}` : 'reprise par la vague (le lot repart de son travail)'}`);
+  const refused = first ? blockingRefusal(l.repo, first, first.base, planFiles) : null;
+  const age = first && !refused ? branchStaleness(l.repo, first.branch, first.base) : undefined;
+  // L676 : toute branche en retard est rebasée avant d'être reprise, par la règle de l'intégration (CHANGELOG, plan, base du cliquet résolus) ; le dry-run ne rebase pas, il dit les deux issues.
+  const taken = !age?.behind ? 'reprise par la vague (le lot repart de son travail)' : `reprise par la vague après un rebase sur ${first!.base} (${stalenessText(age)} à la fusion à blanc${staleRefusal(age) ? ', branche périmée' : ''}) : réussi, le lot repart de son travail, échoué, le lot est rendu sans session et la branche reste intacte`;
+  return found.map((t) => `  branche ${t.branch} d'une vague précédente (${t.unintegrated} commit(s) non intégré(s)) : ${t !== first ? notTakenCause(t, branch, worktrees, first, refused) : refused ? `n'est pas reprise, ${refused}` : taken}`);
 }
 
 /** Pourquoi `recoverTree` ne prend pas cette branche gardée, quand ce n'est pas la plus récente partie de la branche du dépôt (L581). */

@@ -46,7 +46,10 @@ describe('R11 — reprise dans les worktrees retrouvés', () => {
     const again = await run(parent, ['--resume', WAVE, '--budget', '5M'], g);
     expect(again.err).toBe('');
     expect(again.code).toBe(0);
-    expect(seen).toEqual([`${dir}|${tip}`]); // la revue relit le travail commité avant l'arrêt, dans le même worktree
+    // la revue relit le travail commité avant l'arrêt, dans le même worktree ; L676 : la branche est rebasée d'abord sur main (qui a pris les commits de plan), le sommet change, pas le diff
+    expect(seen).toHaveLength(1);
+    expect(seen[0].split('|')[0]).toBe(dir);
+    expect(git(parent, '-C', 'a', 'diff', tip, seen[0].split('|')[1], '--', 'L1.txt')).toBe('');
     expect(g.calls.filter((c) => c.kind === 'implement')).toHaveLength(0);
     expect(store(parent).readLot('a', 'L1')!.status).toBe('ready');
   });
@@ -76,7 +79,9 @@ describe('R11 — reprise dans les worktrees retrouvés', () => {
     });
     const again = await run(parent, ['--resume', WAVE, '--budget', '5M'], g);
     expect(again.code).toBe(0);
-    expect(seen).toEqual([`${dir}|${tip}`]);
+    expect(seen).toHaveLength(1);
+    expect(seen[0].split('|')[0]).toBe(dir);
+    expect(git(repo, 'diff', tip, seen[0].split('|')[1], '--', 'L1.txt')).toBe(''); // L676 : rebasée sur main d'abord, même travail
     expect(existsSync(join(repo, 'L1.txt'))).toBe(true);
   });
 });

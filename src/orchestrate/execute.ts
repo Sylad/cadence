@@ -22,7 +22,8 @@ import { slotPlace } from './attente.js';
 import { AddFeed, addToLive, openInRepo, type AddAsk, type KnownLot, type LaunchChecks } from './ajout.js';
 import { takeIntegrations } from './integration-vivante.js';
 import { repoBranch } from './integrate.js';
-import { baseBranchOf, keptLines, legacyLotSlug, lotBranch, lotTreeDir, planFileSet, recoverTree, stalenessText } from './worktree.js';
+import { baseBranchOf, keptLines, legacyLotSlug, lotBranch, lotTreeDir, planFileSet, recoverTree } from './worktree.js';
+import { rebaseOwnBranch, settleRecovered } from './reprise-rebase.js';
 import { applyAnswer, excludeState, lotFinished, lotKey, lotRepoPaths, RunStore, type LotState, type WaveState } from './state.js';
 import { linkNodeBin } from './node-env.js';
 import { endOfWaveLines } from '../inspect-read.js';
@@ -115,14 +116,6 @@ const oldSlugs = (project: string, lot: string): string[] => {
   return old ? [old] : [];
 };
 
-/** L676 : des commits du lot existent sur une branche d'une vague passée que la reprise ne prend pas : jamais de session sur une branche neuve, le lot est rendu au lead (`runLot` ne joue pas un lot rendu) et la branche reste intacte ; il garde son arbre planifié, la vague ne passe en mode multi-créneaux que si tous ses lots en ont un. */
-function handBackKept(c: LotCtx, refused: { from: string; refused: string }, log: (line: string) => void): void {
-  const key = lotKey(c.lot.project, c.lot.lot);
-  c.lot.status = 'handed-back';
-  c.lot.outcome = `branche ${refused.from} d'une vague précédente non reprise : ${refused.refused} ; lot rendu sans session, branche intacte`;
-  log(`orchestrate : ${key} : ${c.lot.outcome} (rebaser à la main puis relancer le lot, ou retirer la branche : cadence orchestrate --remove-worktree ${key} --abandon-commits)`);
-}
-
 /**
  * Quels lots jouent dans un worktree (L279). Un groupe de lots du même dépôt (`groupLots`) y joue si `orchestrate.worktrees` est vrai, s'il a au moins deux lots
  * ou si la vague a plus d'un créneau (`multiSlot`, L527 : tout lot d'un tel dépôt reçoit son worktree — donné seul, tiré par le remplissage ou apporté par `--add`, avec ou sans `--continue` — pour qu'un créneau libre reçoive le lot suivant du même dépôt), si le dépôt est sur une branche et si aucun de ses lots n'a de dépôt voisin (`repos:`, R2) ; sinon les lots restent à la suite, avec un avertissement qui dit pourquoi.
@@ -142,16 +135,9 @@ export function planTrees(ctxs: LotCtx[], store: RunStore, wave: string, log: (l
       // Chemin de reprise d'un lot rendu hors intégration : sa branche d'une vague passée devient celle de cette vague (recoverTree), puis se retrouve comme une reprise (R11).
       const dir = lotTreeDir(store.dir, c.lot.project, c.lot.lot, repo);
       const recovered = !baseBranchOf(repo, lotBr) && c.lot.next !== 'integrate' && branch && c.config.worktrees ? recoverTree(repo, lotBr, dir, branch, { planFiles: planFileSet(c.loadPlan(), repo), alsoSlugs: oldSlugs(c.lot.project, c.lot.lot) }) : null;
-      if (recovered && 'refused' in recovered) handBackKept(c, recovered, log);
-      else if (recovered) {
-        log(`orchestrate : ${lotKey(c.lot.project, c.lot.lot)} : branche ${recovered.from} d'une vague précédente reprise (${recovered.unintegrated} commit(s) non intégré(s), ${stalenessText(recovered)}) : le lot repart de son travail`);
-        // L311 : le lot repris ne repasse pas par le contrôle préalable. Il reprend les constats de sa dernière revue (état de la vague qui l'a rendu) et repart à leur correction, ou à la revue quand il en a déjà passé une sans constat ; rendu avant sa première revue (ou état illisible ; les constats `tests` d'un lot rendu pour tests rouges ne font pas une revue, L318), il repart à l'écriture.
-        const old = new RunStore(store.launchDir, recovered.from.split('/')[1]).readLot(c.lot.project, c.lot.lot);
-        c.lot.resumedFrom = recovered.from.split('/')[1];
-        c.lot.constats = old?.constats ?? [];
-        c.lot.resumedReviewed = !!old && (old.constats.some((k) => k.source === 'code') || old.steps.some((s) => s.kind.startsWith('review')));
-      }
+      settleRecovered(c, recovered, branch, store.launchDir);
       const known = baseBranchOf(repo, lotBr);
+      rebaseOwnBranch(c, { repo, branch: lotBr, dir, base: known, recovered: !!recovered });
       const base = known ?? branch;
       // Un lot repris à l'intégration dont la branche n'existe plus (retirée par --remove-worktree --abandon-commits) n'a plus de commits à intégrer : pas de worktree recréé au sommet, `integrateLot` le rend.
       if (c.lot.next === 'integrate' && !known) continue;

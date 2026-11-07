@@ -95,21 +95,21 @@ describe('R3 — les conflits au bord', () => {
   });
 });
 
-describe('R4 — le --dry-run applique le même refus', () => {
-  it('R4 — branche en conflit : le dry-run dit qu\'elle n\'est pas reprise et nomme le fichier', async () => {
+describe('R4 — le --dry-run dit le rebase tenté d\'abord (L676) et les refus', () => {
+  it('R4 — branche en conflit : le dry-run dit le rebase tenté d\'abord, ses deux issues, et nomme le fichier', async () => {
     const { parent, repo } = setup();
     const old = oldBranch(repo, { 'partage.txt': 'lot\n' });
     mainWrites(repo, { 'partage.txt': 'main\n' });
     const r = await run(parent, ['a:L1', '--dry-run'], fake());
     removeDryRunBriefs(r.out);
-    expect(r.out).toMatch(new RegExp(`branche ${old.branch.replace(/\//g, '\\/')} .*n'est pas reprise, main a 1 commit\\(s\\) d'avance et 1 conflit\\(s\\) \\(partage\\.txt\\)`));
+    expect(r.out).toMatch(new RegExp(`branche ${old.branch.replace(/\//g, '\\/')} .*reprise par la vague après un rebase sur main \\(main a 1 commit\\(s\\) d'avance et 1 conflit\\(s\\) \\(partage\\.txt\\) à la fusion à blanc, branche périmée\\) : réussi, le lot repart de son travail, échoué, le lot est rendu sans session`));
   });
-  it('R4 — branche à plus de 100 commits : le dry-run dit qu\'elle n\'est pas reprise telle quelle et les deux issues du rebase', async () => {
+  it('R4 — branche à plus de 100 commits : le dry-run dit le rebase tenté d\'abord et ses deux issues', async () => {
     const { parent, repo } = setup();
     const old = oldBranch(repo, { 'x.txt': 'lot\n' });
     for (let i = 0; i < 101; i++) commitFile(repo, `m-${i}.txt`, `chore: ${i}`);
     const r = await run(parent, ['a:L1', '--dry-run'], fake());
     removeDryRunBriefs(r.out);
-    expect(r.out).toMatch(new RegExp(`branche ${old.branch.replace(/\//g, '\\/')} .*n'est pas reprise, main a 101 commit\\(s\\).*tente d'abord un rebase sur main : réussi, le lot repart de son travail, échoué, le lot est rendu sans session`));
+    expect(r.out).toMatch(new RegExp(`branche ${old.branch.replace(/\//g, '\\/')} .*reprise par la vague après un rebase sur main \\(main a 101 commit\\(s\\).*branche périmée\\) : réussi, le lot repart de son travail, échoué, le lot est rendu sans session`));
   });
 });

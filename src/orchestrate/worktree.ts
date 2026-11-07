@@ -8,6 +8,7 @@ import type { Plan } from '../plan.js';
 import { lotSlug } from './state.js';
 import { cadenceHome, liveWaves } from './registry.js';
 import { git, gitFailure, tryGit } from './git.js';
+import { rebaseNotes, rebaseOnto } from './integrate.js';
 
 /** Un worktree par lot (L279) : nom du dossier de la vague où ils vivent, hors du dépôt du lead. */
 export const WORKTREES_DIR = 'worktrees';
@@ -261,24 +262,21 @@ export function prepareTree(t: TreeSpec): { ok: true; reused: boolean } | { ok: 
  * (git emporte la config de cadence) et son worktree déplacé vers `dir` : le reste de l'orchestration, qui ne connaît que les noms de la vague, la voit
  * comme la sienne. Rend la branche reprise, ou null (rien à reprendre). Jamais la branche d'une vague vivante.
  * Une branche que la reprise ne pourrait pas mener à l'intégration est refusée sans y toucher (`refused` dit pourquoi) : son worktree porte un fichier suivi modifié
- * (R11 : comme `--resume`, la session n'y démarre pas), un de ses commits touche un fichier du plan (`opts.planFiles`, relatifs au dépôt : le plan n'est écrit que par le programme), ou elle est périmée et son rebase sur `base` échoue (L665 : `branchStaleness`, L676 : `rebaseKept`). Un `git worktree move` ou `git branch -m` qui échoue est refusé de même, avec la cause de git (le déplacement est défait).
+ * (R11 : comme `--resume`, la session n'y démarre pas), un de ses commits touche un fichier du plan (`opts.planFiles`, relatifs au dépôt : le plan n'est écrit que par le programme), ou son rebase sur `base`, toujours tenté quel que soit son retard, échoue (L676 : `rebaseLotBranch` ; la cause dit l'âge d'avant, et la péremption L665 au-delà du seuil). Un `git worktree move` ou `git branch -m` qui échoue est refusé de même, avec la cause de git (le déplacement est défait).
  */
-export function recoverTree(repo: string, branch: string, dir: string, base: string, opts: { planFiles: ReadonlySet<string>; alsoSlugs: readonly string[] } = { planFiles: new Set(), alsoSlugs: [] }): { from: string; unintegrated: number; behind: number; conflicts: string[] } | { from: string; refused: string } | null {
+export function recoverTree(repo: string, branch: string, dir: string, base: string, opts: { planFiles: ReadonlySet<string>; alsoSlugs: readonly string[] } = { planFiles: new Set(), alsoSlugs: [] }): { from: string; unintegrated: number; behind: number; conflicts: string[]; caughtUp: number; notes: string[] } | { from: string; refused: string } | null {
   const { planFiles, alsoSlugs } = opts;
   const found = keptBranchesOfLot(repo, branch, [branch.split('/').slice(2).join('/'), ...alsoSlugs]).find((t) => t.base === base);
   if (!found || branchSha(repo, branch) !== null) return null;
   tryGit(repo, 'worktree', 'prune');
   const moved = found.dir !== null && existsSync(found.dir);
-  let age = branchStaleness(repo, found.branch, base);
-  let refused = recoveryRefusal(repo, found, base, planFiles, age);
-  // L676 : une branche périmée n'est refusée qu'après un vrai rebase sur `base` ; réussi, le lot repart de ses commits, échoué (conflit), la branche reste intacte.
-  if (refused && refused === staleRefusal(age)) {
-    const failed = rebaseKept(repo, found, base);
-    if (failed) return { from: found.branch, refused: `${refused}, et le rebase sur ${base} a échoué (${failed}) : branche laissée intacte` };
-    age = branchStaleness(repo, found.branch, base);
-    refused = recoveryRefusal(repo, found, base, planFiles, age);
-  }
-  if (refused) return { from: found.branch, refused };
+  const blocked = blockingRefusal(repo, found, base, planFiles);
+  if (blocked) return { from: found.branch, refused: blocked };
+  // L676 : la branche est toujours rebasée sur `base` avant d'être reprise, quel que soit son retard ; réussi, le lot repart de ses commits, échoué, elle reste intacte et le lot est rendu.
+  const before = branchStaleness(repo, found.branch, base);
+  const rebased = rebaseLotBranch(repo, found.branch, found.dir, base, lotKeyOf(found));
+  if (!rebased.ok) return { from: found.branch, refused: rebaseRefusal(before, base, rebased.cause) };
+  const age = branchStaleness(repo, found.branch, base);
   try {
     if (moved) {
       mkdirSync(dirname(dir), { recursive: true });
@@ -289,29 +287,39 @@ export function recoverTree(repo: string, branch: string, dir: string, base: str
     if (moved && existsSync(dir) && !existsSync(found.dir as string)) tryGit(repo, 'worktree', 'move', dir, found.dir as string);
     return { from: found.branch, refused: `déplacement ou renommage de la branche refusé par git (${gitFailure(e)}), rien n'a bougé` };
   }
-  return { from: found.branch, unintegrated: found.unintegrated, behind: age.behind, conflicts: age.conflicts };
+  return { from: found.branch, unintegrated: found.unintegrated, behind: age.behind, conflicts: age.conflicts, caughtUp: rebased.caughtUp, notes: rebased.notes };
+}
+
+const lotKeyOf = (t: KeptTree): string => (t.lot.includes(':') ? t.lot : t.branch);
+
+/** La cause d'un rendu après un rebase raté (L676) : l'âge d'avant le rebase (et la péremption L665 quand la branche passe le seuil), puis la cause du rebase ; la branche reste intacte. */
+export function rebaseRefusal(age: { behind: number; conflicts: string[] }, base: string, cause: string): string {
+  return `${staleRefusal(age) ?? stalenessText(age)}, et le rebase sur ${base} a échoué (${cause}) : branche laissée intacte`;
 }
 
 /**
- * Rebase la branche gardée sur `base` (L676), dans son worktree, ou dans un worktree jetable quand le sien a disparu. Rend null quand le rebase a réussi ; sinon la cause de git,
- * après `git rebase --abort` : la branche garde ses commits et son sommet d'avant.
+ * Rebase la branche de lot `branch` sur `base` (L676) par `rebaseOnto`, la règle de l'intégration : les conflits d'ajout pur du CHANGELOG, du plan et de la base du cliquet sont
+ * résolus comme à l'intégration. Dans `dir`, son worktree, quand il existe ; sinon dans un worktree jetable, retiré ensuite. Une branche à jour (0 commit de retard) n'est pas touchée.
+ * Rend `caughtUp` (les commits de `base` rattrapés) et les lignes de journal des résolutions (`rebaseNotes`, préfixées de `key`) ; ou la cause de l'échec, après
+ * `git rebase --abort` : la branche garde ses commits et son sommet d'avant.
  */
-function rebaseKept(repo: string, found: KeptTree, base: string): string | null {
-  const own = found.dir !== null && existsSync(join(found.dir, '.git'));
+export function rebaseLotBranch(repo: string, branch: string, dir: string | null, base: string, key: string): { ok: true; caughtUp: number; notes: string[] } | { ok: false; cause: string } {
+  const caughtUp = Number(tryGit(repo, 'rev-list', '--count', `refs/heads/${base}`, '--not', `refs/heads/${branch}`) ?? 0);
+  if (caughtUp === 0) return { ok: true, caughtUp, notes: [] };
+  const own = dir !== null && existsSync(join(dir, '.git'));
   const temp = own ? null : mkdtempSync(join(tmpdir(), 'cadence-rebase-'));
-  const wd = own ? (found.dir as string) : join(temp as string, 'wt');
+  const wd = own ? (dir as string) : join(temp as string, 'wt');
   try {
-    if (!own) git(repo, 'worktree', 'add', wd, found.branch);
-    try {
-      git(wd, 'rebase', `refs/heads/${base}`);
-      return null;
-    } catch (e) {
-      const conflicts = (tryGit(wd, 'diff', '--name-only', '--diff-filter=U') ?? '').split('\n').filter(Boolean);
-      tryGit(wd, 'rebase', '--abort');
-      return conflicts.length ? `conflit sur ${conflicts.join(', ')}` : gitFailure(e).replace(/\r/g, ' ').slice(0, 160);
+    if (!own) {
+      tryGit(repo, 'worktree', 'prune'); // un worktree enregistré dont le dossier a disparu tient encore la branche
+      git(repo, 'worktree', 'add', wd, branch);
     }
+    const r = rebaseOnto(wd, base);
+    if (r.kind === 'conflict') return { ok: false, cause: r.files.length ? `conflit sur ${r.files.join(', ')}` : r.detail.replace(/\r/g, ' ').slice(0, 160) };
+    return { ok: true, caughtUp, notes: r.kind === 'rebased' ? rebaseNotes(r, key) : [] };
   } catch (e) {
-    return gitFailure(e).replace(/\r/g, ' ').slice(0, 160);
+    if (existsSync(join(wd, '.git'))) tryGit(wd, 'rebase', '--abort');
+    return { ok: false, cause: gitFailure(e).replace(/\r/g, ' ').slice(0, 160) };
   } finally {
     if (temp) {
       tryGit(repo, 'worktree', 'remove', '--force', wd);
@@ -352,11 +360,16 @@ export function stalenessText(age: { behind: number; conflicts: string[] }): str
  * à la fusion à blanc ; `age` évite de la mesurer deux fois). Ne touche à rien : `recoverTree` et le `--dry-run` (L581) appliquent ainsi les mêmes refus.
  */
 export function recoveryRefusal(repo: string, found: KeptTree, base: string, planFiles: ReadonlySet<string>, age = branchStaleness(repo, found.branch, base)): string | null {
+  return blockingRefusal(repo, found, base, planFiles) ?? staleRefusal(age);
+}
+
+/** Ce qui empêche la reprise sans rien tenter (L676 : avant tout rebase) : un fichier suivi modifié dans son worktree (R11), ou un de ses commits qui touche le plan. */
+export function blockingRefusal(repo: string, found: KeptTree, base: string, planFiles: ReadonlySet<string>): string | null {
   const dirty = found.dir !== null && existsSync(join(found.dir, '.git')) ? trackedDirty(found.dir) : [];
   if (dirty.length) return `son worktree porte des fichiers suivis modifiés (${dirty.join(', ')})`;
   const touched = (tryGit(repo, 'log', '--name-only', '-z', '--format=', `refs/heads/${found.branch}`, '--not', `refs/heads/${base}`) ?? '').split('\0').find((f) => planFiles.has(f));
   if (touched) return `un de ses commits modifie le plan (${touched})`;
-  return staleRefusal(age);
+  return null;
 }
 
 /** Le refus d'une branche périmée (L665 : plus de `STALE_BASE_COMMITS` commits de retard, ou des conflits à la fusion à blanc), ou null ; le même texte pour la reprise, le `--dry-run` et le tour du lead. */

@@ -45,7 +45,7 @@ describe('R1 — une nouvelle vague retrouve la branche gardée sous l\'ancien n
     const dir = lotTreeDir(join(parent, '.cadence', 'runs', 'w2'), 'org/a', 'L1');
     const branch = lotBranch('w2', 'org/a', 'L1');
     expect(branch).toBe('cadence/w2/org__a--L1');
-    expect(recoverTree(repo, branch, dir, 'main', { planFiles: new Set(), alsoSlugs: [legacyLotSlug('org/a', 'L1') as string] })).toEqual({ from: old.branch, unintegrated: 5, behind: 0, conflicts: [] });
+    expect(recoverTree(repo, branch, dir, 'main', { planFiles: new Set(), alsoSlugs: [legacyLotSlug('org/a', 'L1') as string] })).toEqual({ from: old.branch, unintegrated: 5, behind: 0, conflicts: [], caughtUp: 0, notes: [] });
     expect(baseBranchOf(repo, branch)).toBe('main');
     expect(existsSync(old.dir)).toBe(false);
     expect(git(dir, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe(branch);
@@ -165,6 +165,6 @@ describe('R2 — le --dry-run applique les refus de recoverTree et en dit la cau
     removeDryRunBriefs(r.out);
     expect(r.out).toContain(`branche ${old.branch} d'une vague précédente (2 commit(s) non intégré(s)) : reprise par la vague (le lot repart de son travail)`);
     const dir = lotTreeDir(join(parent, '.cadence', 'runs', 'w2'), 'a', 'L1');
-    expect(recoverTree(repo, lotBranch('w2', 'a', 'L1'), dir, 'main', { planFiles: new Set(['.cadence/raf.yaml']), alsoSlugs: [] })).toEqual({ from: old.branch, unintegrated: 2, behind: 0, conflicts: [] });
+    expect(recoverTree(repo, lotBranch('w2', 'a', 'L1'), dir, 'main', { planFiles: new Set(['.cadence/raf.yaml']), alsoSlugs: [] })).toEqual({ from: old.branch, unintegrated: 2, behind: 0, conflicts: [], caughtUp: 0, notes: [] });
   });
 });

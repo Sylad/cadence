@@ -66,7 +66,14 @@ function verrouiller(racine: string): () => void {
   }
 }
 
-type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string; repetitions?: number;
+/** Garde le patch et les commits du bras à côté du clone, puis efface le clone (≈ 1 Go) ; captures et journaux restent. */
+function archiver(c: string, base: string | undefined): void {
+  if (base) for (const [ext, a] of [['patch', ['diff', `${base}..HEAD`]], ['commits.txt', ['log', '--oneline', `${base}..HEAD`]]] as const)
+    try { writeFileSync(`${c}.${ext}`, execFileSync('git', a, { cwd: c, encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'ignore'] })); } catch { /* clone illisible */ }
+  rmSync(c, { recursive: true, force: true });
+}
+
+type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string; repetitions?: number; garderClones?: boolean;
   exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void;
   avantVerdict?: (res: ResultatBanc[]) => void };
 
@@ -86,7 +93,7 @@ function passageVerrouille(o: OptPassage): Verdict {
   const jouer = (b: ReturnType<typeof listerBancs>[number], i: number, k: number): ResultatBanc => {
     const ordre = (i + k - 1) % 2 === 0 ? [o.ref, o.cand] : [o.cand, o.ref];
     const idBanc = N > 1 ? `${b.id}#${k}` : b.id; const sous = N > 1 ? join(b.id, `r${k}`) : b.id;
-    const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {}; const suiteBase: Record<string, number> = {};
+    const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {}; const suiteBase: Record<string, number> = {}; const bases: Record<string, string> = {};
     const mapping: Record<string, string> = {}; // c1/c2 -> bras : écrit seulement après les juges (aveugle)
     let jugement: Jugement | null = null; let phase = 'préparation';
     try {
@@ -95,7 +102,7 @@ function passageVerrouille(o: OptPassage): Verdict {
         mapping[`c${j + 1}`] = n; clones[n] = c;
         phase = 'préparation'; suiteBase[n] = o.prep(b, c).testsBase;
         o.out(`${idBanc} : bras ${n}…`);
-        const avant = etatGit(c);
+        const avant = etatGit(c); bases[n] = avant.head;
         phase = `bras ${n}`; const m = lancerBras(b, bras[n], c, o.exec);
         mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)) };
         phase = 'fuites'; fuites[n] = fuitesDuBras(o.home, o.racine, b.id, c);
@@ -119,6 +126,7 @@ function passageVerrouille(o: OptPassage): Verdict {
     const r: ResultatBanc = { banc: idBanc, taille: b.taille, visible: b.visible, reponses: b.reponses, frais: b.frais, mesures, jugement, fuites };
     mkdirSync(join(dirRun, sous), { recursive: true });
     writeFileSync(join(dirRun, sous, 'resultat.json'), JSON.stringify({ ...r, clones: mapping, suite_base: suiteBase }, null, 2));
+    if (!o.garderClones) for (const n of ordre) if (clones[n]) archiver(clones[n], bases[n]);
     return r;
   };
   const res: ResultatBanc[] = listerBancs(o.racine, o.numeros).flatMap((b, i) => Array.from({ length: N }, (_, k) => jouer(b, i, k + 1)));
@@ -190,7 +198,7 @@ export async function bench(args: string[], io: Io): Promise<number> {
     } catch (e) { io.err(`cadence2 bench ajouter : ${e instanceof Error ? e.message : String(e)}`); return 1; }
   }
   const numeros = sous === 'court' ? COURT : sous === 'hebdo' ? undefined : sous === 'eclair' ? ['1'] : sous === 'lancer' ? (option(reste, 'bancs')?.split(',') ?? null) : null;
-  if (numeros === null) { io.err('usage : cadence2 bench court|hebdo|eclair|lancer --bancs 1,3|statut|verifier-publication|ajouter [--candidat c] [--reference r] [--repetitions N]'); return 2; }
+  if (numeros === null) { io.err('usage : cadence2 bench court|hebdo|eclair|lancer --bancs 1,3|statut|verifier-publication|ajouter [--candidat c] [--reference r] [--repetitions N] [--garder-clones]'); return 2; }
   const rep = repetitions(reste);
   if (rep === null) { io.err('usage : --repetitions N (entier ≥ 1) avec court|hebdo|eclair|lancer'); return 2; }
   const ref = option(reste, 'reference') ?? 'A'; const cand = option(reste, 'candidat') ?? 'equipe-legere';
@@ -204,7 +212,7 @@ export async function bench(args: string[], io: Io): Promise<number> {
   let eclair = true;
   const v = passage({ racine, numeros, ref, cand,
     avantVerdict: sous === 'eclair' ? (res) => { const e = controlesEclair(res, ref, cand); eclair = e.ok; e.lignes.forEach((l) => io.out(l)); } : undefined,
-    hebdo: sous === 'hebdo', repetitions: rep, juge: option(reste, 'juge') ?? 'opus', exec: executeurClaude, prep: preparer,
+    hebdo: sous === 'hebdo', repetitions: rep, garderClones: reste.includes('--garder-clones'), juge: option(reste, 'juge') ?? 'opus', exec: executeurClaude, prep: preparer,
     maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out });
   return v.vert && eclair ? 0 : 1;
 }

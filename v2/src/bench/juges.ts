@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { lireDemande, type Banc } from './banc.js';
 import { environnementNeutre, OUTILS_INTERDITS, type Executeur } from './bras.js';
@@ -98,22 +98,23 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
     }
     return true;
   };
-  if (!copier()) return null;
-  const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests };
-  const sMeca = join(dirEval, 'meca.json');
-  const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca }), sMeca, validerMeca, dirEval, modele, exec) as Record<'X' | 'Y', Meca> | null;
-  if (!copier()) return null; // le juge à l'aveugle voit les livrables, pas les mutations
-  const ecran = b.visible
-    ? `Lance l'app de chaque copie, l'une après l'autre, comme le dit ${v.MESURE} (section Écran). Fais des captures à 1440 et à 390 px dans ${dirEval}/captures-X et captures-Y, et regarde-les. ui = la copie dont l'écran est le plus cohérent avec le reste de l'application.`
-    : 'Pas d\'écran : ui = "na".';
-  const sAv = join(dirEval, 'aveugle.json');
-  const av = demander(remplir('juge-aveugle.md', { ...v, ECRAN: ecran, SORTIE: sAv }), sAv, validerAveugle, dirEval, modele, exec) as
-    { X: Defauts; Y: Defauts; prefere: string; ui: string; raisons: string } | null;
-  if (!meca || !av) return null;
-  const nom = (x: string) => (x === 'X' || x === 'Y' ? anon[x] : x);
-  for (const k of ['X', 'Y'] as const) if (existsSync(join(dirEval, k))) rmSync(join(dirEval, k), { recursive: true, force: true });
-  return {
-    meca: { [anon.X]: meca.X, [anon.Y]: meca.Y }, defauts: { [anon.X]: av.X, [anon.Y]: av.Y },
-    prefere: nom(av.prefere), ui: nom(av.ui), raisons: av.raisons,
-  };
+  try {
+    if (!copier()) return null;
+    const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests };
+    const sMeca = join(dirEval, 'meca.json');
+    const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca }), sMeca, validerMeca, dirEval, modele, exec) as Record<'X' | 'Y', Meca> | null;
+    if (!copier()) return null; // le juge à l'aveugle voit les livrables, pas les mutations
+    const ecran = b.visible
+      ? `Lance l'app de chaque copie, l'une après l'autre, comme le dit ${v.MESURE} (section Écran). Fais des captures à 1440 et à 390 px dans ${dirEval}/captures-X et captures-Y, et regarde-les. ui = la copie dont l'écran est le plus cohérent avec le reste de l'application.`
+      : 'Pas d\'écran : ui = "na".';
+    const sAv = join(dirEval, 'aveugle.json');
+    const av = demander(remplir('juge-aveugle.md', { ...v, ECRAN: ecran, SORTIE: sAv }), sAv, validerAveugle, dirEval, modele, exec) as
+      { X: Defauts; Y: Defauts; prefere: string; ui: string; raisons: string } | null;
+    if (!meca || !av) return null;
+    const nom = (x: string) => (x === 'X' || x === 'Y' ? anon[x] : x);
+    return {
+      meca: { [anon.X]: meca.X, [anon.Y]: meca.Y }, defauts: { [anon.X]: av.X, [anon.Y]: av.Y },
+      prefere: nom(av.prefere), ui: nom(av.ui), raisons: av.raisons,
+    };
+  } finally { for (const k of ['X', 'Y']) rmSync(join(dirEval, k), { recursive: true, force: true }); } // copies effacées sur tous les chemins
 }

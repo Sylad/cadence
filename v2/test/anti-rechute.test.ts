@@ -109,7 +109,7 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/bench/juges.ts': ['output-format', 'model', 'permission-mode', 'disallowedTools', 'resume', 'porcelain'], // + git status --porcelain
   'src/bench/preparer.ts': ['no-hardlinks', 'format', 'is-ancestor', 'all', 'expire', 'prune', 'not'],
   'src/bench/ajouter.ts': ['format', 'reverse', 'grep', 'verify', 'name-only'],
-  'src/bench/cli.ts': ['porcelain'], // git status --porcelain
+  'src/bench/cli.ts': ['porcelain', 'oneline'], // git status --porcelain, git log --oneline
 };
 const prefixe = (k: string) => (k.startsWith('src/bench/') ? 'bench' : 'cadence2');
 function reglesC4(f: Fichiers, existe: (chemin: string) => boolean): string[] {

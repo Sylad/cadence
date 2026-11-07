@@ -239,7 +239,7 @@ describe('répétitions (R18)', () => {
   it('N = 1 : ids et dossiers inchangés', () => {
     const r = racine();
     passage({ ...base, racine: r, numeros: ['1'], exec, home: r, out: () => {} });
-    expect(existsSync(join(r, 'runs', '2026-11-08-1000-e1', '1-a', 'c1'))).toBe(true);
+    expect(existsSync(join(r, 'runs', '2026-11-08-1000-e1', '1-a', 'c1.patch'))).toBe(true);
   });
   it('--repetitions 0, -1, 1.5, abc : usage et code 2, pour court, hebdo, lancer et eclair', async () => {
     for (const sous of ['court', 'hebdo', 'eclair', 'lancer']) for (const v of ['0', '-1', '1.5', 'abc']) {
@@ -295,5 +295,29 @@ describe('travail du bras (I-2)', () => {
   it('un fichier non suivi laissé par l\'install avant le bras ne compte pas ; un commit propre passe', () => {
     const prepSale = (b: unknown, cible: string) => { const x = prep(b, cible); writeFileSync(join(cible, 'artefact-install'), 'x'); return x; };
     expect(jouer(commit, prepSale).C.echec).toBeNull();
+  });
+});
+
+describe('nettoyage des clones (I-3)', () => {
+  const jouer = (garderClones?: boolean) => {
+    const r = racine();
+    const exec2: Executeur = (args, o) => { if (!/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) { mkdirSync(`${o.cwd}.captures`, { recursive: true }); writeFileSync(`${o.cwd}.captures/a.png`, 'p'); } return exec(args, o); };
+    passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: exec2, prep: prep as never, garderClones,
+      maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
+    return join(r, 'runs', '2026-11-08-1000-e1', '1-a');
+  };
+  it('après resultat.json : patch et commits gardés à côté, clone effacé, captures gardées', () => {
+    const d = jouer();
+    for (const c of ['c1', 'c2']) {
+      expect(existsSync(join(d, c)), `${c} reste`).toBe(false);
+      expect(existsSync(join(d, `${c}.patch`))).toBe(true);
+      expect(readFileSync(join(d, `${c}.commits.txt`), 'utf8')).toMatch(/bras/);
+      expect(existsSync(join(d, `${c}.captures`, 'a.png'))).toBe(true);
+    }
+    expect(existsSync(join(d, 'resultat.json'))).toBe(true);
+  });
+  it('--garder-clones : les clones restent', () => {
+    const d = jouer(true);
+    expect(existsSync(join(d, 'c1', '.git'))).toBe(true);
   });
 });

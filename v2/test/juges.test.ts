@@ -64,6 +64,7 @@ describe('juges', () => {
   it('JSON invalide deux fois : banc non jugé (null), jamais un vert par défaut', () => {
     const { b, clones, dirEval } = decor();
     expect(juger(b, clones, dirEval, 'opus', fauxJuge([{}, {}]), () => 0.2)).toBeNull();
+    for (const k of ['X', 'Y']) expect(existsSync(join(dirEval, k)), `copie ${k} restée`).toBe(false);
   });
   it('sortie claude illisible ou code non nul : null, sans exception (R7)', () => {
     const { b, clones, dirEval } = decor();
@@ -75,6 +76,7 @@ describe('juges', () => {
     const { b, clones, dirEval } = decor();
     clones.cand = mkdtempSync(join(tmpdir(), 'pasgit-'));
     expect(juger(b, clones, dirEval, 'opus', fauxJuge([]), () => 0.2)).toBeNull();
+    for (const k of ['X', 'Y']) expect(existsSync(join(dirEval, k)), `copie ${k} restée`).toBe(false);
   });
   it('le juge aveugle voit des copies fraîches, sans les mutations du mécanique', () => {
     const { b, clones, dirEval } = decor();

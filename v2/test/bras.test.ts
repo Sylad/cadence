@@ -1,0 +1,73 @@
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import type { Banc } from '../src/bench/banc.js';
+import { environnementNeutre, lancerBras, OUTILS_INTERDITS, type Executeur } from '../src/bench/bras.js';
+
+function bancTest(reponses?: string): { b: Banc; clone: string } {
+  const r = mkdtempSync(join(tmpdir(), 'bras-'));
+  const dir = join(r, 'bancs', '1-t'); mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'demande.md'), 'Ajoute un séparateur.');
+  if (reponses) writeFileSync(join(dir, 'reponses.md'), reponses);
+  const clone = join(r, 'runs', 'x', '1-t', 'A'); mkdirSync(clone, { recursive: true });
+  const b: Banc = { id: '1-t', dir, secrets: join(r, 'secrets', '1-t'), projet: 't', source: '/s', base: 'abc1234',
+    install: 'true', tests: 'true', visible: false, taille: 'retouche', frais: false, reponses: !!reponses };
+  return { b, clone };
+}
+const json = (session: string, tokens: number, cout: number) => JSON.stringify({ session_id: session, total_cost_usd: cout,
+  modelUsage: { 'claude-opus-5-5': { inputTokens: tokens, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 } } });
+
+describe('lancerBras', () => {
+  const brief = join(import.meta.dirname, '..', 'briefs', 'bras-A.md');
+
+  it('une session sans question : mesures, brief rempli, garde-fous passés à claude', () => {
+    const { b, clone } = bancTest();
+    const appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
+    const exec: Executeur = (args, o) => { appels.push({ args, env: o.env }); return { stdout: json('s1', 1000, 0.5), code: 0 }; };
+    let t = 0; const horloge = () => new Date(Date.UTC(2026, 10, 8, 10, 0, t++ * 90));
+    const m = lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, exec, horloge);
+    expect(m).toMatchObject({ bras: 'A', banc: '1-t', duree_s: 90, tokens: 1000, cout_usd: 0.5, questions: 0, sessions: ['s1'] });
+    const a = appels[0].args;
+    expect(a[a.indexOf('-p') + 1]).toContain('Ajoute un séparateur.');
+    expect(a[a.indexOf('-p') + 1]).toContain(clone);
+    expect(a[a.indexOf('-p') + 1]).not.toContain('{{');
+    expect(a).toContain('--disallowedTools');
+    expect(a[a.indexOf('--disallowedTools') + 1].split(',')).toEqual(OUTILS_INTERDITS);
+    expect(a[a.indexOf('--model') + 1]).toBe('opus');
+    expect(appels[0].env.KUBECONFIG).toBe('/nonexistent');
+    expect(appels[0].env.GH_TOKEN).toBe('');
+  });
+
+  it('une question : réponse du banc, reprise de la même session, question comptée', () => {
+    const { b, clone } = bancTest('Rotation seule.');
+    const appels: string[][] = [];
+    const exec: Executeur = (args) => {
+      appels.push(args);
+      if (appels.length === 1) writeFileSync(`${clone}.question.md`, 'Faut-il réorganiser ?');
+      return { stdout: json('s1', 500, 0.1), code: 0 };
+    };
+    const m = lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, exec);
+    expect(m.questions).toBe(1);
+    expect(m.tokens).toBe(1000);
+    expect(appels[1]).toEqual(expect.arrayContaining(['--resume', 's1']));
+    expect(appels[1][appels[1].indexOf('-p') + 1]).toContain('Rotation seule.');
+    expect(existsSync(`${clone}.question.md`)).toBe(false);
+  });
+
+  it('au-delà de 3 questions, on arrête', () => {
+    const { b, clone } = bancTest();
+    const exec: Executeur = () => { writeFileSync(`${clone}.question.md`, '?'); return { stdout: json('s', 1, 0), code: 0 }; };
+    expect(lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, exec).questions).toBe(3);
+  });
+
+  it('sortie illisible : erreur avec la fin de la sortie', () => {
+    const { b, clone } = bancTest();
+    expect(() => lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, () => ({ stdout: 'boum', code: 1 }))).toThrow(/boum/);
+  });
+
+  it('environnement neutre : pas de kube, pas de jeton, pas de prod maritime', () => {
+    const e = environnementNeutre({ HOME: '/h', KUBECONFIG: '/h/.kube/config', GH_TOKEN: 'x', GITHUB_TOKEN: 'y' });
+    expect(e).toMatchObject({ HOME: '/h', KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', AETHERWX_URL: 'http://127.0.0.1:9' });
+  });
+});

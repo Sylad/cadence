@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { RunStore } from '../src/orchestrate/state.js';
 import { tourRow, tourStaleBranchLines } from '../src/lead.js';
 import { gitRepo } from './helpers.js';
 
@@ -36,7 +37,8 @@ describe('lead tour — branche vieille, données réelles (L676)', () => {
     const lines = tourStaleBranchLines([tourRow(dir, '2026-11-07')], Date.now());
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('2 commit(s) non intégré(s)');
-    expect(lines[0]).toContain('--resume --wave 2026-11-01-0800 --integrate demo:L1');
+    expect(lines[0]).toContain('reprendre : cadence orchestrate demo:L1');
+    expect(lines[0]).not.toContain('--integrate');
   });
   it('R2 — une vraie branche de 3 j sans commit non intégré : aucun ⚠', () => {
     const dir = repoWithBranch({ lot: 'demo:L1', createdMsAgo: 72 * H, commits: 0 });
@@ -46,10 +48,26 @@ describe('lead tour — branche vieille, données réelles (L676)', () => {
     const dir = repoWithBranch({ lot: 'demo:L1', createdMsAgo: 47 * H, commits: 1 });
     expect(tourStaleBranchLines([tourRow(dir, '2026-11-07')], Date.now())).toEqual([]);
   });
-  it('R2 — la même ligne ne sort pas deux fois si la liste est lue deux fois', () => {
+  it('R2 — une vraie branche à 3 j dont le lot est rendu à l\'intégration dans sa vague : le ⚠ propose --integrate', () => {
     const dir = repoWithBranch({ lot: 'demo:L1', createdMsAgo: 72 * H, commits: 1 });
-    const row = tourRow(dir, '2026-11-07');
-    expect(tourStaleBranchLines([row], Date.now())).toHaveLength(1);
-    expect(tourStaleBranchLines([row], Date.now())).toHaveLength(1);
+    const store = new RunStore(dir, '2026-11-01-0800');
+    store.writeLot({ project: 'demo', lot: 'L1', repo: dir, status: 'handed-back', next: 'integrate' } as never);
+    const [line] = tourStaleBranchLines([tourRow(dir, '2026-11-07')], Date.now());
+    expect(line).toContain('intégrer : cadence orchestrate --resume --wave 2026-11-01-0800 --integrate demo:L1');
+  });
+  it('R2 — une vraie branche à 3 j en conflit avec main : la reprise est refusée, la ligne le dit au lieu de proposer « reprendre »', () => {
+    const dir = repoWithBranch({ lot: 'demo:L1', createdMsAgo: 72 * H, commits: 1 });
+    writeFileSync(join(dir, 'f0.txt'), 'main');
+    git(dir, 'add', '.');
+    git(dir, 'commit', '-q', '-m', 'main avance sur le même fichier');
+    const [line] = tourStaleBranchLines([tourRow(dir, '2026-11-07')], Date.now());
+    expect(line).toContain('reprise refusée (main a 1 commit(s) d\'avance et 1 conflit(s) (f0.txt))');
+    expect(line).not.toContain('reprendre :');
+  });
+  it('R2 — une vraie branche sans cadence-lot dans la config git : la ligne dit que le lot est inconnu, sans geste', () => {
+    const dir = repoWithBranch({ createdMsAgo: 72 * H, commits: 1 });
+    const [line] = tourStaleBranchLines([tourRow(dir, '2026-11-07')], Date.now());
+    expect(line).toContain('lot non identifié');
+    expect(line).not.toContain('reprendre :');
   });
 });

@@ -18,7 +18,9 @@ import { staleNotes, staleText } from './stale-notes.js';
 import { ciGapsField, ciParityText, type CiGap } from './orchestrate/ci-parity.js';
 import { noTestGate, noTestText, type NoTestGate } from './orchestrate/no-test.js';
 import { unpublishedField, unpublishedLine, type Unpublished } from './unpublished.js';
-import { KEPT_TITLE, UNDECIDED_BRANCH_HOURS, ageText, keptLine, keptTrees, type KeptTree } from './orchestrate/worktree.js';
+import { KEPT_TITLE, STALE_BASE_COMMITS, UNDECIDED_BRANCH_HOURS, ageText, branchStaleness, keptLine, keptTrees, stalenessText, type KeptTree } from './orchestrate/worktree.js';
+import { RunStore } from './orchestrate/state.js';
+import { integrationHandBack } from './orchestrate/integration-vivante.js';
 
 /** Le bloc `lead:` du cadence.yaml du dossier parent (absent = `undefined`) ; un `lead` qui n'est pas une table est refusé en nommant `key`. */
 function readLeadBlock(parent: string, key: string, expected: string): { file: string; block: Record<string, unknown> } | undefined {
@@ -126,6 +128,8 @@ export interface TourRow {
   repo: string[];
   /** Worktrees de lot conservés par une vague (L279, R19) ; absent quand il n'y en a aucun. */
   worktrees?: KeptTree[];
+  /** Les gestes que le ⚠ de chaque branche gardée de plus de 48 h peut honnêtement proposer (L676), par branche ; absent sans branche gardée avec des commits non intégrés. */
+  branchGestures?: Record<string, BranchGestures>;
   /** Le projet ne déclare pas `orchestrate.test` (L327) : la vague ne lancera pas la suite ; absent quand il le déclare. */
   noTest?: NoTestGate;
   /** Commandes de test des workflows CI que la porte ne joue pas (L499) ; absent quand il n'y en a aucune. */
@@ -182,6 +186,32 @@ export function findProjects(parent: string, depth = 1): string[] {
   return found.sort();
 }
 
+/** Ce que le lead peut faire d'une branche gardée : `integrable` (le lot est rendu à l'intégration, ou corrigé et revu conforme : `--integrate` l'accepte) et `resumeRefusal` (pourquoi la reprise refuserait la branche, L665 ; null quand elle la reprend). */
+export interface BranchGestures {
+  integrable: boolean;
+  resumeRefusal: string | null;
+}
+
+/** Les gestes de chaque branche gardée qui porte des commits non intégrés, lus sans rien écrire : l'état du lot dans sa vague, et l'âge de la branche (même seuil que `recoveryRefusal`). */
+function branchGestures(root: string, trees: KeptTree[]): { branchGestures?: Record<string, BranchGestures> } {
+  const out: Record<string, BranchGestures> = {};
+  for (const t of trees.filter((x) => x.unintegrated > 0 && x.created > 0 && Date.now() - x.created > UNDECIDED_BRANCH_HOURS * 3600_000)) {
+    const age = branchStaleness(root, t.branch, t.base);
+    const resumeRefusal = age.behind > STALE_BASE_COMMITS ? `${stalenessText(age)}, plus de ${STALE_BASE_COMMITS} commits d'avance` : age.conflicts.length ? stalenessText(age) : null;
+    const [project, lot] = t.lot.split(':');
+    let integrable = false;
+    if (lot && existsSync(join(RunStore.runsDir(root), t.wave))) {
+      try {
+        const store = new RunStore(root, t.wave);
+        const state = store.readLot(project, lot);
+        integrable = !!state && !!integrationHandBack(store, state);
+      } catch { /* état de vague illisible : aucun geste d'intégration proposé */ }
+    }
+    out[t.branch] = { integrable, resumeRefusal };
+  }
+  return Object.keys(out).length ? { branchGestures: out } : {};
+}
+
 /** Les faits de `cadence session start` pour un projet, sous forme de données ; lecture seule. */
 export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basename(dir)): TourRow {
   const row = empty(name);
@@ -225,6 +255,7 @@ export function tourRow(dir: string, today: Day, idle = TOUR_IDLE, name = basena
     row.repo.push(...localRepoNotes(root, new Date()));
     const kept = keptTrees(root);
     if (kept.length) row.worktrees = kept;
+    Object.assign(row, branchGestures(root, kept));
     const noTest = noTestGate(root);
     if (noTest) row.noTest = noTest;
     Object.assign(row, ciGapsField(root));
@@ -297,12 +328,20 @@ export function tourUnpublishedLines(rows: TourRow[]): string[] {
 }
 
 /**
- * Une ligne ⚠ par branche de lot gardée qui porte des commits non intégrés depuis plus de `UNDECIDED_BRANCH_HOURS` h (L676) : le lead décide, intégrer
- * (`--resume --wave <vague> --integrate`) ou reprendre (relancer le lot, la reprise refuse une branche périmée, L665). Une date de création absente (0) n'en marque aucune.
+ * Une ligne ⚠ par branche de lot gardée qui porte des commits non intégrés, créée il y a plus de `UNDECIDED_BRANCH_HOURS` h (L676). Les gestes ne sont proposés que s'ils valent :
+ * intégrer (`--resume --wave <vague> --integrate`) quand le lot est rendu à l'intégration ou revu conforme (`branchGestures`), reprendre (relancer le lot) quand la reprise n'est pas refusée
+ * (L665) ; sinon la ligne dit le refus et propose de rebaser à la main ou de retirer la branche. Une date de création absente (0) n'en marque aucune ; un lot que la config git ne nomme pas
+ * (`cadence-lot` absent : `lot` est le nom de la branche) n'a aucun geste.
  */
 export function tourStaleBranchLines(rows: TourRow[], now = Date.now()): string[] {
-  return rows.flatMap((r) => (r.worktrees ?? []).filter((t) => t.unintegrated > 0 && t.created > 0 && now - t.created > UNDECIDED_BRANCH_HOURS * 3600_000).map((t) =>
-    `⚠ ${r.project} · ${t.lot} · branche non intégrée depuis ${ageText(now - t.created)} (${t.unintegrated} commit(s) non intégré(s)), sans décision · intégrer : cadence orchestrate --resume --wave ${t.wave} --integrate ${t.lot} · reprendre : cadence orchestrate ${t.lot}`));
+  return rows.flatMap((r) => (r.worktrees ?? []).filter((t) => t.unintegrated > 0 && t.created > 0 && now - t.created > UNDECIDED_BRANCH_HOURS * 3600_000).map((t) => {
+    const head = `⚠ ${r.project} · ${t.lot} · branche créée il y a ${ageText(now - t.created)}, toujours non intégrée (${t.unintegrated} commit(s) non intégré(s))`;
+    if (!t.lot.includes(':')) return `${head} · lot non identifié (config git sans cadence-lot) : intégrer ou retirer la branche ${t.branch} à la main`;
+    const g = r.branchGestures?.[t.branch];
+    const integrate = g?.integrable ? [`intégrer : cadence orchestrate --resume --wave ${t.wave} --integrate ${t.lot}`] : [];
+    const resume = g?.resumeRefusal ? [`reprise refusée (${g.resumeRefusal}) : rebaser à la main ou retirer : cadence orchestrate --remove-worktree ${t.lot} --abandon-commits`] : [`reprendre : cadence orchestrate ${t.lot}`];
+    return [head, ...integrate, ...resume].join(' · ');
+  }));
 }
 
 const DRIFT_SHOWN = 2;

@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [1.62.0] - 2026-11-07
+
 ### Added
 
 - `cadence orchestrate queue add|show|drop <project>:<lot>…` and `--queue` (L498, [docs/orchestrate.md](docs/orchestrate.md#the-queue-l498)): the lead approves an ordered list of lots once, and every live wave draws the next one as soon as one of its slots is free, before the plan, without going through the lead. The queue is `queue.json` in the shared state (`~/.cadence/orchestrate/`), written by atomic rename under a lock, never a commit; `show` says the state of each lot (« en attente », « sauté : <cause> », « réservé » or « tiré par la vague <id> »), `drop` refuses a lot already drawn. A wave takes the first mature lot of the queue (ready, no question, no `uses:` resource taken, not kept out by `orchestrate.continue`, budget that fits), reserves it so two waves never play the same lot, and pushes it with the mechanism of `--add` into the live wave that holds its repository, or plays it itself when no wave does; the journal says `file : tire <project:lot> (position n)`, `file : lot sauté — <project:lot> : <cause>` (once per cause per wave) or `file : aucun lot mûr`. A skipped lot stays in the queue at its place; a reservation left by a dead wave is taken back; `--until` also goes with `--queue`; `--no-fill` keeps the plan out of the free slots, not the queue.

@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **1.62.0**: `orchestrate queue` lets the lead approve an ordered list of lots once, drawn by any live wave; a wave resumed after days rebases its branch first; an integration tolerates a modified plan; `--follow` loses no line.
 - **1.61.0**: a stale kept branch is no longer recovered; `raf done` reads a verdict's start only; cadence's own gate overflows to a second machine; a fixed minor is no longer reopened; a test must not build a step's state by hand.
 - **1.60.0**: `--add` takes `--goal` and `--budget`, `--resume` rereads a changed goal; the probe skips diffs the gate cannot reach; `verify --gate` finds waves launched higher up; the lots panel shows sleeping lots.
 - **1.59.0**: the review loop stops reopening the same defect and a repeated finding is recognised by its place; `raf done` refuses a handed-back lot whose code is not on main; a fix no longer leaves its documentation behind.
@@ -91,6 +92,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**1.62.0**: `cadence orchestrate queue add|show|drop` and `--queue` let the lead approve an ordered list of lots once, and every live wave draws the next mature one as soon as a slot is free, without going through the lead (L498). A wave that finds a branch of the lot, including its own on `--resume`, rebases it onto the repository's branch before any session, and hands the lot back if that fails (L676). An integration no longer refuses its lot for a modified plan in the lead's tree (L673), and the warning of `raf add`, `raf note` and `raf done` says so (L425). The lead's answer is written in the lot's notes and every wait over 10 s says what it waits for (L670), and becomes a rule with its edge cases before the spec (L666). `orchestrate --follow` no longer loses a line between two follow-ups (L668), `cadence lead tour` marks stale kept branches with the gestures that hold, a lot that names a shared page gets it in its `uses:` (L671), the overflow gate never waits for a host slot (L674), and the `deliver` skill says what happens without a `deliver:` key (L675).
 
 **1.61.0**: A kept branch of a past wave is no longer recovered when it has gone stale (L665). `raf done` reads only the start of a verdict, so a compliant verdict quoting « non conforme » passes (L660). A test that builds by hand the state a cycle step writes no longer passes the lot (L663), the correction pass receives the open minors of the last review (L664) and no longer gets a fixed minor back as open (L667). cadence's own gate plays on the free machine (L661).
 

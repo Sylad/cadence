@@ -2981,11 +2981,12 @@ lots:
     finished: 2026-11-07
   - id: L668
     title: "orchestrate --follow perd une ligne entre deux suivis : 06-11, la question de L477 (22:00:39Z) n'a pas été remontée au réarmement du suivi et a attendu 33 min ; --follow --since <horodatage ou ligne> rejoue les lignes manquées, et une question ouverte se relit au démarrage du suivi ; mesure : 0 ligne de geste perdue au réarmement"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-06
     started: 2026-11-07
     review: { date: 2026-11-07, verdict: "conforme : voie express (retouche de 0,1 j au plus), pas de revue séparée — le lead lit le diff et regarde la capture — orchestré (vague 2026-11-07-0800, 0 passe(s) de correction)", commit: b9d440aa1cfa68bfef7671cad09b2419e240e751, reporte: { de: f8a66ed240a96c396526ab3580365f5f5f000638, vers: b9d440aa1cfa68bfef7671cad09b2419e240e751, patchId: 77e84f962e893d645e6e9876901eed861f62711f } }
+    finished: 2026-11-07
   - id: L669
     title: "test/changelog.test.ts hermétique aux tags : le test lit `git tag --list v*` (global, changelog.test.ts:21,34) donc chaque tag du lead rougit tous les worktrees de vague ; ne lire que `git tag --merged HEAD` ; 07-11 : v1.61.0 posé à 00:11:40Z, L477 bloqué (≥ 10,8 min, session fable de 33,6 min sans commit) ; niveau : source (test), niveau le plus tôt : source ; mesure : 0 test de CHANGELOG rouge dans un worktree après un tag du lead"
     status: done

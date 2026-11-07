@@ -167,8 +167,8 @@ describe('R5 / R7 — les ressources tenues par une file qui joue : uses: et dif
     const l2 = ctxOf(repo, 'L2', undefined, 'queued');
     const l3 = ctxOf(repo, 'L3', undefined, 'queued');
     const lock = resourceLock(new Map([[Promise.resolve(), [l1]]]), new Set([l1, l2, l3]));
-    expect(lock.wants([l2])).toBe(true);
-    expect(lock.wants([l3])).toBe(false);
+    expect(lock.wanted([l2])).not.toEqual([]);
+    expect(lock.wanted([l3])).toEqual([]);
   });
 
   it('R7 — lot sans commit : aucune ressource déduite, le lot prêt voisin est offert', () => {
@@ -176,7 +176,7 @@ describe('R5 / R7 — les ressources tenues par une file qui joue : uses: et dif
     planWithUses(repo);
     const l1 = ctxOf(repo, 'L1', tree('L1'));
     const l2 = ctxOf(repo, 'L2', undefined, 'queued');
-    expect(resourceLock(new Map([[Promise.resolve(), [l1]]]), new Set([l1, l2])).wants([l2])).toBe(false);
+    expect(resourceLock(new Map([[Promise.resolve(), [l1]]]), new Set([l1, l2])).wanted([l2])).toEqual([]);
   });
 
   it('R5 — lot « uses: [banc] » sans diff : banc reste tenu', () => {
@@ -184,7 +184,7 @@ describe('R5 / R7 — les ressources tenues par une file qui joue : uses: et dif
     planWithUses(repo);
     const l3 = ctxOf(repo, 'L3', tree('L3'));
     const other = ctxOf(repo, 'L3', undefined, 'queued');
-    expect(resourceLock(new Map([[Promise.resolve(), [l3]]]), new Set([l3, other])).wants([other])).toBe(true);
+    expect(resourceLock(new Map([[Promise.resolve(), [l3]]]), new Set([l3, other])).wanted([other])).not.toEqual([]);
   });
 
   it('R5 — fichier sous deux ressources : les deux sont tenues', () => {
@@ -199,7 +199,7 @@ describe('R5 / R7 — les ressources tenues par une file qui joue : uses: et dif
     const l1 = ctxOf(repo, 'L1', tree('L1', ['src/orchestrate/cycle.ts']), 'ready');
     const l2 = ctxOf(repo, 'L2', undefined, 'queued');
     // une file finie n'est plus dans `live`
-    expect(resourceLock(new Map([[Promise.resolve(), [l1]]]), new Set([l2])).wants([l2])).toBe(false);
+    expect(resourceLock(new Map([[Promise.resolve(), [l1]]]), new Set([l2])).wanted([l2])).toEqual([]);
   });
 
   it('R1 — resources en liste de noms : resourceLock ne lit aucun diff (le résultat d\'avant)', () => {
@@ -207,7 +207,7 @@ describe('R5 / R7 — les ressources tenues par une file qui joue : uses: et dif
     planWithUses(repo);
     const l1 = ctxOf(repo, 'L1', tree('L1', ['src/orchestrate/cycle.ts']));
     const l2 = ctxOf(repo, 'L2', undefined, 'queued');
-    expect(resourceLock(new Map([[Promise.resolve(), [l1]]]), new Set([l1, l2])).wants([l2])).toBe(false);
+    expect(resourceLock(new Map([[Promise.resolve(), [l1]]]), new Set([l1, l2])).wanted([l2])).toEqual([]);
   });
 
   it('R12 — un diff illisible : la file ne tient que ses uses:, la cause est rendue une fois par lot', () => {
@@ -219,8 +219,8 @@ describe('R5 / R7 — les ressources tenues par une file qui joue : uses: et dif
     const l2 = ctxOf(repo, 'L2', undefined, 'queued');
     const warned: string[] = [];
     const lock = resourceLock(new Map([[Promise.resolve(), [l1]]]), new Set([l1, l2]), (c, cause) => warned.push(`${c.lot.lot}:${cause}`));
-    expect(lock.wants([l2])).toBe(false);
-    expect(lock.wants([l2])).toBe(false);
+    expect(lock.wanted([l2])).toEqual([]);
+    expect(lock.wanted([l2])).toEqual([]);
     expect(warned).toHaveLength(1);
     expect(warned[0]).toMatch(/^L1:/);
   });

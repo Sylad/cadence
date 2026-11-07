@@ -66,8 +66,8 @@ export interface OrchestrateDeps {
   snapshot?: SnapshotDeps;
   /** Cœurs de la machine (L350) : de quoi calculer la part de chaque session ; défaut `availableParallelism()`, injectable pour les tests. */
   cores?: () => number;
-  /** Attente du verrou d'intégration du dépôt (L279, R25) : défauts 10 minutes et 1 s ; réglable pour les tests. */
-  integrate?: { waitMs?: number; pollMs?: number };
+  /** Attente du verrou d'intégration du dépôt (L279, R25) : défauts 10 minutes et 1 s ; `slowMs` (L670) : au-delà, l'attente est dite au journal (défaut 10 s) ; réglables pour les tests. */
+  integrate?: { waitMs?: number; pollMs?: number; slowMs?: number };
   /** Attente, par `--resume --integrate`/`--replay`, du verrou de dépôt tenu par une autre vague vivante (L443) : défauts 3 heures et 5 s ; réglable pour les tests. */
   repoWait?: { waitMs?: number; pollMs?: number };
 }

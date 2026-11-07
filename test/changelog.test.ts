@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const root = join(import.meta.dirname, '..');
 const changelog = readFileSync(join(root, 'CHANGELOG.md'), 'utf8');
 const version: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+// Seuls les tags atteignables depuis HEAD comptent : un tag posé ailleurs (le lead) ne regarde pas un worktree de vague.
+const mergedTags = (cwd: string): string[] =>
+  execFileSync('git', ['tag', '--merged', 'HEAD', '--list', 'v*'], { cwd, encoding: 'utf8' }).split('\n').filter(Boolean);
 const headings = [...changelog.matchAll(/^## \[(\d+\.\d+\.\d+)\]/gm)].map((m) => m[1]);
 
 describe('CHANGELOG.md', () => {
@@ -18,9 +22,22 @@ describe('CHANGELOG.md', () => {
   });
 
   it('a une section par tag git existant', () => {
-    const tags = execFileSync('git', ['tag', '--list', 'v*'], { cwd: root, encoding: 'utf8' })
-      .split('\n').filter(Boolean).map((t) => t.slice(1));
+    const tags = mergedTags(root).map((t) => t.slice(1));
     for (const tag of tags) expect(headings, `section [${tag}] manquante`).toContain(tag);
+  });
+
+  it('ignore un tag posé sur un commit hors de HEAD', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'changelog-tags-'));
+    const g = (...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, encoding: 'utf8' });
+    try {
+    g('init', '-q');
+    g('commit', '-q', '--allow-empty', '-m', 'base');
+    g('tag', 'v1.0.0');
+    g('commit', '-q', '--allow-empty', '-m', 'ailleurs');
+    g('tag', 'v9.9.9');
+    g('reset', '-q', '--hard', 'HEAD~1');
+    expect(mergedTags(dir)).toEqual(['v1.0.0']);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   it('ne répète aucune version', () => {
@@ -31,7 +48,7 @@ describe('CHANGELOG.md', () => {
 describe('CHANGELOG.md — une entrée est rangée sous la version qui la contient', () => {
   const sections = changelog.split(/^## /m).slice(1);
   const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
-  const tagged = (v: string) => git('tag', '--list', `v${v}`).trim() !== '';
+  const tagged = (v: string) => mergedTags(root).includes(`v${v}`);
 
   it('un lot cité sous le dernier tag a au moins un commit dans ce tag', () => {
     const latest = sections.find((section) => {

@@ -9,7 +9,7 @@ import { chargerBras, executeurClaude, lancerBras, type DefBras, type Executeur,
 import { fuitesDuBras } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
-import { BARRE_SPEC, banBase, ligneHistorique, rapport, statut, verdict, type ResultatBanc, type Verdict } from './verdict.js';
+import { BARRE_SPEC, banBase, ligneHistorique, parisJour, rapport, statut, verdict, type ResultatBanc, type Verdict } from './verdict.js';
 
 const REPO = join(import.meta.dirname, '..', '..', '..');
 const COURT = ['1', '3', '6'];
@@ -74,17 +74,16 @@ function archiver(c: string, base: string | undefined): void {
 }
 
 type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string; repetitions?: number; garderClones?: boolean;
-  exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void;
-  avantVerdict?: (res: ResultatBanc[]) => void };
+  exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void; eclair?: boolean };
 
-export function passage(o: OptPassage): Verdict {
+export function passage(o: OptPassage): Verdict & { eclair_ok?: boolean } {
   const liberer = verrouiller(o.racine);
   try { return passageVerrouille(o); } finally { liberer(); }
 }
 
-function passageVerrouille(o: OptPassage): Verdict {
-  const date = o.maintenant.toISOString().slice(0, 10);
-  const id = `${date}-${o.maintenant.toISOString().slice(11, 16).replace(':', '')}-${o.empreinte}`;
+function passageVerrouille(o: OptPassage): Verdict & { eclair_ok?: boolean } {
+  const { jour: date, hhmm } = parisJour(o.maintenant); // nom du passage à l'heure de Paris, comme statut
+  const id = `${date}-${hhmm}-${o.empreinte}`;
   const dirRun = join(o.racine, 'runs', id);
   const bras = chargerBras(o.racine);
   for (const n of [o.ref, o.cand]) if (!bras[n]) throw new Error(`bras « ${n} » absent de ${o.racine}/bras.yaml`);
@@ -132,15 +131,16 @@ function passageVerrouille(o: OptPassage): Verdict {
   };
   const res: ResultatBanc[] = listerBancs(o.racine, o.numeros).flatMap((bid, i) => Array.from({ length: N }, (_, k) => jouer(bid, i, k + 1)));
   const v = verdict(res, o.ref, o.cand, BARRE_SPEC);
+  const e = o.eclair ? controlesEclair(res, o.ref, o.cand) : undefined;
+  e?.lignes.forEach((l) => o.out(l));
   mkdirSync(join(o.racine, 'rapports'), { recursive: true });
   const base = join(o.racine, 'rapports', id);
-  writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N }));
+  writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N, eclair: e?.lignes }));
   writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultats: res.map((r, i) => ({ ...r, clones: clonesParBanc[i] })) }, null, 2));
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
-    candidat: o.cand, reference: o.ref, modele_candidat: bras[o.cand].modele, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: new Set(res.filter((r) => r.frais).map((r) => banBase(r.banc))).size })}\n`);
-  o.avantVerdict?.(res);
+    candidat: o.cand, reference: o.ref, modele_candidat: bras[o.cand].modele, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: new Set(res.filter((r) => r.frais).map((r) => banBase(r.banc))).size, ...(e && { eclair_ok: e.ok }) })}\n`);
   o.out(`${v.vert ? 'VERT' : 'ROUGE'} — rapport : ${base}.md`);
-  return v;
+  return { ...v, eclair_ok: e?.ok };
 }
 
 /** Banc éclair : deux contrôles rapides sur le banc 1 (temps ≤ 1,2 × A, aucune question du candidat). */
@@ -210,10 +210,8 @@ export async function bench(args: string[], io: Io): Promise<number> {
       : pretAPasser(REPO, { [ref]: tous[ref], [cand]: tous[cand] }, racine);
   } catch (e) { refus = e instanceof Error ? e.message : String(e); }
   if (refus) { io.err(`bench refusé : ${refus}`); return 2; }
-  let eclair = true;
-  const v = passage({ racine, numeros, ref, cand,
-    avantVerdict: sous === 'eclair' ? (res) => { const e = controlesEclair(res, ref, cand); eclair = e.ok; e.lignes.forEach((l) => io.out(l)); } : undefined,
+  const v = passage({ racine, numeros, ref, cand, eclair: sous === 'eclair',
     hebdo: sous === 'hebdo', repetitions: rep, garderClones: reste.includes('--garder-clones'), juge: option(reste, 'juge') ?? 'opus', exec: executeurClaude, prep: preparer,
     maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out });
-  return v.vert && eclair ? 0 : 1;
+  return v.vert && v.eclair_ok !== false ? 0 : 1;
 }

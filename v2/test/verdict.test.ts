@@ -188,3 +188,19 @@ describe('publication : la dernière mesure réelle de l\'empreinte (C-1, I-7)',
     expect(h).toMatchObject({ reference: 'A', modele_candidat: 'opus' });
   });
 });
+
+describe('rapport : suite, attendu et contrôles éclair (M-2, M-3)', () => {
+  it('colonnes Suite et Attendu par bras ; non jugé : tiret', () => {
+    const b = banc(); b.jugement!.meca.C = { ...b.jugement!.meca.C, suite_ok: false, attendu: 'en partie' };
+    const md = rapport([b, banc({ nonJuge: true })], 'A', 'C', verdict([b], 'A', 'C', BARRE_SPEC), { date: 'd', empreinte: 'e' });
+    expect(md).toContain('| Suite A · C | Attendu A · C |');
+    expect(md).toMatch(/\| ok · ROUGE \| oui · en partie \|$/m);
+    expect(md).toMatch(/\| – \| – \|$/m);
+  });
+  it('section « Contrôles éclair » quand le passage en a, absente sinon ; eclair_ok dans l\'historique', () => {
+    const v = verdict([banc()], 'A', 'C', BARRE_SPEC);
+    expect(rapport([banc()], 'A', 'C', v, { date: 'd', empreinte: 'e', eclair: ['temps candidat ≤ 1,2 × A : ROUGE (x)'] })).toContain('## Contrôles éclair\n\n- temps candidat ≤ 1,2 × A : ROUGE (x)');
+    expect(rapport([banc()], 'A', 'C', v, { date: 'd', empreinte: 'e' })).not.toContain('Contrôles éclair');
+    expect(JSON.parse(ligneHistorique(v, { date: 'd', empreinte: 'e', candidat: 'C', reference: 'A', modele_candidat: 'o', bancs: [], hebdo: false, frais: 0, eclair_ok: false })).eclair_ok).toBe(false);
+  });
+});

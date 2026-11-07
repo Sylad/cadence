@@ -34,7 +34,7 @@ Les chiffres absolus du 07-11 (304 tests cachés, 79 % de mutations) sont affich
 - Un bras livre par commit : s'il finit sans commit (« aucun commit ») ou laisse des fichiers modifiés ou non suivis apparus pendant son tour (« travail non commité », hors `.cadence`, `docs/plan` et `cadence.yaml`), il est en échec et les juges du banc sont sautés : ils ne voient que `base..HEAD`.
 - Les juges travaillent dans `<racine>/eval/<passage>/<banc>` ; leurs copies `X` et `Y` sont effacées à la sortie du juge, quel que soit le chemin (jugement rendu, JSON invalide, erreur).
 - Nettoyage : après `resultat.json`, chaque clone (environ 1 Go) est remplacé par `<clone>.patch` (`git diff base..HEAD`) et `<clone>.commits.txt` (`git log --oneline base..HEAD`) ; captures et journaux restent. `--garder-clones` les garde pour le débogage.
-- Un passage s'appelle `<date>-<HHMM>-<empreinte>` ; l'empreinte hache `v2/src` et `v2/briefs` à HEAD.
+- Un passage s'appelle `<date>-<HHMM>-<empreinte>`, date et heure de Paris (comme `statut`) ; l'empreinte hache `v2/src` et `v2/briefs` à HEAD.
 - Refus (code 2) si `v2/src` ou `v2/briefs` a des changements non commités, ou si `v2/dist/cli.js` est absent ou plus ancien que les sources.
 - **Publication** : permise seulement si le **dernier** passage de l'empreinte courante qui couvre les bancs 1, 3 et 6 est vert, oppose un candidat à une référence distincte (`--candidat` égal à `--reference` est refusé, code 2), avec le modèle que le `bras.yaml` courant donne au candidat (le modèle est hors de l'empreinte : chaque ligne d'historique porte `reference` et `modele_candidat`), et si aucun passage rouge de cette empreinte, éclair compris, ne le suit.
 
@@ -63,7 +63,7 @@ Le service lance `cadence2 bench hebdo` avec un `PATH` explicite (node de nvm, `
 
 ## Banc éclair
 
-`cadence2 bench eclair` joue le seul banc 1 (une retouche), A contre le candidat, avec les juges : environ 15 minutes, à lancer après tout changement de v2 pour vérifier que le flux n'est pas redevenu lent ni bavard. Même garde (checkout propre et construit) et même verrou qu'un passage ordinaire. Il affiche d'abord « temps candidat ≤ 1,2 × A » et « questions du candidat : 0 », et ne sort en 0 que si le verdict est vert et les deux contrôles tiennent. Il n'autorise jamais la publication : `statut` exige les bancs 1, 3 et 6, donc seul `bench court` compte.
+`cadence2 bench eclair` joue le seul banc 1 (une retouche), A contre le candidat, avec les juges : environ 15 minutes, à lancer après tout changement de v2 pour vérifier que le flux n'est pas redevenu lent ni bavard. Même garde (checkout propre et construit) et même verrou qu'un passage ordinaire. Il affiche d'abord « temps candidat ≤ 1,2 × A » et « questions du candidat : 0 », les recopie dans la section « Contrôles éclair » du rapport et note `eclair_ok` dans la ligne d'historique (le HUD affiche ✗ quand il vaut `false`) ; il ne sort en 0 que si le verdict est vert et les deux contrôles tiennent. Il n'autorise jamais la publication : `statut` exige les bancs 1, 3 et 6, donc seul `bench court` compte.
 
 ## Rattrapage
 
@@ -71,7 +71,7 @@ Le service lance `cadence2 bench hebdo` avec un `PATH` explicite (node de nvm, `
 
 ## Où lire les rapports
 
-- `~/bench-cadence/rapports/<passage>.md` (et `.json`) ;
+- `~/bench-cadence/rapports/<passage>.md` (et `.json`) : par banc, temps, jetons, préféré, tests cachés, mutations, suite du projet (`ok` ou `ROUGE`) et réponse à la demande (`oui`, `en partie`, `non`) de chaque bras ;
 - `~/bench-cadence/historique.jsonl`, une ligne par passage ;
 - `~/bench-cadence/runs/<passage>/<banc>/resultat.json` pour le détail.
 

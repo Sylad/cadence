@@ -42,21 +42,27 @@ const sansChaines = (s: string) => s.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\
 // ---------------------------------------------------------------------------------------------------------------------
 // C1, conformité à une fiche figée
 // Légitimes : « Conformité » est un titre de mesure.md dans ajouter.ts ; « gabarit » est un paramètre de juges.ts (fichier modèle de brief).
-const AUTORISES_C1: Record<string, string[]> = { 'src/bench/ajouter.ts': ['conformit'], 'src/bench/juges.ts': ['gabarit'] };
+// Nombre EXACT d'occurrences tolérées par fichier et par mot : une de plus est une violation.
+const AUTORISES_C1: Record<string, Record<string, number>> = { 'src/bench/ajouter.ts': { conformit: 1 }, 'src/bench/juges.ts': { gabarit: 2 } };
 const MOTS_C1: [string, RegExp][] = [['scell', /scell/i], ['acceptation', /acceptation/i], ['fiche', /fiche/i], ['maquette', /maquette/i],
   ['spec:', /(?<![\w])spec:/i], ['contrat', /contrat/i], ['gabarit', /gabarit/i], ['seal', /seal/i], ['golden', /golden/i],
   ['snapshot', /snapshot/i], ['conformit', /conformit/i]]; // `spec:` = clé de fiche, pas BARRE_SPEC:
-const PHRASE_RELECTEUR = /Donne-lui seulement le texte de la demande ci-dessus et la sortie de `git -C \{\{CLONE\}\} diff/;
+const PHRASE_RELECTEUR = /Donne-lui seulement le texte de la demande ci-dessus et la sortie de `git -C \{\{CLONE\}\} diff \{\{BASE\}\}\.\.HEAD`/;
+const MODELE_RELECTEUR = /subagent_type general-purpose, model opus\)/;
 
 function reglesC1(f: Fichiers): string[] {
   const v: string[] = [];
   for (const k of [...sources(f), ...briefsDe(f)])
-    for (const [mot, re] of MOTS_C1) if (re.test(f[k]) && !(AUTORISES_C1[k] ?? []).includes(mot)) v.push(`C1 : « ${mot} » dans ${k}`);
+    for (const [mot, re] of MOTS_C1) {
+      const n = (f[k].match(new RegExp(re.source, 'gi')) ?? []).length;
+      if (n > (AUTORISES_C1[k]?.[mot] ?? 0)) v.push(`C1 : « ${mot} » ×${n} dans ${k}`);
+    }
   const b = f[BRIEF_CAND] ?? '';
   if (!b.includes('{{DEMANDE}}')) v.push('C1 : le brief candidat ne contient pas {{DEMANDE}}');
   if (!b.includes('le texte de la demande') || !b.includes('git -C {{CLONE}} diff')) v.push('C1 : le relecteur ne reçoit pas demande + diff');
   const para = b.split('\n').find((l) => l.startsWith('- Relecture')) ?? '';
   if (!PHRASE_RELECTEUR.test(para)) v.push('C1 : phrase exacte du relecteur absente');
+  if (!MODELE_RELECTEUR.test(para)) v.push('C1 : le relecteur n\'est plus pinné sur model opus');
   const intrus = para.match(/\b(plan|lot|raf\.yaml|carte|description)\b/i);
   if (intrus) v.push(`C1 : « ${intrus[0]} » dans le paragraphe du relecteur`);
   return v;
@@ -70,6 +76,10 @@ function reglesC2(f: Fichiers): string[] {
   for (const k of briefsDe(f)) for (const m of ['nouvelle session', 'claude -p']) if (f[k].toLowerCase().includes(m)) v.push(`C2 : « ${m} » dans ${k}`);
   for (const k of [...briefsDe(f), 'docs/banc.md', ...sources(f).filter((s) => !ALLOWLIST_MODELES_SRC.includes(s))])
     if (/sonnet|haiku/i.test(f[k] ?? '')) v.push(`C2 : sonnet ou haiku dans ${k}`);
+  for (const k of briefsDe(f).filter((b) => b.startsWith('briefs/bras-'))) {
+    const lignes = f[k].split('\n').filter((l) => l.includes('subagent_type'));
+    if (lignes.length > 1 || lignes.some((l) => !l.startsWith('- Relecture'))) v.push(`C2 : sous-agent hors de la relecture dans ${k}`);
+  }
   if (!/option\(reste, 'juge'\) \?\? 'opus'/.test(f['src/bench/cli.ts'] ?? '')) v.push('C2 : le juge par défaut n\'est pas opus');
   if (!/'--resume'/.test(f['src/bench/bras.ts'] ?? '')) v.push('C2 : bras.ts ne reprend plus la session (--resume)');
   return v;
@@ -128,9 +138,15 @@ function reglesC5(f: Fichiers): string[] {
   if (!/c\('questions inutiles', [^\n]*, inutiles === 0\),/.test(t)) v.push('C5 : « questions inutiles » n\'est plus un critère bloquant simple');
   if (!/c\('aucun bras en échec', [^\n]*, echecs\.length === 0\),/.test(t)) v.push('C5 : « aucun bras en échec » n\'est plus un critère bloquant simple');
   if (!/bloquant = true\)/.test(t)) v.push('C5 : bloquant n\'est plus vrai par défaut');
+  if (/\bc\('[^\n]*', [^\n]*, true(, (?:true|false))?\),/.test(t)) v.push('C5 : un critère a un ok constant (true)');
   if (!/vert: criteres\.every\(\(x\) => x\.ok \|\| !x\.bloquant\)/.test(t)) v.push('C5 : la formule du vert a changé');
   if (!/\['1', '3', '6'\]\.every/.test(t)) v.push('C5 : statut ne demande plus 1, 3 et 6');
   return v;
+}
+
+// Barre de la spec §1 : temps au plus 1,5 × la référence (1,2 × sur les retouches).
+function reglesBarre(b: { temps_max: number; temps_max_retouche: number }): string[] {
+  return b.temps_max === 1.5 && b.temps_max_retouche === 1.2 ? [] : ['C5 : BARRE_SPEC a bougé (spec §1 : 1,5 et 1,2)'];
 }
 
 const existeReel = (p: string) => existsSync(join(depot, p));
@@ -141,6 +157,7 @@ describe('les vrais fichiers respectent les règles', () => {
   it('C3', () => expect(reglesC3(reel)).toEqual([]));
   it('C4', () => expect(reglesC4(reel, existeReel)).toEqual([]));
   it('C5', () => expect(reglesC5(reel)).toEqual([]));
+  it('barre §1 exacte', () => expect(reglesBarre(BARRE_SPEC)).toEqual([]));
   it('au moins une option est lue (la règle C4 ne tourne pas à vide)', () =>
     expect(Object.keys(JSON.parse(reel['options.json']).options).length).toBeGreaterThan(5));
 });
@@ -183,6 +200,12 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C1', 'phrase du relecteur modifiée', BRIEF_CAND, remplace('la sortie de `git -C', 'le résumé de `git -C')],
   ['C1', 'snapshot dans src', 'src/bench/fuites.ts', ajout('// snapshot de référence')],
   ['C1', 'contrat dans un brief', 'briefs/juge-aveugle.md', ajout('Respecte le contrat.')],
+  ['C1', 'relecteur sur tout le dépôt', BRIEF_CAND, remplace('{{BASE}}..HEAD', '4b825dc..HEAD')],
+  ['C1', 'relecteur sans model opus', BRIEF_CAND, remplace(', model opus', '')],
+  ['C2', 'sous-agent qui écrit le code', BRIEF_CAND, ajout("Délègue l'implémentation à un sous-agent, subagent_type general-purpose")],
+  ['C5', 'critère ok constant', 'src/bench/verdict.ts', remplace("c('aucune fuite', `${fuites.length}`, '0', fuites.length === 0)", "c('aucune fuite', `${fuites.length}`, '0', true)")],
+  ['C1', 'second gabarit toléré par erreur', 'src/bench/juges.ts', ajout('// un gabarit de plus')],
+  ['C1', 'seconde conformité', 'src/bench/ajouter.ts', ajout('// conformité')],
   ['C3', 'porte déguisée en controle', 'src/bench/banc.ts', ajout('controle(a);\ncheckAll(b);\nverif(c);')],
 ];
 describe('mutation : chaque régression connue est détectée', () => {
@@ -192,6 +215,11 @@ describe('mutation : chaque régression connue est détectée', () => {
     expect(copie[fichier]).not.toBe(reel[fichier]);
     expect(regles[cause](copie).length, `${cause} : la régression n'est pas vue`).toBeGreaterThan(0);
   });
+});
+
+it('mutation : BARRE_SPEC.temps_max à 3 serait vu', () => {
+  expect(reglesBarre({ ...BARRE_SPEC, temps_max: 3 }).length).toBeGreaterThan(0);
+  expect(reglesBarre({ ...BARRE_SPEC, temps_max_retouche: 2 }).length).toBeGreaterThan(0);
 });
 
 // ---------------------------------------------------------------------------------------------------------------------

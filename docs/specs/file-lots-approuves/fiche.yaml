@@ -3,12 +3,13 @@ sujet:
   titre: File de lots pré-approuvés tirée à chaque créneau libre
   lot: L498
   perimetre:
-    modules: [src/orchestrate/command.ts, src/orchestrate/continue.ts, src/ready-free.ts, src/orchestrate/registry.ts, src/orchestrate/lock.ts, src/cli.ts]
+    modules: [src/orchestrate/queue.ts, src/orchestrate/queue-command.ts, src/orchestrate/queue-draw.ts, src/orchestrate/draw.ts, src/orchestrate/ajout.ts, src/orchestrate/execute.ts, src/orchestrate/command.ts, src/orchestrate/command-args.ts, src/orchestrate/command-checks.ts, src/orchestrate/continue.ts, src/ready-free.ts]
     endpoints: []
     jobs: []
     hors_perimetre:
       - "l'ajout d'un lot à une vague vivante lui-même (--add <projet:lot>, lot L421, dépendance : la file l'utilise, elle ne le définit pas ni n'en fixe le contrat)"
       - "lever pour un lot approuvé les garde-fous continue.exclude, continue.maxEstimate et « non tirable » (option, pas livrée par ce lot)"
+      - "le remplissage des créneaux libres par le plan lui-même (L527, L587 : la file s'y insère, avant le plan, et ne le redéfinit pas)"
       - "l'affichage de la file dans le HUD ou dans le tour du lead"
       - "le skill lead (la consigne d'approuver une liste)"
 
@@ -52,11 +53,11 @@ cas:
     preconditions:
       - la file approuvée contient au moins un lot en attente
       - la vague vit et aucune borne d'arrêt ne joue (stopReason nul)
-      - "L421 est livré (--add, dépendance déclarée du lot : R18)"
+      - "L421 est livré (--add, dépendance déclarée du lot : R18 ; livré le 06-11, le repli de R18 n'a plus cours)"
     nominal:
       - "Le créneau se libère ; la vague n'attend pas la fin du tour en cours ni le lead. Toute vague vivante tire, quel que soit son lancement, sans option (R11)."
       - "Elle parcourt la file dans l'ordre, avant tout tirage du plan de --continue (R19), et prend le premier lot mûr (R5) : un seul lot par créneau libéré (R20)."
-      - "Elle réserve le lot dans la file (R7), puis le pousse par le mécanisme de --add de L421 (R9) : dans la vague vivante qui tient son dépôt (la sienne ou une autre) ; si aucune vague ne tient le dépôt, elle lance une vague neuve sur ce lot (R9)."
+      - "Elle réserve le lot dans la file (R7), puis le pousse par le mécanisme de --add de L421 (R9) dans la vague vivante qui tient son dépôt quand c'est une autre vague ; si c'est la sienne, ou si aucune vague ne tient le dépôt, elle le joue elle-même dans ce créneau (c'est elle la vague vivante qui prend le dépôt ; le lancement d'un second processus de vague pour un dépôt libre n'aurait aucun sens : le créneau est le sien)."
       - "Une fois la poussée acceptée, le lot passe à l'état tiré avec l'id de la vague qui l'a reçu (R13) ; le journal écrit « file : tire <projet:lot> (position n) »."
       - "Aucune écriture dans l'état d'un execute en cours ne passe par un autre chemin que --add (R18)."
     alternatives:
@@ -65,8 +66,9 @@ cas:
       - { si: "une borne d'arrêt joue (question posée à la vague, deux lots rendus de suite, budget épuisé, --until, quota, --stop-after-current)", alors: "rien n'est tiré", regles: [R8] }
       - { si: "le budget du lot dépasse le budget restant", alors: "lot sauté et dit, il reste en file", regles: [R8] }
       - { si: "le dépôt du lot est tenu par une autre vague vivante", alors: "le lot est poussé dans cette vague par --add ; si --add le refuse, la réservation est rendue (en attente), le lot est sauté et le journal dit « file : --add refusé — <projet:lot> : <message de --add> »", regles: [R9, R7] }
-      - { si: "aucune vague ne tient le dépôt du lot", alors: "une vague neuve est lancée sur ce lot ; si son lancement est refusé, la réservation est rendue et la cause dite", regles: [R9, R7] }
-      - { si: "L421 n'est pas livré (la commande --add n'existe pas)", alors: "repli : aucun lot n'est poussé dans une vague tenue par une autre ; il est sauté et dit « file : --add indisponible — <projet:lot> : dépôt tenu par <vague> » ; un dépôt libre ou tenu par la vague elle-même reste tirable par le chemin interne de la vague ; aucune injection par un autre chemin", regles: [R18] }
+      - { si: "aucune vague ne tient le dépôt du lot", alors: "la vague le joue elle-même dans son créneau libre (elle devient la vague vivante qui tient ce dépôt) ; si sa prise est refusée (verrou, garde de push), la réservation est rendue et la cause dite", regles: [R9, R7] }
+      - { si: "le créneau est celui d'un tour (premier tirage de --queue ou --continue, tirage entre deux tours) et le dépôt est tenu par une autre vague vivante", alors: "le tour ne pousse pas : le lot est sauté et dit « file : lot sauté — <projet:lot> : dépôt tenu par la vague <id> », reste en file ; cette vague le tire à son prochain créneau libre, ou une vague vivante l'y pousse par --add à l'un des siens", regles: [R9, R18] }
+      - { si: "--add a déjà été refusé par cette vague pour ce lot", alors: "la poussée n'est pas rejouée tant que la même vague tient le dépôt (une poussée relit le contrôle préalable) ; la vague qui tient le dépôt tire le lot elle-même à son prochain créneau", regles: [R9] }
       - { si: "le contrôle préalable refuse le lot pour lui-même", alors: "le lot est exclu de cette vague, reste en file et la cause est dite", regles: [R10] }
       - { si: "le plafond de sessions (vagues et holds du lead compris) est atteint", alors: "aucun créneau n'est libre, rien n'est tiré", regles: [R8] }
       - { si: "le réglage orchestrate.continue (exclude, maxEstimate) ou le marqueur « non tirable » écarte le lot", alors: "il est sauté et dit « écarté du tirage : <cause> », reste en file", regles: [R12] }
@@ -87,7 +89,7 @@ cas:
       - "Au démarrage elle tire, dans l'ordre (R5), au plus un lot par créneau libre et un par dépôt par tour comme le tirage existant (src/orchestrate/command.ts:919-921) ; les autres lots d'un même dépôt sont tirés aux créneaux suivants (C3)."
     alternatives:
       - { si: "la file est vide ou sans lot mûr", alors: "refus de démarrer, la vague nomme les lots sautés et leurs causes", regles: [R6, R11] }
-      - { si: "une vague vit déjà dans le même dépôt", alors: "le lot n'est pas joué par une vague neuve : il est poussé dans la vague vivante par --add (C3, R9) ; si L421 n'est pas livré, le refus existant (src/orchestrate/command.ts:418) nomme la vague vivante et la commande n'écrit rien dans son état", regles: [R9, R18] }
+      - { si: "une vague vit déjà dans le dépôt du lot", alors: "le lot n'est pas joué par la vague neuve : sauté « dépôt tenu par la vague <id> » (un premier tirage ne pousse pas, R9) ; sans autre lot mûr la commande refuse de démarrer et n'écrit rien dans l'état de cette vague, qui tire le lot à son prochain créneau libre", regles: [R9, R18] }
       - { si: "des lots sont donnés à la main avec --queue", alors: "ils passent d'abord, la file complète les créneaux restants", regles: [R11] }
     resultat: Une vague démarre sur la file sans que le lead choisisse les lots un à un.
 
@@ -155,10 +157,10 @@ regles:
     tests: ["R8 — vague en question : la file n'est pas tirée", "R8 — --stop-after-current : rien n'est tiré à la libération du créneau", "R8 — budget restant inférieur à celui du lot : lot sauté et dit, reste en file", "R8 — plafond atteint avec un hold du lead : aucun tirage"]
   - id: R9
     cas: [C3, C4]
-    enonce: "Le tirage s'appuie sur L421 : dès qu'un créneau se libère, la file pousse le lot suivant dans la vague vivante qui tient son dépôt (la sienne ou une autre, registre waves/<pid>.json, liveWaves src/orchestrate/registry.ts:51) par le mécanisme de --add ; si aucune vague vivante ne tient le dépôt, elle lance une vague neuve sur ce lot. Une vague refusée par --add laisse le lot en file, sauté et dit (R7)."
+    enonce: "Le tirage s'appuie sur L421 : dès qu'un créneau se libère dans une vague vivante, la file pousse le lot suivant dans la vague vivante qui tient son dépôt quand c'est une autre vague (registre waves/<pid>.json, liveWaves src/orchestrate/registry.ts) par le mécanisme de --add (addToLive, src/orchestrate/ajout.ts : même contrôle préalable, même file d'ajouts adds.log) ; si le dépôt est le sien ou qu'aucune vague ne le tient, la vague joue le lot elle-même dans ce créneau. Une poussée refusée laisse le lot en file, sauté et dit avec le message de --add (R7), et n'est pas rejouée tant que la même vague tient le dépôt. Un tirage de tour (premier tirage, entre deux tours) ne pousse pas : le lot est sauté « dépôt tenu par la vague <id> »."
     statut: sourcee
     source: "arbitrage du lead (01-11) : « le tirage s'appuie sur L421 (--add) : la file pousse le lot suivant dans la vague vivante qui tient son dépôt par le mécanisme de --add, ou lance une vague neuve si aucune ne le tient » ; refus existant src/orchestrate/command.ts:418 évité par la poussée"
-    tests: ["R9 — dépôt tenu par une autre vague vivante : le lot est poussé par --add dans cette vague", "R9 — dépôt tenu par la vague elle-même : le lot est ajouté à ses propres lots par --add", "R9 — aucune vague ne tient le dépôt : une vague neuve est lancée sur ce lot", "R9 — --add refusé : lot en attente et sauté avec le message de --add", "R9 — orchestrate --queue dans un dépôt tenu : le lot est poussé dans la vague vivante, pas de seconde vague"]
+    tests: ["R9 — dépôt tenu par une autre vague vivante : le lot est poussé par --add dans cette vague (sa file d'ajouts), « tiré par » elle, rien d'autre n'est écrit chez elle", "R9 — dépôt tenu par la vague elle-même ou par personne : le lot est joué par la vague dans son créneau", "R9 — --add refusé : lot en attente et sauté avec le message de --add, une fois", "R9 — orchestrate --queue dans un dépôt tenu par une autre vague : refus qui nomme la vague, rien d'écrit chez elle"]
   - id: R10
     cas: [C3]
     enonce: "Un refus du contrôle préalable propre au lot l'exclut de la vague mais le laisse en file, avec sa cause dite ; un refus du dépôt (arbre sale, orchestration en cours) ne l'exclut que pour ce tirage."
@@ -167,7 +169,7 @@ regles:
     tests: ["R10 — refus propre au lot : non retiré de la file, non retenté par cette vague", "R10 — arbre sale : retenté au créneau suivant"]
   - id: R11
     cas: [C3, C4]
-    enonce: "Toute vague vivante tire de la file, sans option : qu'elle ait été lancée avec des lots donnés, avec --continue ou avec --queue. --queue est le démarrage d'une vague sur la file sans lot donné : sans lot mûr il refuse de démarrer en listant les lots sautés et leurs causes ; avec des lots donnés à la main, ceux-ci passent avant et la file complète les créneaux restants."
+    enonce: "Toute vague vivante tire de la file, sans option : qu'elle ait été lancée avec des lots donnés, avec --continue ou avec --queue ; --no-fill (L587) écarte le plan du remplissage des créneaux libres, pas la file. --queue est le démarrage d'une vague sur la file sans lot donné : sans lot mûr il refuse de démarrer en listant les lots sautés et leurs causes ; avec des lots donnés à la main, ceux-ci passent avant et la file complète les créneaux restants."
     statut: sourcee
     source: "arbitrage du lead (01-11) : « toute vague vivante tire de la file (lancée avec des lots donnés, --continue ou --queue) »"
     tests: ["R11 — vague lancée avec des lots donnés : un créneau libéré tire le lot de la file", "R11 — vague lancée avec --continue : un créneau libéré tire le lot de la file", "R11 — vague lancée avec --queue : un créneau libéré tire le lot de la file", "R11 — file sans lot mûr : orchestrate --queue refuse en listant les causes", "R11 — lots donnés et --queue : les lots donnés d'abord"]
@@ -209,13 +211,13 @@ regles:
     tests: ["R17 — orchestrate queue show : aiguillé vers la file, pas lu comme un lot", "R17 — orchestrate queue:L1 : lu comme le lot L1 du projet queue", "R17 — orchestrate queue frobnicate : refus du sous-mot inconnu"]
   - id: R18
     cas: [C3, C4]
-    enonce: "Dépendance déclarée : le lot dépend de L421 (--add, status doing, non livré dans src/orchestrate/command.ts : aucune occurrence de --add hors --add-dir). Jamais d'injection dans un execute en cours par un autre chemin que --add : la file n'écrit pas dans l'état d'une autre vague. Repli tant que L421 n'est pas livré : aucun lot n'est poussé dans une vague tenue par une autre, il est sauté et dit « file : --add indisponible — <projet:lot> : dépôt tenu par <vague> » et reste en file ; seuls un dépôt libre (vague neuve) ou la vague elle-même tirent."
+    enonce: "Dépendance déclarée : le lot dépend de L421 (--add, livré le 06-11 : addToLive dans src/orchestrate/ajout.ts). Jamais d'injection dans un execute en cours par un autre chemin que --add : la file n'écrit dans l'état d'une autre vague que par sa file d'ajouts (adds.log), ce que --add écrit ; le registre, wave.json et les états de lots de cette vague ne sont pas touchés. Le tirage interne d'une vague (ses propres créneaux) n'est pas une injection. Le repli « --add indisponible » prévu tant que L421 n'était pas livré n'a plus cours."
     statut: sourcee
     source: "arbitrage du lead (01-11) : « jamais d'injection dans un execute en cours par un autre chemin » ; L421 .cadence/raf.yaml:268-275 (doing)"
-    tests: ["R18 — L421 non livré, dépôt tenu par une autre vague : lot sauté « --add indisponible », état de l'autre vague inchangé", "R18 — poussée dans une vague : seul le chemin --add écrit dans son état", "R18 — L421 non livré, dépôt libre : une vague neuve est lancée"]
+    tests: ["R18 — poussée dans une vague : seul le chemin --add écrit chez elle (adds.log), son registre et ses lots sont inchangés", "R18 — dépôt libre : la vague joue le lot elle-même"]
   - id: R19
     cas: [C3, C4]
-    enonce: "La file passe avant le tirage du plan de --continue : à un créneau libéré, la vague tente d'abord la file ; le plan de --continue n'est tiré que si aucun lot de la file n'est tirable à ce créneau."
+    enonce: "La file passe avant le tirage du plan, à chaque moment où le plan est tiré : premier tirage (--queue, --continue sans lot), remplissage d'un créneau libre en cours de vague (L527, L587) et tirage entre deux tours de --continue ; à un créneau libéré, la vague tente d'abord la file, le plan ne reçoit que les créneaux que la file laisse, et un lot qui attend dans la file n'est jamais tiré comme lot du plan."
     statut: sourcee
     source: "arbitrage du lead (01-11) : « la file passe AVANT le tirage du plan de --continue » ; tirage du plan src/orchestrate/command.ts:919-921"
     tests: ["R19 — --continue avec un lot mûr en file et un lot prêt au plan : le lot de la file est tiré", "R19 — file sans lot mûr : le plan de --continue est tiré"]
@@ -265,7 +267,8 @@ contrats:
       - { code: log info, message: "file : aucun lot mûr (<n> sauté(s))" }
       - { code: log info, message: "file : lot sauté — <projet:lot> : écarté du tirage : <cause>" }
       - { code: log info, message: "file : --add refusé — <projet:lot> : <message de --add>" }
-      - { code: log info, message: "file : --add indisponible — <projet:lot> : dépôt tenu par <vague>" }
+      - { code: log info, message: "file : tire <projet:lot> (position <n>) — poussé par --add dans la vague <id>" }
+      - { code: log info, message: "file : lot sauté — <projet:lot> : dépôt tenu par la vague <id>" }
       - { code: log warn, message: "file : réservation orpheline reprise — <projet:lot> (vague <id>)" }
       - { code: log warn, message: "file : illisible ou verrouillée, rien n'est tiré à ce créneau" }
       - { code: log error, message: "orchestrate --queue : aucun lot mûr dans la file approuvée" }
@@ -273,5 +276,5 @@ contrats:
 
 donnees:
   - { id: D1, objet: "queue.json dans l'état commun (CADENCE_HOME, par défaut ~/.cadence/orchestrate/queue.json), à côté de slots/ et waves/ : liste ordonnée de { clé projet:lot, état (en attente, réservé, tiré : conservé en file), vague } ; écrite par renommage atomique sous verrou, éditée par la commande orchestrate queue, ni commit ni écriture dans les plans", existant: false, modification: ajout, note: "nouveau fichier partagé entre vagues vivantes ; réservation = état réservé + id et pid de la vague (R7, R14) ; ne touche aucun format existant ; décision du lead : option (a), état commun à côté du registre des créneaux" }
-  - { id: D2, objet: "état de vague (lots, journal) et registre des vagues vivantes (waves/<pid>.json)", existant: true, modification: aucune, note: "lus pour savoir ce qui est tenu ; le lot tiré y entre uniquement par --add (L421, R18), la file n'y écrit pas" }
+  - { id: D2, objet: "état de vague (lots, journal, file d'ajouts adds.log) et registre des vagues vivantes (waves/<pid>.json)", existant: true, modification: aucune, note: "lus pour savoir ce qui est tenu ; dans une autre vague, le lot tiré n'entre que par sa file d'ajouts adds.log, ce que --add écrit (L421, R18) ; la file n'écrit rien d'autre chez elle" }
   - { id: D3, objet: "plan du projet (after, uses, notes « à décider »)", existant: true, modification: aucune, note: "lu seulement pour juger la maturité" }

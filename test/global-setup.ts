@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runCompiler } from './run-tsc.js';
+import { GIT_REPO_VARS } from './git-env-hygiene.js';
 import { sanitizePath } from './path-hygiene.js';
 import { PID_FILE, ROOT_PREFIX, leftovers, pickRootBase, pidFileText, removeStaleRoots, removeTree } from './tmp-hygiene.js';
 
@@ -35,6 +36,9 @@ function buildThrowawayPackage(into: string): string {
 export default function setup(): () => void {
   // L355 : NODE_PATH (posé par une session de vague, jamais par un shell) fait résoudre « yaml » depuis n'importe quel paquet jetable :
   // les tests « yaml introuvable » du fichier orchestrate-snapshot passaient au vert dans un shell et au rouge en session. Les workers héritent de l'environnement nettoyé.
+  // L677 : GIT_DIR, GIT_INDEX_FILE, GIT_WORK_TREE (exportés par git à un hook) retirés avant tout test ; restaurés en fin de run.
+  const gitVars = Object.fromEntries(GIT_REPO_VARS.map((n) => [n, process.env[n]]));
+  for (const n of GIT_REPO_VARS) delete process.env[n];
   const nodePath = process.env.NODE_PATH;
   delete process.env.NODE_PATH;
   // L360 : un TMPDIR sous un dossier qui a node_modules/yaml donne les trois rouges « yaml introuvable » du 26-10 (reproduit hors vague, docs/mesures/orchestrate-snapshot-session-2026-10-26.md) : écarté. Sans candidat propre, la suite refuse de partir.
@@ -60,6 +64,7 @@ export default function setup(): () => void {
   process.env.CADENCE_TEST_PACKAGE = buildThrowawayPackage(root);
   process.env.CADENCE_TEST_REAL_TMP = realTmp;
   return () => {
+    for (const n of GIT_REPO_VARS) if (gitVars[n] !== undefined) process.env[n] = gitVars[n];
     if (nodePath !== undefined) process.env.NODE_PATH = nodePath;
     for (const n of names) {
       if (previous[n] === undefined) delete process.env[n];

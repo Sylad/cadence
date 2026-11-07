@@ -50,7 +50,7 @@ describe('raf add / note / done pendant une intégration (L425)', () => {
     const dir = projet();
     integrating(dir);
     const { err } = raf(dir, 'add', 'deux');
-    expect(err).toContain('le tolère et son commit de plan l\'emporte (L673)');
+    expect(err).toContain('le tolère (un plan que le diff de son lot ne touche pas) et son commit de plan l\'emporte (L673)');
     expect(err).toContain('rejouer son rebase et sa porte complète');
     expect(err).not.toMatch(/refuser|sans attendre/);
   });

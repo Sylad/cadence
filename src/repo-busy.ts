@@ -21,7 +21,7 @@ export function warnIntegrating(root: string, err: (line: string) => void): void
   const top = gitRoot(root);
   if (!top || !statSync(join(top, '.git')).isDirectory()) return;
   const holder = activeLock(join(sharedStateDir(root), INTEGRATION_LOCK));
-  if (holder) err(`avertissement : intégration en cours (vague ${holder.wave}, pid ${holder.pid}) — ce plan est un fichier suivi modifié de l'arbre principal : l'intégration en cours le tolère et son commit de plan l'emporte (L673) ; ne pas le committer avant sa fin, un commit sur la branche lui ferait rejouer son rebase et sa porte complète`);
+  if (holder) err(`avertissement : intégration en cours (vague ${holder.wave}, pid ${holder.pid}) — ce plan est un fichier suivi modifié de l'arbre principal : l'intégration en cours le tolère (un plan que le diff de son lot ne touche pas) et son commit de plan l'emporte (L673) ; ne pas le committer avant sa fin, un commit sur la branche lui ferait rejouer son rebase et sa porte complète`);
 }
 
 /**

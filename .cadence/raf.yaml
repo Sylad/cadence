@@ -3001,6 +3001,7 @@ lots:
     estimate: 0.25
     created: 2026-11-07
     started: 2026-11-07
+    review: { date: 2026-11-07, verdict: "compliant : 0 bloquant, 0 majeur, 1 mineur (déduplication de la note par texte complet) — orchestré (vague 2026-11-07-0800, 3 passe(s) de correction) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase n'a changé que le contexte du CHANGELOG, entrée L670 conservée sous [Unreleased] avant ### Fixed de L675 ; 1 mineur antérieur reste en note (dédoublonnage de la note sur le texte seul)", commit: d1b27bba02d4817055be7b3170464b2e069af8a5 }
   - id: L671
     title: "docs-orchestrate au lancement : les lots dont le titre ou le diff cite docs/orchestrate*.md reçoivent uses: docs-orchestrate à raf add / --dry-run, donc L551 les joue l'un après l'autre ; 07-11 : 113,6 min d'attente d'intégration (L665 35,3, L667 ~78) pour deux lots tenus par L662 et L666, qui n'ont rien livré ; niveau : source (lancement), niveau le plus tôt : source ; mesure : 0 min d'attente de ressource par vague sans lot qui touche la ressource avant d'avoir intégré"
     status: doing

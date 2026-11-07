@@ -90,7 +90,7 @@ export async function bench(args: string[], io: Io): Promise<number> {
     io.out(ok ? `banc vert sur l'empreinte ${emp}` : `aucun banc vert sur l'empreinte ${emp} : lancer « cadence2 bench court »`);
     return ok ? 0 : 1;
   }
-  const numeros = sous === 'court' ? COURT : sous === 'hebdo' ? undefined : sous === 'lancer' ? option(reste, 'bancs')?.split(',') : null;
+  const numeros = sous === 'court' ? COURT : sous === 'hebdo' ? undefined : sous === 'lancer' ? (option(reste, 'bancs')?.split(',') ?? null) : null;
   if (numeros === null) { io.err('usage : cadence2 bench court|hebdo|lancer --bancs 1,3|statut|verifier-publication|ajouter [--candidat c] [--reference r]'); return 2; }
   const v = passage({ racine, numeros, ref: option(reste, 'reference') ?? 'A', cand: option(reste, 'candidat') ?? 'equipe-legere',
     hebdo: sous === 'hebdo', juge: option(reste, 'juge') ?? 'opus', exec: executeurClaude, prep: preparer,

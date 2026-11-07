@@ -929,7 +929,7 @@ lots:
   - id: L477
     title: "Cliquet (suite de L462) : une fonction qui grossit sous le pire chiffre de son fichier passe, et comparerMigration compense un défaut neuf (fichier neuf) par un gain ailleurs — compter la somme des excès par fichier et par règle, refuser un défaut neuf même compensé ; test sur les deux cas mesurés par la revue"
     status: doing
-    estimate: 0.25
+    estimate: 0.75
     spec: true
     created: 2026-10-31
     started: 2026-11-02
@@ -2534,7 +2534,7 @@ lots:
     started: 2026-11-05
     notes:
       - { date: 2026-11-05, text: "titre remplacé : « Porte déportée sur mini-blue pour cadence (orchestrate.gate.host, docs/remote-gate.md) : préparer WSL de mini-blue (node, git, clé), déclarer l'hôte, jouer la porte des lots là-bas ; mesurer avant et après sur trois lots réels, durée de porte et charge de Big-Blue (05-11 : 8 à 13 min sous charge 43, environ 4 min seule) ; avec repli local si l'hôte ne répond pas »" }
-    review: { date: 2026-11-05, verdict: "conforme : revue Opus, un seul correctif appliqué (test de gate.refs sur la route de vague, mutation rouge) ; mesure sur trois lots réels à faire après mise en service, relevée au lot ; revue courte du diff rebasé (patch-id différent) : compliant (0 blocking, 0 major, 2 minor notes: gate.refs absent from docs/config.md and docs/overview.md; refspec `HEAD` not refused)", commit: b8975c14df44bd43b8e0aeed782bf640002cbee4 }
+    review: { date: 2026-11-07, verdict: "conforme : relu le 07-11, le seul commit postérieur (ba96aea8, L640) retire orchestrate.gate de cadence.yaml et adapte le test, sans changer le code de L617", commit: ba96aea8ef587ceebfb32bc1f1efc442bbea2dc0 }
     finished: 2026-11-05
   - id: L618
     title: "Activer la porte déportée dans cadence.yaml (orchestrate.gate: host mini-blue-wsl, install npm ci, refs main et origin/main, test de la config sauvé par L617), une fois L617 en service ; mesurer sur trois lots réels en vague la durée de porte et la charge de Big-Blue, avant et après (8 à 13 min sous charge 43 le 05-11)"
@@ -2935,7 +2935,7 @@ lots:
   - id: L662
     title: "Moins de portes par lot : (1) la sonde joue avant la première porte, une seule porte entre implement et revue (33,2 min sur 5 lots en 1805) ; (2) après « main a avancé », la porte d'intégration n'est rejouée que si le delta de main touche un fichier ou un test lié au diff du lot (26,3 min sur 4 lots, 4 reprises) ; niveau : source (ordre des étapes), puis intégration ; niveau le plus tôt : source ; on ne peut pas prévenir le déplacement de main, seulement son effet ; mesure : <= 3 portes par lot en moyenne sur 3 vagues (4,1 en 1805)"
     status: doing
-    estimate: 0.25
+    estimate: 0.5
     created: 2026-11-06
     started: 2026-11-06
     notes:
@@ -2984,6 +2984,41 @@ lots:
     status: todo
     estimate: 0.1
     created: 2026-11-06
+  - id: L669
+    title: "test/changelog.test.ts hermétique aux tags : le test lit `git tag --list v*` (global, changelog.test.ts:21,34) donc chaque tag du lead rougit tous les worktrees de vague ; ne lire que `git tag --merged HEAD` ; 07-11 : v1.61.0 posé à 00:11:40Z, L477 bloqué (≥ 10,8 min, session fable de 33,6 min sans commit) ; niveau : source (test), niveau le plus tôt : source ; mesure : 0 test de CHANGELOG rouge dans un worktree après un tag du lead"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-07
+  - id: L670
+    title: "Attente silencieuse après réponse du lead : « réponse prise, le lot repart » puis 18,6 et 18,7 min sans ligne (L477, 21:31:37 à 21:50:16 et 22:33:36 à 22:52:18, 37,3 min) ; la reprise attend une ressource inconnue ; toute attente > 10 s écrit au journal ce qu'elle attend, puis supprimer la cause ; et le programme inscrit la réponse du lead dans les notes du lot à sa prise (la 2e question de L477, 32,9 min, venait de « aucune trace écrite dans les notes ») ; niveau : source (notes écrites à la prise), niveau le plus tôt : source ; mesure : 0 min entre réponse prise et session suivante hors créneau, 0 question sur une décision déjà répondue"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-07
+  - id: L671
+    title: "docs-orchestrate au lancement : les lots dont le titre ou le diff cite docs/orchestrate*.md reçoivent uses: docs-orchestrate à raf add / --dry-run, donc L551 les joue l'un après l'autre ; 07-11 : 113,6 min d'attente d'intégration (L665 35,3, L667 ~78) pour deux lots tenus par L662 et L666, qui n'ont rien livré ; niveau : source (lancement), niveau le plus tôt : source ; mesure : 0 min d'attente de ressource par vague sans lot qui touche la ressource avant d'avoir intégré"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-07
+  - id: L672
+    title: "Doc d'usage périmée par une phrase de comportement : L648 ne liste que les identifiants ; L662 (orchestrate-gate.md:114) et L666 (fonctionnement.md:30, lead.md:13) rendus avec un majeur de doc après opus et fable ; le brief d'implement et de fix liste les pages de docs/ qui contiennent les termes du critère que le titre du lot change (grep de ses phrases) ; niveau : source (brief), puis écriture (hook sur src/orchestrate) ; mesure : 0 majeur de doc d'usage à la revue sur 3 vagues ; L666 ≈ 22 min, L662 6,9 min"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-07
+  - id: L673
+    title: "Plan écrit pendant une intégration : l'intégration ne refuse que si un fichier modifié de l'arbre principal est dans le diff du lot, ou raf add/raf done pendant une vague commite le plan lui-même ; 07-11 : L667 refusé « arbre du dépôt modifié (.cadence/raf.yaml) », porte rejouée 8,8 min ; niveau : source (le refus ne naît plus), niveau le plus tôt : source ; mesure : 0 refus « arbre du dépôt modifié » pour .cadence/raf.yaml par vague"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-07
+  - id: L674
+    title: "Porte déportée mini-blue : 59 % des minutes de porte, mais 8,8 min par porte contre 4,9 en local, plafond 2 et 10 à 19 min d'attente de créneau ; porte de 52,8 % du temps actif contre 44 % en 1805 ; envoyer sur mini-blue seulement quand la porte locale est occupée et que la file mini est vide (jamais attendre un créneau mini) ; niveau : source (placement), niveau le plus tôt : source ; mesure : 0 min d'attente de créneau de porte, minutes de porte par lot < 27"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-07
+  - id: L675
+    title: "Skill deliver : dire ce que fait cadence deliver sans clé deliver: (07-11 : évaluation de la 1.61.0, cas livrer-sh-sans-bloc à 0,67, deux réponses sur trois écrivent « la skill ne décrit pas ce cas » et devinent) ; la skill le dit en une phrase, vérifiée sur le code réel ; mesure : livrer-sh-sans-bloc à 1,00 sur deux évaluations de suite"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-07
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

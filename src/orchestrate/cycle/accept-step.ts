@@ -9,7 +9,7 @@ import { waveCommits, takeReport, dirtAfter } from './shared.js';
 import { ficheOf } from './brief.js';
 import { session, badReport } from './session.js';
 import { type AcceptReport, checkShape, ACCEPT_SCHEMA } from '../schemas.js';
-import { commitPlan } from './plan-writes.js';
+import { commitPlan, takeAnswerNote } from './plan-writes.js';
 import { type Constat } from '../state.js';
 const NO_TEST_ACCEPT = 'étape accept : orchestrate.test absent, rien ne prouve que les tests rouges sont exclus du lanceur de tests et de la CI (vérifier à la main la config du lanceur avant de livrer)';
 
@@ -120,6 +120,7 @@ export async function acceptStep(c: LotCtx): Promise<void> {
   const l = c.lot;
   const fiche = ficheOf(c);
   if (!fiche || !c.config.accept) {
+    await takeAnswerNote(c); // pas de session accept : la réponse du lead va à implement, notée ici (runLot ne note pas un lot à l'étape accept)
     l.next = 'implement';
     save(c);
     return;
@@ -145,11 +146,12 @@ export async function acceptStep(c: LotCtx): Promise<void> {
     }
     l.accept = { acceptation: json, rouge: redSha(wd(c), json) ?? '' };
     l.next = 'implement';
-    // Un lot en question n'a plus rien à demander : la réponse du lead (« ne réécris rien ») est prise en compte par ce choix, elle ne repart pas dans le brief d'implement.
+    // Un lot en question n'a plus rien à demander : la réponse du lead (« ne réécris rien ») est prise en compte par ce choix, elle ne repart ni dans le brief d'implement ni dans les notes du lot (L670).
     l.pendingAnswer = null;
     transition(c, 'implementing', 'acceptation déjà verte : accept ignoré');
     return;
   }
+  await takeAnswerNote(c);
   const done = await session(c, 'accept');
   if (!done) return;
   let rep: AcceptReport;

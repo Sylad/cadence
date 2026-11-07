@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runLot, type LotCtx } from '../src/orchestrate/cycle.js';
 import { noteAnswer } from '../src/orchestrate/cycle/plan-writes.js';
 import { INTEGRATION_LOCK, takeRepoWrite } from '../src/orchestrate/integrate.js';
+import { takeLock } from '../src/orchestrate/lock.js';
 import { sharedStateDir } from '../src/state.js';
 import { claudeOut, git, harness, workReport, type Handler } from './orchestrate-harness.js';
 import { gitRepo, tempDir } from './helpers.js';
@@ -78,6 +79,23 @@ describe('L670 — la réponse du lead est une note du lot', () => {
     await noteAnswer(c, REPONSE);
     expect(notes(h).some((t) => t.includes(REPONSE))).toBe(false);
     expect(c.lot.warnings.join('\n')).toMatch(/réponse du lead non notée.*a\.txt/);
+  });
+});
+
+describe('L670 — le verrou du dépôt, erreur d\'E/S', () => {
+  it('R6 — takeLock qui lève pendant l\'attente : le minuteur est effacé, aucune ligne d\'une attente finie', async () => {
+    const r = gitRepo();
+    const dir = sharedStateDir(r);
+    const file = join(dir, INTEGRATION_LOCK);
+    mkdirSync(dir, { recursive: true });
+    takeLock(file, { pid: process.ppid, wave: 'autre', started: new Date().toISOString() });
+    const lines: string[] = [];
+    const attente = takeRepoWrite(r, { wave: 'w' }, { slowMs: 60, pollMs: 5, onSlow: (w) => lines.push(w) });
+    await sleep(15);
+    rmSync(dir, { recursive: true, force: true });
+    await expect(attente).rejects.toThrow();
+    await sleep(120);
+    expect(lines).toEqual([]);
   });
 });
 

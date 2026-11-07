@@ -91,6 +91,8 @@ export interface LotTree {
 }
 
 export interface LotCtx {
+  /** L670 : l'écriture de la note de réponse du lead, en cours dans un worktree (la session ne l'attend pas) ; `runLot` l'attend à la fin du passage. */
+  answerNoted?: Promise<void>;
   wave: WaveCtx;
   lot: LotState;
   config: OrchestrateConfig;

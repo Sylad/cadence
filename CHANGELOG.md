@@ -83,7 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Changed
 
-- The lead's answer is written in the lot's notes when it is taken, and every wait of the repository over 10 s says what it waits for (L670, [docs/orchestrate.md](docs/orchestrate.md)): `Réponse du lead (vague <id>, <date>) — <text>` is committed with the plan once, without holding the next session back, and a plan write or an integration waiting behind the repository's queue or lock writes one journal line naming what holds it (L477: 18.6 and 18.7 min without a line after « réponse prise, le lot repart »).
+- The lead's answer is written in the lot's notes when it is taken, and every wait of the repository over 10 s says what it waits for (L670, [docs/orchestrate.md](docs/orchestrate.md)): `Réponse du lead (vague <id>, <date>) — <text>` is committed with the plan once, without holding the next session back, and a plan write or an integration waiting behind the repository's queue or lock writes one journal line naming what holds it (L477: 18.6 and 18.7 min without a line after « réponse prise, le lot repart »). A lot at the accept step is not noted when the program consumes the answer itself (green acceptance), and a failing lock read no longer leaves a stale wait line; the hypotheses write before a session still waits for the repository lock (named in the journal).
 
 ### Fixed
 

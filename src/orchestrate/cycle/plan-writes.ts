@@ -148,12 +148,14 @@ export async function noteAnswer(c: LotCtx, answer: string): Promise<void> {
 
 /**
  * La réponse du lead en attente est notée à la prise du lot (L670). Dans le dépôt lui-même, l'écriture est jouée avant la session (elle salirait l'arbre où la session écrit) ;
- * en worktree elle peut attendre le dépôt (une intégration le tient) : la session ne l'attend pas, et l'appelant attend `end` à la fin du passage.
+ * en worktree elle peut attendre le dépôt (une intégration le tient) : la session ne l'attend pas, et `runLot` attend `c.answerNoted` à la fin du passage.
  */
-export async function takeAnswerNote(c: LotCtx): Promise<{ end: Promise<void> }> {
-  const end = c.lot.pendingAnswer ? noteAnswer(c, c.lot.pendingAnswer) : Promise.resolve();
+export async function takeAnswerNote(c: LotCtx, atTake = false): Promise<void> {
+  // À la prise (`atTake`), un lot à l'étape accept n'est pas noté : le programme peut consommer la réponse lui-même (acceptation déjà verte, elle ne va ni au brief ni aux notes) ; l'étape accept la note quand elle la passe à une session.
+  if (!c.lot.pendingAnswer || (atTake && c.lot.next === 'accept')) return;
+  const end = noteAnswer(c, c.lot.pendingAnswer);
+  c.answerNoted = end;
   if (!c.tree) await end;
-  return { end }; // enveloppée : `await` d'une promesse rendue nue attendrait aussi l'écriture en worktree
 }
 
 /**

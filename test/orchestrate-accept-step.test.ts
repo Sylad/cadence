@@ -175,6 +175,28 @@ describe('étape accept : où elle s’insère', () => {
     c.lot.answers.push('ne réécris rien');
   };
 
+  it('L670 — la réponse à une question d’accept dont la session accept est jouée est notée sur le lot avant cette session', async () => {
+    const h = prepared({ accept: [accept()], implement: [green], review: [ok] });
+    const c = h.lot('L1', screen, config);
+    c.lot.status = 'question';
+    c.lot.next = 'accept';
+    c.lot.pendingAnswer = 'garde le seuil';
+    await runLot(c);
+    expect(kinds(h)[0]).toBe('accept');
+    expect(h.plan().lot('L1').notes.filter((n) => n.text.includes('garde le seuil'))).toHaveLength(1);
+  });
+
+  it('L670 — la réponse à une question d’accept d’un lot sans fiche (accept ignoré, next implement) est notée une fois', async () => {
+    const h = prepared({ implement: [notGreen], review: [ok] });
+    const c = h.lot('L1', screen);
+    c.lot.status = 'question';
+    c.lot.next = 'accept';
+    c.lot.pendingAnswer = 'garde le seuil';
+    await runLot(c);
+    expect(c.lot.next).toBe('implement');
+    expect(h.plan().lot('L1').notes.filter((n) => n.text.includes('garde le seuil'))).toHaveLength(1);
+  });
+
   it('L233 — une session accept qui a réécrit puis commité l’oracle vert avant sa question : le lot est rendu, la réécriture n’est jamais adoptée comme commit rouge', async () => {
     const { h, a, c, vert } = verteEnQuestion();
     const doc = JSON.parse(readFileSync(join(h.repo, a.json), 'utf8'));
@@ -221,14 +243,14 @@ describe('étape accept : où elle s’insère', () => {
     expect(kinds(h)).toEqual(['implement', 'review']);
   });
 
-  it('L233 — la réponse du lead à une question d’accept (« ne réécris rien ») n’atteint le brief d’implement que par les notes du lot, une fois (L670), pas en bloc « Answer from the human »', async () => {
+  it('L233 — la réponse du lead à une question d’accept (« ne réécris rien ») n’est pas reportée dans le brief d’implement, ni dans les notes du lot (L670 : le choix du programme la consomme)', async () => {
     const { h, c, vert } = verteEnQuestion();
     questionPosee(c, h, vert);
     expect(c.lot.pendingAnswer).toBe('ne réécris rien');
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
-    expect(h.calls[0].brief?.split('ne réécris rien').length).toBe(2);
-    expect(h.calls[0].brief).toContain('Réponse du lead (vague w1');
+    expect(h.calls[0].brief).not.toContain('ne réécris rien');
+    expect(h.plan().lot('L1').notes.map((n) => n.text).join('\n')).not.toContain('ne réécris rien');
     expect(h.calls[0].brief).not.toContain('Answer from the human');
     expect(c.lot.pendingAnswer).toBeNull();
   });

@@ -62,27 +62,34 @@ export async function takeRepoWrite(repo: string, who: { wave: string }, o: { wa
   }
   const turn = (await queue.acquire(Infinity, o.first))!;
   const deadline = Date.now() + waitMs;
-  for (;;) {
-    const lock: OLock = { pid: process.pid, wave: who.wave, started: new Date().toISOString() };
-    const got = takeLock(file, lock);
-    if (got.ok) {
-      settle();
-      return {
-        ok: true,
-        release: () => {
-          releaseLock(file, process.pid);
-          turn();
-        },
-      };
+  try {
+    for (;;) {
+      const lock: OLock = { pid: process.pid, wave: who.wave, started: new Date().toISOString() };
+      const got = takeLock(file, lock);
+      if (got.ok) {
+        settle();
+        return {
+          ok: true,
+          release: () => {
+            releaseLock(file, process.pid);
+            turn();
+          },
+        };
+      }
+      if (Date.now() >= deadline) {
+        turn();
+        settle();
+        return { ok: false, holder: { wave: got.held.wave, pid: got.held.pid } };
+      }
+      wait();
+      startSlow(`le verrou du dépôt tenu par la vague ${got.held.wave} (pid ${got.held.pid})`);
+      await sleep(pollMs);
     }
-    if (Date.now() >= deadline) {
-      turn();
-      settle();
-      return { ok: false, holder: { wave: got.held.wave, pid: got.held.pid } };
-    }
-    wait();
-    startSlow(`le verrou du dépôt tenu par la vague ${got.held.wave} (pid ${got.held.pid})`);
-    await sleep(pollMs);
+  } catch (e) {
+    // takeLock lève (E/S) : le tour en mémoire est rendu et le minuteur effacé, la ligne « attend » ne décrit plus rien.
+    turn();
+    settle();
+    throw e;
   }
 }
 

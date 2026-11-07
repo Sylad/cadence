@@ -15,12 +15,13 @@ function decor(): { b: Banc; clones: Record<string, string>; dirEval: string } {
   const dir = join(r, 'bancs', '1-t'); mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'demande.md'), 'd');
   const secrets = join(r, 'secrets', '1-t'); mkdirSync(secrets, { recursive: true }); writeFileSync(join(secrets, 'mesure.md'), 'm');
   const clones: Record<string, string> = {};
-  for (const nom of ['A', 'cand']) {
-    const c = join(r, 'runs', nom); mkdirSync(c, { recursive: true });
-    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: c });
-    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'base'], { cwd: c });
-    clones[nom] = c;
-  }
+  // Un seul dépôt, cloné pour le second bras : la base est le même commit des deux côtés (deux commits faits à des secondes
+  // différentes auraient deux sha, et `git diff base..HEAD` échouerait dans l'un d'eux).
+  clones.A = join(r, 'runs', 'A'); mkdirSync(clones.A, { recursive: true });
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: clones.A });
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'base'], { cwd: clones.A });
+  clones.cand = join(r, 'runs', 'cand');
+  execFileSync('git', ['clone', '-q', clones.A, clones.cand]);
   const base = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: clones.A, encoding: 'utf8' }).trim();
   return { b: { id: '1-t', dir, secrets, projet: 't', source: '/s', base, install: 'true', tests: 'true', visible: false, taille: 'retouche', frais: false, reponses: false },
     clones, dirEval: join(r, 'runs', 'eval') };

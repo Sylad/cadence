@@ -85,6 +85,11 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - Fewer gates per lot (L662, [docs/orchestrate-gate.md](docs/orchestrate-gate.md#the-edge-case-probe-orchestrateprobe-l497)): the edge-case probe now plays right after the write, before the program's gate, which is played once between the write and the review (a second gate after a probe that had committed cost 33.2 min over five lots in wave 1805; a session that announces red keeps the gate first, and when that gate does not confirm the announcement the probe plays right after it, for an express lot that touches the cycle too). After « main a avancé » the integration gate is still replayed at the new tip, as before: skipping it was measured to bring no gain on our repositories (only cadence integrates through worktrees, and its code reads the plan).
 
+### Fixed
+
+- The R7 and R11 tests of the approved queue no longer depend on the clock order between two repositories, and the test lead's holds follow the real clock (L685): a dated test went red at every run since 07-11.
+- `citedResources` (`raf add`, resources cited by a title) reads a title in linear time instead of quadratic (L686): no upper bound on wall-clock duration is left in the suite, which had failed the publication of 1.62.0 on the runner.
+
 ## [1.62.0] - 2026-11-07
 
 ### Added

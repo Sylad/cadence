@@ -68,6 +68,8 @@ cas:
       - { si: "le dépôt du lot est tenu par une autre vague vivante", alors: "le lot est poussé dans cette vague par --add ; si --add le refuse, la réservation est rendue (en attente), le lot est sauté et le journal dit « file : --add refusé — <projet:lot> : <message de --add> »", regles: [R9, R7] }
       - { si: "aucune vague ne tient le dépôt du lot", alors: "la vague le joue elle-même dans son créneau libre (elle devient la vague vivante qui tient ce dépôt) ; si sa prise est refusée (verrou, garde de push), la réservation est rendue et la cause dite", regles: [R9, R7] }
       - { si: "le créneau est celui d'un tour (premier tirage de --queue ou --continue, tirage entre deux tours) et le dépôt est tenu par une autre vague vivante", alors: "le tour ne pousse pas : le lot est sauté et dit « file : lot sauté — <projet:lot> : dépôt tenu par la vague <id> », reste en file ; cette vague le tire à son prochain créneau libre, ou une vague vivante l'y pousse par --add à l'un des siens", regles: [R9, R18] }
+      - { si: "la vague receveuse écarte ensuite la demande poussée (arrêt demandé, budget épuisé, limite d'usage, lot fini entre-temps, vague qui a fini de jouer, verrou refusé)", alors: "elle rend le lot à la file (en attente) et son journal dit « file : <projet:lot> rendu à la file (ajout écarté) » ; la demande porte l'origine du lot (file et dossier) dans sa file d'ajouts pour cela", regles: [R7, R9] }
+      - { si: "la vague qui tient le dépôt n'a plus de créneau libre (ses voies occupées atteignent son plafond, registre waves/<pid>.json), ou que cette vague y a déjà poussé autant de lots qu'elle avait de créneaux libres", alors: "le lot est sauté « dépôt tenu par la vague <id>, sans créneau libre » et reste en file ; au plus un lot poussé ou pris par créneau libre à chaque regard", regles: [R20, R9] }
       - { si: "--add a déjà été refusé par cette vague pour ce lot", alors: "la poussée n'est pas rejouée tant que la même vague tient le dépôt (une poussée relit le contrôle préalable) ; la vague qui tient le dépôt tire le lot elle-même à son prochain créneau", regles: [R9] }
       - { si: "le contrôle préalable refuse le lot pour lui-même", alors: "le lot est exclu de cette vague, reste en file et la cause est dite", regles: [R10] }
       - { si: "le plafond de sessions (vagues et holds du lead compris) est atteint", alors: "aucun créneau n'est libre, rien n'est tiré", regles: [R8] }
@@ -121,7 +123,7 @@ regles:
     tests: ["R2 — même clé deux fois dans une commande (add A A) : une seule occurrence, avertissement, rien de dupliqué", "R2 — clé de lot inconnu : refus nommant la clé, file inchangée", "R2 — liste vide : refus, file inchangée"]
   - id: R3
     cas: [C1]
-    enonce: "Une clé déjà présente en file garde sa position (pas de doublon) et l'ajout l'avertit."
+    enonce: "Une clé déjà présente en file garde sa position (pas de doublon) et l'ajout l'avertit ; deux clés qui nomment le même lot (a:L1 et ./a:L1) sont la même clé, l'avertissement nomme celle qui est en file, et drop retire le lot par l'une ou l'autre."
     statut: hypothese
     si_faux: "Si le lead veut déplacer un lot en le réajoutant, il devra le retirer (drop) puis l'ajouter ; aucune donnée perdue."
     tests: ["R3 — clé déjà en file : une seule occurrence, position inchangée, avertissement"]
@@ -145,10 +147,10 @@ regles:
     tests: ["R6 — after non clos : journal « file : lot sauté — p:L2 : after non clos (L1) » et lot toujours en file", "R6 — même cause sur deux créneaux de la même vague : une seule ligne", "R6 — cause qui change puis revient dans la même vague : trois lignes", "R6 — même cause dans une autre vague : une ligne par vague", "R6 — aucun lot mûr : le créneau reste libre et le journal le dit"]
   - id: R7
     cas: [C3, C5]
-    enonce: "Le tirage réserve le lot dans queue.json (~/.cadence/orchestrate, à côté des créneaux) de façon atomique avant de le lancer : un lot de la file n'est tiré que par une seule vague, une seule fois, et l'ordre est réservé, puis poussé par --add (R9), puis tiré (état tiré avec l'id de la vague qui l'a reçu) ; un --add refusé, un lancement refusé, une vague qui échoue ou est interrompue entre la réservation et le tiré rend le lot à la file (en attente) ; la réservation porte l'id et le pid de la vague qui tire (R14)."
+    enonce: "Le tirage réserve le lot dans queue.json (~/.cadence/orchestrate, à côté des créneaux) de façon atomique avant de le lancer : un lot de la file n'est tiré que par une seule vague, une seule fois, et l'ordre est réservé, puis poussé par --add (R9), puis tiré (état tiré avec l'id de la vague qui l'a reçu) ; un --add refusé, un lancement refusé, une vague qui échoue ou est interrompue entre la réservation et le tiré rend le lot à la file (en attente), et une vague receveuse qui écarte la demande poussée (arrêt, budget, limite d'usage, lot fini, fin de vague) le rend de même ; la réservation porte l'id et le pid de la vague qui tire (R14)."
     statut: hypothese
     si_faux: "Sans réservation atomique, deux vagues joueraient le même lot (double travail, deux branches) ; c'est le seul risque, corrigé par un verrou de plus."
-    tests: ["R7 — deux tirages simultanés du même lot : un seul le prend", "R7 — vague interrompue avant le lancement : le lot revient en file", "R7 — --add refusé après réservation : lot en attente, sauté et dit", "R7 — --add accepté : état tiré avec l'id de la vague receveuse, jamais tiré avant l'acceptation"]
+    tests: ["R7 — deux tirages simultanés du même lot : un seul le prend", "R7 — vague interrompue avant le lancement : le lot revient en file", "R7 — --add refusé après réservation : lot en attente, sauté et dit", "R7 — --add accepté : état tiré avec l'id de la vague receveuse, jamais tiré avant l'acceptation", "R7 — lot poussé puis écarté par la vague receveuse : rendu à la file, drop l'accepte"]
   - id: R8
     cas: [C3]
     enonce: "Le tirage de la file respecte les bornes de la vague : stopReason (src/orchestrate/continue.ts, question posée, deux lots rendus de suite, --until, quota, --stop-after-current, budget épuisé), le plafond de sessions qui compte les holds du lead, et le budget restant (un lot qui n'y tient pas est sauté et dit, comme src/orchestrate/command.ts:920)."
@@ -223,10 +225,10 @@ regles:
     tests: ["R19 — --continue avec un lot mûr en file et un lot prêt au plan : le lot de la file est tiré", "R19 — file sans lot mûr : le plan de --continue est tiré"]
   - id: R20
     cas: [C3, C4]
-    enonce: "Un seul lot de la file est tiré par créneau libéré ; deux créneaux libérés tirent deux lots, un chacun."
+    enonce: "Un seul lot de la file est tiré par créneau libéré ; deux créneaux libérés tirent deux lots, un chacun. Un lot poussé par --add compte pour le créneau du regard qui le pousse, et une vague ne pousse pas plus de lots dans une autre que celle-ci n'a de créneaux libres tant qu'elle ne les a pas pris."
     statut: sourcee
     source: "arbitrage du lead (01-11) : « un lot à la fois par créneau libéré »"
-    tests: ["R20 — un créneau libéré, trois lots mûrs : un seul tiré", "R20 — deux créneaux libérés : deux lots tirés, un par créneau"]
+    tests: ["R20 — un créneau libéré, trois lots mûrs : un seul tiré", "R20 — deux créneaux libérés : deux lots tirés, un par créneau", "R20 — créneau libre d'une vague vivante, receveuse à deux voies libres, trois lots en file : deux poussés, le troisième attend"]
 
 contrats:
   - id: A1
@@ -269,6 +271,9 @@ contrats:
       - { code: log info, message: "file : --add refusé — <projet:lot> : <message de --add>" }
       - { code: log info, message: "file : tire <projet:lot> (position <n>) — poussé par --add dans la vague <id>" }
       - { code: log info, message: "file : lot sauté — <projet:lot> : dépôt tenu par la vague <id>" }
+      - { code: log info, message: "file : lot sauté — <projet:lot> : dépôt tenu par la vague <id>, sans créneau libre" }
+      - { code: log info, message: "file : <projet:lot> rendu à la file (ajout écarté)" }
+      - { code: log info, message: "file : aucun créneau libre pour la file (plafond <n> : <v> vague(s) vivante(s), <h> session(s) du lead)" }
       - { code: log warn, message: "file : réservation orpheline reprise — <projet:lot> (vague <id>)" }
       - { code: log warn, message: "file : illisible ou verrouillée, rien n'est tiré à ce créneau" }
       - { code: log error, message: "orchestrate --queue : aucun lot mûr dans la file approuvée" }

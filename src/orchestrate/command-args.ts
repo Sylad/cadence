@@ -101,6 +101,9 @@ const asksAnotherAction = (a: Args): boolean =>
   a.resume !== undefined || a.status !== undefined || a.waits || a.follow || a.add.length > 0 || a.drop.length > 0 || a.stopAfterCurrent || a.answers.length > 0 || a.removeWorktree !== undefined;
 
 /** Les options sans valeur, et le champ de `Args` qu'elles lèvent. */
+/** `--since` de `--follow` (L668) : un horodatage ISO du journal (`2026-11-06T22:00:39Z`, millisecondes permises) ou un numéro de ligne. */
+const SINCE_FOLLOW = /^(?:\d+|\d{4}-\d{2}-\d{2}T[\d:.]+Z)$/;
+
 const BOOLEAN_FLAGS: Record<string, 'dryRun' | 'waits' | 'watch' | 'follow' | 'stopAfterCurrent' | 'abandonCommits' | 'continue' | 'noFill'> = {
   '--dry-run': 'dryRun',
   '--waits': 'waits',
@@ -128,7 +131,7 @@ export function parseOrchestrateArgs(argv: string[]): Args {
       a[t === '--status' ? 'status' : 'resume'] = v ?? true;
     } else if (t === '--since') {
       a.since = value(t);
-      if (!isDay(a.since)) throw new RafError(`--since invalide : ${a.since} (AAAA-MM-JJ)`);
+      if (!isDay(a.since) && !SINCE_FOLLOW.test(a.since)) throw new RafError(`--since invalide : ${a.since} (AAAA-MM-JJ, ou avec --follow un horodatage ISO ou un numéro de ligne)`);
     } else if (t === '--detail') a.detail = value(t);
     else if (t === '--interval') a.interval = parseMaxSessions(value(t), '--interval');
     else if (t === '--budget') {

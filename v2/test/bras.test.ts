@@ -27,7 +27,7 @@ describe('lancerBras', () => {
     const exec: Executeur = (args, o) => { appels.push({ args, env: o.env }); return { stdout: json('s1', 1000, 0.5), code: 0 }; };
     let t = 0; const horloge = () => new Date(Date.UTC(2026, 10, 8, 10, 0, t++ * 90));
     const m = lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, exec, horloge);
-    expect(m).toMatchObject({ bras: 'A', banc: '1-t', duree_s: 90, tokens: 1000, cout_usd: 0.5, questions: 0, sessions: ['s1'] });
+    expect(m).toMatchObject({ bras: 'A', banc: '1-t', duree_s: 90, tokens: 1000, cout_usd: 0.5, questions: 0, questions_texte: [], sessions: ['s1'], echec: null });
     const a = appels[0].args;
     expect(a[a.indexOf('-p') + 1]).toContain('Ajoute un séparateur.');
     expect(a[a.indexOf('-p') + 1]).toContain(clone);
@@ -49,6 +49,8 @@ describe('lancerBras', () => {
     };
     const m = lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, exec);
     expect(m.questions).toBe(1);
+    expect(m.questions_texte).toEqual(['Faut-il réorganiser ?']);
+    expect(m.echec).toBeNull();
     expect(m.tokens).toBe(1000);
     expect(appels[1]).toEqual(expect.arrayContaining(['--resume', 's1']));
     expect(appels[1][appels[1].indexOf('-p') + 1]).toContain('Rotation seule.');
@@ -58,7 +60,34 @@ describe('lancerBras', () => {
   it('au-delà de 3 questions, on arrête', () => {
     const { b, clone } = bancTest();
     const exec: Executeur = () => { writeFileSync(`${clone}.question.md`, '?'); return { stdout: json('s', 1, 0), code: 0 }; };
-    expect(lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, exec).questions).toBe(3);
+    const m = lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, exec);
+    expect(m.questions).toBe(3);
+    expect(m.questions_texte).toEqual(['?', '?', '?']);
+    expect(m.echec).toBe('question ouverte après 3 réponses');
+    expect(existsSync(`${clone}.question.md`)).toBe(false);
+  });
+
+  it('session en échec (is_error) : echec renseigné, mesures gardées, boucle arrêtée', () => {
+    const { b, clone } = bancTest('x');
+    let n = 0;
+    const exec: Executeur = () => { n++; writeFileSync(`${clone}.question.md`, '?');
+      return { stdout: JSON.stringify({ session_id: 's1', is_error: true, subtype: 'error_max_turns', total_cost_usd: 0.2,
+        modelUsage: { m: { inputTokens: 7 } } }), code: 0 }; };
+    const m = lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, exec);
+    expect(n).toBe(1);
+    expect(m).toMatchObject({ echec: 'session s1 : error_max_turns', tokens: 7, cout_usd: 0.2, questions: 0 });
+  });
+
+  it('code non nul avec sortie lisible : echec code N ; session_id absent : echec', () => {
+    const { b, clone } = bancTest();
+    const d = { nom: 'A', modele: 'opus', brief };
+    expect(lancerBras(b, d, clone, () => ({ stdout: json('s1', 1, 0), code: 1 })).echec).toBe('code 1');
+    expect(lancerBras(b, d, clone, () => ({ stdout: '{}', code: 0 })).echec).toBe('session_id absent');
+  });
+
+  it('sortie illisible : l erreur de l exécuteur figure dans le message', () => {
+    const { b, clone } = bancTest();
+    expect(() => lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, () => ({ stdout: '', code: 1, erreur: 'SIGKILL' }))).toThrow(/SIGKILL/);
   });
 
   it('sortie illisible : erreur avec la fin de la sortie', () => {
@@ -67,7 +96,7 @@ describe('lancerBras', () => {
   });
 
   it('environnement neutre : pas de kube, pas de jeton, pas de prod maritime', () => {
-    const e = environnementNeutre({ HOME: '/h', KUBECONFIG: '/h/.kube/config', GH_TOKEN: 'x', GITHUB_TOKEN: 'y' });
-    expect(e).toMatchObject({ HOME: '/h', KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', AETHERWX_URL: 'http://127.0.0.1:9' });
+    const e = environnementNeutre({ HOME: '/h', KUBECONFIG: '/h/.kube/config', GH_TOKEN: 'x', GITHUB_TOKEN: 'y', SSH_AUTH_SOCK: '/s' });
+    expect(e).toMatchObject({ HOME: '/h', KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', GH_CONFIG_DIR: '/nonexistent', SSH_AUTH_SOCK: '', AETHERWX_URL: 'http://127.0.0.1:9' });
   });
 });

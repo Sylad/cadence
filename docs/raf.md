@@ -196,6 +196,7 @@ holds it (the `--continue` draw, the `tirables, ressources libres` line and, ins
   `<file> : resources.<nom> : clé inconnue « <clé> » (seule paths est connue)`;
   `<file> : resources.<nom> : chemin invalide « <chemin> » (relatif au dépôt, sans « .. », « \ » ni joker)` for an absolute path, a `..` segment, a backslash
   (`src\x`, `src\`), a glob character (`*`, `?`, `[`), an empty path, or a path empty after normalisation (`.`, `./`, `././`: it would cover the whole repository).
+- **A title that cites a path (L671).** A lot whose title cites a path of such a resource (`docs/orchestrate*.md`, `docs/orchestrate-gate.md:114`, `src/orchestrate/cycle/brief.ts`: a word with a `/`, a file under a declared path, or a glob that covers one) gets that resource in its `uses:` at `raf add` (after the `--uses` given, no duplicate; not for a sub-task), and the pool counts it for a lot already in the plan, so two lots that name the same page play one after the other instead of the later one waiting, at its integration, for the older one (07-11: 113,6 min). `cadence orchestrate --dry-run` says it under the lot (`ressources : … (cité par le titre`). A bare name without `/` (`gate.md`) cites nothing; the `--continue` draw and the `tirables` line still read `uses:` only.
   What the wave does with the paths is in [docs/orchestrate-worktrees.md](orchestrate-worktrees.md#one-worktree-per-lot-orchestrateworktrees-l279) (« Resources deduced from the diff »).
 
 ## Where the plan is

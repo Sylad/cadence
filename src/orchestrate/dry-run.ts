@@ -1,3 +1,4 @@
+import { citedResources, declaredFor } from '../resources.js';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
@@ -136,6 +137,12 @@ function budgetLine(l: LotState, lot: ReturnType<Plan['lot']>, env: ReturnType<t
   return `  budget du lot : ${l.budget} tokens comptés (base : ${lotBudgetBasis(lot.estimate, stage, l.escalationReserve ? env.config.escalation?.model : undefined, measured)})`;
 }
 
+/** Sous la ligne du budget, la ressource que le titre du lot cite (L671) : la file de la vague le joue après tout lot qui la tient ; rien sans ressource citée. */
+const citedLine = (l: LotState): string => {
+  const cited = citedResources(l.title, declaredFor(l.repo));
+  return cited.length ? `\n  ressources : ${cited.join(', ')} (cité par le titre : la file de la vague le joue après tout lot qui la tient)` : '';
+};
+
 /** `wave` : la vague simulée — son identifiant, son budget et si elle a plus d'un créneau (L527 : tout lot d'un dépôt en worktrees y joue alors dans le sien). */
 export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDeps, { budget, id, multiSlot, measured }: { budget: number; id: string; multiSlot: boolean; measured?: MeasuredBudgets }): void {
   const tmp = mkdtempSync(join(tmpdir(), 'cadence-orchestrate-'));
@@ -151,7 +158,7 @@ export function dryRun(lots: LotState[], io: OrchestrateIo, deps: OrchestrateDep
     const slot = repos.indexOf(l.repo);
     io.out(`${lotKey(l.project, l.lot)} — ${l.title}`);
     if (l.goal) io.out(`  objectif donné : ${l.goal} (à la place du titre dans les briefs)`);
-    io.out(budgetLine(l, lot, env, measured));
+    io.out(budgetLine(l, lot, env, measured) + citedLine(l));
     const mine = lots.filter((o) => o.repo === l.repo);
     const together = env.config.worktrees && (mine.length > 1 || multiSlot) && !mine.some((o) => o.repos?.length) && !!repoBranch(l.repo);
     io.out(together ? `  file ${basename(l.repo)} · en parallèle des autres lots du dépôt, dans son worktree (cadence/${id}/${lotSlug(l.project, l.lot)}, créé à la prise du créneau)` : `  file ${basename(l.repo)} · ${slot < 2 ? `créneau ${slot + 1}` : 'en attente d\'un créneau'}`);

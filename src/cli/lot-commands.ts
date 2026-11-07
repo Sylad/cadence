@@ -12,6 +12,7 @@ import { printUncommittedPlan } from '../plan-uncommitted.js';
 import { resolveCommit } from '../git.js';
 import { loadEntries } from '../news.js';
 import { addLot } from '../cli-add.js';
+import { declaredFor } from '../resources.js';
 import { type Lot, RafError, type Screen, SCREENS, type Status } from '../plan.js';
 import { refuseDoneInMainTree, warnIntegrating, warnWaveWorking, waveHolding } from '../repo-busy.js';
 import { type Ctx, knownLot, touchedLot } from './context.js';
@@ -21,7 +22,7 @@ export function cmdAdd(c: Ctx): number | Promise<number> {
   const { rest, values, io, today, root, loadPlan, refuseLongTitle, need } = c;
   need(1, 'add "titre"');
   const plan = loadPlan();
-  const id = addLot(plan, values, rest.join(' '), today, refuseLongTitle);
+  const id = addLot(plan, values, rest.join(' '), today, { refuseLongTitle, declared: declaredFor(root) });
   plan.save();
   io.out(id);
   warnIntegrating(root, io.err);

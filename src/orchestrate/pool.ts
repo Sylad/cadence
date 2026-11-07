@@ -2,7 +2,7 @@ import { runLot, type LotCtx } from './cycle.js';
 import { slowWaitLog } from './cycle/plan-writes.js';
 import { WAIT_LOG_MS } from './integrate.js';
 import { deducedResources } from './lot-diff.js';
-import { declaredFor } from '../resources.js';
+import { citedResources, declaredFor } from '../resources.js';
 import { lotKey, lotRepoPaths, type LotState } from './state.js';
 
 /** Valeur de repli de `runPool` quand l'appelant ne donne pas de plafond ; le réglage réel est DEFAULT_MAX_SESSIONS, `--max-sessions` ou CADENCE_MAX_SESSIONS (command-args.ts). */
@@ -69,7 +69,7 @@ function playingDeps(queue: LotCtx[], ctxs: LotCtx[], live: Set<LotCtx>): string
 }
 
 /**
- * Les ressources tenues par les files qui jouent (L551) : les `uses:` des lots non finis de ces files, lus du plan une fois, plus celles que le diff de leur
+ * Les ressources tenues par les files qui jouent (L551) : les `uses:` des lots non finis de ces files et celles que leur titre cite (L671), lus du plan une fois, plus celles que le diff de leur
  * worktree déduit (L558, R5 : ressources à chemins déclarées dans le cadence.yaml parent), relu à chaque appel sans cache (R7 : le diff change à chaque commit).
  * `wanted(queue)` rend les ressources tenues qu'un lot de la file veut par ses `uses:` (vide : la file peut partir). `warn(c, cause)` reçoit un diff que git n'a pas pu lire (R12) : le lot ne
  * tient alors que ses `uses:` ; la même cause n'est redite pour un lot que si elle a changé. Exporté pour ses tests ; `runPool` en est le seul appelant.
@@ -77,7 +77,10 @@ function playingDeps(queue: LotCtx[], ctxs: LotCtx[], live: Set<LotCtx>): string
 export function resourceLock(running: Map<Promise<void>, LotCtx[]>, live: Set<LotCtx>, warn: (c: LotCtx, cause: string) => void = () => {}): { wanted: (queue: LotCtx[]) => string[] } {
   const cache = new WeakMap<LotCtx, string[]>();
   const usesOf = (c: LotCtx): string[] => {
-    if (!cache.has(c)) cache.set(c, c.loadPlan().lots().find((l) => l.id === c.lot.lot)?.uses ?? []);
+    if (!cache.has(c)) {
+      const lot = c.loadPlan().lots().find((l) => l.id === c.lot.lot);
+      cache.set(c, [...new Set([...(lot?.uses ?? []), ...citedResources(lot?.title ?? '', declaredFor(c.lot.repo))])]);
+    }
     return cache.get(c)!;
   };
   const warned = new WeakMap<LotCtx, string>();

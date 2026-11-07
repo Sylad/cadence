@@ -3113,6 +3113,11 @@ lots:
     started: 2026-11-07
     review: { date: 2026-11-07, verdict: "conforme : relu par le lead ; l'ordre de démarrage de deux dépôts au même tour est une affaire d'horloge (fiche R19, C3 tenues par wave.lots), les tests vérifient l'ensemble et l'ordre dans un dépôt ; date figée des holds remplacée par l'horloge réelle (le test R8 rougissait depuis le 07-11 à midi) ; 10 rejeux sous charge, 0 rouge", commit: 3fb188cfd8b183981877ecc93846ceae0af71672 }
     finished: 2026-11-07
+  - id: L686
+    title: "Publication 1.62.0 refusée par un test au chronomètre (L671 : citedResources sur un titre de 150 000 caractères en moins de 2 000 ms, 2 080 ms sur le runner GitHub) ; rendre citedResources linéaire et remplacer les assertions de durée murale de la suite par une mesure de croissance (rapport entre deux tailles) ou une borne d'entrée ; même classe que L685 (date figée) ; mesure : 0 assertion Date.now() < N ms dans test/, publication 1.62.1 verte"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-07
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -1,0 +1,13 @@
+[Unit]
+Description=Banc hebdomadaire de cadence 2 (docs/v2/banc.md)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=sylvain_ladoire
+Environment=HOME=/home/sylvain_ladoire
+# PATH explicite : ~/.bashrc rend la main aux shells non interactifs, nvm n'y est donc pas chargé.
+Environment=PATH=/home/sylvain_ladoire/.nvm/versions/node/v22.22.3/bin:/home/sylvain_ladoire/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/usr/bin/mkdir -p /home/sylvain_ladoire/bench-cadence
+ExecStart=/bin/bash -c 'cadence2 bench hebdo >> "$HOME/bench-cadence/hebdo.log" 2>&1'
+TimeoutStartSec=10h

@@ -508,6 +508,9 @@ export function ageText(ms: number): string {
   return min < 60 ? `${min} min` : min < 48 * 60 ? `${Math.round(min / 60)} h` : `${Math.round(min / 1440)} j`;
 }
 
+/** Au-delà de ce nombre d'heures, une branche de lot gardée avec des commits non intégrés attend une décision : le tour du lead la marque ⚠ (L676). */
+export const UNDECIDED_BRANCH_HOURS = 48;
+
 export const KEPT_TITLE = 'worktrees de lot conservés (cadence orchestrate --remove-worktree <projet>:<lot> pour les retirer) :';
 
 /** Une ligne par worktree conservé (R19) : dépôt, lot, âge, commits non intégrés, chemin. */

@@ -18,7 +18,7 @@ import { staleNotes, staleText } from './stale-notes.js';
 import { ciGapsField, ciParityText, type CiGap } from './orchestrate/ci-parity.js';
 import { noTestGate, noTestText, type NoTestGate } from './orchestrate/no-test.js';
 import { unpublishedField, unpublishedLine, type Unpublished } from './unpublished.js';
-import { KEPT_TITLE, keptLine, keptTrees, type KeptTree } from './orchestrate/worktree.js';
+import { KEPT_TITLE, UNDECIDED_BRANCH_HOURS, ageText, keptLine, keptTrees, type KeptTree } from './orchestrate/worktree.js';
 
 /** Le bloc `lead:` du cadence.yaml du dossier parent (absent = `undefined`) ; un `lead` qui n'est pas une table est refusé en nommant `key`. */
 function readLeadBlock(parent: string, key: string, expected: string): { file: string; block: Record<string, unknown> } | undefined {
@@ -294,6 +294,15 @@ export function tourCiLines(rows: TourRow[]): string[] {
 /** Une ligne ⚠ par projet qui a des lots en service non publiés (L571) ; rien quand tout est publié. */
 export function tourUnpublishedLines(rows: TourRow[]): string[] {
   return rows.filter((r) => r.unpublished).map((r) => `${r.project} · ${unpublishedLine(r.unpublished!)}`);
+}
+
+/**
+ * Une ligne ⚠ par branche de lot gardée qui porte des commits non intégrés depuis plus de `UNDECIDED_BRANCH_HOURS` h (L676) : le lead décide, intégrer
+ * (`--resume --wave <vague> --integrate`) ou reprendre (relancer le lot, la reprise refuse une branche périmée, L665). Une date de création absente (0) n'en marque aucune.
+ */
+export function tourStaleBranchLines(rows: TourRow[], now = Date.now()): string[] {
+  return rows.flatMap((r) => (r.worktrees ?? []).filter((t) => t.unintegrated > 0 && t.created > 0 && now - t.created > UNDECIDED_BRANCH_HOURS * 3600_000).map((t) =>
+    `⚠ ${r.project} · ${t.lot} · branche non intégrée depuis ${ageText(now - t.created)} (${t.unintegrated} commit(s) non intégré(s)), sans décision · intégrer : cadence orchestrate --resume --wave ${t.wave} --integrate ${t.lot} · reprendre : cadence orchestrate ${t.lot}`));
 }
 
 const DRIFT_SHOWN = 2;

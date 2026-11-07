@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { currentBranch, hasTrackedChanges, tagExists } from './git.js';
@@ -274,10 +275,21 @@ function steps(p: Planned, files: string[], branch: string): string[] {
 }
 
 /** `cadence release patch|minor|major [--dry-run]` : prépare le commit de version, sans rien publier. Rend le code de sortie. */
+/** Refonte du 07-11 : une version 2.x ne se prépare qu'avec un banc vert sur l'empreinte de v2 (cadence2 bench verifier-publication). */
+export function gardeBancV2(version: string, verifier: () => { code: number; sortie: string }): void {
+  if (Number(version.split('.')[0]) < 2) return;
+  const r = verifier();
+  if (r.code !== 0) throw new RafError(`release : ${version} demande un banc vert sur cette version de v2 — ${r.sortie.trim() || 'cadence2 introuvable'}`);
+}
+
 export function release(rest: string[], dryRun: boolean, root: string, today: Day, out: (l: string) => void): number {
   const bump = rest[0] as Bump | undefined;
   if (rest.length !== 1 || !bump || !BUMPS.includes(bump)) throw new RafError('usage : cadence release patch|minor|major [--dry-run]');
   const p = plan(root, bump, today);
+  gardeBancV2(p.version, () => {
+    const r = spawnSync('node', [join(root, 'v2', 'bin', 'cadence2.js'), 'bench', 'verifier-publication'], { cwd: root, encoding: 'utf8' });
+    return { code: r.status ?? 1, sortie: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+  });
 
   const whatsNewPath = join(root, WHATS_NEW);
   const hasWhatsNew = existsSync(whatsNewPath);

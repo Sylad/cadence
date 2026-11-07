@@ -1160,7 +1160,7 @@ lots:
     finished: 2026-10-31
   - id: L498
     title: "File de lots pré-approuvés tirée à chaque créneau libre (inventaire des pertes du 31-10 (17→31-10) : 2 569 min de mur sans aucune session, 1,58 créneau occupé sur 3 en moyenne) : le lead approuve une liste ordonnée de lots (projet:lot) une fois, chaque vague vivante ou une vague neuve en tire le suivant dès qu'un créneau se libère, sans attendre le lead ; un lot non mûr (question, after non clos, uses tenu) est sauté et dit ; avec L421 (ajout à une vague vivante)"
-    status: doing
+    status: done
     estimate: 0.5
     spec: true
     created: 2026-10-31
@@ -1189,6 +1189,7 @@ lots:
       - { date: 2026-11-06, text: "Hypothèses (fiche file-lots-approuves) — R17 : queue est un mot réservé quand c'est le premier jeton positionnel de orchestrate : il est aiguillé vers la sous-commande add|show|drop avant l'analyse des lots… ; si faux : Si un projet nommé queue existe et doit rester lançable par son seul nom, la sous-commande passe en option (--queue-add) ; aucune donnée en jeu" }
       - { date: 2026-11-06, text: "06-11 : branche partie du 01-11, 1617 commits derrière main, sans L421 ni L527 ; rebaser coûtait 6 conflits. Retirée de la vague. Avant toute reprise : relire si le lot vaut encore, le remplissage de vague (L587) et --add ayant repris une partie du besoin ; repartir de main, fiche à revoir." }
     review: { date: 2026-11-07, verdict: "conforme : repris par le lead le 07-11, rebasé sur main et branché sur --add (L421) et le remplissage L587 ; 4 revues, 8 majeurs corrigés chacun par un test qui rougit sans son correctif ; 103 tests de la file verts, tsc et qualité verts, fiche à jour ; revue courte du diff rebasé (patch-id différent) : conforme — rebase propre (19 patches identiques), aucune interaction cassée avec L666/L671/L673 de main", commit: 6b557440c6d7787adfcf0ab6aff6c8baafd5f35f }
+    finished: 2026-11-07
   - id: L499
     title: "Parité porte ↔ CI (inventaire des pertes du 31-10 (17→31-10) : 37 livraisons rouges, ~12 h estimées, dont des tests joués en CI seulement, ex. e2e warhammer) : cadence lit les commandes de test des workflows CI du dépôt et signale (lead tour, orchestrate --dry-run, verify --gate) celles que orchestrate.test/build ne jouent pas ; avec L482"
     status: done

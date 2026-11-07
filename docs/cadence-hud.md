@@ -175,6 +175,7 @@ The state of the cadence 2 bench, one line at the bottom of the band, drawn only
 `~/bench-cadence/`; one line per run, written by `ligneHistorique` of `v2/src/bench/verdict.ts`). The file is read every 5 s by the
 `BANC_READER` script (collect.ts, python3); no cadence command runs, and an unreadable line is skipped.
 
+- `banc ⟳ 3/6 bancs · 3-ol-companion-L241 #1 · bras equipe-legere · 7 min (depuis 1 h 24)` in the accent colour, first of the bench lines, while a run is going (`en-cours.json` next to `historique.jsonl`, read by the same script); orange with ` · bloqué ?` when the phase has not changed for 6 h. The lots panel shows it above the last 5 runs;
 - `banc ✓ 08-11 court · eq-legere/A` in green: the last run is green (Paris day, kind of run, candidate against A). The kind: `court` for
   benches 1, 3 and 6 exactly, `hebdo` for a weekend run, `éclair` for bench 1 alone, else `N bancs`;
 - `banc ✗ 08-11 : temps total, relecture aveugle` in red: the last run is red, with its first three red criteria;

@@ -369,14 +369,21 @@ print(json.dumps(out))
 
 /**
  * Lit l'historique du banc de cadence 2 (Task 16) (python3 -I) : `$BENCH_ROOT/historique.jsonl`, sinon `~/bench-cadence/historique.jsonl`.
- * Sortie : ses 500 dernières lignes non vides (JSON), ou `null` quand le fichier n'existe pas. Aucune commande cadence n'est lancée.
+ * Sortie : `{"h": ses 500 dernières lignes non vides ou null (fichier absent), "c": le texte de en-cours.json ou null}`. Aucune commande cadence n'est lancée.
  */
 export const BANC_READER = `
 import os, json
 root = os.environ.get('BENCH_ROOT') or os.path.join(os.path.expanduser('~'), 'bench-cadence')
+h = c = None
 try:
     with open(os.path.join(root, 'historique.jsonl'), encoding='utf-8') as f:
-        print(json.dumps([l for l in f.read().split('\\n') if l.strip()][-500:]))
+        h = [l for l in f.read().split('\\n') if l.strip()][-500:]
 except OSError:
-    print('null')
+    pass
+try:
+    with open(os.path.join(root, 'en-cours.json'), encoding='utf-8') as f:
+        c = f.read()
+except OSError:
+    pass
+print(json.dumps({'h': h, 'c': c}))
 `

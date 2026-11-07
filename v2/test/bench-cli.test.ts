@@ -98,6 +98,18 @@ describe('passage du banc', () => {
     expect(lancer(r).vert).toBe(true);
     expect(existsSync(join(r, 'passage.lock'))).toBe(false);
   });
+  it('en-cours.json : présent pendant un bras (banc, phase), absent après, même après une levée', () => {
+    const r = racine(); const vus: Record<string, unknown>[] = [];
+    const espion: Executeur = (a, o) => { const f = join(r, 'en-cours.json'); if (existsSync(f)) vus.push(JSON.parse(readFileSync(f, 'utf8'))); return exec(a, o); };
+    passage({ racine: r, numeros: ['1', '2'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: espion, prep: prep as never,
+      maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
+    expect(vus[0]).toMatchObject({ run: '2026-11-08-1100-e1', candidat: 'C', reference: 'A', bancs_total: 2, banc: '1-a', repetition: 1, phase: 'bras A', termines: 0 });
+    expect(vus.some((v) => v.banc === '2-b' && v.termines === 1)).toBe(true);
+    expect(existsSync(join(r, 'en-cours.json'))).toBe(false);
+    const r2 = racine(); writeFileSync(join(r2, 'bras.yaml'), 'A:\n  modele: opus\n  brief: /nulle/part\n');
+    expect(() => passage({ racine: r2, ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec, prep: prep as never, maintenant: new Date(), empreinte: 'e1', home: r2, out: () => {} })).toThrow();
+    expect(existsSync(join(r2, 'en-cours.json'))).toBe(false);
+  });
   it('phase : un bras qui lève est étiqueté « bras X »', () => {
     const r = racine();
     const v = passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: () => { throw new Error('boum'); }, prep: prep as never,

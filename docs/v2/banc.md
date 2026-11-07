@@ -78,6 +78,7 @@ Le service lance `cadence2 bench hebdo` avec un `PATH` explicite (node de nvm, `
 - `~/bench-cadence/rapports/<passage>.md` (et `.json`) : par banc, temps, jetons, préféré, tests cachés, mutations, suite du projet (`ok` ou `ROUGE`) et réponse à la demande (`oui`, `en partie`, `non`) de chaque bras ;
 - `~/bench-cadence/historique.jsonl`, une ligne par passage ;
 - `~/bench-cadence/runs/<passage>/<banc>/resultat.json` pour le détail.
+- `~/bench-cadence/en-cours.json` : écrit à chaque changement de phase pendant un passage (banc, répétition, phase, termines), effacé avec le verrou ; le HUD le montre.
 
 ## Règle
 

@@ -126,11 +126,16 @@ export type MoveAsk = { id: string; target: string; place: 'before' | 'after' }
 /** Le dernier mot du panneau sur un déplacement : fait (`done`, le plan est à commiter), sans effet (`unchanged`, le lot était déjà à cette place dans le plan) ou refusé avec sa raison (`refused`). */
 export type LotsNotice = { text: string; kind: 'done' | 'unchanged' | 'refused' }
 
+/** `en-cours.json` du banc : le passage qui tourne (écrit à chaque changement de phase par `passage`). */
+export type EnCours = { run: string; debut: string; candidat: string; reference: string; bancs_total: number; banc: string; repetition: number; phase: string; phase_debut: string; termines: number }
+
 declare module 'claude-code' {
   interface PluginState {
     'cadence-hud': {
       /** Les passages du banc lus de `historique.jsonl` (Task 16, cadence 2) ; null quand le fichier n'existe pas. */
       banc: BancPassage[] | null
+      /** Le passage du banc en cours (`en-cours.json`) ; null quand aucun ne tourne. */
+      enCours: EnCours | null
       usage: Usage | null
       agents: AgentsSummary
       /** Identifiants des commandes d'arrière-plan (Bash, Monitor) en cours, sous-agents compris. */

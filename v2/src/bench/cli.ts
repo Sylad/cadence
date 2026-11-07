@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { ajouterBanc } from './ajouter.js';
@@ -78,7 +78,7 @@ type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: strin
 
 export function passage(o: OptPassage): Verdict & { eclair_ok?: boolean } {
   const liberer = verrouiller(o.racine);
-  try { return passageVerrouille(o); } finally { liberer(); }
+  try { return passageVerrouille(o); } finally { rmSync(join(o.racine, 'en-cours.json'), { force: true }); liberer(); }
 }
 
 function passageVerrouille(o: OptPassage): Verdict & { eclair_ok?: boolean } {
@@ -89,28 +89,37 @@ function passageVerrouille(o: OptPassage): Verdict & { eclair_ok?: boolean } {
   for (const n of [o.ref, o.cand]) if (!bras[n]) throw new Error(`bras « ${n} » absent de ${o.racine}/bras.yaml`);
   const clonesParBanc: Record<string, unknown>[] = [];
   const N = o.repetitions ?? 1;
+  const ids = listerBancs(o.racine, o.numeros);
+  const debut = new Date().toISOString(); let termines = 0;
+  /** `en-cours.json` : ce que le HUD montre pendant le passage (écrit par renommage, jamais à moitié). */
+  const signaler = (banc: string, repetition: number, phase: string) => {
+    const f = join(o.racine, 'en-cours.json');
+    writeFileSync(`${f}.tmp`, JSON.stringify({ run: id, debut, candidat: o.cand, reference: o.ref, bancs_total: ids.length * N, banc, repetition, phase, phase_debut: new Date().toISOString(), termines }));
+    renameSync(`${f}.tmp`, f);
+  };
   const jouer = (bid: string, i: number, k: number): ResultatBanc => {
     const ordre = (i + k - 1) % 2 === 0 ? [o.ref, o.cand] : [o.cand, o.ref];
     const idBanc = N > 1 ? `${bid}#${k}` : bid; const sous = N > 1 ? join(bid, `r${k}`) : bid;
     const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {}; const suiteBase: Record<string, number> = {}; const bases: Record<string, string> = {};
     const mapping: Record<string, string> = {}; // c1/c2 -> bras : écrit seulement après les juges (aveugle)
     let jugement: Jugement | null = null; let phase = 'banc invalide'; let b: Banc | undefined;
+    const aller = (p: string) => { phase = p; signaler(bid, k, p); };
     try {
       const bc = chargerBanc(o.racine, bid); b = bc;
       ordre.forEach((n, j) => {
         const c = join(dirRun, sous, `c${j + 1}`);
         mapping[`c${j + 1}`] = n; clones[n] = c;
-        phase = 'préparation'; suiteBase[n] = o.prep(bc, c).testsBase;
+        aller('préparation'); suiteBase[n] = o.prep(bc, c).testsBase;
         o.out(`${idBanc} : bras ${n}…`);
         const avant = etatGit(c); bases[n] = avant.head;
-        phase = `bras ${n}`; const m = lancerBras(bc, bras[n], c, o.exec);
+        aller(`bras ${n}`); const m = lancerBras(bc, bras[n], c, o.exec);
         mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)) };
-        phase = 'fuites'; fuites[n] = fuitesDuBras(o.home, o.racine, bid, c);
+        aller('fuites'); fuites[n] = fuitesDuBras(o.home, o.racine, bid, c);
       });
       if (ordre.some((n) => mesures[n].echec !== null)) o.out(`${idBanc} : un bras en échec, juges sautés`);
       else {
         o.out(`${idBanc} : juges…`);
-        phase = 'juges';
+        aller('juges');
         jugement = juger(bc, clones, join(o.racine, 'eval', id, sous), o.juge, o.exec);
       }
     } catch (e) {
@@ -127,9 +136,10 @@ function passageVerrouille(o: OptPassage): Verdict & { eclair_ok?: boolean } {
     mkdirSync(join(dirRun, sous), { recursive: true });
     writeFileSync(join(dirRun, sous, 'resultat.json'), JSON.stringify({ ...r, clones: mapping, suite_base: suiteBase }, null, 2));
     if (!o.garderClones) for (const n of ordre) if (clones[n]) archiver(clones[n], bases[n]);
+    termines++;
     return r;
   };
-  const res: ResultatBanc[] = listerBancs(o.racine, o.numeros).flatMap((bid, i) => Array.from({ length: N }, (_, k) => jouer(bid, i, k + 1)));
+  const res: ResultatBanc[] = ids.flatMap((bid, i) => Array.from({ length: N }, (_, k) => jouer(bid, i, k + 1)));
   const v = verdict(res, o.ref, o.cand, BARRE_SPEC);
   const e = o.eclair ? controlesEclair(res, o.ref, o.cand) : undefined;
   e?.lignes.forEach((l) => o.out(l));

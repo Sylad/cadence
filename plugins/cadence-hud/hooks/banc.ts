@@ -1,6 +1,6 @@
 import type { ThemeKey } from 'claude-code'
 
-import type { BancPassage } from '../types'
+import type { BancPassage, EnCours } from '../types'
 
 // ── Task 16 (cadence 2) : l'état du banc, lu de `historique.jsonl` (une ligne par passage, `ligneHistorique` de v2/src/bench/verdict.ts) ──
 
@@ -9,9 +9,39 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 /** La sortie de BANC_READER (collect.ts) : `null` (fichier absent) ou ses lignes ; une sortie illisible lève (le passage d'avant reste affiché). */
 export const readBanc = (stdout: string): BancPassage[] | null => {
   const raw: unknown = JSON.parse(stdout)
-  if (raw === null) return null
-  if (!Array.isArray(raw)) throw new Error('historique du banc : sortie illisible')
-  return parseBanc(strings(raw))
+  const h = typeof raw === 'object' && raw !== null && 'h' in raw ? (raw as { h: unknown }).h : undefined
+  if (h === null) return null
+  if (!Array.isArray(h)) throw new Error('historique du banc : sortie illisible')
+  return parseBanc(strings(h))
+}
+
+/** `en-cours.json` (écrit par `passage`, v2/src/bench/cli.ts) dans la même sortie du lecteur : null s'il manque ou s'il est illisible. */
+export const readEnCours = (stdout: string): EnCours | null => {
+  try {
+    const c: unknown = (JSON.parse(stdout) as { c?: unknown }).c
+    const o: unknown = typeof c === 'string' ? JSON.parse(c) : null
+    if (typeof o !== 'object' || o === null) return null
+    const x = o as Record<string, unknown>
+    const ok = ['debut', 'phase_debut', 'banc', 'phase'].every(k => typeof x[k] === 'string') && [x.bancs_total, x.termines, x.repetition].every(n => typeof n === 'number')
+    return ok ? (x as unknown as EnCours) : null
+  } catch {
+    return null
+  }
+}
+
+const SIX_HEURES = 6 * 3600_000
+/** « 7 min », « 1 h 24 » : une durée en millisecondes. */
+export const duree = (ms: number): string => {
+  const m = Math.max(0, Math.floor(ms / 60_000))
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`
+}
+
+/** La ligne d'un passage en cours, avant toute autre ligne du banc : accent ; orange avec « bloqué ? » quand la phase n'a pas changé depuis plus de 6 h. */
+export const enCoursLine = (e: EnCours | null, now: number): { text: string; color: ThemeKey } | null => {
+  if (!e) return null
+  const bloque = now - Date.parse(e.phase_debut) > SIX_HEURES
+  const text = `banc ⟳ ${e.termines + 1}/${e.bancs_total} bancs · ${e.banc} #${e.repetition} · ${e.phase} · ${duree(now - Date.parse(e.phase_debut))} (depuis ${duree(now - Date.parse(e.debut))})${bloque ? ' · bloqué ?' : ''}`
+  return { text, color: bloque ? 'warning' : 'claude' }
 }
 
 /** Les passages lisibles de l'historique, dans l'ordre du fichier ; une ligne illisible (JSON invalide, date ou verdict absent) est sautée. */

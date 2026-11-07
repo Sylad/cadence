@@ -3,7 +3,7 @@ import type { ClientProps, ElementConstructor, EngineInterface, Register, Render
 
 import type { AgentsSummary, CommandInfo, LeadHold, LotsNotice, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
 import { BANC_READER, CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, DELIVERIES, LAST_DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
-import { bancDetail, bancLine, readBanc } from './banc'
+import { bancDetail, bancLine, enCoursLine, readBanc, readEnCours } from './banc'
 import { buildDecisions, decisionsOf, parseDeliveries } from './decisions'
 import { buildDeliveries, deliveriesHeight, deliveriesOf, parseLastDeliveries } from './deliveries'
 import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
@@ -49,6 +49,7 @@ const lotsTypical = atom({ plugin: 'cadence-hud', key: 'lotsTypical' } as const,
 const lotsAt = atom({ plugin: 'cadence-hud', key: 'lotsAt' } as const, 0)
 const error = atom({ plugin: 'cadence-hud', key: 'error' } as const, null)
 const banc = atom({ plugin: 'cadence-hud', key: 'banc' } as const, null)
+const enCours = atom({ plugin: 'cadence-hud', key: 'enCours' } as const, null)
 const isHidden = atom({ plugin: 'cadence-hud', key: 'isHidden' } as const, false)
 const now = atom({ plugin: 'cadence-hud', key: 'now' } as const, 0)
 
@@ -247,7 +248,9 @@ export const register: Register = on => {
         if (bench?.exitCode === 0) {
           try {
             const passages = readBanc(bench.stdout)
+            const running = readEnCours(bench.stdout)
             await update($, banc, () => passages)
+            await update($, enCours, () => running)
           } catch {}
         }
       } finally {
@@ -429,7 +432,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, cap, board, bench] = await Promise.all([
+    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, cap, board, bench, running] = await Promise.all([
       read($, usage),
       read($, agents),
       read($, commands),
@@ -444,8 +447,10 @@ export const register: Register = on => {
       read($, slotCap),
       read($, lotsBoard),
       read($, banc),
+      read($, enCours),
     ])
     const benchLine = bancLine(bench, at)
+    const runningLine = enCoursLine(running, at)
     const w = allWaves.filter(wave => isWaveShown(wave, at))
     const shownProjects = activeProjects(allProjects)
     const holds = liveHolds(allHolds, at)
@@ -767,6 +772,11 @@ export const register: Register = on => {
         {waveRows}
         {leadRows}
         {projectRows}
+        {runningLine && (
+          <Text key="banc-en-cours" color={runningLine.color} wrap="truncate-end">
+            {runningLine.text}
+          </Text>
+        )}
         {benchLine && (
           <Text key="banc" color={benchLine.color} wrap="truncate-end">
             {benchLine.text}
@@ -855,7 +865,7 @@ export const register: Register = on => {
 
   // Le panneau des lots (L401) : lecture seule, l'arbre des lots non clos de chaque projet du dossier (lead tour --json).
   on('ui.render', { component: 'Pane', requestId: LOTS_PANE }, async ($, e) => {
-    const [board, failed, readAt, allWaves, ended, at, folds, views, notice, deliveries, typical, latest, bench] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, endedWaves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries), read($, lotsTypical), read($, lotsLast), read($, banc)])
+    const [board, failed, readAt, allWaves, ended, at, folds, views, notice, deliveries, typical, latest, bench, running] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, endedWaves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries), read($, lotsTypical), read($, lotsLast), read($, banc), read($, enCours)])
     const table = $.ui.resolve(e)
     const { Box, Text, Button } = table
     // les surfaces sans région Client (mobile, éditeur) dessinent les lots sans les réordonner
@@ -921,9 +931,15 @@ export const register: Register = on => {
     )
 
     // les 5 derniers passages du banc de cadence 2 (Task 16), sous les livraisons ; rien sans historique
+    const runningPane = enCoursLine(running, at)
     const benchLines = bench && bench.length > 0 ? [`Banc : ${Math.min(5, bench.length)} derniers passages`, ...bancDetail(bench)] : []
-    const benchBlock = benchLines.length > 0 && (
+    const benchBlock = (benchLines.length > 0 || runningPane) && (
       <Box key="banc" flexDirection="column">
+        {runningPane && (
+          <Text key="b-en-cours" color={runningPane.color} wrap="truncate-end">
+            {runningPane.text}
+          </Text>
+        )}
         {benchLines.map((l, i) => (
           <Text key={`b${i}`} bold={i === 0} color={i > 0 && l.includes('✗') ? 'error' : undefined} wrap="truncate-end">
             {l}

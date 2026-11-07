@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { bancDetail, bancLine, parseBanc, readBanc } from '../hooks/banc'
+import { bancDetail, bancLine, duree, enCoursLine, parseBanc, readBanc, readEnCours } from '../hooks/banc'
 import { BANC_READER } from '../hooks/collect'
 
 declare function setTimeout(fn: () => void, ms?: number): unknown
@@ -88,14 +88,14 @@ test('banc — le panneau : les 5 derniers passages, le plus récent d\'abord', 
 })
 
 test('banc — la sortie du lecteur : null quand le fichier manque, ses lignes sinon ; une sortie illisible lève', () => {
-  expect(readBanc('null')).toBeNull()
-  expect(readBanc(JSON.stringify([ligne(), 'cassée', 42]))?.length).toBe(1)
+  expect(readBanc('{"h":null,"c":null}')).toBeNull()
+  expect(readBanc(JSON.stringify({ h: [ligne(), 'cassée', 42], c: null }))?.length).toBe(1)
   expect(() => readBanc('{"x":1}')).toThrow()
   expect(() => readBanc('pas du json')).toThrow()
 })
 
 /** Monte le mod : état en mémoire, horloge au lundi, le lecteur du banc répond `historique` (null = fichier absent), toute autre commande échoue. */
-const monte = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], historique: string[] | null) => {
+const monte = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], historique: string[] | null, c: string | null = null) => {
   const store = new Map<string, { value: unknown; version: number }>()
   on('state.get', (_$, e) => ({ value: store.get(e.key) ?? { value: undefined, version: 0 } }) as never)
   on('state.set', (_$, e) => {
@@ -110,7 +110,7 @@ const monte = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], hi
   on('agent.list', () => ({ value: [] }) as never)
   on('process.run', (_$, e) => {
     const argv = (e as unknown as { argv: string[] }).argv
-    if (argv[3] === BANC_READER) return { value: { exitCode: 0, stdout: JSON.stringify(historique), stderr: '' } } as never
+    if (argv[3] === BANC_READER) return { value: { exitCode: 0, stdout: JSON.stringify({ h: historique, c }), stderr: '' } } as never
     return { value: { exitCode: 1, stdout: '', stderr: 'absent' } } as never
   })
   await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
@@ -141,5 +141,41 @@ test('banc — branché, historique absent : ni ligne dans la bande, ni bloc dan
   await band.unmount()
   const pane = await $.ui.mount({ plugin: 'cadence-hud', surface: 'terminal', component: 'Pane', requestId: 'lots', props: { title: 'Lots', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} } } as never)
   expect(await pane.find({ type: 'Text', text: /Banc/ })).toBeUndefined()
+  await pane.unmount()
+})
+
+const T0 = Date.parse('2026-11-09T10:00:00+01:00')
+const encours = (extra: Record<string, unknown> = {}) => ({ run: 'r', debut: new Date(T0 - 84 * 60_000).toISOString(), candidat: 'equipe-legere', reference: 'A', bancs_total: 6, banc: '3-ol-companion-L241', repetition: 1,
+  phase: 'bras equipe-legere', phase_debut: new Date(T0 - 7 * 60_000).toISOString(), termines: 2, ...extra })
+
+test('banc en cours — la ligne : position, banc, phase avec sa durée, durée totale ; accent', () => {
+  expect(enCoursLine(encours(), T0)).toEqual({ text: 'banc ⟳ 3/6 bancs · 3-ol-companion-L241 #1 · bras equipe-legere · 7 min (depuis 1 h 24)', color: 'claude' })
+  expect(enCoursLine(null, T0)).toBeNull()
+  expect([duree(0), duree(59 * 60_000), duree(3600_000), duree(-5)]).toEqual(['0 min', '59 min', '1 h 00', '0 min'])
+})
+
+test('banc en cours — plus de 6 h sans changement de phase : orange, « bloqué ? »', () => {
+  const l = enCoursLine(encours({ phase_debut: new Date(T0 - 6.5 * 3600_000).toISOString() }), T0)
+  expect(l?.color).toBe('warning')
+  expect(l?.text).toMatch(/ · bloqué \?$/)
+  expect(enCoursLine(encours({ phase_debut: new Date(T0 - 5 * 3600_000).toISOString() }), T0)?.color).toBe('claude')
+})
+
+test('banc en cours — la lecture : illisible ou incomplet = null', () => {
+  expect(readEnCours(JSON.stringify({ h: null, c: JSON.stringify(encours()) }))?.banc).toBe('3-ol-companion-L241')
+  expect(readEnCours(JSON.stringify({ h: null, c: null }))).toBeNull()
+  expect(readEnCours(JSON.stringify({ h: null, c: '{coupé' }))).toBeNull()
+  expect(readEnCours(JSON.stringify({ h: null, c: '{"banc":"x"}' }))).toBeNull()
+})
+
+test('banc en cours — branché : la ligne ⟳ passe avant la ligne du banc dans la bande, et en tête du panneau', async ($, on) => {
+  await monte($, on, [hebdo, ligne()], JSON.stringify(encours({ debut: new Date(LUNDI - 84 * 60_000).toISOString(), phase_debut: new Date(LUNDI - 7 * 60_000).toISOString() })))
+  const band = await $.ui.mount({ plugin: 'cadence-hud', surface: 'terminal', ...BAND })
+  expect(await band.find({ type: 'Text', text: /^banc ⟳ 3\/6 bancs · 3-ol-companion-L241 #1 · bras equipe-legere · \d+ min \(depuis 1 h \d+\)$/ })).toBeDefined()
+  expect(await band.find({ type: 'Text', text: /^banc ✓ 08-11/ })).toBeDefined()
+  await band.unmount()
+  const pane = await $.ui.mount({ plugin: 'cadence-hud', surface: 'terminal', component: 'Pane', requestId: 'lots', props: { title: 'Lots', isFocused: false, bodyColumns: 120, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} } } as never)
+  expect(await pane.find({ type: 'Text', text: /^banc ⟳ 3\/6/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /^Banc : 2 derniers passages$/ })).toBeDefined()
   await pane.unmount()
 })

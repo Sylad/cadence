@@ -30,7 +30,7 @@ const plusRecent = (dir: string, t: number): string | null => {
 };
 
 /** Le passage ne mesure que ce que l'empreinte décrit : null = prêt, sinon la raison du refus. */
-export function pretAPasser(repo: string, bras: Record<string, DefBras>): string | null {
+export function pretAPasser(repo: string, bras: Record<string, DefBras>, racine = ''): string | null {
   const sale = execFileSync('git', ['status', '--porcelain', '--', 'v2/src', 'v2/briefs'], { cwd: repo, encoding: 'utf8' }).trim();
   if (sale) return `v2/src ou v2/briefs a des changements non commités (l'empreinte ne les voit pas) :\n${sale}`;
   const cli = join(repo, 'v2', 'dist', 'cli.js');
@@ -38,7 +38,7 @@ export function pretAPasser(repo: string, bras: Record<string, DefBras>): string
   const neuf = plusRecent(join(repo, 'v2', 'src'), statSync(cli).mtimeMs);
   if (neuf) return `${neuf} est plus récent que v2/dist/cli.js : lancer « npm run build » dans v2`;
   const briefs = join(repo, 'v2', 'briefs') + '/';
-  for (const d of Object.values(bras)) if (!resolve(d.brief).startsWith(briefs)) return `brief du bras ${d.nom} hors de ${briefs} : ${d.brief}`;
+  for (const d of Object.values(bras)) if (!resolve(racine, d.brief).startsWith(briefs)) return `brief du bras ${d.nom} hors de ${briefs} : ${d.brief}`;
   return null;
 }
 
@@ -149,7 +149,7 @@ export async function bench(args: string[], io: Io): Promise<number> {
   try {
     const tous = chargerBras(racine);
     refus = [ref, cand].find((n) => !tous[n]) ? `bras absent de ${racine}/bras.yaml` : emp === 'inconnue' ? 'empreinte inconnue (pas de dépôt git)'
-      : pretAPasser(REPO, { [ref]: tous[ref], [cand]: tous[cand] });
+      : pretAPasser(REPO, { [ref]: tous[ref], [cand]: tous[cand] }, racine);
   } catch (e) { refus = e instanceof Error ? e.message : String(e); }
   if (refus) { io.err(`bench refusé : ${refus}`); return 2; }
   const v = passage({ racine, numeros, ref, cand,

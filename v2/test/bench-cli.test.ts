@@ -118,6 +118,11 @@ describe('pretAPasser et empreinte', () => {
     const t = new Date(Date.now() + 5000); utimesSync(join(repo, 'v2', 'dist', 'cli.js'), t, t);
     expect(pretAPasser(repo, { A: { nom: 'A', modele: 'm', brief: '/ailleurs/b.md' } })).toMatch(/hors de/);
   });
+  it('brief relatif résolu depuis la racine du banc', () => {
+    const { repo } = depot();
+    expect(pretAPasser(repo, { A: { nom: 'A', modele: 'm', brief: 'v2/briefs/b.md' } }, repo)).toBeNull();
+    expect(pretAPasser(repo, { A: { nom: 'A', modele: 'm', brief: 'v2/briefs/b.md' } }, '/ailleurs')).toMatch(/hors de/);
+  });
   it('empreinte inconnue sans dépôt git', () => {
     expect(empreinte(mkdtempSync(join(tmpdir(), 'nogit-')))).toBe('inconnue');
   });
@@ -130,6 +135,14 @@ describe('executeur en groupe de processus', () => {
     writeFileSync(cmd, `#!/bin/bash\nsleep ${marque} &\necho '{"ok":1}'\n`, { mode: 0o755 });
     const r = creerExecuteur(cmd)([], { cwd: d, env: process.env });
     expect(r.stdout).toContain('ok'); expect(r.code).toBe(0);
-    expect(spawnSync('pgrep', ['-f', `sleep ${marque}`]).status).toBe(1);
+    expect(spawnSync('pgrep', ['-f', `sleep ${marque.replace('.', '[.]')}`]).status).toBe(1);
+  });
+  it('au délai dépassé, le groupe entier est tué (le bras ne continue pas)', () => {
+    const d = mkdtempSync(join(tmpdir(), 'ex-')); const cmd = join(d, 'long.sh');
+    writeFileSync(cmd, '#!/bin/bash\nsleep 20.456\n', { mode: 0o755 });
+    creerExecuteur(cmd, 2000)([], { cwd: d, env: process.env });
+    const fin = Date.now() + 3000;
+    while (spawnSync('pgrep', ['-f', 'sleep 20[.]456']).status === 0 && Date.now() < fin) spawnSync('sleep', ['0.2']);
+    expect(spawnSync('pgrep', ['-f', 'sleep 20[.]456']).status).toBe(1);
   });
 });

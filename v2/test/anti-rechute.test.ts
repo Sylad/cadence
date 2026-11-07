@@ -203,7 +203,7 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C1', 'relecteur sur tout le dépôt', BRIEF_CAND, remplace('{{BASE}}..HEAD', '4b825dc..HEAD')],
   ['C1', 'relecteur sans model opus', BRIEF_CAND, remplace(', model opus', '')],
   ['C2', 'sous-agent qui écrit le code', BRIEF_CAND, ajout("Délègue l'implémentation à un sous-agent, subagent_type general-purpose")],
-  ['C5', 'critère ok constant', 'src/bench/verdict.ts', remplace("c('aucune fuite', `${fuites.length}`, '0', fuites.length === 0)", "c('aucune fuite', `${fuites.length}`, '0', true)")],
+  ['C5', 'critère ok constant', 'src/bench/verdict.ts', remplace("'0', fuites.length === 0)", "'0', true)")],
   ['C1', 'second gabarit toléré par erreur', 'src/bench/juges.ts', ajout('// un gabarit de plus')],
   ['C1', 'seconde conformité', 'src/bench/ajouter.ts', ajout('// conformité')],
   ['C3', 'porte déguisée en controle', 'src/bench/banc.ts', ajout('controle(a);\ncheckAll(b);\nverif(c);')],

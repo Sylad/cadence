@@ -34,6 +34,13 @@ describe('fuites', () => {
   });
   const C = `${H}/bench-cadence/runs/r1/1-t/A`;
   const S = `${H}/bench-cadence/secrets/1-t/attendu.md`;
+  const avecCwd = (cwd: string, input: object) => JSON.stringify({ type: 'assistant', cwd, message: { content: [{ type: 'tool_use', name: 'Bash', input }] } });
+  it('cwd persistant de la ligne : mkdir -p ../../A.captures depuis <clone>/frontend n\'est pas une fuite', () => {
+    expect(chercherFuites([avecCwd(`${C}/frontend`, { command: 'mkdir -p ../../A.captures' })], r, H, C)).toEqual([]);
+  });
+  it('cwd persistant de la ligne : cat ../../../../secrets/... (cinq niveaux) depuis <clone>/frontend est une fuite', () => {
+    expect(chercherFuites([avecCwd(`${C}/frontend`, { command: 'cat ../../../../../secrets/1-t/attendu.md' })], r, H, C)).toEqual([S]);
+  });
   it('chemins relatifs, « .. », cd, ${HOME} et accolades', () => {
     expect(chercherFuites([appel({ command: 'cat ../../../../secrets/1-t/attendu.md' })], r, H, C)).toEqual([S]);
     expect(chercherFuites([appel({ file_path: `${C}/../A2/x` })], r, H, C)).toEqual([`${H}/bench-cadence/runs/r1/1-t/A2/x`]);

@@ -81,6 +81,7 @@ function passageVerrouille(o: OptPassage): Verdict {
   const dirRun = join(o.racine, 'runs', id);
   const bras = chargerBras(o.racine);
   for (const n of [o.ref, o.cand]) if (!bras[n]) throw new Error(`bras « ${n} » absent de ${o.racine}/bras.yaml`);
+  const clonesParBanc: Record<string, unknown>[] = [];
   const res: ResultatBanc[] = listerBancs(o.racine, o.numeros).map((b, i) => {
     const ordre = i % 2 === 0 ? [o.ref, o.cand] : [o.cand, o.ref];
     const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {};
@@ -110,6 +111,7 @@ function passageVerrouille(o: OptPassage): Verdict {
       }
       o.out(`${b.id} : ${msg}`);
     }
+    clonesParBanc.push(mapping);
     const r: ResultatBanc = { banc: b.id, taille: b.taille, visible: b.visible, reponses: b.reponses, frais: b.frais, mesures, jugement, fuites };
     mkdirSync(join(dirRun, b.id), { recursive: true });
     writeFileSync(join(dirRun, b.id, 'resultat.json'), JSON.stringify({ ...r, clones: mapping }, null, 2));
@@ -119,7 +121,7 @@ function passageVerrouille(o: OptPassage): Verdict {
   mkdirSync(join(o.racine, 'rapports'), { recursive: true });
   const base = join(o.racine, 'rapports', id);
   writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte }));
-  writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultats: res }, null, 2));
+  writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultats: res.map((r, i) => ({ ...r, clones: clonesParBanc[i] })) }, null, 2));
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
     candidat: o.cand, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: res.filter((r) => r.frais).length })}\n`);
   o.avantVerdict?.(res);

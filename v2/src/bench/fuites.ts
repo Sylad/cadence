@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 
 export interface Regles { autorises: string[]; interdits: string[] }
 
@@ -38,7 +38,7 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
   const juger = (p: string | null) => { if (p && sous(p, r.interdits) && !sous(p, r.autorises)) vus.add(p); };
   const depart = cwd || r.autorises[0];
   for (const l of lignes) {
-    let d: { type?: string; message?: { content?: { type: string; name?: string; input?: unknown }[] } };
+    let d: { type?: string; cwd?: string; message?: { content?: { type: string; name?: string; input?: unknown }[] } };
     try { d = JSON.parse(l); } catch { continue; }
     if (d.type !== 'assistant') continue;
     for (const c of d.message?.content ?? []) {
@@ -47,7 +47,7 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
       const sources: [string, boolean][] = [...[...textes(c.input)].map((t): [string, boolean] => [t, false]),
         ...(c.name === 'Bash' && typeof cmd === 'string' ? [[cmd, true] as [string, boolean]] : [])];
       for (const [texte, rel] of sources) {
-        let dir = depart;
+        let dir = rel && typeof d.cwd === 'string' && isAbsolute(d.cwd) ? d.cwd : depart;
         for (const seg of texte.replace(/\$\{HOME\}/g, '$HOME').split(/&&|\|\||;|\n/)) {
           for (const v of accolades(seg)) {
             const cd = rel ? /^\s*cd\s+(\S+)/.exec(v) : null;

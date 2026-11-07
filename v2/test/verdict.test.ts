@@ -7,13 +7,13 @@ const mes = (bras: string, duree_s: number, questions = 0, echec: string | null 
   ({ bras, banc: 'b', debut: '', fin: '', duree_s, tokens: 1000, cout_usd: 1, questions, questions_texte: [], sessions: [], echec });
 const meca = (p: number, t: number): Meca => ({ suite_ok: true, caches_passes: p, caches_total: 10, mutations_tuees: t, mutations_total: 10, attendu: 'oui', mutations: [] });
 function banc(o: Partial<{ dA: number; dC: number; cA: number; cC: number; mA: number; mC: number; majA: number; majC: number; pref: string; ui: string;
-  taille: 'retouche' | 'fonction'; qC: number; reponses: boolean; fuiteC: string[]; nonJuge: boolean; echecA: string; echecC: string }> = {}): ResultatBanc {
+  taille: 'retouche' | 'fonction'; qC: number; reponses: boolean; fuiteC: string[]; fuiteA: string[]; nonJuge: boolean; echecA: string; echecC: string }> = {}): ResultatBanc {
   const j: Jugement = { meca: { A: meca(o.cA ?? 8, o.mA ?? 8), C: meca(o.cC ?? 8, o.mC ?? 8) },
     defauts: { A: { bloquants: 0, majeurs: o.majA ?? 0, mineurs: 0 }, C: { bloquants: 0, majeurs: o.majC ?? 0, mineurs: 0 } },
     prefere: o.pref ?? 'egal', ui: o.ui ?? 'na', raisons: '' };
   return { banc: 'b', taille: o.taille ?? 'fonction', visible: false, reponses: o.reponses ?? false, frais: false,
     mesures: { A: mes('A', o.dA ?? 100, 0, o.echecA ?? null), C: mes('C', o.dC ?? 100, o.qC ?? 0, o.echecC ?? null) },
-    jugement: o.nonJuge ? null : j, fuites: { A: [], C: o.fuiteC ?? [] } };
+    jugement: o.nonJuge ? null : j, fuites: { A: o.fuiteA ?? [], C: o.fuiteC ?? [] } };
 }
 const rouges = (r: ResultatBanc[]) => verdict(r, 'A', 'C', BARRE_SPEC).criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom);
 
@@ -33,6 +33,11 @@ describe('verdict', () => {
     expect(rouges([banc({ qC: 1, reponses: true })])).toEqual([]);
   });
   it('fuite du candidat : rouge', () => expect(rouges([banc({ fuiteC: ['/h/projects/x'] })])).toEqual(['aucune fuite']));
+  it('fuite de la référence : rouge aussi, listée banc/bras : chemin', () => {
+    expect(rouges([banc({ fuiteA: ['/h/secrets/x'] })])).toEqual(['aucune fuite']);
+    const v = verdict([banc({ fuiteA: ['/h/secrets/x'], fuiteC: ['/h/projects/y'] })], 'A', 'C', BARRE_SPEC);
+    expect(v.criteres.find((c) => c.nom === 'aucune fuite')).toMatchObject({ seuil: '0', valeur: 'b/A : /h/secrets/x ; b/C : /h/projects/y' });
+  });
   it('banc non jugé : rouge, jamais vert par défaut', () => expect(rouges([banc({ nonJuge: true })])).toEqual(['tous les bancs jugés']));
   it('bras candidat en échec : rouge sur cette seule barre, cause listée', () => {
     const v = verdict([banc({ echecC: 'code 1' })], 'A', 'C', BARRE_SPEC);

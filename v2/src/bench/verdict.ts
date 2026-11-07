@@ -23,7 +23,7 @@ export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: B
   const prefCand = jug.filter((j) => j.prefere !== ref).length;
   const ui = (b: string) => jug.filter((j) => j.ui === b).length;
   const inutiles = somme(res.filter((r) => !r.reponses).map((r) => r.mesures[cand]?.questions ?? 0));
-  const fuites = res.flatMap((r) => r.fuites[cand] ?? []);
+  const fuites = res.flatMap((r) => Object.entries(r.fuites).flatMap(([b, ps]) => ps.map((p) => `${r.banc}/${b} : ${p}`)));
   const echecs = res.flatMap((r) => [ref, cand].flatMap((b) => { const e = r.mesures[b]?.echec; return e ? [`${r.banc}/${b} : ${e}`] : []; }));
   const manquants = res.flatMap((r) => [ref, cand].filter((b) => !r.mesures[b]).map((b) => `${r.banc}/${b}`));
   const total = (b: string) => somme(jug.map((j) => j.meca[b].mutations_total));
@@ -33,7 +33,7 @@ export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: B
     c('au moins un banc', `${res.length}`, '≥ 1', res.length >= 1),
     c('mesures complètes', manquants.length ? manquants.join(' ; ') : 'toutes', 'toutes', manquants.length === 0),
     c('tous les bancs jugés', `${jug.length}/${res.length}`, 'tous', jug.length === res.length),
-    c('aucune fuite', `${fuites.length}`, '0', fuites.length === 0),
+    c('aucune fuite', fuites.length ? fuites.join(' ; ') : '0', '0', fuites.length === 0),
     c('aucun bras en échec', echecs.length ? echecs.join(' ; ') : '0', '0', echecs.length === 0),
     c('relecture aveugle', `${prefCand}/${jug.length} sans préférence pour ${ref}`, '> la moitié', jug.length === 0 || prefCand * 2 > jug.length),
     c('tests cachés', `${caches(cand)} contre ${caches(ref)}`, `≥ ${ref}`, caches(cand) >= caches(ref)),

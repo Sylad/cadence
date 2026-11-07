@@ -46,6 +46,8 @@ describe('passage du banc', () => {
     const map = (id: string) => JSON.parse(readFileSync(join(r, 'runs', '2026-11-08-1000-e1', id, 'resultat.json'), 'utf8')).clones;
     expect(map('1-a')).toEqual({ c1: 'A', c2: 'C' });
     expect(map('2-b')).toEqual({ c1: 'C', c2: 'A' });
+    const rap = JSON.parse(readFileSync(join(r, 'rapports', '2026-11-08-1000-e1.json'), 'utf8'));
+    expect(rap.resultats.map((x: { clones: unknown }) => x.clones)).toEqual([{ c1: 'A', c2: 'C' }, { c1: 'C', c2: 'A' }]);
     expect(readdirSync(join(r, 'rapports')).sort()).toEqual(['2026-11-08-1000-e1.json', '2026-11-08-1000-e1.md']);
     expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8').trim())).toMatchObject({ empreinte: 'e1', vert: true, hebdo: false });
   });

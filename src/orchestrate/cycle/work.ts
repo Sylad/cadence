@@ -1,4 +1,5 @@
 import { type LotCtx, workDir as wd, histPlan, propose, short, save, stop, transition, startSha, MAX_PASSES } from './ctx.js';
+import { type Plan } from '../../plan.js';
 import { lockViolations, lotStartHead } from '../accept.js';
 import { lotWork, lotCommits, isPlanOnly } from '../../audit.js';
 import { session, badReport, type Done } from './session.js';
@@ -149,7 +150,7 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
   // qui juge l'annonce (L213, L522) : la sonde attend alors la prochaine écriture aux portes vertes.
   const redTests = redAnnounced(l, rep, c.config.test);
   const announcedRed = redTests || !rep.build.vert;
-  if (scheduleProbe(c.config, l, { skip: minorsPass || !alreadyDone || announcedRed, late: l.pass >= MAX_PASSES - 1, pays: fixAffordable(l, false, PROBE_RESERVE), count: budgetCount(l), reached: !c.config.probe || gateReachesLot(c, plan), cycle: !!c.config.probe && !!l.express && lotTouchesCycle(c, plan) })) return save(c);
+  if (probeBeforeGate(c, plan, minorsPass || !alreadyDone || announcedRed)) return save(c);
 
   const red: Constat[] = [];
   // Tests annoncés rouges (L213) : avec orchestrate.test, le programme rejoue et compare à la ligne de base, la session n'est crue que si les tests y sont rouges autrement que par des échecs de départ, et jamais quand sa porte, jouée en suite complète, est verte (L522, quels que soient echecsDeBase et nouveauxEchecs) ; sans, la liste des échecs de base de la session, non vérifiée.
@@ -189,6 +190,12 @@ export async function work(c: LotCtx, kind: 'implement' | 'fix'): Promise<void> 
   // Porte « code modifié sans test » (L287) : le diff du lot (son dépôt et ses voisins, fichiers supprimés exclus), toutes sessions comprises, touche du code sans fichier de test → correction directe, sans session de revue. Une seule fois par lot, jamais pendant la passe des mineurs, ni quand la correction prendrait la dernière passe (la revue n'en aurait plus), ni quand le budget du lot ne paie plus la correction (la revue, elle, part toujours).
   if (await testGates(c, plan, minorsPass)) return;
   await toReview(c, runs, minorsPass);
+}
+
+/** Sonde de cas limites (L497) avant la première porte (L662). Sans orchestrate.probe, scheduleProbe ne fait rien : le diff du lot (`reached`, `cycle` de L663) n'est lu que quand la sonde existe. */
+function probeBeforeGate(c: LotCtx, plan: Plan, skip: boolean): boolean {
+  const l = c.lot;
+  return !!c.config.probe && scheduleProbe(c.config, l, { skip, late: l.pass >= MAX_PASSES - 1, pays: fixAffordable(l, false, PROBE_RESERVE), count: budgetCount(l), reached: gateReachesLot(c, plan), cycle: !!l.express && lotTouchesCycle(c, plan) });
 }
 
 /** Fin d'une écriture dont les portes sont passées : le bibliothécaire (L306), puis la première revue. Aussi la suite d'une sonde (L497) dont la porte est verte. */

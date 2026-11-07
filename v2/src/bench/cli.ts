@@ -45,18 +45,22 @@ export function pretAPasser(repo: string, bras: Record<string, DefBras>, racine 
 
 const vivant = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM'; } };
 
+const bootId = (): string => { try { return readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(); } catch { return ''; } };
+
 /** Un seul passage à la fois par racine : verrou à création exclusive, repris si son pid est mort. */
 function verrouiller(racine: string): () => void {
   const f = join(racine, 'passage.lock');
   mkdirSync(racine, { recursive: true });
   for (let essai = 0; ; essai++) {
     try {
-      const fd = openSync(f, 'wx'); writeFileSync(fd, `${process.pid} ${new Date().toISOString()}`); closeSync(fd);
+      const fd = openSync(f, 'wx'); writeFileSync(fd, `${process.pid} ${new Date().toISOString()} ${bootId()}`.trim()); closeSync(fd);
       return () => rmSync(f, { force: true });
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST' || essai > 0) throw e;
       const contenu = readFileSync(f, 'utf8');
-      if (vivant(Number(contenu.split(' ')[0]))) throw new Error(`un passage est déjà en cours (${contenu}) : ${f}`);
+      const [pid, , boot] = contenu.split(' '); const ici = bootId();
+      const autreDemarrage = Boolean(boot && ici && boot !== ici); // le pid a pu être réutilisé après un redémarrage de WSL
+      if (!autreDemarrage && vivant(Number(pid))) throw new Error(`un passage est déjà en cours (${contenu}) : ${f}`);
       rmSync(f, { force: true });
     }
   }

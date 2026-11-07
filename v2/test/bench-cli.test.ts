@@ -85,6 +85,12 @@ describe('passage du banc', () => {
     expect(lancer(r).vert).toBe(true);
     expect(existsSync(join(r, 'passage.lock'))).toBe(false);
   });
+  it('verrou : même pid mais autre démarrage de la machine = périmé, repris', () => {
+    const r = racine();
+    writeFileSync(join(r, 'passage.lock'), `${process.pid} x boot-d-un-autre-demarrage`);
+    expect(lancer(r).vert).toBe(true);
+    expect(existsSync(join(r, 'passage.lock'))).toBe(false);
+  });
   it('phase : un bras qui lève est étiqueté « bras X »', () => {
     const r = racine();
     const v = passage({ racine: r, numeros: ['1'], ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec: () => { throw new Error('boum'); }, prep: prep as never,

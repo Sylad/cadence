@@ -19,14 +19,15 @@ Un passage est **vert** si tous les critères bloquants passent (`verdict.ts`).
 | tests cachés, mutations tuées | ≥ référence |
 | défauts bloquants et majeurs | ≤ référence |
 | cohérence UI | ≥ référence |
-| temps total / des retouches | ≤ 1,5 × / 1,2 × la référence |
+| temps total | ≤ 1,5 × la référence |
+| temps des retouches | ≤ 1,2 × la référence ; bloquant seulement si le passage compte au moins un banc de retouche |
 | questions inutiles | 0 sur un banc sans vraie décision |
 
 Les chiffres absolus du 07-11 (304 tests cachés, 79 % de mutations) sont affichés, non bloquants : la barre est relative à la référence du même passage.
 
 ## Fonctionnement
 
-- Un seul passage à la fois par racine : verrou `<racine>/passage.lock`, repris si son pid est mort.
+- Un seul passage à la fois par racine : verrou `<racine>/passage.lock`, repris si son pid est mort ou s'il date d'un autre démarrage de la machine (identifiant de démarrage écrit dans le verrou ; un pid réutilisé après un redémarrage de WSL ne bloque donc pas). Échappatoire manuelle : `rm ~/bench-cadence/passage.lock`.
 - Un seul bras à la fois, dans des clones jetables `c1`/`c2` (ordre alterné d'un banc à l'autre) ; la correspondance bras/clone n'est écrite qu'après les juges (relecture aveugle).
 - Les juges travaillent dans `<racine>/eval/<passage>/<banc>`.
 - Un passage s'appelle `<date>-<HHMM>-<empreinte>` ; l'empreinte hache `v2/src` et `v2/briefs` à HEAD.
@@ -54,7 +55,7 @@ Options communes : `--candidat <bras>`, `--reference <bras>`, `--juge <modèle>`
 bash v2/systeme/installer.sh
 ```
 
-Le service lance `cadence2 bench hebdo` avec un `PATH` explicite (node de nvm, `~/.local/bin` pour `claude`) : pas de shell de connexion. Il utilise le dépôt auquel `cadence2` est lié : ce checkout doit être propre (rien de non commité sous `v2/src` et `v2/briefs`) et construit (`npm run build` dans `v2`), sinon le passage est refusé. Journal : `~/bench-cadence/hebdo.log`.
+Le service lance `cadence2 bench hebdo` avec un `PATH` explicite (node de nvm, `~/.local/bin` pour `claude`) : pas de shell de connexion. Précondition, vérifiée au démarrage du service (échec net dans le journal sinon) : `cadence2` doit être lié au checkout principal, `~/projects/developpeur/cadence/v2` ; pour le corriger : `cd ~/projects/developpeur/cadence/v2 && npm run build && npm link` (l'installeur avertit si le lien pointe ailleurs). Le service vérifie aussi que `node` est sur son `PATH` : après une montée de version nvm, mettre à jour la ligne `Environment=PATH` du service puis relancer l'installeur. Ce checkout doit être propre (rien de non commité sous `v2/src` et `v2/briefs`) et construit (`npm run build` dans `v2`), sinon le passage est refusé. Journal : `~/bench-cadence/hebdo.log`.
 
 ## Rattrapage
 

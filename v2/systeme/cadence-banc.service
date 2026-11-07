@@ -8,6 +8,8 @@ User=sylvain_ladoire
 Environment=HOME=/home/sylvain_ladoire
 # PATH explicite : ~/.bashrc rend la main aux shells non interactifs, nvm n'y est donc pas chargé.
 Environment=PATH=/home/sylvain_ladoire/.nvm/versions/node/v22.22.3/bin:/home/sylvain_ladoire/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/bin/bash -c 'command -v node >/dev/null || { echo "cadence-banc : node introuvable sur le PATH de l unité ; mettre à jour la ligne Environment=PATH de /etc/systemd/system/cadence-banc.service après une montée de version nvm" >&2; exit 1; }'
+ExecStartPre=/bin/bash -c 'c=$$(readlink -f "$$(command -v cadence2)"); case "$$c" in /home/sylvain_ladoire/projects/developpeur/cadence/v2/*) ;; *) echo "cadence-banc : cadence2 pointe sur « $$c » et non sur le checkout principal ; corriger : cd ~/projects/developpeur/cadence/v2 && npm run build && npm link" >&2; exit 1;; esac'
 ExecStartPre=/usr/bin/mkdir -p /home/sylvain_ladoire/bench-cadence
 ExecStart=/bin/bash -c 'cadence2 bench hebdo >> "$HOME/bench-cadence/hebdo.log" 2>&1'
 TimeoutStartSec=10h

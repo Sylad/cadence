@@ -2936,7 +2936,7 @@ lots:
     finished: 2026-11-06
   - id: L662
     title: "Moins de portes par lot : (1) la sonde joue avant la première porte, une seule porte entre implement et revue (33,2 min sur 5 lots en 1805) ; (2) après « main a avancé », la porte d'intégration n'est rejouée que si le delta de main touche un fichier ou un test lié au diff du lot (26,3 min sur 4 lots, 4 reprises) ; niveau : source (ordre des étapes), puis intégration ; niveau le plus tôt : source ; on ne peut pas prévenir le déplacement de main, seulement son effet ; mesure : <= 3 portes par lot en moyenne sur 3 vagues (4,1 en 1805)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-06
     started: 2026-11-06
@@ -2944,6 +2944,7 @@ lots:
       - { date: 2026-11-07, text: "Point laissé ouvert le 06-11 : gate.readsPlan non déclaré (204 fichiers de cadence citent le plan) : un test qui lit le plan sans déclaration n'est plus rattrapé quand la porte est sautée sur un delta de plan seul ; la CI et la publication jouent toujours la suite. Effet de sonde sur la borne de 10 : non tranché." }
       - { date: 2026-11-07, text: "Revue neuve du 06-11 non conforme, 1 bloquant (tmp/revue-L662.md) : la porte sautée laisse passer un rouge si le delta de main touche un fichier importé hors du dossier du lot ou ajoute un test, verify --gate rend vert sans rien jouer (integration-porte.ts:99). À faire : ne sauter la porte que sur un delta de plan seul ; les 4 reprises de 1805 étaient du plan seul, le gain reste entier. Non intégré." }
     review: { date: 2026-11-07, verdict: "conforme : partie (1) revue aux passes précédentes, sonde avant la première porte ; partie (2) retirée par b9e3f9bb sur décision du lead (trois bloquants, gain nul mesuré : seul cadence a les worktrees et il lit son plan) ; 446 tests ciblés verts, qualité sans recul ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (df581518) ne change que la place de l'entrée CHANGELOG, remise sous [Unreleased] par 481a09f8 ; diff src/docs/test identique à la revue précédente, 69 tests ciblés verts", commit: c7626cc110368286ee7a076a0cbcde9ae56be33c }
+    finished: 2026-11-07
   - id: L663
     title: "Test qui fabrique l'état à la main : le brief d'un lot qui lit un état écrit par une étape du cycle exige que le test appelle l'étape réelle (L654 : handBack rend avant d'écrire maquetteConstats, 75,4 min de refus à prêt), et la sonde joue aussi sur un lot express qui touche src/orchestrate/cycle/ ; niveau : source (brief) puis sonde ; niveau le plus tôt : source ; mesure : 0 refus d'intégration pour un état non écrit avant une remise sur 3 vagues"
     status: done

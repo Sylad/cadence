@@ -52,15 +52,23 @@ wins. For each source and each tool-rule, the sum of its new files must not exce
 (the sum over its keys of the start's value minus the current one, floored at 0): an equal sum passes, so a pure rename
 or a function moved whole passes, one figure more does not. A new file with no source (rewritten code, no kinship, a
 copy that leaves its source intact, a source merely fixed) gets no credit and pays its defect: the refusal names it, says
-« fichier neuf : au-delà de ce que sa source a perdu » and gives the nearest source or « aucune source ». No option
-replaces this link. The credit is recomputed from the start of the lot at each call and never stored, so a piece already
+« fichier neuf : au-delà de ce que sa source a perdu » and gives the nearest source (the linked one, or under the 50 %
+threshold the file of the start that lost the most of its lines, with that share: `source la plus proche : src/cli.ts,
+46 % de ses lignes en viennent (lien à partir de 50 %)`) or « aucune source » when no file of the start lost a single
+one of its lines. No option replaces this link. The credit is recomputed from the start of the lot at each call and never stored, so a piece already
 accepted stays accepted while it does not grow, and two successive `--migrer` whose pieces exceed the loss are refused at
 the second. The same rule is what `--contre` applies to the baseline of the lot, so a migrated baseline passes the gate
-and the CI, and a hand-edited one does not. It needs `--contre` (the files that « existed » are those of the start of the
+and the CI, and a hand-edited one does not. A key of a new file left in the baseline after the file was renamed, deleted
+or rewritten (the piece now measures less, the gain is not locked yet) only counts for what the file measures today: it
+blocks neither the gate, nor `--ecrire`, nor the next `--migrer`, and a file that grows back under that key is judged by
+its content (the integration's check, which has no measure, still refuses a committed key whose file is not in the
+commit: lock the gain before committing). It needs `--contre` (the files that « existed » are those of the start of the
 lot) and exits 2 without it. Without a `qualite-baseline.json` at the start (the lot that adopts the tools with `--init`),
 `--migrer` refuses (exit 1) and says so; the gate compares nothing, as before. When git cannot give a file of the start
-(shallow clone, no merge-base, git missing or too slow), both exit 2 naming the file and the reference: never a false
-refusal. Git is read only when a new file carries a positive figure, one `git show` per file of the start at most, cached.
+(shallow clone, no merge-base, git in error, or slower than `QUALITE_GIT_DELAI_MS` milliseconds, 60 s by default), both
+exit 2 naming the file and the reference; a missing git fails at the merge-base, before any file is read, and names the
+reference alone: never a false refusal. Git is read only when a new file carries a positive figure, one `git show` per
+file of the start at most, cached.
 The way out of a finding is to fix it and lock the gain. Two other ways would also lower the measure without fixing
 anything, and the ratchet closes them:
 

@@ -91,8 +91,8 @@ nothing below applies and the wave behaves as before; any other value is refused
      repository's value plus the replayed commit's signed difference (the commit's parent version minus the commit's, so `main` minus the commit's
      lowering), floored at 0, a key at 0 removed, the file sorted, indented by 2 spaces and ending with a newline (the format of `scripts/qualite.mjs`);
      a key lowered by both sides is lowered twice, floored at 0. Beforehand the commit is checked with the gate's rule (`comparerMigration`, the commit's parent against
-     the commit; a file « exists » if it is in the parent of the replayed commit): a key of an existing file that goes up, or a total that goes up,
-     is not resolved. It is done **commit by commit**, so an intermediate commit that raises the baseline aborts the rebase even if a later one lowers it
+     the commit; a file « exists » if it is in the parent of the replayed commit): a key of an existing file that goes up, a total that goes up, or a new file
+     whose content is not linked to a file of the start that lost at least as much (L477, [qualite.md](qualite.md)) is not resolved. It is done **commit by commit**, so an intermediate commit that raises the baseline aborts the rebase even if a later one lowers it
      again (the gate checks each state the same way). It is not resolved either when one of the three versions (parent, repository, commit) is missing
      (the lot or the repository creates or deletes the file) or is not a flat key → number map. The journal says
      `<project>:<lot> qualite-baseline.json : base recalculée sur main + baisses du lot (<n> commit(s))`. The ratchet is not bypassed: the checks of step 3 replay it at the

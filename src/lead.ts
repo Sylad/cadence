@@ -207,7 +207,7 @@ function waveLaunchDir(root: string, t: Pick<KeptTree, 'wave' | 'dir'>): string 
   return [...fromTree, ...up].find((d) => existsSync(join(RunStore.runsDir(d), t.wave))) ?? null;
 }
 
-/** Les gestes de chaque branche gardée qui porte des commits non intégrés, lus sans rien écrire : l'état du lot dans sa vague, et l'âge de la branche (même seuil que `recoveryRefusal`). */
+/** Les gestes de chaque branche gardée qui porte des commits non intégrés, lus sans rien écrire : l'état du lot dans sa vague, et l'âge de la branche (même seuil que `staleRefusal`). */
 function branchGestures(root: string, trees: KeptTree[]): { branchGestures?: Record<string, BranchGestures> } {
   const out: Record<string, BranchGestures> = {};
   for (const t of trees.filter((x) => x.unintegrated > 0 && x.created > 0 && Date.now() - x.created > UNDECIDED_BRANCH_HOURS * 3600_000)) {

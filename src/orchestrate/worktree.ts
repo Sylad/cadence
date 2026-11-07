@@ -354,15 +354,6 @@ export function stalenessText(age: { behind: number; conflicts: string[] }): str
   return `main a ${age.behind} commit(s) d'avance et ${age.conflicts.length} conflit(s)${age.conflicts.length ? ` (${age.conflicts.join(', ')})` : ''}`;
 }
 
-/**
- * Pourquoi la reprise refuserait cette branche gardée sans y toucher, ou null : son worktree porte un fichier suivi modifié (R11), un de ses commits
- * touche un fichier du plan (`planFiles`, relatifs au dépôt), ou elle est périmée (L665 : plus de `STALE_BASE_COMMITS` commits de `base` d'avance, ou des conflits
- * à la fusion à blanc ; `age` évite de la mesurer deux fois). Ne touche à rien : `recoverTree` et le `--dry-run` (L581) appliquent ainsi les mêmes refus.
- */
-export function recoveryRefusal(repo: string, found: KeptTree, base: string, planFiles: ReadonlySet<string>, age = branchStaleness(repo, found.branch, base)): string | null {
-  return blockingRefusal(repo, found, base, planFiles) ?? staleRefusal(age);
-}
-
 /** Ce qui empêche la reprise sans rien tenter (L676 : avant tout rebase) : un fichier suivi modifié dans son worktree (R11), ou un de ses commits qui touche le plan. */
 export function blockingRefusal(repo: string, found: KeptTree, base: string, planFiles: ReadonlySet<string>): string | null {
   const dirty = found.dir !== null && existsSync(join(found.dir, '.git')) ? trackedDirty(found.dir) : [];

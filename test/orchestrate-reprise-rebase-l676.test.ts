@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { lotBranch, lotTreeDir, prepareTree } from '../src/orchestrate/worktree.js';
+import { rebaseOwnBranch } from '../src/orchestrate/reprise-rebase.js';
+import { redSha } from '../src/orchestrate/accept.js';
+import type { LotCtx } from '../src/orchestrate/cycle.js';
 import { join } from 'node:path';
 import { claudeOut, commitFile, git, workReport } from './orchestrate-harness.js';
 import { fake, meeting, run, setup, store, WAVE, writes } from './orchestrate-worktree-harness.js';
@@ -57,5 +61,55 @@ describe('R1 — --resume rebase la branche de la vague avant toute session', ()
     const onDisk = JSON.parse(readFileSync(join(store(parent).dir, 'a--L1.json'), 'utf8'));
     expect(onDisk.status).toBe('handed-back');
     expect(onDisk.outcome).toContain('le rebase sur main a échoué');
+  });
+});
+
+describe('R2 — le rebase de --resume reporte les shas que l\'état garde (revue conforme, ancre du commit rouge)', () => {
+  const ACC = 'docs/specs/ecran/acceptation-L1.json';
+  /** Une branche de la vague avec un commit rouge d'acceptation puis un commit de travail, main avancé d'un commit ; l'état garde la revue conforme au sommet et l'ancre du commit rouge. */
+  function lotState() {
+    const { parent, repo } = setup();
+    const branch = lotBranch(WAVE, 'a', 'L1');
+    const dir = lotTreeDir(store(parent).dir, 'a', 'L1', repo);
+    const made = prepareTree({ repo, dir, branch, base: 'main', lot: 'a:L1' });
+    if (!made.ok) throw new Error(made.cause);
+    mkdirSync(join(dir, 'docs/specs/ecran'), { recursive: true });
+    writeFileSync(join(dir, ACC), '{"fichiers":[]}\n');
+    git(dir, 'add', '--', ACC);
+    git(dir, 'commit', '-q', '-m', 'test(L1): acceptation scellée', '--', ACC);
+    const rouge = git(dir, 'rev-parse', 'HEAD');
+    commitFile(dir, 'L1.txt', 'feat(L1): travail');
+    const head = git(dir, 'rev-parse', 'HEAD');
+    const work = head;
+    commitFile(repo, 'main-1.txt', 'chore: main');
+    const logs: string[] = [];
+    const lot = { project: 'a', lot: 'L1', repo, status: 'suspended', next: 'fix', steps: [], constats: [], warnings: [], code: { conforme: true, bloquants: 0, majeurs: 0, mineurs: 1, verdict: 'conforme', sousTaches: [], nonVerifie: [], head }, accept: { acceptation: ACC, rouge } };
+    const c = { lot, wave: { store: store(parent), log: (l: string) => logs.push(l) } } as never as LotCtx;
+    return { parent, repo, branch, dir, c, lot, logs, rouge, head, work };
+  }
+  it('R2 — revue conforme gardée : code.head suit le sommet rebasé, conclude ne voit pas « un commit postérieur à la revue »', () => {
+    const s = lotState();
+    rebaseOwnBranch(s.c, { repo: s.repo, branch: s.branch, dir: s.dir, base: 'main', recovered: false });
+    expect(s.lot.status).toBe('suspended');
+    expect(git(s.dir, 'rev-list', '--count', 'HEAD..main')).toBe('0');
+    expect(s.lot.code.head).not.toBe(s.head);
+    expect(s.lot.code.head).toBe(git(s.dir, 'rev-parse', 'HEAD'));
+    expect(s.logs.join('\n')).toContain('revue de code gardée reporté(e) sur le commit rebasé');
+    expect(store(s.parent).readLot('a', 'L1')?.code?.head).toBe(s.lot.code.head);
+  });
+  it('R2 — ancre du commit rouge : accept.rouge suit le commit rouge rebasé, le verrou n\'y voit pas de réécriture', () => {
+    const s = lotState();
+    rebaseOwnBranch(s.c, { repo: s.repo, branch: s.branch, dir: s.dir, base: 'main', recovered: false });
+    expect(s.lot.accept.rouge).not.toBe(s.rouge);
+    expect(s.lot.accept.rouge).toBe(redSha(s.dir, ACC));
+  });
+  it('R2 — report impossible (un commit du lot déjà dans main) : branche remise à son sommet, lot rendu sans session, cause au journal', () => {
+    const s = lotState();
+    git(s.repo, 'cherry-pick', s.work);
+    rebaseOwnBranch(s.c, { repo: s.repo, branch: s.branch, dir: s.dir, base: 'main', recovered: false });
+    expect(s.lot.status).toBe('handed-back');
+    expect(git(s.repo, 'rev-parse', s.branch)).toBe(s.head);
+    expect(s.lot.code.head).toBe(s.head);
+    expect(s.logs.join('\n')).toMatch(/remise à son sommet .*ne peuvent pas être reportées/);
   });
 });

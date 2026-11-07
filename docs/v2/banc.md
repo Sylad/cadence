@@ -38,6 +38,10 @@ Les chiffres absolus du 07-11 (304 tests cachés, 79 % de mutations) sont affich
 - Refus (code 2) si `v2/src` ou `v2/briefs` a des changements non commités, ou si `v2/dist/cli.js` est absent ou plus ancien que les sources.
 - **Publication** : permise seulement si le **dernier** passage de l'empreinte courante qui couvre les bancs 1, 3 et 6 est vert, oppose un candidat à une référence distincte (`--candidat` égal à `--reference` est refusé, code 2), avec le modèle que le `bras.yaml` courant donne au candidat (le modèle est hors de l'empreinte : chaque ligne d'historique porte `reference` et `modele_candidat`), et si aucun passage rouge de cette empreinte, éclair compris, ne le suit.
 
+## Limites connues des garde-fous
+
+Les outils interdits aux bras et aux juges (`--disallowedTools`, `OUTILS_INTERDITS` de `bras.ts`) sont des motifs sur le **début** de la commande : `Bash(git push:*)` n'arrête pas `git -C x push`, ni `Bash(ssh:*)` un `ssh` lancé par `env`, `bash -c` ou un script. Ce qui protège vraiment : les clones n'ont aucun remote (supprimé à la préparation), `SSH_AUTH_SOCK`, `GH_TOKEN` et `GITHUB_TOKEN` sont vides et `KUBECONFIG` pointe sur `/nonexistent`. Restent possibles un `git push` vers une URL explicite ou un `ssh` qui lit une clé de `~/.ssh` sans phrase de passe ; le contrôle des fuites ne les voit pas. Le banc suppose des bras de bonne foi ; le durcir demanderait un utilisateur ou un conteneur séparé.
+
 ## Commandes
 
 La racine est `~/bench-cadence` (ou `$BENCH_ROOT`).

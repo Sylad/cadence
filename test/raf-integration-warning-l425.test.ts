@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { INTEGRATION_LOCK } from '../src/orchestrate/integrate.js';
 import { sharedStateDir } from '../src/state.js';
 import { gitRepo, tempDir } from './helpers.js';
 
-// L425 — raf add / note / done préviennent quand une intégration du dépôt est en cours : un fichier suivi modifié dans l'arbre principal la fait refuser.
+// L425 — raf add / note / done préviennent quand une intégration du dépôt est en cours ; L673 : l'intégration tolère le plan modifié, le message dit de ne pas le committer avant sa fin.
 
 const fileHome = process.env.CADENCE_HOME;
 beforeEach(() => {
@@ -44,7 +44,22 @@ describe('raf add / note / done pendant une intégration (L425)', () => {
     expect(r.code).toBe(0);
     expect(r.out).toBe('L2');
     expect(r.err).toMatch(WARN);
-    expect(r.err).toContain('refuser');
+    expect(r.err).toContain('ne pas le committer avant sa fin');
+  });
+  it('L673 — l\'avertissement ne demande plus de committer le plan : l\'intégration le tolère, un commit lui ferait rejouer sa porte', () => {
+    const dir = projet();
+    integrating(dir);
+    const { err } = raf(dir, 'add', 'deux');
+    expect(err).toContain('le tolère et son commit de plan l\'emporte (L673)');
+    expect(err).toContain('rejouer son rebase et sa porte complète');
+    expect(err).not.toMatch(/refuser|sans attendre/);
+  });
+  it('L673 — docs/raf.md et agents/livreur.md disent la tolérance : la doc ne demande plus au lead de committer tout de suite, le livreur sait pourquoi il commite quand même', () => {
+    const raf = readFileSync(join(import.meta.dirname, '..', 'docs', 'raf.md'), 'utf8');
+    expect(raf).toContain('leave the plan uncommitted until the integration ends');
+    expect(raf).not.toMatch(/Commit the plan right away/);
+    const livreur = readFileSync(join(import.meta.dirname, '..', 'agents', 'livreur.md'), 'utf8');
+    expect(livreur).toContain('since L673 the integration tolerates the modified plan');
   });
   it('R1 — raf note avertit et écrit la note', () => {
     const dir = projet();

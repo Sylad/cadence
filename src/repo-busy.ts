@@ -12,15 +12,16 @@ import { RafError } from './plan.js';
 // Ce que `raf`, `deliver` et `spec` lisent du verrou du dépôt : une orchestration (ou une tâche locale du lead, L519) qui le tient, ou une intégration en cours.
 
 /**
- * Avertit (stderr, sans refuser) quand une intégration du dépôt est en cours (L425) : le plan écrit dans l'arbre principal est un fichier suivi modifié, et
- * l'intégration en cours le voit et refuse son lot (« arbre du dépôt modifié »). Seul l'arbre principal est concerné : dans le worktree d'un lot, l'écriture
- * ne change pas l'arbre que l'intégration contrôle.
+ * Avertit (stderr, sans refuser) quand une intégration du dépôt est en cours (L425) : le plan écrit dans l'arbre principal est un fichier suivi modifié. Depuis L673
+ * l'intégration en cours le tolère (hors du diff de son lot) et le commit de plan du programme l'emporte : le message dit de NE PAS le committer tout de suite, un
+ * commit sur la branche pendant l'intégration lui fait rejouer son rebase et sa porte complète (le coût que L673 supprime, 8,8 min le 07-11). Seul l'arbre principal
+ * est concerné : dans le worktree d'un lot, l'écriture ne change pas l'arbre que l'intégration contrôle.
  */
 export function warnIntegrating(root: string, err: (line: string) => void): void {
   const top = gitRoot(root);
   if (!top || !statSync(join(top, '.git')).isDirectory()) return;
   const holder = activeLock(join(sharedStateDir(root), INTEGRATION_LOCK));
-  if (holder) err(`avertissement : intégration en cours (vague ${holder.wave}, pid ${holder.pid}) — ce plan est un fichier suivi modifié de l'arbre principal, l'intégration en cours peut refuser son lot (arbre du dépôt modifié) : committer le plan sans attendre`);
+  if (holder) err(`avertissement : intégration en cours (vague ${holder.wave}, pid ${holder.pid}) — ce plan est un fichier suivi modifié de l'arbre principal : l'intégration en cours le tolère et son commit de plan l'emporte (L673) ; ne pas le committer avant sa fin, un commit sur la branche lui ferait rejouer son rebase et sa porte complète`);
 }
 
 /**

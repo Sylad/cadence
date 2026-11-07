@@ -152,7 +152,7 @@ async function awaitTurn(c: LotCtx): Promise<Grant> {
 /**
  * Intégration d'un lot en worktree à la branche du dépôt (L279, C2), AVANT sa transition à ready (R22). D'abord, hors verrou, l'attente d'un lot plus ancien de la
  * vague qui travaille sur une ressource à chemins que le lot touche aussi (L558, `awaitOlder`). Puis sous le verrou d'intégration : branche du dépôt encore
- * celle de départ (R24), aucun fichier suivi modifié (R8), rebase sur le sommet courant (conflit : abandonné, rendu au lead, R6), contrôles joués au sommet
+ * celle de départ (R24), aucun fichier suivi modifié hors le plan et ce qui est tenu avec lui que le diff du lot ne touche pas (R8, L673 `toleratedDirty`), rebase sur le sommet courant (conflit : abandonné, rendu au lead, R6), contrôles joués au sommet
  * (rebasé ou non, suite complète une fois par sommet, L590 R5 et R7), report du verdict si le patch-id est le même (R9) ou revue courte du diff rebasé sinon (R17), avance en fast-forward, puis écriture du plan dans le
  * dépôt du projet (R23). Tout rendu garde `next: integrate` et le worktree : seul `--resume --integrate` le rejoue (R14, R27).
  */

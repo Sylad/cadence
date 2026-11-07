@@ -4,7 +4,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync
 import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { ajouterBanc } from './ajouter.js';
-import { listerBancs, racineBanc } from './banc.js';
+import { chargerBanc, listerBancs, racineBanc, type Banc } from './banc.js';
 import { chargerBras, executeurClaude, lancerBras, type DefBras, type Executeur, type Mesure } from './bras.js';
 import { fuitesDuBras } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
@@ -90,28 +90,29 @@ function passageVerrouille(o: OptPassage): Verdict {
   for (const n of [o.ref, o.cand]) if (!bras[n]) throw new Error(`bras « ${n} » absent de ${o.racine}/bras.yaml`);
   const clonesParBanc: Record<string, unknown>[] = [];
   const N = o.repetitions ?? 1;
-  const jouer = (b: ReturnType<typeof listerBancs>[number], i: number, k: number): ResultatBanc => {
+  const jouer = (bid: string, i: number, k: number): ResultatBanc => {
     const ordre = (i + k - 1) % 2 === 0 ? [o.ref, o.cand] : [o.cand, o.ref];
-    const idBanc = N > 1 ? `${b.id}#${k}` : b.id; const sous = N > 1 ? join(b.id, `r${k}`) : b.id;
+    const idBanc = N > 1 ? `${bid}#${k}` : bid; const sous = N > 1 ? join(bid, `r${k}`) : bid;
     const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {}; const suiteBase: Record<string, number> = {}; const bases: Record<string, string> = {};
     const mapping: Record<string, string> = {}; // c1/c2 -> bras : écrit seulement après les juges (aveugle)
-    let jugement: Jugement | null = null; let phase = 'préparation';
+    let jugement: Jugement | null = null; let phase = 'banc invalide'; let b: Banc | undefined;
     try {
+      const bc = chargerBanc(o.racine, bid); b = bc;
       ordre.forEach((n, j) => {
         const c = join(dirRun, sous, `c${j + 1}`);
         mapping[`c${j + 1}`] = n; clones[n] = c;
-        phase = 'préparation'; suiteBase[n] = o.prep(b, c).testsBase;
+        phase = 'préparation'; suiteBase[n] = o.prep(bc, c).testsBase;
         o.out(`${idBanc} : bras ${n}…`);
         const avant = etatGit(c); bases[n] = avant.head;
-        phase = `bras ${n}`; const m = lancerBras(b, bras[n], c, o.exec);
+        phase = `bras ${n}`; const m = lancerBras(bc, bras[n], c, o.exec);
         mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)) };
-        phase = 'fuites'; fuites[n] = fuitesDuBras(o.home, o.racine, b.id, c);
+        phase = 'fuites'; fuites[n] = fuitesDuBras(o.home, o.racine, bid, c);
       });
       if (ordre.some((n) => mesures[n].echec !== null)) o.out(`${idBanc} : un bras en échec, juges sautés`);
       else {
         o.out(`${idBanc} : juges…`);
         phase = 'juges';
-        jugement = juger(b, clones, join(o.racine, 'eval', id, sous), o.juge, o.exec);
+        jugement = juger(bc, clones, join(o.racine, 'eval', id, sous), o.juge, o.exec);
       }
     } catch (e) {
       const msg = `${phase} : ${e instanceof Error ? e.message : String(e)}`;
@@ -123,13 +124,13 @@ function passageVerrouille(o: OptPassage): Verdict {
       o.out(`${idBanc} : ${msg}`);
     }
     clonesParBanc.push(mapping);
-    const r: ResultatBanc = { banc: idBanc, taille: b.taille, visible: b.visible, reponses: b.reponses, frais: b.frais, mesures, jugement, fuites };
+    const r: ResultatBanc = { banc: idBanc, taille: b?.taille ?? 'fonction', visible: b?.visible ?? false, reponses: b?.reponses ?? false, frais: b?.frais ?? false, mesures, jugement, fuites };
     mkdirSync(join(dirRun, sous), { recursive: true });
     writeFileSync(join(dirRun, sous, 'resultat.json'), JSON.stringify({ ...r, clones: mapping, suite_base: suiteBase }, null, 2));
     if (!o.garderClones) for (const n of ordre) if (clones[n]) archiver(clones[n], bases[n]);
     return r;
   };
-  const res: ResultatBanc[] = listerBancs(o.racine, o.numeros).flatMap((b, i) => Array.from({ length: N }, (_, k) => jouer(b, i, k + 1)));
+  const res: ResultatBanc[] = listerBancs(o.racine, o.numeros).flatMap((bid, i) => Array.from({ length: N }, (_, k) => jouer(bid, i, k + 1)));
   const v = verdict(res, o.ref, o.cand, BARRE_SPEC);
   mkdirSync(join(o.racine, 'rapports'), { recursive: true });
   const base = join(o.racine, 'rapports', id);

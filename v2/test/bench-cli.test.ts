@@ -321,3 +321,15 @@ describe('nettoyage des clones (I-3)', () => {
     expect(existsSync(join(d, 'c1', '.git'))).toBe(true);
   });
 });
+
+describe('banc invalide (I-5)', () => {
+  it('un banc.yaml invalide met ses deux bras en échec, le passage continue ; un fichier sous bancs/ est ignoré', () => {
+    const r = racine(); writeFileSync(join(r, 'bancs', '1-a', 'banc.yaml'), 'projet: p\n'); writeFileSync(join(r, 'bancs', 'LISEZMOI.md'), 'x');
+    const v = passage({ racine: r, ref: 'A', cand: 'C', hebdo: false, juge: 'opus', exec, prep: prep as never,
+      maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', home: r, out: () => {} });
+    expect(v.vert).toBe(false);
+    const res = (id: string) => JSON.parse(readFileSync(join(r, 'runs', '2026-11-08-1000-e1', id, 'resultat.json'), 'utf8'));
+    for (const b of ['A', 'C']) expect(res('1-a').mesures[b].echec).toMatch(/^banc invalide : banc 1-a : champ « source » manquant/);
+    expect(res('2-b').mesures.C.echec).toBeNull();
+  });
+});

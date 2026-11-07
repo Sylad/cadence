@@ -34,8 +34,9 @@ describe('bancs', () => {
   });
   it('liste par numéro et filtre', () => {
     const r = racineAvec({ '10-a': YAML, '2-b': YAML, '1-c': YAML });
-    expect(listerBancs(r).map((b) => b.id)).toEqual(['1-c', '2-b', '10-a']);
-    expect(listerBancs(r, ['1', '10']).map((b) => b.id)).toEqual(['1-c', '10-a']);
+    writeFileSync(join(r, 'bancs', 'LISEZMOI.md'), 'pas un banc');
+    expect(listerBancs(r)).toEqual(['1-c', '2-b', '10-a']);
+    expect(listerBancs(r, ['1', '10'])).toEqual(['1-c', '10-a']);
   });
   it('racine : BENCH_ROOT, sinon ~/bench-cadence', () => {
     expect(racineBanc({ BENCH_ROOT: '/x' })).toBe('/x');

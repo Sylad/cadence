@@ -173,11 +173,10 @@ describe('verifyGate : la porte rejouée au sha dans un worktree jetable (L348)'
 
 describe('verifyGate : délai, noms des suites, signal (L348)', () => {
   it('au délai : tout le groupe est tué, code 124 et rouge, worktree retiré', async () => {
-    const { repo, sha } = project('orchestrate:\n  test: "sleep 30"\n');
+    // Une suite de 10 min pour un délai de 300 ms : revenir dans le délai du test (30 s) prouve la coupure, sans chronomètre (L686).
+    const { repo, sha } = project('orchestrate:\n  test: "sleep 600"\n');
     const lines: string[] = [];
-    const t0 = Date.now();
     const code = await verifyGate({ repo, sha, config: readOrchestrateConfig(join(repo, 'cadence.yaml')), verify: readVerifyConfig(join(repo, 'cadence.yaml')), out: (l) => lines.push(l), timeoutMs: 300 });
-    expect(Date.now() - t0).toBeLessThan(10_000);
     expect(code).toBe(1);
     expect(lines.join('\n')).toContain('code 124');
     expect(lines.join('\n')).toContain('délai dépassé');

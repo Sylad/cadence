@@ -103,13 +103,8 @@ describe('L531 — équité entre vagues pour le créneau qui se libère', () =>
 
   it('R6 — sans autre attente, un créneau libre est pris sans délai (comportement inchangé)', async () => {
     const home = tempDir();
-    const t0 = Date.now();
-    const free = await acquireSlot(home, 2, {
-      wave: 'seul',
-      fresh: true,
-      rank: 4,
-    });
-    expect(Date.now() - t0).toBeLessThan(500);
+    // pollMs de 10 min : « sans délai » veut dire aucun tour d'attente ; un seul tour dépasserait le délai du test (30 s). Revenir le prouve, sans chronomètre (L686).
+    const free = await acquireSlot(home, 2, { wave: 'seul', fresh: true, rank: 4, pollMs: 600_000 });
     free();
   });
 

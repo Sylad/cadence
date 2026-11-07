@@ -52,11 +52,11 @@ describe('L645 — le cliquet contre origin/main refuse un origin/main en retard
 
   it('R1 — la ligne de commande refuse (code 1) avec ce texte, sans passer par la mesure', () => {
     const { dir } = depot(3);
-    const t0 = Date.now();
     const r = spawnSync('node', [QUALITE, '--contre', 'origin/main'], { cwd: dir, encoding: 'utf8' });
     expect(r.status).toBe(1);
-    expect(r.stderr).toContain('origin/main est en retard de 3 commits sur main');
-    expect(Date.now() - t0).toBeLessThan(10000);
+    // « Sans passer par la mesure » : la sortie est exactement le texte du refus, rien de la mesure (qui écrit son verdict sur stdout ou stderr) — L686 : pas de chronomètre.
+    expect(r.stderr.trim()).toBe(retardSurBranche(dir, 'origin/main')!.texte);
+    expect(r.stdout).toBe('');
   });
 });
 

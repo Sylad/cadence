@@ -219,10 +219,9 @@ describe('cadence orchestrate de bout en bout (faux claude)', () => {
   });
 
   it('délai dépassé : la session est tuée, échec nommé', async () => {
-    const s = setup({ implement: [{ sleepMs: 30000 }] }, { cadenceYaml: 'orchestrate:\n  timeouts: { implement: 0.01 }\n' });
-    const t0 = Date.now();
+    // La session simulée dormirait 10 min : revenir dans le délai du test (30 s) prouve qu'elle a été coupée au délai de 0,01 min, sans chronomètre (L686).
+    const s = setup({ implement: [{ sleepMs: 600_000 }] }, { cadenceYaml: 'orchestrate:\n  timeouts: { implement: 0.01 }\n' });
     const r = await s.cli('proj:L1');
-    expect(Date.now() - t0).toBeLessThan(20000); // bien avant les 30 s de la session simulée, même sous charge
     expect(r.code).toBe(1);
     expect(r.out).toContain('délai dépassé');
   });

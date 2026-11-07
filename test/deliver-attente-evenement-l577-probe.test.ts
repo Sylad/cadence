@@ -17,10 +17,9 @@ const alive = (pid: number) => {
 describe('L577 probe : deliver exec, attente du descendant par événement', () => {
   it('un descendant déjà mort avant l’adoption ne retient pas la commande (code 0 rendu vite)', async () => {
     const logs = tempDir();
-    const t0 = Date.now();
-    const code = await realDeps(logs, readProcs, 2_000, 600).exec('sleep 0.1 & exit 0', {}, 20_000);
+    // Délai de 10 min : revenir dans le délai du test (30 s) prouve que la commande n'a pas attendu ce délai, sans chronomètre (L686).
+    const code = await realDeps(logs, readProcs, 2_000, 600).exec('sleep 0.1 & exit 0', {}, 600_000);
     expect(code).toBe(0);
-    expect(Date.now() - t0).toBeLessThan(10_000);
   }, 30_000);
 
   it('le code non nul de la racine est rendu tel quel avec un descendant vivant, qui reste borné', async () => {

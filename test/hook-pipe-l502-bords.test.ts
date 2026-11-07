@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { run } from '../src/cli.js';
+import { growthRatio } from './helpers.js';
 
 // L502 (sonde) — les bords du hook « pipe » : formes de shell valides qui masquent le code de sortie, et faux positifs.
 async function pipe(stdin: string) {
@@ -77,11 +78,8 @@ describe('L502 sonde — formes de shell qui masquent le code de sortie', () => 
     expect(await pipe(JSON.stringify({ tool_input: { command: ['npm test | tail'] } }))).toEqual({ code: 0, out: '' });
   });
 
-  it('commande très longue : rapide et sans exception', async () => {
-    const c = 'echo a | tail; '.repeat(5000) + 'npm test | tail';
-    const t = Date.now();
-    const r = await pipe(pre(c));
-    expect(r.out).not.toBe('');
-    expect(Date.now() - t).toBeLessThan(3000);
+  it('commande très longue : lue en temps linéaire et sans exception (L686 : rapport de croissance, pas une durée)', async () => {
+    const ratio = await growthRatio(async (n) => expect((await pipe(pre('echo a | tail; '.repeat(n) + 'npm test | tail'))).out).not.toBe(''), 5_000, 20_000);
+    expect(ratio).toBeLessThan(10); // linéaire : proche de 4 ; en carré : proche de 16
   });
 });

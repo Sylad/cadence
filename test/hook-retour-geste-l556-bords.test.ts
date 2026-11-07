@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { run } from '../src/cli.js';
+import { growthRatio } from './helpers.js';
 
 // L556 — sonde des bords du hook « retour → geste » (R3, R5, R7, R9, R13, R14) : écrite sans lire les tests du lot, sur la forme réelle des refus.
 async function hook(sub: string, stdin: string) {
@@ -123,17 +124,14 @@ describe('L556 sonde — R9 : entrées de mauvais type', () => {
       expect(r).toEqual({ code: 0, out: '', err: '' });
     }
   });
-  it('R9 — une commande de 300 Ko faite de « while » répétés, sans pgrep : le hook répond en moins d’une seconde', async () => {
-    const t = Date.now();
-    const r = await hook('attente', JSON.stringify({ tool_input: { command: 'while '.repeat(50_000) } }));
-    expect(r).toEqual({ code: 0, out: '', err: '' });
-    expect(Date.now() - t).toBeLessThan(1000);
+  // L686 : la vitesse se prouve par le rapport de croissance entre deux tailles (linéaire : proche de 4 ; en carré : proche de 16), jamais par une durée murale.
+  it('R9 — une commande de 300 Ko faite de « while » répétés, sans pgrep : le hook la lit en temps linéaire', async () => {
+    const ratio = await growthRatio(async (n) => expect(await hook('attente', JSON.stringify({ tool_input: { command: 'while '.repeat(n) } }))).toEqual({ code: 0, out: '', err: '' }), 50_000, 200_000);
+    expect(ratio).toBeLessThan(10);
   });
-  it('R9 — une sortie de 5 Mo sur une seule ligne faite de « a:b » : réponse en moins d’une seconde', async () => {
-    const t = Date.now();
-    const r = await hook('retour', post('cadence verify', 'a:b '.repeat(1_250_000)));
-    expect(r).toEqual({ code: 0, out: '', err: '' });
-    expect(Date.now() - t).toBeLessThan(1000);
+  it('R9 — une sortie de 5 Mo sur une seule ligne faite de « a:b » : lue en temps linéaire', async () => {
+    const ratio = await growthRatio(async (n) => expect(await hook('retour', post('cadence verify', 'a:b '.repeat(n)))).toEqual({ code: 0, out: '', err: '' }), 312_500, 1_250_000);
+    expect(ratio).toBeLessThan(10);
   });
 });
 

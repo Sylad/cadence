@@ -91,10 +91,11 @@ describe('L298 — délai des étapes d’écriture', () => {
     it('R7 — la prolongation a un plafond : une session qui commite sans fin est coupée après `max` prolongations', async () => {
       const dir = tempDir();
       const t0 = Date.now();
-      const out = await realClaude(slow(dir), process.env)([], { cwd: dir, env: {}, timeoutMs: 1_000, extend: { progressed: () => true, ms: 1_000, max: 2 } });
+      let asked = 0;
+      const out = await realClaude(slow(dir), process.env)([], { cwd: dir, env: {}, timeoutMs: 1_000, extend: { progressed: () => (asked++, true), ms: 1_000, max: 2 } });
       expect(out.timedOut).toBe(true);
-      expect(Date.now() - t0).toBeGreaterThanOrEqual(2_900);
-      expect(Date.now() - t0).toBeLessThan(10_000);
+      expect(asked).toBe(2); // le plafond : deux échéances ont demandé une prolongation, la troisième coupe sans demander (L686 : compteur, pas une borne haute de durée)
+      expect(Date.now() - t0).toBeGreaterThanOrEqual(2_900); // 1 s + 2 prolongations de 1 s : une borne basse ne dépend pas de la charge
     }, 15_000);
   });
 

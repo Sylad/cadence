@@ -690,9 +690,8 @@ describe('realClaude : fin de session (L83)', () => {
     const bin = join(dir, 'fake-claude.sh');
     // Le descendant hérite du stdout de la session (pas de redirection) : `close` ne viendrait qu'à sa mort.
     writeFileSync(bin, `#!/bin/sh\nsetsid sh -c 'echo $$ > "${pidFile}"; exec sleep 60' &\nwhile [ ! -s "${pidFile}" ]; do sleep 0.05; done\necho '{"ok":true}'\nexit 0\n`, { mode: 0o755 });
-    const started = Date.now();
-    const out = await realClaude(bin, process.env)([], { cwd: dir, env: {}, timeoutMs: 30_000 });
-    expect(Date.now() - started).toBeLessThan(10_000);
+    // Délai de 10 min : `timedOut` faux et un retour dans le délai du test (30 s) prouvent que `close` n'a pas été attendu, sans chronomètre (L686).
+    const out = await realClaude(bin, process.env)([], { cwd: dir, env: {}, timeoutMs: 600_000 });
     expect(out.timedOut).toBe(false);
     expect(out.code).toBe(0);
     expect(out.stdout).toContain('{"ok":true}');

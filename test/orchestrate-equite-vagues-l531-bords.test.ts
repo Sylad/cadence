@@ -23,9 +23,8 @@ describe('L531 bords — attentes illisibles, doublons, rang neutre', () => {
     const home = tempDir();
     mkdirSync(join(home, 'waiters'), { recursive: true });
     writeFileSync(join(home, 'waiters', `${process.pid}-99.json`), JSON.stringify({ pid: process.pid, start: 'jamais-ce-start', wave: 'fantome', since: 1, seq: 99, fresh: false, rank: 0 }));
-    const t = Date.now();
-    const free = await acquireSlot(home, 1, { wave: 'a', pollMs: POLL, fresh: true, rank: 9 });
-    expect(Date.now() - t).toBeLessThan(1000);
+    // pollMs de 10 min : si l'inscription périmée retenait, le premier tour d'attente dépasserait le délai du test (30 s) ; revenir prouve la prise au premier essai, sans chronomètre (L686).
+    const free = await acquireSlot(home, 1, { wave: 'a', pollMs: 600_000, fresh: true, rank: 9 });
     free();
   });
 

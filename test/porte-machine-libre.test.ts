@@ -305,9 +305,8 @@ describe('L639 — la décision d\'hôte, une fois par lot (R5, R6, R7, R8, R10)
     const started = Date.now();
     const p = withPlace(opts({}, { owner: {}, env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` } }), async () => {});
     while (!count('porte déportée indisponible') && Date.now() - started < 18_000) await wait(100);
-    const elapsed = Date.now() - started;
-    expect(elapsed).toBeGreaterThan(9_500); // la sonde bloquée n'est coupée qu'à la borne totale de 10 s…
-    expect(elapsed).toBeLessThan(16_000); // …et pas à celle de 30 s de gate.host
+    expect(Date.now() - started).toBeGreaterThan(9_500); // la sonde bloquée n'est coupée qu'à la borne totale de 10 s (une borne basse ne dépend pas de la charge)…
+    // …et pas à celle de 30 s de gate.host : c'est le message qui nomme la borne appliquée, « délai dépassé (10 s) » (L686 : pas de borne haute de durée).
     expect(said.join('\n')).toMatch(/porte déportée indisponible sur box \(délai dépassé \(10 s\)\) — jouée en local/);
     held.pop()!();
     await p;

@@ -181,14 +181,15 @@ describe('vérifications en parallèle, chacune avec le budget entier', () => {
     expect(out.join('\n')).not.toMatch(/non vérifiée|\?/);
   });
 
-  it('pour de vrai : trois « sleep 5 » en session start prennent ~5 s, pas 15', async () => {
+  it('pour de vrai : trois vérifications en session start tournent EN PARALLÈLE (barrière à trois, pas un chronomètre)', async () => {
     const { effectLines } = await import('../src/verify.js');
-    const t = Date.now();
-    // Sommeils de 5 s : en série ce serait 15 s ; la borne de 12 s laisse 7 s de marge à la charge de la machine (L90 : 4,5 s pour 2 s
-    // de sommeil sautaient en suite complète sous charge), sans cesser de distinguer le parallèle du séquentiel.
-    const lines = await effectLines(config('    - command: sleep 5\n    - command: sleep 5\n    - command: sleep 5\n'), 'abc', realCheckDeps(tempDir(), { quiet: true }));
+    // Chaque vérification pose son jeton puis attend les trois : en série, la première attendrait les deux autres sans fin (rouge au budget,
+    // ou coupée par le délai du test) ; en parallèle, les trois se libèrent mutuellement. La preuve ne dépend pas de la vitesse de la machine (L686 ;
+    // avant : « ~5 s, pas 15 » sous une borne de 12 s, qui sautait sous charge).
+    const dir = tempDir();
+    const barrier = (me: string) => `"touch '${dir}/${me}'; while [ ! -e '${dir}/a' ] || [ ! -e '${dir}/b' ] || [ ! -e '${dir}/c' ]; do sleep 0.05; done"`;
+    const lines = await effectLines(config(`    - command: ${barrier('a')}\n    - command: ${barrier('b')}\n    - command: ${barrier('c')}\n`), 'abc', realCheckDeps(dir, { quiet: true }));
     expect(lines).toEqual(['✓ verify : 3/3 vérifications vertes']);
-    expect(Date.now() - t).toBeLessThan(12_000);
   }, 30_000);
 });
 

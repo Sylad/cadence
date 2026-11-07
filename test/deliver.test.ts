@@ -8,7 +8,7 @@ import { readProcs } from '../src/proc.js';
 import { headSha } from '../src/git.js';
 import { Plan, type PlanFormat } from '../src/plan.js';
 import { appendDelivery, lastDelivery, readLock, sharedStateDir as stateDir, writeLock } from '../src/state.js';
-import { commit, gitRepo, tempDir } from './helpers.js';
+import { commit, gitRepo, isRunning, tempDir } from './helpers.js';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });
 
@@ -778,15 +778,14 @@ describe('cadence deliver (CLI)', () => {
 
   it('tue une vérification qui dépasse le délai', async () => {
     const dir = pushedRepo();
-    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  verify:\n    - command: exec sleep 30\n  verifyTimeout: 1\n');
+    // Une vérification de 10 min pour un délai de 1 s : revenir dans le délai du test (30 s) prouve qu'elle a été tuée, sans chronomètre (L686).
+    writeFileSync(join(dir, 'cadence.yaml'), 'deliver:\n  verify:\n    - command: exec sleep 600\n  verifyTimeout: 1\n');
     git(dir, 'add', 'cadence.yaml');
     commit(dir, 'chore: config');
     git(dir, 'push', '-q');
-    const t = Date.now();
     const r = await cad(dir, 'deliver');
     expect(r.code).toBe(1);
     expect(r.err).toContain('délai dépassé');
-    expect(Date.now() - t).toBeLessThan(10_000);
   });
 
   it('script du projet : les arguments après « -- » lui sont passés tels quels', async () => {
@@ -949,13 +948,14 @@ describe('deliver : délai dépassé et SIGTERM à cadence seul (L20)', () => {
 
   it('realDeps.exec : au délai, aucun descendant de la commande ne survit (le fork de sh compris)', async () => {
     const dir = tempDir();
-    // Le script dort 6 s pour un délai de 1 s : revenir avant la fin du sommeil prouve que exec n'attend pas l'enfant (5 s de marge
-    // pour la charge de la machine, au lieu de 1,5 s) ; le fichier `bumped` prouve que le descendant, lui, est bien mort.
-    writeFileSync(join(dir, 'livrer.sh'), `#!/bin/sh\nsleep 6\necho bumped > '${dir}/bumped'\n`, { mode: 0o755 });
-    const t = Date.now();
+    // Le script dort 10 min pour un délai de 1 s : revenir dans le délai du test (20 s) prouve que exec n'attend pas l'enfant ; les pids
+    // notés par le script (sh, puis son fork `sleep`) prouvent que les descendants sont morts, sans chronomètre (L686). Le fichier `bumped`
+    // ne peut plus apparaître : sh est mort avant la fin du sommeil.
+    writeFileSync(join(dir, 'livrer.sh'), `#!/bin/sh\necho $$ > '${dir}/sh.pid'\nsleep 600 &\necho $! > '${dir}/sleep.pid'\nwait\necho bumped > '${dir}/bumped'\n`, { mode: 0o755 });
     expect(await realDeps(dir).exec('./livrer.sh', {}, 1_000)).toBe(TIMED_OUT);
-    expect(Date.now() - t).toBeLessThan(6_000);
-    await pause(Math.max(0, t + 6_000 - Date.now()) + 1_500); // jusqu'après la fin qu'aurait eue le sommeil
+    const pids = ['sh.pid', 'sleep.pid'].map((f) => Number(readFileSync(join(dir, f), 'utf8').trim()));
+    expect(pids.every((p) => p > 0)).toBe(true);
+    while (pids.some(isRunning)) await pause(50); // le SIGKILL est parti avant le retour de exec : il ne reste qu'à voir les processus disparaître
     expect(existsSync(join(dir, 'bumped'))).toBe(false);
   }, 20_000);
 

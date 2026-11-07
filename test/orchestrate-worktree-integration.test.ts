@@ -509,15 +509,14 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
     const holderStore = RunStore.reserve(launch, 'autre-vague')!; // la vague porteuse est inscrite, aucun de ses lots n'écrit dans l'arbre principal
     holderStore.writeWave({ id: 'autre-vague', status: 'running', created: 'x', lots: [] } as never);
     registerWave(cadenceHome(), { pid: sleeper.pid!, wave: 'autre-vague', started: 'x', cwd: launch, repos: [repo] });
-    const t0 = Date.now();
     try {
-      const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }), { repoWait: { waitMs: 20_000, pollMs: 50 } });
+      // waitMs de 10 min : revenir dans le délai du test (30 s) prouve qu'aucune attente du dépôt n'a eu lieu, sans chronomètre (L686).
+      const again = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }), { repoWait: { waitMs: 600_000, pollMs: 50 } });
       expect(again.err).toBe('');
       expect(again.code).toBe(0);
       expect(again.out).not.toContain('attente de sa fin');
       expect(again.out).toContain('a : tenu par la vague autre-vague');
       expect(again.out).toContain("l'intégration passe entre ses étapes");
-      expect(Date.now() - t0).toBeLessThan(15_000);
       expect(store(parent).readLot('a', lot)!.status).toBe('ready');
       expect(subjects(repo).some((s) => s.startsWith(`feat(${lot})`))).toBe(true);
       expect(activeLock(join(sharedStateDir(repo), REPO_LOCK))?.pid).toBe(sleeper.pid); // le verrou de l'autre vague n'est ni pris ni retiré
@@ -624,13 +623,12 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
     git(repo, 'checkout', '-q', 'main');
     const sleeper = await otherWaveHolds(repo, null);
     registerWave(cadenceHome(), { pid: sleeper.pid!, wave: '2026-10-04-1412', started: '2026-10-04T00:00:00Z', cwd: parent, repos: [] }); // la première reprise, en attente dans un autre processus
-    const t0 = Date.now();
-    const second = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 20_000, pollMs: 50 } });
+    // waitMs de 10 min : revenir dans le délai du test (30 s) prouve qu'aucune attente du dépôt n'a eu lieu, sans chronomètre (L686).
+    const second = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake(), { repoWait: { waitMs: 600_000, pollMs: 50 } });
     try {
       expect(second.code).toBe(2);
       expect(second.err).toContain('la vague 2026-10-04-1412 tourne encore');
       expect(second.out).not.toContain('attente de sa fin');
-      expect(Date.now() - t0).toBeLessThan(15_000); // une attente irait jusqu'à waitMs (20 s) : la borne est sous cette attente, large pour la charge de la suite
     } finally {
       sleeper.kill();
     }
@@ -641,13 +639,12 @@ describe('R24 / R8 — le dépôt du lead est revérifié juste avant l\'avance 
     const sleeper = spawn('sleep', ['30'], { stdio: 'ignore' });
     writeFileSync(join(sharedStateDir(repo), REPO_LOCK), JSON.stringify({ pid: sleeper.pid, wave: '2026-10-04-1412', started: '2026-10-04T00:00:00Z' }));
     const before = JSON.stringify(store(parent).readLot('a', lot));
-    const t0 = Date.now();
     try {
-      const second = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }), { repoWait: { waitMs: 20_000, pollMs: 50 } });
+      // idem : waitMs de 10 min, le retour dans le délai du test prouve l'absence d'attente (L686).
+      const second = await run(parent, ['--resume', '2026-10-04-1412', '--integrate', `a:${lot}`], fake({ 'review-small': () => claudeOut(reviewReport({ verdict: 'seconde lecture' })) }), { repoWait: { waitMs: 600_000, pollMs: 50 } });
       expect(second.code).toBe(2);
       expect(second.err).toBe(`orchestrate : la vague 2026-10-04-1412 tourne encore (pid ${sleeper.pid}, verrou de a)`);
       expect(second.out).not.toContain('attente de sa fin');
-      expect(Date.now() - t0).toBeLessThan(15_000); // idem : sous waitMs, pas un délai serré qui casse sous charge
       expect(JSON.stringify(store(parent).readLot('a', lot))).toBe(before); // rien d'écrit : ni suspended, ni session relancée
       expect(activeLock(join(sharedStateDir(repo), REPO_LOCK))?.pid).toBe(sleeper.pid); // le verrou de la première reprise n'est pas touché
     } finally {

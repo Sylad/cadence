@@ -55,9 +55,8 @@ describe('application de la revue UX lancée par le programme (L60)', () => {
 
   it('la commande s\'arrête avant de répondre : non vérifiée sans attendre le délai', async () => {
     const t = await setup(0);
-    const t0 = Date.now();
-    const app = await startApp({ command: 'echo boum; exit 3', url: t.url, cwd: t.dir, log: t.log, timeoutMs: 20_000, every: 50 });
-    expect(Date.now() - t0).toBeLessThan(5_000);
+    // Délai de 10 min : revenir dans le délai du test (30 s) prouve que la sortie de la commande n'a pas attendu ce délai, sans chronomètre (L686).
+    const app = await startApp({ command: 'echo boum; exit 3', url: t.url, cwd: t.dir, log: t.log, timeoutMs: 600_000, every: 50 });
     expect(app.state.kind === 'unverified' && app.state.cause).toMatch(/code 3[\s\S]*boum/);
   });
 

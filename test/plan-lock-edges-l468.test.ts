@@ -99,9 +99,7 @@ describe('CADENCE_PLAN_LOCK_WAIT_MS', () => {
     const p = fresh();
     held(p);
     p.add('A', T);
-    const t0 = Date.now();
-    env('0', () => expect(() => p.save()).toThrow(/après 0 s/));
-    expect(Date.now() - t0).toBeLessThan(1000);
+    env('0', () => expect(() => p.save()).toThrow(/après 0 s/)); // le message porte l'attente appliquée : 0 s, pas les 30 s par défaut (L686 : pas de chronomètre)
   });
   it.each(['abc', '-1', '1.5', '', ' 100'])('valeur invalide %j : retombe sur 30 s (attend le verrou rendu à 600 ms au lieu de refuser)', async (v) => {
     const p = fresh();
@@ -133,9 +131,8 @@ describe('verrou et fichiers annexes', () => {
     const p = fresh();
     writeFileSync(lockOf(p), JSON.stringify({ pid: process.pid, started: 'x' }));
     p.add('A', T);
-    const t0 = Date.now();
-    env('200', () => expect(() => p.save()).toThrow(/plan tenu par une autre session/));
-    expect(Date.now() - t0).toBeLessThan(3000);
+    // Le message porte l'attente appliquée (0,2 s) : la preuve que l'attente n'a pas été celle de 30 s par défaut, sans chronomètre (L686).
+    env('200', () => expect(() => p.save()).toThrow(/plan tenu par une autre session.*après 0\.2 s/));
   });
 
   it('le verrou d\'un autre, pris pendant notre écriture (finally), n\'est pas retiré', () => {

@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { run } from '../src/cli.js';
 import { atWaveEnd, newWaveGesture, resumeCommand } from '../src/orchestrate/geste.js';
+import { growthRatio } from './helpers.js';
 
 // L556 — le hook « retour → geste » : le refus d'une commande cadence/raf revient avec le geste exact, et un rappel contre la boucle d'attente.
 async function hook(sub: string | null, stdin: string) {
@@ -220,12 +221,17 @@ describe('L556 — le hook ne gêne jamais (R9)', () => {
     expect(await retour(JSON.stringify({ tool_input: { command: 12 }, tool_response: 'la vague w1 tourne encore' }))).toEqual(silent);
     expect(await retour(JSON.stringify({ tool_input: { command: CMD }, tool_response: { stdout: 5, stderr: [] }, error: {} }))).toEqual(silent);
   });
-  it('R9 — une sortie de 5 Mo sans refus : code 0, rien d’imprimé, en moins d’une seconde', async () => {
-    const big = `${'x'.repeat(99)}\n`.repeat(50_000);
-    const start = Date.now();
-    expect(await retour(post(CMD, big))).toEqual(silent);
-    expect(await retour(post(CMD, 'y'.repeat(5_000_000)))).toEqual(silent);
-    expect(Date.now() - start).toBeLessThan(1000);
+  it('R9 — une sortie de 5 Mo sans refus : code 0, rien d’imprimé, lue en temps linéaire (L686 : rapport de croissance, pas une durée)', async () => {
+    // 50 000 lignes de 100 octets puis une seule ligne de 5 Mo ; le rapport entre n et 4n est proche de 4 si la lecture est linéaire, de 16 en carré.
+    const ratio = await growthRatio(
+      async (n) => {
+        expect(await retour(post(CMD, `${'x'.repeat(99)}\n`.repeat(n)))).toEqual(silent);
+        expect(await retour(post(CMD, 'y'.repeat(100 * n)))).toEqual(silent);
+      },
+      12_500,
+      50_000,
+    );
+    expect(ratio).toBeLessThan(10);
   });
   it('R9 — cadence claude-hook sans sous-commande ou avec un nom inconnu : code 0, rien d’imprimé', async () => {
     const withRefusal = post(CMD, 'la vague w1 tourne encore');

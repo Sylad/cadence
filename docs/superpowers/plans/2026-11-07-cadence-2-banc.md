@@ -1908,6 +1908,79 @@ Si le résultat est **vert**, le flux v2 de la spec est confirmé et le plan n°
 
 ---
 
+### Task 14 : Tests anti-rechute rapides (moins d'une minute, sans IA)
+
+Ajout de Sylvain le 07-11 : « prévoir des tests, pas d'1 h, pour tester qu'on ne recommence pas nos âneries ». Chaque cause de l'échec du 07-11 (spec §0) devient un test qui tourne dans la suite v2, en quelques secondes, à chaque commit.
+
+**Files:**
+- Create: `v2/test/anti-rechute.test.ts`, `v2/options.json`
+- Modify: rien d'autre
+
+**Interfaces:**
+- Consumes : `v2/src/**`, `v2/briefs/**`, `v2/budget.json`, `~/bench-cadence` jamais lu (test autonome).
+- Produces : `v2/options.json` = `{ "options": { "<sous-commande> --<option>": "<chemin d'un rapport de banc ou de la spec qui la justifie>" } }`.
+
+Une règle par cause, chacune avec son `describe` nommé d'après la cause :
+- **C1, conformité à une fiche figée** :
+  - aucun fichier de `v2/src` ni de `v2/briefs` ne contient les mots `scell`, `acceptation`, `fiche`, `maquette` ou `spec:` (insensible à la casse) ;
+  - le brief du bras candidat contient `{{DEMANDE}}` ;
+  - la consigne du relecteur ne lui donne que la demande et le diff : le brief contient « le texte de la demande » et « git -C {{CLONE}} diff ».
+- **C2, contexte découpé** :
+  - les briefs de bras ne demandent jamais une nouvelle session pour écrire le code (pas de « nouvelle session », pas de `claude -p` dans un brief) ;
+  - les bras de `bras.yaml` produits par la doc et les modèles par défaut de `cli.ts` (juge) ne sont jamais `sonnet` ni `haiku` pour écrire le code. Le test lit `v2/src/bench/cli.ts` et vérifie que la valeur par défaut de `--juge` vaut `opus`.
+- **C3, portes empilées** : `v2/src` ne contient au plus que deux appels à la porte. Le test compte les occurrences de `preparer(` et de la future `porte(` hors des tests, et vérifie qu'il n'en existe pas plus de deux par fichier. Le seuil est écrit en constante avec la phrase de la spec qui le justifie.
+- **C4, mécanismes sans mesure** :
+  - le budget de lignes existe déjà dans `budget.test.ts` et n'est pas dupliqué ;
+  - en plus, toute option `--xxx` lue dans `v2/src` (motif `option(reste, 'xxx')` ou `'--xxx'`) doit figurer dans `v2/options.json`, avec un chemin qui existe dans le dépôt : un rapport de banc copié dans `docs/v2/mesures/`, ou la spec. Une option sans justification fait échouer le test. Remplir `options.json` avec les options actuelles (`candidat`, `reference`, `juge`, `bancs`, `taille`, `install`, `tests`, `visible`), chacune pointant vers `docs/v2/2026-11-07-cadence-2-design.md`.
+- **C5, rattrapages du lead** :
+  - `verdict.ts` garde les critères bloquants `questions inutiles` et `aucun bras en échec`. Le test les cherche dans la sortie de `verdict()` sur un jeu minimal et vérifie `bloquant: true` ;
+  - `statut()` refuse la publication sans passage couvrant 1, 3 et 6.
+
+- [ ] **Step 1 : Écrire le test.** Il échoue sur un point s'il faut ajouter `options.json`.
+- [ ] **Step 2 : Lancer, vérifier l'échec**, puis écrire `options.json`.
+- [ ] **Step 3 : Lancer la suite v2 et chronométrer.** `cd v2 && time npx vitest run` doit rester sous 60 s au total.
+- [ ] **Step 4 : Commit** (chemins explicites, ligne Co-Authored-By).
+
+---
+
+### Task 15 : Banc éclair (environ 15 min, réel)
+
+Le banc court (1, 3, 6, environ 1 h) reste la condition de publication. Le banc éclair sert à vérifier vite, après un changement de v2, que le flux n'est pas redevenu lent ni bavard. Il joue le seul banc 1, une retouche, A contre le candidat, avec les juges.
+
+**Files:**
+- Modify: `v2/src/bench/cli.ts`, ajout de la sous-commande `eclair`, qui vaut `lancer --bancs 1`, avec deux contrôles en plus :
+  - temps du candidat ≤ 1,2 × A ;
+  - aucune question.
+
+  Ces deux contrôles s'affichent en tête de sortie. Le passage n'entre **pas** dans les passages qui autorisent la publication, puisque `statut` exige 1, 3 et 6.
+- Test: `v2/test/bench-cli.test.ts`, un cas `eclair` avec le faux exécuteur. Il vérifie qu'un seul banc est joué et que la ligne d'historique a `hebdo: false`.
+
+- [ ] Steps TDD habituels ; commit.
+
+---
+
+### Task 16 : HUD — état du banc dans la barre
+
+Ajout de Sylvain le 07-11 : la barre et le panneau de droite du HUD doivent suivre v2. Le HUD complet de v2 (demandes, étapes, gardien) arrivera avec le flux v2, au plan n°2. Ici, on ajoute seulement ce qui existe déjà : l'état du banc.
+
+**Files:**
+- Modify: `plugins/cadence-hud/hooks/collect.ts` (lecture de `~/bench-cadence/historique.jsonl`, sans lancer aucune commande, comme le HUD lit les vagues), `plugins/cadence-hud/hooks/format.ts`, plus le rendu de la barre.
+- Test: `plugins/cadence-hud/tests/banc.test.ts`.
+
+Une ligne, affichée seulement quand `historique.jsonl` existe :
+- `banc ✓ 08-11 court · eq-legere/A` en vert : le dernier passage est vert ;
+- `banc ✗ 08-11 : temps total, relecture aveugle` en rouge : il est rouge, avec ses trois premiers critères rouges ;
+- `banc ⚠ weekend manquant` en orange, du lundi au vendredi, si aucun passage hebdo n'a eu lieu depuis le samedi (heure de Paris), avec la même règle que `statut` de `verdict.ts`, recopiée : le plugin ne dépend pas de v2.
+
+Le panneau `/hud` ajoute le détail des 5 derniers passages : date, bancs, verdict, critères rouges.
+
+- [ ] Lire `docs/cadence-hud.md` et le code du HUD ; suivre ses motifs (fonctions pures dans `format.ts`, tests sous `plugins/cadence-hud/tests/`, joués par `claude plugin test`, cf. son README).
+- [ ] TDD sur la fonction pure qui transforme les lignes d'historique en ligne de barre, puis branchement dans le rendu.
+- [ ] Mettre à jour `docs/cadence-hud.md` (une section courte « Banc »).
+- [ ] Commit.
+
+---
+
 ## Couverture de la spec par ce plan
 
 | Spec | Tâches |
@@ -1921,4 +1994,6 @@ Si le résultat est **vert**, le flux v2 de la spec est confirmé et le plan n°
 | §4.5 lancement, rappel si manqué | 8 (statut), 10 (hook), 11 (timer) |
 | §5 budget de lignes | 1 |
 | §6.2-6.3 bench d'abord, puis premier passage | 13 |
+| §0 anti-rechute en tests rapides (ajout du 07-11) | 14, 15 |
+| HUD (ajout du 07-11) : état du banc | 16 ; HUD complet de v2 au plan n°2 |
 | §2, §3 (flux, gardien), §4.3 (audit de durée), §4.4 journal des demandes réelles, §6.4-6.5 | **plans suivants**, une fois le banc vert sur le contre-essai |

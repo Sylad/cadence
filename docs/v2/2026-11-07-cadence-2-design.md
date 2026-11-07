@@ -156,6 +156,16 @@ nombre de constats d'une semaine à l'autre.
 - Chaque demande réelle journalise : temps demande → prod, tokens, interventions. Le rapport
   hebdomadaire les montre à côté du banc.
 
+### 4.4 bis Tests anti-rechute rapides et banc éclair (ajout de Sylvain, 07-11)
+
+- **Tests anti-rechute** : chaque cause C1 à C5 du §0 est un test de la suite v2, sans IA, joué à chaque commit en moins d'une minute.
+  - C1 : aucun mécanisme de fiche ni de scellés.
+  - C2 : une seule session par bras, l'écriture du code jamais confiée à Sonnet ou Haiku.
+  - C3 : deux portes au plus.
+  - C4 : budget de lignes, et aucune option sans rapport qui la justifie.
+  - C5 : les critères bloquants « questions inutiles » et « échec ».
+- **Banc éclair** : le banc 1 seul (une retouche), réel, environ 15 minutes, à lancer après tout changement de v2. Il n'autorise pas la publication, qui demande le banc court.
+
 ### 4.5 Lancement
 
 Le banc complet tourne sur Big-Blue. WSL ne démarre pas avec Windows (choix de Sylvain) :
@@ -197,6 +207,10 @@ Règles :
    restent lisibles ; les champs v1 sans usage en v2 (screen, spec, scellés) sont ignorés.
 5. Lots v1 en suspens (L477 `doing`, L678 à L684) : réévalués un par un contre ce design, abandonnés
    avec raison s'ils ne servent plus.
+
+## 6 bis. HUD
+
+La barre et le panneau du HUD suivent v2. Dès le plan n°1 : l'état du banc (dernier verdict, banc du weekend manquant). Au plan n°2, avec le flux : la demande en cours, son étape (accueil, réalisation, relecture, intégration, livraison), le responsable et son modèle, et l'avis du gardien. Le HUD de v2 reste lui aussi sous budget de lignes.
 
 ## 7. Hors périmètre
 

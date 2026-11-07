@@ -3038,7 +3038,7 @@ lots:
   - id: L676
     title: "Branche de lot qui vieillit sans décision : 07-11, L498 repris le 06-11 par une vague depuis une branche du 01-11 (1 617 commits de retard, 372 touchant src/), 8 commits écrits sur cette base périmée puis 6 conflits et --drop ; B6/DI1 de maritime et L554 gardent aussi des commits hors de main ; (1) une vague qui retrouve une branche de lot la rebase d'abord, et rend le lot au lead avant toute session si le rebase échoue ou si le retard dépasse un seuil ; (2) lead tour marque ⚠ toute branche de lot non intégrée depuis plus de 48 h, avec les gestes intégrer ou reprendre ; niveau : source (reprise), niveau le plus tôt : source ; mesure : 0 session jouée sur une branche périmée, 0 branche de lot non intégrée de plus de 48 h sans décision"
     status: doing
-    estimate: 0.25
+    estimate: 0.5
     created: 2026-11-07
     started: 2026-11-07
   - id: L677

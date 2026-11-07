@@ -2971,7 +2971,7 @@ lots:
     estimate: 0.25
     created: 2026-11-06
     started: 2026-11-06
-    review: { date: 2026-11-07, verdict: "conforme : le dernier majeur (critère du precheck périmé dans fonctionnement.md et lead.md, et le desc des deux SVG) est corrigé par 14f93bdc et b0c8dfc5, relu par le lead ; 12 fichiers de tests de doc verts ; 3 mineurs notés (brief.ts:270, briefs.ts:186, test par regex)", commit: b0c8dfc55d2735e801d64a9ff98568feca96513f }
+    review: { date: 2026-11-07, verdict: "conforme : le dernier majeur (critère du precheck périmé dans fonctionnement.md et lead.md, et le desc des deux SVG) est corrigé par 14f93bdc et b0c8dfc5, relu par le lead ; 12 fichiers de tests de doc verts ; 3 mineurs notés (brief.ts:270, briefs.ts:186, test par regex) ; revue courte du diff rebasé (patch-id différent) : conforme : le rebase sur main (f1ce29a2) ne change que le contexte de l'entrée CHANGELOG L666, bien résolu (sous [Unreleased] après L670, l'entrée L661 étant publiée en 1.61.0) ; les 9 commits du lot sont identiques pour le reste (git range-diff), et les points de la revue précédente restent corrigés", commit: 8509e900b6c15107fef6bcf55908442011951dda }
   - id: L667
     title: "Mineur corrigé redonné comme « ouvert » par openMinorsText : constat-classes.ts:36 lit carriedNoted de codeConstats (review.ts:224, converge.ts:93) ; ne présenter à la passe de fix que les mineurs de la dernière revue ; niveau : source (brief de fix) ; mesure : 0 mineur corrigé redonné à un fix de rang 3 sur la vague suivante (cadence perf, écartés L649)"
     status: done

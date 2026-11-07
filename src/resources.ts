@@ -55,8 +55,19 @@ export function resourcesTouching(r: Resources, files: Iterable<string>): Map<st
   return out;
 }
 
-/** Un mot d'un texte qui est un chemin : au moins un « / », des lettres, chiffres, « . », « _ », « - » et « * » (« docs/orchestrate*.md ») ; « :114 », une virgule ou une parenthèse le terminent. */
-const CITED_PATH = /[\w.*-]*\/[\w./*-]*/g;
+/**
+ * Un mot d'un texte : une suite de lettres, chiffres, « . », « _ », « - », « * » et « / » ; « :114 », une virgule ou une parenthèse le terminent. Un chemin
+ * cité est un tel mot qui contient un « / » (« docs/orchestrate*.md »), filtré ensuite. Une seule classe, sans « / » obligatoire dans le motif : la lecture
+ * est linéaire (L686 : « [\w.*-]*\/… » revenait sur chaque caractère d'un mot sans « / », en carré — 2,9 s pour 100 000 « * »).
+ */
+const WORD = /[\w./*-]+/g;
+
+/** Les « . » de fin d'un mot retirés (« docs/orchestrate.md. ») — en boucle, pas par « /\.+$/ », qui revient sur chaque point quand ils ne finissent pas le mot. */
+const trimDots = (w: string): string => {
+  let end = w.length;
+  while (end > 0 && w.charCodeAt(end - 1) === 46) end--;
+  return w.slice(0, end);
+};
 
 /** Le joker d'un chemin cité (« * » = un nom de fichier ou de dossier, jamais un « / »), en expression ancrée ; sans joker, null. */
 const globOf = (cited: string): RegExp | null =>
@@ -66,17 +77,16 @@ const globOf = (cited: string): RegExp | null =>
  * Les ressources à chemins dont un chemin est CITÉ dans `text` (L671), dans l'ordre de la table, une fois chacune : un mot du texte qui contient un « / » est
  * le chemin d'une ressource ou un fichier dessous, ou un joker (`docs/orchestrate*.md`) qui couvre un de ses chemins. Un chemin sans « / » (« gate.md »),
  * un dossier cité qui contient seulement le chemin d'une ressource et une ressource sans chemin ne sont jamais cités. Sans ressource à chemins : aucune.
+ * Chaque chemin cité distinct est préparé une fois (joker compilé, chemin normalisé), quel que soit le nombre de ressources (L686).
  */
 export function citedResources(text: string, r: Resources): string[] {
   if (!hasPaths(r)) return [];
-  const words = (text.match(CITED_PATH) ?? []).map((w) => w.replace(/\.+$/, '')).filter((w) => w.includes('/'));
+  const words = new Set<string>();
+  for (const w of text.match(WORD) ?? []) if (w.includes('/')) words.add(trimDots(w));
+  const cited = [...words].map((w) => ({ glob: globOf(w), path: normalizePath(w) }));
   const found: string[] = [];
   for (const [name, paths] of r.paths) {
-    const hit = words.some((w) => {
-      const glob = globOf(w);
-      return paths.some((p) => (glob ? glob.test(p) : coversFile(p, normalizePath(w))));
-    });
-    if (hit) found.push(name);
+    if (cited.some((c) => paths.some((p) => (c.glob ? c.glob.test(p) : coversFile(p, c.path))))) found.push(name);
   }
   return found;
 }

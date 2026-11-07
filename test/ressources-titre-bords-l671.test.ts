@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { citedResources, readResources } from '../src/resources.js';
-import { gitRepo, tempDir } from './helpers.js';
+import { gitRepo, growthRatio, tempDir } from './helpers.js';
 
 // L671 — bords : la ressource citée par le titre (citedResources, raf add) face aux écritures réelles d'un titre de lot.
 
@@ -71,10 +71,15 @@ describe('L671 bords — citedResources', () => {
   it('R1 bord — un mot « et/ou » ou une date « 07/11 » ne cite rien', () => {
     expect(citedResources('lire et/ou corriger le 07/11', r)).toEqual([]);
   });
-  it('R1 bord — un très long titre sans chemin se lit vite', () => {
-    const t0 = Date.now();
-    expect(citedResources('a/'.repeat(50000) + ' ' + '*'.repeat(50000), r)).toEqual([]);
-    expect(Date.now() - t0).toBeLessThan(2000);
+  it('R1 bord — un très long titre sans chemin se lit en temps linéaire (L686 : rapport de croissance, pas une durée)', async () => {
+    // Un mot de 2n « a/ » puis un mot de n « * » : avant L686, le motif revenait sur chaque « * » (quadratique, ×4 par doublement — 2 080 ms sur le
+    // runner GitHub pour n = 50 000) ; linéaire, le rapport entre n et 4n est proche de 4, en carré il serait proche de 16.
+    const ratio = await growthRatio((n) => expect(citedResources('a/'.repeat(n) + ' ' + '*'.repeat(n), r)).toEqual([]), 50_000, 200_000);
+    expect(ratio).toBeLessThan(10);
+  });
+  it('R1 bord — un mot fait de points qui ne finissent pas le mot se lit en temps linéaire (L686)', async () => {
+    const ratio = await growthRatio((n) => expect(citedResources(`docs/${'.'.repeat(n)}x`, r)).toEqual([]), 50_000, 200_000);
+    expect(ratio).toBeLessThan(10);
   });
   it('R1 bord — ressource à chemins dont un chemin est un dossier, citée par le dossier exact', () => {
     expect(citedResources('src/orchestrate/cycle/', r)).toEqual(['cycle-ts']);

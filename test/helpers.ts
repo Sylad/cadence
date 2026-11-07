@@ -119,3 +119,20 @@ export function isRunning(pid: number): boolean {
   }
   return readStat('/proc', pid)?.state !== 'Z';
 }
+
+/**
+ * Le rapport de croissance d'un traitement entre deux tailles d'entrée (L686) : la plus courte de `rounds` mesures par taille, alternées, pour que la
+ * charge de la machine pèse sur les deux de la même façon. Linéaire : proche de big/small ; en carré : proche de (big/small)². Se compare à une
+ * borne de rapport, jamais à une durée : la vitesse de la machine s'annule.
+ */
+export async function growthRatio(run: (n: number) => void | Promise<void>, small: number, big: number, rounds = 3): Promise<number> {
+  const best = { small: Infinity, big: Infinity };
+  for (let i = 0; i < rounds; i++) {
+    for (const [k, n] of [['small', small], ['big', big]] as const) {
+      const t0 = performance.now();
+      await run(n);
+      best[k] = Math.min(best[k], performance.now() - t0);
+    }
+  }
+  return best.big / Math.max(best.small, 0.01);
+}

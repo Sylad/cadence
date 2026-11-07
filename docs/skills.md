@@ -35,7 +35,7 @@ version that installed it).
   skills can become one-line aliases of `session-start` / `session-close`.
 - **deliver**: dry run, delivery, and on failure the cause fixed rather than a
   blind retry; after a green delivery that changes what a page shows or what it
-  is served, the `qa-reviewer` agent walks the delivered app.
+  is served, the `qa-reviewer` agent walks the delivered app. Without a `deliver:` key the skill says what `cadence deliver` does: it refuses before any step and never runs a `./livrer.sh` by itself ([deliver](deliver.md)).
 - **lead**: from a folder holding several projects, `cadence lead tour` (a program,
   no model: see [lead tour](lead.md#lead-tour)) prints one line of facts per project, you choose the priorities, the lots are delegated with
   `cadence orchestrate` (fresh short sessions with a standard brief — test first,

@@ -9,7 +9,7 @@ import { chargerBras, executeurClaude, lancerBras, type DefBras, type Executeur,
 import { fuitesDuBras } from './fuites.js';
 import { juger, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
-import { BARRE_SPEC, ligneHistorique, rapport, statut, verdict, type ResultatBanc, type Verdict } from './verdict.js';
+import { BARRE_SPEC, banBase, ligneHistorique, rapport, statut, verdict, type ResultatBanc, type Verdict } from './verdict.js';
 
 const REPO = join(import.meta.dirname, '..', '..', '..');
 const COURT = ['1', '3', '6'];
@@ -95,7 +95,7 @@ function passageVerrouille(o: OptPassage): Verdict {
         mapping[`c${j + 1}`] = n; clones[n] = c;
         phase = 'préparation'; o.prep(b, c);
         o.out(`${idBanc} : bras ${n}…`);
-        phase = `bras ${n}`; mesures[n] = lancerBras(b, bras[n], c, o.exec);
+        phase = `bras ${n}`; mesures[n] = { ...lancerBras(b, bras[n], c, o.exec), banc: idBanc };
         phase = 'fuites'; fuites[n] = fuitesDuBras(o.home, o.racine, b.id, c);
       });
       if (ordre.some((n) => mesures[n].echec !== null)) o.out(`${idBanc} : un bras en échec, juges sautés`);
@@ -126,7 +126,7 @@ function passageVerrouille(o: OptPassage): Verdict {
   writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N }));
   writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultats: res.map((r, i) => ({ ...r, clones: clonesParBanc[i] })) }, null, 2));
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
-    candidat: o.cand, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: res.filter((r) => r.frais).length })}\n`);
+    candidat: o.cand, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: new Set(res.filter((r) => r.frais).map((r) => banBase(r.banc))).size })}\n`);
   o.avantVerdict?.(res);
   o.out(`${v.vert ? 'VERT' : 'ROUGE'} — rapport : ${base}.md`);
   return v;
@@ -187,7 +187,7 @@ export async function bench(args: string[], io: Io): Promise<number> {
     } catch (e) { io.err(`cadence2 bench ajouter : ${e instanceof Error ? e.message : String(e)}`); return 1; }
   }
   const numeros = sous === 'court' ? COURT : sous === 'hebdo' ? undefined : sous === 'eclair' ? ['1'] : sous === 'lancer' ? (option(reste, 'bancs')?.split(',') ?? null) : null;
-  if (numeros === null) { io.err('usage : cadence2 bench court|hebdo|eclair|lancer --bancs 1,3|statut|verifier-publication|ajouter [--candidat c] [--reference r]'); return 2; }
+  if (numeros === null) { io.err('usage : cadence2 bench court|hebdo|eclair|lancer --bancs 1,3|statut|verifier-publication|ajouter [--candidat c] [--reference r] [--repetitions N]'); return 2; }
   const rep = repetitions(reste);
   if (rep === null) { io.err('usage : --repetitions N (entier ≥ 1) avec court|hebdo|eclair|lancer'); return 2; }
   const ref = option(reste, 'reference') ?? 'A'; const cand = option(reste, 'candidat') ?? 'equipe-legere';

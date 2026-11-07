@@ -134,6 +134,9 @@ Garde-fou C1 : la carte décrit, elle ne verrouille rien. Aucun test, aucune por
 - **2 ou 3 bancs frais** tirés des vraies demandes livrées dans la semaine (commit de départ =
   parent du premier commit du lot ; tests cachés = tests du lot d'origine). Empêche de
   s'ajuster aux bancs fixes.
+- **Répétitions** (`--repetitions N`) : chaque bras joué N fois par banc ; une préférence ne
+  compte que si toutes les répétitions s'accordent (le bruit mesuré entre deux passages
+  identiques est d'environ 25 %).
 - Bras : A (Opus seul) contre cadence 2 ; au premier passage, aussi cadence 2 avec Fable en
   responsable, et cadence 2 sans gardien (le gardien doit gagner sa place).
 - Mesures (outils existants de l'essai, transformés en commande `cadence bench`) : temps, tokens,

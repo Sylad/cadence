@@ -47,7 +47,7 @@ La racine est `~/bench-cadence` (ou `$BENCH_ROOT`).
 | `cadence2 bench verifier-publication` | code 0 si la publication est permise |
 | `cadence2 bench ajouter <projet> <lot> <demande.md> --install c --tests c [--taille retouche\|fonction\|grosse] [--visible]` | fabrique un banc frais à partir d'un lot livré |
 
-Options communes : `--candidat <bras>`, `--reference <bras>`, `--juge <modèle>`.
+Options communes : `--candidat <bras>`, `--reference <bras>`, `--juge <modèle>`, et `--repetitions N` (entier ≥ 1, défaut 1) sur `court`, `hebdo`, `lancer` et `eclair` : chaque bras est joué N fois par banc, dans des clones frais `r1`, `r2`… jugés séparément (ids `<banc>#k` au rapport). Temps, jetons et critères mécaniques sont sommés sur les répétitions ; une préférence (relecture aveugle, UI) ne compte pour un banc que si toutes ses répétitions sont jugées et s'accordent, sinon le banc compte égal. Préférer un N pair, pour que l'ordre des bras soit équilibré.
 
 ## Installation du timer
 

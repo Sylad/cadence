@@ -245,4 +245,15 @@ describe('répétitions (R18)', () => {
       expect(rc).toBe(2); expect(err.join('\n')).toMatch(/--repetitions/);
     }
   });
+  it('Mesure.banc porte #k (normal et erreur) ; frais compte les bancs de base', () => {
+    const r = racine(); writeFileSync(join(r, 'bancs', '1-a', 'banc.yaml'), 'projet: p\nsource: /s\nbase: HEAD\ninstall: "true"\ntests: "true"\ntaille: fonction\nfrais: true\n');
+    passage({ ...base, racine: r, numeros: ['1'], repetitions: 2, exec, home: r, out: () => {} });
+    const rap = JSON.parse(readFileSync(join(r, 'rapports', '2026-11-08-1000-e1.json'), 'utf8'));
+    expect(rap.resultats.map((x: { mesures: Record<string, { banc: string }> }) => x.mesures.A.banc)).toEqual(['1-a#1', '1-a#2']);
+    expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8').trim()).frais).toBe(1);
+    const r2 = racine();
+    passage({ ...base, racine: r2, numeros: ['1'], repetitions: 2, exec: () => { throw new Error('boum'); }, home: r2, out: () => {} });
+    const rap2 = JSON.parse(readFileSync(join(r2, 'rapports', '2026-11-08-1000-e1.json'), 'utf8'));
+    expect(rap2.resultats.map((x: { mesures: Record<string, { banc: string }> }) => x.mesures.A.banc)).toEqual(['1-a#1', '1-a#2']);
+  });
 });

@@ -127,13 +127,13 @@ describe('R3 — la file de la vague : deux lots dont les titres citent la même
     const repo = repoWith(['docs/orchestrate-gate.md', 'docs/orchestrate*.md', 'sans page']);
     const [l1, l2, l3] = [ctxOf(repo, 'L1', 'implementing'), ctxOf(repo, 'L2', 'queued'), ctxOf(repo, 'L3', 'queued')];
     const lock = resourceLock(new Map([[Promise.resolve(), [l1]]]), new Set([l1, l2, l3]));
-    expect(lock.wants([l2])).toBe(true);
-    expect(lock.wants([l3])).toBe(false);
+    expect(lock.wanted([l2])).not.toEqual([]);
+    expect(lock.wanted([l3])).toEqual([]);
   });
   it('R3 — la file qui jouait a fini (hors live) : L2 part', () => {
     const repo = repoWith(['docs/orchestrate-gate.md', 'docs/orchestrate*.md']);
     const [l1, l2] = [ctxOf(repo, 'L1', 'ready'), ctxOf(repo, 'L2', 'queued')];
-    expect(resourceLock(new Map([[Promise.resolve(), [l1]]]), new Set([l2])).wants([l2])).toBe(false);
+    expect(resourceLock(new Map([[Promise.resolve(), [l1]]]), new Set([l2])).wanted([l2])).toEqual([]);
   });
 });
 

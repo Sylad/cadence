@@ -76,7 +76,7 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
   return { certaines: [...vus.certaines], a_verifier: [...vus.a_verifier] };
 }
 
-function jsonl(dir: string): string[] {
+export function jsonl(dir: string): string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((e) => {
     const p = join(dir, e);

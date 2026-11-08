@@ -53,7 +53,7 @@ const vivant = (pid: number) => { try { process.kill(pid, 0); return true; } cat
 const bootId = (): string => { try { return readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(); } catch { return ''; } };
 
 /** Un seul passage à la fois par racine : verrou à création exclusive, repris si son pid est mort. */
-function verrouiller(racine: string): () => void {
+export function verrouiller(racine: string): () => void {
   const f = join(racine, 'passage.lock');
   mkdirSync(racine, { recursive: true });
   for (let essai = 0; ; essai++) {
@@ -72,7 +72,7 @@ function verrouiller(racine: string): () => void {
 }
 
 /** Garde le patch et les commits du bras à côté du clone, puis efface le clone (≈ 1 Go) ; captures et journaux restent. */
-function archiver(c: string, base: string | undefined): void {
+export function archiver(c: string, base: string | undefined): void {
   if (base) for (const [ext, a] of [['patch', ['diff', `${base}..HEAD`]], ['commits.txt', ['log', '--oneline', `${base}..HEAD`]]] as const)
     try { writeFileSync(`${c}.${ext}`, execFileSync('git', a, { cwd: c, encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'ignore'] })); } catch { /* clone illisible */ }
   rmSync(c, { recursive: true, force: true });

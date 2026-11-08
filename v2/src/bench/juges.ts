@@ -81,7 +81,8 @@ function demander(brief: string, sortie: string, valider: (o: unknown) => string
   return null;
 }
 
-export function juger(b: Banc, clones: Record<string, string>, dirEval: string, modele: string, exec: Executeur, tirage = Math.random): Jugement | null {
+/** `demandes` : liste des demandes d'une séquence (champ {{DEMANDES}} des briefs), vide pour un banc. */
+export function juger(b: Banc, clones: Record<string, string>, dirEval: string, modele: string, exec: Executeur, tirage = Math.random, demandes = ''): Jugement | null {
   const noms = Object.keys(clones) as [string, string];
   const anon = anonymiser(noms, tirage);
   rmSync(dirEval, { recursive: true, force: true }); mkdirSync(dirEval, { recursive: true });
@@ -99,7 +100,7 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
   };
   try {
     if (!copier()) return null;
-    const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests };
+    const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests, DEMANDES: demandes };
     const sMeca = join(dirEval, 'meca.json');
     const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca }), sMeca, validerMeca, dirEval, modele, exec) as Record<'X' | 'Y', Meca> | null;
     if (!copier()) return null; // le juge à l'aveugle voit les livrables, pas les mutations

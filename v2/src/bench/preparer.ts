@@ -8,7 +8,7 @@ export class FuturVisible extends Error {}
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
 
 /** Commande du banc dans son propre groupe, sortie dans le journal ; au retour ou au délai, le groupe entier est tué. */
-function shell(quoi: string, cmd: string, cwd: string, log: string, delaiMs: number): number {
+export function shell(quoi: string, cmd: string, cwd: string, log: string, delaiMs: number): number {
   const fd = openSync(log, 'w');
   try {
     const r = spawnSync('setsid', ['bash', '-c', cmd], { cwd, stdio: ['ignore', fd, fd], timeout: delaiMs, killSignal: 'SIGKILL' });

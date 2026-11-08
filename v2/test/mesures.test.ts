@@ -178,3 +178,14 @@ describe('maintenabilite', () => {
     expect(m.plus_gros[0]).toEqual({ fichier: 'src/gros.ts', lignes: 451 });
   });
 });
+
+describe('jouerTests, suite du projet (R24)', () => {
+  it('sans copie, commande avec <sortie> : ids relatifs au clone, clone intact', () => {
+    const d = depot();
+    writeFileSync(join(d, 'src', 'v.spec.ts'), "import {it,expect} from 'vitest';it('vert',()=>expect(1).toBe(1));it('rouge',()=>expect(1).toBe(2));\n");
+    g(d, 'add', '.'); g(d, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'spec');
+    const r = jouerTests(d, [], `${vitestBin} run --reporter=json --outputFile=<sortie>/suite.json`, 60_000);
+    expect(r.statuts).toEqual({ 'src/v.spec.ts > vert': true, 'src/v.spec.ts > rouge': false });
+    expect(g(d, 'status', '--porcelain', '--untracked-files=all')).toBe('');
+  });
+});

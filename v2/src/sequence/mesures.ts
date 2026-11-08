@@ -1,6 +1,6 @@
 import { execFileSync, execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, rmdirSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, lstatSync, readdirSync, rmSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 
@@ -22,20 +22,21 @@ function balayer(dir: string): void { // reste d'un run planté : copies cachée
   for (const e of existsSync(dir) ? readdirSync(dir) : []) {
     if (e === 'node_modules' || e === '.git') continue;
     const p = join(dir, e);
-    if (statSync(p).isDirectory()) balayer(p); else if (COPIE.test(e)) rmSync(p, { force: true });
+    if (lstatSync(p).isDirectory()) balayer(p); else if (COPIE.test(e)) rmSync(p, { force: true });
   }
 }
 /** Nom de la copie : `<base>.banc-cache.<spec|test>.<ext>` garde le suffixe que l'include du projet attend. */
 const nomCopie = (dest: string) => (/\.(spec|test)\.\w+$/.test(dest) ? dest.replace(/\.(spec|test)(\.\w+)$/, '.banc-cache.$1$2') : `${dest.replace(/\.[^./]+$/, '')}.banc-cache.spec.ts`);
+const sortie = (tmp: string) => { const f = readdirSync(tmp).find((x) => x.endsWith('.json')); return f && join(tmp, f); };
 const STATUTS_IGNORES = ['skipped', 'pending', 'todo', 'disabled'];
 
-/** Joue des tests cachés dans le clone, puis le rend identique à l'avant (sinon CloneModifie, après restauration). Id : « dest > ancêtres > titre » (doublon : « #2 »).
+/** Joue des tests (cachés copiés, ou la suite du projet sans copie) dans le clone, puis le rend identique à l'avant (sinon CloneModifie, après restauration).
+ * Id : « dest > ancêtres > titre » (doublon : « #2 ») ; sans copie, chemin relatif au clone. `commande` avec `<sortie>` : dossier du JSON (flags du reporter fournis, vitest ou jest).
  * `connus` : ids déjà vus à une étape précédente ; un fichier en erreur d'import les passe tous au rouge. Rien de trouvé = TestsIntrouvables. */
 export function jouerTests(clone: string, fichiers: { src: string; dest: string }[], commande: string, delaiMs: number, connus: string[] = []): ResultatTests {
   balayer(clone);
   const avant = etat(clone);
   const tmp = mkdtempSync(join(tmpdir(), 'banc-tests-'));
-  const sortie = join(tmp, 'resultat.json');
   const copies = fichiers.map((f) => {
     const dest = isAbsolute(f.dest) ? f.dest : join(clone, f.dest);
     return { ...f, id: relative(clone, dest), copie: nomCopie(dest) };
@@ -51,10 +52,11 @@ export function jouerTests(clone: string, fichiers: { src: string; dest: string 
       mkdirSync(join(c.copie, '..'), { recursive: true }); copyFileSync(c.src, c.copie);
     }
     try {
-      execSync(`${commande} ${copies.map((c) => JSON.stringify(c.copie)).join(' ')} --reporter=json --outputFile=${sortie}`,
+      const f = copies.map((c) => JSON.stringify(c.copie)).join(' ');
+      execSync(commande.includes('<sortie>') ? `${commande.replaceAll('<sortie>', tmp)} ${f}` : `${commande} ${f} --reporter=json --outputFile=${join(tmp, 'resultat.json')}`,
         { cwd: clone, timeout: delaiMs, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 << 20 });
     } catch (e) { // vitest sort en 1 quand un test est rouge : le JSON fait foi
-      if (!existsSync(sortie)) throw /No test files found/.test(String((e as { stdout?: string }).stdout) + String((e as { stderr?: string }).stderr)) ? new TestsIntrouvables('vitest n\'a trouvé aucun des fichiers copiés') : e;
+      if (!sortie(tmp)) throw /No test files found/.test(String((e as { stdout?: string }).stdout) + String((e as { stderr?: string }).stderr)) ? new TestsIntrouvables('vitest n\'a trouvé aucun des fichiers copiés') : e;
     }
   } catch (e) { erreur = e; } finally {
     for (const c of copies) { rmSync(c.copie, { force: true }); rmSync(join(c.copie, '..', '__snapshots__', `${basename(c.copie)}.snap`), { force: true }); }
@@ -75,8 +77,9 @@ export function jouerTests(clone: string, fichiers: { src: string; dest: string 
   }
   try {
     if (erreur) throw erreur;
-    if (!existsSync(sortie)) throw new Error('la commande de test n\'a produit aucun JSON');
-    return lire(JSON.parse(readFileSync(sortie, 'utf8')) as Vitest, copies, clone, connus);
+    const s = sortie(tmp);
+    if (!s) throw new Error('la commande de test n\'a produit aucun JSON');
+    return lire(JSON.parse(readFileSync(s, 'utf8')) as Vitest, copies, clone, connus);
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 }
 
@@ -86,7 +89,7 @@ function lire(json: Vitest, copies: { id: string; copie: string }[], clone: stri
   let ignores = 0;
   for (const r of json.testResults ?? []) {
     const c = copies.find((x) => resolve(clone, r.name) === x.copie);
-    const id = c?.id ?? r.name;
+    const id = c?.id ?? relative(clone, resolve(clone, r.name));
     if (c) vus.add(c.id);
     const tests = r.assertionResults ?? [];
     if (!tests.length && r.status === 'failed') { // import cassé : rien n'a tourné, rien ne doit compter comme vert
@@ -145,7 +148,7 @@ function fichiers(dir: string): string[] {
   return readdirSync(dir).flatMap((e) => {
     if (e === 'node_modules' || e === 'dist' || e === '.git') return [];
     const p = join(dir, e);
-    return statSync(p).isDirectory() ? fichiers(p) : SOURCES.test(p) ? [p] : [];
+    return lstatSync(p).isDirectory() ? fichiers(p) : SOURCES.test(p) ? [p] : [];
   });
 }
 

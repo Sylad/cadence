@@ -10,9 +10,10 @@ source: SRC
 base: e91b65c
 install: npm ci
 tests: npm test
+suite_projet: { vitest_json: npx vitest run --outputFile=<sortie>/r.json, build: npm run build }
 etapes:
-  - { k: 1, lot: L1, demande: etape-1.md, pieces: [docs/spec.pdf], taille: retouche }
-  - { k: 2, lot: L2, demande: etape-2.md, pieces: [], taille: fonction }
+  - { k: 1, lot: L1, demande: e1/demande.md, pieces: [docs/spec.pdf], references_depot: [docs/norme.md], taille: retouche }
+  - { k: 2, lot: L2, demande: e2/demande.md, pieces: [], taille: fonction }
 `;
 const SEC = `caches:
   1: { fichiers: [e1.test.ts], commande: npx vitest e1 }
@@ -29,9 +30,9 @@ function racine(seq = SEQ, sec = SEC): string {
   seq = seq.replace('SRC', join(r, 'src'));
   const d = join(r, 'sequences', 's1');
   const s = join(r, 'secrets', 'sequences', 's1');
-  mkdirSync(join(d, 'docs'), { recursive: true });
+  for (const x of ['docs', 'e1', 'e2']) mkdirSync(join(d, x), { recursive: true });
   mkdirSync(s, { recursive: true });
-  for (const f of ['etape-1.md', 'etape-2.md', 'docs/spec.pdf']) writeFileSync(join(d, f), 'x');
+  for (const f of ['e1/demande.md', 'e2/demande.md', 'docs/spec.pdf']) writeFileSync(join(d, f), 'x');
   for (const f of ['e1.test.ts', 'e2.test.ts', 'reg.test.ts']) writeFileSync(join(s, f), 'x');
   writeFileSync(join(d, 'sequence.yaml'), seq);
   writeFileSync(join(s, 'sequence-secrets.yaml'), sec);
@@ -50,7 +51,9 @@ describe('séquence', () => {
     expect(s).toMatchObject({ id: 's1', projet: 'ol-companion', base: 'e91b65c', tests: 'npm test' });
     expect(s.secrets).toBe(join(r, 'secrets', 'sequences', 's1'));
     expect(s.etapes.map((e) => [e.k, e.taille])).toEqual([[1, 'retouche'], [2, 'fonction']]);
-    expect(s.etapes[0].demande).toBe(join(s.dir, 'etape-1.md'));
+    expect(s.etapes[0].demande).toBe(join(s.dir, 'e1/demande.md'));
+    expect(s.etapes.map((e) => e.references_depot)).toEqual([['docs/norme.md'], []]);
+    expect(s.suite_projet).toEqual({ vitest_json: 'npx vitest run --outputFile=<sortie>/r.json', build: 'npm run build' });
     expect(s.etapes[0].pieces).toEqual([join(s.dir, 'docs/spec.pdf')]);
     expect(s.caches[2]).toEqual({ fichiers: [join(s.secrets, 'e2.test.ts')], commande: 'npx vitest e2' });
     expect(s.regression).toEqual({ a_partir_de: 2, fichiers: [join(s.secrets, 'reg.test.ts')], commande: 'npx vitest reg' });
@@ -59,7 +62,7 @@ describe('séquence', () => {
   it('refuse une taille inconnue', () => refus(SEQ.replace('fonction', 'grosse'), /taille/));
   it('refuse une pièce absente', () => refus(SEQ.replace('docs/spec.pdf', 'docs/nope.pdf'), /pièce.*nope\.pdf/));
   it('refuse des étapes non numérotées 1..n', () => refus(SEQ.replace('k: 2', 'k: 3'), /étape.*1\.\.2/));
-  it('refuse une demande absente', () => refus(SEQ.replace('etape-2.md', 'zz.md'), /demande.*zz\.md/));
+  it('refuse une demande absente', () => refus(SEQ.replace('e2/demande.md', 'zz/demande.md'), /demande.*zz\/demande\.md/));
   it('refuse une séquence sans étapes', () => refus(SEQ.replace(/etapes:[\s\S]*/, 'etapes: []\n'), /etapes/));
   it('refuse un test caché absent ou une étape sans cache', () => {
     refus(SEQ, /caché.*absent\.ts/, SEC.replace('[e1.test.ts]', '[absent.ts]'));
@@ -74,7 +77,7 @@ describe('séquence', () => {
     refus(SEQ, /sort du dossier des secrets/, SEC.replace('[reg.test.ts]', '[/etc/hostname]'));
   });
   it('refuse un chemin public hors du dossier de la séquence', () => {
-    refus(SEQ.replace('etape-1.md', '../etape-1.md'), /demande.*sort du dossier/);
+    refus(SEQ.replace('e1/demande.md', '../e1/demande.md'), /demande.*sort du dossier/);
     refus(SEQ.replace('docs/spec.pdf', '/etc/hostname'), /pièce.*sort du dossier/);
     refus(SEQ.replace('docs/spec.pdf', '../../../secrets/sequences/s1/e1.test.ts'), /pièce.*sort du dossier/);
   });
@@ -83,6 +86,14 @@ describe('séquence', () => {
     refus('a: [', /YAML invalide.*sequence\.yaml/);
     refus(SEQ, /YAML invalide.*sequence-secrets\.yaml/, 'a: [');
     expect(() => chargerSequence(racine(), 'zz')).toThrow(/sequence\.yaml absent/);
+  });
+  it('refuse une demande hors de son dossier d\'étape, une référence hors du dépôt, une suite_projet sans <sortie>', () => {
+    refus(SEQ.replace('e1/demande.md', 'docs/spec.pdf'), /demande\.md/);
+    refus(SEQ.replace('e1/demande.md', 'demande.md'), /dossier de l'étape/);
+    refus(SEQ.replace('[docs/norme.md]', '[../x.md]'), /référence.*hors du dépôt/);
+    refus(SEQ.replace('[docs/norme.md]', '[/etc/hostname]'), /référence.*hors du dépôt/);
+    refus(SEQ.replace('<sortie>/r.json', 'r.json'), /suite_projet/);
+    refus(SEQ.replace(', build: npm run build', ''), /suite_projet/);
   });
   it('refuse une régression mal définie', () => {
     refus(SEQ, /regression/, SEC.replace(/regression:[\s\S]*/, ''));

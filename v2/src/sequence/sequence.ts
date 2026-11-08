@@ -1,13 +1,14 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { BancInvalide } from '../bench/banc.js';
 
 export type TailleEtape = 'retouche' | 'fonction';
-export interface Etape { k: number; lot: string; demande: string; pieces: string[]; taille: TailleEtape }
+/** `references_depot` : documents présents dans le clone (relatifs au dépôt), à lire comme les pièces. */
+export interface Etape { k: number; lot: string; demande: string; pieces: string[]; references_depot: string[]; taille: TailleEtape }
 export interface Cache { fichiers: string[]; commande: string }
 export interface Sequence { id: string; dir: string; secrets: string; projet: string; source: string; base: string;
-  install: string; tests: string; etapes: Etape[]; caches: Record<number, Cache>;
+  install: string; tests: string; visible: boolean; suite_projet: { vitest_json: string; build: string }; etapes: Etape[]; caches: Record<number, Cache>;
   regression: { a_partir_de: number; fichiers: string[]; commande: string } }
 
 const TAILLES: TailleEtape[] = ['retouche', 'fonction'];
@@ -29,6 +30,8 @@ export function chargerSequence(racine: string, id: string): Sequence {
   const y = lire(join(dir, 'sequence.yaml'));
   for (const k of REQUIS) if (!texte(y[k])) ko(`champ « ${k} » manquant`);
   if (!existsSync(y.source as string) || !statSync(y.source as string).isDirectory()) ko(`« source » ${String(y.source)} n'est pas un dossier existant`);
+  const sp = (y.suite_projet ?? {}) as Obj;
+  if (!texte(sp.vitest_json) || !sp.vitest_json.includes('<sortie>') || !texte(sp.build)) ko('« suite_projet » : vitest_json (avec <sortie>) et build requis');
   const brutes = Array.isArray(y.etapes) ? (y.etapes as Obj[]) : [];
   if (!brutes.length) ko('champ « etapes » manquant ou vide');
   const abs = (base: string, p: string) => (isAbsolute(p) ? p : join(base, p));
@@ -41,12 +44,16 @@ export function chargerSequence(racine: string, id: string): Sequence {
     if (e?.k !== i + 1) ko(`étape ${i + 1} : « k » doit valoir ${i + 1} (étapes numérotées 1..${brutes.length})`);
     if (!texte(e.lot)) ko(`étape ${i + 1} : champ « lot » manquant`);
     if (!texte(e.demande)) ko(`étape ${i + 1} : champ « demande » manquant`);
-    if (!existsSync(public_(`étape ${i + 1} : demande`, e.demande as string))) ko(`étape ${i + 1} : demande « ${String(e.demande)} » absente`);
+    const dem = public_(`étape ${i + 1} : demande`, e.demande as string);
+    if (basename(dem) !== 'demande.md' || dirname(dem) === dir) ko(`étape ${i + 1} : la demande doit être <dossier de l'étape>/demande.md`);
+    if (!existsSync(dem)) ko(`étape ${i + 1} : demande « ${String(e.demande)} » absente`);
     if (!TAILLES.includes(e.taille as TailleEtape)) ko(`étape ${i + 1} : taille « ${String(e.taille)} » inconnue (${TAILLES.join(', ')})`);
     const pieces = (e.pieces === undefined ? [] : liste(e.pieces)) ?? ko(`étape ${i + 1} : « pieces » doit être une liste de chemins`);
     const chemins = pieces.map((p) => public_(`étape ${i + 1} : pièce`, p));
     for (const [j, c] of chemins.entries()) if (!existsSync(c)) ko(`étape ${i + 1} : pièce « ${pieces[j]} » absente`);
-    return { k: i + 1, lot: e.lot as string, demande: abs(dir, e.demande as string), pieces: chemins, taille: e.taille as TailleEtape };
+    const refs = (e.references_depot === undefined ? [] : liste(e.references_depot)) ?? ko(`étape ${i + 1} : « references_depot » doit être une liste`);
+    for (const x of refs) if (isAbsolute(x) || x.split('/').includes('..')) ko(`étape ${i + 1} : référence « ${x} » hors du dépôt`);
+    return { k: i + 1, lot: e.lot as string, demande: dem, pieces: chemins, references_depot: refs, taille: e.taille as TailleEtape };
   });
 
   const s = lire(join(secrets, 'sequence-secrets.yaml'));
@@ -72,5 +79,5 @@ export function chargerSequence(racine: string, id: string): Sequence {
   if (!Number.isInteger(a) || (a as number) < 1 || (a as number) > etapes.length) ko(`regression : « a_partir_de » doit être entre 1 et ${etapes.length}`);
   const reg = fichiers('regression', (r as Obj).fichiers, (r as Obj).commande);
   return { id, dir, secrets, projet: y.projet as string, source: y.source as string, base: y.base as string,
-    install: y.install as string, tests: y.tests as string, etapes, caches, regression: { a_partir_de: a as number, ...reg } };
+    install: y.install as string, tests: y.tests as string, visible: y.visible === true, suite_projet: { vitest_json: sp.vitest_json as string, build: sp.build as string }, etapes, caches, regression: { a_partir_de: a as number, ...reg } };
 }

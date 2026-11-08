@@ -1,1 +1,1 @@
-{ "total": 3000, "modules": { "bench": 800, "plan": 500, "accueil": 200, "run": 700, "porte": 250, "deliver": 550 } }
+{ "total": 3000, "modules": { "bench": 800, "sequence": 350, "plan": 400, "accueil": 200, "run": 500, "porte": 250, "deliver": 450 } }

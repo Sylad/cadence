@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -177,6 +177,11 @@ describe('maintenabilite', () => {
     expect(m.fichiers_400).toBe(1);
     expect(m.plus_gros[0]).toEqual({ fichier: 'src/gros.ts', lignes: 451 });
   });
+  it('ignore un lien symbolique cassé et un lien vers un dossier', () => {
+    const d = depot();
+    symlinkSync('/nulle/part.ts', join(d, 'src', 'casse.ts')); symlinkSync(d, join(d, 'src', 'boucle'));
+    expect(maintenabilite(d, ['src'], ['/introuvable/jscpd']).plus_gros.map((x) => x.fichier)).toEqual(['src/a.ts']);
+  });
 });
 
 describe('jouerTests, suite du projet (R24)', () => {
@@ -184,7 +189,9 @@ describe('jouerTests, suite du projet (R24)', () => {
     const d = depot();
     writeFileSync(join(d, 'src', 'v.spec.ts'), "import {it,expect} from 'vitest';it('vert',()=>expect(1).toBe(1));it('rouge',()=>expect(1).toBe(2));\n");
     g(d, 'add', '.'); g(d, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'spec');
-    const r = jouerTests(d, [], `${vitestBin} run --reporter=json --outputFile=<sortie>/suite.json`, 60_000);
+    const brut = join(mkdtempSync(join(tmpdir(), 'brut-')), 'suite.json');
+    const r = jouerTests(d, [], `${vitestBin} run --reporter=json --outputFile=<sortie>/suite.json`, 60_000, [], brut);
+    expect(JSON.parse(readFileSync(brut, 'utf8')).testResults).toHaveLength(1);
     expect(r.statuts).toEqual({ 'src/v.spec.ts > vert': true, 'src/v.spec.ts > rouge': false });
     expect(g(d, 'status', '--porcelain', '--untracked-files=all')).toBe('');
   });

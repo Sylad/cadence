@@ -8,7 +8,7 @@ export type TailleEtape = 'retouche' | 'fonction';
 export interface Etape { k: number; lot: string; demande: string; pieces: string[]; references_depot: string[]; taille: TailleEtape }
 export interface Cache { fichiers: string[]; commande: string }
 export interface Sequence { id: string; dir: string; secrets: string; projet: string; source: string; base: string;
-  install: string; tests: string; visible: boolean; suite_projet: { vitest_json: string; build: string }; etapes: Etape[]; caches: Record<number, Cache>;
+  install: string; tests: string; visible: boolean; suite_projet: { vitest_json: string; build: string; portee: string }; etapes: Etape[]; caches: Record<number, Cache>;
   regression: { a_partir_de: number; fichiers: string[]; commande: string } }
 
 const TAILLES: TailleEtape[] = ['retouche', 'fonction'];
@@ -32,6 +32,8 @@ export function chargerSequence(racine: string, id: string): Sequence {
   if (!existsSync(y.source as string) || !statSync(y.source as string).isDirectory()) ko(`« source » ${String(y.source)} n'est pas un dossier existant`);
   const sp = (y.suite_projet ?? {}) as Obj;
   if (!texte(sp.vitest_json) || !sp.vitest_json.includes('<sortie>') || !texte(sp.build)) ko('« suite_projet » : vitest_json (avec <sortie>) et build requis');
+  const dossier = /^cd (\S+) &&/.exec(sp.vitest_json as string)?.[1]; // portée affichée par étape : ce que la suite ne voit pas, seul le juge final le voit
+  const portee = texte(sp.portee) ? sp.portee : `Suite mesurée : ${dossier ? `${dossier} uniquement (le reste du dépôt est vu par le juge final)` : 'tout le dépôt'}`;
   const brutes = Array.isArray(y.etapes) ? (y.etapes as Obj[]) : [];
   if (!brutes.length) ko('champ « etapes » manquant ou vide');
   const abs = (base: string, p: string) => (isAbsolute(p) ? p : join(base, p));
@@ -79,5 +81,5 @@ export function chargerSequence(racine: string, id: string): Sequence {
   if (!Number.isInteger(a) || (a as number) < 1 || (a as number) > etapes.length) ko(`regression : « a_partir_de » doit être entre 1 et ${etapes.length}`);
   const reg = fichiers('regression', (r as Obj).fichiers, (r as Obj).commande);
   return { id, dir, secrets, projet: y.projet as string, source: y.source as string, base: y.base as string,
-    install: y.install as string, tests: y.tests as string, visible: y.visible === true, suite_projet: { vitest_json: sp.vitest_json as string, build: sp.build as string }, etapes, caches, regression: { a_partir_de: a as number, ...reg } };
+    install: y.install as string, tests: y.tests as string, visible: y.visible === true, suite_projet: { vitest_json: sp.vitest_json as string, build: sp.build as string, portee }, etapes, caches, regression: { a_partir_de: a as number, ...reg } };
 }

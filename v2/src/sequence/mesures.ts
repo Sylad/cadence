@@ -32,8 +32,8 @@ const STATUTS_IGNORES = ['skipped', 'pending', 'todo', 'disabled'];
 
 /** Joue des tests (cachés copiés, ou la suite du projet sans copie) dans le clone, puis le rend identique à l'avant (sinon CloneModifie, après restauration).
  * Id : « dest > ancêtres > titre » (doublon : « #2 ») ; sans copie, chemin relatif au clone. `commande` avec `<sortie>` : dossier du JSON (flags du reporter fournis, vitest ou jest).
- * `connus` : ids déjà vus à une étape précédente ; un fichier en erreur d'import les passe tous au rouge. Rien de trouvé = TestsIntrouvables. */
-export function jouerTests(clone: string, fichiers: { src: string; dest: string }[], commande: string, delaiMs: number, connus: string[] = []): ResultatTests {
+ * `garder` : copie du JSON brut, hors du clone. `connus` : ids déjà vus à une étape précédente ; un fichier en erreur d'import les passe tous au rouge. Rien de trouvé = TestsIntrouvables. */
+export function jouerTests(clone: string, fichiers: { src: string; dest: string }[], commande: string, delaiMs: number, connus: string[] = [], garder?: string): ResultatTests {
   balayer(clone);
   const avant = etat(clone);
   const tmp = mkdtempSync(join(tmpdir(), 'banc-tests-'));
@@ -79,6 +79,7 @@ export function jouerTests(clone: string, fichiers: { src: string; dest: string 
     if (erreur) throw erreur;
     const s = sortie(tmp);
     if (!s) throw new Error('la commande de test n\'a produit aucun JSON');
+    if (garder) copyFileSync(s, garder);
     return lire(JSON.parse(readFileSync(s, 'utf8')) as Vitest, copies, clone, connus);
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 }
@@ -148,7 +149,8 @@ function fichiers(dir: string): string[] {
   return readdirSync(dir).flatMap((e) => {
     if (e === 'node_modules' || e === 'dist' || e === '.git') return [];
     const p = join(dir, e);
-    return lstatSync(p).isDirectory() ? fichiers(p) : SOURCES.test(p) ? [p] : [];
+    const l = lstatSync(p); // liens symboliques ignorés (un lien cassé ferait échouer la lecture)
+    return l.isDirectory() ? fichiers(p) : l.isFile() && SOURCES.test(p) ? [p] : [];
   });
 }
 

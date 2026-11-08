@@ -53,7 +53,11 @@ describe('séquence', () => {
     expect(s.etapes.map((e) => [e.k, e.taille])).toEqual([[1, 'retouche'], [2, 'fonction']]);
     expect(s.etapes[0].demande).toBe(join(s.dir, 'e1/demande.md'));
     expect(s.etapes.map((e) => e.references_depot)).toEqual([['docs/norme.md'], []]);
-    expect(s.suite_projet).toEqual({ vitest_json: 'npx vitest run --outputFile=<sortie>/r.json', build: 'npm run build' });
+    expect(s.suite_projet).toEqual({ vitest_json: 'npx vitest run --outputFile=<sortie>/r.json', build: 'npm run build', portee: 'Suite mesurée : tout le dépôt' });
+    const avecCd = chargerSequence(racine(SEQ.replace('vitest_json: npx', 'vitest_json: cd frontend && npx')), 's1').suite_projet.portee;
+    expect(avecCd).toBe('Suite mesurée : frontend uniquement (le reste du dépôt est vu par le juge final)');
+    expect(chargerSequence(racine(SEQ.replace('build: npm run build', 'build: npm run build, portee: "Suite mesurée : frontend uniquement (API et SLD vus par le juge final)"')), 's1')
+      .suite_projet.portee).toBe('Suite mesurée : frontend uniquement (API et SLD vus par le juge final)');
     expect(s.etapes[0].pieces).toEqual([join(s.dir, 'docs/spec.pdf')]);
     expect(s.caches[2]).toEqual({ fichiers: [join(s.secrets, 'e2.test.ts')], commande: 'npx vitest e2' });
     expect(s.regression).toEqual({ a_partir_de: 2, fichiers: [join(s.secrets, 'reg.test.ts')], commande: 'npx vitest reg' });

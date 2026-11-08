@@ -23,8 +23,7 @@ export function travailNonLivre(avant: { head: string; sale: string[] }, apres: 
   return apres.head === avant.head ? 'aucun commit' : null;
 }
 
-export const anonymiser = (bras: [string, string], tirage: () => number): Record<'X' | 'Y', string> =>
-  tirage() < 0.5 ? { X: bras[0], Y: bras[1] } : { X: bras[1], Y: bras[0] };
+export const anonymiser = (bras: [string, string], tirage: () => number): Record<'X' | 'Y', string> => (tirage() < 0.5 ? { X: bras[0], Y: bras[1] } : { X: bras[1], Y: bras[0] });
 
 const entier = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
 

@@ -100,7 +100,7 @@ function passageVerrouille(o: OptPassage): Verdict & { eclair_ok?: boolean } {
   const jouer = (bid: string, i: number, k: number): ResultatBanc => {
     const ordre = (i + k - 1) % 2 === 0 ? [o.ref, o.cand] : [o.cand, o.ref];
     const idBanc = N > 1 ? `${bid}#${k}` : bid; const sous = N > 1 ? join(bid, `r${k}`) : bid;
-    const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {}; const suiteBase: Record<string, number> = {}; const bases: Record<string, string> = {};
+    const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {}; const aVerifier: Record<string, string[]> = {}; const suiteBase: Record<string, number> = {}; const bases: Record<string, string> = {};
     const mapping: Record<string, string> = {}; // c1/c2 -> bras : écrit seulement après les juges (aveugle)
     let jugement: Jugement | null = null; let phase = 'banc invalide'; let b: Banc | undefined;
     const aller = (p: string) => { phase = p; signaler(bid, k, p); };
@@ -114,7 +114,7 @@ function passageVerrouille(o: OptPassage): Verdict & { eclair_ok?: boolean } {
         const avant = etatGit(c); bases[n] = avant.head;
         aller(`bras ${n}`); const m = lancerBras(bc, bras[n], c, o.exec);
         mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)) };
-        aller('fuites'); fuites[n] = fuitesDuBras(o.home, o.racine, bid, c);
+        aller('fuites'); const fu = fuitesDuBras(o.home, o.racine, bid, c); fuites[n] = fu.certaines; aVerifier[n] = fu.a_verifier;
       });
       if (ordre.some((n) => mesures[n].echec !== null)) o.out(`${idBanc} : un bras en échec, juges sautés`);
       else {
@@ -127,12 +127,12 @@ function passageVerrouille(o: OptPassage): Verdict & { eclair_ok?: boolean } {
       for (const n of ordre) if (!mesures[n]) {
         mesures[n] = { bras: n, banc: idBanc, debut: o.maintenant.toISOString(), fin: o.maintenant.toISOString(), duree_s: 0, tokens: 0,
           cout_usd: 0, questions: 0, questions_texte: [], sessions: [], echec: msg };
-        fuites[n] = [];
+        fuites[n] = []; aVerifier[n] = [];
       }
       o.out(`${idBanc} : ${msg}`);
     }
     clonesParBanc.push(mapping);
-    const r: ResultatBanc = { banc: idBanc, taille: b?.taille ?? 'fonction', visible: b?.visible ?? false, reponses: b?.reponses ?? false, frais: b?.frais ?? false, mesures, jugement, fuites };
+    const r: ResultatBanc = { banc: idBanc, taille: b?.taille ?? 'fonction', visible: b?.visible ?? false, reponses: b?.reponses ?? false, frais: b?.frais ?? false, mesures, jugement, fuites, fuites_a_verifier: aVerifier };
     mkdirSync(join(dirRun, sous), { recursive: true });
     writeFileSync(join(dirRun, sous, 'resultat.json'), JSON.stringify({ ...r, clones: mapping, suite_base: suiteBase }, null, 2));
     if (!o.garderClones) for (const n of ordre) if (clones[n]) archiver(clones[n], bases[n]);
@@ -170,7 +170,6 @@ export function controlesEclair(res: ResultatBanc[], ref: string, cand: string):
     `questions du candidat : 0 / ${c.q} ${questionsOk ? 'ok' : 'ROUGE'}`] };
 }
 
-/** `--repetitions N` : entier ≥ 1 (défaut 1), null si la valeur est refusée. */
 const repetitions = (args: string[]): number | null => { const v = option(args, 'repetitions'); if (v === undefined) return 1; return /^[1-9]\d*$/.test(v) ? Number(v) : null; };
 
 function option(args: string[], nom: string): string | undefined {

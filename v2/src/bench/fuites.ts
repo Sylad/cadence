@@ -1,14 +1,15 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 
-export interface Regles { autorises: string[]; interdits: string[] }
+export interface Regles { autorises: string[]; certains: string[]; runs: string }
+export interface Fuites { certaines: string[]; a_verifier: string[] } // R21 : à vérifier = le reste de runs (ancêtres du clone, globs d'ancêtres)
 
 export const dossierTranscripts = (home: string, cwd: string) => join(home, '.claude', 'projects', cwd.replace(/[^A-Za-z0-9]/g, '-'));
 
 export function reglesDuBras(home: string, racine: string, banc: string, clone: string): Regles {
   return {
     autorises: [clone, `${clone}.captures`, `${clone}.question.md`, join(racine, 'bancs', banc), dossierTranscripts(home, clone)],
-    interdits: [join(racine, 'secrets'), join(racine, 'runs'), join(racine, 'bancs'), join(home, 'projects'), join(home, '.claude', 'projects')],
+    certains: [join(racine, 'secrets'), join(racine, 'bancs'), join(home, 'projects'), join(home, '.claude', 'projects')], runs: join(racine, 'runs'),
   };
 }
 
@@ -33,9 +34,15 @@ function resoudre(tok: string, cwd: string, home: string, rel: boolean, cd = fal
   return rel && (cd || t.includes('/') || t === '..') ? resolve(cwd, t) : null;
 }
 
-export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = ''): string[] {
-  const vus = new Set<string>();
-  const juger = (p: string | null) => { if (p && sous(p, r.interdits) && !sous(p, r.autorises)) vus.add(p); };
+export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = ''): Fuites {
+  const vus = { certaines: new Set<string>(), a_verifier: new Set<string>() };
+  const juger = (p: string | null) => {
+    const g = p ? p.search(/[*?[]/) : -1; // glob : seul le préfixe littéral compte
+    if (p && g >= 0) p = p.slice(0, p.lastIndexOf('/', g)) || '/';
+    if (!p || sous(p, r.autorises)) return;
+    if (sous(p, r.certains) || p.slice(r.runs.length + 1).split('/').slice(2).some((x) => /^c\d+$/.test(x)) && sous(p, [r.runs])) vus.certaines.add(p);
+    else if (sous(p, [r.runs])) vus.a_verifier.add(p);
+  };
   const depart = cwd || r.autorises[0];
   for (const l of lignes) {
     let d: { type?: string; cwd?: string; message?: { content?: { type: string; name?: string; input?: unknown }[] } };
@@ -60,7 +67,7 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
       }
     }
   }
-  return [...vus];
+  return { certaines: [...vus.certaines], a_verifier: [...vus.a_verifier] };
 }
 
 function jsonl(dir: string): string[] {
@@ -71,7 +78,7 @@ function jsonl(dir: string): string[] {
   });
 }
 
-export function fuitesDuBras(home: string, racine: string, banc: string, clone: string): string[] {
+export function fuitesDuBras(home: string, racine: string, banc: string, clone: string): Fuites {
   const lignes = jsonl(dossierTranscripts(home, clone)).flatMap((f) => readFileSync(f, 'utf8').split('\n'));
   return chercherFuites(lignes, reglesDuBras(home, racine, banc, clone), home, clone);
 }

@@ -26,15 +26,13 @@ export function chargerBanc(racine: string, id: string): Banc {
   };
 }
 
-const numero = (id: string) => Number(id.split('-')[0]);
-
 /** Ids des bancs (dossiers de `bancs/`) ; chacun est chargé par le passage, où un banc invalide devient un échec. */
 export function listerBancs(racine: string, numeros?: string[]): string[] {
   const dir = join(racine, 'bancs');
   if (!existsSync(dir)) return [];
   return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
     .filter((id) => !numeros || numeros.includes(id.split('-')[0]))
-    .sort((a, b) => numero(a) - numero(b));
+    .sort((a, b) => Number(a.split('-')[0]) - Number(b.split('-')[0]));
 }
 
 export const lireDemande = (b: Banc) => readFileSync(join(b.dir, 'demande.md'), 'utf8').trim();

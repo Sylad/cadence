@@ -110,12 +110,19 @@ describe('lancerBras', () => {
     expect(() => writeFileSync(cheminReglages(clone), '{}')).toThrow();
     const j = JSON.parse(readFileSync(cheminReglages(clone), 'utf8'));
     expect(j.hooks.PreToolUse[0].hooks[0].command).toBe(`node "${join(import.meta.dirname, '..', 'hooks', 'lecture-obligatoire.mjs')}" || exit 2`);
-    expect(j.hooks.PreToolUse[0].matcher).toBe('Edit|Write|MultiEdit|NotebookEdit');
+    expect(j.hooks.PreToolUse[0].matcher).toBe('Edit|Write|MultiEdit|NotebookEdit|Bash');
     const e0 = empreinteReglages(clone);
     lancerBras(b, { nom: 'C', modele: 'opus', brief, settings }, clone, exec); // réécrit à l'identique : même empreinte
     expect(empreinteReglages(clone)).toBe(e0);
     libererReglages(clone); chmodSync(cheminReglages(clone), 0o600); writeFileSync(cheminReglages(clone), '{}');
     expect(empreinteReglages(clone)).not.toBe(e0);
+    const e1 = empreinteReglages(clone), home = process.env.HOME; // ~/.claude/settings*.json sont scellés (lus, jamais écrits)
+    try {
+      process.env.HOME = mkdtempSync(join(tmpdir(), 'home-')); const e2 = empreinteReglages(clone);
+      expect(e2).not.toBe(e1);
+      mkdirSync(join(process.env.HOME, '.claude')); writeFileSync(join(process.env.HOME, '.claude', 'settings.local.json'), '{"disableAllHooks":true}');
+      expect(empreinteReglages(clone)).not.toBe(e2);
+    } finally { process.env.HOME = home; }
     const sans: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
     lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, (args, o) => { sans.push({ args, env: o.env }); return { stdout: json('s', 1, 0), code: 0 }; });
     expect(sans[0].args).not.toContain('--settings'); expect(sans[0].env.CADENCE_PIECES).toBeUndefined();

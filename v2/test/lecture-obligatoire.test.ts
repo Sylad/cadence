@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { lectureReferences } from '../src/sequence/mesures.js';
+import { ecritureBash } from '../hooks/lecture.mjs';
 
 // Le vrai script du hook, lancé comme Claude Code le lance : JSON sur stdin, liste des pièces dans l'environnement (R31),
 // refus = code 2 + raison sur stderr + décision JSON sur stdout.
@@ -153,5 +154,52 @@ describe('hook lecture obligatoire', () => {
     const t0 = performance.now(); const r = hook(ecriture(m), env(m, [m.doc])); const ms = performance.now() - t0;
     permis(r);
     expect(ms).toBeLessThan(1000);
+  });
+});
+
+describe('ecritureBash (R31 ronde 3) : une commande Bash qui écrit dans le clone', () => {
+  const c = '/b/runs/r/s/c1';
+  it.each([
+    'echo x > a.txt', 'echo x >> src/a.ts', `printf x > ${c}/a.txt`, 'cat <<EOF > src/a.ts\nconst a = 1;\nEOF', 'ls | tee out.log',
+    "sed -i 's/a/b/' src/a.ts", 'sed -i.bak -e s/a/b/ src/a.ts', "perl -pi -e 's/a/b/' src/a.ts", 'cp /tmp/x.ts src/', 'mv a.ts b.ts', 'rm -rf src',
+    'install -m 644 /tmp/x src/x', 'touch src/n.ts', 'git apply /tmp/p.diff', 'git checkout -- src/a.ts', `git -C ${c} restore src/a.ts`, 'patch -p1 < /tmp/p.diff',
+    `python3 -c "open('a.txt','w').write('x')"`, "node -e \"require('fs').writeFileSync('a.txt','x')\"", 'cd src && echo x > a.ts', `cd /tmp && echo x > ${c}/a.txt`,
+  ])('écrit : %s', (cmd) => expect(ecritureBash(cmd, c, c)).toBe(true));
+  it.each([
+    'npx vitest run', 'npm test', 'npm run build', 'git status', 'git diff HEAD~1', 'git log --oneline -5', 'ls -la src', 'cat src/a.ts',
+    'echo x > /dev/null', 'npx vitest run 2>&1 | tail -20', 'npm test 2>&1', 'echo x > /tmp/notes.md', 'cd /tmp && echo x > a.txt', 'cp src/a.ts /tmp/a.ts',
+    "grep -n 'a > b' src/a.ts", 'git log --format="%h > %s"', 'cat <<EOF > /tmp/x.md\nif a > b then\nEOF', "sed -n '1,5p' src/a.ts", 'node scripts/run.js',
+    "python3 -c \"print('x')\"", 'rm -rf /tmp/build-cache', 'touch /tmp/marque',
+  ])('n\'écrit pas : %s', (cmd) => expect(ecritureBash(cmd, c, c)).toBe(false));
+  it('cwd hors du clone : une cible relative ne vise pas le clone', () => expect(ecritureBash('echo x > a.txt', c, '/tmp')).toBe(false));
+});
+
+describe('hook lecture obligatoire, Bash et code du hook (R31 ronde 3)', () => {
+  const bash = (m: Monde, command: string, cwd = m.clone) => ({ tool_name: 'Bash', tool_input: { command }, transcript_path: m.t, cwd });
+  it('Bash qui écrit dans le clone : refusé tant que la pièce n\'est pas lue, permis ensuite ; les commandes de lecture et de test passent', () => {
+    const m = monde(); m.ecrire([]);
+    refuse(hook(bash(m, 'echo x > a.txt'), env(m, [m.doc])), m.doc);
+    refuse(hook(bash(m, "sed -i 's/a/b/' src/a.ts"), env(m, [m.doc])), m.doc);
+    for (const cmd of ['npx vitest run', 'git status', 'git diff', 'ls', 'cat src/a.ts', 'npm run build 2>&1 | tail -5']) permis(hook(bash(m, cmd), env(m, [m.doc])));
+    m.ecrire(lu({ file_path: m.doc }));
+    permis(hook(bash(m, 'echo x > a.txt'), env(m, [m.doc])));
+  });
+  it('Bash qui touche aux réglages de Claude Code : refusé même pièces lues ; sans environnement : refusé', () => {
+    const m = monde(); m.ecrire(lu({ file_path: m.doc }));
+    refuse(hook(bash(m, 'echo \'{"disableAllHooks":true}\' > ~/.claude/settings.json'), env(m, [m.doc])), /réglages de Claude Code/);
+    refuse(hook(bash(m, 'ls'), { ...env(m, [m.doc]), CADENCE_CLONE: undefined }), /CADENCE_CLONE/);
+  });
+  it('le code du hook (v2/hooks) : écriture refusée, par outil ou par Bash', () => {
+    const m = monde(); m.ecrire(lu({ file_path: m.doc }));
+    const ici = join(import.meta.dirname, '..', 'hooks');
+    refuse(hook(ecriture(m, join(ici, 'lecture.mjs'), 'Edit'), env(m, [m.doc])), /code du hook/);
+    refuse(hook(bash(m, `echo 'process.exit(0)' > ${join(ici, 'lecture-obligatoire.mjs')}`), env(m, [m.doc])), /code du hook/);
+  });
+  it('la mesure ferme la fenêtre de lecture sur une écriture par Bash', () => {
+    const m = monde();
+    const l = [JSON.stringify({ type: 'assistant', cwd: m.clone, message: { content: [{ type: 'tool_use', id: 'b1', name: 'Bash', input: { command: 'echo x > a.txt' } }] } }), ...lu({ file_path: m.doc })];
+    expect(lectureReferences(l, [m.doc], m.clone)).toMatchObject({ ouvertes: [], apres_ecriture: [m.doc] });
+    const neutre = [JSON.stringify({ type: 'assistant', cwd: m.clone, message: { content: [{ type: 'tool_use', id: 'b2', name: 'Bash', input: { command: 'npx vitest run' } }] } }), ...lu({ file_path: m.doc })];
+    expect(lectureReferences(neutre, [m.doc], m.clone).ouvertes).toEqual([m.doc]);
   });
 });

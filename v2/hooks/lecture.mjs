@@ -7,15 +7,12 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
-/** Outils qui écrivent un fichier. Une écriture par Bash (sed -i, tee, redirection) n'est pas vue : limite connue. */
+/** Outils qui écrivent un fichier ; Bash : voir ecritureBash. */
 export const ECRITURES = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
 const LIMITE_READ = 2000; // défauts de Read : offset 1, limit 2000
 const IMAGE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 
-export const cheminOutil = (input) => {
-  const f = input?.file_path ?? input?.notebook_path;
-  return typeof f === 'string' ? f : undefined;
-};
+export const cheminOutil = (input) => { const f = input?.file_path ?? input?.notebook_path; return typeof f === 'string' ? f : undefined; };
 
 /** Chemin réel (liens résolus) ; un chemin qui n'existe pas encore garde son nom sous l'ancêtre réel. */
 export function reel(p) {
@@ -34,6 +31,30 @@ export const reglageClaude = (p, home) => (!!home && dansClone(p, join(home, '.c
 export const contournement = (name, input, home) => (ECRITURES.includes(name) && !!cheminOutil(input) && reglageClaude(cheminOutil(input), home))
   || (name === 'Bash' && /disableAllHooks|\.claude\/settings/.test(String(input?.command ?? '')));
 
+/** Une commande Bash écrit-elle dans `clone` ? Redirection > >>, tee, rm, touch, patch, truncate, cp, mv, install, ln (cible), sed/perl -i,
+ * git apply/checkout/restore, python -c / node -e qui écrit. Cible dans le clone, ou relative depuis un dossier courant dans le clone. Dans le doute : oui. */
+export function ecritureBash(cmd, clone, cwd = clone) {
+  let dir = cwd;
+  const dedans = (t) => !!t && t !== '/dev/null' && dansClone(resolve(dir, t.replace(/^(['"])(.*)\1$/, '$2')), clone);
+  const texte = String(cmd).replace(/(<<-?\s*['"]?(\w+)['"]?[^\n]*)\n[\s\S]*?\n\s*\2(?=\n|$)/g, '$1') // corps des heredocs retirés
+    .replace(/'[^']*'|"[^"]*"/g, (q) => (/[>|;&\n]/.test(q) ? '""' : q)); // guillemets qui cachent un opérateur
+  for (const seg of texte.split(/&&|\|\|?|;|\n/)) {
+    for (const m of seg.matchAll(/(?<![<>=-])(?:\d|&)?>>?\s*([^\s;&|<>()]+)/g)) if (dedans(m[1])) return true;
+    const mots = seg.match(/'[^']*'|"[^"]*"|\S+/g) ?? [];
+    while (/^\w+=/.test(mots[0] ?? '')) mots.shift();
+    const [c, ...args] = mots, noms = args.filter((a) => !a.startsWith('-')), opts = args.filter((a) => a.startsWith('-'));
+    if (c === 'cd' && noms[0]) dir = resolve(dir, noms[0].replace(/^(['"])(.*)\1$/, '$2'));
+    else if (/^(tee|rm|touch|truncate)$/.test(c) ? noms.some(dedans) : /^(cp|mv|install|ln)$/.test(c) ? dedans(noms.at(-1)) : false) return true;
+    else if (c === 'patch' && (dansClone(dir, clone) || noms.some(dedans))) return true;
+    else if (/^(sed|perl)$/.test(c) && opts.some((o) => /^-[a-zA-Z]*i|^--in-place/.test(o)) && noms.filter((a) => !/^['"]/.test(a)).some(dedans)) return true;
+    else if (c === 'git') {
+      const k = args.indexOf('-C'), g = k >= 0 ? resolve(dir, args[k + 1]) : dir;
+      if (args.some((a) => /^(apply|checkout|restore)$/.test(a)) && dansClone(g, clone)) return true;
+    } else if (/^(python3?|node)$/.test(c ?? '') && opts.some((o) => /^-[ce]$/.test(o)) && /write/i.test(seg) && (dansClone(dir, clone) || seg.includes(clone))) return true;
+  }
+  return false;
+}
+
 /** Appels d'outils (assistant) et résultats (tool_result) d'une ligne de transcript, sous-agents compris.
  * Chemin rapide : une ligne de résultats sans `"is_error":true` n'est pas analysée, ses ids sont lus par motif. */
 export function evenements(ligne) {
@@ -43,7 +64,7 @@ export function evenements(ligne) {
   try { d = JSON.parse(ligne); } catch { return { appels: [], resultats: [] }; }
   const c = Array.isArray(d?.message?.content) ? d.message.content : [];
   return {
-    appels: d?.type === 'assistant' ? c.filter((x) => x?.type === 'tool_use' && typeof x.name === 'string').map((x) => ({ id: x.id, name: x.name, input: x.input ?? {} })) : [],
+    appels: d?.type === 'assistant' ? c.filter((x) => x?.type === 'tool_use' && typeof x.name === 'string').map((x) => ({ id: x.id, name: x.name, input: x.input ?? {}, cwd: d.cwd })) : [],
     resultats: c.filter((x) => x?.type === 'tool_result' && typeof x.tool_use_id === 'string').map((x) => ({ id: x.tool_use_id, erreur: x.is_error === true })),
   };
 }
@@ -53,20 +74,11 @@ const memo = (cle, f) => { if (!compte.has(cle)) compte.set(cle, f()); return co
 /** Nombre de lignes au sens de Read (un saut final ne compte pas). */
 const lignesDe = (f) => memo(`l:${f}`, () => { const t = readFileSync(f, 'utf8'); return t === '' ? 0 : t.split('\n').length - (t.endsWith('\n') ? 1 : 0); });
 /** Pages d'un PDF : pdfinfo, sinon objets /Type /Page ; null si inconnu. */
-export const pagesDe = (f) => memo(`p:${f}`, () => {
-  const p = spawnSync('pdfinfo', [f], { encoding: 'utf8' });
-  const n = Number(/^Pages:\s+(\d+)/m.exec(p.stdout ?? '')?.[1]);
-  if (n > 0) return n;
-  const objets = (readFileSync(f, 'latin1').match(/\/Type\s*\/Page(?![a-zA-Z])/g) ?? []).length;
-  return objets || null;
-});
+export const pagesDe = (f) => memo(`p:${f}`, () => Number(/^Pages:\s+(\d+)/m.exec(spawnSync('pdfinfo', [f], { encoding: 'utf8' }).stdout ?? '')?.[1])
+  || (readFileSync(f, 'latin1').match(/\/Type\s*\/Page(?![a-zA-Z])/g) ?? []).length || null);
 const plages = (pages) => String(pages).split(',').map((s) => s.trim().split('-').map(Number)).map(([a, b]) => [a, b ?? a]);
 /** Les intervalles [a, b] couvrent-ils 1..n ? */
-function couvre(intervalles, n) {
-  let jusqua = 0;
-  for (const [a, b] of [...intervalles].sort((x, y) => x[0] - y[0])) { if (a > jusqua + 1) break; jusqua = Math.max(jusqua, b); }
-  return jusqua >= n;
-}
+const couvre = (iv, n) => [...iv].sort((x, y) => x[0] - y[0]).reduce((j, [a, b]) => (a > j + 1 ? j : Math.max(j, b)), 0) >= n;
 
 /** Couverture d'un fichier par ses Read réussis : { entiere, pages_inconnues }. */
 export function couverture(f, inputs) {
@@ -87,15 +99,10 @@ export function couverture(f, inputs) {
  * `appels` : Read retenus (déjà filtrés par fenêtre) ; `ok` : ids des résultats sans erreur. */
 export function lectures(appels, ok, pieces) {
   const parPiece = new Map(pieces.map((p) => [reel(p), []]));
-  for (const a of appels) {
-    const f = cheminOutil(a.input);
-    if (a.name !== 'Read' || !f || !ok.has(a.id)) continue;
-    parPiece.get(reel(f))?.push(a.input);
-  }
+  for (const a of appels) if (a.name === 'Read' && cheminOutil(a.input) && ok.has(a.id)) parPiece.get(reel(cheminOutil(a.input)))?.push(a.input);
   return new Map(pieces.map((p) => {
     const inputs = parPiece.get(reel(p));
-    let c;
-    try { c = couverture(p, inputs); } catch { c = { entiere: false, pages_inconnues: false }; } // pièce illisible : jamais entière
+    const c = (() => { try { return couverture(p, inputs); } catch { return { entiere: false, pages_inconnues: false }; } })(); // illisible : jamais entière
     return [p, { lue: inputs.length > 0, ...c }];
   }));
 }

@@ -1,15 +1,13 @@
 #!/usr/bin/env node
-// Hook PreToolUse du bras candidat « sequence-v2 » (lecture obligatoire, spec banc séquence §5, besoin 2 ; R30, R31).
-// Refuse Edit|Write|MultiEdit|NotebookEdit sur un fichier du clone tant qu'une pièce n'est pas COUVERTE par des Read
-// réussis (hooks/lecture.mjs) dans le transcript de la session, sous-agents compris.
-// La liste vient de l'environnement du bras, fixé par le banc au lancement (le bras ne peut pas la changer) :
-// CADENCE_CLONE (dossier du clone), CADENCE_PIECES (tableau JSON de chemins absolus) et CADENCE_BANC_RACINE. Absente ou illisible : refus.
-// R32 : refuse aussi toute écriture des réglages de Claude Code (~/.claude/, **/.claude/settings*.json) et du dossier du banc hors du clone.
-// Fermé en cas d'erreur : toute exception refuse l'écriture. Transcripts lus par blocs, lignes filtrées avant tout JSON.parse.
+// Hook PreToolUse du bras candidat « sequence-v2 » (lecture obligatoire, spec banc séquence §5 ; R30-R32). Refuse une écriture dans le clone
+// (Edit|Write|MultiEdit|NotebookEdit, ou Bash qui écrit : ecritureBash) tant qu'une pièce n'est pas COUVERTE par des Read réussis
+// (hooks/lecture.mjs), sous-agents compris. Liste par l'environnement fixé au lancement : CADENCE_CLONE, CADENCE_PIECES (JSON), CADENCE_BANC_RACINE.
+// Refuse toujours : réglages de Claude Code, dossier du banc hors du clone, code de ce hook. Fermé : absence, illisible ou exception = refus.
 import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
-import { cheminOutil, dansClone, ECRITURES, evenements, lectures, reel, reglageClaude } from './lecture.mjs';
+import { cheminOutil, contournement, dansClone, ECRITURES, ecritureBash, evenements, lectures, reel, reglageClaude } from './lecture.mjs';
+const ICI = dirname(new URL(import.meta.url).pathname); // le code du hook
 
 /** Transcript principal et transcripts des sous-agents (`<session>/subagents/*.jsonl`), que le hook tourne dans l'un ou l'autre. */
 export function transcripts(t) {
@@ -28,8 +26,7 @@ function lignes(fichier, filtres, f) {
   try {
     for (let n; (n = readSync(fd, bloc, 0, bloc.length, null)) > 0;) {
       const morceaux = (reste + dec.write(bloc.subarray(0, n))).split('\n');
-      reste = morceaux.pop();
-      morceaux.forEach(garder);
+      reste = morceaux.pop(); morceaux.forEach(garder);
     }
     garder(reste + dec.end());
   } finally { closeSync(fd); }
@@ -39,25 +36,32 @@ function lignes(fichier, filtres, f) {
 export function nonLues(pieces, fichiers) {
   const appels = [], ok = new Set();
   for (const t of fichiers) lignes(t, ['"Read"', '"tool_use_id"'], (l) => {
-    const e = evenements(l);
-    appels.push(...e.appels.filter((a) => a.name === 'Read'));
-    for (const r of e.resultats) if (!r.erreur) ok.add(r.id);
+    const e = evenements(l); appels.push(...e.appels.filter((a) => a.name === 'Read')); for (const r of e.resultats) if (!r.erreur) ok.add(r.id);
   });
   return [...lectures(appels, ok, pieces)].filter(([, v]) => !v.entiere).map(([p]) => p);
 }
 
 /** Décision pour une entrée de hook : null (permis) ou la raison du refus. */
 export function decider(e, env) {
-  if (!ECRITURES.includes(e?.tool_name)) return null;
+  const bash = e?.tool_name === 'Bash', cwd = e?.cwd ?? process.cwd();
+  if (!ECRITURES.includes(e?.tool_name) && !bash) return null;
   const clone = env.CADENCE_CLONE, racine = env.CADENCE_BANC_RACINE;
   if (!clone || !racine) return 'Écriture refusée : CADENCE_CLONE ou CADENCE_BANC_RACINE absent, la liste des pièces du bras est introuvable.';
-  const brut = cheminOutil(e.tool_input);
-  if (!brut) return null;
-  const f = resolve(e.cwd ?? process.cwd(), brut);
-  if (reglageClaude(f, env.HOME)) return `Écriture refusée : ${f} est un réglage de Claude Code ; ne touche pas aux réglages de Claude Code.`;
-  const permis = dansClone(f, clone) || dansClone(f, `${clone}.captures`) || reel(f) === reel(`${clone}.question.md`);
-  if (dansClone(f, racine) && !permis) return `Écriture refusée : ${f} est dans le dossier du banc, hors de ton dépôt.`;
-  if (!dansClone(f, clone)) return null;
+  if (bash) {
+    const cmd = String(e.tool_input?.command ?? '');
+    if (contournement('Bash', e.tool_input, env.HOME)) return 'Commande refusée : ne touche pas aux réglages de Claude Code.';
+    if (ecritureBash(cmd, ICI, cwd)) return 'Commande refusée : elle écrit dans le code du hook.';
+    if (!ecritureBash(cmd, clone, cwd)) return null;
+  } else {
+    const brut = cheminOutil(e.tool_input);
+    if (!brut) return null;
+    const f = resolve(cwd, brut);
+    if (reglageClaude(f, env.HOME)) return `Écriture refusée : ${f} est un réglage de Claude Code ; ne touche pas aux réglages de Claude Code.`;
+    if (dansClone(f, ICI)) return `Écriture refusée : ${f} est le code du hook.`;
+    const permis = dansClone(f, clone) || dansClone(f, `${clone}.captures`) || reel(f) === reel(`${clone}.question.md`);
+    if (dansClone(f, racine) && !permis) return `Écriture refusée : ${f} est dans le dossier du banc, hors de ton dépôt.`;
+    if (!dansClone(f, clone)) return null;
+  }
   let pieces;
   try { pieces = JSON.parse(env.CADENCE_PIECES ?? ''); } catch { pieces = null; }
   if (!Array.isArray(pieces) || !pieces.every((p) => typeof p === 'string'))

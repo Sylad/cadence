@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parse } from 'yaml';
 import { lireDemande, type Banc } from './banc.js';
@@ -59,7 +60,7 @@ export function ecrireReglages(modele: string, clone: string): string {
 }
 /** Empreinte des réglages du run, des hooks et des réglages Claude du clone : un changement pendant l'étape est un contournement (R31). */
 export const empreinteReglages = (clone: string): string => [cheminReglages(clone), ...readdirSync(HOOKS).sort().map((e) => join(HOOKS, e)),
-  join(clone, '.claude', 'settings.json'), join(clone, '.claude', 'settings.local.json')]
+  ...[clone, homedir()].flatMap((d) => [join(d, '.claude', 'settings.json'), join(d, '.claude', 'settings.local.json')])] // ~/.claude : lu, jamais modifié
   .reduce((h, f) => h.update(`${f}\0${existsSync(f) ? readFileSync(f, 'latin1') : 'absent'}\0`), createHash('sha1')).digest('hex');
 /** `garde` : pièces à lire avant d'écrire et racine du banc, données au hook du bras par l'environnement (CADENCE_*), jamais par un fichier. */
 export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }): Mesure {

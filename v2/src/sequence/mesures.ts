@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, lstatSync, readdirSync, rmSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
-import { cheminOutil, dansClone, ECRITURES, evenements, lectures, type Appel } from '../../hooks/lecture.mjs';
+import { cheminOutil, dansClone, ECRITURES, ecritureBash, evenements, lectures, type Appel } from '../../hooks/lecture.mjs';
 
 export class CloneModifie extends Error {}
 export class TestsIntrouvables extends Error {}
@@ -113,7 +113,7 @@ function lire(json: Vitest, copies: { id: string; copie: string }[], clone: stri
   return { passes: ids.filter((i) => statuts[i]).length, total: ids.length, echoues: ids.filter((i) => !statuts[i]), statuts, ignores, fichiers_en_erreur: en_erreur };
 }
 
-// Limites connues : une écriture par Bash (sed -i, tee, redirection) n'est pas vue. Les lectures et écritures des sous-agents (sidechain)
+// Une écriture par Bash compte (ecritureBash, la même règle que le hook). Les lectures et écritures des sous-agents (sidechain)
 // COMPTENT : le bras a délégué, la lecture a eu lieu. « Lire » (couvrir par des Read réussis) et « écrire » : hooks/lecture.mjs, la définition
 // du hook du bras candidat. Fenêtre : le hook regarde tout le transcript au moment de l'écriture ; la mesure ne garde que les Read d'AVANT
 // la première écriture dans le clone. La mesure est la porte stricte : une lecture qui ne compte que pour le hook ne compte pas ici.
@@ -126,6 +126,7 @@ export function lectureReferences(lignes: string[], pieces: string[], clone?: st
     for (const c of e.appels) {
       const f = cheminOutil(c.input);
       if (f && ECRITURES.includes(c.name) && (!clone || dansClone(f, clone))) ecrit = true;
+      if (clone && c.name === 'Bash' && ecritureBash(String(c.input.command ?? ''), clone, c.cwd ?? clone)) ecrit = true;
       tous.push(c); if (!ecrit) avant.push(c);
     }
   }

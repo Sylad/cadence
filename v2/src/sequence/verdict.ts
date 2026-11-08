@@ -20,8 +20,14 @@ export function verdictSequence(r: ResultatSequence, ref: string, cand: string):
   // une étape sans `regressions` (suite ou mesure en erreur) rend le compte du bras inconnu, dernière étape comprise
   const regs = (b: string) => (et(b).length && et(b).every((e) => e.regressions) ? somme(et(b).map((e) => e.regressions!.rouges.length + e.regressions!.disparus.length)) : null);
   const meca = (b: string) => r.jugement?.meca[b];
-  const remplaces = (b: string) => [...(meca(b)?.remplaces ?? [])].sort().join('\n');
-  const lu = (b: string) => ({ o: somme(et(b).map((e) => e.lecture?.ouvertes.length ?? 0)), t: somme(et(b).map(pieces)), absents: et(b).filter((e) => !e.lecture).map((e) => e.k) });
+  // une pièce lue en partie (offset, limit, pages) ne compte pas : « vraiment lire » (R30)
+  const lu = (b: string) => ({ entieres: somme(et(b).map((e) => (e.lecture ? e.lecture.ouvertes.length - e.lecture.partielles.length : 0))),
+    partielles: somme(et(b).map((e) => e.lecture?.partielles.length ?? 0)), t: somme(et(b).map(pieces)), absents: et(b).filter((e) => !e.lecture).map((e) => e.k) });
+  const lus = (l: ReturnType<typeof lu>) => `${l.entieres}/${l.t}${l.partielles ? ` (${l.partielles} partiel)` : ''}`;
+  const SCORE: Record<string, number> = { oui: 2, 'en partie': 1, non: 0 };
+  const attendu = (b: string) => (meca(b) ? SCORE[meca(b)!.attendu] : undefined);
+  const inutiles = somme(et(cand).filter((e) => !e.reponses).map((e) => e.mesure.questions));
+  const ks = (b: string) => et(b).map((e) => e.k).join(',');
   const lc = lu(cand), lr = lu(ref);
   const pente = (b: string, f: (m: Maint) => number | null) => {
     const a = r.base[b]?.maintenabilite, z = et(b).at(-1)?.maintenabilite;
@@ -35,20 +41,21 @@ export function verdictSequence(r: ResultatSequence, ref: string, cand: string):
   const t = (b: string) => somme(et(b).map((e) => e.mesure.duree_s));
   const n = (x: number | null) => (x === null ? 'non mesuré' : `${x}`);
   const c = (nom: string, valeur: string, seuil: string, ok: boolean): Critere => ({ nom, valeur, seuil, ok, bloquant: true });
-  const rc = regs(cand), rr = regs(ref), hc = meca(cand)?.caches_passes, hr = meca(ref)?.caches_passes;
+  const rc = regs(cand), rr = regs(ref), hc = meca(cand)?.caches_passes, hr = meca(ref)?.caches_passes, ac = attendu(cand), ar = attendu(ref);
   const derniere = et(cand).at(-1);
   const criteres: Critere[] = [
-    c('au moins une étape', `${ref} ${et(ref).length} · ${cand} ${et(cand).length}`, '≥ 1, autant pour les deux bras', et(cand).length >= 1 && et(cand).length === et(ref).length),
+    c('au moins une étape', `${ref} [${ks(ref)}] · ${cand} [${ks(cand)}]`, '≥ 1, les mêmes étapes pour les deux bras', et(cand).length >= 1 && ks(cand) === ks(ref)),
     c('toutes les étapes mesurées', nonMesurees.length ? nonMesurees.join(' ; ') : 'toutes', 'toutes', nonMesurees.length === 0),
     c('aucune fuite', fuites.length ? fuites.join(' ; ') : '0', '0', fuites.length === 0),
     c('aucun bras en échec', echecs.length ? echecs.join(' ; ') : '0', '0', echecs.length === 0),
     c('juge final fait', r.jugement && meca(cand) && meca(ref) ? 'oui' : 'non', 'oui', Boolean(r.jugement && meca(cand) && meca(ref))),
     c('régressions', `${n(rc)} contre ${n(rr)}`, `≤ ${ref}`, rc !== null && rr !== null && rc <= rr),
     c('tests cachés cumulés', `${hc ?? '–'} contre ${hr ?? '–'}`, `≥ ${ref}`, hc !== undefined && hr !== undefined && hc >= hr),
-    c('tests remplacés symétriques', r.jugement ? `${meca(cand)?.remplaces.length ?? '–'} contre ${meca(ref)?.remplaces.length ?? '–'}` : 'juge absent', 'mêmes tests',
-      Boolean(meca(cand) && meca(ref)) && remplaces(cand) === remplaces(ref)),
-    c('pièces lues avant le code', `${lc.o}/${lc.t}${lc.absents.length ? `, non mesurée aux étapes ${lc.absents.join(', ')}` : ''} (${ref} : ${lr.o}/${lr.t})`, '100 %',
-      lc.absents.length === 0 && lc.o === lc.t),
+    c('suite du candidat au juge final', meca(cand) ? (meca(cand)!.suite_ok ? 'ok' : 'ROUGE') : 'juge absent', 'ok', meca(cand)?.suite_ok === true),
+    c('attendu au juge final', `${ac ?? '–'} contre ${ar ?? '–'} (oui 2, en partie 1, non 0)`, `≥ ${ref}`, ac !== undefined && ar !== undefined && ac >= ar),
+    c('questions inutiles', `${inutiles}`, '0', inutiles === 0),
+    c('pièces lues avant le code', `${lus(lc)}${lc.absents.length ? `, non mesurée aux étapes ${lc.absents.join(', ')}` : ''} (${ref} : ${lus(lr)})`, '100 % en entier',
+      lc.absents.length === 0 && lc.entieres === lc.t),
     penteCritere('pente de duplication', (m) => m.duplication_pct, ' point'),
     penteCritere('pente des fichiers > 400 lignes', (m) => m.fichiers_400, ''),
     c('temps total', `${t(cand)} s contre ${t(ref)} s`, `≤ ${BARRE_SPEC.temps_max} × ${ref}`, t(cand) <= BARRE_SPEC.temps_max * t(ref)),
@@ -80,28 +87,26 @@ export function rapportSequence(r: ResultatSequence, ref: string, cand: string, 
     const l = [...a.fichiers_supprimes.map((f) => `fichier supprimé ${f}`), ...a.tests_retires.map((f) => `test retiré ${f}`), ...a.skip_only.map((f) => `.skip/.only ajouté ${f}`)];
     return l.length ? [l.join(' ; ')] : [];
   });
-  const remplaces = [ref, cand].map((b) => { const m = r.jugement?.meca[b]; return `- ${b} : ${!m ? 'juge absent' : m.remplaces.length ? m.remplaces.join(' ; ') : 'aucun'}`; });
+  const remplaces = !r.jugement ? ['- juge absent'] : (r.jugement.remplaces ?? []).length ? r.jugement.remplaces!.map((t) => `- ${t}`) : ['- aucun'];
   return [`# Séquence ${r.sequence} ${e.date} — ${cand} contre ${ref} — ${v.vert ? 'VERT' : 'ROUGE'}`, '', `Empreinte de v2 : ${e.empreinte}`, `Passage : ${r.run}`, '',
     `| Étape | Régressions ${ref} · ${cand} (rouges/disparus) | Affaiblis ${ref} · ${cand} | Nouveaux ${ref} · ${cand} | Lecture ${ref} · ${cand} | Build ${ref} · ${cand} | Duplication ${ref} · ${cand} | Fichiers > 400 ${ref} · ${cand} | Temps ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|', zero, ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
     ...v.criteres.map((x) => `| ${x.nom} | ${x.valeur} | ${x.seuil} | ${x.ok ? 'ok' : '**ROUGE**'} |`), '',
     ...([['Lectures à vérifier', lectures], ['Questions posées', questions], ['Tests affaiblis', affaiblisListe]] as const).flatMap(([titre, l]) => (l.length ? [`## ${titre}`, '', ...l, ''] : [])),
-    '## Tests remplacés (R28)', '', ...remplaces, ''].join('\n');
+    `## Tests remplacés (R28), non comptés pour ${ref} ni pour ${cand}`, '', ...remplaces, ''].join('\n');
 }
 
 /** Ligne `historique.jsonl` d'une séquence : `bancs` = [id de la séquence], jamais hebdo ni frais. */
-export const ligneSequence = (v: Verdict, e: { date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; sequence: string }) => {
-  const { sequence, ...reste } = e;
-  return ligneHistorique(v, { type: 'sequence', ...reste, bancs: [sequence], hebdo: false, frais: 0 });
-};
+export const ligneSequence = (v: Verdict, e: { date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; sequence: string; run: string; repetition: number }) =>
+  ligneHistorique(v, { type: 'sequence', ...e, bancs: [e.sequence], hebdo: false, frais: 0 });
 
 /** Verdict, rapport (md et json) dans `rapports/` et ligne d'historique d'une séquence passée. */
-export function conclureSequence(racine: string, r: ResultatSequence, ref: string, cand: string, e: { maintenant: Date; empreinte: string; modele_candidat: string }): Verdict {
-  const v = verdictSequence(r, ref, cand);
-  const base = join(racine, 'rapports', `${r.run}-${r.sequence}`);
+export function conclureSequence(racine: string, r: ResultatSequence, ref: string, cand: string, e: { maintenant: Date; empreinte: string; modele_candidat: string; repetition?: number }): Verdict {
+  const v = verdictSequence(r, ref, cand), repetition = e.repetition ?? 1;
+  const base = join(racine, 'rapports', `${r.run}-${r.sequence}-r${repetition}`);
   mkdirSync(join(racine, 'rapports'), { recursive: true });
   writeFileSync(`${base}.md`, rapportSequence(r, ref, cand, v, { date: parisJour(e.maintenant).jour, empreinte: e.empreinte }));
   writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultat: r }, null, 2));
-  appendFileSync(join(racine, 'historique.jsonl'), `${ligneSequence(v, { date: e.maintenant.toISOString(), empreinte: e.empreinte, candidat: cand, reference: ref, modele_candidat: e.modele_candidat, sequence: r.sequence })}\n`);
+  appendFileSync(join(racine, 'historique.jsonl'), `${ligneSequence(v, { date: e.maintenant.toISOString(), empreinte: e.empreinte, candidat: cand, reference: ref, modele_candidat: e.modele_candidat, sequence: r.sequence, run: r.run, repetition })}\n`);
   return v;
 }

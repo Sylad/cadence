@@ -14,12 +14,12 @@ const etape = (k: number, o: Partial<MesureEtape> = {}): MesureEtape => ({
   lecture: { ouvertes: ['p1'], manquantes: [], apres_ecriture: [], partielles: [] }, suite: { passes: 10, total: 10 },
   regressions: { rouges: [], disparus: [] }, nouveaux: ['n'], tests_affaiblis: { fichiers_supprimes: [], tests_retires: [], skip_only: [] },
   build_ok: true, maintenabilite: maint(2, 1), ...o });
-const meca = (o: Partial<Meca> = {}): Meca => ({ suite_ok: true, caches_passes: 10, caches_total: 12, mutations_tuees: 5, mutations_total: 6, attendu: 'oui', mutations: [], remplaces: ['t1'], ...o });
+const meca = (o: Partial<Meca> = {}): Meca => ({ suite_ok: true, caches_passes: 10, caches_total: 12, mutations_tuees: 5, mutations_total: 6, attendu: 'oui', mutations: [], ...o });
 const base = (): Base => ({ suite: { passes: 10, total: 10 }, build_ok: true, maintenabilite: maint(2, 1) });
 function seq(f: (r: ResultatSequence) => void = () => {}): ResultatSequence {
   const r: ResultatSequence = { run: 'r1', sequence: 'aether-b68', clones: { c1: 'A', c2: 'C' }, base: { A: base(), C: base() },
     etapes: { A: [etape(1), etape(2)], C: [etape(1), etape(2)] },
-    jugement: { meca: { A: meca(), C: meca() }, defauts: {}, prefere: 'egal', ui: 'na', raisons: '' } };
+    jugement: { meca: { A: meca(), C: meca() }, remplaces: ['t1'], defauts: {}, prefere: 'egal', ui: 'na', raisons: '' } };
   f(r);
   return r;
 }
@@ -33,6 +33,7 @@ describe('verdictSequence : un critère par ligne, vert puis rouge', () => {
     expect(rouges(seq((r) => { r.etapes = { A: [], C: [] }; }))).toContain('au moins une étape');
     expect(rouges(seq((r) => { r.etapes = {}; }))).toContain('au moins une étape');
     expect(rouges(seq((r) => { r.etapes.C = [etape(1)]; }))).toContain('au moins une étape'); // pas le même nombre d'étapes
+    expect(rouges(seq((r) => { r.etapes.C = [etape(1), etape(3)]; }))).toContain('au moins une étape'); // pas les mêmes numéros
   });
   it('régressions ≤ référence, cumulées sur la séquence (rouges + disparus)', () => {
     expect(crit(seq((r) => { r.etapes.A[0].regressions = { rouges: ['a'], disparus: [] }; r.etapes.C[1].regressions = { rouges: [], disparus: ['b'] }; }), 'régressions'))
@@ -55,17 +56,27 @@ describe('verdictSequence : un critère par ligne, vert puis rouge', () => {
     expect(crit(seq((r) => { r.jugement!.meca.C.caches_passes = 11; }), 'tests cachés cumulés')).toMatchObject({ valeur: '11 contre 10', ok: true });
     expect(crit(seq((r) => { r.jugement!.meca.C.caches_passes = 9; }), 'tests cachés cumulés')).toMatchObject({ ok: false });
     const sans = seq((r) => { r.jugement = null; });
-    expect(rouges(sans)).toEqual(expect.arrayContaining(['juge final fait', 'tests cachés cumulés', 'tests remplacés symétriques']));
+    expect(rouges(sans)).toEqual(expect.arrayContaining(['juge final fait', 'tests cachés cumulés', 'suite du candidat au juge final', 'attendu au juge final']));
   });
-  it('tests remplacés : la même liste pour les deux bras, sinon rouge', () => {
-    expect(crit(seq((r) => { r.jugement!.meca.C.remplaces = ['t1']; }), 'tests remplacés symétriques')).toMatchObject({ ok: true });
-    expect(crit(seq((r) => { r.jugement!.meca.C.remplaces = []; }), 'tests remplacés symétriques')).toMatchObject({ valeur: '0 contre 1', ok: false });
+  it('juge final : suite du candidat verte ; attendu (oui 2, en partie 1, non 0) ≥ référence', () => {
+    expect(rouges(seq((r) => { r.jugement!.meca.C.suite_ok = false; }))).toEqual(['suite du candidat au juge final']);
+    expect(rouges(seq((r) => { r.jugement!.meca.A.suite_ok = false; }))).toEqual([]);
+    expect(crit(seq((r) => { r.jugement!.meca.C.attendu = 'en partie'; }), 'attendu au juge final')).toMatchObject({ valeur: '1 contre 2 (oui 2, en partie 1, non 0)', ok: false });
+    expect(crit(seq((r) => { r.jugement!.meca.A.attendu = 'non'; r.jugement!.meca.C.attendu = 'en partie'; }), 'attendu au juge final')).toMatchObject({ ok: true });
+  });
+  it('questions inutiles du candidat = 0 ; une étape avec reponses.md les permet', () => {
+    expect(crit(seq((r) => { r.etapes.C[1].mesure.questions = 1; }), 'questions inutiles')).toMatchObject({ valeur: '1', ok: false });
+    expect(crit(seq((r) => { r.etapes.C[1].mesure.questions = 1; r.etapes.C[1].reponses = true; }), 'questions inutiles')).toMatchObject({ ok: true });
+    expect(crit(seq((r) => { r.etapes.A[1].mesure.questions = 3; }), 'questions inutiles')).toMatchObject({ ok: true });
   });
   it('lecture : 100 % des pièces du candidat avant le code ; la référence est montrée, pas bloquante', () => {
     const lu = { ouvertes: [], manquantes: ['p1'], apres_ecriture: [], partielles: [] };
     expect(crit(seq((r) => { r.etapes.A[0].lecture = lu; }), 'pièces lues avant le code')).toMatchObject({ valeur: '2/2 (A : 1/2)', ok: true });
     expect(crit(seq((r) => { r.etapes.C[1].lecture = { ...lu, manquantes: [], apres_ecriture: ['p1'] }; }), 'pièces lues avant le code')).toMatchObject({ valeur: '1/2 (A : 2/2)', ok: false });
     expect(crit(seq((r) => { r.etapes.C[1].lecture = undefined; }), 'pièces lues avant le code')).toMatchObject({ ok: false });
+    // lue en partie (offset, limit, pages) : ne compte pas (R30)
+    expect(crit(seq((r) => { r.etapes.C[1].lecture = { ouvertes: ['p1'], manquantes: [], apres_ecriture: [], partielles: ['p1'] }; }), 'pièces lues avant le code'))
+      .toMatchObject({ valeur: '1/2 (1 partiel) (A : 2/2)', ok: false });
     const sansPiece = { ouvertes: [], manquantes: [], apres_ecriture: [], partielles: [] };
     expect(crit(seq((r) => { for (const b of ['A', 'C']) for (const e of r.etapes[b]) e.lecture = sansPiece; }), 'pièces lues avant le code')).toMatchObject({ ok: true });
   });
@@ -104,7 +115,7 @@ describe('rapport, historique et publication de la séquence', () => {
       x.etapes.C[1].tests_affaiblis = { fichiers_supprimes: ['f.spec.ts'], tests_retires: ['g.spec.ts > t'], skip_only: [] };
       x.etapes.A[1].fuites_a_verifier = ['/x/runs/r'];
       x.etapes.C[1].mesure.questions_texte = ['Quel format ?'];
-      x.jugement!.meca.C.remplaces = ['t1', 't2'];
+      x.jugement!.remplaces = ['a.spec.ts > t1', 'b.spec.ts > t2'];
     });
     const md = rapportSequence(r, 'A', 'C', v(r), { date: '2026-11-08', empreinte: 'e1' });
     expect(md).toMatch(/^# Séquence aether-b68 2026-11-08 — C contre A — ROUGE/);
@@ -115,28 +126,28 @@ describe('rapport, historique et publication de la séquence', () => {
     for (const c of v(r).criteres) expect(md).toContain(`| ${c.nom} |`);
     expect(md).toContain('## Lectures à vérifier\n\n- A étape 2 : /x/runs/r\n- C étape 1 : pièce lue en partie, p1');
     expect(md).toContain('## Questions posées\n\n- C étape 2 : Quel format ?');
-    expect(md).toContain('## Tests remplacés (R28)\n\n- A : t1\n- C : t1 ; t2');
+    expect(md).toContain('## Tests remplacés (R28), non comptés pour A ni pour C\n\n- a.spec.ts > t1\n- b.spec.ts > t2');
     expect(md).toContain('## Tests affaiblis\n\n- C étape 2 : fichier supprimé f.spec.ts ; test retiré g.spec.ts > t');
     const nul = seq((x) => { x.etapes.C[1] = etape(2, { regressions: undefined, suite_en_erreur: 'boom', maintenabilite: maint(null, 1) }); });
     expect(rapportSequence(nul, 'A', 'C', v(nul), { date: 'd', empreinte: 'e' })).toContain('| 2 | 0/0 · ERREUR |');
   });
   it('ligne d\'historique type sequence, avec candidat, référence, modèle et empreinte', () => {
-    const h = JSON.parse(ligneSequence(v(seq()), { date: 'd', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', sequence: 'aether-b68' }));
-    expect(h).toMatchObject({ type: 'sequence', candidat: 'C', reference: 'A', modele_candidat: 'opus', empreinte: 'e1', bancs: ['aether-b68'], hebdo: false, vert: true, rouges: [] });
+    const h = JSON.parse(ligneSequence(v(seq()), { date: 'd', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', sequence: 'aether-b68', run: 'r1', repetition: 2 }));
+    expect(h).toMatchObject({ type: 'sequence', sequence: 'aether-b68', run: 'r1', repetition: 2, candidat: 'C', reference: 'A', modele_candidat: 'opus', empreinte: 'e1', bancs: ['aether-b68'], hebdo: false, vert: true, rouges: [] });
   });
   it('conclureSequence écrit le rapport, le JSON et la ligne d\'historique', () => {
     const racine = mkdtempSync(join(tmpdir(), 'seq-v-'));
-    const vv = conclureSequence(racine, seq(), 'A', 'C', { maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', modele_candidat: 'opus' });
+    const vv = conclureSequence(racine, seq(), 'A', 'C', { maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', modele_candidat: 'opus', repetition: 2 });
     expect(vv.vert).toBe(true);
-    expect(readFileSync(join(racine, 'rapports', 'r1-aether-b68.md'), 'utf8')).toMatch(/— VERT/);
-    expect(JSON.parse(readFileSync(join(racine, 'rapports', 'r1-aether-b68.json'), 'utf8')).verdict.vert).toBe(true);
-    expect(JSON.parse(readFileSync(join(racine, 'historique.jsonl'), 'utf8').trim())).toMatchObject({ type: 'sequence', vert: true });
+    expect(readFileSync(join(racine, 'rapports', 'r1-aether-b68-r2.md'), 'utf8')).toMatch(/— VERT/);
+    expect(JSON.parse(readFileSync(join(racine, 'rapports', 'r1-aether-b68-r2.json'), 'utf8')).verdict.vert).toBe(true);
+    expect(JSON.parse(readFileSync(join(racine, 'historique.jsonl'), 'utf8').trim())).toMatchObject({ type: 'sequence', sequence: 'aether-b68', run: 'r1', repetition: 2, vert: true });
   });
 
   const now = new Date('2026-11-09T08:00:00Z'); const modeles = { C: 'opus', A: 'opus' };
   const court = (o: Record<string, unknown> = {}) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus',
     bancs: ['1-a', '3-b', '6-c'], hebdo: true, frais: 0, vert: true, rouges: [], ...o });
-  const sequence = (o: Record<string, unknown> = {}) => court({ type: 'sequence', bancs: ['aether-b68'], hebdo: false, ...o });
+  const sequence = (o: Record<string, unknown> = {}) => court({ type: 'sequence', sequence: 'aether-b68', run: 'run1', repetition: 1, bancs: ['aether-b68'], hebdo: false, ...o });
   const ok = (h: string[], m: Record<string, string> = modeles) => statut(h, now, 'e1', m).publication_ok;
   it('publication : court ET séquence verts, même candidat, même modèle', () => {
     expect(ok([court(), sequence()])).toBe(true);
@@ -155,8 +166,22 @@ describe('rapport, historique et publication de la séquence', () => {
     expect(ok([court(), sequence({ empreinte: 'e2' })])).toBe(false);
     expect(ok([court(), sequence({ reference: undefined })])).toBe(false);
   });
+  it('R30 : chaque id de séquence, toutes les lignes de son dernier run (répétitions) et celles qui suivent, vertes', () => {
+    const triviale = sequence({ sequence: 'triviale', bancs: ['triviale'], run: 'run2' });
+    expect(ok([court(), sequence({ vert: false }), triviale])).toBe(false); // une triviale verte ne débloque pas la principale rouge
+    expect(ok([court(), sequence(), triviale])).toBe(true);
+    expect(ok([court(), sequence({ run: 'run2' }), sequence({ run: 'run2', repetition: 2, vert: false })])).toBe(false);
+    expect(ok([court(), sequence({ run: 'run2', vert: false }), sequence({ run: 'run2', repetition: 2 })])).toBe(false);
+    expect(ok([court(), sequence({ vert: false }), sequence({ run: 'run2' }), sequence({ run: 'run2', repetition: 2 })])).toBe(true); // rouge d'un run plus ancien
+    expect(ok([court(), sequence({ run: undefined })])).toBe(false);
+  });
+  it('statut saute les lignes illisibles ou sans date valide ; dernier dit « séquence »', () => {
+    const s = statut(['pas du json', '{"vert":true}', JSON.stringify({ date: 'hier', vert: true }), court(), sequence()], now, 'e1', modeles);
+    expect(s.publication_ok).toBe(true);
+    expect(s.dernier).toBe('2026-11-07T10:00:00Z séquence vert (e1)');
+  });
   it('une séquence ne compte ni comme court, ni comme rouge d\'un court ; un éclair rouge après le court bloque toujours', () => {
-    expect(ok([court(), sequence({ vert: false }), sequence()])).toBe(true);
+    expect(ok([court(), sequence({ vert: false }), sequence({ run: 'run2' })])).toBe(true);
     expect(ok([court(), sequence(), court({ bancs: ['1-a'], eclair_ok: false })])).toBe(false);
   });
 });

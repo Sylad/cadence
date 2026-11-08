@@ -17,7 +17,8 @@ export interface Ecart { rouges: string[]; disparus: string[] }
 /** Ce que le diff de l'étape a retiré aux tests, en ids « fichier > titre » (titre seul, sans les describe) : ils ne se joignent PAS aux ids de la suite, le rapport les montre à part. */
 export interface Affaiblis { fichiers_supprimes: string[]; tests_retires: string[]; skip_only: string[] }
 export interface MesureEtape {
-  k: number; portee_suite: string; mesure: Mesure; fuites: string[]; fuites_a_verifier: string[];
+  /** `reponses` : l'étape a un reponses.md (une question y est utile) ; sans lui, toute question du candidat est inutile. */
+  k: number; portee_suite: string; reponses?: boolean; mesure: Mesure; fuites: string[]; fuites_a_verifier: string[];
   lecture?: ReturnType<typeof lectureReferences>; suite?: { passes: number; total: number }; suite_en_erreur: string | null;
   regressions?: Ecart; nouveaux?: string[]; tests_affaiblis?: Affaiblis; build_ok?: boolean; maintenabilite?: ReturnType<typeof maintenabilite>;
   mesure_en_erreur: string | null;
@@ -168,7 +169,7 @@ function lancer(x: Ctx, e: Etape, b: string, avant: { head: string; sale: string
 /** Une étape pour un bras : chaque mesure dans sa phase ; une mesure qui lève est notée et la séquence continue. */
 function jouerEtape(x: Ctx, e: Etape, b: string): MesureEtape {
   const c = x.clones[b], transcripts = empreintes(x, c);
-  const me: MesureEtape = { k: e.k, portee_suite: x.s.suite_projet.portee, mesure: mesureVide(b, x.s.id, 'non lancé'),
+  const me: MesureEtape = { k: e.k, portee_suite: x.s.suite_projet.portee, reponses: existsSync(join(dirname(e.demande), 'reponses.md')), mesure: mesureVide(b, x.s.id, 'non lancé'),
     fuites: [], fuites_a_verifier: [], suite_en_erreur: null, mesure_en_erreur: null };
   let phase = 'état avant';
   try {
@@ -210,7 +211,7 @@ function demandesDuJuge(s: Sequence): string {
   return `\n\nCe que tu juges est l'état final d'une suite de ${s.etapes.length} demandes successives (demande.md = la dernière) ; juge l'ensemble, base..HEAD de toute la suite :\n${demandes}\n\n`
     + 'Tests cachés d\'origine, écrits pour le code d\'origine. Règle unique, la même pour X et Y : adapte seulement les sélecteurs, imports et noms renommés ; '
     + 'quand une demande ULTÉRIEURE change un comportement testé par un test d\'une demande antérieure, c\'est la demande ultérieure qui fait foi : '
-    + 'marque ce test « remplacé par l\'étape k » au lieu de le compter, et liste-le (champ "remplaces" de la copie, une ligne par test).\n'
+    + 'marque ce test « remplacé par l\'étape k » au lieu de le compter, et liste-le dans le champ "remplaces" (une seule liste pour X et Y, décidée avant de juger l\'une ou l\'autre).\n'
     + `${caches.join('\n')}\n`;
 }
 

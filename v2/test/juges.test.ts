@@ -7,7 +7,7 @@ import type { Banc } from '../src/bench/banc.js';
 import type { Executeur } from '../src/bench/bras.js';
 import { anonymiser, juger, validerAveugle, validerMeca } from '../src/bench/juges.js';
 
-const meca = { suite_ok: true, caches_passes: 2, caches_total: 2, mutations_tuees: 5, mutations_total: 6, attendu: 'oui', mutations: [], remplaces: [] };
+const meca = { suite_ok: true, caches_passes: 2, caches_total: 2, mutations_tuees: 5, mutations_total: 6, attendu: 'oui', mutations: [] };
 const aveugle = { X: { bloquants: 0, majeurs: 1, mineurs: 0 }, Y: { bloquants: 0, majeurs: 0, mineurs: 2 }, prefere: 'Y', ui: 'na', raisons: 'r' };
 
 function decor(): { b: Banc; clones: Record<string, string>; dirEval: string } {
@@ -46,20 +46,21 @@ describe('juges', () => {
     expect(anonymiser(['A', 'cand'], () => 0.8)).toEqual({ X: 'cand', Y: 'A' });
   });
   it('valide les JSON des juges', () => {
-    expect(validerMeca({ X: meca, Y: meca })).toEqual([]);
-    expect(validerMeca({ X: meca })).toEqual(['Y manquant']);
-    expect(validerMeca({ X: { ...meca, caches_passes: 3 }, Y: meca })).toEqual(['X.caches_passes > caches_total']);
-    expect(validerMeca({ X: { ...meca, remplaces: ['a > t'] }, Y: meca })).toEqual([]);
-    expect(validerMeca({ X: { ...meca, remplaces: undefined }, Y: meca })).toEqual(["X.remplaces n'est pas une liste de textes"]);
-    expect(validerMeca({ X: meca, Y: { ...meca, remplaces: [3] } })).toEqual(["Y.remplaces n'est pas une liste de textes"]);
+    expect(validerMeca({ X: meca, Y: meca, remplaces: [] })).toEqual([]);
+    expect(validerMeca({ X: meca, remplaces: [] })).toEqual(['Y manquant']);
+    expect(validerMeca({ X: { ...meca, caches_passes: 3 }, Y: meca, remplaces: [] })).toEqual(['X.caches_passes > caches_total']);
+    expect(validerMeca({ X: meca, Y: meca, remplaces: ['a.spec.ts > t'] })).toEqual([]);
+    expect(validerMeca({ X: meca, Y: meca })).toEqual(["remplaces n'est pas une liste de textes"]);
+    expect(validerMeca({ X: meca, Y: meca, remplaces: [3] })).toEqual(["remplaces n'est pas une liste de textes"]);
     expect(validerAveugle(aveugle)).toEqual([]);
     expect(validerAveugle({ ...aveugle, prefere: 'Z' })).toEqual(['prefere doit valoir X, Y ou egal']);
   });
   it('désanonymise le jugement (X = A, Y = cand), garde-fous prod sur les sessions', () => {
     const { b, clones, dirEval } = decor();
     const vus: string[][] = [];
-    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: meca, Y: { ...meca, caches_passes: 1 } }, aveugle], vus, dirEval), () => 0.2);
+    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: meca, Y: { ...meca, caches_passes: 1 }, remplaces: ['o.spec.ts > t'] }, aveugle], vus, dirEval), () => 0.2);
     expect(j!.meca.cand.caches_passes).toBe(1);
+    expect(j!.remplaces).toEqual(['o.spec.ts > t']); // une seule liste, pour les deux bras
     expect(j!.defauts.A.majeurs).toBe(1);
     expect(j!.prefere).toBe('cand');
     expect(readFileSync(join(dirEval, 'demande.md'), 'utf8')).toBe('d');
@@ -87,7 +88,7 @@ describe('juges', () => {
     let n = 0;
     const exec: Executeur = (args) => {
       const m = /dans (\S+\.json)/.exec(args[args.indexOf('-p') + 1])!;
-      if (n++ === 0) { writeFileSync(join(dirEval, 'X', 'MUTATION'), 'm'); writeFileSync(m[1], JSON.stringify({ X: meca, Y: meca })); }
+      if (n++ === 0) { writeFileSync(join(dirEval, 'X', 'MUTATION'), 'm'); writeFileSync(m[1], JSON.stringify({ X: meca, Y: meca, remplaces: [] })); }
       else { expect(existsSync(join(dirEval, 'X', 'MUTATION'))).toBe(false); writeFileSync(m[1], JSON.stringify(aveugle)); }
       return { stdout: JSON.stringify({ session_id: `s${n}` }), code: 0 };
     };
@@ -96,8 +97,9 @@ describe('juges', () => {
   });
   it('tirage 0.8 : X = cand, Y = A', () => {
     const { b, clones, dirEval } = decor();
-    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: { ...meca, caches_passes: 1 }, Y: meca }, aveugle]), () => 0.8);
+    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: { ...meca, caches_passes: 1 }, Y: meca, remplaces: [] }, aveugle]), () => 0.8);
     expect(j!.meca.cand.caches_passes).toBe(1);
+    expect(j!.remplaces).toEqual([]);
     expect(j!.meca.A.caches_passes).toBe(2);
     expect(j!.defauts.cand.majeurs).toBe(1);
     expect(j!.defauts.A.mineurs).toBe(2);
@@ -105,7 +107,7 @@ describe('juges', () => {
   });
   it('premier JSON invalide, relance valide : accepté', () => {
     const { b, clones, dirEval } = decor();
-    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{}, { X: meca, Y: meca }, aveugle]), () => 0.2);
+    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{}, { X: meca, Y: meca, remplaces: [] }, aveugle]), () => 0.2);
     expect(j).not.toBeNull();
     expect(j!.prefere).toBe('cand');
   });

@@ -5,7 +5,7 @@ import { BARRE_SPEC, ligneHistorique, rapport, statut, verdict, type ResultatBan
 
 const mes = (bras: string, duree_s: number, questions = 0, echec: string | null = null): Mesure =>
   ({ bras, banc: 'b', debut: '', fin: '', duree_s, tokens: 1000, cout_usd: 1, questions, questions_texte: [], sessions: [], echec });
-const meca = (p: number, t: number): Meca => ({ suite_ok: true, caches_passes: p, caches_total: 10, mutations_tuees: t, mutations_total: 10, attendu: 'oui', mutations: [], remplaces: [] });
+const meca = (p: number, t: number): Meca => ({ suite_ok: true, caches_passes: p, caches_total: 10, mutations_tuees: t, mutations_total: 10, attendu: 'oui', mutations: [] });
 function banc(o: Partial<{ dA: number; dC: number; cA: number; cC: number; mA: number; mC: number; majA: number; majC: number; pref: string; ui: string;
   taille: 'retouche' | 'fonction'; qC: number; reponses: boolean; fuiteC: string[]; fuiteA: string[]; nonJuge: boolean; echecA: string; echecC: string }> = {}): ResultatBanc {
   const j: Jugement = { meca: { A: meca(o.cA ?? 8, o.mA ?? 8), C: meca(o.cC ?? 8, o.mC ?? 8) },
@@ -99,7 +99,7 @@ describe('rapport, historique, statut', () => {
     const s = statut([h('2026-11-06T10:00:00Z', true)], new Date('2026-11-09T08:00:00Z'), 'e1');
     expect(s.banc_du_weekend).toBe(false);
   });
-  const seqVerte = JSON.stringify({ type: 'sequence', date: '2026-11-07T12:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['s'], hebdo: false, frais: 0, vert: true, rouges: [] });
+  const seqVerte = JSON.stringify({ type: 'sequence', sequence: 's', run: 'r1', repetition: 1, date: '2026-11-07T12:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['s'], hebdo: false, frais: 0, vert: true, rouges: [] });
   it('passage samedi : banc du weekend fait ; publication seulement si vert sur la même empreinte (et séquence verte)', () => {
     const s = statut([h('2026-11-07T10:00:00Z', true, 'e1'), seqVerte], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' });
     expect(s).toMatchObject({ banc_du_weekend: true, publication_ok: true });
@@ -153,7 +153,7 @@ describe('répétitions (R18)', () => {
     const mt = rapport([t], 'A', 'C', v, { date: 'd', empreinte: 'e' });
     expect(mt).toContain('Taille déclarée A · C'); expect(mt).toContain('| – · Taille : fonction |'); expect(mt).toContain('## Lectures à vérifier\n\n- b/C : /x/runs/r');
     const ligne = JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a#1', '1-a#2', '3-x#1', '3-x#2', '6-y#1', '6-y#2'], hebdo: true, frais: 0, vert: true, rouges: [] });
-    const seq = JSON.stringify({ type: 'sequence', date: '2026-11-07T12:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['s'], hebdo: false, frais: 0, vert: true, rouges: [] });
+    const seq = JSON.stringify({ type: 'sequence', sequence: 's', run: 'r1', repetition: 1, date: '2026-11-07T12:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['s'], hebdo: false, frais: 0, vert: true, rouges: [] });
     expect(statut([ligne, seq], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(true);
   });
   it('une répétition non jugée : le banc compte egal, jamais la préférence de l\'autre', () => {
@@ -172,7 +172,7 @@ describe('publication : la dernière mesure réelle de l\'empreinte (C-1, I-7)',
   const l = (o: Record<string, unknown> = {}) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus',
     bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, vert: true, rouges: [], ...o });
   // une séquence verte du même candidat est ajoutée : ici on éprouve la règle du passage court (sequence-verdict.test.ts éprouve l'autre)
-  const seq = l({ type: 'sequence', bancs: ['s'] });
+  const seq = l({ type: 'sequence', sequence: 's', run: 'r1', repetition: 1, bancs: ['s'] });
   const ok = (h: string[], m: Record<string, string> = modeles) => statut([...h, seq], now, 'e1', m).publication_ok;
   it('vert sur 1, 3, 6, candidat ≠ référence, modèle du bras.yaml courant : permise', () => expect(ok([l()])).toBe(true));
   it('candidat = référence (A contre A) : refusée', () => expect(ok([l({ candidat: 'A' })])).toBe(false));

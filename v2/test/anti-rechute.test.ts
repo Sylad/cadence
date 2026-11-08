@@ -158,6 +158,15 @@ function reglesC5(f: Fichiers): string[] {
   if (!/vert: criteres\.every\(\(x\) => x\.ok \|\| !x\.bloquant\)/.test(t)) v.push('C5 : la formule du vert a changé');
   if (!/\['1', '3', '6'\]\.every/.test(t)) v.push('C5 : statut ne demande plus 1, 3 et 6');
   if (!/m\.candidat !== m\.reference/.test(t)) v.push('C5 : la publication accepte un candidat égal à la référence (A contre A)');
+  if (!/\n\s*&& seqOk\(seqs, \(s\) => reel\(s\) && s\.vert && s\.candidat === m\.candidat && s\.modele_candidat === m\.modele_candidat\),/.test(t))
+    v.push('C5 : la publication ne demande plus une séquence verte (R30)');
+  // banc séquence (S4, R30) : mêmes garde-fous sur sequence/verdict.ts
+  const q = f['src/sequence/verdict.ts'] ?? '';
+  if (!/return \{ vert: criteres\.every\(\(x\) => x\.ok \|\| !x\.bloquant\), criteres \};/.test(q)) v.push('C5 : séquence, la formule du vert a changé');
+  if (!/ok, bloquant: true \}\);/.test(q)) v.push('C5 : séquence, un critère n\'est plus bloquant');
+  if (!/c\(nom, 'non mesuré', [^\n]*?, false\)/.test(q)) v.push('C5 : séquence, une pente non mesurée n\'est plus rouge');
+  if (!/lc\.absents\.length === 0 && lc\.entieres === lc\.t\),/.test(q)) v.push('C5 : séquence, « pièces lues avant le code » n\'exige plus 100 % en entier');
+  if (/\|\|\s*true\b/.test(sansCommentaires(t) + sansCommentaires(q))) v.push('C5 : « || true » dans un verdict');
   return v;
 }
 
@@ -230,6 +239,11 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C5', 'critère ok constant', 'src/bench/verdict.ts', remplace("'0', fuites.length === 0)", "'0', true)")],
   ['C1', 'second gabarit toléré par erreur', 'src/bench/juges.ts', ajout('// un gabarit de plus')],
   ['C1', 'seconde conformité', 'src/bench/ajouter.ts', ajout('// conformité')],
+  // banc séquence (R30)
+  ['C5', 'séquence : pièces lues neutralisé', 'src/sequence/verdict.ts', remplace('lc.entieres === lc.t)', 'lc.entieres >= 0)')],
+  ['C5', 'séquence : pente non mesurée verte', 'src/sequence/verdict.ts', remplace("'non mesuré', `≤ ${ref}`, false)", "'non mesuré', `≤ ${ref}`, true)")],
+  ['C5', 'publication sans séquence', 'src/bench/verdict.ts', remplace(/\n\s*&& seqOk\([^\n]*\),/, ',')],
+  ['C5', 'séquence : || true sur le every final', 'src/sequence/verdict.ts', remplace('x.ok || !x.bloquant)', 'x.ok || !x.bloquant || true)')],
   ['C3', 'porte déguisée en controle', 'src/bench/banc.ts', ajout('controle(a);\ncheckAll(b);\nverif(c);')],
 ];
 describe('mutation : chaque régression connue est détectée', () => {
@@ -271,7 +285,7 @@ describe('C5, comportement de verdict, rapport et historique', () => {
     const ligne = (bancs: string[]) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', vert: true, hebdo: false, frais: 0, bancs });
     const now = new Date('2026-11-07T12:00:00Z');
     expect(statut([ligne(['1-a', '3-b'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(false);
-    const seq = JSON.stringify({ ...JSON.parse(ligne(['s'])), type: 'sequence' });
+    const seq = JSON.stringify({ ...JSON.parse(ligne(['s'])), type: 'sequence', sequence: 's', run: 'r1', repetition: 1 });
     expect(statut([ligne(['1-a', '3-b', '6-c'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(false); // sans séquence verte
     expect(statut([ligne(['1-a', '3-b', '6-c']), seq], now, 'e1', { C: 'opus' }).publication_ok).toBe(true);
   });

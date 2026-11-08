@@ -9,5 +9,5 @@ Pour CHAQUE copie, avec exactement la même méthode pour les deux :
 4. Attendu : oui / en partie / non, au sens de {{MESURE}}.
 
 Écris UNIQUEMENT ce JSON dans {{SORTIE}}, rien d'autre :
-remplaces : les tests cachés marqués « remplacé par l'étape k » (liste vide s'il n'y en a pas).
-{"X":{"suite_ok":true,"caches_passes":0,"caches_total":0,"mutations_tuees":0,"mutations_total":0,"attendu":"oui","mutations":[{"ou":"fichier:ligne","quoi":"avant → après","tuee":true}],"remplaces":[]},"Y":{…même forme…}}
+remplaces : UNE liste pour les deux copies, décidée d'après les demandes AVANT de juger X ou Y, et appliquée aux deux : les tests cachés marqués « remplacé par l'étape k », chacun sous la forme « fichier d'origine > titre » (liste vide s'il n'y en a pas).
+{"X":{"suite_ok":true,"caches_passes":0,"caches_total":0,"mutations_tuees":0,"mutations_total":0,"attendu":"oui","mutations":[{"ou":"fichier:ligne","quoi":"avant → après","tuee":true}]},"Y":{…même forme…},"remplaces":["fichier d'origine > titre"]}

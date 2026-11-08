@@ -39,7 +39,7 @@ regression: { a_partir_de: 3, fichiers: [reg.ts], commande: vr }\n`);
   return { r, d };
 }
 
-const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuees: 1, mutations_total: 1, attendu: 'oui', mutations: [], remplaces: [] };
+const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuees: 1, mutations_total: 1, attendu: 'oui', mutations: [] };
 let horloge = 0;
 const outil = (name: string, input: object) => JSON.stringify({ type: 'assistant', timestamp: new Date(Date.UTC(2026, 10, 8) + ++horloge * 1000).toISOString(), message: { content: [{ type: 'tool_use', name, input }] } });
 type Geste = (c: string, ecrire: (lignes: string[], sous?: string) => void) => void | 'plante' | 'erreur';
@@ -52,7 +52,7 @@ function faux(r: string, d: string, gestes: Record<string, Geste>) {
     const j = /dans (\S+\.json)/.exec(p);
     if (j) {
       vu.juges.push(p);
-      writeFileSync(j[1], JSON.stringify(j[1].endsWith('meca.json') ? { X: meca, Y: meca }
+      writeFileSync(j[1], JSON.stringify(j[1].endsWith('meca.json') ? { X: meca, Y: meca, remplaces: [] }
         : { X: { bloquants: 0, majeurs: 0, mineurs: 0 }, Y: { bloquants: 0, majeurs: 0, mineurs: 0 }, prefere: 'egal', ui: 'na', raisons: '' }));
       return { stdout: JSON.stringify({ session_id: 'j', total_cost_usd: 0, modelUsage: {} }), code: 0 };
     }
@@ -113,6 +113,7 @@ describe('passage d\'une séquence', () => {
     expect(A[0].fuites).toEqual([]); expect(C[0].fuites).toEqual([join(d, 'etapes', '3', 'demande.md')]);
     expect(A[2].fuites).toEqual([dir('etape-1.c2.json'), dir('suite-0.c2.json')]); // M3 : son build-1.log est permis, les mesures de l'autre non
     expect(A.every((e) => e.build_ok && e.portee_suite === 'Suite mesurée : tout le dépôt')).toBe(true);
+    expect(A.every((e) => typeof e.reponses === 'boolean')).toBe(true); // questions inutiles du verdict
     expect(res.clones).toEqual({ c1: 'A', c2: 'C' });
     expect(vu.juges).toHaveLength(2);
     for (const t of ['1. demande 1', '3. demande 3', 'c2.ts (v2)', 'reg.ts (vr)', 'remplacé par l\'étape k']) expect(vu.juges[0]).toContain(t);

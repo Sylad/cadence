@@ -81,7 +81,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
     ...[['Lectures à vérifier', lectures], ['Questions posées', questions]].flatMap(([t, l]) => (l.length ? [`## ${t}`, '', ...l, ''] : []))].join('\n');
 }
 
-export const ligneHistorique = (v: Verdict, e: { type?: 'sequence'; date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; bancs: string[]; hebdo: boolean; frais: number; eclair_ok?: boolean }) =>
+export const ligneHistorique = (v: Verdict, e: { type?: 'sequence'; sequence?: string; run?: string; repetition?: number; date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; bancs: string[]; hebdo: boolean; frais: number; eclair_ok?: boolean }) =>
   JSON.stringify({ ...e, vert: v.vert, rouges: v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom) });
 
 const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -97,29 +97,42 @@ function samediCourant(d: Date): string {
   return new Date(Date.UTC(y, m - 1, j - ((sem + 1) % 7))).toISOString().slice(0, 10);
 }
 
-type Ligne = { type?: string; date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number; bancs?: string[]; candidat?: string; reference?: string; modele_candidat?: string; eclair_ok?: boolean };
+type Ligne = { type?: string; sequence?: string; run?: string; date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number; bancs?: string[]; candidat?: string; reference?: string; modele_candidat?: string; eclair_ok?: boolean };
+
+/** Au moins une séquence ; pour chaque id, de la première ligne de son dernier run à la fin, toutes les lignes passent `ok`. */
+function seqOk(seqs: Ligne[], ok: (s: Ligne) => boolean): boolean {
+  const ids = [...new Set(seqs.map((x) => x.sequence ?? ''))];
+  return ids.length > 0 && ids.every((id) => {
+    const l = seqs.filter((x) => (x.sequence ?? '') === id);
+    const run = l.at(-1)!.run;
+    return run !== undefined && l.slice(l.findIndex((x) => x.run === run)).every(ok);
+  });
+}
 
 /** `modeles` : nom du bras -> modèle, lus dans le bras.yaml courant (le modèle n'est pas dans l'empreinte). */
 export function statut(historique: string[], maintenant: Date, empreinte: string, modeles: Record<string, string> = {}) {
-  const h = historique.filter(Boolean).map((l) => JSON.parse(l) as Ligne);
+  const h = historique.flatMap((l) => { // une ligne illisible ou sans date valide est sautée, jamais levée
+    try { const x = JSON.parse(l) as Ligne; return typeof x?.date === 'string' && !Number.isNaN(Date.parse(x.date)) ? [x] : []; } catch { return []; }
+  });
   const sam = samediCourant(maintenant);
   const enWeekend = [6, 0].includes(parisJour(maintenant).sem);
   const depuisSamedi = h.filter((x) => parisJour(new Date(x.date)).jour >= sam);
   const dernier = h.at(-1);
   // Publication (C-1 pour chacun) : le DERNIER passage court de l'empreinte couvrant 1, 3 et 6 est vert, mesure un vrai candidat avec le modèle
   // du bras.yaml courant, et aucun passage court rouge de cette empreinte (éclair compris) ne le suit ; la DERNIÈRE séquence de l'empreinte
-  // est verte, mesure un vrai candidat, avec le même candidat et le même modèle que ce passage court.
+  // est verte, mesure un vrai candidat, avec le même candidat et le même modèle que ce passage court. Séquences (R30) : pour CHAQUE id de séquence
+  // de l'empreinte, toutes les lignes de son dernier run (répétitions) et toutes celles qui suivent sont vertes et réelles, même candidat et modèle.
   const miennes = h.filter((x) => x.empreinte === empreinte);
   const courts = miennes.filter((x) => x.type !== 'sequence');
   const i = courts.map((x) => ['1', '3', '6'].every((n) => (x.bancs ?? []).some((id) => banBase(id).split('-')[0] === n))).lastIndexOf(true);
-  const m = courts[i], s = miennes.filter((x) => x.type === 'sequence').at(-1);
+  const m = courts[i], seqs = miennes.filter((x) => x.type === 'sequence');
   const reel = (m: Ligne | undefined): m is Ligne => m !== undefined && typeof m.reference === 'string' && m.candidat !== m.reference
     && typeof m.modele_candidat === 'string' && modeles[m.candidat ?? ''] === m.modele_candidat;
   return {
-    dernier: dernier ? `${dernier.date} ${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
+    dernier: dernier ? `${dernier.date} ${dernier.type === 'sequence' ? 'séquence ' : ''}${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
     banc_du_weekend: enWeekend || depuisSamedi.some((x) => x.hebdo),
     publication_ok: empreinte !== 'inconnue' && reel(m) && !courts.slice(i).some((x) => !x.vert || x.eclair_ok === false)
-      && reel(s) && s.vert && s.candidat === m.candidat && s.modele_candidat === m.modele_candidat,
+      && seqOk(seqs, (s) => reel(s) && s.vert && s.candidat === m.candidat && s.modele_candidat === m.modele_candidat),
     frais_semaine: somme(depuisSamedi.map((x) => x.frais ?? 0)),
   };
 }

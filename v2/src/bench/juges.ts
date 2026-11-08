@@ -5,10 +5,10 @@ import { lireDemande, type Banc } from './banc.js';
 import { environnementNeutre, OUTILS_INTERDITS, type Executeur } from './bras.js';
 
 export interface Meca { suite_ok: boolean; caches_passes: number; caches_total: number; mutations_tuees: number; mutations_total: number;
-  attendu: 'oui' | 'en partie' | 'non'; mutations: { ou: string; quoi: string; tuee: boolean }[];
-  /** Tests cachés remplacés par une demande ultérieure (R28), non comptés ; vide pour un banc. */ remplaces: string[] }
+  attendu: 'oui' | 'en partie' | 'non'; mutations: { ou: string; quoi: string; tuee: boolean }[] }
 export interface Defauts { bloquants: number; majeurs: number; mineurs: number }
-export interface Jugement { meca: Record<string, Meca>; defauts: Record<string, Defauts>; prefere: string; ui: string; raisons: string }
+/** `remplaces` (R28, R30) : tests cachés remplacés par une demande ultérieure, une liste UNIQUE décidée avant X et Y, non comptée pour les deux. */
+export interface Jugement { meca: Record<string, Meca>; remplaces?: string[]; defauts: Record<string, Defauts>; prefere: string; ui: string; raisons: string }
 
 const BRIEFS = join(import.meta.dirname, '..', '..', 'briefs');
 const HORS_DIFF = [':(exclude).cadence', ':(exclude)docs/plan', ':(exclude)cadence.yaml'];
@@ -37,9 +37,10 @@ export function validerMeca(o: unknown): string[] {
     if (m.caches_passes > m.caches_total) e.push(`${k}.caches_passes > caches_total`);
     if (m.mutations_tuees > m.mutations_total) e.push(`${k}.mutations_tuees > mutations_total`);
     if (typeof m.suite_ok !== 'boolean') e.push(`${k}.suite_ok n'est pas un booléen`);
-    if (!Array.isArray(m.remplaces) || m.remplaces.some((t) => typeof t !== 'string')) e.push(`${k}.remplaces n'est pas une liste de textes`);
     if (!['oui', 'en partie', 'non'].includes(m.attendu)) e.push(`${k}.attendu doit valoir oui, en partie ou non`);
   }
+  const r = (o as { remplaces?: unknown } | null)?.remplaces;
+  if (!Array.isArray(r) || r.some((t) => typeof t !== 'string')) e.push('remplaces n\'est pas une liste de textes');
   return e;
 }
 
@@ -104,7 +105,7 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
     if (!copier()) return null;
     const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests, DEMANDES: demandes };
     const sMeca = join(dirEval, 'meca.json');
-    const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca }), sMeca, validerMeca, dirEval, modele, exec) as Record<'X' | 'Y', Meca> | null;
+    const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca }), sMeca, validerMeca, dirEval, modele, exec) as (Record<'X' | 'Y', Meca> & { remplaces: string[] }) | null;
     if (!copier()) return null; // le juge à l'aveugle voit les livrables, pas les mutations
     const ecran = b.visible
       ? `Lance l'app de chaque copie, l'une après l'autre, comme le dit ${v.MESURE} (section Écran). Fais des captures à 1440 et à 390 px dans ${dirEval}/captures-X et captures-Y, et regarde-les. ui = la copie dont l'écran est le plus cohérent avec le reste de l'application.`
@@ -115,7 +116,7 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
     if (!meca || !av) return null;
     const nom = (x: string) => (x === 'X' || x === 'Y' ? anon[x] : x);
     return {
-      meca: { [anon.X]: meca.X, [anon.Y]: meca.Y }, defauts: { [anon.X]: av.X, [anon.Y]: av.Y },
+      meca: { [anon.X]: meca.X, [anon.Y]: meca.Y }, remplaces: meca.remplaces, defauts: { [anon.X]: av.X, [anon.Y]: av.Y },
       prefere: nom(av.prefere), ui: nom(av.ui), raisons: av.raisons,
     };
   } finally { for (const k of ['X', 'Y']) rmSync(join(dirEval, k), { recursive: true, force: true }); } // copies effacées sur tous les chemins

@@ -1,50 +1,119 @@
 import { execFileSync, execSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, rmdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 
 export class CloneModifie extends Error {}
-export interface ResultatTests { passes: number; total: number; echoues: string[]; statuts: Record<string, boolean> }
-interface Vitest { testResults?: { name: string; assertionResults?: { ancestorTitles?: string[]; title: string; status: string }[] }[] }
+export class TestsIntrouvables extends Error {}
+export interface ResultatTests { passes: number; total: number; echoues: string[]; statuts: Record<string, boolean>; ignores: number; fichiers_en_erreur: string[] }
+interface Vitest { testResults?: { name: string; status?: string; assertionResults?: { ancestorTitles?: string[]; title: string; status: string }[] }[] }
 
 const git = (clone: string, ...a: string[]) => execFileSync('git', a, { cwd: clone, encoding: 'utf8', maxBuffer: 256 << 20 });
-const etat = (clone: string) => [git(clone, 'status', '--porcelain'), git(clone, 'ls-files', '--others', '--exclude-standard')].join('\n--\n');
+const sha = (f: string) => (existsSync(f) ? createHash('sha1').update(readFileSync(f)).digest('hex') : 'absent');
+const lignes = (t: string) => t.split('\n').filter(Boolean);
+/** Contenu du clone : sha de chaque fichier suivi modifié et de chaque fichier non suivi (le texte de `git status` ne voit pas un contenu qui change). */
+function etat(clone: string): { sales: Map<string, string>; neufs: Map<string, string> } {
+  const f = (chemins: string[]) => new Map(chemins.map((c) => [c, sha(join(clone, c))]));
+  return { sales: f(lignes(git(clone, 'diff', 'HEAD', '--name-only'))), neufs: f(lignes(git(clone, 'ls-files', '--others', '--exclude-standard'))) };
+}
+const COPIE = /\.banc-cache\./;
+function balayer(dir: string): void { // reste d'un run planté : copies cachées et leurs snapshots
+  for (const e of existsSync(dir) ? readdirSync(dir) : []) {
+    if (e === 'node_modules' || e === '.git') continue;
+    const p = join(dir, e);
+    if (statSync(p).isDirectory()) balayer(p); else if (COPIE.test(e)) rmSync(p, { force: true });
+  }
+}
+/** Nom de la copie : `<base>.banc-cache.<spec|test>.<ext>` garde le suffixe que l'include du projet attend. */
+const nomCopie = (dest: string) => (/\.(spec|test)\.\w+$/.test(dest) ? dest.replace(/\.(spec|test)(\.\w+)$/, '.banc-cache.$1$2') : `${dest.replace(/\.[^./]+$/, '')}.banc-cache.spec.ts`);
+const STATUTS_IGNORES = ['skipped', 'pending', 'todo', 'disabled'];
 
-/** Joue des tests cachés dans le clone, puis le rend identique à l'avant (sinon CloneModifie). Id d'un test : « dest > ancêtres > titre ». */
-export function jouerTests(clone: string, fichiers: { src: string; dest: string }[], commande: string, delaiMs: number): ResultatTests {
+/** Joue des tests cachés dans le clone, puis le rend identique à l'avant (sinon CloneModifie, après restauration). Id : « dest > ancêtres > titre » (doublon : « #2 »).
+ * `connus` : ids déjà vus à une étape précédente ; un fichier en erreur d'import les passe tous au rouge. Rien de trouvé = TestsIntrouvables. */
+export function jouerTests(clone: string, fichiers: { src: string; dest: string }[], commande: string, delaiMs: number, connus: string[] = []): ResultatTests {
+  balayer(clone);
   const avant = etat(clone);
   const tmp = mkdtempSync(join(tmpdir(), 'banc-tests-'));
   const sortie = join(tmp, 'resultat.json');
   const copies = fichiers.map((f) => {
     const dest = isAbsolute(f.dest) ? f.dest : join(clone, f.dest);
-    const copie = /\.spec\.\w+$/.test(dest) ? dest.replace(/\.spec(\.\w+)$/, '.banc-cache.spec$1') : `${dest.replace(/\.[^./]+$/, '')}.banc-cache.spec.ts`;
-    return { ...f, id: relative(clone, dest), copie };
+    return { ...f, id: relative(clone, dest), copie: nomCopie(dest) };
   });
+  const dossiers: string[] = [];
+  let erreur: unknown;
   try {
-    for (const c of copies) { mkdirSync(join(c.copie, '..'), { recursive: true }); copyFileSync(c.src, c.copie); }
+    for (const c of copies) if (existsSync(c.copie)) throw new Error(`la copie ${c.copie} existe déjà`);
+    for (const c of copies) {
+      let d = join(c.copie, '..'); const neufs: string[] = [];
+      while (!existsSync(d)) { neufs.push(d); d = join(d, '..'); }
+      dossiers.push(...neufs);
+      mkdirSync(join(c.copie, '..'), { recursive: true }); copyFileSync(c.src, c.copie);
+    }
     try {
       execSync(`${commande} ${copies.map((c) => JSON.stringify(c.copie)).join(' ')} --reporter=json --outputFile=${sortie}`,
         { cwd: clone, timeout: delaiMs, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 << 20 });
-    } catch (e) { if (!existsSync(sortie)) throw e; } // vitest sort en 1 quand un test est rouge : le JSON fait foi
-  } finally {
-    for (const c of copies) rmSync(c.copie, { force: true });
+    } catch (e) { // vitest sort en 1 quand un test est rouge : le JSON fait foi
+      if (!existsSync(sortie)) throw /No test files found/.test(String((e as { stdout?: string }).stdout) + String((e as { stderr?: string }).stderr)) ? new TestsIntrouvables('vitest n\'a trouvé aucun des fichiers copiés') : e;
+    }
+  } catch (e) { erreur = e; } finally {
+    for (const c of copies) { rmSync(c.copie, { force: true }); rmSync(join(c.copie, '..', '__snapshots__', `${basename(c.copie)}.snap`), { force: true }); }
+    for (const d of dossiers.flatMap((x) => [join(x, '__snapshots__'), x])) { try { rmdirSync(d); } catch { /* non vide ou déjà parti */ } }
   }
-  if (etat(clone) !== avant) throw new CloneModifie(`le clone ${clone} n'est plus identique après les tests cachés : ${etat(clone).replace(avant, "").trim()}`);
-  if (!existsSync(sortie)) throw new Error('la commande de test n\'a produit aucun JSON');
-  const json = JSON.parse(readFileSync(sortie, 'utf8')) as Vitest;
-  const statuts: Record<string, boolean> = {};
-  for (const r of json.testResults ?? []) {
-    const c = copies.find((x) => resolve(clone, r.name) === x.copie);
-    for (const t of r.assertionResults ?? []) statuts[[c?.id ?? r.name, ...(t.ancestorTitles ?? []), t.title].join(' > ')] = t.status === 'passed';
+  const apres = etat(clone);
+  const restes: string[] = [], intouches: string[] = [];
+  for (const [m, neuf] of [[apres.neufs, avant.neufs], [apres.sales, avant.sales]] as const) {
+    for (const [c, h] of m) {
+      if (!neuf.has(c)) { restes.push(c); (m === apres.neufs ? rmSync(join(clone, c), { force: true }) : git(clone, 'checkout', '--', c)); }
+      else if (neuf.get(c) !== h) intouches.push(c); // déjà sale avant : on ne le touche pas, on le dit
+    }
+    for (const c of neuf.keys()) if (!m.has(c)) intouches.push(c);
   }
-  const ids = Object.keys(statuts);
-  return { passes: ids.filter((i) => statuts[i]).length, total: ids.length, echoues: ids.filter((i) => !statuts[i]), statuts };
+  if (restes.length || intouches.length) {
+    rmSync(tmp, { recursive: true, force: true });
+    throw new CloneModifie(`le clone ${clone} n'est plus identique après les tests cachés : restauré ${restes.join(', ') || 'rien'} ; non touché ${intouches.join(', ') || 'rien'}${erreur ? ` (erreur de la commande : ${String(erreur)})` : ''}`);
+  }
+  try {
+    if (erreur) throw erreur;
+    if (!existsSync(sortie)) throw new Error('la commande de test n\'a produit aucun JSON');
+    return lire(JSON.parse(readFileSync(sortie, 'utf8')) as Vitest, copies, clone, connus);
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
 }
 
-/** Tests passés à une étape antérieure et rouges maintenant. Un rouge d'avant, ou un test absent d'avant, n'en est pas un. */
-export const regressions = (avant: Record<string, boolean>, apres: Record<string, boolean>): string[] =>
-  Object.keys(avant).filter((k) => avant[k] === true && apres[k] === false);
+function lire(json: Vitest, copies: { id: string; copie: string }[], clone: string, connus: string[]): ResultatTests {
+  const statuts: Record<string, boolean> = {};
+  const en_erreur: string[] = [], vus = new Set<string>();
+  let ignores = 0;
+  for (const r of json.testResults ?? []) {
+    const c = copies.find((x) => resolve(clone, r.name) === x.copie);
+    const id = c?.id ?? r.name;
+    if (c) vus.add(c.id);
+    const tests = r.assertionResults ?? [];
+    if (!tests.length && r.status === 'failed') { // import cassé : rien n'a tourné, rien ne doit compter comme vert
+      en_erreur.push(id);
+      statuts[`${id} > (fichier en erreur)`] = false;
+      for (const k of connus) if (k.startsWith(`${id} > `)) statuts[k] = false;
+    }
+    for (const t of tests) {
+      if (STATUTS_IGNORES.includes(t.status)) { ignores++; continue; }
+      const base = [id, ...(t.ancestorTitles ?? []), t.title].join(' > ');
+      let k = base; for (let n = 2; k in statuts; n++) k = `${base} #${n}`;
+      statuts[k] = t.status === 'passed';
+    }
+  }
+  const absents = copies.filter((c) => !vus.has(c.id)).map((c) => c.id);
+  if (absents.length) throw new TestsIntrouvables(`aucun résultat pour ${absents.join(', ')} (filtré par l'include du projet ?)`);
+  const ids = Object.keys(statuts);
+  if (!ids.length) throw new TestsIntrouvables('aucun test n\'a tourné');
+  return { passes: ids.filter((i) => statuts[i]).length, total: ids.length, echoues: ids.filter((i) => !statuts[i]), statuts, ignores, fichiers_en_erreur: en_erreur };
+}
 
+/** Tests passés avant et rouges maintenant. Un rouge d'avant n'en est pas un ; un vert d'avant ABSENT d'après en est un (échec fermé). */
+export const regressions = (avant: Record<string, boolean>, apres: Record<string, boolean>): string[] =>
+  Object.keys(avant).filter((k) => avant[k] === true && apres[k] !== true);
+
+// Limites connues : une écriture par Bash (sed -i, tee, redirection) n'est pas vue. Les lectures et écritures des sous-agents (sidechain)
+// COMPTENT : le bras a délégué, la lecture a eu lieu.
 const ECRITURES = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
 /** Lectures des pièces de référence AVANT la première écriture dans le clone (sans `clone`, toute écriture compte). */
 export function lectureReferences(lignes: string[], pieces: string[], clone?: string): { ouvertes: string[]; manquantes: string[]; apres_ecriture: string[]; partielles: string[] } {
@@ -57,7 +126,7 @@ export function lectureReferences(lignes: string[], pieces: string[], clone?: st
     try { d = JSON.parse(l); } catch { continue; }
     if (d.type !== 'assistant') continue;
     for (const c of d.message?.content ?? []) {
-      const f = c.input?.file_path;
+      const f = c.input?.file_path ?? c.input?.notebook_path;
       if (c.type !== 'tool_use' || typeof f !== 'string') continue;
       if (ECRITURES.includes(c.name ?? '') && dedans(f)) ecrit = true;
       const piece = c.name === 'Read' ? cibles.get(resolve(f)) : undefined;
@@ -81,15 +150,15 @@ function fichiers(dir: string): string[] {
 }
 
 /** Duplication (jscpd, null si indisponible, jamais 0) et tailles de fichiers des dossiers donnés. */
-export function maintenabilite(clone: string, dossiers: string[], jscpd: string[] = ['npx', '--yes', 'jscpd@4']): { duplication_pct: number | null; plus_gros: { fichier: string; lignes: number }[]; fichiers_400: number } {
+export function maintenabilite(clone: string, dossiers: string[], jscpd: string[] = ['npx', '--yes', 'jscpd@4']): { duplication_pct: number | null; raison?: string; plus_gros: { fichier: string; lignes: number }[]; fichiers_400: number } {
   const tailles = dossiers.flatMap((d) => fichiers(join(clone, d))).map((f) => ({ fichier: relative(clone, f), lignes: readFileSync(f, 'utf8').split('\n').length }))
     .sort((a, b) => b.lignes - a.lignes);
-  let duplication_pct: number | null = null;
+  let duplication_pct: number | null = null, raison: string | undefined;
   const sortie = mkdtempSync(join(tmpdir(), 'banc-jscpd-'));
   try {
-    execFileSync(jscpd[0], [...jscpd.slice(1), ...dossiers.map((d) => join(clone, d)), '--reporters', 'json', '--output', sortie, '--silent'], { timeout: 300_000, stdio: 'ignore' });
+    execFileSync(jscpd[0], [...jscpd.slice(1), ...dossiers.map((d) => join(clone, d)), '--ignore', '**/node_modules/**', '--reporters', 'json', '--output', sortie, '--silent'], { timeout: 300_000, stdio: 'ignore' });
     const p = (JSON.parse(readFileSync(join(sortie, 'jscpd-report.json'), 'utf8')) as { statistics?: { total?: { percentage?: number } } }).statistics?.total?.percentage;
-    duplication_pct = typeof p === 'number' ? p : null;
-  } catch { duplication_pct = null; } finally { rmSync(sortie, { recursive: true, force: true }); }
-  return { duplication_pct, plus_gros: tailles.slice(0, 5), fichiers_400: tailles.filter((t) => t.lignes > 400).length };
+    if (typeof p === 'number') duplication_pct = p; else raison = 'rapport jscpd sans pourcentage';
+  } catch (e) { raison = (e as Error).message; } finally { rmSync(sortie, { recursive: true, force: true }); }
+  return { duplication_pct, ...(raison ? { raison } : {}), plus_gros: tailles.slice(0, 5), fichiers_400: tailles.filter((t) => t.lignes > 400).length };
 }

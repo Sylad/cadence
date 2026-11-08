@@ -43,7 +43,7 @@ const sansChaines = (s: string) => s.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\
 // C1, conformité à une fiche figée
 // Légitimes : « Conformité » est un titre de mesure.md dans ajouter.ts ; « gabarit » est un paramètre de juges.ts (fichier modèle de brief).
 // Nombre EXACT d'occurrences tolérées par fichier et par mot : une de plus est une violation.
-const AUTORISES_C1: Record<string, Record<string, number>> = { 'src/bench/ajouter.ts': { conformit: 1 }, 'src/bench/juges.ts': { gabarit: 2 } };
+const AUTORISES_C1: Record<string, Record<string, number>> = { 'src/bench/ajouter.ts': { conformit: 1 }, 'src/bench/juges.ts': { gabarit: 2 }, 'src/sequence/mesures.ts': { snapshot: 3 } }; // mesures.ts : dossier __snapshots__ des tests cachés
 const MOTS_C1: [string, RegExp][] = [['scell', /scell/i], ['acceptation', /acceptation/i], ['fiche', /fiche/i], ['maquette', /maquette/i],
   ['spec:', /(?<![\w])spec:/i], ['contrat', /contrat/i], ['gabarit', /gabarit/i], ['seal', /seal/i], ['golden', /golden/i],
   ['snapshot', /snapshot/i], ['conformit', /conformit/i]]; // `spec:` = clé de fiche, pas BARRE_SPEC:
@@ -109,7 +109,7 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/bench/juges.ts': ['output-format', 'model', 'permission-mode', 'disallowedTools', 'resume', 'porcelain'], // + git status --porcelain
   'src/bench/preparer.ts': ['no-hardlinks', 'format', 'is-ancestor', 'all', 'expire', 'prune', 'not'],
   'src/bench/ajouter.ts': ['format', 'reverse', 'grep', 'verify', 'name-only'],
-  'src/sequence/mesures.ts': ['porcelain', 'others', 'exclude-standard', 'reporter', 'outputFile', 'yes', 'reporters', 'output', 'silent'], // flags git, vitest et jscpd (S2), aucune option de cadence2
+  'src/sequence/mesures.ts': ['porcelain', 'others', 'exclude-standard', 'reporter', 'outputFile', 'yes', 'reporters', 'output', 'silent', 'ignore', 'name-only'], // flags git, vitest et jscpd (S2), aucune option de cadence2
   'src/bench/cli.ts': ['porcelain', 'oneline', 'reverse', 'format'], // git status --porcelain, git log --oneline, git log --reverse --format=%s (Taille déclarée)
 };
 const prefixe = (k: string) => (k.startsWith('src/bench/') ? 'bench' : 'cadence2');

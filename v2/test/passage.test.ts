@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cheminReglages, libererReglages, type Executeur } from '../src/bench/bras.js';
 import { dossierTranscripts } from '../src/bench/fuites.js';
-import { passageSequence } from '../src/sequence/passage.js';
+import { empreinteUtilisateur, passageSequence } from '../src/sequence/passage.js';
 
 const sh = (cwd: string, cmd: string) => execFileSync('bash', ['-c', cmd], { cwd, encoding: 'utf8' });
 const GIT = 'git -c user.email=t@t -c user.name=t';
@@ -116,7 +116,7 @@ describe('passage d\'une séquence', () => {
     expect(A[2].fuites).toEqual([dir('etape-1.c2.json'), dir('suite-0.c2.json')]); // M3 : son build-1.log est permis, les mesures de l'autre non
     expect(A.every((e) => e.build_ok && e.portee_suite === 'Suite mesurée : tout le dépôt')).toBe(true);
     expect(A.every((e) => typeof e.reponses === 'boolean')).toBe(true); // questions inutiles du verdict
-    expect(res.clones).toEqual({ c1: 'A', c2: 'C' });
+    expect(res.clones).toEqual({ c1: 'A', c2: 'C' }); expect(res.reglages_utilisateur).toEqual([]); expect(A.every((e) => e.reglages_utilisateur?.length === 0)).toBe(true);
     expect(vu.juges).toHaveLength(2);
     for (const t of ['1. demande 1', '3. demande 3', 'c2.ts (v2)', 'reg.ts (vr)', 'remplacé par l\'étape k']) expect(vu.juges[0]).toContain(t);
     expect(vu.juges[0]).not.toContain('adapte-les à l\'état final');
@@ -172,6 +172,29 @@ describe('passage d\'une séquence', () => {
       ? { stdout: JSON.stringify({ session_id: 'p', total_cost_usd: 0, modelUsage: {} }), code: 0 } : exec(args, o));
     const res = passageSequence(opts(r, paresseux));
     expect(res.etapes.C.map((e) => e.mesure.echec)).toEqual(['aucun commit', 'aucun commit', 'aucun commit']);
+  });
+
+  it('R36 : empreinte des réglages utilisateur — CLAUDE.md, ses @imports récursifs (relatifs au fichier qui importe), settings*.json s\'ils existent', () => {
+    const h = mkdtempSync(join(tmpdir(), 'home-')), cl = join(h, '.claude');
+    mkdirSync(join(cl, 'sous'), { recursive: true });
+    writeFileSync(join(cl, 'CLAUDE.md'), 'intro\n@RTK.md\nmail noreply@x.com\n@sous/a.md\n'); writeFileSync(join(cl, 'RTK.md'), 'r');
+    writeFileSync(join(cl, 'sous', 'a.md'), '@b.md'); writeFileSync(join(cl, 'sous', 'b.md'), '@../CLAUDE.md'); writeFileSync(join(cl, 'settings.json'), '{}');
+    const e = empreinteUtilisateur(h);
+    expect(Object.keys(e).sort()).toEqual(['CLAUDE.md', 'RTK.md', 'settings.json', 'settings.local.json', 'sous/a.md', 'sous/b.md'].map((f) => join(cl, f)));
+    expect(e[join(cl, 'settings.local.json')]).toBe('-'); // absent : sa création sera vue
+    expect(empreinteUtilisateur(h)).toEqual(e); // stable
+    writeFileSync(join(cl, 'sous', 'b.md'), '@../CLAUDE.md\nchangé');
+    expect(Object.keys(e).filter((f) => empreinteUtilisateur(h)[f] !== e[f])).toEqual([join(cl, 'sous', 'b.md')]);
+  });
+
+  it('R36 : un fichier importé par ~/.claude/CLAUDE.md modifié pendant une étape est nommé à cette étape, aux suivantes et avant les juges', () => {
+    const { r, d } = racine(), cl = join(r, '.claude'); // home = r (opts)
+    mkdirSync(cl); writeFileSync(join(cl, 'CLAUDE.md'), '@RTK.md'); writeFileSync(join(cl, 'RTK.md'), 'avant'); writeFileSync(join(cl, 'settings.json'), '{}');
+    const { exec } = faux(r, d, { A2: () => writeFileSync(join(cl, 'RTK.md'), 'après') });
+    const res = passageSequence(opts(r, exec));
+    expect(res.etapes.C.map((e) => e.reglages_utilisateur)).toEqual([[], [], [join(cl, 'RTK.md')]]); // C2 joue avant A2
+    expect(res.etapes.A.map((e) => e.reglages_utilisateur)).toEqual([[], [join(cl, 'RTK.md')], [join(cl, 'RTK.md')]]);
+    expect(res.reglages_utilisateur).toEqual([join(cl, 'RTK.md')]);
   });
 
   it('refusé quand le dépôt n\'est pas prêt, sans verrou laissé', () => {

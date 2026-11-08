@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import type { Banc } from '../bench/banc.js';
 import { chargerBras, cheminReglages, ecrireReglages, empreinteReglages, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from '../bench/bras.js';
 import { archiver, pretAPasser, verrouiller } from '../bench/cli.js';
@@ -21,15 +22,16 @@ export interface MesureEtape {
   k: number; portee_suite: string; reponses?: boolean; mesure: Mesure; fuites: string[]; fuites_a_verifier: string[];
   lecture?: ReturnType<typeof lectureReferences>; suite?: { passes: number; total: number }; suite_en_erreur: string | null;
   regressions?: Ecart; nouveaux?: string[]; tests_affaiblis?: Affaiblis; build_ok?: boolean; maintenabilite?: ReturnType<typeof maintenabilite>;
-  mesure_en_erreur: string | null;
+  mesure_en_erreur: string | null; reglages_utilisateur?: string[];
 }
 /** Étape 0 : la pente de maintenabilité se mesure depuis ici. */
 export interface Base { suite: { passes: number; total: number }; build_ok: boolean; maintenabilite: ReturnType<typeof maintenabilite> }
-export interface ResultatSequence { run: string; sequence: string; clones: Record<string, string>; base: Record<string, Base>; etapes: Record<string, MesureEtape[]>; jugement: Jugement | null }
+export interface ResultatSequence { run: string; sequence: string; clones: Record<string, string>; base: Record<string, Base>; etapes: Record<string, MesureEtape[]>; jugement: Jugement | null;
+  /** R36 : réglages utilisateur changés depuis le début du passage, recontrôlés avant les juges. */ reglages_utilisateur?: string[] }
 type Opt = { racine: string; id: string; ref: string; cand: string; juge: string; exec: Executeur; maintenant: Date; empreinte: string; home: string; out: (l: string) => void;
   repetition?: number; repetitions?: number; prep?: typeof preparer; pret?: (b: Record<string, DefBras>) => string | null; jscpd?: string[]; delaiMs?: number; garderClones?: boolean; tirage?: () => number };
 interface Ctx { o: Opt; s: Sequence; bras: Record<string, DefBras>; run: string; dir: string; debut: string; delai: number;
-  noms: string[]; clones: Record<string, string>; prec: Record<string, Statuts> }
+  noms: string[]; clones: Record<string, string>; prec: Record<string, Statuts>; reglages: Record<string, string> }
 
 const REPO = join(import.meta.dirname, '..', '..', '..');
 const TITRE = /\b(?:it|test)(\.\w+)?\s*\(\s*(['"`])(.*?)\2/;
@@ -104,6 +106,20 @@ export function passageSequences(o: Opt, n: number, apres?: (r: ResultatSequence
     try { rmSync(join(o.racine, 'en-cours.json'), { force: true }); } finally { liberer(); }
   }
 }
+
+/** R36 : empreinte de ~/.claude/CLAUDE.md, de ses @imports (récursifs, relatifs au fichier qui importe) et des settings*.json ; absent = « - ». */
+export function empreinteUtilisateur(home: string): Record<string, string> {
+  const r: Record<string, string> = {};
+  const voir = (f: string, suivre: boolean): void => {
+    if (f in r) return;
+    r[f] = existsSync(f) && statSync(f).isFile() ? createHash('sha256').update(readFileSync(f)).digest('hex') : '-';
+    if (suivre && r[f] !== '-') for (const m of readFileSync(f, 'utf8').matchAll(/(?:^|\s)@(\S+)/g)) voir(resolve(dirname(f), m[1].replace(/^~(?=\/)/, home)), true);
+  };
+  voir(join(home, '.claude', 'CLAUDE.md'), true);
+  for (const s of ['settings.json', 'settings.local.json']) voir(join(home, '.claude', s), false);
+  return r;
+}
+const reglagesChanges = (x: Ctx) => { const e = empreinteUtilisateur(x.o.home); return [...new Set([...Object.keys(x.reglages), ...Object.keys(e)])].filter((f) => x.reglages[f] !== e[f]); };
 
 const nomClone = (x: Ctx, b: string) => `c${x.noms.indexOf(b) + 1}`;
 
@@ -212,6 +228,7 @@ function jouerEtape(x: Ctx, e: Etape, b: string): MesureEtape {
   } catch (err) {
     me.mesure_en_erreur = `${phase} : ${(err as Error).message}`;
   }
+  me.reglages_utilisateur = reglagesChanges(x);
   const cn = nomClone(x, b); // anonyme jusqu'aux juges (R9)
   writeFileSync(join(x.dir, `etape-${e.k}.${cn}.json`), JSON.stringify({ ...me, mesure: { ...me.mesure, bras: cn } }, null, 2));
   return me;
@@ -237,7 +254,7 @@ function passer(o: Opt, bras: Record<string, DefBras>, s: Sequence): ResultatSeq
   const dir = join(o.racine, 'runs', run, s.id, sous);
   const tirage = o.tirage ?? Math.random;
   const noms = tirage() < 0.5 ? [o.ref, o.cand] : [o.cand, o.ref]; // R9 : clones c1/c2, correspondance écrite après les juges
-  const x: Ctx = { o, s, bras, run, dir, debut: new Date().toISOString(), delai: o.delaiMs ?? 30 * 60_000, noms, clones: {}, prec: {} };
+  const x: Ctx = { o, s, bras, run, dir, debut: new Date().toISOString(), delai: o.delaiMs ?? 30 * 60_000, noms, clones: {}, prec: {}, reglages: empreinteUtilisateur(o.home) };
   for (const b of noms) x.clones[b] = join(dir, nomClone(x, b));
   mkdirSync(dir, { recursive: true });
   const heads: Record<string, string> = {};
@@ -250,10 +267,11 @@ function passer(o: Opt, bras: Record<string, DefBras>, s: Sequence): ResultatSeq
       for (const b of ordre) etapes[b].push(jouerEtape(x, e, b));
     }
     signaler(x, s.etapes.length, 'juges', s.etapes.length);
+    const reglages_utilisateur = reglagesChanges(x);
     const dernier = bancEtape(s, s.etapes[s.etapes.length - 1], heads[noms[0]]);
     const jugement = juger(dernier, x.clones, join(o.racine, 'eval', run, s.id, sous), o.juge, o.exec, tirage, demandesDuJuge(s));
     const clones = Object.fromEntries(noms.map((b) => [nomClone(x, b), b]));
-    const res: ResultatSequence = { run, sequence: s.id, clones, base, etapes, jugement };
+    const res: ResultatSequence = { run, sequence: s.id, clones, base, etapes, jugement, reglages_utilisateur };
     writeFileSync(join(dir, 'resultat.json'), JSON.stringify(res, null, 2));
     return res;
   } finally {

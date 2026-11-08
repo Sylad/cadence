@@ -42,11 +42,12 @@ export function verdictSequence(r: ResultatSequence, ref: string, cand: string):
   const n = (x: number | null) => (x === null ? 'non mesuré' : `${x}`);
   const c = (nom: string, valeur: string, seuil: string, ok: boolean): Critere => ({ nom, valeur, seuil, ok, bloquant: true });
   const rc = regs(cand), rr = regs(ref), hc = meca(cand)?.caches_passes, hr = meca(ref)?.caches_passes, ac = attendu(cand), ar = attendu(ref);
-  const derniere = et(cand).at(-1);
+  const derniere = et(cand).at(-1), reglages = [...new Set([...(r.reglages_utilisateur ?? []), ...bras.flatMap((b) => et(b).flatMap((e) => e.reglages_utilisateur ?? []))])];
   const criteres: Critere[] = [
     c('au moins une étape', `${ref} [${ks(ref)}] · ${cand} [${ks(cand)}]`, '≥ 1, les mêmes étapes pour les deux bras', et(cand).length >= 1 && ks(cand) === ks(ref)),
     c('toutes les étapes mesurées', nonMesurees.length ? nonMesurees.join(' ; ') : 'toutes', 'toutes', nonMesurees.length === 0),
     c('aucune fuite', fuites.length ? fuites.join(' ; ') : '0', '0', fuites.length === 0),
+    c('réglages utilisateur inchangés pendant le passage', r.reglages_utilisateur ? reglages.join(', ') || 'inchangés' : 'non mesuré', 'inchangés', Boolean(r.reglages_utilisateur) && !reglages.length), // R36
     c('aucun bras en échec', echecs.length ? echecs.join(' ; ') : '0', '0', echecs.length === 0),
     c('juge final fait', r.jugement && meca(cand) && meca(ref) ? 'oui' : 'non', 'oui', Boolean(r.jugement && meca(cand) && meca(ref))),
     c('régressions', `${n(rc)} contre ${n(rr)}`, `≤ ${ref}`, rc !== null && rr !== null && rc <= rr),

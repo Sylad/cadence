@@ -17,7 +17,7 @@ const etape = (k: number, o: Partial<MesureEtape> = {}): MesureEtape => ({
 const meca = (o: Partial<Meca> = {}): Meca => ({ suite_ok: true, caches_passes: 10, caches_total: 12, mutations_tuees: 5, mutations_total: 6, attendu: 'oui', mutations: [], ...o });
 const base = (): Base => ({ suite: { passes: 10, total: 10 }, build_ok: true, maintenabilite: maint(2, 1) });
 function seq(f: (r: ResultatSequence) => void = () => {}): ResultatSequence {
-  const r: ResultatSequence = { run: 'r1', sequence: 'aether-b68', clones: { c1: 'A', c2: 'C' }, base: { A: base(), C: base() },
+  const r: ResultatSequence = { run: 'r1', sequence: 'aether-b68', clones: { c1: 'A', c2: 'C' }, base: { A: base(), C: base() }, reglages_utilisateur: [],
     etapes: { A: [etape(1), etape(2)], C: [etape(1), etape(2)] },
     jugement: { meca: { A: meca(), C: meca() }, remplaces: ['t1'], defauts: {}, prefere: 'egal', ui: 'na', raisons: '' } };
   f(r);
@@ -48,6 +48,14 @@ describe('verdictSequence : un critère par ligne, vert puis rouge', () => {
       expect(crit(r, 'régressions').valeur).toContain('non mesuré');
       expect(rouges(r)).toContain('toutes les étapes mesurées');
     }
+  });
+  it('R36 : réglages utilisateur changés pendant le passage (à une étape ou avant les juges) : rouge, fichiers nommés ; non mesuré : rouge', () => {
+    const nom = 'réglages utilisateur inchangés pendant le passage';
+    expect(crit(seq(), nom)).toMatchObject({ valeur: 'inchangés', ok: true, bloquant: true });
+    expect(crit(seq((r) => { r.etapes.A[0].reglages_utilisateur = ['/h/.claude/RTK.md']; }), nom)).toMatchObject({ valeur: '/h/.claude/RTK.md', ok: false });
+    expect(crit(seq((r) => { r.reglages_utilisateur = ['/h/.claude/CLAUDE.md']; r.etapes.C[1].reglages_utilisateur = ['/h/.claude/CLAUDE.md']; }), nom))
+      .toMatchObject({ valeur: '/h/.claude/CLAUDE.md', ok: false });
+    expect(crit(seq((r) => { r.reglages_utilisateur = undefined; }), nom)).toMatchObject({ valeur: 'non mesuré', ok: false });
   });
   it('mesure en erreur : étape non mesurée, rouge', () => {
     expect(rouges(seq((r) => { r.etapes.C[0].mesure_en_erreur = 'build : boom'; }))).toEqual(['toutes les étapes mesurées']);

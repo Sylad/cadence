@@ -198,7 +198,7 @@ describe('rapport : suite, attendu et contrôles éclair (M-2, M-3)', () => {
     const md = rapport([b, banc({ nonJuge: true })], 'A', 'C', verdict([b], 'A', 'C', BARRE_SPEC), { date: 'd', empreinte: 'e' });
     expect(md).toContain('| Suite A · C | Attendu A · C |');
     expect(md).toMatch(/\| ok · ROUGE \| oui · en partie \| – · – \|$/m);
-    expect(md).toMatch(/\| – \| – \|$/m);
+    expect(md).toMatch(/\| – \| – \| – · – \|$/m);
   });
   it('section « Contrôles éclair » quand le passage en a, absente sinon ; eclair_ok dans l\'historique', () => {
     const v = verdict([banc()], 'A', 'C', BARRE_SPEC);

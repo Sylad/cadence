@@ -14,8 +14,8 @@ export type CommandInfo = { tool: string; label: string; since: number }
 // dans `declare module 'claude-code'`, « CommandInfo » nommerait le type des commandes slash du module : un alias hors du bloc lève l'ambiguïté
 export type BackgroundCommandInfo = CommandInfo
 
-/** Un passage du banc de cadence 2, une ligne de `historique.jsonl` (ligneHistorique de v2/src/bench/verdict.ts). */
-export type BancPassage = { date: string; candidat: string; bancs: string[]; hebdo: boolean; vert: boolean; rouges: string[] }
+/** Un passage du banc de cadence 2, une ligne de `historique.jsonl` (ligneHistorique de v2/src/bench/verdict.ts) ; `sequence` : ligne `type: 'sequence'` (v2/src/sequence/verdict.ts). */
+export type BancPassage = { date: string; candidat: string; bancs: string[]; hebdo: boolean; vert: boolean; rouges: string[]; sequence?: boolean }
 
 export type AgentsSummary = { running: number; names: string[] }
 

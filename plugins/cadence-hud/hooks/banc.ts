@@ -54,7 +54,7 @@ export const parseBanc = (lines: string[]): BancPassage[] =>
       if (typeof o.date !== 'string' || Number.isNaN(Date.parse(o.date)) || typeof o.vert !== 'boolean') return []
       // contrôles éclair rouges (`eclair_ok: false`) : le passage s'affiche ✗, même sur un verdict vert
       const eclairRouge = o.eclair_ok === false
-      return [{ date: o.date, candidat: typeof o.candidat === 'string' ? o.candidat : '?', bancs: strings(o.bancs), hebdo: o.hebdo === true, vert: o.vert && !eclairRouge, rouges: [...strings(o.rouges), ...(eclairRouge ? ['contrôles éclair'] : [])] }]
+      return [{ date: o.date, candidat: typeof o.candidat === 'string' ? o.candidat : '?', bancs: strings(o.bancs), hebdo: o.hebdo === true, ...(o.type === 'sequence' && { sequence: true }), vert: o.vert && !eclairRouge, rouges: [...strings(o.rouges), ...(eclairRouge ? ['contrôles éclair'] : [])] }]
     } catch {
       return []
     }
@@ -80,8 +80,9 @@ const weekendManquant = (passages: BancPassage[], now: number): boolean => {
   return !passages.some(x => x.hebdo && parisJour(new Date(x.date)).jour >= sam)
 }
 
-/** La sorte d'un passage, sur les bancs de base (`<banc>#k` = répétition k) : 1, 3 et 6 exactement = court ; hebdo ; le banc 1 seul = éclair ; sinon le nombre de bancs. */
+/** La sorte d'un passage : séquence ; puis, sur les bancs de base (`<banc>#k` = répétition k) : 1, 3 et 6 exactement = court ; hebdo ; le banc 1 seul = éclair ; sinon le nombre de bancs. */
 export const sorte = (p: BancPassage): string => {
+  if (p.sequence) return 'séquence'
   const base = [...new Set(p.bancs.map(id => id.replace(/#[^#]*$/, '')))]
   const n = [...new Set(base.map(id => id.split('-')[0]))].sort()
   if (n.join(',') === '1,3,6' && base.length === 3) return 'court'

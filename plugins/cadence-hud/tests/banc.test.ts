@@ -52,6 +52,13 @@ test('banc — sorte du passage : hebdo, éclair, N bancs', () => {
   expect(sorte({ bancs: ['1-a', '3-b', '6-c', '7-d'] })).toBe('banc ✓ 08-11 4 bancs · eq-legere/A')
 })
 
+test('banc — une ligne type sequence : sorte « séquence », dans la bande et le détail', () => {
+  const seq = ligne({ type: 'sequence', bancs: ['1-aether-b68'] })
+  expect(bancLine(parseBanc([hebdo, seq]), LUNDI)?.text).toBe('banc ✓ 08-11 séquence · eq-legere/A')
+  expect(bancDetail(parseBanc([seq]))[0]).toMatch(/ séquence {2}✓ vert$/)
+  expect(bancLine(parseBanc([hebdo, ligne({ type: 'autre', bancs: ['1-a'] })]), LUNDI)?.text).toBe('banc ✓ 08-11 éclair · eq-legere/A')
+})
+
 test('banc — répétitions (ids <banc>#k) : la sorte compte les bancs de base', () => {
   const sorte = (bancs: string[]) => bancLine(parseBanc([hebdo, ligne({ bancs })]), LUNDI)?.text
   expect(sorte(['1-a#1', '1-a#2', '3-b#1', '3-b#2', '6-c#1', '6-c#2'])).toBe('banc ✓ 08-11 court · eq-legere/A')

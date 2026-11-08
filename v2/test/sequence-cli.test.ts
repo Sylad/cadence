@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFil
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { preparer } from '../src/bench/preparer.js';
+import { statut } from '../src/bench/verdict.js';
 import type { Executeur } from '../src/bench/bras.js';
 import { run } from '../src/cli.js';
 import { sequence, type Dep } from '../src/sequence/cli.js';
@@ -108,5 +110,24 @@ describe('cadence2 bench sequence : passage', () => {
       expect(h.map((l) => l.vert)).toEqual(attendu); expect(new Set(h.map((l) => l.run)).size).toBe(1);
       expect(io.sortie.filter((l) => /^(VERT|ROUGE)/.test(l))).toHaveLength(2);
     }
+  });
+  it('une répétition qui lève : ligne rouge « répétition non terminée », les suivantes jouées, code 1, publication refusée', async () => {
+    for (const lance of [2, 1]) {
+      const r = racine(), { exec } = faux(r); let appels = 0;
+      const prep: typeof preparer = (...a) => { if (++appels === (lance === 2 ? 3 : 1)) throw new Error('disque plein'); return preparer(...a); };
+      const io = ioTest({ BENCH_ROOT: r, HOME: r });
+      expect(await sequence(['s1', '--repetitions', '2'], io, { ...dep(r, exec), prep })).toBe(1);
+      const h = histo(r);
+      expect(h.map((l) => [l.repetition, l.repetitions, l.vert])).toEqual(lance === 2 ? [[1, 2, true], [2, 2, false]] : [[1, 2, false], [2, 2, true]]);
+      expect(h.find((l) => !l.vert).rouges[0]).toMatch(/^répétition non terminée : .*disque plein/);
+      expect(new Set(h.map((l) => l.run)).size).toBe(1);
+      expect(io.erreurs.join('\n')).toMatch(/non terminée : .*disque plein/);
+      expect(statut(readFileSync(join(r, 'historique.jsonl'), 'utf8').split('\n'), new Date('2026-11-09T12:00:00Z'), 'e1', { A: 'opus', 'sequence-v2': 'sonnet' }).publication_ok).toBe(false);
+    }
+  });
+  it('le rapport dit sa répétition (« Répétition 2/2 »), un fichier par répétition', async () => {
+    const r = racine(), { exec } = faux(r);
+    await sequence(['s1', '--repetitions', '2'], ioTest({ BENCH_ROOT: r, HOME: r }), dep(r, exec));
+    expect(readFileSync(join(r, 'rapports', '2026-11-09-1100-e1-s1-r2.md'), 'utf8')).toMatch(/^Répétition 2\/2$/m);
   });
 });

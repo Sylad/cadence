@@ -85,7 +85,7 @@ export function passageSequence(o: Opt): ResultatSequence {
 }
 
 /** `n` répétitions sous UN run id, UN verrou et UNE vérification de prêt ; `apres` reçoit chaque répétition dès qu'elle est finie (rapport, historique). */
-export function passageSequences(o: Opt, n: number, apres?: (r: ResultatSequence, repetition: number) => void): ResultatSequence[] {
+export function passageSequences(o: Opt, n: number, apres?: (r: ResultatSequence, repetition: number) => void, echec?: (message: string, repetition: number, run: string) => void): ResultatSequence[] {
   const bras = chargerBras(o.racine);
   for (const b of [o.ref, o.cand]) if (!bras[b]) throw new Error(`bras « ${b} » absent de ${o.racine}/bras.yaml`);
   const pret = o.pret ?? ((x) => pretAPasser(REPO, x, o.racine));
@@ -94,7 +94,12 @@ export function passageSequences(o: Opt, n: number, apres?: (r: ResultatSequence
   const liberer = verrouiller(o.racine);
   try {
     const s = chargerSequence(o.racine, o.id);
-    return Array.from({ length: n }, (_, i) => { const r = passer({ ...o, repetition: i + 1, repetitions: n }, bras, s); apres?.(r, i + 1); return r; });
+    const rs: ResultatSequence[] = [];
+    for (let k = 1; k <= n; k++) {
+      try { const r = passer({ ...o, repetition: k, repetitions: n }, bras, s); rs.push(r); apres?.(r, k); } // `echec` : la répétition qui lève est notée rouge, les suivantes sont jouées
+      catch (e) { if (!echec) throw e; echec(e instanceof Error ? e.message : String(e), k, runId(o)); }
+    }
+    return rs;
   } finally {
     try { rmSync(join(o.racine, 'en-cours.json'), { force: true }); } finally { liberer(); }
   }
@@ -224,8 +229,10 @@ function demandesDuJuge(s: Sequence): string {
     + `${caches.join('\n')}\n`;
 }
 
+const runId = (o: Opt) => { const p = parisJour(o.maintenant); return `${p.jour}-${p.hhmm}-${o.empreinte}`; };
+
 function passer(o: Opt, bras: Record<string, DefBras>, s: Sequence): ResultatSequence {
-  const p = parisJour(o.maintenant), run = `${p.jour}-${p.hhmm}-${o.empreinte}`;
+  const run = runId(o);
   const sous = (o.repetitions ?? 1) > 1 ? `r${o.repetition}` : ''; // une seule répétition : chemins d'avant
   const dir = join(o.racine, 'runs', run, s.id, sous);
   const tirage = o.tirage ?? Math.random;

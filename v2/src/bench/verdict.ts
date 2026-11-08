@@ -81,7 +81,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
     ...[['Lectures à vérifier', lectures], ['Questions posées', questions]].flatMap(([t, l]) => (l.length ? [`## ${t}`, '', ...l, ''] : []))].join('\n');
 }
 
-export const ligneHistorique = (v: Verdict, e: { type?: 'sequence'; sequence?: string; run?: string; repetition?: number; date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; bancs: string[]; hebdo: boolean; frais: number; eclair_ok?: boolean }) =>
+export const ligneHistorique = (v: Verdict, e: { type?: 'sequence'; sequence?: string; run?: string; repetition?: number; repetitions?: number; date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; bancs: string[]; hebdo: boolean; frais: number; eclair_ok?: boolean }) =>
   JSON.stringify({ ...e, vert: v.vert, rouges: v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom) });
 
 const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -97,15 +97,15 @@ function samediCourant(d: Date): string {
   return new Date(Date.UTC(y, m - 1, j - ((sem + 1) % 7))).toISOString().slice(0, 10);
 }
 
-type Ligne = { type?: string; sequence?: string; run?: string; date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number; bancs?: string[]; candidat?: string; reference?: string; modele_candidat?: string; eclair_ok?: boolean };
+type Ligne = { type?: string; sequence?: string; run?: string; repetition?: number; repetitions?: number; date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number; bancs?: string[]; candidat?: string; reference?: string; modele_candidat?: string; eclair_ok?: boolean };
 
-/** Au moins une séquence ; pour chaque id, de la première ligne de son dernier run à la fin, toutes les lignes passent `ok`. */
+/** Au moins une séquence ; pour chaque id, de la première ligne de son dernier run à la fin, toutes les lignes passent `ok` et le run compte exactement `repetitions` lignes (répétition 1..N). */
 function seqOk(seqs: Ligne[], ok: (s: Ligne) => boolean): boolean {
   const ids = [...new Set(seqs.map((x) => x.sequence ?? ''))];
   return ids.length > 0 && ids.every((id) => {
     const l = seqs.filter((x) => (x.sequence ?? '') === id);
-    const run = l.at(-1)!.run;
-    return run !== undefined && l.slice(l.findIndex((x) => x.run === run)).every(ok);
+    const run = l.at(-1)!.run, n = l.at(-1)!.repetitions, d = l.filter((x) => x.run === run); // exactement N lignes, répétitions 1..N : une répétition tuée n'écrit rien
+    return run !== undefined && l.slice(l.findIndex((x) => x.run === run)).every(ok) && Number.isInteger(n) && n! >= 1 && d.length === n && d.every((x) => x.repetitions === n && x.repetition! >= 1 && x.repetition! <= n) && new Set(d.map((x) => x.repetition)).size === n;
   });
 }
 

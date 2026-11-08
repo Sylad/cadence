@@ -118,7 +118,7 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/sequence/mesures.ts': ['porcelain', 'others', 'exclude-standard', 'reporter', 'outputFile', 'yes', 'reporters', 'output', 'silent', 'ignore', 'name-only'], // flags git, vitest et jscpd (S2), aucune option de cadence2
   'src/bench/cli.ts': ['porcelain', 'oneline', 'reverse', 'format'], // git status --porcelain, git log --oneline, git log --reverse --format=%s (Taille déclarée)
 };
-const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' ? 'bench' : 'cadence2'); // le banc séquence est « bench sequence »
+const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
   noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 450, porte: 250, deliver: 450, hooks: 200 } }, // R32 : hooks, mécanisme du bras candidat
@@ -299,7 +299,7 @@ describe('C5, comportement de verdict, rapport et historique', () => {
     const ligne = (bancs: string[]) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', vert: true, hebdo: false, frais: 0, bancs });
     const now = new Date('2026-11-07T12:00:00Z');
     expect(statut([ligne(['1-a', '3-b'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(false);
-    const seq = JSON.stringify({ ...JSON.parse(ligne(['s'])), type: 'sequence', sequence: 's', run: 'r1', repetition: 1 });
+    const seq = JSON.stringify({ ...JSON.parse(ligne(['s'])), type: 'sequence', sequence: 's', run: 'r1', repetition: 1, repetitions: 1 });
     expect(statut([ligne(['1-a', '3-b', '6-c'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(false); // sans séquence verte
     expect(statut([ligne(['1-a', '3-b', '6-c']), seq], now, 'e1', { C: 'opus' }).publication_ok).toBe(true);
   });

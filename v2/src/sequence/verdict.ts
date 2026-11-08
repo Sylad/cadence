@@ -71,7 +71,7 @@ function cellule(r: ResultatSequence, ref: string, cand: string, k: number, f: (
 const pct = (m?: Maint) => (m ? (m.duplication_pct === null ? 'n.m.' : `${+m.duplication_pct.toFixed(1)} %`) : '–');
 const affaiblis = (e: MesureEtape) => (e.tests_affaiblis ? `${somme(Object.values(e.tests_affaiblis).map((l) => l.length))}` : '–');
 
-export function rapportSequence(r: ResultatSequence, ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string }): string {
+export function rapportSequence(r: ResultatSequence, ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetition?: number; repetitions?: number }): string {
   const ks = [...new Set([ref, cand].flatMap((b) => (r.etapes[b] ?? []).map((x) => x.k)))].sort((a, b) => a - b);
   const bc = (f: (b: string) => string) => `${f(ref)} · ${f(cand)}`;
   const zero = `| 0 | – · – | – · – | – · – | – · – | ${bc((b) => (r.base[b] ? (r.base[b].build_ok ? 'ok' : 'ko') : '–'))} | ${bc((b) => pct(r.base[b]?.maintenabilite))} | ${bc((b) => `${r.base[b]?.maintenabilite?.fichiers_400 ?? '–'}`)} | – · – |`;
@@ -88,7 +88,7 @@ export function rapportSequence(r: ResultatSequence, ref: string, cand: string, 
     return l.length ? [l.join(' ; ')] : [];
   });
   const remplaces = !r.jugement ? ['- juge absent'] : (r.jugement.remplaces ?? []).length ? r.jugement.remplaces!.map((t) => `- ${t}`) : ['- aucun'];
-  return [`# Séquence ${r.sequence} ${e.date} — ${cand} contre ${ref} — ${v.vert ? 'VERT' : 'ROUGE'}`, '', `Empreinte de v2 : ${e.empreinte}`, `Passage : ${r.run}`, '',
+  return [`# Séquence ${r.sequence} ${e.date} — ${cand} contre ${ref} — ${v.vert ? 'VERT' : 'ROUGE'}`, '', `Empreinte de v2 : ${e.empreinte}`, `Passage : ${r.run}`, `Répétition ${e.repetition ?? 1}/${e.repetitions ?? 1}`, '',
     `| Étape | Régressions ${ref} · ${cand} (rouges/disparus) | Affaiblis ${ref} · ${cand} | Nouveaux ${ref} · ${cand} | Lecture ${ref} · ${cand} | Build ${ref} · ${cand} | Duplication ${ref} · ${cand} | Fichiers > 400 ${ref} · ${cand} | Temps ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|', zero, ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
     ...v.criteres.map((x) => `| ${x.nom} | ${x.valeur} | ${x.seuil} | ${x.ok ? 'ok' : '**ROUGE**'} |`), '',
@@ -97,16 +97,23 @@ export function rapportSequence(r: ResultatSequence, ref: string, cand: string, 
 }
 
 /** Ligne `historique.jsonl` d'une séquence : `bancs` = [id de la séquence], jamais hebdo ni frais. */
-export const ligneSequence = (v: Verdict, e: { date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; sequence: string; run: string; repetition: number }) =>
+export const ligneSequence = (v: Verdict, e: { date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; sequence: string; run: string; repetition: number; repetitions: number }) =>
   ligneHistorique(v, { type: 'sequence', ...e, bancs: [e.sequence], hebdo: false, frais: 0 });
 
 /** Verdict, rapport (md et json) dans `rapports/` et ligne d'historique d'une séquence passée. */
-export function conclureSequence(racine: string, r: ResultatSequence, ref: string, cand: string, e: { maintenant: Date; empreinte: string; modele_candidat: string; repetition?: number }): Verdict {
-  const v = verdictSequence(r, ref, cand), repetition = e.repetition ?? 1;
+export function conclureSequence(racine: string, r: ResultatSequence, ref: string, cand: string, e: { maintenant: Date; empreinte: string; modele_candidat: string; repetition?: number; repetitions?: number }): Verdict {
+  const v = verdictSequence(r, ref, cand), repetition = e.repetition ?? 1, repetitions = e.repetitions ?? 1;
   const base = join(racine, 'rapports', `${r.run}-${r.sequence}-r${repetition}`);
   mkdirSync(join(racine, 'rapports'), { recursive: true });
-  writeFileSync(`${base}.md`, rapportSequence(r, ref, cand, v, { date: parisJour(e.maintenant).jour, empreinte: e.empreinte }));
+  writeFileSync(`${base}.md`, rapportSequence(r, ref, cand, v, { date: parisJour(e.maintenant).jour, empreinte: e.empreinte, repetition, repetitions }));
   writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultat: r }, null, 2));
-  appendFileSync(join(racine, 'historique.jsonl'), `${ligneSequence(v, { date: e.maintenant.toISOString(), empreinte: e.empreinte, candidat: cand, reference: ref, modele_candidat: e.modele_candidat, sequence: r.sequence, run: r.run, repetition })}\n`);
+  appendFileSync(join(racine, 'historique.jsonl'), `${ligneSequence(v, { date: e.maintenant.toISOString(), empreinte: e.empreinte, candidat: cand, reference: ref, modele_candidat: e.modele_candidat, sequence: r.sequence, run: r.run, repetition, repetitions })}\n`);
+  return v;
+}
+
+/** Une répétition qui n'a pas pu se terminer : ligne rouge dans l'historique (un run sans ses N lignes n'autorise jamais la publication). */
+export function echecRepetition(racine: string, e: { message: string; run: string; sequence: string; repetition: number; repetitions: number; maintenant: Date; empreinte: string; candidat: string; reference: string; modele_candidat: string }): Verdict {
+  const v: Verdict = { vert: false, criteres: [{ nom: `répétition non terminée : ${e.message.split('\n')[0]}`, valeur: 'interrompue', seuil: 'terminée', ok: false, bloquant: true }] };
+  appendFileSync(join(racine, 'historique.jsonl'), `${ligneSequence(v, { date: e.maintenant.toISOString(), empreinte: e.empreinte, candidat: e.candidat, reference: e.reference, modele_candidat: e.modele_candidat, sequence: e.sequence, run: e.run, repetition: e.repetition, repetitions: e.repetitions })}\n`);
   return v;
 }

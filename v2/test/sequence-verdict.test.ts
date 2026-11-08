@@ -147,7 +147,7 @@ describe('rapport, historique et publication de la séquence', () => {
   const now = new Date('2026-11-09T08:00:00Z'); const modeles = { C: 'opus', A: 'opus' };
   const court = (o: Record<string, unknown> = {}) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus',
     bancs: ['1-a', '3-b', '6-c'], hebdo: true, frais: 0, vert: true, rouges: [], ...o });
-  const sequence = (o: Record<string, unknown> = {}) => court({ type: 'sequence', sequence: 'aether-b68', run: 'run1', repetition: 1, bancs: ['aether-b68'], hebdo: false, ...o });
+  const sequence = (o: Record<string, unknown> = {}) => court({ type: 'sequence', sequence: 'aether-b68', run: 'run1', repetition: 1, repetitions: 1, bancs: ['aether-b68'], hebdo: false, ...o });
   const ok = (h: string[], m: Record<string, string> = modeles) => statut(h, now, 'e1', m).publication_ok;
   it('publication : court ET séquence verts, même candidat, même modèle', () => {
     expect(ok([court(), sequence()])).toBe(true);
@@ -170,10 +170,19 @@ describe('rapport, historique et publication de la séquence', () => {
     const triviale = sequence({ sequence: 'triviale', bancs: ['triviale'], run: 'run2' });
     expect(ok([court(), sequence({ vert: false }), triviale])).toBe(false); // une triviale verte ne débloque pas la principale rouge
     expect(ok([court(), sequence(), triviale])).toBe(true);
-    expect(ok([court(), sequence({ run: 'run2' }), sequence({ run: 'run2', repetition: 2, vert: false })])).toBe(false);
-    expect(ok([court(), sequence({ run: 'run2', vert: false }), sequence({ run: 'run2', repetition: 2 })])).toBe(false);
-    expect(ok([court(), sequence({ vert: false }), sequence({ run: 'run2' }), sequence({ run: 'run2', repetition: 2 })])).toBe(true); // rouge d'un run plus ancien
+    expect(ok([court(), sequence({ run: 'run2', repetitions: 2 }), sequence({ run: 'run2', repetition: 2, repetitions: 2, vert: false })])).toBe(false);
+    expect(ok([court(), sequence({ run: 'run2', repetitions: 2, vert: false }), sequence({ run: 'run2', repetition: 2, repetitions: 2 })])).toBe(false);
+    expect(ok([court(), sequence({ vert: false }), sequence({ run: 'run2', repetitions: 2 }), sequence({ run: 'run2', repetition: 2, repetitions: 2 })])).toBe(true); // rouge d'un run plus ancien
     expect(ok([court(), sequence({ run: undefined })])).toBe(false);
+  });
+  it('répétitions : un run sans ses N lignes (tué), N inconnu ou lignes mêlées refuse la publication', () => {
+    const r = (o: Record<string, unknown>) => sequence({ run: 'run2', repetitions: 2, ...o });
+    expect(ok([court(), r({}), r({ repetition: 2 })])).toBe(true);
+    expect(ok([court(), r({})])).toBe(false); // répétition 2 jamais écrite
+    expect(ok([court(), r({ repetition: 2 })])).toBe(false); // répétition 1 absente
+    expect(ok([court(), r({}), r({})])).toBe(false); // deux fois la 1
+    expect(ok([court(), r({ repetitions: undefined })])).toBe(false); // ancienne ligne sans N
+    expect(ok([court(), r({}), r({ repetition: 3 })])).toBe(false);
   });
   it('statut saute les lignes illisibles ou sans date valide ; dernier dit « séquence »', () => {
     const s = statut(['pas du json', '{"vert":true}', JSON.stringify({ date: 'hier', vert: true }), court(), sequence()], now, 'e1', modeles);

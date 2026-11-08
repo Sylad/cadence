@@ -271,7 +271,9 @@ describe('C5, comportement de verdict, rapport et historique', () => {
     const ligne = (bancs: string[]) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', vert: true, hebdo: false, frais: 0, bancs });
     const now = new Date('2026-11-07T12:00:00Z');
     expect(statut([ligne(['1-a', '3-b'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(false);
-    expect(statut([ligne(['1-a', '3-b', '6-c'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(true);
+    const seq = JSON.stringify({ ...JSON.parse(ligne(['s'])), type: 'sequence' });
+    expect(statut([ligne(['1-a', '3-b', '6-c'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(false); // sans séquence verte
+    expect(statut([ligne(['1-a', '3-b', '6-c']), seq], now, 'e1', { C: 'opus' }).publication_ok).toBe(true);
   });
 });
 

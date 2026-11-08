@@ -99,8 +99,9 @@ describe('rapport, historique, statut', () => {
     const s = statut([h('2026-11-06T10:00:00Z', true)], new Date('2026-11-09T08:00:00Z'), 'e1');
     expect(s.banc_du_weekend).toBe(false);
   });
-  it('passage samedi : banc du weekend fait ; publication seulement si vert sur la même empreinte', () => {
-    const s = statut([h('2026-11-07T10:00:00Z', true, 'e1')], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' });
+  const seqVerte = JSON.stringify({ type: 'sequence', date: '2026-11-07T12:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['s'], hebdo: false, frais: 0, vert: true, rouges: [] });
+  it('passage samedi : banc du weekend fait ; publication seulement si vert sur la même empreinte (et séquence verte)', () => {
+    const s = statut([h('2026-11-07T10:00:00Z', true, 'e1'), seqVerte], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' });
     expect(s).toMatchObject({ banc_du_weekend: true, publication_ok: true });
     expect(statut([h('2026-11-07T10:00:00Z', true, 'e1')], new Date('2026-11-09T08:00:00Z'), 'e2', { C: 'opus' }).publication_ok).toBe(false);
     expect(statut([h('2026-11-07T10:00:00Z', false, 'e1')], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(false);
@@ -152,7 +153,8 @@ describe('répétitions (R18)', () => {
     const mt = rapport([t], 'A', 'C', v, { date: 'd', empreinte: 'e' });
     expect(mt).toContain('Taille déclarée A · C'); expect(mt).toContain('| – · Taille : fonction |'); expect(mt).toContain('## Lectures à vérifier\n\n- b/C : /x/runs/r');
     const ligne = JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a#1', '1-a#2', '3-x#1', '3-x#2', '6-y#1', '6-y#2'], hebdo: true, frais: 0, vert: true, rouges: [] });
-    expect(statut([ligne], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(true);
+    const seq = JSON.stringify({ type: 'sequence', date: '2026-11-07T12:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['s'], hebdo: false, frais: 0, vert: true, rouges: [] });
+    expect(statut([ligne, seq], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(true);
   });
   it('une répétition non jugée : le banc compte egal, jamais la préférence de l\'autre', () => {
     const v = verdict([rep('1-a#1', { pref: 'A', ui: 'A' }), rep('1-a#2', { nonJuge: true })], 'A', 'C', BARRE_SPEC);
@@ -169,7 +171,9 @@ describe('publication : la dernière mesure réelle de l\'empreinte (C-1, I-7)',
   const now = new Date('2026-11-09T08:00:00Z'); const modeles = { C: 'opus', A: 'opus' };
   const l = (o: Record<string, unknown> = {}) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus',
     bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, vert: true, rouges: [], ...o });
-  const ok = (h: string[], m: Record<string, string> = modeles) => statut(h, now, 'e1', m).publication_ok;
+  // une séquence verte du même candidat est ajoutée : ici on éprouve la règle du passage court (sequence-verdict.test.ts éprouve l'autre)
+  const seq = l({ type: 'sequence', bancs: ['s'] });
+  const ok = (h: string[], m: Record<string, string> = modeles) => statut([...h, seq], now, 'e1', m).publication_ok;
   it('vert sur 1, 3, 6, candidat ≠ référence, modèle du bras.yaml courant : permise', () => expect(ok([l()])).toBe(true));
   it('candidat = référence (A contre A) : refusée', () => expect(ok([l({ candidat: 'A' })])).toBe(false));
   it('ligne sans référence (historique d\'avant) : refusée', () => expect(ok([l({ reference: undefined })])).toBe(false));

@@ -22,7 +22,8 @@ export interface MesureEtape {
   regressions?: Ecart; nouveaux?: string[]; tests_affaiblis?: Affaiblis; build_ok?: boolean; maintenabilite?: ReturnType<typeof maintenabilite>;
   mesure_en_erreur: string | null;
 }
-export interface Base { suite: { passes: number; total: number }; build_ok: boolean }
+/** Étape 0 : la pente de maintenabilité se mesure depuis ici. */
+export interface Base { suite: { passes: number; total: number }; build_ok: boolean; maintenabilite: ReturnType<typeof maintenabilite> }
 export interface ResultatSequence { run: string; sequence: string; clones: Record<string, string>; base: Record<string, Base>; etapes: Record<string, MesureEtape[]>; jugement: Jugement | null }
 type Opt = { racine: string; id: string; ref: string; cand: string; juge: string; exec: Executeur; maintenant: Date; empreinte: string; home: string; out: (l: string) => void;
   prep?: typeof preparer; pret?: (b: Record<string, DefBras>) => string | null; jscpd?: string[]; delaiMs?: number; garderClones?: boolean; tirage?: () => number };
@@ -123,8 +124,10 @@ function preparerBras(x: Ctx, b: string): Base {
   const r = jouerSuite(x, b, 0);
   if ('erreur' in r) throw new Error(`suite du projet à la base (${nomClone(x, b)}) : ${r.erreur}`);
   x.prec[b] = r.statuts;
-  return { suite: { passes: r.passes, total: r.total }, build_ok: jouerBuild(x, x.clones[b], 0) };
+  return { suite: { passes: r.passes, total: r.total }, build_ok: jouerBuild(x, x.clones[b], 0), maintenabilite: mesurerMaintenabilite(x, x.clones[b]) };
 }
+
+const mesurerMaintenabilite = (x: Ctx, c: string) => maintenabilite(c, [existsSync(join(c, 'frontend')) ? 'frontend' : '.'], x.o.jscpd);
 
 /** Empreinte (taille, date) de chaque transcript du clone : ce qui change pendant l'étape lui appartient. */
 function empreintes(x: Ctx, c: string): Map<string, string> {
@@ -190,7 +193,7 @@ function jouerEtape(x: Ctx, e: Etape, b: string): MesureEtape {
     }
     phase = 'tests affaiblis'; me.tests_affaiblis = testsAffaiblis(c, avant.head);
     phase = 'build'; me.build_ok = jouerBuild(x, c, e.k);
-    phase = 'maintenabilité'; me.maintenabilite = maintenabilite(c, [existsSync(join(c, 'frontend')) ? 'frontend' : '.'], x.o.jscpd);
+    phase = 'maintenabilité'; me.maintenabilite = mesurerMaintenabilite(x, c);
   } catch (err) {
     me.mesure_en_erreur = `${phase} : ${(err as Error).message}`;
   }

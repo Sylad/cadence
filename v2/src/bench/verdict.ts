@@ -81,7 +81,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
     ...[['Lectures à vérifier', lectures], ['Questions posées', questions]].flatMap(([t, l]) => (l.length ? [`## ${t}`, '', ...l, ''] : []))].join('\n');
 }
 
-export const ligneHistorique = (v: Verdict, e: { date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; bancs: string[]; hebdo: boolean; frais: number; eclair_ok?: boolean }) =>
+export const ligneHistorique = (v: Verdict, e: { type?: 'sequence'; date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; bancs: string[]; hebdo: boolean; frais: number; eclair_ok?: boolean }) =>
   JSON.stringify({ ...e, vert: v.vert, rouges: v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom) });
 
 const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -97,7 +97,7 @@ function samediCourant(d: Date): string {
   return new Date(Date.UTC(y, m - 1, j - ((sem + 1) % 7))).toISOString().slice(0, 10);
 }
 
-type Ligne = { date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number; bancs?: string[]; candidat?: string; reference?: string; modele_candidat?: string; eclair_ok?: boolean };
+type Ligne = { type?: string; date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number; bancs?: string[]; candidat?: string; reference?: string; modele_candidat?: string; eclair_ok?: boolean };
 
 /** `modeles` : nom du bras -> modèle, lus dans le bras.yaml courant (le modèle n'est pas dans l'empreinte). */
 export function statut(historique: string[], maintenant: Date, empreinte: string, modeles: Record<string, string> = {}) {
@@ -106,17 +106,20 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
   const enWeekend = [6, 0].includes(parisJour(maintenant).sem);
   const depuisSamedi = h.filter((x) => parisJour(new Date(x.date)).jour >= sam);
   const dernier = h.at(-1);
-  // Publication : le DERNIER passage de l'empreinte couvrant 1, 3 et 6 est vert, mesure un vrai candidat avec le modèle du bras.yaml
-  // courant, et aucun passage rouge de cette empreinte (éclair compris) ne le suit.
+  // Publication (C-1 pour chacun) : le DERNIER passage court de l'empreinte couvrant 1, 3 et 6 est vert, mesure un vrai candidat avec le modèle
+  // du bras.yaml courant, et aucun passage court rouge de cette empreinte (éclair compris) ne le suit ; la DERNIÈRE séquence de l'empreinte
+  // est verte, mesure un vrai candidat, avec le même candidat et le même modèle que ce passage court.
   const miennes = h.filter((x) => x.empreinte === empreinte);
-  const i = miennes.map((x) => ['1', '3', '6'].every((n) => (x.bancs ?? []).some((id) => banBase(id).split('-')[0] === n))).lastIndexOf(true);
-  const m = miennes[i];
+  const courts = miennes.filter((x) => x.type !== 'sequence');
+  const i = courts.map((x) => ['1', '3', '6'].every((n) => (x.bancs ?? []).some((id) => banBase(id).split('-')[0] === n))).lastIndexOf(true);
+  const m = courts[i], s = miennes.filter((x) => x.type === 'sequence').at(-1);
+  const reel = (m: Ligne | undefined): m is Ligne => m !== undefined && typeof m.reference === 'string' && m.candidat !== m.reference
+    && typeof m.modele_candidat === 'string' && modeles[m.candidat ?? ''] === m.modele_candidat;
   return {
     dernier: dernier ? `${dernier.date} ${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
     banc_du_weekend: enWeekend || depuisSamedi.some((x) => x.hebdo),
-    publication_ok: empreinte !== 'inconnue' && m !== undefined && typeof m.reference === 'string' && m.candidat !== m.reference
-      && typeof m.modele_candidat === 'string' && modeles[m.candidat ?? ''] === m.modele_candidat
-      && !miennes.slice(i).some((x) => !x.vert || x.eclair_ok === false),
+    publication_ok: empreinte !== 'inconnue' && reel(m) && !courts.slice(i).some((x) => !x.vert || x.eclair_ok === false)
+      && reel(s) && s.vert && s.candidat === m.candidat && s.modele_candidat === m.modele_candidat,
     frais_semaine: somme(depuisSamedi.map((x) => x.frais ?? 0)),
   };
 }

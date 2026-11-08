@@ -95,7 +95,8 @@ describe('passage d\'une séquence', () => {
     expect(vu.ordre).toEqual(['A1', 'C1', 'C2', 'A2', 'A3', 'C3']);
     expect(vu.etapes).toEqual(['1/3', '1/3', '2/3', '2/3', '3/3', '3/3']);
     const A = res.etapes.A, C = res.etapes.C;
-    expect(res.base).toEqual({ A: { suite: { passes: 3, total: 3 }, build_ok: true }, C: { suite: { passes: 3, total: 3 }, build_ok: true } });
+    expect(res.base).toMatchObject({ A: { suite: { passes: 3, total: 3 }, build_ok: true }, C: { suite: { passes: 3, total: 3 }, build_ok: true } });
+    expect(res.base.A.maintenabilite).toMatchObject({ duplication_pct: null, fichiers_400: 0 }); // étape 0 de la pente
     expect(A[1].mesure.echec).toMatch(/plantage du bras/); expect(A[2].mesure.echec).toBeNull(); // échec à l'étape 2, l'étape 3 est jouée
     expect(A[1].fuites).toEqual([join(d, 'etapes', '3', 'demande.md')]); // M4 : bras planté, transcripts lus quand même
     expect(A.map((e) => e.regressions)).toEqual([{ rouges: [], disparus: [] }, { rouges: [], disparus: [] },

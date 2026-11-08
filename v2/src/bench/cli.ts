@@ -197,7 +197,7 @@ export async function bench(args: string[], io: Io): Promise<number> {
   }
   if (sous === 'verifier-publication') {
     const ok = statut(hist, io.now(), emp, modeles()).publication_ok;
-    io.out(ok ? `banc vert sur l'empreinte ${emp}` : `aucun banc vert sur l'empreinte ${emp} : lancer « cadence2 bench court »`);
+    io.out(ok ? `banc court et séquence verts sur l'empreinte ${emp}` : `publication refusée sur l'empreinte ${emp} : il faut le dernier banc court ET la dernière séquence verts, même candidat et même modèle`);
     return ok ? 0 : 1;
   }
   if (sous === 'ajouter') {

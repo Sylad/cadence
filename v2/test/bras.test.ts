@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Banc } from '../src/bench/banc.js';
-import { chargerBras, environnementNeutre, lancerBras, OUTILS_INTERDITS, type Executeur } from '../src/bench/bras.js';
+import { chargerBras, cheminReglages, empreinteReglages, environnementNeutre, libererReglages, lancerBras, OUTILS_INTERDITS, type Executeur } from '../src/bench/bras.js';
 
 function bancTest(reponses?: string): { b: Banc; clone: string } {
   const r = mkdtempSync(join(tmpdir(), 'bras-'));
@@ -93,20 +93,32 @@ describe('lancerBras', () => {
     expect(lancerBras(b, d, clone, () => ({ stdout: '', code: 1, erreur: 'SIGKILL' })).echec).toBe('sortie illisible (SIGKILL) : ');
   });
 
-  it('réglages du bras : --settings vers un fichier du run (à côté du clone), {{HOOKS}} absolu, passé aussi à la reprise', () => {
+  it('réglages du bras : --settings vers un fichier du run en lecture seule, {{HOOKS}} absolu, pièces par l\'environnement, aussi à la reprise (R31)', () => {
     const { b, clone } = bancTest('Oui.');
     const settings = join(import.meta.dirname, '..', 'briefs', 'settings-sequence-v2.json');
-    const appels: string[][] = [];
-    const exec: Executeur = (args) => { appels.push(args); if (appels.length === 1) writeFileSync(`${clone}.question.md`, '?'); return { stdout: json('s1', 1, 0), code: 0 }; };
-    lancerBras(b, { nom: 'C', modele: 'opus', brief, settings }, clone, exec);
-    for (const a of appels) expect(a[a.indexOf('--settings') + 1]).toBe(`${clone}.settings.json`);
-    const j = JSON.parse(readFileSync(`${clone}.settings.json`, 'utf8'));
-    const cmd = j.hooks.PreToolUse[0].hooks[0].command as string;
-    expect(cmd).toBe(`node "${join(import.meta.dirname, '..', 'hooks', 'lecture-obligatoire.mjs')}"`);
-    expect(existsSync(join(import.meta.dirname, '..', 'hooks', 'lecture-obligatoire.mjs'))).toBe(true);
+    const appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
+    const exec: Executeur = (args, o) => { appels.push({ args, env: o.env }); if (appels.length === 1) writeFileSync(`${clone}.question.md`, '?'); return { stdout: json('s1', 1, 0), code: 0 }; };
+    lancerBras(b, { nom: 'C', modele: 'opus', brief, settings }, clone, exec, undefined, ['/ref/a.pdf']);
+    expect(appels).toHaveLength(2);
+    for (const a of appels) {
+      expect(a.args[a.args.indexOf('--settings') + 1]).toBe(cheminReglages(clone));
+      expect(a.env).toMatchObject({ CADENCE_CLONE: clone, CADENCE_PIECES: '["/ref/a.pdf"]' });
+    }
+    expect(cheminReglages(clone)).toBe(join(`${clone}.reglages`, 'settings.json'));
+    expect(statSync(`${clone}.reglages`).mode & 0o777).toBe(0o500);
+    expect(statSync(cheminReglages(clone)).mode & 0o777).toBe(0o400);
+    expect(() => writeFileSync(cheminReglages(clone), '{}')).toThrow();
+    const j = JSON.parse(readFileSync(cheminReglages(clone), 'utf8'));
+    expect(j.hooks.PreToolUse[0].hooks[0].command).toBe(`node "${join(import.meta.dirname, '..', 'hooks', 'lecture-obligatoire.mjs')}" || exit 2`);
     expect(j.hooks.PreToolUse[0].matcher).toBe('Edit|Write|MultiEdit|NotebookEdit');
-    expect(lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, (args) => { appels.push(args); return { stdout: json('s', 1, 0), code: 0 }; }).echec).toBeNull();
-    expect(appels.at(-1)).not.toContain('--settings');
+    const e0 = empreinteReglages(clone);
+    lancerBras(b, { nom: 'C', modele: 'opus', brief, settings }, clone, exec); // réécrit à l'identique : même empreinte
+    expect(empreinteReglages(clone)).toBe(e0);
+    libererReglages(clone); chmodSync(cheminReglages(clone), 0o600); writeFileSync(cheminReglages(clone), '{}');
+    expect(empreinteReglages(clone)).not.toBe(e0);
+    const sans: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
+    lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, (args, o) => { sans.push({ args, env: o.env }); return { stdout: json('s', 1, 0), code: 0 }; });
+    expect(sans[0].args).not.toContain('--settings'); expect(sans[0].env.CADENCE_PIECES).toBeUndefined();
   });
 
   it('{{TAILLE}} : la taille du gardien (retouche ou fonction), fonction pour un banc court « grosse »', () => {

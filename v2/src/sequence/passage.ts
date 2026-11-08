@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Banc } from '../bench/banc.js';
-import { chargerBras, lancerBras, type DefBras, type Executeur, type Mesure } from '../bench/bras.js';
+import { chargerBras, cheminReglages, ecrireReglages, empreinteReglages, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from '../bench/bras.js';
 import { archiver, pretAPasser, verrouiller } from '../bench/cli.js';
 import { chercherFuites, dossierTranscripts, jsonl, reglesDuBras, type Regles } from '../bench/fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from '../bench/juges.js';
@@ -147,7 +147,7 @@ function lignesEtape(x: Ctx, c: string, sessions: string[], avant: Map<string, s
 /** Fuites : demandes et pièces des étapes ≤ k et ses propres fichiers de mesure permis ; le reste de la séquence et les mesures de l'autre bras, certains. */
 function reglesEtape(x: Ctx, b: string, k: number): Regles {
   const r = reglesDuBras(x.o.home, x.o.racine, x.s.id, x.clones[b]);
-  const mesures = (bras: string) => [`${x.clones[bras]}.pieces.json`, `${x.clones[bras]}.settings.json`, ...[0, ...x.s.etapes.map((e) => e.k)].flatMap((j) => [`${x.clones[bras]}.build-${j}.log`,
+  const mesures = (bras: string) => [`${x.clones[bras]}.reglages`, ...[0, ...x.s.etapes.map((e) => e.k)].flatMap((j) => [`${x.clones[bras]}.build-${j}.log`,
     join(x.dir, `etape-${j}.${nomClone(x, bras)}.json`), join(x.dir, `suite-${j}.${nomClone(x, bras)}.json`)])];
   r.autorises.push(...x.s.etapes.slice(0, k).flatMap((e) => [dirname(e.demande), ...e.pieces]), ...mesures(b));
   r.certains.push(join(x.o.racine, 'sequences'), ...x.noms.filter((n) => n !== b).flatMap(mesures));
@@ -155,10 +155,10 @@ function reglesEtape(x: Ctx, b: string, k: number): Regles {
 }
 
 /** Le bras joue l'étape : un échec (y compris une exception) est noté, jamais levé. */
-function lancer(x: Ctx, e: Etape, b: string, avant: { head: string; sale: string[] }): Mesure {
+function lancer(x: Ctx, e: Etape, b: string, avant: { head: string; sale: string[] }, pieces: string[]): Mesure {
   const c = x.clones[b];
   try {
-    const m = lancerBras(bancEtape(x.s, e, avant.head), x.bras[b], c, x.o.exec);
+    const m = lancerBras(bancEtape(x.s, e, avant.head), x.bras[b], c, x.o.exec, undefined, pieces);
     m.echec ??= travailNonLivre(avant, etatGit(c));
     return m;
   } catch (err) {
@@ -174,15 +174,17 @@ function jouerEtape(x: Ctx, e: Etape, b: string): MesureEtape {
   let phase = 'état avant';
   try {
     const avant = etatGit(c);
-    writeFileSync(`${c}.pieces.json`, JSON.stringify({ etape: e.k, pieces: aLire })); // lu par le hook lecture-obligatoire du bras candidat
     phase = 'bras'; signaler(x, e.k, `bras ${b}`, e.k - 1);
     x.o.out(`${x.s.id} étape ${e.k}/${x.s.etapes.length} : bras ${b}…`);
-    me.mesure = lancer(x, e, b, avant);
+    const d = x.bras[b], sceau = d.settings ? (ecrireReglages(d.settings, c), empreinteReglages(c)) : empreinteReglages(c); // R31 : réglages et hooks figés pendant l'étape
+    me.mesure = lancer(x, e, b, avant, aLire);
+    const contourne = empreinteReglages(c) !== sceau;
     if (me.mesure.echec) x.o.out(`${x.s.id} étape ${e.k} : bras ${b} en échec (${me.mesure.echec}), la séquence continue avec son code tel quel`);
     signaler(x, e.k, 'mesures', e.k - 1);
     phase = 'fuites'; const lignes = lignesEtape(x, c, me.mesure.sessions, transcripts);
     const fu = chercherFuites(lignes, reglesEtape(x, b, e.k), x.o.home, c);
-    me.fuites = fu.certaines; me.fuites_a_verifier = fu.a_verifier;
+    me.fuites = [...(contourne ? [`contournement : réglages ou hooks du bras modifiés pendant l'étape (${cheminReglages(c)}, v2/hooks, .claude du clone)`] : []), ...fu.certaines];
+    me.fuites_a_verifier = fu.a_verifier;
     phase = 'lecture'; me.lecture = lectureReferences(lignes, aLire, c);
     phase = 'suite'; const r = jouerSuite(x, b, e.k);
     if ('erreur' in r) me.suite_en_erreur = r.erreur; // l'étape suivante se compare à la dernière mesure réussie
@@ -241,6 +243,6 @@ function passer(o: Opt, bras: Record<string, DefBras>, s: Sequence): ResultatSeq
     writeFileSync(join(dir, 'resultat.json'), JSON.stringify(res, null, 2));
     return res;
   } finally {
-    if (!o.garderClones) for (const b of noms) archiver(x.clones[b], heads[b]);
+    for (const b of noms) if (o.garderClones) libererReglages(x.clones[b]); else archiver(x.clones[b], heads[b]);
   }
 }

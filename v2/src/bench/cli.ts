@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { ajouterBanc } from './ajouter.js';
 import { chargerBanc, listerBancs, racineBanc, type Banc } from './banc.js';
-import { chargerBras, executeurClaude, lancerBras, type DefBras, type Executeur, type Mesure } from './bras.js';
+import { chargerBras, executeurClaude, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from './bras.js';
 import { fuitesDuBras } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
@@ -75,6 +75,7 @@ export function verrouiller(racine: string): () => void {
 
 /** Garde le patch et les commits du bras à côté du clone, puis efface le clone (≈ 1 Go) ; captures et journaux restent. */
 export function archiver(c: string, base: string | undefined): void {
+  libererReglages(c);
   if (base) for (const [ext, a] of [['patch', ['diff', `${base}..HEAD`]], ['commits.txt', ['log', '--oneline', `${base}..HEAD`]]] as const)
     try { writeFileSync(`${c}.${ext}`, execFileSync('git', a, { cwd: c, encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'ignore'] })); } catch { /* clone illisible */ }
   rmSync(c, { recursive: true, force: true });

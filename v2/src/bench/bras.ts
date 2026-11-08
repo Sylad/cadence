@@ -1,11 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { parse } from 'yaml';
 import { lireDemande, type Banc } from './banc.js';
 
-/** `settings` : fichier de réglages Claude Code du bras (hooks) ; `{{HOOKS}}` y devient le chemin absolu de v2/hooks. */
-export interface DefBras { nom: string; modele: string; brief: string; settings?: string }
+export interface DefBras { nom: string; modele: string; brief: string; settings?: string } // settings : réglages Claude Code du bras (hooks)
 export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number;
   tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string }
 export type Executeur = (args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }) => { stdout: string; code: number; erreur?: string };
@@ -47,23 +47,29 @@ function lire(e: { stdout: string; code: number; erreur?: string }): { session: 
   if (e.code !== 0) causes.push(`code ${e.code}${e.erreur ? ` (${e.erreur})` : ''}`);
   return { session, tokens, cout: j.total_cost_usd ?? 0, echec: causes.length ? causes.join(', ') : null };
 }
-
 const HOOKS = join(import.meta.dirname, '..', '..', 'hooks');
-/** Réglages du run, à côté du clone (jamais dedans) : `{{HOOKS}}` résolu en chemin absolu. */
-function reglages(modele: string, clone: string): string {
-  const f = `${clone}.settings.json`;
-  writeFileSync(f, readFileSync(modele, 'utf8').replaceAll('{{HOOKS}}', JSON.stringify(HOOKS).slice(1, -1)));
+export const cheminReglages = (clone: string) => join(`${clone}.reglages`, 'settings.json');
+export const libererReglages = (clone: string) => { if (existsSync(`${clone}.reglages`)) chmodSync(`${clone}.reglages`, 0o700); }; // avant réécriture ou effacement
+/** Réglages du run, à côté du clone, en lecture seule (dossier 0500, fichier 0400) ; `{{HOOKS}}` devient le chemin absolu de v2/hooks. */
+export function ecrireReglages(modele: string, clone: string): string {
+  const f = cheminReglages(clone);
+  libererReglages(clone); rmSync(dirname(f), { recursive: true, force: true }); mkdirSync(dirname(f));
+  writeFileSync(f, readFileSync(modele, 'utf8').replaceAll('{{HOOKS}}', JSON.stringify(HOOKS).slice(1, -1)), { mode: 0o400 }); chmodSync(dirname(f), 0o500);
   return f;
 }
-
-export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date()): Mesure {
+/** Empreinte des réglages du run, des hooks et des réglages Claude du clone : un changement pendant l'étape est un contournement (R31). */
+export const empreinteReglages = (clone: string): string => [cheminReglages(clone), ...readdirSync(HOOKS).sort().map((e) => join(HOOKS, e)),
+  join(clone, '.claude', 'settings.json'), join(clone, '.claude', 'settings.local.json')]
+  .reduce((h, f) => h.update(`${f}\0${existsSync(f) ? readFileSync(f, 'latin1') : 'absent'}\0`), createHash('sha1')).digest('hex');
+/** `pieces` : chemins absolus à lire avant d'écrire, donnés au hook du bras par l'environnement (CADENCE_PIECES, CADENCE_CLONE), jamais par un fichier. */
+export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), pieces: string[] = []): Mesure {
   const question = `${clone}.question.md`;
   const brief = readFileSync(d.brief, 'utf8').replaceAll('{{DEMANDE}}', lireDemande(b)).replaceAll('{{CLONE}}', clone)
     .replaceAll('{{QUESTION}}', question).replaceAll('{{BASE}}', b.base)
     .replaceAll('{{TAILLE}}', b.taille === 'retouche' ? 'retouche' : 'fonction'); // taille fixée par le gardien ; banc court sans retouche : fonction
   const commun = ['--output-format', 'json', '--model', d.modele, '--permission-mode', 'bypassPermissions',
-    '--disallowedTools', OUTILS_INTERDITS.join(','), ...(d.settings ? ['--settings', reglages(d.settings, clone)] : [])];
-  const o = { cwd: clone, env: environnementNeutre(process.env) };
+    '--disallowedTools', OUTILS_INTERDITS.join(','), ...(d.settings ? ['--settings', ecrireReglages(d.settings, clone)] : [])];
+  const o = { cwd: clone, env: { ...environnementNeutre(process.env), ...(d.settings ? { CADENCE_CLONE: clone, CADENCE_PIECES: JSON.stringify(pieces) } : {}) } };
   const reponse = b.reponses ? readFileSync(join(b.dir, 'reponses.md'), 'utf8') : SANS_REPONSE;
   const debut = horloge();
   let r = lire(exec(['-p', brief, ...commun], o));

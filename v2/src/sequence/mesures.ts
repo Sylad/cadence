@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, lstatSync, readdirSync, rmSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
-import { appelsOutils, cheminOutil, dansClone, ECRITURES, lectureEntiere } from '../../hooks/lecture.mjs';
+import { cheminOutil, dansClone, ECRITURES, evenements, lectures, type Appel } from '../../hooks/lecture.mjs';
 
 export class CloneModifie extends Error {}
 export class TestsIntrouvables extends Error {}
@@ -114,23 +114,25 @@ function lire(json: Vitest, copies: { id: string; copie: string }[], clone: stri
 }
 
 // Limites connues : une écriture par Bash (sed -i, tee, redirection) n'est pas vue. Les lectures et écritures des sous-agents (sidechain)
-// COMPTENT : le bras a délégué, la lecture a eu lieu. « Lire » et « écrire » : hooks/lecture.mjs, la définition du hook du bras candidat.
+// COMPTENT : le bras a délégué, la lecture a eu lieu. « Lire » (couvrir par des Read réussis) et « écrire » : hooks/lecture.mjs, la définition
+// du hook du bras candidat. Fenêtre : le hook regarde tout le transcript au moment de l'écriture ; la mesure ne garde que les Read d'AVANT
+// la première écriture dans le clone. La mesure est la porte stricte : une lecture qui ne compte que pour le hook ne compte pas ici.
 /** Lectures des pièces de référence AVANT la première écriture dans le clone (sans `clone`, toute écriture compte). */
-export function lectureReferences(lignes: string[], pieces: string[], clone?: string): { ouvertes: string[]; manquantes: string[]; apres_ecriture: string[]; partielles: string[] } {
-  const cibles = new Map(pieces.map((p) => [resolve(p), p]));
-  const avant = new Set<string>(), apres = new Set<string>(), entieres = new Set<string>();
+export function lectureReferences(lignes: string[], pieces: string[], clone?: string): { ouvertes: string[]; manquantes: string[]; apres_ecriture: string[]; partielles: string[]; pages_inconnues: string[] } {
+  const avant: Appel[] = [], tous: Appel[] = [], ok = new Set<string | undefined>();
   let ecrit = false;
-  for (const c of lignes.flatMap(appelsOutils)) {
-    const f = cheminOutil(c.input);
-    if (!f) continue;
-    if (ECRITURES.includes(c.name) && (!clone || dansClone(f, clone))) ecrit = true;
-    const piece = c.name === 'Read' ? cibles.get(resolve(f)) : undefined;
-    if (!piece) continue;
-    if (ecrit) apres.add(piece);
-    else { avant.add(piece); if (lectureEntiere(c.input)) entieres.add(piece); }
+  for (const e of lignes.map(evenements)) {
+    for (const r of e.resultats) if (!r.erreur) ok.add(r.id);
+    for (const c of e.appels) {
+      const f = cheminOutil(c.input);
+      if (f && ECRITURES.includes(c.name) && (!clone || dansClone(f, clone))) ecrit = true;
+      tous.push(c); if (!ecrit) avant.push(c);
+    }
   }
-  return { ouvertes: pieces.filter((p) => avant.has(p)), manquantes: pieces.filter((p) => !avant.has(p) && !apres.has(p)),
-    apres_ecriture: pieces.filter((p) => !avant.has(p) && apres.has(p)), partielles: pieces.filter((p) => avant.has(p) && !entieres.has(p)) };
+  const av = lectures(avant, ok, pieces), tt = lectures(tous, ok, pieces);
+  const quand = (f: (p: string) => boolean) => pieces.filter(f);
+  return { ouvertes: quand((p) => av.get(p)!.lue), manquantes: quand((p) => !tt.get(p)!.lue), apres_ecriture: quand((p) => !av.get(p)!.lue && tt.get(p)!.lue),
+    partielles: quand((p) => av.get(p)!.lue && !av.get(p)!.entiere), pages_inconnues: quand((p) => av.get(p)!.pages_inconnues) };
 }
 
 const SOURCES = /\.(ts|tsx|js|java|py|html|scss|css)$/;

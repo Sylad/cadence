@@ -80,7 +80,7 @@ export function rapportSequence(r: ResultatSequence, ref: string, cand: string, 
     return `| ${k} | ${x((m) => (m.regressions ? `${m.regressions.rouges.length}/${m.regressions.disparus.length}` : 'ERREUR'))} | ${x(affaiblis)} | ${x((m) => `${m.nouveaux?.length ?? '–'}`)} | ${x((m) => (m.lecture ? `${m.lecture.ouvertes.length}/${pieces(m)}${m.lecture.partielles.length ? ' partiel' : ''}` : '–'))} | ${x((m) => (m.build_ok === undefined ? '–' : m.build_ok ? 'ok' : 'ko'))} | ${x((m) => pct(m.maintenabilite))} | ${x((m) => `${m.maintenabilite?.fichiers_400 ?? '–'}`)} | ${x((m) => `${m.mesure.duree_s} s`)} |`;
   });
   const parEtape = (f: (b: string, m: MesureEtape) => string[]) => [ref, cand].flatMap((b) => (r.etapes[b] ?? []).flatMap((m) => f(b, m).map((l) => `- ${b} étape ${m.k} : ${l}`)));
-  const lectures = parEtape((_, m) => [...m.fuites_a_verifier, ...(m.lecture?.partielles ?? []).map((p) => `pièce lue en partie, ${p}`)]);
+  const lectures = parEtape((_, m) => [...m.fuites_a_verifier, ...(m.lecture?.partielles ?? []).map((p) => `pièce lue en partie, ${p}`), ...(m.lecture?.pages_inconnues ?? []).map((p) => `nombre de pages inconnu, ${p}`)]);
   const questions = parEtape((_, m) => m.mesure.questions_texte.map((q) => q.trim().replace(/\s*\n\s*/g, ' ')));
   const affaiblisListe = parEtape((_, m) => {
     const a = m.tests_affaiblis; if (!a) return [];

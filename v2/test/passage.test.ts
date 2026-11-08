@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { Executeur } from '../src/bench/bras.js';
+import { cheminReglages, libererReglages, type Executeur } from '../src/bench/bras.js';
 import { dossierTranscripts } from '../src/bench/fuites.js';
 import { passageSequence } from '../src/sequence/passage.js';
 
@@ -41,7 +41,9 @@ regression: { a_partir_de: 3, fichiers: [reg.ts], commande: vr }\n`);
 
 const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuees: 1, mutations_total: 1, attendu: 'oui', mutations: [] };
 let horloge = 0;
-const outil = (name: string, input: object) => JSON.stringify({ type: 'assistant', timestamp: new Date(Date.UTC(2026, 10, 8) + ++horloge * 1000).toISOString(), message: { content: [{ type: 'tool_use', name, input }] } });
+/** Un appel d'outil et son résultat réussi (deux lignes, même horodatage) : seul un Read réussi compte (R31). */
+const outil = (name: string, input: object) => { const timestamp = new Date(Date.UTC(2026, 10, 8) + ++horloge * 1000).toISOString(), id = `o${horloge}`;
+  return `${JSON.stringify({ type: 'assistant', timestamp, message: { content: [{ type: 'tool_use', id, name, input }] } })}\n${JSON.stringify({ type: 'user', timestamp, message: { content: [{ type: 'tool_result', tool_use_id: id }] } })}`; };
 type Geste = (c: string, ecrire: (lignes: string[], sous?: string) => void) => void | 'plante' | 'erreur';
 
 /** Faux claude. Par défaut, chaque bras écrit (Write) puis commite src/<bras><k>.js ; `gestes['A2']` ajoute un comportement à l'étape. */
@@ -125,15 +127,22 @@ describe('passage d\'une séquence', () => {
     expect(existsSync(join(r, 'en-cours.json'))).toBe(false); expect(existsSync(join(r, 'passage.lock'))).toBe(false);
   });
 
-  it('avant chaque étape, <clone>.pieces.json liste en absolu les pièces et les références du dépôt résolues dans CE clone', () => {
+  it('bras avec réglages : pièces et références (résolues dans CE clone) par l\'environnement ; réglages touchés pendant l\'étape = contournement (R31)', () => {
     const { r, d } = racine();
+    const settings = join(r, 'settings.json'); writeFileSync(settings, '{"hooks":{}}');
+    writeFileSync(join(r, 'bras.yaml'), `A:\n  modele: opus\n  brief: ${join(r, 'brief-A.md')}\nC:\n  modele: opus\n  brief: ${join(r, 'brief-C.md')}\n  settings: ${settings}\n`);
     const vus: Record<string, unknown> = {};
-    const lirePieces = (c: string, k: number) => { vus[`${c.endsWith('c1') ? 'c1' : 'c2'}-${k}`] = lire(`${c}.pieces.json`); };
-    const { exec } = faux(r, d, { A1: (c) => lirePieces(c, 1), C1: (c) => lirePieces(c, 1), A2: (c) => lirePieces(c, 2) });
-    passageSequence({ ...opts(r, exec), garderClones: true });
+    const env: Record<string, NodeJS.ProcessEnv> = {};
+    const { exec: base } = faux(r, d, { C2: (c) => { libererReglages(c); chmodSync(cheminReglages(c), 0o600); writeFileSync(cheminReglages(c), '{}'); } });
+    const exec: Executeur = (args, o) => { if (!/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) env[`${o.cwd.slice(-2)}-${Object.keys(env).length}`] = o.env; return base(args, o); };
+    const res = passageSequence({ ...opts(r, exec), garderClones: true });
     const dir = (x: string) => join(r, 'runs', '2026-11-08-1100-e1', 's1', x), piece = join(d, 'etapes', '1', 'pieces', 'fig.png');
-    expect(vus).toEqual({ 'c1-1': { etape: 1, pieces: [piece, join(dir('c1'), 'docs', 'norme.md')] },
-      'c2-1': { etape: 1, pieces: [piece, join(dir('c2'), 'docs', 'norme.md')] }, 'c1-2': { etape: 2, pieces: [] } });
+    for (const [k, e] of Object.entries(env)) vus[k] = e.CADENCE_PIECES === undefined ? null : JSON.parse(e.CADENCE_PIECES);
+    expect(vus).toEqual({ 'c1-0': null, 'c2-1': [piece, join(dir('c2'), 'docs', 'norme.md')], 'c2-2': [], 'c1-3': null, 'c1-4': null, 'c2-5': [] });
+    expect(env['c2-1'].CADENCE_CLONE).toBe(dir('c2'));
+    expect(res.etapes.C.map((e) => e.fuites.filter((f) => f.startsWith('contournement')).length)).toEqual([0, 1, 0]);
+    expect(res.etapes.A.every((e) => e.fuites.length === 0)).toBe(true);
+    expect(statSync(dir('c2.reglages')).mode & 0o777).toBe(0o700); // rendu effaçable en fin de séquence
   });
 
   it('suite en erreur à une étape : notée, et l\'étape suivante se compare à la dernière mesure réussie', () => {

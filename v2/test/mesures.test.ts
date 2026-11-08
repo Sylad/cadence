@@ -127,32 +127,36 @@ describe('jouerTests, échec fermé et restauration', () => {
   });
 });
 
-const ligne = (name: string, input: object) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name, input }] } });
+let idOutil = 0; // chaque appel porte un id ; son résultat réussi suit sur la même ligne logique (R31 : seul un Read réussi compte)
+const ligne = (name: string, input: object) => { const id = `m${++idOutil}`;
+  return `${JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name, input }] } })}\n${JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id }] } })}`; };
+const L = (l: string[]) => l.flatMap((x) => x.split('\n'));
 describe('lectureReferences', () => {
   const pieces = ['/ref/spec.pdf', '/ref/maquette.pdf', '/ref/autre.md'];
   it('compte avant la première écriture, signale après-écriture, manquantes et partielles', () => {
     const l = [ligne('Read', { file_path: '/ref/spec.pdf' }), ligne('Read', { file_path: '/ref/maquette.pdf', pages: '1' }),
       ligne('Read', { file_path: '/c/clone/hors-liste.md' }), ligne('Edit', { file_path: '/c/clone/src/x.ts' }),
       ligne('Read', { file_path: '/ref/autre.md' }), 'pas du json'];
-    expect(lectureReferences(l, pieces, '/c/clone')).toEqual({ ouvertes: ['/ref/spec.pdf', '/ref/maquette.pdf'], manquantes: [],
-      apres_ecriture: ['/ref/autre.md'], partielles: ['/ref/maquette.pdf'] });
+    expect(lectureReferences(L(l), pieces, '/c/clone')).toEqual({ ouvertes: ['/ref/spec.pdf', '/ref/maquette.pdf'], manquantes: [],
+      apres_ecriture: ['/ref/autre.md'], partielles: ['/ref/maquette.pdf'], pages_inconnues: [] });
   });
   it('une écriture hors du clone ne ferme pas la fenêtre ; une pièce jamais lue est manquante', () => {
     const l = [ligne('Write', { file_path: '/tmp/notes.md' }), ligne('Read', { file_path: '/ref/spec.pdf' })];
-    const r = lectureReferences(l, pieces, '/c/clone');
+    const r = lectureReferences(L(l), pieces, '/c/clone');
     expect(r.ouvertes).toEqual(['/ref/spec.pdf']); expect(r.manquantes).toEqual(['/ref/maquette.pdf', '/ref/autre.md']);
   });
   it('une lecture complète après une partielle n\'est plus partielle', () => {
     const l = [ligne('Read', { file_path: '/ref/spec.pdf', limit: 10 }), ligne('Read', { file_path: '/ref/spec.pdf' })];
-    expect(lectureReferences(l, ['/ref/spec.pdf']).partielles).toEqual([]);
+    expect(lectureReferences(L(l), ['/ref/spec.pdf']).partielles).toEqual([]);
   });
 });
 
 describe('lectureReferences, cas annexes', () => {
   it('NotebookEdit (notebook_path) ferme la fenêtre ; un sous-agent compte', () => {
-    const l = [ligne('Read', { file_path: '/ref/a.md' }), JSON.stringify({ type: 'assistant', isSidechain: true, message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: '/ref/b.md' } }] } }),
+    const l = [ligne('Read', { file_path: '/ref/a.md' }), JSON.stringify({ type: 'assistant', isSidechain: true, message: { content: [{ type: 'tool_use', id: 'sb', name: 'Read', input: { file_path: '/ref/b.md' } }] } }),
+      JSON.stringify({ type: 'user', isSidechain: true, message: { content: [{ type: 'tool_result', tool_use_id: 'sb' }] } }),
       ligne('NotebookEdit', { notebook_path: '/c/clone/n.ipynb' }), ligne('Read', { file_path: '/ref/c.md' })];
-    expect(lectureReferences(l, ['/ref/a.md', '/ref/b.md', '/ref/c.md'], '/c/clone')).toMatchObject({ ouvertes: ['/ref/a.md', '/ref/b.md'], apres_ecriture: ['/ref/c.md'] });
+    expect(lectureReferences(L(l), ['/ref/a.md', '/ref/b.md', '/ref/c.md'], '/c/clone')).toMatchObject({ ouvertes: ['/ref/a.md', '/ref/b.md'], apres_ecriture: ['/ref/c.md'] });
   });
 });
 
@@ -183,5 +187,24 @@ describe('jouerTests, suite du projet (R24)', () => {
     expect(JSON.parse(readFileSync(brut, 'utf8')).testResults).toHaveLength(1);
     expect(r.statuts).toEqual({ 'src/v.spec.ts > vert': true, 'src/v.spec.ts > rouge': false });
     expect(g(d, 'status', '--porcelain', '--untracked-files=all')).toBe('');
+  });
+});
+
+describe('lectureReferences, couverture (R31)', () => {
+  const d = mkdtempSync(join(tmpdir(), 'couv-'));
+  const long = join(d, 'long.md'), pdf = join(d, 'sans-pages.pdf');
+  writeFileSync(long, 'l\n'.repeat(2500)); writeFileSync(pdf, '%PDF-1.4\n%%EOF\n');
+  it('texte de 2500 lignes : sans limit = partiel ; 1-2000 + 2001-2500 = entier', () => {
+    expect(lectureReferences(L([ligne('Read', { file_path: long })]), [long]).partielles).toEqual([long]);
+    expect(lectureReferences(L([ligne('Read', { file_path: long }), ligne('Read', { file_path: long, offset: 2001, limit: 500 })]), [long]).partielles).toEqual([]);
+  });
+  it('un Read en erreur n\'ouvre pas la pièce', () => {
+    const l = [JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 'e1', name: 'Read', input: { file_path: long } }] } }),
+      JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'e1', is_error: true, content: 'trop gros' }] } })];
+    expect(lectureReferences(l, [long])).toMatchObject({ ouvertes: [], manquantes: [long] });
+  });
+  it('PDF au nombre de pages inconnu : pages 1-3 contiguës comptent, signalées « pages inconnues »', () => {
+    expect(lectureReferences(L([ligne('Read', { file_path: pdf, pages: '1-3' })]), [pdf])).toMatchObject({ partielles: [], pages_inconnues: [pdf] });
+    expect(lectureReferences(L([ligne('Read', { file_path: pdf, pages: '2-3' })]), [pdf]).partielles).toEqual([pdf]);
   });
 });

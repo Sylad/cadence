@@ -80,7 +80,7 @@ describe('juges', () => {
     expect(j!.meca.A.sorties).toEqual([{ i: 1, k: 1, sortie: 'légende en D/A', verdict: 'non', preuve: 'captures-sorties-X/legende.png : L/H' }, { i: 2, k: 3, sortie: 'cartouche à 3 h', verdict: 'oui', preuve: 'p' }]);
     expect(j!.anonymat).toEqual({ X: 'A', Y: 'cand' }); // m2 : preuves captures-X/... vérifiables
     const p = vus[0][vus[0].indexOf('-p') + 1];
-    for (const t of ['1. étape 1 : légende en D/A', '2. étape 3 : cartouche à 3 h', 'application réelle', 'état final', '"sorties"', '"i"', 'captures-sorties-X']) expect(p).toContain(t);
+    for (const t of ['S1 (i=1). étape 1 : légende en D/A', 'S2 (i=2). étape 3 : cartouche à 3 h', 'application réelle', 'état final', '"sorties"', '"i"', 'captures-sorties-X']) expect(p).toContain(t);
     expect(p.indexOf('sorties attendues, cachées')).toBeLessThan(p.indexOf('Mutations')); // M1 : avant toute mutation
     expect(p).not.toMatch(/captures-X\b/); // m2 : jamais les dossiers du juge aveugle
     expect(p).not.toContain('{{');

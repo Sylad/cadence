@@ -228,7 +228,7 @@ describe('passage d\'une séquence', () => {
     const { exec, vu } = faux(r, d, {});
     const res = passageSequence(opts(r, exec));
     expect(res.sorties_attendues).toBe(2);
-    expect(vu.juges[0]).toContain('1. étape 1 : cartouche à 3 h\n2. étape 3 : légende du globe en D/A quand D/A est choisi');
+    expect(vu.juges[0]).toContain('S1 (i=1). étape 1 : cartouche à 3 h\nS2 (i=2). étape 3 : légende du globe en D/A quand D/A est choisi');
     expect(vu.juges[0]).toContain(join(dirname(sec), 'mesure.md')); // B1 : le juge lit le mesure.md des secrets de la séquence
     expect(vu.juges.some((p) => p.includes('sorties : i attendus [1, 2] dans l\'ordre, sans doublon ; reçus [] (manquants : 1, 2)'))).toBe(true); // M2 : relance précise
     expect(res.jugement).toBeNull(); // le faux juge n'a pas rendu les sorties : échec fermé

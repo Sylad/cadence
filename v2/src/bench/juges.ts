@@ -109,7 +109,7 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
   try {
     if (!copier()) return null;
     const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests, DEMANDES: demandes }, sMeca = join(dirEval, 'meca.json');
-    const so = sorties.length ? '\n' + remplir('juge-sorties.md', { ...v, LISTE: sorties.map((x, i) => `${i + 1}. étape ${x.k} : ${x.sortie}`).join('\n') }).trimEnd() : '';
+    const so = sorties.length ? '\n' + remplir('juge-sorties.md', { ...v, LISTE: sorties.map((x, i) => `S${i + 1} (i=${i + 1}). étape ${x.k} : ${x.sortie}`).join('\n') }).trimEnd() : '';
     const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca, SORTIES: so }), sMeca, (x) => validerMeca(x, sorties), dirEval, modele, exec) as (Record<'X' | 'Y', Meca> & { remplaces: string[] }) | null;
     for (const m of meca && sorties.length ? [meca.X, meca.Y] : []) m.sorties = m.sorties!.map((x, j) => ({ ...sorties[j], i: x.i, verdict: x.verdict, preuve: x.preuve }));
     if (!copier()) return null; // le juge à l'aveugle voit les livrables, pas les mutations

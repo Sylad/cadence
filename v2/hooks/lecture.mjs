@@ -32,7 +32,7 @@ export const contournement = (name, input, home) => (ECRITURES.includes(name) &&
   || (name === 'Bash' && /disableAllHooks|\.claude\/settings/.test(String(input?.command ?? '')));
 
 /** Une commande Bash écrit-elle dans `clone` ? Redirection > >>, tee, rm, touch, patch, truncate, cp, mv, install, ln (cible), sed/perl -i,
- * git apply/checkout/restore, python -c / node -e qui écrit. Cible dans le clone, ou relative depuis un dossier courant dans le clone. Dans le doute : oui. */
+ * git apply/checkout/restore/reset/merge/stash…, --write/--fix, ng/nest generate, python -c|- / node -e|- qui écrit (heredoc : oui). Cible dans le clone, ou relative depuis un dossier courant dans le clone. Dans le doute : oui. */
 export function ecritureBash(cmd, clone, cwd = clone) {
   let dir = cwd;
   const dedans = (t) => !!t && t !== '/dev/null' && dansClone(resolve(dir, t.replace(/^(['"])(.*)\1$/, '$2')), clone);
@@ -47,10 +47,11 @@ export function ecritureBash(cmd, clone, cwd = clone) {
     else if (/^(tee|rm|touch|truncate)$/.test(c) ? noms.some(dedans) : /^(cp|mv|install|ln)$/.test(c) ? dedans(noms.at(-1)) : false) return true;
     else if (c === 'patch' && (dansClone(dir, clone) || noms.some(dedans))) return true;
     else if (/^(sed|perl)$/.test(c) && opts.some((o) => /^-[a-zA-Z]*i|^--in-place/.test(o)) && noms.filter((a) => !/^['"]/.test(a)).some(dedans)) return true;
+    else if ((opts.some((o) => /^--(write|fix)(=|$)/.test(o)) || (/^(ng|nest)$/.test(c === 'npx' ? noms[0] : c) && noms.some((a) => /^(g|generate)$/.test(a)))) && (dansClone(dir, clone) || noms.some(dedans))) return true;
     else if (c === 'git') {
-      const k = args.indexOf('-C'), g = k >= 0 ? resolve(dir, args[k + 1]) : dir;
-      if (args.some((a) => /^(apply|checkout|restore)$/.test(a)) && dansClone(g, clone)) return true;
-    } else if (/^(python3?|node)$/.test(c ?? '') && opts.some((o) => /^-[ce]$/.test(o)) && /write/i.test(seg) && (dansClone(dir, clone) || seg.includes(clone))) return true;
+      const k = args.indexOf('-C'), g = k >= 0 ? resolve(dir, args[k + 1]) : dir, s = args.indexOf('stash');
+      if ((args.some((a) => /^(apply|checkout|restore|reset|merge|pull|rebase|cherry-pick|revert|am|clean|switch|mv|rm)$/.test(a)) || (s >= 0 && !/^(list|show)$/.test(args[s + 1] ?? ''))) && dansClone(g, clone)) return true;
+    } else if (/^(python3?|node)$/.test(c ?? '') && opts.some((o) => /^-[ce]?$/.test(o)) && /write|<</i.test(seg) && (dansClone(dir, clone) || seg.includes(clone))) return true;
   }
   return false;
 }

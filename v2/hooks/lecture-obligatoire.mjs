@@ -51,7 +51,7 @@ export function decider(e, env) {
     const cmd = String(e.tool_input?.command ?? '');
     if (contournement('Bash', e.tool_input, env.HOME)) return 'Commande refusée : ne touche pas aux réglages de Claude Code.';
     if (ecritureBash(cmd, ICI, cwd)) return 'Commande refusée : elle écrit dans le code du hook.';
-    if (!ecritureBash(cmd, clone, cwd)) return null;
+    if (!ecritureBash(cmd, clone, cwd)) return ecritureBash(cmd, racine, cwd) && !ecritureBash(cmd, `${clone}.captures`, cwd) ? 'Commande refusée : elle écrit dans le dossier du banc, hors de ton dépôt.' : null;
   } else {
     const brut = cheminOutil(e.tool_input);
     if (!brut) return null;

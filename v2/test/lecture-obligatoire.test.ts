@@ -164,12 +164,15 @@ describe('ecritureBash (R31 ronde 3) : une commande Bash qui écrit dans le clon
     "sed -i 's/a/b/' src/a.ts", 'sed -i.bak -e s/a/b/ src/a.ts', "perl -pi -e 's/a/b/' src/a.ts", 'cp /tmp/x.ts src/', 'mv a.ts b.ts', 'rm -rf src',
     'install -m 644 /tmp/x src/x', 'touch src/n.ts', 'git apply /tmp/p.diff', 'git checkout -- src/a.ts', `git -C ${c} restore src/a.ts`, 'patch -p1 < /tmp/p.diff',
     `python3 -c "open('a.txt','w').write('x')"`, "node -e \"require('fs').writeFileSync('a.txt','x')\"", 'cd src && echo x > a.ts', `cd /tmp && echo x > ${c}/a.txt`,
+    'npx prettier --write src', 'npx eslint --fix .', 'npx ng generate component x', 'nest g module y', 'git stash', 'git stash pop', 'git reset --hard HEAD',
+    'git merge main', 'git clean -fd', `python3 - <<'PY'\nopen('a.txt','w')\nPY`,
   ])('écrit : %s', (cmd) => expect(ecritureBash(cmd, c, c)).toBe(true));
   it.each([
     'npx vitest run', 'npm test', 'npm run build', 'git status', 'git diff HEAD~1', 'git log --oneline -5', 'ls -la src', 'cat src/a.ts',
     'echo x > /dev/null', 'npx vitest run 2>&1 | tail -20', 'npm test 2>&1', 'echo x > /tmp/notes.md', 'cd /tmp && echo x > a.txt', 'cp src/a.ts /tmp/a.ts',
     "grep -n 'a > b' src/a.ts", 'git log --format="%h > %s"', 'cat <<EOF > /tmp/x.md\nif a > b then\nEOF', "sed -n '1,5p' src/a.ts", 'node scripts/run.js',
     "python3 -c \"print('x')\"", 'rm -rf /tmp/build-cache', 'touch /tmp/marque',
+    'git stash list', 'git stash show -p', 'npx prettier --check src', 'npx ng build', 'cd /tmp && npx prettier --write x.ts', 'grep -w a src/a.ts',
   ])('n\'écrit pas : %s', (cmd) => expect(ecritureBash(cmd, c, c)).toBe(false));
   it('cwd hors du clone : une cible relative ne vise pas le clone', () => expect(ecritureBash('echo x > a.txt', c, '/tmp')).toBe(false));
 });

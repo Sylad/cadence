@@ -119,14 +119,17 @@ function lire(json: Vitest, copies: { id: string; copie: string }[], clone: stri
 // la première écriture dans le clone. La mesure est la porte stricte : une lecture qui ne compte que pour le hook ne compte pas ici.
 /** Lectures des pièces de référence AVANT la première écriture dans le clone (sans `clone`, toute écriture compte). */
 export function lectureReferences(lignes: string[], pieces: string[], clone?: string): { ouvertes: string[]; manquantes: string[]; apres_ecriture: string[]; partielles: string[]; pages_inconnues: string[] } {
-  const avant: Appel[] = [], tous: Appel[] = [], ok = new Set<string | undefined>();
+  const avant: Appel[] = [], tous: Appel[] = [], ok = new Set<string | undefined>(), erreurs = new Set<string | undefined>(), refus = new Set<string | undefined>();
+  const ev = lignes.map(evenements);
+  // Sans effet sur le disque (S7) : un outil d'écriture en erreur, ou un appel refusé par un hook PreToolUse (Bash en erreur par son code de sortie a pu écrire).
+  ev.forEach((e, i) => { for (const r of e.resultats) if (r.erreur) { erreurs.add(r.id); if (/PreToolUse:\w+ hook error/.test(lignes[i])) refus.add(r.id); } });
   let ecrit = false;
-  for (const e of lignes.map(evenements)) {
+  for (const e of ev) {
     for (const r of e.resultats) if (!r.erreur) ok.add(r.id);
     for (const c of e.appels) {
       const f = cheminOutil(c.input);
-      if (f && ECRITURES.includes(c.name) && (!clone || dansClone(f, clone))) ecrit = true;
-      if (clone && c.name === 'Bash' && ecritureBash(String(c.input.command ?? ''), clone, c.cwd ?? clone)) ecrit = true;
+      if (f && ECRITURES.includes(c.name) && !erreurs.has(c.id) && (!clone || dansClone(f, clone))) ecrit = true;
+      if (clone && c.name === 'Bash' && !refus.has(c.id) && ecritureBash(String(c.input.command ?? ''), clone, c.cwd ?? clone)) ecrit = true;
       tous.push(c); if (!ecrit) avant.push(c);
     }
   }
@@ -137,24 +140,22 @@ export function lectureReferences(lignes: string[], pieces: string[], clone?: st
 }
 
 const SOURCES = /\.(ts|tsx|js|java|py|html|scss|css)$/;
-function fichiers(dir: string): string[] {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir).flatMap((e) => {
-    if (e === 'node_modules' || e === 'dist' || e === '.git') return [];
-    const p = join(dir, e);
-    const l = lstatSync(p); // liens symboliques ignorés (un lien cassé ferait échouer la lecture)
-    return l.isDirectory() ? fichiers(p) : l.isFile() && SOURCES.test(p) ? [p] : [];
-  });
+/** Fichiers sources DU DÉPÔT (suivis ou nouveaux, hors .gitignore) : un cache comme .angular/ ne compte pas (S7). Liens symboliques ignorés. */
+function fichiers(clone: string, dir: string): string[] {
+  if (!existsSync(join(clone, dir))) return [];
+  return execFileSync('git', ['-C', clone, 'ls-files', '-coz', '--exclude-standard', '--', dir], { encoding: 'utf8', maxBuffer: 1 << 28 }).split('\0')
+    .filter((f) => SOURCES.test(f) && existsSync(join(clone, f)) && lstatSync(join(clone, f)).isFile()).map((f) => join(clone, f));
 }
 
 /** Duplication (jscpd, null si indisponible, jamais 0) et tailles de fichiers des dossiers donnés. */
 export function maintenabilite(clone: string, dossiers: string[], jscpd: string[] = ['npx', '--yes', 'jscpd@4']): { duplication_pct: number | null; raison?: string; plus_gros: { fichier: string; lignes: number }[]; fichiers_400: number } {
-  const tailles = dossiers.flatMap((d) => fichiers(join(clone, d))).map((f) => ({ fichier: relative(clone, f), lignes: readFileSync(f, 'utf8').split('\n').length }))
+  const tailles = dossiers.flatMap((d) => fichiers(clone, d)).map((f) => ({ fichier: relative(clone, f), lignes: readFileSync(f, 'utf8').split('\n').length }))
     .sort((a, b) => b.lignes - a.lignes);
   let duplication_pct: number | null = null, raison: string | undefined;
   const sortie = mkdtempSync(join(tmpdir(), 'banc-jscpd-'));
   try {
-    execFileSync(jscpd[0], [...jscpd.slice(1), ...dossiers.map((d) => join(clone, d)), '--ignore', '**/node_modules/**', '--reporters', 'json', '--output', sortie, '--silent'], { timeout: 300_000, stdio: 'ignore' });
+    execFileSync(jscpd[0], [...jscpd.slice(1), ...dossiers.map((d) => join(clone, d)), '--gitignore', '--ignore', '**/node_modules/**,**/.*/**,**/dist/**', '--reporters', 'json', '--output', sortie, '--silent'],
+      { cwd: clone, timeout: 300_000, stdio: 'ignore' });
     const p = (JSON.parse(readFileSync(join(sortie, 'jscpd-report.json'), 'utf8')) as { statistics?: { total?: { percentage?: number } } }).statistics?.total?.percentage;
     if (typeof p === 'number') duplication_pct = p; else raison = 'rapport jscpd sans pourcentage';
   } catch (e) { raison = (e as Error).message; } finally { rmSync(sortie, { recursive: true, force: true }); }

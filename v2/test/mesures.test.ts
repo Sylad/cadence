@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CloneModifie, TestsIntrouvables, jouerTests, lectureReferences, maintenabilite } from '../src/sequence/mesures.js';
 
@@ -160,7 +160,34 @@ describe('lectureReferences, cas annexes', () => {
   });
 });
 
+describe('lectureReferences, écritures sans effet (S7)', () => {
+  const res = (id: string, contenu: string) => JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, is_error: true, content: contenu }] } });
+  const app = (id: string, name: string, input: object) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name, input }] } });
+  it('un Edit refusé par le hook ou en erreur, un Bash refusé par le hook ne ferment pas la fenêtre ; un Bash en erreur par son code de sortie, si', () => {
+    const l = [app('r1', 'Edit', { file_path: '/c/clone/a.ts' }), res('r1', "PreToolUse:Edit hook error: Lis d'abord en entier"),
+      app('r2', 'Write', { file_path: '/c/clone/b.ts' }), res('r2', 'File has not been read yet'),
+      app('r3', 'Bash', { command: 'echo x > a.ts', cwd: '/c/clone' }), res('r3', 'PreToolUse:Bash hook error: refusé'),
+      ...L([ligne('Read', { file_path: '/ref/a.md' })]),
+      app('r4', 'Bash', { command: 'echo x > a.ts' }), res('r4', 'Exit code 1'), ...L([ligne('Read', { file_path: '/ref/b.md' })])];
+    expect(lectureReferences(l, ['/ref/a.md', '/ref/b.md'], '/c/clone')).toMatchObject({ ouvertes: ['/ref/a.md'], apres_ecriture: ['/ref/b.md'] });
+  });
+});
+
 describe('maintenabilite', () => {
+  it('ne compte que les fichiers du dépôt : un cache ignoré par .gitignore (.angular/) est exclu, un fichier nouveau compte ; jscpd reçoit --gitignore', () => {
+    const d = depot();
+    writeFileSync(join(d, '.gitignore'), 'node_modules\n.angular/\n');
+    mkdirSync(join(d, 'src', '.angular', 'cache'), { recursive: true });
+    writeFileSync(join(d, 'src', '.angular', 'cache', 'vendor.js'), 'x\n'.repeat(900));
+    writeFileSync(join(d, 'src', 'nouveau.ts'), 'x\n'.repeat(500));
+    const trace = join(mkdtempSync(join(tmpdir(), 'jscpd-')), 'args.json');
+    const faux = join(dirname(trace), 'faux.cjs');
+    writeFileSync(faux, `require('fs').writeFileSync(${JSON.stringify(trace)}, JSON.stringify(process.argv.slice(2)));`);
+    const m = maintenabilite(d, ['src'], [process.execPath, faux]);
+    expect(m.plus_gros.map((x) => x.fichier)).toEqual(['src/nouveau.ts', 'src/a.ts']);
+    expect(m.fichiers_400).toBe(1);
+    expect(JSON.parse(readFileSync(trace, 'utf8'))).toEqual(expect.arrayContaining(['--gitignore', '**/node_modules/**,**/.*/**,**/dist/**']));
+  });
   it('compte les tailles et met null (jamais 0) si jscpd est absent', () => {
     const d = depot();
     writeFileSync(join(d, 'src', 'gros.ts'), 'x\n'.repeat(450));

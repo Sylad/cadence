@@ -139,7 +139,7 @@ describe('passage d\'une séquence', () => {
     const dir = (x: string) => join(r, 'runs', '2026-11-08-1100-e1', 's1', x), piece = join(d, 'etapes', '1', 'pieces', 'fig.png');
     for (const [k, e] of Object.entries(env)) vus[k] = e.CADENCE_PIECES === undefined ? null : JSON.parse(e.CADENCE_PIECES);
     expect(vus).toEqual({ 'c1-0': null, 'c2-1': [piece, join(dir('c2'), 'docs', 'norme.md')], 'c2-2': [], 'c1-3': null, 'c1-4': null, 'c2-5': [] });
-    expect(env['c2-1'].CADENCE_CLONE).toBe(dir('c2'));
+    expect(env['c2-1']).toMatchObject({ CADENCE_CLONE: dir('c2'), CADENCE_BANC_RACINE: r });
     expect(res.etapes.C.map((e) => e.fuites.filter((f) => f.startsWith('contournement')).length)).toEqual([0, 1, 0]);
     expect(res.etapes.A.every((e) => e.fuites.length === 0)).toBe(true);
     expect(statSync(dir('c2.reglages')).mode & 0o777).toBe(0o700); // rendu effaçable en fin de séquence

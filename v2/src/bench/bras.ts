@@ -61,15 +61,15 @@ export function ecrireReglages(modele: string, clone: string): string {
 export const empreinteReglages = (clone: string): string => [cheminReglages(clone), ...readdirSync(HOOKS).sort().map((e) => join(HOOKS, e)),
   join(clone, '.claude', 'settings.json'), join(clone, '.claude', 'settings.local.json')]
   .reduce((h, f) => h.update(`${f}\0${existsSync(f) ? readFileSync(f, 'latin1') : 'absent'}\0`), createHash('sha1')).digest('hex');
-/** `pieces` : chemins absolus à lire avant d'écrire, donnés au hook du bras par l'environnement (CADENCE_PIECES, CADENCE_CLONE), jamais par un fichier. */
-export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), pieces: string[] = []): Mesure {
+/** `garde` : pièces à lire avant d'écrire et racine du banc, données au hook du bras par l'environnement (CADENCE_*), jamais par un fichier. */
+export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }): Mesure {
   const question = `${clone}.question.md`;
   const brief = readFileSync(d.brief, 'utf8').replaceAll('{{DEMANDE}}', lireDemande(b)).replaceAll('{{CLONE}}', clone)
     .replaceAll('{{QUESTION}}', question).replaceAll('{{BASE}}', b.base)
     .replaceAll('{{TAILLE}}', b.taille === 'retouche' ? 'retouche' : 'fonction'); // taille fixée par le gardien ; banc court sans retouche : fonction
   const commun = ['--output-format', 'json', '--model', d.modele, '--permission-mode', 'bypassPermissions',
     '--disallowedTools', OUTILS_INTERDITS.join(','), ...(d.settings ? ['--settings', ecrireReglages(d.settings, clone)] : [])];
-  const o = { cwd: clone, env: { ...environnementNeutre(process.env), ...(d.settings ? { CADENCE_CLONE: clone, CADENCE_PIECES: JSON.stringify(pieces) } : {}) } };
+  const o = { cwd: clone, env: { ...environnementNeutre(process.env), ...(d.settings ? { CADENCE_CLONE: clone, CADENCE_PIECES: JSON.stringify(garde.pieces), CADENCE_BANC_RACINE: garde.racine } : {}) } };
   const reponse = b.reponses ? readFileSync(join(b.dir, 'reponses.md'), 'utf8') : SANS_REPONSE;
   const debut = horloge();
   let r = lire(exec(['-p', brief, ...commun], o));

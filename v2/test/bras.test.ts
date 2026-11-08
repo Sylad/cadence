@@ -98,11 +98,11 @@ describe('lancerBras', () => {
     const settings = join(import.meta.dirname, '..', 'briefs', 'settings-sequence-v2.json');
     const appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
     const exec: Executeur = (args, o) => { appels.push({ args, env: o.env }); if (appels.length === 1) writeFileSync(`${clone}.question.md`, '?'); return { stdout: json('s1', 1, 0), code: 0 }; };
-    lancerBras(b, { nom: 'C', modele: 'opus', brief, settings }, clone, exec, undefined, ['/ref/a.pdf']);
+    lancerBras(b, { nom: 'C', modele: 'opus', brief, settings }, clone, exec, undefined, { pieces: ['/ref/a.pdf'], racine: '/banc' });
     expect(appels).toHaveLength(2);
     for (const a of appels) {
       expect(a.args[a.args.indexOf('--settings') + 1]).toBe(cheminReglages(clone));
-      expect(a.env).toMatchObject({ CADENCE_CLONE: clone, CADENCE_PIECES: '["/ref/a.pdf"]' });
+      expect(a.env).toMatchObject({ CADENCE_CLONE: clone, CADENCE_PIECES: '["/ref/a.pdf"]', CADENCE_BANC_RACINE: '/banc' });
     }
     expect(cheminReglages(clone)).toBe(join(`${clone}.reglages`, 'settings.json'));
     expect(statSync(`${clone}.reglages`).mode & 0o777).toBe(0o500);

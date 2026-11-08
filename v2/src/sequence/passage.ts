@@ -158,7 +158,7 @@ function reglesEtape(x: Ctx, b: string, k: number): Regles {
 function lancer(x: Ctx, e: Etape, b: string, avant: { head: string; sale: string[] }, pieces: string[]): Mesure {
   const c = x.clones[b];
   try {
-    const m = lancerBras(bancEtape(x.s, e, avant.head), x.bras[b], c, x.o.exec, undefined, pieces);
+    const m = lancerBras(bancEtape(x.s, e, avant.head), x.bras[b], c, x.o.exec, undefined, { pieces, racine: x.o.racine });
     m.echec ??= travailNonLivre(avant, etatGit(c));
     return m;
   } catch (err) {

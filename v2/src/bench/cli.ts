@@ -120,7 +120,7 @@ function passageVerrouille(o: OptPassage): Verdict & { eclair_ok?: boolean } {
         aller('préparation'); suiteBase[n] = o.prep(bc, c).testsBase;
         o.out(`${idBanc} : bras ${n}…`);
         const avant = etatGit(c); bases[n] = avant.head;
-        aller(`bras ${n}`); const m = lancerBras(bc, bras[n], c, o.exec);
+        aller(`bras ${n}`); const m = lancerBras(bc, bras[n], c, o.exec, undefined, { pieces: [], racine: o.racine });
         mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)), taille_declaree: tailleDeclaree(c, avant.head) };
         aller('fuites'); const fu = fuitesDuBras(o.home, o.racine, bid, c); fuites[n] = fu.certaines; aVerifier[n] = fu.a_verifier;
       });

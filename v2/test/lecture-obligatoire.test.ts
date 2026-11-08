@@ -31,7 +31,7 @@ function hook(entree: object, env: Record<string, string | undefined>): { code: 
   const p = spawnSync('node', [HOOK], { input: typeof entree === 'string' ? entree : JSON.stringify(entree), encoding: 'utf8', env: { PATH: process.env.PATH, ...env } });
   return { code: p.status ?? -1, stdout: p.stdout, stderr: p.stderr };
 }
-const env = (m: Monde, pieces: string[]) => ({ CADENCE_CLONE: m.clone, CADENCE_PIECES: JSON.stringify(pieces) });
+const env = (m: Monde, pieces: string[]) => ({ CADENCE_CLONE: m.clone, CADENCE_PIECES: JSON.stringify(pieces), CADENCE_BANC_RACINE: m.r, HOME: join(m.r, 'home') });
 const ecriture = (m: Monde, file_path = join(m.clone, 'src', 'a.ts'), tool_name = 'Write') =>
   ({ hook_event_name: 'PreToolUse', tool_name, tool_input: { file_path, content: 'x' }, transcript_path: m.t, cwd: m.clone });
 function refuse(r: ReturnType<typeof hook>, motif: string | RegExp) {
@@ -94,18 +94,31 @@ describe('hook lecture obligatoire', () => {
     m.ecrire([]);
     refuse(hook(ecriture(m, join(m.r, 'lien-clone', 'src', 'neuf.ts')), env(m, [m.doc])), m.doc);
   });
-  it('écriture hors du clone (captures, dossier voisin), outil non concerné : permis', () => {
+  it('écriture hors du banc, captures et question du bras, outil non concerné : permis', () => {
     const m = monde(); m.ecrire([]);
     permis(hook(ecriture(m, `${m.clone}.captures/a.png`), env(m, [m.doc])));
-    permis(hook(ecriture(m, join(m.r, 'run', 'c1x', 'a.ts')), env(m, [m.doc])));
+    permis(hook(ecriture(m, `${m.clone}.question.md`), env(m, [m.doc])));
+    permis(hook(ecriture(m, join(tmpdir(), 'notes-du-bras.md')), env(m, [m.doc])));
     permis(hook({ ...ecriture(m), tool_name: 'Bash', tool_input: { command: 'ls' } }, env(m, [m.doc])));
+  });
+  it('R32 : refus des réglages de Claude Code (~/.claude/, **/.claude/settings*.json) et du banc hors du clone, même pièces lues', () => {
+    const m = monde(); m.ecrire(lu({ file_path: m.doc }));
+    const e = env(m, [m.doc]);
+    for (const f of [join(e.HOME, '.claude', 'settings.json'), join(e.HOME, '.claude', 'settings.local.json'), join(e.HOME, '.claude', 'hooks', 'x.sh'),
+      join(m.clone, '.claude', 'settings.local.json'), join(tmpdir(), 'ailleurs', '.claude', 'settings.json')])
+      for (const outil of ['Write', 'Edit', 'MultiEdit']) refuse(hook(ecriture(m, f, outil), e), /réglage de Claude Code/);
+    refuse(hook(ecriture(m, join(m.r, 'run', 'c1x', 'a.ts')), e), /dossier du banc/);
+    refuse(hook(ecriture(m, join(m.r, 'run', 'c1.reglages', 'settings.json')), e), /dossier du banc/);
+    refuse(hook(ecriture(m, join(m.r, 'historique.jsonl')), e), /dossier du banc/);
+    permis(hook(ecriture(m, join(m.clone, '.claude', 'notes.md')), e));
+    refuse(hook(ecriture(m), { ...e, CADENCE_BANC_RACINE: undefined }), /CADENCE_BANC_RACINE/);
   });
   it('liste vide : permis ; liste absente, illisible ou clone absent : refus (fermé)', () => {
     const m = monde(); m.ecrire([]);
     permis(hook(ecriture(m), env(m, [])));
-    refuse(hook(ecriture(m), { CADENCE_CLONE: m.clone }), /CADENCE_PIECES/);
-    refuse(hook(ecriture(m), { CADENCE_CLONE: m.clone, CADENCE_PIECES: '{"pieces":[]}' }), /CADENCE_PIECES/);
-    refuse(hook(ecriture(m), { CADENCE_PIECES: '[]' }), /CADENCE_CLONE/);
+    refuse(hook(ecriture(m), { ...env(m, []), CADENCE_PIECES: undefined }), /CADENCE_PIECES/);
+    refuse(hook(ecriture(m), { ...env(m, []), CADENCE_PIECES: '{"pieces":[]}' }), /CADENCE_PIECES/);
+    refuse(hook(ecriture(m), { ...env(m, []), CADENCE_CLONE: undefined }), /CADENCE_CLONE/);
   });
   it('fermé en cas d\'erreur : entrée illisible ou transcript illisible → « hook en erreur »', () => {
     const m = monde();

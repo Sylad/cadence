@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
+import { contournement } from '../../hooks/lecture.mjs';
 
 export interface Regles { autorises: string[]; certains: string[]; runs: string }
 export interface Fuites { certaines: string[]; a_verifier: string[] } // R21 : à vérifier = le reste de runs (ancêtres du clone, globs d'ancêtres)
@@ -56,6 +57,7 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
     if (d.type !== 'assistant') continue;
     for (const c of d.message?.content ?? []) {
       if (c.type !== 'tool_use') continue;
+      if (contournement(c.name ?? '', c.input, home)) vus.certaines.add(`contournement : ${c.name} ${JSON.stringify(c.input).slice(0, 160)}`); // R32
       if (c.name === 'Bash' && typeof d.cwd === 'string' && isAbsolute(d.cwd)) juger(resolve(d.cwd));
       const cmd = (c.input as { command?: unknown } | undefined)?.command;
       const sources: [string, boolean][] = [...[...textes(c.input)].map((t): [string, boolean] => [t, false]),
@@ -76,13 +78,8 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
   return { certaines: [...vus.certaines], a_verifier: [...vus.a_verifier] };
 }
 
-export function jsonl(dir: string): string[] {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir).flatMap((e) => {
-    const p = join(dir, e);
-    return statSync(p).isDirectory() ? jsonl(p) : p.endsWith('.jsonl') ? [p] : [];
-  });
-}
+export const jsonl = (dir: string): string[] => (!existsSync(dir) ? [] : readdirSync(dir).flatMap((e) => {
+  const p = join(dir, e); return statSync(p).isDirectory() ? jsonl(p) : p.endsWith('.jsonl') ? [p] : []; }));
 
 export function fuitesDuBras(home: string, racine: string, banc: string, clone: string): Fuites {
   const lignes = jsonl(dossierTranscripts(home, clone)).flatMap((f) => readFileSync(f, 'utf8').split('\n'));

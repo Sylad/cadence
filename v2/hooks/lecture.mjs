@@ -28,6 +28,12 @@ export const dansClone = (p, clone) => {
   return r !== '..' && !r.startsWith('../') && !isAbsolute(r);
 };
 
+/** Réglages de Claude Code (R32) : tout ce qui est sous ~/.claude/, et tout `.claude/settings*.json` (disableAllHooks y couperait le hook). */
+export const reglageClaude = (p, home) => (!!home && dansClone(p, join(home, '.claude'))) || (basename(dirname(reel(p))) === '.claude' && /^settings.*\.json$/.test(basename(p)));
+/** Contournement par un appel d'outil : écriture d'un réglage de Claude Code, ou commande Bash qui y touche. */
+export const contournement = (name, input, home) => (ECRITURES.includes(name) && !!cheminOutil(input) && reglageClaude(cheminOutil(input), home))
+  || (name === 'Bash' && /disableAllHooks|\.claude\/settings/.test(String(input?.command ?? '')));
+
 /** Appels d'outils (assistant) et résultats (tool_result) d'une ligne de transcript, sous-agents compris.
  * Chemin rapide : une ligne de résultats sans `"is_error":true` n'est pas analysée, ses ids sont lus par motif. */
 export function evenements(ligne) {

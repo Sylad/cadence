@@ -69,7 +69,7 @@ function reglesC1(f: Fichiers): string[] {
     const intrus = (para ?? '').match(/\b(plan|lot|raf\.yaml|carte|description)\b/i);
     if (intrus) v.push(`C1 : « ${intrus[0]} » dans le paragraphe du relecteur de ${k}`);
   }
-  for (const n of ['sequence-v2', 'sequence-v2b']) { // v2b (S7) : sequence-v2 sans relecture
+  for (const n of ['sequence-v2', 'sequence-v2b', 'sequence-v2c']) { // v2b (S7) : sequence-v2 sans relecture ; v2c (plan n°4) : v2b + sorties attendues
     const seq = f[`briefs/bras-${n}.md`];
     if (seq !== undefined && !seq.includes('Taille fixée par le gardien : {{TAILLE}}')) v.push(`C1 : bras-${n} ne reçoit plus la taille du gardien`);
   }
@@ -262,6 +262,7 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C2', 'séquence : sous-agent qui écrit le code', 'briefs/bras-sequence-v2.md', ajout("- Délègue l'implémentation (subagent_type general-purpose)")],
   ['C1', 'séquence : fiche dans le brief', 'briefs/bras-sequence-v2.md', ajout('Respecte la fiche.')],
   ['C1', 'séquence v2b : le bras reclasse la taille', 'briefs/bras-sequence-v2b.md', remplace('Taille fixée par le gardien : {{TAILLE}}', 'Classe la demande')],
+  ['C1', 'séquence v2c : le bras reclasse la taille', 'briefs/bras-sequence-v2c.md', remplace('Taille fixée par le gardien : {{TAILLE}}', 'Classe la demande')],
 ];
 describe('mutation : chaque régression connue est détectée', () => {
   it.each(mutations)('%s : %s', (cause, _nom, fichier, muter) => {

@@ -12,6 +12,7 @@
     "bench --visible": "docs/v2/2026-11-07-cadence-2-design.md",
     "cadence2 --help": "docs/v2/2026-11-07-cadence-2-design.md",
     "bench env BENCH_ROOT": "docs/v2/2026-11-07-cadence-2-design.md",
-    "bench env HOME": "docs/v2/2026-11-07-cadence-2-design.md"
+    "bench env HOME": "docs/v2/2026-11-07-cadence-2-design.md",
+    "bench --settings": "docs/v2/2026-11-08-banc-sequence-design.md"
   }
 }

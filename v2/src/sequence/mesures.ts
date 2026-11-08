@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, lstatSync, readdirSync, rmSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
+import { appelsOutils, cheminOutil, dansClone, ECRITURES, lectureEntiere } from '../../hooks/lecture.mjs';
 
 export class CloneModifie extends Error {}
 export class TestsIntrouvables extends Error {}
@@ -113,27 +114,20 @@ function lire(json: Vitest, copies: { id: string; copie: string }[], clone: stri
 }
 
 // Limites connues : une écriture par Bash (sed -i, tee, redirection) n'est pas vue. Les lectures et écritures des sous-agents (sidechain)
-// COMPTENT : le bras a délégué, la lecture a eu lieu.
-const ECRITURES = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
+// COMPTENT : le bras a délégué, la lecture a eu lieu. « Lire » et « écrire » : hooks/lecture.mjs, la définition du hook du bras candidat.
 /** Lectures des pièces de référence AVANT la première écriture dans le clone (sans `clone`, toute écriture compte). */
 export function lectureReferences(lignes: string[], pieces: string[], clone?: string): { ouvertes: string[]; manquantes: string[]; apres_ecriture: string[]; partielles: string[] } {
   const cibles = new Map(pieces.map((p) => [resolve(p), p]));
-  const dedans = (p: string) => !clone || resolve(p) === resolve(clone) || resolve(p).startsWith(`${resolve(clone)}/`);
   const avant = new Set<string>(), apres = new Set<string>(), entieres = new Set<string>();
   let ecrit = false;
-  for (const l of lignes) {
-    let d: { type?: string; message?: { content?: { type: string; name?: string; input?: Record<string, unknown> }[] } };
-    try { d = JSON.parse(l); } catch { continue; }
-    if (d.type !== 'assistant') continue;
-    for (const c of d.message?.content ?? []) {
-      const f = c.input?.file_path ?? c.input?.notebook_path;
-      if (c.type !== 'tool_use' || typeof f !== 'string') continue;
-      if (ECRITURES.includes(c.name ?? '') && dedans(f)) ecrit = true;
-      const piece = c.name === 'Read' ? cibles.get(resolve(f)) : undefined;
-      if (!piece) continue;
-      if (ecrit) apres.add(piece);
-      else { avant.add(piece); if (c.input?.pages === undefined && c.input?.limit === undefined && c.input?.offset === undefined) entieres.add(piece); }
-    }
+  for (const c of lignes.flatMap(appelsOutils)) {
+    const f = cheminOutil(c.input);
+    if (!f) continue;
+    if (ECRITURES.includes(c.name) && (!clone || dansClone(f, clone))) ecrit = true;
+    const piece = c.name === 'Read' ? cibles.get(resolve(f)) : undefined;
+    if (!piece) continue;
+    if (ecrit) apres.add(piece);
+    else { avant.add(piece); if (lectureEntiere(c.input)) entieres.add(piece); }
   }
   return { ouvertes: pieces.filter((p) => avant.has(p)), manquantes: pieces.filter((p) => !avant.has(p) && !apres.has(p)),
     apres_ecriture: pieces.filter((p) => !avant.has(p) && apres.has(p)), partielles: pieces.filter((p) => avant.has(p) && !entieres.has(p)) };

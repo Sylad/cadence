@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { lireDemande, type Banc } from './banc.js';
 
-export interface DefBras { nom: string; modele: string; brief: string }
+/** `settings` : fichier de réglages Claude Code du bras (hooks) ; `{{HOOKS}}` y devient le chemin absolu de v2/hooks. */
+export interface DefBras { nom: string; modele: string; brief: string; settings?: string }
 export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number;
   tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string }
 export type Executeur = (args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }) => { stdout: string; code: number; erreur?: string };
@@ -15,8 +16,8 @@ const QUESTIONS_MAX = 3;
 const SANS_REPONSE = 'Pas de réponse de Sylvain : décide toi-même, note ton hypothèse dans le message de commit, et termine.';
 
 export function chargerBras(racine: string): Record<string, DefBras> {
-  const y = parse(readFileSync(join(racine, 'bras.yaml'), 'utf8')) as Record<string, { modele: string; brief: string }>;
-  return Object.fromEntries(Object.entries(y).map(([nom, d]) => [nom, { nom, modele: d.modele, brief: d.brief }]));
+  const y = parse(readFileSync(join(racine, 'bras.yaml'), 'utf8')) as Record<string, { modele: string; brief: string; settings?: string }>;
+  return Object.fromEntries(Object.entries(y).map(([nom, d]) => [nom, { nom, modele: d.modele, brief: d.brief, ...(d.settings ? { settings: d.settings } : {}) }]));
 }
 
 export const environnementNeutre = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
@@ -47,12 +48,21 @@ function lire(e: { stdout: string; code: number; erreur?: string }): { session: 
   return { session, tokens, cout: j.total_cost_usd ?? 0, echec: causes.length ? causes.join(', ') : null };
 }
 
+const HOOKS = join(import.meta.dirname, '..', '..', 'hooks');
+/** Réglages du run, à côté du clone (jamais dedans) : `{{HOOKS}}` résolu en chemin absolu. */
+function reglages(modele: string, clone: string): string {
+  const f = `${clone}.settings.json`;
+  writeFileSync(f, readFileSync(modele, 'utf8').replaceAll('{{HOOKS}}', JSON.stringify(HOOKS).slice(1, -1)));
+  return f;
+}
+
 export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date()): Mesure {
   const question = `${clone}.question.md`;
   const brief = readFileSync(d.brief, 'utf8').replaceAll('{{DEMANDE}}', lireDemande(b)).replaceAll('{{CLONE}}', clone)
-    .replaceAll('{{QUESTION}}', question).replaceAll('{{BASE}}', b.base);
+    .replaceAll('{{QUESTION}}', question).replaceAll('{{BASE}}', b.base)
+    .replaceAll('{{TAILLE}}', b.taille === 'retouche' ? 'retouche' : 'fonction'); // taille fixée par le gardien ; banc court sans retouche : fonction
   const commun = ['--output-format', 'json', '--model', d.modele, '--permission-mode', 'bypassPermissions',
-    '--disallowedTools', OUTILS_INTERDITS.join(',')];
+    '--disallowedTools', OUTILS_INTERDITS.join(','), ...(d.settings ? ['--settings', reglages(d.settings, clone)] : [])];
   const o = { cwd: clone, env: environnementNeutre(process.env) };
   const reponse = b.reponses ? readFileSync(join(b.dir, 'reponses.md'), 'utf8') : SANS_REPONSE;
   const debut = horloge();

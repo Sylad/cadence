@@ -142,6 +142,15 @@ describe('pretAPasser et empreinte', () => {
     expect(pretAPasser(repo, d)).toMatch(/npm run build/);
     const t = new Date(Date.now() + 5000); utimesSync(join(repo, 'v2', 'dist', 'cli.js'), t, t);
     expect(pretAPasser(repo, { A: { nom: 'A', modele: 'm', brief: '/ailleurs/b.md' } })).toMatch(/hors de/);
+    expect(pretAPasser(repo, { A: { nom: 'A', modele: 'm', brief, settings: '/ailleurs/s.json' } })).toMatch(/réglages du bras A hors de/);
+    mkdirSync(join(repo, 'v2', 'hooks')); writeFileSync(join(repo, 'v2', 'hooks', 'h.mjs'), 'h');
+    expect(pretAPasser(repo, d)).toMatch(/v2\/hooks/); // le hook d'un bras compte comme son brief
+  });
+  it('empreinte : un hook commité la change', () => {
+    const { repo } = depot(); const e0 = empreinte(repo);
+    mkdirSync(join(repo, 'v2', 'hooks')); writeFileSync(join(repo, 'v2', 'hooks', 'h.mjs'), 'h');
+    execFileSync('bash', ['-c', 'git add v2/hooks && git -c user.email=t@t -c user.name=t commit -q -m h'], { cwd: repo });
+    expect(empreinte(repo)).not.toBe(e0); expect(empreinte(repo)).not.toBe('inconnue');
   });
   it('brief relatif résolu depuis la racine du banc', () => {
     const { repo } = depot();

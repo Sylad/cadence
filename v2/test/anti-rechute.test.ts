@@ -60,11 +60,17 @@ function reglesC1(f: Fichiers): string[] {
   const b = f[BRIEF_CAND] ?? '';
   if (!b.includes('{{DEMANDE}}')) v.push('C1 : le brief candidat ne contient pas {{DEMANDE}}');
   if (!b.includes('le texte de la demande') || !b.includes('git -C {{CLONE}} diff')) v.push('C1 : le relecteur ne reçoit pas demande + diff');
-  const para = b.split('\n').find((l) => l.startsWith('- Relecture')) ?? '';
-  if (!PHRASE_RELECTEUR.test(para)) v.push('C1 : phrase exacte du relecteur absente');
-  if (!MODELE_RELECTEUR.test(para)) v.push('C1 : le relecteur n\'est plus pinné sur model opus');
-  const intrus = para.match(/\b(plan|lot|raf\.yaml|carte|description)\b/i);
-  if (intrus) v.push(`C1 : « ${intrus[0]} » dans le paragraphe du relecteur`);
+  // le brief candidat doit avoir son relecteur ; tout autre brief de bras qui en a un suit la même phrase (S5 : bras-sequence-v2)
+  for (const k of briefsDe(f).filter((x) => x.startsWith('briefs/bras-'))) {
+    const para = f[k].split('\n').find((l) => l.startsWith('- Relecture'));
+    if (para === undefined && k !== BRIEF_CAND) continue;
+    if (!PHRASE_RELECTEUR.test(para ?? '')) v.push(`C1 : phrase exacte du relecteur absente de ${k}`);
+    if (!MODELE_RELECTEUR.test(para ?? '')) v.push(`C1 : le relecteur n'est plus pinné sur model opus dans ${k}`);
+    const intrus = (para ?? '').match(/\b(plan|lot|raf\.yaml|carte|description)\b/i);
+    if (intrus) v.push(`C1 : « ${intrus[0]} » dans le paragraphe du relecteur de ${k}`);
+  }
+  const seq = f['briefs/bras-sequence-v2.md'];
+  if (seq !== undefined && !seq.includes('Taille fixée par le gardien : {{TAILLE}}')) v.push('C1 : bras-sequence-v2 ne reçoit plus la taille du gardien');
   return v;
 }
 
@@ -245,6 +251,12 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C5', 'publication sans séquence', 'src/bench/verdict.ts', remplace(/\n\s*&& seqOk\([^\n]*\),/, ',')],
   ['C5', 'séquence : || true sur le every final', 'src/sequence/verdict.ts', remplace('x.ok || !x.bloquant)', 'x.ok || !x.bloquant || true)')],
   ['C3', 'porte déguisée en controle', 'src/bench/banc.ts', ajout('controle(a);\ncheckAll(b);\nverif(c);')],
+  // bras candidat de la séquence (S5)
+  ['C1', 'séquence : carte donnée au relecteur', 'briefs/bras-sequence-v2.md', remplace('Donne-lui seulement', 'Donne-lui la carte, puis seulement')],
+  ['C1', 'séquence : relecteur sans model opus', 'briefs/bras-sequence-v2.md', remplace(', model opus', '')],
+  ['C1', 'séquence : le bras reclasse la taille', 'briefs/bras-sequence-v2.md', remplace('Taille fixée par le gardien : {{TAILLE}}', 'Classe la demande')],
+  ['C2', 'séquence : sous-agent qui écrit le code', 'briefs/bras-sequence-v2.md', ajout("- Délègue l'implémentation (subagent_type general-purpose)")],
+  ['C1', 'séquence : fiche dans le brief', 'briefs/bras-sequence-v2.md', ajout('Respecte la fiche.')],
 ];
 describe('mutation : chaque régression connue est détectée', () => {
   it.each(mutations)('%s : %s', (cause, _nom, fichier, muter) => {

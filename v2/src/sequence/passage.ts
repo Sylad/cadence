@@ -147,8 +147,8 @@ function lignesEtape(x: Ctx, c: string, sessions: string[], avant: Map<string, s
 /** Fuites : demandes et pièces des étapes ≤ k et ses propres fichiers de mesure permis ; le reste de la séquence et les mesures de l'autre bras, certains. */
 function reglesEtape(x: Ctx, b: string, k: number): Regles {
   const r = reglesDuBras(x.o.home, x.o.racine, x.s.id, x.clones[b]);
-  const mesures = (bras: string) => [0, ...x.s.etapes.map((e) => e.k)].flatMap((j) => [`${x.clones[bras]}.build-${j}.log`,
-    join(x.dir, `etape-${j}.${nomClone(x, bras)}.json`), join(x.dir, `suite-${j}.${nomClone(x, bras)}.json`)]);
+  const mesures = (bras: string) => [`${x.clones[bras]}.pieces.json`, `${x.clones[bras]}.settings.json`, ...[0, ...x.s.etapes.map((e) => e.k)].flatMap((j) => [`${x.clones[bras]}.build-${j}.log`,
+    join(x.dir, `etape-${j}.${nomClone(x, bras)}.json`), join(x.dir, `suite-${j}.${nomClone(x, bras)}.json`)])];
   r.autorises.push(...x.s.etapes.slice(0, k).flatMap((e) => [dirname(e.demande), ...e.pieces]), ...mesures(b));
   r.certains.push(join(x.o.racine, 'sequences'), ...x.noms.filter((n) => n !== b).flatMap(mesures));
   return r;
@@ -168,12 +168,13 @@ function lancer(x: Ctx, e: Etape, b: string, avant: { head: string; sale: string
 
 /** Une étape pour un bras : chaque mesure dans sa phase ; une mesure qui lève est notée et la séquence continue. */
 function jouerEtape(x: Ctx, e: Etape, b: string): MesureEtape {
-  const c = x.clones[b], transcripts = empreintes(x, c);
+  const c = x.clones[b], transcripts = empreintes(x, c), aLire = [...e.pieces, ...e.references_depot.map((r) => join(c, r))];
   const me: MesureEtape = { k: e.k, portee_suite: x.s.suite_projet.portee, reponses: existsSync(join(dirname(e.demande), 'reponses.md')), mesure: mesureVide(b, x.s.id, 'non lancé'),
     fuites: [], fuites_a_verifier: [], suite_en_erreur: null, mesure_en_erreur: null };
   let phase = 'état avant';
   try {
     const avant = etatGit(c);
+    writeFileSync(`${c}.pieces.json`, JSON.stringify({ etape: e.k, pieces: aLire })); // lu par le hook lecture-obligatoire du bras candidat
     phase = 'bras'; signaler(x, e.k, `bras ${b}`, e.k - 1);
     x.o.out(`${x.s.id} étape ${e.k}/${x.s.etapes.length} : bras ${b}…`);
     me.mesure = lancer(x, e, b, avant);
@@ -182,7 +183,7 @@ function jouerEtape(x: Ctx, e: Etape, b: string): MesureEtape {
     phase = 'fuites'; const lignes = lignesEtape(x, c, me.mesure.sessions, transcripts);
     const fu = chercherFuites(lignes, reglesEtape(x, b, e.k), x.o.home, c);
     me.fuites = fu.certaines; me.fuites_a_verifier = fu.a_verifier;
-    phase = 'lecture'; me.lecture = lectureReferences(lignes, [...e.pieces, ...e.references_depot.map((r) => join(c, r))], c);
+    phase = 'lecture'; me.lecture = lectureReferences(lignes, aLire, c);
     phase = 'suite'; const r = jouerSuite(x, b, e.k);
     if ('erreur' in r) me.suite_en_erreur = r.erreur; // l'étape suivante se compare à la dernière mesure réussie
     else {

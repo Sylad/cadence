@@ -17,7 +17,8 @@ const COURT = ['1', '3', '6'];
 export function empreinte(repo: string): string {
   try {
     const arbres = ['v2/src', 'v2/briefs'].map((p) => execFileSync('git', ['rev-parse', `HEAD:${p}`], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
-    return createHash('sha1').update(arbres.join('\n')).digest('hex').slice(0, 12);
+    const hooks = execFileSync('git', ['ls-tree', 'HEAD', 'v2/hooks'], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); // hooks d'un bras : vide sans eux
+    return createHash('sha1').update([...arbres, ...(hooks ? [hooks] : [])].join('\n')).digest('hex').slice(0, 12);
   } catch { return 'inconnue'; }
 }
 
@@ -37,14 +38,15 @@ const plusRecent = (dir: string, t: number): string | null => {
 
 /** Le passage ne mesure que ce que l'empreinte décrit : null = prêt, sinon la raison du refus. */
 export function pretAPasser(repo: string, bras: Record<string, DefBras>, racine = ''): string | null {
-  const sale = execFileSync('git', ['status', '--porcelain', '--', 'v2/src', 'v2/briefs'], { cwd: repo, encoding: 'utf8' }).trim();
-  if (sale) return `v2/src ou v2/briefs a des changements non commités (l'empreinte ne les voit pas) :\n${sale}`;
+  const sale = execFileSync('git', ['status', '--porcelain', '--', 'v2/src', 'v2/briefs', 'v2/hooks'], { cwd: repo, encoding: 'utf8' }).trim();
+  if (sale) return `v2/src, v2/briefs ou v2/hooks a des changements non commités (l'empreinte ne les voit pas) :\n${sale}`;
   const cli = join(repo, 'v2', 'dist', 'cli.js');
   if (!existsSync(cli)) return 'v2/dist/cli.js absent : lancer « npm run build » dans v2';
   const neuf = plusRecent(join(repo, 'v2', 'src'), statSync(cli).mtimeMs);
   if (neuf) return `${neuf} est plus récent que v2/dist/cli.js : lancer « npm run build » dans v2`;
   const briefs = join(repo, 'v2', 'briefs') + '/';
-  for (const d of Object.values(bras)) if (!resolve(racine, d.brief).startsWith(briefs)) return `brief du bras ${d.nom} hors de ${briefs} : ${d.brief}`;
+  for (const d of Object.values(bras)) for (const f of [d.brief, ...(d.settings ? [d.settings] : [])])
+    if (!resolve(racine, f).startsWith(briefs)) return `brief ou réglages du bras ${d.nom} hors de ${briefs} : ${f}`;
   return null;
 }
 

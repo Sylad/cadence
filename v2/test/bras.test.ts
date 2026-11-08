@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Banc } from '../src/bench/banc.js';
-import { environnementNeutre, lancerBras, OUTILS_INTERDITS, type Executeur } from '../src/bench/bras.js';
+import { chargerBras, environnementNeutre, lancerBras, OUTILS_INTERDITS, type Executeur } from '../src/bench/bras.js';
 
 function bancTest(reponses?: string): { b: Banc; clone: string } {
   const r = mkdtempSync(join(tmpdir(), 'bras-'));
@@ -91,6 +91,38 @@ describe('lancerBras', () => {
     const m = lancerBras(b, d, clone, () => ({ stdout: 'boum', code: 1 }));
     expect(m).toMatchObject({ echec: 'sortie illisible (code 1) : boum', tokens: 0, cout_usd: 0, sessions: [] });
     expect(lancerBras(b, d, clone, () => ({ stdout: '', code: 1, erreur: 'SIGKILL' })).echec).toBe('sortie illisible (SIGKILL) : ');
+  });
+
+  it('réglages du bras : --settings vers un fichier du run (à côté du clone), {{HOOKS}} absolu, passé aussi à la reprise', () => {
+    const { b, clone } = bancTest('Oui.');
+    const settings = join(import.meta.dirname, '..', 'briefs', 'settings-sequence-v2.json');
+    const appels: string[][] = [];
+    const exec: Executeur = (args) => { appels.push(args); if (appels.length === 1) writeFileSync(`${clone}.question.md`, '?'); return { stdout: json('s1', 1, 0), code: 0 }; };
+    lancerBras(b, { nom: 'C', modele: 'opus', brief, settings }, clone, exec);
+    for (const a of appels) expect(a[a.indexOf('--settings') + 1]).toBe(`${clone}.settings.json`);
+    const j = JSON.parse(readFileSync(`${clone}.settings.json`, 'utf8'));
+    const cmd = j.hooks.PreToolUse[0].hooks[0].command as string;
+    expect(cmd).toBe(`node "${join(import.meta.dirname, '..', 'hooks', 'lecture-obligatoire.mjs')}"`);
+    expect(existsSync(join(import.meta.dirname, '..', 'hooks', 'lecture-obligatoire.mjs'))).toBe(true);
+    expect(j.hooks.PreToolUse[0].matcher).toBe('Edit|Write|MultiEdit|NotebookEdit');
+    expect(lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, (args) => { appels.push(args); return { stdout: json('s', 1, 0), code: 0 }; }).echec).toBeNull();
+    expect(appels.at(-1)).not.toContain('--settings');
+  });
+
+  it('{{TAILLE}} : la taille du gardien (retouche ou fonction), fonction pour un banc court « grosse »', () => {
+    const seq = join(import.meta.dirname, '..', 'briefs', 'bras-sequence-v2.md');
+    for (const [taille, attendu] of [['retouche', 'retouche'], ['fonction', 'fonction'], ['grosse', 'fonction']] as const) {
+      const { b, clone } = bancTest(); const p: string[] = [];
+      lancerBras({ ...b, taille }, { nom: 'C', modele: 'opus', brief: seq }, clone, (args) => { p.push(args[args.indexOf('-p') + 1]); return { stdout: json('s', 1, 0), code: 0 }; });
+      expect(p[0]).toContain(`Taille fixée par le gardien : ${attendu}.`);
+      expect(p[0]).not.toContain('{{');
+    }
+  });
+
+  it('chargerBras lit settings quand il est donné', () => {
+    const r = mkdtempSync(join(tmpdir(), 'brasyaml-'));
+    writeFileSync(join(r, 'bras.yaml'), 'A:\n  modele: opus\n  brief: /b/a.md\nC:\n  modele: opus\n  brief: /b/c.md\n  settings: /b/s.json\n');
+    expect(chargerBras(r)).toEqual({ A: { nom: 'A', modele: 'opus', brief: '/b/a.md' }, C: { nom: 'C', modele: 'opus', brief: '/b/c.md', settings: '/b/s.json' } });
   });
 
   it('environnement neutre : pas de kube, pas de jeton, pas de prod maritime', () => {

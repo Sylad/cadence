@@ -125,6 +125,17 @@ describe('passage d\'une séquence', () => {
     expect(existsSync(join(r, 'en-cours.json'))).toBe(false); expect(existsSync(join(r, 'passage.lock'))).toBe(false);
   });
 
+  it('avant chaque étape, <clone>.pieces.json liste en absolu les pièces et les références du dépôt résolues dans CE clone', () => {
+    const { r, d } = racine();
+    const vus: Record<string, unknown> = {};
+    const lirePieces = (c: string, k: number) => { vus[`${c.endsWith('c1') ? 'c1' : 'c2'}-${k}`] = lire(`${c}.pieces.json`); };
+    const { exec } = faux(r, d, { A1: (c) => lirePieces(c, 1), C1: (c) => lirePieces(c, 1), A2: (c) => lirePieces(c, 2) });
+    passageSequence({ ...opts(r, exec), garderClones: true });
+    const dir = (x: string) => join(r, 'runs', '2026-11-08-1100-e1', 's1', x), piece = join(d, 'etapes', '1', 'pieces', 'fig.png');
+    expect(vus).toEqual({ 'c1-1': { etape: 1, pieces: [piece, join(dir('c1'), 'docs', 'norme.md')] },
+      'c2-1': { etape: 1, pieces: [piece, join(dir('c2'), 'docs', 'norme.md')] }, 'c1-2': { etape: 2, pieces: [] } });
+  });
+
   it('suite en erreur à une étape : notée, et l\'étape suivante se compare à la dernière mesure réussie', () => {
     const { r, d } = racine();
     const { exec } = faux(r, d, { A1: (c) => writeFileSync(join(c, 'src', 'crash'), ''),

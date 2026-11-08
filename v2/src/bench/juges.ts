@@ -6,10 +6,11 @@ import { environnementNeutre, OUTILS_INTERDITS, type Executeur } from './bras.js
 
 /** R35 : sortie attendue cachée d'une séquence (étape k), jugée sur l'application de l'état final. */ export interface Sortie { k: number; sortie: string }
 export interface Meca { suite_ok: boolean; caches_passes: number; caches_total: number; mutations_tuees: number; mutations_total: number;
-  attendu: 'oui' | 'en partie' | 'non'; mutations: { ou: string; quoi: string; tuee: boolean }[]; sorties?: (Sortie & { verdict: 'oui' | 'non' | 'incertain'; preuve: string })[] }
+  attendu: 'oui' | 'en partie' | 'non'; mutations: { ou: string; quoi: string; tuee: boolean }[]; sorties?: (Sortie & { i: number; verdict: 'oui' | 'non' | 'incertain'; preuve: string })[] }
 export interface Defauts { bloquants: number; majeurs: number; mineurs: number }
 /** `remplaces` (R28, R30) : tests cachés remplacés par une demande ultérieure, une liste UNIQUE décidée avant X et Y, non comptée pour les deux. */
-export interface Jugement { meca: Record<string, Meca>; remplaces?: string[]; defauts: Record<string, Defauts>; prefere: string; ui: string; raisons: string }
+export interface Jugement { meca: Record<string, Meca>; remplaces?: string[]; defauts: Record<string, Defauts>; prefere: string; ui: string; raisons: string;
+  /** m2 : X et Y → bras, pour vérifier les preuves (captures-sorties-X/…). */ anonymat?: Record<'X' | 'Y', string> }
 
 const BRIEFS = join(import.meta.dirname, '..', '..', 'briefs');
 const HORS_DIFF = [':(exclude).cadence', ':(exclude)docs/plan', ':(exclude)cadence.yaml'];
@@ -37,11 +38,12 @@ export function validerMeca(o: unknown, attendues: Sortie[] = []): string[] {
     if (m.mutations_tuees > m.mutations_total) e.push(`${k}.mutations_tuees > mutations_total`);
     if (typeof m.suite_ok !== 'boolean') e.push(`${k}.suite_ok n'est pas un booléen`);
     if (!['oui', 'en partie', 'non'].includes(m.attendu)) e.push(`${k}.attendu doit valoir oui, en partie ou non`);
-    if (attendues.length && (!Array.isArray(m.sorties) || m.sorties.length !== attendues.length)) e.push(`${k}.sorties : ${attendues.length} entrées attendues, dans l'ordre des sorties déclarées`);
-    else for (const [i, x] of (attendues.length ? m.sorties! : []).entries()) {
-      if (x?.k !== attendues[i].k || x.sortie !== attendues[i].sortie) e.push(`${k}.sorties[${i}] ne reprend pas l'étape et le texte de la sortie déclarée`);
-      else if (!['oui', 'non', 'incertain'].includes(x.verdict)) e.push(`${k}.sorties[${i}].verdict doit valoir oui, non ou incertain`);
-      else if (typeof x.preuve !== 'string' || !x.preuve.trim()) e.push(`${k}.sorties[${i}].preuve vide`);
+    // R38 : rendues par index {i, verdict, preuve}, i = 1..n exactement, dans l'ordre ; le code rattache k et le texte
+    const is = Array.isArray(m.sorties) ? m.sorties.map((x) => x?.i) : [], n = attendues.map((_, j) => j + 1), manquants = n.filter((i) => !is.includes(i));
+    if (attendues.length && JSON.stringify(is) !== JSON.stringify(n)) e.push(`${k}.sorties : i attendus [${n.join(', ')}] dans l'ordre, sans doublon ; reçus [${is.join(', ')}]${manquants.length ? ` (manquants : ${manquants.join(', ')})` : ''}`);
+    else for (const x of attendues.length ? m.sorties! : []) {
+      if (!['oui', 'non', 'incertain'].includes(x.verdict)) e.push(`${k}.sorties[i=${x.i}].verdict doit valoir oui, non ou incertain`);
+      else if (typeof x.preuve !== 'string' || !x.preuve.trim()) e.push(`${k}.sorties[i=${x.i}].preuve vide`);
     }
   }
   const r = (o as { remplaces?: unknown } | null)?.remplaces;
@@ -60,9 +62,7 @@ export function validerAveugle(o: unknown): string[] {
   return e;
 }
 
-function remplir(gabarit: string, v: Record<string, string>): string {
-  return Object.entries(v).reduce((t, [k, x]) => t.replaceAll(`{{${k}}}`, x), readFileSync(join(BRIEFS, gabarit), 'utf8'));
-}
+const remplir = (gabarit: string, v: Record<string, string>): string => Object.entries(v).reduce((t, [k, x]) => t.replaceAll(`{{${k}}}`, x), readFileSync(join(BRIEFS, gabarit), 'utf8'));
 
 /** Une session claude : { ok, session } ; jamais d'exception sur la sortie de claude (R7). */
 function appeler(exec: Executeur, args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }): { ok: boolean; session: string } {
@@ -109,8 +109,9 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
   try {
     if (!copier()) return null;
     const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests, DEMANDES: demandes }, sMeca = join(dirEval, 'meca.json');
-    const so = sorties.length ? '\n' + remplir('juge-sorties.md', { ...v, LISTE: sorties.map((x) => `- étape ${x.k} : ${x.sortie}`).join('\n') }).trimEnd() : '';
+    const so = sorties.length ? '\n' + remplir('juge-sorties.md', { ...v, LISTE: sorties.map((x, i) => `${i + 1}. étape ${x.k} : ${x.sortie}`).join('\n') }).trimEnd() : '';
     const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca, SORTIES: so }), sMeca, (x) => validerMeca(x, sorties), dirEval, modele, exec) as (Record<'X' | 'Y', Meca> & { remplaces: string[] }) | null;
+    for (const m of meca && sorties.length ? [meca.X, meca.Y] : []) m.sorties = m.sorties!.map((x, j) => ({ ...sorties[j], i: x.i, verdict: x.verdict, preuve: x.preuve }));
     if (!copier()) return null; // le juge à l'aveugle voit les livrables, pas les mutations
     const ecran = b.visible
       ? `Lance l'app de chaque copie, l'une après l'autre, comme le dit ${v.MESURE} (section Écran). Fais des captures à 1440 et à 390 px dans ${dirEval}/captures-X et captures-Y, et regarde-les. ui = la copie dont l'écran est le plus cohérent avec le reste de l'application.`
@@ -122,7 +123,7 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
     const nom = (x: string) => (x === 'X' || x === 'Y' ? anon[x] : x);
     return {
       meca: { [anon.X]: meca.X, [anon.Y]: meca.Y }, remplaces: meca.remplaces, defauts: { [anon.X]: av.X, [anon.Y]: av.Y },
-      prefere: nom(av.prefere), ui: nom(av.ui), raisons: av.raisons,
+      prefere: nom(av.prefere), ui: nom(av.ui), raisons: av.raisons, anonymat: anon,
     };
   } finally { for (const k of ['X', 'Y']) rmSync(join(dirEval, k), { recursive: true, force: true }); } // copies effacées sur tous les chemins
 }

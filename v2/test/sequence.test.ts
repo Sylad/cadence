@@ -24,7 +24,8 @@ regression:
   commande: npx vitest reg
 `;
 
-function racine(seq = SEQ, sec = SEC): string {
+const ECRAN = '# Mesure\n\n## Écran\n\nnpm run start:local (API locale, jamais la prod), captures 1440 et 390 px\n';
+function racine(seq = SEQ, sec = SEC, mesure?: string): string {
   const r = mkdtempSync(join(tmpdir(), 'seq-'));
   mkdirSync(join(r, 'src'));
   seq = seq.replace('SRC', join(r, 'src'));
@@ -36,10 +37,11 @@ function racine(seq = SEQ, sec = SEC): string {
   for (const f of ['e1.test.ts', 'e2.test.ts', 'reg.test.ts']) writeFileSync(join(s, f), 'x');
   writeFileSync(join(d, 'sequence.yaml'), seq);
   writeFileSync(join(s, 'sequence-secrets.yaml'), sec);
+  if (mesure !== undefined) writeFileSync(join(s, 'mesure.md'), mesure);
   return r;
 }
-const refus = (seq: string, motif: RegExp, sec = SEC) => {
-  const r = racine(seq, sec);
+const refus = (seq: string, motif: RegExp, sec = SEC, mesure?: string) => {
+  const r = racine(seq, sec, mesure);
   expect(() => chargerSequence(r, 's1')).toThrow(BancInvalide);
   expect(() => chargerSequence(r, 's1')).toThrow(motif);
 };
@@ -101,7 +103,7 @@ describe('séquence', () => {
   });
   it('R35 : sorties attendues facultatives, par étape, dans les secrets ; aplaties dans l\'ordre des étapes', () => {
     expect(chargerSequence(racine(), 's1').sorties).toEqual([]);
-    const s = chargerSequence(racine(SEQ, `${SEC}sorties:\n  2: [légende du globe en D/A quand D/A est choisi, "réponse /api/x : champ y"]\n  1: [cartouche à 3 h]\n`), 's1');
+    const s = chargerSequence(racine(SEQ, `${SEC}sorties:\n  2: [légende du globe en D/A quand D/A est choisi, "réponse /api/x : champ y"]\n  1: [cartouche à 3 h]\n`, ECRAN), 's1');
     expect(s.sorties).toEqual([{ k: 1, sortie: 'cartouche à 3 h' }, { k: 2, sortie: 'légende du globe en D/A quand D/A est choisi' }, { k: 2, sortie: 'réponse /api/x : champ y' }]);
   });
   it('R35 : refuse des sorties mal formées (étape inconnue, liste vide, texte vide, pas une liste)', () => {
@@ -110,6 +112,15 @@ describe('séquence', () => {
     refus(SEQ, /sorties 1/, `${SEC}sorties:\n  1: ["a", ""]\n`);
     refus(SEQ, /sorties 2/, `${SEC}sorties:\n  2: a\n`);
     refus(SEQ, /sorties/, `${SEC}sorties: [a]\n`);
+    // m5 : clé présente mais nulle ou d'un mauvais type
+    for (const v of ['', '~', '3', 'a', 'true']) refus(SEQ, /« sorties » doit associer/, `${SEC}sorties: ${v}\n`, ECRAN);
+  });
+  it('B1 : des sorties déclarées exigent dans les secrets un mesure.md avec une section « Écran » (lancer l\'app sans toucher la prod)', () => {
+    const so = `${SEC}sorties:\n  1: [cartouche à 3 h]\n`;
+    refus(SEQ, /mesure\.md.*Écran/, so);
+    refus(SEQ, /mesure\.md.*Écran/, so, '# Mesure\n\nÉcran : npm start\n'); // pas un titre
+    expect(chargerSequence(racine(SEQ, so, '## Section Écran locale\nx'), 's1').sorties).toHaveLength(1);
+    expect(chargerSequence(racine(), 's1').sorties).toEqual([]); // sans sorties : mesure.md facultatif
   });
   it('refuse une régression mal définie', () => {
     refus(SEQ, /regression/, SEC.replace(/regression:[\s\S]*/, ''));

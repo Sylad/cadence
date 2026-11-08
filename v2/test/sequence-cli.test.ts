@@ -69,13 +69,16 @@ describe('cadence2 bench sequence : ligne de commande', () => {
       [['s1'], { ...dep(r, exec), pret: () => 'v2/src sale' }, /séquence refusée : v2\/src sale/],
       [['s1'], { ...dep(r, exec), empreinte: 'inconnue' }, /empreinte inconnue/],
     ];
-    for (const [a, d, re] of cas) { const io = ioTest({ BENCH_ROOT: r }); expect(await sequence(a, io, d), a.join(' ')).toBe(2); expect(io.erreurs.join('\n')).toMatch(re); }
-    const io = ioTest({ BENCH_ROOT: r }); expect(await sequence(['nulle'], io, dep(r, exec))).toBe(1); expect(io.erreurs[0]).toMatch(/séquence nulle/);
+    for (const [a, d, re] of cas) { const io = ioTest({ BENCH_ROOT: r, HOME: r }); expect(await sequence(a, io, d), a.join(' ')).toBe(2); expect(io.erreurs.join('\n')).toMatch(re); }
+    for (const env of [{ BENCH_ROOT: r }, { BENCH_ROOT: r, HOME: '' }]) { // m3 : sans HOME, les réglages utilisateur ne se contrôlent pas (R36)
+      const io = ioTest(env); expect(await sequence(['s1'], io, dep(r, exec))).toBe(2); expect(io.erreurs[0]).toMatch(/sequence refusée : HOME vide/);
+    }
+    const io = ioTest({ BENCH_ROOT: r, HOME: r }); expect(await sequence(['nulle'], io, dep(r, exec))).toBe(1); expect(io.erreurs[0]).toMatch(/séquence nulle/);
     expect(existsSync(join(r, 'historique.jsonl')) || existsSync(join(r, 'passage.lock'))).toBe(false);
   });
   it('un verrou vivant refuse le passage (code 2)', async () => {
     const r = racine(), { exec } = faux(r); writeFileSync(join(r, 'passage.lock'), `${process.pid} 2026-11-08T00:00:00Z`);
-    const io = ioTest({ BENCH_ROOT: r }); expect(await sequence(['s1'], io, dep(r, exec))).toBe(2); expect(io.erreurs[0]).toMatch(/déjà en cours/);
+    const io = ioTest({ BENCH_ROOT: r, HOME: r }); expect(await sequence(['s1'], io, dep(r, exec))).toBe(2); expect(io.erreurs[0]).toMatch(/déjà en cours/);
   });
   it('aide et aiguillage : « cadence2 » liste la commande, « bench sequence » sans id affiche son usage', async () => {
     const a = ioTest(); await run([], a); expect(a.sortie.join('\n')).toMatch(/cadence2 bench sequence <id> \[--candidat c\] \[--reference r\] \[--repetitions N\]/);

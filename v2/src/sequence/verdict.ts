@@ -8,7 +8,7 @@ const somme = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const signe = (x: number) => `${x >= 0 ? '+' : ''}${+x.toFixed(1)}`;
 const pieces = (e: MesureEtape) => (e.lecture ? e.lecture.ouvertes.length + e.lecture.manquantes.length + e.lecture.apres_ecriture.length : 0);
 
-/** Barre du banc séquence (spec §4), échec fermé : une donnée absente ne rend jamais un critère vert. Tous les critères sont bloquants, sauf les tests cachés (R35, affichés). */
+/** Barre du banc séquence (spec §4), échec fermé : une donnée absente ne rend jamais un critère vert. Tous bloquants ; avec des sorties attendues, les tests cachés sont affichés (R35, R37). */
 export function verdictSequence(r: ResultatSequence, ref: string, cand: string): Verdict {
   const bras = [ref, cand];
   const et = (b: string) => r.etapes[b] ?? [];
@@ -43,6 +43,7 @@ export function verdictSequence(r: ResultatSequence, ref: string, cand: string):
   const c = (nom: string, valeur: string, seuil: string, ok: boolean): Critere => ({ nom, valeur, seuil, ok, bloquant: true });
   const rc = regs(cand), rr = regs(ref), hc = meca(cand)?.caches_passes, hr = meca(ref)?.caches_passes, ac = attendu(cand), ar = attendu(ref);
   const oui = (b: string) => meca(b)?.sorties?.filter((x) => x.verdict === 'oui').length, oc = oui(cand), or = oui(ref), ns = r.sorties_attendues ?? 0, sur = (x?: number) => (x === undefined ? '–' : `${x}/${ns}`);
+  const incertains = pour((b) => (meca(b)?.sorties ?? []).filter((x) => x.verdict === 'incertain').map((x) => `${b} étape ${x.k} : ${x.sortie}`)); // B2 (R38)
   const derniere = et(cand).at(-1), reglages = [...new Set([...(r.reglages_utilisateur ?? []), ...bras.flatMap((b) => et(b).flatMap((e) => e.reglages_utilisateur ?? []))])];
   const criteres: Critere[] = [
     c('au moins une étape', `${ref} [${ks(ref)}] · ${cand} [${ks(cand)}]`, '≥ 1, les mêmes étapes pour les deux bras', et(cand).length >= 1 && ks(cand) === ks(ref)),
@@ -52,8 +53,8 @@ export function verdictSequence(r: ResultatSequence, ref: string, cand: string):
     c('aucun bras en échec', echecs.length ? echecs.join(' ; ') : '0', '0', echecs.length === 0),
     c('juge final fait', r.jugement && meca(cand) && meca(ref) ? 'oui' : 'non', 'oui', Boolean(r.jugement && meca(cand) && meca(ref))),
     c('régressions', `${n(rc)} contre ${n(rr)}`, `≤ ${ref}`, rc !== null && rr !== null && rc <= rr),
-    { ...c('tests cachés cumulés', `${hc ?? '–'} contre ${hr ?? '–'}`, `≥ ${ref}`, hc !== undefined && hr !== undefined && hc >= hr), bloquant: false }, // R35 : couplés au code d'origine
-    ...(ns ? [c('sorties attendues vérifiées', `${sur(oc)} contre ${sur(or)}`, `≥ ${ref}`, oc !== undefined && or !== undefined && oc >= or)] : []),
+    { ...c('tests cachés cumulés', `${hc ?? '–'} contre ${hr ?? '–'}`, `≥ ${ref}`, hc !== undefined && hr !== undefined && hc >= hr), bloquant: !ns }, // R35, R37 : couplés au code d'origine
+    ...(ns ? [c('sorties attendues vérifiées', incertains.length ? `non mesuré : ${incertains.join(' ; ')}` : `${sur(oc)} contre ${sur(or)}`, `≥ ${ref}`, !incertains.length && oc !== undefined && or !== undefined && oc >= or)] : []),
     c('suite du candidat au juge final', meca(cand) ? (meca(cand)!.suite_ok ? 'ok' : 'ROUGE') : 'juge absent', 'ok', meca(cand)?.suite_ok === true),
     c('attendu au juge final', `${ac ?? '–'} contre ${ar ?? '–'} (oui 2, en partie 1, non 0)`, `≥ ${ref}`, ac !== undefined && ar !== undefined && ac >= ar),
     c('questions inutiles', `${inutiles}`, '0', inutiles === 0),
@@ -95,7 +96,7 @@ export function rapportSequence(r: ResultatSequence, ref: string, cand: string, 
   return [`# Séquence ${r.sequence} ${e.date} — ${cand} contre ${ref} — ${v.vert ? 'VERT' : 'ROUGE'}`, '', `Empreinte de v2 : ${e.empreinte}`, `Passage : ${r.run}`, `Répétition ${e.repetition ?? 1}/${e.repetitions ?? 1}`, '',
     `| Étape | Régressions ${ref} · ${cand} (rouges/disparus) | Affaiblis ${ref} · ${cand} | Nouveaux ${ref} · ${cand} | Lecture ${ref} · ${cand} | Build ${ref} · ${cand} | Duplication ${ref} · ${cand} | Fichiers > 400 ${ref} · ${cand} | Temps ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|', zero, ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
-    ...v.criteres.map((x) => `| ${x.nom} | ${x.valeur} | ${x.seuil} | ${x.ok ? 'ok' : '**ROUGE**'} |`), '',
+    ...v.criteres.map((x) => `| ${x.nom} | ${x.valeur} | ${x.seuil} | ${x.ok ? 'ok' : x.bloquant ? '**ROUGE**' : 'en dessous (indicatif)'} |`), '',
     ...([['Lectures à vérifier', lectures], ['Questions posées', questions], ['Tests affaiblis', affaiblisListe], ['Sorties attendues non vérifiées (non, incertain)', sorties]] as const).flatMap(([titre, l]) => (l.length ? [`## ${titre}`, '', ...l, ''] : [])),
     `## Tests remplacés (R28), non comptés pour ${ref} ni pour ${cand}`, '', ...remplaces, ''].join('\n');
 }

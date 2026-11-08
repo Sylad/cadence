@@ -58,11 +58,7 @@ export function testsAffaiblis(clone: string, avant: string): Affaiblis {
   }
   const ids = (signe: string, skip?: boolean) => new Set(vus.filter((v) => v.signe === signe && (skip === undefined || v.skip === skip)).map((v) => v.id));
   const ajoutes = ids('+'), skipAvant = ids('-', true);
-  return {
-    fichiers_supprimes: supprimes,
-    tests_retires: [...ids('-')].filter((i) => !ajoutes.has(i)),
-    skip_only: [...ids('+', true)].filter((i) => !skipAvant.has(i)),
-  };
+  return { fichiers_supprimes: supprimes, tests_retires: [...ids('-')].filter((i) => !ajoutes.has(i)), skip_only: [...ids('+', true)].filter((i) => !skipAvant.has(i)) };
 }
 
 /** Banc d'une étape pour lancerBras et juger : `dir` = dossier de l'étape (demande.md, reponses.md). */
@@ -104,10 +100,11 @@ export function passageSequences(o: Opt, n: number, apres?: (r: ResultatSequence
 /** R36 : empreinte de ~/.claude/CLAUDE.md, de ses @imports (récursifs, relatifs au fichier qui importe) et des settings*.json ; absent = « - ». */
 export function empreinteUtilisateur(home: string): Record<string, string> {
   const r: Record<string, string> = {};
-  const voir = (f: string, suivre: boolean): void => {
+  const voir = (f: string, suivre: boolean): void => { // m4 : ponctuation finale retirée ; illisible = une empreinte, jamais une exception
     if (f in r) return;
-    r[f] = existsSync(f) && statSync(f).isFile() ? createHash('sha256').update(readFileSync(f)).digest('hex') : '-';
-    if (suivre && r[f] !== '-') for (const m of readFileSync(f, 'utf8').matchAll(/(?:^|\s)@(\S+)/g)) voir(resolve(dirname(f), m[1].replace(/^~(?=\/)/, home)), true);
+    let t: Buffer | null = null;
+    try { t = existsSync(f) && statSync(f).isFile() ? readFileSync(f) : null; r[f] = t ? createHash('sha256').update(t).digest('hex') : '-'; } catch { r[f] = 'illisible'; }
+    if (suivre && t) for (const m of t.toString('utf8').matchAll(/(?:^|\s)@(\S+)/g)) voir(resolve(dirname(f), m[1].replace(/[,;:.)]+$/, '').replace(/^~(?=\/)/, home)), true);
   };
   voir(join(home, '.claude', 'CLAUDE.md'), true);
   for (const s of ['settings.json', 'settings.local.json']) voir(join(home, '.claude', s), false);
@@ -261,10 +258,9 @@ function passer(o: Opt, bras: Record<string, DefBras>, s: Sequence): ResultatSeq
       for (const b of ordre) etapes[b].push(jouerEtape(x, e, b));
     }
     signaler(x, s.etapes.length, 'juges', s.etapes.length);
-    const reglages_utilisateur = reglagesChanges(x);
-    const dernier = bancEtape(s, s.etapes[s.etapes.length - 1], heads[noms[0]]);
+    const avantJuges = reglagesChanges(x), dernier = bancEtape(s, s.etapes[s.etapes.length - 1], heads[noms[0]]);
     const jugement = juger(dernier, x.clones, join(o.racine, 'eval', run, s.id, sous), o.juge, o.exec, tirage, demandesDuJuge(s), s.sorties);
-    const clones = Object.fromEntries(noms.map((b) => [nomClone(x, b), b]));
+    const reglages_utilisateur = [...new Set([...avantJuges, ...reglagesChanges(x)])], clones = Object.fromEntries(noms.map((b) => [nomClone(x, b), b])); // M3 : avant ET après les juges
     const res: ResultatSequence = { run, sequence: s.id, clones, base, etapes, jugement, reglages_utilisateur, sorties_attendues: s.sorties.length };
     writeFileSync(join(dir, 'resultat.json'), JSON.stringify(res, null, 2));
     return res;

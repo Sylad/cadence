@@ -197,14 +197,40 @@ describe('passage d\'une séquence', () => {
     expect(res.reglages_utilisateur).toEqual([join(cl, 'RTK.md')]);
   });
 
+  it('R36, M3 : un réglage modifié PENDANT les juges est aussi nommé dans reglages_utilisateur', () => {
+    const { r, d } = racine(), cl = join(r, '.claude');
+    mkdirSync(cl); writeFileSync(join(cl, 'CLAUDE.md'), '@RTK.md'); writeFileSync(join(cl, 'RTK.md'), 'avant');
+    const { exec } = faux(r, d, {});
+    const juge: Executeur = (a, o) => { if (/meca\.json/.test(a[a.indexOf('-p') + 1])) writeFileSync(join(cl, 'RTK.md'), 'pendant le juge'); return exec(a, o); };
+    const res = passageSequence(opts(r, juge));
+    expect(res.etapes.A.every((e) => e.reglages_utilisateur?.length === 0)).toBe(true);
+    expect(res.reglages_utilisateur).toEqual([join(cl, 'RTK.md')]);
+  });
+
+  it('m4 : @chemin suivi d\'une ponctuation (,;:.) retirée, extension .md gardée ; un import illisible = « illisible », sans exception', () => {
+    const h = mkdtempSync(join(tmpdir(), 'home-')), cl = join(h, '.claude'); mkdirSync(cl, { recursive: true });
+    writeFileSync(join(cl, 'CLAUDE.md'), 'voir @RTK.md, puis @a.md; (et @b.md) enfin @c.md.\n'); for (const f of ['RTK.md', 'a.md', 'b.md', 'c.md']) writeFileSync(join(cl, f), f);
+    const e = empreinteUtilisateur(h);
+    expect(Object.keys(e).sort()).toEqual(['CLAUDE.md', 'RTK.md', 'a.md', 'b.md', 'c.md', 'settings.json', 'settings.local.json'].map((f) => join(cl, f)));
+    expect(Object.values(e).filter((x) => x === '-')).toHaveLength(2); // seuls les settings*.json absents
+    chmodSync(join(cl, 'a.md'), 0o000);
+    try {
+      const apres = empreinteUtilisateur(h);
+      expect(apres[join(cl, 'a.md')]).toBe('illisible');
+      expect(Object.keys(e).filter((f) => apres[f] !== e[f])).toEqual([join(cl, 'a.md')]);
+    } finally { chmodSync(join(cl, 'a.md'), 0o644); }
+  });
+
   it('R35 : les sorties attendues des secrets vont au juge mécanique (toutes étapes, avec leur k) ; JSON sans elles = jugement refusé', () => {
     const { r, d } = racine(), sec = join(r, 'secrets', 'sequences', 's1', 'sequence-secrets.yaml');
     writeFileSync(sec, `${readFileSync(sec, 'utf8')}sorties:\n  3: [légende du globe en D/A quand D/A est choisi]\n  1: [cartouche à 3 h]\n`);
+    writeFileSync(join(dirname(sec), 'mesure.md'), '## Écran\nnpm run start:local\n'); // B1
     const { exec, vu } = faux(r, d, {});
     const res = passageSequence(opts(r, exec));
     expect(res.sorties_attendues).toBe(2);
-    expect(vu.juges[0]).toContain('- étape 1 : cartouche à 3 h\n- étape 3 : légende du globe en D/A quand D/A est choisi');
-    expect(vu.juges.some((p) => p.includes('sorties : 2 entrées attendues'))).toBe(true); // relance du juge avec l'erreur
+    expect(vu.juges[0]).toContain('1. étape 1 : cartouche à 3 h\n2. étape 3 : légende du globe en D/A quand D/A est choisi');
+    expect(vu.juges[0]).toContain(join(dirname(sec), 'mesure.md')); // B1 : le juge lit le mesure.md des secrets de la séquence
+    expect(vu.juges.some((p) => p.includes('sorties : i attendus [1, 2] dans l\'ordre, sans doublon ; reçus [] (manquants : 1, 2)'))).toBe(true); // M2 : relance précise
     expect(res.jugement).toBeNull(); // le faux juge n'a pas rendu les sorties : échec fermé
   });
 

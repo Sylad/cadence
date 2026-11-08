@@ -2,11 +2,11 @@ Tu évalues deux réalisations anonymes, X et Y, de la même demande. Tu ne sais
 
 Demande : voir {{EVAL}}/demande.md.{{DEMANDES}} Critères et tests cachés : {{MESURE}} et {{SECRETS}}/tests-origine/. Copies jetables : {{EVAL}}/X et {{EVAL}}/Y (tu peux les modifier ; elles n'ont pas d'historique git : restaure chaque mutation en annulant ta modification à la main) ; diffs : {{EVAL}}/X.patch et {{EVAL}}/Y.patch.
 
-Pour CHAQUE copie, avec exactement la même méthode pour les deux :
+Pour CHAQUE copie, avec exactement la même méthode pour les deux :{{SORTIES}}
 1. Suite du projet : `{{TESTS}}` ; suite_ok = code 0 (un test instable rejoué seul une fois, noté).
 2. Tests cachés : copie les tests d'origine à côté des tests du bras, sous un autre nom (sans écraser). N'adapte que les sélecteurs ou les imports renommés, de la même façon pour X et Y, jamais une attente. Compte uniquement les cas que le lot d'origine a ajoutés ou modifiés.
 3. Mutations : 8 à 15 mutations du code CHANGÉ par la copie (inverser une condition, changer une constante, supprimer un appel, décaler un indice). Joue les tests du bras pour chacune ; tuée = au moins un test rouge. Restaure après chaque mutation. Une à la fois, jamais en parallèle.
-4. Attendu : oui / en partie / non, au sens de {{MESURE}}.{{SORTIES}}
+4. Attendu : oui / en partie / non, au sens de {{MESURE}}.
 
 Écris UNIQUEMENT ce JSON dans {{SORTIE}}, rien d'autre :
 remplaces : UNE liste pour les deux copies, décidée d'après les demandes AVANT de juger X ou Y, et appliquée aux deux : les tests cachés marqués « remplacé par l'étape k », chacun sous la forme « fichier d'origine > titre » (liste vide s'il n'y en a pas).

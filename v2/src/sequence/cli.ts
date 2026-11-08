@@ -22,12 +22,12 @@ export async function sequence(args: string[], io: Io, dep: Dep = {}): Promise<n
   if (!id || id.startsWith('--') || n === 0) { io.err(USAGE_SEQUENCE + (n === 0 ? ' (--repetitions : entier ≥ 1)' : '')); return 2; }
   const racine = racineBanc(io.env), emp = dep.empreinte ?? empreinte(REPO), maintenant = io.now();
   if (ref === cand) { io.err(`sequence refusée : --candidat et --reference désignent le même bras (${ref})`); return 2; }
-  if (emp === 'inconnue') { io.err('sequence refusée : empreinte inconnue (pas de dépôt git)'); return 2; }
+  if (emp === 'inconnue' || !io.env.HOME) { io.err(`sequence refusée : ${io.env.HOME ? 'empreinte inconnue (pas de dépôt git)' : 'HOME vide, les réglages utilisateur ne peuvent pas être contrôlés (R36)'}`); return 2; }
   let modele = '';
   try { modele = chargerBras(racine)[cand]?.modele ?? ''; } catch { /* bras.yaml illisible : passageSequences le dira */ }
   const verts: boolean[] = [];
   try {
-    passageSequences({ racine, id, ref, cand, juge: option(args, 'juge') ?? 'opus', exec: dep.exec ?? executeurClaude, maintenant, empreinte: emp, home: io.env.HOME ?? '',
+    passageSequences({ racine, id, ref, cand, juge: option(args, 'juge') ?? 'opus', exec: dep.exec ?? executeurClaude, maintenant, empreinte: emp, home: io.env.HOME,
       out: io.out, ...(dep.pret && { pret: dep.pret }), jscpd: dep.jscpd, prep: dep.prep, delaiMs: dep.delaiMs, garderClones: args.includes('--garder-clones') }, n, (r, repetition) => {
       const v = conclureSequence(racine, r, ref, cand, { maintenant: io.now(), empreinte: emp, modele_candidat: modele, repetition, repetitions: n });
       verts.push(v.vert);

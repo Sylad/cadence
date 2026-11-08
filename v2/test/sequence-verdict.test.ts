@@ -60,22 +60,28 @@ describe('verdictSequence : un critère par ligne, vert puis rouge', () => {
   it('mesure en erreur : étape non mesurée, rouge', () => {
     expect(rouges(seq((r) => { r.etapes.C[0].mesure_en_erreur = 'build : boom'; }))).toEqual(['toutes les étapes mesurées']);
   });
-  it('R35 : tests cachés cumulés affichés, jamais bloquants ; juge absent : rouge sur les autres critères du juge', () => {
-    expect(crit(seq((r) => { r.jugement!.meca.C.caches_passes = 11; }), 'tests cachés cumulés')).toMatchObject({ valeur: '11 contre 10', ok: true, bloquant: false });
-    expect(crit(seq((r) => { r.jugement!.meca.C.caches_passes = 9; }), 'tests cachés cumulés')).toMatchObject({ ok: false, bloquant: false });
-    expect(v(seq((r) => { r.jugement!.meca.C.caches_passes = 9; })).vert).toBe(true);
-    expect(v(seq((r) => { r.sorties_attendues = 1; for (const b of ['A', 'C']) r.jugement!.meca[b].sorties = [{ k: 1, sortie: 's', verdict: 'oui', preuve: 'p' }]; r.jugement!.meca.C.caches_passes = 0; })).vert).toBe(true);
-    const sans = seq((r) => { r.jugement = null; });
-    expect(rouges(sans)).toEqual(expect.arrayContaining(['juge final fait', 'suite du candidat au juge final', 'attendu au juge final']));
+  it('R37 : tests cachés cumulés bloquants pour une séquence SANS sorties (ancien comportement), informatifs AVEC sorties (R35)', () => {
+    const avecSo = (f: (r: ResultatSequence) => void) => seq((r) => { r.sorties_attendues = 1; for (const b of ['A', 'C']) r.jugement!.meca[b].sorties = [{ i: 1, k: 1, sortie: 's', verdict: 'oui', preuve: 'p' }]; f(r); });
+    expect(crit(seq((r) => { r.jugement!.meca.C.caches_passes = 11; }), 'tests cachés cumulés')).toMatchObject({ valeur: '11 contre 10', ok: true, bloquant: true });
+    expect(rouges(seq((r) => { r.jugement!.meca.C.caches_passes = 9; }))).toEqual(['tests cachés cumulés']);
+    expect(rouges(seq((r) => { r.jugement = null; }))).toContain('tests cachés cumulés'); // juge absent : jamais vert
+    expect(crit(avecSo((r) => { r.jugement!.meca.C.caches_passes = 9; }), 'tests cachés cumulés')).toMatchObject({ ok: false, bloquant: false });
+    expect(v(avecSo((r) => { r.jugement!.meca.C.caches_passes = 0; })).vert).toBe(true);
+    const sans = avecSo((r) => { r.jugement = null; });
+    expect(rouges(sans)).toEqual(expect.arrayContaining(['juge final fait', 'suite du candidat au juge final', 'attendu au juge final', 'sorties attendues vérifiées']));
     expect(rouges(sans)).not.toContain('tests cachés cumulés');
   });
   it('R35 : sorties attendues vérifiées (oui du candidat ≥ oui de la référence), seulement si la séquence en déclare', () => {
     const nom = 'sorties attendues vérifiées';
-    const so = (...vs: string[]) => vs.map((verdict, i) => ({ k: i + 1, sortie: `s${i + 1}`, verdict: verdict as 'oui', preuve: 'p' }));
+    const so = (...vs: string[]) => vs.map((verdict, i) => ({ i: i + 1, k: i + 1, sortie: `s${i + 1}`, verdict: verdict as 'oui', preuve: 'p' }));
     const avec = (a: string[], c: string[]) => seq((r) => { r.sorties_attendues = a.length; r.jugement!.meca.A.sorties = so(...a); r.jugement!.meca.C.sorties = so(...c); });
     expect(crit(seq(), nom)).toBeUndefined(); // séquence sans sorties : inchangé
     expect(crit(avec(['oui', 'non'], ['oui', 'oui']), nom)).toMatchObject({ valeur: '2/2 contre 1/2', ok: true, bloquant: true });
-    expect(crit(avec(['oui', 'oui'], ['oui', 'incertain']), nom)).toMatchObject({ valeur: '1/2 contre 2/2', ok: false });
+    expect(crit(avec(['oui', 'oui'], ['oui', 'non']), nom)).toMatchObject({ valeur: '1/2 contre 2/2', ok: false });
+    // B2 (R38) : un « incertain » chez l'un OU l'autre bras = non mesuré, rouge, sorties nommées
+    expect(crit(avec(['oui', 'oui'], ['oui', 'incertain']), nom)).toMatchObject({ valeur: 'non mesuré : C étape 2 : s2', ok: false, bloquant: true });
+    expect(crit(avec(['incertain', 'oui'], ['oui', 'oui']), nom)).toMatchObject({ valeur: 'non mesuré : A étape 1 : s1', ok: false });
+    expect(crit(avec(['incertain', 'oui'], ['incertain', 'oui']), nom)).toMatchObject({ valeur: 'non mesuré : A étape 1 : s1 ; C étape 1 : s1', ok: false });
     expect(rouges(avec(['non', 'non'], ['non', 'non']))).toEqual([]);
     expect(crit(seq((r) => { r.sorties_attendues = 2; }), nom)).toMatchObject({ ok: false }); // juge sans sorties : échec fermé
     expect(crit(seq((r) => { r.sorties_attendues = 2; r.jugement = null; }), nom)).toMatchObject({ valeur: '– contre –', ok: false });
@@ -126,8 +132,10 @@ describe('verdictSequence : un critère par ligne, vert puis rouge', () => {
     expect(rouges(seq((r) => { r.etapes.C[1].fuites_a_verifier = ['/x']; }))).toEqual([]);
     expect(rouges(seq((r) => { r.etapes.A[1].mesure.echec = 'aucun commit'; }))).toEqual(['aucun bras en échec']);
   });
-  it('tous les critères sont bloquants, sauf les tests cachés cumulés (R35)', () =>
-    expect(v(seq()).criteres.filter((c) => !c.bloquant).map((c) => c.nom)).toEqual(['tests cachés cumulés']));
+  it('tous les critères sont bloquants ; avec des sorties attendues, sauf les tests cachés cumulés (R35, R37)', () => {
+    expect(v(seq()).criteres.filter((c) => !c.bloquant)).toEqual([]);
+    expect(v(seq((r) => { r.sorties_attendues = 1; })).criteres.filter((c) => !c.bloquant).map((c) => c.nom)).toEqual(['tests cachés cumulés']);
+  });
 });
 
 describe('rapport, historique et publication de la séquence', () => {
@@ -154,9 +162,12 @@ describe('rapport, historique et publication de la séquence', () => {
     const nul = seq((x) => { x.etapes.C[1] = etape(2, { regressions: undefined, suite_en_erreur: 'boom', maintenabilite: maint(null, 1) }); });
     expect(rapportSequence(nul, 'A', 'C', v(nul), { date: 'd', empreinte: 'e' })).toContain('| 2 | 0/0 · ERREUR |');
     expect(md).not.toContain('## Sorties attendues');
-    const so = seq((x) => { x.sorties_attendues = 2; x.jugement!.meca.A.sorties = [{ k: 1, sortie: 'légende D/A', verdict: 'oui', preuve: 'p' }, { k: 2, sortie: 'cartouche', verdict: 'incertain', preuve: 'app non lancée' }];
-      x.jugement!.meca.C.sorties = [{ k: 1, sortie: 'légende D/A', verdict: 'non', preuve: 'captures-X/l.png : L/H' }, { k: 2, sortie: 'cartouche', verdict: 'oui', preuve: 'p' }]; });
-    expect(rapportSequence(so, 'A', 'C', v(so), { date: 'd', empreinte: 'e' })).toContain('## Sorties attendues non vérifiées (non, incertain)\n\n- A étape 2 : incertain — cartouche (app non lancée)\n- C étape 1 : non — légende D/A (captures-X/l.png : L/H)');
+    const so = seq((x) => { x.sorties_attendues = 2; x.jugement!.meca.A.sorties = [{ i: 1, k: 1, sortie: 'légende D/A', verdict: 'oui', preuve: 'p' }, { i: 2, k: 2, sortie: 'cartouche', verdict: 'incertain', preuve: 'app non lancée' }];
+      x.jugement!.meca.C.sorties = [{ i: 1, k: 1, sortie: 'légende D/A', verdict: 'non', preuve: 'captures-X/l.png : L/H' }, { i: 2, k: 2, sortie: 'cartouche', verdict: 'oui', preuve: 'p' }]; x.jugement!.meca.C.caches_passes = 0; });
+    const mso = rapportSequence(so, 'A', 'C', v(so), { date: 'd', empreinte: 'e' });
+    expect(mso).toContain('## Sorties attendues non vérifiées (non, incertain)\n\n- A étape 2 : incertain — cartouche (app non lancée)\n- C étape 1 : non — légende D/A (captures-X/l.png : L/H)');
+    expect(mso).toContain('| tests cachés cumulés | 0 contre 10 | ≥ A | en dessous (indicatif) |'); // m1 : non bloquant, jamais « ROUGE »
+    expect(mso).toContain('| sorties attendues vérifiées | non mesuré : A étape 2 : cartouche | ≥ A | **ROUGE** |');
   });
   it('ligne d\'historique type sequence, avec candidat, référence, modèle et empreinte', () => {
     const h = JSON.parse(ligneSequence(v(seq()), { date: 'd', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', sequence: 'aether-b68', run: 'r1', repetition: 2 }));

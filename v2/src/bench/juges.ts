@@ -4,8 +4,9 @@ import { join } from 'node:path';
 import { lireDemande, type Banc } from './banc.js';
 import { environnementNeutre, OUTILS_INTERDITS, type Executeur } from './bras.js';
 
+/** R35 : sortie attendue cachée d'une séquence (étape k), jugée sur l'application de l'état final. */ export interface Sortie { k: number; sortie: string }
 export interface Meca { suite_ok: boolean; caches_passes: number; caches_total: number; mutations_tuees: number; mutations_total: number;
-  attendu: 'oui' | 'en partie' | 'non'; mutations: { ou: string; quoi: string; tuee: boolean }[] }
+  attendu: 'oui' | 'en partie' | 'non'; mutations: { ou: string; quoi: string; tuee: boolean }[]; sorties?: (Sortie & { verdict: 'oui' | 'non' | 'incertain'; preuve: string })[] }
 export interface Defauts { bloquants: number; majeurs: number; mineurs: number }
 /** `remplaces` (R28, R30) : tests cachés remplacés par une demande ultérieure, une liste UNIQUE décidée avant X et Y, non comptée pour les deux. */
 export interface Jugement { meca: Record<string, Meca>; remplaces?: string[]; defauts: Record<string, Defauts>; prefere: string; ui: string; raisons: string }
@@ -25,10 +26,8 @@ export function travailNonLivre(avant: { head: string; sale: string[] }, apres: 
 }
 
 export const anonymiser = (bras: [string, string], tirage: () => number): Record<'X' | 'Y', string> => (tirage() < 0.5 ? { X: bras[0], Y: bras[1] } : { X: bras[1], Y: bras[0] });
-
 const entier = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
-
-export function validerMeca(o: unknown): string[] {
+export function validerMeca(o: unknown, attendues: Sortie[] = []): string[] {
   const e: string[] = [];
   for (const k of ['X', 'Y'] as const) {
     const m = (o as Record<string, Meca> | null)?.[k];
@@ -38,6 +37,12 @@ export function validerMeca(o: unknown): string[] {
     if (m.mutations_tuees > m.mutations_total) e.push(`${k}.mutations_tuees > mutations_total`);
     if (typeof m.suite_ok !== 'boolean') e.push(`${k}.suite_ok n'est pas un booléen`);
     if (!['oui', 'en partie', 'non'].includes(m.attendu)) e.push(`${k}.attendu doit valoir oui, en partie ou non`);
+    if (attendues.length && (!Array.isArray(m.sorties) || m.sorties.length !== attendues.length)) e.push(`${k}.sorties : ${attendues.length} entrées attendues, dans l'ordre des sorties déclarées`);
+    else for (const [i, x] of (attendues.length ? m.sorties! : []).entries()) {
+      if (x?.k !== attendues[i].k || x.sortie !== attendues[i].sortie) e.push(`${k}.sorties[${i}] ne reprend pas l'étape et le texte de la sortie déclarée`);
+      else if (!['oui', 'non', 'incertain'].includes(x.verdict)) e.push(`${k}.sorties[${i}].verdict doit valoir oui, non ou incertain`);
+      else if (typeof x.preuve !== 'string' || !x.preuve.trim()) e.push(`${k}.sorties[${i}].preuve vide`);
+    }
   }
   const r = (o as { remplaces?: unknown } | null)?.remplaces;
   if (!Array.isArray(r) || r.some((t) => typeof t !== 'string')) e.push('remplaces n\'est pas une liste de textes');
@@ -84,8 +89,8 @@ function demander(brief: string, sortie: string, valider: (o: unknown) => string
   return null;
 }
 
-/** `demandes` : liste des demandes d'une séquence (champ {{DEMANDES}} des briefs), vide pour un banc. */
-export function juger(b: Banc, clones: Record<string, string>, dirEval: string, modele: string, exec: Executeur, tirage = Math.random, demandes = ''): Jugement | null {
+/** `demandes` : liste des demandes d'une séquence (champ {{DEMANDES}} des briefs), vide pour un banc ; `sorties` : sorties attendues cachées (R35), vide pour un banc. */
+export function juger(b: Banc, clones: Record<string, string>, dirEval: string, modele: string, exec: Executeur, tirage = Math.random, demandes = '', sorties: Sortie[] = []): Jugement | null {
   const noms = Object.keys(clones) as [string, string];
   const anon = anonymiser(noms, tirage);
   rmSync(dirEval, { recursive: true, force: true }); mkdirSync(dirEval, { recursive: true });
@@ -103,9 +108,9 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
   };
   try {
     if (!copier()) return null;
-    const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests, DEMANDES: demandes };
-    const sMeca = join(dirEval, 'meca.json');
-    const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca }), sMeca, validerMeca, dirEval, modele, exec) as (Record<'X' | 'Y', Meca> & { remplaces: string[] }) | null;
+    const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests, DEMANDES: demandes }, sMeca = join(dirEval, 'meca.json');
+    const so = sorties.length ? '\n' + remplir('juge-sorties.md', { ...v, LISTE: sorties.map((x) => `- étape ${x.k} : ${x.sortie}`).join('\n') }).trimEnd() : '';
+    const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca, SORTIES: so }), sMeca, (x) => validerMeca(x, sorties), dirEval, modele, exec) as (Record<'X' | 'Y', Meca> & { remplaces: string[] }) | null;
     if (!copier()) return null; // le juge à l'aveugle voit les livrables, pas les mutations
     const ecran = b.visible
       ? `Lance l'app de chaque copie, l'une après l'autre, comme le dit ${v.MESURE} (section Écran). Fais des captures à 1440 et à 390 px dans ${dirEval}/captures-X et captures-Y, et regarde-les. ui = la copie dont l'écran est le plus cohérent avec le reste de l'application.`

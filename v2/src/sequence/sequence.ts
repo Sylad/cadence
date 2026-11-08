@@ -2,6 +2,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { BancInvalide } from '../bench/banc.js';
+import type { Sortie } from '../bench/juges.js';
 
 export type TailleEtape = 'retouche' | 'fonction';
 /** `references_depot` : documents présents dans le clone (relatifs au dépôt), à lire comme les pièces. */
@@ -9,7 +10,7 @@ export interface Etape { k: number; lot: string; demande: string; pieces: string
 export interface Cache { fichiers: string[]; commande: string }
 export interface Sequence { id: string; dir: string; secrets: string; projet: string; source: string; base: string;
   install: string; tests: string; visible: boolean; suite_projet: { vitest_json: string; build: string; portee: string }; etapes: Etape[]; caches: Record<number, Cache>;
-  regression: { a_partir_de: number; fichiers: string[]; commande: string } }
+  regression: { a_partir_de: number; fichiers: string[]; commande: string }; /** R35 : sorties attendues cachées, dans l'ordre des étapes ([] : aucune). */ sorties: Sortie[] }
 
 const TAILLES: TailleEtape[] = ['retouche', 'fonction'];
 const REQUIS = ['projet', 'source', 'base', 'install', 'tests'] as const;
@@ -80,6 +81,10 @@ export function chargerSequence(racine: string, id: string): Sequence {
   const a = (r as Obj).a_partir_de;
   if (!Number.isInteger(a) || (a as number) < 1 || (a as number) > etapes.length) ko(`regression : « a_partir_de » doit être entre 1 et ${etapes.length}`);
   const reg = fichiers('regression', (r as Obj).fichiers, (r as Obj).commande);
+  const so = (s.sorties ?? {}) as Record<string, unknown>;
+  if (typeof so !== 'object' || Array.isArray(so)) ko('« sorties » doit associer une étape à une liste de sorties');
+  for (const k of Object.keys(so)) if (!etapes.some((e) => String(e.k) === k)) ko(`sorties : clé « ${k} » hors des étapes 1..${etapes.length}`);
+  const sorties = etapes.flatMap((e) => (so[e.k] === undefined ? [] : liste(so[e.k])?.length ? liste(so[e.k])! : ko(`sorties ${e.k} : liste de textes non vides attendue`)).map((sortie) => ({ k: e.k, sortie })));
   return { id, dir, secrets, projet: y.projet as string, source: y.source as string, base: y.base as string,
-    install: y.install as string, tests: y.tests as string, visible: y.visible === true, suite_projet: { vitest_json: sp.vitest_json as string, build: sp.build as string, portee }, etapes, caches, regression: { a_partir_de: a as number, ...reg } };
+    install: y.install as string, tests: y.tests as string, visible: y.visible === true, suite_projet: { vitest_json: sp.vitest_json as string, build: sp.build as string, portee }, etapes, caches, regression: { a_partir_de: a as number, ...reg }, sorties };
 }

@@ -28,11 +28,7 @@ const tailleDeclaree = (c: string, base: string): string | undefined => {
 };
 
 const plusRecent = (dir: string, t: number): string | null => {
-  for (const f of readdirSync(dir, { withFileTypes: true })) {
-    const p = join(dir, f.name);
-    const r = f.isDirectory() ? plusRecent(p, t) : statSync(p).mtimeMs > t ? p : null;
-    if (r) return r;
-  }
+  for (const f of readdirSync(dir, { withFileTypes: true })) { const p = join(dir, f.name), r = f.isDirectory() ? plusRecent(p, t) : statSync(p).mtimeMs > t ? p : null; if (r) return r; }
   return null;
 };
 
@@ -51,7 +47,6 @@ export function pretAPasser(repo: string, bras: Record<string, DefBras>, racine 
 }
 
 const vivant = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM'; } };
-
 const bootId = (): string => { try { return readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(); } catch { return ''; } };
 
 /** Un seul passage à la fois par racine : verrou à création exclusive, repris si son pid est mort. */

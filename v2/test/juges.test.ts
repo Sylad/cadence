@@ -55,6 +55,31 @@ describe('juges', () => {
     expect(validerAveugle(aveugle)).toEqual([]);
     expect(validerAveugle({ ...aveugle, prefere: 'Z' })).toEqual(['prefere doit valoir X, Y ou egal']);
   });
+  it('R35 : sorties attendues — une entrée par sortie déclarée, dans l\'ordre, verdict oui/non/incertain, preuve non vide ; ignorées sans sortie déclarée', () => {
+    const at = [{ k: 1, sortie: 'a' }, { k: 2, sortie: 'b' }];
+    const so = [{ k: 1, sortie: 'a', verdict: 'oui', preuve: 'capture X-1.png' }, { k: 2, sortie: 'b', verdict: 'incertain', preuve: 'curl /api : 500' }];
+    const avec = (x: unknown, y: unknown = so) => validerMeca({ X: { ...meca, sorties: x }, Y: { ...meca, sorties: y }, remplaces: [] }, at);
+    expect(avec(so)).toEqual([]);
+    expect(validerMeca({ X: meca, Y: meca, remplaces: [] })).toEqual([]); // banc ou séquence sans sorties : inchangé
+    expect(avec(undefined)).toEqual(['X.sorties : 2 entrées attendues, dans l\'ordre des sorties déclarées']);
+    expect(avec(so.slice(0, 1))).toEqual(['X.sorties : 2 entrées attendues, dans l\'ordre des sorties déclarées']);
+    expect(avec([so[1], so[0]])).toEqual(['X.sorties[0] ne reprend pas l\'étape et le texte de la sortie déclarée', 'X.sorties[1] ne reprend pas l\'étape et le texte de la sortie déclarée']);
+    expect(avec(so, [{ ...so[0], verdict: 'peut-être' }, { ...so[1], preuve: ' ' }])).toEqual(['Y.sorties[0].verdict doit valoir oui, non ou incertain', 'Y.sorties[1].preuve vide']);
+  });
+  it('R35 : le juge mécanique reçoit les sorties attendues (toutes étapes, avec leur k) et la façon de les vérifier ; sans sortie, rien', () => {
+    const { b, clones, dirEval } = decor();
+    const at = [{ k: 1, sortie: 'légende en D/A' }];
+    const so = [{ k: 1, sortie: 'légende en D/A', verdict: 'non', preuve: 'capture captures-X/legende.png : L/H' }];
+    const vus: string[][] = [];
+    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: { ...meca, sorties: so }, Y: { ...meca, sorties: so }, remplaces: [] }, aveugle], vus), () => 0.2, '', at);
+    expect(j!.meca.A.sorties).toEqual(so);
+    const p = vus[0][vus[0].indexOf('-p') + 1];
+    for (const t of ['étape 1 : légende en D/A', 'application réelle', 'état final', '"sorties"']) expect(p).toContain(t);
+    expect(p).not.toContain('{{');
+    const sans: string[][] = [];
+    juger(b, clones, dirEval, 'opus', fauxJuge([{ X: meca, Y: meca, remplaces: [] }, aveugle], sans), () => 0.2);
+    expect(sans[0][sans[0].indexOf('-p') + 1]).not.toMatch(/application réelle|\{\{/);
+  });
   it('désanonymise le jugement (X = A, Y = cand), garde-fous prod sur les sessions', () => {
     const { b, clones, dirEval } = decor();
     const vus: string[][] = [];

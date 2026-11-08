@@ -99,6 +99,18 @@ describe('séquence', () => {
     refus(SEQ.replace('<sortie>/r.json', 'r.json'), /suite_projet/);
     refus(SEQ.replace(', build: npm run build', ''), /suite_projet/);
   });
+  it('R35 : sorties attendues facultatives, par étape, dans les secrets ; aplaties dans l\'ordre des étapes', () => {
+    expect(chargerSequence(racine(), 's1').sorties).toEqual([]);
+    const s = chargerSequence(racine(SEQ, `${SEC}sorties:\n  2: [légende du globe en D/A quand D/A est choisi, "réponse /api/x : champ y"]\n  1: [cartouche à 3 h]\n`), 's1');
+    expect(s.sorties).toEqual([{ k: 1, sortie: 'cartouche à 3 h' }, { k: 2, sortie: 'légende du globe en D/A quand D/A est choisi' }, { k: 2, sortie: 'réponse /api/x : champ y' }]);
+  });
+  it('R35 : refuse des sorties mal formées (étape inconnue, liste vide, texte vide, pas une liste)', () => {
+    refus(SEQ, /sorties.*clé « 3 »/, `${SEC}sorties:\n  3: [a]\n`);
+    refus(SEQ, /sorties 1/, `${SEC}sorties:\n  1: []\n`);
+    refus(SEQ, /sorties 1/, `${SEC}sorties:\n  1: ["a", ""]\n`);
+    refus(SEQ, /sorties 2/, `${SEC}sorties:\n  2: a\n`);
+    refus(SEQ, /sorties/, `${SEC}sorties: [a]\n`);
+  });
   it('refuse une régression mal définie', () => {
     refus(SEQ, /regression/, SEC.replace(/regression:[\s\S]*/, ''));
     refus(SEQ, /a_partir_de/, SEC.replace('a_partir_de: 2', 'a_partir_de: 9'));

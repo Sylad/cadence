@@ -27,7 +27,7 @@ export interface MesureEtape {
 /** Étape 0 : la pente de maintenabilité se mesure depuis ici. */
 export interface Base { suite: { passes: number; total: number }; build_ok: boolean; maintenabilite: ReturnType<typeof maintenabilite> }
 export interface ResultatSequence { run: string; sequence: string; clones: Record<string, string>; base: Record<string, Base>; etapes: Record<string, MesureEtape[]>; jugement: Jugement | null;
-  /** R36 : réglages utilisateur changés depuis le début du passage, recontrôlés avant les juges. */ reglages_utilisateur?: string[] }
+  /** R36 : réglages utilisateur changés depuis le début du passage, recontrôlés avant les juges. R35 : nombre de sorties attendues déclarées. */ reglages_utilisateur?: string[]; sorties_attendues?: number }
 type Opt = { racine: string; id: string; ref: string; cand: string; juge: string; exec: Executeur; maintenant: Date; empreinte: string; home: string; out: (l: string) => void;
   repetition?: number; repetitions?: number; prep?: typeof preparer; pret?: (b: Record<string, DefBras>) => string | null; jscpd?: string[]; delaiMs?: number; garderClones?: boolean; tirage?: () => number };
 interface Ctx { o: Opt; s: Sequence; bras: Record<string, DefBras>; run: string; dir: string; debut: string; delai: number;
@@ -38,11 +38,7 @@ const TITRE = /\b(?:it|test)(\.\w+)?\s*\(\s*(['"`])(.*?)\2/;
 
 export function ecart(avant: Statuts, apres: Statuts): Ecart & { nouveaux: string[] } {
   const verts = Object.keys(avant).filter((k) => avant[k]);
-  return {
-    rouges: verts.filter((k) => apres[k] === false),
-    disparus: verts.filter((k) => !(k in apres)),
-    nouveaux: Object.keys(apres).filter((k) => !(k in avant)),
-  };
+  return { rouges: verts.filter((k) => apres[k] === false), disparus: verts.filter((k) => !(k in apres)), nouveaux: Object.keys(apres).filter((k) => !(k in avant)) };
 }
 
 /** Diff de `avant` à la copie de travail, fichiers *.spec.* et *.test.* : fichiers supprimés, titres retirés, `.skip`/`.only` ajoutés. */
@@ -76,10 +72,8 @@ function bancEtape(s: Sequence, e: Etape, base: string): Banc {
     visible: s.visible, taille: e.taille, frais: false, reponses: existsSync(join(dir, 'reponses.md')) };
 }
 
-const mesureVide = (bras: string, banc: string, echec: string): Mesure => {
-  const t = new Date().toISOString();
-  return { bras, banc, debut: t, fin: t, duree_s: 0, tokens: 0, cout_usd: 0, questions: 0, questions_texte: [], sessions: [], echec };
-};
+const mesureVide = (bras: string, banc: string, echec: string, t = new Date().toISOString()): Mesure =>
+  ({ bras, banc, debut: t, fin: t, duree_s: 0, tokens: 0, cout_usd: 0, questions: 0, questions_texte: [], sessions: [], echec });
 
 /** Passage d'une séquence : un clone par bras gardé d'une étape à l'autre, une session neuve par étape, mesures par étape, juges sur l'état final. */
 export function passageSequence(o: Opt): ResultatSequence {
@@ -269,9 +263,9 @@ function passer(o: Opt, bras: Record<string, DefBras>, s: Sequence): ResultatSeq
     signaler(x, s.etapes.length, 'juges', s.etapes.length);
     const reglages_utilisateur = reglagesChanges(x);
     const dernier = bancEtape(s, s.etapes[s.etapes.length - 1], heads[noms[0]]);
-    const jugement = juger(dernier, x.clones, join(o.racine, 'eval', run, s.id, sous), o.juge, o.exec, tirage, demandesDuJuge(s));
+    const jugement = juger(dernier, x.clones, join(o.racine, 'eval', run, s.id, sous), o.juge, o.exec, tirage, demandesDuJuge(s), s.sorties);
     const clones = Object.fromEntries(noms.map((b) => [nomClone(x, b), b]));
-    const res: ResultatSequence = { run, sequence: s.id, clones, base, etapes, jugement, reglages_utilisateur };
+    const res: ResultatSequence = { run, sequence: s.id, clones, base, etapes, jugement, reglages_utilisateur, sorties_attendues: s.sorties.length };
     writeFileSync(join(dir, 'resultat.json'), JSON.stringify(res, null, 2));
     return res;
   } finally {

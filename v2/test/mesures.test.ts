@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFil
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CloneModifie, TestsIntrouvables, jouerTests, lectureReferences, maintenabilite, regressions } from '../src/sequence/mesures.js';
+import { CloneModifie, TestsIntrouvables, jouerTests, lectureReferences, maintenabilite } from '../src/sequence/mesures.js';
 
 const g = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' });
 function depot(): string {
@@ -124,17 +124,6 @@ describe('jouerTests, échec fermé et restauration', () => {
     const d = depot();
     jouerTests(d, [{ src: cache(d), dest: 'nouveau/profond/a.spec.ts' }], faux(), 20_000);
     expect(existsSync(join(d, 'nouveau'))).toBe(false);
-  });
-});
-
-describe('regressions', () => {
-  it('ne compte que passé avant puis rouge après (rouge déjà avant ignoré, nouveau test rouge ignoré)', () => {
-    const avant = { a: true, b: false, c: true, d: true };
-    const apres = { a: false, b: false, c: true, e: false, d: true };
-    expect(regressions(avant, apres)).toEqual(['a']);
-  });
-  it('un vert d\'avant absent d\'après est une régression (échec fermé)', () => {
-    expect(regressions({ a: true, b: false }, { })).toEqual(['a']);
   });
 });
 

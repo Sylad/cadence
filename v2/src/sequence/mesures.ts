@@ -112,10 +112,6 @@ function lire(json: Vitest, copies: { id: string; copie: string }[], clone: stri
   return { passes: ids.filter((i) => statuts[i]).length, total: ids.length, echoues: ids.filter((i) => !statuts[i]), statuts, ignores, fichiers_en_erreur: en_erreur };
 }
 
-/** Tests passés avant et rouges maintenant. Un rouge d'avant n'en est pas un ; un vert d'avant ABSENT d'après en est un (échec fermé). */
-export const regressions = (avant: Record<string, boolean>, apres: Record<string, boolean>): string[] =>
-  Object.keys(avant).filter((k) => avant[k] === true && apres[k] !== true);
-
 // Limites connues : une écriture par Bash (sed -i, tee, redirection) n'est pas vue. Les lectures et écritures des sous-agents (sidechain)
 // COMPTENT : le bras a délégué, la lecture a eu lieu.
 const ECRITURES = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];

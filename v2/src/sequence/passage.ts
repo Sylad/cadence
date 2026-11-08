@@ -14,7 +14,7 @@ import { chargerSequence, type Etape, type Sequence } from './sequence.js';
 type Statuts = Record<string, boolean>;
 /** Tests verts à l'étape d'avant : rouges maintenant, ou disparus (absents, ignorés, supprimés). */
 export interface Ecart { rouges: string[]; disparus: string[] }
-/** Ce que le diff de l'étape a retiré aux tests, en ids « fichier > titre » pour rapprocher chaque disparu de sa cause. */
+/** Ce que le diff de l'étape a retiré aux tests, en ids « fichier > titre » (titre seul, sans les describe) : ils ne se joignent PAS aux ids de la suite, le rapport les montre à part. */
 export interface Affaiblis { fichiers_supprimes: string[]; tests_retires: string[]; skip_only: string[] }
 export interface MesureEtape {
   k: number; portee_suite: string; mesure: Mesure; fuites: string[]; fuites_a_verifier: string[];

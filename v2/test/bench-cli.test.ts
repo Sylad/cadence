@@ -9,7 +9,7 @@ import { statut } from '../src/bench/verdict.js';
 import { run } from '../src/cli.js';
 import { creerExecuteur } from '../src/bench/bras.js';
 
-const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuees: 1, mutations_total: 1, attendu: 'oui', mutations: [] };
+const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuees: 1, mutations_total: 1, attendu: 'oui', mutations: [], remplaces: [] };
 function racine(): string {
   const r = mkdtempSync(join(tmpdir(), 'bench-'));
   for (const id of ['1-a', '2-b']) {

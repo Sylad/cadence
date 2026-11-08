@@ -5,7 +5,7 @@ import { BARRE_SPEC, ligneHistorique, rapport, statut, verdict, type ResultatBan
 
 const mes = (bras: string, duree_s: number, questions = 0, echec: string | null = null): Mesure =>
   ({ bras, banc: 'b', debut: '', fin: '', duree_s, tokens: 1000, cout_usd: 1, questions, questions_texte: [], sessions: [], echec });
-const meca = (p: number, t: number): Meca => ({ suite_ok: true, caches_passes: p, caches_total: 10, mutations_tuees: t, mutations_total: 10, attendu: 'oui', mutations: [] });
+const meca = (p: number, t: number): Meca => ({ suite_ok: true, caches_passes: p, caches_total: 10, mutations_tuees: t, mutations_total: 10, attendu: 'oui', mutations: [], remplaces: [] });
 function banc(o: Partial<{ dA: number; dC: number; cA: number; cC: number; mA: number; mC: number; majA: number; majC: number; pref: string; ui: string;
   taille: 'retouche' | 'fonction'; qC: number; reponses: boolean; fuiteC: string[]; fuiteA: string[]; nonJuge: boolean; echecA: string; echecC: string }> = {}): ResultatBanc {
   const j: Jugement = { meca: { A: meca(o.cA ?? 8, o.mA ?? 8), C: meca(o.cC ?? 8, o.mC ?? 8) },

@@ -7,7 +7,7 @@ import type { Banc } from '../src/bench/banc.js';
 import type { Executeur } from '../src/bench/bras.js';
 import { anonymiser, juger, validerAveugle, validerMeca } from '../src/bench/juges.js';
 
-const meca = { suite_ok: true, caches_passes: 2, caches_total: 2, mutations_tuees: 5, mutations_total: 6, attendu: 'oui', mutations: [] };
+const meca = { suite_ok: true, caches_passes: 2, caches_total: 2, mutations_tuees: 5, mutations_total: 6, attendu: 'oui', mutations: [], remplaces: [] };
 const aveugle = { X: { bloquants: 0, majeurs: 1, mineurs: 0 }, Y: { bloquants: 0, majeurs: 0, mineurs: 2 }, prefere: 'Y', ui: 'na', raisons: 'r' };
 
 function decor(): { b: Banc; clones: Record<string, string>; dirEval: string } {
@@ -49,6 +49,9 @@ describe('juges', () => {
     expect(validerMeca({ X: meca, Y: meca })).toEqual([]);
     expect(validerMeca({ X: meca })).toEqual(['Y manquant']);
     expect(validerMeca({ X: { ...meca, caches_passes: 3 }, Y: meca })).toEqual(['X.caches_passes > caches_total']);
+    expect(validerMeca({ X: { ...meca, remplaces: ['a > t'] }, Y: meca })).toEqual([]);
+    expect(validerMeca({ X: { ...meca, remplaces: undefined }, Y: meca })).toEqual(["X.remplaces n'est pas une liste de textes"]);
+    expect(validerMeca({ X: meca, Y: { ...meca, remplaces: [3] } })).toEqual(["Y.remplaces n'est pas une liste de textes"]);
     expect(validerAveugle(aveugle)).toEqual([]);
     expect(validerAveugle({ ...aveugle, prefere: 'Z' })).toEqual(['prefere doit valoir X, Y ou egal']);
   });

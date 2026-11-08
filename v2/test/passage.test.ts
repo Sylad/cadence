@@ -39,7 +39,7 @@ regression: { a_partir_de: 3, fichiers: [reg.ts], commande: vr }\n`);
   return { r, d };
 }
 
-const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuees: 1, mutations_total: 1, attendu: 'oui', mutations: [] };
+const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuees: 1, mutations_total: 1, attendu: 'oui', mutations: [], remplaces: [] };
 let horloge = 0;
 const outil = (name: string, input: object) => JSON.stringify({ type: 'assistant', timestamp: new Date(Date.UTC(2026, 10, 8) + ++horloge * 1000).toISOString(), message: { content: [{ type: 'tool_use', name, input }] } });
 type Geste = (c: string, ecrire: (lignes: string[], sous?: string) => void) => void | 'plante' | 'erreur';

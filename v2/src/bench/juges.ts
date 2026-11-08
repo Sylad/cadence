@@ -5,7 +5,8 @@ import { lireDemande, type Banc } from './banc.js';
 import { environnementNeutre, OUTILS_INTERDITS, type Executeur } from './bras.js';
 
 export interface Meca { suite_ok: boolean; caches_passes: number; caches_total: number; mutations_tuees: number; mutations_total: number;
-  attendu: 'oui' | 'en partie' | 'non'; mutations: { ou: string; quoi: string; tuee: boolean }[] }
+  attendu: 'oui' | 'en partie' | 'non'; mutations: { ou: string; quoi: string; tuee: boolean }[];
+  /** Tests cachés remplacés par une demande ultérieure (R28), non comptés ; vide pour un banc. */ remplaces: string[] }
 export interface Defauts { bloquants: number; majeurs: number; mineurs: number }
 export interface Jugement { meca: Record<string, Meca>; defauts: Record<string, Defauts>; prefere: string; ui: string; raisons: string }
 
@@ -36,6 +37,7 @@ export function validerMeca(o: unknown): string[] {
     if (m.caches_passes > m.caches_total) e.push(`${k}.caches_passes > caches_total`);
     if (m.mutations_tuees > m.mutations_total) e.push(`${k}.mutations_tuees > mutations_total`);
     if (typeof m.suite_ok !== 'boolean') e.push(`${k}.suite_ok n'est pas un booléen`);
+    if (!Array.isArray(m.remplaces) || m.remplaces.some((t) => typeof t !== 'string')) e.push(`${k}.remplaces n'est pas une liste de textes`);
     if (!['oui', 'en partie', 'non'].includes(m.attendu)) e.push(`${k}.attendu doit valoir oui, en partie ou non`);
   }
   return e;

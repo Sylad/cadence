@@ -9,4 +9,5 @@ Pour CHAQUE copie, avec exactement la même méthode pour les deux :
 4. Attendu : oui / en partie / non, au sens de {{MESURE}}.
 
 Écris UNIQUEMENT ce JSON dans {{SORTIE}}, rien d'autre :
-{"X":{"suite_ok":true,"caches_passes":0,"caches_total":0,"mutations_tuees":0,"mutations_total":0,"attendu":"oui","mutations":[{"ou":"fichier:ligne","quoi":"avant → après","tuee":true}]},"Y":{…même forme…}}
+remplaces : les tests cachés marqués « remplacé par l'étape k » (liste vide s'il n'y en a pas).
+{"X":{"suite_ok":true,"caches_passes":0,"caches_total":0,"mutations_tuees":0,"mutations_total":0,"attendu":"oui","mutations":[{"ou":"fichier:ligne","quoi":"avant → après","tuee":true}],"remplaces":[]},"Y":{…même forme…}}

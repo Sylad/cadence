@@ -1,7 +1,7 @@
 // Tests anti-rechute (Task 14) : une règle par cause de l'échec du 07-11 (spec §0), sans IA, en quelques secondes.
 // Chaque règle est une fonction PURE sur le contenu des fichiers (Record chemin -> texte) qui renvoie ses violations.
 // 1. les vrais fichiers donnent [] ; 2. une table de mutations applique chaque régression connue à une copie EN MÉMOIRE
-// des vrais contenus et exige au moins une violation (rien n'est écrit sur disque). Le budget de lignes (C4) vit dans budget.test.ts.
+// des vrais contenus et exige au moins une violation (rien n'est écrit sur disque). Le budget de lignes (C4) vit dans budget.test.ts ; ses plafonds de R29, dans reglesBudget ci-dessous.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -96,8 +96,8 @@ function reglesC3(f: Fichiers): string[] {
     return (t.match(/\b\w*(?:porte|gate|verif|verify|controle|check)\w*\s*\(/gi) ?? []).map((m) => `${k}: ${m}`);
   });
   if (sites.length > MAX_SITES_PORTE) v.push(`C3 : ${sites.length} sites de porte (${sites.join(' ; ')})`);
-  const b = JSON.parse(f['budget.json']) as { modules: Record<string, number> };
-  if (b.modules.porte > 250) v.push(`C3 : budget porte ${b.modules.porte} > 250`);
+  const b = JSON.parse(f['budget.json']) as { noyau: { modules: Record<string, number> } };
+  if (!(b.noyau?.modules?.porte <= 250)) v.push(`C3 : budget porte ${b.noyau?.modules?.porte} > 250`);
   return v;
 }
 
@@ -113,9 +113,24 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/bench/cli.ts': ['porcelain', 'oneline', 'reverse', 'format'], // git status --porcelain, git log --oneline, git log --reverse --format=%s (Taille déclarée)
 };
 const prefixe = (k: string) => (k.startsWith('src/bench/') ? 'bench' : 'cadence2');
+// Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
+const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
+  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 450, porte: 250, deliver: 450 } },
+  mesure: { total: 1500, modules: { bench: 800, sequence: 700 } },
+};
+function reglesBudget(f: Fichiers): string[] {
+  const b = JSON.parse(f['budget.json']) as Record<string, { total: number; modules: Record<string, number> }>;
+  const v: string[] = [];
+  if (Object.keys(b).sort().join(',') !== 'mesure,noyau') v.push(`C4 : groupes de budget ${Object.keys(b).join(', ')} (R29 : noyau, mesure)`);
+  for (const [g, r] of Object.entries(BUDGET_R29)) {
+    if (!(b[g]?.total <= r.total)) v.push(`C4 : total ${g} ${b[g]?.total} > ${r.total}`);
+    for (const [m, n] of Object.entries(b[g]?.modules ?? {})) if (!(n <= (r.modules[m] ?? 0))) v.push(`C4 : budget ${g}.${m} ${n} > ${r.modules[m] ?? 0}`);
+  }
+  return v;
+}
 function reglesC4(f: Fichiers, existe: (chemin: string) => boolean): string[] {
   const opts = (JSON.parse(f['options.json']) as { options: Record<string, string> }).options;
-  const v: string[] = [];
+  const v: string[] = reglesBudget(f);
   const exige = (cle: string) => {
     if (!(cle in opts)) v.push(`C4 : « ${cle} » sans justification dans options.json`);
     else if (!existe(opts[cle])) v.push(`C4 : ${opts[cle]} (pour « ${cle} ») n'existe pas`);
@@ -181,6 +196,12 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C2', "modele: 'sonnet'", 'src/bench/bras.ts', ajout("const d = { modele: 'sonnet' };")],
   ['C3', 'trois portes', 'src/bench/banc.ts', ajout('porte(1);\ngate(2);\nverifyAll(3);')],
   ['C3', 'budget porte 400', 'budget.json', remplace('"porte": 250', '"porte": 400')],
+  ['C4', 'total mesure relevé', 'budget.json', remplace('"total": 1500', '"total": 2000')],
+  ['C4', 'total noyau relevé', 'budget.json', remplace('"total": 3000', '"total": 3500')],
+  ['C4', 'budget sequence relevé', 'budget.json', remplace('"sequence": 700', '"sequence": 900')],
+  ['C4', 'budget plan relevé sous le total', 'budget.json', remplace('"plan": 350', '"plan": 1000')],
+  ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 800', '"bench": 800, "outil": 100')],
+  ['C4', 'groupe de budget ajouté', 'budget.json', remplace(/\n}\s*$/, ',\n  "autre": { "total": 900, "modules": {} }\n}')],
   ['C4', "option(reste,'zzz') sans entrée", 'src/bench/cli.ts', remplace("option(reste, 'taille')", "option(reste, 'zzz')")],
   ['C4', 'chemin options.json inexistant', 'options.json', remplace('"bench --juge": "docs/v2/2026-11-07-cadence-2-design.md"', '"bench --juge": "docs/v2/mesures/rien.md"')],
   ['C5', 'questions inutiles non bloquant', 'src/bench/verdict.ts', remplace('inutiles === 0)', 'inutiles === 0, false)')],

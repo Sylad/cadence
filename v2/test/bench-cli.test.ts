@@ -328,6 +328,11 @@ describe('travail du bras (I-2)', () => {
     const prepSale = (b: unknown, cible: string) => { const x = prep(b, cible); writeFileSync(join(cible, 'artefact-install'), 'x'); return x; };
     expect(jouer(commit, prepSale).C.echec).toBeNull();
   });
+  it('« Taille : … » du premier commit est relevée dans la mesure ; absente : indéfinie', () => {
+    const avec = (c: string) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'Taille : retouche\n\ncorps'], { cwd: c });
+    expect(jouer(avec).C.taille_declaree).toBe('Taille : retouche');
+    expect(jouer(commit).C.taille_declaree).toBeUndefined();
+  });
 });
 
 describe('nettoyage des clones (I-3)', () => {

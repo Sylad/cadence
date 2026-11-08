@@ -6,7 +6,7 @@ import { lireDemande, type Banc } from './banc.js';
 
 export interface DefBras { nom: string; modele: string; brief: string }
 export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number;
-  tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null }
+  tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string }
 export type Executeur = (args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }) => { stdout: string; code: number; erreur?: string };
 
 export const OUTILS_INTERDITS = ['Bash(kubectl:*)', 'Bash(helm:*)', 'Bash(gh:*)', 'Bash(ssh:*)', 'Bash(scp:*)',

@@ -84,12 +84,28 @@ describe('fuites', () => {
       expect(ver('cat test/fixtures/a.json', `${run}/3-t`).certaines).toEqual([]);
       expect(ver('cat test/fixtures/a.json', `${run}/3-t`).a_verifier).toEqual([`${run}/3-t`, `${run}/3-t/test/fixtures/a.json`]);
     });
-    it('glob dont le préfixe littéral est un ancêtre : à vérifier ; un clone voisin (ou son glob) : certaine', () => {
+    it('glob dont le préfixe est un ancêtre et dont aucun composant ne peut viser un clone voisin : à vérifier ; sinon (doute) certaine', () => {
       const rl = reglesDuBras(H, `${H}/bench-cadence`, '3-t', `${run}/3-t/r1/c1`);
-      expect(chercherFuites([appel({ command: `ls ${run}/3-t/r1/*/node_modules/*` })], rl, H)).toEqual({ certaines: [], a_verifier: [`${run}/3-t/r1`] });
+      expect(chercherFuites([appel({ command: `ls ${run}/3-t/r1/x*/node_modules/*` })], rl, H)).toEqual({ certaines: [], a_verifier: [`${run}/3-t/r1`] });
+      expect(chercherFuites([appel({ command: `ls ${run}/3-t/r1/*/node_modules/*` })], rl, H).certaines).toEqual([`${run}/3-t/r1`]);
+      expect(ver('ls ../../c*', `${cl}/src`).certaines).toEqual([`${run}/3-t`]);
+      expect(ver('ls ../../../*/c1', `${cl}/src`).certaines).toEqual([run]);
+      expect(ver(`ls ${run}/3-t/*`).certaines).toEqual([`${run}/3-t`]);
       expect(ver(`ls ${run}/3-t/c2/src/*.ts`).certaines).toEqual([`${run}/3-t/c2/src`]);
       expect(ver(`ls ${run}/3-t/c2/*`).certaines).toEqual([`${run}/3-t/c2`]);
       expect(ver(`cat ${run}/4-t/c1/a.ts`).certaines).toEqual([`${run}/4-t/c1/a.ts`]);
+    });
+    it('c2.patch, c2.commits.txt, c2.captures, c2.question.md : certaines ; ses propres .captures, .question.md, logs : permis', () => {
+      for (const f of ['c2.patch', 'c2.commits.txt', 'c2.captures', 'c2.question.md']) expect(ver(`cat ${run}/3-t/${f}`).certaines).toEqual([`${run}/3-t/${f}`]);
+      expect(ver(`cat ${cl}.captures/a.png ${cl}.question.md ${cl}.install.log ${cl}.tests-base.log`)).toEqual({ certaines: [], a_verifier: [] });
+    });
+    it('eval et rapports : certaines', () => {
+      expect(ver(`cat ${H}/bench-cadence/eval/x/y ${H}/bench-cadence/rapports/z.md`).certaines).toEqual([`${H}/bench-cadence/eval/x/y`, `${H}/bench-cadence/rapports/z.md`]);
+    });
+    it('cd c2 et ls c2 nus depuis le dossier du banc : certaines ; depuis son clone : permis', () => {
+      expect(ver('cd c2', `${run}/3-t`).certaines).toEqual([`${run}/3-t/c2`]);
+      expect(ver('ls c2', `${run}/3-t`).certaines).toEqual([`${run}/3-t/c2`]);
+      expect(ver('ls c2 && cd c2', cl).certaines).toEqual([]);
     });
     it('secrets, transcripts d\'un autre clone : certaines ; son propre clone : rien', () => {
       expect(ver(`cat ${H}/bench-cadence/secrets/3-t/a ${H}/.claude/projects/-x-c2/s.jsonl`).certaines).toHaveLength(2);

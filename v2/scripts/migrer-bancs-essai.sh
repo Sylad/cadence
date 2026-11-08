@@ -22,7 +22,7 @@ ligne() { local id=$1 projet=$2 base=$3 inst=$4 tst=$5 vis=$6 taille=$7
   # texte brut de Sylvain : la partie au-dessus de « --- », sans le titre ni les citations « > »
   python3 -I -c 'import sys,re;t=open(sys.argv[1]).read().split("\n---\n")[0];t=re.sub(r"^# Demande\s*\n","",t).strip();t=re.sub(r"^> ?","",t,flags=re.M);print(re.sub(r"\n{3,}","\n\n",t).strip())' "$E/$id/demande.md" > "$b/demande.md"
   if [ -d "$E/$id/pieces" ]; then rm -rf "$b/pieces"; cp -a "$E/$id/pieces" "$b/pieces"; fi
-  sed -i -e "s#$E/$id/pieces#$b/pieces#g" -E -e "s#(^|[^/A-Za-z0-9_.-])pieces/#\\1$b/pieces/#g" "$b/demande.md"   # références relatives pieces/ -> absolu
+  sed -i -e "s#$E/$id/pieces#$b/pieces#g" -E -e "s#(^|[^A-Za-z0-9_.-])\\./pieces/#\\1pieces/#g" -e "s#(^|[^/A-Za-z0-9_.-])pieces/#\\1$b/pieces/#g" "$b/demande.md"   # références relatives pieces/ -> absolu
   if [ -f "$C/$id/reponses-de-sylvain.md" ]; then cp "$C/$id/reponses-de-sylvain.md" "$b/reponses.md"; fi
   for f in mesure.md attendu.md; do
     sed -e "s#$C/$id/#$s/#g" -e "s#$E/$id/<A|B>#<clone X ou Y>#g" -e "s#<A|B>#<X|Y>#g" "$C/$id/$f" \

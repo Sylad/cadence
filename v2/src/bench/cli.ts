@@ -21,6 +21,11 @@ export function empreinte(repo: string): string {
   } catch { return 'inconnue'; }
 }
 
+/** Premier sujet de commit « Taille … » de base..HEAD (le bras classe sa demande). */
+const tailleDeclaree = (c: string, base: string): string | undefined => {
+  try { return execFileSync('git', ['log', '--reverse', '--format=%s', `${base}..HEAD`], { cwd: c, encoding: 'utf8' }).split('\n').find((l) => l.startsWith('Taille')); } catch { return undefined; }
+};
+
 const plusRecent = (dir: string, t: number): string | null => {
   for (const f of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, f.name);
@@ -113,7 +118,7 @@ function passageVerrouille(o: OptPassage): Verdict & { eclair_ok?: boolean } {
         o.out(`${idBanc} : bras ${n}…`);
         const avant = etatGit(c); bases[n] = avant.head;
         aller(`bras ${n}`); const m = lancerBras(bc, bras[n], c, o.exec);
-        mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)) };
+        mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)), taille_declaree: tailleDeclaree(c, avant.head) };
         aller('fuites'); const fu = fuitesDuBras(o.home, o.racine, bid, c); fuites[n] = fu.certaines; aVerifier[n] = fu.a_verifier;
       });
       if (ordre.some((n) => mesures[n].echec !== null)) o.out(`${idBanc} : un bras en échec, juges sautés`);

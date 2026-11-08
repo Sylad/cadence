@@ -148,6 +148,9 @@ describe('répétitions (R18)', () => {
     const md = rapport(rs, 'A', 'C', v, { date: '2026-11-08', empreinte: 'e1', repetitions: 2 });
     expect(md).toContain('Répétitions : 2'); expect(md).toContain('| 1-a#1 |'); expect(md).toContain('| 1-a#2 |');
     expect(rapport(rs, 'A', 'C', v, { date: 'd', empreinte: 'e' })).toContain('Répétitions : 1');
+    const t = banc(); t.mesures.C.taille_declaree = 'Taille : fonction'; t.fuites_a_verifier = { C: ['/x/runs/r'] };
+    const mt = rapport([t], 'A', 'C', v, { date: 'd', empreinte: 'e' });
+    expect(mt).toContain('Taille déclarée A · C'); expect(mt).toContain('| – · Taille : fonction |'); expect(mt).toContain('## Lectures à vérifier\n\n- b/C : /x/runs/r');
     const ligne = JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a#1', '1-a#2', '3-x#1', '3-x#2', '6-y#1', '6-y#2'], hebdo: true, frais: 0, vert: true, rouges: [] });
     expect(statut([ligne], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(true);
   });
@@ -194,7 +197,7 @@ describe('rapport : suite, attendu et contrôles éclair (M-2, M-3)', () => {
     const b = banc(); b.jugement!.meca.C = { ...b.jugement!.meca.C, suite_ok: false, attendu: 'en partie' };
     const md = rapport([b, banc({ nonJuge: true })], 'A', 'C', verdict([b], 'A', 'C', BARRE_SPEC), { date: 'd', empreinte: 'e' });
     expect(md).toContain('| Suite A · C | Attendu A · C |');
-    expect(md).toMatch(/\| ok · ROUGE \| oui · en partie \|$/m);
+    expect(md).toMatch(/\| ok · ROUGE \| oui · en partie \| – · – \|$/m);
     expect(md).toMatch(/\| – \| – \|$/m);
   });
   it('section « Contrôles éclair » quand le passage en a, absente sinon ; eclair_ok dans l\'historique', () => {

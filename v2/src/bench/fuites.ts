@@ -8,8 +8,8 @@ export const dossierTranscripts = (home: string, cwd: string) => join(home, '.cl
 
 export function reglesDuBras(home: string, racine: string, banc: string, clone: string): Regles {
   return {
-    autorises: [clone, `${clone}.captures`, `${clone}.question.md`, join(racine, 'bancs', banc), dossierTranscripts(home, clone)],
-    certains: [join(racine, 'secrets'), join(racine, 'bancs'), join(home, 'projects'), join(home, '.claude', 'projects')], runs: join(racine, 'runs'),
+    autorises: [clone, `${clone}.captures`, `${clone}.question.md`, `${clone}.install.log`, `${clone}.tests-base.log`, join(racine, 'bancs', banc), dossierTranscripts(home, clone)],
+    certains: [join(racine, 'secrets'), join(racine, 'eval'), join(racine, 'rapports'), join(racine, 'bancs'), join(home, 'projects'), join(home, '.claude', 'projects')], runs: join(racine, 'runs'),
   };
 }
 
@@ -21,6 +21,8 @@ function* textes(v: unknown): Generator<string> {
 
 const sous = (p: string, prefixes: string[]) => prefixes.some((x) => p === x || p.startsWith(`${x}/`));
 
+const globale = (x: string) => { try { return new RegExp(`^${x.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`); } catch { return /./; } };
+
 function accolades(t: string): string[] {
   const m = /^(.*?)\{([^{}$]*,[^{}]*)\}(.*)$/s.exec(t);
   return m ? m[2].split(',').flatMap((x) => accolades(m[1] + x + m[3])) : [t];
@@ -31,17 +33,21 @@ function resoudre(tok: string, cwd: string, home: string, rel: boolean, cd = fal
   const t = tok.replace(/(?<![./])\.+$/, '').replace(/[,:]+$/, '');
   if (/^(~|\$HOME)(\/|$)/.test(t)) return resolve(home, t.replace(/^(~|\$HOME)\/?/, ''));
   if (t.startsWith('/')) return resolve(t);
-  return rel && (cd || t.includes('/') || t === '..') ? resolve(cwd, t) : null;
+  return rel && (cd || t.includes('/') || t === '..' || /^c\d+/.test(t)) ? resolve(cwd, t) : null;
 }
 
 export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = ''): Fuites {
   const vus = { certaines: new Set<string>(), a_verifier: new Set<string>() };
   const juger = (p: string | null) => {
-    const g = p ? p.search(/[*?[]/) : -1; // glob : seul le préfixe littéral compte
-    if (p && g >= 0) p = p.slice(0, p.lastIndexOf('/', g)) || '/';
-    if (!p || sous(p, r.autorises)) return;
-    if (sous(p, r.certains) || p.slice(r.runs.length + 1).split('/').slice(2).some((x) => /^c\d+$/.test(x)) && sous(p, [r.runs])) vus.certaines.add(p);
-    else if (sous(p, [r.runs])) vus.a_verifier.add(p);
+    if (!p) return;
+    const g = p.search(/[*?[]/); // glob : préfixe littéral ; en cas de doute (composant pouvant désigner un clone voisin), certaine
+    const pre = g >= 0 ? p.slice(0, p.lastIndexOf('/', g)) || '/' : p;
+    if (sous(pre, r.autorises)) return;
+    const sousRuns = sous(pre, [r.runs]);
+    const comps = sousRuns ? p.slice(r.runs.length + 1).split('/').slice(2) : [];
+    const premier = comps.findIndex((x) => /[*?[]/.test(x)); // seul le premier composant à glob peut désigner un dossier de clone
+    if (sous(pre, r.certains) || comps.some((x, i) => /^c\d+(\.|$)/.test(x) || (i === premier && globale(x).test('c2'))))  vus.certaines.add(pre);
+    else if (sousRuns) vus.a_verifier.add(pre);
   };
   const depart = cwd || r.autorises[0];
   for (const l of lignes) {
@@ -61,7 +67,7 @@ export function chercherFuites(lignes: string[], r: Regles, home: string, cwd = 
             const cd = rel ? /^\s*cd\s+(\S+)/.exec(v) : null;
             const cible = cd ? resoudre(cd[1].replace(/^['"]|['"]$/g, ''), dir, home, true, true) : null;
             for (const tok of v.split(/[\s'"`|&<>(){}=]+/)) juger(resoudre(tok, dir, home, rel));
-            if (cible) dir = cible;
+            juger(cible); if (cible) dir = cible;
           }
         }
       }

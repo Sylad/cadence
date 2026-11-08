@@ -6,7 +6,7 @@ import { BancInvalide } from '../src/bench/banc.js';
 import { chargerSequence } from '../src/sequence/sequence.js';
 
 const SEQ = `projet: ol-companion
-source: /src/ol
+source: SRC
 base: e91b65c
 install: npm ci
 tests: npm test
@@ -25,6 +25,8 @@ regression:
 
 function racine(seq = SEQ, sec = SEC): string {
   const r = mkdtempSync(join(tmpdir(), 'seq-'));
+  mkdirSync(join(r, 'src'));
+  seq = seq.replace('SRC', join(r, 'src'));
   const d = join(r, 'sequences', 's1');
   const s = join(r, 'secrets', 'sequences', 's1');
   mkdirSync(join(d, 'docs'), { recursive: true });
@@ -60,8 +62,27 @@ describe('séquence', () => {
   it('refuse une demande absente', () => refus(SEQ.replace('etape-2.md', 'zz.md'), /demande.*zz\.md/));
   it('refuse une séquence sans étapes', () => refus(SEQ.replace(/etapes:[\s\S]*/, 'etapes: []\n'), /etapes/));
   it('refuse un test caché absent ou une étape sans cache', () => {
-    refus(SEQ, /cache.*e1\.test\.ts/, SEC.replace('e1.test.ts', 'manque.ts').replace('manque.ts', 'e1.test.ts').replace('[e1.test.ts]', '[absent.ts]').replace('absent.ts', 'e1.test.ts.absent'));
+    refus(SEQ, /caché.*absent\.ts/, SEC.replace('[e1.test.ts]', '[absent.ts]'));
     refus(SEQ, /caches.*2/, SEC.replace(/  2: .*\n/, ''));
+  });
+  it('refuse des fichiers cachés vides, une clé de cache en trop', () => {
+    refus(SEQ, /vide/, SEC.replace('[e1.test.ts]', '[]'));
+    refus(SEQ, /clé « 3 »/, SEC.replace('regression:', '  3: { fichiers: [e1.test.ts], commande: x }\nregression:'));
+  });
+  it('refuse un chemin caché hors du dossier des secrets', () => {
+    refus(SEQ, /sort du dossier des secrets/, SEC.replace('[e1.test.ts]', '[../autre.ts]'));
+    refus(SEQ, /sort du dossier des secrets/, SEC.replace('[reg.test.ts]', '[/etc/hostname]'));
+  });
+  it('refuse un chemin public hors du dossier de la séquence', () => {
+    refus(SEQ.replace('etape-1.md', '../etape-1.md'), /demande.*sort du dossier/);
+    refus(SEQ.replace('docs/spec.pdf', '/etc/hostname'), /pièce.*sort du dossier/);
+    refus(SEQ.replace('docs/spec.pdf', '../../../secrets/sequences/s1/e1.test.ts'), /pièce.*sort du dossier/);
+  });
+  it('refuse une source absente, un yaml absent ou invalide', () => {
+    refus(SEQ.replace('SRC', '/nope/xx'), /source/);
+    refus('a: [', /YAML invalide.*sequence\.yaml/);
+    refus(SEQ, /YAML invalide.*sequence-secrets\.yaml/, 'a: [');
+    expect(() => chargerSequence(racine(), 'zz')).toThrow(/sequence\.yaml absent/);
   });
   it('refuse une régression mal définie', () => {
     refus(SEQ, /regression/, SEC.replace(/regression:[\s\S]*/, ''));

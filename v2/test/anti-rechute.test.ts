@@ -118,7 +118,7 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/sequence/mesures.ts': ['porcelain', 'others', 'exclude-standard', 'reporter', 'outputFile', 'yes', 'reporters', 'output', 'silent', 'ignore', 'name-only'], // flags git, vitest et jscpd (S2), aucune option de cadence2
   'src/bench/cli.ts': ['porcelain', 'oneline', 'reverse', 'format'], // git status --porcelain, git log --oneline, git log --reverse --format=%s (Taille déclarée)
 };
-const prefixe = (k: string) => (k.startsWith('src/bench/') ? 'bench' : 'cadence2');
+const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' ? 'bench' : 'cadence2'); // le banc séquence est « bench sequence »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
   noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 450, porte: 250, deliver: 450, hooks: 200 } }, // R32 : hooks, mécanisme du bras candidat

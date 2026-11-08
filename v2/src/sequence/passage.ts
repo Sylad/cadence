@@ -27,7 +27,7 @@ export interface MesureEtape {
 export interface Base { suite: { passes: number; total: number }; build_ok: boolean; maintenabilite: ReturnType<typeof maintenabilite> }
 export interface ResultatSequence { run: string; sequence: string; clones: Record<string, string>; base: Record<string, Base>; etapes: Record<string, MesureEtape[]>; jugement: Jugement | null }
 type Opt = { racine: string; id: string; ref: string; cand: string; juge: string; exec: Executeur; maintenant: Date; empreinte: string; home: string; out: (l: string) => void;
-  prep?: typeof preparer; pret?: (b: Record<string, DefBras>) => string | null; jscpd?: string[]; delaiMs?: number; garderClones?: boolean; tirage?: () => number };
+  repetition?: number; repetitions?: number; prep?: typeof preparer; pret?: (b: Record<string, DefBras>) => string | null; jscpd?: string[]; delaiMs?: number; garderClones?: boolean; tirage?: () => number };
 interface Ctx { o: Opt; s: Sequence; bras: Record<string, DefBras>; run: string; dir: string; debut: string; delai: number;
   noms: string[]; clones: Record<string, string>; prec: Record<string, Statuts> }
 
@@ -81,14 +81,20 @@ const mesureVide = (bras: string, banc: string, echec: string): Mesure => {
 
 /** Passage d'une séquence : un clone par bras gardé d'une étape à l'autre, une session neuve par étape, mesures par étape, juges sur l'état final. */
 export function passageSequence(o: Opt): ResultatSequence {
+  return passageSequences(o, 1)[0];
+}
+
+/** `n` répétitions sous UN run id, UN verrou et UNE vérification de prêt ; `apres` reçoit chaque répétition dès qu'elle est finie (rapport, historique). */
+export function passageSequences(o: Opt, n: number, apres?: (r: ResultatSequence, repetition: number) => void): ResultatSequence[] {
   const bras = chargerBras(o.racine);
-  for (const n of [o.ref, o.cand]) if (!bras[n]) throw new Error(`bras « ${n} » absent de ${o.racine}/bras.yaml`);
-  const pret = o.pret ?? ((b) => pretAPasser(REPO, b, o.racine));
+  for (const b of [o.ref, o.cand]) if (!bras[b]) throw new Error(`bras « ${b} » absent de ${o.racine}/bras.yaml`);
+  const pret = o.pret ?? ((x) => pretAPasser(REPO, x, o.racine));
   const refus = pret({ [o.ref]: bras[o.ref], [o.cand]: bras[o.cand] });
   if (refus) throw new Error(`séquence refusée : ${refus}`);
   const liberer = verrouiller(o.racine);
   try {
-    return passer(o, bras, chargerSequence(o.racine, o.id));
+    const s = chargerSequence(o.racine, o.id);
+    return Array.from({ length: n }, (_, i) => { const r = passer({ ...o, repetition: i + 1, repetitions: n }, bras, s); apres?.(r, i + 1); return r; });
   } finally {
     try { rmSync(join(o.racine, 'en-cours.json'), { force: true }); } finally { liberer(); }
   }
@@ -99,7 +105,7 @@ const nomClone = (x: Ctx, b: string) => `c${x.noms.indexOf(b) + 1}`;
 function signaler(x: Ctx, k: number, phase: string, termines: number): void {
   const f = join(x.o.racine, 'en-cours.json');
   writeFileSync(`${f}.tmp`, JSON.stringify({ run: x.run, debut: x.debut, candidat: x.o.cand, reference: x.o.ref, bancs_total: 1, banc: x.s.id,
-    etape: `${k}/${x.s.etapes.length}`, repetition: 1, phase, phase_debut: new Date().toISOString(), termines }));
+    etape: `${k}/${x.s.etapes.length}`, repetition: x.o.repetition ?? 1, repetitions: x.o.repetitions ?? 1, phase, phase_debut: new Date().toISOString(), termines }));
   renameSync(`${f}.tmp`, f);
 }
 
@@ -220,7 +226,8 @@ function demandesDuJuge(s: Sequence): string {
 
 function passer(o: Opt, bras: Record<string, DefBras>, s: Sequence): ResultatSequence {
   const p = parisJour(o.maintenant), run = `${p.jour}-${p.hhmm}-${o.empreinte}`;
-  const dir = join(o.racine, 'runs', run, s.id);
+  const sous = (o.repetitions ?? 1) > 1 ? `r${o.repetition}` : ''; // une seule répétition : chemins d'avant
+  const dir = join(o.racine, 'runs', run, s.id, sous);
   const tirage = o.tirage ?? Math.random;
   const noms = tirage() < 0.5 ? [o.ref, o.cand] : [o.cand, o.ref]; // R9 : clones c1/c2, correspondance écrite après les juges
   const x: Ctx = { o, s, bras, run, dir, debut: new Date().toISOString(), delai: o.delaiMs ?? 30 * 60_000, noms, clones: {}, prec: {} };
@@ -237,7 +244,7 @@ function passer(o: Opt, bras: Record<string, DefBras>, s: Sequence): ResultatSeq
     }
     signaler(x, s.etapes.length, 'juges', s.etapes.length);
     const dernier = bancEtape(s, s.etapes[s.etapes.length - 1], heads[noms[0]]);
-    const jugement = juger(dernier, x.clones, join(o.racine, 'eval', run, s.id), o.juge, o.exec, tirage, demandesDuJuge(s));
+    const jugement = juger(dernier, x.clones, join(o.racine, 'eval', run, s.id, sous), o.juge, o.exec, tirage, demandesDuJuge(s));
     const clones = Object.fromEntries(noms.map((b) => [nomClone(x, b), b]));
     const res: ResultatSequence = { run, sequence: s.id, clones, base, etapes, jugement };
     writeFileSync(join(dir, 'resultat.json'), JSON.stringify(res, null, 2));

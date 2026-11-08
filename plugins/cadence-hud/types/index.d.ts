@@ -127,7 +127,7 @@ export type MoveAsk = { id: string; target: string; place: 'before' | 'after' }
 export type LotsNotice = { text: string; kind: 'done' | 'unchanged' | 'refused' }
 
 /** `en-cours.json` du banc : le passage qui tourne (écrit à chaque changement de phase par `passage`). */
-export type EnCours = { run: string; debut: string; candidat: string; reference: string; bancs_total: number; banc: string; repetition: number; phase: string; phase_debut: string; termines: number }
+export type EnCours = { run: string; debut: string; candidat: string; reference: string; bancs_total: number; banc: string; repetition: number; phase: string; phase_debut: string; termines: number; /** Banc séquence seulement : « k/n » (étape 0 = préparation) et nombre de répétitions. */ etape?: string; repetitions?: number }
 
 declare module 'claude-code' {
   interface PluginState {

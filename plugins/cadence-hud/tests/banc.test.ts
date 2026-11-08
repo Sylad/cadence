@@ -161,6 +161,16 @@ test('banc en cours — la ligne : position, banc, phase avec sa durée, durée 
   expect([duree(0), duree(59 * 60_000), duree(3600_000), duree(-5)]).toEqual(['0 min', '59 min', '1 h 00', '0 min'])
 })
 
+test('banc en cours — une séquence : « étape k/n » et la répétition, au lieu de « bancs »', () => {
+  const e = encours({ banc: 'aether-b68', etape: '3/6', repetition: 2, repetitions: 2, bancs_total: 1, termines: 2, phase: 'bras sequence-v2' })
+  expect(enCoursLine(e, T0)).toEqual({ text: 'séquence ⟳ aether-b68 · étape 3/6 · répétition 2/2 · bras sequence-v2 · 7 min (depuis 1 h 24)', color: 'claude' })
+  expect(enCoursLine({ ...e, repetitions: 1 }, T0)?.text).toBe('séquence ⟳ aether-b68 · étape 3/6 · bras sequence-v2 · 7 min (depuis 1 h 24)')
+  expect(enCoursLine({ ...e, phase_debut: new Date(T0 - 7 * 3600_000).toISOString() }, T0)).toMatchObject({ color: 'warning' })
+  expect(readEnCours(JSON.stringify({ h: null, c: JSON.stringify(e) }))?.etape).toBe('3/6')
+  expect(readEnCours(JSON.stringify({ h: null, c: JSON.stringify({ ...e, etape: 3 }) }))).toBeNull()
+  expect(enCoursLine(encours(), T0)?.text).toMatch(/^banc ⟳ 3\/6 bancs/) // un passage ordinaire ne change pas
+})
+
 test('banc en cours — plus de 6 h sans changement de phase : orange, « bloqué ? »', () => {
   const l = enCoursLine(encours({ phase_debut: new Date(T0 - 6.5 * 3600_000).toISOString() }), T0)
   expect(l?.color).toBe('warning')

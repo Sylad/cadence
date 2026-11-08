@@ -23,7 +23,8 @@ export const readEnCours = (stdout: string): EnCours | null => {
     if (typeof o !== 'object' || o === null) return null
     const x = o as Record<string, unknown>
     const ok = ['debut', 'phase_debut', 'banc', 'phase'].every(k => typeof x[k] === 'string') && [x.bancs_total, x.termines, x.repetition].every(n => typeof n === 'number')
-    return ok ? (x as unknown as EnCours) : null
+    const seq = x.etape === undefined || (typeof x.etape === 'string' && /^\d+\/\d+$/.test(x.etape)) // un banc séquence : « k/n »
+    return ok && seq ? (x as unknown as EnCours) : null
   } catch {
     return null
   }
@@ -40,7 +41,8 @@ export const duree = (ms: number): string => {
 export const enCoursLine = (e: EnCours | null, now: number): { text: string; color: ThemeKey } | null => {
   if (!e) return null
   const bloque = now - Date.parse(e.phase_debut) > SIX_HEURES
-  const text = `banc ⟳ ${Math.min(e.termines + 1, e.bancs_total)}/${e.bancs_total} bancs · ${e.banc} #${e.repetition} · ${e.phase} · ${duree(now - Date.parse(e.phase_debut))} (depuis ${duree(now - Date.parse(e.debut))})${bloque ? ' · bloqué ?' : ''}`
+  const rep = (e.repetitions ?? 1) > 1 ? ` · répétition ${e.repetition}/${e.repetitions}` : ''
+  const text = e.etape ? `séquence ⟳ ${e.banc} · étape ${e.etape}${rep} · ${e.phase} · ${duree(now - Date.parse(e.phase_debut))} (depuis ${duree(now - Date.parse(e.debut))})${bloque ? ' · bloqué ?' : ''}` : `banc ⟳ ${Math.min(e.termines + 1, e.bancs_total)}/${e.bancs_total} bancs · ${e.banc} #${e.repetition} · ${e.phase} · ${duree(now - Date.parse(e.phase_debut))} (depuis ${duree(now - Date.parse(e.debut))})${bloque ? ' · bloqué ?' : ''}`
   return { text, color: bloque ? 'warning' : 'claude' }
 }
 

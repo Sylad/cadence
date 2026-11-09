@@ -38,7 +38,7 @@ describe('le dist/ en service (L195)', () => {
   });
 
   it('prepare (npm install, publication) construit dist/ : le paquet publié l’embarque ; il n’y a plus de build:service', () => {
-    expect(scripts.prepare).toBe('tsc -p tsconfig.build.json');
+    expect(scripts.prepare).toBe('tsc -p tsconfig.build.json && tsc -p v2/tsconfig.json'); // 09-11 : v2/dist (cadence run) est publié avec le paquet
     expect(scripts['build:service']).toBeUndefined();
     expect(scripts.service).toBe('node scripts/mise-en-service.mjs');
   });

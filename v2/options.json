@@ -13,6 +13,11 @@
     "bench --help": "docs/v2/2026-11-07-cadence-2-design.md",
     "bench env BENCH_ROOT": "docs/v2/2026-11-07-cadence-2-design.md",
     "bench env HOME": "docs/v2/2026-11-07-cadence-2-design.md",
-    "bench --settings": "docs/v2/2026-11-08-banc-sequence-design.md"
+    "bench --settings": "docs/v2/2026-11-08-banc-sequence-design.md",
+    "cadence2 --piece": "docs/v2/2026-11-09-cadence-run.md",
+    "cadence2 --taille": "docs/v2/2026-11-09-cadence-run.md",
+    "cadence2 --sans-porte": "docs/v2/2026-11-09-cadence-run.md",
+    "cadence2 --reponse": "docs/v2/2026-11-09-cadence-run.md",
+    "cadence2 --liste": "docs/v2/2026-11-09-cadence-run.md"
   }
 }

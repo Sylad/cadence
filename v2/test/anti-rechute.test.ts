@@ -7,9 +7,9 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { lancerBras, type Executeur } from '../src/bench/bras.js';
 import { BARRE_SPEC, ligneHistorique, rapport, statut, verdict, type ResultatBanc } from '../src/bench/verdict.js';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import type { Banc } from '../src/bench/banc.js';
+import { dossierTemp } from './temp.js';
 
 const v2 = join(import.meta.dirname, '..');
 const depot = join(v2, '..');
@@ -95,7 +95,7 @@ function reglesC2(f: Fichiers): string[] {
 
 // ---------------------------------------------------------------------------------------------------------------------
 // C3, portes empilées. Spec §0 C3 : « Deux portes au plus : ciblée par le responsable, complète une fois à l'intégration. »
-// Aucun module de porte n'existe encore (R15) : la règle est TAUTOLOGIQUE (0 site) jusqu'à sa création, à revérifier alors.
+// Sites (09-11) : controlesEclair (banc éclair) et jouerPorte de cadence run (porte complète, une fois, plus une reprise après correction).
 const MAX_SITES_PORTE = 2;
 function reglesC3(f: Fichiers): string[] {
   const v: string[] = [];
@@ -118,6 +118,8 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/bench/preparer.ts': ['no-hardlinks', 'format', 'is-ancestor', 'all', 'expire', 'prune', 'not'],
   'src/bench/ajouter.ts': ['format', 'reverse', 'grep', 'verify', 'name-only'],
   'src/sequence/mesures.ts': ['porcelain', 'others', 'exclude-standard', 'reporter', 'outputFile', 'yes', 'reporters', 'output', 'silent', 'ignore', 'name-only', 'gitignore'], // flags git, vitest et jscpd (S2, S7 : --gitignore), aucune option de cadence2
+  'src/run/run.ts': ['show-toplevel', 'count', 'abort', 'abbrev-ref', 'short', 'ff-only', 'force', 'resume'], // git et claude --resume (reprise de la même session)
+  'src/run/cli.ts': ['show-toplevel'],
   'src/bench/cli.ts': ['porcelain', 'oneline', 'reverse', 'format', 'binary'], // git status --porcelain, git log --oneline, git log --reverse --format=%s (Taille déclarée)
 };
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
@@ -312,7 +314,7 @@ describe('C5, comportement de verdict, rapport et historique', () => {
 
 describe('C2, une seule session par bras', () => {
   it('les appels suivants reprennent la session du premier (--resume), sans nouvelle session', () => {
-    const r = mkdtempSync(join(tmpdir(), 'rechute-'));
+    const r = dossierTemp('rechute-');
     const dir = join(r, 'bancs', '1-t'); mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'demande.md'), 'Ajoute un séparateur.'); writeFileSync(join(dir, 'reponses.md'), 'Oui.');
     const clone = join(r, 'runs', 'A'); mkdirSync(clone, { recursive: true });

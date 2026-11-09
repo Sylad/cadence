@@ -10,7 +10,11 @@ const io = {
   now: () => new Date(),
 };
 
-if (tool === 'raf') {
+if (tool === 'run') {
+  // cadence 2 (09-11) : une demande, une session Opus, porte, intégration — le bras gagnant du banc (v2/src/run).
+  const v2 = await import('../v2/dist/cli.js');
+  process.exitCode = await v2.run(['run', ...args], io);
+} else if (tool === 'raf') {
   process.exitCode = await run(args, io);
 } else if (['news', 'session', 'deliver', 'verify', 'skills', 'orchestrate', 'lead', 'corrections', 'perf', 'inspect', 'spec', 'ref', 'config', 'release', 'local', 'claude-hook'].includes(tool)) {
   process.exitCode = await run([tool, ...args], io);

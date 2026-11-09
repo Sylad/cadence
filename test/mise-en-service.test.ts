@@ -29,6 +29,8 @@ function workRepo(statuses: Record<string, string> = { L1: 'done' }) {
   git(dir, 'config', 'user.name', 'T');
   git(dir, 'config', 'commit.gpgsign', 'false');
   for (const n of ['src', 'bin', 'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.build.json']) cpSync(join(REPO, n), join(dir, n), { recursive: true });
+  // 09-11 : prepare compile aussi v2/ (cadence run), sans ses node_modules ni son dist
+  cpSync(join(REPO, 'v2'), join(dir, 'v2'), { recursive: true, filter: (p) => !/[\\/]v2[\\/](node_modules|dist)(?:[\\/]|$)/.test(p) });
   // L538 : src/orchestrate/integrate.ts importe ../../scripts/qualite.mjs, sans quoi le tsc de l'installation échoue
   mkdirSync(join(dir, 'scripts'));
   for (const n of ['qualite.mjs', 'qualite.d.mts']) cpSync(join(REPO, 'scripts', n), join(dir, 'scripts', n));

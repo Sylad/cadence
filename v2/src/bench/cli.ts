@@ -69,7 +69,7 @@ export function verrouiller(racine: string): () => void {
 /** Garde le patch et les commits du bras à côté du clone, puis efface le clone (≈ 1 Go) ; captures et journaux restent. */
 export function archiver(c: string, base: string | undefined): void {
   libererReglages(c);
-  if (base) for (const [ext, a] of [['patch', ['diff', `${base}..HEAD`]], ['commits.txt', ['log', '--oneline', `${base}..HEAD`]]] as const)
+  if (base) for (const [ext, a] of [['patch', ['diff', '--binary', `${base}..HEAD`]], ['commits.txt', ['log', '--oneline', `${base}..HEAD`]]] as const)
     try { writeFileSync(`${c}.${ext}`, execFileSync('git', a, { cwd: c, encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'ignore'] })); } catch { /* clone illisible */ }
   rmSync(c, { recursive: true, force: true });
 }

@@ -118,7 +118,7 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/bench/preparer.ts': ['no-hardlinks', 'format', 'is-ancestor', 'all', 'expire', 'prune', 'not'],
   'src/bench/ajouter.ts': ['format', 'reverse', 'grep', 'verify', 'name-only'],
   'src/sequence/mesures.ts': ['porcelain', 'others', 'exclude-standard', 'reporter', 'outputFile', 'yes', 'reporters', 'output', 'silent', 'ignore', 'name-only', 'gitignore'], // flags git, vitest et jscpd (S2, S7 : --gitignore), aucune option de cadence2
-  'src/bench/cli.ts': ['porcelain', 'oneline', 'reverse', 'format'], // git status --porcelain, git log --oneline, git log --reverse --format=%s (Taille déclarée)
+  'src/bench/cli.ts': ['porcelain', 'oneline', 'reverse', 'format', 'binary'], // git status --porcelain, git log --oneline, git log --reverse --format=%s (Taille déclarée)
 };
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.

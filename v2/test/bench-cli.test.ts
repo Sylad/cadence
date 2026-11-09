@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
-import { controlesEclair, empreinte, passage, pretAPasser } from '../src/bench/cli.js';
+import { archiver, controlesEclair, empreinte, passage, pretAPasser } from '../src/bench/cli.js';
 import { statut } from '../src/bench/verdict.js';
 import { run } from '../src/cli.js';
 import { creerExecuteur } from '../src/bench/bras.js';
@@ -393,5 +393,20 @@ describe('lecteur du HUD (BANC_READER)', () => {
     expect(lire('999999 2026-11-09T09:00:00Z')).toBeNull();
     expect(lire(null)).toBeNull();
     expect(lire(`${process.pid} 2026-11-09T09:00:00Z autre-demarrage`)).toBeNull();
+  });
+});
+
+describe('archiver : patch rejouable, binaires compris (09-11)', () => {
+  it('une image ajoutée par le bras est dans le patch et le patch s\'applique sur la base', () => {
+    const d = mkdtempSync(join(tmpdir(), 'arch-')), c = join(d, 'c1'), g = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, stdio: 'pipe' });
+    mkdirSync(c); g(c, 'init', '-q'); writeFileSync(join(c, 'a.ts'), '1'); g(c, 'add', '.'); g(c, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base');
+    const base = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: c, encoding: 'utf8' }).trim();
+    writeFileSync(join(c, 'img.webp'), Buffer.from([0, 255, 1, 254, 0, 0, 7])); writeFileSync(join(c, 'a.ts'), '2');
+    g(c, 'add', '.'); g(c, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'bras');
+    const autre = join(d, 'rejoue'); execFileSync('git', ['clone', '-q', c, autre]); g(autre, 'checkout', '-q', base);
+    archiver(c, base);
+    expect(existsSync(c)).toBe(false);
+    g(autre, 'apply', join(d, 'c1.patch'));
+    expect(readFileSync(join(autre, 'img.webp'))).toEqual(Buffer.from([0, 255, 1, 254, 0, 0, 7]));
   });
 });

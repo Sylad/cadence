@@ -69,7 +69,7 @@ function reglesC1(f: Fichiers): string[] {
     const intrus = (para ?? '').match(/\b(plan|lot|raf\.yaml|carte|description)\b/i);
     if (intrus) v.push(`C1 : « ${intrus[0]} » dans le paragraphe du relecteur de ${k}`);
   }
-  for (const n of ['sequence-v2', 'sequence-v2b', 'sequence-v2c']) { // v2b (S7) : sequence-v2 sans relecture ; v2c (plan n°4) : v2b + sorties attendues
+  for (const n of ['sequence-v2', 'sequence-v2b', 'sequence-v2c', 'sequence-v2d']) { // v2b (S7) : sequence-v2 sans relecture ; v2c (plan n°4) : v2b + sorties attendues ; v2d (09-11) : v2b + registre des demandes
     const seq = f[`briefs/bras-${n}.md`];
     if (seq !== undefined && !seq.includes('Taille fixée par le gardien : {{TAILLE}}')) v.push(`C1 : bras-${n} ne reçoit plus la taille du gardien`);
   }
@@ -263,6 +263,7 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C1', 'séquence : fiche dans le brief', 'briefs/bras-sequence-v2.md', ajout('Respecte la fiche.')],
   ['C1', 'séquence v2b : le bras reclasse la taille', 'briefs/bras-sequence-v2b.md', remplace('Taille fixée par le gardien : {{TAILLE}}', 'Classe la demande')],
   ['C1', 'séquence v2c : le bras reclasse la taille', 'briefs/bras-sequence-v2c.md', remplace('Taille fixée par le gardien : {{TAILLE}}', 'Classe la demande')],
+  ['C1', 'séquence v2d : le bras reclasse la taille', 'briefs/bras-sequence-v2d.md', remplace('Taille fixée par le gardien : {{TAILLE}}', 'Classe la demande')],
 ];
 describe('mutation : chaque régression connue est détectée', () => {
   it.each(mutations)('%s : %s', (cause, _nom, fichier, muter) => {

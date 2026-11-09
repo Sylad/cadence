@@ -3,6 +3,8 @@
 # Chaque répétition tourne dans sa propre racine de banc (BENCH_ROOT, donc son propre verrou), avec :
 #   - un port d'application à elle : CADENCE_PORT pour les bras (ligne commune des briefs v2b/v2c), section Écran réécrite pour le juge ;
 #   - un navigateur Playwright isolé (PLAYWRIGHT_MCP_ISOLATED) : deux sessions ne se disputent pas le même profil ;
+#   - son propre espace de processus (unshare --pid) : un bras qui fait pkill ou killall ne voit et ne tue que les siens
+#     (vécu le 09-11 : « pkill -f ng serve » d'un bras tuait les sessions des autres répétitions, code 143) ;
 #   - les mêmes séquences et pièces (lien vers ~/bench-cadence/sequences).
 # Les deux bras lisent la même consigne de port : la comparaison reste à armes égales.
 # Usage : banc-parallele.sh <séquence> <candidat> <référence> <N> [port de départ, 4400]
@@ -21,11 +23,11 @@ for i in $(seq 1 "$N"); do
   cp -r "$BANC/secrets/sequences/$SEQ" "$R/secrets/sequences/$SEQ"
   # Juge : le port écrit dans la section Écran devient celui de la répétition.
   sed -i -E "s/--port [0-9]+/--port $P/g; s/localhost:[0-9]+/localhost:$P/g" "$R/secrets/sequences/$SEQ/mesure.md"
-  printf '\n\nCette évaluation tourne en même temps que d'"'"'autres : pour lancer une application, utilise le port %s (ng serve --port %s) et aucun autre.\n' "$P" "$P" >> "$R/secrets/sequences/$SEQ/mesure.md"
+  printf '\n\nCette évaluation tourne en même temps que d'"'"'autres : pour lancer une application, utilise le port %s (ng serve --port %s) et aucun autre ; arrête-la par son numéro de processus, jamais par son nom.\n' "$P" "$P" >> "$R/secrets/sequences/$SEQ/mesure.md"
   # Bras : briefs d'origine (le banc n'admet que les briefs versionnés) ; le port passe par CADENCE_PORT, lu par la même ligne des deux briefs.
   cp "$BANC/bras.yaml" "$R/bras.yaml"
   ( set +e; BENCH_ROOT=$R CADENCE_PORT=$P PLAYWRIGHT_MCP_ISOLATED=true \
-      cadence2 bench sequence "$SEQ" --candidat "$CAND" --reference "$REF" --repetitions 1 > "$R/journal.log" 2>&1
+      unshare --user --map-current-user --pid --fork --mount-proc cadence2 bench sequence "$SEQ" --candidat "$CAND" --reference "$REF" --repetitions 1 > "$R/journal.log" 2>&1
     echo "code=$?" >> "$R/journal.log" ) &
   pids+=($!)
   echo "répétition $i : racine $R, port $P, pid $!"

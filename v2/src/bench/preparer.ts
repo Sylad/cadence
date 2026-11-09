@@ -26,9 +26,7 @@ export function preparer(b: Banc, cible: string, delaiMs = 30 * 60_000): { tests
   git(cible, 'checkout', '-q', '-B', 'main', b.base);
   git(cible, 'remote', 'remove', 'origin');
   for (const br of git(cible, 'branch', '--format=%(refname:short)').split('\n')) if (br && br !== 'main') git(cible, 'branch', '-D', '-q', br);
-  for (const t of git(cible, 'tag').split('\n').filter(Boolean)) {
-    if (spawnSync('git', ['merge-base', '--is-ancestor', t, 'HEAD'], { cwd: cible }).status !== 0) git(cible, 'tag', '-d', t);
-  }
+  for (const t of git(cible, 'tag').split('\n').filter(Boolean)) if (spawnSync('git', ['merge-base', '--is-ancestor', t, 'HEAD'], { cwd: cible }).status !== 0) git(cible, 'tag', '-d', t);
   git(cible, 'reflog', 'expire', '--expire=now', '--all');
   git(cible, 'gc', '-q', '--prune=now');
   const futur = git(cible, 'rev-list', '--all', '--not', 'HEAD');

@@ -1,6 +1,6 @@
 import type { Taille } from './banc.js';
 import type { Mesure } from './bras.js';
-import type { Jugement, Meca } from './juges.js';
+import { avisLu, type Jugement, type Meca } from './juges.js';
 
 export interface ResultatBanc { banc: string; taille: Taille; visible: boolean; reponses: boolean; frais: boolean;
   mesures: Record<string, Mesure>; jugement: Jugement | null; fuites: Record<string, string[]>; fuites_a_verifier?: Record<string, string[]> }
@@ -16,7 +16,7 @@ const pct = (x: number) => `${Math.round(x * 100)} %`;
 /** Banc de base d'un id de répétition `<banc>#k`. */
 export const banBase = (id: string): string => (id.includes('#') ? id.slice(0, id.lastIndexOf('#')) : id);
 
-/** Avis par banc de base : les répétitions comptent une fois, et seulement si toutes sont jugées et s'accordent ; sinon « egal ». */
+/** Avis par banc de base : les répétitions comptent une fois, et seulement si toutes sont jugées et s'accordent ; sinon « egal ». « indécis » (R39) n'est pas une préférence. */
 function avisParBanc(res: ResultatBanc[], champ: 'prefere' | 'ui'): { id: string; val: string; label: string }[] {
   const groupes = new Map<string, ResultatBanc[]>();
   res.forEach((r, i) => { const k = r.banc.includes('#') ? banBase(r.banc) : `\0${i}`; groupes.set(k, [...(groupes.get(k) ?? []), r]); });
@@ -24,7 +24,7 @@ function avisParBanc(res: ResultatBanc[], champ: 'prefere' | 'ui'): { id: string
     const id = banBase(rs[0].banc); const a = rs.map((r) => r.jugement?.[champ]);
     if (a.some((x) => x === undefined)) return { id, val: 'egal', label: 'égal (non jugé)' };
     if (a.some((x) => x !== a[0])) return { id, val: 'egal', label: 'égal (désaccord)' };
-    return { id, val: a[0]!, label: a[0] === 'egal' ? 'égal' : a[0]! };
+    return { id, val: a[0]!, label: a[0] === 'egal' ? 'égal' : [...new Set(rs.map((r) => avisLu(r.jugement!, champ)))].join(' ; ') };
   });
 }
 const detail = (av: { id: string; label: string }[]) => av.map((x) => `${x.id} : ${x.label}`).join(' · ');
@@ -69,7 +69,7 @@ export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: B
 export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetitions?: number; eclair?: string[] }): string {
   const lignes = res.map((r) => {
     const j = r.jugement; const m = (b: string) => r.mesures[b]; const deux = (f: (x: Meca) => string) => (j ? `${f(j.meca[ref])} · ${f(j.meca[cand])}` : '–');
-    return `| ${r.banc} | ${m(ref)?.duree_s ?? '–'} s | ${m(cand)?.duree_s ?? '–'} s | ${m(ref)?.tokens ?? '–'} | ${m(cand)?.tokens ?? '–'} | ${j?.prefere ?? 'non jugé'} | ${j ? `${j.meca[ref].caches_passes} · ${j.meca[cand].caches_passes}` : '–'} | ${j ? `${j.meca[ref].mutations_tuees}/${j.meca[ref].mutations_total} · ${j.meca[cand].mutations_tuees}/${j.meca[cand].mutations_total}` : '–'} | ${deux((x) => (x.suite_ok ? 'ok' : 'ROUGE'))} | ${deux((x) => x.attendu)} | ${m(ref)?.taille_declaree ?? '–'} · ${m(cand)?.taille_declaree ?? '–'} |`;
+    return `| ${r.banc} | ${m(ref)?.duree_s ?? '–'} s | ${m(cand)?.duree_s ?? '–'} s | ${m(ref)?.tokens ?? '–'} | ${m(cand)?.tokens ?? '–'} | ${j ? avisLu(j, 'prefere') : 'non jugé'} | ${j ? `${j.meca[ref].caches_passes} · ${j.meca[cand].caches_passes}` : '–'} | ${j ? `${j.meca[ref].mutations_tuees}/${j.meca[ref].mutations_total} · ${j.meca[cand].mutations_tuees}/${j.meca[cand].mutations_total}` : '–'} | ${deux((x) => (x.suite_ok ? 'ok' : 'ROUGE'))} | ${deux((x) => x.attendu)} | ${m(ref)?.taille_declaree ?? '–'} · ${m(cand)?.taille_declaree ?? '–'} |`;
   });
   const questions = res.flatMap((r) => [ref, cand].flatMap((b) => (r.mesures[b]?.questions_texte ?? []).map((q) => `- ${r.banc}/${b} : ${q.trim().replace(/\s*\n\s*/g, ' ')}`)));
   const lectures = res.flatMap((r) => Object.entries(r.fuites_a_verifier ?? {}).flatMap(([b, ps]) => ps.map((p) => `- ${r.banc}/${b} : ${p}`)));

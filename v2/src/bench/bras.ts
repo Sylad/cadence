@@ -34,11 +34,7 @@ export const executeurClaude: Executeur = creerExecuteur();
 
 function lire(e: { stdout: string; code: number; erreur?: string }): { session: string; tokens: number; cout: number; echec: string | null } {
   let j: { session_id?: string; total_cost_usd?: number; is_error?: boolean; subtype?: string; modelUsage?: Record<string, Record<string, number>> };
-  try {
-    j = JSON.parse(e.stdout);
-  } catch {
-    return { session: '', tokens: 0, cout: 0, echec: `sortie illisible (${e.erreur ?? `code ${e.code}`}) : ${e.stdout.slice(-200)}` };
-  }
+  try { j = JSON.parse(e.stdout); } catch { return { session: '', tokens: 0, cout: 0, echec: `sortie illisible (${e.erreur ?? `code ${e.code}`}) : ${e.stdout.slice(-200)}` }; }
   const tokens = Object.values(j.modelUsage ?? {}).reduce((n, u) =>
     n + (u.inputTokens ?? 0) + (u.outputTokens ?? 0) + (u.cacheReadInputTokens ?? 0) + (u.cacheCreationInputTokens ?? 0), 0);
   const session = j.session_id ?? '';

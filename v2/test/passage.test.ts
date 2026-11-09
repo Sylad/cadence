@@ -117,7 +117,8 @@ describe('passage d\'une séquence', () => {
     expect(A.every((e) => e.build_ok && e.portee_suite === 'Suite mesurée : tout le dépôt')).toBe(true);
     expect(A.every((e) => typeof e.reponses === 'boolean')).toBe(true); // questions inutiles du verdict
     expect(res.clones).toEqual({ c1: 'A', c2: 'C' }); expect(res.reglages_utilisateur).toEqual([]); expect(res.sorties_attendues).toBe(0); expect(A.every((e) => e.reglages_utilisateur?.length === 0)).toBe(true);
-    expect(vu.juges).toHaveLength(2);
+    expect(vu.juges).toHaveLength(3); // mécanique, puis aveugle dans les deux ordres (R39)
+    expect(vu.juges[2]).toContain('aveugle-2.json');
     for (const t of ['1. demande 1', '3. demande 3', 'c2.ts (v2)', 'reg.ts (vr)', 'remplacé par l\'étape k']) expect(vu.juges[0]).toContain(t);
     expect(vu.juges[0]).not.toContain('adapte-les à l\'état final');
     expect(lire(dir('etape-2.c2.json'))).toMatchObject({ k: 2, regressions: { rouges: ['tests/a.test.js > x'] }, mesure: { bras: 'c2' } });

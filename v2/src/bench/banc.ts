@@ -17,13 +17,8 @@ export function chargerBanc(racine: string, id: string): Banc {
   const y = (parse(readFileSync(join(dir, 'banc.yaml'), 'utf8')) ?? {}) as Record<string, unknown>;
   for (const k of REQUIS) if (typeof y[k] !== 'string' || !y[k]) throw new BancInvalide(`banc ${id} : champ « ${k} » manquant`);
   if (!TAILLES.includes(y.taille as Taille)) throw new BancInvalide(`banc ${id} : taille « ${String(y.taille)} » inconnue (${TAILLES.join(', ')})`);
-  return {
-    id, dir, secrets: join(racine, 'secrets', id),
-    projet: y.projet as string, source: y.source as string, base: y.base as string,
-    install: y.install as string, tests: y.tests as string,
-    visible: y.visible === true, taille: y.taille as Taille, frais: y.frais === true,
-    reponses: existsSync(join(dir, 'reponses.md')),
-  };
+  return { id, dir, secrets: join(racine, 'secrets', id), projet: y.projet as string, source: y.source as string, base: y.base as string, install: y.install as string,
+    tests: y.tests as string, visible: y.visible === true, taille: y.taille as Taille, frais: y.frais === true, reponses: existsSync(join(dir, 'reponses.md')) };
 }
 
 /** Ids des bancs (dossiers de `bancs/`) ; chacun est chargé par le passage, où un banc invalide devient un échec. */

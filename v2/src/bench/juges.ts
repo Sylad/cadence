@@ -9,8 +9,11 @@ export interface Meca { suite_ok: boolean; caches_passes: number; caches_total: 
   attendu: 'oui' | 'en partie' | 'non'; mutations: { ou: string; quoi: string; tuee: boolean }[]; sorties?: (Sortie & { i: number; verdict: 'oui' | 'non' | 'incertain'; preuve: string })[] }
 export interface Defauts { bloquants: number; majeurs: number; mineurs: number }
 /** `remplaces` (R28, R30) : tests cachés remplacés par une demande ultérieure, une liste UNIQUE décidée avant X et Y, non comptée pour les deux. */
+/** R39 : `prefere` et `ui` valent « indécis » quand les deux ordres du juge aveugle se contredisent ; `defauts` = max des deux ordres. */
 export interface Jugement { meca: Record<string, Meca>; remplaces?: string[]; defauts: Record<string, Defauts>; prefere: string; ui: string; raisons: string;
-  /** m2 : X et Y → bras, pour vérifier les preuves (captures-sorties-X/…). */ anonymat?: Record<'X' | 'Y', string> }
+  /** m2 : X et Y → bras, pour vérifier les preuves (captures-sorties-X/…). */ anonymat?: Record<'X' | 'Y', string>; aveugle_ordres?: Ordre[] }
+type Avis = { X: Defauts; Y: Defauts; prefere: string; ui: string; raisons: string };
+/** Un passage du juge aveugle, `prefere` et `ui` ramenés aux noms des bras. */ export type Ordre = Avis & { anonymat: Record<'X' | 'Y', string> };
 
 const BRIEFS = join(import.meta.dirname, '..', '..', 'briefs');
 const HORS_DIFF = [':(exclude).cadence', ':(exclude)docs/plan', ':(exclude)cadence.yaml', ':(exclude).playwright-mcp']; // .playwright-mcp : captures du serveur MCP Playwright (S7)
@@ -26,6 +29,17 @@ export function travailNonLivre(avant: { head: string; sale: string[] }, apres: 
   return apres.head === avant.head ? 'aucun commit' : null;
 }
 
+/** R39 : un avis ne compte que s'il désigne la même chose dans les deux ordres, sinon « indécis » ; défauts par bras au max (échec fermé). */
+export function combiner(p: Ordre[]): Pick<Jugement, 'defauts' | 'prefere' | 'ui' | 'raisons' | 'aveugle_ordres'> {
+  const o = p.map((x) => ({ ...x, prefere: nom(x.anonymat, x.prefere), ui: nom(x.anonymat, x.ui) }));
+  const accord = (f: 'prefere' | 'ui') => (o.every((x) => x[f] === o[0][f]) ? o[0][f] : 'indécis');
+  const max = (b: string) => Object.fromEntries((['bloquants', 'majeurs', 'mineurs'] as const).map((f) => [f, Math.max(...o.map((x) => x[x.anonymat.X === b ? 'X' : 'Y'][f]))])) as unknown as Defauts;
+  return { defauts: Object.fromEntries(Object.values(p[0].anonymat).map((b) => [b, max(b)])), prefere: accord('prefere'), ui: accord('ui'),
+    raisons: o.map((x, i) => `ordre ${i + 1} (X = ${x.anonymat.X}) : ${x.raisons}`).join(' '), aveugle_ordres: o };
+}
+const nom = (a: Record<'X' | 'Y', string>, x: string) => (x === 'X' || x === 'Y' ? a[x] : x);
+/** Avis lisible au rapport : « indécis (A dans un ordre, cand dans l'autre) ». */
+export const avisLu = (j: Jugement, f: 'prefere' | 'ui'): string => (j[f] === 'indécis' ? `indécis (${(j.aveugle_ordres ?? []).map((x) => x[f]).join(' dans un ordre, ')} dans l'autre)` : j[f]);
 export const anonymiser = (bras: [string, string], tirage: () => number): Record<'X' | 'Y', string> => (tirage() < 0.5 ? { X: bras[0], Y: bras[1] } : { X: bras[1], Y: bras[0] });
 const entier = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
 export function validerMeca(o: unknown, attendues: Sortie[] = []): string[] {
@@ -95,35 +109,34 @@ export function juger(b: Banc, clones: Record<string, string>, dirEval: string, 
   const anon = anonymiser(noms, tirage);
   rmSync(dirEval, { recursive: true, force: true }); mkdirSync(dirEval, { recursive: true });
   writeFileSync(join(dirEval, 'demande.md'), lireDemande(b));
-  const copier = (): boolean => {
+  const copier = (a: Record<'X' | 'Y', string>): boolean => {
     for (const k of ['X', 'Y'] as const) {
       try {
-        writeFileSync(join(dirEval, `${k}.patch`), execFileSync('git', ['diff', `${b.base}..HEAD`, '--', '.', ...HORS_DIFF], { cwd: clones[anon[k]], encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'ignore'] }));
+        writeFileSync(join(dirEval, `${k}.patch`), execFileSync('git', ['diff', `${b.base}..HEAD`, '--', '.', ...HORS_DIFF], { cwd: clones[a[k]], encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'ignore'] }));
       } catch { return false; }
       rmSync(join(dirEval, k), { recursive: true, force: true });
-      cpSync(clones[anon[k]], join(dirEval, k), { recursive: true });
+      cpSync(clones[a[k]], join(dirEval, k), { recursive: true });
       rmSync(join(dirEval, k, '.git'), { recursive: true, force: true }); // la copie ne doit pas trahir le bras
     }
     return true;
   };
   try {
-    if (!copier()) return null;
+    if (!copier(anon)) return null;
     const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests, DEMANDES: demandes }, sMeca = join(dirEval, 'meca.json');
     const so = sorties.length ? '\n' + remplir('juge-sorties.md', { ...v, LISTE: sorties.map((x, i) => `S${i + 1} (i=${i + 1}). étape ${x.k} : ${x.sortie}`).join('\n') }).trimEnd() : '';
     const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca, SORTIES: so }), sMeca, (x) => validerMeca(x, sorties), dirEval, modele, exec) as (Record<'X' | 'Y', Meca> & { remplaces: string[] }) | null;
-    for (const m of meca && sorties.length ? [meca.X, meca.Y] : []) m.sorties = m.sorties!.map((x, j) => ({ ...sorties[j], i: x.i, verdict: x.verdict, preuve: x.preuve }));
-    if (!copier()) return null; // le juge à l'aveugle voit les livrables, pas les mutations
-    const ecran = b.visible
-      ? `Lance l'app de chaque copie, l'une après l'autre, comme le dit ${v.MESURE} (section Écran). Fais des captures à 1440 et à 390 px dans ${dirEval}/captures-X et captures-Y, et regarde-les. ui = la copie dont l'écran est le plus cohérent avec le reste de l'application.`
-      : 'Pas d\'écran : ui = "na".';
-    const sAv = join(dirEval, 'aveugle.json');
-    const av = demander(remplir('juge-aveugle.md', { ...v, ECRAN: ecran, SORTIE: sAv }), sAv, validerAveugle, dirEval, modele, exec) as
-      { X: Defauts; Y: Defauts; prefere: string; ui: string; raisons: string } | null;
-    if (!meca || !av) return null;
-    const nom = (x: string) => (x === 'X' || x === 'Y' ? anon[x] : x);
-    return {
-      meca: { [anon.X]: meca.X, [anon.Y]: meca.Y }, remplaces: meca.remplaces, defauts: { [anon.X]: av.X, [anon.Y]: av.Y },
-      prefere: nom(av.prefere), ui: nom(av.ui), raisons: av.raisons, anonymat: anon,
-    };
+    if (!meca) return null;
+    for (const m of sorties.length ? [meca.X, meca.Y] : []) m.sorties = m.sorties!.map((x, j) => ({ ...sorties[j], i: x.i, verdict: x.verdict, preuve: x.preuve }));
+    const ecran = (s: string) => (b.visible
+      ? `Lance l'app de chaque copie, l'une après l'autre, comme le dit ${v.MESURE} (section Écran). Fais des captures à 1440 et à 390 px dans ${dirEval}/captures${s}-X et captures${s}-Y, et regarde-les. ui = la copie dont l'écran est le plus cohérent avec le reste de l'application.`
+      : 'Pas d\'écran : ui = "na".');
+    const ordres: Ordre[] = [];
+    for (const [a, s] of [[anon, ''], [{ X: anon.Y, Y: anon.X }, '-2']] as const) { // R39 : second passage à ordre permuté (biais de position)
+      if (!copier(a)) return null; // le juge à l'aveugle voit les livrables, pas les mutations
+      const f = join(dirEval, `aveugle${s}.json`), av = demander(remplir('juge-aveugle.md', { ...v, ECRAN: ecran(s), SORTIE: f }), f, validerAveugle, dirEval, modele, exec) as Avis | null;
+      if (!av) return null;
+      ordres.push({ ...av, anonymat: a });
+    }
+    return { meca: { [anon.X]: meca.X, [anon.Y]: meca.Y }, remplaces: meca.remplaces, ...combiner(ordres), anonymat: anon };
   } finally { for (const k of ['X', 'Y']) rmSync(join(dirEval, k), { recursive: true, force: true }); } // copies effacées sur tous les chemins
 }

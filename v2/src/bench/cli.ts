@@ -23,9 +23,7 @@ export function empreinte(repo: string): string {
 }
 
 /** Premier sujet de commit « Taille … » de base..HEAD (le bras classe sa demande). */
-const tailleDeclaree = (c: string, base: string): string | undefined => {
-  try { return execFileSync('git', ['log', '--reverse', '--format=%s', `${base}..HEAD`], { cwd: c, encoding: 'utf8' }).split('\n').find((l) => l.startsWith('Taille')); } catch { return undefined; }
-};
+const tailleDeclaree = (c: string, base: string): string | undefined => { try { return execFileSync('git', ['log', '--reverse', '--format=%s', `${base}..HEAD`], { cwd: c, encoding: 'utf8' }).split('\n').find((l) => l.startsWith('Taille')); } catch { return undefined; } };
 
 const plusRecent = (dir: string, t: number): string | null => {
   for (const f of readdirSync(dir, { withFileTypes: true })) { const p = join(dir, f.name), r = f.isDirectory() ? plusRecent(p, t) : statSync(p).mtimeMs > t ? p : null; if (r) return r; }
@@ -166,8 +164,7 @@ export function controlesEclair(res: ResultatBanc[], ref: string, cand: string):
     if (x.echec !== null) return rouge(`bras en échec : ${b}, ${x.echec}`);
   }
   const m = (b: string) => res.reduce((a, r) => ({ t: a.t + r.mesures[b].duree_s, q: a.q + r.mesures[b].questions }), { t: 0, q: 0 });
-  const a = m(ref); const c = m(cand);
-  const tempsOk = c.t <= BARRE_SPEC.temps_max_retouche * a.t; const questionsOk = c.q === 0;
+  const a = m(ref), c = m(cand), tempsOk = c.t <= BARRE_SPEC.temps_max_retouche * a.t, questionsOk = c.q === 0;
   return { ok: tempsOk && questionsOk, lignes: [
     `temps candidat ≤ ${BARRE_SPEC.temps_max_retouche.toString().replace('.', ',')} × A : ${tempsOk ? 'ok' : 'ROUGE'} (${c.t} s contre ${a.t} s)`,
     `questions du candidat : 0 / ${c.q} ${questionsOk ? 'ok' : 'ROUGE'}`] };
@@ -175,10 +172,7 @@ export function controlesEclair(res: ResultatBanc[], ref: string, cand: string):
 
 const repetitions = (args: string[]): number | null => { const v = option(args, 'repetitions'); if (v === undefined) return 1; return /^[1-9]\d*$/.test(v) ? Number(v) : null; };
 
-function option(args: string[], nom: string): string | undefined {
-  const i = args.indexOf(`--${nom}`);
-  return i >= 0 ? args[i + 1] : undefined;
-}
+const option = (args: string[], nom: string): string | undefined => { const i = args.indexOf(`--${nom}`); return i >= 0 ? args[i + 1] : undefined; };
 
 export async function bench(args: string[], io: Io): Promise<number> {
   const [sous, ...reste] = args;

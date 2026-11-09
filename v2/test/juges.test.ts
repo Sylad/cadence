@@ -1,14 +1,15 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Banc } from '../src/bench/banc.js';
 import type { Executeur } from '../src/bench/bras.js';
-import { anonymiser, etatGit, juger, travailNonLivre, validerAveugle, validerMeca } from '../src/bench/juges.js';
+import { anonymiser, avisLu, combiner, etatGit, juger, travailNonLivre, validerAveugle, validerMeca } from '../src/bench/juges.js';
 
 const meca = { suite_ok: true, caches_passes: 2, caches_total: 2, mutations_tuees: 5, mutations_total: 6, attendu: 'oui', mutations: [] };
 const aveugle = { X: { bloquants: 0, majeurs: 1, mineurs: 0 }, Y: { bloquants: 0, majeurs: 0, mineurs: 2 }, prefere: 'Y', ui: 'na', raisons: 'r' };
+const aveugle2 = { X: aveugle.Y, Y: aveugle.X, prefere: 'X', ui: 'na', raisons: 'r2' }; // R39 : le même avis, ordre permuté
 
 function decor(): { b: Banc; clones: Record<string, string>; dirEval: string } {
   const r = mkdtempSync(join(tmpdir(), 'juges-'));
@@ -76,7 +77,7 @@ describe('juges', () => {
     const at = [{ k: 1, sortie: 'légende en D/A' }, { k: 3, sortie: 'cartouche à 3 h' }];
     const so = [{ i: 1, verdict: 'non', preuve: 'captures-sorties-X/legende.png : L/H', sortie: 'recopie fausse' }, { i: 2, verdict: 'oui', preuve: 'p' }];
     const vus: string[][] = [];
-    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: { ...meca, sorties: so }, Y: { ...meca, sorties: so }, remplaces: [] }, aveugle], vus), () => 0.2, '', at);
+    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: { ...meca, sorties: so }, Y: { ...meca, sorties: so }, remplaces: [] }, aveugle, aveugle2], vus), () => 0.2, '', at);
     expect(j!.meca.A.sorties).toEqual([{ i: 1, k: 1, sortie: 'légende en D/A', verdict: 'non', preuve: 'captures-sorties-X/legende.png : L/H' }, { i: 2, k: 3, sortie: 'cartouche à 3 h', verdict: 'oui', preuve: 'p' }]);
     expect(j!.anonymat).toEqual({ X: 'A', Y: 'cand' }); // m2 : preuves captures-X/... vérifiables
     const p = vus[0][vus[0].indexOf('-p') + 1];
@@ -85,13 +86,13 @@ describe('juges', () => {
     expect(p).not.toMatch(/captures-X\b/); // m2 : jamais les dossiers du juge aveugle
     expect(p).not.toContain('{{');
     const sans: string[][] = [];
-    juger(b, clones, dirEval, 'opus', fauxJuge([{ X: meca, Y: meca, remplaces: [] }, aveugle], sans), () => 0.2);
+    juger(b, clones, dirEval, 'opus', fauxJuge([{ X: meca, Y: meca, remplaces: [] }, aveugle, aveugle2], sans), () => 0.2);
     expect(sans[0][sans[0].indexOf('-p') + 1]).not.toMatch(/application réelle|\{\{/);
   });
   it('désanonymise le jugement (X = A, Y = cand), garde-fous prod sur les sessions', () => {
     const { b, clones, dirEval } = decor();
     const vus: string[][] = [];
-    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: meca, Y: { ...meca, caches_passes: 1 }, remplaces: ['o.spec.ts > t'] }, aveugle], vus, dirEval), () => 0.2);
+    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: meca, Y: { ...meca, caches_passes: 1 }, remplaces: ['o.spec.ts > t'] }, aveugle, aveugle2], vus, dirEval), () => 0.2);
     expect(j!.meca.cand.caches_passes).toBe(1);
     expect(j!.remplaces).toEqual(['o.spec.ts > t']); // une seule liste, pour les deux bras
     expect(j!.defauts.A.majeurs).toBe(1);
@@ -122,15 +123,15 @@ describe('juges', () => {
     const exec: Executeur = (args) => {
       const m = /dans (\S+\.json)/.exec(args[args.indexOf('-p') + 1])!;
       if (n++ === 0) { writeFileSync(join(dirEval, 'X', 'MUTATION'), 'm'); writeFileSync(m[1], JSON.stringify({ X: meca, Y: meca, remplaces: [] })); }
-      else { expect(existsSync(join(dirEval, 'X', 'MUTATION'))).toBe(false); writeFileSync(m[1], JSON.stringify(aveugle)); }
+      else { expect(existsSync(join(dirEval, 'X', 'MUTATION'))).toBe(false); writeFileSync(m[1], JSON.stringify(n === 2 ? aveugle : aveugle2)); }
       return { stdout: JSON.stringify({ session_id: `s${n}` }), code: 0 };
     };
     expect(juger(b, clones, dirEval, 'opus', exec, () => 0.2)).not.toBeNull();
-    expect(n).toBe(2);
+    expect(n).toBe(3); // mécanique, puis aveugle dans les deux ordres (R39)
   });
   it('tirage 0.8 : X = cand, Y = A', () => {
     const { b, clones, dirEval } = decor();
-    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: { ...meca, caches_passes: 1 }, Y: meca, remplaces: [] }, aveugle]), () => 0.8);
+    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{ X: { ...meca, caches_passes: 1 }, Y: meca, remplaces: [] }, aveugle, aveugle2]), () => 0.8);
     expect(j!.meca.cand.caches_passes).toBe(1);
     expect(j!.remplaces).toEqual([]);
     expect(j!.meca.A.caches_passes).toBe(2);
@@ -140,9 +141,71 @@ describe('juges', () => {
   });
   it('premier JSON invalide, relance valide : accepté', () => {
     const { b, clones, dirEval } = decor();
-    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{}, { X: meca, Y: meca, remplaces: [] }, aveugle]), () => 0.2);
+    const j = juger(b, clones, dirEval, 'opus', fauxJuge([{}, { X: meca, Y: meca, remplaces: [] }, aveugle, aveugle2]), () => 0.2);
     expect(j).not.toBeNull();
     expect(j!.prefere).toBe('cand');
+  });
+});
+
+/** R39 : faux juge qui lit quel bras est en X (fichier bras.txt de la copie) et rend son avis selon l'ordre. */
+function jugeSelonOrdre(avis: (enX: string, passage: number) => object | null, vus: string[] = []): Executeur {
+  let i = 0;
+  return (args) => {
+    const p = args[args.indexOf('-p') + 1], f = /dans (\S+\.json)/.exec(p)![1]; vus.push(p);
+    const r = i++ === 0 ? { X: meca, Y: meca, remplaces: [] } : avis(readFileSync(join(dirname(f), 'X', 'bras.txt'), 'utf8'), i - 1);
+    writeFileSync(f, JSON.stringify(r ?? {}));
+    return { stdout: JSON.stringify({ session_id: `s${i}` }), code: 0 };
+  };
+}
+const d = (bloquants: number, majeurs: number, mineurs: number) => ({ bloquants, majeurs, mineurs });
+function decorMarque() {
+  const x = decor();
+  for (const [n, c] of Object.entries(x.clones)) writeFileSync(join(c, 'bras.txt'), n);
+  return x;
+}
+
+describe('R39 : juge aveugle joué deux fois, ordre X/Y permuté', () => {
+  it('avis cohérent dans les deux ordres : gardé, ramené au bras ; les deux passages et leurs raisons gardés', () => {
+    const { b, clones, dirEval } = decorMarque();
+    const vus: string[] = [];
+    const j = juger(b, clones, dirEval, 'opus', jugeSelonOrdre((enX) => ({ X: d(0, 0, 0), Y: d(0, 0, 0), prefere: enX === 'cand' ? 'X' : 'Y', ui: enX === 'cand' ? 'X' : 'Y', raisons: `vu ${enX} en X` }), vus), () => 0.2)!;
+    expect([j.prefere, j.ui]).toEqual(['cand', 'cand']);
+    expect(j.anonymat).toEqual({ X: 'A', Y: 'cand' });
+    expect(j.aveugle_ordres!.map((o) => [o.anonymat, o.prefere])).toEqual([[{ X: 'A', Y: 'cand' }, 'cand'], [{ X: 'cand', Y: 'A' }, 'cand']]);
+    expect(j.raisons).toContain('vu A en X'); expect(j.raisons).toContain('vu cand en X');
+    expect(vus).toHaveLength(3);
+    expect(vus[2]).toContain(join(dirEval, 'aveugle-2.json'));
+    expect(existsSync(join(dirEval, 'aveugle.json')) && existsSync(join(dirEval, 'aveugle-2.json'))).toBe(true);
+    expect(avisLu(j, 'prefere')).toBe('cand');
+  });
+  it('biais de position (X toujours préféré) : indécis ; ui na dans les deux ordres reste na', () => {
+    const { b, clones, dirEval } = decorMarque();
+    const j = juger(b, clones, dirEval, 'opus', jugeSelonOrdre(() => ({ X: d(0, 0, 0), Y: d(0, 0, 0), prefere: 'X', ui: 'na', raisons: 'r' })), () => 0.2)!;
+    expect([j.prefere, j.ui]).toEqual(['indécis', 'na']);
+    expect(avisLu(j, 'prefere')).toBe('indécis (A dans un ordre, cand dans l\'autre)');
+  });
+  it('défauts finaux par bras : max champ par champ des deux passages', () => {
+    const { b, clones, dirEval } = decorMarque();
+    // passage 1 : X = A ; passage 2 : X = cand
+    const avis = (enX: string, k: number) => (k === 1 ? { X: d(0, 1, 0), Y: d(0, 0, 2), prefere: 'egal', ui: 'na', raisons: 'r' } : { X: d(0, 0, 3), Y: d(1, 0, 0), prefere: 'egal', ui: 'na', raisons: 'r' });
+    const j = juger(b, clones, dirEval, 'opus', jugeSelonOrdre(avis), () => 0.2)!;
+    expect(j.defauts).toEqual({ A: d(1, 1, 0), cand: d(0, 0, 3) });
+    expect(j.prefere).toBe('egal');
+  });
+  it('un des deux passages invalide après relance : jugement null (échec fermé)', () => {
+    for (const rate of [1, 2]) {
+      const { b, clones, dirEval } = decorMarque();
+      const vus: string[] = [];
+      const j = juger(b, clones, dirEval, 'opus', jugeSelonOrdre((_, k) => (k >= rate && k <= rate + 1 ? null : { X: d(0, 0, 0), Y: d(0, 0, 0), prefere: 'X', ui: 'na', raisons: 'r' }), vus), () => 0.2);
+      expect(j).toBeNull();
+      expect(vus).toHaveLength(rate === 1 ? 3 : 4); // passage 1 raté (et relance) : pas de second passage
+      for (const k of ['X', 'Y']) expect(existsSync(join(dirEval, k)), `copie ${k} restée`).toBe(false);
+    }
+  });
+  it('combiner : prefere egal dans un ordre et un bras dans l\'autre : indécis ; na contre X : indécis', () => {
+    const o = (X: string, prefere: string, ui: string) => ({ X: d(0, 0, 0), Y: d(0, 0, 0), prefere, ui, raisons: '', anonymat: { X, Y: X === 'A' ? 'C' : 'A' } });
+    expect(combiner([o('A', 'egal', 'na'), o('C', 'Y', 'X')])).toMatchObject({ prefere: 'indécis', ui: 'indécis' });
+    expect(combiner([o('A', 'X', 'egal'), o('C', 'Y', 'egal')])).toMatchObject({ prefere: 'A', ui: 'egal' });
   });
 });
 

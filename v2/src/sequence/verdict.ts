@@ -1,6 +1,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BARRE_SPEC, ligneHistorique, parisJour, type Critere, type Verdict } from '../bench/verdict.js';
+import { avisLu } from '../bench/juges.js';
 import type { MesureEtape, ResultatSequence } from './passage.js';
 
 type Maint = NonNullable<MesureEtape['maintenabilite']>;
@@ -77,7 +78,7 @@ const affaiblis = (e: MesureEtape) => (e.tests_affaiblis ? `${somme(Object.value
 
 export function rapportSequence(r: ResultatSequence, ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetition?: number; repetitions?: number }): string {
   const ks = [...new Set([ref, cand].flatMap((b) => (r.etapes[b] ?? []).map((x) => x.k)))].sort((a, b) => a - b);
-  const bc = (f: (b: string) => string) => `${f(ref)} · ${f(cand)}`;
+  const bc = (f: (b: string) => string) => `${f(ref)} · ${f(cand)}`, j = r.jugement;
   const zero = `| 0 | – · – | – · – | – · – | – · – | ${bc((b) => (r.base[b] ? (r.base[b].build_ok ? 'ok' : 'ko') : '–'))} | ${bc((b) => pct(r.base[b]?.maintenabilite))} | ${bc((b) => `${r.base[b]?.maintenabilite?.fichiers_400 ?? '–'}`)} | – · – |`;
   const lignes = ks.map((k) => {
     const x = (f: (e: MesureEtape) => string) => cellule(r, ref, cand, k, f);
@@ -94,6 +95,7 @@ export function rapportSequence(r: ResultatSequence, ref: string, cand: string, 
   const sorties = [ref, cand].flatMap((b) => (r.jugement?.meca[b]?.sorties ?? []).filter((x) => x.verdict !== 'oui').map((x) => `- ${b} étape ${x.k} : ${x.verdict} — ${x.sortie} (${x.preuve})`));
   const remplaces = !r.jugement ? ['- juge absent'] : (r.jugement.remplaces ?? []).length ? r.jugement.remplaces!.map((t) => `- ${t}`) : ['- aucun'];
   return [`# Séquence ${r.sequence} ${e.date} — ${cand} contre ${ref} — ${v.vert ? 'VERT' : 'ROUGE'}`, '', `Empreinte de v2 : ${e.empreinte}`, `Passage : ${r.run}`, `Répétition ${e.repetition ?? 1}/${e.repetitions ?? 1}`, '',
+    j ? `Juge aveugle (deux ordres, R39) : préféré ${avisLu(j, 'prefere')} ; écran ${avisLu(j, 'ui')} ; défauts bloquants/majeurs/mineurs ${bc((b) => (j.defauts[b] ? `${j.defauts[b].bloquants}/${j.defauts[b].majeurs}/${j.defauts[b].mineurs}` : '–'))}` : 'Juge aveugle : absent', '',
     `| Étape | Régressions ${ref} · ${cand} (rouges/disparus) | Affaiblis ${ref} · ${cand} | Nouveaux ${ref} · ${cand} | Lecture ${ref} · ${cand} | Build ${ref} · ${cand} | Duplication ${ref} · ${cand} | Fichiers > 400 ${ref} · ${cand} | Temps ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|', zero, ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
     ...v.criteres.map((x) => `| ${x.nom} | ${x.valeur} | ${x.seuil} | ${x.ok ? 'ok' : x.bloquant ? '**ROUGE**' : 'en dessous (indicatif)'} |`), '',

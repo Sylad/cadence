@@ -162,6 +162,11 @@ describe('rapport, historique et publication de la séquence', () => {
     const nul = seq((x) => { x.etapes.C[1] = etape(2, { regressions: undefined, suite_en_erreur: 'boom', maintenabilite: maint(null, 1) }); });
     expect(rapportSequence(nul, 'A', 'C', v(nul), { date: 'd', empreinte: 'e' })).toContain('| 2 | 0/0 · ERREUR |');
     expect(md).not.toContain('## Sorties attendues');
+    expect(md).toContain('Juge aveugle (deux ordres, R39) : préféré egal ; écran na ; défauts bloquants/majeurs/mineurs – · –');
+    const ind = seq((x) => { Object.assign(x.jugement!, { prefere: 'indécis', defauts: { A: { bloquants: 0, majeurs: 2, mineurs: 1 }, C: { bloquants: 1, majeurs: 0, mineurs: 0 } },
+      aveugle_ordres: [{ anonymat: { X: 'C', Y: 'A' }, prefere: 'C' }, { anonymat: { X: 'A', Y: 'C' }, prefere: 'A' }] }); });
+    expect(rapportSequence(ind, 'A', 'C', v(ind), { date: 'd', empreinte: 'e' })).toContain('Juge aveugle (deux ordres, R39) : préféré indécis (C dans un ordre, A dans l\'autre) ; écran na ; défauts bloquants/majeurs/mineurs 0/2/1 · 1/0/0');
+    expect(rapportSequence(seq((x) => { x.jugement = null; }), 'A', 'C', v(seq()), { date: 'd', empreinte: 'e' })).toContain('Juge aveugle : absent');
     const so = seq((x) => { x.sorties_attendues = 2; x.jugement!.meca.A.sorties = [{ i: 1, k: 1, sortie: 'légende D/A', verdict: 'oui', preuve: 'p' }, { i: 2, k: 2, sortie: 'cartouche', verdict: 'incertain', preuve: 'app non lancée' }];
       x.jugement!.meca.C.sorties = [{ i: 1, k: 1, sortie: 'légende D/A', verdict: 'non', preuve: 'captures-X/l.png : L/H' }, { i: 2, k: 2, sortie: 'cartouche', verdict: 'oui', preuve: 'p' }]; x.jugement!.meca.C.caches_passes = 0; });
     const mso = rapportSequence(so, 'A', 'C', v(so), { date: 'd', empreinte: 'e' });

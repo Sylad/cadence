@@ -117,6 +117,22 @@ describe('rapport, historique, statut', () => {
   });
 });
 
+describe('R39 : préférence indécise (le juge change d\'avis avec l\'ordre X/Y)', () => {
+  const ind = (o: Parameters<typeof banc>[0] = {}) => { const r = banc({ pref: 'indécis', ...o });
+    r.jugement!.aveugle_ordres = [{ anonymat: { X: 'A', Y: 'C' }, X: r.jugement!.defauts.A, Y: r.jugement!.defauts.C, prefere: 'A', ui: 'na', raisons: '' },
+      { anonymat: { X: 'C', Y: 'A' }, X: r.jugement!.defauts.C, Y: r.jugement!.defauts.A, prefere: 'C', ui: 'na', raisons: '' }]; return r; };
+  it('« indécis » compte comme une absence de préférence pour la référence, comme egal', () => {
+    expect(rouges([ind(), ind(), banc({ pref: 'A' })])).toEqual([]);
+    expect(rouges([ind(), banc({ pref: 'A' }), banc({ pref: 'A' })])).toEqual(['relecture aveugle']);
+    expect(verdict([ind()], 'A', 'C', BARRE_SPEC).criteres.find((c) => c.nom === 'relecture aveugle')!.valeur).toBe('1/1 bancs de base sans préférence pour A (b : indécis (A dans un ordre, C dans l\'autre))');
+  });
+  it('ui indécise : ne compte pour aucun bras', () => expect(rouges([banc({ ui: 'indécis' })])).toEqual([]));
+  it('le rapport montre les deux ordres', () => {
+    const r = [ind()];
+    expect(rapport(r, 'A', 'C', verdict(r, 'A', 'C', BARRE_SPEC), { date: 'd', empreinte: 'e' })).toContain('| indécis (A dans un ordre, C dans l\'autre) |');
+  });
+});
+
 describe('répétitions (R18)', () => {
   const rep = (id: string, o: Parameters<typeof banc>[0] = {}) => ({ ...banc(o), banc: id });
   it('deux répétitions en désaccord : le banc compte egal ; d\'accord sur A : il compte pour A', () => {

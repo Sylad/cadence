@@ -107,36 +107,36 @@ function demander(brief: string, sortie: string, valider: (o: unknown) => string
 export function juger(b: Banc, clones: Record<string, string>, dirEval: string, modele: string, exec: Executeur, tirage = Math.random, demandes = '', sorties: Sortie[] = []): Jugement | null {
   const noms = Object.keys(clones) as [string, string];
   const anon = anonymiser(noms, tirage);
-  rmSync(dirEval, { recursive: true, force: true }); mkdirSync(dirEval, { recursive: true });
-  writeFileSync(join(dirEval, 'demande.md'), lireDemande(b));
-  const copier = (a: Record<'X' | 'Y', string>): boolean => {
+  rmSync(dirEval, { recursive: true, force: true });
+  const passes = ['meca', 'ordre-1', 'ordre-2'].map((n) => join(dirEval, n)); // R39, revue M1 : une passe = un dossier et un cwd, rien de visible d'une autre
+  const copier = (p: string, a: Record<'X' | 'Y', string>): boolean => {
+    mkdirSync(p, { recursive: true }); writeFileSync(join(p, 'demande.md'), lireDemande(b));
     for (const k of ['X', 'Y'] as const) {
       try {
-        writeFileSync(join(dirEval, `${k}.patch`), execFileSync('git', ['diff', `${b.base}..HEAD`, '--', '.', ...HORS_DIFF], { cwd: clones[a[k]], encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'ignore'] }));
+        writeFileSync(join(p, `${k}.patch`), execFileSync('git', ['diff', `${b.base}..HEAD`, '--', '.', ...HORS_DIFF], { cwd: clones[a[k]], encoding: 'utf8', maxBuffer: 256 << 20, stdio: ['ignore', 'pipe', 'ignore'] }));
       } catch { return false; }
-      rmSync(join(dirEval, k), { recursive: true, force: true });
-      cpSync(clones[a[k]], join(dirEval, k), { recursive: true });
-      rmSync(join(dirEval, k, '.git'), { recursive: true, force: true }); // la copie ne doit pas trahir le bras
+      cpSync(clones[a[k]], join(p, k), { recursive: true });
+      rmSync(join(p, k, '.git'), { recursive: true, force: true }); // la copie ne doit pas trahir le bras
     }
     return true;
   };
   try {
-    if (!copier(anon)) return null;
-    const v = { EVAL: dirEval, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests, DEMANDES: demandes }, sMeca = join(dirEval, 'meca.json');
-    const so = sorties.length ? '\n' + remplir('juge-sorties.md', { ...v, LISTE: sorties.map((x, i) => `S${i + 1} (i=${i + 1}). étape ${x.k} : ${x.sortie}`).join('\n') }).trimEnd() : '';
-    const meca = demander(remplir('juge-mecanique.md', { ...v, SORTIE: sMeca, SORTIES: so }), sMeca, (x) => validerMeca(x, sorties), dirEval, modele, exec) as (Record<'X' | 'Y', Meca> & { remplaces: string[] }) | null;
+    if (!copier(passes[0], anon)) return null;
+    const v = (p: string) => ({ EVAL: p, SECRETS: b.secrets, MESURE: join(b.secrets, 'mesure.md'), TESTS: b.tests, DEMANDES: demandes }), sMeca = join(passes[0], 'meca.json');
+    const so = sorties.length ? '\n' + remplir('juge-sorties.md', { ...v(passes[0]), LISTE: sorties.map((x, i) => `S${i + 1} (i=${i + 1}). étape ${x.k} : ${x.sortie}`).join('\n') }).trimEnd() : '';
+    const meca = demander(remplir('juge-mecanique.md', { ...v(passes[0]), SORTIE: sMeca, SORTIES: so }), sMeca, (x) => validerMeca(x, sorties), passes[0], modele, exec) as (Record<'X' | 'Y', Meca> & { remplaces: string[] }) | null;
     if (!meca) return null;
     for (const m of sorties.length ? [meca.X, meca.Y] : []) m.sorties = m.sorties!.map((x, j) => ({ ...sorties[j], i: x.i, verdict: x.verdict, preuve: x.preuve }));
-    const ecran = (s: string) => (b.visible
-      ? `Lance l'app de chaque copie, l'une après l'autre, comme le dit ${v.MESURE} (section Écran). Fais des captures à 1440 et à 390 px dans ${dirEval}/captures${s}-X et captures${s}-Y, et regarde-les. ui = la copie dont l'écran est le plus cohérent avec le reste de l'application.`
+    const ecran = (p: string) => (b.visible
+      ? `Lance l'app de chaque copie, l'une après l'autre, comme le dit ${join(b.secrets, 'mesure.md')} (section Écran). Fais des captures à 1440 et à 390 px dans ${p}/captures-X et captures-Y, et regarde-les. ui = la copie dont l'écran est le plus cohérent avec le reste de l'application.`
       : 'Pas d\'écran : ui = "na".');
     const ordres: Ordre[] = [];
-    for (const [a, s] of [[anon, ''], [{ X: anon.Y, Y: anon.X }, '-2']] as const) { // R39 : second passage à ordre permuté (biais de position)
-      if (!copier(a)) return null; // le juge à l'aveugle voit les livrables, pas les mutations
-      const f = join(dirEval, `aveugle${s}.json`), av = demander(remplir('juge-aveugle.md', { ...v, ECRAN: ecran(s), SORTIE: f }), f, validerAveugle, dirEval, modele, exec) as Avis | null;
+    for (const [a, p] of [[anon, passes[1]], [{ X: anon.Y, Y: anon.X }, passes[2]]] as const) { // R39 : second passage à ordre permuté (biais de position)
+      if (!copier(p, a)) return null; // le juge à l'aveugle voit les livrables, pas les mutations
+      const f = join(p, 'aveugle.json'), av = demander(remplir('juge-aveugle.md', { ...v(p), ECRAN: ecran(p), SORTIE: f }), f, validerAveugle, p, modele, exec) as Avis | null;
       if (!av) return null;
       ordres.push({ ...av, anonymat: a });
     }
     return { meca: { [anon.X]: meca.X, [anon.Y]: meca.Y }, remplaces: meca.remplaces, ...combiner(ordres), anonymat: anon };
-  } finally { for (const k of ['X', 'Y']) rmSync(join(dirEval, k), { recursive: true, force: true }); } // copies effacées sur tous les chemins
+  } finally { for (const p of passes) for (const k of ['X', 'Y']) rmSync(join(p, k), { recursive: true, force: true }); } // copies effacées sur tous les chemins
 }

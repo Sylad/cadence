@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -34,7 +34,7 @@ function fauxJuge(sorties: object[], vus: string[][] = [], dirEvalVu = ''): Exec
     vus.push(args);
     expect(o.env.KUBECONFIG).toBe('/nonexistent');
     const p = args[args.indexOf('-p') + 1];
-    if (i === 0 && dirEvalVu) { expect(existsSync(join(dirEvalVu, 'X', '.git'))).toBe(false); expect(existsSync(join(dirEvalVu, 'X.patch'))).toBe(true); }
+    if (i === 0 && dirEvalVu) { expect(existsSync(join(dirEvalVu, 'meca', 'X', '.git'))).toBe(false); expect(existsSync(join(dirEvalVu, 'meca', 'X.patch'))).toBe(true); }
     const m = /dans (\S+\.json)/.exec(p);
     writeFileSync(m![1], JSON.stringify(sorties[i++] ?? {}));
     return { stdout: JSON.stringify({ session_id: `j${i}`, total_cost_usd: 0, modelUsage: {} }), code: 0 };
@@ -97,7 +97,7 @@ describe('juges', () => {
     expect(j!.remplaces).toEqual(['o.spec.ts > t']); // une seule liste, pour les deux bras
     expect(j!.defauts.A.majeurs).toBe(1);
     expect(j!.prefere).toBe('cand');
-    expect(readFileSync(join(dirEval, 'demande.md'), 'utf8')).toBe('d');
+    for (const p of ['meca', 'ordre-1', 'ordre-2']) expect(readFileSync(join(dirEval, p, 'demande.md'), 'utf8')).toBe('d');
     expect(vus.every((a) => a[a.indexOf('--disallowedTools') + 1].includes('Bash(kubectl:*)'))).toBe(true);
   });
   it('JSON invalide deux fois : banc non jugé (null), jamais un vert par défaut', () => {
@@ -120,10 +120,10 @@ describe('juges', () => {
   it('le juge aveugle voit des copies fraîches, sans les mutations du mécanique', () => {
     const { b, clones, dirEval } = decor();
     let n = 0;
-    const exec: Executeur = (args) => {
+    const exec: Executeur = (args, o) => {
       const m = /dans (\S+\.json)/.exec(args[args.indexOf('-p') + 1])!;
-      if (n++ === 0) { writeFileSync(join(dirEval, 'X', 'MUTATION'), 'm'); writeFileSync(m[1], JSON.stringify({ X: meca, Y: meca, remplaces: [] })); }
-      else { expect(existsSync(join(dirEval, 'X', 'MUTATION'))).toBe(false); writeFileSync(m[1], JSON.stringify(n === 2 ? aveugle : aveugle2)); }
+      if (n++ === 0) { writeFileSync(join(o.cwd, 'X', 'MUTATION'), 'm'); writeFileSync(m[1], JSON.stringify({ X: meca, Y: meca, remplaces: [] })); }
+      else { expect(existsSync(join(o.cwd, 'X', 'MUTATION'))).toBe(false); writeFileSync(m[1], JSON.stringify(n === 2 ? aveugle : aveugle2)); }
       return { stdout: JSON.stringify({ session_id: `s${n}` }), code: 0 };
     };
     expect(juger(b, clones, dirEval, 'opus', exec, () => 0.2)).not.toBeNull();
@@ -174,8 +174,8 @@ describe('R39 : juge aveugle joué deux fois, ordre X/Y permuté', () => {
     expect(j.aveugle_ordres!.map((o) => [o.anonymat, o.prefere])).toEqual([[{ X: 'A', Y: 'cand' }, 'cand'], [{ X: 'cand', Y: 'A' }, 'cand']]);
     expect(j.raisons).toContain('vu A en X'); expect(j.raisons).toContain('vu cand en X');
     expect(vus).toHaveLength(3);
-    expect(vus[2]).toContain(join(dirEval, 'aveugle-2.json'));
-    expect(existsSync(join(dirEval, 'aveugle.json')) && existsSync(join(dirEval, 'aveugle-2.json'))).toBe(true);
+    expect(vus[2]).toContain(join(dirEval, 'ordre-2', 'aveugle.json'));
+    expect(existsSync(join(dirEval, 'ordre-1', 'aveugle.json')) && existsSync(join(dirEval, 'ordre-2', 'aveugle.json'))).toBe(true);
     expect(avisLu(j, 'prefere')).toBe('cand');
   });
   it('biais de position (X toujours préféré) : indécis ; ui na dans les deux ordres reste na', () => {
@@ -201,6 +201,31 @@ describe('R39 : juge aveugle joué deux fois, ordre X/Y permuté', () => {
       expect(vus).toHaveLength(rate === 1 ? 3 : 4); // passage 1 raté (et relance) : pas de second passage
       for (const k of ['X', 'Y']) expect(existsSync(join(dirEval, k)), `copie ${k} restée`).toBe(false);
     }
+  });
+  it('revue M1 : chaque passe (mécanique, ordre 1, ordre 2) dans son propre dossier, son cwd, sans aucun artefact d\'une autre passe', () => {
+    const { b, clones, dirEval } = decorMarque();
+    const cwds: string[] = [];
+    let i = 0;
+    const exec: Executeur = (args, o) => {
+      const p = args[args.indexOf('-p') + 1], f = /dans (\S+\.json)/.exec(p)![1];
+      cwds.push(o.cwd);
+      expect(dirname(f)).toBe(o.cwd); // la sortie est dans le dossier de la passe
+      expect(readdirSync(o.cwd).sort()).toEqual(['X', 'X.patch', 'Y', 'Y.patch', 'demande.md']); // rien d'une autre passe : ni JSON, ni captures
+      expect(p).toContain(join(o.cwd, 'X')); expect(p).not.toContain(join(dirEval, 'X'));
+      for (const k of ['X', 'Y']) mkdirSync(join(o.cwd, `captures-${k}`)); // artefacts que les passes suivantes ne doivent pas voir
+      writeFileSync(f, JSON.stringify(i++ === 0 ? { X: meca, Y: meca, remplaces: [] } : { X: d(0, 0, 0), Y: d(0, 0, 0), prefere: 'X', ui: 'na', raisons: 'r' }));
+      return { stdout: JSON.stringify({ session_id: `s${i}` }), code: 0 };
+    };
+    expect(juger(b, clones, dirEval, 'opus', exec, () => 0.2)).not.toBeNull();
+    expect(cwds).toEqual(['meca', 'ordre-1', 'ordre-2'].map((n) => join(dirEval, n)));
+    for (const n of ['meca', 'ordre-1', 'ordre-2']) for (const k of ['X', 'Y']) expect(existsSync(join(dirEval, n, k)), `copie ${n}/${k} restée`).toBe(false);
+  });
+  it('revue m1 : mécanique null (après relance) : aucune session aveugle lancée', () => {
+    const { b, clones, dirEval } = decorMarque();
+    const cwds: string[] = [], faux = fauxJuge([{}, {}, aveugle, aveugle2]); // le faux rendrait des avis aveugles valides s'il était appelé
+    expect(juger(b, clones, dirEval, 'opus', (a, o) => { cwds.push(o.cwd); return faux(a, o); }, () => 0.2)).toBeNull();
+    expect(cwds).toEqual([join(dirEval, 'meca'), join(dirEval, 'meca')]); // session et relance du mécanique, rien d'autre
+    expect(existsSync(join(dirEval, 'ordre-1'))).toBe(false);
   });
   it('combiner : prefere egal dans un ordre et un bras dans l\'autre : indécis ; na contre X : indécis', () => {
     const o = (X: string, prefere: string, ui: string) => ({ X: d(0, 0, 0), Y: d(0, 0, 0), prefere, ui, raisons: '', anonymat: { X, Y: X === 'A' ? 'C' : 'A' } });

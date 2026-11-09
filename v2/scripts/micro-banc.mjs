@@ -66,16 +66,16 @@ await Promise.all(jobs);
 
 // Bilan : par bras, les tests cachés réussis (au total et par catégorie), le temps, les échecs.
 const lus = readdirSync(lot).filter((d) => existsSync(join(lot, d, 'resultat.json'))).map((d) => JSON.parse(readFileSync(join(lot, d, 'resultat.json'), 'utf8')));
-const cat = (t) => (/^PIÈGE/.test(t) ? 'pièges' : /^DEMANDE GLISSÉE/.test(t) ? 'glissée' : 'demandes');
-const lignes = [`# Micro-banc ${cand} contre ${ref}, ${N} répétitions`, '', `| bras | répétitions | tests cachés réussis | demandes | pièges | demande glissée | suite verte | temps médian | échecs |`, '|---|---|---|---|---|---|---|---|---|'];
+const cat = (t) => (/^PIÈGE/.test(t) ? 'pièges' : /^DEMANDE GLISSÉE/.test(t) ? 'glissée' : /^DEMANDE DIFFÉRÉE/.test(t) ? 'différée' : 'demandes');
+const lignes = [`# Micro-banc ${cand} contre ${ref}, ${N} répétitions`, '', `| bras | répétitions | tests cachés réussis | demandes | pièges | demande glissée | demande différée | suite verte | temps médian | échecs |`, '|---|---|---|---|---|---|---|---|---|---|'];
 for (const nom of [cand, ref]) {
   const r = lus.filter((x) => x.bras === nom);
-  if (!r.length) { lignes.push(`| ${nom} | 0 | – | – | – | – | – | – | tous en erreur |`); continue; }
+  if (!r.length) { lignes.push(`| ${nom} | 0 | – | – | – | – | – | – | – | tous en erreur |`); continue; }
   const somme = (f) => r.reduce((a, x) => a + x.caches.filter((c) => f(c.test) && c.ok).length, 0);
   const total = (f) => r.reduce((a, x) => a + x.caches.filter((c) => f(c.test)).length, 0);
   const t = r.map((x) => x.duree_s).sort((a, b) => a - b), med = t[Math.floor(t.length / 2)];
   const echecs = r.flatMap((x) => x.etapes.filter((e) => e.echec).map((e) => `${e.k}: ${e.echec}`));
-  lignes.push(`| ${nom} | ${r.length} | ${somme(() => true)}/${total(() => true)} | ${somme((c) => cat(c) === 'demandes')}/${total((c) => cat(c) === 'demandes')} | ${somme((c) => cat(c) === 'pièges')}/${total((c) => cat(c) === 'pièges')} | ${somme((c) => cat(c) === 'glissée')}/${total((c) => cat(c) === 'glissée')} | ${r.filter((x) => x.suite_ok).length}/${r.length} | ${med} s | ${echecs.length ? echecs.join(' ; ') : '–'} |`);
+  lignes.push(`| ${nom} | ${r.length} | ${somme(() => true)}/${total(() => true)} | ${somme((c) => cat(c) === 'demandes')}/${total((c) => cat(c) === 'demandes')} | ${somme((c) => cat(c) === 'pièges')}/${total((c) => cat(c) === 'pièges')} | ${somme((c) => cat(c) === 'glissée')}/${total((c) => cat(c) === 'glissée')} | ${somme((c) => cat(c) === 'différée')}/${total((c) => cat(c) === 'différée')} | ${r.filter((x) => x.suite_ok).length}/${r.length} | ${med} s | ${echecs.length ? echecs.join(' ; ') : '–'} |`);
 }
 const erreurs = readdirSync(lot).filter((f) => f.endsWith('.erreur.txt'));
 if (erreurs.length) lignes.push('', `Bras en erreur (voir les fichiers) : ${erreurs.join(', ')}`);

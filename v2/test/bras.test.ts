@@ -1,12 +1,12 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Banc } from '../src/bench/banc.js';
 import { chargerBras, cheminReglages, empreinteReglages, environnementNeutre, libererReglages, lancerBras, OUTILS_INTERDITS, type Executeur } from '../src/bench/bras.js';
+import { dossierTemp } from './temp.js';
 
 function bancTest(reponses?: string): { b: Banc; clone: string } {
-  const r = mkdtempSync(join(tmpdir(), 'bras-'));
+  const r = dossierTemp('bras-');
   const dir = join(r, 'bancs', '1-t'); mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'demande.md'), 'Ajoute un séparateur.');
   if (reponses) writeFileSync(join(dir, 'reponses.md'), reponses);
@@ -118,7 +118,7 @@ describe('lancerBras', () => {
     expect(empreinteReglages(clone)).not.toBe(e0);
     const e1 = empreinteReglages(clone), home = process.env.HOME; // ~/.claude/settings*.json sont scellés (lus, jamais écrits)
     try {
-      process.env.HOME = mkdtempSync(join(tmpdir(), 'home-')); const e2 = empreinteReglages(clone);
+      process.env.HOME = dossierTemp('home-'); const e2 = empreinteReglages(clone);
       expect(e2).not.toBe(e1);
       mkdirSync(join(process.env.HOME, '.claude')); writeFileSync(join(process.env.HOME, '.claude', 'settings.local.json'), '{"disableAllHooks":true}');
       expect(empreinteReglages(clone)).not.toBe(e2);
@@ -139,7 +139,7 @@ describe('lancerBras', () => {
   });
 
   it('chargerBras lit settings quand il est donné', () => {
-    const r = mkdtempSync(join(tmpdir(), 'brasyaml-'));
+    const r = dossierTemp('brasyaml-');
     writeFileSync(join(r, 'bras.yaml'), 'A:\n  modele: opus\n  brief: /b/a.md\nC:\n  modele: opus\n  brief: /b/c.md\n  settings: /b/s.json\n');
     expect(chargerBras(r)).toEqual({ A: { nom: 'A', modele: 'opus', brief: '/b/a.md' }, C: { nom: 'C', modele: 'opus', brief: '/b/c.md', settings: '/b/s.json' } });
   });

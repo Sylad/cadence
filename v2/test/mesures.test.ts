@@ -1,13 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CloneModifie, TestsIntrouvables, jouerTests, lectureReferences, maintenabilite } from '../src/sequence/mesures.js';
+import { dossierTemp } from './temp.js';
 
 const g = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' });
 function depot(): string {
-  const d = mkdtempSync(join(tmpdir(), 'mesures-'));
+  const d = dossierTemp('mesures-');
   g(d, 'init', '-q'); mkdirSync(join(d, 'src'));
   writeFileSync(join(d, 'src', 'a.ts'), 'export const a = 1;\n');
   writeFileSync(join(d, '.gitignore'), 'node_modules\n.vite\n');
@@ -16,7 +16,7 @@ function depot(): string {
 }
 // Fausse commande de test : écrit le JSON de vitest pour les fichiers reçus ; « ok » passe, « ko » échoue.
 function faux(mode = ''): string {
-  const f = join(mkdtempSync(join(tmpdir(), 'faux-')), 'faux.cjs');
+  const f = join(dossierTemp('faux-'), 'faux.cjs');
   writeFileSync(f, `const fs=require('fs');const a=process.argv.slice(2);
 const out=a.find(x=>x.startsWith('--outputFile=')).slice(13);const files=a.filter(x=>!x.startsWith('--'));
 ${mode}
@@ -25,7 +25,7 @@ const testResults=files.map(n=>({name:n,assertionResults:[{ancestorTitles:['suit
 fs.writeFileSync(out,JSON.stringify({testResults}));process.exit(1);`);
   return `node ${f}`;
 }
-const cache = (d: string) => { const s = join(d, '..', `src-${Math.random()}.spec.ts`); writeFileSync(s, 'x'); return s; };
+const cache = (d: string) => { void d; const s = join(dossierTemp('cache-'), 'src.spec.ts'); writeFileSync(s, 'x'); return s; };
 
 describe('jouerTests', () => {
   it('copie, lance, lit les statuts par id, et laisse le clone intact', () => {
@@ -50,7 +50,7 @@ describe('jouerTests', () => {
   });
   it('lit le vrai format de vitest (un test vert, un rouge)', () => {
     const d = depot();
-    const h = mkdtempSync(join(tmpdir(), 'hid-'));
+    const h = dossierTemp('hid-');
     writeFileSync(join(h, 'p.ts'), "import {it,expect} from 'vitest';it('vert',()=>expect(1).toBe(1));\n");
     writeFileSync(join(h, 'q.ts'), "import {describe,it,expect} from 'vitest';describe('grp',()=>{it('rouge',()=>expect(1).toBe(2));});\n");
     const bin = join(import.meta.dirname, '..', 'node_modules', '.bin', 'vitest');
@@ -63,8 +63,8 @@ describe('jouerTests', () => {
 });
 
 const vitestBin = join(import.meta.dirname, '..', 'node_modules', '.bin', 'vitest');
-const cacheTxt = (d: string, txt: string) => { const s = join(d, '..', `h-${Math.random()}.ts`); writeFileSync(s, txt); return s; };
-const fauxJson = (tests: object[]) => { const f = join(mkdtempSync(join(tmpdir(), 'fj-')), 'f.cjs');
+const cacheTxt = (d: string, txt: string) => { void d; const s = join(dossierTemp('cache-'), 'h.ts'); writeFileSync(s, txt); return s; };
+const fauxJson = (tests: object[]) => { const f = join(dossierTemp('fj-'), 'f.cjs');
   writeFileSync(f, `const a=process.argv.slice(2);const o=a.find(x=>x.startsWith('--outputFile=')).slice(13);const n=a.find(x=>!x.startsWith('--'));
 require('fs').writeFileSync(o,JSON.stringify({testResults:[{name:n,status:'passed',assertionResults:${JSON.stringify(tests)}}]}));`); return `node ${f}`; };
 
@@ -180,7 +180,7 @@ describe('maintenabilite', () => {
     mkdirSync(join(d, 'src', '.angular', 'cache'), { recursive: true });
     writeFileSync(join(d, 'src', '.angular', 'cache', 'vendor.js'), 'x\n'.repeat(900));
     writeFileSync(join(d, 'src', 'nouveau.ts'), 'x\n'.repeat(500));
-    const trace = join(mkdtempSync(join(tmpdir(), 'jscpd-')), 'args.json');
+    const trace = join(dossierTemp('jscpd-'), 'args.json');
     const faux = join(dirname(trace), 'faux.cjs');
     writeFileSync(faux, `require('fs').writeFileSync(${JSON.stringify(trace)}, JSON.stringify(process.argv.slice(2)));`);
     const m = maintenabilite(d, ['src'], [process.execPath, faux]);
@@ -209,7 +209,7 @@ describe('jouerTests, suite du projet (R24)', () => {
     const d = depot();
     writeFileSync(join(d, 'src', 'v.spec.ts'), "import {it,expect} from 'vitest';it('vert',()=>expect(1).toBe(1));it('rouge',()=>expect(1).toBe(2));\n");
     g(d, 'add', '.'); g(d, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'spec');
-    const brut = join(mkdtempSync(join(tmpdir(), 'brut-')), 'suite.json');
+    const brut = join(dossierTemp('brut-'), 'suite.json');
     const r = jouerTests(d, [], `${vitestBin} run --reporter=json --outputFile=<sortie>/suite.json`, 60_000, [], brut);
     expect(JSON.parse(readFileSync(brut, 'utf8')).testResults).toHaveLength(1);
     expect(r.statuts).toEqual({ 'src/v.spec.ts > vert': true, 'src/v.spec.ts > rouge': false });
@@ -218,7 +218,7 @@ describe('jouerTests, suite du projet (R24)', () => {
 });
 
 describe('lectureReferences, couverture (R31)', () => {
-  const d = mkdtempSync(join(tmpdir(), 'couv-'));
+  const d = dossierTemp('couv-');
   const long = join(d, 'long.md'), pdf = join(d, 'sans-pages.pdf');
   writeFileSync(long, 'l\n'.repeat(2500)); writeFileSync(pdf, '%PDF-1.4\n%%EOF\n');
   it('texte de 2500 lignes : sans limit = partiel ; 1-2000 + 2001-2500 = entier', () => {

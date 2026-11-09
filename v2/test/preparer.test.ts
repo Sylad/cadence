@@ -1,15 +1,15 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Banc } from '../src/bench/banc.js';
 import { preparer } from '../src/bench/preparer.js';
+import { dossierTemp } from './temp.js';
 
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
 
 function depot(): { dir: string; base: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'src-'));
+  const dir = dossierTemp('src-');
   git(dir, 'init', '-q', '-b', 'main');
   git(dir, 'config', 'user.email', 't@t'); git(dir, 'config', 'user.name', 't');
   writeFileSync(join(dir, 'a.txt'), '1'); git(dir, 'add', 'a.txt'); git(dir, 'commit', '-qm', 'base');
@@ -26,7 +26,7 @@ const banc = (source: string, base: string, tests = 'true', install = 'true'): B
 describe('preparer', () => {
   it('clone à la base, sans remote, sans tag ni branche du futur', () => {
     const { dir, base } = depot();
-    const cible = join(mkdtempSync(join(tmpdir(), 'run-')), 'A');
+    const cible = join(dossierTemp('run-'), 'A');
     const r = preparer(banc(dir, base), cible);
     expect(git(cible, 'rev-parse', 'HEAD')).toBe(base);
     expect(git(cible, 'remote')).toBe('');
@@ -38,17 +38,17 @@ describe('preparer', () => {
   });
   it('rapporte le code de la suite à la base', () => {
     const { dir, base } = depot();
-    const cible = join(mkdtempSync(join(tmpdir(), 'run-')), 'A');
+    const cible = join(dossierTemp('run-'), 'A');
     expect(preparer(banc(dir, base, 'exit 3'), cible).testsBase).toBe(3);
   });
   it('install en échec : lève en nommant son journal (échec en phase préparation)', () => {
     const { dir, base } = depot();
-    const cible = join(mkdtempSync(join(tmpdir(), 'run-')), 'A');
+    const cible = join(dossierTemp('run-'), 'A');
     expect(() => preparer(banc(dir, base, 'true', 'echo cassé; exit 4'), cible)).toThrow(`install : voir ${cible}.install.log`);
   });
   it('délai dépassé sur install ou sur tests : lève, et rien ne survit', () => {
     const { dir, base } = depot(); const marque = `40.${process.pid}`;
-    const cible = join(mkdtempSync(join(tmpdir(), 'run-')), 'A');
+    const cible = join(dossierTemp('run-'), 'A');
     const t0 = Date.now();
     expect(() => preparer(banc(dir, base, 'true', `sleep ${marque} & sleep ${marque}`), cible, 500)).toThrow(/install : délai de .* dépassé, voir .*install\.log/);
     expect(() => preparer(banc(dir, base, `sleep ${marque}`), cible, 500)).toThrow(/tests : délai de .* dépassé, voir .*tests-base\.log/);

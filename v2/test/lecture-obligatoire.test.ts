@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { closeSync, mkdirSync, mkdtempSync, openSync, symlinkSync, writeFileSync, writeSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, symlinkSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { lectureReferences } from '../src/sequence/mesures.js';
 import { ecritureBash } from '../hooks/lecture.mjs';
+import { dossierTemp } from './temp.js';
 
 // Le vrai script du hook, lancé comme Claude Code le lance : JSON sur stdin, liste des pièces dans l'environnement (R31),
 // refus = code 2 + raison sur stderr + décision JSON sur stdout.
@@ -18,7 +19,7 @@ const lu = (input: object, erreur = false) => { const id = `t${++n}`; return [ap
 const pdf = (pages: number) => `%PDF-1.4\n1 0 obj << /Type /Pages /Count ${pages} >> endobj\n${Array.from({ length: pages }, (_, i) => `${i + 2} 0 obj << /Type /Page >> endobj`).join('\n')}\n%%EOF\n`;
 
 function monde() {
-  const r = mkdtempSync(join(tmpdir(), 'hook-lecture-'));
+  const r = dossierTemp('hook-lecture-');
   const clone = join(r, 'run', 'c1'); mkdirSync(join(clone, 'src'), { recursive: true });
   const ref = join(r, 'ref'); mkdirSync(ref);
   const doc = join(ref, 'norme.md'), fig = join(ref, 'fig.png'), long = join(ref, 'long.md'), p40 = join(ref, 'p40.pdf');

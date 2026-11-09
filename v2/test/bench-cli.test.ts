@@ -1,6 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, utimesSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, utimesSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
@@ -8,10 +7,11 @@ import { archiver, controlesEclair, empreinte, passage, pretAPasser } from '../s
 import { statut } from '../src/bench/verdict.js';
 import { run } from '../src/cli.js';
 import { creerExecuteur } from '../src/bench/bras.js';
+import { dossierTemp } from './temp.js';
 
 const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuees: 1, mutations_total: 1, attendu: 'oui', mutations: [] };
 function racine(): string {
-  const r = mkdtempSync(join(tmpdir(), 'bench-'));
+  const r = dossierTemp('bench-');
   for (const id of ['1-a', '2-b']) {
     mkdirSync(join(r, 'bancs', id), { recursive: true }); mkdirSync(join(r, 'secrets', id), { recursive: true });
     writeFileSync(join(r, 'bancs', id, 'banc.yaml'), 'projet: p\nsource: /s\nbase: HEAD\ninstall: "true"\ntests: "true"\ntaille: fonction\n');
@@ -122,7 +122,7 @@ describe('passage du banc', () => {
 
 describe('pretAPasser et empreinte', () => {
   function depot(): { repo: string; brief: string } {
-    const repo = mkdtempSync(join(tmpdir(), 'depot-'));
+    const repo = dossierTemp('depot-');
     mkdirSync(join(repo, 'v2', 'src'), { recursive: true }); mkdirSync(join(repo, 'v2', 'briefs')); mkdirSync(join(repo, 'v2', 'dist'));
     writeFileSync(join(repo, 'v2', 'src', 'a.ts'), 'x'); writeFileSync(join(repo, 'v2', 'briefs', 'b.md'), 'b'); writeFileSync(join(repo, 'v2', 'dist', 'cli.js'), 'j');
     execFileSync('bash', ['-c', 'git init -q -b main && git add v2/src v2/briefs && git -c user.email=t@t -c user.name=t commit -q -m i'], { cwd: repo });
@@ -158,13 +158,13 @@ describe('pretAPasser et empreinte', () => {
     expect(pretAPasser(repo, { A: { nom: 'A', modele: 'm', brief: 'v2/briefs/b.md' } }, '/ailleurs')).toMatch(/hors de/);
   });
   it('empreinte inconnue sans dépôt git', () => {
-    expect(empreinte(mkdtempSync(join(tmpdir(), 'nogit-')))).toBe('inconnue');
+    expect(empreinte(dossierTemp('nogit-'))).toBe('inconnue');
   });
 });
 
 describe('executeur en groupe de processus', () => {
   it('tue les processus laissés en arrière-plan par la commande', () => {
-    const d = mkdtempSync(join(tmpdir(), 'ex-')); const cmd = join(d, 'faux.sh');
+    const d = dossierTemp('ex-'); const cmd = join(d, 'faux.sh');
     const marque = `300.${process.pid}`;
     writeFileSync(cmd, `#!/bin/bash\nsleep ${marque} &\necho '{"ok":1}'\n`, { mode: 0o755 });
     const r = creerExecuteur(cmd)([], { cwd: d, env: process.env });
@@ -172,7 +172,7 @@ describe('executeur en groupe de processus', () => {
     expect(spawnSync('pgrep', ['-f', `sleep ${marque.replace('.', '[.]')}`]).status).toBe(1);
   });
   it('au délai dépassé, le groupe entier est tué (le bras ne continue pas)', () => {
-    const d = mkdtempSync(join(tmpdir(), 'ex-')); const cmd = join(d, 'long.sh');
+    const d = dossierTemp('ex-'); const cmd = join(d, 'long.sh');
     writeFileSync(cmd, '#!/bin/bash\nsleep 20.456\n', { mode: 0o755 });
     creerExecuteur(cmd, 2000)([], { cwd: d, env: process.env });
     const fin = Date.now() + 3000;
@@ -383,7 +383,7 @@ describe('banc invalide (I-5)', () => {
 describe('lecteur du HUD (BANC_READER)', () => {
   const script = /BANC_READER = `\n([\s\S]*?)`/.exec(readFileSync(join(import.meta.dirname, '..', '..', 'plugins', 'cadence-hud', 'hooks', 'collect.ts'), 'utf8'))![1].replace(/\\\\n/g, '\\n');
   const lire = (lock: string | null): string | null => {
-    const r = mkdtempSync(join(tmpdir(), 'banc-hud-'));
+    const r = dossierTemp('banc-hud-');
     writeFileSync(join(r, 'en-cours.json'), '{"banc":"1-a"}');
     if (lock !== null) writeFileSync(join(r, 'passage.lock'), lock);
     return JSON.parse(execFileSync('python3', ['-I', '-c', script], { env: { ...process.env, BENCH_ROOT: r }, encoding: 'utf8' })).c;
@@ -398,7 +398,7 @@ describe('lecteur du HUD (BANC_READER)', () => {
 
 describe('archiver : patch rejouable, binaires compris (09-11)', () => {
   it('une image ajoutée par le bras est dans le patch et le patch s\'applique sur la base', () => {
-    const d = mkdtempSync(join(tmpdir(), 'arch-')), c = join(d, 'c1'), g = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, stdio: 'pipe' });
+    const d = dossierTemp('arch-'), c = join(d, 'c1'), g = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, stdio: 'pipe' });
     mkdirSync(c); g(c, 'init', '-q'); writeFileSync(join(c, 'a.ts'), '1'); g(c, 'add', '.'); g(c, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base');
     const base = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: c, encoding: 'utf8' }).trim();
     writeFileSync(join(c, 'img.webp'), Buffer.from([0, 255, 1, 254, 0, 0, 7])); writeFileSync(join(c, 'a.ts'), '2');

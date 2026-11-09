@@ -323,7 +323,8 @@ describe('raf migrate', () => {
   it('R7 — cadence est entièrement migré : rejouer raf migrate sur ses propres sources ne trouve aucun lecteur à réécrire', () => {
     const m = planMigration(process.cwd());
     expect(m.readers).toEqual([]);
-    expect(m.unhandled).toEqual([]);
+    // le banc de cadence 2 (v2/, docs/v2/) exclut du diff le plan des projets mesurés (docs/plan d'AetherWX) : ce n'est pas un lecteur du plan de cadence
+    expect(m.unhandled.filter((u) => !/^(v2|docs\/v2)\//.test(u.file))).toEqual([]);
     expect(m.move).toBeNull();
   });
 });

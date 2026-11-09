@@ -52,6 +52,11 @@ describe('cadence release — issues, bords (L548)', () => {
   it('minor et major : la version du commentaire suit le bump', () => {
     const dir = project(lot('L1', 'a (issue #30)'), '- a (L1).\n');
     expect(release(dir, 'minor', '--dry-run').out).toContain('publiée en 1.3.0"');
+    // une 2.x exige un banc vert (garde de cadence 2, release-banc-v2.test.ts) : cadence2 factice qui le dit
+    mkdirSync(join(dir, 'v2', 'bin'), { recursive: true });
+    writeFileSync(join(dir, 'v2', 'bin', 'cadence2.js'), "console.log(\"banc vert sur l'empreinte test\");\n");
+    execFileSync('git', ['add', '.'], { cwd: dir });
+    commit(dir, 'chore: banc vert');
     expect(release(dir, 'major', '--dry-run').out).toContain('publiée en 2.0.0"');
   });
   it('lot non clos (todo) cité dans le corps : la commande est tout de même imprimée (le lead tranche)', () => {

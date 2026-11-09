@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cheminReglages, libererReglages, type Executeur } from '../src/bench/bras.js';
 import { dossierTranscripts } from '../src/bench/fuites.js';
 import { empreinteUtilisateur, passageSequence } from '../src/sequence/passage.js';
+import { dossierTemp } from './temp.js';
 
 const sh = (cwd: string, cmd: string) => execFileSync('bash', ['-c', cmd], { cwd, encoding: 'utf8' });
 const GIT = 'git -c user.email=t@t -c user.name=t';
@@ -16,7 +16,7 @@ assertionResults:[...fs.readFileSync(p.join('tests',f),'utf8').matchAll(/it(\\.s
 status:m[1]?'skipped':fs.existsSync('src/'+m[2]+'.casse')?'failed':'passed'}))}));fs.writeFileSync(o,JSON.stringify({testResults}));`;
 
 function racine() {
-  const r = mkdtempSync(join(tmpdir(), 'seqpass-'));
+  const r = dossierTemp('seqpass-');
   const src = join(r, 'projet'); mkdirSync(join(src, 'tests'), { recursive: true }); mkdirSync(join(src, 'src')); mkdirSync(join(src, 'docs'));
   writeFileSync(join(src, 'suite.cjs'), SUITE);
   writeFileSync(join(src, 'tests', 'a.test.js'), "it('x')\nit('y')\n"); writeFileSync(join(src, 'tests', 'b.test.js'), "it('z')\n");
@@ -176,7 +176,7 @@ describe('passage d\'une séquence', () => {
   });
 
   it('R36 : empreinte des réglages utilisateur — CLAUDE.md, ses @imports récursifs (relatifs au fichier qui importe), settings*.json s\'ils existent', () => {
-    const h = mkdtempSync(join(tmpdir(), 'home-')), cl = join(h, '.claude');
+    const h = dossierTemp('home-'), cl = join(h, '.claude');
     mkdirSync(join(cl, 'sous'), { recursive: true });
     writeFileSync(join(cl, 'CLAUDE.md'), 'intro\n@RTK.md\nmail noreply@x.com\n@sous/a.md\n'); writeFileSync(join(cl, 'RTK.md'), 'r');
     writeFileSync(join(cl, 'sous', 'a.md'), '@b.md'); writeFileSync(join(cl, 'sous', 'b.md'), '@../CLAUDE.md'); writeFileSync(join(cl, 'settings.json'), '{}');
@@ -209,7 +209,7 @@ describe('passage d\'une séquence', () => {
   });
 
   it('m4 : @chemin suivi d\'une ponctuation (,;:.) retirée, extension .md gardée ; un import illisible = « illisible », sans exception', () => {
-    const h = mkdtempSync(join(tmpdir(), 'home-')), cl = join(h, '.claude'); mkdirSync(cl, { recursive: true });
+    const h = dossierTemp('home-'), cl = join(h, '.claude'); mkdirSync(cl, { recursive: true });
     writeFileSync(join(cl, 'CLAUDE.md'), 'voir @RTK.md, puis @a.md; (et @b.md) enfin @c.md.\n'); for (const f of ['RTK.md', 'a.md', 'b.md', 'c.md']) writeFileSync(join(cl, f), f);
     const e = empreinteUtilisateur(h);
     expect(Object.keys(e).sort()).toEqual(['CLAUDE.md', 'RTK.md', 'a.md', 'b.md', 'c.md', 'settings.json', 'settings.local.json'].map((f) => join(cl, f)));

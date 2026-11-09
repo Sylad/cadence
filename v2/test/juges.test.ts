@@ -1,18 +1,18 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Banc } from '../src/bench/banc.js';
 import type { Executeur } from '../src/bench/bras.js';
 import { anonymiser, avisLu, combiner, etatGit, juger, travailNonLivre, validerAveugle, validerMeca } from '../src/bench/juges.js';
+import { dossierTemp } from './temp.js';
 
 const meca = { suite_ok: true, caches_passes: 2, caches_total: 2, mutations_tuees: 5, mutations_total: 6, attendu: 'oui', mutations: [] };
 const aveugle = { X: { bloquants: 0, majeurs: 1, mineurs: 0 }, Y: { bloquants: 0, majeurs: 0, mineurs: 2 }, prefere: 'Y', ui: 'na', raisons: 'r' };
 const aveugle2 = { X: aveugle.Y, Y: aveugle.X, prefere: 'X', ui: 'na', raisons: 'r2' }; // R39 : le même avis, ordre permuté
 
 function decor(): { b: Banc; clones: Record<string, string>; dirEval: string } {
-  const r = mkdtempSync(join(tmpdir(), 'juges-'));
+  const r = dossierTemp('juges-');
   const dir = join(r, 'bancs', '1-t'); mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'demande.md'), 'd');
   const secrets = join(r, 'secrets', '1-t'); mkdirSync(secrets, { recursive: true }); writeFileSync(join(secrets, 'mesure.md'), 'm');
   const clones: Record<string, string> = {};
@@ -113,7 +113,7 @@ describe('juges', () => {
   });
   it('clone qui n\'est pas un dépôt git : null, sans exception', () => {
     const { b, clones, dirEval } = decor();
-    clones.cand = mkdtempSync(join(tmpdir(), 'pasgit-'));
+    clones.cand = dossierTemp('pasgit-');
     expect(juger(b, clones, dirEval, 'opus', fauxJuge([]), () => 0.2)).toBeNull();
     for (const k of ['X', 'Y']) expect(existsSync(join(dirEval, k)), `copie ${k} restée`).toBe(false);
   });
@@ -236,7 +236,7 @@ describe('R39 : juge aveugle joué deux fois, ordre X/Y permuté', () => {
 
 describe('travailNonLivre : captures du serveur MCP Playwright (S7, 2e occurrence)', () => {
   it('.playwright-mcp/ laissé dans le clone n\'est pas du travail non commité ; un vrai fichier oublié, si', () => {
-    const d = mkdtempSync(join(tmpdir(), 'pw-')), g = (...a: string[]) => execFileSync('git', a, { cwd: d });
+    const d = dossierTemp('pw-'), g = (...a: string[]) => execFileSync('git', a, { cwd: d });
     g('init', '-q'); writeFileSync(join(d, 'a.ts'), '1'); g('add', '.'); g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base');
     const avant = etatGit(d);
     writeFileSync(join(d, 'a.ts'), '2'); g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', 'travail');

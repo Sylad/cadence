@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { preparer } from '../src/bench/preparer.js';
@@ -9,6 +8,7 @@ import type { Executeur } from '../src/bench/bras.js';
 import { run } from '../src/cli.js';
 import { sequence, type Dep } from '../src/sequence/cli.js';
 import { ioTest } from './cli.test.js';
+import { dossierTemp } from './temp.js';
 
 const sh = (cwd: string, cmd: string) => execFileSync('bash', ['-c', cmd], { cwd, encoding: 'utf8' });
 const GIT = 'git -c user.email=t@t -c user.name=t';
@@ -19,7 +19,7 @@ const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuee
 
 /** Séquence de 2 étapes, bras A et sequence-v2 ; `jscpd` est un faux jscpd. */
 function racine() {
-  const r = mkdtempSync(join(tmpdir(), 'seqcli-')), src = join(r, 'projet');
+  const r = dossierTemp('seqcli-'), src = join(r, 'projet');
   mkdirSync(join(src, 'tests'), { recursive: true }); mkdirSync(join(src, 'src'));
   writeFileSync(join(src, 'suite.cjs'), SUITE); writeFileSync(join(src, 'tests', 'a.test.js'), "it('x')\n"); writeFileSync(join(src, 'src', 'app.js'), '1');
   sh(src, `git init -q -b main && git add . && ${GIT} commit -qm base`);

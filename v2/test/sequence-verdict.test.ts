@@ -1,11 +1,11 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Meca } from '../src/bench/juges.js';
 import { statut } from '../src/bench/verdict.js';
 import type { Base, MesureEtape, ResultatSequence } from '../src/sequence/passage.js';
 import { conclureSequence, ligneSequence, rapportSequence, verdictSequence } from '../src/sequence/verdict.js';
+import { dossierTemp } from './temp.js';
 
 const maint = (dup: number | null, f400: number) => ({ duplication_pct: dup, plus_gros: [], fichiers_400: f400 });
 const etape = (k: number, o: Partial<MesureEtape> = {}): MesureEtape => ({
@@ -179,7 +179,7 @@ describe('rapport, historique et publication de la séquence', () => {
     expect(h).toMatchObject({ type: 'sequence', sequence: 'aether-b68', run: 'r1', repetition: 2, candidat: 'C', reference: 'A', modele_candidat: 'opus', empreinte: 'e1', bancs: ['aether-b68'], hebdo: false, vert: true, rouges: [] });
   });
   it('conclureSequence écrit le rapport, le JSON et la ligne d\'historique', () => {
-    const racine = mkdtempSync(join(tmpdir(), 'seq-v-'));
+    const racine = dossierTemp('seq-v-');
     const vv = conclureSequence(racine, seq(), 'A', 'C', { maintenant: new Date('2026-11-08T10:00:00Z'), empreinte: 'e1', modele_candidat: 'opus', repetition: 2 });
     expect(vv.vert).toBe(true);
     expect(readFileSync(join(racine, 'rapports', 'r1-aether-b68-r2.md'), 'utf8')).toMatch(/— VERT/);

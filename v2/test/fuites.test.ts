@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { chercherFuites, fuitesDuBras, dossierTranscripts, reglesDuBras } from '../src/bench/fuites.js';
+import { dossierTemp } from './temp.js';
 
 const H = '/home/u';
 const appel = (input: object) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input }] } });
@@ -64,7 +64,7 @@ describe('fuites', () => {
     expect(chercherFuites([outil('Write', { file_path: `${C}/n.md`, content: 'voir ~/bench-cadence/secrets/1-t/attendu.md' })], r, H, C).certaines).toEqual([S]);
   });
   it('fuitesDuBras lit aussi les transcripts de sous-agents', () => {
-    const home = mkdtempSync(join(tmpdir(), 'fu-'));
+    const home = dossierTemp('fu-');
     const clone = `${home}/bench-cadence/runs/r1/1-t/c1`;
     const dir = `${dossierTranscripts(home, clone)}/sess/subagents`;
     mkdirSync(dir, { recursive: true });

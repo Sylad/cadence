@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BancInvalide } from '../src/bench/banc.js';
 import { chargerSequence } from '../src/sequence/sequence.js';
+import { dossierTemp } from './temp.js';
 
 const SEQ = `projet: ol-companion
 source: SRC
@@ -26,7 +26,7 @@ regression:
 
 const ECRAN = '# Mesure\n\n## Écran\n\nnpm run start:local (API locale, jamais la prod), captures 1440 et 390 px\n';
 function racine(seq = SEQ, sec = SEC, mesure?: string): string {
-  const r = mkdtempSync(join(tmpdir(), 'seq-'));
+  const r = dossierTemp('seq-');
   mkdirSync(join(r, 'src'));
   seq = seq.replace('SRC', join(r, 'src'));
   const d = join(r, 'sequences', 's1');

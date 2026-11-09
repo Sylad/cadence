@@ -1,11 +1,11 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BancInvalide, chargerBanc, listerBancs, lireDemande, racineBanc } from '../src/bench/banc.js';
+import { dossierTemp } from './temp.js';
 
 function racineAvec(bancs: Record<string, string>): string {
-  const r = mkdtempSync(join(tmpdir(), 'banc-'));
+  const r = dossierTemp('banc-');
   for (const [id, yaml] of Object.entries(bancs)) {
     mkdirSync(join(r, 'bancs', id), { recursive: true });
     writeFileSync(join(r, 'bancs', id, 'banc.yaml'), yaml);

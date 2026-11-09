@@ -34,11 +34,10 @@ if (mode === 'bras') { // un bras, une répétition : node micro-banc.mjs bras <
   const suite = (cwd) => { try { execFileSync('node', ['--test'], { cwd, stdio: 'pipe', timeout: 120_000 }); return true; } catch { return false; } };
   res.suite_ok = suite(clone);
   const copie = join(dir, 'juge'); cpSync(clone, copie, { recursive: true });
-  for (const f of readdirSync(join(micro, 'caches'))) cpSync(join(micro, 'caches', f), join(copie, 'test', `cache-${f}`));
-  let sortie = '';
-  try { sortie = execFileSync('node', ['--test', '--test-reporter=tap'], { cwd: copie, encoding: 'utf8', stdio: 'pipe', timeout: 120_000 }); } catch (e) { sortie = String(e.stdout ?? ''); }
-  res.caches = [...sortie.matchAll(/^(not ok|ok) \d+ - (.+)$/gm)].filter((x) => !/^(la carte dessine un symbole|la légende a deux|la fiche porte)/.test(x[2]))
-    .map((x) => ({ test: x[2].trim(), ok: x[1] === 'ok' }));
+  const caches = readdirSync(join(micro, 'caches')).map((f) => { cpSync(join(micro, 'caches', f), join(copie, 'test', `cache-${f}`)); return join('test', `cache-${f}`); });
+  let sortie = ''; // seulement les tests cachés : ceux que le bras a écrits ne comptent pas
+  try { sortie = execFileSync('node', ['--test', '--test-reporter=tap', ...caches], { cwd: copie, encoding: 'utf8', stdio: 'pipe', timeout: 120_000 }); } catch (e) { sortie = String(e.stdout ?? ''); }
+  res.caches = [...sortie.matchAll(/^\s*(not ok|ok) \d+ - (.+)$/gm)].filter((x) => !/^test\//.test(x[2].trim())).map((x) => ({ test: x[2].trim(), ok: x[1] === 'ok' }));
   res.commits = Number(execFileSync('git', ['rev-list', '--count', `${base}..HEAD`], { cwd: clone, encoding: 'utf8' }).trim());
   res.duree_s = res.etapes.reduce((a, e) => a + e.duree_s, 0);
   writeFileSync(join(dir, 'resultat.json'), JSON.stringify(res, null, 1));

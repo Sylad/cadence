@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Banc } from '../src/bench/banc.js';
 import type { Executeur } from '../src/bench/bras.js';
-import { anonymiser, juger, validerAveugle, validerMeca } from '../src/bench/juges.js';
+import { anonymiser, etatGit, juger, travailNonLivre, validerAveugle, validerMeca } from '../src/bench/juges.js';
 
 const meca = { suite_ok: true, caches_passes: 2, caches_total: 2, mutations_tuees: 5, mutations_total: 6, attendu: 'oui', mutations: [] };
 const aveugle = { X: { bloquants: 0, majeurs: 1, mineurs: 0 }, Y: { bloquants: 0, majeurs: 0, mineurs: 2 }, prefere: 'Y', ui: 'na', raisons: 'r' };
@@ -143,5 +143,18 @@ describe('juges', () => {
     const j = juger(b, clones, dirEval, 'opus', fauxJuge([{}, { X: meca, Y: meca, remplaces: [] }, aveugle]), () => 0.2);
     expect(j).not.toBeNull();
     expect(j!.prefere).toBe('cand');
+  });
+});
+
+describe('travailNonLivre : captures du serveur MCP Playwright (S7, 2e occurrence)', () => {
+  it('.playwright-mcp/ laissé dans le clone n\'est pas du travail non commité ; un vrai fichier oublié, si', () => {
+    const d = mkdtempSync(join(tmpdir(), 'pw-')), g = (...a: string[]) => execFileSync('git', a, { cwd: d });
+    g('init', '-q'); writeFileSync(join(d, 'a.ts'), '1'); g('add', '.'); g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base');
+    const avant = etatGit(d);
+    writeFileSync(join(d, 'a.ts'), '2'); g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', 'travail');
+    mkdirSync(join(d, '.playwright-mcp')); writeFileSync(join(d, '.playwright-mcp', '01-legende.png'), 'png');
+    expect(travailNonLivre(avant, etatGit(d))).toBeNull();
+    writeFileSync(join(d, 'oublie.ts'), 'x');
+    expect(travailNonLivre(avant, etatGit(d))).toBe('travail non commité');
   });
 });

@@ -13,7 +13,7 @@ export interface Jugement { meca: Record<string, Meca>; remplaces?: string[]; de
   /** m2 : X et Y → bras, pour vérifier les preuves (captures-sorties-X/…). */ anonymat?: Record<'X' | 'Y', string> }
 
 const BRIEFS = join(import.meta.dirname, '..', '..', 'briefs');
-const HORS_DIFF = [':(exclude).cadence', ':(exclude)docs/plan', ':(exclude)cadence.yaml'];
+const HORS_DIFF = [':(exclude).cadence', ':(exclude)docs/plan', ':(exclude)cadence.yaml', ':(exclude).playwright-mcp']; // .playwright-mcp : captures du serveur MCP Playwright (S7)
 
 /** HEAD et fichiers sales d'un clone, hors fichiers de cadence (les juges ne voient que base..HEAD). */
 export function etatGit(clone: string): { head: string; sale: string[] } {

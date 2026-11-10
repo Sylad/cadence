@@ -83,6 +83,19 @@ It refuses, with exit code 2 and nothing written:
 - a `package-lock.json` that is not at the version of `package.json`, or whose dependencies differ from those of `package.json`
   (a `npm install` would move them: commit that apart, before the release);
 - a version in `package.json` that is not `x.y.z`.
+- a **red smoke test of the installed package** (L696). Before writing anything, the command packs `HEAD` with `npm pack` in a detached
+  `git worktree` (what is not committed does not get in; the repository's `node_modules` are linked so that `prepare` builds), installs the
+  tarball with `npm install` in an empty folder, then runs the smoke commands from that installed package, each in an empty folder of its own,
+  with the package's `bin` first on the `PATH`, `CADENCE_FUMEE_PAQUET` (the installed package) and `CADENCE_FUMEE_RACINE` (the repository) set,
+  and the `CADENCE_*` and `GIT_*` variables of the calling session removed. The refusal names the failing step (`npm pack`, `npm install`
+  or `$ <command>`), its exit code and the end of its output. The commands are `release.smoke` of `cadence.yaml` (a list of bash commands);
+  without that key, `<bin> --help` for each `bin` of `package.json`; a package with neither gets no smoke test. `--dry-run` runs it too.
+  It is why ten versions went out broken or red from 28-10 to 10-11 (1.22.0 to 2.0.1), each fix closing one case: 2.0.0 and 2.0.1 shipped
+  without `v2/briefs/bras-A.md` and every `cadence run` in light mode crashed for an npm user. cadence declares `cadence --help`,
+  `cadence run --help`, `raf --help`, the help of `cadence2` (loaded from the published `v2/dist/cli.js`: `cadence2` is not a `bin` of the
+  package), `cadence run` in light mode with a fake `claude` on a toy repository (`scripts/fumee/run-leger.sh`) and `raf init`, `raf add`,
+  `raf check` on a toy plan (`scripts/fumee/raf-check.sh`): replayed on `v2.0.1`, it refuses (`cadence run --help` started a run, and the light
+  run fails on `ENOENT … bras-A.md`); on `v2.0.2` it passes, in about 10 s.
 
 Write the two forms of the new version in `docs/whats-new.md` **before** running the command: the file may be modified (it is the one tracked file allowed to be, since the version commit holds it) and the command then reads the forms it finds. Run after the forms are written, it exits 0; if it exits 1 the version files are already written, so fix `docs/whats-new.md` by hand and do not run the command again (it would bump once more).
 

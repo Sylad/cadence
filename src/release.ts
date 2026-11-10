@@ -5,6 +5,7 @@ import { currentBranch, hasTrackedChanges, tagExists } from './git.js';
 import { RafError } from './plan.js';
 import type { Day } from './dates.js';
 import { releaseIssueLines } from './issues.js';
+import { commandesFumee, fumerPaquet } from './release-fumee.js';
 
 const BUMPS = ['patch', 'minor', 'major'] as const;
 type Bump = (typeof BUMPS)[number];
@@ -341,6 +342,9 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
     const delai = r.error || r.signal ? `cadence2 n'a pas répondu en 60 s (${r.error?.message ?? r.signal}) — ` : '';
     return { code: r.status ?? 1, sortie: `${delai}${r.stdout ?? ''}${r.stderr ?? ''}` };
   }, (v) => { const f = join(root, PUBLICATIONS, `${v}.md`); return existsSync(f) ? readFileSync(f, 'utf8') : undefined; });
+  // L696 : le paquet réel (npm pack de HEAD), installé dans un dossier vide, joue ses commandes de fumée avant tout écrit ; un rouge refuse la release.
+  const fumee = commandesFumee(root, readJson(root, PACKAGE));
+  if (fumee.length > 0) fumerPaquet(root, fumee, out);
 
   const whatsNewPath = join(root, WHATS_NEW);
   const hasWhatsNew = existsSync(whatsNewPath);

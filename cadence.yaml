@@ -35,6 +35,17 @@ orchestrate:
     code: [src/**, 'bin/*.js', '!**/*.test.ts']
     tests: ['test/**']
 
+# Fumée du paquet (L696, D-11) : avant le tag, cadence release fait npm pack de HEAD, l'installe dans un dossier vide et joue ces commandes
+# depuis le paquet installé ; une rouge refuse la release (dix versions publiées cassées ou rouges du 28-10 au 10-11, dont 2.0.0 et 2.0.1 sans bras-A.md).
+release:
+  smoke:
+    - cadence --help
+    - cadence run --help
+    - raf --help
+    - node "$CADENCE_FUMEE_RACINE/scripts/fumee/cadence2-aide.mjs"
+    - bash "$CADENCE_FUMEE_RACINE/scripts/fumee/run-leger.sh"
+    - bash "$CADENCE_FUMEE_RACINE/scripts/fumee/raf-check.sh"
+
 # Lecteurs de l'ancien emplacement du plan (l'ancien dossier du plan) que « raf migrate » laisse tels quels (L284) : ils décrivent ou testent le repli sur l'ancien emplacement
 # (les autres projets n'ont pas tous migré), ou datent d'avant le déplacement (fiches, conceptions, mesures).
 migrate:

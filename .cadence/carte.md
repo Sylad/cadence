@@ -20,3 +20,12 @@
   Décision : pas de gestionnaire SIGINT dans le run (code synchrone, il différerait la mort) ; un run tué laisse son fichier, porteur mort par pid+start.
 - Décision : les commits des programmes (commitPlan v1, deliver, config set) passent le pre-commit par `CADENCE_COMMIT_PROGRAMME=1` (`commitAsProgram`,
   src/git.ts), posée sur ce seul `git commit`. Plan en attente : ajout et application sous `<git-common-dir>/cadence/plan-en-attente.lock`.
+
+## Fumée du paquet avant le tag (src/release-fumee.ts, scripts/fumee/) — L696, D-11
+
+- Workflow : `cadence release` (et `--dry-run`), après ses refus habituels et la garde du banc v2, avant tout écrit : `npm pack` de HEAD dans un worktree détaché
+  (node_modules du dépôt liés pour `prepare`), `npm install` du tarball dans un dossier vide, puis chaque commande de `release.smoke` (cadence.yaml), chacune
+  dans un dossier vide, bin du paquet en tête du PATH, `CADENCE_FUMEE_PAQUET` / `CADENCE_FUMEE_RACINE` posés, `CADENCE_*` et `GIT_*` retirés. Rouge = refus (code 2) avec la commande, le code, la fin de la sortie.
+- Décision : sans `release.smoke`, `<bin> --help` pour chaque bin de package.json ; ni l'un ni l'autre, pas de fumée. Pas d'option pour la sauter.
+- Décision : `cadence2` n'est pas un bin publié (le banc se lie depuis le checkout) : sa fumée charge `v2/dist/cli.js` du paquet installé. `cadence-hud` n'est pas dans
+  le paquet npm (marketplace git) : pas de fumée npm pour lui. Rejoué : v2.0.1 refusée (`cadence run --help`, puis `ENOENT bras-A.md`), v2.0.2 verte en ~10 s.

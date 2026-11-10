@@ -3,7 +3,7 @@
 Depuis le 2026-11-09, `cadence run` remplace `cadence orchestrate` pour faire une demande. Il joue exactement ce que le banc a mesuré gagnant (docs/v2/banc.md), et rien d'autre.
 
 ```bash
-cadence run "<demande>" [--piece docs/norme.md]… [--lot L12] [--taille retouche|fonction] [--complet] [--sans-porte] [--fond]
+cadence run "<demande>" [--piece docs/norme.md]… [--lot L12] [--taille retouche|fonction] [--complet] [--modele opus|fable] [--sans-porte] [--fond]
 cadence run --reponse <id> "<texte>"
 cadence run --liste
 cadence run --help        # ou -h
@@ -22,13 +22,13 @@ references:
     docs: [docs/normes/sigwx.md]
 ```
 
-Le mode et sa raison s'affichent au lancement. Dans un vrai dépôt, la ligne « Taille » du brief complet, qui ne sert qu'au banc, est retirée : elle casserait un commitlint. Les mots se comparent sans accents ni casse, en mot entier. Un document ou une `--piece` peut être relatif au dépôt, absolu ou sous `~` : une base de connaissance hors du dépôt (par exemple `~/kb/dossiers/<dépôt>-<lot>.md`) se lit comme une pièce.
+Le modèle, le mode et sa raison s'affichent au lancement (« session Fable en mode leger (…) »). Dans un vrai dépôt, la ligne « Taille » du brief complet, qui ne sert qu'au banc, est retirée : elle casserait un commitlint. Les mots se comparent sans accents ni casse, en mot entier. Un document ou une `--piece` peut être relatif au dépôt, absolu ou sous `~` : une base de connaissance hors du dépôt (par exemple `~/kb/dossiers/<dépôt>-<lot>.md`) se lit comme une pièce.
 
 ## Déroulé
 
 1. Ouvre un worktree à côté du dépôt (`../.cadence-run/<projet>-<id>`), sur une branche `cadence/run-<id>`. Les `node_modules` et `.venv` y sont liés en dur.
-2. Lance une seule session Opus, dans le mode choisi par l'aiguillage. En mode complet : brief `v2/briefs/bras-sequence-v2d.md` et hook « lecture obligatoire ». Les pièces passées par `--piece` doivent être lues en entier avant toute écriture. La session tient le registre des demandes du dépôt (`.cadence/demandes/`).
-3. Si la session pose une question, le run s'arrête à l'état `attente`. `--reponse` reprend alors la même session.
+2. Lance une seule session, dans le mode choisi par l'aiguillage et sur le modèle choisi (`--modele`, sinon `CADENCE_RUN_MODELE`, sinon Opus). En mode complet : brief `v2/briefs/bras-sequence-v2d.md` et hook « lecture obligatoire ». Les pièces passées par `--piece` doivent être lues en entier avant toute écriture. La session tient le registre des demandes du dépôt (`.cadence/demandes/`).
+3. Si la session pose une question, le run s'arrête à l'état `attente`. `--reponse` reprend alors la même session, sur le modèle de son lancement (gardé dans l'état du run).
 4. Rebase sur la branche de départ, puis porte complète (`orchestrate.test` et `orchestrate.build` de `cadence.yaml`), jouée une seule fois. Si elle est rouge, la même session corrige une fois, puis la porte est rejouée.
 5. Intégration en avance rapide sur la branche de départ, puis le worktree est retiré. Rien n'est poussé. Le plan (`raf`) et `cadence deliver` restent ceux de la v1.
 
@@ -44,6 +44,7 @@ En cas d'échec, le worktree est gardé avec l'état du run (`../.cadence-run/<p
 | `--liste` | Retrouver un run rendu, en attente ou rouge, sans fouiller le disque. |
 | `--complet` | Forcer le mode complet quand l'aiguillage rate une demande qui a des références. |
 | `--lot` | Les commits d'un dépôt suivi par un plan citent le lot (`feat(L51): …`) : la session le reçoit avec la demande. |
+| `--modele`, `CADENCE_RUN_MODELE` | Choisir le modèle de la session : `opus` (défaut, celui des deux bras mesurés au banc) ou `fable` ; Sonnet et Haiku n'écrivent pas de code (cause C2). La valeur s'écrit en minuscules. L'option l'emporte sur la variable ; une valeur inconnue est refusée en code 2 avant toute création ; la ligne de lancement dit le modèle utilisé (L699). En Fable, le run sort de ce que le banc a mesuré. |
 | `--fond` | Le run se détache et survit à la session qui l'a lancée (vécu au compte pro le 10-11 : un lot mort avec la session précédente) ; journal dans `../.cadence-run/`. |
 | `KUBECONFIG` | Comme les vagues : sans `orchestrate.prodAccess: true`, la session n'a ni `kubectl`, ni `helm`, ni `KUBECONFIG` ; avec, elle joue le banc du projet. |
 | `--sans-porte` | Un dépôt sans porte déclarée n'est pas intégré en silence : il faut le choisir explicitement. |

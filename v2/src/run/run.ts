@@ -1,4 +1,4 @@
-// cadence run : une demande, une session Opus, de bout en bout (plan n°6, 09-11).
+// cadence run : une demande, une session (Opus par défaut, L699 : --modele), de bout en bout (plan n°6, 09-11).
 // Le produit joue EXACTEMENT un bras mesuré au banc, choisi par l'aiguillage (aiguillage.ts) : brief v2d + hook « lecture obligatoire »
 // quand la demande a des références à lire, brief de Claude seul sinon ; mêmes interdictions. Puis : rebase sur la branche de départ, porte complète UNE fois
 // (une reprise de la même session si elle est rouge), intégration en avance rapide. Le plan (raf) et deliver restent ceux de la v1.
@@ -8,13 +8,13 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, type Executeur } from '../bench/bras.js';
-import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin } from './aiguillage.js';
+import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun } from './aiguillage.js';
 
 const PORTE_MS = 30 * 60_000;
 
 export type EtatRun = 'en-cours' | 'attente' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
 export interface Etat { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string; pieces: string[];
-  taille: string; mode: 'complet' | 'leger'; acces_cluster: boolean; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string }
+  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string }
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string }
 
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -93,10 +93,11 @@ function jouerPorte(cmds: string[], cwd: string): { ok: boolean; sortie: string 
 
 function session(e: Etat, prompt: string, o: Opts): boolean {
   const exec = o.exec ?? creerExecuteur('claude', 4 * 3600_000);
+  // L699 : le modèle est celui du lancement, gardé dans l'état (une reprise par --reponse ne le change pas) ; un état d'avant L699 n'en a pas : opus.
   // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet
   const env = { ...process.env, CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
   const interdits = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
-  const r = lire(exec(['-p', prompt, ...(e.session ? ['--resume', e.session] : []), ...argsClaude(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET, e.worktree, interdits)], { cwd: e.worktree, env }));
+  const r = lire(exec(['-p', prompt, ...(e.session ? ['--resume', e.session] : []), ...argsClaude({ ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }, e.worktree, interdits)], { cwd: e.worktree, env }));
   e.session = r.session || e.session; e.cout_usd += r.cout;
   if (r.echec) { e.etat = 'echec'; e.detail = r.echec; return false; }
   if (r.resultat) o.out(`session : ${r.resultat.slice(-1500)}`);
@@ -151,7 +152,8 @@ function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
   return e;
 }
 
-export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string }): Etat {
+export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; modele?: string; exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string }): Etat {
+  const modele = modeleRun(a.modele); // avant le worktree : un modèle inconnu ne crée rien
   const repo = git(a.repo, 'rev-parse', '--show-toplevel'), cible = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD');
   const id = `${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${process.pid}`;
   const runs = dossierRuns(repo), worktree = join(runs, `${basename(repo)}-${id}`);
@@ -160,9 +162,9 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   copierDeps(repo, worktree);
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
-    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, acces_cluster: orchestrate(worktree).prodAccess === true, session: '', cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
+    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, session: '', cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
   sauver(e);
-  a.out(`cadence run ${id} : session Opus en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);
+  a.out(`cadence run ${id} : session ${modele[0].toUpperCase()}${modele.slice(1)} en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);
   // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.
   const demande = a.lot ? `${a.demande}\n\nLot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).` : a.demande;
   const brief = readFileSync(aig.bras.brief, 'utf8').split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)

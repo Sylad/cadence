@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
 import { executerRun, repondreRun, type Etat } from '../src/run/run.js';
@@ -117,5 +117,60 @@ describe('cadence run', () => {
     const e = executerRun({ repo, demande: 'x', exec: fauxClaude([]), out: () => {} });
     expect(e.etat).toBe('sans-commit');
     expect(JSON.parse(readFileSync(e.fichier, 'utf8')).etat).toBe('sans-commit');
+  });
+});
+
+describe('cadence run : choix du modèle (L699)', () => {
+  type Appels = { args: string[]; env: NodeJS.ProcessEnv }[];
+  const modeleDe = (a: Appels, i = 0) => a[i].args[a[i].args.indexOf('--model') + 1];
+
+  for (const [mode, pieces] of [['leger', []], ['complet', ['cadence.yaml']]] as const) {
+    it(`bras ${mode} : le modèle demandé arrive dans la commande claude, la ligne de lancement et l'état`, () => {
+      const repo = depot(), appels: Appels = [], { l, out } = io();
+      const e = executerRun({ repo, demande: 'Crée fait.txt', pieces: [...pieces], modele: 'fable', exec: fauxClaude([commite('fait.txt')], appels), out });
+      expect(e).toMatchObject({ etat: 'integre', mode, modele: 'fable' });
+      expect(modeleDe(appels)).toBe('fable');
+      expect(appels[0].args.filter((x) => x === '--model')).toHaveLength(1);
+      expect(l[0]).toMatch(new RegExp(`session Fable en mode ${mode} `));
+      expect(l[0]).not.toMatch(/Opus/);
+    });
+
+    it(`bras ${mode} : sans choix, opus, et la ligne de lancement le dit`, () => {
+      const repo = depot(), appels: Appels = [], { l, out } = io();
+      const e = executerRun({ repo, demande: 'Crée fait.txt', pieces: [...pieces], exec: fauxClaude([commite('fait.txt')], appels), out });
+      expect(e).toMatchObject({ mode, modele: 'opus' });
+      expect(modeleDe(appels)).toBe('opus');
+      expect(l[0]).toMatch(new RegExp(`session Opus en mode ${mode} `));
+    });
+  }
+
+  it('porte rouge puis --reponse : chaque reprise garde le modèle du lancement, lu dans l\'état', () => {
+    const repo = depot(), appels: Appels = [];
+    const exec = fauxClaude([commite('a.txt'), commite('b.txt'), commite('fait.txt')], appels);
+    const e1 = executerRun({ repo, demande: 'x', modele: 'fable', exec, out: () => {} });
+    expect(e1.etat).toBe('porte-rouge');
+    expect(JSON.parse(readFileSync(e1.fichier, 'utf8')).modele).toBe('fable');
+    expect(repondreRun(e1.id, repo, 'crée fait.txt', { exec, out: () => {} }).etat).toBe('integre');
+    expect(appels.map((_, i) => modeleDe(appels, i))).toEqual(['fable', 'fable', 'fable']);
+    expect(appels[2].args).toEqual(expect.arrayContaining(['--resume', 's2']));
+  });
+
+  it('état écrit avant L699 (sans modèle) : la reprise part en opus', () => {
+    const repo = depot(), appels: Appels = [];
+    const exec = fauxClaude([(cwd) => writeFileSync(`${cwd}.question.md`, 'Rouge ou bleu ?'), commite('fait.txt')], appels);
+    const e1 = executerRun({ repo, demande: 'x', exec, out: () => {} });
+    const { modele: _retire, ...ancien } = JSON.parse(readFileSync(e1.fichier, 'utf8')) as Etat;
+    writeFileSync(e1.fichier, JSON.stringify(ancien));
+    expect(repondreRun(e1.id, repo, 'bleu', { exec, out: () => {} }).etat).toBe('integre');
+    expect(modeleDe(appels, 1)).toBe('opus');
+  });
+
+  for (const refuse of ['gpt', 'sonnet', 'haiku', 'Opus']) it(`modèle ${refuse} : refusé avant toute création (ni worktree, ni branche, ni état), aucune session`, () => {
+    const repo = depot(), appels: Appels = [];
+    expect(() => executerRun({ repo, demande: 'x', modele: refuse, exec: fauxClaude([], appels), out: () => {} })).toThrow(new RegExp(`modèle inconnu : « ${refuse} » ; attendu : opus, fable$`));
+    expect(appels).toEqual([]);
+    expect(git(repo, 'branch', '--format=%(refname:short)')).toBe('main');
+    expect(git(repo, 'worktree', 'list').split('\n')).toHaveLength(1);
+    expect(existsSync(join(dirname(repo), '.cadence-run'))).toBe(false);
   });
 });

@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { homedir } from 'node:os';
-import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin } from '../src/run/aiguillage.js';
+import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, MODELES, modeleRun } from '../src/run/aiguillage.js';
 import { dossierTemp } from './temp.js';
 
 function depot(yaml?: string): string {
@@ -56,5 +56,21 @@ describe('aiguillage de cadence run', () => {
   });
   it('references mal formée : refus clair plutôt qu un aiguillage faux', () => {
     expect(() => aiguiller('x', depot('references: oui\n'), [])).toThrow(/references/);
+  });
+});
+
+describe('modèle de cadence run (L699)', () => {
+  it('défaut opus, celui des deux bras mesurés ; une variable vide compte pour absente', () => {
+    expect([modeleRun(), modeleRun(undefined, ''), BRAS_COMPLET.modele, BRAS_LEGER.modele]).toEqual(['opus', 'opus', 'opus', 'opus']);
+  });
+  it('la variable d\'environnement est lue, l\'option l\'emporte', () => {
+    expect(modeleRun(undefined, 'fable')).toBe('fable');
+    expect(modeleRun('opus', 'fable')).toBe('opus');
+    expect(modeleRun('fable', 'gpt')).toBe('fable'); // la variable n'est pas lue quand l'option est donnée
+  });
+  it('opus et fable passent ; toute autre valeur lève en nommant sa source (sonnet et haiku compris : cause C2)', () => {
+    expect(MODELES.map((m) => modeleRun(m))).toEqual(['opus', 'fable']);
+    for (const m of ['gpt', 'sonnet', 'haiku', 'Opus', '']) expect(() => modeleRun(m, 'opus')).toThrow(new RegExp(`modèle inconnu : « ${m} » ; attendu : opus, fable$`));
+    expect(() => modeleRun(undefined, 'gpt')).toThrow(/« gpt » \(CADENCE_RUN_MODELE\)/);
   });
 });

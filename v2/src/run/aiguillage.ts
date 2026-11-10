@@ -10,6 +10,14 @@ import type { DefBras } from '../bench/bras.js';
 const BRIEFS = join(import.meta.dirname, '..', '..', 'briefs');
 export const BRAS_COMPLET: DefBras = { nom: 'sequence-v2d', modele: 'opus', brief: join(BRIEFS, 'bras-sequence-v2d.md'), settings: join(BRIEFS, 'settings-sequence-v2.json') };
 export const BRAS_LEGER: DefBras = { nom: 'A', modele: 'opus', brief: join(BRIEFS, 'bras-A.md') };
+/** L699 : les modèles qu'une session de cadence run peut prendre ; le banc a mesuré les deux bras en opus, qui reste le défaut. */
+export const MODELES = ['opus', 'fable'];
+/** Le modèle du run : l'option, sinon la variable d'environnement, sinon opus. Une valeur inconnue lève, avant toute création. */
+export function modeleRun(option?: string, env?: string): string {
+  const m = option ?? (env || 'opus');
+  if (!MODELES.includes(m)) throw new Error(`cadence run : modèle inconnu : « ${m} »${option === undefined ? ' (CADENCE_RUN_MODELE)' : ''} ; attendu : ${MODELES.join(', ')}`);
+  return m;
+}
 export interface Aiguillage { mode: 'complet' | 'leger'; bras: DefBras; pieces: string[]; raison: string }
 
 /** Chemin d'une pièce ou d'une référence : relatif au dépôt, absolu, ou sous ~ (une base de connaissance hors du dépôt). */

@@ -21,6 +21,8 @@
     "cadence2 --liste": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 --complet": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 --lot": "docs/v2/2026-11-09-cadence-run.md",
+    "cadence2 --modele": "docs/v2/2026-11-09-cadence-run.md",
+    "cadence2 env CADENCE_RUN_MODELE": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 --fond": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 --help": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 argv": "docs/v2/2026-11-09-cadence-run.md",

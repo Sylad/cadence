@@ -2,15 +2,19 @@ import { existsSync, mkdirSync, openSync, readdirSync, readFileSync } from 'node
 import { dirname, join } from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import type { Io } from '../cli.js';
+import type { Executeur } from '../bench/bras.js';
+import { MODELES, modeleRun } from './aiguillage.js';
 import { executerRun, repondreRun, type Etat } from './run.js';
 
-export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L12] [--taille retouche|fonction] [--complet] [--sans-porte] [--fond]   une demande, une session Opus (mode complet si références), porte, intégration
+export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L12] [--taille retouche|fonction] [--complet] [--modele ${MODELES.join('|')}] [--sans-porte] [--fond]   une demande, une session (mode complet si références), porte, intégration
   cadence run --reponse <id> "<texte>"   reprend un run en attente ou rendu, dans la même session
   cadence run --liste                    les runs du dépôt et leur état
   cadence run --help | -h                cette aide, sans rien créer
+  --modele : le modèle de la session, opus par défaut ; sans l'option, la variable CADENCE_RUN_MODELE ; un run repris par --reponse garde le sien
   --fond : le run se détache (il survit à la session qui l'a lancé), son journal est dans ../.cadence-run/`;
 
-export async function cmdRun(a: string[], io: Io): Promise<number> {
+/** `exec` : l'exécuteur de la session, pour les tests (claude par défaut). */
+export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<number> {
   const out = io.out;
   try {
     if (a.includes('--help') || a.includes('-h')) { out(`usage :\n${AIDE_RUN}`); return 0; } // issue #54 : « --help » lancé comme une demande, worktree et branche laissés
@@ -25,18 +29,21 @@ export async function cmdRun(a: string[], io: Io): Promise<number> {
       if (!a[1] || !a[2]) { io.err('usage : cadence run --reponse <id> "<texte>"'); return 2; }
       return repondreRun(a[1], io.cwd, a.slice(2).join(' '), { out }).etat === 'integre' ? 0 : 1;
     }
-    const pieces: string[] = [], mots: string[] = []; let taille: string | undefined, lot: string | undefined, sansPorte = false, complet = false;
+    const pieces: string[] = [], mots: string[] = []; let taille: string | undefined, lot: string | undefined, choix: string | undefined, sansPorte = false, complet = false;
     for (let i = 0; i < a.length; i++) {
       if (a[i] === '--piece') pieces.push(a[++i]);
       else if (a[i] === '--taille') taille = a[++i];
       else if (a[i] === '--sans-porte') sansPorte = true;
       else if (a[i] === '--complet') complet = true;
       else if (a[i] === '--lot') lot = a[++i];
+      else if (a[i] === '--modele') choix = a[++i] ?? '';
       else if (a[i] !== '--fond') mots.push(a[i]);
     }
     const inconnue = mots.find((m) => m.startsWith('-')); // une option mal tapée, ou une demande qui commence par « - », ne part pas en session
     if (inconnue) { io.err(`cadence run : option inconnue : ${inconnue}\nusage :\n${AIDE_RUN}`); return 2; }
     if (!mots.length || pieces.some((p) => !p) || (lot !== undefined && !lot) || (taille && !['retouche', 'fonction'].includes(taille))) { io.err(`usage :\n${AIDE_RUN}`); return 2; }
+    let modele: string; // L699 : l'option l'emporte sur la variable ; une valeur inconnue est refusée ici, avant le worktree et avant --fond
+    try { modele = modeleRun(choix, io.env.CADENCE_RUN_MODELE); } catch (e) { io.err((e as Error).message); return 2; }
     if (a.includes('--fond')) { // relancé détaché, sans --fond : vécu au pro le 10-11, une session de lot morte avec celle qui l'avait lancée
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
       mkdirSync(d, { recursive: true });
@@ -45,6 +52,6 @@ export async function cmdRun(a: string[], io: Io): Promise<number> {
       out(`cadence run lancé en arrière-plan ; journal : ${journal} ; état : cadence run --liste`);
       return 0;
     }
-    return executerRun({ repo: io.cwd, demande: mots.join(' '), pieces, taille, complet, lot, out, sansPorte }).etat === 'integre' ? 0 : 1;
+    return executerRun({ repo: io.cwd, demande: mots.join(' '), pieces, taille, complet, lot, modele, exec, out, sansPorte }).etat === 'integre' ? 0 : 1;
   } catch (e) { io.err(String((e as Error).message ?? e)); return 1; }
 }

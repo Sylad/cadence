@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { aiguiller, BRAS_COMPLET, BRAS_LEGER } from '../src/run/aiguillage.js';
+import { homedir } from 'node:os';
+import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin } from '../src/run/aiguillage.js';
 import { dossierTemp } from './temp.js';
 
 function depot(yaml?: string): string {
@@ -41,6 +42,14 @@ describe('aiguillage de cadence run', () => {
     const d = depot(REFS);
     const a = aiguiller('Pour les SIGWX, voir la capture', d, ['capture.png', 'docs/normes/sigwx.md']);
     expect(a).toMatchObject({ mode: 'complet', pieces: ['capture.png', 'docs/normes/sigwx.md'] });
+  });
+  it('références et pièces hors du dépôt (chemin absolu ou ~) : gardées telles quelles, comme une base de connaissance', () => {
+    const kb = dossierTemp('kb-'); writeFileSync(join(kb, 'lot.md'), 'dossier du lot');
+    const d = depot(`references:\n  - mots: [canopy]\n    docs: [${join(kb, 'lot.md')}]\n`);
+    expect(aiguiller('Le style canopy', d, [])).toMatchObject({ mode: 'complet', pieces: [join(kb, 'lot.md')] });
+    expect(chemin(d, '~/x.md')).toBe(join(homedir(), 'x.md'));
+    expect(chemin(d, '/abs/y.md')).toBe('/abs/y.md');
+    expect(chemin(d, 'docs/z.md')).toBe(join(d, 'docs/z.md'));
   });
   it('--complet force le mode complet sans référence', () => {
     expect(aiguiller('Ajoute un bouton', depot(), [], true)).toMatchObject({ mode: 'complet', pieces: [] });

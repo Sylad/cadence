@@ -2,7 +2,8 @@
 // (normes, captures : AetherWX) ; sans elles, Claude seul fait aussi bien plus vite (banc court du 10-11).
 // La règle est mécanique : une pièce donnée, ou un mot de la section `references` de cadence.yaml dans la demande.
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import type { DefBras } from '../bench/bras.js';
 
@@ -11,6 +12,8 @@ export const BRAS_COMPLET: DefBras = { nom: 'sequence-v2d', modele: 'opus', brie
 export const BRAS_LEGER: DefBras = { nom: 'A', modele: 'opus', brief: join(BRIEFS, 'bras-A.md') };
 export interface Aiguillage { mode: 'complet' | 'leger'; bras: DefBras; pieces: string[]; raison: string }
 
+/** Chemin d'une pièce ou d'une référence : relatif au dépôt, absolu, ou sous ~ (une base de connaissance hors du dépôt). */
+export const chemin = (repo: string, p: string): string => resolve(repo, p.replace(/^~(?=\/|$)/, homedir()));
 const plat = (t: string) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 const contient = (texte: string, mot: string) => new RegExp(`(^|[^\\p{L}\\p{N}])${plat(mot).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\p{L}\\p{N}])`, 'u').test(texte);
 
@@ -24,7 +27,7 @@ export function aiguiller(demande: string, repo: string, pieces: string[], force
   for (const r of (refs ?? []) as { mots: string[]; docs: string[] }[]) {
     const mot = r.mots.find((m) => contient(texte, String(m)));
     if (!mot) continue;
-    const ici = r.docs.filter((x) => existsSync(join(repo, x)));
+    const ici = r.docs.filter((x) => existsSync(chemin(repo, x)));
     trouves.push(`${mot} → ${ici.join(', ') || 'aucun document présent'}`);
     for (const x of ici) if (!docs.includes(x)) docs.push(x);
   }

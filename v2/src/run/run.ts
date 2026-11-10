@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { basename, dirname, join } from 'node:path';
 import { parse } from 'yaml';
 import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, type Executeur } from '../bench/bras.js';
-import { aiguiller, BRAS_COMPLET, BRAS_LEGER } from './aiguillage.js';
+import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin } from './aiguillage.js';
 
 const PORTE_MS = 30 * 60_000;
 
@@ -114,7 +114,7 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   copierDeps(repo, worktree);
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
-    demande: a.demande, pieces: aig.pieces.map((p) => join(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, acces_cluster: orchestrate(worktree).prodAccess === true, session: '', cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
+    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, acces_cluster: orchestrate(worktree).prodAccess === true, session: '', cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
   sauver(e);
   a.out(`cadence run ${id} : session Opus en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);
   // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.

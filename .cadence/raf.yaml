@@ -3142,10 +3142,14 @@ lots:
     created: 2026-11-10
   - id: L690
     title: "cadence run --suite : garder la session d'un lot à l'autre dans un même projet, avec ou sans /compact dirigé par cadence ; mesurer 3 variantes au micro-banc (session neuve, gardée, gardée+compactée) (D-4)"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-10
     started: 2026-11-10
+    review: { date: 2026-11-10, verdict: "conforme (r2) : 3 majeurs de r1 corrigés en 3e00f1a (lignes de l'étape triées par horodatage, test de reprise, docs/v2/banc.md) ; 2 mineurs en notes ; cadence run inchangé ; porte verte à 3e00f1a", commit: 3e00f1ac751f30cc4eca10f9ba68e8d6e25f333d }
+    notes:
+      - { date: 2026-11-10, text: "Mesure AetherWX court 10-11 (2 rép.) : session gardée ×3,5 en coût, +24 %/+39 % de temps, qualité non départagée → --suite non ajouté. Mineurs r1 : compactage en échec qui lance quand même la demande (bras.ts:76) ; micro-banc et passage divergent après un échec." }
+    finished: 2026-11-10
   - id: L691
     title: "Tests instables sous la charge de la suite complète en clone neuf : ressources-titre-bords-l671 R1 (rapport de croissance) et porte-mod R5 (mod cadence-hud, 120 s), rouges une fois chacun aux releases 2.0.1/2.0.2, verts seuls"
     status: todo

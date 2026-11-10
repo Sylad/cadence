@@ -3142,9 +3142,10 @@ lots:
     created: 2026-11-10
   - id: L690
     title: "cadence run --suite : garder la session d'un lot à l'autre dans un même projet, avec ou sans /compact dirigé par cadence ; mesurer 3 variantes au micro-banc (session neuve, gardée, gardée+compactée) (D-4)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-10
+    started: 2026-11-10
   - id: L691
     title: "Tests instables sous la charge de la suite complète en clone neuf : ressources-titre-bords-l671 R1 (rapport de croissance) et porte-mod R5 (mod cadence-hud, 120 s), rouges une fois chacun aux releases 2.0.1/2.0.2, verts seuls"
     status: todo

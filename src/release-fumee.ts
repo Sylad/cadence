@@ -26,13 +26,18 @@ export function readReleaseConfig(file: string): { smoke?: string[] } {
   return { smoke: r.smoke.map((c: string) => c.trim()) };
 }
 
+/** Les bins de package.json, nom → fichier (un `bin` chaîne prend le nom du paquet, sans sa portée). */
+function binsDeclares(pkg: Record<string, any>): [string, string][] {
+  const bin = pkg.bin;
+  const bins: [string, string][] = typeof bin === 'string' ? [[String(pkg.name ?? '').replace(/^@[^/]+\//, ''), bin]] : isObject(bin) ? Object.entries(bin).map(([n, f]) => [n, String(f)]) : [];
+  return bins.filter(([n]) => n);
+}
+
 /** Les commandes à jouer : `release.smoke`, sinon `<bin> --help` pour chaque bin de package.json. */
 export function commandesFumee(root: string, pkg: Record<string, any>): string[] {
   const declarees = readReleaseConfig(join(root, 'cadence.yaml')).smoke;
   if (declarees) return declarees;
-  const bin = pkg.bin;
-  const noms = typeof bin === 'string' ? [String(pkg.name ?? '').replace(/^@[^/]+\//, '')] : isObject(bin) ? Object.keys(bin) : [];
-  return noms.filter(Boolean).map((n) => `${n} --help`);
+  return binsDeclares(pkg).map(([n]) => `${n} --help`);
 }
 
 type Sortie = { status: number | null; stdout?: string; stderr?: string; error?: Error };
@@ -41,10 +46,21 @@ const queue = (s: string) => (s.length > SORTIE_MAX ? `…${s.slice(-SORTIE_MAX)
 const refus = (etape: string, r: Sortie) =>
   new RafError(`release : la fumée du paquet installé est rouge, rien n'est écrit — ${etape} (code ${r.status ?? r.error?.message ?? '?'})\n${queue(texte(r))}`);
 
-/** L'environnement des commandes : ni variables CADENCE_* d'une session ou d'un run, ni GIT_* d'un hook (elles viseraient un autre dépôt). */
-function environnement(bin: string, paquet: string, root: string): NodeJS.ProcessEnv {
+/**
+ * Les dossiers système gardés dans le PATH : bash, git et les outils de base des scripts de fumée. Le PATH appelant n'est pas repris :
+ * il porte un cadence et un raf globaux (~/.local/bin, le bin de nvm), qui répondraient à la place d'un bin absent du paquet (revue L696 r1).
+ */
+const PATH_SYSTEME = ['/usr/local/sbin', '/usr/local/bin', '/usr/sbin', '/usr/bin', '/sbin', '/bin'];
+
+/**
+ * L'environnement des commandes : PATH réduit au node_modules/.bin du dossier d'installation, au node qui lance la release (seul
+ * dans son dossier : celui de nvm porte aussi les paquets globaux) et aux dossiers système ; NODE_PATH vide (rien du node_modules
+ * du dépôt) ; ni variables CADENCE_* d'une session ou d'un run, ni GIT_* d'un hook (elles viseraient un autre dépôt).
+ */
+function environnement(bin: string, nodeSeul: string, paquet: string, root: string): NodeJS.ProcessEnv {
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('CADENCE_') && !k.startsWith('GIT_')));
-  return { ...env, PATH: `${bin}:${process.env.PATH ?? ''}`, CADENCE_FUMEE_PAQUET: paquet, CADENCE_FUMEE_RACINE: root };
+  const PATH = [bin, nodeSeul, ...PATH_SYSTEME].join(':');
+  return { ...env, PATH, NODE_PATH: '', CADENCE_FUMEE_PAQUET: paquet, CADENCE_FUMEE_RACINE: root };
 }
 
 /** Les node_modules non suivis du dépôt, liés dans le worktree : `prepare` (tsc) y trouve ses outils sans `npm ci`. */
@@ -70,14 +86,22 @@ export function fumerPaquet(root: string, commandes: string[], out: (l: string) 
     if (pack.status !== 0) throw refus('$ npm pack', pack);
     const fichier = readdirSync(tmp).find((f) => f.endsWith('.tgz'));
     if (!fichier) throw refus('$ npm pack (aucun .tgz produit)', pack);
-    const pkg = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8')) as { name: string };
+    const pkg = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8')) as Record<string, any>;
     const installe = join(tmp, 'installe');
     mkdirSync(installe);
     writeFileSync(join(installe, 'package.json'), '{ "name": "fumee", "private": true }\n');
     const npmI = spawnSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', join(tmp, fichier)], { cwd: installe, encoding: 'utf8', maxBuffer: 64 << 20, timeout: FUMEE_MS });
     if (npmI.status !== 0) throw refus(`$ npm install ${fichier} (dans un dossier vide)`, npmI);
+    const bin = join(installe, 'node_modules', '.bin');
+    // npm installe sans un mot un paquet dont un bin déclaré manque (fichier absent de HEAD) : aucun lien dans .bin, rien ne le dit.
+    for (const [n, f] of binsDeclares(pkg)) {
+      if (!existsSync(join(bin, n))) throw refus(`bin ${n} déclaré dans package.json absent de node_modules/.bin du paquet installé`, { status: null, error: new Error(`${f} n'est pas dans ${fichier}`) });
+    }
     out(`fumée du paquet : ${fichier} installé dans un dossier vide`);
-    const env = environnement(join(installe, 'node_modules', '.bin'), join(installe, 'node_modules', pkg.name), root);
+    const nodeSeul = join(tmp, 'node-seul');
+    mkdirSync(nodeSeul);
+    symlinkSync(process.execPath, join(nodeSeul, 'node'));
+    const env = environnement(bin, nodeSeul, join(installe, 'node_modules', pkg.name), root);
     commandes.forEach((c, i) => {
       const cwd = join(tmp, `essai-${i + 1}`);
       mkdirSync(cwd);

@@ -86,8 +86,11 @@ It refuses, with exit code 2 and nothing written:
 - a **red smoke test of the installed package** (L696). Before writing anything, the command packs `HEAD` with `npm pack` in a detached
   `git worktree` (what is not committed does not get in; the repository's `node_modules` are linked so that `prepare` builds), installs the
   tarball with `npm install` in an empty folder, then runs the smoke commands from that installed package, each in an empty folder of its own,
-  with the package's `bin` first on the `PATH`, `CADENCE_FUMEE_PAQUET` (the installed package) and `CADENCE_FUMEE_RACINE` (the repository) set,
-  and the `CADENCE_*` and `GIT_*` variables of the calling session removed. The refusal names the failing step (`npm pack`, `npm install`
+  `CADENCE_FUMEE_PAQUET` (the installed package) and `CADENCE_FUMEE_RACINE` (the repository) set, and the `CADENCE_*` and `GIT_*` variables
+  of the calling session removed. The `PATH` is reduced to the package's `node_modules/.bin`, the `node` that runs the release (alone in a
+  folder of its own) and the system folders (`/usr/local/bin`, `/usr/bin`, `/bin` and their `sbin`); `NODE_PATH` is empty. The caller's
+  `PATH` is not kept: it carries a global `cadence` and `raf` (`~/.local/bin`, the nvm folder) that would answer in place of a missing `bin`.
+  A `bin` of `package.json` missing from `node_modules/.bin` (its file not in `HEAD`: `npm install` says nothing) refuses the release too. The refusal names the failing step (`npm pack`, `npm install`
   or `$ <command>`), its exit code and the end of its output. The commands are `release.smoke` of `cadence.yaml` (a list of bash commands);
   without that key, `<bin> --help` for each `bin` of `package.json`; a package with neither gets no smoke test. `--dry-run` runs it too.
   It is why ten versions went out broken or red from 28-10 to 10-11 (1.22.0 to 2.0.1), each fix closing one case: 2.0.0 and 2.0.1 shipped

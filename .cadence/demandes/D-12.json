@@ -1,0 +1,11 @@
+{
+ "id": "D-12",
+ "texte": "Corriger le point de la revue L696 (pièce jointe) : l'essai de fumée de cadence release ne doit jamais retomber sur un cadence ou raf global ni sur le node_modules du dépôt — PATH réduit au node_modules/.bin du dossier vide (plus node), et refus explicite quand un bin déclaré dans package.json manque dans node_modules/.bin, avec un test qui retire un bin du paquet et attend le refus.",
+ "date": "2026-11-10",
+ "origine": "demande cadence run, pièce jointe tmp/revues/L696-r1.md (finding 1)",
+ "etat": "livrée",
+ "lots": [
+  "L696"
+ ],
+ "preuve": "test/release-fumee-l696.test.ts : 2 tests ajoutés, rouges avant le code (bin acme-outil retiré du paquet + acme-outil global sur le PATH appelant → refus « bin acme-outil déclaré dans package.json absent de node_modules/.bin du paquet installé » ; acme-global du PATH appelant → code 127, NODE_PATH vide), 8/8 verts après ; fumée réelle de cadence avec le PATH réduit : 6/6 vertes en 9 s, aucun dossier ni worktree restant ; tsc et qualite.mjs --contre main verts ; suite complète 585 fichiers verts (CADENCE_* de la session retirées, voir commit)"
+}

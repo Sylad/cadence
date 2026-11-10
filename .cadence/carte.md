@@ -29,3 +29,6 @@
 - Décision : sans `release.smoke`, `<bin> --help` pour chaque bin de package.json ; ni l'un ni l'autre, pas de fumée. Pas d'option pour la sauter.
 - Décision : `cadence2` n'est pas un bin publié (le banc se lie depuis le checkout) : sa fumée charge `v2/dist/cli.js` du paquet installé. `cadence-hud` n'est pas dans
   le paquet npm (marketplace git) : pas de fumée npm pour lui. Rejoué : v2.0.1 refusée (`cadence run --help`, puis `ENOENT bras-A.md`), v2.0.2 verte en ~10 s.
+- Revue r1 (D-12) : PATH des commandes réduit à `<installe>/node_modules/.bin`, un dossier à lui avec le seul `node` de la release (lien vers process.execPath :
+  le dossier nvm porte un `cadence2` global) et les dossiers système (`/usr/local/bin`, `/usr/bin`, `/bin` + sbin, pour bash et git) ; `NODE_PATH` vide.
+  Un bin de package.json sans lien dans `.bin` (fichier absent de HEAD, npm se tait) : refus explicite avant toute commande.

@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { run } from '../src/cli.js';
@@ -10,15 +10,15 @@ import { cleanupTempDirs, commit, gitRepo, tempDir } from './helpers.js';
 // L696 (D-11, erreur 2 du relevé du 10-11) : dix versions publiées cassées ou rouges, chaque correctif n'ayant bouché qu'un cas
 // (2.0.0 et 2.0.1 sans v2/briefs/bras-A.md : cadence run en mode léger plantait chez un utilisateur npm).
 // cadence release essaie le paquet réel avant le tag : npm pack de HEAD, installation dans un dossier vide, commandes de fumée.
-afterEach(cleanupTempDirs);
+afterEach(() => { vi.unstubAllEnvs(); cleanupTempDirs(); });
 
 const CHANGELOG = '# Changelog\n\n## [Unreleased]\n\n### Added\n\n- A thing (L7).\n\n## [1.0.0] - 2026-10-01\n\n- Old.\n';
 
 /** Un paquet jouet sans dépendance : `acme` lit lib/msg.txt, que `files` publie ou non. */
-function paquet(o: { files?: string[]; smoke?: string[]; msgSuivi?: boolean } = {}): string {
+function paquet(o: { files?: string[]; smoke?: string[]; msgSuivi?: boolean; bin?: Record<string, string> } = {}): string {
   const dir = gitRepo();
   const put = (f: string, t: string) => { mkdirSync(join(dir, f, '..'), { recursive: true }); writeFileSync(join(dir, f), t); };
-  put('package.json', `${JSON.stringify({ name: 'acme-fumee', version: '1.0.0', bin: { acme: 'bin/acme.js' }, files: o.files ?? ['bin', 'lib'] }, null, 2)}\n`);
+  put('package.json', `${JSON.stringify({ name: 'acme-fumee', version: '1.0.0', bin: o.bin ?? { acme: 'bin/acme.js' }, files: o.files ?? ['bin', 'lib'] }, null, 2)}\n`);
   put('bin/acme.js', "#!/usr/bin/env node\nimport { readFileSync } from 'node:fs';\nconsole.log(readFileSync(new URL('../lib/msg.txt', import.meta.url), 'utf8'));\n");
   put('CHANGELOG.md', CHANGELOG);
   if (o.smoke) put('cadence.yaml', `release:\n  smoke:\n${o.smoke.map((c) => `    - ${JSON.stringify(c)}`).join('\n')}\n`);
@@ -72,6 +72,33 @@ describe('cadence release — le paquet essayé avant le tag (L696)', () => {
     expect(r.code).toBe(2);
     expect(r.out).toMatch(/✓ acme\n[\s\S]*✓ test -f "\$CADENCE_FUMEE_PAQUET/);
     expect(r.err).toMatch(/\$ echo cassé; exit 3 \(code 3\)\ncassé/);
+  }, 120_000);
+
+  // Revue L696 r1 (D-12) : le PATH appelant porte un cadence et un raf globaux (~/.local/bin, nvm) ; un bin retiré du paquet
+  // faisait répondre la copie globale, et la fumée validait un binaire absent de l'artefact.
+  it('un bin déclaré dans package.json et absent du paquet : refus explicite, même si le PATH appelant en a un global', () => {
+    const global = tempDir();
+    writeFileSync(join(global, 'acme-outil'), '#!/usr/bin/env bash\necho global\n');
+    chmodSync(join(global, 'acme-outil'), 0o755);
+    vi.stubEnv('PATH', `${global}:${process.env.PATH}`);
+    const dir = paquet({ bin: { acme: 'bin/acme.js', 'acme-outil': 'bin/acme-outil.js' } });
+    const r = release(dir, 'patch', '--dry-run');
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/bin acme-outil déclaré dans package\.json absent de node_modules\/\.bin du paquet installé/);
+    expect(r.out).not.toMatch(/✓/);
+  }, 120_000);
+
+  it("les commandes ne voient que le paquet installé et node : ni un outil global du PATH appelant, ni NODE_PATH", () => {
+    const global = tempDir();
+    writeFileSync(join(global, 'acme-global'), '#!/usr/bin/env bash\necho global\n');
+    chmodSync(join(global, 'acme-global'), 0o755);
+    vi.stubEnv('PATH', `${global}:${process.env.PATH}`);
+    vi.stubEnv('NODE_PATH', global);
+    const dir = paquet({ smoke: ['acme', 'node --version', 'git --version', 'test -z "$NODE_PATH"', 'acme-global'] });
+    const r = release(dir, 'patch', '--dry-run');
+    expect(r.code).toBe(2);
+    expect(r.out).toMatch(/✓ acme\n[\s\S]*✓ node --version\n[\s\S]*✓ git --version\n[\s\S]*✓ test -z/);
+    expect(r.err).toMatch(/\$ acme-global \(code 127\)/);
   }, 120_000);
 
   it('release.smoke se valide : une liste de commandes non vides, aucune autre clé', () => {

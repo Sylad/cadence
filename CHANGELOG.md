@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-10
+
 ### Added
 
 - `cadence run "<demande>"` ([docs/v2/2026-11-09-cadence-run.md](docs/v2/2026-11-09-cadence-run.md)): one request, one Opus session in its own worktree, the full gate once (one fix by the same session if red), fast-forward integration. Mode complet (« read the references first » hook, request register `.cadence/demandes/`: a deferred request kept 3/3 against 0/3 without it) when the request has references to read — a `--piece`, a word of the new `references:` section of `cadence.yaml`, or `--complet` —, mode léger (Claude alone) otherwise. `--lot`, `--fond` (detached run), `orchestrate.prodAccess` honoured, pieces outside the repository allowed. The lead, session and orchestrate skills delegate through it. `--reponse` resumes a run that asked a question; `--liste` shows the runs of the repository. Plan (`raf`) and `cadence deliver` are unchanged.

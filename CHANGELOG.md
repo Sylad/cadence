@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- `cadence run` in mode léger failed for anyone who installed cadence from npm: the package left out `v2/briefs/bras-A.md`, the brief of that mode. It is published now, and a test checks that every brief, setting and hook `cadence run` reads is in the package. A local install (`npm run service`) now also builds `v2/`, as `prepare` does.
+
 ## [2.0.1] - 2026-11-10
 
 ### Changed

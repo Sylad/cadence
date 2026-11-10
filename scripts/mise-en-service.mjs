@@ -396,6 +396,7 @@ function installAndBuild(dir) {
   const run = (cmd, args) => execFileSync(cmd, args, { cwd: dir, stdio: 'inherit' });
   run('npm', ['ci', '--ignore-scripts']);
   run('npx', ['tsc', '-p', 'tsconfig.build.json']);
+  run('npx', ['tsc', '-p', 'v2/tsconfig.json']); // 2.0.2 : cadence run (v2/dist), comme prepare
 }
 
 /** Empreinte du code en service : tout ce que raf/cadence chargent (bin, dist, package.json), hors node_modules. */

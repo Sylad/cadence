@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **2.0.2**: `cadence run` in mode léger works from an npm install (its brief was missing from 2.0.0 and 2.0.1); a local install builds `v2/`.
 - **2.0.1**: the README and the quickstart show `cadence run` (new figure of a lot's cycle) instead of the cycle of a wave.
 - **2.0.0**: `cadence run "<request>"`: one request, one Opus session in a worktree, the full gate once, fast-forward; measured against Claude alone.
 - **1.62.1**: republishes 1.62.0, whose npm publication failed on a wall-clock test (it carries the 1.62.0 content too); `citedResources` reads a title in linear time; two queue tests no longer depend on clock order.
@@ -95,6 +96,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**2.0.2**: `cadence run` in mode léger failed for anyone who installed cadence from npm: the package of 2.0.0 and 2.0.1 left out `v2/briefs/bras-A.md`, the brief of that mode. It is published now, and a test checks that every brief, setting and hook `cadence run` reads is in the package. A local install (`npm run service`) also builds `v2/` now, as `prepare` does. Upgrade before your first `cadence run` without references.
 
 **2.0.1**: documentation only. The README figure now draws how a lot is done since 2.0.0 — `cadence run`: the references read when the request has some, one Opus session, the gate once, the fast-forward, then the lead's delivery — instead of the cycle of a wave; the quickstart's first lot is a `cadence run`, and a wave comes on request.
 

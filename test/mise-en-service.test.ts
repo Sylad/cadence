@@ -38,7 +38,7 @@ function workRepo(statuses: Record<string, string> = { L1: 'done' }) {
   writeFileSync(join(dir, 'docs/plan/raf.yaml'), plan(statuses));
   writeFileSync(join(dir, '.gitignore'), 'dist/\nnode_modules/\n');
   symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'), 'dir');
-  const first = commitAll(dir, 'feat(L1): premier', 'src', 'bin', 'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.build.json', 'scripts', 'docs/plan/raf.yaml', '.gitignore');
+  const first = commitAll(dir, 'feat(L1): premier', 'src', 'bin', 'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.build.json', 'scripts', 'docs/plan/raf.yaml', '.gitignore', 'v2');
   return { dir, first };
 }
 

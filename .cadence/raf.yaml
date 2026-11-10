@@ -3187,9 +3187,10 @@ lots:
     finished: 2026-11-10
   - id: L696
     title: "Paquet essayé avant publication (D-7, erreur 2 du relevé 10-11, 10 versions cassées dont 2.0.0 et 2.0.1) : cadence release installe le npm pack dans un dossier vide et joue des commandes de fumée (cadence --help, cadence run --help, raf --help, cadence2) avant de poser le tag ; mesure : 0 version publiée cassée"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-10
+    started: 2026-11-10
   - id: L697
     title: "raf hook install place son bloc en TÊTE d'un pre-commit existant (suite de L695) : ajouté à la fin, il ne s'exécute pas quand le script maison sort tôt (cas de cadence, exit 0 sans fichier de doc ; corrigé à la main le 10-11) ; test : pre-commit maison avec exit 0 précoce, commit sur dépôt tenu refusé quand même ; corriger aussi les dépôts déjà installés"
     status: todo

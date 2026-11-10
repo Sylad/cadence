@@ -134,6 +134,27 @@ message (the reason is required) says the lines stay true. Other commits (`feat(
 commits remove or add an identifier, the `fix` brief names those identifiers and lists every line that cites them, the ones the lot has not touched first, then the ones it
 updated (the fix most often bears on what the lot just wrote), and asks the writer to re-list the lines for the identifiers its own diff changes and update them in the same commit.
 
+### A branch held by a program: the pending plan (L695)
+
+`cadence run` integrates its work with a fast-forward (`merge --ff-only`): one commit of the lead on the target branch
+during the run makes it fail (`refus-integration`). A gate played in the main tree (`cadence verify --gate`, the one of
+`cadence release`) gives no verdict when the branch moves under it. While such a program runs, it **holds** the branch:
+a file `<git-common-dir>/cadence/tenu/<kind>-<pid>.json` (`pid`, `kind`, `label`, `branch`, `since`), removed when it
+ends; a file whose process died is ignored and removed.
+
+- The **pre-commit** hook (`raf hook install`) refuses a commit on a held branch (exit code 3, `--no-verify` bypasses
+  it) and says what to do instead. A commit on another branch (the worktree of a run or of a lot) goes through.
+- `raf add`, `raf note` and `raf done` on a held branch write nothing in the plan: they append their command line to
+  `.cadence/plan-en-attente.yaml` (added to `.git/info/exclude`, never tracked) and say so.
+- `cadence run` releases the branch at its end, integrated or not, and runs `raf attente appliquer`. After a gate, the
+  first `raf add|note|done` on the free branch applies the pending writes first. The plan is then modified, for the
+  lead to commit.
+- `raf attente` lists the pending writes; `raf attente appliquer` plays them in order (refused while the branch is
+  held). A write that fails stays pending with the ones after it.
+
+Waves of `cadence orchestrate` (v1) keep their own guards (L425, L475, L521): their orchestrator commits the plan on
+the branch itself.
+
 Global options: `--file path` or `RAF_FILE`; `RAF_TODAY=YYYY-MM-DD` to freeze
 the date. `cadence raf …` is the same as `raf …`.
 

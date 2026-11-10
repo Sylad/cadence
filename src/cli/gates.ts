@@ -17,6 +17,7 @@ import { Plan, RafError } from '../plan.js';
 import { dueLine, isRecurring } from '../recurring.js';
 import { TITLE_MAX, truncate } from '../lead.js';
 import { waveHolding } from '../repo-busy.js';
+import { commitRefusal } from '../repo-held.js';
 import { cadenceHome, waveLotsIn } from '../orchestrate/registry.js';
 import { localLotOf } from '../local-task.js';
 import { type Ctx, type Io, planFileIn, touchedLot } from './context.js';
@@ -211,6 +212,18 @@ function prePush(root: string, io: Io, remoteName: string | undefined, configPat
   return REFUSED;
 }
 
+/** Pre-commit (L695) : un commit sur une branche tenue par un programme est refusé, avec le geste à faire. Une panne laisse passer le commit. */
+function heldBranch(io: Io): boolean {
+  let refusal: string | null = null;
+  try {
+    refusal = commitRefusal(io.cwd);
+  } catch {
+    return false;
+  }
+  if (refusal) io.err(`raf: ${refusal}`);
+  return refusal !== null;
+}
+
 /** raf hook install|pre-commit|post-commit|pre-push. */
 export function cmdHook(c: Ctx): number | Promise<number> {
   const { rest, values, io, today, root, configPath, planPath, loadPlan, newsDir } = c;
@@ -221,6 +234,7 @@ export function cmdHook(c: Ctx): number | Promise<number> {
   }
   if (rest[0] === 'post-commit') return postCommit(existsSync(planPath) ? loadPlan : null, newsDir, root, today, io, readHookConfig(configPath).autostart, !!values.verbose);
   if (rest[0] === 'pre-commit') {
+    if (heldBranch(io)) return REFUSED;
     const config = readHookConfig(configPath);
     return docsFollow(config.docs, root, io) || preCommit(existsSync(planPath) ? loadPlan : null, config.autostart, root, today, io);
   }

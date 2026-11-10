@@ -7,6 +7,7 @@ import type { RecordedGate } from './gate-record.js';
 import { recordVerdict } from './gate-verdict.js';
 import { onTermination } from './proc.js';
 import { sharedStateDir } from './state.js';
+import { holdRepo } from './repo-held.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { failedTests, hasUnnamedFailure, unloadedSuites } from './orchestrate/baseline.js';
 import { configuredCap } from './orchestrate/command.js';
@@ -192,7 +193,10 @@ async function playGate(ctx: GateCtx): Promise<number> {
     out(`verify --gate ${short} : porte jouée dans l'arbre principal ${repo} (propre, au sha)`);
     out(replayReason);
     const group: { pgid?: number } = {};
+    // L695 : un commit du lead sur la branche pendant la porte la rendrait non probante (06-11, porte de release) : le pre-commit le refuse tant qu'elle tourne.
+    const unhold = holdRepo(repo, 'porte', `cadence verify --gate ${short}`);
     const forget = onTermination(() => {
+      unhold();
       if (group.pgid !== undefined) killGroup(group.pgid);
     });
     try {
@@ -206,6 +210,7 @@ async function playGate(ctx: GateCtx): Promise<number> {
       out(`verify --gate ${short} : verdict non probant — ${moved} pendant la porte (un lot a pu être intégré ou le plan d'une vague commité pendant qu'elle tournait, ou une commande a écrit hors des dossiers ignorés) ; les ✓/✗ ci-dessus ne sont pas ceux de ${short} ; la rejouer`);
       return 2;
     } finally {
+      unhold();
       forget();
     }
   }

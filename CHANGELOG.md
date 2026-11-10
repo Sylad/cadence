@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Added
+
+- A program that holds the branch keeps the lead's commits off it (L695, [docs/raf.md](docs/raf.md#a-branch-held-by-a-program-the-pending-plan-l695)): while `cadence run` works, and while `cadence verify --gate` plays in the main tree, the pre-commit hook of `raf hook install` refuses a commit on that branch and says what to do; `raf add`, `raf note` and `raf done` write to `.cadence/plan-en-attente.yaml` instead of the plan, and `cadence run` applies it when it gives the repository back (`raf attente [appliquer]` shows or plays it). One commit of the lead on `main` used to make the run fail its fast-forward (≥ 12 times from 26-10 to 06-11).
+
 ### Changed
 
 - `cadence release` raises the version of another plugin of the marketplace (the `cadence-hud` mod) by a patch when its code changed since the last release under the same version, and says so. `cadence-hud` had stayed 0.7.0 from 1.39.0 to 2.0.2 while its code changed: it is 0.8.0 now.

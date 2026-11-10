@@ -13,6 +13,7 @@ import { cmdSession, cmdSessionAll } from './cli/session-commands.js';
 import { cmdDeliver, cmdLocal, cmdVerify } from './cli/deliver-commands.js';
 import { corrections, inspect, perf } from './cli/stats-commands.js';
 import { cmdConfig, cmdLead } from './cli/lead-commands.js';
+import { cmdAttente, heldPlanWrite } from './cli/attente-commands.js';
 import { claudeHook } from './claude-hook.js';
 import { refCommand } from './ref/command.js';
 import { release } from './release.js';
@@ -53,6 +54,7 @@ Une seule aide : « raf --help », « cadence --help » et « cadence help » im
   raf status [<id> <état> ["message"] | <id> --back ["message"]]   états détaillés du projet (cadence.yaml : plan.states) : pose l'état d'un lot sous la garde de plan.transitions et note le message ; --back sort de l'état bloqué vers l'état d'avant ; sans argument, liste les états. start / done / drop / todo posent eux-mêmes l'état de leur statut
   raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits ; rouvre un lot done ou dropped (→ todo, finished retiré, note « rouvert ») — la seule façon de rouvrir, archivé compris (il revient dans le fichier du plan)
   raf note <id> "texte"
+  raf attente [appliquer]   le plan en attente (L695) : sur une branche tenue par un programme (cadence run, porte jouée dans l'arbre principal), add, note et done écrivent dans .cadence/plan-en-attente.yaml (jamais suivi) au lieu du plan, et le hook pre-commit refuse le commit ; le programme l'applique en rendant le dépôt ; appliquer le joue à la main, refusé tant que la branche est tenue
   --verbose             avec done, ux, review, note, move ou public : imprime la ligne « id  état  titre entier » du lot touché ; avec hook post-commit : le titre entier (sinon 60 caractères au plus)
   raf title <id> "nouveau titre"   remplace le titre d'un lot, de tout statut (done compris), et note l'ancien dans une note datée
   raf did <id> ["texte"]   un lot récurrent (--every) a été refait : le « dû depuis N j » repart de aujourd'hui
@@ -76,7 +78,7 @@ Une seule aide : « raf --help », « cadence --help » et « cadence help » im
   raf import --to-config [--from plan-natif.yaml] [--out plan.yaml] [--rename ancien=nouveau]… [--force] [--dry-run]   le chemin inverse : réécrit au format d'origine (états, effort en libellé, alias, clés non mappées) le plan natif, écritures faites depuis comprises ; remplace la liste des lots du fichier d'origine (--force) en gardant ses autres clés ; refuse un statut qu'aucun état du format ne porte
   cadence config set <clé> <valeur> --all [--dry-run] [--depth n]   pose la même clé dans le cadence.yaml de chaque projet du dossier (ceux de lead tour), commentaires et ordre gardés, un lot de config qui la cite (raf add + start) et un commit à chemin explicite par projet ; ne pousse pas ; liste ce qui est fait et sauté (dépôt sale, déjà posée, plan en lecture seule) ; s'arrête sur une config qui ne se relit pas
   raf migrate [--dry-run]   déplace docs/plan/raf.yaml vers .cadence/raf.yaml (git mv) et réécrit les lecteurs du chemin dans le dépôt ; --dry-run les liste sans rien toucher ; refus tant qu'un lecteur n'est pas traité (migrate.keep de cadence.yaml pour ceux qui ne lisent pas le plan) ; rejouable
-  raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start ; hook.docs: warn|refuse, un fix( qui change un identifiant cité par la doc sans la toucher)
+  raf hook install      (pre-commit et post-commit ; cadence.yaml hook.autostart: warn|refuse|start ; hook.docs: warn|refuse, un fix( qui change un identifiant cité par la doc sans la toucher ; le pre-commit refuse un commit sur une branche tenue par un programme, voir raf attente)
   cadence orchestrate <projet>:<lot>[@modèle]… [--budget 2M] [--goal "…"] [--dry-run] [--wave nom] [--no-fill] [--continue [--until HH:MM] [--priority a,b]]   une session claude neuve par étape ; une vague de lots nommés remplit ses créneaux libres avec les lots tirables du plan jusqu'à la fin du budget, --no-fill la borne aux lots donnés ; --queue [<projet>:<lot>…] [--until HH:MM] (la vague démarre sur la file approuvée) ; queue add|show|drop <projet>:<lot>… (la file approuvée : une liste ordonnée de lots que toute vague vivante tire avant le plan à chaque créneau libre, poussée par --add dans la vague qui tient le dépôt) ; --status [vague] [--watch [--interval s]] ; --follow [--wave vague] [--interval s] [--since horodatage|ligne] (le journal réduit aux lignes qui demandent un geste du lead, écrites après l'armement, plus les questions ouvertes ; --since rejoue depuis un horodatage ISO ou une ligne ; « fin de vague » 6 relevés après l'arrêt) ; --resume [vague | --wave vague] [--budget 1M] [--budget projet:lot=+300k] [--answer projet:lot "réponse"] [--drop projet:lot] ; --drop projet:lot [--wave vague] ; --stop-after-current [--wave vague] ; --waits [--since AAAA-MM-JJ]
                         mode worktree par lot (orchestrate.worktrees: true)  (activé par défaut dans cadence, désactivé ailleurs tant que la clé est absente) ; ses options : --resume --wave <vague> --integrate projet:lot (rejoue un lot rendu à l'intégration) · --resume --wave <vague> --replay projet:lot (idem, et après une écriture de plan refusée) · --remove-worktree projet:lot [--abandon-commits] (retire le worktree et la branche conservés) ; la liste des worktrees conservés : orchestrate --status et lead tour
   cadence lead tour [dossier] [--idle 3] [--depth n] [--json]   le tableau du lead, sans modèle (et, sous les lignes, ⚠ N lots done depuis le dernier tag v<x.y.z> quand des lots en service ne sont pas publiés) : une ligne par sous-dossier qui a un plan, ou la ligne du dossier seul s'il est lui-même un projet (en cours, dérive, notes de clôture, prochain lot tirable, dépôt), précédées de l'en-tête perf : une ligne par ⚠ de cadence perf, rien si tout est stable
@@ -161,6 +163,7 @@ const BEFORE_PLAN: Record<string, (c: EarlyCtx) => number | Promise<number> | nu
   'claude-hook': (c) => claudeHook(c.rest[0], () => (c.io.stdin ? c.io.stdin() : readFileSync(0, 'utf8')), c.io.out),
   spec: cmdSpecChecks,
   session: (c) => cmdSessionAll(c, run),
+  attente: (c) => cmdAttente(c, run),
 };
 
 /** Les commandes qui lisent le plan. */
@@ -214,6 +217,14 @@ export const COMMAND_TABLES = [...new Set([...Object.keys(BEFORE_PLAN), ...Objec
 // Une session d'orchestration ne ferme pas un lot, n'enregistre pas de verdict à la place du lead et ne livre pas.
 const LEAD_ONLY = new Set(['done', 'ux', 'review', 'deliver']);
 
+/** Ce qui répond avant toute lecture du plan, ou null : add, note et done sur une branche tenue par un programme (L695), puis les commandes de BEFORE_PLAN. */
+function beforePlan(command: string, argv: string[], base: EarlyCtx): number | Promise<number> | null {
+  const held = heldPlanWrite(command, argv, base, run);
+  if (held !== null) return held;
+  // Object.hasOwn : « constructor » ou « toString » ne sont pas des commandes.
+  return Object.hasOwn(BEFORE_PLAN, command) ? BEFORE_PLAN[command]!(base) : null;
+}
+
 function dispatch(argv: string[], io: Io): number | Promise<number> {
   const { values, positionals } = parseCli(argv);
   const [command, ...rest] = positionals;
@@ -225,8 +236,7 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   const today: Day = io.env.RAF_TODAY ?? toDay(io.now());
   if (!isDay(today)) throw new RafError(`RAF_TODAY invalide : ${today} (attendu AAAA-MM-JJ)`);
   const base = { rest, values, io, today, root: gitRoot(io.cwd) ?? io.cwd };
-  // Object.hasOwn : « constructor » ou « toString » ne sont pas des commandes.
-  const early = Object.hasOwn(BEFORE_PLAN, command) ? BEFORE_PLAN[command]!(base) : null;
+  const early = beforePlan(command, argv, base);
   if (early !== null) return early;
   const ctx = buildCtx({ ...base, command });
   if (io.env.CADENCE_ORCHESTRATED && LEAD_ONLY.has(command)) {

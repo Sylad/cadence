@@ -4,7 +4,8 @@
 // (une reprise de la même session si elle est rouge), intégration en avance rapide. Le plan (raf) et deliver restent ceux de la v1.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, type Executeur } from '../bench/bras.js';
 import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin } from './aiguillage.js';
@@ -14,12 +15,31 @@ const PORTE_MS = 30 * 60_000;
 export type EtatRun = 'en-cours' | 'attente' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
 export interface Etat { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string; pieces: string[];
   taille: string; mode: 'complet' | 'leger'; acces_cluster: boolean; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string }
-interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean }
+interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string }
 
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const essaiGit = (cwd: string, ...a: string[]) => spawnSync('git', a, { cwd, encoding: 'utf8' });
 const dossierRuns = (repo: string) => join(dirname(repo), '.cadence-run');
 const sauver = (e: Etat) => { writeFileSync(e.fichier, JSON.stringify(e, null, 1)); return e; };
+
+// L695 (D-9) : le run tient la branche cible du début à la fin ; le pre-commit de raf (raf hook install) y refuse un commit du lead, qui le ferait
+// échouer en avance rapide, et raf add|note|done écrivent dans le plan en attente. Même format que src/repo-held.ts, qui le lit.
+const PLAN_EN_ATTENTE = join('.cadence', 'plan-en-attente.yaml');
+const RAF = fileURLToPath(new URL('../../../bin/raf.js', import.meta.url));
+const fichierTenu = (repo: string) => join(resolve(repo, git(repo, 'rev-parse', '--git-common-dir')), 'cadence', 'tenu', `run-${process.pid}.json`);
+function tenir(e: Etat): void {
+  const f = fichierTenu(e.repo);
+  mkdirSync(dirname(f), { recursive: true });
+  writeFileSync(f, JSON.stringify({ pid: process.pid, kind: 'run', label: `cadence run ${e.id}`, branch: e.cible, since: new Date().toISOString() }));
+}
+/** Rend la branche, puis fait appliquer par raf le plan mis en attente pendant le run (raf refuse si un autre programme la tient encore). */
+function rendre(e: Etat, o: Opts): void {
+  rmSync(fichierTenu(e.repo), { force: true });
+  if (!existsSync(join(e.repo, PLAN_EN_ATTENTE))) return;
+  const r = spawnSync(process.execPath, [o.raf ?? RAF, 'attente', 'appliquer'], { cwd: e.repo, encoding: 'utf8' });
+  const sortie = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
+  o.out(r.status === 0 ? sortie : `plan en attente non appliqué (${sortie || r.error?.message || `code ${r.status}`}) : raf attente appliquer à la main`);
+}
 
 /** Dépendances non suivies (node_modules, .venv) liées en dur dans le worktree : rapide, et les outils les voient chez eux. */
 function copierDeps(repo: string, wt: string): void {
@@ -98,6 +118,7 @@ function registreOuvert(wt: string): string[] {
 
 function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
   sauver(e);
+  rendre(e, o);
   const duree = Math.round((Date.now() - Date.parse(e.debut)) / 1000);
   o.out(`cadence run ${e.id} : ${e.etat}${e.integre ? ` (${e.cible} = ${e.integre})` : ''} · ${duree} s · ${e.cout_usd.toFixed(2)} $${e.detail ? `\n${e.detail}` : ''}`);
   for (const r of registre) o.out(`registre : ${r}`);
@@ -105,7 +126,7 @@ function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
   return e;
 }
 
-export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; exec?: Executeur; out: (l: string) => void; sansPorte?: boolean }): Etat {
+export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string }): Etat {
   const repo = git(a.repo, 'rev-parse', '--show-toplevel'), cible = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD');
   const id = `${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${process.pid}`;
   const runs = dossierRuns(repo), worktree = join(runs, `${basename(repo)}-${id}`);
@@ -115,13 +136,13 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
     demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, acces_cluster: orchestrate(worktree).prodAccess === true, session: '', cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
-  sauver(e);
+  sauver(e); tenir(e);
   a.out(`cadence run ${id} : session Opus en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);
   // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.
   const demande = a.lot ? `${a.demande}\n\nLot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).` : a.demande;
   const brief = readFileSync(aig.bras.brief, 'utf8').split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
     .replaceAll('{{QUESTION}}', `${worktree}.question.md`).replaceAll('{{BASE}}', e.base).replaceAll('{{TAILLE}}', e.taille);
-  const o = { exec: a.exec, out: a.out, sansPorte: a.sansPorte };
+  const o = { exec: a.exec, out: a.out, sansPorte: a.sansPorte, raf: a.raf };
   return session(e, brief, o) ? suite(e, o) : fin(e, o);
 }
 
@@ -132,6 +153,6 @@ export function repondreRun(id: string, repo: string, reponse: string, o: Opts):
   if (!existsSync(f)) throw new Error(`cadence run : run inconnu : ${id} (${f})`);
   const e = JSON.parse(readFileSync(f, 'utf8')) as Etat;
   if (e.etat === 'integre') throw new Error(`cadence run : ${id} est déjà intégré`);
-  e.etat = 'en-cours';
+  e.etat = 'en-cours'; tenir(e);
   return session(e, `Réponse de Sylvain : ${reponse}`, o) ? suite(e, o) : fin(e, o);
 }

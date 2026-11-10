@@ -7,5 +7,5 @@
  "lots": [
   "L695"
  ],
- "preuve": "test/depot-tenu-l695.test.ts (6 verts ; l'e2e rouge sans le refus du pre-commit) : faux cadence run, raf note mis en attente, git commit du lead sur main refusé, run intégré, note appliquée ; suite complète 9797 verts, 1 rouge (test/porte-mod.test.ts, typage du mod contre les types de Claude Code non versionnés, rouge aussi sur b1f4a065)"
+ "preuve": "test/depot-tenu-l695.test.ts (6 verts ; l'e2e rouge sans le refus du pre-commit) : faux cadence run, raf note mis en attente, git commit du lead sur main refusé, run intégré, note appliquée ; suite complète 583 fichiers, 9798 verts, 0 rouge (après mise au type isCollapsed des tests du mod cadence-hud)"
 }

@@ -126,7 +126,7 @@ const monte = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], hi
   await settle()
   return store
 }
-const BAND = { component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} } } as const
+const BAND = { component: 'AbovePrompt', props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} } } as const
 
 test('banc — branché : la bande dessine la ligne du banc lue par le lecteur, le panneau des lots ses 5 derniers passages', async ($, on) => {
   await monte($, on, [hebdo, ligne({ vert: false, rouges: ['temps total'] })])

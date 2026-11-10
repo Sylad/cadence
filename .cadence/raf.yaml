@@ -3129,9 +3129,12 @@ lots:
     created: 2026-11-10
   - id: L688
     title: "Adapter tous les skills de cadence à cadence run (D-2) : session-start, session-close, deliver, orchestrate, lead, agents et hooks du plugin"
-    status: todo
+    status: done
     estimate: 0.5
     created: 2026-11-10
+    review: { date: 2026-11-10, verdict: "conforme — relu par le lead : les trois skills et le lead décrivent cadence run tel qu'il est (états du run vérifiés contre v2/src/run/run.ts ; sans-porte et echec ajoutés en fix(L688)), tests des skills verts", commit: 171d86d843e334530046cf5693a687c08b554261 }
+    started: 2026-11-10
+    finished: 2026-11-10
   - id: L689
     title: "Bancs en trois niveaux : micro-banc (8 min), banc mécanique sans juge IA en parallèle (≈30 min) à chaque changement, banc complet avec juge seulement avant une release ; bancs du banc court en parallèle (D-3)"
     status: todo

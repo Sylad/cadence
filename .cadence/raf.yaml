@@ -3197,9 +3197,10 @@ lots:
     finished: 2026-11-10
   - id: L697
     title: "raf hook install place son bloc en TÊTE d'un pre-commit existant (suite de L695) : ajouté à la fin, il ne s'exécute pas quand le script maison sort tôt (cas de cadence, exit 0 sans fichier de doc ; corrigé à la main le 10-11) ; test : pre-commit maison avec exit 0 précoce, commit sur dépôt tenu refusé quand même ; corriger aussi les dépôts déjà installés"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-10
+    started: 2026-11-10
   - id: L698
     title: "Avant le tag, rejouer la CI de publication (publish.yml : npm ci + prepublishOnly) dans un clone neuf, plus un test statique du champ files de package.json (D-7, erreur 2 : 7 des 10 casses passées viennent de la CI, que L696 ne couvre pas)"
     status: todo
@@ -3207,11 +3208,13 @@ lots:
     created: 2026-11-10
   - id: L699
     title: "cadence run : choix du modèle (D-13) — option --modele <opus|fable|sonnet|haiku> et variable CADENCE_RUN_MODELE, défaut inchangé (opus) ; la ligne de lancement dit le modèle réellement utilisé ; test : le modèle demandé arrive dans la commande claude des deux bras (léger, complet)"
-    status: doing
+    status: done
     estimate: 0.25
     quickwin: true
     created: 2026-11-10
     started: 2026-11-10
+    review: { date: 2026-11-10, verdict: "conforme : --modele opus|fable et CADENCE_RUN_MODELE, autres valeurs refusées, reprise et --fond gardent le modèle ; 1 mineur (pas de test du chemin valide de --fond) ; porte verte à c819d57", commit: c819d57272e4afe348c1b5c850537e3d6efd0f55 }
+    finished: 2026-11-10
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

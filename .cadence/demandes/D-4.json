@@ -16,6 +16,10 @@
   {
    "date": "2026-11-10",
    "texte": "Précision de Sylvain : « peut-être que c'est le côté systematique de compactage qui est a eviter, par exemple on ne lancerais le compact que si le context des sous sessions que si on se rapproche des 150k par exemple (le 150k correspond au message que je vois dans le /usage la plus part du temps) ». À mesurer sur AetherWX le 11-11 : neuve, gardée, gardée + /compact dirigé au-dessus de 150 k."
+  },
+  {
+   "date": "2026-11-10",
+   "texte": "Précision de Sylvain : « le seuil est modifiable suivant tes tests/recommandations, j'ai cité l'un des rare chiffre de tocken que je connais ». 150 k n'est qu'un point de départ : la valeur se règle d'après la mesure."
   }
  ]
 }

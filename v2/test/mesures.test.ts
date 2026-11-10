@@ -53,7 +53,7 @@ describe('jouerTests', () => {
     const h = dossierTemp('hid-');
     writeFileSync(join(h, 'p.ts'), "import {it,expect} from 'vitest';it('vert',()=>expect(1).toBe(1));\n");
     writeFileSync(join(h, 'q.ts'), "import {describe,it,expect} from 'vitest';describe('grp',()=>{it('rouge',()=>expect(1).toBe(2));});\n");
-    const bin = join(import.meta.dirname, '..', 'node_modules', '.bin', 'vitest');
+    const bin = vitestBin;
     const r = jouerTests(d, [{ src: join(h, 'p.ts'), dest: 'src/p.spec.ts' }, { src: join(h, 'q.ts'), dest: 'src/q.spec.ts' }],
       `${bin} run --root . --config /dev/null`, 60_000);
     expect(r.statuts).toEqual({ 'src/p.spec.ts > vert': true, 'src/q.spec.ts > grp > rouge': false });
@@ -62,7 +62,8 @@ describe('jouerTests', () => {
   });
 });
 
-const vitestBin = join(import.meta.dirname, '..', 'node_modules', '.bin', 'vitest');
+// celui de v2/ s'il est installé, sinon celui du paquet racine (la CI ne fait que « npm ci » à la racine)
+const vitestBin = [join(import.meta.dirname, '..', 'node_modules', '.bin', 'vitest'), join(import.meta.dirname, '..', '..', 'node_modules', '.bin', 'vitest')].find((f) => existsSync(f)) ?? 'vitest';
 const cacheTxt = (d: string, txt: string) => { void d; const s = join(dossierTemp('cache-'), 'h.ts'); writeFileSync(s, txt); return s; };
 const fauxJson = (tests: object[]) => { const f = join(dossierTemp('fj-'), 'f.cjs');
   writeFileSync(f, `const a=process.argv.slice(2);const o=a.find(x=>x.startsWith('--outputFile=')).slice(13);const n=a.find(x=>!x.startsWith('--'));

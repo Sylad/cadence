@@ -12,6 +12,10 @@
   {
    "date": "2026-11-10",
    "texte": "Micro-banc (2 rép.) : compactée rejetée (+12 % de temps, ×3 en coût) ; gardée −20 % de temps, demande différée 2/2, mais +65 % de coût. À confirmer sur AetherWX avant d'ajouter --suite."
+  },
+  {
+   "date": "2026-11-10",
+   "texte": "Précision de Sylvain : « peut-être que c'est le côté systematique de compactage qui est a eviter, par exemple on ne lancerais le compact que si le context des sous sessions que si on se rapproche des 150k par exemple (le 150k correspond au message que je vois dans le /usage la plus part du temps) ». À mesurer sur AetherWX le 11-11 : neuve, gardée, gardée + /compact dirigé au-dessus de 150 k."
   }
  ]
 }

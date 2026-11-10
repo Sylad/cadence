@@ -3176,12 +3176,15 @@ lots:
     created: 2026-11-10
   - id: L695
     title: "Dépôt occupé (D-7, erreur 1 du relevé 10-11, ≥12 fois) : hook pre-commit (raf hook install) qui refuse un commit sur la branche principale tant qu'un run, une vague ou une release tient le dépôt ; raf add/note/done écrivent alors dans .cadence/plan-en-attente.yaml, appliqué après l'intégration ; test e2e (faux run, raf note, git commit refusé, note appliquée, run intégré) ; mesure : 0 refus-integration de run dû à un commit de main sur 2 semaines"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-10
     started: 2026-11-10
     notes:
       - { date: 2026-11-10, text: "Revue r1 : majeur 5 (vagues v1 hors du verrou) laissé hors du lot par le lead le 10-11 : cadence run est le chemin par défaut depuis 2.0.0, les vagues ne se lancent plus que sur demande." }
+      - { date: 2026-11-10, text: "Mineurs r2 : test de commitPlan seulement textuel ; raf done mis en attente avant ses refus." }
+    review: { date: 2026-11-10, verdict: "conforme (r2) : majeurs 1-4 de r1 corrigés en ac5cef9 (verrou rendu dans tous les cas, commits des programmes admis, verify --gate testé, plan en attente verrouillé) ; majeur 5 hors lot ; 2 mineurs en notes ; porte verte à ac5cef9", commit: ac5cef91afffb3c60056e8228eebf67f74f7c168 }
+    finished: 2026-11-10
   - id: L696
     title: "Paquet essayé avant publication (D-7, erreur 2 du relevé 10-11, 10 versions cassées dont 2.0.0 et 2.0.1) : cadence release installe le npm pack dans un dossier vide et joue des commandes de fumée (cadence --help, cadence run --help, raf --help, cadence2) avant de poser le tag ; mesure : 0 version publiée cassée"
     status: todo

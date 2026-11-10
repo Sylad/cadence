@@ -7,5 +7,11 @@
  "lots": [
   "L690"
  ],
- "preuve": null
+ "preuve": null,
+ "precisions": [
+  {
+   "date": "2026-11-10",
+   "texte": "Micro-banc (2 rép.) : compactée rejetée (+12 % de temps, ×3 en coût) ; gardée −20 % de temps, demande différée 2/2, mais +65 % de coût. À confirmer sur AetherWX avant d'ajouter --suite."
+  }
+ ]
 }

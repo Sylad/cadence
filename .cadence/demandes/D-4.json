@@ -20,6 +20,10 @@
   {
    "date": "2026-11-10",
    "texte": "Précision de Sylvain : « le seuil est modifiable suivant tes tests/recommandations, j'ai cité l'un des rare chiffre de tocken que je connais ». 150 k n'est qu'un point de départ : la valeur se règle d'après la mesure."
+  },
+  {
+   "date": "2026-11-10",
+   "texte": "Banc AetherWX court (run 2026-11-10-1551-b4bcc9ea9150, 2 rép.) : bras seuil (session gardée, compaction au-dessus de 150 k) contre session neuve. Coût 31,5 $ et 29,7 $ contre 8,4 $ et 9,1 $ (×3,5) ; temps +24 % et +39 % ; tests cachés 18 contre 7 puis 12 contre 12 ; régressions 2 contre 0 puis 0 contre 0 ; juge : seuil puis indécis. Rouge les deux fois aussi pour une fuite propre au banc (pièce d'aether-b68 lue). Pas de gain qualité établi pour ×3,5 en coût : --suite non ajouté, proposé à Sylvain."
   }
  ]
 }

@@ -3180,6 +3180,8 @@ lots:
     estimate: 0.5
     created: 2026-11-10
     started: 2026-11-10
+    notes:
+      - { date: 2026-11-10, text: "Revue r1 : majeur 5 (vagues v1 hors du verrou) laissé hors du lot par le lead le 10-11 : cadence run est le chemin par défaut depuis 2.0.0, les vagues ne se lancent plus que sur demande." }
   - id: L696
     title: "Paquet essayé avant publication (D-7, erreur 2 du relevé 10-11, 10 versions cassées dont 2.0.0 et 2.0.1) : cadence release installe le npm pack dans un dossier vide et joue des commandes de fumée (cadence --help, cadence run --help, raf --help, cadence2) avant de poser le tag ; mesure : 0 version publiée cassée"
     status: todo

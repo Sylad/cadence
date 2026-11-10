@@ -1,0 +1,11 @@
+{
+ "id": "D-4",
+ "texte": "tient question bete, mais est ce que l'on ne devrait pas garder le context d'une session, si le nouveau lot est dans le même projet, quite à faire un compact si necessaire?",
+ "date": "2026-11-10",
+ "origine": "session du lead ; précisé par « et le context on peu pas le compacter via cadence? » ; essai /compact en -p --resume réussi le 10-11 ; « ok » au plan des 3 variantes",
+ "etat": "ouverte",
+ "lots": [
+  "L690"
+ ],
+ "preuve": null
+}

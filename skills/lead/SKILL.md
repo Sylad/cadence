@@ -94,7 +94,7 @@ cd <project> && raf start <lot> && cadence run "<the human's request, verbatim>"
 - **Mode.** Complet (references read in full before any write, enforced by a hook; request register) when a `--piece` is given, when the request names a word of `references:` in `cadence.yaml`, or with `--complet`; léger (Claude alone) otherwise. The launch line says which and why. A piece may be absolute or under `~` (a knowledge base outside the repository, e.g. the lot's dossier). When the project keeps such a base, pass the lot's dossier as `--piece`.
 - `--fond` detaches the run: it survives this session, its journal is in `../.cadence-run/`. `cadence run --liste` shows each run's state.
 - **Question** (state `attente`): relay it to the human, then `cadence run --reponse <id> "<answer>"` resumes the same session.
-- **Handed back** (`porte-rouge`, `conflit`, `refus-integration`, `sans-commit`): the worktree is kept with its state file; read it, then relay to the human — never redo the lot yourself.
+- **Handed back** (`porte-rouge`, `conflit`, `refus-integration`, `sans-commit`, `sans-porte`, `echec`): the worktree is kept with its state file; read it, then relay to the human — never redo the lot yourself.
 - Cluster access follows `orchestrate.prodAccess`, as for waves.
 - Several lots in parallel are several `cadence run`, one worktree each; two lots that share a resource (`uses:`, a bench) run one after the other.
 

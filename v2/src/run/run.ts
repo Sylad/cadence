@@ -6,14 +6,14 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { parse } from 'yaml';
-import { argsClaude, creerExecuteur, libererReglages, lire, type Executeur } from '../bench/bras.js';
+import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, type Executeur } from '../bench/bras.js';
 import { aiguiller, BRAS_COMPLET, BRAS_LEGER } from './aiguillage.js';
 
 const PORTE_MS = 30 * 60_000;
 
 export type EtatRun = 'en-cours' | 'attente' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
 export interface Etat { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string; pieces: string[];
-  taille: string; mode: 'complet' | 'leger'; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string }
+  taille: string; mode: 'complet' | 'leger'; acces_cluster: boolean; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string }
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean }
 
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -32,10 +32,10 @@ function copierDeps(repo: string, wt: string): void {
   }
 }
 
+const orchestrate = (repo: string): { test?: string; build?: string; prodAccess?: boolean } =>
+  existsSync(join(repo, 'cadence.yaml')) ? (parse(readFileSync(join(repo, 'cadence.yaml'), 'utf8')) as { orchestrate?: object } | null)?.orchestrate ?? {} : {};
 function commandesDeCadenceYaml(repo: string): string[] {
-  const f = join(repo, 'cadence.yaml');
-  if (!existsSync(f)) return [];
-  const o = (parse(readFileSync(f, 'utf8')) as { orchestrate?: { test?: string; build?: string } } | null)?.orchestrate ?? {};
+  const o = orchestrate(repo);
   return [o.test, o.build].filter((c): c is string => typeof c === 'string' && !!c.trim());
 }
 function jouerPorte(cmds: string[], cwd: string): { ok: boolean; sortie: string } {
@@ -48,8 +48,10 @@ function jouerPorte(cmds: string[], cwd: string): { ok: boolean; sortie: string 
 
 function session(e: Etat, prompt: string, o: Opts): boolean {
   const exec = o.exec ?? creerExecuteur('claude', 4 * 3600_000);
-  const env = { ...process.env, CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo) };
-  const r = lire(exec(['-p', prompt, ...(e.session ? ['--resume', e.session] : []), ...argsClaude(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET, e.worktree)], { cwd: e.worktree, env }));
+  // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet
+  const env = { ...process.env, CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
+  const interdits = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
+  const r = lire(exec(['-p', prompt, ...(e.session ? ['--resume', e.session] : []), ...argsClaude(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET, e.worktree, interdits)], { cwd: e.worktree, env }));
   e.session = r.session || e.session; e.cout_usd += r.cout;
   if (r.echec) { e.etat = 'echec'; e.detail = r.echec; return false; }
   if (r.resultat) o.out(`session : ${r.resultat.slice(-1500)}`);
@@ -103,7 +105,7 @@ function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
   return e;
 }
 
-export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; exec?: Executeur; out: (l: string) => void; sansPorte?: boolean }): Etat {
+export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; exec?: Executeur; out: (l: string) => void; sansPorte?: boolean }): Etat {
   const repo = git(a.repo, 'rev-parse', '--show-toplevel'), cible = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD');
   const id = `${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${process.pid}`;
   const runs = dossierRuns(repo), worktree = join(runs, `${basename(repo)}-${id}`);
@@ -112,10 +114,12 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   copierDeps(repo, worktree);
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
-    demande: a.demande, pieces: aig.pieces.map((p) => join(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, session: '', cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
+    demande: a.demande, pieces: aig.pieces.map((p) => join(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, acces_cluster: orchestrate(worktree).prodAccess === true, session: '', cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
   sauver(e);
   a.out(`cadence run ${id} : session Opus en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);
-  const brief = readFileSync(aig.bras.brief, 'utf8').replaceAll('{{DEMANDE}}', a.demande).replaceAll('{{CLONE}}', worktree)
+  // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.
+  const demande = a.lot ? `${a.demande}\n\nLot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).` : a.demande;
+  const brief = readFileSync(aig.bras.brief, 'utf8').split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
     .replaceAll('{{QUESTION}}', `${worktree}.question.md`).replaceAll('{{BASE}}', e.base).replaceAll('{{TAILLE}}', e.taille);
   const o = { exec: a.exec, out: a.out, sansPorte: a.sansPorte };
   return session(e, brief, o) ? suite(e, o) : fin(e, o);

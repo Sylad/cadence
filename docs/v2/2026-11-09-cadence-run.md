@@ -3,7 +3,7 @@
 Depuis le 2026-11-09, `cadence run` remplace `cadence orchestrate` pour faire une demande. Il joue exactement ce que le banc a mesuré gagnant (docs/v2/banc.md), et rien d'autre.
 
 ```bash
-cadence run "<demande>" [--piece docs/norme.md]… [--taille retouche|fonction] [--complet] [--sans-porte]
+cadence run "<demande>" [--piece docs/norme.md]… [--lot L12] [--taille retouche|fonction] [--complet] [--sans-porte] [--fond]
 cadence run --reponse <id> "<texte>"
 cadence run --liste
 ```
@@ -21,7 +21,7 @@ references:
     docs: [docs/normes/sigwx.md]
 ```
 
-Le mode et sa raison s'affichent au lancement. Les mots se comparent sans accents ni casse, en mot entier.
+Le mode et sa raison s'affichent au lancement. Dans un vrai dépôt, la ligne « Taille » du brief complet, qui ne sert qu'au banc, est retirée : elle casserait un commitlint. Les mots se comparent sans accents ni casse, en mot entier.
 
 ## Déroulé
 
@@ -42,6 +42,9 @@ En cas d'échec, le worktree est gardé avec l'état du run (`../.cadence-run/<p
 | `--reponse` | Une question à Sylvain reprend la même session (cause C2 : ne pas découper le contexte). |
 | `--liste` | Retrouver un run rendu, en attente ou rouge, sans fouiller le disque. |
 | `--complet` | Forcer le mode complet quand l'aiguillage rate une demande qui a des références. |
+| `--lot` | Les commits d'un dépôt suivi par un plan citent le lot (`feat(L51): …`) : la session le reçoit avec la demande. |
+| `--fond` | Le run se détache et survit à la session qui l'a lancée (vécu au compte pro le 10-11 : un lot mort avec la session précédente) ; journal dans `../.cadence-run/`. |
+| `KUBECONFIG` | Comme les vagues : sans `orchestrate.prodAccess: true`, la session n'a ni `kubectl`, ni `helm`, ni `KUBECONFIG` ; avec, elle joue le banc du projet. |
 | `--sans-porte` | Un dépôt sans porte déclarée n'est pas intégré en silence : il faut le choisir explicitement. |
 
 ## Mesures qui le fondent

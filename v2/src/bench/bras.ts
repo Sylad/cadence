@@ -60,8 +60,8 @@ export const empreinteReglages = (clone: string): string => [cheminReglages(clon
   ...[clone, homedir()].flatMap((d) => [join(d, '.claude', 'settings.json'), join(d, '.claude', 'settings.local.json')])] // ~/.claude : lu, jamais modifié
   .reduce((h, f) => h.update(`${f}\0${existsSync(f) ? readFileSync(f, 'latin1') : 'absent'}\0`), createHash('sha1')).digest('hex');
 /** Arguments communs d'une session de bras ou de `cadence run` : même modèle, mêmes interdictions, mêmes réglages (hook de lecture). */
-export const argsClaude = (d: DefBras, clone: string): string[] => ['--output-format', 'json', '--model', d.modele, '--permission-mode', 'bypassPermissions',
-  '--disallowedTools', OUTILS_INTERDITS.join(','), ...(d.settings ? ['--settings', ecrireReglages(d.settings, clone)] : [])];
+export const argsClaude = (d: DefBras, clone: string, interdits = OUTILS_INTERDITS): string[] => ['--output-format', 'json', '--model', d.modele, '--permission-mode', 'bypassPermissions',
+  '--disallowedTools', interdits.join(','), ...(d.settings ? ['--settings', ecrireReglages(d.settings, clone)] : [])];
 /** `garde` : pièces à lire avant d'écrire et racine du banc, données au hook du bras par l'environnement (CADENCE_*), jamais par un fichier. */
 export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }): Mesure {
   if (d.aiguillage) { const a = aiguiller(lireDemande(b), clone, garde.pieces.map((p) => relative(clone, p))); d = { ...a.bras, nom: d.nom }; garde = { ...garde, pieces: a.pieces.map((p) => join(clone, p)) }; }

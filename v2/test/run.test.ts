@@ -92,6 +92,26 @@ describe('cadence run', () => {
     expect(l[0]).toMatch(/mode leger \(aucune référence dans la demande\)/);
   });
 
+  it('dépôt réel : pas de ligne « Taille » (commitlint), lot cité, sans prodAccess ni kubectl ni KUBECONFIG', () => {
+    const repo = depot(), appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
+    executerRun({ repo, demande: 'Crée fait.txt', pieces: ['cadence.yaml'], lot: 'L51', exec: fauxClaude([commite('fait.txt')], appels), out: () => {} });
+    const prompt = appels[0].args[appels[0].args.indexOf('-p') + 1];
+    expect(prompt).not.toMatch(/Taille fixée/);
+    expect(prompt).toMatch(/Lot du plan : L51\. Cite-le dans chaque message de commit/);
+    expect(appels[0].args[appels[0].args.indexOf('--disallowedTools') + 1]).toMatch(/Bash\(kubectl:\*\)/);
+    expect(appels[0].env.KUBECONFIG).toBe('/dev/null');
+  });
+
+  it('orchestrate.prodAccess: true : kubectl et helm permis, KUBECONFIG gardé (banc du projet)', () => {
+    const repo = depot(), appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
+    writeFileSync(join(repo, 'cadence.yaml'), 'orchestrate:\n  test: test -f fait.txt\n  prodAccess: true\n');
+    git(repo, 'add', '.'); git(repo, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'prodAccess');
+    const e = executerRun({ repo, demande: 'x', exec: fauxClaude([commite('fait.txt')], appels), out: () => {} });
+    expect(e.acces_cluster).toBe(true);
+    expect(appels[0].args[appels[0].args.indexOf('--disallowedTools') + 1]).not.toMatch(/kubectl|helm/);
+    expect(appels[0].env.KUBECONFIG).toBe(process.env.KUBECONFIG);
+  });
+
   it('aucun commit : échec, rien intégré', () => {
     const repo = depot();
     const e = executerRun({ repo, demande: 'x', exec: fauxClaude([]), out: () => {} });

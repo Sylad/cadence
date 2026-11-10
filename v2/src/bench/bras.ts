@@ -6,9 +6,9 @@ import { dirname, join, relative } from 'node:path';
 import { parse } from 'yaml';
 import { lireDemande, type Banc } from './banc.js';
 import { aiguiller } from '../run/aiguillage.js';
-import { COMPACTAGE } from '../run/suite.js';
+import { COMPACTAGE, doitCompacter, type Suite } from '../run/suite.js';
 
-export interface DefBras { nom: string; modele: string; brief: string; settings?: string; aiguillage?: boolean; suite?: 'gardee' | 'compactee' } // aiguillage : le bras de cadence run ; suite (L690) : reprend la session de l'étape d'avant // settings : réglages Claude Code du bras (hooks)
+export interface DefBras { nom: string; modele: string; brief: string; settings?: string; aiguillage?: boolean; suite?: Suite } // aiguillage : le bras de cadence run ; suite (L690) : reprend la session de l'étape d'avant // settings : réglages Claude Code du bras (hooks)
 export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number;
   tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string }
 export type Executeur = (args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }) => { stdout: string; code: number; erreur?: string };
@@ -19,7 +19,7 @@ const QUESTIONS_MAX = 3;
 const SANS_REPONSE = 'Pas de réponse de Sylvain : décide toi-même, note ton hypothèse dans le message de commit, et termine.';
 
 export function chargerBras(racine: string): Record<string, DefBras> {
-  const y = parse(readFileSync(join(racine, 'bras.yaml'), 'utf8')) as Record<string, { modele: string; brief: string; settings?: string; aiguillage?: boolean; suite?: 'gardee' | 'compactee' }>;
+  const y = parse(readFileSync(join(racine, 'bras.yaml'), 'utf8')) as Record<string, { modele: string; brief: string; settings?: string; aiguillage?: boolean; suite?: Suite }>;
   return Object.fromEntries(Object.entries(y).map(([nom, d]) => [nom, { nom, modele: d.modele, brief: d.brief, ...(d.settings ? { settings: d.settings } : {}), ...(d.aiguillage ? { aiguillage: true } : {}), ...(d.suite ? { suite: d.suite } : {}) }]));
 }
 
@@ -73,7 +73,7 @@ export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, 
   const o = { cwd: clone, env: { ...environnementNeutre(process.env), ...(d.settings ? { CADENCE_CLONE: clone, CADENCE_PIECES: JSON.stringify(garde.pieces), CADENCE_BANC_RACINE: garde.racine } : {}) } };
   const reponse = b.reponses ? readFileSync(join(b.dir, 'reponses.md'), 'utf8') : SANS_REPONSE;
   const debut = horloge();
-  const c = reprise && d.suite === 'compactee' ? lire(exec(['-p', COMPACTAGE, '--resume', reprise, ...commun], o)) : undefined; // L690 : compactée avant le lot
+  const c = doitCompacter(d.suite, reprise) ? lire(exec(['-p', COMPACTAGE, '--resume', reprise!, ...commun], o)) : undefined; // L690 : compactée avant le lot
   let r = lire(exec(['-p', brief, ...(reprise && d.suite ? ['--resume', c?.session || reprise] : []), ...commun], o));
   const m = { tokens: r.tokens + (c?.tokens ?? 0), cout: r.cout + (c?.cout ?? 0), questions: 0, textes: [] as string[], sessions: r.session ? [r.session] : [], echec: c?.echec ?? r.echec };
   while (!m.echec && existsSync(question)) {

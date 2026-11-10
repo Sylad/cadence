@@ -31,7 +31,7 @@ export interface ResultatSequence { run: string; sequence: string; clones: Recor
 type Opt = { racine: string; id: string; ref: string; cand: string; juge: string; exec: Executeur; maintenant: Date; empreinte: string; home: string; out: (l: string) => void;
   repetition?: number; repetitions?: number; prep?: typeof preparer; pret?: (b: Record<string, DefBras>) => string | null; jscpd?: string[]; delaiMs?: number; garderClones?: boolean; tirage?: () => number };
 interface Ctx { o: Opt; s: Sequence; bras: Record<string, DefBras>; run: string; dir: string; debut: string; delai: number;
-  noms: string[]; clones: Record<string, string>; prec: Record<string, Statuts>; reglages: Record<string, string> }
+  noms: string[]; clones: Record<string, string>; prec: Record<string, Statuts>; reglages: Record<string, string>; sessions?: Record<string, string> } // sessions : dernière session de chaque bras (L690)
 
 const REPO = join(import.meta.dirname, '..', '..', '..');
 const TITRE = /\b(?:it|test)(\.\w+)?\s*\(\s*(['"`])(.*?)\2/;
@@ -176,7 +176,8 @@ function reglesEtape(x: Ctx, b: string, k: number): Regles {
 function lancer(x: Ctx, e: Etape, b: string, avant: { head: string; sale: string[] }, pieces: string[]): Mesure {
   const c = x.clones[b];
   try {
-    const m = lancerBras(bancEtape(x.s, e, avant.head), x.bras[b], c, x.o.exec, undefined, { pieces, racine: x.o.racine });
+    const m = lancerBras(bancEtape(x.s, e, avant.head), x.bras[b], c, x.o.exec, undefined, { pieces, racine: x.o.racine }, x.sessions?.[b]);
+    if (m.sessions.length) (x.sessions ??= {})[b] = m.sessions[m.sessions.length - 1]; // un bras « suite » reprend la session de l'étape d'avant
     m.echec ??= travailNonLivre(avant, etatGit(c));
     return m;
   } catch (err) {

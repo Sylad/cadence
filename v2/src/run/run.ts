@@ -27,10 +27,35 @@ const sauver = (e: Etat) => { writeFileSync(e.fichier, JSON.stringify(e, null, 1
 const PLAN_EN_ATTENTE = join('.cadence', 'plan-en-attente.yaml');
 const RAF = fileURLToPath(new URL('../../../bin/raf.js', import.meta.url));
 const fichierTenu = (repo: string) => join(resolve(repo, git(repo, 'rev-parse', '--git-common-dir')), 'cadence', 'tenu', `run-${process.pid}.json`);
+/** Heure de démarrage du processus (champ 22 de /proc/<pid>/stat, sinon lstart de ps), comme processStart de src/proc.ts : avec le pid, l'identité du porteur. */
+function debutProcessus(pid: number): string | undefined {
+  try {
+    const st = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    return st.slice(st.lastIndexOf(')') + 2).split(' ')[19] || undefined;
+  } catch {
+    return spawnSync('ps', ['-p', String(pid), '-o', 'lstart='], { encoding: 'utf8' }).stdout?.trim() || undefined;
+  }
+}
+// Revue L695 r1 (D-10) : `start` écrit, un fichier laissé par un run tué (Ctrl-C, SIGKILL, PC éteint) ne tient plus la branche quand son pid est repris.
 function tenir(e: Etat): void {
   const f = fichierTenu(e.repo);
   mkdirSync(dirname(f), { recursive: true });
-  writeFileSync(f, JSON.stringify({ pid: process.pid, kind: 'run', label: `cadence run ${e.id}`, branch: e.cible, since: new Date().toISOString() }));
+  writeFileSync(f, JSON.stringify({ pid: process.pid, start: debutProcessus(process.pid), kind: 'run', label: `cadence run ${e.id}`, branch: e.cible, since: new Date().toISOString() }));
+}
+/**
+ * Joue le run en tenant la branche : une exception (un git qui échoue, l'exécuteur qui lève) finit le run en échec et rend le dépôt comme les autres fins.
+ * Un run tué par un signal ne passe pas ici : son fichier reste, mais un porteur mort (pid absent ou repris, `start` à l'appui) ne tient rien.
+ */
+function tenu(e: Etat, o: Opts, corps: () => Etat): Etat {
+  tenir(e);
+  try {
+    return corps();
+  } catch (x) {
+    e.etat = 'echec'; e.detail = `erreur pendant le run : ${(x as Error).message ?? x}`;
+    return fin(e, o);
+  } finally {
+    rmSync(fichierTenu(e.repo), { force: true });
+  }
 }
 /** Rend la branche, puis fait appliquer par raf le plan mis en attente pendant le run (raf refuse si un autre programme la tient encore). */
 function rendre(e: Etat, o: Opts): void {
@@ -136,14 +161,14 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
     demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, acces_cluster: orchestrate(worktree).prodAccess === true, session: '', cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
-  sauver(e); tenir(e);
+  sauver(e);
   a.out(`cadence run ${id} : session Opus en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);
   // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.
   const demande = a.lot ? `${a.demande}\n\nLot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).` : a.demande;
   const brief = readFileSync(aig.bras.brief, 'utf8').split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
     .replaceAll('{{QUESTION}}', `${worktree}.question.md`).replaceAll('{{BASE}}', e.base).replaceAll('{{TAILLE}}', e.taille);
   const o = { exec: a.exec, out: a.out, sansPorte: a.sansPorte, raf: a.raf };
-  return session(e, brief, o) ? suite(e, o) : fin(e, o);
+  return tenu(e, o, () => (session(e, brief, o) ? suite(e, o) : fin(e, o)));
 }
 
 /** Reprend un run en attente (question) ou rendu (porte rouge, conflit, sans porte) : la réponse va à la même session. */
@@ -153,6 +178,6 @@ export function repondreRun(id: string, repo: string, reponse: string, o: Opts):
   if (!existsSync(f)) throw new Error(`cadence run : run inconnu : ${id} (${f})`);
   const e = JSON.parse(readFileSync(f, 'utf8')) as Etat;
   if (e.etat === 'integre') throw new Error(`cadence run : ${id} est déjà intégré`);
-  e.etat = 'en-cours'; tenir(e);
-  return session(e, `Réponse de Sylvain : ${reponse}`, o) ? suite(e, o) : fin(e, o);
+  e.etat = 'en-cours';
+  return tenu(e, o, () => (session(e, `Réponse de Sylvain : ${reponse}`, o) ? suite(e, o) : fin(e, o)));
 }

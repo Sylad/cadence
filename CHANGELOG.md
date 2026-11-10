@@ -83,7 +83,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Added
 
-- A program that holds the branch keeps the lead's commits off it (L695, [docs/raf.md](docs/raf.md#a-branch-held-by-a-program-the-pending-plan-l695)): while `cadence run` works, and while `cadence verify --gate` plays in the main tree, the pre-commit hook of `raf hook install` refuses a commit on that branch and says what to do; `raf add`, `raf note` and `raf done` write to `.cadence/plan-en-attente.yaml` instead of the plan, and `cadence run` applies it when it gives the repository back (`raf attente [appliquer]` shows or plays it). One commit of the lead on `main` used to make the run fail its fast-forward (≥ 12 times from 26-10 to 06-11).
+- A program that holds the branch keeps the lead's commits off it (L695, [docs/raf.md](docs/raf.md#a-branch-held-by-a-program-the-pending-plan-l695)): while `cadence run` works, and while `cadence verify --gate` plays in the main tree, the pre-commit hook of `raf hook install` refuses a commit on that branch and says what to do; `raf add`, `raf note` and `raf done` write to `.cadence/plan-en-attente.yaml` instead of the plan, and `cadence run` applies it when it gives the repository back (`raf attente [appliquer]` shows or plays it). One commit of the lead on `main` used to make the run fail its fast-forward (≥ 12 times from 26-10 to 06-11). After review: the run writes its process start time and releases the branch on an error too (a file left by a killed run no longer holds when its pid is reused), the commits of cadence's own programs (v1 wave plan, `deliver`, `config set`) pass the hook, and the pending plan is appended and applied under a lock.
 
 ### Changed
 

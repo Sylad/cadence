@@ -5,13 +5,16 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { gitCommonDir, tryGit } from './git.js';
+import { gitCommonDir, PROGRAM_COMMIT_VAR, tryGit } from './git.js';
 import { holderAlive } from './orchestrate/lock.js';
+import { RafError } from './plan.js';
+import { withPlanLock } from './plan-lock.js';
 import { processStart } from './proc.js';
 import { sharedStateDir } from './state.js';
 
 export const HELD_DIR = 'tenu';
 export const PENDING_PLAN = '.cadence/plan-en-attente.yaml';
+const PENDING_LOCK = 'plan-en-attente.lock';
 
 interface Holder { pid: number; start?: string; kind: string; label: string; branch: string; since: string }
 interface PendingWrite { date: string; tenu: string; argv: string[] }
@@ -59,8 +62,9 @@ const since = (h: Holder) => h.since.slice(11, 16);
 /** Qui applique l'attente : cadence run en rendant le dépôt ; après une porte, le prochain add|note|done ou `raf attente appliquer`. */
 const applier = (h: Holder) => (h.kind === 'run' ? 'appliqué par le run quand il rend le dépôt' : 'appliqué au premier raf add|note|done après sa fin, ou par raf attente appliquer');
 
-/** Le refus du pre-commit quand la branche du commit est tenue, avec le geste à faire ; null si elle est libre. */
-export function commitRefusal(cwd: string): string | null {
+/** Le refus du pre-commit quand la branche du commit est tenue, avec le geste à faire ; null si elle est libre ou si le commit est celui d'un programme (`commitAsProgram`). */
+export function commitRefusal(cwd: string, env: NodeJS.ProcessEnv = {}): string | null {
+  if (env[PROGRAM_COMMIT_VAR]) return null;
   const h = holderHere(cwd);
   if (!h) return null;
   return `commit refusé : la branche ${h.branch} est tenue par ${h.label} (pid ${h.pid}, depuis ${since(h)}) — un commit ici lui ferait échouer son intégration en avance rapide ou rendrait sa porte non probante. `
@@ -77,12 +81,27 @@ export function readPending(root: string): PendingWrite[] {
   return (parse(readFileSync(f, 'utf8')) as PendingWrite[] | null) ?? [];
 }
 
+/**
+ * Ajout et application passent sous le même verrou (revue L695 r1, D-10) : un ajout fait pendant une application attend qu'elle finisse au lieu d'être
+ * effacé par elle, et deux applications concurrentes ne jouent pas deux fois la même écriture (la seconde relit le fichier vidé par la première).
+ */
+function withPendingLock<T>(root: string, fn: () => T): T {
+  mkdirSync(dirname(pendingFile(root)), { recursive: true });
+  // Le verrou vit dans l'état commun du dépôt, hors de l'arbre : jamais vu par git status ni par une porte.
+  const dir = sharedStateDir(root);
+  mkdirSync(dir, { recursive: true });
+  return withPlanLock(join(dir, PENDING_LOCK), (m) => new RafError(m.replace('plan tenu', 'plan en attente tenu')), fn);
+}
+
+const PENDING_HEADER = `# Écritures du plan mises en attente pendant que le dépôt était tenu (L695) : \`raf attente appliquer\` les joue dans l'ordre.\n`;
+
 /** Met une écriture de `raf` en attente ; rend la ligne qui le dit. */
 export function deferPlanWrite(root: string, h: Holder, argv: string[], now: Date): string {
-  const f = pendingFile(root);
-  const all = [...readPending(root), { date: now.toISOString(), tenu: h.label, argv }];
-  mkdirSync(dirname(f), { recursive: true });
-  writeFileSync(f, `# Écritures du plan mises en attente pendant que le dépôt était tenu (L695) : \`raf attente appliquer\` les joue dans l'ordre.\n${stringify(all)}`);
+  const all = withPendingLock(root, () => {
+    const next = [...readPending(root), { date: now.toISOString(), tenu: h.label, argv }];
+    writeFileSync(pendingFile(root), `${PENDING_HEADER}${stringify(next)}`);
+    return next;
+  });
   const exclude = join(gitCommonDir(root), 'info', 'exclude');
   const line = `/${PENDING_PLAN}`;
   if (!existsSync(exclude) || !readFileSync(exclude, 'utf8').split('\n').includes(line)) {
@@ -94,15 +113,22 @@ export function deferPlanWrite(root: string, h: Holder, argv: string[], now: Dat
 
 /** Joue les écritures en attente dans l'ordre ; la première qui échoue et les suivantes restent en attente. */
 export function applyPending(root: string, raf: (argv: string[]) => number, out: (l: string) => void): number {
-  const all = readPending(root);
-  let done = 0;
-  for (const w of all) {
-    if (raf(w.argv) !== 0) break;
-    done++;
+  const { done, left } = withPendingLock(root, () => {
+    const all = readPending(root);
+    let n = 0;
+    for (const w of all) {
+      if (raf(w.argv) !== 0) break;
+      n++;
+    }
+    const rest = all.slice(n);
+    if (rest.length === 0) rmSync(pendingFile(root), { force: true });
+    else writeFileSync(pendingFile(root), `${PENDING_HEADER}${stringify(rest)}`);
+    return { done: n, left: rest };
+  });
+  if (done === 0 && left.length === 0) {
+    out('rien en attente (déjà appliqué)');
+    return 0;
   }
-  const left = all.slice(done);
-  if (left.length === 0) rmSync(pendingFile(root), { force: true });
-  else writeFileSync(pendingFile(root), stringify(left));
   out(`plan en attente : ${done} écriture(s) appliquée(s)${left.length ? `, ${left.length} restée(s) en attente (échec de raf ${left[0]!.argv.join(' ')})` : ''}${done ? ' — le plan est modifié, à commiter' : ''}`);
   return left.length ? 1 : 0;
 }

@@ -344,11 +344,22 @@ export function dirtyContents(root: string): Map<string, string> {
   return state;
 }
 
+/**
+ * Marque d'un commit fait par un programme de cadence (plan d'une vague, deliver, config set) : le pre-commit d'une branche tenue (L695) ne refuse
+ * que le commit du lead. Posée dans l'environnement de ce seul `git commit`, jamais héritée par une session ni par le lead.
+ */
+export const PROGRAM_COMMIT_VAR = 'CADENCE_COMMIT_PROGRAMME';
+
+/** `git commit <args>` fait par un programme de cadence (hooks actifs, marqué `PROGRAM_COMMIT_VAR`) ; lève comme `git`. */
+export function commitAsProgram(cwd: string, args: string[]): string {
+  return execFileSync('git', ['commit', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, [PROGRAM_COMMIT_VAR]: '1' } });
+}
+
 /** Commit de `paths` seuls (à chemin explicite : le reste de l'index n'y entre pas). Rend le sha court. Lève l'erreur de git (hook refusé compris). */
 export function commitPaths(root: string, paths: string[], message: string): string {
   git(root, ['add', '--', ...paths]);
   try {
-    git(root, ['commit', '-q', '-m', message, '--', ...paths]);
+    commitAsProgram(root, ['-q', '-m', message, '--', ...paths]);
   } catch (e) {
     tryGit(root, ['reset', '-q', '--', ...paths]);
     const err = e as { stderr?: string; stdout?: string; message: string };

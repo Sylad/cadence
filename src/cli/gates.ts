@@ -216,7 +216,7 @@ function prePush(root: string, io: Io, remoteName: string | undefined, configPat
 function heldBranch(io: Io): boolean {
   let refusal: string | null = null;
   try {
-    refusal = commitRefusal(io.cwd);
+    refusal = commitRefusal(io.cwd, io.env);
   } catch {
     return false;
   }

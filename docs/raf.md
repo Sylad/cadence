@@ -139,18 +139,23 @@ updated (the fix most often bears on what the lot just wrote), and asks the writ
 `cadence run` integrates its work with a fast-forward (`merge --ff-only`): one commit of the lead on the target branch
 during the run makes it fail (`refus-integration`). A gate played in the main tree (`cadence verify --gate`, the one of
 `cadence release`) gives no verdict when the branch moves under it. While such a program runs, it **holds** the branch:
-a file `<git-common-dir>/cadence/tenu/<kind>-<pid>.json` (`pid`, `kind`, `label`, `branch`, `since`), removed when it
-ends; a file whose process died is ignored and removed.
+a file `<git-common-dir>/cadence/tenu/<kind>-<pid>.json` (`pid`, `start`, `kind`, `label`, `branch`, `since`), removed
+when it ends, on success, failure or error alike (a gate also on Ctrl-C or SIGTERM). A file whose process died, or whose
+pid now belongs to another process (`start` differs: a run killed before a reboot), is ignored and removed.
 
-- The **pre-commit** hook (`raf hook install`) refuses a commit on a held branch (exit code 3, `--no-verify` bypasses
-  it) and says what to do instead. A commit on another branch (the worktree of a run or of a lot) goes through.
+- The **pre-commit** hook (`raf hook install`) refuses a commit **of the lead** on a held branch (exit code 3,
+  `--no-verify` bypasses it) and says what to do instead. A commit on another branch (the worktree of a run or of a
+  lot) goes through, and so do the commits cadence's own programs make on the branch (the plan commit of a v1 wave,
+  `cadence deliver`, `cadence config set`): they mark their `git commit` with `CADENCE_COMMIT_PROGRAMME=1`.
 - `raf add`, `raf note` and `raf done` on a held branch write nothing in the plan: they append their command line to
   `.cadence/plan-en-attente.yaml` (added to `.git/info/exclude`, never tracked) and say so.
 - `cadence run` releases the branch at its end, integrated or not, and runs `raf attente appliquer`. After a gate, the
   first `raf add|note|done` on the free branch applies the pending writes first. The plan is then modified, for the
   lead to commit.
 - `raf attente` lists the pending writes; `raf attente appliquer` plays them in order (refused while the branch is
-  held). A write that fails stays pending with the ones after it.
+  held). A write that fails stays pending with the ones after it. Appending and applying take the same lock
+  (`<git-common-dir>/cadence/plan-en-attente.lock`, the plan lock's rules): a write deferred during an application
+  waits for it instead of being erased, and two applications never play the same write twice.
 
 Waves of `cadence orchestrate` (v1) keep their own guards (L425, L475, L521): their orchestrator commits the plan on
 the branch itself.

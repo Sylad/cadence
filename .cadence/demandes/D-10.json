@@ -1,0 +1,11 @@
+{
+ "id": "D-10",
+ "texte": "Corriger les majeurs 1 à 4 de la revue L695 (pièce jointe) : (1) le run doit libérer son verrou dans tous les cas (try/finally, échec, Ctrl-C) et un verrou dont le pid est réutilisé ne doit pas rester tenu ; (2) le hook ne doit refuser que les commits du lead, jamais ceux des programmes eux-mêmes sur main pendant un run (commitPlan d'une vague, deliver, config set) ; (3) tester le maintien du verrou sur place de verify --gate ; (4) verrouiller l'écriture et l'application de .cadence/plan-en-attente.yaml (pas de doublon, pas d'écriture perdue pendant une application). Le majeur 5 (vagues v1) est hors du lot.",
+ "date": "2026-11-10",
+ "origine": "demande cadence run, pièce jointe tmp/revues/L695-r1.md",
+ "etat": "livrée",
+ "lots": [
+  "L695"
+ ],
+ "preuve": "test/depot-tenu-l695-revue.test.ts (11 verts ; 6 rouges avant le correctif : start absent du fichier du run, exception qui laissait le dépôt tenu, commitPaths refusé par le hook, commitPlan sans marque, écriture perdue pendant une application, double application) ; suite complète 584 fichiers, 9809 verts, 0 rouge ; tsc et qualite.mjs --contre main verts"
+}

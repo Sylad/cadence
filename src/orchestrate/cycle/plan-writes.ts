@@ -3,7 +3,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { lotWork } from '../../audit.js';
 import { readPlanConfig } from '../../config.js';
 import { PLAN_ACTIONS, planCommitMessage } from '../../plan-commit.js';
-import { dirtyPaths, restoreWorktree, tryGit, unquotePath } from '../../git.js';
+import { commitAsProgram, dirtyPaths, restoreWorktree, tryGit, unquotePath } from '../../git.js';
 import { RafError, type Plan } from '../../plan.js';
 import { snapshot, type Snapshot } from '../guard.js';
 import { type ReviewReport } from '../schemas.js';
@@ -68,7 +68,7 @@ export async function commitPlan(c: LotCtx, message: string, root = c.lot.repo, 
   if (foreign.length) return `arbre sale (fichiers hors plan) : ${foreign.join(', ')}`;
   try {
     git(repo, 'add', '--', ...dirty);
-    git(repo, 'commit', '-q', '-m', message, '--', ...dirty);
+    commitAsProgram(repo, ['-q', '-m', message, '--', ...dirty]); // un programme : le pre-commit d'une branche tenue par un cadence run le laisse passer (L695)
   } catch (e) {
     // Commit refusé (hook commit-msg…, L343) ou index verrouillé (L385) : le plan n'a pas à rester indexé ni modifié par cadence, le lot suivant y verrait un dépôt sale et serait rendu.
     // Ce que le lead avait modifié sans commiter (raf add, raf note pendant la session) est remis, pas effacé.

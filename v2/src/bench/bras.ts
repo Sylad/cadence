@@ -6,8 +6,9 @@ import { dirname, join, relative } from 'node:path';
 import { parse } from 'yaml';
 import { lireDemande, type Banc } from './banc.js';
 import { aiguiller } from '../run/aiguillage.js';
+import { COMPACTAGE } from '../run/suite.js';
 
-export interface DefBras { nom: string; modele: string; brief: string; settings?: string; aiguillage?: boolean } // aiguillage : le bras de cadence run (brief choisi par aiguiller) // settings : réglages Claude Code du bras (hooks)
+export interface DefBras { nom: string; modele: string; brief: string; settings?: string; aiguillage?: boolean; suite?: 'gardee' | 'compactee' } // aiguillage : le bras de cadence run ; suite (L690) : reprend la session de l'étape d'avant // settings : réglages Claude Code du bras (hooks)
 export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number;
   tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string }
 export type Executeur = (args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }) => { stdout: string; code: number; erreur?: string };
@@ -18,8 +19,8 @@ const QUESTIONS_MAX = 3;
 const SANS_REPONSE = 'Pas de réponse de Sylvain : décide toi-même, note ton hypothèse dans le message de commit, et termine.';
 
 export function chargerBras(racine: string): Record<string, DefBras> {
-  const y = parse(readFileSync(join(racine, 'bras.yaml'), 'utf8')) as Record<string, { modele: string; brief: string; settings?: string; aiguillage?: boolean }>;
-  return Object.fromEntries(Object.entries(y).map(([nom, d]) => [nom, { nom, modele: d.modele, brief: d.brief, ...(d.settings ? { settings: d.settings } : {}), ...(d.aiguillage ? { aiguillage: true } : {}) }]));
+  const y = parse(readFileSync(join(racine, 'bras.yaml'), 'utf8')) as Record<string, { modele: string; brief: string; settings?: string; aiguillage?: boolean; suite?: 'gardee' | 'compactee' }>;
+  return Object.fromEntries(Object.entries(y).map(([nom, d]) => [nom, { nom, modele: d.modele, brief: d.brief, ...(d.settings ? { settings: d.settings } : {}), ...(d.aiguillage ? { aiguillage: true } : {}), ...(d.suite ? { suite: d.suite } : {}) }]));
 }
 
 export const environnementNeutre = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
@@ -63,18 +64,18 @@ export const empreinteReglages = (clone: string): string => [cheminReglages(clon
 export const argsClaude = (d: DefBras, clone: string, interdits = OUTILS_INTERDITS): string[] => ['--output-format', 'json', '--model', d.modele, '--permission-mode', 'bypassPermissions',
   '--disallowedTools', interdits.join(','), ...(d.settings ? ['--settings', ecrireReglages(d.settings, clone)] : [])];
 /** `garde` : pièces à lire avant d'écrire et racine du banc, données au hook du bras par l'environnement (CADENCE_*), jamais par un fichier. */
-export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }): Mesure {
-  if (d.aiguillage) { const a = aiguiller(lireDemande(b), clone, garde.pieces.map((p) => relative(clone, p))); d = { ...a.bras, nom: d.nom }; garde = { ...garde, pieces: a.pieces.map((p) => join(clone, p)) }; }
+export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }, reprise?: string): Mesure {
+  if (d.aiguillage) { const a = aiguiller(lireDemande(b), clone, garde.pieces.map((p) => relative(clone, p))); d = { ...a.bras, nom: d.nom, ...(d.suite ? { suite: d.suite } : {}) }; garde = { ...garde, pieces: a.pieces.map((p) => join(clone, p)) }; }
   const question = `${clone}.question.md`;
   const brief = readFileSync(d.brief, 'utf8').replaceAll('{{DEMANDE}}', lireDemande(b)).replaceAll('{{CLONE}}', clone)
-    .replaceAll('{{QUESTION}}', question).replaceAll('{{BASE}}', b.base)
-    .replaceAll('{{TAILLE}}', b.taille === 'retouche' ? 'retouche' : 'fonction'); // taille fixée par le gardien ; banc court sans retouche : fonction
+    .replaceAll('{{QUESTION}}', question).replaceAll('{{BASE}}', b.base).replaceAll('{{TAILLE}}', b.taille === 'retouche' ? 'retouche' : 'fonction'); // taille fixée par le gardien ; banc court sans retouche : fonction
   const commun = argsClaude(d, clone);
   const o = { cwd: clone, env: { ...environnementNeutre(process.env), ...(d.settings ? { CADENCE_CLONE: clone, CADENCE_PIECES: JSON.stringify(garde.pieces), CADENCE_BANC_RACINE: garde.racine } : {}) } };
   const reponse = b.reponses ? readFileSync(join(b.dir, 'reponses.md'), 'utf8') : SANS_REPONSE;
   const debut = horloge();
-  let r = lire(exec(['-p', brief, ...commun], o));
-  const m = { tokens: r.tokens, cout: r.cout, questions: 0, textes: [] as string[], sessions: r.session ? [r.session] : [], echec: r.echec };
+  const c = reprise && d.suite === 'compactee' ? lire(exec(['-p', COMPACTAGE, '--resume', reprise, ...commun], o)) : undefined; // L690 : compactée avant le lot
+  let r = lire(exec(['-p', brief, ...(reprise && d.suite ? ['--resume', c?.session || reprise] : []), ...commun], o));
+  const m = { tokens: r.tokens + (c?.tokens ?? 0), cout: r.cout + (c?.cout ?? 0), questions: 0, textes: [] as string[], sessions: r.session ? [r.session] : [], echec: c?.echec ?? r.echec };
   while (!m.echec && existsSync(question)) {
     if (m.questions >= QUESTIONS_MAX) { rmSync(question); m.echec = `question ouverte après ${QUESTIONS_MAX} réponses`; break; }
     m.textes.push(readFileSync(question, 'utf8')); rmSync(question); m.questions++;

@@ -23,12 +23,14 @@ if (mode === 'bras') { // un bras, une répétition : node micro-banc.mjs bras <
   const base = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: clone, encoding: 'utf8' }).trim();
   const etapes = readdirSync(join(micro, 'demandes')).sort();
   const res = { bras: nom, etapes: [] };
+  let prec; // L690 : session de l'étape d'avant, reprise par un bras « suite »
   for (const k of etapes) {
     const b = { id: `micro-${k}`, dir: join(micro, 'demandes', k), secrets: '', projet: 'mini-carte', source: '', base, install: '', tests: 'node --test',
       visible: false, taille: 'fonction', frais: false, reponses: false };
     const pieces = existsSync(join(micro, 'demandes', k, 'pieces.json')) ? JSON.parse(readFileSync(join(micro, 'demandes', k, 'pieces.json'), 'utf8')).map((p) => join(clone, p)) : [];
-    const m = lancerBras(b, d, clone, creerExecuteur('claude', 30 * 60_000), undefined, { pieces, racine: dir });
-    res.etapes.push({ k, duree_s: m.duree_s, echec: m.echec ?? null, cout_usd: m.cout_usd });
+    const m = lancerBras(b, d, clone, creerExecuteur('claude', 30 * 60_000), undefined, { pieces, racine: dir }, prec);
+    prec = m.sessions.at(-1);
+    res.etapes.push({ k, duree_s: m.duree_s, echec: m.echec ?? null, cout_usd: m.cout_usd, tokens: m.tokens });
   }
   // Juge mécanique : la suite du bras, puis tous les tests cachés copiés dans une copie du clone.
   const suite = (cwd) => { try { execFileSync('node', ['--test'], { cwd, stdio: 'pipe', timeout: 120_000 }); return true; } catch { return false; } };
@@ -67,15 +69,15 @@ await Promise.all(jobs);
 // Bilan : par bras, les tests cachés réussis (au total et par catégorie), le temps, les échecs.
 const lus = readdirSync(lot).filter((d) => existsSync(join(lot, d, 'resultat.json'))).map((d) => JSON.parse(readFileSync(join(lot, d, 'resultat.json'), 'utf8')));
 const cat = (t) => (/^PIÈGE/.test(t) ? 'pièges' : /^DEMANDE GLISSÉE/.test(t) ? 'glissée' : /^DEMANDE DIFFÉRÉE/.test(t) ? 'différée' : 'demandes');
-const lignes = [`# Micro-banc ${cand} contre ${ref}, ${N} répétitions`, '', `| bras | répétitions | tests cachés réussis | demandes | pièges | demande glissée | demande différée | suite verte | temps médian | échecs |`, '|---|---|---|---|---|---|---|---|---|---|'];
+const lignes = [`# Micro-banc ${cand} contre ${ref}, ${N} répétitions`, '', `| bras | répétitions | tests cachés réussis | demandes | pièges | demande glissée | demande différée | suite verte | temps médian | tokens médians | échecs |`, '|---|---|---|---|---|---|---|---|---|---|---|'];
 for (const nom of [cand, ref]) {
   const r = lus.filter((x) => x.bras === nom);
-  if (!r.length) { lignes.push(`| ${nom} | 0 | – | – | – | – | – | – | – | tous en erreur |`); continue; }
+  if (!r.length) { lignes.push(`| ${nom} | 0 | – | – | – | – | – | – | – | – | tous en erreur |`); continue; }
   const somme = (f) => r.reduce((a, x) => a + x.caches.filter((c) => f(c.test) && c.ok).length, 0);
   const total = (f) => r.reduce((a, x) => a + x.caches.filter((c) => f(c.test)).length, 0);
   const t = r.map((x) => x.duree_s).sort((a, b) => a - b), med = t[Math.floor(t.length / 2)];
   const echecs = r.flatMap((x) => x.etapes.filter((e) => e.echec).map((e) => `${e.k}: ${e.echec}`));
-  lignes.push(`| ${nom} | ${r.length} | ${somme(() => true)}/${total(() => true)} | ${somme((c) => cat(c) === 'demandes')}/${total((c) => cat(c) === 'demandes')} | ${somme((c) => cat(c) === 'pièges')}/${total((c) => cat(c) === 'pièges')} | ${somme((c) => cat(c) === 'glissée')}/${total((c) => cat(c) === 'glissée')} | ${somme((c) => cat(c) === 'différée')}/${total((c) => cat(c) === 'différée')} | ${r.filter((x) => x.suite_ok).length}/${r.length} | ${med} s | ${echecs.length ? echecs.join(' ; ') : '–'} |`);
+  lignes.push(`| ${nom} | ${r.length} | ${somme(() => true)}/${total(() => true)} | ${somme((c) => cat(c) === 'demandes')}/${total((c) => cat(c) === 'demandes')} | ${somme((c) => cat(c) === 'pièges')}/${total((c) => cat(c) === 'pièges')} | ${somme((c) => cat(c) === 'glissée')}/${total((c) => cat(c) === 'glissée')} | ${somme((c) => cat(c) === 'différée')}/${total((c) => cat(c) === 'différée')} | ${r.filter((x) => x.suite_ok).length}/${r.length} | ${med} s | ${(() => { const k = r.map((x) => x.etapes.reduce((a, e) => a + (e.tokens ?? 0), 0)).sort((a, b) => a - b); return (k[Math.floor(k.length / 2)] / 1e6).toFixed(1); })()} M | ${echecs.length ? echecs.join(' ; ') : '–'} |`);
 }
 const erreurs = readdirSync(lot).filter((f) => f.endsWith('.erreur.txt'));
 if (erreurs.length) lignes.push('', `Bras en erreur (voir les fichiers) : ${erreurs.join(', ')}`);

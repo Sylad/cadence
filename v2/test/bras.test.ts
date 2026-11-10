@@ -149,3 +149,36 @@ describe('lancerBras', () => {
     expect(e).toMatchObject({ HOME: '/h', KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', GH_CONFIG_DIR: '/nonexistent', SSH_AUTH_SOCK: '', AETHERWX_URL: 'http://127.0.0.1:9' });
   });
 });
+
+describe('lancerBras, suite de session (L690)', () => {
+  const brief = join(import.meta.dirname, '..', 'briefs', 'bras-A.md');
+  const banc = (): { b: Banc; clone: string } => {
+    const r = dossierTemp('suite-');
+    const dir = join(r, 'b'); mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'demande.md'), 'Demande 2.');
+    const clone = join(r, 'clone'); mkdirSync(clone);
+    return { b: { id: 'm-2', dir, secrets: '', projet: 't', source: '', base: 'abc', install: 'true', tests: 'true', visible: false, taille: 'fonction', frais: false, reponses: false }, clone };
+  };
+  const sortie = (s: string) => JSON.stringify({ session_id: s, total_cost_usd: 0.1, subtype: 'success', modelUsage: { m: { inputTokens: 10, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 } } });
+  it('gardée : la demande suivante reprend la session de la précédente', () => {
+    const { b, clone } = banc(); const appels: string[][] = [];
+    const m = lancerBras(b, { nom: 'g', modele: 'opus', brief, suite: 'gardee' }, clone, (a) => { appels.push(a); return { stdout: sortie('s9'), code: 0 }; }, undefined, undefined, 's1');
+    expect(appels).toHaveLength(1);
+    expect(appels[0].slice(appels[0].indexOf('--resume'), appels[0].indexOf('--resume') + 2)).toEqual(['--resume', 's1']);
+    expect(m.sessions).toEqual(['s9']);
+  });
+  it('compactée : /compact dirigé sur la session précédente, puis la demande dans la session compactée ; tokens et coût comptés', () => {
+    const { b, clone } = banc(); const appels: string[][] = [];
+    const m = lancerBras(b, { nom: 'c', modele: 'opus', brief, suite: 'compactee' }, clone, (a) => { appels.push(a); return { stdout: sortie(appels.length === 1 ? 's1c' : 's2'), code: 0 }; }, undefined, undefined, 's1');
+    expect(appels).toHaveLength(2);
+    expect(appels[0][1]).toMatch(/^\/compact Garde : les décisions/);
+    expect(appels[0]).toEqual(expect.arrayContaining(['--resume', 's1']));
+    expect(appels[1]).toEqual(expect.arrayContaining(['--resume', 's1c']));
+    expect(m).toMatchObject({ tokens: 20 }); expect(m.cout_usd).toBeCloseTo(0.2);
+  });
+  it('sans suite, ou sans session précédente : session neuve', () => {
+    const { b, clone } = banc(); const appels: string[][] = [];
+    lancerBras(b, { nom: 'n', modele: 'opus', brief }, clone, (a) => { appels.push(a); return { stdout: sortie('x'), code: 0 }; }, undefined, undefined, 's1');
+    lancerBras(b, { nom: 'g', modele: 'opus', brief, suite: 'gardee' }, clone, (a) => { appels.push(a); return { stdout: sortie('y'), code: 0 }; });
+    expect(appels.every((a) => !a.includes('--resume'))).toBe(true);
+  });
+});

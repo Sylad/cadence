@@ -235,7 +235,7 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C2', '--model sonnet dans un brief', 'briefs/bras-A.md', ajout('lance claude --model sonnet')],
   ['C2', '"model": "Haiku" dans src', 'src/bench/juges.ts', ajout('const j = { "model": "Haiku" };')],
   ['C2', 'doc du banc en sonnet', 'docs/banc.md', ajout('modele: sonnet')],
-  ['C2', 'le bras ne reprend plus la session', 'src/bench/bras.ts', remplace("'--resume'", "'--continue'")],
+  ['C2', 'le bras ne reprend plus la session', 'src/bench/bras.ts', remplace(/'--resume'/g, "'--continue'")],
   ['C4', 'option entre guillemets doubles', 'src/bench/cli.ts', ajout('const x = ["--zzz"];')],
   ['C4', 'option dans un gabarit', 'src/bench/preparer.ts', ajout('const y = `--yyy`;')],
   ['C4', 'variable d\'environnement lue', 'src/bench/banc.ts', ajout('const z = process.env.CADENCE_TRUC;')],

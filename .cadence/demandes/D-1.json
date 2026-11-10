@@ -1,0 +1,11 @@
+{
+ "id": "D-1",
+ "texte": "Oui il faudra revoir le hud,peut être faire des choix sur l'affichage en bas et dans le panneau de gauche. Éviter les doublons, lieux repartir les infos, et peut être en afficher plus si il y a de la place",
+ "date": "2026-11-10",
+ "origine": "session du lead, après « le HUD et cadence lead tour ne voient pas les runs »",
+ "etat": "ouverte",
+ "lots": [
+  "L687"
+ ],
+ "preuve": null
+}

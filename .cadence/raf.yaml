@@ -3121,6 +3121,12 @@ lots:
     started: 2026-11-07
     review: { date: 2026-11-07, verdict: "conforme : relu par le lead ; citedResources passe de quadratique (×4 par doublement, 2,9 s à 100 000) à linéaire, résultats identiques ; 22 bornes de durée murale remplacées par des preuves indépendantes de la machine ; 598 tests verts 5 fois sous charge, tsc et qualité verts", commit: 3e946b026ed30353fd052922ec4ee643621783fc }
     finished: 2026-11-07
+  - id: L687
+    title: "HUD 2.0 (D-1) : montrer les cadence run, revoir la répartition entre la barre du bas et le panneau de gauche, sans doublon, plus d'infos s'il y a la place"
+    status: todo
+    estimate: 1
+    visible: true
+    created: 2026-11-10
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

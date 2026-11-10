@@ -85,6 +85,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - `cadence run "<demande>"` ([docs/v2/2026-11-09-cadence-run.md](docs/v2/2026-11-09-cadence-run.md)): one request, one Opus session in its own worktree, the full gate once (one fix by the same session if red), fast-forward integration. It plays exactly what the cadence 2 bench measured as winning — one session without a reviewer, the « read the references first » hook, the request register `.cadence/demandes/` (a deferred request kept 3/3 against 0/3 without it, +7 % time). `--reponse` resumes a run that asked a question; `--liste` shows the runs of the repository. Plan (`raf`) and `cadence deliver` are unchanged.
 
+### Changed
+
+- The 2.x release guard (`cadence release major`) also accepts a versioned publication record, `docs/v2/publications/<version>.md`, that quotes the exact fingerprint of v2 and the per-arm measurements. On 2026-11-10 a short bench comparing two identical arms came out red at ×2.2: one pass alone cannot tell them apart. The automated cumulative rule comes with L689.
+
 ## [1.62.1] - 2026-11-07
 
 ### Changed

@@ -274,12 +274,23 @@ function steps(p: Planned, files: string[], branch: string): string[] {
   return out.map((s, i) => `  ${i + 1}. ${s}`);
 }
 
-/** Refonte du 07-11 : une version 2.x ne se prépare qu'avec un banc vert sur l'empreinte de v2 (cadence2 bench verifier-publication). */
-export function gardeBancV2(version: string, verifier: () => { code: number; sortie: string }): void {
+/**
+ * Refonte du 07-11 : une version 2.x ne se prépare qu'avec un banc vert sur l'empreinte de v2 (cadence2 bench verifier-publication).
+ * 10-11 (décision de Sylvain) : le dernier passage seul ne distingue pas deux bras identiques (banc court A contre A rouge à ×2,2) ;
+ * à défaut de banc vert, un dossier de publication versionné (`docs/v2/publications/<version>.md`) qui cite l'empreinte exacte
+ * et les mesures bras par bras (critères du candidat, cumul sur ≥ 3 comparaisons) vaut décision. Le cumul automatique viendra avec L689.
+ */
+export function gardeBancV2(version: string, verifier: () => { code: number; sortie: string }, dossier?: (version: string) => string | undefined): void {
   if (Number(version.split('.')[0]) < 2) return;
   const r = verifier();
-  if (r.code !== 0) throw new RafError(`release : ${version} demande un banc vert sur cette version de v2 — ${r.sortie.trim() || 'cadence2 introuvable'}`);
+  if (r.code === 0) return;
+  const emp = /empreinte ([0-9a-f]{12})\b/.exec(r.sortie)?.[1];
+  const texte = dossier?.(version);
+  if (emp && texte !== undefined && new RegExp(`^Empreinte de v2 : ${emp}$`, 'm').test(texte)) return;
+  const raison = texte === undefined ? `ni dossier ${PUBLICATIONS}/${version}.md` : `et le dossier ${PUBLICATIONS}/${version}.md ne cite pas l'empreinte ${emp ?? '?'} (ligne « Empreinte de v2 : … »)`;
+  throw new RafError(`release : ${version} demande un banc vert sur cette version de v2, ${raison} — ${r.sortie.trim() || 'cadence2 introuvable'}`);
 }
+const PUBLICATIONS = 'docs/v2/publications';
 
 /** `cadence release patch|minor|major [--dry-run]` : prépare le commit de version, sans rien publier. Rend le code de sortie. */
 export function release(rest: string[], dryRun: boolean, root: string, today: Day, out: (l: string) => void): number {
@@ -290,7 +301,7 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
     const r = spawnSync('node', [join(root, 'v2', 'bin', 'cadence2.js'), 'bench', 'verifier-publication'], { cwd: root, encoding: 'utf8', timeout: 60_000 });
     const delai = r.error || r.signal ? `cadence2 n'a pas répondu en 60 s (${r.error?.message ?? r.signal}) — ` : '';
     return { code: r.status ?? 1, sortie: `${delai}${r.stdout ?? ''}${r.stderr ?? ''}` };
-  });
+  }, (v) => { const f = join(root, PUBLICATIONS, `${v}.md`); return existsSync(f) ? readFileSync(f, 'utf8') : undefined; });
 
   const whatsNewPath = join(root, WHATS_NEW);
   const hasWhatsNew = existsSync(whatsNewPath);

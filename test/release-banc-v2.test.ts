@@ -14,6 +14,16 @@ describe('garde de publication 2.x', () => {
   it('2.0.0 sans banc vert : refus, avec la raison', () => {
     expect(() => gardeBancV2('2.0.0', () => ({ code: 1, sortie: 'aucun banc vert sur l\'empreinte e1' }))).toThrow(/banc vert.*e1/s);
   });
+  it('2.0.0 sans banc vert, avec un dossier de publication qui cite l empreinte exacte : permis', () => {
+    const v = () => ({ code: 1, sortie: "publication refusée sur l'empreinte 5194fed874a1 : …" });
+    expect(() => gardeBancV2('2.0.0', v, () => '# 2.0.0\n\nEmpreinte de v2 : 5194fed874a1\n')).not.toThrow();
+  });
+  it('2.0.0 sans banc vert : un dossier sur une autre empreinte, ou absent, ne suffit pas', () => {
+    const v = () => ({ code: 1, sortie: "publication refusée sur l'empreinte 5194fed874a1 : …" });
+    expect(() => gardeBancV2('2.0.0', v, () => 'Empreinte de v2 : e8f9e5514920\n')).toThrow(/ne cite pas l'empreinte 5194fed874a1/);
+    expect(() => gardeBancV2('2.0.0', v, () => undefined)).toThrow(/ni dossier docs\/v2\/publications\/2\.0\.0\.md/);
+    expect(() => gardeBancV2('2.0.0', v, () => 'mentionne 5194fed874a1 en passant\n')).toThrow(/ne cite pas/);
+  });
   it('2.0.0 avec banc vert : permis', () => {
     expect(() => gardeBancV2('2.0.0', () => ({ code: 0, sortie: 'banc vert' }))).not.toThrow();
   });

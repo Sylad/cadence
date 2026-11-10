@@ -83,6 +83,15 @@ describe('cadence run', () => {
     expect(git(repo, 'log', '--format=%s')).toMatch(/ajoute fait.txt\najoute ailleurs.txt/);
   });
 
+  it('sans pièce ni référence : mode léger, brief de Claude seul sans réglages', () => {
+    const repo = depot(), appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
+    const { l, out } = io();
+    const e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([commite('fait.txt')], appels), out });
+    expect(e).toMatchObject({ etat: 'integre', mode: 'leger' });
+    expect(appels[0].args).not.toContain('--settings');
+    expect(l[0]).toMatch(/mode leger \(aucune référence dans la demande\)/);
+  });
+
   it('aucun commit : échec, rien intégré', () => {
     const repo = depot();
     const e = executerRun({ repo, demande: 'x', exec: fauxClaude([]), out: () => {} });

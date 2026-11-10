@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import type { Io } from '../cli.js';
 import { executerRun, repondreRun, type Etat } from './run.js';
 
-export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--taille retouche|fonction] [--sans-porte]   une demande, une session Opus, porte, intégration
+export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--taille retouche|fonction] [--complet] [--sans-porte]   une demande, une session Opus (mode complet si références), porte, intégration
   cadence run --reponse <id> "<texte>"   reprend un run en attente ou rendu, dans la même session
   cadence run --liste                    les runs du dépôt et leur état`;
 
@@ -22,14 +22,15 @@ export async function cmdRun(a: string[], io: Io): Promise<number> {
       if (!a[1] || !a[2]) { io.err('usage : cadence run --reponse <id> "<texte>"'); return 2; }
       return repondreRun(a[1], io.cwd, a.slice(2).join(' '), { out }).etat === 'integre' ? 0 : 1;
     }
-    const pieces: string[] = [], mots: string[] = []; let taille: string | undefined, sansPorte = false;
+    const pieces: string[] = [], mots: string[] = []; let taille: string | undefined, sansPorte = false, complet = false;
     for (let i = 0; i < a.length; i++) {
       if (a[i] === '--piece') pieces.push(a[++i]);
       else if (a[i] === '--taille') taille = a[++i];
       else if (a[i] === '--sans-porte') sansPorte = true;
+      else if (a[i] === '--complet') complet = true;
       else mots.push(a[i]);
     }
     if (!mots.length || pieces.some((p) => !p) || (taille && !['retouche', 'fonction'].includes(taille))) { io.err(`usage :\n${AIDE_RUN}`); return 2; }
-    return executerRun({ repo: io.cwd, demande: mots.join(' '), pieces, taille, out, sansPorte }).etat === 'integre' ? 0 : 1;
+    return executerRun({ repo: io.cwd, demande: mots.join(' '), pieces, taille, complet, out, sansPorte }).etat === 'integre' ? 0 : 1;
   } catch (e) { io.err(String((e as Error).message ?? e)); return 1; }
 }

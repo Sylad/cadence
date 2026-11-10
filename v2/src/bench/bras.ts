@@ -2,11 +2,12 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { parse } from 'yaml';
 import { lireDemande, type Banc } from './banc.js';
+import { aiguiller } from '../run/aiguillage.js';
 
-export interface DefBras { nom: string; modele: string; brief: string; settings?: string } // settings : réglages Claude Code du bras (hooks)
+export interface DefBras { nom: string; modele: string; brief: string; settings?: string; aiguillage?: boolean } // aiguillage : le bras de cadence run (brief choisi par aiguiller) // settings : réglages Claude Code du bras (hooks)
 export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number;
   tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string }
 export type Executeur = (args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }) => { stdout: string; code: number; erreur?: string };
@@ -17,8 +18,8 @@ const QUESTIONS_MAX = 3;
 const SANS_REPONSE = 'Pas de réponse de Sylvain : décide toi-même, note ton hypothèse dans le message de commit, et termine.';
 
 export function chargerBras(racine: string): Record<string, DefBras> {
-  const y = parse(readFileSync(join(racine, 'bras.yaml'), 'utf8')) as Record<string, { modele: string; brief: string; settings?: string }>;
-  return Object.fromEntries(Object.entries(y).map(([nom, d]) => [nom, { nom, modele: d.modele, brief: d.brief, ...(d.settings ? { settings: d.settings } : {}) }]));
+  const y = parse(readFileSync(join(racine, 'bras.yaml'), 'utf8')) as Record<string, { modele: string; brief: string; settings?: string; aiguillage?: boolean }>;
+  return Object.fromEntries(Object.entries(y).map(([nom, d]) => [nom, { nom, modele: d.modele, brief: d.brief, ...(d.settings ? { settings: d.settings } : {}), ...(d.aiguillage ? { aiguillage: true } : {}) }]));
 }
 
 export const environnementNeutre = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
@@ -63,6 +64,7 @@ export const argsClaude = (d: DefBras, clone: string): string[] => ['--output-fo
   '--disallowedTools', OUTILS_INTERDITS.join(','), ...(d.settings ? ['--settings', ecrireReglages(d.settings, clone)] : [])];
 /** `garde` : pièces à lire avant d'écrire et racine du banc, données au hook du bras par l'environnement (CADENCE_*), jamais par un fichier. */
 export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }): Mesure {
+  if (d.aiguillage) { const a = aiguiller(lireDemande(b), clone, garde.pieces.map((p) => relative(clone, p))); d = { ...a.bras, nom: d.nom }; garde = { ...garde, pieces: a.pieces.map((p) => join(clone, p)) }; }
   const question = `${clone}.question.md`;
   const brief = readFileSync(d.brief, 'utf8').replaceAll('{{DEMANDE}}', lireDemande(b)).replaceAll('{{CLONE}}', clone)
     .replaceAll('{{QUESTION}}', question).replaceAll('{{BASE}}', b.base)

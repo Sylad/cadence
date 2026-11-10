@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **2.0.0**: `cadence run "<request>"`: one request, one Opus session in a worktree, the full gate once, fast-forward; measured against Claude alone.
 - **1.62.1**: republishes 1.62.0, whose npm publication failed on a wall-clock test (it carries the 1.62.0 content too); `citedResources` reads a title in linear time; two queue tests no longer depend on clock order.
 - **1.62.0**: `orchestrate queue` lets the lead approve an ordered list of lots once, drawn by any live wave; a wave resumed after days rebases its branch first; an integration tolerates a modified plan; `--follow` loses no line.
 - **1.61.0**: a stale kept branch is no longer recovered; `raf done` reads a verdict's start only; cadence's own gate overflows to a second machine; a fixed minor is no longer reopened; a test must not build a step's state by hand.
@@ -93,6 +94,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**2.0.0**: cadence 2. `cadence run "<request>"` ([docs/v2/2026-11-09-cadence-run.md](v2/2026-11-09-cadence-run.md)) does a request from start to end: a worktree next to the repository, one Opus session with the brief that won the cadence 2 bench, the « read the references first » hook (every `--piece` read in full before any write) and the request register `.cadence/demandes/` (a request said in passing or « for later » is kept word for word and done when it applies), then a rebase, the full gate of `cadence.yaml` once (one fix by the same session when it is red), and a fast-forward on the starting branch; nothing is pushed. `--reponse <id>` resumes a run that asked a question in the same session, `--liste` shows the runs. Why: a blind trial found the 1.x waves 3.8 times slower than Claude alone and never preferred; on AetherWX `cadence run` is preferred by the blind judge, has fewer major defects, always reads the norms and takes about 1.25 times Claude alone. The plan (`raf`), `cadence deliver`, the sessions and the lead tour are unchanged; `cadence orchestrate` stays available.
 
 **1.62.1**: republishes 1.62.0, whose npm publication failed on the runner (the tag exists but 1.62.0 never reached npm), so this version also carries everything 1.62.0 brings below. `citedResources` (`raf add`, resources cited by a title) reads a title in linear time instead of quadratic, and no upper bound on wall-clock duration is left in the suite (L686). The R7 and R11 tests of the approved queue no longer depend on the clock order between two repositories, and the test lead's holds follow the real clock (L685).
 

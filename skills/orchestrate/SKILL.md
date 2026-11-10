@@ -1,9 +1,11 @@
 ---
 name: orchestrate
-description: The exact command line of `cadence orchestrate` — launch a wave ("lancer une vague orchestrate", "start an orchestrate wave", run lot X with model Haiku) and resume it with `--resume [--wave <wave>]`. Use it before writing any `cadence orchestrate` command, without going through /lead. Syntax `<project>:<lot>[@<model>]`, a lot id with « / » kept as is.
+description: The exact command line of `cadence orchestrate`, when the human asks for a wave (since 2.0.0 a lot is done with `cadence run`) — launch a wave ("lancer une vague orchestrate", "start an orchestrate wave", run lot X with model Haiku) and resume it with `--resume [--wave <wave>]`. Use it before writing any `cadence orchestrate` command, without going through /lead. Syntax `<project>:<lot>[@<model>]`, a lot id with « / » kept as is.
 ---
 
 # orchestrate — the command line of a wave
+
+**Since 2.0.0, a chosen lot is done with `cadence run`** (one Opus session, gate once, fast-forward; see the `cadence:lead` skill, section 2a). Launch a wave only when the human asks for one: a blind trial measured waves 3.8 times slower than Claude alone and never preferred.
 
 `cadence orchestrate` runs one fresh short session per step of each lot (write, review, correction, delivery of
 the sheet). This page is only the syntax; the lead's workflow is the `cadence:lead` skill and every option is in

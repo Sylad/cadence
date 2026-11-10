@@ -31,6 +31,8 @@ three most useful items across projects and wait. With a project named, work in 
    - **Done since**: 3 to 6 lines, grouped by lot, not by commit. Mention commits without a lot.
    - **Drift**: each `✗` line from the check, with the one command that fixes it.
    - **Delivery in progress** or a stale lock: no new delivery until it is resolved.
+   - **Runs** (`cadence run --liste`, since 2.0.0): a run in `attente` carries a question for the human — ask it first;
+     a run handed back (`porte-rouge`, `conflit`, `refus-integration`, `sans-commit`) is work in progress whose worktree is kept in `../.cadence-run/`.
    - **Effects in production** ("Effets en production"): a red `✗` line is the first thing to say —
      a delivered feature that no longer works outranks any new lot; re-run `cadence verify` to confirm
      (a network blip also shows as red).

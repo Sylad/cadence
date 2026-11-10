@@ -34,6 +34,8 @@ With no project named, run `cadence session close --all` from the parent folder,
      code review of a lot with commits, or one older than the lot's latest commit
      (`raf review enable`), UX review of a visible lot (`raf ux enable`) → have the `code-reviewer` / `ux-reviewer` agent review it, then record its
      verdict with `raf review <id> "…"` / `raf ux <id> "…"`; never write a verdict nobody gave;
+   - a run of `cadence run` still open (`cadence run --liste`, since 2.0.0): one in `attente` → its question goes in the notes for
+     next time; one handed back → `raf note <lot> "cadence run <id> : <état>, worktree ../.cadence-run/…"`, never deleted without the human;
    - rerun until the check part is clean.
 3. **Stale working files** (report section "Nettoyage proposé", from `session.clean` in `cadence.yaml`):
    list them to the human — shared tmp folder, screenshots no one refers to, throwaway scripts,

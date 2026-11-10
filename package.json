@@ -86,7 +86,7 @@
     "qualite": "node scripts/qualite.mjs",
     "qualite:cliquet": "node scripts/qualite.mjs --ecrire",
     "eval:plugin": "claude plugin eval . --max-cost-usd 5 --no-publish",
-    "prepare": "tsc -p tsconfig.build.json",
+    "prepare": "tsc -p tsconfig.build.json && tsc -p v2/tsconfig.json",
     "prepublishOnly": "npm run typecheck && npm run qualite && npm test"
   },
   "dependencies": {

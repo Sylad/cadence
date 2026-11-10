@@ -4,3 +4,5 @@ dist/
 plugins/*/.claude-plugin/types/
 # résultats de `claude plugin eval` (facturés, régénérables)
 evals/results/
+v2/node_modules/
+v2/dist/

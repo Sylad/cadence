@@ -80,7 +80,27 @@ progress, then drift that blocks a delivery, then ready quick wins. **Stop and w
 
 ## 2. Delegation
 
-The default way to delegate is **`cadence orchestrate`** (section 2b): a program, not a conversation, that runs
+**Since 2.0.0 the default way to do a chosen lot is `cadence run`** (section 2a). Waves through `cadence orchestrate` (section 2b) stay available, but a blind trial measured them 3.8 times slower than Claude alone and never preferred; use a wave only when the human asks for one.
+
+### 2a. One lot, one session: `cadence run`
+
+From the project's folder, in the background (one notification at the end, nothing to follow):
+
+```sh
+cd <project> && raf start <lot> && cadence run "<the human's request, verbatim>" --lot <lot> [--piece <doc>]… --fond
+```
+
+- One Opus session does the whole lot in a worktree next to the repository (`../.cadence-run/`), then the full gate of `cadence.yaml` once (one fix by the same session when red), and a fast-forward on the starting branch. Nothing is pushed: delivery stays yours (`cadence verify --gate --sha`, push of the sha, `cadence deliver`, `raf done`).
+- **Mode.** Complet (references read in full before any write, enforced by a hook; request register) when a `--piece` is given, when the request names a word of `references:` in `cadence.yaml`, or with `--complet`; léger (Claude alone) otherwise. The launch line says which and why. A piece may be absolute or under `~` (a knowledge base outside the repository, e.g. the lot's dossier). When the project keeps such a base, pass the lot's dossier as `--piece`.
+- `--fond` detaches the run: it survives this session, its journal is in `../.cadence-run/`. `cadence run --liste` shows each run's state.
+- **Question** (state `attente`): relay it to the human, then `cadence run --reponse <id> "<answer>"` resumes the same session.
+- **Handed back** (`porte-rouge`, `conflit`, `refus-integration`, `sans-commit`): the worktree is kept with its state file; read it, then relay to the human — never redo the lot yourself.
+- Cluster access follows `orchestrate.prodAccess`, as for waves.
+- Several lots in parallel are several `cadence run`, one worktree each; two lots that share a resource (`uses:`, a bench) run one after the other.
+
+### Delegating by hand
+
+The other way to delegate is **`cadence orchestrate`** (section 2b): a program, not a conversation, that runs
 one fresh short session per step; the wave runs from a frozen copy of the cadence package, so it can orchestrate cadence itself and its templates can be edited meanwhile. When the lead delegates by hand, the brief is the template
 `templates/orchestrate/implement.md` of the cadence package — the single source, tested. The lead runs
 `cd <project> && raf start <lot>`, then starts from the brief written by `cadence orchestrate --dry-run

@@ -61,7 +61,15 @@ Options communes : `--candidat <bras>`, `--reference <bras>`, `--juge <modèle>`
 
 ## Banc séquence
 
-`cadence2 bench sequence aether-b68` rejoue une **suite de vraies demandes successives** d'un même projet, depuis un même commit. Chaque bras garde son propre code d'une demande à l'autre, avec une session neuve par demande, comme dans la vraie vie. Il mesure ce que le banc court ne voit pas : lire vraiment les documents de référence, ne pas casser ce qui existe, garder un code maintenable (spec : [2026-11-08-banc-sequence-design.md](2026-11-08-banc-sequence-design.md)).
+`cadence2 bench sequence aether-b68` rejoue une **suite de vraies demandes successives** d'un même projet, depuis un même commit. Chaque bras garde son propre code d'une demande à l'autre ; il ouvre une session neuve par demande, sauf un bras qui déclare la clé `suite` (ci-dessous). Il mesure ce que le banc court ne voit pas : lire vraiment les documents de référence, ne pas casser ce qui existe, garder un code maintenable (spec : [2026-11-08-banc-sequence-design.md](2026-11-08-banc-sequence-design.md)).
+
+**Bras qui gardent leur session (clé `suite` de `bras.yaml`, L690)**. Sans la clé, chaque étape part d'une session neuve. Avec elle, l'étape k reprend (`claude -p --resume`) la dernière session de l'étape k-1 du même bras, même identifiant, même journal :
+
+- `suite: gardee` : la session est reprise telle quelle ;
+- `suite: compactee` : un `/compact` dirigé (garder décisions, fichiers touchés, conventions, demandes ouvertes ; jeter sorties de commandes et fichiers lus) est lancé avant chaque étape, et son coût compté à l'étape ;
+- `suite: seuil` : le même `/compact`, seulement quand le contexte de la session dépasse 150 000 jetons (`SEUIL_CONTEXTE`, lu à la dernière requête du journal `~/.claude/projects/<…>/<session>.jsonl` : entrée + cache lu + cache écrit). 150 k est un point de départ, réglé d'après la mesure.
+
+La première étape, et une étape dont la précédente n'a rendu aucune session, partent d'une session neuve. La clé n'existe qu'au banc : `cadence run` n'a pas d'option de suite. Pour un bras qui reprend sa session, les fuites et la lecture des références d'une étape ne lisent que les lignes du journal horodatées depuis le début de l'étape : une fuite n'est comptée qu'à son étape, et une écriture d'une étape d'avant ne classe pas « après écriture » une pièce lue avant d'écrire.
 
 **Les 6 étapes d'aether** (maritime-atlas, base `def0e7b2`, centres de pression et barre de temps) : B68, B68.2, B68.3, Q-LBL1, Q-LBL4, Q-LBL5. Les lots de réparation B68.4 et B68.5 n'y sont pas ; leurs tests servent de tests de régression cachés. Les pièces à lire sont `docs/normes/centres-de-pression.md` et la figure `centres-pression-meteored`.
 

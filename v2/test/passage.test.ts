@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cheminReglages, libererReglages, type Executeur } from '../src/bench/bras.js';
@@ -41,14 +41,15 @@ regression: { a_partir_de: 3, fichiers: [reg.ts], commande: vr }\n`);
 
 const meca = { suite_ok: true, caches_passes: 1, caches_total: 1, mutations_tuees: 1, mutations_total: 1, attendu: 'oui', mutations: [] };
 let horloge = 0;
-/** Un appel d'outil et son résultat réussi (deux lignes, même horodatage) : seul un Read réussi compte (R31). */
-const outil = (name: string, input: object) => { const timestamp = new Date(Date.UTC(2026, 10, 8) + ++horloge * 1000).toISOString(), id = `o${horloge}`;
+/** Un appel d'outil et son résultat réussi (deux lignes, même horodatage) : seul un Read réussi compte (R31). `quand` : horodatage réel (session reprise, L690). */
+const outil = (name: string, input: object, quand?: number) => { const n = ++horloge, timestamp = new Date(quand ?? Date.UTC(2026, 10, 8) + n * 1000).toISOString(), id = `o${n}`;
   return `${JSON.stringify({ type: 'assistant', timestamp, message: { content: [{ type: 'tool_use', id, name, input }] } })}\n${JSON.stringify({ type: 'user', timestamp, message: { content: [{ type: 'tool_result', tool_use_id: id }] } })}`; };
 type Geste = (c: string, ecrire: (lignes: string[], sous?: string) => void) => void | 'plante' | 'erreur';
 
-/** Faux claude. Par défaut, chaque bras écrit (Write) puis commite src/<bras><k>.js ; `gestes['A2']` ajoute un comportement à l'étape. */
+/** Faux claude. Par défaut, chaque bras écrit (Write) puis commite src/<bras><k>.js ; `gestes['A2']` ajoute un comportement à l'étape.
+ * `--resume <id>` reprend la session : même id, lignes ajoutées au même fichier (comme claude -p --resume). */
 function faux(r: string, d: string, gestes: Record<string, Geste>) {
-  const vu = { ordre: [] as string[], etapes: [] as string[], juges: [] as string[] }; let n = 0;
+  const vu = { ordre: [] as string[], etapes: [] as string[], juges: [] as string[], reprises: [] as string[] }; let n = 0;
   const exec: Executeur = (args, o) => {
     const p = args[args.indexOf('-p') + 1];
     const j = /dans (\S+\.json)/.exec(p);
@@ -58,11 +59,11 @@ function faux(r: string, d: string, gestes: Record<string, Geste>) {
         : { X: { bloquants: 0, majeurs: 0, mineurs: 0 }, Y: { bloquants: 0, majeurs: 0, mineurs: 0 }, prefere: 'egal', ui: 'na', raisons: '' }));
       return { stdout: JSON.stringify({ session_id: 'j', total_cost_usd: 0, modelUsage: {} }), code: 0 };
     }
-    const b = /BRAS-(\w)/.exec(p)![1], k = Number(/demande (\d)/.exec(p)![1]), c = o.cwd, session = `s${++n}`;
-    vu.ordre.push(`${b}${k}`); vu.etapes.push(JSON.parse(readFileSync(join(r, 'en-cours.json'), 'utf8')).etape);
+    const b = /BRAS-(\w)/.exec(p)![1], k = Number(/demande (\d)/.exec(p)![1]), c = o.cwd, i = args.indexOf('--resume'), session = i < 0 ? `s${++n}` : args[i + 1];
+    vu.ordre.push(`${b}${k}`); vu.reprises.push(`${b}${k}:${i < 0 ? '-' : session}`); vu.etapes.push(JSON.parse(readFileSync(join(r, 'en-cours.json'), 'utf8')).etape);
     const t = dossierTranscripts(r, c);
     const ecrire = (lignes: string[], sous = '') => { const f = join(t, session, sous); mkdirSync(sous ? dirname(f) : t, { recursive: true });
-      writeFileSync(sous ? f : `${f}.jsonl`, lignes.join('\n')); };
+      if (!sous && i >= 0) appendFileSync(`${f}.jsonl`, `\n${lignes.join('\n')}`); else writeFileSync(sous ? f : `${f}.jsonl`, lignes.join('\n')); };
     const g = gestes[`${b}${k}`]?.(c, ecrire);
     if (g === 'plante') throw new Error('plantage du bras');
     if (g === 'erreur') return { stdout: JSON.stringify({ session_id: session, is_error: true, subtype: 'error_during_execution' }), code: 1 };
@@ -144,6 +145,25 @@ describe('passage d\'une séquence', () => {
     expect(res.etapes.C.map((e) => e.fuites.filter((f) => f.startsWith('contournement')).length)).toEqual([0, 1, 0]);
     expect(res.etapes.A.every((e) => e.fuites.length === 0)).toBe(true);
     expect(statSync(dir('c2.reglages')).mode & 0o777).toBe(0o700); // rendu effaçable en fin de séquence
+  });
+
+  it('L690 : l\'étape k d\'un bras « suite » reprend la dernière session de l\'étape k-1 ; sa mesure ne garde que les lignes de l\'étape ; un bras sans suite reste en session neuve', () => {
+    const { r, d } = racine(), y = join(d, 'sequence.yaml');
+    writeFileSync(y, readFileSync(y, 'utf8').replace('demande: etapes/2/demande.md, taille', 'demande: etapes/2/demande.md, references_depot: [docs/norme.md], taille'));
+    writeFileSync(join(r, 'bras.yaml'), `A:\n  modele: opus\n  brief: ${join(r, 'brief-A.md')}\nC:\n  modele: opus\n  brief: ${join(r, 'brief-C.md')}\n  suite: gardee\n`);
+    const fuite = join(d, 'etapes', '3', 'demande.md');
+    const { exec, vu } = faux(r, d, {
+      // étape 1 : écrit puis lit la demande 3 (fuite) ; étape 2, même session : lit la norme AVANT d'écrire
+      C1: (c, ecrire) => ecrire([outil('Write', { file_path: join(c, 'src', 'app.js') }), outil('Bash', { command: `cat ${fuite}` })]),
+      C2: (c, ecrire) => ecrire([outil('Read', { file_path: join(c, 'docs', 'norme.md') }, Date.now()), outil('Write', { file_path: join(c, 'src', 'app.js') }, Date.now())]),
+      C3: (c, ecrire) => ecrire([outil('Write', { file_path: join(c, 'src', 'app.js') }, Date.now())]),
+    });
+    const res = passageSequence(opts(r, exec));
+    const [s1] = res.etapes.C[0].mesure.sessions;
+    expect(vu.reprises).toEqual(['A1:-', 'C1:-', `C2:${s1}`, 'A2:-', 'A3:-', `C3:${s1}`]);
+    expect(res.etapes.C.map((e) => e.mesure.sessions)).toEqual([[s1], [s1], [s1]]);
+    expect(res.etapes.C.map((e) => e.fuites)).toEqual([[fuite], [], []]); // la fuite de l'étape 1 n'est pas recomptée aux étapes 2 et 3
+    expect(res.etapes.C[1].lecture).toMatchObject({ ouvertes: [join(r, 'runs', '2026-11-08-1100-e1', 's1', 'c2', 'docs', 'norme.md')], apres_ecriture: [] }); // l'écriture de l'étape 1 ne compte pas
   });
 
   it('suite en erreur à une étape : notée, et l\'étape suivante se compare à la dernière mesure réussie', () => {

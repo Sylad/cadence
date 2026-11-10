@@ -71,7 +71,7 @@ function bancEtape(s: Sequence, e: Etape, base: string): Banc {
 const mesureVide = (bras: string, banc: string, echec: string, t = new Date().toISOString()): Mesure =>
   ({ bras, banc, debut: t, fin: t, duree_s: 0, tokens: 0, cout_usd: 0, questions: 0, questions_texte: [], sessions: [], echec });
 
-/** Passage d'une séquence : un clone par bras gardé d'une étape à l'autre, une session neuve par étape, mesures par étape, juges sur l'état final. */
+/** Passage d'une séquence : un clone par bras gardé d'une étape à l'autre, une session neuve par étape (sauf bras « suite », L690), mesures par étape, juges sur l'état final. */
 export function passageSequence(o: Opt): ResultatSequence {
   return passageSequences(o, 1)[0];
 }
@@ -153,13 +153,15 @@ function empreintes(x: Ctx, c: string): Map<string, string> {
   return new Map(jsonl(dossierTranscripts(x.o.home, c)).map((f) => { const st = statSync(f); return [f, `${st.size}:${st.mtimeMs}`]; }));
 }
 
-/** Lignes des transcripts de l'étape (sessions du bras, sous-agents, reprises, ou fichiers neufs ou changés pendant l'étape), triées par horodatage. */
-function lignesEtape(x: Ctx, c: string, sessions: string[], avant: Map<string, string>): string[] {
+/** Lignes des transcripts de l'étape (sessions du bras, sous-agents, reprises, ou fichiers neufs ou changés pendant l'étape), triées par horodatage.
+ * Un fichier qui existait avant l'étape (session reprise par un bras « suite », L690) ne donne que ses lignes horodatées depuis `debut` :
+ * sans quoi les fuites des étapes d'avant sont recomptées et leurs écritures classent les lectures de l'étape « après écriture ». */
+function lignesEtape(x: Ctx, c: string, sessions: string[], avant: Map<string, string>, debut: string): string[] {
   const apres = empreintes(x, c);
   const deLEtape = (f: string) => sessions.some((s) => f.includes(`/${s}.jsonl`) || f.includes(`/${s}/`)) || avant.get(f) !== apres.get(f);
-  const lignes = [...apres.keys()].filter(deLEtape).flatMap((f) => readFileSync(f, 'utf8').split('\n').filter(Boolean));
   const date = (l: string) => { try { return String((JSON.parse(l) as { timestamp?: string }).timestamp ?? ''); } catch { return ''; } };
-  return lignes.map((l) => ({ l, t: date(l) })).sort((a, b) => a.t.localeCompare(b.t)).map((v) => v.l);
+  return [...apres.keys()].filter(deLEtape).flatMap((f) => readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => ({ l, t: date(l) }))
+    .filter((v) => !avant.has(f) || v.t >= debut)).sort((a, b) => a.t.localeCompare(b.t)).map((v) => v.l);
 }
 
 /** Fuites : demandes et pièces des étapes ≤ k et ses propres fichiers de mesure permis ; le reste de la séquence et les mesures de l'autre bras, certains. */
@@ -187,7 +189,7 @@ function lancer(x: Ctx, e: Etape, b: string, avant: { head: string; sale: string
 
 /** Une étape pour un bras : chaque mesure dans sa phase ; une mesure qui lève est notée et la séquence continue. */
 function jouerEtape(x: Ctx, e: Etape, b: string): MesureEtape {
-  const c = x.clones[b], transcripts = empreintes(x, c), aLire = [...e.pieces, ...e.references_depot.map((r) => join(c, r))];
+  const c = x.clones[b], debut = new Date().toISOString(), transcripts = empreintes(x, c), aLire = [...e.pieces, ...e.references_depot.map((r) => join(c, r))];
   const me: MesureEtape = { k: e.k, portee_suite: x.s.suite_projet.portee, reponses: existsSync(join(dirname(e.demande), 'reponses.md')), mesure: mesureVide(b, x.s.id, 'non lancé'),
     fuites: [], fuites_a_verifier: [], suite_en_erreur: null, mesure_en_erreur: null };
   let phase = 'état avant';
@@ -200,7 +202,7 @@ function jouerEtape(x: Ctx, e: Etape, b: string): MesureEtape {
     const contourne = empreinteReglages(c) !== sceau;
     if (me.mesure.echec) x.o.out(`${x.s.id} étape ${e.k} : bras ${b} en échec (${me.mesure.echec}), la séquence continue avec son code tel quel`);
     signaler(x, e.k, 'mesures', e.k - 1);
-    phase = 'fuites'; const lignes = lignesEtape(x, c, me.mesure.sessions, transcripts);
+    phase = 'fuites'; const lignes = lignesEtape(x, c, me.mesure.sessions, transcripts, debut);
     const fu = chercherFuites(lignes, reglesEtape(x, b, e.k), x.o.home, c);
     me.fuites = [...(contourne ? [`contournement : réglages ou hooks du bras modifiés pendant l'étape (${cheminReglages(c)}, v2/hooks, .claude du clone)`] : []), ...fu.certaines];
     me.fuites_a_verifier = fu.a_verifier;

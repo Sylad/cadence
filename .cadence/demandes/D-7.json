@@ -8,6 +8,14 @@
   {
    "date": "2026-11-10",
    "texte": "« ok » de Sylvain à la piste proposée : partir des erreurs réelles qui reviennent (reproches de Sylvain, tickets du compte pro, récidives), chacune bloquée par un test ou un hook ; mesure = l'erreur revient-elle en usage ; retirer ce qui n'a pas de gain mesuré. Première étape : la liste des erreurs vues au moins deux fois sur deux semaines, avec le blocage proposé."
+  },
+  {
+   "date": "2026-11-10",
+   "texte": "« ok » de Sylvain au calculateur de coût sans modèle et à la mesure du socle chargé à chaque session (la qualité reste mesurée sur les erreurs réelles, le coût se calcule)."
   }
+ ],
+ "lots": [
+  "L693",
+  "L694"
  ]
 }

@@ -3160,6 +3160,16 @@ lots:
     started: 2026-11-10
     review: { date: 2026-11-10, verdict: "conforme : --help/-h affichent l'usage sans rien créer, option inconnue refusée en code 2 (vérifié au vrai point d'entrée après build de v2) ; refactor release.ts sans changement de comportement ; porte verte à 3d31209", commit: 3d312092796369e7ab828f5836ab4a91a9700370 }
     finished: 2026-11-10
+  - id: L693
+    title: "Calculateur de coût sans modèle (D-7) : estimer avant tout banc le coût et le temps d'un mécanisme d'après les règles connues (contexte renvoyé à chaque échange, cache lu ≈10 % et écrit, prix par modèle, nombre d'échanges, socle chargé) ; mesure : prédiction à ±20 % des coûts réels du banc 2026-11-10-1551 (neuve 8,4 et 9,1 $, seuil 31,5 et 29,7 $)"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-10
+  - id: L694
+    title: "Socle chargé à chaque session (D-7) : mesurer en tokens ce que chaque session lancée par cadence charge avant son premier geste (CLAUDE.md, MEMORY.md, skills, agents, brief) et proposer les coupes ; mesure : tokens du socle avant/après"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-10
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

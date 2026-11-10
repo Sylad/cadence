@@ -7,11 +7,13 @@ import { executerRun, repondreRun, type Etat } from './run.js';
 export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L12] [--taille retouche|fonction] [--complet] [--sans-porte] [--fond]   une demande, une session Opus (mode complet si références), porte, intégration
   cadence run --reponse <id> "<texte>"   reprend un run en attente ou rendu, dans la même session
   cadence run --liste                    les runs du dépôt et leur état
+  cadence run --help | -h                cette aide, sans rien créer
   --fond : le run se détache (il survit à la session qui l'a lancé), son journal est dans ../.cadence-run/`;
 
 export async function cmdRun(a: string[], io: Io): Promise<number> {
   const out = io.out;
   try {
+    if (a.includes('--help') || a.includes('-h')) { out(`usage :\n${AIDE_RUN}`); return 0; } // issue #54 : « --help » lancé comme une demande, worktree et branche laissés
     if (a[0] === '--liste') {
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
       const etats = existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(d, f), 'utf8')) as Etat).filter((e) => e.repo === racine) : [];
@@ -32,6 +34,9 @@ export async function cmdRun(a: string[], io: Io): Promise<number> {
       else if (a[i] === '--lot') lot = a[++i];
       else if (a[i] !== '--fond') mots.push(a[i]);
     }
+    const inconnue = mots.find((m) => m.startsWith('-')); // une option mal tapée, ou une demande qui commence par « - », ne part pas en session
+    if (inconnue) { io.err(`cadence run : option inconnue : ${inconnue}\nusage :\n${AIDE_RUN}`); return 2; }
+    if (!mots.length || pieces.some((p) => !p) || (lot !== undefined && !lot) || (taille && !['retouche', 'fonction'].includes(taille))) { io.err(`usage :\n${AIDE_RUN}`); return 2; }
     if (a.includes('--fond')) { // relancé détaché, sans --fond : vécu au pro le 10-11, une session de lot morte avec celle qui l'avait lancée
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
       mkdirSync(d, { recursive: true });
@@ -40,7 +45,6 @@ export async function cmdRun(a: string[], io: Io): Promise<number> {
       out(`cadence run lancé en arrière-plan ; journal : ${journal} ; état : cadence run --liste`);
       return 0;
     }
-    if (!mots.length || pieces.some((p) => !p) || (lot !== undefined && !lot) || (taille && !['retouche', 'fonction'].includes(taille))) { io.err(`usage :\n${AIDE_RUN}`); return 2; }
     return executerRun({ repo: io.cwd, demande: mots.join(' '), pieces, taille, complet, lot, out, sansPorte }).etat === 'integre' ? 0 : 1;
   } catch (e) { io.err(String((e as Error).message ?? e)); return 1; }
 }

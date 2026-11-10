@@ -6,6 +6,7 @@ Depuis le 2026-11-09, `cadence run` remplace `cadence orchestrate` pour faire un
 cadence run "<demande>" [--piece docs/norme.md]… [--lot L12] [--taille retouche|fonction] [--complet] [--sans-porte] [--fond]
 cadence run --reponse <id> "<texte>"
 cadence run --liste
+cadence run --help        # ou -h
 ```
 
 ## Aiguillage (10-11)
@@ -46,6 +47,7 @@ En cas d'échec, le worktree est gardé avec l'état du run (`../.cadence-run/<p
 | `--fond` | Le run se détache et survit à la session qui l'a lancée (vécu au compte pro le 10-11 : un lot mort avec la session précédente) ; journal dans `../.cadence-run/`. |
 | `KUBECONFIG` | Comme les vagues : sans `orchestrate.prodAccess: true`, la session n'a ni `kubectl`, ni `helm`, ni `KUBECONFIG` ; avec, elle joue le banc du projet. |
 | `--sans-porte` | Un dépôt sans porte déclarée n'est pas intégré en silence : il faut le choisir explicitement. |
+| `--help`, `-h` | L'usage, sans rien créer (issue #54 : « --help » partait en demande, laissait worktree, branche et état). Un autre argument qui commence par `-` est refusé en code 2 avant toute création. |
 
 ## Mesures qui le fondent
 

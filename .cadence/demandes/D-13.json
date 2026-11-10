@@ -1,0 +1,16 @@
+{
+ "id": "D-13",
+ "texte": "On va passer à  Fable, on n’a plus de ticket opus",
+ "date": "2026-11-10",
+ "etat": "ouverte",
+ "lots": [
+  "L699"
+ ],
+ "preuve": null,
+ "precisions": [
+  {
+   "date": "2026-11-10",
+   "texte": "cadence run a le modèle opus en dur (v2/src/run/aiguillage.ts) : lot ouvert pour le choix du modèle ; revues lancées sur Fable dès ce message."
+  }
+ ]
+}

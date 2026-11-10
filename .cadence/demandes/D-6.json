@@ -1,0 +1,9 @@
+{
+ "id": "D-6",
+ "texte": "il faut pas oublié de faire évoluer la version du Hud quand on le modifie",
+ "date": "2026-11-10",
+ "origine": "session du lead",
+ "etat": "livrée",
+ "lots": [],
+ "preuve": "cadence release monte la version d'un autre plugin dont le code a changé depuis la dernière release (src/release.ts, test/release-autres-plugins.test.ts) ; cadence-hud 0.7.0 → 0.8.0"
+}

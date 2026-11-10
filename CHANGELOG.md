@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- `cadence release` raises the version of another plugin of the marketplace (the `cadence-hud` mod) by a patch when its code changed since the last release under the same version, and says so. `cadence-hud` had stayed 0.7.0 from 1.39.0 to 2.0.2 while its code changed: it is 0.8.0 now.
+
 ## [2.0.2] - 2026-11-10
 
 ### Fixed

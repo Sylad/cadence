@@ -90,6 +90,8 @@ interface Planned {
   current: string;
   writes: Map<string, string>;
   files: string[];
+  /** Les autres plugins du marketplace dont la version a monté (code changé depuis la dernière release). */
+  autres: string[];
   pluginName: string | null;
   marketplaceName: string | null;
   packageName: string;
@@ -165,6 +167,28 @@ function plan(root: string, bump: Bump, today: Day): Planned {
     put(MARKETPLACE, edit(MARKETPLACE, [[new RegExp(`("name":\\s*"${escape(String(own.name))}"(?:[^{}]|\\{[^{}]*\\})*?"version":\\s*")([^"]*)(")`), `de version pour le plugin « ${own.name} »`]]));
   }
 
+  // Les autres plugins du marketplace (le mod cadence-hud) : un code changé depuis la dernière release sous la même version est
+  // une version que personne ne voit passer (cadence-hud resté 0.7.0 de la 1.39.0 à la 2.0.2, demande de Sylvain du 10-11) → patch, ici.
+  const autres: string[] = [];
+  if (writes.has(MARKETPLACE) && inGit('la lecture des tags', () => tagExists(root, `v${current}`))) {
+    let market = writes.get(MARKETPLACE)!;
+    for (const p of (JSON.parse(market) as Json).plugins as Json[]) {
+      const src = typeof p.source === 'string' ? p.source.replace(/^\.\//, '').replace(/\/$/, '') : '';
+      const fichier = src ? `${src}/${PLUGIN}` : '';
+      if (!src || p.name === pluginName || !existsSync(join(root, fichier))) continue;
+      const change = spawnSync('git', ['diff', '--quiet', `v${current}`, 'HEAD', '--', src], { cwd: root }).status === 1;
+      const avant = spawnSync('git', ['show', `v${current}:${fichier}`], { cwd: root, encoding: 'utf8' });
+      const vAvant = avant.status === 0 ? String((JSON.parse(avant.stdout) as Json).version ?? '') : '';
+      const vIci = String(readJson(root, fichier).version ?? '');
+      if (!change || vIci !== vAvant || !/^\d+\.\d+\.\d+$/.test(vIci)) continue;
+      const neuve = nextVersion(vIci, 'patch');
+      const texte = readFileSync(join(root, fichier), 'utf8').replace(/("version":\s*")[^"]*(")/, `$1${neuve}$2`);
+      market = market.replace(new RegExp(`("name":\\s*"${escape(String(p.name))}"(?:[^{}]|\\{[^{}]*\\})*?"version":\\s*")([^"]*)(")`), `$1${neuve}$3`);
+      put(fichier, texte); autres.push(`${p.name} ${vIci} → ${neuve} (code changé depuis v${current})`);
+    }
+    writes.set(MARKETPLACE, market);
+  }
+
   if (!existsSync(join(root, CHANGELOG))) throw new RafError(`release : ${CHANGELOG} n'existe pas — la release renomme sa section [Unreleased], il faut donc un ${CHANGELOG} qui en porte une`);
   const changelog = readFileSync(join(root, CHANGELOG), 'utf8');
   const { before, body, after } = splitUnreleased(changelog);
@@ -182,6 +206,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
     } catch {
       throw new RafError(`release : ${file} ne se relirait plus après la mise à jour de la version`);
     }
+    if (file !== PLUGIN && file !== PACKAGE && file !== LOCK && file.endsWith(PLUGIN)) continue; // un autre plugin garde sa propre version
     const seen = file === MARKETPLACE ? parsed.plugins.some((p: Json) => p.version === version) : parsed.version === version;
     if (!seen) throw new RafError(`release : ${file} ne porte pas ${version} après la mise à jour`);
   }
@@ -192,6 +217,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
     current,
     writes,
     files,
+    autres,
     pluginName,
     marketplaceName,
     packageName: String(pkg.name ?? ''),
@@ -309,6 +335,7 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
   const branch = inGit('la lecture de la branche', () => currentBranch(root)) ?? 'main';
 
   out(`${dryRun ? 'release (--dry-run, rien n\'est écrit)' : 'release'} : ${p.current} → ${p.version}`);
+  for (const x of p.autres) out(`  ${x}`);
   for (const f of p.files) out(`  ${dryRun ? 'écrirait' : 'écrit'} : ${f}${f === 'CHANGELOG.md' ? ` ([Unreleased] → [${p.version}] - ${today}, une section [Unreleased] vide au-dessus)` : ' (version)'}`);
   if (!dryRun) for (const [file, text] of p.writes) writeFileSync(join(root, file), text);
 

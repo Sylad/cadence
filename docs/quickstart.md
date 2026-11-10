@@ -3,11 +3,11 @@
 # Start in 10 minutes: one lead, several projects
 
 You keep a folder with a few small projects. A **lead** session looks at all of them, you choose what to
-do, and a program runs each lot in fresh sessions. This page takes you from nothing to the first wave.
+do, and `cadence run` does each lot in one Opus session. This page takes you from nothing to the first lot.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="quickstart-dark.svg">
-  <img alt="A parent folder holds the projects alpha and beta; the lead session reads their tour and you choose; a wave of fresh sessions works; you review and deliver" src="quickstart-light.svg">
+  <img alt="A parent folder holds the projects alpha and beta; the lead session reads their tour and you choose; cadence run does each lot in one session; you review and deliver" src="quickstart-light.svg">
 </picture>
 
 The commands below were played on a clean Windows 11 machine with WSL (Ubuntu 24.04, L357): about 40 seconds of commands,
@@ -103,9 +103,19 @@ claude
 then type `/cadence:lead` (or say « pilot all projects »). The lead runs the tour, reports in a table, proposes three
 lots and **waits for your priority**: nothing starts before you answer. [The lead workflow](lead.md) draws every step.
 
-## The first wave
+## The first lot
 
-When you pick `alpha:L1`, the lead launches a wave. You can do it yourself, from the parent folder:
+When you pick `alpha:L1`, the lead runs it with `cadence run`. You can do it yourself, from the project:
+
+```sh
+cd alpha && raf start L1 && cadence run "what L1 must do, in your words" --lot L1 --fond
+```
+
+One Opus session does the lot in a worktree next to the project (`../.cadence-run/`), then the gate of `cadence.yaml` runs once and the work lands on your branch by fast-forward; nothing is pushed. `cadence run --liste` shows where it is; a question stops it until `cadence run --reponse <id> "…"`. When the request names references (a `--piece`, a word of `references:` in `cadence.yaml`), the session reads them in full before writing ([cadence run](v2/2026-11-09-cadence-run.md)).
+
+## A wave, on request
+
+Waves run each step of a lot in fresh sessions; a blind trial measured them slower than one session, so use one only when you want it. From the parent folder:
 
 ```sh
 cadence orchestrate alpha:L1 --dry-run
@@ -116,7 +126,7 @@ The first line only prints what would run: each step, its model and its budget. 
 sessions: implement, then review, and hands the lot back to you. From inside a project, write `.:L1` instead of
 `alpha:L1` (the project is a sub-folder of the current folder, so `alpha:L1` from inside `alpha` finds nothing).
 
-The sessions of a wave never push and never deliver. You read the table, answer the questions it brings back, then
+Neither a run nor a wave pushes or delivers. You read the result, answer the questions it brings back, then
 `/cadence:deliver` ships one project at a time ([deliver](deliver.md)). How waves work: [orchestrate](orchestrate.md) (commands and options, with the table of its five pages); budgets and reviews: [orchestrate-cycle](orchestrate-cycle.md); the gate: [orchestrate-gate](orchestrate-gate.md).
 
 ## If it stops

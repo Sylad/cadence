@@ -25,14 +25,14 @@ describe('README en page d’accueil (L232)', () => {
     expect(m).toContain('208 101');
   });
 
-  it('R2 — l’accueil dit ce que fait l’outil en 5 lignes au plus, puis montre le cycle d’une vague et le rôle du lead', () => {
+  it('R2 — l’accueil dit ce que fait l’outil en 5 lignes au plus, puis montre le cycle d’un lot (cadence run) et le rôle du lead', () => {
     const lignes = lignesIntro(readme);
     expect(lignes.length, lignes.join('\n')).toBeGreaterThan(0);
     expect(lignes.length, lignes.join('\n')).toBeLessThanOrEqual(5);
     for (const v of ['light', 'dark']) {
-      expect(readme).toContain(`docs/cycle-vague-${v}.svg`);
-      const svg = read(`docs/cycle-vague-${v}.svg`);
-      for (const mot of ['spec', 'mockup', 'accept', 'implement', 'review', 'ux', 'deliver', 'lead']) expect(svg.toLowerCase(), mot).toContain(mot);
+      expect(readme).toContain(`docs/cycle-run-${v}.svg`); // 2.0.0 : le cycle de cadence run (avant : docs/cycle-vague-*.svg)
+      const svg = read(`docs/cycle-run-${v}.svg`);
+      for (const mot of ['cadence run', 'references', 'session', 'gate', 'integrate', 'deliver', 'lead']) expect(svg.toLowerCase(), mot).toContain(mot);
     }
   });
 
@@ -104,7 +104,7 @@ describe('README en page d’accueil (L232)', () => {
     const cites = new Set([...readme.matchAll(/(docs\/[\w./-]+?\.(?:md|svg))/g)].map((m) => m[1]));
     expect(cites.size).toBeGreaterThanOrEqual(10);
     for (const f of cites) expect(files, f).toContain(f);
-    for (const f of ['docs/cycle-vague-light.svg', 'docs/cycle-vague-dark.svg', 'docs/raf.md', 'docs/stabilite.md', 'docs/orchestrate.md']) expect(cites.has(f), f).toBe(true);
+    for (const f of ['docs/cycle-run-light.svg', 'docs/cycle-run-dark.svg', 'docs/raf.md', 'docs/stabilite.md', 'docs/orchestrate.md']) expect(cites.has(f), f).toBe(true);
   });
 
   it('R8 — aucun lien relatif ni ancre cassé dans le README et les pages docs/', () => {

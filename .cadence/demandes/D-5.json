@@ -1,0 +1,9 @@
+{
+ "id": "D-5",
+ "texte": "euhhhh si la 2.0.0 est commité ilm faut refaire la doc, nottement le readmé, et le schéma, qui affiche toujours",
+ "date": "2026-11-10",
+ "origine": "session du lead, capture du schéma du README (cycle des vagues v1)",
+ "etat": "livrée",
+ "lots": [],
+ "preuve": "README (schéma docs/cycle-run-*.svg, accroche, section lead), docs/quickstart.md (premier lot = cadence run) et son schéma ; tests de docs 104 fichiers verts ; publié en 2.0.1"
+}

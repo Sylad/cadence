@@ -28,7 +28,7 @@ describe('démarrage « lead multi-projets » en 10 minutes (L358)', () => {
   });
 
   it('R2 — la page suit l\'ordre du parcours : prérequis, installation, plugin, dossier parent, raf init, tour, /lead, première vague', () => {
-    const ordre = ['## Before you start', '## Install', '## The parent folder', 'raf init', 'cadence lead tour', '/cadence:lead', 'cadence orchestrate alpha:L1 --wave first'];
+    const ordre = ['## Before you start', '## Install', '## The parent folder', 'raf init', 'cadence lead tour', '/cadence:lead', 'cadence run "what L1 must do', 'cadence orchestrate alpha:L1 --wave first'];
     let pos = -1;
     for (const m of ordre) {
       const i = page.indexOf(m, pos + 1);
@@ -60,7 +60,7 @@ describe('démarrage « lead multi-projets » en 10 minutes (L358)', () => {
       expect(existsSync(join(root, f)), f).toBe(true);
       expect(files, f).toContain(f);
       const svg = read(f).toLowerCase();
-      for (const mot of ['parent folder', 'lead', 'wave', 'alpha', 'beta']) expect(svg, mot).toContain(mot);
+      for (const mot of ['parent folder', 'lead', 'cadence run', 'alpha', 'beta']) expect(svg, mot).toContain(mot);
     }
     expect(files).toContain('docs/quickstart.md');
   });

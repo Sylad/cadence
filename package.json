@@ -29,6 +29,7 @@
     "docs/v2/banc.md",
     "docs/v2/2026-11-09-cadence-run.md",
     "docs/v2/publications/2.0.0.md",
+    "docs/v2/publications/2.0.1.md",
     "docs/v2/2026-11-07-cadence-2-design.md",
     "docs/orchestrate.md",
     "docs/orchestrate-cycle.md",
@@ -79,6 +80,8 @@
     "docs/with-your-tools.md",
     "docs/with-your-tools-light.svg",
     "docs/with-your-tools-dark.svg",
+    "docs/cycle-run-light.svg",
+    "docs/cycle-run-dark.svg",
     "docs/cycle-vague-light.svg",
     "docs/cycle-vague-dark.svg",
     "LICENSE"

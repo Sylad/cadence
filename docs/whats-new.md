@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **2.0.1**: the README and the quickstart show `cadence run` (new figure of a lot's cycle) instead of the cycle of a wave.
 - **2.0.0**: `cadence run "<request>"`: one request, one Opus session in a worktree, the full gate once, fast-forward; measured against Claude alone.
 - **1.62.1**: republishes 1.62.0, whose npm publication failed on a wall-clock test (it carries the 1.62.0 content too); `citedResources` reads a title in linear time; two queue tests no longer depend on clock order.
 - **1.62.0**: `orchestrate queue` lets the lead approve an ordered list of lots once, drawn by any live wave; a wave resumed after days rebases its branch first; an integration tolerates a modified plan; `--follow` loses no line.
@@ -94,6 +95,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**2.0.1**: documentation only. The README figure now draws how a lot is done since 2.0.0 — `cadence run`: the references read when the request has some, one Opus session, the gate once, the fast-forward, then the lead's delivery — instead of the cycle of a wave; the quickstart's first lot is a `cadence run`, and a wave comes on request.
 
 **2.0.0**: cadence 2. `cadence run "<request>"` ([docs/v2/2026-11-09-cadence-run.md](v2/2026-11-09-cadence-run.md)) does a request from start to end: a worktree next to the repository, one Opus session in one of two modes: complet when the request has references to read (a `--piece`, a word of the new `references:` section of `cadence.yaml`, or `--complet`), with the « read the references first » hook (every piece read in full before any write, a piece may sit outside the repository, e.g. under `~`) and the request register `.cadence/demandes/`; léger otherwise (Claude alone, who did as well and faster on requests with nothing to read). Then a rebase, the full gate of `cadence.yaml` once (one fix by the same session when it is red), and a fast-forward on the starting branch; nothing is pushed. `--lot <id>` has the commits cite the lot, `--fond` detaches the run so it survives the session that started it, `orchestrate.prodAccess` gives the session cluster access as for waves, `--reponse <id>` resumes a run that asked a question in the same session, `--liste` shows the runs. The `cadence:lead`, `session-start`, `session-close` and `orchestrate` skills now delegate through `cadence run`; a wave only when asked. Why: a blind trial found the 1.x waves 3.8 times slower than Claude alone and never preferred; measured against Claude alone, `cadence run` is on par in time over four comparisons (×1.00), leaves more hidden tests passing and no regression, and always reads the references ([publication record](v2/publications/2.0.0.md)). The plan (`raf`), `cadence deliver`, the sessions and the lead tour are unchanged; `cadence orchestrate` stays available.
 

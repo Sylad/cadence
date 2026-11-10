@@ -81,6 +81,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+### Changed
+
+- The README and the quickstart show how a lot is done since 2.0.0: a new figure (`docs/cycle-run-*.svg`) draws `cadence run` (references read when the request has some, one Opus session, the gate once, fast-forward) instead of the cycle of a wave; the quickstart's first lot is a `cadence run`, a wave comes on request.
+
 ## [2.0.0] - 2026-11-10
 
 ### Added

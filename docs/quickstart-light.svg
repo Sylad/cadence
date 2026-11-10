@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1010 190" width="1010" height="190" role="img" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="13" fill="#1f2328">
-<title>One lead, several projects, one wave</title>
-<desc>A parent folder holds the projects alpha and beta, each with its own plan. The lead session reads their tour and you choose the lots. A wave of fresh sessions does the work, then you review and deliver.</desc>
+<title>One lead, several projects, one cadence run per lot</title>
+<desc>A parent folder holds the projects alpha and beta; the lead session reads their tour and asks you; cadence run does each chosen lot in one Opus session, the gate once; you review and deliver one project at a time. Waves (cadence orchestrate) stay available on request.</desc>
 <defs><marker id="arq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#57606a"/></marker></defs>
 <rect width="1010" height="190" fill="#ffffff"/>
 <text x="20" y="22" font-weight="600" font-size="13.5" fill="#1f2328">1. Parent folder</text>
@@ -17,11 +17,11 @@
 <text x="405.0" y="96" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Lead session</text>
 <text x="405.0" y="114" text-anchor="middle" font-size="11.5" fill="#57606a">reads the tour, asks you</text>
 <text x="405.0" y="132" text-anchor="middle" font-size="11" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#57606a">/cadence:lead</text>
-<text x="570" y="22" font-weight="600" font-size="13.5" fill="#1f2328">3. The wave</text>
+<text x="570" y="22" font-weight="600" font-size="13.5" fill="#1f2328">3. The run</text>
 <rect x="570" y="64" width="200" height="94" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
-<text x="670.0" y="96" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Fresh sessions</text>
-<text x="670.0" y="114" text-anchor="middle" font-size="11.5" fill="#57606a">implement, then review</text>
-<text x="670.0" y="132" text-anchor="middle" font-size="11" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#57606a">cadence orchestrate</text>
+<text x="670.0" y="96" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">One Opus session per lot</text>
+<text x="670.0" y="114" text-anchor="middle" font-size="11.5" fill="#57606a">code + tests, gate once</text>
+<text x="670.0" y="132" text-anchor="middle" font-size="11" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#57606a">cadence run</text>
 <text x="830" y="22" font-weight="600" font-size="13.5" fill="#1f2328">4. You</text>
 <rect x="830" y="64" width="160" height="94" rx="6" fill="#ffffff" stroke="#57606a" stroke-width="1.5"/>
 <text x="910.0" y="96" text-anchor="middle" font-weight="600" font-size="13.5" fill="#1f2328">Review, deliver</text>

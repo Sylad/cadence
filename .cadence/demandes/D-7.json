@@ -1,0 +1,13 @@
+{
+ "id": "D-7",
+ "texte": "je ne comprend absolument rien, je n'arrive pas a avoir d'idée, les fonctionnement/gains/perte je ne les comprend pas. pourtant des fois ca semble logique, les tests montre le contraire.\nFranchement à part te demander d'innover je ne vois plus quoi comme solution pour améliorer les choses :x",
+ "date": "2026-11-10",
+ "etat": "ouverte",
+ "preuve": null,
+ "precisions": [
+  {
+   "date": "2026-11-10",
+   "texte": "« ok » de Sylvain à la piste proposée : partir des erreurs réelles qui reviennent (reproches de Sylvain, tickets du compte pro, récidives), chacune bloquée par un test ou un hook ; mesure = l'erreur revient-elle en usage ; retirer ce qui n'a pas de gain mesuré. Première étape : la liste des erreurs vues au moins deux fois sur deux semaines, avec le blocage proposé."
+  }
+ ]
+}

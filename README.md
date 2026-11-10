@@ -1,7 +1,7 @@
 # cadence
 
 A small working method that lives in your repository: a versioned plan linked to your commits,
-one AI session per request driven by a program (`cadence run`), and deliveries proved by their effect.
+one AI session per request ([`cadence run`](docs/v2/2026-11-09-cadence-run.md)), and deliveries proved by their effect.
 It is for solo developers and AI-assisted sessions who lose track of *what is left to do* and *what each commit was for*:
 cadence keeps both in plain files next to the code, and [Claude Code](https://claude.com/claude-code) skills turn it into rituals.
 New to the words (lot, wave, hold…)? [docs/concepts.md](docs/concepts.md) explains each notion, with four figures.
@@ -49,7 +49,7 @@ Details: [docs/skills.md](docs/skills.md) and [docs/cadence-hud.md](docs/cadence
 
 - [docs/raf.md](docs/raf.md): the plan, its commands, its file, and [a lot of the lead](docs/raf.md#a-lot-of-the-lead-local-l519).
 - [Waves](docs/orchestrate.md): [cycle](docs/orchestrate-cycle.md), [probe](docs/orchestrate-gate.md#the-edge-case-probe-orchestrateprobe-l497).
-- [`cadence run`](docs/v2/2026-11-09-cadence-run.md): one request, one Opus session, one gate (2.0.0, measured against Claude alone).
+- [Brief grid and pre-check reading](docs/mesures/brief-implementation-enrichi-avant-apres.md): grid of the code-reviewer in the `implement` brief (L523).
 - [docs/deliver.md](docs/deliver.md): CI, deploy, verify, mark lots delivered (delivered ≠ finished); [remote gate](docs/remote-gate.md).
 - [docs/spec.md](docs/spec.md): screen and back-end sheets; [`cadence inspect`](docs/perf.md#inspection-of-a-wave-l627): where a wave's time went.
 - [docs/ref.md](docs/ref.md): reference documents (specs, norms, mock-ups) and the coverage of their elements by the lots.

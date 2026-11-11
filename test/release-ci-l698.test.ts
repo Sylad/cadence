@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { run } from '../src/cli.js';
 import { workflowsCI } from '../src/release-ci.js';
 import { cleanupTempDirs, commit, gitRepo, tempDir } from './helpers.js';
@@ -10,6 +10,9 @@ import { cleanupTempDirs, commit, gitRepo, tempDir } from './helpers.js';
 // que la porte jouée dans l'arbre du lead et la fumée du paquet installé ne couvrent pas. Avant tout écrit, cadence release rejoue,
 // dans un clone neuf du commit de version (HEAD + fichiers de version, tagué v<version>), les étapes `run` du workflow déclenché par un tag.
 afterEach(() => { vi.unstubAllEnvs(); cleanupTempDirs(); });
+// Le chemin de la trace est écrit dans trace.cjs : le rejeu ne transmet que sa liste blanche de variables (revue L698 r2, D-17).
+let cible = '';
+beforeEach(() => { cible = join(tempDir(), 'trace.json'); });
 
 const CHANGELOG = '# Changelog\n\n## [Unreleased]\n\n### Added\n\n- A thing (L7).\n\n## [1.0.0] - 2026-10-01\n\n- Old.\n';
 const WHATS_NEW_SANS = "# What's new\n\n## In two lines\n\n- **1.0.0**: old.\n\n## Version by version\n\nIntro.\n\n**1.0.0**: old long.\n";
@@ -18,7 +21,7 @@ const WHATS_NEW_AVEC = "# What's new\n\n## In two lines\n\n- **1.0.1**: new.\n- 
 /** La trace qu'écrit un script du paquet jouet : où il tourne, sur quel commit, avec quel environnement. */
 const TRACE = `const fs = require('fs'), cp = require('child_process');
 const sh = (c) => { try { return cp.execSync(c, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return 'erreur'; } };
-fs.writeFileSync(process.env.ACME_TRACE, JSON.stringify({
+fs.writeFileSync(CIBLE, JSON.stringify({
   cwd: process.cwd(), version: require('./package.json').version, tag: sh('git describe --tags --exact-match'),
   nonSuivi: fs.existsSync('non-suivi.txt'), prepare: fs.existsSync('prepare.txt'), ref: process.env.GITHUB_REF_NAME, ci: process.env.CI,
   whatsNew: fs.readFileSync('docs/whats-new.md', 'utf8'), cadenceVar: process.env.CADENCE_ESSAI ?? null, gitVar: process.env.GIT_AUTHOR_NAME ?? null,
@@ -26,6 +29,8 @@ fs.writeFileSync(process.env.ACME_TRACE, JSON.stringify({
   home: process.env.HOME, homeFichiers: fs.readdirSync(process.env.HOME), origine: sh('git remote get-url origin'), refsOrigine: sh('git branch -r'), pousse: sh('git push -q origin HEAD:refs/heads/essai'), gitGlobal: sh('git config --global --list'),
   jetons: ['NPM_TOKEN', 'NODE_AUTH_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'].filter((v) => process.env[v] !== undefined),
   jetonNpm: sh('npm config get //registry.npmjs.org/:_authToken'),
+  env: Object.keys(process.env).sort(), xdg: process.env.XDG_CONFIG_HOME ?? null, gitConfigGlobal: process.env.GIT_CONFIG_GLOBAL ?? null, assistant: sh('git config credential.helper'), ssh: sh('ssh -G nas'), sshChemin: sh('command -v ssh'),
+  coupes: ['ssh', 'scp', 'sftp', 'rsync', 'kubectl', 'helm', 'gh', 'docker'].map((c) => sh('command -v ' + c)),
 }));
 `;
 
@@ -67,7 +72,7 @@ function paquet(o: { test?: string; workflow?: string | null; whatsNew?: string;
   const scripts = { prepublishOnly: 'node trace.cjs', prepare: 'node -e "require(\'fs\').writeFileSync(\'prepare.txt\', \'ok\')"', test: o.test ?? 'echo test', ...o.scripts };
   put('package.json', `${JSON.stringify({ name: 'acme-ci', version: '1.0.0', scripts, files: ['trace.cjs'] }, null, 2)}\n`);
   put('package-lock.json', `${JSON.stringify({ name: 'acme-ci', version: '1.0.0', lockfileVersion: 3, requires: true, packages: { '': { name: 'acme-ci', version: '1.0.0' } } }, null, 2)}\n`);
-  put('trace.cjs', TRACE);
+  put('trace.cjs', TRACE.replace('CIBLE', JSON.stringify(cible)));
   put('CHANGELOG.md', CHANGELOG);
   put('docs/whats-new.md', WHATS_NEW_SANS);
   put('.gitignore', 'prepare.txt\nnode_modules\n');
@@ -90,9 +95,8 @@ const version = (dir: string) => JSON.parse(readFileSync(join(dir, 'package.json
 const git = (dir: string, ...a: string[]) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' }).trim();
 
 function trace() {
-  const f = join(tempDir(), 'trace.json');
-  vi.stubEnv('ACME_TRACE', f);
-  return () => JSON.parse(readFileSync(f, 'utf8')) as Record<string, string | boolean | null>;
+  const f = cible;
+  return () => JSON.parse(readFileSync(f, 'utf8')) as Record<string, string | boolean | null | string[]>;
 }
 
 describe('cadence release — la CI de publication rejouée dans un clone neuf du commit de version (L698)', () => {
@@ -200,13 +204,18 @@ describe('cadence release — la CI de publication rejouée dans un clone neuf d
     expect(tue.code).toBe(2);
     expect(tue.err).toMatch(/étape « npm test » \(code SIGKILL\)/);
     expect(readdirSync(tmp).filter((d) => d.startsWith('cadence-ci-'))).toEqual([]);
-    // HEAD détaché sur un commit que le clone ne voit pas : le checkout du clone lève avant toute étape
+    // le commit de version du clone refusé (un pre-commit qui échoue, par core.hooksPath) : clonerCommitDeVersion lève avant toute étape.
+    // (Revue L698 r2 : l'ancien cas, HEAD détaché hors branche, ne faisait pas échouer le clone — git clone copie le commit ; il était
+    // rouge seulement parce que la trace n'avait pas sa variable d'environnement.)
     const dir = paquet();
-    git(dir, 'checkout', '-q', '--detach');
-    git(dir, 'commit', '-q', '--allow-empty', '-m', 'hors branche');
-    git(dir, 'branch', '-q', '-D', 'main');
+    const crochets = tempDir();
+    writeFileSync(join(crochets, 'pre-commit'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    vi.stubEnv('GIT_CONFIG_COUNT', '1');
+    vi.stubEnv('GIT_CONFIG_KEY_0', 'core.hooksPath');
+    vi.stubEnv('GIT_CONFIG_VALUE_0', crochets);
     const casse = release(dir, 'patch');
     expect(casse.code).toBe(2);
+    expect(casse.err).toMatch(/git commit de version dans le clone/);
     expect(readdirSync(tmp).filter((d) => d.startsWith('cadence-ci-'))).toEqual([]);
   }, 180_000);
 });
@@ -320,6 +329,127 @@ describe('cadence release — le rejeu ne publie, ne pousse ni n’appelle le r�
       expect(r.out).not.toMatch(/brouillon|npm run inexistant/);
     }
   }, 180_000);
+});
+
+describe('cadence release — revue L698 r2 (D-17) : cycle de vie de npm ci, environnement en liste blanche, working-directory et job sous if:', () => {
+  const wf = (corps: string) => `name: publish\non:\n  push:\n    tags: ['v*']\n${corps}`;
+  const job = (steps: string, tete = '') => wf(`jobs:\n  publish:\n    runs-on: ubuntu-latest\n${tete}    steps:\n${steps}`);
+
+  it('point 1 : npm ci joue preinstall, install, postinstall, prepublish, preprepare, prepare et postprepare ; un seul qui pousse refuse l’étape', () => {
+    for (const s of ['preinstall', 'install', 'postinstall', 'prepublish', 'preprepare', 'prepare', 'postprepare']) {
+      const dir = paquet({ workflow: job('      - run: npm ci\n'), scripts: { [s]: 'git push origin HEAD' } });
+      expect(workflowsCI(dir)[0].etapes[0].sautee, s).toMatch(new RegExp(`le script npm « ${s} » publie ou pousse`));
+    }
+    // npm pack joue aussi preprepare et postprepare autour de prepare
+    for (const s of ['preprepare', 'postprepare']) {
+      const dir = paquet({ workflow: job('      - run: npm pack --dry-run\n'), scripts: { [s]: 'rsync -a dist/ serveur:/srv' } });
+      expect(workflowsCI(dir)[0].etapes[0].sautee, s).toMatch(new RegExp(`le script npm « ${s} » publie ou pousse`));
+    }
+  });
+
+  it('point 1 : les scripts des paquets de workspaces, que npm ci joue aussi, sont vérifiés ; -w, --workspace, --prefix, --userconfig et --globalconfig sont refusés', () => {
+    const dir = paquet({ workflow: job('      - run: npm ci\n') });
+    const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ ...pkg, workspaces: ['packages/*'] }));
+    mkdirSync(join(dir, 'packages/a'), { recursive: true });
+    writeFileSync(join(dir, 'packages/a/package.json'), JSON.stringify({ name: 'a', scripts: { postprepare: 'kubectl apply -f k8s/' } }));
+    expect(workflowsCI(dir)[0].etapes[0].sautee).toMatch(/le script npm « postprepare » de packages\/a publie ou pousse : kubectl apply/);
+    for (const ligne of ['npm run build -w a', 'npm test --workspace=a', 'npm run build --workspaces', 'npm ci --prefix packages/a', 'npm run build --userconfig /home/u/.npmrc', 'npm pack --globalconfig=/etc/npmrc']) {
+      const d = paquet({ workflow: job(`      - run: ${ligne}\n`) });
+      expect(workflowsCI(d)[0].etapes[0].sautee, ligne).toMatch(/hors liste blanche : option « -/);
+    }
+  });
+
+  it('point 1, rejoué : un postprepare qui pousse n’est jamais joué par npm ci (aucun marqueur)', () => {
+    const m = tempDir();
+    const dir = paquet({ workflow: job('      - run: npm ci\n'), scripts: { postprepare: `node -e "require('fs').writeFileSync('${m}/m-postprepare', 'x')" && git push origin HEAD` } });
+    const r = release(dir, 'patch');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/– non rejouée : npm ci \(le script npm « postprepare » publie ou pousse/);
+    expect(readdirSync(m)).toEqual([]);
+  }, 180_000);
+
+  it('point 2 : seules les variables de la liste blanche passent ; ni KUBECONFIG, ni SSH_AUTH_SOCK, ni XDG_CONFIG_HOME ou GIT_CONFIG_GLOBAL de l’utilisateur, ni assistant d’identifiants ; ssh, scp, rsync, kubectl, gh… coupés', () => {
+    const maison = tempDir();
+    writeFileSync(join(maison, 'kubeconfig'), 'apiVersion: v1\nclusters: [{name: prod, cluster: {server: https://192.0.2.1:6443}}]\n');
+    writeFileSync(join(maison, 'gitconfig'), '[credential]\n\thelper = store\n[user]\n\tname = Utilisateur\n');
+    mkdirSync(join(maison, 'xdg/git'), { recursive: true });
+    writeFileSync(join(maison, 'xdg/git/config'), '[credential]\n\thelper = cache\n');
+    const dir = paquet({ workflow: job('      - run: npm publish\n') });
+    const lire = trace();
+    const poses: Record<string, string> = {
+      KUBECONFIG: join(maison, 'kubeconfig'), SSH_AUTH_SOCK: join(maison, 'agent.sock'), SSH_AGENT_PID: '4242', XDG_CONFIG_HOME: join(maison, 'xdg'),
+      GIT_CONFIG_GLOBAL: join(maison, 'gitconfig'), DOCKER_HOST: 'ssh://nas', CLOUDSDK_CONFIG: maison, NETRC: join(maison, 'netrc'),
+      AWS_ACCESS_KEY_ID: 'AKIA-ESSAI', AWS_PROFILE: 'prod', ACME_AUTRE: 'quelconque', NODE_OPTIONS: '--require /tmp/x.js',
+    };
+    for (const [k, v] of Object.entries(poses)) vi.stubEnv(k, v);
+    const r = release(dir, 'patch');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    const t = lire();
+    const env = t.env as string[];
+    // XDG_CONFIG_HOME et GIT_CONFIG_GLOBAL sont reposés dans le HOME temporaire ; les autres sont absents
+    for (const k of Object.keys(poses).filter((v) => !['XDG_CONFIG_HOME', 'GIT_CONFIG_GLOBAL'].includes(v))) expect(env, k).not.toContain(k);
+    expect(String(t.xdg).startsWith(String(t.home))).toBe(true);
+    expect(t.gitConfigGlobal).toBe(join(String(t.home), '.gitconfig'));
+    // ce qui reste, hors variables que npm pose pour ses scripts : la liste blanche, et ce que le rejeu pose lui-même
+    const npm = /^(npm_|INIT_CWD$|NODE$|PWD$|OLDPWD$|SHLVL$|_$|COLOR$|EDITOR$|NODE_ENV$)/;
+    const permises = new Set(['PATH', 'LANG', 'LANGUAGE', 'TERM', 'TZ', 'TMPDIR', 'USER', 'LOGNAME', 'SHELL', 'NODE_DISABLE_COMPILE_CACHE',
+      'HOME', 'XDG_CONFIG_HOME', 'GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL', 'GIT_TERMINAL_PROMPT', 'GIT_SSH_COMMAND', 'GIT_ASKPASS', 'SSH_ASKPASS', 'CI',
+      'GITHUB_ACTIONS', 'GITHUB_REF', 'GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_WORKSPACE', 'GITHUB_OUTPUT', 'GITHUB_ENV', 'GITHUB_PATH',
+      'GITHUB_STEP_SUMMARY', 'RUNNER_TEMP']);
+    expect(env.filter((k) => !npm.test(k) && !/^LC_[A-Z]+$/.test(k) && !permises.has(k))).toEqual([]);
+    expect(String(t.home).startsWith(maison)).toBe(false);
+    expect(t.gitGlobal).toBe('user.name=cadence-ci\nuser.email=cadence-ci@cadence.invalid');
+    expect(t.assistant).toBe('erreur'); // git config credential.helper : aucune valeur
+    // ssh lit ~/.ssh par passwd, pas par HOME : la commande est coupée en tête du PATH ; ssh -G (sans connexion) échoue
+    expect(t.ssh).toBe('erreur');
+    const coupes = t.coupes as string[];
+    expect(new Set(coupes.map((c) => dirname(c))).size).toBe(1);
+    expect(coupes.every((c) => !c.startsWith('/usr') && !c.startsWith(maison))).toBe(true);
+    expect(r.out).toMatch(/variables transmises : liste blanche/);
+  }, 180_000);
+
+  it('point 3 : working-directory (étape, defaults.run du job et du workflow) est honoré : les scripts lus et joués sont ceux de ce dossier', () => {
+    const m = tempDir();
+    const steps = '      - run: npm test\n        working-directory: sous\n      - run: npm test\n';
+    const dir = paquet({ workflow: job(steps) });
+    mkdirSync(join(dir, 'sous'));
+    writeFileSync(join(dir, 'sous/package.json'), JSON.stringify({ name: 'sous', scripts: { test: `node -e "require('fs').writeFileSync('${m}/sous.txt', process.cwd())"` } }));
+    git(dir, 'add', 'sous');
+    git(dir, 'commit', '-q', '-m', 'sous');
+    const etapes = workflowsCI(dir)[0].etapes;
+    expect(etapes.map((e) => e.dossier)).toEqual(['sous', undefined]);
+    const r = release(dir, 'patch');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(readFileSync(join(m, 'sous.txt'), 'utf8')).toMatch(/\/clone\/sous$/);
+    expect(r.out).toMatch(/✓ npm test \(dans sous\)/);
+    // defaults.run.working-directory : du job, sinon du workflow ; celui de l'étape l'emporte
+    const parJob = paquet({ workflow: job('      - run: npm test\n      - run: npm test\n        working-directory: b\n', '    defaults:\n      run:\n        working-directory: a\n') });
+    for (const d of ['a', 'b']) mkdirSync(join(parJob, d));
+    expect(workflowsCI(parJob)[0].etapes.map((e) => e.dossier)).toEqual(['a', 'b']);
+    const parWf = paquet({ workflow: wf('defaults:\n  run:\n    working-directory: w\njobs:\n  p:\n    runs-on: x\n    steps:\n      - run: npm test\n') });
+    mkdirSync(join(parWf, 'w'));
+    expect(workflowsCI(parWf)[0].etapes.map((e) => e.dossier)).toEqual(['w']);
+  }, 180_000);
+
+  it('point 3 : un working-directory hors du clone, absolu, calculé (${{ }}) ou absent est refusé en le disant', () => {
+    const cas: [string, RegExp][] = [['../ailleurs', /working-directory « \.\.\/ailleurs » hors du clone/], ['/etc', /working-directory « \/etc » hors du clone/],
+      ['${{ matrix.dir }}', /working-directory « \$\{\{ matrix\.dir \}\} » calculé/], ['inexistant', /working-directory « inexistant » absent du commit/]];
+    for (const [wd, raison] of cas) {
+      const dir = paquet({ workflow: job(`      - run: npm test\n        working-directory: ${JSON.stringify(wd)}\n`) });
+      expect(workflowsCI(dir)[0].etapes[0].sautee, wd).toMatch(raison);
+    }
+  });
+
+  it('point 3 : les étapes d’un job sous if: ne sont pas rejouées, et c’est dit ; les autres jobs le sont', () => {
+    const dir = paquet({ workflow: wf("jobs:\n  docs:\n    if: github.repository == 'acme/ci'\n    runs-on: x\n    steps:\n      - run: npm test\n  publish:\n    runs-on: x\n    steps:\n      - run: npm ci\n") });
+    const etapes = workflowsCI(dir)[0].etapes;
+    expect(etapes[0].sautee).toBe("job « docs » sous condition if (github.repository == 'acme/ci')");
+    expect(etapes[1].commandes).toEqual([['npm', 'ci']]);
+  });
 });
 
 describe('publish.yml de cadence : ce que la release rejoue et ce qu’elle laisse à la CI', () => {

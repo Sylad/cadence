@@ -1,0 +1,11 @@
+{
+ "id": "D-17",
+ "texte": "Corriger les 3 suites de la revue L698 r2 (pièce jointe). (1) npm ci joue aussi prepublish, preprepare, prepare, postprepare, preinstall, install, postinstall : soit npm ci --ignore-scripts puis seulement les scripts de la liste blanche, soit contrôler ces scripts comme les autres ; (2) l'environnement du rejeu ne garde AUCUN accès : pas de KUBECONFIG (il pointe sur le cluster de production), pas de SSH_AUTH_SOCK ni de clés ssh accessibles via HOME, pas de credential helper git, pas de XDG_CONFIG_HOME ni GIT_CONFIG_GLOBAL utilisateur, liste blanche des variables transmises plutôt que liste noire ; la doc doit dire exactement ce qui est retiré ; (3) une étape avec working-directory ou un job sous if: est traité correctement ou refusé en le disant. Tests pour chaque point.",
+ "date": "2026-11-11",
+ "origine": "demande cadence run, pièce jointe tmp/revues/L698-r2.md",
+ "etat": "ouverte",
+ "lots": [
+  "L698"
+ ],
+ "preuve": ""
+}

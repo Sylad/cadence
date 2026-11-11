@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, normalize } from 'node:path';
 import { parse } from 'yaml';
 import { RafError } from './plan.js';
 import { isObject } from './yaml-keys.js';
@@ -19,8 +19,8 @@ import { queueSortie, texteSortie, type Sortie } from './release-fumee.js';
 const ETAPE_MS = 30 * 60_000;
 const WORKFLOWS = '.github/workflows';
 
-/** Une étape rejouée est une suite de commandes npm, jouées sans shell (argv), arrêtée au premier code non nul. */
-type EtapeCI = { nom: string; commandes: string[][]; sautee?: undefined } | { nom: string; sautee: string; commandes?: undefined };
+/** Une étape rejouée est une suite de commandes npm, jouées sans shell (argv) dans `dossier` du clone (son working-directory), arrêtée au premier code non nul. */
+type EtapeCI = { nom: string; commandes: string[][]; dossier?: string; sautee?: undefined } | { nom: string; sautee: string; commandes?: undefined; dossier?: undefined };
 interface WorkflowCI { fichier: string; etapes: EtapeCI[] }
 /** Le commit de version que la release écrira : ses fichiers calculés, plus ceux repris de l'arbre de travail (docs/whats-new.md). */
 interface CommitDeVersion { version: string; writes: Map<string, string>; copies: string[] }
@@ -45,20 +45,27 @@ const RAISONS: [RegExp, string][] = [
 ];
 /** Un mot de commande sans rien que bash interprète. */
 const CARACTERE_SHELL = /[^\w@%+=:,./\s-]/;
-/** Les sous-commandes npm de la liste blanche et les scripts de cycle de vie qu'elles jouent. */
+/**
+ * Les sous-commandes npm de la liste blanche et les scripts de cycle de vie qu'elles jouent. Revue L698 r2 (D-17), mesuré avec npm 12.2 :
+ * npm ci joue aussi prepublish, preprepare et postprepare, et npm pack preprepare et postprepare autour de prepare.
+ */
+const CYCLE_CI = ['preinstall', 'install', 'postinstall', 'prepublish', 'preprepare', 'prepare', 'postprepare'];
 const NPM_RECONNUES: Record<string, (script?: string) => string[]> = {
-  ci: () => ['preinstall', 'install', 'postinstall', 'prepare'],
+  ci: () => CYCLE_CI,
   test: () => ['pretest', 'test', 'posttest'],
   t: () => ['pretest', 'test', 'posttest'],
   run: (s) => [`pre${s}`, s!, `post${s}`],
   'run-script': (s) => [`pre${s}`, s!, `post${s}`],
-  pack: () => ['prepack', 'prepare', 'postpack'],
+  pack: () => ['prepack', 'preprepare', 'prepare', 'postprepare', 'postpack'],
 };
 /** Un corps de script npm qui publie, pousse, déploie ou appelle le réseau. */
-const SCRIPT_PUBLIE = /\b(publish|push|deploy|release|curl|wget|gh|ssh|scp|rsync)\b|\bsemantic-release\b|\bchangeset\b/;
+const SCRIPT_PUBLIE = /\b(publish|push|deploy|release|curl|wget|gh|ssh|scp|sftp|rsync|kubectl|helm)\b|\bsemantic-release\b|\bchangeset\b/;
+/** Les options npm qui changent de paquet (workspaces, --prefix) ou de configuration (--userconfig, --globalconfig vers un chemin du poste). */
+const OPTION_REFUSEE = /^(-w|--workspaces?|--include-workspace-root|--prefix|-C|--userconfig|--globalconfig)(=|$)/;
 const PUBLISH = /\bnpm\s+publish\b/;
 /** Ce que `npm publish` joue avant d'envoyer : prepublishOnly (la suite), puis prepack, prepare (le build) et postpack par `npm pack --dry-run` ; rien ne part. */
 const REJEU_PUBLISH = [['npm', 'run', 'prepublishOnly', '--if-present'], ['npm', 'pack', '--dry-run']];
+const CYCLE_PUBLISH = ['prepublishOnly', 'prepack', 'preprepare', 'prepare', 'postprepare', 'postpack'];
 const texteCommandes = (c: string[][]) => c.map((a) => a.join(' ')).join(' && ');
 
 /** Un workflow déclenché par un tag poussé (`on.push.tags`) : celui de la publication. */
@@ -88,65 +95,124 @@ function scriptQuiPublie(noms: string[], scripts: Record<string, string>, vus = 
   return undefined;
 }
 
+/** Les scripts npm d'un dossier : ceux de son package.json, et ceux des paquets de ses workspaces (npm ci joue leur cycle de vie aussi). */
+interface PaquetsNpm { racine: Record<string, string>; workspaces: [string, Record<string, string>][] }
+
+/** La raison du refus si un script de `noms` (dans le paquet, ou, pour npm ci, dans un paquet de workspace) publie ou pousse. */
+function raisonScripts(noms: string[], p: PaquetsNpm, workspaces: boolean): string | undefined {
+  const fautif = scriptQuiPublie(noms, p.racine);
+  if (fautif) return `le script npm « ${fautif} » publie ou pousse : ${p.racine[fautif]}`;
+  for (const [chemin, scripts] of workspaces ? p.workspaces : []) {
+    const f = scriptQuiPublie(noms, scripts);
+    if (f) return `le script npm « ${f} » de ${chemin} publie ou pousse : ${scripts[f]}`;
+  }
+  return undefined;
+}
+
 /** Une ligne de commande de la liste blanche : son argv, ou la raison du refus. */
-function ligneReconnue(ligne: string, scripts: Record<string, string>): string[] | string {
+function ligneReconnue(ligne: string, p: PaquetsNpm): string[] | string {
   const argv = ligne.split(/\s+/);
   const sous = argv[0] === 'npm' ? argv[1] : undefined;
   const cycle = sous === undefined ? undefined : NPM_RECONNUES[sous];
   if (!cycle) return `hors liste blanche : « ${sous === undefined ? argv[0] : `npm ${sous}`} » n'est pas une commande reconnue (npm ci, npm test, npm run, npm pack)`;
+  const option = argv.find((a) => OPTION_REFUSEE.test(a));
+  if (option) return `hors liste blanche : option « ${option} » (autre paquet ou autre configuration npm)`;
   const parScript = sous === 'run' || sous === 'run-script';
   const script = parScript ? argv.slice(2).find((a) => !a.startsWith('-')) : undefined;
   if (parScript && !script) return `hors liste blanche : « ${ligne} » sans script`;
   if (script && /^(pre|post)?publish$/.test(script)) return `hors liste blanche : script npm « ${script} »`;
-  const fautif = scriptQuiPublie(cycle(script), scripts);
-  return fautif ? `le script npm « ${fautif} » publie ou pousse : ${scripts[fautif]}` : argv;
+  return raisonScripts(cycle(script), p, sous === 'ci') ?? argv;
 }
 
 /** Les commandes (argv) d'un script `run` si chaque ligne est dans la liste blanche, sinon la raison du refus. */
-function commandesReconnues(run: string, scripts: Record<string, string>): string[][] | string {
+function commandesReconnues(run: string, p: PaquetsNpm): string[][] | string {
   const raison = RAISONS.find(([re]) => re.test(run))?.[1];
   if (raison) return raison;
   const car = CARACTERE_SHELL.exec(run);
   if (car) return `hors liste blanche : caractère « ${car[0]} » du shell`;
   const commandes: string[][] = [];
   for (const ligne of run.split('\n').map((l) => l.trim()).filter(Boolean)) {
-    const c = ligneReconnue(ligne, scripts);
+    const c = ligneReconnue(ligne, p);
     if (typeof c === 'string') return c;
     commandes.push(c);
   }
   return commandes;
 }
 
-function classer(step: Record<string, unknown>, i: number, scripts: Record<string, string>): EtapeCI {
-  const run = typeof step.run === 'string' ? step.run.trim() : '';
-  const nom = typeof step.name === 'string' ? step.name : typeof step.uses === 'string' ? step.uses : run.split('\n')[0] || `étape ${i + 1}`;
-  if (typeof step.uses === 'string') return { nom, sautee: 'action GitHub' };
-  if (!run) return { nom, sautee: 'sans commande run' };
-  // Le texte d'une étape de publication n'est jamais joué : cadence joue à sa place ce que npm publish joue avant d'envoyer.
-  if (PUBLISH.test(sansEcho(run))) {
-    const fautif = scriptQuiPublie(['prepublishOnly', 'prepack', 'prepare', 'postpack'], scripts);
-    if (fautif) return { nom, sautee: `le script npm « ${fautif} » publie ou pousse : ${scripts[fautif]}` };
-    return { nom: `${nom} → ${texteCommandes(REJEU_PUBLISH)}`, commandes: REJEU_PUBLISH };
-  }
-  if (step.if !== undefined) return { nom, sautee: `condition if (${String(step.if)})` };
-  const c = commandesReconnues(run, scripts);
-  return typeof c === 'string' ? { nom, sautee: c } : { nom, commandes: c };
+/** Le job d'une étape : son nom, son `if:`, et le working-directory par défaut (defaults.run du job, sinon du workflow). */
+interface JobCI { nom: string; si: unknown; dossier: unknown }
+
+/**
+ * Le dossier du clone où l'étape tourne (revue L698 r2, D-17 : une étape `npm test` sous `working-directory: packages/a` était jouée à la
+ * racine, un verdict faux) : '' pour la racine, ou la raison du refus — un chemin calculé, absolu, qui sort du clone, ou absent du commit.
+ */
+function dossierEtape(root: string, wd: unknown): string | { refus: string } {
+  if (wd === undefined) return '';
+  const texte = String(wd);
+  if (texte.includes('${{')) return { refus: `working-directory « ${texte} » calculé (\${{ }}) : non rejouable hors de la CI` };
+  const n = normalize(texte).replace(/\/+$/, '');
+  if (isAbsolute(texte) || n === '..' || n.startsWith('../')) return { refus: `working-directory « ${texte} » hors du clone` };
+  const d = n === '.' ? '' : n;
+  if (d && !(existsSync(join(root, d)) && statSync(join(root, d)).isDirectory())) return { refus: `working-directory « ${texte} » absent du commit` };
+  return d;
 }
 
-function scriptsNpm(root: string): Record<string, string> {
+function classer(step: Record<string, unknown>, i: number, root: string, job: JobCI): EtapeCI {
+  const run = typeof step.run === 'string' ? step.run.trim() : '';
+  const nom = typeof step.name === 'string' ? step.name : typeof step.uses === 'string' ? step.uses : run.split('\n')[0] || `étape ${i + 1}`;
+  // Un job sous condition (if: github.repository == …, une branche, un événement) n'est pas rejoué : cadence ne sait pas l'évaluer.
+  if (job.si !== undefined) return { nom, sautee: `job « ${job.nom} » sous condition if (${String(job.si)})` };
+  if (typeof step.uses === 'string') return { nom, sautee: 'action GitHub' };
+  if (!run) return { nom, sautee: 'sans commande run' };
+  const d = dossierEtape(root, step['working-directory'] ?? job.dossier);
+  if (typeof d !== 'string') return { nom, sautee: d.refus };
+  const dossier = d || undefined;
+  const p = paquetsNpm(join(root, d));
+  // Le texte d'une étape de publication n'est jamais joué : cadence joue à sa place ce que npm publish joue avant d'envoyer.
+  if (PUBLISH.test(sansEcho(run))) {
+    const raison = raisonScripts(CYCLE_PUBLISH, p, false);
+    if (raison) return { nom, sautee: raison };
+    return { nom: `${nom} → ${texteCommandes(REJEU_PUBLISH)}`, commandes: REJEU_PUBLISH, dossier };
+  }
+  if (step.if !== undefined) return { nom, sautee: `condition if (${String(step.if)})` };
+  const c = commandesReconnues(run, p);
+  return typeof c === 'string' ? { nom, sautee: c } : { nom, commandes: c, dossier };
+}
+
+function lirePaquet(dir: string): { scripts: Record<string, string>; workspaces: string[] } {
   try {
-    const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { scripts?: unknown };
-    return isObject(pkg.scripts) ? Object.fromEntries(Object.entries(pkg.scripts).filter(([, v]) => typeof v === 'string')) as Record<string, string> : {};
+    const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { scripts?: unknown; workspaces?: unknown };
+    const scripts = isObject(pkg.scripts) ? Object.fromEntries(Object.entries(pkg.scripts).filter(([, v]) => typeof v === 'string')) as Record<string, string> : {};
+    const ws = Array.isArray(pkg.workspaces) ? pkg.workspaces : isObject(pkg.workspaces) && Array.isArray(pkg.workspaces.packages) ? pkg.workspaces.packages : [];
+    return { scripts, workspaces: ws.filter((w): w is string => typeof w === 'string') };
   } catch {
-    return {};
+    return { scripts: {}, workspaces: [] };
   }
 }
+
+/** Les dossiers d'un motif de workspaces : un chemin, ou un chemin qui finit par `*` ou `**` (ses sous-dossiers directs). */
+function dossiersWorkspace(dir: string, motif: string): string[] {
+  const m = motif.replace(/\/+$/, '').replace(/^\.\//, '');
+  const etoile = /\/\*{1,2}$/.exec(m);
+  if (!etoile) return existsSync(join(dir, m, 'package.json')) ? [m] : [];
+  const parent = m.slice(0, etoile.index);
+  if (!existsSync(join(dir, parent))) return [];
+  return readdirSync(join(dir, parent), { withFileTypes: true }).filter((e) => e.isDirectory() && existsSync(join(dir, parent, e.name, 'package.json'))).map((e) => `${parent}/${e.name}`).sort();
+}
+
+function paquetsNpm(dir: string): PaquetsNpm {
+  const racine = lirePaquet(dir);
+  const workspaces = racine.workspaces.flatMap((w) => dossiersWorkspace(dir, w)).map((w): [string, Record<string, string>] => [w, lirePaquet(join(dir, w)).scripts]);
+  return { racine: racine.scripts, workspaces };
+}
+
+/** `defaults.run.working-directory` d'un workflow ou d'un job. */
+const defautWd = (o: Record<string, unknown>): unknown => (isObject(o.defaults) && isObject(o.defaults.run) ? o.defaults.run['working-directory'] : undefined);
 
 /** Les workflows de `.github/workflows` déclenchés par un tag, avec leurs étapes `run` classées : rejouée (commande) ou non (raison). */
 export function workflowsCI(root: string): WorkflowCI[] {
   const dir = join(root, WORKFLOWS);
   if (!existsSync(dir)) return [];
-  const scripts = scriptsNpm(root);
   const out: WorkflowCI[] = [];
   for (const f of readdirSync(dir).filter((n) => /\.ya?ml$/.test(n)).sort()) {
     let doc: unknown;
@@ -156,8 +222,14 @@ export function workflowsCI(root: string): WorkflowCI[] {
       throw new RafError(`release : ${WORKFLOWS}/${f} illisible : ${(e as Error).message.split('\n')[0]}`);
     }
     if (!declencheParTag(doc)) continue;
-    const jobs = isObject((doc as Record<string, unknown>).jobs) ? Object.values((doc as Record<string, unknown>).jobs as Record<string, unknown>) : [];
-    const etapes = jobs.flatMap((j) => (isObject(j) && Array.isArray(j.steps) ? j.steps : [])).filter(isObject).map((st, i) => classer(st, i, scripts));
+    const d = doc as Record<string, unknown>;
+    const wdWorkflow = defautWd(d);
+    const jobs = isObject(d.jobs) ? Object.entries(d.jobs) : [];
+    const etapes = jobs.flatMap(([nom, j]) => {
+      if (!isObject(j) || !Array.isArray(j.steps)) return [];
+      const job: JobCI = { nom, si: j.if, dossier: defautWd(j) ?? wdWorkflow };
+      return j.steps.filter(isObject).map((st, i) => classer(st, i, root, job));
+    });
     out.push({ fichier: `${WORKFLOWS}/${f}`, etapes });
   }
   return out;
@@ -166,22 +238,35 @@ export function workflowsCI(root: string): WorkflowCI[] {
 const refus = (etape: string, r: Sortie & { signal?: NodeJS.Signals | null }) =>
   new RafError(`release : la CI de publication rejouée dans un clone neuf est rouge, rien n'est écrit — ${etape} (code ${r.status ?? r.signal ?? r.error?.message ?? '?'})\n${queueSortie(texteSortie(r))}`);
 
-/** Variables qui portent un identifiant, ou que la session, un hook ou un script appelant ont posées (CADENCE_*, GIT_*, npm_* ou NPM_*, RAF_*). */
-const VARIABLE_RETIREE = /^(CADENCE_|GIT_|RAF_|NPM_|GH_|GITHUB_|SSH_AUTH_SOCK$|SSH_AGENT_PID$|XDG_CONFIG_HOME$)|TOKEN|SECRET|PASSW|CREDENTIAL|API_KEY/i;
+/**
+ * Revue L698 r2 (D-17) : une liste noire laissait passer KUBECONFIG (le cluster de production), DOCKER_HOST, NETRC, AWS_*… Seules ces
+ * variables de l'appelant sont transmises ; toutes les autres sont retirées. Aucune ne porte d'accès : le chemin des commandes, la langue,
+ * le terminal, le fuseau, le dossier temporaire, le nom de l'utilisateur, son shell, et le refus du cache de compilation de node.
+ */
+const VARIABLE_TRANSMISE = /^(PATH|LANG|LANGUAGE|LC_[A-Z]+|TERM|TZ|TMPDIR|USER|LOGNAME|SHELL|NODE_DISABLE_COMPILE_CACHE)$/;
+/** Commandes qui atteignent une machine avec les accès de l'utilisateur sans passer par HOME (ssh lit ~/.ssh par passwd) : coupées en tête du PATH. */
+const COMMANDES_COUPEES = ['ssh', 'scp', 'sftp', 'rsync', 'kubectl', 'helm', 'gh', 'docker'];
 
 /**
- * L'environnement du runner, sans aucun identifiant de l'utilisateur (revue L698 r1, D-16) : HOME vide et temporaire, qui ne porte que
- * l'identité git que la CI se donne (`git config --global user.*`), donc ni ~/.npmrc, ni ~/.gitconfig, ni assistant d'identifiants ;
- * npmrc global vide, ssh désactivé pour git, aucune invite ; NPM_TOKEN, NODE_AUTH_TOKEN, GH_TOKEN, GITHUB_TOKEN et toute variable
- * *TOKEN*, *SECRET*, *PASSWORD*, *CREDENTIAL*, *API_KEY* retirés. Le cache npm (paquets publics, sans identifiant) reste partagé, pour
- * que npm ci ne retélécharge pas tout. Puis `CI` et les variables GITHUB_* que les étapes lisent (le tag dans GITHUB_REF_NAME, RUNNER_TEMP…).
+ * L'environnement du runner, sans aucun accès de l'utilisateur (revues L698 r1 et r2, D-16 et D-17) : seules les variables de
+ * VARIABLE_TRANSMISE passent ; HOME vide et temporaire, qui ne porte que l'identité git que la CI se donne (`git config --global user.*`),
+ * donc ni ~/.npmrc, ni ~/.gitconfig, ni ~/.kube, ni assistant d'identifiants ; XDG_CONFIG_HOME et GIT_CONFIG_GLOBAL dans ce HOME, configuration
+ * git système ignorée, ssh désactivé pour git, aucune invite ; npmrc global vide ; les COMMANDES_COUPEES remplacées en tête du PATH par une
+ * cale qui échoue. Le cache npm (paquets publics, sans identifiant) reste partagé, pour que npm ci ne retélécharge pas tout. Puis `CI` et
+ * les variables GITHUB_* que les étapes lisent (le tag dans GITHUB_REF_NAME, RUNNER_TEMP…).
  */
 function environnementCI(tmp: string, clone: string, version: string): NodeJS.ProcessEnv {
   const cache = process.env.npm_config_cache ?? process.env.NPM_CONFIG_CACHE ?? join(homedir(), '.npm');
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !VARIABLE_RETIREE.test(k)));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => VARIABLE_TRANSMISE.test(k)));
   const home = join(tmp, 'home');
   mkdirSync(home);
   writeFileSync(join(home, '.gitconfig'), '[user]\n\tname = cadence-ci\n\temail = cadence-ci@cadence.invalid\n');
+  const coupees = join(tmp, 'coupees');
+  mkdirSync(coupees);
+  for (const c of COMMANDES_COUPEES) {
+    writeFileSync(join(coupees, c), `#!/bin/sh\necho "cadence release : ${c} est coupé pendant le rejeu de la CI de publication (aucun accès de l'utilisateur)" >&2\nexit 126\n`);
+    chmodSync(join(coupees, c), 0o755);
+  }
   const npmrcGlobal = join(tmp, 'npmrc-global');
   writeFileSync(npmrcGlobal, '');
   const runnerTemp = join(tmp, 'runner-temp');
@@ -192,8 +277,8 @@ function environnementCI(tmp: string, clone: string, version: string): NodeJS.Pr
     writeFileSync(fichiers[variable], '');
   }
   return {
-    ...env, ...fichiers, HOME: home, XDG_CONFIG_HOME: join(home, '.config'),
-    GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'false',
+    ...env, ...fichiers, PATH: env.PATH ? `${coupees}:${env.PATH}` : coupees, HOME: home, XDG_CONFIG_HOME: join(home, '.config'),
+    GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'false',
     npm_config_userconfig: join(home, '.npmrc'), npm_config_globalconfig: npmrcGlobal, npm_config_cache: cache,
     CI: 'true', GITHUB_REF: `refs/tags/v${version}`, GITHUB_REF_NAME: `v${version}`, GITHUB_REF_TYPE: 'tag', GITHUB_WORKSPACE: clone, RUNNER_TEMP: runnerTemp,
   };
@@ -233,23 +318,26 @@ function clonerCommitDeVersion(root: string, clone: string, cv: CommitDeVersion)
   if (tag.status !== 0) throw refus(`git tag v${cv.version} dans le clone`, tag);
 }
 
+/** Joue une étape reconnue dans son dossier du clone, sans shell ; lève au premier code non nul. */
+function jouerEtape(fichier: string, e: EtapeCI & { commandes: string[][] }, clone: string, env: NodeJS.ProcessEnv, out: (l: string) => void): void {
+  const debut = Date.now();
+  const dans = e.dossier ? ` (dans ${e.dossier})` : '';
+  for (const [cmd, ...args] of e.commandes) {
+    const r = spawnSync(cmd, args, { cwd: join(clone, e.dossier ?? ''), env, encoding: 'utf8', maxBuffer: 64 << 20, timeout: ETAPE_MS });
+    if (r.status !== 0) throw refus(`${fichier}, étape « ${e.nom} »${dans}`, { ...r, stdout: `$ ${[cmd, ...args].join(' ')}\n${r.stdout ?? ''}` });
+  }
+  out(`  ✓ ${e.nom}${dans} (${Math.round((Date.now() - debut) / 1000)} s)`);
+}
+
 /** Rejoue les étapes reconnues de chaque workflow dans le clone, sans shell ; lève au premier rouge. */
 function rejouerCI(tmp: string, clone: string, workflows: WorkflowCI[], version: string, out: (l: string) => void): void {
   const env = environnementCI(tmp, clone, version);
-  out('Rejeu dans un environnement sans identifiants : HOME vide et temporaire, ni .npmrc ni configuration git de l\'utilisateur, jetons retirés, origin du clone vers un chemin inexistant');
+  out(`Rejeu dans un environnement sans identifiants : HOME vide et temporaire, variables transmises : liste blanche (PATH, LANG, LC_*, TERM, TZ, TMPDIR, USER, LOGNAME, SHELL, NODE_DISABLE_COMPILE_CACHE), ${COMMANDES_COUPEES.join(', ')} coupés, ni .npmrc ni configuration git de l'utilisateur, origin du clone vers un chemin inexistant`);
   for (const wf of workflows) {
     out(`CI de publication rejouée dans un clone neuf du commit de version (${wf.fichier}, tag v${version}) :`);
     for (const e of wf.etapes) {
-      if (e.sautee !== undefined) {
-        out(`  – non rejouée : ${e.nom} (${e.sautee})`);
-        continue;
-      }
-      const debut = Date.now();
-      for (const [cmd, ...args] of e.commandes) {
-        const r = spawnSync(cmd, args, { cwd: clone, env, encoding: 'utf8', maxBuffer: 64 << 20, timeout: ETAPE_MS });
-        if (r.status !== 0) throw refus(`${wf.fichier}, étape « ${e.nom} »`, { ...r, stdout: `$ ${[cmd, ...args].join(' ')}\n${r.stdout ?? ''}` });
-      }
-      out(`  ✓ ${e.nom} (${Math.round((Date.now() - debut) / 1000)} s)`);
+      if (e.sautee !== undefined) out(`  – non rejouée : ${e.nom} (${e.sautee})`);
+      else jouerEtape(wf.fichier, e, clone, env, out);
     }
   }
 }
@@ -258,7 +346,7 @@ function rejouerCI(tmp: string, clone: string, workflows: WorkflowCI[], version:
 function listerCI(workflows: WorkflowCI[], out: (l: string) => void): void {
   for (const wf of workflows) {
     out(`CI de publication (${wf.fichier}) : --dry-run ne la rejoue pas ; sans --dry-run, rejouée dans un clone neuf du commit de version :`);
-    for (const e of wf.etapes) out(e.sautee !== undefined ? `  – non rejouée : ${e.nom} (${e.sautee})` : `  ▸ ${e.nom}`);
+    for (const e of wf.etapes) out(e.sautee !== undefined ? `  – non rejouée : ${e.nom} (${e.sautee})` : `  ▸ ${e.nom}${e.dossier ? ` (dans ${e.dossier})` : ''}`);
   }
 }
 

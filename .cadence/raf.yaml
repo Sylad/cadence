@@ -3207,10 +3207,12 @@ lots:
     finished: 2026-11-11
   - id: L698
     title: "Avant le tag, rejouer la CI de publication (publish.yml : npm ci + prepublishOnly) dans un clone neuf, plus un test statique du champ files de package.json (D-7, erreur 2 : 7 des 10 casses passées viennent de la CI, que L696 ne couvre pas)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-10
     started: 2026-11-11
+    review: { date: 2026-11-11, verdict: "conforme (r3) : rejeu de la CI de publication sans shell, en liste blanche, sans identifiants (cluster, ssh, npm, git inaccessibles), cycle de vie de npm ci contrôlé ; 1 majeur restant (--ws et motifs de workspaces imbriqués contournent le contrôle des scripts de workspace) reporté en L702 : sans identifiants, un tel script ne peut ni publier ni pousser ; porte verte à 0b990f0", commit: 0b990f06d56ed934137cb171366cbb1c05cf3578 }
+    finished: 2026-11-11
   - id: L699
     title: "cadence run : choix du modèle (D-13) — option --modele <opus|fable|sonnet|haiku> et variable CADENCE_RUN_MODELE, défaut inchangé (opus) ; la ligne de lancement dit le modèle réellement utilisé ; test : le modèle demandé arrive dans la commande claude des deux bras (léger, complet)"
     status: done
@@ -3227,6 +3229,11 @@ lots:
     created: 2026-11-11
   - id: L701
     title: "cadence run inscrit au registre des demandes les consignes du lead (D-8 à D-12, D-14 du 10-11 : briefs de correction) comme si elles venaient de l'humain ; le registre ne doit garder que les demandes de l'humain : ne rien inscrire quand la demande vient du lead (option ou marqueur), ou les inscrire à part ; mesure : 0 entrée de registre créée par un brief du lead"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-11
+  - id: L702
+    title: "release-ci, défense en profondeur (suites de la revue L698 r3) : npm run/test --ws et motifs de workspaces imbriqués contournent le contrôle des scripts de workspace ; working-directory en lien symbolique vers l'extérieur du clone ; tests pour chaque cas"
     status: todo
     estimate: 0.25
     created: 2026-11-11

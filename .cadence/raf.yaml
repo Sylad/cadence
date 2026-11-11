@@ -3166,9 +3166,10 @@ lots:
     finished: 2026-11-10
   - id: L693
     title: "Calculateur de coût sans modèle (D-7) : estimer avant tout banc le coût et le temps d'un mécanisme d'après les règles connues (contexte renvoyé à chaque échange, cache lu ≈10 % et écrit, prix par modèle, nombre d'échanges, socle chargé) ; mesure : prédiction à ±20 % des coûts réels du banc 2026-11-10-1551 (neuve 8,4 et 9,1 $, seuil 31,5 et 29,7 $)"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-10
+    started: 2026-11-11
   - id: L694
     title: "Socle chargé à chaque session (D-7) : mesurer en tokens ce que chaque session lancée par cadence charge avant son premier geste (CLAUDE.md, MEMORY.md, skills, agents, brief) et proposer les coupes ; mesure : tokens du socle avant/après"
     status: todo
@@ -3234,10 +3235,12 @@ lots:
     finished: 2026-11-11
   - id: L701
     title: "cadence run inscrit au registre des demandes les consignes du lead (D-8 à D-12, D-14 du 10-11 : briefs de correction) comme si elles venaient de l'humain ; le registre ne doit garder que les demandes de l'humain : ne rien inscrire quand la demande vient du lead (option ou marqueur), ou les inscrire à part ; mesure : 0 entrée de registre créée par un brief du lead"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-11
     started: 2026-11-11
+    review: { date: 2026-11-11, verdict: "conforme (r2) : le registre ne garde que les demandes de l'humain ; --registre D-n complète l'entrée sans en créer, entrées des consignes du lead abandonnées texte intact ; 2 mineurs en notes ; porte verte à 27e3f25", commit: 27e3f25d164d57a2c2cfdf4c125ff4160b38df23 }
+    finished: 2026-11-11
   - id: L702
     title: "release-ci, défense en profondeur (suites de la revue L698 r3) : npm run/test --ws et motifs de workspaces imbriqués contournent le contrôle des scripts de workspace ; working-directory en lien symbolique vers l'extérieur du clone ; tests pour chaque cas"
     status: todo

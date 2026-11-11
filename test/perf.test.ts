@@ -1551,9 +1551,9 @@ describe('cadence perf — coût par lot livré (R8, R9, R10, R12)', () => {
     expect(data.cost.perDelivered.current).toBeCloseTo(0.6, 9);
   });
 
-  it('R8 — étape avec counted seul à 1 M : 0,9 M entrée et 0,1 M sortie, cacheRead 0', async () => {
+  it('R8 — étape avec counted seul à 1 M : 0,9 M écrits en cache et 0,1 M sortie, cacheRead 0 (L704)', async () => {
     const { data } = await cost({ A0: [impl({ counted: M })] });
-    expect(data.cost.perDelivered.current).toBeCloseTo(0.9 * 3 + 0.1 * 15, 9);
+    expect(data.cost.perDelivered.current).toBeCloseTo(0.9 * 6 + 0.1 * 15, 9);
   });
 
   it('R8 — étape aux quatre compteurs : le compteur counted n\'est pas réparti', async () => {

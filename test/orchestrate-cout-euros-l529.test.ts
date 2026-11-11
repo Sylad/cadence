@@ -107,11 +107,12 @@ describe('L529 — estimation en euros du --dry-run', () => {
   it('R6 — --dry-run annonce, à côté du budget du lot, son estimation en euros, et le total de la vague', async () => {
     const r = await dry(world(PRICED), ['a:L1', 'a:L2', '--dry-run']);
     try {
-      // L1 : 750 000 comptés × (0,9 × 3 + 0,1 × 15) / 1 M = 3,15 ; L2 : 600 000 → 2,52 ; total 5,67
+      // L704 : la part écrite au prix d'écriture de cache (entrée × 2 sans cacheWrite). L1 : 750 000 comptés × (0,9 × 6 + 0,1 × 15) / 1 M = 5,175, affiché 5,17
+      // (toFixed d'un flottant juste sous 5,175) ; L2 : 600 000 → 4,14 ; total 9,31
       expect(r.text).toContain('budget du lot : 750000 tokens comptés');
-      expect(r.text).toMatch(/estimation du lot : 3,15/);
-      expect(r.text).toMatch(/estimation du lot : 2,52/);
-      expect(r.text).toMatch(/estimation de la vague : 5,67/);
+      expect(r.text).toMatch(/estimation du lot : 5,17/);
+      expect(r.text).toMatch(/estimation du lot : 4,14/);
+      expect(r.text).toMatch(/estimation de la vague : 9,31/);
     } finally {
       removeDryRunBriefs(r.text);
     }

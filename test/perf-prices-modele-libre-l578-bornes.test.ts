@@ -52,8 +52,8 @@ describe('L578 bornes — stepEuros, nom de modèle quelconque', () => {
     expect(stepEuros({ model: 'fable', usage: use(1e6, 1e6) }, GRID)).toBeCloseTo(30);
     expect(stepEuros({ model: 'claude-opus-4-7', usage: use(1e6) }, GRID)).toBeCloseTo(15);
   });
-  it('compteur seul (counted) chiffré au prix du modèle libre : 90 % entrée, 10 % sortie', () => {
-    expect(stepEuros({ model: 'fable', counted: 1e6 }, GRID)).toBeCloseTo(0.9 * 10 + 0.1 * 20);
+  it('compteur seul (counted) chiffré au prix du modèle libre : 90 % écrits en cache (entrée × 2 sans cacheWrite, L704), 10 % sortie', () => {
+    expect(stepEuros({ model: 'fable', counted: 1e6 }, GRID)).toBeCloseTo(0.9 * 20 + 0.1 * 20);
   });
   it('sumEuros : une étape sans prix parmi des chiffrées → null', () => {
     expect(sumEuros([{ model: 'fable', usage: use(1e6) }, { model: 'zz', usage: use(1) }], GRID)).toBeNull();
@@ -198,10 +198,10 @@ describe('L578 bornes — orchestrate cout', () => {
     writeFileSync(join(d, 'cadence.yaml'), 'perf:\n  currency: USD\n  prices:\n    fable: { input: 10, output: 20, cacheRead: 1 }\n');
     const lots = [mk('L1', 'fable', [], 1_000_000), mk('L2', 'zz', [], 10), mk('L3', 'zz', [], 10)];
     const out = estimateLines(lots, d, () => {});
-    expect(out[0]).toMatch(/11,00 USD/);
+    expect(out[0]).toMatch(/20,00 USD/); // 0,9 M écrits × 20 (entrée × 2) + 0,1 M × 20 (L704)
     expect(out[1]).toContain('n/d (zz sans prix dans perf.prices)');
     const wave = out[out.length - 1]!;
-    expect(wave).toContain('11,00 USD');
+    expect(wave).toContain('20,00 USD');
     expect(wave).toContain('n/d pour 2 lots, modèle sans prix : zz');
     expect(wave.match(/zz/g)).toHaveLength(1);
   });

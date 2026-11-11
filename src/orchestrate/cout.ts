@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { cacheWriteWarning, readPerfSettings, type PerfConfig, type PriceGrid } from '../perf-config.js';
-import { COUNTED_INPUT_SHARE, euros, missingModels, stepEuros, sumEuros, waveEuros } from '../cost.js';
+import { COUNTED_WRITE_SHARE, euros, missingModels, stepEuros, sumEuros, waveEuros } from '../cost.js';
 import { RafError } from '../plan.js';
 import type { LotState } from './state.js';
 
@@ -29,7 +29,8 @@ const unknownText = (n: number, models: string[]) => `n/d pour ${n} lot${n > 1 ?
 
 /**
  * L'estimation en euros de `--dry-run` : une ligne par lot puis une pour la vague. Le budget du lot (entrée + écriture de cache + sortie, mesuré au p90)
- * est chiffré au modèle d'écriture du lot, `COUNTED_INPUT_SHARE` en entrée : la lecture de cache et les étapes d'un autre modèle (revue) n'y sont pas.
+ * est chiffré au modèle d'écriture du lot, `COUNTED_WRITE_SHARE` en écriture de cache au prix de la grille de `cadence cost` (L704), le reste en sortie : la lecture de cache
+ * et les étapes d'un autre modèle (revue) n'y sont pas.
  * Vide sans grille.
  */
 export function estimateLines(lots: LotState[], launch: string, warn: (line: string) => void): string[] {
@@ -39,7 +40,7 @@ export function estimateLines(lots: LotState[], launch: string, warn: (line: str
     const e = stepEuros({ model: l.model, counted: l.budget ?? 0 }, prices);
     return typeof e === 'number' ? e : null;
   });
-  const out = lots.map((l, i) => `${l.project}:${l.lot} — estimation du lot : ${per[i] === null ? `n/d (${l.model} sans prix dans perf.prices)` : `${euros(per[i]!, currency)} (budget de ${l.budget ?? 0} tokens au prix ${l.model}, ${Math.round(COUNTED_INPUT_SHARE * 100)} % en entrée)`}`);
+  const out = lots.map((l, i) => `${l.project}:${l.lot} — estimation du lot : ${per[i] === null ? `n/d (${l.model} sans prix dans perf.prices)` : `${euros(per[i]!, currency)} (budget de ${l.budget ?? 0} tokens au prix ${l.model}, ${Math.round(COUNTED_WRITE_SHARE * 100)} % en écriture de cache)`}`);
   const sum = waveEuros(per);
   const unpriced = [...new Set(lots.filter((_, i) => per[i] === null).map((l) => l.model))];
   out.push(`estimation de la vague : ${euros(sum.total, currency)}${sum.unknown ? ` (${unknownText(sum.unknown, unpriced)})` : ''} — base : le budget de chaque lot, mesuré au p90 comme lui`);

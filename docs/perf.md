@@ -84,7 +84,7 @@ Without `perf.prices` (absent or empty) the cost is `n/d` and a warning says whe
 The same grid prices the waves (L529, [orchestrate](orchestrate.md#cost-in-euros-before-and-after-a-wave-l529)): `orchestrate --dry-run` announces an estimate in euros per lot and for the wave, the final table and `--status` print the real cost.
 
 **Cost of a step** = `input` × input price + `cacheWrite` × cacheWrite price + `output` × output price + `cacheRead` × cacheRead price, per million tokens, at the price of the step's own model, the rule of `cadence cost` (L704; until then a write was priced at the input price, half its one-hour price, while writes were a third of the cost of the bench 2026-11-10-1551). Assumptions written in the sheet (`docs/specs/perf-tokens-delais-cout/fiche.yaml`, R8):
-a step that only carries `counted` (an old journal) is split 90 % input, 10 % output, no cache read;
+a step that only carries `counted` (an old journal) is split 90 % cache write, 10 % output, no cache read (`counted` is input + cache writes + output, and the input outside the cache, about a hundred tokens per session, is neglected as in `cadence cost`; L704, it used to be 90 % input);
 a step without any readable token costs 0 € (the lot stays in the population); a `local` step costs 0 € whatever its counters (outside quota and budget) and needs no price.
 A lot with a step of a model that has no price in the grid (or no readable `model`, named `inconnu`) is never priced without it: it is left out of the cost, counted apart, and a warning on the error output names the model and the number of lots; delivered lots without any journal are counted aside (`N lot(s) livré(s) sans journal`). No `⚠` on a cost that is `n/d`.
 

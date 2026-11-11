@@ -66,8 +66,9 @@ describe('L529 bornes — estimation et coût', () => {
     const dir = tempDir();
     writeFileSync(join(dir, 'cadence.yaml'), 'perf:\n  currency: $\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n');
     const txt = estimateLines([mk('L1', 'sonnet', [], 1e6)], dir, () => {}).join('\n');
-    expect(txt).toMatch(/estimation du lot : 4,20 \$ /);
-    expect(txt).toContain('estimation de la vague : 4,20 $');
+    // 0,9 M écrits × 6 (entrée × 2) + 0,1 M × 15 (L704)
+    expect(txt).toMatch(/estimation du lot : 6,90 \$ /);
+    expect(txt).toContain('estimation de la vague : 6,90 $');
     expect(launchPrices(dir, () => {})).toEqual({ sonnet: { input: 3, output: 15, cacheRead: 0.3 } });
   });
 

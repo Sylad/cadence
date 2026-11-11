@@ -1,8 +1,11 @@
 import { cacheWritePrice, type ModelPrice, type PriceGrid } from './perf-config.js';
 import type { JournalStep } from './corrections.js';
 
-/** Part de `counted` rangée en entrée quand une étape ne porte que ce compteur (journal ancien, ou budget d'un lot annoncé en euros) : le reste est en sortie (R8 b de L226). */
-export const COUNTED_INPUT_SHARE = 0.9;
+/**
+ * Part de `counted` rangée en écriture de cache quand une étape ne porte que ce compteur (journal ancien, ou budget d'un lot annoncé en euros) : le reste est en sortie
+ * (R8 b de L226). `counted` = entrée + écriture + sortie, et l'entrée hors cache (une centaine de tokens par session) est négligée comme dans `cadence cost` (L704).
+ */
+export const COUNTED_WRITE_SHARE = 0.9;
 
 /** Ce que le coût lit d'une étape : son modèle et ses compteurs (les quatre, ou le seul `counted`). */
 type CostStep = Pick<JournalStep, 'model' | 'usage' | 'counted'>;
@@ -10,7 +13,7 @@ type CostStep = Pick<JournalStep, 'model' | 'usage' | 'counted'>;
 /** Coût d'une étape (R8 de L226), au prix du modèle que son journal enregistre (L578), l'écriture de cache à son prix (L704, la grille de `cadence cost`) ; le nom du modèle sans prix quand il en faudrait un (`inconnu` sans modèle lisible). */
 export function stepEuros(step: CostStep, prices: PriceGrid): number | { missing: string } {
   if (step.model === 'local') return 0;
-  const usage = step.usage ?? (step.counted === undefined ? null : { input: COUNTED_INPUT_SHARE * step.counted, cacheWrite: 0, cacheRead: 0, output: (1 - COUNTED_INPUT_SHARE) * step.counted });
+  const usage = step.usage ?? (step.counted === undefined ? null : { input: 0, cacheWrite: COUNTED_WRITE_SHARE * step.counted, cacheRead: 0, output: (1 - COUNTED_WRITE_SHARE) * step.counted });
   if (!usage) return 0;
   const name = typeof step.model === 'string' && step.model !== '' ? step.model : 'inconnu';
   const price: ModelPrice | undefined = name !== 'inconnu' && Object.hasOwn(prices, name) ? prices[name] : undefined;

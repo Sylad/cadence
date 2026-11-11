@@ -23,3 +23,9 @@
 - Sans option : consigne du lead, rien n'entre dans `.cadence/demandes/` (lignes du brief v2d sur le registre retirées, porte qui refuse tout fichier du registre touché). `--demande-humaine` inscrit la demande sous le D-<n> suivant ; `--registre D-n` complète une entrée commitée (lot, id du run).
 - Revue r1 : avec `--registre D-n`, le brief v2d perd seulement « Crée une entrée pour CHAQUE demande » (lecture et relecture du registre gardées, test sur le brief rendu en mode complet) ; la porte refuse toute entrée **neuve** autre que D-n (`git diff --diff-filter=A`), reprise une fois sinon porte-rouge. Passer une autre entrée à « livrée » reste permis. `--demande-humaine` garde le brief entier.
 - D-8 à D-12, D-14, D-16, D-17 et D-18 : `abandonnée`, raison « consigne du lead, pas une demande de l'humain », texte intact, ancien état dans `etat_avant_abandon`.
+
+## Coût : une seule grille pour perf, orchestrate et cadence cost (L704, revue r1)
+
+- `stepEuros` (src/cost.ts) chiffre l'écriture de cache à `cacheWritePrice` (cacheWrite de `perf.prices`, sinon entrée × 2, avec avertissement) : perf, table et `--status` d'orchestrate, `cadence cost`.
+- Décision revue r1 : une étape qui ne porte que `counted` (journal ancien) **et** le budget chiffré par `orchestrate --dry-run` se répartissent `COUNTED_WRITE_SHARE` = 90 % en écriture de cache, 10 % en sortie (l'entrée hors cache, une centaine de tokens, est négligée comme dans `cadence cost`). Avant : 90 % au prix d'entrée.
+- Écran : `a:L1 — estimation du lot : 5,17 € (budget de 750000 tokens au prix sonnet, 90 % en écriture de cache)`. Test : test/orchestrate-estimation-cache-l704.test.ts.

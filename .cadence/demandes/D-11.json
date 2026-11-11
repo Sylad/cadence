@@ -3,9 +3,12 @@
  "texte": "Erreur 2 du relevé des erreurs récurrentes (pièce jointe, section 2) : des versions publiées cassées ou rouges en CI (1.22.0, 1.25.0, 1.34.0, 1.40 à 1.42, 1.59, 1.61, 2.0.0, 2.0.1), chaque correctif n'ayant bouché qu'un cas. Blocage voulu : avant de poser le tag, cadence release fait npm pack, installe le paquet dans un dossier vide et joue des commandes de fumée (cadence --help, cadence run --help, raf --help, cadence2 --help au minimum, et ce que la section 2 du relevé cite comme cassé) ; refus de la release si l'une échoue, avec la commande et sa sortie.",
  "date": "2026-11-10",
  "origine": "demande cadence run, pièce jointe tmp/erreurs-recurrentes-2026-11-10.md",
- "etat": "livrée",
+ "etat": "abandonnée",
  "lots": [
   "L696"
  ],
- "preuve": "test/release-fumee-l696.test.ts (6 verts ; rouge avant le code : module absent) ; fumée réelle de ce dépôt : HEAD vert en 9 s (6 commandes), v2.0.1 refusée (« $ cadence run --help (code 1) », et run léger seul : « ENOENT … v2/briefs/bras-A.md »), v2.0.2 verte ; tsc et qualite.mjs --contre main verts ; suite complète verte (voir commit)"
+ "preuve": "test/release-fumee-l696.test.ts (6 verts ; rouge avant le code : module absent) ; fumée réelle de ce dépôt : HEAD vert en 9 s (6 commandes), v2.0.1 refusée (« $ cadence run --help (code 1) », et run léger seul : « ENOENT … v2/briefs/bras-A.md »), v2.0.2 verte ; tsc et qualite.mjs --contre main verts ; suite complète verte (voir commit)",
+ "etat_avant_abandon": "livrée",
+ "raison": "consigne du lead, pas une demande de l'humain",
+ "abandon": "2026-11-11, L701 (demande de Sylvain : le registre ne garde que les demandes de l'humain)"
 }

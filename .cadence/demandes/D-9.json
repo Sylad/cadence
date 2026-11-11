@@ -3,9 +3,12 @@
  "texte": "Erreur 1 du relevé des erreurs récurrentes (pièce jointe, section 1) : le lead commite ou écrit le plan sur la branche principale pendant qu'un programme (cadence run, vague, porte, release) y travaille, ≥12 fois du 26-10 au 06-11 ; en v2 cadence run intègre en --ff-only et un commit du lead fait échouer le run. Blocage voulu : hook pre-commit posé par raf hook install qui refuse ce commit tant que le dépôt est tenu, avec le geste à faire ; raf add/note/done écrivent alors dans .cadence/plan-en-attente.yaml, appliqué après l'intégration ; test e2e du scénario complet.",
  "date": "2026-11-10",
  "origine": "demande cadence run, pièce jointe tmp/erreurs-recurrentes-2026-11-10.md",
- "etat": "livrée",
+ "etat": "abandonnée",
  "lots": [
   "L695"
  ],
- "preuve": "test/depot-tenu-l695.test.ts (6 verts ; l'e2e rouge sans le refus du pre-commit) : faux cadence run, raf note mis en attente, git commit du lead sur main refusé, run intégré, note appliquée ; suite complète 583 fichiers, 9798 verts, 0 rouge (après mise au type isCollapsed des tests du mod cadence-hud)"
+ "preuve": "test/depot-tenu-l695.test.ts (6 verts ; l'e2e rouge sans le refus du pre-commit) : faux cadence run, raf note mis en attente, git commit du lead sur main refusé, run intégré, note appliquée ; suite complète 583 fichiers, 9798 verts, 0 rouge (après mise au type isCollapsed des tests du mod cadence-hud)",
+ "etat_avant_abandon": "livrée",
+ "raison": "consigne du lead, pas une demande de l'humain",
+ "abandon": "2026-11-11, L701 (demande de Sylvain : le registre ne garde que les demandes de l'humain)"
 }

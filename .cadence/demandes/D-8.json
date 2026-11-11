@@ -3,9 +3,12 @@
  "texte": "Corriger les 3 défauts majeurs de la revue L690 (pièce jointe) : (1) passage.ts lignesEtape — pour un bras qui reprend sa session, ne garder que les lignes de l'étape (horodatage ≥ début de l'étape), sinon fuites comptées à chaque étape et lectures classées après écriture ; (2) test passage : l'étape k d'un bras suite reprend la dernière session de l'étape k-1, un bras sans suite reste en session neuve ; (3) docs/v2/banc.md : décrire la clé suite (gardee, compactee, seuil 150 k) et corriger « session neuve par demande ». Ne pas ajouter d'option cadence run --suite.",
  "date": "2026-11-10",
  "origine": "demande cadence run, pièce jointe tmp/revues/L690-r1.md",
- "etat": "livrée",
+ "etat": "abandonnée",
  "lots": [
   "L690"
  ],
- "preuve": "v2/src/sequence/passage.ts lignesEtape (lignes horodatées depuis le début de l'étape pour un journal repris) ; test « L690 : l'étape k d'un bras suite reprend… » de v2/test/passage.test.ts, rouge avant le correctif (fuite de l'étape 1 recomptée à l'étape 2), vert après ; docs/v2/banc.md (clé suite) ; v2 : 443/443 verts sans les variables CADENCE_* héritées de la session ; racine : 9790 verts, 2 rouges dus à ces variables héritées"
+ "preuve": "v2/src/sequence/passage.ts lignesEtape (lignes horodatées depuis le début de l'étape pour un journal repris) ; test « L690 : l'étape k d'un bras suite reprend… » de v2/test/passage.test.ts, rouge avant le correctif (fuite de l'étape 1 recomptée à l'étape 2), vert après ; docs/v2/banc.md (clé suite) ; v2 : 443/443 verts sans les variables CADENCE_* héritées de la session ; racine : 9790 verts, 2 rouges dus à ces variables héritées",
+ "etat_avant_abandon": "livrée",
+ "raison": "consigne du lead, pas une demande de l'humain",
+ "abandon": "2026-11-11, L701 (demande de Sylvain : le registre ne garde que les demandes de l'humain)"
 }

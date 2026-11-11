@@ -10,7 +10,7 @@ describe('cadence run', () => {
     let vu = { deps: false };
     const exec = fauxClaude([(cwd, a, e) => { vu.deps = existsSync(join(cwd, 'node_modules', 'dep', 'index.js')); commite('fait.txt', 'pour plus tard : un export')(cwd); void a; void e; }], appels);
     const { l, out } = io();
-    const e = executerRun({ repo, demande: 'Crée fait.txt', pieces: ['cadence.yaml'], exec, out });
+    const e = executerRun({ repo, demande: 'Crée fait.txt', pieces: ['cadence.yaml'], registre: 'humaine', exec, out }); // L701 : une demande de l'humain
     expect(e.etat).toBe('integre');
     expect(vu.deps).toBe(true);
     expect(git(repo, 'log', '--oneline', '-1')).toMatch(/ajoute fait.txt/);

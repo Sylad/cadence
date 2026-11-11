@@ -120,6 +120,7 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/sequence/mesures.ts': ['porcelain', 'others', 'exclude-standard', 'reporter', 'outputFile', 'yes', 'reporters', 'output', 'silent', 'ignore', 'name-only', 'gitignore'], // flags git, vitest et jscpd (S2, S7 : --gitignore), aucune option de cadence2
   'src/run/run.ts': ['show-toplevel', 'count', 'abort', 'abbrev-ref', 'short', 'ff-only', 'force', 'resume'], // git et claude --resume (reprise de la même session)
   'src/run/cli.ts': ['show-toplevel'],
+  'src/registre.ts': ['name-only'], // git diff --name-only (L701 : le registre touché sans option)
   'src/bench/cli.ts': ['porcelain', 'oneline', 'reverse', 'format', 'binary'], // git status --porcelain, git log --oneline, git log --reverse --format=%s (Taille déclarée)
 };
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »

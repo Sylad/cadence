@@ -3,9 +3,12 @@
  "texte": "Erreur 2 du relevé des erreurs récurrentes (pièce jointe, section 2), suite de L696 : 7 des 10 versions cassées l'ont été dans la CI de publication, que l'essai du paquet installé ne couvre pas. Avant de poser le tag, cadence release rejoue dans un clone neuf du commit de version ce que joue .github/workflows/publish.yml (npm ci puis prepublishOnly, et toute étape de test ou de build du workflow), refuse la release si une étape échoue en donnant la commande et sa sortie, et nettoie le clone. Ajouter un test statique du champ files de package.json : chaque chemin déclaré existe après le build, et chaque bin déclaré y est couvert.",
  "date": "2026-11-11",
  "origine": "demande cadence run, pièce jointe tmp/erreurs-recurrentes-2026-11-10.md (section 2)",
- "etat": "vérifiée",
+ "etat": "abandonnée",
  "lots": [
   "L698"
  ],
- "preuve": "test/release-ci-l698.test.ts (8 verts ; rouge avant le code : module absent) et test/paquet-files-l698.test.ts (3 verts) ; src/release-ci.ts branché dans cadence release ; tests L446/L508 du pas clone imprimé mis à jour ; suite complète, tsc et qualite.mjs --contre main verts (commit 55f427e4) ; essai réel sur ce dépôt (capture .cadence-run/cadence-20261111140512-1974520.captures/release-reel-l698.txt) : cadence release patch rejoue publish.yml dans un clone neuf tagué v2.0.3 — tag ✓, CHANGELOG ✓, npm ci 8 s, prepublishOnly + npm pack --dry-run 351 s, 7 étapes listées non rejouées, 0 dossier cadence-ci-* restant, 6 min 8 s au total ; --dry-run liste les étapes en 8 s"
+ "preuve": "test/release-ci-l698.test.ts (8 verts ; rouge avant le code : module absent) et test/paquet-files-l698.test.ts (3 verts) ; src/release-ci.ts branché dans cadence release ; tests L446/L508 du pas clone imprimé mis à jour ; suite complète, tsc et qualite.mjs --contre main verts (commit 55f427e4) ; essai réel sur ce dépôt (capture .cadence-run/cadence-20261111140512-1974520.captures/release-reel-l698.txt) : cadence release patch rejoue publish.yml dans un clone neuf tagué v2.0.3 — tag ✓, CHANGELOG ✓, npm ci 8 s, prepublishOnly + npm pack --dry-run 351 s, 7 étapes listées non rejouées, 0 dossier cadence-ci-* restant, 6 min 8 s au total ; --dry-run liste les étapes en 8 s",
+ "etat_avant_abandon": "vérifiée",
+ "raison": "consigne du lead, pas une demande de l'humain",
+ "abandon": "2026-11-11, L701 (demande de Sylvain : le registre ne garde que les demandes de l'humain)"
 }

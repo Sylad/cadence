@@ -3,12 +3,12 @@
  "texte": "tient question bete, mais est ce que l'on ne devrait pas garder le context d'une session, si le nouveau lot est dans le même projet, quite à faire un compact si necessaire?",
  "date": "2026-11-10",
  "origine": "session du lead ; précisé par « et le context on peu pas le compacter via cadence? » ; essai /compact en -p --resume réussi le 10-11 ; « ok » au plan des 3 variantes",
- "etat": "ouverte",
+ "etat": "livrée",
  "lots": [
   "L690",
   "L703"
  ],
- "preuve": "L690 clos (revue r2 conforme, porte verte 3e00f1ac) ; banc 2026-11-10-1551-b4bcc9ea9150 : session gardée ×3,5 en coût sans gain de qualité établi, cadence run --suite non ajouté",
+ "preuve": "Mesures du 10-11 (coût corrigé) et du 11-11 : 4 répétitions, aucun gain ni perte stable de la session gardée ; --suite non ajouté (règle : aucun mécanisme sans gain mesuré).",
  "precisions": [
   {
    "date": "2026-11-10",
@@ -37,6 +37,10 @@
   {
    "date": "2026-11-11",
    "texte": "L703 livré : le banc séquence compte, pour une étape d'un bras qui reprend sa session, l'écart entre son dernier relevé et le dernier relevé de la même session avant elle (compactage et réponses compris). Les relevés réels du banc 2026-11-10-1551-b4bcc9ea9150 rejoués appel par appel donnent 10,01 et 9,08 $ (gardée), 8,42 et 9,14 $ (neuve), 24,9 M tokens en r1 (v2/test/bras.test.ts, fixture v2/test/fixtures/releves-banc-2026-11-10.json). La demande reste ouverte : la remesure courte de la session gardée, avec le banc corrigé, reste à faire."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "Remesure courte (banc corrigé par L703, run 2026-11-11-2122-616d97ccd73f, séquence aether-b68-court, 2 rép.), session gardée contre neuve : coût 7,03 contre 9,74 $ puis 10,67 contre 10,20 $ ; temps 1230 contre 1736 s puis 1331 contre 1927 s (gardée plus rapide de 30 %, alors que le 10-11 elle était plus lente de 24 et 39 %) ; tests cachés 7 contre 15 puis 15 contre 11 ; sorties attendues 3/8 contre 4/8 puis 3/8 contre 3/8 ; juge : neuve préférée puis indécis. Sur 4 répétitions en deux jours : ni gain ni perte stable, coût à peu près égal, temps dans le bruit (±35 %). Sans gain mesuré, --suite n'est pas ajouté ; la question peut revenir si une mesure plus longue ou un autre banc montre un écart."
   }
  ],
  "runs": [

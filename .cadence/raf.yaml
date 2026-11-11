@@ -3224,9 +3224,10 @@ lots:
     finished: 2026-11-10
   - id: L700
     title: "cadence run et quota (D-15) : reconnaître la fin de quota d'une session claude -p (texte « You've hit your weekly limit · resets … » et « Opus limit »), état quota avec l'heure de reprise au lieu d'echec, reprise automatique de la même session après la remise à zéro ; bascule sur Fable seulement sur une limite propre à Opus ; jauge hebdo (rate_limits.seven_day de la status line, déjà lue par cadence-hud) affichée par le HUD et lead tour ; mesure : 0 run en echec pour quota, 0 limite hebdo atteinte par surprise"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-11
+    started: 2026-11-11
   - id: L701
     title: "cadence run inscrit au registre des demandes les consignes du lead (D-8 à D-12, D-14 du 10-11 : briefs de correction) comme si elles venaient de l'humain ; le registre ne doit garder que les demandes de l'humain : ne rien inscrire quand la demande vient du lead (option ou marqueur), ou les inscrire à part ; mesure : 0 entrée de registre créée par un brief du lead"
     status: todo

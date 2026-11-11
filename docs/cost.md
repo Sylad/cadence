@@ -35,7 +35,7 @@ nothing on stdout, for an unreadable file, a malformed rollout (an unknown key, 
 | `cacheWriteFactor` | optional, the price of a cache write as a multiple of the input price, over the `cacheWrite` of the price; without either, 2 (the one-hour cache of Claude Code, with a warning when the grid lacks it), 1.25 for the five-minute cache |
 | `defaults` | optional, keys given to every session that does not set them |
 | `sessions[].exchanges` | calls to the model in the session (one tool turn is one call) |
-| `sessions[].base` | context sent with the first call: the base the session loads (system prompt, `CLAUDE.md`, tools, request) |
+| `sessions[].base` | context sent with the first call: the base the session loads (system prompt, `CLAUDE.md`, tools, request), measured post by post in [the base of a session](mesures/socle-session-2026-11-11.md) (L694) |
 | `sessions[].growth` | tokens added to the context by each call: the model's output plus the tool results |
 | `sessions[].output` | tokens produced per call (billed output, thinking included) |
 | `sessions[].kept` | share of the context sent again that is read from the cache, between 0 and 1; the rest is written to it |

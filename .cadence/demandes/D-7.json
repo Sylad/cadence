@@ -16,6 +16,10 @@
   {
    "date": "2026-11-11",
    "texte": "L693 livré (run 20261111190444-2449989) : cadence cost <déroulé> estime coût et tokens sans modèle (docs/cost.md). Preuve : test/cost-estimate-l693.test.ts, les quatre exécutions du banc 2026-11-10-1551 retrouvées à −7 à −10 % (neuve 7,86/8,42 et 8,23/9,14 $ ; gardée 9,18/10,01 et 8,41/9,08 $). Constat des journaux : le coût « session gardée » du banc (31,5 et 29,7 $) additionne des totaux cumulés ; le coût réel est 10,01 et 9,08 $. D-7 reste ouverte : L694 (socle chargé) est à faire."
+  },
+  {
+   "date": "2026-11-11",
+   "texte": "L694 livré (run 20261111211808-2649855) : socle d'une session cadence run mesuré dans les journaux de la semaine, 62 005 jetons poste par poste (docs/mesures/socle-session-2026-11-11.md) ; coupes C1–C4 côté cadence −15 947 jetons, 0,26 $ par lot (−11 %), U1–U3 côté ~/.claude seulement proposées. Preuve : test/socle-coupes-l694.test.ts. Aucune coupe appliquée. D-7 reste ouverte : L695, L696, L698."
   }
  ],
  "lots": [
@@ -26,6 +30,7 @@
   "L698"
  ],
  "runs": [
-  "20261111190444-2449989"
+  "20261111190444-2449989",
+  "20261111211808-2649855"
  ]
 }

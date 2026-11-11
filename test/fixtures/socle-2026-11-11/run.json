@@ -1,0 +1,19 @@
+{
+  "model": "claude-opus-5-5",
+  "prices": {
+    "input": 4,
+    "output": 20,
+    "cacheRead": 0.2,
+    "cacheWrite": 8
+  },
+  "sessions": [
+    {
+      "label": "cadence run, session médiane",
+      "exchanges": 37,
+      "base": 62448,
+      "growth": 2329,
+      "output": 854,
+      "kept": 0.97
+    }
+  ]
+}

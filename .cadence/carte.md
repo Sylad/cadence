@@ -49,3 +49,4 @@
   mieux (commit de version réel, tag, tous les scripts de prepublishOnly, prepare) avant d'écrire. Tests L446/L508 du clone imprimé mis à jour.
 - Test statique `test/paquet-files-l698.test.ts` : chaque chemin de `files` existe après le build (`npm run prepare` joué si dist/ manque), chaque `bin`
   existe et est couvert par un chemin de `files`.
+- Mesuré le 11-11 sur ce dépôt (capture `release-reel-l698.txt`) : `--dry-run` 8 s ; rejeu réel 6 min 8 s (npm ci 8 s, prepublishOnly + pack 351 s), clone retiré.

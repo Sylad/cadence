@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { workflowsCI } from '../src/release-ci.js';
@@ -23,6 +23,9 @@ fs.writeFileSync(process.env.ACME_TRACE, JSON.stringify({
   nonSuivi: fs.existsSync('non-suivi.txt'), prepare: fs.existsSync('prepare.txt'), ref: process.env.GITHUB_REF_NAME, ci: process.env.CI,
   whatsNew: fs.readFileSync('docs/whats-new.md', 'utf8'), cadenceVar: process.env.CADENCE_ESSAI ?? null, gitVar: process.env.GIT_AUTHOR_NAME ?? null,
   statut: sh('git status --porcelain'), head: sh('git rev-parse HEAD'),
+  home: process.env.HOME, homeFichiers: fs.readdirSync(process.env.HOME), origine: sh('git remote get-url origin'), refsOrigine: sh('git branch -r'), pousse: sh('git push -q origin HEAD:refs/heads/essai'), gitGlobal: sh('git config --global --list'),
+  jetons: ['NPM_TOKEN', 'NODE_AUTH_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'].filter((v) => process.env[v] !== undefined),
+  jetonNpm: sh('npm config get //registry.npmjs.org/:_authToken'),
 }));
 `;
 
@@ -58,10 +61,10 @@ jobs:
 `;
 
 /** Un paquet jouet sans dépendance, avec son workflow de publication ; `prepublishOnly` écrit la trace. */
-function paquet(o: { test?: string; workflow?: string | null; whatsNew?: string } = {}): string {
+function paquet(o: { test?: string; workflow?: string | null; whatsNew?: string; scripts?: Record<string, string> } = {}): string {
   const dir = gitRepo();
   const put = (f: string, t: string) => { mkdirSync(join(dir, f, '..'), { recursive: true }); writeFileSync(join(dir, f), t); };
-  const scripts = { prepublishOnly: 'node trace.cjs', prepare: 'node -e "require(\'fs\').writeFileSync(\'prepare.txt\', \'ok\')"', test: o.test ?? 'echo test' };
+  const scripts = { prepublishOnly: 'node trace.cjs', prepare: 'node -e "require(\'fs\').writeFileSync(\'prepare.txt\', \'ok\')"', test: o.test ?? 'echo test', ...o.scripts };
   put('package.json', `${JSON.stringify({ name: 'acme-ci', version: '1.0.0', scripts, files: ['trace.cjs'] }, null, 2)}\n`);
   put('package-lock.json', `${JSON.stringify({ name: 'acme-ci', version: '1.0.0', lockfileVersion: 3, requires: true, packages: { '': { name: 'acme-ci', version: '1.0.0' } } }, null, 2)}\n`);
   put('trace.cjs', TRACE);
@@ -123,11 +126,10 @@ describe('cadence release — la CI de publication rejouée dans un clone neuf d
     expect(git(dir, 'tag', '--list')).toBe('');
     expect(version(dir)).toBe('1.0.1');
     expect(r.out).toMatch(/CI de publication rejouée dans un clone neuf du commit de version \(\.github\/workflows\/publish\.yml, tag v1\.0\.1\)/);
-    expect(r.out).toMatch(/✓ Le tag correspond à package\.json/);
     expect(r.out).toMatch(/✓ npm ci/);
     expect(r.out).toMatch(/✓ npm test/);
     expect(r.out).toMatch(/✓ Publier sur npm → npm run prepublishOnly --if-present && npm pack --dry-run/);
-    for (const s of ['actions/checkout@v5 (action GitHub)', 'npm install -g npm@^11.5.1 (installation globale)', 'sudo apt-get update (commande sudo)', 'La version est-elle déjà au registre (lit le registre npm)', 'Release GitHub (GitHub (gh))']) {
+    for (const s of ['actions/checkout@v5 (action GitHub)', 'npm install -g npm@^11.5.1 (installation globale)', 'Le tag correspond à package.json (hors liste blanche', 'sudo apt-get update (commande sudo)', 'La version est-elle déjà au registre (lit le registre npm)', 'Release GitHub (GitHub (gh))']) {
       expect(r.out).toContain(`– non rejouée : ${s}`);
     }
     // le rejeu précède l'écriture et les étapes du lead, qui ne portent plus de clone à jouer à la main
@@ -190,25 +192,144 @@ describe('cadence release — la CI de publication rejouée dans un clone neuf d
     expect(r.err).toMatch(/release : \.github\/workflows\/publish\.yml illisible/);
   });
 
-  it('le clone est retiré même quand une étape lève (délai, signal) : aucun dossier cadence-ci-* ne reste', () => {
-    const dir = paquet({ test: 'exit 7' });
+  it('le clone est retiré quand une étape est tuée par un signal (statut null), et quand le clone lui-même échoue', () => {
+    const tmp = tempDir();
+    vi.stubEnv('TMPDIR', tmp);
+    // npm lui-même tué : spawnSync rend status null et signal SIGKILL
+    const tue = release(paquet({ test: 'kill -KILL $PPID' }), 'patch');
+    expect(tue.code).toBe(2);
+    expect(tue.err).toMatch(/étape « npm test » \(code SIGKILL\)/);
+    expect(readdirSync(tmp).filter((d) => d.startsWith('cadence-ci-'))).toEqual([]);
+    // HEAD détaché sur un commit que le clone ne voit pas : le checkout du clone lève avant toute étape
+    const dir = paquet();
+    git(dir, 'checkout', '-q', '--detach');
+    git(dir, 'commit', '-q', '--allow-empty', '-m', 'hors branche');
+    git(dir, 'branch', '-q', '-D', 'main');
+    const casse = release(dir, 'patch');
+    expect(casse.code).toBe(2);
+    expect(readdirSync(tmp).filter((d) => d.startsWith('cadence-ci-'))).toEqual([]);
+  }, 180_000);
+});
+
+describe('cadence release — le rejeu ne publie, ne pousse ni n’appelle le réseau avec les identifiants de l’utilisateur (revue L698 r1, D-16)', () => {
+  /** Chaque forme de la revue, plus les sous-shells, tubes et redirections : un marqueur (touch) dans chaque étape prouve qu'elle n'a pas tourné. */
+  const FORMES: [string, string, RegExp][] = [
+    ['echo puis git push', 'echo "tagging" && touch m-push && git push origin --tags', /pousse \(git push\)/],
+    ['echo puis curl', 'echo start; touch m-curl; curl -X POST https://x', /réseau/],
+    ['if then else', 'if [ -n "$X" ]; then echo skip; else touch m-if; fi', /caractère « \[ » du shell/],
+    ['point-virgule', 'npm test; touch m-pv', /caractère « ; » du shell/],
+    ['et logique', 'npm test && touch m-et', /caractère « & » du shell/],
+    ['tube', 'npm test | touch m-tube', /caractère « \| » du shell/],
+    ['sous-shell', '(touch m-sous && npm test)', /caractère « \( » du shell/],
+    ['substitution', 'npm test $(touch m-subst)', /caractère « \$ » du shell/],
+    ['accent grave', 'npm test `touch m-grave`', /caractère « ` » du shell/],
+    ['redirection', 'npm test > m-redir', /caractère « > » du shell/],
+    ['ligne inconnue', 'npm ci\ntouch m-ligne', /« touch » n'est pas une commande reconnue/],
+    ['pnpm publish', 'touch m-pnpm && pnpm publish', /publication \(pnpm\/yarn\/changeset\/semantic-release\)/],
+    ['yarn publish', 'yarn publish --non-interactive', /publication \(pnpm\/yarn\/changeset\/semantic-release\)/],
+    ['changeset publish', 'npx changeset publish', /publication \(pnpm\/yarn\/changeset\/semantic-release\)/],
+    ['semantic-release', 'npx semantic-release', /publication \(pnpm\/yarn\/changeset\/semantic-release\)/],
+    ['git -C push', 'git -C . push', /pousse \(git push\)/],
+    ['docker push', 'docker push acme/ci', /pousse \(docker push\)/],
+    ['wrangler deploy', 'npx wrangler pages deploy dist', /déploiement/],
+    ['npm run publish', 'npm run publish', /script npm « publish »/],
+    ['npm run d’un script qui publie', 'npm run livrer', /le script npm « livrer » publie ou pousse/],
+    ['npm run d’un script qui en appelle un qui pousse', 'npm run tout', /le script npm « pousser » publie ou pousse/],
+    ['npm test dont le posttest publie', 'npm test', /le script npm « posttest » publie ou pousse/],
+    ['autre sous-commande npm', 'npm exec -- touch m-exec', /« npm exec » n'est pas une commande reconnue/],
+  ];
+  const workflow = (runs: string[]) => `name: publish\non:\n  push:\n    tags: ['v*']\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n${runs.map((r, i) => `      - name: forme ${i}\n        run: |\n${r.split('\n').map((l) => `          ${l}`).join('\n')}\n`).join('')}`;
+  const scripts = { livrer: 'npm run build && npm publish', tout: 'npm run pousser', pousser: 'git push origin HEAD', posttest: 'changeset publish' };
+
+  it('chaque forme est classée non rejouée, avec sa raison', () => {
+    const dir = paquet({ workflow: workflow(FORMES.map(([, r]) => r)), scripts });
+    const etapes = workflowsCI(dir)[0].etapes;
+    expect(etapes).toHaveLength(FORMES.length);
+    FORMES.forEach(([forme, , raison], i) => {
+      expect(etapes[i].commandes, forme).toBeUndefined();
+      expect(etapes[i].sautee, forme).toMatch(raison);
+    });
+  });
+
+  it('cadence release joue le workflow de toutes ces formes sans en exécuter aucune : aucun marqueur, aucun tag poussé dans le dépôt du lead', () => {
+    const m = tempDir();
+    const dir = paquet({ workflow: workflow(FORMES.map(([, r]) => r.replace(/m-/g, `${m}/m-`))), scripts });
     const r = release(dir, 'patch');
-    expect(r.code).toBe(2);
-    const tmp = process.env.TMPDIR ?? '/tmp';
-    expect(execFileSync('ls', [tmp], { encoding: 'utf8' }).split('\n').filter((d) => d.startsWith('cadence-ci-'))).toEqual([]);
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    FORMES.forEach(([forme], i) => expect(r.out, forme).toContain(`– non rejouée : forme ${i} (`));
+    expect(r.out).not.toMatch(/✓ forme/);
+    expect(readdirSync(m)).toEqual([]);
+    expect(git(dir, 'tag', '--list')).toBe('');
+  }, 180_000);
+
+  it('npm publish, même chaîné après un echo, n’est jamais joué : remplacé par prepublishOnly puis npm pack --dry-run, le reste de l’étape ne tourne pas', () => {
+    const m = tempDir();
+    const etapes = [`echo "Publishing $V" && touch ${m}/m-a && npm publish --access public`, `echo ok; touch ${m}/m-b; npm publish`];
+    const dir = paquet({ workflow: workflow(etapes) });
+    const lire = trace();
+    const r = release(dir, 'patch');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('✓ forme 0 → npm run prepublishOnly --if-present && npm pack --dry-run');
+    expect(r.out).toContain('✓ forme 1 → npm run prepublishOnly --if-present && npm pack --dry-run');
+    expect(readdirSync(m)).toEqual([]);
+    expect(lire().version).toBe('1.0.1');
+  }, 180_000);
+
+  it('une publication remplacée dont prepublishOnly publie : non rejouée', () => {
+    const dir = paquet({ workflow: workflow(['npm publish']), scripts: { prepublishOnly: 'npm run livrer', livrer: 'npm publish' } });
+    expect(workflowsCI(dir)[0].etapes[0].sautee).toMatch(/le script npm « livrer » publie ou pousse/);
+  });
+
+  it('environnement sans identifiants : HOME vide et temporaire (identité git seule), ni .npmrc ni configuration git de l’utilisateur, jetons retirés, origin du clone qui ne mène nulle part', () => {
+    const maison = tempDir();
+    writeFileSync(join(maison, '.npmrc'), '//registry.npmjs.org/:_authToken=SECRET-NPMRC\n');
+    writeFileSync(join(maison, '.gitconfig'), '[user]\n\tname = Utilisateur\n[credential]\n\thelper = store\n');
+    const dir = paquet({ workflow: workflow(['npm ci', 'npm publish']) });
+    const lire = trace();
+    vi.stubEnv('HOME', maison);
+    for (const v of ['NPM_TOKEN', 'NODE_AUTH_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN']) vi.stubEnv(v, `secret-${v}`);
+    vi.stubEnv('NPM_CONFIG_USERCONFIG', join(maison, '.npmrc'));
+    const r = release(dir, 'patch');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    const t = lire();
+    expect(String(t.home).startsWith(maison)).toBe(false);
+    expect(t.homeFichiers).toEqual(['.gitconfig']);
+    expect(t.gitGlobal).toBe('user.name=cadence-ci\nuser.email=cadence-ci@cadence.invalid');
+    expect(t.jetons).toEqual([]);
+    expect(t.jetonNpm).not.toContain('SECRET');
+    // origin garde ses refs (des tests lisent origin/main) mais ne mène pas au dépôt du lead : le push échoue, rien n'y arrive
+    expect(String(t.refsOrigine)).toContain('origin/main');
+    expect(String(t.origine).startsWith(dir)).toBe(false);
+    expect(t.pousse).toBe('erreur');
+    expect(git(dir, 'branch', '--list', 'essai')).toBe('');
+    expect(r.out).toMatch(/environnement sans identifiants : HOME vide et temporaire/);
+  }, 180_000);
+
+  it('le workflow est lu dans le clone du commit de version : un workflow absent du commit (non suivi) n’est pas rejoué (revue L698 r1, point 2)', () => {
+    const dir = paquet({ workflow: workflow(['npm ci']) });
+    writeFileSync(join(dir, '.github/workflows/brouillon.yml'), workflow(['npm run inexistant']).replace('forme 0', 'brouillon'));
+    expect(workflowsCI(dir).map((w) => w.fichier)).toContain('.github/workflows/brouillon.yml');
+    for (const argv of [['patch', '--dry-run'], ['patch']]) {
+      const r = release(dir, ...argv);
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+      expect(r.out).toMatch(/forme 0/);
+      expect(r.out).not.toMatch(/brouillon|npm run inexistant/);
+    }
   }, 180_000);
 });
 
 describe('publish.yml de cadence : ce que la release rejoue et ce qu’elle laisse à la CI', () => {
   const root = join(import.meta.dirname, '..');
-  it('rejouées : le contrôle du tag, la section du CHANGELOG, npm ci et la publication (prepublishOnly puis npm pack --dry-run, qui joue prepare) ; non rejouées : actions, npm global, apt, identité git globale, registre, gh', () => {
+  it('rejouées : npm ci et la publication (prepublishOnly puis npm pack --dry-run, qui joue prepare) ; non rejouées : actions, npm global, contrôles en shell, apt, identité git globale, registre, gh', () => {
     const wfs = workflowsCI(root);
     expect(wfs.map((w) => w.fichier)).toEqual(['.github/workflows/publish.yml']);
     const etapes = wfs[0].etapes;
-    const jouees = etapes.filter((e) => e.commande).map((e) => e.nom);
+    const jouees = etapes.filter((e) => e.commandes).map((e) => e.nom);
     expect(jouees).toEqual([
-      'Le tag correspond à package.json et aux fichiers du plugin',
-      'Le CHANGELOG a une section pour le tag',
       'npm ci',
       'Publier sur npm → npm run prepublishOnly --if-present && npm pack --dry-run',
     ]);
@@ -217,6 +338,8 @@ describe('publish.yml de cadence : ce que la release rejoue et ce qu’elle lais
       'actions/checkout@v5 (action GitHub)',
       'actions/setup-node@v5 (action GitHub)',
       'npm install -g npm@^11.5.1 (installation globale)',
+      'Le tag correspond à package.json et aux fichiers du plugin (hors liste blanche : caractère « ; » du shell)',
+      'Le CHANGELOG a une section pour le tag (hors liste blanche : caractère « " » du shell)',
       'git config --global user.name "cadence-ci" (git hors du clone)',
       'sudo apt-get update (commande sudo)',
       'La version est-elle déjà au registre (lit le registre npm)',

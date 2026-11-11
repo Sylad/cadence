@@ -90,7 +90,9 @@ describe('porte du mod cadence-hud (L417)', () => {
   });
 
   // La porte réelle : vitest exclut plugins/**, c'est ce test qui fait jouer le mod à la vague (cadence.yaml : orchestrate.test).
-  const claudeDisponible = spawnSync('claude', ['--version'], { stdio: 'ignore' }).status === 0;
+  // Sur un runner de CI (CI posée : GitHub, où claude manque déjà, ou le rejeu de cadence release, HOME vide, L698 r1), les types générés du mod
+  // vivent dans ~/.claude/mods de l'utilisateur, hors d'atteinte : la porte réelle se joue sur le poste, là où elle tournait déjà.
+  const claudeDisponible = spawnSync('claude', ['--version'], { stdio: 'ignore' }).status === 0 && !process.env.CI;
   it.skipIf(!claudeDisponible)('R5 — le mod cadence-hud passe ses tests et son typage', () => {
     const r = porteDuMod({ dir: join(REPO, 'plugins', 'cadence-hud') });
     expect(r.output.split('\n').filter((l) => /error TS|\(fail\)/.test(l))).toEqual([]);

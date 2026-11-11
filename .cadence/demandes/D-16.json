@@ -1,0 +1,11 @@
+{
+ "id": "D-16",
+ "texte": "Corriger le défaut bloquant et les 2 suites de la revue L698 (pièce jointe). Le rejeu de la CI de publication ne doit JAMAIS pouvoir publier, pousser ni appeler le réseau avec les identifiants de l'utilisateur, quelle que soit l'écriture de l'étape (enchaînements &&, ;, |, sous-shells, pnpm/yarn/changeset publish, curl, git push). Deux protections, toutes les deux : (1) liste blanche au lieu d'une liste noire — seules des étapes reconnues sont jouées (npm ci, npm run <script> dont le script n'est ni publish ni un script qui publie, npm test, npm pack) et toute autre étape est refusée en le disant ; (2) environnement sans identifiants : HOME vide et temporaire, aucun .npmrc ni configuration git de l'utilisateur, variables NPM_TOKEN/NODE_AUTH_TOKEN/GH_TOKEN/GITHUB_TOKEN retirées. Lire les workflows dans le clone du commit de version. Tests : chaque forme d'enchaînement citée par la revue est refusée sans rien exécuter.",
+ "date": "2026-11-11",
+ "origine": "demande cadence run, pièce jointe tmp/revues/L698-r1.md",
+ "etat": "ouverte",
+ "lots": [
+  "L698"
+ ],
+ "preuve": null
+}

@@ -91,16 +91,29 @@ It refuses, with exit code 2 and nothing written:
   a documentation test, 1.22.0), which neither the gate in the lead's tree nor the smoke test of the installed package sees. Before writing
   anything, the command makes a `git clone --no-hardlinks` of the repository in a temporary folder, detaches it on `HEAD`, writes there the
   version files it is about to write (plus `docs/whats-new.md` as it is in the working tree), commits them (`release: <version>`) and tags
-  `v<version>`: the commit and the tag the CI checkout will see. Then it plays, in that clone, the `run` steps of every workflow of
-  `.github/workflows` triggered by a tag (`on.push.tags`), in order, with `bash -e` as GitHub does, `CI=true`, `GITHUB_REF_NAME=v<version>`,
-  `RUNNER_TEMP` and `GITHUB_OUTPUT` set, and the `CADENCE_*`, `GIT_*`, `npm_*` and `RAF_*` variables of the caller removed. A step that runs
-  `npm publish` is replayed as `npm run prepublishOnly --if-present && npm pack --dry-run` (what `npm publish` runs before sending: the suite,
-  then `prepack`, `prepare`, `postpack`; nothing is sent). Steps it cannot replay on a workstation are listed as « non rejouée » with the reason:
-  `uses:` actions, `sudo` and `apt-get`, `npm install -g`, `npm view` (the registry), `gh`, `git config --global`, `git push`, `curl`/`wget`,
-  and steps carrying an `if:` (their condition depends on the run). Each replayed step is printed with its duration; the first red one refuses
-  the release with the workflow file, the step, its command and the end of its output; the clone is removed, green or red. A repository with
-  no workflow triggered by a tag gets no replay, and the command says so. `--dry-run` lists the steps it would replay without playing them
-  (the full suite takes minutes). For cadence, the replay runs the tag check, the CHANGELOG check, `npm ci` and `prepublishOnly` + `prepare`.
+  `v<version>`: the commit and the tag the CI checkout will see. The clone's `origin` keeps its refs (`origin/main`, read by a ratchet test
+  as on the CI) but points to a path that does not exist: neither a fetch nor a push reaches your repository. The workflows are read **in that
+  clone**, not in the working tree (an untracked workflow is not replayed: the CI would not see it). Then it plays, in that clone, the `run` steps of every
+  workflow of `.github/workflows` triggered by a tag (`on.push.tags`), in order, with `CI=true`, `GITHUB_REF_NAME=v<version>`, `RUNNER_TEMP`
+  and `GITHUB_OUTPUT` set.
+  The replay can **never publish, push or reach the network with your credentials**, however the step is written (review L698 r1, D-16).
+  Two barriers, both always on. (1) An **allow-list**: a step is played only if each of its lines is `npm ci`, `npm test`, `npm pack` or
+  `npm run <script>`, written in plain words (no `&&`, `;`, `|`, subshell, `$`, quote, redirection: the first such character refuses the
+  step) and run without a shell; `npm run publish` is refused, and so is any of these whose npm script — lifecycle `pre`/`post` scripts and
+  the scripts it calls with `npm run` included — mentions `publish`, `push`, `deploy`, `release`, `curl`, `wget`, `gh`, `ssh`, `changeset`.
+  A step that runs `npm publish` is replaced as a whole by `npm run prepublishOnly --if-present`, then `npm pack --dry-run` (what `npm publish`
+  runs before sending: the suite, then `prepack`, `prepare`, `postpack`; nothing is sent): its own text, `echo … && npm publish` included,
+  never runs. Every other step is listed as « non rejouée » with the reason (`uses:` actions, `sudo`, `npm install -g`, `npm view`,
+  `pnpm`/`yarn`/`changeset publish`, `git push`, `curl`, a shell character, a command outside the list, a step under `if:`). (2) An
+  **environment without credentials**: an empty temporary `HOME` holding only the git identity the CI gives itself (`cadence-ci`), so no
+  `~/.npmrc`, `~/.gitconfig` or credential helper of yours; an empty global npmrc, `GIT_CONFIG_NOSYSTEM`, ssh disabled for git, no prompt;
+  `NPM_TOKEN`, `NODE_AUTH_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN` and every variable named like a token, secret, password, credential or API key
+  removed, with the `CADENCE_*`, `GIT_*`, `npm_*` and `RAF_*` variables of the caller. The npm cache (public packages) is shared, so `npm ci`
+  does not download everything again. Each replayed step is printed with its duration; the first red one refuses the release with the
+  workflow file, the step, its command and the end of its output; the clone is removed, green or red. A repository with no workflow triggered
+  by a tag gets no replay, and the command says so. `--dry-run` clones too and lists the steps it would replay without playing them (the full
+  suite takes minutes). For cadence, the replay runs `npm ci` and `prepublishOnly` + `prepare`; the tag and CHANGELOG checks of `publish.yml`
+  are shell scripts, not replayed (the command writes those files itself).
 - a **red smoke test of the installed package** (L696). Before writing anything, the command packs `HEAD` with `npm pack` in a detached
   `git worktree` (what is not committed does not get in; the repository's `node_modules` are linked so that `prepare` builds), installs the
   tarball with `npm install` in an empty folder, then runs the smoke commands from that installed package, each in an empty folder of its own,

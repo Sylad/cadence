@@ -85,6 +85,10 @@ even adds two of them, the one after `/compact` and the one at the end of the st
 are counted the same way: 79.2 M reported in r1 for 24.9 M really sent. Real cost per run: kept session 10.01 $ against 8.42 $ for new
 sessions in r1 (+19 %), 9.08 $ against 9.14 $ in r2 (−1 %), not ×3.5. The new-session figures are right (one session per step).
 
+Fixed by L703: a step of an arm that resumes its session counts the gap between its last record and the last record of the same session before
+it (the compaction's record included). Replayed call by call, the records of this bench give 10.01 and 9.08 $ for the kept session, 8.42 and
+9.14 $ for the new sessions (`v2/test/bras.test.ts`, records in `v2/test/fixtures/releves-banc-2026-11-10.json`).
+
 ## Limits
 
 - `cadence perf` and `orchestrate` price a cache write at the input price (`src/cost.ts`), so they count the one-hour writes at half their price; on this bench writes were a third of the cost.

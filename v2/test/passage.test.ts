@@ -47,9 +47,10 @@ const outil = (name: string, input: object, quand?: number) => { const n = ++hor
 type Geste = (c: string, ecrire: (lignes: string[], sous?: string) => void) => void | 'plante' | 'erreur';
 
 /** Faux claude. Par défaut, chaque bras écrit (Write) puis commite src/<bras><k>.js ; `gestes['A2']` ajoute un comportement à l'étape.
- * `--resume <id>` reprend la session : même id, lignes ajoutées au même fichier (comme claude -p --resume). */
+ * `--resume <id>` reprend la session : même id, lignes ajoutées au même fichier, coût et tokens rendus cumulés depuis le début de la session
+ * (comme claude -p --resume) ; chaque appel d'un bras coûte 1 $ et 100 tokens. */
 function faux(r: string, d: string, gestes: Record<string, Geste>) {
-  const vu = { ordre: [] as string[], etapes: [] as string[], juges: [] as string[], reprises: [] as string[] }; let n = 0;
+  const vu = { ordre: [] as string[], etapes: [] as string[], juges: [] as string[], reprises: [] as string[] }; let n = 0; const cumul = new Map<string, number>();
   const exec: Executeur = (args, o) => {
     const p = args[args.indexOf('-p') + 1];
     const j = /dans (\S+\.json)/.exec(p);
@@ -69,7 +70,8 @@ function faux(r: string, d: string, gestes: Record<string, Geste>) {
     if (g === 'erreur') return { stdout: JSON.stringify({ session_id: session, is_error: true, subtype: 'error_during_execution' }), code: 1 };
     if (!existsSync(join(t, `${session}.jsonl`))) ecrire([outil('Write', { file_path: join(c, 'src', 'app.js') })]);
     writeFileSync(join(c, 'src', `${b}${k}.js`), 'v'); sh(c, `git add -A && ${GIT} commit -qm e${k}`);
-    return { stdout: JSON.stringify({ session_id: session, total_cost_usd: 0, modelUsage: {} }), code: 0 };
+    const appels = (cumul.get(session) ?? 0) + 1; cumul.set(session, appels);
+    return { stdout: JSON.stringify({ session_id: session, total_cost_usd: appels, modelUsage: { m: { inputTokens: 100 * appels } } }), code: 0 };
   };
   return { exec, vu };
 }
@@ -162,6 +164,9 @@ describe('passage d\'une séquence', () => {
     const [s1] = res.etapes.C[0].mesure.sessions;
     expect(vu.reprises).toEqual(['A1:-', 'C1:-', `C2:${s1}`, 'A2:-', 'A3:-', `C3:${s1}`]);
     expect(res.etapes.C.map((e) => e.mesure.sessions)).toEqual([[s1], [s1], [s1]]);
+    // L703 : la session reprise rend son total cumulé (1, 2, 3 $) ; chaque étape ne compte que son écart, comme le bras en session neuve
+    expect(res.etapes.C.map((e) => [e.mesure.cout_usd, e.mesure.tokens])).toEqual([[1, 100], [1, 100], [1, 100]]);
+    expect(res.etapes.A.map((e) => [e.mesure.cout_usd, e.mesure.tokens])).toEqual([[1, 100], [1, 100], [1, 100]]);
     expect(res.etapes.C.map((e) => e.fuites)).toEqual([[fuite], [], []]); // la fuite de l'étape 1 n'est pas recomptée aux étapes 2 et 3
     expect(res.etapes.C[1].lecture).toMatchObject({ ouvertes: [join(r, 'runs', '2026-11-08-1100-e1', 's1', 'c2', 'docs', 'norme.md')], apres_ecriture: [] }); // l'écriture de l'étape 1 ne compte pas
   });

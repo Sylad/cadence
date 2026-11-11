@@ -9,8 +9,8 @@ import { aiguiller } from '../run/aiguillage.js';
 import { COMPACTAGE, doitCompacter, type Suite } from '../run/suite.js';
 
 export interface DefBras { nom: string; modele: string; brief: string; settings?: string; aiguillage?: boolean; suite?: Suite } // aiguillage : le bras de cadence run ; suite (L690) : reprend la session de l'étape d'avant // settings : réglages Claude Code du bras (hooks)
-export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number;
-  tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string }
+export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number; releve?: Releve; // releve (L703) : ce que claude -p a rendu en dernier pour la dernière session (coût et tokens CUMULÉS depuis son début, reprises et /compact compris), repris par l'étape suivante d'un bras « suite »
+  tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string } export type Releve = { session: string; cout: number; tokens: number };
 export type Executeur = (args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }) => { stdout: string; code: number; erreur?: string };
 
 export const OUTILS_INTERDITS = ['Bash(kubectl:*)', 'Bash(helm:*)', 'Bash(gh:*)', 'Bash(ssh:*)', 'Bash(scp:*)',
@@ -64,7 +64,7 @@ export const empreinteReglages = (clone: string): string => [cheminReglages(clon
 export const argsClaude = (d: DefBras, clone: string, interdits = OUTILS_INTERDITS): string[] => ['--output-format', 'json', '--model', d.modele, '--permission-mode', 'bypassPermissions',
   '--disallowedTools', interdits.join(','), ...(d.settings ? ['--settings', ecrireReglages(d.settings, clone)] : [])];
 /** `garde` : pièces à lire avant d'écrire et racine du banc, données au hook du bras par l'environnement (CADENCE_*), jamais par un fichier. */
-export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }, reprise?: string): Mesure {
+export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }, reprise?: Releve): Mesure {
   if (d.aiguillage) { const a = aiguiller(lireDemande(b), clone, garde.pieces.map((p) => relative(clone, p))); d = { ...a.bras, nom: d.nom, ...(d.suite ? { suite: d.suite } : {}) }; garde = { ...garde, pieces: a.pieces.map((p) => join(clone, p)) }; }
   const question = `${clone}.question.md`;
   const brief = readFileSync(d.brief, 'utf8').replaceAll('{{DEMANDE}}', lireDemande(b)).replaceAll('{{CLONE}}', clone)
@@ -73,17 +73,17 @@ export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, 
   const o = { cwd: clone, env: { ...environnementNeutre(process.env), ...(d.settings ? { CADENCE_CLONE: clone, CADENCE_PIECES: JSON.stringify(garde.pieces), CADENCE_BANC_RACINE: garde.racine } : {}) } };
   const reponse = b.reponses ? readFileSync(join(b.dir, 'reponses.md'), 'utf8') : SANS_REPONSE;
   const debut = horloge();
-  const c = doitCompacter(d.suite, reprise) ? lire(exec(['-p', COMPACTAGE, '--resume', reprise!, ...commun], o)) : undefined; // L690 : compactée avant le lot
-  let r = lire(exec(['-p', brief, ...(reprise && d.suite ? ['--resume', c?.session || reprise] : []), ...commun], o));
-  const m = { tokens: r.tokens + (c?.tokens ?? 0), cout: r.cout + (c?.cout ?? 0), questions: 0, textes: [] as string[], sessions: r.session ? [r.session] : [], echec: c?.echec ?? r.echec };
+  const suite = d.suite ? reprise?.session : undefined, derniers = new Map<string, Releve>(suite ? [[suite, reprise!]] : []), m = { tokens: 0, cout: 0, questions: 0, textes: [] as string[], sessions: [] as string[], echec: null as string | null };
+  const compter = (x: ReturnType<typeof lire>) => { const p = derniers.get(x.session), cumul = !!p && x.cout >= p.cout && x.tokens >= p.tokens; m.tokens += x.tokens - (cumul ? p!.tokens : 0); m.cout += x.cout - (cumul ? p!.cout : 0); if (x.session) derniers.set(x.session, { session: x.session, cout: x.cout, tokens: x.tokens }); return x; }; // L703 : seul l'écart au dernier relevé de la même session compte (un relevé plus bas : session repartie de zéro)
+  const c = doitCompacter(d.suite, suite) ? compter(lire(exec(['-p', COMPACTAGE, '--resume', suite!, ...commun], o))) : undefined; // L690 : compactée avant le lot
+  let r = compter(lire(exec(['-p', brief, ...(suite ? ['--resume', c?.session || suite] : []), ...commun], o))); m.sessions = r.session ? [r.session] : []; m.echec = c?.echec ?? r.echec;
   while (!m.echec && existsSync(question)) {
     if (m.questions >= QUESTIONS_MAX) { rmSync(question); m.echec = `question ouverte après ${QUESTIONS_MAX} réponses`; break; }
     m.textes.push(readFileSync(question, 'utf8')); rmSync(question); m.questions++;
-    r = lire(exec(['-p', `Réponse de Sylvain : ${reponse}`, '--resume', r.session, ...commun], o));
-    m.tokens += r.tokens; m.cout += r.cout; m.echec = r.echec;
+    r = compter(lire(exec(['-p', `Réponse de Sylvain : ${reponse}`, '--resume', r.session, ...commun], o))); m.echec = r.echec;
     if (r.session && !m.sessions.includes(r.session)) m.sessions.push(r.session);
   }
   const fin = horloge();
   return { bras: d.nom, banc: b.id, debut: debut.toISOString(), fin: fin.toISOString(),
-    duree_s: Math.round((fin.getTime() - debut.getTime()) / 1000), tokens: m.tokens, cout_usd: m.cout, questions: m.questions, questions_texte: m.textes, sessions: m.sessions, echec: m.echec };
+    duree_s: Math.round((fin.getTime() - debut.getTime()) / 1000), tokens: m.tokens, cout_usd: m.cout, questions: m.questions, questions_texte: m.textes, sessions: m.sessions, echec: m.echec, ...(derniers.has(m.sessions.at(-1) ?? '') ? { releve: derniers.get(m.sessions.at(-1)!) } : {}) };
 }

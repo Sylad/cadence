@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Banc } from '../src/bench/banc.js';
-import { chargerBras, cheminReglages, empreinteReglages, environnementNeutre, libererReglages, lancerBras, OUTILS_INTERDITS, type Executeur } from '../src/bench/bras.js';
+import { chargerBras, cheminReglages, empreinteReglages, environnementNeutre, libererReglages, lancerBras, OUTILS_INTERDITS, type DefBras, type Executeur, type Releve } from '../src/bench/bras.js';
 import { dossierTemp } from './temp.js';
 
 function bancTest(reponses?: string): { b: Banc; clone: string } {
@@ -39,19 +39,20 @@ describe('lancerBras', () => {
     expect(appels[0].env.GH_TOKEN).toBe('');
   });
 
-  it('une question : réponse du banc, reprise de la même session, question comptée', () => {
+  it('une question : réponse du banc, reprise de la même session, question comptée ; le relevé cumulé de la reprise compté une fois (L703)', () => {
     const { b, clone } = bancTest('Rotation seule.');
     const appels: string[][] = [];
     const exec: Executeur = (args) => {
       appels.push(args);
       if (appels.length === 1) writeFileSync(`${clone}.question.md`, 'Faut-il réorganiser ?');
-      return { stdout: json('s1', 500, 0.1), code: 0 };
+      return { stdout: json('s1', 500 * appels.length, 0.1 * appels.length), code: 0 }; // claude -p --resume rend le total de la session
     };
     const m = lancerBras(b, { nom: 'A', modele: 'opus', brief }, clone, exec);
     expect(m.questions).toBe(1);
     expect(m.questions_texte).toEqual(['Faut-il réorganiser ?']);
     expect(m.echec).toBeNull();
-    expect(m.tokens).toBe(1000);
+    expect(m.tokens).toBe(1000); expect(m.cout_usd).toBeCloseTo(0.2);
+    expect(m.releve).toMatchObject({ session: 's1', tokens: 1000 });
     expect(appels[1]).toEqual(expect.arrayContaining(['--resume', 's1']));
     expect(appels[1][appels[1].indexOf('-p') + 1]).toContain('Rotation seule.');
     expect(existsSync(`${clone}.question.md`)).toBe(false);
@@ -161,14 +162,14 @@ describe('lancerBras, suite de session (L690)', () => {
   const sortie = (s: string) => JSON.stringify({ session_id: s, total_cost_usd: 0.1, subtype: 'success', modelUsage: { m: { inputTokens: 10, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 } } });
   it('gardée : la demande suivante reprend la session de la précédente', () => {
     const { b, clone } = banc(); const appels: string[][] = [];
-    const m = lancerBras(b, { nom: 'g', modele: 'opus', brief, suite: 'gardee' }, clone, (a) => { appels.push(a); return { stdout: sortie('s9'), code: 0 }; }, undefined, undefined, 's1');
+    const m = lancerBras(b, { nom: 'g', modele: 'opus', brief, suite: 'gardee' }, clone, (a) => { appels.push(a); return { stdout: sortie('s9'), code: 0 }; }, undefined, undefined, { session: 's1', cout: 0, tokens: 0 });
     expect(appels).toHaveLength(1);
     expect(appels[0].slice(appels[0].indexOf('--resume'), appels[0].indexOf('--resume') + 2)).toEqual(['--resume', 's1']);
     expect(m.sessions).toEqual(['s9']);
   });
   it('compactée : /compact dirigé sur la session précédente, puis la demande dans la session compactée ; tokens et coût comptés', () => {
     const { b, clone } = banc(); const appels: string[][] = [];
-    const m = lancerBras(b, { nom: 'c', modele: 'opus', brief, suite: 'compactee' }, clone, (a) => { appels.push(a); return { stdout: sortie(appels.length === 1 ? 's1c' : 's2'), code: 0 }; }, undefined, undefined, 's1');
+    const m = lancerBras(b, { nom: 'c', modele: 'opus', brief, suite: 'compactee' }, clone, (a) => { appels.push(a); return { stdout: sortie(appels.length === 1 ? 's1c' : 's2'), code: 0 }; }, undefined, undefined, { session: 's1', cout: 0, tokens: 0 });
     expect(appels).toHaveLength(2);
     expect(appels[0][1]).toMatch(/^\/compact Garde : les décisions/);
     expect(appels[0]).toEqual(expect.arrayContaining(['--resume', 's1']));
@@ -177,8 +178,33 @@ describe('lancerBras, suite de session (L690)', () => {
   });
   it('sans suite, ou sans session précédente : session neuve', () => {
     const { b, clone } = banc(); const appels: string[][] = [];
-    lancerBras(b, { nom: 'n', modele: 'opus', brief }, clone, (a) => { appels.push(a); return { stdout: sortie('x'), code: 0 }; }, undefined, undefined, 's1');
+    lancerBras(b, { nom: 'n', modele: 'opus', brief }, clone, (a) => { appels.push(a); return { stdout: sortie('x'), code: 0 }; }, undefined, undefined, { session: 's1', cout: 0, tokens: 0 });
     lancerBras(b, { nom: 'g', modele: 'opus', brief, suite: 'gardee' }, clone, (a) => { appels.push(a); return { stdout: sortie('y'), code: 0 }; });
     expect(appels.every((a) => !a.includes('--resume'))).toBe(true);
+  });
+});
+
+/** L703 : relevés réels du banc 2026-11-10-1551-b4bcc9ea9150 (cost-state des journaux = sorties de claude -p), rejoués appel par appel. */
+describe('lancerBras, coût d\'un bras qui reprend sa session (L703)', () => {
+  const brief = join(import.meta.dirname, '..', 'briefs', 'bras-A.md');
+  type Sortie = { session_id: string; total_cost_usd: number; modelUsage: Record<string, Record<string, number>> };
+  const F = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'releves-banc-2026-11-10.json'), 'utf8')) as Record<string, Record<'neuve' | 'gardee', Sortie[][]>>;
+  /** Trois étapes comme le banc séquence : le relevé de fin de l'étape k est repris à l'étape k+1 ; le bras seuil a compacté avant l'étape 2 seulement. */
+  const jouer = (etapes: Sortie[][], suite: boolean) => etapes.reduce<{ cout: number; tokens: number; releve?: Releve }>((acc, sorties, i) => {
+    const { b, clone } = bancTest(); let n = 0;
+    const d: DefBras = { nom: 'x', modele: 'opus', brief, ...(suite ? { suite: sorties.length === 2 ? 'compactee' as const : 'gardee' as const } : {}) };
+    const m = lancerBras(b, d, clone, () => ({ stdout: JSON.stringify({ ...sorties[n++], subtype: 'success' }), code: 0 }), undefined, undefined, acc.releve);
+    expect(n, `étape ${i + 1} : appels`).toBe(sorties.length);
+    return { cout: acc.cout + m.cout_usd, tokens: acc.tokens + m.tokens, releve: m.releve };
+  }, { cout: 0, tokens: 0 });
+
+  it.each([['r1', 10.01, 8.42], ['r2', 9.08, 9.14]] as const)('%s : session gardée %s $, session neuve %s $', (r, gardee, neuve) => {
+    const g = jouer(F[r].gardee, true), n = jouer(F[r].neuve, false);
+    expect(g.cout).toBeCloseTo(gardee, 2); expect(n.cout).toBeCloseTo(neuve, 2);
+    const fin = Object.values(F[r].gardee[2][0].modelUsage)[0]; // tokens : le total de la session à sa fin, pas la somme des totaux
+    expect(g.tokens).toBe(fin.inputTokens + fin.outputTokens + fin.cacheReadInputTokens + fin.cacheCreationInputTokens);
+  });
+  it('r1 : 24,9 M tokens pour la session gardée, et non 79,2 M', () => {
+    expect(jouer(F.r1.gardee, true).tokens / 1e6).toBeCloseTo(24.9, 1);
   });
 });

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { Banc } from '../bench/banc.js';
-import { chargerBras, cheminReglages, ecrireReglages, empreinteReglages, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from '../bench/bras.js';
+import { chargerBras, cheminReglages, ecrireReglages, empreinteReglages, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure, type Releve } from '../bench/bras.js';
 import { archiver, pretAPasser, verrouiller } from '../bench/cli.js';
 import { chercherFuites, dossierTranscripts, jsonl, reglesDuBras, type Regles } from '../bench/fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from '../bench/juges.js';
@@ -31,7 +31,7 @@ export interface ResultatSequence { run: string; sequence: string; clones: Recor
 type Opt = { racine: string; id: string; ref: string; cand: string; juge: string; exec: Executeur; maintenant: Date; empreinte: string; home: string; out: (l: string) => void;
   repetition?: number; repetitions?: number; prep?: typeof preparer; pret?: (b: Record<string, DefBras>) => string | null; jscpd?: string[]; delaiMs?: number; garderClones?: boolean; tirage?: () => number };
 interface Ctx { o: Opt; s: Sequence; bras: Record<string, DefBras>; run: string; dir: string; debut: string; delai: number;
-  noms: string[]; clones: Record<string, string>; prec: Record<string, Statuts>; reglages: Record<string, string>; sessions?: Record<string, string> } // sessions : dernière session de chaque bras (L690)
+  noms: string[]; clones: Record<string, string>; prec: Record<string, Statuts>; reglages: Record<string, string>; sessions?: Record<string, Releve> } // sessions : dernier relevé de la dernière session de chaque bras (L690, L703)
 
 const REPO = join(import.meta.dirname, '..', '..', '..');
 const TITRE = /\b(?:it|test)(\.\w+)?\s*\(\s*(['"`])(.*?)\2/;
@@ -179,7 +179,7 @@ function lancer(x: Ctx, e: Etape, b: string, avant: { head: string; sale: string
   const c = x.clones[b];
   try {
     const m = lancerBras(bancEtape(x.s, e, avant.head), x.bras[b], c, x.o.exec, undefined, { pieces, racine: x.o.racine }, x.sessions?.[b]);
-    if (m.sessions.length) (x.sessions ??= {})[b] = m.sessions[m.sessions.length - 1]; // un bras « suite » reprend la session de l'étape d'avant
+    if (m.releve) (x.sessions ??= {})[b] = m.releve; // un bras « suite » reprend la session de l'étape d'avant et ne compte que l'écart à ce relevé (L703)
     m.echec ??= travailNonLivre(avant, etatGit(c));
     return m;
   } catch (err) {

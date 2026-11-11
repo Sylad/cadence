@@ -33,6 +33,13 @@
   {
    "date": "2026-11-11",
    "texte": "Sylvain, à la question « je remesure la session gardée une fois L703 corrigé ? » : « Oui, remesure courte »."
+  },
+  {
+   "date": "2026-11-11",
+   "texte": "L703 livré : le banc séquence compte, pour une étape d'un bras qui reprend sa session, l'écart entre son dernier relevé et le dernier relevé de la même session avant elle (compactage et réponses compris). Les relevés réels du banc 2026-11-10-1551-b4bcc9ea9150 rejoués appel par appel donnent 10,01 et 9,08 $ (gardée), 8,42 et 9,14 $ (neuve), 24,9 M tokens en r1 (v2/test/bras.test.ts, fixture v2/test/fixtures/releves-banc-2026-11-10.json). La demande reste ouverte : la remesure courte de la session gardée, avec le banc corrigé, reste à faire."
   }
+ ],
+ "runs": [
+  "20261111195439-926309"
  ]
 }

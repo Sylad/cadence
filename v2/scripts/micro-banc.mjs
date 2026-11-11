@@ -23,13 +23,13 @@ if (mode === 'bras') { // un bras, une répétition : node micro-banc.mjs bras <
   const base = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: clone, encoding: 'utf8' }).trim();
   const etapes = readdirSync(join(micro, 'demandes')).sort();
   const res = { bras: nom, etapes: [] };
-  let prec; // L690 : session de l'étape d'avant, reprise par un bras « suite »
+  let prec; // L690 : session de l'étape d'avant, reprise par un bras « suite » ; L703 : avec son dernier relevé cumulé
   for (const k of etapes) {
     const b = { id: `micro-${k}`, dir: join(micro, 'demandes', k), secrets: '', projet: 'mini-carte', source: '', base, install: '', tests: 'node --test',
       visible: false, taille: 'fonction', frais: false, reponses: false };
     const pieces = existsSync(join(micro, 'demandes', k, 'pieces.json')) ? JSON.parse(readFileSync(join(micro, 'demandes', k, 'pieces.json'), 'utf8')).map((p) => join(clone, p)) : [];
     const m = lancerBras(b, d, clone, creerExecuteur('claude', 30 * 60_000), undefined, { pieces, racine: dir }, prec);
-    prec = m.sessions.at(-1);
+    prec = m.releve;
     res.etapes.push({ k, duree_s: m.duree_s, echec: m.echec ?? null, cout_usd: m.cout_usd, tokens: m.tokens });
   }
   // Juge mécanique : la suite du bras, puis tous les tests cachés copiés dans une copie du clone.

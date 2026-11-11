@@ -3220,6 +3220,16 @@ lots:
     started: 2026-11-10
     review: { date: 2026-11-10, verdict: "conforme : --modele opus|fable et CADENCE_RUN_MODELE, autres valeurs refusées, reprise et --fond gardent le modèle ; 1 mineur (pas de test du chemin valide de --fond) ; porte verte à c819d57", commit: c819d57272e4afe348c1b5c850537e3d6efd0f55 }
     finished: 2026-11-10
+  - id: L700
+    title: "cadence run et quota (D-15) : reconnaître la fin de quota d'une session claude -p (texte « You've hit your weekly limit · resets … » et « Opus limit »), état quota avec l'heure de reprise au lieu d'echec, reprise automatique de la même session après la remise à zéro ; bascule sur Fable seulement sur une limite propre à Opus ; jauge hebdo (rate_limits.seven_day de la status line, déjà lue par cadence-hud) affichée par le HUD et lead tour ; mesure : 0 run en echec pour quota, 0 limite hebdo atteinte par surprise"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-11
+  - id: L701
+    title: "cadence run inscrit au registre des demandes les consignes du lead (D-8 à D-12, D-14 du 10-11 : briefs de correction) comme si elles venaient de l'humain ; le registre ne doit garder que les demandes de l'humain : ne rien inscrire quand la demande vient du lead (option ou marqueur), ou les inscrire à part ; mesure : 0 entrée de registre créée par un brief du lead"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-11
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

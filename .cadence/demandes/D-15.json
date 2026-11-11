@@ -1,0 +1,32 @@
+{
+ "id": "D-15",
+ "texte": "par contre il faudra que l'on gère le quota Fabe avec cadence, sinon il ne servira à rien",
+ "date": "2026-11-11",
+ "etat": "ouverte",
+ "lots": [
+  "L700"
+ ],
+ "preuve": null,
+ "precisions": [
+  {
+   "date": "2026-11-11",
+   "texte": "Sylvain, sur l'ordre des modèles : « ah mmoins queca soit une pure perte ». Choix retenu : Opus d'abord, Fable en secours sur limite d'usage (reprise de la même session) ; l'ordre est une ligne de cadence.yaml (run.modeles), à inverser si les crédits Fable non utilisés sont perdus."
+  },
+  {
+   "date": "2026-11-11",
+   "texte": "Sylvain : « j'ai l'impressions que les crédit Fable sont inutilisable, si on a plus de token hebdo, de ce que je crois comprendre la limite hebdo cest limite Fable + limite des autres. La semaibe dernière on a perdu 50% des tocken Fable. Mais bon à ce qui parait Opus fait aussi bien en ce moment ». Fait mesuré par lui : 50 % des tokens Fable perdus la semaine du 03-11. Proposition : les relectures (code-reviewer, ux, qa) sur Fable par défaut, le code sur Opus avec bascule sur Fable en cas de limite ; mesure : part des tokens Fable perdue en fin de semaine (/usage), cible < 10 %."
+  },
+  {
+   "date": "2026-11-11",
+   "texte": "Sylvain : « bah hier ont a atteint la limite hebdo, il restait 50% de la jauge de Fable, mais on ne pouvait pas l'utiliser ». Fait observé le 10-11 : la limite hebdomadaire atteinte bloque aussi Fable, jauge Fable à 50 %."
+  },
+  {
+   "date": "2026-11-11",
+   "texte": "Doc officielle lue le 11-11 (support.claude.com 11145838 et 17728952, code.claude.com errors, headless, statusline) : plan Ultra = limite hebdo sur tous les modèles + limite hebdo séparée pour Fable, sans fenêtre de 5 h ; pas de report d'une semaine à l'autre ; en claude -p, la fin de quota n'est reconnaissable que par le texte « You've hit your weekly limit · resets … » ; la status line reçoit rate_limits.seven_day.used_percentage et resets_at (pas de détail par modèle). Mécanisme retenu : cadence run reconnaît la fin de quota (état quota avec heure de reprise, pas echec) et reprend seul après ; le lead et le HUD lisent la jauge hebdo pour ne pas lancer un banc coûteux près de la limite ; bascule sur Fable seulement sur « Opus limit »."
+  },
+  {
+   "date": "2026-11-11",
+   "texte": "Renumérotée D-15 : le numéro D-14 a été pris par le run de L698 (consigne du lead inscrite par erreur) pendant que cette entrée n'était pas encore commitée."
+  }
+ ]
+}

@@ -4,11 +4,12 @@ import { execFileSync, spawn } from 'node:child_process';
 import type { Io } from '../cli.js';
 import type { Executeur } from '../bench/bras.js';
 import { MODELES, modeleRun } from './aiguillage.js';
-import { executerRun, repondreRun, type Etat } from './run.js';
+import { executerRun, occupantRun, repondreRun, type Etat } from './run.js';
 import { heureLocale, type Quota } from './quota.js';
 
-/** D-15 : ce que --liste dit d'un run en quota. */
-const quotaListe = (q: Quota) => `limite ${q.limite === 'hebdo' ? 'hebdo' : 'Opus'}, ${q.reprise ? `reprise après ${heureLocale(q.reprise)}` : 'heure de reprise illisible : cadence run --reponse'}`;
+/** D-15 : ce que --liste dit d'un run en quota ; D-18 : une reprise seule seulement si un processus vivant attend, sinon l'attente est arrêtée. */
+const quotaListe = (e: Etat, q: Quota, l = `limite ${q.limite === 'hebdo' ? 'hebdo' : 'Opus'}`, p = q.reprise ? occupantRun(e.fichier) : null) => (!q.reprise ? `${l}, heure de reprise illisible : cadence run --reponse`
+  : p ? `${l}, reprise seule après ${heureLocale(q.reprise)} (processus ${p.pid} en attente)` : `${l}, attente arrêtée (aucun processus n'attend ; reprise prévue ${heureLocale(q.reprise)}) : reprendre : cadence run --reponse ${e.id} "reprends"`);
 
 export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L12] [--taille retouche|fonction] [--complet] [--modele ${MODELES.join('|')}] [--sans-porte] [--fond]   une demande, une session (mode complet si références), porte, intégration
   cadence run --reponse <id> "<texte>"   reprend un run en attente, en quota ou rendu, dans la même session
@@ -16,6 +17,7 @@ export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L1
   cadence run --help | -h                cette aide, sans rien créer
   --modele : le modèle de la session, opus par défaut ; sans l'option, la variable CADENCE_RUN_MODELE ; un run repris par --reponse garde le sien
   quota (D-15) : une session qui finit sur « You've hit your weekly limit · resets … » met le run en état quota ; il reprend seul la même session après l'heure dite ;
+           tant que son processus attend, --reponse est refusé (kill <pid> d'abord) ; processus mort, --liste dit « attente arrêtée » : --reponse le reprend
            « You've hit your Opus limit » bascule sur fable dans la même session (jamais sur la limite hebdo, qui bloque tous les modèles)
   --fond : le run se détache (il survit à la session qui l'a lancé), son journal est dans ../.cadence-run/`;
 
@@ -27,7 +29,7 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
     if (a[0] === '--liste') {
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
       const etats = existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(d, f), 'utf8')) as Etat).filter((e) => e.repo === racine) : [];
-      for (const e of etats) out(`${e.id}  ${e.etat}  ${e.demande.split('\n')[0].slice(0, 80)}${e.etat === 'quota' && e.quota ? `  · ${quotaListe(e.quota)}` : ''}`);
+      for (const e of etats) out(`${e.id}  ${e.etat}  ${e.demande.split('\n')[0].slice(0, 80)}${e.etat === 'quota' && e.quota ? `  · ${quotaListe(e, e.quota)}` : ''}`);
       if (!etats.length) out('aucun run');
       return 0;
     }

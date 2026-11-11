@@ -46,11 +46,22 @@ describe('lead tour — runs en quota (L700)', () => {
     return { parent, repo };
   }
   it('un run en quota : projet, id, limite, heure de reprise et geste pour reprendre avant ; les autres états sont passés', () => {
-    const { repo } = runs({ id: 'r1', etat: 'quota', quota: { limite: 'hebdo', reprise: '2026-11-12T08:00:00.000Z' } }, { id: 'r2', etat: 'integre' }, { id: 'r3', etat: 'quota', quota: { limite: 'opus', reprise: null } });
+    const { repo, parent } = runs({ id: 'r1', etat: 'quota', quota: { limite: 'hebdo', reprise: '2026-11-12T08:00:00.000Z' } }, { id: 'r2', etat: 'integre' }, { id: 'r3', etat: 'quota', quota: { limite: 'opus', reprise: null } });
+    // revue L700 r1 (D-18) : r1 a un processus vivant qui attend (son verrou, à côté de son état) ; sans lui, il serait dit arrêté (test suivant)
+    writeFileSync(join(parent, '.cadence-run', 'cadence-0.verrou'), JSON.stringify({ pid: process.pid, role: 'attente', depuis: '2026-11-11T16:00:00Z' }));
     const lines = tourQuotaRunLines([repo]);
     expect(lines).toHaveLength(2);
-    expect(lines[0]).toMatch(/^run en quota : cadence r1 · limite hebdo · reprise seule après \d{4}-11-12 \d\d:\d\d · avant : cadence run --reponse r1 "reprends"$/);
+    expect(lines[0]).toMatch(new RegExp(`^run en quota : cadence r1 · limite hebdo · reprise seule après \\d{4}-11-12 \\d\\d:\\d\\d \\(processus ${process.pid} en attente\\) · avant : kill ${process.pid}, puis cadence run --reponse r1 "reprends"$`));
     expect(lines[1]).toBe('run en quota : cadence r3 · limite Opus · heure de reprise illisible · reprendre : cadence run --reponse r3 "reprends"');
+  });
+  it('revue L700 r1 (D-18) : un run en quota dont l\'attente est morte (pas de verrou, ou pid repris) est dit arrêté, avec la commande de reprise', () => {
+    const { repo, parent } = runs({ id: 'r1', etat: 'quota', quota: { limite: 'hebdo', reprise: '2026-11-12T08:00:00.000Z' } }, { id: 'r2', etat: 'quota', quota: { limite: 'hebdo', reprise: '2026-11-12T08:00:00.000Z' } });
+    writeFileSync(join(parent, '.cadence-run', 'cadence-1.verrou'), JSON.stringify({ pid: process.pid, start: 'un autre processus', role: 'attente', depuis: '2026-11-11T16:00:00Z' }));
+    const lines = tourQuotaRunLines([repo]);
+    expect(lines).toHaveLength(2);
+    for (const [i, l] of lines.entries()) {
+      expect(l).toMatch(new RegExp(`^run en quota : cadence r${i + 1} · limite hebdo · attente arrêtée \\(aucun processus n'attend ; reprise prévue \\d{4}-11-12 \\d\\d:\\d\\d\\) · reprendre : cadence run --reponse r${i + 1} "reprends"$`));
+    }
   });
   it('un run d\'un autre dépôt du même dossier n\'est pas compté deux fois ; pas de .cadence-run : rien', () => {
     const { repo, parent } = runs({ id: 'r1', etat: 'quota', quota: { limite: 'hebdo', reprise: null } });

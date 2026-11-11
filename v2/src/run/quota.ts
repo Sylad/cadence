@@ -34,14 +34,15 @@ function lireReprise(texte: string, maintenant: Date): string | null {
   const fz = /\(([A-Za-z_]+(?:\/[A-Za-z_+-]+)*)\)/.exec(apres)?.[1];
   let fuseau = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if (fz) try { new Intl.DateTimeFormat('en-US', { timeZone: fz }); fuseau = fz; } catch { /* fuseau inconnu : celui de la machine */ }
-  const ampm = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i.exec(apres), h24 = /\b(\d{1,2}):(\d{2})\b/.exec(apres);
+  // Revue L700 r1 (D-18) : jour, mois et heure se lisent hors de la parenthèse du fuseau (America/Montevideo n'est pas un lundi, Thunder_Bay pas un jeudi).
+  const quand = apres.replace(/\([^)]*\)/g, ' '), ampm = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i.exec(quand), h24 = /\b(\d{1,2}):(\d{2})\b/.exec(quand);
   if (!ampm && !h24) return null;
   let h = Number((ampm ?? h24)![1]); const mn = Number((ampm ?? h24)![2] ?? 0);
   if (ampm) h = (h % 12) + (ampm[3].toLowerCase() === 'pm' ? 12 : 0);
   if (h > 23 || mn > 59) return null;
   const t = maintenant.getTime(), auj = aujourdhui(t, fuseau);
-  const md = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/i.exec(apres);
-  const js = /\b(sun|mon|tue|wed|thu|fri|sat)[a-z]*\b/i.exec(apres);
+  const md = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/i.exec(quand);
+  const js = /\b(sun|mon|tue|wed|thu|fri|sat)[a-z]*\b/i.exec(quand);
   let r: number;
   if (md) {
     const m = MOIS.indexOf(md[1].toLowerCase()), j = Number(md[2]);

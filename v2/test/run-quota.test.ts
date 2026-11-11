@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { cmdRun } from '../src/run/cli.js';
-import { executerRun, repondreRun, type Etat } from '../src/run/run.js';
+import { executerRun, fichierVerrou, repondreRun, type Etat } from '../src/run/run.js';
 import { heureLocale } from '../src/run/quota.js';
 import { commite, depot, fauxClaude, git, io } from './run-outils.js';
 
@@ -112,10 +112,77 @@ describe('cadence run : fin de quota (D-15)', () => {
     expect(e.etat).toBe('en-cours');
   });
 
-  it('cadence run --liste affiche l état quota, la limite et l heure de reprise', async () => {
+  it('cadence run --liste : un run en quota dont un processus vivant attend montre l heure de reprise et ce processus', async () => {
     const repo = depot(), { l, out } = io();
     const e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([() => HEBDO]), out: () => {}, ...horloge(), attendre: null });
+    writeFileSync(fichierVerrou(e.fichier), JSON.stringify({ pid: process.pid, role: 'attente', depuis: new Date().toISOString() }));
     await cmdRun(['--liste'], { cwd: repo, env: {}, out, err: out, now: () => new Date() });
-    expect(l).toEqual([`${e.id}  quota  Crée fait.txt  · limite hebdo, reprise après ${heureLocale(REPRISE)}`]);
+    expect(l).toEqual([`${e.id}  quota  Crée fait.txt  · limite hebdo, reprise seule après ${heureLocale(REPRISE)} (processus ${process.pid} en attente)`]);
+  });
+});
+
+// Revue L700 r1 (D-18) : un seul processus joue ou attend un run à la fois (verrou <run>.verrou), et une attente morte se voit.
+describe('cadence run : verrou du run et attente morte (D-18)', () => {
+  const MORT = { pid: process.pid, start: 'un autre processus', role: 'attente', depuis: '2026-11-11T16:00:00Z' }; // pid repris : porteur mort
+
+  it('le verrou est tenu pendant la session, au nom de ce processus, et rendu à la fin du run', () => {
+    const repo = depot(), vus: unknown[] = [];
+    const e = executerRun({ repo, demande: 'x', exec: fauxClaude([(cwd) => { vus.push(JSON.parse(readFileSync(fichierVerrou(`${cwd}.json`), 'utf8'))); commite('fait.txt')(cwd); }]), out: () => {}, ...horloge() });
+    expect(e.etat).toBe('integre');
+    expect(vus).toEqual([expect.objectContaining({ pid: process.pid, role: 'session' })]);
+    expect(existsSync(fichierVerrou(e.fichier))).toBe(false);
+  });
+
+  it('un --reponse pendant que le run attend le quota est refusé avec le pid qui attend ; une seule reprise, celle de l attente', () => {
+    const repo = depot(), appels: Appels = [], h = horloge(), refus: string[] = [], roles: string[] = [];
+    let fichier = '';
+    const exec = fauxClaude([(cwd) => { fichier = `${cwd}.json`; return HEBDO; }, commite('fait.txt')], appels);
+    const attendre = (ms: number) => {
+      h.attendre(ms);
+      roles.push((JSON.parse(readFileSync(fichierVerrou(fichier), 'utf8')) as { role: string }).role);
+      const id = (JSON.parse(readFileSync(fichier, 'utf8')) as Etat).id;
+      try { repondreRun(id, repo, 'reprends', { exec, out: () => {} }); } catch (x) { refus.push((x as Error).message); }
+    };
+    const e = executerRun({ repo, demande: 'x', exec, out: () => {}, maintenant: h.maintenant, attendre });
+    expect(e.etat).toBe('integre');
+    expect(appels).toHaveLength(2); // la session de départ et la reprise de l'attente, jamais une troisième
+    expect(refus.length).toBeGreaterThan(0);
+    expect(refus[0]).toMatch(new RegExp(`processus ${process.pid} attend la remise à zéro du quota`));
+    expect(refus[0]).toMatch(/kill \d+/);
+    expect(roles.every((r) => r === 'attente')).toBe(true);
+    expect(existsSync(fichierVerrou(e.fichier))).toBe(false);
+  });
+
+  it('un --reponse pendant qu une session du run tourne est refusé', () => {
+    const repo = depot(), refus: string[] = [];
+    const exec = fauxClaude([(cwd) => {
+      const id = (JSON.parse(readFileSync(`${cwd}.json`, 'utf8')) as Etat).id;
+      try { repondreRun(id, repo, 'autre chose', { exec: fauxClaude([]), out: () => {} }); } catch (x) { refus.push((x as Error).message); }
+      commite('fait.txt')(cwd);
+    }]);
+    expect(executerRun({ repo, demande: 'x', exec, out: () => {}, ...horloge() }).etat).toBe('integre');
+    expect(refus).toEqual([expect.stringMatching(new RegExp(`une session de ce run tourne déjà \\(processus ${process.pid}\\)`))]);
+  });
+
+  it('le scénario de la revue : attente morte, --reponse avant la remise à zéro, le quota revient à la même heure ; ce --reponse attend seul et reprend une fois', () => {
+    const repo = depot(), appels: Appels = [], h = horloge();
+    const exec = fauxClaude([() => HEBDO, () => HEBDO, commite('fait.txt')], appels);
+    const e1 = executerRun({ repo, demande: 'x', exec, out: () => {}, ...h, attendre: null });
+    writeFileSync(fichierVerrou(e1.fichier), JSON.stringify(MORT)); // l'attente d'origine a été tuée : son verrou reste, mort
+    const e2 = repondreRun(e1.id, repo, 'reprends', { exec, out: () => {}, ...h });
+    expect(e2.etat).toBe('integre');
+    expect(appels).toHaveLength(3);
+    expect(arg(appels, 2, '-p')).toMatch(/quota est revenu/);
+    expect(existsSync(fichierVerrou(e1.fichier))).toBe(false);
+  });
+
+  it('cadence run --liste : un run en quota sans processus vivant qui attend est dit arrêté, avec la commande de reprise', async () => {
+    const repo = depot(), { l, out } = io();
+    const e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([() => HEBDO]), out: () => {}, ...horloge(), attendre: null });
+    const arrete = `${e.id}  quota  Crée fait.txt  · limite hebdo, attente arrêtée (aucun processus n'attend ; reprise prévue ${heureLocale(REPRISE)}) : reprendre : cadence run --reponse ${e.id} "reprends"`;
+    await cmdRun(['--liste'], { cwd: repo, env: {}, out, err: out, now: () => new Date() });
+    writeFileSync(fichierVerrou(e.fichier), JSON.stringify(MORT));
+    await cmdRun(['--liste'], { cwd: repo, env: {}, out, err: out, now: () => new Date() });
+    expect(l).toEqual([arrete, arrete]);
   });
 });

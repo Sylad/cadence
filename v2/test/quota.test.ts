@@ -32,6 +32,15 @@ describe('reconnaitreQuota', () => {
     expect(reconnaitreQuota("You've hit your Opus limit", MAINTENANT)).toMatchObject({ limite: 'opus', reprise: null });
   });
 
+  it('revue L700 r1 (D-18) : le jour de la semaine n est jamais lu dans le nom du fuseau', () => {
+    // Montevideo, Monaco contiennent « mon », Thunder_Bay « thu » : la reprise est la prochaine 9 h, jeudi 12-11, pas lundi ni la semaine suivante
+    expect(reconnaitreQuota("You've hit your weekly limit · resets 9am (America/Montevideo)", MAINTENANT)?.reprise).toBe('2026-11-12T12:00:00.000Z');
+    expect(reconnaitreQuota("You've hit your weekly limit · resets 9am (Europe/Monaco)", MAINTENANT)?.reprise).toBe('2026-11-12T08:00:00.000Z');
+    expect(reconnaitreQuota("You've hit your weekly limit · resets 8pm (America/Thunder_Bay)", MAINTENANT)?.reprise).toBe('2026-11-12T01:00:00.000Z');
+    // un jour dit hors de la parenthèse reste lu
+    expect(reconnaitreQuota("You've hit your weekly limit · resets Fri 9am (America/Montevideo)", MAINTENANT)?.reprise).toBe('2026-11-13T12:00:00.000Z');
+  });
+
   it('heure de reprise illisible : quota reconnu, reprise inconnue', () => {
     expect(reconnaitreQuota("You've hit your weekly limit · resets soon", MAINTENANT)).toMatchObject({ limite: 'hebdo', reprise: null });
   });

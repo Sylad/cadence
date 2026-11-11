@@ -2,6 +2,7 @@
 // Doc officielle lue le 11-11 : la status line reçoit rate_limits.seven_day (used_percentage, resets_at), sans détail par modèle ; la limite hebdo bloque tous les modèles.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
+import { holderAlive } from './orchestrate/lock.js';
 import { cadenceHome } from './orchestrate/registry.js';
 
 /** Fichier que la bande écrit dans CADENCE_HOME à chaque rafraîchissement : { percent, resetsAt, at }. */
@@ -38,7 +39,18 @@ export function tourQuotaLine(env: NodeJS.ProcessEnv, now: number): string {
   return parts.join(' · ');
 }
 
-interface RunState { id?: string; repo?: string; etat?: string; quota?: { limite?: string; reprise?: string | null } }
+interface RunState { id?: string; repo?: string; etat?: string; quota?: { limite?: string; reprise?: string | null }; verrou?: string }
+
+/** Revue L700 r1 (D-18) : le pid du processus vivant qui attend le run (verrou `<run>.verrou` qu'écrit v2/src/run/run.ts), ou null. */
+function waitingPid(lockFile: string | undefined): number | null {
+  try {
+    const v = JSON.parse(readFileSync(lockFile ?? '', 'utf8')) as { pid?: unknown; start?: unknown };
+    const pid = Number(v.pid);
+    return Number.isInteger(pid) && holderAlive(pid, typeof v.start === 'string' ? v.start : undefined) ? pid : null;
+  } catch {
+    return null;
+  }
+}
 
 const localTime = (iso: string): string => {
   const d = new Date(iso), z = (n: number) => String(n).padStart(2, '0');
@@ -50,7 +62,7 @@ function runStates(dir: string): RunState[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter((x) => x.endsWith('.json')).sort().flatMap((f) => {
     try {
-      return [JSON.parse(readFileSync(join(dir, f), 'utf8')) as RunState];
+      return [{ ...(JSON.parse(readFileSync(join(dir, f), 'utf8')) as RunState), verrou: join(dir, f.replace(/\.json$/, '.verrou')) }];
     } catch {
       return [];
     }
@@ -59,7 +71,10 @@ function runStates(dir: string): RunState[] {
 
 function quotaRunLine(e: RunState): string {
   const limit = e.quota?.limite === 'opus' ? 'limite Opus' : 'limite hebdo', resume = `cadence run --reponse ${e.id} "reprends"`;
-  const when = e.quota?.reprise ? `reprise seule après ${localTime(e.quota.reprise)} · avant : ${resume}` : `heure de reprise illisible · reprendre : ${resume}`;
+  const pid = e.quota?.reprise ? waitingPid(e.verrou) : null;
+  const when = !e.quota?.reprise ? `heure de reprise illisible · reprendre : ${resume}`
+    : pid ? `reprise seule après ${localTime(e.quota.reprise)} (processus ${pid} en attente) · avant : kill ${pid}, puis ${resume}`
+      : `attente arrêtée (aucun processus n'attend ; reprise prévue ${localTime(e.quota.reprise)}) · reprendre : ${resume}`;
   return `run en quota : ${basename(e.repo ?? '')} ${e.id} · ${limit} · ${when}`;
 }
 

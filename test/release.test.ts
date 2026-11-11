@@ -298,7 +298,6 @@ describe('cadence release — rien n’est publié', () => {
       'git commit',
       'git tag v1.2.4',
       'cadence verify --gate --sha HEAD',
-      'git clone',
       'npm run eval:plugin -- --trust-plugin',
       'git push origin main v1.2.4',
       'gh run watch',
@@ -589,33 +588,14 @@ describe('cadence release — le plugin du marketplace', () => {
   });
 });
 
-describe('cadence release — passage en clone neuf (L446)', () => {
-  it('L446 — la porte est aussi rejouée dans un git clone du commit de version, sans fichier non suivi : clone, npm ci, typecheck, test, puis le clone est retiré', () => {
+describe('cadence release — passage en clone neuf (L446, repris par la commande en L698)', () => {
+  // L698 : le clone neuf n'est plus une étape que le lead joue à la main après le tag : la commande rejoue elle-même la CI de publication
+  // dans un clone neuf du commit de version avant d'écrire (test/release-ci-l698.test.ts). Sans workflow déclenché par un tag, elle le dit.
+  it('L698 — aucune étape « git clone » n’est plus imprimée au lead ; sans workflow de publication, la commande dit qu’il n’y a rien à rejouer', () => {
     const r = release(project({ whatsNew: WHATS_NEW_DONE }), 'patch');
-    const line = r.out.split('\n').find((l) => l.includes('git clone')) ?? '';
-    expect(line).toMatch(/git clone .*--no-hardlinks/);
-    const at = (s: string) => line.indexOf(s);
-    expect(at('npm ci'), line).toBeGreaterThan(at('git clone'));
-    expect(at('npm run typecheck'), line).toBeGreaterThan(at('npm ci'));
-    expect(at('npm test'), line).toBeGreaterThan(at('npm run typecheck'));
-    expect(at('rm -rf'), line).toBeGreaterThan(at('npm test'));
-    expect(r.out.indexOf('git clone'), 'après la porte').toBeGreaterThan(r.out.indexOf('cadence verify --gate --sha HEAD'));
-    expect(r.out.indexOf('git clone'), 'après le tag provisoire, que le clone reçoit').toBeGreaterThan(r.out.indexOf('git tag v1.2.4'));
-  });
-
-  it('L446 — le clone ne rejoue que les scripts que le paquet déclare : sans script typecheck, pas de typecheck ; sans test ni typecheck, pas de clone', () => {
-    const only = (scripts: Record<string, string>) => {
-      const dir = project({ whatsNew: WHATS_NEW_DONE });
-      const pkg = JSON.parse(read(dir, 'package.json'));
-      pkg.scripts = scripts;
-      writeFileSync(join(dir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
-      git(dir, 'commit', '-qam', 'chore: scripts');
-      return release(dir, 'patch').out;
-    };
-    const testOnly = only({ test: 'vitest run' });
-    expect(testOnly).toContain('git clone');
-    expect(testOnly).not.toContain('npm run typecheck');
-    expect(only({ 'eval:plugin': 'x' })).not.toContain('git clone');
+    expect(r.out).not.toContain('git clone');
+    expect(r.out).toContain('CI de publication : aucun workflow déclenché par un tag dans .github/workflows — rien à rejouer');
+    expect(r.out.indexOf('CI de publication'), 'avant l’écriture des fichiers de version').toBeLessThan(r.out.indexOf('release : 1.2.3 → 1.2.4'));
   });
 
   it('L446 — tests.yml tourne sur chaque push de main (un clone neuf par run), en plus des branches diag/**', () => {
@@ -629,18 +609,17 @@ describe('cadence release — tag local provisoire (L508)', () => {
   const find = (out: string, s: string) => lines(out).find((l) => l.includes(s)) ?? '';
   const untag = '{ git tag -d v1.2.4; false; }';
 
-  it('R1 — le tag v<version> est posé en local juste après le commit de version, avant la porte, le clone et l’éval : ils voient la version publiée', () => {
+  it('R1 — le tag v<version> est posé en local juste après le commit de version, avant la porte et l’éval : elles voient la version publiée', () => {
     const r = release(project({ whatsNew: WHATS_NEW_DONE }), 'patch');
     const at = (s: string) => r.out.indexOf(s);
     expect(find(r.out, 'git tag v1.2.4')).toMatch(/^\s*\d+\. git tag v1\.2\.4 /);
     expect(at('git tag v1.2.4')).toBeGreaterThan(at('git commit'));
-    for (const later of ['cadence verify --gate', 'git clone', 'eval:plugin']) expect(at(later), later).toBeGreaterThan(at('git tag v1.2.4'));
+    for (const later of ['cadence verify --gate', 'eval:plugin']) expect(at(later), later).toBeGreaterThan(at('git tag v1.2.4'));
   });
 
-  it('R2 — la porte, le clone et l’éval retirent le tag provisoire quand ils sont rouges', () => {
+  it('R2 — la porte et l’éval retirent le tag provisoire quand ils sont rouges (le clone neuf est joué par la commande avant le tag, L698)', () => {
     const r = release(project({ whatsNew: WHATS_NEW_DONE }), 'patch');
     expect(find(r.out, 'cadence verify --gate --sha HEAD')).toContain(`|| ${untag}`);
-    expect(find(r.out, 'git clone')).toContain(`test $r -eq 0 || ${untag}`);
     expect(find(r.out, 'npm run eval:plugin')).toContain(`|| ${untag}`);
   });
 

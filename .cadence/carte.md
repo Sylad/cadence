@@ -32,3 +32,20 @@
 - Revue r1 (D-12) : PATH des commandes réduit à `<installe>/node_modules/.bin`, un dossier à lui avec le seul `node` de la release (lien vers process.execPath :
   le dossier nvm porte un `cadence2` global) et les dossiers système (`/usr/local/bin`, `/usr/bin`, `/bin` + sbin, pour bash et git) ; `NODE_PATH` vide.
   Un bin de package.json sans lien dans `.bin` (fichier absent de HEAD, npm se tait) : refus explicite avant toute commande.
+
+## CI de publication rejouée avant le tag (src/release-ci.ts) — L698, D-14
+
+- Workflow : `cadence release`, après la fumée du paquet (L696) et avant tout écrit : `git clone --no-hardlinks` du dépôt dans un dossier temporaire,
+  détaché sur HEAD, les fichiers de version qu'elle va écrire (plus `docs/whats-new.md` de l'arbre de travail) commités (`release: <version>`) et tagués
+  `v<version>` : le commit et le tag que verra le checkout de la CI. Puis les étapes `run` de chaque workflow de `.github/workflows` déclenché par un
+  tag (`on.push.tags`), dans l'ordre, en `bash -e`, `CI=true`, `GITHUB_REF_NAME`, `RUNNER_TEMP`, `GITHUB_OUTPUT` posés, `CADENCE_*`, `GIT_*`, `npm_*`,
+  `RAF_*` retirés. Rouge = refus (code 2) avec le fichier, l'étape, la commande et la fin de la sortie ; le clone est retiré, vert ou rouge.
+- Décision : une étape `npm publish` est rejouée comme `npm run prepublishOnly --if-present && npm pack --dry-run` (ce que publish joue avant l'envoi :
+  suite, prepack, prepare, postpack ; rien ne part, aucun registre touché). Non rejouées, listées avec la raison : actions `uses:`, `sudo`/`apt-get`,
+  `npm install -g`, `npm view`, `gh`, `git config --global`/`push`/`fetch`, `curl`/`wget`, étapes sous `if:`. Les `echo` et commentaires d'un script
+  ne comptent pas pour cette classification (« npm publish est sauté » dans un message).
+- Décision : `--dry-run` liste les étapes sans les jouer (la suite complète dure plusieurs minutes) ; sans workflow déclenché par un tag, la commande le dit.
+- Décision : l'étape « git clone … npm ci … npm test » que le lead jouait à la main après le tag (L446/L508) n'est plus imprimée : la commande fait
+  mieux (commit de version réel, tag, tous les scripts de prepublishOnly, prepare) avant d'écrire. Tests L446/L508 du clone imprimé mis à jour.
+- Test statique `test/paquet-files-l698.test.ts` : chaque chemin de `files` existe après le build (`npm run prepare` joué si dist/ manque), chaque `bin`
+  existe et est couvert par un chemin de `files`.

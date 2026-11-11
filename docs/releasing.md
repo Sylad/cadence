@@ -19,8 +19,8 @@ Between the version commit and the gate it also prints a **provisional local tag
    to be reviewed.
 2. Put the provisional local tag on that commit, then replay the project's gate on it (L508). Some tests read the latest tag
    (`test/changelog.test.ts` checks that a lot cited under the latest tagged version has a commit in that tag); run before the tag
-   exists, they still see the previous version, which is how 1.34.0 was tagged green and failed its publication. The tag is made first, local only, and the gate,
-   the fresh-clone replay and the evaluation below each remove it (`git tag -d`, the step stays red) when they fail; nothing is pushed
+   exists, they still see the previous version, which is how 1.34.0 was tagged green and failed its publication. The tag is made first, local only, and the gate
+   and the evaluation below each remove it (`git tag -d`, the step stays red) when they fail; nothing is pushed
    until step 4. The gate: `cadence verify --gate --sha HEAD` (L380). The version commit empties
    `## [Unreleased]` of `CHANGELOG.md`, and a test that read only that section would pass before it and fail after — the red
    publish run of 1.14.0 (L368) and the stopped 1.15.2 (L380) — so the suite is run on the commit that will be tagged, before the
@@ -29,14 +29,17 @@ Between the version commit and the gate it also prints a **provisional local tag
    `changelogSectionOf` (`test/changelog-section.ts`); `test/changelog-garde.test.ts` refuses a test that selects `## [Unreleased]`
    of the repository's CHANGELOG itself. The gate runs in the lead's tree or in a copy of it, both full of files git does not track
    (the `plugins/cadence-hud/.claude-plugin/types` that Claude Code generates, `node_modules`): the 1.25.0 publish run broke on three
-   `hud-*` tests that read those types, present in every local tree and absent from the CI checkout (L446). So the same commit is
-   also replayed **in a fresh `git clone`** — the next step the command prints: `git clone --no-hardlinks` of the repository
-   (only what is committed), `npm ci`, then `npm run typecheck` and `npm test` (those the package declares; a package with neither gets no
-   such step), the clone removed whatever the result. Red: no evaluation, tag removed. `.github/workflows/tests.yml` does the same on every
+   `hud-*` tests that read those types, present in every local tree and absent from the CI checkout (L446). That is why `cadence release`
+   itself, before writing anything, **replays the publication CI in a fresh `git clone` of the version commit** (L698, see
+   [`cadence release`](#cadence-release) below): a clone of the repository (only what is committed), detached on `HEAD`, where the version
+   files it is about to write are committed and tagged `v<version>` exactly as the CI checkout will see them, then the `run` steps of
+   `.github/workflows/publish.yml` (tag check, CHANGELOG section, `npm ci`, and what `npm publish` runs before sending: `prepublishOnly`, then
+   `prepare` through `npm pack --dry-run`). Red: the release is refused with the step, its command and the end of its output, nothing written;
+   the clone is removed either way. The lead no longer plays a clone step by hand. `.github/workflows/tests.yml` does the same on every
    push to `main`, from a fresh checkout.
    With `orchestrate.gate.host` ([remote-gate.md](remote-gate.md)) the gate is played on another machine that receives only the commit
    (`refs/cadence-gate/<sha>`), so that host does not see the provisional tag and a test reading the latest tag passes there without checking
-   anything; only the local fresh-clone replay, which does receive the tag, catches it, and it is printed only when the package declares `test` or `typecheck`.
+   anything; the command's fresh-clone replay, which does carry the tag, catches it.
 3. Run the plugin evaluation, `npm run eval:plugin` (billed, see [Evaluating the plugin](#evaluating-the-plugin-before-a-release)),
    on that version commit; a case below the threshold stops the release and removes the tag (step 2) until you have read it in the report; if you judge the case a false negative, run `git tag v<version>` again on the version commit before step 4.
 4. `git push origin main v<version>` (the tag already exists, step 2; `git tag v<version>` is not run twice) — the tag starts `.github/workflows/publish.yml`,
@@ -83,6 +86,21 @@ It refuses, with exit code 2 and nothing written:
 - a `package-lock.json` that is not at the version of `package.json`, or whose dependencies differ from those of `package.json`
   (a `npm install` would move them: commit that apart, before the release);
 - a version in `package.json` that is not `x.y.z`.
+- a **red step of the publication CI replayed in a fresh clone of the version commit** (L698). 7 of the 10 versions broken from 28-10 to 10-11
+  broke in `publish.yml` (a file untracked but present in every local tree, 1.25.0; a test reading the latest tag, 1.34.0; the ratchet, 1.42.0;
+  a documentation test, 1.22.0), which neither the gate in the lead's tree nor the smoke test of the installed package sees. Before writing
+  anything, the command makes a `git clone --no-hardlinks` of the repository in a temporary folder, detaches it on `HEAD`, writes there the
+  version files it is about to write (plus `docs/whats-new.md` as it is in the working tree), commits them (`release: <version>`) and tags
+  `v<version>`: the commit and the tag the CI checkout will see. Then it plays, in that clone, the `run` steps of every workflow of
+  `.github/workflows` triggered by a tag (`on.push.tags`), in order, with `bash -e` as GitHub does, `CI=true`, `GITHUB_REF_NAME=v<version>`,
+  `RUNNER_TEMP` and `GITHUB_OUTPUT` set, and the `CADENCE_*`, `GIT_*`, `npm_*` and `RAF_*` variables of the caller removed. A step that runs
+  `npm publish` is replayed as `npm run prepublishOnly --if-present && npm pack --dry-run` (what `npm publish` runs before sending: the suite,
+  then `prepack`, `prepare`, `postpack`; nothing is sent). Steps it cannot replay on a workstation are listed as « non rejouée » with the reason:
+  `uses:` actions, `sudo` and `apt-get`, `npm install -g`, `npm view` (the registry), `gh`, `git config --global`, `git push`, `curl`/`wget`,
+  and steps carrying an `if:` (their condition depends on the run). Each replayed step is printed with its duration; the first red one refuses
+  the release with the workflow file, the step, its command and the end of its output; the clone is removed, green or red. A repository with
+  no workflow triggered by a tag gets no replay, and the command says so. `--dry-run` lists the steps it would replay without playing them
+  (the full suite takes minutes). For cadence, the replay runs the tag check, the CHANGELOG check, `npm ci` and `prepublishOnly` + `prepare`.
 - a **red smoke test of the installed package** (L696). Before writing anything, the command packs `HEAD` with `npm pack` in a detached
   `git worktree` (what is not committed does not get in; the repository's `node_modules` are linked so that `prepare` builds), installs the
   tarball with `npm install` in an empty folder, then runs the smoke commands from that installed package, each in an empty folder of its own,
@@ -115,8 +133,8 @@ introduction (the newest version first, as the file is read). Exit code 1 when a
 version files are written, the commit is not ready. `--dry-run` reads the forms the same way (nothing is written) and exits 1 on the same findings, so the forms can be checked before the real run.
 
 It prints the lead's steps, in order, and runs none: the `git add` of exactly the files of the version commit and the commit,
-the provisional tag `git tag v<x.y.z>` (L508: made before the gate, removed by `git tag -d` when the gate, the clone replay or the evaluation is red),
-`cadence verify --gate --sha HEAD` (always printed, before the evaluation), the replay in a fresh clone (L446: `git clone --no-hardlinks`, `npm ci`, `npm run typecheck` and `npm test` for the scripts `package.json` declares, none printed when it declares neither),
+the provisional tag `git tag v<x.y.z>` (L508: made before the gate, removed by `git tag -d` when the gate or the evaluation is red),
+`cadence verify --gate --sha HEAD` (always printed, before the evaluation; the fresh-clone replay of L446 is no longer a step of the lead: the command played it itself, on the version commit and its tag, before writing — L698),
 `npm run eval:plugin -- --trust-plugin` (only when `package.json` has that script), `git push origin <branch> v<x.y.z>`,
 `gh run watch`, `npm view <package> version` (not for a private package) and, only with a `.claude-plugin/plugin.json`,
 the plugin update: `claude plugin marketplace update <marketplace>` first (without it the installed plugin stays at the old

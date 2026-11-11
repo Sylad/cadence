@@ -32,57 +32,12 @@ const sh = (dir: string, script: string, env: NodeJS.ProcessEnv = {}) => spawnSy
 const tags = (dir: string) => execFileSync('git', ['tag', '--list'], { cwd: dir, encoding: 'utf8' }).trim();
 
 describe('L508 — tag provisoire : exécution réelle des étapes imprimées', () => {
-  it('le clone neuf voit le tag provisoire (npm factice qui lit git describe dans le clone)', () => {
-    const dir = repo('1.2.4');
-    const o = printed(dir, 'patch').out;
-    execFileSync('git', ['tag', 'v1.2.4'], { cwd: dir });
-    const bin = tempDir();
-    writeFileSync(join(bin, 'npm'), '#!/bin/sh\n[ "$1" = ci ] && exit 0\ngit describe --tags --abbrev=0 > "$PROBE_OUT"\n');
-    chmodSync(join(bin, 'npm'), 0o755);
-    const probe = join(tempDir(), 'seen');
-    const r = sh(dir, cmd(o, 'git clone'), { PATH: `${bin}:${process.env.PATH}`, PROBE_OUT: probe });
-    expect(r.status, r.stderr).toBe(0);
-    expect(execFileSync('cat', [probe], { encoding: 'utf8' }).trim()).toBe('v1.2.4');
-    expect(tags(dir)).toBe('v1.2.4');
-  });
-
-  it('clone rouge (npm test échoue) : tag retiré, code non nul, clone temporaire supprimé', () => {
-    const dir = repo('1.2.4');
-    const o = printed(dir, 'patch').out;
-    execFileSync('git', ['tag', 'v1.2.4'], { cwd: dir });
-    const bin = tempDir();
-    writeFileSync(join(bin, 'npm'), '#!/bin/sh\n[ "$1" = ci ] && exit 0\npwd > "$PROBE_OUT"\nexit 3\n');
-    chmodSync(join(bin, 'npm'), 0o755);
-    const probe = join(tempDir(), 'cwd');
-    const r = sh(dir, cmd(o, 'git clone'), { PATH: `${bin}:${process.env.PATH}`, PROBE_OUT: probe });
-    expect(r.status).not.toBe(0);
-    expect(tags(dir)).toBe('');
-    const cloneDir = execFileSync('cat', [probe], { encoding: 'utf8' }).trim();
-    expect(sh('/', `test -e ${cloneDir}`).status, 'clone supprimé').not.toBe(0);
-  });
-
-  it('clone rouge dès npm ci : tag retiré aussi', () => {
-    const dir = repo('1.2.4');
-    const o = printed(dir, 'patch').out;
-    execFileSync('git', ['tag', 'v1.2.4'], { cwd: dir });
-    const bin = tempDir();
-    writeFileSync(join(bin, 'npm'), '#!/bin/sh\nexit 1\n');
-    chmodSync(join(bin, 'npm'), 0o755);
-    const r = sh(dir, cmd(o, 'git clone'), { PATH: `${bin}:${process.env.PATH}` });
-    expect(r.status).not.toBe(0);
-    expect(tags(dir)).toBe('');
-  });
-
-  it('clone vert : tag conservé, code 0', () => {
-    const dir = repo('1.2.4');
-    const o = printed(dir, 'patch').out;
-    execFileSync('git', ['tag', 'v1.2.4'], { cwd: dir });
-    const bin = tempDir();
-    writeFileSync(join(bin, 'npm'), '#!/bin/sh\nexit 0\n');
-    chmodSync(join(bin, 'npm'), 0o755);
-    const r = sh(dir, cmd(o, 'git clone'), { PATH: `${bin}:${process.env.PATH}` });
-    expect(r.status).toBe(0);
-    expect(tags(dir)).toBe('v1.2.4');
+  // L698 : l'étape « git clone … npm ci … » n'est plus imprimée ; la commande rejoue elle-même la CI dans un clone neuf du commit de version
+  // avant d'écrire (test/release-ci-l698.test.ts). Les sondes du clone imprimé (tag vu par le clone, clone rouge → tag retiré) sont parties avec elle.
+  it('L698 — aucune étape « git clone » imprimée : le clone neuf n’est plus à jouer par le lead', () => {
+    const o = printed(repo('1.2.4'), 'patch').out;
+    expect(o).not.toContain('git clone');
+    expect(o).toContain('rien à rejouer');
   });
 
   it('retrait de l’éval rouge : la commande imprimée avec un npm en échec retire le tag', () => {

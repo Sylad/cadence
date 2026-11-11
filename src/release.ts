@@ -6,6 +6,7 @@ import { RafError } from './plan.js';
 import type { Day } from './dates.js';
 import { releaseIssueLines } from './issues.js';
 import { commandesFumee, fumerPaquet } from './release-fumee.js';
+import { ciAvantEcriture } from './release-ci.js';
 
 const BUMPS = ['patch', 'minor', 'major'] as const;
 type Bump = (typeof BUMPS)[number];
@@ -98,8 +99,6 @@ interface Planned {
   packageName: string;
   isPrivate: boolean;
   hasEvalScript: boolean;
-  /** Les scripts npm que le clone neuf rejoue, dans l'ordre : typecheck puis test, ceux que le paquet déclare. */
-  cloneScripts: string[];
 }
 
 /** Un échec de git (hors dépôt, dépôt sans commit) est un refus, pas une trace de pile. */
@@ -237,7 +236,6 @@ function plan(root: string, bump: Bump, today: Day): Planned {
     packageName: String(pkg.name ?? ''),
     isPrivate: pkg.private === true,
     hasEvalScript: typeof pkg.scripts?.['eval:plugin'] === 'string',
-    cloneScripts: ['typecheck', 'test'].filter((n) => typeof pkg.scripts?.[n] === 'string'),
   };
 }
 
@@ -281,26 +279,16 @@ function whatsNewIssues(text: string, version: string): string[] {
   return issues;
 }
 
-/**
- * Le passage en clone neuf (L446) : la porte voit l'arbre du lead, avec ses fichiers non suivis (la 1.25.0 a cassé à la publication sur des
- * types que Claude Code génère dans plugins/cadence-hud et que seul un clone ne porte pas). `git clone` du dépôt courant ne prend que ce qui est commité,
- * `--no-hardlinks` pour ne rien partager avec lui ; le clone est retiré, vert ou rouge.
- */
-function cloneStep(scripts: string[], untag: string): string {
-  const run = scripts.map((n) => (n === 'test' ? 'npm test' : `npm run ${n}`)).join(' && ');
-  return `d=$(mktemp -d) && git clone -q --no-hardlinks . "$d/c" && (cd "$d/c" && npm ci && ${run}); r=$?; rm -rf "$d"; test $r -eq 0 || ${untag}    (la suite dans un git clone neuf, qui reçoit le tag provisoire, comme publish.yml ; rouge = tag retiré)`;
-}
-
 /** Les étapes que le lead joue, dans l'ordre : la commande n'en fait aucune. */
 function steps(p: Planned, files: string[], branch: string): string[] {
   const tag = `v${p.version}`;
-  // Rouge à la porte, au clone ou à l'éval : le tag provisoire est retiré, la release n'a pas eu lieu.
+  // Rouge à la porte ou à l'éval : le tag provisoire est retiré, la release n'a pas eu lieu. Le passage en clone neuf (L446) n'est plus
+  // une étape du lead : la commande l'a joué elle-même, sur le commit de version et son tag, avant d'écrire (L698, src/release-ci.ts).
   const untag = `{ git tag -d ${tag}; false; }`;
   const out = [
     `git add ${files.join(' ')} && git commit -m "release: ${p.version}"`,
-    `git tag ${tag}    (tag local provisoire sur le commit de version : les tests qui lisent le dernier tag, comme test/changelog.test.ts, voient la version publiée ; retiré si une des trois étapes suivantes est rouge, jamais poussé avant)`,
+    `git tag ${tag}    (tag local provisoire sur le commit de version : les tests qui lisent le dernier tag, comme test/changelog.test.ts, voient la version publiée ; retiré si une des deux étapes suivantes est rouge, jamais poussé avant)`,
     `cadence verify --gate --sha HEAD || ${untag}    (la suite et le build rejoués sur le commit de version, où le CHANGELOG n'a plus de [Unreleased] plein ; rouge = tag retiré, pas d'éval)`,
-    ...(p.cloneScripts.length ? [cloneStep(p.cloneScripts, untag)] : []),
     ...(p.hasEvalScript ? [`npm run eval:plugin -- --trust-plugin || ${untag}    (facturé ; un cas sous le seuil arrête la release et retire le tag ; si la lecture du rapport le juge faux, reposer le tag de l’étape 2 avant le push)`] : []),
     `git push origin ${branch} ${tag}    (le tag provisoire devient le tag de la release ; il lance le workflow de publication)`,
     'gh run watch    (jusqu\'à la fin du run de publication)',
@@ -348,6 +336,8 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
 
   const whatsNewPath = join(root, WHATS_NEW);
   const hasWhatsNew = existsSync(whatsNewPath);
+  // L698 : la CI de publication (le workflow déclenché par un tag) rejouée dans un clone neuf du commit de version, tagué ; un rouge refuse la release.
+  ciAvantEcriture(root, dryRun, { version: p.version, writes: p.writes, copies: hasWhatsNew ? [WHATS_NEW] : [] }, out);
   const files = hasWhatsNew ? [...p.files, WHATS_NEW] : p.files;
   const branch = inGit('la lecture de la branche', () => currentBranch(root)) ?? 'main';
 

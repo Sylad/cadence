@@ -40,11 +40,13 @@ export function commandesFumee(root: string, pkg: Record<string, any>): string[]
   return binsDeclares(pkg).map(([n]) => `${n} --help`);
 }
 
-type Sortie = { status: number | null; stdout?: string; stderr?: string; error?: Error };
-const texte = (r: Sortie) => `${r.stdout ?? ''}${r.stderr ?? ''}${r.error ? `\n${r.error.message}` : ''}`.trim();
-const queue = (s: string) => (s.length > SORTIE_MAX ? `…${s.slice(-SORTIE_MAX)}` : s);
+export type Sortie = { status: number | null; stdout?: string; stderr?: string; error?: Error };
+/** Sortie et erreur d'un processus, en un texte. */
+export const texteSortie = (r: Sortie) => `${r.stdout ?? ''}${r.stderr ?? ''}${r.error ? `\n${r.error.message}` : ''}`.trim();
+/** La fin d'une sortie longue : ce qu'un refus montre. */
+export const queueSortie = (s: string) => (s.length > SORTIE_MAX ? `…${s.slice(-SORTIE_MAX)}` : s);
 const refus = (etape: string, r: Sortie) =>
-  new RafError(`release : la fumée du paquet installé est rouge, rien n'est écrit — ${etape} (code ${r.status ?? r.error?.message ?? '?'})\n${queue(texte(r))}`);
+  new RafError(`release : la fumée du paquet installé est rouge, rien n'est écrit — ${etape} (code ${r.status ?? r.error?.message ?? '?'})\n${queueSortie(texteSortie(r))}`);
 
 /**
  * Les dossiers système gardés dans le PATH : bash, git et les outils de base des scripts de fumée. Le PATH appelant n'est pas repris :

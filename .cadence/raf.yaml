@@ -3234,9 +3234,10 @@ lots:
     finished: 2026-11-11
   - id: L701
     title: "cadence run inscrit au registre des demandes les consignes du lead (D-8 à D-12, D-14 du 10-11 : briefs de correction) comme si elles venaient de l'humain ; le registre ne doit garder que les demandes de l'humain : ne rien inscrire quand la demande vient du lead (option ou marqueur), ou les inscrire à part ; mesure : 0 entrée de registre créée par un brief du lead"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-11
+    started: 2026-11-11
   - id: L702
     title: "release-ci, défense en profondeur (suites de la revue L698 r3) : npm run/test --ws et motifs de workspaces imbriqués contournent le contrôle des scripts de workspace ; working-directory en lien symbolique vers l'extérieur du clone ; tests pour chaque cas"
     status: todo

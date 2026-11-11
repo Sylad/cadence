@@ -3252,9 +3252,10 @@ lots:
     created: 2026-11-11
   - id: L703
     title: "Banc séquence : le coût et les tokens d'un bras qui reprend sa session additionnent les totaux cumulés de claude -p --resume (bras gardé du banc 2026-11-10-1551 : 31,5 et 29,7 $ rapportés pour 10,01 et 9,08 $ réels ; 79,2 M tokens pour 24,9 M) ; compter la différence entre deux relevés d'une même session ; test sur ce banc"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-11
+    started: 2026-11-11
   - id: L704
     title: "cadence perf et orchestrate comptent l'écriture de cache au prix d'entrée (src/cost.ts) : écritures sous-estimées de moitié, un tiers du coût sur le banc 2026-11-10-1551 ; utiliser la grille de L693 (cadence cost)"
     status: todo

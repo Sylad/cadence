@@ -5,7 +5,8 @@
  "origine": "session du lead ; précisé par « et le context on peu pas le compacter via cadence? » ; essai /compact en -p --resume réussi le 10-11 ; « ok » au plan des 3 variantes",
  "etat": "ouverte",
  "lots": [
-  "L690"
+  "L690",
+  "L703"
  ],
  "preuve": "L690 clos (revue r2 conforme, porte verte 3e00f1ac) ; banc 2026-11-10-1551-b4bcc9ea9150 : session gardée ×3,5 en coût sans gain de qualité établi, cadence run --suite non ajouté",
  "precisions": [
@@ -28,6 +29,10 @@
   {
    "date": "2026-11-11",
    "texte": "CORRECTION de la mesure du 10-11 : le banc additionnait les totaux cumulés d'une session reprise. Coût réel du bras gardé (journaux, recalculé par L693 puis par le lead : 9,89 $ pour r1) : 10,01 et 9,08 $ contre 8,42 et 9,14 $ en session neuve, soit +19 % et −1 %, et non ×3,5. Les autres chiffres tiennent (temps +24 % et +39 %, tests cachés 18/7 puis 12/12, juge : gardée puis indécis). La décision de ne pas ajouter --suite reposait sur un coût faux : question rouverte à Sylvain."
+  },
+  {
+   "date": "2026-11-11",
+   "texte": "Sylvain, à la question « je remesure la session gardée une fois L703 corrigé ? » : « Oui, remesure courte »."
   }
  ]
 }

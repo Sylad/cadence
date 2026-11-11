@@ -3166,10 +3166,14 @@ lots:
     finished: 2026-11-10
   - id: L693
     title: "Calculateur de coût sans modèle (D-7) : estimer avant tout banc le coût et le temps d'un mécanisme d'après les règles connues (contexte renvoyé à chaque échange, cache lu ≈10 % et écrit, prix par modèle, nombre d'échanges, socle chargé) ; mesure : prédiction à ±20 % des coûts réels du banc 2026-11-10-1551 (neuve 8,4 et 9,1 $, seuil 31,5 et 29,7 $)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-10
     started: 2026-11-11
+    review: { date: 2026-11-11, verdict: "conforme : cadence cost retrouve à −7/−10 % les coûts réels (totalCostUSD des journaux) des 4 exécutions du banc 2026-11-10-1551 ; limite : paramètres calés et testés sur le même banc, pas encore validé sur un autre ; 3 mineurs en notes ; porte verte à 79d19fe", commit: 79d19fed235edfa8eac5a9e9d950f8c0696cfd4a }
+    notes:
+      - { date: 2026-11-11, text: "Mineurs r1 : titre du lot périmé (commande cadence cost) ; prix d'entrée mesurable en fait ; --config absent ignoré sans le dire. À faire : valider cadence cost sur un banc autre que celui du calage." }
+    finished: 2026-11-11
   - id: L694
     title: "Socle chargé à chaque session (D-7) : mesurer en tokens ce que chaque session lancée par cadence charge avant son premier geste (CLAUDE.md, MEMORY.md, skills, agents, brief) et proposer les coupes ; mesure : tokens du socle avant/après"
     status: todo

@@ -127,6 +127,11 @@ it exits with code 2 and asks for `--session`. With no band loaded in that sessi
 code 2 and the lead does not chain on: **disabling or changing this mod therefore cuts the lead's chaining**. Files older than 24 h are
 ignored and deleted when the command reads.
 
+It writes a second file, for `cadence lead tour` (L700): `~/.cadence/orchestrate/hud-quota.json` (`percent`, `resetsAt`, `at`), the weekly
+window (`seven_day`) that Claude Code gives the band, one file for the account since the weekly limit is the account's and blocks every model.
+The tour prints it on one line, `quota hebdo : 45 % · remise à zéro dans 1 j 16 h`, with a `⚠` beyond 80 %, the age of a reading older
+than 15 min, `relevé périmé` once the reset time has passed, and `inconnu` without a file: the lead does not start a costly bench near the limit.
+
 ### The lots panel (`/hud lots`, L401)
 
 `/hud lots` opens a **panel**, beside the conversation (inline above the prompt on the main screen); the same command closes it. It is never opened on its own, and the command opens it whatever the width of the window, Claude placing it; when Claude cannot place it, the command answers `panneau des lots non placé : <reason>` and nothing opens. For each project of the folder (the order of `priority:`) it draws the open lots as a tree, with their state and their `after:` links:

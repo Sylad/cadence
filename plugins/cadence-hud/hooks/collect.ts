@@ -237,6 +237,20 @@ os.replace(tmp, os.path.join(folder, name))
 `
 
 /**
+ * Jauge hebdo (rate_limits.seven_day) publiée pour `cadence lead tour` (L700, D-15) : `<CADENCE_HOME>/hud-quota.json`, écrit d'un bloc (fichier
+ * temporaire puis renommage) ; argv[1] = { percent, resetsAt, at }. Un seul fichier : la limite hebdo est celle du compte, pas d'une session.
+ */
+export const QUOTA_WRITER = `
+import os, sys
+home = os.environ.get('CADENCE_HOME') or os.path.join(os.path.expanduser('~'), '.cadence', 'orchestrate')
+os.makedirs(home, exist_ok=True)
+tmp = os.path.join(home, 'hud-quota.json.%d' % os.getpid())
+with open(tmp, 'w') as f:
+    f.write(sys.argv[1])
+os.replace(tmp, os.path.join(home, 'hud-quota.json'))
+`
+
+/**
  * Dossier de lancement de la session (python3 -I, argv[1] = le dossier courant) : le plus proche ancêtre, lui-même compris,
  * dont le `cadence.yaml` porte une clé `priority:` (le dossier parent des projets) ; sans un tel dossier, le dossier courant.
  * Écrit le chemin seul sur la sortie standard.

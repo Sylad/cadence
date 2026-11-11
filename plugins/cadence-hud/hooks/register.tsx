@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { ClientProps, ElementConstructor, EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
 import type { AgentsSummary, CommandInfo, LeadHold, LotsNotice, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
-import { BANC_READER, CONTEXT_WRITER, COLLECTOR, DEFAULT_CAP, DELIVERIES, LAST_DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
+import { BANC_READER, CONTEXT_WRITER, COLLECTOR, QUOTA_WRITER, DEFAULT_CAP, DELIVERIES, LAST_DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
 import { bancDetail, bancLine, enCoursLine, readBanc, readEnCours } from './banc'
 import { buildDecisions, decisionsOf, parseDeliveries } from './decisions'
 import { buildDeliveries, deliveriesHeight, deliveriesOf, parseLastDeliveries } from './deliveries'
@@ -232,6 +232,12 @@ export const register: Register = on => {
             const published = JSON.stringify({ session, cwd, percent: nextUsage.percent, tokens: nextUsage.tokens, window: nextUsage.window, at })
             await $.process.run(['python3', '-I', '-c', CONTEXT_WRITER, published], { timeoutMs: 4_000 }).catch(() => undefined)
           }
+        }
+        // la jauge hebdo sort aussi de la bande : `cadence lead tour` la lit pour ne pas lancer un banc coûteux près de la limite (L700, D-15)
+        const week = nextUsage?.limits.find(l => l.kind === 'seven_day')
+        if (week && Number.isFinite(week.percentUsed)) {
+          const published = JSON.stringify({ percent: week.percentUsed, resetsAt: week.resetsAt, at })
+          await $.process.run(['python3', '-I', '-c', QUOTA_WRITER, published], { timeoutMs: 4_000 }).catch(() => undefined)
         }
         await update($, usage, () => nextUsage)
         await update($, agents, () => summary)

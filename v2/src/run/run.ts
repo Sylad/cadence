@@ -9,13 +9,20 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, type Executeur } from '../bench/bras.js';
 import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun } from './aiguillage.js';
+import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
 
 const PORTE_MS = 30 * 60_000;
+/** D-15 : le run reprend une minute après l'heure de remise à zéro annoncée, relit son état au plus tard toutes les 10 min (une reprise par --reponse arrête
+ * l'attente), et ne reprend pas plus de 5 fois de suite sur un quota (une heure de remise à zéro qui ne remet rien à zéro ne boucle pas). */
+const MARGE_REPRISE_MS = 60_000, TRANCHE_ATTENTE_MS = 10 * 60_000, REPRISES_QUOTA_MAX = 5;
+const REPRISE_QUOTA = 'Le quota est revenu : reprends le travail là où tu t\'étais arrêté, dans le même dossier, puis dis « fini ».';
+const BASCULE_FABLE = 'La limite Opus est atteinte : tu continues sur Fable. Reprends le travail là où tu t\'étais arrêté, dans le même dossier, puis dis « fini ».';
 
-export type EtatRun = 'en-cours' | 'attente' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
+export type EtatRun = 'en-cours' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
 export interface Etat { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string; pieces: string[];
-  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string }
-interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string }
+  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota }
+/** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
+interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const essaiGit = (cwd: string, ...a: string[]) => spawnSync('git', a, { cwd, encoding: 'utf8' });
@@ -97,8 +104,22 @@ function session(e: Etat, prompt: string, o: Opts): boolean {
   // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet
   const env = { ...process.env, CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
   const interdits = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
-  const r = lire(exec(['-p', prompt, ...(e.session ? ['--resume', e.session] : []), ...argsClaude({ ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }, e.worktree, interdits)], { cwd: e.worktree, env }));
+  const brut = exec(['-p', prompt, ...(e.session ? ['--resume', e.session] : []), ...argsClaude({ ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }, e.worktree, interdits)], { cwd: e.worktree, env });
+  const r = lire(brut);
   e.session = r.session || e.session; e.cout_usd += r.cout;
+  // D-15 : une fin de quota n'est pas un échec. La limite Opus seule bascule sur fable dans la même session ; la limite hebdo bloque tous les modèles : on attend.
+  const q = reconnaitreQuota(r.resultat || brut.stdout, (o.maintenant ?? (() => new Date()))());
+  if (q?.limite === 'opus' && (e.modele ?? 'opus') === 'opus') {
+    o.out('limite Opus atteinte : bascule sur fable, même session');
+    e.modele = 'fable'; sauver(e);
+    return session(e, e.session ? BASCULE_FABLE : prompt, o);
+  }
+  if (q) {
+    e.etat = 'quota'; e.quota = q;
+    e.detail = `limite ${q.limite === 'hebdo' ? 'hebdo' : 'Opus'} atteinte ; ${q.reprise ? `reprise seule après ${heureLocale(q.reprise)}` : 'heure de reprise illisible, pas de reprise seule'}`
+      + ` (« ${q.texte.split('\n')[0]} ») ; pour reprendre avant : cadence run --reponse ${e.id} "reprends"`;
+    return false;
+  }
   if (r.echec) { e.etat = 'echec'; e.detail = r.echec; return false; }
   if (r.resultat) o.out(`session : ${r.resultat.slice(-1500)}`);
   return true;
@@ -152,7 +173,8 @@ function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
   return e;
 }
 
-export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; modele?: string; exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string }): Etat {
+export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; modele?: string; exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string;
+  maintenant?: () => Date; attendre?: ((ms: number) => void) | null }): Etat {
   const modele = modeleRun(a.modele); // avant le worktree : un modèle inconnu ne crée rien
   const repo = git(a.repo, 'rev-parse', '--show-toplevel'), cible = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD');
   const id = `${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${process.pid}`;
@@ -169,8 +191,8 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   const demande = a.lot ? `${a.demande}\n\nLot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).` : a.demande;
   const brief = readFileSync(aig.bras.brief, 'utf8').split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
     .replaceAll('{{QUESTION}}', `${worktree}.question.md`).replaceAll('{{BASE}}', e.base).replaceAll('{{TAILLE}}', e.taille);
-  const o = { exec: a.exec, out: a.out, sansPorte: a.sansPorte, raf: a.raf };
-  return tenu(e, o, () => (session(e, brief, o) ? suite(e, o) : fin(e, o)));
+  const o = { exec: a.exec, out: a.out, sansPorte: a.sansPorte, raf: a.raf, maintenant: a.maintenant, attendre: a.attendre };
+  return attendreQuota(tenu(e, o, () => (session(e, brief, o) ? suite(e, o) : fin(e, o))), o);
 }
 
 /** Reprend un run en attente (question) ou rendu (porte rouge, conflit, sans porte) : la réponse va à la même session. */
@@ -180,6 +202,30 @@ export function repondreRun(id: string, repo: string, reponse: string, o: Opts):
   if (!existsSync(f)) throw new Error(`cadence run : run inconnu : ${id} (${f})`);
   const e = JSON.parse(readFileSync(f, 'utf8')) as Etat;
   if (e.etat === 'integre') throw new Error(`cadence run : ${id} est déjà intégré`);
-  e.etat = 'en-cours';
-  return tenu(e, o, () => (session(e, `Réponse de Sylvain : ${reponse}`, o) ? suite(e, o) : fin(e, o)));
+  e.etat = 'en-cours'; delete e.quota; sauver(e); // un run qui attend le quota (D-15) voit cet état et cesse d'attendre
+  return attendreQuota(tenu(e, o, () => (session(e, `Réponse de Sylvain : ${reponse}`, o) ? suite(e, o) : fin(e, o))), o);
+}
+
+/** Attente bloquante, sans processus fils (le run est synchrone de bout en bout). */
+const dormir = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+const lireEtat = (f: string) => JSON.parse(readFileSync(f, 'utf8')) as Etat;
+
+/**
+ * D-15 : un run en quota attend l'heure de remise à zéro, puis reprend la même session dans le même worktree. Pendant l'attente, la branche est rendue
+ * (fin() est passé) : le lead travaille. Relit l'état à chaque tranche : un --reponse qui l'a repris entre-temps arrête cette attente.
+ */
+function attendreQuota(e: Etat, o: Opts): Etat {
+  if (o.attendre === null) return e;
+  const maintenant = o.maintenant ?? (() => new Date()), attendre = o.attendre ?? dormir;
+  for (let n = 0; e.etat === 'quota' && e.quota?.reprise && n < REPRISES_QUOTA_MAX; n++) {
+    const reprise = e.quota.reprise, attendu = () => { const x = lireEtat(e.fichier); return x.etat === 'quota' && x.quota?.reprise === reprise; };
+    for (let reste: number; (reste = Date.parse(reprise) + MARGE_REPRISE_MS - maintenant().getTime()) > 0;) {
+      attendre(Math.min(reste, TRANCHE_ATTENTE_MS));
+      if (!attendu()) { o.out(`cadence run ${e.id} : repris ailleurs pendant l'attente du quota, cette attente s'arrête`); return lireEtat(e.fichier); }
+    }
+    o.out(`cadence run ${e.id} : quota revenu : reprise de la session ${e.session}`);
+    e.etat = 'en-cours'; delete e.quota; sauver(e);
+    e = tenu(e, o, () => (session(e, REPRISE_QUOTA, o) ? suite(e, o) : fin(e, o)));
+  }
+  return e;
 }

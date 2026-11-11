@@ -2,11 +2,11 @@
  "id": "D-15",
  "texte": "par contre il faudra que l'on gère le quota Fabe avec cadence, sinon il ne servira à rien",
  "date": "2026-11-11",
- "etat": "ouverte",
+ "etat": "livrée",
  "lots": [
   "L700"
  ],
- "preuve": null,
+ "preuve": "lot L700 : v2/test/quota.test.ts (8 : weekly avec jour/heure/fuseau, semaine suivante, mois-jour, heure seule, 24 h, Opus avec et sans heure, heure illisible, message cité dans un compte rendu = pas un quota), v2/test/run-quota.test.ts (10 sur sorties claude simulées : état quota et heure de reprise, attente puis reprise de la même session et intégration, hebdo en fable sans bascule, Opus → fable même session sans attente, Opus en fable = quota, quota pendant la correction de porte, heure illisible, --reponse, reprise faite ailleurs pendant l'attente, --liste), test/lead-tour-quota-l700.test.ts (9 : jauge < 80, 80 pile, > 80 avec ⚠, relevé vieux, périmé, absent/illisible, runs en quota, cadence lead tour), plugins/cadence-hud/tests/hud.test.tsx (la bande publie hud-quota.json depuis seven_day ; rien sans). Rouges avant le code (9 sur 10 de run-quota, modules absents pour les autres). Suite complète 591 fichiers : 9905 verts, 8 sautés (sans CADENCE_PIECES de la session appelante, qui rougit bras/passage indépendamment de ce lot) ; tsc racine et v2, qualite.mjs --contre main verts ; mod : porte-mod.mjs 473 verts + tsc. Run réel avec faux claude sur le PATH (capture .cadence-run/cadence-20261111164704-1087953.captures/quota-run-reel-l700.txt) : Opus limit → bascule fable --resume sess-1, weekly limit resets 6:12pm → état quota, --liste et lead tour l'affichent avec ⚠ 86 %, reprise seule de sess-1 à 18:13, intégré en 173 s. Non vérifié : un vrai message de quota de claude (texte exact de « resets … » d'après la doc, pas observé), la bande cadence-hud rechargée dans une vraie session.",
  "precisions": [
   {
    "date": "2026-11-11",
@@ -27,6 +27,10 @@
   {
    "date": "2026-11-11",
    "texte": "Renumérotée D-15 : le numéro D-14 a été pris par le run de L698 (consigne du lead inscrite par erreur) pendant que cette entrée n'était pas encore commitée."
+  },
+  {
+   "date": "2026-11-11",
+   "texte": "Consigne du run de L700 (mot pour mot) : « gérer le quota avec cadence. (1) cadence run reconnaît la fin de quota d'une session claude -p — en claude -p elle n'est reconnaissable que par le texte du résultat, « You've hit your weekly limit · resets <jour heure> », ou « You've hit your Opus limit » — et passe en état quota (pas echec) avec l'heure de reprise lue dans ce texte ; cadence run --liste et lead tour l'affichent ; le run reprend seul la même session (--resume, même worktree) après l'heure de remise à zéro, ou à la demande avec cadence run --reponse ; (2) sur « Opus limit » seulement, bascule sur fable (option --modele déjà existante) en reprenant la même session ; jamais sur la limite hebdo, qui bloque tous les modèles ; (3) la jauge hebdo (rate_limits.seven_day.used_percentage et resets_at, reçus par la status line et déjà lus par le mod cadence-hud) est publiée dans un fichier que lead tour lit et affiche en une ligne, avec un ⚠ au-delà de 80 %. Tests sur des sorties claude simulées pour chaque message. »"
   }
  ]
 }

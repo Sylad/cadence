@@ -1125,6 +1125,36 @@ test('la fiche publiée pour `cadence session context` porte le cwd de session.s
   expect(JSON.parse(published![published!.length - 1]!)).toMatchObject({ session: 'lead-2', cwd: '/w/ol' })
 })
 
+test('la bande publie la jauge hebdo pour `cadence lead tour` (L700) ; sans limite 7 j, rien', async ($, on) => {
+  const runs: string[][] = []
+  const limits = { current: [{ kind: 'five_hour', percentUsed: 10, resetsAt: '2026-11-11T20:00:00Z' }, { kind: 'seven_day', percentUsed: 83, resetsAt: '2026-11-13T08:00:00Z' }] as unknown[] }
+  wired(on)
+  const clock = mock.clock(on)
+  on('command.register', () => ({ value: {} }) as never)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
+  on('agent.list', () => ({ value: [] }) as never)
+  on('session.usage', () => ({ value: { context: { percent: 61, tokens: 122_000, window: 200_000 }, rateLimits: limits.current } }) as never)
+  on('session.id', () => ({ value: 'lead-3' }) as never)
+  on('process.run', async (_$, e) => {
+    runs.push((e as unknown as { argv: string[] }).argv)
+    return { value: { exitCode: 1, stdout: '', stderr: 'absent' } } as never
+  })
+  await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
+  await settle()
+  await clock.advance(5_000)
+  await settle()
+  const published = runs.filter(a => a.some(x => x.includes('hud-quota.json')))
+  expect(published.length).toBeGreaterThan(0)
+  const body = JSON.parse(published[published.length - 1]![published[published.length - 1]!.length - 1]!)
+  expect(body).toMatchObject({ percent: 83, resetsAt: '2026-11-13T08:00:00Z' })
+  expect(typeof body.at).toBe('number')
+  limits.current = [{ kind: 'five_hour', percentUsed: 10 }]
+  runs.length = 0
+  await clock.advance(5_000)
+  await settle()
+  expect(runs.filter(a => a.some(x => x.includes('hud-quota.json')))).toEqual([])
+})
+
 // ── L149 : avancement des plans par projet ────────────────────────────────────────────────────────────────────
 
 const TOUR = [

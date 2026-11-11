@@ -1,31 +1,8 @@
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { Executeur } from '../src/bench/bras.js';
 import { executerRun, repondreRun, type Etat } from '../src/run/run.js';
-import { dossierTemp } from './temp.js';
-
-const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
-function depot(porte = 'test -f fait.txt'): string {
-  const r = dossierTemp('run-'), repo = join(r, 'projet');
-  mkdirSync(join(repo, 'node_modules', 'dep'), { recursive: true });
-  writeFileSync(join(repo, 'node_modules', 'dep', 'index.js'), 'x');
-  writeFileSync(join(repo, '.gitignore'), 'node_modules\n');
-  writeFileSync(join(repo, 'cadence.yaml'), `orchestrate:\n  test: ${porte}\n`);
-  git(r, 'init', '-q', '-b', 'main', repo); git(repo, 'add', '.'); git(repo, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base');
-  return repo;
-}
-const sortie = (session: string, result = 'fini') => JSON.stringify({ session_id: session, total_cost_usd: 0.1, result, subtype: 'success' });
-/** Faux claude : chaque appel joue une action dans le worktree (cwd) puis rend une sortie JSON. */
-const fauxClaude = (actions: ((cwd: string, args: string[], env: NodeJS.ProcessEnv) => void)[], appels: { args: string[]; env: NodeJS.ProcessEnv }[] = []): Executeur =>
-  (args, o) => { appels.push({ args, env: o.env }); (actions.shift() ?? (() => {}))(o.cwd, args, o.env); return { stdout: sortie(`s${appels.length}`), code: 0 }; };
-const commite = (fichier: string, demande?: string) => (cwd: string) => {
-  writeFileSync(join(cwd, fichier), 'ok');
-  if (demande) { mkdirSync(join(cwd, '.cadence', 'demandes'), { recursive: true }); writeFileSync(join(cwd, '.cadence', 'demandes', 'D-1.json'), JSON.stringify({ id: 'D-1', texte: demande, etat: 'ouverte' })); }
-  git(cwd, 'add', '-A'); git(cwd, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', `ajoute ${fichier}`);
-};
-const io = () => { const l: string[] = []; return { l, out: (x: string) => l.push(x) }; };
+import { commite, depot, fauxClaude, git, io } from './run-outils.js';
 
 describe('cadence run', () => {
   it('une demande : worktree avec dépendances, session avec brief mesuré et hook, porte verte, intégration en avance rapide, worktree retiré', () => {

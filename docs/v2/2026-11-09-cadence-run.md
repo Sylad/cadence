@@ -32,6 +32,8 @@ Le modèle, le mode et sa raison s'affichent au lancement (« session Fable en m
 4. Rebase sur la branche de départ, puis porte complète (`orchestrate.test` et `orchestrate.build` de `cadence.yaml`), jouée une seule fois. Si elle est rouge, la même session corrige une fois, puis la porte est rejouée.
 5. Intégration en avance rapide sur la branche de départ, puis le worktree est retiré. Rien n'est poussé. Le plan (`raf`) et `cadence deliver` restent ceux de la v1.
 
+**Quota (L700, D-15).** En `claude -p`, la fin de quota ne se reconnaît qu'au texte du résultat (doc officielle lue le 11-11). Un résultat qui commence par « You've hit your weekly limit · resets <jour heure> » met le run à l'état `quota`, pas `echec`, avec l'heure de reprise lue dans ce texte (jour, heure, fuseau entre parenthèses). Le run rend la branche, puis attend : une minute après l'heure dite, il reprend la même session (`--resume`, même worktree, même modèle) et continue (porte, intégration). `cadence run --reponse <id> "reprends"` le reprend avant ; le run qui attendait relit son état toutes les 10 min et s'arrête. Une heure illisible : pas de reprise seule, `--reponse` seulement. « You've hit your Opus limit » bascule sur `fable` dans la même session, sans attendre ; jamais la limite hebdo, qui bloque tous les modèles (Fable compris, vécu le 10-11). `cadence run --liste` et `cadence lead tour` montrent les runs en quota et leur heure de reprise ; le tour montre aussi la jauge hebdo publiée par la bande cadence-hud.
+
 En cas d'échec, le worktree est gardé avec l'état du run (`../.cadence-run/<projet>-<id>.json`). Le run s'arrête alors dans l'un de ces états : `sans-commit`, `conflit`, `porte-rouge`, `sans-porte` ou `refus-integration`.
 
 ## Pourquoi ces options

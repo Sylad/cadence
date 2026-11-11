@@ -244,8 +244,12 @@ const refus = (etape: string, r: Sortie & { signal?: NodeJS.Signals | null }) =>
  * le terminal, le fuseau, le dossier temporaire, le nom de l'utilisateur, son shell, et le refus du cache de compilation de node.
  */
 const VARIABLE_TRANSMISE = /^(PATH|LANG|LANGUAGE|LC_[A-Z]+|TERM|TZ|TMPDIR|USER|LOGNAME|SHELL|NODE_DISABLE_COMPILE_CACHE)$/;
-/** Commandes qui atteignent une machine avec les accès de l'utilisateur sans passer par HOME (ssh lit ~/.ssh par passwd) : coupées en tête du PATH. */
-const COMMANDES_COUPEES = ['ssh', 'scp', 'sftp', 'rsync', 'kubectl', 'helm', 'gh', 'docker'];
+/**
+ * Commandes qui atteignent une machine avec les accès de l'utilisateur sans passer par HOME (ssh lit ~/.ssh par passwd) : coupées en tête du
+ * PATH. rsync n'y est pas : la suite de cadence s'en sert en local (scripts/mise-en-service.mjs), et un rsync distant lance `ssh` par le PATH,
+ * donc la cale ; scp et sftp, eux, lancent ssh par son chemin absolu.
+ */
+const COMMANDES_COUPEES = ['ssh', 'scp', 'sftp', 'kubectl', 'helm', 'gh', 'docker'];
 
 /**
  * L'environnement du runner, sans aucun accès de l'utilisateur (revues L698 r1 et r2, D-16 et D-17) : seules les variables de

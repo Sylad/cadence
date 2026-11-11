@@ -30,7 +30,8 @@ fs.writeFileSync(CIBLE, JSON.stringify({
   jetons: ['NPM_TOKEN', 'NODE_AUTH_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN'].filter((v) => process.env[v] !== undefined),
   jetonNpm: sh('npm config get //registry.npmjs.org/:_authToken'),
   env: Object.keys(process.env).sort(), xdg: process.env.XDG_CONFIG_HOME ?? null, gitConfigGlobal: process.env.GIT_CONFIG_GLOBAL ?? null, assistant: sh('git config credential.helper'), ssh: sh('ssh -G nas'), sshChemin: sh('command -v ssh'),
-  coupes: ['ssh', 'scp', 'sftp', 'rsync', 'kubectl', 'helm', 'gh', 'docker'].map((c) => sh('command -v ' + c)),
+  coupes: ['ssh', 'scp', 'sftp', 'kubectl', 'helm', 'gh', 'docker'].map((c) => sh('command -v ' + c)),
+  rsyncDistant: sh('rsync -a trace.cjs nas:/tmp/cadence-essai'), rsyncLocal: sh('rsync -a trace.cjs ' + process.env.RUNNER_TEMP + '/'),
 }));
 `;
 
@@ -370,7 +371,7 @@ describe('cadence release — revue L698 r2 (D-17) : cycle de vie de npm ci, env
     expect(readdirSync(m)).toEqual([]);
   }, 180_000);
 
-  it('point 2 : seules les variables de la liste blanche passent ; ni KUBECONFIG, ni SSH_AUTH_SOCK, ni XDG_CONFIG_HOME ou GIT_CONFIG_GLOBAL de l’utilisateur, ni assistant d’identifiants ; ssh, scp, rsync, kubectl, gh… coupés', () => {
+  it('point 2 : seules les variables de la liste blanche passent ; ni KUBECONFIG, ni SSH_AUTH_SOCK, ni XDG_CONFIG_HOME ou GIT_CONFIG_GLOBAL de l’utilisateur, ni assistant d’identifiants ; ssh, scp, kubectl, gh… coupés, rsync distant en échec', () => {
     const maison = tempDir();
     writeFileSync(join(maison, 'kubeconfig'), 'apiVersion: v1\nclusters: [{name: prod, cluster: {server: https://192.0.2.1:6443}}]\n');
     writeFileSync(join(maison, 'gitconfig'), '[credential]\n\thelper = store\n[user]\n\tname = Utilisateur\n');
@@ -405,6 +406,9 @@ describe('cadence release — revue L698 r2 (D-17) : cycle de vie de npm ci, env
     expect(t.assistant).toBe('erreur'); // git config credential.helper : aucune valeur
     // ssh lit ~/.ssh par passwd, pas par HOME : la commande est coupée en tête du PATH ; ssh -G (sans connexion) échoue
     expect(t.ssh).toBe('erreur');
+    // rsync reste permis en local (la suite de cadence s'en sert) ; vers une machine, il lance ssh par le PATH, donc la cale, et échoue
+    expect(t.rsyncDistant).toBe('erreur');
+    expect(t.rsyncLocal).toBe('');
     const coupes = t.coupes as string[];
     expect(new Set(coupes.map((c) => dirname(c))).size).toBe(1);
     expect(coupes.every((c) => !c.startsWith('/usr') && !c.startsWith(maison))).toBe(true);

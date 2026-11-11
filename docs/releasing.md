@@ -123,8 +123,8 @@ It refuses, with exit code 2 and nothing written:
   `GIT_CONFIG_GLOBAL` inside that `HOME`, `GIT_CONFIG_NOSYSTEM=1` (no system git configuration), `GIT_SSH_COMMAND=false` (ssh disabled for
   git), `GIT_TERMINAL_PROMPT=0`; an empty user and global npmrc; `CI`, `GITHUB_REF*`, `GITHUB_WORKSPACE`, `GITHUB_OUTPUT`, `GITHUB_ENV`,
   `GITHUB_PATH`, `GITHUB_STEP_SUMMARY`, `RUNNER_TEMP`. ssh does not find `~/.ssh` through `HOME` but through the user's passwd entry, so
-  `ssh`, `scp`, `sftp`, `rsync`, `kubectl`, `helm`, `gh` and `docker` are replaced at the head of `PATH` by a stub that fails (code 126) and
-  says why. What is **not** closed: the replay is not a sandbox — a script that calls `/usr/bin/ssh` by its absolute path still reads the
+  `ssh`, `scp`, `sftp`, `kubectl`, `helm`, `gh` and `docker` are replaced at the head of `PATH` by a stub that fails (code 126) and
+  says why. `rsync` stays usable for local copies (the cadence suite uses it); towards a machine it launches `ssh` through `PATH`, so the stub. What is **not** closed: the replay is not a sandbox — a script that calls `/usr/bin/ssh` by its absolute path still reads the
   user's `~/.ssh`; the barrier (1) refuses any script that names `ssh`, and the dependencies' install scripts run as on any `npm ci`.
   The npm cache (public packages) is shared, so `npm ci` does not download everything again, and `npm ci` reaches the public registry
   anonymously. Each replayed step is printed with its duration; the first red one refuses the release with the

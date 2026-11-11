@@ -126,8 +126,9 @@ describe('L578 bornes — readPerfSettings', () => {
   it('prix à zéro accepté (modèle gratuit)', () => {
     expect(readPerfConfig(yaml('perf:\n  prices:\n    fable: { input: 0, output: 0, cacheRead: 0 }\n'))).toEqual({ fable: { input: 0, output: 0, cacheRead: 0 } });
   });
-  it('clé de prix inconnue (cacheWrite) : refusée', () => {
-    expect(() => readPerfSettings(yaml('perf:\n  prices:\n    fable: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 }\n'))).toThrow(/perf\.prices\.fable\.cacheWrite inconnu/);
+  it('clé de prix inconnue (cacheWrites) : refusée ; cacheWrite est lu (L704)', () => {
+    expect(readPerfSettings(yaml('perf:\n  prices:\n    fable: { input: 1, output: 1, cacheRead: 1, cacheWrite: 2 }\n')).prices).toEqual({ fable: { input: 1, output: 1, cacheRead: 1, cacheWrite: 2 } });
+    expect(() => readPerfSettings(yaml('perf:\n  prices:\n    fable: { input: 1, output: 1, cacheRead: 1, cacheWrites: 1 }\n'))).toThrow(/perf\.prices\.fable\.cacheWrites inconnu/);
   });
   it('nom de modèle numérique ou avec @ / points : accepté, lu comme texte', () => {
     const g = readPerfConfig(yaml('perf:\n  prices:\n    4: { input: 1, output: 1, cacheRead: 1 }\n    "gpt-5.1@x": { input: 2, output: 2, cacheRead: 2 }\n'));

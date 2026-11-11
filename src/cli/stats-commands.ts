@@ -11,8 +11,8 @@ import { renderPerf } from '../perf.js';
 import { renderInspection } from '../inspect.js';
 import { inspectFolder } from '../inspect-read.js';
 import { readPerf } from '../perf-read.js';
-import { readPerfSettings } from '../perf-config.js';
-import { estimateRollout, readRollout, renderRolloutCost, rolloutPrice } from '../cost-estimate.js';
+import { readPerfSettings, type PerfConfig } from '../perf-config.js';
+import { estimateRollout, readRollout, renderRolloutCost, rolloutPrice, rolloutWarnings } from '../cost-estimate.js';
 import { type Io } from './context.js';
 
 /** `cadence corrections` (L165) : la mesure de référence des passes de correction d'une vague, lue dans <dossier>/.cadence/runs. */
@@ -113,8 +113,9 @@ export function cost(rest: string[], values: { config?: string; json?: boolean }
     }
     const rollout = readRollout(raw);
     const configFile = resolve(io.cwd, values.config ?? 'cadence.yaml');
-    const settings = existsSync(configFile) ? readPerfSettings(configFile) : { prices: null };
+    const settings: PerfConfig = existsSync(configFile) ? readPerfSettings(configFile) : { prices: null };
     const result = estimateRollout(rollout, rolloutPrice(rollout, settings.prices));
+    for (const w of rolloutWarnings(rollout, settings)) io.err(`cost : ${w}`);
     if (values.json) io.out(JSON.stringify({ ...result, ...(settings.currency ? { currency: settings.currency } : {}) }, null, 2));
     else for (const l of renderRolloutCost(result, settings.currency)) io.out(l);
     return 0;

@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { readPerfSettings, type PerfConfig, type PriceGrid } from '../perf-config.js';
+import { cacheWriteWarning, readPerfSettings, type PerfConfig, type PriceGrid } from '../perf-config.js';
 import { COUNTED_INPUT_SHARE, euros, missingModels, stepEuros, sumEuros, waveEuros } from '../cost.js';
 import { RafError } from '../plan.js';
 import type { LotState } from './state.js';
@@ -10,7 +10,9 @@ import type { LotState } from './state.js';
  */
 export function launchCost(launch: string, warn: (line: string) => void): PerfConfig {
   try {
-    return readPerfSettings(join(launch, 'cadence.yaml'));
+    const settings = readPerfSettings(join(launch, 'cadence.yaml'));
+    if (settings.defaultCacheWrite) warn(cacheWriteWarning(settings.defaultCacheWrite));
+    return settings;
   } catch (e) {
     if (!(e instanceof RafError)) throw e;
     warn(`coût n/d : ${e.message}`);

@@ -1435,7 +1435,7 @@ describe('cadence perf — lecture seule des nouveaux indicateurs (R15)', () => 
 
 // ── L226 : grille de prix et coût par lot livré (R7 à R10) ──────────────────────────────────────
 
-const GRID = 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n    opus: { input: 15, output: 75, cacheRead: 1.5 }\n    haiku: { input: 1, output: 5, cacheRead: 0.1 }\n';
+const GRID = 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 6 }\n    opus: { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 30 }\n    haiku: { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 2 }\n';
 const M = 1_000_000;
 const usage = (input: number, output = 0, cacheRead = 0, cacheWrite = 0) => ({ input, cacheWrite, cacheRead, output, counted: input + cacheWrite + output });
 
@@ -1449,7 +1449,7 @@ describe('cadence perf — grille de prix (R7)', () => {
 
   it('R7 — grille complète lue : prix de sonnet, opus et haiku', () => {
     const c = withGrid(GRID);
-    expect(readPerfConfig(join(c.root, 'cadence.yaml'))).toEqual({ sonnet: { input: 3, output: 15, cacheRead: 0.3 }, opus: { input: 15, output: 75, cacheRead: 1.5 }, haiku: { input: 1, output: 5, cacheRead: 0.1 } });
+    expect(readPerfConfig(join(c.root, 'cadence.yaml'))).toEqual({ sonnet: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 6 }, opus: { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 30 }, haiku: { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 2 } });
   });
 
   it('R7 — perf absent : pas de grille, pas d\'erreur', async () => {
@@ -1483,7 +1483,7 @@ describe('cadence perf — grille de prix (R7)', () => {
 
   it('L578 — perf.currency : lue, rognée ; absente, aucune monnaie ; vide ou non texte, refus nommé', async () => {
     const ok = withGrid('perf:\n  currency: " $ "\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n');
-    expect(readPerfSettings(join(ok.root, 'cadence.yaml'))).toEqual({ prices: { sonnet: { input: 3, output: 15, cacheRead: 0.3 } }, currency: '$' });
+    expect(readPerfSettings(join(ok.root, 'cadence.yaml'))).toEqual({ prices: { sonnet: { input: 3, output: 15, cacheRead: 0.3 } }, currency: '$', defaultCacheWrite: ['sonnet'] });
     expect(readPerfSettings(join(withGrid(GRID).root, 'cadence.yaml')).currency).toBeUndefined();
     expect(readPerfSettings(join(withGrid('perf:\n  currency: USD\n').root, 'cadence.yaml'))).toEqual({ prices: null, currency: 'USD' });
     await refused('perf:\n  currency: ""\n  prices:\n    sonnet: { input: 1, output: 1, cacheRead: 1 }\n', /perf\.currency : texte non vide attendu/);
@@ -1500,7 +1500,8 @@ describe('cadence perf — grille de prix (R7)', () => {
     await refused('perf:\n  prices:\n    sonnet: { input: 1, output: "cher", cacheRead: 1 }\n', /perf\.prices\.sonnet\.output : nombre ≥ 0 attendu/);
   });
   it('R7 — modèle sans cacheRead : refus nommé', () => refused('perf:\n  prices:\n    opus: { input: 1, output: 1 }\n', /perf\.prices\.opus\.cacheRead : nombre ≥ 0 attendu/));
-  it('R7 — clé inconnue sous un modèle : refus nommé', () => refused('perf:\n  prices:\n    opus: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 }\n', /perf\.prices\.opus\.cacheWrite inconnu \(attendu : input, output, cacheRead\)$/));
+  it('R7 — clé inconnue sous un modèle : refus nommé', () => refused('perf:\n  prices:\n    opus: { input: 1, output: 1, cacheRead: 1, cacheWrites: 1 }\n', /perf\.prices\.opus\.cacheWrites inconnu \(attendu : input, output, cacheRead, cacheWrite\)$/));
+  it('L704 — cacheWrite négatif : refus nommé', () => refused('perf:\n  prices:\n    opus: { input: 1, output: 1, cacheRead: 1, cacheWrite: -1 }\n', /perf\.prices\.opus\.cacheWrite : nombre ≥ 0 attendu/));
   it('R7 — clé perf.xxx inconnue : refus nommé', () => refused('perf:\n  xxx: 1\n', /perf\.xxx inconnu \(attendu : prices, currency\)$/));
   it('R7 — cadence.yaml illisible : refus avec l\'erreur du fichier, aucune sortie', () => refused('perf: [pas du yaml', /^raf: .*cadence\.yaml illisible : /));
 
@@ -1533,9 +1534,16 @@ describe('cadence perf — coût par lot livré (R8, R9, R10, R12)', () => {
     expect(text).toContain('coût par lot livré : 4,50');
   });
 
-  it('R8 — cacheWrite facturé au prix input', async () => {
+  it('R8 — cacheWrite facturé à son prix de la grille (6 €, pas les 3 € de l\'entrée, L704)', async () => {
     const { data } = await cost({ A0: [impl(usage(0, 0, 0, M))] });
-    expect(data.cost.perDelivered.current).toBeCloseTo(3, 9);
+    expect(data.cost.perDelivered.current).toBeCloseTo(6, 9);
+  });
+
+  it('L704 — grille sans cacheWrite : entrée × 2 par défaut, et un avertissement qui nomme le modèle', async () => {
+    const { data, err } = await cost({ A0: [impl(usage(0, 0, 0, M))] }, 'perf:\n  prices:\n    sonnet: { input: 3, output: 15, cacheRead: 0.3 }\n');
+    expect(data.cost.perDelivered.current).toBeCloseTo(6, 9);
+    expect(err.filter((l) => l.includes('sans cacheWrite pour sonnet'))).toHaveLength(1);
+    expect(err.join('\n')).toContain('entrée × 2');
   });
 
   it('R8 — cacheRead 2 M à 0,3 € : 0,6 €', async () => {

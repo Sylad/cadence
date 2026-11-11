@@ -9,7 +9,7 @@ its rollout and the known rules of how a Claude session is billed. No model is c
 cadence cost <rollout.json|yaml> [--config cadence.yaml] [--json]
 ```
 
-The price comes from the rollout (`prices`) or from the grid `perf.prices` of `cadence.yaml` ([perf](perf.md)), the one of the current folder
+The price comes from the rollout (`prices`) or from the grid `perf.prices` of `cadence.yaml` ([perf](perf.md)), the grid `cadence perf` and `orchestrate` price their steps with (L704), the one of the current folder
 or the one `--config` names, under the rollout's `model`; `perf.currency` is written after the amounts. Exit 1, with the reason on stderr and
 nothing on stdout, for an unreadable file, a malformed rollout (an unknown key, a negative number, a share above 1…) or a model with no price.
 
@@ -31,8 +31,8 @@ nothing on stdout, for an unreadable file, a malformed rollout (an unknown key, 
 | key | meaning |
 |---|---|
 | `model` | the model, a key of `perf.prices` |
-| `prices` | optional, `{ input, output, cacheRead }` per million tokens, instead of the grid |
-| `cacheWriteFactor` | optional, the price of a cache write as a multiple of the input price; 2 by default (the one-hour cache of Claude Code), 1.25 for the five-minute cache |
+| `prices` | optional, `{ input, output, cacheRead, cacheWrite }` per million tokens, instead of the grid; `cacheWrite` optional |
+| `cacheWriteFactor` | optional, the price of a cache write as a multiple of the input price, over the `cacheWrite` of the price; without either, 2 (the one-hour cache of Claude Code, with a warning when the grid lacks it), 1.25 for the five-minute cache |
 | `defaults` | optional, keys given to every session that does not set them |
 | `sessions[].exchanges` | calls to the model in the session (one tool turn is one call) |
 | `sessions[].base` | context sent with the first call: the base the session loads (system prompt, `CLAUDE.md`, tools, request) |
@@ -46,7 +46,7 @@ nothing on stdout, for an unreadable file, a malformed rollout (an unknown key, 
 
 Each call sends the whole context again. A session of E calls that starts from a context C₀ and grows by g per call sends
 C₀ + (i − 1)·g at call i, E·C₀ + g·E(E − 1)/2 in all: `kept` of it is read from the cache at the `cacheRead` price, the rest is written at the
-input price × `cacheWriteFactor`. The output is E × `output` at the output price. The session leaves a context of C₀ + E·g, the one a
+`cacheWrite` price (or the input price × `cacheWriteFactor`). The output is E × `output` at the output price. The session leaves a context of C₀ + E·g, the one a
 `continues` session takes up. The uncached input (about a hundred tokens per session in the journals) is left out.
 
 The output prints the price line, one line per session (calls, context at start and end, tokens read, written, produced, cost) and the total.
@@ -91,6 +91,5 @@ it (the compaction's record included). Replayed call by call, the records of thi
 
 ## Limits
 
-- `cadence perf` and `orchestrate` price a cache write at the input price (`src/cost.ts`), so they count the one-hour writes at half their price; on this bench writes were a third of the cost.
 - One model per rollout: a mechanism that mixes models is two rollouts.
 - Subagents are sessions of their own: describe them as sessions.

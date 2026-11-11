@@ -60,27 +60,31 @@ quality twin (the share of lots right the first time) on the same line. A rise i
 | wall time per step kind | median of `ended − started` in minutes of the `ok` steps with both bounds readable, ranked in the window by the local day of `ended`; one line per kind seen | which step is slow? timeouts, effort or model |
 | cost per delivered lot | median of the sum, over every step of every journal of the lot (all waves), of the step cost; lots `done` in the window with at least one journal | is the model chosen for each step right? |
 
-**Price grid.** Declared in the `cadence.yaml` of the folder, per million tokens, in the money of your choice, the three prices mandatory for a declared model. The key is any model name, the ones `orchestrate.escalation.model` and `@<model>` take (`sonnet`, `fable`, a full identifier…), and a step is priced by the model its journal records, by exact name:
+**Price grid.** Declared in the `cadence.yaml` of the folder, per million tokens, in the money of your choice, `input`, `output` and `cacheRead` mandatory for a declared model, `cacheWrite` optional (L704). The same grid prices `cadence cost` ([cost](cost.md)). The key is any model name, the ones `orchestrate.escalation.model` and `@<model>` take (`sonnet`, `fable`, a full identifier…), and a step is priced by the model its journal records, by exact name:
 
 ```yaml
 perf:
   prices:
-    sonnet: { input: 3, output: 15, cacheRead: 0.3 }
-    opus: { input: 15, output: 75, cacheRead: 1.5 }
-    haiku: { input: 1, output: 5, cacheRead: 0.1 }
-    fable: { input: 5, output: 25, cacheRead: 0.5 }
+    sonnet: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 6 }
+    opus: { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 30 }
+    haiku: { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 2 }
+    fable: { input: 5, output: 25, cacheRead: 0.5 }   # no cacheWrite: 5 × 2 = 10, and a warning
   currency: "€"   # optional
 ```
 
 `perf.currency` (optional, a non-empty text such as `€`, `$` or `USD`) is written after every amount (`4,50 €`, and in the JSON as `cost.currency`); without it no symbol is imposed and the amounts print bare (`4,50`), the cost column of the orchestrate table being named `coût`. A grid entered in dollars is thus no longer shown as euros.
+
+`cacheWrite` is the price of a cache write. Absent, it defaults to the input price × 2, the one-hour cache that Claude Code sessions write
+(1.25 for the five-minute cache: declare it), and `perf`, `orchestrate` and `cadence cost` print on the error output
+`perf.prices sans cacheWrite pour <models> : écriture de cache chiffrée à l'entrée × 2 …`.
 
 An unknown key (under `perf` other than `prices` and `currency`, or under a model), an empty or non-text `currency`, a negative or non-numeric price, or an unreadable file refuses the command before any journal is read (`raf: …`, exit 1, no output).
 Without `perf.prices` (absent or empty) the cost is `n/d` and a warning says where to declare it; the other indicators are served.
 
 The same grid prices the waves (L529, [orchestrate](orchestrate.md#cost-in-euros-before-and-after-a-wave-l529)): `orchestrate --dry-run` announces an estimate in euros per lot and for the wave, the final table and `--status` print the real cost.
 
-**Cost of a step** = (`input` + `cacheWrite`) × input price + `output` × output price + `cacheRead` × cacheRead price, per million tokens, at the price of the step's own model. Assumptions written in the sheet (`docs/specs/perf-tokens-delais-cout/fiche.yaml`, R8):
-cache writes are billed at the input price (the grid has no write price, so the cost is slightly underestimated if they are billed more); a step that only carries `counted` (an old journal) is split 90 % input, 10 % output, no cache read;
+**Cost of a step** = `input` × input price + `cacheWrite` × cacheWrite price + `output` × output price + `cacheRead` × cacheRead price, per million tokens, at the price of the step's own model, the rule of `cadence cost` (L704; until then a write was priced at the input price, half its one-hour price, while writes were a third of the cost of the bench 2026-11-10-1551). Assumptions written in the sheet (`docs/specs/perf-tokens-delais-cout/fiche.yaml`, R8):
+a step that only carries `counted` (an old journal) is split 90 % input, 10 % output, no cache read;
 a step without any readable token costs 0 € (the lot stays in the population); a `local` step costs 0 € whatever its counters (outside quota and budget) and needs no price.
 A lot with a step of a model that has no price in the grid (or no readable `model`, named `inconnu`) is never priced without it: it is left out of the cost, counted apart, and a warning on the error output names the model and the number of lots; delivered lots without any journal are counted aside (`N lot(s) livré(s) sans journal`). No `⚠` on a cost that is `n/d`.
 

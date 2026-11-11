@@ -3197,15 +3197,20 @@ lots:
     finished: 2026-11-10
   - id: L697
     title: "raf hook install place son bloc en TÊTE d'un pre-commit existant (suite de L695) : ajouté à la fin, il ne s'exécute pas quand le script maison sort tôt (cas de cadence, exit 0 sans fichier de doc ; corrigé à la main le 10-11) ; test : pre-commit maison avec exit 0 précoce, commit sur dépôt tenu refusé quand même ; corriger aussi les dépôts déjà installés"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-10
     started: 2026-11-10
+    review: { date: 2026-11-11, verdict: "conforme : bloc raf en tête du pre-commit, réinstallation déplace sans dupliquer ; 3 mineurs en notes ; porte verte à 6319fc2", commit: 6319fc2d344a68accc335d3bdb453892766979a7 }
+    notes:
+      - { date: 2026-11-11, text: "Mineurs r1 : bloc déjà présent déplacé sans rejouer le contrôle « script shell » (src/hook.ts:37-38) ; déplacement qui force 755 ; bloc non reconnu (indenté, CRLF) laissé sous l'exit précoce sans avertissement." }
+    finished: 2026-11-11
   - id: L698
     title: "Avant le tag, rejouer la CI de publication (publish.yml : npm ci + prepublishOnly) dans un clone neuf, plus un test statique du champ files de package.json (D-7, erreur 2 : 7 des 10 casses passées viennent de la CI, que L696 ne couvre pas)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-10
+    started: 2026-11-11
   - id: L699
     title: "cadence run : choix du modèle (D-13) — option --modele <opus|fable|sonnet|haiku> et variable CADENCE_RUN_MODELE, défaut inchangé (opus) ; la ligne de lancement dit le modèle réellement utilisé ; test : le modèle demandé arrive dans la commande claude des deux bras (léger, complet)"
     status: done

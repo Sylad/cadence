@@ -2,11 +2,11 @@
  "id": "D-13",
  "texte": "On va passer à  Fable, on n’a plus de ticket opus",
  "date": "2026-11-10",
- "etat": "ouverte",
+ "etat": "vérifiée",
  "lots": [
   "L699"
  ],
- "preuve": null,
+ "preuve": "L699 (c819d572) : cadence run --modele fable ; vrai run sur Fable intégré le 11-11 (run 20261110220037-4176517, L697, main = 6319fc2d) ; revues lancées sur Fable",
  "precisions": [
   {
    "date": "2026-11-10",

@@ -1,5 +1,6 @@
 // corrections et perf : les mesures du workflow, sans modèle ni écriture (L488, sorti de cli.ts).
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { parse } from 'yaml';
 import { join, resolve } from 'node:path';
 import { type Day } from '../dates.js';
 import { RafError } from '../plan.js';
@@ -10,6 +11,8 @@ import { renderPerf } from '../perf.js';
 import { renderInspection } from '../inspect.js';
 import { inspectFolder } from '../inspect-read.js';
 import { readPerf } from '../perf-read.js';
+import { readPerfSettings } from '../perf-config.js';
+import { estimateRollout, readRollout, renderRolloutCost, rolloutPrice } from '../cost-estimate.js';
 import { type Io } from './context.js';
 
 /** `cadence corrections` (L165) : la mesure de référence des passes de correction d'une vague, lue dans <dossier>/.cadence/runs. */
@@ -86,6 +89,34 @@ export function inspect(rest: string[], values: { wave?: string; json?: boolean 
     const result = inspectFolder(resolve(io.cwd, rest[0] ?? '.'), values.wave);
     if (values.json) io.out(JSON.stringify(result, null, 2));
     else for (const l of renderInspection(result)) io.out(l);
+    return 0;
+  } catch (e) {
+    if (!(e instanceof RafError)) throw e;
+    io.err(`raf: ${e.message}`);
+    return 1;
+  }
+}
+
+/**
+ * `cadence cost` (L693) : le coût et les tokens d'un déroulé décrit dans un fichier JSON ou YAML, sans modèle ni journal ; le prix vient du déroulé ou
+ * de `perf.prices` du cadence.yaml (`--config`, sinon celui du dossier courant). Un fichier illisible, un déroulé mal formé ou un modèle sans prix : code 1.
+ */
+export function cost(rest: string[], values: { config?: string; json?: boolean }, io: Io): number {
+  try {
+    if (rest.length !== 1) throw new RafError('usage : cadence cost <déroulé.json|yaml> [--config cadence.yaml] [--json]');
+    const file = resolve(io.cwd, rest[0]);
+    let raw: unknown;
+    try {
+      raw = parse(readFileSync(file, 'utf8'));
+    } catch (e) {
+      throw new RafError(`${file} illisible : ${e instanceof Error ? e.message : String(e)}`);
+    }
+    const rollout = readRollout(raw);
+    const configFile = resolve(io.cwd, values.config ?? 'cadence.yaml');
+    const settings = existsSync(configFile) ? readPerfSettings(configFile) : { prices: null };
+    const result = estimateRollout(rollout, rolloutPrice(rollout, settings.prices));
+    if (values.json) io.out(JSON.stringify({ ...result, ...(settings.currency ? { currency: settings.currency } : {}) }, null, 2));
+    else for (const l of renderRolloutCost(result, settings.currency)) io.out(l);
     return 0;
   } catch (e) {
     if (!(e instanceof RafError)) throw e;

@@ -11,7 +11,7 @@ import { cmdInit, cmdMigrate, cmdSkills } from './cli/setup-commands.js';
 import { cmdSpec, cmdSpecChecks } from './cli/spec-commands.js';
 import { cmdSession, cmdSessionAll } from './cli/session-commands.js';
 import { cmdDeliver, cmdLocal, cmdVerify } from './cli/deliver-commands.js';
-import { corrections, inspect, perf } from './cli/stats-commands.js';
+import { corrections, cost, inspect, perf } from './cli/stats-commands.js';
 import { cmdConfig, cmdLead } from './cli/lead-commands.js';
 import { cmdAttente, heldPlanWrite } from './cli/attente-commands.js';
 import { claudeHook } from './claude-hook.js';
@@ -86,6 +86,7 @@ Une seule aide : « raf --help », « cadence --help » et « cadence help » im
   cadence lead hold <étiquette> [--ttl minutes] | lead release <étiquette>   déclare (60 min par défaut), puis rend, une session lancée à la main par le lead : elle est soustraite des créneaux libres de orchestrate --status et de lead tour ; au TTL échu, les deux la signalent en ⚠ jusqu'au release
   cadence corrections [dossier] [--classify [--model m]] [--cache fichier] [--cache-sous-causes fichier] [--sample n] [--until date] [--since date] [--json]   mesure des passes de correction des journaux dossier/.cadence/runs : lots à ≥1 et ≥2 corrections, par projet, visibles ou non, passes par cause (classées par Ollama avec --classify, hors quota)
   cadence perf [dossier] [--since date] [--json]   tableau de bord du workflow, sans modèle : deux fenêtres (7 derniers jours contre les 7 précédents) lues dans dossier/.cadence/runs et les plans, chaque vitesse à côté de sa qualité, ⚠ au-delà de 25 % de dégradation ; tokens par lot selon l'estimate, part de la revue, délais création → done → livraison, durée de mur par étape, coût par lot livré (grille cadence.yaml perf.prices, monnaie perf.currency) ; --since est un jour qui tronque les fenêtres
+  cadence cost <déroulé.json|yaml> [--config cadence.yaml] [--json]   le coût estimé d'un déroulé, sans modèle ni banc (L693) : sessions, appels par session, socle, croissance et sortie par appel, part lue dans le cache, modèle ; chaque appel renvoie tout le contexte, cache lu au prix cacheRead, cache écrit au prix d'entrée × cacheWriteFactor (2 par défaut), prix du déroulé ou de perf.prices ; une ligne par session puis le total (docs/cost.md)
   cadence inspect [dossier] [--wave vague] [--json]   l'inspection des travaux de la dernière vague (ou de --wave), sans modèle : minutes de chaque lot par étape et par porte, pertes classées par cause (refus d'intégration, reprise du lead, attente de créneau, conflit), cause déjà vue dans une vague d'avant (récidive) et le lot du plan qui la traite, sinon la commande raf add qui la supprimerait ; imprimé aussi en fin de vague
   cadence ref add <document.pdf> [--sections 3-5,9] [--slug nom]   enregistre un document de référence hors du dépôt (references.dir de cadence.yaml, sinon $XDG_DATA_HOME/cadence/references) : pages rendues à 200 dpi, texte positionné, images incluses, index des figures et des passages qui les citent ; exige poppler, ImageMagick et tesseract (outil absent nommé avec sa commande, code 2)
   cadence ref analyse <document.pdf> [--sections 3-5,9] [--slug nom] [--model sonnet|opus|haiku] [--model-b sonnet|opus|haiku] [--seuil 30] [--double]   la chaîne : add, puis UNE lecture (une session de l'agent reference-analyst, lectures/a.json, le programme relit le fichier : ref check, document et genre) ; --double : deux lectures indépendantes (A sur --model, B sur --model-b, lectures/a.json et b.json), ref diff, le troisième regard (agent reference-verifier : confirme ou écarte ce qu'une seule lecture porte, d'après une découpe) et l'inventaire réconcilié (inventaire.json, usage.tokens = les trois sessions) — option dont la mesure n'a pas montré de gain (docs/mesures/ref-double-lecture-2026-10-25.md) ; --model-b et --seuil n'ont de sens qu'avec --double ; plafond déclaré : 20 pages par lecture ; code 1 lecture refusée ou (--double) trop d'éléments non appariés (--seuil, 30 %), 2 refus (plafond, modèle, session en échec), 3 quota
@@ -155,6 +156,7 @@ const BEFORE_PLAN: Record<string, (c: EarlyCtx) => number | Promise<number> | nu
   corrections: (c) => corrections(c.rest, c.values, c.io),
   perf: (c) => perf(c.rest, c.values, c.today, c.io),
   inspect: (c) => inspect(c.rest, c.values, c.io),
+  cost: (c) => cost(c.rest, c.values, c.io),
   ref: (c) => (c.rest[0] === 'coverage' ? null : refCommand(c.rest, c.values, c.root, c.io)),
   // Prépare le commit de version : écrit les fichiers de version, ne commite ni ne publie rien (L341).
   release: (c) => release(c.rest, !!c.values['dry-run'], c.root, c.today, c.io.out),

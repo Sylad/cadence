@@ -1,0 +1,37 @@
+{
+  "model": "claude-opus-5-5",
+  "sessions": [
+    {
+      "label": "étape 1",
+      "exchanges": 86,
+      "base": 67183,
+      "growth": 2129,
+      "output": 755,
+      "kept": 0.9854
+    },
+    {
+      "label": "compactage avant étape 2",
+      "exchanges": 1,
+      "growth": 0,
+      "base": 250284,
+      "output": 4345,
+      "kept": 0.9855
+    },
+    {
+      "label": "étape 2",
+      "exchanges": 28,
+      "base": 80513,
+      "growth": 1663,
+      "output": 666,
+      "kept": 0.9664
+    },
+    {
+      "label": "étape 3",
+      "exchanges": 20,
+      "growth": 1226,
+      "output": 572,
+      "kept": 0.9909,
+      "continues": true
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "model": "claude-opus-5-5",
+  "sessions": [
+    {
+      "label": "étape 1",
+      "exchanges": 82,
+      "base": 67185,
+      "growth": 1970,
+      "output": 674,
+      "kept": 0.9857
+    },
+    {
+      "label": "étape 2",
+      "exchanges": 36,
+      "base": 65974,
+      "growth": 1531,
+      "output": 477,
+      "kept": 0.9735
+    },
+    {
+      "label": "étape 3",
+      "exchanges": 38,
+      "base": 65982,
+      "growth": 1368,
+      "output": 393,
+      "kept": 0.9751
+    }
+  ]
+}

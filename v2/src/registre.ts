@@ -30,13 +30,22 @@ export function preparerRegistre(wt: string, choix: string | undefined, a: { dem
 }
 const lister = (d: string) => (existsSync(d) ? readdirSync(d).filter((f) => /^D-\d+\.json$/.test(f)) : []);
 
-/** Le brief complet (v2d) fait inscrire la demande par la session : sans option, ces lignes sont retirées. */
-export const briefSansRegistre = (brief: string) => brief.split('\n').filter((l) => !/^- (Registre des demandes|Crée une entrée pour CHAQUE|Avant de commiter, relis le registre)/.test(l)).join('\n');
+/** Le brief complet (v2d) fait inscrire la demande par la session : sans option, ces lignes sont retirées ; avec --registre D-n, celle qui fait créer
+ *  une entrée (le texte est une consigne du lead qui sert D-n : revue L701-r1), la lecture et la relecture du registre restant. */
+export const briefRegistre = (choix: string | undefined) => (brief: string) => (choix === 'humaine' ? brief : brief.split('\n')
+  .filter((l) => !(choix ? /^- Crée une entrée pour CHAQUE/ : /^- (Registre des demandes|Crée une entrée pour CHAQUE|Avant de commiter, relis le registre)/).test(l)).join('\n'));
 
-/** Sans option, les fichiers du registre que la session a changés depuis `depuis` (la branche de départ après rebase) : rien n'y entre. */
+/** Sans option, les fichiers du registre que la session a changés depuis `depuis` (la branche de départ après rebase) : rien n'y entre. Avec --registre
+ *  D-n, les entrées neuves autres que D-n (passer une entrée existante à « livrée » reste permis). */
 export function registreTouche(wt: string, choix: string | undefined, depuis: string): string | null {
-  if (choix) return null;
-  const f = execFileSync('git', ['diff', '--name-only', depuis, 'HEAD', '--', DOSSIER], { cwd: wt, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+  if (choix === 'humaine') return null;
+  const diff = (...o: string[]) => execFileSync('git', ['diff', '--name-only', ...o, depuis, 'HEAD', '--', DOSSIER], { cwd: wt, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+  if (choix) {
+    const n = diff('--diff-filter=A').filter((x) => x !== `${DOSSIER}/${choix}.json`);
+    return n.length ? `entrée neuve au registre des demandes : ${n.join(', ')} ; ce run sert ${choix}, son texte est une consigne du lead, pas une demande de `
+      + `Sylvain : supprime ces fichiers (git rm) et complète seulement ${choix}` : null;
+  }
+  const f = diff();
   return f.length ? `registre des demandes modifié sans --demande-humaine ni --registre : ${f.join(', ')} ; ce run est une consigne du lead, pas une demande `
     + `de Sylvain : rends ces fichiers tels qu'ils sont sur ${depuis.slice(0, 7)} (git checkout ${depuis.slice(0, 7)} -- ${DOSSIER}, les fichiers neufs supprimés)` : null;
 }

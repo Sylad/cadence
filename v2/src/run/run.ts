@@ -10,7 +10,7 @@ import { parse } from 'yaml';
 import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, type Executeur } from '../bench/bras.js';
 import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun } from './aiguillage.js';
 import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
-import { briefSansRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
+import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
 import { debutProcessus, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
 const PORTE_MS = 30 * 60_000;
@@ -140,7 +140,7 @@ function suite(e: Etat, o: Opts): Etat {
   if (!cmds.length && !o.sansPorte) { e.etat = 'sans-porte'; e.detail = 'cadence.yaml ne déclare ni orchestrate.test ni orchestrate.build : relance avec --sans-porte pour intégrer quand même'; return fin(e, o); }
   // Porte complète : une fois ; rouge, la même session corrige une fois et la porte est rejouée (C3 : un seul site de porte).
   for (let essai = 0; ; essai++) {
-    const r = registreTouche(e.worktree, e.registre, cible), p = r ? { ok: false, sortie: r } : jouerPorte(cmds, e.worktree); // L701 : sans option, rien au registre
+    const r = registreTouche(e.worktree, e.registre, cible), p = r ? { ok: false, sortie: r } : jouerPorte(cmds, e.worktree); // L701 : sans option, rien au registre ; --registre D-n, aucune entrée neuve
     if (p.ok) break;
     if (essai === 1) { e.etat = 'porte-rouge'; e.detail = p.sortie; return fin(e, o); }
     o.out('porte rouge : reprise de la session pour corriger');
@@ -186,7 +186,7 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.
   const demande = `${a.demande}\n\n${a.lot ? `Lot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).\n\n` : ''}`
     + preparerRegistre(worktree, a.registre, { demande: a.demande, lot: a.lot, run: id }); // L701 : la demande de l'humain seule entre au registre
-  const brief = (a.registre ? (b: string) => b : briefSansRegistre)(readFileSync(aig.bras.brief, 'utf8')).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
+  const brief = briefRegistre(a.registre)(readFileSync(aig.bras.brief, 'utf8')).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
     .replaceAll('{{QUESTION}}', `${worktree}.question.md`).replaceAll('{{BASE}}', e.base).replaceAll('{{TAILLE}}', e.taille);
   const o = { exec: a.exec, out: a.out, sansPorte: a.sansPorte, raf: a.raf, maintenant: a.maintenant, attendre: a.attendre };
   try { return attendreQuota(tenu(e, o, () => (session(e, brief, o) ? suite(e, o) : fin(e, o))), o); } finally { rendreVerrou(fichierVerrou(e.fichier)); }

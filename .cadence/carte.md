@@ -17,3 +17,9 @@
 - La bande cadence-hud écrit `~/.cadence/orchestrate/hud-quota.json` (`percent`, `resetsAt`, `at`) depuis `rate_limits.seven_day` à chaque rafraîchissement : un seul fichier, la limite hebdo est celle du compte.
 - Revue L700 r1 (D-18) : un seul processus joue ou attend un run. Verrou `<run>.verrou` à côté de l'état (`{ pid, start, role: session|attente, depuis }`, v2/src/verrou.ts, pose atomique par lien, porteur mort = pid absent ou start différent). Décision : un `--reponse` sur un run tenu par un vivant est **refusé** (pas de prise de main automatique : tuer un processus qui passe de l'attente à la session pourrait laisser un claude orphelin) ; le message donne `kill <pid>`, puis relancer.
 - Écrans : `--liste` « reprise seule après … (processus N en attente) » ou « attente arrêtée (aucun processus n'attend ; reprise prévue …) : reprendre : cadence run --reponse <id> "reprends" » ; `lead tour` idem (« avant : kill N, puis … »). Le jour, le mois et l'heure de « resets … » se lisent hors de la parenthèse du fuseau.
+
+## cadence run et le registre des demandes (L701)
+
+- Sans option : consigne du lead, rien n'entre dans `.cadence/demandes/` (lignes du brief v2d sur le registre retirées, porte qui refuse tout fichier du registre touché). `--demande-humaine` inscrit la demande sous le D-<n> suivant ; `--registre D-n` complète une entrée commitée (lot, id du run).
+- Revue r1 : avec `--registre D-n`, le brief v2d perd seulement « Crée une entrée pour CHAQUE demande » (lecture et relecture du registre gardées, test sur le brief rendu en mode complet) ; la porte refuse toute entrée **neuve** autre que D-n (`git diff --diff-filter=A`), reprise une fois sinon porte-rouge. Passer une autre entrée à « livrée » reste permis. `--demande-humaine` garde le brief entier.
+- D-8 à D-12, D-14, D-16, D-17 et D-18 : `abandonnée`, raison « consigne du lead, pas une demande de l'humain », texte intact, ancien état dans `etat_avant_abandon`.

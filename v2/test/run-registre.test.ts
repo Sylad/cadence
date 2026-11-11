@@ -58,6 +58,38 @@ describe('cadence run et le registre des demandes (L701)', () => {
     expect(prompt(appels[0])).toMatch(/ce run sert l'entrée D-2 du registre/);
   });
 
+  it('--registre D-n en mode complet (revue L701-r1) : le brief rendu ne fait plus créer d\'entrée, garde la lecture et la relecture du registre', () => {
+    const repo = depotAvecRegistre(), appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
+    const e = executerRun({ repo, demande: 'Corriger les majeurs de la revue L9 (pièce jointe)', pieces: ['cadence.yaml'], lot: 'L9', registre: 'D-2',
+      exec: fauxClaude([commite('fait.txt')], appels), out: () => {} });
+    expect(e).toMatchObject({ etat: 'integre', mode: 'complet', registre: 'D-2' });
+    const p = prompt(appels[0]);
+    expect(p).not.toMatch(/Crée une entrée pour CHAQUE demande/);
+    expect(p).toMatch(/^- Registre des demandes : .*\/\.cadence\/demandes\/ garde chaque demande/m);
+    expect(p).toMatch(/^- Avant de commiter, relis le registre/m);
+    expect(p).toMatch(/ce run sert l'entrée D-2 du registre/);
+    expect(demandes(repo)).toEqual(['D-1.json', 'D-2.json']);
+  });
+
+  it('--registre D-n : une entrée neuve créée par la session est refusée en porte (reprise une fois, sinon porte-rouge) ; D-n et les états des autres passent', () => {
+    const repo = depotAvecRegistre(), appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
+    const ecrit = (cwd: string) => { writeFileSync(join(cwd, '.cadence', 'demandes', 'D-3.json'), '{"id":"D-3"}'); commiteTout(cwd); };
+    const retire = (cwd: string) => { git(cwd, 'rm', '-q', '.cadence/demandes/D-3.json'); git(cwd, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'retire D-3'); };
+    const e = executerRun({ repo, demande: 'x', pieces: ['cadence.yaml'], registre: 'D-2', exec: fauxClaude([ecrit, retire], appels), out: () => {} });
+    expect(e.etat).toBe('integre');
+    expect(demandes(repo)).toEqual(['D-1.json', 'D-2.json']);
+    expect(prompt(appels[1])).toMatch(/entrée neuve au registre des demandes : \.cadence\/demandes\/D-3\.json ; ce run sert D-2/);
+    const r = depotAvecRegistre(), b = git(r, 'rev-parse', 'HEAD');
+    const e2 = executerRun({ repo: r, demande: 'x', registre: 'D-2', exec: fauxClaude([ecrit, () => {}]), out: () => {} });
+    expect(e2).toMatchObject({ etat: 'porte-rouge' });
+    expect(e2.detail).toMatch(/D-3\.json/);
+    expect(git(r, 'rev-parse', 'HEAD')).toBe(b);
+    const r3 = depotAvecRegistre();
+    const livre = (cwd: string) => { writeFileSync(join(cwd, '.cadence', 'demandes', 'D-1.json'), '{"id":"D-1","texte":"demande 1","etat":"livrée"}'); commiteTout(cwd); };
+    expect(executerRun({ repo: r3, demande: 'x', registre: 'D-2', exec: fauxClaude([livre]), out: () => {} }).etat).toBe('integre');
+    expect(entree(r3, 'D-1')).toMatchObject({ etat: 'livrée' });
+  });
+
   it('--registre D-n inconnu : refusé avant toute création', () => {
     const repo = depotAvecRegistre();
     expect(() => executerRun({ repo, demande: 'x', registre: 'D-7', exec: fauxClaude([]), out: () => {} })).toThrow(/D-7 absente du registre/);

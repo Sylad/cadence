@@ -94,6 +94,7 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ### Fixed
 
+- `raf hook install` puts its block at the head of an existing pre-commit script, right after the shebang, instead of appending it (L697, [docs/raf.md](docs/raf.md#commands)): appended, the block never ran when the hand-written script exited early (cadence's own pre-commit, 2026-11-10: `exit 0` when no documentation file is staged), so a commit on a branch held by a program (L695) went through. Running `raf hook install` again moves a block already posted at the end to the head, without duplicating it, and says so.
 - `cadence run --help` (and `-h`) prints the usage of `cadence run` and creates nothing (L692, issue #54). It used to start a session on the request « --help », which failed in a second and left a worktree, a branch `cadence/run-<id>` and a state file in `.cadence-run/` to remove by hand. An argument that starts with `-` and is not an option of `cadence run` (a mistyped option, a request that starts with « - ») is now refused with code 2 and the usage, before anything is created, `--fond` included.
 
 ## [2.0.2] - 2026-11-10

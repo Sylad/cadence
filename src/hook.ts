@@ -14,37 +14,64 @@ const BLOCKS = {
   'pre-commit': `${BEGIN}\nif command -v raf >/dev/null 2>&1; then raf hook pre-commit; [ $? -ne ${REFUSED} ] || exit 1; fi\n${END}\n`,
 };
 
-/** Adds the raf blocks to post-commit and pre-commit without touching anything else already there. */
-export function installHook(cwd: string): { path: string; changed: boolean } {
+/**
+ * Adds the raf blocks to post-commit and pre-commit without touching anything else already there.
+ * The pre-commit block goes at the HEAD of the script (L697): a hand-written pre-commit that exits early (`exit 0` when nothing
+ * it checks is staged) would never reach a block appended at the end, and a commit on a held branch would go through.
+ * A block already there but lower is moved to the head, never duplicated.
+ */
+export function installHook(cwd: string): { path: string; changed: boolean; moved: string | null } {
   const post = installBlock(cwd, 'post-commit');
   const pre = installBlock(cwd, 'pre-commit');
-  return { path: post.path, changed: post.changed || pre.changed };
+  return { path: post.path, changed: post.changed || pre.changed, moved: pre.moved ? pre.path : null };
 }
 
-function installBlock(cwd: string, name: keyof typeof BLOCKS): { path: string; changed: boolean } {
-  const BLOCK = BLOCKS[name];
+/** Where each block goes in an existing script: pre-commit at the head (after the shebang), post-commit at the end (read-only, never refuses). */
+const AT_HEAD: Record<keyof typeof BLOCKS, boolean> = { 'pre-commit': true, 'post-commit': false };
+
+function installBlock(cwd: string, name: keyof typeof BLOCKS): { path: string; changed: boolean; moved: boolean } {
   const dir = hooksDir(cwd);
   mkdirSync(dir, { recursive: true });
   const path = join(dir, name);
   const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
-  if (current.includes(BEGIN)) return { path, changed: false };
-  if (current !== '' && !/^#!.*\b(sh|bash|zsh|dash)\b/.test(current)) {
-    throw new RafError(`${path} n'est pas un script shell : y ajouter à la main « raf hook ${name} »`);
-  }
-  let next: string;
-  if (current === '') {
-    next = `#!/bin/sh\n${BLOCK}`;
-  } else {
-    const lines = current.replace(/\n*$/, '').split('\n');
-    // Un « exit » final empêcherait le bloc de s'exécuter : on l'insère juste avant.
-    const last = lines.length - 1;
-    if (/^\s*exit\b/.test(lines[last])) lines.splice(last, 0, BLOCK.trimEnd());
-    else lines.push(BLOCK.trimEnd());
-    next = `${lines.join('\n')}\n`;
-  }
+  const present = current.includes(BEGIN);
+  const next = present ? (AT_HEAD[name] ? moveBlockToHead(current) : null) : placeBlock(current, name, path);
+  if (next === null) return { path, changed: false, moved: false };
   writeFileSync(path, next);
   chmodSync(path, 0o755);
-  return { path, changed: true };
+  return { path, changed: true, moved: present };
+}
+
+/** The script `current` (without a raf block) with the block of `name` added: at the head, or at the end before a final « exit ». */
+function placeBlock(current: string, name: keyof typeof BLOCKS, path: string): string {
+  const BLOCK = BLOCKS[name];
+  if (current === '') return `#!/bin/sh\n${BLOCK}`;
+  if (!/^#!.*\b(sh|bash|zsh|dash)\b/.test(current)) {
+    throw new RafError(`${path} n'est pas un script shell : y ajouter à la main « raf hook ${name} »`);
+  }
+  const lines = current.replace(/\n*$/, '').split('\n');
+  // En tête : juste après le shebang, avant toute commande du script maison, dont un « exit 0 » précoce.
+  // À la fin : un « exit » final empêcherait le bloc de s'exécuter, on l'insère juste avant.
+  const last = lines.length - 1;
+  const at = AT_HEAD[name] ? 1 : /^\s*exit\b/.test(lines[last]) ? last : lines.length;
+  lines.splice(at, 0, BLOCK.trimEnd());
+  return `${lines.join('\n')}\n`;
+}
+
+/**
+ * The script with its raf block moved right after the shebang, or null when it is already at the head (only the shebang,
+ * blank lines and comments before it) or when the block's end marker is missing (a hand-edited block is left alone).
+ */
+export function moveBlockToHead(script: string): string | null {
+  const lines = script.replace(/\n*$/, '').split('\n');
+  const begin = lines.indexOf(BEGIN);
+  const end = lines.indexOf(END, begin);
+  if (begin < 0 || end < 0) return null;
+  const head = lines[0]?.startsWith('#!') ? 1 : 0;
+  if (lines.slice(head, begin).every((l) => /^\s*(#.*)?$/.test(l))) return null;
+  const block = lines.splice(begin, end - begin + 1);
+  lines.splice(head, 0, ...block);
+  return `${lines.join('\n')}\n`;
 }
 
 /**

@@ -228,7 +228,8 @@ function heldBranch(io: Io): boolean {
 export function cmdHook(c: Ctx): number | Promise<number> {
   const { rest, values, io, today, root, configPath, planPath, loadPlan, newsDir } = c;
   if (rest[0] === 'install') {
-    const { path, changed } = installHook(io.cwd);
+    const { path, changed, moved } = installHook(io.cwd);
+    if (moved) io.out(`bloc raf déplacé en tête du script (il s'exécutait après un exit précoce du hook maison) : ${moved}`);
     io.out(changed ? `hook installé : ${path}` : `hook déjà présent : ${path}`);
     return 0;
   }

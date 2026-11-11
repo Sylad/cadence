@@ -3176,9 +3176,10 @@ lots:
     finished: 2026-11-11
   - id: L694
     title: "Socle chargé à chaque session (D-7) : mesurer en tokens ce que chaque session lancée par cadence charge avant son premier geste (CLAUDE.md, MEMORY.md, skills, agents, brief) et proposer les coupes ; mesure : tokens du socle avant/après"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-10
+    started: 2026-11-11
   - id: L695
     title: "Dépôt occupé (D-7, erreur 1 du relevé 10-11, ≥12 fois) : hook pre-commit (raf hook install) qui refuse un commit sur la branche principale tant qu'un run, une vague ou une release tient le dépôt ; raf add/note/done écrivent alors dans .cadence/plan-en-attente.yaml, appliqué après l'intégration ; test e2e (faux run, raf note, git commit refusé, note appliquée, run intégré) ; mesure : 0 refus-integration de run dû à un commit de main sur 2 semaines"
     status: done

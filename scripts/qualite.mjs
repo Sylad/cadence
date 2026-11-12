@@ -230,12 +230,14 @@ export function comparerMigration(avant, apres, existe, lien, depart = avant) {
 }
 
 /**
- * La base du lot telle que la porte la juge contre le départ : une clé d'un fichier neuf (absent du départ, `existe`) ne couvre que ce que le fichier
- * mesure aujourd'hui (le plus petit de la base et de `mesure`). Un morceau migré puis renommé, supprimé ou réécrit laisse sa clé dans la base jusqu'au
- * prochain --ecrire : elle ne donne rien à personne (un fichier qui reparaît sous ce nom est jugé par son contenu), et la refuser coincerait la base
- * (R10, R11). Une clé au-dessus de sa mesure reste un gain non figé, que la porte rappelle.
+ * La base du lot telle que la porte la juge contre le départ : une clé d'un fichier neuf (absent du départ, `existe`) dont le fichier ne mesure plus rien
+ * (morceau migré puis renommé, supprimé ou ramené à 0) ne couvre rien et sort du jugement : elle ne donne rien à personne (un fichier qui reparaît sous
+ * ce nom est jugé par son contenu), et la refuser coincerait la base jusqu'au prochain --ecrire (R10, R11). Tant que le fichier mesure quelque chose, sa
+ * clé est jugée à la VALEUR écrite dans la base, pas à la mesure : gonflée à la main au-dessus de ce que sa source a perdu, elle est refusée (R3, R11),
+ * sinon elle deviendrait au lot suivant la clé d'un fichier « qui existait » et le laisserait grossir. Un gain non figé d'un morceau migré reste couvert :
+ * sa clé a été acceptée dans la perte de sa source, qui ne fait que grandir.
  */
-const baseJugee = (base, mesure, existe) => Object.fromEntries(Object.entries(base).map(([k, n]) => [k, existe(cheminDeCle(k)) ? n : Math.min(n, mesure[k] ?? 0)]).filter(([, v]) => v > 0));
+const baseJugee = (base, mesure, existe) => Object.fromEntries(Object.entries(base).filter(([k]) => existe(cheminDeCle(k)) || (mesure[k] ?? 0) > 0));
 
 const trier = (mesure) => Object.fromEntries(Object.entries(mesure).sort(([a], [b]) => (a < b ? -1 : 1)));
 
@@ -472,7 +474,7 @@ export function retardSurBranche(racine, ref) {
 /** La référence à laquelle un test compare le lot : `origin/main` (comme la CI) quand il est à jour, sinon `main`, le départ du lot (comme la porte). */
 export const refDepartLot = (racine, branche = 'main') => (retardSurBranche(racine, `origin/${branche}`) ? branche : `origin/${branche}`);
 
-/** La base du lot contre celle du départ : refus (code 1) si elle monte, null sinon. Une clé d'un fichier neuf n'est jugée que pour ce que le fichier mesure (`baseJugee`). */
+/** La base du lot contre celle du départ : refus (code 1) si elle monte, null sinon. Une clé d'un fichier neuf qui ne mesure plus rien sort du jugement, les autres sont jugées à leur valeur (`baseJugee`). */
 function baseRemonte(racine, base, mesure, ref) {
   if (!ref?.base) return null;
   const vus = new Map(); // un ls-tree par fichier, pas un par passage

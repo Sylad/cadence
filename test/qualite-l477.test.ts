@@ -371,7 +371,8 @@ describe('L477 — --migrer et la porte', () => {
     const r = appliquer(dir, 'verifier', carte({ 'src/cli.ts': 350, 'src/cli-plan.ts': 600 }), ref);
     expect(r.code).toBe(1);
     expect(r.texte).toContain('remonte');
-    expect(r.texte).toContain(`${cle('src/cli-plan.ts')} : 0 → 600`);
+    // la clé est jugée à la valeur de la base (650), pas à la mesure (600)
+    expect(r.texte).toContain(`${cle('src/cli-plan.ts')} : 0 → 650`);
     expect(r.texte).toContain('aucune source');
   });
 
@@ -417,6 +418,42 @@ describe('L477 — --migrer et la porte', () => {
     const r = appliquer(dir, 'verifier', truquee, ref);
     expect(r.code).toBe(1);
     expect(r.texte).toContain('source la plus proche : src/cli.ts');
+  });
+
+  it('R11 — clé d\'un fichier neuf gonflée à la main au-dessus de sa mesure (700 pour 650 mesurés, source qui a perdu 650) : la porte, --ecrire et --migrer refusent, base intacte', () => {
+    const dir = tempDir();
+    coupe(dir);
+    writeFileSync(join(dir, BASELINE), JSON.stringify(depart));
+    expect(appliquer(dir, 'migrer', apresCoupe, ref).code).toBe(0);
+    const gonflee = JSON.stringify(carte({ 'src/cli.ts': 350, 'src/cli-plan.ts': 700 }));
+    writeFileSync(join(dir, BASELINE), gonflee);
+    for (const mode of ['verifier', 'ecrire', 'migrer'] as const) {
+      const r = appliquer(dir, mode, apresCoupe, ref);
+      expect(r.code, mode).toBe(1);
+      expect(r.texte).toContain('remonte');
+      expect(r.texte).toContain(`${cle('src/cli-plan.ts')} : 0 → 700`);
+      expect(r.texte).toContain('source la plus proche : src/cli.ts');
+      expect(lire(dir)).toBe(gonflee);
+    }
+  });
+
+  it('R11 — sous la clé gonflée, cli-plan.ts grossit de 650 à 700 : la porte refuse (la base gonflée ne devient pas le départ d\'un lot suivant)', () => {
+    const dir = tempDir();
+    ecrire(dir, { 'src/cli.ts': lignes(350, 650), 'src/cli-plan.ts': `${lignes(650)}\n${lignes(50, 9000, 'y')}` });
+    writeFileSync(join(dir, BASELINE), JSON.stringify(carte({ 'src/cli.ts': 350, 'src/cli-plan.ts': 700 })));
+    const r = appliquer(dir, 'verifier', carte({ 'src/cli.ts': 350, 'src/cli-plan.ts': 700 }), ref);
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain(`${cle('src/cli-plan.ts')} : 0 → 700`);
+  });
+
+  it('R11 — morceau migré à 650 puis allégé à 600 sans figer le gain : sa clé (650) reste dans la perte de la source, la porte est verte et --ecrire fige', () => {
+    const dir = tempDir();
+    ecrire(dir, { 'src/cli.ts': lignes(350, 650), 'src/cli-plan.ts': lignes(600) });
+    writeFileSync(join(dir, BASELINE), JSON.stringify(apresCoupe));
+    const allege = carte({ 'src/cli.ts': 350, 'src/cli-plan.ts': 600 });
+    expect(appliquer(dir, 'verifier', allege, ref).code).toBe(0);
+    expect(appliquer(dir, 'ecrire', allege, ref).code).toBe(0);
+    expect(JSON.parse(lire(dir))).toEqual(allege);
   });
 
   it('R12 — migration refusée : code 1, base inchangée, chaque clé en cause nommée avec « avant → après »', () => {

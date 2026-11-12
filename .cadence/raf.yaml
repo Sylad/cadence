@@ -3314,10 +3314,12 @@ lots:
     finished: 2026-11-12
   - id: L710
     title: "Les runs cadence run en cours comptent dans les créneaux de cadence lead tour et cadence orchestrate --status (et dans « sessions en cours ») ; un run mort ne compte pas (issue #55 du compte pro : « créneaux libres : 3 sur 3 » avec deux runs vivants)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-12
     started: 2026-11-12
+    review: { date: 2026-11-12, verdict: "conforme (revue Opus puis revue courte Sonnet de dc8d1f25, 12-11) : 0 bloquant ; runs vivants comptés dans les créneaux, lead tour et orchestrate --status ; double compte avec lead hold supprimé (lead hold refuse un run vivant), docs et skill du lead à jour, slotsLine sur outsideSessions ; mineur : un label qui cite en mot entier le lot d'un run vivant est refusé (contournable)", commit: dc8d1f2505f5760a3209795bc61c71a4a68e85fc }
+    finished: 2026-11-12
   - id: L711
     title: "cadence run --fond écrit dans son journal le signal qui l'arrête (SIGHUP, SIGTERM, SIGINT) et son cgroup au lancement, pour établir la cause de l'issue #55 (runs morts à la fin de la session lanceuse chez le compte pro, non reproduit sur Big-Blue : setsid déjà là, init.scope, linger) ; test du journal sur un signal envoyé"
     status: todo

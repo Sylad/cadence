@@ -3283,9 +3283,10 @@ lots:
     finished: 2026-11-11
   - id: L705
     title: "Coupes du socle côté cadence (D-7, mesure L694 : docs/mesures/socle-session-2026-11-11.md) : C1 worktree de cadence run hors de l'arborescence du dépôt, à décider par dépôt ; C2 plugins de l'utilisateur coupés sauf cadence et playwright dans cadence run et le banc (comme L398) ; C3 connecteurs claude.ai coupés ; C4 mémoire auto coupée ; vérifier chaque mécanisme sur une vraie session ; gain mesuré attendu −11 % par lot"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-11
+    started: 2026-11-12
   - id: L706
     title: "Banc séquence : une demande qui cite un fichier hors des pièces de son étape est refusée au chargement de la séquence (D-7 ; vécu 10 au 12-11 : aether-b68-court citait la pièce d'aether-b68, 4 passages rouges sur une fausse fuite) ; test sur ce cas ; mesure : 0 passage rouge pour une fuite de pièce déclarée"
     status: done

@@ -20,16 +20,15 @@ const MARGE_REPRISE_MS = 60_000, TRANCHE_ATTENTE_MS = 10 * 60_000, REPRISES_QUOT
 const REPRISE_QUOTA = 'Le quota est revenu : reprends le travail là où tu t\'étais arrêté, dans le même dossier, puis dis « fini ».';
 const BASCULE_FABLE = 'La limite Opus est atteinte : tu continues sur Fable. Reprends le travail là où tu t\'étais arrêté, dans le même dossier, puis dis « fini ».';
 
-export type EtatRun = 'en-cours' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
+export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
 export interface Etat { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string; pieces: string[];
   taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
 const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-const essaiGit = (cwd: string, ...a: string[]) => spawnSync('git', a, { cwd, encoding: 'utf8' });
-const dossierRuns = (repo: string) => join(dirname(repo), '.cadence-run');
-const sauver = (e: Etat) => { writeFileSync(e.fichier, JSON.stringify(e, null, 1)); return e; };
+const essaiGit = (cwd: string, ...a: string[]) => spawnSync('git', a, { cwd, encoding: 'utf8' }), dossierRuns = (repo: string) => join(dirname(repo), '.cadence-run');
+const sauver = (e: Etat) => { writeFileSync(e.fichier, JSON.stringify(e, null, 1)); return e; }, lireEtat = (f: string) => JSON.parse(readFileSync(f, 'utf8')) as Etat;
 
 // L695 (D-9) : le run tient la branche cible du début à la fin ; le pre-commit de raf (raf hook install) y refuse un commit du lead, qui le ferait
 // échouer en avance rapide, et raf add|note|done écrivent dans le plan en attente. Même format que src/repo-held.ts, qui le lit.
@@ -60,6 +59,7 @@ function tenu(e: Etat, o: Opts, corps: () => Etat): Etat {
 // D-18 : un seul processus joue ou attend un run ; verrou `<run>.verrou` (../verrou.ts), lu aussi par src/quota-tour.ts (mort : l'attente est arrêtée).
 export const fichierVerrou = (fichier: string) => fichier.replace(/\.json$/, '.verrou');
 export const occupantRun = (fichier: string) => occupantVivant(fichierVerrou(fichier));
+export const etatVu = (e: Etat): EtatRun => (e.etat === 'en-cours' && !occupantRun(e.fichier) ? 'interrompu' : e.etat); // L709 : processus mort (lanceur fermé, kill, PC éteint) ; sur disque, en-cours
 function verrouiller(e: Etat): void {
   const p = prendreVerrou(fichierVerrou(e.fichier), 'session'), quand = e.quota?.reprise ? ` après ${heureLocale(e.quota.reprise)}` : '';
   if (p) throw new Error(p.role === 'attente' ? `cadence run : le processus ${p.pid} attend la remise à zéro du quota de ${e.id} et reprendra seul la session${quand} ; `
@@ -100,13 +100,15 @@ function jouerPorte(cmds: string[], cwd: string): { ok: boolean; sortie: string 
   return { ok: true, sortie: '' };
 }
 
-function session(e: Etat, prompt: string, o: Opts): boolean {
+// L709 (issue #55) : rien de ce qui lie un processus à la session Claude Code lanceuse (pid, socket, auth rafraîchie par l'hôte) ; `neuve` : 1re session, id de l'état.
+const LIEN_HOTE = /^CLAUDE_(PID|SSH_\w+|CODE_(CHILD_SESSION|MESSAGING_\w+|SDK_HAS_HOST_AUTH_REFRESH|HOST_SESSION_ID|SESSION_ID))$/;
+function session(e: Etat, prompt: string, o: Opts, neuve = false): boolean {
   const exec = o.exec ?? creerExecuteur('claude', 4 * 3600_000);
   // L699 : le modèle est celui du lancement, gardé dans l'état (une reprise par --reponse ne le change pas) ; un état d'avant L699 n'en a pas : opus.
   // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet
-  const env = { ...process.env, CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k))), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
   const interdits = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
-  const brut = exec(['-p', prompt, ...(e.session ? ['--resume', e.session] : []), ...argsClaude({ ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }, e.worktree, interdits)], { cwd: e.worktree, env });
+  const brut = exec(['-p', prompt, ...(neuve ? ['--session-id', e.session] : e.session ? ['--resume', e.session] : []), ...argsClaude({ ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }, e.worktree, interdits)], { cwd: e.worktree, env });
   const r = lire(brut);
   e.session = r.session || e.session; e.cout_usd += r.cout;
   // D-15 : une fin de quota n'est pas un échec. La limite Opus seule bascule sur fable dans la même session ; la limite hebdo bloque tous les modèles : on attend.
@@ -179,7 +181,7 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   copierDeps(repo, worktree);
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
-    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, session: '', cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
+    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, session: crypto.randomUUID(), cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
   sauver(e);
   verrouiller(e);
   a.out(`cadence run ${id} : session ${modele[0].toUpperCase()}${modele.slice(1)} en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);
@@ -189,7 +191,7 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   const brief = briefRegistre(a.registre)(readFileSync(aig.bras.brief, 'utf8')).split('\n').filter((l) => !l.startsWith('- Taille fixée par le gardien')).join('\n').replaceAll('{{DEMANDE}}', demande).replaceAll('{{CLONE}}', worktree)
     .replaceAll('{{QUESTION}}', `${worktree}.question.md`).replaceAll('{{BASE}}', e.base).replaceAll('{{TAILLE}}', e.taille);
   const o = { exec: a.exec, out: a.out, sansPorte: a.sansPorte, raf: a.raf, maintenant: a.maintenant, attendre: a.attendre };
-  try { return attendreQuota(tenu(e, o, () => (session(e, brief, o) ? suite(e, o) : fin(e, o))), o); } finally { rendreVerrou(fichierVerrou(e.fichier)); }
+  try { return attendreQuota(tenu(e, o, () => (session(e, brief, o, true) ? suite(e, o) : fin(e, o))), o); } finally { rendreVerrou(fichierVerrou(e.fichier)); }
 }
 
 /** Reprend un run en attente (question) ou rendu (porte rouge, conflit, sans porte) : la réponse va à la même session. */
@@ -197,18 +199,18 @@ export function repondreRun(id: string, repo: string, reponse: string, o: Opts):
   const racine = git(repo, 'rev-parse', '--show-toplevel');
   const f = join(dossierRuns(racine), `${basename(racine)}-${id}.json`);
   if (!existsSync(f)) throw new Error(`cadence run : run inconnu : ${id} (${f})`);
+  const coupe = etatVu(lireEtat(f)) === 'interrompu' ? 'Ta session a été interrompue (le processus du run est mort) : reprends là où tu t\'étais arrêté, dans le même dossier. ' : '';
   verrouiller(lireEtat(f)); // D-18 : refusé si un processus vivant joue ou attend ce run ; l'état est relu sous le verrou
   try {
     const e = lireEtat(f);
     if (e.etat === 'integre') throw new Error(`cadence run : ${id} est déjà intégré`);
-    e.etat = 'en-cours'; delete e.quota; sauver(e);
-    return attendreQuota(tenu(e, o, () => (session(e, `Réponse de Sylvain : ${reponse}`, o) ? suite(e, o) : fin(e, o))), o);
+    e.etat = 'en-cours'; delete e.quota; sauver(e); // L709 : un run interrompu reprend la même session (son id est dans l'état dès le lancement), même worktree
+    return attendreQuota(tenu(e, o, () => (session(e, `${coupe}Réponse de Sylvain : ${reponse}`, o) ? suite(e, o) : fin(e, o))), o);
   } finally { rendreVerrou(fichierVerrou(f)); }
 }
 
 /** Attente bloquante, sans processus fils (le run est synchrone de bout en bout). */
 const dormir = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-const lireEtat = (f: string) => JSON.parse(readFileSync(f, 'utf8')) as Etat;
 
 /** D-15 : un run en quota attend l'heure de remise à zéro, puis reprend la même session dans le même worktree. Pendant l'attente, la branche est rendue (fin()
  * est passé) : le lead travaille ; le verrou reste à ce processus (rôle « attente », D-18) : un --reponse est refusé. Relue à chaque tranche, un état changé

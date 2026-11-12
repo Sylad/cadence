@@ -32,6 +32,10 @@
   {
    "date": "2026-11-12",
    "texte": "L706 fait (run 20261112113406-1675645) : le banc séquence refuse au chargement une demande qui cite un fichier hors des pièces déclarées de son étape ou des étapes d'avant, en nommant le chemin cité et les pièces permises (cas aether-b68-court du 10 au 12-11, 4 passages rouges à tort). Preuve : v2/test/sequence-citations-l706.test.ts (rouge avant le correctif, vert après) ; suites v2 et racine vertes. La mesure (0 passage rouge pour une fuite de pièce déclarée) reste à relever au prochain banc, et la séquence aether-b68-court est à corriger (elle sera désormais refusée). D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "L709 fait (run 20261112131550-1911486, issue #55 du compte pro) : les sessions claude d'un run ne reçoivent plus les variables qui les lient à la session Claude Code lanceuse (CLAUDE_PID, CLAUDE_SSH_*, CLAUDE_CODE_CHILD_SESSION, CLAUDE_CODE_MESSAGING_*, CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH…), --fond garde les options de Node, --liste affiche « interrompu » pour un run en-cours sans processus vivant, et l'id de session est écrit dans l'état dès le lancement (--session-id) pour que --reponse reprenne un run mort pendant sa première session. Preuve : v2/test/run-fond-l709.test.ts (4 cas, 3 rouges sur le code d'avant, verts après ; le premier tue le groupe de la lanceuse et vérifie que le run et sa session vivent et vont à l'intégration). Non mesuré : un vrai run --fond dont on ferme la session Claude Code lanceuse au compte pro. D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -41,12 +45,14 @@
   "L696",
   "L698",
   "L682",
-  "L706"
+  "L706",
+  "L709"
  ],
  "runs": [
   "20261111190444-2449989",
   "20261111211808-2649855",
   "20261112081458-4076309",
-  "20261112113406-1675645"
+  "20261112113406-1675645",
+  "20261112131550-1911486"
  ]
 }

@@ -4,7 +4,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import type { Io } from '../cli.js';
 import type { Executeur } from '../bench/bras.js';
 import { MODELES, modeleRun } from './aiguillage.js';
-import { executerRun, occupantRun, repondreRun, type Etat } from './run.js';
+import { etatVu, executerRun, occupantRun, repondreRun, type Etat } from './run.js';
 import { heureLocale, type Quota } from './quota.js';
 
 /** D-15 : ce que --liste dit d'un run en quota ; D-18 : une reprise seule seulement si un processus vivant attend, sinon l'attente est arrêtée. */
@@ -13,7 +13,7 @@ const quotaListe = (e: Etat, q: Quota, l = `limite ${q.limite === 'hebdo' ? 'heb
 
 export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L12] [--demande-humaine | --registre D-n] [--taille retouche|fonction] [--complet] [--modele ${MODELES.join('|')}] [--sans-porte] [--fond]   une demande, une session (mode complet si références), porte, intégration
   cadence run --reponse <id> "<texte>"   reprend un run en attente, en quota ou rendu, dans la même session
-  cadence run --liste                    les runs du dépôt et leur état
+  cadence run --liste                    les runs du dépôt et leur état ; « interrompu » : en-cours, processus mort (L709) : --reponse reprend la même session
   cadence run --help | -h                cette aide, sans rien créer
   registre (L701) : sans --demande-humaine ni --registre D-n, la demande est une consigne du lead : rien n'est inscrit au registre (.cadence/demandes/)
            --demande-humaine l'inscrit (texte mot pour mot, D-<n> suivant) ; --registre D-n rattache le run à cette entrée existante
@@ -21,7 +21,8 @@ export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L1
   quota (D-15) : une session qui finit sur « You've hit your weekly limit · resets … » met le run en état quota ; il reprend seul la même session après l'heure dite ;
            tant que son processus attend, --reponse est refusé (kill <pid> d'abord) ; processus mort, --liste dit « attente arrêtée » : --reponse le reprend
            « You've hit your Opus limit » bascule sur fable dans la même session (jamais sur la limite hebdo, qui bloque tous les modèles)
-  --fond : le run se détache (il survit à la session qui l'a lancé), son journal est dans ../.cadence-run/`;
+  --fond : le run se détache (il survit à la session qui l'a lancé), son journal est dans ../.cadence-run/
+  L709 : ses sessions claude ne gardent aucun lien avec la session Claude Code lanceuse (pid, socket, auth par l'hôte) ; l'id de session est dans l'état dès le lancement`;
 
 /** `exec` : l'exécuteur de la session, pour les tests (claude par défaut). */
 export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<number> {
@@ -31,7 +32,7 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
     if (a[0] === '--liste') {
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
       const etats = existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(d, f), 'utf8')) as Etat).filter((e) => e.repo === racine) : [];
-      for (const e of etats) out(`${e.id}  ${e.etat}  ${e.demande.split('\n')[0].slice(0, 80)}${e.etat === 'quota' && e.quota ? `  · ${quotaListe(e, e.quota)}` : ''}`);
+      for (const e of etats) out(`${e.id}  ${etatVu(e)}${etatVu(e) === 'interrompu' ? ` (reprendre : cadence run --reponse ${e.id} "reprends")` : ''}  ${e.demande.split('\n')[0].slice(0, 80)}${e.etat === 'quota' && e.quota ? `  · ${quotaListe(e, e.quota)}` : ''}`);
       if (!etats.length) out('aucun run');
       return 0;
     }
@@ -60,7 +61,7 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
       mkdirSync(d, { recursive: true });
       const journal = join(d, `fond-${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.log`), fd = openSync(journal, 'a');
-      spawn(process.execPath, [process.argv[1], 'run', ...a.filter((x) => x !== '--fond')], { cwd: io.cwd, detached: true, stdio: ['ignore', fd, fd] }).unref();
+      spawn(process.execPath, [...process.execArgv, process.argv[1], 'run', ...a.filter((x) => x !== '--fond')], { cwd: io.cwd, detached: true, stdio: ['ignore', fd, fd] }).unref();
       out(`cadence run lancé en arrière-plan ; journal : ${journal} ; état : cadence run --liste`);
       return 0;
     }

@@ -3077,10 +3077,12 @@ lots:
     created: 2026-11-07
   - id: L679
     title: "CHANGELOG partagé : 7 conflits d'ajout pur et 13 rejeux de porte (80 min sur 970 en 0800, 26,3 min en 1805) ; chaque lot écrit changelog.d/L<id>.md, le release l'assemble, test/changelog.test.ts lit les fragments ; niveau : source ; niveau le plus tôt : source ; mesure : 0 rejeu de porte dû au seul CHANGELOG sur 3 vagues"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-07
     started: 2026-11-12
+    review: { date: 2026-11-12, verdict: "conforme (revue Opus puis revue courte Sonnet de 796cfbd, 12-11) : 0 bloquant ; fragments changelog.d/ assemblés par release (essai sur clone jetable : 6 fragments mot pour mot), commit de version reconnu malgré les suppressions de fragments, note du geste sur conflit modify/delete, pre-commit local joue le test des fragments ; mineur : un commit de pures suppressions de fragments passerait pour une release ; non vérifié : release réelle", commit: 796cfbd101c4addc42d7cc59368fbef89e0ca4b1 }
+    finished: 2026-11-12
   - id: L680
     title: "Ressource par fichier de src/ au lancement : en 0800 L671 (wants renommé wanted par L670, tsc rouge), L673 (conflit integrate-lot.ts, CHANGELOG.md) et L662 (work.ts) refusés à l'intégration, ~54 min plus les rejeux ; les fichiers de src/ cités par le titre ou lus par le precheck reçoivent uses: automatique (comme L671 pour docs) donc leurs lots passent l'un après l'autre ; niveau : source ; niveau le plus tôt : source ; mesure : 0 refus d'intégration pour main avancé sur 3 vagues"
     status: todo
@@ -3331,11 +3333,12 @@ lots:
     finished: 2026-11-12
   - id: L712
     title: "Panneau /hud lots : l'arbre des lots n'est jamais réduit à rien par les autres blocs (décisions, dépenses, livraisons, Banc) ; les blocs secondaires cèdent leur place d'abord (Banc replié en une ligne quand la place manque) ; un panneau trop petit pour un lot le dit (« pas la place : agrandir le panneau »), jamais « Aucun lot non clos » quand des lots existent ; test sur hauteur réduite et capture réelle du panneau (D-20 : capture du 12-11 à 20:35, panneau vide pendant L679)"
-    status: todo
+    status: doing
     estimate: 0.5
     visible: true
     screen: component
     created: 2026-11-12
+    started: 2026-11-12
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

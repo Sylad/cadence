@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { ClientProps, ElementConstructor, EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
+import type { ClientProps, ElementConstructor, EngineInterface, Register, RenderChildren, ThemeKey, Timer } from 'claude-code'
 
 import type { AgentsSummary, CommandInfo, LeadHold, LiveRun, LotsNotice, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
 import { BANC_READER, CONTEXT_WRITER, COLLECTOR, QUOTA_WRITER, DEFAULT_CAP, DELIVERIES, LAST_DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
@@ -10,7 +10,8 @@ import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
 import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
-import { buildPanel, ellipsize, foldText, foldWave, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
+import { lignesDuBloc, partage } from './partage'
+import { besoinArbre, buildPanel, ellipsize, foldText, foldWave, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
@@ -900,59 +901,68 @@ export const register: Register = on => {
       </Text>
     )
 
-    // « ce qui attend une décision » (L412) : au plus la moitié du corps, l'arbre garde le reste ; les vagues finies viennent d'`endedWaves` (la bande et l'arbre ne lisent que `waves`),
+    // « ce qui attend une décision » (L412) : au plus la moitié du corps ; les vagues finies viennent d'`endedWaves` (la bande et l'arbre ne lisent que `waves`),
     // le tableau lu écarte les décisions dont le lot est clos au plan
-    const decisions = buildDecisions(decisionsOf(allWaves, deliveries, ended, board), columns, Math.max(3, Math.floor(e.props.scroll.bodyRows / 2)))
-    const decisionBlock = decisions.lines.length > 0 && (
+    const bodyRows = e.props.scroll.bodyRows
+    const decisions = buildDecisions(decisionsOf(allWaves, deliveries, ended, board), columns, Math.max(3, Math.floor(bodyRows / 2)))
+    // « lots en cours : budget et durée » (L414), sous les décisions : au plus le quart du corps, décisions et dépenses ensemble au plus la moitié ; un lot en dépassement garde ses deux lignes (spendHeight)
+    const spendRows = spendOf(allWaves, typical, at)
+    const spend = buildSpend(spendRows, columns, spendHeight(spendRows, bodyRows, decisions.lines.length))
+    // « dernière livraison par projet » (L415), sous les dépenses : ce que décisions et dépenses laissent de la moitié du corps
+    const deliveryRows = deliveriesOf(latest, board, at)
+    const shipped = buildDeliveries(deliveryRows, columns, deliveriesHeight(deliveryRows.length, bodyRows, decisions.lines.length + spend.lines.length))
+    // les 5 derniers passages du banc de cadence 2 (Task 16), sous les livraisons, et le passage en cours avant eux ; rien sans historique
+    const runningPane = enCoursLine(running, at)
+    const benchDetail = bench && bench.length > 0 ? bancDetail(bench) : []
+    const benchLines: { text: string; color?: ThemeKey; bold?: boolean }[] = [
+      ...(runningPane ? [{ text: runningPane.text, color: runningPane.color }] : []),
+      ...(benchDetail.length > 0 ? [{ text: `Banc : ${Math.min(5, bench!.length)} derniers passages`, bold: true }, ...benchDetail.map(l => ({ text: l, ...(l.includes('✗') ? { color: 'error' as const } : {}) }))] : []),
+    ]
+
+    // le partage de la hauteur (L712) : l'arbre des lots d'abord ; tant qu'il n'a pas de quoi montrer ses projets en cours, le banc, les livraisons, les dépenses puis les décisions
+    // se replient en une ligne, puis cèdent cette ligne, dans cet ordre
+    const panelInput = board && !board.outdated ? { rows: board.rows, columns, waves: waveLotsOf(allWaves, at), folds, views, now: at } : undefined
+    const treeNeed = panelInput ? besoinArbre(panelInput, bodyRows) : 1
+    const share = partage(bodyRows, treeNeed, { decisions: decisions.lines.length, depenses: spend.lines.length, livraisons: shipped.lines.length, banc: benchLines.length }, { depenses: spend.lines.some(l => l.tone === 'warning') ? 1 : 0 })
+    const rouges = deliveryRows.filter(r => r.status === 'rouge').length
+    const decisionLines = lignesDuBloc(decisions.lines, decisions.lines[0], share.decisions)
+    const spendLines = lignesDuBloc(spend.lines, spend.lines.find(l => l.tone === 'warning') ?? spend.lines[0], share.depenses)
+    const shippedLines = lignesDuBloc(shipped.lines, shipped.lines[0] && (rouges > 0 ? { text: ellipsize(`${shipped.lines[0].text} · ✖ ${rouges} rouge${rouges > 1 ? 's' : ''}`, columns), tone: 'error' as const } : shipped.lines[0]), share.livraisons)
+    const benchFolded = runningPane ? benchLines[0] : benchDetail[0] !== undefined ? { text: `Banc : ${benchDetail[0]}`, bold: true, ...(benchDetail[0].includes('✗') ? { color: 'error' as const } : {}) } : undefined
+    const benchShown = lignesDuBloc(benchLines, benchFolded, share.banc)
+
+    const decisionBlock = decisionLines.length > 0 && (
       <Box key="decisions" flexDirection="column">
-        {decisions.lines.map((l, i) => (
+        {decisionLines.map((l, i) => (
           <Text key={`d${i}`} bold={l.tone === 'title'} dimColor={l.tone === 'subtle'} color={l.tone === 'error' ? 'error' : undefined} wrap="truncate-end">
             {l.text}
           </Text>
         ))}
       </Box>
     )
-
-    // « lots en cours : budget et durée » (L414), sous les décisions : au plus le quart du corps, et décisions et dépenses ensemble au plus la moitié, l'arbre garde le reste —
-    // sauf qu'un lot en dépassement garde toujours ses deux lignes (titre et ⚠), prises sur l'arbre : le signal ne disparaît jamais faute de place (spendHeight)
-    const spendRows = spendOf(allWaves, typical, at)
-    const spend = buildSpend(spendRows, columns, spendHeight(spendRows, e.props.scroll.bodyRows, decisions.lines.length))
-    const spendBlock = spend.lines.length > 0 && (
+    const spendBlock = spendLines.length > 0 && (
       <Box key="spend" flexDirection="column">
-        {spend.lines.map((l, i) => (
+        {spendLines.map((l, i) => (
           <Text key={`s${i}`} bold={l.tone === 'title'} color={l.tone === 'warning' ? 'warning' : undefined} wrap="truncate-end">
             {l.text}
           </Text>
         ))}
       </Box>
     )
-
-    // « dernière livraison par projet » (L415), sous les dépenses : ce que décisions et dépenses laissent de la moitié du corps, l'arbre garde le reste
-    const deliveryRows = deliveriesOf(latest, board, at)
-    const shipped = buildDeliveries(deliveryRows, columns, deliveriesHeight(deliveryRows.length, e.props.scroll.bodyRows, decisions.lines.length + spend.lines.length))
-    const deliveriesBlock = shipped.lines.length > 0 && (
+    const deliveriesBlock = shippedLines.length > 0 && (
       <Box key="deliveries" flexDirection="column">
-        {shipped.lines.map((l, i) => (
+        {shippedLines.map((l, i) => (
           <Text key={`v${i}`} bold={l.tone === 'title'} color={l.tone === 'error' ? 'error' : undefined} wrap="truncate-end">
             {l.text}
           </Text>
         ))}
       </Box>
     )
-
-    // les 5 derniers passages du banc de cadence 2 (Task 16), sous les livraisons ; rien sans historique
-    const runningPane = enCoursLine(running, at)
-    const benchLines = bench && bench.length > 0 ? [`Banc : ${Math.min(5, bench.length)} derniers passages`, ...bancDetail(bench)] : []
-    const benchBlock = (benchLines.length > 0 || runningPane) && (
+    const benchBlock = benchShown.length > 0 && (
       <Box key="banc" flexDirection="column">
-        {runningPane && (
-          <Text key="b-en-cours" color={runningPane.color} wrap="truncate-end">
-            {runningPane.text}
-          </Text>
-        )}
-        {benchLines.map((l, i) => (
-          <Text key={`b${i}`} bold={i === 0} color={i > 0 && l.includes('✗') ? 'error' : undefined} wrap="truncate-end">
-            {l}
+        {benchShown.map((l, i) => (
+          <Text key={`b${i}`} bold={l.bold === true} color={l.color} wrap="truncate-end">
+            {l.text}
           </Text>
         ))}
       </Box>
@@ -965,17 +975,20 @@ export const register: Register = on => {
       body = failed ? message("Lots illisibles : cadence lead tour n'a pas répondu. Nouvelle lecture dans une minute.", 'error') : message('Lecture des plans…', 'subtle')
     } else {
       // l'ordre des projets (L449) : une région de plus, une ligne par projet (et son titre), quand il y a un ordre à ranger (deux projets au moins) ;
-      // elle prend ses lignes sur l'arbre et ne vient que s'il lui reste de quoi montrer le nom de chaque projet et un lot (2 lignes par projet)
+      // elle prend ses lignes sur l'arbre et ne vient que s'il lui reste de quoi montrer le nom de chaque projet et un lot (2 lignes par projet), et ce que l'arbre demande (L712)
       const ranked = projectsOf(board.rows)
-      const room = e.props.scroll.bodyRows - decisions.lines.length - spend.lines.length - shipped.lines.length - benchLines.length
-      const showOrder = Client !== undefined && ranked.length >= 2 && room - (ranked.length + 1) >= 2 * ranked.length + 1
+      const room = bodyRows - decisionLines.length - spendLines.length - shippedLines.length - benchShown.length
+      const showOrder = Client !== undefined && ranked.length >= 2 && room - (ranked.length + 1) >= Math.max(2 * ranked.length + 1, treeNeed)
       const order = showOrder && (
         <Client key="projects" module="./projects-list.tsx" props={{ projects: ranked.map(r => ({ name: r.project, detail: projectDetail(r), ...projectProgress(r) })) }} width="100%" />
       )
       const orderRows = order ? ranked.length + 1 : 0
-      const panel = buildPanel({ rows: board.rows, columns, height: room - orderRows, waves: waveLotsOf(allWaves, at), folds, views, now: at })
+      const panel = buildPanel({ ...panelInput!, height: room - orderRows })
+      // « aucun lot » ne se dit que d'un dossier sans lot non clos ; un arbre qui a des lots mais pas la place d'en montrer un le dit (L712)
       if (panel.lines.length === 0) {
-        body = message('Aucun lot non clos dans les projets de ce dossier.', 'subtle')
+        body = !board.rows.some(r => r.error || (r.lots && r.lots.length > 0))
+          ? message('Aucun lot non clos dans les projets de ce dossier.', 'subtle')
+          : message('Pas la place de montrer un lot : agrandir le panneau.', 'error')
       } else {
         // une région Client par projet : on ne réordonne qu'à l'intérieur de son projet
         const rows: RenderChildren[] = []

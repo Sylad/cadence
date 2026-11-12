@@ -453,6 +453,42 @@ export const buildPanel = (input: {
   return { lines: fits.map(({ height: _h, ...l }) => l as PanelLine), more: cutLots + droppedLots + cutButtons }
 }
 
+/** Les projets que des lignes du panneau montrent : par un de leurs lots, ou par leur ligne repliée (qui dit ses lots en cours). */
+const projetsVus = (lines: readonly PanelLine[]): Set<string> => {
+  const vus = new Set<string>()
+  let projet = ''
+  for (const l of lines) {
+    if (l.kind === 'project') {
+      projet = l.name
+      if (l.folded) vus.add(projet)
+    } else if (l.kind === 'lot') vus.add(projet)
+  }
+  return vus
+}
+
+/**
+ * La hauteur que l'arbre des lots demande dans le partage du panneau (L712), au plus `max` : la plus petite qui montre tous les projets à lot en cours (un lot ou leur ligne repliée) ;
+ * sinon celle qui montre le premier d'entre eux ; sinon celle qui montre un lot. Aucune ne tient : `max`, tout le corps à l'arbre. Sans projet à montrer : 1, la ligne qui le dit.
+ */
+export const besoinArbre = (input: Omit<Parameters<typeof buildPanel>[0], 'height'>, max: number): number => {
+  const montres = input.rows.filter(r => r.error || (r.lots && r.lots.length > 0))
+  if (montres.length === 0) return 1
+  const enCours = montres.filter(r => !r.error && (r.lots ?? []).some(l => !isTask(l) && l.status === 'doing')).map(r => r.project)
+  const buts: ((vus: Set<string>, lines: readonly PanelLine[]) => boolean)[] = [
+    ...(enCours.length > 0 ? [(vus: Set<string>) => enCours.every(p => vus.has(p)), (vus: Set<string>) => vus.has(enCours[0]!)] : []),
+    (vus, lines) => vus.size > 0 || lines.some(l => l.kind === 'project' && l.error),
+  ]
+  const atteint: (number | undefined)[] = buts.map(() => undefined)
+  for (let h = 0; h <= max && atteint[0] === undefined; h++) {
+    const lines = buildPanel({ ...input, height: h }).lines
+    const vus = projetsVus(lines)
+    buts.forEach((but, i) => {
+      if (atteint[i] === undefined && but(vus, lines)) atteint[i] = h
+    })
+  }
+  return atteint.find(h => h !== undefined) ?? max
+}
+
 /** Une ligne de lot du panneau, telle que le dessin la porte ; le projet la date. */
 export type PanelLot = Extract<PanelLine, { kind: 'lot' }>
 

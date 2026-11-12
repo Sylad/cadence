@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Mounted, TestBody } from 'claude-code/testing'
 
-import { DELIVERIES, LAST_DELIVERIES, PLAN_STAMPS } from '../hooks/collect'
+import { BANC_READER, DELIVERIES, LAST_DELIVERIES, PLAN_STAMPS } from '../hooks/collect'
 import type { LotsRow, TourLot, Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module) : laisse se poser un travail lancé sans être attendu. */
@@ -22,7 +22,7 @@ const WAVE: Wave = {
 type Cadence = { exitCode: number; stdout: string }
 
 /** Monte le mod comme une session, avec un moteur simulé : état en mémoire, panneaux ouverts, processus pilotés par le test. */
-const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave[]; stamps?: () => string; deliveries?: () => string; last?: () => string; perf?: () => Cadence; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string }; priority?: (argv: string[], cwd: string | undefined) => { exitCode: number; stdout: string; stderr: string } } = {}) => {
+const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave[]; stamps?: () => string; deliveries?: () => string; last?: () => string; perf?: () => Cadence; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string }; priority?: (argv: string[], cwd: string | undefined) => { exitCode: number; stdout: string; stderr: string }; banc?: string[] } = {}) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const open = new Set<string>()
   const opened: unknown[] = []
@@ -76,6 +76,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
       const r = await tour.current()
       return { value: { ...r, stderr: '' } } as never
     }
+    if (argv[3] === BANC_READER) return { value: { exitCode: 0, stdout: JSON.stringify({ h: setup.banc ?? null, c: null }), stderr: '' } } as never
     if (argv[3] === LAST_DELIVERIES) return { value: { exitCode: 0, stdout: (setup.last ?? (() => '[]'))(), stderr: '' } } as never
     if (argv[3] === DELIVERIES) return { value: { exitCode: 0, stdout: (setup.deliveries ?? (() => '[]'))(), stderr: '' } } as never
     if (argv[3] === PLAN_STAMPS) return { value: { exitCode: 0, stdout: stamps.current(), stderr: '' } } as never
@@ -1310,13 +1311,15 @@ test('L414 R14 — à 30 lignes, des décisions qui prennent toute leur moitié 
   expect(at(/L401/)).toBeGreaterThan(at(/ol:L80/))
 })
 
-test('L414 R15 — un corps de 6 lignes (le quart ne fait pas deux lignes) : le lot en dépassement reste visible, titre et ligne ⚠ ; hors dépassement, le bloc cède la place à l’arbre', async ($, on) => {
+test('L414 R15 — un corps de 6 lignes (le quart ne fait pas deux lignes) : le lot en dépassement reste visible ; replié en sa ligne ⚠ quand l’arbre a besoin de la place (L712), titre et ligne ⚠ sinon', async ($, on) => {
   const over = await session($, on, { waves: [spending({})], perf: () => ({ exitCode: 0, stdout: PERF }) })
   await over.advance(5_000)
   await over.hud('lots')
   const { texts } = await over.draw(70, 6)
-  expect(texts.findIndex(t => /Lots en cours : budget et durée \(1\)/.test(t))).toBeGreaterThan(-1)
   expect(texts.find(t => /ol:L80/.test(t))).toMatch(/^⚠ ol:L80 {2}786k\/750k tokens dépassé/)
+  const tall = (await over.draw(70, 30)).texts
+  expect(tall.findIndex(t => /Lots en cours : budget et durée \(1\)/.test(t))).toBeGreaterThan(-1)
+  expect(tall.find(t => /ol:L80/.test(t))).toMatch(/^⚠ ol:L80 {2}786k\/750k tokens dépassé/)
 })
 
 test('L414 R16 — hors dépassement, un bloc qui n’a pas deux lignes de place n’apparaît pas : l’arbre garde le corps', async ($, on) => {
@@ -1694,4 +1697,76 @@ test('R10 — le panneau garde le dernier tableau entre deux relectures : lot «
   const after = await s.draw()
   expect(after.buttons.map(b => b.text)).toContain('▸ livrés : 1')
   expect(after.buttons.map(b => b.text)).not.toContain('▸ prêts : 1')
+})
+
+// ── L712 (D-20) : l'arbre des lots d'abord dans le partage de la hauteur ──
+
+const passage = (j: number) => JSON.stringify({ date: `2026-11-0${j}T09:00:00.000Z`, candidat: 'eq', bancs: ['1-a', '3-b', '6-c'], hebdo: false, vert: true, rouges: [] })
+const BANC5 = [3, 4, 5, 6, 7].map(passage)
+const WAVE_L712: Wave = {
+  id: 'w712', pid: 1, cwd: '/p', cap: 2, started: '1970-01-01T00:00:00.000Z', status: 'running', live: true, budget: 1_000_000, consumed: 1,
+  lots: [
+    { project: 'cadence', repo: '/p/cadence', lot: 'L401', title: 't', status: 'implementing', pass: 0, model: 'sonnet', next: null, steps: 1, step: null, since: '1970-01-01T00:00:00.000Z', consumed: 1000 },
+    { project: 'ol', repo: '/p/ol', lot: 'L80', title: 't', status: 'question', pass: 0, model: 'sonnet', next: null, steps: 1, step: null, questions: ['Quelle base ?'] },
+  ],
+} as Wave
+/** La répartition de la capture du 12-11 : décisions, dépenses, livraisons et un banc de 5 passages au-dessus de l'arbre. */
+const crowded = async ($: Parameters<TestBody>[0], on: On, tour: unknown[] = TOUR) => {
+  const s = await session($, on, { waves: [WAVE_L712], last: () => LAST, banc: BANC5, tour: () => ({ exitCode: 0, stdout: JSON.stringify(tour) }) })
+  await s.advance(5_000)
+  await s.hud('lots')
+  await s.advance(5_000)
+  return s
+}
+
+test('L712 — la répartition de la capture (corps de 16 lignes) : le lot en cours reste visible, le banc se replie, jamais « Aucun lot non clos »', async ($, on) => {
+  const s = await crowded($, on)
+  const { text } = await s.draw(70, 16)
+  expect(text).toContain('L401')
+  expect(text).not.toContain('Aucun lot non clos')
+  expect(text).not.toContain('Banc : 5 derniers passages')
+})
+
+test('L712 — haut assez : tous les blocs entiers, le banc avec ses 5 passages, et l’arbre', async ($, on) => {
+  const s = await crowded($, on)
+  const { text } = await s.draw(70, 60)
+  expect(text).toContain('Banc : 5 derniers passages')
+  expect(text).toContain('Dernière livraison par projet (2)')
+  expect(text).toContain('Ce qui attend une décision')
+  expect(text).toContain('L401')
+  expect(text).toContain('L80')
+})
+
+test('L712 — les blocs cèdent dans l’ordre : le banc d’abord, puis les livraisons, les dépenses, les décisions en dernier', async ($, on) => {
+  const s = await crowded($, on)
+  const at = async (rows: number) => (await s.draw(70, rows)).text
+  const tall = await at(60)
+  expect(tall).toContain('07-11 10:00') // le passage le plus récent, entier
+  // en réduisant la hauteur, un bloc ne perd sa dernière ligne qu'après que le banc a perdu la sienne
+  for (let rows = 30; rows >= 6; rows--) {
+    const t = await at(rows)
+    if (t.includes('Dernière livraison') || t.includes('budget et durée') || t.includes('Ce qui attend une décision')) continue
+    expect(t.includes('Banc')).toBe(false)
+  }
+  for (let rows = 30; rows >= 6; rows--) {
+    const t = await at(rows)
+    if (t.includes('Ce qui attend une décision')) continue
+    expect(t.includes('Dernière livraison')).toBe(false)
+    expect(t.includes('Banc')).toBe(false)
+  }
+})
+
+test('L712 — un panneau trop petit pour un seul lot le dit, sans prétendre qu’il n’y a aucun lot', async ($, on) => {
+  const s = await crowded($, on)
+  const { text } = await s.draw(70, 3)
+  expect(text).toContain('Pas la place de montrer un lot : agrandir le panneau.')
+  expect(text).not.toContain('Aucun lot non clos')
+})
+
+test('L712 — un projet à lot en cours placé après un autre reste visible quand la hauteur le permet', async ($, on) => {
+  const many = row('ol', ['L80', 'L81', 'L82', 'L83', 'L84', 'L85'].map(id => lot(id)))
+  const s = await crowded($, on, [many, TOUR[0]])
+  const { text } = await s.draw(70, 18)
+  expect(text).toContain('L401')
+  expect(text).not.toContain('Aucun lot non clos')
 })

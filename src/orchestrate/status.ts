@@ -5,7 +5,7 @@ import { RafError } from '../plan.js';
 import { findProjects, isProject as isLeadProject } from '../lead.js';
 import { unpublishedAt, unpublishedLine } from '../unpublished.js';
 import { freeLine, readyFree } from '../ready-free.js';
-import { cadenceHome, expiredHolds, freeSlots, liveHolds, liveRuns, liveSlots, liveWaves } from './registry.js';
+import { cadenceHome, expiredHolds, freeSlots, liveHolds, liveRuns, liveSlots, liveWaves, outsideSessions } from './registry.js';
 import { longDuration } from './guard.js';
 import { keptLines } from './worktree.js';
 import { lotFinished, lotKey, RunStore, type LotState } from './state.js';
@@ -46,7 +46,7 @@ export function slotsLine(cap = DEFAULT_MAX_SESSIONS, now = new Date()): { line:
   const home = cadenceHome();
   const holds = liveHolds(home, now);
   const runs = liveRuns(home);
-  const free = freeSlots(liveWaves(home), cap, holds.length + runs.length);
+  const free = freeSlots(liveWaves(home), cap, outsideSessions(home, now)); // la somme des vagues, pas une copie : une source ajoutée là s'affiche ici
   const run = runs.length ? ` · runs cadence run : ${runs.length} (${runs.map((r) => `${basename(r.repo)} ${r.id}`).join(', ')})` : '';
   const lead = holds.length ? ` · sessions du lead : ${holds.length} (${holds.map((h) => h.label).join(', ')})` : '';
   return { line: `vagues en cours : ${liveWaves(home).length} · sessions en cours : ${liveSlots(home).length + runs.length}${run}${lead} · créneaux libres : ${free} sur ${cap}`, free };

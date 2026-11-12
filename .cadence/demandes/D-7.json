@@ -40,6 +40,10 @@
   {
    "date": "2026-11-12",
    "texte": "L710 fait (run 20261112141141-2253545, issue #55 du compte pro) : les runs de cadence run vivants (état en-cours, processus vivant au verrou du run, le contrôle de « interrompu » de --liste) prennent un créneau. Le run s'inscrit dans $CADENCE_HOME/runs/ le temps de sa session, de sa porte et de son intégration ; cadence lead tour, cadence orchestrate --status et la bande cadence-hud le comptent dans les sessions en cours et le nomment (« runs cadence run : 1 (projet <id>) ») ; les vagues attendent son créneau et le citent dans leur journal ; formule écrite une fois dans docs/concepts.md#slots-and-holds. Preuve : test/creneaux-runs-l710.test.ts (un run vivant factice compte, un pid mort ne compte pas, un run fini ou en quota non plus, registre et bande sur le même registre, une vague attend), v2/test/run-creneau-l710.test.ts ; suites racine (604 fichiers), v2 (526 tests) et bande (474 tests) vertes. Non vérifié : un vrai cadence run vu par un vrai cadence lead tour (le run en cours tourne sur la copie en service, d'avant ce changement). D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "Suite de revue L710 (run 20261112143710-3694893) : cadence lead hold refuse (code 2, rien d'inscrit) une étiquette qui nomme le lot ou l'id d'un cadence run vivant, qui se compte déjà (mesuré en revue : 1 run + hold run-L710 → « 1 sur 3 » au lieu de 2) ; le lot du run est écrit dans son état ; la skill lead, docs/lead.md et docs/cadence-hud.md citent les runs dans les créneaux ; slotsLine appelle outsideSessions. Preuve : test/lead-hold-run-l710.test.ts (R1 et R3 rouges sans le refus, verts avec), v2/test/run-creneau-l710.test.ts ; suite v2 verte (527), suite racine verte sauf les deux tests du cliquet qualité, corrigés ensuite (node scripts/qualite.mjs --contre main : rien n'empire) et rejoués verts. Non vérifié : un vrai cadence run face à un vrai lead hold. D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -59,6 +63,7 @@
   "20261112081458-4076309",
   "20261112113406-1675645",
   "20261112131550-1911486",
-  "20261112141141-2253545"
+  "20261112141141-2253545",
+  "20261112143710-3694893"
  ]
 }

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { Tokens } from './result.js';
 import { processStart } from '../proc.js';
 import { gitCommonDir } from '../git.js';
+import { escapeRe } from '../plan-ids.js';
 import { lotFinished, lotKey, lotRepoPaths, RunStore, type LotState } from './state.js';
 import { hasRoom, whileWaiting } from './attente.js';
 import { activeLock, holderAlive, releaseLock, takeLock, type OLock } from './lock.js';
@@ -179,9 +180,30 @@ export function expiredHolds(home: string, now: Date): LeadHold[] {
 export interface LiveRun {
   id: string;
   repo: string;
+  /** Le lot du plan qu'il sert (`--lot`), écrit dans son état ; absent d'un run sans lot ou lancé par une version d'avant. */
+  lot?: string;
 }
 
 const runsDir = (home: string) => join(home, 'runs');
+
+/** Le run que l'état `etat` (lu sur disque) décrit, avec son lot quand il en a un. */
+const runOf = (raw: { id: unknown; repo: unknown }, etat: { lot?: unknown }): LiveRun =>
+  ({ id: String(raw.id), repo: String(raw.repo), ...(typeof etat.lot === 'string' && etat.lot ? { lot: etat.lot } : {}) });
+
+/** Lit une inscription : un porteur vivant tient-il le verrou du run, et le run est-il en cours. Illisible ou absent : aucun porteur vivant connu. */
+function readRun(file: string): { alive: boolean; run: LiveRun | null } {
+  let alive = false;
+  try {
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    const state = String(raw.fichier);
+    const lock = JSON.parse(readFileSync(state.replace(/\.json$/, '.verrou'), 'utf8'));
+    alive = Number.isInteger(lock.pid) && holderAlive(lock.pid, typeof lock.start === 'string' ? lock.start : undefined);
+    const etat = alive ? JSON.parse(readFileSync(state, 'utf8')) : null;
+    return { alive, run: etat?.etat === 'en-cours' ? runOf(raw, etat) : null };
+  } catch {
+    return { alive, run: null };
+  }
+}
 
 /** Les runs de `cadence run` qui tiennent une session en ce moment ; une inscription dont le verrou n'a plus de porteur vivant (run tué, PC éteint) est écartée au passage. */
 export function liveRuns(home: string): LiveRun[] {
@@ -194,21 +216,22 @@ export function liveRuns(home: string): LiveRun[] {
   const out: LiveRun[] = [];
   for (const n of names.sort()) {
     const file = join(runsDir(home), n);
-    let alive = false;
-    let run: LiveRun | null = null;
-    try {
-      const raw = JSON.parse(readFileSync(file, 'utf8'));
-      const state = String(raw.fichier);
-      const lock = JSON.parse(readFileSync(state.replace(/\.json$/, '.verrou'), 'utf8'));
-      alive = Number.isInteger(lock.pid) && holderAlive(lock.pid, typeof lock.start === 'string' ? lock.start : undefined);
-      if (alive && JSON.parse(readFileSync(state, 'utf8')).etat === 'en-cours') run = { id: String(raw.id), repo: String(raw.repo) };
-    } catch {
-      // inscription, état ou verrou illisible ou absent : aucun porteur vivant connu
-    }
+    const { alive, run } = readRun(file);
     if (run) out.push(run);
     else if (!alive) rmSync(file, { force: true });
   }
   return out;
+}
+
+/** Vrai quand `label` cite `word` entier : « run-L710 » cite L710, pas L71 ni L7100. */
+const cites = (label: string, word: string) => new RegExp(`(^|[^A-Za-z0-9])${escapeRe(word)}($|[^A-Za-z0-9])`).test(label);
+
+/**
+ * Le run vivant que l'étiquette d'un `lead hold` nomme (son id ou son lot), sinon undefined. Un run se compte seul depuis L710 :
+ * le tenir aussi par `lead hold` le compterait deux fois (revue L710 : 1 run + hold run-L710 → « 1 sur 3 » au lieu de 2).
+ */
+export function runNamedBy(label: string, runs: LiveRun[]): LiveRun | undefined {
+  return runs.find((r) => cites(label, r.id) || (r.lot !== undefined && cites(label, r.lot)));
 }
 
 /** Les sessions qu'aucune vague ne porte et qui prennent un créneau : sessions du lead inscrites et runs vivants de `cadence run` (L710). Le `outside` de `freeSlots`. */

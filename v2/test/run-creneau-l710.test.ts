@@ -24,6 +24,18 @@ describe('cadence run dans le registre des créneaux (L710)', () => {
     expect(inscrits()).toEqual([]);
   });
 
+  it('le lot du run est écrit dans son état (liveRuns le lit, lead hold refuse une étiquette qui le nomme)', () => {
+    const repo = depot();
+    let lot: string | undefined;
+    const exec = fauxClaude([(cwd) => {
+      const [f] = inscrits();
+      lot = JSON.parse(readFileSync(JSON.parse(readFileSync(join(process.env.CADENCE_HOME!, 'runs', f), 'utf8')).fichier, 'utf8')).lot;
+      commite('fait.txt')(cwd);
+    }]);
+    expect(executerRun({ repo, demande: 'Crée fait.txt', lot: 'L12', exec, out: () => {} }).etat).toBe('integre');
+    expect(lot).toBe('L12');
+  });
+
   it('un run qui finit en échec se retire aussi', () => {
     const repo = depot();
     const e = executerRun({ repo, demande: 'x', exec: () => { throw new Error('claude absent'); }, out: () => {} });

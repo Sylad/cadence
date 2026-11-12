@@ -54,6 +54,8 @@ interface Spec {
 interface RunSpec {
   pid?: number;
   etat?: string;
+  /** Le lot du run (`--lot`), écrit dans son état (L710). */
+  lot?: string;
 }
 
 /**
@@ -64,7 +66,7 @@ export function writeRun(home: string, dir: string, id: string, r: RunSpec = {})
   const pid = r.pid ?? living();
   const fichier = join(dir, `proj-${id}.json`);
   mkdirSync(join(home, 'runs'), { recursive: true });
-  writeFileSync(fichier, JSON.stringify({ id, repo: join(dir, 'proj'), etat: r.etat ?? 'en-cours' }));
+  writeFileSync(fichier, JSON.stringify({ id, repo: join(dir, 'proj'), etat: r.etat ?? 'en-cours', ...(r.lot ? { lot: r.lot } : {}) }));
   writeFileSync(fichier.replace(/\.json$/, '.verrou'), JSON.stringify({ pid, start: processStart(pid) ?? undefined, role: 'session', depuis: NOW.toISOString() }));
   writeFileSync(join(home, 'runs', `${id}.json`), JSON.stringify({ id, repo: join(dir, 'proj'), fichier }));
   return id;

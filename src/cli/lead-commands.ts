@@ -11,7 +11,7 @@ import { findProjects, isProject, leadTour, readDepth, readLeadUx, tourCiLines, 
 import { tourMemoryLines } from '../memory-index.js';
 import { localOverdueLines } from '../local-task.js';
 import { configuredCap, expiredHoldLines, slotsLine } from '../orchestrate/command.js';
-import { addHold, cadenceHome, releaseHold } from '../orchestrate/registry.js';
+import { addHold, cadenceHome, liveRuns, releaseHold, runNamedBy } from '../orchestrate/registry.js';
 import { perfHeader } from '../perf.js';
 import { tourInspectLines } from '../inspect-read.js';
 import { tourQuotaLines } from '../quota-tour.js';
@@ -61,6 +61,14 @@ function leadPriority(rest: string[], before: string | undefined, after: string 
   return 0;
 }
 
+/** Un cadence run vivant se compte seul dans les créneaux (L710) : le tenir aussi par `lead hold` le compterait deux fois. */
+function refuseLiveRun(label: string): void {
+  const run = runNamedBy(label, liveRuns(cadenceHome()));
+  if (!run) return;
+  const named = run.lot ? `ni ${run.lot} ni ${run.id}` : `pas ${run.id}`;
+  throw new RafError(`« ${label} » nomme le cadence run vivant ${run.id}${run.lot ? ` (lot ${run.lot})` : ''} de ${basename(run.repo)} : il se compte déjà dans les créneaux, le tenir aussi le compterait deux fois ; pour une autre session, une étiquette qui ne cite ${named}`);
+}
+
 /** `cadence lead hold <étiquette> [--ttl minutes]` / `lead release <étiquette>` (L255) : inscrit, ou rend, une session lancée à la main par le lead, qui compte dans les créneaux libres. */
 function leadHold(rest: string[], ttl: string | undefined, io: Io, today: Day): number {
   const [verb, label] = rest;
@@ -81,6 +89,7 @@ function leadHold(rest: string[], ttl: string | undefined, io: Io, today: Day): 
   if (encodeURIComponent(label!).length > HOLD_LABEL_MAX) throw new RafError(`étiquette trop longue (${usage})`);
   const minutes = ttl === undefined ? HOLD_TTL_MINUTES : Number(ttl);
   if (!(Number.isInteger(minutes) && minutes >= 1)) throw new RafError(`--ttl invalide : ${ttl} (un nombre entier de minutes ≥ 1)`);
+  refuseLiveRun(label!);
   addHold(cadenceHome(), label!, minutes, io.now());
   io.out(`session « ${label} » inscrite pour ${minutes} min : elle compte dans les créneaux libres (cadence lead release « ${label} » à sa fin)`);
   return 0;

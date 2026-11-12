@@ -36,7 +36,9 @@ sessions du lead : 1 · créneaux libres : 2 sur 3
   correctif-L12  depuis 4 min · reste 56 min
 ```
 
-With a live wave and no held session the line reads `créneaux libres : 1 sur 2`; with neither, nothing. A wave whose lots
+With a live wave and no held session the line reads `créneaux libres : 1 sur 2`; a live `cadence run` (L710) adds
+`runs cadence run : 1 (alpha 2026…) · ` in front and is subtracted, and prints the line alone too; with no wave, held session
+nor run, nothing. A wave whose lots
 play in their own worktrees takes one slot per lot that holds a claude session (`lanes` of the wave registry: a lot settled,
 waiting for a dependency or in the tests/build gate, which has no session, holds none), not one per repository it holds,
 exactly as `cadence orchestrate --status` counts them (L589: the band said « 2 libres » while `--status` said 0 on 3). The lots

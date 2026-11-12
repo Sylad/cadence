@@ -3344,10 +3344,12 @@ lots:
     finished: 2026-11-12
   - id: L713
     title: "spec reseal --porteur n'est plus bloqué par une modification de fiche venant d'un lot abandonné (raf drop) ou fini : ce commit est accepté et inscrit dans resceaux avec sa raison ; un lot en cours qui n'est pas le porteur bloque toujours ; plus jamais d'édition à la main d'acceptation-<lot>.json (issue #56 du compte pro, vécu deux fois ; même famille que #53)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-12
     started: 2026-11-12
+    review: { date: 2026-11-12, verdict: "conforme (revue Opus du 12-11 sur e4b41dc et e714c55) : 0 bloquant ; reseal --porteur admet une fiche amendée par un lot abandonné ou fini et l'inscrit dans resceaux.amendements ; lot en cours non porteur toujours bloquant ; refus avec gestes outillés rejoués par les tests ; verrou intact (empreintes, lockViolations) ; mineurs : sortie de succès sans les commits admis, raison « publié » même non poussé, raf done non rejoué", commit: e714c557e86bad431e904317ae1196c1a2c020ca }
+    finished: 2026-11-12
   - id: L714
     title: "Test instable v2/test/run-signal-l711.test.ts : rouge une fois dans la suite complète du run de L713 (12-11), vert seul (8/8) ; rendre le test indépendant de la charge (attente sur un événement, pas sur un délai) ; mesure : 0 rouge sur 5 suites complètes"
     status: todo

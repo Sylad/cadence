@@ -3298,10 +3298,12 @@ lots:
     created: 2026-11-12
   - id: L708
     title: "Retirer le doublement de l'estimate à raf add pour un lot dont le titre cite src/orchestrate/cycle/ (ajouté par L682) : sans effet mesurable (plancher de budget 600 k), lit le titre seul (aurait raté L676, doublé L629 à tort) ; garder la réserve de correction avant l'escalade (D-19)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-12
     started: 2026-11-12
+    review: { date: 2026-11-12, verdict: "conforme (revue Sonnet du 12-11) : 0 défaut, 13/13 tests ciblés, tsc propre ; doublement retiré partout, réserve de correction avant l'escalade intacte et testée", commit: 0b4beb8ae8de0b46a2469d07035a840e2a38bb49 }
+    finished: 2026-11-12
   - id: L709
     title: "cadence run --fond survit à la session Claude Code qui le lance (détaché de son groupe de processus : setsid ou équivalent) ; --liste signale un run dont le processus est mort comme « interrompu » au lieu de « en-cours » ; l'id de session est écrit dans l'état dès le lancement (--session-id), pour que --reponse reprenne aussi un run mort pendant sa première session ; test qui tue la session lanceuse (issue #55 du compte pro : 2 runs perdus, 3 h de créneau)"
     status: todo

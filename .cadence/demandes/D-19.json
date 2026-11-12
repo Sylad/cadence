@@ -3,7 +3,7 @@
  "texte": "Oui, le retirer",
  "date": "2026-11-12",
  "etat": "livrée",
- "preuve": "L708 : doublement retiré de src/cli-add.ts (citesCycle, estimateFor), de docs/raf.md et docs/orchestrate-cycle.md ; entrée Removed sous [Unreleased] du CHANGELOG (celle de 2.0.3, publiée, gardée) ; réserve de correction avant l'escalade (budget.ts) gardée. test/orchestrate-budget-correction-l682.test.ts R5 : un titre qui cite src/orchestrate/cycle/ garde son estimate (0.25 et 1). npx vitest run : 10046 verts, 2 rouges sous v2/ dus à CADENCE_PIECES de la session, verts sans elle (28/28).",
+ "preuve": "L708, commit 0b4beb8a (doublement retiré, réserve de correction gardée), revue conforme, porte verte",
  "precisions": [
   {
    "date": "2026-11-12",

@@ -3077,9 +3077,10 @@ lots:
     created: 2026-11-07
   - id: L679
     title: "CHANGELOG partagé : 7 conflits d'ajout pur et 13 rejeux de porte (80 min sur 970 en 0800, 26,3 min en 1805) ; chaque lot écrit changelog.d/L<id>.md, le release l'assemble, test/changelog.test.ts lit les fragments ; niveau : source ; niveau le plus tôt : source ; mesure : 0 rejeu de porte dû au seul CHANGELOG sur 3 vagues"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-07
+    started: 2026-11-12
   - id: L680
     title: "Ressource par fichier de src/ au lancement : en 0800 L671 (wants renommé wanted par L670, tsc rouge), L673 (conflit integrate-lot.ts, CHANGELOG.md) et L662 (work.ts) refusés à l'intégration, ~54 min plus les rejeux ; les fichiers de src/ cités par le titre ou lus par le precheck reçoivent uses: automatique (comme L671 pour docs) donc leurs lots passent l'un après l'autre ; niveau : source ; niveau le plus tôt : source ; mesure : 0 refus d'intégration pour main avancé sur 3 vagues"
     status: todo

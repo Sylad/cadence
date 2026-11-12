@@ -51,7 +51,8 @@ function faux(r: string, paresseux: (appelCandidat: number) => boolean = () => f
   };
   return { exec, vu };
 }
-const dep = (r: string, exec: Executeur): Dep => ({ exec, pret: () => null, jscpd: ['node', join(r, 'jscpd.cjs')], empreinte: 'e1' });
+/** Horloge fixe des bras : la durée d'un faux bras (un git commit, plus d'une demi-seconde sous charge) ne fait plus rougir le critère « temps total » (porte du 12-11). */
+const dep = (r: string, exec: Executeur): Dep => ({ exec, pret: () => null, jscpd: ['node', join(r, 'jscpd.cjs')], empreinte: 'e1', horloge: () => new Date('2026-11-09T10:00:00Z') });
 const histo = (r: string) => readFileSync(join(r, 'historique.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
 
 describe('cadence2 bench sequence : ligne de commande', () => {
@@ -113,6 +114,13 @@ describe('cadence2 bench sequence : passage', () => {
       expect(h.map((l) => l.vert)).toEqual(attendu); expect(new Set(h.map((l) => l.run)).size).toBe(1);
       expect(io.sortie.filter((l) => /^(VERT|ROUGE)/.test(l))).toHaveLength(2);
     }
+  });
+  it('un bras lent (charge de la machine) ne rougit pas le passage : la durée des bras se lit sur l\'horloge injectée (porte du 12-11)', async () => {
+    const r = racine(), { exec } = faux(r);
+    const lent: Executeur = (args, o) => { if (!/dans \S+\.json/.test(args[args.indexOf('-p') + 1]) && JSON.parse(readFileSync(join(r, 'en-cours.json'), 'utf8')).phase === 'bras sequence-v2') sh(r, 'sleep 0.6'); return exec(args, o); };
+    const io = ioTest({ BENCH_ROOT: r, HOME: r });
+    expect(await sequence(['s1'], io, dep(r, lent))).toBe(0);
+    expect(histo(r).map((l) => l.vert)).toEqual([true]);
   });
   it('une répétition qui lève : ligne rouge « répétition non terminée », les suivantes jouées, code 1, publication refusée', async () => {
     for (const lance of [2, 1]) {

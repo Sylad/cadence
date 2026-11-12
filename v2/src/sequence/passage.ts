@@ -29,7 +29,7 @@ export interface Base { suite: { passes: number; total: number }; build_ok: bool
 export interface ResultatSequence { run: string; sequence: string; clones: Record<string, string>; base: Record<string, Base>; etapes: Record<string, MesureEtape[]>; jugement: Jugement | null;
   /** R36 : réglages utilisateur changés depuis le début du passage, recontrôlés avant les juges. R35 : nombre de sorties attendues déclarées. */ reglages_utilisateur?: string[]; sorties_attendues?: number }
 type Opt = { racine: string; id: string; ref: string; cand: string; juge: string; exec: Executeur; maintenant: Date; empreinte: string; home: string; out: (l: string) => void;
-  repetition?: number; repetitions?: number; prep?: typeof preparer; pret?: (b: Record<string, DefBras>) => string | null; jscpd?: string[]; delaiMs?: number; garderClones?: boolean; tirage?: () => number };
+  repetition?: number; repetitions?: number; prep?: typeof preparer; pret?: (b: Record<string, DefBras>) => string | null; jscpd?: string[]; delaiMs?: number; garderClones?: boolean; tirage?: () => number; horloge?: () => Date }; // horloge : celle de la durée des bras, fixée par les tests (le « temps total » ne juge pas la charge de la machine)
 interface Ctx { o: Opt; s: Sequence; bras: Record<string, DefBras>; run: string; dir: string; debut: string; delai: number;
   noms: string[]; clones: Record<string, string>; prec: Record<string, Statuts>; reglages: Record<string, string>; sessions?: Record<string, Releve> } // sessions : dernier relevé de la dernière session de chaque bras (L690, L703)
 
@@ -178,7 +178,7 @@ function reglesEtape(x: Ctx, b: string, k: number): Regles {
 function lancer(x: Ctx, e: Etape, b: string, avant: { head: string; sale: string[] }, pieces: string[]): Mesure {
   const c = x.clones[b];
   try {
-    const m = lancerBras(bancEtape(x.s, e, avant.head), x.bras[b], c, x.o.exec, undefined, { pieces, racine: x.o.racine }, x.sessions?.[b]);
+    const m = lancerBras(bancEtape(x.s, e, avant.head), x.bras[b], c, x.o.exec, x.o.horloge, { pieces, racine: x.o.racine }, x.sessions?.[b]);
     if (m.releve) (x.sessions ??= {})[b] = m.releve; // un bras « suite » reprend la session de l'étape d'avant et ne compte que l'écart à ce relevé (L703)
     m.echec ??= travailNonLivre(avant, etatGit(c));
     return m;

@@ -363,7 +363,7 @@ describe('L477 — --migrer et la porte', () => {
     expect(JSON.parse(lire(dir))).toEqual(sans);
   });
 
-  it('R11 — la clé d\'un morceau migré ne couvre que ce qu\'il mesure : réécrit sans lien et regrossi sous sa clé, la porte le refuse', () => {
+  it('R11 — la clé d\'un morceau migré réécrit sans lien et allégé à 600 est jugée à la valeur de la base (650), pas à la mesure : la porte le refuse', () => {
     const dir = tempDir();
     coupe(dir);
     writeFileSync(join(dir, BASELINE), JSON.stringify(apresCoupe));

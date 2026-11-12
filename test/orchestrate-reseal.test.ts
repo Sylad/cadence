@@ -1007,10 +1007,10 @@ describe('cadence spec reseal d’un lot livré, fiche amendée par un autre lot
 
   it('R3 — refus d’un lot livré : le message nomme le sha fautif, le lot cité, et la voie à suivre (--porteur / commit à citer)', () => {
     const { repo, a } = lots();
-    const faute = amende(repo, a.fiche, 'docs(L4): fiche');
+    const faute = amende(repo, a.fiche, 'docs(L5): fiche');
     corrige(repo, a.test);
     const r = reseal(repo, a.test);
-    expect(r.err).toMatch(new RegExp(`a été modifiée depuis le commit rouge [0-9a-f]{7} par un commit qui ne cite ni L1, ni le porteur L2, ni un lot livré : ${faute} \\(cite : L4\\) — faire citer le porteur ou un lot livré par ce commit \\(le réécrire avant qu'il soit poussé\\) ou, sinon, rescelle à la main avec le lead`));
+    expect(r.err).toMatch(new RegExp(`a été modifiée depuis le commit rouge [0-9a-f]{7} par un commit qui ne cite ni L1, ni le porteur L2, ni un lot livré : ${faute} \\(cite : L5\\) — faire citer le porteur ou un lot livré par ce commit \\(le réécrire avant qu'il soit poussé\\) ou, sinon, rescelle à la main avec le lead`));
   });
 
   it('R3 — refus d’un lot en cours : message L217 inchangé', () => {
@@ -1101,7 +1101,7 @@ describe('cadence spec reseal d’un lot livré, fiche amendée par un autre lot
     const { repo, a } = lots();
     amende(repo, a.fiche, 'fix(L5): fiche');
     corrige(repo, a.test);
-    expect(() => resealAcceptation(repo, a.json, a.test, 'x', '2026-10-16', 'L2', refsL, [])).toThrow(/ne cite ni L1/);
+    expect(() => resealAcceptation(repo, a.json, a.test, 'x', '2026-10-16', 'L2', refsL, {})).toThrow(/ne cite ni L1/);
     const r = reseal(repo, a.test);
     expect(r.code).not.toBe(0);
     expect(r.err).toContain('ne cite ni L1');
@@ -1251,5 +1251,94 @@ describe('cadence spec reseal <lot> <test> <test>… (L546, issue #23)', () => {
     const { repo, a } = livre();
     expect(cli(repo, 'spec', 'reseal', 'L1', '--reason', 'x', '--porteur', 'L2').err).toContain('usage : cadence spec reseal <lot> <test>');
     expect(cli(repo, 'spec', 'reseal', 'L1', a.test, '--porteur', 'L2').err).toContain('usage');
+  });
+});
+
+// L713 (issue #56) : la fiche d'un lot livré amendée par un commit d'un lot abandonné ou fini ne bloque plus le rescellé ; le commit est admis et inscrit dans
+// `resceaux` (sha, lot, état, raison). Un commit d'un lot en cours qui n'est pas le porteur bloque toujours, et le refus nomme ce lot et le geste.
+describe('cadence spec reseal d’un lot livré, fiche amendée par un lot abandonné, fini ou en cours (L713)', () => {
+  function cli(repo: string, env: Record<string, string>, ...argv: string[]) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = run(argv, { cwd: repo, env: { RAF_TODAY: '2026-11-12', ...env }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-11-12T10:00:00') });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  }
+  /** L1 livré (acceptation verte), L2 porteur en cours, L3 en cours qui amende la fiche ; `fin` clôt L3 après son commit de la fiche (poussé, non réécrit). */
+  function cas(fin: 'drop' | 'done' | undefined) {
+    const s = lotScelle({ vert: true });
+    cli(s.repo, {}, 'init', '--project', 'demo');
+    for (const t of ['un', 'deux', 'trois']) cli(s.repo, {}, 'add', `Lot ${t}`);
+    cli(s.repo, {}, 'start', 'L1');
+    cli(s.repo, {}, 'done', 'L1', '--force');
+    cli(s.repo, {}, 'start', 'L2');
+    cli(s.repo, {}, 'start', 'L3');
+    commitPaths(s.repo, 'plan: lots', '.cadence/raf.yaml', '.cadence/notes/.gitkeep', '.gitignore');
+    writeFileSync(join(s.repo, s.a.fiche), `${readFileSync(join(s.repo, s.a.fiche), 'utf8')}# R62 amendée par L3\n`);
+    commitPaths(s.repo, 'docs(L3): fiche, R62 amendée', s.a.fiche);
+    const sha = git(s.repo, 'rev-parse', '--short', 'HEAD').trim();
+    if (fin === 'drop') cli(s.repo, {}, 'drop', 'L3', '--reason', 'abandonné');
+    if (fin === 'done') cli(s.repo, {}, 'done', 'L3', '--force');
+    if (fin) commitPaths(s.repo, `plan: L3 ${fin}`, '.cadence/raf.yaml');
+    writeFileSync(join(s.repo, s.a.test), `${readFileSync(join(s.repo, s.a.test), 'utf8')}// chemin corrigé\n`);
+    return { ...s, sha };
+  }
+  const reseal = (repo: string, test: string) => cli(repo, {}, 'spec', 'reseal', 'L1', test, '--reason', 'nouveau chemin de base', '--porteur', 'L2');
+  const journal = (repo: string, json: string) => JSON.parse(readFileSync(join(repo, json), 'utf8')).resceaux as Record<string, unknown>[];
+
+  for (const [fin, etat, mot] of [['drop', 'dropped', 'abandonné'], ['done', 'done', 'fini']] as const) {
+    it(`R1 — fiche amendée par un lot ${mot} (${etat}) : rescellé accepté, le commit inscrit dans resceaux (sha, lot, état, raison) et dans le corps du commit`, () => {
+      const { repo, a, sha } = cas(fin);
+      expect(git(repo, 'diff', '--quiet', 'HEAD', '--', '.cadence/raf.yaml')).toBe('');
+      const r = reseal(repo, a.test);
+      expect(r.err).toBe('');
+      expect(r.code).toBe(0);
+      const [entree] = journal(repo, a.json);
+      expect(entree).toMatchObject({ test: a.test, porteur: 'L2', ficheAmendee: sha });
+      expect(entree!.amendements).toEqual([{ sha, lot: 'L3', etat, raison: `lot L3 ${mot} : son commit de la fiche est publié et ne se réécrit pas, la fiche vivante fait foi` }]);
+      expect(git(repo, 'log', '-2', '--format=%b')).toContain(`commits de la fiche admis (lot clos) :\n- ${sha} (lot L3, ${mot})`);
+      expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
+    });
+  }
+
+  it('R2 — fiche amendée par un lot en cours qui n’est pas le porteur : refus qui nomme le lot, le commit et les gestes, rien d’écrit', () => {
+    const { repo, a, sha } = cas(undefined);
+    const jsonAvant = readFileSync(join(repo, a.json), 'utf8');
+    const r = reseal(repo, a.test);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain(`par ${sha}, commit du lot en cours L3 qui n'est pas le porteur L2 : il bloque le rescellé tant que L3 est en cours — clore L3 (raf done L3) ou l'abandonner (raf drop L3), puis relancer ; ou, si L3 porte la correction du test, relancer avec --porteur L3`);
+    expect(readFileSync(join(repo, a.json), 'utf8')).toBe(jsonAvant);
+    expect(git(repo, 'log', '-1', '--format=%s').trim()).toBe('docs(L3): fiche, R62 amendée');
+  });
+
+  it('R2 — le geste proposé marche : avec --porteur L3, le rescellé passe et le commit de L3 n’est pas inscrit comme admis (il cite le porteur)', () => {
+    const { repo, a } = cas(undefined);
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'nouveau chemin de base', '--porteur', 'L3');
+    expect(r.err).toBe('');
+    expect(journal(repo, a.json)[0]!.amendements).toBeUndefined();
+  });
+
+  /** L1 en cours (le lot du test), L2 qui amende la fiche puis est abandonné. */
+  function enCoursAmendeParAbandonne() {
+    const s = lotScelle();
+    cli(s.repo, {}, 'init', '--project', 'demo');
+    cli(s.repo, {}, 'add', 'Lot un');
+    cli(s.repo, {}, 'add', 'Lot deux');
+    cli(s.repo, {}, 'start', 'L1');
+    cli(s.repo, {}, 'start', 'L2');
+    commitPaths(s.repo, 'plan: lots', '.cadence/raf.yaml', '.gitignore');
+    writeFileSync(join(s.repo, s.a.fiche), `${readFileSync(join(s.repo, s.a.fiche), 'utf8')}# amendée\n`);
+    commitPaths(s.repo, 'docs(L2): fiche', s.a.fiche);
+    const sha = git(s.repo, 'rev-parse', '--short', 'HEAD').trim();
+    cli(s.repo, {}, 'drop', 'L2', '--reason', 'x');
+    commitPaths(s.repo, 'plan: L2 abandonné', '.cadence/raf.yaml');
+    writeFileSync(join(s.repo, s.a.test), 'autre\n');
+    return { ...s, sha };
+  }
+
+  it('R3 — lot en cours (sans porteur) : la règle L229 R4 tient, un commit d’un lot abandonné bloque, message L217 inchangé', () => {
+    const { repo, a, sha } = enCoursAmendeParAbandonne();
+    const r = cli(repo, {}, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    expect(r.code).not.toBe(0);
+    expect(r.err).toMatch(new RegExp(`par un commit qui ne cite pas L1 : ${sha}$`));
   });
 });

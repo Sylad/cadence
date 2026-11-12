@@ -180,14 +180,14 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   const before = { json: readFileSync(join(repo, json), 'utf8'), tests: norms.map((n) => ({ norm: n, text: existsSync(join(repo, n)) ? readFileSync(join(repo, n), 'utf8') : '' })) };
   let r: ReturnType<typeof resealAcceptation>;
   try {
-    r = resealAcceptation(repo, json, norms, reason, ctx.today, livre ? porteur : undefined, plan.refs, plan.lots().filter((l) => l.status === 'done').map((l) => l.id));
+    r = resealAcceptation(repo, json, norms, reason, ctx.today, livre ? porteur : undefined, plan.refs, Object.fromEntries(plan.lots().map((l) => [l.id, l.status])));
   } catch (e) {
     throw new RafError((e as Error).message);
   }
   const paths = [json, ...norms];
   try {
     git(repo, ['add', '--', ...paths]);
-    const [subject, body] = resealCommitMessage({ cite, livre: livre ? lotId : undefined, tests: norms, reason, ficheAmendee: r.ficheAmendee });
+    const [subject, body] = resealCommitMessage({ cite, livre: livre ? lotId : undefined, tests: norms, reason, ficheAmendee: r.ficheAmendee, amendements: r.amendements });
     git(repo, ['commit', '-q', '-m', subject, '-m', body, '--', ...paths]);
   } catch (e) {
     // Atomique : un commit refusé (hook pre-commit, ...) ne laisse ni empreinte refaite ni index à moitié prêt ; le test retrouve le texte du lead.

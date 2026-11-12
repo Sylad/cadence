@@ -60,6 +60,10 @@
   {
    "date": "2026-11-12",
    "texte": "Suite de revue L679 (run 20261112195643-3050360) : le commit de version qui retire les fragments changelog.d/*.md (hors README.md) reste un commit de version — isReleaseOnly l'accepte quand le fragment est retiré, jamais modifié ni ajouté ; raf check ne compte plus « release: x.y.z » sans lot et la porte de revue ne se rouvre pas (docs/releasing.md:14-19 tenu). Une suite de revue dont le fragment a été retiré par une release est rendue avec le geste nommé dans le message d'intégration (recréer changelog.d/<lot>.md avec seulement ce que la suite change). Preuve : test/release-commit-fragments-l679.test.ts (5 cas ; R1 et R2 rouges sans le correctif, verts avec) ; suite racine 608/608 fichiers verte, tsc et cliquet qualité verts. Non vérifié : une vraie release 2.0.4. D-7 reste ouverte : L702, coupes du socle, erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "L713 fait (run 20261112210748-3196908, issue #56 du compte pro) : cadence spec reseal <lot livré> … --porteur <lot> admet une fiche amendée par un commit d'un lot abandonné (dropped) ou fini (done) et l'inscrit dans resceaux sous amendements (sha, lot, etat, raison) et dans le corps du commit du rescellé ; un commit d'un autre lot en cours bloque toujours, le refus nomme ce lot, son commit et les gestes (raf done/raf drop du lot, ou --porteur <lot>). Pas de nouvelle option. Le rescellé d'un lot en cours (sans porteur) garde la règle L217/L229 R4 : seuls ses propres commits. Logique déplacée dans src/orchestrate/fiche-amendee.ts. Preuve : test/orchestrate-reseal.test.ts, describe L713 (dropped, done, en cours non porteur, geste --porteur, lot en cours inchangé) ; 6 rouges sur le code d'avant, 96/96 verts après ; suite racine 607/608 (le rouge, v2/test/run-signal-l711, vert rejoué seul) ; tsc et cliquet qualité verts. Non vérifié : un vrai rescellé au compte pro. D-7 reste ouverte : L702, coupes du socle, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -73,7 +77,8 @@
   "L709",
   "L710",
   "L711",
-  "L679"
+  "L679",
+  "L713"
  ],
  "runs": [
   "20261111190444-2449989",
@@ -86,6 +91,7 @@
   "20261112172302-1494393",
   "20261112180310-509174",
   "20261112193327-1761527",
-  "20261112195643-3050360"
+  "20261112195643-3050360",
+  "20261112210748-3196908"
  ]
 }

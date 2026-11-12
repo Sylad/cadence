@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, posix } from 'node:path';
 import { parse } from 'yaml';
 import type { Ref } from '../plan.js';
-import { citedRefs } from '../link.js';
+import { admettreFiche, type Amendement } from './fiche-amendee.js';
 import { PLAN_ACTIONS } from '../plan-commit.js';
 import { testsAbsents, type Partage } from './accept-regles.js';
 import { isParts, type GateTest } from './gate-parts.js';
@@ -29,7 +29,7 @@ export interface Acceptation {
   /** Ids des règles de la fiche dont le lot doit les tests (L552) ; lue telle quelle, `checkAcceptation` la valide (une valeur fausse y est un écart). Comptée dans le verrou comme toute clé autre que `vert`. */
   regles?: unknown;
   /** Journal des rescellés d'un seul test (`cadence spec reseal`, L200) : le test, la raison donnée par le lead, la date et les deux empreintes. */
-  resceaux?: { test: string; raison: string; date: string; avant: string; apres: string; porteur?: string; ficheAmendee?: string }[];
+  resceaux?: { test: string; raison: string; date: string; avant: string; apres: string; porteur?: string; ficheAmendee?: string; amendements?: Amendement[] }[];
 }
 
 type Obj = Record<string, unknown>;
@@ -153,9 +153,10 @@ export function sealAcceptation(repo: string, path: string): void {
  * ne laisse aucun chemin de correction. Seules les empreintes des tests nommés sont refaites, tout ou rien (les autres fichiers listés restent inchangés), la raison et les deux
  * empreintes vont dans `resceaux`. Le commit (test + acceptation) est à faire : il devient le commit rouge.
  * La fiche est celle du commit rouge, ou (L217) une fiche amendée par des commits qui citent tous le lot (`refsOf` : `plan.refs`, lu comme `citedRefs` ;
- * lot livré : le lot, son `porteur` ou, L229, l'un des `livres`, les lots done du plan — la fiche vivante fait foi) et commitée : l'entrée porte alors `ficheAmendee`, le sha court du dernier commit qui l'a touchée.
+ * lot livré : le lot, son `porteur` ou, L229 et L713, un lot fini ou abandonné selon `etats`, statut au plan de chaque lot — `admettreFiche`) et commitée : l'entrée porte alors
+ * `ficheAmendee`, le sha court du dernier commit qui l'a touchée, et `amendements`, chaque commit admis pour son seul lot fini ou abandonné (sha, lot, état, raison).
  */
-export function resealAcceptation(repo: string, path: string, test: string | string[], reason: string, today: string, porteur?: string, refsOf: (text: string) => Ref[] = () => [], livres: string[] = []): { resceles: { test: string; avant: string; apres: string }[]; lot: string; ficheAmendee?: string } {
+export function resealAcceptation(repo: string, path: string, test: string | string[], reason: string, today: string, porteur?: string, refsOf: (text: string) => Ref[] = () => [], etats: Record<string, string> = {}): { resceles: { test: string; avant: string; apres: string }[]; lot: string; ficheAmendee?: string; amendements: Amendement[] } {
   const file = join(repo, path);
   const a = parseAcceptation(readFileSync(file, 'utf8'));
   if (typeof a === 'string') throw new Error(`${path} : ${a}`);
@@ -174,19 +175,12 @@ export function resealAcceptation(repo: string, path: string, test: string | str
   if (absent) throw new Error(`${absent} : fichier absent (un test supprimé ne se rescelle pas)`);
   // Une fiche modifiée dans l'arbre de travail ou l'index n'est pas celle d'un commit du lot : elle se commite d'abord.
   if (git(repo, 'status', '--porcelain', '--', a.fiche).trim() !== '') throw new Error(`la fiche ${a.fiche} a des modifications non commitées : la commiter (en citant ${a.lot}) avant le rescellé`);
-  let ficheAmendee: string | undefined;
+  let amendee: ReturnType<typeof admettreFiche> = { amendements: [] };
   if (!gitOk(repo, 'diff', '--quiet', red, '--', a.fiche)) {
     if (!existsSync(join(repo, a.fiche))) throw new Error(`la fiche ${a.fiche} a été supprimée ou renommée depuis le commit rouge ${red.slice(0, 7)} : le rescellé ne vaut que pour une fiche présente`);
-    const citant = new Set([a.lot, ...(porteur ? [porteur, ...livres] : [])]);
-    const commits = git(repo, 'log', '--format=%H%x1f%s%x1f%b%x1e', `${red}..HEAD`, '--', a.fiche).split('\x1e').map((r) => r.replace(/^\n/, '')).filter(Boolean).map((r) => { const [sha = '', subject = '', body = ''] = r.split('\x1f'); return { sha, day: '', subject, body: body.trim() }; });
-    const fautif = commits.find((c) => !citedRefs(c, refsOf).some((r) => citant.has(r.lot)));
-    if (fautif && porteur) {
-      const cites = [...new Set(citedRefs(fautif, refsOf).map((r) => r.lot))];
-      throw new Error(`la fiche ${a.fiche} a été modifiée depuis le commit rouge ${red.slice(0, 7)} par un commit qui ne cite ni ${a.lot}, ni le porteur ${porteur}, ni un lot livré : ${fautif.sha.slice(0, 7)} (cite : ${cites.length ? cites.join(', ') : 'aucun lot'}) — faire citer le porteur ou un lot livré par ce commit (le réécrire avant qu'il soit poussé) ou, sinon, rescelle à la main avec le lead`);
-    }
-    if (fautif) throw new Error(`la fiche ${a.fiche} a été modifiée depuis le commit rouge ${red.slice(0, 7)} par un commit qui ne cite pas ${a.lot} : ${fautif.sha.slice(0, 7)}`);
-    ficheAmendee = commits[0]?.sha.slice(0, 7);
+    amendee = admettreFiche(repo, { fiche: a.fiche, lot: a.lot, red, porteur, refsOf, etats });
   }
+  const { ficheAmendee, amendements } = amendee;
   const touches = fichiers.filter((f) => !norms.includes(f) && (!gitOk(repo, 'diff', '--quiet', red, '--', f) || !existsSync(join(repo, f)) || a.empreintes?.[f] !== git(repo, 'hash-object', '--', f).trim()));
   if (touches.length) throw new Error(`autre(s) test(s) listé(s) modifié(s) depuis le commit rouge : ${touches.join(', ')} (le rescellé ne couvre que ${norms.join(', ')}, le verrou garde le reste)`);
   // Tout ou rien : un test nommé inchangé refuse la commande entière, avant la moindre écriture.
@@ -196,9 +190,9 @@ export function resealAcceptation(repo: string, path: string, test: string | str
   const doc = JSON.parse(readFileSync(file, 'utf8')) as Obj;
   for (const r of resceles) (doc.empreintes as Record<string, string>)[r.test] = r.apres;
   const journal = Array.isArray(doc.resceaux) ? doc.resceaux : [];
-  doc.resceaux = [...journal, ...resceles.map((r) => ({ test: r.test, raison: reason.trim(), date: today, avant: r.avant, apres: r.apres, ...(porteur ? { porteur } : {}), ...(ficheAmendee ? { ficheAmendee } : {}) }))];
+  doc.resceaux = [...journal, ...resceles.map((r) => ({ test: r.test, raison: reason.trim(), date: today, avant: r.avant, apres: r.apres, ...(porteur ? { porteur } : {}), ...(ficheAmendee ? { ficheAmendee } : {}), ...(amendements.length ? { amendements } : {}) }))];
   writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
-  return { resceles, lot: a.lot, ...(ficheAmendee ? { ficheAmendee } : {}) };
+  return { resceles, lot: a.lot, ...(ficheAmendee ? { ficheAmendee } : {}), amendements };
 }
 
 /** Les acceptations de `dir` à `vert: false` au HEAD : leur chemin et le lot qu'elles portent. Un fichier illisible n'en est pas une. */

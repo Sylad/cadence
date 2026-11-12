@@ -73,42 +73,23 @@ function raf(dir: string, ...argv: string[]) {
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
-/** Un dépôt avec un plan, et le dossier du cycle quand `cycle` est vrai. */
-function depot(cycle = true): string {
+/** Un dépôt avec un plan et le dossier du cycle. */
+function depot(): string {
   const dir = gitRepo();
-  if (cycle) mkdirSync(join(dir, 'src/orchestrate/cycle'), { recursive: true });
+  mkdirSync(join(dir, 'src/orchestrate/cycle'), { recursive: true });
   raf(dir, 'init', '--project', 'demo', '--no-hook');
   return dir;
 }
 const estimateOf = (dir: string, id: string) => Number(new RegExp(`id: ${id}\\n(?:.*\\n)*?\\s+estimate: ([\\d.]+)`).exec(readFileSync(join(dir, '.cadence/raf.yaml'), 'utf8'))?.[1]);
 
-describe("raf add : l'estimate d'un lot qui touche le cycle est doublée (L682)", () => {
-  it("R5 — un titre qui cite src/orchestrate/cycle/ (dossier, sans « / » final, ou fichier dessous) double l'estimate donnée, et le dit sur stderr", () => {
+describe("raf add : l'estimate d'un lot qui cite le cycle n'est plus doublée (L708, retire le doublement de L682)", () => {
+  it("R5 — un titre qui cite src/orchestrate/cycle/ garde l'estimate donnée, ou celle par défaut, et rien n'est dit sur stderr", () => {
     const dir = depot();
-    const a = raf(dir, 'add', 'Budget : réserve prise dans src/orchestrate/cycle/', '--estimate', '0.25');
+    const a = raf(dir, 'add', 'Budget : réserve prise dans src/orchestrate/cycle/budget.ts', '--estimate', '0.25');
     expect(a.code).toBe(0);
-    expect(estimateOf(dir, 'L1')).toBe(0.5);
-    expect(a.err).toContain('estimate doublée : 0.25 → 0.5 j');
-    raf(dir, 'add', 'voir src/orchestrate/cycle/budget.ts:58', '--estimate', '0.5');
-    expect(estimateOf(dir, 'L2')).toBe(1);
-    raf(dir, 'add', 'toucher src/orchestrate/cycle.', '--estimate', '0.5');
-    expect(estimateOf(dir, 'L3')).toBe(1);
-  });
-
-  it("R6 — sans --estimate, l'estimate par défaut est doublée", () => {
-    const dir = depot();
-    raf(dir, 'add', 'src/orchestrate/cycle/review.ts');
-    expect(estimateOf(dir, 'L1')).toBe(2);
-  });
-
-  it("R7 — un titre qui ne cite pas le cycle (src/orchestrate/cycle.ts, src/orchestrate/cyclex/), ou un dépôt sans ce dossier : estimate inchangée, rien sur stderr", () => {
-    const dir = depot();
-    const a = raf(dir, 'add', 'src/orchestrate/cycle.ts et src/orchestrate/cyclex/a.ts', '--estimate', '0.25');
     expect(estimateOf(dir, 'L1')).toBe(0.25);
     expect(a.err).not.toContain('estimate doublée');
-    const other = depot(false);
-    const b = raf(other, 'add', 'src/orchestrate/cycle/budget.ts', '--estimate', '0.25');
-    expect(estimateOf(other, 'L1')).toBe(0.25);
-    expect(b.err).not.toContain('estimate doublée');
+    raf(dir, 'add', 'src/orchestrate/cycle/review.ts');
+    expect(estimateOf(dir, 'L2')).toBe(1);
   });
 });

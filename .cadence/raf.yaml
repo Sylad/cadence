@@ -3299,7 +3299,7 @@ lots:
   - id: L708
     title: "Retirer le doublement de l'estimate à raf add pour un lot dont le titre cite src/orchestrate/cycle/ (ajouté par L682) : sans effet mesurable (plancher de budget 600 k), lit le titre seul (aurait raté L676, doublé L629 à tort) ; garder la réserve de correction avant l'escalade (D-19)"
     status: doing
-    estimate: 0.5
+    estimate: 0.25
     created: 2026-11-12
     started: 2026-11-12
 acknowledged:

@@ -85,6 +85,10 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 - The sequence bench refuses, when it loads a sequence, a request that cites a file outside the pieces declared for its step or the steps before (L706, D-7, [docs/v2/banc.md](docs/v2/banc.md#banc-séquence)): from 10 to 12-11, `aether-b68-court/etapes/1/demande.md` cited the figure of `aether-b68`, both arms opened it and the leak detector counted a leak, 4 runs red for nothing. Cited are `~/…`, `$HOME/…`, absolute paths under the home or the bench root or that exist (an `/api/x` route is not one) and relative paths with a `/` that exist from the step or the sequence; the message names the cited path and the allowed pieces. `v2/test/sequence-citations-l706.test.ts` replays the case.
 
+### Removed
+
+- `raf add` no longer doubles the estimate of a lot whose title cites `src/orchestrate/cycle/` (L708, D-19, [docs/orchestrate-cycle.md](docs/orchestrate-cycle.md)), added by L682 in 2.0.3: it read the title only, so it missed L676 (two files of the folder touched, no path in its title) and would have doubled L629 (only `cadence.yaml` changed), and 0.25 → 0.5 j stays at the 600 k floor of the lot's budget, so the doubling had no effect on the budget. The other half of L682 stays: a fix takes its shortfall from the escalation share. `test/orchestrate-budget-correction-l682.test.ts` checks that such a title keeps its estimate.
+
 ## [2.0.3] - 2026-11-12
 
 ### Added

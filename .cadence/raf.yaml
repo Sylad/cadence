@@ -3306,12 +3306,19 @@ lots:
     finished: 2026-11-12
   - id: L709
     title: "cadence run --fond survit à la session Claude Code qui le lance (détaché de son groupe de processus : setsid ou équivalent) ; --liste signale un run dont le processus est mort comme « interrompu » au lieu de « en-cours » ; l'id de session est écrit dans l'état dès le lancement (--session-id), pour que --reponse reprenne aussi un run mort pendant sa première session ; test qui tue la session lanceuse (issue #55 du compte pro : 2 runs perdus, 3 h de créneau)"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-12
     started: 2026-11-12
+    review: { date: 2026-11-12, verdict: "conforme (revue Opus du 12-11) : 0 bloquant ; (2) run au pid mort affiché interrompu, pid recyclé écarté par l'heure du verrou ; (3) id de session écrit avant la session, --reponse reprend ; (1) détachement vérifié pour de vrai par le lead (processus détaché vivant après la fin de claude -p, et après HUP+KILL du groupe lanceur), mais la cause de l'incident #55 n'est pas reproduite ici (setsid déjà en 2.0.2, init.scope, linger) : suite en L711 ; mineurs : pas de test pid recyclé pour interrompu, 41e0ddb sans test", commit: 41e0ddb10a95baaadf5a34cbd2fa3c6575d2420e }
+    finished: 2026-11-12
   - id: L710
     title: "Les runs cadence run en cours comptent dans les créneaux de cadence lead tour et cadence orchestrate --status (et dans « sessions en cours ») ; un run mort ne compte pas (issue #55 du compte pro : « créneaux libres : 3 sur 3 » avec deux runs vivants)"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-12
+  - id: L711
+    title: "cadence run --fond écrit dans son journal le signal qui l'arrête (SIGHUP, SIGTERM, SIGINT) et son cgroup au lancement, pour établir la cause de l'issue #55 (runs morts à la fin de la session lanceuse chez le compte pro, non reproduit sur Big-Blue : setsid déjà là, init.scope, linger) ; test du journal sur un signal envoyé"
     status: todo
     estimate: 0.25
     created: 2026-11-12

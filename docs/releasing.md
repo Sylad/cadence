@@ -10,7 +10,8 @@ Between the version commit and the gate it also prints a **provisional local tag
    `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, and write the version's section of
    `CHANGELOG.md` (`## [x.y.z] - date`, what changes for the user, lots cited; for cadence, the fragments of `changelog.d/`
    gathered, see [CHANGELOG fragments](#changelog-fragments)), in **one commit that holds
-   only those files** (the version fields and the CHANGELOG, nothing else in the manifests, `docs/whats-new.md`: add the version to its « In two lines » list and its
+   only those files** (the version fields and the CHANGELOG, nothing else in the manifests, the fragments of `changelog.d/` removed — never edited
+   or added, and never its `README.md` —, `docs/whats-new.md`: add the version to its « In two lines » list and its
    long form (the README no longer carries a « What's new » section, L326)). Such a commit is
    exempt from the code-review gate like a plan commit: it closes the lot after its review, and `raf check`
    does not ask for a new one (nor does it count it as a commit without a lot). The « What's new »
@@ -86,6 +87,9 @@ Since L679 cadence's own lots never edit `## [Unreleased]` of `CHANGELOG.md`: ea
 `Security`), each followed by its entries. Two branches that edited `[Unreleased]` conflicted at every rebase (7 add-only
 conflicts and 13 replayed gates in the 2026-11-07-0800 wave, 80 min of 970); two branches that each add a file never do.
 `[Unreleased]` stays empty (`test/changelog-fragments-l679.test.ts` checks it) and a review fix edits the lot's fragment.
+If a release removed that fragment after the fix's branch started, the rebase stops on a modify/delete conflict and the
+integration hands the lot back naming the gesture: recreate `changelog.d/<lot>.md` with only what the fix changes, the
+earlier entry being published already (`test/release-commit-fragments-l679.test.ts`).
 
 `cadence release` reads every `*.md` of `changelog.d/` but `README.md` (the folder's instructions, which keep it alive after
 a release), groups the entries by section in that order, the most recent lot first within a section (`L711` before `L710`,

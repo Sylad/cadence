@@ -14,6 +14,7 @@ import { type Entry, loadEntries, newsIssues, PUBLIC_TITLE_DEFAULT, publicTitleT
 import { isRecurring } from './recurring.js';
 import { resourceIssues } from './resources.js';
 import { windowIssues } from './plan-window.js';
+import { isFragmentPath } from './changelog-fragments.js';
 import { escapeRe, isOpen, type Lot, type Plan, type Ref, type Verdict } from './plan.js';
 
 /** Chemin de la configuration lue, relatif à la racine : celui de --config, sinon cadence.yaml. */
@@ -132,15 +133,17 @@ function withoutVersion(text: string | null): string | null {
  * Commit de version (L72) : TOUS ses fichiers sont des fichiers de version — package.json, package-lock.json,
  * .claude-plugin/plugin.json et marketplace.json, où seule la `version` change, et CHANGELOG.md, plus la section « What's new » du README (seule) et docs/whats-new.md, sa forme longue (L232). Il clôt le lot
  * après sa revue : l'exiger relu rouvrirait la porte à chaque release. Les fichiers décident, jamais le sujet.
+ * Un fragment de changelog.d/ (hors mode d'emploi) y est permis s'il est retiré : la release l'assemble dans CHANGELOG.md (L679).
  */
 export function isReleaseOnly(sha: string, root: string): boolean {
   const files = changedFiles(root, sha);
   // Les noms d'abord : un fichier hors version refuse le commit sans qu'aucun contenu ne soit lu.
-  if (!files.length || !files.every((f) => CHANGELOG.test(f) || WHATS_NEW.test(f) || README.test(f) || VERSION_JSON.test(f))) return false;
+  if (!files.length || !files.every((f) => CHANGELOG.test(f) || WHATS_NEW.test(f) || README.test(f) || VERSION_JSON.test(f) || isFragmentPath(f))) return false;
   return (
     files.length > 0 &&
     files.every((f) => {
       if (CHANGELOG.test(f) || WHATS_NEW.test(f)) return true;
+      if (isFragmentPath(f)) return fileAt(root, sha, f) === null;
       if (README.test(f)) return withoutWhatsNew(fileAt(root, `${sha}^`, f)) === withoutWhatsNew(fileAt(root, sha, f));
       if (!VERSION_JSON.test(f)) return false;
       const before = withoutVersion(fileAt(root, `${sha}^`, f));

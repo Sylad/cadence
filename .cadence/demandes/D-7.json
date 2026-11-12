@@ -56,6 +56,10 @@
   {
    "date": "2026-11-12",
    "texte": "L679 fait (run 20261112193327-1761527) : le CHANGELOG du dépôt cadence s'écrit en fragments changelog.d/<lot>.md (rubriques Added/Changed/Deprecated/Removed/Fixed/Security), [Unreleased] reste vide ; cadence release assemble les fragments d'un dépôt qui a changelog.d/ dans la section de la version (rubriques regroupées dans l'ordre Keep a Changelog, lot le plus récent en tête) et les retire dans le commit de version, CI rejouée comprise ; un dépôt sans changelog.d/ publie comme avant. Entrées L706 à L711 migrées sans perte (5 entrées identiques). Consigne : CLAUDE.md du dépôt, changelog.d/README.md, docs/releasing.md#changelog-fragments, briefs implement/fix/fix-docs d'orchestrate. Preuve : test/changelog-fragments-l679.test.ts (13 cas : deux branches avec chacune un fragment se rebasent sans conflit, le témoin sous [Unreleased] est en conflit ; release --dry-run assemble deux fragments) ; suite racine 605/607 fichiers verts, les 2 rouges (v2/test/bras, v2/test/passage) dus à CADENCE_PIECES hérité de la session du run, verts sans cette variable ; tsc et cliquet qualité verts. Non mesuré : les conflits CHANGELOG de la prochaine vague. D-7 reste ouverte : L702, coupes du socle, erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "Suite de revue L679 (run 20261112195643-3050360) : le commit de version qui retire les fragments changelog.d/*.md (hors README.md) reste un commit de version — isReleaseOnly l'accepte quand le fragment est retiré, jamais modifié ni ajouté ; raf check ne compte plus « release: x.y.z » sans lot et la porte de revue ne se rouvre pas (docs/releasing.md:14-19 tenu). Une suite de revue dont le fragment a été retiré par une release est rendue avec le geste nommé dans le message d'intégration (recréer changelog.d/<lot>.md avec seulement ce que la suite change). Preuve : test/release-commit-fragments-l679.test.ts (5 cas ; R1 et R2 rouges sans le correctif, verts avec) ; suite racine 608/608 fichiers verte, tsc et cliquet qualité verts. Non vérifié : une vraie release 2.0.4. D-7 reste ouverte : L702, coupes du socle, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -81,6 +85,7 @@
   "20261112143710-3694893",
   "20261112172302-1494393",
   "20261112180310-509174",
-  "20261112193327-1761527"
+  "20261112193327-1761527",
+  "20261112195643-3050360"
  ]
 }

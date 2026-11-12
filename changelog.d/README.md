@@ -12,6 +12,7 @@ A fragment is one or more Keep a Changelog sections, each a `###` title then its
 ```
 
 Titles: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`. A review fix of the same lot edits the lot's
-fragment. `cadence release patch|minor|major` gathers the fragments into the section of the version (sections grouped in
-that order, the most recent lot first within a section) and removes them in the version commit; this file stays.
+fragment; if a release already removed it, recreate it with only the fix's entry (the earlier one is published).
+`cadence release patch|minor|major` gathers the fragments into the section of the version (sections grouped in that
+order, the most recent lot first within a section) and removes them in the version commit; this file stays.
 See [docs/releasing.md](../docs/releasing.md#changelog-fragments).

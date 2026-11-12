@@ -3,7 +3,7 @@ import { type ReviewSummary, type Constat, lotKey } from '../state.js';
 import { repoShas, repoWork } from '../../repos.js';
 import { lotWork, coveredTasks } from '../../audit.js';
 import { openDocGap } from './brief.js';
-import { git, trackedDirty, lotBranch, branchExists, integrated, gitFailure, removeTree } from '../worktree.js';
+import { git, tryGit, trackedDirty, lotBranch, branchExists, integrated, gitFailure, removeTree } from '../worktree.js';
 import { foreignDirty, planBefore, commitPlan, planMessage, leadMoved, slowWaitLog, toleratedDirty } from './plan-writes.js';
 import { repoBranch, INTEGRATE_WAIT_MS, takeRepoWrite, rebaseOnto, rebaseNotes, changelogShapeOf, patchId, mergeBase, advance, baseMoved, MAX_REPLAYS, type Grant, type Rebase } from '../integrate.js';
 import { relative } from 'node:path';
@@ -17,6 +17,7 @@ import { blockingConstats } from './shared.js';
 import { lateRefusal } from './depot-partage.js';
 import { awaitOlder } from './integrate-wait.js';
 import { conflictNotes } from '../lot-diff.js';
+import { publishedFragmentNote } from '../../changelog-fragments.js';
 import { reviewedHead } from '../reprise-rebase.js';
 import { declaredFor } from '../../resources.js';
 import { readyOutcome, withUnverifiedGoal } from '../objectif.js';
@@ -135,7 +136,7 @@ const minutesText = (ms: number): string => (ms % 60_000 === 0 ? `${ms / 60_000}
  */
 function conflictRefusal(repo: string, t: LotTree, rebased: Extract<Rebase, { kind: 'conflict' }>): string {
   const files = rebased.files.length ? ` (fichiers : ${rebased.files.join(', ')})` : ` (${rebased.detail})`;
-  return `intégration impossible : conflit en rebasant ${t.branch} sur ${t.base}${files}${conflictNotes(t.dir, t.base, rebased.files, declaredFor(repo))}`;
+  return `intégration impossible : conflit en rebasant ${t.branch} sur ${t.base}${files}${conflictNotes(t.dir, t.base, rebased.files, declaredFor(repo))}${publishedFragmentNote(rebased.files, (f) => tryGit(t.dir, 'cat-file', '-e', `refs/heads/${t.base}:${f}`) !== null)}`;
 }
 
 /**

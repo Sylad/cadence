@@ -127,6 +127,22 @@ export function changelogWithFragments(root: string): string {
   return `${text.slice(0, start)}${versionSection(root, text.slice(start, end)).body}${text.slice(end)}`;
 }
 
+/** Vrai pour le chemin d'un fragment de `changelog.d/` (à la racine ou dans un sous-dossier), jamais son mode d'emploi. */
+export const isFragmentPath = (path: string): boolean => {
+  const m = /(?:^|\/)changelog\.d\/([^/]+)$/.exec(path);
+  return m !== null && isFragmentFile(m[1]);
+};
+
+/**
+ * La note d'un conflit d'intégration sur un fragment qu'une release a retiré entre-temps (modify/delete, L679) : l'entrée d'avant est déjà publiée
+ * dans le CHANGELOG, la suite recrée donc `changelog.d/<lot>.md` avec seulement ce qu'elle change. `exists` dit si le fichier est sur la branche du dépôt.
+ */
+export function publishedFragmentNote(files: string[], exists: (file: string) => boolean): string {
+  const gone = files.filter((f) => isFragmentPath(f) && !exists(f));
+  if (!gone.length) return '';
+  return ` ; ${gone.join(', ')} : retiré par une release depuis le départ du lot (son entrée est publiée dans CHANGELOG.md) — recréer le fragment avec seulement ce que la suite change, sans y remettre l'entrée publiée`;
+}
+
 /** Retire les fragments assemblés dans la section de la version (le commit de version les compte comme supprimés). */
 export function removeFragments(root: string, removes: string[]): void {
   for (const file of removes) rmSync(join(root, file));

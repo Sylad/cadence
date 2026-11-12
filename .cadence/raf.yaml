@@ -928,7 +928,7 @@ lots:
     finished: 2026-10-31
   - id: L477
     title: "Cliquet (suite de L462) : une fonction qui grossit sous le pire chiffre de son fichier passe, et comparerMigration compense un défaut neuf (fichier neuf) par un gain ailleurs — compter la somme des excès par fichier et par règle, refuser un défaut neuf même compensé ; test sur les deux cas mesurés par la revue"
-    status: doing
+    status: done
     estimate: 0.75
     spec: true
     created: 2026-10-31
@@ -953,6 +953,7 @@ lots:
       - { date: 2026-11-06, text: "Hypothèses (fiche migration-cliquet-regles) — R14 : Le lien d'un fichier neuf à sa source est un lien de contenu mesuré, sans déclaration ; si faux : Si le lead exige la détection de copie de git (décision (1) lue à la lettre), seule la fonction de lien change (git diff -C / blame -C à la place du multiensem…" }
       - { date: 2026-11-06, text: "Hypothèses (fiche migration-cliquet-regles) — R15 : Le refus d'un fichier neuf garde la forme du refus existant (R12) et ajoute la mention « fichier neuf : au-delà de ce que sa source a perdu » suivie de « sourc… ; si faux : Seul le texte du message change (le code de sortie et la base intacte sont ceux de R12)" }
     review: { date: 2026-11-12, verdict: "conforme (revue Fable du 12-11 sur cf75378c ; fiche alignée en 64696e59 et c5a1f579, fiche seule) : 0 bloquant ; majeur de la base gonflée levé, R10 et base coincée intacts ; suite complète à l'intégration précédente : 1 rouge, la forme de fiche corrigée en c5a1f579 ; hors lot : L707", commit: c5a1f5795b78e0859a3db192f047414ea5035251 }
+    finished: 2026-11-12
   - id: L478
     title: "Cliquet (suite de L462) : la base ne doit pas remonter (rm + --init ou édition à la main passent en porte et en CI : comparer à la base du sha de départ) et le découpage d'un fichier de la base doit avoir une voie admise (transfert documenté, mesure comparée au total) — cas L461"
     status: dropped

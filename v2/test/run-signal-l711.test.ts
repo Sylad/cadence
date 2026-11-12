@@ -14,6 +14,10 @@ import { dossierTemp } from './temp.js';
 const FOND = join(import.meta.dirname, 'fond');
 const ioTest = (cwd: string) => { const sortie: string[] = []; return { cwd, env: {}, now: () => new Date(), out: (l: string) => sortie.push(l), err: (l: string) => sortie.push(l), sortie }; };
 const HEURE = '\\(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\)';
+// L714 : chaque attente guette un fait observable (ligne du journal, processus mort) ; le plafond, large, ne sert qu'à ne pas pendre si le fait n'arrive
+// jamais. Un délai court rougissait le cas du groupe quand la suite complète chargeait la machine (12-11, run de L713).
+const PLAFOND = 60_000;
+const DUREE_CAS = 4 * PLAFOND;
 
 /** Lance un vrai `cadence run --fond` sur un faux claude qui attend, et rend le journal, le pid du run (son verrou) et celui de claude. */
 async function runFond() {
@@ -22,15 +26,15 @@ async function runFond() {
     { cwd: repo, encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } });
   const journal = /journal : (\S+) ;/.exec(r.stdout)?.[1];
   expect(journal, r.stdout + r.stderr).toBeTruthy();
-  const pidClaude = await attendre(() => (existsSync(join(trace, 'claude.pid')) ? Number(readFileSync(join(trace, 'claude.pid'), 'utf8')) : undefined), 20_000, 'la session du run n\'a pas démarré');
-  const e = await attendre(() => etats(repo)[0], 5000, 'aucun état de run');
+  const pidClaude = await attendre(() => (existsSync(join(trace, 'claude.pid')) ? Number(readFileSync(join(trace, 'claude.pid'), 'utf8')) : undefined), PLAFOND, 'la session du run n\'a pas démarré');
+  const e = await attendre(() => etats(repo)[0], PLAFOND, 'aucun état de run');
   const pidRun = Number(JSON.parse(readFileSync(e.fichier.replace(/\.json$/, '.verrou'), 'utf8')).pid);
   const lu = () => readFileSync(journal!, 'utf8');
-  const finir = async () => { writeFileSync(join(trace, 'go'), ''); await attendre(() => (vivant(pidClaude) ? undefined : true), 10_000, 'claude ne s\'est pas arrêté'); };
+  const finir = async () => { writeFileSync(join(trace, 'go'), ''); await attendre(() => (vivant(pidClaude) ? undefined : true), PLAFOND, 'claude ne s\'est pas arrêté'); };
   return { repo, journal: journal!, e, pidRun, pidClaude, lu, finir };
 }
 
-describe('le journal d\'un run --fond dit qui il était et ce qui l\'a arrêté (L711, issue #55)', () => {
+describe('le journal d\'un run --fond dit qui il était et ce qui l\'a arrêté (L711, issue #55)', { timeout: DUREE_CAS }, () => {
   it('un run factice reçoit SIGTERM : le journal le dit avec l\'heure, l\'arrêt est celui d\'avant, --liste affiche la cause', async () => {
     const { repo, journal, e, pidRun, lu, finir } = await runFond();
     try {
@@ -42,10 +46,10 @@ describe('le journal d\'un run --fond dit qui il était et ce qui l\'a arrêté 
       expect([pgid, sid]).toEqual([ppid, ppid]); // le veilleur, détaché (setsid), est le parent du run et le chef de son groupe et de sa session
 
       process.kill(pidRun, 'SIGTERM'); // le run seul, comme un kill <pid> du verrou
-      const ligne = await attendre(() => lu().split('\n').find((l) => l.includes('SIGTERM')), 5000, `rien sur SIGTERM dans le journal :\n${lu()}`);
+      const ligne = await attendre(() => lu().split('\n').find((l) => l.includes('SIGTERM')), PLAFOND, `rien sur SIGTERM dans le journal :\n${lu()}`);
       expect(ligne).toMatch(new RegExp(`^cause d'arrêt ${HEURE} : le processus du run \\(pid ${pidRun}\\) a reçu SIGTERM et s'est arrêté \\(code 143\\)$`));
-      await attendre(() => (vivant(pidRun) ? undefined : true), 5000, 'le run vit encore');
-      await attendre(() => (vivant(ppid) ? undefined : true), 5000, 'le veilleur vit encore après le run');
+      await attendre(() => (vivant(pidRun) ? undefined : true), PLAFOND, 'le run vit encore');
+      await attendre(() => (vivant(ppid) ? undefined : true), PLAFOND, 'le veilleur vit encore après le run');
 
       const io = ioTest(repo);
       expect(await cmdRun(['--liste'], io)).toBe(0);
@@ -58,11 +62,13 @@ describe('le journal d\'un run --fond dit qui il était et ce qui l\'a arrêté 
     try {
       const pgid = Number(/pgid (\d+)/.exec(lu())![1]);
       process.kill(-pgid, 'SIGTERM');
-      await attendre(() => (vivant(pidClaude) ? undefined : true), 5000, 'l\'enveloppe n\'a pas arrêté claude (comportement d\'avant)');
-      await attendre(() => (/le processus du run .* a reçu SIGTERM/.test(lu()) ? true : undefined), 5000, `pas de ligne du run :\n${lu()}`);
-      expect(lu()).toMatch(new RegExp(`^cause d'arrêt ${HEURE} : la session claude \\(enveloppe pid \\d+, claude pid ${pidClaude}\\) a reçu SIGTERM$`, 'm'));
-      expect(lu()).toMatch(new RegExp(`^cause d'arrêt ${HEURE} : SIGTERM reçu par le groupe du run \\(veilleur pid ${pgid}, run pid ${pidRun}\\)$`, 'm'));
-      await attendre(() => (vivant(pgid) ? undefined : true), 5000, 'le veilleur vit encore');
+      await attendre(() => (vivant(pidClaude) ? undefined : true), PLAFOND, 'l\'enveloppe n\'a pas arrêté claude (comportement d\'avant)');
+      // les trois écrivains (run par son veilleur, enveloppe, veilleur) écrivent chacun à son heure : on attend que le veilleur soit mort, puis chaque ligne
+      await attendre(() => (vivant(pgid) ? undefined : true), PLAFOND, 'le veilleur vit encore');
+      const ligne = (motif: RegExp) => attendre(() => (motif.test(lu()) ? true : undefined), PLAFOND, `pas de ligne ${motif} :\n${lu()}`);
+      await ligne(/le processus du run .* a reçu SIGTERM/);
+      await ligne(new RegExp(`^cause d'arrêt ${HEURE} : la session claude \\(enveloppe pid \\d+, claude pid ${pidClaude}\\) a reçu SIGTERM$`, 'm'));
+      await ligne(new RegExp(`^cause d'arrêt ${HEURE} : SIGTERM reçu par le groupe du run \\(veilleur pid ${pgid}, run pid ${pidRun}\\)$`, 'm'));
     } finally { await finir(); }
   });
 
@@ -71,10 +77,10 @@ describe('le journal d\'un run --fond dit qui il était et ce qui l\'a arrêté 
     try {
       const veilleur = Number(/ppid (\d+)/.exec(lu())![1]);
       process.kill(veilleur, 'SIGTERM');
-      await attendre(() => (vivant(veilleur) ? undefined : true), 5000, `le veilleur a survécu à SIGTERM :\n${lu()}`);
+      await attendre(() => (vivant(veilleur) ? undefined : true), PLAFOND, `le veilleur a survécu à SIGTERM :\n${lu()}`);
       expect(lu()).toMatch(new RegExp(`^cause d'arrêt ${HEURE} : SIGTERM reçu par le groupe du run \\(veilleur pid ${veilleur}, run pid ${pidRun}\\)$`, 'm'));
       expect([vivant(pidRun), vivant(pidClaude)]).toEqual([true, true]); // il n'arrête rien d'autre que lui
-    } finally { await finir(); await attendre(() => (vivant(pidRun) ? undefined : true), 20_000, 'le run ne s\'est pas terminé'); }
+    } finally { await finir(); await attendre(() => (vivant(pidRun) ? undefined : true), PLAFOND, 'le run ne s\'est pas terminé'); }
   });
 });
 

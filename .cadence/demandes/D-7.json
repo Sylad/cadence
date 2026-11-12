@@ -72,6 +72,10 @@
   {
    "date": "2026-11-12",
    "texte": "L705 fait (run 20261112220439-3616819) : coupes du socle de cadence run. C2 (enabledPlugins à false sauf cadence et playwright), C3 (disableClaudeAiConnectors, doc officielle code.claude.com/docs/en/mcp) et C4 (autoMemoryEnabled: false, code.claude.com/docs/en/memory) passent par le --settings de chaque session du run, actives par défaut ; C1 est l'option run.worktreeOutside de cadence.yaml (défaut false), worktree sous $CADENCE_HOME/run-worktrees/. Le banc garde ses réglages. Mesure sur de vraies sessions claude -p lancées comme le run (haiku, « Réponds ok », 12-11) : premier tour 64 844 → 57 653 jetons (−11,1 %, 0,12 $ par lot avec cadence cost), 52 278 avec C1 (−19,4 %) ; seules : C1 −5 299, C2 −3 193, C3 −3 289, C4 −699 (docs/mesures/socle-session-2026-11-11.md, « Coupes appliquées »). Preuve : v2/test/run-socle-l705.test.ts (7 cas, 4 rouges sans le branchement de run.ts), test/socle-coupes-l705.test.ts. Non mesuré : un premier tour Opus, la qualité des sessions sans ces plugins. D-7 reste ouverte : L702, erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-13",
+   "texte": "L714 fait (run 20261112223833-2103224) : v2/test/run-signal-l711.test.ts ne dépend plus de la charge de la machine. Rouge reproduit 1 fois sur 6 sous charge (40 boucles actives sur 32 cœurs), cas « SIGTERM au groupe » : la ligne du veilleur s'écrit parfois après celle du run, et le test lisait le journal tout de suite. Chaque attente guette désormais une ligne du journal ou la fin d'un processus, avec un plafond de 60 s (cas plafonnés à 240 s) ; chaque cas vérifie exactement ce qu'il vérifiait. Source inchangée : la course des trap de l'enveloppe (bras.ts), soupçonnée, n'apparaît pas (120/120 en 130 sous charge). Preuve : sous charge, 12/12 puis 14/14 passages verts du fichier (10 autres arrêtés par EAGAIN, plafond de processus du banc de charge) ; suite v2 complète 5 fois de suite : run-signal-l711 vert 5/5 (8/8 chaque fois), suite 542/542 verte 5/5 sans CADENCE_PIECES (avec cette variable héritée de la session du run, bras et passage rouges, comme déjà noté pour L679) ; suite racine 610/610 fichiers verte ; tsc v2 et cliquet qualité verts. D-7 reste ouverte : L702, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -87,7 +91,8 @@
   "L711",
   "L679",
   "L713",
-  "L705"
+  "L705",
+  "L714"
  ],
  "runs": [
   "20261111190444-2449989",
@@ -103,6 +108,7 @@
   "20261112195643-3050360",
   "20261112210748-3196908",
   "20261112213432-1019580",
-  "20261112220439-3616819"
+  "20261112220439-3616819",
+  "20261112223833-2103224"
  ]
 }

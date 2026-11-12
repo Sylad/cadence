@@ -59,9 +59,10 @@ export function rendreVerrou(f: string): void {
 // (CADENCE_HOME, défaut ~/.cadence/orchestrate, comme cadenceHome de src/orchestrate/registry.ts, qui le lit : liveRuns) le temps de sa session, de sa porte
 // et de son intégration. Format partagé : runs/<id>.json = { id, repo, fichier } ; le lecteur compte le run quand son état est en-cours et qu'un porteur
 // vivant tient son verrou `<run>.verrou` (le contrôle de « interrompu » de --liste, L709).
+export const dossierCadence = () => process.env.CADENCE_HOME || join(homedir(), '.cadence', 'orchestrate');
 /** Inscrit le run ; rend son retrait (à appeler à la fin du run, quelle qu'elle soit). */
 export function inscrireCreneau(r: { id: string; repo: string; fichier: string }): () => void {
-  const dossier = join(process.env.CADENCE_HOME || join(homedir(), '.cadence', 'orchestrate'), 'runs'), f = join(dossier, `${r.id}.json`);
+  const dossier = join(dossierCadence(), 'runs'), f = join(dossier, `${r.id}.json`);
   mkdirSync(dossier, { recursive: true });
   writeFileSync(`${f}.tmp`, JSON.stringify({ id: r.id, repo: r.repo, fichier: r.fichier }));
   renameSync(`${f}.tmp`, f);

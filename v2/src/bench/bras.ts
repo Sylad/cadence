@@ -49,20 +49,20 @@ export function lire(e: { stdout: string; code: number; erreur?: string }): { se
 const HOOKS = join(import.meta.dirname, '..', '..', 'hooks');
 export const cheminReglages = (clone: string) => join(`${clone}.reglages`, 'settings.json');
 export const libererReglages = (clone: string) => { if (existsSync(`${clone}.reglages`)) chmodSync(`${clone}.reglages`, 0o700); }; // avant réécriture ou effacement
-/** Réglages du run, à côté du clone, en lecture seule (dossier 0500, fichier 0400) ; `{{HOOKS}}` devient le chemin absolu de v2/hooks. */
-export function ecrireReglages(modele: string, clone: string): string {
-  const f = cheminReglages(clone);
+/** Réglages du run, à côté du clone, en lecture seule (dossier 0500, fichier 0400) ; `{{HOOKS}}` devient le chemin absolu de v2/hooks. `supplement` (L705, cadence run seul) : clés ajoutées à celles du bras ; sans lui, le fichier du bras tel quel (banc). */
+export function ecrireReglages(modele: string | undefined, clone: string, supplement: Record<string, unknown> = {}): string {
+  const f = cheminReglages(clone), texte = modele ? readFileSync(modele, 'utf8').replaceAll('{{HOOKS}}', JSON.stringify(HOOKS).slice(1, -1)) : '{}';
   libererReglages(clone); rmSync(dirname(f), { recursive: true, force: true }); mkdirSync(dirname(f));
-  writeFileSync(f, readFileSync(modele, 'utf8').replaceAll('{{HOOKS}}', JSON.stringify(HOOKS).slice(1, -1)), { mode: 0o400 }); chmodSync(dirname(f), 0o500);
+  writeFileSync(f, Object.keys(supplement).length ? JSON.stringify({ ...JSON.parse(texte), ...supplement }, null, 1) : texte, { mode: 0o400 }); chmodSync(dirname(f), 0o500);
   return f;
 }
 /** Empreinte des réglages du run, des hooks et des réglages Claude du clone : un changement pendant l'étape est un contournement (R31). */
 export const empreinteReglages = (clone: string): string => [cheminReglages(clone), ...readdirSync(HOOKS).sort().map((e) => join(HOOKS, e)),
   ...[clone, homedir()].flatMap((d) => [join(d, '.claude', 'settings.json'), join(d, '.claude', 'settings.local.json')])] // ~/.claude : lu, jamais modifié
   .reduce((h, f) => h.update(`${f}\0${existsSync(f) ? readFileSync(f, 'latin1') : 'absent'}\0`), createHash('sha1')).digest('hex');
-/** Arguments communs d'une session de bras ou de `cadence run` : même modèle, mêmes interdictions, mêmes réglages (hook de lecture). */
-export const argsClaude = (d: DefBras, clone: string, interdits = OUTILS_INTERDITS): string[] => ['--output-format', 'json', '--model', d.modele, '--permission-mode', 'bypassPermissions',
-  '--disallowedTools', interdits.join(','), ...(d.settings ? ['--settings', ecrireReglages(d.settings, clone)] : [])];
+/** Arguments communs d'une session de bras ou de `cadence run` : même modèle, mêmes interdictions, mêmes réglages (hook de lecture). `supplement` : coupes du socle de cadence run (L705, ../run/socle.ts). */
+export const argsClaude = (d: DefBras, clone: string, interdits = OUTILS_INTERDITS, supplement: Record<string, unknown> = {}): string[] => ['--output-format', 'json', '--model', d.modele, '--permission-mode', 'bypassPermissions',
+  '--disallowedTools', interdits.join(','), ...(d.settings || Object.keys(supplement).length ? ['--settings', ecrireReglages(d.settings, clone, supplement)] : [])];
 /** `garde` : pièces à lire avant d'écrire et racine du banc, données au hook du bras par l'environnement (CADENCE_*), jamais par un fichier. */
 export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }, reprise?: Releve): Mesure {
   if (d.aiguillage) { const a = aiguiller(lireDemande(b), clone, garde.pieces.map((p) => relative(clone, p))); d = { ...a.bras, nom: d.nom, ...(d.suite ? { suite: d.suite } : {}) }; garde = { ...garde, pieces: a.pieces.map((p) => join(clone, p)) }; }

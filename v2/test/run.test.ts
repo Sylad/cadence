@@ -60,12 +60,14 @@ describe('cadence run', () => {
     expect(git(repo, 'log', '--format=%s')).toMatch(/ajoute fait.txt\najoute ailleurs.txt/);
   });
 
-  it('sans pièce ni référence : mode léger, brief de Claude seul sans réglages', () => {
+  it('sans pièce ni référence : mode léger, brief de Claude seul ; réglages : les coupes du socle (L705), sans hook de lecture', () => {
     const repo = depot(), appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
     const { l, out } = io();
-    const e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([commite('fait.txt')], appels), out });
+    let r: Record<string, unknown> = {}; // lu pendant la session : le dossier des réglages est retiré à l'intégration
+    const e = executerRun({ repo, demande: 'Crée fait.txt', exec: fauxClaude([(c, a) => { r = JSON.parse(readFileSync(a[a.indexOf('--settings') + 1], 'utf8')); commite('fait.txt')(c); }], appels), out });
     expect(e).toMatchObject({ etat: 'integre', mode: 'leger' });
-    expect(appels[0].args).not.toContain('--settings');
+    expect(r).toMatchObject({ disableClaudeAiConnectors: true, autoMemoryEnabled: false });
+    expect(r.hooks).toBeUndefined();
     expect(l[0]).toMatch(/mode leger \(aucune référence dans la demande\)/);
   });
 

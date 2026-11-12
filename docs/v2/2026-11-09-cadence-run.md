@@ -26,7 +26,7 @@ Le modèle, le mode et sa raison s'affichent au lancement (« session Fable en m
 
 ## Déroulé
 
-1. Ouvre un worktree à côté du dépôt (`../.cadence-run/<projet>-<id>`), sur une branche `cadence/run-<id>`. Les `node_modules` et `.venv` y sont liés en dur.
+1. Ouvre un worktree à côté du dépôt (`../.cadence-run/<projet>-<id>`), sur une branche `cadence/run-<id>`. Les `node_modules` et `.venv` y sont liés en dur. Avec `run.worktreeOutside: true` dans `cadence.yaml`, le worktree va sous `$CADENCE_HOME/run-worktrees/` (voir « Socle de la session » ci-dessous).
 2. Lance une seule session, dans le mode choisi par l'aiguillage et sur le modèle choisi (`--modele`, sinon `CADENCE_RUN_MODELE`, sinon Opus). En mode complet : brief `v2/briefs/bras-sequence-v2d.md` et hook « lecture obligatoire ». Les pièces passées par `--piece` doivent être lues en entier avant toute écriture. Le registre des demandes du dépôt (`.cadence/demandes/`) ne garde que les demandes de l'humain (L701) : voir « Registre des demandes » ci-dessous.
 3. Si la session pose une question, le run s'arrête à l'état `attente`. `--reponse` reprend alors la même session, sur le modèle de son lancement (gardé dans l'état du run).
 4. Rebase sur la branche de départ, puis porte complète (`orchestrate.test` et `orchestrate.build` de `cadence.yaml`), jouée une seule fois. Si elle est rouge, la même session corrige une fois, puis la porte est rejouée.
@@ -51,6 +51,17 @@ Le modèle, le mode et sa raison s'affichent au lancement (« session Fable en m
 
 **Le run prend un créneau (L710, issue #55 du compte pro).** Le 12-11, `cadence lead tour` affichait « créneaux libres : 3 sur 3 » pendant que deux runs tournaient : le registre des créneaux ne voyait que les vagues et les sessions du lead. Pendant sa session, sa porte et son intégration, le run s'inscrit dans le registre commun (`$CADENCE_HOME/runs/<id>.json`, `CADENCE_HOME` valant `~/.cadence/orchestrate` par défaut, comme pour `orchestrate`), puis s'en retire à la fin (`inscrireCreneau`, `v2/src/verrou.ts`). Il compte tant que son état est `en-cours` et qu'un processus vivant tient son verrou : c'est le contrôle de `interrompu` dans `--liste`. Un run mort, fini, en attente ou en quota ne compte pas. `cadence lead tour`, `cadence orchestrate --status` et la bande `cadence-hud` l'ajoutent aux sessions en cours et le nomment (`runs cadence run : 1 (projet <id>)`), selon la formule de [concepts.md](../concepts.md#slots-and-holds). Les vagues l'attendent comme une session du lead, et leur journal le cite (`… en cours : w1, cadence run <id>`). Tests : `test/creneaux-runs-l710.test.ts` (registre et bande sur le même registre : un run vivant compte, un pid mort ne compte pas, une vague attend) et `v2/test/run-creneau-l710.test.ts` (l'inscription pendant la session, puis son retrait).
 
+**Socle de la session (L705, D-7).** Chaque session du run reçoit, par son `--settings`, trois coupes mesurées sur de vraies sessions le 12-11 ([mesure](../mesures/socle-session-2026-11-11.md#coupes-appliquées-l705-2026-11-12)) : les plugins activés de l'utilisateur (`~/.claude/settings.json`, ou `$CLAUDE_CONFIG_DIR`) et du projet sont à `false` (`enabledPlugins`), sauf `cadence` et `playwright` ; les connecteurs du compte claude.ai sont coupés (`disableClaudeAiConnectors`), les serveurs MCP des plugins restent ; la mémoire auto est désactivée (`autoMemoryEnabled: false`). Premier tour : 64 844 → 57 653 jetons (−11 %), environ 0,12 $ par lot. Les autres réglages de l'utilisateur et du projet s'appliquent comme avant. Le banc ne prend pas ces coupes : ses bras gardent leurs réglages, et le bras `cadence run` du banc n'est donc plus tout à fait le run.
+
+Le `CLAUDE.md` du dossier parent du dépôt est chargé parce que le worktree est sous `../.cadence-run/` (5,3 k jetons sur Big-Blue). Un dépôt qui n'en a pas besoin le coupe dans son `cadence.yaml` :
+
+```yaml
+run:
+  worktreeOutside: true   # défaut false : le CLAUDE.md parent peut porter des consignes de sécurité (maritime-atlas : kubectl pointe sur la prod)
+```
+
+Le worktree va alors sous `$CADENCE_HOME/run-worktrees/<projet>-<id>` (défaut `~/.cadence/orchestrate/run-worktrees/`) ; l'état, le verrou et le journal restent dans `../.cadence-run/`. Une autre valeur que `true` ou `false` est refusée avant toute création.
+
 En cas d'échec, le worktree est gardé avec l'état du run (`../.cadence-run/<projet>-<id>.json`). Le run s'arrête alors dans l'un de ces états : `sans-commit`, `conflit`, `porte-rouge`, `sans-porte` ou `refus-integration`.
 
 ## Pourquoi ces options
@@ -67,6 +78,7 @@ En cas d'échec, le worktree est gardé avec l'état du run (`../.cadence-run/<p
 | `--modele`, `CADENCE_RUN_MODELE` | Choisir le modèle de la session : `opus` (défaut, celui des deux bras mesurés au banc) ou `fable` ; Sonnet et Haiku n'écrivent pas de code (cause C2). La valeur s'écrit en minuscules. L'option l'emporte sur la variable ; une valeur inconnue est refusée en code 2 avant toute création ; la ligne de lancement dit le modèle utilisé (L699). En Fable, le run sort de ce que le banc a mesuré. |
 | `--fond` | Le run se détache et survit à la session qui l'a lancée (vécu au compte pro le 10-11 : un lot mort avec la session précédente, puis deux runs le 11-11, issue #55) ; journal dans `../.cadence-run/`. Ses sessions ne gardent aucun lien avec la session lanceuse (L709). Le journal dit qui était le run et ce qui l'a arrêté (L711). |
 | `KUBECONFIG` | Comme les vagues : sans `orchestrate.prodAccess: true`, la session n'a ni `kubectl`, ni `helm`, ni `KUBECONFIG` ; avec, elle joue le banc du projet. |
+| `run.worktreeOutside` | Couper le `CLAUDE.md` parent (−5,3 k jetons au premier tour, mesuré le 12-11), dépôt par dépôt : il porte parfois des consignes de sécurité, d'où le défaut `false` (L705). |
 | `--sans-porte` | Un dépôt sans porte déclarée n'est pas intégré en silence : il faut le choisir explicitement. |
 | `--help`, `-h` | L'usage, sans rien créer (issue #54 : « --help » partait en demande, laissait worktree, branche et état). Un autre argument qui commence par `-` est refusé en code 2 avant toute création. |
 

@@ -1,8 +1,8 @@
 # Le socle d'une session chargée par cadence, poste par poste (L694, D-7)
 
 Avant son premier geste, chaque session que cadence lance (`cadence run`, mode léger ou complet, sessions des bancs) envoie un contexte de
-**62 k jetons** : c'est le `base` de [`cadence cost`](../cost.md). Cette page dit d'où ils viennent et ce qu'on gagnerait à en couper. Aucune
-coupe n'est appliquée ici.
+**62 k jetons** : c'est le `base` de [`cadence cost`](../cost.md). Cette page dit d'où ils viennent et ce qu'on gagnerait à en couper. L694 n'a
+appliqué aucune coupe ; C2, C3 et C4 le sont depuis L705, C1 en option ([Coupes appliquées](#coupes-appliquées-l705-2026-11-12)).
 
 ## Mesuré
 
@@ -105,3 +105,59 @@ vérifier coupe par coupe sur les erreurs réelles (D-7), pas supposé.
   déduit (16,7 k) d'environ ±2,5 k.
 - Une semaine en cours : 3 jours, sessions toutes en mode léger. Le mode complet ajoute à la demande le brief `bras-sequence-v2d.md`
   (3 201 caractères, ~1,5 k jetons) et son hook de lecture.
+
+## Coupes appliquées (L705, 2026-11-12)
+
+Décision du lead : C2, C3 et C4 actives dans chaque session de `cadence run` ; C1 en option par dépôt, désactivée par défaut (le `CLAUDE.md` parent
+porte des consignes de sécurité). Le banc garde ses réglages : `argsClaude` ne reçoit les coupes que de `cadence run` (`v2/src/socle.ts`).
+
+**Mécanismes**, tous dans la documentation officielle de Claude Code, passés par le `--settings` de la session (un fichier, à côté du worktree, qui
+porte aussi le hook de lecture en mode complet) :
+
+- C2 : `enabledPlugins` à `false` pour les plugins activés dans `~/.claude/settings.json` (ou `$CLAUDE_CONFIG_DIR`) et `.claude/settings*.json` du
+  projet, sauf `cadence@…` et `playwright@…`, la règle de L398 ;
+- C3 : `"disableClaudeAiConnectors": true` ([MCP, « Disable claude.ai connectors »](https://code.claude.com/docs/en/mcp)) ; les serveurs des plugins
+  restent (playwright mesuré `connected`). Équivalent : `ENABLE_CLAUDEAI_MCP_SERVERS=false`, mesuré identique (61 472 contre 61 474) ;
+- C4 : `"autoMemoryEnabled": false` ([mémoire](https://code.claude.com/docs/en/memory)) ; équivalent `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, mesuré
+  identique (64 068 contre 64 064). Les consignes de mémoire disparaissent du prompt système (0 occurrence au journal, 2 sans la coupe) ;
+- C1 : `run: { worktreeOutside: true }` dans le `cadence.yaml` du dépôt ; le worktree va sous `$CADENCE_HOME/run-worktrees/` (défaut
+  `~/.cadence/orchestrate/run-worktrees/`, aucun `CLAUDE.md` dans ses dossiers parents, vérifié le 12-11). État, verrou et journal restent dans
+  `../.cadence-run/`.
+
+**Méthode.** Vraies sessions `claude -p` (Claude Code 2.1.293) le 12-11, lancées comme `session()` de `cadence run` en mode léger : mêmes arguments
+(`--permission-mode bypassPermissions`, `--disallowedTools` du run, `--settings`), même environnement (variables de la session lanceuse retirées,
+`CADENCE_*`, `KUBECONFIG=/dev/null`), dans le worktree de ce run (sous `~/projects/developpeur/.cadence-run/`, donc avec le `CLAUDE.md` parent) ;
+seuls changent le modèle (`haiku`), le prompt (« Réponds ok ») et la sortie (`stream-json --verbose`, pour lire le premier appel). Premier tour =
+`input + cache_creation + cache_read` du premier message `assistant`. C1 : un worktree du même commit sous le dossier temporaire de la session, sans
+`CLAUDE.md` parent. Les lignes « code de L705 » prennent la ligne de commande de `argsClaude` et `reglagesRun` compilés (`v2/dist`), chacune deux fois.
+
+| sessions | premier tour (jetons) | écart | ce qui change dans l'`init` |
+|---|---:|---:|---|
+| aucune coupe | 64 763 (64 762) | — | 13 plugins, 14 serveurs MCP dont 7 claude.ai, 146 outils, 105 skills |
+| C1 seule | 59 464 | −5 299 | sans le `CLAUDE.md` parent |
+| C2 seule | 61 570 | −3 193 | 7 plugins, 78 skills, plus de hook superpowers |
+| C3 seule (`--settings`) | 61 474 | −3 289 | 0 serveur claude.ai, 70 outils |
+| C4 seule (`--settings`) | 64 064 | −699 | plus de consignes de mémoire |
+| C2 + C3 + C4, à la main | 57 576 (57 570) | −7 190 | |
+| C1 + C2 + C3 + C4, à la main | 52 279 | −12 484 | |
+| code de L705, sans coupe (`argsClaude` sans supplément) | 64 844 (64 846) | — | comme « aucune coupe » (git status plus long : fichiers du lot) |
+| **code de L705, C2 + C3 + C4** (défaut) | **57 653** (57 652) | **−7 191** (−11,1 %) | 7 plugins, 0 serveur claude.ai, 78 skills |
+| code de L705, C1 + C2 + C3 + C4 (`worktreeOutside`) | 52 278 (52 277) | −12 566 (−19,4 %) | |
+
+Les coupes s'additionnent (3 193 + 3 289 + 699 = 7 181 pour 7 190 ensemble). Avec le déroulé médian de `cadence cost` ci-dessus : **0,12 $ par lot
+(−5,0 %)** par défaut, 0,20 $ (−8,7 %) avec C1 (`test/socle-coupes-l705.test.ts`).
+
+Écarts à l'estimation de L694 (même ordre pour C1 et C3, moitié pour C2) :
+
+- C2 retire 3 193 jetons, pas 6 575 : les plugins `cadence-hud`, `discord-idle` et `cc-plugin-*` ne sont dans aucun `enabledPlugins` (ils ne se
+  coupent pas ainsi), `cloudflare-api` et `context7` sont des serveurs MCP de l'utilisateur, pas de plugins, et le jeton de Haiku n'est pas celui
+  d'Opus (L694 comptait 2,01 à 2,14 caractères par jeton Opus) ;
+- C3 retire 3 289 jetons pour 2 875 estimés, C4 699 pour 988, C1 5 299 pour 5 509.
+
+## Limites de L705
+
+- Jetons comptés par Haiku : un premier tour Opus du même contexte n'a pas été mesuré (le rapport L694 de 2,14 caractères par jeton est celui d'Opus).
+- Un prompt minimal : les tours suivants paient le même socle (relu du cache), pas mesuré au-delà du premier appel.
+- Qualité non mesurée : qu'une session de `cadence run` n'ait besoin ni d'un skill des plugins coupés, ni d'un connecteur claude.ai, ni de la
+  mémoire n'est pas vérifié ; à suivre sur les erreurs réelles (D-7), comme toute coupe.
+

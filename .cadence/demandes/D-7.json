@@ -68,6 +68,10 @@
   {
    "date": "2026-11-12",
    "texte": "Suite L713 (run 20261112213432-1019580, issue #56 du compte pro) : le refus de cadence spec reseal <lot livré> … --porteur, pour une fiche modifiée par un commit d'un lot todo, d'aucun lot ou d'un lot absent du plan, ne propose plus « rescelle à la main avec le lead » ni aucune édition d'acceptation-<lot>.json : lot todo → raf done / raf drop puis relancer, ou raf start puis --porteur <lot> ; commit sans lot du plan non poussé → le réécrire pour citer le porteur (git commit --amend ou git rebase -i <sha>^, reword) ; déjà poussé → remettre la fiche au contenu du commit rouge dans un commit du porteur (comptée inchangée), puis refaire l'amendement dans un commit du porteur. Décision du lead tenue : rien d'étendu au rescellé d'un lot en cours sans --porteur (R4 de L229). Preuve : test/orchestrate-reseal.test.ts, describe « L713, suite » (6 cas, chacun rejoue le geste proposé et relance ; 6 rouges sur le code d'avant, verts après) ; suite racine 608/608 fichiers verte, tsc et cliquet qualité verts. Non vérifié : un vrai refus au compte pro. D-7 reste ouverte : L702, coupes du socle, erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "L705 fait (run 20261112220439-3616819) : coupes du socle de cadence run. C2 (enabledPlugins à false sauf cadence et playwright), C3 (disableClaudeAiConnectors, doc officielle code.claude.com/docs/en/mcp) et C4 (autoMemoryEnabled: false, code.claude.com/docs/en/memory) passent par le --settings de chaque session du run, actives par défaut ; C1 est l'option run.worktreeOutside de cadence.yaml (défaut false), worktree sous $CADENCE_HOME/run-worktrees/. Le banc garde ses réglages. Mesure sur de vraies sessions claude -p lancées comme le run (haiku, « Réponds ok », 12-11) : premier tour 64 844 → 57 653 jetons (−11,1 %, 0,12 $ par lot avec cadence cost), 52 278 avec C1 (−19,4 %) ; seules : C1 −5 299, C2 −3 193, C3 −3 289, C4 −699 (docs/mesures/socle-session-2026-11-11.md, « Coupes appliquées »). Preuve : v2/test/run-socle-l705.test.ts (7 cas, 4 rouges sans le branchement de run.ts), test/socle-coupes-l705.test.ts. Non mesuré : un premier tour Opus, la qualité des sessions sans ces plugins. D-7 reste ouverte : L702, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -82,7 +86,8 @@
   "L710",
   "L711",
   "L679",
-  "L713"
+  "L713",
+  "L705"
  ],
  "runs": [
   "20261111190444-2449989",
@@ -97,6 +102,7 @@
   "20261112193327-1761527",
   "20261112195643-3050360",
   "20261112210748-3196908",
-  "20261112213432-1019580"
+  "20261112213432-1019580",
+  "20261112220439-3616819"
  ]
 }

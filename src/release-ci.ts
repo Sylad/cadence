@@ -23,7 +23,7 @@ const WORKFLOWS = '.github/workflows';
 type EtapeCI = { nom: string; commandes: string[][]; dossier?: string; sautee?: undefined } | { nom: string; sautee: string; commandes?: undefined; dossier?: undefined };
 interface WorkflowCI { fichier: string; etapes: EtapeCI[] }
 /** Le commit de version que la release écrira : ses fichiers calculés, plus ceux repris de l'arbre de travail (docs/whats-new.md). */
-interface CommitDeVersion { version: string; writes: Map<string, string>; copies: string[] }
+interface CommitDeVersion { version: string; writes: Map<string, string>; removes?: string[]; copies: string[] }
 
 /**
  * Revue L698 r1 (D-16) : une liste noire laissait passer « echo … && npm publish », « echo x; git push », pnpm/changeset publish. Seules sont
@@ -307,6 +307,11 @@ function clonerCommitDeVersion(root: string, clone: string, cv: CommitDeVersion)
   for (const [f, texte] of cv.writes) {
     mkdirSync(dirname(join(clone, f)), { recursive: true });
     writeFileSync(join(clone, f), texte);
+    fichiers.push(f);
+  }
+  // L679 : les fragments du CHANGELOG assemblés dans la section sont retirés par le commit de version, dans le clone comme chez le lead.
+  for (const f of cv.removes ?? []) {
+    rmSync(join(clone, f), { force: true });
     fichiers.push(f);
   }
   for (const f of cv.copies.filter((c) => existsSync(join(root, c)))) {

@@ -7,6 +7,7 @@ import type { Day } from './dates.js';
 import { releaseIssueLines } from './issues.js';
 import { commandesFumee, fumerPaquet } from './release-fumee.js';
 import { ciAvantEcriture } from './release-ci.js';
+import { hasEntries, nothingToRelease, releaseFileLine, removeFragments, versionSection } from './changelog-fragments.js';
 
 const BUMPS = ['patch', 'minor', 'major'] as const;
 type Bump = (typeof BUMPS)[number];
@@ -80,17 +81,15 @@ export function refuseDuplicateTitles(body: string): void {
   }
 }
 
-/** Une section est vide quand elle n'a que des titres de sous-section (« ### Added ») et des lignes blanches. */
-function hasEntries(body: string): boolean {
-  return body.split('\n').some((l) => l.trim() !== '' && !/^#{3,}\s/.test(l));
-}
-
 interface Planned {
   version: string;
   /** Le corps de [Unreleased], celui qui devient la section de la version. */
   body: string;
   current: string;
   writes: Map<string, string>;
+  /** Les fragments de changelog.d/ assemblés dans la section, que le commit de version retire (L679). */
+  removes: string[];
+  /** Les fichiers du commit de version : ceux écrits, puis les fragments retirés. */
   files: string[];
   /** Les autres plugins du marketplace dont la version a monté (code changé depuis la dernière release). */
   autres: string[];
@@ -216,11 +215,14 @@ function plan(root: string, bump: Bump, today: Day): Planned {
 
   if (!existsSync(join(root, CHANGELOG))) throw new RafError(`release : ${CHANGELOG} n'existe pas — la release renomme sa section [Unreleased], il faut donc un ${CHANGELOG} qui en porte une`);
   const changelog = readFileSync(join(root, CHANGELOG), 'utf8');
-  const { before, body, after } = splitUnreleased(changelog);
-  refuseDuplicateTitles(body);
-  if (!hasEntries(body)) throw new RafError(`release : la section [Unreleased] est vide dans ${CHANGELOG} — rien à publier ; y écrire ce qui change pour l'utilisateur (lots cités)`);
+  const { before, body: own, after } = splitUnreleased(changelog);
+  refuseDuplicateTitles(own);
+  // L679 : les fragments de changelog.d/ (un par lot) s'assemblent dans la section, à la suite de ce que [Unreleased] porte encore, et sont retirés par le commit de version.
+  const { body, removes } = versionSection(root, own);
+  if (!hasEntries(body)) throw new RafError(nothingToRelease(root));
   // Une section [Unreleased] vide reste au-dessus : sans elle, la fusion de CHANGELOG du mode worktree d'orchestrate ne trouve plus où poser les entrées des lots suivants.
   put(CHANGELOG, `${before}## [Unreleased]\n\n## [${version}] - ${today}\n${body}${after}`);
+  files.push(...removes);
 
   verifierRelecture(writes, version);
 
@@ -229,6 +231,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
     body,
     current,
     writes,
+    removes,
     files,
     autres,
     pluginName,
@@ -337,14 +340,17 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
   const whatsNewPath = join(root, WHATS_NEW);
   const hasWhatsNew = existsSync(whatsNewPath);
   // L698 : la CI de publication (le workflow déclenché par un tag) rejouée dans un clone neuf du commit de version, tagué ; un rouge refuse la release.
-  ciAvantEcriture(root, dryRun, { version: p.version, writes: p.writes, copies: hasWhatsNew ? [WHATS_NEW] : [] }, out);
+  ciAvantEcriture(root, dryRun, { version: p.version, writes: p.writes, removes: p.removes, copies: hasWhatsNew ? [WHATS_NEW] : [] }, out);
   const files = hasWhatsNew ? [...p.files, WHATS_NEW] : p.files;
   const branch = inGit('la lecture de la branche', () => currentBranch(root)) ?? 'main';
 
   out(`${dryRun ? 'release (--dry-run, rien n\'est écrit)' : 'release'} : ${p.current} → ${p.version}`);
   for (const x of p.autres) out(`  ${x}`);
-  for (const f of p.files) out(`  ${dryRun ? 'écrirait' : 'écrit'} : ${f}${f === 'CHANGELOG.md' ? ` ([Unreleased] → [${p.version}] - ${today}, une section [Unreleased] vide au-dessus)` : ' (version)'}`);
-  if (!dryRun) for (const [file, text] of p.writes) writeFileSync(join(root, file), text);
+  for (const f of p.files) out(releaseFileLine(f, { version: p.version, today, removes: p.removes, dryRun }));
+  if (!dryRun) {
+    for (const [file, text] of p.writes) writeFileSync(join(root, file), text);
+    removeFragments(root, p.removes);
+  }
 
   let ready = true;
   if (hasWhatsNew) {

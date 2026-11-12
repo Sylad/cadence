@@ -31,7 +31,8 @@ describe('L626 — niveau 1 : CLAUDE.md à la racine du dépôt', () => {
     const t = lire('CLAUDE.md');
     expect(t).toMatch(/README[^\n]*64 lignes[^\n]*160 colonnes/);
     expect(t).toMatch(/docs\/concepts\.md[^\n]*15 Ko/);
-    expect(t).toMatch(/CHANGELOG[^\n]*\[Unreleased\][^\n]*titre dupliqué/);
+    // L679 : l'entrée d'un lot va dans un fragment changelog.d/<lot>.md, [Unreleased] reste vide.
+    expect(t).toMatch(/CHANGELOG[^\n]*changelog\.d\/<lot>\.md[^\n]*\[Unreleased\]` reste vide/);
     expect(t).toMatch(/nouvelle page de docs[^\n]*`files`[^\n]*package\.json/);
   });
 

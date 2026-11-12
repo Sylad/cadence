@@ -1,3 +1,11 @@
+import { changelogWithFragments } from '../src/changelog-fragments.js';
+
+/**
+ * Le CHANGELOG du dépôt tel que la prochaine release le publierait (L679) : les fragments de `changelog.d/` assemblés sous `[Unreleased]`.
+ * Un test qui cherche l'entrée d'un lot pas encore publié lit ce texte, avec `changelogSectionOf`.
+ */
+export const repoChangelog = (root: string): string => changelogWithFragments(root);
+
 /**
  * La section du CHANGELOG qui porte l'entrée d'un lot : `[Unreleased]` avant la publication, `[x.y.z]` après le commit de version
  * (qui renomme `[Unreleased]` et en laisse une vide). Un test qui cherche l'entrée d'un lot passe par ici, jamais par `[Unreleased]` seul

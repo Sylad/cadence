@@ -52,6 +52,10 @@
   {
    "date": "2026-11-12",
    "texte": "Suite de revue L711 (run 20261112180310-509174) : la cause écrite est la vraie. Une session arrêtée par son délai écrit « délai de 4 h dépassé : le run a arrêté la session claude (SIGTERM à son enveloppe, code 143) » ; un SIGINT à l'enveloppe sort en 130 et s'écrit SIGINT ; tout autre signal garde son nom exact. Le veilleur d'un run --fond qui reçoit un signal l'écrit puis s'arrête de ce signal, gestionnaires retirés (au plus 1 s laissée au run pour mourir du même signal et que sa ligne soit écrite) ; le run n'est pas arrêté par un signal au veilleur seul. Preuve : v2/test/run-signal-l711.test.ts (8 cas, les 3 nouveaux rouges sur le code d'avant, verts après) ; suite v2 verte (535), tsc sans erreur. D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "L679 fait (run 20261112193327-1761527) : le CHANGELOG du dépôt cadence s'écrit en fragments changelog.d/<lot>.md (rubriques Added/Changed/Deprecated/Removed/Fixed/Security), [Unreleased] reste vide ; cadence release assemble les fragments d'un dépôt qui a changelog.d/ dans la section de la version (rubriques regroupées dans l'ordre Keep a Changelog, lot le plus récent en tête) et les retire dans le commit de version, CI rejouée comprise ; un dépôt sans changelog.d/ publie comme avant. Entrées L706 à L711 migrées sans perte (5 entrées identiques). Consigne : CLAUDE.md du dépôt, changelog.d/README.md, docs/releasing.md#changelog-fragments, briefs implement/fix/fix-docs d'orchestrate. Preuve : test/changelog-fragments-l679.test.ts (13 cas : deux branches avec chacune un fragment se rebasent sans conflit, le témoin sous [Unreleased] est en conflit ; release --dry-run assemble deux fragments) ; suite racine 605/607 fichiers verts, les 2 rouges (v2/test/bras, v2/test/passage) dus à CADENCE_PIECES hérité de la session du run, verts sans cette variable ; tsc et cliquet qualité verts. Non mesuré : les conflits CHANGELOG de la prochaine vague. D-7 reste ouverte : L702, coupes du socle, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -64,7 +68,8 @@
   "L706",
   "L709",
   "L710",
-  "L711"
+  "L711",
+  "L679"
  ],
  "runs": [
   "20261111190444-2449989",
@@ -75,6 +80,7 @@
   "20261112141141-2253545",
   "20261112143710-3694893",
   "20261112172302-1494393",
-  "20261112180310-509174"
+  "20261112180310-509174",
+  "20261112193327-1761527"
  ]
 }

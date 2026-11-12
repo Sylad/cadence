@@ -8,7 +8,8 @@ Between the version commit and the gate it also prints a **provisional local tag
 
 1. Bump `version` in `package.json` (then `npm install` to refresh `package-lock.json`),
    `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, and write the version's section of
-   `CHANGELOG.md` (`## [x.y.z] - date`, what changes for the user, lots cited), in **one commit that holds
+   `CHANGELOG.md` (`## [x.y.z] - date`, what changes for the user, lots cited; for cadence, the fragments of `changelog.d/`
+   gathered, see [CHANGELOG fragments](#changelog-fragments)), in **one commit that holds
    only those files** (the version fields and the CHANGELOG, nothing else in the manifests, `docs/whats-new.md`: add the version to its « In two lines » list and its
    long form (the README no longer carries a « What's new » section, L326)). Such a commit is
    exempt from the code-review gate like a plan commit: it closes the lot after its review, and `raf check`
@@ -75,13 +76,31 @@ It computes the next `x.y.z` from `package.json` and writes it, **only the versi
 plugin that carries the name of `plugin.json` (the other plugins of the marketplace keep their own version); a file that does
 not exist is skipped. In `CHANGELOG.md` the `## [Unreleased]` section becomes `## [x.y.z] - <date>` and **an empty
 `## [Unreleased]` is kept above it** (without it, the `CHANGELOG.md` union of the worktree mode of `cadence orchestrate`, L314,
-has nowhere to put the next lots' entries).
+has nowhere to put the next lots' entries). In a repository that has a `changelog.d/` folder, cadence's own included, the section
+also gathers the **fragments** of that folder and the version commit removes them, see [CHANGELOG fragments](#changelog-fragments).
+
+### CHANGELOG fragments
+
+Since L679 cadence's own lots never edit `## [Unreleased]` of `CHANGELOG.md`: each lot writes its entry in
+`changelog.d/<lot>.md`, one or more Keep a Changelog sections (`### Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`,
+`Security`), each followed by its entries. Two branches that edited `[Unreleased]` conflicted at every rebase (7 add-only
+conflicts and 13 replayed gates in the 2026-11-07-0800 wave, 80 min of 970); two branches that each add a file never do.
+`[Unreleased]` stays empty (`test/changelog-fragments-l679.test.ts` checks it) and a review fix edits the lot's fragment.
+
+`cadence release` reads every `*.md` of `changelog.d/` but `README.md` (the folder's instructions, which keep it alive after
+a release), groups the entries by section in that order, the most recent lot first within a section (`L711` before `L710`,
+then by name), after the entries still under `[Unreleased]` if any, writes them as the section of the version (same form as a
+section written by hand), and lists the fragments in the version commit's `git add` as removed (`--dry-run`: `retirerait :
+changelog.d/L679.md`). The replayed CI sees the same commit, fragments removed. A tool that wants the next release's text
+reads `changelogWithFragments` (`src/changelog-fragments.ts`). A repository without `changelog.d/` releases exactly as before:
+the folder is what turns fragments on.
 
 It refuses, with exit code 2 and nothing written:
 
 - a tracked file modified, `docs/whats-new.md` excepted (an untracked file does not count: the commit names its paths);
 - a missing `CHANGELOG.md` (the one file that is not skipped: the release renames its `[Unreleased]` section);
-- an `[Unreleased]` section that is missing or holds nothing but sub-section titles, or that carries the same sub-section title (`### Fixed`, case aside) twice (L568: the trace of a lot merge that copied the section; published, the entries would be doubled);
+- a fragment of `changelog.d/` with an unknown section title, text before its first title, or no entry (the message names the file);
+- an `[Unreleased]` section that is missing or holds nothing but sub-section titles (and, with `changelog.d/`, no fragment either), or that carries the same sub-section title (`### Fixed`, case aside) twice (L568: the trace of a lot merge that copied the section; published, the entries would be doubled);
 - a version already tagged (`v<x.y.z>`);
 - a `package-lock.json` that is not at the version of `package.json`, or whose dependencies differ from those of `package.json`
   (a `npm install` would move them: commit that apart, before the release);

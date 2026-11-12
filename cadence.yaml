@@ -94,6 +94,8 @@ bounds:
     chars: 15360
     tests: [test/concepts-doc.test.ts, test/pret-tirable-l601.test.ts]
   - paths: [CHANGELOG.md]
-    tests: [test/changelog.test.ts, test/changelog-unreleased-titres-l568.test.ts]
+    tests: [test/changelog.test.ts, test/changelog-unreleased-titres-l568.test.ts, test/changelog-fragments-l679.test.ts]
+  - paths: ['changelog.d/*.md']
+    tests: [test/changelog-fragments-l679.test.ts]
   - paths: [package.json, 'docs/*.md']
     tests: [test/docs-publiees-l626.test.ts, test/orchestrate-pages-l599.test.ts]

@@ -81,6 +81,8 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.3] - 2026-11-12
+
 ### Added
 
 - `cadence cost <rollout>` estimates what a way of working costs before any bench, without a model (L693, D-7, [docs/cost.md](docs/cost.md)): sessions, calls per session, loaded base, context growth and output per call, share read from the cache, model; each call sends the whole context again, cache reads at `cacheRead`, cache writes at the input price × `cacheWriteFactor` (2, the one-hour cache), prices from the rollout or `perf.prices`. Calibrated on the session journals of the bench 2026-11-10-1551 (prices fitted on its cost records: output 20 $/M, cache read 0.20, cache write 8; input supposed 4), it finds the real cost of its four runs within 10 % (`test/cost-estimate-l693.test.ts`, ±20 % required). The same journals show that the bench's kept-session cost (31.52 and 29.66 $) adds up cumulative totals: the real cost is 10.01 and 9.08 $.

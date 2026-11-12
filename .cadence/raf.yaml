@@ -3314,9 +3314,10 @@ lots:
     finished: 2026-11-12
   - id: L710
     title: "Les runs cadence run en cours comptent dans les créneaux de cadence lead tour et cadence orchestrate --status (et dans « sessions en cours ») ; un run mort ne compte pas (issue #55 du compte pro : « créneaux libres : 3 sur 3 » avec deux runs vivants)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-12
+    started: 2026-11-12
   - id: L711
     title: "cadence run --fond écrit dans son journal le signal qui l'arrête (SIGHUP, SIGTERM, SIGINT) et son cgroup au lancement, pour établir la cause de l'issue #55 (runs morts à la fin de la session lanceuse chez le compte pro, non reproduit sur Big-Blue : setsid déjà là, init.scope, linger) ; test du journal sur un signal envoyé"
     status: todo

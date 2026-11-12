@@ -1,0 +1,16 @@
+{
+ "id": "D-19",
+ "texte": "Oui, le retirer",
+ "date": "2026-11-12",
+ "etat": "ouverte",
+ "preuve": null,
+ "precisions": [
+  {
+   "date": "2026-11-12",
+   "texte": "Réponse de Sylvain à la question du lead « Je retire le doublement inerte de L682 ? » : le doublement de l'estimate à raf add d'un lot qui cite src/orchestrate/cycle/ (L682) lit seulement le titre, aurait raté L676 et doublé L629 à tort, et 0,25 → 0,5 reste au plancher de 600 k (revue de L682) ; mécanisme sans gain mesuré, à retirer."
+  }
+ ],
+ "lots": [
+  "L708"
+ ]
+}

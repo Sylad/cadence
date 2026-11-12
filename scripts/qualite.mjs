@@ -482,11 +482,7 @@ function baseRemonte(racine, base, mesure, ref) {
   const remonte = comparerMigration(ref.base, baseJugee(base, mesure, existe), existe, lienDe(racine, ref));
   // les clés sorties du jugement (fichier neuf qui ne mesure plus rien) pèsent encore dans le total de la base : une clé restante légitime a été acceptée
   // sous ce total, une clé fabriquée au-dessus est refusée (elle deviendrait au lot suivant la clé d'un fichier « qui existait »)
-  const ta = totaux(ref.base);
-  for (const [cle, n] of Object.entries(totaux(base))) {
-    const nom = `${cle} (total, tous fichiers)`;
-    if (n > (ta[cle] ?? 0) && !remonte.some((p) => p.cle === nom)) remonte.push({ cle: nom, avant: ta[cle] ?? 0, apres: n });
-  }
+  remonte.push(...comparer(totaux(ref.base), totaux(base)).pires.map((p) => ({ ...p, cle: `${p.cle} (total, tous fichiers)` })).filter((p) => !remonte.some((q) => q.cle === p.cle)));
   if (!remonte.length) return null;
   return { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${remonte.map(ligne).join('\n')}` };
 }

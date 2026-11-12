@@ -29,6 +29,7 @@
     "cadence2 --help": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 argv": "docs/v2/2026-11-09-cadence-run.md",
     "cadence2 env KUBECONFIG": "docs/v2/2026-11-09-cadence-run.md",
+    "cadence2 env HOME": "docs/v2/banc.md",
     "cadence2 --git-common-dir": "docs/raf.md"
   }
 }

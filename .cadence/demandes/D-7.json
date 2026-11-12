@@ -28,6 +28,10 @@
   {
    "date": "2026-11-12",
    "texte": "L682 fait (run 20261112081458-4076309) : une passe fix refusée pour budget prend le manque sur la part de l'escalade quand elle le couvre (après le prélèvement de vague L584), et raf add double l'estimate d'un lot dont le titre cite src/orchestrate/cycle/. Preuve : test/orchestrate-budget-correction-l682.test.ts (R1 reproduit L676 : 559 676 / 775 000 dont 175 000 retenus ; rouge sans le correctif, vert avec). La mesure (0 lot rendu pour budget avec un majeur ouvert sur 3 vagues) reste à relever. D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "L706 fait (run 20261112113406-1675645) : le banc séquence refuse au chargement une demande qui cite un fichier hors des pièces déclarées de son étape ou des étapes d'avant, en nommant le chemin cité et les pièces permises (cas aether-b68-court du 10 au 12-11, 4 passages rouges à tort). Preuve : v2/test/sequence-citations-l706.test.ts (rouge avant le correctif, vert après) ; suites v2 et racine vertes. La mesure (0 passage rouge pour une fuite de pièce déclarée) reste à relever au prochain banc, et la séquence aether-b68-court est à corriger (elle sera désormais refusée). D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -36,11 +40,13 @@
   "L695",
   "L696",
   "L698",
-  "L682"
+  "L682",
+  "L706"
  ],
  "runs": [
   "20261111190444-2449989",
   "20261111211808-2649855",
-  "20261112081458-4076309"
+  "20261112081458-4076309",
+  "20261112113406-1675645"
  ]
 }

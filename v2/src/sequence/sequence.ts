@@ -20,6 +20,10 @@ const dedans = (base: string, c: string) => { const r = relative(resolve(base), 
 const texte = (v: unknown): v is string => typeof v === 'string' && v !== '';
 const liste = (v: unknown): string[] | null => (Array.isArray(v) && v.every((x) => texte(x)) ? (v as string[]) : null);
 
+const citations = (t: string, seq: string, etape: string, racine: string, h = process.env.HOME ?? '/') => t.split(/[\s'"`()<>[\]*,;]+/).map((x) => x.replace(/[.:!?]+$/, '')) // L706 : [cité, absolu] des fichiers cités : ~, $HOME, absolus sous le home ou le banc ou existants (pas une route « /api/x »), relatifs existants
+  .map((x): [string, string | undefined] => [x, /^(~|\$HOME)\//.test(x) ? resolve(h, x.replace(/^\S+?\//, '')) : x.startsWith('/') ? [resolve(x)].find((c) => c.startsWith(`${h}/`) || dedans(racine, c) || existsSync(c))
+    : x.includes('/') && !/^[a-z]+:/i.test(x) ? [resolve(etape, x), resolve(seq, x)].find((c) => existsSync(c)) : undefined]).filter((v): v is [string, string] => v[1] !== undefined);
+
 export function chargerSequence(racine: string, id: string): Sequence {
   const ko = (m: string): never => { throw new BancInvalide(`séquence ${id} : ${m}`); };
   const lire = (f: string): Obj => {
@@ -54,6 +58,9 @@ export function chargerSequence(racine: string, id: string): Sequence {
     for (const x of refs) if (isAbsolute(x) || x.split('/').includes('..')) ko(`étape ${i + 1} : référence « ${x} » hors du dépôt`);
     return { k: i + 1, lot: e.lot as string, demande: dem, pieces: chemins, references_depot: refs, taille: e.taille as TailleEtape };
   });
+  for (const e of etapes) { // L706 : un bras ouvre ce que sa demande cite ; hors des pièces permises, le détecteur de fuites en compte une
+    const avant = etapes.slice(0, e.k), hors = citations(readFileSync(e.demande, 'utf8'), dir, dirname(e.demande), racine).find(([, c]) => !avant.some((x) => [dirname(x.demande), ...x.pieces].some((p) => c === p || c.startsWith(`${p}/`))));
+    if (hors) ko(`étape ${e.k} : la demande cite « ${hors[0]} », hors des pièces de son étape et des étapes d'avant ; pièces permises : ${avant.flatMap((x) => x.pieces).map((p) => relative(dir, p)).join(', ') || 'aucune'} (la déclarer dans « pieces » de sequence.yaml, ou corriger le chemin)`); }
 
   const s = lire(join(secrets, 'sequence-secrets.yaml'));
   const fichiers = (ou: string, v: unknown, cmd: unknown): Cache => {
@@ -65,18 +72,12 @@ export function chargerSequence(racine: string, id: string): Sequence {
     return { fichiers: chemins, commande: cmd as string };
   };
   const bruts = (s.caches ?? {}) as Record<string, Obj>;
-  const caches: Record<number, Cache> = {};
-  for (const e of etapes) {
-    const c = bruts[String(e.k)];
-    if (!c) ko(`caches : étape ${e.k} sans tests cachés`);
-    caches[e.k] = fichiers(`caches ${e.k}`, c.fichiers, c.commande);
-  }
+  const caches: Record<number, Cache> = Object.fromEntries(etapes.map((e) => {
+    const c = bruts[String(e.k)] ?? ko(`caches : étape ${e.k} sans tests cachés`); return [e.k, fichiers(`caches ${e.k}`, c.fichiers, c.commande)]; }));
   for (const k of Object.keys(bruts)) if (!etapes.some((e) => String(e.k) === k)) ko(`caches : clé « ${k} » hors des étapes 1..${etapes.length}`);
-  const r = s.regression as Obj | undefined;
-  if (!r) ko('champ « regression » manquant');
-  const a = (r as Obj).a_partir_de;
+  const r = (s.regression as Obj | undefined) ?? ko('champ « regression » manquant'), a = r.a_partir_de;
   if (!Number.isInteger(a) || (a as number) < 1 || (a as number) > etapes.length) ko(`regression : « a_partir_de » doit être entre 1 et ${etapes.length}`);
-  const reg = fichiers('regression', (r as Obj).fichiers, (r as Obj).commande);
+  const reg = fichiers('regression', r.fichiers, r.commande);
   const so = ('sorties' in s ? s.sorties : {}) as Record<string, unknown>; // m5 : présente, nulle ou d'un autre type = refusée
   if (!so || typeof so !== 'object' || Array.isArray(so)) ko('« sorties » doit associer une étape à une liste de sorties');
   for (const k of Object.keys(so)) if (!etapes.some((e) => String(e.k) === k)) ko(`sorties : clé « ${k} » hors des étapes 1..${etapes.length}`);

@@ -63,6 +63,8 @@ Options communes : `--candidat <bras>`, `--reference <bras>`, `--juge <modèle>`
 
 `cadence2 bench sequence aether-b68` rejoue une **suite de vraies demandes successives** d'un même projet, depuis un même commit. Chaque bras garde son propre code d'une demande à l'autre ; il ouvre une session neuve par demande, sauf un bras qui déclare la clé `suite` (ci-dessous). Il mesure ce que le banc court ne voit pas : lire vraiment les documents de référence, ne pas casser ce qui existe, garder un code maintenable (spec : [2026-11-08-banc-sequence-design.md](2026-11-08-banc-sequence-design.md)).
 
+**Une demande ne cite que ses pièces (L706)**. Au chargement, `etapes/<k>/demande.md` est refusée si elle cite un fichier hors des pièces déclarées (`pieces` de `sequence.yaml`) de son étape ou des étapes d'avant, et hors des dossiers de ces étapes : le bras ouvrirait le fichier cité et le détecteur de fuites compterait une fuite. Sont des citations les chemins `~/…`, `$HOME/…`, les chemins absolus sous le home (`HOME`) ou sous le banc ou qui existent (une route `/api/x` n'en est pas une), et les chemins relatifs avec `/` qui existent depuis l'étape ou la séquence. Le message nomme le chemin cité et les pièces permises. Vécu du 10 au 12-11 : `aether-b68-court/etapes/1/demande.md` citait la figure de `aether-b68` ; 4 passages rouges à tort.
+
 **Bras qui gardent leur session (clé `suite` de `bras.yaml`, L690)**. Sans la clé, chaque étape part d'une session neuve. Avec elle, l'étape k reprend (`claude -p --resume`) la dernière session de l'étape k-1 du même bras, même identifiant, même journal :
 
 - `suite: gardee` : la session est reprise telle quelle ;

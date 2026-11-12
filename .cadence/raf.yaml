@@ -3285,9 +3285,10 @@ lots:
     created: 2026-11-11
   - id: L706
     title: "Banc séquence : une demande qui cite un fichier hors des pièces de son étape est refusée au chargement de la séquence (D-7 ; vécu 10 au 12-11 : aether-b68-court citait la pièce d'aether-b68, 4 passages rouges sur une fausse fuite) ; test sur ce cas ; mesure : 0 passage rouge pour une fuite de pièce déclarée"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-12
+    started: 2026-11-12
   - id: L707
     title: "Cliquet : une clé fabriquée à mesure nulle sous le total du départ ({cli.ts:350, x.ts:650}) passe en code 0 et laisse x.ts grossir au lot suivant — décider (figer à l'intégration, ou état stocké) ; vu par la revue Fable de L477 le 12-11, vrai avant L477 ; rapport tmp/revue2-L477.md"
     status: todo

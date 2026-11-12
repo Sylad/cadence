@@ -1,0 +1,16 @@
+{
+ "id": "D-20",
+ "texte": "hum mais les hud spont buggé ou c'est moi, je n'ai plus aucune vision sur l'avancement des projets",
+ "date": "2026-11-12",
+ "etat": "ouverte",
+ "preuve": null,
+ "precisions": [
+  {
+   "date": "2026-11-12",
+   "texte": "Constat du lead : le panneau /hud lots affichait « Aucun lot non clos dans les projets de ce dossier » alors que L679 était en cours (capture de Sylvain à 20:35). lead tour --json porte bien les lots ; le panneau partage sa hauteur (décisions, dépenses, livraisons, bloc Banc ajouté le 10-11) et l'arbre des lots, servi en dernier, peut tomber à 0 ligne, puis le message dit qu'il n'y a pas de lot."
+  }
+ ],
+ "lots": [
+  "L712"
+ ]
+}

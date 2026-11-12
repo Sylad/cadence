@@ -3094,9 +3094,10 @@ lots:
     created: 2026-11-07
   - id: L682
     title: "Budget : correction non jouée après revue finale non conforme (L676 : 559 676 / 600 000, 74 min en handed-back, majeurs sans correction) ; l'estimate d'un lot qui touche src/orchestrate/cycle/ est doublé à raf add et la réserve de la dernière correction est prise avant celle de l'escalade ; niveau : source ; niveau le plus tôt : source ; mesure : 0 lot rendu pour budget avec un majeur ouvert sur 3 vagues"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-07
+    started: 2026-11-12
   - id: L683
     title: "Créneaux tenus par les sessions du lead : 16,4 min d'attente sur 7 lots en 0800 (reprise-L498 3 min 09 s et 5 min 06 s pour L673), --integrate de L666 dit 29 min sans activité par le lead (non retrouvé au journal) ; le registre écrit l'âge et l'objet de la session du lead, et --integrate ne prend de créneau que pendant une session jouée ; niveau : source ; niveau le plus tôt : source ; mesure : 0 min d'attente de créneau due à une session du lead sans activité"
     status: todo

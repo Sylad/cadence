@@ -48,6 +48,10 @@
   {
    "date": "2026-11-12",
    "texte": "L711 fait (run 20261112172302-1494393, issue #55 du compte pro) : le journal d'un cadence run --fond dit qui était le run et ce qui l'a arrêté. Au lancement : pid, pgid, sid, ppid et cgroup (cgroup seulement si /proc/self/cgroup existe). Chaque SIGHUP, SIGTERM ou SIGINT reçu par le groupe du run, par l'enveloppe de sa session claude, ou qui a arrêté le run, s'écrit avec l'heure sur une ligne « cause d'arrêt » ; une session claude morte sur un signal aussi, avec son code. --liste ajoute à un run interrompu la dernière de ces lignes. Arrêt inchangé : le run est synchrone, donc un gestionnaire de signal dans son processus attendrait la fin de la session ; --fond détache plutôt un veilleur qui lance le run et écrit à sa place (v2/src/trace.ts). Doc : docs/v2/2026-11-09-cadence-run.md (ce qu'on joint à une issue : le journal du run). Preuve : v2/test/run-signal-l711.test.ts (4 cas : SIGTERM au run seul → journal et --liste ; SIGTERM au groupe → enveloppe et veilleur ; claude mort sur SIGKILL ; enveloppe tuée), rouge 4/4 sur le code d'avant, vert après ; suite v2 verte (531), budgets run 450/450 et bench 800/800 ; essai à la main d'un SIGHUP au groupe d'un vrai run --fond : trois lignes datées, cause visible dans --liste. Non mesuré : le prochain arrêt réel au compte pro. D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "Suite de revue L711 (run 20261112180310-509174) : la cause écrite est la vraie. Une session arrêtée par son délai écrit « délai de 4 h dépassé : le run a arrêté la session claude (SIGTERM à son enveloppe, code 143) » ; un SIGINT à l'enveloppe sort en 130 et s'écrit SIGINT ; tout autre signal garde son nom exact. Le veilleur d'un run --fond qui reçoit un signal l'écrit puis s'arrête de ce signal, gestionnaires retirés (au plus 1 s laissée au run pour mourir du même signal et que sa ligne soit écrite) ; le run n'est pas arrêté par un signal au veilleur seul. Preuve : v2/test/run-signal-l711.test.ts (8 cas, les 3 nouveaux rouges sur le code d'avant, verts après) ; suite v2 verte (535), tsc sans erreur. D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -70,6 +74,7 @@
   "20261112131550-1911486",
   "20261112141141-2253545",
   "20261112143710-3694893",
-  "20261112172302-1494393"
+  "20261112172302-1494393",
+  "20261112180310-509174"
  ]
 }

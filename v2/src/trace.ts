@@ -8,6 +8,8 @@ import { constants } from 'node:os';
 /** Les lignes qui disent pourquoi un run s'est arrêté commencent ainsi ; --liste montre la dernière d'un run interrompu. */
 export const CAUSE = 'cause d\'arrêt';
 const SIGNAUX = ['SIGHUP', 'SIGTERM', 'SIGINT'] as const;
+/** Ce que le veilleur, signalé, laisse au run pour mourir du même signal et que sa ligne soit écrite, avant de s'arrêter lui-même. */
+export const GRACE_MS = 1000;
 const deux = (n: number) => String(n).padStart(2, '0');
 /** Heure locale à la seconde, avec la date : le journal d'un run dure parfois plusieurs jours (attente de quota). */
 export const horodatage = (d = new Date()) => `${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(d.getDate())} ${deux(d.getHours())}:${deux(d.getMinutes())}:${deux(d.getSeconds())}`;
@@ -36,17 +38,28 @@ export function identite(): string {
  * Le veilleur d'un run --fond : son parent, détaché à sa place. Le run est synchrone de bout en bout (spawnSync pendant toute la session claude) : un
  * gestionnaire de signal dans son processus ne jouerait qu'à la fin de la session, et le run ne s'arrêterait plus au signal. Le run garde donc l'arrêt par
  * défaut, et c'est le veilleur, dont la boucle d'événements est libre, qui écrit le signal reçu par le groupe et le signal qui a arrêté le run.
- * Il ne transmet rien, n'arrête rien, et rend le code du run.
+ * Il ne transmet rien et n'arrête pas le run. Un signal qu'il reçoit l'arrête comme un processus sans gestionnaire, une fois écrit : il laisse au run
+ * au plus GRACE_MS pour mourir du même signal (signal au groupe) et écrire sa ligne, puis se renvoie le signal, gestionnaires retirés (arrêt par défaut).
+ * Sinon il rend le code du run.
  */
 export function veiller(args: string[], env: NodeJS.ProcessEnv, cwd: string, out: (l: string) => void): Promise<number> {
   const run = spawn(process.execPath, [...process.execArgv, process.argv[1], ...args], { cwd, env, stdio: 'inherit' });
-  const recu = (s: string) => () => out(ligneCause(`${s} reçu par le groupe du run (veilleur pid ${process.pid}, run pid ${run.pid ?? '?'})`));
+  let signale: NodeJS.Signals | null = null, grace: NodeJS.Timeout | undefined;
+  const mourir = () => { for (const [x, g] of gestion) process.off(x, g); process.kill(process.pid, signale!); };
+  const recu = (s: NodeJS.Signals) => () => {
+    out(ligneCause(`${s} reçu par le groupe du run (veilleur pid ${process.pid}, run pid ${run.pid ?? '?'})`));
+    if (signale) return; // un second signal pendant la grâce : écrit, l'arrêt vient du premier
+    signale = s;
+    if (run.exitCode !== null || run.signalCode !== null) return mourir();
+    grace = setTimeout(mourir, GRACE_MS);
+  };
   const gestion = SIGNAUX.map((s) => [s, recu(s)] as const);
   for (const [s, g] of gestion) process.on(s, g);
   return new Promise((fini) => run.on('exit', (code, signal) => {
-    for (const [s, g] of gestion) process.off(s, g);
     if (signal) out(ligneCause(`le processus du run (pid ${run.pid}) a reçu ${signal} et s'est arrêté (code ${128 + (constants.signals[signal] ?? 0)})`));
     else out(`fin du processus du run (pid ${run.pid}, ${horodatage()}) : code ${code}`);
+    if (signale) { clearTimeout(grace); return mourir(); } // le veilleur signalé ne rend pas la main : il meurt de son signal
+    for (const [s, g] of gestion) process.off(s, g);
     fini(signal ? 128 + (constants.signals[signal] ?? 0) : code ?? 1);
   }));
 }
@@ -57,8 +70,12 @@ export function causeListe(journal: string | undefined): string {
   return c ? `  · ${c}` : '';
 }
 
-/** Une session claude arrêtée par un signal : l'enveloppe tuée (signal rendu par spawnSync), ou claude mort sur 128 + n ; null sinon. */
-export function causeSession(brut: { code: number; erreur?: string }): string | null {
+const duree = (ms: number) => (ms % 3600_000 === 0 ? `${ms / 3600_000} h` : ms % 60_000 === 0 ? `${ms / 60_000} min` : `${ms / 1000} s`);
+
+/** Une session claude arrêtée : son délai dépassé (l'exécuteur a envoyé SIGTERM à l'enveloppe), l'enveloppe tuée (signal rendu par spawnSync), ou claude
+ * mort sur 128 + n, l'enveloppe rendant ce code pour le signal qu'elle a reçu (TERM 143, INT 130) ; null sinon. */
+export function causeSession(brut: { code: number; erreur?: string; delaiMs?: number }): string | null {
+  if (brut.delaiMs) return ligneCause(`délai de ${duree(brut.delaiMs)} dépassé : le run a arrêté la session claude (SIGTERM à son enveloppe, code ${brut.code})`);
   const sig = /^SIG[A-Z0-9]+$/.test(brut.erreur ?? '') ? brut.erreur! : signalDuCode(brut.code);
   return sig && ligneCause(sig === brut.erreur ? `l'enveloppe de la session claude a été tuée par ${sig}` : `la session claude s'est arrêtée sur ${sig} (code ${brut.code})`);
 }

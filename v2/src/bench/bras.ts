@@ -11,7 +11,7 @@ import { COMPACTAGE, doitCompacter, type Suite } from '../run/suite.js';
 export interface DefBras { nom: string; modele: string; brief: string; settings?: string; aiguillage?: boolean; suite?: Suite } // aiguillage : le bras de cadence run ; suite (L690) : reprend la session de l'étape d'avant // settings : réglages Claude Code du bras (hooks)
 export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number; releve?: Releve; // releve (L703) : ce que claude -p a rendu en dernier pour la dernière session (coût et tokens CUMULÉS depuis son début, reprises et /compact compris), repris par l'étape suivante d'un bras « suite »
   tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string } export type Releve = { session: string; cout: number; tokens: number };
-export type Executeur = (args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }) => { stdout: string; code: number; erreur?: string };
+export type Executeur = (args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }) => { stdout: string; code: number; erreur?: string; delaiMs?: number }; // delaiMs : la session a dépassé ce délai et l'exécuteur l'a arrêtée
 
 export const OUTILS_INTERDITS = ['Bash(kubectl:*)', 'Bash(helm:*)', 'Bash(gh:*)', 'Bash(ssh:*)', 'Bash(scp:*)',
   'Bash(git push:*)', 'Bash(npm publish:*)', 'Bash(raf:*)', 'Bash(cadence:*)'];
@@ -26,11 +26,11 @@ export function chargerBras(racine: string): Record<string, DefBras> {
 export const environnementNeutre = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
   ({ ...env, KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', GH_CONFIG_DIR: '/nonexistent', SSH_AUTH_SOCK: '', AETHERWX_URL: 'http://127.0.0.1:9' });
 
-/** Lance la commande dans son propre groupe de processus et tue le groupe au retour : rien ne survit au bras suivant. L711 : l'enveloppe écrit le signal reçu sur la sortie d'erreur de l'appelant (le journal d'un run --fond, préfixe CAUSE de ../trace.ts) et s'arrête comme avant (HUP : arrêt par défaut, la commande continue). */
+/** Lance la commande dans son propre groupe de processus et tue le groupe au retour : rien ne survit au bras suivant. L711 : l'enveloppe écrit le signal reçu sur la sortie d'erreur de l'appelant (le journal d'un run --fond, préfixe CAUSE de ../trace.ts) et s'arrête comme avant (HUP : arrêt par défaut, la commande continue), avec le code de shell du signal reçu (TERM 143, INT 130). */
 export const creerExecuteur = (commande = 'claude', delaiMs = 4 * 3600_000): Executeur => (args, o) => {
-  const sh = `trace() { printf "cause d'arrêt (%s) : la session claude (enveloppe pid %s, claude pid %s) a reçu %s\\n" "$(date '+%F %T')" $$ "$p" "$1" 2>/dev/null >&3; }; setsid "$0" "$@" 3>&- & p=$!; arret() { trace $1; kill -TERM -- -$p 2>/dev/null; sleep 1; kill -KILL -- -$p 2>/dev/null; exit 143; }; trap 'arret SIGTERM' TERM; trap 'arret SIGINT' INT; trap 'trace SIGHUP; trap - HUP; kill -HUP $$' HUP; wait $p; rc=$?; kill -TERM -- -$p 2>/dev/null; sleep 1; kill -KILL -- -$p 2>/dev/null; exit $rc`;
+  const sh = `trace() { printf "cause d'arrêt (%s) : la session claude (enveloppe pid %s, claude pid %s) a reçu %s\\n" "$(date '+%F %T')" $$ "$p" "$1" 2>/dev/null >&3; }; setsid "$0" "$@" 3>&- & p=$!; arret() { trace $1; kill -TERM -- -$p 2>/dev/null; sleep 1; kill -KILL -- -$p 2>/dev/null; exit $2; }; trap 'arret SIGTERM 143' TERM; trap 'arret SIGINT 130' INT; trap 'trace SIGHUP; trap - HUP; kill -HUP $$' HUP; wait $p; rc=$?; kill -TERM -- -$p 2>/dev/null; sleep 1; kill -KILL -- -$p 2>/dev/null; exit $rc`;
   const r = spawnSync('bash', ['-c', sh, commande, ...args], { cwd: o.cwd, env: o.env, encoding: 'utf8', maxBuffer: 256 << 20, timeout: delaiMs, stdio: ['pipe', 'pipe', 'pipe', 2] });
-  return { stdout: r.stdout ?? '', code: r.status ?? 1, erreur: r.error?.message ?? (r.signal ?? undefined) };
+  return { stdout: r.stdout ?? '', code: r.status ?? 1, erreur: r.error?.message ?? (r.signal ?? undefined), ...((r.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT' ? { delaiMs } : {}) };
 };
 export const executeurClaude: Executeur = creerExecuteur();
 

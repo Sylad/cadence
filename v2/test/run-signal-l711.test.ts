@@ -3,7 +3,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cmdRun } from '../src/run/cli.js';
+import { creerExecuteur } from '../src/bench/bras.js';
 import { executerRun } from '../src/run/run.js';
+import { causeSession } from '../src/trace.js';
 import { attendre, depot, etats, fauxClaudeBin, vivant } from './run-outils.js';
 import { dossierTemp } from './temp.js';
 
@@ -60,7 +62,19 @@ describe('le journal d\'un run --fond dit qui il était et ce qui l\'a arrêté 
       await attendre(() => (/le processus du run .* a reçu SIGTERM/.test(lu()) ? true : undefined), 5000, `pas de ligne du run :\n${lu()}`);
       expect(lu()).toMatch(new RegExp(`^cause d'arrêt ${HEURE} : la session claude \\(enveloppe pid \\d+, claude pid ${pidClaude}\\) a reçu SIGTERM$`, 'm'));
       expect(lu()).toMatch(new RegExp(`^cause d'arrêt ${HEURE} : SIGTERM reçu par le groupe du run \\(veilleur pid ${pgid}, run pid ${pidRun}\\)$`, 'm'));
+      await attendre(() => (vivant(pgid) ? undefined : true), 5000, 'le veilleur vit encore');
     } finally { await finir(); }
+  });
+
+  it('SIGTERM au veilleur seul : il l\'écrit puis s\'arrête comme sans gestionnaire, le run continue', async () => {
+    const { pidRun, pidClaude, lu, finir } = await runFond();
+    try {
+      const veilleur = Number(/ppid (\d+)/.exec(lu())![1]);
+      process.kill(veilleur, 'SIGTERM');
+      await attendre(() => (vivant(veilleur) ? undefined : true), 5000, `le veilleur a survécu à SIGTERM :\n${lu()}`);
+      expect(lu()).toMatch(new RegExp(`^cause d'arrêt ${HEURE} : SIGTERM reçu par le groupe du run \\(veilleur pid ${veilleur}, run pid ${pidRun}\\)$`, 'm'));
+      expect([vivant(pidRun), vivant(pidClaude)]).toEqual([true, true]); // il n'arrête rien d'autre que lui
+    } finally { await finir(); await attendre(() => (vivant(pidRun) ? undefined : true), 20_000, 'le run ne s\'est pas terminé'); }
   });
 });
 
@@ -80,5 +94,28 @@ describe('une session claude arrêtée par un signal (L711)', () => {
   it('l\'enveloppe elle-même tuée (signal rendu par spawnSync) : le run le dit ; une fin ordinaire n\'écrit aucune cause', () => {
     expect(jouer({ stdout: '', code: 1, erreur: 'SIGHUP' }).sortie).toMatch(/^cause d'arrêt \(.*\) : l'enveloppe de la session claude a été tuée par SIGHUP$/m);
     expect(jouer({ stdout: '', code: 1 }).sortie).not.toContain('cause d\'arrêt');
+  });
+});
+
+describe('la cause écrite est la vraie : délai, SIGINT, signal exact (L711, suite de revue)', () => {
+  const o = { cwd: process.cwd(), env: process.env };
+  const tuer = (sig: string) => creerExecuteur('bash')(['-c', `kill -${sig} $PPID; sleep 5`], o); // claude qui signale son enveloppe
+
+  it('délai dépassé : « délai de N h dépassé », pas un SIGTERM venu d\'ailleurs', () => {
+    const brut = creerExecuteur('sleep', 1500)(['10'], o);
+    expect(brut).toMatchObject({ code: 143, delaiMs: 1500 });
+    expect(causeSession(brut)).toMatch(new RegExp(`^cause d'arrêt ${HEURE} : délai de 1.5 s dépassé : le run a arrêté la session claude \\(SIGTERM à son enveloppe, code 143\\)$`));
+    expect(causeSession({ code: 143, erreur: 'spawnSync bash ETIMEDOUT', delaiMs: 4 * 3600_000 })).toContain('délai de 4 h dépassé');
+  });
+
+  it('SIGINT à l\'enveloppe : SIGINT (code 130), plus SIGTERM', () => {
+    const brut = tuer('INT');
+    expect(brut.code).toBe(130);
+    expect(causeSession(brut)).toMatch(/: la session claude s'est arrêtée sur SIGINT \(code 130\)$/);
+  });
+
+  it('un autre signal : le signal exact', () => {
+    expect(causeSession(tuer('TERM'))).toMatch(/: la session claude s'est arrêtée sur SIGTERM \(code 143\)$/);
+    expect(causeSession(tuer('HUP'))).toMatch(/: l'enveloppe de la session claude a été tuée par SIGHUP$/);
   });
 });

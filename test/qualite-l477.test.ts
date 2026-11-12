@@ -456,6 +456,15 @@ describe('L477 — --migrer et la porte', () => {
     expect(JSON.parse(lire(dir))).toEqual(allege);
   });
 
+  it('R2 — clé fabriquée pour un fichier neuf qui ne mesure rien (700, total de la base 1050 pour 1000 au départ) : la porte refuse sur le total', () => {
+    const dir = tempDir();
+    ecrire(dir, { 'src/cli.ts': lignes(350, 650), 'src/x.ts': 'const a = 1;' });
+    writeFileSync(join(dir, BASELINE), JSON.stringify(carte({ 'src/cli.ts': 350, 'src/x.ts': 700 })));
+    const r = appliquer(dir, 'verifier', carte({ 'src/cli.ts': 350 }), ref);
+    expect(r.code).toBe(1);
+    expect(r.texte).toContain('(total, tous fichiers) : 1000 → 1050');
+  });
+
   it('R12 — migration refusée : code 1, base inchangée, chaque clé en cause nommée avec « avant → après »', () => {
     const dir = tempDir();
     coupe(dir);

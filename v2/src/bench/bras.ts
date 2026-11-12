@@ -26,10 +26,10 @@ export function chargerBras(racine: string): Record<string, DefBras> {
 export const environnementNeutre = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
   ({ ...env, KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', GH_CONFIG_DIR: '/nonexistent', SSH_AUTH_SOCK: '', AETHERWX_URL: 'http://127.0.0.1:9' });
 
-/** Lance la commande dans son propre groupe de processus et tue le groupe au retour : rien ne survit au bras suivant. */
+/** Lance la commande dans son propre groupe de processus et tue le groupe au retour : rien ne survit au bras suivant. L711 : l'enveloppe écrit le signal reçu sur la sortie d'erreur de l'appelant (le journal d'un run --fond, préfixe CAUSE de ../trace.ts) et s'arrête comme avant (HUP : arrêt par défaut, la commande continue). */
 export const creerExecuteur = (commande = 'claude', delaiMs = 4 * 3600_000): Executeur => (args, o) => {
-  const sh = 'setsid "$0" "$@" & p=$!; trap \'kill -TERM -- -$p 2>/dev/null; sleep 1; kill -KILL -- -$p 2>/dev/null; exit 143\' TERM INT; wait $p; rc=$?; kill -TERM -- -$p 2>/dev/null; sleep 1; kill -KILL -- -$p 2>/dev/null; exit $rc';
-  const r = spawnSync('bash', ['-c', sh, commande, ...args], { cwd: o.cwd, env: o.env, encoding: 'utf8', maxBuffer: 256 << 20, timeout: delaiMs });
+  const sh = `trace() { printf "cause d'arrêt (%s) : la session claude (enveloppe pid %s, claude pid %s) a reçu %s\\n" "$(date '+%F %T')" $$ "$p" "$1" 2>/dev/null >&3; }; setsid "$0" "$@" 3>&- & p=$!; arret() { trace $1; kill -TERM -- -$p 2>/dev/null; sleep 1; kill -KILL -- -$p 2>/dev/null; exit 143; }; trap 'arret SIGTERM' TERM; trap 'arret SIGINT' INT; trap 'trace SIGHUP; trap - HUP; kill -HUP $$' HUP; wait $p; rc=$?; kill -TERM -- -$p 2>/dev/null; sleep 1; kill -KILL -- -$p 2>/dev/null; exit $rc`;
+  const r = spawnSync('bash', ['-c', sh, commande, ...args], { cwd: o.cwd, env: o.env, encoding: 'utf8', maxBuffer: 256 << 20, timeout: delaiMs, stdio: ['pipe', 'pipe', 'pipe', 2] });
   return { stdout: r.stdout ?? '', code: r.status ?? 1, erreur: r.error?.message ?? (r.signal ?? undefined) };
 };
 export const executeurClaude: Executeur = creerExecuteur();

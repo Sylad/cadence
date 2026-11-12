@@ -10,6 +10,7 @@ import { parse } from 'yaml';
 import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, type Executeur } from '../bench/bras.js';
 import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun } from './aiguillage.js';
 import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
+import { causeSession } from '../trace.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
@@ -22,7 +23,7 @@ const BASCULE_FABLE = 'La limite Opus est atteinte : tu continues sur Fable. Rep
 
 export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
 export interface Etat { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string; pieces: string[];
-  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota }
+  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
@@ -70,8 +71,7 @@ function verrouiller(e: Etat): void {
 function rendre(e: Etat, o: Opts): void {
   rmSync(fichierTenu(e.repo), { force: true });
   if (!existsSync(join(e.repo, PLAN_EN_ATTENTE))) return;
-  const r = spawnSync(process.execPath, [o.raf ?? RAF, 'attente', 'appliquer'], { cwd: e.repo, encoding: 'utf8' });
-  const sortie = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
+  const r = spawnSync(process.execPath, [o.raf ?? RAF, 'attente', 'appliquer'], { cwd: e.repo, encoding: 'utf8' }), sortie = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
   o.out(r.status === 0 ? sortie : `plan en attente non appliqué (${sortie || r.error?.message || `code ${r.status}`}) : raf attente appliquer à la main`);
 }
 
@@ -106,10 +106,10 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false): boolean {
   const exec = o.exec ?? creerExecuteur('claude', 4 * 3600_000);
   // L699 : le modèle est celui du lancement, gardé dans l'état (une reprise par --reponse ne le change pas) ; un état d'avant L699 n'en a pas : opus.
   // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet
-  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k))), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k) && k !== 'CADENCE_RUN_JOURNAL')), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
   const interdits = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
   const brut = exec(['-p', prompt, ...(neuve ? ['--session-id', e.session] : e.session ? ['--resume', e.session] : []), ...argsClaude({ ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }, e.worktree, interdits)], { cwd: e.worktree, env });
-  const r = lire(brut);
+  const r = lire(brut), cause = causeSession(brut); if (cause) o.out(cause); // L711 : une session arrêtée par un signal le dit dans le journal, avant la suite habituelle
   e.session = r.session || e.session; e.cout_usd += r.cout;
   // D-15 : une fin de quota n'est pas un échec. La limite Opus seule bascule sur fable dans la même session ; la limite hebdo bloque tous les modèles : on attend.
   const q = reconnaitreQuota(r.resultat || brut.stdout, (o.maintenant ?? (() => new Date()))());
@@ -148,8 +148,7 @@ function suite(e: Etat, o: Opts): Etat {
     o.out('porte rouge : reprise de la session pour corriger');
     if (!session(e, `La porte complète est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, puis dis « fini ».`, o)) return fin(e, o);
   }
-  const br = git(e.worktree, 'rev-parse', '--abbrev-ref', 'HEAD');
-  const actuelle = essaiGit(e.repo, 'symbolic-ref', '-q', '--short', 'HEAD').stdout.trim();
+  const br = git(e.worktree, 'rev-parse', '--abbrev-ref', 'HEAD'), actuelle = essaiGit(e.repo, 'symbolic-ref', '-q', '--short', 'HEAD').stdout.trim();
   const m = actuelle === e.cible ? essaiGit(e.repo, 'merge', '-q', '--ff-only', br) : essaiGit(e.repo, 'fetch', '-q', '.', `${br}:${e.cible}`);
   if (m.status !== 0) { e.etat = 'refus-integration'; e.detail = `${m.stderr}`.trim() || 'avance rapide impossible'; return fin(e, o); }
   e.integre = git(e.repo, 'rev-parse', '--short', e.cible); e.etat = 'integre'; e.detail = '';
@@ -170,7 +169,7 @@ function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
 }
 
 export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; registre?: string; modele?: string; exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string;
-  maintenant?: () => Date; attendre?: ((ms: number) => void) | null }): Etat {
+  maintenant?: () => Date; attendre?: ((ms: number) => void) | null; journal?: string }): Etat {
   const modele = modeleRun(a.modele); // avant le worktree : un modèle inconnu ne crée rien, une entrée --registre absente non plus
   const repo = git(a.repo, 'rev-parse', '--show-toplevel'), cible = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD');
   if (a.registre && a.registre !== 'humaine') entreeCommitee(repo, a.registre);
@@ -181,7 +180,7 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   copierDeps(repo, worktree);
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
-    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, ...(a.lot ? { lot: a.lot } : {}), session: crypto.randomUUID(), cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
+    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, ...(a.lot ? { lot: a.lot } : {}), ...(a.journal ? { journal: a.journal } : {}), session: crypto.randomUUID(), cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
   sauver(e);
   verrouiller(e);
   a.out(`cadence run ${id} : session ${modele[0].toUpperCase()}${modele.slice(1)} en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);

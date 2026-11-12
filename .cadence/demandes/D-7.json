@@ -44,6 +44,10 @@
   {
    "date": "2026-11-12",
    "texte": "Suite de revue L710 (run 20261112143710-3694893) : cadence lead hold refuse (code 2, rien d'inscrit) une étiquette qui nomme le lot ou l'id d'un cadence run vivant, qui se compte déjà (mesuré en revue : 1 run + hold run-L710 → « 1 sur 3 » au lieu de 2) ; le lot du run est écrit dans son état ; la skill lead, docs/lead.md et docs/cadence-hud.md citent les runs dans les créneaux ; slotsLine appelle outsideSessions. Preuve : test/lead-hold-run-l710.test.ts (R1 et R3 rouges sans le refus, verts avec), v2/test/run-creneau-l710.test.ts ; suite v2 verte (527), suite racine verte sauf les deux tests du cliquet qualité, corrigés ensuite (node scripts/qualite.mjs --contre main : rien n'empire) et rejoués verts. Non vérifié : un vrai cadence run face à un vrai lead hold. D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "L711 fait (run 20261112172302-1494393, issue #55 du compte pro) : le journal d'un cadence run --fond dit qui était le run et ce qui l'a arrêté. Au lancement : pid, pgid, sid, ppid et cgroup (cgroup seulement si /proc/self/cgroup existe). Chaque SIGHUP, SIGTERM ou SIGINT reçu par le groupe du run, par l'enveloppe de sa session claude, ou qui a arrêté le run, s'écrit avec l'heure sur une ligne « cause d'arrêt » ; une session claude morte sur un signal aussi, avec son code. --liste ajoute à un run interrompu la dernière de ces lignes. Arrêt inchangé : le run est synchrone, donc un gestionnaire de signal dans son processus attendrait la fin de la session ; --fond détache plutôt un veilleur qui lance le run et écrit à sa place (v2/src/trace.ts). Doc : docs/v2/2026-11-09-cadence-run.md (ce qu'on joint à une issue : le journal du run). Preuve : v2/test/run-signal-l711.test.ts (4 cas : SIGTERM au run seul → journal et --liste ; SIGTERM au groupe → enveloppe et veilleur ; claude mort sur SIGKILL ; enveloppe tuée), rouge 4/4 sur le code d'avant, vert après ; suite v2 verte (531), budgets run 450/450 et bench 800/800 ; essai à la main d'un SIGHUP au groupe d'un vrai run --fond : trois lignes datées, cause visible dans --liste. Non mesuré : le prochain arrêt réel au compte pro. D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -55,7 +59,8 @@
   "L682",
   "L706",
   "L709",
-  "L710"
+  "L710",
+  "L711"
  ],
  "runs": [
   "20261111190444-2449989",
@@ -64,6 +69,7 @@
   "20261112113406-1675645",
   "20261112131550-1911486",
   "20261112141141-2253545",
-  "20261112143710-3694893"
+  "20261112143710-3694893",
+  "20261112172302-1494393"
  ]
 }

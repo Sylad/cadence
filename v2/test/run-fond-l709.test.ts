@@ -1,38 +1,17 @@
 import { spawn } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cmdRun } from '../src/run/cli.js';
 import { executerRun, repondreRun, type Etat } from '../src/run/run.js';
 import { prendreVerrou, rendreVerrou } from '../src/verrou.js';
-import { commite, depot, fauxClaude } from './run-outils.js';
+import { attendre, commite, depot, etats, fauxClaude, fauxClaudeBin, vivant } from './run-outils.js';
 import { dossierTemp } from './temp.js';
 
 // L709 (issue #55 du compte pro) : deux runs --fond morts avec la session Claude Code qui les avait lancés, et rien pour les reprendre.
 const FOND = join(import.meta.dirname, 'fond');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const ioTest = (cwd: string) => { const sortie: string[] = []; return { cwd, env: {}, now: () => new Date(), out: (l: string) => sortie.push(l), err: (l: string) => sortie.push(l), sortie }; };
-const vivant = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
-async function attendre<T>(quoi: () => T | undefined, ms: number, sinon: string): Promise<T> {
-  for (const fin = Date.now() + ms; Date.now() < fin; await new Promise((r) => setTimeout(r, 100))) { const v = quoi(); if (v !== undefined) return v; }
-  throw new Error(sinon);
-}
-const etats = (repo: string) => { const d = join(dirname(repo), '.cadence-run'); return existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(d, f), 'utf8')) as Etat) : []; };
-
-/** Faux claude : note son pid, ses arguments et son environnement, attend le signal du test, puis commite fait.txt et rend l'id de --session-id. */
-function fauxClaudeBin(trace: string): string {
-  const bin = join(dossierTemp('fond-bin-'), 'claude');
-  writeFileSync(bin, `#!/bin/bash
-sid=; prec=; for a in "$@"; do [ "$prec" = --session-id ] && sid=$a; prec=$a; done
-printf '%s\\n' "$@" > "${trace}/args"; env > "${trace}/env"; echo $$ > "${trace}/claude.pid"
-for i in $(seq 300); do [ -f "${trace}/go" ] && break; sleep 0.1; done
-echo ok > fait.txt; git add -A; git -c user.email=t@t -c user.name=t commit -qm 'ajoute fait.txt'
-printf '{"session_id":"%s","total_cost_usd":0,"result":"fini","subtype":"success"}' "$sid"
-`);
-  chmodSync(bin, 0o755);
-  return dirname(bin);
-}
-
 describe('cadence run --fond survit à la session qui le lance (L709, issue #55)', () => {
   it('lancé par une « session » dont on tue tout le groupe : le run et sa session vivent, sans lien avec la lanceuse, et le run va au bout', async () => {
     const repo = depot(), trace = dossierTemp('fond-trace-'), bin = fauxClaudeBin(trace);

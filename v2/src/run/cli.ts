@@ -6,6 +6,7 @@ import type { Executeur } from '../bench/bras.js';
 import { MODELES, modeleRun } from './aiguillage.js';
 import { etatVu, executerRun, occupantRun, repondreRun, type Etat } from './run.js';
 import { heureLocale, type Quota } from './quota.js';
+import { causeListe, identite, veiller } from '../trace.js';
 
 /** D-15 : ce que --liste dit d'un run en quota ; D-18 : une reprise seule seulement si un processus vivant attend, sinon l'attente est arrêtée. */
 const quotaListe = (e: Etat, q: Quota, l = `limite ${q.limite === 'hebdo' ? 'hebdo' : 'Opus'}`, p = q.reprise ? occupantRun(e.fichier) : null) => (!q.reprise ? `${l}, heure de reprise illisible : cadence run --reponse`
@@ -21,7 +22,7 @@ export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L1
   quota (D-15) : une session qui finit sur « You've hit your weekly limit · resets … » met le run en état quota ; il reprend seul la même session après l'heure dite ;
            tant que son processus attend, --reponse est refusé (kill <pid> d'abord) ; processus mort, --liste dit « attente arrêtée » : --reponse le reprend
            « You've hit your Opus limit » bascule sur fable dans la même session (jamais sur la limite hebdo, qui bloque tous les modèles)
-  --fond : le run se détache (il survit à la session qui l'a lancé), son journal est dans ../.cadence-run/
+  --fond : le run se détache (il survit à la session qui l'a lancé), son journal est dans ../.cadence-run/ ; L711 : pid, pgid, sid, ppid, cgroup du run et chaque signal reçu
   L709 : ses sessions claude ne gardent aucun lien avec la session Claude Code lanceuse (pid, socket, auth par l'hôte) ; l'id de session est dans l'état dès le lancement`;
 
 /** `exec` : l'exécuteur de la session, pour les tests (claude par défaut). */
@@ -32,10 +33,10 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
     if (a[0] === '--liste') {
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
       const etats = existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(d, f), 'utf8')) as Etat).filter((e) => e.repo === racine) : [];
-      for (const e of etats) out(`${e.id}  ${etatVu(e)}${etatVu(e) === 'interrompu' ? ` (reprendre : cadence run --reponse ${e.id} "reprends")` : ''}  ${e.demande.split('\n')[0].slice(0, 80)}${e.etat === 'quota' && e.quota ? `  · ${quotaListe(e, e.quota)}` : ''}`);
-      if (!etats.length) out('aucun run');
-      return 0;
+      for (const e of etats) out(`${e.id}  ${etatVu(e)}${etatVu(e) === 'interrompu' ? ` (reprendre : cadence run --reponse ${e.id} "reprends")` : ''}  ${e.demande.split('\n')[0].slice(0, 80)}${e.etat === 'quota' && e.quota ? `  · ${quotaListe(e, e.quota)}` : ''}${etatVu(e) === 'interrompu' ? causeListe(e.journal) : ''}`);
+      if (!etats.length) out('aucun run'); return 0;
     }
+    if (a[0] === '--veilleur') return veiller(['run', ...a.slice(1)], io.env, io.cwd, out); // L711 : le parent d'un run --fond, lancé par --fond seul
     if (a[0] === '--reponse') {
       if (!a[1] || !a[2]) { io.err('usage : cadence run --reponse <id> "<texte>"'); return 2; }
       return repondreRun(a[1], io.cwd, a.slice(2).join(' '), { out }).etat === 'integre' ? 0 : 1;
@@ -58,13 +59,13 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
     let modele: string; // L699 : l'option l'emporte sur la variable ; une valeur inconnue est refusée ici, avant le worktree et avant --fond
     try { modele = modeleRun(choix, io.env.CADENCE_RUN_MODELE); } catch (e) { io.err((e as Error).message); return 2; }
     if (a.includes('--fond')) { // relancé détaché, sans --fond : vécu au pro le 10-11, une session de lot morte avec celle qui l'avait lancée
-      const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
-      mkdirSync(d, { recursive: true });
+      const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run'); mkdirSync(d, { recursive: true });
       const journal = join(d, `fond-${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.log`), fd = openSync(journal, 'a');
-      spawn(process.execPath, [...process.execArgv, process.argv[1], 'run', ...a.filter((x) => x !== '--fond')], { cwd: io.cwd, detached: true, stdio: ['ignore', fd, fd] }).unref();
+      spawn(process.execPath, [...process.execArgv, process.argv[1], 'run', '--veilleur', ...a.filter((x) => x !== '--fond')], { cwd: io.cwd, detached: true, stdio: ['ignore', fd, fd], env: { ...process.env, CADENCE_RUN_JOURNAL: journal } }).unref(); // L711 : un veilleur lance le run
       out(`cadence run lancé en arrière-plan ; journal : ${journal} ; état : cadence run --liste`);
       return 0;
     }
-    return executerRun({ repo: io.cwd, demande: mots.join(' '), pieces, taille, complet, lot, registre: registres[0], modele, exec, out, sansPorte }).etat === 'integre' ? 0 : 1;
+    if (io.env.CADENCE_RUN_JOURNAL) out(identite()); // L711 : au lancement d'un run --fond, de quoi savoir au prochain arrêt inexpliqué où il vivait
+    return executerRun({ repo: io.cwd, demande: mots.join(' '), pieces, taille, complet, lot, registre: registres[0], modele, exec, out, sansPorte, journal: io.env.CADENCE_RUN_JOURNAL || undefined }).etat === 'integre' ? 0 : 1;
   } catch (e) { io.err(String((e as Error).message ?? e)); return 1; }
 }

@@ -3285,10 +3285,12 @@ lots:
     created: 2026-11-11
   - id: L706
     title: "Banc séquence : une demande qui cite un fichier hors des pièces de son étape est refusée au chargement de la séquence (D-7 ; vécu 10 au 12-11 : aether-b68-court citait la pièce d'aether-b68, 4 passages rouges sur une fausse fuite) ; test sur ce cas ; mesure : 0 passage rouge pour une fuite de pièce déclarée"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-12
     started: 2026-11-12
+    review: { date: 2026-11-12, verdict: "conforme (revue Sonnet du 12-11) : 0 bloquant ; tests ciblés 79/79 ; vrai cas vérifié par le lead (les séquences actuelles se chargent, l'ancienne demande fautive est refusée avec un message clair) ; mineur : texte lu brut, un chemin absolu vers le dépôt cible dans une demande serait refusé", commit: 6298120965ddaa164072df53d8fb0741089ea929 }
+    finished: 2026-11-12
   - id: L707
     title: "Cliquet : une clé fabriquée à mesure nulle sous le total du départ ({cli.ts:350, x.ts:650}) passe en code 0 et laisse x.ts grossir au lot suivant — décider (figer à l'intégration, ou état stocké) ; vu par la revue Fable de L477 le 12-11, vrai avant L477 ; rapport tmp/revue2-L477.md"
     status: todo

@@ -3302,6 +3302,16 @@ lots:
     estimate: 0.25
     created: 2026-11-12
     started: 2026-11-12
+  - id: L709
+    title: "cadence run --fond survit à la session Claude Code qui le lance (détaché de son groupe de processus : setsid ou équivalent) ; --liste signale un run dont le processus est mort comme « interrompu » au lieu de « en-cours » ; l'id de session est écrit dans l'état dès le lancement (--session-id), pour que --reponse reprenne aussi un run mort pendant sa première session ; test qui tue la session lanceuse (issue #55 du compte pro : 2 runs perdus, 3 h de créneau)"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-12
+  - id: L710
+    title: "Les runs cadence run en cours comptent dans les créneaux de cadence lead tour et cadence orchestrate --status (et dans « sessions en cours ») ; un run mort ne compte pas (issue #55 du compte pro : « créneaux libres : 3 sur 3 » avec deux runs vivants)"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-12
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

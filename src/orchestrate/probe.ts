@@ -34,7 +34,7 @@ interface ProbeMoment {
 }
 
 /** Le dossier du cycle d'un lot : ses étapes écrivent l'état que d'autres lots lisent (L654 : `handBack` rendait avant d'écrire `maquetteConstats`). */
-const CYCLE_DIR = 'src/orchestrate/cycle/';
+export const CYCLE_DIR = 'src/orchestrate/cycle/';
 
 /** Le diff du lot touche-t-il le cycle (L663) ? */
 export const touchesCycle = (files: ReadonlySet<string>): boolean => [...files].some((f) => f.startsWith(CYCLE_DIR));

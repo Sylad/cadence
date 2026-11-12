@@ -22,7 +22,7 @@ export function cmdAdd(c: Ctx): number | Promise<number> {
   const { rest, values, io, today, root, loadPlan, refuseLongTitle, need } = c;
   need(1, 'add "titre"');
   const plan = loadPlan();
-  const id = addLot(plan, values, rest.join(' '), today, { refuseLongTitle, declared: declaredFor(root) });
+  const id = addLot(plan, values, rest.join(' '), today, { refuseLongTitle, declared: declaredFor(root), root, notice: io.err });
   plan.save();
   io.out(id);
   warnIntegrating(root, io.err);

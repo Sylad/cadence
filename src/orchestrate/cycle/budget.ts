@@ -87,8 +87,25 @@ function topUpBudget(c: LotCtx): boolean {
   return true;
 }
 
-/** La passe fix que le budget du lot refuse, après le prélèvement de la dernière passe (L584) : toute autre étape n'est pas concernée. */
-export const fixRefused = (c: LotCtx, kind: SessionKind): boolean => kind === 'fix' && !fixAffordable(c.lot) && !topUpBudget(c);
+/**
+ * La correction avant l'escalade (L682) : une passe fix que les passes ordinaires ne paient plus prend le manque sur la part retenue pour l'escalade, quand
+ * cette part le couvre. L676 : 559 676 / 600 000 tokens comptés, 175 000 retenus pour l'escalade sur 775 000, lot rendu « correction non jouée (budget) »
+ * avec ses majeurs alors que 215 k restaient. La part restante peut ne plus payer l'escalade : `toFix` la dit alors « non jouée », la correction est faite.
+ * Ni pendant la passe des mineurs (ils deviennent des propositions), ni une fois l'escalade engagée (sa part est déjà libérée). Vrai si la part a été réduite.
+ */
+function takeFromEscalation(c: LotCtx): boolean {
+  const l = c.lot;
+  const held = heldForEscalation(l);
+  const shortfall = fixShortfall(l);
+  if (!shortfall || l.minorFix || shortfall > held) return false;
+  l.escalationReserve = held - shortfall;
+  l.warnings.push(`correction payée sur la part de l'escalade : ${shortfall} token(s) pris, ${l.escalationReserve} encore retenus (la correction passe avant l'escalade, L682)`);
+  c.wave.log(`${lotKey(l.project, l.lot)} · ${shortfall} token(s) de la part de l'escalade pris pour la correction et la revue courte (${l.escalationReserve} encore retenus)`);
+  return true;
+}
+
+/** La passe fix que le budget du lot refuse, après le prélèvement de la dernière passe (L584) puis la part de l'escalade (L682) : toute autre étape n'est pas concernée. */
+export const fixRefused = (c: LotCtx, kind: SessionKind): boolean => kind === 'fix' && !fixAffordable(c.lot) && !topUpBudget(c) && !takeFromEscalation(c);
 
 /** Cause d'une suspension demandée par `--stop-after-current` (L79). */
 export const STOP_REQUESTED = 'arrêt demandé (--stop-after-current)';

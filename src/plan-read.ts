@@ -32,6 +32,9 @@ function readDelivered(raw: unknown): Pick<Lot, 'delivered'> {
   return isDay(date) && typeof sha === 'string' && sha.trim() !== '' ? { delivered: { date, sha: sha.trim() } } : {};
 }
 
+/** L'estimation d'un lot sans `estimate:` lisible, et celle que `raf add` écrit sans `--estimate`, en jours. */
+export const DEFAULT_ESTIMATE = 1;
+
 /** L'estimation d'un lot : celle du plan, ou 1 jour par défaut avec la marque `unestimated` (L467). */
 /** `spec:` d'un lot : `true`, `false`, ou `revue` (L650, spec vraie d'un lot dont le sujet est la revue) ; autre chose est un problème. */
 function readSpec(raw: unknown, problems: string[]): { spec?: true; revue?: true } {
@@ -43,7 +46,7 @@ function readSpec(raw: unknown, problems: string[]): { spec?: true; revue?: true
 }
 
 function readEstimate(v: unknown): { estimate: number; unestimated?: true } {
-  return typeof v === 'number' && v > 0 ? { estimate: v } : { estimate: 1, unestimated: true };
+  return typeof v === 'number' && v > 0 ? { estimate: v } : { estimate: DEFAULT_ESTIMATE, unestimated: true };
 }
 
 export function normalizeLot(raw: Record<string, unknown>, problems: string[] = []): Lot {

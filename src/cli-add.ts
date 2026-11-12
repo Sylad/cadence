@@ -1,9 +1,13 @@
 // `raf add` : les contrôles des options et l'ajout du lot ou de la sous-tâche (sorti de cli.ts).
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { invalidResource, RafError, type Plan, type Screen } from './plan.js';
+import { DEFAULT_ESTIMATE } from './plan-read.js';
 import type { Day } from './dates.js';
 import { parseSet } from './plan-extras.js';
 import { parseWindow } from './plan-window.js';
 import { citedResources, type Resources } from './resources.js';
+import { CYCLE_DIR } from './orchestrate/probe.js';
 
 /** Les options de `raf add` telles que `parseArgs` les rend. */
 interface AddValues {
@@ -45,13 +49,34 @@ function usesOf(option: string | undefined, title: string, declared: Resources):
 }
 
 /**
+ * Le titre cite-t-il un chemin du cycle d'un lot (`src/orchestrate/cycle/` ou un fichier dessous), dans un dépôt qui porte ce dossier (L682) ? Un mot du titre
+ * qui commence par le dossier, « / » final facultatif : « src/orchestrate/cycle.ts » n'en est pas.
+ */
+function citesCycle(title: string, root: string): boolean {
+  const bare = CYCLE_DIR.slice(0, -1);
+  return existsSync(join(root, CYCLE_DIR)) && (title.match(/[\w./*-]+/g) ?? []).some((w) => w.startsWith(CYCLE_DIR) || (w.startsWith(bare) && /^\.*$/.test(w.slice(bare.length))));
+}
+
+/**
+ * L'estimate d'un lot qui touche le cycle est doublée (L682) : ses lots dépassent l'estimate (L676 : 0,5 j, 559 676 / 600 000 tokens, rendu au lead avec ses majeurs
+ * sans correction ; « correction non jouée » dans 7 vagues). Le budget du lot, dérivé de l'estimate, suit. Sans `--estimate`, l'estimate par défaut est doublée.
+ */
+function estimateFor(estimate: number | undefined, title: string, root: string, notice: (line: string) => void): number | undefined {
+  if (!citesCycle(title, root)) return estimate;
+  const base = estimate ?? DEFAULT_ESTIMATE;
+  notice(`estimate doublée : ${base} → ${base * 2} j (le titre cite ${CYCLE_DIR}, dont les lots dépassent leur estimate, L682)`);
+  return base * 2;
+}
+
+/**
  * Ajoute un lot (ou, avec `--parent`, une sous-tâche) et rend son identifiant ; le plan n'est pas encore écrit. Un lot reçoit aussi, après ses `--uses`, les ressources
  * à chemins de `declared` que son titre cite (L671) : il n'attend plus l'intégration d'un lot plus ancien qui touche la même page, la file de la vague (L551) le tient.
  */
-export function addLot(plan: Plan, values: AddValues, title: string, today: Day, env: { refuseLongTitle: (text: string) => void; declared: Resources }): string {
+export function addLot(plan: Plan, values: AddValues, title: string, today: Day, env: { refuseLongTitle: (text: string) => void; declared: Resources; root: string; notice: (line: string) => void }): string {
   if (values.parent) return addSubTask(plan, values.parent, values, title);
-  const estimate = values.estimate === undefined ? undefined : Number(values.estimate);
-  if (estimate !== undefined && !(estimate > 0)) throw new RafError(`estimation invalide : ${values.estimate}`);
+  const given = values.estimate === undefined ? undefined : Number(values.estimate);
+  if (given !== undefined && !(given > 0)) throw new RafError(`estimation invalide : ${values.estimate}`);
+  const estimate = estimateFor(given, title, env.root, env.notice);
   const after = values.after ? values.after.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
   const every = values.every === undefined ? undefined : Number(values.every);
   if (every !== undefined && !(Number.isInteger(every) && every > 0)) throw new RafError(`périodicité invalide : ${values.every} (un nombre entier de jours)`);

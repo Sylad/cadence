@@ -7,7 +7,7 @@ import { assertFilesUnchanged, assertPlanUnchanged, withPlanLock } from './plan-
 import { ON_WRITE_TIMEOUT_MS, failureMessage, noticeHookFiles } from './plan-onwrite.js';
 import { Document, isMap, isSeq, parseDocument, YAMLMap, YAMLSeq } from 'yaml';
 import { isDay, toDay, type Day } from './dates.js';
-import { normalizeLot } from './plan-read.js';
+import { DEFAULT_ESTIMATE, normalizeLot } from './plan-read.js';
 import { foreignLots } from './plan-foreign.js';
 import { currentState, defaultState, rebase, stateProblems, transitionProblem, type StateModel } from './plan-states.js';
 import { DOCS_OK_FILE, readDocsOkFile } from './docs-ok-file.js';
@@ -716,7 +716,7 @@ export class Plan {
     const entry: Record<string, unknown> = { id, title };
     if (opts.under !== undefined) entry.parent = opts.under;
     if (pub !== undefined) entry.public = pub;
-    Object.assign(entry, { status: 'todo', estimate: opts.estimate ?? 1 }, trueFlags({ quickwin: opts.quickwin, visible: opts.visible }));
+    Object.assign(entry, { status: 'todo', estimate: opts.estimate ?? DEFAULT_ESTIMATE }, trueFlags({ quickwin: opts.quickwin, visible: opts.visible }));
     if (opts.screen) entry.screen = opts.screen;
     Object.assign(entry, trueFlags({ spec: opts.spec, local: opts.local }));
     if (opts.every !== undefined) entry.every = opts.every;

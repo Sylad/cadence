@@ -24,6 +24,10 @@
   {
    "date": "2026-11-11",
    "texte": "Rectification du lead : la précision précédente (run de L694) dit « L695, L696 et L698 restent à faire » ; c'est faux, ils sont terminés et en service (L695 le 10-11, L696 et L698 le 11-11). Restent liés à D-7 : L679, L702, les coupes du socle (lot à ouvrir) et les erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "L682 fait (run 20261112081458-4076309) : une passe fix refusée pour budget prend le manque sur la part de l'escalade quand elle le couvre (après le prélèvement de vague L584), et raf add double l'estimate d'un lot dont le titre cite src/orchestrate/cycle/. Preuve : test/orchestrate-budget-correction-l682.test.ts (R1 reproduit L676 : 559 676 / 775 000 dont 175 000 retenus ; rouge sans le correctif, vert avec). La mesure (0 lot rendu pour budget avec un majeur ouvert sur 3 vagues) reste à relever. D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -31,10 +35,12 @@
   "L694",
   "L695",
   "L696",
-  "L698"
+  "L698",
+  "L682"
  ],
  "runs": [
   "20261111190444-2449989",
-  "20261111211808-2649855"
+  "20261111211808-2649855",
+  "20261112081458-4076309"
  ]
 }

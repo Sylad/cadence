@@ -40,15 +40,27 @@ describe('budget de lot : la part de l\'escalade est réservée (L349)', () => {
     expect(c.lot.escalation).toMatchObject({ model: 'fable', issue: 'rendu' });
   });
 
-  it("R2 — les passes ordinaires ne dépensent pas la part de l'escalade : une correction qui n'entrerait que grâce à elle est refusée", async () => {
+  it("R2 — une correction qui n'entre que grâce à la part de l'escalade est jouée sur elle (L682, qui remplace le refus de L349)", async () => {
     const before2ndFix = await spentAfter(4);
     const h = harness({ script: script() });
-    // Sans la part retenue, la seconde correction serait payée (spent + 155 k < budget) ; avec elle, il reste moins de 155 k.
+    // Sans la part retenue, la seconde correction serait payée (spent + 155 k < budget) ; la part en couvre le manque (2 tokens).
     const c = h.lot('L1', { budget: before2ndFix + REVIEW_RESERVE + ESCALATION_RESERVE - 1, escalationReserve: ESCALATION_RESERVE }, esc);
+    await runLot(c);
+    expect(kinds(h).slice(0, 6)).toEqual(['implement', 'review', 'fix', 'review', 'fix', 'review']);
+    expect(c.lot.warnings.join('\n')).toContain("correction payée sur la part de l'escalade : 2 token(s) pris");
+    expect(c.lot.escalationReserve).toBe(ESCALATION_RESERVE - 2);
+  });
+
+  it("R2b — la part de l'escalade ne couvre pas le manque (le budget entier ne paie pas la correction) : refusée, la part intacte", async () => {
+    const before2ndFix = await spentAfter(4);
+    const h = harness({ script: script() });
+    // Une part de 1 000 : le budget entier (spent + 155 k) manque d'un token pour la seconde correction, la part ne le couvre pas.
+    const c = h.lot('L1', { budget: before2ndFix + REVIEW_RESERVE, escalationReserve: 1_000 }, esc);
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review', 'fix', 'review']);
     expect(c.lot.status).toBe('handed-back');
     expect(c.lot.outcome).toContain('correction non jouée (budget)');
+    expect(c.lot.escalationReserve).toBe(1_000);
   });
 
   it("R3 — sans part déclarée (aucune escalade configurée, lot d'une vague antérieure), le budget borne comme avant", async () => {
@@ -62,22 +74,26 @@ describe('budget de lot : la part de l\'escalade est réservée (L349)', () => {
   it("R4 — le refus d'une correction nomme la part retenue et le budget des passes ordinaires, pas le budget entier", async () => {
     const before2ndFix = await spentAfter(4);
     const h = harness({ script: script() });
-    const budget = before2ndFix + REVIEW_RESERVE + ESCALATION_RESERVE - 1;
-    const c = h.lot('L1', { budget, escalationReserve: ESCALATION_RESERVE }, esc);
+    // Le budget entier ne paie pas la correction : la part de l'escalade ne la couvre pas (L682), le refus la nomme.
+    const held = 1_000;
+    const budget = before2ndFix + REVIEW_RESERVE;
+    const c = h.lot('L1', { budget, escalationReserve: held }, esc);
     await runLot(c);
-    expect(c.lot.outcome).toContain(`budget du lot : ${before2ndFix} / ${budget - ESCALATION_RESERVE} tokens comptés, ${ESCALATION_RESERVE} retenus pour l'escalade sur ${budget} (dérivé de l'estimate)`);
+    expect(c.lot.outcome).toContain(`budget du lot : ${before2ndFix} / ${budget - held} tokens comptés, ${held} retenus pour l'escalade sur ${budget} (dérivé de l'estimate)`);
     expect(c.lot.outcome).toContain(`(${REVIEW_RESERVE} réservés)`);
   });
 
   it("R5 — « budget du lot atteint » se mesure hors la part retenue et le dit : atteint pour les passes ordinaires, pas pour l'escalade", async () => {
     const afterReview = await spentAfter(2);
     const h = harness({ script: script() });
-    const budget = afterReview + ESCALATION_RESERVE;
-    const c = h.lot('L1', { budget, escalationReserve: ESCALATION_RESERVE }, esc);
+    // Une part plus petite que la réserve d'une correction (155 k) : elle ne la paie pas (L682), le budget des passes ordinaires est atteint.
+    const held = REVIEW_RESERVE - 1;
+    const budget = afterReview + held;
+    const c = h.lot('L1', { budget, escalationReserve: held }, esc);
     await runLot(c);
     expect(kinds(h)).toEqual(['implement', 'review']);
     expect(c.lot.status).toBe('handed-back');
-    expect(c.lot.outcome).toContain(`budget du lot atteint (${afterReview} / ${afterReview} tokens comptés, ${ESCALATION_RESERVE} retenus pour l'escalade sur ${budget}, dérivé de l'estimate)`);
+    expect(c.lot.outcome).toContain(`budget du lot atteint (${afterReview} / ${afterReview} tokens comptés, ${held} retenus pour l'escalade sur ${budget}, dérivé de l'estimate)`);
   });
 
   it("R6 — l'avertissement de la porte « code sans test » compte le budget hors la part retenue", async () => {

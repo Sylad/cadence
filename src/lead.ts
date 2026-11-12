@@ -158,13 +158,14 @@ export function truncate(text: string, max: number): string {
 export function isProject(dir: string): boolean {
   if (existsSync(join(dir, PLAN_DEFAULT)) || existsSync(join(dir, PLAN_LEGACY))) return true;
   const conf = join(dir, 'cadence.yaml');
-  if (!existsSync(conf) || !statSync(conf).isFile()) return false;
+  // L709 : un seul stat ; effacé pendant le parcours (un voisin jetable, porte du 12-11) ou illisible, ce n'est pas un projet, ni une erreur du tour
+  try { if (!statSync(conf).isFile()) return false; } catch { return false; }
   try {
     const c = readPlanConfig(conf);
     // Une clé qa: seule ne désigne aucun plan.
     return !!c && (!!c.path || Object.keys(c.settings).some((k) => k !== 'qaExpectations' && k !== 'qaWorstData'));
   } catch {
-    return true; // un cadence.yaml illisible reste un projet : sa ligne dit l'erreur
+    return existsSync(conf); // un cadence.yaml illisible reste un projet : sa ligne dit l'erreur ; effacé entre-temps, il n'en est plus un
   }
 }
 

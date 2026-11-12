@@ -36,6 +36,10 @@
   {
    "date": "2026-11-12",
    "texte": "L709 fait (run 20261112131550-1911486, issue #55 du compte pro) : les sessions claude d'un run ne reçoivent plus les variables qui les lient à la session Claude Code lanceuse (CLAUDE_PID, CLAUDE_SSH_*, CLAUDE_CODE_CHILD_SESSION, CLAUDE_CODE_MESSAGING_*, CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH…), --fond garde les options de Node, --liste affiche « interrompu » pour un run en-cours sans processus vivant, et l'id de session est écrit dans l'état dès le lancement (--session-id) pour que --reponse reprenne un run mort pendant sa première session. Preuve : v2/test/run-fond-l709.test.ts (4 cas, 3 rouges sur le code d'avant, verts après ; le premier tue le groupe de la lanceuse et vérifie que le run et sa session vivent et vont à l'intégration). Non mesuré : un vrai run --fond dont on ferme la session Claude Code lanceuse au compte pro. D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "L710 fait (run 20261112141141-2253545, issue #55 du compte pro) : les runs de cadence run vivants (état en-cours, processus vivant au verrou du run, le contrôle de « interrompu » de --liste) prennent un créneau. Le run s'inscrit dans $CADENCE_HOME/runs/ le temps de sa session, de sa porte et de son intégration ; cadence lead tour, cadence orchestrate --status et la bande cadence-hud le comptent dans les sessions en cours et le nomment (« runs cadence run : 1 (projet <id>) ») ; les vagues attendent son créneau et le citent dans leur journal ; formule écrite une fois dans docs/concepts.md#slots-and-holds. Preuve : test/creneaux-runs-l710.test.ts (un run vivant factice compte, un pid mort ne compte pas, un run fini ou en quota non plus, registre et bande sur le même registre, une vague attend), v2/test/run-creneau-l710.test.ts ; suites racine (604 fichiers), v2 (526 tests) et bande (474 tests) vertes. Non vérifié : un vrai cadence run vu par un vrai cadence lead tour (le run en cours tourne sur la copie en service, d'avant ce changement). D-7 reste ouverte : L679, L702, coupes du socle, erreurs 4 et 5 du relevé."
   }
  ],
  "lots": [
@@ -46,13 +50,15 @@
   "L698",
   "L682",
   "L706",
-  "L709"
+  "L709",
+  "L710"
  ],
  "runs": [
   "20261111190444-2449989",
   "20261111211808-2649855",
   "20261112081458-4076309",
   "20261112113406-1675645",
-  "20261112131550-1911486"
+  "20261112131550-1911486",
+  "20261112141141-2253545"
  ]
 }

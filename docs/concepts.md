@@ -125,13 +125,13 @@ Detail: [lead.md](lead.md).
 The machine and your quota are shared: at most **N sessions run at once**: N is the cap (`CADENCE_MAX_SESSIONS` or `--max-sessions`, 2 by default; never raised by the lead). Each running session occupies a **slot**; a freed slot goes to the next
 lot of the wave; a freed slot is also filled at once by the next ready lot of the plan (always with `--continue`, with named lots since L587; `--no-fill` stops it). A session the lead starts by hand (fix, QA pass) is invisible to waves, so
 the lead declares it: `cadence lead hold <label>` and lifts it with `cadence lead release <label>`: a **hold** takes a slot that
-waves wait for. `orchestrate --status` prints `créneaux libres : 1 sur 3`. Detail: [lead.md](lead.md#lead-hold-and-release).
+waves wait for. Detail: [lead.md](lead.md#lead-hold-and-release).
 
 **Free slots.** The `créneaux libres : N sur M` figure of `orchestrate --status`, `lead tour` and the `cadence-hud` band is:
 
-> M, minus, for each live wave, the smaller of the **common cap** (the lowest cap of any live wave, M if none) and what the wave holds — one slot per lot holding a claude session in worktrees (`lanes`), one per repository otherwise —, minus the unexpired `lead hold`s; never below 0.
+> M, minus, for each live wave, the smaller of the **common cap** (the lowest cap of any live wave, M if none) and what the wave holds — one slot per lot holding a claude session in worktrees (`lanes`), one per repository otherwise —, minus the unexpired `lead hold`s and the live `cadence run`s; never below 0.
 
-A wave with no cap is bounded by M. A dead wave (pid and start time both match) and an expired hold count for nothing. The registry (`src/orchestrate/registry.ts`) and the band (`plugins/cadence-hud/hooks/format.ts`) implement it twice; `test/creneaux-libres-contrat-l598.test.ts` plays both. Not the *vacant lanes* of a wave (`vacantLanes`, L527).
+A wave with no cap is bounded by M. A run is live while `en-cours` with a live process on its lock (L710); a dead wave or run and an expired hold count for nothing. `src/orchestrate/registry.ts` and the band (`plugins/cadence-hud/hooks/format.ts`) implement it twice; `test/creneaux-libres-contrat-l598.test.ts` plays both. Not the *vacant lanes* of a wave (`vacantLanes`, L527).
 
 ## Escalation
 

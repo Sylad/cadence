@@ -5,7 +5,7 @@ import { fillRoom, fillStop, queueVerdict, resolveQueueLot, type FillFacts, type
 import type { LotCtx } from './cycle.js';
 import { measuredBudgetsAt } from './budget-mesure.js';
 import { effectiveState, QueueError, QueueSession, SkipLog, type Queued, type QueueEntry } from './queue.js';
-import { cadenceHome, freeSlots, liveHolds, liveWaves, type LiveWave } from './registry.js';
+import { cadenceHome, freeSlots, liveWaves, outsideSessions, type LiveWave } from './registry.js';
 import { lotFinished, lotKey, RunStore, type LotState, type WaveState } from './state.js';
 
 /**
@@ -334,7 +334,7 @@ export async function queueFill(q: QueueRun, f: QueueFillFacts, vacant: number, 
   const pending = q.pending(entries);
   // Les lots qui attendent dans la file, même quand aucun créneau ne leur est libre : le plan ne les tire pas (R19, R7).
   const waiting = new Set(pending.flatMap((p) => { const ref = resolveQueueLot(f.launch, p.entry.key); return 'lot' in ref ? [lotKey(ref.project, ref.lot.id)] : []; }));
-  const slots = Math.min(vacant - blocked, freeSlots(waves, f.cap, liveHolds(f.home, f.io.now()).length));
+  const slots = Math.min(vacant - blocked, freeSlots(waves, f.cap, outsideSessions(f.home, f.io.now())));
   if (!pending.length || slots <= 0) return { ...none, pushed: blocked, waiting };
   const s: Scan = { remaining, held: f.all.filter((l) => !lotFinished(l)), measured: measuredBudgetsAt(f.launch, f.io), others: waves.filter((w) => w.pid !== process.pid), inWave: new Set(f.all.map((l) => lotKey(l.project, l.lot))), waiting, targets: [], skipped: 0, pushed: 0 };
   // R20 : un lot par créneau libre à ce regard, poussé ou pris ; les lots d'après attendent le créneau suivant.

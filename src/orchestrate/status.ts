@@ -5,7 +5,7 @@ import { RafError } from '../plan.js';
 import { findProjects, isProject as isLeadProject } from '../lead.js';
 import { unpublishedAt, unpublishedLine } from '../unpublished.js';
 import { freeLine, readyFree } from '../ready-free.js';
-import { cadenceHome, expiredHolds, freeSlots, liveHolds, liveSlots, liveWaves } from './registry.js';
+import { cadenceHome, expiredHolds, freeSlots, liveHolds, liveRuns, liveSlots, liveWaves } from './registry.js';
 import { longDuration } from './guard.js';
 import { keptLines } from './worktree.js';
 import { lotFinished, lotKey, RunStore, type LotState } from './state.js';
@@ -38,20 +38,25 @@ export function duration(ms: number): string {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
 }
 
-/** La ligne des créneaux (L141, L255) et leur nombre libre : toujours, même sans vague ni session du lead (L416 : « libres : 3 sur 3 » se lit, il ne se déduit pas d'une absence de ligne). */
+/**
+ * La ligne des créneaux (L141, L255) et leur nombre libre : toujours, même sans vague ni session du lead (L416 : « libres : 3 sur 3 » se lit, il ne se déduit pas d'une absence de ligne).
+ * L710 (issue #55) : les runs vivants de `cadence run` comptent dans les sessions en cours et dans les créneaux pris, et la ligne les nomme.
+ */
 export function slotsLine(cap = DEFAULT_MAX_SESSIONS, now = new Date()): { line: string; free: number } {
   const home = cadenceHome();
   const holds = liveHolds(home, now);
-  const free = freeSlots(liveWaves(home), cap, holds.length);
+  const runs = liveRuns(home);
+  const free = freeSlots(liveWaves(home), cap, holds.length + runs.length);
+  const run = runs.length ? ` · runs cadence run : ${runs.length} (${runs.map((r) => `${basename(r.repo)} ${r.id}`).join(', ')})` : '';
   const lead = holds.length ? ` · sessions du lead : ${holds.length} (${holds.map((h) => h.label).join(', ')})` : '';
-  return { line: `vagues en cours : ${liveWaves(home).length} · sessions en cours : ${liveSlots(home).length}${lead} · créneaux libres : ${free} sur ${cap}`, free };
+  return { line: `vagues en cours : ${liveWaves(home).length} · sessions en cours : ${liveSlots(home).length + runs.length}${run}${lead} · créneaux libres : ${free} sur ${cap}`, free };
 }
 
-/** Vagues vivantes (toutes, quel que soit leur dossier de départ), sessions du lead (L255), créneaux libres et dépôts qu'elles tiennent. Rien sans vague ni session du lead. */
+/** Vagues vivantes (toutes, quel que soit leur dossier de départ), sessions du lead (L255), runs de `cadence run` (L710), créneaux libres et dépôts qu'elles tiennent. Rien sans vague, session du lead ni run. */
 export function liveLines(cap = DEFAULT_MAX_SESSIONS, now = new Date()): string[] {
   const home = cadenceHome();
   const waves = liveWaves(home);
-  if (waves.length === 0 && liveHolds(home, now).length === 0) return [];
+  if (waves.length === 0 && liveHolds(home, now).length === 0 && liveRuns(home).length === 0) return [];
   const lines = [slotsLine(cap, now).line];
   for (const w of waves) lines.push(`  ${w.wave} (pid ${w.pid}, depuis ${w.started}) lancée depuis ${w.cwd} · plafond ${w.cap ?? '?'} · dépôts : ${w.repos.join(', ')}`);
   return lines;

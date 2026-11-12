@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { ClientProps, ElementConstructor, EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
-import type { AgentsSummary, CommandInfo, LeadHold, LotsNotice, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
+import type { AgentsSummary, CommandInfo, LeadHold, LiveRun, LotsNotice, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
 import { BANC_READER, CONTEXT_WRITER, COLLECTOR, QUOTA_WRITER, DEFAULT_CAP, DELIVERIES, LAST_DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
 import { bancDetail, bancLine, enCoursLine, readBanc, readEnCours } from './banc'
 import { buildDecisions, decisionsOf, parseDeliveries } from './decisions'
@@ -34,6 +34,7 @@ const waves = atom({ plugin: 'cadence-hud', key: 'waves' } as const, [])
 const endedWaves = atom({ plugin: 'cadence-hud', key: 'endedWaves' } as const, [])
 const projects = atom({ plugin: 'cadence-hud', key: 'projects' } as const, [])
 const leadHolds = atom({ plugin: 'cadence-hud', key: 'leadHolds' } as const, [])
+const liveRuns = atom({ plugin: 'cadence-hud', key: 'liveRuns' } as const, [])
 const slotCap = atom({ plugin: 'cadence-hud', key: 'slotCap' } as const, DEFAULT_CAP)
 const projectsFolded = atom({ plugin: 'cadence-hud', key: 'projectsFolded' } as const, false)
 const lotsBoard = atom({ plugin: 'cadence-hud', key: 'lotsBoard' } as const, null)
@@ -210,12 +211,13 @@ export const register: Register = on => {
 
         let found: Wave[] = []
         let foundHolds: LeadHold[] = []
+        let foundRuns: LiveRun[] = []
         let foundCap = DEFAULT_CAP
         let foundEnded: Wave[] = []
         let problem: string | null = null
         if (collected.exitCode === 0) {
           try {
-            ;({ waves: found, holds: foundHolds, cap: foundCap, ended: foundEnded } = parseCollected(collected.stdout))
+            ;({ waves: found, holds: foundHolds, runs: foundRuns, cap: foundCap, ended: foundEnded } = parseCollected(collected.stdout))
           } catch (err) {
             problem = `collecteur illisible : ${String(err).slice(0, 60)}`
           }
@@ -244,6 +246,7 @@ export const register: Register = on => {
         await update($, waves, () => found)
         await update($, endedWaves, () => foundEnded)
         await update($, leadHolds, () => foundHolds)
+        await update($, liveRuns, () => foundRuns)
         await update($, slotCap, () => foundCap)
         await update($, error, () => problem)
         await update($, now, () => at)
@@ -438,7 +441,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, cap, board, bench, running] = await Promise.all([
+    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, runs, cap, board, bench, running] = await Promise.all([
       read($, usage),
       read($, agents),
       read($, commands),
@@ -450,6 +453,7 @@ export const register: Register = on => {
       read($, projects),
       read($, projectsFolded),
       read($, leadHolds),
+      read($, liveRuns),
       read($, slotCap),
       read($, lotsBoard),
       read($, banc),
@@ -461,7 +465,7 @@ export const register: Register = on => {
     const shownProjects = activeProjects(allProjects)
     const holds = liveHolds(allHolds, at)
     const lateHolds = expiredHolds(allHolds, at)
-    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0 && holds.length === 0 && lateHolds.length === 0 && !benchLine) return next(e)
+    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0 && holds.length === 0 && runs.length === 0 && lateHolds.length === 0 && !benchLine) return next(e)
 
     const ambiguous = parseAmbiguous(await $.env.get('CADENCE_HUD_AMBIGUOUS'))
     const { Box, Text } = $.ui.resolve(e)
@@ -712,7 +716,7 @@ export const register: Register = on => {
     })
 
     // comme `cadence orchestrate --status` : la ligne des créneaux, puis une ligne par session que le lead a inscrite
-    const slots = slotsLine(w, holds, cap)
+    const slots = slotsLine(w, holds, cap, runs)
     const leadRows = (slots || lateHolds.length > 0) && (
       <Box key="lead" flexDirection="column">
         {slots && (

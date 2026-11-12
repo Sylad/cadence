@@ -414,9 +414,9 @@ async function slotGuarded(s: SlotScene, argv: string[], o: Parameters<ClaudeFn>
       if (o.lot && ctl.drops.includes(o.lot)) return DROPPED;
       return ctl.stopAfterCurrent ? STOP_REQUESTED : null;
     },
-    onWait: (h, ms, limit, lead) => {
-      const who = [...new Set(h.map((x) => x.wave)), ...lead.map((x) => `session du lead ${x.label}`)];
-      s.log(`${o.lot ? `${o.lot} · ` : ''}en attente d'un créneau de session depuis ${duration(ms)} (${h.length + lead.length}/${limit} en cours : ${who.join(', ')})`);
+    onWait: (h, ms, limit, lead, runs) => {
+      const who = [...new Set(h.map((x) => x.wave)), ...lead.map((x) => `session du lead ${x.label}`), ...runs.map((x) => `cadence run ${x.id}`)];
+      s.log(`${o.lot ? `${o.lot} · ` : ''}en attente d'un créneau de session depuis ${duration(ms)} (${h.length + lead.length + runs.length}/${limit} en cours : ${who.join(', ')})`);
     },
     onGot: (ms) => s.log(`${o.lot ? `${o.lot} · ` : ''}créneau de session obtenu après ${duration(ms)} d'attente`),
   });

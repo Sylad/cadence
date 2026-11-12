@@ -1,15 +1,16 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect } from 'vitest';
 import { addHold, registerWave, updateWaveRepos } from '../src/orchestrate/registry.js';
+import { processStart } from '../src/proc.js';
 import { slotsLine } from '../src/orchestrate/status.js';
 import { tempDir } from './helpers.js';
 
 // Le mod est hors du typecheck de cadence (tsconfig.json) : ses modules sont chargés à l'exécution, par une URL que tsc ne suit pas.
 const { COLLECTOR, parseCollected } = (await import(new URL('../plugins/cadence-hud/hooks/collect.ts', import.meta.url).href)) as {
   COLLECTOR: string;
-  parseCollected: (stdout: string) => { waves: unknown[]; holds: { expires: string }[]; cap: number };
+  parseCollected: (stdout: string) => { waves: unknown[]; holds: { expires: string }[]; runs: unknown[]; cap: number };
 };
 const hud = (await import(new URL('../plugins/cadence-hud/hooks/format.ts', import.meta.url).href)) as {
   freeSlots: (waves: unknown[], cap: number, leadSessions: number) => number;
@@ -49,8 +50,28 @@ interface Spec {
   start?: string;
 }
 
-/** Inscrit les vagues et les sessions du lead par le registre lui-même, rend le `free` des deux lecteurs sur le plafond `total`. */
-export function both(total: number, waves: Spec[], holds: { label: string; ttlMinutes: number }[] = []): { registre: number; bande: number } {
+/** Un run de `cadence run` (L710) : son pid (vivant par défaut) tient le verrou, son état est `etat` (`en-cours` par défaut). */
+interface RunSpec {
+  pid?: number;
+  etat?: string;
+}
+
+/**
+ * Inscrit un run comme v2/src/run/run.ts le fait (`runs/<id>.json` → { id, repo, fichier }), avec son état et son verrou `<run>.verrou` ({ pid, start, role, depuis }) ;
+ * un pid vivant reçoit son heure de démarrage réelle. Rend l'id.
+ */
+export function writeRun(home: string, dir: string, id: string, r: RunSpec = {}): string {
+  const pid = r.pid ?? living();
+  const fichier = join(dir, `proj-${id}.json`);
+  mkdirSync(join(home, 'runs'), { recursive: true });
+  writeFileSync(fichier, JSON.stringify({ id, repo: join(dir, 'proj'), etat: r.etat ?? 'en-cours' }));
+  writeFileSync(fichier.replace(/\.json$/, '.verrou'), JSON.stringify({ pid, start: processStart(pid) ?? undefined, role: 'session', depuis: NOW.toISOString() }));
+  writeFileSync(join(home, 'runs', `${id}.json`), JSON.stringify({ id, repo: join(dir, 'proj'), fichier }));
+  return id;
+}
+
+/** Inscrit les vagues, les sessions du lead et les runs de `cadence run` (L710) par le format du registre, rend le `free` des deux lecteurs sur le plafond `total`. */
+export function both(total: number, waves: Spec[], holds: { label: string; ttlMinutes: number }[] = [], runs: RunSpec[] = []): { registre: number; bande: number } {
   const root = tempDir();
   const home = join(root, 'home');
   const cwd = join(root, 'proj');
@@ -62,13 +83,14 @@ export function both(total: number, waves: Spec[], holds: { label: string; ttlMi
     updateWaveRepos(home, pid, repos, w.lanes);
   });
   for (const h of holds) addHold(home, h.label, h.ttlMinutes, NOW);
+  runs.forEach((r, i) => writeRun(home, root, `run-${i}`, r));
   process.env.CADENCE_HOME = home;
   try {
     const registre = slotsLine(total, NOW).free;
     const run = spawnSync('python3', ['-I', '-c', COLLECTOR], { encoding: 'utf8', cwd, env: { ...process.env, CADENCE_HOME: home, CADENCE_MAX_SESSIONS: String(total) } });
     expect(run.status).toBe(0);
     const c = parseCollected(run.stdout);
-    const bande = hud.freeSlots(c.waves, total, hud.liveHolds(c.holds, NOW.getTime()).length);
+    const bande = hud.freeSlots(c.waves, total, hud.liveHolds(c.holds, NOW.getTime()).length + c.runs.length);
     return { registre, bande };
   } finally {
     delete process.env.CADENCE_HOME;

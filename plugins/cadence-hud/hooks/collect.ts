@@ -1,4 +1,4 @@
-import type { LeadHold, Wave } from '../types'
+import type { LeadHold, LiveRun, Wave } from '../types'
 
 /**
  * Le collecteur des vagues `cadence orchestrate`, exécuté par python3 -I : il lit le registre
@@ -18,7 +18,8 @@ import type { LeadHold, Wave } from '../types'
  * filtrer l'échéance : la bande le fait à chaque dessin) et le plafond de sessions (CADENCE_MAX_SESSIONS, 2 par défaut).
  * Chaque lot porte `trail`, la liste de ses pas (genre, statut, début, fin ; L413) d'où la frise du panneau des lots tire ses étapes.
  * Chaque lot porte aussi ce que le panneau lit de sa dépense (L414) : `budget`, `escalationReserve`, `estimate`, `escalated`, `spec`, les tokens comptés par ses étapes (`consumed`), le début de sa première étape (`since`) ; la durée écoulée court jusqu'à maintenant (le panneau n'en lit pas la fin).
- * Sortie : `{waves, holds, cap, ended}`.
+ * Il rend enfin les runs de `cadence run` vivants (`<home>/runs/*.json`, L710) : ils prennent un créneau comme une session du lead.
+ * Sortie : `{waves, holds, runs, cap, ended}`.
  */
 export const COLLECTOR = `
 import json, os, glob, datetime, time
@@ -185,15 +186,26 @@ for hf in sorted(glob.glob(os.path.join(home, 'holds', '*.json'))):
     if isinstance(h, dict) and isinstance(h.get('label'), str) and isinstance(h.get('expires'), str):
         holds.append({'label': h['label'], 'since': str(h.get('since')), 'expires': h['expires']})
 
+# L710 : les runs de cadence run vivants (inscrits dans runs/ par v2/src/run/run.ts, état en-cours, verrou tenu par un processus vivant), comme liveRuns du registre
+runs = []
+for rf in sorted(glob.glob(os.path.join(home, 'runs', '*.json'))):
+    r = load(rf)
+    if not isinstance(r, dict) or not isinstance(r.get('fichier'), str):
+        continue
+    lock = load(r['fichier'][:-5] + '.verrou' if r['fichier'].endswith('.json') else r['fichier'])
+    state = load(r['fichier'])
+    if isinstance(lock, dict) and isinstance(lock.get('pid'), int) and holder_alive(lock['pid'], lock.get('start')) and isinstance(state, dict) and state.get('etat') == 'en-cours':
+        runs.append({'id': str(r.get('id')), 'repo': str(r.get('repo'))})
+
 raw_cap = (os.environ.get('CADENCE_MAX_SESSIONS') or '').strip()
 cap = int(raw_cap) if raw_cap.isdigit() and int(raw_cap) >= 1 else 2
-print(json.dumps({'waves': out, 'holds': holds, 'cap': cap, 'ended': ended}))
+print(json.dumps({'waves': out, 'holds': holds, 'runs': runs, 'cap': cap, 'ended': ended}))
 `
 
 /** Plafond de sessions quand le collecteur n'en donne pas de valide (le défaut de cadence). */
 export const DEFAULT_CAP = 2
 
-export type Collected = { waves: Wave[]; holds: LeadHold[]; cap: number; /** les vagues finies du dossier, la plus récente d'abord, qu'une vague vive ou non (L412) ; vide sans */ ended: Wave[] }
+export type Collected = { waves: Wave[]; holds: LeadHold[]; /** les runs de cadence run vivants (L710) */ runs: LiveRun[]; cap: number; /** les vagues finies du dossier, la plus récente d'abord, qu'une vague vive ou non (L412) ; vide sans */ ended: Wave[] }
 
 const isWave = (w: unknown): w is Wave => typeof w === 'object' && w !== null && typeof (w as Wave).id === 'string'
 
@@ -212,8 +224,11 @@ export const parseCollected = (stdout: string): Collected => {
   const holds = (Array.isArray(obj.holds) ? obj.holds : []).filter(
     (h): h is LeadHold => typeof h === 'object' && h !== null && typeof (h as LeadHold).label === 'string' && typeof (h as LeadHold).expires === 'string',
   )
+  const runs = (Array.isArray(obj.runs) ? obj.runs : []).filter(
+    (r): r is LiveRun => typeof r === 'object' && r !== null && typeof (r as LiveRun).id === 'string' && typeof (r as LiveRun).repo === 'string',
+  )
   const cap = typeof obj.cap === 'number' && Number.isInteger(obj.cap) && obj.cap >= 1 ? obj.cap : DEFAULT_CAP
-  return { waves, holds, cap, ended }
+  return { waves, holds, runs, cap, ended }
 }
 
 /**

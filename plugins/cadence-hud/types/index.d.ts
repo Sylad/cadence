@@ -97,6 +97,9 @@ export type Wave = {
 /** Une session lancée à la main par le lead et inscrite par `cadence lead hold` (`holds/<étiquette>.json` du dossier de cadence) : elle prend un créneau jusqu'à son échéance. */
 export type LeadHold = { label: string; since: string; expires: string }
 
+/** Un run de `cadence run` vivant (L710) : il prend un créneau de sessions comme une session du lead. */
+export type LiveRun = { id: string; repo: string }
+
 /** Une ligne de `cadence lead tour --json` (L149) : ce que la bande en garde pour dessiner l'avancement d'un plan. */
 export type Project = {
   project: string
@@ -152,6 +155,8 @@ declare module 'claude-code' {
       projects: Project[]
       /** Sessions du lead inscrites par `cadence lead hold` (celles dont l'échéance est passée sont écartées au dessin). */
       leadHolds: LeadHold[]
+      /** Runs de `cadence run` vivants (L710) : ils comptent dans les créneaux. */
+      liveRuns: LiveRun[]
       /** Plafond de sessions simultanées (CADENCE_MAX_SESSIONS, 2 par défaut). */
       slotCap: number
       /** La liste des projets est repliée sur une ligne (`/hud projets`). */

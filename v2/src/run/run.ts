@@ -11,7 +11,7 @@ import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, ty
 import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun } from './aiguillage.js';
 import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
-import { debutProcessus, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
+import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
 const PORTE_MS = 30 * 60_000;
 /** D-15 : le run reprend une minute après l'heure de remise à zéro annoncée, relit son état au plus tard toutes les 10 min (une reprise par --reponse arrête
@@ -46,14 +46,14 @@ function tenir(e: Etat): void {
  * Un run tué par un signal ne passe pas ici : son fichier reste, mais un porteur mort (pid absent ou repris, `start` à l'appui) ne tient rien.
  */
 function tenu(e: Etat, o: Opts, corps: () => Etat): Etat {
-  tenir(e);
+  tenir(e); const retirer = inscrireCreneau(e); // L710 : le run vivant prend un créneau de sessions (../verrou.ts)
   try {
     return corps();
   } catch (x) {
     e.etat = 'echec'; e.detail = `erreur pendant le run : ${(x as Error).message ?? x}`;
     return fin(e, o);
   } finally {
-    rmSync(fichierTenu(e.repo), { force: true });
+    rmSync(fichierTenu(e.repo), { force: true }); retirer();
   }
 }
 // D-18 : un seul processus joue ou attend un run ; verrou `<run>.verrou` (../verrou.ts), lu aussi par src/quota-tour.ts (mort : l'attente est arrêtée).

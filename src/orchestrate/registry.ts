@@ -78,14 +78,15 @@ export function commonCap(waves: LiveWave[], fallback: number): number {
  * Les créneaux que le lead peut encore donner à des sous-agents : `total` moins, pour chaque vague vivante, le
  * plus petit du plafond commun (`commonCap`) et du nombre de lots qu'elle joue à la fois — un par dépôt qu'elle tient encore, un par lot pour des lots en worktrees (ses pas prennent un créneau et le
  * rendent entre deux étapes : les sessions vivantes à l'instant ne disent pas ce que la vague va reprendre).
- * Une vague sans plafond connu est bornée par `total` au lieu du plafond commun.
+ * Une vague sans plafond connu est bornée par `total` au lieu du plafond commun. `outside` : les sessions qu'aucune vague ne porte, sessions du lead
+ * inscrites (`liveHolds`) et runs de `cadence run` vivants (`liveRuns`, L710).
  * LA formule, dite en mots dans docs/concepts.md (« Slots and holds ») : la bande du lead (`freeSlots` de plugins/cadence-hud/hooks/format.ts) en
  * est la seconde implémentation, sans la CLI, et test/creneaux-libres-contrat-l598.test.ts les joue sur le même registre. Modifier l'une, c'est modifier l'autre.
  */
-export function freeSlots(waves: LiveWave[], total: number, leadSessions = 0): number {
+export function freeSlots(waves: LiveWave[], total: number, outside = 0): number {
   const common = commonCap(waves, total);
   const held = waves.reduce((n, w) => n + Math.min(w.cap !== undefined ? common : total, w.lanes ?? w.repos.length), 0);
-  return Math.max(0, total - held - leadSessions);
+  return Math.max(0, total - held - outside);
 }
 
 /**
@@ -169,6 +170,50 @@ export function expiredHolds(home: string, now: Date): LeadHold[] {
   return scanHolds(home, now).expired;
 }
 
+/**
+ * Un run de `cadence run` (v2/src/run/run.ts, L710) : une session claude qu'aucune vague ne porte. Le run s'inscrit dans `runs/<id>.json`
+ * ({ id, repo, fichier }, `fichier` = son état) le temps de sa session, de sa porte et de son intégration, et s'en retire à la fin ;
+ * v2 ne lit pas src/, il écrit lui-même ce format. Il compte quand son état est `en-cours` ET qu'un processus vivant tient son verrou
+ * (`<run>.verrou`, pid et heure de démarrage) : le contrôle de l'état « interrompu » de `cadence run --liste` (L709).
+ */
+export interface LiveRun {
+  id: string;
+  repo: string;
+}
+
+const runsDir = (home: string) => join(home, 'runs');
+
+/** Les runs de `cadence run` qui tiennent une session en ce moment ; une inscription dont le verrou n'a plus de porteur vivant (run tué, PC éteint) est écartée au passage. */
+export function liveRuns(home: string): LiveRun[] {
+  let names: string[];
+  try {
+    names = readdirSync(runsDir(home)).filter((n) => n.endsWith('.json'));
+  } catch {
+    return [];
+  }
+  const out: LiveRun[] = [];
+  for (const n of names.sort()) {
+    const file = join(runsDir(home), n);
+    let alive = false;
+    let run: LiveRun | null = null;
+    try {
+      const raw = JSON.parse(readFileSync(file, 'utf8'));
+      const state = String(raw.fichier);
+      const lock = JSON.parse(readFileSync(state.replace(/\.json$/, '.verrou'), 'utf8'));
+      alive = Number.isInteger(lock.pid) && holderAlive(lock.pid, typeof lock.start === 'string' ? lock.start : undefined);
+      if (alive && JSON.parse(readFileSync(state, 'utf8')).etat === 'en-cours') run = { id: String(raw.id), repo: String(raw.repo) };
+    } catch {
+      // inscription, état ou verrou illisible ou absent : aucun porteur vivant connu
+    }
+    if (run) out.push(run);
+    else if (!alive) rmSync(file, { force: true });
+  }
+  return out;
+}
+
+/** Les sessions qu'aucune vague ne porte et qui prennent un créneau : sessions du lead inscrites et runs vivants de `cadence run` (L710). Le `outside` de `freeSlots`. */
+export const outsideSessions = (home: string, now: Date): number => liveHolds(home, now).length + liveRuns(home).length;
+
 /** Inscrit la vague ; écarte au passage les entrées de processus morts (les `.tmp` d'une inscription en cours ne sont pas touchés). */
 export function registerWave(home: string, given: LiveWave): void {
   const w: LiveWave = { ...given, start: given.start ?? processStart(given.pid) ?? undefined };
@@ -235,7 +280,7 @@ export class SlotAbandoned extends Error {
 
 /**
  * Attend que le nombre de sessions vivantes, TOUTES vagues confondues et quel que soit l'index de leur créneau,
- * — plus les sessions du lead inscrites par `lead hold` (L424), qu'aucune vague ne porte — soit sous le plafond commun — `cap` (le plafond de cette vague) ou, s'il est plus bas, celui d'une autre vague vivante
+ * — plus les sessions du lead inscrites par `lead hold` (L424) et les runs vivants de `cadence run` (L710), qu'aucune vague ne porte — soit sous le plafond commun — `cap` (le plafond de cette vague) ou, s'il est plus bas, celui d'une autre vague vivante
  * (`commonCap`, relu à chaque tour, L395) —, puis prend le premier créneau libre (un pid mort est repris) et
  * rend sa libération. Toutes les vagues appliquent le même plafond : jamais « 4/3 en cours ».
  * Deux vagues qui prennent en même temps se départagent au recomptage : si le total dépasse `cap` une fois
@@ -258,7 +303,7 @@ export async function acquireSlot(home: string, cap: number, opts: Parameters<ty
 async function takeSlot(
   home: string,
   cap: number,
-  opts: { wave: string; fresh?: boolean; rank?: number; slots?: (home: string) => OLock[]; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number, limit: number, leadHolds: LeadHold[]) => void; onGot?: (waitedMs: number) => void; abandon?: () => string | null; now?: () => number },
+  opts: { wave: string; fresh?: boolean; rank?: number; slots?: (home: string) => OLock[]; pollMs?: number; reportMs?: number; onWait?: (holders: OLock[], waitedMs: number, limit: number, leadHolds: LeadHold[], runs: LiveRun[]) => void; onGot?: (waitedMs: number) => void; abandon?: () => string | null; now?: () => number },
   myTurn: () => boolean,
 ): Promise<() => void> {
   mkdirSync(slotsDir(home), { recursive: true });
@@ -274,8 +319,8 @@ async function takeSlot(
   for (;;) {
     const limit = commonCap(liveWaves(home), cap); // relu à chaque tour : une vague au plafond bas qui s'arrête le relève
     if (reportedAt !== null) checkAbandon(); // pas à la première tentative : un créneau libre est pris même si une demande est posée
-    // Les sessions du lead (`lead hold`) tournent hors de toute vague mais prennent un créneau : relues à chaque comptage (L424).
-    const taken = () => live(home).length + liveHolds(home, new Date()).length;
+    // Les sessions du lead (`lead hold`, L424) et les runs de `cadence run` (L710) tournent hors de toute vague mais prennent un créneau : relus à chaque comptage.
+    const taken = () => live(home).length + outsideSessions(home, new Date());
     if (hasRoom(taken, limit, myTurn)) {
       for (let k = 0; k < MAX_SLOT_INDEX; k++) {
         const file = join(slotsDir(home), `slot-${k}.lock`);
@@ -292,7 +337,7 @@ async function takeSlot(
     if (reportedAt === null) checkAbandon(); // la première tentative a échoué : l'attente commence, la demande déjà posée l'interrompt sans attendre un tour
     if (reportedAt === null || now() - reportedAt >= (opts.reportMs ?? WAIT_REPORT_MS)) {
       reportedAt = now();
-      opts.onWait?.(live(home), reportedAt - t0, limit, liveHolds(home, new Date()));
+      opts.onWait?.(live(home), reportedAt - t0, limit, liveHolds(home, new Date()), liveRuns(home));
     }
     await new Promise((r) => setTimeout(r, pollMs + Math.random() * pollMs * 0.25));
   }

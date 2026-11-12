@@ -782,7 +782,7 @@ describe('L498 — tirage de la file approuvée', () => {
     leadHold();
     const o = io(parent);
     expect(await orchestrate(['--queue', '--max-sessions', '1'], o.io, fakeDeps().deps)).toBe(2);
-    expect(o.err).toEqual(['file : aucun créneau libre pour la file (plafond 1 : 0 vague(s) vivante(s), 1 session(s) du lead)', 'orchestrate --queue : aucun lot mûr dans la file approuvée']);
+    expect(o.err).toEqual(['file : aucun créneau libre pour la file (plafond 1 : 0 vague(s) vivante(s), 1 session(s) du lead ou run(s) cadence run)', 'orchestrate --queue : aucun lot mûr dans la file approuvée']);
   });
 
   it('R20 — le plan ne remplit pas le créneau qu\'une poussée vient de prendre : c:L1 (prêt au plan) attend la fin de a:L1', async () => {

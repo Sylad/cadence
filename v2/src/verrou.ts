@@ -1,7 +1,9 @@
 // Verrou de processus dans un fichier (revue L700 r1, D-18) : { pid, start, role, depuis }. Le porteur est vivant si son pid existe et que son heure de
 // démarrage est la même (un pid se réutilise) ; un verrou laissé par un mort (PC éteint, kill) ne tient rien. Pose atomique par lien vers un fichier
 // complet, verrou mort écarté seulement s'il est encore celui qu'on a lu : comme takeLock de src/orchestrate/lock.ts (v2 ne lit pas src/).
-import { linkSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { linkSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 export interface Porteur { pid: number; start?: string; role: string; depuis: string }
@@ -51,4 +53,17 @@ export function roleVerrou(f: string, role: string): void {
 /** Retire le verrou s'il est à ce processus. */
 export function rendreVerrou(f: string): void {
   if (lire(f)?.pid === process.pid) rmSync(f, { force: true });
+}
+
+// L710 (issue #55) : un run vivant de cadence run prend un créneau de sessions, comme une vague. Il s'inscrit dans le registre commun des créneaux
+// (CADENCE_HOME, défaut ~/.cadence/orchestrate, comme cadenceHome de src/orchestrate/registry.ts, qui le lit : liveRuns) le temps de sa session, de sa porte
+// et de son intégration. Format partagé : runs/<id>.json = { id, repo, fichier } ; le lecteur compte le run quand son état est en-cours et qu'un porteur
+// vivant tient son verrou `<run>.verrou` (le contrôle de « interrompu » de --liste, L709).
+/** Inscrit le run ; rend son retrait (à appeler à la fin du run, quelle qu'elle soit). */
+export function inscrireCreneau(r: { id: string; repo: string; fichier: string }): () => void {
+  const dossier = join(process.env.CADENCE_HOME || join(homedir(), '.cadence', 'orchestrate'), 'runs'), f = join(dossier, `${r.id}.json`);
+  mkdirSync(dossier, { recursive: true });
+  writeFileSync(`${f}.tmp`, JSON.stringify({ id: r.id, repo: r.repo, fichier: r.fichier }));
+  renameSync(`${f}.tmp`, f);
+  return () => rmSync(f, { force: true });
 }

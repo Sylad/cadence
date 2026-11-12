@@ -1,4 +1,4 @@
-import { git } from '../git.js';
+import { git, onRemote } from '../git.js';
 import { citedRefs } from '../link.js';
 import type { Ref } from '../plan.js';
 
@@ -24,7 +24,7 @@ export function admettreFiche(repo: string, o: { fiche: string; lot: string; red
   // Seul le chemin du porteur (lot livré) admet un lot clos ; un lot en cours n'admet que lui-même (L217, L229 R4).
   const clos = (l: string) => porteur !== undefined && (etats[l] ?? '') in CLOS;
   const fautif = commits.find((c) => !cites(c).some((l) => propres.has(l) || clos(l)));
-  if (fautif && porteur) throw new Error(refusPorteur(o, fautif.sha.slice(0, 7), cites(fautif)));
+  if (fautif && porteur) throw new Error(refusPorteur(repo, o, fautif.sha, cites(fautif)));
   if (fautif) throw new Error(`la fiche ${fiche} a été modifiée depuis le commit rouge ${red.slice(0, 7)} par un commit qui ne cite pas ${lot} : ${fautif.sha.slice(0, 7)}`);
   const amendements = commits
     .filter((c) => !cites(c).some((l) => propres.has(l)))
@@ -37,11 +37,21 @@ export function admettreFiche(repo: string, o: { fiche: string; lot: string; red
   return { ficheAmendee: commits[0]?.sha.slice(0, 7), amendements };
 }
 
-/** Le refus d'un lot livré : un lot en cours cité (autre que le porteur) est nommé avec ses gestes ; sinon les lots cités et la voie de L229. */
-function refusPorteur(o: { fiche: string; lot: string; red: string; porteur?: string; etats: Record<string, string> }, sha: string, lots: string[]): string {
+/**
+ * Le refus d'un lot livré, avec le geste outillé de chaque cas, jamais une édition à la main de `acceptation-<lot>.json` (issue #56) : un lot en cours cité
+ * (autre que le porteur) se clôt ou devient le porteur ; un lot pas commencé se clôt ou se démarre pour devenir le porteur ; un commit sans lot du plan se
+ * réécrit pour citer le porteur s'il n'est pas poussé, sinon la fiche revient à son contenu du commit rouge dans un commit du porteur (comptée inchangée).
+ */
+function refusPorteur(repo: string, o: { fiche: string; lot: string; red: string; porteur?: string; etats: Record<string, string> }, sha: string, lots: string[]): string {
+  const court = sha.slice(0, 7);
   const debut = `la fiche ${o.fiche} a été modifiée depuis le commit rouge ${o.red.slice(0, 7)} par`;
   const enCours = lots.filter((l) => o.etats[l] === 'doing');
   const [premier] = enCours;
-  if (premier) return `${debut} ${sha}, commit du lot en cours ${enCours.join(', ')} qui n'est pas le porteur ${o.porteur} : il bloque le rescellé tant que ${premier} est en cours — clore ${premier} (raf done ${premier}) ou l'abandonner (raf drop ${premier}), puis relancer ; ou, si ${premier} porte la correction du test, relancer avec --porteur ${premier}`;
-  return `${debut} un commit qui ne cite ni ${o.lot}, ni le porteur ${o.porteur}, ni un lot livré : ${sha} (cite : ${lots.length ? lots.join(', ') : 'aucun lot'}) — faire citer le porteur ou un lot livré par ce commit (le réécrire avant qu'il soit poussé) ou, sinon, rescelle à la main avec le lead`;
+  if (premier) return `${debut} ${court}, commit du lot en cours ${enCours.join(', ')} qui n'est pas le porteur ${o.porteur} : il bloque le rescellé tant que ${premier} est en cours — clore ${premier} (raf done ${premier}) ou l'abandonner (raf drop ${premier}), puis relancer ; ou, si ${premier} porte la correction du test, relancer avec --porteur ${premier}`;
+  const constat = `${debut} un commit qui ne cite ni ${o.lot}, ni le porteur ${o.porteur}, ni un lot livré : ${court} (cite : ${lots.length ? lots.join(', ') : 'aucun lot'})`;
+  const aFaire = lots.find((l) => o.etats[l] !== undefined);
+  if (aFaire) return `${constat} — ${aFaire} n'est pas commencé (${o.etats[aFaire]}) : clore ${aFaire} (raf done ${aFaire}) ou l'abandonner (raf drop ${aFaire}), puis relancer ; ou, si ${aFaire} porte la correction du test, le démarrer (raf start ${aFaire}) et relancer avec --porteur ${aFaire}`;
+  const inconnus = lots.length ? ` (${lots.join(', ')} ${lots.length > 1 ? "ne sont pas" : "n'est pas"} au plan)` : '';
+  if (!onRemote(repo, sha)) return `${constat} — ce commit n'est pas poussé${inconnus} : le réécrire pour qu'il cite le porteur ${o.porteur} (git commit --amend s'il est le dernier commit, sinon git rebase -i ${court}^ et reword), puis relancer`;
+  return `${constat} — ce commit est poussé et ne se réécrit pas${inconnus} : remettre la fiche au contenu du commit rouge dans un commit qui cite le porteur (git checkout ${o.red.slice(0, 7)} -- ${o.fiche}, puis git commit -m "docs(${o.porteur}): fiche remise au commit rouge" -- ${o.fiche}) et relancer, une fiche revenue au contenu du commit rouge compte comme inchangée ; l'amendement se refait ensuite dans un commit qui cite ${o.porteur}`;
 }

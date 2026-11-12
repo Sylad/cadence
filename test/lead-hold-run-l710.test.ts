@@ -11,6 +11,8 @@ import { tempDir } from './helpers.js';
 // d'avant) le comptait deux fois — 1 run + hold run-L710 → « 1 sur 3 » au lieu de 2. `lead hold` refuse une étiquette qui nomme un run vivant.
 
 let home: string, dir: string, before: string | undefined;
+// L711 : une seule horloge pour inscrire les holds (TTL 60 min) et les compter ; slotsLine sur l'heure réelle les voyait échus après 16:00Z le 12-11.
+const NOW = new Date('2026-11-12T15:00:00Z');
 beforeEach(() => {
   dir = tempDir();
   home = join(dir, 'home');
@@ -25,7 +27,7 @@ afterEach(() => {
 async function cad(...argv: string[]) {
   const out: string[] = [];
   const err: string[] = [];
-  const code = await run(argv, { cwd: dir, env: { RAF_TODAY: '2026-11-12' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-11-12T15:00:00Z') });
+  const code = await run(argv, { cwd: dir, env: { RAF_TODAY: '2026-11-12' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => NOW });
   return { code, out: out.join('\n'), err: err.join('\n') };
 }
 
@@ -39,13 +41,13 @@ describe('lead hold d\'un cadence run vivant (L710)', () => {
       expect(r.err).toContain('il se compte déjà dans les créneaux');
     }
     expect(existsSync(join(home, 'holds'))).toBe(false);
-    expect(slotsLine(3).free).toBe(2);
+    expect(slotsLine(3, NOW).free).toBe(2);
   });
 
   it('R2 — une étiquette qui ne le nomme pas passe : autre lot, préfixe d\'un autre id (L71, L7100)', async () => {
     writeRun(home, dir, 'r1', { lot: 'L710' });
     for (const label of ['qa-L71', 'fix-L7100', 'revue-L12']) expect((await cad('lead', 'hold', label)).code, label).toBe(0);
-    expect(slotsLine(3).free).toBe(0);
+    expect(slotsLine(3, NOW).free).toBe(0);
   });
 
   it('R3 — un run mort, fini ou sans lot ne bloque pas l\'étiquette de son lot', async () => {

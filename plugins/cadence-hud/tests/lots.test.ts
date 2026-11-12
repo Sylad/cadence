@@ -861,23 +861,25 @@ test('R9 — hauteur 16 (14 de corps), repliés : tout tient (12 rangées), aucu
   expect(folds(p)).toHaveLength(3)
 })
 
-test('R9 — hauteur 10, repliés : projet, L588 et sa frise, les trois lignes, « … +5 lots de plus »', () => {
+test('R9 — hauteur 10, repliés : les trois lots en cours et leur frise d’abord (L712), les lignes repliées comptées dans « … +N »', () => {
   const p = L592({ ...BUSY(), height: 10, now: 0 })
-  expect(kinds(p)).toEqual(['project', 'lot', 'fold', 'fold', 'fold'])
-  expect(lotIds(p)).toEqual(['L588'])
-  expect(p.more).toBe(5) // L589, L592, L593, L594 et le sous-lot de L594
+  expect(kinds(p)).toEqual(['project', 'lot', 'lot', 'lot'])
+  expect(lotIds(p)).toEqual(['L588', 'L589', 'L592'])
+  expect(p.more).toBe(3 + 4 + 11 + 3) // L593, L594 et son sous-lot ; puis ce que replient prêts, livrés et clos
+  expect(p.enCours).toBe(0)
 })
 
-test('R9 — hauteur 10, 11 livrés dépliés : mêmes lignes, « … +16 lots de plus »', () => {
+test('R9 — hauteur 10, 11 livrés dépliés : mêmes lignes, les 11 livrés comptés un par un', () => {
   const p = L592({ ...BUSY(), height: 10, now: 0, views: { 'livres:p': true } })
-  expect(kinds(p)).toEqual(['project', 'lot', 'fold', 'fold', 'fold'])
-  expect(p.more).toBe(16) // 5 + les 11 lots livrés, coupés avec les lots
+  expect(kinds(p)).toEqual(['project', 'lot', 'lot', 'lot'])
+  expect(p.more).toBe(21)
 })
 
-test('R9 — la coupure traverse les lots : les trois lignes restent avant « … +N lots de plus »', () => {
+test('R9 — la coupure passe après les lots en cours : les lignes repliées qui tiennent viennent avant les autres lots, dans leur ordre', () => {
   const p = L592({ ...BUSY(), height: 12, now: 0 })
-  expect(kinds(p)).toEqual(['project', 'lot', 'lot', 'fold', 'fold', 'fold'])
-  expect(p.more).toBe(4) // L592, L593, L594 et son sous-lot
+  expect(kinds(p)).toEqual(['project', 'lot', 'lot', 'lot', 'fold', 'fold'])
+  expect(texts(p)).toEqual(['prêts : 4', 'livrés : 11'])
+  expect(p.more).toBe(3 + 3) // L593, L594 et son sous-lot ; les 3 clos
 })
 
 test('R9 — un projet sans lot qui joue : ses trois lignes gardent leur place, le nom du projet aussi', () => {

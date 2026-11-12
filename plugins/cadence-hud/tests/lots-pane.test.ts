@@ -1759,7 +1759,7 @@ test('L712 — les blocs cèdent dans l’ordre : le banc d’abord, puis les li
 test('L712 — un panneau trop petit pour un seul lot le dit, sans prétendre qu’il n’y a aucun lot', async ($, on) => {
   const s = await crowded($, on)
   const { text } = await s.draw(70, 3)
-  expect(text).toContain('Pas la place de montrer un lot : agrandir le panneau.')
+  expect(text).toContain('Pas la place de montrer un lot (+3 lots en cours non affichés) : agrandir le panneau.')
   expect(text).not.toContain('Aucun lot non clos')
 })
 
@@ -1769,4 +1769,31 @@ test('L712 — un projet à lot en cours placé après un autre reste visible qu
   const { text } = await s.draw(70, 18)
   expect(text).toContain('L401')
   expect(text).not.toContain('Aucun lot non clos')
+})
+
+// ── L712, suite de revue : 13 projets, le projet en cours loin dans priority: ──
+
+/** 13 projets de `n` lots ; au rang `rang`, cadence, dont L679 est en cours. */
+const TREIZE = (rang: number, n: number) =>
+  Array.from({ length: 13 }, (_, i) =>
+    i + 1 === rang ? row('cadence', [lot('L679', 'doing'), ...Array.from({ length: n - 1 }, (_, j) => lot(`L${700 + j}`))]) : row(`p${i + 1}`, Array.from({ length: n }, (_, j) => lot(`P${i + 1}x${j + 1}`))),
+  )
+
+for (const [rang, n] of [[7, 3], [7, 12], [13, 3], [13, 12]] as const)
+  test(`L712 — 13 projets, cadence ${rang}e de priority:, ${n} lots chacun : de 16 à 50 lignes, L679 est à l’écran, jamais un panneau sans lui ni sans le compter`, async ($, on) => {
+    const s = await crowded($, on, TREIZE(rang, n))
+    for (let rows = 16; rows <= 50; rows++) {
+      const { text } = await s.draw(70, rows)
+      expect({ rows, L679: text.includes('L679'), cadence: text.includes('cadence') }).toEqual({ rows, L679: true, cadence: true })
+      expect(text).not.toContain('Aucun lot non clos')
+      expect(text).not.toContain('en cours non affiché')
+    }
+  })
+
+test('L712 — un corps où même les lots en cours ne tiennent pas : le pied les compte à part', async ($, on) => {
+  const tour = Array.from({ length: 13 }, (_, i) => row(`p${i + 1}`, [lot(`A${i + 1}`, 'doing'), lot(`B${i + 1}`)]))
+  const s = await crowded($, on, tour)
+  const { text } = await s.draw(70, 12)
+  expect(text).toMatch(/… \+\d+ lots en cours non affichés · \+\d+ lots de plus/)
+  expect(text).not.toMatch(/B\d+/) // aucun lot à faire tant qu'un lot en cours manque
 })

@@ -274,7 +274,7 @@ export type PanelLine =
   /** Un lot d'une ligne repliée dépliée : la ligne de lot telle que lotRow la dessine, sans frise ni after:. */
   | { kind: 'folded'; row: PanelLot }
 
-export type Panel = { lines: PanelLine[]; /** lignes de lot non affichées faute de hauteur */ more: number }
+export type Panel = { lines: PanelLine[]; /** lots non affichés faute de hauteur */ more: number; /** ceux d'entre eux qui sont en cours (L712) : la ligne horsVue les nomme */ enCours: number }
 
 /** La vague d'un lot : le projet de la vague est le nom du dossier du projet du tour (« apps/ol » ↔ « ol »). */
 const sameProject = (row: string, wave: string): boolean => row === wave || row.split('/').pop() === wave
@@ -339,11 +339,8 @@ export const foldWave = <T extends { project: string; lot: string }>(board: Lots
   return { open, livres, clos }
 }
 
-/**
- * Les lignes du panneau pour `columns` colonnes de corps et `height` lignes de corps : le titre et le pied en prennent deux ;
- * si l'arbre est plus haut, les premières lignes restent et `more` compte les lots que la ligne « … +N lots de plus » (une ligne de plus) remplace ; un projet replié placé après la coupure garde sa ligne, de même que le bouton « + N lots » / « moins » et les lignes repliées prêts, livrés, clos (L592) du projet que la coupure traverse.
- */
-export const buildPanel = (input: {
+/** Ce que le panneau dessine : le tableau lu, la largeur et la hauteur du corps, les vagues et les choix de la personne. */
+export type PanelInput = {
   rows: readonly LotsRow[]
   columns: number
   height: number
@@ -354,13 +351,33 @@ export const buildPanel = (input: {
   views?: Readonly<Record<string, boolean>>
   /** L'heure (ms) à laquelle les durées de la frise sont calculées ; absent, maintenant. */
   now?: number
-}): Panel => {
+}
+
+/** Ce que la coupe sait d'une ligne du panneau (L712), en plus de sa hauteur. */
+type Meta = {
+  /** L'indice de la ligne de son projet (le sien, pour une ligne de projet). */
+  head: number
+  /** La ligne sans laquelle elle ne se montre pas : le lot parent d'un sous-lot, la ligne repliée qu'un lot déplie. */
+  up?: number
+  /** Elle passe avant les autres quand la hauteur manque : un lot du groupe « en cours » (L410), un projet replié qui a des lots en cours, un projet illisible. */
+  prio: boolean
+  /** Les lots en cours qu'elle montre ou cache derrière elle : ceux qui manquent au panneau quand elle n'y est pas. */
+  enCours: number
+}
+
+type Ligne = PanelLine & { height: number }
+
+/** Tous les lots d'un sous-arbre, à toute profondeur. */
+const lotsOf = (nodes: readonly LotNode[]): TourLot[] => nodes.flatMap(n => [n.lot, ...lotsOf(n.children)])
+
+/** Les lignes du panneau dans l'ordre d'affichage, avant toute coupe, avec ce que la coupe en sait (`meta`, même indice). */
+const panelLines = (input: Omit<PanelInput, 'height'>): { lines: Ligne[]; meta: Meta[] } => {
   const { rows, columns, waves } = input
   const now = input.now ?? Date.now()
   const folds = input.folds ?? {}
   const views = input.views ?? {}
   const narrow = columns < NARROW_BODY
-  type Block = { project: LotsRow; flat: FlatLot[]; hidden: number; behind: number; open: Set<string>; folded: boolean; ranks: Map<TourLot, number>; rest: RestGroup[] }
+  type Block = { project: LotsRow; tree: LotNode[]; rankOf: (lot: TourLot) => 0 | 1 | 2; flat: FlatLot[]; hidden: number; behind: number; open: Set<string>; folded: boolean; ranks: Map<TourLot, number>; rest: RestGroup[] }
   const blocks: Block[] = rows
     .filter(r => r.error || (r.lots && r.lots.length > 0))
     .map(r => {
@@ -369,7 +386,7 @@ export const buildPanel = (input: {
       const prets = new Set(rest.find(g => g.group === 'prets')?.items.map(i => i.id))
       const tree = sortTree(lotTree((r.lots ?? []).filter(l => !prets.has(l.id))), rankOf)
       const { flat, hidden, behind } = visibleLots(r.project, tree, views)
-      return { project: r, flat, hidden, behind, open: new Set((r.lots ?? []).map(l => l.id)), folded: !r.error && isFolded(r.project, r.lots ?? [], folds), ranks: displayRanks(r.lots ?? [], rankOf), rest }
+      return { project: r, tree, rankOf, flat, hidden, behind, open: new Set((r.lots ?? []).map(l => l.id)), folded: !r.error && isFolded(r.project, r.lots ?? [], folds), ranks: displayRanks(r.lots ?? [], rankOf), rest }
     })
   const expandedRest = (b: Block) => b.rest.filter(g => views[foldKey(g.group, b.project.project)] === true)
   const baseLead = (f: FlatLot) => (f.depth === 0 ? '  ' : `  ${'  '.repeat(f.depth - 1)}${f.branch} `)
@@ -386,15 +403,24 @@ export const buildPanel = (input: {
   const stateOf = (b: Block, f: FlatLot) => lotState(f.lot, b.open, waves.find(w => w.lot === f.lot.id && sameProject(b.project.project, w.project))?.status)
   const stateWidth = Math.max(0, ...shown.flatMap(b => [...b.flat.map(f => stateOf(b, f).text.length), ...expandedRest(b).map(g => FOLD_STATE[g.group].length)]))
 
-  const lines: (PanelLine & { height: number })[] = []
+  const lines: Ligne[] = []
+  const meta: Meta[] = []
   for (const b of blocks) {
+    const head = lines.length
     if (b.project.error) {
       lines.push({ kind: 'project', name: b.project.project, count: 0, doing: 0, error: `illisible : ${b.project.error}`, height: 1 })
+      meta.push({ head, prio: true, enCours: 0 })
       continue
     }
     const top = (b.project.lots ?? []).filter(l => !isTask(l))
-    lines.push({ kind: 'project', name: b.project.project, count: top.length, doing: top.filter(l => l.status === 'doing').length, folded: b.folded, height: 1 })
+    const doing = top.filter(l => l.status === 'doing').length
+    lines.push({ kind: 'project', name: b.project.project, count: top.length, doing, folded: b.folded, height: 1 })
+    meta.push({ head, prio: b.folded && doing > 0, enCours: b.folded ? doing : 0 })
     if (b.folded) continue
+    const nodeOf = new Map<TourLot, LotNode>()
+    const walk = (nodes: readonly LotNode[]): void => nodes.forEach(n => (nodeOf.set(n.lot, n), walk(n.children)))
+    walk(b.tree)
+    const parents: number[] = [] // l'indice du dernier lot montré à chaque profondeur
     for (const f of b.flat) {
       const after = f.lot.after.map(id => ({ id, struck: !b.open.has(id) }))
       const afterText = after.length ? `after: ${after.map(a => a.id).join(' ')}` : ''
@@ -407,26 +433,88 @@ export const buildPanel = (input: {
       lines.push({
         kind: 'lot', id: f.lot.id, lead: leadOf(b, f), title: ellipsize(f.lot.title, Math.max(1, room)), state: stateOf(b, f), after, afterOwnLine, group: groupOf(f.lot), rank: b.ranks.get(f.lot)!, idWidth, stateWidth, ...(subs ? { subs } : {}), ...(cycle.length > 0 ? { cycle } : {}), height: (afterOwnLine ? 2 : 1) + (cycle.length > 0 ? 1 : 0),
       })
+      // un lot replié cache ses descendants : leurs lots en cours manquent avec lui
+      const caches = subs && !subs.open ? lotsOf(nodeOf.get(f.lot)?.children ?? []) : []
+      meta.push({ head, ...(f.depth > 0 ? { up: parents[f.depth - 1] } : {}), prio: b.ranks.get(f.lot) === 0, enCours: [f.lot, ...caches].filter(l => b.rankOf(l) === 0).length })
+      parents[f.depth] = lines.length - 1
     }
-    if (b.hidden > 0) lines.push({ kind: 'more', project: b.project.project, hidden: b.hidden, behind: b.behind, expanded: views[moreKey(b.project.project)] === true, height: 1 })
+    if (b.hidden > 0) {
+      const expanded = views[moreKey(b.project.project)] === true
+      lines.push({ kind: 'more', project: b.project.project, hidden: b.hidden, behind: b.behind, expanded, height: 1 })
+      meta.push({ head, prio: false, enCours: expanded ? 0 : lotsOf(b.tree.slice(LOTS_PER_PROJECT)).filter(l => b.rankOf(l) === 0).length })
+    }
     for (const g of b.rest) {
       const key = foldKey(g.group, b.project.project)
       const expanded = views[key] === true
+      const fold = lines.length
       lines.push({ kind: 'fold', project: b.project.project, group: g.group, key, text: `${FOLD_LABEL[g.group]} : ${g.items.length}`, count: g.items.length, expanded, height: 1 })
+      meta.push({ head, prio: false, enCours: 0 })
       if (!expanded) continue
       const room = Math.max(1, columns - idWidth - 2 - stateWidth - 2)
       for (const i of g.items) {
         const state: LotState = { text: FOLD_STATE[g.group], color: 'subtle' }
         lines.push({ kind: 'folded', row: { kind: 'lot', id: i.id, lead: REST_LEAD, title: ellipsize(i.title, room), state, after: [], afterOwnLine: false, group: '', rank: 2, idWidth, stateWidth }, height: 1 })
+        meta.push({ head, up: fold, prio: false, enCours: 0 })
       }
     }
   }
-  // les lots qu'une ligne cache et qu'aucune autre ligne ne porte : les descendants d'un lot replié (à toute profondeur), le reste d'un projet derrière un bouton replié
-  const hides = (l: PanelLine): number => (l.kind === 'lot' ? (l.subs && !l.subs.open ? l.subs.total : 0) : l.kind === 'more' && !l.expanded ? l.behind : l.kind === 'fold' && !l.expanded ? l.count : 0)
+  return { lines, meta }
+}
+
+/** Les lots qu'une ligne cache et qu'aucune autre ligne ne porte : les descendants d'un lot replié (à toute profondeur), le reste d'un projet derrière un bouton replié. */
+const hides = (l: PanelLine): number => (l.kind === 'lot' ? (l.subs && !l.subs.open ? l.subs.total : 0) : l.kind === 'more' && !l.expanded ? l.behind : l.kind === 'fold' && !l.expanded ? l.count : 0)
+
+/** Les lignes à ajouter à `pris` pour montrer la ligne `i` : elle, ses parents (sous-lot, lot d'une ligne repliée dépliée) et le nom de son projet. */
+const chaine = (meta: readonly Meta[], pris: ReadonlySet<number>, i: number): number[] => {
+  const out: number[] = []
+  for (let at: number | undefined = i; at !== undefined && !pris.has(at); at = meta[at]!.up) out.push(at)
+  if (!pris.has(meta[i]!.head) && !out.includes(meta[i]!.head)) out.push(meta[i]!.head)
+  return out
+}
+
+/**
+ * La coupe « en cours d'abord » (L712), dans `budget` lignes : chaque ligne prioritaire (Meta.prio), dans l'ordre d'affichage et avec le nom de son projet, avant toute autre ligne de n'importe quel projet ;
+ * puis les lignes repliées (L592) des projets montrés, puis, seulement si toutes ont tenu, le reste dans l'ordre, tant qu'il tient. Un nom de projet sans aucune de ses lignes n'apprend rien ; un bouton « + N lots » suit un lot gardé de son projet. `seulPrio` : s'arrêter après les prioritaires.
+ */
+const enCoursDAbord = (lines: readonly Ligne[], meta: readonly Meta[], budget: number, seulPrio = false): { pris: Set<number>; used: number } => {
+  const pris = new Set<number>()
+  let used = 0
+  const prendre = (i: number) => {
+    const c = chaine(meta, pris, i)
+    const cout = c.reduce((n, j) => n + lines[j]!.height, 0)
+    if (used + cout > budget) return
+    c.forEach(j => pris.add(j))
+    used += cout
+  }
+  meta.forEach((m, i) => m.prio && prendre(i))
+  // tant qu'une ligne prioritaire manque, aucune autre ne prend la place, pas même une ligne plus courte qui tiendrait
+  if (seulPrio || meta.some((m, i) => m.prio && !pris.has(i))) return { pris, used }
+  // les lignes repliées prêts, livrés, clos (L592) d'un projet montré gardent leur place avant ses autres lots : elles comptent ce qu'elles replient
+  lines.forEach((l, i) => l.kind === 'fold' && pris.has(meta[i]!.head) && prendre(i))
+  lines.forEach((l, i) => {
+    if (pris.has(i) || (l.kind === 'project' && !l.folded && !l.error)) return
+    if (l.kind === 'more' && !lines.some((o, j) => o.kind === 'lot' && pris.has(j) && meta[j]!.head === meta[i]!.head)) return
+    prendre(i)
+  })
+  return { pris, used }
+}
+
+/** Les lots en cours que les lignes absentes de `montrees` portent ou cachent : ceux que le pied du panneau compte (L712). */
+const enCoursHors = (meta: readonly Meta[], montrees: ReadonlySet<number>): number => meta.reduce((n, m, i) => n + (montrees.has(i) ? 0 : m.enCours), 0)
+
+/**
+ * Les lignes du panneau pour `columns` colonnes de corps et `height` lignes de corps : le titre et le pied en prennent deux ; si l'arbre est plus haut, une ligne de plus dit ce qui manque (horsVue).
+ * Les premières lignes restent tant qu'elles montrent tous les lots en cours : un projet replié placé après la coupure garde sa ligne, de même que le bouton « + N lots » / « moins » et les lignes
+ * repliées prêts, livrés, clos (L592) du projet que la coupure traverse. Sinon (L712), chaque lot en cours de chaque projet garde sa ligne, avec le nom de son projet, avant tout autre lot (enCoursDAbord).
+ * `more` compte les lots non affichés, `enCours` ceux d'entre eux qui sont en cours.
+ */
+export const buildPanel = (input: PanelInput): Panel => {
+  const { lines, meta } = panelLines(input)
+  const strip = (ls: readonly Ligne[]): PanelLine[] => ls.map(({ height: _h, ...l }) => l as PanelLine)
 
   const room = Math.max(1, input.height - 2)
   const total = lines.reduce((n, l) => n + l.height, 0)
-  if (total <= room) return { lines: lines.map(({ height: _h, ...l }) => l as PanelLine), more: 0 }
+  if (total <= room) return { lines: strip(lines), more: 0, enCours: 0 }
   const isFoldedLine = (l: PanelLine) => l.kind === 'project' && !!l.folded
   const tail = (from: number) => lines.slice(from).filter(isFoldedLine) // les projets repliés après la coupure gardent leur ligne
   // les lignes qui gardent leur place quand la coupure traverse un projet, jamais coupées avec ses lots : le bouton « + N lots » / « moins » (après un lot gardé) et les lignes repliées prêts, livrés, clos (L592) ; les lots d'une ligne dépliée, eux, sont coupés
@@ -450,43 +538,38 @@ export const buildPanel = (input: {
   const cutButtons = lines.slice(kept).filter(l => (l.kind === 'more' || l.kind === 'fold') && !keptBack.includes(l)).reduce((n, l) => n + hides(l), 0)
   // un lot replié que la coupure retire emporte ses descendants à toute profondeur, qui ne sont plus des lignes : ils passent dans « … +N » avec lui ; de même les lots d'une ligne repliée dépliée
   const cutLots = lines.slice(kept).reduce((n, l) => n + (l.kind === 'lot' ? 1 + hides(l) : l.kind === 'folded' ? 1 : 0), 0)
-  return { lines: fits.map(({ height: _h, ...l }) => l as PanelLine), more: cutLots + droppedLots + cutButtons }
+  const montrees = new Set(fits.map(l => lines.indexOf(l)))
+  if (meta.every((m, i) => !m.prio || montrees.has(i))) return { lines: strip(fits), more: cutLots + droppedLots + cutButtons, enCours: enCoursHors(meta, montrees) }
+
+  // la coupe laisserait un lot en cours sans ligne (L712, D-20) : les lots en cours d'abord, puis le reste ; ce qui manque est compté
+  const { pris } = enCoursDAbord(lines, meta, room - 1)
+  const absents = lines.filter((_, i) => !pris.has(i))
+  const more = absents.reduce((n, l) => n + (l.kind === 'lot' ? 1 + hides(l) : l.kind === 'folded' ? 1 : l.kind === 'project' ? (l.folded ? l.count : 0) : hides(l)), 0)
+  return { lines: strip(lines.filter((_, i) => pris.has(i))), more, enCours: enCoursHors(meta, pris) }
 }
 
-/** Les projets que des lignes du panneau montrent : par un de leurs lots, ou par leur ligne repliée (qui dit ses lots en cours). */
-const projetsVus = (lines: readonly PanelLine[]): Set<string> => {
-  const vus = new Set<string>()
-  let projet = ''
-  for (const l of lines) {
-    if (l.kind === 'project') {
-      projet = l.name
-      if (l.folded) vus.add(projet)
-    } else if (l.kind === 'lot') vus.add(projet)
-  }
-  return vus
+/** La ligne qui dit ce que le panneau ne montre pas (L712) : « … +2 lots en cours non affichés · +5 lots de plus », ou « … +5 lots de plus » quand tous les lots en cours sont là. */
+export const horsVue = (p: Pick<Panel, 'more' | 'enCours'>): string => {
+  const s = (n: number) => (n > 1 ? 's' : '')
+  const reste = Math.max(0, p.more - p.enCours)
+  return `… ${[p.enCours > 0 ? `+${p.enCours} lot${s(p.enCours)} en cours non affiché${s(p.enCours)}` : '', reste > 0 ? `+${reste} lot${s(reste)} de plus` : ''].filter(Boolean).join(' · ')}`
 }
 
 /**
- * La hauteur que l'arbre des lots demande dans le partage du panneau (L712), au plus `max` : la plus petite qui montre tous les projets à lot en cours (un lot ou leur ligne repliée) ;
- * sinon celle qui montre le premier d'entre eux ; sinon celle qui montre un lot. Aucune ne tient : `max`, tout le corps à l'arbre. Sans projet à montrer : 1, la ligne qui le dit.
+ * La hauteur que l'arbre des lots demande dans le partage du panneau (L712), au plus `max` : celle qui montre chaque lot en cours de chaque projet avec le nom de son projet, plus la ligne
+ * qui compte le reste ; sans lot en cours, celle qui montre une première ligne ; tout tient : la hauteur de tout l'arbre. Calculée sur la coupe elle-même (enCoursDAbord), qui garde ces lignes
+ * à toute hauteur au moins égale : rien ne suppose que buildPanel montre davantage quand la hauteur grandit. Sans projet à montrer : 1, la ligne qui le dit.
  */
-export const besoinArbre = (input: Omit<Parameters<typeof buildPanel>[0], 'height'>, max: number): number => {
-  const montres = input.rows.filter(r => r.error || (r.lots && r.lots.length > 0))
-  if (montres.length === 0) return 1
-  const enCours = montres.filter(r => !r.error && (r.lots ?? []).some(l => !isTask(l) && l.status === 'doing')).map(r => r.project)
-  const buts: ((vus: Set<string>, lines: readonly PanelLine[]) => boolean)[] = [
-    ...(enCours.length > 0 ? [(vus: Set<string>) => enCours.every(p => vus.has(p)), (vus: Set<string>) => vus.has(enCours[0]!)] : []),
-    (vus, lines) => vus.size > 0 || lines.some(l => l.kind === 'project' && l.error),
-  ]
-  const atteint: (number | undefined)[] = buts.map(() => undefined)
-  for (let h = 0; h <= max && atteint[0] === undefined; h++) {
-    const lines = buildPanel({ ...input, height: h }).lines
-    const vus = projetsVus(lines)
-    buts.forEach((but, i) => {
-      if (atteint[i] === undefined && but(vus, lines)) atteint[i] = h
-    })
+export const besoinArbre = (input: Omit<PanelInput, 'height'>, max: number): number => {
+  const { lines, meta } = panelLines(input)
+  if (lines.length === 0) return 1
+  const total = lines.reduce((n, l) => n + l.height, 0)
+  let { used } = enCoursDAbord(lines, meta, Infinity, true)
+  if (used === 0) {
+    const premiere = lines.findIndex(l => l.kind !== 'project' || l.folded || l.error)
+    used = premiere < 0 ? 0 : chaine(meta, new Set(), premiere).reduce((n, j) => n + lines[j]!.height, 0)
   }
-  return atteint.find(h => h !== undefined) ?? max
+  return Math.min(max, total + 2, used + 3)
 }
 
 /** Une ligne de lot du panneau, telle que le dessin la porte ; le projet la date. */

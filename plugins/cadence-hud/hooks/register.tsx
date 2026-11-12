@@ -11,7 +11,7 @@ import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, color
 
 import { lotRow } from './lot-row'
 import { lignesDuBloc, partage } from './partage'
-import { besoinArbre, buildPanel, ellipsize, foldText, foldWave, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
+import { besoinArbre, buildPanel, ellipsize, horsVue, foldText, foldWave, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
@@ -984,11 +984,11 @@ export const register: Register = on => {
       )
       const orderRows = order ? ranked.length + 1 : 0
       const panel = buildPanel({ ...panelInput!, height: room - orderRows })
-      // « aucun lot » ne se dit que d'un dossier sans lot non clos ; un arbre qui a des lots mais pas la place d'en montrer un le dit (L712)
+      // « aucun lot » ne se dit que d'un dossier sans lot non clos ; un arbre qui a des lots mais pas la place d'en montrer un le dit, et compte ses lots en cours (L712)
       if (panel.lines.length === 0) {
         body = !board.rows.some(r => r.error || (r.lots && r.lots.length > 0))
           ? message('Aucun lot non clos dans les projets de ce dossier.', 'subtle')
-          : message('Pas la place de montrer un lot : agrandir le panneau.', 'error')
+          : message(`Pas la place de montrer un lot${panel.enCours > 0 ? ` (${horsVue({ more: panel.enCours, enCours: panel.enCours }).slice(2)})` : ''} : agrandir le panneau.`, 'error')
       } else {
         // une région Client par projet : on ne réordonne qu'à l'intérieur de son projet
         const rows: RenderChildren[] = []
@@ -1075,9 +1075,10 @@ export const register: Register = on => {
             )}
             {order}
             {rows}
+            {/* ce qui manque, les lots en cours d'abord (L712) : jamais un lot en cours absent sans une ligne qui le compte */}
             {panel.more > 0 && (
-              <Text dimColor>
-                … +{panel.more} lot{panel.more > 1 ? 's' : ''} de plus
+              <Text dimColor={panel.enCours === 0} color={panel.enCours > 0 ? 'warning' : undefined} wrap="truncate-end">
+                {horsVue(panel)}
               </Text>
             )}
           </Box>

@@ -3,7 +3,7 @@
  "texte": "hum mais les hud spont buggé ou c'est moi, je n'ai plus aucune vision sur l'avancement des projets",
  "date": "2026-11-12",
  "etat": "livrée",
- "preuve": "L712 : hooks/partage.ts, besoinArbre (hooks/lots.ts), register.tsx ; claude plugin test plugins/cadence-hud → 486 pass, 0 fail (tests/partage-l712.test.ts, tests/lots-pane.test.ts « L712 — … ») ; rendu texte du panneau à 60, 16, 10 et 3 lignes dans cadence-20261112201653-676678.captures/L712-panneau-lots.txt (non commité).",
+ "preuve": "L712 (suite de revue) : hooks/lots.ts (buildPanel, enCoursDAbord, besoinArbre, horsVue), register.tsx ; claude plugin test plugins/cadence-hud → 496 pass, 0 fail, dont tests/partage-l712.test.ts (13 projets, projet en cours 1er, 7e, 13e, 3 et 12 lots, corps 16 à 50 ; hauteur ≥ besoinArbre jusqu'à 120 ; lots en cours qui ne tiennent pas comptés) et tests/lots-pane.test.ts (même simulation sur le rendu du panneau) ; capture texte du panneau rendu dans cadence-20261112203450-1344295.captures/L712-panneau-lots.txt (non commitée).",
  "precisions": [
   {
    "date": "2026-11-12",
@@ -12,12 +12,17 @@
   {
    "date": "2026-11-12",
    "texte": "L712 : l'arbre des lots passe en premier dans le partage de la hauteur (banc, livraisons, dépenses, décisions se replient en une ligne puis cèdent) ; « Pas la place de montrer un lot : agrandir le panneau. » quand la hauteur manque ; « Aucun lot non clos » seulement sans lot ouvert."
+  },
+  {
+   "date": "2026-11-12",
+   "texte": "L712, suite de revue : le panneau ne coupe plus l'arbre par le haut quand un lot en cours en sortirait ; chaque lot en cours de chaque projet garde sa ligne avec le nom de son projet avant tout autre lot, ce qui manque est compté (« … +N lots en cours non affichés · +M lots de plus ») ; besoinArbre est calculé sur cette coupe, sans supposer que buildPanel montre davantage quand la hauteur grandit."
   }
  ],
  "lots": [
   "L712"
  ],
  "runs": [
-  "20261112201653-676678"
+  "20261112201653-676678",
+  "20261112203450-1344295"
  ]
 }

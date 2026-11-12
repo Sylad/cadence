@@ -3333,12 +3333,15 @@ lots:
     finished: 2026-11-12
   - id: L712
     title: "Panneau /hud lots : l'arbre des lots n'est jamais réduit à rien par les autres blocs (décisions, dépenses, livraisons, Banc) ; les blocs secondaires cèdent leur place d'abord (Banc replié en une ligne quand la place manque) ; un panneau trop petit pour un lot le dit (« pas la place : agrandir le panneau »), jamais « Aucun lot non clos » quand des lots existent ; test sur hauteur réduite et capture réelle du panneau (D-20 : capture du 12-11 à 20:35, panneau vide pendant L679)"
-    status: doing
+    status: done
     estimate: 0.5
     visible: true
     screen: component
     created: 2026-11-12
     started: 2026-11-12
+    review: { date: 2026-11-12, verdict: "conforme (revue Sonnet de a6f42e5, puis revue courte de 9eee6ca, 12-11) : 0 bloquant ; 496 tests du plugin verts ; l'arbre des lots passe avant les blocs secondaires, chaque lot en cours garde sa ligne sous son projet (7e et 13e de priority: compris), ce qui manque est compté, un panneau trop petit le dit", commit: 9eee6ca3f6da9e00b25096779c3374f9149d7bbd }
+    ux: { date: 2026-11-12, verdict: "conforme sur la capture texte du rendu (moteur de test du mod, 50 à 3 lignes) lue par le lead ; rendu réel dans Claude Code à confirmer par la capture de Sylvain après mise en service (D-20)" }
+    finished: 2026-11-12
   - id: L713
     title: "spec reseal --porteur n'est plus bloqué par une modification de fiche venant d'un lot abandonné (raf drop) ou fini : ce commit est accepté et inscrit dans resceaux avec sa raison ; un lot en cours qui n'est pas le porteur bloque toujours ; plus jamais d'édition à la main d'acceptation-<lot>.json (issue #56 du compte pro, vécu deux fois ; même famille que #53)"
     status: todo

@@ -9,7 +9,7 @@ COMMANDES.run = cmdRun;
 COMMANDES.bench = (a, io) => (a[0] === 'sequence' ? sequence(a.slice(1), io) : bench(a, io)); // le banc séquence vit dans son module
 
 const AIDE = `cadence2 — noyau de cadence 2 (en construction)
-  cadence2 bench court|hebdo|eclair|lancer|statut|verifier-publication|ajouter   banc de mesure (docs/v2/)
+  cadence2 bench court|hebdo|eclair|micro|mecanique|lancer|statut|verifier-publication|ajouter [--paralleles N]   banc de mesure (docs/v2/banc.md)
   cadence2 bench sequence <id> [--candidat c] [--reference r] [--repetitions N] [--juge modèle]   banc séquence (docs/v2/banc.md)
 ${AIDE_RUN}`;
 

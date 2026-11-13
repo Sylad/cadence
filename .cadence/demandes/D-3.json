@@ -3,15 +3,22 @@
  "texte": "ok, donc on attend en attendant les tests. 1h30 de tests pour mesurer les effets d'un soft me paraisse quand même ennormeeeeeeeeeeeee",
  "date": "2026-11-10",
  "origine": "session du lead ; proposition des trois niveaux de banc acceptée (« ok »)",
- "etat": "ouverte",
+ "etat": "livrée",
  "lots": [
   "L689"
  ],
- "preuve": null,
+ "preuve": "commit feat(L689) : v2/test/banc-niveaux-l689.test.ts, 12 tests verts (bancs micro et mécanique sans juge IA ; garde cadence-run contre A ; commande du dépôt à publier ; passage de 3 bancs en 3 processus cadence2 parallèles : 6 sessions d'une seconde jouées en 4,3 s) ; suite v2 554/554 verte (npx vitest run dans v2).",
  "precisions": [
   {
    "date": "2026-11-13",
    "texte": "Redite de Sylvain pendant le banc hebdo (plus de 2 h 15, 3 bancs sur 6) : « on attend, le compte pro attend le fix de #56, on va pas s'arreter en plein millieu, mais ziut, il faudra après regler ce pb de longeur insuportable ». À traiter juste après la release 2.0.4 (L689)."
+  },
+  {
+   "date": "2026-11-13",
+   "texte": "L689 livré dans le code. Pas encore vérifié : la durée avant/après sur un vrai passage (il faut ~/bench-cadence et de vraies sessions Claude, hors du dépôt du run) ; à mesurer avec « node <dépôt>/v2/bin/cadence2.js bench mecanique » puis « bench court », contre le banc hebdo du 13-11 (plus de 5 h). Non fait : les répétitions du banc séquence restent l'une après l'autre (module à 2 lignes de son budget R29)."
   }
+ ],
+ "runs": [
+  "20261113134206-2310058"
  ]
 }

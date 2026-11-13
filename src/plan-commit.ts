@@ -134,11 +134,13 @@ function wrap(text: string, width: number): string[] {
  * Le message du commit de `spec reseal` (L546) : le sujet est court et fixe (comme `spec green`), les chemins, la raison (coupée à 90 colonnes) et la fiche amendée,
  * sans borne, vont dans le corps ; un sujet qui les portait dépassait `header-max-length` de commitlint. `livre` : l'id du lot livré rescellé par le lot `cite`.
  */
-export function resealCommitMessage(o: { cite: string; livre?: string; tests: string[]; reason: string; ficheAmendee?: string; amendements?: { sha: string; lot: string; etat: string }[] }): [subject: string, body: string] {
+export function resealCommitMessage(o: { cite: string; livre?: string; tests: string[]; reason: string; ficheAmendee?: string; amendements?: { sha: string; lot?: string; etat: string }[] }): [subject: string, body: string] {
   const subject = `test(${o.cite}): acceptation rescellée${o.livre ? ` du lot livré ${o.livre}` : ''}`;
   // L713 : les commits de la fiche admis pour leur lot fini ou abandonné sont dits, le journal de l'acceptation les garde aussi.
-  const admis = (o.amendements ?? []).map((m) => `- ${m.sha} (lot ${m.lot}, ${m.etat === 'done' ? 'fini' : 'abandonné'})`);
-  const body = [...o.tests.map((t) => `- ${t}`), '', ...wrap(`raison : ${o.reason.trim()}`, 90), ...(o.ficheAmendee ? ['', `fiche amendée en ${o.ficheAmendee}`] : []), ...(admis.length ? ['commits de la fiche admis (lot clos) :', ...admis] : [])].join('\n');
+  const admis = (o.amendements ?? []).filter((m) => m.etat !== 'acquitté').map((m) => `- ${m.sha} (lot ${m.lot}, ${m.etat === 'done' ? 'fini' : 'abandonné'})`);
+  // L729 : et ceux qu'un `raf ignore` a acquittés (la raison est dans resceaux).
+  const acquittes = (o.amendements ?? []).filter((m) => m.etat === 'acquitté').map((m) => `- ${m.sha}`);
+  const body = [...o.tests.map((t) => `- ${t}`), '', ...wrap(`raison : ${o.reason.trim()}`, 90), ...(o.ficheAmendee ? ['', `fiche amendée en ${o.ficheAmendee}`] : []), ...(admis.length ? ['commits de la fiche admis (lot clos) :', ...admis] : []), ...(acquittes.length ? ['commits de la fiche admis (raf ignore) :', ...acquittes] : [])].join('\n');
   return [subject, body];
 }
 

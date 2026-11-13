@@ -1406,7 +1406,7 @@ describe('cadence spec reseal d’un lot livré : le refus donne le geste outill
     const { repo, a, sha } = cas('docs: fiche amendée');
     const r = reseal(repo, a.test);
     expect(r.code).not.toBe(0);
-    expect(r.err).toContain(`ni un lot livré : ${sha} (cite : aucun lot) — ce commit n'est pas poussé : le réécrire pour qu'il cite le porteur L2 (git commit --amend s'il est le dernier commit, sinon git rebase -i ${sha}^ et reword), puis relancer`);
+    expect(r.err).toContain(`ni un lot livré : ${sha} (cite : aucun lot) — ce commit n'est pas poussé : le réécrire pour qu'il cite le porteur L2 (git commit --amend s'il est le dernier commit, sinon git rebase -i ${sha}^ et reword), puis relancer ; ou l'acquitter (raf ignore ${sha} --reason`);
     jamaisALaMain(r.err);
     git(repo, 'commit', '-q', '--amend', '-m', 'docs(L2): fiche amendée', '--', a.fiche);
     const apres = reseal(repo, a.test);
@@ -1422,29 +1422,120 @@ describe('cadence spec reseal d’un lot livré : le refus donne le geste outill
     jamaisALaMain(r.err);
   });
 
-  it('aucun lot, commit poussé : le refus propose de remettre la fiche au commit rouge dans un commit du porteur ; le geste passe, l’amendement refait ensuite ne viole pas le verrou', () => {
-    const { repo, a, sha, red } = cas('docs: fiche amendée', true);
-    const amendee = readFileSync(join(repo, a.fiche), 'utf8');
+  it('aucun lot, commit poussé : le refus propose de l’acquitter (raf ignore), plus de remettre la fiche au commit rouge (L729)', () => {
+    const { repo, a, sha } = cas('docs: fiche amendée', true);
     const r = reseal(repo, a.test);
     expect(r.code).not.toBe(0);
-    expect(r.err).toContain(`ni un lot livré : ${sha} (cite : aucun lot) — ce commit est poussé et ne se réécrit pas : remettre la fiche au contenu du commit rouge dans un commit qui cite le porteur (git checkout ${red} -- ${a.fiche}, puis git commit -m "docs(L2): fiche remise au commit rouge" -- ${a.fiche}) et relancer, une fiche revenue au contenu du commit rouge compte comme inchangée ; l'amendement se refait ensuite dans un commit qui cite L2`);
+    expect(r.err).toContain(`ni un lot livré : ${sha} (cite : aucun lot) — ce commit est poussé et ne se réécrit pas : l'acquitter (raf ignore ${sha} --reason "pourquoi ce commit amende la fiche hors d'un lot", plan commité), puis relancer : il est admis et inscrit dans resceaux avec sa raison`);
+    expect(r.err).not.toContain('git checkout');
     jamaisALaMain(r.err);
-    git(repo, 'checkout', red, '--', a.fiche);
-    git(repo, 'commit', '-q', '-m', 'docs(L2): fiche remise au commit rouge', '--', a.fiche);
-    const apres = reseal(repo, a.test);
-    expect(apres.err).toBe('');
-    expect(apres.code).toBe(0);
-    expect(JSON.parse(readFileSync(join(repo, a.json), 'utf8')).resceaux[0].ficheAmendee).toBeUndefined();
-    const avant = git(repo, 'rev-parse', 'HEAD').trim();
-    writeFileSync(join(repo, a.fiche), amendee);
-    commitPaths(repo, 'docs(L2): fiche, R62 amendée', a.fiche);
-    expect(lockViolations(repo, DIR, avant)).toEqual([]);
   });
 
   it('lot inconnu, commit poussé : même geste, le lot nommé absent du plan', () => {
     const { repo, a, sha } = cas('docs(L99): fiche amendée', true);
     const r = reseal(repo, a.test);
-    expect(r.err).toContain(`ni un lot livré : ${sha} (cite : L99) — ce commit est poussé et ne se réécrit pas (L99 n'est pas au plan) : remettre la fiche au contenu du commit rouge`);
+    expect(r.err).toContain(`ni un lot livré : ${sha} (cite : L99) — ce commit est poussé et ne se réécrit pas (L99 n'est pas au plan) : l'acquitter (raf ignore ${sha}`);
     jamaisALaMain(r.err);
+  });
+});
+
+// L729 (issue #60) : la fiche d'un lot livré modifiée après le commit rouge par un commit sans lot du plan (le commit poussé d'un collègue, fait hors cadence)
+// ne bloque plus le rescellé une fois ce commit acquitté par `raf ignore` : il est admis et inscrit dans `resceaux`, sous `amendements`, avec la raison.
+// Un commit sans lot qui n'est pas acquitté bloque toujours (le verrou des tests reste).
+describe('cadence spec reseal : un commit de la fiche acquitté par raf ignore est admis (L729)', () => {
+  function cli(repo: string, ...argv: string[]) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = run(argv, { cwd: repo, env: { RAF_TODAY: '2026-11-13' }, out: (l) => out.push(l), err: (l) => err.push(l), now: () => new Date('2026-11-13T10:00:00') });
+    return { code, out: out.join('\n'), err: err.join('\n') };
+  }
+  /** L1 livré (acceptation verte), L2 porteur en cours ; la fiche amendée par un commit par message de `messages`, poussés sur origin ; le test corrigé. */
+  function cas(messages: string[], o: { livre?: boolean } = {}) {
+    const livre = o.livre ?? true;
+    const s = lotScelle({ vert: livre });
+    cli(s.repo, 'init', '--project', 'demo');
+    for (const t of ['un', 'deux']) cli(s.repo, 'add', `Lot ${t}`);
+    cli(s.repo, 'start', 'L1');
+    if (livre) cli(s.repo, 'done', 'L1', '--force');
+    cli(s.repo, 'start', 'L2');
+    commitPaths(s.repo, 'plan: lots', '.cadence/raf.yaml', '.cadence/notes/.gitkeep', '.gitignore');
+    const shas = messages.map((m, n) => {
+      writeFileSync(join(s.repo, s.a.fiche), `${readFileSync(join(s.repo, s.a.fiche), 'utf8')}# amendement ${n} d'un collègue\n`);
+      commitPaths(s.repo, m, s.a.fiche);
+      return git(s.repo, 'rev-parse', '--short', 'HEAD').trim();
+    });
+    const origine = tempDir();
+    git(origine, 'init', '-q', '--bare');
+    git(s.repo, 'remote', 'add', 'origin', origine);
+    git(s.repo, 'push', '-q', 'origin', 'main');
+    writeFileSync(join(s.repo, s.a.test), `${readFileSync(join(s.repo, s.a.test), 'utf8')}// chemin corrigé\n`);
+    return { ...s, shas };
+  }
+  const ignore = (repo: string, arg: string, reason?: string) => {
+    const r = cli(repo, 'ignore', arg, ...(reason ? ['--reason', reason] : []));
+    expect(r.code).toBe(0);
+    commitPaths(repo, 'plan: commit du collègue acquitté', '.cadence/raf.yaml');
+  };
+  const reseal = (repo: string, test: string) => cli(repo, 'spec', 'reseal', 'L1', test, '--reason', 'nouveau chemin de base', '--porteur', 'L2');
+  const journal = (repo: string, json: string) => JSON.parse(readFileSync(join(repo, json), 'utf8')).resceaux as Record<string, unknown>[];
+
+  it('commit sans lot poussé, acquitté par son sha : rescellé accepté, inscrit dans resceaux sous amendements avec la raison et dans le corps du commit', () => {
+    const { repo, a, shas } = cas(['docs: fiche reprise par un collègue']);
+    const [sha] = shas as [string];
+    const ficheAvant = readFileSync(join(repo, a.fiche), 'utf8');
+    ignore(repo, sha, 'commit d’un collègue hors cadence, déjà poussé');
+    const r = reseal(repo, a.test);
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    const [entree] = journal(repo, a.json);
+    expect(entree).toMatchObject({ test: a.test, porteur: 'L2', ficheAmendee: sha });
+    expect(entree!.amendements).toEqual([{ sha, etat: 'acquitté', raison: 'acquitté par raf ignore le 2026-11-13 : commit d’un collègue hors cadence, déjà poussé' }]);
+    expect(git(repo, 'log', '-2', '--format=%b')).toContain(`commits de la fiche admis (raf ignore) :\n- ${sha}`);
+    // La fiche vivante fait foi : rien n'est défait.
+    expect(readFileSync(join(repo, a.fiche), 'utf8')).toBe(ficheAvant);
+    expect(lockViolations(repo, DIR, git(repo, 'rev-parse', 'HEAD').trim())).toEqual([]);
+  });
+
+  it('commit d’un lot absent du plan, acquitté : admis de même', () => {
+    const { repo, a, shas } = cas(['docs(L99): fiche reprise']);
+    ignore(repo, shas[0]!, 'lot d’un autre plan');
+    const r = reseal(repo, a.test);
+    expect(r.err).toBe('');
+    expect((journal(repo, a.json)[0]!.amendements as { etat: string }[])[0]!.etat).toBe('acquitté');
+  });
+
+  it('acquitté par son sujet exact, sans raison : admis, la raison dit qu’aucune n’a été donnée', () => {
+    const { repo, a, shas } = cas(['docs: fiche reprise par un collègue']);
+    ignore(repo, 'docs: fiche reprise par un collègue');
+    const r = reseal(repo, a.test);
+    expect(r.err).toBe('');
+    expect(journal(repo, a.json)[0]!.amendements).toEqual([{ sha: shas[0], etat: 'acquitté', raison: 'acquitté par raf ignore le 2026-11-13 : sans raison donnée' }]);
+  });
+
+  it('commit sans lot NON acquitté : refusé, même quand un autre commit de la fiche l’est ; le refus nomme celui-là et rien n’est écrit', () => {
+    const { repo, a, shas } = cas(['docs: première reprise', 'docs: seconde reprise']);
+    const [premier, second] = shas as [string, string];
+    ignore(repo, premier, 'collègue');
+    const jsonAvant = readFileSync(join(repo, a.json), 'utf8');
+    const r = reseal(repo, a.test);
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain(`ni un lot livré : ${second} (cite : aucun lot) — ce commit est poussé et ne se réécrit pas : l'acquitter (raf ignore ${second}`);
+    expect(readFileSync(join(repo, a.json), 'utf8')).toBe(jsonAvant);
+    ignore(repo, second, 'collègue aussi');
+    const apres = reseal(repo, a.test);
+    expect(apres.err).toBe('');
+    expect((journal(repo, a.json)[0]!.amendements as { sha: string }[]).map((m) => m.sha)).toEqual([premier, second]);
+  });
+
+  it('lot en cours (sans porteur) : un commit acquitté de la fiche est admis aussi, un commit non acquitté bloque toujours', () => {
+    const { repo, a, shas } = cas(['docs: fiche reprise par un collègue'], { livre: false });
+    const bloque = cli(repo, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    expect(bloque.code).not.toBe(0);
+    expect(bloque.err).toMatch(new RegExp(`par un commit qui ne cite pas L1 : ${shas[0]}$`));
+    ignore(repo, shas[0]!, 'collègue');
+    const r = cli(repo, 'spec', 'reseal', 'L1', a.test, '--reason', 'x');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    expect((journal(repo, a.json)[0]!.amendements as { etat: string }[])[0]!.etat).toBe('acquitté');
   });
 });

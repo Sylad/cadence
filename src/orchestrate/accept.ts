@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, posix } from 'node:path';
 import { parse } from 'yaml';
 import type { Ref } from '../plan.js';
-import { admettreFiche, type Amendement } from './fiche-amendee.js';
+import { admettreFiche, type Acquittement, type Amendement } from './fiche-amendee.js';
 import { PLAN_ACTIONS } from '../plan-commit.js';
 import { testsAbsents, type Partage } from './accept-regles.js';
 import { isParts, type GateTest } from './gate-parts.js';
@@ -153,10 +153,11 @@ export function sealAcceptation(repo: string, path: string): void {
  * ne laisse aucun chemin de correction. Seules les empreintes des tests nommés sont refaites, tout ou rien (les autres fichiers listés restent inchangés), la raison et les deux
  * empreintes vont dans `resceaux`. Le commit (test + acceptation) est à faire : il devient le commit rouge.
  * La fiche est celle du commit rouge, ou (L217) une fiche amendée par des commits qui citent tous le lot (`refsOf` : `plan.refs`, lu comme `citedRefs` ;
- * lot livré : le lot, son `porteur` ou, L229 et L713, un lot fini ou abandonné selon `etats`, statut au plan de chaque lot — `admettreFiche`) et commitée : l'entrée porte alors
- * `ficheAmendee`, le sha court du dernier commit qui l'a touchée, et `amendements`, chaque commit admis pour son seul lot fini ou abandonné (sha, lot, état, raison).
+ * lot livré : le lot, son `porteur` ou, L229 et L713, un lot fini ou abandonné selon `au.etats`, statut au plan de chaque lot — `admettreFiche`) et commitée : l'entrée porte alors
+ * `ficheAmendee`, le sha court du dernier commit qui l'a touchée, et `amendements`, chaque commit admis pour son seul lot fini ou abandonné (sha, lot, état, raison)
+ * ou parce qu'il est acquitté (`au.acquittes` : `plan.acknowledged`, L729 ; sha, état `acquitté`, raison de l'acquittement).
  */
-export function resealAcceptation(repo: string, path: string, test: string | string[], reason: string, today: string, porteur?: string, refsOf: (text: string) => Ref[] = () => [], etats: Record<string, string> = {}): { resceles: { test: string; avant: string; apres: string }[]; lot: string; ficheAmendee?: string; amendements: Amendement[] } {
+export function resealAcceptation(repo: string, path: string, test: string | string[], reason: string, today: string, porteur?: string, refsOf: (text: string) => Ref[] = () => [], au: { etats?: Record<string, string>; acquittes?: Acquittement[] } = {}): { resceles: { test: string; avant: string; apres: string }[]; lot: string; ficheAmendee?: string; amendements: Amendement[] } {
   const file = join(repo, path);
   const a = parseAcceptation(readFileSync(file, 'utf8'));
   if (typeof a === 'string') throw new Error(`${path} : ${a}`);
@@ -178,7 +179,7 @@ export function resealAcceptation(repo: string, path: string, test: string | str
   let amendee: ReturnType<typeof admettreFiche> = { amendements: [] };
   if (!gitOk(repo, 'diff', '--quiet', red, '--', a.fiche)) {
     if (!existsSync(join(repo, a.fiche))) throw new Error(`la fiche ${a.fiche} a été supprimée ou renommée depuis le commit rouge ${red.slice(0, 7)} : le rescellé ne vaut que pour une fiche présente`);
-    amendee = admettreFiche(repo, { fiche: a.fiche, lot: a.lot, red, porteur, refsOf, etats });
+    amendee = admettreFiche(repo, { fiche: a.fiche, lot: a.lot, red, porteur, refsOf, etats: au.etats ?? {}, acquittes: au.acquittes ?? [] });
   }
   const { ficheAmendee, amendements } = amendee;
   const touches = fichiers.filter((f) => !norms.includes(f) && (!gitOk(repo, 'diff', '--quiet', red, '--', f) || !existsSync(join(repo, f)) || a.empreintes?.[f] !== git(repo, 'hash-object', '--', f).trim()));

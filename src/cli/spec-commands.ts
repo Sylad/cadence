@@ -180,7 +180,7 @@ function specReseal(args: string[], reason: string | undefined, porteur: string 
   const before = { json: readFileSync(join(repo, json), 'utf8'), tests: norms.map((n) => ({ norm: n, text: existsSync(join(repo, n)) ? readFileSync(join(repo, n), 'utf8') : '' })) };
   let r: ReturnType<typeof resealAcceptation>;
   try {
-    r = resealAcceptation(repo, json, norms, reason, ctx.today, livre ? porteur : undefined, plan.refs, Object.fromEntries(plan.lots().map((l) => [l.id, l.status])));
+    r = resealAcceptation(repo, json, norms, reason, ctx.today, livre ? porteur : undefined, plan.refs, { etats: Object.fromEntries(plan.lots().map((l) => [l.id, l.status])), acquittes: plan.acknowledged });
   } catch (e) {
     throw new RafError((e as Error).message);
   }

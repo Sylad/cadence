@@ -3151,12 +3151,14 @@ lots:
     finished: 2026-11-10
   - id: L689
     title: "Bancs en trois niveaux : micro-banc (8 min), banc mécanique sans juge IA en parallèle (≈30 min) à chaque changement, banc complet avec juge seulement avant une release ; bancs du banc court en parallèle (D-3)"
-    status: todo
+    status: doing
     estimate: 1
     created: 2026-11-10
     notes:
       - { date: 2026-11-13, text: "13-11, décision de Sylvain : le banc hebdo (garde de publication) doit mesurer le mode par défaut, cadence run, contre A (Claude seul), et plus l'équipe légère. Le banc du 13-11 a comparé équipe légère contre A (plus de 5 h, ×2,07, rapport ~/bench-cadence/rapports/2026-11-13-0835-06a30f5c451a.md), alors que cadence run (mesuré le 12-11 : ×1,49, préféré par le juge) est le mode utilisé depuis 2.0.0. Même lot que D-3 : banc plus court ET sur le bon candidat." }
       - { date: 2026-11-13, text: "13-11 : le banc hebdo a mesuré le clone cadence-v2-banc (cadence2 du PATH → ../cadence-v2-banc, empreinte 06a30f5c451a, arrêté après L706) et non la version publiée (5fe7bdf4cff7) : 6 commits v2 (L705, L709-L711) non mesurés. Le banc de publication doit lancer la version à publier." }
+      - { date: 2026-11-13, text: "13-11, Sylvain suit la recommandation du lead : le banc du samedi passe en banc mécanique (tendance, sans juge, ne bloque rien) ; le banc complet avec juges n'est joué qu'avant une release et reste la seule garde de publication (statut n'exige plus le passage du weekend). Budget de lignes de la mesure (1492/1500) : décidé après la revue de L689." }
+    started: 2026-11-13
   - id: L690
     title: "cadence run --suite : garder la session d'un lot à l'autre dans un même projet, avec ou sans /compact dirigé par cadence ; mesurer 3 variantes au micro-banc (session neuve, gardée, gardée+compactée) (D-4)"
     status: done
@@ -3396,6 +3398,37 @@ lots:
     title: "HUD : panneau ouvert sur un plan long et sans banc en cours, le dernier verdict du banc (✓/✗) n'est dessiné ni par la bande ni par le panneau ; le garder visible d'un côté (vu par la revue de L716 le 13-11 ; Sylvain : « on fera un petit lot que l'on règlera plus tard »)"
     status: todo
     estimate: 0.1
+    created: 2026-11-13
+  - id: L718
+    title: "Tour : « N lots clos non livrés » faux quand la livraison s'est faite hors cadence deliver — maritime-atlas affichait 23 lots clos non livrés (dernière livraison du journal f779e4a, 16 j) alors que la prod portait déjà tout leur code (tags du 01 au 03-11 livrés par livrer.sh direct ; diff hors tests vide entre chaque tag déployé et 1fcea98, vérifié le 13-11). Le signal a coûté une livraison à vide et une question à Sylvain. Juger « livré » sur ce qui est réellement déployé, ou permettre d'enregistrer une livraison constatée ; mesure : le tour de maritime ne compte plus ces 23 lots"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-13
+  - id: L719
+    title: "HUD, régression de L716 vue par Sylvain dans l'app de bureau le 13-11 (capture tmp/hud-l716-regression-2026-11-13.webp) : (1) la barre du bas est trop étroite pour les cellules d'avancement « plusieurs par ligne » : colonnes décalées et barres coupées ; (2) les barres d'avancement ont disparu du panneau des lots, qui avait pourtant la place. Les barres vont là où il y a la place : dans le panneau quand il est ouvert et assez haut, dans la bande sinon, alignées sur la largeur réelle, jamais coupées (D-1)"
+    status: todo
+    estimate: 0.25
+    visible: true
+    created: 2026-11-13
+  - id: L720
+    title: "Issue #57 du compte pro : cadence run garde comme rapport final le dernier message de la session ; une notification de tâche arrivée en retard le remplace (« nothing new, the done report stays valid ») et le vrai rapport (commits, tests à resceller, vérifié / non vérifié, hypothèses) est perdu du journal fond-<id>.log et de l'état ; garder le rapport donné à la fin du travail, ignorer les notifications après « fini »"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-13
+  - id: L721
+    title: "Veille #50 : Claude Code 2.1.317 a retiré le raccourci « fichier inchangé » de Read (une relecture renvoie tout le contenu) — remesurer le hook de lecture intégrale du mode complet de cadence run (mesuré le 08-11) sur la version actuelle : utile, inutile ou plus cher ? Et évaluer permissions.denyInsteadOfPrompting pour les runs sans surveillance"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-13
+  - id: L722
+    title: "Écritures du lead dans l'arbre principal pendant qu'un programme le tient : 2 pertes le 13-11 — dossier 2.0.4 écrit pendant un verify --gate (verdict non probant, porte rejouée) ; D-1.json modifié à la main pendant un cadence run (refus-integration du correctif HUD, 36 min de run à réintégrer). Étendre la mise en attente de raf (plan-en-attente) au registre .cadence/demandes/ (une commande pour ajouter une précision ou changer l'état d'une demande, mise en attente quand le dépôt est tenu), et signaler toute autre écriture non commitée du lead au moment où un run ou une porte démarre ; mesure : 0 refus d'intégration ni porte non probante causés par le lead"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-13
+  - id: L723
+    title: "cadence run se rebase seul quand l'avance rapide est refusée : 2 fois le 13-11 (L687 après L707 ; correctif HUD après L689), à chaque fois un run de 15 à 35 min rendu « refus-integration » et repris à la main par --reponse (13 min et ~5 $ la première fois). À l'intégration, si main a avancé : rebase dans le worktree, conflits → la même session les résout, porte rejouée, puis avance rapide ; rendu au lead seulement si la session ne sait pas résoudre ; mesure : 0 refus-integration pour divergence sur une semaine de runs parallèles"
+    status: todo
+    estimate: 0.25
     created: 2026-11-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }

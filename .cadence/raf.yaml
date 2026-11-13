@@ -3408,9 +3408,10 @@ lots:
     created: 2026-11-13
   - id: L718
     title: "Tour : « N lots clos non livrés » faux quand la livraison s'est faite hors cadence deliver — maritime-atlas affichait 23 lots clos non livrés (dernière livraison du journal f779e4a, 16 j) alors que la prod portait déjà tout leur code (tags du 01 au 03-11 livrés par livrer.sh direct ; diff hors tests vide entre chaque tag déployé et 1fcea98, vérifié le 13-11). Le signal a coûté une livraison à vide et une question à Sylvain. Juger « livré » sur ce qui est réellement déployé, ou permettre d'enregistrer une livraison constatée ; mesure : le tour de maritime ne compte plus ces 23 lots"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-13
+    started: 2026-11-13
   - id: L719
     title: "HUD, régression de L716 vue par Sylvain dans l'app de bureau le 13-11 (capture tmp/hud-l716-regression-2026-11-13.webp) : (1) la barre du bas est trop étroite pour les cellules d'avancement « plusieurs par ligne » : colonnes décalées et barres coupées ; (2) les barres d'avancement ont disparu du panneau des lots, qui avait pourtant la place. Les barres vont là où il y a la place : dans le panneau quand il est ouvert et assez haut, dans la bande sinon, alignées sur la largeur réelle, jamais coupées (D-1)"
     status: done
@@ -3436,16 +3437,18 @@ lots:
     created: 2026-11-13
   - id: L722
     title: "Écritures du lead dans l'arbre principal pendant qu'un programme le tient : 2 pertes le 13-11 — dossier 2.0.4 écrit pendant un verify --gate (verdict non probant, porte rejouée) ; D-1.json modifié à la main pendant un cadence run (refus-integration du correctif HUD, 36 min de run à réintégrer). Étendre la mise en attente de raf (plan-en-attente) au registre .cadence/demandes/ (une commande pour ajouter une précision ou changer l'état d'une demande, mise en attente quand le dépôt est tenu), et signaler toute autre écriture non commitée du lead au moment où un run ou une porte démarre ; mesure : 0 refus d'intégration ni porte non probante causés par le lead"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-13
     notes:
       - { date: 2026-11-13, text: "13-11 : raf review écrit directement le plan de l'arbre principal pendant qu'un cadence run tient le dépôt (raf note, elle, est mise en attente) : à couvrir aussi." }
+    started: 2026-11-13
   - id: L723
     title: "cadence run se rebase seul quand l'avance rapide est refusée : 2 fois le 13-11 (L687 après L707 ; correctif HUD après L689), à chaque fois un run de 15 à 35 min rendu « refus-integration » et repris à la main par --reponse (13 min et ~5 $ la première fois). À l'intégration, si main a avancé : rebase dans le worktree, conflits → la même session les résout, porte rejouée, puis avance rapide ; rendu au lead seulement si la session ne sait pas résoudre ; mesure : 0 refus-integration pour divergence sur une semaine de runs parallèles"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-13
+    started: 2026-11-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

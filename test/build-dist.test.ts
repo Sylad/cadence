@@ -12,9 +12,10 @@ afterAll(cleanupTempDirs);
 function copyOfPackage(): string {
   const dir = tempDir();
   for (const n of ['src', 'package.json', 'tsconfig.json', 'tsconfig.build.json']) cpSync(join(REPO, n), join(dir, n), { recursive: true });
-  // L538 : src/orchestrate/integrate.ts importe ../../scripts/qualite.mjs, sans quoi la compilation échoue
+  // L538 : src/orchestrate/integrate.ts importe ../../scripts/qualite.mjs, sans quoi la compilation échoue ; L722 : src/repo-held.ts, ../scripts/arbre-non-commite.mjs.
+  // Tous les scripts que « files » publie.
   mkdirSync(join(dir, 'scripts'));
-  for (const n of ['qualite.mjs', 'qualite.d.mts']) cpSync(join(REPO, 'scripts', n), join(dir, 'scripts', n));
+  for (const f of (JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')) as { files: string[] }).files.filter((n) => n.startsWith('scripts/'))) cpSync(join(REPO, f), join(dir, f));
   symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'), 'dir');
   return dir;
 }

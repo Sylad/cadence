@@ -31,9 +31,10 @@ function workRepo(statuses: Record<string, string> = { L1: 'done' }) {
   for (const n of ['src', 'bin', 'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.build.json']) cpSync(join(REPO, n), join(dir, n), { recursive: true });
   // 09-11 : prepare compile aussi v2/ (cadence run), sans ses node_modules ni son dist
   cpSync(join(REPO, 'v2'), join(dir, 'v2'), { recursive: true, filter: (p) => !/[\\/]v2[\\/](node_modules|dist)(?:[\\/]|$)/.test(p) });
-  // L538 : src/orchestrate/integrate.ts importe ../../scripts/qualite.mjs, sans quoi le tsc de l'installation échoue
+  // L538 : src/orchestrate/integrate.ts importe ../../scripts/qualite.mjs, sans quoi le tsc de l'installation échoue ; L722 : src/repo-held.ts, ../scripts/arbre-non-commite.mjs.
+  // Tous les scripts que « files » publie.
   mkdirSync(join(dir, 'scripts'));
-  for (const n of ['qualite.mjs', 'qualite.d.mts']) cpSync(join(REPO, 'scripts', n), join(dir, 'scripts', n));
+  for (const f of (JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')) as { files: string[] }).files.filter((n) => n.startsWith('scripts/'))) cpSync(join(REPO, f), join(dir, f));
   mkdirSync(join(dir, 'docs/plan'), { recursive: true });
   writeFileSync(join(dir, 'docs/plan/raf.yaml'), plan(statuses));
   writeFileSync(join(dir, '.gitignore'), 'dist/\nnode_modules/\n');

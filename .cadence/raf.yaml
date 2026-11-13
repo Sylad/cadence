@@ -3131,10 +3131,11 @@ lots:
     finished: 2026-11-07
   - id: L687
     title: "HUD 2.0 (D-1) : montrer les cadence run, revoir la répartition entre la barre du bas et le panneau de gauche, sans doublon, plus d'infos s'il y a la place"
-    status: todo
+    status: doing
     estimate: 1
     visible: true
     created: 2026-11-10
+    started: 2026-11-13
   - id: L688
     title: "Adapter tous les skills de cadence à cadence run (D-2) : session-start, session-close, deliver, orchestrate, lead, agents et hooks du plugin"
     status: done
@@ -3299,9 +3300,14 @@ lots:
     finished: 2026-11-12
   - id: L707
     title: "Cliquet : une clé fabriquée à mesure nulle sous le total du départ ({cli.ts:350, x.ts:650}) passe en code 0 et laisse x.ts grossir au lot suivant — décider (figer à l'intégration, ou état stocké) ; vu par la revue Fable de L477 le 12-11, vrai avant L477 ; rapport tmp/revue2-L477.md"
-    status: todo
+    status: done
     estimate: 0.25
     created: 2026-11-12
+    started: 2026-11-13
+    review: { date: 2026-11-13, verdict: "conforme : 0 bloquant, 0 majeur ; trou du cliquet fermé sans en ouvrir d'autre (revue Opus du 13-11)", commit: 3c3c57a643931ac657d9c39b574e7771f73750e2 }
+    notes:
+      - { date: 2026-11-13, text: "Mineur de la revue (13-11) : docs/qualite.md:36 et :68 devraient dire que sous --contre un fichier neuf allégé doit être figé (--ecrire) avant l'intégration." }
+    finished: 2026-11-13
   - id: L708
     title: "Retirer le doublement de l'estimate à raf add pour un lot dont le titre cite src/orchestrate/cycle/ (ajouté par L682) : sans effet mesurable (plancher de budget 600 k), lit le titre seul (aurait raté L676, doublé L629 à tort) ; garder la réserve de correction avant l'escalade (D-19)"
     status: done

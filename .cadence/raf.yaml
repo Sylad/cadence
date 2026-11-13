@@ -3408,12 +3408,13 @@ lots:
     finished: 2026-11-13
   - id: L717
     title: "HUD : panneau ouvert sur un plan long et sans banc en cours, le dernier verdict du banc (✓/✗) n'est dessiné ni par la bande ni par le panneau ; le garder visible d'un côté (vu par la revue de L716 le 13-11 ; Sylvain : « on fera un petit lot que l'on règlera plus tard »)"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-13
     started: 2026-11-13
     review: { date: 2026-11-13, verdict: "conforme (2e revue, 13-11) : même nombre de lots en cours visibles avec et sans banc (18 configurations, 0 écart), verdict affiché dès que l'arbre a sa part ; 5 tests rouges sans le correctif ; sous le seuil le verdict cède (compromis documenté)", commit: 6c7053cb060033e1e40138c3fb9938b4ea0f6ad9 }
     ux: { date: 2026-11-13, verdict: "conforme : captures texte du lead à 95 colonnes, 45 et 100 lignes — verdict du banc en tête quand les lots en cours tiennent, cède sa ligne sinon ; rien en double avec la bande" }
+    finished: 2026-11-14
   - id: L718
     title: "Tour : « N lots clos non livrés » faux quand la livraison s'est faite hors cadence deliver — maritime-atlas affichait 23 lots clos non livrés (dernière livraison du journal f779e4a, 16 j) alors que la prod portait déjà tout leur code (tags du 01 au 03-11 livrés par livrer.sh direct ; diff hors tests vide entre chaque tag déployé et 1fcea98, vérifié le 13-11). Le signal a coûté une livraison à vide et une question à Sylvain. Juger « livré » sur ce qui est réellement déployé, ou permettre d'enregistrer une livraison constatée ; mesure : le tour de maritime ne compte plus ces 23 lots"
     status: done

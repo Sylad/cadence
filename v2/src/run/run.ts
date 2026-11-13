@@ -12,7 +12,7 @@ import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, ty
 import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun } from './aiguillage.js';
 import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
 import { causeSession } from '../trace.js';
-import { garderRapport, type Message } from '../rapport.js';
+import { garderRapport, origineRapport, type Message } from '../rapport.js';
 import { cheminWorktree, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
 import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
@@ -32,7 +32,7 @@ export interface Conflit { cible: string; sur: string; fichiers: string[]; resol
 export interface Correction { rouge: string; message?: string; verte?: boolean }
 export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
 export interface Etat { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string; pieces: string[];
-  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; rapport?: string; messages?: Message[];
+  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; rapport?: string; rapport_tour?: number; messages?: Message[];
   conflits?: Conflit[]; corrections?: Correction[] }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
@@ -124,11 +124,11 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   // D-15 : une fin de quota n'est pas un échec. La limite Opus seule bascule sur fable dans la même session ; la limite hebdo bloque tous les modèles : on attend.
   const q = reconnaitreQuota(r.resultat || brut.stdout, (o.maintenant ?? (() => new Date()))());
   // Issue #57 : chaque message de la session va au journal et à l'état quelle que soit sa fin (travail fini, échec, délai, signal, quota) : c'est là que le
-  // lead lit ce qui a été fait et ce qui reste. Le rapport est le dernier message du tour du prompt, fixé seulement si le travail a fini ; les tours ouverts
-  // après lui (notifications de tâche) vont au journal, sans le remplacer.
+  // lead lit ce qui a été fait et ce qui reste. Le rapport est le dernier message du tour du rapport (../rapport.ts, issue #58 : celui du prompt, ou celui où
+  // la session a fini le travail qu'elle attendait en fond), fixé seulement si le travail a fini ; les tours ouverts après lui vont au journal, sans le remplacer.
   garderRapport(e, r.messages, o.out, !q && !r.echec, sujet);
   // L724 : le dernier mot d'une session à sujet va à ce qu'elle traite (le conflit, la correction), à chaque passage : reprise après quota et bascule comprises
-  const mot = r.messages.filter((m) => m.tour === 1).at(-1)?.texte;
+  const mot = r.messages.filter((m) => !m.apres).at(-1)?.texte;
   const vise = sujet === SUJET_CONFLIT ? e.conflits?.at(-1) : sujet === SUJET_CORRECTION ? e.corrections?.at(-1) : undefined;
   if (mot && vise) vise.message = mot;
   if (q?.limite === 'opus' && (e.modele ?? 'opus') === 'opus') {
@@ -268,7 +268,7 @@ function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
   sauver(e);
   rendre(e, o);
   const duree = Math.round((Date.now() - Date.parse(e.debut)) / 1000);
-  o.out(`cadence run ${e.id} : ${e.etat}${e.integre ? ` (${e.cible} = ${e.integre})` : ''} · ${duree} s · ${e.cout_usd.toFixed(2)} $${e.detail ? `\n${e.detail}` : ''}`);
+  o.out(`cadence run ${e.id} : ${e.etat}${e.integre ? ` (${e.cible} = ${e.integre})` : ''} · ${duree} s · ${e.cout_usd.toFixed(2)} $${e.rapport_tour ? ` · rapport : ${origineRapport(e.rapport_tour)}` : ''}${e.detail ? `\n${e.detail}` : ''}`);
   for (const r of registre) o.out(`registre : ${r}`);
   if (e.etat !== 'integre') o.out(`worktree gardé : ${e.worktree} (état : ${e.fichier})`);
   return e;

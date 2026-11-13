@@ -35,7 +35,7 @@ export const creerExecuteur = (commande = 'claude', delaiMs = 4 * 3600_000): Exe
 };
 export const executeurClaude: Executeur = creerExecuteur();
 
-/** Le tour du prompt (`travail`) décide de la session, de l'échec et du résultat ; un tour ouvert après lui (notification de tâche) n'en décide plus (issue #57).
+/** Le tour du rapport (`travail`, ../rapport.ts, issue #58) décide de la session, de l'échec et du résultat ; un tour ouvert après lui n'en décide plus (issue #57).
  * Coût et jetons : ceux du dernier result, cumulés depuis le début de la session. `messages` : chaque message sans appel d'outil, avec son tour. */
 export function lire(e: { stdout: string; code: number; erreur?: string }): { session: string; tokens: number; cout: number; echec: string | null; resultat: string; messages: Message[] } {
   const { travail, fin, messages, apres } = lireFlux(e.stdout);

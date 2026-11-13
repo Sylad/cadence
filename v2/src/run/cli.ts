@@ -6,6 +6,7 @@ import type { Executeur } from '../bench/bras.js';
 import { MODELES, modeleRun } from './aiguillage.js';
 import { etatVu, executerRun, occupantRun, repondreRun, type Etat } from './run.js';
 import { heureLocale, type Quota } from './quota.js';
+import { origineRapport } from '../rapport.js';
 import { causeListe, identite, veiller } from '../trace.js';
 
 /** D-15 : ce que --liste dit d'un run en quota ; D-18 : une reprise seule seulement si un processus vivant attend, sinon l'attente est arrêtée. */
@@ -33,7 +34,7 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
     if (a[0] === '--liste') {
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
       const etats = existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(d, f), 'utf8')) as Etat).filter((e) => e.repo === racine) : [];
-      for (const e of etats) out(`${e.id}  ${etatVu(e)}${etatVu(e) === 'interrompu' ? ` (reprendre : cadence run --reponse ${e.id} "reprends")` : ''}  ${e.demande.split('\n')[0].slice(0, 80)}${e.etat === 'quota' && e.quota ? `  · ${quotaListe(e, e.quota)}` : ''}${etatVu(e) === 'interrompu' ? causeListe(e.journal) : ''}`);
+      for (const e of etats) out(`${e.id}  ${etatVu(e)}${etatVu(e) === 'interrompu' ? ` (reprendre : cadence run --reponse ${e.id} "reprends")` : ''}  ${e.demande.split('\n')[0].slice(0, 80)}${e.etat === 'quota' && e.quota ? `  · ${quotaListe(e, e.quota)}` : ''}${e.rapport_tour ? `  · rapport : ${origineRapport(e.rapport_tour)}` : ''}${etatVu(e) === 'interrompu' ? causeListe(e.journal) : ''}`);
       if (!etats.length) out('aucun run'); return 0;
     }
     if (a[0] === '--veilleur') return veiller(['run', ...a.slice(1)], io.env, io.cwd, out); // L711 : le parent d'un run --fond, lancé par --fond seul

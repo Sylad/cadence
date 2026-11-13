@@ -43,7 +43,7 @@ describe('cadence run garde le rapport de fin de travail (issue #57)', () => {
     const f = lireFlux(TARDIVE);
     expect(f.messages).toEqual([
       { texte: 'fini, commande lancée en fond.', tour: 1 },
-      { texte: 'Fini : la commande en arrière-plan a bien terminé avec le code de sortie 0.', tour: 2 },
+      { texte: 'Fini : la commande en arrière-plan a bien terminé avec le code de sortie 0.', tour: 2, apres: true },
     ]);
     expect(f.travail?.result).toBe('fini, commande lancée en fond.');
     expect(f.fin?.total_cost_usd).toBeGreaterThan(f.travail?.total_cost_usd ?? Infinity); // le dernier result cumule
@@ -54,7 +54,7 @@ describe('cadence run garde le rapport de fin de travail (issue #57)', () => {
     const { messages } = lireFlux(PENDANT);
     expect(messages).toEqual([
       { texte: 'fini, trois commandes lancées.', tour: 1 },
-      { texte: 'fini : la commande « tardif » en arrière-plan s\'est terminée avec le code 0.', tour: 2 },
+      { texte: 'fini : la commande « tardif » en arrière-plan s\'est terminée avec le code 0.', tour: 2, apres: true },
     ]);
     const e: { rapport?: string } = {}, lignes: string[] = [];
     garderRapport(e, messages, (x) => lignes.push(x));

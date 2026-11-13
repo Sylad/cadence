@@ -3406,15 +3406,17 @@ lots:
     created: 2026-11-13
   - id: L719
     title: "HUD, régression de L716 vue par Sylvain dans l'app de bureau le 13-11 (capture tmp/hud-l716-regression-2026-11-13.webp) : (1) la barre du bas est trop étroite pour les cellules d'avancement « plusieurs par ligne » : colonnes décalées et barres coupées ; (2) les barres d'avancement ont disparu du panneau des lots, qui avait pourtant la place. Les barres vont là où il y a la place : dans le panneau quand il est ouvert et assez haut, dans la bande sinon, alignées sur la largeur réelle, jamais coupées (D-1)"
-    status: todo
+    status: doing
     estimate: 0.25
     visible: true
     created: 2026-11-13
+    started: 2026-11-13
   - id: L720
     title: "Issue #57 du compte pro : cadence run garde comme rapport final le dernier message de la session ; une notification de tâche arrivée en retard le remplace (« nothing new, the done report stays valid ») et le vrai rapport (commits, tests à resceller, vérifié / non vérifié, hypothèses) est perdu du journal fond-<id>.log et de l'état ; garder le rapport donné à la fin du travail, ignorer les notifications après « fini »"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-13
+    started: 2026-11-13
   - id: L721
     title: "Veille #50 : Claude Code 2.1.317 a retiré le raccourci « fichier inchangé » de Read (une relecture renvoie tout le contenu) — remesurer le hook de lecture intégrale du mode complet de cadence run (mesuré le 08-11) sur la version actuelle : utile, inutile ou plus cher ? Et évaluer permissions.denyInsteadOfPrompting pour les runs sans surveillance"
     status: todo

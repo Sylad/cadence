@@ -3415,6 +3415,8 @@ lots:
     visible: true
     created: 2026-11-13
     started: 2026-11-13
+    review: { date: 2026-11-13, verdict: "conforme (13-11) : a27a5ce2 revu conforme (bande sans barre de projet, barres dans le panneau, cohabite avec L689, sans tassement) ; 978511a0 et 6f145550 conformes, 0 constat : vague panneau fermé reprise en 5 s, ouverture du panneau lue tout de suite, test accéléré toujours probant", commit: dc0a4bdd73b8d75955731b62137459242988c904 }
+    ux: { date: 2026-11-13, verdict: "conforme : captures vues par le lead à 95 et 200 colonnes (bande avec les seuls travaux en cours, 13 barres alignées dans l'ordre des projets du panneau) ; règle de Sylvain du 13-11 appliquée ; non vu dans l'app de bureau elle-même" }
   - id: L720
     title: "Issue #57 du compte pro : cadence run garde comme rapport final le dernier message de la session ; une notification de tâche arrivée en retard le remplace (« nothing new, the done report stays valid ») et le vrai rapport (commits, tests à resceller, vérifié / non vérifié, hypothèses) est perdu du journal fond-<id>.log et de l'état ; garder le rapport donné à la fin du travail, ignorer les notifications après « fini »"
     status: doing

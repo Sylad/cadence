@@ -55,15 +55,19 @@ const addPrecision: Write = (e, args, today) => {
   return `précision ajoutée (${today})`;
 };
 
-/** Livrée et vérifiée se prouvent ; abandonnée dit sa raison (le geste est celui de Sylvain). Une preuve s'ajoute à la précédente (« · »). */
-const setState: Write = (e, args) => {
+/**
+ * Livrée et vérifiée se prouvent, la preuve s'ajoute à la précédente (« · ») ; abandonnée dit sa raison (le geste est celui de Sylvain), rangée comme
+ * dans le registre (revue L722 r1) : `raison`, `abandon` (la date) et `etat_avant_abandon`, la preuve d'une livraison d'avant restant telle quelle.
+ */
+const setState: Write = (e, args, today) => {
   const state = STATE_OF[args[0] ?? ''];
   if (!state) throw new RafError(`état inconnu : ${args[0] ?? '(aucun)'} (ouverte, livrée, vérifiée ou abandonnée) — ${USAGE}`);
   const proof = args.slice(1).join(' ').trim();
   const word = state === 'abandonnée' ? 'raison' : 'preuve';
   if (state !== 'ouverte' && !proof) throw new RafError(`${state} sans ${word} — raf demande ${e.id} etat ${state} "${state === 'abandonnée' ? 'raison' : 'commit, test, ou commande et sa sortie'}"`);
+  if (state === 'abandonnée') Object.assign(e, { etat_avant_abandon: e.etat, raison: proof, abandon: today });
+  else if (proof) e.preuve = e.preuve ? `${e.preuve} · ${proof}` : proof;
   e.etat = state;
-  if (proof) e.preuve = e.preuve ? `${e.preuve} · ${proof}` : proof;
   return `état ${state}${proof ? `, ${word} ajoutée` : ''}`;
 };
 
@@ -80,6 +84,18 @@ const WRITERS: Record<string, Write> = { precision: addPrecision, 'précision': 
 /** `raf demande <D-n> precision|etat|lot …` écrit le registre : mis en attente sur une branche tenue ; la lecture (`raf demande [D-n]`) ne l'est pas. */
 export const isRegistryWrite = (rest: string[]): boolean => rest.length > 1 && Object.hasOwn(WRITERS, rest[1]!);
 
+/** L'écriture appliquée à l'entrée lue (en mémoire) : ce qu'elle dit, null si rien ne change ; une écriture invalide est refusée. */
+function written(e: Entry, what: string, args: string[], today: string): string | null {
+  if (!Object.hasOwn(WRITERS, what)) throw new RafError(USAGE);
+  return WRITERS[what]!(e, args, today);
+}
+
+/** Valide une écriture sans rien écrire (revue L722 r1) : sur une branche tenue, une écriture invalide est refusée avant la mise en attente. */
+export function checkRegistryWrite(c: EarlyCtx): void {
+  const [id, what, ...args] = c.rest as [string, string, ...string[]];
+  written(read(c.root, id), what, args, c.today);
+}
+
 /** raf demande : liste les demandes ouvertes, montre une entrée, ou y écrit une précision, un état et sa preuve, un lot. */
 export function cmdDemande(c: EarlyCtx): number {
   const { rest, root, io, today } = c;
@@ -93,8 +109,7 @@ export function cmdDemande(c: EarlyCtx): number {
     io.out(JSON.stringify(e, null, 1));
     return 0;
   }
-  if (!Object.hasOwn(WRITERS, what)) throw new RafError(USAGE);
-  const said = WRITERS[what]!(e, args, today);
+  const said = written(e, what, args, today);
   if (said === null) {
     io.out(`${id} : ${args[0]} déjà rattaché`);
     return 0;

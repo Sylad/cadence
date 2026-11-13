@@ -15,6 +15,7 @@ import { causeSession } from '../trace.js';
 import { garderRapport, type Message } from '../rapport.js';
 import { cheminWorktree, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
+import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
 
 /** D-15 : le run reprend une minute après l'heure de remise à zéro annoncée, relit son état au plus tard toutes les 10 min (une reprise par --reponse arrête
@@ -38,7 +39,6 @@ const sauver = (e: Etat) => { writeFileSync(e.fichier, JSON.stringify(e, null, 1
 
 // L695 (D-9) : le run tient la branche cible du début à la fin ; le pre-commit de raf (raf hook install) y refuse un commit du lead, qui le ferait
 // échouer en avance rapide, et raf add|note|done|review|ux|demande écrivent dans le plan en attente (L722). Même format que src/repo-held.ts, qui le lit.
-const PLAN_EN_ATTENTE = join('.cadence', 'plan-en-attente.yaml');
 const RAF = fileURLToPath(new URL('../../../bin/raf.js', import.meta.url));
 const fichierTenu = (repo: string) => join(resolve(repo, git(repo, 'rev-parse', '--git-common-dir')), 'cadence', 'tenu', `run-${process.pid}.json`);
 // Revue L695 r1 (D-10) : `start` écrit, un fichier laissé par un run tué (Ctrl-C, SIGKILL, PC éteint) ne tient plus la branche quand son pid est repris.
@@ -71,13 +71,6 @@ function verrouiller(e: Etat): void {
   if (p) throw new Error(p.role === 'attente' ? `cadence run : le processus ${p.pid} attend la remise à zéro du quota de ${e.id} et reprendra seul la session${quand} ; `
     + `pour reprendre maintenant : kill ${p.pid}, puis relance cette commande` : `cadence run : une session de ce run tourne déjà (processus ${p.pid}) : attends sa fin`);
 }
-
-/** L722 : les fichiers non commités de l'arbre principal, hors plan en attente (même lecture que uncommittedFiles de src/repo-held.ts) ; [] si git ne répond pas. */
-function nonCommites(repo: string): string[] {
-  const r = essaiGit(repo, 'status', '--porcelain', '--no-renames', '-z'); // -z : chemins bruts ; un renommage est dit en deux chemins (supprimé, ajouté)
-  return r.status === 0 ? r.stdout.split('\0').filter(Boolean).map((e) => e.slice(3)).filter((f) => f !== PLAN_EN_ATTENTE) : [];
-}
-const nommer = (f: string[]) => (f.length > 10 ? `${f.slice(0, 10).join(', ')} et ${f.length - 10} autre(s)` : f.join(', '));
 
 /** Rend la branche, puis fait appliquer par raf le plan mis en attente pendant le run (raf refuse si un autre programme la tient encore). */
 function rendre(e: Etat, o: Opts): void {
@@ -199,10 +192,10 @@ function avancer(e: Etat, br: string, cible: string): { avance: boolean; raison:
   const actuelle = essaiGit(e.repo, 'symbolic-ref', '-q', '--short', 'HEAD').stdout.trim();
   if (actuelle === e.cible) {
     // L723 : git refuse (« Your local changes would be overwritten ») quand l'arbre principal a des changements non commités sur un fichier que le run modifie.
-    // nonCommites (L722) dit un dossier non suivi en « dossier/ » : seul un fichier que le run crée et qui y existe déjà fait refuser git.
-    const locales = nonCommites(e.repo), dossiers = locales.filter((f) => f.endsWith('/'));
+    // fichiersNonCommites (L722) dit un dossier non suivi en « dossier/ » : seul un fichier que le run crée et qui y existe déjà fait refuser git.
+    const locales = fichiersNonCommites(e.repo) ?? [], dossiers = locales.filter((f) => f.endsWith('/'));
     const sales = fichiersGit(e.repo, 'diff', '--name-only', cible, br).filter((t) => locales.includes(t) || (dossiers.some((d) => t.startsWith(d)) && existsSync(join(e.repo, t))));
-    if (sales.length) return { avance: false, raison: `modifications non commitées dans l'arbre principal (${e.repo}) sur des fichiers que le run modifie aussi : ${nommer(sales)}. `
+    if (sales.length) return { avance: false, raison: `modifications non commitées dans l'arbre principal (${e.repo}) sur des fichiers que le run modifie aussi : ${nommerFichiers(sales)}. `
       + `Commite-les ou mets-les de côté, puis : cadence run --reponse ${e.id} "intègre"` };
   }
   const m = actuelle === e.cible ? essaiGit(e.repo, 'merge', '-q', '--ff-only', br) : essaiGit(e.repo, 'fetch', '-q', '.', `${br}:${e.cible}`);
@@ -259,7 +252,7 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   const repo = git(a.repo, 'rev-parse', '--show-toplevel'), cible = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD');
   if (a.registre && a.registre !== 'humaine') entreeCommitee(repo, a.registre);
   // L722 : D-1.json modifié à la main pendant un run (13-11) a fait refuser l'intégration ; ce qui n'est pas commité au départ est nommé (lu avant le worktree).
-  const sales = nonCommites(repo);
+  const sales = fichiersNonCommites(repo) ?? [];
   const id = `${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${process.pid}`;
   const runs = dossierRuns(repo), worktree = cheminWorktree(repo, runs, `${basename(repo)}-${id}`); // L705 (C1) : hors du dépôt avec run.worktreeOutside ; état, verrou, journal dans runs
   mkdirSync(runs, { recursive: true });
@@ -271,7 +264,7 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   sauver(e);
   verrouiller(e);
   a.out(`cadence run ${id} : session ${modele[0].toUpperCase()}${modele.slice(1)} en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);
-  if (sales.length) a.out(`cadence run ${id} : l'arbre principal a des modifications non commitées (hors plan en attente) : ${nommer(sales)} — le run part de `
+  if (sales.length) a.out(`cadence run ${id} : l'arbre principal a des modifications non commitées (hors plan en attente) : ${nommerFichiers(sales)} — le run part de `
     + `${e.base.slice(0, 7)} sans elles ; les commiter sur ${cible} est refusé pendant le run, et un fichier que le run change aussi fera échouer l'intégration`);
   // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.
   const demande = `${a.demande}\n\n${a.lot ? `Lot du plan : ${a.lot}. Cite-le dans chaque message de commit, selon les conventions de commit du dépôt (par exemple feat(${a.lot}): …).\n\n` : ''}`

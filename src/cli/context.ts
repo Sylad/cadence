@@ -95,6 +95,9 @@ const OPTIONS = {
     double: { type: 'boolean' },
     largeur: { type: 'string' },
     until: { type: 'string' },
+    // Internes (L722) : ce qu'une revue mise en attente a relu, écrit par la mise en attente, refusé ailleurs (attente-commands.ts).
+    vu: { type: 'string' },
+    'vu-depot': { type: 'string', multiple: true },
     help: { type: 'boolean', short: 'h' },
 } as const;
 

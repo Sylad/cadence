@@ -60,11 +60,11 @@ describe('L722 (1) : raf review et raf ux passent par le plan en attente', () =>
     try {
       const review = raf(dir, 'review', 'L1', 'conforme');
       expect(review.code).toBe(0);
-      expect(review.out).toMatch(/mis en attente : raf review L1 conforme — la branche main est tenue par cadence verify --gate abc1234/);
+      expect(review.out).toMatch(/mis en attente : raf review L1 conforme --vu aucun — la branche main est tenue par cadence verify --gate abc1234/);
       expect(raf(dir, 'ux', 'L1', 'lisible').out).toMatch(/mis en attente : raf ux L1 lisible/);
       expect(raf(dir, 'review', 'enable').out).toMatch(/mis en attente : raf review enable/);
       expect(planText(dir)).not.toMatch(/conforme|lisible|reviewSince/);
-      expect(readPending(dir).map((w) => w.argv)).toEqual([['review', 'L1', 'conforme'], ['ux', 'L1', 'lisible'], ['review', 'enable']]);
+      expect(readPending(dir).map((w) => w.argv)).toEqual([['review', 'L1', 'conforme', '--vu', 'aucun'], ['ux', 'L1', 'lisible'], ['review', 'enable']]);
     } finally {
       unhold();
     }
@@ -180,5 +180,128 @@ describe('L722 (3) : au démarrage d un run ou d une porte, les fichiers non com
     const propre: string[] = [];
     executerRun({ repo: dir, demande: 'Crée fait.txt', exec, out: (l) => propre.push(l), raf: RAF_JS() });
     expect(propre.join('\n')).not.toMatch(/non commitées/);
+  });
+});
+
+// Revue L722 r1 : une revue mise en attente ne gardait que la commande ; appliquée plus tard, elle retenait le dernier commit du lot À CE MOMENT-LÀ et
+// couvrait des commits arrivés entre-temps (intégration d'un run, correctif commité après une porte), que raf done laissait passer sans revue.
+describe('L722 (4) : une revue mise en attente porte sur le dernier commit du lot au moment où elle est tapée', () => {
+  /** Le projet, revue de code exigée, L1 démarré avec un premier commit de travail. */
+  function reviewed(): { dir: string; env: NodeJS.ProcessEnv; first: string } {
+    const { dir, env } = project();
+    raf(dir, 'review', 'enable');
+    raf(dir, 'start', 'L1');
+    writeFileSync(join(dir, 'a.txt'), 'a');
+    sh(dir, env, 'git', 'add', '-A');
+    expect(sh(dir, env, 'git', 'commit', '-qm', 'feat(L1): premier').status).toBe(0);
+    return { dir, env, first: sh(dir, env, 'git', 'rev-parse', 'HEAD').stdout.trim() };
+  }
+
+  const second = (dir: string, env: NodeJS.ProcessEnv) => {
+    writeFileSync(join(dir, 'b.txt'), 'b');
+    sh(dir, env, 'git', 'add', 'b.txt');
+    expect(sh(dir, env, 'git', 'commit', '-qm', 'fix(L1): second').status).toBe(0);
+  };
+
+  it('porte : un correctif du lot commité après la porte, avant l application, n est pas couvert ; raf done refuse', () => {
+    const { dir, env, first } = reviewed();
+    const unhold = holdRepo(dir, 'porte', 'cadence verify --gate');
+    try {
+      expect(raf(dir, 'review', 'L1', 'conforme').out).toMatch(new RegExp(`mis en attente : raf review L1 conforme --vu ${first}`));
+    } finally {
+      unhold();
+    }
+    second(dir, env);
+    expect(raf(dir, 'attente', 'appliquer').code).toBe(0);
+    expect(planText(dir)).toMatch(new RegExp(`commit: ${first}`));
+    const done = raf(dir, 'done', 'L1');
+    expect(done.err).toMatch(/la revue de code précède 1 commit\(s\) du lot, elle est à refaire/);
+  });
+
+  it('run : un commit du lot intégré pendant que la branche est tenue n est pas couvert ; sans commit postérieur, raf done passe', () => {
+    const { dir, env, first } = reviewed();
+    const unhold = holdRepo(dir, 'run', 'cadence run 1');
+    try {
+      raf(dir, 'review', 'L1', 'conforme');
+      second(dir, { ...env, CADENCE_COMMIT_PROGRAMME: '1' });
+    } finally {
+      unhold();
+    }
+    expect(raf(dir, 'attente', 'appliquer').code).toBe(0);
+    expect(planText(dir)).toMatch(new RegExp(`commit: ${first}`));
+    expect(raf(dir, 'done', 'L1').err).toMatch(/la revue de code précède 1 commit\(s\) du lot/);
+    // Revue refaite sur le second commit : rien après, done passe.
+    expect(raf(dir, 'review', 'L1', 'conforme').code).toBe(0);
+    expect(raf(dir, 'done', 'L1').code).toBe(0);
+  });
+
+  it('un lot sans commit au moment de la revue : la revue ne couvre aucun commit venu après', () => {
+    const { dir, env } = project();
+    raf(dir, 'review', 'enable');
+    raf(dir, 'start', 'L1');
+    const unhold = holdRepo(dir, 'porte', 'porte');
+    try {
+      expect(raf(dir, 'review', 'L1', 'conforme').out).toMatch(/raf review L1 conforme --vu aucun/);
+    } finally {
+      unhold();
+    }
+    second(dir, env);
+    raf(dir, 'attente', 'appliquer');
+    expect(planText(dir)).toMatch(/commit: null/);
+    expect(raf(dir, 'done', 'L1').err).toMatch(/la revue de code précède 1 commit\(s\) du lot/);
+  });
+
+  it('--vu tapé à la main, hors application de l attente, est refusé', () => {
+    const { dir } = reviewed();
+    expect(raf(dir, 'review', 'L1', 'conforme', '--vu', 'aucun').err).toMatch(/--vu .*réservé/);
+  });
+});
+
+describe('L722 (5) : une écriture invalide est refusée avant la mise en attente, elle ne bloque plus celles qui la suivent', () => {
+  it('demande inconnue, état sans preuve, revue d un lot inconnu : refusés, rien en attente ; la note suivante est appliquée', () => {
+    const { dir } = project();
+    const unhold = holdRepo(dir, 'run', 'cadence run 1');
+    try {
+      expect(raf(dir, 'demande', 'D-99', 'etat', 'livrée', 'x').err).toMatch(/D-99 absente du registre/);
+      expect(raf(dir, 'demande', 'D-1', 'etat', 'livrée').err).toMatch(/livrée sans preuve/);
+      expect(raf(dir, 'demande', 'D-1', 'etat', 'finie', 'x').err).toMatch(/état inconnu : finie/);
+      expect(raf(dir, 'review', 'L9', 'conforme')).toMatchObject({ code: 2, err: expect.stringMatching(/L9/) });
+      expect(raf(dir, 'ux', 'L9', 'lisible')).toMatchObject({ code: 2, err: expect.stringMatching(/L9/) });
+      expect(readPending(dir)).toEqual([]);
+      expect(raf(dir, 'note', 'L1', 'après').code).toBe(0);
+    } finally {
+      unhold();
+    }
+    expect(raf(dir, 'attente', 'appliquer').out).toMatch(/1 écriture\(s\) appliquée\(s\) —/);
+    expect(planText(dir)).toMatch(/après/);
+  });
+});
+
+describe('L722 (6) : la raison d un abandon va dans les champs du registre, jamais dans la preuve', () => {
+  it('raison, date de l abandon et état d avant ; la preuve de la livraison reste telle quelle', () => {
+    const { dir } = project();
+    raf(dir, 'demande', 'D-1', 'etat', 'livrée', 'commit abc1234');
+    expect(raf(dir, 'demande', 'D-1', 'etat', 'abandonnee', 'consigne', 'du', 'lead').out).toMatch(/état abandonnée, raison ajoutée/);
+    expect(entry(dir, 'D-1')).toEqual({
+      id: 'D-1', texte: 'Le texte de Sylvain', date: '2026-11-10', etat: 'abandonnée', preuve: 'commit abc1234',
+      etat_avant_abandon: 'livrée', raison: 'consigne du lead', abandon: '2026-11-13',
+    });
+  });
+});
+
+// Revue L722 r1 : v2/src/run/run.ts recopiait uncommittedFiles et namedFiles de src/repo-held.ts ; un changement du filtre fait d'un seul côté aurait divergé.
+describe('L722 (7) : cadence run et la porte lisent l arbre non commité avec le même code', () => {
+  const source = (f: string) => readFileSync(join(import.meta.dirname, '..', f), 'utf8');
+
+  it('src/repo-held.ts et v2/src/run/run.ts importent scripts/arbre-non-commite.mjs, aucun ne relit git status lui-même', () => {
+    expect(source('src/repo-held.ts')).toMatch(/from '\.\.\/scripts\/arbre-non-commite\.mjs'/);
+    expect(source('v2/src/run/run.ts')).toMatch(/from '\.\.\/\.\.\/\.\.\/scripts\/arbre-non-commite\.mjs'/);
+    for (const f of ['src/repo-held.ts', 'v2/src/run/run.ts']) expect(source(f)).not.toMatch(/'status', '--porcelain'/);
+  });
+
+  it('le module partagé est publié avec le paquet (dist et v2/dist l importent à l exécution)', () => {
+    const files = (JSON.parse(source('package.json')) as { files: string[] }).files;
+    expect(files).toEqual(expect.arrayContaining(['scripts/arbre-non-commite.mjs', 'scripts/arbre-non-commite.d.mts']));
+    expect(readFileSync(join(testPackage(), 'scripts/arbre-non-commite.mjs'), 'utf8')).toMatch(/export function fichiersNonCommites/);
   });
 });

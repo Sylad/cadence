@@ -28,7 +28,18 @@ const GATES = {
 };
 
 /** « raf ux … » et « raf review … » ont la même forme : activer la porte, ou noter le verdict d'un lot. */
-function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io, opts: { verbose: boolean; commit: string | undefined }): number {
+/** Ce qu'une revue de code relit : le dernier commit compté du lot et celui de chaque dépôt voisin (null : aucun ; un plan en lecture seule ne lit pas git). */
+interface ReviewedAt { commit: string | null; repos?: Record<string, string | null> }
+
+export function reviewedAt(plan: Plan, root: string, lotId: string): ReviewedAt {
+  // Les dépôts voisins du lot : un dépôt qu'on ne peut pas lire ferait enregistrer un verdict sur un sha non lu.
+  const neighbours = plan.readonly || lotId.includes('/') ? undefined : resolveLotRepos(root, plan.lots().find((l) => l.id === lotId) ?? {});
+  if (neighbours?.problems.length) throw new RafError(`${neighbours.problems.join(' ; ')} — la revue de code relit aussi les dépôts du lot`);
+  return { commit: plan.readonly ? null : (lotWork(plan, root, lotId)[0]?.sha ?? null), ...(neighbours?.repos.length ? { repos: repoShas(plan, neighbours.repos, lotId) } : {}) };
+}
+
+/** `seen` : ce que la revue a relu quand elle a été tapée (revue mise en attente, L722), sinon lu maintenant. */
+function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io, opts: { verbose: boolean; commit: string | undefined; seen?: ReviewedAt }): number {
   if (rest.length < 1) throw new RafError(`usage : raf ${kind} enable | ${kind} <lot> "verdict"`);
   const plan = loadPlan();
   if (rest[0] === 'enable') {
@@ -43,10 +54,8 @@ function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, ro
   if (kind === 'ux') plan.recordUx(rest[0], verdict, today);
   // Le verdict vaut jusqu'au dernier commit compté du lot ; un plan en lecture seule refuse sans lire git.
   else {
-    // Les dépôts voisins du lot : un dépôt qu'on ne peut pas lire ferait enregistrer un verdict sur un sha non lu.
-    const neighbours = plan.readonly || rest[0].includes('/') ? undefined : resolveLotRepos(root, plan.lots().find((l) => l.id === rest[0]) ?? {});
-    if (neighbours?.problems.length) throw new RafError(`${neighbours.problems.join(' ; ')} — la revue de code relit aussi les dépôts du lot`);
-    plan.recordReview(rest[0], verdict, today, plan.readonly ? null : (lotWork(plan, root, rest[0])[0]?.sha ?? null), neighbours?.repos.length ? repoShas(plan, neighbours.repos, rest[0]) : undefined);
+    const { commit, repos } = opts.seen ?? reviewedAt(plan, root, rest[0]);
+    plan.recordReview(rest[0], verdict, today, commit, repos);
   }
   plan.save();
   touchedLot(plan, rest[0], opts.verbose, io);
@@ -243,8 +252,20 @@ export function cmdHook(c: Ctx): number | Promise<number> {
   throw new RafError('usage : raf hook install|pre-commit|post-commit|pre-push');
 }
 
+/** Les options internes d'une revue mise en attente (L722) : `--vu <sha|aucun>` et `--vu-depot <dépôt>=<sha|aucun>`, une par dépôt voisin. */
+const NONE = 'aucun';
+export function seenArgs(at: ReviewedAt): string[] {
+  return ['--vu', at.commit ?? NONE, ...Object.entries(at.repos ?? {}).flatMap(([rel, sha]) => ['--vu-depot', `${rel}=${sha ?? NONE}`])];
+}
+
+function seenOf(vu: string, depots: string[] = []): ReviewedAt {
+  const sha = (v: string) => (v === NONE ? null : v);
+  const repos = Object.fromEntries(depots.map((d) => [d.slice(0, d.lastIndexOf('=')), sha(d.slice(d.lastIndexOf('=') + 1))]));
+  return { commit: sha(vu), ...(depots.length ? { repos } : {}) };
+}
+
 /** raf ux|review : active la porte, ou note le verdict d'un lot. */
 export function cmdGate(c: Ctx): number {
   const { command, rest, values, io, today, root, planConfig, loadPlan } = c;
-  return gate(command as keyof typeof GATES, rest, loadPlan, root, today, io, { verbose: !!values.verbose, commit: planConfig?.commit });
+  return gate(command as keyof typeof GATES, rest, loadPlan, root, today, io, { verbose: !!values.verbose, commit: planConfig?.commit, seen: values.vu === undefined ? undefined : seenOf(values.vu, values['vu-depot']) });
 }

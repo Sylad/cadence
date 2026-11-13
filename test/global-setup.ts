@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,9 +19,11 @@ function buildThrowawayPackage(into: string): string {
   mkdirSync(pkg);
   runCompiler(process.execPath, [join(REPO, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.build.json', '--outDir', join(pkg, 'dist')], REPO);
   for (const n of ['bin', 'templates', 'agents', 'skills', 'package.json']) cpSync(join(REPO, n), join(pkg, n), { recursive: true });
-  // L538 : integrate.ts importe scripts/qualite.mjs, que le paquet publié embarque (package.json « files »).
+  // L538 : integrate.ts importe scripts/qualite.mjs, que le paquet publié embarque (package.json « files ») ; L722 : repo-held.ts, scripts/arbre-non-commite.mjs.
+  // Tous les scripts que « files » publie, comme le paquet installé.
   mkdirSync(join(pkg, 'scripts'));
-  for (const n of ['qualite.mjs', 'qualite.d.mts']) cpSync(join(REPO, 'scripts', n), join(pkg, 'scripts', n));
+  const published = (JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')) as { files: string[] }).files.filter((f) => f.startsWith('scripts/'));
+  for (const f of published) cpSync(join(REPO, f), join(pkg, f));
   symlinkSync(join(REPO, 'node_modules'), join(pkg, 'node_modules'), 'dir');
   return pkg;
 }

@@ -34,7 +34,8 @@ export const isSnapshotChild = (env: NodeJS.ProcessEnv, root = PACKAGE_ROOT): bo
 const BIN_ENTRIES = { raf: 'raf.js', cadence: 'cadence.js' };
 
 /** Ce du paquet qui sert à l'exécution d'une vague ; node_modules est lié, jamais copié. */
-const COPIED = ['bin', 'dist', 'templates', 'agents', 'skills', 'scripts/qualite.mjs', 'scripts/qualite.d.mts', 'package.json'];
+// L722 : dist/repo-held.js importe scripts/arbre-non-commite.mjs.
+const COPIED = ['bin', 'dist', 'templates', 'agents', 'skills', 'scripts/qualite.mjs', 'scripts/qualite.d.mts', 'scripts/arbre-non-commite.mjs', 'scripts/arbre-non-commite.d.mts', 'package.json'];
 
 /** Dossier et sorties du processus relancé : ceux du `io` de l'appelant. */
 export interface LineSink {

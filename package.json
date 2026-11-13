@@ -23,6 +23,8 @@
     "templates",
     "scripts/qualite.mjs",
     "scripts/qualite.d.mts",
+    "scripts/arbre-non-commite.mjs",
+    "scripts/arbre-non-commite.d.mts",
     ".claude-plugin",
     "README.md",
     "NOTICE",

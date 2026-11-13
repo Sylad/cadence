@@ -6,7 +6,8 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { git, gitCommonDir, PROGRAM_COMMIT_VAR, tryGit } from './git.js';
+import { PLAN_EN_ATTENTE } from '../scripts/arbre-non-commite.mjs';
+import { gitCommonDir, PROGRAM_COMMIT_VAR, tryGit } from './git.js';
 import { holderAlive } from './orchestrate/lock.js';
 import { RafError } from './plan.js';
 import { withPlanLock } from './plan-lock.js';
@@ -14,7 +15,7 @@ import { processStart } from './proc.js';
 import { sharedStateDir } from './state.js';
 
 export const HELD_DIR = 'tenu';
-export const PENDING_PLAN = '.cadence/plan-en-attente.yaml';
+export const PENDING_PLAN = PLAN_EN_ATTENTE;
 const PENDING_LOCK = 'plan-en-attente.lock';
 /** Les écritures mises en attente sur une branche tenue, telles que les messages les nomment. */
 const DEFERRED_WRITES = 'raf add|note|done|review|ux|demande';
@@ -136,20 +137,5 @@ export function applyPending(root: string, raf: (argv: string[]) => number, out:
   return left.length ? 1 : 0;
 }
 
-/**
- * Les fichiers de l'arbre de `root` que git voit modifiés, ajoutés, supprimés ou non suivis, hors du plan en attente (L722) : dits au démarrage d'un run
- * ou d'une porte, qui jouent HEAD sans eux. Un dossier non suivi est nommé une fois (« dossier/ »), comme le montre git status ; null si git ne répond pas.
- */
-export function uncommittedFiles(root: string): string[] | null {
-  try {
-    // Pas de trim (tryGit) : il mangerait l'espace de tête du premier « XY chemin » ( M a.txt). Sans renommages : l'ancien et le nouveau chemin sont dits.
-    return git(root, ['status', '--porcelain', '--no-renames', '-z']).split('\0').filter(Boolean).map((e) => e.slice(3)).filter((f) => f !== PENDING_PLAN);
-  } catch {
-    return null;
-  }
-}
-
-/** La ligne qui nomme ces fichiers ; au-delà de 10, le compte des autres. */
-export function namedFiles(files: string[]): string {
-  return files.length > 10 ? `${files.slice(0, 10).join(', ')} et ${files.length - 10} autre(s)` : files.join(', ');
-}
+/** L722 : les fichiers que l'arbre de `root` n'a pas commités, hors plan en attente, et la ligne qui les nomme ; lecture partagée avec cadence run (v2). */
+export { fichiersNonCommites as uncommittedFiles, nommerFichiers as namedFiles } from '../scripts/arbre-non-commite.mjs';

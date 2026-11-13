@@ -1,8 +1,9 @@
 // Le plan en attente (L695, D-9) : `raf add|note|done|review|ux|demande` (L722) sur une branche tenue par un programme, puis `raf attente [appliquer]`.
-import { isRegistryWrite } from './demande-commands.js';
+import { checkRegistryWrite, isRegistryWrite } from './demande-commands.js';
+import { reviewedAt, seenArgs } from './gates.js';
 import { applyPending, deferPlanWrite, holderHere, PENDING_PLAN, readPending } from '../repo-held.js';
 import { RafError } from '../plan.js';
-import type { EarlyCtx, Io } from './context.js';
+import { buildCtx, type EarlyCtx, type Io } from './context.js';
 
 type Run = (argv: string[], io: Io) => number | Promise<number>;
 
@@ -24,10 +25,33 @@ function apply(root: string, io: Io, run: Run): number {
 }
 
 /**
+ * Avant la mise en attente (revue L722 r1) : une écriture invalide est refusée tout de suite, elle ne bloquerait plus à l'application les écritures
+ * qui la suivent ; une revue fige ce qu'elle a relu (le dernier commit du lot et des dépôts voisins), rend les options qui le disent.
+ */
+function checked(command: string, c: EarlyCtx): string[] {
+  if (command === 'demande') {
+    checkRegistryWrite(c);
+    return [];
+  }
+  if ((command !== 'review' && command !== 'ux') || c.rest.length < 2) return [];
+  const plan = buildCtx({ ...c, command }).loadPlan();
+  const verdict = c.rest.slice(1).join(' ');
+  // Le plan refuse en mémoire, rien n'est sauvé : sous-tâche, verdict vide, lot inconnu, plan en lecture seule.
+  if (command === 'ux') {
+    plan.recordUx(c.rest[0]!, verdict, c.today);
+    return [];
+  }
+  const at = reviewedAt(plan, c.root, c.rest[0]!);
+  plan.recordReview(c.rest[0]!, verdict, c.today, at.commit, at.repos);
+  return seenArgs(at);
+}
+
+/**
  * Une écriture du plan sur une branche tenue va dans le plan en attente (rend 0) ; sur une branche libre, l'attente laissée par un programme
  * qui ne l'a pas appliquée (arrêté en route) passe d'abord, puis la commande suit (rend null).
  */
 export function heldPlanWrite(command: string, argv: string[], c: EarlyCtx, run: Run): number | null {
+  if ((c.values.vu !== undefined || c.values['vu-depot']) && !applying) throw new RafError('--vu et --vu-depot sont réservés au plan en attente : la mise en attente d\'une revue les écrit, raf attente appliquer les lit');
   if (!DEFERRABLE.has(command) || applying || c.values.help || (command === 'demande' && !isRegistryWrite(c.rest))) return null;
   let holder;
   try {
@@ -36,7 +60,7 @@ export function heldPlanWrite(command: string, argv: string[], c: EarlyCtx, run:
     return null; // hors d'un dépôt git : rien ne peut le tenir
   }
   if (holder) {
-    c.io.out(deferPlanWrite(c.root, holder, argv, c.io.now()));
+    c.io.out(deferPlanWrite(c.root, holder, [...argv, ...checked(command, c)], c.io.now()));
     return 0;
   }
   if (readPending(c.root).length > 0) apply(c.root, c.io, run);

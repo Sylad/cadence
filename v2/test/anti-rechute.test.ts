@@ -118,7 +118,7 @@ const FLAGS_CLI: Record<string, string[]> = {
   'src/bench/preparer.ts': ['no-hardlinks', 'format', 'is-ancestor', 'all', 'expire', 'prune', 'not'],
   'src/bench/ajouter.ts': ['format', 'reverse', 'grep', 'verify', 'name-only'],
   'src/sequence/mesures.ts': ['porcelain', 'others', 'exclude-standard', 'reporter', 'outputFile', 'yes', 'reporters', 'output', 'silent', 'ignore', 'name-only', 'gitignore'], // flags git, vitest et jscpd (S2, S7 : --gitignore), aucune option de cadence2
-  'src/run/run.ts': ['show-toplevel', 'count', 'abort', 'abbrev-ref', 'short', 'ff-only', 'force', 'resume', 'session-id', 'porcelain', 'no-renames', 'git-path', 'continue', 'skip', 'name-only', 'diff-filter', 'is-ancestor'], // git, claude --resume (reprise de la même session) et --session-id (L709 : id écrit dès le lancement) ; L722 : git status --porcelain --no-renames au départ du run
+  'src/run/run.ts': ['show-toplevel', 'count', 'abort', 'abbrev-ref', 'short', 'ff-only', 'force', 'resume', 'session-id', 'git-path', 'continue', 'skip', 'name-only', 'diff-filter', 'is-ancestor'], // git, claude --resume (reprise de la même session) et --session-id (L709 : id écrit dès le lancement) ; L722 : git status au départ du run lu par scripts/arbre-non-commite.mjs
   // L723 : rebase seul (--git-path, --diff-filter=U, --is-ancestor ; --continue et --skip dans la consigne de résolution), fichiers que le run modifie (--name-only)
   'src/run/cli.ts': ['show-toplevel'],
   'src/registre.ts': ['name-only', 'diff-filter'], // git diff --name-only, --diff-filter=A (L701 : le registre touché sans option, entrée neuve avec --registre)
@@ -127,9 +127,10 @@ const FLAGS_CLI: Record<string, string[]> = {
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
-  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 539, porte: 250, deliver: 450, hooks: 200 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
+  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 532, porte: 250, deliver: 450, hooks: 200 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
   // L723 : run 520, rebase seul quand la cible avance pendant la porte (conflit rendu à la session, porte rejouée, arbre principal sale nommé), sans ligne tassée
   // L723 (revue, M1) : run 539, un conflit de rebase résolu est ajouté à l'état (conflits, détail de fin) et au journal sans remplacer le rapport du travail, sans ligne tassée
+  // L722 (revue r1) : run 532 (-7), la lecture des fichiers non commités vient de scripts/arbre-non-commite.mjs, partagée avec src (copie retirée de run.ts)
   mesure: { total: 1698, modules: { bench: 998, sequence: 700 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
 };
 function reglesBudget(f: Fichiers): string[] {

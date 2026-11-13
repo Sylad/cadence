@@ -1376,9 +1376,9 @@ test('L719 — panneau fermé et aucune vague dans la bande, cadence lead tour n
   await $.session.start({ cwd: '/p', surface: 'terminal', isInteractive: true } as never)
   await settle()
   const tours = () => runs.filter(a => a[0] === 'cadence' && a[1] === 'lead')
-  // une heure panneau fermé, sans vague : aucun tour
-  for (let i = 0; i < 12; i++) {
-    await clock.advance(5 * 60_000)
+  // panneau fermé, sans vague : aucun tour, ni au départ ni aux minutes suivantes (le tour est dû chaque minute, TOUR_REFRESH_MS)
+  for (let i = 0; i < 2; i++) {
+    await clock.advance(TOUR_REFRESH_MS + 5_000)
     await settle()
   }
   expect(tours()).toHaveLength(0)
@@ -1394,9 +1394,9 @@ test('L719 — panneau fermé et aucune vague dans la bande, cadence lead tour n
   await clock.advance(60_000)
   await settle()
   expect(tours()).toHaveLength(3)
-  // refermé : plus de tour
+  // refermé : plus de tour, même passé la minute
   await $.command.run({ command: 'hud', args: 'lots' } as never)
-  await clock.advance(5 * 60_000)
+  await clock.advance(TOUR_REFRESH_MS + 5_000)
   await settle()
   expect(tours()).toHaveLength(3)
   // une vague dans la bande, panneau fermé : le tour revient (repli des lots clos, L609)

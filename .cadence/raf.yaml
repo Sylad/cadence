@@ -3408,11 +3408,12 @@ lots:
     created: 2026-11-13
   - id: L718
     title: "Tour : « N lots clos non livrés » faux quand la livraison s'est faite hors cadence deliver — maritime-atlas affichait 23 lots clos non livrés (dernière livraison du journal f779e4a, 16 j) alors que la prod portait déjà tout leur code (tags du 01 au 03-11 livrés par livrer.sh direct ; diff hors tests vide entre chaque tag déployé et 1fcea98, vérifié le 13-11). Le signal a coûté une livraison à vide et une question à Sylvain. Juger « livré » sur ce qui est réellement déployé, ou permettre d'enregistrer une livraison constatée ; mesure : le tour de maritime ne compte plus ces 23 lots"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-13
     started: 2026-11-13
     review: { date: 2026-11-13, verdict: "conforme (13-11) : revue f63d07a7 conforme après 1 correctif (constat refusé si deliver.deployed ou deliver.verify le contredit, inscrit « sur votre parole » sinon, générique) ; correctif bbdf5860 relu par le lead : test de --constat --block, ligne d'aide, R3 vérifie le compte annoncé", commit: bbdf586005fdcf705b34857b9546606f434d985f }
+    finished: 2026-11-13
   - id: L719
     title: "HUD, régression de L716 vue par Sylvain dans l'app de bureau le 13-11 (capture tmp/hud-l716-regression-2026-11-13.webp) : (1) la barre du bas est trop étroite pour les cellules d'avancement « plusieurs par ligne » : colonnes décalées et barres coupées ; (2) les barres d'avancement ont disparu du panneau des lots, qui avait pourtant la place. Les barres vont là où il y a la place : dans le panneau quand il est ouvert et assez haut, dans la bande sinon, alignées sur la largeur réelle, jamais coupées (D-1)"
     status: done
@@ -3446,10 +3447,12 @@ lots:
     started: 2026-11-13
   - id: L723
     title: "cadence run se rebase seul quand l'avance rapide est refusée : 2 fois le 13-11 (L687 après L707 ; correctif HUD après L689), à chaque fois un run de 15 à 35 min rendu « refus-integration » et repris à la main par --reponse (13 min et ~5 $ la première fois). À l'intégration, si main a avancé : rebase dans le worktree, conflits → la même session les résout, porte rejouée, puis avance rapide ; rendu au lead seulement si la session ne sait pas résoudre ; mesure : 0 refus-integration pour divergence sur une semaine de runs parallèles"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-13
     started: 2026-11-13
+    review: { date: 2026-11-13, verdict: "conforme (13-11) : revue c8a4c957+03188d4c conforme après 1 correctif (porte toujours rejouée sur le sha rebasé, pas de boucle sans fin, test L624 toujours probant) ; correctif ec4254e7 : rapport du travail intact, conflit résolu gardé dans l'état et le journal, 2 tests rouges sans le correctif ; porte verte au sha ec4254e", commit: ec4254e7120efda2914b5ae99312c886d6cd0c57 }
+    finished: 2026-11-13
   - id: L724
     title: "cadence run : la reprise après une porte rouge remplace encore le rapport de travail par le « fini » de la session de correction (même famille que l'issue #57 / L720 et le conflit de rebase de L723) — vu par le correctif de L723 le 13-11 ; le rapport de travail reste celui du travail, la correction est ajoutée à l'état et au journal ; test d'un run complet porte rouge → correction → porte verte"
     status: todo

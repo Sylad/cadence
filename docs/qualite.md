@@ -59,9 +59,12 @@ one of its lines. No option replaces this link. The credit is recomputed from th
 accepted stays accepted while it does not grow, and two successive `--migrer` whose pieces exceed the loss are refused at
 the second. The same rule is what `--contre` applies to the baseline of the lot, so a migrated baseline passes the gate
 and the CI, and a hand-edited one does not. A key of a new file left in the baseline after the file was renamed, deleted
-or rewritten down to nothing (the file measures 0 on that key, the gain is not locked yet) counts for nothing: it
-blocks neither the gate, nor `--ecrire`, nor the next `--migrer`, and a file that grows back under that key is judged by
-its content. While the file still measures something, its key is judged at the value written in the baseline, not at the
+or rewritten down to nothing (the file measures 0 on that key, the gain is not locked yet) does not count as a raised
+baseline: it blocks neither `--ecrire` nor the next `--migrer`, and a file that grows back under that key is judged by
+its content. The gate itself (`--contre`, no write mode) still refuses any key of a new file above its measure, gain not
+locked or key forged under the start's total (nothing tells them apart, nothing is stored): a new file enters `main` at
+its measure, otherwise it could grow back to its key in the next lot. `npm run qualite:cliquet -- --contre main` (or
+`--migrer`) locks it. While the file still measures something, its key is judged at the value written in the baseline, not at the
 measure: a key raised by hand above what its source lost is refused even when the file measures less (it would otherwise
 let the file grow in the next lot), and a migrated piece that got lighter stays covered (the integration's check, which has no measure, still refuses a committed key whose file is not in the
 commit: lock the gain before committing). It needs `--contre` (the files that « existed » are those of the start of the

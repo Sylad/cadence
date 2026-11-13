@@ -342,15 +342,16 @@ describe('L477 — --migrer et la porte', () => {
     expect(appliquer(dir, 'ecrire', renomme, ref).code).toBe(0);
   });
 
-  it('R10 — morceau déjà migré puis supprimé, mesure en baisse : la porte est verte et --ecrire fige le gain', () => {
+  it('R10 — morceau déjà migré puis supprimé, mesure en baisse : la porte demande de figer (L707), --ecrire fige le gain', () => {
     const dir = tempDir();
     coupe(dir);
     writeFileSync(join(dir, BASELINE), JSON.stringify(apresCoupe));
     rmSync(join(dir, 'src/cli-plan.ts'));
     const sans = carte({ 'src/cli.ts': 350 });
-    expect(appliquer(dir, 'verifier', sans, ref).code).toBe(0);
+    expect(appliquer(dir, 'verifier', sans, ref).code).toBe(1);
     expect(appliquer(dir, 'ecrire', sans, ref).code).toBe(0);
     expect(JSON.parse(lire(dir))).toEqual(sans);
+    expect(appliquer(dir, 'verifier', sans, ref).code).toBe(0);
   });
 
   it('R10 — morceau déjà migré puis réécrit et ramené à 0 : --ecrire fige le gain', () => {
@@ -446,14 +447,15 @@ describe('L477 — --migrer et la porte', () => {
     expect(r.texte).toContain(`${cle('src/cli-plan.ts')} : 0 → 700`);
   });
 
-  it('R11 — morceau migré à 650 puis allégé à 600 sans figer le gain : sa clé (650) reste dans la perte de la source, la porte est verte et --ecrire fige', () => {
+  it('R11 — morceau migré à 650 puis allégé à 600 sans figer le gain : sa clé (650) reste dans la perte de la source, la porte demande de figer (L707) et --ecrire fige', () => {
     const dir = tempDir();
     ecrire(dir, { 'src/cli.ts': lignes(350, 650), 'src/cli-plan.ts': lignes(600) });
     writeFileSync(join(dir, BASELINE), JSON.stringify(apresCoupe));
     const allege = carte({ 'src/cli.ts': 350, 'src/cli-plan.ts': 600 });
-    expect(appliquer(dir, 'verifier', allege, ref).code).toBe(0);
+    expect(appliquer(dir, 'verifier', allege, ref).code).toBe(1);
     expect(appliquer(dir, 'ecrire', allege, ref).code).toBe(0);
     expect(JSON.parse(lire(dir))).toEqual(allege);
+    expect(appliquer(dir, 'verifier', allege, ref).code).toBe(0);
   });
 
   it('R2 — clé fabriquée pour un fichier neuf qui ne mesure rien (700, total de la base 1050 pour 1000 au départ) : la porte refuse sur le total', () => {

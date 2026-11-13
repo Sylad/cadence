@@ -483,9 +483,16 @@ function baseRemonte(racine, base, mesure, ref) {
   // les clés sorties du jugement (fichier neuf qui ne mesure plus rien) pèsent encore dans le total de la base : une clé restante légitime a été acceptée
   // sous ce total, une clé fabriquée au-dessus est refusée (elle deviendrait au lot suivant la clé d'un fichier « qui existait »)
   remonte.push(...comparer(totaux(ref.base), totaux(base)).pires.map((p) => ({ ...p, cle: `${p.cle} (total, tous fichiers)` })).filter((p) => !remonte.some((q) => q.cle === p.cle)));
-  if (!remonte.length) return null;
-  return { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${remonte.map(ligne).join('\n')}` };
+  return !remonte.length ? null : { code: 1, texte: `${BASELINE} remonte par rapport à ${ref.nom} (elle ne peut que baisser : corriger le code, pas la base) :\n${remonte.map(ligne).join('\n')}` };
 }
+
+/**
+ * La porte (`--contre`) : une clé d'un fichier neuf (absent du départ) au-dessus de sa mesure est refusée (L707). Gain non figé d'un morceau migré ou clé
+ * fabriquée sous le total du départ, rien ne les distingue et rien n'est stocké (D1) ; une fois intégrée, elle deviendrait au lot suivant la clé d'un fichier
+ * « qui existait » et le laisserait grossir jusqu'à elle. Un fichier neuf entre donc dans main à sa mesure : --ecrire ou --migrer la ramène, la base n'est pas coincée.
+ */
+const neufsNonFiges = (base, mesure, ref) => (ref?.base ? Object.entries(base).filter(([k, n]) => !existeAuDepart(ref)(cheminDeCle(k)) && n > (mesure[k] ?? 0)).map(([cle, avant]) => ({ cle, avant, apres: mesure[cle] ?? 0 })) : []);
+const nonFige = (hautes, ref) => ({ code: 1, texte: `Qualité : ${hautes.length} clé(s) de fichier neuf au-dessus de la mesure (gain non figé) : un fichier neuf entre dans ${ref.nom} à sa mesure, sinon il pourrait regrossir jusqu'à sa clé au lot suivant. Figer : « npm run qualite:cliquet -- --contre ${ref.nom.split(' ')[0]} » (ou --migrer si des fichiers ont été déplacés).\n${hautes.map(ligne).join('\n')}` });
 
 /** `--migrer` : réécrit la base pour une mesure où des fichiers ont été déplacés ou découpés. */
 function migrer(racine, base, mesure, ref) {
@@ -535,10 +542,9 @@ function decider(racine, mode, mesure, ref) {
   if (mode === 'migrer') return migrer(racine, base, mesure, ref);
   const { pires, mieux } = comparer(base, mesure);
   if (pires.length) return empire(pires, ref);
-  if (mode === 'ecrire') {
-    ecrireBase(racine, mesure);
-    return { code: 0, texte: `${BASELINE} baissée : ${mieux.length} mesure(s) en moins.` };
-  }
+  const hautes = mode === 'verifier' ? neufsNonFiges(base, mesure, ref) : [];
+  if (hautes.length) return nonFige(hautes, ref);
+  if (mode === 'ecrire') return (ecrireBase(racine, mesure), { code: 0, texte: `${BASELINE} baissée : ${mieux.length} mesure(s) en moins.` });
   const reste = mieux.length ? `\n${mieux.length} mesure(s) ont baissé : « npm run qualite:cliquet » fige le gain.` : '';
   return { code: 0, texte: `Qualité : rien n'empire (${Object.keys(mesure).length} mesures sous la ligne de base).${reste}` };
 }

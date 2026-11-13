@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { cmdRun } from '../src/run/cli.js';
 import { executerRun, fichierVerrou, repondreRun, type Etat } from '../src/run/run.js';
 import { heureLocale } from '../src/run/quota.js';
-import { commite, depot, fauxClaude, git, io } from './run-outils.js';
+import { commite, depot, fauxClaude, git, horloge, io } from './run-outils.js';
 
 // D-15 (L700) : la fin de quota d'une session claude -p, reconnue au texte de son résultat, met le run en état « quota » (pas « echec »).
 const HEBDO = "You've hit your weekly limit · resets Thu 9am (Europe/Paris)";
@@ -11,12 +11,6 @@ const OPUS = "You've hit your Opus limit · resets Fri 10am (Europe/Paris)";
 const REPRISE = '2026-11-12T08:00:00.000Z'; // jeudi 12-11 9 h à Paris, vu du mercredi 11-11 17 h
 type Appels = { args: string[]; env: NodeJS.ProcessEnv }[];
 const arg = (a: Appels, i: number, nom: string) => a[i].args[a[i].args.indexOf(nom) + 1];
-/** Une horloge simulée que l'attente fait avancer : aucun test ne dort vraiment. */
-function horloge(debut = '2026-11-11T16:00:00Z') {
-  let t = Date.parse(debut);
-  const attentes: number[] = [];
-  return { attentes, maintenant: () => new Date(t), attendre: (ms: number) => { attentes.push(ms); t += ms; } };
-}
 
 describe('cadence run : fin de quota (D-15)', () => {
   it('limite hebdo : état quota avec l heure de reprise, branche rendue, worktree gardé ; sans attente, rien d autre', () => {

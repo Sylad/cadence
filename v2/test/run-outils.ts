@@ -31,6 +31,12 @@ export const commite = (fichier: string, demande?: string) => (cwd: string) => {
   if (demande) { mkdirSync(join(cwd, '.cadence', 'demandes'), { recursive: true }); writeFileSync(join(cwd, '.cadence', 'demandes', 'D-1.json'), JSON.stringify({ id: 'D-1', texte: demande, etat: 'ouverte' })); }
   git(cwd, 'add', '-A'); git(cwd, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', `ajoute ${fichier}`);
 };
+/** Une horloge simulée que l'attente du quota (D-15) fait avancer : aucun test ne dort vraiment. */
+export function horloge(debut = '2026-11-11T16:00:00Z') {
+  let t = Date.parse(debut);
+  const attentes: number[] = [];
+  return { attentes, maintenant: () => new Date(t), attendre: (ms: number) => { attentes.push(ms); t += ms; } };
+}
 export const io = () => { const l: string[] = []; return { l, out: (x: string) => l.push(x) }; };
 
 // Outils des tests qui lancent cadence run dans de vrais processus (L709, L711).

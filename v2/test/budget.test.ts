@@ -28,6 +28,7 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L723 (revue, M1) : run 539, le conflit résolu va à l'état et au journal, le rapport du travail n'est plus remplacé par le « fini » de la résolution.
   // L722 (revue r1) : run 532 (-7), la lecture des fichiers non commités vient de scripts/arbre-non-commite.mjs, partagée avec src (la copie de run.ts est retirée).
   // L724 : run 557, la correction après porte rouge va à l'état et au journal, le rapport du travail n'est plus remplacé par le « fini » de la correction.
+  // L724 (revue) : run 561 (+4), la reprise après quota pendant un conflit garde le rapport ; le dernier mot d'une session à sujet n'a plus qu'un mécanisme.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 1698 (L689, issue #57)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1698]);

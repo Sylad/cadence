@@ -4,15 +4,18 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
 import { executerRun, repondreRun, type Etat } from '../src/run/run.js';
-import { commite, depot, fauxClaude, io, sortie } from './run-outils.js';
+import { commite, depot, fauxClaude, horloge, io, sortie } from './run-outils.js';
 
-/** Faux claude dont chaque session rend son propre dernier message (`reponses`), comme un vrai rapport de travail puis une réponse de correction. */
+/** Faux claude dont chaque session rend son propre dernier message (`reponses`), comme un vrai rapport de travail puis une réponse de correction ;
+ * une fin de quota garde son texte. */
 const parlant = (exec: Executeur, reponses: string[]): Executeur => (args, o) => {
   const r = exec(args, o), j = JSON.parse(r.stdout);
+  if (r.code) return r;
   return { ...r, stdout: sortie(j.session_id, reponses.shift() ?? j.result) };
 };
 const RAPPORT = 'fini. Commit : ajoute autre.txt. Vérifié : suite ciblée. Non vérifié : la porte complète.';
 const CORRECTION = 'fini : fait.txt manquait, ajouté et commité.';
+const HEBDO = "You've hit your weekly limit · resets Thu 9am (Europe/Paris)";
 const relire = (e: Etat) => JSON.parse(readFileSync(e.fichier, 'utf8')) as Etat;
 
 describe('cadence run : correction après porte rouge (L724)', () => {
@@ -57,5 +60,17 @@ describe('cadence run : correction après porte rouge (L724)', () => {
     expect(etat.rapport).toBe(RAPPORT);
     expect(etat.corrections?.map((c) => [c.message, c.verte])).toEqual([['raté', false], [CORRECTION, true]]);
     expect(l.join('\n')).toContain(`session, correction après porte rouge, fin (ne remplace pas le rapport du travail) : ${CORRECTION}`);
+  });
+
+  it('quota hebdo pendant la correction, puis reprise : rapport du travail intact, la correction garde le mot de la session reprise et sa porte verte', () => {
+    const repo = depot(), { l, out } = io();
+    const exec = parlant(fauxClaude([commite('a.txt'), () => HEBDO, commite('fait.txt')]), [RAPPORT, CORRECTION]);
+    const e = executerRun({ repo, demande: 'x', exec, out, ...horloge() });
+    const etat = relire(e);
+    expect(etat.etat).toBe('integre');
+    expect(etat.rapport).toBe(RAPPORT); // la reprise après quota continue la correction : son « fini » ne remplace pas le rapport
+    expect(etat.corrections).toEqual([{ rouge: '$ test -f fait.txt\n', message: CORRECTION, verte: true }]);
+    expect(etat.messages?.at(-1)).toEqual({ texte: CORRECTION, tour: 1, sujet: 'correction après porte rouge' });
+    expect(l.join('\n')).toMatch(/quota revenu : reprise de la session/);
   });
 });

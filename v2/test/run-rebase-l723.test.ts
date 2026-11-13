@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
 import { executerRun, type Etat } from '../src/run/run.js';
-import { commite, depot, fauxClaude, git, io, sortie } from './run-outils.js';
+import { commite, depot, fauxClaude, git, horloge, io, sortie } from './run-outils.js';
 
 const ID = ['-c', 'user.email=t@t', '-c', 'user.name=t'];
 /** Porte qui compte ses passages dans `compte` et joue `pendant` (une commande shell) à chaque passage, comme un autre run qui s'intègre pendant elle. */
@@ -19,8 +19,10 @@ const passages = (compte: string) => (existsSync(compte) ? readFileSync(compte, 
 /** Faux claude dont chaque session rend son propre dernier message (`reponses`), comme un vrai rapport de travail puis une réponse de résolution. */
 const parlant = (exec: Executeur, reponses: string[]): Executeur => (args, o) => {
   const r = exec(args, o), j = JSON.parse(r.stdout);
+  if (r.code) return r; // une fin de quota garde son texte
   return { ...r, stdout: sortie(j.session_id, reponses.shift() ?? j.result) };
 };
+const HEBDO = "You've hit your weekly limit · resets Thu 9am (Europe/Paris)";
 const RAPPORT = 'fini. Commit : ajoute fait.txt. Vérifié : porte verte. Non vérifié : la capture.';
 const RESOLUTION = 'fini : fait.txt garde les deux versions, rebase terminé.';
 /** La session de travail commite fait.txt pendant qu'« ailleurs » commite un autre fait.txt sur main : le rebase est en conflit sur fait.txt. */
@@ -93,6 +95,18 @@ describe('cadence run : la branche cible avance pendant la porte (L723)', () => 
     expect(positions).toEqual([...positions].sort((a, b) => a - b)); // dans cet ordre
     expect(journal).toContain(`cadence run ${e.id} : integre (main = ${e.integre})`); // ligne de fin, suivie du détail : le conflit résolu
     expect(journal.slice(journal.indexOf(`cadence run ${e.id} : integre`))).toContain(`\n${etat.detail}`);
+  });
+
+  it('quota hebdo pendant la résolution d\'un conflit, puis reprise (L724) : rapport du travail intact, le conflit coupé garde le mot de la reprise', () => {
+    const repo = depot(), REPRIS = 'fini : repris après le quota.';
+    const exec = parlant(fauxClaude([travailEnConflit(repo), () => HEBDO, () => {}, resout]), [RAPPORT, REPRIS, RESOLUTION]);
+    const e = executerRun({ repo, demande: 'Crée fait.txt', exec, out: () => {}, ...horloge() });
+    const etat = JSON.parse(readFileSync(e.fichier, 'utf8')) as Etat;
+    expect(etat.etat).toBe('integre');
+    expect(etat.rapport).toBe(RAPPORT); // ni la reprise après quota ni la résolution ne remplacent le rapport du travail
+    // le rebase coupé par le quota est annulé, puis rejoué : un second conflit, résolu
+    expect(etat.conflits?.map((c) => [c.resolu, c.message])).toEqual([[false, REPRIS], [true, RESOLUTION]]);
+    expect(etat.messages?.filter((m) => m.texte !== RAPPORT).every((m) => m.sujet === 'résolution du conflit au rebase')).toBe(true);
   });
 
   it('la cible avance à chaque porte : rendu au lead après 3 rebases, avec la raison', () => {

@@ -24,8 +24,9 @@ const MARGE_REPRISE_MS = 60_000, PORTE_MS = 30 * 60_000 /* une commande de la po
 const REPRISE_QUOTA = 'Le quota est revenu : reprends le travail là où tu t\'étais arrêté, dans le même dossier, puis dis « fini ».';
 const BASCULE_FABLE = 'La limite Opus est atteinte : tu continues sur Fable. Reprends le travail là où tu t\'étais arrêté, dans le même dossier, puis dis « fini ».';
 
-/** L723 : un conflit au rebase sur la cible, rendu à la session ; `resolu` faux tant qu'elle ne l'a pas résolu (refus, quota, signal), `message` : son dernier mot. */
-export interface Conflit { cible: string; sur: string; fichiers: string[]; resolu: boolean; message?: string }
+/** L723 : un conflit au rebase sur la cible, rendu à la session ; `resolu` absent tant qu'elle y travaille (reprise après quota, signal, question), faux si elle
+ * ne l'a pas résolu, `message` : son dernier mot. */
+export interface Conflit { cible: string; sur: string; fichiers: string[]; resolu?: boolean; message?: string }
 /** L724 : une porte rouge rendue à la session pour correction ; `rouge` : la sortie de la porte, `message` : le dernier mot de la session,
  * `verte` : la porte rejouée après la correction, absente tant qu'elle n'a pas été rejouée. */
 export interface Correction { rouge: string; message?: string; verte?: boolean }
@@ -126,8 +127,10 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   // lead lit ce qui a été fait et ce qui reste. Le rapport est le dernier message du tour du prompt, fixé seulement si le travail a fini ; les tours ouverts
   // après lui (notifications de tâche) vont au journal, sans le remplacer.
   garderRapport(e, r.messages, o.out, !q && !r.echec, sujet);
-  const mot = r.messages.filter((m) => m.tour === 1).at(-1)?.texte, c = e.corrections?.at(-1);
-  if (sujet === SUJET_CORRECTION && mot && c) c.message = mot; // L724 : ce que la correction a fait, gardé avec ce qui était rouge
+  // L724 : le dernier mot d'une session à sujet va à ce qu'elle traite (le conflit, la correction), à chaque passage : reprise après quota et bascule comprises
+  const mot = r.messages.filter((m) => m.tour === 1).at(-1)?.texte;
+  const vise = sujet === SUJET_CONFLIT ? e.conflits?.at(-1) : sujet === SUJET_CORRECTION ? e.corrections?.at(-1) : undefined;
+  if (mot && vise) vise.message = mot;
   if (q?.limite === 'opus' && (e.modele ?? 'opus') === 'opus') {
     o.out('limite Opus atteinte : bascule sur fable, même session');
     e.modele = 'fable'; sauver(e);
@@ -170,8 +173,9 @@ function ouvrirCorrection(e: Etat, rouge: string): void {
   if (c && c.verte === undefined) c.verte = false;
   e.corrections = [...(e.corrections ?? []), { rouge }]; sauver(e);
 }
-/** Une session reprise (--reponse, quota) pendant une correction la continue : même sujet, le rapport du travail reste. */
-const sujetEnCours = (e: Etat) => (e.corrections?.length && e.corrections.at(-1)?.verte === undefined ? SUJET_CORRECTION : undefined);
+/** Une session reprise (--reponse, quota) pendant une résolution de conflit ou une correction la continue : même sujet, le rapport du travail reste. */
+const sujetEnCours = (e: Etat) => (e.conflits?.length && e.conflits.at(-1)?.resolu === undefined ? SUJET_CONFLIT
+  : e.corrections?.length && e.corrections.at(-1)?.verte === undefined ? SUJET_CORRECTION : undefined);
 const enBref = (sortie: string) => { const l = sortie.split('\n').map((x) => x.trim()).filter(Boolean); return l.length > 1 ? `${l[0]} … ${l.at(-1)}` : l[0] ?? ''; };
 const correctionFaite = (c: Correction) => `porte rouge (${enBref(c.rouge)}) corrigée par la session, porte verte ensuite${c.message ? ` ; la session : ${c.message}` : ''}`;
 const conflitResolu = (e: Etat, c: Conflit) => `conflit au rebase sur ${e.cible} (${c.sur.slice(0, 7)}) résolu par la session, fichiers : ${c.fichiers.join(', ')}`
@@ -183,20 +187,20 @@ const conflitResolu = (e: Etat, c: Conflit) => `conflit au rebase sur ${e.cible}
  */
 function rebaser(e: Etat, o: Opts, cible: string): Etat | null {
   if (rebaseEnCours(e.worktree)) essaiGit(e.worktree, 'rebase', '--abort'); // une résolution coupée (quota, signal) repart de zéro
+  const coupe = e.conflits?.at(-1);
+  if (coupe && coupe.resolu === undefined) coupe.resolu = false; // L724 : le conflit de la résolution coupée n'est pas résolu ; le rebase rejoué ouvre le sien
   if (essaiGit(e.worktree, 'rebase', '-q', cible).status === 0) return null;
   const fichiers = fichiersGit(e.worktree, 'diff', '--name-only', '--diff-filter=U');
-  const c: Conflit = { cible: e.cible, sur: cible, fichiers, resolu: false };
+  const c: Conflit = { cible: e.cible, sur: cible, fichiers };
   e.conflits = [...(e.conflits ?? []), c]; sauver(e);
   o.out(`conflit au rebase sur ${e.cible} (${fichiers.join(', ')}) : reprise de la session pour le résoudre`);
-  const avant = e.messages?.length ?? 0;
   const repondu = session(e, consigneConflit(e, fichiers), o, false, SUJET_CONFLIT), enCours = rebaseEnCours(e.worktree);
-  const message = (e.messages ?? []).slice(avant).filter((m) => m.tour === 1).at(-1)?.texte;
-  if (message) c.message = message;
   if (enCours) essaiGit(e.worktree, 'rebase', '--abort');
   if (!repondu) return fin(e, o);
   const q = question(e, o);
   if (q) return q;
   if (enCours || essaiGit(e.worktree, 'merge-base', '--is-ancestor', cible, 'HEAD').status !== 0) {
+    c.resolu = false;
     e.etat = 'conflit'; e.detail = `conflit au rebase sur ${e.cible} (fichiers : ${fichiers.join(', ')}) : la session ne l'a pas résolu, rebase annulé`; return fin(e, o);
   }
   c.resolu = true; sauver(e);

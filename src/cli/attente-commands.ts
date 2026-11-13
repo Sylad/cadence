@@ -1,6 +1,6 @@
 // Le plan en attente (L695, D-9) : `raf add|note|done|review|ux|demande` (L722) sur une branche tenue par un programme, puis `raf attente [appliquer]`.
 import { checkRegistryWrite, isRegistryWrite } from './demande-commands.js';
-import { reviewedAt, seenArgs } from './gates.js';
+import { checkGateUsage, reviewedAt, seenArgs } from './gates.js';
 import { applyPending, deferPlanWrite, holderHere, PENDING_PLAN, readPending } from '../repo-held.js';
 import { RafError } from '../plan.js';
 import { buildCtx, type EarlyCtx, type Io } from './context.js';
@@ -33,7 +33,9 @@ function checked(command: string, c: EarlyCtx): string[] {
     checkRegistryWrite(c);
     return [];
   }
-  if ((command !== 'review' && command !== 'ux') || c.rest.length < 2) return [];
+  if (command !== 'review' && command !== 'ux') return [];
+  checkGateUsage(command, c.rest);
+  if (c.rest[0] === 'enable') return [];
   const plan = buildCtx({ ...c, command }).loadPlan();
   const verdict = c.rest.slice(1).join(' ');
   // Le plan refuse en mémoire, rien n'est sauvé : sous-tâche, verdict vide, lot inconnu, plan en lecture seule.

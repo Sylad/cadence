@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { run } from '../src/cli.js';
 import { readOrchestrateConfig, readVerifyConfig } from '../src/config.js';
 import { holdRepo, PENDING_PLAN, readPending, uncommittedFiles } from '../src/repo-held.js';
+import { Plan } from '../src/plan.js';
 import { verifyGate } from '../src/verify-gate.js';
 import { executerRun } from '../v2/src/run/run.js';
 import type { Executeur } from '../v2/src/bench/bras.js';
-import { gitRepo, tempDir, testPackage } from './helpers.js';
+import { commit, gitRepo, tempDir, testPackage } from './helpers.js';
 
 // L722 : le lead écrivait dans l'arbre principal pendant qu'un programme le tenait (dossier 2.0.4 pendant une porte, D-1.json pendant un run, raf review
 // sur le plan) : review, ux et le registre des demandes passent par le plan en attente, et un run ou une porte nomme au départ ce qui n'est pas commité.
@@ -274,6 +275,68 @@ describe('L722 (5) : une écriture invalide est refusée avant la mise en attent
     }
     expect(raf(dir, 'attente', 'appliquer').out).toMatch(/1 écriture\(s\) appliquée\(s\) —/);
     expect(planText(dir)).toMatch(/après/);
+  });
+});
+
+// Revue L722 r2 (L725) : `raf review L1` ou `raf ux L1` sans verdict était mis en attente sans contrôle ; à l'application, il échouait (usage) et
+// toutes les écritures mises en attente derrière lui restaient bloquées jusqu'à une correction à la main de .cadence/plan-en-attente.yaml.
+describe('L725 (1) : review et ux sans verdict, ou sans lot, sont refusés avant la mise en attente, comme hors attente', () => {
+  it('refusés avec l usage, rien en attente ; enable reste mis en attente ; la note suivante est appliquée', () => {
+    const { dir } = project();
+    const unhold = holdRepo(dir, 'run', 'cadence run 1');
+    try {
+      expect(raf(dir, 'review', 'L1')).toMatchObject({ code: 2, err: expect.stringMatching(/usage : raf review <lot> "verdict"/) });
+      expect(raf(dir, 'ux', 'L1')).toMatchObject({ code: 2, err: expect.stringMatching(/usage : raf ux <lot> "verdict"/) });
+      expect(raf(dir, 'review')).toMatchObject({ code: 2, err: expect.stringMatching(/usage : raf review enable \| review <lot> "verdict"/) });
+      expect(raf(dir, 'ux')).toMatchObject({ code: 2, err: expect.stringMatching(/usage : raf ux enable \| ux <lot> "verdict"/) });
+      expect(readPending(dir)).toEqual([]);
+      expect(raf(dir, 'ux', 'enable').out).toMatch(/mis en attente : raf ux enable/);
+      expect(raf(dir, 'note', 'L1', 'après').code).toBe(0);
+    } finally {
+      unhold();
+    }
+    const applied = raf(dir, 'attente', 'appliquer');
+    expect(applied.code).toBe(0);
+    expect(applied.out).toMatch(/2 écriture\(s\) appliquée\(s\) —/);
+    expect(planText(dir)).toMatch(/après/);
+    expect(planText(dir)).toMatch(/uxSince/);
+  });
+});
+
+// Revue L722 r2 (L725) : le sha figé d'un dépôt voisin (`--vu-depot <dépôt>=<sha|aucun>`) n'avait aucun test.
+describe('L725 (2) : une revue mise en attente fige aussi le dernier commit du lot de chaque dépôt voisin', () => {
+  /** Le projet avec L1 démarré qui déclare deux dépôts voisins : l'un a un commit du lot, l'autre aucun. */
+  function withNeighbours(): { dir: string; env: NodeJS.ProcessEnv; voisin: string; vide: string; relVoisin: string; relVide: string; first: string } {
+    const { dir, env } = project();
+    raf(dir, 'review', 'enable');
+    raf(dir, 'start', 'L1');
+    const voisin = gitRepo(tempDir());
+    const vide = gitRepo(tempDir());
+    commit(voisin, 'fix(L1): côté voisin', '2026-11-13T10:00:00');
+    commit(vide, 'chore: sans rapport', '2026-11-13T10:00:00');
+    const [relVoisin, relVide] = [relative(dir, voisin), relative(dir, vide)];
+    const file = join(dir, '.cadence/raf.yaml');
+    writeFileSync(file, planText(dir).replace(/- id: L1\n/, `- id: L1\n    repos: [${JSON.stringify(relVoisin)}, ${JSON.stringify(relVide)}]\n`));
+    sh(dir, env, 'git', 'add', '-A');
+    expect(sh(dir, env, 'git', 'commit', '-qm', 'chore: dépôts voisins de L1').status).toBe(0);
+    return { dir, env, voisin, vide, relVoisin, relVide, first: sh(voisin, env, 'git', 'rev-parse', 'HEAD').stdout.trim() };
+  }
+
+  it('la ligne mise en attente porte --vu-depot pour chaque voisin ; un commit voisin venu avant l application ne change pas le sha retenu', () => {
+    const { dir, env, voisin, vide, relVoisin, relVide, first } = withNeighbours();
+    const unhold = holdRepo(dir, 'run', 'cadence run 1');
+    try {
+      expect(raf(dir, 'review', 'L1', 'conforme').code).toBe(0);
+    } finally {
+      unhold();
+    }
+    expect(readPending(dir).map((w) => w.argv)).toEqual([['review', 'L1', 'conforme', '--vu', 'aucun', '--vu-depot', `${relVoisin}=${first}`, '--vu-depot', `${relVide}=aucun`]]);
+    commit(voisin, 'fix(L1): second côté voisin', '2026-11-13T11:00:00');
+    commit(vide, 'feat(L1): premier côté vide', '2026-11-13T11:00:00');
+    expect(sh(voisin, env, 'git', 'rev-parse', 'HEAD').stdout.trim()).not.toBe(first);
+    expect(raf(dir, 'attente', 'appliquer').code).toBe(0);
+    const review = Plan.load(join(dir, '.cadence/raf.yaml')).lots().find((l) => l.id === 'L1')?.review;
+    expect(review).toMatchObject({ commit: null, repos: { [relVoisin]: first, [relVide]: null } });
   });
 });
 

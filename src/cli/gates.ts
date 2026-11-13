@@ -38,9 +38,15 @@ export function reviewedAt(plan: Plan, root: string, lotId: string): ReviewedAt 
   return { commit: plan.readonly ? null : (lotWork(plan, root, lotId)[0]?.sha ?? null), ...(neighbours?.repos.length ? { repos: repoShas(plan, neighbours.repos, lotId) } : {}) };
 }
 
+/** Les refus d'usage de `raf ux|review`, joués aussi avant la mise en attente (L725) : une ligne sans lot ou sans verdict bloquerait celles qui la suivent. */
+export function checkGateUsage(kind: keyof typeof GATES, rest: string[]): void {
+  if (rest.length < 1) throw new RafError(`usage : raf ${kind} enable | ${kind} <lot> "verdict"`);
+  if (rest[0] !== 'enable' && rest.length < 2) throw new RafError(`usage : raf ${kind} <lot> "verdict"`);
+}
+
 /** `seen` : ce que la revue a relu quand elle a été tapée (revue mise en attente, L722), sinon lu maintenant. */
 function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, root: string, today: Day, io: Io, opts: { verbose: boolean; commit: string | undefined; seen?: ReviewedAt }): number {
-  if (rest.length < 1) throw new RafError(`usage : raf ${kind} enable | ${kind} <lot> "verdict"`);
+  checkGateUsage(kind, rest);
   const plan = loadPlan();
   if (rest[0] === 'enable') {
     const changed = kind === 'ux' ? plan.enableUx(today) : plan.enableReview(today);
@@ -48,7 +54,6 @@ function gate(kind: keyof typeof GATES, rest: string[], loadPlan: () => Plan, ro
     io.out(changed ? `${GATES[kind].on} à partir du ${today}` : `${GATES[kind].already} depuis le ${kind === 'ux' ? plan.uxSince : plan.reviewSince}`);
     return 0;
   }
-  if (rest.length < 2) throw new RafError(`usage : raf ${kind} <lot> "verdict"`);
   // Le plan refuse lui-même une sous-tâche, un verdict vide, un lot inconnu.
   const verdict = rest.slice(1).join(' ');
   if (kind === 'ux') plan.recordUx(rest[0], verdict, today);

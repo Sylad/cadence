@@ -153,8 +153,8 @@ pid now belongs to another process (`start` differs: a run killed before a reboo
   nothing in the plan or the register: they append their command line to `.cadence/plan-en-attente.yaml` (added to
   `.git/info/exclude`, never tracked) and say so. In a session of a wave (`CADENCE_ORCHESTRATED`), `done`, `review` and
   `ux` are refused before that step: their verdict is the lead's, it is never queued to be played later.
-- Before queuing, the write is checked as if it were played (unknown lot, empty verdict, unknown request or state,
-  missing proof): an invalid write is refused at once instead of blocking every write queued after it. A queued
+- Before queuing, the write is checked as if it were played (unknown lot, empty or missing verdict, unknown request or
+  state, missing proof): an invalid write is refused at once instead of blocking every write queued after it. A queued
   `raf review <lot>` freezes what it reviewed: the last commit of the lot (and of each neighbour repository) when it is
   typed, written in the queued line as `--vu <sha|aucun>` and `--vu-depot <repo>=<sha|aucun>` (internal options, refused
   outside the pending plan). Applied later, the verdict covers that commit only: a commit of the lot that came in between

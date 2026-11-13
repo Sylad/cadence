@@ -3,8 +3,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { executerRun } from '../src/run/run.js';
-import { commite, depot, fauxClaude, git, io } from './run-outils.js';
+import type { Executeur } from '../src/bench/bras.js';
+import { executerRun, type Etat } from '../src/run/run.js';
+import { commite, depot, fauxClaude, git, io, sortie } from './run-outils.js';
 
 const ID = ['-c', 'user.email=t@t', '-c', 'user.name=t'];
 /** Porte qui compte ses passages dans `compte` et joue `pendant` (une commande shell) à chaque passage, comme un autre run qui s'intègre pendant elle. */
@@ -15,6 +16,18 @@ function porte(repo: string, pendant: string): string {
   return compte;
 }
 const passages = (compte: string) => (existsSync(compte) ? readFileSync(compte, 'utf8').split('\n').filter(Boolean).length : 0);
+/** Faux claude dont chaque session rend son propre dernier message (`reponses`), comme un vrai rapport de travail puis une réponse de résolution. */
+const parlant = (exec: Executeur, reponses: string[]): Executeur => (args, o) => {
+  const r = exec(args, o), j = JSON.parse(r.stdout);
+  return { ...r, stdout: sortie(j.session_id, reponses.shift() ?? j.result) };
+};
+const RAPPORT = 'fini. Commit : ajoute fait.txt. Vérifié : porte verte. Non vérifié : la capture.';
+const RESOLUTION = 'fini : fait.txt garde les deux versions, rebase terminé.';
+/** La session de travail commite fait.txt pendant qu'« ailleurs » commite un autre fait.txt sur main : le rebase est en conflit sur fait.txt. */
+const travailEnConflit = (repo: string) => (cwd: string) => {
+  commite('fait.txt')(cwd); writeFileSync(join(repo, 'fait.txt'), 'autre'); git(repo, 'add', '.'); git(repo, ...ID, 'commit', '-qm', 'fait.txt ailleurs');
+};
+const resout = (cwd: string) => { writeFileSync(join(cwd, 'fait.txt'), 'les deux'); git(cwd, 'add', 'fait.txt'); git(cwd, ...ID, '-c', 'core.editor=true', 'rebase', '--continue'); };
 const rebaseEnCours = (wt: string) => ['rebase-merge', 'rebase-apply'].some((d) => existsSync(join(wt, git(wt, 'rev-parse', '--git-path', d))));
 
 describe('cadence run : la branche cible avance pendant la porte (L723)', () => {
@@ -35,8 +48,7 @@ describe('cadence run : la branche cible avance pendant la porte (L723)', () => 
 
   it('conflit au rebase : la même session le résout avec la liste des fichiers, la porte est rejouée, puis intégration', () => {
     const repo = depot(), appels: { args: string[]; env: NodeJS.ProcessEnv }[] = [];
-    const exec = fauxClaude([(cwd) => { commite('fait.txt')(cwd); writeFileSync(join(repo, 'fait.txt'), 'autre'); git(repo, 'add', '.'); git(repo, ...ID, 'commit', '-qm', 'fait.txt ailleurs'); },
-      (cwd) => { writeFileSync(join(cwd, 'fait.txt'), 'les deux'); git(cwd, 'add', 'fait.txt'); git(cwd, ...ID, '-c', 'core.editor=true', 'rebase', '--continue'); }], appels);
+    const exec = fauxClaude([travailEnConflit(repo), resout], appels);
     const e = executerRun({ repo, demande: 'Crée fait.txt', exec, out: () => {} });
     expect(e.etat).toBe('integre');
     const prompt = appels[1].args[appels[1].args.indexOf('-p') + 1];
@@ -47,15 +59,40 @@ describe('cadence run : la branche cible avance pendant la porte (L723)', () => 
 
   it('conflit que la session ne résout pas : rendu au lead (« conflit »), rebase annulé, fichiers nommés', () => {
     const repo = depot(), base = () => git(repo, 'rev-parse', 'HEAD');
-    const exec = fauxClaude([(cwd) => { commite('fait.txt')(cwd); writeFileSync(join(repo, 'fait.txt'), 'autre'); git(repo, 'add', '.'); git(repo, ...ID, 'commit', '-qm', 'fait.txt ailleurs'); }, () => {}]);
+    const exec = parlant(fauxClaude([travailEnConflit(repo), () => {}]), [RAPPORT, 'je n\'y arrive pas']);
     const avant = base();
     const e = executerRun({ repo, demande: 'x', exec, out: () => {} });
     expect(e.etat).toBe('conflit');
+    expect(e.rapport).toBe(RAPPORT); // la réponse de la résolution ne remplace pas le rapport du travail
+    expect(e.conflits).toEqual([expect.objectContaining({ cible: 'main', fichiers: ['fait.txt'], resolu: false, message: 'je n\'y arrive pas' })]);
     expect(e.detail).toMatch(/fait\.txt/);
     expect(e.detail).toMatch(/pas résolu/);
     expect(rebaseEnCours(e.worktree)).toBe(false);
     expect(base()).not.toBe(avant); // seul le commit d'« ailleurs » est sur main
     expect(git(repo, 'log', '--format=%s', '-1')).toBe('fait.txt ailleurs');
+  });
+
+  it('run complet avec conflit résolu : rapport du travail intact, conflit visible dans l\'état (fichiers, sha, ce que la session a dit) et au journal', () => {
+    const repo = depot(), { l, out } = io();
+    const e = executerRun({ repo, demande: 'Crée fait.txt', exec: parlant(fauxClaude([travailEnConflit(repo), resout]), [RAPPORT, RESOLUTION]), out });
+    const etat = JSON.parse(readFileSync(e.fichier, 'utf8')) as Etat, journal = l.join('\n'), ailleurs = git(repo, 'rev-parse', 'HEAD~1');
+    expect(etat.etat).toBe('integre');
+    expect(etat.rapport).toBe(RAPPORT);
+    expect(etat.conflits).toEqual([{ cible: 'main', sur: ailleurs, fichiers: ['fait.txt'], resolu: true, message: RESOLUTION }]);
+    expect(etat.detail).toBe(`conflit au rebase sur main (${ailleurs.slice(0, 7)}) résolu par la session, fichiers : fait.txt ; la session : ${RESOLUTION}`);
+    // les deux sessions restent dans l'état, chacune pour ce qu'elle est
+    expect(etat.messages).toEqual([{ texte: RAPPORT, tour: 1 }, { texte: RESOLUTION, tour: 1, sujet: 'résolution du conflit au rebase' }]);
+    const lignes = [
+      `session, rapport : ${RAPPORT}`,
+      'conflit au rebase sur main (fait.txt) : reprise de la session pour le résoudre',
+      `session, résolution du conflit au rebase, fin (ne remplace pas le rapport du travail) : ${RESOLUTION}`,
+      etat.detail,
+    ];
+    const positions = lignes.map((x) => journal.indexOf(x));
+    expect(positions.every((i) => i >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b)); // dans cet ordre
+    expect(journal).toContain(`cadence run ${e.id} : integre (main = ${e.integre})`); // ligne de fin, suivie du détail : le conflit résolu
+    expect(journal.slice(journal.indexOf(`cadence run ${e.id} : integre`))).toContain(`\n${etat.detail}`);
   });
 
   it('la cible avance à chaque porte : rendu au lead après 3 rebases, avec la raison', () => {

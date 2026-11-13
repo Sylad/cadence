@@ -25,6 +25,7 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // run.ts garde les messages de la session à toute fin (échec, délai, signal, quota), pas seulement au succès.
   // L722 : run 466 (+11 lignes), le départ du run nomme les fichiers non commités de l'arbre principal (même règle : pas de ligne tassée pour tenir le budget).
   // L723 : run 520, run.ts se rebase seul quand la cible avance pendant la porte (rebase, conflit rendu à la session, porte rejouée, arbre principal sale nommé).
+  // L723 (revue, M1) : run 539, le conflit résolu va à l'état et au journal, le rapport du travail n'est plus remplacé par le « fini » de la résolution.
   it('les totaux sont ceux de R29 : noyau 3000, mesure 1698 (L689, issue #57)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1698]);

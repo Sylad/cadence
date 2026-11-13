@@ -4,8 +4,9 @@
 // qui fait le travail ; un tour suivant n'a pas été ouvert par le prompt (en vrai flux, après un événement system/task_notification, rien dans un message
 // user : test/fixtures/flux-notification-tardive-2.1.293.jsonl). Les tours se comptent donc sur les `result`, quel que soit le format de la notification.
 
-/** Message de l'assistant sans appel d'outil ; `tour` : 1 pour le tour du prompt, 2 et plus pour un tour ouvert après lui (une notification de tâche). */
-export interface Message { texte: string; tour: number }
+/** Message de l'assistant sans appel d'outil ; `tour` : 1 pour le tour du prompt, 2 et plus pour un tour ouvert après lui (une notification de tâche) ;
+ * `sujet` : la session ne faisait pas le travail demandé mais autre chose (L723 : « résolution du conflit au rebase »). */
+export interface Message { texte: string; tour: number; sujet?: string }
 export type Evenement = { type?: string; result?: string; session_id?: string; total_cost_usd?: number; is_error?: boolean; subtype?: string;
   modelUsage?: Record<string, Record<string, number>>; message?: { id?: string; content?: unknown } };
 type Bloc = { type?: string; text?: string };
@@ -70,13 +71,16 @@ export function lireFlux(stdout: string): Flux {
 
 /** Garde la session dans l'état (`messages` ajoutés, jamais remplacés) et écrit au journal chaque message, dans l'ordre, quelle que soit la fin de la session.
  * `fini` : le travail du tour 1 a fini ; son dernier message est alors le rapport (`rapport` de l'état). Sinon (échec, délai, signal, quota), l'état ne reçoit
- * pas de rapport et le journal nomme ce dernier message pour ce qu'il est : le dernier dit avant l'arrêt, celui où le lead lit ce qui a été fait et ce qui reste. */
-export function garderRapport(e: { rapport?: string; messages?: Message[] }, messages: Message[], out: (l: string) => void, fini = true): void {
+ * pas de rapport et le journal nomme ce dernier message pour ce qu'il est : le dernier dit avant l'arrêt, celui où le lead lit ce qui a été fait et ce qui reste.
+ * `sujet` (L723) : la session faisait autre chose que le travail (une résolution de conflit) ; ses messages vont à l'état et au journal, marqués de leur sujet,
+ * et le rapport reste celui du travail : un « fini » de résolution ne le remplace jamais. */
+export function garderRapport(e: { rapport?: string; messages?: Message[] }, messages: Message[], out: (l: string) => void, fini = true, sujet?: string): void {
   const travail = messages.filter((m) => m.tour === 1), dernier = travail.at(-1);
-  if (fini && dernier) e.rapport = dernier.texte;
-  e.messages = [...(e.messages ?? []), ...messages];
+  if (fini && dernier && !sujet) e.rapport = dernier.texte;
+  e.messages = [...(e.messages ?? []), ...messages.map((m) => (sujet ? { ...m, sujet } : m))];
   for (const m of messages) {
     if (m.tour > 1) out(`session, tour ${m.tour}, après le rapport (notification de tâche ; ne change ni le rapport ni l'état du run) : ${m.texte}`);
+    else if (sujet) out(`session, ${sujet}${m === dernier ? (fini ? ', fin (ne remplace pas le rapport du travail)' : ', dernier message avant l\'arrêt') : ''} : ${m.texte}`);
     else if (m !== dernier) out(`session, pendant le travail : ${m.texte}`);
     else if (fini) out(`session, rapport : ${m.texte}`);
     else out(`session, dernier message avant l'arrêt (travail non fini) : ${m.texte}`);

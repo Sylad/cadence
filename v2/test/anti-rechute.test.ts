@@ -127,8 +127,9 @@ const FLAGS_CLI: Record<string, string[]> = {
 const prefixe = (k: string) => (k.startsWith('src/bench/') || k === 'src/sequence/cli.ts' || k === 'src/cli.ts' ? 'bench' : 'cadence2'); // l'aide de cli.ts et le banc séquence décrivent les options de « bench »
 // Budgets de R29 : relever un total ou un module (même sous le total) est une violation ; le baisser est permis.
 const BUDGET_R29: Record<string, { total: number; modules: Record<string, number> }> = {
-  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 520, porte: 250, deliver: 450, hooks: 200 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
+  noyau: { total: 3000, modules: { plan: 350, accueil: 200, run: 539, porte: 250, deliver: 450, hooks: 200 } }, // R32 : hooks, mécanisme du bras candidat ; issue #57 : run 455, run.ts détassé, messages gardés à toute fin ; L722 : run 466 (+11), le départ nomme les fichiers non commités de l'arbre principal (pas de ligne tassée)
   // L723 : run 520, rebase seul quand la cible avance pendant la porte (conflit rendu à la session, porte rejouée, arbre principal sale nommé), sans ligne tassée
+  // L723 (revue, M1) : run 539, un conflit de rebase résolu est ajouté à l'état (conflits, détail de fin) et au journal sans remplacer le rapport du travail, sans ligne tassée
   mesure: { total: 1698, modules: { bench: 998, sequence: 700 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
 };
 function reglesBudget(f: Fichiers): string[] {

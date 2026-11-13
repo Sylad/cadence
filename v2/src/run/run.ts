@@ -23,9 +23,12 @@ const MARGE_REPRISE_MS = 60_000, PORTE_MS = 30 * 60_000 /* une commande de la po
 const REPRISE_QUOTA = 'Le quota est revenu : reprends le travail là où tu t\'étais arrêté, dans le même dossier, puis dis « fini ».';
 const BASCULE_FABLE = 'La limite Opus est atteinte : tu continues sur Fable. Reprends le travail là où tu t\'étais arrêté, dans le même dossier, puis dis « fini ».';
 
+/** L723 : un conflit au rebase sur la cible, rendu à la session ; `resolu` faux tant qu'elle ne l'a pas résolu (refus, quota, signal), `message` : son dernier mot. */
+export interface Conflit { cible: string; sur: string; fichiers: string[]; resolu: boolean; message?: string }
 export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
 export interface Etat { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string; pieces: string[];
-  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; rapport?: string; messages?: Message[] }
+  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; rapport?: string; messages?: Message[];
+  conflits?: Conflit[] }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
@@ -111,7 +114,8 @@ function jouerPorte(cmds: string[], cwd: string): { ok: boolean; sortie: string 
 
 // L709 (issue #55) : rien de ce qui lie un processus à la session Claude Code lanceuse (pid, socket, auth rafraîchie par l'hôte) ; `neuve` : 1re session, id de l'état.
 const LIEN_HOTE = /^CLAUDE_(PID|SSH_\w+|CODE_(CHILD_SESSION|MESSAGING_\w+|SDK_HAS_HOST_AUTH_REFRESH|HOST_SESSION_ID|SESSION_ID))$/;
-function session(e: Etat, prompt: string, o: Opts, neuve = false): boolean {
+/** `sujet` : une session qui ne fait pas le travail demandé (L723 : la résolution d'un conflit) ; ses messages ne remplacent pas le rapport du travail. */
+function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string): boolean {
   const exec = o.exec ?? creerExecuteur('claude', 4 * 3600_000);
   // L699 : le modèle est celui du lancement, gardé dans l'état (une reprise par --reponse ne le change pas) ; un état d'avant L699 n'en a pas : opus.
   // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet
@@ -125,11 +129,11 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false): boolean {
   // Issue #57 : chaque message de la session va au journal et à l'état quelle que soit sa fin (travail fini, échec, délai, signal, quota) : c'est là que le
   // lead lit ce qui a été fait et ce qui reste. Le rapport est le dernier message du tour du prompt, fixé seulement si le travail a fini ; les tours ouverts
   // après lui (notifications de tâche) vont au journal, sans le remplacer.
-  garderRapport(e, r.messages, o.out, !q && !r.echec);
+  garderRapport(e, r.messages, o.out, !q && !r.echec, sujet);
   if (q?.limite === 'opus' && (e.modele ?? 'opus') === 'opus') {
     o.out('limite Opus atteinte : bascule sur fable, même session');
     e.modele = 'fable'; sauver(e);
-    return session(e, e.session ? BASCULE_FABLE : prompt, o);
+    return session(e, e.session ? BASCULE_FABLE : prompt, o, false, sujet);
   }
   if (q) {
     e.etat = 'quota'; e.quota = q;
@@ -158,13 +162,25 @@ const consigneConflit = (e: Etat, fichiers: string[]) => `Le rebase de ta branch
   + `Le rebase est en cours dans ${e.worktree}. Résous chaque conflit en gardant les deux intentions (le travail de ${e.cible} et le tien), git add, puis `
   + '`GIT_EDITOR=true git rebase --continue`, jusqu\'à la fin du rebase, sans --skip ni --abort. Ne commite rien d\'autre, puis dis « fini ».';
 
-/** Rebase le worktree sur `cible` ; en conflit, la même session le résout. Rend l'état de fin si le run s'arrête, null pour continuer. */
+const SUJET_CONFLIT = 'résolution du conflit au rebase';
+const conflitResolu = (e: Etat, c: Conflit) => `conflit au rebase sur ${e.cible} (${c.sur.slice(0, 7)}) résolu par la session, fichiers : ${c.fichiers.join(', ')}`
+  + `${c.message ? ` ; la session : ${c.message}` : ''}`;
+
+/**
+ * Rebase le worktree sur `cible` ; en conflit, la même session le résout. Rend l'état de fin si le run s'arrête, null pour continuer.
+ * Le conflit est AJOUTÉ à l'état (`conflits`) et au journal, résolu ou non ; le rapport du travail reste celui du travail (sujet de la session, ../rapport.ts).
+ */
 function rebaser(e: Etat, o: Opts, cible: string): Etat | null {
   if (rebaseEnCours(e.worktree)) essaiGit(e.worktree, 'rebase', '--abort'); // une résolution coupée (quota, signal) repart de zéro
   if (essaiGit(e.worktree, 'rebase', '-q', cible).status === 0) return null;
   const fichiers = fichiersGit(e.worktree, 'diff', '--name-only', '--diff-filter=U');
+  const c: Conflit = { cible: e.cible, sur: cible, fichiers, resolu: false };
+  e.conflits = [...(e.conflits ?? []), c]; sauver(e);
   o.out(`conflit au rebase sur ${e.cible} (${fichiers.join(', ')}) : reprise de la session pour le résoudre`);
-  const repondu = session(e, consigneConflit(e, fichiers), o), enCours = rebaseEnCours(e.worktree);
+  const avant = e.messages?.length ?? 0;
+  const repondu = session(e, consigneConflit(e, fichiers), o, false, SUJET_CONFLIT), enCours = rebaseEnCours(e.worktree);
+  const message = (e.messages ?? []).slice(avant).filter((m) => m.tour === 1).at(-1)?.texte;
+  if (message) c.message = message;
   if (enCours) essaiGit(e.worktree, 'rebase', '--abort');
   if (!repondu) return fin(e, o);
   const q = question(e, o);
@@ -172,6 +188,8 @@ function rebaser(e: Etat, o: Opts, cible: string): Etat | null {
   if (enCours || essaiGit(e.worktree, 'merge-base', '--is-ancestor', cible, 'HEAD').status !== 0) {
     e.etat = 'conflit'; e.detail = `conflit au rebase sur ${e.cible} (fichiers : ${fichiers.join(', ')}) : la session ne l'a pas résolu, rebase annulé`; return fin(e, o);
   }
+  c.resolu = true; sauver(e);
+  o.out(conflitResolu(e, c));
   return null;
 }
 
@@ -217,7 +235,8 @@ function suite(e: Etat, o: Opts): Etat {
     }
     o.out(`${e.cible} a avancé pendant la porte : rebase et porte rejouée (${rebase + 1}/${REBASES_MAX})`);
   }
-  e.integre = git(e.repo, 'rev-parse', '--short', e.cible); e.etat = 'integre'; e.detail = '';
+  e.integre = git(e.repo, 'rev-parse', '--short', e.cible); e.etat = 'integre';
+  e.detail = (e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)).join('\n'); // L723 : intégré, mais une fusion écrite par la session est à relire
   const registre = registreOuvert(e.worktree);
   essaiGit(e.repo, 'worktree', 'remove', '--force', e.worktree); essaiGit(e.repo, 'branch', '-D', br);
   libererReglages(e.worktree); rmSync(`${e.worktree}.reglages`, { recursive: true, force: true });

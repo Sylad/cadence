@@ -7,5 +7,11 @@
  "lots": [
   "L689"
  ],
- "preuve": null
+ "preuve": null,
+ "precisions": [
+  {
+   "date": "2026-11-13",
+   "texte": "Redite de Sylvain pendant le banc hebdo (plus de 2 h 15, 3 bancs sur 6) : « on attend, le compte pro attend le fix de #56, on va pas s'arreter en plein millieu, mais ziut, il faudra après regler ce pb de longeur insuportable ». À traiter juste après la release 2.0.4 (L689)."
+  }
+ ]
 }

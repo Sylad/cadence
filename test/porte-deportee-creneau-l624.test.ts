@@ -103,7 +103,9 @@ describe('L624 — une porte jouée sur l\'hôte rend le créneau de session du 
       const mine = ctxs.find((c) => c.lot.repo === o.cwd)!;
       if (o.cwd === hs[0].repo) {
         setGate(mine, { label: 'tests', started: new Date().toISOString(), ...(remoteGate ? { remote: true as const } : {}) });
-        await Promise.race([started, new Promise((r) => setTimeout(r, 300))]);
+        // L723 : porte sur l'hôte, ouverte jusqu'au départ de L2 (plafond 5 s) : sous la charge de la suite complète, L2 part après 300 ms (vécu à la porte
+        // du 13-11) et R1 voyait la porte déjà levée. Si le créneau reste tenu, L2 ne part qu'après L1 : le plafond tombe et R1 reste rouge.
+        await Promise.race([started, new Promise((r) => setTimeout(r, remoteGate ? 5000 : 300))]);
         setGate(mine, undefined);
       } else l2Started();
       return claudeOut(workReport({ commits: [commitFile(o.cwd, `${lot}-${Math.random()}.txt`, `feat(${lot}): x`)] }));

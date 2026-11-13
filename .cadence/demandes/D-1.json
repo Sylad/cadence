@@ -3,9 +3,18 @@
  "texte": "Oui il faudra revoir le hud,peut être faire des choix sur l'affichage en bas et dans le panneau de gauche. Éviter les doublons, lieux repartir les infos, et peut être en afficher plus si il y a de la place",
  "date": "2026-11-10",
  "origine": "session du lead, après « le HUD et cadence lead tour ne voient pas les runs »",
- "etat": "ouverte",
+ "etat": "livrée",
  "lots": [
   "L687"
  ],
- "preuve": null
+ "preuve": "L687 : bandeau — une ligne par cadence run avec son état ; panneau des lots ouvert, la bande ne répète ni la liste des projets ni le banc ; panneau — un lot joué par un run lit « ⟳ run » ; « à commiter » seulement dans un dépôt git. Tests : claude plugin test plugins/cadence-hud (506 pass, dont tests/hud2-l687.test.tsx et 2 tests L687 de tests/lots-pane.test.ts), npx vitest run test/hud-runs-l687.test.ts (vrai collecteur). Capture du rendu réel (claude --plugin-dir, tmux 200x50, 2026-11-13 08:05) : cadence-20261113065602-42393.captures/l687-panneau-{ouvert,run,ferme}.{txt,ansi,png}",
+ "runs": [
+  "20261113065602-42393"
+ ],
+ "precisions": [
+  {
+   "date": "2026-11-13",
+   "texte": "Servie par le lot L687 (HUD 2.0). « En afficher plus s'il y a la place » : les runs de cadence run avec leur état, modèle, durée et coût, dans la place que libèrent la liste des projets et le banc quand le panneau des lots est ouvert."
+  }
+ ]
 }

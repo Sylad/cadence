@@ -100,6 +100,27 @@ export type LeadHold = { label: string; since: string; expires: string }
 /** Un run de `cadence run` vivant (L710) : il prend un créneau de sessions comme une session du lead. */
 export type LiveRun = { id: string; repo: string }
 
+/**
+ * Un run de `cadence run` à montrer (L687, D-1), lu de son fichier d'état (`.cadence-run/<dépôt>-<id>.json`) et de son verrou : `etat` est celui de
+ * `cadence run --liste` (`en-cours` sans porteur vivant devient `interrompu`), `role` celui du porteur vivant (`session` : il joue ; `attente` : il attend le quota), null sans porteur.
+ */
+export type ShownRun = {
+  id: string
+  repo: string
+  lot: string | null
+  etat: string
+  role: string | null
+  debut?: string | null
+  modele?: string | null
+  cout?: number | null
+  /** La première ligne de la demande. */
+  titre: string
+  /** L'heure de reprise d'un run en quota. */
+  reprise?: string | null
+  /** La dernière écriture de l'état (ISO). */
+  vu: string
+}
+
 /** Une ligne de `cadence lead tour --json` (L149) : ce que la bande en garde pour dessiner l'avancement d'un plan. */
 export type Project = {
   project: string
@@ -157,6 +178,10 @@ declare module 'claude-code' {
       leadHolds: LeadHold[]
       /** Runs de `cadence run` vivants (L710) : ils comptent dans les créneaux. */
       liveRuns: LiveRun[]
+      /** Les runs de `cadence run` à montrer avec leur état (L687) : vivants, intégrés depuis moins de 30 min, en attente d'un geste depuis moins de 12 h. */
+      shownRuns: ShownRun[]
+      /** Le panneau des lots est ouvert (L687) : la bande ne répète pas ce qu'il montre (projets, banc). */
+      lotsOpen: boolean
       /** Plafond de sessions simultanées (CADENCE_MAX_SESSIONS, 2 par défaut). */
       slotCap: number
       /** La liste des projets est repliée sur une ligne (`/hud projets`). */

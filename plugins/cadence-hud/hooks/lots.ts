@@ -186,9 +186,11 @@ const WAVE_GLYPH: Record<string, string> = { queued: '…', question: '?', ready
 export type LotState = { text: string; color: ThemeKey }
 
 /** L'état d'un lot en mots, glyphe et couleur : celui de la vague s'il y en a un (mots et couleurs de la bande), sinon celui du plan (un lot doing sans vague est « en sommeil »). Une sous-tâche n'a que son statut. `openIds` : les lots non clos du projet. */
-export const lotState = (lot: TourLot, openIds: ReadonlySet<string>, waveStatus?: string): LotState => {
+export const lotState = (lot: TourLot, openIds: ReadonlySet<string>, waveStatus?: string, runState?: string): LotState => {
   if (isTask(lot)) return lot.status === 'doing' ? { text: '▶ en cours', color: 'claude' } : { text: '○ à faire', color: 'text' }
   if (waveStatus !== undefined) return { text: `${WAVE_GLYPH[waveStatus] ?? '⟳'} ${lotStatusFr(waveStatus)}`, color: colorOfLot(waveStatus) }
+  // L687 : un lot qu'un run de cadence run vivant joue n'est pas en sommeil ; il dit son run, dans ses mots (« ⟳ run », « ⏸ run en quota »)
+  if (runState !== undefined) return runState === 'quota' ? { text: '⏸ run en quota', color: 'warning' } : { text: '⟳ run', color: 'claude' }
   // doing au plan sans session de vague : rien ne tourne (L659), « en cours » serait faux
   if (lot.status === 'doing') return { text: '◌ en sommeil', color: 'subtle' }
   return lot.after.some(id => openIds.has(id)) ? { text: '⊘ bloqué', color: 'subtle' } : { text: '○ libre', color: 'text' }
@@ -351,6 +353,8 @@ export type PanelInput = {
   views?: Readonly<Record<string, boolean>>
   /** L'heure (ms) à laquelle les durées de la frise sont calculées ; absent, maintenant. */
   now?: number
+  /** Les lots joués par un run vivant de `cadence run` (L687) : le dossier de son dépôt, le lot et son état (`quota` quand il attend la remise à zéro). */
+  runs?: readonly { project: string; lot: string; state: string }[]
 }
 
 /** Ce que la coupe sait d'une ligne du panneau (L712), en plus de sa hauteur. */
@@ -400,7 +404,8 @@ const panelLines = (input: Omit<PanelInput, 'height'>): { lines: Ligne[]; meta: 
   }
   const shown = blocks.filter(b => !b.folded)
   const idWidth = Math.max(0, ...shown.flatMap(b => [...b.flat.map(f => leadOf(b, f).length + f.lot.id.length), ...expandedRest(b).flatMap(g => g.items.map(i => REST_LEAD.length + i.id.length))]))
-  const stateOf = (b: Block, f: FlatLot) => lotState(f.lot, b.open, waves.find(w => w.lot === f.lot.id && sameProject(b.project.project, w.project))?.status)
+  const stateOf = (b: Block, f: FlatLot) =>
+    lotState(f.lot, b.open, waves.find(w => w.lot === f.lot.id && sameProject(b.project.project, w.project))?.status, input.runs?.find(r => r.lot === f.lot.id && sameProject(b.project.project, r.project))?.state)
   const stateWidth = Math.max(0, ...shown.flatMap(b => [...b.flat.map(f => stateOf(b, f).text.length), ...expandedRest(b).map(g => FOLD_STATE[g.group].length)]))
 
   const lines: Ligne[] = []
@@ -629,3 +634,14 @@ export const parseProjectMoveAsk = (data: unknown, rows: readonly LotsRow[]): Mo
 
 /** La commande qui range un projet : `cadence lead priority` sur le dossier du tour. */
 export const priorityArgv = (folder: string, ask: MoveAsk): string[] => ['cadence', 'lead', 'priority', ask.id, `--${ask.place}`, ask.target, folder]
+
+/**
+ * Ce que le panneau dit après un déplacement réussi (L687, D-1) : « à commiter » seulement quand le fichier modifié est dans un dépôt git. `inGit` : vrai dans un dépôt,
+ * faux hors dépôt (git y répond « not a git repository »), null quand git n'a pas pu répondre (on garde alors le conseil d'avant, plutôt que de taire un commit dû).
+ * Case : le dossier parent de dix projets porte le `cadence.yaml` de `priority:` sans être un dépôt ; le panneau disait « à commiter » un fichier que rien ne commite.
+ */
+export const movedText = (kind: 'lot' | 'project', ask: { id: string; place: 'before' | 'after'; target: string }, inGit: boolean | null): string => {
+  const head = `${ask.id} placé ${ask.place === 'before' ? 'avant' : 'après'} ${ask.target}`
+  if (kind === 'project') return `${head} — priority: du cadence.yaml est modifiée${inGit === false ? ' (dossier hors dépôt git : rien à commiter)' : ', à commiter'}`
+  return `${head} — le plan est modifié${inGit === false ? ' (dossier hors dépôt git : rien à commiter)' : ', à commiter (raf move ne commite pas)'}`
+}

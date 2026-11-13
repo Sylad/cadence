@@ -18,8 +18,8 @@ The band does not need the `cadence` CLI, except for the progress of the plans a
 - `ctx` — context of the session; `5h`, `7j` — quota windows and time to their reset; `$1.23` — cost of the session;
   `fable 410k sonnet 85k` — consumption per model;
 - `⚙ 2 agents` — subagents of this session; `2 cmd` — background commands of this session;
-- one header and one aligned line per active lot for each live `cadence orchestrate` wave; free slots and the sessions of the lead;
-- one progress bar per project with open lots.
+- one header and one aligned line per active lot for each live `cadence orchestrate` wave; one line per `cadence run` and its state; free slots and the sessions of the lead;
+- one progress bar per project with open lots, and the bench line, left out while the lots panel (which shows them) is open.
 
 ## Commands
 

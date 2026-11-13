@@ -1521,10 +1521,10 @@ test('R4 — la ligne des créneaux suit orchestrate --status, et se tait sans v
   expect(slotsLine([{ ...WAVE, live: false }], [], 2)).toBeNull()
 })
 
-test('L710 — un run de cadence run vivant prend un créneau et la ligne le nomme ; le collecteur le rend, une entrée étrange est sautée', () => {
+test('L710 — un run de cadence run vivant prend un créneau (L687 : la ligne le compte sans le nommer, sa propre ligne le nomme) ; le collecteur le rend, une entrée étrange est sautée', () => {
   const run = { id: '20261112141141-2253545', repo: '/p/cadence' }
-  expect(slotsLine([], [], 3, [run])).toBe('runs cadence run : 1 (cadence 20261112141141-2253545) · créneaux libres : 2 sur 3')
-  expect(slotsLine([{ ...WAVE, repos: 1 }], [HOLD], 3, [run])).toBe('runs cadence run : 1 (cadence 20261112141141-2253545) · sessions du lead : 1 · créneaux libres : 0 sur 3')
+  expect(slotsLine([], [], 3, [run])).toBe('runs cadence run : 1 · créneaux libres : 2 sur 3')
+  expect(slotsLine([{ ...WAVE, repos: 1 }], [HOLD], 3, [run])).toBe('runs cadence run : 1 · sessions du lead : 1 · créneaux libres : 0 sur 3')
   expect(parseCollected(JSON.stringify({ waves: [], runs: [run, { id: 3 }, null] })).runs).toEqual([run])
   expect(parseCollected(JSON.stringify({ waves: [] })).runs).toEqual([])
 })
@@ -1537,7 +1537,7 @@ test('R5 — le collecteur rend aussi les sessions du lead et le plafond, un anc
   expect(parseCollected(JSON.stringify([WAVE]))).toMatchObject({ holds: [], cap: 2 })
   expect(parseCollected(JSON.stringify({ waves: [], holds: [], cap: 0 })).cap).toBe(2)
   expect(parseCollected(JSON.stringify({ waves: [{ ...WAVE, repos: 1, lanes: 3 }] })).waves[0]).toMatchObject({ repos: 1, lanes: 3 })
-  expect(parseCollected('{}')).toEqual({ waves: [], holds: [], runs: [], cap: 2, ended: [] })
+  expect(parseCollected('{}')).toEqual({ waves: [], holds: [], runs: [], shownRuns: [], cap: 2, ended: [] })
 })
 
 test('R6 — la bande affiche les sessions du lead et les créneaux sans aucune vague', async ($, on) => {

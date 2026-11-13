@@ -1,6 +1,6 @@
 import type { ThemeKey } from 'claude-code'
 
-import type { CommandInfo, LeadHold, LiveRun, ModelsSummary, Project, Wave, WaveLot } from '../types'
+import type { CommandInfo, LeadHold, LiveRun, ModelsSummary, Project, ShownRun, Wave, WaveLot } from '../types'
 
 /** Couleur d'un taux d'occupation (contexte, fenêtre, budget) : vert, puis orange, puis rouge. */
 export const colorOfPercent = (percent: number | undefined, warn = 60, bad = 85): ThemeKey =>
@@ -480,12 +480,12 @@ export const freeSlots = (waves: readonly Wave[], cap: number, outside: number):
 export const gatedLots = (waves: readonly Wave[]): string[] => waves.filter(w => w.live).flatMap(w => w.lots.filter(l => l.gate).map(l => l.lot))
 
 /**
- * « runs cadence run : 1 (cadence 2026…) · sessions du lead : 1 · créneaux libres : 1 sur 3 · 2 en porte : L514 L473 » (sans segment à zéro, sans le dernier sans lot en porte) ;
- * null sans vague vivante, session du lead ni run (L710) : rien à dire.
+ * « runs cadence run : 1 · sessions du lead : 1 · créneaux libres : 1 sur 3 · 2 en porte : L514 L473 » (sans segment à zéro, sans le dernier sans lot en porte) ;
+ * null sans vague vivante, session du lead ni run (L710) : rien à dire. Les runs ne sont plus nommés ici (L687) : chacun a sa ligne au-dessus (runRows), la ligne ne les répète pas.
  */
 export const slotsLine = (waves: readonly Wave[], holds: readonly LeadHold[], cap: number, runs: readonly LiveRun[] = []): string | null => {
   if (!waves.some(w => w.live) && holds.length === 0 && runs.length === 0) return null
-  const run = runs.length > 0 ? `runs cadence run : ${runs.length} (${runs.map(r => `${r.repo.split('/').pop()} ${r.id}`).join(', ')}) · ` : ''
+  const run = runs.length > 0 ? `runs cadence run : ${runs.length} · ` : ''
   const lead = holds.length > 0 ? `sessions du lead : ${holds.length} · ` : ''
   const gated = gatedLots(waves)
   const porte = gated.length > 0 ? ` · ${gated.length} en porte : ${gated.join(' ')}` : ''
@@ -505,3 +505,76 @@ export const expiredHoldText = (hold: LeadHold, now: number): string => {
   const age = Number.isFinite(since) ? `depuis ${duration(now - since)} · ` : ''
   return `⚠ session du lead échue : ${hold.label}  ${age}échue depuis ${duration(now - Date.parse(hold.expires))}`
 }
+
+// ── L687 (D-1) : les runs de cadence run et leur état ──────────────────────────────────────────────────────────────
+
+/** Les mots de l'état d'un run, ceux de `cadence run --liste` dits en français de la bande. */
+const RUN_STATE_FR: Record<string, string> = {
+  'en-cours': 'en cours',
+  interrompu: 'interrompu',
+  attente: 'question',
+  quota: 'quota',
+  'sans-commit': 'sans commit',
+  echec: 'échec',
+  conflit: 'conflit',
+  'porte-rouge': 'porte rouge',
+  'sans-porte': 'sans porte',
+  'refus-integration': 'intégration refusée',
+  integre: 'intégré',
+}
+
+/** Couleur de l'état d'un run : il joue (accent), il est intégré (vert), il attend un geste (orange) ou il a échoué (rouge). */
+export const colorOfRun = (run: Pick<ShownRun, 'etat'>): ThemeKey => {
+  switch (run.etat) {
+    case 'en-cours':
+      return 'claude'
+    case 'integre':
+      return 'success'
+    case 'attente':
+    case 'quota':
+    case 'interrompu':
+    case 'sans-porte':
+      return 'warning'
+    default:
+      return 'error'
+  }
+}
+
+/** Le run est-il tenu par un processus vivant (il joue, ou il attend le quota pour reprendre seul) ? */
+export const isRunLive = (run: Pick<ShownRun, 'role'>): boolean => run.role !== null
+
+/** « 14:05 » : l'heure locale d'une date ISO, '' si illisible. */
+const hourOf = (iso: string | null | undefined): string => {
+  const t = Date.parse(iso ?? '')
+  if (!Number.isFinite(t)) return ''
+  const d = new Date(t)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/**
+ * Les quatre colonnes d'un run : « cadence:L687 » · « en cours » · « opus 12 min · $1.20 » · « HUD 2.0 (D-1) : … ».
+ * L'étiquette est le dossier du dépôt et le lot (l'id du run sans lot) ; le détail dit, pour un run vivant, le modèle et le temps depuis son début
+ * (« attend le quota · reprise 14:05 » pour celui qui attend), pour un run fini depuis quand il l'est ; puis son coût. Le titre est la première ligne
+ * de la demande, sans l'id du lot qui la commence (il est déjà dans l'étiquette).
+ */
+export const runCells = (run: ShownRun, now: number): { label: string; status: string; detail: string; title: string } => {
+  const repo = run.repo.split('/').filter(Boolean).pop() ?? ''
+  const label = `${repo}${repo ? ':' : ''}${run.lot ?? run.id}`
+  const status = run.role === 'attente' ? 'attend le quota' : (RUN_STATE_FR[run.etat] ?? run.etat)
+  const detail: string[] = []
+  if (run.role === 'attente') {
+    const at = hourOf(run.reprise)
+    if (at) detail.push(`reprise ${at}`)
+  } else if (isRunLive(run)) {
+    const since = Date.parse(run.debut ?? '')
+    detail.push([run.modele ?? '', Number.isFinite(since) ? duration(now - since) : ''].filter(Boolean).join(' '))
+  } else {
+    detail.push(ago(run.vu, now))
+  }
+  if (typeof run.cout === 'number' && run.cout > 0) detail.push(`$${run.cout.toFixed(2)}`)
+  const title = run.lot && run.titre.startsWith(run.lot) ? run.titre.slice(run.lot.length).replace(/^\s*[—–:-]\s*/, '') : run.titre
+  return { label, status, detail: detail.filter(Boolean).join(' · '), title }
+}
+
+/** Au-delà de ce nombre, les runs de la bande se comptent sur une ligne (« … +N runs »), les vivants d'abord (l'ordre du collecteur). */
+export const RUNS_SHOWN = 4

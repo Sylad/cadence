@@ -1,17 +1,17 @@
 import { atom, read, update } from 'claude-code'
 import type { ClientProps, ElementConstructor, EngineInterface, Register, RenderChildren, ThemeKey, Timer } from 'claude-code'
 
-import type { AgentsSummary, CommandInfo, LeadHold, LiveRun, LotsNotice, ModelsSummary, Project, Usage, Wave, WaveLot } from '../types'
+import type { AgentsSummary, CommandInfo, LeadHold, LiveRun, LotsNotice, ModelsSummary, Project, ShownRun, Usage, Wave, WaveLot } from '../types'
 import { BANC_READER, CONTEXT_WRITER, COLLECTOR, QUOTA_WRITER, DEFAULT_CAP, DELIVERIES, LAST_DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
 import { bancDetail, bancLine, enCoursLine, readBanc, readEnCours } from './banc'
 import { buildDecisions, decisionsOf, parseDeliveries } from './decisions'
 import { buildDeliveries, deliveriesHeight, deliveriesOf, parseLastDeliveries } from './deliveries'
 import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
-import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
+import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, colorOfRun, isRunLive, runCells, RUNS_SHOWN, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
 import { lignesDuBloc, partage } from './partage'
-import { besoinArbre, buildPanel, ellipsize, horsVue, foldText, foldWave, isFolded, moreKey, moreText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
+import { besoinArbre, buildPanel, ellipsize, horsVue, foldText, foldWave, isFolded, moreKey, moreText, movedText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
@@ -36,6 +36,10 @@ const endedWaves = atom({ plugin: 'cadence-hud', key: 'endedWaves' } as const, [
 const projects = atom({ plugin: 'cadence-hud', key: 'projects' } as const, [])
 const leadHolds = atom({ plugin: 'cadence-hud', key: 'leadHolds' } as const, [])
 const liveRuns = atom({ plugin: 'cadence-hud', key: 'liveRuns' } as const, [])
+/** Les runs de cadence run à montrer avec leur état (L687). */
+const shownRuns = atom({ plugin: 'cadence-hud', key: 'shownRuns' } as const, [])
+/** Le panneau des lots est ouvert (L687) : la bande ne répète ni la liste des projets ni le banc qu'il montre. */
+const lotsOpen = atom({ plugin: 'cadence-hud', key: 'lotsOpen' } as const, false)
 const slotCap = atom({ plugin: 'cadence-hud', key: 'slotCap' } as const, DEFAULT_CAP)
 const projectsFolded = atom({ plugin: 'cadence-hud', key: 'projectsFolded' } as const, false)
 const lotsBoard = atom({ plugin: 'cadence-hud', key: 'lotsBoard' } as const, null)
@@ -75,6 +79,13 @@ const isLotsOpen = ($: EngineInterface): Promise<boolean> =>
   $.ui.panes().then(
     list => list.some(p => p.id === LOTS_PANE),
     () => false,
+  )
+
+/** Le dossier est-il dans un dépôt git (L687) : vrai, faux (git répond qu'il n'y en a pas), null quand git n'a pas pu répondre (absent, délai). */
+const isGitRepo = ($: EngineInterface, dir: string): Promise<boolean | null> =>
+  $.process.run(['git', '-C', dir, 'rev-parse', '--is-inside-work-tree'], { timeoutMs: 4_000 }).then(
+    r => (r.exitCode === 0 ? r.stdout.trim() !== 'false' : /not a git repository/i.test(r.stderr) ? false : null),
+    () => null,
   )
 
 /** Replie le projet s'il est déplié et inversement ; le choix est gardé. Renvoie le nouvel état (vrai = replié), `undefined` si le projet n'est pas dans le tableau lu. */
@@ -213,12 +224,13 @@ export const register: Register = on => {
         let found: Wave[] = []
         let foundHolds: LeadHold[] = []
         let foundRuns: LiveRun[] = []
+        let foundShown: ShownRun[] = []
         let foundCap = DEFAULT_CAP
         let foundEnded: Wave[] = []
         let problem: string | null = null
         if (collected.exitCode === 0) {
           try {
-            ;({ waves: found, holds: foundHolds, runs: foundRuns, cap: foundCap, ended: foundEnded } = parseCollected(collected.stdout))
+            ;({ waves: found, holds: foundHolds, runs: foundRuns, shownRuns: foundShown, cap: foundCap, ended: foundEnded } = parseCollected(collected.stdout))
           } catch (err) {
             problem = `collecteur illisible : ${String(err).slice(0, 60)}`
           }
@@ -248,6 +260,10 @@ export const register: Register = on => {
         await update($, endedWaves, () => foundEnded)
         await update($, leadHolds, () => foundHolds)
         await update($, liveRuns, () => foundRuns)
+        await update($, shownRuns, () => foundShown)
+        // fermé par la croix du panneau, pas par /hud lots : la bande le voit au rafraîchissement suivant
+        const open = await isLotsOpen($)
+        await update($, lotsOpen, () => open)
         await update($, slotCap, () => foundCap)
         await update($, error, () => problem)
         await update($, now, () => at)
@@ -423,11 +439,13 @@ export const register: Register = on => {
     if (arg === 'lots') {
       if (await isLotsOpen($)) {
         await $.ui.close({ id: LOTS_PANE })
+        await update($, lotsOpen, () => false)
         return { text: 'panneau des lots fermé.' }
       }
       // demandé par la commande, le panneau est placé à toute largeur : c'est le moteur qui décide (`presentation.columns` ne décrit pas la place d'un panneau, sur desktop notamment)
       const opened = await $.ui.open({ id: LOTS_PANE, title: 'Lots' })
       if (!opened.isPlaced) return { text: `panneau des lots non placé : ${opened.reason}` }
+      await update($, lotsOpen, () => true)
       void readTourNow?.()
       return { text: 'panneau des lots ouvert (/hud lots pour le fermer).' }
     }
@@ -442,7 +460,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, runs, cap, board, bench, running] = await Promise.all([
+    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, runs, cap, board, bench, running, allShownRuns, paneOpen] = await Promise.all([
       read($, usage),
       read($, agents),
       read($, commands),
@@ -459,14 +477,18 @@ export const register: Register = on => {
       read($, lotsBoard),
       read($, banc),
       read($, enCours),
+      read($, shownRuns),
+      read($, lotsOpen),
     ])
-    const benchLine = bancLine(bench, at)
-    const runningLine = enCoursLine(running, at)
+    // L687 (D-1) : panneau des lots ouvert, la bande ne répète pas ce qu'il montre — la liste des projets (ses barres sont celles de l'ordre des projets, chaque projet a sa ligne dans l'arbre)
+    // et le banc (son bloc « Banc »). Elle garde ce que le panneau n'a pas : le contexte, les quotas, les vagues, les runs et les créneaux.
+    const benchLine = paneOpen ? null : bancLine(bench, at)
+    const runningLine = paneOpen ? null : enCoursLine(running, at)
     const w = allWaves.filter(wave => isWaveShown(wave, at))
-    const shownProjects = activeProjects(allProjects)
+    const shownProjects = paneOpen ? [] : activeProjects(allProjects)
     const holds = liveHolds(allHolds, at)
     const lateHolds = expiredHolds(allHolds, at)
-    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0 && holds.length === 0 && runs.length === 0 && lateHolds.length === 0 && !benchLine) return next(e)
+    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0 && holds.length === 0 && runs.length === 0 && allShownRuns.length === 0 && lateHolds.length === 0 && !benchLine && !runningLine) return next(e)
 
     const ambiguous = parseAmbiguous(await $.env.get('CADENCE_HUD_AMBIGUOUS'))
     const { Box, Text } = $.ui.resolve(e)
@@ -716,6 +738,48 @@ export const register: Register = on => {
       )
     })
 
+    // L687 (D-1) : une ligne par run de cadence run, alignée comme les lots d'une vague : dépôt:lot, état, détail (modèle et durée, ou depuis quand il est fini ; coût), titre de la demande.
+    // Les vivants d'abord (ordre du collecteur), RUNS_SHOWN au plus puis « … +N runs ».
+    const runList = allShownRuns.slice(0, RUNS_SHOWN).map(run => ({ run, ...runCells(run, at) }))
+    const runLabelWidth = Math.max(0, ...runList.map(r => r.label.length))
+    const runStatusWidth = Math.max(0, ...runList.map(r => r.status.length))
+    const runDetailWidth = Math.max(0, ...runList.map(r => r.detail.length))
+    const runRows = runList.length > 0 && (
+      <Box key="runs" flexDirection="column">
+        {runList.map(r => (
+          <Box key={`run-${r.run.id}`} flexDirection="row">
+            <Box minWidth={6 + runLabelWidth} flexShrink={0}>
+              <Text wrap="truncate-end" bold={isRunLive(r.run)} color={isRunLive(r.run) ? 'claude' : 'subtle'}>
+                {isRunLive(r.run) ? '▶ ' : '  '}run {r.label}
+              </Text>
+            </Box>
+            <Box minWidth={2 + runStatusWidth} paddingLeft={2} flexShrink={0}>
+              <Text wrap="truncate-end" color={colorOfRun(r.run)}>
+                {r.status}
+              </Text>
+            </Box>
+            {runDetailWidth > 0 && (
+              <Box minWidth={2 + runDetailWidth} paddingLeft={2} flexShrink={0}>
+                <Text wrap="truncate-end" dimColor>
+                  {r.detail}
+                </Text>
+              </Box>
+            )}
+            <Box flexGrow={1} flexShrink={1} paddingLeft={2}>
+              <Text wrap="truncate-end" color="subtle">
+                {r.title}
+              </Text>
+            </Box>
+          </Box>
+        ))}
+        {allShownRuns.length > RUNS_SHOWN && (
+          <Text color="subtle" wrap="truncate-end">
+            {'  '}… +{allShownRuns.length - RUNS_SHOWN} runs
+          </Text>
+        )}
+      </Box>
+    )
+
     // comme `cadence orchestrate --status` : la ligne des créneaux, puis une ligne par session que le lead a inscrite
     const slots = slotsLine(w, holds, cap, runs)
     const leadRows = (slots || lateHolds.length > 0) && (
@@ -781,6 +845,7 @@ export const register: Register = on => {
       <Box flexDirection="column">
         {contextRow}
         {waveRows}
+        {runRows}
         {leadRows}
         {projectRows}
         {runningLine && (
@@ -831,7 +896,7 @@ export const register: Register = on => {
         else if (r.exitCode !== 0) await say($, refusalReason(r.stderr, r.exitCode, 'cadence lead priority'), 'refused')
         else if (/rien à changer/.test(r.stdout)) await say($, `${projectAsk.id} est déjà ${projectAsk.place === 'before' ? 'avant' : 'après'} ${projectAsk.target}`, 'unchanged')
         else {
-          await say($, `${projectAsk.id} placé ${projectAsk.place === 'before' ? 'avant' : 'après'} ${projectAsk.target} — priority: du cadence.yaml est modifiée, à commiter`, 'done')
+          await say($, movedText('project', projectAsk, await isGitRepo($, folder)), 'done')
           void readTourNow?.()
         }
       } finally {
@@ -859,12 +924,12 @@ export const register: Register = on => {
     }
     isMoving = true
     try {
-      const r = await $.process.run(plan.argv, { cwd: projectDir(folder, ask.project, board.rows), timeoutMs: 10_000 }).catch(() => undefined)
+      const dir = projectDir(folder, ask.project, board.rows)
+      const r = await $.process.run(plan.argv, { cwd: dir, timeoutMs: 10_000 }).catch(() => undefined)
       if (!r) await say($, `raf move n’a pas pu être lancé (raf absent du PATH ou sans réponse) : rien n’a été déplacé`, 'refused')
       else if (r.exitCode !== 0) await say($, refusalReason(r.stderr, r.exitCode), 'refused')
       else {
-        const done = `${ask.id} placé ${ask.place === 'before' ? 'avant' : 'après'} ${ask.target} — le plan est modifié, à commiter (raf move ne commite pas)`
-        await say($, done, 'done')
+        await say($, movedText('lot', ask, await isGitRepo($, dir)), 'done')
         moveGen += 1 // le tableau est périmé jusqu'à la fin d'une relecture commencée maintenant
         void readTourNow?.()
       }
@@ -876,7 +941,7 @@ export const register: Register = on => {
 
   // Le panneau des lots (L401) : lecture seule, l'arbre des lots non clos de chaque projet du dossier (lead tour --json).
   on('ui.render', { component: 'Pane', requestId: LOTS_PANE }, async ($, e) => {
-    const [board, failed, readAt, allWaves, ended, at, folds, views, notice, deliveries, typical, latest, bench, running] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, endedWaves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries), read($, lotsTypical), read($, lotsLast), read($, banc), read($, enCours)])
+    const [board, failed, readAt, allWaves, ended, at, folds, views, notice, deliveries, typical, latest, bench, running, runsNow] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, endedWaves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries), read($, lotsTypical), read($, lotsLast), read($, banc), read($, enCours), read($, shownRuns)])
     const table = $.ui.resolve(e)
     const { Box, Text, Button } = table
     // les surfaces sans région Client (mobile, éditeur) dessinent les lots sans les réordonner
@@ -921,7 +986,9 @@ export const register: Register = on => {
 
     // le partage de la hauteur (L712) : l'arbre des lots d'abord ; tant qu'il n'a pas de quoi montrer ses projets en cours, le banc, les livraisons, les dépenses puis les décisions
     // se replient en une ligne, puis cèdent cette ligne, dans cet ordre
-    const panelInput = board && !board.outdated ? { rows: board.rows, columns, waves: waveLotsOf(allWaves, at), folds, views, now: at } : undefined
+    // L687 : les lots que joue un run vivant de cadence run (le dossier de son dépôt fait le projet, comme pour une vague)
+    const runLots = runsNow.filter(r => isRunLive(r) && r.lot).map(r => ({ project: r.repo.split('/').filter(Boolean).pop() ?? '', lot: r.lot!, state: r.role === 'attente' ? 'quota' : 'en-cours' }))
+    const panelInput = board && !board.outdated ? { rows: board.rows, columns, waves: waveLotsOf(allWaves, at), folds, views, now: at, runs: runLots } : undefined
     const treeNeed = panelInput ? besoinArbre(panelInput, bodyRows) : 1
     const share = partage(bodyRows, treeNeed, { decisions: decisions.lines.length, depenses: spend.lines.length, livraisons: shipped.lines.length, banc: benchLines.length }, { depenses: spend.lines.some(l => l.tone === 'warning') ? 1 : 0 })
     const rouges = deliveryRows.filter(r => r.status === 'rouge').length

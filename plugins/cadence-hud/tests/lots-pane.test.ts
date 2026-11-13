@@ -22,7 +22,7 @@ const WAVE: Wave = {
 type Cadence = { exitCode: number; stdout: string }
 
 /** Monte le mod comme une session, avec un moteur simulé : état en mémoire, panneaux ouverts, processus pilotés par le test. */
-const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave[]; stamps?: () => string; deliveries?: () => string; last?: () => string; perf?: () => Cadence; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string }; priority?: (argv: string[], cwd: string | undefined) => { exitCode: number; stdout: string; stderr: string }; banc?: string[] } = {}) => {
+const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () => Cadence | Promise<Cadence>; waves?: Wave[]; ended?: Wave[]; stamps?: () => string; deliveries?: () => string; last?: () => string; perf?: () => Cadence; refuse?: string; kv?: [string, unknown][]; raf?: (argv: string[], cwd: string | undefined) => { exitCode: number; stderr: string }; priority?: (argv: string[], cwd: string | undefined) => { exitCode: number; stdout: string; stderr: string }; banc?: string[]; /** la réponse de `git rev-parse --is-inside-work-tree` (L687) ; absente, un dépôt */ git?: (argv: string[]) => { exitCode: number; stdout: string; stderr: string } } = {}) => {
   const store = new Map<string, { value: unknown; version: number }>()
   const open = new Set<string>()
   const opened: unknown[] = []
@@ -60,6 +60,7 @@ const session = async ($: Parameters<TestBody>[0], on: On, setup: { tour?: () =>
   on('process.run', async (_$, e) => {
     const argv = (e as unknown as { argv: string[] }).argv
     runs.push(argv)
+    if (argv[0] === 'git') return { value: (setup.git ?? (() => ({ exitCode: 0, stdout: 'true\n', stderr: '' })))(argv) } as never
     if (argv[0] === 'raf') {
       const r = (setup.raf ?? (() => ({ exitCode: 0, stderr: '' })))(argv, (e as unknown as { init?: { cwd?: string } }).init?.cwd)
       return { value: { exitCode: r.exitCode, stdout: '', stderr: r.stderr } } as never
@@ -1796,4 +1797,33 @@ test('L712 — un corps où même les lots en cours ne tiennent pas : le pied le
   const { text } = await s.draw(70, 12)
   expect(text).toMatch(/… \+\d+ lots en cours non affichés · \+\d+ lots de plus/)
   expect(text).not.toMatch(/B\d+/) // aucun lot à faire tant qu'un lot en cours manque
+})
+
+// L687 (D-1) : « à commiter » seulement dans un dépôt git. Le dossier parent qui porte le priority: de dix projets n'en est pas un : le panneau y disait « à commiter ».
+const NOT_GIT = () => ({ exitCode: 128, stdout: '', stderr: 'fatal: not a git repository (or any of the parent directories): .git\n' })
+
+test('L687 — dossier des plans hors dépôt git : l’ordre des projets est écrit, le panneau ne dit pas « à commiter »', async ($, on) => {
+  const s = await session($, on, { priority: () => ({ exitCode: 0, stdout: 'ol placé avant cadence', stderr: '' }), git: NOT_GIT })
+  await s.hud('lots')
+  const text = await projectGestures(s, async ui => {
+    await ui.pointer(pdown(1))
+    await ui.pointer(pmove(0))
+    await ui.pointer(pup(0))
+  })
+  expect(s.runs.filter(a => a[0] === 'git')).toContainEqual(['git', '-C', '/x', 'rev-parse', '--is-inside-work-tree'])
+  expect(text).toMatch(/✔ ol placé avant cadence — priority: du cadence.yaml est modifiée \(dossier hors dépôt git : rien à commiter\)$/m)
+  expect(text).not.toMatch(/, à commiter/)
+})
+
+test('L687 — projet hors dépôt git : raf move passe, le panneau ne dit pas « à commiter »', async ($, on) => {
+  const s = await moves($, on, { git: NOT_GIT })
+  await s.hud('lots')
+  const text = await s.gestures(async ui => {
+    await ui.pointer(down(3))
+    await ui.pointer(move(0))
+    await ui.pointer(up(0))
+  })
+  expect(s.rafs()).toEqual([['raf', 'move', 'L402', '--before', 'L401']])
+  expect(text).toMatch(/✔ L402 placé avant L401 — le plan est modifié \(dossier hors dépôt git : rien à commiter\)$/m)
+  expect(text).not.toMatch(/à commiter \(raf move/)
 })

@@ -1,4 +1,4 @@
-import type { LeadHold, LiveRun, Wave } from '../types'
+import type { LeadHold, LiveRun, ShownRun, Wave } from '../types'
 
 /**
  * Le collecteur des vagues `cadence orchestrate`, exécuté par python3 -I : il lit le registre
@@ -19,7 +19,8 @@ import type { LeadHold, LiveRun, Wave } from '../types'
  * Chaque lot porte `trail`, la liste de ses pas (genre, statut, début, fin ; L413) d'où la frise du panneau des lots tire ses étapes.
  * Chaque lot porte aussi ce que le panneau lit de sa dépense (L414) : `budget`, `escalationReserve`, `estimate`, `escalated`, `spec`, les tokens comptés par ses étapes (`consumed`), le début de sa première étape (`since`) ; la durée écoulée court jusqu'à maintenant (le panneau n'en lit pas la fin).
  * Il rend enfin les runs de `cadence run` vivants (`<home>/runs/*.json`, L710) : ils prennent un créneau comme une session du lead.
- * Sortie : `{waves, holds, runs, cap, ended}`.
+ * Il rend aussi les runs à montrer avec leur état (`shownRuns`, L687) : vivants, intégrés depuis moins de 30 min, ou en attente d'un geste depuis moins de 12 h.
+ * Sortie : `{waves, holds, runs, shownRuns, cap, ended}`.
  */
 export const COLLECTOR = `
 import json, os, glob, datetime, time
@@ -197,15 +198,58 @@ for rf in sorted(glob.glob(os.path.join(home, 'runs', '*.json'))):
     if isinstance(lock, dict) and isinstance(lock.get('pid'), int) and holder_alive(lock['pid'], lock.get('start')) and isinstance(state, dict) and state.get('etat') == 'en-cours':
         runs.append({'id': str(r.get('id')), 'repo': str(r.get('repo'))})
 
+# L687 (D-1) : les runs de cadence run À MONTRER, avec leur état : les fichiers d'état du dossier .cadence-run du cwd et de son parent (cadence run
+# les écrit à côté du dépôt : dirname(dépôt)/.cadence-run), et celui de chaque run inscrit. Un run dont un processus vivant tient le verrou se montre
+# toujours (rôle session : il joue ; rôle attente : il attend le quota) ; sinon un run intégré reste RUN_LINGER, un run qui attend un geste RUN_KEEP.
+RUN_LINGER, RUN_KEEP = 30 * 60, 12 * 3600
+run_dirs = [os.path.join(cwd, '.cadence-run'), os.path.join(os.path.dirname(cwd), '.cadence-run')]
+for rf in sorted(glob.glob(os.path.join(home, 'runs', '*.json'))):
+    r = load(rf)
+    if isinstance(r, dict) and isinstance(r.get('fichier'), str):
+        run_dirs.append(os.path.dirname(r['fichier']))
+seen_dirs, shown = set(), []
+for d in run_dirs:
+    real = os.path.realpath(d)
+    if real in seen_dirs:
+        continue
+    seen_dirs.add(real)
+    for sf in glob.glob(os.path.join(d, '*.json')):
+        e = load(sf)
+        if not isinstance(e, dict) or not isinstance(e.get('id'), str) or not isinstance(e.get('etat'), str):
+            continue
+        try:
+            m = os.stat(sf).st_mtime
+        except Exception:
+            continue
+        lock = load(sf[:-5] + '.verrou')
+        held = isinstance(lock, dict) and isinstance(lock.get('pid'), int) and holder_alive(lock['pid'], lock.get('start'))
+        etat = e['etat']
+        if etat == 'en-cours' and not held:
+            etat = 'interrompu'
+        age = time.time() - m
+        if not held and (age > RUN_KEEP or (etat == 'integre' and age > RUN_LINGER)):
+            continue
+        q = e.get('quota') if isinstance(e.get('quota'), dict) else {}
+        shown.append({
+            'id': e['id'], 'repo': str(e.get('repo') or ''), 'lot': e.get('lot') if isinstance(e.get('lot'), str) else None,
+            'etat': etat, 'role': lock.get('role') if held else None, 'debut': e.get('debut'), 'modele': e.get('modele'),
+            'cout': e.get('cout_usd') if isinstance(e.get('cout_usd'), (int, float)) else None,
+            'titre': str(e.get('demande') or '').strip().split('\\n')[0][:240], 'reprise': q.get('reprise'),
+            'vu': datetime.datetime.fromtimestamp(m, datetime.timezone.utc).isoformat(), '_held': held, '_m': m,
+        })
+shown.sort(key=lambda x: (not x['_held'], -x['_m']))
+for x in shown:
+    del x['_held'], x['_m']
+
 raw_cap = (os.environ.get('CADENCE_MAX_SESSIONS') or '').strip()
 cap = int(raw_cap) if raw_cap.isdigit() and int(raw_cap) >= 1 else 2
-print(json.dumps({'waves': out, 'holds': holds, 'runs': runs, 'cap': cap, 'ended': ended}))
+print(json.dumps({'waves': out, 'holds': holds, 'runs': runs, 'shownRuns': shown, 'cap': cap, 'ended': ended}))
 `
 
 /** Plafond de sessions quand le collecteur n'en donne pas de valide (le défaut de cadence). */
 export const DEFAULT_CAP = 2
 
-export type Collected = { waves: Wave[]; holds: LeadHold[]; /** les runs de cadence run vivants (L710) */ runs: LiveRun[]; cap: number; /** les vagues finies du dossier, la plus récente d'abord, qu'une vague vive ou non (L412) ; vide sans */ ended: Wave[] }
+export type Collected = { waves: Wave[]; holds: LeadHold[]; /** les runs de cadence run vivants (L710) */ runs: LiveRun[]; /** les runs à montrer avec leur état (L687) */ shownRuns: ShownRun[]; cap: number; /** les vagues finies du dossier, la plus récente d'abord, qu'une vague vive ou non (L412) ; vide sans */ ended: Wave[] }
 
 const isWave = (w: unknown): w is Wave => typeof w === 'object' && w !== null && typeof (w as Wave).id === 'string'
 
@@ -227,8 +271,11 @@ export const parseCollected = (stdout: string): Collected => {
   const runs = (Array.isArray(obj.runs) ? obj.runs : []).filter(
     (r): r is LiveRun => typeof r === 'object' && r !== null && typeof (r as LiveRun).id === 'string' && typeof (r as LiveRun).repo === 'string',
   )
+  const shownRuns = (Array.isArray(obj.shownRuns) ? obj.shownRuns : []).filter(
+    (r): r is ShownRun => typeof r === 'object' && r !== null && typeof (r as ShownRun).id === 'string' && typeof (r as ShownRun).etat === 'string' && typeof (r as ShownRun).vu === 'string',
+  ).map(r => ({ ...r, repo: typeof r.repo === 'string' ? r.repo : '', lot: typeof r.lot === 'string' ? r.lot : null, role: typeof r.role === 'string' ? r.role : null, titre: typeof r.titre === 'string' ? r.titre : '' }))
   const cap = typeof obj.cap === 'number' && Number.isInteger(obj.cap) && obj.cap >= 1 ? obj.cap : DEFAULT_CAP
-  return { waves, holds, runs, cap, ended }
+  return { waves, holds, runs, shownRuns, cap, ended }
 }
 
 /**

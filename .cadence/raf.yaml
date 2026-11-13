@@ -3136,6 +3136,9 @@ lots:
     visible: true
     created: 2026-11-10
     started: 2026-11-13
+    review: { date: 2026-11-13, verdict: "conforme : 0 bloquant, 0 majeur, 2 mineurs (banc en cours perdu des deux côtés panneau ouvert → L716 ; verrou lu non atomique, transitoire → note) ; collecteur 20 ms mesurés", commit: e84f9f35d66d838966b86612b45a80ef0e18a116 }
+    notes:
+      - { date: 2026-11-13, text: "Mineur de revue (13-11) : <run>.verrou écrit sans écriture atomique (v2/src/verrou.ts:49-51) : une lecture du HUD pendant session→attente peut afficher le run « interrompu » un rafraîchissement ; se corrige seul." }
   - id: L688
     title: "Adapter tous les skills de cadence à cadence run (D-2) : session-start, session-close, deliver, orchestrate, lead, agents et hooks du plugin"
     status: done
@@ -3367,6 +3370,16 @@ lots:
     started: 2026-11-12
     review: { date: 2026-11-13, verdict: "conforme (lecture du lead, lot de test seul, 3 fichiers) : run-signal-l711 attend des faits observables au lieu de délais courts, assertions inchangées ; mesure : suite v2 5 fois 542/542 sans rouge de ce fichier, suite racine 610/610, sous charge 26/26 ; porte verte", commit: 76f5d381ce4675895720a4b8c2b9d997f3e97f03 }
     finished: 2026-11-13
+  - id: L715
+    title: "Tests v2 dépendants de l'environnement : v2/test/bras.test.ts et v2/test/passage.test.ts échouent quand CADENCE_PIECES / CADENCE_CLONE / CADENCE_BANC_RACINE sont posées (toute suite lancée depuis une session cadence run : vu par L707 et L687 le 13-11, « expected '[]' to be undefined ») ; les isoler de l'environnement ; mesure : la suite verte avec ces variables posées"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-13
+  - id: L716
+    title: "HUD : panneau ouvert, la ligne du banc en cours disparaît des deux côtés quand le plan est long (partage.ts donne 0 ligne au bloc banc, la bande la masque) : plancher 1 pour 'banc' quand un banc tourne, ou la bande la garde ; vu par la revue de L687 le 13-11"
+    status: todo
+    estimate: 0.25
+    created: 2026-11-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

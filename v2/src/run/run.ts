@@ -1,7 +1,8 @@
 // cadence run : une demande, une session (Opus par défaut, L699 : --modele), de bout en bout (plan n°6, 09-11).
 // Le produit joue EXACTEMENT un bras mesuré au banc, choisi par l'aiguillage (aiguillage.ts) : brief v2d + hook « lecture obligatoire »
 // quand la demande a des références à lire, brief de Claude seul sinon ; mêmes interdictions. Puis : rebase sur la branche de départ, porte complète UNE fois
-// (une reprise de la même session si elle est rouge), intégration en avance rapide. Le plan (raf) et deliver restent ceux de la v1.
+// (une reprise de la même session si elle est rouge), intégration en avance rapide ; si la cible a avancé entre-temps, rebase et porte rejoués (L723).
+// Le plan (raf) et deliver restent ceux de la v1.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -141,28 +142,81 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false): boolean {
   return true;
 }
 
-/** Après chaque passage de session : question, commits, rebase, porte (une reprise), intégration. */
-function suite(e: Etat, o: Opts): Etat {
+/** La session a posé une question (fichier `<worktree>.question.md`) : le run attend la réponse de l'humain. */
+function question(e: Etat, o: Opts): Etat | null {
   const q = `${e.worktree}.question.md`;
-  if (existsSync(q)) { e.etat = 'attente'; e.detail = readFileSync(q, 'utf8'); rmSync(q); o.out(`question (réponds : cadence run --reponse ${e.id} "…") :\n${e.detail}`); return fin(e, o); }
-  if (git(e.worktree, 'rev-list', '--count', `${e.base}..HEAD`) === '0') { e.etat = 'sans-commit'; e.detail = 'la session n\'a rien commité'; return fin(e, o); }
-  const cible = git(e.repo, 'rev-parse', e.cible);
-  if (essaiGit(e.worktree, 'rebase', '-q', cible).status !== 0) {
-    essaiGit(e.worktree, 'rebase', '--abort'); e.etat = 'conflit'; e.detail = `conflit au rebase sur ${e.cible}`; return fin(e, o);
+  if (!existsSync(q)) return null;
+  e.etat = 'attente'; e.detail = readFileSync(q, 'utf8'); rmSync(q); o.out(`question (réponds : cadence run --reponse ${e.id} "…") :\n${e.detail}`); return fin(e, o);
+}
+
+// L723 : la branche cible avance pendant la porte quand un autre run s'intègre (vécu 2 fois le 13-11, 15 à 35 min de run rendues à la main) : le run se
+// rebase, rejoue la porte et retente l'avance rapide, 3 fois au plus ; un conflit de rebase est rendu à la même session, le lead ne reçoit que ce qu'elle n'a pas su résoudre.
+const REBASES_MAX = 3;
+const rebaseEnCours = (wt: string) => ['rebase-merge', 'rebase-apply'].some((d) => existsSync(resolve(wt, git(wt, 'rev-parse', '--git-path', d))));
+const fichiersGit = (cwd: string, ...a: string[]) => essaiGit(cwd, ...a, '-z').stdout.split('\0').filter(Boolean);
+const consigneConflit = (e: Etat, fichiers: string[]) => `Le rebase de ta branche sur ${e.cible}, qui a avancé pendant ton travail, est en conflit sur : ${fichiers.join(', ')}.\n`
+  + `Le rebase est en cours dans ${e.worktree}. Résous chaque conflit en gardant les deux intentions (le travail de ${e.cible} et le tien), git add, puis `
+  + '`GIT_EDITOR=true git rebase --continue`, jusqu\'à la fin du rebase, sans --skip ni --abort. Ne commite rien d\'autre, puis dis « fini ».';
+
+/** Rebase le worktree sur `cible` ; en conflit, la même session le résout. Rend l'état de fin si le run s'arrête, null pour continuer. */
+function rebaser(e: Etat, o: Opts, cible: string): Etat | null {
+  if (rebaseEnCours(e.worktree)) essaiGit(e.worktree, 'rebase', '--abort'); // une résolution coupée (quota, signal) repart de zéro
+  if (essaiGit(e.worktree, 'rebase', '-q', cible).status === 0) return null;
+  const fichiers = fichiersGit(e.worktree, 'diff', '--name-only', '--diff-filter=U');
+  o.out(`conflit au rebase sur ${e.cible} (${fichiers.join(', ')}) : reprise de la session pour le résoudre`);
+  const repondu = session(e, consigneConflit(e, fichiers), o), enCours = rebaseEnCours(e.worktree);
+  if (enCours) essaiGit(e.worktree, 'rebase', '--abort');
+  if (!repondu) return fin(e, o);
+  const q = question(e, o);
+  if (q) return q;
+  if (enCours || essaiGit(e.worktree, 'merge-base', '--is-ancestor', cible, 'HEAD').status !== 0) {
+    e.etat = 'conflit'; e.detail = `conflit au rebase sur ${e.cible} (fichiers : ${fichiers.join(', ')}) : la session ne l'a pas résolu, rebase annulé`; return fin(e, o);
   }
+  return null;
+}
+
+/** Avance rapide de la cible sur la branche du run : null si faite, sinon la raison, et si la cible a bougé depuis `cible` (un rebase de plus la règle). */
+function avancer(e: Etat, br: string, cible: string): { avance: boolean; raison: string } | null {
+  if (git(e.repo, 'rev-parse', e.cible) !== cible) return { avance: true, raison: `${e.cible} a avancé pendant la porte` };
+  const actuelle = essaiGit(e.repo, 'symbolic-ref', '-q', '--short', 'HEAD').stdout.trim();
+  if (actuelle === e.cible) {
+    // L723 : git refuse (« Your local changes would be overwritten ») quand l'arbre principal a des changements non commités sur un fichier que le run modifie.
+    // nonCommites (L722) dit un dossier non suivi en « dossier/ » : seul un fichier que le run crée et qui y existe déjà fait refuser git.
+    const locales = nonCommites(e.repo), dossiers = locales.filter((f) => f.endsWith('/'));
+    const sales = fichiersGit(e.repo, 'diff', '--name-only', cible, br).filter((t) => locales.includes(t) || (dossiers.some((d) => t.startsWith(d)) && existsSync(join(e.repo, t))));
+    if (sales.length) return { avance: false, raison: `modifications non commitées dans l'arbre principal (${e.repo}) sur des fichiers que le run modifie aussi : ${nommer(sales)}. `
+      + `Commite-les ou mets-les de côté, puis : cadence run --reponse ${e.id} "intègre"` };
+  }
+  const m = actuelle === e.cible ? essaiGit(e.repo, 'merge', '-q', '--ff-only', br) : essaiGit(e.repo, 'fetch', '-q', '.', `${br}:${e.cible}`);
+  return m.status === 0 ? null : { avance: git(e.repo, 'rev-parse', e.cible) !== cible, raison: `${m.stderr}`.trim() || 'avance rapide impossible' };
+}
+
+/** Après chaque passage de session : question, commits, puis rebase, porte et avance rapide, rejoués tant que la cible avance (L723). */
+function suite(e: Etat, o: Opts): Etat {
+  const q = question(e, o);
+  if (q) return q;
+  if (git(e.worktree, 'rev-list', '--count', `${e.base}..HEAD`) === '0') { e.etat = 'sans-commit'; e.detail = 'la session n\'a rien commité'; return fin(e, o); }
   const cmds = commandesDeCadenceYaml(e.repo);
   if (!cmds.length && !o.sansPorte) { e.etat = 'sans-porte'; e.detail = 'cadence.yaml ne déclare ni orchestrate.test ni orchestrate.build : relance avec --sans-porte pour intégrer quand même'; return fin(e, o); }
-  // Porte complète : une fois ; rouge, la même session corrige une fois et la porte est rejouée (C3 : un seul site de porte).
-  for (let essai = 0; ; essai++) {
-    const r = registreTouche(e.worktree, e.registre, cible), p = r ? { ok: false, sortie: r } : jouerPorte(cmds, e.worktree); // L701 : sans option, rien au registre ; --registre D-n, aucune entrée neuve
-    if (p.ok) break;
-    if (essai === 1) { e.etat = 'porte-rouge'; e.detail = p.sortie; return fin(e, o); }
-    o.out('porte rouge : reprise de la session pour corriger');
-    if (!session(e, `La porte complète est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, puis dis « fini ».`, o)) return fin(e, o);
+  const br = git(e.worktree, 'rev-parse', '--abbrev-ref', 'HEAD');
+  for (let rebase = 1; ; rebase++) {
+    const cible = git(e.repo, 'rev-parse', e.cible), arret = rebaser(e, o, cible);
+    if (arret) return arret;
+    // Porte complète : une fois ; rouge, la même session corrige une fois et la porte est rejouée (C3 : un seul site de porte).
+    for (let essai = 0; ; essai++) {
+      const r = registreTouche(e.worktree, e.registre, cible), p = r ? { ok: false, sortie: r } : jouerPorte(cmds, e.worktree); // L701 : sans option, rien au registre ; --registre D-n, aucune entrée neuve
+      if (p.ok) break;
+      if (essai === 1) { e.etat = 'porte-rouge'; e.detail = p.sortie; return fin(e, o); }
+      o.out('porte rouge : reprise de la session pour corriger');
+      if (!session(e, `La porte complète est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, puis dis « fini ».`, o)) return fin(e, o);
+    }
+    const refus = avancer(e, br, cible);
+    if (!refus) break;
+    if (!refus.avance || rebase === REBASES_MAX) {
+      e.etat = 'refus-integration'; e.detail = refus.avance ? `${e.cible} a encore avancé après ${REBASES_MAX} rebases : ${refus.raison}` : refus.raison; return fin(e, o);
+    }
+    o.out(`${e.cible} a avancé pendant la porte : rebase et porte rejouée (${rebase + 1}/${REBASES_MAX})`);
   }
-  const br = git(e.worktree, 'rev-parse', '--abbrev-ref', 'HEAD'), actuelle = essaiGit(e.repo, 'symbolic-ref', '-q', '--short', 'HEAD').stdout.trim();
-  const m = actuelle === e.cible ? essaiGit(e.repo, 'merge', '-q', '--ff-only', br) : essaiGit(e.repo, 'fetch', '-q', '.', `${br}:${e.cible}`);
-  if (m.status !== 0) { e.etat = 'refus-integration'; e.detail = `${m.stderr}`.trim() || 'avance rapide impossible'; return fin(e, o); }
   e.integre = git(e.repo, 'rev-parse', '--short', e.cible); e.etat = 'integre'; e.detail = '';
   const registre = registreOuvert(e.worktree);
   essaiGit(e.repo, 'worktree', 'remove', '--force', e.worktree); essaiGit(e.repo, 'branch', '-D', br);

@@ -3389,6 +3389,11 @@ lots:
     review: { date: 2026-11-13, verdict: "conforme : 0 bloquant ; pas de doublon réintroduit, bloc banc fermé ; 2 notes mineures (dernier verdict du banc absent panneau ouvert sur plan long ; terminal bas non testé)", commit: 8c175d8a061bef9f29fbbb7cffa2798f925f6c60 }
     ux: { date: 2026-11-13, verdict: "conforme : capture vue par le lead (13 projets, panneau ouvert, banc en cours et barres d'avancement dans la bande, rien en double)" }
     finished: 2026-11-13
+  - id: L717
+    title: "HUD : panneau ouvert sur un plan long et sans banc en cours, le dernier verdict du banc (✓/✗) n'est dessiné ni par la bande ni par le panneau ; le garder visible d'un côté (vu par la revue de L716 le 13-11 ; Sylvain : « on fera un petit lot que l'on règlera plus tard »)"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

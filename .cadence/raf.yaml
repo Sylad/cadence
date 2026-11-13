@@ -3439,12 +3439,14 @@ lots:
     created: 2026-11-13
   - id: L722
     title: "Écritures du lead dans l'arbre principal pendant qu'un programme le tient : 2 pertes le 13-11 — dossier 2.0.4 écrit pendant un verify --gate (verdict non probant, porte rejouée) ; D-1.json modifié à la main pendant un cadence run (refus-integration du correctif HUD, 36 min de run à réintégrer). Étendre la mise en attente de raf (plan-en-attente) au registre .cadence/demandes/ (une commande pour ajouter une précision ou changer l'état d'une demande, mise en attente quand le dépôt est tenu), et signaler toute autre écriture non commitée du lead au moment où un run ou une porte démarre ; mesure : 0 refus d'intégration ni porte non probante causés par le lead"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-13
     notes:
       - { date: 2026-11-13, text: "13-11 : raf review écrit directement le plan de l'arbre principal pendant qu'un cadence run tient le dépôt (raf note, elle, est mise en attente) : à couvrir aussi." }
     started: 2026-11-13
+    review: { date: 2026-11-13, verdict: "conforme (2e revue, 13-11) : la revue mise en attente fige le commit relu (--vu, --vu-depot), raf done refuse les commits du lot postérieurs, test rouge 3/4 sans le correctif ; mineurs de r1 corrigés ; rebase sur L723 sans perte ; mineur restant (review/ux sans verdict mis en attente) → L725", commit: c402a3b92857b6008d602eb433cc2e90fe89d12a }
+    finished: 2026-11-13
   - id: L723
     title: "cadence run se rebase seul quand l'avance rapide est refusée : 2 fois le 13-11 (L687 après L707 ; correctif HUD après L689), à chaque fois un run de 15 à 35 min rendu « refus-integration » et repris à la main par --reponse (13 min et ~5 $ la première fois). À l'intégration, si main a avancé : rebase dans le worktree, conflits → la même session les résout, porte rejouée, puis avance rapide ; rendu au lead seulement si la session ne sait pas résoudre ; mesure : 0 refus-integration pour divergence sur une semaine de runs parallèles"
     status: done
@@ -3459,6 +3461,13 @@ lots:
     estimate: 0.25
     created: 2026-11-13
     started: 2026-11-13
+    notes:
+      - { date: 2026-11-13, text: "Vu par le run L724 (13-11) : une reprise après quota pendant une correction (L724) ou pendant la résolution d'un conflit (L723) peut encore remplacer le rapport ; codé pour L724 sans test, non traité pour L723." }
+  - id: L725
+    title: "raf review <lot> ou raf ux <lot> sans verdict, lancé pendant que le dépôt est tenu, est mis en attente puis bloque les écritures qui suivent (src/cli/attente-commands.ts:36, reproduit par la revue r2 de L722 le 13-11) : refuser avant la mise en attente, comme raf demande ; et tester --vu-depot"
+    status: todo
+    estimate: 0.1
+    created: 2026-11-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

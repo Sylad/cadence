@@ -39,14 +39,23 @@ export const executeurClaude: Executeur = creerExecuteur();
  * Coût et jetons : ceux du dernier result, cumulés depuis le début de la session. `messages` : chaque message sans appel d'outil, avec son tour. */
 export function lire(e: { stdout: string; code: number; erreur?: string }): { session: string; tokens: number; cout: number; echec: string | null; resultat: string; messages: Message[] } {
   const { travail, fin, messages, apres } = lireFlux(e.stdout);
-  if (!travail || !fin) return { session: '', tokens: 0, cout: 0, resultat: '', messages, echec: `sortie illisible (${e.erreur ?? `code ${e.code}`}) : ${e.stdout.slice(-200)}` };
+  const arret = e.erreur ?? `code ${e.code}`;
+  // Sans result : la session s'est arrêtée avant la fin de son tour (délai, signal) ; ce qu'elle a dit est dans `messages`, l'appelant le garde (issue #57).
+  if (!travail || !fin) {
+    const echec = messages.length ? `session arrêtée avant son result (${arret}) ; dernier message : ${messages.at(-1)!.texte.slice(-200)}` : `sortie illisible (${arret}) : ${e.stdout.slice(-200)}`;
+    return { session: '', tokens: 0, cout: 0, resultat: '', messages, echec };
+  }
   const tokens = Object.values(fin.modelUsage ?? {}).reduce((n, u) =>
     n + (u.inputTokens ?? 0) + (u.outputTokens ?? 0) + (u.cacheReadInputTokens ?? 0) + (u.cacheCreationInputTokens ?? 0), 0);
   const session = travail.session_id ?? fin.session_id ?? '';
   const travailFini = !travail.is_error && (travail.subtype === undefined || travail.subtype === 'success');
   const causes: string[] = [];
   if (!session) causes.push('session_id absent');
-  if (!travailFini) causes.push(`session ${session || '?'} : ${travail.subtype ?? 'is_error'}`);
+  // Une erreur d'API dans claude -p a la forme `is_error: true, subtype: 'success'` : le détail dit « erreur » et cite le texte, jamais « success ».
+  if (!travailFini) {
+    const nature = travail.subtype && travail.subtype !== 'success' ? travail.subtype : 'erreur';
+    causes.push(`session ${session || '?'} : ${nature}${travail.result?.trim() ? ` (« ${travail.result.trim().split('\n')[0]} »)` : ''}`);
+  }
   // Le code de sortie est celui du dernier tour : il ne compte que si le travail n'a pas fini, ou si aucun tour n'a commencé après lui.
   if (e.code !== 0 && (!travailFini || !apres)) causes.push(`code ${e.code}${e.erreur ? ` (${e.erreur})` : ''}`);
   return { session, tokens, cout: fin.total_cost_usd ?? 0, resultat: travail.result ?? '', messages, echec: causes.length ? causes.join(', ') : null };

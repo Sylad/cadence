@@ -114,6 +114,10 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false): boolean {
   e.session = r.session || e.session; e.cout_usd += r.cout;
   // D-15 : une fin de quota n'est pas un échec. La limite Opus seule bascule sur fable dans la même session ; la limite hebdo bloque tous les modèles : on attend.
   const q = reconnaitreQuota(r.resultat || brut.stdout, (o.maintenant ?? (() => new Date()))());
+  // Issue #57 : chaque message de la session va au journal et à l'état quelle que soit sa fin (travail fini, échec, délai, signal, quota) : c'est là que le
+  // lead lit ce qui a été fait et ce qui reste. Le rapport est le dernier message du tour du prompt, fixé seulement si le travail a fini ; les tours ouverts
+  // après lui (notifications de tâche) vont au journal, sans le remplacer.
+  garderRapport(e, r.messages, o.out, !q && !r.echec);
   if (q?.limite === 'opus' && (e.modele ?? 'opus') === 'opus') {
     o.out('limite Opus atteinte : bascule sur fable, même session');
     e.modele = 'fable'; sauver(e);
@@ -126,8 +130,6 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false): boolean {
     return false;
   }
   if (r.echec) { e.etat = 'echec'; e.detail = r.echec; return false; }
-  // Issue #57 : le rapport est le dernier message du tour du prompt ; les tours ouverts après lui (notifications de tâche) vont au journal, sans le remplacer.
-  garderRapport(e, r.messages, o.out);
   sauver(e);
   return true;
 }

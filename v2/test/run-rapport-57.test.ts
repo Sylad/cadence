@@ -19,8 +19,22 @@ const assistant = (id: string, ...content: object[]) => ligne({ type: 'assistant
 const texte = (text: string) => ({ type: 'text', text });
 const outil = (id: string) => ({ type: 'tool_use', id, name: 'Bash', input: { command: 'git commit' } });
 const notification = ligne({ type: 'system', subtype: 'task_notification', task_id: 'b1', status: 'completed', summary: 'Background command completed' });
-const resultat = (session: string, result: string, cout: number, erreur = false) =>
-  ligne({ type: 'result', subtype: 'success', is_error: erreur, session_id: session, total_cost_usd: cout, result });
+const resultat = (session: string, result: string, cout: number, erreur = false, subtype = 'success') =>
+  ligne({ type: 'result', subtype, is_error: erreur, session_id: session, total_cost_usd: cout, ...(result ? { result } : {}) });
+const QUOTA = 'You\'ve hit your weekly limit · resets Thu 9am (Europe/Paris)';
+const AVANT = 'Fichier créé et commité, je lance la suite complète.'; // ce que la session a dit avant de s'arrêter : c'est là que le lead lit où elle en était
+/** Joue un run avec un faux claude qui rend `sorties` dans l'ordre (une par session) ; rend l'état relu sur disque et le journal. */
+function lancer(sorties: ReturnType<Executeur>[], opts: Partial<Parameters<typeof executerRun>[0]> = {}) {
+  const repo = depot(), { l, out } = io(), appels: string[][] = [];
+  const exec: Executeur = (args, o) => {
+    appels.push(args);
+    commite(appels.length === 1 ? 'fait.txt' : `fait${appels.length}.txt`)(o.cwd); // fait.txt : la porte du dépôt
+    return sorties[appels.length - 1];
+  };
+  const e = executerRun({ repo, demande: 'Crée fait.txt', exec, out, maintenant: () => new Date('2026-11-11T16:00:00Z'), attendre: null, ...opts });
+  const etat = JSON.parse(readFileSync(e.fichier, 'utf8')) as { etat: string; detail: string; rapport?: string; messages?: { texte: string; tour: number }[] };
+  return { e, etat, journal: l.join('\n'), appels };
+}
 const RAPPORT = 'fini. Commits : 1a2b3c4 (issue #57). Tests scellés à resceller : test/x.test.ts. Vérifié : suite verte. Non vérifié : la capture.';
 const TARD = 'Notification tardive : rien de neuf, le rapport « fini » reste valable.';
 
@@ -93,15 +107,76 @@ describe('cadence run garde le rapport de fin de travail (issue #57)', () => {
     expect(lire({ stdout: [assistant('a', texte(RAPPORT)), resultat('s', RAPPORT, 1)].join('\n'), code: 1 }).echec).toBe('code 1'); // un seul tour : le code compte
   });
 
-  it('un travail en échec reste un échec, même suivi d\'un tour réussi', () => {
-    const flux = [assistant('a', texte('Erreur.')), resultat('s', 'Erreur.', 1, true), notification, assistant('b', texte(TARD)), resultat('s', TARD, 1.1)].join('\n');
-    expect(lire({ stdout: flux, code: 0 }).echec).toBe('session s : success');
+  it('un travail en échec reste un échec, même suivi d\'un tour réussi ; le détail nomme l\'erreur et la cite, jamais « success »', () => {
+    const api = 'API Error: 500 {"type":"error"}\nrien de plus';
+    const flux = [assistant('a', texte('Erreur.')), resultat('s', api, 1, true), notification, assistant('b', texte(TARD)), resultat('s', TARD, 1.1)].join('\n');
+    expect(lire({ stdout: flux, code: 0 }).echec).toBe('session s : erreur (« API Error: 500 {"type":"error"} »)');
+    expect(lire({ stdout: [assistant('a', texte('Erreur.')), resultat('s', '', 1, true)].join('\n'), code: 1 }).echec).toBe('session s : erreur, code 1');
+    expect(lire({ stdout: [assistant('a', texte(AVANT)), resultat('s', '', 0.5, true, 'error_max_turns')].join('\n'), code: 1 }).echec).toBe('session s : error_max_turns, code 1');
   });
 
-  it('flux coupé avant tout result : ce qui a été dit est gardé au tour 1, la sortie est illisible', () => {
+  it('flux coupé avant tout result : ce qui a été dit est gardé au tour 1 ; le détail dit l\'arrêt et le dernier message, « illisible » seulement sans message', () => {
     const flux = [assistant('a', texte('Je commence.')), assistant('b', outil('t'))].join('\n');
     expect(lireFlux(flux)).toMatchObject({ travail: null, messages: [{ texte: 'Je commence.', tour: 1 }], apres: false });
-    expect(lire({ stdout: flux, code: 143 }).echec).toMatch(/^sortie illisible/);
+    expect(lire({ stdout: flux, code: 143, erreur: 'SIGTERM' }).echec).toBe('session arrêtée avant son result (SIGTERM) ; dernier message : Je commence.');
+    expect(lire({ stdout: '{"type":"system","subtype":"init"}', code: 143 }).echec).toBe('sortie illisible (code 143) : {"type":"system","subtype":"init"}');
+  });
+
+  // Revue r2 de l'issue #57 (majeur 1) : les branches échec et quota de run.ts rendaient la main avant garderRapport ; sur un échec, un délai, un signal ou
+  // un quota, rien de ce que la session avait dit n'allait au journal ni à l'état, là même où le lead en a besoin. Un test par fin de session.
+  describe('les messages de la session vont au journal et à l\'état quelle que soit sa fin', () => {
+    const coupe = [assistant('a', texte('Je commence.')), assistant('b', outil('t')), assistant('c', texte(AVANT))].join('\n'); // aucun result : tour coupé
+    const avantArret = `session, dernier message avant l'arrêt (travail non fini) : ${AVANT}`;
+    const attendu = (r: ReturnType<typeof lancer>) => {
+      expect(r.etat.messages).toEqual([{ texte: 'Je commence.', tour: 1 }, { texte: AVANT, tour: 1 }]);
+      expect(r.etat.rapport).toBeUndefined(); // pas de rapport : le travail n'a pas fini
+      expect(r.journal.indexOf('session, pendant le travail : Je commence.')).toBeGreaterThan(-1);
+      expect(r.journal.indexOf('session, pendant le travail : Je commence.')).toBeLessThan(r.journal.indexOf(avantArret));
+    };
+
+    it('échec (error_max_turns, code 1) : état echec, détail nommé, messages au journal et à l\'état', () => {
+      const r = lancer([{ stdout: `${coupe}\n${resultat('s', '', 0.5, true, 'error_max_turns')}`, code: 1 }]);
+      expect(r.etat).toMatchObject({ etat: 'echec', detail: 'session s : error_max_turns, code 1' });
+      attendu(r);
+    });
+
+    it('délai de 4 h dépassé (flux coupé, SIGTERM par l\'enveloppe) : la cause puis les messages, dans l\'ordre', () => {
+      const r = lancer([{ stdout: coupe, code: 143, erreur: 'SIGTERM', delaiMs: 4 * 3600_000 }]);
+      expect(r.etat).toMatchObject({ etat: 'echec', detail: `session arrêtée avant son result (SIGTERM) ; dernier message : ${AVANT}` });
+      expect(r.journal).toMatch(/délai de 4 h dépassé : le run a arrêté la session claude/);
+      expect(r.journal.indexOf('délai de 4 h dépassé')).toBeLessThan(r.journal.indexOf('session, pendant le travail'));
+      attendu(r);
+    });
+
+    it('signal reçu par la session (flux coupé, code 143) : messages au journal et à l\'état', () => {
+      const r = lancer([{ stdout: coupe, code: 143, erreur: 'SIGTERM' }]);
+      expect(r.etat).toMatchObject({ etat: 'echec', detail: `session arrêtée avant son result (SIGTERM) ; dernier message : ${AVANT}` });
+      expect(r.journal).toMatch(/l'enveloppe de la session claude a été tuée par SIGTERM/);
+      attendu(r);
+    });
+
+    it('quota hebdo : état quota, ce que la session a dit avant la limite est au journal et à l\'état', () => {
+      const r = lancer([{ stdout: `${coupe}\n${resultat('s', QUOTA, 0.5, true)}`, code: 1 }]);
+      expect(r.etat).toMatchObject({ etat: 'quota', detail: expect.stringMatching(/^limite hebdo atteinte/) });
+      attendu(r);
+    });
+
+    it('limite Opus puis bascule sur fable : les messages des deux sessions se suivent, le rapport est celui de la session qui a fini', () => {
+      const opus = 'You\'ve hit your Opus limit · resets Fri 10am (Europe/Paris)';
+      const r = lancer([{ stdout: `${coupe}\n${resultat('s', opus, 0.5, true)}`, code: 1 }, { stdout: TARDIVE, code: 0 }]);
+      expect(r.e).toMatchObject({ etat: 'integre', modele: 'fable' });
+      expect(r.appels).toHaveLength(2);
+      expect(r.etat.rapport).toBe('fini, commande lancée en fond.');
+      expect(r.etat.messages!.map((m) => [m.tour, m.texte])).toEqual([
+        [1, 'Je commence.'], [1, AVANT], [1, 'fini, commande lancée en fond.'],
+        [2, 'Fini : la commande en arrière-plan a bien terminé avec le code de sortie 0.'],
+      ]);
+      const i = (s: string) => r.journal.indexOf(s);
+      expect(i(avantArret)).toBeGreaterThan(-1);
+      expect(i(avantArret)).toBeLessThan(i('limite Opus atteinte : bascule sur fable'));
+      expect(i('limite Opus atteinte')).toBeLessThan(i('session, rapport : fini, commande lancée en fond.'));
+      expect(i('session, rapport :')).toBeLessThan(i('session, tour 2, après le rapport'));
+    });
   });
 
   it('un message en plusieurs événements (un par bloc, même id) ne compte que sans appel d\'outil', () => {

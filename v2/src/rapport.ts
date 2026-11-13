@@ -68,14 +68,17 @@ export function lireFlux(stdout: string): Flux {
   return { travail: resultats[0] ?? null, fin: resultats.at(-1) ?? null, messages, apres };
 }
 
-/** Garde la session dans l'état (`messages` ajoutés, jamais remplacés ; `rapport` : le dernier message du tour 1) et écrit au journal chaque message, dans l'ordre. */
-export function garderRapport(e: { rapport?: string; messages?: Message[] }, messages: Message[], out: (l: string) => void): void {
-  const travail = messages.filter((m) => m.tour === 1);
-  if (travail.length) e.rapport = travail.at(-1)!.texte;
+/** Garde la session dans l'état (`messages` ajoutés, jamais remplacés) et écrit au journal chaque message, dans l'ordre, quelle que soit la fin de la session.
+ * `fini` : le travail du tour 1 a fini ; son dernier message est alors le rapport (`rapport` de l'état). Sinon (échec, délai, signal, quota), l'état ne reçoit
+ * pas de rapport et le journal nomme ce dernier message pour ce qu'il est : le dernier dit avant l'arrêt, celui où le lead lit ce qui a été fait et ce qui reste. */
+export function garderRapport(e: { rapport?: string; messages?: Message[] }, messages: Message[], out: (l: string) => void, fini = true): void {
+  const travail = messages.filter((m) => m.tour === 1), dernier = travail.at(-1);
+  if (fini && dernier) e.rapport = dernier.texte;
   e.messages = [...(e.messages ?? []), ...messages];
   for (const m of messages) {
     if (m.tour > 1) out(`session, tour ${m.tour}, après le rapport (notification de tâche ; ne change ni le rapport ni l'état du run) : ${m.texte}`);
-    else if (m === travail.at(-1)) out(`session, rapport : ${m.texte}`);
-    else out(`session, pendant le travail : ${m.texte}`);
+    else if (m !== dernier) out(`session, pendant le travail : ${m.texte}`);
+    else if (fini) out(`session, rapport : ${m.texte}`);
+    else out(`session, dernier message avant l'arrêt (travail non fini) : ${m.texte}`);
   }
 }

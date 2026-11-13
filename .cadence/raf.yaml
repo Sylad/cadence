@@ -3072,9 +3072,10 @@ lots:
     finished: 2026-11-07
   - id: L678
     title: "Hypothèses écrites sans bloquer la reprise : avant une session accept ou implement d'un lot avec fiche, settleHypotheses puis noteHypotheses attendent le verrou du dépôt, donc une intégration longue retarde la session après « réponse prise, le lot repart » (L670 l'a rendu visible, 37,3 min vues le 06-11) ; supprimer l'attente sans perdre le rendu du lot sur écriture refusée (HYPOTHESES_HANDBACK) ; niveau : source, niveau le plus tôt : source ; mesure : 0 min d'attente de verrou entre réponse prise et session suivante"
-    status: todo
+    status: dropped
     estimate: 0.25
     created: 2026-11-07
+    finished: 2026-11-13
   - id: L679
     title: "CHANGELOG partagé : 7 conflits d'ajout pur et 13 rejeux de porte (80 min sur 970 en 0800, 26,3 min en 1805) ; chaque lot écrit changelog.d/L<id>.md, le release l'assemble, test/changelog.test.ts lit les fragments ; niveau : source ; niveau le plus tôt : source ; mesure : 0 rejeu de porte dû au seul CHANGELOG sur 3 vagues"
     status: done
@@ -3085,16 +3086,18 @@ lots:
     finished: 2026-11-12
   - id: L680
     title: "Ressource par fichier de src/ au lancement : en 0800 L671 (wants renommé wanted par L670, tsc rouge), L673 (conflit integrate-lot.ts, CHANGELOG.md) et L662 (work.ts) refusés à l'intégration, ~54 min plus les rejeux ; les fichiers de src/ cités par le titre ou lus par le precheck reçoivent uses: automatique (comme L671 pour docs) donc leurs lots passent l'un après l'autre ; niveau : source ; niveau le plus tôt : source ; mesure : 0 refus d'intégration pour main avancé sur 3 vagues"
-    status: todo
+    status: dropped
     estimate: 0.5
     after: [ L671 ]
     created: 2026-11-07
+    finished: 2026-11-13
   - id: L681
     title: "Porte de ligne de base inutile : 5 portes de base (33,2 min) en 0800 pour 4 tests instables différents rejoués verts seuls ; ne jouer la base que si un rouge reste rouge après rejeu seul ; niveau : porte ; niveau le plus tôt : porte, la charge n'est connue qu'à l'exécution ; mesure : 0 porte de base si tous les rouges repassent seuls"
-    status: todo
+    status: dropped
     estimate: 0.25
     after: [ L642 ]
     created: 2026-11-07
+    finished: 2026-11-13
   - id: L682
     title: "Budget : correction non jouée après revue finale non conforme (L676 : 559 676 / 600 000, 74 min en handed-back, majeurs sans correction) ; l'estimate d'un lot qui touche src/orchestrate/cycle/ est doublé à raf add et la réserve de la dernière correction est prise avant celle de l'escalade ; niveau : source ; niveau le plus tôt : source ; mesure : 0 lot rendu pour budget avec un majeur ouvert sur 3 vagues"
     status: done
@@ -3105,14 +3108,16 @@ lots:
     finished: 2026-11-12
   - id: L683
     title: "Créneaux tenus par les sessions du lead : 16,4 min d'attente sur 7 lots en 0800 (reprise-L498 3 min 09 s et 5 min 06 s pour L673), --integrate de L666 dit 29 min sans activité par le lead (non retrouvé au journal) ; le registre écrit l'âge et l'objet de la session du lead, et --integrate ne prend de créneau que pendant une session jouée ; niveau : source ; niveau le plus tôt : source ; mesure : 0 min d'attente de créneau due à une session du lead sans activité"
-    status: todo
+    status: dropped
     estimate: 0.25
     created: 2026-11-07
+    finished: 2026-11-13
   - id: L684
     title: "Constats de chaque passe de revue conservés au JSON du lot : L670 (11 sessions, 124 min) et L673 (9 sessions, 80 min) ont un constats vide après conformité, la cause des 2 escalades fable ne peut pas être classée ; garder la liste par passe (gravité, fichier, texte) ; niveau : source ; niveau le plus tôt : source ; mesure : 100 % des passes non conformes classables après la prochaine vague"
-    status: todo
+    status: dropped
     estimate: 0.25
     created: 2026-11-07
+    finished: 2026-11-13
   - id: L685
     title: "Tests R7 et R11 de la file approuvée (L498) instables sous charge : rouges dans le clone neuf de la release 1.62.0, verts trois fois seuls ; l'ordre de jeu attendu (z:L1 avant a:L1, a:L1 avant b:L1) n'est pas tenu sous charge ; dire si l'ordre est un contrat (file avant plan) et corriger le code, sinon le test ; mesure : 10 rejeux de la suite du fichier sous charge, 0 rouge"
     status: done
@@ -3457,20 +3462,33 @@ lots:
     finished: 2026-11-13
   - id: L724
     title: "cadence run : la reprise après une porte rouge remplace encore le rapport de travail par le « fini » de la session de correction (même famille que l'issue #57 / L720 et le conflit de rebase de L723) — vu par le correctif de L723 le 13-11 ; le rapport de travail reste celui du travail, la correction est ajoutée à l'état et au journal ; test d'un run complet porte rouge → correction → porte verte"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-13
     started: 2026-11-13
     notes:
       - { date: 2026-11-13, text: "Vu par le run L724 (13-11) : une reprise après quota pendant une correction (L724) ou pendant la résolution d'un conflit (L723) peut encore remplacer le rapport ; codé pour L724 sans test, non traité pour L723." }
     review: { date: 2026-11-13, verdict: "conforme (2e revue, 13-11) : reprise après quota pendant une correction et pendant un conflit testées (6 mutations sur 6 rouges), un seul mécanisme du dernier mot (run.ts:131-133), budget run au compte réel 561, tests L723 et L720 verts", commit: 16c106c4402188888b2a883161ab44667c0c6a94 }
+    finished: 2026-11-13
   - id: L725
     title: "raf review <lot> ou raf ux <lot> sans verdict, lancé pendant que le dépôt est tenu, est mis en attente puis bloque les écritures qui suivent (src/cli/attente-commands.ts:36, reproduit par la revue r2 de L722 le 13-11) : refuser avant la mise en attente, comme raf demande ; et tester --vu-depot"
-    status: doing
+    status: done
     estimate: 0.1
     created: 2026-11-13
     started: 2026-11-13
     review: { date: 2026-11-13, verdict: "conforme (relu par le lead, 13-11) : review|ux sans verdict validés par checkGateUsage avant la mise en attente, comme hors attente ; tests dans ecritures-arbre-tenu-l722 (+67 lignes)", commit: d460d60cce1a118e2a982312db4349b2cb5c2720 }
+    finished: 2026-11-13
+  - id: L726
+    title: "Aiguillage de modèle dans cadence run (décision de Sylvain du 13-11, garder l'« intelligence » des vagues) : à côté de l'aiguillage léger/complet, choisir le modèle de la session — Sonnet pour un petit lot si L524 le justifie, Opus par défaut, Fable automatiquement à la 3e passe ou après deux revues non conformes ; adopté seulement sur la mesure de L524"
+    status: todo
+    estimate: 0.5
+    after: [ L524 ]
+    created: 2026-11-13
+  - id: L727
+    title: "Étude, lecture seule : cartographie de cadence orchestrate — chaque commande et module classé « encore utilisé (perso ou compte pro : spec reseal/green, verify --gate, créneaux, lead hold…) » ou « ne sert qu'aux vagues », avec lignes et tests concernés ; prépare le retrait des vagues (le compte pro n'en lance plus depuis le 09-11, son commentaire sur #50) ; confirmation écrite du compte pro demandée avant le retrait"
+    status: todo
+    estimate: 0.5
+    created: 2026-11-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -3382,6 +3382,9 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-11-13
+    review: { date: 2026-11-13, verdict: "conforme (2e revue, 13-11) : seule la liste test/variables-session.ts est retirée, CADENCE_PLAYWRIGHT arrive, R16-R18 et R20 rejoués ; sonde rouge sur purge totale et sur absence de purge ; note : aucun test ne vérifie que la liste est complète", commit: 652f28784984436bec44f1367af3cd87740b77c1 }
+    notes:
+      - { date: 2026-11-13, text: "Mineur de la 2e revue : la sonde vérifie la liste VARIABLES_SESSION avec elle-même ; une nouvelle variable posée par une session et oubliée dans la liste ne fait rien rougir." }
   - id: L716
     title: "HUD : panneau ouvert, la ligne du banc en cours disparaît des deux côtés quand le plan est long (partage.ts donne 0 ligne au bloc banc, la bande la masque) : plancher 1 pour 'banc' quand un banc tourne, ou la bande la garde ; vu par la revue de L687 le 13-11"
     status: done
@@ -3427,6 +3430,8 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-11-13
+    notes:
+      - { date: 2026-11-13, text: "13-11 : raf review écrit directement le plan de l'arbre principal pendant qu'un cadence run tient le dépôt (raf note, elle, est mise en attente) : à couvrir aussi." }
   - id: L723
     title: "cadence run se rebase seul quand l'avance rapide est refusée : 2 fois le 13-11 (L687 après L707 ; correctif HUD après L689), à chaque fois un run de 15 à 35 min rendu « refus-integration » et repris à la main par --reponse (13 min et ~5 $ la première fois). À l'intégration, si main a avancé : rebase dans le worktree, conflits → la même session les résout, porte rejouée, puis avance rapide ; rendu au lead seulement si la session ne sait pas résoudre ; mesure : 0 refus-integration pour divergence sur une semaine de runs parallèles"
     status: todo

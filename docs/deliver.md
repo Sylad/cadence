@@ -311,6 +311,7 @@ What is checked before a line is written, in this order (nothing is written when
 constat that cannot be made is not a delivery):
 
 - the sha: the argument (or `--sha`, not both), otherwise the last line of `deliver.deployed`; neither is refused (exit 2);
+- `--block`, when given, names a block of `deliver.blocks`; an unknown block is refused (exit 2);
 - `deliver.deployed`, when declared, is run (2 minutes at most): it fails, prints nothing, prints something that is not
   a hexadecimal sha of the repository (`HEAD`, a branch, an unknown sha), or names another sha than the one given — exit 1;
 - the sha is pushed (on a remote branch), no delivery is running (live lock), and it is not older than the last green
@@ -319,8 +320,9 @@ constat that cannot be made is not a delivery):
 - `deliver.verify`, when declared, runs once with `CADENCE_SHA` set to the sha observed; a red check is exit 1.
 
 Then one `day sha [block]` line joins `deliveries.log`, exactly like a green delivery: the lots cited since the
-previous delivery are announced and marked `delivered:` in the plan (and the plan committed, as after a delivery), the article to refresh
-is opened, and the HUD panel reads the project as `verte` — its green journal is now newer than the red one, and the
+previous delivery (with `--block`, the previous line that counts for that block, and only its lots) are announced and
+marked `delivered:` in the plan (and the plan committed, as after a delivery), the article to refresh is opened,
+and the HUD panel reads the project as `verte` — its green journal is now newer than the red one, and the
 day of the last green covers every lot closed until today. With neither `deliver.deployed` nor `deliver.verify`, the
 line rests on the lead's word, and stderr says so. `--constat` runs no CI, no deploy command and no script; it is
 accepted while a wave runs, since it deploys nothing. Tested by `test/deliver-constat-l718.test.ts`.

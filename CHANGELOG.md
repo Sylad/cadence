@@ -81,6 +81,35 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.5] - 2026-11-13
+
+### Added
+
+- Bench in three levels (L689, D-3, [docs/v2/banc.md](docs/v2/banc.md#trois-niveaux-de-banc-l689)): `cadence2 bench micro` (bench 1, no AI judge, about 8 min) and `cadence2 bench mecanique` (benches 1, 3 and 6, no AI judge, about 30 min, after every change of v2) run the project suite and the original tests in each arm's clone instead of the judges; they never allow nor block a release. The full bench with judges (`court` and the sequence) stays the release guard.
+
+### Changed
+
+- The `cadence-hud` band no longer runs `cadence lead tour --json` every minute while nothing uses it (L719,
+  [docs/cadence-hud.md](docs/cadence-hud.md)): the tour (7 to 9 s per call on ten projects) feeds the lots panel and, in the band, only the folding
+  of the wave lots the plan says closed (L609), so it runs only while the lots panel is open or a wave is in the band. Opening the panel reads it at
+  once, as before; `/hud lots <project>` with no table read yet starts a reading.
+- The `cadence-hud` band shows work in progress only and never the progress of the projects, lots panel open or closed (D-1, after L716,
+  [docs/cadence-hud.md](docs/cadence-hud.md)): runs, waves, lead sessions, slots and the bench run in progress. The progress bars are back in
+  the lots panel, beside each project of the project order (`▮▮▮▮▮▮▮▮▮▯ 682/697  15 lots non clos`), or, when the panel
+  is too short for that region, on each project's line of the tree; never both.
+  The compact cells of L716 shifted and were cut in the desktop app's narrow band (about 95 columns). `/hud projets` no longer folds a list:
+  it says where the progress went.
+- The benches of a `micro` or `mecanique` passage run in parallel (L689), each in its own `cadence2` process, three at a time by default (`--paralleles N`); the two arms of a bench stay one after the other. A bench process that does not start, dies without a result or leaves an unreadable one fails both its arms, and the other benches go to the end. The report and the history line give the duration of the whole passage.
+- The passages the release guard counts (`court`, `hebdo`, `eclair`, `lancer`, the sequence) stay one bench after the other, and refuse `--paralleles` above 1 (L689): under parallel load the two arms of a bench are not timed under the same load, which would bias the blocking "total time ≤ 1.5 × A" criterion, until a real passage has compared serial and parallel.
+- The release guard measures `cadence run` against Claude alone (L689, Sylvain's decision of 2026-11-13): `bench` defaults to `--candidat cadence-run --reference A`, and `verifier-publication` only accepts a passage of `cadence-run` against `A`. A refusal gives the exact commands to run from the repository being released, the sequence with `--candidat cadence-run --reference A` (its own defaults measure `sequence-v2`), and every passage prints the repository, branch and commit it measures: on 2026-11-13 the bench had measured another clone through the `cadence2` of the PATH.
+- The Saturday timer runs `cadence2 bench mecanique` instead of `cadence2 bench hebdo` (L689, Sylvain's decision of 2026-11-13; log `~/bench-cadence/mecanique.log`; rerun `v2/systeme/installer.sh` to install it). No weekend passage is required any more: `cadence2 bench statut` always exits 0 and no longer prints "BANC DU WEEKEND MANQUANT", and the HUD no longer shows `⚠ weekend manquant`; it names `micro` and `mécanique` passages. Only the guard, `court` then the sequence before a release, counts.
+- The line budget of the v2 measure (R29) goes from 1500 to 1684 lines, `bench` from 800 to 984 (L689, Sylvain's decision of 2026-11-13): the code is no longer squeezed onto long lines to fit the budget.
+
+### Fixed
+
+- `cadence run` keeps the report its session gave when it finished its work (L720, issue #57 of the pro account, [docs/v2/2026-11-09-cadence-run.md](docs/v2/2026-11-09-cadence-run.md)): a task notification that arrived after that report (a background agent or command finishing late) opened one more turn, and its reply replaced the report in the run's state and in the `fond-<id>.log` journal, so the commits, the sealed tests to reseal and the verified / not verified lines were only left in the session transcript. Sessions now talk `--output-format stream-json` and turns are counted on its `result` events: the report is the last message of the turn opened by the prompt, whatever the notification looks like (in a real stream it is a `system/task_notification` event) and even when the late reply says « fini ». Every message is kept with its turn in the state (`messages`) and written to the journal in order; a later turn no longer decides the run's state (its error, exit code or quota text), only the cost and tokens come from the last `result`. The messages are kept whatever the session's end: finished work, but also a failure (`error_max_turns`, an API error), the 4 h deadline, a signal or a quota, which is exactly where the lead needs to read what was done and what remains; in those ends the state gets no `rapport` and the journal names the last message as the last one said before the stop. The failure detail names the error and quotes it (`session <id> : error_max_turns, code 1`), never « success ». Tests: `v2/test/run-rapport-57.test.ts`, on two captured streams and one full run per kind of end.
+- The test suites no longer depend on the `CADENCE_*` variables of the session that runs them (L715): `v2/test/bras.test.ts` and `v2/test/passage.test.ts` failed (« expected '[]' to be undefined ») whenever `CADENCE_PIECES`, `CADENCE_CLONE` or `CADENCE_BANC_RACINE` were set, which is the case of any suite run from a `cadence run` session. The setup files (`test/setup-env.ts`, `v2/test/setup-home.ts`) now remove, before each test file, the variables a cadence session sets for itself (wave, `cadence run`, gate, delivery, release smoke; listed in `test/variables-session.ts`), and a test that reads one sets it itself. The settings of the suite (`CADENCE_PLAYWRIGHT`, set by the CI for the real rendering tests R16-R18 and R20 of `ref corpus`, and `CADENCE_TEST_*`) still reach the tests; a probe relaunches vitest with these variables set and fails if a session variable gets through or if `CADENCE_PLAYWRIGHT` is lost. The bench's neutral environment no longer passes the guard of a parent `cadence run` session (`CADENCE_CLONE`, `CADENCE_PIECES`, `CADENCE_BANC_RACINE`) to an arm without settings or to the judges. Tests: `test/environnement-isole-l715.test.ts`, `v2/test/environnement-isole-l715.test.ts`, `v2/test/bras.test.ts`, `v2/test/passage.test.ts`.
+
 ## [2.0.4] - 2026-11-13
 
 ### Added

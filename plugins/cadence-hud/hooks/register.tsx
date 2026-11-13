@@ -945,12 +945,13 @@ export const register: Register = on => {
     ]
 
     // le partage de la hauteur (L712) : l'arbre des lots d'abord ; tant qu'il n'a pas de quoi montrer ses projets en cours, le banc, les livraisons, les dépenses puis les décisions
-    // se replient en une ligne, puis cèdent cette ligne, dans cet ordre
+    // se replient en une ligne, puis cèdent cette ligne, dans cet ordre ; le banc garde la sienne, son dernier verdict (L717)
     // L687 : les lots que joue un run vivant de cadence run (le dossier de son dépôt fait le projet, comme pour une vague)
     const runLots = runsNow.filter(r => isRunLive(r) && r.lot).map(r => ({ project: r.repo.split('/').filter(Boolean).pop() ?? '', lot: r.lot!, state: r.role === 'attente' ? 'quota' : 'en-cours' }))
     const panelInput = board && !board.outdated ? { rows: board.rows, columns, waves: waveLotsOf(allWaves, at), folds, views, now: at, runs: runLots } : undefined
     const treeNeed = panelInput ? besoinArbre(panelInput, bodyRows) : 1
-    const share = partage(bodyRows, treeNeed, { decisions: decisions.lines.length, depenses: spend.lines.length, livraisons: shipped.lines.length, banc: benchLines.length }, { depenses: spend.lines.some(l => l.tone === 'warning') ? 1 : 0 })
+    // L717 : le dernier verdict du banc garde sa ligne repliée, même quand l'arbre réclame la hauteur (la bande ne le montre pas panneau ouvert)
+    const share = partage(bodyRows, treeNeed, { decisions: decisions.lines.length, depenses: spend.lines.length, livraisons: shipped.lines.length, banc: benchLines.length }, { depenses: spend.lines.some(l => l.tone === 'warning') ? 1 : 0, banc: benchLines.length > 0 ? 1 : 0 })
     const rouges = deliveryRows.filter(r => r.status === 'rouge').length
     const decisionLines = lignesDuBloc(decisions.lines, decisions.lines[0], share.decisions)
     const spendLines = lignesDuBloc(spend.lines, spend.lines.find(l => l.tone === 'warning') ?? spend.lines[0], share.depenses)

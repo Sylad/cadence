@@ -1738,22 +1738,21 @@ test('L712 — haut assez : tous les blocs entiers, le banc avec ses 5 passages,
   expect(text).toContain('L80')
 })
 
-test('L712 — les blocs cèdent dans l’ordre : le banc d’abord, puis les livraisons, les dépenses, les décisions en dernier', async ($, on) => {
+test('L712 — les blocs cèdent dans l’ordre : le banc d’abord, puis les livraisons, les dépenses, les décisions en dernier ; le banc garde la ligne de son dernier verdict (L717)', async ($, on) => {
   const s = await crowded($, on)
   const at = async (rows: number) => (await s.draw(70, rows)).text
   const tall = await at(60)
   expect(tall).toContain('07-11 10:00') // le passage le plus récent, entier
-  // en réduisant la hauteur, un bloc ne perd sa dernière ligne qu'après que le banc a perdu la sienne
+  // en réduisant la hauteur, le banc se replie le premier (l'ordre : tests/partage-l712.test.ts) et ne cède jamais sa ligne repliée, son dernier verdict
   for (let rows = 30; rows >= 6; rows--) {
     const t = await at(rows)
-    if (t.includes('Dernière livraison') || t.includes('budget et durée') || t.includes('Ce qui attend une décision')) continue
-    expect(t.includes('Banc')).toBe(false)
+    if (!t.includes('Banc : 5 derniers passages')) expect({ rows, banc: t.match(/^Banc : 07-11 10:00 {2}court {2}✓ vert$/gm)?.length }).toEqual({ rows, banc: 1 })
   }
+  // un bloc ne perd sa dernière ligne qu'après les livraisons, les décisions en dernier
   for (let rows = 30; rows >= 6; rows--) {
     const t = await at(rows)
     if (t.includes('Ce qui attend une décision')) continue
     expect(t.includes('Dernière livraison')).toBe(false)
-    expect(t.includes('Banc')).toBe(false)
   }
 })
 
@@ -1854,3 +1853,23 @@ test('D-1, suite de L716 — panneau trop court pour l’ordre des projets : la 
     expect(text.match(/ 1\/14 /g)).toHaveLength(1)
   }
 })
+
+// ── L717 : panneau ouvert sur un plan long, sans banc en cours, le dernier verdict du banc reste dessiné, sur une ligne ──
+
+const rouge = JSON.stringify({ date: '2026-11-12T17:00:00.000Z', candidat: 'eq', bancs: ['1-a', '3-b', '6-c'], hebdo: false, vert: false, rouges: ['tokens', 'durée'] })
+for (const [verdict, banc, attendu] of [
+  ['vert', BANC5, /^Banc : 07-11 10:00 {2}court {2}✓ vert$/gm],
+  ['rouge', [...BANC5, rouge], /^Banc : 12-11 18:00 {2}court {2}✗ rouge : tokens, durée$/gm],
+] as const)
+  test(`L717 — 13 projets de 12 lots, 95 colonnes, aucun banc en cours, dernier passage ${verdict} : de 6 à 50 lignes, le verdict est dans le panneau, une seule ligne, même quand l’arbre réclame la hauteur`, async ($, on) => {
+    const s = await session($, on, { waves: [WAVE_L712], last: () => LAST, banc: [...banc], tour: () => ({ exitCode: 0, stdout: JSON.stringify(TREIZE(7, 12)) }) })
+    await s.advance(5_000)
+    await s.hud('lots')
+    await s.advance(5_000)
+    for (let rows = 6; rows <= 50; rows++) {
+      const { text } = await s.draw(95, rows)
+      const entier = text.includes('Banc : 6 derniers passages') || text.includes('Banc : 5 derniers passages')
+      expect({ rows, verdict: entier || text.match(attendu)?.length === 1 }).toEqual({ rows, verdict: true })
+      if (!entier) expect(text.match(/^Banc/gm)).toHaveLength(1)
+    }
+  })

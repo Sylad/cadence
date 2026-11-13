@@ -189,7 +189,7 @@ test('R16 — le panneau n’est jamais ouvert de lui-même', async ($, on) => {
 
 test('R16 — argument inconnu : la réponse cite lots', async ($, on) => {
   const s = await session($, on)
-  expect((await s.hud('lot')).text).toBe('argument inconnu : lot (attendu : cmd, projets, lots)')
+  expect((await s.hud('lot')).text).toBe('argument inconnu : lot (attendu : cmd, lots)')
   expect(s.opened).toEqual([])
 })
 
@@ -1524,7 +1524,7 @@ test('L449 — trop peu de place : la région des projets cède sa place à l’
   expect(small.text).toMatch(/L401/)
 })
 
-test('L716 — la région des projets ne répète pas l’avancement que la bande garde panneau ouvert : le nom et ses lots non clos, sans barre', async ($, on) => {
+test('D-1, suite de L716 — la région des projets montre la barre colorée de chaque projet, fait/total et ses lots non clos : le seul endroit où l’avancement est dessiné', async ($, on) => {
   const withProgress = [
     { ...row('cadence', TOUR[0]!.lots), doing: [{ id: 'L401' }], progress: { done: 3, doing: 1, todo: 6, added7: 2 } },
     { ...row('ol', TOUR[1]!.lots), progress: { done: 9, doing: 0, todo: 1, added7: 0 } },
@@ -1533,9 +1533,8 @@ test('L716 — la région des projets ne répète pas l’avancement que la band
   await s.hud('lots')
   const text = (await s.draw(70, 30, 'terminal')).text
   expect(text).toMatch(/ordre des projets/)
-  expect(text).not.toMatch(/[▮▯]/)
-  expect(text).not.toMatch(/3\/10|9\/10/)
-  expect(text).toMatch(/2 lots non clos/)
+  expect(text).toMatch(/^▮▮▮▯▯▯▯▯▯▯ 3\/10  2 lots non clos$/m)
+  expect(text).toMatch(/^▮{9}▯ 9\/10  1 lot non clos$/m)
 })
 
 test('L481 — un cadence qui ne donne pas progress : la ligne du projet garde le nombre de lots non clos, sans barre', async ($, on) => {
@@ -1543,9 +1542,8 @@ test('L481 — un cadence qui ne donne pas progress : la ligne du projet garde l
   const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify(old) }) })
   await s.hud('lots')
   const text = (await s.draw(70, 30, 'terminal')).text
-  // L716 : une boîte pour le nom, une pour le détail (la mise en page de L495 pour toute ligne)
-  expect(text).toMatch(/^cadence\n2 lots non clos$/m)
-  expect(text).toMatch(/^ol\n1 lot non clos$/m)
+  expect(text).toMatch(/cadence {2}2 lots non clos/)
+  expect(text).toMatch(/ol {2}1 lot non clos/)
 })
 
 test('L495 — le nom de chaque projet est dans une boîte de largeur fixe, celle du plus long nom : l’alignement ne dépend pas des espaces (police proportionnelle)', async ($, on) => {
@@ -1828,4 +1826,31 @@ test('L687 — projet hors dépôt git : raf move passe, le panneau ne dit pas �
   expect(s.rafs()).toEqual([['raf', 'move', 'L402', '--before', 'L401']])
   expect(text).toMatch(/✔ L402 placé avant L401 — le plan est modifié \(dossier hors dépôt git : rien à commiter\)$/m)
   expect(text).not.toMatch(/à commiter \(raf move/)
+})
+
+test('D-1, suite de L716 — treize projets, panneau de 95 ou 200 colonnes : chaque projet de l’ordre a sa barre et fait/total, une seule fois', async ($, on) => {
+  const thirteen = Array.from({ length: 13 }, (_, i) => ({ ...row(i === 0 ? 'cadence' : `projet-${i}`, [lot(`L${i + 1}`)]), progress: { done: i + 1, doing: 0, todo: 13 - i, added7: 0 } }))
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify(thirteen) }) })
+  await s.hud('lots')
+  for (const columns of [95, 200])
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const { text } = await s.draw(columns, 60, surface)
+      expect(text).toMatch(/ordre des projets/)
+      // chaque projet a fait i+1 lots sur 14 : un fait/total distinct par projet, présent une fois et une seule
+      for (const [i, r] of thirteen.entries()) expect([r.project, text.match(new RegExp(`^[▮▯]{10} ${i + 1}/14 {2}1 lot non clos$`, 'gm'))?.length]).toEqual([r.project, 1])
+      // l'arbre ne répète pas la barre que porte l'ordre des projets
+      expect(text).not.toMatch(/\/14 · /)
+    }
+})
+
+test('D-1, suite de L716 — panneau trop court pour l’ordre des projets : la barre passe sur la ligne de chaque projet de l’arbre, une seule fois', async ($, on) => {
+  const thirteen = Array.from({ length: 13 }, (_, i) => ({ ...row(i === 0 ? 'cadence' : `projet-${i}`, [lot(`L${i + 1}`)]), progress: { done: i + 1, doing: 0, todo: 13 - i, added7: 0 } }))
+  const s = await session($, on, { tour: () => ({ exitCode: 0, stdout: JSON.stringify(thirteen) }) })
+  await s.hud('lots')
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const { text } = await s.draw(95, 16, surface)
+    expect(text).not.toMatch(/ordre des projets/)
+    expect(text).toMatch(/^ {2}▮▯{9} 1\/14 · 1 lot non clos$/m) // cadence, premier projet de l'arbre
+    expect(text.match(/ 1\/14 /g)).toHaveLength(1)
+  }
 })

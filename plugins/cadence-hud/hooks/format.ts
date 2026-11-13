@@ -1,6 +1,6 @@
 import type { ThemeKey } from 'claude-code'
 
-import type { CommandInfo, LeadHold, LiveRun, ModelsSummary, Project, ShownRun, Wave, WaveLot } from '../types'
+import type { CommandInfo, LeadHold, LiveRun, ModelsSummary, ShownRun, Wave, WaveLot } from '../types'
 
 /** Couleur d'un taux d'occupation (contexte, fenêtre, budget) : vert, puis orange, puis rouge. */
 export const colorOfPercent = (percent: number | undefined, warn = 60, bad = 85): ThemeKey =>
@@ -379,55 +379,10 @@ export const isWaveShown = (wave: Wave, now: number): boolean => {
   return !Number.isFinite(t) || now - t < WAVE_LINGER_MS
 }
 
-// ── L149 : avancement des plans par projet ──────────────────────────────────────────────────────────────────
+// ── L149 : avancement des plans par projet (D-1, suite de L716 : dessiné dans l'ordre des projets du panneau seulement) ──────────────────────────────────────────────────────────────────
 
 /** Le tableau des projets est relu au plus toutes les minutes (et à chaque transition de vague). */
 export const TOUR_REFRESH_MS = 60_000
-
-/** Lit la sortie de `cadence lead tour --json` ; une ligne sans `progress` (cadence trop ancien) ou en erreur est écartée. */
-export const parseTour = (stdout: string): Project[] => {
-  const raw: unknown = JSON.parse(stdout)
-  if (!Array.isArray(raw)) return []
-  return raw
-    .filter((r): r is Project & { error?: string } => typeof r === 'object' && r !== null && typeof (r as Project).project === 'string')
-    .filter(r => !r.error)
-    .map(r => ({ project: r.project, doing: Array.isArray(r.doing) ? r.doing.filter(d => typeof d?.id === 'string').map(d => ({ id: d.id })) : undefined, progress: r.progress }))
-}
-
-const open = (p: Project): number => (p.progress ? p.progress.doing + p.progress.todo : 0)
-
-/** Les projets qui ont encore des lots ouverts, dans l'ordre reçu (celui de la priorité). */
-export const activeProjects = (projects: readonly Project[]): Project[] => projects.filter(p => p.progress && open(p) > 0)
-
-// ── L716 : panneau des lots ouvert, la bande garde l'avancement de chaque projet, en cases compactes ──
-
-/** L'écart entre deux cases d'une ligne compacte. */
-export const COMPACT_GAP = 3
-
-/** La case compacte d'un projet : son nom, sa barre (les dix cases de la bande), `fait/total` ; ni les lots en cours (l'arbre du panneau les montre) ni le « +N cette semaine ». */
-export const compactCell = (p: Project): { name: string; bar: string; color: ThemeKey; figures: string; width: number } => {
-  const { done, doing, todo } = p.progress
-  const bar = progressBar(done, done + doing + todo)
-  const figures = `${done}/${done + doing + todo}`
-  return { name: p.project, bar, color: colorOfDone(done, done + doing + todo), figures, width: p.project.length + 1 + bar.length + 1 + figures.length }
-}
-
-/** Les cases rangées en lignes de `width` colonnes au plus, dans l'ordre reçu (celui de la priorité) ; une case plus large que la ligne a la sienne. */
-export const packCells = <T extends { width: number }>(cells: readonly T[], width: number, gap = COMPACT_GAP): T[][] => {
-  const rows: T[][] = []
-  let used = 0
-  for (const c of cells) {
-    const last = rows.at(-1)
-    if (last && used + gap + c.width <= width) {
-      last.push(c)
-      used += gap + c.width
-    } else {
-      rows.push([c])
-      used = c.width
-    }
-  }
-  return rows
-}
 
 /** Dix cases : pleines pour la part de lots faits ; dès le premier lot fait une case est pleine, tant qu'un reste est à faire la dernière reste vide. */
 export const progressBar = (done: number, total: number, cellCount = 10): string => {
@@ -439,25 +394,6 @@ export const progressBar = (done: number, total: number, cellCount = 10): string
 /** Couleur de la barre d'un projet selon sa part de lots faits : rouge sous 33 %, orange sous 66 %, vert au-delà (seuils propres à la barre : ceux de la consommation sont 60/85, aucun ne dérive de l'autre) ; gris sans lot. */
 export const colorOfDone = (done: number, total: number): ThemeKey =>
   total <= 0 ? 'subtle' : (done / total) * 100 < 33 ? 'error' : (done / total) * 100 < 66 ? 'warning' : 'success'
-
-/** Au-delà de ce nombre, les ids des lots en cours sont tronqués par « … » (L153). */
-export const DOING_IDS_MAX = 3
-
-/** `39/78 · 2 en cours : L72 L79 · +3 cette semaine` : faits sur total des lots, en cours avec leurs ids (trois au plus puis « … » ; le compte seul à zéro ou sans id), ajoutés sur 7 jours (rien à zéro). Sans la barre ni le nom du projet, qui ont leurs propres Text. */
-export const projectFigures = (p: Project): string => {
-  const { done, doing, todo, added7 } = p.progress
-  const ids = p.doing?.map(d => d.id) ?? []
-  const named = doing > 0 && ids.length > 0 ? ` : ${ids.slice(0, DOING_IDS_MAX).join(' ')}${ids.length > DOING_IDS_MAX ? ' …' : ''}` : ''
-  const parts = [`${done}/${done + doing + todo}`, `${doing} en cours${named}`]
-  if (added7 > 0) parts.push(`+${added7} cette semaine`)
-  return parts.join(' · ')
-}
-
-/** `▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine` : la barre puis les chiffres, en texte brut (la bande les écrit dans des Text séparés pour colorer les cases pleines). */
-export const projectStats = (p: Project): string => {
-  const { done, doing, todo } = p.progress
-  return `${progressBar(done, done + doing + todo)} ${projectFigures(p)}`
-}
 
 /** Ce qui change à une transition de vague : l'état de chaque lot de chaque vague (pas le budget consommé, qui bouge sans cesse). */
 export const waveSignature = (waves: readonly Wave[]): string =>

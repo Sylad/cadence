@@ -8,10 +8,11 @@
   "L687",
   "L716"
  ],
- "preuve": "L687 : bandeau — une ligne par cadence run avec son état ; panneau des lots ouvert, la bande ne répète ni la liste des projets ni le banc ; panneau — un lot joué par un run lit « ⟳ run » ; « à commiter » seulement dans un dépôt git. Tests : claude plugin test plugins/cadence-hud (506 pass, dont tests/hud2-l687.test.tsx et 2 tests L687 de tests/lots-pane.test.ts), npx vitest run test/hud-runs-l687.test.ts (vrai collecteur). Capture du rendu réel (claude --plugin-dir, tmux 200x50, 2026-11-13 08:05) : cadence-20261113065602-42393.captures/l687-panneau-{ouvert,run,ferme}.{txt,ansi,png} · L716 : claude plugin test plugins/cadence-hud (508 pass, dont tests/hud2-l716.test.tsx) ; capture du rendu réel (claude --plugin-dir, tmux 200x50 puis 200x28, panneau ouvert, cadence déplié, 13 projets, banc en cours, 2026-11-13 10:22) : cadence-20261113091601-1255146.captures/l716-{panneau-ouvert,plan-long-28l,panneau-ferme}.{txt,ansi,png}",
+ "preuve": "L687 : bandeau — une ligne par cadence run avec son état ; panneau des lots ouvert, la bande ne répète ni la liste des projets ni le banc ; panneau — un lot joué par un run lit « ⟳ run » ; « à commiter » seulement dans un dépôt git. Tests : claude plugin test plugins/cadence-hud (506 pass, dont tests/hud2-l687.test.tsx et 2 tests L687 de tests/lots-pane.test.ts), npx vitest run test/hud-runs-l687.test.ts (vrai collecteur). Capture du rendu réel (claude --plugin-dir, tmux 200x50, 2026-11-13 08:05) : cadence-20261113065602-42393.captures/l687-panneau-{ouvert,run,ferme}.{txt,ansi,png} · L716 : claude plugin test plugins/cadence-hud (508 pass, dont tests/hud2-l716.test.tsx) ; capture du rendu réel (claude --plugin-dir, tmux 200x50 puis 200x28, panneau ouvert, cadence déplié, 13 projets, banc en cours, 2026-11-13 10:22) : cadence-20261113091601-1255146.captures/l716-{panneau-ouvert,plan-long-28l,panneau-ferme}.{txt,ansi,png} · D-1, suite de L716 : claude plugin test plugins/cadence-hud (502 pass, dont tests/hud2-l716.test.tsx réécrit — 13 projets, 95 et 200 colonnes, panneau ouvert et fermé, terminal et bureau : aucune barre ni nom de projet dans la bande — et 3 tests D-1 de tests/lots-pane.test.ts) ; claude plugin validate vert ; tsc 0 erreur. Rendu réel (claude --plugin-dir, tmux, dossier de 13 projets, 2026-11-13 15:09–15:23) : cadence-20261113135703-2500321.captures/d1-{95col,200col}-panneau-{ferme,ouvert} et d1-200col-100l-panneau-ouvert-ordre (.txt/.ansi/.png) — bande sans barre aux deux largeurs ; panneau 95×50 et 200×50 : barre sur la ligne de chaque projet de l'arbre ; 200×100 : région « ordre des projets » avec ses 13 barres, arbre sans barre. Non vérifié : l'app de bureau elle-même.",
  "runs": [
   "20261113065602-42393",
-  "20261113091601-1255146"
+  "20261113091601-1255146",
+  "20261113135703-2500321"
  ],
  "precisions": [
   {
@@ -25,6 +26,10 @@
   {
    "date": "2026-11-13",
    "texte": "Servie aussi par L716 : panneau des lots ouvert, la bande garde la ligne du banc en cours (avant l'avancement ; le panneau ne la porte plus) et l'avancement de chaque projet en cases compactes (la région « ordre des projets » du panneau n'a plus de barres) — sans doublon bande/panneau."
+  },
+  {
+   "date": "2026-11-13",
+   "texte": "Régression de L716 vue par Sylvain dans l'app de bureau (cases compactes décalées et coupées dans la bande étroite, barres absentes du panneau). Règle de Sylvain du 13-11, qui remplace celle de la demande de correctif : la bande ne montre plus jamais les barres d'avancement par projet (panneau ouvert ou fermé), seulement le travail en cours (runs, vagues, sessions, créneaux, banc en cours) ; les barres vont dans le panneau des lots, à côté de chaque projet de l'ordre des projets ; pas de doublon bande/panneau. Choix du run : quand le panneau est trop court pour la région « ordre des projets », la barre passe sur la ligne du projet dans l'arbre (jamais les deux)."
   }
  ]
 }

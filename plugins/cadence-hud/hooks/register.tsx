@@ -1,17 +1,17 @@
 import { atom, read, update } from 'claude-code'
 import type { ClientProps, ElementConstructor, EngineInterface, Register, RenderChildren, ThemeKey, Timer } from 'claude-code'
 
-import type { AgentsSummary, CommandInfo, LeadHold, LiveRun, LotsNotice, ModelsSummary, Project, ShownRun, Usage, Wave, WaveLot } from '../types'
+import type { AgentsSummary, CommandInfo, LeadHold, LiveRun, LotsNotice, ModelsSummary, ShownRun, Usage, Wave, WaveLot } from '../types'
 import { BANC_READER, CONTEXT_WRITER, COLLECTOR, QUOTA_WRITER, DEFAULT_CAP, DELIVERIES, LAST_DELIVERIES, LAUNCH_FOLDER, PLAN_STAMPS, parseCollected } from './collect'
 import { bancDetail, bancLine, enCoursLine, readBanc, readEnCours } from './banc'
 import { buildDecisions, decisionsOf, parseDeliveries } from './decisions'
 import { buildDeliveries, deliveriesHeight, deliveriesOf, parseLastDeliveries } from './deliveries'
 import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
-import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, colorOfRun, COMPACT_GAP, compactCell, packCells, isRunLive, runCells, RUNS_SHOWN, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
+import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, RESET_BACK, colorOfRun, isRunLive, runCells, RUNS_SHOWN, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
 import { lignesDuBloc, partage } from './partage'
-import { besoinArbre, buildPanel, ellipsize, horsVue, foldText, foldWave, isFolded, moreKey, moreText, movedText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
+import { besoinArbre, buildPanel, ellipsize, horsVue, foldText, foldWave, isFolded, moreKey, moreText, movedText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
@@ -33,15 +33,13 @@ const info = atom({ plugin: 'cadence-hud', key: 'commandInfo' } as const, {})
 const models = atom({ plugin: 'cadence-hud', key: 'models' } as const, { byModel: {}, usdSeen: 0 })
 const waves = atom({ plugin: 'cadence-hud', key: 'waves' } as const, [])
 const endedWaves = atom({ plugin: 'cadence-hud', key: 'endedWaves' } as const, [])
-const projects = atom({ plugin: 'cadence-hud', key: 'projects' } as const, [])
 const leadHolds = atom({ plugin: 'cadence-hud', key: 'leadHolds' } as const, [])
 const liveRuns = atom({ plugin: 'cadence-hud', key: 'liveRuns' } as const, [])
 /** Les runs de cadence run à montrer avec leur état (L687). */
 const shownRuns = atom({ plugin: 'cadence-hud', key: 'shownRuns' } as const, [])
-/** Le panneau des lots est ouvert (L687) : la bande ne répète ni la liste des projets ni le banc qu'il montre. */
+/** Le panneau des lots est ouvert (L687) : la bande ne répète pas l'historique du banc qu'il montre. */
 const lotsOpen = atom({ plugin: 'cadence-hud', key: 'lotsOpen' } as const, false)
 const slotCap = atom({ plugin: 'cadence-hud', key: 'slotCap' } as const, DEFAULT_CAP)
-const projectsFolded = atom({ plugin: 'cadence-hud', key: 'projectsFolded' } as const, false)
 const lotsBoard = atom({ plugin: 'cadence-hud', key: 'lotsBoard' } as const, null)
 const lotsFailed = atom({ plugin: 'cadence-hud', key: 'lotsFailed' } as const, false)
 const lotsFolds = atom({ plugin: 'cadence-hud', key: 'lotsFolds' } as const, {})
@@ -177,7 +175,7 @@ export const register: Register = on => {
     if (isRecord(keptViews)) await update($, lotsViews, () => onlyBooleans(keptViews))
     await $.command.register({
       name: 'hud',
-      description: 'Affiche ou masque la bande cadence-hud ; « /hud cmd » liste les commandes d\'arrière-plan comptées, « /hud projets » replie la liste des projets, « /hud lots » ouvre ou ferme le panneau des lots, « /hud lots <projet> » y replie ou déplie un projet',
+      description: 'Affiche ou masque la bande cadence-hud ; « /hud cmd » liste les commandes d\'arrière-plan comptées, « /hud lots » ouvre ou ferme le panneau des lots, « /hud lots <projet> » y replie ou déplie un projet',
     })
 
     const refresh = async () => {
@@ -314,8 +312,6 @@ export const register: Register = on => {
         const r = await $.process.run(['cadence', 'lead', 'tour', folder, '--json'], { timeoutMs: 20_000 })
         if (r.exitCode !== 0) throw new Error(`cadence lead tour : code ${r.exitCode}`)
         const board = parseLotsBoard(r.stdout)
-        const tour = parseTour(r.stdout)
-        await update($, projects, () => activeProjects(tour))
         await update($, lotsBoard, () => board)
         await update($, lotsFailed, () => false)
         await update($, lotsAt, () => at)
@@ -421,11 +417,8 @@ export const register: Register = on => {
       const [ids, i, o, at] = await Promise.all([read($, commands), read($, info), read($, owners), $.clock.now()])
       return { text: commandsText(ids, i, o, at) }
     }
-    if (arg === 'projets') {
-      const folded = !(await read($, projectsFolded))
-      await update($, projectsFolded, () => folded)
-      return { text: folded ? 'liste des projets repliée (/hud projets pour la rouvrir).' : 'liste des projets affichée.' }
-    }
+    // D-1, suite de L716 : la bande ne montre plus l'avancement des projets, il n'y a plus de liste à replier ; l'ancien argument dit où il est passé
+    if (arg === 'projets') return { text: "l'avancement des projets est dans le panneau des lots, à côté de chaque projet de l'ordre des projets (/hud lots)." }
     if (arg.startsWith('lots ')) {
       const project = arg.slice(5).trim()
       if (!(await read($, lotsBoard))) return { text: 'les plans ne sont pas encore lus : réessayez dans un instant.' }
@@ -450,7 +443,7 @@ export const register: Register = on => {
       return { text: 'panneau des lots ouvert (/hud lots pour le fermer).' }
     }
     // un argument inconnu ne bascule pas la bande : se tromper d'argument ne doit pas la faire disparaître sans un mot
-    if (arg !== '') return { text: `argument inconnu : ${fit(arg, 40)} (attendu : cmd, projets, lots)` }
+    if (arg !== '') return { text: `argument inconnu : ${fit(arg, 40)} (attendu : cmd, lots)` }
     const hidden = !(await read($, isHidden))
     await update($, isHidden, () => hidden)
 
@@ -460,7 +453,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
-    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allProjects, folded, allHolds, runs, cap, board, bench, running, allShownRuns, paneOpen] = await Promise.all([
+    const [u, a, cmds, cmdInfo, m, allWaves, problem, at, allHolds, runs, cap, board, bench, running, allShownRuns, paneOpen] = await Promise.all([
       read($, usage),
       read($, agents),
       read($, commands),
@@ -469,8 +462,6 @@ export const register: Register = on => {
       read($, waves),
       read($, error),
       read($, now),
-      read($, projects),
-      read($, projectsFolded),
       read($, leadHolds),
       read($, liveRuns),
       read($, slotCap),
@@ -481,15 +472,15 @@ export const register: Register = on => {
       read($, lotsOpen),
     ])
     // L687 (D-1) : panneau des lots ouvert, la bande ne répète pas ce qu'il montre — les lots en cours de chaque projet (l'arbre) et l'historique du banc (son bloc « Banc »).
-    // L716 : elle garde ce que le panneau ne garantit pas, faute de place avec un plan long — la ligne du banc en cours (vivante, comme les runs : le panneau ne la porte plus)
-    // et l'avancement de chaque projet, en cases compactes (la région « ordre des projets » du panneau n'a plus de barres).
+    // L716 : elle garde la ligne du banc en cours (vivante, comme les runs : le panneau ne la porte plus).
+    // D-1, suite de L716 (règle de Sylvain du 13-11) : la bande ne montre que le travail en cours — runs, vagues, sessions, créneaux, banc en cours —, jamais l'avancement
+    // des projets, panneau ouvert ou fermé : il est dans le panneau, à côté de chaque projet de l'ordre des projets.
     const benchLine = paneOpen ? null : bancLine(bench, at)
     const runningLine = enCoursLine(running, at)
     const w = allWaves.filter(wave => isWaveShown(wave, at))
-    const shownProjects = activeProjects(allProjects)
     const holds = liveHolds(allHolds, at)
     const lateHolds = expiredHolds(allHolds, at)
-    if (u === null && w.length === 0 && problem === null && shownProjects.length === 0 && holds.length === 0 && runs.length === 0 && allShownRuns.length === 0 && lateHolds.length === 0 && !benchLine && !runningLine) return next(e)
+    if (u === null && w.length === 0 && problem === null && holds.length === 0 && runs.length === 0 && allShownRuns.length === 0 && lateHolds.length === 0 && !benchLine && !runningLine) return next(e)
 
     const ambiguous = parseAmbiguous(await $.env.get('CADENCE_HUD_AMBIGUOUS'))
     const { Box, Text } = $.ui.resolve(e)
@@ -804,80 +795,18 @@ export const register: Register = on => {
       </Box>
     )
 
-    const nameWidth = Math.max(0, ...shownProjects.map(p => p.project.length))
-    // L716 : panneau ouvert, une case par projet (nom, barre, fait/total), plusieurs par ligne dans l'ordre de la priorité
-    const compactRows = paneOpen && !folded && shownProjects.length > 0 && (
-      <Box key="projects" flexDirection="column">
-        {packCells(shownProjects.map(compactCell), width).map((cells, i) => (
-          <Box key={`compact-${i}`} flexDirection="row">
-            {cells.map((c, j) => {
-              const filled = c.bar.replace(/▯/g, '')
-              return (
-                <Box key={`cell-${c.name}`} flexShrink={0} paddingLeft={j === 0 ? 0 : COMPACT_GAP}>
-                  <Text wrap="truncate-end" color="subtle">
-                    {c.name}{' '}
-                  </Text>
-                  {filled && <Text color={c.color}>{filled}</Text>}
-                  <Text color="subtle">
-                    {c.bar.slice(filled.length)} {c.figures}
-                  </Text>
-                </Box>
-              )
-            })}
-          </Box>
-        ))}
-      </Box>
-    )
-    const projectRows =
-      shownProjects.length === 0 ? null : compactRows ? compactRows : folded ? (
-        <Text key="projects" color="subtle" wrap="truncate-end">
-          ▸ projets ({shownProjects.length}) : /hud projets pour les afficher
-        </Text>
-      ) : (
-        <Box key="projects" flexDirection="column">
-          {shownProjects.map(p => (
-            <Box key={`project-${p.project}`} flexDirection="row">
-              <Box width={nameWidth} flexShrink={0}>
-                <Text wrap="truncate-end" color="subtle">
-                  {p.project}
-                </Text>
-              </Box>
-              <Box flexGrow={1} flexShrink={1} paddingLeft={1}>
-                {(() => {
-                  const { done, doing, todo } = p.progress
-                  const barText = progressBar(done, done + doing + todo)
-                  const filled = barText.replace(/▯/g, '')
-                  return (
-                    <Box flexDirection="row">
-                      {filled && <Text color={colorOfDone(done, done + doing + todo)}>{filled}</Text>}
-                      <Text color="subtle">{barText.slice(filled.length)}</Text>
-                      <Box paddingLeft={1} flexShrink={1}>
-                        <Text wrap="truncate-end" color="subtle">
-                          {projectFigures(p)}
-                        </Text>
-                      </Box>
-                    </Box>
-                  )
-                })()}
-              </Box>
-            </Box>
-          ))}
-        </Box>
-      )
-
     return (
       <Box flexDirection="column">
         {contextRow}
         {waveRows}
         {runRows}
         {leadRows}
-        {/* L716 : le passage en cours est vivant, comme les runs : avant l'avancement des projets, que Claude Code coupe en premier quand la bande dépasse sa hauteur */}
+        {/* L716 : le passage en cours est vivant, comme les runs */}
         {runningLine && (
           <Text key="banc-en-cours" color={runningLine.color} wrap="truncate-end">
             {runningLine.text}
           </Text>
         )}
-        {projectRows}
         {benchLine && (
           <Text key="banc" color={benchLine.color} wrap="truncate-end">
             {benchLine.text}
@@ -1070,8 +999,9 @@ export const register: Register = on => {
       const ranked = projectsOf(board.rows)
       const room = bodyRows - decisionLines.length - spendLines.length - shippedLines.length - benchShown.length
       const showOrder = Client !== undefined && ranked.length >= 2 && room - (ranked.length + 1) >= Math.max(2 * ranked.length + 1, treeNeed)
+      // D-1, suite de L716 : chaque projet de l'ordre porte sa barre d'avancement ; c'est le seul endroit où elle est dessinée (la bande ne la montre plus)
       const order = showOrder && (
-        <Client key="projects" module="./projects-list.tsx" props={{ projects: ranked.map(r => ({ name: r.project, detail: projectDetail(r) })) }} width="100%" />
+        <Client key="projects" module="./projects-list.tsx" props={{ projects: ranked.map(r => ({ name: r.project, detail: projectDetail(r), ...projectProgress(r) })) }} width="100%" />
       )
       const orderRows = order ? ranked.length + 1 : 0
       const panel = buildPanel({ ...panelInput!, height: room - orderRows })
@@ -1131,6 +1061,9 @@ export const register: Register = on => {
             return
           }
           runProject = line.name
+          // D-1, suite de L716 : sans la région « ordre des projets » (panneau trop court pour elle), la barre d'avancement passe sur la ligne du projet dans l'arbre ;
+          // avec elle, la ligne de l'arbre n'en a pas (jamais deux fois la même barre dans le panneau, jamais dans la bande)
+          const progress = order ? undefined : projectProgress(board.rows.find(r => r.project === line.name) ?? { project: line.name, error: '' })
           rows.push(
             <Box key={`p${i}`} flexDirection="row">
               {line.folded === undefined ? (
@@ -1150,6 +1083,8 @@ export const register: Register = on => {
               ) : (
                 <Text dimColor wrap="truncate-end">
                   {'  '}
+                  {progress && <Text color={progress.color}>{progress.bar.replace(/▯/g, '')}</Text>}
+                  {progress && `${progress.bar.replace(/▮/g, '')} ${progress.figures} · `}
                   {line.count} lot{line.count > 1 ? 's' : ''} non clos{line.folded ? ` · ${line.doing} en cours` : ''}
                 </Text>
               )}

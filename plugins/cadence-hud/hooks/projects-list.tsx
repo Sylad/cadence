@@ -3,8 +3,9 @@ import type { ClientModule } from 'claude-code'
 // ── L449 : l'ordre des projets dans le panneau, réordonnable à la souris (glisser-déposer) et au clavier (Alt+↑ / Alt+↓) ──
 // Région Client : elle ne connaît que ses lignes (un nom, un détail) ; le dépôt est posté au module de hooks, qui contrôle la demande et lance cadence.
 
-/** L716 : la ligne d'un projet dit son nombre de lots non clos ; son avancement (la barre, L481) est dans la bande, qui le garde panneau ouvert, pas ici en double. */
-type Props = { projects: { name: string; detail: string }[] }
+/** `bar`, `color` et `figures` : l'avancement du projet (sa barre, sa couleur selon la part de lots clos, `fait/total`), calculé par le module de hooks ; absents (projet illisible), la ligne garde `detail`.
+ *  D-1, suite de L716 : c'est le seul endroit où l'avancement des projets est dessiné, la bande ne le montre plus. */
+type Props = { projects: { name: string; detail: string; bar?: string; color?: 'error' | 'warning' | 'success' | 'subtle'; figures?: string }[] }
 /** Le glisser retient le projet saisi par son nom, pas par sa ligne : les props changent pendant un geste (relecture du tableau). */
 type State = { selected?: string; drag?: { name: string; over: number } }
 
@@ -66,7 +67,16 @@ const List: ClientModule<Props, State> = (props, surface) => {
     <Box flexDirection="column" width="100%">
       {projects.map((p, i) => {
         const m = mark(i)
+        const filled = p.bar?.replace(/▯/g, '') ?? ''
         const style = { bold: p.name === state.selected, underline: dragging && i === hover }
+        if (p.bar === undefined)
+          return (
+            <Text key={`p${i}`} wrap="truncate-end" {...style}>
+              {m ? <Text color={m.color}>{m.glyph}</Text> : <Text> </Text>}
+              {` ${p.name}`}
+              <Text dimColor>{`  ${p.detail}`}</Text>
+            </Text>
+          )
         // la police du panneau est proportionnelle : des espaces de bourrage n'alignent rien, la largeur du nom est donc celle d'une boîte (L495)
         return (
           <Box key={`p${i}`} flexDirection="row">
@@ -78,9 +88,10 @@ const List: ClientModule<Props, State> = (props, surface) => {
                 {p.name}
               </Text>
             </Box>
-            <Box paddingLeft={2} flexShrink={1}>
-              <Text wrap="truncate-end" dimColor>
-                {p.detail}
+            <Box paddingLeft={1} flexShrink={1}>
+              <Text wrap="truncate-end">
+                {filled && <Text color={p.color}>{filled}</Text>}
+                <Text dimColor>{`${p.bar.slice(filled.length)} ${p.figures ?? ''}  ${p.detail}`}</Text>
               </Text>
             </Box>
           </Box>

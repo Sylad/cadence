@@ -1,7 +1,7 @@
 # cadence-hud
 
 A band above the Claude Code prompt (terminal and desktop app), refreshed every 5 s: context, quota windows, cost, subagents,
-background commands, the live `cadence orchestrate` waves and the progress of the plans. Short card; the single description of the
+background commands, the live `cadence orchestrate` waves and `cadence run` runs: work in progress only. Short card; the single description of the
 band, with every cell, is [docs/cadence-hud.md](../../docs/cadence-hud.md), which makes the reference (fait foi).
 
 ## Install
@@ -11,7 +11,7 @@ band, with every cell, is [docs/cadence-hud.md](../../docs/cadence-hud.md), whic
 /plugin install cadence-hud@cadence
 ```
 
-The band does not need the `cadence` CLI, except for the progress of the plans and the lots panel (`@sylad/cadence` on the PATH).
+The band does not need the `cadence` CLI, except for the lots panel (`@sylad/cadence` on the PATH).
 
 ## Segments
 
@@ -19,12 +19,12 @@ The band does not need the `cadence` CLI, except for the progress of the plans a
   `fable 410k sonnet 85k` — consumption per model;
 - `⚙ 2 agents` — subagents of this session; `2 cmd` — background commands of this session;
 - one header and one aligned line per active lot for each live `cadence orchestrate` wave; one line per `cadence run` and its state; free slots and the sessions of the lead;
-- one progress bar per project with open lots (compact cells, several to a line, while the lots panel is open); the bench run in progress;
-  the last bench verdict, left out while the lots panel (which shows the bench history) is open.
+- the bench run in progress; the last bench verdict, left out while the lots panel (which shows the bench history) is open.
+  The progress bar of each project is never in the band: it is in the lots panel, beside each project of the project order.
 
 ## Commands
 
-`/hud` hides or shows the band; `/hud cmd` lists the background commands counted; `/hud projets` folds the project list;
+`/hud` hides or shows the band; `/hud cmd` lists the background commands counted;
 `/hud lots` opens the lots panel (`/hud lots <project>` folds a project in it).
 
 ## Work on it

@@ -4,8 +4,8 @@ import type { TestBody } from 'claude-code/testing'
 
 import { COLLECTOR, LAUNCH_FOLDER, parseCollected } from '../hooks/collect'
 import { register } from '../hooks/register'
-import { activeProjects, expiredHolds, expiredHoldText, freeSlots, holdText, liveHolds, slotsLine, launchFolder, colorOfDone, parseTour, progressBar, projectFigures, projectStats, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
-import type { LeadHold, Project, Wave } from '../types'
+import { expiredHolds, expiredHoldText, freeSlots, holdText, liveHolds, slotsLine, launchFolder, colorOfDone, progressBar, tourDue, tourFolder, waveSignature, TOUR_REFRESH_MS, commandLabel, commandsText, endedOwners, isWaveShown, splitCommands, ago, attributeTurn, endedCommands, endedTask, notifiedEnd, withoutIds, startedCommand, stoppedTask, trackCommand, bar, colorOfLot, colorOfPercent, commonProject, cells, duration, fit, k, lotCells, lotCounts, lotText, fitSegments, RESET_BACK, modelsText, parseAmbiguous, shortModel, wavePercent } from '../hooks/format'
+import type { LeadHold, LotsBoard, Wave } from '../types'
 
 /** Minuterie du moteur de test (absente des types du module, qui n'a ni DOM ni Node) : pour laisser se poser un travail lancé sans être attendu. */
 declare function setTimeout(fn: () => void, ms?: number): unknown
@@ -1050,7 +1050,7 @@ test('R16 — argument inconnu : la réponse cite lots (/hud avec un argument in
   mock.clock(on)
   for (const args of ['cmds', 'list', 'CMD']) {
     const unknown = await $.command.run({ command: 'hud', args } as never)
-    expect(unknown.text).toBe(`argument inconnu : ${args} (attendu : cmd, projets, lots)`)
+    expect(unknown.text).toBe(`argument inconnu : ${args} (attendu : cmd, lots)`)
   }
   // rien n'a basculé : le premier « /hud » nu masque la bande, le second la réaffiche
   expect((await $.command.run({ command: 'hud', args: '' } as never)).text).toMatch(/masquée/)
@@ -1173,50 +1173,6 @@ test('la barre de projet compte les lots faits sur dix cases, au moins une case 
   expect(progressBar(0, 0)).toBe('▯▯▯▯▯▯▯▯▯▯')
 })
 
-test('la sortie de lead tour est lue ; une sortie étrange vaut aucun projet, un projet en erreur est écarté, un projet sans reste à faire aussi', () => {
-  expect(parseTour(JSON.stringify(TOUR)).map(p => p.project)).toEqual(['ol', 'cadence', 'fini'])
-  expect(parseTour('{}')).toEqual([])
-  expect(() => parseTour('pas du json')).toThrow()
-  expect(activeProjects(parseTour(JSON.stringify(TOUR))).map(p => p.project)).toEqual(['ol', 'cadence'])
-  // un tableau sans `progress` (cadence trop ancien) n'affiche rien
-  expect(activeProjects(parseTour(JSON.stringify([{ project: 'x', doing: [] }])))).toEqual([])
-})
-
-test('R10 — la bande lit une ligne portant lots comme avant', () => {
-  const lots = [
-    { id: 'L149', title: 'Un lot en cours', status: 'doing', after: [] },
-    { id: 'L150', title: 'Un lot qui attend', status: 'todo', after: ['L149', 'L12'] },
-    { id: 'L149/1', title: 'Une sous-tâche', status: 'todo', after: [], parent: 'L149' },
-    { id: 'L151', title: 'Un lot d’un autre outil', status: 'todo', after: [], parent: 'L150' },
-  ]
-  const sans = TOUR.filter(r => !r.error)
-  const avec = sans.map(r => ({ ...r, lots }))
-  expect(parseTour(JSON.stringify(avec))).toEqual(parseTour(JSON.stringify(sans)))
-  const [ol, cadence] = activeProjects(parseTour(JSON.stringify(avec))) as [Project, Project]
-  expect(projectStats(ol)).toBe('▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine')
-  expect(projectFigures(cadence)).toBe('10/20 · 2 en cours : L149')
-  expect(Object.keys(cadence)).not.toContain('lots')
-})
-
-test('les chiffres d’un projet : barre, faits/total, en cours, ajoutés cette semaine (rien à zéro), sans le nom ni remplissage', () => {
-  const [ol, cadence] = activeProjects(parseTour(JSON.stringify(TOUR))) as [Project, Project]
-  expect(projectStats(ol)).toBe('▮▮▮▮▮▯▯▯▯▯ 39/78 · 0 en cours · +3 cette semaine')
-  expect(projectStats(cadence)).toBe('▮▮▮▮▮▯▯▯▯▯ 10/20 · 2 en cours : L149')
-})
-
-test('les ids des lots en cours suivent le compte, tronqués au-delà de 3 par « … » ; sans id ou à zéro, le compte seul (L153)', () => {
-  const at = (n: number, ids: string[]): Project => ({ project: 'x', doing: ids.map(id => ({ id })), progress: { done: 1, doing: n, todo: 0, added7: 0 } })
-  expect(projectFigures(at(2, ['L72', 'L79']))).toBe('1/3 · 2 en cours : L72 L79')
-  expect(projectFigures(at(1, ['L153']))).toBe('1/2 · 1 en cours : L153')
-  expect(projectFigures(at(3, ['L1', 'L2', 'L3']))).toBe('1/4 · 3 en cours : L1 L2 L3')
-  expect(projectFigures(at(5, ['L1', 'L2', 'L3', 'L4', 'L5']))).toBe('1/6 · 5 en cours : L1 L2 L3 …')
-  expect(projectFigures(at(0, []))).toBe('1/1 · 0 en cours')
-  expect(projectFigures({ project: 'x', progress: { done: 1, doing: 2, todo: 1, added7: 2 } })).toBe('1/4 · 2 en cours · +2 cette semaine')
-  expect(projectFigures({ ...at(1, ['L9']), progress: { done: 1, doing: 1, todo: 1, added7: 2 } })).toBe('1/3 · 1 en cours : L9 · +2 cette semaine')
-  // la sortie de lead tour porte les ids
-  expect(parseTour(JSON.stringify(TOUR))[1]!.doing).toEqual([{ id: 'L149' }])
-})
-
 test('la couleur de la barre d’un projet suit le taux de faits : rouge < 33 %, orange < 66 %, vert au-delà, gris sans lot', () => {
   expect(colorOfDone(0, 0)).toBe('subtle')
   expect(colorOfDone(0, 10)).toBe('error')
@@ -1225,7 +1181,6 @@ test('la couleur de la barre d’un projet suit le taux de faits : rouge < 33 %,
   expect(colorOfDone(65, 100)).toBe('warning')
   expect(colorOfDone(66, 100)).toBe('success')
   expect(colorOfDone(10, 10)).toBe('success')
-  expect(projectFigures(parseTour(JSON.stringify(TOUR))[1] as Project)).toBe('10/20 · 2 en cours : L149')
 })
 
 test('le tableau est relu à chaque transition de vague, sinon toutes les minutes', () => {
@@ -1278,7 +1233,7 @@ test('un cd du lead dans un sous-projet ne déplace pas le dossier du tableau : 
   await $.session.start({ cwd: '/w/ol/sub', surface: 'terminal', isInteractive: true } as never)
   await settle()
   expect(tours().every(f => f === '/w')).toBe(true)
-  expect(hud.state('projects')).toBeDefined()
+  expect(hud.state('lotsBoard')).toBeDefined()
 })
 
 // L547 (issue #24) : le tour se lance dans le dossier qui porte `priority:`, quel que soit le cwd de la vague ou celui du shell
@@ -1331,67 +1286,30 @@ test('L547 R5 — le temps habituel (cadence perf) se lit dans le cwd de la vagu
   expect(await cadenceFolders($, on, '/w/ol', '/ailleurs', PRIORITY_ABOVE, true)).toEqual({ tours: ['/w'], perfs: ['/w/ol'] })
 })
 
-const PROJECTS = activeProjects(parseTour(JSON.stringify(TOUR)))
-
-test('la bande écrit une ligne par projet actif, repliable par /hud projets', async ($, on) => {
-  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0, projects: PROJECTS, projectsFolded: false })
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
-    expect(await ui.find({ type: 'Text', text: /^ol$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^cadence$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^39\/78 · 0 en cours · \+3 cette semaine$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /^10\/20 · 2 en cours : L149$/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /fini/ })).toBeUndefined()
-    await ui.unmount()
+// D-1, suite de L716 (règle de Sylvain du 13-11) : la bande ne montre que le travail en cours ; l'avancement des projets est dans le panneau des lots seulement.
+test('la bande ne montre jamais l’avancement des projets, panneau des lots ouvert ou fermé, sur chaque surface', async ($, on) => {
+  const values: Record<string, unknown> = { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0, lotsBoard: { outdated: false, rows: TOUR }, lotsOpen: false }
+  seed(on, values)
+  for (const open of [false, true]) {
+    values.lotsOpen = open
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
+      const t = (await ui.findAll({ type: 'Text' })).map(x => x.text ?? '').join('\n')
+      expect(t).toMatch(/ctx/)
+      expect(t).not.toMatch(/[▮▯]{10}/)
+      expect(t).not.toMatch(/39\/78|10\/20/)
+      expect(t).not.toMatch(/^(ol|cadence)$/m)
+      expect(t).not.toMatch(/\/hud projets/)
+      await ui.unmount()
+    }
   }
 })
 
-test('la barre de chaque projet colore ses cases pleines selon le taux de faits, ses cases vides restent grises, sur chaque surface', async ($, on) => {
-  const at = (done: number, todo: number): Project => ({ project: `p${done}`, progress: { done, doing: 0, todo, added7: 0 } })
-  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0, projects: [at(1, 9), at(5, 5), at(9, 1)], projectsFolded: false })
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
-    const full = await ui.findAll({ type: 'Text', text: /^▮+$/ })
-    expect(full.map(t => [t.text, t.props.color])).toEqual([['▮', 'error'], ['▮▮▮▮▮', 'warning'], ['▮▮▮▮▮▮▮▮▮', 'success']])
-    const empty = await ui.findAll({ type: 'Text', text: /^▯+$/ })
-    expect(empty.map(t => [t.text, t.props.color])).toEqual([['▯▯▯▯▯▯▯▯▯', 'subtle'], ['▯▯▯▯▯', 'subtle'], ['▯', 'subtle']])
-    await ui.unmount()
-  }
-})
-
-test('les projets sont alignés par une Box à largeur fixe pour le nom, sans espaces de remplissage dans un Text', async ($, on) => {
-  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0, projects: PROJECTS, projectsFolded: false })
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: PLUGIN, surface, ...BAND })
-    const boxes = await ui.findAll({ type: 'Box' })
-    // colonne des noms : « cadence » (7), identique pour les deux lignes, qui ne rétrécit pas
-    expect(boxes.filter(b => b.props.width === 7 && b.props.flexShrink === 0)).toHaveLength(2)
-    // les chiffres prennent la largeur restante, séparés du nom par un paddingLeft, et se tronquent
-    expect(boxes.filter(b => b.props.flexGrow === 1 && b.props.flexShrink === 1 && b.props.paddingLeft === 1)).toHaveLength(2)
-    const texts = (await ui.findAll({ type: 'Text' })).filter(t => /^(ol|cadence)$|^\d+\/\d+ · \d+ en cours/.test(t.text ?? ''))
-    expect(texts).toHaveLength(4)
-    expect(texts.filter(t => /^\s|\s{2,}|\s$/.test(t.text ?? ''))).toEqual([])
-    await ui.unmount()
-  }
-})
-
-test('repliée, la liste tient sur une ligne qui dit comment la rouvrir', async ($, on) => {
-  seed(on, { ...EMPTY, usage: { percent: 42, window: 200_000, limits: [] }, waves: [], now: 0, projects: PROJECTS, projectsFolded: true })
-  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
-  expect(await ui.find({ type: 'Text', text: /39\/78/ })).toBeUndefined()
-  expect(await ui.find({ type: 'Text', text: /projets \(2\).*\/hud projets/ })).toBeDefined()
-  await ui.unmount()
-})
-
-test('/hud projets replie puis rouvre la liste sans masquer la bande', async ($, on) => {
+test('/hud projets ne replie plus rien : il dit où est passé l’avancement des projets, sans toucher la bande', async ($, on) => {
   const hud = wired(on)
   mock.clock(on)
-  const first = await $.command.run({ command: 'hud', args: 'projets' } as never)
-  expect(first.text).toMatch(/repliée/)
-  expect(hud.state('projectsFolded')).toBe(true)
-  const second = await $.command.run({ command: 'hud', args: 'projets' } as never)
-  expect(second.text).toMatch(/affichée/)
-  expect(hud.state('projectsFolded')).toBe(false)
+  const r = await $.command.run({ command: 'hud', args: 'projets' } as never)
+  expect(r.text).toMatch(/panneau des lots.*\/hud lots/)
   expect(hud.state('isHidden')).toBeUndefined()
 })
 
@@ -1413,7 +1331,7 @@ test('le tableau est demandé à cadence lead tour --json dans le dossier de la 
   await settle()
   const tours = () => runs.filter(a => a[0] === 'cadence' && a[1] === 'lead')
   expect(tours()).toEqual([['cadence', 'lead', 'tour', '/p', '--json']])
-  expect((hud.state('projects') as Project[]).map(p => p.project)).toEqual(['ol', 'cadence'])
+  expect((hud.state('lotsBoard') as LotsBoard).rows.map(r => r.project)).toEqual(['ol', 'cadence', 'fini', 'cassé'])
   // 5 s plus tard, rien n'a changé : pas de nouvelle lecture
   await clock.advance(5_000)
   await settle()
@@ -1443,11 +1361,11 @@ test('un cadence absent ou en échec garde le dernier tableau lu et ne met pas l
   })
   await $.session.start({ cwd: '/x', surface: 'terminal', isInteractive: true } as never)
   await settle()
-  expect((hud.state('projects') as Project[]).map(p => p.project)).toEqual(['ol', 'cadence'])
+  expect((hud.state('lotsBoard') as LotsBoard).rows.map(r => r.project)).toEqual(['ol', 'cadence', 'fini', 'cassé'])
   ok.current = false
   await clock.advance(60_000)
   await settle()
-  expect((hud.state('projects') as Project[]).map(p => p.project)).toEqual(['ol', 'cadence'])
+  expect((hud.state('lotsBoard') as LotsBoard).rows.map(r => r.project)).toEqual(['ol', 'cadence', 'fini', 'cassé'])
   expect(hud.state('error')).toBeNull()
 })
 

@@ -58,7 +58,6 @@ const seed = (on: On, values: Record<string, unknown>) => {
   on('state.get', (_$, e, next) => (e.plugin === PLUGIN && e.key in values ? { value: { value: values[e.key], version: 1 } } : next(e)))
 }
 const EMPTY = { commands: [], commandOwners: {}, agents: { running: 0, names: [] }, models: { byModel: {}, usdSeen: 0 }, error: null, isHidden: false, waves: [], leadHolds: [], liveRuns: [], slotCap: 3 }
-const PROJECTS = [{ project: 'cadence', doing: [{ id: 'L687' }], progress: { done: 10, doing: 1, todo: 9, added7: 2 } }, { project: 'ol', progress: { done: 39, doing: 0, todo: 39, added7: 0 } }]
 const BANC = [{ date: '2026-11-08T09:00:00.000Z', vert: true, hebdo: true, bancs: ['1', '3', '6'], rouges: [], candidat: 'eq-legere' }]
 
 const texts = async (ui: { findAll: (q: { type: 'Text' }) => Promise<{ text?: string }[]> }) => (await ui.findAll({ type: 'Text' })).map(t => t.text ?? '').join('\n')
@@ -91,22 +90,17 @@ test('L687 — au-delà de RUNS_SHOWN runs, les autres se comptent sur une ligne
   await ui.unmount()
 })
 
-test('L687 — panneau des lots ouvert : la bande ne répète ni les lots en cours des projets ni le banc ; fermé, elle les montre', async ($, on) => {
-  const base = { ...EMPTY, usage: { percent: 42, tokens: 84_000, window: 200_000, limits: [] }, projects: PROJECTS, banc: BANC, enCours: null, shownRuns: [RUN], now: NOW }
+test('L687 — panneau des lots ouvert : la bande ne répète pas l’historique du banc ; fermé, elle le montre (l’avancement des projets n’y est jamais : D-1, suite de L716)', async ($, on) => {
+  const base = { ...EMPTY, usage: { percent: 42, tokens: 84_000, window: 200_000, limits: [] }, banc: BANC, enCours: null, shownRuns: [RUN], now: NOW }
   const values: Record<string, unknown> = { ...base, lotsOpen: false }
   seed(on, values)
   const closed = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
   const before = await texts(closed)
-  expect(before).toMatch(/^cadence$/m)
-  expect(before).toMatch(/10\/20/)
   expect(before).toMatch(/^banc /m)
   await closed.unmount()
   values.lotsOpen = true
   const open = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
   const after = await texts(open)
-  // L716 : l'avancement reste, en cases compactes, sans les lots en cours que l'arbre du panneau montre
-  expect(after).toMatch(/10\/20/)
-  expect(after).not.toMatch(/en cours : L687/)
   expect(after).not.toMatch(/^banc /m)
   // ce que le panneau n'a pas reste : le contexte et les runs
   expect(after).toMatch(/42 %/)

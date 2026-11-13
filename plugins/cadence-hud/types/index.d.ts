@@ -172,20 +172,16 @@ declare module 'claude-code' {
       waves: Wave[]
       /** Les vagues finies du dossier, la plus récente d'abord (vagues finies des 7 derniers jours), qu'une vague vive ou non (L412) : lues par « ce qui attend une décision » du panneau des lots, jamais par la bande (qui ne voit, dans `waves`, que la dernière et sans vague vivante). */
       endedWaves: Wave[]
-      /** Projets actifs (au moins un lot ouvert), dans l'ordre de priorité de `cadence lead tour`. */
-      projects: Project[]
       /** Sessions du lead inscrites par `cadence lead hold` (celles dont l'échéance est passée sont écartées au dessin). */
       leadHolds: LeadHold[]
       /** Runs de `cadence run` vivants (L710) : ils comptent dans les créneaux. */
       liveRuns: LiveRun[]
       /** Les runs de `cadence run` à montrer avec leur état (L687) : vivants, intégrés depuis moins de 30 min, en attente d'un geste depuis moins de 12 h. */
       shownRuns: ShownRun[]
-      /** Le panneau des lots est ouvert (L687) : la bande ne répète pas ce qu'il montre (projets, banc). */
+      /** Le panneau des lots est ouvert (L687) : la bande ne répète pas l'historique du banc qu'il montre. */
       lotsOpen: boolean
       /** Plafond de sessions simultanées (CADENCE_MAX_SESSIONS, 2 par défaut). */
       slotCap: number
-      /** La liste des projets est repliée sur une ligne (`/hud projets`). */
-      projectsFolded: boolean
       /** Ce que le panneau des lots (`/hud lots`) a lu de `cadence lead tour --json` ; null avant la première lecture réussie. */
       lotsBoard: LotsBoard | null
       /** La dernière lecture du panneau des lots a échoué (cadence absent, délai dépassé, sortie illisible). */

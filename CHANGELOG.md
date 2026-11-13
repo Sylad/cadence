@@ -81,6 +81,31 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.7] - 2026-11-14
+
+### Fixed
+
+- `cadence spec reseal` admits a commit of the sheet acknowledged by `raf ignore` (L729, issue #60,
+  [docs/orchestrate-spec.md](docs/orchestrate-spec.md)): a colleague's commit without a lot, already pushed, no longer
+  blocks the reseal; it is written in the `resceaux` entry, under `amendements`, with the reason of the acknowledgement.
+  The refusal of a commit without a lot now offers `raf ignore <sha> --reason …` instead of a `git checkout` of the sheet
+  at the red commit, which undid the work of the lots delivered since. A commit without a lot that is not acknowledged
+  still refuses the reseal.
+- `cadence run` no longer guesses which message is the session's report (L728, issues #57 and #58). Guessing from the shape of the
+  stream (tools called, background tasks still running) failed five times in one day: a late turn that read a task's output after
+  the report replaced it, and a late report given without a tool looked like a normal run. The brief now asks the session to start
+  its final report with the line `=== FINI ===`, alone on its line and nowhere else (not in a waiting line, not in a reply to a
+  task notification); the report kept is the LAST message that starts with that line, and the result of its turn decides the run's
+  state. Without any marker, the last message is kept and the state, the closing line and `cadence run --liste` say
+  `rapport sans marqueur : à vérifier dans le journal`. Every message still goes to the journal. The quota, Opus-to-Fable, rebase
+  conflict and red-gate prompts ask for the same marker.
+- cadence-hud, lots panel open on a long plan with no bench run going: the last bench verdict (`✓`/`✗`) is drawn again
+  (L717, [docs/cadence-hud.md](docs/cadence-hud.md#banc-cadence-2)). The band leaves it to the panel when the panel is
+  open, and the panel's `Banc` block gave up its last line when the tree needed the height, so neither drew it. The block
+  now folds to the newest run on one line (`Banc : 13-11 18:00  court  ✗ rouge : tokens, durée`) and keeps it.
+  That line never takes the place of a lot in progress (L712): it stays only while the tree, in the height left to it, still
+  shows a lot and every lot in progress; otherwise it gives up its line as before.
+
 ## [2.0.6] - 2026-11-13
 
 ### Added

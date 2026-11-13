@@ -3379,11 +3379,16 @@ lots:
     created: 2026-11-13
   - id: L716
     title: "HUD : panneau ouvert, la ligne du banc en cours disparaît des deux côtés quand le plan est long (partage.ts donne 0 ligne au bloc banc, la bande la masque) : plancher 1 pour 'banc' quand un banc tourne, ou la bande la garde ; vu par la revue de L687 le 13-11"
-    status: todo
+    status: done
     estimate: 0.25
     created: 2026-11-13
     notes:
       - { date: 2026-11-13, text: "13-11, choix de Sylvain : garder aussi les barres d'avancement par projet (679/694…) visibles panneau ouvert ; avec 13 projets elles n'apparaissent plus nulle part (constat du run L687)." }
+      - { date: 2026-11-13, text: "Mineur de revue (13-11) : panneau ouvert sur un plan long et sans banc en cours, le dernier verdict du banc (✓/✗) n'est dessiné ni par la bande ni par le panneau ; non ouvert en lot, à Sylvain de dire." }
+    started: 2026-11-13
+    review: { date: 2026-11-13, verdict: "conforme : 0 bloquant ; pas de doublon réintroduit, bloc banc fermé ; 2 notes mineures (dernier verdict du banc absent panneau ouvert sur plan long ; terminal bas non testé)", commit: 8c175d8a061bef9f29fbbb7cffa2798f925f6c60 }
+    ux: { date: 2026-11-13, verdict: "conforme : capture vue par le lead (13 projets, panneau ouvert, banc en cours et barres d'avancement dans la bande, rien en double)" }
+    finished: 2026-11-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

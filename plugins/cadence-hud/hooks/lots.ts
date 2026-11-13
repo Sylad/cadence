@@ -3,7 +3,7 @@ import type { ThemeKey } from 'claude-code'
 import type { LotsBoard, LotsRow, MoveAsk, TourLot, Wave } from '../types'
 import { cycleOf, cycleSegments } from './cycle'
 import type { CycleInput, CycleSeg } from './cycle'
-import { colorOfDone, colorOfLot, isWaveShown, lotStatusFr, progressBar, projectFigures } from './format'
+import { colorOfLot, isWaveShown, lotStatusFr } from './format'
 
 // ── L401 : le panneau des lots (/hud lots) — lecture de `cadence lead tour --json`, arbre et mise en page ───────────
 
@@ -613,13 +613,6 @@ export const projectDetail = (r: LotsRow): string => {
   if (r.error !== undefined) return 'illisible'
   const n = openCount(r.lots ?? [])
   return `${n} lot${n > 1 ? 's' : ''} non clos`
-}
-
-/** L'avancement d'un projet comme la bande l'écrit (L481) : la barre, sa couleur selon la part de lots clos, les chiffres. Rien pour un projet illisible ou d'un cadence qui ne donne pas `progress`. */
-export const projectProgress = (r: LotsRow): { bar: string; color: ThemeKey; figures: string } | undefined => {
-  if (r.error !== undefined || !r.progress) return undefined
-  const { done, doing, todo } = r.progress
-  return { bar: progressBar(done, done + doing + todo), color: colorOfDone(done, done + doing + todo), figures: projectFigures({ project: r.project, doing: r.doing, progress: r.progress }) }
 }
 
 /** Lit ce que la région des projets a posté : placer `id` avant ou après `target`, deux projets différents du tableau lu, sinon rien (la donnée vient du dessin, elle n'est pas crue). */

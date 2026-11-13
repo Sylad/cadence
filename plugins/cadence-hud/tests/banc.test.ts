@@ -185,14 +185,14 @@ test('banc en cours — la lecture : illisible ou incomplet = null', () => {
   expect(readEnCours(JSON.stringify({ h: null, c: '{"banc":"x"}' }))).toBeNull()
 })
 
-test('banc en cours — branché : la ligne ⟳ passe avant la ligne du banc dans la bande, et en tête du panneau', async ($, on) => {
+test('banc en cours — branché : la ligne ⟳ passe avant la ligne du banc dans la bande ; le panneau garde l’historique, sans la répéter (L716)', async ($, on) => {
   await monte($, on, [hebdo, ligne()], JSON.stringify(encours({ debut: new Date(LUNDI - 84 * 60_000).toISOString(), phase_debut: new Date(LUNDI - 7 * 60_000).toISOString() })))
   const band = await $.ui.mount({ plugin: 'cadence-hud', surface: 'terminal', ...BAND })
   expect(await band.find({ type: 'Text', text: /^banc ⟳ 3\/6 bancs · 3-ol-companion-L241 #1 · bras equipe-legere · \d+ min \(depuis 1 h \d+\)$/ })).toBeDefined()
   expect(await band.find({ type: 'Text', text: /^banc ✓ 08-11/ })).toBeDefined()
   await band.unmount()
   const pane = await $.ui.mount({ plugin: 'cadence-hud', surface: 'terminal', component: 'Pane', requestId: 'lots', props: { title: 'Lots', isFocused: false, bodyColumns: 120, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} } } as never)
-  expect(await pane.find({ type: 'Text', text: /^banc ⟳ 3\/6/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /^banc ⟳ 3\/6/ })).toBeUndefined()
   expect(await pane.find({ type: 'Text', text: /^Banc : 2 derniers passages$/ })).toBeDefined()
   await pane.unmount()
 })

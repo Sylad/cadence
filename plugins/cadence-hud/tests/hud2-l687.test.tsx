@@ -91,7 +91,7 @@ test('L687 — au-delà de RUNS_SHOWN runs, les autres se comptent sur une ligne
   await ui.unmount()
 })
 
-test('L687 — panneau des lots ouvert : la bande ne répète ni la liste des projets ni le banc ; fermé, elle les montre', async ($, on) => {
+test('L687 — panneau des lots ouvert : la bande ne répète ni les lots en cours des projets ni le banc ; fermé, elle les montre', async ($, on) => {
   const base = { ...EMPTY, usage: { percent: 42, tokens: 84_000, window: 200_000, limits: [] }, projects: PROJECTS, banc: BANC, enCours: null, shownRuns: [RUN], now: NOW }
   const values: Record<string, unknown> = { ...base, lotsOpen: false }
   seed(on, values)
@@ -104,8 +104,9 @@ test('L687 — panneau des lots ouvert : la bande ne répète ni la liste des pr
   values.lotsOpen = true
   const open = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', ...BAND })
   const after = await texts(open)
-  expect(after).not.toMatch(/10\/20/)
-  expect(after).not.toMatch(/39\/78/)
+  // L716 : l'avancement reste, en cases compactes, sans les lots en cours que l'arbre du panneau montre
+  expect(after).toMatch(/10\/20/)
+  expect(after).not.toMatch(/en cours : L687/)
   expect(after).not.toMatch(/^banc /m)
   // ce que le panneau n'a pas reste : le contexte et les runs
   expect(after).toMatch(/42 %/)

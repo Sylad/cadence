@@ -399,6 +399,36 @@ const open = (p: Project): number => (p.progress ? p.progress.doing + p.progress
 /** Les projets qui ont encore des lots ouverts, dans l'ordre reçu (celui de la priorité). */
 export const activeProjects = (projects: readonly Project[]): Project[] => projects.filter(p => p.progress && open(p) > 0)
 
+// ── L716 : panneau des lots ouvert, la bande garde l'avancement de chaque projet, en cases compactes ──
+
+/** L'écart entre deux cases d'une ligne compacte. */
+export const COMPACT_GAP = 3
+
+/** La case compacte d'un projet : son nom, sa barre (les dix cases de la bande), `fait/total` ; ni les lots en cours (l'arbre du panneau les montre) ni le « +N cette semaine ». */
+export const compactCell = (p: Project): { name: string; bar: string; color: ThemeKey; figures: string; width: number } => {
+  const { done, doing, todo } = p.progress
+  const bar = progressBar(done, done + doing + todo)
+  const figures = `${done}/${done + doing + todo}`
+  return { name: p.project, bar, color: colorOfDone(done, done + doing + todo), figures, width: p.project.length + 1 + bar.length + 1 + figures.length }
+}
+
+/** Les cases rangées en lignes de `width` colonnes au plus, dans l'ordre reçu (celui de la priorité) ; une case plus large que la ligne a la sienne. */
+export const packCells = <T extends { width: number }>(cells: readonly T[], width: number, gap = COMPACT_GAP): T[][] => {
+  const rows: T[][] = []
+  let used = 0
+  for (const c of cells) {
+    const last = rows.at(-1)
+    if (last && used + gap + c.width <= width) {
+      last.push(c)
+      used += gap + c.width
+    } else {
+      rows.push([c])
+      used = c.width
+    }
+  }
+  return rows
+}
+
 /** Dix cases : pleines pour la part de lots faits ; dès le premier lot fait une case est pleine, tant qu'un reste est à faire la dernière reste vide. */
 export const progressBar = (done: number, total: number, cellCount = 10): string => {
   if (total <= 0 || done <= 0) return '▯'.repeat(cellCount)

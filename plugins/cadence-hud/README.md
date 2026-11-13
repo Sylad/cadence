@@ -19,7 +19,8 @@ The band does not need the `cadence` CLI, except for the progress of the plans a
   `fable 410k sonnet 85k` — consumption per model;
 - `⚙ 2 agents` — subagents of this session; `2 cmd` — background commands of this session;
 - one header and one aligned line per active lot for each live `cadence orchestrate` wave; one line per `cadence run` and its state; free slots and the sessions of the lead;
-- one progress bar per project with open lots, and the bench line, left out while the lots panel (which shows them) is open.
+- one progress bar per project with open lots (compact cells, several to a line, while the lots panel is open); the bench run in progress;
+  the last bench verdict, left out while the lots panel (which shows the bench history) is open.
 
 ## Commands
 

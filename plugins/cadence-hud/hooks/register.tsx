@@ -7,11 +7,11 @@ import { bancDetail, bancLine, enCoursLine, readBanc, readEnCours } from './banc
 import { buildDecisions, decisionsOf, parseDeliveries } from './decisions'
 import { buildDeliveries, deliveriesHeight, deliveriesOf, parseLastDeliveries } from './deliveries'
 import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
-import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, colorOfRun, isRunLive, runCells, RUNS_SHOWN, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
+import { activeProjects, ago, attributeTurn, bar, colorOfDone, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, parseTour, progressBar, projectFigures, RESET_BACK, colorOfRun, COMPACT_GAP, compactCell, packCells, isRunLive, runCells, RUNS_SHOWN, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
 import { lignesDuBloc, partage } from './partage'
-import { besoinArbre, buildPanel, ellipsize, horsVue, foldText, foldWave, isFolded, moreKey, moreText, movedText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
+import { besoinArbre, buildPanel, ellipsize, horsVue, foldText, foldWave, isFolded, moreKey, moreText, movedText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
 const PLUGIN = 'cadence-hud'
@@ -480,12 +480,13 @@ export const register: Register = on => {
       read($, shownRuns),
       read($, lotsOpen),
     ])
-    // L687 (D-1) : panneau des lots ouvert, la bande ne répète pas ce qu'il montre — la liste des projets (ses barres sont celles de l'ordre des projets, chaque projet a sa ligne dans l'arbre)
-    // et le banc (son bloc « Banc »). Elle garde ce que le panneau n'a pas : le contexte, les quotas, les vagues, les runs et les créneaux.
+    // L687 (D-1) : panneau des lots ouvert, la bande ne répète pas ce qu'il montre — les lots en cours de chaque projet (l'arbre) et l'historique du banc (son bloc « Banc »).
+    // L716 : elle garde ce que le panneau ne garantit pas, faute de place avec un plan long — la ligne du banc en cours (vivante, comme les runs : le panneau ne la porte plus)
+    // et l'avancement de chaque projet, en cases compactes (la région « ordre des projets » du panneau n'a plus de barres).
     const benchLine = paneOpen ? null : bancLine(bench, at)
-    const runningLine = paneOpen ? null : enCoursLine(running, at)
+    const runningLine = enCoursLine(running, at)
     const w = allWaves.filter(wave => isWaveShown(wave, at))
-    const shownProjects = paneOpen ? [] : activeProjects(allProjects)
+    const shownProjects = activeProjects(allProjects)
     const holds = liveHolds(allHolds, at)
     const lateHolds = expiredHolds(allHolds, at)
     if (u === null && w.length === 0 && problem === null && shownProjects.length === 0 && holds.length === 0 && runs.length === 0 && allShownRuns.length === 0 && lateHolds.length === 0 && !benchLine && !runningLine) return next(e)
@@ -804,8 +805,31 @@ export const register: Register = on => {
     )
 
     const nameWidth = Math.max(0, ...shownProjects.map(p => p.project.length))
+    // L716 : panneau ouvert, une case par projet (nom, barre, fait/total), plusieurs par ligne dans l'ordre de la priorité
+    const compactRows = paneOpen && !folded && shownProjects.length > 0 && (
+      <Box key="projects" flexDirection="column">
+        {packCells(shownProjects.map(compactCell), width).map((cells, i) => (
+          <Box key={`compact-${i}`} flexDirection="row">
+            {cells.map((c, j) => {
+              const filled = c.bar.replace(/▯/g, '')
+              return (
+                <Box key={`cell-${c.name}`} flexShrink={0} paddingLeft={j === 0 ? 0 : COMPACT_GAP}>
+                  <Text wrap="truncate-end" color="subtle">
+                    {c.name}{' '}
+                  </Text>
+                  {filled && <Text color={c.color}>{filled}</Text>}
+                  <Text color="subtle">
+                    {c.bar.slice(filled.length)} {c.figures}
+                  </Text>
+                </Box>
+              )
+            })}
+          </Box>
+        ))}
+      </Box>
+    )
     const projectRows =
-      shownProjects.length === 0 ? null : folded ? (
+      shownProjects.length === 0 ? null : compactRows ? compactRows : folded ? (
         <Text key="projects" color="subtle" wrap="truncate-end">
           ▸ projets ({shownProjects.length}) : /hud projets pour les afficher
         </Text>
@@ -847,12 +871,13 @@ export const register: Register = on => {
         {waveRows}
         {runRows}
         {leadRows}
-        {projectRows}
+        {/* L716 : le passage en cours est vivant, comme les runs : avant l'avancement des projets, que Claude Code coupe en premier quand la bande dépasse sa hauteur */}
         {runningLine && (
           <Text key="banc-en-cours" color={runningLine.color} wrap="truncate-end">
             {runningLine.text}
           </Text>
         )}
+        {projectRows}
         {benchLine && (
           <Text key="banc" color={benchLine.color} wrap="truncate-end">
             {benchLine.text}
@@ -941,7 +966,7 @@ export const register: Register = on => {
 
   // Le panneau des lots (L401) : lecture seule, l'arbre des lots non clos de chaque projet du dossier (lead tour --json).
   on('ui.render', { component: 'Pane', requestId: LOTS_PANE }, async ($, e) => {
-    const [board, failed, readAt, allWaves, ended, at, folds, views, notice, deliveries, typical, latest, bench, running, runsNow] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, endedWaves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries), read($, lotsTypical), read($, lotsLast), read($, banc), read($, enCours), read($, shownRuns)])
+    const [board, failed, readAt, allWaves, ended, at, folds, views, notice, deliveries, typical, latest, bench, runsNow] = await Promise.all([read($, lotsBoard), read($, lotsFailed), read($, lotsAt), read($, waves), read($, endedWaves), read($, now), read($, lotsFolds), read($, lotsViews), read($, lotsNotice), read($, lotsDeliveries), read($, lotsTypical), read($, lotsLast), read($, banc), read($, shownRuns)])
     const table = $.ui.resolve(e)
     const { Box, Text, Button } = table
     // les surfaces sans région Client (mobile, éditeur) dessinent les lots sans les réordonner
@@ -977,10 +1002,9 @@ export const register: Register = on => {
     const deliveryRows = deliveriesOf(latest, board, at)
     const shipped = buildDeliveries(deliveryRows, columns, deliveriesHeight(deliveryRows.length, bodyRows, decisions.lines.length + spend.lines.length))
     // les 5 derniers passages du banc de cadence 2 (Task 16), sous les livraisons, et le passage en cours avant eux ; rien sans historique
-    const runningPane = enCoursLine(running, at)
+    // L716 : la ligne du passage en cours est dans la bande, qui ne cède pas sa place ; le panneau garde l'historique
     const benchDetail = bench && bench.length > 0 ? bancDetail(bench) : []
     const benchLines: { text: string; color?: ThemeKey; bold?: boolean }[] = [
-      ...(runningPane ? [{ text: runningPane.text, color: runningPane.color }] : []),
       ...(benchDetail.length > 0 ? [{ text: `Banc : ${Math.min(5, bench!.length)} derniers passages`, bold: true }, ...benchDetail.map(l => ({ text: l, ...(l.includes('✗') ? { color: 'error' as const } : {}) }))] : []),
     ]
 
@@ -995,7 +1019,7 @@ export const register: Register = on => {
     const decisionLines = lignesDuBloc(decisions.lines, decisions.lines[0], share.decisions)
     const spendLines = lignesDuBloc(spend.lines, spend.lines.find(l => l.tone === 'warning') ?? spend.lines[0], share.depenses)
     const shippedLines = lignesDuBloc(shipped.lines, shipped.lines[0] && (rouges > 0 ? { text: ellipsize(`${shipped.lines[0].text} · ✖ ${rouges} rouge${rouges > 1 ? 's' : ''}`, columns), tone: 'error' as const } : shipped.lines[0]), share.livraisons)
-    const benchFolded = runningPane ? benchLines[0] : benchDetail[0] !== undefined ? { text: `Banc : ${benchDetail[0]}`, bold: true, ...(benchDetail[0].includes('✗') ? { color: 'error' as const } : {}) } : undefined
+    const benchFolded = benchDetail[0] !== undefined ? { text: `Banc : ${benchDetail[0]}`, bold: true, ...(benchDetail[0].includes('✗') ? { color: 'error' as const } : {}) } : undefined
     const benchShown = lignesDuBloc(benchLines, benchFolded, share.banc)
 
     const decisionBlock = decisionLines.length > 0 && (
@@ -1047,7 +1071,7 @@ export const register: Register = on => {
       const room = bodyRows - decisionLines.length - spendLines.length - shippedLines.length - benchShown.length
       const showOrder = Client !== undefined && ranked.length >= 2 && room - (ranked.length + 1) >= Math.max(2 * ranked.length + 1, treeNeed)
       const order = showOrder && (
-        <Client key="projects" module="./projects-list.tsx" props={{ projects: ranked.map(r => ({ name: r.project, detail: projectDetail(r), ...projectProgress(r) })) }} width="100%" />
+        <Client key="projects" module="./projects-list.tsx" props={{ projects: ranked.map(r => ({ name: r.project, detail: projectDetail(r) })) }} width="100%" />
       )
       const orderRows = order ? ranked.length + 1 : 0
       const panel = buildPanel({ ...panelInput!, height: room - orderRows })

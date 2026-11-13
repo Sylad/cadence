@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { cheminReglages, libererReglages, type Executeur } from '../src/bench/bras.js';
 import { dossierTranscripts } from '../src/bench/fuites.js';
 import { empreinteUtilisateur, passageSequence } from '../src/sequence/passage.js';
@@ -139,13 +139,17 @@ describe('passage d\'une séquence', () => {
     const env: Record<string, NodeJS.ProcessEnv> = {};
     const { exec: base } = faux(r, d, { C2: (c) => { libererReglages(c); chmodSync(cheminReglages(c), 0o600); writeFileSync(cheminReglages(c), '{}'); } });
     const exec: Executeur = (args, o) => { if (!/dans \S+\.json/.test(args[args.indexOf('-p') + 1])) env[`${o.cwd.slice(-2)}-${Object.keys(env).length}`] = o.env; return base(args, o); };
-    const res = passageSequence({ ...opts(r, exec), garderClones: true });
+    // L715 : passage lancé depuis une session cadence run (garde parente dans l'environnement) : le bras A n'en hérite pas
+    vi.stubEnv('CADENCE_CLONE', '/parent'); vi.stubEnv('CADENCE_PIECES', '[]'); vi.stubEnv('CADENCE_BANC_RACINE', '/runs');
+    let res: ReturnType<typeof passageSequence>;
+    try { res = passageSequence({ ...opts(r, exec), garderClones: true }); } finally { vi.unstubAllEnvs(); }
     const dir = (x: string) => join(r, 'runs', '2026-11-08-1100-e1', 's1', x), piece = join(d, 'etapes', '1', 'pieces', 'fig.png');
     for (const [k, e] of Object.entries(env)) vus[k] = e.CADENCE_PIECES === undefined ? null : JSON.parse(e.CADENCE_PIECES);
     expect(vus).toEqual({ 'c1-0': null, 'c2-1': [piece, join(dir('c2'), 'docs', 'norme.md')], 'c2-2': [], 'c1-3': null, 'c1-4': null, 'c2-5': [] });
     expect(env['c2-1']).toMatchObject({ CADENCE_CLONE: dir('c2'), CADENCE_BANC_RACINE: r });
-    expect(res.etapes.C.map((e) => e.fuites.filter((f) => f.startsWith('contournement')).length)).toEqual([0, 1, 0]);
-    expect(res.etapes.A.every((e) => e.fuites.length === 0)).toBe(true);
+    expect(env['c1-0'].CADENCE_CLONE).toBeUndefined(); expect(env['c1-0'].CADENCE_BANC_RACINE).toBeUndefined();
+    expect(res!.etapes.C.map((e) => e.fuites.filter((f) => f.startsWith('contournement')).length)).toEqual([0, 1, 0]);
+    expect(res!.etapes.A.every((e) => e.fuites.length === 0)).toBe(true);
     expect(statSync(dir('c2.reglages')).mode & 0o777).toBe(0o700); // rendu effaçable en fin de séquence
   });
 

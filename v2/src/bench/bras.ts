@@ -24,8 +24,8 @@ export function chargerBras(racine: string): Record<string, DefBras> {
   return Object.fromEntries(Object.entries(y).map(([nom, d]) => [nom, { nom, modele: d.modele, brief: d.brief, ...(d.settings ? { settings: d.settings } : {}), ...(d.aiguillage ? { aiguillage: true } : {}), ...(d.suite ? { suite: d.suite } : {}) }]));
 }
 
-export const environnementNeutre = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
-  ({ ...env, KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', GH_CONFIG_DIR: '/nonexistent', SSH_AUTH_SOCK: '', AETHERWX_URL: 'http://127.0.0.1:9' });
+export const environnementNeutre = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => // L715 : la garde d'un bras (CADENCE_CLONE, _PIECES, _BANC_RACINE) est posée pour CETTE session, jamais héritée de celle qui lance le banc
+  ({ ...Object.fromEntries(Object.entries(env).filter(([k]) => !/^CADENCE_(CLONE|PIECES|BANC_RACINE)$/.test(k))), KUBECONFIG: '/nonexistent', GH_TOKEN: '', GITHUB_TOKEN: '', GH_CONFIG_DIR: '/nonexistent', SSH_AUTH_SOCK: '', AETHERWX_URL: 'http://127.0.0.1:9' });
 
 /** Lance la commande dans son propre groupe de processus et tue le groupe au retour : rien ne survit au bras suivant. L711 : l'enveloppe écrit le signal reçu sur la sortie d'erreur de l'appelant (le journal d'un run --fond, préfixe CAUSE de ../trace.ts) et s'arrête comme avant (HUP : arrêt par défaut, la commande continue), avec le code de shell du signal reçu (TERM 143, INT 130). */
 export const creerExecuteur = (commande = 'claude', delaiMs = 4 * 3600_000): Executeur => (args, o) => {

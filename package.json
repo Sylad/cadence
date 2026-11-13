@@ -1,6 +1,6 @@
 {
   "name": "@sylad/cadence",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "A small, repo-native working method: a versioned plan linked to your commits, a changelog with screenshots, session rituals and deliveries proven by their effect.",
   "license": "MIT",
   "author": "Sylvain Ladoire",

@@ -81,6 +81,46 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.6] - 2026-11-13
+
+### Added
+
+- `raf demande` writes the register of requests, `.cadence/demandes/D-<n>.json` (L722, [docs/raf.md](docs/raf.md#a-branch-held-by-a-program-the-pending-plan-l695)): `raf demande` lists the open requests, `raf demande D-3` prints one, `precision "text"` appends a dated précision (the original text is never rewritten), `etat livrée|vérifiée|abandonnée "proof"` changes the state and appends its proof (an abandon writes `raison`, `abandon` and `etat_avant_abandon`, never `preuve`), `lot L12` attaches a lot. On a branch held by a program the write is queued in the pending plan, like `raf note`.
+- At its start, `cadence run` and `cadence verify --gate` name the files the main tree has not committed, the pending plan left out (L722): the run starts from `HEAD` and the gate plays its sha without them, and a file the run also changes makes its integration fail.
+- `cadence deliver --constat [<sha>]` and `deliver.deployed` (L718, [docs/deliver.md](docs/deliver.md)): a sha already
+  in production, deployed without `cadence deliver`, is logged as delivered without deploying anything. The sha must be
+  pushed, agree with `deliver.deployed` (a command that prints the sha deployed, the source of the sha when none is
+  given) and pass `deliver.verify` when they are declared. Its lots are marked delivered, the tour and the HUD panel stop
+  counting them as « clos non livrés », and a red delivery followed by a constat no longer shows as failed.
+  With `--block <name>`, the line carries the block and only that block's lots are marked; an unknown block is refused
+  (exit 2). `cadence --help` lists the command.
+
+### Changed
+
+- `raf review` and `raf ux` on a branch held by a program (`cadence run`, a gate in the main tree) are queued in `.cadence/plan-en-attente.yaml` like `raf add|note|done`, instead of writing the plan of the main tree (L722). `done`, `review` and `ux` from a session of a wave are refused before being queued. A queued write is checked before it is queued (an invalid one no longer blocks the writes after it), and a queued `raf review` freezes the last commit of the lot (and of its neighbour repositories) when it is typed: a commit of the lot that comes in before the queue is applied stays unreviewed, and `raf done` refuses.
+
+### Fixed
+
+- `raf review <lot>` or `raf ux <lot>` without a verdict (or without a lot) on a branch held by a program is refused with its usage
+  before it is queued, as on a free branch (L725). It was queued, then made `raf attente appliquer` fail and blocked every write
+  queued after it.
+- After a red gate, `cadence run` keeps the work report (L724). The « fini » of the correction session no longer replaces it, nor does
+  the lead's `--reponse` to a `porte-rouge` run, nor a quota resume during a correction. Each correction is added to the run state
+  (`corrections`: the red gate output, what the session said, whether the gate replayed after it is green) and to the log, and an
+  integrated run names the correction in its detail and its closing line.
+- A quota resume during the resolution of a rebase conflict no longer replaces the work report either (L724): the resumed session continues
+  the resolution, its last word goes to the conflict (`resolu` stays absent while the session works on it, false when it did not resolve it).
+- `cadence run` now rebases itself when the start branch moves during the gate, for example when another run integrates into it
+  (L723, [docs/v2/2026-11-09-cadence-run.md](docs/v2/2026-11-09-cadence-run.md)). It rebases onto the new tip, replays the gate
+  on the rebased result, then fast-forwards, with at most three rebases. Before, the run stopped in `refus-integration` and had
+  to be resumed by hand with `--reponse` (twice on 13-11, up to $14.55 for one run). A rebase conflict goes first to the same
+  session, with the conflicting files; the lead gets it (`conflit`, files named) only when the session cannot resolve it. When
+  the main tree has uncommitted changes to a file the run also changes, the refusal names that file and gives the command to
+  resume, instead of git's raw « Your local changes would be overwritten ».
+- After a rebase conflict resolved by the session, `cadence run` keeps the work report (L723, review). The session's « fini » for
+  the resolution no longer replaces it. The conflict is added to the run state (`conflits`: files, target sha, resolved or not,
+  what the session said) and to the log, and an integrated run names the resolved conflict in its detail and its closing line.
+
 ## [2.0.5] - 2026-11-13
 
 ### Added

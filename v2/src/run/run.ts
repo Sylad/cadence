@@ -26,10 +26,13 @@ const BASCULE_FABLE = 'La limite Opus est atteinte : tu continues sur Fable. Rep
 
 /** L723 : un conflit au rebase sur la cible, rendu à la session ; `resolu` faux tant qu'elle ne l'a pas résolu (refus, quota, signal), `message` : son dernier mot. */
 export interface Conflit { cible: string; sur: string; fichiers: string[]; resolu: boolean; message?: string }
+/** L724 : une porte rouge rendue à la session pour correction ; `rouge` : la sortie de la porte, `message` : le dernier mot de la session,
+ * `verte` : la porte rejouée après la correction, absente tant qu'elle n'a pas été rejouée. */
+export interface Correction { rouge: string; message?: string; verte?: boolean }
 export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
 export interface Etat { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string; pieces: string[];
   taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; rapport?: string; messages?: Message[];
-  conflits?: Conflit[] }
+  conflits?: Conflit[]; corrections?: Correction[] }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
@@ -123,6 +126,8 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   // lead lit ce qui a été fait et ce qui reste. Le rapport est le dernier message du tour du prompt, fixé seulement si le travail a fini ; les tours ouverts
   // après lui (notifications de tâche) vont au journal, sans le remplacer.
   garderRapport(e, r.messages, o.out, !q && !r.echec, sujet);
+  const mot = r.messages.filter((m) => m.tour === 1).at(-1)?.texte, c = e.corrections?.at(-1);
+  if (sujet === SUJET_CORRECTION && mot && c) c.message = mot; // L724 : ce que la correction a fait, gardé avec ce qui était rouge
   if (q?.limite === 'opus' && (e.modele ?? 'opus') === 'opus') {
     o.out('limite Opus atteinte : bascule sur fable, même session');
     e.modele = 'fable'; sauver(e);
@@ -156,6 +161,19 @@ const consigneConflit = (e: Etat, fichiers: string[]) => `Le rebase de ta branch
   + '`GIT_EDITOR=true git rebase --continue`, jusqu\'à la fin du rebase, sans --skip ni --abort. Ne commite rien d\'autre, puis dis « fini ».';
 
 const SUJET_CONFLIT = 'résolution du conflit au rebase';
+// L724 : même modèle pour la correction après porte rouge : son « fini » ne remplace pas le rapport du travail ; la porte rouge, ce que la session en
+// dit et la porte rejouée ensuite sont AJOUTÉS à l'état (`corrections`) et au journal.
+const SUJET_CORRECTION = 'correction après porte rouge';
+/** Ouvre une correction ; une correction encore en attente de sa porte (reprise par --reponse) a été suivie d'une porte rouge : elle n'a pas rendu la porte verte. */
+function ouvrirCorrection(e: Etat, rouge: string): void {
+  const c = e.corrections?.at(-1);
+  if (c && c.verte === undefined) c.verte = false;
+  e.corrections = [...(e.corrections ?? []), { rouge }]; sauver(e);
+}
+/** Une session reprise (--reponse, quota) pendant une correction la continue : même sujet, le rapport du travail reste. */
+const sujetEnCours = (e: Etat) => (e.corrections?.length && e.corrections.at(-1)?.verte === undefined ? SUJET_CORRECTION : undefined);
+const enBref = (sortie: string) => { const l = sortie.split('\n').map((x) => x.trim()).filter(Boolean); return l.length > 1 ? `${l[0]} … ${l.at(-1)}` : l[0] ?? ''; };
+const correctionFaite = (c: Correction) => `porte rouge (${enBref(c.rouge)}) corrigée par la session, porte verte ensuite${c.message ? ` ; la session : ${c.message}` : ''}`;
 const conflitResolu = (e: Etat, c: Conflit) => `conflit au rebase sur ${e.cible} (${c.sur.slice(0, 7)}) résolu par la session, fichiers : ${c.fichiers.join(', ')}`
   + `${c.message ? ` ; la session : ${c.message}` : ''}`;
 
@@ -216,10 +234,15 @@ function suite(e: Etat, o: Opts): Etat {
     // Porte complète : une fois ; rouge, la même session corrige une fois et la porte est rejouée (C3 : un seul site de porte).
     for (let essai = 0; ; essai++) {
       const r = registreTouche(e.worktree, e.registre, cible), p = r ? { ok: false, sortie: r } : jouerPorte(cmds, e.worktree); // L701 : sans option, rien au registre ; --registre D-n, aucune entrée neuve
-      if (p.ok) break;
-      if (essai === 1) { e.etat = 'porte-rouge'; e.detail = p.sortie; return fin(e, o); }
-      o.out('porte rouge : reprise de la session pour corriger');
-      if (!session(e, `La porte complète est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, puis dis « fini ».`, o)) return fin(e, o);
+      const c = e.corrections?.at(-1), attendue = c?.verte === undefined ? c : undefined;
+      if (p.ok) {
+        if (attendue) { attendue.verte = true; sauver(e); o.out(correctionFaite(attendue)); }
+        break;
+      }
+      if (essai === 1) { if (attendue) attendue.verte = false; e.etat = 'porte-rouge'; e.detail = p.sortie; return fin(e, o); }
+      o.out(`porte rouge : reprise de la session pour corriger :\n${p.sortie}`);
+      ouvrirCorrection(e, p.sortie);
+      if (!session(e, `La porte complète est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, puis dis « fini ».`, o, false, SUJET_CORRECTION)) return fin(e, o);
     }
     const refus = avancer(e, br, cible);
     if (!refus) break;
@@ -229,7 +252,8 @@ function suite(e: Etat, o: Opts): Etat {
     o.out(`${e.cible} a avancé pendant la porte : rebase et porte rejouée (${rebase + 1}/${REBASES_MAX})`);
   }
   e.integre = git(e.repo, 'rev-parse', '--short', e.cible); e.etat = 'integre';
-  e.detail = (e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)).join('\n'); // L723 : intégré, mais une fusion écrite par la session est à relire
+  // L723 : intégré, mais une fusion écrite par la session est à relire ; L724 : de même pour une correction après porte rouge
+  e.detail = [...(e.conflits ?? []).filter((c) => c.resolu).map((c) => conflitResolu(e, c)), ...(e.corrections ?? []).filter((c) => c.verte).map(correctionFaite)].join('\n');
   const registre = registreOuvert(e.worktree);
   essaiGit(e.repo, 'worktree', 'remove', '--force', e.worktree); essaiGit(e.repo, 'branch', '-D', br);
   libererReglages(e.worktree); rmSync(`${e.worktree}.reglages`, { recursive: true, force: true });
@@ -285,8 +309,9 @@ export function repondreRun(id: string, repo: string, reponse: string, o: Opts):
   try {
     const e = lireEtat(f);
     if (e.etat === 'integre') throw new Error(`cadence run : ${id} est déjà intégré`);
+    if (e.etat === 'porte-rouge') ouvrirCorrection(e, e.detail); // L724 : la réponse du lead à une porte rouge est une correction, pas le travail
     e.etat = 'en-cours'; delete e.quota; sauver(e); // L709 : un run interrompu reprend la même session (son id est dans l'état dès le lancement), même worktree
-    return attendreQuota(tenu(e, o, () => (session(e, `${coupe}Réponse de Sylvain : ${reponse}`, o) ? suite(e, o) : fin(e, o))), o);
+    return attendreQuota(tenu(e, o, () => (session(e, `${coupe}Réponse de Sylvain : ${reponse}`, o, false, sujetEnCours(e)) ? suite(e, o) : fin(e, o))), o);
   } finally { rendreVerrou(fichierVerrou(f)); }
 }
 
@@ -307,7 +332,7 @@ function attendreQuota(e: Etat, o: Opts): Etat {
     }
     o.out(`cadence run ${e.id} : quota revenu : reprise de la session ${e.session}`);
     e.etat = 'en-cours'; delete e.quota; sauver(e); roleVerrou(fichierVerrou(e.fichier), 'session');
-    e = tenu(e, o, () => (session(e, REPRISE_QUOTA, o) ? suite(e, o) : fin(e, o)));
+    e = tenu(e, o, () => (session(e, REPRISE_QUOTA, o, false, sujetEnCours(e)) ? suite(e, o) : fin(e, o)));
   }
   return e;
 }

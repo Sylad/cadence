@@ -3491,22 +3491,24 @@ lots:
     created: 2026-11-13
   - id: L728
     title: "Issue #58 du compte pro : cadence run garde comme rapport le message du tour du prompt quand la session finit ce tour avec un travail encore en arrière-plan (« la recette tourne, je surveille ») et donne son vrai rapport dans un tour ouvert plus tard par une notification — l'inverse de #57 (L720). Le rapport est celui du dernier tour qui finit sans tâche de fond restante ; à défaut, le dernier message, et la fin de run dit de quel tour il vient"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-13
     started: 2026-11-13
     review: { date: 2026-11-13, verdict: "conforme (2e revue, 13-11) : contrat explicite, rapport = dernier message marqué « === FINI === » (MARQUEUR défini une fois, rapport.ts:14, lié aux briefs par un test) ; 16 tests rouges sans le correctif dont M1, M2, vrais flux #57 et #58 ; L723 et L724 tiennent", commit: e928717a2687d4d143ffff0c89219ff0fc3dc7c3 }
     notes:
       - { date: 2026-11-13, text: "Mineurs de la 2e revue (13-11) : --reponse (run.ts:320) ne redonne pas la consigne du marqueur ; liste des briefs vérifiés en dur dans le test ; anciens bras du banc reviennent au dernier tour ; un marqueur en gras ou en titre n'est pas reconnu (repli « à vérifier »)." }
+    finished: 2026-11-13
   - id: L729
     title: "Issue #60 du compte pro : spec reseal --porteur refuse une fiche touchée par un commit sans lot d'un collègue (déjà poussé, fait hors cadence), même après raf ignore ; le seul geste proposé (git checkout de la fiche au commit rouge) déferait 91 commits. Un commit reconnu par raf ignore ne bloque plus le reseal, ou une option --admet <sha> avec raison écrite dans resceaux"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-13
     started: 2026-11-13
     review: { date: 2026-11-13, verdict: "conforme (13-11) : un commit sans lot non acquitté bloque toujours (fiche-amendee.ts:34), verrou des tests inchangé ; acquittement par raf ignore tracé dans resceaux et dans le corps du commit de reseal ; 6 tests rouges sans le correctif ; tests L713 adaptés toujours probants", commit: a77938d2744378b806377efed4fff846bed938b7 }
     notes:
       - { date: 2026-11-13, text: "Mineurs de revue (13-11) : un acquittement raf ignore par sujet exact admet tout commit de même sujet ; l'admission vaut aussi pour un lot en cours (documenté) ; « plan commité » non vérifié." }
+    finished: 2026-11-13
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

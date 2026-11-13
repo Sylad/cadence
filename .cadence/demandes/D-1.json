@@ -15,6 +15,10 @@
   {
    "date": "2026-11-13",
    "texte": "Servie par le lot L687 (HUD 2.0). « En afficher plus s'il y a la place » : les runs de cadence run avec leur état, modèle, durée et coût, dans la place que libèrent la liste des projets et le banc quand le panneau des lots est ouvert."
+  },
+  {
+   "date": "2026-11-13",
+   "texte": "Revue conforme, porte verte (verify --gate e84f9f3), poussé (1edaf2df). Choix de Sylvain : garder visibles panneau ouvert les barres d'avancement et le banc en cours → lot L716."
   }
  ]
 }

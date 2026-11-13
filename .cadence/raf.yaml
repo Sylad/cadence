@@ -3463,12 +3463,14 @@ lots:
     started: 2026-11-13
     notes:
       - { date: 2026-11-13, text: "Vu par le run L724 (13-11) : une reprise après quota pendant une correction (L724) ou pendant la résolution d'un conflit (L723) peut encore remplacer le rapport ; codé pour L724 sans test, non traité pour L723." }
+    review: { date: 2026-11-13, verdict: "conforme (2e revue, 13-11) : reprise après quota pendant une correction et pendant un conflit testées (6 mutations sur 6 rouges), un seul mécanisme du dernier mot (run.ts:131-133), budget run au compte réel 561, tests L723 et L720 verts", commit: 16c106c4402188888b2a883161ab44667c0c6a94 }
   - id: L725
     title: "raf review <lot> ou raf ux <lot> sans verdict, lancé pendant que le dépôt est tenu, est mis en attente puis bloque les écritures qui suivent (src/cli/attente-commands.ts:36, reproduit par la revue r2 de L722 le 13-11) : refuser avant la mise en attente, comme raf demande ; et tester --vu-depot"
     status: doing
     estimate: 0.1
     created: 2026-11-13
     started: 2026-11-13
+    review: { date: 2026-11-13, verdict: "conforme (relu par le lead, 13-11) : review|ux sans verdict validés par checkGateUsage avant la mise en attente, comme hors attente ; tests dans ecritures-arbre-tenu-l722 (+67 lignes)", commit: d460d60cce1a118e2a982312db4349b2cb5c2720 }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

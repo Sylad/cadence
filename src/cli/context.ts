@@ -67,6 +67,7 @@ const OPTIONS = {
     'dry-run': { type: 'boolean' },
     sha: { type: 'string' },
     block: { type: 'string' },
+    constat: { type: 'boolean' },
     retry: { type: 'string' },
     gate: { type: 'boolean' },
     clear: { type: 'boolean' },

@@ -266,6 +266,11 @@ A `retour → geste :` or `rappel :` line that the cadence plugin's hook adds to
 One project at a time, by the lead or, for a ready lot it hands over, by the `livreur` agent (« Limits that always apply »): push, then the `deliver` skill (`cadence deliver --dry-run`, then
 `cadence deliver`). Follow the human's standing instructions about confirmation before production.
 
+**Closed lots « not delivered » already in production (L718).** The tour counts a lot delivered only from the journal of
+`cadence deliver`. When production already runs their code (deployed by the project's script or a pipeline), do not
+launch an empty delivery and do not ask the human: record the fact with `cadence deliver --constat <sha>` (or
+`--constat` alone when the project declares `deliver.deployed`), see `docs/deliver.md` of the package.
+
 **The sha pushed needs a green verdict of the gate (L426).** Where the project declares a gate (`orchestrate.test` or
 `orchestrate.build`), the `pre-push` hook (the wave's, or the gate-only hook it leaves behind once the repository is freed)
 refuses with exit 3 a push of a branch whose local sha has no green verdict of `cadence verify --gate`, naming the sha and

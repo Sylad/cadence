@@ -10,7 +10,7 @@ import { cmdGate, cmdHook } from './cli/gates.js';
 import { cmdInit, cmdMigrate, cmdSkills } from './cli/setup-commands.js';
 import { cmdSpec, cmdSpecChecks } from './cli/spec-commands.js';
 import { cmdSession, cmdSessionAll } from './cli/session-commands.js';
-import { cmdDeliver, cmdLocal, cmdVerify } from './cli/deliver-commands.js';
+import { cmdConstat, cmdDeliver, cmdLocal, cmdVerify } from './cli/deliver-commands.js';
 import { corrections, cost, inspect, perf } from './cli/stats-commands.js';
 import { cmdConfig, cmdLead } from './cli/lead-commands.js';
 import { cmdAttente, heldPlanWrite } from './cli/attente-commands.js';
@@ -205,7 +205,7 @@ const WITH_PLAN: Record<string, (c: Ctx) => number | Promise<number>> = {
   gantt: cmdGantt,
   hook: cmdHook,
   session: cmdSession,
-  deliver: cmdDeliver,
+  deliver: (c) => (c.values.constat ? cmdConstat(c) : cmdDeliver(c)),
   verify: cmdVerify,
   skills: cmdSkills,
   local: cmdLocal,

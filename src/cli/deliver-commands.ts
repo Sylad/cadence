@@ -5,6 +5,7 @@ import { defaultPlan, readDocsConfig, readOrchestrateConfig, readPlanConfig, rea
 import { type Day } from '../dates.js';
 import { blockProblem } from '../deliver-blocks.js';
 import { deliver, type DeliveredCtx, parseDeliverConfig, realDeps } from '../deliver.js';
+import { constat, readDeployed, realConstatDeps } from '../deliver-constat.js';
 import { defaultTarget, realCheckDeps, verifyCommand } from '../verify.js';
 import { waveLaunchDirs } from '../gate-record.js';
 import { verifyGate } from '../verify-gate.js';
@@ -50,6 +51,26 @@ async function verifyGateCommand(values: { sha?: string; project?: string; retry
     planFile = undefined;
   }
   return verifyGate({ repo: top, sha, config: readOrchestrateConfig(configPath), verify: readVerifyConfig(configPath), launchDirs: waveLaunchDirs(io.cwd, top), planFile, now: io.now, out: io.out });
+}
+
+/**
+ * `cadence deliver --constat [<sha>]` (L718) : inscrit au journal un sha déjà déployé hors de cadence deliver, sans rien déployer ; le sha vient de
+ * l'argument, de --sha ou de `deliver.deployed`. Permis pendant une vague : il ne déploie rien, il dit ce qui tourne.
+ */
+export function cmdConstat(c: Ctx): Promise<number> {
+  const { rest, values, io, today, root, configPath, planPath, loadPlan, newsDir } = c;
+  if (!gitRoot(io.cwd)) throw new RafError('deliver --constat : à lancer dans un dépôt git');
+  if (rest.length > 1) throw new RafError(`deliver --constat : un seul sha à constater, pas ${rest.length} (${rest.join(' ')})`);
+  if (rest.length === 1 && values.sha !== undefined) throw new RafError('deliver --constat : le sha se donne une fois, en argument ou par --sha');
+  if (!existsSync(configPath)) throw new RafError(`pas de configuration de livraison : ${configPath} (voir « cadence.yaml » dans docs/deliver.md du paquet @sylad/cadence)`);
+  const config = parseDeliverConfig(readFileSync(configPath, 'utf8'), configPath);
+  const refused = values.block === undefined ? null : blockProblem(values.block, config);
+  if (refused) throw new RafError(`deliver --constat : ${refused}`);
+  const holding = waveHolding(root);
+  const waveId = holding && !localLotOf(holding.wave) ? holding.wave : undefined;
+  const effects = deliveredEffects({ root, configPath, planPath, loadPlan, newsDir, today, waveId, io });
+  const ctx = { ...effects, state: sharedStateDir(root), config, deployed: readDeployed(configPath), sha: rest[0] ?? values.sha, block: values.block, dryRun: !!values['dry-run'] };
+  return constat(ctx, realConstatDeps(root, realCheckDeps(root)));
 }
 
 /** cadence deliver : refusé pendant une vague sauf un sha livrable, puis la livraison du projet. */

@@ -3156,6 +3156,7 @@ lots:
     created: 2026-11-10
     notes:
       - { date: 2026-11-13, text: "13-11, décision de Sylvain : le banc hebdo (garde de publication) doit mesurer le mode par défaut, cadence run, contre A (Claude seul), et plus l'équipe légère. Le banc du 13-11 a comparé équipe légère contre A (plus de 5 h, ×2,07, rapport ~/bench-cadence/rapports/2026-11-13-0835-06a30f5c451a.md), alors que cadence run (mesuré le 12-11 : ×1,49, préféré par le juge) est le mode utilisé depuis 2.0.0. Même lot que D-3 : banc plus court ET sur le bon candidat." }
+      - { date: 2026-11-13, text: "13-11 : le banc hebdo a mesuré le clone cadence-v2-banc (cadence2 du PATH → ../cadence-v2-banc, empreinte 06a30f5c451a, arrêté après L706) et non la version publiée (5fe7bdf4cff7) : 6 commits v2 (L705, L709-L711) non mesurés. Le banc de publication doit lancer la version à publier." }
   - id: L690
     title: "cadence run --suite : garder la session d'un lot à l'autre dans un même projet, avec ou sans /compact dirigé par cadence ; mesurer 3 variantes au micro-banc (session neuve, gardée, gardée+compactée) (D-4)"
     status: done

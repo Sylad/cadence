@@ -11,6 +11,7 @@ import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, ty
 import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun } from './aiguillage.js';
 import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
 import { causeSession } from '../trace.js';
+import { garderRapport, type Message } from '../rapport.js';
 import { cheminWorktree, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
 import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreVerrou, roleVerrou } from '../verrou.js';
@@ -23,7 +24,7 @@ const BASCULE_FABLE = 'La limite Opus est atteinte : tu continues sur Fable. Rep
 
 export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
 export interface Etat { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string; pieces: string[];
-  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string }
+  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; rapport?: string; messages?: Message[] }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
@@ -125,8 +126,7 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false): boolean {
     return false;
   }
   if (r.echec) { e.etat = 'echec'; e.detail = r.echec; return false; }
-  if (r.resultat) o.out(`session : ${r.resultat.slice(-1500)}`);
-  return true;
+  garderRapport(e, r.messages, o.out); sauver(e); return true; // issue #57 : le rapport de fin de travail, qu'une notification arrivée après ne remplace pas
 }
 
 /** Après chaque passage de session : question, commits, rebase, porte (une reprise), intégration. */

@@ -113,7 +113,7 @@ function reglesC3(f: Fichiers): string[] {
 // C4, mécanismes sans mesure : toute option lue (littéral --xxx, option(x,'xxx'), env, argv) est justifiée dans options.json
 // Flags des CLI claude et git, par fichier (liste exacte ; aucune autre valeur n'est tolérée).
 const FLAGS_CLI: Record<string, string[]> = {
-  'src/bench/bras.ts': ['output-format', 'model', 'permission-mode', 'disallowedTools', 'resume'],
+  'src/bench/bras.ts': ['output-format', 'verbose', 'model', 'permission-mode', 'disallowedTools', 'resume'], // --verbose : exigé par claude -p avec stream-json (issue #57)
   'src/bench/juges.ts': ['output-format', 'model', 'permission-mode', 'disallowedTools', 'resume', 'porcelain'], // + git status --porcelain
   'src/bench/preparer.ts': ['no-hardlinks', 'format', 'is-ancestor', 'all', 'expire', 'prune', 'not'],
   'src/bench/ajouter.ts': ['format', 'reverse', 'grep', 'verify', 'name-only'],

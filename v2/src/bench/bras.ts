@@ -7,6 +7,7 @@ import { parse } from 'yaml';
 import { lireDemande, type Banc } from './banc.js';
 import { aiguiller } from '../run/aiguillage.js';
 import { COMPACTAGE, doitCompacter, type Suite } from '../run/suite.js';
+import { lireFlux, type Message } from '../rapport.js';
 
 export interface DefBras { nom: string; modele: string; brief: string; settings?: string; aiguillage?: boolean; suite?: Suite } // aiguillage : le bras de cadence run ; suite (L690) : reprend la session de l'étape d'avant // settings : réglages Claude Code du bras (hooks)
 export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number; releve?: Releve; // releve (L703) : ce que claude -p a rendu en dernier pour la dernière session (coût et tokens CUMULÉS depuis son début, reprises et /compact compris), repris par l'étape suivante d'un bras « suite »
@@ -34,17 +35,16 @@ export const creerExecuteur = (commande = 'claude', delaiMs = 4 * 3600_000): Exe
 };
 export const executeurClaude: Executeur = creerExecuteur();
 
-export function lire(e: { stdout: string; code: number; erreur?: string }): { session: string; tokens: number; cout: number; echec: string | null; resultat: string } {
-  let j: { result?: string; session_id?: string; total_cost_usd?: number; is_error?: boolean; subtype?: string; modelUsage?: Record<string, Record<string, number>> };
-  try { j = JSON.parse(e.stdout); } catch { return { session: '', tokens: 0, cout: 0, resultat: '', echec: `sortie illisible (${e.erreur ?? `code ${e.code}`}) : ${e.stdout.slice(-200)}` }; }
-  const tokens = Object.values(j.modelUsage ?? {}).reduce((n, u) =>
-    n + (u.inputTokens ?? 0) + (u.outputTokens ?? 0) + (u.cacheReadInputTokens ?? 0) + (u.cacheCreationInputTokens ?? 0), 0);
+export function lire(e: { stdout: string; code: number; erreur?: string }): { session: string; tokens: number; cout: number; echec: string | null; resultat: string; messages: Message[] } { // messages (issue #57) : le message final de chaque tour ; resultat : celui du dernier
+  const { fin, messages } = lireFlux(e.stdout), j = (fin ?? {}) as { result?: string; session_id?: string; total_cost_usd?: number; is_error?: boolean; subtype?: string; modelUsage?: Record<string, Record<string, number>> };
+  if (!fin) return { session: '', tokens: 0, cout: 0, resultat: '', messages, echec: `sortie illisible (${e.erreur ?? `code ${e.code}`}) : ${e.stdout.slice(-200)}` };
+  const tokens = Object.values(j.modelUsage ?? {}).reduce((n, u) => n + (u.inputTokens ?? 0) + (u.outputTokens ?? 0) + (u.cacheReadInputTokens ?? 0) + (u.cacheCreationInputTokens ?? 0), 0);
   const session = j.session_id ?? '';
   const causes: string[] = [];
   if (!session) causes.push('session_id absent');
   if (j.is_error || (j.subtype !== undefined && j.subtype !== 'success')) causes.push(`session ${session || '?'} : ${j.subtype ?? 'is_error'}`);
   if (e.code !== 0) causes.push(`code ${e.code}${e.erreur ? ` (${e.erreur})` : ''}`);
-  return { session, tokens, cout: j.total_cost_usd ?? 0, resultat: j.result ?? '', echec: causes.length ? causes.join(', ') : null };
+  return { session, tokens, cout: j.total_cost_usd ?? 0, resultat: j.result ?? '', messages, echec: causes.length ? causes.join(', ') : null };
 }
 const HOOKS = join(import.meta.dirname, '..', '..', 'hooks');
 export const cheminReglages = (clone: string) => join(`${clone}.reglages`, 'settings.json');
@@ -60,8 +60,8 @@ export function ecrireReglages(modele: string | undefined, clone: string, supple
 export const empreinteReglages = (clone: string): string => [cheminReglages(clone), ...readdirSync(HOOKS).sort().map((e) => join(HOOKS, e)),
   ...[clone, homedir()].flatMap((d) => [join(d, '.claude', 'settings.json'), join(d, '.claude', 'settings.local.json')])] // ~/.claude : lu, jamais modifié
   .reduce((h, f) => h.update(`${f}\0${existsSync(f) ? readFileSync(f, 'latin1') : 'absent'}\0`), createHash('sha1')).digest('hex');
-/** Arguments communs d'une session de bras ou de `cadence run` : même modèle, mêmes interdictions, mêmes réglages (hook de lecture). `supplement` : coupes du socle de cadence run (L705, ../run/socle.ts). */
-export const argsClaude = (d: DefBras, clone: string, interdits = OUTILS_INTERDITS, supplement: Record<string, unknown> = {}): string[] => ['--output-format', 'json', '--model', d.modele, '--permission-mode', 'bypassPermissions',
+/** Arguments communs d'une session de bras ou de `cadence run` (stream-json : chaque message final de tour, issue #57) : même modèle, mêmes interdictions, mêmes réglages (hook de lecture). `supplement` : coupes du socle de cadence run (L705, ../run/socle.ts). */
+export const argsClaude = (d: DefBras, clone: string, interdits = OUTILS_INTERDITS, supplement: Record<string, unknown> = {}): string[] => ['--output-format', 'stream-json', '--verbose', '--model', d.modele, '--permission-mode', 'bypassPermissions',
   '--disallowedTools', interdits.join(','), ...(d.settings || Object.keys(supplement).length ? ['--settings', ecrireReglages(d.settings, clone, supplement)] : [])];
 /** `garde` : pièces à lire avant d'écrire et racine du banc, données au hook du bras par l'environnement (CADENCE_*), jamais par un fichier. */
 export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }, reprise?: Releve): Mesure {

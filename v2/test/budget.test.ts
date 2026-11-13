@@ -20,10 +20,11 @@ const modules = [...dossiers, 'hooks'];
 const fichiersRacine = entrees.filter((e) => !dossiers.includes(e));
 
 describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () => {
-  // L689 (décision de Sylvain du 13-11) : on ne tasse pas le code pour tenir le budget ; bench relevé de 800 à 984, ses lignes lisibles (bancs sans juge, en parallèle).
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 1684 (L689)', () => {
+  // L689 (décision de Sylvain du 13-11) : on ne tasse pas le code pour tenir le budget ; bench relevé de 800 à 984, ses lignes lisibles (bancs sans juge, en parallèle) ;
+  // issue #57 : 989, bras.ts rendu lisible (lire : le tour du travail décide, le dernier result donne le coût).
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 1689 (L689, issue #57)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1684]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1689]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

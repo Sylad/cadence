@@ -126,7 +126,10 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false): boolean {
     return false;
   }
   if (r.echec) { e.etat = 'echec'; e.detail = r.echec; return false; }
-  garderRapport(e, r.messages, o.out); sauver(e); return true; // issue #57 : le rapport de fin de travail, qu'une notification arrivée après ne remplace pas
+  // Issue #57 : le rapport est le dernier message du tour du prompt ; les tours ouverts après lui (notifications de tâche) vont au journal, sans le remplacer.
+  garderRapport(e, r.messages, o.out);
+  sauver(e);
+  return true;
 }
 
 /** Après chaque passage de session : question, commits, rebase, porte (une reprise), intégration. */

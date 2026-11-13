@@ -35,16 +35,21 @@ export const creerExecuteur = (commande = 'claude', delaiMs = 4 * 3600_000): Exe
 };
 export const executeurClaude: Executeur = creerExecuteur();
 
-export function lire(e: { stdout: string; code: number; erreur?: string }): { session: string; tokens: number; cout: number; echec: string | null; resultat: string; messages: Message[] } { // messages (issue #57) : le message final de chaque tour ; resultat : celui du dernier
-  const { fin, messages } = lireFlux(e.stdout), j = (fin ?? {}) as { result?: string; session_id?: string; total_cost_usd?: number; is_error?: boolean; subtype?: string; modelUsage?: Record<string, Record<string, number>> };
-  if (!fin) return { session: '', tokens: 0, cout: 0, resultat: '', messages, echec: `sortie illisible (${e.erreur ?? `code ${e.code}`}) : ${e.stdout.slice(-200)}` };
-  const tokens = Object.values(j.modelUsage ?? {}).reduce((n, u) => n + (u.inputTokens ?? 0) + (u.outputTokens ?? 0) + (u.cacheReadInputTokens ?? 0) + (u.cacheCreationInputTokens ?? 0), 0);
-  const session = j.session_id ?? '';
+/** Le tour du prompt (`travail`) décide de la session, de l'échec et du résultat ; un tour ouvert après lui (notification de tâche) n'en décide plus (issue #57).
+ * Coût et jetons : ceux du dernier result, cumulés depuis le début de la session. `messages` : chaque message sans appel d'outil, avec son tour. */
+export function lire(e: { stdout: string; code: number; erreur?: string }): { session: string; tokens: number; cout: number; echec: string | null; resultat: string; messages: Message[] } {
+  const { travail, fin, messages, apres } = lireFlux(e.stdout);
+  if (!travail || !fin) return { session: '', tokens: 0, cout: 0, resultat: '', messages, echec: `sortie illisible (${e.erreur ?? `code ${e.code}`}) : ${e.stdout.slice(-200)}` };
+  const tokens = Object.values(fin.modelUsage ?? {}).reduce((n, u) =>
+    n + (u.inputTokens ?? 0) + (u.outputTokens ?? 0) + (u.cacheReadInputTokens ?? 0) + (u.cacheCreationInputTokens ?? 0), 0);
+  const session = travail.session_id ?? fin.session_id ?? '';
+  const travailFini = !travail.is_error && (travail.subtype === undefined || travail.subtype === 'success');
   const causes: string[] = [];
   if (!session) causes.push('session_id absent');
-  if (j.is_error || (j.subtype !== undefined && j.subtype !== 'success')) causes.push(`session ${session || '?'} : ${j.subtype ?? 'is_error'}`);
-  if (e.code !== 0) causes.push(`code ${e.code}${e.erreur ? ` (${e.erreur})` : ''}`);
-  return { session, tokens, cout: j.total_cost_usd ?? 0, resultat: j.result ?? '', messages, echec: causes.length ? causes.join(', ') : null };
+  if (!travailFini) causes.push(`session ${session || '?'} : ${travail.subtype ?? 'is_error'}`);
+  // Le code de sortie est celui du dernier tour : il ne compte que si le travail n'a pas fini, ou si aucun tour n'a commencé après lui.
+  if (e.code !== 0 && (!travailFini || !apres)) causes.push(`code ${e.code}${e.erreur ? ` (${e.erreur})` : ''}`);
+  return { session, tokens, cout: fin.total_cost_usd ?? 0, resultat: travail.result ?? '', messages, echec: causes.length ? causes.join(', ') : null };
 }
 const HOOKS = join(import.meta.dirname, '..', '..', 'hooks');
 export const cheminReglages = (clone: string) => join(`${clone}.reglages`, 'settings.json');

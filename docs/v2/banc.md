@@ -75,7 +75,7 @@ La racine est `~/bench-cadence` (ou `$BENCH_ROOT`).
 |---|---|
 | `cadence2 bench micro` | banc 1, sans juge IA (≈ 8 min) |
 | `cadence2 bench mecanique` | bancs 1, 3 et 6 en parallèle, sans juge IA (≈ 30 min), à chaque changement |
-| `cadence2 bench court` | bancs 1, 3 et 6 en parallèle, avec juges : le passage minimal avant publication |
+| `cadence2 bench court` | bancs 1, 3 et 6 l'un après l'autre (`--paralleles` > 1 refusé), avec juges : le passage minimal avant publication |
 | `cadence2 bench hebdo` | tous les bancs, avec juges, l'un après l'autre (plus de 5 h le 13-11) ; le samedi ne le lance plus |
 | `cadence2 bench lancer --bancs 1,4` | les bancs choisis |
 | `cadence2 bench statut` | dernier passage, publication permise ou non (avec la commande à lancer si elle est refusée), alerte « aucun banc frais » ; toujours code 0 : plus de banc du weekend exigé (décision de Sylvain du 13-11), seule la garde court + séquence compte, avant une release |

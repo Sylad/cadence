@@ -3151,7 +3151,7 @@ lots:
     finished: 2026-11-10
   - id: L689
     title: "Bancs en trois niveaux : micro-banc (8 min), banc mécanique sans juge IA en parallèle (≈30 min) à chaque changement, banc complet avec juge seulement avant une release ; bancs du banc court en parallèle (D-3)"
-    status: doing
+    status: done
     estimate: 1
     created: 2026-11-10
     notes:
@@ -3160,6 +3160,7 @@ lots:
       - { date: 2026-11-13, text: "13-11, Sylvain suit la recommandation du lead : le banc du samedi passe en banc mécanique (tendance, sans juge, ne bloque rien) ; le banc complet avec juges n'est joué qu'avant une release et reste la seule garde de publication (statut n'exige plus le passage du weekend). Budget de lignes de la mesure (1492/1500) : décidé après la revue de L689." }
     started: 2026-11-13
     review: { date: 2026-11-13, verdict: "conforme (2e revue, 13-11) : les 5 constats de la 1re revue corrigés avec un test chacun ; code décompacté (73 car./ligne), budget relevé au compte mesuré ; banc du samedi en mécanique cohérent ; majeur de doc (banc.md:78) corrigé en a542aa9", commit: a542aa9f2a7dbf841b058a1d67c908dc4c4efe8b }
+    finished: 2026-11-13
   - id: L690
     title: "cadence run --suite : garder la session d'un lot à l'autre dans un même projet, avec ou sans /compact dirigé par cadence ; mesurer 3 variantes au micro-banc (session neuve, gardée, gardée+compactée) (D-4)"
     status: done
@@ -3380,12 +3381,14 @@ lots:
     finished: 2026-11-13
   - id: L715
     title: "Tests v2 dépendants de l'environnement : v2/test/bras.test.ts et v2/test/passage.test.ts échouent quand CADENCE_PIECES / CADENCE_CLONE / CADENCE_BANC_RACINE sont posées (toute suite lancée depuis une session cadence run : vu par L707 et L687 le 13-11, « expected '[]' to be undefined ») ; les isoler de l'environnement ; mesure : la suite verte avec ces variables posées"
-    status: todo
+    status: done
     estimate: 0.25
     created: 2026-11-13
     review: { date: 2026-11-13, verdict: "conforme (2e revue, 13-11) : seule la liste test/variables-session.ts est retirée, CADENCE_PLAYWRIGHT arrive, R16-R18 et R20 rejoués ; sonde rouge sur purge totale et sur absence de purge ; note : aucun test ne vérifie que la liste est complète", commit: 652f28784984436bec44f1367af3cd87740b77c1 }
     notes:
       - { date: 2026-11-13, text: "Mineur de la 2e revue : la sonde vérifie la liste VARIABLES_SESSION avec elle-même ; une nouvelle variable posée par une session et oubliée dans la liste ne fait rien rougir." }
+    started: 2026-11-13
+    finished: 2026-11-13
   - id: L716
     title: "HUD : panneau ouvert, la ligne du banc en cours disparaît des deux côtés quand le plan est long (partage.ts donne 0 ligne au bloc banc, la bande la masque) : plancher 1 pour 'banc' quand un banc tourne, ou la bande la garde ; vu par la revue de L687 le 13-11"
     status: done
@@ -3410,20 +3413,22 @@ lots:
     created: 2026-11-13
   - id: L719
     title: "HUD, régression de L716 vue par Sylvain dans l'app de bureau le 13-11 (capture tmp/hud-l716-regression-2026-11-13.webp) : (1) la barre du bas est trop étroite pour les cellules d'avancement « plusieurs par ligne » : colonnes décalées et barres coupées ; (2) les barres d'avancement ont disparu du panneau des lots, qui avait pourtant la place. Les barres vont là où il y a la place : dans le panneau quand il est ouvert et assez haut, dans la bande sinon, alignées sur la largeur réelle, jamais coupées (D-1)"
-    status: doing
+    status: done
     estimate: 0.25
     visible: true
     created: 2026-11-13
     started: 2026-11-13
     review: { date: 2026-11-13, verdict: "conforme (13-11) : a27a5ce2 revu conforme (bande sans barre de projet, barres dans le panneau, cohabite avec L689, sans tassement) ; 978511a0 et 6f145550 conformes, 0 constat : vague panneau fermé reprise en 5 s, ouverture du panneau lue tout de suite, test accéléré toujours probant", commit: dc0a4bdd73b8d75955731b62137459242988c904 }
     ux: { date: 2026-11-13, verdict: "conforme : captures vues par le lead à 95 et 200 colonnes (bande avec les seuls travaux en cours, 13 barres alignées dans l'ordre des projets du panneau) ; règle de Sylvain du 13-11 appliquée ; non vu dans l'app de bureau elle-même" }
+    finished: 2026-11-13
   - id: L720
     title: "Issue #57 du compte pro : cadence run garde comme rapport final le dernier message de la session ; une notification de tâche arrivée en retard le remplace (« nothing new, the done report stays valid ») et le vrai rapport (commits, tests à resceller, vérifié / non vérifié, hypothèses) est perdu du journal fond-<id>.log et de l'état ; garder le rapport donné à la fin du travail, ignorer les notifications après « fini »"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-13
     started: 2026-11-13
     review: { date: 2026-11-13, verdict: "conforme (3e revue, 13-11, passe Fable) : rapport de fin de travail gardé, tours délimités par les result du vrai flux stream-json, messages au journal et à l'état pour toute fin (échec, délai, signal, quota, bascule), 5 tests qui tombent sans le correctif ; budgets au mesuré, sans tassement ; fragment renommé L720.md (95dc597)", commit: 95dc597ff98effcd032267121364a6550d012353 }
+    finished: 2026-11-13
   - id: L721
     title: "Veille #50 : Claude Code 2.1.317 a retiré le raccourci « fichier inchangé » de Read (une relecture renvoie tout le contenu) — remesurer le hook de lecture intégrale du mode complet de cadence run (mesuré le 08-11) sur la version actuelle : utile, inutile ou plus cher ? Et évaluer permissions.denyInsteadOfPrompting pour les runs sans surveillance"
     status: todo

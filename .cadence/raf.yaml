@@ -3495,6 +3495,9 @@ lots:
     estimate: 0.25
     created: 2026-11-13
     started: 2026-11-13
+    review: { date: 2026-11-13, verdict: "conforme (2e revue, 13-11) : contrat explicite, rapport = dernier message marqué « === FINI === » (MARQUEUR défini une fois, rapport.ts:14, lié aux briefs par un test) ; 16 tests rouges sans le correctif dont M1, M2, vrais flux #57 et #58 ; L723 et L724 tiennent", commit: e928717a2687d4d143ffff0c89219ff0fc3dc7c3 }
+    notes:
+      - { date: 2026-11-13, text: "Mineurs de la 2e revue (13-11) : --reponse (run.ts:320) ne redonne pas la consigne du marqueur ; liste des briefs vérifiés en dur dans le test ; anciens bras du banc reviennent au dernier tour ; un marqueur en gras ou en titre n'est pas reconnu (repli « à vérifier »)." }
   - id: L729
     title: "Issue #60 du compte pro : spec reseal --porteur refuse une fiche touchée par un commit sans lot d'un collègue (déjà poussé, fait hors cadence), même après raf ignore ; le seul geste proposé (git checkout de la fiche au commit rouge) déferait 91 commits. Un commit reconnu par raf ignore ne bloque plus le reseal, ou une option --admet <sha> avec raison écrite dans resceaux"
     status: doing

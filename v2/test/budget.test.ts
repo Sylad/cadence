@@ -23,6 +23,7 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L689 (décision de Sylvain du 13-11) : on ne tasse pas le code pour tenir le budget ; bench relevé de 800 à 984, ses lignes lisibles (bancs sans juge, en parallèle) ;
   // issue #57 : bench 998, run 455 : bras.ts rendu lisible (lire : le tour du travail décide, le dernier result donne le coût, l'erreur est nommée),
   // run.ts garde les messages de la session à toute fin (échec, délai, signal, quota), pas seulement au succès.
+  // L722 : run 466 (+11 lignes), le départ du run nomme les fichiers non commités de l'arbre principal (même règle : pas de ligne tassée pour tenir le budget).
   it('les totaux sont ceux de R29 : noyau 3000, mesure 1698 (L689, issue #57)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1698]);

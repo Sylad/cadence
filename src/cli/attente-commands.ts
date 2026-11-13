@@ -1,14 +1,16 @@
-// Le plan en attente (L695, D-9) : `raf add|note|done` sur une branche tenue par un programme, puis `raf attente [appliquer]`.
+// Le plan en attente (L695, D-9) : `raf add|note|done|review|ux|demande` (L722) sur une branche tenue par un programme, puis `raf attente [appliquer]`.
+import { isRegistryWrite } from './demande-commands.js';
 import { applyPending, deferPlanWrite, holderHere, PENDING_PLAN, readPending } from '../repo-held.js';
 import { RafError } from '../plan.js';
 import type { EarlyCtx, Io } from './context.js';
 
 type Run = (argv: string[], io: Io) => number | Promise<number>;
 
-const DEFERRABLE = new Set(['add', 'note', 'done']);
+// L722 : review et ux écrivaient le plan de l'arbre principal pendant qu'un run le tenait ; demande écrit le registre, commité avec le code.
+const DEFERRABLE = new Set(['add', 'note', 'done', 'review', 'ux', 'demande']);
 let applying = false;
 
-/** Joue les écritures en attente avec `run` (des commandes synchrones : add, note, done). */
+/** Joue les écritures en attente avec `run` (des commandes synchrones : add, note, done, review, ux, demande). */
 function apply(root: string, io: Io, run: Run): number {
   applying = true;
   try {
@@ -26,7 +28,7 @@ function apply(root: string, io: Io, run: Run): number {
  * qui ne l'a pas appliquée (arrêté en route) passe d'abord, puis la commande suit (rend null).
  */
 export function heldPlanWrite(command: string, argv: string[], c: EarlyCtx, run: Run): number | null {
-  if (!DEFERRABLE.has(command) || applying || c.values.help) return null;
+  if (!DEFERRABLE.has(command) || applying || c.values.help || (command === 'demande' && !isRegistryWrite(c.rest))) return null;
   let holder;
   try {
     holder = holderHere(c.root);

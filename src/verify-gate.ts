@@ -7,7 +7,7 @@ import type { RecordedGate } from './gate-record.js';
 import { recordVerdict } from './gate-verdict.js';
 import { onTermination } from './proc.js';
 import { sharedStateDir } from './state.js';
-import { holdRepo } from './repo-held.js';
+import { holdRepo, namedFiles, uncommittedFiles } from './repo-held.js';
 import { activeLock, REPO_LOCK } from './orchestrate/lock.js';
 import { failedTests, hasUnnamedFailure, unloadedSuites } from './orchestrate/baseline.js';
 import { configuredCap } from './orchestrate/command.js';
@@ -86,11 +86,20 @@ function mainTreeObstacle(repo: string, sha: string): string | null {
   try {
     const head = git(repo, 'rev-parse', 'HEAD');
     if (head !== sha) return `l'arbre principal est à ${head.slice(0, 7)}, pas au sha demandé`;
-    if (git(repo, 'status', '--porcelain')) return 'l\'arbre principal a des modifications non validées ou des fichiers non suivis';
+    // L722 : le dossier 2.0.4 écrit pendant une porte (13-11) ; ce qui n'est pas commité au départ est nommé (refus de verify.inPlace, ligne de la copie jetable).
+    const dirty = uncommittedFiles(repo);
+    if (dirty === null) throw new Error('git status a échoué');
+    if (dirty.length) return `l'arbre principal a des modifications non commitées ou des fichiers non suivis (hors plan en attente) : ${namedFiles(dirty)}`;
     return null;
   } catch (e) {
     return `l'état de l'arbre principal est illisible (${gitFailure(e)})`;
   }
+}
+
+/** Les fichiers non commités de l'arbre principal (L722), dits quand la porte joue dans une copie pour une autre raison (verify.inPlace: false, vague vivante). */
+function sayDirty(repo: string, short: string, out: (l: string) => void): void {
+  const dirty = uncommittedFiles(repo);
+  if (dirty?.length) out(`verify --gate ${short} : l'arbre principal a aussi des modifications non commitées (hors plan en attente) : ${namedFiles(dirty)} — la copie joue ${short} sans elles`);
 }
 
 /**
@@ -250,6 +259,8 @@ async function playGate(ctx: GateCtx): Promise<number> {
     }
     const why = mode === false ? 'verify.inPlace: false' : (obstacle ?? `la vague ${liveWave} est vivante sur ce dépôt : HEAD et le plan y bougent`);
     out(`verify --gate ${short} : porte jouée dans une copie jetable ${dir} (${why}) ; dépendances copiées : ${copied.length ? copied.join(', ') : 'aucune'}`);
+    // L722 : sans verify.inPlace: false ni vague vivante, `why` les nomme déjà ; sinon la ligne qui suit.
+    if (why !== obstacle) sayDirty(repo, short, out);
     out(replayReason);
     if (missing.length) out(`dépendances déclarées absentes de l'arbre principal, non copiées : ${missing.join(', ')}`);
     const done = await runSteps(steps, (cmd) => sh(cmd, dir, ctx.timeoutMs ?? GATE_TIMEOUT_MS, group, env), out, config, short);

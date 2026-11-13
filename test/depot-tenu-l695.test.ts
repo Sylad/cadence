@@ -69,7 +69,7 @@ describe('L695 : dépôt tenu par un programme', () => {
     expect(vu.plan).not.toMatch(/écrite pendant le run/);
     const commit = vu.commit as ReturnType<typeof sh>;
     expect(commit.status).not.toBe(0);
-    expect(commit.stderr).toMatch(/commit refusé : la branche main est tenue par cadence run .* `raf add\|note\|done` écrivent dans \.cadence\/plan-en-attente\.yaml/);
+    expect(commit.stderr).toMatch(/commit refusé : la branche main est tenue par cadence run .* `raf add\|note\|done\|review\|ux\|demande` écrivent dans \.cadence\/plan-en-attente\.yaml/);
     expect((vu.session as ReturnType<typeof sh>).status).toBe(0);
 
     expect(e.etat).toBe('integre');

@@ -14,6 +14,7 @@ import { cmdConstat, cmdDeliver, cmdLocal, cmdVerify } from './cli/deliver-comma
 import { corrections, cost, inspect, perf } from './cli/stats-commands.js';
 import { cmdConfig, cmdLead } from './cli/lead-commands.js';
 import { cmdAttente, heldPlanWrite } from './cli/attente-commands.js';
+import { cmdDemande } from './cli/demande-commands.js';
 import { claudeHook } from './claude-hook.js';
 import { refCommand } from './ref/command.js';
 import { release } from './release.js';
@@ -54,7 +55,8 @@ Une seule aide : « raf --help », « cadence --help » et « cadence help » im
   raf status [<id> <état> ["message"] | <id> --back ["message"]]   états détaillés du projet (cadence.yaml : plan.states) : pose l'état d'un lot sous la garde de plan.transitions et note le message ; --back sort de l'état bloqué vers l'état d'avant ; sans argument, liste les états. start / done / drop / todo posent eux-mêmes l'état de leur statut
   raf todo <id> [--reason texte]   remet en attente un lot démarré sans commit de travail (doing → todo, started retiré, note datée) ; refusé s'il a des commits ; rouvre un lot done ou dropped (→ todo, finished retiré, note « rouvert ») — la seule façon de rouvrir, archivé compris (il revient dans le fichier du plan)
   raf note <id> "texte"
-  raf attente [appliquer]   le plan en attente (L695) : sur une branche tenue par un programme (cadence run, porte jouée dans l'arbre principal), add, note et done écrivent dans .cadence/plan-en-attente.yaml (jamais suivi) au lieu du plan, et le hook pre-commit refuse le commit ; le programme l'applique en rendant le dépôt ; appliquer le joue à la main, refusé tant que la branche est tenue
+  raf attente [appliquer]   le plan en attente (L695) : sur une branche tenue par un programme (cadence run, porte jouée dans l'arbre principal), add, note, done, review, ux et demande (L722) écrivent dans .cadence/plan-en-attente.yaml (jamais suivi) au lieu du plan ou du registre, et le hook pre-commit refuse le commit ; le programme l'applique en rendant le dépôt ; appliquer le joue à la main, refusé tant que la branche est tenue
+  raf demande [<D-n> [precision "texte" | etat ouverte|livrée|vérifiée|abandonnée ["preuve ou raison"] | lot <id>]]   le registre des demandes (.cadence/demandes/D-<n>.json, L722) : sans argument les demandes ouvertes, avec D-n l'entrée ; precision ajoute une précision datée (le texte d'origine n'est jamais réécrit), etat change l'état (preuve requise pour livrée et vérifiée, raison pour abandonnée, ajoutée à la preuve d'avant), lot rattache un lot ; mis en attente sur une branche tenue
   --verbose             avec done, ux, review, note, move ou public : imprime la ligne « id  état  titre entier » du lot touché ; avec hook post-commit : le titre entier (sinon 60 caractères au plus)
   raf title <id> "nouveau titre"   remplace le titre d'un lot, de tout statut (done compris), et note l'ancien dans une note datée
   raf did <id> ["texte"]   un lot récurrent (--every) a été refait : le « dû depuis N j » repart de aujourd'hui
@@ -166,6 +168,7 @@ const BEFORE_PLAN: Record<string, (c: EarlyCtx) => number | Promise<number> | nu
   spec: cmdSpecChecks,
   session: (c) => cmdSessionAll(c, run),
   attente: (c) => cmdAttente(c, run),
+  demande: cmdDemande,
 };
 
 /** Les commandes qui lisent le plan. */
@@ -219,7 +222,7 @@ export const COMMAND_TABLES = [...new Set([...Object.keys(BEFORE_PLAN), ...Objec
 // Une session d'orchestration ne ferme pas un lot, n'enregistre pas de verdict à la place du lead et ne livre pas.
 const LEAD_ONLY = new Set(['done', 'ux', 'review', 'deliver']);
 
-/** Ce qui répond avant toute lecture du plan, ou null : add, note et done sur une branche tenue par un programme (L695), puis les commandes de BEFORE_PLAN. */
+/** Ce qui répond avant toute lecture du plan, ou null : add, note, done, review, ux et demande sur une branche tenue par un programme (L695, L722), puis les commandes de BEFORE_PLAN. */
 function beforePlan(command: string, argv: string[], base: EarlyCtx): number | Promise<number> | null {
   const held = heldPlanWrite(command, argv, base, run);
   if (held !== null) return held;
@@ -237,13 +240,14 @@ function dispatch(argv: string[], io: Io): number | Promise<number> {
   if (command !== 'session' && command !== 'config' && !(command === 'lead' && !values.all) && (values.all || values.depth !== undefined)) throw new RafError(`${values.all ? '--all' : '--depth'} ne va qu'avec session start ou session close`);
   const today: Day = io.env.RAF_TODAY ?? toDay(io.now());
   if (!isDay(today)) throw new RafError(`RAF_TODAY invalide : ${today} (attendu AAAA-MM-JJ)`);
+  // Avant la mise en attente (L722) : un done, review ou ux d'une session orchestrée ne passe pas par le plan en attente pour être joué plus tard.
+  if (io.env.CADENCE_ORCHESTRATED && LEAD_ONLY.has(command)) {
+    throw new RafError(`${command} refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead`);
+  }
   const base = { rest, values, io, today, root: gitRoot(io.cwd) ?? io.cwd };
   const early = beforePlan(command, argv, base);
   if (early !== null) return early;
   const ctx = buildCtx({ ...base, command });
-  if (io.env.CADENCE_ORCHESTRATED && LEAD_ONLY.has(command)) {
-    throw new RafError(`${command} refusé pendant une vague orchestrée (${io.env.CADENCE_ORCHESTRATED}) : c'est le travail du lead`);
-  }
   if (!Object.hasOwn(WITH_PLAN, command)) throw new RafError(`commande inconnue : ${command} (raf --help)`);
   return WITH_PLAN[command]!(ctx);
 }

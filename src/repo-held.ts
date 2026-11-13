@@ -1,11 +1,12 @@
 // Dépôt tenu (L695, D-9) : pendant qu'un programme (cadence run, porte jouée dans l'arbre principal) va intégrer ou lire une branche, le lead n'y commite pas.
-// Le programme pose un fichier dans <git-common-dir>/cadence/tenu/ ; le pre-commit refuse un commit sur cette branche, et `raf add|note|done` mettent
-// leur écriture dans .cadence/plan-en-attente.yaml, que le programme fait appliquer (`raf attente appliquer`) une fois le dépôt rendu.
+// Le programme pose un fichier dans <git-common-dir>/cadence/tenu/ ; le pre-commit refuse un commit sur cette branche, et `raf add|note|done|review|ux|demande`
+// (L722 : review, ux et le registre des demandes aussi) mettent leur écriture dans .cadence/plan-en-attente.yaml, que le programme fait appliquer
+// (`raf attente appliquer`) une fois le dépôt rendu.
 // Le format du fichier est partagé avec v2/src/run/run.ts, qui l'écrit lui-même (v2 ne lit pas src/) : { pid, start?, kind, label, branch, since }.
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { gitCommonDir, PROGRAM_COMMIT_VAR, tryGit } from './git.js';
+import { git, gitCommonDir, PROGRAM_COMMIT_VAR, tryGit } from './git.js';
 import { holderAlive } from './orchestrate/lock.js';
 import { RafError } from './plan.js';
 import { withPlanLock } from './plan-lock.js';
@@ -15,6 +16,8 @@ import { sharedStateDir } from './state.js';
 export const HELD_DIR = 'tenu';
 export const PENDING_PLAN = '.cadence/plan-en-attente.yaml';
 const PENDING_LOCK = 'plan-en-attente.lock';
+/** Les écritures mises en attente sur une branche tenue, telles que les messages les nomment. */
+const DEFERRED_WRITES = 'raf add|note|done|review|ux|demande';
 
 interface Holder { pid: number; start?: string; kind: string; label: string; branch: string; since: string }
 interface PendingWrite { date: string; tenu: string; argv: string[] }
@@ -59,8 +62,8 @@ export function holderHere(cwd: string): Holder | null {
 
 const since = (h: Holder) => h.since.slice(11, 16);
 
-/** Qui applique l'attente : cadence run en rendant le dépôt ; après une porte, le prochain add|note|done ou `raf attente appliquer`. */
-const applier = (h: Holder) => (h.kind === 'run' ? 'appliqué par le run quand il rend le dépôt' : 'appliqué au premier raf add|note|done après sa fin, ou par raf attente appliquer');
+/** Qui applique l'attente : cadence run en rendant le dépôt ; après une porte, le prochain add|note|done|review|ux|demande ou `raf attente appliquer`. */
+const applier = (h: Holder) => (h.kind === 'run' ? 'appliqué par le run quand il rend le dépôt' : `appliqué au premier ${DEFERRED_WRITES} après sa fin, ou par raf attente appliquer`);
 
 /** Le refus du pre-commit quand la branche du commit est tenue, avec le geste à faire ; null si elle est libre ou si le commit est celui d'un programme (`commitAsProgram`). */
 export function commitRefusal(cwd: string, env: NodeJS.ProcessEnv = {}): string | null {
@@ -68,7 +71,7 @@ export function commitRefusal(cwd: string, env: NodeJS.ProcessEnv = {}): string 
   const h = holderHere(cwd);
   if (!h) return null;
   return `commit refusé : la branche ${h.branch} est tenue par ${h.label} (pid ${h.pid}, depuis ${since(h)}) — un commit ici lui ferait échouer son intégration en avance rapide ou rendrait sa porte non probante. `
-    + `À faire : pour le plan, \`raf add|note|done\` écrivent dans ${PENDING_PLAN}, ${applier(h)} (\`raf attente\` le montre) ; `
+    + `À faire : pour le plan et le registre des demandes, \`${DEFERRED_WRITES}\` écrivent dans ${PENDING_PLAN}, ${applier(h)} (\`raf attente\` le montre) ; `
     + `pour un autre changement, attendre sa fin (cadence run --liste) puis commiter, ou le commiter sur une autre branche ; --no-verify pour passer outre`;
 }
 
@@ -93,7 +96,7 @@ function withPendingLock<T>(root: string, fn: () => T): T {
   return withPlanLock(join(dir, PENDING_LOCK), (m) => new RafError(m.replace('plan tenu', 'plan en attente tenu')), fn);
 }
 
-const PENDING_HEADER = `# Écritures du plan mises en attente pendant que le dépôt était tenu (L695) : \`raf attente appliquer\` les joue dans l'ordre.\n`;
+const PENDING_HEADER = `# Écritures du plan et du registre des demandes mises en attente pendant que le dépôt était tenu (L695, L722) : \`raf attente appliquer\` les joue dans l'ordre.\n`;
 
 /** Met une écriture de `raf` en attente ; rend la ligne qui le dit. */
 export function deferPlanWrite(root: string, h: Holder, argv: string[], now: Date): string {
@@ -131,4 +134,22 @@ export function applyPending(root: string, raf: (argv: string[]) => number, out:
   }
   out(`plan en attente : ${done} écriture(s) appliquée(s)${left.length ? `, ${left.length} restée(s) en attente (échec de raf ${left[0]!.argv.join(' ')})` : ''}${done ? ' — le plan est modifié, à commiter' : ''}`);
   return left.length ? 1 : 0;
+}
+
+/**
+ * Les fichiers de l'arbre de `root` que git voit modifiés, ajoutés, supprimés ou non suivis, hors du plan en attente (L722) : dits au démarrage d'un run
+ * ou d'une porte, qui jouent HEAD sans eux. Un dossier non suivi est nommé une fois (« dossier/ »), comme le montre git status ; null si git ne répond pas.
+ */
+export function uncommittedFiles(root: string): string[] | null {
+  try {
+    // Pas de trim (tryGit) : il mangerait l'espace de tête du premier « XY chemin » ( M a.txt). Sans renommages : l'ancien et le nouveau chemin sont dits.
+    return git(root, ['status', '--porcelain', '--no-renames', '-z']).split('\0').filter(Boolean).map((e) => e.slice(3)).filter((f) => f !== PENDING_PLAN);
+  } catch {
+    return null;
+  }
+}
+
+/** La ligne qui nomme ces fichiers ; au-delà de 10, le compte des autres. */
+export function namedFiles(files: string[]): string {
+  return files.length > 10 ? `${files.slice(0, 10).join(', ')} et ${files.length - 10} autre(s)` : files.join(', ');
 }

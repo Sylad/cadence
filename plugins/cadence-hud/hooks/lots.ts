@@ -13,7 +13,7 @@ export const NARROW_BODY = 60
 const isProgress = (p: unknown): p is NonNullable<LotsRow['progress']> =>
   typeof p === 'object' && p !== null && ['done', 'doing', 'todo', 'added7'].every(k => Number.isFinite((p as Record<string, unknown>)[k]))
 
-/** Lit la sortie de `cadence lead tour --json` pour le panneau : toutes les lignes, celles en erreur comprises (parseTour les écarte). `outdated` : aucune ligne lisible ne porte `lots` (cadence plus ancien que le mod) ; une ligne en erreur n'en a jamais et ne le dit donc pas. */
+/** Lit la sortie de `cadence lead tour --json` pour le panneau : toutes les lignes, celles en erreur comprises. `outdated` : aucune ligne lisible ne porte `lots` (cadence plus ancien que le mod) ; une ligne en erreur n'en a jamais et ne le dit donc pas. */
 export const parseLotsBoard = (stdout: string): LotsBoard => {
   const raw: unknown = JSON.parse(stdout)
   const rows: LotsRow[] = (Array.isArray(raw) ? raw : [])

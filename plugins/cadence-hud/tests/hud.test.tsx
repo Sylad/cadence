@@ -1214,6 +1214,7 @@ test('le dossier de lancement est le cwd ou son ancêtre qui porte la sortie du 
 test('un cd du lead dans un sous-projet ne déplace pas le dossier du tableau : il reste celui de lancement', async ($, on) => {
   const hud = wired(on)
   mock.clock(on)
+  on('ui.panes', () => ({ value: [{ id: 'lots', title: 'Lots', isShown: true, isFocused: false, isPlaced: true }] }) as never) // sans vague, le tour ne tourne que panneau ouvert (L719)
   const runs: string[][] = []
   on('command.register', () => ({ value: {} }) as never)
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
@@ -1347,9 +1348,68 @@ test('le tableau est demandé à cadence lead tour --json dans le dossier de la 
   expect(tours()).toHaveLength(3)
 })
 
+// L719 : panneau fermé, le tableau ne sert qu'au repli des lots clos des vagues de la bande (L609) ; sans vague ni panneau, le tour (7 à 9 s) ne tourne pas.
+test('L719 — panneau fermé et aucune vague dans la bande, cadence lead tour n’est pas lancé ; l’ouverture du panneau et une vague le relancent', async ($, on) => {
+  const hud = wired(on)
+  const clock = mock.clock(on)
+  const runs: string[][] = []
+  const wave: { current: Wave[] } = { current: [] }
+  const open = new Set<string>()
+  on('command.register', () => ({ value: {} }) as never)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
+  on('agent.list', () => ({ value: [] }) as never)
+  on('ui.panes', () => ({ value: [...open].map(id => ({ id, title: 'Lots', isShown: true, isFocused: false, isPlaced: true })) }) as never)
+  on('ui.open', (_$, e) => {
+    open.add((e as unknown as { id: string }).id)
+    return { value: { isPlaced: true } } as never
+  })
+  on('ui.close', (_$, e) => {
+    open.delete((e as unknown as { id: string }).id)
+    return { value: {} } as never
+  })
+  on('process.run', async (_$, e) => {
+    const argv = (e as unknown as { argv: string[] }).argv
+    runs.push(argv)
+    if (argv[0] === 'cadence') return { value: { exitCode: 0, stdout: JSON.stringify(TOUR), stderr: '' } } as never
+    return { value: { exitCode: 0, stdout: JSON.stringify(wave.current), stderr: '' } } as never
+  })
+  await $.session.start({ cwd: '/p', surface: 'terminal', isInteractive: true } as never)
+  await settle()
+  const tours = () => runs.filter(a => a[0] === 'cadence' && a[1] === 'lead')
+  // une heure panneau fermé, sans vague : aucun tour
+  for (let i = 0; i < 12; i++) {
+    await clock.advance(5 * 60_000)
+    await settle()
+  }
+  expect(tours()).toHaveLength(0)
+  expect(hud.state('lotsBoard')).toBeUndefined()
+  // /hud lots <projet> sans tableau lu : la demande lance le tour
+  expect((await $.command.run({ command: 'hud', args: 'lots ol' } as never)).text).toMatch(/réessayez/)
+  await settle()
+  expect(tours()).toHaveLength(1)
+  // l'ouverture du panneau lit tout de suite, puis le tour suit la minute tant qu'il est ouvert
+  await $.command.run({ command: 'hud', args: 'lots' } as never)
+  await settle()
+  expect(tours()).toHaveLength(2)
+  await clock.advance(60_000)
+  await settle()
+  expect(tours()).toHaveLength(3)
+  // refermé : plus de tour
+  await $.command.run({ command: 'hud', args: 'lots' } as never)
+  await clock.advance(5 * 60_000)
+  await settle()
+  expect(tours()).toHaveLength(3)
+  // une vague dans la bande, panneau fermé : le tour revient (repli des lots clos, L609)
+  wave.current = [{ ...WAVE, cwd: '/p' }]
+  await clock.advance(5_000)
+  await settle()
+  expect(tours()).toHaveLength(4)
+})
+
 test('un cadence absent ou en échec garde le dernier tableau lu et ne met pas la bande en erreur', async ($, on) => {
   const hud = wired(on)
   const clock = mock.clock(on)
+  on('ui.panes', () => ({ value: [{ id: 'lots', title: 'Lots', isShown: true, isFocused: false, isPlaced: true }] }) as never) // sans vague, le tour ne tourne que panneau ouvert (L719)
   const ok = { current: true }
   on('command.register', () => ({ value: {} }) as never)
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)

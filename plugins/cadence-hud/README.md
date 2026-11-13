@@ -11,7 +11,8 @@ band, with every cell, is [docs/cadence-hud.md](../../docs/cadence-hud.md), whic
 /plugin install cadence-hud@cadence
 ```
 
-The band does not need the `cadence` CLI, except for the lots panel (`@sylad/cadence` on the PATH).
+The band works without the `cadence` CLI. With `@sylad/cadence` on the PATH, `cadence lead tour` feeds the lots panel and folds the lots
+the plan says closed out of the wave lines; it runs only while the panel is open or a wave is in the band.
 
 ## Segments
 

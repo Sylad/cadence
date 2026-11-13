@@ -11,8 +11,10 @@ const TOUR = [{ project: 'ol', doing: [], drift: [], notes: [], next: null, repo
 
 type Resolver = (cwd: string) => { exitCode: number; stdout: string } | 'throw'
 
-const run = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], waveCwd: string | undefined, shell: string, resolver: Resolver) => {
+const run = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], waveCwd: string | undefined, shell: string, resolver: Resolver, lotsOpen = false) => {
   const clock = mock.clock(on)
+  // sans vague, le tour ne tourne que panneau des lots ouvert (L719)
+  if (lotsOpen) on('ui.panes', () => ({ value: [{ id: 'lots', title: 'Lots', isShown: true, isFocused: false, isPlaced: true }] }) as never)
   const runs: string[][] = []
   on('state.get', () => ({ value: { value: undefined, version: 0 } }) as never)
   on('state.set', () => ({ value: { isSet: true, version: 1 } }) as never)
@@ -80,8 +82,8 @@ test('L547 probe — le résolveur n’est lancé qu’une fois par cwd de vague
   expect(r.resolverCallsFor('/w/ol')).toBe(1)
 })
 
-test('L547 probe — sans vague du tout : le dossier de la session (dossier de lancement), pas de résolveur sur un cwd de vague', async ($, on) => {
-  const r = await run($, on, undefined, '/w/ol', c => ({ exitCode: 0, stdout: c.startsWith('/w/') ? '/w\n' : c }))
+test('L547 probe — sans vague du tout, panneau des lots ouvert : le dossier de la session (dossier de lancement), pas de résolveur sur un cwd de vague', async ($, on) => {
+  const r = await run($, on, undefined, '/w/ol', c => ({ exitCode: 0, stdout: c.startsWith('/w/') ? '/w\n' : c }), true)
   expect(r.tours).toEqual(['/w'])
 })
 

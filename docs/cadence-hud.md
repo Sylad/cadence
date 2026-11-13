@@ -64,7 +64,8 @@ line again (at the next refresh when the panel is closed by its own cross). Test
 The progress bar of a project is in the lots panel. The bar is lots done over lots done + in progress + to do (dropped and recurring lots left out); it is followed by
 `done/total` and the project's open lots (`▮▮▮▮▮▮▮▮▮▯ 682/697  15 lots non clos`). The source is
 `cadence lead tour <folder> --json` (run in the folder carrying `priority:` that encloses the launch folder of the wave, the live one or else the last finished one, so a wave launched from a project or a sub-folder no longer narrows the bars to that project (issue #24, L547); with no such folder above, the wave's own folder; with no wave, the session's launch folder),
-read again at every wave transition and otherwise every minute; without `cadence` on the PATH, the panel says so.
+read again at every wave transition and otherwise every minute, but only while the panel is open or a wave is in the band (L719: closed panel and no wave, nothing uses it,
+and one call takes 7 to 9 s; opening the panel or `/hud lots <project>` reads it at once); without `cadence` on the PATH, the panel says so.
 
 Install it as a plugin from the same marketplace:
 

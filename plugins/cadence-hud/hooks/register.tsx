@@ -265,7 +265,9 @@ export const register: Register = on => {
         await update($, slotCap, () => foundCap)
         await update($, error, () => problem)
         await update($, now, () => at)
-        void refreshProjects(found, at)
+        // L719 : le tour (plusieurs secondes par appel) ne nourrit que le panneau des lots et le repli des lots clos des vagues de la bande (L609) :
+        // panneau fermé et aucune vague dans la bande, il n'est pas lancé ; l'ouverture du panneau le relit tout de suite (readTourNow).
+        if (open || found.length > 0) void refreshProjects(found, at)
         void refreshDeliveries(found)
         // le banc de cadence 2 (Task 16) : un fichier lu, aucune commande cadence ; une sortie illisible garde les passages d'avant
         const bench = await $.process.run(['python3', '-I', '-c', BANC_READER], { timeoutMs: 4_000 }).catch(() => undefined)
@@ -295,9 +297,10 @@ export const register: Register = on => {
       await update($, lotsDeliveries, () => failed).catch(() => undefined)
       await update($, lotsLast, () => latest).catch(() => undefined)
     }
-    // L'avancement des plans vient de `cadence lead tour --json` : relu à chaque transition de vague, sinon toutes les minutes.
-    // Hors de refresh() (un `cadence` lent ne retarde pas la bande) et sans effet sur `error` : cadence absent = pas de lignes de projets.
-    // La même lecture nourrit le panneau des lots (L401) ; tant qu'il est ouvert, la date de modification des plans fait aussi relire.
+    // Le tableau des plans vient de `cadence lead tour --json` : relu à chaque transition de vague, sinon toutes les minutes, tant que le panneau est ouvert
+    // ou qu'une vague est dans la bande (L719). Il nourrit le panneau des lots (L401) et, dans la bande, seulement le repli des lots que le plan dit clos (L609) ;
+    // l'avancement des projets n'est plus dans la bande (D-1). Hors de refresh() (un `cadence` lent ne retarde pas la bande) et sans effet sur `error` :
+    // cadence absent = pas de tableau, les lots des vagues restent ouverts. Tant que le panneau est ouvert, la date de modification des plans fait aussi relire.
     const refreshProjects = async (found: Wave[], at: number) => {
       const folder = await tourDir($, found, sessionCwd, waveFolders)
       if (isTouring || !folder) return
@@ -421,7 +424,11 @@ export const register: Register = on => {
     if (arg === 'projets') return { text: "l'avancement des projets est dans le panneau des lots, à côté de chaque projet de l'ordre des projets (/hud lots)." }
     if (arg.startsWith('lots ')) {
       const project = arg.slice(5).trim()
-      if (!(await read($, lotsBoard))) return { text: 'les plans ne sont pas encore lus : réessayez dans un instant.' }
+      if (!(await read($, lotsBoard))) {
+        // panneau fermé et sans vague, le tour ne tourne pas tout seul (L719) : la demande le lance
+        void readTourNow?.()
+        return { text: 'les plans ne sont pas encore lus : réessayez dans un instant.' }
+      }
       const folded = await toggleFold($, project)
       if (folded === undefined) {
         const names = ((await read($, lotsBoard))?.rows ?? []).filter(r => !r.error).map(r => r.project)

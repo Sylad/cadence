@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileS
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
-import { bench, commandeBanc, enParallele, passage } from '../src/bench/cli.js';
+import { bancsALaFois, bench, commandeBanc, enParallele, passage, PARALLELES } from '../src/bench/cli.js';
 import { nomCache } from '../src/bench/sans-juge.js';
 import { PUBLIE, statut, verdictSansJuge, type ResultatBanc } from '../src/bench/verdict.js';
 import { dossierTemp } from './temp.js';
@@ -92,6 +92,21 @@ describe('garde de publication : cadence run contre A, sur la version à publier
     expect(sortie.join('\n')).toContain(`« ${commandeBanc('/depot/a-publier', 'court')} »`);
     expect(commandeBanc('/depot/a-publier', 'court')).toBe('node /depot/a-publier/v2/bin/cadence2.js bench court');
     expect(sortie.join('\n')).toMatch(/cadence-run contre A/);
+    expect(sortie.join('\n')).toContain(`« ${commandeBanc('/depot/a-publier', 'sequence <id> --repetitions 2 --candidat cadence-run --reference A')} »`);
+  });
+  it('le minuteur du samedi lance bench mecanique, plus bench hebdo (décision de Sylvain du 13-11)', () => {
+    const service = readFileSync(join(import.meta.dirname, '..', 'systeme', 'cadence-banc.service'), 'utf8');
+    const lancement = service.split('\n').filter((x) => x.startsWith('ExecStart='));
+    expect(lancement).toEqual([`ExecStart=/bin/bash -c 'cadence2 bench mecanique >> "$HOME/bench-cadence/mecanique.log" 2>&1'`]);
+    expect(service).not.toMatch(/bench hebdo/);
+  });
+  it('statut (décision de Sylvain du 13-11) : plus de banc du weekend exigé, code 0 sans passage hebdo ; le refus de publication dit quoi lancer', async () => {
+    const r = racine([]), sortie: string[] = []; writeFileSync(join(r, 'historique.jsonl'), `${l({ date: '2026-11-04T10:00:00Z', vert: false })}\n`);
+    const lundi = new Date('2026-11-16T08:00:00Z');
+    const rc = await bench(['statut'], { cwd: r, env: { BENCH_ROOT: r, HOME: r }, now: () => lundi, out: (x) => sortie.push(x), err: (x) => sortie.push(x) }, '/depot/a-publier');
+    expect(rc).toBe(0);
+    expect(sortie.join('\n')).not.toMatch(/WEEKEND|hebdo/i);
+    expect(sortie[0]).toMatch(/publication refusée sur l'empreinte inconnue : lancer, depuis la version à publier : « node \/depot\/a-publier\/v2\/bin\/cadence2\.js bench court »/);
   });
   it('sans --candidat, le banc mesure cadence-run (refus net si bras.yaml ne le déclare pas)', async () => {
     const r = racine([]), err: string[] = []; writeFileSync(join(r, 'bras.yaml'), `A:\n  modele: opus\n  brief: ${BRIEF}\nequipe-legere:\n  modele: opus\n  brief: ${BRIEF}\n`);
@@ -134,11 +149,64 @@ describe('bancs d\'un passage en parallèle, un processus par banc (L689)', () =
     expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8'))).toMatchObject({ niveau: 'mecanique', bancs: ['1-a', '3-b', '6-c'] });
     expect(readdirSync(join(r, 'runs', '2026-11-13-1600-e1')).sort()).toEqual(['1-a', '3-b', '6-c', 'taches']);
   }, 60_000);
+  /** Lanceur des enfants : `bash <script> bench _banc <tache.json>` ; le script décide, d'après le nom de la tâche, de mourir, d'écrire un résultat illisible ou de jouer le banc. */
+  function lanceur(r: string, cas: string) {
+    const bin = dossierTemp('banc-l689-bin-'), script = join(bin, 'lanceur.sh');
+    writeFileSync(join(bin, 'claude'), `#!/bin/bash\necho x > fait.txt; git add -A; git -c user.email=t@t -c user.name=t commit -qm bras\nprintf '${sortie}'\n`);
+    chmodSync(join(bin, 'claude'), 0o755);
+    writeFileSync(script, `case "$3" in\n${cas}\nesac\nexec ${process.execPath} --import ${join(FOND, 'ts.mjs')} ${join(FOND, 'cadence.mjs')} "$@"\n`);
+    return { lanceur: ['bash', script], paralleles: 2, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } };
+  }
   it('un processus de banc mort sans résultat met ses deux bras en échec, les autres bancs vont au bout', async () => {
-    const r = racine(['1-a']);
-    const v = await passage({ ...base, racine: r, numeros: ['1'], exec: () => { throw new Error('jamais en ligne'); }, prep: prepReel, home: r,
-      enfants: { lanceur: ['false'], paralleles: 2 } });
+    const r = racine(['1-a', '3-b', '6-c']);
+    const v = await passage({ ...base, racine: r, numeros: ['1', '3', '6'], niveau: 'mecanique', exec: () => { throw new Error('jamais en ligne'); }, prep: prepReel, home: r,
+      enfants: lanceur(r, '  */3-b.tache.json) exit 1;;') });
     expect(v.vert).toBe(false);
-    expect(v.criteres.find((c) => c.nom === 'aucun bras en échec')?.valeur).toMatch(/processus du banc arrêté sans résultat \(code 1\)/);
+    expect(v.criteres.find((c) => c.nom === 'aucun bras en échec')?.valeur).toBe('3-b/A : processus du banc arrêté sans résultat (code 1) ; 3-b/cadence-run : processus du banc arrêté sans résultat (code 1)');
+    const rap = JSON.parse(readFileSync(join(r, 'rapports', '2026-11-13-1600-e1.json'), 'utf8')) as { resultats: ResultatBanc[] };
+    expect(rap.resultats.map((x) => x.banc)).toEqual(['1-a', '3-b', '6-c']);
+    for (const x of [rap.resultats[0], rap.resultats[2]]) { // les deux autres bancs sont allés au bout : bras mesurés sans échec, suite jouée
+      expect(Object.values(x.mesures).map((m) => m.echec)).toEqual([null, null]);
+      expect(x.sans_juge).toEqual({ A: { suite_ok: true, caches_ok: null }, 'cadence-run': { suite_ok: true, caches_ok: null } });
+    }
+  }, 60_000);
+  it('un résultat de banc illisible met ses deux bras en échec, sans arrêter le passage', async () => {
+    const r = racine(['1-a', '3-b']);
+    const v = await passage({ ...base, racine: r, numeros: ['1', '3'], niveau: 'mecanique', exec: () => { throw new Error('jamais en ligne'); }, prep: prepReel, home: r,
+      enfants: lanceur(r, '  */1-a.tache.json) echo tronqué > "$3.joue.json"; exit 0;;') });
+    const echecs = v.criteres.find((c) => c.nom === 'aucun bras en échec')?.valeur ?? '';
+    expect(echecs).toMatch(/^1-a\/A : résultat du banc illisible \(/);
+    expect(echecs).not.toMatch(/3-b/);
+  }, 60_000);
+  it('un processus de banc qui ne démarre pas (erreur de spawn) : ses bras en échec, le passage va au bout et écrit son rapport', async () => {
+    const r = racine(['1-a', '3-b']), sorties: string[] = [];
+    const v = await passage({ ...base, racine: r, numeros: ['1', '3'], exec: () => { throw new Error('jamais en ligne'); }, prep: prepReel, home: r, out: (x) => sorties.push(x),
+      enfants: { lanceur: [join(r, 'absent-cadence2')], paralleles: 2 } });
+    expect(v.vert).toBe(false);
+    expect(v.criteres.find((c) => c.nom === 'aucun bras en échec')?.valeur).toMatch(/^1-a\/A : processus du banc non démarré \(spawn .*ENOENT\)/);
+    expect(existsSync(join(r, 'rapports', '2026-11-13-1600-e1.md'))).toBe(true);
+    expect(sorties.at(-1)).toMatch(/^ROUGE — /);
+  });
+});
+
+describe('passages comptés par la garde : en série tant que série et parallèle n\'ont pas été comparés (L689, décision du lead)', () => {
+  it('micro et mécanique : trois bancs à la fois par défaut, N sur demande', () => {
+    expect(PARALLELES).toBe(3);
+    for (const n of ['micro', 'mecanique'] as const) { expect(bancsALaFois(n, undefined)).toBe(3); expect(bancsALaFois(n, 1)).toBe(1); expect(bancsALaFois(n, 5)).toBe(5); }
+  });
+  it('court, hebdo, éclair, lancer (avec juges) : un banc à la fois ; --paralleles N > 1 refusé', () => {
+    expect(bancsALaFois(undefined, undefined)).toBe(1);
+    expect(bancsALaFois(undefined, 1)).toBe(1);
+    expect(bancsALaFois(undefined, 3)).toMatch(/seulement avec micro ou mecanique/);
+  });
+  it('« bench court --paralleles 3 » : code 2 et la raison, avant tout passage', async () => {
+    const r = racine([]), err: string[] = [];
+    for (const sous of [['court'], ['hebdo'], ['eclair'], ['lancer', '--bancs', '1,3,6']]) {
+      const rc = await bench([...sous, '--paralleles', '3'], { cwd: r, env: { BENCH_ROOT: r, HOME: r }, now: () => new Date(), out: () => {}, err: (x) => err.push(x) });
+      expect(rc, sous.join(' ')).toBe(2);
+    }
+    expect(err).toHaveLength(4);
+    expect(err.every((x) => /^bench refusé : --paralleles N > 1 seulement avec micro ou mecanique/.test(x))).toBe(true);
+    expect(existsSync(join(r, 'historique.jsonl'))).toBe(false);
   });
 });

@@ -95,25 +95,21 @@ describe('rapport, historique, statut', () => {
     expect(statut([partiel], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(false);
     expect(statut([h('2026-11-07T10:00:00Z', true, 'inconnue')], new Date('2026-11-09T08:00:00Z'), 'inconnue', { C: 'opus' }).publication_ok).toBe(false);
   });
-  it('lundi sans passage depuis samedi : banc du weekend manquant', () => {
+  it('plus de banc du weekend exigé (décision de Sylvain du 13-11) : lundi sans passage depuis samedi, statut ne signale rien', () => {
     const s = statut([h('2026-11-06T10:00:00Z', true)], new Date('2026-11-09T08:00:00Z'), 'e1');
-    expect(s.banc_du_weekend).toBe(false);
+    expect(s).not.toHaveProperty('banc_du_weekend');
   });
   const seqVerte = JSON.stringify({ type: 'sequence', sequence: 's', run: 'r1', repetition: 1, repetitions: 1, date: '2026-11-07T12:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['s'], hebdo: false, frais: 0, vert: true, rouges: [] });
-  it('passage samedi : banc du weekend fait ; publication seulement si vert sur la même empreinte (et séquence verte)', () => {
+  it('publication seulement si vert sur la même empreinte (et séquence verte)', () => {
     const s = statut([h('2026-11-07T10:00:00Z', true, 'e1'), seqVerte], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' });
-    expect(s).toMatchObject({ banc_du_weekend: true, publication_ok: true });
+    expect(s).toMatchObject({ publication_ok: true });
     expect(statut([h('2026-11-07T10:00:00Z', true, 'e1')], new Date('2026-11-09T08:00:00Z'), 'e2', { C: 'opus' }).publication_ok).toBe(false);
     expect(statut([h('2026-11-07T10:00:00Z', false, 'e1')], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(false);
   });
-  it('un banc court le samedi ne compte pas comme banc du weekend', () => {
-    expect(statut([h('2026-11-07T10:00:00Z', true, 'e1', false)], new Date('2026-11-09T08:00:00Z'), 'e1').banc_du_weekend).toBe(false);
-  });
-  it('samedi 00 h 30 à Paris (vendredi 23 h 30 UTC) compte comme le weekend', () => {
-    expect(statut([h('2026-11-13T23:30:00Z', true)], new Date('2026-11-16T08:00:00Z'), 'e1').banc_du_weekend).toBe(true);
-  });
-  it('en plein weekend, avant le passage : pas encore manquant', () => {
-    expect(statut([], new Date('2026-11-08T08:00:00Z'), 'e1').banc_du_weekend).toBe(true);
+  it('bancs frais de la semaine : comptés depuis samedi 00 h à Paris (samedi 00 h 30 = vendredi 23 h 30 UTC)', () => {
+    const frais = (date: string) => ligneHistorique({ vert: true, criteres: [] }, { date, empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a'], hebdo: false, frais: 1 });
+    expect(statut([frais('2026-11-13T23:30:00Z')], new Date('2026-11-16T08:00:00Z'), 'e1').frais_semaine).toBe(1);
+    expect(statut([frais('2026-11-13T22:30:00Z')], new Date('2026-11-16T08:00:00Z'), 'e1').frais_semaine).toBe(0);
   });
 });
 

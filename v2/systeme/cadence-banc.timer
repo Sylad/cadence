@@ -1,5 +1,5 @@
 [Unit]
-Description=Banc de cadence 2, chaque samedi ; rattrapé au premier démarrage de WSL s'il a été manqué
+Description=Banc mécanique de cadence 2, chaque samedi ; rattrapé au premier démarrage de WSL s'il a été manqué
 
 [Timer]
 OnCalendar=Sat *-*-* 10:00:00

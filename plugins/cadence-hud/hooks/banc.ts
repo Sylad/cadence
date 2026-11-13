@@ -56,35 +56,22 @@ export const parseBanc = (lines: string[]): BancPassage[] =>
       if (typeof o.date !== 'string' || Number.isNaN(Date.parse(o.date)) || typeof o.vert !== 'boolean') return []
       // contrôles éclair rouges (`eclair_ok: false`) : le passage s'affiche ✗, même sur un verdict vert
       const eclairRouge = o.eclair_ok === false
-      return [{ date: o.date, candidat: typeof o.candidat === 'string' ? o.candidat : '?', bancs: strings(o.bancs), hebdo: o.hebdo === true, ...(o.type === 'sequence' && { sequence: true }), vert: o.vert && !eclairRouge, rouges: [...strings(o.rouges), ...(eclairRouge ? ['contrôles éclair'] : [])] }]
+      return [{ date: o.date, candidat: typeof o.candidat === 'string' ? o.candidat : '?', bancs: strings(o.bancs), hebdo: o.hebdo === true, ...(o.type === 'sequence' && { sequence: true }), ...(typeof o.niveau === 'string' && { niveau: o.niveau }), vert: o.vert && !eclairRouge, rouges: [...strings(o.rouges), ...(eclairRouge ? ['contrôles éclair'] : [])] }]
     } catch {
       return []
     }
   })
 
-// Recopie de parisJour et samediCourant de v2/src/bench/verdict.ts (le plugin ne dépend pas de v2) : la même règle que `statut`.
+// Recopie de parisJour de v2/src/bench/verdict.ts (le plugin ne dépend pas de v2).
 const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 const parisJour = (d: Date) => {
   const p = Object.fromEntries(PARIS.formatToParts(d).map(x => [x.type, x.value]))
   return { jour: `${p.year}-${p.month}-${p.day}`, sem: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday ?? ''), jjmm: `${p.day}-${p.month}`, heure: `${p.hour}:${p.minute}` }
 }
-const samediCourant = (d: Date): string => {
-  const { jour, sem } = parisJour(d)
-  const [y = 0, m = 1, j = 1] = jour.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, j - ((sem + 1) % 7))).toISOString().slice(0, 10)
-}
-
-/** Du lundi au vendredi (heure de Paris), aucun passage hebdo depuis le samedi : le banc du weekend manque (`banc_du_weekend` de `statut`). */
-const weekendManquant = (passages: BancPassage[], now: number): boolean => {
-  const d = new Date(now)
-  if ([6, 0].includes(parisJour(d).sem)) return false
-  const sam = samediCourant(d)
-  return !passages.some(x => x.hebdo && parisJour(new Date(x.date)).jour >= sam)
-}
-
-/** La sorte d'un passage : séquence ; puis, sur les bancs de base (`<banc>#k` = répétition k) : 1, 3 et 6 exactement = court ; hebdo ; le banc 1 seul = éclair ; sinon le nombre de bancs. */
+/** La sorte d'un passage : séquence ; micro ou mécanique (L689, sans juge IA) ; puis, sur les bancs de base (`<banc>#k` = répétition k) : 1, 3 et 6 exactement = court ; hebdo ; le banc 1 seul = éclair ; sinon le nombre de bancs. */
 export const sorte = (p: BancPassage): string => {
   if (p.sequence) return 'séquence'
+  if (p.niveau) return p.niveau === 'mecanique' ? 'mécanique' : p.niveau
   const base = [...new Set(p.bancs.map(id => id.replace(/#[^#]*$/, '')))]
   const n = [...new Set(base.map(id => id.split('-')[0]))].sort()
   if (n.join(',') === '1,3,6' && base.length === 3) return 'court'
@@ -93,16 +80,14 @@ export const sorte = (p: BancPassage): string => {
   return `${base.length} banc${base.length > 1 ? 's' : ''}`
 }
 
-/** La ligne du banc dans la bande ; `null` sans historique (fichier absent) ou sans rien à dire. Rouge l'emporte sur orange, orange sur vert. */
-export const bancLine = (passages: BancPassage[] | null, now: number): { text: string; color: ThemeKey } | null => {
+/** La ligne du banc dans la bande ; `null` sans historique (fichier absent) ou sans passage. Plus de banc du weekend exigé (L689, décision de Sylvain du 13-11). */
+export const bancLine = (passages: BancPassage[] | null, _now: number): { text: string; color: ThemeKey } | null => {
   if (!passages) return null
   const last = passages.at(-1)
-  const manque = weekendManquant(passages, now)
   if (last && !last.vert) {
     const rouges = last.rouges.slice(0, 3).join(', ')
-    return { text: `banc ✗ ${parisJour(new Date(last.date)).jjmm}${rouges ? ` : ${rouges}` : ''}${manque ? ' · ⚠ weekend manquant' : ''}`, color: 'error' }
+    return { text: `banc ✗ ${parisJour(new Date(last.date)).jjmm}${rouges ? ` : ${rouges}` : ''}`, color: 'error' }
   }
-  if (manque) return { text: 'banc ⚠ weekend manquant', color: 'warning' }
   return last ? { text: `banc ✓ ${parisJour(new Date(last.date)).jjmm} ${sorte(last)} · ${last.candidat}/A`, color: 'success' } : null
 }
 

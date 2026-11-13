@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { preparer } from '../src/bench/preparer.js';
-import { statut } from '../src/bench/verdict.js';
+import { bench } from '../src/bench/cli.js';
+import { PUBLIE, statut } from '../src/bench/verdict.js';
 import type { Executeur } from '../src/bench/bras.js';
 import { run } from '../src/cli.js';
 import { sequence, type Dep } from '../src/sequence/cli.js';
@@ -140,5 +141,35 @@ describe('cadence2 bench sequence : passage', () => {
     const r = racine(), { exec } = faux(r);
     await sequence(['s1', '--repetitions', '2'], ioTest({ BENCH_ROOT: r, HOME: r }), dep(r, exec));
     expect(readFileSync(join(r, 'rapports', '2026-11-09-1100-e1-s1-r2.md'), 'utf8')).toMatch(/^Répétition 2\/2$/m);
+  });
+});
+
+describe('la commande de séquence proposée au refus de la garde produit une séquence que la garde accepte (L689, revue)', () => {
+  const modeles = { A: 'opus', 'sequence-v2': 'sonnet', 'cadence-run': 'sonnet' };
+  const court = JSON.stringify({ date: '2026-11-09T09:00:00Z', empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'sonnet', bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, vert: true, rouges: [] });
+  const publiable = (r: string) => statut(readFileSync(join(r, 'historique.jsonl'), 'utf8').split('\n'), new Date('2026-11-09T12:00:00Z'), 'e1', modeles, PUBLIE).publication_ok;
+  /** Un banc court vert cadence-run contre A déjà passé ; il manque la séquence. */
+  function racinePublication() {
+    const r = racine();
+    writeFileSync(join(r, 'bras.yaml'), `${readFileSync(join(r, 'bras.yaml'), 'utf8')}cadence-run:\n  modele: sonnet\n  brief: ${join(import.meta.dirname, '..', 'briefs', 'bras-A.md')}\n`);
+    writeFileSync(join(r, 'historique.jsonl'), `${court}\n`);
+    return r;
+  }
+  it('la commande imprimée par verifier-publication, jouée telle quelle, rend la publication permise', async () => {
+    const r = racinePublication(), io = ioTest({ BENCH_ROOT: r, HOME: r });
+    expect(await bench(['verifier-publication'], io, '/depot/a-publier')).toBe(1);
+    expect(publiable(r)).toBe(false);
+    const proposee = /« node \/depot\/a-publier\/v2\/bin\/cadence2\.js bench sequence ([^»]+) »/.exec(io.sortie.join('\n'));
+    expect(proposee).not.toBeNull();
+    const args = proposee![1].trim().split(/\s+/).map((a) => (a === '<id>' ? 's1' : a));
+    expect(args).toEqual(['s1', '--repetitions', '2', '--candidat', 'cadence-run', '--reference', 'A']);
+    const { exec } = faux(r);
+    expect(await sequence(args, ioTest({ BENCH_ROOT: r, HOME: r }), dep(r, exec))).toBe(0);
+    expect(publiable(r)).toBe(true);
+  });
+  it('sans les bras dans la commande (défaut sequence-v2), la même séquence verte laisse la publication refusée', async () => {
+    const r = racinePublication(), { exec } = faux(r);
+    expect(await sequence(['s1', '--repetitions', '2'], ioTest({ BENCH_ROOT: r, HOME: r }), dep(r, exec))).toBe(0);
+    expect(publiable(r)).toBe(false);
   });
 });

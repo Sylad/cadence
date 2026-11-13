@@ -23,25 +23,17 @@ test('banc — dernier passage rouge : ses trois premiers critères rouges', () 
   expect(bancLine(parseBanc([hebdo, rouge]), LUNDI)).toEqual({ text: 'banc ✗ 08-11 : temps total, relecture aveugle, tests cachés', color: 'error' })
 })
 
-test('banc — en semaine sans passage hebdo depuis samedi : orange « weekend manquant »', () => {
-  expect(bancLine(parseBanc([ligne()]), LUNDI)).toEqual({ text: 'banc ⚠ weekend manquant', color: 'warning' })
-})
-
-test('banc — rouge ET weekend manquant : la ligne rouge, suivie du rappel', () => {
+test('banc — plus de banc du weekend exigé (L689) : en semaine sans passage hebdo, le dernier passage seul', () => {
+  expect(bancLine(parseBanc([ligne()]), LUNDI)).toEqual({ text: 'banc ✓ 08-11 court · eq-legere/A', color: 'success' })
   const rouge = ligne({ vert: false, rouges: ['temps total'] })
-  expect(bancLine(parseBanc([rouge]), LUNDI)).toEqual({ text: 'banc ✗ 08-11 : temps total · ⚠ weekend manquant', color: 'error' })
-})
-
-test('banc — le samedi et le dimanche, rien ne manque encore', () => {
+  expect(bancLine(parseBanc([rouge]), LUNDI)).toEqual({ text: 'banc ✗ 08-11 : temps total', color: 'error' })
   const vieux = ligne({ date: '2026-11-03T09:00:00.000Z', bancs: ['1-a'] })
   expect(bancLine(parseBanc([vieux]), SAMEDI)).toEqual({ text: 'banc ✓ 03-11 éclair · eq-legere/A', color: 'success' })
 })
 
-test('banc — un passage hebdo de vendredi soir ne couvre pas le weekend (samedi 00:00 heure de Paris)', () => {
-  const vendredi = ligne({ date: '2026-11-06T22:30:00.000Z', hebdo: true }) // vendredi 23:30 Paris
-  expect(bancLine(parseBanc([vendredi]), LUNDI)?.text).toBe('banc ⚠ weekend manquant')
-  const samediMinuit = ligne({ date: '2026-11-06T23:30:00.000Z', hebdo: true }) // samedi 00:30 Paris
-  expect(bancLine(parseBanc([samediMinuit]), LUNDI)?.color).toBe('success')
+test('banc — un passage micro ou mécanique (champ niveau, L689) : sa sorte, même sur les bancs 1, 3 et 6', () => {
+  expect(bancLine(parseBanc([ligne({ niveau: 'mecanique', candidat: 'cadence-run' })]), LUNDI)?.text).toBe('banc ✓ 08-11 mécanique · cadence-run/A')
+  expect(bancLine(parseBanc([ligne({ niveau: 'micro', bancs: ['1-a'] })]), LUNDI)?.text).toBe('banc ✓ 08-11 micro · eq-legere/A')
 })
 
 test('banc — sorte du passage : hebdo, éclair, N bancs', () => {

@@ -3131,7 +3131,7 @@ lots:
     finished: 2026-11-07
   - id: L687
     title: "HUD 2.0 (D-1) : montrer les cadence run, revoir la répartition entre la barre du bas et le panneau de gauche, sans doublon, plus d'infos s'il y a la place"
-    status: doing
+    status: done
     estimate: 1
     visible: true
     created: 2026-11-10
@@ -3139,6 +3139,8 @@ lots:
     review: { date: 2026-11-13, verdict: "conforme : 0 bloquant, 0 majeur, 2 mineurs (banc en cours perdu des deux côtés panneau ouvert → L716 ; verrou lu non atomique, transitoire → note) ; collecteur 20 ms mesurés", commit: e84f9f35d66d838966b86612b45a80ef0e18a116 }
     notes:
       - { date: 2026-11-13, text: "Mineur de revue (13-11) : <run>.verrou écrit sans écriture atomique (v2/src/verrou.ts:49-51) : une lecture du HUD pendant session→attente peut afficher le run « interrompu » un rafraîchissement ; se corrige seul." }
+    ux: { date: 2026-11-13, verdict: "conforme : captures vues par le lead (panneau ouvert, runs ⟳, panneau fermé) ; runs visibles bande et panneau, plus de doublon projets/banc ; barres d'avancement et banc en cours à garder visibles panneau ouvert → L716 (choix de Sylvain 13-11)" }
+    finished: 2026-11-13
   - id: L688
     title: "Adapter tous les skills de cadence à cadence run (D-2) : session-start, session-close, deliver, orchestrate, lead, agents et hooks du plugin"
     status: done
@@ -3380,6 +3382,8 @@ lots:
     status: todo
     estimate: 0.25
     created: 2026-11-13
+    notes:
+      - { date: 2026-11-13, text: "13-11, choix de Sylvain : garder aussi les barres d'avancement par projet (679/694…) visibles panneau ouvert ; avec 13 projets elles n'apparaissent plus nulle part (constat du run L687)." }
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

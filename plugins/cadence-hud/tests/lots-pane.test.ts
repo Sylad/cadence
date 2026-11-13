@@ -1719,6 +1719,8 @@ const crowded = async ($: Parameters<TestBody>[0], on: On, tour: unknown[] = TOU
   await s.advance(5_000)
   return s
 }
+/** Ce que l'arbre montre des lots en cours : le compte de ceux qu'il cache, et « Pas la place » s'il n'en montre aucun. */
+const vue = (text: string) => ({ caches: Number(text.match(/\+(\d+) lots? en cours non affichés?/)?.[1] ?? 0), place: text.includes('Pas la place de montrer un lot') })
 
 test('L712 — la répartition de la capture (corps de 16 lignes) : le lot en cours reste visible, le banc se replie, jamais « Aucun lot non clos »', async ($, on) => {
   const s = await crowded($, on)
@@ -1738,21 +1740,17 @@ test('L712 — haut assez : tous les blocs entiers, le banc avec ses 5 passages,
   expect(text).toContain('L80')
 })
 
-test('L712 — les blocs cèdent dans l’ordre : le banc d’abord, puis les livraisons, les dépenses, les décisions en dernier ; le banc garde la ligne de son dernier verdict (L717)', async ($, on) => {
+test('L712 — les blocs cèdent dans l’ordre : le banc d’abord, puis les livraisons, les dépenses, les décisions en dernier ; le banc garde sa ligne repliée tant que l’arbre a sa part (L717)', async ($, on) => {
   const s = await crowded($, on)
   const at = async (rows: number) => (await s.draw(70, rows)).text
   const tall = await at(60)
   expect(tall).toContain('07-11 10:00') // le passage le plus récent, entier
-  // en réduisant la hauteur, le banc se replie le premier (l'ordre : tests/partage-l712.test.ts) et ne cède jamais sa ligne repliée, son dernier verdict
   for (let rows = 30; rows >= 6; rows--) {
     const t = await at(rows)
-    if (!t.includes('Banc : 5 derniers passages')) expect({ rows, banc: t.match(/^Banc : 07-11 10:00 {2}court {2}✓ vert$/gm)?.length }).toEqual({ rows, banc: 1 })
-  }
-  // un bloc ne perd sa dernière ligne qu'après les livraisons, les décisions en dernier
-  for (let rows = 30; rows >= 6; rows--) {
-    const t = await at(rows)
-    if (t.includes('Ce qui attend une décision')) continue
-    expect(t.includes('Dernière livraison')).toBe(false)
+    // un bloc ne perd sa dernière ligne qu'avant les décisions (l'ordre fin : tests/partage-l712.test.ts)
+    if (!t.includes('Ce qui attend une décision')) expect({ rows, livraisons: t.includes('Dernière livraison') }).toEqual({ rows, livraisons: false })
+    // le banc replié garde son dernier verdict, jamais au prix d'un lot en cours de l'arbre (suite de revue de L717)
+    if (!t.includes('Banc : 5 derniers passages') && /^Banc/m.test(t)) expect({ rows, banc: t.match(/^Banc : 07-11 10:00 {2}court {2}✓ vert$/gm)?.length, ...vue(t) }).toEqual({ rows, banc: 1, caches: 0, place: false })
   }
 })
 
@@ -1856,12 +1854,14 @@ test('D-1, suite de L716 — panneau trop court pour l’ordre des projets : la 
 
 // ── L717 : panneau ouvert sur un plan long, sans banc en cours, le dernier verdict du banc reste dessiné, sur une ligne ──
 
+/** 13 projets dont chacun a un lot en cours : l'arbre réclame toute la hauteur jusqu'à une trentaine de lignes. */
+const EN_COURS_13 = Array.from({ length: 13 }, (_, i) => row(`p${i + 1}`, [lot(`A${i + 1}`, 'doing'), lot(`B${i + 1}`)]))
 const rouge = JSON.stringify({ date: '2026-11-12T17:00:00.000Z', candidat: 'eq', bancs: ['1-a', '3-b', '6-c'], hebdo: false, vert: false, rouges: ['tokens', 'durée'] })
 for (const [verdict, banc, attendu] of [
   ['vert', BANC5, /^Banc : 07-11 10:00 {2}court {2}✓ vert$/gm],
   ['rouge', [...BANC5, rouge], /^Banc : 12-11 18:00 {2}court {2}✗ rouge : tokens, durée$/gm],
 ] as const)
-  test(`L717 — 13 projets de 12 lots, 95 colonnes, aucun banc en cours, dernier passage ${verdict} : de 6 à 50 lignes, le verdict est dans le panneau, une seule ligne, même quand l’arbre réclame la hauteur`, async ($, on) => {
+  test(`L717 — 13 projets de 12 lots, 95 colonnes, aucun banc en cours, dernier passage ${verdict} : de 6 à 50 lignes, le verdict est dans le panneau, une seule ligne, tant que l’arbre a sa part`, async ($, on) => {
     const s = await session($, on, { waves: [WAVE_L712], last: () => LAST, banc: [...banc], tour: () => ({ exitCode: 0, stdout: JSON.stringify(TREIZE(7, 12)) }) })
     await s.advance(5_000)
     await s.hud('lots')
@@ -1869,7 +1869,48 @@ for (const [verdict, banc, attendu] of [
     for (let rows = 6; rows <= 50; rows++) {
       const { text } = await s.draw(95, rows)
       const entier = text.includes('Banc : 6 derniers passages') || text.includes('Banc : 5 derniers passages')
+      expect(text.match(/^Banc/gm)?.length ?? 0).toBeLessThanOrEqual(1)
+      // le banc ne cède sa ligne repliée qu'à un arbre qui n'a pas sa part (L712, suite de revue de L717) : ici, de 6 à 50 lignes, l'arbre l'a toujours
+      expect({ rows, ...vue(text) }).toEqual({ rows, caches: 0, place: false })
       expect({ rows, verdict: entier || text.match(attendu)?.length === 1 }).toEqual({ rows, verdict: true })
-      if (!entier) expect(text.match(/^Banc/gm)).toHaveLength(1)
     }
   })
+
+// ── L717, suite de revue : la ligne du banc ne prend jamais la place d'un lot en cours (L712) ──
+
+for (const [nom, tour] of [['13 projets en cours', EN_COURS_13], ['TOUR', TOUR], ['TREIZE(7, 12)', TREIZE(7, 12)]] as const)
+  test(`L717 — ${nom}, 95 colonnes, de 3 à 45 lignes : avec un banc, l’arbre cache autant de lots en cours que sans banc ; le verdict n’est là que si l’arbre a sa part`, async ($, on) => {
+    const banc = [...BANC5]
+    const s = await session($, on, { waves: [WAVE_L712], last: () => LAST, banc, tour: () => ({ exitCode: 0, stdout: JSON.stringify(tour) }) })
+    await s.advance(5_000)
+    await s.hud('lots')
+    await s.advance(5_000)
+    const hauteurs = Array.from({ length: 43 }, (_, i) => i + 3)
+    const avec: { text: string }[] = []
+    for (const rows of hauteurs) avec.push(await s.draw(95, rows))
+    banc.splice(0) // le même panneau, l'historique du banc vidé
+    await s.advance(5_000)
+    const { text: sansBanc } = await s.draw(95, 40)
+    expect(sansBanc).not.toMatch(/^Banc/m)
+    for (const [i, rows] of hauteurs.entries()) {
+      const { text } = await s.draw(95, rows)
+      expect({ rows, ...vue(avec[i]!.text) }).toEqual({ rows, ...vue(text) })
+      if (/^Banc : 07-11/m.test(avec[i]!.text)) expect({ rows, ...vue(avec[i]!.text) }).toEqual({ rows, caches: 0, place: false })
+    }
+  })
+
+test('L717 — 13 projets en cours, 95 colonnes : à 29 lignes aucun lot en cours caché, à 6 lignes un lot montré, avec le banc comme sans', async ($, on) => {
+  const banc = [...BANC5]
+  const s = await session($, on, { waves: [WAVE_L712], last: () => LAST, banc, tour: () => ({ exitCode: 0, stdout: JSON.stringify(EN_COURS_13) }) })
+  await s.advance(5_000)
+  await s.hud('lots')
+  await s.advance(5_000)
+  for (const pass of ['banc', 'sans banc']) {
+    const { text: t29 } = await s.draw(95, 29)
+    expect({ pass, ...vue(t29) }).toEqual({ pass, caches: 0, place: false })
+    const { text: t6 } = await s.draw(95, 6)
+    expect({ pass, place: vue(t6).place, lot: /A\d+/.test(t6) }).toEqual({ pass, place: false, lot: true })
+    banc.splice(0)
+    await s.advance(5_000)
+  }
+})

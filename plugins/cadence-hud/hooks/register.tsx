@@ -10,7 +10,8 @@ import { buildSpend, parseTypical, spendHeight, spendOf } from './spend'
 import { ago, attributeTurn, bar, colorOfLot, colorOfPercent, commandLabel, commandsText, commonProject, endedCommands, endedOwners, fit, expiredHolds, expiredHoldText, fitSegments, holdText, isInside, k, launchFolder, limitLabel, isWaveShown, liveHolds, lotCells, lotCounts, modelsText, notifiedEnd, parseAmbiguous, RESET_BACK, colorOfRun, isRunLive, runCells, RUNS_SHOWN, shortModel, slotsLine, splitCommands, startedCommand, stoppedTask, tourDue, tourFolder, trackCommand, untilReset, waveSignature, wavePercent, waveSessions, waveStatusFr, withoutIds } from './format'
 
 import { lotRow } from './lot-row'
-import { lignesDuBloc, partage } from './partage'
+import { CEDENT, lignesDuBloc, partage } from './partage'
+import type { Bloc } from './partage'
 import { besoinArbre, buildPanel, ellipsize, horsVue, foldText, foldWave, isFolded, moreKey, moreText, movedText, parseLotsBoard, parseMoveAsk, parseProjectMoveAsk, parseToggleAsk, planMove, priorityArgv, projectDetail, projectProgress, projectDir, projectsOf, rankerOf, readTime, refusalReason, stampsSignature, waveLotsOf } from './lots'
 import type { PanelLot } from './lots'
 
@@ -945,13 +946,22 @@ export const register: Register = on => {
     ]
 
     // le partage de la hauteur (L712) : l'arbre des lots d'abord ; tant qu'il n'a pas de quoi montrer ses projets en cours, le banc, les livraisons, les dépenses puis les décisions
-    // se replient en une ligne, puis cèdent cette ligne, dans cet ordre ; le banc garde la sienne, son dernier verdict (L717)
+    // se replient en une ligne, puis cèdent cette ligne, dans cet ordre
     // L687 : les lots que joue un run vivant de cadence run (le dossier de son dépôt fait le projet, comme pour une vague)
     const runLots = runsNow.filter(r => isRunLive(r) && r.lot).map(r => ({ project: r.repo.split('/').filter(Boolean).pop() ?? '', lot: r.lot!, state: r.role === 'attente' ? 'quota' : 'en-cours' }))
     const panelInput = board && !board.outdated ? { rows: board.rows, columns, waves: waveLotsOf(allWaves, at), folds, views, now: at, runs: runLots } : undefined
     const treeNeed = panelInput ? besoinArbre(panelInput, bodyRows) : 1
-    // L717 : le dernier verdict du banc garde sa ligne repliée, même quand l'arbre réclame la hauteur (la bande ne le montre pas panneau ouvert)
-    const share = partage(bodyRows, treeNeed, { decisions: decisions.lines.length, depenses: spend.lines.length, livraisons: shipped.lines.length, banc: benchLines.length }, { depenses: spend.lines.some(l => l.tone === 'warning') ? 1 : 0, banc: benchLines.length > 0 ? 1 : 0 })
+    const tailles = { decisions: decisions.lines.length, depenses: spend.lines.length, livraisons: shipped.lines.length, banc: benchLines.length }
+    const planchers = { depenses: spend.lines.some(l => l.tone === 'warning') ? 1 : 0 }
+    const cede = partage(bodyRows, treeNeed, tailles, planchers)
+    // L717 : le dernier verdict du banc (la bande ne le montre pas panneau ouvert) garde sa ligne repliée, les autres blocs cédant la leur avant elle, mais seulement si
+    // l'arbre a encore sa part : dans la hauteur qui lui reste, un lot et tous ses lots en cours (L712) ; sinon elle cède sa place, comme avant
+    const garde = cede.banc === 0 && benchLines.length > 0 && panelInput ? partage(bodyRows, treeNeed, tailles, { ...planchers, banc: 1 }) : undefined
+    const arbreEntier = (h: Record<Bloc, number>) => {
+      const panel = buildPanel({ ...panelInput!, height: bodyRows - CEDENT.reduce((n, b) => n + h[b], 0) })
+      return panel.lines.length > 0 && panel.enCours === 0
+    }
+    const share = garde && arbreEntier(garde) ? garde : cede
     const rouges = deliveryRows.filter(r => r.status === 'rouge').length
     const decisionLines = lignesDuBloc(decisions.lines, decisions.lines[0], share.decisions)
     const spendLines = lignesDuBloc(spend.lines, spend.lines.find(l => l.tone === 'warning') ?? spend.lines[0], share.depenses)

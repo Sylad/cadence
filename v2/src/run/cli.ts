@@ -34,7 +34,12 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
     if (a[0] === '--liste') {
       const racine = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: io.cwd, encoding: 'utf8' }).trim(), d = join(dirname(racine), '.cadence-run');
       const etats = existsSync(d) ? readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(d, f), 'utf8')) as Etat).filter((e) => e.repo === racine) : [];
-      for (const e of etats) out(`${e.id}  ${etatVu(e)}${etatVu(e) === 'interrompu' ? ` (reprendre : cadence run --reponse ${e.id} "reprends")` : ''}  ${e.demande.split('\n')[0].slice(0, 80)}${e.etat === 'quota' && e.quota ? `  · ${quotaListe(e, e.quota)}` : ''}${e.rapport_tour ? `  · rapport : ${origineRapport(e.rapport_tour)}` : ''}${etatVu(e) === 'interrompu' ? causeListe(e.journal) : ''}`);
+      for (const e of etats) {
+        const vu = etatVu(e), interrompu = vu === 'interrompu';
+        const notes = [e.etat === 'quota' && e.quota ? quotaListe(e, e.quota) : '', e.rapport_tour ? origineRapport(e) : ''].filter(Boolean);
+        out(`${e.id}  ${vu}${interrompu ? ` (reprendre : cadence run --reponse ${e.id} "reprends")` : ''}  ${e.demande.split('\n')[0].slice(0, 80)}`
+          + `${notes.map((n) => `  · ${n}`).join('')}${interrompu ? causeListe(e.journal) : ''}`);
+      }
       if (!etats.length) out('aucun run'); return 0;
     }
     if (a[0] === '--veilleur') return veiller(['run', ...a.slice(1)], io.env, io.cwd, out); // L711 : le parent d'un run --fond, lancé par --fond seul

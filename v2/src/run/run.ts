@@ -12,7 +12,7 @@ import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, ty
 import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun } from './aiguillage.js';
 import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
 import { causeSession } from '../trace.js';
-import { garderRapport, origineRapport, type Message } from '../rapport.js';
+import { CONSIGNE_FINI, garderRapport, origineRapport, type EtatRapport } from '../rapport.js';
 import { cheminWorktree, reglagesRun } from '../socle.js';
 import { briefRegistre, entreeCommitee, preparerRegistre, registreOuvert, registreTouche } from '../registre.js';
 import { fichiersNonCommites, nommerFichiers, PLAN_EN_ATTENTE } from '../../../scripts/arbre-non-commite.mjs'; // L722 : même lecture que src/repo-held.ts
@@ -21,8 +21,8 @@ import { debutProcessus, inscrireCreneau, occupantVivant, prendreVerrou, rendreV
 /** D-15 : le run reprend une minute après l'heure de remise à zéro annoncée, relit son état au plus tard toutes les 10 min (une reprise par --reponse arrête
  * l'attente), et ne reprend pas plus de 5 fois de suite sur un quota (une heure de remise à zéro qui ne remet rien à zéro ne boucle pas). */
 const MARGE_REPRISE_MS = 60_000, PORTE_MS = 30 * 60_000 /* une commande de la porte */, TRANCHE_ATTENTE_MS = 10 * 60_000, REPRISES_QUOTA_MAX = 5;
-const REPRISE_QUOTA = 'Le quota est revenu : reprends le travail là où tu t\'étais arrêté, dans le même dossier, puis dis « fini ».';
-const BASCULE_FABLE = 'La limite Opus est atteinte : tu continues sur Fable. Reprends le travail là où tu t\'étais arrêté, dans le même dossier, puis dis « fini ».';
+const REPRISE_QUOTA = `Le quota est revenu : reprends le travail là où tu t'étais arrêté, dans le même dossier, ${CONSIGNE_FINI}.`;
+const BASCULE_FABLE = `La limite Opus est atteinte : tu continues sur Fable. Reprends le travail là où tu t'étais arrêté, dans le même dossier, ${CONSIGNE_FINI}.`;
 
 /** L723 : un conflit au rebase sur la cible, rendu à la session ; `resolu` absent tant qu'elle y travaille (reprise après quota, signal, question), faux si elle
  * ne l'a pas résolu, `message` : son dernier mot. */
@@ -31,9 +31,10 @@ export interface Conflit { cible: string; sur: string; fichiers: string[]; resol
  * `verte` : la porte rejouée après la correction, absente tant qu'elle n'a pas été rejouée. */
 export interface Correction { rouge: string; message?: string; verte?: boolean }
 export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-commit' | 'echec' | 'conflit' | 'porte-rouge' | 'sans-porte' | 'refus-integration' | 'integre';
-export interface Etat { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string; pieces: string[];
-  taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number; etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; rapport?: string; rapport_tour?: number; messages?: Message[];
-  conflits?: Conflit[]; corrections?: Correction[] }
+/** `rapport`, `rapport_tour`, `rapport_sans_marqueur`, `messages` : ../rapport.ts (EtatRapport, issues #57 et #58). */
+export interface Etat extends EtatRapport { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string;
+  pieces: string[]; taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number;
+  etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; conflits?: Conflit[]; corrections?: Correction[] }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
@@ -124,8 +125,8 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   // D-15 : une fin de quota n'est pas un échec. La limite Opus seule bascule sur fable dans la même session ; la limite hebdo bloque tous les modèles : on attend.
   const q = reconnaitreQuota(r.resultat || brut.stdout, (o.maintenant ?? (() => new Date()))());
   // Issue #57 : chaque message de la session va au journal et à l'état quelle que soit sa fin (travail fini, échec, délai, signal, quota) : c'est là que le
-  // lead lit ce qui a été fait et ce qui reste. Le rapport est le dernier message du tour du rapport (../rapport.ts, issue #58 : celui du prompt, ou celui où
-  // la session a fini le travail qu'elle attendait en fond), fixé seulement si le travail a fini ; les tours ouverts après lui vont au journal, sans le remplacer.
+  // lead lit ce qui a été fait et ce qui reste. Le rapport est le dernier message marqué « === FINI === » (../rapport.ts, L728 : consigne du brief), fixé seulement
+  // si le travail a fini ; ce qui vient après lui va au journal sans le remplacer. Sans marqueur, le dernier message, et l'état le dit (à vérifier au journal).
   garderRapport(e, r.messages, o.out, !q && !r.echec, sujet);
   // L724 : le dernier mot d'une session à sujet va à ce qu'elle traite (le conflit, la correction), à chaque passage : reprise après quota et bascule comprises
   const mot = r.messages.filter((m) => !m.apres).at(-1)?.texte;
@@ -161,7 +162,7 @@ const rebaseEnCours = (wt: string) => ['rebase-merge', 'rebase-apply'].some((d) 
 const fichiersGit = (cwd: string, ...a: string[]) => essaiGit(cwd, ...a, '-z').stdout.split('\0').filter(Boolean);
 const consigneConflit = (e: Etat, fichiers: string[]) => `Le rebase de ta branche sur ${e.cible}, qui a avancé pendant ton travail, est en conflit sur : ${fichiers.join(', ')}.\n`
   + `Le rebase est en cours dans ${e.worktree}. Résous chaque conflit en gardant les deux intentions (le travail de ${e.cible} et le tien), git add, puis `
-  + '`GIT_EDITOR=true git rebase --continue`, jusqu\'à la fin du rebase, sans --skip ni --abort. Ne commite rien d\'autre, puis dis « fini ».';
+  + `\`GIT_EDITOR=true git rebase --continue\`, jusqu'à la fin du rebase, sans --skip ni --abort. Ne commite rien d'autre, ${CONSIGNE_FINI}.`;
 
 const SUJET_CONFLIT = 'résolution du conflit au rebase';
 // L724 : même modèle pour la correction après porte rouge : son « fini » ne remplace pas le rapport du travail ; la porte rouge, ce que la session en
@@ -246,7 +247,7 @@ function suite(e: Etat, o: Opts): Etat {
       if (essai === 1) { if (attendue) attendue.verte = false; e.etat = 'porte-rouge'; e.detail = p.sortie; return fin(e, o); }
       o.out(`porte rouge : reprise de la session pour corriger :\n${p.sortie}`);
       ouvrirCorrection(e, p.sortie);
-      if (!session(e, `La porte complète est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, puis dis « fini ».`, o, false, SUJET_CORRECTION)) return fin(e, o);
+      if (!session(e, `La porte complète est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, ${CONSIGNE_FINI}.`, o, false, SUJET_CORRECTION)) return fin(e, o);
     }
     const refus = avancer(e, br, cible);
     if (!refus) break;
@@ -268,7 +269,8 @@ function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
   sauver(e);
   rendre(e, o);
   const duree = Math.round((Date.now() - Date.parse(e.debut)) / 1000);
-  o.out(`cadence run ${e.id} : ${e.etat}${e.integre ? ` (${e.cible} = ${e.integre})` : ''} · ${duree} s · ${e.cout_usd.toFixed(2)} $${e.rapport_tour ? ` · rapport : ${origineRapport(e.rapport_tour)}` : ''}${e.detail ? `\n${e.detail}` : ''}`);
+  const ou = e.integre ? ` (${e.cible} = ${e.integre})` : '', rapport = e.rapport_tour ? ` · ${origineRapport(e)}` : '';
+  o.out(`cadence run ${e.id} : ${e.etat}${ou} · ${duree} s · ${e.cout_usd.toFixed(2)} $${rapport}${e.detail ? `\n${e.detail}` : ''}`);
   for (const r of registre) o.out(`registre : ${r}`);
   if (e.etat !== 'integre') o.out(`worktree gardé : ${e.worktree} (état : ${e.fichier})`);
   return e;

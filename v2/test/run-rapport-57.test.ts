@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { lire, type Executeur } from '../src/bench/bras.js';
-import { garderRapport, lireFlux } from '../src/rapport.js';
+import { garderRapport, lireFlux, MARQUEUR } from '../src/rapport.js';
 import { executerRun } from '../src/run/run.js';
 import { commite, depot, io } from './run-outils.js';
 
@@ -10,9 +10,14 @@ import { commite, depot, io } from './run-outils.js';
 // à une notification de tâche arrivée après le rapport ; le rapport (commits, tests scellés à resceller, vérifié / non vérifié) n'était plus que dans le transcript.
 // Les flux sont capturés de vrais `claude -p --output-format stream-json --verbose --model haiku` (2.1.293, 13-11) ; seuls l'événement init (réduit à
 // quelques champs) et les chemins ont été retouchés. La notification y est un événement system/task_notification, jamais un message user.
+// L728 (revue) : le rapport est le dernier message qui commence par MARQUEUR (consigne du brief) ; les flux captaient d'avant la consigne, `marquer` le met
+// dans le message du tour 1, celui qu'une session qui suit le brief aurait marqué. Les flux bruts (sans marqueur) sont joués dans run-rapport-58.test.ts.
 const fixture = (nom: string) => readFileSync(join(import.meta.dirname, 'fixtures', nom), 'utf8');
 const TARDIVE = fixture('flux-notification-tardive-2.1.293.jsonl');
 const PENDANT = fixture('flux-notification-pendant-le-travail-2.1.293.jsonl');
+const marquer = (flux: string, texte: string) => flux.replaceAll(JSON.stringify(texte).slice(1, -1), JSON.stringify(`${MARQUEUR}\n${texte}`).slice(1, -1));
+const FINI = `${MARQUEUR}\nfini, commande lancée en fond.`, TARDIVE_M = marquer(TARDIVE, 'fini, commande lancée en fond.');
+const TROIS = `${MARQUEUR}\nfini, trois commandes lancées.`, PENDANT_M = marquer(PENDANT, 'fini, trois commandes lancées.');
 
 const ligne = (o: object) => JSON.stringify(o);
 const assistant = (id: string, ...content: object[]) => ligne({ type: 'assistant', message: { id, role: 'assistant', content } });
@@ -35,33 +40,33 @@ function lancer(sorties: ReturnType<Executeur>[], opts: Partial<Parameters<typeo
   const etat = JSON.parse(readFileSync(e.fichier, 'utf8')) as { etat: string; detail: string; rapport?: string; messages?: { texte: string; tour: number }[] };
   return { e, etat, journal: l.join('\n'), appels };
 }
-const RAPPORT = 'fini. Commits : 1a2b3c4 (issue #57). Tests scellés à resceller : test/x.test.ts. Vérifié : suite verte. Non vérifié : la capture.';
+const RAPPORT = `${MARQUEUR}\nfini. Commits : 1a2b3c4 (issue #57). Tests scellés à resceller : test/x.test.ts. Vérifié : suite verte. Non vérifié : la capture.`;
 const TARD = 'Notification tardive : rien de neuf, le rapport « fini » reste valable.';
 
 describe('cadence run garde le rapport de fin de travail (issue #57)', () => {
-  it('vrai flux : la réponse tardive, qui dit « Fini », reste au tour 2 ; le rapport est le message du tour du prompt', () => {
-    const f = lireFlux(TARDIVE);
+  it('vrai flux : la réponse tardive, qui dit « Fini », reste au tour 2 ; le rapport est le message marqué du tour du prompt', () => {
+    const f = lireFlux(TARDIVE_M);
     expect(f.messages).toEqual([
-      { texte: 'fini, commande lancée en fond.', tour: 1 },
+      { texte: FINI, tour: 1, marque: true },
       { texte: 'Fini : la commande en arrière-plan a bien terminé avec le code de sortie 0.', tour: 2, apres: true },
     ]);
-    expect(f.travail?.result).toBe('fini, commande lancée en fond.');
+    expect(f.travail?.result).toBe(FINI);
     expect(f.fin?.total_cost_usd).toBeGreaterThan(f.travail?.total_cost_usd ?? Infinity); // le dernier result cumule
     expect(f.apres).toBe(true);
   });
 
   it('vrai flux : une notification pendant le travail ne change pas le tour ; le rapport est celui du tour 1, la réponse tardive va au tour 2', () => {
-    const { messages } = lireFlux(PENDANT);
+    const { messages } = lireFlux(PENDANT_M);
     expect(messages).toEqual([
-      { texte: 'fini, trois commandes lancées.', tour: 1 },
+      { texte: TROIS, tour: 1, marque: true },
       { texte: 'fini : la commande « tardif » en arrière-plan s\'est terminée avec le code 0.', tour: 2, apres: true },
     ]);
     const e: { rapport?: string } = {}, lignes: string[] = [];
     garderRapport(e, messages, (x) => lignes.push(x));
-    expect(e.rapport).toBe('fini, trois commandes lancées.');
+    expect(e.rapport).toBe(TROIS);
     expect(lignes).toEqual([
-      'session, rapport : fini, trois commandes lancées.',
-      'session, tour 2, après le rapport (notification de tâche ; ne change ni le rapport ni l\'état du run) : fini : la commande « tardif » en arrière-plan s\'est terminée avec le code 0.',
+      `session, rapport : ${TROIS}`,
+      'session, tour 2, après le rapport (ne change ni le rapport ni l\'état du run) : fini : la commande « tardif » en arrière-plan s\'est terminée avec le code 0.',
     ]);
   });
 
@@ -71,18 +76,18 @@ describe('cadence run garde le rapport de fin de travail (issue #57)', () => {
       appels.push(args);
       commite('fait.txt')(o.cwd);
       const i = args.indexOf('--session-id');
-      return { stdout: TARDIVE.replaceAll('4ac4aee7-0d65-49a0-b15d-51761b43a6a8', args[i + 1]), code: 0 };
+      return { stdout: TARDIVE_M.replaceAll('4ac4aee7-0d65-49a0-b15d-51761b43a6a8', args[i + 1]), code: 0 };
     };
     const e = executerRun({ repo, demande: 'Crée fait.txt', exec, out });
     expect(e.etat).toBe('integre');
     expect(appels[0]).toEqual(expect.arrayContaining(['--output-format', 'stream-json', '--verbose']));
     const etat = JSON.parse(readFileSync(e.fichier, 'utf8'));
-    expect(etat.rapport).toBe('fini, commande lancée en fond.');
+    expect(etat.rapport).toBe(FINI);
     expect(etat.messages.map((m: { tour: number }) => m.tour)).toEqual([1, 2]);
     expect(etat.cout_usd).toBeCloseTo(0.00773859);
     const journal = l.join('\n');
-    expect(journal.indexOf('session, rapport : fini, commande lancée en fond.')).toBeGreaterThan(-1);
-    expect(journal.indexOf('session, rapport : fini')).toBeLessThan(journal.indexOf('session, tour 2, après le rapport'));
+    expect(journal.indexOf(`session, rapport : ${FINI}`)).toBeGreaterThan(-1);
+    expect(journal.indexOf('session, rapport :')).toBeLessThan(journal.indexOf('session, tour 2, après le rapport'));
   });
 
   it('un message « fini » pendant le travail, un appel d\'outil, puis le rapport : tous au journal, le rapport est le dernier du tour 1', () => {
@@ -94,7 +99,7 @@ describe('cadence run garde le rapport de fin de travail (issue #57)', () => {
     expect(lignes).toEqual([
       'session, pendant le travail : Agent lancé, fini pour cette étape.',
       `session, rapport : ${RAPPORT}`,
-      `session, tour 2, après le rapport (notification de tâche ; ne change ni le rapport ni l'état du run) : ${TARD}`,
+      `session, tour 2, après le rapport (ne change ni le rapport ni l'état du run) : ${TARD}`,
     ]);
   });
 
@@ -107,9 +112,9 @@ describe('cadence run garde le rapport de fin de travail (issue #57)', () => {
     expect(lire({ stdout: [assistant('a', texte(RAPPORT)), resultat('s', RAPPORT, 1)].join('\n'), code: 1 }).echec).toBe('code 1'); // un seul tour : le code compte
   });
 
-  it('un travail en échec reste un échec, même suivi d\'un tour réussi ; le détail nomme l\'erreur et la cite, jamais « success »', () => {
+  it('un travail en échec (result en erreur du tour marqué) reste un échec, même suivi d\'un tour réussi ; le détail nomme l\'erreur et la cite, jamais « success »', () => {
     const api = 'API Error: 500 {"type":"error"}\nrien de plus';
-    const flux = [assistant('a', texte('Erreur.')), resultat('s', api, 1, true), notification, assistant('b', texte(TARD)), resultat('s', TARD, 1.1)].join('\n');
+    const flux = [assistant('a', texte(RAPPORT)), resultat('s', api, 1, true), notification, assistant('b', texte(TARD)), resultat('s', TARD, 1.1)].join('\n');
     expect(lire({ stdout: flux, code: 0 }).echec).toBe('session s : erreur (« API Error: 500 {"type":"error"} »)');
     expect(lire({ stdout: [assistant('a', texte('Erreur.')), resultat('s', '', 1, true)].join('\n'), code: 1 }).echec).toBe('session s : erreur, code 1');
     expect(lire({ stdout: [assistant('a', texte(AVANT)), resultat('s', '', 0.5, true, 'error_max_turns')].join('\n'), code: 1 }).echec).toBe('session s : error_max_turns, code 1');
@@ -163,18 +168,18 @@ describe('cadence run garde le rapport de fin de travail (issue #57)', () => {
 
     it('limite Opus puis bascule sur fable : les messages des deux sessions se suivent, le rapport est celui de la session qui a fini', () => {
       const opus = 'You\'ve hit your Opus limit · resets Fri 10am (Europe/Paris)';
-      const r = lancer([{ stdout: `${coupe}\n${resultat('s', opus, 0.5, true)}`, code: 1 }, { stdout: TARDIVE, code: 0 }]);
+      const r = lancer([{ stdout: `${coupe}\n${resultat('s', opus, 0.5, true)}`, code: 1 }, { stdout: TARDIVE_M, code: 0 }]);
       expect(r.e).toMatchObject({ etat: 'integre', modele: 'fable' });
       expect(r.appels).toHaveLength(2);
-      expect(r.etat.rapport).toBe('fini, commande lancée en fond.');
+      expect(r.etat.rapport).toBe(FINI);
       expect(r.etat.messages!.map((m) => [m.tour, m.texte])).toEqual([
-        [1, 'Je commence.'], [1, AVANT], [1, 'fini, commande lancée en fond.'],
+        [1, 'Je commence.'], [1, AVANT], [1, FINI],
         [2, 'Fini : la commande en arrière-plan a bien terminé avec le code de sortie 0.'],
       ]);
       const i = (s: string) => r.journal.indexOf(s);
       expect(i(avantArret)).toBeGreaterThan(-1);
       expect(i(avantArret)).toBeLessThan(i('limite Opus atteinte : bascule sur fable'));
-      expect(i('limite Opus atteinte')).toBeLessThan(i('session, rapport : fini, commande lancée en fond.'));
+      expect(i('limite Opus atteinte')).toBeLessThan(i(`session, rapport : ${FINI}`));
       expect(i('session, rapport :')).toBeLessThan(i('session, tour 2, après le rapport'));
     });
   });

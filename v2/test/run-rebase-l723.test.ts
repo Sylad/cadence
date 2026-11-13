@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
 import { executerRun, type Etat } from '../src/run/run.js';
+import { MARQUEUR } from '../src/rapport.js';
 import { commite, depot, fauxClaude, git, horloge, io, sortie } from './run-outils.js';
 
 const ID = ['-c', 'user.email=t@t', '-c', 'user.name=t'];
@@ -23,7 +24,7 @@ const parlant = (exec: Executeur, reponses: string[]): Executeur => (args, o) =>
   return { ...r, stdout: sortie(j.session_id, reponses.shift() ?? j.result) };
 };
 const HEBDO = "You've hit your weekly limit · resets Thu 9am (Europe/Paris)";
-const RAPPORT = 'fini. Commit : ajoute fait.txt. Vérifié : porte verte. Non vérifié : la capture.';
+const RAPPORT = `${MARQUEUR}\nfini. Commit : ajoute fait.txt. Vérifié : porte verte. Non vérifié : la capture.`; // L728 : le rapport commence par le marqueur, comme le brief le demande
 const RESOLUTION = 'fini : fait.txt garde les deux versions, rebase terminé.';
 /** La session de travail commite fait.txt pendant qu'« ailleurs » commite un autre fait.txt sur main : le rebase est en conflit sur fait.txt. */
 const travailEnConflit = (repo: string) => (cwd: string) => {
@@ -83,7 +84,7 @@ describe('cadence run : la branche cible avance pendant la porte (L723)', () => 
     expect(etat.conflits).toEqual([{ cible: 'main', sur: ailleurs, fichiers: ['fait.txt'], resolu: true, message: RESOLUTION }]);
     expect(etat.detail).toBe(`conflit au rebase sur main (${ailleurs.slice(0, 7)}) résolu par la session, fichiers : fait.txt ; la session : ${RESOLUTION}`);
     // les deux sessions restent dans l'état, chacune pour ce qu'elle est
-    expect(etat.messages).toEqual([{ texte: RAPPORT, tour: 1 }, { texte: RESOLUTION, tour: 1, sujet: 'résolution du conflit au rebase' }]);
+    expect(etat.messages).toEqual([{ texte: RAPPORT, tour: 1, marque: true }, { texte: RESOLUTION, tour: 1, sujet: 'résolution du conflit au rebase' }]);
     const lignes = [
       `session, rapport : ${RAPPORT}`,
       'conflit au rebase sur main (fait.txt) : reprise de la session pour le résoudre',

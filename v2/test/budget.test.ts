@@ -30,6 +30,7 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L724 : run 557, la correction après porte rouge va à l'état et au journal, le rapport du travail n'est plus remplacé par le « fini » de la correction.
   // L724 (revue) : run 561 (+4), la reprise après quota pendant un conflit garde le rapport ; le dernier mot d'une session à sujet n'a plus qu'un mécanisme.
   // L728 (issue #58) : run 562 (+1, import de origineRapport dans cli.ts), --liste dit de quel tour vient le rapport.
+  // L728 (revue) : run 569 (+7), la ligne --liste et la ligne de fin détassées (cinq et deux lignes), le type Etat étend EtatRapport (rapport.ts).
   it('les totaux sont ceux de R29 : noyau 3000, mesure 1698 (L689, issue #57)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1698]);

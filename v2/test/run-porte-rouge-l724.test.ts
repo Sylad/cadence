@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Executeur } from '../src/bench/bras.js';
 import { executerRun, repondreRun, type Etat } from '../src/run/run.js';
+import { MARQUEUR } from '../src/rapport.js';
 import { commite, depot, fauxClaude, horloge, io, sortie } from './run-outils.js';
 
 /** Faux claude dont chaque session rend son propre dernier message (`reponses`), comme un vrai rapport de travail puis une réponse de correction ;
@@ -13,7 +14,7 @@ const parlant = (exec: Executeur, reponses: string[]): Executeur => (args, o) =>
   if (r.code) return r;
   return { ...r, stdout: sortie(j.session_id, reponses.shift() ?? j.result) };
 };
-const RAPPORT = 'fini. Commit : ajoute autre.txt. Vérifié : suite ciblée. Non vérifié : la porte complète.';
+const RAPPORT = `${MARQUEUR}\nfini. Commit : ajoute autre.txt. Vérifié : suite ciblée. Non vérifié : la porte complète.`; // L728 : le rapport commence par le marqueur, comme le brief le demande
 const CORRECTION = 'fini : fait.txt manquait, ajouté et commité.';
 const HEBDO = "You've hit your weekly limit · resets Thu 9am (Europe/Paris)";
 const relire = (e: Etat) => JSON.parse(readFileSync(e.fichier, 'utf8')) as Etat;
@@ -26,7 +27,7 @@ describe('cadence run : correction après porte rouge (L724)', () => {
     expect(etat.etat).toBe('integre');
     expect(etat.rapport).toBe(RAPPORT); // le « fini » de la correction ne le remplace pas
     expect(etat.corrections).toEqual([{ rouge: '$ test -f fait.txt\n', message: CORRECTION, verte: true }]);
-    expect(etat.messages).toEqual([{ texte: RAPPORT, tour: 1 }, { texte: CORRECTION, tour: 1, sujet: 'correction après porte rouge' }]);
+    expect(etat.messages).toEqual([{ texte: RAPPORT, tour: 1, marque: true }, { texte: CORRECTION, tour: 1, sujet: 'correction après porte rouge' }]);
     expect(etat.detail).toBe(`porte rouge ($ test -f fait.txt) corrigée par la session, porte verte ensuite ; la session : ${CORRECTION}`);
     const lignes = [
       `session, rapport : ${RAPPORT}`,

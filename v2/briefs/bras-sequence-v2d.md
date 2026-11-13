@@ -18,4 +18,4 @@ Tu es le responsable de cette demande, de bout en bout, dans le dépôt {{CLONE}
 - Si un point bloque vraiment et que la réponse est à Sylvain, écris ta question dans {{QUESTION}} et arrête-toi. Sinon, décide et note ton hypothèse dans le message de commit.
 - Avant de commiter, relis le registre : traite chaque demande ouverte qui s'applique maintenant, celle-ci comme les précédentes, et passe-la à « livrée » avec sa preuve (commit, test ou commande et sa sortie). Une demande qui ne s'applique pas encore reste « ouverte ». Le registre est commité avec le reste.
 - Commite (sans `--no-verify`, aucun push).
-- Dis ensuite « fini », avec ce que tu as vérifié et ce que tu n'as pas vérifié.
+- Dis ensuite « fini » : un seul message, qui commence par la ligne « === FINI === » (seule sur sa ligne), puis ce que tu as vérifié et ce que tu n'as pas vérifié. Le rapport retenu est le dernier message qui commence par cette ligne : ne l'écris nulle part ailleurs, ni dans une ligne d'attente, ni dans une réponse à une notification de tâche, ni dans un message de commit.

@@ -1,11 +1,12 @@
 import { afterAll } from 'vitest';
 import { cleanupTempDirs, tempDir } from './helpers.js';
+import { retirerVariablesSession } from './variables-session.js';
 
 // Les tests de cadence vérifient eux-mêmes les refus sous CADENCE_ORCHESTRATED (deliver, raf done, orchestrate) :
 // lancés depuis une session de vague, ils ne doivent pas hériter de la variable de cette session.
-// L715 : de même pour toute CADENCE_* (CADENCE_PIECES, CADENCE_CLONE, CADENCE_BANC_RACINE d'une session cadence run, CADENCE_MAX_SESSIONS…) :
-// le test qui en lit une la pose lui-même (vi.stubEnv). Restent les CADENCE_TEST_*, réglages de la suite elle-même (global-setup.ts, vitest.config.ts).
-for (const k of Object.keys(process.env)) if (k.startsWith('CADENCE_') && !k.startsWith('CADENCE_TEST_')) delete process.env[k];
+// L715 : de même pour les autres variables qu'une session de cadence pose pour elle-même (liste dans variables-session.ts) ;
+// jamais les réglages de la suite (CADENCE_PLAYWRIGHT, CADENCE_TEST_*).
+retirerVariablesSession();
 
 // Les dossiers créés par tempDir() ne survivent pas à leur fichier de test (L45).
 afterAll(cleanupTempDirs);

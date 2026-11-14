@@ -74,11 +74,13 @@ describe('L671 bords — citedResources', () => {
   it('R1 bord — un très long titre sans chemin se lit en temps linéaire (L686 : rapport de croissance, pas une durée)', async () => {
     // Un mot de 2n « a/ » puis un mot de n « * » : avant L686, le motif revenait sur chaque « * » (quadratique, ×4 par doublement — 2 080 ms sur le
     // runner GitHub pour n = 50 000) ; linéaire, le rapport entre n et 4n est proche de 4, en carré il serait proche de 16.
-    const ratio = await growthRatio((n) => expect(citedResources('a/'.repeat(n) + ' ' + '*'.repeat(n), r)).toEqual([]), 50_000, 200_000);
+    // Tailles ×4 et 5 tours (porte rouge du 14-11 : 10,8) : à n = 50 000 la petite mesure dure ~1 ms, une tranche d'ordonnanceur ; sous la charge de la
+    // suite complète, la grande seule est préemptée et le rapport montait à 11 (reproduit sous 64 boucles CPU), il reste sous 6,5 à ~5 et ~20 ms.
+    const ratio = await growthRatio((n) => expect(citedResources('a/'.repeat(n) + ' ' + '*'.repeat(n), r)).toEqual([]), 200_000, 800_000, 5);
     expect(ratio).toBeLessThan(10);
   });
   it('R1 bord — un mot fait de points qui ne finissent pas le mot se lit en temps linéaire (L686)', async () => {
-    const ratio = await growthRatio((n) => expect(citedResources(`docs/${'.'.repeat(n)}x`, r)).toEqual([]), 50_000, 200_000);
+    const ratio = await growthRatio((n) => expect(citedResources(`docs/${'.'.repeat(n)}x`, r)).toEqual([]), 200_000, 800_000, 5); // tailles : voir le test précédent
     expect(ratio).toBeLessThan(10);
   });
   it('R1 bord — ressource à chemins dont un chemin est un dossier, citée par le dossier exact', () => {

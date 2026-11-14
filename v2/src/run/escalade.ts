@@ -6,16 +6,18 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-export const PASSE_FABLE = 3, REVUES_FABLE = 2;
+export const PASSE_FABLE = 3;
+export const REVUES_FABLE = 2;
 export interface Revue { date: string; verdict: string; commit?: string | null }
 /** Ce que l'état d'un run garde pour l'aiguillage (sous-ensemble de Etat, run.ts). */
-export interface RunDuLot { id: string; repo: string; lot?: string; etat: string; corrections?: unknown[]; correction_revue?: boolean; revue?: Revue }
+export interface RunDuLot { id: string; repo: string; lot?: string; etat: string; debut?: string; corrections?: unknown[]; correction_revue?: boolean; revue?: Revue }
 /** Une session du run : ce qu'elle a fait, sur quel modèle, et pourquoi ce modèle. */
 export interface Passe { quoi: string; modele: string; raison: string }
 
 /** Même règle que isNonConformingVerdict (src/audit.ts, L660) : le verdict COMMENCE par « non conforme » / « not compliant ». */
 export const nonConforme = (verdict: string) => /^[^\p{L}\p{N}]*(?:non[\s-]*conforme|not\s+compliant|non[\s-]*compliant)/iu.test(verdict);
-const cle = (r: Revue) => `${r.date}|${r.commit ?? ''}|${r.verdict}`;
+/** L726 (revue) : une revue est son jour et le commit revu, pas son texte : la même revue réécrite par raf review (verdict précisé) reste la même. */
+const cle = (r: Revue) => `${r.date}|${r.commit ?? ''}`;
 
 /** La revue de code du lot dans le plan, lue par raf ; `erreur` si le plan ne se lit pas (le run part quand même, sans la compter). */
 export function revueDuPlan(repo: string, lot: string, raf: string): { revue?: Revue; erreur?: string } {
@@ -24,7 +26,7 @@ export function revueDuPlan(repo: string, lot: string, raf: string): { revue?: R
   try {
     const l = (JSON.parse(r.stdout) as { id: string; review?: Revue }[]).find((x) => x.id === lot);
     return l ? (l.review ? { revue: l.review } : {}) : { erreur: `lot ${lot} absent du plan` };
-  } catch (x) { return { erreur: `plan illisible (raf list : ${(x as Error).message})` }; }
+  } catch (x) { return { erreur: `plan illisible (raf list : ${(x as Error).message.replace(/\s+/g, ' ').trim()})` }; } // sur une ligne : elle va à la ligne de lancement
 }
 
 /** Les runs précédents du lot dans ce dépôt (états de `dossier`), hors `id`. Un état illisible est ignoré. */
@@ -35,7 +37,7 @@ export function runsDuLot(dossier: string, repo: string, lot: string, id: string
   }).filter((e) => e.repo === repo && e.lot === lot && e.id !== id);
 }
 
-/** Passes de correction déjà jouées sur le lot : chaque run relancé après un run intégré (correction après revue), plus chaque correction de porte rouge. */
+/** Passes de correction déjà jouées sur le lot : chaque run relancé sur une revue non conforme neuve (correction après revue), plus chaque correction de porte rouge. */
 export const correctionsAvant = (runs: RunDuLot[]) => runs.reduce((n, r) => n + (r.correction_revue ? 1 : 0) + (r.corrections?.length ?? 0), 0);
 
 /** Les revues non conformes distinctes du lot : celles qu'ont vues les runs précédents, plus celle du plan au lancement. */
@@ -44,15 +46,28 @@ export function revuesNonConformes(runs: RunDuLot[], revue?: Revue): Revue[] {
   return [...new Map(toutes.map((r) => [cle(r), r])).values()];
 }
 
+/**
+ * L726 (revue) : le run corrige après revue si la revue non conforme du plan est postérieure au dernier run intégré du lot, c'est-à-dire qu'aucun run
+ * lancé jusqu'à lui ne l'a vue. Un lot livré en plusieurs runs sans revue, ou relancé sur une revue déjà traitée, n'est pas une correction.
+ */
+export function revueApresIntegre(runs: RunDuLot[], revue?: Revue): boolean {
+  const integre = runs.filter((r) => r.etat === 'integre').map((r) => r.debut ?? '').sort().at(-1);
+  if (!revue || integre === undefined) return false;
+  return !runs.some((r) => (r.debut ?? '') <= integre && r.revue && cle(r.revue) === cle(revue));
+}
+
 export interface Depart { modele: string; raison: string; correctionRevue: boolean; correctionsAvant: number; revue?: Revue }
 /**
  * Le modèle de la première session. `choisi` : celui de --modele, de CADENCE_RUN_MODELE ou du défaut, avec sa source. Sans lot, rien ne se compte.
- * Un run relancé sur un lot déjà intégré est une passe de correction (après revue) ; à la 3e, ou dès deux revues non conformes, Fable.
+ * Un run relancé sur une revue non conforme postérieure au dernier run intégré du lot est une passe de correction (après revue) ; à la 3e, ou dès deux
+ * revues non conformes, Fable.
  */
 export function modeleDeDepart(choisi: { modele: string; raison: string }, lot: string | undefined, runs: RunDuLot[], plan: { revue?: Revue; erreur?: string }): Depart {
   if (!lot) return { ...choisi, correctionRevue: false, correctionsAvant: 0 };
-  const correctionRevue = runs.some((r) => r.etat === 'integre'), avant = correctionsAvant(runs);
-  const revue = plan.revue && nonConforme(plan.revue.verdict) ? plan.revue : undefined, revues = revuesNonConformes(runs, revue);
+  const revue = plan.revue && nonConforme(plan.revue.verdict) ? plan.revue : undefined;
+  const correctionRevue = revueApresIntegre(runs, revue);
+  const avant = correctionsAvant(runs);
+  const revues = revuesNonConformes(runs, revue);
   const d = { correctionRevue, correctionsAvant: avant, ...(revue ? { revue } : {}) };
   if (choisi.modele === 'fable') return { ...choisi, ...d };
   if (revues.length >= REVUES_FABLE) return { modele: 'fable', raison: `${revues.length} revues non conformes du lot ${lot} (${revues.map((r) => r.date).join(', ')})`, ...d };

@@ -123,7 +123,8 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k) && k !== 'CADENCE_RUN_JOURNAL')), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
   const interdits = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
-  e.passes = [...(e.passes ?? []), { quoi: quoiPasse(e, neuve, sujet), modele: e.modele ?? 'opus', raison: e.modele_raison ?? (e.modele ? 'choisi au lancement' : 'par défaut') }]; sauver(e); // L726
+  e.passes = [...(e.passes ?? []), { quoi: quoiPasse(e, neuve, sujet), modele: e.modele ?? 'opus', raison: e.modele_raison ?? (e.modele ? 'choisi au lancement' : 'par défaut') }]; // L726
+  sauver(e);
   const brut = exec(['-p', prompt, ...(neuve ? ['--session-id', e.session] : e.session ? ['--resume', e.session] : []), ...argsClaude({ ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }, e.worktree, interdits, reglagesRun(e.worktree))], { cwd: e.worktree, env }); // L705 : coupes du socle (../socle.ts)
   const r = lire(brut), cause = causeSession(brut); if (cause) o.out(cause); // L711 : une session arrêtée par un signal le dit dans le journal, avant la suite habituelle
   e.session = r.session || e.session; e.cout_usd += r.cout;
@@ -139,7 +140,9 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   if (mot && vise) vise.message = mot;
   if (q?.limite === 'opus' && (e.modele ?? 'opus') === 'opus') {
     o.out('limite Opus atteinte : bascule sur fable, même session');
-    e.modele = 'fable'; e.modele_raison = 'limite Opus atteinte'; sauver(e);
+    e.modele = 'fable';
+    e.modele_raison = 'limite Opus atteinte';
+    sauver(e);
     return session(e, e.session ? BASCULE_FABLE : prompt, o, false, sujet);
   }
   if (q) {
@@ -181,7 +184,8 @@ function ouvrirCorrection(e: Etat, rouge: string, out: (l: string) => void): voi
   e.corrections = [...(e.corrections ?? []), { rouge }];
   const n = numeroCorrection(e);
   if (n >= PASSE_FABLE && e.modele !== 'fable') {
-    e.modele = 'fable'; e.modele_raison = `${n}e passe de correction${e.lot ? ` du lot ${e.lot}` : ''}`;
+    e.modele = 'fable';
+    e.modele_raison = `${n}e passe de correction${e.lot ? ` du lot ${e.lot}` : ''}`;
     out(`${e.modele_raison} : bascule sur fable, même session`);
   }
   sauver(e);
@@ -308,14 +312,16 @@ export function executerRun(a: { repo: string; demande: string; pieces?: string[
   const runs = dossierRuns(repo), worktree = cheminWorktree(repo, runs, `${basename(repo)}-${id}`); // L705 (C1) : hors du dépôt avec run.worktreeOutside ; état, verrou, journal dans runs
   // L726 : Opus par défaut, Fable à la 3e passe de correction du lot ou après deux revues non conformes (runs précédents du lot, revue du plan au lancement)
   const depart = modeleDeDepart({ modele: choisi, raison: a.modele ? a.modeleRaison ?? '--modele' : 'par défaut' }, a.lot,
-    a.lot ? runsDuLot(runs, repo, a.lot, id) : [], a.lot ? revueDuPlan(repo, a.lot, a.raf ?? RAF) : {}), modele = depart.modele;
+    a.lot ? runsDuLot(runs, repo, a.lot, id) : [], a.lot ? revueDuPlan(repo, a.lot, a.raf ?? RAF) : {});
+  const modele = depart.modele;
   mkdirSync(runs, { recursive: true });
   git(repo, 'worktree', 'add', '-q', '-b', `cadence/run-${id}`, worktree, 'HEAD');
   copierDeps(repo, worktree);
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
     demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, ...(a.lot ? { lot: a.lot } : {}),
-    modele_raison: depart.raison, ...(depart.correctionRevue ? { correction_revue: true } : {}), ...(depart.correctionsAvant ? { corrections_avant: depart.correctionsAvant } : {}), ...(depart.revue ? { revue: depart.revue } : {}), ...(a.journal ? { journal: a.journal } : {}), session: crypto.randomUUID(), cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
+    modele_raison: depart.raison, ...(depart.correctionRevue ? { correction_revue: true } : {}), ...(depart.correctionsAvant ? { corrections_avant: depart.correctionsAvant } : {}),
+    ...(depart.revue ? { revue: depart.revue } : {}), ...(a.journal ? { journal: a.journal } : {}), session: crypto.randomUUID(), cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
   sauver(e);
   verrouiller(e);
   a.out(`cadence run ${id} : session ${modeleDit(modele, depart.raison)} en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);

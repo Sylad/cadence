@@ -162,6 +162,9 @@ It refuses, with exit code 2 and nothing written:
   of the calling session removed. The `PATH` is reduced to the package's `node_modules/.bin`, the `node` that runs the release (alone in a
   folder of its own) and the system folders (`/usr/local/bin`, `/usr/bin`, `/bin` and their `sbin`); `NODE_PATH` is empty. The caller's
   `PATH` is not kept: it carries a global `cadence` and `raf` (`~/.local/bin`, the nvm folder) that would answer in place of a missing `bin`.
+  `npm pack`, `npm install` and the smoke commands run without the lowercase `npm_*` variables a parent npm gives its scripts (L731: under
+  `npm publish --dry-run`, `npm_config_dry_run=true` made `npm pack` name the tarball, exit 0 and write nothing); only `npm_config_userconfig`,
+  `npm_config_globalconfig`, `npm_config_cache` and `npm_config_registry` are kept, and the uppercase `NPM_CONFIG_*` you set yourself.
   A `bin` of `package.json` missing from `node_modules/.bin` (its file not in `HEAD`: `npm install` says nothing) refuses the release too. The refusal names the failing step (`npm pack`, `npm install`
   or `$ <command>`), its exit code and the end of its output. The commands are `release.smoke` of `cadence.yaml` (a list of bash commands);
   without that key, `<bin> --help` for each `bin` of `package.json`; a package with neither gets no smoke test. `--dry-run` runs it too.

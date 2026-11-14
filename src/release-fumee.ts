@@ -57,12 +57,24 @@ const PATH_SYSTEME = ['/usr/local/sbin', '/usr/local/bin', '/usr/sbin', '/usr/bi
 /**
  * L'environnement des commandes : PATH réduit au node_modules/.bin du dossier d'installation, au node qui lance la release (seul
  * dans son dossier : celui de nvm porte aussi les paquets globaux) et aux dossiers système ; NODE_PATH vide (rien du node_modules
- * du dépôt) ; ni variables CADENCE_* d'une session ou d'un run, ni GIT_* d'un hook (elles viseraient un autre dépôt).
+ * du dépôt) ; ni variables CADENCE_* d'une session ou d'un run, ni GIT_* d'un hook (elles viseraient un autre dépôt), ni la configuration d'un npm parent (L731).
  */
 function environnement(bin: string, nodeSeul: string, paquet: string, root: string): NodeJS.ProcessEnv {
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('CADENCE_') && !k.startsWith('GIT_')));
+  const env = Object.fromEntries(Object.entries(sansNpmParent(process.env)).filter(([k]) => !k.startsWith('CADENCE_') && !k.startsWith('GIT_')));
   const PATH = [bin, nodeSeul, ...PATH_SYSTEME].join(':');
   return { ...env, PATH, NODE_PATH: '', CADENCE_FUMEE_PAQUET: paquet, CADENCE_FUMEE_RACINE: root };
+}
+
+/**
+ * L731 : un npm parent (`npm publish --dry-run`, `npm run release -- --ignore-scripts`…) passe sa configuration à ses scripts en
+ * `npm_config_*` minuscules, que le npm enfant lit comme la sienne : sous `npm_config_dry_run=true`, `npm pack` écrit le nom du tarball,
+ * sort en 0 et ne l'écrit pas (CI tests rouge du 13-11, la suite jouée dans `npm publish --dry-run`). Les npm de la fumée et ses commandes
+ * repartent sans elles ; seuls restent les emplacements (fichiers de configuration, cache, registre), d'où viennent l'accès au registre.
+ * Les `NPM_CONFIG_*` majuscules sont posées par l'utilisateur ou son outil (setup-node), pas héritées d'un npm parent : gardées.
+ */
+const NPM_GARDEES = new Set(['npm_config_userconfig', 'npm_config_globalconfig', 'npm_config_cache', 'npm_config_registry']);
+function sansNpmParent(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(env).filter(([k]) => !k.startsWith('npm_') || NPM_GARDEES.has(k)));
 }
 
 /** Les node_modules non suivis du dépôt, liés dans le worktree : `prepare` (tsc) y trouve ses outils sans `npm ci`. */
@@ -80,11 +92,12 @@ export function fumerPaquet(root: string, commandes: string[], out: (l: string) 
   const tmp = mkdtempSync(join(tmpdir(), 'cadence-fumee-'));
   const source = join(tmp, 'source');
   const git = (...a: string[]) => spawnSync('git', a, { cwd: root, encoding: 'utf8' });
+  const envNpm = sansNpmParent(process.env);
   try {
     const wt = git('worktree', 'add', '-q', '--detach', source, 'HEAD');
     if (wt.status !== 0) throw refus('git worktree add de HEAD', wt);
     lierDependances(root, source);
-    const pack = spawnSync('npm', ['pack', '--pack-destination', tmp], { cwd: source, encoding: 'utf8', maxBuffer: 64 << 20, timeout: FUMEE_MS });
+    const pack = spawnSync('npm', ['pack', '--pack-destination', tmp], { cwd: source, env: envNpm, encoding: 'utf8', maxBuffer: 64 << 20, timeout: FUMEE_MS });
     if (pack.status !== 0) throw refus('$ npm pack', pack);
     const fichier = readdirSync(tmp).find((f) => f.endsWith('.tgz'));
     if (!fichier) throw refus('$ npm pack (aucun .tgz produit)', pack);
@@ -92,7 +105,7 @@ export function fumerPaquet(root: string, commandes: string[], out: (l: string) 
     const installe = join(tmp, 'installe');
     mkdirSync(installe);
     writeFileSync(join(installe, 'package.json'), '{ "name": "fumee", "private": true }\n');
-    const npmI = spawnSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', join(tmp, fichier)], { cwd: installe, encoding: 'utf8', maxBuffer: 64 << 20, timeout: FUMEE_MS });
+    const npmI = spawnSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', join(tmp, fichier)], { cwd: installe, env: envNpm, encoding: 'utf8', maxBuffer: 64 << 20, timeout: FUMEE_MS });
     if (npmI.status !== 0) throw refus(`$ npm install ${fichier} (dans un dossier vide)`, npmI);
     const bin = join(installe, 'node_modules', '.bin');
     // npm installe sans un mot un paquet dont un bin déclaré manque (fichier absent de HEAD) : aucun lien dans .bin, rien ne le dit.

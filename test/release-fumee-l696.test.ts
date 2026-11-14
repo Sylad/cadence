@@ -47,6 +47,20 @@ describe('cadence release — le paquet essayé avant le tag (L696)', () => {
     expect(version(dir)).toBe('1.0.1');
   }, 120_000);
 
+  // L731 : la CI jouait la suite dans `npm publish --dry-run`, qui passe npm_config_dry_run=true à ses scripts ; le npm pack de la fumée
+  // héritait du dry-run, nommait le tarball, sortait en 0 sans l'écrire, et la release était refusée (« aucun .tgz produit »).
+  it('lancée sous un npm parent (npm publish --dry-run) : sa configuration ne passe ni à npm pack ni aux commandes de fumée (L731)', () => {
+    vi.stubEnv('npm_config_dry_run', 'true');
+    vi.stubEnv('npm_config_ignore_scripts', 'true');
+    vi.stubEnv('npm_lifecycle_event', 'prepublishOnly');
+    const dir = paquet({ smoke: ['acme', 'test -z "${npm_config_dry_run:-}${npm_lifecycle_event:-}"'] });
+    const r = release(dir, 'patch');
+    expect(r.err).toBe('');
+    expect(r.out).toMatch(/fumée du paquet : acme-fumee-1\.0\.0\.tgz installé dans un dossier vide/);
+    expect(r.out).toMatch(/✓ test -z/);
+    expect(version(dir)).toBe('1.0.1');
+  }, 120_000);
+
   it('un fichier lu par le bin et absent de files : refus avant toute écriture, avec la commande et sa sortie', () => {
     const dir = paquet({ files: ['bin'] });
     const r = release(dir, 'patch');

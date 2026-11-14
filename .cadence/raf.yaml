@@ -3490,13 +3490,15 @@ lots:
     finished: 2026-11-13
   - id: L726
     title: "Aiguillage de modèle dans cadence run (décision de Sylvain du 13-11, garder l'« intelligence » des vagues) : à côté de l'aiguillage léger/complet, choisir le modèle de la session — Sonnet pour un petit lot si L524 le justifie, Opus par défaut, Fable automatiquement à la 3e passe ou après deux revues non conformes ; adopté seulement sur la mesure de L524"
-    status: doing
+    status: done
     estimate: 0.5
     after: [ L524 ]
     created: 2026-11-13
     notes:
       - { date: 2026-11-14, text: "14-11 : périmètre réduit après L524 (décision de Sylvain) — pas de branche Sonnet ; reste : Opus par défaut, Fable automatiquement à la 3e passe ou après deux revues non conformes." }
     started: 2026-11-14
+    review: { date: 2026-11-14, verdict: "conforme : Opus par défaut, Fable à la 3e passe de correction ou après deux revues non conformes neuves (dédoublonnées sans le texte du verdict) ; raisons affichées au lancement et dans la ligne modèles, limite Opus et lot absent testés ; mesure du test de croissance l671 rallongée sans toucher la borne", commit: 29ea92c8c9168b41a416386545dae8edbbb01034 }
+    finished: 2026-11-14
   - id: L727
     title: "Étude, lecture seule : cartographie de cadence orchestrate — chaque commande et module classé « encore utilisé (perso ou compte pro : spec reseal/green, verify --gate, créneaux, lead hold…) » ou « ne sert qu'aux vagues », avec lignes et tests concernés ; prépare le retrait des vagues (le compte pro n'en lance plus depuis le 09-11, son commentaire sur #50) ; confirmation écrite du compte pro demandée avant le retrait"
     status: todo

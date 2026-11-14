@@ -81,6 +81,19 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.8] - 2026-11-14
+
+### Changed
+
+- `cadence run` picks the model of each pass (L726, [docs/v2/2026-11-09-cadence-run.md](docs/v2/2026-11-09-cadence-run.md)): Opus by default, Fable by itself from the 3rd correction pass of the lot (`--lot`: runs relaunched on a non-compliant review newer than the last integrated run of the lot, fixes after a red gate; a lot delivered in several runs without review is not a correction) or after two non-compliant code reviews of the lot (read from the plan at launch, one review counted once even when its verdict is rewritten); the launch line says which model and why (`session Opus (par défaut)`, `session Fable (2 revues non conformes du lot L12 (…))`), and the end of the run lists every pass with its model and reason (`modèles : travail : Opus (par défaut) · correction 3 (porte rouge) : Fable (3e passe de correction du lot L12)`).
+
+### Fixed
+
+- `cadence release` no longer refuses a sound package when it runs under a parent npm (L731, [docs/releasing.md](docs/releasing.md)): the smoke
+  test's `npm pack`, `npm install` and commands inherited the lowercase `npm_*` variables that npm gives its scripts, so under
+  `npm publish --dry-run` (`npm_config_dry_run=true`) `npm pack` named the tarball, exited 0 and wrote nothing (« npm pack (aucun .tgz
+  produit) »); they now run without them, keeping only the locations (`npm_config_userconfig`, `globalconfig`, `cache`, `registry`).
+
 ## [2.0.7] - 2026-11-14
 
 ### Fixed

@@ -20,6 +20,8 @@ export const AIDE_RUN = `  cadence run "<demande>" [--piece chemin]… [--lot L1
   registre (L701) : sans --demande-humaine ni --registre D-n, la demande est une consigne du lead : rien n'est inscrit au registre (.cadence/demandes/)
            --demande-humaine l'inscrit (texte mot pour mot, D-<n> suivant) ; --registre D-n rattache le run à cette entrée existante
   --modele : le modèle de la session, opus par défaut ; sans l'option, la variable CADENCE_RUN_MODELE ; un run repris par --reponse garde le sien
+           L726 : fable d'office à la 3e passe de correction du lot (--lot : runs du lot relancés après intégration, corrections de porte rouge) ou après
+           deux revues non conformes (revue du plan au lancement) ; la ligne de lancement et la fin du run disent le modèle de chaque passe et pourquoi
   quota (D-15) : une session qui finit sur « You've hit your weekly limit · resets … » met le run en état quota ; il reprend seul la même session après l'heure dite ;
            tant que son processus attend, --reponse est refusé (kill <pid> d'abord) ; processus mort, --liste dit « attente arrêtée » : --reponse le reprend
            « You've hit your Opus limit » bascule sur fable dans la même session (jamais sur la limite hebdo, qui bloque tous les modèles)
@@ -72,6 +74,7 @@ export async function cmdRun(a: string[], io: Io, exec?: Executeur): Promise<num
       return 0;
     }
     if (io.env.CADENCE_RUN_JOURNAL) out(identite()); // L711 : au lancement d'un run --fond, de quoi savoir au prochain arrêt inexpliqué où il vivait
-    return executerRun({ repo: io.cwd, demande: mots.join(' '), pieces, taille, complet, lot, registre: registres[0], modele, exec, out, sansPorte, journal: io.env.CADENCE_RUN_JOURNAL || undefined }).etat === 'integre' ? 0 : 1;
+    const modeleRaison = choix !== undefined ? '--modele' : io.env.CADENCE_RUN_MODELE ? 'CADENCE_RUN_MODELE' : undefined;
+    return executerRun({ repo: io.cwd, demande: mots.join(' '), pieces, taille, complet, lot, registre: registres[0], modele: modeleRaison ? modele : undefined, modeleRaison, exec, out, sansPorte, journal: io.env.CADENCE_RUN_JOURNAL || undefined }).etat === 'integre' ? 0 : 1;
   } catch (e) { io.err(String((e as Error).message ?? e)); return 1; }
 }

@@ -80,12 +80,13 @@ describe('cadence run : aide et options inconnues (issue #54)', () => {
   }
 
   // Lancement réel par la CLI, avec un faux claude qui commite : le modèle de la commande est celui de la variable, sauf option
-  const lances: [string, string[], NodeJS.ProcessEnv, string][] = [
-    ['variable valide prise en compte', ['--sans-porte', 'Crée x'], { CADENCE_RUN_MODELE: 'fable' }, 'fable'],
-    ['l\'option valide l\'emporte sur la variable', ['--sans-porte', '--modele', 'opus', 'Crée x'], { CADENCE_RUN_MODELE: 'fable' }, 'opus'],
-    ['ni option ni variable', ['--sans-porte', 'Crée x'], {}, 'opus'],
+  // L726 : la ligne de lancement dit aussi d'où vient le modèle
+  const lances: [string, string[], NodeJS.ProcessEnv, string, string][] = [
+    ['variable valide prise en compte', ['--sans-porte', 'Crée x'], { CADENCE_RUN_MODELE: 'fable' }, 'fable', 'CADENCE_RUN_MODELE'],
+    ['l\'option valide l\'emporte sur la variable', ['--sans-porte', '--modele', 'opus', 'Crée x'], { CADENCE_RUN_MODELE: 'fable' }, 'opus', '--modele'],
+    ['ni option ni variable', ['--sans-porte', 'Crée x'], {}, 'opus', 'par défaut'],
   ];
-  for (const [nom, args, env, attendu] of lances) {
+  for (const [nom, args, env, attendu, source] of lances) {
     it(`modèle, ${nom} : la commande claude part en ${attendu}, la ligne de lancement le dit`, async () => {
       const repo = depot(), io = { ...ioTest(env), cwd: repo }, appels: string[][] = [];
       const code = await cmdRun(args, io, (a, o) => {
@@ -96,7 +97,7 @@ describe('cadence run : aide et options inconnues (issue #54)', () => {
       expect([code, io.erreurs]).toEqual([0, []]);
       expect(appels).toHaveLength(1);
       expect(appels[0][appels[0].indexOf('--model') + 1]).toBe(attendu);
-      expect(io.sortie[0]).toMatch(new RegExp(`session ${attendu[0].toUpperCase()}${attendu.slice(1)} en mode leger `));
+      expect(io.sortie[0]).toContain(`session ${attendu[0].toUpperCase()}${attendu.slice(1)} (${source}) en mode leger `);
     });
   }
 

@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { argsClaude, creerExecuteur, libererReglages, lire, OUTILS_INTERDITS, type Executeur } from '../bench/bras.js';
 import { aiguiller, BRAS_COMPLET, BRAS_LEGER, chemin, modeleRun } from './aiguillage.js';
+import { lignePasses, modeleDeDepart, modeleDit, numeroCorrection, PASSE_FABLE, revueDuPlan, runsDuLot, type Passe, type Revue } from './escalade.js';
 import { heureLocale, reconnaitreQuota, type Quota } from './quota.js';
 import { causeSession } from '../trace.js';
 import { CONSIGNE_FINI, garderRapport, origineRapport, type EtatRapport } from '../rapport.js';
@@ -34,7 +35,10 @@ export type EtatRun = 'en-cours' | 'interrompu' | 'attente' | 'quota' | 'sans-co
 /** `rapport`, `rapport_tour`, `rapport_sans_marqueur`, `messages` : ../rapport.ts (EtatRapport, issues #57 et #58). */
 export interface Etat extends EtatRapport { id: string; repo: string; branche: string; cible: string; base: string; worktree: string; fichier: string; demande: string;
   pieces: string[]; taille: string; mode: 'complet' | 'leger'; modele?: string; acces_cluster: boolean; registre?: string; lot?: string; session: string; cout_usd: number;
-  etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; conflits?: Conflit[]; corrections?: Correction[] }
+  etat: EtatRun; detail: string; debut: string; integre?: string; quota?: Quota; journal?: string; conflits?: Conflit[]; corrections?: Correction[];
+  /** L726 (escalade.ts) : pourquoi `modele` ; le run est une correction après revue (un run du lot déjà intégré) ; passes de correction du lot avant ce run ;
+   * revue non conforme du plan au lancement ; chaque session jouée, son modèle et pourquoi. */
+  modele_raison?: string; correction_revue?: boolean; corrections_avant?: number; revue?: Revue; passes?: Passe[] }
 /** `maintenant` et `attendre` : l'horloge et l'attente du quota (D-15), simulées par les tests ; `attendre: null` rend la main sans attendre la remise à zéro. */
 interface Opts { exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null }
 
@@ -119,6 +123,7 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   // orchestrate.prodAccess (comme les vagues de la v1) : sans lui, ni kubectl, ni helm, ni KUBECONFIG ; avec lui, la session joue le banc du projet
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !LIEN_HOTE.test(k) && k !== 'CADENCE_RUN_JOURNAL')), CADENCE_CLONE: e.worktree, CADENCE_PIECES: JSON.stringify(e.pieces), CADENCE_BANC_RACINE: dossierRuns(e.repo), ...(e.acces_cluster ? {} : { KUBECONFIG: '/dev/null' }) };
   const interdits = e.acces_cluster ? OUTILS_INTERDITS.filter((x) => !/kubectl|helm/.test(x)) : OUTILS_INTERDITS;
+  e.passes = [...(e.passes ?? []), { quoi: quoiPasse(e, neuve, sujet), modele: e.modele ?? 'opus', raison: e.modele_raison ?? (e.modele ? 'choisi au lancement' : 'par défaut') }]; sauver(e); // L726
   const brut = exec(['-p', prompt, ...(neuve ? ['--session-id', e.session] : e.session ? ['--resume', e.session] : []), ...argsClaude({ ...(e.mode === 'leger' ? BRAS_LEGER : BRAS_COMPLET), modele: e.modele ?? 'opus' }, e.worktree, interdits, reglagesRun(e.worktree))], { cwd: e.worktree, env }); // L705 : coupes du socle (../socle.ts)
   const r = lire(brut), cause = causeSession(brut); if (cause) o.out(cause); // L711 : une session arrêtée par un signal le dit dans le journal, avant la suite habituelle
   e.session = r.session || e.session; e.cout_usd += r.cout;
@@ -134,7 +139,7 @@ function session(e: Etat, prompt: string, o: Opts, neuve = false, sujet?: string
   if (mot && vise) vise.message = mot;
   if (q?.limite === 'opus' && (e.modele ?? 'opus') === 'opus') {
     o.out('limite Opus atteinte : bascule sur fable, même session');
-    e.modele = 'fable'; sauver(e);
+    e.modele = 'fable'; e.modele_raison = 'limite Opus atteinte'; sauver(e);
     return session(e, e.session ? BASCULE_FABLE : prompt, o, false, sujet);
   }
   if (q) {
@@ -168,11 +173,25 @@ const SUJET_CONFLIT = 'résolution du conflit au rebase';
 // L724 : même modèle pour la correction après porte rouge : son « fini » ne remplace pas le rapport du travail ; la porte rouge, ce que la session en
 // dit et la porte rejouée ensuite sont AJOUTÉS à l'état (`corrections`) et au journal.
 const SUJET_CORRECTION = 'correction après porte rouge';
-/** Ouvre une correction ; une correction encore en attente de sa porte (reprise par --reponse) a été suivie d'une porte rouge : elle n'a pas rendu la porte verte. */
-function ouvrirCorrection(e: Etat, rouge: string): void {
+/** Ouvre une correction ; une correction encore en attente de sa porte (reprise par --reponse) a été suivie d'une porte rouge : elle n'a pas rendu la porte verte.
+ * L726 : à la 3e passe de correction du lot (celles des runs précédents du lot comprises), la session passe sur fable, la même session. */
+function ouvrirCorrection(e: Etat, rouge: string, out: (l: string) => void): void {
   const c = e.corrections?.at(-1);
   if (c && c.verte === undefined) c.verte = false;
-  e.corrections = [...(e.corrections ?? []), { rouge }]; sauver(e);
+  e.corrections = [...(e.corrections ?? []), { rouge }];
+  const n = numeroCorrection(e);
+  if (n >= PASSE_FABLE && e.modele !== 'fable') {
+    e.modele = 'fable'; e.modele_raison = `${n}e passe de correction${e.lot ? ` du lot ${e.lot}` : ''}`;
+    out(`${e.modele_raison} : bascule sur fable, même session`);
+  }
+  sauver(e);
+}
+/** L726 : ce que fait une session, pour la ligne des modèles du rapport. */
+function quoiPasse(e: Etat, neuve: boolean, sujet?: string): string {
+  if (sujet === SUJET_CORRECTION) return `correction ${numeroCorrection(e)} (porte rouge)`;
+  if (sujet === SUJET_CONFLIT) return 'résolution du conflit au rebase';
+  if (neuve) return e.correction_revue ? `correction ${(e.corrections_avant ?? 0) + 1} (après revue)` : 'travail';
+  return 'reprise';
 }
 /** Une session reprise (--reponse, quota) pendant une résolution de conflit ou une correction la continue : même sujet, le rapport du travail reste. */
 const sujetEnCours = (e: Etat) => (e.conflits?.length && e.conflits.at(-1)?.resolu === undefined ? SUJET_CONFLIT
@@ -246,7 +265,7 @@ function suite(e: Etat, o: Opts): Etat {
       }
       if (essai === 1) { if (attendue) attendue.verte = false; e.etat = 'porte-rouge'; e.detail = p.sortie; return fin(e, o); }
       o.out(`porte rouge : reprise de la session pour corriger :\n${p.sortie}`);
-      ouvrirCorrection(e, p.sortie);
+      ouvrirCorrection(e, p.sortie, o.out);
       if (!session(e, `La porte complète est rouge après ton travail :\n${p.sortie}\nCorrige la cause (sans affaiblir aucun test), commite, ${CONSIGNE_FINI}.`, o, false, SUJET_CORRECTION)) return fin(e, o);
     }
     const refus = avancer(e, br, cible);
@@ -271,29 +290,35 @@ function fin(e: Etat, o: Opts, registre = registreOuvert(e.worktree)): Etat {
   const duree = Math.round((Date.now() - Date.parse(e.debut)) / 1000);
   const ou = e.integre ? ` (${e.cible} = ${e.integre})` : '', rapport = e.rapport_tour ? ` · ${origineRapport(e)}` : '';
   o.out(`cadence run ${e.id} : ${e.etat}${ou} · ${duree} s · ${e.cout_usd.toFixed(2)} $${rapport}${e.detail ? `\n${e.detail}` : ''}`);
+  if (e.passes?.length) o.out(lignePasses(e.passes)); // L726 : quel modèle a joué chaque passe, et pourquoi
   for (const r of registre) o.out(`registre : ${r}`);
   if (e.etat !== 'integre') o.out(`worktree gardé : ${e.worktree} (état : ${e.fichier})`);
   return e;
 }
 
-export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; registre?: string; modele?: string; exec?: Executeur; out: (l: string) => void; sansPorte?: boolean; raf?: string;
-  maintenant?: () => Date; attendre?: ((ms: number) => void) | null; journal?: string }): Etat {
-  const modele = modeleRun(a.modele); // avant le worktree : un modèle inconnu ne crée rien, une entrée --registre absente non plus
+/** `modeleRaison` : d'où vient `modele` (--modele, CADENCE_RUN_MODELE) ; sans `modele`, opus « par défaut ». */
+export function executerRun(a: { repo: string; demande: string; pieces?: string[]; taille?: string; complet?: boolean; lot?: string; registre?: string; modele?: string; modeleRaison?: string; exec?: Executeur;
+  out: (l: string) => void; sansPorte?: boolean; raf?: string; maintenant?: () => Date; attendre?: ((ms: number) => void) | null; journal?: string }): Etat {
+  const choisi = modeleRun(a.modele); // avant le worktree : un modèle inconnu ne crée rien, une entrée --registre absente non plus
   const repo = git(a.repo, 'rev-parse', '--show-toplevel'), cible = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD');
   if (a.registre && a.registre !== 'humaine') entreeCommitee(repo, a.registre);
   // L722 : D-1.json modifié à la main pendant un run (13-11) a fait refuser l'intégration ; ce qui n'est pas commité au départ est nommé (lu avant le worktree).
   const sales = fichiersNonCommites(repo) ?? [];
   const id = `${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${process.pid}`;
   const runs = dossierRuns(repo), worktree = cheminWorktree(repo, runs, `${basename(repo)}-${id}`); // L705 (C1) : hors du dépôt avec run.worktreeOutside ; état, verrou, journal dans runs
+  // L726 : Opus par défaut, Fable à la 3e passe de correction du lot ou après deux revues non conformes (runs précédents du lot, revue du plan au lancement)
+  const depart = modeleDeDepart({ modele: choisi, raison: a.modele ? a.modeleRaison ?? '--modele' : 'par défaut' }, a.lot,
+    a.lot ? runsDuLot(runs, repo, a.lot, id) : [], a.lot ? revueDuPlan(repo, a.lot, a.raf ?? RAF) : {}), modele = depart.modele;
   mkdirSync(runs, { recursive: true });
   git(repo, 'worktree', 'add', '-q', '-b', `cadence/run-${id}`, worktree, 'HEAD');
   copierDeps(repo, worktree);
   const aig = aiguiller(a.demande, worktree, a.pieces ?? [], a.complet);
   const e: Etat = { id, repo, branche: `cadence/run-${id}`, cible, base: git(worktree, 'rev-parse', 'HEAD'), worktree, fichier: join(runs, `${basename(repo)}-${id}.json`),
-    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, ...(a.lot ? { lot: a.lot } : {}), ...(a.journal ? { journal: a.journal } : {}), session: crypto.randomUUID(), cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
+    demande: a.demande, pieces: aig.pieces.map((p) => chemin(worktree, p)), taille: a.taille ?? 'fonction', mode: aig.mode, modele, acces_cluster: orchestrate(worktree).prodAccess === true, registre: a.registre, ...(a.lot ? { lot: a.lot } : {}),
+    modele_raison: depart.raison, ...(depart.correctionRevue ? { correction_revue: true } : {}), ...(depart.correctionsAvant ? { corrections_avant: depart.correctionsAvant } : {}), ...(depart.revue ? { revue: depart.revue } : {}), ...(a.journal ? { journal: a.journal } : {}), session: crypto.randomUUID(), cout_usd: 0, etat: 'en-cours', detail: '', debut: new Date().toISOString() };
   sauver(e);
   verrouiller(e);
-  a.out(`cadence run ${id} : session ${modele[0].toUpperCase()}${modele.slice(1)} en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);
+  a.out(`cadence run ${id} : session ${modeleDit(modele, depart.raison)} en mode ${aig.mode} (${aig.raison}) dans ${worktree}`);
   if (sales.length) a.out(`cadence run ${id} : l'arbre principal a des modifications non commitées (hors plan en attente) : ${nommerFichiers(sales)} — le run part de `
     + `${e.base.slice(0, 7)} sans elles ; les commiter sur ${cible} est refusé pendant le run, et un fichier que le run change aussi fera échouer l'intégration`);
   // La ligne « Taille » du brief sert au banc (taille déclarée) ; dans un vrai dépôt, elle casserait commitlint : retirée.
@@ -315,7 +340,7 @@ export function repondreRun(id: string, repo: string, reponse: string, o: Opts):
   try {
     const e = lireEtat(f);
     if (e.etat === 'integre') throw new Error(`cadence run : ${id} est déjà intégré`);
-    if (e.etat === 'porte-rouge') ouvrirCorrection(e, e.detail); // L724 : la réponse du lead à une porte rouge est une correction, pas le travail
+    if (e.etat === 'porte-rouge') ouvrirCorrection(e, e.detail, o.out); // L724 : la réponse du lead à une porte rouge est une correction, pas le travail
     e.etat = 'en-cours'; delete e.quota; sauver(e); // L709 : un run interrompu reprend la même session (son id est dans l'état dès le lancement), même worktree
     return attendreQuota(tenu(e, o, () => (session(e, `${coupe}Réponse de Sylvain : ${reponse}`, o, false, sujetEnCours(e)) ? suite(e, o) : fin(e, o))), o);
   } finally { rendreVerrou(fichierVerrou(f)); }

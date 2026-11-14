@@ -110,7 +110,7 @@ describe('cadence run : choix du modèle (L699)', () => {
       expect(e).toMatchObject({ etat: 'integre', mode, modele: 'fable' });
       expect(modeleDe(appels)).toBe('fable');
       expect(appels[0].args.filter((x) => x === '--model')).toHaveLength(1);
-      expect(l[0]).toMatch(new RegExp(`session Fable en mode ${mode} `));
+      expect(l[0]).toMatch(new RegExp(`session Fable \\(--modele\\) en mode ${mode} `));
       expect(l[0]).not.toMatch(/Opus/);
     });
 
@@ -119,7 +119,7 @@ describe('cadence run : choix du modèle (L699)', () => {
       const e = executerRun({ repo, demande: 'Crée fait.txt', pieces: [...pieces], exec: fauxClaude([commite('fait.txt')], appels), out });
       expect(e).toMatchObject({ mode, modele: 'opus' });
       expect(modeleDe(appels)).toBe('opus');
-      expect(l[0]).toMatch(new RegExp(`session Opus en mode ${mode} `));
+      expect(l[0]).toMatch(new RegExp(`session Opus \\(par défaut\\) en mode ${mode} `));
     });
   }
 

@@ -3524,6 +3524,11 @@ lots:
     notes:
       - { date: 2026-11-13, text: "Mineurs de revue (13-11) : un acquittement raf ignore par sujet exact admet tout commit de même sujet ; l'admission vaut aussi pour un lot en cours (documenté) ; « plan commité » non vérifié." }
     finished: 2026-11-13
+  - id: L730
+    title: "D-22 : garde de publication proportionnée — avant une publication, le banc mécanique (sans juge, 3 bancs en parallèle, ~30 min) suffit ; le banc complet (court avec juges + séquence) passe chaque samedi sur le minuteur à la place du mécanique. Mesure : délai lot clos → publié < 1 h ; tout défaut trouvé le samedi qui aurait dû bloquer une publication fait revenir en arrière. Docs banc.md, verifier-publication, service du samedi."
+    status: todo
+    estimate: 0.25
+    created: 2026-11-14
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -1524,10 +1524,13 @@ lots:
     finished: 2026-11-01
   - id: L524
     title: "Essai comparatif du modèle d'implémentation : Sonnet (défaut) contre Opus sur ~20 lots comparables (estimate 0,1–0,5 j, mêmes projets), un réglage orchestrate.implement.model par vague ; mesurer passes de correction, mur et jetons comptés totaux du lot (implémentation + corrections + revues) avec scripts/temps-d-un-lot.mjs ; décision chiffrée à Sylvain (une passe coûte 11,9 min et 126 k jetons, étude L517)"
-    status: todo
+    status: doing
     estimate: 0.5
     after: [ L523 ]
     created: 2026-11-01
+    started: 2026-11-14
+    notes:
+      - { date: 2026-11-14, text: "14-11 : reformulé par le lead — les vagues sont abandonnées, la mesure se fait en cadence run au banc : bras cadence-run-sonnet (même brief et aiguillage que cadence-run, modèle sonnet) contre cadence-run (opus), cadence2 bench court --repetitions 2, lancé après le banc mécanique du samedi. Critères : temps, jetons, juge mécanique et aveugle. Décision chiffrée à Sylvain, puis L726." }
   - id: L525
     title: "deliver et raf move pendant une tâche locale (L519) : refus avec heldRefusal, pas de « vague local:L1 — état illisible » ni de conseil --sha impossible — revue passe 3 du 02-11"
     status: done

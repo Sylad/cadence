@@ -1531,6 +1531,7 @@ lots:
     started: 2026-11-14
     notes:
       - { date: 2026-11-14, text: "14-11 : reformulé par le lead — les vagues sont abandonnées, la mesure se fait en cadence run au banc : bras cadence-run-sonnet (même brief et aiguillage que cadence-run, modèle sonnet) contre cadence-run (opus), cadence2 bench court --repetitions 2, lancé après le banc mécanique du samedi. Critères : temps, jetons, juge mécanique et aveugle. Décision chiffrée à Sylvain, puis L726." }
+      - { date: 2026-11-14, text: "14-11, mesure faite (rapport ~/bench-cadence/rapports/2026-11-14-1018-0118958c983c.md, court, 3 bancs × 2 répétitions, 3 h 24) : Sonnet contre Opus en cadence run — temps 2244 s contre 1904 s (+18 %), coût 14,56 $ contre 12,18 $ (+20 %), jetons 27,9 M contre 22,9 M ; qualité égale ou un peu meilleure pour Sonnet (tests cachés 48 contre 32, mutations 87 % contre 75 %, défauts bloquants+majeurs 2 contre 4), relecture aveugle égale sur les 3 bancs. Bruit fort : banc 6 bimodal (un bras finit en ~60 s sans l'attendu, une fois chaque modèle). Proposition du lead : garder Opus par défaut, Sonnet n'est ni moins cher ni plus rapide ici ; L726 sans la branche Sonnet." }
   - id: L525
     title: "deliver et raf move pendant une tâche locale (L519) : refus avec heldRefusal, pas de « vague local:L1 — état illisible » ni de conseil --sha impossible — revue passe 3 du 02-11"
     status: done

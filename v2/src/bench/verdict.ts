@@ -161,7 +161,8 @@ export const COMPLET_MAX_JOURS = 8;
 /**
  * Garde de publication en quatre règles (L730, D-22 ; tableau dans docs/v2/banc.md, « Garde en quatre règles », section « Garde proportionnée »). Seule fonction qui porte ces règles :
  * (1) une alerte naît de chaque passage rouge du banc complet, cadence-run contre A : le banc court, ou une séquence identifiée par son id ;
- * (2) elle ne tombe que lorsque CE banc (le court, ou CETTE séquence) est rejoué vert après elle, sur l'empreinte à publier ;
+ * (2) elle tombe lorsque CE banc (le court, ou CETTE séquence) est rejoué vert après elle (ordre de l'historique), sur la version corrigée ou une
+ *     suivante ; levée, elle le reste pour toutes les empreintes suivantes (revue 3 : sinon chaque publication après un rouge redemanderait le complet) ;
  * (3) tant qu'une alerte tient, la publication est refusée, quel que soit le reste (mécanique vert, banc complet vert sans le banc rouge) ;
  * (4) hors alerte, le banc mécanique vert de l'empreinte suffit, et un banc complet vert aussi.
  */
@@ -179,11 +180,11 @@ function gardeEnQuatreRegles(h: Ligne[], empreinte: string, reel: (m: Ligne | un
   // empreinte, quel qu'il soit (micro, mécanique, court, éclair, séquence), ne le suit.
   const j = miennes.map((x) => x.niveau === 'mecanique' && couvreCourt(x)).lastIndexOf(true);
   const mecaOk = reel(miennes[j]) && !miennes.slice(j).some((x) => !x.vert || x.eclair_ok === false);
-  // (1) chaque rouge du banc complet ; (2) rejoué : un court vert et réel après lui, ou un run complet et vert de la MÊME séquence après lui,
-  // les deux sur l'empreinte à publier. Un court et une séquence X verts ne rejouent pas une séquence Y (revues L730).
+  // (1) chaque rouge du banc complet ; (2) rejoué : un court vert et réel écrit après lui, ou un run complet et vert de la MÊME séquence écrit après
+  // lui, sur n'importe quelle empreinte ; un vert d'avant le rouge ne compte pas, ni un court et une séquence X verts pour une séquence Y (revues L730).
   const rouges = h.filter((x) => duComplet(x) && !x.vert && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference)));
   const rejoue = (rg: Ligne): boolean => {
-    const apres = h.slice(h.indexOf(rg) + 1).filter((y) => y.empreinte === empreinte && duComplet(y));
+    const apres = h.slice(h.indexOf(rg) + 1).filter(duComplet);
     return rg.type === 'sequence'
       ? seqOk(apres.filter((y) => y.type === 'sequence' && (y.sequence ?? '') === (rg.sequence ?? '')), (s) => reel(s) && s.vert)
       : apres.some((y) => y.type !== 'sequence' && reel(y) && y.vert);
@@ -200,7 +201,7 @@ const quoi = (x: Ligne) => (x.type === 'sequence' ? `séquence ${x.sequence ?? '
  * Garde de publication. `modeles` : nom du bras -> modèle, lus dans le bras.yaml courant (le modèle n'est pas dans l'empreinte). `publie` (L689) :
  * candidat et référence exigés (la CLI passe PUBLIE) ; sans lui, tout candidat distinct de sa référence.
  * L730 (D-22, Sylvain du 14-11 : 3 h de banc avant chaque publication, « complètement dingue ») : la garde est proportionnée, selon `gardeEnQuatreRegles`.
- * `alerte` (signalée par `statut` et le tour) nomme le dernier rouge en attente et les autres ; `a_rejouer` dit quoi rejouer sur l'empreinte ;
+ * `alerte` (signalée par `statut` et le tour) nomme le dernier rouge en attente et les autres ; `a_rejouer` dit quoi rejouer (sur la version corrigée) ;
  * `mode` vaut `complet` tant qu'une alerte tient.
  */
 export function statut(historique: string[], maintenant: Date, empreinte: string, modeles: Record<string, string> = {}, publie?: { candidat: string; reference: string }) {
@@ -222,7 +223,7 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
     dernier: dernier ? `${dernier.date} ${dernier.type === 'sequence' ? 'séquence ' : ''}${dernier.niveau ? `${dernier.niveau} ` : ''}${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
     mode: (alerte ? 'complet' : 'mecanique') as 'complet' | 'mecanique',
     alerte,
-    /** Bancs à rejouer verts sur l'empreinte à publier pour lever l'alerte : `court`, ou `sequence <id>`, dans l'ordre des rouges. */
+    /** Bancs à rejouer verts, après le rouge (version corrigée ou suivante), pour lever l'alerte : `court`, ou `sequence <id>`, dans l'ordre des rouges. */
     a_rejouer: [...new Set(enAttente.map((x) => (x.type === 'sequence' ? `sequence ${x.sequence ?? ''}` : 'court')))],
     /** Jours depuis le dernier passage du banc complet, null s'il n'a jamais tourné (le minuteur du samedi a pu être manqué). */
     jours_depuis_complet: dernierComplet ? Math.floor((maintenant.getTime() - Date.parse(dernierComplet.date)) / 86_400_000) : null,

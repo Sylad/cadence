@@ -36,6 +36,7 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L730 (D-22) : bench 1080 (+82), mesure 1780 : garde proportionnée (banc mécanique avant publication, alerte du banc complet) et bench complet.ts, sans ligne tassée.
   // L730 (revue) : bench 1090 (+10), mesure 1790 : l'alerte du banc complet ne tombe que sur un banc complet vert qui rejoue chaque rouge en attente (même séquence).
   // L730 (revue 2) : bench 1100 (+10), mesure 1800 : la garde en quatre règles (une fonction, le banc rouge rejoué sur l'empreinte à publier, refus nommant les bancs à rejouer).
+  // L730 (revue 3) : règle 2 bornée (un rejeu vert après le rouge, sur la version corrigée ou une suivante, lève l'alerte pour de bon), budget inchangé (1100 atteint).
   it('les totaux sont ceux de R29 : noyau 3000, mesure 1800 (L689, issue #57, L730)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
     expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1800]);

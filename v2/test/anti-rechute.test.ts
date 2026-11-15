@@ -142,6 +142,7 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L730 (D-22) : bench 1080, garde proportionnée (banc mécanique avant publication, alerte du banc complet du samedi) et complet.ts, sans ligne tassée
   // L730 (revue) : bench 1090, l'alerte ne tombe que sur un banc complet vert qui rejoue chaque rouge en attente (même séquence)
   // L730 (revue 2) : bench 1100, la garde en quatre règles (le banc rouge rejoué sur l'empreinte à publier, refus nommant les bancs à rejouer)
+  // L730 (revue 3) : règle 2 bornée, un rejeu vert après le rouge (version corrigée ou suivante) lève l'alerte pour les empreintes suivantes
 };
 function reglesBudget(f: Fichiers): string[] {
   const b = JSON.parse(f['budget.json']) as Record<string, { total: number; modules: Record<string, number> }>;
@@ -187,9 +188,10 @@ function reglesC5(f: Fichiers): string[] {
     v.push('C5 : la publication ne demande plus une séquence verte (R30)');
   // L730 (D-22, garde en quatre règles, docs/v2/banc.md) : tant qu'une alerte tient, rien ne publie, ni le mécanique ni un banc complet vert
   if (!/enAttente\.length === 0 && \(mecaOk \|\| completOk\)/.test(t)) v.push('C5 : une alerte du banc complet n\'empêche plus la publication (L730)');
-  // L730 (revues) : une alerte ne tombe que si CE banc est rejoué vert : la même séquence (même id), sur l'empreinte à publier
+  // L730 (revues) : une alerte ne tombe que si CE banc est rejoué vert : la même séquence (même id), écrite APRÈS le rouge (revue 3 : sur toute
+  // empreinte postérieure, pas seulement celle à publier)
   if (!/y\.type === 'sequence' && \(y\.sequence \?\? ''\) === \(rg\.sequence \?\? ''\)/.test(t)) v.push('C5 : une séquence rouge est levée par une autre séquence (L730, revue)');
-  if (!/filter\(\(y\) => y\.empreinte === empreinte && duComplet\(y\)\)/.test(t)) v.push('C5 : un banc rouge est levé hors de l\'empreinte à publier (L730, revue)');
+  if (!/h\.slice\(h\.indexOf\(rg\) \+ 1\)\.filter\(duComplet\)/.test(t)) v.push('C5 : un banc rouge est levé par un vert d\'avant lui, ou par un banc hors du complet (L730, revue 3)');
   // banc séquence (S4, R30) : mêmes garde-fous sur sequence/verdict.ts
   const q = f['src/sequence/verdict.ts'] ?? '';
   if (!/return \{ vert: criteres\.every\(\(x\) => x\.ok \|\| !x\.bloquant\), criteres \};/.test(q)) v.push('C5 : séquence, la formule du vert a changé');
@@ -278,7 +280,7 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C5', 'alerte du banc complet ignorée (L730)', 'src/bench/verdict.ts', remplace('enAttente.length === 0 && (mecaOk || completOk)', '(mecaOk || completOk)')],
   ['C5', 'banc complet vert sans le banc rouge pendant une alerte (L730, revue 2)', 'src/bench/verdict.ts', remplace('enAttente.length === 0 && (mecaOk || completOk)', '(enAttente.length === 0 && mecaOk) || completOk')],
   ['C5', 'séquence rouge levée par une autre séquence (L730, revue)', 'src/bench/verdict.ts', remplace(" && (y.sequence ?? '') === (rg.sequence ?? '')", '')],
-  ['C5', 'banc rouge levé sur une autre empreinte (L730, revue 2)', 'src/bench/verdict.ts', remplace('y.empreinte === empreinte && duComplet(y)', 'duComplet(y)')],
+  ['C5', 'banc rouge levé par un vert d\'avant lui (L730, revue 3)', 'src/bench/verdict.ts', remplace('h.slice(h.indexOf(rg) + 1).filter(duComplet)', 'h.filter(duComplet)')],
   ['C5', 'séquence : || true sur le every final', 'src/sequence/verdict.ts', remplace('x.ok || !x.bloquant)', 'x.ok || !x.bloquant || true)')],
   ['C3', 'porte déguisée en controle', 'src/bench/banc.ts', ajout('controle(a);\ncheckAll(b);\nverif(c);')],
   // bras candidat de la séquence (S5)

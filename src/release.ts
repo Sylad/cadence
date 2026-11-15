@@ -311,7 +311,7 @@ function steps(p: Planned, files: string[], branch: string): string[] {
  * à défaut de banc vert, un dossier de publication versionné (`docs/v2/publications/<version>.md`) qui cite l'empreinte exacte
  * et les mesures bras par bras (critères du candidat, cumul sur ≥ 3 comparaisons) vaut décision. Le cumul automatique viendra avec L689.
  * L730 (D-22) : la garde est proportionnée ; `verifier-publication` se contente du banc mécanique (≈ 30 min) ; après un banc complet rouge,
- * il refuse tout tant que ce banc n'est pas rejoué vert sur l'empreinte (quatre règles, docs/v2/banc.md).
+ * il refuse tout tant que ce banc n'est pas rejoué vert après le rouge, sur la version corrigée ou une suivante (quatre règles, docs/v2/banc.md).
  */
 export function gardeBancV2(version: string, verifier: () => { code: number; sortie: string }, dossier?: (version: string) => string | undefined): void {
   if (Number(version.split('.')[0]) < 2) return;

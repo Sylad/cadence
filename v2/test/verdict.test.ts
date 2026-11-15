@@ -195,8 +195,8 @@ describe('publication : la dernière mesure réelle de l\'empreinte (C-1, I-7)',
     expect(ok([l(), l({ bancs: ['1-a'], eclair_ok: false })])).toBe(false);
   });
   // L730, garde en quatre règles (docs/v2/banc.md, règles 2 et 3) : avant, un rouge d'une autre empreinte après le vert ne comptait pas ;
-  // c'est une alerte, qui tient tant que le banc rouge n'est pas rejoué vert sur l'empreinte à publier.
-  it('un rouge puis un vert : permise ; un rouge d\'une autre empreinte après le vert refuse, jusqu\'à ce banc rejoué vert sur l\'empreinte', () => {
+  // c'est une alerte, qui tient tant que le banc rouge n'est pas rejoué vert après lui (revue 3 : sur la version corrigée, ou une suivante).
+  it('un rouge puis un vert : permise ; un rouge d\'une autre empreinte après le vert refuse, jusqu\'à ce banc rejoué vert après lui', () => {
     expect(ok([l({ vert: false }), l()])).toBe(true);
     expect(ok([l(), l({ vert: false, empreinte: 'e2' })])).toBe(false);
     expect(ok([l(), l({ vert: false, empreinte: 'e2' }), l()])).toBe(true);

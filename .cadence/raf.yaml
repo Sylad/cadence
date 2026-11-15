@@ -3569,6 +3569,12 @@ lots:
     started: 2026-11-15
     review: { date: 2026-11-15, verdict: "conforme : une suite rouge pendant un passage mécanique est rejouée seule après les autres bancs ; le rejeu compte, la première mesure est gardée ; rejeu impossible = rouge", commit: 786bf2149af8aef1f7098b2c1abc32bf8b907f02 }
     finished: 2026-11-15
+  - id: L735
+    title: "Enquête : cadence run plus lent qu'A au banc 3 (ol-companion L241) à 5 passages sur 6 depuis le 14-11 (× 2,0, 1,5, 1,5, 1,3, 2,1 ; 599 s et 7,6 M jetons contre 286 s et 2,5 M le 15-11 à 17 h 49). Où partent le temps et les jetons (lecture, porte, corrections, attentes) ; proposer un mécanisme mesuré. Dossier de publication 2.0.9."
+    status: doing
+    estimate: 0.5
+    created: 2026-11-15
+    started: 2026-11-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

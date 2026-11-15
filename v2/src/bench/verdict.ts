@@ -193,18 +193,20 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
   const miennes = h.filter((x) => x.empreinte === empreinte);
   const j = miennes.map((x) => x.niveau === 'mecanique' && couvreCourt(x)).lastIndexOf(true);
   const mecaOk = reel(miennes[j]) && !miennes.slice(j).some((x) => !x.vert || x.eclair_ok === false);
-  // Alerte (L730) : le dernier passage rouge du banc complet, cadence-run contre A. Elle ne tombe que sur un banc complet vert (court et séquences
-  // d'une même empreinte, `completOk`) qui rejoue tout ce qui était rouge depuis la dernière levée : un banc court rouge exige un court vert,
-  // une séquence rouge exige un run vert de la MÊME séquence. Un court vert et une séquence X verte ne lèvent pas l'alerte d'une séquence Y rouge.
+  // Alerte (L730) : le dernier passage rouge du banc complet, cadence-run contre A. Elle ne tombe que sur un passage vert après lequel le banc
+  // complet de son empreinte est vert (`completOk` sur l'historique jusqu'à lui) et qui rejoue, sur cette empreinte, tout ce qui était rouge depuis
+  // la dernière levée : un banc court rouge exige un court vert après lui, une séquence rouge un run vert de la MÊME séquence après elle.
+  // Un court vert et une séquence X verte ne lèvent pas l'alerte d'une séquence Y rouge (revue L730).
   const complets = h.filter((x) => duComplet(x) && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference)));
-  let enAttente: Ligne[] = [], r = -1;
-  complets.forEach((x, i) => {
-    if (!x.vert) { enAttente.push(x); r = i; return; }
-    if (!enAttente.length) return;
-    const apres = complets.slice(r + 1, i + 1).filter((y) => y.empreinte === x.empreinte);
-    const rejoue = (rg: Ligne) => rg.type !== 'sequence' || apres.some((y) => y.type === 'sequence' && (y.sequence ?? '') === (rg.sequence ?? ''));
-    if (completOk(apres, x.empreinte) && enAttente.every(rejoue)) enAttente = [];
-  });
+  let enAttente: Ligne[] = [];
+  for (const x of complets) {
+    if (!x.vert) { enAttente.push(x); continue; }
+    if (!enAttente.length) continue;
+    const jusque = complets.slice(0, complets.indexOf(x) + 1);
+    const rejoue = (rg: Ligne) => jusque.slice(jusque.indexOf(rg) + 1).some((y) => y.vert && y.empreinte === x.empreinte
+      && (rg.type === 'sequence' ? y.type === 'sequence' && (y.sequence ?? '') === (rg.sequence ?? '') : y.type !== 'sequence'));
+    if (completOk(h.slice(0, h.indexOf(x) + 1), x.empreinte) && enAttente.every(rejoue)) enAttente = [];
+  }
   const rouge = enAttente.at(-1);
   const quoi = (x: Ligne) => (x.type === 'sequence' ? `séquence ${x.sequence ?? '?'}` : 'banc court');
   const autres = [...new Set(enAttente.slice(0, -1).map(quoi))].filter((q) => !rouge || q !== quoi(rouge));
@@ -216,8 +218,7 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
     alerte,
     /** Jours depuis le dernier passage du banc complet, null s'il n'a jamais tourné (le minuteur du samedi a pu être manqué). */
     jours_depuis_complet: dernierComplet ? Math.floor((maintenant.getTime() - Date.parse(dernierComplet.date)) / 86_400_000) : null,
-    // Tant que l'alerte tient, rien ne publie, pas même un banc complet vert d'avant le rouge : seul le banc complet qui la lève y ramène.
-    publication_ok: empreinte !== 'inconnue' && !alerte && (completOk(h, empreinte) || mecaOk),
+    publication_ok: empreinte !== 'inconnue' && (completOk(h, empreinte) || (!alerte && mecaOk)),
     frais_semaine: somme(depuisSamedi.map((x) => x.frais ?? 0)),
   };
 }

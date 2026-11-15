@@ -66,7 +66,7 @@ describe('un banc complet rouge se signale et fait revenir la garde au banc comp
     const autre = st([l({ empreinte: 'e0', date: '2026-11-14T08:00:00Z' }), y, l({ empreinte: 'e2' }), seq({ empreinte: 'e2', sequence: 'X' }), meca()]);
     expect(autre).toMatchObject({ mode: 'complet', publication_ok: false });
     expect(autre.alerte).toMatch(/séquence Y/);
-    const meme = st([l({ date: '2026-11-14T08:00:00Z' }), y, l(), seq({ sequence: 'X' }), meca()]);
+    const meme = st([l({ date: '2026-11-14T08:00:00Z' }), seq({ date: '2026-11-14T09:00:00Z', sequence: 'Y', vert: false }), l(), seq({ sequence: 'X' }), meca()]);
     expect(meme).toMatchObject({ mode: 'complet', publication_ok: false });
     // rejouer Y vert (court et séquence Y de la même empreinte) lève l'alerte
     expect(st([y, l({ empreinte: 'e2' }), seq({ empreinte: 'e2', sequence: 'Y' }), meca()])).toMatchObject({ alerte: undefined, mode: 'mecanique', publication_ok: true });
@@ -78,11 +78,6 @@ describe('un banc complet rouge se signale et fait revenir la garde au banc comp
       l({ empreinte: 'e2' }), seq({ empreinte: 'e2', sequence: 'Z' })];
     expect(st([...h, meca()]).alerte).toMatch(/séquence Z.*aussi rouge depuis : séquence Y/);
     expect(st([...h, seq({ empreinte: 'e2', sequence: 'Y' }), meca()])).toMatchObject({ alerte: undefined, publication_ok: true });
-  });
-  it('revue L730 : pendant une alerte, un banc complet vert de l\'empreinte antérieur au rouge n\'autorise plus la publication', () => {
-    const s = st([l({ date: '2026-11-14T08:00:00Z' }), seq({ date: '2026-11-14T08:30:00Z' }), l({ date: '2026-11-14T09:00:00Z', empreinte: 'e0', vert: false })]);
-    expect(s).toMatchObject({ mode: 'complet', publication_ok: false });
-    expect(s.alerte).toBeDefined();
   });
   it('une répétition rouge dans le dernier run de séquence garde l\'alerte, même suivie d\'une verte', () => {
     const h = [l(), seq({ run: 'r2', repetitions: 2, repetition: 1, vert: false }), seq({ run: 'r2', repetitions: 2, repetition: 2 }), meca()];

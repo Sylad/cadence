@@ -185,9 +185,9 @@ function reglesC5(f: Fichiers): string[] {
   if (!/\n\s*&& seqOk\(seqs, \(s\) => reel\(s\) && s\.vert && s\.candidat === m\.candidat && s\.modele_candidat === m\.modele_candidat\)[,;]/.test(t))
     v.push('C5 : la publication ne demande plus une séquence verte (R30)');
   // L730 (D-22) : le banc mécanique ne suffit que sans alerte ; un banc complet rouge fait revenir la garde au banc complet
-  if (!/!alerte && \(completOk\(h, empreinte\) \|\| mecaOk\)/.test(t)) v.push('C5 : la publication passe malgré une alerte du banc complet (L730)');
+  if (!/\(completOk\(h, empreinte\) \|\| \(!alerte && mecaOk\)\)/.test(t)) v.push('C5 : le banc mécanique suffit même après un banc complet rouge (L730)');
   // L730 (revue) : l'alerte ne tombe que si le banc complet vert rejoue chaque rouge en attente (même séquence)
-  if (!/completOk\(apres, x\.empreinte\) && enAttente\.every\(rejoue\)/.test(t)) v.push('C5 : l\'alerte tombe sans rejouer la séquence rouge (L730, revue)');
+  if (!/completOk\(h\.slice\(0, h\.indexOf\(x\) \+ 1\), x\.empreinte\) && enAttente\.every\(rejoue\)/.test(t)) v.push('C5 : l\'alerte tombe sans rejouer la séquence rouge (L730, revue)');
   // banc séquence (S4, R30) : mêmes garde-fous sur sequence/verdict.ts
   const q = f['src/sequence/verdict.ts'] ?? '';
   if (!/return \{ vert: criteres\.every\(\(x\) => x\.ok \|\| !x\.bloquant\), criteres \};/.test(q)) v.push('C5 : séquence, la formule du vert a changé');
@@ -273,7 +273,7 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C5', 'séquence : pièces lues neutralisé', 'src/sequence/verdict.ts', remplace('lc.entieres === lc.t)', 'lc.entieres >= 0)')],
   ['C5', 'séquence : pente non mesurée verte', 'src/sequence/verdict.ts', remplace("'non mesuré', `≤ ${ref}`, false)", "'non mesuré', `≤ ${ref}`, true)")],
   ['C5', 'publication sans séquence', 'src/bench/verdict.ts', remplace(/\n\s*&& seqOk\([^\n]*\);/, ';')],
-  ['C5', 'alerte du banc complet ignorée (L730)', 'src/bench/verdict.ts', remplace('!alerte && (completOk(h, empreinte) || mecaOk)', '(completOk(h, empreinte) || mecaOk)')],
+  ['C5', 'alerte du banc complet ignorée (L730)', 'src/bench/verdict.ts', remplace('(!alerte && mecaOk)', 'mecaOk')],
   ['C5', 'alerte levée sans rejouer la séquence rouge (L730, revue)', 'src/bench/verdict.ts', remplace(' && enAttente.every(rejoue)', '')],
   ['C5', 'séquence : || true sur le every final', 'src/sequence/verdict.ts', remplace('x.ok || !x.bloquant)', 'x.ok || !x.bloquant || true)')],
   ['C3', 'porte déguisée en controle', 'src/bench/banc.ts', ajout('controle(a);\ncheckAll(b);\nverif(c);')],

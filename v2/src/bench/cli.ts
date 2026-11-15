@@ -310,7 +310,7 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
   }
   if (sous === 'verifier-publication') {
     const s = statut(hist, io.now(), emp, modeles(), PUBLIE);
-    io.out(s.publication_ok ? `banc mécanique ou complet vert sur l'empreinte ${emp}`
+    io.out(s.publication_ok ? `banc ${s.mode === 'complet' ? 'complet' : 'mécanique ou complet'} vert sur l'empreinte ${emp}`
       : s.mode === 'complet' ? `publication refusée sur l'empreinte ${emp} : ${s.alerte} ; la garde exige de nouveau le dernier banc court ET la dernière séquence verts, en rejouant ce qui était rouge (même séquence), ${PUBLIE.candidat} contre ${PUBLIE.reference}, même modèle ; ${pourPublier(repo, 'complet')}`
         : `publication refusée sur l'empreinte ${emp} : il faut le dernier banc mécanique (1, 3 et 6) vert, ${PUBLIE.candidat} contre ${PUBLIE.reference}, même modèle, sans passage rouge après lui ; ${pourPublier(repo)}`);
     return s.publication_ok ? 0 : 1;

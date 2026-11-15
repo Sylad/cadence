@@ -49,14 +49,17 @@ describe('isRunning (L579) : un zombie n\'est pas un processus qui tourne', () =
       await new Promise((r) => sh.once('exit', r)); // orphelin : son recueil revient à init, hors de ce processus
       process.kill(pid, 'SIGKILL');
       let seenDead = false;
-      // jusqu'à ce que le pid disparaisse : chaque lecture après une première « mort » doit dire mort
-      for (let gone = false; !gone; ) {
-        if (!isRunning(pid)) seenDead = true;
-        else if (seenDead) flips++;
-        try {
-          process.kill(pid, 0);
-        } catch {
-          gone = true;
+      // jusqu'à ce que le pid disparaisse : chaque lecture après une première « mort » doit dire mort. Lectures par paquets de 100, puis la main
+      // est rendue : la sonde ne bloque ni son worker ni un cœur pendant que init recueille sous charge.
+      for (let gone = false; !gone; await new Promise((r) => setImmediate(r))) {
+        for (let k = 0; k < 100 && !gone; k++) {
+          if (!isRunning(pid)) seenDead = true;
+          else if (seenDead) flips++;
+          try {
+            process.kill(pid, 0);
+          } catch {
+            gone = true;
+          }
         }
       }
     }

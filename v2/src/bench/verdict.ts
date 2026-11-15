@@ -6,10 +6,14 @@ import { avisLu, type Jugement, type Meca } from './juges.js';
 export interface MesureSansJuge { suite_ok: boolean; caches_ok: boolean | null }
 export interface ResultatBanc { banc: string; taille: Taille; visible: boolean; reponses: boolean; frais: boolean;
   mesures: Record<string, Mesure>; jugement: Jugement | null; fuites: Record<string, string[]>; fuites_a_verifier?: Record<string, string[]>;
-  sans_juge?: Record<string, MesureSansJuge> }
+  sans_juge?: Record<string, MesureSansJuge>;
+  /** L733 : bras qui n'ont livré aucun fichier hors plan et doc, et la raison ; le banc n'est alors pas mesuré (sans juge seulement). */
+  non_livre?: Record<string, string> }
 export interface Barre { temps_max: number; temps_max_retouche: number; reference_absolue: { caches: number; mutations: number } }
 export interface Critere { nom: string; valeur: string; seuil: string; ok: boolean; bloquant: boolean }
-export interface Verdict { vert: boolean; criteres: Critere[] }
+/** `non_mesurable` (L733) : bancs dont un bras n'a pas livré le travail ; le passage n'est ni vert ni rouge, il est à rejouer. */
+export interface Verdict { vert: boolean; criteres: Critere[]; non_mesurable?: string[] }
+export const titreVerdict = (v: Verdict): string => (v.non_mesurable ? 'NON MESURABLE (à rejouer)' : v.vert ? 'VERT' : 'ROUGE');
 
 export const BARRE_SPEC: Barre = { temps_max: 1.5, temps_max_retouche: 1.2, reference_absolue: { caches: 304, mutations: 0.79 } };
 /** L689 (décision de Sylvain du 13-11) : la publication exige cadence run, le mode par défaut, contre Claude seul. */
@@ -58,7 +62,10 @@ function communs(res: ResultatBanc[], ref: string, cand: string, barre: Barre): 
 }
 
 /** L689 : verdict d'un banc micro ou mécanique, sans juge IA : suite du projet et tests d'origine verts sur au moins autant de bancs que la référence. */
-export function verdictSansJuge(res: ResultatBanc[], ref: string, cand: string, barre: Barre): Verdict {
+export function verdictSansJuge(tous: ResultatBanc[], ref: string, cand: string, barre: Barre): Verdict {
+  // L733 : un banc dont un bras n'a écrit que du plan ou de la doc sort des critères (son temps n'est pas une victoire) et rend le passage non mesurable
+  const nonLivres = tous.filter((r) => r.non_livre && Object.keys(r.non_livre).length);
+  const res = tous.filter((r) => !nonLivres.includes(r));
   const k = communs(res, ref, cand, barre);
   const mes = res.filter((r) => r.sans_juge?.[ref] && r.sans_juge?.[cand]);
   const avecCaches = mes.filter((r) => r.sans_juge![ref].caches_ok !== null).length;
@@ -68,8 +75,9 @@ export function verdictSansJuge(res: ResultatBanc[], ref: string, cand: string, 
     c('bancs mesurés sans juge', `${mes.length}/${res.length}`, 'tous', mes.length === res.length),
     c('suite du projet verte', `${n(cand, 'suite_ok')} contre ${n(ref, 'suite_ok')} bancs`, `≥ ${ref}`, ok('suite_ok')),
     c('tests d\'origine verts', avecCaches ? `${n(cand, 'caches_ok')} contre ${n(ref, 'caches_ok')} bancs sur ${avecCaches}` : 'aucun banc avec tests d\'origine', `≥ ${ref}`, ok('caches_ok')),
-    ...k.apres];
-  return { vert: criteres.every((x) => x.ok || !x.bloquant), criteres };
+    ...k.apres,
+    ...(nonLivres.length ? [c('bras qui ont livré le travail', nonLivres.flatMap((r) => Object.entries(r.non_livre!).map(([b, x]) => `${r.banc}/${b} : ${x}`)).join(' ; '), 'tous', false)] : [])];
+  return { vert: !nonLivres.length && criteres.every((x) => x.ok || !x.bloquant), criteres, ...(nonLivres.length && { non_mesurable: nonLivres.map((r) => r.banc) }) };
 }
 
 export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: Barre): Verdict {
@@ -104,27 +112,29 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
   const lignes = res.map((r) => {
     const j = r.jugement; const sj = r.sans_juge; const m = (b: string) => r.mesures[b]; const deux = (f: (x: Meca) => string) => (j ? `${f(j.meca[ref])} · ${f(j.meca[cand])}` : '–');
     const sans = (f: 'suite_ok' | 'caches_ok') => (sj ? `${okRouge(sj[ref]?.[f])} · ${okRouge(sj[cand]?.[f])}` : '–');
-    const prefere = j ? avisLu(j, 'prefere') : sj ? 'sans juge' : 'non jugé';
+    const prefere = j ? avisLu(j, 'prefere') : r.non_livre ? 'non mesurable' : sj ? 'sans juge' : 'non jugé';
     const caches = j ? `${j.meca[ref].caches_passes} · ${j.meca[cand].caches_passes}` : sans('caches_ok');
     const suite = j ? deux((x) => (x.suite_ok ? 'ok' : 'ROUGE')) : sans('suite_ok');
     return `| ${r.banc} | ${m(ref)?.duree_s ?? '–'} s | ${m(cand)?.duree_s ?? '–'} s | ${m(ref)?.tokens ?? '–'} | ${m(cand)?.tokens ?? '–'} | ${prefere} | ${caches} | ${j ? `${j.meca[ref].mutations_tuees}/${j.meca[ref].mutations_total} · ${j.meca[cand].mutations_tuees}/${j.meca[cand].mutations_total}` : '–'} | ${suite} | ${deux((x) => x.attendu)} | ${m(ref)?.taille_declaree ?? '–'} · ${m(cand)?.taille_declaree ?? '–'} |`;
   });
   const questions = res.flatMap((r) => [ref, cand].flatMap((b) => (r.mesures[b]?.questions_texte ?? []).map((q) => `- ${r.banc}/${b} : ${q.trim().replace(/\s*\n\s*/g, ' ')}`)));
   const lectures = res.flatMap((r) => Object.entries(r.fuites_a_verifier ?? {}).flatMap(([b, ps]) => ps.map((p) => `- ${r.banc}/${b} : ${p}`)));
-  return [`# Banc ${e.date} — ${cand} contre ${ref} — ${v.vert ? 'VERT' : 'ROUGE'}`, '', `Empreinte de v2 : ${e.empreinte}`, `Répétitions : ${e.repetitions ?? 1}`,
+  const nonLivres = res.flatMap((r) => Object.entries(r.non_livre ?? {}).map(([b, x]) => `- ${r.banc}/${b} : ${x}`));
+  return [`# Banc ${e.date} — ${cand} contre ${ref} — ${titreVerdict(v)}`, '', `Empreinte de v2 : ${e.empreinte}`, `Répétitions : ${e.repetitions ?? 1}`,
     ...(e.niveau ? [`Niveau : ${e.niveau}, sans juge IA (n'autorise pas la publication)`] : []),
     ...(e.depot ? [`Dépôt mesuré : ${e.depot}`] : []),
     ...(e.duree_s !== undefined ? [`Durée du passage : ${e.duree_s} s`] : []), '',
     `| Banc | Temps ${ref} | Temps ${cand} | Tokens ${ref} | Tokens ${cand} | Préféré | Cachés ${ref} · ${cand} | Mutations ${ref} · ${cand} | Suite ${ref} · ${cand} | Attendu ${ref} · ${cand} | Taille déclarée ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|---|---|', ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
     ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.bloquant ? '**ROUGE**' : 'en dessous (indicatif)'} |`), '',
+    ...(nonLivres.length ? ['## Bancs non mesurables', '', 'Un bras n\'a livré aucun fichier hors plan et doc : son temps ne compte pas, ni en victoire ni en défaite. Rejouer le passage.', '', ...nonLivres, ''] : []),
     ...(e.eclair ? ['## Contrôles éclair', '', ...e.eclair.map((l) => `- ${l}`), ''] : []),
     ...[['Lectures à vérifier', lectures], ['Questions posées', questions]].flatMap(([t, l]) => (l.length ? [`## ${t}`, '', ...l, ''] : []))].join('\n');
 }
 
 export const ligneHistorique = (v: Verdict, e: { type?: 'sequence'; sequence?: string; run?: string; repetition?: number; repetitions?: number; date: string; empreinte: string; candidat: string; reference: string; modele_candidat: string; bancs: string[]; hebdo: boolean; frais: number; eclair_ok?: boolean;
   niveau?: string; duree_s?: number }) =>
-  JSON.stringify({ ...e, vert: v.vert, rouges: v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom) });
+  JSON.stringify({ ...e, vert: v.vert, rouges: v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom), ...(v.non_mesurable && { non_mesurable: v.non_mesurable }) });
 
 const PARIS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 /** Jour civil (AAAA-MM-JJ), heure (HHMM) et jour de semaine (0 = dimanche) à Paris. */
@@ -140,7 +150,7 @@ function samediCourant(d: Date): string {
 }
 
 type Ligne = { type?: string; sequence?: string; run?: string; repetition?: number; repetitions?: number; date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number; bancs?: string[]; candidat?: string; reference?: string; modele_candidat?: string; eclair_ok?: boolean;
-  niveau?: string; rouges?: string[] };
+  niveau?: string; rouges?: string[]; non_mesurable?: string[] };
 
 /** Au moins une séquence ; pour chaque id, de la première ligne de son dernier run à la fin, toutes les lignes passent `ok` et le run compte exactement `repetitions` lignes (répétition 1..N). */
 function seqOk(seqs: Ligne[], ok: (s: Ligne) => boolean): boolean {
@@ -209,12 +219,13 @@ const quoi = (x: Ligne) => (x.type === 'sequence' ? `séquence ${x.sequence ?? '
  * `mode` vaut `complet` tant qu'une alerte tient.
  */
 export function statut(historique: string[], maintenant: Date, empreinte: string, modeles: Record<string, string> = {}, publie?: { candidat: string; reference: string }) {
-  const h = historique.flatMap((l) => { // une ligne illisible ou sans date valide est sautée, jamais levée
+  const lues = historique.flatMap((l) => { // une ligne illisible ou sans date valide est sautée, jamais levée
     try { const x = JSON.parse(l) as Ligne; return typeof x?.date === 'string' && !Number.isNaN(Date.parse(x.date)) ? [x] : []; } catch { return []; }
   });
+  const h = lues.filter((x) => !x.non_mesurable?.length); // L733 : un passage non mesurable n'est ni vert ni rouge pour la garde
   const sam = samediCourant(maintenant);
   const depuisSamedi = h.filter((x) => parisJour(new Date(x.date)).jour >= sam);
-  const dernier = h.at(-1);
+  const dernier = lues.at(-1);
   const reel = (m: Ligne | undefined): m is Ligne => m !== undefined && typeof m.reference === 'string' && m.candidat !== m.reference
     && typeof m.modele_candidat === 'string' && modeles[m.candidat ?? ''] === m.modele_candidat
     && (!publie || (m.candidat === publie.candidat && m.reference === publie.reference));
@@ -224,7 +235,7 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
   const alerte = rouge ? `banc complet rouge le ${parisJour(new Date(rouge.date)).jour} sur l'empreinte ${rouge.empreinte} (${quoi(rouge)}${rouge.rouges?.length ? ` : ${rouge.rouges.join(', ')}` : ''})${autres.length ? ` ; aussi rouge depuis : ${autres.join(', ')}` : ''}` : undefined;
   const dernierComplet = h.filter((x) => duComplet(x) && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference))).at(-1);
   return {
-    dernier: dernier ? `${dernier.date} ${dernier.type === 'sequence' ? 'séquence ' : ''}${dernier.niveau ? `${dernier.niveau} ` : ''}${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
+    dernier: dernier ? `${dernier.date} ${dernier.type === 'sequence' ? 'séquence ' : ''}${dernier.niveau ? `${dernier.niveau} ` : ''}${dernier.non_mesurable?.length ? 'non mesurable' : dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
     mode: (alerte ? 'complet' : 'mecanique') as 'complet' | 'mecanique',
     alerte,
     /** Bancs à rejouer verts, après le rouge (version corrigée ou suivante), pour lever l'alerte : `court`, ou `sequence <id>`, dans l'ordre des rouges. */

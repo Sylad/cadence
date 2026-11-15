@@ -10,8 +10,8 @@ import { chargerBras, executeurClaude, lancerBras, libererReglages, type DefBras
 import { fuitesDuBras } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
-import { mesurerSansJuge } from './sans-juge.js';
-import { BARRE_SPEC, banBase, COMPLET_MAX_JOURS, ligneHistorique, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type ResultatBanc, type Verdict } from './verdict.js';
+import { mesurerSansJuge, sansLivrable } from './sans-juge.js';
+import { BARRE_SPEC, banBase, COMPLET_MAX_JOURS, ligneHistorique, titreVerdict, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type ResultatBanc, type Verdict } from './verdict.js';
 
 const REPO = join(import.meta.dirname, '..', '..', '..');
 const COURT = ['1', '3', '6'];
@@ -111,7 +111,7 @@ export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out:
   const idBanc = idTache(t); const sous = t.N > 1 ? join(t.bid, `r${t.k}`) : t.bid;
   const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {}; const aVerifier: Record<string, string[]> = {}; const suiteBase: Record<string, number> = {}; const bases: Record<string, string> = {};
   const mapping: Record<string, string> = {}; // c1/c2 -> bras : écrit seulement après les juges (aveugle)
-  let jugement: Jugement | null = null; let sansJuge: Record<string, MesureSansJuge> | undefined; let phase = 'banc invalide'; let b: Banc | undefined;
+  let jugement: Jugement | null = null; let sansJuge: Record<string, MesureSansJuge> | undefined; let nonLivre: Record<string, string> | undefined; let phase = 'banc invalide'; let b: Banc | undefined;
   const aller = (p: string) => { phase = p; signaler(p); };
   try {
     const bc = chargerBanc(t.racine, t.bid); b = bc;
@@ -127,8 +127,13 @@ export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out:
     });
     if (ordre.some((n) => mesures[n].echec !== null)) out(`${idBanc} : un bras en échec, ${t.sansJuge ? 'mesure sautée' : 'juges sautés'}`);
     else if (t.sansJuge) {
-      aller('mesure sans juge');
-      sansJuge = Object.fromEntries(ordre.map((n) => [n, mesurerSansJuge(bc, clones[n])]));
+      // L733 : sans juge, rien d'autre ne verrait qu'un bras n'a écrit que du plan ou de la doc ; son temps ne compte pas, le banc est à rejouer
+      const nl = Object.fromEntries(ordre.flatMap((n) => { const x = sansLivrable(clones[n], bases[n]); return x ? [[n, x]] : []; }));
+      if (Object.keys(nl).length) { nonLivre = nl; out(`${idBanc} : banc non mesurable, à rejouer (${Object.entries(nl).map(([n, x]) => `${n} : ${x}`).join(' ; ')})`); }
+      else {
+        aller('mesure sans juge');
+        sansJuge = Object.fromEntries(ordre.map((n) => [n, mesurerSansJuge(bc, clones[n])]));
+      }
     } else {
       out(`${idBanc} : juges…`);
       aller('juges');
@@ -143,7 +148,7 @@ export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out:
     out(`${idBanc} : ${msg}`);
   }
   const r: ResultatBanc = { banc: idBanc, taille: b?.taille ?? 'fonction', visible: b?.visible ?? false, reponses: b?.reponses ?? false, frais: b?.frais ?? false,
-    mesures, jugement, fuites, fuites_a_verifier: aVerifier, ...(sansJuge && { sans_juge: sansJuge }) };
+    mesures, jugement, fuites, fuites_a_verifier: aVerifier, ...(sansJuge && { sans_juge: sansJuge }), ...(nonLivre && { non_livre: nonLivre }) };
   mkdirSync(join(t.dirRun, sous), { recursive: true });
   writeFileSync(join(t.dirRun, sous, 'resultat.json'), JSON.stringify({ ...r, clones: mapping, suite_base: suiteBase }, null, 2));
   if (!t.garderClones) for (const n of ordre) if (clones[n]) archiver(clones[n], bases[n]);
@@ -234,7 +239,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
     candidat: o.cand, reference: o.ref, modele_candidat: bras[o.cand].modele, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: new Set(res.filter((r) => r.frais).map((r) => banBase(r.banc))).size,
     ...(e && { eclair_ok: e.ok }), ...(o.niveau && { niveau: o.niveau }), duree_s })}\n`);
-  o.out(`${v.vert ? 'VERT' : 'ROUGE'} — ${duree_s} s — rapport : ${base}.md`);
+  o.out(`${titreVerdict(v)} — ${duree_s} s — rapport : ${base}.md`);
   return { ...v, eclair_ok: e?.ok };
 }
 
@@ -351,5 +356,5 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
     hebdo: sous === 'hebdo', repetitions: rep, garderClones: reste.includes('--garder-clones'), juge: option(reste, 'juge') ?? 'opus', exec: executeurClaude, prep: preparer,
     maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out, depot: depotMesure(repo),
     ...(par > 1 && { enfants: { lanceur: [process.execPath, join(repo, 'v2', 'bin', 'cadence2.js')], paralleles: par } }) });
-  return v.vert && v.eclair_ok !== false ? 0 : 1;
+  return v.non_mesurable ? 3 : v.vert && v.eclair_ok !== false ? 0 : 1;
 }

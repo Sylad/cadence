@@ -1,4 +1,5 @@
 // L689 (D-3) : mesure des bancs micro et mécanique, sans juge IA ; seulement des commandes. Ni mutations ni relecture aveugle : ces bancs n'autorisent pas la publication.
+import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
 import type { Banc } from './banc.js';
@@ -18,4 +19,17 @@ export function mesurerSansJuge(b: Banc, clone: string, delaiMs = 30 * 60_000): 
     for (const f of tests) { const c = join(clone, nomCache(f)); if (!existsSync(c)) { mkdirSync(dirname(c), { recursive: true }); copyFileSync(join(origine, f), c); poses.push(c); } }
     return { suite_ok, caches_ok: shell('tests d\'origine', b.tests, clone, `${clone}.tests-origine.log`, delaiMs) === 0 };
   } finally { for (const p of poses) rmSync(p, { force: true }); }
+}
+
+/** L733 : chemins qui ne sont pas le travail d'un banc (plan, registre, docs, captures MCP, Markdown). */
+const HORS_LIVRABLE = (f: string): boolean => /^(\.cadence|docs|\.playwright-mcp)\//.test(f) || f === 'cadence.yaml' || f.endsWith('.md');
+
+/**
+ * L733 (vécu des 14 et 15-11, banc 6) : un bras qui ne livre que du plan ou de la doc finit en 75 s et gagne en temps sans avoir fait le travail.
+ * null si base..HEAD touche au moins un fichier hors plan et doc ; sinon la raison, avec les fichiers touchés.
+ */
+export function sansLivrable(clone: string, base: string): string | null {
+  const touches = execFileSync('git', ['diff', '--name-only', `${base}..HEAD`], { cwd: clone, encoding: 'utf8' }).split('\n').filter(Boolean);
+  if (touches.some((f) => !HORS_LIVRABLE(f))) return null;
+  return `aucun fichier livré hors plan et doc${touches.length ? ` (seulement ${touches.join(', ')})` : ''}`;
 }

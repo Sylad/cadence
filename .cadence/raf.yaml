@@ -3601,6 +3601,12 @@ lots:
     started: 2026-11-15
     review: { date: 2026-11-15, verdict: "conforme : bruit d'un banc expiré à 14 jours, remesuré par bench complet (A contre A), seules les paires du samedi comptent, seuil = médiane des 3 dernières ; un banc sans bruit récent redevient bloquant", commit: bfa8ac79fbd3a81d57cdeecd32b367acda00f0f9 }
     finished: 2026-11-15
+  - id: L739
+    title: "Banc 6 (ol-companion L167) ambigu : sa demande verbatim dit « il faudrait rajouter au plan, si possible, de proposer la même page… » ; cadence run l'ajoute au plan (lecture littérale), A implémente ; depuis L733 le banc est non mesurable à chaque passage (15-11 17 h 49 et 20 h 45), donc aucune publication possible. Remplacer le banc 6 par le banc 7 (ol-companion L160, grosse, avec pièce) dans les bancs mécanique, court et micro où il figure ; le banc 6 reste dans hebdo. Tests et docs/v2/banc.md."
+    status: doing
+    estimate: 0.25
+    created: 2026-11-15
+    started: 2026-11-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

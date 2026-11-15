@@ -3587,9 +3587,10 @@ lots:
     finished: 2026-11-15
   - id: L737
     title: "M2 de docs/etudes/banc3-lenteur.md : le critère de temps tient compte du bruit propre à chaque banc (bancs marqués bruités, ou seuil par banc tiré des passages où les bras étaient identiques) et l'ordre des bras alterne d'un passage à l'autre. Mesure : 0 rouge de temps sur les 10 passages déjà joués à bras identiques ; aucun rouge dû à un banc bruité sur les 4 passages suivants."
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-15
+    started: 2026-11-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -81,6 +81,23 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.10] - 2026-11-15
+
+### Added
+
+- `cadence2 bench bruit [--bancs 3,6]` (L738): an A-versus-A pass (A against its twin `A-bis`, same arm fingerprint), without judge, one bench after the other. The Saturday `bench complet` runs it first on every short-bench bench that is noisy or whose noise expires within 7 days (or already expired), to remeasure it. Only the A-versus-A pairs played by `bench complet` count for the noise (review fix): a `bench bruit` run by hand shows its gap and writes a `-bruit-main` report that the threshold never reads, so replaying it until a gap ≥ 2 shows up can no longer lift a bench's time threshold and turn a red mechanical pass green. Neither writes a line in the guard's history; the L730 guard and the L733 and L737 rules are unchanged.
+
+### Changed
+
+- The short and mechanical benches now play benches 1, 3 and 7 instead of 1, 3 and 6 (L739, [docs/v2/banc.md](docs/v2/banc.md)): bench 6 (ol-companion L167) asks to "add to the plan" a France team match page, `cadence run` reads it literally and only plans it, so since L733 every pass was unmeasurable and no release was possible. Bench 7 (ol-companion L160, large, with an image attachment) replaces it; bench 6 stays in the weekly bench. One constant, `BANCS_COURT` in `v2/src/bench/verdict.ts`, now feeds the release guard, the `court` and `mecanique` subcommands and the refusal message of `verifier-publication`. A mechanical pass on benches 1, 3, 6 recorded before this change no longer allows a release. The HUD labels a pass on 1, 3 and 6 or on 1, 3 and 7 as `court`.
+
+### Fixed
+
+- A bench's measured time noise now expires (L738, [docs/v2/banc.md](docs/v2/banc.md)): since L736 the two arms are no longer identical, so noise frozen on the older identical-arm history would have kept benches 3 and 6 out of the blocking time criterion forever. An identical pair counts for 14 days after its pass; a bench's noise is the median of its last three still-valid counted pairs (review fix: never the largest gap, so one extreme pair cannot make a bench noisy), so it expires 14 days after its last A-versus-A pair, and the bench falls back to the default threshold (1.5 × A total, 1.2 × A touch-ups), blocking again.
+- The bench time criterion now accounts for each bench's own noise (L737, [docs/v2/banc.md](docs/v2/banc.md#trois-niveaux-de-banc-l689), study [docs/etudes/banc3-lenteur.md](docs/etudes/banc3-lenteur.md)): "total time ≤ 1.5 × A" flagged red 4 passes out of 9 where both arms were identical. Each bench's gap is the largest time ratio between two identical arms in the history (`rapports/*.json`: same `empreinte_bras`, now recorded in every measure, or a pass proven identical by the study). Below the bar the bar applies; between the bar and 2 the gap becomes that bench's threshold; at 2 or more the bench is noisy and its time leaves the blocking criteria for an indicative "temps des bancs bruités". One function, `criteresTemps`, carries the rule; replayed on the 9 identical-arm reports, 0 time reds (4 before), while a real × 2 on a non-noisy bench stays red. The L733 non-delivered rules and the L730 guard are unchanged.
+- The order of the two arms now also alternates from one pass of a bench to the next (L737): `cadence-run` always played first on bench 3, a position effect the study measured at p = 0.063.
+- The short bench now plays the real `cadence run` (L736, [docs/v2/banc.md](docs/v2/banc.md#fonctionnement), study [docs/etudes/banc3-lenteur.md](docs/etudes/banc3-lenteur.md)): the bench gave the `aiguillage` arm no attachments, so the switch always chose the light mode and the `cadence-run` arm ran arm `A`'s brief, prompt identical byte for byte, even on bench 3 whose request cites a capture. The files of `bancs/<id>/pieces/` (subfolders included) are now handed to the arm, as the sequence bench already did: with attachments, `cadence-run` gets the full brief ("Taille fixée par le gardien"), the mandatory-reading hook settings and the attachments in `CADENCE_PIECES`; without them it keeps `A`'s brief. A switched arm also keeps the model declared in `bras.yaml` (passed as is to `--model`; before, it fell back to the model of the arm the switch chose, `opus`).
+
 ## [2.0.9] - 2026-11-15
 
 ### Changed

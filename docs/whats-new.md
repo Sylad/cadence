@@ -4,6 +4,7 @@
 
 ## In two lines
 
+- **2.0.10**: the bench now measures the real `cadence run` (pieces and declared model reach the arm); time judged against each bench's own noise; first green bench.
 - **2.0.9**: proportionate release gate (mechanical bench before a release, full bench on Saturdays); a bench arm that delivers nothing is not measured; red suites replayed alone; red bench.
 - **2.0.8**: `cadence run` picks each pass's model: Opus, Fable at the 3rd fix or after two non-compliant reviews; Sonnet measured, not kept; release smoke ignores a parent npm's dry-run; mechanical bench.
 - **2.0.7**: a run's report is the message marked `=== FINI ===` (#58); `spec reseal` admits a commit acknowledged by `raf ignore` (#60); mechanical bench red on time.
@@ -103,6 +104,8 @@ Each is a paragraph in [docs/whats-new.md](whats-new.md) and a full section in [
 ## Version by version
 
 The long form of « In two lines » above (the README no longer carries a « What's new » section since L326: it links here). The full history, with the date of each version, is in [CHANGELOG.md](../CHANGELOG.md).
+
+**2.0.10**: the bench finally measures `cadence run`. Until 2.0.9 it gave the routing an empty list of pieces, so the `cadence-run` arm played Claude-alone's brief, and it lost the arm's declared model, so the Sonnet arm ran on Opus (study in `docs/etudes/banc3-lenteur.md`; the 2.0.8 and 2.0.9 publication records carry a correction). Each bench's time is now judged against its own noise, measured on pairs of identical arms; that noise expires after 14 days and the Saturday full bench measures it again with an A-against-A pass, the median of the last three pairs counting; the arms' order alternates between passes. Bench 6, whose request literally asks to add the page to the plan, is replaced by bench 7 in the short and mechanical benches. Measured: the mechanical bench is green, 904 s for `cadence run` against 1425 s for Claude alone over three benches (on bench 3, 217 s and 1.6 M tokens against 752 s and 8.7 M) ([publication record](v2/publications/2.0.10.md)).
 
 **2.0.9**: the release gate is proportionate: before a release, the mechanical bench (about 30 minutes, no judge) is enough, and the full bench (short bench with judges, then the sequences) runs every Saturday on the timer; a red full bench raises an alert that blocks every release until that same bench is replayed green, and reds older than 15-11 do not count. The mechanical bench no longer rewards an arm that delivers nothing: an arm that only touched the plan or docs makes its bench « not measurable », out of every criterion, while the other benches are still judged, time included. A test suite that turned red while the other benches ran in parallel is replayed alone before it counts. Also: a study of what removing waves would take (`docs/etudes/retrait-vagues.md`), and three tests that failed under load now wait for events. Measured honestly: the mechanical bench of this version is red on time (× 1.59 for `cadence run` against Claude alone over the two measured benches), driven by one bench where `cadence run` has been slower in five passes out of six; this version does not change `cadence run`, an investigation lot is open, and the publication is Sylvain's decision ([publication record](v2/publications/2.0.9.md)).
 

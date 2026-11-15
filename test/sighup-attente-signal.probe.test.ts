@@ -17,9 +17,12 @@ describe('L505 : la mort d\'un processus se constate par attente, jamais sans d�
     expect(bad).toEqual([]);
   });
 
-  it('verify.test : le contrôle de mort après relais de signal passe par until() avec un délai ≥ 10 s', () => {
+  // L732 : la mort se lit sur un événement (fin de fichier de la FIFO que la vérification tient), plus en relisant /proc ; la borne d'échec reste ≥ 10 s.
+  it('verify.test : le contrôle de mort après relais de signal attend la fin de la FIFO, bornée à ≥ 10 s', () => {
     const lines = src('verify.test.ts').join('\n');
-    const m = [...lines.matchAll(/until\(\(\) => !alive\(checkPid\), (\d[\d_]*)\)/g)].map((x) => Number(x[1].replace(/_/g, '')));
+    expect(lines).toMatch(/const died = new Promise<true>\(\(r\) => reader\.once\('end', \(\) => r\(true\)\)\)/);
+    expect(lines).not.toMatch(/!alive\(checkPid\)/);
+    const m = [...lines.matchAll(/Promise\.race\(\[died, bound\((\d[\d_]*)\)\]\)/g)].map((x) => Number(x[1].replace(/_/g, '')));
     expect(m.length).toBeGreaterThan(0);
     for (const ms of m) expect(ms).toBeGreaterThanOrEqual(10_000);
   });

@@ -109,15 +109,22 @@ export function readJsonLines<T = any>(path: string): T[] {
  * Le processus tourne-t-il encore ? Un zombie (mort, pas encore recueilli par son parent) répond à `kill(pid, 0)` : on le compte pour mort,
  * c'est la mort du processus qu'on veut lire, pas le recueil par son parent.
  * Un pid qui n'est pas un entier strictement positif n'est pas un processus : `kill(0, 0)` et `kill(-n, 0)` visent un groupe.
+ * L732 : pendant son recueil, un zombie passe par l'état X (« dead ») puis disparaît de /proc ; recueilli entre `kill(pid, 0)` et la lecture
+ * de `/proc/<pid>/stat`, il laisse un stat illisible. Comptés vivants, ces deux cas faisaient repasser à « vivant » un processus déjà vu mort
+ * (162 orphelins sur 300). Sous Linux, stat illisible après le signal 0 : il vient de partir. Sans `procRoot` (macOS), le signal 0 fait foi.
  */
-export function isRunning(pid: number): boolean {
+export const isRunning = (pid: number): boolean => processRunning(pid, '/proc');
+
+/** isRunning sur une racine de /proc donnée (tests de ses bords). */
+export function processRunning(pid: number, procRoot: string): boolean {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
   } catch {
     return false;
   }
-  return readStat('/proc', pid)?.state !== 'Z';
+  const st = readStat(procRoot, pid);
+  return st ? st.state !== 'Z' && st.state !== 'X' : !existsSync(procRoot);
 }
 
 /**

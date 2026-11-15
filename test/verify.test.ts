@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync, spawn, type SpawnOptions } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, createReadStream, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
@@ -375,9 +375,13 @@ describe('cadence session start : effets', () => {
 
 describe('realCheckDeps.exec : vérifications en groupe détaché (verify, session start)', () => {
   const alive = isRunning;
+  // L732 : rend la valeur vue, sans relire ok() après la boucle (une seconde lecture pouvait contredire la première).
   const until = async (ok: () => boolean, ms: number) => {
-    for (let t = 0; t < ms && !ok(); t += 50) await new Promise((r) => setTimeout(r, 50));
-    return ok();
+    for (let t = 0; ; t += 50) {
+      if (ok()) return true;
+      if (t >= ms) return false;
+      await new Promise((r) => setTimeout(r, 50));
+    }
   };
   const viteNode = () => join(process.cwd(), 'node_modules/.bin/vite-node');
 
@@ -427,28 +431,36 @@ describe('realCheckDeps.exec : vérifications en groupe détaché (verify, sessi
     expect(probe('quiet')).not.toContain('BRUIT-SOUS-PROCESSUS');
   });
 
+  // L732 : rouge sous npm publish --dry-run (SIGHUP, 626 ms) : la vérification, vue morte, redevenait « vivante » à la relecture de /proc
+  // pendant son recueil (état X, puis stat disparu). La mort se lit maintenant comme un événement : la vérification tient l'écriture d'une
+  // FIFO, son pid y arrive quand elle tourne, la fin de fichier quand elle meurt (le noyau ferme ses descripteurs à la mort, avant tout recueil).
   it.each(['SIGINT', 'SIGTERM', 'SIGHUP'] as const)(
     '%s reçu par cadence : relayé au groupe de la vérification, qui meurt avec lui',
     async (sig) => {
       const tmp = tempDir();
-      const pidFile = join(tmp, 'check.pid');
+      const fifo = join(tmp, 'check.fifo');
+      execFileSync('mkfifo', [fifo]);
       const script = join(tmp, 'probe.ts');
       writeFileSync(
         script,
         `import { realCheckDeps } from ${JSON.stringify(join(process.cwd(), 'src/verify.ts'))};\n` +
-          `process.exitCode = await realCheckDeps(${JSON.stringify(tmp)}, { quiet: true }).exec("echo $$ > '${pidFile}'; exec sleep 30", {}, 60_000);\n`,
+          `process.exitCode = await realCheckDeps(${JSON.stringify(tmp)}, { quiet: true }).exec("exec 3>'${fifo}'; echo $$ >&3; exec sleep 30", {}, 60_000);\n`,
       );
+      const reader = createReadStream(fifo, 'utf8');
+      let text = '';
+      const started = new Promise<number>((r) => reader.on('data', (d) => (text += d) && text.includes('\n') && r(Number(text.trim()))));
+      const died = new Promise<true>((r) => reader.once('end', () => r(true)));
+      const bound = (ms: number) => new Promise<false>((r) => setTimeout(() => r(false), ms).unref());
       const child = spawn(viteNode(), [script], { detached: true, stdio: 'ignore' });
       const exited = new Promise<NodeJS.Signals | null>((r) => child.on('exit', (_c, s) => r(s)));
       let checkPid = 0;
       try {
-        expect(await until(() => existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim() !== '', 15_000)).toBe(true);
-        checkPid = Number(readFileSync(pidFile, 'utf8').trim());
+        checkPid = await Promise.race([started, bound(15_000).then(() => 0)]);
+        expect(checkPid).toBeGreaterThan(0);
         // la vérification est dans sa propre session : le signal du terminal ne l'atteint pas directement
         process.kill(-child.pid!, sig);
         expect(await exited).toBe(sig); // cadence sort comme sans relais : tué par le même signal
-        const survived = !(await until(() => !alive(checkPid), 10_000));
-        expect(survived).toBe(false);
+        expect(await Promise.race([died, bound(10_000)])).toBe(true); // la borne ne sert qu'à échouer : vivante, la FIFO reste ouverte
       } finally {
         for (const pid of [-child.pid!, checkPid]) {
           try {
@@ -457,6 +469,12 @@ describe('realCheckDeps.exec : vérifications en groupe détaché (verify, sessi
             // déjà mort
           }
         }
+        try {
+          closeSync(openSync(fifo, constants.O_WRONLY | constants.O_NONBLOCK)); // débloque une ouverture de lecture restée en attente
+        } catch {
+          // plus de lecteur
+        }
+        reader.destroy();
       }
     },
     30_000,

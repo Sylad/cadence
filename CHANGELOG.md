@@ -81,6 +81,19 @@ reached npm): what they brought is part of the first tagged release, 0.5.0.
 
 ## [Unreleased]
 
+## [2.0.9] - 2026-11-15
+
+### Changed
+
+- The release guard is proportionate (L730, D-22, [docs/v2/banc.md](docs/v2/banc.md#garde-proportionnée-l730)): before a release, `cadence2 bench verifier-publication` (and so `cadence release`) accepts the last green mechanical bench (banks 1, 3 and 6 in parallel, no AI judge, about 30 min) of `cadence-run` against `A` on the fingerprint, with no red passage after it; on 2026-11-14 the court bench with judges had taken about 3 h. The full bench (court with judges, then each sequence twice) moves to the Saturday timer, through the new `cadence2 bench complet`.
+- A red full bench raises an alert (a ⚠ line of `bench statut`, shown at session start and by `cadence lead tour`); the guard follows four written rules ([docs/v2/banc.md](docs/v2/banc.md#garde-proportionnée-l730)): every red court or red sequence (by id) is an alert; it clears once that same bench is replayed green after it, on the corrected version or a later one, and stays cleared for the fingerprints that follow; while an alert holds nothing releases, neither a green mechanical bench nor a green full bench that skips the red one; otherwise the mechanical bench or a full bench suffices. The refusal names the benches to replay. `statut` also warns when no full bench ran in the last 8 days.
+- Red full benches from before the guard went live (2026-11-15, 00:00 Paris time, a constant in `v2/src/bench/verdict.ts`) raise no alert: they were already settled (2.0.3 to 2.0.8 released on record).
+
+### Fixed
+
+- A mechanical or micro bench (no AI judge) no longer counts against an arm a test suite that went red only under the load of the parallel benches (L734, [docs/v2/banc.md](docs/v2/banc.md#trois-niveaux-de-banc-l689)): on 2026-11-15, bench 1's `cadence-run` suite had 28 `findBy` time out at ~1 s while the three benches ran (19.9 s against 11.7 s), and was green 68/68 twice when replayed alone. Like `orchestrate.testReplay`, a red suite (project suite or original tests) is now replayed alone after every bench of the passage has finished, before it is counted: green on replay counts green and the report says "rejoué", red on replay stays red. The measure under load stays in `resultat.json` (`sans_juge.<arm>.rejoue`) and in its log.
+- A mechanical or micro bench (no AI judge) no longer counts an arm that delivered nothing as a time win (L733, [docs/v2/banc.md](docs/v2/banc.md#trois-niveaux-de-banc-l689)): on 2026-11-14 and 2026-11-15, arm `A` finished bench 6 in 75 s and 90 s by writing only a feasibility note in the plan, and the passage went red ×2.0 on time. When an arm's commits touch no file outside plan and docs (`.cadence/`, `docs/`, `cadence.yaml`, `.playwright-mcp/`, Markdown), the bench is not measured and the verdict follows a five-line contract (table "Banc non livré : contrat du verdict", one function, `verdictSansJuge`): (a) the undelivered bench leaves every criterion, times included; (b) total time and rework time are computed on the remaining measured benches and stay blocking; (c) any blocking criterion red on a measured bench makes the passage red (exit code 1, counted by the release guard); (d) no red and at least one undelivered bench makes it "NON MESURABLE (à rejouer)", neither green nor red (exit code 3, `non_mesurable` on the history line, ignored by the guard); (e) otherwise green. A suite red under load and green when replayed alone (L734) is not a red. Two reviews each found a real red hidden by an undelivered bench of the same passage (a red project suite, then a ×3 time): both now stay red.
+
 ## [2.0.8] - 2026-11-14
 
 ### Changed

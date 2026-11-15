@@ -3501,10 +3501,12 @@ lots:
     finished: 2026-11-14
   - id: L727
     title: "Étude, lecture seule : cartographie de cadence orchestrate — chaque commande et module classé « encore utilisé (perso ou compte pro : spec reseal/green, verify --gate, créneaux, lead hold…) » ou « ne sert qu'aux vagues », avec lignes et tests concernés ; prépare le retrait des vagues (le compte pro n'en lance plus depuis le 09-11, son commentaire sur #50) ; confirmation écrite du compte pro demandée avant le retrait"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-13
     started: 2026-11-15
+    review: { date: 2026-11-15, verdict: "conforme : étude docs/etudes/retrait-vagues.md (36 % du code hors v2 ne sert qu'aux vagues, retrait en 3.0.0 en 7 lots après confirmation du compte pro) ; test mise-en-service passé de spawnSync à spawn, assertions inchangées", commit: 5aa4abd0b94835fd4f2304bae4a5433d0906c4ce }
+    finished: 2026-11-15
   - id: L728
     title: "Issue #58 du compte pro : cadence run garde comme rapport le message du tour du prompt quand la session finit ce tour avec un travail encore en arrière-plan (« la recette tourne, je surveille ») et donne son vrai rapport dans un tour ouvert plus tard par une notification — l'inverse de #57 (L720). Le rapport est celui du dernier tour qui finit sans tâche de fond restante ; à défaut, le dernier message, et la fin de run dit de quel tour il vient"
     status: done
@@ -3545,9 +3547,10 @@ lots:
     finished: 2026-11-14
   - id: L732
     title: "Test instable en CI : verify.test.ts « SIGHUP reçu par cadence : relayé au groupe de la vérification, qui meurt avec lui » rouge le 14-11 sur d5f22c54 dans l'étape « Suite sous npm publish --dry-run » (expected true to be false), vert à l'étape npm test du même job — rendre le test déterministe (attente d'événement, pas de délai)"
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-14
+    started: 2026-11-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

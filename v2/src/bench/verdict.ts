@@ -280,8 +280,12 @@ function seqOk(seqs: Ligne[], ok: (s: Ligne) => boolean): boolean {
   });
 }
 
-const couvreCourt = (x: Ligne) => ['1', '3', '6'].every((n) => (x.bancs ?? []).some((id) => banBase(id).split('-')[0] === n));
-/** Un passage du banc complet (L730) : banc avec juges couvrant 1, 3 et 6, ou ligne de séquence ; ni micro, ni mécanique, ni éclair. */
+/** Les bancs du court et du mécanique. L739 : le banc 7 (ol-companion L160) remplace le banc 6, dont la demande « rajouter au plan » se lit
+ * littéralement comme du plan seul et rend le passage non mesurable (L733) ; le banc 6 reste dans l'hebdo. */
+export const BANCS_COURT = ['1', '3', '7'];
+export const LIBELLE_COURT = `${BANCS_COURT.slice(0, -1).join(', ')} et ${BANCS_COURT.at(-1)}`;
+const couvreCourt = (x: Ligne) => BANCS_COURT.every((n) => (x.bancs ?? []).some((id) => banBase(id).split('-')[0] === n));
+/** Un passage du banc complet (L730) : banc avec juges couvrant 1, 3 et 7, ou ligne de séquence ; ni micro, ni mécanique, ni éclair. */
 const duComplet = (x: Ligne) => x.type === 'sequence' || (!x.niveau && x.eclair_ok === undefined && couvreCourt(x));
 /** Au-delà, le banc complet du samedi n'a pas tourné : la garde proportionnée n'a plus de filet (L730). */
 export const COMPLET_MAX_JOURS = 8;
@@ -300,7 +304,7 @@ export const GARDE_DEPUIS = '2026-11-15T00:00:00+01:00';
  */
 function gardeEnQuatreRegles(h: Ligne[], empreinte: string, reel: (m: Ligne | undefined) => m is Ligne, publie?: { candidat: string; reference: string }) {
   const miennes = h.filter((x) => x.empreinte === empreinte);
-  // Banc complet (C-1 pour chacun) : le DERNIER passage court de l'empreinte couvrant 1, 3 et 6 est vert, mesure un vrai candidat avec le modèle
+  // Banc complet (C-1 pour chacun) : le DERNIER passage court de l'empreinte couvrant 1, 3 et 7 est vert, mesure un vrai candidat avec le modèle
   // du bras.yaml courant, et aucun passage court rouge de cette empreinte (éclair compris) ne le suit ; pour CHAQUE id de séquence de l'empreinte
   // (R30), toutes les lignes de son dernier run (répétitions) et toutes celles qui suivent sont vertes et réelles, même candidat et modèle.
   const courts = miennes.filter((x) => x.type !== 'sequence' && !x.niveau); // un banc micro ou mécanique ne compte pas ici
@@ -308,7 +312,7 @@ function gardeEnQuatreRegles(h: Ligne[], empreinte: string, reel: (m: Ligne | un
   const m = courts[i], seqs = miennes.filter((x) => x.type === 'sequence');
   const completOk = reel(m) && !courts.slice(i).some((x) => !x.vert || x.eclair_ok === false)
     && seqOk(seqs, (s) => reel(s) && s.vert && s.candidat === m.candidat && s.modele_candidat === m.modele_candidat);
-  // Banc mécanique : le DERNIER passage mécanique de l'empreinte couvrant 1, 3 et 6 est vert et réel, et aucun passage rouge de cette
+  // Banc mécanique : le DERNIER passage mécanique de l'empreinte couvrant 1, 3 et 7 est vert et réel, et aucun passage rouge de cette
   // empreinte, quel qu'il soit (micro, mécanique, court, éclair, séquence), ne le suit.
   const j = miennes.map((x) => x.niveau === 'mecanique' && couvreCourt(x)).lastIndexOf(true);
   const mecaOk = reel(miennes[j]) && !miennes.slice(j).some((x) => !x.vert || x.eclair_ok === false);

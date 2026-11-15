@@ -186,8 +186,8 @@ describe('banc non livré : contrat du verdict sans juge (L733)', () => {
 describe('garde : un passage non mesurable n\'est ni vert ni rouge (L733)', () => {
   const now = new Date('2026-11-15T18:00:00Z');
   const l = (o: Record<string, unknown> = {}) => JSON.stringify({ date: '2026-11-15T15:00:00Z', empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus',
-    bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, vert: true, rouges: [], niveau: 'mecanique', ...o });
-  const nm = l({ date: '2026-11-15T16:00:00Z', vert: false, rouges: ['bras qui ont livré le travail'], non_mesurable: ['6-c'] });
+    bancs: ['1-a', '3-b', '7-c'], hebdo: false, frais: 0, vert: true, rouges: [], niveau: 'mecanique', ...o });
+  const nm = l({ date: '2026-11-15T16:00:00Z', vert: false, rouges: ['bras qui ont livré le travail'], non_mesurable: ['7-c'] });
   const s = (h: string[]) => statut(h, now, 'e1', { 'cadence-run': 'opus', A: 'opus' }, PUBLIE);
   it('après un mécanique vert, un non mesurable ne retire pas la publication ; seul, il ne la donne pas', () => {
     expect(s([l(), nm]).publication_ok).toBe(true);

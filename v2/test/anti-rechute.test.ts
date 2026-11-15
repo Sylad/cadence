@@ -139,7 +139,7 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L728 (revue) : run 569 (+7), --liste sur cinq lignes et la ligne de fin sur deux au lieu d'une chacune (lignes détassées), Etat étend EtatRapport
   // L726 : run 670 (+101), aiguillage de modèle : escalade.ts (passes de correction et revues non conformes du lot, Fable d'office) et la ligne des modèles de chaque passe, sans ligne tassée
   // L726 (revue) : run 695 (+25), correction après revue seulement sur une revue non conforme neuve (revueApresIntegre), lignes à deux instructions détassées (run.ts, escalade.ts)
-  mesure: { total: 2040, modules: { bench: 1340, sequence: 700 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
+  mesure: { total: 2043, modules: { bench: 1343, sequence: 700 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
   // L730 (D-22) : bench 1080, garde proportionnée (banc mécanique avant publication, alerte du banc complet du samedi) et complet.ts, sans ligne tassée
   // L730 (revue) : bench 1090, l'alerte ne tombe que sur un banc complet vert qui rejoue chaque rouge en attente (même séquence)
   // L730 (revue 2) : bench 1100, la garde en quatre règles (le banc rouge rejoué sur l'empreinte à publier, refus nommant les bancs à rejouer)
@@ -152,6 +152,7 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L737 : bench 1240 (+69), le temps tient compte du bruit de chaque banc (bruitParBanc, criteresTemps, lirePassages, empreinte du bras), l'ordre des bras alterne d'un passage à l'autre, sans ligne tassée
   // L738 : bench 1320 (+80), le bruit d'un banc expire 14 jours après sa dernière paire A contre A et le banc complet du samedi le remesure (bench bruit, A contre son jumeau), sans ligne tassée
   // L738 (revue 1) : bench 1340 (+20), seules les paires A contre A du banc complet comptent pour le bruit (bruitDuSamedi, ecartPaire) et le seuil est la médiane des 3 dernières, sans ligne tassée
+  // L739 : bench 1343 (+3), les bancs du court (1, 3 et 7) dans une seule constante, BANCS_COURT
 };
 function reglesBudget(f: Fichiers): string[] {
   const b = JSON.parse(f['budget.json']) as Record<string, { total: number; modules: Record<string, number> }>;
@@ -191,7 +192,7 @@ function reglesC5(f: Fichiers): string[] {
   if (!/bloquant = true\)/.test(t)) v.push('C5 : bloquant n\'est plus vrai par défaut');
   if (/\bc\('[^\n]*', [^\n]*, true(, (?:true|false))?\),/.test(t)) v.push('C5 : un critère a un ok constant (true)');
   if (!/vert: criteres\.every\(\(x\) => x\.ok \|\| !x\.bloquant\)/.test(t)) v.push('C5 : la formule du vert a changé');
-  if (!/\['1', '3', '6'\]\.every/.test(t)) v.push('C5 : statut ne demande plus 1, 3 et 6');
+  if (!/export const BANCS_COURT = \['1', '3', '7'\];/.test(t) || !/BANCS_COURT\.every/.test(t)) v.push('C5 : statut ne demande plus 1, 3 et 7 (L739)');
   if (!/m\.candidat !== m\.reference/.test(t)) v.push('C5 : la publication accepte un candidat égal à la référence (A contre A)');
   if (!/\n\s*&& seqOk\(seqs, \(s\) => reel\(s\) && s\.vert && s\.candidat === m\.candidat && s\.modele_candidat === m\.modele_candidat\)[,;]/.test(t))
     v.push('C5 : la publication ne demande plus une séquence verte (R30)');
@@ -246,20 +247,21 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C2', "modele: 'sonnet'", 'src/bench/bras.ts', ajout("const d = { modele: 'sonnet' };")],
   ['C3', 'trois portes', 'src/bench/banc.ts', ajout('porte(1);\ngate(2);\nverifyAll(3);')],
   ['C3', 'budget porte 400', 'budget.json', remplace('"porte": 250', '"porte": 400')],
-  ['C4', 'total mesure relevé', 'budget.json', remplace('"total": 2040', '"total": 2100')],
+  ['C4', 'total mesure relevé', 'budget.json', remplace('"total": 2043', '"total": 2100')],
   ['C4', 'total noyau relevé', 'budget.json', remplace('"total": 3000', '"total": 3500')],
   ['C4', 'budget sequence relevé', 'budget.json', remplace('"sequence": 700', '"sequence": 900')],
   ['C4', 'budget plan relevé sous le total', 'budget.json', remplace('"plan": 350', '"plan": 1000')],
   ['C4', 'budget hooks relevé (R32)', 'budget.json', remplace('"hooks": 200', '"hooks": 300')],
   ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 450, "hooks": 200', '"deliver": 450').replace('"sequence": 700', '"sequence": 700, "hooks": 200')],
-  ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1340', '"bench": 1340, "outil": 100')],
+  ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1343', '"bench": 1343, "outil": 100')],
   ['C4', 'groupe de budget ajouté', 'budget.json', remplace(/\n}\s*$/, ',\n  "autre": { "total": 900, "modules": {} }\n}')],
   ['C4', "option(reste,'zzz') sans entrée", 'src/bench/cli.ts', remplace("option(reste, 'taille')", "option(reste, 'zzz')")],
   ['C4', 'chemin options.json inexistant', 'options.json', remplace('"bench --juge": "docs/v2/2026-11-07-cadence-2-design.md"', '"bench --juge": "docs/v2/mesures/rien.md"')],
   ['C5', 'questions inutiles non bloquant', 'src/bench/verdict.ts', remplace('inutiles === 0)', 'inutiles === 0, false)')],
   ['C5', 'aucun bras en échec non bloquant', 'src/bench/verdict.ts', remplace('echecs.length === 0)', 'echecs.length === 0, false)')],
   ['C5', 'publication sur A contre A', 'src/bench/verdict.ts', remplace('m.candidat !== m.reference', 'true')],
-  ['C5', 'statut sans le banc 6', 'src/bench/verdict.ts', remplace("['1', '3', '6'].every", "['1', '3'].every")],
+  ['C5', 'statut sans le banc 7', 'src/bench/verdict.ts', remplace("BANCS_COURT = ['1', '3', '7']", "BANCS_COURT = ['1', '3']")],
+  ['C5', 'statut ne lit plus les bancs du court', 'src/bench/verdict.ts', remplace('BANCS_COURT.every', "['1', '3'].every")],
   // déguisements essayés par le relecteur Opus
   ['C5', 'critère neutralisé par || true', 'src/bench/verdict.ts', remplace('inutiles === 0)', 'inutiles === 0 || true)')],
   ['C5', 'bloquant faux par défaut', 'src/bench/verdict.ts', remplace('bloquant = true)', 'bloquant = false)')],
@@ -337,13 +339,14 @@ describe('C5, comportement de verdict, rapport et historique', () => {
     expect(h.vert).toBe(false);
     expect(h.rouges).toContain(nom);
   });
-  it('statut refuse la publication sans passage couvrant 1, 3 et 6', () => {
+  it('statut refuse la publication sans passage couvrant 1, 3 et 7 (L739)', () => {
     const ligne = (bancs: string[]) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', vert: true, hebdo: false, frais: 0, bancs });
     const now = new Date('2026-11-07T12:00:00Z');
     expect(statut([ligne(['1-a', '3-b'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(false);
     const seq = JSON.stringify({ ...JSON.parse(ligne(['s'])), type: 'sequence', sequence: 's', run: 'r1', repetition: 1, repetitions: 1 });
-    expect(statut([ligne(['1-a', '3-b', '6-c'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(false); // sans séquence verte
-    expect(statut([ligne(['1-a', '3-b', '6-c']), seq], now, 'e1', { C: 'opus' }).publication_ok).toBe(true);
+    expect(statut([ligne(['1-a', '3-b', '7-c'])], now, 'e1', { C: 'opus' }).publication_ok).toBe(false); // sans séquence verte
+    expect(statut([ligne(['1-a', '3-b', '7-c']), seq], now, 'e1', { C: 'opus' }).publication_ok).toBe(true);
+    expect(statut([ligne(['1-a', '3-b', '6-c']), seq], now, 'e1', { C: 'opus' }).publication_ok).toBe(false); // L739 : le banc 6 ne fait plus le court
   });
 });
 

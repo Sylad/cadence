@@ -89,7 +89,7 @@ describe('rapport, historique, statut', () => {
     expect(md).toContain('- b/C : Quel format de date ?');
   });
   const h = (date: string, vert: boolean, empreinte = 'e1', hebdo = true) =>
-    ligneHistorique({ vert, criteres: [] }, { date, empreinte, candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a', '3-b', '6-c'], hebdo, frais: 0 });
+    ligneHistorique({ vert, criteres: [] }, { date, empreinte, candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a', '3-b', '7-c'], hebdo, frais: 0 });
   it('publication : un vert partiel (banc 1 seul) ne suffit pas, empreinte inconnue refusée', () => {
     const partiel = ligneHistorique({ vert: true, criteres: [] }, { date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a'], hebdo: false, frais: 0 });
     expect(statut([partiel], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(false);
@@ -164,7 +164,7 @@ describe('répétitions (R18)', () => {
     const t = banc(); t.mesures.C.taille_declaree = 'Taille : fonction'; t.fuites_a_verifier = { C: ['/x/runs/r'] };
     const mt = rapport([t], 'A', 'C', v, { date: 'd', empreinte: 'e' });
     expect(mt).toContain('Taille déclarée A · C'); expect(mt).toContain('| – · Taille : fonction |'); expect(mt).toContain('## Lectures à vérifier\n\n- b/C : /x/runs/r');
-    const ligne = JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a#1', '1-a#2', '3-x#1', '3-x#2', '6-y#1', '6-y#2'], hebdo: true, frais: 0, vert: true, rouges: [] });
+    const ligne = JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['1-a#1', '1-a#2', '3-x#1', '3-x#2', '7-y#1', '7-y#2'], hebdo: true, frais: 0, vert: true, rouges: [] });
     const seq = JSON.stringify({ type: 'sequence', sequence: 's', run: 'r1', repetition: 1, repetitions: 1, date: '2026-11-07T12:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus', bancs: ['s'], hebdo: false, frais: 0, vert: true, rouges: [] });
     expect(statut([ligne, seq], new Date('2026-11-09T08:00:00Z'), 'e1', { C: 'opus' }).publication_ok).toBe(true);
   });
@@ -182,11 +182,11 @@ describe('répétitions (R18)', () => {
 describe('publication : la dernière mesure réelle de l\'empreinte (C-1, I-7)', () => {
   const now = new Date('2026-11-09T08:00:00Z'); const modeles = { C: 'opus', A: 'opus' };
   const l = (o: Record<string, unknown> = {}) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus',
-    bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, vert: true, rouges: [], ...o });
+    bancs: ['1-a', '3-b', '7-c'], hebdo: false, frais: 0, vert: true, rouges: [], ...o });
   // une séquence verte du même candidat est ajoutée : ici on éprouve la règle du passage court (sequence-verdict.test.ts éprouve l'autre)
   const seq = l({ type: 'sequence', sequence: 's', run: 'r1', repetition: 1, repetitions: 1, bancs: ['s'] });
   const ok = (h: string[], m: Record<string, string> = modeles) => statut([...h, seq], now, 'e1', m).publication_ok;
-  it('vert sur 1, 3, 6, candidat ≠ référence, modèle du bras.yaml courant : permise', () => expect(ok([l()])).toBe(true));
+  it('vert sur 1, 3, 7, candidat ≠ référence, modèle du bras.yaml courant : permise', () => expect(ok([l()])).toBe(true));
   it('candidat = référence (A contre A) : refusée', () => expect(ok([l({ candidat: 'A' })])).toBe(false));
   it('ligne sans référence (historique d\'avant) : refusée', () => expect(ok([l({ reference: undefined })])).toBe(false));
   it('un vert suivi d\'un rouge de la même empreinte : refusée, même si le rouge est un éclair', () => {

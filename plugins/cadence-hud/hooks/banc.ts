@@ -68,13 +68,13 @@ const parisJour = (d: Date) => {
   const p = Object.fromEntries(PARIS.formatToParts(d).map(x => [x.type, x.value]))
   return { jour: `${p.year}-${p.month}-${p.day}`, sem: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday ?? ''), jjmm: `${p.day}-${p.month}`, heure: `${p.hour}:${p.minute}` }
 }
-/** La sorte d'un passage : séquence ; micro ou mécanique (L689, sans juge IA) ; puis, sur les bancs de base (`<banc>#k` = répétition k) : 1, 3 et 6 exactement = court ; hebdo ; le banc 1 seul = éclair ; sinon le nombre de bancs. */
+/** La sorte d'un passage : séquence ; micro ou mécanique (L689, sans juge IA) ; puis, sur les bancs de base (`<banc>#k` = répétition k) : 1, 3 et 7 exactement = court (1, 3 et 6 avant L739, qui a remplacé le banc 6) ; hebdo ; le banc 1 seul = éclair ; sinon le nombre de bancs. */
 export const sorte = (p: BancPassage): string => {
   if (p.sequence) return 'séquence'
   if (p.niveau) return p.niveau === 'mecanique' ? 'mécanique' : p.niveau
   const base = [...new Set(p.bancs.map(id => id.replace(/#[^#]*$/, '')))]
   const n = [...new Set(base.map(id => id.split('-')[0]))].sort()
-  if (n.join(',') === '1,3,6' && base.length === 3) return 'court'
+  if (['1,3,6', '1,3,7'].includes(n.join(',')) && base.length === 3) return 'court'
   if (p.hebdo) return 'hebdo'
   if (n.join(',') === '1' && base.length === 1) return 'éclair'
   return `${base.length} banc${base.length > 1 ? 's' : ''}`

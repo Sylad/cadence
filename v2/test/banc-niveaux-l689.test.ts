@@ -77,12 +77,12 @@ describe('banc micro et mécanique : mesurés sans juge IA (L689)', () => {
 describe('garde de publication : cadence run contre A, sur la version à publier (L689)', () => {
   const now = new Date('2026-11-13T15:00:00Z');
   const l = (o: Record<string, unknown> = {}) => JSON.stringify({ date: '2026-11-13T10:00:00Z', empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus',
-    bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, vert: true, rouges: [], ...o });
+    bancs: ['1-a', '3-b', '7-c'], hebdo: false, frais: 0, vert: true, rouges: [], ...o });
   const seq = (o: Record<string, unknown> = {}) => l({ type: 'sequence', sequence: 's', run: 'r1', repetition: 1, repetitions: 1, bancs: ['s'], ...o });
   const ok = (h: string[]) => statut(h, now, 'e1', { 'cadence-run': 'opus', 'equipe-legere': 'opus', A: 'opus' }, PUBLIE).publication_ok;
   it('cadence-run contre A, court et séquence verts : permise', () => expect(ok([l(), seq()])).toBe(true));
   it('équipe légère contre A (le banc hebdo du 13-11) : refusée', () => expect(ok([l({ candidat: 'equipe-legere' }), seq({ candidat: 'equipe-legere' })])).toBe(false));
-  it('L730 : un banc mécanique vert (1, 3 et 6) suffit ; un banc micro ne suffit pas ; un micro rouge après un banc complet vert ne le défait pas', () => {
+  it('L730 : un banc mécanique vert (1, 3 et 7, L739) suffit ; un banc micro ne suffit pas ; un micro rouge après un banc complet vert ne le défait pas', () => {
     expect(ok([l({ niveau: 'mecanique' })])).toBe(true);
     expect(ok([l({ niveau: 'micro', bancs: ['1-a'] })])).toBe(false);
     expect(ok([l(), l({ niveau: 'micro', bancs: ['1-a'], vert: false }), seq()])).toBe(true);
@@ -124,14 +124,14 @@ describe('bancs d\'un passage en parallèle, un processus par banc (L689)', () =
     expect(res).toEqual([30, 10, 20, 5]); expect(max).toBe(2);
   });
   it('trois bancs joués en même temps par de vrais processus cadence2 : ordre alterné gardé, en-cours.json des bancs en parallèle, durée ≈ un banc', async () => {
-    const r = racine(['1-a', '3-b', '6-c']), bin = dossierTemp('banc-l689-bin-');
+    const r = racine(['1-a', '3-b', '7-c']), bin = dossierTemp('banc-l689-bin-');
     // faux claude : une seconde par session, puis un commit dans le clone ; il note le début de chaque session
     writeFileSync(join(bin, 'claude'), `#!/bin/bash\ndate +%s%N >> "${r}/debuts"\nsleep 1\necho x > fait.txt; git add -A; git -c user.email=t@t -c user.name=t commit -qm bras\nprintf '${sortie}'\n`);
     chmodSync(join(bin, 'claude'), 0o755);
     const vus: string[] = [], sorties: string[] = [];
     const espion = setInterval(() => { try { vus.push(readFileSync(join(r, 'en-cours.json'), 'utf8')); } catch { /* pas encore */ } }, 50);
     const t0 = Date.now();
-    const v = await passage({ ...base, racine: r, numeros: ['1', '3', '6'], niveau: 'mecanique', exec: () => { throw new Error('jamais en ligne'); }, prep: prepReel, home: r,
+    const v = await passage({ ...base, racine: r, numeros: ['1', '3', '7'], niveau: 'mecanique', exec: () => { throw new Error('jamais en ligne'); }, prep: prepReel, home: r,
       out: (x) => sorties.push(x), depot: '/depot (branche main, 12345678)',
       enfants: { lanceur: [process.execPath, '--import', join(FOND, 'ts.mjs'), join(FOND, 'cadence.mjs')], paralleles: 3, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } } });
     clearInterval(espion);
@@ -139,7 +139,7 @@ describe('bancs d\'un passage en parallèle, un processus par banc (L689)', () =
     expect(v.criteres.filter((c) => !c.ok)).toEqual([]);
     const rap = JSON.parse(readFileSync(join(r, 'rapports', '2026-11-13-1600-e1.json'), 'utf8'));
     expect(rap.resultats.map((x: { banc: string; clones: unknown }) => [x.banc, x.clones])).toEqual([
-      ['1-a', { c1: 'A', c2: 'cadence-run' }], ['3-b', { c1: 'cadence-run', c2: 'A' }], ['6-c', { c1: 'A', c2: 'cadence-run' }]]);
+      ['1-a', { c1: 'A', c2: 'cadence-run' }], ['3-b', { c1: 'cadence-run', c2: 'A' }], ['7-c', { c1: 'A', c2: 'cadence-run' }]]);
     const debuts = readFileSync(join(r, 'debuts'), 'utf8').trim().split('\n').map((x) => Number(x) / 1e6).sort((a, b) => a - b);
     expect(debuts).toHaveLength(6);
     expect(debuts[2] - debuts[0]).toBeLessThan(900); // les premiers bras des trois bancs démarrent ensemble, pas l'un après l'autre (1 s chacun)
@@ -148,8 +148,8 @@ describe('bancs d\'un passage en parallèle, un processus par banc (L689)', () =
     expect(existsSync(join(r, 'en-cours.json'))).toBe(false);
     expect(sorties[0]).toBe('banc mecanique : dépôt mesuré /depot (branche main, 12345678), empreinte e1, 3 banc(s) à la fois');
     expect(sorties.at(-1)).toMatch(/^VERT — \d+ s — rapport : /);
-    expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8'))).toMatchObject({ niveau: 'mecanique', bancs: ['1-a', '3-b', '6-c'] });
-    expect(readdirSync(join(r, 'runs', '2026-11-13-1600-e1')).sort()).toEqual(['1-a', '3-b', '6-c', 'taches']);
+    expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8'))).toMatchObject({ niveau: 'mecanique', bancs: ['1-a', '3-b', '7-c'] });
+    expect(readdirSync(join(r, 'runs', '2026-11-13-1600-e1')).sort()).toEqual(['1-a', '3-b', '7-c', 'taches']);
   }, 60_000);
   /** Lanceur des enfants : `bash <script> bench _banc <tache.json>` ; le script décide, d'après le nom de la tâche, de mourir, d'écrire un résultat illisible ou de jouer le banc. */
   function lanceur(r: string, cas: string) {
@@ -160,13 +160,13 @@ describe('bancs d\'un passage en parallèle, un processus par banc (L689)', () =
     return { lanceur: ['bash', script], paralleles: 2, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } };
   }
   it('un processus de banc mort sans résultat met ses deux bras en échec, les autres bancs vont au bout', async () => {
-    const r = racine(['1-a', '3-b', '6-c']);
-    const v = await passage({ ...base, racine: r, numeros: ['1', '3', '6'], niveau: 'mecanique', exec: () => { throw new Error('jamais en ligne'); }, prep: prepReel, home: r,
+    const r = racine(['1-a', '3-b', '7-c']);
+    const v = await passage({ ...base, racine: r, numeros: ['1', '3', '7'], niveau: 'mecanique', exec: () => { throw new Error('jamais en ligne'); }, prep: prepReel, home: r,
       enfants: lanceur(r, '  */3-b.tache.json) exit 1;;') });
     expect(v.vert).toBe(false);
     expect(v.criteres.find((c) => c.nom === 'aucun bras en échec')?.valeur).toBe('3-b/A : processus du banc arrêté sans résultat (code 1) ; 3-b/cadence-run : processus du banc arrêté sans résultat (code 1)');
     const rap = JSON.parse(readFileSync(join(r, 'rapports', '2026-11-13-1600-e1.json'), 'utf8')) as { resultats: ResultatBanc[] };
-    expect(rap.resultats.map((x) => x.banc)).toEqual(['1-a', '3-b', '6-c']);
+    expect(rap.resultats.map((x) => x.banc)).toEqual(['1-a', '3-b', '7-c']);
     for (const x of [rap.resultats[0], rap.resultats[2]]) { // les deux autres bancs sont allés au bout : bras mesurés sans échec, suite jouée
       expect(Object.values(x.mesures).map((m) => m.echec)).toEqual([null, null]);
       expect(x.sans_juge).toEqual({ A: { suite_ok: true, caches_ok: null }, 'cadence-run': { suite_ok: true, caches_ok: null } });
@@ -203,7 +203,7 @@ describe('passages comptés par la garde : en série tant que série et parallè
   });
   it('« bench court --paralleles 3 » : code 2 et la raison, avant tout passage', async () => {
     const r = racine([]), err: string[] = [];
-    for (const sous of [['court'], ['hebdo'], ['eclair'], ['lancer', '--bancs', '1,3,6']]) {
+    for (const sous of [['court'], ['hebdo'], ['eclair'], ['lancer', '--bancs', '1,3,7']]) {
       const rc = await bench([...sous, '--paralleles', '3'], { cwd: r, env: { BENCH_ROOT: r, HOME: r }, now: () => new Date(), out: () => {}, err: (x) => err.push(x) });
       expect(rc, sous.join(' ')).toBe(2);
     }

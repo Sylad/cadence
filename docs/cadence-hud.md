@@ -199,7 +199,7 @@ The state of the cadence 2 bench, one line at the bottom of the band, drawn only
 
 - `banc ⟳ 3/6 bancs · 3-ol-companion-L241 #1 · bras equipe-legere · 7 min (depuis 1 h 24)` in the accent colour, first of the bench lines, while a run is going (`en-cours.json` next to `historique.jsonl`, read by the same script); orange with ` · bloqué ?` when the phase has not changed for 6 h. During a sequence run (`cadence2 bench sequence`) the line reads `séquence ⟳ aether-b68 · étape 3/6 · répétition 2/2 · bras sequence-v2 · 7 min (depuis 1 h 24)` (step 0 is the preparation; the repetition shows from 2 repetitions on). It stays in the band while the lots panel is open, and the panel does not repeat it (L716);
 - `banc ✓ 08-11 court · eq-legere/A` in green: the last run is green (Paris day, kind of run, candidate against A). The kind: `séquence`;
-  `micro` or `mécanique` for a run without AI judge (`niveau` in the history line, L689); `court` for benches 1, 3 and 6 exactly, `hebdo`
+  `micro` or `mécanique` for a run without AI judge (`niveau` in the history line, L689); `court` for benches 1, 3 and 7 exactly (1, 3 and 6 before L739), `hebdo`
   for a run of every bench, `éclair` for bench 1 alone, else `N bancs`;
 - `banc ✗ 08-11 : temps total, relecture aveugle` in red: the last run is red, with its first three red criteria.
 

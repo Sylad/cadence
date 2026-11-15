@@ -189,7 +189,7 @@ describe('rapport, historique et publication de la séquence', () => {
 
   const now = new Date('2026-11-09T08:00:00Z'); const modeles = { C: 'opus', A: 'opus' };
   const court = (o: Record<string, unknown> = {}) => JSON.stringify({ date: '2026-11-07T10:00:00Z', empreinte: 'e1', candidat: 'C', reference: 'A', modele_candidat: 'opus',
-    bancs: ['1-a', '3-b', '6-c'], hebdo: true, frais: 0, vert: true, rouges: [], ...o });
+    bancs: ['1-a', '3-b', '7-c'], hebdo: true, frais: 0, vert: true, rouges: [], ...o });
   const sequence = (o: Record<string, unknown> = {}) => court({ type: 'sequence', sequence: 'aether-b68', run: 'run1', repetition: 1, repetitions: 1, bancs: ['aether-b68'], hebdo: false, ...o });
   const ok = (h: string[], m: Record<string, string> = modeles) => statut(h, now, 'e1', m).publication_ok;
   it('publication : court ET séquence verts, même candidat, même modèle', () => {

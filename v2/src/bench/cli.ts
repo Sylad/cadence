@@ -11,10 +11,9 @@ import { fuitesDuBras } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
 import { mesurerSansJuge, sansLivrable } from './sans-juge.js';
-import { BARRE_SPEC, banBase, bancsARemesurer, bruitParBanc, COMPLET_MAX_JOURS, ecartPaire, SUFFIXE_BRUIT_COMPTE, SUFFIXE_BRUIT_MAIN, ligneHistorique, titreVerdict, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type PassageLu, type ResultatBanc, type Verdict } from './verdict.js';
+import { BANCS_COURT, BARRE_SPEC, banBase, LIBELLE_COURT, bancsARemesurer, bruitParBanc, COMPLET_MAX_JOURS, ecartPaire, SUFFIXE_BRUIT_COMPTE, SUFFIXE_BRUIT_MAIN, ligneHistorique, titreVerdict, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type PassageLu, type ResultatBanc, type Verdict } from './verdict.js';
 
 const REPO = join(import.meta.dirname, '..', '..', '..');
-const COURT = ['1', '3', '6'];
 
 export function empreinte(repo: string): string {
   try {
@@ -82,7 +81,7 @@ export function archiver(c: string, base: string | undefined): void {
   rmSync(c, { recursive: true, force: true });
 }
 
-/** L689 : `micro` (banc 1) et `mecanique` (1, 3 et 6) se jouent sans juge IA et n'autorisent jamais la publication. `Enfants` : un processus cadence2 par banc, `paralleles` à la fois.
+/** L689 : `micro` (banc 1) et `mecanique` (1, 3 et 7) se jouent sans juge IA et n'autorisent jamais la publication. `Enfants` : un processus cadence2 par banc, `paralleles` à la fois.
  * L738 : `bruit`, A contre A sans juge, remesure le bruit de temps des bancs ; ni vert ni rouge, il n'écrit pas dans l'historique que lit la garde. */
 export type Niveau = 'micro' | 'mecanique' | 'bruit';
 
@@ -293,10 +292,10 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
 
 /** L738 : les numéros des bancs du court que le banc complet remesure (`bancsARemesurer`). */
 export const numerosARemesurer = (racine: string, maintenant: Date): string[] =>
-  bancsARemesurer(lirePassages(racine), maintenant, listerBancs(racine, COURT)).map((id) => id.split('-')[0]);
+  bancsARemesurer(lirePassages(racine), maintenant, listerBancs(racine, BANCS_COURT)).map((id) => id.split('-')[0]);
 
 /**
- * L738 : `cadence2 bench bruit [--bancs 3,6]`, passage A contre A sans juge (A et son jumeau, même empreinte de bras), un banc après l'autre,
+ * L738 : `cadence2 bench bruit [--bancs 3,7]`, passage A contre A sans juge (A et son jumeau, même empreinte de bras), un banc après l'autre,
  * sur les bancs donnés ou ceux à remesurer. 0 si chaque banc a mesuré son écart, 1 sinon, 2 si refusé ; rien à remesurer : 0. Correctif de revue L738 : à la main,
  * le passage est `-bruit-main`, jamais compté ; `bruitCompte` (`bruitDuSamedi`, appelé par `complet` seulement, aucune sous-commande) le nomme `-bruit`, compté.
  */
@@ -374,7 +373,7 @@ export function alertesGarde(s: ReturnType<typeof statut>): string[] {
   ];
 }
 
-const SOUS: Record<string, { numeros?: string[]; niveau?: Niveau }> = { court: { numeros: COURT }, hebdo: {}, eclair: { numeros: ['1'] }, micro: { numeros: ['1'], niveau: 'micro' }, mecanique: { numeros: COURT, niveau: 'mecanique' } };
+export const SOUS: Record<string, { numeros?: string[]; niveau?: Niveau }> = { court: { numeros: BANCS_COURT }, hebdo: {}, eclair: { numeros: ['1'] }, micro: { numeros: ['1'], niveau: 'micro' }, mecanique: { numeros: BANCS_COURT, niveau: 'mecanique' } };
 
 export async function bench(args: string[], io: Io, repo = REPO): Promise<number> {
   const [sous, ...reste] = args;
@@ -394,7 +393,7 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
     const s = statut(hist, io.now(), emp, modeles(), PUBLIE);
     io.out(s.publication_ok ? `banc mécanique ou complet vert sur l'empreinte ${emp}` // permise : aucune alerte ne tient (le mode est alors mécanique)
       : s.mode === 'complet' ? `publication refusée sur l'empreinte ${emp} : ${s.alerte} ; tant qu'une alerte tient, rien ne publie : chaque banc rouge (${s.a_rejouer.join(', ')}) doit être rejoué vert après lui (version corrigée ou suivante), ${PUBLIE.candidat} contre ${PUBLIE.reference}, même modèle ; ${pourPublier(repo, s.a_rejouer)}`
-        : `publication refusée sur l'empreinte ${emp} : il faut le dernier banc mécanique (1, 3 et 6) vert, ${PUBLIE.candidat} contre ${PUBLIE.reference}, même modèle, sans passage rouge après lui ; ${pourPublier(repo)}`);
+        : `publication refusée sur l'empreinte ${emp} : il faut le dernier banc mécanique (${LIBELLE_COURT}) vert, ${PUBLIE.candidat} contre ${PUBLIE.reference}, même modèle, sans passage rouge après lui ; ${pourPublier(repo)}`);
     return s.publication_ok ? 0 : 1;
   }
   if (sous === 'ajouter') {
@@ -413,7 +412,7 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
   if (sous === 'bruit') return remesurerBruit(racine, bancs, emp, repo, io);
   const choix = sous === 'lancer' ? (bancs ? { numeros: bancs.split(',') } : null) : Object.hasOwn(SOUS, sous ?? '') ? SOUS[sous!] : null;
   if (choix === null) {
-    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|bruit [--bancs 3,6]|complet|statut|verifier-publication|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones]');
+    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|bruit [--bancs 3,7]|complet|statut|verifier-publication|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones]');
     return 2;
   }
   const rep = entierOption(reste, 'repetitions', 1);

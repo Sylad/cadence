@@ -42,6 +42,7 @@ test('banc — sorte du passage : hebdo, éclair, N bancs', () => {
   expect(sorte({ bancs: ['1-a'] })).toBe('banc ✓ 08-11 éclair · eq-legere/A')
   expect(sorte({ bancs: ['1-a', '2-b'] })).toBe('banc ✓ 08-11 2 bancs · eq-legere/A')
   expect(sorte({ bancs: ['1-a', '3-b', '6-c', '7-d'] })).toBe('banc ✓ 08-11 4 bancs · eq-legere/A')
+  expect(sorte({ bancs: ['1-a', '3-b', '7-d'] })).toBe('banc ✓ 08-11 court · eq-legere/A') // L739 : le banc 7 remplace le banc 6 dans le court
 })
 
 test('banc — une ligne type sequence : sorte « séquence », dans la bande et le détail', () => {

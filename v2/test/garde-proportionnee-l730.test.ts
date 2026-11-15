@@ -13,17 +13,17 @@ import { dossierTemp } from './temp.js';
 const now = new Date('2026-11-15T12:00:00Z');
 const modeles = { 'cadence-run': 'opus', 'sequence-v2': 'opus', A: 'opus' };
 const l = (o: Record<string, unknown> = {}) => JSON.stringify({ date: '2026-11-15T10:00:00Z', empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus',
-  bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, vert: true, rouges: [], ...o });
+  bancs: ['1-a', '3-b', '7-c'], hebdo: false, frais: 0, vert: true, rouges: [], ...o });
 const meca = (o: Record<string, unknown> = {}) => l({ niveau: 'mecanique', ...o });
 const seq = (o: Record<string, unknown> = {}) => l({ type: 'sequence', sequence: 's', run: 'r1', repetition: 1, repetitions: 1, bancs: ['s'], ...o });
 const st = (h: string[], emp = 'e1') => statut(h, now, emp, modeles, PUBLIE);
 const ioMaintenant = (env: NodeJS.ProcessEnv) => ({ ...ioTest(env), now: () => now });
 
 describe('garde proportionnée : le banc mécanique suffit avant une publication (L730)', () => {
-  it('banc mécanique vert, cadence-run contre A, bancs 1, 3 et 6 : permise, sans juge ni séquence', () => {
+  it('banc mécanique vert, cadence-run contre A, bancs 1, 3 et 7 (L739) : permise, sans juge ni séquence', () => {
     expect(st([meca()])).toMatchObject({ publication_ok: true, mode: 'mecanique', alerte: undefined });
   });
-  it('refusée : mécanique rouge, sur une autre empreinte, sans le banc 6, autre candidat, autre modèle, empreinte inconnue', () => {
+  it('refusée : mécanique rouge, sur une autre empreinte, sans le banc 7, autre candidat, autre modèle, empreinte inconnue', () => {
     expect(st([meca({ vert: false })]).publication_ok).toBe(false);
     expect(st([meca({ empreinte: 'e0' })]).publication_ok).toBe(false);
     expect(st([meca({ bancs: ['1-a', '3-b'] })]).publication_ok).toBe(false);

@@ -17,7 +17,7 @@ export const sequencesDe = (racine: string): string[] => {
 
 /**
  * `cadence2 bench complet` : d'abord, s'il y en a, les bancs du court à remesurer (L738 : `bench bruit`, A contre A sans juge, sur chaque banc bruité ou
- * dont le bruit expire dans les 7 jours, le seul passage A contre A compté pour le seuil ; joué avant le court pour que son verdict lise un bruit frais, et hors du code de retour), puis le banc court (1, 3 et 6, avec juges, en série), puis chaque séquence (`--sequences`, défaut toutes celles de la racine),
+ * dont le bruit expire dans les 7 jours, le seul passage A contre A compté pour le seuil ; joué avant le court pour que son verdict lise un bruit frais, et hors du code de retour), puis le banc court (1, 3 et 7, avec juges, en série), puis chaque séquence (`--sequences`, défaut toutes celles de la racine),
  * deux répétitions, cadence-run contre A ; puis `statut`, dont les lignes ⚠ portent une alerte au journal. 0 si tout est vert, 2 si le court est refusé
  * (les séquences le seraient aussi), 1 sinon. Un court rouge n'arrête pas les séquences : le samedi mesure tout.
  */

@@ -11,7 +11,9 @@ import { lireFlux, type Message } from '../rapport.js';
 
 export interface DefBras { nom: string; modele: string; brief: string; settings?: string; aiguillage?: boolean; suite?: Suite } // aiguillage : le bras de cadence run ; suite (L690) : reprend la session de l'étape d'avant // settings : réglages Claude Code du bras (hooks)
 export interface Mesure { bras: string; banc: string; debut: string; fin: string; duree_s: number; releve?: Releve; // releve (L703) : ce que claude -p a rendu en dernier pour la dernière session (coût et tokens CUMULÉS depuis son début, reprises et /compact compris), repris par l'étape suivante d'un bras « suite »
-  tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string } export type Releve = { session: string; cout: number; tokens: number };
+  tokens: number; cout_usd: number; questions: number; questions_texte: string[]; sessions: string[]; echec: string | null; taille_declaree?: string;
+  /** L737 : empreinte de ce que le bras a reçu (brief hors chemins du clone, modèle, réglages, pièces) ; deux bras de même empreinte sont identiques et mesurent le bruit du banc. */
+  empreinte_bras?: string } export type Releve = { session: string; cout: number; tokens: number };
 export type Executeur = (args: string[], o: { cwd: string; env: NodeJS.ProcessEnv }) => { stdout: string; code: number; erreur?: string; delaiMs?: number }; // delaiMs : la session a dépassé ce délai et l'exécuteur l'a arrêtée
 
 export const OUTILS_INTERDITS = ['Bash(kubectl:*)', 'Bash(helm:*)', 'Bash(gh:*)', 'Bash(ssh:*)', 'Bash(scp:*)',
@@ -82,8 +84,9 @@ export const argsClaude = (d: DefBras, clone: string, interdits = OUTILS_INTERDI
 export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }, reprise?: Releve): Mesure {
   if (d.aiguillage) { const a = aiguiller(lireDemande(b), clone, garde.pieces.map((p) => relative(clone, p))); d = { ...a.bras, nom: d.nom, modele: d.modele, ...(d.suite ? { suite: d.suite } : {}) }; garde = { ...garde, pieces: a.pieces.map((p) => join(clone, p)) }; }
   const question = `${clone}.question.md`;
-  const brief = readFileSync(d.brief, 'utf8').replaceAll('{{DEMANDE}}', lireDemande(b)).replaceAll('{{CLONE}}', clone)
-    .replaceAll('{{QUESTION}}', question).replaceAll('{{BASE}}', b.base).replaceAll('{{TAILLE}}', b.taille === 'retouche' ? 'retouche' : 'fonction'); // taille fixée par le gardien ; banc court sans retouche : fonction
+  const texte = readFileSync(d.brief, 'utf8').replaceAll('{{DEMANDE}}', lireDemande(b)).replaceAll('{{BASE}}', b.base).replaceAll('{{TAILLE}}', b.taille === 'retouche' ? 'retouche' : 'fonction'); // taille fixée par le gardien ; banc court sans retouche : fonction
+  const brief = texte.replaceAll('{{CLONE}}', clone).replaceAll('{{QUESTION}}', question);
+  const empreinte_bras = createHash('sha1').update([texte, d.modele, d.settings ? readFileSync(d.settings, 'utf8') : '', ...garde.pieces.map((p) => relative(clone, p))].join('\0')).digest('hex').slice(0, 12);
   const commun = argsClaude(d, clone);
   const o = { cwd: clone, env: { ...environnementNeutre(process.env), ...(d.settings ? { CADENCE_CLONE: clone, CADENCE_PIECES: JSON.stringify(garde.pieces), CADENCE_BANC_RACINE: garde.racine } : {}) } };
   const reponse = b.reponses ? readFileSync(join(b.dir, 'reponses.md'), 'utf8') : SANS_REPONSE;
@@ -100,5 +103,5 @@ export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, 
   }
   const fin = horloge();
   return { bras: d.nom, banc: b.id, debut: debut.toISOString(), fin: fin.toISOString(),
-    duree_s: Math.round((fin.getTime() - debut.getTime()) / 1000), tokens: m.tokens, cout_usd: m.cout, questions: m.questions, questions_texte: m.textes, sessions: m.sessions, echec: m.echec, ...(derniers.has(m.sessions.at(-1) ?? '') ? { releve: derniers.get(m.sessions.at(-1)!) } : {}) };
+    duree_s: Math.round((fin.getTime() - debut.getTime()) / 1000), tokens: m.tokens, cout_usd: m.cout, questions: m.questions, questions_texte: m.textes, sessions: m.sessions, echec: m.echec, empreinte_bras, ...(derniers.has(m.sessions.at(-1) ?? '') ? { releve: derniers.get(m.sessions.at(-1)!) } : {}) };
 }

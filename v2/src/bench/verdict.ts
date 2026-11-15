@@ -10,7 +10,8 @@ export interface ResultatBanc { banc: string; taille: Taille; visible: boolean; 
   sans_juge?: Record<string, MesureSansJuge>;
   /** L733 : bras qui n'ont livré aucun fichier hors plan et doc, et la raison ; le banc n'est alors pas mesuré (sans juge seulement). */
   non_livre?: Record<string, string> }
-export interface Barre { temps_max: number; temps_max_retouche: number; reference_absolue: { caches: number; mutations: number } }
+/** `bruit` (L737) : banc de base -> plus grand écart de temps (rapport ≥ 1) mesuré entre deux bras identiques dans l'historique (`bruitParBanc`). */
+export interface Barre { temps_max: number; temps_max_retouche: number; reference_absolue: { caches: number; mutations: number }; bruit?: Record<string, number> }
 export interface Critere { nom: string; valeur: string; seuil: string; ok: boolean; bloquant: boolean }
 /** `non_mesurable` (L733, ligne (d) des cinq règles de `verdictSansJuge`) : bancs dont un bras n'a pas livré le travail, posé seulement si aucun critère bloquant n'est rouge ; le passage n'est ni vert ni rouge, il est à rejouer. */
 export interface Verdict { vert: boolean; criteres: Critere[]; non_mesurable?: string[] }
@@ -40,10 +41,63 @@ function avisParBanc(res: ResultatBanc[], champ: 'prefere' | 'ui'): { id: string
 const detail = (av: { id: string; label: string }[]) => av.map((x) => `${x.id} : ${x.label}`).join(' · ');
 
 const c = (nom: string, valeur: string, seuil: string, ok: boolean, bloquant = true): Critere => ({ nom, valeur, seuil, ok, bloquant });
+/** L737 : à partir de cet écart entre deux bras identiques, un banc ne départage plus un vrai × 2 : son temps devient indicatif. */
+export const BRUIT_MAX = 2;
+/**
+ * L737 : passages déjà joués où les deux bras recevaient le même prompt au même modèle, prouvé sur les transcripts par l'étude L735
+ * (docs/etudes/banc3-lenteur.md, § 4a : avant L736, `cadence-run` jouait le brief A au banc court). Le banc ne notait pas encore `empreinte_bras`.
+ */
+export const PAIRES_IDENTIQUES_L735 = ['2026-11-13-1717-af18c3783fa3', '2026-11-13-2047-2b220bd21ebf', '2026-11-14-0002-0118958c983c', '2026-11-14-1000-0118958c983c',
+  '2026-11-14-1018-0118958c983c', '2026-11-14-1721-1085f4914df4', '2026-11-15-1540-f83140f3ab70', '2026-11-15-1604-f83140f3ab70', '2026-11-15-1749-edc99cb3f24c'];
+/** Un passage relu dans `rapports/<run>.json`. */
+export type PassageLu = { run: string; resultats: ResultatBanc[] };
+
+/**
+ * L737 : bruit de chaque banc de base, le plus grand rapport des temps (≥ 1) entre deux bras identiques de l'historique : même `empreinte_bras`
+ * (brief, modèle, réglages et pièces), ou passage de PAIRES_IDENTIQUES_L735. Un banc non livré, un bras en échec ou un temps nul ne mesure rien.
+ */
+export function bruitParBanc(passages: PassageLu[]): Record<string, number> {
+  const bruit: Record<string, number> = {};
+  for (const p of passages) for (const r of p.resultats) {
+    const m = Object.values(r.mesures ?? {});
+    if (m.length !== 2 || (r.non_livre && Object.keys(r.non_livre).length) || m.some((x) => x.echec !== null || !(x.duree_s > 0))) continue;
+    if (!(PAIRES_IDENTIQUES_L735.includes(p.run) || (m[0].empreinte_bras && m[0].empreinte_bras === m[1].empreinte_bras))) continue;
+    const id = banBase(r.banc), e = Math.max(m[0].duree_s, m[1].duree_s) / Math.min(m[0].duree_s, m[1].duree_s);
+    bruit[id] = Math.max(bruit[id] ?? 1, e);
+  }
+  return bruit;
+}
+
+const nb = (x: number) => String(Math.round(x * 100) / 100).replace('.', ',');
+/**
+ * L737 : critères de temps selon le bruit de chaque banc (tableau « Bruit du temps » dans docs/v2/banc.md). Seule fonction qui porte la règle.
+ * Écart e d'un banc : `barre.bruit[banc de base]`. Sans paire identique connue ou e ≤ seuil de la barre : le seuil de la barre ; seuil < e < BRUIT_MAX : e ;
+ * e ≥ BRUIT_MAX : banc bruité, son temps sort du temps total et des retouches et se lit dans « temps des bancs bruités », indicatif.
+ * Un critère vaut « candidat ≤ Σ seuil du banc × référence » sur ses bancs : sans bruit, c'est la règle d'avant (1,5 × A, 1,2 × A). Les bancs non livrés
+ * sont déjà sortis (L733, règle (a)) ; temps total et retouches restent bloquants sur les bancs non bruités (règle (b)).
+ */
+function criteresTemps(res: ResultatBanc[], ref: string, cand: string, barre: Barre): Critere[] {
+  const t = (rs: ResultatBanc[], b: string) => somme(rs.map((r) => r.mesures[b]?.duree_s ?? 0));
+  const e = (r: ResultatBanc) => barre.bruit?.[banBase(r.banc)] ?? 1;
+  const bruites = res.filter((r) => e(r) >= BRUIT_MAX), fiables = res.filter((r) => !bruites.includes(r)), ret = fiables.filter((r) => r.taille === 'retouche');
+  /** `vide` : la valeur d'un critère sans banc, alors indicatif. */
+  const critere = (nom: string, rs: ResultatBanc[], seuil: number, vide?: string): Critere => {
+    const s = (r: ResultatBanc) => Math.max(seuil, e(r)), limite = somme(rs.map((r) => s(r) * (r.mesures[ref]?.duree_s ?? 0)));
+    const parBanc = rs.some((r) => s(r) !== seuil) ? ` (seuil par banc, bruit compris : ${[...new Set(rs.map((r) => `${banBase(r.banc)} ${nb(s(r))}`))].join(' ; ')})` : '';
+    return c(nom, vide && !rs.length ? vide : `${t(rs, cand)} s contre ${t(rs, ref)} s`, parBanc ? `≤ ${Math.round(limite)} s${parBanc}` : `≤ ${seuil} × ${ref}`,
+      t(rs, cand) <= limite, !(vide && !rs.length));
+  };
+  const idsBruites = [...new Set(bruites.map((r) => `${banBase(r.banc)} ${nb(e(r))}`))].join(' ; ');
+  return [
+    critere('temps total', fiables, barre.temps_max, bruites.length ? 'aucun banc au temps fiable' : undefined),
+    critere('temps des retouches', ret, barre.temps_max_retouche, 'aucun banc de retouche'),
+    ...(bruites.length ? [c('temps des bancs bruités', `${t(bruites, cand)} s contre ${t(bruites, ref)} s (${idsBruites})`,
+      `≤ ${barre.temps_max} × ${ref}, indicatif : écart entre bras identiques ≥ ${BRUIT_MAX}`, t(bruites, cand) <= barre.temps_max * t(bruites, ref), false)] : []),
+  ];
+}
+
 /** Critères sans juge, communs à tous les passages (L689) : mesures, fuites et échecs (`avant`), temps et questions (`apres`). */
 function communs(res: ResultatBanc[], ref: string, cand: string, barre: Barre): { avant: Critere[]; apres: Critere[] } {
-  const t = (rs: ResultatBanc[], b: string) => somme(rs.map((r) => r.mesures[b]?.duree_s ?? 0));
-  const ret = res.filter((r) => r.taille === 'retouche');
   const inutiles = somme(res.filter((r) => !r.reponses).map((r) => r.mesures[cand]?.questions ?? 0));
   const fuites = res.flatMap((r) => Object.entries(r.fuites).flatMap(([b, ps]) => ps.map((p) => `${r.banc}/${b} : ${p}`)));
   const echecs = res.flatMap((r) => [ref, cand].flatMap((b) => { const e = r.mesures[b]?.echec; return e ? [`${r.banc}/${b} : ${e}`] : []; }));
@@ -55,8 +109,7 @@ function communs(res: ResultatBanc[], ref: string, cand: string, barre: Barre): 
     c('aucun bras en échec', echecs.length ? echecs.join(' ; ') : '0', '0', echecs.length === 0),
   ];
   const apres = [
-    c('temps total', `${t(res, cand)} s contre ${t(res, ref)} s`, `≤ ${barre.temps_max} × ${ref}`, t(res, cand) <= barre.temps_max * t(res, ref)),
-    c('temps des retouches', ret.length ? `${t(ret, cand)} s contre ${t(ret, ref)} s` : 'aucun banc de retouche', `≤ ${barre.temps_max_retouche} × ${ref}`, !ret.length || t(ret, cand) <= barre.temps_max_retouche * t(ret, ref), ret.length > 0),
+    ...criteresTemps(res, ref, cand, barre),
     c('questions inutiles', `${inutiles}`, '0', inutiles === 0),
   ];
   return { avant, apres };

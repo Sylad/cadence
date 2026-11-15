@@ -11,7 +11,7 @@ import { fuitesDuBras } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
 import { mesurerSansJuge, sansLivrable } from './sans-juge.js';
-import { BARRE_SPEC, banBase, COMPLET_MAX_JOURS, ligneHistorique, titreVerdict, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type ResultatBanc, type Verdict } from './verdict.js';
+import { BARRE_SPEC, banBase, bruitParBanc, COMPLET_MAX_JOURS, ligneHistorique, titreVerdict, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type PassageLu, type ResultatBanc, type Verdict } from './verdict.js';
 
 const REPO = join(import.meta.dirname, '..', '..', '..');
 const COURT = ['1', '3', '6'];
@@ -90,9 +90,9 @@ type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: strin
   exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void; eclair?: boolean;
   niveau?: Niveau; enfants?: Enfants; depot?: string };
 
-/** Un banc (une répétition) à jouer, sérialisable pour un processus enfant. */
+/** Un banc (une répétition) à jouer, sérialisable pour un processus enfant. `joues` (L737) : passages antérieurs de ce banc, pour alterner l'ordre des bras. */
 export type Tache = { racine: string; dirRun: string; run: string; ref: string; cand: string; N: number; juge: string; garderClones: boolean;
-  maintenant: string; home: string; sansJuge: boolean; bid: string; i: number; k: number };
+  maintenant: string; home: string; sansJuge: boolean; bid: string; i: number; k: number; joues?: number };
 /** `rejeu` (L734) : clones gardés dont la suite est rouge, à rejouer seuls après les autres bancs du passage. */
 type Joue = { r: ResultatBanc; clones: Record<string, string>; rejeu?: { bid: string; dossier: string; bras: Record<string, { clone: string; base: string }> } };
 
@@ -108,7 +108,8 @@ export async function passage(o: OptPassage): Promise<Verdict & { eclair_ok?: bo
 /** Un banc : préparation, bras l'un après l'autre (ordre alterné), fuites, puis les juges, ou la mesure sans juge (L689) ; écrit resultat.json. */
 export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out: (l: string) => void, signaler: (phase: string) => void): Joue {
   const bras = chargerBras(t.racine);
-  const ordre = (t.i + t.k - 1) % 2 === 0 ? [t.ref, t.cand] : [t.cand, t.ref];
+  // L737 : l'ordre alterne d'un banc à l'autre, d'une répétition à l'autre, et d'un passage du même banc au suivant (le 13-15-11, cadence-run jouait toujours premier au banc 3)
+  const ordre = (t.i + t.k - 1 + (t.joues ?? 0)) % 2 === 0 ? [t.ref, t.cand] : [t.cand, t.ref];
   const idBanc = idTache(t); const sous = t.N > 1 ? join(t.bid, `r${t.k}`) : t.bid;
   const mesures: Record<string, Mesure> = {}; const clones: Record<string, string> = {}; const fuites: Record<string, string[]> = {}; const aVerifier: Record<string, string[]> = {}; const suiteBase: Record<string, number> = {}; const bases: Record<string, string> = {};
   const mapping: Record<string, string> = {}; // c1/c2 -> bras : écrit seulement après les juges (aveugle)
@@ -217,6 +218,16 @@ export function rejouerSuites(joues: Joue[], racine: string, garderClones: boole
   }
 }
 
+/** L737 : les passages déjà rapportés (`rapports/<run>.json` d'un banc court, micro ou mécanique ; les séquences n'ont pas de `resultats`), dans l'ordre des noms. */
+export function lirePassages(racine: string): PassageLu[] {
+  const d = join(racine, 'rapports');
+  if (!existsSync(d)) return [];
+  return readdirSync(d).filter((f) => f.endsWith('.json')).sort().flatMap((f) => {
+    try { const x = JSON.parse(readFileSync(join(d, f), 'utf8')) as { resultats?: unknown }; return Array.isArray(x.resultats) ? [{ run: f.slice(0, -5), resultats: x.resultats as ResultatBanc[] }] : []; }
+    catch { return []; }
+  });
+}
+
 async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?: boolean }> {
   const { jour: date, hhmm } = parisJour(o.maintenant); // nom du passage à l'heure de Paris, comme statut
   const id = `${date}-${hhmm}-${o.empreinte}`;
@@ -225,10 +236,12 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   for (const n of [o.ref, o.cand]) if (!bras[n]) throw new Error(`bras « ${n} » absent de ${o.racine}/bras.yaml`);
   const N = o.repetitions ?? 1;
   const ids = listerBancs(o.racine, o.numeros);
+  const passes = lirePassages(o.racine);
+  const dejaJoues = (bid: string) => passes.filter((p) => p.resultats.some((r) => banBase(r.banc) === bid)).length;
   const debut = new Date(); const phases: Record<string, string> = {}; let termines = 0;
   const taches: Tache[] = ids.flatMap((bid, i) => Array.from({ length: N }, (_, k) => ({
     racine: o.racine, dirRun, run: id, ref: o.ref, cand: o.cand, N, juge: o.juge, garderClones: o.garderClones ?? false,
-    maintenant: o.maintenant.toISOString(), home: o.home, sansJuge: o.niveau !== undefined, bid, i, k: k + 1,
+    maintenant: o.maintenant.toISOString(), home: o.home, sansJuge: o.niveau !== undefined, bid, i, k: k + 1, joues: dejaJoues(bid),
   })));
   /** `en-cours.json` : ce que le HUD montre pendant le passage (écrit par renommage, jamais à moitié) ; `en_parallele` (L689) : la phase de chaque banc en cours. */
   const signaler = (t: Tache) => (phase: string) => {
@@ -248,7 +261,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
     : taches.map((t) => fini(t, jouerBanc(t, o.exec, o.prep, o.out, signaler(t))));
   rejouerSuites(joues, o.racine, o.garderClones ?? false, o.out);
   const res = joues.map((j) => j.r);
-  const v = (o.niveau ? verdictSansJuge : verdict)(res, o.ref, o.cand, BARRE_SPEC);
+  const v = (o.niveau ? verdictSansJuge : verdict)(res, o.ref, o.cand, { ...BARRE_SPEC, bruit: bruitParBanc(passes) }); // L737 : bruit tiré des passages d'avant celui-ci
   const e = o.eclair ? controlesEclair(res, o.ref, o.cand) : undefined;
   e?.lignes.forEach((l) => o.out(l));
   const duree_s = Math.round((Date.now() - debut.getTime()) / 1000);

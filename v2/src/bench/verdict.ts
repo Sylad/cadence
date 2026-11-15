@@ -164,7 +164,7 @@ export const COMPLET_MAX_JOURS = 8;
  * L730 (D-22, Sylvain du 14-11 : 3 h de banc avant chaque publication, « complètement dingue ») : la garde est proportionnée. Avant une publication,
  * le banc mécanique (1, 3 et 6, sans juge, ≈ 30 min) suffit ; le banc complet (court avec juges puis séquence) passe chaque samedi. Un banc complet
  * rouge lève `alerte` (signalée par `statut` et le tour) et fait revenir la garde en arrière : la publication exige de nouveau le banc complet,
- * jusqu'à un banc complet vert. `mode` dit lequel des deux la garde exige.
+ * jusqu'à un banc complet vert qui rejoue ce qui était rouge (même séquence). `mode` dit lequel des deux la garde exige.
  */
 export function statut(historique: string[], maintenant: Date, empreinte: string, modeles: Record<string, string> = {}, publie?: { candidat: string; reference: string }) {
   const h = historique.flatMap((l) => { // une ligne illisible ou sans date valide est sautée, jamais levée
@@ -193,13 +193,22 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
   const miennes = h.filter((x) => x.empreinte === empreinte);
   const j = miennes.map((x) => x.niveau === 'mecanique' && couvreCourt(x)).lastIndexOf(true);
   const mecaOk = reel(miennes[j]) && !miennes.slice(j).some((x) => !x.vert || x.eclair_ok === false);
-  // Alerte (L730) : le dernier passage rouge du banc complet, cadence-run contre A, tant qu'aucun banc complet vert (court et séquences) ne le suit.
+  // Alerte (L730) : le dernier passage rouge du banc complet, cadence-run contre A. Elle ne tombe que sur un banc complet vert (court et séquences
+  // d'une même empreinte, `completOk`) qui rejoue tout ce qui était rouge depuis la dernière levée : un banc court rouge exige un court vert,
+  // une séquence rouge exige un run vert de la MÊME séquence. Un court vert et une séquence X verte ne lèvent pas l'alerte d'une séquence Y rouge.
   const complets = h.filter((x) => duComplet(x) && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference)));
-  const r = complets.map((x) => !x.vert).lastIndexOf(true);
-  const apres = complets.slice(r + 1);
-  const leve = r >= 0 && !(apres.length > 0 && completOk(apres, apres.at(-1)!.empreinte));
-  const rouge = complets[r];
-  const alerte = leve ? `banc complet rouge le ${parisJour(new Date(rouge.date)).jour} sur l'empreinte ${rouge.empreinte} (${rouge.type === 'sequence' ? `séquence ${rouge.sequence ?? '?'}` : 'banc court'}${rouge.rouges?.length ? ` : ${rouge.rouges.join(', ')}` : ''})` : undefined;
+  let enAttente: Ligne[] = [], r = -1;
+  complets.forEach((x, i) => {
+    if (!x.vert) { enAttente.push(x); r = i; return; }
+    if (!enAttente.length) return;
+    const apres = complets.slice(r + 1, i + 1).filter((y) => y.empreinte === x.empreinte);
+    const rejoue = (rg: Ligne) => rg.type !== 'sequence' || apres.some((y) => y.type === 'sequence' && (y.sequence ?? '') === (rg.sequence ?? ''));
+    if (completOk(apres, x.empreinte) && enAttente.every(rejoue)) enAttente = [];
+  });
+  const rouge = enAttente.at(-1);
+  const quoi = (x: Ligne) => (x.type === 'sequence' ? `séquence ${x.sequence ?? '?'}` : 'banc court');
+  const autres = [...new Set(enAttente.slice(0, -1).map(quoi))].filter((q) => !rouge || q !== quoi(rouge));
+  const alerte = rouge ? `banc complet rouge le ${parisJour(new Date(rouge.date)).jour} sur l'empreinte ${rouge.empreinte} (${quoi(rouge)}${rouge.rouges?.length ? ` : ${rouge.rouges.join(', ')}` : ''})${autres.length ? ` ; aussi rouge depuis : ${autres.join(', ')}` : ''}` : undefined;
   const dernierComplet = complets.at(-1);
   return {
     dernier: dernier ? `${dernier.date} ${dernier.type === 'sequence' ? 'séquence ' : ''}${dernier.niveau ? `${dernier.niveau} ` : ''}${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
@@ -207,7 +216,8 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
     alerte,
     /** Jours depuis le dernier passage du banc complet, null s'il n'a jamais tourné (le minuteur du samedi a pu être manqué). */
     jours_depuis_complet: dernierComplet ? Math.floor((maintenant.getTime() - Date.parse(dernierComplet.date)) / 86_400_000) : null,
-    publication_ok: empreinte !== 'inconnue' && (completOk(h, empreinte) || (!alerte && mecaOk)),
+    // Tant que l'alerte tient, rien ne publie, pas même un banc complet vert d'avant le rouge : seul le banc complet qui la lève y ramène.
+    publication_ok: empreinte !== 'inconnue' && !alerte && (completOk(h, empreinte) || mecaOk),
     frais_semaine: somme(depuisSamedi.map((x) => x.frais ?? 0)),
   };
 }

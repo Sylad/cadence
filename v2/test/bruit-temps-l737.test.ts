@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur, Mesure } from '../src/bench/bras.js';
 import { lirePassages, passage } from '../src/bench/cli.js';
-import { BARRE_SPEC, BRUIT_MAX, bruitParBanc, PAIRES_IDENTIQUES_L735, verdictSansJuge, type PassageLu, type ResultatBanc } from '../src/bench/verdict.js';
+import { BARRE_SPEC, BRUIT_MAX, bruitParBanc, ecartPaire, PAIRES_IDENTIQUES_L735, verdictSansJuge, type PassageLu, type ResultatBanc } from '../src/bench/verdict.js';
 import { dossierTemp } from './temp.js';
 
 // L737 (étude L735, docs/etudes/banc3-lenteur.md) : le critère de temps déclarait rouges des passages où les deux bras étaient identiques.
@@ -36,19 +36,24 @@ const rougesTemps = (res: ResultatBanc[], bruit?: Record<string, number>) =>
   verdictSansJuge(res, 'A', 'C', { ...BARRE_SPEC, ...(bruit && { bruit }) }).criteres.filter((x) => TEMPS.includes(x.nom) && x.bloquant && !x.ok).map((x) => x.nom);
 
 describe('le temps tient compte du bruit de chaque banc (L737)', () => {
-  const bruit = bruitParBanc(passages, LE_15);
+  // Le bruit tel que L737 le calculait (le plus grand écart) : les règles de criteresTemps ci-dessous ne dépendent que de ces valeurs et restent celles de L737.
+  const bruit = { '1-ol-companion-L239': 210 / 156, '3-ol-companion-L241': 650 / 202, '6-ol-companion-L167': 761 / 59 };
 
-  it('le bruit de chaque banc est le plus grand écart entre bras identiques : banc 1 1,35, bancs 3 et 6 bruités', () => {
-    expect(bruit['1-ol-companion-L239']).toBeCloseTo(210 / 156);
-    expect(bruit['3-ol-companion-L241']).toBeCloseTo(650 / 202);
-    expect(bruit['6-ol-companion-L167']).toBeCloseTo(761 / 59); // le banc non livré du 15-11 17:49 (473 contre 82) ne compte pas
-    expect(bruit['1-ol-companion-L239']).toBeLessThan(BRUIT_MAX);
+  it('correctif de revue L738 : le bruit est la médiane des 3 dernières paires, plus le plus grand écart : banc 1 1,13, banc 3 1,52, banc 6 bruité 5,67', () => {
+    const mediane = bruitParBanc(passages, LE_15);
+    expect(mediane['1-ol-companion-L239']).toBeCloseTo(202 / 178); // 15-11 : 1,24 ; 1,08 ; 1,13
+    expect(mediane['3-ol-companion-L241']).toBeCloseTo(730 / 481); // 15-11 : 1,52 ; 1,34 ; 2,09 (le plus haut, 3,22 du 14-11, ne compte plus)
+    expect(mediane['6-ol-companion-L167']).toBeCloseTo(510 / 90); // 14-11 17:21 et 15-11 : 1,06 ; 5,67 ; 9,59 ; le banc non livré du 15-11 17:49 ne compte pas
+    expect(mediane['3-ol-companion-L241']).toBeLessThan(BRUIT_MAX);
+    expect(mediane['6-ol-companion-L167']).toBeGreaterThanOrEqual(BRUIT_MAX);
   });
 
-  it('rejouer les passages à bras identiques : 4 rouges de temps sur 9 avant, 0 après', () => {
+  it('rejouer les passages à bras identiques : 4 rouges de temps sur 9 avant, 0 avec le plus grand écart (L737), 3 avec la médiane (correctif L738)', () => {
     expect(passages.filter((p) => rougesTemps(p.resultats).length).map((p) => p.run))
       .toEqual(['2026-11-14-0002-0118958c983c', '2026-11-15-1540-f83140f3ab70', '2026-11-15-1604-f83140f3ab70', '2026-11-15-1749-edc99cb3f24c']);
     expect(passages.map((p) => rougesTemps(p.resultats, bruit))).toEqual(passages.map(() => []));
+    expect(passages.filter((p) => rougesTemps(p.resultats, bruitParBanc(passages, LE_15)).length).map((p) => p.run))
+      .toEqual(['2026-11-14-0002-0118958c983c', '2026-11-15-1540-f83140f3ab70', '2026-11-15-1749-edc99cb3f24c']);
   });
 
   it('un vrai écart × 2 sur un banc non bruité reste rouge, temps total et retouches', () => {
@@ -90,7 +95,7 @@ describe('le temps tient compte du bruit de chaque banc (L737)', () => {
 
 describe('bruitParBanc : seules les paires de bras identiques mesurent le bruit (L737)', () => {
   it('même empreinte de bras : la paire compte ; empreintes différentes ou absentes : non', () => {
-    const p = (run: string, e?: [string, string]): PassageLu => ({ run: `2026-11-15-1000-${run}`, resultats: [banc(['9-x#1', 100, 180], e)] });
+    const p = (run: string, e?: [string, string]): PassageLu => ({ run: `2026-11-15-1000-${run}-bruit`, resultats: [banc(['9-x#1', 100, 180], e)] }); // passage A contre A du samedi
     expect(bruitParBanc([p('r1', ['e', 'e'])], LE_15)).toEqual({ '9-x': 1.8 });
     expect(bruitParBanc([p('r1', ['e', 'f']), p('r2')], LE_15)).toEqual({});
   });
@@ -149,7 +154,8 @@ describe('passage : ordre alterné d\'un passage à l\'autre, empreinte du bras 
     expect(m.A.empreinte_bras).toMatch(/^[0-9a-f]{12}$/);
     expect(m.C.empreinte_bras).toBe(m.A.empreinte_bras);
     for (const x of p.resultats) { x.mesures.A.duree_s = 100; x.mesures.C.duree_s = 130; } // le faux claude rend la main en 0 s : un temps nul ne mesure rien
-    expect(bruitParBanc([p], LE_15)).toEqual({ '1-a': 1.3, '2-b': 1.3 });
+    expect(p.resultats.map((x) => ecartPaire(x))).toEqual([1.3, 1.3]);
+    expect(bruitParBanc([p], LE_15)).toEqual({}); // correctif de revue L738 : deux noms pour une même définition, hors banc complet, ne relèvent pas le seuil
   });
 
   it('un modèle différent change l\'empreinte : la paire ne mesure pas le bruit', async () => {

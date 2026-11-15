@@ -67,29 +67,44 @@ export function datePassage(run: string): Date | null {
   return instants.find((d) => parisJour(d).jour === `${m[1]}-${m[2]}-${m[3]}` && parisJour(d).hhmm === `${m[4]}${m[5]}`) ?? null;
 }
 
+/** Correctif de revue L738 : suffixes des passages A contre A, du banc complet (seuls comptés pour le bruit, avec l'étude L735) ou lancés à la main (jamais comptés) ;
+ * le bruit d'un banc est la médiane de ses BRUIT_PAIRES dernières paires comptées, jamais la plus haute. */
+export const SUFFIXE_BRUIT_COMPTE = '-bruit', SUFFIXE_BRUIT_MAIN = '-bruit-main', BRUIT_PAIRES = 3;
+
 /**
- * L737 : paires de bras identiques de l'historique, par banc de base : même `empreinte_bras` (brief, modèle, réglages et pièces), ou passage de
- * PAIRES_IDENTIQUES_L735. Un banc non livré, un bras en échec, un temps nul ou un passage sans date (L738) ne mesure rien. `e` : rapport des temps, ≥ 1.
+ * L737 : paires de bras identiques de l'historique, par banc de base. Correctif de revue L738 : seulement celles du banc complet (SUFFIXE_BRUIT_COMPTE, même
+ * `empreinte_bras`) et de PAIRES_IDENTIQUES_L735 ; un passage à la main, ou deux noms d'une même définition, ne relèvent jamais le seuil. Un passage sans date ne mesure rien.
  */
 export function pairesIdentiques(passages: PassageLu[]): Record<string, { e: number; date: Date }[]> {
   const paires: Record<string, { e: number; date: Date }[]> = {};
   for (const p of passages) for (const r of p.resultats) {
-    const m = Object.values(r.mesures ?? {}), date = datePassage(p.run);
-    if (!date || m.length !== 2 || (r.non_livre && Object.keys(r.non_livre).length) || m.some((x) => x.echec !== null || !(x.duree_s > 0))) continue;
-    if (!(PAIRES_IDENTIQUES_L735.includes(p.run) || (m[0].empreinte_bras && m[0].empreinte_bras === m[1].empreinte_bras))) continue;
-    (paires[banBase(r.banc)] ??= []).push({ e: Math.max(m[0].duree_s, m[1].duree_s) / Math.min(m[0].duree_s, m[1].duree_s), date });
+    const date = datePassage(p.run), l735 = PAIRES_IDENTIQUES_L735.includes(p.run), e = ecartPaire(r, l735);
+    if (date && e !== null && (l735 || p.run.endsWith(SUFFIXE_BRUIT_COMPTE))) (paires[banBase(r.banc)] ??= []).push({ e, date });
   }
   return paires;
 }
 
+/** L737 : écart (≥ 1) des deux bras d'un banc s'ils sont identiques (même `empreinte_bras`, ou `sansEmpreinte` : étude L735) ; null pour un banc non livré, un bras en échec ou un temps nul. */
+export function ecartPaire(r: ResultatBanc, sansEmpreinte = false): number | null {
+  const m = Object.values(r.mesures ?? {});
+  if (m.length !== 2 || (r.non_livre && Object.keys(r.non_livre).length) || m.some((x) => x.echec !== null || !(x.duree_s > 0))) return null;
+  if (!sansEmpreinte && !(m[0].empreinte_bras && m[0].empreinte_bras === m[1].empreinte_bras)) return null;
+  return Math.max(m[0].duree_s, m[1].duree_s) / Math.min(m[0].duree_s, m[1].duree_s);
+}
+
+const mediane = (xs: number[]): number => { const t = [...xs].sort((a, b) => a - b), m = t.length >> 1; return t.length % 2 ? t[m] : (t[m - 1] + t[m]) / 2; };
+
 /**
- * L737 : bruit de chaque banc de base, le plus grand écart de ses paires identiques. L738 : seules comptent les paires des BRUIT_VALIDITE_JOURS
- * derniers jours ; le bruit d'un banc expire donc 14 jours après sa dernière paire, et le banc revient au seuil de la barre (1,5 × A, 1,2 × A).
+ * L737 : bruit de chaque banc de base. L738 : seules comptent les paires des BRUIT_VALIDITE_JOURS derniers jours ; le bruit d'un banc expire donc 14 jours
+ * après sa dernière paire, et le banc revient au seuil de la barre (1,5 × A, 1,2 × A). Correctif de revue L738 : l'écart est la médiane des BRUIT_PAIRES
+ * dernières paires valables, pas la plus haute : une paire extrême isolée ne fait pas d'un banc un banc bruité.
  */
 export function bruitParBanc(passages: PassageLu[], maintenant: Date): Record<string, number> {
   const bruit: Record<string, number> = {};
-  for (const [id, ps] of Object.entries(pairesIdentiques(passages)))
-    for (const { e, date } of ps) if (maintenant.getTime() - date.getTime() <= BRUIT_VALIDITE_JOURS * JOUR_MS) bruit[id] = Math.max(bruit[id] ?? 1, e);
+  for (const [id, ps] of Object.entries(pairesIdentiques(passages))) {
+    const valables = ps.filter(({ date }) => maintenant.getTime() - date.getTime() <= BRUIT_VALIDITE_JOURS * JOUR_MS).sort((a, b) => a.date.getTime() - b.date.getTime());
+    if (valables.length) bruit[id] = mediane(valables.slice(-BRUIT_PAIRES).map((x) => x.e));
+  }
   return bruit;
 }
 

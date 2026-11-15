@@ -11,7 +11,7 @@ import { fuitesDuBras } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
 import { mesurerSansJuge, sansLivrable } from './sans-juge.js';
-import { BARRE_SPEC, banBase, bancsARemesurer, bruitParBanc, COMPLET_MAX_JOURS, ligneHistorique, titreVerdict, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type PassageLu, type ResultatBanc, type Verdict } from './verdict.js';
+import { BARRE_SPEC, banBase, bancsARemesurer, bruitParBanc, COMPLET_MAX_JOURS, ecartPaire, SUFFIXE_BRUIT_COMPTE, SUFFIXE_BRUIT_MAIN, ligneHistorique, titreVerdict, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type PassageLu, type ResultatBanc, type Verdict } from './verdict.js';
 
 const REPO = join(import.meta.dirname, '..', '..', '..');
 const COURT = ['1', '3', '6'];
@@ -97,7 +97,7 @@ export type Enfants = { lanceur: string[]; paralleles: number; env?: NodeJS.Proc
 
 type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string; repetitions?: number; garderClones?: boolean;
   exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void; eclair?: boolean;
-  niveau?: Niveau; enfants?: Enfants; depot?: string };
+  niveau?: Niveau; enfants?: Enfants; depot?: string; bruitCompte?: boolean };
 
 /** Un banc (une répétition) à jouer, sérialisable pour un processus enfant. `joues` (L737) : passages antérieurs de ce banc, pour alterner l'ordre des bras. */
 export type Tache = { racine: string; dirRun: string; run: string; ref: string; cand: string; N: number; juge: string; garderClones: boolean;
@@ -239,7 +239,7 @@ export function lirePassages(racine: string): PassageLu[] {
 
 async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?: boolean }> {
   const { jour: date, hhmm } = parisJour(o.maintenant); // nom du passage à l'heure de Paris, comme statut
-  const id = `${date}-${hhmm}-${o.empreinte}${o.niveau === 'bruit' ? '-bruit' : ''}`;
+  const id = `${date}-${hhmm}-${o.empreinte}${o.niveau === 'bruit' ? (o.bruitCompte ? SUFFIXE_BRUIT_COMPTE : SUFFIXE_BRUIT_MAIN) : ''}`; // correctif L738 : seul le samedi compte
   const dirRun = join(o.racine, 'runs', id);
   const bras = brasDuPassage(o.racine, o.ref, o.cand);
   for (const n of [o.ref, o.cand]) if (!bras[n]) throw new Error(`bras « ${n} » absent de ${o.racine}/bras.yaml`);
@@ -279,9 +279,10 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N, eclair: e?.lignes, niveau: o.niveau, depot: o.depot, duree_s }));
   writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultats: res.map((r, i) => ({ ...r, clones: joues[i].clones })) }, null, 2));
   if (o.niveau === 'bruit') { // L738 : seul l'écart compte, lu au prochain passage dans rapports/<run>.json ; la garde ne voit pas ce passage
-    const ecarts = bruitParBanc([{ run: id, resultats: res }], o.maintenant);
-    o.out(`bruit remesuré, ${o.ref} contre ${o.cand} : ${res.map((r) => `${r.banc} ${ecarts[banBase(r.banc)]?.toFixed(2) ?? 'non mesuré'}`).join(' ; ')} — ${duree_s} s — rapport : ${base}.md`);
-    return { ...v, vert: res.every((r) => ecarts[banBase(r.banc)] !== undefined) };
+    const ecarts = res.map((r) => ecartPaire(r)); // correctif L738 : toujours montré, compté pour le seuil seulement quand le banc complet l'a joué
+    o.out(`bruit remesuré, ${o.ref} contre ${o.cand} : ${res.map((r, i) => `${r.banc} ${ecarts[i]?.toFixed(2) ?? 'non mesuré'}`).join(' ; ')} — ${duree_s} s — rapport : ${base}.md`);
+    if (!o.bruitCompte) o.out('bruit lancé à la main : mesure montrée, non comptée pour le seuil de temps (seules comptent les paires du banc complet du samedi)');
+    return { ...v, vert: ecarts.every((x) => x !== null) };
   }
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
     candidat: o.cand, reference: o.ref, modele_candidat: bras[o.cand].modele, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: new Set(res.filter((r) => r.frais).map((r) => banBase(r.banc))).size,
@@ -296,9 +297,10 @@ export const numerosARemesurer = (racine: string, maintenant: Date): string[] =>
 
 /**
  * L738 : `cadence2 bench bruit [--bancs 3,6]`, passage A contre A sans juge (A et son jumeau, même empreinte de bras), un banc après l'autre,
- * sur les bancs donnés ou ceux à remesurer. 0 si chaque banc a mesuré son écart, 1 sinon, 2 si refusé ; rien à remesurer : 0.
+ * sur les bancs donnés ou ceux à remesurer. 0 si chaque banc a mesuré son écart, 1 sinon, 2 si refusé ; rien à remesurer : 0. Correctif de revue L738 : à la main,
+ * le passage est `-bruit-main`, jamais compté ; `bruitCompte` (`bruitDuSamedi`, appelé par `complet` seulement, aucune sous-commande) le nomme `-bruit`, compté.
  */
-async function remesurerBruit(racine: string, bancs: string | undefined, emp: string, repo: string, io: Io): Promise<number> {
+async function remesurerBruit(racine: string, bancs: string | undefined, emp: string, repo: string, io: Io, bruitCompte = false): Promise<number> {
   const numeros = bancs ? bancs.split(',').filter(Boolean) : numerosARemesurer(racine, io.now());
   if (!numeros.length) { io.out('bruit : aucun banc à remesurer (aucun banc bruité, aucun bruit qui expire dans les 7 jours)'); return 0; }
   const ref = PUBLIE.reference, cand = jumeau(ref);
@@ -310,9 +312,12 @@ async function remesurerBruit(racine: string, bancs: string | undefined, emp: st
   } catch (e) { refus = e instanceof Error ? e.message : String(e); }
   if (refus) { io.err(`bench bruit refusé : ${refus}`); return 2; }
   const v = await passage({ racine, numeros, niveau: 'bruit', ref, cand, hebdo: false, juge: 'opus', exec: executeurClaude, prep: preparer,
-    maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out, depot: depotMesure(repo) });
+    maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out, depot: depotMesure(repo), bruitCompte });
   return v.vert ? 0 : 1;
 }
+
+/** Correctif de revue L738 : le passage A contre A du banc complet, seul compté pour le bruit ; à la main, `bench bruit` ne peut pas débloquer la garde L730. */
+export const bruitDuSamedi = (numeros: string[], io: Io, repo = REPO): Promise<number> => remesurerBruit(racineBanc(io.env), numeros.join(','), empreinte(repo), repo, io, true);
 
 /** Banc éclair : deux contrôles rapides sur le banc 1 (temps ≤ 1,2 × A, aucune question du candidat). */
 export function controlesEclair(res: ResultatBanc[], ref: string, cand: string): { lignes: string[]; ok: boolean } {

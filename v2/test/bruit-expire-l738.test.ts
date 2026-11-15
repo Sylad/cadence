@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Executeur, Mesure } from '../src/bench/bras.js';
 import { bench, jumeau, lirePassages, numerosARemesurer, passage } from '../src/bench/cli.js';
 import { complet } from '../src/bench/complet.js';
-import { BARRE_SPEC, bancsARemesurer, bruitParBanc, datePassage, verdictSansJuge, type PassageLu, type ResultatBanc } from '../src/bench/verdict.js';
+import { BARRE_SPEC, bancsARemesurer, bruitParBanc, datePassage, ecartPaire, verdictSansJuge, type PassageLu, type ResultatBanc } from '../src/bench/verdict.js';
 import { ioTest } from './cli.test.js';
 import { dossierTemp } from './temp.js';
 
@@ -56,7 +56,7 @@ describe('le bruit d\'un banc expire 14 jours après sa dernière paire A contre
 
   it('une remesure calme remplace un vieux bruit : chaque paire compte 14 jours', () => {
     const remesure = [...h, paire(10, '3-x', 100, 110)];
-    expect(bruitParBanc(remesure, le(14))['3-x']).toBe(5);
+    expect(bruitParBanc(remesure, le(14))['3-x']).toBeCloseTo((5 + 1.1) / 2); // correctif de revue L738 : médiane des deux paires valables
     expect(bruitParBanc(remesure, le(16))['3-x']).toBeCloseTo(1.1);
     expect(bruitParBanc(remesure, le(25))).toEqual({});
   });
@@ -101,7 +101,7 @@ describe('cadence2 bench bruit : A contre son jumeau, sans juge (L738)', () => {
   it('le passage oppose A à A-bis, de même empreinte : son rapport remesure le bruit, l\'historique de la garde ne le voit pas', async () => {
     const r = racine(), sortie: string[] = [];
     await passage({ racine: r, numeros: ['3'], niveau: 'bruit', ref: 'A', cand: jumeau('A'), hebdo: false, juge: 'opus', exec, prep: prep as never,
-      maintenant: new Date('2026-11-21T09:00:00Z'), empreinte: 'e1', home: r, out: (l) => sortie.push(l) });
+      maintenant: new Date('2026-11-21T09:00:00Z'), empreinte: 'e1', home: r, out: (l) => sortie.push(l), bruitCompte: true });
     expect(existsSync(join(r, 'historique.jsonl'))).toBe(false);
     const [p] = lirePassages(r);
     expect(p.run).toBe('2026-11-21-1000-e1-bruit');
@@ -128,13 +128,51 @@ describe('cadence2 bench bruit : A contre son jumeau, sans juge (L738)', () => {
     mkdirSync(join(r, 'sequences', 's1'), { recursive: true }); mkdirSync(join(r, 'rapports'), { recursive: true });
     writeFileSync(join(r, 'rapports', '2026-11-14-1000-e0-bruit.json'), JSON.stringify({ verdict: {}, resultats: [banc('3-b', 100, 400), banc('1-a', 100, 110)] }));
     const appels: string[][] = [];
-    const d = { bench: async (a: string[]) => { appels.push(a); return 0; }, sequence: async () => 0 };
+    const d = { bench: async (a: string[]) => { appels.push(a); return 0; }, sequence: async () => 0, bruit: async (n: string[]) => { appels.push(['bruit-du-samedi', ...n]); return 0; } };
     const io = { ...ioTest({ BENCH_ROOT: r, HOME: '/x' }), now: () => le(21) };
     expect(numerosARemesurer(r, le(21))).toEqual(['1', '3']);
     expect(await complet([], io, d)).toBe(0);
-    expect(appels.slice(0, 2)).toEqual([['bruit', '--bancs', '1,3'], ['court', '--candidat', 'cadence-run', '--reference', 'A']]);
+    expect(appels.slice(0, 2)).toEqual([['bruit-du-samedi', '1', '3'], ['court', '--candidat', 'cadence-run', '--reference', 'A']]);
     appels.length = 0;
     expect(await complet([], { ...io, now: () => le(15) }, d)).toBe(0); // le 15 : banc 3 bruité seulement
-    expect(appels[0]).toEqual(['bruit', '--bancs', '3']);
+    expect(appels[0]).toEqual(['bruit-du-samedi', '3']);
+  });
+
+  it('cas de la revue : « bench bruit » rejoué à la main jusqu\'à un écart ≥ 2 ne relève pas le seuil, le mécanique rouge au banc 3 le reste', async () => {
+    const r = racine(), sortie: string[] = [];
+    for (const h of ['09', '10', '11']) // trois tirages à la main, le 20-11 ; chacun mesure A 100 s contre A-bis 500 s
+      await passage({ racine: r, numeros: ['3'], niveau: 'bruit', ref: 'A', cand: jumeau('A'), hebdo: false, juge: 'opus', exec, prep: prep as never,
+        maintenant: new Date(`2026-11-20T${h}:00:00Z`), empreinte: 'e1', home: r, out: (l) => sortie.push(l) });
+    const rap = join(r, 'rapports');
+    for (const f of readdirSync(rap).filter((x) => x.endsWith('.json'))) {
+      const x = JSON.parse(readFileSync(join(rap, f), 'utf8')) as { resultats: ResultatBanc[] };
+      x.resultats[0].mesures.A.duree_s = 100; x.resultats[0].mesures['A-bis'].duree_s = 500;
+      writeFileSync(join(rap, f), JSON.stringify(x));
+    }
+    expect(lirePassages(r).map((p) => p.run)).toEqual(['2026-11-20-1000-e1-bruit-main', '2026-11-20-1100-e1-bruit-main', '2026-11-20-1200-e1-bruit-main']);
+    expect(lirePassages(r).map((p) => ecartPaire(p.resultats[0]))).toEqual([5, 5, 5]); // la mesure existe, et s'affiche
+    expect(sortie.filter((l) => l.startsWith('bruit lancé à la main'))).toHaveLength(3);
+    expect(existsSync(join(r, 'historique.jsonl'))).toBe(false);
+    const bruit = bruitParBanc(lirePassages(r), le(21));
+    expect(bruit).toEqual({}); // avant le correctif : { '3-b': 5 }, banc 3 bruité
+    const meca = verdictSansJuge([banc('3-b', 300, 480, ['a', 'c'])], 'A', 'C', { ...BARRE_SPEC, bruit });
+    expect(meca.criteres.find((x) => x.nom === 'temps total')).toMatchObject({ seuil: '≤ 1.5 × A', ok: false, bloquant: true });
+    expect(meca.vert).toBe(false);
+  });
+});
+
+describe('correctif de revue L738 : le seuil d\'un banc est la médiane de ses 3 dernières paires comptées', () => {
+  it('une paire extrême isolée ne fait pas un banc bruité ; la plus ancienne de 4 paires sort', () => {
+    const h = [paire(10, '3-x', 100, 110), paire(11, '3-x', 100, 500), paire(12, '3-x', 100, 120)];
+    expect(bruitParBanc(h, le(13))['3-x']).toBeCloseTo(1.2); // médiane de 1,1 ; 5 ; 1,2, jamais 5
+    expect(bruitParBanc([...h, paire(13, '3-x', 100, 400)], le(14))['3-x']).toBeCloseTo(4); // 5 ; 1,2 ; 4 → 4 (la paire du 10 sort)
+    expect(bruitParBanc([paire(10, '3-x', 100, 300)], le(11))['3-x']).toBeCloseTo(3); // une seule paire : son écart
+  });
+
+  it('seuls comptent les passages A contre A du banc complet (-bruit) et ceux de l\'étude L735, jamais un passage à la main (-bruit-main)', () => {
+    const main: PassageLu = { run: '2026-11-12-1000-e0-bruit-main', resultats: [banc('3-x', 100, 900)] };
+    expect(bruitParBanc([main], le(13))).toEqual({});
+    expect(bruitParBanc([paire(11, '3-x', 100, 110), main], le(13))['3-x']).toBeCloseTo(1.1);
+    expect(bancsARemesurer([main], le(21), ['3-x'])).toEqual([]);
   });
 });

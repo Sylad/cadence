@@ -3579,9 +3579,10 @@ lots:
     finished: 2026-11-15
   - id: L736
     title: "M1 de docs/etudes/banc3-lenteur.md : le banc transmet les pièces de la demande à l'aiguillage (cli.ts:125 pieces: []) et garde le modèle déclaré du bras (bras.ts:82 : l'aiguillage écrase la définition). Mesure : au prochain passage, le prompt du bras cadence-run porte le mode complet quand la demande a des pièces, et un bras modele: sonnet tourne en Sonnet (modèle lu dans le transcript)."
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-15
+    started: 2026-11-15
   - id: L737
     title: "M2 de docs/etudes/banc3-lenteur.md : le critère de temps tient compte du bruit propre à chaque banc (bancs marqués bruités, ou seuil par banc tiré des passages où les bras étaient identiques) et l'ordre des bras alterne d'un passage à l'autre. Mesure : 0 rouge de temps sur les 10 passages déjà joués à bras identiques ; aucun rouge dû à un banc bruité sur les 4 passages suivants."
     status: todo

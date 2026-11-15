@@ -3530,7 +3530,7 @@ lots:
     estimate: 0.25
     created: 2026-11-14
     started: 2026-11-15
-    review: { date: 2026-11-15, verdict: "non conforme (revue 2, sur 7543a083, enregistrée en retard par le lead) : pendant une alerte de séquence Y, un banc complet vert sans Y autorisait la publication (verdict.ts:221)", commit: 9e97d07bd6e1b06fad849c5dbdebcc7f1699d094 }
+    review: { date: 2026-11-15, verdict: "non conforme (revue 3, Fable, sur 9e97d07b) : la règle 2 « rejoué vert sur l'empreinte à publier » rend l'alerte permanente pour les empreintes suivantes ; banc.md:88/105 périmés ; branche verdict.ts:188-189 sans test", commit: 9e97d07bd6e1b06fad849c5dbdebcc7f1699d094 }
   - id: L731
     title: "CI « tests » rouge sur main depuis le 13-11 19 h 47 (6 runs, dont 9a182b0c) : test/release-fumee-l696.test.ts échoue en CI seulement — « npm pack (aucun .tgz produit) (code 0) » alors que npm a bien écrit acme-fumee-1.0.0.tgz (sortie précédée de « npm warn Unknown user config always-auth ») ; porte locale verte. Trouver pourquoi le .tgz n'est pas retrouvé en CI, corriger le code de release (pas seulement le test) si la fumée réelle est concernée, et dire pourquoi la porte ne l'a pas vu."
     status: done

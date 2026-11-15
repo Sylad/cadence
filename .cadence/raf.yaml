@@ -3609,6 +3609,11 @@ lots:
     started: 2026-11-15
     review: { date: 2026-11-15, verdict: "conforme : banc 7 à la place du banc 6 (ambigu) dans le court et le mécanique, banc 6 gardé dans l'hebdo ; banc 7 préparé et vert sans session", commit: da42d4c6b5f7c03532639b0cda53a121a66d9e76 }
     finished: 2026-11-15
+  - id: L740
+    title: "Éval du plugin (étape 4 de cadence release) : une release s'arrête sur UN run sur six d'un cas sans rapport avec la version (14-11 : orchestrate-id-avec-slash 0,83, juge PASS FAIL FAIL ; 15-11 : livrer-sh-sans-bloc 0,83, juge FAIL FAIL FAIL ; moyenne Δ +0,92 et +0,96). 2e occurrence. Un cas sous le seuil est rejoué une fois (ses 6 runs) avant de retirer le tag ; il bloque seulement s'il reste sous le seuil, et le rapport dit « rejoué »."
+    status: todo
+    estimate: 0.25
+    created: 2026-11-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

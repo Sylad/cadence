@@ -12,7 +12,7 @@ export interface ResultatBanc { banc: string; taille: Taille; visible: boolean; 
   non_livre?: Record<string, string> }
 export interface Barre { temps_max: number; temps_max_retouche: number; reference_absolue: { caches: number; mutations: number } }
 export interface Critere { nom: string; valeur: string; seuil: string; ok: boolean; bloquant: boolean }
-/** `non_mesurable` (L733) : bancs dont un bras n'a pas livré le travail ; le passage n'est ni vert ni rouge, il est à rejouer. */
+/** `non_mesurable` (L733) : bancs dont un bras n'a pas livré le travail, posé seulement si aucun autre critère bloquant n'est rouge ; le passage n'est ni vert ni rouge, il est à rejouer. */
 export interface Verdict { vert: boolean; criteres: Critere[]; non_mesurable?: string[] }
 export const titreVerdict = (v: Verdict): string => (v.non_mesurable ? 'NON MESURABLE (à rejouer)' : v.vert ? 'VERT' : 'ROUGE');
 
@@ -64,10 +64,9 @@ function communs(res: ResultatBanc[], ref: string, cand: string, barre: Barre): 
 
 /** L689 : verdict d'un banc micro ou mécanique, sans juge IA : suite du projet et tests d'origine verts sur au moins autant de bancs que la référence. */
 export function verdictSansJuge(tous: ResultatBanc[], ref: string, cand: string, barre: Barre): Verdict {
-  // L733 : un banc dont un bras n'a écrit que du plan ou de la doc sort des critères (son temps n'est pas une victoire) et rend le passage non mesurable
-  const nonLivres = tous.filter((r) => r.non_livre && Object.keys(r.non_livre).length);
-  const res = tous.filter((r) => !nonLivres.includes(r));
-  const k = communs(res, ref, cand, barre);
+  // L733 : un banc dont un bras n'a écrit que du plan ou de la doc sort des critères ; le temps des autres n'est plus qu'indicatif, leurs autres critères bloquants restent jugés (revue : un rouge ne se masque pas)
+  const nonLivres = tous.filter((r) => r.non_livre && Object.keys(r.non_livre).length), res = tous.filter((r) => !nonLivres.includes(r)), k = communs(res, ref, cand, barre);
+  if (nonLivres.length) for (const x of [...k.avant, ...k.apres]) if (['au moins un banc', 'temps total', 'temps des retouches'].includes(x.nom)) x.bloquant = false;
   const mes = res.filter((r) => r.sans_juge?.[ref] && r.sans_juge?.[cand]);
   const avecCaches = mes.filter((r) => r.sans_juge![ref].caches_ok !== null).length;
   const n = (b: string, f: 'suite_ok' | 'caches_ok') => mes.filter((r) => r.sans_juge![b][f] === true).length;
@@ -77,8 +76,9 @@ export function verdictSansJuge(tous: ResultatBanc[], ref: string, cand: string,
     c('suite du projet verte', `${n(cand, 'suite_ok')} contre ${n(ref, 'suite_ok')} bancs`, `≥ ${ref}`, ok('suite_ok')),
     c('tests d\'origine verts', avecCaches ? `${n(cand, 'caches_ok')} contre ${n(ref, 'caches_ok')} bancs sur ${avecCaches}` : 'aucun banc avec tests d\'origine', `≥ ${ref}`, ok('caches_ok')),
     ...k.apres,
-    ...(nonLivres.length ? [c('bras qui ont livré le travail', nonLivres.flatMap((r) => Object.entries(r.non_livre!).map(([b, x]) => `${r.banc}/${b} : ${x}`)).join(' ; '), 'tous', false)] : [])];
-  return { vert: !nonLivres.length && criteres.every((x) => x.ok || !x.bloquant), criteres, ...(nonLivres.length && { non_mesurable: nonLivres.map((r) => r.banc) }) };
+    ...(nonLivres.length ? [c('bras qui ont livré le travail', nonLivres.flatMap((r) => Object.entries(r.non_livre!).map(([b, x]) => `${r.banc}/${b} : ${x}`)).join(' ; '), 'tous', false, false)] : [])];
+  const sansRouge = criteres.every((x) => x.ok || !x.bloquant);
+  return { vert: sansRouge && !nonLivres.length, criteres, ...(sansRouge && nonLivres.length && { non_mesurable: nonLivres.map((r) => r.banc) }) };
 }
 
 export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: Barre): Verdict {
@@ -128,7 +128,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
     ...(e.duree_s !== undefined ? [`Durée du passage : ${e.duree_s} s`] : []), '',
     `| Banc | Temps ${ref} | Temps ${cand} | Tokens ${ref} | Tokens ${cand} | Préféré | Cachés ${ref} · ${cand} | Mutations ${ref} · ${cand} | Suite ${ref} · ${cand} | Attendu ${ref} · ${cand} | Taille déclarée ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|---|---|', ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
-    ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.bloquant ? '**ROUGE**' : 'en dessous (indicatif)'} |`), '',
+    ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.bloquant ? '**ROUGE**' : c.nom === 'bras qui ont livré le travail' ? '**non livré**' : 'en dessous (indicatif)'} |`), '',
     ...(rejoues.length ? ['## Suites rejouées', '', 'Rouge pendant que les autres bancs tournaient, rejouée seule après eux : le rejeu compte (L734).', '', ...rejoues, ''] : []),
     ...(nonLivres.length ? ['## Bancs non mesurables', '', 'Un bras n\'a livré aucun fichier hors plan et doc : son temps ne compte pas, ni en victoire ni en défaite. Rejouer le passage.', '', ...nonLivres, ''] : []),
     ...(e.eclair ? ['## Contrôles éclair', '', ...e.eclair.map((l) => `- ${l}`), ''] : []),

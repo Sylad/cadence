@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { Executeur, Mesure } from '../src/bench/bras.js';
 import { passage } from '../src/bench/cli.js';
 import { sansLivrable } from '../src/bench/sans-juge.js';
-import { BARRE_SPEC, PUBLIE, statut, verdictSansJuge, type ResultatBanc } from '../src/bench/verdict.js';
+import { BARRE_SPEC, ligneHistorique, PUBLIE, statut, titreVerdict, verdictSansJuge, type ResultatBanc } from '../src/bench/verdict.js';
 import { dossierTemp } from './temp.js';
 
 // L733 (vécu des 14 et 15-11, banc 6-ol-companion-L167) : le bras A a fini en 75 s et 90 s en n'écrivant qu'une note de faisabilité dans le plan,
@@ -76,6 +76,8 @@ describe('passage mécanique : un bras sans livrable rend le banc non mesurable 
     expect(rap.split('\n')[0]).toBe('# Banc 2026-11-15 — cadence-run contre A — NON MESURABLE (à rejouer)');
     expect(rap).toMatch(/## Bancs non mesurables\n\n.*Rejouer le passage\.\n\n- 6-c\/A : aucun fichier livré/);
     expect(rap).toMatch(/\| 6-c \|.*\| non mesurable \|/);
+    expect(rap).toMatch(/\| bras qui ont livré le travail \| 6-c\/A : .* \| tous \| \*\*non livré\*\* \|/);
+    expect(rap).toMatch(/\| temps total \| 0 s contre 0 s \| .* \| ok \|/);
     expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8'))).toMatchObject({ niveau: 'mecanique', vert: false, non_mesurable: ['6-c'] });
     expect(sorties.join('\n')).toMatch(/6-c : banc non mesurable, à rejouer \(A : aucun fichier livré/);
     expect(sorties.at(-1)).toMatch(/^NON MESURABLE \(à rejouer\) — /);
@@ -103,6 +105,37 @@ describe('verdict sans juge : le banc non livré sort des critères, les autres 
     expect(v.criteres.find((c) => c.nom === 'bancs mesurés sans juge')).toMatchObject({ valeur: '2/2', ok: true });
     expect(v).toMatchObject({ vert: false, non_mesurable: ['6-c'] });
   });
+  // Revue de L733 : la suite du candidat rouge au banc 1 était masquée par le banc 6 non livré, et la garde laissait publier.
+  const nl = { sans_juge: undefined, non_livre: { A: 'aucun fichier livré hors plan et doc' } };
+  const rougeSuite = { sans_juge: { A: { suite_ok: true, caches_ok: null }, 'cadence-run': { suite_ok: false, caches_ok: null } } };
+  it('un critère bloquant rouge sur un banc mesuré l\'emporte : ROUGE, pas non mesurable, les bancs non livrés restent listés', () => {
+    const v = verdictSansJuge([r('1-a', 169, 182, rougeSuite), r('3-b', 489, 655), r('6-c', 75, 719, nl)], 'A', 'cadence-run', BARRE_SPEC);
+    expect(v.non_mesurable).toBeUndefined();
+    expect(v.vert).toBe(false);
+    expect(titreVerdict(v)).toBe('ROUGE');
+    expect(v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom)).toEqual(['suite du projet verte']);
+    expect(v.criteres.find((c) => c.nom === 'bras qui ont livré le travail')).toMatchObject({ ok: false, valeur: '6-c/A : aucun fichier livré hors plan et doc' });
+  });
+  it('fuite, bras en échec et questions des bancs mesurés restent bloquants', () => {
+    const echec = { mesures: { A: m(169), 'cadence-run': { ...m(182), echec: 'délai dépassé' } } };
+    const fuite = { fuites: { A: [], 'cadence-run': ['/secrets/x'] } };
+    const questions = { mesures: { A: m(169), 'cadence-run': { ...m(182), questions: 1 } } };
+    for (const [x, nom] of [[echec, 'aucun bras en échec'], [fuite, 'aucune fuite'], [questions, 'questions inutiles']] as const) {
+      const v = verdictSansJuge([r('1-a', 169, 182, x), r('6-c', 75, 719, nl)], 'A', 'cadence-run', BARRE_SPEC);
+      expect(v.non_mesurable, nom).toBeUndefined();
+      expect(v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom), nom).toEqual([nom]);
+    }
+  });
+  it('le temps des seuls bancs mesurés n\'est qu\'indicatif : un temps rouge sans autre rouge reste non mesurable', () => {
+    const v = verdictSansJuge([r('1-a', 100, 400), r('6-c', 75, 719, nl)], 'A', 'cadence-run', BARRE_SPEC);
+    expect(v.criteres.find((c) => c.nom === 'temps total')).toMatchObject({ ok: false, bloquant: false });
+    expect(v).toMatchObject({ vert: false, non_mesurable: ['6-c'] });
+    expect(ligneHistorique(v, { date: 'd', empreinte: 'e', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus', bancs: [], hebdo: false, frais: 0 })).toMatch(/"rouges":\[\]/);
+  });
+  it('aucun banc livré : non mesurable, pas rouge', () => {
+    const v = verdictSansJuge([r('6-c', 75, 719, nl)], 'A', 'cadence-run', BARRE_SPEC);
+    expect(v).toMatchObject({ vert: false, non_mesurable: ['6-c'] });
+  });
 });
 
 describe('garde : un passage non mesurable n\'est ni vert ni rouge (L733)', () => {
@@ -114,6 +147,16 @@ describe('garde : un passage non mesurable n\'est ni vert ni rouge (L733)', () =
   it('après un mécanique vert, un non mesurable ne retire pas la publication ; seul, il ne la donne pas', () => {
     expect(s([l(), nm]).publication_ok).toBe(true);
     expect(s([nm]).publication_ok).toBe(false);
+  });
+  it('revue de L733 : vert, puis rouge sur un banc mesuré avec un autre banc non livré → la publication tombe', () => {
+    const me = (bras: string, banc: string): Mesure => ({ bras, banc, debut: '', fin: '', duree_s: 100, tokens: 0, cout_usd: 0, questions: 0, questions_texte: [], sessions: [], echec: null });
+    const res = (banc: string, x: Partial<ResultatBanc>): ResultatBanc => ({ banc, taille: 'fonction', visible: false, reponses: false, frais: false, jugement: null,
+      fuites: { A: [], 'cadence-run': [] }, mesures: { A: me('A', banc), 'cadence-run': me('cadence-run', banc) }, ...x });
+    const sj = (cand: boolean) => ({ sans_juge: { A: { suite_ok: true, caches_ok: null }, 'cadence-run': { suite_ok: cand, caches_ok: null } } });
+    const v = verdictSansJuge([res('1-a', sj(false)), res('3-b', sj(true)), res('6-c', { non_livre: { A: 'aucun fichier livré hors plan et doc' } })], 'A', 'cadence-run', BARRE_SPEC);
+    const ligne = ligneHistorique(v, { date: '2026-11-15T16:00:00Z', empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus', bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, niveau: 'mecanique' });
+    expect(s([l(), ligne]).publication_ok).toBe(false);
+    expect(s([l(), ligne]).dernier).toBe('2026-11-15T16:00:00Z mecanique rouge (e1)');
   });
   it('le dernier passage se lit « non mesurable », pas « rouge »', () => {
     expect(s([l(), nm]).dernier).toBe('2026-11-15T16:00:00Z mecanique non mesurable (e1)');

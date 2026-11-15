@@ -1,4 +1,4 @@
-import { execFile, execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, chmodSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +14,21 @@ afterAll(cleanupTempDirs);
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
 const plan = (statuses: Record<string, string>) =>
   `version: 1\nproject: "x"\nprefix: L\nlots:\n${Object.entries(statuses).map(([id, s]) => `  - { id: ${id}, title: "t", status: ${s}, estimate: 1, created: 2026-10-01 }`).join('\n')}\n`;
+
+/**
+ * Lance scripts/mise-en-service.mjs sans bloquer le worker : le script compile pour de vrai (tsc de src/ puis de v2/, deux passes
+ * depuis 2.0.2), plus de 60 s sous charge ; en spawnSync, vitest perdait la réponse à onTaskUpdate (même cause que L480 et L567).
+ */
+const miseEnServiceCli = (args: string[], env: NodeJS.ProcessEnv) =>
+  new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+    const p = spawn('node', [join(REPO, 'scripts/mise-en-service.mjs'), ...args], { env });
+    let stdout = '';
+    let stderr = '';
+    p.stdout.setEncoding('utf8').on('data', (d: string) => { stdout += d; });
+    p.stderr.setEncoding('utf8').on('data', (d: string) => { stderr += d; });
+    p.on('error', reject);
+    p.on('close', (status) => resolve({ status, stdout, stderr }));
+  });
 
 function commitAll(dir: string, message: string, ...paths: string[]) {
   git(dir, 'add', '--', ...paths);
@@ -448,7 +463,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     expect(r.fingerprint).toMatch(/^[0-9a-f]{64}$/);
   }, 120_000);
 
-  it.skipIf(process.getuid?.() === 0)("L330 — la ligne de commande : une copie illisible à la purge (EACCES) donne un avertissement sur stderr, l'empreinte, le code de sortie 0 et le lien service basculé", () => {
+  it.skipIf(process.getuid?.() === 0)("L330 — la ligne de commande : une copie illisible à la purge (EACCES) donne un avertissement sur stderr, l'empreinte, le code de sortie 0 et le lien service basculé", async () => {
     const { dir, first } = workRepo();
     const { root, binDir } = places();
     mettreEnService({ repo: dir, rev: first, root, binDir, install });
@@ -462,7 +477,7 @@ describe('le code en service est une copie séparée du dépôt de travail (L195
     const oldest = join(root, 'releases', first.slice(0, 12));
     chmodSync(oldest, 0o000);
     try {
-      const r = spawnSync('node', [join(REPO, 'scripts/mise-en-service.mjs'), fifth, '--root', root, '--bin-dir', binDir, '--repo', dir], { encoding: 'utf8', env: { ...process.env, PATH: `${shim}:${process.env.PATH}`, CADENCE_HOME: join(tempDir(), 'home') } });
+      const r = await miseEnServiceCli([fifth, '--root', root, '--bin-dir', binDir, '--repo', dir], { ...process.env, PATH: `${shim}:${process.env.PATH}`, CADENCE_HOME: join(tempDir(), 'home') });
       expect(r.status).toBe(0);
       expect(r.stdout).toContain('empreinte : ');
       expect(r.stderr).toContain('avertissement : purge des anciennes copies interrompue');
@@ -600,7 +615,7 @@ describe('L419 — la mise en service met aussi à jour la copie locale du mod c
     expect(r.mod).toMatchObject({ updated: false, reason: 'sans source' });
   }, 120_000);
 
-  it("R7 — la ligne de commande dit la mise à jour du mod et accepte --mod-dir", () => {
+  it("R7 — la ligne de commande dit la mise à jour du mod et accepte --mod-dir", async () => {
     const { dir, sha } = repoAvecMod('// v2\n');
     const { root, binDir } = places();
     const modDir = join(tempDir(), 'cadence-hud');
@@ -608,7 +623,7 @@ describe('L419 — la mise en service met aussi à jour la copie locale du mod c
     const shim = tempDir();
     writeFileSync(join(shim, 'npm'), `#!/bin/sh\nln -s '${join(REPO, 'node_modules')}' node_modules\n`, { mode: 0o755 });
     writeFileSync(join(shim, 'npx'), `#!/bin/sh\nshift\nexec '${join(REPO, 'node_modules/.bin/tsc')}' "$@"\n`, { mode: 0o755 });
-    const r = spawnSync('node', [join(REPO, 'scripts/mise-en-service.mjs'), sha, '--root', root, '--bin-dir', binDir, '--repo', dir, '--mod-dir', modDir], { encoding: 'utf8', env: { ...process.env, PATH: `${shim}:${process.env.PATH}`, CADENCE_HOME: join(tempDir(), 'home') } });
+    const r = await miseEnServiceCli([sha, '--root', root, '--bin-dir', binDir, '--repo', dir, '--mod-dir', modDir], { ...process.env, PATH: `${shim}:${process.env.PATH}`, CADENCE_HOME: join(tempDir(), 'home') });
     expect(r.status).toBe(0);
     expect(r.stdout).toContain(`mod cadence-hud : copie locale mise à jour (${modDir})`);
     expect(readFileSync(join(modDir, 'hooks/lots.ts'), 'utf8')).toBe('// v2\n');

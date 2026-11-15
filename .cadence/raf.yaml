@@ -3562,10 +3562,12 @@ lots:
     review: { date: 2026-11-15, verdict: "non conforme (revue 2, sur 0b2bc941) : avec un banc non livré, le temps des bancs mesurés devient indicatif (verdict.ts:69), un rouge de temps est masqué et la garde laisse publier", commit: 0b2bc941c577dd3181aa642205922a0717346683 }
   - id: L734
     title: "Banc mécanique : la suite de tests d'un bras rougit sous la charge des 3 bancs en parallèle (15-11, banc 1, bras cadence-run : 28 findBy expirés à ~1 s dans news.test.tsx et equipe-de-france.acceptation, suite 19,9 s contre 11,7 s ; rejeu calme 68/68 et suite complète verte). Un échec de suite d'un bras doit être rejoué seul, au calme, avant d'être compté (comme orchestrate.testReplay), et le rapport dire « rejoué ». Rapport : ~/bench-cadence/rapports/2026-11-15-1604-f83140f3ab70.md."
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-15
     started: 2026-11-15
+    review: { date: 2026-11-15, verdict: "conforme : une suite rouge pendant un passage mécanique est rejouée seule après les autres bancs ; le rejeu compte, la première mesure est gardée ; rejeu impossible = rouge", commit: 786bf2149af8aef1f7098b2c1abc32bf8b907f02 }
+    finished: 2026-11-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

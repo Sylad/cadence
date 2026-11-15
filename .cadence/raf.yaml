@@ -3526,9 +3526,10 @@ lots:
     finished: 2026-11-13
   - id: L730
     title: "D-22 : garde de publication proportionnée — avant une publication, le banc mécanique (sans juge, 3 bancs en parallèle, ~30 min) suffit ; le banc complet (court avec juges + séquence) passe chaque samedi sur le minuteur à la place du mécanique. Mesure : délai lot clos → publié < 1 h ; tout défaut trouvé le samedi qui aurait dû bloquer une publication fait revenir en arrière. Docs banc.md, verifier-publication, service du samedi."
-    status: todo
+    status: doing
     estimate: 0.25
     created: 2026-11-14
+    started: 2026-11-15
   - id: L731
     title: "CI « tests » rouge sur main depuis le 13-11 19 h 47 (6 runs, dont 9a182b0c) : test/release-fumee-l696.test.ts échoue en CI seulement — « npm pack (aucun .tgz produit) (code 0) » alors que npm a bien écrit acme-fumee-1.0.0.tgz (sortie précédée de « npm warn Unknown user config always-auth ») ; porte locale verte. Trouver pourquoi le .tgz n'est pas retrouvé en CI, corriger le code de release (pas seulement le test) si la fumée réelle est concernée, et dire pourquoi la porte ne l'a pas vu."
     status: done

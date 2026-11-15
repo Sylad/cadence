@@ -139,13 +139,14 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L728 (revue) : run 569 (+7), --liste sur cinq lignes et la ligne de fin sur deux au lieu d'une chacune (lignes détassées), Etat étend EtatRapport
   // L726 : run 670 (+101), aiguillage de modèle : escalade.ts (passes de correction et revues non conformes du lot, Fable d'office) et la ligne des modèles de chaque passe, sans ligne tassée
   // L726 (revue) : run 695 (+25), correction après revue seulement sur une revue non conforme neuve (revueApresIntegre), lignes à deux instructions détassées (run.ts, escalade.ts)
-  mesure: { total: 1834, modules: { bench: 1134, sequence: 700 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
+  mesure: { total: 1864, modules: { bench: 1164, sequence: 700 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
   // L730 (D-22) : bench 1080, garde proportionnée (banc mécanique avant publication, alerte du banc complet du samedi) et complet.ts, sans ligne tassée
   // L730 (revue) : bench 1090, l'alerte ne tombe que sur un banc complet vert qui rejoue chaque rouge en attente (même séquence)
   // L730 (revue 2) : bench 1100, la garde en quatre règles (le banc rouge rejoué sur l'empreinte à publier, refus nommant les bancs à rejouer)
   // L730 (revue 3) : règle 2 bornée, un rejeu vert après le rouge (version corrigée ou suivante) lève l'alerte pour les empreintes suivantes
   // L730 (décision de Sylvain du 15-11) : bench 1104 (+4), règle 1 bornée par GARDE_DEPUIS (les rouges d'avant la mise en service sont déjà arbitrés)
   // L733 : bench 1134 (+30), un bras qui ne livre que du plan ou de la doc rend le banc mécanique non mesurable (sansLivrable, verdict, garde), sans ligne tassée
+  // L734 : bench 1164 (+30), une suite rouge sous la charge des autres bancs est rejouée seule après eux (rejouerSuites), sans ligne tassée
 };
 function reglesBudget(f: Fichiers): string[] {
   const b = JSON.parse(f['budget.json']) as Record<string, { total: number; modules: Record<string, number> }>;
@@ -240,13 +241,13 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C2', "modele: 'sonnet'", 'src/bench/bras.ts', ajout("const d = { modele: 'sonnet' };")],
   ['C3', 'trois portes', 'src/bench/banc.ts', ajout('porte(1);\ngate(2);\nverifyAll(3);')],
   ['C3', 'budget porte 400', 'budget.json', remplace('"porte": 250', '"porte": 400')],
-  ['C4', 'total mesure relevé', 'budget.json', remplace('"total": 1834', '"total": 2000')],
+  ['C4', 'total mesure relevé', 'budget.json', remplace('"total": 1864', '"total": 2000')],
   ['C4', 'total noyau relevé', 'budget.json', remplace('"total": 3000', '"total": 3500')],
   ['C4', 'budget sequence relevé', 'budget.json', remplace('"sequence": 700', '"sequence": 900')],
   ['C4', 'budget plan relevé sous le total', 'budget.json', remplace('"plan": 350', '"plan": 1000')],
   ['C4', 'budget hooks relevé (R32)', 'budget.json', remplace('"hooks": 200', '"hooks": 300')],
   ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 450, "hooks": 200', '"deliver": 450').replace('"sequence": 700', '"sequence": 700, "hooks": 200')],
-  ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1134', '"bench": 1134, "outil": 100')],
+  ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1164', '"bench": 1164, "outil": 100')],
   ['C4', 'groupe de budget ajouté', 'budget.json', remplace(/\n}\s*$/, ',\n  "autre": { "total": 900, "modules": {} }\n}')],
   ['C4', "option(reste,'zzz') sans entrée", 'src/bench/cli.ts', remplace("option(reste, 'taille')", "option(reste, 'zzz')")],
   ['C4', 'chemin options.json inexistant', 'options.json', remplace('"bench --juge": "docs/v2/2026-11-07-cadence-2-design.md"', '"bench --juge": "docs/v2/mesures/rien.md"')],

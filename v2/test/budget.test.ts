@@ -39,9 +39,10 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L730 (revue 3) : règle 2 bornée (un rejeu vert après le rouge, sur la version corrigée ou une suivante, lève l'alerte pour de bon), budget inchangé (1100 atteint).
   // L730 (décision de Sylvain du 15-11) : bench 1104 (+4), mesure 1804 : règle 1 bornée par GARDE_DEPUIS, les rouges d'avant la mise en service sont déjà arbitrés.
   // L733 : bench 1134 (+30), mesure 1834 : un bras qui ne livre que du plan ou de la doc rend le banc mécanique non mesurable (sansLivrable, verdict, garde), sans ligne tassée.
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 1834 (L689, issue #57, L730, L733)', () => {
+  // L734 : bench 1164 (+30), mesure 1864 : une suite rouge sous la charge des autres bancs est rejouée seule après eux (rejouerSuites), sans ligne tassée.
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 1864 (L689, issue #57, L730, L733, L734)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1834]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1864]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

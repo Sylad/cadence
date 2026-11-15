@@ -3,7 +3,8 @@ import type { Mesure } from './bras.js';
 import { avisLu, type Jugement, type Meca } from './juges.js';
 
 /** L689 : mesure sans juge IA d'un bras (bancs micro et mécanique, sans-juge.ts). */
-export interface MesureSansJuge { suite_ok: boolean; caches_ok: boolean | null }
+/** `rejoue` (L734) : la mesure rouge du premier passage, sous la charge des autres bancs ; les champs sont alors ceux du rejeu seul. */
+export interface MesureSansJuge { suite_ok: boolean; caches_ok: boolean | null; rejoue?: { suite_ok: boolean; caches_ok: boolean | null } }
 export interface ResultatBanc { banc: string; taille: Taille; visible: boolean; reponses: boolean; frais: boolean;
   mesures: Record<string, Mesure>; jugement: Jugement | null; fuites: Record<string, string[]>; fuites_a_verifier?: Record<string, string[]>;
   sans_juge?: Record<string, MesureSansJuge>;
@@ -111,7 +112,7 @@ const okRouge = (x: boolean | null | undefined) => (x === null || x === undefine
 export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdict, e: { date: string; empreinte: string; repetitions?: number; eclair?: string[]; niveau?: string; depot?: string; duree_s?: number }): string {
   const lignes = res.map((r) => {
     const j = r.jugement; const sj = r.sans_juge; const m = (b: string) => r.mesures[b]; const deux = (f: (x: Meca) => string) => (j ? `${f(j.meca[ref])} · ${f(j.meca[cand])}` : '–');
-    const sans = (f: 'suite_ok' | 'caches_ok') => (sj ? `${okRouge(sj[ref]?.[f])} · ${okRouge(sj[cand]?.[f])}` : '–');
+    const sans = (f: 'suite_ok' | 'caches_ok') => (sj ? [ref, cand].map((b) => `${okRouge(sj[b]?.[f])}${sj[b]?.rejoue && sj[b].rejoue![f] === false ? ' (rejoué)' : ''}`).join(' · ') : '–');
     const prefere = j ? avisLu(j, 'prefere') : r.non_livre ? 'non mesurable' : sj ? 'sans juge' : 'non jugé';
     const caches = j ? `${j.meca[ref].caches_passes} · ${j.meca[cand].caches_passes}` : sans('caches_ok');
     const suite = j ? deux((x) => (x.suite_ok ? 'ok' : 'ROUGE')) : sans('suite_ok');
@@ -120,6 +121,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
   const questions = res.flatMap((r) => [ref, cand].flatMap((b) => (r.mesures[b]?.questions_texte ?? []).map((q) => `- ${r.banc}/${b} : ${q.trim().replace(/\s*\n\s*/g, ' ')}`)));
   const lectures = res.flatMap((r) => Object.entries(r.fuites_a_verifier ?? {}).flatMap(([b, ps]) => ps.map((p) => `- ${r.banc}/${b} : ${p}`)));
   const nonLivres = res.flatMap((r) => Object.entries(r.non_livre ?? {}).map(([b, x]) => `- ${r.banc}/${b} : ${x}`));
+  const rejoues = res.flatMap((r) => Object.entries(r.sans_juge ?? {}).flatMap(([b, x]) => (x.rejoue ? [`- ${r.banc}/${b} : ${x.suite_ok && x.caches_ok !== false ? 'vert' : 'ROUGE'} au rejeu seul (sous charge : suite ${okRouge(x.rejoue.suite_ok)}, tests d'origine ${okRouge(x.rejoue.caches_ok)})`] : [])));
   return [`# Banc ${e.date} — ${cand} contre ${ref} — ${titreVerdict(v)}`, '', `Empreinte de v2 : ${e.empreinte}`, `Répétitions : ${e.repetitions ?? 1}`,
     ...(e.niveau ? [`Niveau : ${e.niveau}, sans juge IA (n'autorise pas la publication)`] : []),
     ...(e.depot ? [`Dépôt mesuré : ${e.depot}`] : []),
@@ -127,6 +129,7 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
     `| Banc | Temps ${ref} | Temps ${cand} | Tokens ${ref} | Tokens ${cand} | Préféré | Cachés ${ref} · ${cand} | Mutations ${ref} · ${cand} | Suite ${ref} · ${cand} | Attendu ${ref} · ${cand} | Taille déclarée ${ref} · ${cand} |`,
     '|---|---|---|---|---|---|---|---|---|---|---|', ...lignes, '', '| Critère | Valeur | Seuil | Résultat |', '|---|---|---|---|',
     ...v.criteres.map((c) => `| ${c.nom} | ${c.valeur} | ${c.seuil} | ${c.ok ? 'ok' : c.bloquant ? '**ROUGE**' : 'en dessous (indicatif)'} |`), '',
+    ...(rejoues.length ? ['## Suites rejouées', '', 'Rouge pendant que les autres bancs tournaient, rejouée seule après eux : le rejeu compte (L734).', '', ...rejoues, ''] : []),
     ...(nonLivres.length ? ['## Bancs non mesurables', '', 'Un bras n\'a livré aucun fichier hors plan et doc : son temps ne compte pas, ni en victoire ni en défaite. Rejouer le passage.', '', ...nonLivres, ''] : []),
     ...(e.eclair ? ['## Contrôles éclair', '', ...e.eclair.map((l) => `- ${l}`), ''] : []),
     ...[['Lectures à vérifier', lectures], ['Questions posées', questions]].flatMap(([t, l]) => (l.length ? [`## ${t}`, '', ...l, ''] : []))].join('\n');

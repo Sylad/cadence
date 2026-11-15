@@ -93,7 +93,8 @@ type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: strin
 /** Un banc (une répétition) à jouer, sérialisable pour un processus enfant. */
 export type Tache = { racine: string; dirRun: string; run: string; ref: string; cand: string; N: number; juge: string; garderClones: boolean;
   maintenant: string; home: string; sansJuge: boolean; bid: string; i: number; k: number };
-type Joue = { r: ResultatBanc; clones: Record<string, string> };
+/** `rejeu` (L734) : clones gardés dont la suite est rouge, à rejouer seuls après les autres bancs du passage. */
+type Joue = { r: ResultatBanc; clones: Record<string, string>; rejeu?: { bid: string; dossier: string; bras: Record<string, { clone: string; base: string }> } };
 
 const idTache = (t: Tache) => (t.N > 1 ? `${t.bid}#${t.k}` : t.bid);
 
@@ -151,8 +152,9 @@ export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out:
     mesures, jugement, fuites, fuites_a_verifier: aVerifier, ...(sansJuge && { sans_juge: sansJuge }), ...(nonLivre && { non_livre: nonLivre }) };
   mkdirSync(join(t.dirRun, sous), { recursive: true });
   writeFileSync(join(t.dirRun, sous, 'resultat.json'), JSON.stringify({ ...r, clones: mapping, suite_base: suiteBase }, null, 2));
-  if (!t.garderClones) for (const n of ordre) if (clones[n]) archiver(clones[n], bases[n]);
-  return { r, clones: mapping };
+  const aRejouer = ordre.filter((n) => sansJuge && (!sansJuge[n].suite_ok || sansJuge[n].caches_ok === false)); // L734 : rouge peut-être de charge, clone gardé
+  if (!t.garderClones) for (const n of ordre) if (clones[n] && !aRejouer.includes(n)) archiver(clones[n], bases[n]);
+  return { r, clones: mapping, ...(aRejouer.length && { rejeu: { bid: t.bid, dossier: join(t.dirRun, sous), bras: Object.fromEntries(aRejouer.map((n) => [n, { clone: clones[n], base: bases[n] }])) } }) };
 }
 
 const PHASE = '@phase ';
@@ -198,6 +200,23 @@ export async function enParallele<T, R>(taches: T[], n: number, jouer: (t: T) =>
   return res;
 }
 
+/**
+ * L734 (vécu du 15-11, banc 1 : 28 findBy expirés sous la charge des 3 bancs, 68/68 au calme) : une suite rouge d'un bras est rejouée seule, après la fin
+ * de tous les bancs du passage, comme orchestrate.testReplay ; le rejeu compte, la mesure sous charge reste dans `rejoue`. Le clone est archivé ensuite.
+ */
+export function rejouerSuites(joues: Joue[], racine: string, garderClones: boolean, out: (l: string) => void): void {
+  for (const { r, rejeu } of joues) for (const [n, { clone, base }] of Object.entries(rejeu?.bras ?? {})) {
+    const avant = r.sans_juge![n];
+    out(`${r.banc} : suite de ${n} rouge pendant les autres bancs, rejouée seule…`);
+    try {
+      r.sans_juge![n] = { ...mesurerSansJuge(chargerBanc(racine, rejeu!.bid), clone, undefined, true), rejoue: { suite_ok: avant.suite_ok, caches_ok: avant.caches_ok } };
+      const f = join(rejeu!.dossier, 'resultat.json');
+      writeFileSync(f, JSON.stringify({ ...JSON.parse(readFileSync(f, 'utf8')), sans_juge: r.sans_juge }, null, 2));
+    } catch (e) { out(`${r.banc} : rejeu de ${n} impossible, la suite reste rouge (${e instanceof Error ? e.message : String(e)})`); }
+    finally { if (!garderClones) archiver(clone, base); }
+  }
+}
+
 async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?: boolean }> {
   const { jour: date, hhmm } = parisJour(o.maintenant); // nom du passage à l'heure de Paris, comme statut
   const id = `${date}-${hhmm}-${o.empreinte}`;
@@ -227,6 +246,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   const joues = enfants
     ? await enParallele(taches, enfants.paralleles, async (t) => fini(t, await bancDansEnfant(t, enfants, dirTaches, o.out, signaler(t))))
     : taches.map((t) => fini(t, jouerBanc(t, o.exec, o.prep, o.out, signaler(t))));
+  rejouerSuites(joues, o.racine, o.garderClones ?? false, o.out);
   const res = joues.map((j) => j.r);
   const v = (o.niveau ? verdictSansJuge : verdict)(res, o.ref, o.cand, BARRE_SPEC);
   const e = o.eclair ? controlesEclair(res, o.ref, o.cand) : undefined;

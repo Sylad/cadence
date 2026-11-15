@@ -49,12 +49,13 @@ describe('banc micro et mécanique : mesurés sans juge IA (L689)', () => {
     expect(sessions).toHaveLength(2); // deux bras, aucun juge
     const res = JSON.parse(readFileSync(join(r, 'runs', '2026-11-13-1600-e1', '1-a', 'resultat.json'), 'utf8'));
     expect(res.jugement).toBeNull();
-    expect(res.sans_juge).toEqual({ A: { suite_ok: true, caches_ok: true }, 'cadence-run': { suite_ok: false, caches_ok: false } }); // c1 = A, c2 = cadence-run
+    // c1 = A, c2 = cadence-run ; L734 : le rouge est rejoué seul après le passage, et reste rouge
+    expect(res.sans_juge).toEqual({ A: { suite_ok: true, caches_ok: true }, 'cadence-run': { suite_ok: false, caches_ok: false, rejoue: { suite_ok: false, caches_ok: false } } });
     expect(readFileSync(join(r, 'runs', '2026-11-13-1600-e1', '1-a', 'c1.tests-origine.log'), 'utf8')).toBe(''); // la suite a bien tourné avec le test posé
     expect(v.vert).toBe(false);
     expect(v.criteres.filter((c) => !c.ok).map((c) => c.nom)).toEqual(['suite du projet verte', 'tests d\'origine verts']);
     const rap = readFileSync(join(r, 'rapports', '2026-11-13-1600-e1.md'), 'utf8');
-    expect(rap).toMatch(/Niveau : micro, sans juge IA \(n'autorise pas la publication\)/); expect(rap).toMatch(/\| sans juge \| ok · ROUGE \|/);
+    expect(rap).toMatch(/Niveau : micro, sans juge IA \(n'autorise pas la publication\)/); expect(rap).toMatch(/\| sans juge \| ok · ROUGE \(rejoué\) \|/);
     expect(JSON.parse(readFileSync(join(r, 'historique.jsonl'), 'utf8'))).toMatchObject({ niveau: 'micro', candidat: 'cadence-run', reference: 'A' });
   });
   it('les tests d\'origine posés sont retirés du clone ; un banc sans tests d\'origine les compte « aucun »', async () => {

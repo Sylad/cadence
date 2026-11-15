@@ -3530,10 +3530,10 @@ lots:
     estimate: 0.25
     created: 2026-11-14
     started: 2026-11-15
-    review: { date: 2026-11-15, verdict: "conforme (revue 4) : garde proportionnée en quatre règles, une alerte tombe quand ce banc rouge est rejoué vert après le rouge et reste levée ; banc mécanique avant publication, banc complet le samedi (D-22) ; mineurs notés : rejeu à 1 répétition lève une séquence rouge à 2, libellé « postérieure » de banc.md:33", commit: 609734b73f06cab2822c335c3dd92b87f83897d6 }
+    review: { date: 2026-11-15, verdict: "conforme : rouges antérieurs à la garde (2026-11-15) sans alerte, décision de Sylvain ; règles 2-4 intactes ; tests redatés sans perte d'intention", commit: 28e9375d87de0aa60eb72af416d684b9a147dcd9 }
     finished: 2026-11-15
     tasks:
-      - { id: t1, title: "Les rouges antérieurs à la mise en service de la garde (L730, 2026-11-15) ne sont pas des alertes : déjà arbitrés par Sylvain (2.0.3 à 2.0.8 publiées sur dossier). Décision de Sylvain du 15-11.", status: todo }
+      - { id: t1, title: "Les rouges antérieurs à la mise en service de la garde (L730, 2026-11-15) ne sont pas des alertes : déjà arbitrés par Sylvain (2.0.3 à 2.0.8 publiées sur dossier). Décision de Sylvain du 15-11.", status: done }
   - id: L731
     title: "CI « tests » rouge sur main depuis le 13-11 19 h 47 (6 runs, dont 9a182b0c) : test/release-fumee-l696.test.ts échoue en CI seulement — « npm pack (aucun .tgz produit) (code 0) » alors que npm a bien écrit acme-fumee-1.0.0.tgz (sortie précédée de « npm warn Unknown user config always-auth ») ; porte locale verte. Trouver pourquoi le .tgz n'est pas retrouvé en CI, corriger le code de release (pas seulement le test) si la fumée réelle est concernée, et dire pourquoi la porte ne l'a pas vu."
     status: done

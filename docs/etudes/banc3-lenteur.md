@@ -187,8 +187,8 @@ La distribution est bimodale, et la médiane ne suffit pas à la lisser.
   - L'ordre des bras alterne aussi d'un passage à l'autre (parité du passage ajoutée à `t.i + t.k`).
 - **Données disponibles.** Le banc 3 dispose déjà de 10 paires identiques (§ 4c, sans coût supplémentaire), qui
   donnent 4 faux rouges sur 10 avec le seuil de 1,5. Pour les autres bancs, on calcule le même taux à partir des
-  passages où l'aiguillage a choisi le mode léger : aux bancs 1 et 6, toutes les paires `cadence-run` / A depuis le
-  13-11 sont des paires A/A.
+  passages où l'aiguillage a choisi le mode léger : aux bancs 1 et 6 (sans pièce), les paires `cadence-run` / A sont des
+  paires A/A (prompts identiques, vérifié sur les passages du 14-11 à 10 h et du 15-11 à 17 h 49).
 - **Règle proposée.**
   - Un banc dont le taux de faux rouge entre bras identiques dépasse 10 % est marqué « temps bruité ».
   - Son temps est rapporté sans entrer dans le critère bloquant, tant qu'il n'a pas assez de répétitions.

@@ -3571,10 +3571,22 @@ lots:
     finished: 2026-11-15
   - id: L735
     title: "Enquête : cadence run plus lent qu'A au banc 3 (ol-companion L241) à 5 passages sur 6 depuis le 14-11 (× 2,0, 1,5, 1,5, 1,3, 2,1 ; 599 s et 7,6 M jetons contre 286 s et 2,5 M le 15-11 à 17 h 49). Où partent le temps et les jetons (lecture, porte, corrections, attentes) ; proposer un mécanisme mesuré. Dossier de publication 2.0.9."
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-15
     started: 2026-11-15
+    review: { date: 2026-11-15, verdict: "conforme : étude docs/etudes/banc3-lenteur.md ; causes vérifiées par le lead dans le code (cli.ts:125 pieces: [] → mode léger = brief A ; bras.ts:82 l'aiguillage remplace la définition du bras et perd le modèle déclaré)", commit: 344dab7fc8214fec0a4c74c867f85c185fc86e48 }
+    finished: 2026-11-15
+  - id: L736
+    title: "M1 de docs/etudes/banc3-lenteur.md : le banc transmet les pièces de la demande à l'aiguillage (cli.ts:125 pieces: []) et garde le modèle déclaré du bras (bras.ts:82 : l'aiguillage écrase la définition). Mesure : au prochain passage, le prompt du bras cadence-run porte le mode complet quand la demande a des pièces, et un bras modele: sonnet tourne en Sonnet (modèle lu dans le transcript)."
+    status: todo
+    estimate: 0.5
+    created: 2026-11-15
+  - id: L737
+    title: "M2 de docs/etudes/banc3-lenteur.md : le critère de temps tient compte du bruit propre à chaque banc (bancs marqués bruités, ou seuil par banc tiré des passages où les bras étaient identiques) et l'ordre des bras alterne d'un passage à l'autre. Mesure : 0 rouge de temps sur les 10 passages déjà joués à bras identiques ; aucun rouge dû à un banc bruité sur les 4 passages suivants."
+    status: todo
+    estimate: 0.5
+    created: 2026-11-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

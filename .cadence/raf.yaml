@@ -3555,11 +3555,12 @@ lots:
     finished: 2026-11-15
   - id: L733
     title: "Banc mécanique : un bras qui s'arrête en 1-2 min sans faire le travail attendu « gagne » le temps (banc 6 : A 90 s le 15-11 → rouge ×2,0 ; sonnet 59 s et opus 74 s le 14-11, « attendu non »). Le mécanique ne contrôle pas les sorties attendues : un bras sans l'attendu doit invalider la mesure du banc (refaire ou exclure), pas compter comme rapide. 2e occurrence."
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-15
     started: 2026-11-15
-    review: { date: 2026-11-15, verdict: "non conforme (revue 2, sur 0b2bc941) : avec un banc non livré, le temps des bancs mesurés devient indicatif (verdict.ts:69), un rouge de temps est masqué et la garde laisse publier", commit: 0b2bc941c577dd3181aa642205922a0717346683 }
+    review: { date: 2026-11-15, verdict: "conforme (revue 3, Fable) : cinq règles dans une seule fonction — banc non livré hors de tous les critères, temps des bancs mesurés bloquant, rouge → ROUGE, sinon non livré → NON MESURABLE, sinon VERT ; 12 scénarios sans rouge masqué", commit: 2a042789c6ef46c0125852dce90b1ec8816a5959 }
+    finished: 2026-11-15
   - id: L734
     title: "Banc mécanique : la suite de tests d'un bras rougit sous la charge des 3 bancs en parallèle (15-11, banc 1, bras cadence-run : 28 findBy expirés à ~1 s dans news.test.tsx et equipe-de-france.acceptation, suite 19,9 s contre 11,7 s ; rejeu calme 68/68 et suite complète verte). Un échec de suite d'un bras doit être rejoué seul, au calme, avant d'être compté (comme orchestrate.testReplay), et le rapport dire « rejoué ». Rapport : ~/bench-cadence/rapports/2026-11-15-1604-f83140f3ab70.md."
     status: done

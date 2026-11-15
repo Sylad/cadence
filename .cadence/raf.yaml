@@ -3526,11 +3526,12 @@ lots:
     finished: 2026-11-13
   - id: L730
     title: "D-22 : garde de publication proportionnée — avant une publication, le banc mécanique (sans juge, 3 bancs en parallèle, ~30 min) suffit ; le banc complet (court avec juges + séquence) passe chaque samedi sur le minuteur à la place du mécanique. Mesure : délai lot clos → publié < 1 h ; tout défaut trouvé le samedi qui aurait dû bloquer une publication fait revenir en arrière. Docs banc.md, verifier-publication, service du samedi."
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-14
     started: 2026-11-15
-    review: { date: 2026-11-15, verdict: "non conforme (revue 3, Fable, sur 9e97d07b) : la règle 2 « rejoué vert sur l'empreinte à publier » rend l'alerte permanente pour les empreintes suivantes ; banc.md:88/105 périmés ; branche verdict.ts:188-189 sans test", commit: 9e97d07bd6e1b06fad849c5dbdebcc7f1699d094 }
+    review: { date: 2026-11-15, verdict: "conforme (revue 4) : garde proportionnée en quatre règles, une alerte tombe quand ce banc rouge est rejoué vert après le rouge et reste levée ; banc mécanique avant publication, banc complet le samedi (D-22) ; mineurs notés : rejeu à 1 répétition lève une séquence rouge à 2, libellé « postérieure » de banc.md:33", commit: 609734b73f06cab2822c335c3dd92b87f83897d6 }
+    finished: 2026-11-15
   - id: L731
     title: "CI « tests » rouge sur main depuis le 13-11 19 h 47 (6 runs, dont 9a182b0c) : test/release-fumee-l696.test.ts échoue en CI seulement — « npm pack (aucun .tgz produit) (code 0) » alors que npm a bien écrit acme-fumee-1.0.0.tgz (sortie précédée de « npm warn Unknown user config always-auth ») ; porte locale verte. Trouver pourquoi le .tgz n'est pas retrouvé en CI, corriger le code de release (pas seulement le test) si la fumée réelle est concernée, et dire pourquoi la porte ne l'a pas vu."
     status: done

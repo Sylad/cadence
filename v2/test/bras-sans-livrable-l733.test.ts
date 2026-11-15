@@ -95,46 +95,91 @@ describe('passage mécanique : un bras sans livrable rend le banc non mesurable 
   });
 });
 
-describe('verdict sans juge : le banc non livré sort des critères, les autres restent mesurés (L733)', () => {
+// Banc non livré : contrat en cinq lignes (L733, décidé par le lead le 15-11 après deux revues qui trouvaient chacune un rouge masqué ; tableau « Banc
+// non livré » dans docs/v2/banc.md, une seule fonction : verdictSansJuge). Un test par ligne, puis les cas des deux revues.
+describe('banc non livré : contrat du verdict sans juge (L733)', () => {
   const m = (duree_s: number): Mesure => ({ bras: 'x', banc: '', debut: '', fin: '', duree_s, tokens: 0, cout_usd: 0, questions: 0, questions_texte: [], sessions: [], echec: null });
   const r = (banc: string, a: number, c: number, x: Partial<ResultatBanc> = {}): ResultatBanc => ({ banc, taille: 'fonction', visible: false, reponses: false, frais: false,
     mesures: { A: m(a), 'cadence-run': m(c) }, jugement: null, fuites: { A: [], 'cadence-run': [] }, sans_juge: { A: { suite_ok: true, caches_ok: null }, 'cadence-run': { suite_ok: true, caches_ok: null } }, ...x });
-  it('banc 6 à 75 s contre 719 s non livré, bancs 1 et 3 mesurés : le temps total ne compte que 1 et 3', () => {
-    const v = verdictSansJuge([r('1-a', 169, 182), r('3-b', 489, 655), r('6-c', 75, 719, { sans_juge: undefined, non_livre: { A: 'aucun fichier livré hors plan et doc' } })], 'A', 'cadence-run', BARRE_SPEC);
-    expect(v.criteres.find((c) => c.nom === 'temps total')).toMatchObject({ valeur: '837 s contre 658 s', ok: true });
-    expect(v.criteres.find((c) => c.nom === 'bancs mesurés sans juge')).toMatchObject({ valeur: '2/2', ok: true });
-    expect(v).toMatchObject({ vert: false, non_mesurable: ['6-c'] });
-  });
-  // Revue de L733 : la suite du candidat rouge au banc 1 était masquée par le banc 6 non livré, et la garde laissait publier.
+  const v = (...res: ResultatBanc[]) => verdictSansJuge(res, 'A', 'cadence-run', BARRE_SPEC);
+  const rouges = (x: ReturnType<typeof v>) => x.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom);
+  /** Banc non livré par A : A très rapide (75 s), candidat lent (719 s), suite du candidat rouge, une fuite, une question : rien de tout cela ne doit compter. */
   const nl = { sans_juge: undefined, non_livre: { A: 'aucun fichier livré hors plan et doc' } };
+  const nlCharge = { ...nl, taille: 'retouche' as const, fuites: { A: [], 'cadence-run': ['/secrets/x'] }, mesures: { A: m(75), 'cadence-run': { ...m(719), questions: 3, echec: 'délai dépassé' } } };
   const rougeSuite = { sans_juge: { A: { suite_ok: true, caches_ok: null }, 'cadence-run': { suite_ok: false, caches_ok: null } } };
-  it('un critère bloquant rouge sur un banc mesuré l\'emporte : ROUGE, pas non mesurable, les bancs non livrés restent listés', () => {
-    const v = verdictSansJuge([r('1-a', 169, 182, rougeSuite), r('3-b', 489, 655), r('6-c', 75, 719, nl)], 'A', 'cadence-run', BARRE_SPEC);
-    expect(v.non_mesurable).toBeUndefined();
-    expect(v.vert).toBe(false);
-    expect(titreVerdict(v)).toBe('ROUGE');
-    expect(v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom)).toEqual(['suite du projet verte']);
-    expect(v.criteres.find((c) => c.nom === 'bras qui ont livré le travail')).toMatchObject({ ok: false, valeur: '6-c/A : aucun fichier livré hors plan et doc' });
+
+  it('(a) un banc non livré sort de TOUS les critères : ni son temps, ni ses retouches, ni sa fuite, ni son échec, ni ses questions', () => {
+    const x = v(r('1-a', 169, 182), r('3-b', 489, 655), r('6-c', 75, 719, nlCharge));
+    expect(x.criteres.find((c) => c.nom === 'temps total')).toMatchObject({ valeur: '837 s contre 658 s', ok: true, bloquant: true }); // 1 et 3 seulement
+    expect(x.criteres.find((c) => c.nom === 'temps des retouches')).toMatchObject({ valeur: 'aucun banc de retouche', bloquant: false }); // le banc 6, retouche, ne compte pas
+    expect(x.criteres.find((c) => c.nom === 'aucune fuite')).toMatchObject({ valeur: '0', ok: true });
+    expect(x.criteres.find((c) => c.nom === 'aucun bras en échec')).toMatchObject({ valeur: '0', ok: true });
+    expect(x.criteres.find((c) => c.nom === 'questions inutiles')).toMatchObject({ valeur: '0', ok: true });
+    expect(x.criteres.find((c) => c.nom === 'bancs mesurés sans juge')).toMatchObject({ valeur: '2/2', ok: true });
+    expect(rouges(x)).toEqual([]);
+    expect(x).toMatchObject({ vert: false, non_mesurable: ['6-c'] });
   });
-  it('fuite, bras en échec et questions des bancs mesurés restent bloquants', () => {
+  it('(b) temps total et temps des retouches se calculent sur les bancs mesurés restants et restent bloquants', () => {
+    const lent = v(r('1-a', 100, 400), r('3-b', 100, 200), r('6-c', 75, 719, nl)); // 600 s contre 200 s : ×3 sur les bancs mesurés
+    expect(lent.criteres.find((c) => c.nom === 'temps total')).toMatchObject({ valeur: '600 s contre 200 s', seuil: '≤ 1.5 × A', ok: false, bloquant: true });
+    const retouche = v(r('1-a', 100, 130, { taille: 'retouche' }), r('6-c', 75, 719, nl)); // 130 s contre 100 s : ×1,3 > 1,2
+    expect(retouche.criteres.find((c) => c.nom === 'temps des retouches')).toMatchObject({ valeur: '130 s contre 100 s', seuil: '≤ 1.2 × A', ok: false, bloquant: true });
+    const juste = v(r('1-a', 100, 150), r('6-c', 75, 719, nl)); // ×1,5 : à la barre, encore ok
+    expect(juste.criteres.find((c) => c.nom === 'temps total')).toMatchObject({ ok: true, bloquant: true });
+  });
+  it('(c) tout critère bloquant rouge sur un banc mesuré → ROUGE, jamais non mesurable, les bancs non livrés restent listés', () => {
     const echec = { mesures: { A: m(169), 'cadence-run': { ...m(182), echec: 'délai dépassé' } } };
     const fuite = { fuites: { A: [], 'cadence-run': ['/secrets/x'] } };
     const questions = { mesures: { A: m(169), 'cadence-run': { ...m(182), questions: 1 } } };
-    for (const [x, nom] of [[echec, 'aucun bras en échec'], [fuite, 'aucune fuite'], [questions, 'questions inutiles']] as const) {
-      const v = verdictSansJuge([r('1-a', 169, 182, x), r('6-c', 75, 719, nl)], 'A', 'cadence-run', BARRE_SPEC);
-      expect(v.non_mesurable, nom).toBeUndefined();
-      expect(v.criteres.filter((c) => c.bloquant && !c.ok).map((c) => c.nom), nom).toEqual([nom]);
+    const caches = { sans_juge: { A: { suite_ok: true, caches_ok: true }, 'cadence-run': { suite_ok: true, caches_ok: false } } };
+    const cas: [Partial<ResultatBanc>, string][] = [[rougeSuite, 'suite du projet verte'], [caches, 'tests d\'origine verts'], [echec, 'aucun bras en échec'], [fuite, 'aucune fuite'], [questions, 'questions inutiles'], [{ sans_juge: undefined }, 'bancs mesurés sans juge'], [{ mesures: { A: m(169) } }, 'mesures complètes']];
+    for (const [x, nom] of cas) {
+      const vd = v(r('1-a', 169, 182, x), r('3-b', 489, 655), r('6-c', 75, 719, nl));
+      expect(vd.non_mesurable, nom).toBeUndefined();
+      expect(vd.vert, nom).toBe(false);
+      expect(titreVerdict(vd), nom).toBe('ROUGE');
+      expect(rouges(vd), nom).toContain(nom);
+      expect(vd.criteres.find((c) => c.nom === 'bras qui ont livré le travail'), nom).toMatchObject({ ok: false, bloquant: false, valeur: '6-c/A : aucun fichier livré hors plan et doc' });
     }
   });
-  it('le temps des seuls bancs mesurés n\'est qu\'indicatif : un temps rouge sans autre rouge reste non mesurable', () => {
-    const v = verdictSansJuge([r('1-a', 100, 400), r('6-c', 75, 719, nl)], 'A', 'cadence-run', BARRE_SPEC);
-    expect(v.criteres.find((c) => c.nom === 'temps total')).toMatchObject({ ok: false, bloquant: false });
-    expect(v).toMatchObject({ vert: false, non_mesurable: ['6-c'] });
-    expect(ligneHistorique(v, { date: 'd', empreinte: 'e', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus', bancs: [], hebdo: false, frais: 0 })).toMatch(/"rouges":\[\]/);
+  it('(d) aucun rouge et au moins un banc non livré → NON MESURABLE, même si aucun banc n\'est livré', () => {
+    const un = v(r('1-a', 169, 182), r('6-c', 75, 719, nl));
+    expect(un).toMatchObject({ vert: false, non_mesurable: ['6-c'] });
+    expect(titreVerdict(un)).toBe('NON MESURABLE (à rejouer)');
+    expect(rouges(un)).toEqual([]);
+    const aucun = v(r('6-c', 75, 719, nl), r('3-b', 489, 655, { ...nl, non_livre: { 'cadence-run': 'aucun fichier livré hors plan et doc' } }));
+    expect(aucun).toMatchObject({ vert: false, non_mesurable: ['6-c', '3-b'] });
+    expect(aucun.criteres.find((c) => c.nom === 'au moins un banc')).toMatchObject({ valeur: '0', ok: false, bloquant: false }); // le seul critère qui cesse d'être bloquant
+    expect(rouges(aucun)).toEqual([]);
   });
-  it('aucun banc livré : non mesurable, pas rouge', () => {
-    const v = verdictSansJuge([r('6-c', 75, 719, nl)], 'A', 'cadence-run', BARRE_SPEC);
-    expect(v).toMatchObject({ vert: false, non_mesurable: ['6-c'] });
+  it('(e) sinon VERT : tous les bancs livrés et sans rouge ; « au moins un banc » reste bloquant sans banc non livré', () => {
+    const vert = v(r('1-a', 169, 182), r('3-b', 489, 655));
+    expect(vert).toEqual({ vert: true, criteres: expect.any(Array) });
+    expect(titreVerdict(vert)).toBe('VERT');
+    expect(vert.criteres.map((c) => c.nom)).not.toContain('bras qui ont livré le travail');
+    expect(v().criteres.find((c) => c.nom === 'au moins un banc')).toMatchObject({ ok: false, bloquant: true });
+  });
+  it('L734 : une suite rouge sous charge rejouée verte n\'est pas un rouge ; rouge au rejeu, elle en est un', () => {
+    const rejoueVert = { sans_juge: { A: { suite_ok: true, caches_ok: null }, 'cadence-run': { suite_ok: true, caches_ok: null, rejoue: { suite_ok: false, caches_ok: null } } } };
+    expect(v(r('1-a', 169, 182, rejoueVert), r('6-c', 75, 719, nl))).toMatchObject({ vert: false, non_mesurable: ['6-c'] });
+    expect(v(r('1-a', 169, 182, rejoueVert))).toMatchObject({ vert: true });
+    const rejoueRouge = { sans_juge: { A: { suite_ok: true, caches_ok: null }, 'cadence-run': { suite_ok: false, caches_ok: null, rejoue: { suite_ok: false, caches_ok: null } } } };
+    expect(rouges(v(r('1-a', 169, 182, rejoueRouge), r('6-c', 75, 719, nl)))).toEqual(['suite du projet verte']);
+  });
+  // Les deux revues de L733 : chacune avait trouvé un rouge réel masqué par le banc non livré du même passage, et la garde laissait publier.
+  it('revue 1 : la suite du candidat rouge au banc 1 avec le banc 6 non livré → ROUGE, ligne d\'historique avec le rouge', () => {
+    const x = v(r('1-a', 169, 182, rougeSuite), r('3-b', 489, 655), r('6-c', 75, 719, nl));
+    expect(x.non_mesurable).toBeUndefined();
+    expect(rouges(x)).toEqual(['suite du projet verte']);
+    expect(ligneHistorique(x, { date: 'd', empreinte: 'e', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus', bancs: [], hebdo: false, frais: 0 })).toMatch(/"vert":false,"rouges":\["suite du projet verte"\]}$/);
+  });
+  it('revue 2 : candidat ×3 en temps sur les bancs 1 et 3 avec le banc 6 non livré → ROUGE, pas un temps indicatif', () => {
+    const x = v(r('1-a', 100, 400), r('3-b', 100, 200), r('6-c', 75, 719, nl));
+    expect(x.non_mesurable).toBeUndefined();
+    expect(x.vert).toBe(false);
+    expect(titreVerdict(x)).toBe('ROUGE');
+    expect(rouges(x)).toEqual(['temps total']);
+    expect(ligneHistorique(x, { date: 'd', empreinte: 'e', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus', bancs: [], hebdo: false, frais: 0 })).toMatch(/"rouges":\["temps total"\]/);
   });
 });
 
@@ -148,13 +193,24 @@ describe('garde : un passage non mesurable n\'est ni vert ni rouge (L733)', () =
     expect(s([l(), nm]).publication_ok).toBe(true);
     expect(s([nm]).publication_ok).toBe(false);
   });
-  it('revue de L733 : vert, puis rouge sur un banc mesuré avec un autre banc non livré → la publication tombe', () => {
+  it('revue 1 de L733 : vert, puis suite rouge sur un banc mesuré avec un autre banc non livré → la publication tombe', () => {
     const me = (bras: string, banc: string): Mesure => ({ bras, banc, debut: '', fin: '', duree_s: 100, tokens: 0, cout_usd: 0, questions: 0, questions_texte: [], sessions: [], echec: null });
     const res = (banc: string, x: Partial<ResultatBanc>): ResultatBanc => ({ banc, taille: 'fonction', visible: false, reponses: false, frais: false, jugement: null,
       fuites: { A: [], 'cadence-run': [] }, mesures: { A: me('A', banc), 'cadence-run': me('cadence-run', banc) }, ...x });
     const sj = (cand: boolean) => ({ sans_juge: { A: { suite_ok: true, caches_ok: null }, 'cadence-run': { suite_ok: cand, caches_ok: null } } });
     const v = verdictSansJuge([res('1-a', sj(false)), res('3-b', sj(true)), res('6-c', { non_livre: { A: 'aucun fichier livré hors plan et doc' } })], 'A', 'cadence-run', BARRE_SPEC);
     const ligne = ligneHistorique(v, { date: '2026-11-15T16:00:00Z', empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus', bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, niveau: 'mecanique' });
+    expect(s([l(), ligne]).publication_ok).toBe(false);
+    expect(s([l(), ligne]).dernier).toBe('2026-11-15T16:00:00Z mecanique rouge (e1)');
+  });
+  it('revue 2 de L733 : vert, puis temps ×3 sur les bancs mesurés avec un autre banc non livré → la publication tombe', () => {
+    const me = (bras: string, banc: string, duree_s: number): Mesure => ({ bras, banc, debut: '', fin: '', duree_s, tokens: 0, cout_usd: 0, questions: 0, questions_texte: [], sessions: [], echec: null });
+    const res = (banc: string, a: number, c: number, x: Partial<ResultatBanc> = {}): ResultatBanc => ({ banc, taille: 'fonction', visible: false, reponses: false, frais: false, jugement: null,
+      fuites: { A: [], 'cadence-run': [] }, mesures: { A: me('A', banc, a), 'cadence-run': me('cadence-run', banc, c) }, sans_juge: { A: { suite_ok: true, caches_ok: null }, 'cadence-run': { suite_ok: true, caches_ok: null } }, ...x });
+    const v = verdictSansJuge([res('1-a', 100, 400), res('3-b', 100, 200), res('6-c', 75, 719, { sans_juge: undefined, non_livre: { A: 'aucun fichier livré hors plan et doc' } })], 'A', 'cadence-run', BARRE_SPEC);
+    const ligne = ligneHistorique(v, { date: '2026-11-15T16:00:00Z', empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus', bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, niveau: 'mecanique' });
+    expect(JSON.parse(ligne)).toMatchObject({ vert: false, rouges: ['temps total'] });
+    expect(JSON.parse(ligne).non_mesurable).toBeUndefined();
     expect(s([l(), ligne]).publication_ok).toBe(false);
     expect(s([l(), ligne]).dernier).toBe('2026-11-15T16:00:00Z mecanique rouge (e1)');
   });

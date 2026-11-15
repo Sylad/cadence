@@ -12,7 +12,7 @@ export interface ResultatBanc { banc: string; taille: Taille; visible: boolean; 
   non_livre?: Record<string, string> }
 export interface Barre { temps_max: number; temps_max_retouche: number; reference_absolue: { caches: number; mutations: number } }
 export interface Critere { nom: string; valeur: string; seuil: string; ok: boolean; bloquant: boolean }
-/** `non_mesurable` (L733) : bancs dont un bras n'a pas livré le travail, posé seulement si aucun autre critère bloquant n'est rouge ; le passage n'est ni vert ni rouge, il est à rejouer. */
+/** `non_mesurable` (L733, ligne (d) des cinq règles de `verdictSansJuge`) : bancs dont un bras n'a pas livré le travail, posé seulement si aucun critère bloquant n'est rouge ; le passage n'est ni vert ni rouge, il est à rejouer. */
 export interface Verdict { vert: boolean; criteres: Critere[]; non_mesurable?: string[] }
 export const titreVerdict = (v: Verdict): string => (v.non_mesurable ? 'NON MESURABLE (à rejouer)' : v.vert ? 'VERT' : 'ROUGE');
 
@@ -62,11 +62,19 @@ function communs(res: ResultatBanc[], ref: string, cand: string, barre: Barre): 
   return { avant, apres };
 }
 
-/** L689 : verdict d'un banc micro ou mécanique, sans juge IA : suite du projet et tests d'origine verts sur au moins autant de bancs que la référence. */
+/**
+ * L689 : verdict d'un banc micro ou mécanique, sans juge IA : suite du projet et tests d'origine verts sur au moins autant de bancs que la référence.
+ * Banc non livré : cinq règles (L733, deux revues ; tableau « Banc non livré » dans docs/v2/banc.md). Seule fonction qui les porte :
+ * (a) un banc non livré (`non_livre`, posé par `sansLivrable`) sort de TOUS les critères, temps total et retouches compris ;
+ * (b) temps total (≤ 1,5 × ref) et temps des retouches (≤ 1,2 × ref) se calculent sur les bancs mesurés restants et RESTENT BLOQUANTS ;
+ * (c) tout critère bloquant rouge sur un banc mesuré → ROUGE ; (d) aucun rouge et au moins un banc non livré → NON MESURABLE ; (e) sinon VERT.
+ * Une suite rouge rejouée verte (L734) arrive ici déjà verte (`sans_juge.<bras>.suite_ok` est le rejeu) : ce n'est pas un rouge.
+ * Seul « au moins un banc » cesse d'être bloquant quand un banc n'est pas livré : sans lui, un passage dont aucun banc n'est livré serait rouge, pas non mesurable.
+ */
 export function verdictSansJuge(tous: ResultatBanc[], ref: string, cand: string, barre: Barre): Verdict {
-  // L733 : un banc dont un bras n'a écrit que du plan ou de la doc sort des critères ; le temps des autres n'est plus qu'indicatif, leurs autres critères bloquants restent jugés (revue : un rouge ne se masque pas)
-  const nonLivres = tous.filter((r) => r.non_livre && Object.keys(r.non_livre).length), res = tous.filter((r) => !nonLivres.includes(r)), k = communs(res, ref, cand, barre);
-  if (nonLivres.length) for (const x of [...k.avant, ...k.apres]) if (['au moins un banc', 'temps total', 'temps des retouches'].includes(x.nom)) x.bloquant = false;
+  const nonLivres = tous.filter((r) => r.non_livre && Object.keys(r.non_livre).length), res = tous.filter((r) => !nonLivres.includes(r)); // (a)
+  const k = communs(res, ref, cand, barre); // (b) : les temps sont ceux de `res`, bloquants comme sans banc non livré
+  if (nonLivres.length) for (const x of k.avant) if (x.nom === 'au moins un banc') x.bloquant = false;
   const mes = res.filter((r) => r.sans_juge?.[ref] && r.sans_juge?.[cand]);
   const avecCaches = mes.filter((r) => r.sans_juge![ref].caches_ok !== null).length;
   const n = (b: string, f: 'suite_ok' | 'caches_ok') => mes.filter((r) => r.sans_juge![b][f] === true).length;
@@ -77,8 +85,9 @@ export function verdictSansJuge(tous: ResultatBanc[], ref: string, cand: string,
     c('tests d\'origine verts', avecCaches ? `${n(cand, 'caches_ok')} contre ${n(ref, 'caches_ok')} bancs sur ${avecCaches}` : 'aucun banc avec tests d\'origine', `≥ ${ref}`, ok('caches_ok')),
     ...k.apres,
     ...(nonLivres.length ? [c('bras qui ont livré le travail', nonLivres.flatMap((r) => Object.entries(r.non_livre!).map(([b, x]) => `${r.banc}/${b} : ${x}`)).join(' ; '), 'tous', false, false)] : [])];
-  const sansRouge = criteres.every((x) => x.ok || !x.bloquant);
-  return { vert: sansRouge && !nonLivres.length, criteres, ...(sansRouge && nonLivres.length && { non_mesurable: nonLivres.map((r) => r.banc) }) };
+  const rouge = criteres.some((x) => x.bloquant && !x.ok); // (c)
+  const nonMesurable = !rouge && nonLivres.length > 0; // (d)
+  return { vert: !rouge && !nonMesurable, criteres, ...(nonMesurable && { non_mesurable: nonLivres.map((r) => r.banc) }) }; // (e)
 }
 
 export function verdict(res: ResultatBanc[], ref: string, cand: string, barre: Barre): Verdict {

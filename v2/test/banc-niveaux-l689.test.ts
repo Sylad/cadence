@@ -102,7 +102,7 @@ describe('garde de publication : cadence run contre A, sur la version à publier
     expect(service).not.toMatch(/bench hebdo|bench mecanique/);
   });
   it('statut (décision de Sylvain du 13-11) : plus de banc du weekend exigé, code 0 sans passage hebdo ; le refus de publication dit quoi lancer', async () => {
-    const r = racine([]), sortie: string[] = []; writeFileSync(join(r, 'historique.jsonl'), `${l({ date: '2026-11-04T10:00:00Z', vert: false })}\n`);
+    const r = racine([]), sortie: string[] = []; writeFileSync(join(r, 'historique.jsonl'), `${l({ date: '2026-11-15T10:00:00Z', vert: false })}\n`);
     const lundi = new Date('2026-11-16T08:00:00Z');
     const rc = await bench(['statut'], { cwd: r, env: { BENCH_ROOT: r, HOME: r }, now: () => lundi, out: (x) => sortie.push(x), err: (x) => sortie.push(x) }, '/depot/a-publier');
     expect(rc).toBe(0);

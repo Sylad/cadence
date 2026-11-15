@@ -198,8 +198,9 @@ describe('publication : la dernière mesure réelle de l\'empreinte (C-1, I-7)',
   // c'est une alerte, qui tient tant que le banc rouge n'est pas rejoué vert après lui (revue 3 : sur la version corrigée, ou une suivante).
   it('un rouge puis un vert : permise ; un rouge d\'une autre empreinte après le vert refuse, jusqu\'à ce banc rejoué vert après lui', () => {
     expect(ok([l({ vert: false }), l()])).toBe(true);
-    expect(ok([l(), l({ vert: false, empreinte: 'e2' })])).toBe(false);
-    expect(ok([l(), l({ vert: false, empreinte: 'e2' }), l()])).toBe(true);
+    const r2 = l({ vert: false, empreinte: 'e2', date: '2026-11-15T10:00:00Z' }); // après GARDE_DEPUIS : un rouge d'avant ne lève pas d'alerte
+    expect(ok([l(), r2])).toBe(false);
+    expect(ok([l(), r2, l()])).toBe(true);
   });
   it('modèle du candidat différent de bras.yaml, ou bras.yaml illisible : refusée', () => {
     expect(ok([l()], { C: 'fable' })).toBe(false);

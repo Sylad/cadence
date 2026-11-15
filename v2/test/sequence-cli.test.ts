@@ -146,10 +146,10 @@ describe('cadence2 bench sequence : passage', () => {
 
 describe('la commande de séquence proposée au refus de la garde produit une séquence que la garde accepte (L689, revue)', () => {
   const modeles = { A: 'opus', 'sequence-v2': 'sonnet', 'cadence-run': 'sonnet' };
-  const court = JSON.stringify({ date: '2026-11-09T09:00:00Z', empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'sonnet', bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, vert: true, rouges: [] });
-  const publiable = (r: string) => statut(readFileSync(join(r, 'historique.jsonl'), 'utf8').split('\n'), new Date('2026-11-09T12:00:00Z'), 'e1', modeles, PUBLIE).publication_ok;
-  /** L730 (garde en quatre règles) : la séquence s1 rouge, cadence-run contre A, est une alerte ; seule s1 rejouée verte la lève. Un banc court vert est déjà passé. */
-  const s1Rouge = JSON.stringify({ ...JSON.parse(court), date: '2026-11-08T09:00:00Z', type: 'sequence', sequence: 's1', run: 'r0', repetition: 1, repetitions: 1, bancs: ['s1'], vert: false });
+  const court = JSON.stringify({ date: '2026-11-16T09:00:00Z', empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'sonnet', bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, vert: true, rouges: [] });
+  const publiable = (r: string) => statut(readFileSync(join(r, 'historique.jsonl'), 'utf8').split('\n'), new Date('2026-11-16T12:00:00Z'), 'e1', modeles, PUBLIE).publication_ok;
+  /** L730 (garde en quatre règles) : la séquence s1 rouge (après GARDE_DEPUIS), cadence-run contre A, est une alerte ; seule s1 rejouée verte la lève. Un banc court vert est déjà passé. */
+  const s1Rouge = JSON.stringify({ ...JSON.parse(court), date: '2026-11-15T09:00:00Z', type: 'sequence', sequence: 's1', run: 'r0', repetition: 1, repetitions: 1, bancs: ['s1'], vert: false });
   function racinePublication() {
     const r = racine();
     writeFileSync(join(r, 'bras.yaml'), `${readFileSync(join(r, 'bras.yaml'), 'utf8')}cadence-run:\n  modele: sonnet\n  brief: ${join(import.meta.dirname, '..', 'briefs', 'bras-A.md')}\n`);

@@ -157,10 +157,14 @@ const couvreCourt = (x: Ligne) => ['1', '3', '6'].every((n) => (x.bancs ?? []).s
 const duComplet = (x: Ligne) => x.type === 'sequence' || (!x.niveau && x.eclair_ok === undefined && couvreCourt(x));
 /** Au-delà, le banc complet du samedi n'a pas tourné : la garde proportionnée n'a plus de filet (L730). */
 export const COMPLET_MAX_JOURS = 8;
+/** Mise en service de la garde proportionnée (L730, décision de Sylvain du 15-11) : le 15-11 à 00:00, heure de Paris. Les rouges d'avant ont déjà
+ * été arbitrés (2.0.3 à 2.0.8 publiées sur dossier) : la règle 1 ne les compte pas. Une constante, pas un réglage. */
+export const GARDE_DEPUIS = '2026-11-15T00:00:00+01:00';
 
 /**
  * Garde de publication en quatre règles (L730, D-22 ; tableau dans docs/v2/banc.md, « Garde en quatre règles », section « Garde proportionnée »). Seule fonction qui porte ces règles :
  * (1) une alerte naît de chaque passage rouge du banc complet, cadence-run contre A : le banc court, ou une séquence identifiée par son id ;
+ *     seulement à partir de GARDE_DEPUIS (les rouges d'avant sont déjà arbitrés) ;
  * (2) elle tombe lorsque CE banc (le court, ou CETTE séquence) est rejoué vert après elle (ordre de l'historique), sur la version corrigée ou une
  *     suivante ; levée, elle le reste pour toutes les empreintes suivantes (revue 3 : sinon chaque publication après un rouge redemanderait le complet) ;
  * (3) tant qu'une alerte tient, la publication est refusée, quel que soit le reste (mécanique vert, banc complet vert sans le banc rouge) ;
@@ -182,7 +186,7 @@ function gardeEnQuatreRegles(h: Ligne[], empreinte: string, reel: (m: Ligne | un
   const mecaOk = reel(miennes[j]) && !miennes.slice(j).some((x) => !x.vert || x.eclair_ok === false);
   // (1) chaque rouge du banc complet ; (2) rejoué : un court vert et réel écrit après lui, ou un run complet et vert de la MÊME séquence écrit après
   // lui, sur n'importe quelle empreinte ; un vert d'avant le rouge ne compte pas, ni un court et une séquence X verts pour une séquence Y (revues L730).
-  const rouges = h.filter((x) => duComplet(x) && !x.vert && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference)));
+  const rouges = h.filter((x) => duComplet(x) && !x.vert && Date.parse(x.date) >= Date.parse(GARDE_DEPUIS) && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference)));
   const rejoue = (rg: Ligne): boolean => {
     const apres = h.slice(h.indexOf(rg) + 1).filter(duComplet);
     return rg.type === 'sequence'

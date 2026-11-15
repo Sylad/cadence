@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { bench, commandeBanc } from '../src/bench/cli.js';
 import { complet, sequencesDe } from '../src/bench/complet.js';
-import { COMPLET_MAX_JOURS, PUBLIE, statut } from '../src/bench/verdict.js';
+import { COMPLET_MAX_JOURS, GARDE_DEPUIS, PUBLIE, statut } from '../src/bench/verdict.js';
 import { ioTest } from './cli.test.js';
 import { dossierTemp } from './temp.js';
 
@@ -44,9 +44,9 @@ describe('garde proportionnée : le banc mécanique suffit avant une publication
 
 describe('un banc complet rouge se signale et fait revenir la garde au banc complet (L730)', () => {
   it('banc court rouge du samedi : alerte, mode complet, le mécanique vert ne suffit plus', () => {
-    const s = st([l({ date: '2026-11-14T09:00:00Z', vert: false, rouges: ['temps total'] }), meca()]);
+    const s = st([l({ date: '2026-11-15T09:00:00Z', vert: false, rouges: ['temps total'] }), meca()]);
     expect(s.mode).toBe('complet');
-    expect(s.alerte).toBe('banc complet rouge le 2026-11-14 sur l\'empreinte e1 (banc court : temps total)');
+    expect(s.alerte).toBe('banc complet rouge le 2026-11-15 sur l\'empreinte e1 (banc court : temps total)');
     expect(s.publication_ok).toBe(false);
   });
   it('séquence rouge : alerte, même sur une autre empreinte que celle à publier', () => {
@@ -55,7 +55,7 @@ describe('un banc complet rouge se signale et fait revenir la garde au banc comp
     expect(s.publication_ok).toBe(false);
   });
   it('un court rouge d\'une autre empreinte tient tant que le court n\'est pas rejoué vert après lui ; rejoué vert sur la version corrigée, il tombe, pour elle et les suivantes', () => {
-    const rouge = l({ date: '2026-11-14T09:00:00Z', empreinte: 'e0', vert: false });
+    const rouge = l({ date: '2026-11-15T09:00:00Z', empreinte: 'e0', vert: false });
     expect(st([rouge, seq({ empreinte: 'e2' }), meca()])).toMatchObject({ mode: 'complet', publication_ok: false, a_rejouer: ['court'] });
     expect(st([rouge, l(), meca()])).toMatchObject({ alerte: undefined, mode: 'mecanique', publication_ok: true });
     expect(st([rouge, l({ empreinte: 'e2' }), meca()])).toMatchObject({ alerte: undefined, mode: 'mecanique', publication_ok: true });
@@ -80,9 +80,9 @@ describe('un banc complet rouge se signale et fait revenir la garde au banc comp
 
 // Garde en quatre règles (contrat décidé par le lead le 15-11, docs/v2/banc.md) : un test par ligne du tableau, puis les cas inverses vus aux revues.
 describe('garde en quatre règles (contrat, L730)', () => {
-  const y = (o: Record<string, unknown> = {}) => seq({ date: '2026-11-14T09:00:00Z', empreinte: 'e0', sequence: 'Y', vert: false, ...o });
+  const y = (o: Record<string, unknown> = {}) => seq({ date: '2026-11-15T09:00:00Z', empreinte: 'e0', sequence: 'Y', vert: false, ...o });
   it('règle 1 : une alerte naît de chaque rouge du banc complet, court ou séquence (par son id), sur toute empreinte', () => {
-    const s = st([l({ date: '2026-11-14T08:00:00Z', empreinte: 'e0', vert: false }), y(), meca()]);
+    const s = st([l({ date: '2026-11-15T08:00:00Z', empreinte: 'e0', vert: false }), y(), meca()]);
     expect(s.alerte).toMatch(/\(séquence Y\) ; aussi rouge depuis : banc court$/);
     expect(s.a_rejouer).toEqual(['court', 'sequence Y']);
   });
@@ -97,7 +97,7 @@ describe('garde en quatre règles (contrat, L730)', () => {
     const h = [y(), seq({ sequence: 'Y' }), meca({ empreinte: 'e2' })];
     expect(st(h, 'e2')).toMatchObject({ alerte: undefined, mode: 'mecanique', a_rejouer: [], publication_ok: true });
     expect(st([y(), seq({ sequence: 'Y', empreinte: 'e2' }), meca()])).toMatchObject({ alerte: undefined, publication_ok: true }); // vert sur e2, publication de e1
-    const court = l({ date: '2026-11-14T08:00:00Z', empreinte: 'e0', vert: false });
+    const court = l({ date: '2026-11-15T08:00:00Z', empreinte: 'e0', vert: false });
     expect(st([court, l(), meca({ empreinte: 'e2' })], 'e2')).toMatchObject({ alerte: undefined, publication_ok: true });
     expect(st([court, l(), meca({ empreinte: 'e2' })], 'e3').publication_ok).toBe(false); // e3 n'a pas de mécanique : règle 4, pas la règle 2
     // la même séquence rouge de nouveau sur e2 : une alerte neuve, Y est de nouveau à rejouer
@@ -107,7 +107,7 @@ describe('garde en quatre règles (contrat, L730)', () => {
     expect(st([y(), seq({ sequence: 'Y', candidat: 'sequence-v2' }), meca()])).toMatchObject({ a_rejouer: ['sequence Y'], publication_ok: false });
     expect(st([y(), seq({ sequence: 'Y', modele_candidat: 'sonnet' }), meca()])).toMatchObject({ a_rejouer: ['sequence Y'], publication_ok: false });
     expect(st([y(), seq({ sequence: 'Y', candidat: 'A' }), meca()]).a_rejouer).toEqual(['sequence Y']); // A contre A
-    const court = l({ date: '2026-11-14T08:00:00Z', empreinte: 'e0', vert: false });
+    const court = l({ date: '2026-11-15T08:00:00Z', empreinte: 'e0', vert: false });
     expect(st([court, l({ candidat: 'sequence-v2' }), meca()]).a_rejouer).toEqual(['court']);
     expect(st([court, l({ modele_candidat: 'sonnet' }), meca()]).a_rejouer).toEqual(['court']);
     expect(st([court, l({ candidat: 'A' }), meca()]).a_rejouer).toEqual(['court']);
@@ -126,15 +126,26 @@ describe('garde en quatre règles (contrat, L730)', () => {
     expect(st([y({ empreinte: 'e1' }), l(), seq({ sequence: 'X' }), meca()])).toMatchObject({ mode: 'complet', publication_ok: false, a_rejouer: ['sequence Y'] });
   });
   it('revue 1 : Y et Z rouges, Z seule rejouée ne lève pas Y ; Y rejouée ensuite, l\'alerte tombe', () => {
-    const h = [y(), y({ date: '2026-11-14T10:00:00Z', sequence: 'Z' }), seq({ sequence: 'Z' })];
+    const h = [y(), y({ date: '2026-11-15T10:00:00Z', sequence: 'Z' }), seq({ sequence: 'Z' })];
     expect(st([...h, meca()]).a_rejouer).toEqual(['sequence Y']);
     expect(st([...h, meca()]).alerte).toMatch(/séquence Y/);
     expect(st([...h, seq({ sequence: 'Y' }), meca()])).toMatchObject({ alerte: undefined, publication_ok: true });
   });
   it('revue 2 : un banc complet vert de l\'empreinte sans Y (court + séquence X) n\'autorise pas la publication pendant l\'alerte de Y', () => {
-    const s = st([l({ empreinte: 'e0', date: '2026-11-14T08:00:00Z' }), y(), l(), seq({ sequence: 'X' })]);
+    const s = st([l({ empreinte: 'e0', date: '2026-11-15T08:00:00Z' }), y(), l(), seq({ sequence: 'X' })]);
     expect(s).toMatchObject({ mode: 'complet', publication_ok: false, a_rejouer: ['sequence Y'] });
     expect(st([l(), seq(), y()]).publication_ok).toBe(false); // revue 1, constat mineur : un banc complet vert d'avant le rouge non plus
+  });  // Décision de Sylvain du 15-11 : les rouges d'avant la mise en service (15-11, 00:00 à Paris) sont déjà arbitrés (2.0.3 à 2.0.8 publiées sur dossier).
+  it('règle 1 (GARDE_DEPUIS) : un rouge du 12-11 ne bloque pas ; un rouge du 15-11 ou après bloque comme avant', () => {
+    expect(GARDE_DEPUIS).toBe('2026-11-15T00:00:00+01:00');
+    const avant = [seq({ date: '2026-11-12T20:00:00Z', empreinte: 'e0', sequence: 'aether-b68-court', vert: false }), l({ date: '2026-11-12T08:00:00Z', empreinte: 'e0', vert: false })];
+    expect(st([...avant, meca()])).toMatchObject({ alerte: undefined, mode: 'mecanique', a_rejouer: [], publication_ok: true });
+    expect(st([l({ date: '2026-11-14T22:59:59Z', vert: false }), meca()]).alerte).toBeUndefined(); // 14-11, 23:59:59 à Paris
+    for (const date of ['2026-11-14T23:00:00Z', '2026-11-15T09:00:00Z', '2026-11-21T09:00:00Z']) { // 15-11 00:00 à Paris, puis après
+      expect(st([l({ date, vert: false }), meca()])).toMatchObject({ mode: 'complet', a_rejouer: ['court'], publication_ok: false });
+      expect(st([seq({ date, empreinte: 'e0', sequence: 'Y', vert: false }), meca()]).a_rejouer).toEqual(['sequence Y']);
+    }
+    expect(st([...avant, y(), meca()]).alerte).toMatch(/^banc complet rouge le 2026-11-15 .*\(séquence Y\)$/); // le rouge d'avant n'est pas cité
   });
 });
 
@@ -146,12 +157,12 @@ describe('cadence2 bench statut et verifier-publication (L730)', () => {
     return r;
   };
   it('statut : l\'alerte en ⚠ (reprise par le hook de démarrage et le tour), et la commande du banc complet', async () => {
-    const r = racine([l({ empreinte: 'inconnue', date: '2026-11-14T09:00:00Z', vert: false })]), io = ioMaintenant({ BENCH_ROOT: r, HOME: r });
+    const r = racine([l({ empreinte: 'inconnue', date: '2026-11-15T09:00:00Z', vert: false })]), io = ioMaintenant({ BENCH_ROOT: r, HOME: r });
     expect(await bench(['statut'], io, '/depot/a-publier')).toBe(0);
     const t = io.sortie.join('\n');
     expect(t).toMatch(/garde : banc complet ; publication refusée/);
     expect(t).toContain(`rejouer vert, depuis la version à publier : « ${commandeBanc('/depot/a-publier', 'court')} » ; puis, si la garde le demande encore, « ${commandeBanc('/depot/a-publier', 'mecanique')} »`);
-    expect(io.sortie.filter((x) => x.startsWith('⚠'))).toContainEqual(expect.stringMatching(/^⚠ banc complet rouge le 2026-11-14 .* exige de nouveau le banc complet ; elle reste refusée tant que chaque banc rouge \(court\) n'est pas rejoué vert après lui, sur la version corrigée ou une suivante/));
+    expect(io.sortie.filter((x) => x.startsWith('⚠'))).toContainEqual(expect.stringMatching(/^⚠ banc complet rouge le 2026-11-15 .* exige de nouveau le banc complet ; elle reste refusée tant que chaque banc rouge \(court\) n'est pas rejoué vert après lui, sur la version corrigée ou une suivante/));
   });
   it('statut : un banc complet jamais joué, ou trop ancien, se signale', async () => {
     const jamais = ioMaintenant({ BENCH_ROOT: racine([meca()]), HOME: '/x' });

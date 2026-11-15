@@ -77,9 +77,10 @@ export const empreinteReglages = (clone: string): string => [cheminReglages(clon
 /** Arguments communs d'une session de bras ou de `cadence run` (stream-json : chaque message final de tour, issue #57) : même modèle, mêmes interdictions, mêmes réglages (hook de lecture). `supplement` : coupes du socle de cadence run (L705, ../run/socle.ts). */
 export const argsClaude = (d: DefBras, clone: string, interdits = OUTILS_INTERDITS, supplement: Record<string, unknown> = {}): string[] => ['--output-format', 'stream-json', '--verbose', '--model', d.modele, '--permission-mode', 'bypassPermissions',
   '--disallowedTools', interdits.join(','), ...(d.settings || Object.keys(supplement).length ? ['--settings', ecrireReglages(d.settings, clone, supplement)] : [])];
-/** `garde` : pièces à lire avant d'écrire et racine du banc, données au hook du bras par l'environnement (CADENCE_*), jamais par un fichier. */
+/** `garde` : pièces à lire avant d'écrire et racine du banc, données au hook du bras par l'environnement (CADENCE_*), jamais par un fichier.
+ * Un bras `aiguillage` prend le brief et les réglages choisis par l'aiguillage, mais garde son nom et le modèle déclaré dans bras.yaml (L736). */
 export function lancerBras(b: Banc, d: DefBras, clone: string, exec: Executeur, horloge = () => new Date(), garde = { pieces: [] as string[], racine: '' }, reprise?: Releve): Mesure {
-  if (d.aiguillage) { const a = aiguiller(lireDemande(b), clone, garde.pieces.map((p) => relative(clone, p))); d = { ...a.bras, nom: d.nom, ...(d.suite ? { suite: d.suite } : {}) }; garde = { ...garde, pieces: a.pieces.map((p) => join(clone, p)) }; }
+  if (d.aiguillage) { const a = aiguiller(lireDemande(b), clone, garde.pieces.map((p) => relative(clone, p))); d = { ...a.bras, nom: d.nom, modele: d.modele, ...(d.suite ? { suite: d.suite } : {}) }; garde = { ...garde, pieces: a.pieces.map((p) => join(clone, p)) }; }
   const question = `${clone}.question.md`;
   const brief = readFileSync(d.brief, 'utf8').replaceAll('{{DEMANDE}}', lireDemande(b)).replaceAll('{{CLONE}}', clone)
     .replaceAll('{{QUESTION}}', question).replaceAll('{{BASE}}', b.base).replaceAll('{{TAILLE}}', b.taille === 'retouche' ? 'retouche' : 'fonction'); // taille fixée par le gardien ; banc court sans retouche : fonction

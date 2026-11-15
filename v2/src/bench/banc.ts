@@ -31,3 +31,6 @@ export function listerBancs(racine: string, numeros?: string[]): string[] {
 }
 
 export const lireDemande = (b: Banc) => readFileSync(join(b.dir, 'demande.md'), 'utf8').trim();
+/** Pièces du banc (`bancs/<id>/pieces/`, sous-dossiers compris), chemins absolus triés ; aucune sans le dossier. L736 : données au bras comme au banc séquence, l'aiguillage de cadence run en dépend. */
+export const piecesBanc = (b: Banc): string[] => { const d = join(b.dir, 'pieces');
+  return existsSync(d) ? readdirSync(d, { recursive: true, withFileTypes: true }).filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name)).sort() : []; };

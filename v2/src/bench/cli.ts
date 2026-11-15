@@ -5,7 +5,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync
 import { join, resolve } from 'node:path';
 import type { Io } from '../cli.js';
 import { ajouterBanc } from './ajouter.js';
-import { chargerBanc, listerBancs, racineBanc, type Banc } from './banc.js';
+import { chargerBanc, listerBancs, piecesBanc, racineBanc, type Banc } from './banc.js';
 import { chargerBras, executeurClaude, lancerBras, libererReglages, type DefBras, type Executeur, type Mesure } from './bras.js';
 import { fuitesDuBras } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
@@ -122,7 +122,7 @@ export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out:
       aller('préparation'); suiteBase[n] = prep(bc, c).testsBase;
       out(`${idBanc} : bras ${n}…`);
       const avant = etatGit(c); bases[n] = avant.head;
-      aller(`bras ${n}`); const m = lancerBras(bc, bras[n], c, exec, undefined, { pieces: [], racine: t.racine });
+      aller(`bras ${n}`); const m = lancerBras(bc, bras[n], c, exec, undefined, { pieces: piecesBanc(bc), racine: t.racine });
       mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)), taille_declaree: tailleDeclaree(c, avant.head) };
       aller('fuites'); const fu = fuitesDuBras(t.home, t.racine, t.bid, c); fuites[n] = fu.certaines; aVerifier[n] = fu.a_verifier;
     });

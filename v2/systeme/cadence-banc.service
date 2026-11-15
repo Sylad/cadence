@@ -13,7 +13,7 @@ ExecStartPre=/bin/bash -c 'c=$$(readlink -f "$$(command -v cadence2)"); case "$$
 ExecStartPre=/usr/bin/mkdir -p /home/sylvain_ladoire/bench-cadence
 # L730 (D-22, Sylvain du 14-11) : garde proportionnée. Avant une publication, le banc mécanique suffit (≈ 30 min) ; le samedi joue le banc complet
 # (court avec juges, puis chaque séquence en deux répétitions). Rouge, il lève l'alerte de « bench statut » (hook de démarrage, tour du lead) et la garde
-# exige de nouveau le banc complet jusqu'à un banc complet vert.
+# refuse toute publication tant que chaque banc rouge n'est pas rejoué vert sur l'empreinte à publier (quatre règles, docs/v2/banc.md).
 ExecStart=/bin/bash -c 'cadence2 bench complet >> "$HOME/bench-cadence/complet.log" 2>&1'
 # Aucun délai global : chaque session de bras est bornée à 4 h, install et tests à 30 min (docs/v2/banc.md).
 TimeoutStartSec=infinity

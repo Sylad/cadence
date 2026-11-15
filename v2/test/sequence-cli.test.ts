@@ -148,11 +148,12 @@ describe('la commande de séquence proposée au refus de la garde produit une s�
   const modeles = { A: 'opus', 'sequence-v2': 'sonnet', 'cadence-run': 'sonnet' };
   const court = JSON.stringify({ date: '2026-11-09T09:00:00Z', empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'sonnet', bancs: ['1-a', '3-b', '6-c'], hebdo: false, frais: 0, vert: true, rouges: [] });
   const publiable = (r: string) => statut(readFileSync(join(r, 'historique.jsonl'), 'utf8').split('\n'), new Date('2026-11-09T12:00:00Z'), 'e1', modeles, PUBLIE).publication_ok;
-  /** L730 : un banc complet rouge a fait revenir la garde au banc complet ; un banc court vert cadence-run contre A déjà passé, il manque la séquence. */
+  /** L730 (garde en quatre règles) : la séquence s1 rouge, cadence-run contre A, est une alerte ; seule s1 rejouée verte la lève. Un banc court vert est déjà passé. */
+  const s1Rouge = JSON.stringify({ ...JSON.parse(court), date: '2026-11-08T09:00:00Z', type: 'sequence', sequence: 's1', run: 'r0', repetition: 1, repetitions: 1, bancs: ['s1'], vert: false });
   function racinePublication() {
     const r = racine();
     writeFileSync(join(r, 'bras.yaml'), `${readFileSync(join(r, 'bras.yaml'), 'utf8')}cadence-run:\n  modele: sonnet\n  brief: ${join(import.meta.dirname, '..', 'briefs', 'bras-A.md')}\n`);
-    writeFileSync(join(r, 'historique.jsonl'), `${court.replace('"vert":true', '"vert":false').replace('09T09', '08T09')}\n${court}\n`);
+    writeFileSync(join(r, 'historique.jsonl'), `${s1Rouge}\n${court}\n`);
     return r;
   }
   it('la commande imprimée par verifier-publication, jouée telle quelle, rend la publication permise', async () => {
@@ -161,7 +162,7 @@ describe('la commande de séquence proposée au refus de la garde produit une s�
     expect(publiable(r)).toBe(false);
     const proposee = /« node \/depot\/a-publier\/v2\/bin\/cadence2\.js bench sequence ([^»]+) »/.exec(io.sortie.join('\n'));
     expect(proposee).not.toBeNull();
-    const args = proposee![1].trim().split(/\s+/).map((a) => (a === '<id>' ? 's1' : a));
+    const args = proposee![1].trim().split(/\s+/); // le refus nomme la séquence rouge à rejouer (revue 2 de L730)
     expect(args).toEqual(['s1', '--repetitions', '2', '--candidat', 'cadence-run', '--reference', 'A']);
     const { exec } = faux(r);
     expect(await sequence(args, ioTest({ BENCH_ROOT: r, HOME: r }), dep(r, exec))).toBe(0);

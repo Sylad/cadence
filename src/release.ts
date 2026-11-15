@@ -310,8 +310,8 @@ function steps(p: Planned, files: string[], branch: string): string[] {
  * 10-11 (décision de Sylvain) : le dernier passage seul ne distingue pas deux bras identiques (banc court A contre A rouge à ×2,2) ;
  * à défaut de banc vert, un dossier de publication versionné (`docs/v2/publications/<version>.md`) qui cite l'empreinte exacte
  * et les mesures bras par bras (critères du candidat, cumul sur ≥ 3 comparaisons) vaut décision. Le cumul automatique viendra avec L689.
- * L730 (D-22) : la garde est proportionnée ; `verifier-publication` se contente du banc mécanique (≈ 30 min), et exige de nouveau le banc complet
- * après un banc complet du samedi rouge (docs/v2/banc.md).
+ * L730 (D-22) : la garde est proportionnée ; `verifier-publication` se contente du banc mécanique (≈ 30 min) ; après un banc complet rouge,
+ * il refuse tout tant que ce banc n'est pas rejoué vert sur l'empreinte (quatre règles, docs/v2/banc.md).
  */
 export function gardeBancV2(version: string, verifier: () => { code: number; sortie: string }, dossier?: (version: string) => string | undefined): void {
   if (Number(version.split('.')[0]) < 2) return;

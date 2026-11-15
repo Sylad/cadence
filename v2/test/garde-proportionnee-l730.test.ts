@@ -9,7 +9,7 @@ import { dossierTemp } from './temp.js';
 
 // L730 (D-22, Sylvain du 14-11 : « banc court, environ 3 heures avec juges, c'est complètement dingue ») : garde proportionnée.
 // Avant une publication, le banc mécanique suffit ; le banc complet (court avec juges puis séquence) passe le samedi ; rouge, il se signale
-// et fait revenir la garde au banc complet jusqu'à un banc complet vert.
+// et fait revenir la garde en arrière jusqu'à ce que ce banc soit rejoué vert sur l'empreinte à publier (garde en quatre règles, docs/v2/banc.md).
 const now = new Date('2026-11-15T12:00:00Z');
 const modeles = { 'cadence-run': 'opus', 'sequence-v2': 'opus', A: 'opus' };
 const l = (o: Record<string, unknown> = {}) => JSON.stringify({ date: '2026-11-15T10:00:00Z', empreinte: 'e1', candidat: 'cadence-run', reference: 'A', modele_candidat: 'opus',
@@ -54,30 +54,10 @@ describe('un banc complet rouge se signale et fait revenir la garde au banc comp
     expect(s.alerte).toMatch(/sur l'empreinte e0 \(séquence aether-b68\)/);
     expect(s.publication_ok).toBe(false);
   });
-  it('levée par un banc complet vert ensuite (court et séquence de la même empreinte) ; un court vert seul ne la lève pas', () => {
+  it('un court vert seul ne lève pas l\'alerte d\'un court rouge d\'une autre empreinte quand on publie ailleurs ; rejoué sur l\'empreinte à publier, il la lève', () => {
     const rouge = l({ date: '2026-11-14T09:00:00Z', empreinte: 'e0', vert: false });
-    expect(st([rouge, l(), meca()]).alerte).toBeDefined();
-    expect(st([rouge, l(), meca()]).publication_ok).toBe(false);
-    const s = st([rouge, l({ empreinte: 'e2' }), seq({ empreinte: 'e2' }), meca()]);
-    expect(s).toMatchObject({ alerte: undefined, mode: 'mecanique', publication_ok: true });
-  });
-  it('revue L730 : un banc complet vert qui ne rejoue pas la séquence rouge ne lève pas l\'alerte (court + séquence X vertes contre séquence Y rouge)', () => {
-    const y = seq({ date: '2026-11-14T09:00:00Z', empreinte: 'e0', sequence: 'Y', vert: false });
-    const autre = st([l({ empreinte: 'e0', date: '2026-11-14T08:00:00Z' }), y, l({ empreinte: 'e2' }), seq({ empreinte: 'e2', sequence: 'X' }), meca()]);
-    expect(autre).toMatchObject({ mode: 'complet', publication_ok: false });
-    expect(autre.alerte).toMatch(/séquence Y/);
-    const meme = st([l({ date: '2026-11-14T08:00:00Z' }), seq({ date: '2026-11-14T09:00:00Z', sequence: 'Y', vert: false }), l(), seq({ sequence: 'X' }), meca()]);
-    expect(meme).toMatchObject({ mode: 'complet', publication_ok: false });
-    // rejouer Y vert (court et séquence Y de la même empreinte) lève l'alerte
-    expect(st([y, l({ empreinte: 'e2' }), seq({ empreinte: 'e2', sequence: 'Y' }), meca()])).toMatchObject({ alerte: undefined, mode: 'mecanique', publication_ok: true });
-    // Y rejouée sur une autre empreinte que le court vert : pas un banc complet, l'alerte tient
-    expect(st([y, l({ empreinte: 'e2' }), seq({ empreinte: 'e3', sequence: 'Y' }), meca()]).alerte).toBeDefined();
-  });
-  it('revue L730 : deux rouges en attente (séquences Y puis Z) ; rejouer Z seule ne lève pas l\'alerte de Y', () => {
-    const h = [seq({ date: '2026-11-14T09:00:00Z', empreinte: 'e0', sequence: 'Y', vert: false }), seq({ date: '2026-11-14T10:00:00Z', empreinte: 'e0', sequence: 'Z', vert: false }),
-      l({ empreinte: 'e2' }), seq({ empreinte: 'e2', sequence: 'Z' })];
-    expect(st([...h, meca()]).alerte).toMatch(/séquence Z.*aussi rouge depuis : séquence Y/);
-    expect(st([...h, seq({ empreinte: 'e2', sequence: 'Y' }), meca()])).toMatchObject({ alerte: undefined, publication_ok: true });
+    expect(st([rouge, l({ empreinte: 'e2' }), seq({ empreinte: 'e2' }), meca()])).toMatchObject({ mode: 'complet', publication_ok: false });
+    expect(st([rouge, l(), meca()])).toMatchObject({ alerte: undefined, mode: 'mecanique', publication_ok: true });
   });
   it('une répétition rouge dans le dernier run de séquence garde l\'alerte, même suivie d\'une verte', () => {
     const h = [l(), seq({ run: 'r2', repetitions: 2, repetition: 1, vert: false }), seq({ run: 'r2', repetitions: 2, repetition: 2 }), meca()];
@@ -97,6 +77,47 @@ describe('un banc complet rouge se signale et fait revenir la garde au banc comp
   });
 });
 
+// Garde en quatre règles (contrat décidé par le lead le 15-11, docs/v2/banc.md) : un test par ligne du tableau, puis les cas inverses vus aux revues.
+describe('garde en quatre règles (contrat, L730)', () => {
+  const y = (o: Record<string, unknown> = {}) => seq({ date: '2026-11-14T09:00:00Z', empreinte: 'e0', sequence: 'Y', vert: false, ...o });
+  it('règle 1 : une alerte naît de chaque rouge du banc complet, court ou séquence (par son id), sur toute empreinte', () => {
+    const s = st([l({ date: '2026-11-14T08:00:00Z', empreinte: 'e0', vert: false }), y(), meca()]);
+    expect(s.alerte).toMatch(/\(séquence Y\) ; aussi rouge depuis : banc court$/);
+    expect(s.a_rejouer).toEqual(['court', 'sequence Y']);
+  });
+  it('règle 2 : l\'alerte tombe quand CE banc est rejoué vert après elle, sur l\'empreinte à publier, et seulement sur elle', () => {
+    expect(st([y(), seq({ sequence: 'Y' }), meca()])).toMatchObject({ alerte: undefined, a_rejouer: [], publication_ok: true });
+    expect(st([y(), seq({ sequence: 'Y', empreinte: 'e2' }), meca()])).toMatchObject({ a_rejouer: ['sequence Y'], publication_ok: false });
+    expect(st([seq({ sequence: 'Y' }), y({ empreinte: 'e1' }), meca()]).publication_ok).toBe(false); // un vert d'avant le rouge ne le rejoue pas
+    // un run de Y incomplet (une répétition sur deux) ne rejoue pas Y
+    expect(st([y(), seq({ sequence: 'Y', run: 'r2', repetitions: 2 }), meca()]).a_rejouer).toEqual(['sequence Y']);
+  });
+  it('règle 3 : tant qu\'une alerte tient, rien ne publie, ni le mécanique vert, ni un banc complet vert de l\'empreinte', () => {
+    expect(st([y(), meca()])).toMatchObject({ mode: 'complet', publication_ok: false });
+    expect(st([y(), l(), seq({ sequence: 'X' }), meca()])).toMatchObject({ mode: 'complet', publication_ok: false });
+  });
+  it('règle 4 : hors alerte, le mécanique vert suffit, et un banc complet vert aussi', () => {
+    expect(st([meca()]).publication_ok).toBe(true);
+    expect(st([l(), seq()]).publication_ok).toBe(true);
+    expect(st([y(), seq({ sequence: 'Y' }), l(), seq({ sequence: 'X' })]).publication_ok).toBe(true);
+  });
+  it('revue 1 : un court et une séquence X verts ne lèvent pas Y, ni sur une autre empreinte, ni sur celle à publier', () => {
+    expect(st([y(), l({ empreinte: 'e2' }), seq({ empreinte: 'e2', sequence: 'X' }), meca()]).alerte).toMatch(/séquence Y/);
+    expect(st([y({ empreinte: 'e1' }), l(), seq({ sequence: 'X' }), meca()])).toMatchObject({ mode: 'complet', publication_ok: false, a_rejouer: ['sequence Y'] });
+  });
+  it('revue 1 : Y et Z rouges, Z seule rejouée ne lève pas Y ; Y rejouée ensuite, l\'alerte tombe', () => {
+    const h = [y(), y({ date: '2026-11-14T10:00:00Z', sequence: 'Z' }), seq({ sequence: 'Z' })];
+    expect(st([...h, meca()]).a_rejouer).toEqual(['sequence Y']);
+    expect(st([...h, meca()]).alerte).toMatch(/séquence Y/);
+    expect(st([...h, seq({ sequence: 'Y' }), meca()])).toMatchObject({ alerte: undefined, publication_ok: true });
+  });
+  it('revue 2 : un banc complet vert de l\'empreinte sans Y (court + séquence X) n\'autorise pas la publication pendant l\'alerte de Y', () => {
+    const s = st([l({ empreinte: 'e0', date: '2026-11-14T08:00:00Z' }), y(), l(), seq({ sequence: 'X' })]);
+    expect(s).toMatchObject({ mode: 'complet', publication_ok: false, a_rejouer: ['sequence Y'] });
+    expect(st([l(), seq(), y()]).publication_ok).toBe(false); // revue 1, constat mineur : un banc complet vert d'avant le rouge non plus
+  });
+});
+
 describe('cadence2 bench statut et verifier-publication (L730)', () => {
   const racine = (h: string[]) => {
     const r = dossierTemp('garde-l730-');
@@ -109,8 +130,8 @@ describe('cadence2 bench statut et verifier-publication (L730)', () => {
     expect(await bench(['statut'], io, '/depot/a-publier')).toBe(0);
     const t = io.sortie.join('\n');
     expect(t).toMatch(/garde : banc complet ; publication refusée/);
-    expect(t).toContain(`« ${commandeBanc('/depot/a-publier', 'court')} » puis « ${commandeBanc('/depot/a-publier', 'sequence <id> --repetitions 2 --candidat cadence-run --reference A')} »`);
-    expect(io.sortie.filter((x) => x.startsWith('⚠'))).toContainEqual(expect.stringMatching(/^⚠ banc complet rouge le 2026-11-14 .* exige de nouveau le banc complet/));
+    expect(t).toContain(`rejouer vert, depuis la version à publier : « ${commandeBanc('/depot/a-publier', 'court')} » ; puis, si la garde le demande encore, « ${commandeBanc('/depot/a-publier', 'mecanique')} »`);
+    expect(io.sortie.filter((x) => x.startsWith('⚠'))).toContainEqual(expect.stringMatching(/^⚠ banc complet rouge le 2026-11-14 .* exige de nouveau le banc complet ; elle reste refusée tant que chaque banc rouge \(court\) n'est pas rejoué vert/));
   });
   it('statut : un banc complet jamais joué, ou trop ancien, se signale', async () => {
     const jamais = ioMaintenant({ BENCH_ROOT: racine([meca()]), HOME: '/x' });
@@ -127,10 +148,10 @@ describe('cadence2 bench statut et verifier-publication (L730)', () => {
     const io = ioMaintenant({ BENCH_ROOT: racine([]), HOME: '/x' });
     expect(await bench(['verifier-publication'], io, '/d')).toBe(1);
     expect(io.sortie.join('\n')).toContain(`« ${commandeBanc('/d', 'mecanique')} »`);
-    const alerte = ioMaintenant({ BENCH_ROOT: racine([l({ empreinte: 'e0', vert: false })]), HOME: '/x' });
+    const alerte = ioMaintenant({ BENCH_ROOT: racine([l({ empreinte: 'e0', vert: false }), seq({ empreinte: 'e0', sequence: 'Y', vert: false })]), HOME: '/x' });
     expect(await bench(['verifier-publication'], alerte, '/d')).toBe(1);
-    expect(alerte.sortie.join('\n')).toMatch(/banc complet rouge .* la garde exige de nouveau le dernier banc court ET la dernière séquence verts/);
-    expect(alerte.sortie.join('\n')).toContain(`« ${commandeBanc('/d', 'court')} »`);
+    expect(alerte.sortie.join('\n')).toMatch(/banc complet rouge .* rien ne publie : chaque banc rouge \(court, sequence Y\) doit être rejoué vert sur cette empreinte/);
+    expect(alerte.sortie.join('\n')).toContain(`« ${commandeBanc('/d', 'court')} », « ${commandeBanc('/d', 'sequence Y --repetitions 2 --candidat cadence-run --reference A')} »`);
   });
 });
 

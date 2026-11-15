@@ -138,9 +138,10 @@ const BUDGET_R29: Record<string, { total: number; modules: Record<string, number
   // L728 (revue) : run 569 (+7), --liste sur cinq lignes et la ligne de fin sur deux au lieu d'une chacune (lignes détassées), Etat étend EtatRapport
   // L726 : run 670 (+101), aiguillage de modèle : escalade.ts (passes de correction et revues non conformes du lot, Fable d'office) et la ligne des modèles de chaque passe, sans ligne tassée
   // L726 (revue) : run 695 (+25), correction après revue seulement sur une revue non conforme neuve (revueApresIntegre), lignes à deux instructions détassées (run.ts, escalade.ts)
-  mesure: { total: 1790, modules: { bench: 1090, sequence: 700 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
+  mesure: { total: 1800, modules: { bench: 1100, sequence: 700 } }, // L689 : bench relevé de 800 à 984 plutôt que tassé (décision de Sylvain du 13-11) ; issue #57 : 998, bras.ts détassé, erreur nommée
   // L730 (D-22) : bench 1080, garde proportionnée (banc mécanique avant publication, alerte du banc complet du samedi) et complet.ts, sans ligne tassée
   // L730 (revue) : bench 1090, l'alerte ne tombe que sur un banc complet vert qui rejoue chaque rouge en attente (même séquence)
+  // L730 (revue 2) : bench 1100, la garde en quatre règles (le banc rouge rejoué sur l'empreinte à publier, refus nommant les bancs à rejouer)
 };
 function reglesBudget(f: Fichiers): string[] {
   const b = JSON.parse(f['budget.json']) as Record<string, { total: number; modules: Record<string, number> }>;
@@ -184,10 +185,11 @@ function reglesC5(f: Fichiers): string[] {
   if (!/m\.candidat !== m\.reference/.test(t)) v.push('C5 : la publication accepte un candidat égal à la référence (A contre A)');
   if (!/\n\s*&& seqOk\(seqs, \(s\) => reel\(s\) && s\.vert && s\.candidat === m\.candidat && s\.modele_candidat === m\.modele_candidat\)[,;]/.test(t))
     v.push('C5 : la publication ne demande plus une séquence verte (R30)');
-  // L730 (D-22) : le banc mécanique ne suffit que sans alerte ; un banc complet rouge fait revenir la garde au banc complet
-  if (!/\(completOk\(h, empreinte\) \|\| \(!alerte && mecaOk\)\)/.test(t)) v.push('C5 : le banc mécanique suffit même après un banc complet rouge (L730)');
-  // L730 (revue) : l'alerte ne tombe que si le banc complet vert rejoue chaque rouge en attente (même séquence)
-  if (!/completOk\(h\.slice\(0, h\.indexOf\(x\) \+ 1\), x\.empreinte\) && enAttente\.every\(rejoue\)/.test(t)) v.push('C5 : l\'alerte tombe sans rejouer la séquence rouge (L730, revue)');
+  // L730 (D-22, garde en quatre règles, docs/v2/banc.md) : tant qu'une alerte tient, rien ne publie, ni le mécanique ni un banc complet vert
+  if (!/enAttente\.length === 0 && \(mecaOk \|\| completOk\)/.test(t)) v.push('C5 : une alerte du banc complet n\'empêche plus la publication (L730)');
+  // L730 (revues) : une alerte ne tombe que si CE banc est rejoué vert : la même séquence (même id), sur l'empreinte à publier
+  if (!/y\.type === 'sequence' && \(y\.sequence \?\? ''\) === \(rg\.sequence \?\? ''\)/.test(t)) v.push('C5 : une séquence rouge est levée par une autre séquence (L730, revue)');
+  if (!/filter\(\(y\) => y\.empreinte === empreinte && duComplet\(y\)\)/.test(t)) v.push('C5 : un banc rouge est levé hors de l\'empreinte à publier (L730, revue)');
   // banc séquence (S4, R30) : mêmes garde-fous sur sequence/verdict.ts
   const q = f['src/sequence/verdict.ts'] ?? '';
   if (!/return \{ vert: criteres\.every\(\(x\) => x\.ok \|\| !x\.bloquant\), criteres \};/.test(q)) v.push('C5 : séquence, la formule du vert a changé');
@@ -233,13 +235,13 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C2', "modele: 'sonnet'", 'src/bench/bras.ts', ajout("const d = { modele: 'sonnet' };")],
   ['C3', 'trois portes', 'src/bench/banc.ts', ajout('porte(1);\ngate(2);\nverifyAll(3);')],
   ['C3', 'budget porte 400', 'budget.json', remplace('"porte": 250', '"porte": 400')],
-  ['C4', 'total mesure relevé', 'budget.json', remplace('"total": 1790', '"total": 2000')],
+  ['C4', 'total mesure relevé', 'budget.json', remplace('"total": 1800', '"total": 2000')],
   ['C4', 'total noyau relevé', 'budget.json', remplace('"total": 3000', '"total": 3500')],
   ['C4', 'budget sequence relevé', 'budget.json', remplace('"sequence": 700', '"sequence": 900')],
   ['C4', 'budget plan relevé sous le total', 'budget.json', remplace('"plan": 350', '"plan": 1000')],
   ['C4', 'budget hooks relevé (R32)', 'budget.json', remplace('"hooks": 200', '"hooks": 300')],
   ['C4', 'hooks déplacé dans la mesure', 'budget.json', (t) => t.replace('"deliver": 450, "hooks": 200', '"deliver": 450').replace('"sequence": 700', '"sequence": 700, "hooks": 200')],
-  ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1090', '"bench": 1090, "outil": 100')],
+  ['C4', 'module sans budget R29', 'budget.json', remplace('"bench": 1100', '"bench": 1100, "outil": 100')],
   ['C4', 'groupe de budget ajouté', 'budget.json', remplace(/\n}\s*$/, ',\n  "autre": { "total": 900, "modules": {} }\n}')],
   ['C4', "option(reste,'zzz') sans entrée", 'src/bench/cli.ts', remplace("option(reste, 'taille')", "option(reste, 'zzz')")],
   ['C4', 'chemin options.json inexistant', 'options.json', remplace('"bench --juge": "docs/v2/2026-11-07-cadence-2-design.md"', '"bench --juge": "docs/v2/mesures/rien.md"')],
@@ -273,8 +275,10 @@ const mutations: [string, string, string, (t: string) => string][] = [
   ['C5', 'séquence : pièces lues neutralisé', 'src/sequence/verdict.ts', remplace('lc.entieres === lc.t)', 'lc.entieres >= 0)')],
   ['C5', 'séquence : pente non mesurée verte', 'src/sequence/verdict.ts', remplace("'non mesuré', `≤ ${ref}`, false)", "'non mesuré', `≤ ${ref}`, true)")],
   ['C5', 'publication sans séquence', 'src/bench/verdict.ts', remplace(/\n\s*&& seqOk\([^\n]*\);/, ';')],
-  ['C5', 'alerte du banc complet ignorée (L730)', 'src/bench/verdict.ts', remplace('(!alerte && mecaOk)', 'mecaOk')],
-  ['C5', 'alerte levée sans rejouer la séquence rouge (L730, revue)', 'src/bench/verdict.ts', remplace(' && enAttente.every(rejoue)', '')],
+  ['C5', 'alerte du banc complet ignorée (L730)', 'src/bench/verdict.ts', remplace('enAttente.length === 0 && (mecaOk || completOk)', '(mecaOk || completOk)')],
+  ['C5', 'banc complet vert sans le banc rouge pendant une alerte (L730, revue 2)', 'src/bench/verdict.ts', remplace('enAttente.length === 0 && (mecaOk || completOk)', '(enAttente.length === 0 && mecaOk) || completOk')],
+  ['C5', 'séquence rouge levée par une autre séquence (L730, revue)', 'src/bench/verdict.ts', remplace(" && (y.sequence ?? '') === (rg.sequence ?? '')", '')],
+  ['C5', 'banc rouge levé sur une autre empreinte (L730, revue 2)', 'src/bench/verdict.ts', remplace('y.empreinte === empreinte && duComplet(y)', 'duComplet(y)')],
   ['C5', 'séquence : || true sur le every final', 'src/sequence/verdict.ts', remplace('x.ok || !x.bloquant)', 'x.ok || !x.bloquant || true)')],
   ['C3', 'porte déguisée en controle', 'src/bench/banc.ts', ajout('controle(a);\ncheckAll(b);\nverif(c);')],
   // bras candidat de la séquence (S5)

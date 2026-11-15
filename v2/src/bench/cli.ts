@@ -275,18 +275,19 @@ export const commandeBanc = (repo: string, sous: string) => `node ${join(repo, '
 /** Les bras qu'exige la garde, écrits dans la commande : `bench sequence` a ses propres défauts (candidat sequence-v2). */
 const BRAS_PUBLIES = `--candidat ${PUBLIE.candidat} --reference ${PUBLIE.reference}`;
 
-/** Le banc complet (L730) : le banc court avec juges, puis la séquence, cadence-run contre A ; ce que le samedi lance, et ce que la garde exige après une alerte. */
-export const commandesComplet = (repo: string) => `« ${commandeBanc(repo, 'court')} » puis « ${commandeBanc(repo, `sequence <id> --repetitions 2 ${BRAS_PUBLIES}`)} »`;
-
-/** Ce qu'il faut lancer, depuis la version à publier, pour que la garde accepte : le banc mécanique, ou le banc complet après une alerte (L730). */
-export const pourPublier = (repo: string, mode: 'mecanique' | 'complet' = 'mecanique') => mode === 'mecanique'
-  ? `lancer, depuis la version à publier : « ${commandeBanc(repo, 'mecanique')} » (${PUBLIE.candidat} contre ${PUBLIE.reference}, sans juge, ≈ 30 min)`
-  : `lancer, depuis la version à publier : ${commandesComplet(repo)} (${PUBLIE.candidat} contre ${PUBLIE.reference})`;
+/** Ce qu'il faut lancer, depuis la version à publier, pour que la garde accepte : le banc mécanique ; pendant une alerte (L730, garde en quatre règles),
+ * chaque banc rouge en attente rejoué (`a_rejouer` du statut : le court, ou la séquence de cet id), puis le banc mécanique s'il manque. */
+export const pourPublier = (repo: string, aRejouer: string[] = []) => {
+  const meca = `« ${commandeBanc(repo, 'mecanique')} » (${PUBLIE.candidat} contre ${PUBLIE.reference}, sans juge, ≈ 30 min)`;
+  if (!aRejouer.length) return `lancer, depuis la version à publier : ${meca}`;
+  const cmd = (b: string) => `« ${commandeBanc(repo, b === 'court' ? 'court' : `${b} --repetitions 2 ${BRAS_PUBLIES}`)} »`;
+  return `rejouer vert, depuis la version à publier : ${aRejouer.map(cmd).join(', ')} ; puis, si la garde le demande encore, ${meca}`;
+};
 
 /** Les lignes ⚠ de la garde (L730) : banc complet rouge (la garde est revenue au banc complet), banc complet absent ou trop ancien. */
 export function alertesGarde(s: ReturnType<typeof statut>): string[] {
   return [
-    ...(s.alerte ? [`⚠ ${s.alerte} : la publication exige de nouveau le banc complet jusqu'à un banc complet vert qui rejoue ce qui était rouge ; corriger le défaut, et revenir sur une version publiée depuis qu'il est apparu`] : []),
+    ...(s.alerte ? [`⚠ ${s.alerte} : la publication exige de nouveau le banc complet ; elle reste refusée tant que chaque banc rouge (${s.a_rejouer.join(', ')}) n'est pas rejoué vert sur l'empreinte à publier ; corriger le défaut, et revenir sur une version publiée depuis qu'il est apparu`] : []),
     ...(s.jours_depuis_complet === null ? ['⚠ aucun banc complet dans l\'historique : le minuteur du samedi le lance (cadence2 bench complet, docs/v2/banc.md)']
       : s.jours_depuis_complet > COMPLET_MAX_JOURS ? [`⚠ dernier banc complet il y a ${s.jours_depuis_complet} jours : le minuteur du samedi n'a pas tourné (systemctl list-timers cadence-banc.timer)`] : []),
   ];
@@ -303,7 +304,7 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
   const modeles = (): Record<string, string> => { try { return Object.fromEntries(Object.values(chargerBras(racine)).map((d) => [d.nom, d.modele])); } catch { return {}; } };
   if (sous === 'statut') { // L730 : la garde est proportionnée ; une alerte du banc complet se lit ici (⚠, reprise par le hook de démarrage et le tour)
     const s = statut(hist, io.now(), emp, modeles(), PUBLIE);
-    io.out(`banc : dernier passage ${s.dernier ?? 'aucun'} ; garde : banc ${s.mode} ; publication ${s.publication_ok ? 'permise' : 'refusée'} sur l'empreinte ${emp}${s.publication_ok ? '' : ` : ${pourPublier(repo, s.mode)}`}`);
+    io.out(`banc : dernier passage ${s.dernier ?? 'aucun'} ; garde : banc ${s.mode} ; publication ${s.publication_ok ? 'permise' : 'refusée'} sur l'empreinte ${emp}${s.publication_ok ? '' : ` : ${pourPublier(repo, s.a_rejouer)}`}`);
     for (const l of alertesGarde(s)) io.out(l);
     if (s.frais_semaine === 0) io.out('⚠ aucun banc frais cette semaine : en ajouter avec « cadence2 bench ajouter »');
     return 0;
@@ -311,7 +312,7 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
   if (sous === 'verifier-publication') {
     const s = statut(hist, io.now(), emp, modeles(), PUBLIE);
     io.out(s.publication_ok ? `banc ${s.mode === 'complet' ? 'complet' : 'mécanique ou complet'} vert sur l'empreinte ${emp}`
-      : s.mode === 'complet' ? `publication refusée sur l'empreinte ${emp} : ${s.alerte} ; la garde exige de nouveau le dernier banc court ET la dernière séquence verts, en rejouant ce qui était rouge (même séquence), ${PUBLIE.candidat} contre ${PUBLIE.reference}, même modèle ; ${pourPublier(repo, 'complet')}`
+      : s.mode === 'complet' ? `publication refusée sur l'empreinte ${emp} : ${s.alerte} ; tant qu'une alerte tient, rien ne publie : chaque banc rouge (${s.a_rejouer.join(', ')}) doit être rejoué vert sur cette empreinte, ${PUBLIE.candidat} contre ${PUBLIE.reference}, même modèle ; ${pourPublier(repo, s.a_rejouer)}`
         : `publication refusée sur l'empreinte ${emp} : il faut le dernier banc mécanique (1, 3 et 6) vert, ${PUBLIE.candidat} contre ${PUBLIE.reference}, même modèle, sans passage rouge après lui ; ${pourPublier(repo)}`);
     return s.publication_ok ? 0 : 1;
   }

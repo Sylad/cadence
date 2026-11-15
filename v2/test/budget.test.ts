@@ -35,9 +35,10 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L726 (revue) : run 695 (+25, 691 mesurées) : la correction après revue exige une revue non conforme neuve (revueApresIntegre), lignes à deux instructions détassées.
   // L730 (D-22) : bench 1080 (+82), mesure 1780 : garde proportionnée (banc mécanique avant publication, alerte du banc complet) et bench complet.ts, sans ligne tassée.
   // L730 (revue) : bench 1090 (+10), mesure 1790 : l'alerte du banc complet ne tombe que sur un banc complet vert qui rejoue chaque rouge en attente (même séquence).
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 1790 (L689, issue #57, L730)', () => {
+  // L730 (revue 2) : bench 1100 (+10), mesure 1800 : la garde en quatre règles (une fonction, le banc rouge rejoué sur l'empreinte à publier, refus nommant les bancs à rejouer).
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 1800 (L689, issue #57, L730)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1790]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1800]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

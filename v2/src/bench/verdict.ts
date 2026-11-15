@@ -159,12 +159,49 @@ const duComplet = (x: Ligne) => x.type === 'sequence' || (!x.niveau && x.eclair_
 export const COMPLET_MAX_JOURS = 8;
 
 /**
+ * Garde de publication en quatre règles (L730, D-22 ; tableau dans docs/v2/banc.md, « Garde en quatre règles », section « Garde proportionnée »). Seule fonction qui porte ces règles :
+ * (1) une alerte naît de chaque passage rouge du banc complet, cadence-run contre A : le banc court, ou une séquence identifiée par son id ;
+ * (2) elle ne tombe que lorsque CE banc (le court, ou CETTE séquence) est rejoué vert après elle, sur l'empreinte à publier ;
+ * (3) tant qu'une alerte tient, la publication est refusée, quel que soit le reste (mécanique vert, banc complet vert sans le banc rouge) ;
+ * (4) hors alerte, le banc mécanique vert de l'empreinte suffit, et un banc complet vert aussi.
+ */
+function gardeEnQuatreRegles(h: Ligne[], empreinte: string, reel: (m: Ligne | undefined) => m is Ligne, publie?: { candidat: string; reference: string }) {
+  const miennes = h.filter((x) => x.empreinte === empreinte);
+  // Banc complet (C-1 pour chacun) : le DERNIER passage court de l'empreinte couvrant 1, 3 et 6 est vert, mesure un vrai candidat avec le modèle
+  // du bras.yaml courant, et aucun passage court rouge de cette empreinte (éclair compris) ne le suit ; pour CHAQUE id de séquence de l'empreinte
+  // (R30), toutes les lignes de son dernier run (répétitions) et toutes celles qui suivent sont vertes et réelles, même candidat et modèle.
+  const courts = miennes.filter((x) => x.type !== 'sequence' && !x.niveau); // un banc micro ou mécanique ne compte pas ici
+  const i = courts.map(couvreCourt).lastIndexOf(true);
+  const m = courts[i], seqs = miennes.filter((x) => x.type === 'sequence');
+  const completOk = reel(m) && !courts.slice(i).some((x) => !x.vert || x.eclair_ok === false)
+    && seqOk(seqs, (s) => reel(s) && s.vert && s.candidat === m.candidat && s.modele_candidat === m.modele_candidat);
+  // Banc mécanique : le DERNIER passage mécanique de l'empreinte couvrant 1, 3 et 6 est vert et réel, et aucun passage rouge de cette
+  // empreinte, quel qu'il soit (micro, mécanique, court, éclair, séquence), ne le suit.
+  const j = miennes.map((x) => x.niveau === 'mecanique' && couvreCourt(x)).lastIndexOf(true);
+  const mecaOk = reel(miennes[j]) && !miennes.slice(j).some((x) => !x.vert || x.eclair_ok === false);
+  // (1) chaque rouge du banc complet ; (2) rejoué : un court vert et réel après lui, ou un run complet et vert de la MÊME séquence après lui,
+  // les deux sur l'empreinte à publier. Un court et une séquence X verts ne rejouent pas une séquence Y (revues L730).
+  const rouges = h.filter((x) => duComplet(x) && !x.vert && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference)));
+  const rejoue = (rg: Ligne): boolean => {
+    const apres = h.slice(h.indexOf(rg) + 1).filter((y) => y.empreinte === empreinte && duComplet(y));
+    return rg.type === 'sequence'
+      ? seqOk(apres.filter((y) => y.type === 'sequence' && (y.sequence ?? '') === (rg.sequence ?? '')), (s) => reel(s) && s.vert)
+      : apres.some((y) => y.type !== 'sequence' && reel(y) && y.vert);
+  };
+  const enAttente = rouges.filter((rg) => !rejoue(rg));
+  // (3) et (4)
+  return { enAttente, publication_ok: empreinte !== 'inconnue' && enAttente.length === 0 && (mecaOk || completOk) };
+}
+
+/** Ce qu'une alerte demande de rejouer : « court », ou « sequence <id> ». */
+const quoi = (x: Ligne) => (x.type === 'sequence' ? `séquence ${x.sequence ?? '?'}` : 'banc court');
+
+/**
  * Garde de publication. `modeles` : nom du bras -> modèle, lus dans le bras.yaml courant (le modèle n'est pas dans l'empreinte). `publie` (L689) :
  * candidat et référence exigés (la CLI passe PUBLIE) ; sans lui, tout candidat distinct de sa référence.
- * L730 (D-22, Sylvain du 14-11 : 3 h de banc avant chaque publication, « complètement dingue ») : la garde est proportionnée. Avant une publication,
- * le banc mécanique (1, 3 et 6, sans juge, ≈ 30 min) suffit ; le banc complet (court avec juges puis séquence) passe chaque samedi. Un banc complet
- * rouge lève `alerte` (signalée par `statut` et le tour) et fait revenir la garde en arrière : la publication exige de nouveau le banc complet,
- * jusqu'à un banc complet vert qui rejoue ce qui était rouge (même séquence). `mode` dit lequel des deux la garde exige.
+ * L730 (D-22, Sylvain du 14-11 : 3 h de banc avant chaque publication, « complètement dingue ») : la garde est proportionnée, selon `gardeEnQuatreRegles`.
+ * `alerte` (signalée par `statut` et le tour) nomme le dernier rouge en attente et les autres ; `a_rejouer` dit quoi rejouer sur l'empreinte ;
+ * `mode` vaut `complet` tant qu'une alerte tient.
  */
 export function statut(historique: string[], maintenant: Date, empreinte: string, modeles: Record<string, string> = {}, publie?: { candidat: string; reference: string }) {
   const h = historique.flatMap((l) => { // une ligne illisible ou sans date valide est sautée, jamais levée
@@ -176,49 +213,20 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
   const reel = (m: Ligne | undefined): m is Ligne => m !== undefined && typeof m.reference === 'string' && m.candidat !== m.reference
     && typeof m.modele_candidat === 'string' && modeles[m.candidat ?? ''] === m.modele_candidat
     && (!publie || (m.candidat === publie.candidat && m.reference === publie.reference));
-  // Banc complet (C-1 pour chacun) : le DERNIER passage court de l'empreinte couvrant 1, 3 et 6 est vert, mesure un vrai candidat avec le modèle
-  // du bras.yaml courant, et aucun passage court rouge de cette empreinte (éclair compris) ne le suit ; la DERNIÈRE séquence de l'empreinte
-  // est verte, mesure un vrai candidat, avec le même candidat et le même modèle que ce passage court. Séquences (R30) : pour CHAQUE id de séquence
-  // de l'empreinte, toutes les lignes de son dernier run (répétitions) et toutes celles qui suivent sont vertes et réelles, même candidat et modèle.
-  const completOk = (lignes: Ligne[], emp: string): boolean => {
-    const miennes = lignes.filter((x) => x.empreinte === emp);
-    const courts = miennes.filter((x) => x.type !== 'sequence' && !x.niveau); // un banc micro ou mécanique ne compte pas ici
-    const i = courts.map(couvreCourt).lastIndexOf(true);
-    const m = courts[i], seqs = miennes.filter((x) => x.type === 'sequence');
-    return reel(m) && !courts.slice(i).some((x) => !x.vert || x.eclair_ok === false)
-      && seqOk(seqs, (s) => reel(s) && s.vert && s.candidat === m.candidat && s.modele_candidat === m.modele_candidat);
-  };
-  // Banc mécanique (L730) : le DERNIER passage mécanique de l'empreinte couvrant 1, 3 et 6 est vert et réel, et aucun passage rouge de cette
-  // empreinte, quel qu'il soit (micro, mécanique, court, éclair, séquence), ne le suit.
-  const miennes = h.filter((x) => x.empreinte === empreinte);
-  const j = miennes.map((x) => x.niveau === 'mecanique' && couvreCourt(x)).lastIndexOf(true);
-  const mecaOk = reel(miennes[j]) && !miennes.slice(j).some((x) => !x.vert || x.eclair_ok === false);
-  // Alerte (L730) : le dernier passage rouge du banc complet, cadence-run contre A. Elle ne tombe que sur un passage vert après lequel le banc
-  // complet de son empreinte est vert (`completOk` sur l'historique jusqu'à lui) et qui rejoue, sur cette empreinte, tout ce qui était rouge depuis
-  // la dernière levée : un banc court rouge exige un court vert après lui, une séquence rouge un run vert de la MÊME séquence après elle.
-  // Un court vert et une séquence X verte ne lèvent pas l'alerte d'une séquence Y rouge (revue L730).
-  const complets = h.filter((x) => duComplet(x) && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference)));
-  let enAttente: Ligne[] = [];
-  for (const x of complets) {
-    if (!x.vert) { enAttente.push(x); continue; }
-    if (!enAttente.length) continue;
-    const jusque = complets.slice(0, complets.indexOf(x) + 1);
-    const rejoue = (rg: Ligne) => jusque.slice(jusque.indexOf(rg) + 1).some((y) => y.vert && y.empreinte === x.empreinte
-      && (rg.type === 'sequence' ? y.type === 'sequence' && (y.sequence ?? '') === (rg.sequence ?? '') : y.type !== 'sequence'));
-    if (completOk(h.slice(0, h.indexOf(x) + 1), x.empreinte) && enAttente.every(rejoue)) enAttente = [];
-  }
+  const { enAttente, publication_ok } = gardeEnQuatreRegles(h, empreinte, reel, publie);
   const rouge = enAttente.at(-1);
-  const quoi = (x: Ligne) => (x.type === 'sequence' ? `séquence ${x.sequence ?? '?'}` : 'banc court');
   const autres = [...new Set(enAttente.slice(0, -1).map(quoi))].filter((q) => !rouge || q !== quoi(rouge));
   const alerte = rouge ? `banc complet rouge le ${parisJour(new Date(rouge.date)).jour} sur l'empreinte ${rouge.empreinte} (${quoi(rouge)}${rouge.rouges?.length ? ` : ${rouge.rouges.join(', ')}` : ''})${autres.length ? ` ; aussi rouge depuis : ${autres.join(', ')}` : ''}` : undefined;
-  const dernierComplet = complets.at(-1);
+  const dernierComplet = h.filter((x) => duComplet(x) && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference))).at(-1);
   return {
     dernier: dernier ? `${dernier.date} ${dernier.type === 'sequence' ? 'séquence ' : ''}${dernier.niveau ? `${dernier.niveau} ` : ''}${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
     mode: (alerte ? 'complet' : 'mecanique') as 'complet' | 'mecanique',
     alerte,
+    /** Bancs à rejouer verts sur l'empreinte à publier pour lever l'alerte : `court`, ou `sequence <id>`, dans l'ordre des rouges. */
+    a_rejouer: [...new Set(enAttente.map((x) => (x.type === 'sequence' ? `sequence ${x.sequence ?? ''}` : 'court')))],
     /** Jours depuis le dernier passage du banc complet, null s'il n'a jamais tourné (le minuteur du samedi a pu être manqué). */
     jours_depuis_complet: dernierComplet ? Math.floor((maintenant.getTime() - Date.parse(dernierComplet.date)) / 86_400_000) : null,
-    publication_ok: empreinte !== 'inconnue' && (completOk(h, empreinte) || (!alerte && mecaOk)),
+    publication_ok,
     frais_semaine: somme(depuisSamedi.map((x) => x.frais ?? 0)),
   };
 }

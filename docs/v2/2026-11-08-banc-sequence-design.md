@@ -70,7 +70,7 @@ Pour savoir lequel de ces mécanismes porte le gain, on fera ensuite une ablatio
 
 ## 6. Coût
 
-Environ 6 étapes × 2 bras × 5 à 15 min, plus les tests à chaque étape et les juges en fin de séquence. Compter 2 à 3 h par passage, puis deux passages par bras pour le bruit, soit environ 5 h. Ce banc tourne le weekend avec le banc court.
+Environ 6 étapes × 2 bras × 5 à 15 min, plus les tests à chaque étape et les juges en fin de séquence. Compter 2 à 3 h par passage, puis deux passages par bras pour le bruit, soit environ 5 h. Ce banc tourne le weekend avec le banc court. (L730 : `cadence2 bench complet`, chaque samedi, [banc.md](banc.md#garde-proportionnée-l730).)
 
 ## 7. Ce que l'outil doit savoir faire (pour le plan)
 

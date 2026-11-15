@@ -1,0 +1,36 @@
+// L730 (D-22) : le banc complet du samedi, court avec juges puis chaque séquence, cadence-run contre A ; ses alertes lèvent la garde proportionnée.
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import type { Io } from '../cli.js';
+import { sequence } from '../sequence/cli.js';
+import { racineBanc } from './banc.js';
+import { bench } from './cli.js';
+import { PUBLIE } from './verdict.js';
+
+export const USAGE_COMPLET = 'usage : cadence2 bench complet [--sequences id1,id2] [--juge modèle]';
+
+/** Les séquences de la racine (`<racine>/sequences/<id>/`), dans l'ordre des noms. */
+export const sequencesDe = (racine: string): string[] => {
+  const d = join(racine, 'sequences');
+  return existsSync(d) ? readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort() : [];
+};
+
+/**
+ * `cadence2 bench complet` : le banc court (1, 3 et 6, avec juges, en série), puis chaque séquence (`--sequences`, défaut toutes celles de la racine),
+ * deux répétitions, cadence-run contre A ; puis `statut`, dont les lignes ⚠ portent une alerte au journal. 0 si tout est vert, 2 si le court est refusé
+ * (les séquences le seraient aussi), 1 sinon. Un court rouge n'arrête pas les séquences : le samedi mesure tout.
+ */
+export async function complet(args: string[], io: Io, d = { bench, sequence }): Promise<number> {
+  const choix = args.indexOf('--sequences') >= 0 ? args[args.indexOf('--sequences') + 1] : undefined;
+  const juge = args.indexOf('--juge') >= 0 ? args[args.indexOf('--juge') + 1] : undefined;
+  if ((args.includes('--sequences') && !choix) || (args.includes('--juge') && !juge)) { io.err(USAGE_COMPLET); return 2; }
+  const ids = choix ? choix.split(',').filter(Boolean) : sequencesDe(racineBanc(io.env));
+  if (ids.length === 0) { io.err(`bench complet refusé : aucune séquence sous ${join(racineBanc(io.env), 'sequences')}`); return 2; }
+  const bras = ['--candidat', PUBLIE.candidat, '--reference', PUBLIE.reference, ...(juge ? ['--juge', juge] : [])];
+  io.out(`banc complet : court, puis séquence(s) ${ids.join(', ')} (${PUBLIE.candidat} contre ${PUBLIE.reference})`);
+  const codes = [await d.bench(['court', ...bras], io)];
+  if (codes[0] === 2) return 2;
+  for (const id of ids) codes.push(await d.sequence([id, '--repetitions', '2', ...bras], io));
+  await d.bench(['statut'], io);
+  return codes.every((c) => c === 0) ? 0 : 1;
+}

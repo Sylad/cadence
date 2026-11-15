@@ -1,4 +1,5 @@
 import { bench } from './bench/cli.js';
+import { complet } from './bench/complet.js';
 import { sequence } from './sequence/cli.js';
 import { AIDE_RUN, cmdRun } from './run/cli.js';
 export type Io = { cwd: string; env: NodeJS.ProcessEnv; out: (l: string) => void; err: (l: string) => void; now: () => Date };
@@ -6,10 +7,11 @@ type Commande = (args: string[], io: Io) => Promise<number>;
 
 export const COMMANDES: Record<string, Commande> = {};
 COMMANDES.run = cmdRun;
-COMMANDES.bench = (a, io) => (a[0] === 'sequence' ? sequence(a.slice(1), io) : bench(a, io)); // le banc séquence vit dans son module
+COMMANDES.bench = (a, io) => (a[0] === 'sequence' ? sequence(a.slice(1), io) : a[0] === 'complet' ? complet(a.slice(1), io) : bench(a, io)); // séquence et complet (L730) vivent dans leur module
 
 const AIDE = `cadence2 — noyau de cadence 2 (en construction)
   cadence2 bench court|hebdo|eclair|micro|mecanique|lancer|statut|verifier-publication|ajouter [--paralleles N]   banc de mesure (docs/v2/banc.md)
+  cadence2 bench complet [--sequences id1,id2]   banc complet du samedi : court avec juges puis séquences, cadence-run contre A (docs/v2/banc.md)
   cadence2 bench sequence <id> [--candidat c] [--reference r] [--repetitions N] [--juge modèle]   banc séquence (docs/v2/banc.md)
 ${AIDE_RUN}`;
 

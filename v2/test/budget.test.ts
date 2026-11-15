@@ -33,9 +33,10 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L728 (revue) : run 569 (+7), la ligne --liste et la ligne de fin détassées (cinq et deux lignes), le type Etat étend EtatRapport (rapport.ts).
   // L726 : run 670 (+101), aiguillage de modèle (escalade.ts : Fable d'office à la 3e passe de correction du lot ou après deux revues non conformes ; chaque passe, son modèle et pourquoi).
   // L726 (revue) : run 695 (+25, 691 mesurées) : la correction après revue exige une revue non conforme neuve (revueApresIntegre), lignes à deux instructions détassées.
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 1698 (L689, issue #57)', () => {
+  // L730 (D-22) : bench 1080 (+82), mesure 1780 : garde proportionnée (banc mécanique avant publication, alerte du banc complet) et bench complet.ts, sans ligne tassée.
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 1780 (L689, issue #57, L730)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1698]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1780]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

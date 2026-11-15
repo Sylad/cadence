@@ -124,7 +124,7 @@ Garde-fou C1 : la carte décrit, elle ne verrouille rien. Aucun test, aucune por
 ### 4.1 Banc court — avant TOUTE publication
 
 - Bancs 1, 3, 6 de l'essai (retouche, fonction, page entière), ~1 h.
-- `cadence release` **refuse** de publier sans rapport de banc court vert sur le sha publié.
+- `cadence release` **refuse** de publier sans rapport de banc court vert sur le sha publié. (L730 : remplacé par la garde proportionnée, banc mécanique avant publication et banc complet le samedi, [banc.md](banc.md#garde-proportionnée-l730).)
 - Le rapport est versionné : `bench/rapports/<date>-<sha>.md`.
 
 ### 4.2 Banc complet — chaque weekend

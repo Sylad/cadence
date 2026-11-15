@@ -15,6 +15,7 @@ import { addHold, cadenceHome, liveRuns, releaseHold, runNamedBy } from '../orch
 import { perfHeader } from '../perf.js';
 import { tourInspectLines } from '../inspect-read.js';
 import { tourQuotaLines } from '../quota-tour.js';
+import { tourBancLines } from '../bench-tour.js';
 import { readPerf } from '../perf-read.js';
 import { type EarlyCtx, type Io } from './context.js';
 
@@ -149,7 +150,8 @@ export function cmdLead(c: EarlyCtx): number {
     // … et une tâche locale (L519) au-delà de son délai : le dépôt reste verrouillé, le tour le dit au lieu de le libérer en silence
     // … puis la jauge hebdo publiée par la bande cadence-hud (⚠ au-delà de 80 %) et les runs de cadence run en quota avec leur reprise (L700, D-15)
     const roots = tourRoots(parent, depth);
-    for (const l of [...expiredHoldLines(io.now()), ...localOverdueLines(roots, io.now()), ...tourQuotaLines(io.env, roots, io.now().getTime())]) io.out(l);
+    // … puis l'alerte de la garde de publication (L730, D-22) : un banc complet du samedi rouge, ou manqué, fait revenir la garde au banc complet
+    for (const l of [...expiredHoldLines(io.now()), ...localOverdueLines(roots, io.now()), ...tourQuotaLines(io.env, roots, io.now().getTime()), ...tourBancLines(roots, io.env)]) io.out(l);
     // le réglage lead.ux du cadence.yaml du dossier (L197) : le lead lit ici qui pose le verdict UX, au lieu d'ouvrir le fichier
     try {
       if (readLeadUx(parent) === 'lead') io.out('verdict UX : lead (le lead pose raf ux d\'après le rapport du ux-reviewer et les captures ; l\'humain n\'est consulté qu\'en cas de doute)');

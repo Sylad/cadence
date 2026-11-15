@@ -140,7 +140,7 @@ function samediCourant(d: Date): string {
 }
 
 type Ligne = { type?: string; sequence?: string; run?: string; repetition?: number; repetitions?: number; date: string; empreinte: string; vert: boolean; hebdo: boolean; frais: number; bancs?: string[]; candidat?: string; reference?: string; modele_candidat?: string; eclair_ok?: boolean;
-  niveau?: string };
+  niveau?: string; rouges?: string[] };
 
 /** Au moins une séquence ; pour chaque id, de la première ligne de son dernier run à la fin, toutes les lignes passent `ok` et le run compte exactement `repetitions` lignes (répétition 1..N). */
 function seqOk(seqs: Ligne[], ok: (s: Ligne) => boolean): boolean {
@@ -152,10 +152,19 @@ function seqOk(seqs: Ligne[], ok: (s: Ligne) => boolean): boolean {
   });
 }
 
+const couvreCourt = (x: Ligne) => ['1', '3', '6'].every((n) => (x.bancs ?? []).some((id) => banBase(id).split('-')[0] === n));
+/** Un passage du banc complet (L730) : banc avec juges couvrant 1, 3 et 6, ou ligne de séquence ; ni micro, ni mécanique, ni éclair. */
+const duComplet = (x: Ligne) => x.type === 'sequence' || (!x.niveau && x.eclair_ok === undefined && couvreCourt(x));
+/** Au-delà, le banc complet du samedi n'a pas tourné : la garde proportionnée n'a plus de filet (L730). */
+export const COMPLET_MAX_JOURS = 8;
+
 /**
- * `modeles` : nom du bras -> modèle, lus dans le bras.yaml courant (le modèle n'est pas dans l'empreinte). `publie` (L689) : candidat et
- * référence exigés (la CLI passe PUBLIE) ; sans lui, tout candidat distinct de sa référence. Plus de banc du weekend exigé (décision de
- * Sylvain du 13-11) : seule la garde court + séquence compte, avant une release.
+ * Garde de publication. `modeles` : nom du bras -> modèle, lus dans le bras.yaml courant (le modèle n'est pas dans l'empreinte). `publie` (L689) :
+ * candidat et référence exigés (la CLI passe PUBLIE) ; sans lui, tout candidat distinct de sa référence.
+ * L730 (D-22, Sylvain du 14-11 : 3 h de banc avant chaque publication, « complètement dingue ») : la garde est proportionnée. Avant une publication,
+ * le banc mécanique (1, 3 et 6, sans juge, ≈ 30 min) suffit ; le banc complet (court avec juges puis séquence) passe chaque samedi. Un banc complet
+ * rouge lève `alerte` (signalée par `statut` et le tour) et fait revenir la garde en arrière : la publication exige de nouveau le banc complet,
+ * jusqu'à un banc complet vert. `mode` dit lequel des deux la garde exige.
  */
 export function statut(historique: string[], maintenant: Date, empreinte: string, modeles: Record<string, string> = {}, publie?: { candidat: string; reference: string }) {
   const h = historique.flatMap((l) => { // une ligne illisible ou sans date valide est sautée, jamais levée
@@ -164,21 +173,41 @@ export function statut(historique: string[], maintenant: Date, empreinte: string
   const sam = samediCourant(maintenant);
   const depuisSamedi = h.filter((x) => parisJour(new Date(x.date)).jour >= sam);
   const dernier = h.at(-1);
-  // Publication (C-1 pour chacun) : le DERNIER passage court de l'empreinte couvrant 1, 3 et 6 est vert, mesure un vrai candidat avec le modèle
-  // du bras.yaml courant, et aucun passage court rouge de cette empreinte (éclair compris) ne le suit ; la DERNIÈRE séquence de l'empreinte
-  // est verte, mesure un vrai candidat, avec le même candidat et le même modèle que ce passage court. Séquences (R30) : pour CHAQUE id de séquence
-  // de l'empreinte, toutes les lignes de son dernier run (répétitions) et toutes celles qui suivent sont vertes et réelles, même candidat et modèle.
-  const miennes = h.filter((x) => x.empreinte === empreinte);
-  const courts = miennes.filter((x) => x.type !== 'sequence' && !x.niveau); // L689 : un banc micro ou mécanique (sans juge) ne compte ni pour ni contre la publication
-  const i = courts.map((x) => ['1', '3', '6'].every((n) => (x.bancs ?? []).some((id) => banBase(id).split('-')[0] === n))).lastIndexOf(true);
-  const m = courts[i], seqs = miennes.filter((x) => x.type === 'sequence');
   const reel = (m: Ligne | undefined): m is Ligne => m !== undefined && typeof m.reference === 'string' && m.candidat !== m.reference
     && typeof m.modele_candidat === 'string' && modeles[m.candidat ?? ''] === m.modele_candidat
     && (!publie || (m.candidat === publie.candidat && m.reference === publie.reference));
+  // Banc complet (C-1 pour chacun) : le DERNIER passage court de l'empreinte couvrant 1, 3 et 6 est vert, mesure un vrai candidat avec le modèle
+  // du bras.yaml courant, et aucun passage court rouge de cette empreinte (éclair compris) ne le suit ; la DERNIÈRE séquence de l'empreinte
+  // est verte, mesure un vrai candidat, avec le même candidat et le même modèle que ce passage court. Séquences (R30) : pour CHAQUE id de séquence
+  // de l'empreinte, toutes les lignes de son dernier run (répétitions) et toutes celles qui suivent sont vertes et réelles, même candidat et modèle.
+  const completOk = (lignes: Ligne[], emp: string): boolean => {
+    const miennes = lignes.filter((x) => x.empreinte === emp);
+    const courts = miennes.filter((x) => x.type !== 'sequence' && !x.niveau); // un banc micro ou mécanique ne compte pas ici
+    const i = courts.map(couvreCourt).lastIndexOf(true);
+    const m = courts[i], seqs = miennes.filter((x) => x.type === 'sequence');
+    return reel(m) && !courts.slice(i).some((x) => !x.vert || x.eclair_ok === false)
+      && seqOk(seqs, (s) => reel(s) && s.vert && s.candidat === m.candidat && s.modele_candidat === m.modele_candidat);
+  };
+  // Banc mécanique (L730) : le DERNIER passage mécanique de l'empreinte couvrant 1, 3 et 6 est vert et réel, et aucun passage rouge de cette
+  // empreinte, quel qu'il soit (micro, mécanique, court, éclair, séquence), ne le suit.
+  const miennes = h.filter((x) => x.empreinte === empreinte);
+  const j = miennes.map((x) => x.niveau === 'mecanique' && couvreCourt(x)).lastIndexOf(true);
+  const mecaOk = reel(miennes[j]) && !miennes.slice(j).some((x) => !x.vert || x.eclair_ok === false);
+  // Alerte (L730) : le dernier passage rouge du banc complet, cadence-run contre A, tant qu'aucun banc complet vert (court et séquences) ne le suit.
+  const complets = h.filter((x) => duComplet(x) && (!publie || (x.candidat === publie.candidat && x.reference === publie.reference)));
+  const r = complets.map((x) => !x.vert).lastIndexOf(true);
+  const apres = complets.slice(r + 1);
+  const leve = r >= 0 && !(apres.length > 0 && completOk(apres, apres.at(-1)!.empreinte));
+  const rouge = complets[r];
+  const alerte = leve ? `banc complet rouge le ${parisJour(new Date(rouge.date)).jour} sur l'empreinte ${rouge.empreinte} (${rouge.type === 'sequence' ? `séquence ${rouge.sequence ?? '?'}` : 'banc court'}${rouge.rouges?.length ? ` : ${rouge.rouges.join(', ')}` : ''})` : undefined;
+  const dernierComplet = complets.at(-1);
   return {
-    dernier: dernier ? `${dernier.date} ${dernier.type === 'sequence' ? 'séquence ' : ''}${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
-    publication_ok: empreinte !== 'inconnue' && reel(m) && !courts.slice(i).some((x) => !x.vert || x.eclair_ok === false)
-      && seqOk(seqs, (s) => reel(s) && s.vert && s.candidat === m.candidat && s.modele_candidat === m.modele_candidat),
+    dernier: dernier ? `${dernier.date} ${dernier.type === 'sequence' ? 'séquence ' : ''}${dernier.niveau ? `${dernier.niveau} ` : ''}${dernier.vert ? 'vert' : 'rouge'} (${dernier.empreinte})` : undefined,
+    mode: (alerte ? 'complet' : 'mecanique') as 'complet' | 'mecanique',
+    alerte,
+    /** Jours depuis le dernier passage du banc complet, null s'il n'a jamais tourné (le minuteur du samedi a pu être manqué). */
+    jours_depuis_complet: dernierComplet ? Math.floor((maintenant.getTime() - Date.parse(dernierComplet.date)) / 86_400_000) : null,
+    publication_ok: empreinte !== 'inconnue' && (completOk(h, empreinte) || (!alerte && mecaOk)),
     frais_semaine: somme(depuisSamedi.map((x) => x.frais ?? 0)),
   };
 }

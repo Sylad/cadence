@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installe le banc mécanique du samedi (sudo). À lancer une fois par Sylvain.
+# Installe le banc complet du samedi (sudo). À lancer une fois par Sylvain.
 set -euo pipefail
 D=$(dirname "$(readlink -f "$0")")
 LIEN=$(readlink -f "$(command -v cadence2 || true)" 2>/dev/null || true)

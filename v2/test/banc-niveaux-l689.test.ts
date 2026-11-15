@@ -81,24 +81,25 @@ describe('garde de publication : cadence run contre A, sur la version à publier
   const ok = (h: string[]) => statut(h, now, 'e1', { 'cadence-run': 'opus', 'equipe-legere': 'opus', A: 'opus' }, PUBLIE).publication_ok;
   it('cadence-run contre A, court et séquence verts : permise', () => expect(ok([l(), seq()])).toBe(true));
   it('équipe légère contre A (le banc hebdo du 13-11) : refusée', () => expect(ok([l({ candidat: 'equipe-legere' }), seq({ candidat: 'equipe-legere' })])).toBe(false));
-  it('un banc micro ou mécanique ne compte ni pour ni contre la publication', () => {
-    expect(ok([l({ niveau: 'mecanique' }), seq()])).toBe(false);
+  it('L730 : un banc mécanique vert (1, 3 et 6) suffit ; un banc micro ne suffit pas ; un micro rouge après un banc complet vert ne le défait pas', () => {
+    expect(ok([l({ niveau: 'mecanique' })])).toBe(true);
+    expect(ok([l({ niveau: 'micro', bancs: ['1-a'] })])).toBe(false);
     expect(ok([l(), l({ niveau: 'micro', bancs: ['1-a'], vert: false }), seq()])).toBe(true);
   });
   it('verifier-publication refusée donne la commande exacte du dépôt à publier, cadence-run contre A', async () => {
     const r = racine([]), sortie: string[] = [];
     const rc = await bench(['verifier-publication'], { cwd: r, env: { BENCH_ROOT: r, HOME: r }, now: () => now, out: (x) => sortie.push(x), err: (x) => sortie.push(x) }, '/depot/a-publier');
     expect(rc).toBe(1);
-    expect(sortie.join('\n')).toContain(`« ${commandeBanc('/depot/a-publier', 'court')} »`);
+    expect(sortie.join('\n')).toContain(`« ${commandeBanc('/depot/a-publier', 'mecanique')} »`); // L730 : sans alerte, le banc mécanique suffit
     expect(commandeBanc('/depot/a-publier', 'court')).toBe('node /depot/a-publier/v2/bin/cadence2.js bench court');
     expect(sortie.join('\n')).toMatch(/cadence-run contre A/);
-    expect(sortie.join('\n')).toContain(`« ${commandeBanc('/depot/a-publier', 'sequence <id> --repetitions 2 --candidat cadence-run --reference A')} »`);
+    expect(sortie.join('\n')).not.toMatch(/bench court|bench sequence/);
   });
-  it('le minuteur du samedi lance bench mecanique, plus bench hebdo (décision de Sylvain du 13-11)', () => {
+  it('L730 : le minuteur du samedi lance le banc complet (court avec juges puis séquences), plus le mécanique ni le hebdo', () => {
     const service = readFileSync(join(import.meta.dirname, '..', 'systeme', 'cadence-banc.service'), 'utf8');
     const lancement = service.split('\n').filter((x) => x.startsWith('ExecStart='));
-    expect(lancement).toEqual([`ExecStart=/bin/bash -c 'cadence2 bench mecanique >> "$HOME/bench-cadence/mecanique.log" 2>&1'`]);
-    expect(service).not.toMatch(/bench hebdo/);
+    expect(lancement).toEqual([`ExecStart=/bin/bash -c 'cadence2 bench complet >> "$HOME/bench-cadence/complet.log" 2>&1'`]);
+    expect(service).not.toMatch(/bench hebdo|bench mecanique/);
   });
   it('statut (décision de Sylvain du 13-11) : plus de banc du weekend exigé, code 0 sans passage hebdo ; le refus de publication dit quoi lancer', async () => {
     const r = racine([]), sortie: string[] = []; writeFileSync(join(r, 'historique.jsonl'), `${l({ date: '2026-11-04T10:00:00Z', vert: false })}\n`);
@@ -106,7 +107,7 @@ describe('garde de publication : cadence run contre A, sur la version à publier
     const rc = await bench(['statut'], { cwd: r, env: { BENCH_ROOT: r, HOME: r }, now: () => lundi, out: (x) => sortie.push(x), err: (x) => sortie.push(x) }, '/depot/a-publier');
     expect(rc).toBe(0);
     expect(sortie.join('\n')).not.toMatch(/WEEKEND|hebdo/i);
-    expect(sortie[0]).toMatch(/publication refusée sur l'empreinte inconnue : lancer, depuis la version à publier : « node \/depot\/a-publier\/v2\/bin\/cadence2\.js bench court »/);
+    expect(sortie[0]).toMatch(/publication refusée sur l'empreinte inconnue : lancer, depuis la version à publier : « node \/depot\/a-publier\/v2\/bin\/cadence2\.js bench court »/); // banc court rouge : alerte, la garde exige le banc complet (L730)
   });
   it('sans --candidat, le banc mesure cadence-run (refus net si bras.yaml ne le déclare pas)', async () => {
     const r = racine([]), err: string[] = []; writeFileSync(join(r, 'bras.yaml'), `A:\n  modele: opus\n  brief: ${BRIEF}\nequipe-legere:\n  modele: opus\n  brief: ${BRIEF}\n`);

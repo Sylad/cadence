@@ -1,8 +1,19 @@
 {
-"id": "D-22",
-"texte": "banc court, environ 3 heures avec juges\n\nc'est completement dingue\n\nbanc cout, 3 heuyres...",
-"date": "2026-11-14",
-"etat": "ouverte",
-"preuve": null,
-"lots": ["L730"]
+ "id": "D-22",
+ "texte": "banc court, environ 3 heures avec juges\n\nc'est completement dingue\n\nbanc cout, 3 heuyres...",
+ "date": "2026-11-14",
+ "etat": "livrée",
+ "preuve": "L730 : garde proportionnée dans v2/src/bench/verdict.ts (statut : banc mécanique 1, 3 et 6 suffit, alerte du banc complet rouge qui remet la garde au banc complet), cadence2 bench complet (v2/src/bench/complet.ts) lancé par le service du samedi, alerte au tour (src/bench-tour.ts) ; tests v2/test/garde-proportionnee-l730.test.ts, test/lead-tour-banc-l730.test.ts ; suite complète 10282 tests verts ; sortie réelle de node v2/bin/cadence2.js bench statut / verifier-publication sur un historique de test : mécanique vert → code 0, banc court rouge du samedi → ⚠ alerte, garde : banc complet, code 1. Non vérifié : un vrai samedi (service à réinstaller par Sylvain : bash v2/systeme/installer.sh), le délai réel lot clos → publié.",
+ "lots": [
+  "L730"
+ ],
+ "runs": [
+  "20261115074023-6226"
+ ],
+ "precisions": [
+  {
+   "date": "2026-11-15",
+   "texte": "Garde de publication proportionnée : avant une publication, le banc mécanique (sans juge, 3 bancs en parallèle, ~30 min) suffit à cadence2 bench verifier-publication et à cadence release ; le banc complet (court avec juges + séquence) passe chaque samedi sur le minuteur, à la place du mécanique actuel. Critère de réussite : délai lot clos → publié sous 1 h ; tout défaut trouvé le samedi qui aurait dû bloquer une publication se signale (au tour) et fait revenir en arrière."
+  }
+ ]
 }

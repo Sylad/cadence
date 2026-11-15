@@ -3587,10 +3587,17 @@ lots:
     finished: 2026-11-15
   - id: L737
     title: "M2 de docs/etudes/banc3-lenteur.md : le critère de temps tient compte du bruit propre à chaque banc (bancs marqués bruités, ou seuil par banc tiré des passages où les bras étaient identiques) et l'ordre des bras alterne d'un passage à l'autre. Mesure : 0 rouge de temps sur les 10 passages déjà joués à bras identiques ; aucun rouge dû à un banc bruité sur les 4 passages suivants."
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-15
     started: 2026-11-15
+    review: { date: 2026-11-15, verdict: "conforme : temps du banc selon le bruit de chaque banc (criteresTemps, une fonction), ordre des bras alterné ; 0 rouge de temps sur les 9 passages à bras identiques, × 2 sur banc non bruité reste rouge ; bruit figé suivi en L738", commit: 7de87f2764d9e496ab2a4d9d58e91458b6b35b39 }
+    finished: 2026-11-15
+  - id: L738
+    title: "Suite de L737 : le bruit d'un banc (seuil de temps par banc) est figé sur l'historique à bras identiques, et depuis L736 les bras ne sont plus identiques : les bancs 3 et 6, marqués bruités, ne bloqueraient plus jamais sur le temps. Le bruit expire après 14 jours ; le banc complet du samedi ajoute un passage A contre A sur chaque banc bruité ou expiré pour le remesurer ; un banc sans bruit mesuré récent redevient bloquant au seuil par défaut. Tests ; docs/v2/banc.md."
+    status: todo
+    estimate: 0.5
+    created: 2026-11-15
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

@@ -1,5 +1,5 @@
 [Unit]
-Description=Banc complet du samedi de cadence 2 : court avec juges puis séquences, cadence-run contre A (docs/v2/banc.md)
+Description=Banc complet du samedi de cadence 2 : bruit à remesurer (A contre A), court avec juges puis séquences, cadence-run contre A (docs/v2/banc.md)
 After=network-online.target
 
 [Service]

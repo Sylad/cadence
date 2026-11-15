@@ -10,7 +10,7 @@ export interface ResultatBanc { banc: string; taille: Taille; visible: boolean; 
   sans_juge?: Record<string, MesureSansJuge>;
   /** L733 : bras qui n'ont livré aucun fichier hors plan et doc, et la raison ; le banc n'est alors pas mesuré (sans juge seulement). */
   non_livre?: Record<string, string> }
-/** `bruit` (L737) : banc de base -> plus grand écart de temps (rapport ≥ 1) mesuré entre deux bras identiques dans l'historique (`bruitParBanc`). */
+/** `bruit` (L737) : banc de base -> plus grand écart de temps (rapport ≥ 1) mesuré entre deux bras identiques dans l'historique récent (`bruitParBanc`, 14 jours depuis L738). */
 export interface Barre { temps_max: number; temps_max_retouche: number; reference_absolue: { caches: number; mutations: number }; bruit?: Record<string, number> }
 export interface Critere { nom: string; valeur: string; seuil: string; ok: boolean; bloquant: boolean }
 /** `non_mesurable` (L733, ligne (d) des cinq règles de `verdictSansJuge`) : bancs dont un bras n'a pas livré le travail, posé seulement si aucun critère bloquant n'est rouge ; le passage n'est ni vert ni rouge, il est à rejouer. */
@@ -52,20 +52,57 @@ export const PAIRES_IDENTIQUES_L735 = ['2026-11-13-1717-af18c3783fa3', '2026-11-
 /** Un passage relu dans `rapports/<run>.json`. */
 export type PassageLu = { run: string; resultats: ResultatBanc[] };
 
+/** L738 : une paire de bras identiques ne compte que BRUIT_VALIDITE_JOURS après son passage ; sans paire récente, le banc revient au seuil de la barre. */
+export const BRUIT_VALIDITE_JOURS = 14;
+/** L738 : le banc complet du samedi remesure (A contre A) un banc bruité, ou dont le bruit expire dans ce délai ou a déjà expiré. */
+export const BRUIT_REMESURE_JOURS = 7;
+const JOUR_MS = 86_400_000;
+
+/** L738 : instant d'un passage, lu dans son nom `AAAA-MM-JJ-HHMM-…` (heure de Paris, comme `parisJour`) ; null sans date lisible. */
+export function datePassage(run: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})/.exec(run);
+  if (!m) return null;
+  const u = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  const instants = [1, 2].map((h) => new Date(u - h * 3_600_000)); // CET, puis CEST
+  return instants.find((d) => parisJour(d).jour === `${m[1]}-${m[2]}-${m[3]}` && parisJour(d).hhmm === `${m[4]}${m[5]}`) ?? null;
+}
+
 /**
- * L737 : bruit de chaque banc de base, le plus grand rapport des temps (≥ 1) entre deux bras identiques de l'historique : même `empreinte_bras`
- * (brief, modèle, réglages et pièces), ou passage de PAIRES_IDENTIQUES_L735. Un banc non livré, un bras en échec ou un temps nul ne mesure rien.
+ * L737 : paires de bras identiques de l'historique, par banc de base : même `empreinte_bras` (brief, modèle, réglages et pièces), ou passage de
+ * PAIRES_IDENTIQUES_L735. Un banc non livré, un bras en échec, un temps nul ou un passage sans date (L738) ne mesure rien. `e` : rapport des temps, ≥ 1.
  */
-export function bruitParBanc(passages: PassageLu[]): Record<string, number> {
-  const bruit: Record<string, number> = {};
+export function pairesIdentiques(passages: PassageLu[]): Record<string, { e: number; date: Date }[]> {
+  const paires: Record<string, { e: number; date: Date }[]> = {};
   for (const p of passages) for (const r of p.resultats) {
-    const m = Object.values(r.mesures ?? {});
-    if (m.length !== 2 || (r.non_livre && Object.keys(r.non_livre).length) || m.some((x) => x.echec !== null || !(x.duree_s > 0))) continue;
+    const m = Object.values(r.mesures ?? {}), date = datePassage(p.run);
+    if (!date || m.length !== 2 || (r.non_livre && Object.keys(r.non_livre).length) || m.some((x) => x.echec !== null || !(x.duree_s > 0))) continue;
     if (!(PAIRES_IDENTIQUES_L735.includes(p.run) || (m[0].empreinte_bras && m[0].empreinte_bras === m[1].empreinte_bras))) continue;
-    const id = banBase(r.banc), e = Math.max(m[0].duree_s, m[1].duree_s) / Math.min(m[0].duree_s, m[1].duree_s);
-    bruit[id] = Math.max(bruit[id] ?? 1, e);
+    (paires[banBase(r.banc)] ??= []).push({ e: Math.max(m[0].duree_s, m[1].duree_s) / Math.min(m[0].duree_s, m[1].duree_s), date });
   }
+  return paires;
+}
+
+/**
+ * L737 : bruit de chaque banc de base, le plus grand écart de ses paires identiques. L738 : seules comptent les paires des BRUIT_VALIDITE_JOURS
+ * derniers jours ; le bruit d'un banc expire donc 14 jours après sa dernière paire, et le banc revient au seuil de la barre (1,5 × A, 1,2 × A).
+ */
+export function bruitParBanc(passages: PassageLu[], maintenant: Date): Record<string, number> {
+  const bruit: Record<string, number> = {};
+  for (const [id, ps] of Object.entries(pairesIdentiques(passages)))
+    for (const { e, date } of ps) if (maintenant.getTime() - date.getTime() <= BRUIT_VALIDITE_JOURS * JOUR_MS) bruit[id] = Math.max(bruit[id] ?? 1, e);
   return bruit;
+}
+
+/**
+ * L738 : bancs (parmi `ids`) que le banc complet remesure par un passage A contre A : un banc bruité (écart récent ≥ BRUIT_MAX), ou dont la dernière
+ * paire identique a BRUIT_REMESURE_JOURS jours ou plus (son bruit expire dans les 7 jours, ou a expiré : un samedi manqué). Un banc sans aucune paire n'a pas de bruit à remesurer.
+ */
+export function bancsARemesurer(passages: PassageLu[], maintenant: Date, ids: string[]): string[] {
+  const paires = pairesIdentiques(passages), bruit = bruitParBanc(passages, maintenant);
+  return ids.filter((id) => {
+    const derniere = Math.max(...(paires[id] ?? []).map((x) => x.date.getTime()));
+    return paires[id] && ((bruit[id] ?? 1) >= BRUIT_MAX || maintenant.getTime() - derniere >= BRUIT_REMESURE_JOURS * JOUR_MS);
+  });
 }
 
 const nb = (x: number) => String(Math.round(x * 100) / 100).replace('.', ',');
@@ -185,7 +222,8 @@ export function rapport(res: ResultatBanc[], ref: string, cand: string, v: Verdi
   const nonLivres = res.flatMap((r) => Object.entries(r.non_livre ?? {}).map(([b, x]) => `- ${r.banc}/${b} : ${x}`));
   const rejoues = res.flatMap((r) => Object.entries(r.sans_juge ?? {}).flatMap(([b, x]) => (x.rejoue ? [`- ${r.banc}/${b} : ${x.suite_ok && x.caches_ok !== false ? 'vert' : 'ROUGE'} au rejeu seul (sous charge : suite ${okRouge(x.rejoue.suite_ok)}, tests d'origine ${okRouge(x.rejoue.caches_ok)})`] : [])));
   return [`# Banc ${e.date} — ${cand} contre ${ref} — ${titreVerdict(v)}`, '', `Empreinte de v2 : ${e.empreinte}`, `Répétitions : ${e.repetitions ?? 1}`,
-    ...(e.niveau ? [`Niveau : ${e.niveau}, sans juge IA (n'autorise pas la publication)`] : []),
+    ...(e.niveau === 'bruit' ? [`Niveau : bruit, ${ref} contre son jumeau sans juge IA (L738) : remesure de l'écart de temps de chaque banc ; ce verdict n'entre ni dans l'historique ni dans la garde`]
+      : e.niveau ? [`Niveau : ${e.niveau}, sans juge IA (n'autorise pas la publication)`] : []),
     ...(e.depot ? [`Dépôt mesuré : ${e.depot}`] : []),
     ...(e.duree_s !== undefined ? [`Durée du passage : ${e.duree_s} s`] : []), '',
     `| Banc | Temps ${ref} | Temps ${cand} | Tokens ${ref} | Tokens ${cand} | Préféré | Cachés ${ref} · ${cand} | Mutations ${ref} · ${cand} | Suite ${ref} · ${cand} | Attendu ${ref} · ${cand} | Taille déclarée ${ref} · ${cand} |`,

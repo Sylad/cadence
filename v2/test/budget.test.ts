@@ -43,9 +43,10 @@ describe('budget de lignes de v2/src (cause C4 de l\'échec du 07-11, R29)', () 
   // L733 (revue 2) : bench 1167 (+3), mesure 1867 : les cinq règles du banc non livré écrites en tête de verdictSansJuge, seule fonction qui les porte.
   // L736 : bench 1171 (+4), mesure 1871 : le banc court donne ses pièces au bras (piecesBanc) et le bras aiguillé garde le modèle de bras.yaml.
   // L737 : bench 1240 (+69), mesure 1940 : le temps tient compte du bruit de chaque banc (bruitParBanc, criteresTemps, lirePassages, empreinte du bras) et l'ordre des bras alterne d'un passage à l'autre.
-  it('les totaux sont ceux de R29 : noyau 3000, mesure 1940 (L689, issue #57, L730, L733, L734, L736, L737)', () => {
+  // L738 : bench 1320 (+80), mesure 2020 : le bruit d'un banc expire 14 jours après sa dernière paire A contre A (datePassage, pairesIdentiques, bancsARemesurer) et le samedi le remesure (bench bruit, A contre son jumeau), sans ligne tassée.
+  it('les totaux sont ceux de R29 : noyau 3000, mesure 2020 (L689, issue #57, L730, L733, L734, L736, L737, L738)', () => {
     expect(Object.keys(budget).sort()).toEqual(['mesure', 'noyau']);
-    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 1940]);
+    expect([budget.noyau.total, budget.mesure.total]).toEqual([3000, 2020]);
   });
   for (const [nom, g] of Object.entries(budget)) {
     it(`groupe ${nom} : la somme des budgets ne dépasse pas ${g.total}`, () =>

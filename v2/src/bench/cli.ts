@@ -11,7 +11,7 @@ import { fuitesDuBras } from './fuites.js';
 import { etatGit, juger, travailNonLivre, type Jugement } from './juges.js';
 import { preparer } from './preparer.js';
 import { mesurerSansJuge, sansLivrable } from './sans-juge.js';
-import { BARRE_SPEC, banBase, bruitParBanc, COMPLET_MAX_JOURS, ligneHistorique, titreVerdict, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type PassageLu, type ResultatBanc, type Verdict } from './verdict.js';
+import { BARRE_SPEC, banBase, bancsARemesurer, bruitParBanc, COMPLET_MAX_JOURS, ligneHistorique, titreVerdict, parisJour, PUBLIE, rapport, statut, verdict, verdictSansJuge, type MesureSansJuge, type PassageLu, type ResultatBanc, type Verdict } from './verdict.js';
 
 const REPO = join(import.meta.dirname, '..', '..', '..');
 const COURT = ['1', '3', '6'];
@@ -82,8 +82,17 @@ export function archiver(c: string, base: string | undefined): void {
   rmSync(c, { recursive: true, force: true });
 }
 
-/** L689 : `micro` (banc 1) et `mecanique` (1, 3 et 6) se jouent sans juge IA et n'autorisent jamais la publication. `Enfants` : un processus cadence2 par banc, `paralleles` à la fois. */
-export type Niveau = 'micro' | 'mecanique';
+/** L689 : `micro` (banc 1) et `mecanique` (1, 3 et 6) se jouent sans juge IA et n'autorisent jamais la publication. `Enfants` : un processus cadence2 par banc, `paralleles` à la fois.
+ * L738 : `bruit`, A contre A sans juge, remesure le bruit de temps des bancs ; ni vert ni rouge, il n'écrit pas dans l'historique que lit la garde. */
+export type Niveau = 'micro' | 'mecanique' | 'bruit';
+
+/** L738 : le second bras d'un passage A contre A, même définition que A sous un autre nom (les mesures d'un banc sont rangées par nom de bras). */
+export const jumeau = (b: string) => `${b}-bis`;
+/** Les bras de bras.yaml, plus le jumeau de la référence quand le candidat l'est. */
+export function brasDuPassage(racine: string, ref: string, cand: string): Record<string, DefBras> {
+  const bras = chargerBras(racine);
+  return cand === jumeau(ref) && bras[ref] && !bras[cand] ? { ...bras, [cand]: { ...bras[ref], nom: cand } } : bras;
+}
 export type Enfants = { lanceur: string[]; paralleles: number; env?: NodeJS.ProcessEnv };
 
 type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string; repetitions?: number; garderClones?: boolean;
@@ -107,7 +116,7 @@ export async function passage(o: OptPassage): Promise<Verdict & { eclair_ok?: bo
 
 /** Un banc : préparation, bras l'un après l'autre (ordre alterné), fuites, puis les juges, ou la mesure sans juge (L689) ; écrit resultat.json. */
 export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out: (l: string) => void, signaler: (phase: string) => void): Joue {
-  const bras = chargerBras(t.racine);
+  const bras = brasDuPassage(t.racine, t.ref, t.cand);
   // L737 : l'ordre alterne d'un banc à l'autre, d'une répétition à l'autre, et d'un passage du même banc au suivant (le 13-15-11, cadence-run jouait toujours premier au banc 3)
   const ordre = (t.i + t.k - 1 + (t.joues ?? 0)) % 2 === 0 ? [t.ref, t.cand] : [t.cand, t.ref];
   const idBanc = idTache(t); const sous = t.N > 1 ? join(t.bid, `r${t.k}`) : t.bid;
@@ -230,9 +239,9 @@ export function lirePassages(racine: string): PassageLu[] {
 
 async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?: boolean }> {
   const { jour: date, hhmm } = parisJour(o.maintenant); // nom du passage à l'heure de Paris, comme statut
-  const id = `${date}-${hhmm}-${o.empreinte}`;
+  const id = `${date}-${hhmm}-${o.empreinte}${o.niveau === 'bruit' ? '-bruit' : ''}`;
   const dirRun = join(o.racine, 'runs', id);
-  const bras = chargerBras(o.racine);
+  const bras = brasDuPassage(o.racine, o.ref, o.cand);
   for (const n of [o.ref, o.cand]) if (!bras[n]) throw new Error(`bras « ${n} » absent de ${o.racine}/bras.yaml`);
   const N = o.repetitions ?? 1;
   const ids = listerBancs(o.racine, o.numeros);
@@ -261,7 +270,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
     : taches.map((t) => fini(t, jouerBanc(t, o.exec, o.prep, o.out, signaler(t))));
   rejouerSuites(joues, o.racine, o.garderClones ?? false, o.out);
   const res = joues.map((j) => j.r);
-  const v = (o.niveau ? verdictSansJuge : verdict)(res, o.ref, o.cand, { ...BARRE_SPEC, bruit: bruitParBanc(passes) }); // L737 : bruit tiré des passages d'avant celui-ci
+  const v = (o.niveau ? verdictSansJuge : verdict)(res, o.ref, o.cand, { ...BARRE_SPEC, bruit: bruitParBanc(passes, o.maintenant) }); // L737 : bruit tiré des passages d'avant celui-ci ; L738 : des 14 derniers jours
   const e = o.eclair ? controlesEclair(res, o.ref, o.cand) : undefined;
   e?.lignes.forEach((l) => o.out(l));
   const duree_s = Math.round((Date.now() - debut.getTime()) / 1000);
@@ -269,11 +278,40 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   const base = join(o.racine, 'rapports', id);
   writeFileSync(`${base}.md`, rapport(res, o.ref, o.cand, v, { date, empreinte: o.empreinte, repetitions: N, eclair: e?.lignes, niveau: o.niveau, depot: o.depot, duree_s }));
   writeFileSync(`${base}.json`, JSON.stringify({ verdict: v, resultats: res.map((r, i) => ({ ...r, clones: joues[i].clones })) }, null, 2));
+  if (o.niveau === 'bruit') { // L738 : seul l'écart compte, lu au prochain passage dans rapports/<run>.json ; la garde ne voit pas ce passage
+    const ecarts = bruitParBanc([{ run: id, resultats: res }], o.maintenant);
+    o.out(`bruit remesuré, ${o.ref} contre ${o.cand} : ${res.map((r) => `${r.banc} ${ecarts[banBase(r.banc)]?.toFixed(2) ?? 'non mesuré'}`).join(' ; ')} — ${duree_s} s — rapport : ${base}.md`);
+    return { ...v, vert: res.every((r) => ecarts[banBase(r.banc)] !== undefined) };
+  }
   appendFileSync(join(o.racine, 'historique.jsonl'), `${ligneHistorique(v, { date: o.maintenant.toISOString(), empreinte: o.empreinte,
     candidat: o.cand, reference: o.ref, modele_candidat: bras[o.cand].modele, bancs: res.map((r) => r.banc), hebdo: o.hebdo, frais: new Set(res.filter((r) => r.frais).map((r) => banBase(r.banc))).size,
     ...(e && { eclair_ok: e.ok }), ...(o.niveau && { niveau: o.niveau }), duree_s })}\n`);
   o.out(`${titreVerdict(v)} — ${duree_s} s — rapport : ${base}.md`);
   return { ...v, eclair_ok: e?.ok };
+}
+
+/** L738 : les numéros des bancs du court que le banc complet remesure (`bancsARemesurer`). */
+export const numerosARemesurer = (racine: string, maintenant: Date): string[] =>
+  bancsARemesurer(lirePassages(racine), maintenant, listerBancs(racine, COURT)).map((id) => id.split('-')[0]);
+
+/**
+ * L738 : `cadence2 bench bruit [--bancs 3,6]`, passage A contre A sans juge (A et son jumeau, même empreinte de bras), un banc après l'autre,
+ * sur les bancs donnés ou ceux à remesurer. 0 si chaque banc a mesuré son écart, 1 sinon, 2 si refusé ; rien à remesurer : 0.
+ */
+async function remesurerBruit(racine: string, bancs: string | undefined, emp: string, repo: string, io: Io): Promise<number> {
+  const numeros = bancs ? bancs.split(',').filter(Boolean) : numerosARemesurer(racine, io.now());
+  if (!numeros.length) { io.out('bruit : aucun banc à remesurer (aucun banc bruité, aucun bruit qui expire dans les 7 jours)'); return 0; }
+  const ref = PUBLIE.reference, cand = jumeau(ref);
+  let refus: string | null;
+  try {
+    const tous = chargerBras(racine);
+    refus = !tous[ref] ? `bras ${ref} absent de ${racine}/bras.yaml` : tous[cand] ? `bras ${cand} déjà défini dans ${racine}/bras.yaml : il est réservé au jumeau de ${ref}`
+      : emp === 'inconnue' ? 'empreinte inconnue (pas de dépôt git)' : pretAPasser(repo, { [ref]: tous[ref] }, racine);
+  } catch (e) { refus = e instanceof Error ? e.message : String(e); }
+  if (refus) { io.err(`bench bruit refusé : ${refus}`); return 2; }
+  const v = await passage({ racine, numeros, niveau: 'bruit', ref, cand, hebdo: false, juge: 'opus', exec: executeurClaude, prep: preparer,
+    maintenant: io.now(), empreinte: emp, home: io.env.HOME ?? '', out: io.out, depot: depotMesure(repo) });
+  return v.vert ? 0 : 1;
 }
 
 /** Banc éclair : deux contrôles rapides sur le banc 1 (temps ≤ 1,2 × A, aucune question du candidat). */
@@ -367,9 +405,10 @@ export async function bench(args: string[], io: Io, repo = REPO): Promise<number
     } catch (e) { io.err(`cadence2 bench ajouter : ${e instanceof Error ? e.message : String(e)}`); return 1; }
   }
   const bancs = option(reste, 'bancs');
+  if (sous === 'bruit') return remesurerBruit(racine, bancs, emp, repo, io);
   const choix = sous === 'lancer' ? (bancs ? { numeros: bancs.split(',') } : null) : Object.hasOwn(SOUS, sous ?? '') ? SOUS[sous!] : null;
   if (choix === null) {
-    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|complet|statut|verifier-publication|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones]');
+    io.err('usage : cadence2 bench micro|mecanique|court|hebdo|eclair|lancer --bancs 1,3|bruit [--bancs 3,6]|complet|statut|verifier-publication|ajouter [--candidat c] [--reference r] [--repetitions N] [--paralleles N] [--garder-clones]');
     return 2;
   }
   const rep = entierOption(reste, 'repetitions', 1);

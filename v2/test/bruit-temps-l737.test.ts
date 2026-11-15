@@ -31,11 +31,12 @@ const banc = ([id, a, c, nonLivre]: Ligne, e?: [string, string]): ResultatBanc =
   sans_juge: { A: { suite_ok: true, caches_ok: true }, C: { suite_ok: true, caches_ok: true } }, ...(nonLivre && { non_livre: { C: 'plan seul' } }) });
 const passages: PassageLu[] = IDENTIQUES.map(([run, l]) => ({ run, resultats: l.map((x) => banc(x)) }));
 const TEMPS = ['temps total', 'temps des retouches'];
+const LE_15 = new Date('2026-11-15T18:00:00Z'); // L738 : le bruit ne vaut que 14 jours ; ces tests lisent l'historique au soir du 15-11
 const rougesTemps = (res: ResultatBanc[], bruit?: Record<string, number>) =>
   verdictSansJuge(res, 'A', 'C', { ...BARRE_SPEC, ...(bruit && { bruit }) }).criteres.filter((x) => TEMPS.includes(x.nom) && x.bloquant && !x.ok).map((x) => x.nom);
 
 describe('le temps tient compte du bruit de chaque banc (L737)', () => {
-  const bruit = bruitParBanc(passages);
+  const bruit = bruitParBanc(passages, LE_15);
 
   it('le bruit de chaque banc est le plus grand écart entre bras identiques : banc 1 1,35, bancs 3 et 6 bruités', () => {
     expect(bruit['1-ol-companion-L239']).toBeCloseTo(210 / 156);
@@ -89,14 +90,14 @@ describe('le temps tient compte du bruit de chaque banc (L737)', () => {
 
 describe('bruitParBanc : seules les paires de bras identiques mesurent le bruit (L737)', () => {
   it('même empreinte de bras : la paire compte ; empreintes différentes ou absentes : non', () => {
-    const p = (run: string, e?: [string, string]): PassageLu => ({ run, resultats: [banc(['9-x#1', 100, 180], e)] });
-    expect(bruitParBanc([p('r1', ['e', 'e'])])).toEqual({ '9-x': 1.8 });
-    expect(bruitParBanc([p('r1', ['e', 'f']), p('r2')])).toEqual({});
+    const p = (run: string, e?: [string, string]): PassageLu => ({ run: `2026-11-15-1000-${run}`, resultats: [banc(['9-x#1', 100, 180], e)] });
+    expect(bruitParBanc([p('r1', ['e', 'e'])], LE_15)).toEqual({ '9-x': 1.8 });
+    expect(bruitParBanc([p('r1', ['e', 'f']), p('r2')], LE_15)).toEqual({});
   });
 
   it('un passage de l\'étude L735 compte sans empreinte ; un bras en échec ou un banc non livré, jamais', () => {
     const r = banc(['9-x', 100, 400]); r.mesures.C.echec = 'code 1';
-    expect(bruitParBanc([{ run: PAIRES_IDENTIQUES_L735[0], resultats: [banc(['9-x', 100, 150]), r, banc(['8-y', 100, 900, true])] }])).toEqual({ '9-x': 1.5 });
+    expect(bruitParBanc([{ run: PAIRES_IDENTIQUES_L735[0], resultats: [banc(['9-x', 100, 150]), r, banc(['8-y', 100, 900, true])] }], LE_15)).toEqual({ '9-x': 1.5 });
   });
 
   it('lirePassages lit les rapports de bancs dans l\'ordre et saute les séquences et les fichiers illisibles', () => {
@@ -148,7 +149,7 @@ describe('passage : ordre alterné d\'un passage à l\'autre, empreinte du bras 
     expect(m.A.empreinte_bras).toMatch(/^[0-9a-f]{12}$/);
     expect(m.C.empreinte_bras).toBe(m.A.empreinte_bras);
     for (const x of p.resultats) { x.mesures.A.duree_s = 100; x.mesures.C.duree_s = 130; } // le faux claude rend la main en 0 s : un temps nul ne mesure rien
-    expect(bruitParBanc([p])).toEqual({ '1-a': 1.3, '2-b': 1.3 });
+    expect(bruitParBanc([p], LE_15)).toEqual({ '1-a': 1.3, '2-b': 1.3 });
   });
 
   it('un modèle différent change l\'empreinte : la paire ne mesure pas le bruit', async () => {
@@ -157,6 +158,6 @@ describe('passage : ordre alterné d\'un passage à l\'autre, empreinte du bras 
     const [p] = lirePassages(r);
     expect(p.resultats[0].mesures.S.empreinte_bras).not.toBe(p.resultats[0].mesures.A.empreinte_bras);
     for (const x of p.resultats) { x.mesures.A.duree_s = 100; x.mesures.S.duree_s = 130; }
-    expect(bruitParBanc([p])).toEqual({});
+    expect(bruitParBanc([p], LE_15)).toEqual({});
   });
 });

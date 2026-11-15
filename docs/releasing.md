@@ -42,8 +42,11 @@ Between the version commit and the gate it also prints a **provisional local tag
    With `orchestrate.gate.host` ([remote-gate.md](remote-gate.md)) the gate is played on another machine that receives only the commit
    (`refs/cadence-gate/<sha>`), so that host does not see the provisional tag and a test reading the latest tag passes there without checking
    anything; the command's fresh-clone replay, which does carry the tag, catches it.
-3. Run the plugin evaluation, `npm run eval:plugin` (billed, see [Evaluating the plugin](#evaluating-the-plugin-before-a-release)),
-   on that version commit; a case below the threshold stops the release and removes the tag (step 2) until you have read it in the report; if you judge the case a false negative, run `git tag v<version>` again on the version commit before step 4.
+3. Run the plugin evaluation, `node scripts/eval-plugin.mjs npm run eval:plugin -- --trust-plugin` (billed, see [Evaluating the plugin](#evaluating-the-plugin-before-a-release)),
+   on that version commit; a case below the threshold is first replayed once, its runs with the plugin only (L740: one run in six under the
+   threshold had stopped two releases on a case unrelated to the version), and only a case still below the threshold on the replay stops the
+   release and removes the tag (step 2); `rejeu.md` in the results folder (also at the top of `report.html`) says « rejoué » with both scores.
+   Read it in the report; if you judge the case a false negative, run `git tag v<version>` again on the version commit before step 4.
 4. `git push origin main v<version>` (the tag already exists, step 2; `git tag v<version>` is not run twice) — the tag starts `.github/workflows/publish.yml`,
    which publishes to npm through Trusted Publishing (OIDC, no token stored anywhere): it checks the tag
    matches `package.json`, `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` and that `CHANGELOG.md` has a `## [x.y.z]` section for it (no section, no publication), then `npm publish --provenance`, where `prepublishOnly` runs the type-check, the quality ratchet (`npm run qualite`, [qualite.md](qualite.md): exit 1 when a measure got worse, 2 when a tool crashed or the baseline is missing) and the
@@ -192,7 +195,7 @@ version files are written, the commit is not ready. `--dry-run` reads the forms 
 It prints the lead's steps, in order, and runs none: the `git add` of exactly the files of the version commit and the commit,
 the provisional tag `git tag v<x.y.z>` (L508: made before the gate, removed by `git tag -d` when the gate or the evaluation is red),
 `cadence verify --gate --sha HEAD` (always printed, before the evaluation; the fresh-clone replay of L446 is no longer a step of the lead: the command played it itself, on the version commit and its tag, before writing — L698),
-`npm run eval:plugin -- --trust-plugin` (only when `package.json` has that script), `git push origin <branch> v<x.y.z>`,
+`npm run eval:plugin -- --trust-plugin` (only when `package.json` has that script; prefixed by `node scripts/eval-plugin.mjs` when the repository has that file, which replays a case below the threshold once, L740), `git push origin <branch> v<x.y.z>`,
 `gh run watch`, `npm view <package> version` (not for a private package) and, only with a `.claude-plugin/plugin.json`,
 the plugin update: `claude plugin marketplace update <marketplace>` first (without it the installed plugin stays at the old
 version; skipped when the marketplace has no name), then `claude plugin update <plugin>@<marketplace>`, then `/reload-plugins`
@@ -212,11 +215,15 @@ difference: a trap the baseline already avoids proves nothing about the plugin. 
 
 ```sh
 npm run eval:plugin              # claude plugin eval . --max-cost-usd 5 --no-publish; 4 cases × 3 runs × 2 arms = 24 runs
+node scripts/eval-plugin.mjs npm run eval:plugin -- --trust-plugin    # the same, with the replay of a case below the threshold (L740)
 claude plugin eval . --case deliver-sha --runs 1 --trust-plugin --no-publish --max-cost-usd 1    # one case, one run (the first run asks to trust the plugin)
 ```
 
 **Every run is billed** (a full `claude` session on your own credential, plus the judge): the suite is run at the release, once the
 version commit is ready, never in `npm test`, in `prepublishOnly` or in CI, and `--max-cost-usd 5` aborts a runaway. A case below
-the threshold (1.0 by default, `--threshold`) makes the command exit 1: read the case in the report before deciding it is the plugin
-and not the wording of the case. `npm test` only checks that the
+the threshold (1.0 by default, `--threshold`) makes `claude plugin eval` exit 1; `scripts/eval-plugin.mjs`, which wraps the command (the step of `cadence release` when the repository has
+that file; `package.json` is left alone, its scripts being a config the ratchet refuses to see change in a code lot), then replays that case once
+(`--case <name> --ablation none`, in `rejeu/<name>/` of the same results folder, with what is left of the cost ceiling) and exits 1 only
+if the replay is still below the threshold, has no complete result or the ceiling is spent. A first pass stopped by the ceiling (exit 2,
+partial) is never replayed. Read the case in the report before deciding it is the plugin and not the wording of the case. `npm test` only checks that the
 files are well formed (`test/plugin-evals.test.ts`); `evals/` is not part of the npm package.

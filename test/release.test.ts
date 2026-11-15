@@ -320,6 +320,19 @@ describe('cadence release — rien n’est publié', () => {
     expect(r.out).toContain('git tag v1.2.4');
     expect(r.out).toContain('npm run eval:plugin -- --trust-plugin');
   });
+
+  it('L740 — avec scripts/eval-plugin.mjs, l’éval passe par lui : un cas sous le seuil est rejoué une fois avant d’arrêter la release', () => {
+    const sans = release(project({ whatsNew: WHATS_NEW_DONE }), 'patch', '--dry-run');
+    expect(sans.out).not.toContain('node scripts/eval-plugin.mjs');
+    const dir = project({ whatsNew: WHATS_NEW_DONE });
+    mkdirSync(join(dir, 'scripts'), { recursive: true });
+    writeFileSync(join(dir, 'scripts/eval-plugin.mjs'), '');
+    git(dir, 'add', '.');
+    git(dir, 'commit', '-qm', 'chore: rejeu');
+    const r = release(dir, 'patch', '--dry-run');
+    expect(r.out).toMatch(/node scripts\/eval-plugin\.mjs npm run eval:plugin -- --trust-plugin \|\| \{ git tag -d v1\.2\.4; false; \}/);
+    expect(r.out).toContain('rejoué une fois');
+  });
 });
 
 describe('cadence release — docs/whats-new.md', () => {

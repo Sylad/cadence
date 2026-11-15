@@ -98,6 +98,8 @@ interface Planned {
   packageName: string;
   isPrivate: boolean;
   hasEvalScript: boolean;
+  /** L740 : le dépôt a scripts/eval-plugin.mjs, qui rejoue une fois un cas sous le seuil avant de faire échouer l'éval. */
+  hasEvalReplay: boolean;
 }
 
 /** Un échec de git (hors dépôt, dépôt sans commit) est un refus, pas une trace de pile. */
@@ -239,6 +241,7 @@ function plan(root: string, bump: Bump, today: Day): Planned {
     packageName: String(pkg.name ?? ''),
     isPrivate: pkg.private === true,
     hasEvalScript: typeof pkg.scripts?.['eval:plugin'] === 'string',
+    hasEvalReplay: existsSync(join(root, EVAL_REPLAY)),
   };
 }
 
@@ -282,6 +285,9 @@ function whatsNewIssues(text: string, version: string): string[] {
   return issues;
 }
 
+// L740 : l'enveloppe de l'éval qui rejoue une fois un cas sous le seuil (un seul run sur six avait arrêté deux releases)
+const EVAL_REPLAY = 'scripts/eval-plugin.mjs';
+
 /** Les étapes que le lead joue, dans l'ordre : la commande n'en fait aucune. */
 function steps(p: Planned, files: string[], branch: string): string[] {
   const tag = `v${p.version}`;
@@ -292,7 +298,7 @@ function steps(p: Planned, files: string[], branch: string): string[] {
     `git add ${files.join(' ')} && git commit -m "release: ${p.version}"`,
     `git tag ${tag}    (tag local provisoire sur le commit de version : les tests qui lisent le dernier tag, comme test/changelog.test.ts, voient la version publiée ; retiré si une des deux étapes suivantes est rouge, jamais poussé avant)`,
     `cadence verify --gate --sha HEAD || ${untag}    (la suite et le build rejoués sur le commit de version, où le CHANGELOG n'a plus de [Unreleased] plein ; rouge = tag retiré, pas d'éval)`,
-    ...(p.hasEvalScript ? [`npm run eval:plugin -- --trust-plugin || ${untag}    (facturé ; un cas sous le seuil arrête la release et retire le tag ; si la lecture du rapport le juge faux, reposer le tag de l’étape 2 avant le push)`] : []),
+    ...(p.hasEvalScript ? [`${p.hasEvalReplay ? `node ${EVAL_REPLAY} ` : ''}npm run eval:plugin -- --trust-plugin || ${untag}    (facturé ; ${p.hasEvalReplay ? 'un cas sous le seuil est rejoué une fois, runs « with » seuls (L740), et seul un cas resté sous le seuil' : 'un cas sous le seuil'} arrête la release et retire le tag ; si la lecture du rapport le juge faux, reposer le tag de l’étape 2 avant le push)`] : []),
     `git push origin ${branch} ${tag}    (le tag provisoire devient le tag de la release ; il lance le workflow de publication)`,
     'gh run watch    (jusqu\'à la fin du run de publication)',
     ...(p.isPrivate || p.packageName === '' ? [] : [`npm view ${p.packageName} version    (doit répondre ${p.version})`]),

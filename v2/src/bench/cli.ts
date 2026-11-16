@@ -97,7 +97,7 @@ export type Enfants = { lanceur: string[]; paralleles: number; env?: NodeJS.Proc
 
 type OptPassage = { racine: string; numeros?: string[]; ref: string; cand: string; hebdo: boolean; juge: string; repetitions?: number; garderClones?: boolean;
   exec: Executeur; prep: typeof preparer; maintenant: Date; empreinte: string; home: string; out: (l: string) => void; eclair?: boolean;
-  niveau?: Niveau; enfants?: Enfants; depot?: string; bruitCompte?: boolean; version?: () => string }; // version (L742) : claude --version, remplacée par les tests
+  niveau?: Niveau; enfants?: Enfants; depot?: string; bruitCompte?: boolean; version?: () => string; horloge?: () => Date }; // version (L742) : claude --version ; horloge (L751) : début et fin des bras joués en ligne (duree_s, « temps total ») ; les deux remplacées par les tests
 
 /** Un banc (une répétition) à jouer, sérialisable pour un processus enfant. `joues` (L737) : passages antérieurs de ce banc, pour alterner l'ordre des bras. */
 export type Tache = { racine: string; dirRun: string; run: string; ref: string; cand: string; N: number; juge: string; garderClones: boolean;
@@ -115,7 +115,7 @@ export async function passage(o: OptPassage): Promise<Verdict & { eclair_ok?: bo
 }
 
 /** Un banc : préparation, bras l'un après l'autre (ordre alterné), fuites, puis les juges, ou la mesure sans juge (L689) ; écrit resultat.json. */
-export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out: (l: string) => void, signaler: (phase: string) => void): Joue {
+export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out: (l: string) => void, signaler: (phase: string) => void, horloge?: () => Date): Joue {
   const bras = brasDuPassage(t.racine, t.ref, t.cand);
   // L737 : l'ordre alterne d'un banc à l'autre, d'une répétition à l'autre, et d'un passage du même banc au suivant (le 13-15-11, cadence-run jouait toujours premier au banc 3)
   const ordre = (t.i + t.k - 1 + (t.joues ?? 0)) % 2 === 0 ? [t.ref, t.cand] : [t.cand, t.ref];
@@ -132,7 +132,7 @@ export function jouerBanc(t: Tache, exec: Executeur, prep: typeof preparer, out:
       aller('préparation'); suiteBase[n] = prep(bc, c).testsBase;
       out(`${idBanc} : bras ${n}…`);
       const avant = etatGit(c); bases[n] = avant.head;
-      aller(`bras ${n}`); const m = lancerBras(bc, bras[n], c, exec, undefined, { pieces: piecesBanc(bc), racine: t.racine });
+      aller(`bras ${n}`); const m = lancerBras(bc, bras[n], c, exec, horloge, { pieces: piecesBanc(bc), racine: t.racine });
       mesures[n] = { ...m, banc: idBanc, echec: m.echec ?? travailNonLivre(avant, etatGit(c)), taille_declaree: tailleDeclaree(c, avant.head) };
       aller('fuites'); const fu = fuitesDuBras(t.home, t.racine, t.bid, c); fuites[n] = fu.certaines; aVerifier[n] = fu.a_verifier;
     });
@@ -268,7 +268,7 @@ async function passageVerrouille(o: OptPassage): Promise<Verdict & { eclair_ok?:
   const enfants = o.enfants;
   const joues = enfants
     ? await enParallele(taches, enfants.paralleles, async (t) => fini(t, await bancDansEnfant(t, enfants, dirTaches, o.out, signaler(t))))
-    : taches.map((t) => fini(t, jouerBanc(t, o.exec, o.prep, o.out, signaler(t))));
+    : taches.map((t) => fini(t, jouerBanc(t, o.exec, o.prep, o.out, signaler(t), o.horloge)));
   rejouerSuites(joues, o.racine, o.garderClones ?? false, o.out);
   const res = joues.map((j) => j.r);
   const v = (o.niveau ? verdictSansJuge : verdict)(res, o.ref, o.cand, { ...BARRE_SPEC, bruit: bruitParBanc(passes, o.maintenant) }); // L737 : bruit tiré des passages d'avant celui-ci ; L738 : des 14 derniers jours

@@ -28,7 +28,10 @@ function racine(bancs: string[], tests = 'test ! -e rouge.txt'): string {
 }
 const commit = (cwd: string, f = 'fait.txt') => { writeFileSync(join(cwd, f), 'x'); git(cwd, 'add', '-A'); git(cwd, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'bras'); };
 const sortie = JSON.stringify({ session_id: 's', total_cost_usd: 0, modelUsage: {} });
-const base = { ref: 'A', cand: 'cadence-run', hebdo: false, juge: 'opus', maintenant: new Date('2026-11-13T15:00:00Z'), empreinte: 'e1', out: () => {} };
+/** L751 : horloge des bras en ligne, une minute par lecture ; chaque bras lit début puis fin, donc dure 60 s quelle que soit la charge machine
+ * (sous charge, l'horloge réelle donnait « temps total : 1 s contre 0 s », rouge, au test des tests d'origine retirés). */
+const minuteParLecture = () => { let t = Date.parse('2026-11-13T15:00:00Z'); return () => new Date((t += 60_000)); };
+const base = { ref: 'A', cand: 'cadence-run', hebdo: false, juge: 'opus', maintenant: new Date('2026-11-13T15:00:00Z'), empreinte: 'e1', out: () => {}, horloge: minuteParLecture() };
 const prepReel = (await import('../src/bench/preparer.js')).preparer;
 
 describe('nom d\'un test d\'origine posé à côté de ceux du bras', () => {
@@ -60,7 +63,8 @@ describe('banc micro et mécanique : mesurés sans juge IA (L689)', () => {
   });
   it('les tests d\'origine posés sont retirés du clone ; un banc sans tests d\'origine les compte « aucun »', async () => {
     const r = racine(['1-a']);
-    const exec: Executeur = (_a, o) => { commit(o.cwd); return { stdout: sortie, code: 0 }; };
+    let sessions = 0; // L751 : le second bras ralenti de 0,6 s, comme sous charge ; avec l'horloge réelle, « temps total : 1 s contre 0 s » rougissait le verdict
+    const exec: Executeur = (_a, o) => { if (sessions++ === 1) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 600); commit(o.cwd); return { stdout: sortie, code: 0 }; };
     const v = await passage({ ...base, racine: r, numeros: ['1'], niveau: 'mecanique', garderClones: true, exec, prep: prepReel, home: r });
     expect(v.vert).toBe(true);
     expect(v.criteres.find((c) => c.nom === 'tests d\'origine verts')?.valeur).toBe('aucun banc avec tests d\'origine');

@@ -3744,11 +3744,12 @@ lots:
     finished: 2026-11-16
   - id: L757
     title: "D-4 (article sous-agents et quota, 15-11) : aucun des 11 agents du plugin ne déclare de model, tous héritent du modèle de la session (Opus) — donner un model explicite aux agents mécaniques (livreur, precheck-reader) et mesurer avant de toucher aux juges (code-reviewer reste Opus) ; mesure : jetons Opus par livraison avant/après sur 5 livraisons, 0 livraison ratée de plus"
-    status: doing
+    status: done
     estimate: 0.5
     created: 2026-11-16
     started: 2026-11-16
-    review: { date: 2026-11-16, verdict: "non conforme : 1 bloquant — scripts/jetons-agents.mjs:57-67 lit la réponse dans le dernier bloc de texte alors que les sous-agents rendent par SubagentHandback.input.message : 18/18 livraisons réelles classées RATÉE (14 ok / 4 ratées en vrai), critère « ratées après ≤ avant » toujours vrai", commit: 5b75b586d4b51434acb1906b973d94fd7c2cd7a4 }
+    review: { date: 2026-11-16, verdict: "conforme (passe 2) : livreur et precheck-reader sur Sonnet ; jetons-agents lit SubagentHandback, retrouve 14 ok / 4 ratées sur 18 livraisons réelles (contrôle indépendant identique) ; évals du livreur 1,00 ; porte verte rejouée par le lead à 2e987b91 ; mesure avant/après à faire sur 5 livraisons", commit: 2e987b9119990bac9ba4067f6f3da22b5b17dfef }
+    finished: 2026-11-16
   - id: L758
     title: "D-27 (1/2) : ablation au banc à chaque nouveau modèle (Fable 5.2, Opus 5.5…) — retirer UN composant de cadence run à la fois (lecture obligatoire des pièces, registre, correction après porte, escalade…) sur le banc figé et mesurer réussite, coût par lot réussi et durée ; un composant sans gain mesuré est retiré (idée de l'article « harness agentique », 12-11)"
     status: todo

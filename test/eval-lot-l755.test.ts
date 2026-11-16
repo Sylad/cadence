@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileS
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { casesFor, evalCommand, pathsOf, readEvalEntries, readEvalRecords, runLotEvals } from '../src/lot-evals.js';
+import { validateConfig } from '../src/config-set.js';
 import { RafError } from '../src/plan.js';
 import { git } from './orchestrate-harness.js';
 import { cleanupTempDirs, gitRepo, tempDir } from './helpers.js';
@@ -33,6 +34,10 @@ describe('la clé evals du dépôt cadence', () => {
     for (const s of skills) expect(casesFor(entries, [`skills/${s}/SKILL.md`]), s).not.toEqual([]);
   });
 
+  it('docs/concepts.md, citée par skills/lead et porteuse de la réponse de deliver-sha, rejoue deliver-sha (revue L755)', () => {
+    expect(casesFor(entries, ['docs/concepts.md'])).toContain('deliver-sha');
+  });
+
   it('un lot de code seul ne rejoue rien', () => {
     expect(casesFor(entries, ['src/deliver.ts', 'test/deliver.test.ts'])).toEqual([]);
   });
@@ -60,6 +65,33 @@ describe('readEvalEntries : forme de la clé', () => {
     ['evals:\n  - paths: [skills/**]\n    cases: [a]\n    tests: [b]\n', /tests inconnu/],
   ])('refuse %j', (text, msg) => {
     expect(() => readEvalEntries(cfg(text))).toThrow(msg);
+  });
+});
+
+describe('une clé evals mal formée est refusée, jamais une porte coupée en silence (revue L755)', () => {
+  const malformees: [string, string, RegExp][] = [
+    ['une carte au lieu d\'une liste', 'evals:\n  skills/a/**: [c1]\n', /evals : liste attendue/],
+    ['case au lieu de cases', 'evals:\n  - paths: [skills/a/**]\n    case: [c1]\n', /evals\[0\]\.case inconnu/],
+    ['un nom de cas avec une espace', 'evals:\n  - paths: [skills/a/**]\n    cases: [c 1]\n', /evals\[0\]\.cases/],
+  ];
+
+  it.each(malformees)('validateConfig (porte qui relit cadence.yaml) refuse %s', (_, text, msg) => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'cadence.yaml'), text);
+    expect(() => validateConfig(join(dir, 'cadence.yaml'), dir)).toThrow(msg);
+  });
+
+  it.each(malformees)('raf done refuse un lot quand la clé evals est mal formée (%s), --force avertit', (_, text, msg) => {
+    const repo = depot();
+    commit(repo, 'chore: evals cassée', { 'cadence.yaml': text });
+    commit(repo, 'feat(L1): skill a', { 'skills/a/SKILL.md': 'v2\n' });
+    const refus = cli(repo, {}, 'done', 'L1', '--now');
+    expect(refus.code).not.toBe(0);
+    expect(refus.err).toMatch(msg);
+    expect(refus.err).toMatch(/porte des cas d'éval/);
+    const forced = cli(repo, {}, 'done', 'L1', '--force', '--now');
+    expect(forced.out).toContain('L1 → done');
+    expect(forced.err).toMatch(/avertissement : .*evals/);
   });
 });
 

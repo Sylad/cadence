@@ -52,9 +52,9 @@ describe('L602 — où cadence écrit', () => {
 describe('L602 — où une porte se déclare', () => {
   const gates = () => rows(page(), GATES_TITLE)
 
-  it('L602 — le tableau compte onze portes, chacune avec son endroit et ce qu’elle refuse', () => {
+  it('L602 — le tableau compte douze portes (evals : revue L755), chacune avec son endroit et ce qu’elle refuse', () => {
     const g = gates()
-    expect(g).toHaveLength(11)
+    expect(g).toHaveLength(12)
     for (const r of g) {
       expect(r, r[0]).toHaveLength(4)
       expect(['plan', 'cadence.yaml'], r[0]).toContain(r[2])
@@ -70,15 +70,16 @@ describe('L602 — où une porte se déclare', () => {
       const key = r[1].match(/`([^`]+)`/)![1]
       if (key.startsWith('orchestrate.')) expect(orchKeys, key).toContain(`'${key.slice('orchestrate.'.length)}'`)
       else if (key === 'bounds') expect(read('src/bounds.ts')).toContain("readYamlKey(file, 'bounds')")
+      else if (key === 'evals') expect(read('src/lot-evals.ts')).toContain("readYamlKey(file, 'evals')")
       else if (key === 'docs.sync') expect(cfg).toContain("const DOCS_KEYS = ['sync'")
       else expect(plan, key).toContain(`get ${key}()`)
     }
   })
 
-  it('L602 — les portes de revue et d’UX sont au plan, les neuf autres dans cadence.yaml', () => {
+  it('L602 — les portes de revue et d’UX sont au plan, les dix autres dans cadence.yaml', () => {
     const where = gates().map((r) => r[2])
     expect(where.filter((w) => w === 'plan')).toHaveLength(2)
-    expect(where.filter((w) => w === 'cadence.yaml')).toHaveLength(9)
+    expect(where.filter((w) => w === 'cadence.yaml')).toHaveLength(10)
   })
 
   it('L602 — la page dit où la porte se joue : gate.host et verify.inPlace', () => {

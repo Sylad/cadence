@@ -50,3 +50,9 @@
 - Écran `--archives` : une ligne par archive (ref, sha court, date, sujet) et dessous `restaurer : git branch archive-<id> <ref>`.
 - Hypothèse : un worktree avec un sous-module initialisé n'est jamais retiré (refus de git), plus strict que « aucun commit de sous-module non poussé ». Limites écrites dans la doc : fichiers ignorés du worktree, commits atteignables par le seul reflog, et l'intégration normale par `cadence run` qui retire encore son worktree avec `--force` (sous-module non poussé, hors de ce lot).
 - `--reponse` refuse un run clos. Budget run 845. Le mot « contrat » est interdit dans v2/src (anti-rechute C1).
+
+## Porte des cas d'éval avant raf done (L755, revue r1)
+
+- Une clé `evals` mal formée (carte, `case:`, nom de cas avec une espace) n'est plus lue comme « aucun cas » : `validateConfig` (src/config-set.ts) appelle `readEvalEntries`, donc la porte qui relit cadence.yaml la refuse ; `raf done` refuse le lot avec l'erreur de la clé (`refuseUnevaluatedPlugin`, src/raf-close-checks.ts), `--force` avertit. `evalEntriesOf` (qui avalait l'erreur) est retiré.
+- Écran : `L1 : la porte des cas d'éval du plugin ne peut pas juger le lot, cadence.yaml : evals[0].case inconnu (…) — corriger la clé evals de cadence.yaml (docs/config.md), puis relancer raf done (--force pour passer outre)`.
+- docs/config.md : ligne `evals` dans « Where a gate is declared » (douze portes, test L602 mis à jour). cadence.yaml : `docs/concepts.md` rejoue deliver-sha et livrer-sh-sans-bloc. Décision : docs/qa/expectations.md, citée par la revue, n'existe pas dans ce dépôt (aucun motif ajouté).

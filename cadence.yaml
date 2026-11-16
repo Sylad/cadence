@@ -105,7 +105,8 @@ bounds:
 # fichiers. Le dossier du cas (evals/<cas>/**) compte d'office. Le 16-11, L744 (skills/lead, agents/livreur) a fait tomber livrer-sh-sans-bloc,
 # vu à la publication de 2.0.12 seulement, 7 h après sa clôture. Mesure : 0 éval rouge à la publication sur un défaut d'un lot déjà clos.
 evals:
-  - paths: [skills/deliver/**, skills/lead/**, agents/livreur.md, docs/deliver.md, docs/lead.md, docs/skills.md]
+  # docs/concepts.md : citée par skills/lead, elle donne la réponse attendue par deliver-sha (git push origin <sha>:main && cadence deliver --sha <sha>).
+  - paths: [skills/deliver/**, skills/lead/**, agents/livreur.md, docs/deliver.md, docs/lead.md, docs/skills.md, docs/concepts.md]
     cases: [deliver-sha, livrer-sh-sans-bloc]
   - paths: [skills/orchestrate/**, skills/lead/**, docs/orchestrate.md, docs/lead.md, docs/skills.md]
     cases: [orchestrate-id-avec-slash]

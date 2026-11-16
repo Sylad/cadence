@@ -250,6 +250,7 @@ one minute per case.
 
 `raf done <lot>` then refuses a lot that touches a covered file while one of its cases has no green verdict for the **current content**
 of its files: never replayed, red at its last replay, or files changed since (a plan commit, a rebase or a cherry-pick changes nothing).
-`--force` only warns. Without an `evals` key nothing changes. A test (`test/eval-lot-l755.test.ts`) checks that every case of `evals/`
+`--force` only warns. Without an `evals` key nothing changes; a malformed one (a map, `case:` for `cases:`, a case name with a space) is
+refused by the gate that validates `cadence.yaml` and makes `raf done` refuse the lot with the key's error, instead of closing it unjudged. A test (`test/eval-lot-l755.test.ts`) checks that every case of `evals/`
 is cited, that every skill is covered, and that the files of L744 replay `livrer-sh-sans-bloc`. Measure: no red case at a release on a
 defect of a lot already closed.

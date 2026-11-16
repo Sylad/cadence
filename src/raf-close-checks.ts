@@ -5,7 +5,7 @@ import { gitRoot, tryGit } from './git.js';
 import { redAcceptations } from './orchestrate/accept.js';
 import { lotBranch } from './orchestrate/worktree.js';
 import { lotKey, RunStore } from './orchestrate/state.js';
-import { evalEntriesOf, evalRefusal, filesOfCommits } from './lot-evals.js';
+import { evalRefusal, filesOfCommits, readEvalEntries } from './lot-evals.js';
 import { type Plan, RafError } from './plan.js';
 import { lotWork } from './audit.js';
 
@@ -79,7 +79,18 @@ export function refuseHandedBackWithoutCode(root: string, lotId: string, force: 
  * à la publication de 2.0.12). `cadence eval <lot>` rejoue les cas. Un plan en lecture seule ne lit pas git : rien à refuser. `--force` n'en fait qu'un avertissement.
  */
 export function refuseUnevaluatedPlugin(c: { root: string; configPath: string; plan: Plan; lot: string; force: boolean; warn: (line: string) => void }): void {
-  const entries = c.plan.readonly ? [] : evalEntriesOf(c.configPath);
+  if (c.plan.readonly) return;
+  let entries: ReturnType<typeof readEvalEntries>;
+  try {
+    entries = readEvalEntries(c.configPath);
+  } catch (e) {
+    // Revue L755 : une clé evals mal formée ne coupe plus la porte en silence (avant : aucune entrée, lot clos sans éval ni avertissement).
+    if (!(e instanceof RafError)) throw e;
+    const bad = `${c.lot} : la porte des cas d'éval du plugin ne peut pas juger le lot, ${e.message} — corriger la clé evals de cadence.yaml (docs/config.md), puis relancer raf done`;
+    if (!c.force) throw new RafError(`${bad} (--force pour passer outre)`);
+    c.warn(`avertissement : ${bad}`);
+    return;
+  }
   if (!entries.length) return;
   const repo = gitRoot(c.root) ?? c.root;
   const text = evalRefusal(repo, entries, c.lot, filesOfCommits(repo, lotWork(c.plan, c.root, c.lot).map((w) => w.sha)));

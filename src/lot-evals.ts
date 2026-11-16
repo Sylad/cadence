@@ -126,15 +126,6 @@ export function filesOfCommits(root: string, shas: string[]): string[] {
   return [...new Set(shas.flatMap((s) => changedFiles(root, s)))];
 }
 
-/** Les entrées `evals` du dépôt ; un cadence.yaml illisible n'en donne aucune (`cadence check` en parle). */
-export function evalEntriesOf(configPath: string): EvalEntry[] {
-  try {
-    return readEvalEntries(configPath);
-  } catch {
-    return [];
-  }
-}
-
 /** La phrase de refus de `raf done`, ou null quand le lot n'a aucun cas à rejouer. */
 export function evalRefusal(root: string, entries: EvalEntry[], lotId: string, files: string[]): string | null {
   const gaps = evalGaps(root, entries, files);

@@ -10,6 +10,7 @@ import type { Day } from './dates.js';
 import { parseDeliverConfig } from './deliver.js';
 import { commitPaths, dirtyPaths, gitRoot, restorePaths } from './git.js';
 import { findProjects, isProject, readDepth, readLeadContextThreshold, readLeadUx } from './lead.js';
+import { readEvalEntries } from './lot-evals.js';
 import { readMemoryIndexMax } from './memory-index.js';
 import { readPriority } from './orchestrate/continue.js';
 import { Plan, RafError, type PlanSettings } from './plan.js';
@@ -38,6 +39,7 @@ export function validateConfig(file: string, root: string): void {
   readOrchestrateConfig(file);
   readDocsConfig(file);
   readBounds(file);
+  readEvalEntries(file); // revue L755 : une clé evals mal formée couperait la porte de raf done en silence
   readReferencesConfig(file);
   readMigrateConfig(file);
   readMemoryIndexMax(file);

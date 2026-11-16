@@ -8,6 +8,7 @@ import { releaseIssueLines } from './issues.js';
 import { commandesFumee, fumerPaquet } from './release-fumee.js';
 import { ciAvantEcriture } from './release-ci.js';
 import { hasEntries, nothingToRelease, releaseFileLine, removeFragments, versionSection } from './changelog-fragments.js';
+import { draftWhatsNew, SHORT_LINE_MAX, type WhatsNewDraft } from './whats-new-forms.js';
 
 const BUMPS = ['patch', 'minor', 'major'] as const;
 type Bump = (typeof BUMPS)[number];
@@ -18,8 +19,6 @@ const PLUGIN = '.claude-plugin/plugin.json';
 const MARKETPLACE = '.claude-plugin/marketplace.json';
 const CHANGELOG = 'CHANGELOG.md';
 const WHATS_NEW = 'docs/whats-new.md';
-/** Longueur maximale (en caractères) de la ligne d'une version dans la liste courte de docs/whats-new.md. */
-const SHORT_LINE_MAX = 240;
 
 type Json = Record<string, any>;
 
@@ -246,9 +245,9 @@ function plan(root: string, bump: Bump, today: Day): Planned {
 }
 
 /**
- * docs/whats-new.md porte la version sous deux formes, écrites à la main ou par une session (jamais par la commande) :
- * une ligne de la liste « In two lines » (≤ 240 caractères, en tête) et un paragraphe long (en tête de « Version by version »).
- * Rend les écarts, une ligne chacun ; vide quand les deux sont là, à leur place.
+ * docs/whats-new.md porte la version sous deux formes : une ligne de la liste « In two lines » (≤ 240 caractères, en tête) et un
+ * paragraphe long (en tête de « Version by version »). Écrites à la main ou par une session avant la commande, ou par la commande
+ * elle-même quand elles manquent (L753, src/whats-new-forms.ts). Rend les écarts, une ligne chacun ; vide quand les deux sont là, à leur place.
  */
 function whatsNewIssues(text: string, version: string): string[] {
   const lines = text.split('\n');
@@ -331,6 +330,36 @@ export function gardeBancV2(version: string, verifier: () => { code: number; sor
 }
 const PUBLICATIONS = 'docs/v2/publications';
 
+/**
+ * L753 : docs/whats-new.md tel que le commit de version le portera, les formes absentes de la version écrites depuis la section de
+ * version ; la CI rejouée (L698) reçoit ce texte quand la commande en écrit, sinon la copie de l'arbre de travail.
+ */
+function whatsNewDraft(root: string, p: Planned): { draft: WhatsNewDraft | null; ciWrites: Map<string, string>; copies: string[] } {
+  const path = join(root, WHATS_NEW);
+  if (!existsSync(path)) return { draft: null, ciWrites: p.writes, copies: [] };
+  const draft = draftWhatsNew(readFileSync(path, 'utf8'), p.version, p.body);
+  if (draft.written.length === 0) return { draft, ciWrites: p.writes, copies: [WHATS_NEW] };
+  return { draft, ciWrites: new Map([...p.writes, [WHATS_NEW, draft.text]]), copies: [] };
+}
+
+/** Écrit les formes tirées des entrées (hors --dry-run), puis vérifie les deux formes ; vrai quand le commit de version est prêt. */
+function whatsNewReport(path: string, draft: WhatsNewDraft, version: string, dryRun: boolean, out: (l: string) => void): boolean {
+  if (draft.written.length > 0) {
+    if (!dryRun) writeFileSync(path, draft.text);
+    out(`  ${dryRun ? 'écrirait' : 'écrit'} : ${WHATS_NEW} (${draft.written.join(' et ')} de ${version}, tirés des entrées de [${version}] ; à relire, et réécrire à la main au besoin, avant le commit)`);
+  }
+  const issues = whatsNewIssues(draft.text, version);
+  if (issues.length === 0) {
+    out(`  ${WHATS_NEW} : les deux formes de ${version} sont là`);
+    return true;
+  }
+  for (const i of issues) out(`  ${i}`);
+  out(dryRun
+    ? '  le commit de version ne serait pas prêt : corriger ou déplacer ces formes (à la main ou par une session) avant de lancer la commande'
+    : '  le commit de version n\'est pas prêt : corriger ces formes (à la main ou par une session), puis suivre les étapes ci-dessous sans relancer la commande (elle changerait encore la version)');
+  return false;
+}
+
 /** `cadence release patch|minor|major [--dry-run]` : prépare le commit de version, sans rien publier. Rend le code de sortie. */
 export function release(rest: string[], dryRun: boolean, root: string, today: Day, out: (l: string) => void): number {
   const bump = rest[0] as Bump | undefined;
@@ -345,11 +374,10 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
   const fumee = commandesFumee(root, readJson(root, PACKAGE));
   if (fumee.length > 0) fumerPaquet(root, fumee, out);
 
-  const whatsNewPath = join(root, WHATS_NEW);
-  const hasWhatsNew = existsSync(whatsNewPath);
+  const wn = whatsNewDraft(root, p);
   // L698 : la CI de publication (le workflow déclenché par un tag) rejouée dans un clone neuf du commit de version, tagué ; un rouge refuse la release.
-  ciAvantEcriture(root, dryRun, { version: p.version, writes: p.writes, removes: p.removes, copies: hasWhatsNew ? [WHATS_NEW] : [] }, out);
-  const files = hasWhatsNew ? [...p.files, WHATS_NEW] : p.files;
+  ciAvantEcriture(root, dryRun, { version: p.version, writes: wn.ciWrites, removes: p.removes, copies: wn.copies }, out);
+  const files = wn.draft ? [...p.files, WHATS_NEW] : p.files;
   const branch = inGit('la lecture de la branche', () => currentBranch(root)) ?? 'main';
 
   out(`${dryRun ? 'release (--dry-run, rien n\'est écrit)' : 'release'} : ${p.current} → ${p.version}`);
@@ -360,18 +388,7 @@ export function release(rest: string[], dryRun: boolean, root: string, today: Da
     removeFragments(root, p.removes);
   }
 
-  let ready = true;
-  if (hasWhatsNew) {
-    const issues = whatsNewIssues(readFileSync(whatsNewPath, 'utf8'), p.version);
-    if (issues.length === 0) out(`  ${WHATS_NEW} : les deux formes de ${p.version} sont là`);
-    else {
-      ready = false;
-      for (const i of issues) out(`  ${i}`);
-      out(dryRun
-        ? '  le commit de version ne serait pas prêt : écrire ou déplacer ces formes (à la main ou par une session) avant de lancer la commande'
-        : '  le commit de version n\'est pas prêt : écrire ces formes (à la main ou par une session), puis suivre les étapes ci-dessous sans relancer la commande (elle changerait encore la version)');
-    }
-  }
+  const ready = wn.draft ? whatsNewReport(join(root, WHATS_NEW), wn.draft, p.version, dryRun, out) : true;
 
   out('étapes du lead, dans l\'ordre (la commande n\'en joue aucune ; chacune se lit par son code de sortie : jamais de pipe (`| tail`, `| grep`) derrière une commande dont le code de sortie compte, il lui substitue celui du filtre) :');
   for (const s of steps(p, files, branch)) out(s);

@@ -11,8 +11,8 @@ Between the version commit and the gate it also prints a **provisional local tag
    `CHANGELOG.md` (`## [x.y.z] - date`, what changes for the user, lots cited; for cadence, the fragments of `changelog.d/`
    gathered, see [CHANGELOG fragments](#changelog-fragments)), in **one commit that holds
    only those files** (the version fields and the CHANGELOG, nothing else in the manifests, the fragments of `changelog.d/` removed — never edited
-   or added, and never its `README.md` —, `docs/whats-new.md`: add the version to its « In two lines » list and its
-   long form (the README no longer carries a « What's new » section, L326)). Such a commit is
+   or added, and never its `README.md` —, `docs/whats-new.md`: the version in its « In two lines » list and its
+   long form, which `cadence release` writes when they are missing, L753 (the README no longer carries a « What's new » section, L326)). Such a commit is
    exempt from the code-review gate like a plan commit: it closes the lot after its review, and `raf check`
    does not ask for a new one (nor does it count it as a commit without a lot). The « What's new »
    summary (`docs/whats-new.md`) is ordered by version, a number known only at the release and shared by several lots: write it
@@ -72,7 +72,7 @@ step 6.
 
 ```sh
 cadence release minor --dry-run   # says what it would write and prints the steps; writes nothing
-cadence release minor             # writes the version files, checks docs/whats-new.md, prints the steps
+cadence release minor             # writes the version files and the missing forms of docs/whats-new.md, prints the steps
 ```
 
 It computes the next `x.y.z` from `package.json` and writes it, **only the version fields**, in `package.json`,
@@ -178,7 +178,7 @@ It refuses, with exit code 2 and nothing written:
   `raf check` on a toy plan (`scripts/fumee/raf-check.sh`): replayed on `v2.0.1`, it refuses (`cadence run --help` started a run, and the light
   run fails on `ENOENT … bras-A.md`); on `v2.0.2` it passes, in about 10 s.
 
-Write the two forms of the new version in `docs/whats-new.md` **before** running the command: the file may be modified (it is the one tracked file allowed to be, since the version commit holds it) and the command then reads the forms it finds. Run after the forms are written, it exits 0; if it exits 1 the version files are already written, so fix `docs/whats-new.md` by hand and do not run the command again (it would bump once more).
+The two forms of the new version in `docs/whats-new.md` are **written by the command when they are missing** (L753), from the entries of the version's section (the fragments of `changelog.d/` gathered, plus what `[Unreleased]` still held): see [the two forms of whats-new](#the-two-forms-of-whats-new) below. To write them yourself instead, write them **before** running the command: the file may be modified (it is the one tracked file allowed to be, since the version commit holds it) and the command keeps the forms it finds. If it exits 1 the version files are already written, so fix `docs/whats-new.md` by hand and do not run the command again (it would bump once more).
 
 The check reads the whole « In two lines » list, as `test/readme-accueil.test.ts` (R5) does at the gate, and not only the line of the new version (L418): a bullet of any other version over 240 characters, or a long paragraph (`**x.y.z**: …`, no leading `- `) that fell among the short lines, is a finding too (exit 1). That is the 1.22.0 publication of 28-10, stopped by that very test after a long form had been committed in the list; the command now says it before the version commit and the tag.
 
@@ -186,11 +186,30 @@ The steps it prints are read by their exit code, never through a pipe: a `| tail
 
 After the steps, when a lot named in the version's section (the `[Unreleased]` body that becomes `## [x.y.z]`, matched on the whole lot id, so `L52` is not `L526`) cites a GitHub issue in its title or notes as `issue #n` (L548), the command prints `issues à fermer, une fois la publication vérifiée` and, for each issue, `gh issue close n --comment "Réglée par L526, publiée en x.y.z"` (one command per issue, naming every lot of the version that cites it). Nothing is closed by the command (it does not even call `gh`): the lead runs them once the publication is checked. `--dry-run` prints them too. No plan, or no lot citing an issue: nothing is printed. `cadence lead tour` lists the issues that stay open although their lot is published ([lead tour](lead.md#lead-tour)).
 
-`docs/whats-new.md` is **not written by the command** (the two forms are prose, written by hand or by a session): it checks that
-both are there and in their place, and says where to write what is missing. The « In two lines » line of the version is the
+### The two forms of whats-new
+
+`docs/whats-new.md` carries each version twice. Before L753 the command only checked them and stopped (exit 1) when they were
+missing: on 16-11 that happened at 2.0.11 and again at 2.0.12, and each time an agent was started just to write them. Now, for each
+form of the version found **nowhere** in the file, the command writes it from the entries of the version's section, in order
+(`Added`, `Changed`, …, the most recent lot first), and prints `écrit : docs/whats-new.md (… de x.y.z, tirés des entrées de [x.y.z] ; à relire …)`:
+
+- the « In two lines » line, first of the list: `- **x.y.z**: ` then the head of each entry (its first clause, cut before ` (`, `; `, `. ` or ` — `
+  outside code, links, parentheses and « … »), joined by `; `; a head that would take the line over 240 characters is skipped and the next ones
+  tried, and a first head too long alone is cut at a comma or a space outside code, ending with `…`;
+- the long paragraph, right after the introduction of « Version by version »: `**x.y.z**: ` then every entry, whole, on one line.
+
+Links written from the repository's root (`docs/releasing.md`, `CHANGELOG.md`) are rewritten for `docs/` (`releasing.md`, `../CHANGELOG.md`).
+The text is the fragments' text: read it and rewrite it by hand before the version commit when the prose deserves it (the file stays
+modified, the version commit holds it). A form already in the file, even misplaced or in the other section, is never rewritten nor doubled:
+the check below reports it as before. `--dry-run` says `écrirait` and writes nothing. The fresh-clone replay of the publication CI (L698)
+plays the version commit with the forms the command writes.
+
+The check then reads both forms. The « In two lines » line of the version is the
 first of the list and at most 240 characters; the long paragraph is the first of « Version by version », right after its
-introduction (the newest version first, as the file is read). Exit code 1 when a form is missing, misplaced or too long: the
+introduction (the newest version first, as the file is read). Exit code 1 when a form is still missing (no section to write it in, no entry to draw it from), misplaced or too long: the
 version files are written, the commit is not ready. `--dry-run` reads the forms the same way (nothing is written) and exits 1 on the same findings, so the forms can be checked before the real run.
+
+### The lead's steps
 
 It prints the lead's steps, in order, and runs none: the `git add` of exactly the files of the version commit and the commit,
 the provisional tag `git tag v<x.y.z>` (L508: made before the gate, removed by `git tag -d` when the gate or the evaluation is red),

@@ -138,7 +138,7 @@ describe('cadence release — les versions', () => {
   it('R1 — patch, minor et major calculent la version suivante de package.json', () => {
     for (const [kind, next] of [['patch', '1.2.4'], ['minor', '1.3.0'], ['major', '2.0.0']] as const) {
       const dir = project();
-      expect(release(dir, kind).code, kind).toBe(1); // whats-new manque, les fichiers sont écrits
+      expect(release(dir, kind).code, kind).toBe(0); // whats-new : les deux formes absentes sont écrites par la commande (L753)
       expect(json(dir, 'package.json').version).toBe(next);
     }
   });
@@ -336,14 +336,14 @@ describe('cadence release — rien n’est publié', () => {
 });
 
 describe('cadence release — docs/whats-new.md', () => {
-  it('R10 — les deux formes absentes : la commande dit où les écrire et sort en 1 (les fichiers de version sont écrits)', () => {
+  it('R10 (L753) — les deux formes absentes : la commande les écrit depuis la section de version, à leur place, et sort en 0', () => {
     const dir = project();
     const r = release(dir, 'patch');
-    expect(r.code).toBe(1);
-    expect(r.out).toMatch(/docs\/whats-new\.md.*ligne de « In two lines » manquante/);
-    expect(r.out).toMatch(/docs\/whats-new\.md.*paragraphe long manquant/);
-    expect(r.out).toMatch(/en tête de la liste/);
-    expect(r.out).toMatch(/juste après l’introduction/);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/écrit : docs\/whats-new\.md \(ligne de « In two lines » et paragraphe long de 1\.2\.4/);
+    expect(r.out).toMatch(/docs\/whats-new\.md : les deux formes de 1\.2\.4 sont là/);
+    expect(read(dir, 'docs/whats-new.md')).toContain('## In two lines\n\n- **1.2.4**: A new thing.\n- **1.2.3**: the old release.');
+    expect(read(dir, 'docs/whats-new.md')).toContain('Intro of the long form.\n\n**1.2.4**: A new thing (L7).\n\n**1.2.3**:');
     expect(json(dir, 'package.json').version).toBe('1.2.4');
   });
 
@@ -463,9 +463,11 @@ describe('cadence release — docs/whats-new.md', () => {
     expect(bad.out).toMatch(/paragraphe long/);
     expect(json(dir, 'package.json').version).toBe('1.2.3');
 
-    const none = release(project(), 'patch', '--dry-run');
-    expect(none.code).toBe(1);
-    expect(none.out).toMatch(/ligne de « In two lines » manquante/);
+    const vierge = project();
+    const none = release(vierge, 'patch', '--dry-run');
+    expect(none.code).toBe(0); // L753 : les formes absentes seraient écrites par la commande
+    expect(none.out).toMatch(/écrirait : docs\/whats-new\.md \(ligne de « In two lines » et paragraphe long/);
+    expect(read(vierge, 'docs/whats-new.md')).not.toContain('1.2.4');
   });
 });
 

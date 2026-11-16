@@ -142,6 +142,18 @@ describe('cadence release — la CI de publication rejouée dans un clone neuf d
     expect(r.out).not.toMatch(/git clone/);
   }, 180_000);
 
+  it('L753 : les formes de whats-new écrites par la commande sont celles que voit le clone de la CI, et celles écrites dans l’arbre du lead', () => {
+    const dir = paquet({ whatsNew: WHATS_NEW_SANS });
+    const lire = trace();
+    const r = release(dir, 'patch');
+    expect(r.err).toBe('');
+    expect(r.code).toBe(0);
+    const t = lire();
+    expect(t.whatsNew).toContain('- **1.0.1**: A thing.\n- **1.0.0**: old.');
+    expect(t.whatsNew).toContain('Intro.\n\n**1.0.1**: A thing (L7).\n\n**1.0.0**: old long.');
+    expect(readFileSync(join(dir, 'docs/whats-new.md'), 'utf8')).toBe(t.whatsNew);
+  }, 180_000);
+
   it('rouge : une étape qui échoue refuse la release avec le fichier, l’étape, la commande et sa sortie ; rien n’est écrit, le clone est retiré', () => {
     const lire = trace();
     const dir = paquet({ test: 'node trace.cjs; echo "cassé dans la CI"; exit 3' });

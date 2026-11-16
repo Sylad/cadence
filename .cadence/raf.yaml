@@ -3678,10 +3678,12 @@ lots:
     created: 2026-11-16
   - id: L748
     title: "escalade Fable (L726) manquée : une revue non conforme écrite en attente (plan-en-attente.yaml, main tenue par un autre run) n'est pas vue au lancement du run de correction, donc deux revues non conformes ne comptent que pour une — vécu 16-11 sur L745 (3e passe jouée par Opus)"
-    status: doing
+    status: done
     estimate: 0.25
     created: 2026-11-16
     started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "conforme (passe 2) : revues en attente comptées pour l'escalade Fable, argv en attente lu avec la table d'options de raf, revue conforme en attente remet le compte, tests rouges sur 19dc2d21, rebase sans perte ; porte verte rejouée par le lead à 253f96b1", commit: 253f96b1bfce69353b00bdea39dbcc41a27ecf79 }
+    finished: 2026-11-16
   - id: L749
     title: "cadence run : l'intégration normale retire son worktree avec --force ; un commit fait dans un sous-module du worktree et non poussé y est perdu (limite relevée par L745, 16-11)"
     status: todo
@@ -3734,14 +3736,19 @@ lots:
     finished: 2026-11-16
   - id: L756
     title: "Veille #61 : chaque mesure du banc et chaque run notent l'identifiant exact du modèle (claude-fable-5-2, pas « fable ») — depuis 2.1.321 (09-11) l'alias fable a changé sous nos pieds ; mesure : 100 % des rapports de banc portent l'id exact"
-    status: todo
+    status: done
     estimate: 0.25
     created: 2026-11-16
+    started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "conforme (passe 2) : id exact du modèle réellement utilisé dans chaque run et mesure du banc, juge séparé des auxiliaires, répétition interrompue avec modeles_exacts, tests rouges avant ; porte verte rejouée par le lead à e4ff4f95 ; non vérifié : vrai claude -p des juges", commit: e4ff4f95fbd9923fabd5e0911d4fd7918c6a217b }
+    finished: 2026-11-16
   - id: L757
     title: "D-4 (article sous-agents et quota, 15-11) : aucun des 11 agents du plugin ne déclare de model, tous héritent du modèle de la session (Opus) — donner un model explicite aux agents mécaniques (livreur, precheck-reader) et mesurer avant de toucher aux juges (code-reviewer reste Opus) ; mesure : jetons Opus par livraison avant/après sur 5 livraisons, 0 livraison ratée de plus"
-    status: todo
+    status: doing
     estimate: 0.5
     created: 2026-11-16
+    started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "non conforme : 1 bloquant — scripts/jetons-agents.mjs:57-67 lit la réponse dans le dernier bloc de texte alors que les sous-agents rendent par SubagentHandback.input.message : 18/18 livraisons réelles classées RATÉE (14 ok / 4 ratées en vrai), critère « ratées après ≤ avant » toujours vrai", commit: 5b75b586d4b51434acb1906b973d94fd7c2cd7a4 }
   - id: L758
     title: "D-27 (1/2) : ablation au banc à chaque nouveau modèle (Fable 5.2, Opus 5.5…) — retirer UN composant de cadence run à la fois (lecture obligatoire des pièces, registre, correction après porte, escalade…) sur le banc figé et mesurer réussite, coût par lot réussi et durée ; un composant sans gain mesuré est retiré (idée de l'article « harness agentique », 12-11)"
     status: todo
@@ -3759,9 +3766,12 @@ lots:
     created: 2026-11-16
   - id: L761
     title: "release : un paragraphe **x.y.z**: en tête de « Version by version » n'est pas pris pour l'introduction — sans introduction, la commande écrit la nouvelle version sous l'ancienne et sort quand même en 0 (revue de L753, 16-11)"
-    status: todo
+    status: done
     estimate: 0.25
     created: 2026-11-16
+    started: 2026-11-16
+    review: { date: 2026-11-16, verdict: "conforme : nouvelle version toujours en tête, structure non reconnue → code 1 sans écrire, tests rouges sur 3861ca9d ; porte verte rejouée par le lead ; note : un paragraphe non-version sous la version qui sort (version en deux paragraphes, liste) serait signalé « mal placé » à tort (src/release.ts, if (longAt >= 0)), absent du whats-new actuel", commit: c99646a75551b16d91e63014ab5c527ff94369d8 }
+    finished: 2026-11-16
 acknowledged:
   - { sha: eb82232e00456d002cd5186330ec83b8535f30cb, subject: "chore: 0.12.0 — plugin cadence-hud, raf ignore, avertissement titre public, revue à la taille du lot, precheck du livrable, orchestrate.ux qui lance l'app, README exigé à jour par les briefs ; CHANGELOG et What's new", date: 2026-10-08, reason: "publication 0.12.0 (bump de version, CHANGELOG, What's new)" }
   - { sha: c264534c28e5c8fd81d49e799584c3f33d353a5c, subject: "chore: 0.13.0 — orchestrate --status --watch et suivi de vague dans le skill lead, ids de lot avec /, cadence-hud en cellules et ASCII, actions v5 ; CHANGELOG et What's new", date: 2026-10-08 }

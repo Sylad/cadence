@@ -88,4 +88,32 @@ describe('L757 — scripts/jetons-agents.mjs, la mesure par livraison', () => {
     expect(reponseDe(reponse('a', 'm', U, [{ type: 'text', text: '  \nL84 poussé 3d6edf4 avec le commit du plan 9a1b2c3\nsuite' }]))).toBe('L84 poussé 3d6edf4 avec le commit du plan 9a1b2c3');
     expect([estRatee('L84 livré 3d6edf4'), estRatee('Question : x'), estRatee('')]).toEqual([false, true, true]);
   });
+
+  // Revue L757 r1 : sur les journaux réels, le sous-agent rend sa réponse par l'outil SubagentHandback (tool_use, input.message),
+  // et le dernier bloc texte n'est qu'une phrase intermédiaire (ou rien) : 18/18 livraisons réelles étaient classées RATÉE.
+  const rendu = (id: string, message: string) => reponse(id, 'claude-sonnet-5-5', U, [{ type: 'tool_use', id: `h${id}`, name: 'SubagentHandback', input: { message } }]);
+
+  it('lit la réponse rendue dans SubagentHandback.input.message, le dernier texte seulement à défaut', () => {
+    const t = [user('Livre L84'), reponse('a', 'claude-sonnet-5-5', U, [{ type: 'text', text: 'Je pousse le sha puis je lance deliver.' }]),
+      rendu('b', '\nL84 livré 3d6edf4, QA à lancer http://x\ndétail')].join('\n');
+    expect(reponseDe(t)).toBe('L84 livré 3d6edf4, QA à lancer http://x');
+    expect(estRatee(reponseDe(t))).toBe(false);
+    const sansTexte = [user('Livre L85'), rendu('c', 'Question : la porte est rouge')].join('\n');
+    expect(reponseDe(sansTexte)).toBe('Question : la porte est rouge');
+    const texteApres = [rendu('d', 'L86 poussé 1234567'), reponse('e', 'claude-sonnet-5-5', U, [{ type: 'text', text: 'fin' }])].join('\n');
+    expect(reponseDe(texteApres)).toBe('L86 poussé 1234567');
+  });
+
+  it('deux appels au même prompt : chaque sous-agent est relié à son propre appel, dans l\'ordre', () => {
+    const p = tempDir(), d = join(p, '-home-x-projet'), sous = join(d, 's', 'subagents');
+    mkdirSync(sous, { recursive: true });
+    writeFileSync(join(d, 's.jsonl'), [appelAgent(1, 'cadence:livreur', 'Livre L84'), appelAgent(30, 'cadence:livreur', 'Livre L84')].join('\n'));
+    const premier = (m: number) => JSON.stringify({ type: 'user', timestamp: ts(m), message: { role: 'user', content: 'Livre L84' } });
+    // noms de fichiers dans l'ordre inverse des dates : seule la date du premier message range les sous-agents
+    writeFileSync(join(sous, 'agent-a.jsonl'), [premier(31), rendu('y', 'L84 livré 2222222')].join('\n'));
+    writeFileSync(join(sous, 'agent-z.jsonl'), [premier(2), rendu('x', 'Question : la porte est rouge')].join('\n'));
+    const appels = collecter(p, 'livreur');
+    expect(appels.map((a) => [a.date, a.reponse])).toEqual([[ts(1), 'Question : la porte est rouge'], [ts(30), 'L84 livré 2222222']]);
+    expect(main(['--projects', p, '--since', ts(10)])).toMatch(/1 appel\(s\), .* ; ratées 0$/);
+  });
 });

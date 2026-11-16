@@ -4,7 +4,7 @@
 // Sources : transcript principal `<projects>/<dossier>/<session>.jsonl` (appel Agent ou Task : subagent_type, prompt) et transcripts de
 // ses sous-agents `<projects>/<dossier>/<session>/subagents/*.jsonl` (lignes assistant : message.model, message.usage). Un sous-agent est
 // relié à son appel par son premier message utilisateur, qui est le prompt de l'appel. Une réponse en plusieurs blocs répète la même
-// usage sous le même message.id : elle compte une fois. Mesure du lot : jetons Opus par livraison avant/après (docs/mesures/modele-agents-l757.md).
+// usage sous le même message.id : elle compte une fois. La réponse rendue est le message de l'outil SubagentHandback (à défaut, le dernier texte). Mesure du lot : jetons Opus par livraison avant/après (docs/mesures/modele-agents-l757.md).
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -56,14 +56,21 @@ export function promptDe(texte) {
   return null;
 }
 
-/** Première ligne non vide du dernier texte de l'assistant : la réponse rendue (« L84 livré … », « Question : … »). */
+/** Message rendu par l'outil SubagentHandback dans un contenu d'assistant (le dernier s'il y en a plusieurs), sinon null. */
+const renduDe = (contenu) => (Array.isArray(contenu) ? contenu.filter((b) => b?.type === 'tool_use' && b.name === 'SubagentHandback'
+  && typeof b.input?.message === 'string').map((b) => b.input.message).at(-1) ?? null : null);
+
+/** Première ligne non vide de la réponse rendue (« L84 livré … », « Question : … ») : le message de l'outil SubagentHandback, forme
+ * réelle des journaux (revue L757 r1), et seulement à défaut le dernier texte de l'assistant. */
 export function reponseDe(texte) {
-  let derniere = '';
+  let rendu = null, derniere = '';
   for (const e of lignesJson(texte)) {
-    const t = e.type === 'assistant' ? texteDe(e.message?.content).trim() : '';
+    if (e.type !== 'assistant') continue;
+    const r = renduDe(e.message?.content), t = texteDe(e.message?.content).trim();
+    if (r !== null) rendu = r;
     if (t) derniere = t;
   }
-  return derniere.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+  return (rendu ?? derniere).split('\n').map((l) => l.trim()).find(Boolean) ?? '';
 }
 
 /** Une livraison ratée : une question rendue au lead, ou aucune ligne « livré » / « poussé ». */
@@ -80,16 +87,23 @@ function mesure(session, appel, texte) {
   return { session, date: appel.date, modeles: par, opus: opusDe(par), total: Object.values(par).reduce((n, v) => n + v, 0), reponse, ratee: estRatee(reponse) };
 }
 
-/** Appels de l'agent dans une session : chaque sous-agent de `<session>/subagents/` relié à son appel par le prompt. */
+/** Date du premier message d'un transcript de sous-agent (null sans horodatage). */
+const debutDe = (texte) => lignesJson(texte).find((e) => e.timestamp)?.timestamp ?? null;
+
+/** Appels de l'agent dans une session : chaque sous-agent de `<session>/subagents/` relié à son appel par le prompt. Les sous-agents
+ * sont pris dans l'ordre de leur premier message et chaque appel ne sert qu'une fois : deux appels au même prompt (relance après une
+ * question) gardent chacun leur date. */
 function appelsDeSession(dossier, fichier, agent) {
   const session = fichier.slice(0, -6), sous = join(dossier, session, 'subagents');
   const appels = existsSync(sous) ? appelsAgent(readFileSync(join(dossier, fichier), 'utf8')).filter((a) => nomCourt(a.type) === agent) : [];
   if (!appels.length) return [];
-  return jsonls(sous).flatMap((s) => {
-    const texte = readFileSync(join(sous, s), 'utf8'), prompt = promptDe(texte)?.trim();
-    const appel = appels.find((a) => a.prompt.trim() === prompt);
-    return appel ? [mesure(session, appel, texte)] : [];
-  });
+  const libres = [...appels];
+  return jsonls(sous).map((s) => { const texte = readFileSync(join(sous, s), 'utf8'); return { texte, debut: debutDe(texte) }; })
+    .sort((a, b) => String(a.debut ?? '').localeCompare(String(b.debut ?? '')))
+    .flatMap(({ texte }) => {
+      const prompt = promptDe(texte)?.trim(), i = libres.findIndex((a) => a.prompt.trim() === prompt);
+      return i >= 0 ? [mesure(session, libres.splice(i, 1)[0], texte)] : [];
+    });
 }
 
 /** Appels de l'agent `agent` (nom court) dans les sessions de `projects`, du plus ancien au plus récent. */

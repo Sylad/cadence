@@ -25,12 +25,18 @@ elle compte une fois. Jetons = entrée + écriture de cache + lecture de cache +
 ```sh
 node scripts/jetons-agents.mjs --until 2026-11-17 --dernieres 5     # avant : les 5 dernières livraisons sur Opus
 node scripts/jetons-agents.mjs --since 2026-11-17 --dernieres 5     # après : les 5 dernières livraisons depuis la publication du lot
-node scripts/jetons-agents.mjs --agent precheck-reader              # un autre agent ; --json pour le détail par modèle
+node scripts/jetons-agents.mjs --agent code-reviewer                # un autre agent appelé par l'outil Agent ; --json pour le détail
 ```
+
+`precheck-reader` ne se mesure pas ainsi : `cadence orchestrate` le lance en agent principal (`--agent`), jamais par l'outil Agent, et
+la commande rend toujours « aucun appel trouvé ». La colonne `ok`/`RATÉE` ne vaut que pour le livreur (elle cherche « livré »/« poussé »).
 
 Une ligne par livraison (date, jetons Opus, total, modèles, `ok` ou `RATÉE`, réponse rendue), puis
 `livreur : 5 appel(s), jetons Opus médiane N, total T ; ratées k`. Une livraison est ratée quand le livreur rend une `Question` ou
-aucune ligne « livré » / « poussé ». Remplacer `2026-11-17` par la date où le plugin publié porte ce lot.
+aucune ligne « livré » / « poussé ». La réponse lue est le `message` de l'outil `SubagentHandback`, par lequel le sous-agent
+rend sa réponse, et seulement à défaut son dernier texte (revue r1 : lu dans le texte, 18 livraisons réelles sur 18 sortaient
+`RATÉE` ; lues dans `SubagentHandback`, 14 ok et 4 ratées). Deux appels au même prompt sont reliés chacun au sien, dans l'ordre.
+Remplacer `2026-11-17` par la date où le plugin publié porte ce lot.
 
 Lecture : réussite si la médiane « après » est 0 jeton Opus (le livreur ne tourne plus sur Opus) et si le nombre de ratées « après »
 ne dépasse pas celui d'« avant ». Une question légitime (porte rouge, sha déjà poussé) compte comme ratée des deux côtés : on compare

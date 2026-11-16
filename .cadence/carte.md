@@ -73,6 +73,7 @@
 
 - Décision : `livreur` et `precheck-reader` déclarent `model: sonnet` ; les 9 autres agents (juges compris) n'en déclarent aucun et héritent du modèle de la session. Test : test/modele-agents-l757.test.ts (liste exacte, recopie par `cadence skills install`, `readAgents` ne passe pas `model` à `--agents` : dans une vague le `--model` de l'étape décide).
 - Workflow de mesure : `node scripts/jetons-agents.mjs [--agent livreur] [--since|--until ISO] [--dernieres 5] [--json]` relie chaque sous-agent (`<session>/subagents/*.jsonl`) à son appel Agent par le prompt, compte les jetons par modèle (message.id une fois) et marque `RATÉE` une réponse « Question » ou sans « livré »/« poussé ». Lecture et critère : docs/mesures/modele-agents-l757.md.
+- Revue L757 r1 : la réponse lue est `SubagentHandback.input.message` (forme réelle des journaux), le dernier texte seulement à défaut ; réels : 14 ok / 4 ratées sur 18 (avant : 18 RATÉE). Les sous-agents d'une session sont pris dans l'ordre de leur premier horodatage et chaque appel ne sert qu'une fois (deux prompts identiques gardent chacun leur date). `precheck-reader` n'est pas mesurable par ce script (lancé par orchestrate en `--agent`, jamais par l'outil Agent) : exemple retiré de la doc, remplacé par `--agent code-reviewer` ; la colonne ok/RATÉE ne vaut que pour le livreur.
 
 ## Banc : id exact du modèle, juges et répétitions interrompues (L756, revue)
 
